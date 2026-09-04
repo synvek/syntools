@@ -1,0 +1,2 @@
+# SPA fallback：深链 /tools/:id 直接访问时回退到 index.html，由前端路由接管
+/* /index.html 200

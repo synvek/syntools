@@ -1,0 +1,13 @@
+# Cloudflare Pages / Netlify 自定义响应头（随构建产物发布）
+# 安全策略见技术设计 §10.1：零数据外发、无第三方脚本
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# 带哈希的静态资源可长期强缓存
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

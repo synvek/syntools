@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    name: lint + typecheck + test + build + e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 读取 package.json 的 packageManager 字段安装对应 pnpm
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 代码检查（ESLint）
+        run: pnpm lint
+
+      - name: 类型检查
+        run: pnpm typecheck
+
+      - name: 单元测试（含覆盖率）
+        run: pnpm test -- --coverage
+
+      - name: 构建
+        run: pnpm build
+
+      - name: 产物体积预算检查
+        run: pnpm size
+
+      - name: 安装 Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: E2E 冒烟测试
+        run: pnpm e2e
+
+      - name: 上传 Playwright 报告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: 上传体积报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: size-report
+          path: dist/size-report.md
+          retention-days: 30

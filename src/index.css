@@ -1,0 +1,279 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Markdown 预览排版（T41）：外部 CSS 以符合严格 CSP（禁内联 style 标签） */
+.markdown-body {
+  @apply text-sm leading-6 text-gray-800 dark:text-gray-100;
+  word-wrap: break-word;
+}
+.markdown-body > *:first-child {
+  margin-top: 0;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  @apply mb-2 mt-5 font-semibold leading-tight;
+}
+.markdown-body h1 {
+  @apply border-b border-gray-200 pb-1 text-xl dark:border-gray-700;
+}
+.markdown-body h2 {
+  @apply border-b border-gray-200 pb-1 text-lg dark:border-gray-700;
+}
+.markdown-body h3 {
+  @apply text-base;
+}
+.markdown-body p {
+  @apply my-2;
+}
+.markdown-body a {
+  @apply text-blue-600 underline dark:text-blue-400;
+}
+.markdown-body ul,
+.markdown-body ol {
+  @apply my-2 pl-6;
+}
+.markdown-body ul {
+  list-style: disc;
+}
+.markdown-body ol {
+  list-style: decimal;
+}
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin: 0;
+}
+.markdown-body blockquote {
+  @apply my-2 border-l-4 border-gray-300 py-0.5 pl-3 text-gray-600 dark:border-gray-600 dark:text-gray-300;
+}
+.markdown-body code {
+  @apply rounded bg-gray-100 px-1 py-0.5 font-mono text-[0.85em] dark:bg-gray-800;
+}
+.markdown-body pre {
+  @apply my-2 overflow-x-auto rounded-md bg-gray-100 p-3 dark:bg-gray-800;
+}
+.markdown-body pre code {
+  @apply bg-transparent p-0;
+}
+.markdown-body table {
+  @apply my-2 w-full border-collapse text-left;
+}
+.markdown-body th,
+.markdown-body td {
+  @apply border border-gray-300 px-2 py-1 dark:border-gray-600;
+}
+.markdown-body th {
+  @apply bg-gray-50 font-semibold dark:bg-gray-800;
+}
+.markdown-body img {
+  max-width: 100%;
+  @apply rounded;
+}
+.markdown-body hr {
+  @apply my-4 border-gray-300 dark:border-gray-600;
+}
+.markdown-body del {
+  @apply text-gray-400 dark:text-gray-500;
+}
+
+/* Markdown → 图片导出卡片：不受 dark 主题影响，颜色由内联 style 控制 */
+.md-to-image-card {
+  word-wrap: break-word;
+  text-align: left;
+}
+.md-to-image-card > *:first-child {
+  margin-top: 0;
+}
+.md-to-image-card > *:last-child {
+  margin-bottom: 0;
+}
+.md-to-image-card h1,
+.md-to-image-card h2,
+.md-to-image-card h3,
+.md-to-image-card h4 {
+  margin: 1.1em 0 0.45em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.md-to-image-card h1 {
+  font-size: 1.75em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+.md-to-image-card h2 {
+  font-size: 1.4em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+}
+.md-to-image-card h3 {
+  font-size: 1.2em;
+}
+.md-to-image-card h4 {
+  font-size: 1.05em;
+}
+.md-to-image-card p {
+  margin: 0.65em 0;
+}
+.md-to-image-card a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+.md-to-image-card ul,
+.md-to-image-card ol {
+  margin: 0.65em 0;
+  padding-left: 1.5em;
+}
+.md-to-image-card ul {
+  list-style: disc;
+}
+.md-to-image-card ol {
+  list-style: decimal;
+}
+.md-to-image-card li > ul,
+.md-to-image-card li > ol {
+  margin: 0.2em 0;
+}
+.md-to-image-card blockquote {
+  margin: 0.75em 0;
+  padding: 0.15em 0 0.15em 0.9em;
+  border-left: 4px solid color-mix(in srgb, currentColor 28%, transparent);
+  opacity: 0.88;
+}
+.md-to-image-card code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: 0.25em;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.md-to-image-card pre {
+  margin: 0.75em 0;
+  padding: 0.85em 1em;
+  overflow-x: auto;
+  border-radius: 0.4em;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.md-to-image-card pre code {
+  padding: 0;
+  background: transparent;
+}
+.md-to-image-card table {
+  width: 100%;
+  margin: 0.75em 0;
+  border-collapse: collapse;
+}
+.md-to-image-card th,
+.md-to-image-card td {
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  padding: 0.35em 0.55em;
+}
+.md-to-image-card th {
+  font-weight: 600;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.md-to-image-card img {
+  max-width: 100%;
+  border-radius: 0.35em;
+}
+.md-to-image-card hr {
+  margin: 1.2em 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
+.md-to-image-card del {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+/* Markdown 语法高亮编辑器（CodeJar + Prism） */
+.md-editor .md-editor-surface {
+  @apply min-h-[320px] whitespace-pre-wrap break-words bg-transparent;
+  tab-size: 2;
+}
+.md-editor .md-editor-surface:empty::before {
+  content: '';
+}
+.md-editor .token.title {
+  @apply font-semibold text-blue-700 dark:text-blue-300;
+}
+.md-editor .token.bold {
+  font-weight: 700;
+  @apply text-gray-900 dark:text-white;
+}
+.md-editor .token.italic {
+  font-style: italic;
+  @apply text-violet-700 dark:text-violet-300;
+}
+.md-editor .token.strike {
+  text-decoration: line-through;
+  @apply text-gray-400 dark:text-gray-500;
+}
+.md-editor .token.code,
+.md-editor .token.code-snippet {
+  @apply text-rose-700 dark:text-rose-300;
+}
+.md-editor .token.url,
+.md-editor .token.url-link {
+  @apply text-sky-700 dark:text-sky-300;
+}
+.md-editor .token.list,
+.md-editor .token.list.punctuation {
+  @apply text-amber-700 dark:text-amber-300;
+}
+.md-editor .token.hr {
+  @apply text-gray-400;
+}
+.md-editor .token.blockquote {
+  @apply text-emerald-700 dark:text-emerald-300;
+}
+.md-editor .token.punctuation {
+  @apply text-gray-500 dark:text-gray-400;
+}
+.md-editor .token.coord {
+  @apply text-gray-400;
+}
+
+/* 代码生成图片卡片内 Prism 高亮 */
+.code-image-card .token.comment,
+.code-image-card .token.prolog,
+.code-image-card .token.doctype {
+  opacity: 0.55;
+}
+.code-image-card[data-theme='dark'] .token.string,
+.code-image-card[data-theme='dark'] .token.attr-value {
+  color: #86efac;
+}
+.code-image-card[data-theme='dark'] .token.keyword,
+.code-image-card[data-theme='dark'] .token.boolean {
+  color: #c4b5fd;
+}
+.code-image-card[data-theme='dark'] .token.function {
+  color: #93c5fd;
+}
+.code-image-card[data-theme='dark'] .token.number {
+  color: #fcd34d;
+}
+.code-image-card[data-theme='dark'] .token.operator,
+.code-image-card[data-theme='dark'] .token.punctuation {
+  color: #94a3b8;
+}
+.code-image-card[data-theme='light'] .token.string,
+.code-image-card[data-theme='light'] .token.attr-value {
+  color: #15803d;
+}
+.code-image-card[data-theme='light'] .token.keyword,
+.code-image-card[data-theme='light'] .token.boolean {
+  color: #6d28d9;
+}
+.code-image-card[data-theme='light'] .token.function {
+  color: #1d4ed8;
+}
+.code-image-card[data-theme='light'] .token.number {
+  color: #b45309;
+}
+.code-image-card[data-theme='light'] .token.operator,
+.code-image-card[data-theme='light'] .token.punctuation {
+  color: #64748b;
+}
