@@ -9,8 +9,9 @@ export async function rotatePdfPages(
   selection: string,
   angle: RotateAngle,
   allPages: boolean,
+  password?: string,
 ): Promise<ToolResult<Uint8Array>> {
-  const loaded = await loadPdfFromFile(file);
+  const loaded = await loadPdfFromFile(file, { password });
   if (!loaded.ok) return loaded;
   let indices: number[] = [];
   if (!allPages) {

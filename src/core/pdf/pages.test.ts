@@ -81,6 +81,76 @@ describe('draw & security', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('requires password for encrypted PDFs', async () => {
+    const { loadPdfFromBytes } = await import('./load');
+    const bytes = await makeFixturePdf(1);
+    const enc = await encryptPdf(bytes, { userPassword: 'secret' });
+    expect(enc.ok).toBe(true);
+    if (!enc.ok) return;
+
+    const denied = await loadPdfFromBytes(enc.value);
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.error).toBe('NEED_PASSWORD');
+
+    const wrong = await loadPdfFromBytes(enc.value, { password: 'nope' });
+    expect(wrong.ok).toBe(false);
+    if (!wrong.ok) expect(wrong.error).toBe('WRONG_PASSWORD');
+
+    const ok = await loadPdfFromBytes(enc.value, { password: 'secret' });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.value.getPageCount()).toBe(1);
+  });
+
+  it('keeps page numbers upright on rotated pages', async () => {
+    const { degrees } = await import('@cantoo/pdf-lib');
+    const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+
+    for (const rot of [90, 180, 270] as const) {
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([200, 300]);
+      page.setRotation(degrees(rot));
+      const numbered = await addPageNumbers(doc, {
+        format: 'PAGE-MARK',
+        position: 'bottom-center',
+        fontSize: 12,
+        margin: 20,
+      });
+      expect(numbered.ok).toBe(true);
+      if (!numbered.ok) return;
+
+      const pdf = await getDocument({
+        data: numbered.value.slice(),
+        useSystemFonts: true,
+      }).promise;
+      try {
+        const pdfPage = await pdf.getPage(1);
+        const viewport = pdfPage.getViewport({ scale: 1 });
+        const content = await pdfPage.getTextContent();
+        const mark = content.items.find(
+          (item) => 'str' in item && String(item.str).includes('PAGE-MARK'),
+        ) as { str: string; transform: number[] } | undefined;
+        expect(mark, `missing mark at ${rot}`).toBeTruthy();
+        if (!mark) return;
+
+        const [a, b, , , e, f] = mark.transform;
+        const p0 = viewport.convertToViewportPoint(e, f);
+        const p1 = viewport.convertToViewportPoint(e + a, f + b);
+        const dx = p1[0] - p0[0];
+        const dy = p1[1] - p0[1];
+        // As displayed: text runs horizontally and sits near the visual bottom-center.
+        expect(Math.abs(dx), `not upright at ${rot}`).toBeGreaterThan(Math.abs(dy) * 2);
+        expect(p0[1], `not near bottom at ${rot}`).toBeGreaterThan(viewport.height * 0.6);
+        expect(p0[0], `not near centerX at ${rot}`).toBeGreaterThan(viewport.width * 0.15);
+        expect(p0[0], `not near centerX at ${rot}`).toBeLessThan(viewport.width * 0.85);
+      } finally {
+        await pdf.cleanup();
+      }
+    }
+  });
+
   it('sets metadata', async () => {
     const doc = await loadFixture(1);
     const r = await setPdfMetadata(doc, { title: 'T', author: 'A' });

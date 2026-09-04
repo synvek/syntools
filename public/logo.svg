@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="SynTools">
+  <title>SynTools</title>
+  <defs>
+    <linearGradient id="st-bg" x1="10" y1="2" x2="54" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App tile: matches in-app blue-600 family -->
+  <rect width="64" height="64" rx="14" fill="url(#st-bg)"/>
+  <rect
+    x="1.25"
+    y="1.25"
+    width="61.5"
+    height="61.5"
+    rx="12.75"
+    stroke="#fff"
+    stroke-opacity=".14"
+  />
+
+  <!--
+    SynTools mark
+    - Split S-curve = synthesis / sync
+    - Center lightning = speed / instant tools
+  -->
+  <path
+    d="M43 17c-6.5-4.8-19-4.2-19 6.2 0 3.2 1.8 5.4 5.2 7.2"
+    stroke="#fff"
+    stroke-width="5.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M42.5 35.2c4.2 2 6.5 4.8 6.5 9.2 0 9.8-13 13-21.8 8.2"
+    stroke="#fff"
+    stroke-width="5.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Lightning bolt (classic zigzag) -->
+  <path
+    fill="#fff"
+    d="M38 20.5 27 33.8h7.4L29.2 46l14-15.6h-7.6L38 20.5Z"
+  />
+</svg>

@@ -1,10 +1,20 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '@/core/components/FileDropZone';
+import { FilePreviewList } from '@/core/components/FilePreviewList';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
-import { PDF_MAX_BYTES, downloadBytes } from '@/core/pdf';
+import {
+  PDF_MAX_BYTES,
+  downloadBytes,
+  PdfPasswordField,
+  shouldShowPdfPassword,
+  pdfToolErrorMessage,
+  usePdfPassword,
+} from '@/core/pdf';
 import { PdfRunButton, PdfField, pdfInputClass } from '@/core/pdf/ui';
 import { addTextToPdf } from './core';
+
+const TOOL_ID = 'pdf-add-text';
 
 export default function PdfAddTextTool() {
   const { t } = useTranslation();
@@ -18,15 +28,47 @@ export default function PdfAddTextTool() {
   const [color, setColor] = useState('#111111');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const pdfPwd = usePdfPassword();
+
+  const clear = () => {
+    setFile(null);
+    setError(null);
+    setErrorCode(null);
+    pdfPwd.resetPassword();
+  };
+
+  const onFile = async (f: File) => {
+    setFile(f);
+    setError(null);
+    setErrorCode(null);
+    const probe = await pdfPwd.onPdfSelected(f);
+    if (!probe.ok && probe.error !== 'NEED_PASSWORD') {
+      setErrorCode(probe.error);
+      setError(pdfToolErrorMessage(t, TOOL_ID, probe.error));
+    }
+  };
 
   const run = async () => {
     if (!file) return;
     setBusy(true);
     setError(null);
-    const r = await addTextToPdf(file, { text, selection, allPages, x, y, fontSize, color });
+    setErrorCode(null);
+    const r = await addTextToPdf(file, {
+      text,
+      selection,
+      allPages,
+      x,
+      y,
+      fontSize,
+      color,
+      password: pdfPwd.password,
+    });
     setBusy(false);
     if (!r.ok) {
-      setError(t(`tools.pdf-add-text.errors.${r.error}`));
+      pdfPwd.notePdfError(r.error);
+      setErrorCode(r.error);
+      setError(pdfToolErrorMessage(t, TOOL_ID, r.error));
       return;
     }
     downloadBytes(r.value, 'with-text.pdf');
@@ -35,7 +77,11 @@ export default function PdfAddTextTool() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-gray-500 dark:text-gray-400">{t('tools.pdf-add-text.hint')}</p>
-      <FileDropZone accept=".pdf,application/pdf" maxBytes={PDF_MAX_BYTES} onFile={(f) => { setFile(f); setError(null); }} />
+      <FileDropZone accept=".pdf,application/pdf" maxBytes={PDF_MAX_BYTES} onFile={(f) => void onFile(f)} />
+      <FilePreviewList files={file ? [file] : []} onRemove={clear} />
+      {shouldShowPdfPassword(errorCode, pdfPwd.needsPassword) && (
+        <PdfPasswordField value={pdfPwd.password} onChange={pdfPwd.setPassword} error={errorCode} autoFocus />
+      )}
       <PdfField label={t('tools.pdf-add-text.text')}>
         <input className={pdfInputClass} value={text} onChange={(e) => setText(e.target.value)} />
       </PdfField>
@@ -58,8 +104,12 @@ export default function PdfAddTextTool() {
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <PdfRunButton label={busy ? t('common.loading') : t('tools.pdf-add-text.run')} disabled={!file || busy} onClick={() => void run()} />
-        <ClearButton onClick={() => { setFile(null); setError(null); }} disabled={!file} />
+        <PdfRunButton
+          label={busy ? t('common.loading') : t('tools.pdf-add-text.run')}
+          disabled={!file || busy || (pdfPwd.needsPassword && !pdfPwd.password)}
+          onClick={() => void run()}
+        />
+        <ClearButton onClick={clear} disabled={!file} />
       </div>
     </div>
   );

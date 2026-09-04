@@ -6,10 +6,10 @@ export type { HAlign };
 
 export async function applyHeaderFooter(
   file: File,
-  opts: { header: string; footer: string; align: HAlign; fontSize: number },
+  opts: { header: string; footer: string; align: HAlign; fontSize: number; password?: string },
 ): Promise<ToolResult<Uint8Array>> {
   if (!opts.header.trim() && !opts.footer.trim()) return { ok: false, error: 'EMPTY' };
-  const loaded = await loadPdfFromFile(file);
+  const loaded = await loadPdfFromFile(file, { password: opts.password });
   if (!loaded.ok) return loaded;
   return addHeaderFooter(loaded.value, opts);
 }

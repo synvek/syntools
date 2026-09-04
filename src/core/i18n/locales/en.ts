@@ -74,6 +74,19 @@ const en = {
     max: 'Max {{size}}',
     over: 'File exceeds the {{max}} limit (current {{size}})',
     uploadAria: 'Upload file',
+    previewAlt: 'Preview of {{name}}',
+    pages: '{{n}} pages',
+    encrypted: 'Encrypted',
+  },
+  pdf: {
+    password: 'PDF password',
+    passwordPlaceholder: 'Enter the open password',
+    passwordHint: 'This PDF is encrypted. Enter the password to continue.',
+    unlock: 'Unlock',
+    errors: {
+      NEED_PASSWORD: 'This PDF is encrypted. Please enter the password.',
+      WRONG_PASSWORD: 'Incorrect password. Please try again.',
+    },
   },
   tool: {
     errorTitle: 'Tool runtime error',

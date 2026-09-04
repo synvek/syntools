@@ -8,7 +8,9 @@ export type PdfError =
   | 'INVALID_RANGE'
   | 'TOO_LARGE'
   | 'ENCRYPT_FAILED'
-  | 'PROCESS_FAILED';
+  | 'PROCESS_FAILED'
+  | 'NEED_PASSWORD'
+  | 'WRONG_PASSWORD';
 
 /** 单文件建议上限 50MB */
 export const PDF_MAX_BYTES = 50 * 1024 * 1024;
@@ -23,4 +25,8 @@ export function isPdfFile(file: File): boolean {
 
 export function isImageFile(file: File): boolean {
   return file.type.startsWith('image/');
+}
+
+export function isPdfPasswordError(error: string): boolean {
+  return error === 'NEED_PASSWORD' || error === 'WRONG_PASSWORD';
 }

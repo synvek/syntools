@@ -3,8 +3,8 @@ import { loadPdfFromFile, reorderPages, isPdfFile, PDF_MAX_BYTES } from '@/core/
 
 export { isPdfFile, PDF_MAX_BYTES };
 
-export async function reorderPdfPages(file: File, order: number[]): Promise<ToolResult<Uint8Array>> {
-  const loaded = await loadPdfFromFile(file);
+export async function reorderPdfPages(file: File, order: number[], password?: string): Promise<ToolResult<Uint8Array>> {
+  const loaded = await loadPdfFromFile(file, { password });
   if (!loaded.ok) return loaded;
   return reorderPages(loaded.value, order);
 }

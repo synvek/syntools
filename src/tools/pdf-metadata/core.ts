@@ -24,8 +24,8 @@ export function readMeta(doc: PDFDocument): PdfMetaFields {
   };
 }
 
-export async function loadMeta(file: File): Promise<ToolResult<{ doc: PDFDocument; meta: PdfMetaFields; pageCount: number }>> {
-  const loaded = await loadPdfFromFile(file);
+export async function loadMeta(file: File, password?: string): Promise<ToolResult<{ doc: PDFDocument; meta: PdfMetaFields; pageCount: number }>> {
+  const loaded = await loadPdfFromFile(file, { password });
   if (!loaded.ok) return loaded;
   return {
     ok: true,

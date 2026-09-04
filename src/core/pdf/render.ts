@@ -1,4 +1,9 @@
-import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-dist';
+import {
+  GlobalWorkerOptions,
+  getDocument,
+  PasswordResponses,
+  type PDFDocumentProxy,
+} from 'pdfjs-dist';
 import type { ToolResult } from '@/core/types';
 
 let workerReady = false;
@@ -13,15 +18,35 @@ export function ensurePdfjsWorker() {
   workerReady = true;
 }
 
-export async function openPdfjsDoc(bytes: Uint8Array): Promise<ToolResult<PDFDocumentProxy>> {
+export type OpenPdfjsOptions = {
+  password?: string;
+};
+
+export async function openPdfjsDoc(
+  bytes: Uint8Array,
+  opts?: OpenPdfjsOptions,
+): Promise<ToolResult<PDFDocumentProxy>> {
   try {
     ensurePdfjsWorker();
     const data = bytes.slice();
-    const task = getDocument({ data, useSystemFonts: true });
+    const password = opts?.password?.trim() || undefined;
+    const task = getDocument({ data, useSystemFonts: true, password });
     const doc = await task.promise;
     if (doc.numPages < 1) return { ok: false, error: 'NO_PAGES' };
     return { ok: true, value: doc };
-  } catch {
+  } catch (err) {
+    const code = (err as { code?: number })?.code;
+    if (code === PasswordResponses.NEED_PASSWORD) return { ok: false, error: 'NEED_PASSWORD' };
+    if (code === PasswordResponses.INCORRECT_PASSWORD) {
+      return { ok: false, error: 'WRONG_PASSWORD' };
+    }
+    const msg = String((err as Error)?.message ?? err);
+    if (/password incorrect|incorrect password/i.test(msg)) {
+      return { ok: false, error: 'WRONG_PASSWORD' };
+    }
+    if (/no password|password required|need.?password|encrypted/i.test(msg)) {
+      return { ok: false, error: 'NEED_PASSWORD' };
+    }
     return { ok: false, error: 'LOAD_FAILED' };
   }
 }

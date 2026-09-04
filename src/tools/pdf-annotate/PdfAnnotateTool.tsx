@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '@/core/components/FileDropZone';
+import { FilePreviewList } from '@/core/components/FilePreviewList';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
-import { PDF_MAX_BYTES, downloadBytes } from '@/core/pdf';
+import {
+  PDF_MAX_BYTES,
+  downloadBytes,
+  PdfPasswordField,
+  shouldShowPdfPassword,
+  pdfToolErrorMessage,
+  usePdfPassword,
+} from '@/core/pdf';
 import { PdfRunButton, PdfField, pdfInputClass } from '@/core/pdf/ui';
 import { annotatePdfFile, type AnnotateDraft, type AnnotateKind } from './core';
 
+const TOOL_ID = 'pdf-annotate';
 const KINDS: AnnotateKind[] = ['highlight', 'line', 'rect'];
 
 export default function PdfAnnotateTool() {
@@ -21,6 +30,27 @@ export default function PdfAnnotateTool() {
   const [items, setItems] = useState<AnnotateDraft[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const pdfPwd = usePdfPassword();
+
+  const clear = () => {
+    setFile(null);
+    setItems([]);
+    setError(null);
+    setErrorCode(null);
+    pdfPwd.resetPassword();
+  };
+
+  const onFile = async (f: File) => {
+    setFile(f);
+    setError(null);
+    setErrorCode(null);
+    const probe = await pdfPwd.onPdfSelected(f);
+    if (!probe.ok && probe.error !== 'NEED_PASSWORD') {
+      setErrorCode(probe.error);
+      setError(pdfToolErrorMessage(t, TOOL_ID, probe.error));
+    }
+  };
 
   const add = () => {
     setItems((prev) => [...prev, { kind, page, x, y, width, height, color }]);
@@ -30,10 +60,13 @@ export default function PdfAnnotateTool() {
     if (!file) return;
     setBusy(true);
     setError(null);
-    const r = await annotatePdfFile(file, items);
+    setErrorCode(null);
+    const r = await annotatePdfFile(file, items, pdfPwd.password);
     setBusy(false);
     if (!r.ok) {
-      setError(t(`tools.pdf-annotate.errors.${r.error}`));
+      pdfPwd.notePdfError(r.error);
+      setErrorCode(r.error);
+      setError(pdfToolErrorMessage(t, TOOL_ID, r.error));
       return;
     }
     downloadBytes(r.value, 'annotated.pdf');
@@ -42,7 +75,11 @@ export default function PdfAnnotateTool() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-gray-500 dark:text-gray-400">{t('tools.pdf-annotate.hint')}</p>
-      <FileDropZone accept=".pdf,application/pdf" maxBytes={PDF_MAX_BYTES} onFile={(f) => { setFile(f); setError(null); }} />
+      <FileDropZone accept=".pdf,application/pdf" maxBytes={PDF_MAX_BYTES} onFile={(f) => void onFile(f)} />
+      <FilePreviewList files={file ? [file] : []} onRemove={clear} />
+      {shouldShowPdfPassword(errorCode, pdfPwd.needsPassword) && (
+        <PdfPasswordField value={pdfPwd.password} onChange={pdfPwd.setPassword} error={errorCode} autoFocus />
+      )}
       <OptionBar>
         {KINDS.map((k) => (
           <label key={k} className="flex items-center gap-1 text-sm">
@@ -72,8 +109,12 @@ export default function PdfAnnotateTool() {
       )}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <PdfRunButton label={busy ? t('common.loading') : t('tools.pdf-annotate.run')} disabled={!file || items.length === 0 || busy} onClick={() => void run()} />
-        <ClearButton onClick={() => { setFile(null); setItems([]); setError(null); }} />
+        <PdfRunButton
+          label={busy ? t('common.loading') : t('tools.pdf-annotate.run')}
+          disabled={!file || items.length === 0 || busy || (pdfPwd.needsPassword && !pdfPwd.password)}
+          onClick={() => void run()}
+        />
+        <ClearButton onClick={clear} />
       </div>
     </div>
   );

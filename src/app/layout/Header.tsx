@@ -30,7 +30,7 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
       </button>
 
       <Link to="/" className="flex items-center gap-2 text-lg font-bold">
-        <Icon name="wrench" className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        <img src="/logo.svg" alt="" width={20} height={20} className="h-5 w-5" />
         SynTools
       </Link>
 

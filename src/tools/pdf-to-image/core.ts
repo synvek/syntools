@@ -14,12 +14,12 @@ export type ImageFormat = 'image/png' | 'image/jpeg';
 
 export async function pdfPagesToImages(
   file: File,
-  opts: { format: ImageFormat; scale: number; selection?: string },
+  opts: { format: ImageFormat; scale: number; selection?: string; password?: string },
 ): Promise<ToolResult<string[]>> {
   if (!isPdfFile(file)) return { ok: false, error: 'NOT_PDF' };
   if (file.size > PDF_MAX_BYTES) return { ok: false, error: 'TOO_LARGE' };
   const bytes = await fileToBytes(file);
-  const doc = await openPdfjsDoc(bytes);
+  const doc = await openPdfjsDoc(bytes, { password: opts.password });
   if (!doc.ok) return doc;
   try {
     let pages: number[];

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '@/core/components/FileDropZone';
+import { FilePreviewList } from '@/core/components/FilePreviewList';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
 import { PDF_MAX_BYTES, downloadBytes } from '@/core/pdf';
 import { PdfRunButton, PdfField, pdfInputClass } from '@/core/pdf/ui';
@@ -40,6 +41,7 @@ export default function PdfEncryptTool() {
     <div className="flex flex-col gap-4">
       <p className="text-sm text-gray-500 dark:text-gray-400">{t('tools.pdf-encrypt.hint')}</p>
       <FileDropZone accept=".pdf,application/pdf" maxBytes={PDF_MAX_BYTES} onFile={(f) => { setFile(f); setError(null); }} />
+      <FilePreviewList files={file ? [file] : []} onRemove={() => { setFile(null); setError(null); }} />
       <PdfField label={t('tools.pdf-encrypt.userPassword')}>
         <input className={pdfInputClass} type="password" value={userPassword} onChange={(e) => setUserPassword(e.target.value)} />
       </PdfField>

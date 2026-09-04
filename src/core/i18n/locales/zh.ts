@@ -72,6 +72,19 @@ export default {
     max: '最大 {{size}}',
     over: '文件超出 {{max}} 上限（当前 {{size}}）',
     uploadAria: '上传文件',
+    previewAlt: '{{name}} 预览',
+    pages: '{{n}} 页',
+    encrypted: '已加密',
+  },
+  pdf: {
+    password: 'PDF 密码',
+    passwordPlaceholder: '请输入打开密码',
+    passwordHint: '此 PDF 已加密，请输入密码后继续',
+    unlock: '解锁',
+    errors: {
+      NEED_PASSWORD: '此 PDF 已加密，请输入密码',
+      WRONG_PASSWORD: '密码错误，请重试',
+    },
   },
   tool: {
     errorTitle: '工具运行出错',

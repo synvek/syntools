@@ -6,8 +6,9 @@ import { openPdfjsDoc, renderPageToCanvas, canvasToGrayscale } from './render';
 export async function pdfToGrayscaleVisual(
   bytes: Uint8Array,
   scale = 1.5,
+  opts?: { password?: string },
 ): Promise<ToolResult<Uint8Array>> {
-  const opened = await openPdfjsDoc(bytes);
+  const opened = await openPdfjsDoc(bytes, { password: opts?.password });
   if (!opened.ok) return opened;
   try {
     const out = await PDFDocument.create();

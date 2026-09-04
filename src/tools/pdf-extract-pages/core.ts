@@ -3,8 +3,8 @@ import { loadPdfFromFile, extractPages, parsePageSelection, isPdfFile, PDF_MAX_B
 
 export { isPdfFile, PDF_MAX_BYTES, parsePageSelection };
 
-export async function extractPdfPages(file: File, selection: string): Promise<ToolResult<Uint8Array>> {
-  const loaded = await loadPdfFromFile(file);
+export async function extractPdfPages(file: File, selection: string, password?: string): Promise<ToolResult<Uint8Array>> {
+  const loaded = await loadPdfFromFile(file, { password });
   if (!loaded.ok) return loaded;
   const pages = parsePageSelection(selection, loaded.value.getPageCount());
   if (!pages.ok) return pages;

@@ -5,9 +5,18 @@ export { isPdfFile, PDF_MAX_BYTES, parsePageSelection };
 
 export async function addTextToPdf(
   file: File,
-  opts: { text: string; selection: string; allPages: boolean; x: number; y: number; fontSize: number; color: string },
+  opts: {
+    text: string;
+    selection: string;
+    allPages: boolean;
+    x: number;
+    y: number;
+    fontSize: number;
+    color: string;
+    password?: string;
+  },
 ): Promise<ToolResult<Uint8Array>> {
-  const loaded = await loadPdfFromFile(file);
+  const loaded = await loadPdfFromFile(file, { password: opts.password });
   if (!loaded.ok) return loaded;
   let pageIndices: number[] | undefined;
   if (!opts.allPages) {

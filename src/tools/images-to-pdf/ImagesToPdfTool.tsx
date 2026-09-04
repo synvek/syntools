@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '@/core/components/FileDropZone';
+import { FilePreviewList } from '@/core/components/FilePreviewList';
 import { ClearButton } from '@/core/components/ActionButtons';
 import { PDF_MAX_BYTES, downloadBytes } from '@/core/pdf';
 import { PdfRunButton } from '@/core/pdf/ui';
@@ -43,20 +44,25 @@ export default function ImagesToPdfTool() {
           setError(null);
         }}
       />
-      {files.length > 0 && (
-        <ul className="space-y-1 text-sm">
-          {files.map((f, i) => (
-            <li key={`${f.name}-${i}`} className="flex justify-between gap-2">
-              <span className="truncate">{i + 1}. {f.name}</span>
-              <button type="button" className="text-xs text-red-600" onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}>{t('common.remove')}</button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <FilePreviewList
+        files={files}
+        showIndex
+        onRemove={(index) => setFiles((prev) => prev.filter((_, i) => i !== index))}
+      />
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <PdfRunButton label={busy ? t('common.loading') : t('tools.images-to-pdf.run')} disabled={files.length === 0 || busy} onClick={() => void run()} />
-        <ClearButton onClick={() => { setFiles([]); setError(null); }} disabled={files.length === 0} />
+        <PdfRunButton
+          label={busy ? t('common.loading') : t('tools.images-to-pdf.run')}
+          disabled={files.length === 0 || busy}
+          onClick={() => void run()}
+        />
+        <ClearButton
+          onClick={() => {
+            setFiles([]);
+            setError(null);
+          }}
+          disabled={files.length === 0}
+        />
       </div>
     </div>
   );

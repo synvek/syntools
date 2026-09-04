@@ -14,9 +14,16 @@ export async function signPdfWithImage(
   pdf: File,
   imageBytes: Uint8Array,
   mime: string,
-  opts: { selection: string; allPages: boolean; x: number; y: number; width: number },
+  opts: {
+    selection: string;
+    allPages: boolean;
+    x: number;
+    y: number;
+    width: number;
+    password?: string;
+  },
 ): Promise<ToolResult<Uint8Array>> {
-  const loaded = await loadPdfFromFile(pdf);
+  const loaded = await loadPdfFromFile(pdf, { password: opts.password });
   if (!loaded.ok) return loaded;
   let pageIndices: number[] | undefined;
   if (!opts.allPages) {

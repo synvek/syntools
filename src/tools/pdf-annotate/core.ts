@@ -20,9 +20,9 @@ export type AnnotateDraft = {
   color: string;
 };
 
-export async function annotatePdfFile(file: File, drafts: AnnotateDraft[]): Promise<ToolResult<Uint8Array>> {
+export async function annotatePdfFile(file: File, drafts: AnnotateDraft[], password?: string): Promise<ToolResult<Uint8Array>> {
   if (drafts.length === 0) return { ok: false, error: 'EMPTY' };
-  const loaded = await loadPdfFromFile(file);
+  const loaded = await loadPdfFromFile(file, { password });
   if (!loaded.ok) return loaded;
   const count = loaded.value.getPageCount();
   return annotatePages(

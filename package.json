@@ -3,6 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "homepage": "https://github.com/synvek/syntools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/synvek/syntools.git"
+  },
+  "author": "synvek",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/synvek/syntools/issues"
+  },
   "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=20"

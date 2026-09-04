@@ -2,11 +2,16 @@ import {
   PDFDocument,
   StandardFonts,
   rgb,
+  pushGraphicsState,
+  popGraphicsState,
+  rotateDegrees,
+  translate,
   type PDFPage,
   type PDFFont,
   type RGB,
 } from '@cantoo/pdf-lib';
 import type { ToolResult } from '@/core/types';
+import { embedRasterizedText, needsUnicodeFont } from './text';
 
 export type PageNumberPosition = 'bottom-center' | 'bottom-right' | 'bottom-left' | 'top-center';
 
@@ -19,7 +24,86 @@ function parseColor(hex: string): RGB {
   return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
 }
 
-function placeText(
+/** Normalize page /Rotate to 0 | 90 | 180 | 270 (PDF: clockwise when viewing). */
+export function normalizePageRotation(angle: number): 0 | 90 | 180 | 270 {
+  const a = ((Math.round(angle) % 360) + 360) % 360;
+  if (a === 90 || a === 180 || a === 270) return a;
+  return 0;
+}
+
+/** Size as the viewer sees it after /Rotate. */
+export function getVisualPageSize(page: PDFPage): { width: number; height: number } {
+  const { width, height } = page.getSize();
+  const rot = normalizePageRotation(page.getRotation().angle);
+  if (rot === 90 || rot === 270) return { width: height, height: width };
+  return { width, height };
+}
+
+/**
+ * Remap the CTM so subsequent draws use *visual* coordinates
+ * (origin = displayed bottom-left, +x right, +y up), cancelling /Rotate.
+ * Must be paired with `endVisualDraw`.
+ *
+ * @see https://github.com/Hopding/pdf-lib/issues/147
+ */
+function beginVisualDraw(page: PDFPage): void {
+  const rot = normalizePageRotation(page.getRotation().angle);
+  if (rot === 0) return;
+  const { width, height } = getVisualPageSize(page);
+  page.pushOperators(pushGraphicsState());
+  if (rot === 90) {
+    page.pushOperators(rotateDegrees(90), translate(0, -height));
+  } else if (rot === 180) {
+    page.pushOperators(rotateDegrees(180), translate(-width, -height));
+  } else {
+    page.pushOperators(rotateDegrees(270), translate(-width, 0));
+  }
+}
+
+function endVisualDraw(page: PDFPage): void {
+  const rot = normalizePageRotation(page.getRotation().angle);
+  if (rot === 0) return;
+  page.pushOperators(popGraphicsState());
+}
+
+function resolveTextBox(
+  page: PDFPage,
+  textWidth: number,
+  textHeight: number,
+  opts: {
+    position: PageNumberPosition | 'header' | 'footer';
+    align?: HAlign;
+    size: number;
+    margin: number;
+  },
+): { x: number; y: number } {
+  const { width, height } = getVisualPageSize(page);
+  const margin = opts.margin;
+  let x = margin;
+  const align = opts.align ?? 'center';
+  if (align === 'center') x = (width - textWidth) / 2;
+  else if (align === 'right') x = width - margin - textWidth;
+
+  let y = margin;
+  if (opts.position === 'top-center' || opts.position === 'header') {
+    y = height - margin - textHeight;
+  } else if (
+    opts.position === 'bottom-center' ||
+    opts.position === 'footer' ||
+    opts.position.startsWith('bottom')
+  ) {
+    y = margin;
+  }
+  if (opts.position === 'bottom-left') x = margin;
+  if (opts.position === 'bottom-right') x = width - margin - textWidth;
+  if (opts.position === 'bottom-center' || opts.position === 'top-center') {
+    x = (width - textWidth) / 2;
+  }
+  return { x, y };
+}
+
+async function placeText(
+  doc: PDFDocument,
   page: PDFPage,
   font: PDFFont,
   text: string,
@@ -31,31 +115,32 @@ function placeText(
     margin: number;
   },
 ) {
-  const { width, height } = page.getSize();
-  const textWidth = font.widthOfTextAtSize(text, opts.size);
-  const margin = opts.margin;
-  let x = margin;
-  const align = opts.align ?? 'center';
-  if (align === 'center') x = (width - textWidth) / 2;
-  else if (align === 'right') x = width - margin - textWidth;
+  beginVisualDraw(page);
+  try {
+    if (needsUnicodeFont(text)) {
+      const raster = await embedRasterizedText(doc, text, opts.size, opts.color);
+      const { x, y } = resolveTextBox(page, raster.width, raster.height, opts);
+      page.drawImage(raster.image, {
+        x,
+        y,
+        width: raster.width,
+        height: raster.height,
+      });
+      return;
+    }
 
-  let y = margin;
-  if (opts.position === 'top-center' || opts.position === 'header') {
-    y = height - margin - opts.size;
-  } else if (opts.position === 'bottom-center' || opts.position === 'footer' || opts.position.startsWith('bottom')) {
-    y = margin;
+    const textWidth = font.widthOfTextAtSize(text, opts.size);
+    const { x, y } = resolveTextBox(page, textWidth, opts.size, opts);
+    page.drawText(text, {
+      x,
+      y,
+      size: opts.size,
+      font,
+      color: opts.color,
+    });
+  } finally {
+    endVisualDraw(page);
   }
-  if (opts.position === 'bottom-left') x = margin;
-  if (opts.position === 'bottom-right') x = width - margin - textWidth;
-  if (opts.position === 'bottom-center' || opts.position === 'top-center') x = (width - textWidth) / 2;
-
-  page.drawText(text, {
-    x,
-    y,
-    size: opts.size,
-    font,
-    color: opts.color,
-  });
 }
 
 export async function addPageNumbers(
@@ -78,11 +163,12 @@ export async function addPageNumbers(
     const color = parseColor(opts.color ?? '#333333');
     const margin = opts.margin ?? 24;
     const startFrom = opts.startFrom ?? 1;
-    doc.getPages().forEach((page, i) => {
+    const pages = doc.getPages();
+    for (let i = 0; i < pages.length; i++) {
       const n = startFrom + i;
       const text = format.replace(/\{n\}/g, String(n)).replace(/\{total\}/g, String(total));
-      placeText(page, font, text, { position, size, color, margin });
-    });
+      await placeText(doc, pages[i], font, text, { position, size, color, margin });
+    }
     return { ok: true, value: await doc.save() };
   } catch {
     return { ok: false, error: 'PROCESS_FAILED' };
@@ -108,7 +194,7 @@ export async function addHeaderFooter(
     const align = opts.align ?? 'center';
     for (const page of doc.getPages()) {
       if (opts.header?.trim()) {
-        placeText(page, font, opts.header.trim(), {
+        await placeText(doc, page, font, opts.header.trim(), {
           position: 'header',
           align,
           size,
@@ -117,7 +203,7 @@ export async function addHeaderFooter(
         });
       }
       if (opts.footer?.trim()) {
-        placeText(page, font, opts.footer.trim(), {
+        await placeText(doc, page, font, opts.footer.trim(), {
           position: 'footer',
           align,
           size,
@@ -157,14 +243,31 @@ export async function addTextToPages(
     for (const i of indices) {
       if (i < 0 || i >= pages.length) continue;
       const page = pages[i];
-      const { height } = page.getSize();
-      page.drawText(text, {
-        x: opts.x ?? 48,
-        y: opts.y ?? height - 64,
-        size,
-        font,
-        color,
-      });
+      const { height } = getVisualPageSize(page);
+      const x = opts.x ?? 48;
+      const y = opts.y ?? height - 64;
+      beginVisualDraw(page);
+      try {
+        if (needsUnicodeFont(text)) {
+          const raster = await embedRasterizedText(doc, text, size, color);
+          page.drawImage(raster.image, {
+            x,
+            y: y - (raster.height - size),
+            width: raster.width,
+            height: raster.height,
+          });
+        } else {
+          page.drawText(text, {
+            x,
+            y,
+            size,
+            font,
+            color,
+          });
+        }
+      } finally {
+        endVisualDraw(page);
+      }
     }
     return { ok: true, value: await doc.save() };
   } catch {
@@ -198,14 +301,19 @@ export async function embedImageOnPages(
     for (const i of indices) {
       if (i < 0 || i >= pages.length) continue;
       const page = pages[i];
-      const { height: ph } = page.getSize();
-      page.drawImage(image, {
-        x: opts.x ?? 48,
-        y: opts.y ?? ph - h - 48,
-        width: w,
-        height: h,
-        opacity: opts.opacity ?? 1,
-      });
+      const { height: ph } = getVisualPageSize(page);
+      beginVisualDraw(page);
+      try {
+        page.drawImage(image, {
+          x: opts.x ?? 48,
+          y: opts.y ?? ph - h - 48,
+          width: w,
+          height: h,
+          opacity: opts.opacity ?? 1,
+        });
+      } finally {
+        endVisualDraw(page);
+      }
     }
     return { ok: true, value: await doc.save() };
   } catch {
@@ -290,34 +398,39 @@ export async function annotatePages(
       const page = pages[a.pageIndex];
       const color = parseColor(a.color ?? (a.kind === 'highlight' ? '#facc15' : '#ef4444'));
       const opacity = a.opacity ?? (a.kind === 'highlight' ? 0.35 : 0.9);
-      if (a.kind === 'line') {
-        page.drawLine({
-          start: { x: a.x, y: a.y },
-          end: { x: a.x + a.width, y: a.y + a.height },
-          thickness: 2,
-          color,
-          opacity,
-        });
-      } else if (a.kind === 'highlight') {
-        page.drawRectangle({
-          x: a.x,
-          y: a.y,
-          width: a.width,
-          height: a.height,
-          color,
-          opacity,
-          borderWidth: 0,
-        });
-      } else {
-        page.drawRectangle({
-          x: a.x,
-          y: a.y,
-          width: a.width,
-          height: a.height,
-          borderColor: color,
-          borderWidth: 2,
-          opacity,
-        });
+      beginVisualDraw(page);
+      try {
+        if (a.kind === 'line') {
+          page.drawLine({
+            start: { x: a.x, y: a.y },
+            end: { x: a.x + a.width, y: a.y + a.height },
+            thickness: 2,
+            color,
+            opacity,
+          });
+        } else if (a.kind === 'highlight') {
+          page.drawRectangle({
+            x: a.x,
+            y: a.y,
+            width: a.width,
+            height: a.height,
+            color,
+            opacity,
+            borderWidth: 0,
+          });
+        } else {
+          page.drawRectangle({
+            x: a.x,
+            y: a.y,
+            width: a.width,
+            height: a.height,
+            borderColor: color,
+            borderWidth: 2,
+            opacity,
+          });
+        }
+      } finally {
+        endVisualDraw(page);
       }
     }
     return { ok: true, value: await doc.save() };

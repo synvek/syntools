@@ -3,8 +3,8 @@ import { loadPdfFromFile, deletePages, parsePageSelection, isPdfFile, PDF_MAX_BY
 
 export { isPdfFile, PDF_MAX_BYTES, parsePageSelection };
 
-export async function deletePdfPages(file: File, selection: string): Promise<ToolResult<Uint8Array>> {
-  const loaded = await loadPdfFromFile(file);
+export async function deletePdfPages(file: File, selection: string, password?: string): Promise<ToolResult<Uint8Array>> {
+  const loaded = await loadPdfFromFile(file, { password });
   if (!loaded.ok) return loaded;
   const pages = parsePageSelection(selection, loaded.value.getPageCount());
   if (!pages.ok) return pages;
