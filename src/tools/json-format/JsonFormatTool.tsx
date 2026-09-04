@@ -65,7 +65,7 @@ export default function JsonFormatTool() {
         <ShareButton getState={() => ({ i: input, a: action, n: indent })} />
       </OptionBar>
 
-      <div className="flex flex-col gap-4 lg:flex-row">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
         <IOTextArea
           label={t('tools.json.inputLabel')}
           value={input}
@@ -73,19 +73,19 @@ export default function JsonFormatTool() {
           placeholder={t('tools.json.inputPlaceholder')}
           actions={<ClearButton onClick={() => setInput('')} disabled={!input} />}
         />
-        <IOTextArea
-          label={action === 'validate' ? t('tools.json.validateResult') : t('common.output')}
-          value={output}
-          readOnly
-          actions={
-            <div className="flex flex-wrap items-center gap-1">
-              <CopyButton text={output} disabled={!output} />
-              {action !== 'validate' && (
-                <OpenInToolButton targetId="base64" text={output} disabled={!output} />
-              )}
+        <div className="flex min-w-0 flex-col gap-2">
+          <IOTextArea
+            label={action === 'validate' ? t('tools.json.validateResult') : t('common.output')}
+            value={output}
+            readOnly
+            actions={<CopyButton text={output} disabled={!output} />}
+          />
+          {output && action !== 'validate' ? (
+            <div className="flex flex-wrap gap-1">
+              <OpenInToolButton targetId="base64" text={output} />
             </div>
-          }
-        />
+          ) : null}
+        </div>
       </div>
 
       {result && !result.ok && (

@@ -73,7 +73,7 @@ export default function Base64Tool() {
         <ShareButton getState={() => ({ i: input, d: direction, u: urlSafe })} />
       </OptionBar>
 
-      <div className="flex flex-col gap-4 lg:flex-row">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
         <IOTextArea
           label={
             direction === 'encode'
@@ -100,22 +100,24 @@ export default function Base64Tool() {
             />
           }
         />
-        <IOTextArea
-          label={
-            direction === 'encode'
-              ? t('tools.base64.labels.base64Result')
-              : t('tools.base64.labels.decodeResult')
-          }
-          value={output}
-          readOnly
-          actions={
-            <div className="flex flex-wrap items-center gap-1">
-              <CopyButton text={output} disabled={!output} />
-              <OpenInToolButton targetId="json-format" text={output} disabled={!output} />
-              <OpenInToolButton targetId="hex-codec" text={output} disabled={!output} />
+        <div className="flex min-w-0 flex-col gap-2">
+          <IOTextArea
+            label={
+              direction === 'encode'
+                ? t('tools.base64.labels.base64Result')
+                : t('tools.base64.labels.decodeResult')
+            }
+            value={output}
+            readOnly
+            actions={<CopyButton text={output} disabled={!output} />}
+          />
+          {output ? (
+            <div className="flex flex-wrap gap-1">
+              <OpenInToolButton targetId="json-format" text={output} />
+              <OpenInToolButton targetId="hex-codec" text={output} />
             </div>
-          }
-        />
+          ) : null}
+        </div>
       </div>
 
       {!result.ok && input && (

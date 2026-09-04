@@ -41,10 +41,10 @@ export function IOTextArea({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <label className="text-sm font-medium text-gray-600 dark:text-gray-300">{label}</label>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 dark:text-gray-500">
+      <div className="flex min-h-8 items-center justify-between gap-2">
+        <label className="shrink-0 text-sm font-medium text-gray-600 dark:text-gray-300">{label}</label>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <span className="whitespace-nowrap text-xs text-gray-400 dark:text-gray-500">
             {t('io.stats', { chars: value.length, bytes })}
           </span>
           {actions}
@@ -58,7 +58,7 @@ export function IOTextArea({
         rows={rows}
         aria-label={label}
         spellCheck={false}
-        className="w-full resize-y rounded-lg border border-gray-300 bg-white p-3 font-mono text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:focus:border-blue-400 dark:focus:ring-blue-400"
+        className="box-border w-full flex-1 resize-y rounded-lg border border-gray-300 bg-white p-3 font-mono text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:focus:border-blue-400 dark:focus:ring-blue-400"
       />
       {!readOnly && bytes > WARN_BYTES && !overflowMessage && (
         <p className="text-xs text-amber-600 dark:text-amber-400">{t('io.warnLarge')}</p>
