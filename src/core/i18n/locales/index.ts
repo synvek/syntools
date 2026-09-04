@@ -1,13 +1,7 @@
 import en from '@/core/i18n/locales/en';
 import zh from '@/core/i18n/locales/zh';
 import type { Lang, TranslationResources } from '@/core/i18n/types';
-import { isLang } from '@/core/i18n/types';
-
-/**
- * 同步打包进首屏的语言（默认 zh；en 使用频率高一并内联，避免首切闪烁）。
- * 其余语言按需动态 import，避免撑爆首屏体积预算。
- */
-export const SYNC_LANGS = ['zh', 'en'] as const satisfies readonly Lang[];
+import { isLang, SYNC_LANGS } from '@/core/i18n/types';
 
 type LocaleModule = { default: TranslationResources };
 
@@ -23,14 +17,14 @@ const loaders: Record<Lang, () => Promise<LocaleModule>> = {
   pt: () => import('@/core/i18n/locales/pt'),
 };
 
-/** 首屏同步资源 */
+/** 首屏同步资源（zh / en）；其余语言按需动态 import */
 export const localeResources: Partial<Record<Lang, { translation: TranslationResources }>> &
   Record<(typeof SYNC_LANGS)[number], { translation: TranslationResources }> = {
   zh: { translation: zh },
   en: { translation: en },
 };
 
-const loaded = new Set<Lang>(SYNC_LANGS);
+const loaded = new Set<Lang>([...SYNC_LANGS]);
 
 /** 按需加载语言包并注册到 i18next（同源 chunk，零外发） */
 export async function ensureLangLoaded(
@@ -43,5 +37,5 @@ export async function ensureLangLoaded(
   loaded.add(lang);
 }
 
-export { en, zh, isLang };
+export { en, zh, isLang, SYNC_LANGS };
 export type { Lang, TranslationResources };
