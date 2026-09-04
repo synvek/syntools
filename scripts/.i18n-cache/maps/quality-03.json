@@ -1,0 +1,402 @@
+{
+  "Extracted {{n}} sizes from {{name}}": {
+    "es": "Se extrajeron {{n}} tamaños de {{name}}",
+    "pt": "Extraídos {{n}} tamanhos de {{name}}"
+  },
+  "Extraversion E / Introversion I": {
+    "es": "Extraversión E / Introversión I",
+    "pt": "Extroversão E / Introversão I"
+  },
+  "Failed to decode the image": {
+    "es": "No se pudo decodificar la imagen",
+    "pt": "Falha ao descodificar a imagem"
+  },
+  "Failed to load PDF": {
+    "es": "No se pudo cargar el PDF",
+    "pt": "Falha ao carregar o PDF"
+  },
+  "Failed to load the image": {
+    "es": "No se pudo cargar la imagen",
+    "pt": "Falha ao carregar a imagem"
+  },
+  "Failed to load the image: please make sure it is a valid image file": {
+    "es": "No se pudo cargar la imagen: asegúrate de que sea un archivo de imagen válido",
+    "pt": "Falha ao carregar a imagem: certifique-se de que é um ficheiro de imagem válido"
+  },
+  "Failed to parse GIF": {
+    "es": "No se pudo analizar el GIF",
+    "pt": "Falha ao analisar o GIF"
+  },
+  "Failed to parse header: not valid base64url-encoded JSON": {
+    "es": "No se pudo analizar el encabezado: JSON en base64url no válido",
+    "pt": "Falha ao analisar o cabeçalho: JSON em base64url inválido"
+  },
+  "Failed to parse input: please check the syntax": {
+    "es": "No se pudo analizar la entrada: comprueba la sintaxis",
+    "pt": "Falha ao analisar a entrada: verifique a sintaxe"
+  },
+  "Failed to parse payload: not valid base64url-encoded JSON": {
+    "es": "No se pudo analizar el payload: JSON en base64url no válido",
+    "pt": "Falha ao analisar o payload: JSON em base64url inválido"
+  },
+  "Failed to read file contents": {
+    "es": "No se pudo leer el contenido del archivo",
+    "pt": "Falha ao ler o conteúdo do ficheiro"
+  },
+  "Fairy pink": {
+    "es": "Fairy pink",
+    "pt": "Fairy pink"
+  },
+  "Fake Data Generator": {
+    "es": "Generador de datos falsos",
+    "pt": "Gerador de dados falsos"
+  },
+  "Field": {
+    "es": "Campo",
+    "pt": "Campo"
+  },
+  "Field breakdown": {
+    "es": "Desglose de campos",
+    "pt": "Discriminação de campos"
+  },
+  "File exceeds the {{max}} limit (current {{size}})": {
+    "es": "El archivo supera el límite de {{max}} (actual {{size}})",
+    "pt": "O ficheiro excede o limite de {{max}} (atual {{size}})"
+  },
+  "File hash failed: {{message}}": {
+    "es": "Error de hash del archivo: {{message}}",
+    "pt": "Falha de hash do ficheiro: {{message}}"
+  },
+  "File is empty": {
+    "es": "El archivo está vacío",
+    "pt": "O ficheiro está vazio"
+  },
+  "File mode: file → Base64 (ArrayBuffer chunks)": {
+    "es": "Modo archivo: archivo → Base64 (fragmentos ArrayBuffer)",
+    "pt": "Modo ficheiro: ficheiro → Base64 (fragmentos ArrayBuffer)"
+  },
+  "File too large (recommend < 50MB)": {
+    "es": "Archivo demasiado grande (recomendado < 50MB)",
+    "pt": "Ficheiro demasiado grande (recomendado < 50MB)"
+  },
+  "Fill current (seconds)": {
+    "es": "Rellenar actual (segundos)",
+    "pt": "Preencher atual (segundos)"
+  },
+  "Filter": {
+    "es": "Filtrar",
+    "pt": "Filtrar"
+  },
+  "Fire sky": {
+    "es": "Fire sky",
+    "pt": "Fire sky"
+  },
+  "First host": {
+    "es": "Primer host",
+    "pt": "Primeiro host"
+  },
+  "Fit images to A3/A4/A5/Letter and export PDF": {
+    "es": "Ajusta imágenes a A3/A4/A5/Letter y exporta PDF",
+    "pt": "Ajusta imagens a A3/A4/A5/Letter e exporta PDF"
+  },
+  "Flags": {
+    "es": "Flags",
+    "pt": "Flags"
+  },
+  "Flame": {
+    "es": "Flame",
+    "pt": "Flame"
+  },
+  "Font size": {
+    "es": "Tamaño de fuente",
+    "pt": "Tamanho do tipo de letra"
+  },
+  "Font size / width / padding / line height out of range": {
+    "es": "Tamaño de fuente / ancho / padding / interlineado fuera de rango",
+    "pt": "Tamanho do tipo de letra / largura / padding / entrelinha fora do intervalo"
+  },
+  "Foot ft": {
+    "es": "Pie ft",
+    "pt": "Pé ft"
+  },
+  "Foreground": {
+    "es": "Primer plano",
+    "pt": "Primeiro plano"
+  },
+  "Forest": {
+    "es": "Forest",
+    "pt": "Forest"
+  },
+  "Format / minify / validate with 2/4-space indent and line/column error locations": {
+    "es": "Formatea / minifica / valida con sangría de 2/4 espacios y ubicación de errores línea/columna",
+    "pt": "Formata / minifica / valida com indentação de 2/4 espaços e localização de erros linha/coluna"
+  },
+  "Format supports {n} and {total}.": {
+    "es": "El formato admite {n} y {total}.",
+    "pt": "O formato suporta {n} e {total}."
+  },
+  "Fourier transform": {
+    "es": "Transformada de Fourier",
+    "pt": "Transformada de Fourier"
+  },
+  "Friday": {
+    "es": "Viernes",
+    "pt": "Sexta-feira"
+  },
+  "Frost": {
+    "es": "Frost",
+    "pt": "Frost"
+  },
+  "Full URL (keeps : / ? & etc.)": {
+    "es": "URL completa (conserva : / ? & etc.)",
+    "pt": "URL completa (mantém : / ? & etc.)"
+  },
+  "Full width": {
+    "es": "Ancho completo",
+    "pt": "Largura total"
+  },
+  "Functions": {
+    "es": "Funciones",
+    "pt": "Funções"
+  },
+  "GFM (tables / strikethrough / task lists)": {
+    "es": "GFM (tablas / tachado / listas de tareas)",
+    "pt": "GFM (tabelas / rasurado / listas de tarefas)"
+  },
+  "GIF Frame Extractor": {
+    "es": "Extractor de fotogramas GIF",
+    "pt": "Extrator de fotogramas GIF"
+  },
+  "Galaxy": {
+    "es": "Galaxy",
+    "pt": "Galaxy"
+  },
+  "Galaxy color": {
+    "es": "Galaxy color",
+    "pt": "Galaxy color"
+  },
+  "Gap (px)": {
+    "es": "Espacio (px)",
+    "pt": "Espaço (px)"
+  },
+  "Gaussian integral": {
+    "es": "Integral gaussiana",
+    "pt": "Integral gaussiana"
+  },
+  "Generate": {
+    "es": "Generar",
+    "pt": "Gerar"
+  },
+  "Generate a placeholder PNG by size, colors, and optional text": {
+    "es": "Genera un PNG de marcador de posición por tamaño, colores y texto opcional",
+    "pt": "Gera um PNG de marcador de posição por tamanho, cores e texto opcional"
+  },
+  "Generate and decode QR codes with ECC, size, colors, and margin options": {
+    "es": "Genera y decodifica códigos QR con ECC, tamaño, colores y margen",
+    "pt": "Gera e descodifica códigos QR com ECC, tamanho, cores e margem"
+  },
+  "Generate border-radius, shadows, transform, filter, and more": {
+    "es": "Genera border-radius, sombras, transform, filter y más",
+    "pt": "Gera border-radius, sombras, transform, filter e mais"
+  },
+  "Generate names / emails / UUIDs / lorem in zh/en, 1–50 items": {
+    "es": "Genera nombres / emails / UUID / lorem en zh/en, 1–50 elementos",
+    "pt": "Gera nomes / emails / UUID / lorem em zh/en, 1–50 itens"
+  },
+  "Generate random integers or decimals in a range, with optional unique values": {
+    "es": "Genera enteros o decimales aleatorios en un rango, con valores únicos opcionales",
+    "pt": "Gera inteiros ou decimais aleatórios num intervalo, com valores únicos opcionais"
+  },
+  "Generate random strings by length and charset (alnum / hex / custom)": {
+    "es": "Genera cadenas aleatorias por longitud y juego de caracteres (alnum / hex / personalizado)",
+    "pt": "Gera cadeias aleatórias por comprimento e conjunto de caracteres (alnum / hex / personalizado)"
+  },
+  "Generated (one per line)": {
+    "es": "Generado (uno por línea)",
+    "pt": "Gerado (um por linha)"
+  },
+  "Generic SQL": {
+    "es": "SQL genérico",
+    "pt": "SQL genérico"
+  },
+  "Glacier": {
+    "es": "Glacier",
+    "pt": "Glacier"
+  },
+  "Golden sun": {
+    "es": "Golden sun",
+    "pt": "Golden sun"
+  },
+  "Gradient": {
+    "es": "Degradado",
+    "pt": "Gradiente"
+  },
+  "Gradient preview": {
+    "es": "Vista previa del degradado",
+    "pt": "Pré-visualização do gradiente"
+  },
+  "Gram g": {
+    "es": "Gramo g",
+    "pt": "Grama g"
+  },
+  "Grape": {
+    "es": "Grape",
+    "pt": "Grape"
+  },
+  "Graphite": {
+    "es": "Graphite",
+    "pt": "Graphite"
+  },
+  "Grayscale": {
+    "es": "Escala de grises",
+    "pt": "Escala de cinzentos"
+  },
+  "Greek letters": {
+    "es": "Letras griegas",
+    "pt": "Letras gregas"
+  },
+  "Green": {
+    "es": "Green",
+    "pt": "Green"
+  },
+  "Group": {
+    "es": "Grupo",
+    "pt": "Grupo"
+  },
+  "Groups": {
+    "es": "Grupos",
+    "pt": "Grupos"
+  },
+  "Gzip Compress": {
+    "es": "Compresión Gzip",
+    "pt": "Compressão Gzip"
+  },
+  "Gzip text to base64 / decompress back to text": {
+    "es": "Comprime texto a base64 con Gzip / descomprime de vuelta a texto",
+    "pt": "Comprime texto para base64 com Gzip / descomprime de volta para texto"
+  },
+  "H (~30%)": {
+    "es": "H (~30%)",
+    "pt": "H (~30%)"
+  },
+  "HMAC secret…": {
+    "es": "Secreto HMAC…",
+    "pt": "Segredo HMAC…"
+  },
+  "HMAC-SHA256 / SHA512 with hex / base64 output": {
+    "es": "HMAC-SHA256 / SHA512 con salida hex / base64",
+    "pt": "HMAC-SHA256 / SHA512 com saída hex / base64"
+  },
+  "HSV / CMYK Converter": {
+    "es": "Conversor HSV / CMYK",
+    "pt": "Conversor HSV / CMYK"
+  },
+  "HTML &#x…;": {
+    "es": "HTML &#x…;",
+    "pt": "HTML &#x…;"
+  },
+  "HTML &#…;": {
+    "es": "HTML &#…;",
+    "pt": "HTML &#…;"
+  },
+  "HTML Color Picker": {
+    "es": "Selector de color HTML",
+    "pt": "Seletor de cor HTML"
+  },
+  "HTML Encode / Decode": {
+    "es": "Codificar / decodificar HTML",
+    "pt": "Codificar / descodificar HTML"
+  },
+  "HTML Minify / Beautify": {
+    "es": "Minificar / embellecer HTML",
+    "pt": "Minificar / embelezar HTML"
+  },
+  "HTML input": {
+    "es": "Entrada HTML",
+    "pt": "Entrada HTML"
+  },
+  "HTML preview": {
+    "es": "Vista previa HTML",
+    "pt": "Pré-visualização HTML"
+  },
+  "HTML style": {
+    "es": "Estilo HTML",
+    "pt": "Estilo HTML"
+  },
+  "Harbor": {
+    "es": "Harbor",
+    "pt": "Harbor"
+  },
+  "Has EXIF": {
+    "es": "Tiene EXIF",
+    "pt": "Tem EXIF"
+  },
+  "Hash Calculator": {
+    "es": "Calculadora de hash",
+    "pt": "Calculadora de hash"
+  },
+  "Hash failed: algorithm not supported in this environment": {
+    "es": "Error de hash: algoritmo no compatible en este entorno",
+    "pt": "Falha de hash: algoritmo não suportado neste ambiente"
+  },
+  "Heading 1 (#)": {
+    "es": "Encabezado 1 (#)",
+    "pt": "Cabeçalho 1 (#)"
+  },
+  "Heading 2 (##)": {
+    "es": "Encabezado 2 (##)",
+    "pt": "Cabeçalho 2 (##)"
+  },
+  "Heading 3 (###)": {
+    "es": "Encabezado 3 (###)",
+    "pt": "Cabeçalho 3 (###)"
+  },
+  "Heading 4 (####)": {
+    "es": "Encabezado 4 (####)",
+    "pt": "Cabeçalho 4 (####)"
+  },
+  "Heading 5 (#####)": {
+    "es": "Encabezado 5 (#####)",
+    "pt": "Cabeçalho 5 (#####)"
+  },
+  "Heading 6 (######)": {
+    "es": "Encabezado 6 (######)",
+    "pt": "Cabeçalho 6 (######)"
+  },
+  "Hei (sans CJK)": {
+    "es": "Hei (sans CJK)",
+    "pt": "Hei (sans CJK)"
+  },
+  "Height": {
+    "es": "Alto",
+    "pt": "Altura"
+  },
+  "Height (cm, or meters)": {
+    "es": "Altura (cm, o metros)",
+    "pt": "Altura (cm, ou metros)"
+  },
+  "Height (inches)": {
+    "es": "Altura (pulgadas)",
+    "pt": "Altura (polegadas)"
+  },
+  "Hex (&#x26;)": {
+    "es": "Hex (&#x26;)",
+    "pt": "Hex (&#x26;)"
+  },
+  "Hex Encode / Decode": {
+    "es": "Codificar / decodificar hex",
+    "pt": "Codificar / descodificar hex"
+  },
+  "Hex ↔ UTF-8 text with optional spaces": {
+    "es": "Hex ↔ texto UTF-8 con espacios opcionales",
+    "pt": "Hex ↔ texto UTF-8 com espaços opcionais"
+  },
+  "Hidden": {
+    "es": "Oculto",
+    "pt": "Oculto"
+  },
+  "Highlight": {
+    "es": "Resaltar",
+    "pt": "Realçar"
+  }
+}

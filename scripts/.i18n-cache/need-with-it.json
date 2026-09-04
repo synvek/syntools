@@ -1,0 +1,5510 @@
+[
+  {
+    "en": " (truncated, showing first 1000)",
+    "it": "(troncato, mostra i primi 1000)"
+  },
+  {
+    "en": "# Title\nBody…",
+    "it": "# Title\nCorpo…"
+  },
+  {
+    "en": "# Topic\n## Branch\n- Point…",
+    "it": "# Topic\n## Filiale\n- Punto…"
+  },
+  {
+    "en": "#3b82f6 / rgb(59,130,246)…",
+    "it": "#3b82f6 / rgb(59.130.246)..."
+  },
+  {
+    "en": "(empty match)",
+    "it": "(corrispondenza vuota)"
+  },
+  {
+    "en": "+{{added}} added / −{{removed}} removed / {{same}} unchanged",
+    "it": "+ {{added}} aggiunto /⟦-1⟧ rimosso / {{same}} invariato"
+  },
+  {
+    "en": "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----",
+    "it": "-----CERTIFICATO BEGINE-----\n…\n-----CERTIFICATO END-----"
+  },
+  {
+    "en": "0 or 1",
+    "it": "0 o 1"
+  },
+  {
+    "en": "0 or more",
+    "it": "0 o più"
+  },
+  {
+    "en": "1 or more",
+    "it": "1"
+  },
+  {
+    "en": "2 spaces",
+    "it": "2 spazi"
+  },
+  {
+    "en": "2×2 determinant",
+    "it": "Determinante 2×2"
+  },
+  {
+    "en": "32 or 64 hex chars (AES-128/256)…",
+    "it": "32 o 64 caratteri esadecimali (AES-128/256)..."
+  },
+  {
+    "en": "4 spaces",
+    "it": "4 spazi"
+  },
+  {
+    "en": "A short 24-question MBTI-style quiz (for entertainment only)",
+    "it": "Un breve quiz in stile MBTI di 24 domande (solo per intrattenimento)"
+  },
+  {
+    "en": "AES Encrypt / Decrypt",
+    "it": "AES Crittografa / Decrittografa"
+  },
+  {
+    "en": "AES-GCM with PBKDF2 passphrase or raw key; output base64(salt|iv|ciphertext)",
+    "it": "AES-GCM con passphrase PBKDF2 o chiave raw; output base64(salt|iv|ciphertext)"
+  },
+  {
+    "en": "AI Prompt Library",
+    "it": "Libreria prompt AI"
+  },
+  {
+    "en": "ASCII 0–127 reference with search by decimal, hex, or character",
+    "it": "Riferimento ASCII 0–127 con ricerca per decimale, esadecimale o carattere"
+  },
+  {
+    "en": "ASCII Table",
+    "it": "ASCII TABLE"
+  },
+  {
+    "en": "Above photo",
+    "it": "Sopra la foto"
+  },
+  {
+    "en": "Action",
+    "it": "Azione"
+  },
+  {
+    "en": "Add & download",
+    "it": "Aggiungi Download"
+  },
+  {
+    "en": "Add Text to PDF",
+    "it": "Aggiungi testo a PDF"
+  },
+  {
+    "en": "Add a text watermark with position, opacity, rotation, and tiling",
+    "it": "Aggiungi una filigrana di testo con posizione, opacità, rotazione e affiancamento"
+  },
+  {
+    "en": "Add at least one image",
+    "it": "Aggiungi almeno un'immagine"
+  },
+  {
+    "en": "Add border, rounded corners, and shadow, then export PNG",
+    "it": "Aggiungi bordo, angoli arrotondati e ombreggiatura, quindi esporta PNG"
+  },
+  {
+    "en": "Add header and footer text",
+    "it": "Aggiungi testo intestazione e piè di pagina"
+  },
+  {
+    "en": "Add images one by one (up to {{max}})",
+    "it": "Aggiungi le immagini una per una (fino a {{max}} )"
+  },
+  {
+    "en": "Add page numbers to a PDF",
+    "it": "Aggiungi numeri di pagina a PDF"
+  },
+  {
+    "en": "Add param",
+    "it": "Aggiungi parametro"
+  },
+  {
+    "en": "Add stop",
+    "it": "Aggiungi fermata"
+  },
+  {
+    "en": "Add text onto PDF pages",
+    "it": "Aggiungi testo a PDF pagine"
+  },
+  {
+    "en": "Add to favorites",
+    "it": "Aggiungi ai preferiti"
+  },
+  {
+    "en": "Adjust brightness, contrast, saturation, and hue, then export PNG",
+    "it": "Regola luminosità, contrasto, saturazione e tonalità, quindi esporta PNG"
+  },
+  {
+    "en": "Algorithm",
+    "it": "Algoritmo"
+  },
+  {
+    "en": "Align",
+    "it": "Allinea"
+  },
+  {
+    "en": "All pages",
+    "it": "Tutte le pagine"
+  },
+  {
+    "en": "Allow annotating",
+    "it": "Consenti annotazione"
+  },
+  {
+    "en": "Allow copying",
+    "it": "Consenti copia"
+  },
+  {
+    "en": "Allow modifying",
+    "it": "Consenti modifica"
+  },
+  {
+    "en": "Allow printing",
+    "it": "Consenti stampa"
+  },
+  {
+    "en": "Alphanumeric",
+    "it": "Alfanumerico"
+  },
+  {
+    "en": "Alternation",
+    "it": "Alternanza"
+  },
+  {
+    "en": "Angle",
+    "it": "Smerigliatrice"
+  },
+  {
+    "en": "Annotate PDF",
+    "it": "Annotazione"
+  },
+  {
+    "en": "Answered {{done}} / {{total}}",
+    "it": "Risposto {{done}} / {{total}}"
+  },
+  {
+    "en": "Any character",
+    "it": "Qualsiasi carattere"
+  },
+  {
+    "en": "Apply & download",
+    "it": "Applica e scarica"
+  },
+  {
+    "en": "Arrows",
+    "it": "Frecce"
+  },
+  {
+    "en": "Aspect",
+    "it": "Aspetto"
+  },
+  {
+    "en": "Author",
+    "it": "Autore"
+  },
+  {
+    "en": "Auto detect",
+    "it": "Rilevamento automatico"
+  },
+  {
+    "en": "Avoid",
+    "it": "Evitare"
+  },
+  {
+    "en": "Azure tri-color",
+    "it": "Azzurro tricolore"
+  },
+  {
+    "en": "BMI Calculator",
+    "it": "Calcolatore BMI"
+  },
+  {
+    "en": "Back to home",
+    "it": "Indietro alla home page"
+  },
+  {
+    "en": "Backdrop",
+    "it": "Sfondo"
+  },
+  {
+    "en": "Backdrop color",
+    "it": "Colore sfondo"
+  },
+  {
+    "en": "Background",
+    "it": "Sfondo"
+  },
+  {
+    "en": "Base32 secret",
+    "it": "Base32 Secret"
+  },
+  {
+    "en": "Base64 Encode / Decode",
+    "it": "Base64 Codifica / Decodifica"
+  },
+  {
+    "en": "Base64 input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "Base64 result",
+    "it": "Base64 risultato"
+  },
+  {
+    "en": "Base64 → Image",
+    "it": "Immagine 0"
+  },
+  {
+    "en": "Bayes' theorem",
+    "it": "Teorema di Bayes"
+  },
+  {
+    "en": "Beautify",
+    "it": "Abbellisci"
+  },
+  {
+    "en": "Beautify SQL across dialects with configurable indent and keyword case",
+    "it": "Abbellisci l'SQL tra i dialetti con indentazione configurabile e maiuscole/minuscole per"
+  },
+  {
+    "en": "Beautify and minify XML with 2/4-space indent; CDATA preserved",
+    "it": "Abbellisci e minimizza XML con rientro di 2/4 di spazio; CDATA conservato"
+  },
+  {
+    "en": "Below photo",
+    "it": "Foto sotto"
+  },
+  {
+    "en": "Binomial theorem",
+    "it": "Teorema binomiale"
+  },
+  {
+    "en": "Bit pattern",
+    "it": "schema di bit"
+  },
+  {
+    "en": "Bitwise operations",
+    "it": "Operazioni bit per bit"
+  },
+  {
+    "en": "Block radius",
+    "it": "Raggio di blocco"
+  },
+  {
+    "en": "Bold (**)",
+    "it": "Grassetto"
+  },
+  {
+    "en": "Border",
+    "it": "Bordo"
+  },
+  {
+    "en": "Border color",
+    "it": "Colore bordo"
+  },
+  {
+    "en": "Border width",
+    "it": "Larghezza del Bordo"
+  },
+  {
+    "en": "Both texts are identical",
+    "it": "Entrambi i testi sono identici"
+  },
+  {
+    "en": "Bottom",
+    "it": "In basso"
+  },
+  {
+    "en": "Bottom center",
+    "it": "Centro inferiore"
+  },
+  {
+    "en": "Bottom left",
+    "it": "Sinistra in basso"
+  },
+  {
+    "en": "Bottom right",
+    "it": "Destra in basso"
+  },
+  {
+    "en": "Box shadow",
+    "it": "Ombreggiatura riquadro"
+  },
+  {
+    "en": "Braces",
+    "it": "Bretelle"
+  },
+  {
+    "en": "Brightness",
+    "it": "Luminosità"
+  },
+  {
+    "en": "Broadcast",
+    "it": "Trasmetti"
+  },
+  {
+    "en": "Browser",
+    "it": "Browser"
+  },
+  {
+    "en": "Browser sketch pad with brush, eraser, and PNG export",
+    "it": "Blocco per schizzi del browser con pennello, gomma e⟧ esportazione ⟦0"
+  },
+  {
+    "en": "Build ICO",
+    "it": "Crea ICO"
+  },
+  {
+    "en": "Build a standard 5-field Cron expression from minute/hour/day/month/weekday options",
+    "it": "Crea un'⟧espressione ⟦0 standard a 5 campi dalle opzioni minuto/ora/giorno/mese/giorno feriale"
+  },
+  {
+    "en": "Build bar/line/area/pie/doughnut/scatter charts from CSV with legends and palettes",
+    "it": "Costruisci grafici a barre/a linee/ad area/a torta/ad anello/a dispersione da CSV con legende e tavolozze"
+  },
+  {
+    "en": "Bullet list",
+    "it": "Elenco delle pallottole"
+  },
+  {
+    "en": "Button",
+    "it": "Pulsante"
+  },
+  {
+    "en": "CIDR Calculator",
+    "it": "Calcolatrice"
+  },
+  {
+    "en": "CJK characters",
+    "it": "Caratteri CJK"
+  },
+  {
+    "en": "CONSTANT_CASE",
+    "it": "CONSTANT_CASE"
+  },
+  {
+    "en": "CSS Button Generator",
+    "it": "⟦0 Generatore⟧ di pulsanti"
+  },
+  {
+    "en": "CSS Gradient Generator",
+    "it": "⟦0 Generatore di⟧ gradiente"
+  },
+  {
+    "en": "CSS Minify / Beautify",
+    "it": "CSS Minimizza / Abbellisci"
+  },
+  {
+    "en": "CSS background",
+    "it": "Origini"
+  },
+  {
+    "en": "CSS color",
+    "it": "CSS colore"
+  },
+  {
+    "en": "CSS input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "CSS named colors (including Grey aliases and RebeccaPurple) for color / background use.",
+    "it": "⟦0 colori⟧ denominati (inclusi alias grigi e RebeccaPurple) per uso colore / sfondo."
+  },
+  {
+    "en": "CSS named colors with group filters and copy name / HEX / RGB",
+    "it": "⟦0 colori⟧ denominati con filtri di gruppo e nome della copia/ ESADECIMALE / RGB"
+  },
+  {
+    "en": "CSS3 Code Generator",
+    "it": "Generatore di codici"
+  },
+  {
+    "en": "Calculator",
+    "it": "Calcolatrice"
+  },
+  {
+    "en": "Calculus",
+    "it": "Analisi"
+  },
+  {
+    "en": "Calendar",
+    "it": "Calendario"
+  },
+  {
+    "en": "Camera make",
+    "it": "Marca fotocamera"
+  },
+  {
+    "en": "Cannot convert to the target format (CSV requires an array of objects)",
+    "it": "Impossibile convertire nel formato di destinazione (CSV richiede una matrice di oggetti)"
+  },
+  {
+    "en": "Cannot convert to the target format (e.g. TOML does not support top-level arrays/scalars)",
+    "it": "Impossibile convertire nel formato di destinazione (ad es. TOML non supporta array/scalari di primo livello)"
+  },
+  {
+    "en": "Cannot parse date/time (e.g. 2026-09-01 12:00:00 or ISO 8601)",
+    "it": "Impossibile analizzare data/ora (ad es. 2026-09-01 12:00:00 o ISO 8601)"
+  },
+  {
+    "en": "Cannot parse this SQL: please check the syntax",
+    "it": "Impossibile analizzare questo SQL: controlla la sintassi"
+  },
+  {
+    "en": "Cannot parse: check field count (5 or 6) and ranges (min 0-59 / hour 0-23 / day 1-31 / month 1-12 / weekday 0-7)",
+    "it": "Impossibile analizzare: controllare il conteggio dei campi (5 o 6) e gli intervalli (min 0-59 / ora 0-23 / giorno 1-31 / mese 1-12 / giorno feriale 0-7)"
+  },
+  {
+    "en": "Cannot parse: check the Unicode / UTF-8 representation",
+    "it": "Impossibile analizzare: controllare la⟧ rappresentazione Unicode /⟦0"
+  },
+  {
+    "en": "Cannot parse: check the radix and number format",
+    "it": "Impossibile analizzare: controllare il formato RADIX e numero"
+  },
+  {
+    "en": "Cannot parse: use HEX, RGB, or HSL format",
+    "it": "Impossibile analizzare: utilizzare il formato HEX, RGB o HSL"
+  },
+  {
+    "en": "Caption position",
+    "it": "Posizione didascalia"
+  },
+  {
+    "en": "Capturing group",
+    "it": "Gruppo di acquisizione"
+  },
+  {
+    "en": "Card title…",
+    "it": "Titolo della carta..."
+  },
+  {
+    "en": "Career",
+    "it": "Carriera"
+  },
+  {
+    "en": "Case Converter",
+    "it": "Convertitore di casse"
+  },
+  {
+    "en": "Categories follow WHO adult cutoffs for reference only — not medical advice.",
+    "it": "Le categorie SEGUONO i cutoff per adulti dell'OMS solo per riferimento — non per consulenza medica."
+  },
+  {
+    "en": "Category",
+    "it": "Categoria"
+  },
+  {
+    "en": "Cauchy–Schwarz",
+    "it": "Cauchy–Schwarz"
+  },
+  {
+    "en": "Center",
+    "it": "Centro"
+  },
+  {
+    "en": "Centimeter cm",
+    "it": "Centimetri (cm)"
+  },
+  {
+    "en": "Character class",
+    "it": "una classe di caratteri"
+  },
+  {
+    "en": "Character-level mapping; proper nouns may differ from OpenCC phrase dictionaries",
+    "it": "Mappatura a livello di carattere; i nomi propri possono differire dai dizionari di frasi OpenCC"
+  },
+  {
+    "en": "Characters (no spaces)",
+    "it": "Caratteri (senza spazi)"
+  },
+  {
+    "en": "Characters (with spaces)",
+    "it": "Caratteri (spazi inclusi)"
+  },
+  {
+    "en": "Charset",
+    "it": "Codifica di caratteri"
+  },
+  {
+    "en": "Chart Generator",
+    "it": "Generatore di grafici"
+  },
+  {
+    "en": "Cheat sheet (click to insert)",
+    "it": "Cheat sheet (clicca per inserire)"
+  },
+  {
+    "en": "Chinese",
+    "it": "Cinese"
+  },
+  {
+    "en": "Chinese to Pinyin",
+    "it": "Da cinese a pinyin"
+  },
+  {
+    "en": "Choose a preset…",
+    "it": "Selezionare un preset"
+  },
+  {
+    "en": "Choose an angle for all or selected pages.",
+    "it": "Scegli un angolo per tutte le pagine o per quelle selezionate."
+  },
+  {
+    "en": "Choose to fill in…",
+    "it": "Scegli di compilare..."
+  },
+  {
+    "en": "Ciphertext (base64)",
+    "it": "Testo cifrato (base64)"
+  },
+  {
+    "en": "Circle",
+    "it": "Circonferenza"
+  },
+  {
+    "en": "Classic formulas",
+    "it": "Formule classiche"
+  },
+  {
+    "en": "Clear",
+    "it": "Cancella"
+  },
+  {
+    "en": "Clear page",
+    "it": "Cancellare pagina nodo"
+  },
+  {
+    "en": "Click \"Generate\" to create a password",
+    "it": "Fai clic su \"Genera\" per creare una password"
+  },
+  {
+    "en": "Click a pixel on the image to sample",
+    "it": "Fai clic su un pixel sull'immagine per campionare"
+  },
+  {
+    "en": "Click a symbol to insert at the cursor; classic formulas replace the editor. Rendered by KaTeX; exotic macros may not work.",
+    "it": "Fare clic su un simbolo da inserire con il cursore; le formule classiche sostituiscono l'editor. Renderizzato da KaTeX; le macro esotiche potrebbero non funzionare."
+  },
+  {
+    "en": "Client-side image compression and format conversion (PNG / JPEG / WebP) with resize and quality",
+    "it": "Compressione dell'immagine lato client e conversione del formato (PNG ⟧/⟦1/WebP) con ridimensionamento e qualità"
+  },
+  {
+    "en": "Close menu",
+    "it": "Chiudi menu"
+  },
+  {
+    "en": "Code Highlighter",
+    "it": "Evidenziatore codice"
+  },
+  {
+    "en": "Code block (```)",
+    "it": "Blocco di codice"
+  },
+  {
+    "en": "Code point U+",
+    "it": "Codice punto U+"
+  },
+  {
+    "en": "Code to Image",
+    "it": "Code to Image"
+  },
+  {
+    "en": "Coding",
+    "it": "Programmazione"
+  },
+  {
+    "en": "Color",
+    "it": "Colore"
+  },
+  {
+    "en": "Color Converter",
+    "it": "Convertitore di colore"
+  },
+  {
+    "en": "Color must be #RGB or #RRGGBB",
+    "it": "Il colore deve essere #RGB o #RRGGBB"
+  },
+  {
+    "en": "Color preview",
+    "it": "Anteprima colore"
+  },
+  {
+    "en": "Color scheme",
+    "it": "Schema colori"
+  },
+  {
+    "en": "Combine images into a PDF",
+    "it": "Combina le immagini in uno PDF"
+  },
+  {
+    "en": "Combined text exceeds {{limit}}K character limit; diff stopped (long-run protection)",
+    "it": "Il testo combinato supera il limite di {{limit}} K caratteri; diff interrotto (protezione a lungo termine)"
+  },
+  {
+    "en": "Compile failed: {{message}}",
+    "it": "Compilazione non riuscita: {{message}}"
+  },
+  {
+    "en": "Compress (text → base64)",
+    "it": "Comprimi (testo → base64)"
+  },
+  {
+    "en": "Compute BMI from height and weight with WHO adult categories",
+    "it": "Calcola l'IMC da altezza e peso con le categorie di ADULTI DELL'OMS"
+  },
+  {
+    "en": "Computing…",
+    "it": "Informatica"
+  },
+  {
+    "en": "Config Data Format Converter",
+    "it": "Convertitore del formato dei dati di configurazione"
+  },
+  {
+    "en": "Contain",
+    "it": "Contiene"
+  },
+  {
+    "en": "Content is too long for a QR code: shorten it or lower the error correction level",
+    "it": "Il contenuto è troppo lungo per un⟧ codice ⟦0: abbreviarlo o abbassare il livello di correzione dell'errore"
+  },
+  {
+    "en": "Content too long (> 2KB), cannot create share link",
+    "it": "Contenuto troppo lungo (> 2KB), impossibile creare link di condivisione"
+  },
+  {
+    "en": "Contrast",
+    "it": "Contrasto"
+  },
+  {
+    "en": "Control characters without glyphs show as ·; copy the char or \\xHH",
+    "it": "I caratteri di controllo senza glifi vengono visualizzati come ·; copiare il carattere o \\xHH"
+  },
+  {
+    "en": "Conversion failed; check the SVG or reduce scale",
+    "it": "Conversione non riuscita; controllare lo SVG o ridurre la scala"
+  },
+  {
+    "en": "Conversion failed; try another image",
+    "it": "Conversione non riuscita; prova un'altra immagine"
+  },
+  {
+    "en": "Convert & download",
+    "it": "Converti e scarica"
+  },
+  {
+    "en": "Convert Chinese to pinyin with optional tones, separator, and case",
+    "it": "Converti il cinese in pinyin con toni, separatore e custodia opzionali"
+  },
+  {
+    "en": "Convert PDF to visual grayscale",
+    "it": "Converti ⟦0 in scala⟧ di grigi visiva"
+  },
+  {
+    "en": "Convert SVG markup or files to PNG with scale and transparency",
+    "it": "Converti SVG markup o file in PNG con scala e trasparenza"
+  },
+  {
+    "en": "Convert YAML ⇄ JSON ⇄ TOML via a lossless JS value intermediate",
+    "it": "Converti YAML ⇄ JSON ⇄ TOML tramite un valore JS lossless intermedio"
+  },
+  {
+    "en": "Convert and preview HEX / RGB / HSL color formats",
+    "it": "Converti e visualizza in anteprima i formati colore ESADECIMALE / RGB / HSL"
+  },
+  {
+    "en": "Convert and preview RGB, HSV, CMYK, and HEX color spaces",
+    "it": "Converti e visualizza in anteprima gli spazi colore RGB, HSV, CMYK e HEX"
+  },
+  {
+    "en": "Convert base 2/8/10/16 and visualize bitwise ops for 64-bit signed integers",
+    "it": "Convertire la base 2/8/10/16 e visualizzare le operazioni bit per bit per numeri interi con segno a 64 bit"
+  },
+  {
+    "en": "Convert between Simplified and Traditional Chinese",
+    "it": "Convertire tra cinese semplificato e tradizionale"
+  },
+  {
+    "en": "Convert case and naming styles (camel / snake / kebab, etc.)",
+    "it": "Convertire gli stili di case e naming (cammello / serpente / kebab, ecc.)"
+  },
+  {
+    "en": "Convert images to Base64 / Data URL and back, entirely locally",
+    "it": "Convertire le immagini in Base64/ Dati URL e viceversa, interamente in locale"
+  },
+  {
+    "en": "Convert images to multi-size ICO (favicon), or extract PNG from ICO",
+    "it": "Converti le immagini in ICO multi-size (favicon) o estrai PNG da ICO"
+  },
+  {
+    "en": "Convert metric and imperial length units (mm, cm, m, km, in, ft, and more)",
+    "it": "Converti unità di lunghezza metriche e imperiali (mm, cm, m, km, in, ft e altro)"
+  },
+  {
+    "en": "Convert metric and imperial weight units (mg, g, kg, t, oz, lb, st)",
+    "it": "Converti unità di peso metriche e imperiali (mg, g, kg, t, oz, lb, st)"
+  },
+  {
+    "en": "Convert text and Base64 with Unicode-safe encoding; URL Safe and file mode supported",
+    "it": "Converti testo e Base64 con codifica sicura Unicode; ⟦1 Modalità⟧ sicura e file supportata"
+  },
+  {
+    "en": "Convert text to/from \\uXXXX, code points, HTML entities, and UTF-8 bytes",
+    "it": "Converti testo in/da \\uXXXX, punti di codice, HTML entità e UTF-8 byte"
+  },
+  {
+    "en": "Copied",
+    "it": "Copiato"
+  },
+  {
+    "en": "Copy Data URL",
+    "it": "Copia dei dati"
+  },
+  {
+    "en": "Copy HTML",
+    "it": "Copia {0}"
+  },
+  {
+    "en": "Copy SVG",
+    "it": "Copia {0}"
+  },
+  {
+    "en": "Copy code",
+    "it": "Copiare codice"
+  },
+  {
+    "en": "Count",
+    "it": "Conteggio"
+  },
+  {
+    "en": "Count characters, words, lines, paragraphs, CJK chars, and UTF-8 bytes",
+    "it": "Conta caratteri, parole, righe, paragrafi, caratteri CJK e UTF-8 byte"
+  },
+  {
+    "en": "Count must be an integer from 1 to 100",
+    "it": "Il conteggio deve essere un numero intero compreso tra 1 e 100"
+  },
+  {
+    "en": "Count must be an integer from 1 to 1000",
+    "it": "Il conteggio deve essere un numero intero compreso tra 1 e 1000"
+  },
+  {
+    "en": "Count must be an integer from 1 to 50",
+    "it": "Il conteggio deve essere un numero intero compreso tra 1 e 50"
+  },
+  {
+    "en": "Count must be an integer ≥ 1",
+    "it": "Il conteggio deve essere un numero intero ≥ 1"
+  },
+  {
+    "en": "Countdown Timer",
+    "it": "Tempo Count Down"
+  },
+  {
+    "en": "Cover",
+    "it": "Coperchio"
+  },
+  {
+    "en": "Create PDF",
+    "it": "Crea {0}"
+  },
+  {
+    "en": "Creator",
+    "it": "Creatore"
+  },
+  {
+    "en": "Cron Expression Parser",
+    "it": "Cron Expression Parser"
+  },
+  {
+    "en": "Crontab Generator",
+    "it": "Generatore Crontab"
+  },
+  {
+    "en": "Crop & download",
+    "it": "Ritaglia e scarica"
+  },
+  {
+    "en": "Crop PDF",
+    "it": "Conferma"
+  },
+  {
+    "en": "Crop failed; please retry",
+    "it": "Ritaglio non riuscito; riprova"
+  },
+  {
+    "en": "Crop images freeform or with fixed aspect ratios to PNG",
+    "it": "Ritaglia le immagini a mano libera o con proporzioni fisse a PNG"
+  },
+  {
+    "en": "Crop page margins via cropBox",
+    "it": "Ritaglia i margini della pagina tramite cropBox"
+  },
+  {
+    "en": "Crypto & Hash",
+    "it": "Crittografia e hash"
+  },
+  {
+    "en": "Curated prompts by category with search and one-click copy",
+    "it": "Prompt curati per categoria con ricerca e copia con un clic"
+  },
+  {
+    "en": "Current code",
+    "it": "Codice in vigore"
+  },
+  {
+    "en": "Current time",
+    "it": "Ora corrente"
+  },
+  {
+    "en": "Custom",
+    "it": "Personalizzata"
+  },
+  {
+    "en": "Custom chars",
+    "it": "Caratteri personalizzati"
+  },
+  {
+    "en": "DER length",
+    "it": "DER LENGTH"
+  },
+  {
+    "en": "Daily at 00:00",
+    "it": "Tutti i giorni alle 00:00"
+  },
+  {
+    "en": "Dash -",
+    "it": "Dash"
+  },
+  {
+    "en": "Data (CSV)",
+    "it": "DATI 0"
+  },
+  {
+    "en": "Date & Time",
+    "it": "Data e ora"
+  },
+  {
+    "en": "Date (yyyy-mm-dd)",
+    "it": "Data (AAAA-MM-GG)"
+  },
+  {
+    "en": "Date/time input",
+    "it": "Inserimento data/ora"
+  },
+  {
+    "en": "Day of month",
+    "it": "Giorno del mese"
+  },
+  {
+    "en": "Day of week",
+    "it": "Giorno della settimana"
+  },
+  {
+    "en": "Day pillar {{day}}",
+    "it": "Giorno pilastro {{day}}"
+  },
+  {
+    "en": "Day type",
+    "it": "Tipo di giorno"
+  },
+  {
+    "en": "Decimal (&#38;)",
+    "it": "Decimale (&)"
+  },
+  {
+    "en": "Decimal / hex / char / name…",
+    "it": "Decimale / esadecimale / carattere / nome..."
+  },
+  {
+    "en": "Decimals",
+    "it": "N° decimali"
+  },
+  {
+    "en": "Decimals must be an integer from 0 to 10",
+    "it": "I decimali devono essere un numero intero compreso tra 0 e 10"
+  },
+  {
+    "en": "Decode",
+    "it": "Decodifica"
+  },
+  {
+    "en": "Decode (Base64 → text)",
+    "it": "Decodifica (Base64 → testo)"
+  },
+  {
+    "en": "Decode QR code",
+    "it": "Decodifica ⟧ codice ⟦0"
+  },
+  {
+    "en": "Decode accepts mixed notations; encode uses the selected format",
+    "it": "Decode accetta notazioni miste; Encode utilizza il formato selezionato"
+  },
+  {
+    "en": "Decode failed: malformed percent-encoding",
+    "it": "Decodifica non riuscita: codifica percentuale non corretta"
+  },
+  {
+    "en": "Decode failed: not valid Base64 input",
+    "it": "Decodifica non riuscita:⟧ input ⟦0 non valido"
+  },
+  {
+    "en": "Decoded result",
+    "it": "Risultato decodificato"
+  },
+  {
+    "en": "Decompress (base64 → text)",
+    "it": "Decomprimi (→testo base64)"
+  },
+  {
+    "en": "Decompress failed: not valid gzip data",
+    "it": "Decompressione non riuscita: dati gzip non validi"
+  },
+  {
+    "en": "Decrypt",
+    "it": "Decifra"
+  },
+  {
+    "en": "Decrypt failed: wrong key or corrupted data",
+    "it": "Decrittografia non riuscita: chiave errata o dati danneggiati"
+  },
+  {
+    "en": "Default",
+    "it": "Valore predefinito"
+  },
+  {
+    "en": "Defaults to dimensions",
+    "it": "Impostazioni predefinite per le dimensioni"
+  },
+  {
+    "en": "Defaults to user password if empty",
+    "it": "L'impostazione predefinita è la password utente se vuota"
+  },
+  {
+    "en": "Delay (s)",
+    "it": "Ritardo/i"
+  },
+  {
+    "en": "Delete & download",
+    "it": "Elimina scaricamento"
+  },
+  {
+    "en": "Delete PDF Pages",
+    "it": "Elimina {0} pagine"
+  },
+  {
+    "en": "Derivative definition",
+    "it": "Definizione dei derivati"
+  },
+  {
+    "en": "Developer Online Toolbox",
+    "it": "Toolbox online per sviluppatori"
+  },
+  {
+    "en": "Device",
+    "it": "Dispositivo"
+  },
+  {
+    "en": "Dialect",
+    "it": "dialettale"
+  },
+  {
+    "en": "Digit",
+    "it": "Cifra"
+  },
+  {
+    "en": "Digits",
+    "it": "Ignora"
+  },
+  {
+    "en": "Digits (0-9)",
+    "it": "Cifre (0-9)"
+  },
+  {
+    "en": "Direction",
+    "it": "Direzione"
+  },
+  {
+    "en": "Display mode",
+    "it": "Modalità di visualizzazione"
+  },
+  {
+    "en": "Division by zero",
+    "it": "Divisione per zero"
+  },
+  {
+    "en": "Document has no pages",
+    "it": "Il documento non ha pagine"
+  },
+  {
+    "en": "Doodle Board",
+    "it": "Doodle Board"
+  },
+  {
+    "en": "Doughnut",
+    "it": "Ciambella"
+  },
+  {
+    "en": "Download",
+    "it": "Scarica"
+  },
+  {
+    "en": "Download ICO",
+    "it": "Scarica ICO"
+  },
+  {
+    "en": "Download PNG",
+    "it": "Download PNG"
+  },
+  {
+    "en": "Download SVG",
+    "it": "Download SVG"
+  },
+  {
+    "en": "Download all frames",
+    "it": "Scarica tutti i frame"
+  },
+  {
+    "en": "Download as ZIP",
+    "it": "Scarica come ZIP"
+  },
+  {
+    "en": "Download merged PNG",
+    "it": "Download unito PNG"
+  },
+  {
+    "en": "Download stripped file",
+    "it": "Scarica il file rimosso"
+  },
+  {
+    "en": "Drag & drop a file here, or click to choose",
+    "it": "Rilascia qui I file o fa clic per scegliere"
+  },
+  {
+    "en": "Drag & drop a file here, or click to choose (MD5 streams; large files stay memory-safe)",
+    "it": "Trascina e rilascia un file qui o fai clic per scegliere (MD5 flussi; i file di grandi dimensioni rimangono sicuri per la memoria)"
+  },
+  {
+    "en": "Drag & drop an image here, or click to choose (PNG / JPEG / WebP / GIF, etc.)",
+    "it": "Trascina e rilascia un'immagine qui o fai clic per scegliere (PNG/JPEG/WebP/GIF, ecc.)"
+  },
+  {
+    "en": "Drag on the canvas to draw; mouse and touch supported",
+    "it": "Trascina sulla tela per disegnare; mouse e tocco supportati"
+  },
+  {
+    "en": "Drag to select in free mode, or edit values below",
+    "it": "Trascina per selezionare in modalità libera o modifica i valori qui sotto"
+  },
+  {
+    "en": "Draw at least one annotation first",
+    "it": "Disegna prima almeno un'annotazione"
+  },
+  {
+    "en": "Draw highlights, freehand, shapes, and text on PDF pages",
+    "it": "Disegna evidenziazioni, a mano libera, forme e testo su PDF pagine"
+  },
+  {
+    "en": "Draw or upload a signature image (visual, not certificate)",
+    "it": "Disegna o carica un'immagine della firma (visiva, non certificato)"
+  },
+  {
+    "en": "Draw signature",
+    "it": "Disegna la firma"
+  },
+  {
+    "en": "Drop a JPEG image",
+    "it": "Rilascia un'⟧immagine ⟦0"
+  },
+  {
+    "en": "Drop a PDF",
+    "it": "Lascia uno PDF"
+  },
+  {
+    "en": "Drop images",
+    "it": "Trascina qui le immagini"
+  },
+  {
+    "en": "Drop multiple PDFs",
+    "it": "Rilascia più PDF"
+  },
+  {
+    "en": "Drop or choose a .ico file",
+    "it": "Trascina o scegli un file .ico"
+  },
+  {
+    "en": "Drop or choose a .svg file",
+    "it": "Trascina o scegli un file .svg"
+  },
+  {
+    "en": "Drop or choose a GIF file",
+    "it": "Rilascia o scegli un⟧ file ⟦0"
+  },
+  {
+    "en": "Drop or choose a PNG / JPG / WebP image",
+    "it": "Rilascia o scegli un'⟧immagine PNG ⟧/⟦1/⟦2"
+  },
+  {
+    "en": "Drop or choose an image",
+    "it": "Rilascia o scegli un'immagine"
+  },
+  {
+    "en": "Drop or choose an image (PNG / JPEG / WebP / GIF, etc.)",
+    "it": "Rilasciare o scegliere un'immagine (PNG/JPEG/WebP/GIF, ecc.)"
+  },
+  {
+    "en": "Drop or choose an image containing a QR code (PNG / JPG, etc.)",
+    "it": "Rilascia o scegli un'immagine contenente un⟧ codice ⟦0 (PNG/JPG, ecc.)"
+  },
+  {
+    "en": "Drop or choose an image for the card",
+    "it": "Rilascia o scegli un'immagine per la carta"
+  },
+  {
+    "en": "Drop or choose an image to adjust",
+    "it": "Rilascia o scegli un'immagine da regolare"
+  },
+  {
+    "en": "Drop or choose an image to crop",
+    "it": "Rilascia o scegli un'immagine da ritagliare"
+  },
+  {
+    "en": "Drop or choose an image to watermark",
+    "it": "Rilascia o scegli un'immagine per la filigrana"
+  },
+  {
+    "en": "Duration (s)",
+    "it": "Durata (s)"
+  },
+  {
+    "en": "Duration must be greater than 0",
+    "it": "La durata deve essere maggiore di 0"
+  },
+  {
+    "en": "Edit linear / radial gradients with categorized presets and copy CSS",
+    "it": "Modifica gradienti lineari / radiali con preimpostazioni categorizzate e copia CSS"
+  },
+  {
+    "en": "Edit title, author, and other metadata, then download.",
+    "it": "Modifica titolo, autore e altri metadati, quindi scarica."
+  },
+  {
+    "en": "Ellipse",
+    "it": "Ellisse"
+  },
+  {
+    "en": "Email",
+    "it": "E-mail"
+  },
+  {
+    "en": "Enable tones",
+    "it": "Abilita toni"
+  },
+  {
+    "en": "Encode",
+    "it": "Codifica"
+  },
+  {
+    "en": "Encode (text → Base64)",
+    "it": "Encode (testo → Base64)"
+  },
+  {
+    "en": "Encode failed: input contains unpaired surrogate characters",
+    "it": "Codifica non riuscita: l'input contiene caratteri surrogati non accoppiati"
+  },
+  {
+    "en": "Encode/decode HTML special characters: named / decimal / hex / \\u escapes",
+    "it": "Codifica/decodifica ⟦0 caratteri⟧ speciali: nome / decimale / esadecimale / \\u escape"
+  },
+  {
+    "en": "Encoded text",
+    "it": "Testo codificato"
+  },
+  {
+    "en": "Encoding",
+    "it": "Codifica"
+  },
+  {
+    "en": "Encrypt",
+    "it": "Criptare"
+  },
+  {
+    "en": "Encrypt & download",
+    "it": "Crittografa e scarica"
+  },
+  {
+    "en": "Encrypt PDF",
+    "it": "Criptare"
+  },
+  {
+    "en": "Encrypt output: base64(salt|iv|ciphertext+tag); passphrase uses PBKDF2-SHA256",
+    "it": "Crittografare l'output: base64(salt|iv|ciphertext+tag); la passphrase utilizza PBKDF2-SHA256"
+  },
+  {
+    "en": "Encrypted",
+    "it": "Crittografato"
+  },
+  {
+    "en": "Encryption failed",
+    "it": "Cifratura non riuscita"
+  },
+  {
+    "en": "End of line",
+    "it": "Fine della riga"
+  },
+  {
+    "en": "Engine",
+    "it": "Motore"
+  },
+  {
+    "en": "Enter 6/8-digit code…",
+    "it": "Inserisci il codice a 6 cifre"
+  },
+  {
+    "en": "Enter Base64 or choose an image",
+    "it": "Inserisci Base64 o scegli un'immagine"
+  },
+  {
+    "en": "Enter Chinese, e.g. 你好世界…",
+    "it": "Inserisci il cinese, ad esempio你好世界..."
+  },
+  {
+    "en": "Enter Markdown headings or lists to generate a map",
+    "it": "Inserisci intestazioni o elenchi Markdown per generare una mappa"
+  },
+  {
+    "en": "Enter Markdown, e.g. # Heading…",
+    "it": "Inserisci Markdown, ad es. # Heading..."
+  },
+  {
+    "en": "Enter Mermaid syntax to render",
+    "it": "Inserisci la sintassi della sirena per eseguire il rendering"
+  },
+  {
+    "en": "Enter Simplified Chinese…",
+    "it": "Inserisci il cinese semplificato..."
+  },
+  {
+    "en": "Enter Traditional Chinese…",
+    "it": "Inserisci il cinese tradizionale..."
+  },
+  {
+    "en": "Enter \\u4e2d, U+4E2D, &#x4E2D;, or E4 B8 AD…",
+    "it": "Immettere \\u4e2d&#x4E2D;, U +4E2D o E4 B8 AD..."
+  },
+  {
+    "en": "Enter a formula to preview",
+    "it": "Inserisci una formula per visualizzare l'anteprima"
+  },
+  {
+    "en": "Enter a title or body to preview",
+    "it": "Inserisci un titolo o un corpo per visualizzare l'anteprima"
+  },
+  {
+    "en": "Enter a valid height and weight",
+    "it": "Inserisci un'altezza e un peso validi"
+  },
+  {
+    "en": "Enter a valid hours / minutes / seconds",
+    "it": "Inserisci ore / minuti / secondi validi"
+  },
+  {
+    "en": "Enter allowed characters…",
+    "it": "Inserisci i caratteri consentiti..."
+  },
+  {
+    "en": "Enter annotation text",
+    "it": "Inserisci il testo dell'annotazione"
+  },
+  {
+    "en": "Enter content to encode…",
+    "it": "Inserisci il contenuto da codificare..."
+  },
+  {
+    "en": "Enter content…",
+    "it": "Immettere contenuto."
+  },
+  {
+    "en": "Enter passphrase…",
+    "it": "Inserire la passphrase"
+  },
+  {
+    "en": "Enter text for the card…",
+    "it": "Inserisci il testo per la carta..."
+  },
+  {
+    "en": "Enter text or URL, e.g. https://example.com…",
+    "it": "Inserisci testo o URL, ad es. https://example.com..."
+  },
+  {
+    "en": "Enter text to convert…",
+    "it": "Inserisci il testo da convertire..."
+  },
+  {
+    "en": "Enter text to encode…",
+    "it": "Inserisci il testo da codificare..."
+  },
+  {
+    "en": "Enter text to hash…",
+    "it": "Inserisci il testo da hash..."
+  },
+  {
+    "en": "Enter text, e.g. 中 / A / 😀…",
+    "it": "Inserisci il testo, ad es.中/ A /😀..."
+  },
+  {
+    "en": "Enter the content to encode",
+    "it": "Inserisci il contenuto da codificare"
+  },
+  {
+    "en": "Enter the open password",
+    "it": "È necessario specificare una password per l'accesso all'account email."
+  },
+  {
+    "en": "Entropy ≈ {{bits}} bits",
+    "it": "Entropia ≈ {{bits}} bit"
+  },
+  {
+    "en": "Eraser",
+    "it": "Gomma per cancellare"
+  },
+  {
+    "en": "Error correction",
+    "it": "Correzione dell'errore"
+  },
+  {
+    "en": "Euler's identity",
+    "it": "Identità di Eulero"
+  },
+  {
+    "en": "Evening",
+    "it": "Sera"
+  },
+  {
+    "en": "Every (*)",
+    "it": "Ogni "
+  },
+  {
+    "en": "Every minute",
+    "it": "ogni minuto"
+  },
+  {
+    "en": "Exclude ambiguous characters (0 O 1 l I etc.)",
+    "it": "Escludi caratteri ambigui (0 O 1 l I ecc.)"
+  },
+  {
+    "en": "Expiration exp",
+    "it": "Scadenza EXP"
+  },
+  {
+    "en": "Expired",
+    "it": "scaduta"
+  },
+  {
+    "en": "Export JPG",
+    "it": "Esporta '{0}'"
+  },
+  {
+    "en": "Export PDF",
+    "it": "Esporta '{0}'"
+  },
+  {
+    "en": "Export PNG",
+    "it": "Esporta '{0}'"
+  },
+  {
+    "en": "Export SVG",
+    "it": "Esporta '{0}'"
+  },
+  {
+    "en": "Export annotated PDF",
+    "it": "Esporta annotati PDF"
+  },
+  {
+    "en": "Export failed; try another image",
+    "it": "Esportazione non riuscita; prova un'altra immagine"
+  },
+  {
+    "en": "Export images",
+    "it": "Esportare Immagini"
+  },
+  {
+    "en": "Exporting…",
+    "it": "Esportazione…"
+  },
+  {
+    "en": "Expression",
+    "it": "Espressione"
+  },
+  {
+    "en": "Extra",
+    "it": "Extra"
+  },
+  {
+    "en": "Extract & download",
+    "it": "Estrai e scarica"
+  },
+  {
+    "en": "Extract PDF Pages",
+    "it": "Estrai PDF pagine"
+  },
+  {
+    "en": "Extract selected pages into a new PDF",
+    "it": "Estrai le pagine selezionate in un nuovo PDF"
+  },
+  {
+    "en": "Extracted {{n}} sizes from {{name}}",
+    "it": "Estratto {{n}} taglie da {{name}}"
+  },
+  {
+    "en": "Extraversion E / Introversion I",
+    "it": "Estroversione E / Introversione I"
+  },
+  {
+    "en": "Failed to decode the image",
+    "it": "Impossibile decodificare l'immagine"
+  },
+  {
+    "en": "Failed to load PDF",
+    "it": "Impossibile caricare"
+  },
+  {
+    "en": "Failed to load the image",
+    "it": "Il percorso del file contenente i dati dell'immagine"
+  },
+  {
+    "en": "Failed to load the image: please make sure it is a valid image file",
+    "it": "Impossibile caricare l'immagine: assicurati che sia un file immagine valido"
+  },
+  {
+    "en": "Failed to parse GIF",
+    "it": "Analisi ⟦0 non riuscita⟧"
+  },
+  {
+    "en": "Failed to parse header: not valid base64url-encoded JSON",
+    "it": "Impossibile analizzare l'intestazione: base64url-encoded ⟦0 non valido⟧"
+  },
+  {
+    "en": "Failed to parse input: please check the syntax",
+    "it": "Impossibile analizzare l'input: controllare la sintassi"
+  },
+  {
+    "en": "Failed to parse payload: not valid base64url-encoded JSON",
+    "it": "Impossibile analizzare il payload: base64url-encoded ⟦0 non valido⟧"
+  },
+  {
+    "en": "Failed to read file contents",
+    "it": "Impossibile leggere i contenuti del file!"
+  },
+  {
+    "en": "Fairy pink",
+    "it": "Rosa fata"
+  },
+  {
+    "en": "Fake Data Generator",
+    "it": "Generatore di dati falsi"
+  },
+  {
+    "en": "Favorites",
+    "it": "Preferiti"
+  },
+  {
+    "en": "Field",
+    "it": "Campo"
+  },
+  {
+    "en": "Field breakdown",
+    "it": "Analisi dettagliata del campo"
+  },
+  {
+    "en": "File exceeds the {{max}} limit (current {{size}})",
+    "it": "Il file supera il⟧ limite di ⟦0 (corrente {{size}} )"
+  },
+  {
+    "en": "File hash failed: {{message}}",
+    "it": "Hash del file non riuscito: {{message}}"
+  },
+  {
+    "en": "File is empty",
+    "it": "File vuoto"
+  },
+  {
+    "en": "File mode: file → Base64 (ArrayBuffer chunks)",
+    "it": "Modalità file: file → Base64 (blocchi ArrayBuffer)"
+  },
+  {
+    "en": "File too large (recommend < 50MB)",
+    "it": "File troppo grande (consigliato < 50MB)"
+  },
+  {
+    "en": "Fill current (seconds)",
+    "it": "Corrente di riempimento (secondi)"
+  },
+  {
+    "en": "Filter",
+    "it": "Filtro"
+  },
+  {
+    "en": "Filter tools",
+    "it": "Filtra strumenti"
+  },
+  {
+    "en": "Filter…",
+    "it": "Filtra…"
+  },
+  {
+    "en": "Fire sky",
+    "it": "Cielo di fuoco"
+  },
+  {
+    "en": "First host",
+    "it": "Primo host"
+  },
+  {
+    "en": "Fit images to A3/A4/A5/Letter and export PDF",
+    "it": "Adatta le immagini a A3/A4/A5/Letter ed esporta PDF"
+  },
+  {
+    "en": "Flags",
+    "it": "Flag"
+  },
+  {
+    "en": "Flame",
+    "it": "Fiamma"
+  },
+  {
+    "en": "Font size",
+    "it": "Dimensioni font"
+  },
+  {
+    "en": "Font size / width / padding / line height out of range",
+    "it": "Dimensione / larghezza/imbottitura /altezza della linea del carattere fuori dall'intervallo"
+  },
+  {
+    "en": "Foot ft",
+    "it": "Piede ft"
+  },
+  {
+    "en": "Footer",
+    "it": "Fondo"
+  },
+  {
+    "en": "Foreground",
+    "it": "Primo piano"
+  },
+  {
+    "en": "Forest",
+    "it": "Foresta"
+  },
+  {
+    "en": "Format",
+    "it": "Formato"
+  },
+  {
+    "en": "Format / minify / validate with 2/4-space indent and line/column error locations",
+    "it": "Formatta / minimizza / convalida con rientro di 2/4 di spazio e posizioni degli errori di riga/colonna"
+  },
+  {
+    "en": "Format supports {n} and {total}.",
+    "it": "Il formato supporta {n} e {total}."
+  },
+  {
+    "en": "Formatting",
+    "it": "Formattazione"
+  },
+  {
+    "en": "Fourier transform",
+    "it": "Trasformata di Fourier"
+  },
+  {
+    "en": "Friday",
+    "it": "Venerdì"
+  },
+  {
+    "en": "Frost",
+    "it": "Gelo"
+  },
+  {
+    "en": "Full URL (keeps : / ? & etc.)",
+    "it": "⟦0 completo⟧ (mantiene : / ? & ecc.)"
+  },
+  {
+    "en": "Full width",
+    "it": "A tutto schermo"
+  },
+  {
+    "en": "Functions",
+    "it": "Funzioni"
+  },
+  {
+    "en": "GFM (tables / strikethrough / task lists)",
+    "it": "GFM (tabelle / barrato /elenchi attività)"
+  },
+  {
+    "en": "GIF Frame Extractor",
+    "it": "Estrazioni Frame"
+  },
+  {
+    "en": "Galaxy",
+    "it": "Galassia"
+  },
+  {
+    "en": "Galaxy color",
+    "it": "Colore della galassia"
+  },
+  {
+    "en": "Gap (px)",
+    "it": "Spaziatura (px)"
+  },
+  {
+    "en": "Gaussian integral",
+    "it": "Integrale gaussiano"
+  },
+  {
+    "en": "Generate",
+    "it": "Genera"
+  },
+  {
+    "en": "Generate a placeholder PNG by size, colors, and optional text",
+    "it": "Genera un segnaposto PNG per dimensione, colori e testo opzionale"
+  },
+  {
+    "en": "Generate and decode QR codes with ECC, size, colors, and margin options",
+    "it": "Genera e decodifica QR codici con ecc, dimensioni, colori e opzioni di margine"
+  },
+  {
+    "en": "Generate border-radius, shadows, transform, filter, and more",
+    "it": "Genera raggio di confine, ombre, trasforma, filtra e altro ancora"
+  },
+  {
+    "en": "Generate names / emails / UUIDs / lorem in zh/en, 1–50 items",
+    "it": "Genera nomi / email / UUID / lorem in zh/en, 1–50 elementi"
+  },
+  {
+    "en": "Generate random integers or decimals in a range, with optional unique values",
+    "it": "Genera numeri interi o decimali casuali in un intervallo, con valori univoci opzionali"
+  },
+  {
+    "en": "Generate random strings by length and charset (alnum / hex / custom)",
+    "it": "Genera stringhe casuali per lunghezza e set di caratteri (alnum / hex / custom)"
+  },
+  {
+    "en": "Generated (one per line)",
+    "it": "Generato (uno per riga)"
+  },
+  {
+    "en": "Generators",
+    "it": "Generatori"
+  },
+  {
+    "en": "Generic SQL",
+    "it": "Generale"
+  },
+  {
+    "en": "Glacier",
+    "it": "ghiacciai."
+  },
+  {
+    "en": "Golden sun",
+    "it": "sole d'oro"
+  },
+  {
+    "en": "Gradient",
+    "it": "Gradiente"
+  },
+  {
+    "en": "Gradient preview",
+    "it": "Anteprima sfumatura"
+  },
+  {
+    "en": "Gram g",
+    "it": "Grammo - g"
+  },
+  {
+    "en": "Grape",
+    "it": "Uva"
+  },
+  {
+    "en": "Graphite",
+    "it": "Grafite"
+  },
+  {
+    "en": "Grayscale",
+    "it": "Scala di grigi"
+  },
+  {
+    "en": "Greek letters",
+    "it": "Lettere greche"
+  },
+  {
+    "en": "Green",
+    "it": "Fagiolini"
+  },
+  {
+    "en": "Group",
+    "it": "Group"
+  },
+  {
+    "en": "Groups",
+    "it": "Gruppi"
+  },
+  {
+    "en": "Gzip Compress",
+    "it": "Compressione Gzip"
+  },
+  {
+    "en": "Gzip text to base64 / decompress back to text",
+    "it": "Gzip text to base64 / decompressione back to text"
+  },
+  {
+    "en": "H (~30%)",
+    "it": "H : 30"
+  },
+  {
+    "en": "HMAC secret…",
+    "it": "Segreto"
+  },
+  {
+    "en": "HMAC-SHA256 / SHA512 with hex / base64 output",
+    "it": "HMAC-SHA256 / SHA512 con uscita esagonale / base64"
+  },
+  {
+    "en": "HSV / CMYK Converter",
+    "it": "Convertitore HSV / CMYK"
+  },
+  {
+    "en": "HTML &#x…;",
+    "it": "0 X"
+  },
+  {
+    "en": "HTML &#…;",
+    "it": "HTML &#…;"
+  },
+  {
+    "en": "HTML Color Picker",
+    "it": "Seleziona colore"
+  },
+  {
+    "en": "HTML Encode / Decode",
+    "it": "HTML Codifica / Decodifica"
+  },
+  {
+    "en": "HTML Minify / Beautify",
+    "it": "HTML Minimizza / Abbellisci"
+  },
+  {
+    "en": "HTML input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "HTML preview",
+    "it": "Anteprima: {0}"
+  },
+  {
+    "en": "HTML style",
+    "it": "HTML stile"
+  },
+  {
+    "en": "Harbor",
+    "it": "Porto"
+  },
+  {
+    "en": "Has EXIF",
+    "it": "Ha EXIF"
+  },
+  {
+    "en": "Hash Calculator",
+    "it": "Calcolatore di hash"
+  },
+  {
+    "en": "Hash failed: algorithm not supported in this environment",
+    "it": "Hash non riuscito: algoritmo non supportato in questo ambiente"
+  },
+  {
+    "en": "Header",
+    "it": "Intestazione"
+  },
+  {
+    "en": "Heading 1 (#)",
+    "it": "Intestazione 1"
+  },
+  {
+    "en": "Heading 2 (##)",
+    "it": "Intestazione 2"
+  },
+  {
+    "en": "Heading 3 (###)",
+    "it": "Intestazione 3"
+  },
+  {
+    "en": "Heading 4 (####)",
+    "it": "Intestazione 4"
+  },
+  {
+    "en": "Heading 5 (#####)",
+    "it": "Intestazione 5"
+  },
+  {
+    "en": "Heading 6 (######)",
+    "it": "Intestazione 6"
+  },
+  {
+    "en": "Hei (sans CJK)",
+    "it": "Hei (senza CJK)"
+  },
+  {
+    "en": "Height",
+    "it": "Altezza"
+  },
+  {
+    "en": "Height (cm, or meters)",
+    "it": "Altezza (cm o metri)"
+  },
+  {
+    "en": "Height (inches)",
+    "it": "Statura (centimetri)"
+  },
+  {
+    "en": "Hex (&#x26;)",
+    "it": "Esagonale (&)"
+  },
+  {
+    "en": "Hex Encode / Decode",
+    "it": "Codifica / decodifica esadecimale"
+  },
+  {
+    "en": "Hex ↔ UTF-8 text with optional spaces",
+    "it": "⟧ Testo esadecimale ↔ ⟦0 con spazi opzionali"
+  },
+  {
+    "en": "Hidden",
+    "it": "Nascosto"
+  },
+  {
+    "en": "Highlight",
+    "it": "Evidenzia"
+  },
+  {
+    "en": "Highlighted preview",
+    "it": "Anteprima evidenziata"
+  },
+  {
+    "en": "Hold Ctrl / ⌘ and scroll to zoom in the preview",
+    "it": "Tieni premuto CTRL /e scorri per ingrandire l'anteprima"
+  },
+  {
+    "en": "Holiday",
+    "it": "Festivo"
+  },
+  {
+    "en": "Holidays / terms",
+    "it": "Ferie / termini"
+  },
+  {
+    "en": "Honey gold",
+    "it": "Oro miele"
+  },
+  {
+    "en": "Horizon",
+    "it": "Orizzonte"
+  },
+  {
+    "en": "Horizontal",
+    "it": "Orizzontali"
+  },
+  {
+    "en": "Horizontal bar",
+    "it": "Barra orizzontale"
+  },
+  {
+    "en": "Horizontal rule",
+    "it": "Elemento HTML"
+  },
+  {
+    "en": "Host count",
+    "it": "Conteggio degli host"
+  },
+  {
+    "en": "Hourly (on the hour)",
+    "it": "Ogni ora (all'ora)"
+  },
+  {
+    "en": "Hover",
+    "it": "Passaggio del mouse"
+  },
+  {
+    "en": "Hue rotate",
+    "it": "Tinta-Rotazione"
+  },
+  {
+    "en": "Hyphens",
+    "it": "Sillabazioni"
+  },
+  {
+    "en": "ICO Converter",
+    "it": "Convertitore ICO"
+  },
+  {
+    "en": "ICO → PNG",
+    "it": "ICO"
+  },
+  {
+    "en": "ID card (18 digits)",
+    "it": "Carta d'identità (18 cifre)"
+  },
+  {
+    "en": "IPv4 CIDR: network / broadcast / host range / mask / host count",
+    "it": "IPv4 CIDR: network / broadcast / host range / mask / host count"
+  },
+  {
+    "en": "IPv4 address",
+    "it": "Indirizzo 0"
+  },
+  {
+    "en": "Ice blue",
+    "it": "Azzurro ghiaccio"
+  },
+  {
+    "en": "Iceberg",
+    "it": "Iceberg"
+  },
+  {
+    "en": "Ignore trailing / repeated spaces",
+    "it": "Ignora spazi finali / ripetuti"
+  },
+  {
+    "en": "Image",
+    "it": "Immagine"
+  },
+  {
+    "en": "Image (PNG/JPG)",
+    "it": "Immagine (PNG/JPG)"
+  },
+  {
+    "en": "Image Border / Radius / Shadow",
+    "it": "Bordo / raggio / ombra immagine"
+  },
+  {
+    "en": "Image Color Adjust",
+    "it": "Regolazione del colore dell'immagine"
+  },
+  {
+    "en": "Image Color Picker",
+    "it": "Selettore colore immagine"
+  },
+  {
+    "en": "Image Compress",
+    "it": "Compressione immagine"
+  },
+  {
+    "en": "Image Crop",
+    "it": "Ritaglio immagine"
+  },
+  {
+    "en": "Image Merge",
+    "it": "Unione immagini"
+  },
+  {
+    "en": "Image Watermark",
+    "it": "Image Watermark"
+  },
+  {
+    "en": "Image encode failed: ensure the browser supports this format, or try another image",
+    "it": "Codifica immagine non riuscita: assicurati che il browser supporti questo formato o prova un'altra immagine"
+  },
+  {
+    "en": "Image limit reached",
+    "it": "Limite immagine raggiunto"
+  },
+  {
+    "en": "Image to Card",
+    "it": "Immagine su carta"
+  },
+  {
+    "en": "Image to Paper PDF",
+    "it": "Immagine su carta PDF"
+  },
+  {
+    "en": "Image → Base64",
+    "it": "Immagine 0"
+  },
+  {
+    "en": "Image → ICO",
+    "it": "Immagine → ICO"
+  },
+  {
+    "en": "Image ↔ Base64",
+    "it": "Immagine 0"
+  },
+  {
+    "en": "Images",
+    "it": "Immagini"
+  },
+  {
+    "en": "Images to PDF",
+    "it": "Immagini a PDF"
+  },
+  {
+    "en": "Imperial (in / lb)",
+    "it": "Imperiale (in / lb)"
+  },
+  {
+    "en": "Inch in",
+    "it": "pollici (in)"
+  },
+  {
+    "en": "Include at least one char from each selected set",
+    "it": "Includi almeno un carattere da ciascun set selezionato"
+  },
+  {
+    "en": "Incorrect password. Please try again.",
+    "it": "Password sbagliata. Prova di nuovo"
+  },
+  {
+    "en": "Indent",
+    "it": "Rientro"
+  },
+  {
+    "en": "Index",
+    "it": "Indice"
+  },
+  {
+    "en": "Indigo purple",
+    "it": "Viola indaco"
+  },
+  {
+    "en": "Ink black",
+    "it": "Nero inchiostro"
+  },
+  {
+    "en": "Inline code (`)",
+    "it": "Codice inline (`)"
+  },
+  {
+    "en": "Input",
+    "it": "Input"
+  },
+  {
+    "en": "Input exceeds the 5MB limit; use file mode for large content",
+    "it": "L'input supera il limite di 5 MB; utilizzare la modalità file per contenuti di grandi dimensioni"
+  },
+  {
+    "en": "Insert & download",
+    "it": "Inserisci Download"
+  },
+  {
+    "en": "Insert Image into PDF",
+    "it": "Inserisci immagine in PDF"
+  },
+  {
+    "en": "Inset",
+    "it": "Inset"
+  },
+  {
+    "en": "Integer input",
+    "it": "Ingresso intero"
+  },
+  {
+    "en": "Invalid Base64",
+    "it": "{0} non valido.&#x0D;"
+  },
+  {
+    "en": "Invalid CIDR (IPv4/prefix, e.g. 10.0.0.0/8)",
+    "it": "CIDR (IPv4/prefisso non valido, ad es. 10.0.0.0/8)"
+  },
+  {
+    "en": "Invalid PEM",
+    "it": "PEM non valido"
+  },
+  {
+    "en": "Invalid URL",
+    "it": "{0} non valido.&#x0D;"
+  },
+  {
+    "en": "Invalid XML",
+    "it": "{0} non valido.&#x0D;"
+  },
+  {
+    "en": "Invalid XSLT",
+    "it": "XSLT non valido"
+  },
+  {
+    "en": "Invalid character \"{{char}}\" at position {{position}}",
+    "it": "Carattere \" {{char}} \" non valido nella posizione {{position}}"
+  },
+  {
+    "en": "Invalid crop region",
+    "it": "Regione di coltura non valida"
+  },
+  {
+    "en": "Invalid data format",
+    "it": "Formato dati non valido"
+  },
+  {
+    "en": "Invalid expression syntax",
+    "it": "Sintassi dell'espressione non valida"
+  },
+  {
+    "en": "Invalid field value; check ranges and lists",
+    "it": "Valore del campo non valido; intervalli ed elenchi di controllo"
+  },
+  {
+    "en": "Invalid format: a JWT consists of header.payload.signature",
+    "it": "Formato non valido: uno JWT è costituito da header.payload.signature"
+  },
+  {
+    "en": "Invalid hex (even length, 0-9a-f)",
+    "it": "Hex non valido (lunghezza pari, 0-9a-f)"
+  },
+  {
+    "en": "Invalid image size",
+    "it": "Dimensione dell'immagine non valido"
+  },
+  {
+    "en": "Invalid input",
+    "it": "Input non valido"
+  },
+  {
+    "en": "Invalid input: bad ciphertext or IV",
+    "it": "Input non valido: testo cifrato errato o IV"
+  },
+  {
+    "en": "Invalid key: check passphrase or hex key length",
+    "it": "Chiave non valida: controlla la passphrase o la lunghezza della chiave esadecimale"
+  },
+  {
+    "en": "Invalid length: Base64 content length mod 4 cannot be 1",
+    "it": "Lunghezza non valida: ⟦0 lunghezza⟧ contenuto mod 4 non può essere 1"
+  },
+  {
+    "en": "Invalid margin",
+    "it": "Margine superiore non valido."
+  },
+  {
+    "en": "Invalid or corrupt ICO file",
+    "it": "\"File danneggiato o non valido\""
+  },
+  {
+    "en": "Invalid output size (check scale; max edge 8192)",
+    "it": "Dimensione di uscita non valida (scala di controllo; bordo massimo 8192)"
+  },
+  {
+    "en": "Invalid padding \"=\" at position {{position}}",
+    "it": "Padding non valido \"=\" in posizione {{position}}"
+  },
+  {
+    "en": "Invalid page range",
+    "it": "Intervallo pagine non valido."
+  },
+  {
+    "en": "Invalid range: ensure min ≤ max and enough room when unique",
+    "it": "Intervallo non valido: garantire min ≤ max e spazio sufficiente quando unico"
+  },
+  {
+    "en": "Issued at iat",
+    "it": "Emesso a"
+  },
+  {
+    "en": "Issuer CN",
+    "it": "CN emittente"
+  },
+  {
+    "en": "Italic (*)",
+    "it": "Corsivo"
+  },
+  {
+    "en": "Ivory",
+    "it": "Avorio"
+  },
+  {
+    "en": "JPEG only",
+    "it": "solo 0"
+  },
+  {
+    "en": "JPEG only: strip APP1 (EXIF) and download.",
+    "it": "⟧ Solo⟦ 0: strip APP1 (EXIF) e download."
+  },
+  {
+    "en": "JS Minify / Beautify",
+    "it": "JS Minify / Beautify"
+  },
+  {
+    "en": "JS \\uXXXX",
+    "it": "JS \\uXXXX"
+  },
+  {
+    "en": "JS \\u{…}",
+    "it": "JS \\u{…}"
+  },
+  {
+    "en": "JSON Converter",
+    "it": "Convertitore"
+  },
+  {
+    "en": "JSON Formatter",
+    "it": "programma di formattazione"
+  },
+  {
+    "en": "JSON input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "JSON output",
+    "it": "JSON output"
+  },
+  {
+    "en": "JSON parse failed",
+    "it": "Parse fallito!"
+  },
+  {
+    "en": "JSON parse failed: digits required after decimal point (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: cifre richieste dopo la virgola decimale (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: digits required in exponent (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: cifre richieste nell'esponente (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: expected literal \"{{literal}}\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: letterale previsto \" {{literal}} \" (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: extra content after value (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: contenuto extra dopo il valore (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: input is empty",
+    "it": "JSON analisi non riuscita: l'input è vuoto"
+  },
+  {
+    "en": "JSON parse failed: invalid \\u escape, need 4 hex digits (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: escape non valido \\u, sono necessarie 4 cifre esadecimali (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: invalid character \"{{char}}\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: carattere \" {{char}} \" non valido (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: invalid escape \"\\{{char}}\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: escape non valido \"\\ {{char}} \" (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: invalid number (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: numero non valido (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: missing \",\" between array elements (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: manca \",\" tra gli elementi dell'array (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: missing \",\" between object members (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: manca \",\" tra i membri dell'oggetto (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: missing \":\" after object key (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: manca \":\" dopo la chiave dell'oggetto (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: object key must be a string (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: la chiave dell'oggetto deve essere una stringa (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: please check the syntax",
+    "it": "JSON analisi non riuscita: controllare la sintassi"
+  },
+  {
+    "en": "JSON parse failed: string cannot span lines (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: la stringa non può estendersi sulle righe (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: string ended unexpectedly (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: stringa terminata inaspettatamente (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: trailing comma not allowed (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: virgola finale non consentita (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unclosed array, missing \"]\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: matrice non chiusa, manca \"]\" (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unclosed object, missing \"}\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: oggetto non chiuso, \"}\" mancante (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unclosed string (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: stringa non chiusa (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unexpected end, value missing (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: fine imprevista, valore mancante (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unknown error",
+    "it": "JSON analisi non riuscita: errore sconosciuto"
+  },
+  {
+    "en": "JSON parse failed: value missing (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: valore mancante (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSONPath Query",
+    "it": "Query JSONPath"
+  },
+  {
+    "en": "JWT Parser",
+    "it": "Analizzatore"
+  },
+  {
+    "en": "JWT input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "JavaScript input",
+    "it": "Input JavaScript"
+  },
+  {
+    "en": "Judging J / Perceiving P",
+    "it": "Giudizio J / Percezione P"
+  },
+  {
+    "en": "Jungle",
+    "it": "Giungla"
+  },
+  {
+    "en": "Key mode",
+    "it": "Modalità chiave"
+  },
+  {
+    "en": "Keyword case",
+    "it": "Keyword case"
+  },
+  {
+    "en": "Keywords",
+    "it": "Keywords"
+  },
+  {
+    "en": "Keywords…",
+    "it": "Parole chiave"
+  },
+  {
+    "en": "Kilogram kg",
+    "it": "Chilogrammo (kg)"
+  },
+  {
+    "en": "Kilometer km",
+    "it": "Chilometri (km):"
+  },
+  {
+    "en": "L (~7%)",
+    "it": "L/7"
+  },
+  {
+    "en": "LaTeX Math Editor",
+    "it": "Editor matematico LaTeX"
+  },
+  {
+    "en": "Label",
+    "it": "Label"
+  },
+  {
+    "en": "Lagoon",
+    "it": "Laguna"
+  },
+  {
+    "en": "Lake dusk",
+    "it": "Crepuscolo del lago"
+  },
+  {
+    "en": "Landscape",
+    "it": "Orizzontale"
+  },
+  {
+    "en": "Language",
+    "it": "Lingua"
+  },
+  {
+    "en": "Lap time",
+    "it": "Tempo di esecuzione"
+  },
+  {
+    "en": "Large input (> 500KB), real-time compute may slow down",
+    "it": "Ingresso di grandi dimensioni (> 500 KB), il calcolo in tempo reale potrebbe rallentare"
+  },
+  {
+    "en": "Last host",
+    "it": "Ultimo host"
+  },
+  {
+    "en": "Lavender",
+    "it": "Lavanda"
+  },
+  {
+    "en": "Lavender mist",
+    "it": "nebbia di lavanda"
+  },
+  {
+    "en": "Layout",
+    "it": "Layout"
+  },
+  {
+    "en": "Layout a title and body into a styled card and export PNG",
+    "it": "Disponi un titolo e un corpo in una carta stilizzata ed esporta PNG"
+  },
+  {
+    "en": "Leaf glow",
+    "it": "Bagliore fogliare"
+  },
+  {
+    "en": "Learning",
+    "it": "Apprendimento"
+  },
+  {
+    "en": "Leave empty for all",
+    "it": "Lasciare vuoto per tutti"
+  },
+  {
+    "en": "Legend",
+    "it": "Legend"
+  },
+  {
+    "en": "Length",
+    "it": "Lung."
+  },
+  {
+    "en": "Length Converter",
+    "it": "Convertitore di lunghezza"
+  },
+  {
+    "en": "Length must be an integer from 1 to 256",
+    "it": "La lunghezza deve essere un numero intero compreso tra 1 e 256"
+  },
+  {
+    "en": "Length must be between 4 and 128",
+    "it": "La lunghezza deve essere compresa tra 4 e 128"
+  },
+  {
+    "en": "Letters",
+    "it": "Lettere"
+  },
+  {
+    "en": "Light",
+    "it": "Chiaro"
+  },
+  {
+    "en": "Lilac",
+    "it": "Lillà"
+  },
+  {
+    "en": "Line breaks → <br>",
+    "it": "Interruzioni riga"
+  },
+  {
+    "en": "Line height",
+    "it": "Altezza della linea"
+  },
+  {
+    "en": "Line numbers",
+    "it": "Numeri di riga:"
+  },
+  {
+    "en": "Linear",
+    "it": "Lineare"
+  },
+  {
+    "en": "Linen",
+    "it": "Lino"
+  },
+  {
+    "en": "Lines",
+    "it": "Linee"
+  },
+  {
+    "en": "Link corners",
+    "it": "Collega gli angoli"
+  },
+  {
+    "en": "Live GFM rendering with DOMPurify sanitization for safe preview",
+    "it": "Rendering GFM live con sanificazione DOMPurify per un'anteprima sicura"
+  },
+  {
+    "en": "Live syntax highlighting with line numbers and HTML snippet copy",
+    "it": "Evidenziazione sintassi live con numeri di riga e HTML snippet copy"
+  },
+  {
+    "en": "Load sample",
+    "it": "Carica esempio"
+  },
+  {
+    "en": "Loading",
+    "it": "Caricamento"
+  },
+  {
+    "en": "Local only",
+    "it": "Solo locale"
+  },
+  {
+    "en": "Local preview — nothing is uploaded.",
+    "it": "Anteprima locale — non viene caricato nulla."
+  },
+  {
+    "en": "Local time",
+    "it": "Ora locale"
+  },
+  {
+    "en": "Local-first processing; data stays in your browser (CSP, zero egress) · Press <1>⌘K</1> or <3>/</3> to search",
+    "it": "Elaborazione prima locale; i dati rimangono nel browser (CSP, zero uscita) · Premi <1>⌘K</1> o <3>/</3> per cercare"
+  },
+  {
+    "en": "Local: {{local}} · {{utc}}",
+    "it": "Locale: {{local}} · {{utc}}"
+  },
+  {
+    "en": "Locale",
+    "it": "Impostazioni locali"
+  },
+  {
+    "en": "Logic",
+    "it": "Logica"
+  },
+  {
+    "en": "Lotus",
+    "it": "Loto"
+  },
+  {
+    "en": "Lowercase",
+    "it": "Minuscolo"
+  },
+  {
+    "en": "Lowercase (a-z)",
+    "it": "Minuscole (a-z)"
+  },
+  {
+    "en": "Lunar date",
+    "it": "Data lunare"
+  },
+  {
+    "en": "M (~15%)",
+    "it": "M 15"
+  },
+  {
+    "en": "MBTI Personality Test",
+    "it": "Test della personalità"
+  },
+  {
+    "en": "MD5 / SHA-1 / SHA-256 / SHA-512 for text and files (streaming), hex / base64 output",
+    "it": "MD5/SHA-1/SHA-256/SHA-512 per testo e file (streaming), output hex / base64"
+  },
+  {
+    "en": "Magnolia",
+    "it": "Magnolia"
+  },
+  {
+    "en": "Mango dusk",
+    "it": "Crepuscolo di mango"
+  },
+  {
+    "en": "Margin",
+    "it": "Margine"
+  },
+  {
+    "en": "Margin (mm)",
+    "it": "Margine (mm)"
+  },
+  {
+    "en": "Margin must be an integer from 0 to 10 (modules)",
+    "it": "Il margine deve essere un numero intero da 0 a 10 (moduli)"
+  },
+  {
+    "en": "Margins in PDF points (pt ≈ 1/72 inch).",
+    "it": "Margini in PDF punti (pt ≈ 1/72 pollici)."
+  },
+  {
+    "en": "MariaDB",
+    "it": "MariaDB"
+  },
+  {
+    "en": "Markdown",
+    "it": "Markdown"
+  },
+  {
+    "en": "Markdown Mind Map",
+    "it": "Mappa mentale Markdown"
+  },
+  {
+    "en": "Markdown Preview",
+    "it": "Anteprima ribasso"
+  },
+  {
+    "en": "Markdown editing toolbar",
+    "it": "Barra degli strumenti di modifica dei ribassi"
+  },
+  {
+    "en": "Markdown editor",
+    "it": "Editor ribassi"
+  },
+  {
+    "en": "Markdown to Image",
+    "it": "Ribasso sull'immagine"
+  },
+  {
+    "en": "Marketing",
+    "it": "Obiettivi"
+  },
+  {
+    "en": "Mass–energy",
+    "it": "Massa-energia"
+  },
+  {
+    "en": "Match",
+    "it": "Match"
+  },
+  {
+    "en": "Match highlighting, replace, capture groups, presets, and cheat sheet",
+    "it": "Evidenziazione delle corrispondenze, sostituzione, acquisizione di gruppi, preimpostazioni e cheat sheet"
+  },
+  {
+    "en": "Matcha",
+    "it": "Matcha"
+  },
+  {
+    "en": "Matches every value in this field",
+    "it": "Corrisponde a ogni valore in questo campo"
+  },
+  {
+    "en": "Matrices & vectors",
+    "it": "Matrici e vettori"
+  },
+  {
+    "en": "Max dimension",
+    "it": "MAx dimensione"
+  },
+  {
+    "en": "Max {{size}}",
+    "it": "Max: 0"
+  },
+  {
+    "en": "Maximum {{max}} UUIDs per batch",
+    "it": "Massimo {{max}} UUID per lotto"
+  },
+  {
+    "en": "Maxwell's equation",
+    "it": "Equazione di Maxwell"
+  },
+  {
+    "en": "Meadow",
+    "it": "Prato"
+  },
+  {
+    "en": "Meaning",
+    "it": "Significato"
+  },
+  {
+    "en": "Medium",
+    "it": "Medio"
+  },
+  {
+    "en": "Merge & download",
+    "it": "Unisci e scarica"
+  },
+  {
+    "en": "Merge PDF",
+    "it": "Unisci"
+  },
+  {
+    "en": "Merge failed; please retry",
+    "it": "Unione non riuscita; riprova"
+  },
+  {
+    "en": "Merge multiple PDFs into one file",
+    "it": "Unisci più PDF in un unico file"
+  },
+  {
+    "en": "Merges locally — nothing is uploaded. Prefer files < 50MB.",
+    "it": "Unisce localmente — non viene caricato nulla. Preferisci file < 50 MB."
+  },
+  {
+    "en": "Mermaid",
+    "it": "Sirena"
+  },
+  {
+    "en": "Mermaid Diagram Editor",
+    "it": "Editor di diagrammi di sirene"
+  },
+  {
+    "en": "Message",
+    "it": "Messaggio"
+  },
+  {
+    "en": "Message to authenticate…",
+    "it": "Messaggio da autenticare..."
+  },
+  {
+    "en": "Meter m",
+    "it": "Metri (m):"
+  },
+  {
+    "en": "Metric (cm / kg)",
+    "it": "Metrico (cm, kg)"
+  },
+  {
+    "en": "Midnight",
+    "it": "Mezzanotte"
+  },
+  {
+    "en": "Midnight purple",
+    "it": "Midnight Purple"
+  },
+  {
+    "en": "Mile mi",
+    "it": "Mile mi"
+  },
+  {
+    "en": "Milligram mg",
+    "it": "Milligrammo - mg"
+  },
+  {
+    "en": "Millimeter mm",
+    "it": "Millimetri (mm)"
+  },
+  {
+    "en": "Milliseconds",
+    "it": "Millisecondi"
+  },
+  {
+    "en": "Mind map",
+    "it": "Mappa mentale"
+  },
+  {
+    "en": "Minify",
+    "it": "Minify"
+  },
+  {
+    "en": "Minify and beautify CSS with 2/4-space indent options",
+    "it": "Minimizza e abbellisci CSS con opzioni di rientro a 2/4 spazi"
+  },
+  {
+    "en": "Minify and beautify HTML with 2/4-space indent options",
+    "it": "Minimizza e abbellisci HTML con opzioni di rientro a 2/4 spazi"
+  },
+  {
+    "en": "Minify and beautify JavaScript with 2/4-space indent options",
+    "it": "Minimizza e abbellisci JavaScript con opzioni di rientro a 2/4 spazi"
+  },
+  {
+    "en": "Mint ice",
+    "it": "Gelato di menta"
+  },
+  {
+    "en": "Minute",
+    "it": "Minuto"
+  },
+  {
+    "en": "Monday",
+    "it": "Lunedì"
+  },
+  {
+    "en": "Monospace",
+    "it": "Monospace"
+  },
+  {
+    "en": "Month",
+    "it": "Mese"
+  },
+  {
+    "en": "Month view with lunar/almanac for Chinese and local holidays for English",
+    "it": "Vista mensile con lunare/almanacco per il cinese e vacanze locali per l'inglese"
+  },
+  {
+    "en": "Monthly on day 1 at 00:00",
+    "it": "Mensile il giorno 1 alle 00:00"
+  },
+  {
+    "en": "Moonlight",
+    "it": "MOONLIGHT"
+  },
+  {
+    "en": "Morning",
+    "it": "Mattina"
+  },
+  {
+    "en": "Multicolor",
+    "it": "Multicolore"
+  },
+  {
+    "en": "MySQL",
+    "it": "Mysql"
+  },
+  {
+    "en": "Mysterious purple",
+    "it": "Viola misterioso"
+  },
+  {
+    "en": "Mystic purple",
+    "it": "Viola mistico"
+  },
+  {
+    "en": "Name / HEX / RGB…",
+    "it": "Nome / HEX / RGB…"
+  },
+  {
+    "en": "Named (&amp;)",
+    "it": "Con nome (&amp;)"
+  },
+  {
+    "en": "Nature green",
+    "it": "Nature Green"
+  },
+  {
+    "en": "Nautical mile nmi",
+    "it": "Miglio nautico"
+  },
+  {
+    "en": "Navier–Stokes",
+    "it": "Navier–Stokes"
+  },
+  {
+    "en": "Needs server",
+    "it": "Ha bisogno di un server"
+  },
+  {
+    "en": "Negated class",
+    "it": "Classe negata"
+  },
+  {
+    "en": "Neon multicolor",
+    "it": "Neon multicolor"
+  },
+  {
+    "en": "Netmask",
+    "it": "子网掩码"
+  },
+  {
+    "en": "Network",
+    "it": "Rete"
+  },
+  {
+    "en": "Neutral",
+    "it": "Indifferente"
+  },
+  {
+    "en": "Next month",
+    "it": "Mese successivo"
+  },
+  {
+    "en": "Next steps",
+    "it": "Prossimi passi"
+  },
+  {
+    "en": "Next {{count}} runs",
+    "it": "Prossime {{count}} corse"
+  },
+  {
+    "en": "Night",
+    "it": "Notte"
+  },
+  {
+    "en": "No QR code found in the image",
+    "it": "Nessun ⟧ codice ⟦0 trovato nell'immagine"
+  },
+  {
+    "en": "No matching colors",
+    "it": "Nessun colore corrispondente"
+  },
+  {
+    "en": "No matching prompts",
+    "it": "Nessuna richiesta corrispondente"
+  },
+  {
+    "en": "No matching tools",
+    "it": "Nessuno strumento corrispondente"
+  },
+  {
+    "en": "No matching tools found",
+    "it": "Nessuno strumento corrispondente trovato"
+  },
+  {
+    "en": "No numeric values found",
+    "it": "Nessun valore numerico trovato"
+  },
+  {
+    "en": "Normal",
+    "it": "Normale"
+  },
+  {
+    "en": "Normal distribution",
+    "it": "Distribuzione normale "
+  },
+  {
+    "en": "Normalized",
+    "it": "Normalizzato"
+  },
+  {
+    "en": "Not a valid SVG",
+    "it": "Non è uno ⟦0 valido⟧"
+  },
+  {
+    "en": "Not before nbf",
+    "it": "Non prima"
+  },
+  {
+    "en": "Not expired",
+    "it": "Non scaduto"
+  },
+  {
+    "en": "Note: non-MD5 algorithms load the whole file into memory; very large files may run out of memory",
+    "it": "Nota:⟧ algoritmi diversi da⟦ 0 caricano l'intero file in memoria; file molto grandi potrebbero esaurire la memoria"
+  },
+  {
+    "en": "Number lines",
+    "it": "Numero righe"
+  },
+  {
+    "en": "Numbered list",
+    "it": "Elenco numerato"
+  },
+  {
+    "en": "Obese",
+    "it": "Obeso"
+  },
+  {
+    "en": "Obsidian",
+    "it": "nera"
+  },
+  {
+    "en": "Ocean",
+    "it": "Mare"
+  },
+  {
+    "en": "Ocean wave",
+    "it": "onda oceanica<g id=\"1\"> </g>"
+  },
+  {
+    "en": "Offset X",
+    "it": "Offset X"
+  },
+  {
+    "en": "Offset Y",
+    "it": "Offset Y"
+  },
+  {
+    "en": "Olive",
+    "it": "Verde oliva"
+  },
+  {
+    "en": "One image per page at pixel size.",
+    "it": "Un'immagine per pagina in formato pixel."
+  },
+  {
+    "en": "One item per line…",
+    "it": "Un articolo per riga..."
+  },
+  {
+    "en": "Online stopwatch with start, pause, lap, and reset",
+    "it": "Cronometro online con avvio, pausa, giro e ripristino"
+  },
+  {
+    "en": "Opacity",
+    "it": "Opacità"
+  },
+  {
+    "en": "Open a PDF and draw annotations on the page: pen, highlight, rectangle, ellipse, circle, line, and text.",
+    "it": "Apri uno PDF e disegna annotazioni sulla pagina: penna, evidenziazione, rettangolo, ellisse, cerchio, linea e testo."
+  },
+  {
+    "en": "Open and read a PDF locally",
+    "it": "Apri e leggi uno PDF localmente"
+  },
+  {
+    "en": "Open in {{name}}",
+    "it": "Apri in {{name}}"
+  },
+  {
+    "en": "Open menu",
+    "it": "Apri menu"
+  },
+  {
+    "en": "Open page {{n}} first so it can be rendered before export",
+    "it": "Apri ⟧ prima la pagina ⟦0 in modo che possa essere visualizzata prima dell'esportazione"
+  },
+  {
+    "en": "Operand A reuses the input above; results stay within 64-bit signed integer range",
+    "it": "L'operando A riutilizza l'input di cui sopra; i risultati rimangono all'interno dell'intervallo di numeri interi con segno a 64 bit"
+  },
+  {
+    "en": "Operand B",
+    "it": "Operando B"
+  },
+  {
+    "en": "Operator",
+    "it": "Addetto alla conduzione"
+  },
+  {
+    "en": "Operators",
+    "it": "Operatori"
+  },
+  {
+    "en": "Optional IV (24 hex chars / 12 bytes); random if empty",
+    "it": "Facoltativo IV (24 caratteri esadecimali/ 12 byte); casuale se vuoto"
+  },
+  {
+    "en": "Optional title…",
+    "it": "Titolo opzionale…"
+  },
+  {
+    "en": "Orange",
+    "it": "Arancia"
+  },
+  {
+    "en": "Orchid",
+    "it": "Violetto chiaro"
+  },
+  {
+    "en": "Orientation",
+    "it": "Orientamento"
+  },
+  {
+    "en": "Origin",
+    "it": "Provenienza"
+  },
+  {
+    "en": "Origin is bottom-left; complex Unicode may be limited.",
+    "it": "L'origine è in basso a sinistra; il complesso Unicode può essere limitato."
+  },
+  {
+    "en": "Origin is the bottom-left of the page (PDF coords).",
+    "it": "L'origine è in basso a sinistra della pagina (PDF corde)."
+  },
+  {
+    "en": "Original",
+    "it": "Originale"
+  },
+  {
+    "en": "Original size",
+    "it": "Dimensione Originale"
+  },
+  {
+    "en": "Other",
+    "it": "Altro"
+  },
+  {
+    "en": "Ounce oz",
+    "it": "Oncia oz"
+  },
+  {
+    "en": "Output",
+    "it": "Output"
+  },
+  {
+    "en": "Output format",
+    "it": "Formato output"
+  },
+  {
+    "en": "Overweight",
+    "it": "Sovrappeso"
+  },
+  {
+    "en": "Owner password",
+    "it": "Proprietario Password"
+  },
+  {
+    "en": "PDF Grayscale",
+    "it": "Scala di grigi"
+  },
+  {
+    "en": "PDF Header & Footer",
+    "it": "Intestazione e Piè di pagina"
+  },
+  {
+    "en": "PDF Metadata",
+    "it": "PDF metadati"
+  },
+  {
+    "en": "PDF Page Numbers",
+    "it": "Numeri di pagina"
+  },
+  {
+    "en": "PDF Viewer",
+    "it": "Autorizzazioni di visualizzazione"
+  },
+  {
+    "en": "PDF file",
+    "it": "PDF file"
+  },
+  {
+    "en": "PDF password",
+    "it": "Password 0***"
+  },
+  {
+    "en": "PDF to Image",
+    "it": "PDF all'immagine"
+  },
+  {
+    "en": "PEM certificate",
+    "it": "Certificato PEM"
+  },
+  {
+    "en": "PL/SQL",
+    "it": "PL/SQL"
+  },
+  {
+    "en": "Pacific",
+    "it": "Pacific"
+  },
+  {
+    "en": "Padding",
+    "it": "Imbottiture"
+  },
+  {
+    "en": "Padding X",
+    "it": "Bombatura X"
+  },
+  {
+    "en": "Padding Y",
+    "it": "Bombatura Y"
+  },
+  {
+    "en": "Page or tool not found",
+    "it": "Pagina o strumento non trovato"
+  },
+  {
+    "en": "Page {{n}}",
+    "it": "Pag. 0."
+  },
+  {
+    "en": "Pages",
+    "it": "Pages"
+  },
+  {
+    "en": "Pages (optional)",
+    "it": "Pagine (facoltativo)"
+  },
+  {
+    "en": "Pages to delete",
+    "it": "Pagine da eliminare"
+  },
+  {
+    "en": "Pages to delete, e.g. 1,3-5. At least one page must remain.",
+    "it": "Pagine da eliminare, ad esempio 1,3-5. Deve rimanere almeno una pagina."
+  },
+  {
+    "en": "Pages to extract",
+    "it": "Pagine da estrarre"
+  },
+  {
+    "en": "Pages to extract, e.g. 1,3-5.",
+    "it": "Pagine da estrarre, ad esempio 1,3-5."
+  },
+  {
+    "en": "Papaya cream",
+    "it": "Crema di papaya"
+  },
+  {
+    "en": "Paper",
+    "it": "Carta"
+  },
+  {
+    "en": "Paragraph",
+    "it": "Paragrafo"
+  },
+  {
+    "en": "Paragraphs",
+    "it": "Paragrafi"
+  },
+  {
+    "en": "Parse",
+    "it": "Analizza"
+  },
+  {
+    "en": "Parse JSON and convert it to YAML / XML / CSV",
+    "it": "Analizzare JSON e convertirlo in ⟦⟧ ⟦⟧ ⟦1/2/3⟧"
+  },
+  {
+    "en": "Parse PEM: SHA-256/SHA-1 fingerprints, type, DER length, CN",
+    "it": "Analisi PEM:⟧ impronte digitali SHA-256/⟦1, tipo, lunghezza DER, CN"
+  },
+  {
+    "en": "Parse URL parts and query params; rebuild after edits",
+    "it": "Analizza URL parti e interroga i parametri; ricostruisci dopo le modifiche"
+  },
+  {
+    "en": "Parse XML into JSON, keeping attributes with the @_ prefix",
+    "it": "Analizza XML in JSON, mantenendo gli attributi con il prefisso @_"
+  },
+  {
+    "en": "Parse a browser User-Agent into browser, engine, OS, and device",
+    "it": "Analizza un User-Agent del browser in browser, motore, sistema operativo e dispositivo"
+  },
+  {
+    "en": "Parse failed",
+    "it": "Parse fallito!"
+  },
+  {
+    "en": "Parse header / payload / signature and read exp and other time claims (read-only, no verify)",
+    "it": "Analizza intestazione / payload / firma e leggi EXP e altre attestazioni temporali (sola lettura, nessuna verifica)"
+  },
+  {
+    "en": "Parse only, no signature verification: verification requires a key; all processing stays in your browser",
+    "it": "Solo analisi, nessuna verifica della firma: la verifica richiede una chiave; tutte le elaborazioni rimangono nel browser"
+  },
+  {
+    "en": "PascalCase",
+    "it": "PascalCase"
+  },
+  {
+    "en": "Passphrase (PBKDF2)",
+    "it": "Passphrase (PBKDF2)"
+  },
+  {
+    "en": "Password Generator",
+    "it": "Generatore di password"
+  },
+  {
+    "en": "Paste Authenticator secret (Base32)…",
+    "it": "Incolla Authenticator secret (Base32)..."
+  },
+  {
+    "en": "Paste CSS, e.g. .box{color:red}…",
+    "it": "Incolla CSS, ad es. .box{color:red}..."
+  },
+  {
+    "en": "Paste HTML, e.g. <div><span>Hello</span></div>…",
+    "it": "Incolla HTML, ad es. <div><span>Ciao</span></div>…"
+  },
+  {
+    "en": "Paste JS, e.g. function hello(){return 1}…",
+    "it": "Incolla JS, ad es. funzione hello(){return 1}..."
+  },
+  {
+    "en": "Paste JSON, e.g. [{\"id\":1,\"name\":\"a\"}]…",
+    "it": "Incolla JSON, ad esempio [{\"id\":1,\"name\":\"a\"}]..."
+  },
+  {
+    "en": "Paste JSON, e.g. {\"a\": 1}…",
+    "it": "Incolla JSON, ad esempio {\"a\": 1}..."
+  },
+  {
+    "en": "Paste JSON…",
+    "it": "Incolla"
+  },
+  {
+    "en": "Paste SQL, e.g. select * from users where id = 1…",
+    "it": "Incolla SQL, ad esempio seleziona * dagli utenti dove id = 1..."
+  },
+  {
+    "en": "Paste SVG markup…",
+    "it": "Incolla SVG markup..."
+  },
+  {
+    "en": "Paste XML, e.g. <root a=\"1\"><item>x</item></root>…",
+    "it": "Incolla XML, ad es. <root a=\"1\"><item>x</item></root>..."
+  },
+  {
+    "en": "Paste XML, e.g. <root><item>a</item></root>…",
+    "it": "Incolla XML, ad esempio <root><item>un</item></root>..."
+  },
+  {
+    "en": "Paste XML…",
+    "it": "Incolla"
+  },
+  {
+    "en": "Paste XSLT stylesheet…",
+    "it": "Incolla foglio di stile XSLT..."
+  },
+  {
+    "en": "Paste a Base64 string…",
+    "it": "Incolla una⟧ stringa ⟦0..."
+  },
+  {
+    "en": "Paste a Data URL or raw Base64…",
+    "it": "Incolla un dato URL o RAW Base64..."
+  },
+  {
+    "en": "Paste a JWT (Bearer prefix supported), e.g. eyJhbGci…",
+    "it": "Incolla uno JWT (prefisso del portatore supportato), ad es. eyJhbGci..."
+  },
+  {
+    "en": "Paste a User-Agent string…",
+    "it": "Incolla una stringa User-Agent..."
+  },
+  {
+    "en": "Paste code…",
+    "it": " Incolla codice"
+  },
+  {
+    "en": "Paste content to convert…",
+    "it": "Incolla il contenuto da convertire..."
+  },
+  {
+    "en": "Paste or type text to count…",
+    "it": "Incolla o digita il testo da contare..."
+  },
+  {
+    "en": "Paste percent-encoded content…",
+    "it": "Incolla contenuto codificato in percentuale..."
+  },
+  {
+    "en": "Paste text to match…",
+    "it": "Incolla il testo per abbinarlo..."
+  },
+  {
+    "en": "Pastel",
+    "it": "Pastello"
+  },
+  {
+    "en": "Path not found",
+    "it": "Impossibile trovare il percorso"
+  },
+  {
+    "en": "Path, e.g. a.b[0].c or $.a.b[0]",
+    "it": "Percorso, ad esempio a.b[0].c o $.a.b[0]"
+  },
+  {
+    "en": "Pattern",
+    "it": "Pattern"
+  },
+  {
+    "en": "Pause",
+    "it": "Metti in pausa"
+  },
+  {
+    "en": "Pause clock",
+    "it": "Metti in pausa l'orologio"
+  },
+  {
+    "en": "Payload",
+    "it": "Carico utile"
+  },
+  {
+    "en": "Payload JSON",
+    "it": "Carico utile"
+  },
+  {
+    "en": "Peach",
+    "it": "Pesca "
+  },
+  {
+    "en": "Pearl",
+    "it": "CAB"
+  },
+  {
+    "en": "Peony",
+    "it": "Peonia"
+  },
+  {
+    "en": "Periwinkle",
+    "it": "Pervinca"
+  },
+  {
+    "en": "Petal",
+    "it": "Petalo"
+  },
+  {
+    "en": "Phone (China mainland)",
+    "it": "Telefono (Cina continentale)"
+  },
+  {
+    "en": "Photo + title/subtitle card with backdrop presets or gradients, export PNG",
+    "it": "Foto + cartolina titolo/sottotitolo con sfondi preimpostati o sfumati, esportazione PNG"
+  },
+  {
+    "en": "Photo rotate",
+    "it": "Rotazione foto"
+  },
+  {
+    "en": "Pick colors visually and export HEX / RGB / HSL plus HTML/CSS snippets",
+    "it": "Scegli i colori visivamente ed esporta ESADECIMALI / RGB / HSL più HTML/CSS frammenti"
+  },
+  {
+    "en": "Pick the option that fits you better; submit when all are answered.",
+    "it": "Scegli l'opzione più adatta a te; invia quando hai risposto a tutti."
+  },
+  {
+    "en": "Picked color",
+    "it": "Colore prelevato"
+  },
+  {
+    "en": "Picker",
+    "it": "Addetto al picking"
+  },
+  {
+    "en": "Pine forest",
+    "it": "Pineta"
+  },
+  {
+    "en": "Pink glow",
+    "it": "Pink Glow"
+  },
+  {
+    "en": "Pinyin",
+    "it": "Pinyin"
+  },
+  {
+    "en": "Place an image on PDF pages",
+    "it": "Posiziona un'immagine su PDF pagine"
+  },
+  {
+    "en": "Placeholder Image",
+    "it": "Immagine Segnaposto"
+  },
+  {
+    "en": "Plain text",
+    "it": "Testo normale"
+  },
+  {
+    "en": "Plaintext",
+    "it": "Plaintext"
+  },
+  {
+    "en": "Please choose a GIF file",
+    "it": "Per favore scegli un file"
+  },
+  {
+    "en": "Please choose a file",
+    "it": "Per favore scegli un file"
+  },
+  {
+    "en": "Please choose an ICO file",
+    "it": "Scegli un file ICO"
+  },
+  {
+    "en": "Please choose an image file",
+    "it": "Scegli un'immagine dal tuo PC"
+  },
+  {
+    "en": "Please complete options",
+    "it": "Completa le opzioni"
+  },
+  {
+    "en": "Please complete the input",
+    "it": "Si prega di completare l'input"
+  },
+  {
+    "en": "Please enter CSS content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter Chinese text",
+    "it": "Inserisci il testo cinese"
+  },
+  {
+    "en": "Please enter HTML content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter JSON and a path",
+    "it": "Inserisci JSON e un percorso"
+  },
+  {
+    "en": "Please enter JavaScript content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter Markdown",
+    "it": "Inserisci un ribasso"
+  },
+  {
+    "en": "Please enter Markdown content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter SVG",
+    "it": "Inserisci SVG"
+  },
+  {
+    "en": "Please enter XML",
+    "it": "Inserisci XML"
+  },
+  {
+    "en": "Please enter XML content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter XSLT",
+    "it": "Per favore inserisci"
+  },
+  {
+    "en": "Please enter a CIDR",
+    "it": "Per favore inserisci un"
+  },
+  {
+    "en": "Please enter a URL",
+    "it": "Per favore inserisci un"
+  },
+  {
+    "en": "Please enter a User-Agent",
+    "it": "Inserisci un User-Agent"
+  },
+  {
+    "en": "Please enter a color",
+    "it": "Inserire un colore valido"
+  },
+  {
+    "en": "Please enter a color value",
+    "it": "Inserisci un valore di colore valido."
+  },
+  {
+    "en": "Please enter a cron expression",
+    "it": "Inserisci un'espressione cron"
+  },
+  {
+    "en": "Please enter a date/time",
+    "it": "Inserisci una data"
+  },
+  {
+    "en": "Please enter a formula",
+    "it": "Inserire una formula valida"
+  },
+  {
+    "en": "Please enter a message",
+    "it": "Inserisci un messaggio"
+  },
+  {
+    "en": "Please enter a number",
+    "it": "Inserisci un numero"
+  },
+  {
+    "en": "Please enter a valid number",
+    "it": "Inserire un numero valido"
+  },
+  {
+    "en": "Please enter a valid secret",
+    "it": "Inserire un codice valido"
+  },
+  {
+    "en": "Please enter an expression",
+    "it": "Inserisci un'espressione"
+  },
+  {
+    "en": "Please enter an integer",
+    "it": "Immettere un numero intero positivo."
+  },
+  {
+    "en": "Please enter content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter data",
+    "it": "Inserire tutti i dati"
+  },
+  {
+    "en": "Please enter secret or code",
+    "it": "Inserisci la chiave segreta"
+  },
+  {
+    "en": "Please enter some text",
+    "it": "Inserisca alcune parole"
+  },
+  {
+    "en": "Please enter text",
+    "it": "Si prega di inserire il testo"
+  },
+  {
+    "en": "Please paste PEM",
+    "it": "Si prega di incollare PEM"
+  },
+  {
+    "en": "Please paste a JWT",
+    "it": "Incollare uno JWT"
+  },
+  {
+    "en": "Please provide a non-empty charset",
+    "it": "Fornisci un set di caratteri non vuoto"
+  },
+  {
+    "en": "Please select at least one character set",
+    "it": "Seleziona almeno un set di caratteri"
+  },
+  {
+    "en": "Please upload a PDF file",
+    "it": "Si prega di caricare un file"
+  },
+  {
+    "en": "Please upload an image file",
+    "it": "Si prega di caricare un'immagine."
+  },
+  {
+    "en": "Polar glow",
+    "it": "Polare"
+  },
+  {
+    "en": "Pop art",
+    "it": "POP Art"
+  },
+  {
+    "en": "Portrait",
+    "it": "Ritratto"
+  },
+  {
+    "en": "Position",
+    "it": "Posizione"
+  },
+  {
+    "en": "Position %",
+    "it": "Posizione %"
+  },
+  {
+    "en": "PostgreSQL",
+    "it": "PostgreSQL"
+  },
+  {
+    "en": "Pound lb",
+    "it": "Libbra libbra"
+  },
+  {
+    "en": "Powder blue",
+    "it": "Blu polvere"
+  },
+  {
+    "en": "Powered by Prism; copy the HTML snippet for blogs and docs.",
+    "it": "Powered by Prism; copia lo⟧ snippet ⟦0 per blog e documenti."
+  },
+  {
+    "en": "Prefix",
+    "it": "Prefisso"
+  },
+  {
+    "en": "Preserve",
+    "it": "Conservare"
+  },
+  {
+    "en": "Preset",
+    "it": "Preimpostazione"
+  },
+  {
+    "en": "Presets",
+    "it": "Preimpostazioni"
+  },
+  {
+    "en": "Preview",
+    "it": "Anteprima"
+  },
+  {
+    "en": "Preview in Cron parser",
+    "it": "Anteprima in Cron parser"
+  },
+  {
+    "en": "Preview of {{name}}",
+    "it": "Anteprima di {{name}}"
+  },
+  {
+    "en": "Previous",
+    "it": "Precedente"
+  },
+  {
+    "en": "Previous month",
+    "it": "Mese precedente"
+  },
+  {
+    "en": "Prism",
+    "it": "Prisma"
+  },
+  {
+    "en": "Processing failed",
+    "it": "Elaborazione non riuscita. "
+  },
+  {
+    "en": "Processing failed: please check the syntax",
+    "it": "Elaborazione non riuscita: controllare la sintassi"
+  },
+  {
+    "en": "Processing failed: please check whether the CSS is valid",
+    "it": "Elaborazione non riuscita: controlla se lo CSS è valido"
+  },
+  {
+    "en": "Processing failed: please check whether the HTML is valid",
+    "it": "Elaborazione non riuscita: controlla se lo HTML è valido"
+  },
+  {
+    "en": "Processing failed: please check whether the XML is valid",
+    "it": "Elaborazione non riuscita: controlla se lo XML è valido"
+  },
+  {
+    "en": "Processing failed: try another image",
+    "it": "Elaborazione non riuscita: prova un'altra immagine"
+  },
+  {
+    "en": "Processing failed; try another image",
+    "it": "Elaborazione non riuscita; prova un'altra immagine"
+  },
+  {
+    "en": "Producer",
+    "it": "Produttore"
+  },
+  {
+    "en": "Progress {{current}} / {{total}}",
+    "it": "Avanzamento {{current}} / {{total}}"
+  },
+  {
+    "en": "Property",
+    "it": "Proprietà"
+  },
+  {
+    "en": "Protocol",
+    "it": "Protocollo"
+  },
+  {
+    "en": "Provide at least a header or footer.",
+    "it": "Fornire almeno un'intestazione o un piè di pagina."
+  },
+  {
+    "en": "Purple",
+    "it": "Viola"
+  },
+  {
+    "en": "Purple aurora",
+    "it": "Aurora viola"
+  },
+  {
+    "en": "Purple dusk",
+    "it": "Crepuscolo viola"
+  },
+  {
+    "en": "Purple haze",
+    "it": "Purple Haze"
+  },
+  {
+    "en": "Purple orb",
+    "it": "Sfera viola"
+  },
+  {
+    "en": "Pythagorean theorem",
+    "it": "Teorema di Pitagora"
+  },
+  {
+    "en": "Q (~25%)",
+    "it": "d25"
+  },
+  {
+    "en": "QR Code",
+    "it": "Codice 0"
+  },
+  {
+    "en": "QR code preview",
+    "it": "Anteprima ⟧ codice⟦ 0"
+  },
+  {
+    "en": "Quadratic formula",
+    "it": "2. Formula quadratica"
+  },
+  {
+    "en": "Quality",
+    "it": "Qualità"
+  },
+  {
+    "en": "Question {{n}} / {{total}}",
+    "it": "Domanda {{n}} / {{total}}"
+  },
+  {
+    "en": "Quick symbols",
+    "it": "Simboli rapidi"
+  },
+  {
+    "en": "Quick symbols and classic formulas, KaTeX preview, export PNG/JPG/SVG",
+    "it": "Simboli rapidi e formule classiche, anteprima KaTeX, esportazione PNG/JPG/SVG"
+  },
+  {
+    "en": "Quote (>)",
+    "it": "Preventivo"
+  },
+  {
+    "en": "RFC 6238 TOTP: generate / verify, 6/8 digits, remaining seconds",
+    "it": "RFC 6238 TOTP: generare / verificare, 6/8 cifre, secondi rimanenti"
+  },
+  {
+    "en": "Radial",
+    "it": "Segni"
+  },
+  {
+    "en": "Radius",
+    "it": "Raggio"
+  },
+  {
+    "en": "Radix",
+    "it": "Radix"
+  },
+  {
+    "en": "Radix Converter",
+    "it": "Convertitore Radix"
+  },
+  {
+    "en": "Rainbow",
+    "it": "raiNbow"
+  },
+  {
+    "en": "Rainforest",
+    "it": "Foresta pluviale"
+  },
+  {
+    "en": "Random Number Generator",
+    "it": "generatore di numeri casuali"
+  },
+  {
+    "en": "Random String Generator",
+    "it": "Generatore di stringhe casuali"
+  },
+  {
+    "en": "Random v4 / time-ordered v7 UUIDs with batch output and formatting options",
+    "it": "UUID v4 /v7 ordinati in base al tempo casuali con output batch e opzioni di formattazione"
+  },
+  {
+    "en": "Range",
+    "it": "Intervallo"
+  },
+  {
+    "en": "Raven",
+    "it": "Corvo"
+  },
+  {
+    "en": "Raw key (hex)",
+    "it": "Chiave grezza (esadecimale)"
+  },
+  {
+    "en": "Raw text",
+    "it": "Testo grezzo"
+  },
+  {
+    "en": "Read basic JPEG EXIF and strip APP1; download cleaned file",
+    "it": "Leggere Basic JPEG EXIF e strip APP1; scaricare file pulito"
+  },
+  {
+    "en": "Readable time → timestamp (space-separated uses local timezone)",
+    "it": "→ Timestamp leggibile (lo spazio separato utilizza il fuso orario locale)"
+  },
+  {
+    "en": "Rebuilt URL",
+    "it": "Ricostruito"
+  },
+  {
+    "en": "Recently used",
+    "it": "Usati di recente"
+  },
+  {
+    "en": "Rectangle",
+    "it": "Rettangolo"
+  },
+  {
+    "en": "Red days are weekends or holidays. English uses US public holidays (en-GB uses UK bank holidays).",
+    "it": "I giorni rossi sono fine settimana o festivi. L'inglese utilizza i giorni festivi statunitensi (en-GB utilizza i giorni festivi del Regno Unito)."
+  },
+  {
+    "en": "Red marks weekends or festivals; 休 = statutory rest, 班 = makeup workday. Almanac tips on the right.",
+    "it": "Il rosso segna i fine settimana o le feste; 休 = riposo legale, 班 = giorno lavorativo di trucco. Punte dell'almanacco a destra."
+  },
+  {
+    "en": "Regex Tool",
+    "it": "Regex Utensile"
+  },
+  {
+    "en": "Regular expression cannot be empty",
+    "it": "L'espressione regolare non può essere vuota"
+  },
+  {
+    "en": "Related tools",
+    "it": "Strumenti correlati"
+  },
+  {
+    "en": "Relations",
+    "it": "internazionali"
+  },
+  {
+    "en": "Relative (detected as {{unit}})",
+    "it": "Relativo (rilevato come {{unit}} )"
+  },
+  {
+    "en": "Remove",
+    "it": "Rimuovi"
+  },
+  {
+    "en": "Remove from favorites",
+    "it": "Rimuovi dai preferiti"
+  },
+  {
+    "en": "Remove selected pages from a PDF",
+    "it": "Rimuovi le pagine selezionate da PDF"
+  },
+  {
+    "en": "Render Markdown to a styled card and export PNG with font, size, width, and colors",
+    "it": "Rendering Markdown su una carta in stile ed esportazione PNG con font, dimensioni, larghezza e colori"
+  },
+  {
+    "en": "Render Mermaid locally with themes, zoom, and PNG/SVG export",
+    "it": "Esegui il rendering della sirena localmente con temi, zoom ed⟧ esportazione PNG/⟦1"
+  },
+  {
+    "en": "Render PDF pages as JPG/PNG",
+    "it": "Rendering PDF pagine come JPG/PNG"
+  },
+  {
+    "en": "Render code as a syntax-highlighted card and export PNG",
+    "it": "Rendering del codice come scheda evidenziata dalla sintassi ed esportazione PNG"
+  },
+  {
+    "en": "Render failed: please check the Markdown syntax",
+    "it": "Rendering non riuscito: controlla la sintassi di Markdown"
+  },
+  {
+    "en": "Render failed: {{message}}",
+    "it": "Rendering non riuscito: {{message}}"
+  },
+  {
+    "en": "Rendering…",
+    "it": "Rendering…"
+  },
+  {
+    "en": "Renders locally; large files may be slow.",
+    "it": "Esegue il rendering localmente; i file di grandi dimensioni potrebbero essere lenti."
+  },
+  {
+    "en": "Reorder PDF Pages",
+    "it": "Riordina PDF pagine"
+  },
+  {
+    "en": "Reorder pages in a PDF",
+    "it": "Riordina le pagine in PDF"
+  },
+  {
+    "en": "Replace",
+    "it": "Sostituisci"
+  },
+  {
+    "en": "Replace result",
+    "it": "Sostituisci risultato"
+  },
+  {
+    "en": "Replace with",
+    "it": "Sostituisci con"
+  },
+  {
+    "en": "Reset",
+    "it": "Reimposta"
+  },
+  {
+    "en": "Reset zoom",
+    "it": "Reimposta zoom"
+  },
+  {
+    "en": "Result",
+    "it": "Risultato"
+  },
+  {
+    "en": "Resume",
+    "it": "Riprendi"
+  },
+  {
+    "en": "Resume clock",
+    "it": "Riattiva orologio"
+  },
+  {
+    "en": "Retake",
+    "it": "Ripeti"
+  },
+  {
+    "en": "Retro duo",
+    "it": "Retro duo"
+  },
+  {
+    "en": "Retry",
+    "it": "Riprova"
+  },
+  {
+    "en": "Reverse",
+    "it": "Retromarcia"
+  },
+  {
+    "en": "Revised",
+    "it": "Revisionato"
+  },
+  {
+    "en": "Right",
+    "it": "Destra"
+  },
+  {
+    "en": "Romantic pink",
+    "it": "Rosa romantico"
+  },
+  {
+    "en": "Rose gold",
+    "it": "Oro rosa"
+  },
+  {
+    "en": "Rosewater",
+    "it": "Acqua di rose"
+  },
+  {
+    "en": "Rotate",
+    "it": "Ruotare"
+  },
+  {
+    "en": "Rotate & download",
+    "it": "Ruota e scarica"
+  },
+  {
+    "en": "Rotate PDF Pages",
+    "it": "Ruota PDF pagine"
+  },
+  {
+    "en": "Rotate selected or all pages",
+    "it": "Ruota le pagine selezionate o tutte"
+  },
+  {
+    "en": "Royal purple",
+    "it": "ROYAL PURPLE"
+  },
+  {
+    "en": "SQL Formatter",
+    "it": "Formattatore SQL"
+  },
+  {
+    "en": "SQL Server",
+    "it": "SQL Server"
+  },
+  {
+    "en": "SQL input",
+    "it": "Input SQL"
+  },
+  {
+    "en": "SQLite",
+    "it": "(SQLITE)."
+  },
+  {
+    "en": "SVG source",
+    "it": "SVG source"
+  },
+  {
+    "en": "SVG to PNG",
+    "it": "da 0 to 1"
+  },
+  {
+    "en": "Safe expression calculator with arithmetic, power, modulo, and common functions",
+    "it": "Calcolatore di espressioni sicure con funzioni aritmetiche, di potenza, modulo e funzioni comuni"
+  },
+  {
+    "en": "Saffron",
+    "it": "Zafferano"
+  },
+  {
+    "en": "Sahara",
+    "it": "Sahara"
+  },
+  {
+    "en": "Sakura",
+    "it": "Sakura"
+  },
+  {
+    "en": "Sans-serif",
+    "it": "Sans-serif"
+  },
+  {
+    "en": "Sapphire",
+    "it": "Zaffiro"
+  },
+  {
+    "en": "Saturate",
+    "it": "Satura"
+  },
+  {
+    "en": "Saturation",
+    "it": "Saturazione"
+  },
+  {
+    "en": "Saturday",
+    "it": "Sabato"
+  },
+  {
+    "en": "Save & download",
+    "it": "Salva e scarica"
+  },
+  {
+    "en": "Scale",
+    "it": "Scala"
+  },
+  {
+    "en": "Scatter",
+    "it": "Dispersione"
+  },
+  {
+    "en": "Schrödinger equation",
+    "it": "L'equazione di Schrödinger"
+  },
+  {
+    "en": "Scope",
+    "it": "Ambito"
+  },
+  {
+    "en": "Screen eyedropper",
+    "it": "Contagocce per schermo"
+  },
+  {
+    "en": "Sea blue",
+    "it": "Taupe"
+  },
+  {
+    "en": "Sea mist",
+    "it": "Nebbia marina"
+  },
+  {
+    "en": "Sea pearl",
+    "it": "Perla marina"
+  },
+  {
+    "en": "Seafoam",
+    "it": "Seafoam"
+  },
+  {
+    "en": "Search",
+    "it": "Ricerca"
+  },
+  {
+    "en": "Search tools",
+    "it": "Cerca strumenti"
+  },
+  {
+    "en": "Search tools (name / keywords)…",
+    "it": "Strumenti di ricerca (nome / parole chiave)..."
+  },
+  {
+    "en": "Search tools…",
+    "it": "Cerca strumenti…"
+  },
+  {
+    "en": "Second",
+    "it": "Secondo"
+  },
+  {
+    "en": "Seconds",
+    "it": "Secondi"
+  },
+  {
+    "en": "Seconds left",
+    "it": "secondi rimasti"
+  },
+  {
+    "en": "Secret is not valid Base32",
+    "it": "Il segreto non è valido Base32"
+  },
+  {
+    "en": "See result",
+    "it": "vedi risultati"
+  },
+  {
+    "en": "Select at least one size",
+    "it": "selezionare almeno un'opzione"
+  },
+  {
+    "en": "Selected date",
+    "it": "Data selezionata"
+  },
+  {
+    "en": "Sensing S / Intuition N",
+    "it": "Sensing S / Intuition N"
+  },
+  {
+    "en": "Sentence case",
+    "it": "Maiuscole/minuscole nella frase"
+  },
+  {
+    "en": "Separator",
+    "it": "Separatore"
+  },
+  {
+    "en": "Series label",
+    "it": "Etichetta serie"
+  },
+  {
+    "en": "Serif",
+    "it": "Serif"
+  },
+  {
+    "en": "Set hours, minutes, and seconds; pause, resume, and finish alert",
+    "it": "Imposta ore, minuti e secondi; metti in pausa, riprendi e termina l'avviso"
+  },
+  {
+    "en": "Set open password and permissions. Reader support varies.",
+    "it": "Imposta password e autorizzazioni di apertura. Il supporto del lettore varia."
+  },
+  {
+    "en": "Set password and permission flags",
+    "it": "Imposta password e flag di autorizzazione"
+  },
+  {
+    "en": "Set theory",
+    "it": "Teoria degli insiemi"
+  },
+  {
+    "en": "Shadow",
+    "it": "Ombra"
+  },
+  {
+    "en": "Shadow blur",
+    "it": "Sfocatura ombra:"
+  },
+  {
+    "en": "Shadow offset",
+    "it": "Spostamento X ombra"
+  },
+  {
+    "en": "Shadow opacity",
+    "it": "Opacità ombra"
+  },
+  {
+    "en": "Shape",
+    "it": "Forma"
+  },
+  {
+    "en": "Share",
+    "it": "Condividi"
+  },
+  {
+    "en": "Shortcuts: ⌘/Ctrl+B bold · ⌘/Ctrl+I italic · ⌘/Ctrl+K link · ⌘/Ctrl+E inline code",
+    "it": "Scorciatoie: + Ctrl+B grassetto · + Ctrl+I corsivo · + Ctrl+K link · + Ctrl+E codice inline"
+  },
+  {
+    "en": "Showing a file Base64 result; typing text will clear it.",
+    "it": "Visualizzazione di un file Base64 risultato; la digitazione del testo lo cancellerà."
+  },
+  {
+    "en": "Showing first {{count}} rows only",
+    "it": "Mostra solo⟧ le prime ⟦0 righe"
+  },
+  {
+    "en": "Showing {{n}} / {{total}} colors",
+    "it": "Mostra {{n}} / {{total}} colori"
+  },
+  {
+    "en": "Side-by-side editors with inline line highlights, line numbers, and whitespace ignore",
+    "it": "Gli editor affiancati con evidenziazioni delle righe in linea, numeri di riga e spazi vuoti ignorano"
+  },
+  {
+    "en": "Sign & download",
+    "it": "Firma e scarica"
+  },
+  {
+    "en": "Sign (HS256)",
+    "it": "Cartello (HS256)"
+  },
+  {
+    "en": "Sign PDF",
+    "it": "Cartello PDF"
+  },
+  {
+    "en": "Signature",
+    "it": "Firma"
+  },
+  {
+    "en": "Signed token",
+    "it": "Token firmato"
+  },
+  {
+    "en": "Signing failed",
+    "it": "Firma non riuscita"
+  },
+  {
+    "en": "Signs with HS256 in your browser; the secret never leaves the device",
+    "it": "Segni con HS256 nel browser; il segreto non lascia mai il dispositivo"
+  },
+  {
+    "en": "Simple path queries like a.b[0].c",
+    "it": "Query di percorso semplici come a.b[0].c"
+  },
+  {
+    "en": "Simplified Chinese",
+    "it": "Simplified Chinese"
+  },
+  {
+    "en": "Simplified → Traditional",
+    "it": "→ Tradizionale semplificato"
+  },
+  {
+    "en": "Size increased by {{ratio}}%",
+    "it": "Dimensioni aumentate dello {{ratio}} %"
+  },
+  {
+    "en": "Size must be an integer between 16 and 4000",
+    "it": "La dimensione deve essere un numero intero compreso tra 16 e 4000"
+  },
+  {
+    "en": "Size reduced by {{ratio}}%",
+    "it": "Dimensioni ridotte dello ⟦⟧0%"
+  },
+  {
+    "en": "Sizes",
+    "it": "Misure"
+  },
+  {
+    "en": "Skew X",
+    "it": "Inclinazione X:"
+  },
+  {
+    "en": "Sky dusk",
+    "it": "Sky Dusk"
+  },
+  {
+    "en": "Skyline",
+    "it": "Orizzonte"
+  },
+  {
+    "en": "Slash",
+    "it": "<g id=\"MIFDocuments.YellowBackgroundColor\">Slash</g>"
+  },
+  {
+    "en": "Slate",
+    "it": "Ardesia"
+  },
+  {
+    "en": "Soda pop",
+    "it": "Soda pop"
+  },
+  {
+    "en": "Soft glow",
+    "it": "Soft glow"
+  },
+  {
+    "en": "Soft line breaks",
+    "it": "Interruzioni riga"
+  },
+  {
+    "en": "Solid",
+    "it": "Solid"
+  },
+  {
+    "en": "Song (serif CJK)",
+    "it": "Canzone (serif CJK)"
+  },
+  {
+    "en": "Sort / unique / reverse / number / trim empty lines",
+    "it": "Ordina / univoco / inverso / numero / taglia righe vuote"
+  },
+  {
+    "en": "Sort ascending",
+    "it": "Crescente"
+  },
+  {
+    "en": "Sort descending",
+    "it": "Decrescente"
+  },
+  {
+    "en": "Source",
+    "it": "Sorgente/ fonte"
+  },
+  {
+    "en": "Source code",
+    "it": "Codice sorgente"
+  },
+  {
+    "en": "Source {{sw}}×{{sh}} → output {{pw}}×{{ph}}",
+    "it": "Sorgente {{sw}} × {{sh}} → uscita {{pw}} × {{ph}}"
+  },
+  {
+    "en": "Space",
+    "it": "Spazio"
+  },
+  {
+    "en": "Space-separated bytes",
+    "it": "Byte separati da spazi"
+  },
+  {
+    "en": "Special",
+    "it": "Particolare"
+  },
+  {
+    "en": "Special chars + non-ASCII",
+    "it": "Caratteri speciali + non ASCII"
+  },
+  {
+    "en": "Special chars only (&, <, > etc.)",
+    "it": "Solo caratteri speciali (&, <, > ecc.)"
+  },
+  {
+    "en": "Specific value",
+    "it": "valore specifiche"
+  },
+  {
+    "en": "Spectrum",
+    "it": "Spettro atomico"
+  },
+  {
+    "en": "Spice orange",
+    "it": "Arancia speziata"
+  },
+  {
+    "en": "Split & download",
+    "it": "Dividi e scarica"
+  },
+  {
+    "en": "Split PDF",
+    "it": "Spacca"
+  },
+  {
+    "en": "Split a GIF into PNG frames; download one or all",
+    "it": "Dividi uno GIF in PNG fotogrammi; scarica uno o tutti"
+  },
+  {
+    "en": "Split a PDF into one file per page",
+    "it": "Dividi uno PDF in un file per pagina"
+  },
+  {
+    "en": "Splits into one PDF per page and downloads each.",
+    "it": "Si divide in uno PDF per pagina e scarica ciascuno."
+  },
+  {
+    "en": "Spotlight dark",
+    "it": "Riflettore scuro"
+  },
+  {
+    "en": "Spread",
+    "it": "Differenziale"
+  },
+  {
+    "en": "Spring",
+    "it": "Molla"
+  },
+  {
+    "en": "Standard 5 fields: minute hour day month weekday (0 = Sunday)",
+    "it": "Standard 5 campi: minuto ora giorno mese giorno feriale (0 = domenica)"
+  },
+  {
+    "en": "Start",
+    "it": "Inizia"
+  },
+  {
+    "en": "Start from",
+    "it": "Inizia da"
+  },
+  {
+    "en": "Start of line",
+    "it": "Inizio riga"
+  },
+  {
+    "en": "Stats will appear after you enter text",
+    "it": "Le statistiche appariranno dopo aver inserito il testo"
+  },
+  {
+    "en": "Stitch images horizontally, vertically, or in a grid into one PNG",
+    "it": "Cuci le immagini orizzontalmente, verticalmente o in una griglia in uno PNG"
+  },
+  {
+    "en": "Stone st",
+    "it": "Stone st"
+  },
+  {
+    "en": "Stops",
+    "it": "Arresti"
+  },
+  {
+    "en": "Stopwatch",
+    "it": "Cronometro"
+  },
+  {
+    "en": "Storm night",
+    "it": "Notte di tempesta"
+  },
+  {
+    "en": "Storm sea",
+    "it": "Mare IN tempesta"
+  },
+  {
+    "en": "Strikethrough (~~)",
+    "it": "Barrato"
+  },
+  {
+    "en": "Strip EXIF",
+    "it": "Striscia"
+  },
+  {
+    "en": "Stroke",
+    "it": "Corsa"
+  },
+  {
+    "en": "Strong",
+    "it": "Forte"
+  },
+  {
+    "en": "Strong random passwords with length / charset options, entropy estimate and strength rating",
+    "it": "Password casuali complesse con opzioni di lunghezza / set di caratteri, stima dell'entropia e valutazione della forza"
+  },
+  {
+    "en": "Subject",
+    "it": "Disciplina"
+  },
+  {
+    "en": "Subject CN",
+    "it": "Soggetto CN"
+  },
+  {
+    "en": "Subtitle",
+    "it": "Titoletto"
+  },
+  {
+    "en": "Subtitle size",
+    "it": "Dimensione del sottotitolo"
+  },
+  {
+    "en": "Suitable",
+    "it": "Adatto"
+  },
+  {
+    "en": "Sums & products",
+    "it": "Somme & prodotti"
+  },
+  {
+    "en": "Sun disc glow",
+    "it": "Sun disc Glow"
+  },
+  {
+    "en": "Sunday",
+    "it": "Domenica"
+  },
+  {
+    "en": "Sunrise blend",
+    "it": "Miscela Sunrise"
+  },
+  {
+    "en": "Sunset",
+    "it": "TRAMONTO"
+  },
+  {
+    "en": "Sunset blend",
+    "it": "Miscela tramonto"
+  },
+  {
+    "en": "Sunset orange",
+    "it": "Arancione"
+  },
+  {
+    "en": "Sunset radial",
+    "it": "Tramonto radiale"
+  },
+  {
+    "en": "Supporting line…",
+    "it": "Linea di supporto..."
+  },
+  {
+    "en": "Supports $1, $&, …",
+    "it": "Supporta $1, $&,..."
+  },
+  {
+    "en": "Supports + - * / % ^ () and sqrt/abs/sin/cos/tan/ln/log/floor/ceil/round, plus pi and e",
+    "it": "Supporta + - * / % ^ () e sqrt/abs/sin/cos/tan/ln/log/floor/ceil/round, più pi ed e"
+  },
+  {
+    "en": "Supports HEX / RGB / HSL (including shorthand and percentages)",
+    "it": "Supporta HEX / RGB / HSL (inclusi stenografia e percentuali)"
+  },
+  {
+    "en": "Swap sides",
+    "it": "Inverti lati"
+  },
+  {
+    "en": "Swatch",
+    "it": "Swatch"
+  },
+  {
+    "en": "Switch language",
+    "it": "Cambia lingua"
+  },
+  {
+    "en": "Switch to “ICO → PNG” to open an ICO file",
+    "it": "Passa a \"ICO → PNG\" per aprire un file ICO"
+  },
+  {
+    "en": "Symbols (!@#$%…)",
+    "it": "Simbologia"
+  },
+  {
+    "en": "SynTools · Developer Online Toolbox",
+    "it": "SynTools · Toolbox online per sviluppatori"
+  },
+  {
+    "en": "Synthwave",
+    "it": "Synthwave"
+  },
+  {
+    "en": "Table",
+    "it": "Tavola"
+  },
+  {
+    "en": "Tangerine",
+    "it": "Mandarino "
+  },
+  {
+    "en": "Target format",
+    "it": "Formato dati di destinazione"
+  },
+  {
+    "en": "Taylor series",
+    "it": "Serie di Taylor."
+  },
+  {
+    "en": "Teal breeze",
+    "it": "Teal breeze"
+  },
+  {
+    "en": "Test text",
+    "it": "Testo di prova"
+  },
+  {
+    "en": "Text Counter",
+    "it": "Contatore di testo"
+  },
+  {
+    "en": "Text Diff",
+    "it": "Diff. testo"
+  },
+  {
+    "en": "Text Line Tools",
+    "it": "Strumenti riga di testo"
+  },
+  {
+    "en": "Text background",
+    "it": "Sfondo testo"
+  },
+  {
+    "en": "Text color",
+    "it": "Colore del testo"
+  },
+  {
+    "en": "Text content",
+    "it": "Contenuti testuali"
+  },
+  {
+    "en": "Text exceeds {{limit}}K character limit; matching stopped (ReDoS / long-run protection)",
+    "it": "Il testo supera il limite di {{limit}} K caratteri; corrispondenza interrotta (ReDoS/protezione a lungo termine)"
+  },
+  {
+    "en": "Text input",
+    "it": "Input di testo"
+  },
+  {
+    "en": "Text or gzip base64…",
+    "it": "Testo o gzip base64..."
+  },
+  {
+    "en": "Text or hex…",
+    "it": "Testo o esadecimale..."
+  },
+  {
+    "en": "Text padding",
+    "it": "<code>Padding</code> del testo."
+  },
+  {
+    "en": "Text shadow",
+    "it": "Ombra testo"
+  },
+  {
+    "en": "Text to Card",
+    "it": "Text to Card"
+  },
+  {
+    "en": "Text to decode, e.g. &lt;b&gt;&#20320;&#22909;…",
+    "it": "Testo da decodificare, ad esempio &lt;b&gt;&#20320;&#22909;..."
+  },
+  {
+    "en": "Text to encode, e.g. <b>Hello</b>…",
+    "it": "Testo da codificare, ad es. <b>Ciao</b>..."
+  },
+  {
+    "en": "Theme",
+    "it": "Tema"
+  },
+  {
+    "en": "Thinking T / Feeling F",
+    "it": "Thinking T / Feeling F"
+  },
+  {
+    "en": "This PDF is encrypted. Enter the password to continue.",
+    "it": "Questo PDF è crittografato. Inserisci la password per continuare."
+  },
+  {
+    "en": "This PDF is encrypted. Please enter the password.",
+    "it": "Questo PDF è crittografato. Inserisci la password."
+  },
+  {
+    "en": "This is a simplified quiz for entertainment only — not a clinical assessment.",
+    "it": "Questo è un quiz semplificato solo per intrattenimento, non una valutazione clinica."
+  },
+  {
+    "en": "Thursday",
+    "it": "Giovedì"
+  },
+  {
+    "en": "Time is up!",
+    "it": "Il tempo è scaduto!"
+  },
+  {
+    "en": "Timestamp Converter",
+    "it": "Convertitore timestamp"
+  },
+  {
+    "en": "Timestamp input",
+    "it": "Inserimento marca temporale"
+  },
+  {
+    "en": "Timestamp must be numeric (negative allowed)",
+    "it": "La marca temporale deve essere numerica (consentita negativa)"
+  },
+  {
+    "en": "Timestamp out of numeric range",
+    "it": "Timestamp fuori dall'intervallo numerico"
+  },
+  {
+    "en": "Timestamp out of representable range (±275760 years)",
+    "it": "Timestamp fuori intervallo rappresentabile (±275760 anni)"
+  },
+  {
+    "en": "Timestamp → readable time (auto-detect seconds / ms)",
+    "it": "Timestamp tempo → leggibile (rilevamento automatico secondi / ms)"
+  },
+  {
+    "en": "Timing",
+    "it": "Tempi"
+  },
+  {
+    "en": "Title",
+    "it": "Titolo"
+  },
+  {
+    "en": "Title Case",
+    "it": "Iniziali maiuscole"
+  },
+  {
+    "en": "Title size",
+    "it": "Dimensione titolo"
+  },
+  {
+    "en": "Today",
+    "it": "Oggi"
+  },
+  {
+    "en": "Toggle theme",
+    "it": "Cambia tema"
+  },
+  {
+    "en": "Tonne t",
+    "it": "Tonnellata t"
+  },
+  {
+    "en": "Too many diff rows; rendering first {{count}} only",
+    "it": "Troppe righe diff; rendering⟧ solo prima ⟦0"
+  },
+  {
+    "en": "Tool navigation",
+    "it": "Navigazione tra gli strumenti"
+  },
+  {
+    "en": "Tool runtime error",
+    "it": "Run-time"
+  },
+  {
+    "en": "Top center",
+    "it": "Centro in alto"
+  },
+  {
+    "en": "Top left",
+    "it": "Sinistra in alto"
+  },
+  {
+    "en": "Top right",
+    "it": "Destra in alto"
+  },
+  {
+    "en": "Total",
+    "it": "Totale"
+  },
+  {
+    "en": "Total addresses",
+    "it": "Totale indirizzi IP"
+  },
+  {
+    "en": "Traditional Chinese",
+    "it": "Cinese tradizionale"
+  },
+  {
+    "en": "Traditional Chinese Converter",
+    "it": "Convertitore cinese tradizionale"
+  },
+  {
+    "en": "Traditional → Simplified",
+    "it": "Tradizionale → semplificato"
+  },
+  {
+    "en": "Transform",
+    "it": "Trasforma"
+  },
+  {
+    "en": "Transform XML to HTML with XSLT in the browser",
+    "it": "Trasforma XML a HTML con XSLT nel browser"
+  },
+  {
+    "en": "Transform failed",
+    "it": "Trasformazione non riuscita"
+  },
+  {
+    "en": "Transition",
+    "it": "Cambio"
+  },
+  {
+    "en": "Translate",
+    "it": "Traduci"
+  },
+  {
+    "en": "Translate X",
+    "it": "Trasla X"
+  },
+  {
+    "en": "Translate Y",
+    "it": "Trasla Y"
+  },
+  {
+    "en": "Transparent background",
+    "it": "Sfondo trasparente"
+  },
+  {
+    "en": "Trigonometry",
+    "it": "Trigonometria"
+  },
+  {
+    "en": "Trim empty lines",
+    "it": "Taglia righe vuote"
+  },
+  {
+    "en": "Tropical",
+    "it": "Tropicale"
+  },
+  {
+    "en": "Tuesday",
+    "it": "Martedì"
+  },
+  {
+    "en": "Turn Markdown into a mind map with themes, zoom, and PNG/SVG export",
+    "it": "Trasforma Markdown in una mappa mentale con temi, zoom ed⟧ esportazione PNG/⟦1"
+  },
+  {
+    "en": "Turquoise",
+    "it": "Ciano"
+  },
+  {
+    "en": "Twilight",
+    "it": "Crepuscolo"
+  },
+  {
+    "en": "Twilight purple",
+    "it": "Viola crepuscolare"
+  },
+  {
+    "en": "UPPER CASE",
+    "it": "CASSA SUPERIORE"
+  },
+  {
+    "en": "UPPERCASE",
+    "it": "MAIUSCOLE"
+  },
+  {
+    "en": "URL Encode / Decode",
+    "it": "URL Codifica / Decodifica"
+  },
+  {
+    "en": "URL Query Parser",
+    "it": "⟦0 Parser⟧ query"
+  },
+  {
+    "en": "URL Safe (- _ without padding)",
+    "it": "URL Sicuro (- _ senza imbottitura)"
+  },
+  {
+    "en": "UTF-16 length",
+    "it": "Lunghezza UTF-16"
+  },
+  {
+    "en": "UTF-8 bytes",
+    "it": "0 byte"
+  },
+  {
+    "en": "UUID Generator",
+    "it": "UUID Generatore"
+  },
+  {
+    "en": "Underweight",
+    "it": "Sotto Peso"
+  },
+  {
+    "en": "Unicode Codec",
+    "it": "Codec Unicode"
+  },
+  {
+    "en": "Unique",
+    "it": "Unico"
+  },
+  {
+    "en": "Unit system",
+    "it": "Sistema di unità di misura"
+  },
+  {
+    "en": "Universe",
+    "it": "Universo"
+  },
+  {
+    "en": "Unix ⇄ human-readable time with auto second/ms detection and live clock",
+    "it": "⟦0 tempo⟧ ⇄ leggibile dall'uomo con rilevamento automatico di secondi/ms e orologio in tempo reale"
+  },
+  {
+    "en": "Unlock",
+    "it": "Sblocca"
+  },
+  {
+    "en": "Unrecognized color format",
+    "it": "Formato colore non riconosciuto"
+  },
+  {
+    "en": "Unrecognized entities (kept as-is)",
+    "it": "Entità non riconosciute (mantenute così come sono)"
+  },
+  {
+    "en": "Unsupported font",
+    "it": "Carattere non supportato"
+  },
+  {
+    "en": "Upload an image and click a pixel to sample HEX / RGB",
+    "it": "Carica un'immagine e fai clic su un pixel per campionare ESADECIMALE / RGB"
+  },
+  {
+    "en": "Upload an image to preview the card",
+    "it": "Carica un'immagine per visualizzare l'anteprima della carta"
+  },
+  {
+    "en": "Upload an image, then click to sample a color",
+    "it": "Carica un'immagine, quindi fai clic per campionare un colore"
+  },
+  {
+    "en": "Upload file",
+    "it": "Carica file"
+  },
+  {
+    "en": "Upload signature",
+    "it": "Carica firma"
+  },
+  {
+    "en": "Uppercase",
+    "it": "Maiuscolo"
+  },
+  {
+    "en": "Uppercase (A-Z)",
+    "it": "Lettere maiuscole dalla A alla Z"
+  },
+  {
+    "en": "Use arrows to reorder pages, then export.",
+    "it": "Utilizzare le frecce per riordinare le pagine, quindi esportare."
+  },
+  {
+    "en": "Use current browser",
+    "it": "Usa il browser attuale"
+  },
+  {
+    "en": "User password",
+    "it": "Password utente"
+  },
+  {
+    "en": "User-Agent",
+    "it": "Agente utente"
+  },
+  {
+    "en": "User-Agent Parser",
+    "it": "Parser User-Agent"
+  },
+  {
+    "en": "Uses common readings; polyphonic characters use the default reading",
+    "it": "Utilizza letture comuni; i caratteri polifonici utilizzano la lettura predefinita"
+  },
+  {
+    "en": "Valentine",
+    "it": "Valentine"
+  },
+  {
+    "en": "Validate cron expressions, explain fields, and preview upcoming runs",
+    "it": "Convalidare le espressioni cron, spiegare i campi e visualizzare in anteprima le esecuzioni imminenti"
+  },
+  {
+    "en": "Validate only",
+    "it": "Solo convalida"
+  },
+  {
+    "en": "Validation result",
+    "it": "Risultato convalida"
+  },
+  {
+    "en": "Value",
+    "it": "Valore"
+  },
+  {
+    "en": "Value is outside the 64-bit signed integer range (−2⁶³ ~ 2⁶³−1)",
+    "it": "Il valore è al di fuori dell'intervallo di numeri interi con segno a 64 bit (-2,3 ~2,3-1)"
+  },
+  {
+    "en": "Values are out of a reasonable range; check units",
+    "it": "I valori sono fuori da un intervallo ragionevole; controllare le unità"
+  },
+  {
+    "en": "Velvet purple",
+    "it": "Porpora vellutato"
+  },
+  {
+    "en": "Verification failed",
+    "it": "Verifica non riuscita"
+  },
+  {
+    "en": "Verified",
+    "it": "Verifica effettuata"
+  },
+  {
+    "en": "Verify code (optional)",
+    "it": "Codice di verifica (facoltativo)"
+  },
+  {
+    "en": "Version",
+    "it": "Versione"
+  },
+  {
+    "en": "Vertical",
+    "it": "Verticali"
+  },
+  {
+    "en": "Vibrant",
+    "it": "vibrante"
+  },
+  {
+    "en": "View and edit PDF metadata",
+    "it": "Visualizza e modifica PDF metadati"
+  },
+  {
+    "en": "Vignette",
+    "it": "Immagini"
+  },
+  {
+    "en": "Violet dusk",
+    "it": "Crepuscolo viola"
+  },
+  {
+    "en": "Visual grayscale via re-rasterizing pages; text will not stay selectable.",
+    "it": "Scala di grigi visiva tramite la ri-rasterizzazione delle pagine; il testo non rimarrà selezionabile."
+  },
+  {
+    "en": "Visual signature (image overlay), not a digital certificate.",
+    "it": "Firma visiva (immagine sovrapposta), non certificato digitale."
+  },
+  {
+    "en": "Visually tweak styles and generate button CSS / HTML",
+    "it": "Modificare visivamente gli stili e generare il pulsante CSS/HTML"
+  },
+  {
+    "en": "Vivid tri-color",
+    "it": "Tricolore vivace"
+  },
+  {
+    "en": "Warm glow",
+    "it": "Bagliore caldo"
+  },
+  {
+    "en": "Watermark text",
+    "it": "Testo filigrana"
+  },
+  {
+    "en": "Web Color Table",
+    "it": "Tavola colori"
+  },
+  {
+    "en": "Wednesday",
+    "it": "Mercoledì"
+  },
+  {
+    "en": "Week starts",
+    "it": "Giorno di inizio della settimana"
+  },
+  {
+    "en": "Weekday",
+    "it": "Giorno lavorativo"
+  },
+  {
+    "en": "Weekend",
+    "it": "Fine settimana"
+  },
+  {
+    "en": "Weekly Mon 00:00",
+    "it": "Lun settimanale 00:00"
+  },
+  {
+    "en": "Weight",
+    "it": "Peso"
+  },
+  {
+    "en": "Weight (kg)",
+    "it": "Peso (kg)"
+  },
+  {
+    "en": "Weight (lb)",
+    "it": "Peso (libbre)"
+  },
+  {
+    "en": "Weight Converter",
+    "it": "Convertitore di peso"
+  },
+  {
+    "en": "White",
+    "it": "Bianco"
+  },
+  {
+    "en": "Whitespace",
+    "it": "Spazio vuoto"
+  },
+  {
+    "en": "Width",
+    "it": "Larghezza"
+  },
+  {
+    "en": "Wildcard",
+    "it": "Jolly"
+  },
+  {
+    "en": "Wine purple",
+    "it": "Viola vino"
+  },
+  {
+    "en": "Winter",
+    "it": "INVERNO"
+  },
+  {
+    "en": "Word char",
+    "it": "Word char"
+  },
+  {
+    "en": "Words",
+    "it": "Lettere"
+  },
+  {
+    "en": "Workday",
+    "it": "Workday"
+  },
+  {
+    "en": "Working…",
+    "it": "Al lavoro..."
+  },
+  {
+    "en": "Writing",
+    "it": "Scrittura"
+  },
+  {
+    "en": "X-axis label",
+    "it": "Etichetta Asse X"
+  },
+  {
+    "en": "X.509 Certificate Decoder",
+    "it": "Decodificatore certificato X.509"
+  },
+  {
+    "en": "XML Minify / Beautify",
+    "it": "XML Minimizza / Abbellisci"
+  },
+  {
+    "en": "XML input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "XML parse failed: please check the syntax",
+    "it": "XML analisi non riuscita: controllare la sintassi"
+  },
+  {
+    "en": "XML to JSON",
+    "it": "da 0 to 1"
+  },
+  {
+    "en": "XSLT Transform",
+    "it": "File di trasformazione XSLT"
+  },
+  {
+    "en": "Y-axis label",
+    "it": "Etichetta Asse Y"
+  },
+  {
+    "en": "Yard yd",
+    "it": "Cortile iarda"
+  },
+  {
+    "en": "Yellow",
+    "it": "Giallo"
+  },
+  {
+    "en": "Your type tendency",
+    "it": "Tendenza del tuo tipo"
+  },
+  {
+    "en": "Zoom in",
+    "it": "Ingrandisci"
+  },
+  {
+    "en": "Zoom out",
+    "it": "Riduci"
+  },
+  {
+    "en": "\\u escape (\\u4E2D)",
+    "it": "\\u escape (\\u4E2D)"
+  },
+  {
+    "en": "base64",
+    "it": "Base64"
+  },
+  {
+    "en": "camelCase",
+    "it": "Notazione a cammello"
+  },
+  {
+    "en": "component (param value, encodes reserved chars)",
+    "it": "componente (valore param, codifica caratteri riservati)"
+  },
+  {
+    "en": "e.g. #3b82f6, rgb(59,130,246), hsl(217,91%,60%)…",
+    "it": "ad esempio # 3b82f6, rgb(59.130.246), hsl(217,91%,60%)..."
+  },
+  {
+    "en": "e.g. (1+2)*3 or sqrt(9)+pi",
+    "it": "es. (1+2)*3 o sqrt(9)+pi"
+  },
+  {
+    "en": "e.g. */5 8-18 * * 1-5 or @daily (5 fields, 6 with seconds)",
+    "it": "es. */5 8-18 * * 1-5 o @daily (5 campi, 6 con secondi)"
+  },
+  {
+    "en": "e.g. 1,3,5",
+    "it": "es. 1,3,5"
+  },
+  {
+    "en": "e.g. 1.5",
+    "it": "es. 1,5"
+  },
+  {
+    "en": "e.g. 1725000000 or 1725000000000",
+    "it": "es. 1725000000 o 1725000000000"
+  },
+  {
+    "en": "e.g. 192.168.1.0/24",
+    "it": "ad es .: 192.168.1.0/24"
+  },
+  {
+    "en": "e.g. 2026-09-01 12:00:00 or 2026-09-01T04:00:00Z",
+    "it": "es. 2026-09-01 12:00:00 o 2026-09-01T04:00:00Z"
+  },
+  {
+    "en": "e.g. 255, 0xff, 0b11111111, 0377…",
+    "it": "ad esempio 255, 0xff, 0b11111111, 0377..."
+  },
+  {
+    "en": "e.g. E = mc^2 or \\frac{a}{b}",
+    "it": "ad es. E = mc^2 o \\frac{a}{b}"
+  },
+  {
+    "en": "e.g. Month",
+    "it": "es: mese"
+  },
+  {
+    "en": "e.g. Sales",
+    "it": "ad es. Vendite"
+  },
+  {
+    "en": "e.g. \\d+",
+    "it": "ad es. \\d+"
+  },
+  {
+    "en": "encodeURIComponent / encodeURI modes with malformed percent-encoding detection",
+    "it": "encodeURIComponent / encodeURI mode with malformed percent-encoding detection"
+  },
+  {
+    "en": "every day",
+    "it": "ogni giorno"
+  },
+  {
+    "en": "every day of the week",
+    "it": "ogni giorno della settimana"
+  },
+  {
+    "en": "every hour",
+    "it": "ogni ora"
+  },
+  {
+    "en": "every minute",
+    "it": "ogni minuto"
+  },
+  {
+    "en": "every month",
+    "it": "ogni mese"
+  },
+  {
+    "en": "every second",
+    "it": "ogni attimo,"
+  },
+  {
+    "en": "every {{n}} {{unit}}",
+    "it": "ogni {{n}} {{unit}}"
+  },
+  {
+    "en": "flowchart TD\n  A-->B",
+    "it": "diagramma di flusso TD\n A-->B"
+  },
+  {
+    "en": "hex (hexadecimal)",
+    "it": "esadecimale"
+  },
+  {
+    "en": "hour ",
+    "it": "ora"
+  },
+  {
+    "en": "hours",
+    "it": "ore"
+  },
+  {
+    "en": "https://example.com/path?a=1&b=2",
+    "it": "https://example.com/path?a=1&b=2"
+  },
+  {
+    "en": "kebab-case",
+    "it": "kebab-case"
+  },
+  {
+    "en": "label,value\napple,30\nbanana,20",
+    "it": "etichetta,valore\nmela,30\nbanana,20"
+  },
+  {
+    "en": "lower case",
+    "it": "lettera minuscola"
+  },
+  {
+    "en": "lowercase",
+    "it": "minuscolo"
+  },
+  {
+    "en": "milliseconds",
+    "it": "millisecondi"
+  },
+  {
+    "en": "minute ",
+    "it": "minuto"
+  },
+  {
+    "en": "minutes",
+    "it": "minuti"
+  },
+  {
+    "en": "month ",
+    "it": "mese "
+  },
+  {
+    "en": "months",
+    "it": "mesi"
+  },
+  {
+    "en": "pages",
+    "it": "pagine"
+  },
+  {
+    "en": "sWAP cASE",
+    "it": "sWAP cASE"
+  },
+  {
+    "en": "second ",
+    "it": "secondo"
+  },
+  {
+    "en": "seconds",
+    "it": " secondi"
+  },
+  {
+    "en": "snake_case",
+    "it": "snake_case"
+  },
+  {
+    "en": "two's complement",
+    "it": "complemento a due"
+  },
+  {
+    "en": "v4 (random)",
+    "it": "v4 (random)"
+  },
+  {
+    "en": "v7 (time-ordered)",
+    "it": "v7 (time-ordered)"
+  },
+  {
+    "en": "weekday ",
+    "it": "giorno della settimana"
+  },
+  {
+    "en": "years",
+    "it": "anni"
+  },
+  {
+    "en": "{ \"sub\": \"123\", \"name\": \"Alice\" }",
+    "it": "{ \"sub\": \"123\", \"name\": \"Alice\" }"
+  },
+  {
+    "en": "{{algorithm}} result",
+    "it": "{{algorithm}} risultato"
+  },
+  {
+    "en": "{{chars}} chars / {{bytes}} bytes",
+    "it": "{{chars}} caratteri / {{bytes}} byte"
+  },
+  {
+    "en": "{{count}} match(es)",
+    "it": "Corrispondenza/e"
+  },
+  {
+    "en": "{{count}} {{unit}} ago",
+    "it": "{{count}} {{unit}} fa"
+  },
+  {
+    "en": "{{count}} {{unit}} from now",
+    "it": "{{count}} {{unit}} da adesso"
+  },
+  {
+    "en": "{{noun}}{{a}}–{{b}}",
+    "it": "0 1 2"
+  },
+  {
+    "en": "{{noun}}{{a}}–{{b}}, every {{n}}",
+    "it": "{{noun}} {{a}} – {{b}} , ogni {{n}}"
+  },
+  {
+    "en": "{{noun}}{{values}}",
+    "it": "0 1"
+  },
+  {
+    "en": "{{n}} annotation(s)",
+    "it": "{{n}} annotazioni"
+  },
+  {
+    "en": "{{n}} pages",
+    "it": "{{n}} pagine"
+  },
+  {
+    "en": "{{size}} bytes",
+    "it": "{{size}} byte"
+  },
+  {
+    "en": "{{w}}×{{h}} · {{n}} frames",
+    "it": "{{w}} × {{h}} · {{n}} fotogrammi"
+  },
+  {
+    "en": "{{year}}-{{month}}",
+    "it": "0 1"
+  },
+  {
+    "en": "✓ Valid JSON",
+    "it": "✓ Valido JSON"
+  }
+]

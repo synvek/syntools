@@ -1,0 +1,100 @@
+Kilometer km
+L (~7%)
+LaTeX Math Editor
+Label
+Lagoon
+Lake dusk
+Landscape
+Language
+Lap time
+Large input (> 500KB), real-time compute may slow down
+Last host
+Lavender
+Lavender mist
+Layout
+Layout a title and body into a styled card and export PNG
+Leaf glow
+Learning
+Leave empty for all
+Legend
+Length
+Length Converter
+Length must be an integer from 1 to 256
+Length must be between 4 and 128
+Letters
+Light
+Lilac
+Line breaks → <br>
+Line height
+Line numbers
+Linear
+Linen
+Lines
+Link corners
+Live GFM rendering with DOMPurify sanitization for safe preview
+Live syntax highlighting with line numbers and HTML snippet copy
+Load sample
+Loading
+Local only
+Local preview — nothing is uploaded.
+Local time
+Local-first processing; data stays in your browser (CSP, zero egress) · Press <1>⌘K</1> or <3>/</3> to search
+Local: {{local}} · {{utc}}
+Locale
+Logic
+Lotus
+Lowercase
+Lowercase (a-z)
+Lunar date
+M (~15%)
+MBTI Personality Test
+MD5 / SHA-1 / SHA-256 / SHA-512 for text and files (streaming), hex / base64 output
+Magnolia
+Mango dusk
+Margin
+Margin (mm)
+Margin must be an integer from 0 to 10 (modules)
+Margins in PDF points (pt ≈ 1/72 inch).
+MariaDB
+Markdown
+Markdown Mind Map
+Markdown Preview
+Markdown editing toolbar
+Markdown editor
+Markdown to Image
+Marketing
+Mass–energy
+Match
+Match highlighting, replace, capture groups, presets, and cheat sheet
+Matcha
+Matches every value in this field
+Matrices & vectors
+Max dimension
+Max {{size}}
+Maximum {{max}} UUIDs per batch
+Maxwell's equation
+Meadow
+Meaning
+Medium
+Merge & download
+Merge PDF
+Merge failed; please retry
+Merge multiple PDFs into one file
+Merges locally — nothing is uploaded. Prefer files < 50MB.
+Mermaid
+Mermaid Diagram Editor
+Message
+Message to authenticate…
+Meter m
+Metric (cm / kg)
+Midnight
+Midnight purple
+Mile mi
+Milligram mg
+Millimeter mm
+Milliseconds
+Mind map
+Minify
+Minify and beautify CSS with 2/4-space indent options
+Minify and beautify HTML with 2/4-space indent options
+Minify and beautify JavaScript with 2/4-space indent options

@@ -1,0 +1,802 @@
+[
+  {
+    "en": " (truncated, showing first 1000)",
+    "it": "(troncato, mostra i primi 1000)"
+  },
+  {
+    "en": "# Title\nBody…",
+    "it": "# Title\nCorpo…"
+  },
+  {
+    "en": "# Topic\n## Branch\n- Point…",
+    "it": "# Topic\n## Filiale\n- Punto…"
+  },
+  {
+    "en": "#3b82f6 / rgb(59,130,246)…",
+    "it": "#3b82f6 / rgb(59.130.246)..."
+  },
+  {
+    "en": "(empty match)",
+    "it": "(corrispondenza vuota)"
+  },
+  {
+    "en": "+{{added}} added / −{{removed}} removed / {{same}} unchanged",
+    "it": "+ {{added}} aggiunto /⟦-1⟧ rimosso / {{same}} invariato"
+  },
+  {
+    "en": "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----",
+    "it": "-----CERTIFICATO BEGINE-----\n…\n-----CERTIFICATO END-----"
+  },
+  {
+    "en": "0 or 1",
+    "it": "0 o 1"
+  },
+  {
+    "en": "0 or more",
+    "it": "0 o più"
+  },
+  {
+    "en": "1 or more",
+    "it": "1"
+  },
+  {
+    "en": "2 spaces",
+    "it": "2 spazi"
+  },
+  {
+    "en": "2×2 determinant",
+    "it": "Determinante 2×2"
+  },
+  {
+    "en": "32 or 64 hex chars (AES-128/256)…",
+    "it": "32 o 64 caratteri esadecimali (AES-128/256)..."
+  },
+  {
+    "en": "4 spaces",
+    "it": "4 spazi"
+  },
+  {
+    "en": "A short 24-question MBTI-style quiz (for entertainment only)",
+    "it": "Un breve quiz in stile MBTI di 24 domande (solo per intrattenimento)"
+  },
+  {
+    "en": "AES Encrypt / Decrypt",
+    "it": "AES Crittografa / Decrittografa"
+  },
+  {
+    "en": "AES-GCM with PBKDF2 passphrase or raw key; output base64(salt|iv|ciphertext)",
+    "it": "AES-GCM con passphrase PBKDF2 o chiave raw; output base64(salt|iv|ciphertext)"
+  },
+  {
+    "en": "AI Prompt Library",
+    "it": "Libreria prompt AI"
+  },
+  {
+    "en": "ASCII 0–127 reference with search by decimal, hex, or character",
+    "it": "Riferimento ASCII 0–127 con ricerca per decimale, esadecimale o carattere"
+  },
+  {
+    "en": "ASCII Table",
+    "it": "ASCII TABLE"
+  },
+  {
+    "en": "Above photo",
+    "it": "Sopra la foto"
+  },
+  {
+    "en": "Action",
+    "it": "Azione"
+  },
+  {
+    "en": "Add & download",
+    "it": "Aggiungi Download"
+  },
+  {
+    "en": "Add Text to PDF",
+    "it": "Aggiungi testo a PDF"
+  },
+  {
+    "en": "Add a text watermark with position, opacity, rotation, and tiling",
+    "it": "Aggiungi una filigrana di testo con posizione, opacità, rotazione e affiancamento"
+  },
+  {
+    "en": "Add at least one image",
+    "it": "Aggiungi almeno un'immagine"
+  },
+  {
+    "en": "Add border, rounded corners, and shadow, then export PNG",
+    "it": "Aggiungi bordo, angoli arrotondati e ombreggiatura, quindi esporta PNG"
+  },
+  {
+    "en": "Add header and footer text",
+    "it": "Aggiungi testo intestazione e piè di pagina"
+  },
+  {
+    "en": "Add images one by one (up to {{max}})",
+    "it": "Aggiungi le immagini una per una (fino a {{max}} )"
+  },
+  {
+    "en": "Add page numbers to a PDF",
+    "it": "Aggiungi numeri di pagina a PDF"
+  },
+  {
+    "en": "Add param",
+    "it": "Aggiungi parametro"
+  },
+  {
+    "en": "Add stop",
+    "it": "Aggiungi fermata"
+  },
+  {
+    "en": "Add text onto PDF pages",
+    "it": "Aggiungi testo a PDF pagine"
+  },
+  {
+    "en": "Add to favorites",
+    "it": "Aggiungi ai preferiti"
+  },
+  {
+    "en": "Adjust brightness, contrast, saturation, and hue, then export PNG",
+    "it": "Regola luminosità, contrasto, saturazione e tonalità, quindi esporta PNG"
+  },
+  {
+    "en": "Algorithm",
+    "it": "Algoritmo"
+  },
+  {
+    "en": "Align",
+    "it": "Allinea"
+  },
+  {
+    "en": "All pages",
+    "it": "Tutte le pagine"
+  },
+  {
+    "en": "Allow annotating",
+    "it": "Consenti annotazione"
+  },
+  {
+    "en": "Allow copying",
+    "it": "Consenti copia"
+  },
+  {
+    "en": "Allow modifying",
+    "it": "Consenti modifica"
+  },
+  {
+    "en": "Allow printing",
+    "it": "Consenti stampa"
+  },
+  {
+    "en": "Alphanumeric",
+    "it": "Alfanumerico"
+  },
+  {
+    "en": "Alternation",
+    "it": "Alternanza"
+  },
+  {
+    "en": "Angle",
+    "it": "Smerigliatrice"
+  },
+  {
+    "en": "Annotate PDF",
+    "it": "Annotazione"
+  },
+  {
+    "en": "Answered {{done}} / {{total}}",
+    "it": "Risposto {{done}} / {{total}}"
+  },
+  {
+    "en": "Any character",
+    "it": "Qualsiasi carattere"
+  },
+  {
+    "en": "Apply & download",
+    "it": "Applica e scarica"
+  },
+  {
+    "en": "Arrows",
+    "it": "Frecce"
+  },
+  {
+    "en": "Aspect",
+    "it": "Aspetto"
+  },
+  {
+    "en": "Author",
+    "it": "Autore"
+  },
+  {
+    "en": "Auto detect",
+    "it": "Rilevamento automatico"
+  },
+  {
+    "en": "Avoid",
+    "it": "Evitare"
+  },
+  {
+    "en": "Azure tri-color",
+    "it": "Azzurro tricolore"
+  },
+  {
+    "en": "BMI Calculator",
+    "it": "Calcolatore BMI"
+  },
+  {
+    "en": "Back to home",
+    "it": "Indietro alla home page"
+  },
+  {
+    "en": "Backdrop",
+    "it": "Sfondo"
+  },
+  {
+    "en": "Backdrop color",
+    "it": "Colore sfondo"
+  },
+  {
+    "en": "Background",
+    "it": "Sfondo"
+  },
+  {
+    "en": "Base32 secret",
+    "it": "Base32 Secret"
+  },
+  {
+    "en": "Base64 Encode / Decode",
+    "it": "Base64 Codifica / Decodifica"
+  },
+  {
+    "en": "Base64 input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "Base64 result",
+    "it": "Base64 risultato"
+  },
+  {
+    "en": "Base64 → Image",
+    "it": "Immagine 0"
+  },
+  {
+    "en": "Bayes' theorem",
+    "it": "Teorema di Bayes"
+  },
+  {
+    "en": "Beautify",
+    "it": "Abbellisci"
+  },
+  {
+    "en": "Beautify SQL across dialects with configurable indent and keyword case",
+    "it": "Abbellisci l'SQL tra i dialetti con indentazione configurabile e maiuscole/minuscole per"
+  },
+  {
+    "en": "Beautify and minify XML with 2/4-space indent; CDATA preserved",
+    "it": "Abbellisci e minimizza XML con rientro di 2/4 di spazio; CDATA conservato"
+  },
+  {
+    "en": "Below photo",
+    "it": "Foto sotto"
+  },
+  {
+    "en": "Binomial theorem",
+    "it": "Teorema binomiale"
+  },
+  {
+    "en": "Bit pattern",
+    "it": "schema di bit"
+  },
+  {
+    "en": "Bitwise operations",
+    "it": "Operazioni bit per bit"
+  },
+  {
+    "en": "Block radius",
+    "it": "Raggio di blocco"
+  },
+  {
+    "en": "Bold (**)",
+    "it": "Grassetto"
+  },
+  {
+    "en": "Border",
+    "it": "Bordo"
+  },
+  {
+    "en": "Border color",
+    "it": "Colore bordo"
+  },
+  {
+    "en": "Border width",
+    "it": "Larghezza del Bordo"
+  },
+  {
+    "en": "Both texts are identical",
+    "it": "Entrambi i testi sono identici"
+  },
+  {
+    "en": "Bottom",
+    "it": "In basso"
+  },
+  {
+    "en": "Bottom center",
+    "it": "Centro inferiore"
+  },
+  {
+    "en": "Bottom left",
+    "it": "Sinistra in basso"
+  },
+  {
+    "en": "Bottom right",
+    "it": "Destra in basso"
+  },
+  {
+    "en": "Box shadow",
+    "it": "Ombreggiatura riquadro"
+  },
+  {
+    "en": "Braces",
+    "it": "Bretelle"
+  },
+  {
+    "en": "Brightness",
+    "it": "Luminosità"
+  },
+  {
+    "en": "Broadcast",
+    "it": "Trasmetti"
+  },
+  {
+    "en": "Browser",
+    "it": "Browser"
+  },
+  {
+    "en": "Browser sketch pad with brush, eraser, and PNG export",
+    "it": "Blocco per schizzi del browser con pennello, gomma e⟧ esportazione ⟦0"
+  },
+  {
+    "en": "Build ICO",
+    "it": "Crea ICO"
+  },
+  {
+    "en": "Build a standard 5-field Cron expression from minute/hour/day/month/weekday options",
+    "it": "Crea un'⟧espressione ⟦0 standard a 5 campi dalle opzioni minuto/ora/giorno/mese/giorno feriale"
+  },
+  {
+    "en": "Build bar/line/area/pie/doughnut/scatter charts from CSV with legends and palettes",
+    "it": "Costruisci grafici a barre/a linee/ad area/a torta/ad anello/a dispersione da CSV con legende e tavolozze"
+  },
+  {
+    "en": "Bullet list",
+    "it": "Elenco delle pallottole"
+  },
+  {
+    "en": "Button",
+    "it": "Pulsante"
+  },
+  {
+    "en": "CIDR Calculator",
+    "it": "Calcolatrice"
+  },
+  {
+    "en": "CJK characters",
+    "it": "Caratteri CJK"
+  },
+  {
+    "en": "CONSTANT_CASE",
+    "it": "CONSTANT_CASE"
+  },
+  {
+    "en": "CSS Button Generator",
+    "it": "⟦0 Generatore⟧ di pulsanti"
+  },
+  {
+    "en": "CSS Gradient Generator",
+    "it": "⟦0 Generatore di⟧ gradiente"
+  },
+  {
+    "en": "CSS Minify / Beautify",
+    "it": "CSS Minimizza / Abbellisci"
+  },
+  {
+    "en": "CSS background",
+    "it": "Origini"
+  },
+  {
+    "en": "CSS color",
+    "it": "CSS colore"
+  },
+  {
+    "en": "CSS input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "CSS named colors (including Grey aliases and RebeccaPurple) for color / background use.",
+    "it": "⟦0 colori⟧ denominati (inclusi alias grigi e RebeccaPurple) per uso colore / sfondo."
+  },
+  {
+    "en": "CSS named colors with group filters and copy name / HEX / RGB",
+    "it": "⟦0 colori⟧ denominati con filtri di gruppo e nome della copia/ ESADECIMALE / RGB"
+  },
+  {
+    "en": "CSS3 Code Generator",
+    "it": "Generatore di codici"
+  },
+  {
+    "en": "Calculator",
+    "it": "Calcolatrice"
+  },
+  {
+    "en": "Calculus",
+    "it": "Analisi"
+  },
+  {
+    "en": "Calendar",
+    "it": "Calendario"
+  },
+  {
+    "en": "Camera make",
+    "it": "Marca fotocamera"
+  },
+  {
+    "en": "Cannot convert to the target format (CSV requires an array of objects)",
+    "it": "Impossibile convertire nel formato di destinazione (CSV richiede una matrice di oggetti)"
+  },
+  {
+    "en": "Cannot convert to the target format (e.g. TOML does not support top-level arrays/scalars)",
+    "it": "Impossibile convertire nel formato di destinazione (ad es. TOML non supporta array/scalari di primo livello)"
+  },
+  {
+    "en": "Cannot parse date/time (e.g. 2026-09-01 12:00:00 or ISO 8601)",
+    "it": "Impossibile analizzare data/ora (ad es. 2026-09-01 12:00:00 o ISO 8601)"
+  },
+  {
+    "en": "Cannot parse this SQL: please check the syntax",
+    "it": "Impossibile analizzare questo SQL: controlla la sintassi"
+  },
+  {
+    "en": "Cannot parse: check field count (5 or 6) and ranges (min 0-59 / hour 0-23 / day 1-31 / month 1-12 / weekday 0-7)",
+    "it": "Impossibile analizzare: controllare il conteggio dei campi (5 o 6) e gli intervalli (min 0-59 / ora 0-23 / giorno 1-31 / mese 1-12 / giorno feriale 0-7)"
+  },
+  {
+    "en": "Cannot parse: check the Unicode / UTF-8 representation",
+    "it": "Impossibile analizzare: controllare la⟧ rappresentazione Unicode /⟦0"
+  },
+  {
+    "en": "Cannot parse: check the radix and number format",
+    "it": "Impossibile analizzare: controllare il formato RADIX e numero"
+  },
+  {
+    "en": "Cannot parse: use HEX, RGB, or HSL format",
+    "it": "Impossibile analizzare: utilizzare il formato HEX, RGB o HSL"
+  },
+  {
+    "en": "Caption position",
+    "it": "Posizione didascalia"
+  },
+  {
+    "en": "Capturing group",
+    "it": "Gruppo di acquisizione"
+  },
+  {
+    "en": "Card title…",
+    "it": "Titolo della carta..."
+  },
+  {
+    "en": "Career",
+    "it": "Carriera"
+  },
+  {
+    "en": "Case Converter",
+    "it": "Convertitore di casse"
+  },
+  {
+    "en": "Categories follow WHO adult cutoffs for reference only — not medical advice.",
+    "it": "Le categorie SEGUONO i cutoff per adulti dell'OMS solo per riferimento — non per consulenza medica."
+  },
+  {
+    "en": "Category",
+    "it": "Categoria"
+  },
+  {
+    "en": "Cauchy–Schwarz",
+    "it": "Cauchy–Schwarz"
+  },
+  {
+    "en": "Center",
+    "it": "Centro"
+  },
+  {
+    "en": "Centimeter cm",
+    "it": "Centimetri (cm)"
+  },
+  {
+    "en": "Character class",
+    "it": "una classe di caratteri"
+  },
+  {
+    "en": "Character-level mapping; proper nouns may differ from OpenCC phrase dictionaries",
+    "it": "Mappatura a livello di carattere; i nomi propri possono differire dai dizionari di frasi OpenCC"
+  },
+  {
+    "en": "Characters (no spaces)",
+    "it": "Caratteri (senza spazi)"
+  },
+  {
+    "en": "Characters (with spaces)",
+    "it": "Caratteri (spazi inclusi)"
+  },
+  {
+    "en": "Charset",
+    "it": "Codifica di caratteri"
+  },
+  {
+    "en": "Chart Generator",
+    "it": "Generatore di grafici"
+  },
+  {
+    "en": "Cheat sheet (click to insert)",
+    "it": "Cheat sheet (clicca per inserire)"
+  },
+  {
+    "en": "Chinese",
+    "it": "Cinese"
+  },
+  {
+    "en": "Chinese to Pinyin",
+    "it": "Da cinese a pinyin"
+  },
+  {
+    "en": "Choose a preset…",
+    "it": "Selezionare un preset"
+  },
+  {
+    "en": "Choose an angle for all or selected pages.",
+    "it": "Scegli un angolo per tutte le pagine o per quelle selezionate."
+  },
+  {
+    "en": "Choose to fill in…",
+    "it": "Scegli di compilare..."
+  },
+  {
+    "en": "Ciphertext (base64)",
+    "it": "Testo cifrato (base64)"
+  },
+  {
+    "en": "Circle",
+    "it": "Circonferenza"
+  },
+  {
+    "en": "Classic formulas",
+    "it": "Formule classiche"
+  },
+  {
+    "en": "Clear",
+    "it": "Cancella"
+  },
+  {
+    "en": "Clear page",
+    "it": "Cancellare pagina nodo"
+  },
+  {
+    "en": "Click \"Generate\" to create a password",
+    "it": "Fai clic su \"Genera\" per creare una password"
+  },
+  {
+    "en": "Click a pixel on the image to sample",
+    "it": "Fai clic su un pixel sull'immagine per campionare"
+  },
+  {
+    "en": "Click a symbol to insert at the cursor; classic formulas replace the editor. Rendered by KaTeX; exotic macros may not work.",
+    "it": "Fare clic su un simbolo da inserire con il cursore; le formule classiche sostituiscono l'editor. Renderizzato da KaTeX; le macro esotiche potrebbero non funzionare."
+  },
+  {
+    "en": "Client-side image compression and format conversion (PNG / JPEG / WebP) with resize and quality",
+    "it": "Compressione dell'immagine lato client e conversione del formato (PNG ⟧/⟦1/WebP) con ridimensionamento e qualità"
+  },
+  {
+    "en": "Close menu",
+    "it": "Chiudi menu"
+  },
+  {
+    "en": "Code Highlighter",
+    "it": "Evidenziatore codice"
+  },
+  {
+    "en": "Code block (```)",
+    "it": "Blocco di codice"
+  },
+  {
+    "en": "Code point U+",
+    "it": "Codice punto U+"
+  },
+  {
+    "en": "Code to Image",
+    "it": "Code to Image"
+  },
+  {
+    "en": "Coding",
+    "it": "Programmazione"
+  },
+  {
+    "en": "Color",
+    "it": "Colore"
+  },
+  {
+    "en": "Color Converter",
+    "it": "Convertitore di colore"
+  },
+  {
+    "en": "Color must be #RGB or #RRGGBB",
+    "it": "Il colore deve essere #RGB o #RRGGBB"
+  },
+  {
+    "en": "Color preview",
+    "it": "Anteprima colore"
+  },
+  {
+    "en": "Color scheme",
+    "it": "Schema colori"
+  },
+  {
+    "en": "Combine images into a PDF",
+    "it": "Combina le immagini in uno PDF"
+  },
+  {
+    "en": "Combined text exceeds {{limit}}K character limit; diff stopped (long-run protection)",
+    "it": "Il testo combinato supera il limite di {{limit}} K caratteri; diff interrotto (protezione a lungo termine)"
+  },
+  {
+    "en": "Compile failed: {{message}}",
+    "it": "Compilazione non riuscita: {{message}}"
+  },
+  {
+    "en": "Compress (text → base64)",
+    "it": "Comprimi (testo → base64)"
+  },
+  {
+    "en": "Compute BMI from height and weight with WHO adult categories",
+    "it": "Calcola l'IMC da altezza e peso con le categorie di ADULTI DELL'OMS"
+  },
+  {
+    "en": "Computing…",
+    "it": "Informatica"
+  },
+  {
+    "en": "Config Data Format Converter",
+    "it": "Convertitore del formato dei dati di configurazione"
+  },
+  {
+    "en": "Contain",
+    "it": "Contiene"
+  },
+  {
+    "en": "Content is too long for a QR code: shorten it or lower the error correction level",
+    "it": "Il contenuto è troppo lungo per un⟧ codice ⟦0: abbreviarlo o abbassare il livello di correzione dell'errore"
+  },
+  {
+    "en": "Content too long (> 2KB), cannot create share link",
+    "it": "Contenuto troppo lungo (> 2KB), impossibile creare link di condivisione"
+  },
+  {
+    "en": "Contrast",
+    "it": "Contrasto"
+  },
+  {
+    "en": "Control characters without glyphs show as ·; copy the char or \\xHH",
+    "it": "I caratteri di controllo senza glifi vengono visualizzati come ·; copiare il carattere o \\xHH"
+  },
+  {
+    "en": "Conversion failed; check the SVG or reduce scale",
+    "it": "Conversione non riuscita; controllare lo SVG o ridurre la scala"
+  },
+  {
+    "en": "Conversion failed; try another image",
+    "it": "Conversione non riuscita; prova un'altra immagine"
+  },
+  {
+    "en": "Convert & download",
+    "it": "Converti e scarica"
+  },
+  {
+    "en": "Convert Chinese to pinyin with optional tones, separator, and case",
+    "it": "Converti il cinese in pinyin con toni, separatore e custodia opzionali"
+  },
+  {
+    "en": "Convert PDF to visual grayscale",
+    "it": "Converti ⟦0 in scala⟧ di grigi visiva"
+  },
+  {
+    "en": "Convert SVG markup or files to PNG with scale and transparency",
+    "it": "Converti SVG markup o file in PNG con scala e trasparenza"
+  },
+  {
+    "en": "Convert YAML ⇄ JSON ⇄ TOML via a lossless JS value intermediate",
+    "it": "Converti YAML ⇄ JSON ⇄ TOML tramite un valore JS lossless intermedio"
+  },
+  {
+    "en": "Convert and preview HEX / RGB / HSL color formats",
+    "it": "Converti e visualizza in anteprima i formati colore ESADECIMALE / RGB / HSL"
+  },
+  {
+    "en": "Convert and preview RGB, HSV, CMYK, and HEX color spaces",
+    "it": "Converti e visualizza in anteprima gli spazi colore RGB, HSV, CMYK e HEX"
+  },
+  {
+    "en": "Convert base 2/8/10/16 and visualize bitwise ops for 64-bit signed integers",
+    "it": "Convertire la base 2/8/10/16 e visualizzare le operazioni bit per bit per numeri interi con segno a 64 bit"
+  },
+  {
+    "en": "Convert between Simplified and Traditional Chinese",
+    "it": "Convertire tra cinese semplificato e tradizionale"
+  },
+  {
+    "en": "Convert case and naming styles (camel / snake / kebab, etc.)",
+    "it": "Convertire gli stili di case e naming (cammello / serpente / kebab, ecc.)"
+  },
+  {
+    "en": "Convert images to Base64 / Data URL and back, entirely locally",
+    "it": "Convertire le immagini in Base64/ Dati URL e viceversa, interamente in locale"
+  },
+  {
+    "en": "Convert images to multi-size ICO (favicon), or extract PNG from ICO",
+    "it": "Converti le immagini in ICO multi-size (favicon) o estrai PNG da ICO"
+  },
+  {
+    "en": "Convert metric and imperial length units (mm, cm, m, km, in, ft, and more)",
+    "it": "Converti unità di lunghezza metriche e imperiali (mm, cm, m, km, in, ft e altro)"
+  },
+  {
+    "en": "Convert metric and imperial weight units (mg, g, kg, t, oz, lb, st)",
+    "it": "Converti unità di peso metriche e imperiali (mg, g, kg, t, oz, lb, st)"
+  },
+  {
+    "en": "Convert text and Base64 with Unicode-safe encoding; URL Safe and file mode supported",
+    "it": "Converti testo e Base64 con codifica sicura Unicode; ⟦1 Modalità⟧ sicura e file supportata"
+  },
+  {
+    "en": "Convert text to/from \\uXXXX, code points, HTML entities, and UTF-8 bytes",
+    "it": "Converti testo in/da \\uXXXX, punti di codice, HTML entità e UTF-8 byte"
+  },
+  {
+    "en": "Copied",
+    "it": "Copiato"
+  },
+  {
+    "en": "Copy Data URL",
+    "it": "Copia dei dati"
+  },
+  {
+    "en": "Copy HTML",
+    "it": "Copia {0}"
+  },
+  {
+    "en": "Copy SVG",
+    "it": "Copia {0}"
+  },
+  {
+    "en": "Copy code",
+    "it": "Copiare codice"
+  },
+  {
+    "en": "Count",
+    "it": "Conteggio"
+  },
+  {
+    "en": "Count characters, words, lines, paragraphs, CJK chars, and UTF-8 bytes",
+    "it": "Conta caratteri, parole, righe, paragrafi, caratteri CJK e UTF-8 byte"
+  },
+  {
+    "en": "Count must be an integer from 1 to 100",
+    "it": "Il conteggio deve essere un numero intero compreso tra 1 e 100"
+  },
+  {
+    "en": "Count must be an integer from 1 to 1000",
+    "it": "Il conteggio deve essere un numero intero compreso tra 1 e 1000"
+  },
+  {
+    "en": "Count must be an integer from 1 to 50",
+    "it": "Il conteggio deve essere un numero intero compreso tra 1 e 50"
+  }
+]

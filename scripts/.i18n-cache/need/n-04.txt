@@ -1,0 +1,100 @@
+Forest
+Format
+Format / minify / validate with 2/4-space indent and line/column error locations
+Format supports {n} and {total}.
+Formatting
+Fourier transform
+Friday
+Frost
+Full URL (keeps : / ? & etc.)
+Full width
+Functions
+GFM (tables / strikethrough / task lists)
+GIF Frame Extractor
+Galaxy
+Galaxy color
+Gap (px)
+Gaussian integral
+Generate
+Generate a placeholder PNG by size, colors, and optional text
+Generate and decode QR codes with ECC, size, colors, and margin options
+Generate border-radius, shadows, transform, filter, and more
+Generate names / emails / UUIDs / lorem in zh/en, 1–50 items
+Generate random integers or decimals in a range, with optional unique values
+Generate random strings by length and charset (alnum / hex / custom)
+Generated (one per line)
+Generators
+Generic SQL
+Glacier
+Golden sun
+Gradient
+Gradient preview
+Gram g
+Grape
+Graphite
+Grayscale
+Greek letters
+Green
+Group
+Groups
+Gzip Compress
+Gzip text to base64 / decompress back to text
+H (~30%)
+HMAC secret…
+HMAC-SHA256 / SHA512 with hex / base64 output
+HSV / CMYK Converter
+HTML &#x…;
+HTML &#…;
+HTML Color Picker
+HTML Encode / Decode
+HTML Minify / Beautify
+HTML input
+HTML preview
+HTML style
+Harbor
+Has EXIF
+Hash Calculator
+Hash failed: algorithm not supported in this environment
+Header
+Heading 1 (#)
+Heading 2 (##)
+Heading 3 (###)
+Heading 4 (####)
+Heading 5 (#####)
+Heading 6 (######)
+Hei (sans CJK)
+Height
+Height (cm, or meters)
+Height (inches)
+Hex (&#x26;)
+Hex Encode / Decode
+Hex ↔ UTF-8 text with optional spaces
+Hidden
+Highlight
+Highlighted preview
+Hold Ctrl / ⌘ and scroll to zoom in the preview
+Holiday
+Holidays / terms
+Honey gold
+Horizon
+Horizontal
+Horizontal bar
+Horizontal rule
+Host count
+Hourly (on the hour)
+Hover
+Hue rotate
+Hyphens
+ICO Converter
+ICO → PNG
+ID card (18 digits)
+IPv4 CIDR: network / broadcast / host range / mask / host count
+IPv4 address
+Ice blue
+Iceberg
+Ignore trailing / repeated spaces
+Image
+Image (PNG/JPG)
+Image Border / Radius / Shadow
+Image Color Adjust
+Image Color Picker

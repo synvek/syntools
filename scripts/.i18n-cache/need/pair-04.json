@@ -1,0 +1,802 @@
+[
+  {
+    "en": "Pages to extract, e.g. 1,3-5.",
+    "it": "Pagine da estrarre, ad esempio 1,3-5."
+  },
+  {
+    "en": "Papaya cream",
+    "it": "Crema di papaya"
+  },
+  {
+    "en": "Paper",
+    "it": "Carta"
+  },
+  {
+    "en": "Paragraph",
+    "it": "Paragrafo"
+  },
+  {
+    "en": "Paragraphs",
+    "it": "Paragrafi"
+  },
+  {
+    "en": "Parse",
+    "it": "Analizza"
+  },
+  {
+    "en": "Parse JSON and convert it to YAML / XML / CSV",
+    "it": "Analizzare JSON e convertirlo in ⟦⟧ ⟦⟧ ⟦1/2/3⟧"
+  },
+  {
+    "en": "Parse PEM: SHA-256/SHA-1 fingerprints, type, DER length, CN",
+    "it": "Analisi PEM:⟧ impronte digitali SHA-256/⟦1, tipo, lunghezza DER, CN"
+  },
+  {
+    "en": "Parse URL parts and query params; rebuild after edits",
+    "it": "Analizza URL parti e interroga i parametri; ricostruisci dopo le modifiche"
+  },
+  {
+    "en": "Parse XML into JSON, keeping attributes with the @_ prefix",
+    "it": "Analizza XML in JSON, mantenendo gli attributi con il prefisso @_"
+  },
+  {
+    "en": "Parse a browser User-Agent into browser, engine, OS, and device",
+    "it": "Analizza un User-Agent del browser in browser, motore, sistema operativo e dispositivo"
+  },
+  {
+    "en": "Parse failed",
+    "it": "Parse fallito!"
+  },
+  {
+    "en": "Parse header / payload / signature and read exp and other time claims (read-only, no verify)",
+    "it": "Analizza intestazione / payload / firma e leggi EXP e altre attestazioni temporali (sola lettura, nessuna verifica)"
+  },
+  {
+    "en": "Parse only, no signature verification: verification requires a key; all processing stays in your browser",
+    "it": "Solo analisi, nessuna verifica della firma: la verifica richiede una chiave; tutte le elaborazioni rimangono nel browser"
+  },
+  {
+    "en": "PascalCase",
+    "it": "PascalCase"
+  },
+  {
+    "en": "Passphrase (PBKDF2)",
+    "it": "Passphrase (PBKDF2)"
+  },
+  {
+    "en": "Password Generator",
+    "it": "Generatore di password"
+  },
+  {
+    "en": "Paste Authenticator secret (Base32)…",
+    "it": "Incolla Authenticator secret (Base32)..."
+  },
+  {
+    "en": "Paste CSS, e.g. .box{color:red}…",
+    "it": "Incolla CSS, ad es. .box{color:red}..."
+  },
+  {
+    "en": "Paste HTML, e.g. <div><span>Hello</span></div>…",
+    "it": "Incolla HTML, ad es. <div><span>Ciao</span></div>…"
+  },
+  {
+    "en": "Paste JS, e.g. function hello(){return 1}…",
+    "it": "Incolla JS, ad es. funzione hello(){return 1}..."
+  },
+  {
+    "en": "Paste JSON, e.g. [{\"id\":1,\"name\":\"a\"}]…",
+    "it": "Incolla JSON, ad esempio [{\"id\":1,\"name\":\"a\"}]..."
+  },
+  {
+    "en": "Paste JSON, e.g. {\"a\": 1}…",
+    "it": "Incolla JSON, ad esempio {\"a\": 1}..."
+  },
+  {
+    "en": "Paste JSON…",
+    "it": "Incolla"
+  },
+  {
+    "en": "Paste SQL, e.g. select * from users where id = 1…",
+    "it": "Incolla SQL, ad esempio seleziona * dagli utenti dove id = 1..."
+  },
+  {
+    "en": "Paste SVG markup…",
+    "it": "Incolla SVG markup..."
+  },
+  {
+    "en": "Paste XML, e.g. <root a=\"1\"><item>x</item></root>…",
+    "it": "Incolla XML, ad es. <root a=\"1\"><item>x</item></root>..."
+  },
+  {
+    "en": "Paste XML, e.g. <root><item>a</item></root>…",
+    "it": "Incolla XML, ad esempio <root><item>un</item></root>..."
+  },
+  {
+    "en": "Paste XML…",
+    "it": "Incolla"
+  },
+  {
+    "en": "Paste XSLT stylesheet…",
+    "it": "Incolla foglio di stile XSLT..."
+  },
+  {
+    "en": "Paste a Base64 string…",
+    "it": "Incolla una⟧ stringa ⟦0..."
+  },
+  {
+    "en": "Paste a Data URL or raw Base64…",
+    "it": "Incolla un dato URL o RAW Base64..."
+  },
+  {
+    "en": "Paste a JWT (Bearer prefix supported), e.g. eyJhbGci…",
+    "it": "Incolla uno JWT (prefisso del portatore supportato), ad es. eyJhbGci..."
+  },
+  {
+    "en": "Paste a User-Agent string…",
+    "it": "Incolla una stringa User-Agent..."
+  },
+  {
+    "en": "Paste code…",
+    "it": " Incolla codice"
+  },
+  {
+    "en": "Paste content to convert…",
+    "it": "Incolla il contenuto da convertire..."
+  },
+  {
+    "en": "Paste or type text to count…",
+    "it": "Incolla o digita il testo da contare..."
+  },
+  {
+    "en": "Paste percent-encoded content…",
+    "it": "Incolla contenuto codificato in percentuale..."
+  },
+  {
+    "en": "Paste text to match…",
+    "it": "Incolla il testo per abbinarlo..."
+  },
+  {
+    "en": "Pastel",
+    "it": "Pastello"
+  },
+  {
+    "en": "Path not found",
+    "it": "Impossibile trovare il percorso"
+  },
+  {
+    "en": "Path, e.g. a.b[0].c or $.a.b[0]",
+    "it": "Percorso, ad esempio a.b[0].c o $.a.b[0]"
+  },
+  {
+    "en": "Pattern",
+    "it": "Pattern"
+  },
+  {
+    "en": "Pause",
+    "it": "Metti in pausa"
+  },
+  {
+    "en": "Pause clock",
+    "it": "Metti in pausa l'orologio"
+  },
+  {
+    "en": "Payload",
+    "it": "Carico utile"
+  },
+  {
+    "en": "Payload JSON",
+    "it": "Carico utile"
+  },
+  {
+    "en": "Peach",
+    "it": "Pesca "
+  },
+  {
+    "en": "Pearl",
+    "it": "CAB"
+  },
+  {
+    "en": "Peony",
+    "it": "Peonia"
+  },
+  {
+    "en": "Periwinkle",
+    "it": "Pervinca"
+  },
+  {
+    "en": "Petal",
+    "it": "Petalo"
+  },
+  {
+    "en": "Phone (China mainland)",
+    "it": "Telefono (Cina continentale)"
+  },
+  {
+    "en": "Photo + title/subtitle card with backdrop presets or gradients, export PNG",
+    "it": "Foto + cartolina titolo/sottotitolo con sfondi preimpostati o sfumati, esportazione PNG"
+  },
+  {
+    "en": "Photo rotate",
+    "it": "Rotazione foto"
+  },
+  {
+    "en": "Pick colors visually and export HEX / RGB / HSL plus HTML/CSS snippets",
+    "it": "Scegli i colori visivamente ed esporta ESADECIMALI / RGB / HSL più HTML/CSS frammenti"
+  },
+  {
+    "en": "Pick the option that fits you better; submit when all are answered.",
+    "it": "Scegli l'opzione più adatta a te; invia quando hai risposto a tutti."
+  },
+  {
+    "en": "Picked color",
+    "it": "Colore prelevato"
+  },
+  {
+    "en": "Picker",
+    "it": "Addetto al picking"
+  },
+  {
+    "en": "Pine forest",
+    "it": "Pineta"
+  },
+  {
+    "en": "Pink glow",
+    "it": "Pink Glow"
+  },
+  {
+    "en": "Pinyin",
+    "it": "Pinyin"
+  },
+  {
+    "en": "Place an image on PDF pages",
+    "it": "Posiziona un'immagine su PDF pagine"
+  },
+  {
+    "en": "Placeholder Image",
+    "it": "Immagine Segnaposto"
+  },
+  {
+    "en": "Plain text",
+    "it": "Testo normale"
+  },
+  {
+    "en": "Plaintext",
+    "it": "Plaintext"
+  },
+  {
+    "en": "Please choose a GIF file",
+    "it": "Per favore scegli un file"
+  },
+  {
+    "en": "Please choose a file",
+    "it": "Per favore scegli un file"
+  },
+  {
+    "en": "Please choose an ICO file",
+    "it": "Scegli un file ICO"
+  },
+  {
+    "en": "Please choose an image file",
+    "it": "Scegli un'immagine dal tuo PC"
+  },
+  {
+    "en": "Please complete options",
+    "it": "Completa le opzioni"
+  },
+  {
+    "en": "Please complete the input",
+    "it": "Si prega di completare l'input"
+  },
+  {
+    "en": "Please enter CSS content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter Chinese text",
+    "it": "Inserisci il testo cinese"
+  },
+  {
+    "en": "Please enter HTML content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter JSON and a path",
+    "it": "Inserisci JSON e un percorso"
+  },
+  {
+    "en": "Please enter JavaScript content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter Markdown",
+    "it": "Inserisci un ribasso"
+  },
+  {
+    "en": "Please enter Markdown content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter SVG",
+    "it": "Inserisci SVG"
+  },
+  {
+    "en": "Please enter XML",
+    "it": "Inserisci XML"
+  },
+  {
+    "en": "Please enter XML content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter XSLT",
+    "it": "Per favore inserisci"
+  },
+  {
+    "en": "Please enter a CIDR",
+    "it": "Per favore inserisci un"
+  },
+  {
+    "en": "Please enter a URL",
+    "it": "Per favore inserisci un"
+  },
+  {
+    "en": "Please enter a User-Agent",
+    "it": "Inserisci un User-Agent"
+  },
+  {
+    "en": "Please enter a color",
+    "it": "Inserire un colore valido"
+  },
+  {
+    "en": "Please enter a color value",
+    "it": "Inserisci un valore di colore valido."
+  },
+  {
+    "en": "Please enter a cron expression",
+    "it": "Inserisci un'espressione cron"
+  },
+  {
+    "en": "Please enter a date/time",
+    "it": "Inserisci una data"
+  },
+  {
+    "en": "Please enter a formula",
+    "it": "Inserire una formula valida"
+  },
+  {
+    "en": "Please enter a message",
+    "it": "Inserisci un messaggio"
+  },
+  {
+    "en": "Please enter a number",
+    "it": "Inserisci un numero"
+  },
+  {
+    "en": "Please enter a valid number",
+    "it": "Inserire un numero valido"
+  },
+  {
+    "en": "Please enter a valid secret",
+    "it": "Inserire un codice valido"
+  },
+  {
+    "en": "Please enter an expression",
+    "it": "Inserisci un'espressione"
+  },
+  {
+    "en": "Please enter an integer",
+    "it": "Immettere un numero intero positivo."
+  },
+  {
+    "en": "Please enter content",
+    "it": "Inserisci il contenuto"
+  },
+  {
+    "en": "Please enter data",
+    "it": "Inserire tutti i dati"
+  },
+  {
+    "en": "Please enter secret or code",
+    "it": "Inserisci la chiave segreta"
+  },
+  {
+    "en": "Please enter some text",
+    "it": "Inserisca alcune parole"
+  },
+  {
+    "en": "Please enter text",
+    "it": "Si prega di inserire il testo"
+  },
+  {
+    "en": "Please paste PEM",
+    "it": "Si prega di incollare PEM"
+  },
+  {
+    "en": "Please paste a JWT",
+    "it": "Incollare uno JWT"
+  },
+  {
+    "en": "Please provide a non-empty charset",
+    "it": "Fornisci un set di caratteri non vuoto"
+  },
+  {
+    "en": "Please select at least one character set",
+    "it": "Seleziona almeno un set di caratteri"
+  },
+  {
+    "en": "Please upload a PDF file",
+    "it": "Si prega di caricare un file"
+  },
+  {
+    "en": "Please upload an image file",
+    "it": "Si prega di caricare un'immagine."
+  },
+  {
+    "en": "Polar glow",
+    "it": "Polare"
+  },
+  {
+    "en": "Pop art",
+    "it": "POP Art"
+  },
+  {
+    "en": "Portrait",
+    "it": "Ritratto"
+  },
+  {
+    "en": "Position",
+    "it": "Posizione"
+  },
+  {
+    "en": "Position %",
+    "it": "Posizione %"
+  },
+  {
+    "en": "PostgreSQL",
+    "it": "PostgreSQL"
+  },
+  {
+    "en": "Pound lb",
+    "it": "Libbra libbra"
+  },
+  {
+    "en": "Powder blue",
+    "it": "Blu polvere"
+  },
+  {
+    "en": "Powered by Prism; copy the HTML snippet for blogs and docs.",
+    "it": "Powered by Prism; copia lo⟧ snippet ⟦0 per blog e documenti."
+  },
+  {
+    "en": "Prefix",
+    "it": "Prefisso"
+  },
+  {
+    "en": "Preserve",
+    "it": "Conservare"
+  },
+  {
+    "en": "Preset",
+    "it": "Preimpostazione"
+  },
+  {
+    "en": "Presets",
+    "it": "Preimpostazioni"
+  },
+  {
+    "en": "Preview",
+    "it": "Anteprima"
+  },
+  {
+    "en": "Preview in Cron parser",
+    "it": "Anteprima in Cron parser"
+  },
+  {
+    "en": "Preview of {{name}}",
+    "it": "Anteprima di {{name}}"
+  },
+  {
+    "en": "Previous",
+    "it": "Precedente"
+  },
+  {
+    "en": "Previous month",
+    "it": "Mese precedente"
+  },
+  {
+    "en": "Prism",
+    "it": "Prisma"
+  },
+  {
+    "en": "Processing failed",
+    "it": "Elaborazione non riuscita. "
+  },
+  {
+    "en": "Processing failed: please check the syntax",
+    "it": "Elaborazione non riuscita: controllare la sintassi"
+  },
+  {
+    "en": "Processing failed: please check whether the CSS is valid",
+    "it": "Elaborazione non riuscita: controlla se lo CSS è valido"
+  },
+  {
+    "en": "Processing failed: please check whether the HTML is valid",
+    "it": "Elaborazione non riuscita: controlla se lo HTML è valido"
+  },
+  {
+    "en": "Processing failed: please check whether the XML is valid",
+    "it": "Elaborazione non riuscita: controlla se lo XML è valido"
+  },
+  {
+    "en": "Processing failed: try another image",
+    "it": "Elaborazione non riuscita: prova un'altra immagine"
+  },
+  {
+    "en": "Processing failed; try another image",
+    "it": "Elaborazione non riuscita; prova un'altra immagine"
+  },
+  {
+    "en": "Producer",
+    "it": "Produttore"
+  },
+  {
+    "en": "Progress {{current}} / {{total}}",
+    "it": "Avanzamento {{current}} / {{total}}"
+  },
+  {
+    "en": "Property",
+    "it": "Proprietà"
+  },
+  {
+    "en": "Protocol",
+    "it": "Protocollo"
+  },
+  {
+    "en": "Provide at least a header or footer.",
+    "it": "Fornire almeno un'intestazione o un piè di pagina."
+  },
+  {
+    "en": "Purple",
+    "it": "Viola"
+  },
+  {
+    "en": "Purple aurora",
+    "it": "Aurora viola"
+  },
+  {
+    "en": "Purple dusk",
+    "it": "Crepuscolo viola"
+  },
+  {
+    "en": "Purple haze",
+    "it": "Purple Haze"
+  },
+  {
+    "en": "Purple orb",
+    "it": "Sfera viola"
+  },
+  {
+    "en": "Pythagorean theorem",
+    "it": "Teorema di Pitagora"
+  },
+  {
+    "en": "Q (~25%)",
+    "it": "d25"
+  },
+  {
+    "en": "QR Code",
+    "it": "Codice 0"
+  },
+  {
+    "en": "QR code preview",
+    "it": "Anteprima ⟧ codice⟦ 0"
+  },
+  {
+    "en": "Quadratic formula",
+    "it": "2. Formula quadratica"
+  },
+  {
+    "en": "Quality",
+    "it": "Qualità"
+  },
+  {
+    "en": "Question {{n}} / {{total}}",
+    "it": "Domanda {{n}} / {{total}}"
+  },
+  {
+    "en": "Quick symbols",
+    "it": "Simboli rapidi"
+  },
+  {
+    "en": "Quick symbols and classic formulas, KaTeX preview, export PNG/JPG/SVG",
+    "it": "Simboli rapidi e formule classiche, anteprima KaTeX, esportazione PNG/JPG/SVG"
+  },
+  {
+    "en": "Quote (>)",
+    "it": "Preventivo"
+  },
+  {
+    "en": "RFC 6238 TOTP: generate / verify, 6/8 digits, remaining seconds",
+    "it": "RFC 6238 TOTP: generare / verificare, 6/8 cifre, secondi rimanenti"
+  },
+  {
+    "en": "Radial",
+    "it": "Segni"
+  },
+  {
+    "en": "Radius",
+    "it": "Raggio"
+  },
+  {
+    "en": "Radix",
+    "it": "Radix"
+  },
+  {
+    "en": "Radix Converter",
+    "it": "Convertitore Radix"
+  },
+  {
+    "en": "Rainbow",
+    "it": "raiNbow"
+  },
+  {
+    "en": "Rainforest",
+    "it": "Foresta pluviale"
+  },
+  {
+    "en": "Random Number Generator",
+    "it": "generatore di numeri casuali"
+  },
+  {
+    "en": "Random String Generator",
+    "it": "Generatore di stringhe casuali"
+  },
+  {
+    "en": "Random v4 / time-ordered v7 UUIDs with batch output and formatting options",
+    "it": "UUID v4 /v7 ordinati in base al tempo casuali con output batch e opzioni di formattazione"
+  },
+  {
+    "en": "Range",
+    "it": "Intervallo"
+  },
+  {
+    "en": "Raven",
+    "it": "Corvo"
+  },
+  {
+    "en": "Raw key (hex)",
+    "it": "Chiave grezza (esadecimale)"
+  },
+  {
+    "en": "Raw text",
+    "it": "Testo grezzo"
+  },
+  {
+    "en": "Read basic JPEG EXIF and strip APP1; download cleaned file",
+    "it": "Leggere Basic JPEG EXIF e strip APP1; scaricare file pulito"
+  },
+  {
+    "en": "Readable time → timestamp (space-separated uses local timezone)",
+    "it": "→ Timestamp leggibile (lo spazio separato utilizza il fuso orario locale)"
+  },
+  {
+    "en": "Rebuilt URL",
+    "it": "Ricostruito"
+  },
+  {
+    "en": "Recently used",
+    "it": "Usati di recente"
+  },
+  {
+    "en": "Rectangle",
+    "it": "Rettangolo"
+  },
+  {
+    "en": "Red days are weekends or holidays. English uses US public holidays (en-GB uses UK bank holidays).",
+    "it": "I giorni rossi sono fine settimana o festivi. L'inglese utilizza i giorni festivi statunitensi (en-GB utilizza i giorni festivi del Regno Unito)."
+  },
+  {
+    "en": "Red marks weekends or festivals; 休 = statutory rest, 班 = makeup workday. Almanac tips on the right.",
+    "it": "Il rosso segna i fine settimana o le feste; 休 = riposo legale, 班 = giorno lavorativo di trucco. Punte dell'almanacco a destra."
+  },
+  {
+    "en": "Regex Tool",
+    "it": "Regex Utensile"
+  },
+  {
+    "en": "Regular expression cannot be empty",
+    "it": "L'espressione regolare non può essere vuota"
+  },
+  {
+    "en": "Related tools",
+    "it": "Strumenti correlati"
+  },
+  {
+    "en": "Relations",
+    "it": "internazionali"
+  },
+  {
+    "en": "Relative (detected as {{unit}})",
+    "it": "Relativo (rilevato come {{unit}} )"
+  },
+  {
+    "en": "Remove",
+    "it": "Rimuovi"
+  },
+  {
+    "en": "Remove from favorites",
+    "it": "Rimuovi dai preferiti"
+  },
+  {
+    "en": "Remove selected pages from a PDF",
+    "it": "Rimuovi le pagine selezionate da PDF"
+  },
+  {
+    "en": "Render Markdown to a styled card and export PNG with font, size, width, and colors",
+    "it": "Rendering Markdown su una carta in stile ed esportazione PNG con font, dimensioni, larghezza e colori"
+  },
+  {
+    "en": "Render Mermaid locally with themes, zoom, and PNG/SVG export",
+    "it": "Esegui il rendering della sirena localmente con temi, zoom ed⟧ esportazione PNG/⟦1"
+  },
+  {
+    "en": "Render PDF pages as JPG/PNG",
+    "it": "Rendering PDF pagine come JPG/PNG"
+  },
+  {
+    "en": "Render code as a syntax-highlighted card and export PNG",
+    "it": "Rendering del codice come scheda evidenziata dalla sintassi ed esportazione PNG"
+  },
+  {
+    "en": "Render failed: please check the Markdown syntax",
+    "it": "Rendering non riuscito: controlla la sintassi di Markdown"
+  },
+  {
+    "en": "Render failed: {{message}}",
+    "it": "Rendering non riuscito: {{message}}"
+  },
+  {
+    "en": "Rendering…",
+    "it": "Rendering…"
+  },
+  {
+    "en": "Renders locally; large files may be slow.",
+    "it": "Esegue il rendering localmente; i file di grandi dimensioni potrebbero essere lenti."
+  },
+  {
+    "en": "Reorder PDF Pages",
+    "it": "Riordina PDF pagine"
+  },
+  {
+    "en": "Reorder pages in a PDF",
+    "it": "Riordina le pagine in PDF"
+  },
+  {
+    "en": "Replace",
+    "it": "Sostituisci"
+  },
+  {
+    "en": "Replace result",
+    "it": "Sostituisci risultato"
+  },
+  {
+    "en": "Replace with",
+    "it": "Sostituisci con"
+  },
+  {
+    "en": "Reset",
+    "it": "Reimposta"
+  },
+  {
+    "en": "Reset zoom",
+    "it": "Reimposta zoom"
+  },
+  {
+    "en": "Result",
+    "it": "Risultato"
+  },
+  {
+    "en": "Resume",
+    "it": "Riprendi"
+  }
+]

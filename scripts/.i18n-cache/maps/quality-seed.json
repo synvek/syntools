@@ -1,0 +1,202 @@
+{
+  "Add to favorites": {
+    "es": "Añadir a favoritos",
+    "pt": "Adicionar aos favoritos"
+  },
+  "Remove from favorites": {
+    "es": "Quitar de favoritos",
+    "pt": "Remover dos favoritos"
+  },
+  "Search tools…": {
+    "es": "Buscar herramientas…",
+    "pt": "Pesquisar ferramentas…"
+  },
+  "Search tools": {
+    "es": "Buscar herramientas",
+    "pt": "Pesquisar ferramentas"
+  },
+  "Open menu": {
+    "es": "Abrir menú",
+    "pt": "Abrir menu"
+  },
+  "Close menu": {
+    "es": "Cerrar menú",
+    "pt": "Fechar menu"
+  },
+  "Copy": {
+    "es": "Copiar",
+    "pt": "Copiar"
+  },
+  "Copied": {
+    "es": "Copiado",
+    "pt": "Copiado"
+  },
+  "Clear": {
+    "es": "Borrar",
+    "pt": "Limpar"
+  },
+  "Download": {
+    "es": "Descargar",
+    "pt": "Transferir"
+  },
+  "Share": {
+    "es": "Compartir",
+    "pt": "Partilhar"
+  },
+  "Retry": {
+    "es": "Reintentar",
+    "pt": "Tentar novamente"
+  },
+  "Loading": {
+    "es": "Cargando",
+    "pt": "A carregar"
+  },
+  "Encode": {
+    "es": "Codificar",
+    "pt": "Codificar"
+  },
+  "Decode": {
+    "es": "Decodificar",
+    "pt": "Descodificar"
+  },
+  "Action": {
+    "es": "Acción",
+    "pt": "Ação"
+  },
+  "Result": {
+    "es": "Resultado",
+    "pt": "Resultado"
+  },
+  "Raw text": {
+    "es": "Texto sin procesar",
+    "pt": "Texto em bruto"
+  },
+  "Input": {
+    "es": "Entrada",
+    "pt": "Entrada"
+  },
+  "Output": {
+    "es": "Saída",
+    "pt": "Saída"
+  },
+  "Text": {
+    "es": "Texto",
+    "pt": "Texto"
+  },
+  "File": {
+    "es": "Archivo",
+    "pt": "Ficheiro"
+  },
+  "Remove": {
+    "es": "Eliminar",
+    "pt": "Remover"
+  },
+  "Swap": {
+    "es": "Intercambiar",
+    "pt": "Trocar"
+  },
+  "Developer Online Toolbox": {
+    "es": "Caja de herramientas online para desarrolladores",
+    "pt": "Caixa de ferramentas online para programadores"
+  },
+  "SynTools · Developer Online Toolbox": {
+    "es": "SynTools · Caja de herramientas online para desarrolladores",
+    "pt": "SynTools · Caixa de ferramentas online para programadores"
+  },
+  "Favorites": {
+    "es": "Favoritos",
+    "pt": "Favoritos"
+  },
+  "Recently used": {
+    "es": "Usados recientemente",
+    "pt": "Usados recentemente"
+  },
+  "Back to home": {
+    "es": "Volver al inicio",
+    "pt": "Voltar ao início"
+  },
+  "Page or tool not found": {
+    "es": "Página o herramienta no encontrada",
+    "pt": "Página ou ferramenta não encontrada"
+  },
+  "Crypto & Hash": {
+    "es": "Cifrado y hash",
+    "pt": "Criptografia e hash"
+  },
+  "Date & Time": {
+    "es": "Fecha y hora",
+    "pt": "Data e hora"
+  },
+  "Encoding": {
+    "es": "Codificación",
+    "pt": "Codificação"
+  },
+  "Formatting": {
+    "es": "Formato",
+    "pt": "Formatação"
+  },
+  "Generators": {
+    "es": "Generadores",
+    "pt": "Geradores"
+  },
+  "Network": {
+    "es": "Red",
+    "pt": "Rede"
+  },
+  "Images": {
+    "es": "Imágenes",
+    "pt": "Imagens"
+  },
+  "Other": {
+    "es": "Otros",
+    "pt": "Outros"
+  },
+  "Toggle theme": {
+    "es": "Cambiar tema",
+    "pt": "Alternar tema"
+  },
+  "Switch language": {
+    "es": "Cambiar idioma",
+    "pt": "Mudar idioma"
+  },
+  "Source code": {
+    "es": "Código fuente",
+    "pt": "Código-fonte"
+  },
+  "Tool navigation": {
+    "es": "Navegación de herramientas",
+    "pt": "Navegação de ferramentas"
+  },
+  "Filter tools": {
+    "es": "Filtrar herramientas",
+    "pt": "Filtrar ferramentas"
+  },
+  "Filter…": {
+    "es": "Filtrar…",
+    "pt": "Filtrar…"
+  },
+  "No matching tools": {
+    "es": "No hay herramientas coincidentes",
+    "pt": "Nenhuma ferramenta correspondente"
+  },
+  "No matching tools found": {
+    "es": "No se encontraron herramientas coincidentes",
+    "pt": "Nenhuma ferramenta correspondente encontrada"
+  },
+  "Search tools (name / keywords)…": {
+    "es": "Buscar herramientas (nombre / palabras clave)…",
+    "pt": "Pesquisar ferramentas (nome / palavras-chave)…"
+  },
+  "{{size}} bytes": {
+    "es": "{{size}} bytes",
+    "pt": "{{size}} bytes"
+  },
+  "{{chars}} chars / {{bytes}} bytes": {
+    "es": "{{chars}} caracteres / {{bytes}} bytes",
+    "pt": "{{chars}} caracteres / {{bytes}} bytes"
+  },
+  "Local-first processing; data stays in your browser (CSP, zero egress) · Press <1>⌘K</1> or <3>/</3> to search": {
+    "es": "Procesamiento local primero; los datos permanecen en tu navegador (CSP, sin salida) · Pulsa <1>⌘K</1> o <3>/</3> para buscar",
+    "pt": "Processamento local primeiro; os dados ficam no seu browser (CSP, sem saída) · Prima <1>⌘K</1> ou <3>/</3> para pesquisar"
+  }
+}

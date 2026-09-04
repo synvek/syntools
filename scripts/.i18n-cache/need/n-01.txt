@@ -1,0 +1,100 @@
+CSS background
+CSS color
+CSS input
+CSS named colors (including Grey aliases and RebeccaPurple) for color / background use.
+CSS named colors with group filters and copy name / HEX / RGB
+CSS3 Code Generator
+Calculator
+Calculus
+Calendar
+Camera make
+Cannot convert to the target format (CSV requires an array of objects)
+Cannot convert to the target format (e.g. TOML does not support top-level arrays/scalars)
+Cannot parse date/time (e.g. 2026-09-01 12:00:00 or ISO 8601)
+Cannot parse this SQL: please check the syntax
+Cannot parse: check field count (5 or 6) and ranges (min 0-59 / hour 0-23 / day 1-31 / month 1-12 / weekday 0-7)
+Cannot parse: check the Unicode / UTF-8 representation
+Cannot parse: check the radix and number format
+Cannot parse: use HEX, RGB, or HSL format
+Caption position
+Capturing group
+Card title…
+Career
+Case Converter
+Categories follow WHO adult cutoffs for reference only — not medical advice.
+Category
+Cauchy–Schwarz
+Center
+Centimeter cm
+Character class
+Character-level mapping; proper nouns may differ from OpenCC phrase dictionaries
+Characters (no spaces)
+Characters (with spaces)
+Charset
+Chart Generator
+Cheat sheet (click to insert)
+Chinese
+Chinese to Pinyin
+Choose a preset…
+Choose an angle for all or selected pages.
+Choose to fill in…
+Ciphertext (base64)
+Circle
+Classic formulas
+Clear
+Clear page
+Click "Generate" to create a password
+Click a pixel on the image to sample
+Click a symbol to insert at the cursor; classic formulas replace the editor. Rendered by KaTeX; exotic macros may not work.
+Client-side image compression and format conversion (PNG / JPEG / WebP) with resize and quality
+Close menu
+Code Highlighter
+Code block (```)
+Code point U+
+Code to Image
+Coding
+Color
+Color Converter
+Color must be #RGB or #RRGGBB
+Color preview
+Color scheme
+Combine images into a PDF
+Combined text exceeds {{limit}}K character limit; diff stopped (long-run protection)
+Compile failed: {{message}}
+Compress (text → base64)
+Compute BMI from height and weight with WHO adult categories
+Computing…
+Config Data Format Converter
+Contain
+Content is too long for a QR code: shorten it or lower the error correction level
+Content too long (> 2KB), cannot create share link
+Contrast
+Control characters without glyphs show as ·; copy the char or \xHH
+Conversion failed; check the SVG or reduce scale
+Conversion failed; try another image
+Convert & download
+Convert Chinese to pinyin with optional tones, separator, and case
+Convert PDF to visual grayscale
+Convert SVG markup or files to PNG with scale and transparency
+Convert YAML ⇄ JSON ⇄ TOML via a lossless JS value intermediate
+Convert and preview HEX / RGB / HSL color formats
+Convert and preview RGB, HSV, CMYK, and HEX color spaces
+Convert base 2/8/10/16 and visualize bitwise ops for 64-bit signed integers
+Convert between Simplified and Traditional Chinese
+Convert case and naming styles (camel / snake / kebab, etc.)
+Convert images to Base64 / Data URL and back, entirely locally
+Convert images to multi-size ICO (favicon), or extract PNG from ICO
+Convert metric and imperial length units (mm, cm, m, km, in, ft, and more)
+Convert metric and imperial weight units (mg, g, kg, t, oz, lb, st)
+Convert text and Base64 with Unicode-safe encoding; URL Safe and file mode supported
+Convert text to/from \uXXXX, code points, HTML entities, and UTF-8 bytes
+Copied
+Copy Data URL
+Copy HTML
+Copy SVG
+Copy code
+Count
+Count characters, words, lines, paragraphs, CJK chars, and UTF-8 bytes
+Count must be an integer from 1 to 100
+Count must be an integer from 1 to 1000
+Count must be an integer from 1 to 50

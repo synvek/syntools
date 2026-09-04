@@ -1,0 +1,402 @@
+{
+  "Doodle Board": {
+    "es": "Pizarra de dibujo",
+    "pt": "Quadro de desenho"
+  },
+  "Doughnut": {
+    "es": "Donut",
+    "pt": "Donut"
+  },
+  "Download ICO": {
+    "es": "Descargar ICO",
+    "pt": "Transferir ICO"
+  },
+  "Download PNG": {
+    "es": "Descargar PNG",
+    "pt": "Transferir PNG"
+  },
+  "Download SVG": {
+    "es": "Descargar SVG",
+    "pt": "Transferir SVG"
+  },
+  "Download all frames": {
+    "es": "Descargar todos los fotogramas",
+    "pt": "Transferir todos os fotogramas"
+  },
+  "Download as ZIP": {
+    "es": "Descargar como ZIP",
+    "pt": "Transferir como ZIP"
+  },
+  "Download merged PNG": {
+    "es": "Descargar PNG combinado",
+    "pt": "Transferir PNG unido"
+  },
+  "Download stripped file": {
+    "es": "Descargar archivo limpio",
+    "pt": "Transferir ficheiro limpo"
+  },
+  "Drag & drop a file here, or click to choose": {
+    "es": "Arrastra y suelta un archivo aquí, o haz clic para elegir",
+    "pt": "Arraste e largue um ficheiro aqui, ou clique para escolher"
+  },
+  "Drag & drop a file here, or click to choose (MD5 streams; large files stay memory-safe)": {
+    "es": "Arrastra y suelta un archivo aquí, o haz clic para elegir (MD5 en streaming; archivos grandes seguros en memoria)",
+    "pt": "Arraste e largue um ficheiro aqui, ou clique para escolher (MD5 em streaming; ficheiros grandes seguros em memória)"
+  },
+  "Drag & drop an image here, or click to choose (PNG / JPEG / WebP / GIF, etc.)": {
+    "es": "Arrastra y suelta una imagen aquí, o haz clic para elegir (PNG / JPEG / WebP / GIF, etc.)",
+    "pt": "Arraste e largue uma imagem aqui, ou clique para escolher (PNG / JPEG / WebP / GIF, etc.)"
+  },
+  "Drag on the canvas to draw; mouse and touch supported": {
+    "es": "Arrastra en el lienzo para dibujar; admite ratón y táctil",
+    "pt": "Arraste no canvas para desenhar; suporta rato e toque"
+  },
+  "Drag to select in free mode, or edit values below": {
+    "es": "Arrastra para seleccionar en modo libre, o edita los valores abajo",
+    "pt": "Arraste para selecionar em modo livre, ou edite os valores abaixo"
+  },
+  "Draw at least one annotation first": {
+    "es": "Dibuja al menos una anotación primero",
+    "pt": "Desenhe pelo menos uma anotação primeiro"
+  },
+  "Draw highlights, freehand, shapes, and text on PDF pages": {
+    "es": "Dibuja resaltados, a mano alzada, formas y texto en páginas PDF",
+    "pt": "Desenhe realces, à mão livre, formas e texto em páginas PDF"
+  },
+  "Draw or upload a signature image (visual, not certificate)": {
+    "es": "Dibuja o sube una imagen de firma (visual, no certificado)",
+    "pt": "Desenhe ou carregue uma imagem de assinatura (visual, não certificado)"
+  },
+  "Draw signature": {
+    "es": "Dibujar firma",
+    "pt": "Desenhar assinatura"
+  },
+  "Drop a JPEG image": {
+    "es": "Suelta una imagen JPEG",
+    "pt": "Largue uma imagem JPEG"
+  },
+  "Drop a PDF": {
+    "es": "Suelta un PDF",
+    "pt": "Largue um PDF"
+  },
+  "Drop images": {
+    "es": "Suelta imágenes",
+    "pt": "Largue imagens"
+  },
+  "Drop multiple PDFs": {
+    "es": "Suelta varios PDF",
+    "pt": "Largue vários PDF"
+  },
+  "Drop or choose a .ico file": {
+    "es": "Suelta o elige un archivo .ico",
+    "pt": "Largue ou escolha um ficheiro .ico"
+  },
+  "Drop or choose a .svg file": {
+    "es": "Suelta o elige un archivo .svg",
+    "pt": "Largue ou escolha um ficheiro .svg"
+  },
+  "Drop or choose a GIF file": {
+    "es": "Suelta o elige un archivo GIF",
+    "pt": "Largue ou escolha um ficheiro GIF"
+  },
+  "Drop or choose a PNG / JPG / WebP image": {
+    "es": "Suelta o elige una imagen PNG / JPG / WebP",
+    "pt": "Largue ou escolha uma imagem PNG / JPG / WebP"
+  },
+  "Drop or choose an image": {
+    "es": "Suelta o elige una imagen",
+    "pt": "Largue ou escolha uma imagem"
+  },
+  "Drop or choose an image (PNG / JPEG / WebP / GIF, etc.)": {
+    "es": "Suelta o elige una imagen (PNG / JPEG / WebP / GIF, etc.)",
+    "pt": "Largue ou escolha uma imagem (PNG / JPEG / WebP / GIF, etc.)"
+  },
+  "Drop or choose an image containing a QR code (PNG / JPG, etc.)": {
+    "es": "Suelta o elige una imagen con un código QR (PNG / JPG, etc.)",
+    "pt": "Largue ou escolha uma imagem com um código QR (PNG / JPG, etc.)"
+  },
+  "Drop or choose an image for the card": {
+    "es": "Suelta o elige una imagen para la tarjeta",
+    "pt": "Largue ou escolha uma imagem para o cartão"
+  },
+  "Drop or choose an image to adjust": {
+    "es": "Suelta o elige una imagen para ajustar",
+    "pt": "Largue ou escolha uma imagem para ajustar"
+  },
+  "Drop or choose an image to crop": {
+    "es": "Suelta o elige una imagen para recortar",
+    "pt": "Largue ou escolha uma imagem para recortar"
+  },
+  "Drop or choose an image to watermark": {
+    "es": "Suelta o elige una imagen para marcar",
+    "pt": "Largue ou escolha uma imagem para marcar"
+  },
+  "Duration (s)": {
+    "es": "Duración (s)",
+    "pt": "Duração (s)"
+  },
+  "Duration must be greater than 0": {
+    "es": "La duración debe ser mayor que 0",
+    "pt": "A duração deve ser maior que 0"
+  },
+  "Edit linear / radial gradients with categorized presets and copy CSS": {
+    "es": "Edita degradados lineales / radiales con preajustes categorizados y copia CSS",
+    "pt": "Edite gradientes lineares / radiais com predefinições categorizadas e copie CSS"
+  },
+  "Edit title, author, and other metadata, then download.": {
+    "es": "Edita título, autor y otros metadatos, luego descarga.",
+    "pt": "Edite título, autor e outros metadados, depois transfira."
+  },
+  "Ellipse": {
+    "es": "Elipse",
+    "pt": "Elipse"
+  },
+  "Enable tones": {
+    "es": "Activar tonos",
+    "pt": "Ativar tons"
+  },
+  "Encode (text → Base64)": {
+    "es": "Codificar (texto → Base64)",
+    "pt": "Codificar (texto → Base64)"
+  },
+  "Encode failed: input contains unpaired surrogate characters": {
+    "es": "Error al codificar: la entrada contiene caracteres sustitutos no emparejados",
+    "pt": "Falha ao codificar: a entrada contém caracteres substitutos sem par"
+  },
+  "Encode/decode HTML special characters: named / decimal / hex / \\u escapes": {
+    "es": "Codifica/decodifica caracteres especiales HTML: con nombre / decimal / hex / escapes \\u",
+    "pt": "Codifica/descodifica caracteres especiais HTML: com nome / decimal / hex / escapes \\u"
+  },
+  "Encoded text": {
+    "es": "Texto codificado",
+    "pt": "Texto codificado"
+  },
+  "Encrypt": {
+    "es": "Cifrar",
+    "pt": "Encriptar"
+  },
+  "Encrypt & download": {
+    "es": "Cifrar y descargar",
+    "pt": "Encriptar e transferir"
+  },
+  "Encrypt PDF": {
+    "es": "Cifrar PDF",
+    "pt": "Encriptar PDF"
+  },
+  "Encrypt output: base64(salt|iv|ciphertext+tag); passphrase uses PBKDF2-SHA256": {
+    "es": "Salida cifrada: base64(salt|iv|ciphertext+tag); la frase de contraseña usa PBKDF2-SHA256",
+    "pt": "Saída encriptada: base64(salt|iv|ciphertext+tag); a frase-passe usa PBKDF2-SHA256"
+  },
+  "Encrypted": {
+    "es": "Cifrado",
+    "pt": "Encriptado"
+  },
+  "Encryption failed": {
+    "es": "Error de cifrado",
+    "pt": "Falha de encriptação"
+  },
+  "End of line": {
+    "es": "Fin de línea",
+    "pt": "Fim de linha"
+  },
+  "Engine": {
+    "es": "Motor",
+    "pt": "Motor"
+  },
+  "Enter 6/8-digit code…": {
+    "es": "Introduce un código de 6/8 dígitos…",
+    "pt": "Introduza um código de 6/8 dígitos…"
+  },
+  "Enter Base64 or choose an image": {
+    "es": "Introduce Base64 o elige una imagen",
+    "pt": "Introduza Base64 ou escolha uma imagem"
+  },
+  "Enter Chinese, e.g. 你好世界…": {
+    "es": "Introduce chino, p. ej. 你好世界…",
+    "pt": "Introduza chinês, p. ex. 你好世界…"
+  },
+  "Enter Markdown headings or lists to generate a map": {
+    "es": "Introduce encabezados o listas Markdown para generar un mapa",
+    "pt": "Introduza cabeçalhos ou listas Markdown para gerar um mapa"
+  },
+  "Enter Markdown, e.g. # Heading…": {
+    "es": "Introduce Markdown, p. ej. # Heading…",
+    "pt": "Introduza Markdown, p. ex. # Heading…"
+  },
+  "Enter Mermaid syntax to render": {
+    "es": "Introduce sintaxis Mermaid para renderizar",
+    "pt": "Introduza sintaxe Mermaid para renderizar"
+  },
+  "Enter Simplified Chinese…": {
+    "es": "Introduce chino simplificado…",
+    "pt": "Introduza chinês simplificado…"
+  },
+  "Enter Traditional Chinese…": {
+    "es": "Introduce chino tradicional…",
+    "pt": "Introduza chinês tradicional…"
+  },
+  "Enter \\u4e2d, U+4E2D, &#x4E2D;, or E4 B8 AD…": {
+    "es": "Introduce \\u4e2d, U+4E2D, &#x4E2D; o E4 B8 AD…",
+    "pt": "Introduza \\u4e2d, U+4E2D, &#x4E2D; ou E4 B8 AD…"
+  },
+  "Enter a formula to preview": {
+    "es": "Introduce una fórmula para previsualizar",
+    "pt": "Introduza uma fórmula para pré-visualizar"
+  },
+  "Enter a title or body to preview": {
+    "es": "Introduce un título o cuerpo para previsualizar",
+    "pt": "Introduza um título ou corpo para pré-visualizar"
+  },
+  "Enter a valid height and weight": {
+    "es": "Introduce una altura y un peso válidos",
+    "pt": "Introduza uma altura e um peso válidos"
+  },
+  "Enter a valid hours / minutes / seconds": {
+    "es": "Introduce horas / minutos / segundos válidos",
+    "pt": "Introduza horas / minutos / segundos válidos"
+  },
+  "Enter allowed characters…": {
+    "es": "Introduce caracteres permitidos…",
+    "pt": "Introduza caracteres permitidos…"
+  },
+  "Enter annotation text": {
+    "es": "Introduce texto de anotación",
+    "pt": "Introduza texto de anotação"
+  },
+  "Enter content to encode…": {
+    "es": "Introduce contenido para codificar…",
+    "pt": "Introduza conteúdo para codificar…"
+  },
+  "Enter content…": {
+    "es": "Introduce contenido…",
+    "pt": "Introduza conteúdo…"
+  },
+  "Enter passphrase…": {
+    "es": "Introduce la frase de contraseña…",
+    "pt": "Introduza a frase-passe…"
+  },
+  "Enter text for the card…": {
+    "es": "Introduce texto para la tarjeta…",
+    "pt": "Introduza texto para o cartão…"
+  },
+  "Enter text or URL, e.g. https://example.com…": {
+    "es": "Introduce texto o URL, p. ej. https://example.com…",
+    "pt": "Introduza texto ou URL, p. ex. https://example.com…"
+  },
+  "Enter text to convert…": {
+    "es": "Introduce texto para convertir…",
+    "pt": "Introduza texto para converter…"
+  },
+  "Enter text to encode…": {
+    "es": "Introduce texto para codificar…",
+    "pt": "Introduza texto para codificar…"
+  },
+  "Enter text to hash…": {
+    "es": "Introduce texto para calcular el hash…",
+    "pt": "Introduza texto para calcular o hash…"
+  },
+  "Enter text, e.g. 中 / A / 😀…": {
+    "es": "Introduce texto, p. ej. 中 / A / 😀…",
+    "pt": "Introduza texto, p. ex. 中 / A / 😀…"
+  },
+  "Enter the content to encode": {
+    "es": "Introduce el contenido a codificar",
+    "pt": "Introduza o conteúdo a codificar"
+  },
+  "Enter the open password": {
+    "es": "Introduce la contraseña de apertura",
+    "pt": "Introduza a palavra-passe de abertura"
+  },
+  "Entropy ≈ {{bits}} bits": {
+    "es": "Entropía ≈ {{bits}} bits",
+    "pt": "Entropia ≈ {{bits}} bits"
+  },
+  "Eraser": {
+    "es": "Borrador",
+    "pt": "Borracha"
+  },
+  "Error correction": {
+    "es": "Corrección de errores",
+    "pt": "Correção de erros"
+  },
+  "Euler's identity": {
+    "es": "Identidad de Euler",
+    "pt": "Identidade de Euler"
+  },
+  "Evening": {
+    "es": "Tarde-noche",
+    "pt": "Noite"
+  },
+  "Every (*)": {
+    "es": "Cada (*)",
+    "pt": "Cada (*)"
+  },
+  "Every minute": {
+    "es": "Cada minuto",
+    "pt": "Cada minuto"
+  },
+  "Exclude ambiguous characters (0 O 1 l I etc.)": {
+    "es": "Excluir caracteres ambiguos (0 O 1 l I etc.)",
+    "pt": "Excluir caracteres ambíguos (0 O 1 l I etc.)"
+  },
+  "Expiration exp": {
+    "es": "Caducidad exp",
+    "pt": "Expiração exp"
+  },
+  "Expired": {
+    "es": "Caducado",
+    "pt": "Expirado"
+  },
+  "Export JPG": {
+    "es": "Exportar JPG",
+    "pt": "Exportar JPG"
+  },
+  "Export PDF": {
+    "es": "Exportar PDF",
+    "pt": "Exportar PDF"
+  },
+  "Export PNG": {
+    "es": "Exportar PNG",
+    "pt": "Exportar PNG"
+  },
+  "Export SVG": {
+    "es": "Exportar SVG",
+    "pt": "Exportar SVG"
+  },
+  "Export annotated PDF": {
+    "es": "Exportar PDF anotado",
+    "pt": "Exportar PDF anotado"
+  },
+  "Export failed; try another image": {
+    "es": "Error al exportar; prueba con otra imagen",
+    "pt": "Falha ao exportar; tente outra imagem"
+  },
+  "Export images": {
+    "es": "Exportar imágenes",
+    "pt": "Exportar imagens"
+  },
+  "Exporting…": {
+    "es": "Exportando…",
+    "pt": "A exportar…"
+  },
+  "Expression": {
+    "es": "Expresión",
+    "pt": "Expressão"
+  },
+  "Extra": {
+    "es": "Extra",
+    "pt": "Extra"
+  },
+  "Extract & download": {
+    "es": "Extraer y descargar",
+    "pt": "Extrair e transferir"
+  },
+  "Extract PDF Pages": {
+    "es": "Extraer páginas PDF",
+    "pt": "Extrair páginas PDF"
+  },
+  "Extract selected pages into a new PDF": {
+    "es": "Extrae las páginas seleccionadas a un PDF nuevo",
+    "pt": "Extrai as páginas selecionadas para um novo PDF"
+  }
+}

@@ -1,0 +1,3214 @@
+{
+  "Decimal (&#38;)": {
+    "es": "Decimale (&)",
+    "pt": "Decimale (&)"
+  },
+  "Extra": {
+    "es": "Extra",
+    "pt": "Extra"
+  },
+  "Fairy pink": {
+    "es": "Rosa fata",
+    "pt": "Rosa fata"
+  },
+  "Fire sky": {
+    "es": "Cielo de fuoco",
+    "pt": "Cielo de fuoco"
+  },
+  "Flags": {
+    "es": "Flag",
+    "pt": "Flag"
+  },
+  "Flame": {
+    "es": "Fiamma",
+    "pt": "Fiamma"
+  },
+  "Forest": {
+    "es": "Foresta",
+    "pt": "Foresta"
+  },
+  "Frost": {
+    "es": "Gelo",
+    "pt": "Gelo"
+  },
+  "Galaxy": {
+    "es": "Galassia",
+    "pt": "Galassia"
+  },
+  "Galaxy color": {
+    "es": "Color de la galassia",
+    "pt": "Cor de galassia"
+  },
+  "Glacier": {
+    "es": "ghiacciai.",
+    "pt": "ghiacciai."
+  },
+  "Golden sun": {
+    "es": "sole d'oro",
+    "pt": "sole d'oro"
+  },
+  "Grape": {
+    "es": "Uva",
+    "pt": "Uva"
+  },
+  "Graphite": {
+    "es": "Grafite",
+    "pt": "Grafite"
+  },
+  "Green": {
+    "es": "Fagiolini",
+    "pt": "Fagiolini"
+  },
+  "H (~30%)": {
+    "es": "H : 30",
+    "pt": "H : 30"
+  },
+  "HTML &#x…;": {
+    "es": "0 X",
+    "pt": "0 X"
+  },
+  "HTML &#…;": {
+    "es": "HTML &#…;",
+    "pt": "HTML &#…;"
+  },
+  "Harbor": {
+    "es": "Porto",
+    "pt": "Porto"
+  },
+  "Hei (sans CJK)": {
+    "es": "Hei (sin CJK)",
+    "pt": "Hei (sem CJK)"
+  },
+  "Hex (&#x26;)": {
+    "es": "Esagonale (&)",
+    "pt": "Esagonale (&)"
+  },
+  "Highlighted preview": {
+    "es": "Vista previa evidenziata",
+    "pt": "Pré-visualização evidenziata"
+  },
+  "Hold Ctrl / ⌘ and scroll to zoom in the preview": {
+    "es": "Tieni premuto CTRL /y scorri para ingrandire el vista previa",
+    "pt": "Tieni premuto CTRL /e scorri para ingrandire ou pré-visualização"
+  },
+  "Holiday": {
+    "es": "Festivo",
+    "pt": "Festivo"
+  },
+  "Holidays / terms": {
+    "es": "Ferie / termini",
+    "pt": "Ferie / termini"
+  },
+  "Honey gold": {
+    "es": "Oro miele",
+    "pt": "Oro miele"
+  },
+  "Horizon": {
+    "es": "Orizzonte",
+    "pt": "Orizzonte"
+  },
+  "Horizontal": {
+    "es": "Orizzontali",
+    "pt": "Orizzontali"
+  },
+  "Horizontal bar": {
+    "es": "Barra orizzontale",
+    "pt": "Barra orizzontale"
+  },
+  "Horizontal rule": {
+    "es": "Elemento HTML",
+    "pt": "Elemento HTML"
+  },
+  "Host count": {
+    "es": "Conteggio de los host",
+    "pt": "Conteggio dos host"
+  },
+  "Hourly (on the hour)": {
+    "es": "Ogni ahora (all'ahora)",
+    "pt": "Ogni agora (all'agora)"
+  },
+  "Hover": {
+    "es": "Passaje del mouse",
+    "pt": "Passagem do mouse"
+  },
+  "Hue rotate": {
+    "es": "Tinta-Rotación",
+    "pt": "Tinta-Rotação"
+  },
+  "Hyphens": {
+    "es": "Sillabaciones",
+    "pt": "Sillabações"
+  },
+  "ICO Converter": {
+    "es": "Convertidor ICO",
+    "pt": "Conversor ICO"
+  },
+  "ICO → PNG": {
+    "es": "ICO",
+    "pt": "ICO"
+  },
+  "ID card (18 digits)": {
+    "es": "Carta d'identidad (18 cifre)",
+    "pt": "Carta d'identidade (18 cifre)"
+  },
+  "IPv4 CIDR: network / broadcast / host range / mask / host count": {
+    "es": "IPv4 CIDR: network / broadcast / host range / mask / host count",
+    "pt": "IPv4 CIDR: network / broadcast / host range / mask / host count"
+  },
+  "IPv4 address": {
+    "es": "Dirección 0",
+    "pt": "Endereço 0"
+  },
+  "Ice blue": {
+    "es": "Azzurro ghiaccio",
+    "pt": "Azzurro ghiaccio"
+  },
+  "Iceberg": {
+    "es": "Iceberg",
+    "pt": "Iceberg"
+  },
+  "Ignore trailing / repeated spaces": {
+    "es": "Ignora espacios finali / ripetuti",
+    "pt": "Ignora espaços finali / ripetuti"
+  },
+  "Image": {
+    "es": "Imagen",
+    "pt": "Imagem"
+  },
+  "Image (PNG/JPG)": {
+    "es": "Imagen (PNG/JPG)",
+    "pt": "Imagem (PNG/JPG)"
+  },
+  "Image Border / Radius / Shadow": {
+    "es": "Borde / radio / sombra imagen",
+    "pt": "Margem / raio / sombra imagem"
+  },
+  "Image Color Adjust": {
+    "es": "Regolación del color dell'imagen",
+    "pt": "Regolação do cor dell'imagem"
+  },
+  "Image Color Picker": {
+    "es": "Selettore color imagen",
+    "pt": "Selettore cor imagem"
+  },
+  "Image Compress": {
+    "es": "Compressione imagen",
+    "pt": "Compressione imagem"
+  },
+  "Image Crop": {
+    "es": "Ritaglio imagen",
+    "pt": "Ritaglio imagem"
+  },
+  "Image Merge": {
+    "es": "Unione imágenes",
+    "pt": "Unione imagens"
+  },
+  "Image Watermark": {
+    "es": "Image Watermark",
+    "pt": "Image Watermark"
+  },
+  "Image encode failed: ensure the browser supports this format, or try another image": {
+    "es": "Codificación imagen no correcta: asegúrate che el browser supporti este formato o prova un'otra imagen",
+    "pt": "Codificação imagem não bem-sucedida: certifique-se che ou browser supporti este formato ou prova um'outra imagem"
+  },
+  "Image limit reached": {
+    "es": "Limite imagen raggiunto",
+    "pt": "Limite imagem raggiunto"
+  },
+  "Image to Card": {
+    "es": "Imagen sobre carta",
+    "pt": "Imagem sobre carta"
+  },
+  "Image to Paper PDF": {
+    "es": "Imagen sobre carta PDF",
+    "pt": "Imagem sobre carta PDF"
+  },
+  "Image → Base64": {
+    "es": "Imagen 0",
+    "pt": "Imagem 0"
+  },
+  "Image → ICO": {
+    "es": "Imagen → ICO",
+    "pt": "Imagem → ICO"
+  },
+  "Image ↔ Base64": {
+    "es": "Imagen 0",
+    "pt": "Imagem 0"
+  },
+  "Images to PDF": {
+    "es": "Imágenes a PDF",
+    "pt": "Imagens a PDF"
+  },
+  "Imperial (in / lb)": {
+    "es": "Imperiale (en / lb)",
+    "pt": "Imperiale (em / lb)"
+  },
+  "Inch in": {
+    "es": "pollicos (en)",
+    "pt": "pollicos (em)"
+  },
+  "Include at least one char from each selected set": {
+    "es": "Includi almeno un carácter desde ciascun set selezionato",
+    "pt": "Includi almeno um carácter de ciascun set selezionato"
+  },
+  "Incorrect password. Please try again.": {
+    "es": "Contraseña sbagliata. Prova de nuevo",
+    "pt": "Palavra-passe sbagliata. Prova de novo"
+  },
+  "Indent": {
+    "es": "Rientro",
+    "pt": "Rientro"
+  },
+  "Index": {
+    "es": "Indice",
+    "pt": "Indice"
+  },
+  "Indigo purple": {
+    "es": "Viola indaco",
+    "pt": "Viola indaco"
+  },
+  "Ink black": {
+    "es": "Nero inchiostro",
+    "pt": "Nero inchiostro"
+  },
+  "Inline code (`)": {
+    "es": "Codice inline (`)",
+    "pt": "Codice inline (`)"
+  },
+  "Input exceeds the 5MB limit; use file mode for large content": {
+    "es": "L'input supera el limite de 5 MB; utilizzare la modalidad archivo para contenuti de grandi dimensioni",
+    "pt": "L'input supera ou limite de 5 MB; utilizzare a modalidade ficheiro para contenuti de grandi dimensioni"
+  },
+  "Insert & download": {
+    "es": "Introduce Download",
+    "pt": "Introduza Download"
+  },
+  "Insert Image into PDF": {
+    "es": "Introduce imagen en PDF",
+    "pt": "Introduza imagem em PDF"
+  },
+  "Inset": {
+    "es": "Inset",
+    "pt": "Inset"
+  },
+  "Integer input": {
+    "es": "Ingresso intero",
+    "pt": "Ingresso intero"
+  },
+  "Invalid Base64": {
+    "es": "{0} no válido.&#x0D;",
+    "pt": "{0} inválido.&#x0D;"
+  },
+  "Invalid CIDR (IPv4/prefix, e.g. 10.0.0.0/8)": {
+    "es": "CIDR (IPv4/prefijo no válido, p. ej. 10.0.0.0/8)",
+    "pt": "CIDR (IPv4/prefixo inválido, p. ex. 10.0.0.0/8)"
+  },
+  "Invalid PEM": {
+    "es": "PEM no válido",
+    "pt": "PEM inválido"
+  },
+  "Invalid URL": {
+    "es": "{0} no válido.&#x0D;",
+    "pt": "{0} inválido.&#x0D;"
+  },
+  "Invalid XML": {
+    "es": "{0} no válido.&#x0D;",
+    "pt": "{0} inválido.&#x0D;"
+  },
+  "Invalid XSLT": {
+    "es": "XSLT no válido",
+    "pt": "XSLT inválido"
+  },
+  "Invalid character \"{{char}}\" at position {{position}}": {
+    "es": "Carácter \" {{char}} \" no válido en la posición {{position}}",
+    "pt": "Carácter \" {{char}} \" inválido na posição {{position}}"
+  },
+  "Invalid crop region": {
+    "es": "Regione de coltura no válida",
+    "pt": "Regione de coltura inválida"
+  },
+  "Invalid data format": {
+    "es": "Formato dati no válido",
+    "pt": "Formato dati inválido"
+  },
+  "Invalid expression syntax": {
+    "es": "Sintassi dell'expresión no válida",
+    "pt": "Sintassi dell'expressão inválida"
+  },
+  "Invalid field value; check ranges and lists": {
+    "es": "Valore del campo no válido; intervalli ed elenchi de controllo",
+    "pt": "Valore do campo inválido; intervalli ed elenchi de controllo"
+  },
+  "Invalid format: a JWT consists of header.payload.signature": {
+    "es": "Formato no válido: un JWT es costituito desde header.payload.signature",
+    "pt": "Formato inválido: um JWT é costituito de header.payload.signature"
+  },
+  "Invalid hex (even length, 0-9a-f)": {
+    "es": "Hex no válido (lunghezza pari, 0-9a-f)",
+    "pt": "Hex inválido (lunghezza pari, 0-9a-f)"
+  },
+  "Invalid image size": {
+    "es": "Tamaño dell'imagen no válido",
+    "pt": "Tamanho dell'imagem inválido"
+  },
+  "Invalid input": {
+    "es": "Input no válido",
+    "pt": "Input inválido"
+  },
+  "Invalid input: bad ciphertext or IV": {
+    "es": "Input no válido: texto cifrato errato o IV",
+    "pt": "Input inválido: texto cifrato errato ou IV"
+  },
+  "Invalid key: check passphrase or hex key length": {
+    "es": "Clave no válida: controlla la passphrase o la lunghezza de la clave esadecimale",
+    "pt": "Chave inválida: controlla a passphrase ou a lunghezza de chave esadecimale"
+  },
+  "Invalid length: Base64 content length mod 4 cannot be 1": {
+    "es": "Lunghezza no válida: ⟦0 lunghezza⟧ contenido mod 4 no puede essere 1",
+    "pt": "Lunghezza inválida: ⟦0 lunghezza⟧ conteúdo mod 4 não pode essere 1"
+  },
+  "Invalid margin": {
+    "es": "Margen superiore no válido.",
+    "pt": "Margem superiore inválido."
+  },
+  "Invalid or corrupt ICO file": {
+    "es": "\"Archivo danneggiato o no válido\"",
+    "pt": "\"Ficheiro danneggiato ou inválido\""
+  },
+  "Invalid output size (check scale; max edge 8192)": {
+    "es": "Tamaño de uscita no válida (escala de controllo; borde máximo 8192)",
+    "pt": "Tamanho de uscita inválida (escala de controllo; margem máximo 8192)"
+  },
+  "Invalid padding \"=\" at position {{position}}": {
+    "es": "Padding no válido \"=\" en posición {{position}}",
+    "pt": "Padding inválido \"=\" em posição {{position}}"
+  },
+  "Invalid page range": {
+    "es": "Intervalo páginas no válido.",
+    "pt": "Intervalo páginas inválido."
+  },
+  "Invalid range: ensure min ≤ max and enough room when unique": {
+    "es": "Intervalo no válido: garantire min ≤ max y spazio sufficiente cuando único",
+    "pt": "Intervalo inválido: garantire min ≤ max e spazio sufficiente quando único"
+  },
+  "Issued at iat": {
+    "es": "Emesso a",
+    "pt": "Emesso a"
+  },
+  "Issuer CN": {
+    "es": "CN emittente",
+    "pt": "CN emittente"
+  },
+  "Italic (*)": {
+    "es": "Corsivo",
+    "pt": "Corsivo"
+  },
+  "Ivory": {
+    "es": "Avorio",
+    "pt": "Avorio"
+  },
+  "JPEG only": {
+    "es": "solo 0",
+    "pt": "apenas 0"
+  },
+  "JPEG only: strip APP1 (EXIF) and download.": {
+    "es": "⟧ Solo⟦ 0: strip APP1 (EXIF) y descarga.",
+    "pt": "⟧ Solo⟦ 0: strip APP1 (EXIF) e transferência."
+  },
+  "JS Minify / Beautify": {
+    "es": "JS Minify / Beautify",
+    "pt": "JS Minify / Beautify"
+  },
+  "JS \\uXXXX": {
+    "es": "JS \\uXXXX",
+    "pt": "JS \\uXXXX"
+  },
+  "JS \\u{…}": {
+    "es": "JS \\u{…}",
+    "pt": "JS \\u{…}"
+  },
+  "JSON Converter": {
+    "es": "Convertidor",
+    "pt": "Conversor"
+  },
+  "JSON Formatter": {
+    "es": "programma de formattación",
+    "pt": "programma de formattação"
+  },
+  "JSON input": {
+    "es": "Ingresso 0",
+    "pt": "Ingresso 0"
+  },
+  "JSON output": {
+    "es": "JSON output",
+    "pt": "JSON output"
+  },
+  "JSON parse failed": {
+    "es": "Parse fallido!",
+    "pt": "Parse falhado!"
+  },
+  "JSON parse failed: digits required after decimal point (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: cifre richieste después la virgola decimale (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: cifre richieste depois a virgola decimale (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: digits required in exponent (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: cifre richieste nell'esponente (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: cifre richieste nell'esponente (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: expected literal \"{{literal}}\" (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: letterale previsto \" {{literal}} \" (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: letterale previsto \" {{literal}} \" (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: extra content after value (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: contenido extra después el valor (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: conteúdo extra depois ou valor (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: input is empty": {
+    "es": "JSON analisi no correcta: el input es vacío",
+    "pt": "JSON analisi não bem-sucedida: ou input é vazio"
+  },
+  "JSON parse failed: invalid \\u escape, need 4 hex digits (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: escape no válido \\u, son necessarie 4 cifre esadecimali (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: escape inválido \\u, são necessarie 4 cifre esadecimali (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: invalid character \"{{char}}\" (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: carácter \" {{char}} \" no válido (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: carácter \" {{char}} \" inválido (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: invalid escape \"\\{{char}}\" (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: escape no válido \"\\ {{char}} \" (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: escape inválido \"\\ {{char}} \" (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: invalid number (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: número no válido (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: número inválido (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: missing \",\" between array elements (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: manca \",\" entre los elementi dell'array (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: manca \",\" entre os elementi dell'array (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: missing \",\" between object members (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: manca \",\" entre los membri dell'oggetto (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: manca \",\" entre os membri dell'oggetto (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: missing \":\" after object key (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: manca \":\" después la clave dell'oggetto (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: manca \":\" depois a chave dell'oggetto (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: object key must be a string (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: la clave dell'oggetto debe essere una stringa (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: a chave dell'oggetto deve essere uma stringa (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: please check the syntax": {
+    "es": "JSON analisi no correcta: controllare la sintassi",
+    "pt": "JSON analisi não bem-sucedida: controllare a sintassi"
+  },
+  "JSON parse failed: string cannot span lines (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: la stringa no puede estendersi sulle líneas (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: a stringa não pode estendersi sulle linhas (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: string ended unexpectedly (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: stringa terminata inaspettatamente (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: stringa terminata inaspettatamente (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: trailing comma not allowed (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: virgola finale no consentita (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: virgola finale não consentita (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: unclosed array, missing \"]\" (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: matrice no chiusa, manca \"]\" (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: matrice não chiusa, manca \"]\" (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: unclosed object, missing \"}\" (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: oggetto no chiuso, \"}\" mancante (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: oggetto não chiuso, \"}\" mancante (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: unclosed string (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: stringa no chiusa (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: stringa não chiusa (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: unexpected end, value missing (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: fine imprevista, valor mancante (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: fine imprevista, valor mancante (linha {{line}} , coluna {{column}} )"
+  },
+  "JSON parse failed: unknown error": {
+    "es": "JSON analisi no correcta: error sconosciuto",
+    "pt": "JSON analisi não bem-sucedida: erro sconosciuto"
+  },
+  "JSON parse failed: value missing (line {{line}}, column {{column}})": {
+    "es": "JSON analisi no correcta: valor mancante (línea {{line}} , columna {{column}} )",
+    "pt": "JSON analisi não bem-sucedida: valor mancante (linha {{line}} , coluna {{column}} )"
+  },
+  "JSONPath Query": {
+    "es": "Query JSONPath",
+    "pt": "Query JSONPath"
+  },
+  "JWT Parser": {
+    "es": "Analizador",
+    "pt": "Analisador"
+  },
+  "JWT input": {
+    "es": "Ingresso 0",
+    "pt": "Ingresso 0"
+  },
+  "JavaScript input": {
+    "es": "Input JavaScript",
+    "pt": "Input JavaScript"
+  },
+  "Judging J / Perceiving P": {
+    "es": "Giudizio J / Perceción P",
+    "pt": "Giudizio J / Perceção P"
+  },
+  "Jungle": {
+    "es": "Giungla",
+    "pt": "Giungla"
+  },
+  "Key mode": {
+    "es": "Modalidad clave",
+    "pt": "Modalidade chave"
+  },
+  "Keyword case": {
+    "es": "Keyword case",
+    "pt": "Keyword case"
+  },
+  "Keywords": {
+    "es": "Keywords",
+    "pt": "Keywords"
+  },
+  "Keywords…": {
+    "es": "Parole clave",
+    "pt": "Parole chave"
+  },
+  "Kilogram kg": {
+    "es": "Chilogrammo (kg)",
+    "pt": "Chilogrammo (kg)"
+  },
+  "Kilometer km": {
+    "es": "Chilometri (km):",
+    "pt": "Chilometri (km):"
+  },
+  "L (~7%)": {
+    "es": "L/7",
+    "pt": "L/7"
+  },
+  "LaTeX Math Editor": {
+    "es": "Editor matematico LaTeX",
+    "pt": "Editor matematico LaTeX"
+  },
+  "Lagoon": {
+    "es": "Laguna",
+    "pt": "Laguna"
+  },
+  "Lake dusk": {
+    "es": "Crepuscolo del lago",
+    "pt": "Crepuscolo do lago"
+  },
+  "Landscape": {
+    "es": "Orizzontale",
+    "pt": "Orizzontale"
+  },
+  "Language": {
+    "es": "Idioma",
+    "pt": "Idioma"
+  },
+  "Lap time": {
+    "es": "Tiempo de esecución",
+    "pt": "Tempo de esecução"
+  },
+  "Large input (> 500KB), real-time compute may slow down": {
+    "es": "Ingresso de grandi dimensioni (> 500 KB), el cálculo en tiempo real potrebbe rallentare",
+    "pt": "Ingresso de grandi dimensioni (> 500 KB), ou cálculo em tempo real potrebbe rallentare"
+  },
+  "Last host": {
+    "es": "Ultimo host",
+    "pt": "Ultimo host"
+  },
+  "Lavender": {
+    "es": "Lavanda",
+    "pt": "Lavanda"
+  },
+  "Lavender mist": {
+    "es": "nebbia de lavanda",
+    "pt": "nebbia de lavanda"
+  },
+  "Layout": {
+    "es": "Layout",
+    "pt": "Layout"
+  },
+  "Layout a title and body into a styled card and export PNG": {
+    "es": "Disponi un título y un corpo en una carta stilizzata ed esporta PNG",
+    "pt": "Disponi um título e um corpo em uma carta stilizzata ed esporta PNG"
+  },
+  "Leaf glow": {
+    "es": "Bagliore fogliare",
+    "pt": "Bagliore fogliare"
+  },
+  "Learning": {
+    "es": "Apprendimento",
+    "pt": "Apprendimento"
+  },
+  "Leave empty for all": {
+    "es": "Lasciare vacío para todos",
+    "pt": "Lasciare vazio para todos"
+  },
+  "Legend": {
+    "es": "Legend",
+    "pt": "Legend"
+  },
+  "Length": {
+    "es": "Lung.",
+    "pt": "Lung."
+  },
+  "Length Converter": {
+    "es": "Convertidor de lunghezza",
+    "pt": "Conversor de lunghezza"
+  },
+  "Length must be an integer from 1 to 256": {
+    "es": "La lunghezza debe essere un número intero compreso entre 1 y 256",
+    "pt": "La lunghezza deve essere um número intero compreso entre 1 e 256"
+  },
+  "Length must be between 4 and 128": {
+    "es": "La lunghezza debe essere compresa entre 4 y 128",
+    "pt": "La lunghezza deve essere compresa entre 4 e 128"
+  },
+  "Letters": {
+    "es": "Lettere",
+    "pt": "Lettere"
+  },
+  "Light": {
+    "es": "Chiaro",
+    "pt": "Chiaro"
+  },
+  "Lilac": {
+    "es": "Lillà",
+    "pt": "Lillà"
+  },
+  "Line breaks → <br>": {
+    "es": "Interruciones línea",
+    "pt": "Interruções linha"
+  },
+  "Line height": {
+    "es": "Arriba de la linea",
+    "pt": "Altura de linea"
+  },
+  "Line numbers": {
+    "es": "Numeri de línea:",
+    "pt": "Numeri de linha:"
+  },
+  "Linear": {
+    "es": "Lineare",
+    "pt": "Lineare"
+  },
+  "Linen": {
+    "es": "Lino",
+    "pt": "Lino"
+  },
+  "Lines": {
+    "es": "Linee",
+    "pt": "Linee"
+  },
+  "Link corners": {
+    "es": "Collega los angoli",
+    "pt": "Collega os angoli"
+  },
+  "Live GFM rendering with DOMPurify sanitization for safe preview": {
+    "es": "Rendering GFM live con sanificación DOMPurify para un'vista previa sicura",
+    "pt": "Rendering GFM live com sanificação DOMPurify para um'pré-visualização sicura"
+  },
+  "Live syntax highlighting with line numbers and HTML snippet copy": {
+    "es": "Evidenziación sintassi live con números de línea y HTML snippet copy",
+    "pt": "Evidenziação sintassi live com números de linha e HTML snippet copy"
+  },
+  "Load sample": {
+    "es": "Cargar ejemplo",
+    "pt": "Carregar exemplo"
+  },
+  "Local only": {
+    "es": "Solo local",
+    "pt": "Solo local"
+  },
+  "Local preview — nothing is uploaded.": {
+    "es": "Vista previa local — no viene cargado nulla.",
+    "pt": "Pré-visualização local — não viene carregado nulla."
+  },
+  "Local time": {
+    "es": "Hora local",
+    "pt": "Hora local"
+  },
+  "Local: {{local}} · {{utc}}": {
+    "es": "Local: {{local}} · {{utc}}",
+    "pt": "Local: {{local}} · {{utc}}"
+  },
+  "Locale": {
+    "es": "Impostaciones locali",
+    "pt": "Impostações locali"
+  },
+  "Logic": {
+    "es": "Logica",
+    "pt": "Logica"
+  },
+  "Lotus": {
+    "es": "Loto",
+    "pt": "Loto"
+  },
+  "Lowercase": {
+    "es": "Minuscolo",
+    "pt": "Minuscolo"
+  },
+  "Lowercase (a-z)": {
+    "es": "Minuscole (a-z)",
+    "pt": "Minuscole (a-z)"
+  },
+  "Lunar date": {
+    "es": "Fecha lunare",
+    "pt": "Data lunare"
+  },
+  "M (~15%)": {
+    "es": "M 15",
+    "pt": "M 15"
+  },
+  "MBTI Personality Test": {
+    "es": "Test de la personalidad",
+    "pt": "Test de personalidade"
+  },
+  "MD5 / SHA-1 / SHA-256 / SHA-512 for text and files (streaming), hex / base64 output": {
+    "es": "MD5/SHA-1/SHA-256/SHA-512 para texto y archivo (streaming), output hex / base64",
+    "pt": "MD5/SHA-1/SHA-256/SHA-512 para texto e ficheiro (streaming), output hex / base64"
+  },
+  "Magnolia": {
+    "es": "Magnolia",
+    "pt": "Magnolia"
+  },
+  "Mango dusk": {
+    "es": "Crepuscolo de mango",
+    "pt": "Crepuscolo de mango"
+  },
+  "Margin": {
+    "es": "Margen",
+    "pt": "Margem"
+  },
+  "Margin (mm)": {
+    "es": "Margen (mm)",
+    "pt": "Margem (mm)"
+  },
+  "Margin must be an integer from 0 to 10 (modules)": {
+    "es": "Il margine debe essere un número intero desde 0 a 10 (moduli)",
+    "pt": "Il margine deve essere um número intero de 0 a 10 (moduli)"
+  },
+  "Margins in PDF points (pt ≈ 1/72 inch).": {
+    "es": "Margini en PDF punti (pt ≈ 1/72 pollicos).",
+    "pt": "Margini em PDF punti (pt ≈ 1/72 pollicos)."
+  },
+  "MariaDB": {
+    "es": "MariaDB",
+    "pt": "MariaDB"
+  },
+  "Markdown": {
+    "es": "Markdown",
+    "pt": "Markdown"
+  },
+  "Markdown Mind Map": {
+    "es": "Mappa mentale Markdown",
+    "pt": "Mappa mentale Markdown"
+  },
+  "Markdown Preview": {
+    "es": "Vista previa ribasso",
+    "pt": "Pré-visualização ribasso"
+  },
+  "Markdown editing toolbar": {
+    "es": "Barra de los herramientas de modifica de los ribassi",
+    "pt": "Barra dos ferramentas de modifica dos ribassi"
+  },
+  "Markdown editor": {
+    "es": "Editor ribassi",
+    "pt": "Editor ribassi"
+  },
+  "Markdown to Image": {
+    "es": "Ribasso sull'imagen",
+    "pt": "Ribasso sull'imagem"
+  },
+  "Marketing": {
+    "es": "Obiettivi",
+    "pt": "Obiettivi"
+  },
+  "Mass–energy": {
+    "es": "Massa-energia",
+    "pt": "Massa-energia"
+  },
+  "Match highlighting, replace, capture groups, presets, and cheat sheet": {
+    "es": "Evidenziación de las coincidencias, reemplazo, acquisición de grupos, preajustes y cheat sheet",
+    "pt": "Evidenziação das correspondências, substituição, acquisição de grupos, predefinições e cheat sheet"
+  },
+  "Matcha": {
+    "es": "Matcha",
+    "pt": "Matcha"
+  },
+  "Matches every value in this field": {
+    "es": "Corrisponde a cada valor en este campo",
+    "pt": "Corrisponde a cada valor em este campo"
+  },
+  "Matrices & vectors": {
+    "es": "Matricos y vettori",
+    "pt": "Matricos e vettori"
+  },
+  "Max dimension": {
+    "es": "MAx tamaño",
+    "pt": "MAx tamanho"
+  },
+  "Max {{size}}": {
+    "es": "Max {{size}}",
+    "pt": "Max {{size}}"
+  },
+  "Maximum {{max}} UUIDs per batch": {
+    "es": "Máximo {{max}} UUID para lotto",
+    "pt": "Máximo {{max}} UUID para lotto"
+  },
+  "Maxwell's equation": {
+    "es": "Equación de Maxwell",
+    "pt": "Equação de Maxwell"
+  },
+  "Meadow": {
+    "es": "Prato",
+    "pt": "Prato"
+  },
+  "Meaning": {
+    "es": "Significato",
+    "pt": "Significato"
+  },
+  "Medium": {
+    "es": "Medio",
+    "pt": "Medio"
+  },
+  "Merge & download": {
+    "es": "Combinar y descarga",
+    "pt": "Unir e transfira"
+  },
+  "Merge PDF": {
+    "es": "Combinar",
+    "pt": "Unir"
+  },
+  "Merge failed; please retry": {
+    "es": "Unione no correcta; riprova",
+    "pt": "Unione não bem-sucedida; riprova"
+  },
+  "Merge multiple PDFs into one file": {
+    "es": "Combinar más PDF en un único archivo",
+    "pt": "Unir mais PDF em um único ficheiro"
+  },
+  "Merges locally — nothing is uploaded. Prefer files < 50MB.": {
+    "es": "Unisce localmente — no viene cargado nulla. Preferisci archivo < 50 MB.",
+    "pt": "Unisce localmente — não viene carregado nulla. Preferisci ficheiro < 50 MB."
+  },
+  "Mermaid": {
+    "es": "Sirena",
+    "pt": "Sirena"
+  },
+  "Mermaid Diagram Editor": {
+    "es": "Editor de diagrammi de sirene",
+    "pt": "Editor de diagrammi de sirene"
+  },
+  "Message": {
+    "es": "Messaje",
+    "pt": "Messagem"
+  },
+  "Message to authenticate…": {
+    "es": "Messaje desde autenticare...",
+    "pt": "Messagem de autenticare..."
+  },
+  "Meter m": {
+    "es": "Metri (m):",
+    "pt": "Metri (m):"
+  },
+  "Metric (cm / kg)": {
+    "es": "Metrico (cm, kg)",
+    "pt": "Metrico (cm, kg)"
+  },
+  "Midnight": {
+    "es": "Mezzanotte",
+    "pt": "Mezzanotte"
+  },
+  "Midnight purple": {
+    "es": "Midnight Purple",
+    "pt": "Midnight Purple"
+  },
+  "Mile mi": {
+    "es": "Mile mi",
+    "pt": "Mile mi"
+  },
+  "Milligram mg": {
+    "es": "Milligrammo - mg",
+    "pt": "Milligrammo - mg"
+  },
+  "Millimeter mm": {
+    "es": "Millimetri (mm)",
+    "pt": "Millimetri (mm)"
+  },
+  "Milliseconds": {
+    "es": "Millisecondi",
+    "pt": "Millisecondi"
+  },
+  "Mind map": {
+    "es": "Mappa mentale",
+    "pt": "Mappa mentale"
+  },
+  "Minify": {
+    "es": "Minify",
+    "pt": "Minify"
+  },
+  "Minify and beautify CSS with 2/4-space indent options": {
+    "es": "Minimizza y abbellisci CSS con opciones de rientro a 2/4 espacios",
+    "pt": "Minimizza e abbellisci CSS com opções de rientro a 2/4 espaços"
+  },
+  "Minify and beautify HTML with 2/4-space indent options": {
+    "es": "Minimizza y abbellisci HTML con opciones de rientro a 2/4 espacios",
+    "pt": "Minimizza e abbellisci HTML com opções de rientro a 2/4 espaços"
+  },
+  "Minify and beautify JavaScript with 2/4-space indent options": {
+    "es": "Minimizza y abbellisci JavaScript con opciones de rientro a 2/4 espacios",
+    "pt": "Minimizza e abbellisci JavaScript com opções de rientro a 2/4 espaços"
+  },
+  "Mint ice": {
+    "es": "Gelato de menta",
+    "pt": "Gelato de menta"
+  },
+  "Minute": {
+    "es": "Minuto",
+    "pt": "Minuto"
+  },
+  "Monday": {
+    "es": "Lunes",
+    "pt": "Segunda-feira"
+  },
+  "Monospace": {
+    "es": "Monospace",
+    "pt": "Monospace"
+  },
+  "Month": {
+    "es": "Mes",
+    "pt": "Mês"
+  },
+  "Month view with lunar/almanac for Chinese and local holidays for English": {
+    "es": "Vista mensile con lunare/almanacco para el cinese y vacanze locali para el inglese",
+    "pt": "Vista mensile com lunare/almanacco para ou cinese e vacanze locali para ou inglese"
+  },
+  "Monthly on day 1 at 00:00": {
+    "es": "Mensile el día 1 a las 00:00",
+    "pt": "Mensile ou dia 1 às 00:00"
+  },
+  "Moonlight": {
+    "es": "MOONLIGHT",
+    "pt": "MOONLIGHT"
+  },
+  "Morning": {
+    "es": "Mattina",
+    "pt": "Mattina"
+  },
+  "Multicolor": {
+    "es": "Multicolore",
+    "pt": "Multicolore"
+  },
+  "MySQL": {
+    "es": "Mysql",
+    "pt": "Mysql"
+  },
+  "Mysterious purple": {
+    "es": "Viola misterioso",
+    "pt": "Viola misterioso"
+  },
+  "Mystic purple": {
+    "es": "Viola mistico",
+    "pt": "Viola mistico"
+  },
+  "Name / HEX / RGB…": {
+    "es": "Nome / HEX / RGB…",
+    "pt": "Nome / HEX / RGB…"
+  },
+  "Named (&amp;)": {
+    "es": "Con nome (&amp;)",
+    "pt": "Con nome (&amp;)"
+  },
+  "Nature green": {
+    "es": "Nature Green",
+    "pt": "Nature Green"
+  },
+  "Nautical mile nmi": {
+    "es": "Miglio nautico",
+    "pt": "Miglio nautico"
+  },
+  "Navier–Stokes": {
+    "es": "Navier–Stokes",
+    "pt": "Navier–Stokes"
+  },
+  "Needs server": {
+    "es": "Ha bisogno de un server",
+    "pt": "Ha bisogno de um server"
+  },
+  "Negated class": {
+    "es": "Classe negata",
+    "pt": "Classe negata"
+  },
+  "Neon multicolor": {
+    "es": "Neon multicolor",
+    "pt": "Neon multicolor"
+  },
+  "Netmask": {
+    "es": "子网掩码",
+    "pt": "子网掩码"
+  },
+  "Neutral": {
+    "es": "Indifferente",
+    "pt": "Indifferente"
+  },
+  "Next month": {
+    "es": "Mes successivo",
+    "pt": "Mês successivo"
+  },
+  "Next steps": {
+    "es": "Prossimi passi",
+    "pt": "Prossimi passi"
+  },
+  "Next {{count}} runs": {
+    "es": "Prossime {{count}} corse",
+    "pt": "Prossime {{count}} corse"
+  },
+  "Night": {
+    "es": "Notte",
+    "pt": "Notte"
+  },
+  "No QR code found in the image": {
+    "es": "Nessun ⟧ codice ⟦0 encontrado nell'imagen",
+    "pt": "Nessun ⟧ codice ⟦0 encontrado nell'imagem"
+  },
+  "No matching colors": {
+    "es": "Nessun color corrispondente",
+    "pt": "Nessun cor corrispondente"
+  },
+  "No matching prompts": {
+    "es": "Nessuna richiesta corrispondente",
+    "pt": "Nessuna richiesta corrispondente"
+  },
+  "No numeric values found": {
+    "es": "Nessun valor numerico encontrado",
+    "pt": "Nessun valor numerico encontrado"
+  },
+  "Normal": {
+    "es": "Normale",
+    "pt": "Normale"
+  },
+  "Normal distribution": {
+    "es": "Distribución normale ",
+    "pt": "Distribução normale "
+  },
+  "Normalized": {
+    "es": "Normalizzato",
+    "pt": "Normalizzato"
+  },
+  "Not a valid SVG": {
+    "es": "Non es un ⟦0 válido⟧",
+    "pt": "Non é um ⟦0 válido⟧"
+  },
+  "Not before nbf": {
+    "es": "Non antes",
+    "pt": "Non antes"
+  },
+  "Not expired": {
+    "es": "Non caducado",
+    "pt": "Non expirado"
+  },
+  "Note: non-MD5 algorithms load the whole file into memory; very large files may run out of memory": {
+    "es": "Nota:⟧ algoritmi diferentes desde⟦ 0 caricano el intero archivo en memoria; archivo muy grandi potrebbero esaurire la memoria",
+    "pt": "Nota:⟧ algoritmi diferentes de⟦ 0 caricano ou intero ficheiro em memoria; ficheiro muito grandi potrebbero esaurire a memoria"
+  },
+  "Number lines": {
+    "es": "Numero líneas",
+    "pt": "Numero linhas"
+  },
+  "Numbered list": {
+    "es": "Lista numerato",
+    "pt": "Lista numerato"
+  },
+  "Obese": {
+    "es": "Obeso",
+    "pt": "Obeso"
+  },
+  "Obsidian": {
+    "es": "nera",
+    "pt": "nera"
+  },
+  "Ocean": {
+    "es": "Mare",
+    "pt": "Mare"
+  },
+  "Ocean wave": {
+    "es": "onda oceanica<g id=\"1\"> </g>",
+    "pt": "onda oceanica<g id=\"1\"> </g>"
+  },
+  "Offset X": {
+    "es": "Offset X",
+    "pt": "Offset X"
+  },
+  "Offset Y": {
+    "es": "Offset Y",
+    "pt": "Offset Y"
+  },
+  "Olive": {
+    "es": "Verde oliva",
+    "pt": "Verde oliva"
+  },
+  "One image per page at pixel size.": {
+    "es": "Un'imagen para página en formato pixel.",
+    "pt": "Un'imagem para página em formato pixel."
+  },
+  "One item per line…": {
+    "es": "Un articolo por línea...",
+    "pt": "Un articolo por linha..."
+  },
+  "Online stopwatch with start, pause, lap, and reset": {
+    "es": "Cronometro online con avvio, pausa, giro y ripristino",
+    "pt": "Cronometro online com avvio, pausa, giro e ripristino"
+  },
+  "Opacity": {
+    "es": "Opacidad",
+    "pt": "Opacidade"
+  },
+  "Open a PDF and draw annotations on the page: pen, highlight, rectangle, ellipse, circle, line, and text.": {
+    "es": "Abrir un PDF y disegna annotaciones sobre la página: penna, evidenziación, rettangolo, ellisse, cerchio, linea y texto.",
+    "pt": "Abrir um PDF e disegna annotações sobre a página: penna, evidenziação, rettangolo, ellisse, cerchio, linea e texto."
+  },
+  "Open and read a PDF locally": {
+    "es": "Abrir y leggi un PDF localmente",
+    "pt": "Abrir e leggi um PDF localmente"
+  },
+  "Open in {{name}}": {
+    "es": "Abrir en {{name}}",
+    "pt": "Abrir em {{name}}"
+  },
+  "Open page {{n}} first so it can be rendered before export": {
+    "es": "Open page {{n}} first so it can be rendered before export",
+    "pt": "Open page {{n}} first so it can be rendered before export"
+  },
+  "Operand A reuses the input above; results stay within 64-bit signed integer range": {
+    "es": "L'operando A riutilizza el input de cui arriba; los risultati rimangono all'interno dell'intervallo de números interi con segno a 64 bit",
+    "pt": "L'operando A riutilizza ou input de cui acima; os risultati rimangono all'interno dell'intervallo de números interi com segno a 64 bit"
+  },
+  "Operand B": {
+    "es": "Operando B",
+    "pt": "Operando B"
+  },
+  "Operator": {
+    "es": "Addetto a la condución",
+    "pt": "Addetto à condução"
+  },
+  "Operators": {
+    "es": "Operatori",
+    "pt": "Operatori"
+  },
+  "Optional IV (24 hex chars / 12 bytes); random if empty": {
+    "es": "Facoltativo IV (24 caracteres esadecimali/ 12 byte); casuale si vacío",
+    "pt": "Facoltativo IV (24 caracteres esadecimali/ 12 byte); casuale se vazio"
+  },
+  "Optional title…": {
+    "es": "Título opcional…",
+    "pt": "Título opcional…"
+  },
+  "Orange": {
+    "es": "Arancia",
+    "pt": "Arancia"
+  },
+  "Orchid": {
+    "es": "Violetto claro",
+    "pt": "Violetto claro"
+  },
+  "Orientation": {
+    "es": "Orientamento",
+    "pt": "Orientamento"
+  },
+  "Origin": {
+    "es": "Provenienza",
+    "pt": "Provenienza"
+  },
+  "Origin is bottom-left; complex Unicode may be limited.": {
+    "es": "L'origine es en basso a sinistra; el complejo Unicode puede essere limitado.",
+    "pt": "L'origine é em basso a sinistra; ou complexo Unicode pode essere limitado."
+  },
+  "Origin is the bottom-left of the page (PDF coords).": {
+    "es": "L'origine es en basso a sinistra de la página (PDF corde).",
+    "pt": "L'origine é em basso a sinistra de página (PDF corde)."
+  },
+  "Original": {
+    "es": "Originale",
+    "pt": "Originale"
+  },
+  "Original size": {
+    "es": "Tamaño Originale",
+    "pt": "Tamanho Originale"
+  },
+  "Ounce oz": {
+    "es": "Oncia oz",
+    "pt": "Oncia oz"
+  },
+  "Output format": {
+    "es": "Formato output",
+    "pt": "Formato output"
+  },
+  "Overweight": {
+    "es": "Sovrappeso",
+    "pt": "Sovrappeso"
+  },
+  "Owner password": {
+    "es": "Proprietario Contraseña",
+    "pt": "Proprietario Palavra-passe"
+  },
+  "PDF Grayscale": {
+    "es": "Escala de grigi",
+    "pt": "Escala de grigi"
+  },
+  "PDF Header & Footer": {
+    "es": "Intestación y Piè de página",
+    "pt": "Intestação e Piè de página"
+  },
+  "PDF Metadata": {
+    "es": "PDF metadatos",
+    "pt": "PDF metadados"
+  },
+  "PDF Page Numbers": {
+    "es": "Numeri de página",
+    "pt": "Numeri de página"
+  },
+  "PDF Viewer": {
+    "es": "Autorizzaciones de visualizzación",
+    "pt": "Autorizzações de visualizzação"
+  },
+  "PDF file": {
+    "es": "PDF file",
+    "pt": "PDF file"
+  },
+  "PDF password": {
+    "es": "Contraseña 0***",
+    "pt": "Palavra-passe 0***"
+  },
+  "PDF to Image": {
+    "es": "PDF all'imagen",
+    "pt": "PDF all'imagem"
+  },
+  "PEM certificate": {
+    "es": "Certificado PEM",
+    "pt": "Certificado PEM"
+  },
+  "PL/SQL": {
+    "es": "PL/SQL",
+    "pt": "PL/SQL"
+  },
+  "Pacific": {
+    "es": "Pacific",
+    "pt": "Pacific"
+  },
+  "Padding": {
+    "es": "Imbottiture",
+    "pt": "Imbottiture"
+  },
+  "Padding X": {
+    "es": "Bombatura X",
+    "pt": "Bombatura X"
+  },
+  "Padding Y": {
+    "es": "Bombatura Y",
+    "pt": "Bombatura Y"
+  },
+  "Page {{n}}": {
+    "es": "Page {{n}}",
+    "pt": "Page {{n}}"
+  },
+  "Pages (optional)": {
+    "es": "Páginas (facoltativo)",
+    "pt": "Páginas (facoltativo)"
+  },
+  "Pages to delete": {
+    "es": "Páginas desde eliminare",
+    "pt": "Páginas de eliminare"
+  },
+  "Pages to delete, e.g. 1,3-5. At least one page must remain.": {
+    "es": "Páginas desde eliminare, p. ej. 1,3-5. Deve rimanere almeno una página.",
+    "pt": "Páginas de eliminare, p. ex. 1,3-5. Deve rimanere almeno uma página."
+  },
+  "Pages to extract": {
+    "es": "Páginas desde estrarre",
+    "pt": "Páginas de estrarre"
+  },
+  "Pages to extract, e.g. 1,3-5.": {
+    "es": "Páginas desde estrarre, p. ej. 1,3-5.",
+    "pt": "Páginas de estrarre, p. ex. 1,3-5."
+  },
+  "Papaya cream": {
+    "es": "Crema de papaya",
+    "pt": "Crema de papaya"
+  },
+  "Paper": {
+    "es": "Carta",
+    "pt": "Carta"
+  },
+  "Paragraph": {
+    "es": "Paragrafo",
+    "pt": "Paragrafo"
+  },
+  "Paragraphs": {
+    "es": "Paragrafi",
+    "pt": "Paragrafi"
+  },
+  "Parse": {
+    "es": "Analizza",
+    "pt": "Analizza"
+  },
+  "Parse JSON and convert it to YAML / XML / CSV": {
+    "es": "Analizzare JSON y convertirlo en ⟦⟧ ⟦⟧ ⟦1/2/3⟧",
+    "pt": "Analizzare JSON e convertirlo em ⟦⟧ ⟦⟧ ⟦1/2/3⟧"
+  },
+  "Parse PEM: SHA-256/SHA-1 fingerprints, type, DER length, CN": {
+    "es": "Analisi PEM:⟧ impronte digitali SHA-256/⟦1, tipo, lunghezza DER, CN",
+    "pt": "Analisi PEM:⟧ impronte digitali SHA-256/⟦1, tipo, lunghezza DER, CN"
+  },
+  "Parse URL parts and query params; rebuild after edits": {
+    "es": "Analizza URL parti y interroga los parametri; ricostruisci después las modificas",
+    "pt": "Analizza URL parti e interroga os parametri; ricostruisci depois as modificas"
+  },
+  "Parse XML into JSON, keeping attributes with the @_ prefix": {
+    "es": "Analizza XML en JSON, mantenendo los attributi con el prefijo @_",
+    "pt": "Analizza XML em JSON, mantenendo os attributi com ou prefixo @_"
+  },
+  "Parse a browser User-Agent into browser, engine, OS, and device": {
+    "es": "Analizza un User-Agent del navegador en browser, motore, sistema operativo y dispositivo",
+    "pt": "Analizza um User-Agent do browser em browser, motore, sistema operativo e dispositivo"
+  },
+  "Parse failed": {
+    "es": "Parse fallido!",
+    "pt": "Parse falhado!"
+  },
+  "Parse header / payload / signature and read exp and other time claims (read-only, no verify)": {
+    "es": "Analizza encabezado / payload / firma y leggi EXP y altre attestaciones temporali (sola lettura, ninguna verifica)",
+    "pt": "Analizza cabeçalho / payload / assinatura e leggi EXP e altre attestações temporali (sola lettura, nenhuma verifica)"
+  },
+  "Parse only, no signature verification: verification requires a key; all processing stays in your browser": {
+    "es": "Solo analisi, ninguna verifica de la firma: la verifica richiede una clave; todas las elaboraciones rimangono en el navegador",
+    "pt": "Solo analisi, nenhuma verifica de assinatura: a verifica richiede uma chave; todas as elaborações rimangono no browser"
+  },
+  "PascalCase": {
+    "es": "PascalCase",
+    "pt": "PascalCase"
+  },
+  "Passphrase (PBKDF2)": {
+    "es": "Passphrase (PBKDF2)",
+    "pt": "Passphrase (PBKDF2)"
+  },
+  "Password Generator": {
+    "es": "Generador de contraseña",
+    "pt": "Gerador de palavra-passe"
+  },
+  "Paste Authenticator secret (Base32)…": {
+    "es": "Pegar Authenticator secret (Base32)...",
+    "pt": "Colar Authenticator secret (Base32)..."
+  },
+  "Paste CSS, e.g. .box{color:red}…": {
+    "es": "Pegar CSS, p. ej. .box{color:red}...",
+    "pt": "Colar CSS, p. ex. .box{color:red}..."
+  },
+  "Paste HTML, e.g. <div><span>Hello</span></div>…": {
+    "es": "Pegar HTML, p. ej. <div><span>Ciao</span></div>…",
+    "pt": "Colar HTML, p. ex. <div><span>Ciao</span></div>…"
+  },
+  "Paste JS, e.g. function hello(){return 1}…": {
+    "es": "Pegar JS, p. ej. función hello(){return 1}...",
+    "pt": "Colar JS, p. ex. função hello(){return 1}..."
+  },
+  "Paste JSON, e.g. [{\"id\":1,\"name\":\"a\"}]…": {
+    "es": "Pegar JSON, p. ej. [{\"id\":1,\"name\":\"a\"}]...",
+    "pt": "Colar JSON, p. ex. [{\"id\":1,\"name\":\"a\"}]..."
+  },
+  "Paste JSON, e.g. {\"a\": 1}…": {
+    "es": "Pegar JSON, p. ej. {\"a\": 1}...",
+    "pt": "Colar JSON, p. ex. {\"a\": 1}..."
+  },
+  "Paste JSON…": {
+    "es": "Pegar",
+    "pt": "Colar"
+  },
+  "Paste SQL, e.g. select * from users where id = 1…": {
+    "es": "Pegar SQL, p. ej. seleziona * desde los utenti donde id = 1...",
+    "pt": "Colar SQL, p. ex. seleziona * dos utenti onde id = 1..."
+  },
+  "Paste SVG markup…": {
+    "es": "Pegar SVG markup...",
+    "pt": "Colar SVG markup..."
+  },
+  "Paste XML, e.g. <root a=\"1\"><item>x</item></root>…": {
+    "es": "Pegar XML, p. ej. <root a=\"1\"><item>x</item></root>...",
+    "pt": "Colar XML, p. ex. <root a=\"1\"><item>x</item></root>..."
+  },
+  "Paste XML, e.g. <root><item>a</item></root>…": {
+    "es": "Pegar XML, p. ej. <root><item>un</item></root>...",
+    "pt": "Colar XML, p. ex. <root><item>um</item></root>..."
+  },
+  "Paste XML…": {
+    "es": "Pegar",
+    "pt": "Colar"
+  },
+  "Paste XSLT stylesheet…": {
+    "es": "Pegar foglio de stile XSLT...",
+    "pt": "Colar foglio de stile XSLT..."
+  },
+  "Paste a Base64 string…": {
+    "es": "Pegar una⟧ stringa ⟦0...",
+    "pt": "Colar uma⟧ stringa ⟦0..."
+  },
+  "Paste a Data URL or raw Base64…": {
+    "es": "Pegar un dato URL o RAW Base64...",
+    "pt": "Colar um dato URL ou RAW Base64..."
+  },
+  "Paste a JWT (Bearer prefix supported), e.g. eyJhbGci…": {
+    "es": "Pegar un JWT (prefijo del portatore compatible), p. ej. eyJhbGci...",
+    "pt": "Colar um JWT (prefixo do portatore suportado), p. ex. eyJhbGci..."
+  },
+  "Paste a User-Agent string…": {
+    "es": "Pegar una stringa User-Agent...",
+    "pt": "Colar uma stringa User-Agent..."
+  },
+  "Paste code…": {
+    "es": " Pegar codice",
+    "pt": " Colar codice"
+  },
+  "Paste content to convert…": {
+    "es": "Pegar el contenido desde convertire...",
+    "pt": "Colar ou conteúdo de convertire..."
+  },
+  "Paste or type text to count…": {
+    "es": "Pegar o digita el texto desde contare...",
+    "pt": "Colar ou digita ou texto de contare..."
+  },
+  "Paste percent-encoded content…": {
+    "es": "Pegar contenido codificado en percentuale...",
+    "pt": "Colar conteúdo codificado em percentuale..."
+  },
+  "Paste text to match…": {
+    "es": "Pegar el texto para abbinarlo...",
+    "pt": "Colar ou texto para abbinarlo..."
+  },
+  "Pastel": {
+    "es": "Pastello",
+    "pt": "Pastello"
+  },
+  "Path not found": {
+    "es": "Impossibile trovare el ruta",
+    "pt": "Impossibile trovare ou caminho"
+  },
+  "Path, e.g. a.b[0].c or $.a.b[0]": {
+    "es": "Percorso, p. ej. a.b[0].c o $.a.b[0]",
+    "pt": "Percorso, p. ex. a.b[0].c ou $.a.b[0]"
+  },
+  "Pattern": {
+    "es": "Pattern",
+    "pt": "Pattern"
+  },
+  "Pause": {
+    "es": "Metti en pausa",
+    "pt": "Metti em pausa"
+  },
+  "Pause clock": {
+    "es": "Metti en pausa el orologio",
+    "pt": "Metti em pausa ou orologio"
+  },
+  "Payload": {
+    "es": "Carico utile",
+    "pt": "Carico utile"
+  },
+  "Payload JSON": {
+    "es": "Carico utile",
+    "pt": "Carico utile"
+  },
+  "Peach": {
+    "es": "Pesca ",
+    "pt": "Pesca "
+  },
+  "Pearl": {
+    "es": "CAB",
+    "pt": "CAB"
+  },
+  "Peony": {
+    "es": "Peonia",
+    "pt": "Peonia"
+  },
+  "Periwinkle": {
+    "es": "Pervinca",
+    "pt": "Pervinca"
+  },
+  "Petal": {
+    "es": "Petalo",
+    "pt": "Petalo"
+  },
+  "Phone (China mainland)": {
+    "es": "Telefono (Cina continentale)",
+    "pt": "Telefono (Cina continentale)"
+  },
+  "Photo + title/subtitle card with backdrop presets or gradients, export PNG": {
+    "es": "Foto + cartolina título/sottotitolo con sfondi preimpostati o sfumati, esportación PNG",
+    "pt": "Foto + cartolina título/sottotitolo com sfondi preimpostati ou sfumati, esportação PNG"
+  },
+  "Photo rotate": {
+    "es": "Rotación foto",
+    "pt": "Rotação foto"
+  },
+  "Pick colors visually and export HEX / RGB / HSL plus HTML/CSS snippets": {
+    "es": "Elige los colores visivamente ed esporta ESADECIMALI / RGB / HSL más HTML/CSS frammenti",
+    "pt": "Escolha os cores visivamente ed esporta ESADECIMALI / RGB / HSL mais HTML/CSS frammenti"
+  },
+  "Pick the option that fits you better; submit when all are answered.": {
+    "es": "Elige el opción más adatta a te; invia cuando hai risposto a todos.",
+    "pt": "Escolha ou opção mais adatta a te; invia quando hai risposto a todos."
+  },
+  "Picked color": {
+    "es": "Color prelevato",
+    "pt": "Cor prelevato"
+  },
+  "Picker": {
+    "es": "Addetto al picking",
+    "pt": "Addetto ao picking"
+  },
+  "Pine forest": {
+    "es": "Pineta",
+    "pt": "Pineta"
+  },
+  "Pink glow": {
+    "es": "Pink Glow",
+    "pt": "Pink Glow"
+  },
+  "Pinyin": {
+    "es": "Pinyin",
+    "pt": "Pinyin"
+  },
+  "Place an image on PDF pages": {
+    "es": "Posiziona un'imagen sobre PDF páginas",
+    "pt": "Posiziona um'imagem sobre PDF páginas"
+  },
+  "Placeholder Image": {
+    "es": "Imagen Segnaposto",
+    "pt": "Imagem Segnaposto"
+  },
+  "Plain text": {
+    "es": "Texto normale",
+    "pt": "Texto normale"
+  },
+  "Plaintext": {
+    "es": "Plaintext",
+    "pt": "Plaintext"
+  },
+  "Please choose a GIF file": {
+    "es": "Per favore elige un archivo",
+    "pt": "Per favore escolha um ficheiro"
+  },
+  "Please choose a file": {
+    "es": "Per favore elige un archivo",
+    "pt": "Per favore escolha um ficheiro"
+  },
+  "Please choose an ICO file": {
+    "es": "Elige un archivo ICO",
+    "pt": "Escolha um ficheiro ICO"
+  },
+  "Please choose an image file": {
+    "es": "Elige un'imagen desde el tuo PC",
+    "pt": "Escolha um'imagem do tuo PC"
+  },
+  "Please complete options": {
+    "es": "Completa las opciones",
+    "pt": "Completa as opções"
+  },
+  "Please complete the input": {
+    "es": "Si prega de completare el input",
+    "pt": "Si prega de completare ou input"
+  },
+  "Please enter CSS content": {
+    "es": "Introduce el contenido",
+    "pt": "Introduza ou conteúdo"
+  },
+  "Please enter Chinese text": {
+    "es": "Introduce el texto cinese",
+    "pt": "Introduza ou texto cinese"
+  },
+  "Please enter HTML content": {
+    "es": "Introduce el contenido",
+    "pt": "Introduza ou conteúdo"
+  },
+  "Please enter JSON and a path": {
+    "es": "Introduce JSON y un ruta",
+    "pt": "Introduza JSON e um caminho"
+  },
+  "Please enter JavaScript content": {
+    "es": "Introduce el contenido",
+    "pt": "Introduza ou conteúdo"
+  },
+  "Please enter Markdown": {
+    "es": "Introduce un ribasso",
+    "pt": "Introduza um ribasso"
+  },
+  "Please enter Markdown content": {
+    "es": "Introduce el contenido",
+    "pt": "Introduza ou conteúdo"
+  },
+  "Please enter SVG": {
+    "es": "Introduce SVG",
+    "pt": "Introduza SVG"
+  },
+  "Please enter XML": {
+    "es": "Introduce XML",
+    "pt": "Introduza XML"
+  },
+  "Please enter XML content": {
+    "es": "Introduce el contenido",
+    "pt": "Introduza ou conteúdo"
+  },
+  "Please enter XSLT": {
+    "es": "Per favore introduce",
+    "pt": "Per favore introduza"
+  },
+  "Please enter a CIDR": {
+    "es": "Per favore introduce un",
+    "pt": "Per favore introduza um"
+  },
+  "Please enter a URL": {
+    "es": "Per favore introduce un",
+    "pt": "Per favore introduza um"
+  },
+  "Please enter a User-Agent": {
+    "es": "Introduce un User-Agent",
+    "pt": "Introduza um User-Agent"
+  },
+  "Please enter a color": {
+    "es": "Inserire un color válido",
+    "pt": "Inserire um cor válido"
+  },
+  "Please enter a color value": {
+    "es": "Introduce un valor de color válido.",
+    "pt": "Introduza um valor de cor válido."
+  },
+  "Please enter a cron expression": {
+    "es": "Introduce un'expresión cron",
+    "pt": "Introduza um'expressão cron"
+  },
+  "Please enter a date/time": {
+    "es": "Introduce una fecha",
+    "pt": "Introduza uma data"
+  },
+  "Please enter a formula": {
+    "es": "Inserire una fórmula valida",
+    "pt": "Inserire uma fórmula valida"
+  },
+  "Please enter a message": {
+    "es": "Introduce un mensaje",
+    "pt": "Introduza um mensagem"
+  },
+  "Please enter a number": {
+    "es": "Introduce un número",
+    "pt": "Introduza um número"
+  },
+  "Please enter a valid number": {
+    "es": "Inserire un número válido",
+    "pt": "Inserire um número válido"
+  },
+  "Please enter a valid secret": {
+    "es": "Inserire un codice válido",
+    "pt": "Inserire um codice válido"
+  },
+  "Please enter an expression": {
+    "es": "Introduce un'expresión",
+    "pt": "Introduza um'expressão"
+  },
+  "Please enter an integer": {
+    "es": "Immettere un número intero positivo.",
+    "pt": "Immettere um número intero positivo."
+  },
+  "Please enter content": {
+    "es": "Introduce el contenido",
+    "pt": "Introduza ou conteúdo"
+  },
+  "Please enter data": {
+    "es": "Inserire todos los dati",
+    "pt": "Inserire todos os dati"
+  },
+  "Please enter secret or code": {
+    "es": "Introduce la clave segreta",
+    "pt": "Introduza a chave segreta"
+  },
+  "Please enter some text": {
+    "es": "Inserisca algunas parole",
+    "pt": "Inserisca algumas parole"
+  },
+  "Please enter text": {
+    "es": "Si prega de inserire el texto",
+    "pt": "Si prega de inserire ou texto"
+  },
+  "Please paste PEM": {
+    "es": "Si prega de incollare PEM",
+    "pt": "Si prega de incollare PEM"
+  },
+  "Please paste a JWT": {
+    "es": "Incollare un JWT",
+    "pt": "Incollare um JWT"
+  },
+  "Please provide a non-empty charset": {
+    "es": "Fornisci un set de caracteres no vacío",
+    "pt": "Fornisci um set de caracteres não vazio"
+  },
+  "Please select at least one character set": {
+    "es": "Seleccionar almeno un set de caracteres",
+    "pt": "Selecionar almeno um set de caracteres"
+  },
+  "Please upload a PDF file": {
+    "es": "Si prega de caricare un archivo",
+    "pt": "Si prega de caricare um ficheiro"
+  },
+  "Please upload an image file": {
+    "es": "Si prega de caricare un'imagen.",
+    "pt": "Si prega de caricare um'imagem."
+  },
+  "Polar glow": {
+    "es": "Polare",
+    "pt": "Polare"
+  },
+  "Pop art": {
+    "es": "POP Art",
+    "pt": "POP Art"
+  },
+  "Portrait": {
+    "es": "Ritratto",
+    "pt": "Ritratto"
+  },
+  "Position": {
+    "es": "Posición",
+    "pt": "Posição"
+  },
+  "Position %": {
+    "es": "Posición %",
+    "pt": "Posição %"
+  },
+  "PostgreSQL": {
+    "es": "PostgreSQL",
+    "pt": "PostgreSQL"
+  },
+  "Pound lb": {
+    "es": "Libbra libbra",
+    "pt": "Libbra libbra"
+  },
+  "Powder blue": {
+    "es": "Blu polvere",
+    "pt": "Blu polvere"
+  },
+  "Powered by Prism; copy the HTML snippet for blogs and docs.": {
+    "es": "Powered by Prism; copia el⟧ snippet ⟦0 para blog y documenti.",
+    "pt": "Powered by Prism; copia ou⟧ snippet ⟦0 para blog e documenti."
+  },
+  "Prefix": {
+    "es": "Prefisso",
+    "pt": "Prefisso"
+  },
+  "Preserve": {
+    "es": "Conservare",
+    "pt": "Conservare"
+  },
+  "Preset": {
+    "es": "Preimpostación",
+    "pt": "Preimpostação"
+  },
+  "Presets": {
+    "es": "Preimpostaciones",
+    "pt": "Preimpostações"
+  },
+  "Preview": {
+    "es": "Vista previa",
+    "pt": "Pré-visualização"
+  },
+  "Preview in Cron parser": {
+    "es": "Vista previa en Cron parser",
+    "pt": "Pré-visualização em Cron parser"
+  },
+  "Preview of {{name}}": {
+    "es": "Vista previa de {{name}}",
+    "pt": "Pré-visualização de {{name}}"
+  },
+  "Previous": {
+    "es": "Anterior",
+    "pt": "Anterior"
+  },
+  "Previous month": {
+    "es": "Mes precedente",
+    "pt": "Mês precedente"
+  },
+  "Prism": {
+    "es": "Prisma",
+    "pt": "Prisma"
+  },
+  "Processing failed": {
+    "es": "Elaboración no correcta. ",
+    "pt": "Elaboração não bem-sucedida. "
+  },
+  "Processing failed: please check the syntax": {
+    "es": "Elaboración no correcta: controllare la sintassi",
+    "pt": "Elaboração não bem-sucedida: controllare a sintassi"
+  },
+  "Processing failed: please check whether the CSS is valid": {
+    "es": "Elaboración no correcta: controlla si el CSS es válido",
+    "pt": "Elaboração não bem-sucedida: controlla se ou CSS é válido"
+  },
+  "Processing failed: please check whether the HTML is valid": {
+    "es": "Elaboración no correcta: controlla si el HTML es válido",
+    "pt": "Elaboração não bem-sucedida: controlla se ou HTML é válido"
+  },
+  "Processing failed: please check whether the XML is valid": {
+    "es": "Elaboración no correcta: controlla si el XML es válido",
+    "pt": "Elaboração não bem-sucedida: controlla se ou XML é válido"
+  },
+  "Processing failed: try another image": {
+    "es": "Elaboración no correcta: prova un'otra imagen",
+    "pt": "Elaboração não bem-sucedida: prova um'outra imagem"
+  },
+  "Processing failed; try another image": {
+    "es": "Elaboración no correcta; prova un'otra imagen",
+    "pt": "Elaboração não bem-sucedida; prova um'outra imagem"
+  },
+  "Producer": {
+    "es": "Produttore",
+    "pt": "Produttore"
+  },
+  "Progress {{current}} / {{total}}": {
+    "es": "Avanzamento {{current}} / {{total}}",
+    "pt": "Avanzamento {{current}} / {{total}}"
+  },
+  "Property": {
+    "es": "Proprietà",
+    "pt": "Proprietà"
+  },
+  "Protocol": {
+    "es": "Protocollo",
+    "pt": "Protocollo"
+  },
+  "Provide at least a header or footer.": {
+    "es": "Fornire almeno un'encabezado o un pie de página.",
+    "pt": "Fornire almeno um'cabeçalho ou um rodapé."
+  },
+  "Purple": {
+    "es": "Viola",
+    "pt": "Viola"
+  },
+  "Purple aurora": {
+    "es": "Aurora viola",
+    "pt": "Aurora viola"
+  },
+  "Purple dusk": {
+    "es": "Crepuscolo viola",
+    "pt": "Crepuscolo viola"
+  },
+  "Purple haze": {
+    "es": "Purple Haze",
+    "pt": "Purple Haze"
+  },
+  "Purple orb": {
+    "es": "Sfera viola",
+    "pt": "Sfera viola"
+  },
+  "Pythagorean theorem": {
+    "es": "Teorema de Pitagora",
+    "pt": "Teorema de Pitagora"
+  },
+  "Q (~25%)": {
+    "es": "d25",
+    "pt": "d25"
+  },
+  "QR Code": {
+    "es": "Codice 0",
+    "pt": "Codice 0"
+  },
+  "QR code preview": {
+    "es": "Vista previa ⟧ codice⟦ 0",
+    "pt": "Pré-visualização ⟧ codice⟦ 0"
+  },
+  "Quadratic formula": {
+    "es": "2. Formula quadratica",
+    "pt": "2. Formula quadratica"
+  },
+  "Quality": {
+    "es": "Calidad",
+    "pt": "Qualidade"
+  },
+  "Question {{n}} / {{total}}": {
+    "es": "Domanda {{n}} / {{total}}",
+    "pt": "Domanda {{n}} / {{total}}"
+  },
+  "Quick symbols": {
+    "es": "Simboli rapidi",
+    "pt": "Simboli rapidi"
+  },
+  "Quick symbols and classic formulas, KaTeX preview, export PNG/JPG/SVG": {
+    "es": "Simboli rapidi y formule classicas, vista previa KaTeX, esportación PNG/JPG/SVG",
+    "pt": "Simboli rapidi e formule classicas, pré-visualização KaTeX, esportação PNG/JPG/SVG"
+  },
+  "Quote (>)": {
+    "es": "Preventivo",
+    "pt": "Preventivo"
+  },
+  "RFC 6238 TOTP: generate / verify, 6/8 digits, remaining seconds": {
+    "es": "RFC 6238 TOTP: generare / verificare, 6/8 cifre, segundos restantes",
+    "pt": "RFC 6238 TOTP: generare / verificare, 6/8 cifre, segundos restantes"
+  },
+  "Radial": {
+    "es": "Segni",
+    "pt": "Segni"
+  },
+  "Radius": {
+    "es": "Raje",
+    "pt": "Ragem"
+  },
+  "Radix": {
+    "es": "Radix",
+    "pt": "Radix"
+  },
+  "Radix Converter": {
+    "es": "Convertidor Radix",
+    "pt": "Conversor Radix"
+  },
+  "Rainbow": {
+    "es": "raiNbow",
+    "pt": "raiNbow"
+  },
+  "Rainforest": {
+    "es": "Foresta pluviale",
+    "pt": "Foresta pluviale"
+  },
+  "Random Number Generator": {
+    "es": "generador de números casuali",
+    "pt": "gerador de números casuali"
+  },
+  "Random String Generator": {
+    "es": "Generador de stringhe casuali",
+    "pt": "Gerador de stringhe casuali"
+  },
+  "Random v4 / time-ordered v7 UUIDs with batch output and formatting options": {
+    "es": "UUID v4 /v7 ordinati en básico al tiempo casuali con output batch y opciones de formattación",
+    "pt": "UUID v4 /v7 ordinati em básico ao tempo casuali com output batch e opções de formattação"
+  },
+  "Raven": {
+    "es": "Corvo",
+    "pt": "Corvo"
+  },
+  "Raw key (hex)": {
+    "es": "Clave grezza (esadecimale)",
+    "pt": "Chave grezza (esadecimale)"
+  },
+  "Read basic JPEG EXIF and strip APP1; download cleaned file": {
+    "es": "Leggere Basic JPEG EXIF y strip APP1; scaricare archivo pulito",
+    "pt": "Leggere Basic JPEG EXIF e strip APP1; scaricare ficheiro pulito"
+  },
+  "Readable time → timestamp (space-separated uses local timezone)": {
+    "es": "→ Timestamp leggibile (el spazio separato utilizza el zona horaria local)",
+    "pt": "→ Timestamp leggibile (ou spazio separato utilizza ou fuso horário local)"
+  },
+  "Rebuilt URL": {
+    "es": "Ricostruito",
+    "pt": "Ricostruito"
+  },
+  "Rectangle": {
+    "es": "Rettangolo",
+    "pt": "Rettangolo"
+  },
+  "Red days are weekends or holidays. English uses US public holidays (en-GB uses UK bank holidays).": {
+    "es": "I días rossi son fine settimana o festivi. L'inglese utilizza los días festivi statunitensi (en-GB utilizza los días festivi del Regno Unito).",
+    "pt": "I dias rossi são fine settimana ou festivi. L'inglese utilizza os dias festivi statunitensi (en-GB utilizza os dias festivi do Regno Unito)."
+  },
+  "Red marks weekends or festivals; 休 = statutory rest, 班 = makeup workday. Almanac tips on the right.": {
+    "es": "Il rosso segna los fine settimana o las feste; 休 = riposo legale, 班 = día lavorativo de trucco. Punte dell'almanacco a destra.",
+    "pt": "Il rosso segna os fine settimana ou as feste; 休 = riposo legale, 班 = dia lavorativo de trucco. Punte dell'almanacco a destra."
+  },
+  "Regex Tool": {
+    "es": "Regex Utensile",
+    "pt": "Regex Utensile"
+  },
+  "Regular expression cannot be empty": {
+    "es": "L'expresión regular no puede essere vuota",
+    "pt": "L'expressão regular não pode essere vuota"
+  },
+  "Related tools": {
+    "es": "Herramientas correlati",
+    "pt": "Ferramentas correlati"
+  },
+  "Relations": {
+    "es": "internazionali",
+    "pt": "internazionali"
+  },
+  "Relative (detected as {{unit}})": {
+    "es": "Relativo (detectado como {{unit}} )",
+    "pt": "Relativo (detetado como {{unit}} )"
+  },
+  "Remove selected pages from a PDF": {
+    "es": "Rimuovi las páginas seleccionadas desde PDF",
+    "pt": "Rimuovi as páginas selecionadas de PDF"
+  },
+  "Render Markdown to a styled card and export PNG with font, size, width, and colors": {
+    "es": "Rendering Markdown sobre una carta en stile ed esportación PNG con font, dimensioni, larghezza y colores",
+    "pt": "Rendering Markdown sobre uma carta em stile ed esportação PNG com font, dimensioni, larghezza e cores"
+  },
+  "Render Mermaid locally with themes, zoom, and PNG/SVG export": {
+    "es": "Esegui el rendering de la sirena localmente con temas, zoom ed⟧ esportación PNG/⟦1",
+    "pt": "Esegui ou rendering de sirena localmente com temas, zoom ed⟧ esportação PNG/⟦1"
+  },
+  "Render PDF pages as JPG/PNG": {
+    "es": "Rendering PDF páginas como JPG/PNG",
+    "pt": "Rendering PDF páginas como JPG/PNG"
+  },
+  "Render code as a syntax-highlighted card and export PNG": {
+    "es": "Rendering del codice como scheda evidenziata desde la sintassi ed esportación PNG",
+    "pt": "Rendering do codice como scheda evidenziata de sintassi ed esportação PNG"
+  },
+  "Render failed: please check the Markdown syntax": {
+    "es": "Rendering no correcto: controlla la sintassi de Markdown",
+    "pt": "Rendering não bem-sucedido: controlla a sintassi de Markdown"
+  },
+  "Render failed: {{message}}": {
+    "es": "Rendering no correcto: {{message}}",
+    "pt": "Rendering não bem-sucedido: {{message}}"
+  },
+  "Rendering…": {
+    "es": "Rendering…",
+    "pt": "Rendering…"
+  },
+  "Renders locally; large files may be slow.": {
+    "es": "Esegue el rendering localmente; los archivo de grandi dimensioni potrebbero essere lenti.",
+    "pt": "Esegue ou rendering localmente; os ficheiro de grandi dimensioni potrebbero essere lenti."
+  },
+  "Reorder PDF Pages": {
+    "es": "Riordina PDF páginas",
+    "pt": "Riordina PDF páginas"
+  },
+  "Reorder pages in a PDF": {
+    "es": "Riordina las páginas en PDF",
+    "pt": "Riordina as páginas em PDF"
+  },
+  "Replace": {
+    "es": "Reemplazar",
+    "pt": "Substituir"
+  },
+  "Replace result": {
+    "es": "Reemplazar resultado",
+    "pt": "Substituir resultado"
+  },
+  "Replace with": {
+    "es": "Reemplazar con",
+    "pt": "Substituir com"
+  },
+  "Reset zoom": {
+    "es": "Reimposta zoom",
+    "pt": "Reimposta zoom"
+  },
+  "Resume clock": {
+    "es": "Riattiva orologio",
+    "pt": "Riattiva orologio"
+  },
+  "Retake": {
+    "es": "Ripeti",
+    "pt": "Ripeti"
+  },
+  "Retro duo": {
+    "es": "Retro duo",
+    "pt": "Retro duo"
+  },
+  "Revised": {
+    "es": "Revisionato",
+    "pt": "Revisionato"
+  },
+  "Right": {
+    "es": "Derecha",
+    "pt": "Direita"
+  },
+  "Romantic pink": {
+    "es": "Rosa romantico",
+    "pt": "Rosa romantico"
+  },
+  "Rose gold": {
+    "es": "Oro rosa",
+    "pt": "Oro rosa"
+  },
+  "Rosewater": {
+    "es": "Acqua de rose",
+    "pt": "Acqua de rose"
+  },
+  "Rotate": {
+    "es": "Ruotare",
+    "pt": "Ruotare"
+  },
+  "Rotate & download": {
+    "es": "Rotar y descarga",
+    "pt": "Rodar e transfira"
+  },
+  "Rotate PDF Pages": {
+    "es": "Rotar PDF páginas",
+    "pt": "Rodar PDF páginas"
+  },
+  "Rotate selected or all pages": {
+    "es": "Rotar las páginas seleccionadas o todas",
+    "pt": "Rodar as páginas selecionadas ou todas"
+  },
+  "Royal purple": {
+    "es": "ROYAL PURPLE",
+    "pt": "ROYAL PURPLE"
+  },
+  "SQL Formatter": {
+    "es": "Formateador SQL",
+    "pt": "Formatador SQL"
+  },
+  "SQL Server": {
+    "es": "SQL Server",
+    "pt": "SQL Server"
+  },
+  "SQL input": {
+    "es": "Input SQL",
+    "pt": "Input SQL"
+  },
+  "SQLite": {
+    "es": "(SQLITE).",
+    "pt": "(SQLITE)."
+  },
+  "SVG source": {
+    "es": "SVG source",
+    "pt": "SVG source"
+  },
+  "SVG to PNG": {
+    "es": "desde 0 to 1",
+    "pt": "de 0 to 1"
+  },
+  "Safe expression calculator with arithmetic, power, modulo, and common functions": {
+    "es": "Calculadora de espressioni sicure con funciones aritmeticas, de potenza, modulo y funciones comuni",
+    "pt": "Calculadora de espressioni sicure com funções aritmeticas, de potenza, modulo e funções comuni"
+  },
+  "Saffron": {
+    "es": "Zafferano",
+    "pt": "Zafferano"
+  },
+  "Sahara": {
+    "es": "Sahara",
+    "pt": "Sahara"
+  },
+  "Sakura": {
+    "es": "Sakura",
+    "pt": "Sakura"
+  },
+  "Sans-serif": {
+    "es": "Sans-serif",
+    "pt": "Sans-serif"
+  },
+  "Sapphire": {
+    "es": "Zaffiro",
+    "pt": "Zaffiro"
+  },
+  "Saturate": {
+    "es": "Satura",
+    "pt": "Satura"
+  },
+  "Saturation": {
+    "es": "Saturación",
+    "pt": "Saturação"
+  },
+  "Saturday": {
+    "es": "Sábado",
+    "pt": "Sábado"
+  },
+  "Save & download": {
+    "es": "Guardar y descarga",
+    "pt": "Guardar e transfira"
+  },
+  "Scatter": {
+    "es": "Dispersione",
+    "pt": "Dispersione"
+  },
+  "Schrödinger equation": {
+    "es": "L'equación de Schrödinger",
+    "pt": "L'equação de Schrödinger"
+  },
+  "Screen eyedropper": {
+    "es": "Contagocce para schermo",
+    "pt": "Contagocce para schermo"
+  },
+  "Sea blue": {
+    "es": "Taupe",
+    "pt": "Taupe"
+  },
+  "Sea mist": {
+    "es": "Nebbia marina",
+    "pt": "Nebbia marina"
+  },
+  "Sea pearl": {
+    "es": "Perla marina",
+    "pt": "Perla marina"
+  },
+  "Seafoam": {
+    "es": "Seafoam",
+    "pt": "Seafoam"
+  },
+  "Second": {
+    "es": "Segundo",
+    "pt": "Segundo"
+  },
+  "Seconds": {
+    "es": "Secondi",
+    "pt": "Secondi"
+  },
+  "Seconds left": {
+    "es": "segundos rimasti",
+    "pt": "segundos rimasti"
+  },
+  "Secret is not valid Base32": {
+    "es": "Il secreto no es válido Base32",
+    "pt": "Il segredo não é válido Base32"
+  },
+  "See result": {
+    "es": "vedi risultati",
+    "pt": "vedi risultati"
+  },
+  "Select at least one size": {
+    "es": "selezionare almeno un'opción",
+    "pt": "selezionare almeno um'opção"
+  },
+  "Selected date": {
+    "es": "Fecha selezionata",
+    "pt": "Data selezionata"
+  },
+  "Sensing S / Intuition N": {
+    "es": "Sensing S / Intuition N",
+    "pt": "Sensing S / Intuition N"
+  },
+  "Sentence case": {
+    "es": "Maiuscole/minúsculas en la frase",
+    "pt": "Maiuscole/minúsculas na frase"
+  },
+  "Separator": {
+    "es": "Separatore",
+    "pt": "Separatore"
+  },
+  "Series label": {
+    "es": "Etichetta serie",
+    "pt": "Etichetta serie"
+  },
+  "Serif": {
+    "es": "Serif",
+    "pt": "Serif"
+  },
+  "Set hours, minutes, and seconds; pause, resume, and finish alert": {
+    "es": "Imposta horas, minutos y segundos; metti en pausa, riprendi y termina el avviso",
+    "pt": "Imposta horas, minutos e segundos; metti em pausa, riprendi e termina ou avviso"
+  },
+  "Set open password and permissions. Reader support varies.": {
+    "es": "Imposta contraseña y autorizzaciones de apertura. Il supporto del lettore varia.",
+    "pt": "Imposta palavra-passe e autorizzações de apertura. Il supporto do lettore varia."
+  },
+  "Set password and permission flags": {
+    "es": "Imposta contraseña y flag de autorizzación",
+    "pt": "Imposta palavra-passe e flag de autorizzação"
+  },
+  "Set theory": {
+    "es": "Teoria de los insiemi",
+    "pt": "Teoria dos insiemi"
+  },
+  "Shadow blur": {
+    "es": "Sfocatura sombra:",
+    "pt": "Sfocatura sombra:"
+  },
+  "Shadow offset": {
+    "es": "Spostamento X sombra",
+    "pt": "Spostamento X sombra"
+  },
+  "Shadow opacity": {
+    "es": "Opacidad sombra",
+    "pt": "Opacidade sombra"
+  },
+  "Shortcuts: ⌘/Ctrl+B bold · ⌘/Ctrl+I italic · ⌘/Ctrl+K link · ⌘/Ctrl+E inline code": {
+    "es": "Scorciatoie: + Ctrl+B grassetto · + Ctrl+I corsivo · + Ctrl+K link · + Ctrl+E codice inline",
+    "pt": "Scorciatoie: + Ctrl+B grassetto · + Ctrl+I corsivo · + Ctrl+K link · + Ctrl+E codice inline"
+  },
+  "Showing a file Base64 result; typing text will clear it.": {
+    "es": "Visualizzación de un archivo Base64 resultado; la digitación del texto el cancellerà.",
+    "pt": "Visualizzação de um ficheiro Base64 resultado; a digitação do texto ou cancellerà."
+  },
+  "Showing first {{count}} rows only": {
+    "es": "Showing first {{count}} rows only",
+    "pt": "Showing first {{count}} rows only"
+  },
+  "Showing {{n}} / {{total}} colors": {
+    "es": "Mostrar {{n}} / {{total}} colores",
+    "pt": "Mostrar {{n}} / {{total}} cores"
+  },
+  "Side-by-side editors with inline line highlights, line numbers, and whitespace ignore": {
+    "es": "Gli editor affiancati con evidenziaciones de las líneas en linea, números de línea y espacios vacíos ignorano",
+    "pt": "Gli editor affiancati com evidenziações das linhas em linea, números de linha e espaços vazios ignorano"
+  },
+  "Sign & download": {
+    "es": "Firma y descarga",
+    "pt": "Assinatura e transfira"
+  },
+  "Sign (HS256)": {
+    "es": "Cartello (HS256)",
+    "pt": "Cartello (HS256)"
+  },
+  "Sign PDF": {
+    "es": "Cartello PDF",
+    "pt": "Cartello PDF"
+  },
+  "Signed token": {
+    "es": "Token firmado",
+    "pt": "Token assinado"
+  },
+  "Signing failed": {
+    "es": "Firma no correcta",
+    "pt": "Assinatura não bem-sucedida"
+  },
+  "Signs with HS256 in your browser; the secret never leaves the device": {
+    "es": "Segni con HS256 en el navegador; el secreto no lascia mai el dispositivo",
+    "pt": "Segni com HS256 no browser; ou segredo não lascia mai ou dispositivo"
+  },
+  "Simple path queries like a.b[0].c": {
+    "es": "Query de ruta semplicos como a.b[0].c",
+    "pt": "Query de caminho semplicos como a.b[0].c"
+  },
+  "Simplified Chinese": {
+    "es": "Simplified Chinese",
+    "pt": "Simplified Chinese"
+  },
+  "Simplified → Traditional": {
+    "es": "→ Tradizionale semplificato",
+    "pt": "→ Tradizionale semplificato"
+  },
+  "Size increased by {{ratio}}%": {
+    "es": "Dimensiones aumentate del {{ratio}} %",
+    "pt": "Dimensões aumentate do {{ratio}} %"
+  },
+  "Size must be an integer between 16 and 4000": {
+    "es": "La tamaño debe essere un número intero compreso entre 16 y 4000",
+    "pt": "La tamanho deve essere um número intero compreso entre 16 e 4000"
+  },
+  "Size reduced by {{ratio}}%": {
+    "es": "Size reduced by {{ratio}}%",
+    "pt": "Size reduced by {{ratio}}%"
+  },
+  "Sizes": {
+    "es": "Misure",
+    "pt": "Misure"
+  },
+  "Skew X": {
+    "es": "Inclinación X:",
+    "pt": "Inclinação X:"
+  },
+  "Sky dusk": {
+    "es": "Sky Dusk",
+    "pt": "Sky Dusk"
+  },
+  "Skyline": {
+    "es": "Orizzonte",
+    "pt": "Orizzonte"
+  },
+  "Slash": {
+    "es": "<g id=\"MIFDocuments.YellowBackgroundColor\">Slash</g>",
+    "pt": "<g id=\"MIFDocuments.YellowBackgroundColor\">Slash</g>"
+  },
+  "Slate": {
+    "es": "Ardesia",
+    "pt": "Ardesia"
+  },
+  "Soda pop": {
+    "es": "Soda pop",
+    "pt": "Soda pop"
+  },
+  "Soft glow": {
+    "es": "Soft glow",
+    "pt": "Soft glow"
+  },
+  "Soft line breaks": {
+    "es": "Interruciones línea",
+    "pt": "Interruções linha"
+  },
+  "Solid": {
+    "es": "Solid",
+    "pt": "Solid"
+  },
+  "Song (serif CJK)": {
+    "es": "Canzone (serif CJK)",
+    "pt": "Canzone (serif CJK)"
+  },
+  "Sort / unique / reverse / number / trim empty lines": {
+    "es": "Ordina / univoco / inverso / número / taglia líneas vuote",
+    "pt": "Ordina / univoco / inverso / número / taglia linhas vuote"
+  },
+  "Sort ascending": {
+    "es": "Crescente",
+    "pt": "Crescente"
+  },
+  "Sort descending": {
+    "es": "Decrescente",
+    "pt": "Decrescente"
+  },
+  "Source {{sw}}×{{sh}} → output {{pw}}×{{ph}}": {
+    "es": "Sorgente {{sw}} × {{sh}} → uscita {{pw}} × {{ph}}",
+    "pt": "Sorgente {{sw}} × {{sh}} → uscita {{pw}} × {{ph}}"
+  },
+  "Space": {
+    "es": "Spazio",
+    "pt": "Spazio"
+  },
+  "Space-separated bytes": {
+    "es": "Byte separati desde espacios",
+    "pt": "Byte separati de espaços"
+  },
+  "Special chars + non-ASCII": {
+    "es": "Caracteres speciali + no ASCII",
+    "pt": "Caracteres speciali + não ASCII"
+  },
+  "Special chars only (&, <, > etc.)": {
+    "es": "Solo caracteres speciali (&, <, > ecc.)",
+    "pt": "Solo caracteres speciali (&, <, > ecc.)"
+  },
+  "Specific value": {
+    "es": "valor specificas",
+    "pt": "valor specificas"
+  },
+  "Spice orange": {
+    "es": "Arancia speziata",
+    "pt": "Arancia speziata"
+  },
+  "Split & download": {
+    "es": "Dividir y descarga",
+    "pt": "Dividir e transfira"
+  },
+  "Split PDF": {
+    "es": "Spacca",
+    "pt": "Spacca"
+  },
+  "Split a GIF into PNG frames; download one or all": {
+    "es": "Dividir un GIF en PNG fotogrammi; descarga un o todos",
+    "pt": "Dividir um GIF em PNG fotogrammi; transfira um ou todos"
+  },
+  "Split a PDF into one file per page": {
+    "es": "Dividir un PDF en un archivo para página",
+    "pt": "Dividir um PDF em um ficheiro para página"
+  },
+  "Splits into one PDF per page and downloads each.": {
+    "es": "Si divide en un PDF para página y descarga cada.",
+    "pt": "Si divide em um PDF para página e transfira cada."
+  },
+  "Spotlight dark": {
+    "es": "Riflettore oscuro",
+    "pt": "Riflettore escuro"
+  },
+  "Standard 5 fields: minute hour day month weekday (0 = Sunday)": {
+    "es": "Standard 5 campi: minuto ahora día mese día feriale (0 = domenica)",
+    "pt": "Standard 5 campi: minuto agora dia mese dia feriale (0 = domenica)"
+  },
+  "Start from": {
+    "es": "Inizia desde",
+    "pt": "Inizia de"
+  },
+  "Start of line": {
+    "es": "Inizio línea",
+    "pt": "Inizio linha"
+  },
+  "Stats will appear after you enter text": {
+    "es": "Le statisticas appariranno después aver inserito el texto",
+    "pt": "Le statisticas appariranno depois aver inserito ou texto"
+  },
+  "Stitch images horizontally, vertically, or in a grid into one PNG": {
+    "es": "Cuci las imágenes orizzontalmente, verticalmente o en una griglia en un PNG",
+    "pt": "Cuci as imagens orizzontalmente, verticalmente ou em uma griglia em um PNG"
+  },
+  "Stone st": {
+    "es": "Stone st",
+    "pt": "Stone st"
+  },
+  "Stopwatch": {
+    "es": "Cronometro",
+    "pt": "Cronometro"
+  },
+  "Storm night": {
+    "es": "Notte de tempesta",
+    "pt": "Notte de tempesta"
+  },
+  "Storm sea": {
+    "es": "Mare IN tempesta",
+    "pt": "Mare IN tempesta"
+  },
+  "Strikethrough (~~)": {
+    "es": "Barrato",
+    "pt": "Barrato"
+  },
+  "Strip EXIF": {
+    "es": "Striscia",
+    "pt": "Striscia"
+  },
+  "Strong random passwords with length / charset options, entropy estimate and strength rating": {
+    "es": "Contraseña casuali complesse con opciones de lunghezza / set de caracteres, stima dell'entropia y valutación de la forza",
+    "pt": "Palavra-passe casuali complesse com opções de lunghezza / set de caracteres, stima dell'entropia e valutação de forza"
+  },
+  "Subject CN": {
+    "es": "Soggetto CN",
+    "pt": "Soggetto CN"
+  },
+  "Subtitle size": {
+    "es": "Tamaño del sottotitolo",
+    "pt": "Tamanho do sottotitolo"
+  },
+  "Suitable": {
+    "es": "Adatto",
+    "pt": "Adatto"
+  },
+  "Sums & products": {
+    "es": "Somme & prodotti",
+    "pt": "Somme & prodotti"
+  },
+  "Sun disc glow": {
+    "es": "Sun disc Glow",
+    "pt": "Sun disc Glow"
+  },
+  "Sunday": {
+    "es": "Domingo",
+    "pt": "Domingo"
+  },
+  "Sunrise blend": {
+    "es": "Miscela Sunrise",
+    "pt": "Miscela Sunrise"
+  },
+  "Sunset": {
+    "es": "TRAMONTO",
+    "pt": "TRAMONTO"
+  },
+  "Sunset blend": {
+    "es": "Miscela tramonto",
+    "pt": "Miscela tramonto"
+  },
+  "Sunset orange": {
+    "es": "Arancione",
+    "pt": "Arancione"
+  },
+  "Sunset radial": {
+    "es": "Tramonto radiale",
+    "pt": "Tramonto radiale"
+  },
+  "Supporting line…": {
+    "es": "Linea de supporto...",
+    "pt": "Linea de supporto..."
+  },
+  "Supports $1, $&, …": {
+    "es": "Supporta $1, $&,...",
+    "pt": "Supporta $1, $&,..."
+  },
+  "Supports + - * / % ^ () and sqrt/abs/sin/cos/tan/ln/log/floor/ceil/round, plus pi and e": {
+    "es": "Supporta + - * / % ^ () y sqrt/abs/sin/cos/tan/ln/log/floor/ceil/round, más pi ed y",
+    "pt": "Supporta + - * / % ^ () e sqrt/abs/sin/cos/tan/ln/log/floor/ceil/round, mais pi ed e"
+  },
+  "Supports HEX / RGB / HSL (including shorthand and percentages)": {
+    "es": "Supporta HEX / RGB / HSL (incluidos stenografia y percentuali)",
+    "pt": "Supporta HEX / RGB / HSL (incluídos stenografia e percentuali)"
+  },
+  "Swap sides": {
+    "es": "Inverti lati",
+    "pt": "Inverti lati"
+  },
+  "Swatch": {
+    "es": "Swatch",
+    "pt": "Swatch"
+  },
+  "Switch to “ICO → PNG” to open an ICO file": {
+    "es": "Passa a \"ICO → PNG\" para aprire un archivo ICO",
+    "pt": "Passa a \"ICO → PNG\" para aprire um ficheiro ICO"
+  },
+  "Symbols (!@#$%…)": {
+    "es": "Simbologia",
+    "pt": "Simbologia"
+  },
+  "Synthwave": {
+    "es": "Synthwave",
+    "pt": "Synthwave"
+  },
+  "Tangerine": {
+    "es": "Mandarino ",
+    "pt": "Mandarino "
+  },
+  "Target format": {
+    "es": "Formato dati de destinación",
+    "pt": "Formato dati de destinação"
+  },
+  "Taylor series": {
+    "es": "Serie de Taylor.",
+    "pt": "Serie de Taylor."
+  },
+  "Teal breeze": {
+    "es": "Teal breeze",
+    "pt": "Teal breeze"
+  },
+  "Test text": {
+    "es": "Texto de prova",
+    "pt": "Texto de prova"
+  },
+  "Text Counter": {
+    "es": "Contatore de texto",
+    "pt": "Contatore de texto"
+  },
+  "Text Diff": {
+    "es": "Diff. texto",
+    "pt": "Diff. texto"
+  },
+  "Text Line Tools": {
+    "es": "Herramientas línea de texto",
+    "pt": "Ferramentas linha de texto"
+  },
+  "Text background": {
+    "es": "Fondo texto",
+    "pt": "Fundo texto"
+  },
+  "Text color": {
+    "es": "Color del texto",
+    "pt": "Cor do texto"
+  },
+  "Text content": {
+    "es": "Contenuti testuali",
+    "pt": "Contenuti testuali"
+  },
+  "Text exceeds {{limit}}K character limit; matching stopped (ReDoS / long-run protection)": {
+    "es": "Il texto supera el limite de {{limit}} K caracteres; coincidencia interrotta (ReDoS/proteción a lungo termine)",
+    "pt": "Il texto supera ou limite de {{limit}} K caracteres; correspondência interrotta (ReDoS/proteção a lungo termine)"
+  },
+  "Text input": {
+    "es": "Input de texto",
+    "pt": "Input de texto"
+  },
+  "Text or gzip base64…": {
+    "es": "Texto o gzip base64...",
+    "pt": "Texto ou gzip base64..."
+  },
+  "Text or hex…": {
+    "es": "Texto o esadecimale...",
+    "pt": "Texto ou esadecimale..."
+  },
+  "Text padding": {
+    "es": "<code>Padding</code> del texto.",
+    "pt": "<code>Padding</code> do texto."
+  },
+  "Text shadow": {
+    "es": "Sombra texto",
+    "pt": "Sombra texto"
+  },
+  "Text to Card": {
+    "es": "Text to Card",
+    "pt": "Text to Card"
+  },
+  "Text to decode, e.g. &lt;b&gt;&#20320;&#22909;…": {
+    "es": "Texto desde decodificare, p. ej. &lt;b&gt;&#20320;&#22909;...",
+    "pt": "Texto de decodificare, p. ex. &lt;b&gt;&#20320;&#22909;..."
+  },
+  "Text to encode, e.g. <b>Hello</b>…": {
+    "es": "Texto desde codificare, p. ej. <b>Ciao</b>...",
+    "pt": "Texto de codificare, p. ex. <b>Ciao</b>..."
+  },
+  "Thinking T / Feeling F": {
+    "es": "Thinking T / Feeling F",
+    "pt": "Thinking T / Feeling F"
+  },
+  "This PDF is encrypted. Enter the password to continue.": {
+    "es": "Questo PDF es cifrado. Introduce la contraseña para continuare.",
+    "pt": "Questo PDF é encriptado. Introduza a palavra-passe para continuare."
+  },
+  "This PDF is encrypted. Please enter the password.": {
+    "es": "Questo PDF es cifrado. Introduce la contraseña.",
+    "pt": "Questo PDF é encriptado. Introduza a palavra-passe."
+  },
+  "This is a simplified quiz for entertainment only — not a clinical assessment.": {
+    "es": "Questo es un quiz semplificato solo para intrattenimento, no una valutación clinica.",
+    "pt": "Questo é um quiz semplificato apenas para intrattenimento, não uma valutação clinica."
+  },
+  "Thursday": {
+    "es": "Jueves",
+    "pt": "Quinta-feira"
+  },
+  "Time is up!": {
+    "es": "Il tiempo es caducado!",
+    "pt": "Il tempo é expirado!"
+  },
+  "Timestamp Converter": {
+    "es": "Convertidor timestamp",
+    "pt": "Conversor timestamp"
+  },
+  "Timestamp input": {
+    "es": "Inserimento marca temporale",
+    "pt": "Inserimento marca temporale"
+  },
+  "Timestamp must be numeric (negative allowed)": {
+    "es": "La marca temporale debe essere numerica (consentita negativa)",
+    "pt": "La marca temporale deve essere numerica (consentita negativa)"
+  },
+  "Timestamp out of numeric range": {
+    "es": "Timestamp fuera dall'intervallo numerico",
+    "pt": "Timestamp fora dall'intervallo numerico"
+  },
+  "Timestamp out of representable range (±275760 years)": {
+    "es": "Timestamp fuera intervallo rappresentabile (±275760 anni)",
+    "pt": "Timestamp fora intervallo rappresentabile (±275760 anni)"
+  },
+  "Timestamp → readable time (auto-detect seconds / ms)": {
+    "es": "Timestamp tiempo → leggibile (detección automatico segundos / ms)",
+    "pt": "Timestamp tempo → leggibile (deteção automatico segundos / ms)"
+  },
+  "Title Case": {
+    "es": "Iniziali mayúsculas",
+    "pt": "Iniziali maiúsculas"
+  },
+  "Title size": {
+    "es": "Tamaño título",
+    "pt": "Tamanho título"
+  },
+  "Today": {
+    "es": "Oggi",
+    "pt": "Oggi"
+  },
+  "Tonne t": {
+    "es": "Tonnellata t",
+    "pt": "Tonnellata t"
+  },
+  "Too many diff rows; rendering first {{count}} only": {
+    "es": "Too many diff rows; rendering first {{count}} only",
+    "pt": "Too many diff rows; rendering first {{count}} only"
+  },
+  "Tool runtime error": {
+    "es": "Run-time",
+    "pt": "Run-time"
+  },
+  "Top center": {
+    "es": "Centro en alto",
+    "pt": "Centro em alto"
+  },
+  "Top left": {
+    "es": "Izquierda en alto",
+    "pt": "Esquerda em alto"
+  },
+  "Top right": {
+    "es": "Derecha en alto",
+    "pt": "Direita em alto"
+  },
+  "Total addresses": {
+    "es": "Total indirizzi IP",
+    "pt": "Total indirizzi IP"
+  },
+  "Traditional Chinese": {
+    "es": "Cinese tradizionale",
+    "pt": "Cinese tradizionale"
+  },
+  "Traditional Chinese Converter": {
+    "es": "Convertidor cinese tradizionale",
+    "pt": "Conversor cinese tradizionale"
+  },
+  "Traditional → Simplified": {
+    "es": "Tradizionale → semplificato",
+    "pt": "Tradizionale → semplificato"
+  },
+  "Transform XML to HTML with XSLT in the browser": {
+    "es": "Trasforma XML a HTML con XSLT en el navegador",
+    "pt": "Trasforma XML a HTML com XSLT no browser"
+  },
+  "Transform failed": {
+    "es": "Trasformación no correcta",
+    "pt": "Trasformação não bem-sucedida"
+  },
+  "Translate X": {
+    "es": "Trasla X",
+    "pt": "Trasla X"
+  },
+  "Translate Y": {
+    "es": "Trasla Y",
+    "pt": "Trasla Y"
+  },
+  "Transparent background": {
+    "es": "Fondo trasparente",
+    "pt": "Fundo trasparente"
+  },
+  "Trigonometry": {
+    "es": "Trigonometria",
+    "pt": "Trigonometria"
+  },
+  "Trim empty lines": {
+    "es": "Taglia líneas vuote",
+    "pt": "Taglia linhas vuote"
+  },
+  "Tropical": {
+    "es": "Tropicale",
+    "pt": "Tropicale"
+  },
+  "Tuesday": {
+    "es": "Martes",
+    "pt": "Terça-feira"
+  },
+  "Turn Markdown into a mind map with themes, zoom, and PNG/SVG export": {
+    "es": "Trasforma Markdown en una mappa mentale con temas, zoom ed⟧ esportación PNG/⟦1",
+    "pt": "Trasforma Markdown em uma mappa mentale com temas, zoom ed⟧ esportação PNG/⟦1"
+  },
+  "Turquoise": {
+    "es": "Ciano",
+    "pt": "Ciano"
+  },
+  "Twilight": {
+    "es": "Crepuscolo",
+    "pt": "Crepuscolo"
+  },
+  "Twilight purple": {
+    "es": "Viola crepuscolare",
+    "pt": "Viola crepuscolare"
+  },
+  "URL Encode / Decode": {
+    "es": "URL Codificación / Decodificación",
+    "pt": "URL Codificação / Descodificação"
+  },
+  "URL Query Parser": {
+    "es": "⟦0 Parser⟧ query",
+    "pt": "⟦0 Parser⟧ query"
+  },
+  "URL Safe (- _ without padding)": {
+    "es": "URL Seguro (- _ sin imbottitura)",
+    "pt": "URL Seguro (- _ sem imbottitura)"
+  },
+  "UTF-16 length": {
+    "es": "Lunghezza UTF-16",
+    "pt": "Lunghezza UTF-16"
+  },
+  "UTF-8 bytes": {
+    "es": "0 byte",
+    "pt": "0 byte"
+  },
+  "UUID Generator": {
+    "es": "UUID Generador",
+    "pt": "UUID Gerador"
+  },
+  "Underweight": {
+    "es": "Sotto Peso",
+    "pt": "Sotto Peso"
+  },
+  "Unicode Codec": {
+    "es": "Codec Unicode",
+    "pt": "Codec Unicode"
+  },
+  "Unique": {
+    "es": "Único",
+    "pt": "Único"
+  },
+  "Unit system": {
+    "es": "Sistema de unidad de misura",
+    "pt": "Sistema de unidade de misura"
+  },
+  "Universe": {
+    "es": "Universo",
+    "pt": "Universo"
+  },
+  "Unix ⇄ human-readable time with auto second/ms detection and live clock": {
+    "es": "⟦0 tiempo⟧ ⇄ leggibile dall'uomo con detección automatico de segundos/ms y orologio en tiempo real",
+    "pt": "⟦0 tempo⟧ ⇄ leggibile dall'uomo com deteção automatico de segundos/ms e orologio em tempo real"
+  },
+  "Unlock": {
+    "es": "Sblocca",
+    "pt": "Sblocca"
+  },
+  "Unrecognized color format": {
+    "es": "Formato color no riconosciuto",
+    "pt": "Formato cor não riconosciuto"
+  },
+  "Unrecognized entities (kept as-is)": {
+    "es": "Entidad no riconosciute (mantenute così como son)",
+    "pt": "Entidade não riconosciute (mantenute così como são)"
+  },
+  "Unsupported font": {
+    "es": "Carácter no compatible",
+    "pt": "Carácter não suportado"
+  },
+  "Upload an image and click a pixel to sample HEX / RGB": {
+    "es": "Cargar un'imagen y haz clic sobre un pixel para campionare ESADECIMALE / RGB",
+    "pt": "Carregar um'imagem e clique sobre um pixel para campionare ESADECIMALE / RGB"
+  },
+  "Upload an image to preview the card": {
+    "es": "Cargar un'imagen para visualizzare el vista previa de la carta",
+    "pt": "Carregar um'imagem para visualizzare ou pré-visualização de carta"
+  },
+  "Upload an image, then click to sample a color": {
+    "es": "Cargar un'imagen, por tanto haz clic para campionare un color",
+    "pt": "Carregar um'imagem, portanto clique para campionare um cor"
+  },
+  "Upload file": {
+    "es": "Cargar archivo",
+    "pt": "Carregar ficheiro"
+  },
+  "Upload signature": {
+    "es": "Cargar firma",
+    "pt": "Carregar assinatura"
+  },
+  "Uppercase (A-Z)": {
+    "es": "Lettere mayúsculas desde la A a la Z",
+    "pt": "Lettere maiúsculas de A à Z"
+  },
+  "Use arrows to reorder pages, then export.": {
+    "es": "Utilizzare las frecce para riordinare las páginas, por tanto esportare.",
+    "pt": "Utilizzare as frecce para riordinare as páginas, portanto esportare."
+  },
+  "Use current browser": {
+    "es": "Usa el browser actual",
+    "pt": "Usa ou browser atual"
+  },
+  "User password": {
+    "es": "Contraseña utente",
+    "pt": "Palavra-passe utente"
+  },
+  "User-Agent": {
+    "es": "Agente utente",
+    "pt": "Agente utente"
+  },
+  "User-Agent Parser": {
+    "es": "Parser User-Agent",
+    "pt": "Parser User-Agent"
+  },
+  "Uses common readings; polyphonic characters use the default reading": {
+    "es": "Utilizza letture comuni; los caracteres polifonicos utilizzano la lettura predeterminada",
+    "pt": "Utilizza letture comuni; os caracteres polifonicos utilizzano a lettura predefinida"
+  },
+  "Valentine": {
+    "es": "Valentine",
+    "pt": "Valentine"
+  },
+  "Validate cron expressions, explain fields, and preview upcoming runs": {
+    "es": "Convalidare las espressioni cron, spiegare los campi y visualizzare en vista previa las esecuciones imminenti",
+    "pt": "Convalidare as espressioni cron, spiegare os campi e visualizzare em pré-visualização as esecuções imminenti"
+  },
+  "Validate only": {
+    "es": "Solo convalida",
+    "pt": "Solo convalida"
+  },
+  "Validation result": {
+    "es": "Resultado convalida",
+    "pt": "Resultado convalida"
+  },
+  "Value": {
+    "es": "Valore",
+    "pt": "Valore"
+  },
+  "Value is outside the 64-bit signed integer range (−2⁶³ ~ 2⁶³−1)": {
+    "es": "Il valor es al de fuera dell'intervallo de números interi con segno a 64 bit (-2,3 ~2,3-1)",
+    "pt": "Il valor é ao de fora dell'intervallo de números interi com segno a 64 bit (-2,3 ~2,3-1)"
+  },
+  "Values are out of a reasonable range; check units": {
+    "es": "I valores son fuera desde un intervallo ragionevole; controllare las unidad",
+    "pt": "I valores são fora de um intervallo ragionevole; controllare as unidade"
+  },
+  "Velvet purple": {
+    "es": "Porpora vellutato",
+    "pt": "Porpora vellutato"
+  },
+  "Verification failed": {
+    "es": "Verifica no correcta",
+    "pt": "Verifica não bem-sucedida"
+  },
+  "Verified": {
+    "es": "Verifica effettuata",
+    "pt": "Verifica effettuata"
+  },
+  "Verify code (optional)": {
+    "es": "Codice de verifica (facoltativo)",
+    "pt": "Codice de verifica (facoltativo)"
+  },
+  "View and edit PDF metadata": {
+    "es": "Visualizza y modifica PDF metadatos",
+    "pt": "Visualizza e modifica PDF metadados"
+  },
+  "Violet dusk": {
+    "es": "Crepuscolo viola",
+    "pt": "Crepuscolo viola"
+  },
+  "Visual grayscale via re-rasterizing pages; text will not stay selectable.": {
+    "es": "Escala de grigi visiva mediante la ri-rasterizzación de las páginas; el texto no rimarrà selezionabile.",
+    "pt": "Escala de grigi visiva através de a ri-rasterizzação das páginas; ou texto não rimarrà selezionabile."
+  },
+  "Visual signature (image overlay), not a digital certificate.": {
+    "es": "Firma visiva (imagen sovrapposta), no certificato digitale.",
+    "pt": "Assinatura visiva (imagem sovrapposta), não certificato digitale."
+  },
+  "Visually tweak styles and generate button CSS / HTML": {
+    "es": "Modificare visivamente los stili y generare el botón CSS/HTML",
+    "pt": "Modificare visivamente os stili e generare ou botão CSS/HTML"
+  },
+  "Vivid tri-color": {
+    "es": "Tricolore vivace",
+    "pt": "Tricolore vivace"
+  },
+  "Warm glow": {
+    "es": "Bagliore caldo",
+    "pt": "Bagliore caldo"
+  },
+  "Watermark text": {
+    "es": "Texto filigrana",
+    "pt": "Texto filigrana"
+  },
+  "Web Color Table": {
+    "es": "Tavola colores",
+    "pt": "Tavola cores"
+  },
+  "Wednesday": {
+    "es": "Miércoles",
+    "pt": "Quarta-feira"
+  },
+  "Week starts": {
+    "es": "Día de inizio de la settimana",
+    "pt": "Dia de inizio de settimana"
+  },
+  "Weekday": {
+    "es": "Día lavorativo",
+    "pt": "Dia lavorativo"
+  },
+  "Weekend": {
+    "es": "Fine settimana",
+    "pt": "Fine settimana"
+  },
+  "Weekly Mon 00:00": {
+    "es": "Lun settimanale 00:00",
+    "pt": "Lun settimanale 00:00"
+  },
+  "Weight (kg)": {
+    "es": "Peso (kg)",
+    "pt": "Peso (kg)"
+  },
+  "Weight (lb)": {
+    "es": "Peso (libbre)",
+    "pt": "Peso (libbre)"
+  },
+  "Weight Converter": {
+    "es": "Convertidor de peso",
+    "pt": "Conversor de peso"
+  },
+  "Wine purple": {
+    "es": "Viola vino",
+    "pt": "Viola vino"
+  },
+  "Word char": {
+    "es": "Word char",
+    "pt": "Word char"
+  },
+  "Working…": {
+    "es": "Al lavoro...",
+    "pt": "Al lavoro..."
+  },
+  "X-axis label": {
+    "es": "Etichetta Asse X",
+    "pt": "Etichetta Asse X"
+  },
+  "X.509 Certificate Decoder": {
+    "es": "Decodificatore certificato X.509",
+    "pt": "Decodificatore certificato X.509"
+  },
+  "XML Minify / Beautify": {
+    "es": "XML Minimizza / Abbellisci",
+    "pt": "XML Minimizza / Abbellisci"
+  },
+  "XML input": {
+    "es": "Ingresso 0",
+    "pt": "Ingresso 0"
+  },
+  "XML parse failed: please check the syntax": {
+    "es": "XML analisi no correcta: controllare la sintassi",
+    "pt": "XML analisi não bem-sucedida: controllare a sintassi"
+  },
+  "XML to JSON": {
+    "es": "desde 0 to 1",
+    "pt": "de 0 to 1"
+  },
+  "XSLT Transform": {
+    "es": "Archivo de trasformación XSLT",
+    "pt": "Ficheiro de trasformação XSLT"
+  },
+  "Y-axis label": {
+    "es": "Etichetta Asse Y",
+    "pt": "Etichetta Asse Y"
+  },
+  "Yard yd": {
+    "es": "Cortile iarda",
+    "pt": "Cortile iarda"
+  },
+  "Your type tendency": {
+    "es": "Tendenza del tuo tipo",
+    "pt": "Tendenza do tuo tipo"
+  },
+  "Zoom in": {
+    "es": "Ingrandisci",
+    "pt": "Ingrandisci"
+  },
+  "Zoom out": {
+    "es": "Riduci",
+    "pt": "Riduci"
+  },
+  "component (param value, encodes reserved chars)": {
+    "es": "componente (valor param, codifica caracteres riservati)",
+    "pt": "componente (valor param, codifica caracteres riservati)"
+  },
+  "encodeURIComponent / encodeURI modes with malformed percent-encoding detection": {
+    "es": "encodeURIComponent / encodeURI mode with malformed percent-encoding detection",
+    "pt": "encodeURIComponent / encodeURI mode with malformed percent-encoding detection"
+  },
+  "every day": {
+    "es": "cada día",
+    "pt": "cada dia"
+  },
+  "every day of the week": {
+    "es": "cada día de la settimana",
+    "pt": "cada dia de settimana"
+  },
+  "every hour": {
+    "es": "cada ahora",
+    "pt": "cada agora"
+  },
+  "every minute": {
+    "es": "cada minuto",
+    "pt": "cada minuto"
+  },
+  "every month": {
+    "es": "cada mese",
+    "pt": "cada mese"
+  },
+  "every second": {
+    "es": "cada attimo,",
+    "pt": "cada attimo,"
+  },
+  "every {{n}} {{unit}}": {
+    "es": "cada {{n}} {{unit}}",
+    "pt": "cada {{n}} {{unit}}"
+  },
+  "flowchart TD\n  A-->B": {
+    "es": "diagrama de flusso TD\n A-->B",
+    "pt": "diagrama de flusso TD\n A-->B"
+  },
+  "hour ": {
+    "es": "ahora",
+    "pt": "agora"
+  },
+  "lower case": {
+    "es": "lettera minuscola",
+    "pt": "lettera minuscola"
+  },
+  "minute ": {
+    "es": "minuto",
+    "pt": "minuto"
+  },
+  "month ": {
+    "es": "mese ",
+    "pt": "mese "
+  },
+  "second ": {
+    "es": "secondo",
+    "pt": "secondo"
+  },
+  "weekday ": {
+    "es": "día de la settimana",
+    "pt": "dia de settimana"
+  },
+  "✓ Valid JSON": {
+    "es": "✓ Válido JSON",
+    "pt": "✓ Válido JSON"
+  }
+}

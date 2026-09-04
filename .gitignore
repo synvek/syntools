@@ -35,6 +35,9 @@ test-results
 .env.*
 !.env.example
 
+# i18n generation scratch
+scripts/.en-locale.json
+scripts/locale-chunks/
 
 # AI Tools
 .cursor/

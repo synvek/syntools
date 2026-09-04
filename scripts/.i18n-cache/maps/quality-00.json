@@ -1,0 +1,602 @@
+{
+  " (truncated, showing first 1000)": {
+    "es": " (truncado; se muestran los primeros 1000)",
+    "pt": " (truncado; a mostrar os primeiros 1000)"
+  },
+  "# Title\nBody…": {
+    "es": "# Título\nCuerpo…",
+    "pt": "# Título\nCorpo…"
+  },
+  "# Topic\n## Branch\n- Point…": {
+    "es": "# Tema\n## Rama\n- Punto…",
+    "pt": "# Tópico\n## Ramo\n- Ponto…"
+  },
+  "#3b82f6 / rgb(59,130,246)…": {
+    "es": "#3b82f6 / rgb(59,130,246)…",
+    "pt": "#3b82f6 / rgb(59,130,246)…"
+  },
+  "(empty match)": {
+    "es": "(coincidencia vacía)",
+    "pt": "(correspondência vazia)"
+  },
+  "+{{added}} added / −{{removed}} removed / {{same}} unchanged": {
+    "es": "+{{added}} añadidos / −{{removed}} eliminados / {{same}} sin cambios",
+    "pt": "+{{added}} adicionados / −{{removed}} removidos / {{same}} inalterados"
+  },
+  "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----": {
+    "es": "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----",
+    "pt": "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----"
+  },
+  "0 or 1": {
+    "es": "0 o 1",
+    "pt": "0 ou 1"
+  },
+  "0 or more": {
+    "es": "0 o más",
+    "pt": "0 ou mais"
+  },
+  "1 or more": {
+    "es": "1 o más",
+    "pt": "1 ou mais"
+  },
+  "2 spaces": {
+    "es": "2 espacios",
+    "pt": "2 espaços"
+  },
+  "2×2 determinant": {
+    "es": "Determinante 2×2",
+    "pt": "Determinante 2×2"
+  },
+  "32 or 64 hex chars (AES-128/256)…": {
+    "es": "32 o 64 caracteres hex (AES-128/256)…",
+    "pt": "32 ou 64 caracteres hex (AES-128/256)…"
+  },
+  "4 spaces": {
+    "es": "4 espacios",
+    "pt": "4 espaços"
+  },
+  "A short 24-question MBTI-style quiz (for entertainment only)": {
+    "es": "Un breve cuestionario estilo MBTI de 24 preguntas (solo entretenimiento)",
+    "pt": "Um questionário curto estilo MBTI de 24 perguntas (apenas entretenimento)"
+  },
+  "AES Encrypt / Decrypt": {
+    "es": "Cifrar / descifrar AES",
+    "pt": "Encriptar / desencriptar AES"
+  },
+  "AES-GCM with PBKDF2 passphrase or raw key; output base64(salt|iv|ciphertext)": {
+    "es": "AES-GCM con frase de contraseña PBKDF2 o clave en bruto; salida base64(salt|iv|ciphertext)",
+    "pt": "AES-GCM com frase-passe PBKDF2 ou chave em bruto; saída base64(salt|iv|ciphertext)"
+  },
+  "AI Prompt Library": {
+    "es": "Biblioteca de prompts de IA",
+    "pt": "Biblioteca de prompts de IA"
+  },
+  "ASCII 0–127 reference with search by decimal, hex, or character": {
+    "es": "Referencia ASCII 0–127 con búsqueda por decimal, hex o carácter",
+    "pt": "Referência ASCII 0–127 com pesquisa por decimal, hex ou carácter"
+  },
+  "ASCII Table": {
+    "es": "Tabla ASCII",
+    "pt": "Tabela ASCII"
+  },
+  "Above photo": {
+    "es": "Sobre la foto",
+    "pt": "Acima da foto"
+  },
+  "Add & download": {
+    "es": "Añadir y descargar",
+    "pt": "Adicionar e transferir"
+  },
+  "Add Text to PDF": {
+    "es": "Añadir texto al PDF",
+    "pt": "Adicionar texto ao PDF"
+  },
+  "Add a text watermark with position, opacity, rotation, and tiling": {
+    "es": "Añade una marca de agua de texto con posición, opacidad, rotación y mosaico",
+    "pt": "Adicione uma marca de água de texto com posição, opacidade, rotação e mosaico"
+  },
+  "Add at least one image": {
+    "es": "Añade al menos una imagen",
+    "pt": "Adicione pelo menos uma imagem"
+  },
+  "Add border, rounded corners, and shadow, then export PNG": {
+    "es": "Añade borde, esquinas redondeadas y sombra, luego exporta PNG",
+    "pt": "Adicione margem, cantos arredondados e sombra, depois exporte PNG"
+  },
+  "Add header and footer text": {
+    "es": "Añadir texto de encabezado y pie",
+    "pt": "Adicionar texto de cabeçalho e rodapé"
+  },
+  "Add images one by one (up to {{max}})": {
+    "es": "Añade imágenes una a una (hasta {{max}})",
+    "pt": "Adicione imagens uma a uma (até {{max}})"
+  },
+  "Add page numbers to a PDF": {
+    "es": "Añadir números de página a un PDF",
+    "pt": "Adicionar números de página a um PDF"
+  },
+  "Add param": {
+    "es": "Añadir parámetro",
+    "pt": "Adicionar parâmetro"
+  },
+  "Add stop": {
+    "es": "Añadir parada",
+    "pt": "Adicionar paragem"
+  },
+  "Add text onto PDF pages": {
+    "es": "Añadir texto en las páginas del PDF",
+    "pt": "Adicionar texto nas páginas do PDF"
+  },
+  "Adjust brightness, contrast, saturation, and hue, then export PNG": {
+    "es": "Ajusta brillo, contraste, saturación y tono, luego exporta PNG",
+    "pt": "Ajuste brilho, contraste, saturação e matiz, depois exporte PNG"
+  },
+  "Algorithm": {
+    "es": "Algoritmo",
+    "pt": "Algoritmo"
+  },
+  "Align": {
+    "es": "Alinear",
+    "pt": "Alinhar"
+  },
+  "All pages": {
+    "es": "Todas las páginas",
+    "pt": "Todas as páginas"
+  },
+  "Allow annotating": {
+    "es": "Permitir anotar",
+    "pt": "Permitir anotar"
+  },
+  "Allow copying": {
+    "es": "Permitir copiar",
+    "pt": "Permitir copiar"
+  },
+  "Allow modifying": {
+    "es": "Permitir modificar",
+    "pt": "Permitir modificar"
+  },
+  "Allow printing": {
+    "es": "Permitir imprimir",
+    "pt": "Permitir imprimir"
+  },
+  "Alphanumeric": {
+    "es": "Alfanumérico",
+    "pt": "Alfanumérico"
+  },
+  "Alternation": {
+    "es": "Alternancia",
+    "pt": "Alternância"
+  },
+  "Angle": {
+    "es": "Ángulo",
+    "pt": "Ângulo"
+  },
+  "Annotate PDF": {
+    "es": "Anotar PDF",
+    "pt": "Anotar PDF"
+  },
+  "Answered {{done}} / {{total}}": {
+    "es": "Respondidas {{done}} / {{total}}",
+    "pt": "Respondidas {{done}} / {{total}}"
+  },
+  "Any character": {
+    "es": "Cualquier carácter",
+    "pt": "Qualquer carácter"
+  },
+  "Apply & download": {
+    "es": "Aplicar y descargar",
+    "pt": "Aplicar e transferir"
+  },
+  "Arrows": {
+    "es": "Flechas",
+    "pt": "Setas"
+  },
+  "Aspect": {
+    "es": "Aspecto",
+    "pt": "Aspeto"
+  },
+  "Author": {
+    "es": "Autor",
+    "pt": "Autor"
+  },
+  "Auto detect": {
+    "es": "Detección automática",
+    "pt": "Deteção automática"
+  },
+  "Avoid": {
+    "es": "Evitar",
+    "pt": "Evitar"
+  },
+  "Azure tri-color": {
+    "es": "Tricolor azur",
+    "pt": "Tricolor azur"
+  },
+  "BMI Calculator": {
+    "es": "Calculadora de IMC",
+    "pt": "Calculadora de IMC"
+  },
+  "Backdrop": {
+    "es": "Fondo",
+    "pt": "Fundo"
+  },
+  "Backdrop color": {
+    "es": "Color de fondo",
+    "pt": "Cor de fundo"
+  },
+  "Background": {
+    "es": "Fondo",
+    "pt": "Fundo"
+  },
+  "Base32 secret": {
+    "es": "Secreto Base32",
+    "pt": "Segredo Base32"
+  },
+  "Base64 Encode / Decode": {
+    "es": "Codificar / decodificar Base64",
+    "pt": "Codificar / descodificar Base64"
+  },
+  "Base64 input": {
+    "es": "Entrada Base64",
+    "pt": "Entrada Base64"
+  },
+  "Base64 result": {
+    "es": "Resultado Base64",
+    "pt": "Resultado Base64"
+  },
+  "Base64 → Image": {
+    "es": "Base64 → imagen",
+    "pt": "Base64 → imagem"
+  },
+  "Bayes' theorem": {
+    "es": "Teorema de Bayes",
+    "pt": "Teorema de Bayes"
+  },
+  "Beautify": {
+    "es": "Embellecer",
+    "pt": "Embelezar"
+  },
+  "Beautify SQL across dialects with configurable indent and keyword case": {
+    "es": "Embellece SQL en varios dialectos con sangría y mayúsculas de palabras clave configurables",
+    "pt": "Embeleza SQL em vários dialetos com indentação e maiúsculas de palavras-chave configuráveis"
+  },
+  "Beautify and minify XML with 2/4-space indent; CDATA preserved": {
+    "es": "Embellece y minifica XML con sangría de 2/4 espacios; se conserva CDATA",
+    "pt": "Embeleza e minifica XML com indentação de 2/4 espaços; CDATA preservado"
+  },
+  "Below photo": {
+    "es": "Debajo de la foto",
+    "pt": "Abaixo da foto"
+  },
+  "Binomial theorem": {
+    "es": "Teorema del binomio",
+    "pt": "Teorema do binómio"
+  },
+  "Bit pattern": {
+    "es": "Patrón de bits",
+    "pt": "Padrão de bits"
+  },
+  "Bitwise operations": {
+    "es": "Operaciones bit a bit",
+    "pt": "Operações bit a bit"
+  },
+  "Block radius": {
+    "es": "Radio del bloque",
+    "pt": "Raio do bloco"
+  },
+  "Bold (**)": {
+    "es": "Negrita (**)",
+    "pt": "Negrito (**)"
+  },
+  "Border": {
+    "es": "Borde",
+    "pt": "Margem"
+  },
+  "Border color": {
+    "es": "Color del borde",
+    "pt": "Cor da margem"
+  },
+  "Border width": {
+    "es": "Ancho del borde",
+    "pt": "Largura da margem"
+  },
+  "Both texts are identical": {
+    "es": "Ambos textos son idénticos",
+    "pt": "Ambos os textos são idênticos"
+  },
+  "Bottom": {
+    "es": "Abajo",
+    "pt": "Inferior"
+  },
+  "Bottom center": {
+    "es": "Abajo centro",
+    "pt": "Inferior centro"
+  },
+  "Bottom left": {
+    "es": "Abajo izquierda",
+    "pt": "Inferior esquerda"
+  },
+  "Bottom right": {
+    "es": "Abajo derecha",
+    "pt": "Inferior direita"
+  },
+  "Box shadow": {
+    "es": "Sombra de caja",
+    "pt": "Sombra da caixa"
+  },
+  "Braces": {
+    "es": "Llaves",
+    "pt": "Chavetas"
+  },
+  "Brightness": {
+    "es": "Brillo",
+    "pt": "Brilho"
+  },
+  "Broadcast": {
+    "es": "Broadcast",
+    "pt": "Broadcast"
+  },
+  "Browser": {
+    "es": "Navegador",
+    "pt": "Browser"
+  },
+  "Browser sketch pad with brush, eraser, and PNG export": {
+    "es": "Bloc de dibujo del navegador con pincel, borrador y exportación PNG",
+    "pt": "Bloco de desenho no browser com pincel, borracha e exportação PNG"
+  },
+  "Build ICO": {
+    "es": "Crear ICO",
+    "pt": "Criar ICO"
+  },
+  "Build a standard 5-field Cron expression from minute/hour/day/month/weekday options": {
+    "es": "Construye una expresión Cron estándar de 5 campos a partir de minuto/hora/día/mes/día de la semana",
+    "pt": "Constrói uma expressão Cron padrão de 5 campos a partir de minuto/hora/dia/mês/dia da semana"
+  },
+  "Build bar/line/area/pie/doughnut/scatter charts from CSV with legends and palettes": {
+    "es": "Crea gráficos de barras/líneas/áreas/pastel/anillo/dispersión desde CSV con leyendas y paletas",
+    "pt": "Cria gráficos de barras/linhas/áreas/circular/anel/dispersão a partir de CSV com legendas e paletas"
+  },
+  "Bullet list": {
+    "es": "Lista con viñetas",
+    "pt": "Lista com marcas"
+  },
+  "Button": {
+    "es": "Botón",
+    "pt": "Botão"
+  },
+  "CIDR Calculator": {
+    "es": "Calculadora CIDR",
+    "pt": "Calculadora CIDR"
+  },
+  "CJK characters": {
+    "es": "Caracteres CJK",
+    "pt": "Caracteres CJK"
+  },
+  "CONSTANT_CASE": {
+    "es": "CONSTANT_CASE",
+    "pt": "CONSTANT_CASE"
+  },
+  "CSS Button Generator": {
+    "es": "Generador de botones CSS",
+    "pt": "Gerador de botões CSS"
+  },
+  "CSS Gradient Generator": {
+    "es": "Generador de degradados CSS",
+    "pt": "Gerador de gradientes CSS"
+  },
+  "CSS Minify / Beautify": {
+    "es": "Minificar / embellecer CSS",
+    "pt": "Minificar / embelezar CSS"
+  },
+  "CSS background": {
+    "es": "Fondo CSS",
+    "pt": "Fundo CSS"
+  },
+  "CSS color": {
+    "es": "Color CSS",
+    "pt": "Cor CSS"
+  },
+  "CSS input": {
+    "es": "Entrada CSS",
+    "pt": "Entrada CSS"
+  },
+  "CSS named colors (including Grey aliases and RebeccaPurple) for color / background use.": {
+    "es": "Colores con nombre CSS (incl. alias Grey y RebeccaPurple) para color / fondo.",
+    "pt": "Cores com nome CSS (incl. aliases Grey e RebeccaPurple) para cor / fundo."
+  },
+  "CSS named colors with group filters and copy name / HEX / RGB": {
+    "es": "Colores con nombre CSS con filtros por grupo y copia de nombre / HEX / RGB",
+    "pt": "Cores com nome CSS com filtros por grupo e cópia de nome / HEX / RGB"
+  },
+  "CSS3 Code Generator": {
+    "es": "Generador de código CSS3",
+    "pt": "Gerador de código CSS3"
+  },
+  "Calculator": {
+    "es": "Calculadora",
+    "pt": "Calculadora"
+  },
+  "Calculus": {
+    "es": "Cálculo",
+    "pt": "Cálculo"
+  },
+  "Calendar": {
+    "es": "Calendario",
+    "pt": "Calendário"
+  },
+  "Camera make": {
+    "es": "Marca de cámara",
+    "pt": "Marca da câmara"
+  },
+  "Cannot convert to the target format (CSV requires an array of objects)": {
+    "es": "No se puede convertir al formato de destino (CSV requiere un array de objetos)",
+    "pt": "Não é possível converter para o formato de destino (CSV requer um array de objetos)"
+  },
+  "Cannot convert to the target format (e.g. TOML does not support top-level arrays/scalars)": {
+    "es": "No se puede convertir al formato de destino (p. ej. TOML no admite arrays/escalares de nivel superior)",
+    "pt": "Não é possível converter para o formato de destino (p. ex. TOML não suporte arrays/escalares de nível superior)"
+  },
+  "Cannot parse date/time (e.g. 2026-09-01 12:00:00 or ISO 8601)": {
+    "es": "No se puede analizar fecha/hora (p. ej. 2026-09-01 12:00:00 o ISO 8601)",
+    "pt": "Não é possível analisar data/hora (p. ex. 2026-09-01 12:00:00 ou ISO 8601)"
+  },
+  "Cannot parse this SQL: please check the syntax": {
+    "es": "No se puede analizar este SQL: comprueba la sintaxis",
+    "pt": "Não é possível analisar este SQL: verifique a sintaxe"
+  },
+  "Cannot parse: check field count (5 or 6) and ranges (min 0-59 / hour 0-23 / day 1-31 / month 1-12 / weekday 0-7)": {
+    "es": "No se puede analizar: comprueba el nº de campos (5 o 6) y los rangos (min 0-59 / hora 0-23 / día 1-31 / mes 1-12 / día sem. 0-7)",
+    "pt": "Não é possível analisar: verifique o nº de campos (5 ou 6) e os intervalos (min 0-59 / hora 0-23 / dia 1-31 / mês 1-12 / dia sem. 0-7)"
+  },
+  "Cannot parse: check the Unicode / UTF-8 representation": {
+    "es": "No se puede analizar: comprueba la representación Unicode / UTF-8",
+    "pt": "Não é possível analisar: verifique a representação Unicode / UTF-8"
+  },
+  "Cannot parse: check the radix and number format": {
+    "es": "No se puede analizar: comprueba la base y el formato del número",
+    "pt": "Não é possível analisar: verifique a base e o formato do número"
+  },
+  "Cannot parse: use HEX, RGB, or HSL format": {
+    "es": "No se puede analizar: usa formato HEX, RGB o HSL",
+    "pt": "Não é possível analisar: use o formato HEX, RGB ou HSL"
+  },
+  "Caption position": {
+    "es": "Posición del pie de foto",
+    "pt": "Posição da legenda"
+  },
+  "Capturing group": {
+    "es": "Grupo de captura",
+    "pt": "Grupo de captura"
+  },
+  "Card title…": {
+    "es": "Título de tarjeta…",
+    "pt": "Título do cartão…"
+  },
+  "Career": {
+    "es": "Carrera",
+    "pt": "Carreira"
+  },
+  "Case Converter": {
+    "es": "Conversor de mayúsculas/minúsculas",
+    "pt": "Conversor de maiúsculas/minúsculas"
+  },
+  "Categories follow WHO adult cutoffs for reference only — not medical advice.": {
+    "es": "Las categorías siguen los umbrales WHO para adultos solo como referencia — no es consejo médico.",
+    "pt": "As categorias seguem os limiares WHO para adultos apenas como referência — não é aconselhamento médico."
+  },
+  "Category": {
+    "es": "Categoría",
+    "pt": "Categoria"
+  },
+  "Cauchy–Schwarz": {
+    "es": "Cauchy–Schwarz",
+    "pt": "Cauchy–Schwarz"
+  },
+  "Center": {
+    "es": "Centro",
+    "pt": "Centro"
+  },
+  "Centimeter cm": {
+    "es": "Centímetro cm",
+    "pt": "Centímetro cm"
+  },
+  "Character class": {
+    "es": "Clase de caracteres",
+    "pt": "Classe de caracteres"
+  },
+  "Character-level mapping; proper nouns may differ from OpenCC phrase dictionaries": {
+    "es": "Mapeo a nivel de carácter; los nombres propios pueden diferir de los diccionarios de frases OpenCC",
+    "pt": "Mapeamento ao nível do carácter; nomes próprios podem diferir dos dicionários de frases OpenCC"
+  },
+  "Characters (no spaces)": {
+    "es": "Caracteres (sin espacios)",
+    "pt": "Caracteres (sem espaços)"
+  },
+  "Characters (with spaces)": {
+    "es": "Caracteres (con espacios)",
+    "pt": "Caracteres (com espaços)"
+  },
+  "Charset": {
+    "es": "Juego de caracteres",
+    "pt": "Conjunto de caracteres"
+  },
+  "Chart Generator": {
+    "es": "Generador de gráficos",
+    "pt": "Gerador de gráficos"
+  },
+  "Cheat sheet (click to insert)": {
+    "es": "Chuleta (clic para insertar)",
+    "pt": "Folha de consulta (clique para inserir)"
+  },
+  "Chinese": {
+    "es": "Chino",
+    "pt": "Chinês"
+  },
+  "Chinese to Pinyin": {
+    "es": "Chino a pinyin",
+    "pt": "Chinês para pinyin"
+  },
+  "Choose a preset…": {
+    "es": "Elige un preajuste…",
+    "pt": "Escolha uma predefinição…"
+  },
+  "Choose an angle for all or selected pages.": {
+    "es": "Elige un ángulo para todas las páginas o las seleccionadas.",
+    "pt": "Escolha um ângulo para todas as páginas ou as selecionadas."
+  },
+  "Choose to fill in…": {
+    "es": "Elige qué rellenar…",
+    "pt": "Escolha o que preencher…"
+  },
+  "Ciphertext (base64)": {
+    "es": "Texto cifrado (base64)",
+    "pt": "Texto cifrado (base64)"
+  },
+  "Circle": {
+    "es": "Círculo",
+    "pt": "Círculo"
+  },
+  "Classic formulas": {
+    "es": "Fórmulas clásicas",
+    "pt": "Fórmulas clássicas"
+  },
+  "Clear page": {
+    "es": "Borrar página",
+    "pt": "Limpar página"
+  },
+  "Click \"Generate\" to create a password": {
+    "es": "Haz clic en «Generar» para crear una contraseña",
+    "pt": "Clique em «Gerar» para criar uma palavra-passe"
+  },
+  "Click a pixel on the image to sample": {
+    "es": "Haz clic en un píxel de la imagen para muestrear",
+    "pt": "Clique num píxel da imagem para amostrar"
+  },
+  "Click a symbol to insert at the cursor; classic formulas replace the editor. Rendered by KaTeX; exotic macros may not work.": {
+    "es": "Haz clic en un símbolo para insertarlo en el cursor; las fórmulas clásicas reemplazan el editor. Renderizado con KaTeX; macros exóticas pueden fallar.",
+    "pt": "Clique num símbolo para inserir no cursor; as fórmulas clássicas substituem o editor. Renderizado com KaTeX; macros exóticas podem falhar."
+  },
+  "Client-side image compression and format conversion (PNG / JPEG / WebP) with resize and quality": {
+    "es": "Compresión y conversión de imagen en el cliente (PNG / JPEG / WebP) con redimensionado y calidad",
+    "pt": "Compressão e conversão de imagem no cliente (PNG / JPEG / WebP) com redimensionamento e qualidade"
+  },
+  "Code Highlighter": {
+    "es": "Resaltador de código",
+    "pt": "Realçador de código"
+  },
+  "Code block (```)": {
+    "es": "Bloque de código (```)",
+    "pt": "Bloco de código (```)"
+  },
+  "Code point U+": {
+    "es": "Punto de código U+",
+    "pt": "Ponto de código U+"
+  },
+  "Code to Image": {
+    "es": "Código a imagen",
+    "pt": "Código para imagem"
+  },
+  "Coding": {
+    "es": "Programación",
+    "pt": "Programação"
+  }
+}

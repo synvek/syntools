@@ -1,0 +1,100 @@
+Tool runtime error
+Top center
+Top left
+Top right
+Total
+Total addresses
+Traditional Chinese
+Traditional Chinese Converter
+Traditional → Simplified
+Transform
+Transform XML to HTML with XSLT in the browser
+Transform failed
+Transition
+Translate
+Translate X
+Translate Y
+Transparent background
+Trigonometry
+Trim empty lines
+Tropical
+Tuesday
+Turn Markdown into a mind map with themes, zoom, and PNG/SVG export
+Turquoise
+Twilight
+Twilight purple
+UPPER CASE
+UPPERCASE
+URL Encode / Decode
+URL Query Parser
+URL Safe (- _ without padding)
+UTF-16 length
+UTF-8 bytes
+UUID Generator
+Underweight
+Unicode Codec
+Unique
+Unit system
+Universe
+Unix ⇄ human-readable time with auto second/ms detection and live clock
+Unlock
+Unrecognized color format
+Unrecognized entities (kept as-is)
+Unsupported font
+Upload an image and click a pixel to sample HEX / RGB
+Upload an image to preview the card
+Upload an image, then click to sample a color
+Upload file
+Upload signature
+Uppercase
+Uppercase (A-Z)
+Use arrows to reorder pages, then export.
+Use current browser
+User password
+User-Agent
+User-Agent Parser
+Uses common readings; polyphonic characters use the default reading
+Valentine
+Validate cron expressions, explain fields, and preview upcoming runs
+Validate only
+Validation result
+Value
+Value is outside the 64-bit signed integer range (−2⁶³ ~ 2⁶³−1)
+Values are out of a reasonable range; check units
+Velvet purple
+Verification failed
+Verified
+Verify code (optional)
+Version
+Vertical
+Vibrant
+View and edit PDF metadata
+Vignette
+Violet dusk
+Visual grayscale via re-rasterizing pages; text will not stay selectable.
+Visual signature (image overlay), not a digital certificate.
+Visually tweak styles and generate button CSS / HTML
+Vivid tri-color
+Warm glow
+Watermark text
+Web Color Table
+Wednesday
+Week starts
+Weekday
+Weekend
+Weekly Mon 00:00
+Weight
+Weight (kg)
+Weight (lb)
+Weight Converter
+White
+Whitespace
+Width
+Wildcard
+Wine purple
+Winter
+Word char
+Words
+Workday
+Working…
+Writing

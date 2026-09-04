@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
+import { LANGS, LANG_META, type Lang } from '@/core/i18n';
 import { useSettingsStore } from '@/stores/settings';
 
 interface HeaderProps {
@@ -55,14 +56,24 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
         >
           <Icon name="search" />
         </button>
-        <button
-          type="button"
-          onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
+        <label className="sr-only" htmlFor="header-lang">
+          {t('header.langAria')}
+        </label>
+        <select
+          id="header-lang"
+          value={lang}
           aria-label={t('header.langAria')}
-          className="rounded-md px-2 py-1.5 text-xs font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+          onChange={(e) => {
+            void setLang(e.target.value as Lang);
+          }}
+          className="max-w-[7.5rem] rounded-md border border-transparent bg-transparent py-1.5 pl-1.5 pr-1 text-xs font-medium hover:bg-gray-100 focus:border-gray-300 focus:outline-none dark:hover:bg-gray-800 dark:focus:border-gray-600"
         >
-          {lang === 'zh' ? 'EN' : '中'}
-        </button>
+          {LANGS.map((code) => (
+            <option key={code} value={code}>
+              {LANG_META[code].nativeLabel}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={toggleTheme}

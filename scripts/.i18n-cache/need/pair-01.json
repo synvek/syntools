@@ -1,0 +1,802 @@
+[
+  {
+    "en": "Count must be an integer ≥ 1",
+    "it": "Il conteggio deve essere un numero intero ≥ 1"
+  },
+  {
+    "en": "Countdown Timer",
+    "it": "Tempo Count Down"
+  },
+  {
+    "en": "Cover",
+    "it": "Coperchio"
+  },
+  {
+    "en": "Create PDF",
+    "it": "Crea {0}"
+  },
+  {
+    "en": "Creator",
+    "it": "Creatore"
+  },
+  {
+    "en": "Cron Expression Parser",
+    "it": "Cron Expression Parser"
+  },
+  {
+    "en": "Crontab Generator",
+    "it": "Generatore Crontab"
+  },
+  {
+    "en": "Crop & download",
+    "it": "Ritaglia e scarica"
+  },
+  {
+    "en": "Crop PDF",
+    "it": "Conferma"
+  },
+  {
+    "en": "Crop failed; please retry",
+    "it": "Ritaglio non riuscito; riprova"
+  },
+  {
+    "en": "Crop images freeform or with fixed aspect ratios to PNG",
+    "it": "Ritaglia le immagini a mano libera o con proporzioni fisse a PNG"
+  },
+  {
+    "en": "Crop page margins via cropBox",
+    "it": "Ritaglia i margini della pagina tramite cropBox"
+  },
+  {
+    "en": "Crypto & Hash",
+    "it": "Crittografia e hash"
+  },
+  {
+    "en": "Curated prompts by category with search and one-click copy",
+    "it": "Prompt curati per categoria con ricerca e copia con un clic"
+  },
+  {
+    "en": "Current code",
+    "it": "Codice in vigore"
+  },
+  {
+    "en": "Current time",
+    "it": "Ora corrente"
+  },
+  {
+    "en": "Custom",
+    "it": "Personalizzata"
+  },
+  {
+    "en": "Custom chars",
+    "it": "Caratteri personalizzati"
+  },
+  {
+    "en": "DER length",
+    "it": "DER LENGTH"
+  },
+  {
+    "en": "Daily at 00:00",
+    "it": "Tutti i giorni alle 00:00"
+  },
+  {
+    "en": "Dash -",
+    "it": "Dash"
+  },
+  {
+    "en": "Data (CSV)",
+    "it": "DATI 0"
+  },
+  {
+    "en": "Date & Time",
+    "it": "Data e ora"
+  },
+  {
+    "en": "Date (yyyy-mm-dd)",
+    "it": "Data (AAAA-MM-GG)"
+  },
+  {
+    "en": "Date/time input",
+    "it": "Inserimento data/ora"
+  },
+  {
+    "en": "Day of month",
+    "it": "Giorno del mese"
+  },
+  {
+    "en": "Day of week",
+    "it": "Giorno della settimana"
+  },
+  {
+    "en": "Day pillar {{day}}",
+    "it": "Giorno pilastro {{day}}"
+  },
+  {
+    "en": "Day type",
+    "it": "Tipo di giorno"
+  },
+  {
+    "en": "Decimal (&#38;)",
+    "it": "Decimale (&)"
+  },
+  {
+    "en": "Decimal / hex / char / name…",
+    "it": "Decimale / esadecimale / carattere / nome..."
+  },
+  {
+    "en": "Decimals",
+    "it": "N° decimali"
+  },
+  {
+    "en": "Decimals must be an integer from 0 to 10",
+    "it": "I decimali devono essere un numero intero compreso tra 0 e 10"
+  },
+  {
+    "en": "Decode",
+    "it": "Decodifica"
+  },
+  {
+    "en": "Decode (Base64 → text)",
+    "it": "Decodifica (Base64 → testo)"
+  },
+  {
+    "en": "Decode QR code",
+    "it": "Decodifica ⟧ codice ⟦0"
+  },
+  {
+    "en": "Decode accepts mixed notations; encode uses the selected format",
+    "it": "Decode accetta notazioni miste; Encode utilizza il formato selezionato"
+  },
+  {
+    "en": "Decode failed: malformed percent-encoding",
+    "it": "Decodifica non riuscita: codifica percentuale non corretta"
+  },
+  {
+    "en": "Decode failed: not valid Base64 input",
+    "it": "Decodifica non riuscita:⟧ input ⟦0 non valido"
+  },
+  {
+    "en": "Decoded result",
+    "it": "Risultato decodificato"
+  },
+  {
+    "en": "Decompress (base64 → text)",
+    "it": "Decomprimi (→testo base64)"
+  },
+  {
+    "en": "Decompress failed: not valid gzip data",
+    "it": "Decompressione non riuscita: dati gzip non validi"
+  },
+  {
+    "en": "Decrypt",
+    "it": "Decifra"
+  },
+  {
+    "en": "Decrypt failed: wrong key or corrupted data",
+    "it": "Decrittografia non riuscita: chiave errata o dati danneggiati"
+  },
+  {
+    "en": "Default",
+    "it": "Valore predefinito"
+  },
+  {
+    "en": "Defaults to dimensions",
+    "it": "Impostazioni predefinite per le dimensioni"
+  },
+  {
+    "en": "Defaults to user password if empty",
+    "it": "L'impostazione predefinita è la password utente se vuota"
+  },
+  {
+    "en": "Delay (s)",
+    "it": "Ritardo/i"
+  },
+  {
+    "en": "Delete & download",
+    "it": "Elimina scaricamento"
+  },
+  {
+    "en": "Delete PDF Pages",
+    "it": "Elimina {0} pagine"
+  },
+  {
+    "en": "Derivative definition",
+    "it": "Definizione dei derivati"
+  },
+  {
+    "en": "Developer Online Toolbox",
+    "it": "Toolbox online per sviluppatori"
+  },
+  {
+    "en": "Device",
+    "it": "Dispositivo"
+  },
+  {
+    "en": "Dialect",
+    "it": "dialettale"
+  },
+  {
+    "en": "Digit",
+    "it": "Cifra"
+  },
+  {
+    "en": "Digits",
+    "it": "Ignora"
+  },
+  {
+    "en": "Digits (0-9)",
+    "it": "Cifre (0-9)"
+  },
+  {
+    "en": "Direction",
+    "it": "Direzione"
+  },
+  {
+    "en": "Display mode",
+    "it": "Modalità di visualizzazione"
+  },
+  {
+    "en": "Division by zero",
+    "it": "Divisione per zero"
+  },
+  {
+    "en": "Document has no pages",
+    "it": "Il documento non ha pagine"
+  },
+  {
+    "en": "Doodle Board",
+    "it": "Doodle Board"
+  },
+  {
+    "en": "Doughnut",
+    "it": "Ciambella"
+  },
+  {
+    "en": "Download",
+    "it": "Scarica"
+  },
+  {
+    "en": "Download ICO",
+    "it": "Scarica ICO"
+  },
+  {
+    "en": "Download PNG",
+    "it": "Download PNG"
+  },
+  {
+    "en": "Download SVG",
+    "it": "Download SVG"
+  },
+  {
+    "en": "Download all frames",
+    "it": "Scarica tutti i frame"
+  },
+  {
+    "en": "Download as ZIP",
+    "it": "Scarica come ZIP"
+  },
+  {
+    "en": "Download merged PNG",
+    "it": "Download unito PNG"
+  },
+  {
+    "en": "Download stripped file",
+    "it": "Scarica il file rimosso"
+  },
+  {
+    "en": "Drag & drop a file here, or click to choose",
+    "it": "Rilascia qui I file o fa clic per scegliere"
+  },
+  {
+    "en": "Drag & drop a file here, or click to choose (MD5 streams; large files stay memory-safe)",
+    "it": "Trascina e rilascia un file qui o fai clic per scegliere (MD5 flussi; i file di grandi dimensioni rimangono sicuri per la memoria)"
+  },
+  {
+    "en": "Drag & drop an image here, or click to choose (PNG / JPEG / WebP / GIF, etc.)",
+    "it": "Trascina e rilascia un'immagine qui o fai clic per scegliere (PNG/JPEG/WebP/GIF, ecc.)"
+  },
+  {
+    "en": "Drag on the canvas to draw; mouse and touch supported",
+    "it": "Trascina sulla tela per disegnare; mouse e tocco supportati"
+  },
+  {
+    "en": "Drag to select in free mode, or edit values below",
+    "it": "Trascina per selezionare in modalità libera o modifica i valori qui sotto"
+  },
+  {
+    "en": "Draw at least one annotation first",
+    "it": "Disegna prima almeno un'annotazione"
+  },
+  {
+    "en": "Draw highlights, freehand, shapes, and text on PDF pages",
+    "it": "Disegna evidenziazioni, a mano libera, forme e testo su PDF pagine"
+  },
+  {
+    "en": "Draw or upload a signature image (visual, not certificate)",
+    "it": "Disegna o carica un'immagine della firma (visiva, non certificato)"
+  },
+  {
+    "en": "Draw signature",
+    "it": "Disegna la firma"
+  },
+  {
+    "en": "Drop a JPEG image",
+    "it": "Rilascia un'⟧immagine ⟦0"
+  },
+  {
+    "en": "Drop a PDF",
+    "it": "Lascia uno PDF"
+  },
+  {
+    "en": "Drop images",
+    "it": "Trascina qui le immagini"
+  },
+  {
+    "en": "Drop multiple PDFs",
+    "it": "Rilascia più PDF"
+  },
+  {
+    "en": "Drop or choose a .ico file",
+    "it": "Trascina o scegli un file .ico"
+  },
+  {
+    "en": "Drop or choose a .svg file",
+    "it": "Trascina o scegli un file .svg"
+  },
+  {
+    "en": "Drop or choose a GIF file",
+    "it": "Rilascia o scegli un⟧ file ⟦0"
+  },
+  {
+    "en": "Drop or choose a PNG / JPG / WebP image",
+    "it": "Rilascia o scegli un'⟧immagine PNG ⟧/⟦1/⟦2"
+  },
+  {
+    "en": "Drop or choose an image",
+    "it": "Rilascia o scegli un'immagine"
+  },
+  {
+    "en": "Drop or choose an image (PNG / JPEG / WebP / GIF, etc.)",
+    "it": "Rilasciare o scegliere un'immagine (PNG/JPEG/WebP/GIF, ecc.)"
+  },
+  {
+    "en": "Drop or choose an image containing a QR code (PNG / JPG, etc.)",
+    "it": "Rilascia o scegli un'immagine contenente un⟧ codice ⟦0 (PNG/JPG, ecc.)"
+  },
+  {
+    "en": "Drop or choose an image for the card",
+    "it": "Rilascia o scegli un'immagine per la carta"
+  },
+  {
+    "en": "Drop or choose an image to adjust",
+    "it": "Rilascia o scegli un'immagine da regolare"
+  },
+  {
+    "en": "Drop or choose an image to crop",
+    "it": "Rilascia o scegli un'immagine da ritagliare"
+  },
+  {
+    "en": "Drop or choose an image to watermark",
+    "it": "Rilascia o scegli un'immagine per la filigrana"
+  },
+  {
+    "en": "Duration (s)",
+    "it": "Durata (s)"
+  },
+  {
+    "en": "Duration must be greater than 0",
+    "it": "La durata deve essere maggiore di 0"
+  },
+  {
+    "en": "Edit linear / radial gradients with categorized presets and copy CSS",
+    "it": "Modifica gradienti lineari / radiali con preimpostazioni categorizzate e copia CSS"
+  },
+  {
+    "en": "Edit title, author, and other metadata, then download.",
+    "it": "Modifica titolo, autore e altri metadati, quindi scarica."
+  },
+  {
+    "en": "Ellipse",
+    "it": "Ellisse"
+  },
+  {
+    "en": "Email",
+    "it": "E-mail"
+  },
+  {
+    "en": "Enable tones",
+    "it": "Abilita toni"
+  },
+  {
+    "en": "Encode",
+    "it": "Codifica"
+  },
+  {
+    "en": "Encode (text → Base64)",
+    "it": "Encode (testo → Base64)"
+  },
+  {
+    "en": "Encode failed: input contains unpaired surrogate characters",
+    "it": "Codifica non riuscita: l'input contiene caratteri surrogati non accoppiati"
+  },
+  {
+    "en": "Encode/decode HTML special characters: named / decimal / hex / \\u escapes",
+    "it": "Codifica/decodifica ⟦0 caratteri⟧ speciali: nome / decimale / esadecimale / \\u escape"
+  },
+  {
+    "en": "Encoded text",
+    "it": "Testo codificato"
+  },
+  {
+    "en": "Encoding",
+    "it": "Codifica"
+  },
+  {
+    "en": "Encrypt",
+    "it": "Criptare"
+  },
+  {
+    "en": "Encrypt & download",
+    "it": "Crittografa e scarica"
+  },
+  {
+    "en": "Encrypt PDF",
+    "it": "Criptare"
+  },
+  {
+    "en": "Encrypt output: base64(salt|iv|ciphertext+tag); passphrase uses PBKDF2-SHA256",
+    "it": "Crittografare l'output: base64(salt|iv|ciphertext+tag); la passphrase utilizza PBKDF2-SHA256"
+  },
+  {
+    "en": "Encrypted",
+    "it": "Crittografato"
+  },
+  {
+    "en": "Encryption failed",
+    "it": "Cifratura non riuscita"
+  },
+  {
+    "en": "End of line",
+    "it": "Fine della riga"
+  },
+  {
+    "en": "Engine",
+    "it": "Motore"
+  },
+  {
+    "en": "Enter 6/8-digit code…",
+    "it": "Inserisci il codice a 6 cifre"
+  },
+  {
+    "en": "Enter Base64 or choose an image",
+    "it": "Inserisci Base64 o scegli un'immagine"
+  },
+  {
+    "en": "Enter Chinese, e.g. 你好世界…",
+    "it": "Inserisci il cinese, ad esempio你好世界..."
+  },
+  {
+    "en": "Enter Markdown headings or lists to generate a map",
+    "it": "Inserisci intestazioni o elenchi Markdown per generare una mappa"
+  },
+  {
+    "en": "Enter Markdown, e.g. # Heading…",
+    "it": "Inserisci Markdown, ad es. # Heading..."
+  },
+  {
+    "en": "Enter Mermaid syntax to render",
+    "it": "Inserisci la sintassi della sirena per eseguire il rendering"
+  },
+  {
+    "en": "Enter Simplified Chinese…",
+    "it": "Inserisci il cinese semplificato..."
+  },
+  {
+    "en": "Enter Traditional Chinese…",
+    "it": "Inserisci il cinese tradizionale..."
+  },
+  {
+    "en": "Enter \\u4e2d, U+4E2D, &#x4E2D;, or E4 B8 AD…",
+    "it": "Immettere \\u4e2d&#x4E2D;, U +4E2D o E4 B8 AD..."
+  },
+  {
+    "en": "Enter a formula to preview",
+    "it": "Inserisci una formula per visualizzare l'anteprima"
+  },
+  {
+    "en": "Enter a title or body to preview",
+    "it": "Inserisci un titolo o un corpo per visualizzare l'anteprima"
+  },
+  {
+    "en": "Enter a valid height and weight",
+    "it": "Inserisci un'altezza e un peso validi"
+  },
+  {
+    "en": "Enter a valid hours / minutes / seconds",
+    "it": "Inserisci ore / minuti / secondi validi"
+  },
+  {
+    "en": "Enter allowed characters…",
+    "it": "Inserisci i caratteri consentiti..."
+  },
+  {
+    "en": "Enter annotation text",
+    "it": "Inserisci il testo dell'annotazione"
+  },
+  {
+    "en": "Enter content to encode…",
+    "it": "Inserisci il contenuto da codificare..."
+  },
+  {
+    "en": "Enter content…",
+    "it": "Immettere contenuto."
+  },
+  {
+    "en": "Enter passphrase…",
+    "it": "Inserire la passphrase"
+  },
+  {
+    "en": "Enter text for the card…",
+    "it": "Inserisci il testo per la carta..."
+  },
+  {
+    "en": "Enter text or URL, e.g. https://example.com…",
+    "it": "Inserisci testo o URL, ad es. https://example.com..."
+  },
+  {
+    "en": "Enter text to convert…",
+    "it": "Inserisci il testo da convertire..."
+  },
+  {
+    "en": "Enter text to encode…",
+    "it": "Inserisci il testo da codificare..."
+  },
+  {
+    "en": "Enter text to hash…",
+    "it": "Inserisci il testo da hash..."
+  },
+  {
+    "en": "Enter text, e.g. 中 / A / 😀…",
+    "it": "Inserisci il testo, ad es.中/ A /😀..."
+  },
+  {
+    "en": "Enter the content to encode",
+    "it": "Inserisci il contenuto da codificare"
+  },
+  {
+    "en": "Enter the open password",
+    "it": "È necessario specificare una password per l'accesso all'account email."
+  },
+  {
+    "en": "Entropy ≈ {{bits}} bits",
+    "it": "Entropia ≈ {{bits}} bit"
+  },
+  {
+    "en": "Eraser",
+    "it": "Gomma per cancellare"
+  },
+  {
+    "en": "Error correction",
+    "it": "Correzione dell'errore"
+  },
+  {
+    "en": "Euler's identity",
+    "it": "Identità di Eulero"
+  },
+  {
+    "en": "Evening",
+    "it": "Sera"
+  },
+  {
+    "en": "Every (*)",
+    "it": "Ogni "
+  },
+  {
+    "en": "Every minute",
+    "it": "ogni minuto"
+  },
+  {
+    "en": "Exclude ambiguous characters (0 O 1 l I etc.)",
+    "it": "Escludi caratteri ambigui (0 O 1 l I ecc.)"
+  },
+  {
+    "en": "Expiration exp",
+    "it": "Scadenza EXP"
+  },
+  {
+    "en": "Expired",
+    "it": "scaduta"
+  },
+  {
+    "en": "Export JPG",
+    "it": "Esporta '{0}'"
+  },
+  {
+    "en": "Export PDF",
+    "it": "Esporta '{0}'"
+  },
+  {
+    "en": "Export PNG",
+    "it": "Esporta '{0}'"
+  },
+  {
+    "en": "Export SVG",
+    "it": "Esporta '{0}'"
+  },
+  {
+    "en": "Export annotated PDF",
+    "it": "Esporta annotati PDF"
+  },
+  {
+    "en": "Export failed; try another image",
+    "it": "Esportazione non riuscita; prova un'altra immagine"
+  },
+  {
+    "en": "Export images",
+    "it": "Esportare Immagini"
+  },
+  {
+    "en": "Exporting…",
+    "it": "Esportazione…"
+  },
+  {
+    "en": "Expression",
+    "it": "Espressione"
+  },
+  {
+    "en": "Extra",
+    "it": "Extra"
+  },
+  {
+    "en": "Extract & download",
+    "it": "Estrai e scarica"
+  },
+  {
+    "en": "Extract PDF Pages",
+    "it": "Estrai PDF pagine"
+  },
+  {
+    "en": "Extract selected pages into a new PDF",
+    "it": "Estrai le pagine selezionate in un nuovo PDF"
+  },
+  {
+    "en": "Extracted {{n}} sizes from {{name}}",
+    "it": "Estratto {{n}} taglie da {{name}}"
+  },
+  {
+    "en": "Extraversion E / Introversion I",
+    "it": "Estroversione E / Introversione I"
+  },
+  {
+    "en": "Failed to decode the image",
+    "it": "Impossibile decodificare l'immagine"
+  },
+  {
+    "en": "Failed to load PDF",
+    "it": "Impossibile caricare"
+  },
+  {
+    "en": "Failed to load the image",
+    "it": "Il percorso del file contenente i dati dell'immagine"
+  },
+  {
+    "en": "Failed to load the image: please make sure it is a valid image file",
+    "it": "Impossibile caricare l'immagine: assicurati che sia un file immagine valido"
+  },
+  {
+    "en": "Failed to parse GIF",
+    "it": "Analisi ⟦0 non riuscita⟧"
+  },
+  {
+    "en": "Failed to parse header: not valid base64url-encoded JSON",
+    "it": "Impossibile analizzare l'intestazione: base64url-encoded ⟦0 non valido⟧"
+  },
+  {
+    "en": "Failed to parse input: please check the syntax",
+    "it": "Impossibile analizzare l'input: controllare la sintassi"
+  },
+  {
+    "en": "Failed to parse payload: not valid base64url-encoded JSON",
+    "it": "Impossibile analizzare il payload: base64url-encoded ⟦0 non valido⟧"
+  },
+  {
+    "en": "Failed to read file contents",
+    "it": "Impossibile leggere i contenuti del file!"
+  },
+  {
+    "en": "Fairy pink",
+    "it": "Rosa fata"
+  },
+  {
+    "en": "Fake Data Generator",
+    "it": "Generatore di dati falsi"
+  },
+  {
+    "en": "Favorites",
+    "it": "Preferiti"
+  },
+  {
+    "en": "Field",
+    "it": "Campo"
+  },
+  {
+    "en": "Field breakdown",
+    "it": "Analisi dettagliata del campo"
+  },
+  {
+    "en": "File exceeds the {{max}} limit (current {{size}})",
+    "it": "Il file supera il⟧ limite di ⟦0 (corrente {{size}} )"
+  },
+  {
+    "en": "File hash failed: {{message}}",
+    "it": "Hash del file non riuscito: {{message}}"
+  },
+  {
+    "en": "File is empty",
+    "it": "File vuoto"
+  },
+  {
+    "en": "File mode: file → Base64 (ArrayBuffer chunks)",
+    "it": "Modalità file: file → Base64 (blocchi ArrayBuffer)"
+  },
+  {
+    "en": "File too large (recommend < 50MB)",
+    "it": "File troppo grande (consigliato < 50MB)"
+  },
+  {
+    "en": "Fill current (seconds)",
+    "it": "Corrente di riempimento (secondi)"
+  },
+  {
+    "en": "Filter",
+    "it": "Filtro"
+  },
+  {
+    "en": "Filter tools",
+    "it": "Filtra strumenti"
+  },
+  {
+    "en": "Filter…",
+    "it": "Filtra…"
+  },
+  {
+    "en": "Fire sky",
+    "it": "Cielo di fuoco"
+  },
+  {
+    "en": "First host",
+    "it": "Primo host"
+  },
+  {
+    "en": "Fit images to A3/A4/A5/Letter and export PDF",
+    "it": "Adatta le immagini a A3/A4/A5/Letter ed esporta PDF"
+  },
+  {
+    "en": "Flags",
+    "it": "Flag"
+  },
+  {
+    "en": "Flame",
+    "it": "Fiamma"
+  },
+  {
+    "en": "Font size",
+    "it": "Dimensioni font"
+  },
+  {
+    "en": "Font size / width / padding / line height out of range",
+    "it": "Dimensione / larghezza/imbottitura /altezza della linea del carattere fuori dall'intervallo"
+  },
+  {
+    "en": "Foot ft",
+    "it": "Piede ft"
+  },
+  {
+    "en": "Footer",
+    "it": "Fondo"
+  },
+  {
+    "en": "Foreground",
+    "it": "Primo piano"
+  }
+]

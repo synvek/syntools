@@ -1,0 +1,50 @@
+Nov
+Dec
+From
+To
+TOML
+Paste content to convert…
+Failed to parse input: please check the syntax
+Cannot convert to the target format (e.g. TOML does not support top-level arrays/scalars)
+Dialect
+Keyword case
+UPPERCASE
+lowercase
+Preserve
+Generic SQL
+MySQL
+PostgreSQL
+SQLite
+MariaDB
+SQL Server
+PL/SQL
+SQL input
+Paste SQL, e.g. select * from users where id = 1…
+Cannot parse this SQL: please check the syntax
+Beautify
+HTML input
+Paste HTML, e.g. <div><span>Hello</span></div>…
+Please enter HTML content
+Processing failed: please check whether the HTML is valid
+Beautify
+JavaScript input
+Paste JS, e.g. function hello(){return 1}…
+Please enter JavaScript content
+Processing failed: please check the syntax
+Beautify
+CSS input
+Paste CSS, e.g. .box{color:red}…
+Please enter CSS content
+Processing failed: please check whether the CSS is valid
+Text content
+Enter text or URL, e.g. https://example.com…
+Error correction
+Size
+Margin
+Foreground
+Background
+L (~7%)
+M (~15%)
+Q (~25%)
+H (~30%)
+QR code preview

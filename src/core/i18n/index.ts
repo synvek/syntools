@@ -1,9 +1,11 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { localeResources } from '@/core/i18n/locales';
-import type { Lang } from '@/core/i18n/types';
+import { ensureLangLoaded, localeResources } from '@/core/i18n/locales';
+import { isLang, type Lang } from '@/core/i18n/types';
 
 export type { Lang } from '@/core/i18n/types';
+export { LANGS, LANG_META, isLang } from '@/core/i18n/types';
+export { ensureLangLoaded } from '@/core/i18n/locales';
 
 const SETTINGS_KEY = 'syntools:settings.v1';
 
@@ -11,18 +13,35 @@ export function readStoredLang(): Lang {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     const lang = raw ? JSON.parse(raw).lang : undefined;
-    return lang === 'en' ? 'en' : 'zh';
+    return isLang(lang) ? lang : 'zh';
   } catch {
     return 'zh';
   }
 }
 
-// 资源内联，初始化即同步可用（无加载态、无网络请求，符合零数据外发）
+const storedLang = readStoredLang();
+/** 懒加载语言启动时先用 zh，避免首屏等待 chunk */
+const initialLng: Lang = storedLang === 'zh' || storedLang === 'en' ? storedLang : 'zh';
+
 void i18n.use(initReactI18next).init({
   resources: localeResources,
-  lng: readStoredLang(),
-  fallbackLng: 'zh',
-  interpolation: { escapeValue: false }, // React 默认转义
+  lng: initialLng,
+  fallbackLng: ['en', 'zh'],
+  interpolation: { escapeValue: false },
+  partialBundledLanguages: true,
 });
+
+/** 切换语言：先确保资源已加载，再 changeLanguage */
+export async function changeAppLanguage(lang: Lang): Promise<void> {
+  await ensureLangLoaded(lang, (lng, ns, resources) => {
+    i18n.addResourceBundle(lng, ns, resources, true, true);
+  });
+  await i18n.changeLanguage(lang);
+}
+
+// 若用户上次选择的是懒加载语言，启动后再异步切过去
+if (storedLang !== initialLng) {
+  void changeAppLanguage(storedLang);
+}
 
 export { i18n };

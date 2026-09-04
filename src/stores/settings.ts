@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { i18n, readStoredLang, type Lang } from '@/core/i18n';
+import { changeAppLanguage, readStoredLang, type Lang } from '@/core/i18n';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -32,7 +32,7 @@ interface SettingsState {
   /** 按当前实际明暗状态取反 */
   toggleTheme: () => void;
   lang: Lang;
-  setLang: (lang: Lang) => void;
+  setLang: (lang: Lang) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -47,9 +47,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     get().setTheme(isDark ? 'light' : 'dark');
   },
   lang: readStoredLang(),
-  setLang: (lang) => {
+  setLang: async (lang) => {
     persist(get().theme, lang);
-    void i18n.changeLanguage(lang);
+    await changeAppLanguage(lang);
     set({ lang });
   },
 }));

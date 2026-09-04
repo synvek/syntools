@@ -1,0 +1,802 @@
+[
+  {
+    "en": "Resume clock",
+    "it": "Riattiva orologio"
+  },
+  {
+    "en": "Retake",
+    "it": "Ripeti"
+  },
+  {
+    "en": "Retro duo",
+    "it": "Retro duo"
+  },
+  {
+    "en": "Retry",
+    "it": "Riprova"
+  },
+  {
+    "en": "Reverse",
+    "it": "Retromarcia"
+  },
+  {
+    "en": "Revised",
+    "it": "Revisionato"
+  },
+  {
+    "en": "Right",
+    "it": "Destra"
+  },
+  {
+    "en": "Romantic pink",
+    "it": "Rosa romantico"
+  },
+  {
+    "en": "Rose gold",
+    "it": "Oro rosa"
+  },
+  {
+    "en": "Rosewater",
+    "it": "Acqua di rose"
+  },
+  {
+    "en": "Rotate",
+    "it": "Ruotare"
+  },
+  {
+    "en": "Rotate & download",
+    "it": "Ruota e scarica"
+  },
+  {
+    "en": "Rotate PDF Pages",
+    "it": "Ruota PDF pagine"
+  },
+  {
+    "en": "Rotate selected or all pages",
+    "it": "Ruota le pagine selezionate o tutte"
+  },
+  {
+    "en": "Royal purple",
+    "it": "ROYAL PURPLE"
+  },
+  {
+    "en": "SQL Formatter",
+    "it": "Formattatore SQL"
+  },
+  {
+    "en": "SQL Server",
+    "it": "SQL Server"
+  },
+  {
+    "en": "SQL input",
+    "it": "Input SQL"
+  },
+  {
+    "en": "SQLite",
+    "it": "(SQLITE)."
+  },
+  {
+    "en": "SVG source",
+    "it": "SVG source"
+  },
+  {
+    "en": "SVG to PNG",
+    "it": "da 0 to 1"
+  },
+  {
+    "en": "Safe expression calculator with arithmetic, power, modulo, and common functions",
+    "it": "Calcolatore di espressioni sicure con funzioni aritmetiche, di potenza, modulo e funzioni comuni"
+  },
+  {
+    "en": "Saffron",
+    "it": "Zafferano"
+  },
+  {
+    "en": "Sahara",
+    "it": "Sahara"
+  },
+  {
+    "en": "Sakura",
+    "it": "Sakura"
+  },
+  {
+    "en": "Sans-serif",
+    "it": "Sans-serif"
+  },
+  {
+    "en": "Sapphire",
+    "it": "Zaffiro"
+  },
+  {
+    "en": "Saturate",
+    "it": "Satura"
+  },
+  {
+    "en": "Saturation",
+    "it": "Saturazione"
+  },
+  {
+    "en": "Saturday",
+    "it": "Sabato"
+  },
+  {
+    "en": "Save & download",
+    "it": "Salva e scarica"
+  },
+  {
+    "en": "Scale",
+    "it": "Scala"
+  },
+  {
+    "en": "Scatter",
+    "it": "Dispersione"
+  },
+  {
+    "en": "Schrödinger equation",
+    "it": "L'equazione di Schrödinger"
+  },
+  {
+    "en": "Scope",
+    "it": "Ambito"
+  },
+  {
+    "en": "Screen eyedropper",
+    "it": "Contagocce per schermo"
+  },
+  {
+    "en": "Sea blue",
+    "it": "Taupe"
+  },
+  {
+    "en": "Sea mist",
+    "it": "Nebbia marina"
+  },
+  {
+    "en": "Sea pearl",
+    "it": "Perla marina"
+  },
+  {
+    "en": "Seafoam",
+    "it": "Seafoam"
+  },
+  {
+    "en": "Search",
+    "it": "Ricerca"
+  },
+  {
+    "en": "Search tools",
+    "it": "Cerca strumenti"
+  },
+  {
+    "en": "Search tools (name / keywords)…",
+    "it": "Strumenti di ricerca (nome / parole chiave)..."
+  },
+  {
+    "en": "Search tools…",
+    "it": "Cerca strumenti…"
+  },
+  {
+    "en": "Second",
+    "it": "Secondo"
+  },
+  {
+    "en": "Seconds",
+    "it": "Secondi"
+  },
+  {
+    "en": "Seconds left",
+    "it": "secondi rimasti"
+  },
+  {
+    "en": "Secret is not valid Base32",
+    "it": "Il segreto non è valido Base32"
+  },
+  {
+    "en": "See result",
+    "it": "vedi risultati"
+  },
+  {
+    "en": "Select at least one size",
+    "it": "selezionare almeno un'opzione"
+  },
+  {
+    "en": "Selected date",
+    "it": "Data selezionata"
+  },
+  {
+    "en": "Sensing S / Intuition N",
+    "it": "Sensing S / Intuition N"
+  },
+  {
+    "en": "Sentence case",
+    "it": "Maiuscole/minuscole nella frase"
+  },
+  {
+    "en": "Separator",
+    "it": "Separatore"
+  },
+  {
+    "en": "Series label",
+    "it": "Etichetta serie"
+  },
+  {
+    "en": "Serif",
+    "it": "Serif"
+  },
+  {
+    "en": "Set hours, minutes, and seconds; pause, resume, and finish alert",
+    "it": "Imposta ore, minuti e secondi; metti in pausa, riprendi e termina l'avviso"
+  },
+  {
+    "en": "Set open password and permissions. Reader support varies.",
+    "it": "Imposta password e autorizzazioni di apertura. Il supporto del lettore varia."
+  },
+  {
+    "en": "Set password and permission flags",
+    "it": "Imposta password e flag di autorizzazione"
+  },
+  {
+    "en": "Set theory",
+    "it": "Teoria degli insiemi"
+  },
+  {
+    "en": "Shadow",
+    "it": "Ombra"
+  },
+  {
+    "en": "Shadow blur",
+    "it": "Sfocatura ombra:"
+  },
+  {
+    "en": "Shadow offset",
+    "it": "Spostamento X ombra"
+  },
+  {
+    "en": "Shadow opacity",
+    "it": "Opacità ombra"
+  },
+  {
+    "en": "Shape",
+    "it": "Forma"
+  },
+  {
+    "en": "Share",
+    "it": "Condividi"
+  },
+  {
+    "en": "Shortcuts: ⌘/Ctrl+B bold · ⌘/Ctrl+I italic · ⌘/Ctrl+K link · ⌘/Ctrl+E inline code",
+    "it": "Scorciatoie: + Ctrl+B grassetto · + Ctrl+I corsivo · + Ctrl+K link · + Ctrl+E codice inline"
+  },
+  {
+    "en": "Showing a file Base64 result; typing text will clear it.",
+    "it": "Visualizzazione di un file Base64 risultato; la digitazione del testo lo cancellerà."
+  },
+  {
+    "en": "Showing first {{count}} rows only",
+    "it": "Mostra solo⟧ le prime ⟦0 righe"
+  },
+  {
+    "en": "Showing {{n}} / {{total}} colors",
+    "it": "Mostra {{n}} / {{total}} colori"
+  },
+  {
+    "en": "Side-by-side editors with inline line highlights, line numbers, and whitespace ignore",
+    "it": "Gli editor affiancati con evidenziazioni delle righe in linea, numeri di riga e spazi vuoti ignorano"
+  },
+  {
+    "en": "Sign & download",
+    "it": "Firma e scarica"
+  },
+  {
+    "en": "Sign (HS256)",
+    "it": "Cartello (HS256)"
+  },
+  {
+    "en": "Sign PDF",
+    "it": "Cartello PDF"
+  },
+  {
+    "en": "Signature",
+    "it": "Firma"
+  },
+  {
+    "en": "Signed token",
+    "it": "Token firmato"
+  },
+  {
+    "en": "Signing failed",
+    "it": "Firma non riuscita"
+  },
+  {
+    "en": "Signs with HS256 in your browser; the secret never leaves the device",
+    "it": "Segni con HS256 nel browser; il segreto non lascia mai il dispositivo"
+  },
+  {
+    "en": "Simple path queries like a.b[0].c",
+    "it": "Query di percorso semplici come a.b[0].c"
+  },
+  {
+    "en": "Simplified Chinese",
+    "it": "Simplified Chinese"
+  },
+  {
+    "en": "Simplified → Traditional",
+    "it": "→ Tradizionale semplificato"
+  },
+  {
+    "en": "Size increased by {{ratio}}%",
+    "it": "Dimensioni aumentate dello {{ratio}} %"
+  },
+  {
+    "en": "Size must be an integer between 16 and 4000",
+    "it": "La dimensione deve essere un numero intero compreso tra 16 e 4000"
+  },
+  {
+    "en": "Size reduced by {{ratio}}%",
+    "it": "Dimensioni ridotte dello ⟦⟧0%"
+  },
+  {
+    "en": "Sizes",
+    "it": "Misure"
+  },
+  {
+    "en": "Skew X",
+    "it": "Inclinazione X:"
+  },
+  {
+    "en": "Sky dusk",
+    "it": "Sky Dusk"
+  },
+  {
+    "en": "Skyline",
+    "it": "Orizzonte"
+  },
+  {
+    "en": "Slash",
+    "it": "<g id=\"MIFDocuments.YellowBackgroundColor\">Slash</g>"
+  },
+  {
+    "en": "Slate",
+    "it": "Ardesia"
+  },
+  {
+    "en": "Soda pop",
+    "it": "Soda pop"
+  },
+  {
+    "en": "Soft glow",
+    "it": "Soft glow"
+  },
+  {
+    "en": "Soft line breaks",
+    "it": "Interruzioni riga"
+  },
+  {
+    "en": "Solid",
+    "it": "Solid"
+  },
+  {
+    "en": "Song (serif CJK)",
+    "it": "Canzone (serif CJK)"
+  },
+  {
+    "en": "Sort / unique / reverse / number / trim empty lines",
+    "it": "Ordina / univoco / inverso / numero / taglia righe vuote"
+  },
+  {
+    "en": "Sort ascending",
+    "it": "Crescente"
+  },
+  {
+    "en": "Sort descending",
+    "it": "Decrescente"
+  },
+  {
+    "en": "Source",
+    "it": "Sorgente/ fonte"
+  },
+  {
+    "en": "Source code",
+    "it": "Codice sorgente"
+  },
+  {
+    "en": "Source {{sw}}×{{sh}} → output {{pw}}×{{ph}}",
+    "it": "Sorgente {{sw}} × {{sh}} → uscita {{pw}} × {{ph}}"
+  },
+  {
+    "en": "Space",
+    "it": "Spazio"
+  },
+  {
+    "en": "Space-separated bytes",
+    "it": "Byte separati da spazi"
+  },
+  {
+    "en": "Special",
+    "it": "Particolare"
+  },
+  {
+    "en": "Special chars + non-ASCII",
+    "it": "Caratteri speciali + non ASCII"
+  },
+  {
+    "en": "Special chars only (&, <, > etc.)",
+    "it": "Solo caratteri speciali (&, <, > ecc.)"
+  },
+  {
+    "en": "Specific value",
+    "it": "valore specifiche"
+  },
+  {
+    "en": "Spectrum",
+    "it": "Spettro atomico"
+  },
+  {
+    "en": "Spice orange",
+    "it": "Arancia speziata"
+  },
+  {
+    "en": "Split & download",
+    "it": "Dividi e scarica"
+  },
+  {
+    "en": "Split PDF",
+    "it": "Spacca"
+  },
+  {
+    "en": "Split a GIF into PNG frames; download one or all",
+    "it": "Dividi uno GIF in PNG fotogrammi; scarica uno o tutti"
+  },
+  {
+    "en": "Split a PDF into one file per page",
+    "it": "Dividi uno PDF in un file per pagina"
+  },
+  {
+    "en": "Splits into one PDF per page and downloads each.",
+    "it": "Si divide in uno PDF per pagina e scarica ciascuno."
+  },
+  {
+    "en": "Spotlight dark",
+    "it": "Riflettore scuro"
+  },
+  {
+    "en": "Spread",
+    "it": "Differenziale"
+  },
+  {
+    "en": "Spring",
+    "it": "Molla"
+  },
+  {
+    "en": "Standard 5 fields: minute hour day month weekday (0 = Sunday)",
+    "it": "Standard 5 campi: minuto ora giorno mese giorno feriale (0 = domenica)"
+  },
+  {
+    "en": "Start",
+    "it": "Inizia"
+  },
+  {
+    "en": "Start from",
+    "it": "Inizia da"
+  },
+  {
+    "en": "Start of line",
+    "it": "Inizio riga"
+  },
+  {
+    "en": "Stats will appear after you enter text",
+    "it": "Le statistiche appariranno dopo aver inserito il testo"
+  },
+  {
+    "en": "Stitch images horizontally, vertically, or in a grid into one PNG",
+    "it": "Cuci le immagini orizzontalmente, verticalmente o in una griglia in uno PNG"
+  },
+  {
+    "en": "Stone st",
+    "it": "Stone st"
+  },
+  {
+    "en": "Stops",
+    "it": "Arresti"
+  },
+  {
+    "en": "Stopwatch",
+    "it": "Cronometro"
+  },
+  {
+    "en": "Storm night",
+    "it": "Notte di tempesta"
+  },
+  {
+    "en": "Storm sea",
+    "it": "Mare IN tempesta"
+  },
+  {
+    "en": "Strikethrough (~~)",
+    "it": "Barrato"
+  },
+  {
+    "en": "Strip EXIF",
+    "it": "Striscia"
+  },
+  {
+    "en": "Stroke",
+    "it": "Corsa"
+  },
+  {
+    "en": "Strong",
+    "it": "Forte"
+  },
+  {
+    "en": "Strong random passwords with length / charset options, entropy estimate and strength rating",
+    "it": "Password casuali complesse con opzioni di lunghezza / set di caratteri, stima dell'entropia e valutazione della forza"
+  },
+  {
+    "en": "Subject",
+    "it": "Disciplina"
+  },
+  {
+    "en": "Subject CN",
+    "it": "Soggetto CN"
+  },
+  {
+    "en": "Subtitle",
+    "it": "Titoletto"
+  },
+  {
+    "en": "Subtitle size",
+    "it": "Dimensione del sottotitolo"
+  },
+  {
+    "en": "Suitable",
+    "it": "Adatto"
+  },
+  {
+    "en": "Sums & products",
+    "it": "Somme & prodotti"
+  },
+  {
+    "en": "Sun disc glow",
+    "it": "Sun disc Glow"
+  },
+  {
+    "en": "Sunday",
+    "it": "Domenica"
+  },
+  {
+    "en": "Sunrise blend",
+    "it": "Miscela Sunrise"
+  },
+  {
+    "en": "Sunset",
+    "it": "TRAMONTO"
+  },
+  {
+    "en": "Sunset blend",
+    "it": "Miscela tramonto"
+  },
+  {
+    "en": "Sunset orange",
+    "it": "Arancione"
+  },
+  {
+    "en": "Sunset radial",
+    "it": "Tramonto radiale"
+  },
+  {
+    "en": "Supporting line…",
+    "it": "Linea di supporto..."
+  },
+  {
+    "en": "Supports $1, $&, …",
+    "it": "Supporta $1, $&,..."
+  },
+  {
+    "en": "Supports + - * / % ^ () and sqrt/abs/sin/cos/tan/ln/log/floor/ceil/round, plus pi and e",
+    "it": "Supporta + - * / % ^ () e sqrt/abs/sin/cos/tan/ln/log/floor/ceil/round, più pi ed e"
+  },
+  {
+    "en": "Supports HEX / RGB / HSL (including shorthand and percentages)",
+    "it": "Supporta HEX / RGB / HSL (inclusi stenografia e percentuali)"
+  },
+  {
+    "en": "Swap sides",
+    "it": "Inverti lati"
+  },
+  {
+    "en": "Swatch",
+    "it": "Swatch"
+  },
+  {
+    "en": "Switch language",
+    "it": "Cambia lingua"
+  },
+  {
+    "en": "Switch to “ICO → PNG” to open an ICO file",
+    "it": "Passa a \"ICO → PNG\" per aprire un file ICO"
+  },
+  {
+    "en": "Symbols (!@#$%…)",
+    "it": "Simbologia"
+  },
+  {
+    "en": "SynTools · Developer Online Toolbox",
+    "it": "SynTools · Toolbox online per sviluppatori"
+  },
+  {
+    "en": "Synthwave",
+    "it": "Synthwave"
+  },
+  {
+    "en": "Table",
+    "it": "Tavola"
+  },
+  {
+    "en": "Tangerine",
+    "it": "Mandarino "
+  },
+  {
+    "en": "Target format",
+    "it": "Formato dati di destinazione"
+  },
+  {
+    "en": "Taylor series",
+    "it": "Serie di Taylor."
+  },
+  {
+    "en": "Teal breeze",
+    "it": "Teal breeze"
+  },
+  {
+    "en": "Test text",
+    "it": "Testo di prova"
+  },
+  {
+    "en": "Text Counter",
+    "it": "Contatore di testo"
+  },
+  {
+    "en": "Text Diff",
+    "it": "Diff. testo"
+  },
+  {
+    "en": "Text Line Tools",
+    "it": "Strumenti riga di testo"
+  },
+  {
+    "en": "Text background",
+    "it": "Sfondo testo"
+  },
+  {
+    "en": "Text color",
+    "it": "Colore del testo"
+  },
+  {
+    "en": "Text content",
+    "it": "Contenuti testuali"
+  },
+  {
+    "en": "Text exceeds {{limit}}K character limit; matching stopped (ReDoS / long-run protection)",
+    "it": "Il testo supera il limite di {{limit}} K caratteri; corrispondenza interrotta (ReDoS/protezione a lungo termine)"
+  },
+  {
+    "en": "Text input",
+    "it": "Input di testo"
+  },
+  {
+    "en": "Text or gzip base64…",
+    "it": "Testo o gzip base64..."
+  },
+  {
+    "en": "Text or hex…",
+    "it": "Testo o esadecimale..."
+  },
+  {
+    "en": "Text padding",
+    "it": "<code>Padding</code> del testo."
+  },
+  {
+    "en": "Text shadow",
+    "it": "Ombra testo"
+  },
+  {
+    "en": "Text to Card",
+    "it": "Text to Card"
+  },
+  {
+    "en": "Text to decode, e.g. &lt;b&gt;&#20320;&#22909;…",
+    "it": "Testo da decodificare, ad esempio &lt;b&gt;&#20320;&#22909;..."
+  },
+  {
+    "en": "Text to encode, e.g. <b>Hello</b>…",
+    "it": "Testo da codificare, ad es. <b>Ciao</b>..."
+  },
+  {
+    "en": "Theme",
+    "it": "Tema"
+  },
+  {
+    "en": "Thinking T / Feeling F",
+    "it": "Thinking T / Feeling F"
+  },
+  {
+    "en": "This PDF is encrypted. Enter the password to continue.",
+    "it": "Questo PDF è crittografato. Inserisci la password per continuare."
+  },
+  {
+    "en": "This PDF is encrypted. Please enter the password.",
+    "it": "Questo PDF è crittografato. Inserisci la password."
+  },
+  {
+    "en": "This is a simplified quiz for entertainment only — not a clinical assessment.",
+    "it": "Questo è un quiz semplificato solo per intrattenimento, non una valutazione clinica."
+  },
+  {
+    "en": "Thursday",
+    "it": "Giovedì"
+  },
+  {
+    "en": "Time is up!",
+    "it": "Il tempo è scaduto!"
+  },
+  {
+    "en": "Timestamp Converter",
+    "it": "Convertitore timestamp"
+  },
+  {
+    "en": "Timestamp input",
+    "it": "Inserimento marca temporale"
+  },
+  {
+    "en": "Timestamp must be numeric (negative allowed)",
+    "it": "La marca temporale deve essere numerica (consentita negativa)"
+  },
+  {
+    "en": "Timestamp out of numeric range",
+    "it": "Timestamp fuori dall'intervallo numerico"
+  },
+  {
+    "en": "Timestamp out of representable range (±275760 years)",
+    "it": "Timestamp fuori intervallo rappresentabile (±275760 anni)"
+  },
+  {
+    "en": "Timestamp → readable time (auto-detect seconds / ms)",
+    "it": "Timestamp tempo → leggibile (rilevamento automatico secondi / ms)"
+  },
+  {
+    "en": "Timing",
+    "it": "Tempi"
+  },
+  {
+    "en": "Title",
+    "it": "Titolo"
+  },
+  {
+    "en": "Title Case",
+    "it": "Iniziali maiuscole"
+  },
+  {
+    "en": "Title size",
+    "it": "Dimensione titolo"
+  },
+  {
+    "en": "Today",
+    "it": "Oggi"
+  },
+  {
+    "en": "Toggle theme",
+    "it": "Cambia tema"
+  },
+  {
+    "en": "Tonne t",
+    "it": "Tonnellata t"
+  },
+  {
+    "en": "Too many diff rows; rendering first {{count}} only",
+    "it": "Troppe righe diff; rendering⟧ solo prima ⟦0"
+  },
+  {
+    "en": "Tool navigation",
+    "it": "Navigazione tra gli strumenti"
+  }
+]

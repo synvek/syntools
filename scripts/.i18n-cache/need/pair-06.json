@@ -1,0 +1,710 @@
+[
+  {
+    "en": "Tool runtime error",
+    "it": "Run-time"
+  },
+  {
+    "en": "Top center",
+    "it": "Centro in alto"
+  },
+  {
+    "en": "Top left",
+    "it": "Sinistra in alto"
+  },
+  {
+    "en": "Top right",
+    "it": "Destra in alto"
+  },
+  {
+    "en": "Total",
+    "it": "Totale"
+  },
+  {
+    "en": "Total addresses",
+    "it": "Totale indirizzi IP"
+  },
+  {
+    "en": "Traditional Chinese",
+    "it": "Cinese tradizionale"
+  },
+  {
+    "en": "Traditional Chinese Converter",
+    "it": "Convertitore cinese tradizionale"
+  },
+  {
+    "en": "Traditional → Simplified",
+    "it": "Tradizionale → semplificato"
+  },
+  {
+    "en": "Transform",
+    "it": "Trasforma"
+  },
+  {
+    "en": "Transform XML to HTML with XSLT in the browser",
+    "it": "Trasforma XML a HTML con XSLT nel browser"
+  },
+  {
+    "en": "Transform failed",
+    "it": "Trasformazione non riuscita"
+  },
+  {
+    "en": "Transition",
+    "it": "Cambio"
+  },
+  {
+    "en": "Translate",
+    "it": "Traduci"
+  },
+  {
+    "en": "Translate X",
+    "it": "Trasla X"
+  },
+  {
+    "en": "Translate Y",
+    "it": "Trasla Y"
+  },
+  {
+    "en": "Transparent background",
+    "it": "Sfondo trasparente"
+  },
+  {
+    "en": "Trigonometry",
+    "it": "Trigonometria"
+  },
+  {
+    "en": "Trim empty lines",
+    "it": "Taglia righe vuote"
+  },
+  {
+    "en": "Tropical",
+    "it": "Tropicale"
+  },
+  {
+    "en": "Tuesday",
+    "it": "Martedì"
+  },
+  {
+    "en": "Turn Markdown into a mind map with themes, zoom, and PNG/SVG export",
+    "it": "Trasforma Markdown in una mappa mentale con temi, zoom ed⟧ esportazione PNG/⟦1"
+  },
+  {
+    "en": "Turquoise",
+    "it": "Ciano"
+  },
+  {
+    "en": "Twilight",
+    "it": "Crepuscolo"
+  },
+  {
+    "en": "Twilight purple",
+    "it": "Viola crepuscolare"
+  },
+  {
+    "en": "UPPER CASE",
+    "it": "CASSA SUPERIORE"
+  },
+  {
+    "en": "UPPERCASE",
+    "it": "MAIUSCOLE"
+  },
+  {
+    "en": "URL Encode / Decode",
+    "it": "URL Codifica / Decodifica"
+  },
+  {
+    "en": "URL Query Parser",
+    "it": "⟦0 Parser⟧ query"
+  },
+  {
+    "en": "URL Safe (- _ without padding)",
+    "it": "URL Sicuro (- _ senza imbottitura)"
+  },
+  {
+    "en": "UTF-16 length",
+    "it": "Lunghezza UTF-16"
+  },
+  {
+    "en": "UTF-8 bytes",
+    "it": "0 byte"
+  },
+  {
+    "en": "UUID Generator",
+    "it": "UUID Generatore"
+  },
+  {
+    "en": "Underweight",
+    "it": "Sotto Peso"
+  },
+  {
+    "en": "Unicode Codec",
+    "it": "Codec Unicode"
+  },
+  {
+    "en": "Unique",
+    "it": "Unico"
+  },
+  {
+    "en": "Unit system",
+    "it": "Sistema di unità di misura"
+  },
+  {
+    "en": "Universe",
+    "it": "Universo"
+  },
+  {
+    "en": "Unix ⇄ human-readable time with auto second/ms detection and live clock",
+    "it": "⟦0 tempo⟧ ⇄ leggibile dall'uomo con rilevamento automatico di secondi/ms e orologio in tempo reale"
+  },
+  {
+    "en": "Unlock",
+    "it": "Sblocca"
+  },
+  {
+    "en": "Unrecognized color format",
+    "it": "Formato colore non riconosciuto"
+  },
+  {
+    "en": "Unrecognized entities (kept as-is)",
+    "it": "Entità non riconosciute (mantenute così come sono)"
+  },
+  {
+    "en": "Unsupported font",
+    "it": "Carattere non supportato"
+  },
+  {
+    "en": "Upload an image and click a pixel to sample HEX / RGB",
+    "it": "Carica un'immagine e fai clic su un pixel per campionare ESADECIMALE / RGB"
+  },
+  {
+    "en": "Upload an image to preview the card",
+    "it": "Carica un'immagine per visualizzare l'anteprima della carta"
+  },
+  {
+    "en": "Upload an image, then click to sample a color",
+    "it": "Carica un'immagine, quindi fai clic per campionare un colore"
+  },
+  {
+    "en": "Upload file",
+    "it": "Carica file"
+  },
+  {
+    "en": "Upload signature",
+    "it": "Carica firma"
+  },
+  {
+    "en": "Uppercase",
+    "it": "Maiuscolo"
+  },
+  {
+    "en": "Uppercase (A-Z)",
+    "it": "Lettere maiuscole dalla A alla Z"
+  },
+  {
+    "en": "Use arrows to reorder pages, then export.",
+    "it": "Utilizzare le frecce per riordinare le pagine, quindi esportare."
+  },
+  {
+    "en": "Use current browser",
+    "it": "Usa il browser attuale"
+  },
+  {
+    "en": "User password",
+    "it": "Password utente"
+  },
+  {
+    "en": "User-Agent",
+    "it": "Agente utente"
+  },
+  {
+    "en": "User-Agent Parser",
+    "it": "Parser User-Agent"
+  },
+  {
+    "en": "Uses common readings; polyphonic characters use the default reading",
+    "it": "Utilizza letture comuni; i caratteri polifonici utilizzano la lettura predefinita"
+  },
+  {
+    "en": "Valentine",
+    "it": "Valentine"
+  },
+  {
+    "en": "Validate cron expressions, explain fields, and preview upcoming runs",
+    "it": "Convalidare le espressioni cron, spiegare i campi e visualizzare in anteprima le esecuzioni imminenti"
+  },
+  {
+    "en": "Validate only",
+    "it": "Solo convalida"
+  },
+  {
+    "en": "Validation result",
+    "it": "Risultato convalida"
+  },
+  {
+    "en": "Value",
+    "it": "Valore"
+  },
+  {
+    "en": "Value is outside the 64-bit signed integer range (−2⁶³ ~ 2⁶³−1)",
+    "it": "Il valore è al di fuori dell'intervallo di numeri interi con segno a 64 bit (-2,3 ~2,3-1)"
+  },
+  {
+    "en": "Values are out of a reasonable range; check units",
+    "it": "I valori sono fuori da un intervallo ragionevole; controllare le unità"
+  },
+  {
+    "en": "Velvet purple",
+    "it": "Porpora vellutato"
+  },
+  {
+    "en": "Verification failed",
+    "it": "Verifica non riuscita"
+  },
+  {
+    "en": "Verified",
+    "it": "Verifica effettuata"
+  },
+  {
+    "en": "Verify code (optional)",
+    "it": "Codice di verifica (facoltativo)"
+  },
+  {
+    "en": "Version",
+    "it": "Versione"
+  },
+  {
+    "en": "Vertical",
+    "it": "Verticali"
+  },
+  {
+    "en": "Vibrant",
+    "it": "vibrante"
+  },
+  {
+    "en": "View and edit PDF metadata",
+    "it": "Visualizza e modifica PDF metadati"
+  },
+  {
+    "en": "Vignette",
+    "it": "Immagini"
+  },
+  {
+    "en": "Violet dusk",
+    "it": "Crepuscolo viola"
+  },
+  {
+    "en": "Visual grayscale via re-rasterizing pages; text will not stay selectable.",
+    "it": "Scala di grigi visiva tramite la ri-rasterizzazione delle pagine; il testo non rimarrà selezionabile."
+  },
+  {
+    "en": "Visual signature (image overlay), not a digital certificate.",
+    "it": "Firma visiva (immagine sovrapposta), non certificato digitale."
+  },
+  {
+    "en": "Visually tweak styles and generate button CSS / HTML",
+    "it": "Modificare visivamente gli stili e generare il pulsante CSS/HTML"
+  },
+  {
+    "en": "Vivid tri-color",
+    "it": "Tricolore vivace"
+  },
+  {
+    "en": "Warm glow",
+    "it": "Bagliore caldo"
+  },
+  {
+    "en": "Watermark text",
+    "it": "Testo filigrana"
+  },
+  {
+    "en": "Web Color Table",
+    "it": "Tavola colori"
+  },
+  {
+    "en": "Wednesday",
+    "it": "Mercoledì"
+  },
+  {
+    "en": "Week starts",
+    "it": "Giorno di inizio della settimana"
+  },
+  {
+    "en": "Weekday",
+    "it": "Giorno lavorativo"
+  },
+  {
+    "en": "Weekend",
+    "it": "Fine settimana"
+  },
+  {
+    "en": "Weekly Mon 00:00",
+    "it": "Lun settimanale 00:00"
+  },
+  {
+    "en": "Weight",
+    "it": "Peso"
+  },
+  {
+    "en": "Weight (kg)",
+    "it": "Peso (kg)"
+  },
+  {
+    "en": "Weight (lb)",
+    "it": "Peso (libbre)"
+  },
+  {
+    "en": "Weight Converter",
+    "it": "Convertitore di peso"
+  },
+  {
+    "en": "White",
+    "it": "Bianco"
+  },
+  {
+    "en": "Whitespace",
+    "it": "Spazio vuoto"
+  },
+  {
+    "en": "Width",
+    "it": "Larghezza"
+  },
+  {
+    "en": "Wildcard",
+    "it": "Jolly"
+  },
+  {
+    "en": "Wine purple",
+    "it": "Viola vino"
+  },
+  {
+    "en": "Winter",
+    "it": "INVERNO"
+  },
+  {
+    "en": "Word char",
+    "it": "Word char"
+  },
+  {
+    "en": "Words",
+    "it": "Lettere"
+  },
+  {
+    "en": "Workday",
+    "it": "Workday"
+  },
+  {
+    "en": "Working…",
+    "it": "Al lavoro..."
+  },
+  {
+    "en": "Writing",
+    "it": "Scrittura"
+  },
+  {
+    "en": "X-axis label",
+    "it": "Etichetta Asse X"
+  },
+  {
+    "en": "X.509 Certificate Decoder",
+    "it": "Decodificatore certificato X.509"
+  },
+  {
+    "en": "XML Minify / Beautify",
+    "it": "XML Minimizza / Abbellisci"
+  },
+  {
+    "en": "XML input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "XML parse failed: please check the syntax",
+    "it": "XML analisi non riuscita: controllare la sintassi"
+  },
+  {
+    "en": "XML to JSON",
+    "it": "da 0 to 1"
+  },
+  {
+    "en": "XSLT Transform",
+    "it": "File di trasformazione XSLT"
+  },
+  {
+    "en": "Y-axis label",
+    "it": "Etichetta Asse Y"
+  },
+  {
+    "en": "Yard yd",
+    "it": "Cortile iarda"
+  },
+  {
+    "en": "Yellow",
+    "it": "Giallo"
+  },
+  {
+    "en": "Your type tendency",
+    "it": "Tendenza del tuo tipo"
+  },
+  {
+    "en": "Zoom in",
+    "it": "Ingrandisci"
+  },
+  {
+    "en": "Zoom out",
+    "it": "Riduci"
+  },
+  {
+    "en": "\\u escape (\\u4E2D)",
+    "it": "\\u escape (\\u4E2D)"
+  },
+  {
+    "en": "base64",
+    "it": "Base64"
+  },
+  {
+    "en": "camelCase",
+    "it": "Notazione a cammello"
+  },
+  {
+    "en": "component (param value, encodes reserved chars)",
+    "it": "componente (valore param, codifica caratteri riservati)"
+  },
+  {
+    "en": "e.g. #3b82f6, rgb(59,130,246), hsl(217,91%,60%)…",
+    "it": "ad esempio # 3b82f6, rgb(59.130.246), hsl(217,91%,60%)..."
+  },
+  {
+    "en": "e.g. (1+2)*3 or sqrt(9)+pi",
+    "it": "es. (1+2)*3 o sqrt(9)+pi"
+  },
+  {
+    "en": "e.g. */5 8-18 * * 1-5 or @daily (5 fields, 6 with seconds)",
+    "it": "es. */5 8-18 * * 1-5 o @daily (5 campi, 6 con secondi)"
+  },
+  {
+    "en": "e.g. 1,3,5",
+    "it": "es. 1,3,5"
+  },
+  {
+    "en": "e.g. 1.5",
+    "it": "es. 1,5"
+  },
+  {
+    "en": "e.g. 1725000000 or 1725000000000",
+    "it": "es. 1725000000 o 1725000000000"
+  },
+  {
+    "en": "e.g. 192.168.1.0/24",
+    "it": "ad es .: 192.168.1.0/24"
+  },
+  {
+    "en": "e.g. 2026-09-01 12:00:00 or 2026-09-01T04:00:00Z",
+    "it": "es. 2026-09-01 12:00:00 o 2026-09-01T04:00:00Z"
+  },
+  {
+    "en": "e.g. 255, 0xff, 0b11111111, 0377…",
+    "it": "ad esempio 255, 0xff, 0b11111111, 0377..."
+  },
+  {
+    "en": "e.g. E = mc^2 or \\frac{a}{b}",
+    "it": "ad es. E = mc^2 o \\frac{a}{b}"
+  },
+  {
+    "en": "e.g. Month",
+    "it": "es: mese"
+  },
+  {
+    "en": "e.g. Sales",
+    "it": "ad es. Vendite"
+  },
+  {
+    "en": "e.g. \\d+",
+    "it": "ad es. \\d+"
+  },
+  {
+    "en": "encodeURIComponent / encodeURI modes with malformed percent-encoding detection",
+    "it": "encodeURIComponent / encodeURI mode with malformed percent-encoding detection"
+  },
+  {
+    "en": "every day",
+    "it": "ogni giorno"
+  },
+  {
+    "en": "every day of the week",
+    "it": "ogni giorno della settimana"
+  },
+  {
+    "en": "every hour",
+    "it": "ogni ora"
+  },
+  {
+    "en": "every minute",
+    "it": "ogni minuto"
+  },
+  {
+    "en": "every month",
+    "it": "ogni mese"
+  },
+  {
+    "en": "every second",
+    "it": "ogni attimo,"
+  },
+  {
+    "en": "every {{n}} {{unit}}",
+    "it": "ogni {{n}} {{unit}}"
+  },
+  {
+    "en": "flowchart TD\n  A-->B",
+    "it": "diagramma di flusso TD\n A-->B"
+  },
+  {
+    "en": "hex (hexadecimal)",
+    "it": "esadecimale"
+  },
+  {
+    "en": "hour ",
+    "it": "ora"
+  },
+  {
+    "en": "hours",
+    "it": "ore"
+  },
+  {
+    "en": "https://example.com/path?a=1&b=2",
+    "it": "https://example.com/path?a=1&b=2"
+  },
+  {
+    "en": "kebab-case",
+    "it": "kebab-case"
+  },
+  {
+    "en": "label,value\napple,30\nbanana,20",
+    "it": "etichetta,valore\nmela,30\nbanana,20"
+  },
+  {
+    "en": "lower case",
+    "it": "lettera minuscola"
+  },
+  {
+    "en": "lowercase",
+    "it": "minuscolo"
+  },
+  {
+    "en": "milliseconds",
+    "it": "millisecondi"
+  },
+  {
+    "en": "minute ",
+    "it": "minuto"
+  },
+  {
+    "en": "minutes",
+    "it": "minuti"
+  },
+  {
+    "en": "month ",
+    "it": "mese "
+  },
+  {
+    "en": "months",
+    "it": "mesi"
+  },
+  {
+    "en": "pages",
+    "it": "pagine"
+  },
+  {
+    "en": "sWAP cASE",
+    "it": "sWAP cASE"
+  },
+  {
+    "en": "second ",
+    "it": "secondo"
+  },
+  {
+    "en": "seconds",
+    "it": " secondi"
+  },
+  {
+    "en": "snake_case",
+    "it": "snake_case"
+  },
+  {
+    "en": "two's complement",
+    "it": "complemento a due"
+  },
+  {
+    "en": "v4 (random)",
+    "it": "v4 (random)"
+  },
+  {
+    "en": "v7 (time-ordered)",
+    "it": "v7 (time-ordered)"
+  },
+  {
+    "en": "weekday ",
+    "it": "giorno della settimana"
+  },
+  {
+    "en": "years",
+    "it": "anni"
+  },
+  {
+    "en": "{ \"sub\": \"123\", \"name\": \"Alice\" }",
+    "it": "{ \"sub\": \"123\", \"name\": \"Alice\" }"
+  },
+  {
+    "en": "{{algorithm}} result",
+    "it": "{{algorithm}} risultato"
+  },
+  {
+    "en": "{{chars}} chars / {{bytes}} bytes",
+    "it": "{{chars}} caratteri / {{bytes}} byte"
+  },
+  {
+    "en": "{{count}} match(es)",
+    "it": "Corrispondenza/e"
+  },
+  {
+    "en": "{{count}} {{unit}} ago",
+    "it": "{{count}} {{unit}} fa"
+  },
+  {
+    "en": "{{count}} {{unit}} from now",
+    "it": "{{count}} {{unit}} da adesso"
+  },
+  {
+    "en": "{{noun}}{{a}}–{{b}}",
+    "it": "0 1 2"
+  },
+  {
+    "en": "{{noun}}{{a}}–{{b}}, every {{n}}",
+    "it": "{{noun}} {{a}} – {{b}} , ogni {{n}}"
+  },
+  {
+    "en": "{{noun}}{{values}}",
+    "it": "0 1"
+  },
+  {
+    "en": "{{n}} annotation(s)",
+    "it": "{{n}} annotazioni"
+  },
+  {
+    "en": "{{n}} pages",
+    "it": "{{n}} pagine"
+  },
+  {
+    "en": "{{size}} bytes",
+    "it": "{{size}} byte"
+  },
+  {
+    "en": "{{w}}×{{h}} · {{n}} frames",
+    "it": "{{w}} × {{h}} · {{n}} fotogrammi"
+  },
+  {
+    "en": "{{year}}-{{month}}",
+    "it": "0 1"
+  },
+  {
+    "en": "✓ Valid JSON",
+    "it": "✓ Valido JSON"
+  }
+]

@@ -1,0 +1,802 @@
+[
+  {
+    "en": "Forest",
+    "it": "Foresta"
+  },
+  {
+    "en": "Format",
+    "it": "Formato"
+  },
+  {
+    "en": "Format / minify / validate with 2/4-space indent and line/column error locations",
+    "it": "Formatta / minimizza / convalida con rientro di 2/4 di spazio e posizioni degli errori di riga/colonna"
+  },
+  {
+    "en": "Format supports {n} and {total}.",
+    "it": "Il formato supporta {n} e {total}."
+  },
+  {
+    "en": "Formatting",
+    "it": "Formattazione"
+  },
+  {
+    "en": "Fourier transform",
+    "it": "Trasformata di Fourier"
+  },
+  {
+    "en": "Friday",
+    "it": "Venerdì"
+  },
+  {
+    "en": "Frost",
+    "it": "Gelo"
+  },
+  {
+    "en": "Full URL (keeps : / ? & etc.)",
+    "it": "⟦0 completo⟧ (mantiene : / ? & ecc.)"
+  },
+  {
+    "en": "Full width",
+    "it": "A tutto schermo"
+  },
+  {
+    "en": "Functions",
+    "it": "Funzioni"
+  },
+  {
+    "en": "GFM (tables / strikethrough / task lists)",
+    "it": "GFM (tabelle / barrato /elenchi attività)"
+  },
+  {
+    "en": "GIF Frame Extractor",
+    "it": "Estrazioni Frame"
+  },
+  {
+    "en": "Galaxy",
+    "it": "Galassia"
+  },
+  {
+    "en": "Galaxy color",
+    "it": "Colore della galassia"
+  },
+  {
+    "en": "Gap (px)",
+    "it": "Spaziatura (px)"
+  },
+  {
+    "en": "Gaussian integral",
+    "it": "Integrale gaussiano"
+  },
+  {
+    "en": "Generate",
+    "it": "Genera"
+  },
+  {
+    "en": "Generate a placeholder PNG by size, colors, and optional text",
+    "it": "Genera un segnaposto PNG per dimensione, colori e testo opzionale"
+  },
+  {
+    "en": "Generate and decode QR codes with ECC, size, colors, and margin options",
+    "it": "Genera e decodifica QR codici con ecc, dimensioni, colori e opzioni di margine"
+  },
+  {
+    "en": "Generate border-radius, shadows, transform, filter, and more",
+    "it": "Genera raggio di confine, ombre, trasforma, filtra e altro ancora"
+  },
+  {
+    "en": "Generate names / emails / UUIDs / lorem in zh/en, 1–50 items",
+    "it": "Genera nomi / email / UUID / lorem in zh/en, 1–50 elementi"
+  },
+  {
+    "en": "Generate random integers or decimals in a range, with optional unique values",
+    "it": "Genera numeri interi o decimali casuali in un intervallo, con valori univoci opzionali"
+  },
+  {
+    "en": "Generate random strings by length and charset (alnum / hex / custom)",
+    "it": "Genera stringhe casuali per lunghezza e set di caratteri (alnum / hex / custom)"
+  },
+  {
+    "en": "Generated (one per line)",
+    "it": "Generato (uno per riga)"
+  },
+  {
+    "en": "Generators",
+    "it": "Generatori"
+  },
+  {
+    "en": "Generic SQL",
+    "it": "Generale"
+  },
+  {
+    "en": "Glacier",
+    "it": "ghiacciai."
+  },
+  {
+    "en": "Golden sun",
+    "it": "sole d'oro"
+  },
+  {
+    "en": "Gradient",
+    "it": "Gradiente"
+  },
+  {
+    "en": "Gradient preview",
+    "it": "Anteprima sfumatura"
+  },
+  {
+    "en": "Gram g",
+    "it": "Grammo - g"
+  },
+  {
+    "en": "Grape",
+    "it": "Uva"
+  },
+  {
+    "en": "Graphite",
+    "it": "Grafite"
+  },
+  {
+    "en": "Grayscale",
+    "it": "Scala di grigi"
+  },
+  {
+    "en": "Greek letters",
+    "it": "Lettere greche"
+  },
+  {
+    "en": "Green",
+    "it": "Fagiolini"
+  },
+  {
+    "en": "Group",
+    "it": "Group"
+  },
+  {
+    "en": "Groups",
+    "it": "Gruppi"
+  },
+  {
+    "en": "Gzip Compress",
+    "it": "Compressione Gzip"
+  },
+  {
+    "en": "Gzip text to base64 / decompress back to text",
+    "it": "Gzip text to base64 / decompressione back to text"
+  },
+  {
+    "en": "H (~30%)",
+    "it": "H : 30"
+  },
+  {
+    "en": "HMAC secret…",
+    "it": "Segreto"
+  },
+  {
+    "en": "HMAC-SHA256 / SHA512 with hex / base64 output",
+    "it": "HMAC-SHA256 / SHA512 con uscita esagonale / base64"
+  },
+  {
+    "en": "HSV / CMYK Converter",
+    "it": "Convertitore HSV / CMYK"
+  },
+  {
+    "en": "HTML &#x…;",
+    "it": "0 X"
+  },
+  {
+    "en": "HTML &#…;",
+    "it": "HTML &#…;"
+  },
+  {
+    "en": "HTML Color Picker",
+    "it": "Seleziona colore"
+  },
+  {
+    "en": "HTML Encode / Decode",
+    "it": "HTML Codifica / Decodifica"
+  },
+  {
+    "en": "HTML Minify / Beautify",
+    "it": "HTML Minimizza / Abbellisci"
+  },
+  {
+    "en": "HTML input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "HTML preview",
+    "it": "Anteprima: {0}"
+  },
+  {
+    "en": "HTML style",
+    "it": "HTML stile"
+  },
+  {
+    "en": "Harbor",
+    "it": "Porto"
+  },
+  {
+    "en": "Has EXIF",
+    "it": "Ha EXIF"
+  },
+  {
+    "en": "Hash Calculator",
+    "it": "Calcolatore di hash"
+  },
+  {
+    "en": "Hash failed: algorithm not supported in this environment",
+    "it": "Hash non riuscito: algoritmo non supportato in questo ambiente"
+  },
+  {
+    "en": "Header",
+    "it": "Intestazione"
+  },
+  {
+    "en": "Heading 1 (#)",
+    "it": "Intestazione 1"
+  },
+  {
+    "en": "Heading 2 (##)",
+    "it": "Intestazione 2"
+  },
+  {
+    "en": "Heading 3 (###)",
+    "it": "Intestazione 3"
+  },
+  {
+    "en": "Heading 4 (####)",
+    "it": "Intestazione 4"
+  },
+  {
+    "en": "Heading 5 (#####)",
+    "it": "Intestazione 5"
+  },
+  {
+    "en": "Heading 6 (######)",
+    "it": "Intestazione 6"
+  },
+  {
+    "en": "Hei (sans CJK)",
+    "it": "Hei (senza CJK)"
+  },
+  {
+    "en": "Height",
+    "it": "Altezza"
+  },
+  {
+    "en": "Height (cm, or meters)",
+    "it": "Altezza (cm o metri)"
+  },
+  {
+    "en": "Height (inches)",
+    "it": "Statura (centimetri)"
+  },
+  {
+    "en": "Hex (&#x26;)",
+    "it": "Esagonale (&)"
+  },
+  {
+    "en": "Hex Encode / Decode",
+    "it": "Codifica / decodifica esadecimale"
+  },
+  {
+    "en": "Hex ↔ UTF-8 text with optional spaces",
+    "it": "⟧ Testo esadecimale ↔ ⟦0 con spazi opzionali"
+  },
+  {
+    "en": "Hidden",
+    "it": "Nascosto"
+  },
+  {
+    "en": "Highlight",
+    "it": "Evidenzia"
+  },
+  {
+    "en": "Highlighted preview",
+    "it": "Anteprima evidenziata"
+  },
+  {
+    "en": "Hold Ctrl / ⌘ and scroll to zoom in the preview",
+    "it": "Tieni premuto CTRL /e scorri per ingrandire l'anteprima"
+  },
+  {
+    "en": "Holiday",
+    "it": "Festivo"
+  },
+  {
+    "en": "Holidays / terms",
+    "it": "Ferie / termini"
+  },
+  {
+    "en": "Honey gold",
+    "it": "Oro miele"
+  },
+  {
+    "en": "Horizon",
+    "it": "Orizzonte"
+  },
+  {
+    "en": "Horizontal",
+    "it": "Orizzontali"
+  },
+  {
+    "en": "Horizontal bar",
+    "it": "Barra orizzontale"
+  },
+  {
+    "en": "Horizontal rule",
+    "it": "Elemento HTML"
+  },
+  {
+    "en": "Host count",
+    "it": "Conteggio degli host"
+  },
+  {
+    "en": "Hourly (on the hour)",
+    "it": "Ogni ora (all'ora)"
+  },
+  {
+    "en": "Hover",
+    "it": "Passaggio del mouse"
+  },
+  {
+    "en": "Hue rotate",
+    "it": "Tinta-Rotazione"
+  },
+  {
+    "en": "Hyphens",
+    "it": "Sillabazioni"
+  },
+  {
+    "en": "ICO Converter",
+    "it": "Convertitore ICO"
+  },
+  {
+    "en": "ICO → PNG",
+    "it": "ICO"
+  },
+  {
+    "en": "ID card (18 digits)",
+    "it": "Carta d'identità (18 cifre)"
+  },
+  {
+    "en": "IPv4 CIDR: network / broadcast / host range / mask / host count",
+    "it": "IPv4 CIDR: network / broadcast / host range / mask / host count"
+  },
+  {
+    "en": "IPv4 address",
+    "it": "Indirizzo 0"
+  },
+  {
+    "en": "Ice blue",
+    "it": "Azzurro ghiaccio"
+  },
+  {
+    "en": "Iceberg",
+    "it": "Iceberg"
+  },
+  {
+    "en": "Ignore trailing / repeated spaces",
+    "it": "Ignora spazi finali / ripetuti"
+  },
+  {
+    "en": "Image",
+    "it": "Immagine"
+  },
+  {
+    "en": "Image (PNG/JPG)",
+    "it": "Immagine (PNG/JPG)"
+  },
+  {
+    "en": "Image Border / Radius / Shadow",
+    "it": "Bordo / raggio / ombra immagine"
+  },
+  {
+    "en": "Image Color Adjust",
+    "it": "Regolazione del colore dell'immagine"
+  },
+  {
+    "en": "Image Color Picker",
+    "it": "Selettore colore immagine"
+  },
+  {
+    "en": "Image Compress",
+    "it": "Compressione immagine"
+  },
+  {
+    "en": "Image Crop",
+    "it": "Ritaglio immagine"
+  },
+  {
+    "en": "Image Merge",
+    "it": "Unione immagini"
+  },
+  {
+    "en": "Image Watermark",
+    "it": "Image Watermark"
+  },
+  {
+    "en": "Image encode failed: ensure the browser supports this format, or try another image",
+    "it": "Codifica immagine non riuscita: assicurati che il browser supporti questo formato o prova un'altra immagine"
+  },
+  {
+    "en": "Image limit reached",
+    "it": "Limite immagine raggiunto"
+  },
+  {
+    "en": "Image to Card",
+    "it": "Immagine su carta"
+  },
+  {
+    "en": "Image to Paper PDF",
+    "it": "Immagine su carta PDF"
+  },
+  {
+    "en": "Image → Base64",
+    "it": "Immagine 0"
+  },
+  {
+    "en": "Image → ICO",
+    "it": "Immagine → ICO"
+  },
+  {
+    "en": "Image ↔ Base64",
+    "it": "Immagine 0"
+  },
+  {
+    "en": "Images",
+    "it": "Immagini"
+  },
+  {
+    "en": "Images to PDF",
+    "it": "Immagini a PDF"
+  },
+  {
+    "en": "Imperial (in / lb)",
+    "it": "Imperiale (in / lb)"
+  },
+  {
+    "en": "Inch in",
+    "it": "pollici (in)"
+  },
+  {
+    "en": "Include at least one char from each selected set",
+    "it": "Includi almeno un carattere da ciascun set selezionato"
+  },
+  {
+    "en": "Incorrect password. Please try again.",
+    "it": "Password sbagliata. Prova di nuovo"
+  },
+  {
+    "en": "Indent",
+    "it": "Rientro"
+  },
+  {
+    "en": "Index",
+    "it": "Indice"
+  },
+  {
+    "en": "Indigo purple",
+    "it": "Viola indaco"
+  },
+  {
+    "en": "Ink black",
+    "it": "Nero inchiostro"
+  },
+  {
+    "en": "Inline code (`)",
+    "it": "Codice inline (`)"
+  },
+  {
+    "en": "Input",
+    "it": "Input"
+  },
+  {
+    "en": "Input exceeds the 5MB limit; use file mode for large content",
+    "it": "L'input supera il limite di 5 MB; utilizzare la modalità file per contenuti di grandi dimensioni"
+  },
+  {
+    "en": "Insert & download",
+    "it": "Inserisci Download"
+  },
+  {
+    "en": "Insert Image into PDF",
+    "it": "Inserisci immagine in PDF"
+  },
+  {
+    "en": "Inset",
+    "it": "Inset"
+  },
+  {
+    "en": "Integer input",
+    "it": "Ingresso intero"
+  },
+  {
+    "en": "Invalid Base64",
+    "it": "{0} non valido.&#x0D;"
+  },
+  {
+    "en": "Invalid CIDR (IPv4/prefix, e.g. 10.0.0.0/8)",
+    "it": "CIDR (IPv4/prefisso non valido, ad es. 10.0.0.0/8)"
+  },
+  {
+    "en": "Invalid PEM",
+    "it": "PEM non valido"
+  },
+  {
+    "en": "Invalid URL",
+    "it": "{0} non valido.&#x0D;"
+  },
+  {
+    "en": "Invalid XML",
+    "it": "{0} non valido.&#x0D;"
+  },
+  {
+    "en": "Invalid XSLT",
+    "it": "XSLT non valido"
+  },
+  {
+    "en": "Invalid character \"{{char}}\" at position {{position}}",
+    "it": "Carattere \" {{char}} \" non valido nella posizione {{position}}"
+  },
+  {
+    "en": "Invalid crop region",
+    "it": "Regione di coltura non valida"
+  },
+  {
+    "en": "Invalid data format",
+    "it": "Formato dati non valido"
+  },
+  {
+    "en": "Invalid expression syntax",
+    "it": "Sintassi dell'espressione non valida"
+  },
+  {
+    "en": "Invalid field value; check ranges and lists",
+    "it": "Valore del campo non valido; intervalli ed elenchi di controllo"
+  },
+  {
+    "en": "Invalid format: a JWT consists of header.payload.signature",
+    "it": "Formato non valido: uno JWT è costituito da header.payload.signature"
+  },
+  {
+    "en": "Invalid hex (even length, 0-9a-f)",
+    "it": "Hex non valido (lunghezza pari, 0-9a-f)"
+  },
+  {
+    "en": "Invalid image size",
+    "it": "Dimensione dell'immagine non valido"
+  },
+  {
+    "en": "Invalid input",
+    "it": "Input non valido"
+  },
+  {
+    "en": "Invalid input: bad ciphertext or IV",
+    "it": "Input non valido: testo cifrato errato o IV"
+  },
+  {
+    "en": "Invalid key: check passphrase or hex key length",
+    "it": "Chiave non valida: controlla la passphrase o la lunghezza della chiave esadecimale"
+  },
+  {
+    "en": "Invalid length: Base64 content length mod 4 cannot be 1",
+    "it": "Lunghezza non valida: ⟦0 lunghezza⟧ contenuto mod 4 non può essere 1"
+  },
+  {
+    "en": "Invalid margin",
+    "it": "Margine superiore non valido."
+  },
+  {
+    "en": "Invalid or corrupt ICO file",
+    "it": "\"File danneggiato o non valido\""
+  },
+  {
+    "en": "Invalid output size (check scale; max edge 8192)",
+    "it": "Dimensione di uscita non valida (scala di controllo; bordo massimo 8192)"
+  },
+  {
+    "en": "Invalid padding \"=\" at position {{position}}",
+    "it": "Padding non valido \"=\" in posizione {{position}}"
+  },
+  {
+    "en": "Invalid page range",
+    "it": "Intervallo pagine non valido."
+  },
+  {
+    "en": "Invalid range: ensure min ≤ max and enough room when unique",
+    "it": "Intervallo non valido: garantire min ≤ max e spazio sufficiente quando unico"
+  },
+  {
+    "en": "Issued at iat",
+    "it": "Emesso a"
+  },
+  {
+    "en": "Issuer CN",
+    "it": "CN emittente"
+  },
+  {
+    "en": "Italic (*)",
+    "it": "Corsivo"
+  },
+  {
+    "en": "Ivory",
+    "it": "Avorio"
+  },
+  {
+    "en": "JPEG only",
+    "it": "solo 0"
+  },
+  {
+    "en": "JPEG only: strip APP1 (EXIF) and download.",
+    "it": "⟧ Solo⟦ 0: strip APP1 (EXIF) e download."
+  },
+  {
+    "en": "JS Minify / Beautify",
+    "it": "JS Minify / Beautify"
+  },
+  {
+    "en": "JS \\uXXXX",
+    "it": "JS \\uXXXX"
+  },
+  {
+    "en": "JS \\u{…}",
+    "it": "JS \\u{…}"
+  },
+  {
+    "en": "JSON Converter",
+    "it": "Convertitore"
+  },
+  {
+    "en": "JSON Formatter",
+    "it": "programma di formattazione"
+  },
+  {
+    "en": "JSON input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "JSON output",
+    "it": "JSON output"
+  },
+  {
+    "en": "JSON parse failed",
+    "it": "Parse fallito!"
+  },
+  {
+    "en": "JSON parse failed: digits required after decimal point (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: cifre richieste dopo la virgola decimale (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: digits required in exponent (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: cifre richieste nell'esponente (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: expected literal \"{{literal}}\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: letterale previsto \" {{literal}} \" (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: extra content after value (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: contenuto extra dopo il valore (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: input is empty",
+    "it": "JSON analisi non riuscita: l'input è vuoto"
+  },
+  {
+    "en": "JSON parse failed: invalid \\u escape, need 4 hex digits (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: escape non valido \\u, sono necessarie 4 cifre esadecimali (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: invalid character \"{{char}}\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: carattere \" {{char}} \" non valido (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: invalid escape \"\\{{char}}\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: escape non valido \"\\ {{char}} \" (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: invalid number (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: numero non valido (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: missing \",\" between array elements (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: manca \",\" tra gli elementi dell'array (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: missing \",\" between object members (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: manca \",\" tra i membri dell'oggetto (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: missing \":\" after object key (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: manca \":\" dopo la chiave dell'oggetto (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: object key must be a string (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: la chiave dell'oggetto deve essere una stringa (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: please check the syntax",
+    "it": "JSON analisi non riuscita: controllare la sintassi"
+  },
+  {
+    "en": "JSON parse failed: string cannot span lines (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: la stringa non può estendersi sulle righe (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: string ended unexpectedly (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: stringa terminata inaspettatamente (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: trailing comma not allowed (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: virgola finale non consentita (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unclosed array, missing \"]\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: matrice non chiusa, manca \"]\" (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unclosed object, missing \"}\" (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: oggetto non chiuso, \"}\" mancante (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unclosed string (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: stringa non chiusa (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unexpected end, value missing (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: fine imprevista, valore mancante (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSON parse failed: unknown error",
+    "it": "JSON analisi non riuscita: errore sconosciuto"
+  },
+  {
+    "en": "JSON parse failed: value missing (line {{line}}, column {{column}})",
+    "it": "JSON analisi non riuscita: valore mancante (riga {{line}} , colonna {{column}} )"
+  },
+  {
+    "en": "JSONPath Query",
+    "it": "Query JSONPath"
+  },
+  {
+    "en": "JWT Parser",
+    "it": "Analizzatore"
+  },
+  {
+    "en": "JWT input",
+    "it": "Ingresso 0"
+  },
+  {
+    "en": "JavaScript input",
+    "it": "Input JavaScript"
+  },
+  {
+    "en": "Judging J / Perceiving P",
+    "it": "Giudizio J / Percezione P"
+  },
+  {
+    "en": "Jungle",
+    "it": "Giungla"
+  },
+  {
+    "en": "Key mode",
+    "it": "Modalità chiave"
+  },
+  {
+    "en": "Keyword case",
+    "it": "Keyword case"
+  },
+  {
+    "en": "Keywords",
+    "it": "Keywords"
+  },
+  {
+    "en": "Keywords…",
+    "it": "Parole chiave"
+  },
+  {
+    "en": "Kilogram kg",
+    "it": "Chilogrammo (kg)"
+  }
+]

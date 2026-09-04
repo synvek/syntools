@@ -1,0 +1,422 @@
+{
+  "e.g. Sales": {
+    "es": "e.g. Sales",
+    "pt": "e.g. Sales"
+  },
+  "Stops": {
+    "es": "Stops",
+    "pt": "Stops"
+  },
+  "{{noun}}{{a}}–{{b}}, every {{n}}": {
+    "es": "{{noun}}{{a}}–{{b}}, every {{n}}",
+    "pt": "{{noun}}{{a}}–{{b}}, every {{n}}"
+  },
+  "{{algorithm}} result": {
+    "es": "{{algorithm}} result",
+    "pt": "{{algorithm}} result"
+  },
+  "Resume": {
+    "es": "Resume",
+    "pt": "Resume"
+  },
+  "Reset": {
+    "es": "Reset",
+    "pt": "Reset"
+  },
+  "Transition": {
+    "es": "Transition",
+    "pt": "Transition"
+  },
+  "Special": {
+    "es": "Special",
+    "pt": "Special"
+  },
+  "Whitespace": {
+    "es": "Whitespace",
+    "pt": "Whitespace"
+  },
+  "Color": {
+    "es": "Color",
+    "pt": "Color"
+  },
+  "Shadow": {
+    "es": "Shadow",
+    "pt": "Shadow"
+  },
+  "Theme": {
+    "es": "Theme",
+    "pt": "Theme"
+  },
+  "Uppercase": {
+    "es": "Uppercase",
+    "pt": "Uppercase"
+  },
+  "Table": {
+    "es": "Table",
+    "pt": "Table"
+  },
+  "snake_case": {
+    "es": "snake_case",
+    "pt": "snake_case"
+  },
+  "e.g. \\d+": {
+    "es": "e.g. \\d+",
+    "pt": "e.g. \\d+"
+  },
+  "Pages": {
+    "es": "Pages",
+    "pt": "Pages"
+  },
+  "hours": {
+    "es": "hours",
+    "pt": "hours"
+  },
+  "Signature": {
+    "es": "Signature",
+    "pt": "Signature"
+  },
+  "Transform": {
+    "es": "Transform",
+    "pt": "Transform"
+  },
+  "Workday": {
+    "es": "Workday",
+    "pt": "Workday"
+  },
+  "e.g. 2026-09-01 12:00:00 or 2026-09-01T04:00:00Z": {
+    "es": "e.g. 2026-09-01 12:00:00 or 2026-09-01T04:00:00Z",
+    "pt": "e.g. 2026-09-01 12:00:00 or 2026-09-01T04:00:00Z"
+  },
+  "Subtitle": {
+    "es": "Subtitle",
+    "pt": "Subtitle"
+  },
+  "e.g. (1+2)*3 or sqrt(9)+pi": {
+    "es": "e.g. (1+2)*3 or sqrt(9)+pi",
+    "pt": "e.g. (1+2)*3 or sqrt(9)+pi"
+  },
+  "UPPER CASE": {
+    "es": "UPPER CASE",
+    "pt": "UPPER CASE"
+  },
+  "Words": {
+    "es": "Words",
+    "pt": "Words"
+  },
+  "pages": {
+    "es": "pages",
+    "pt": "pages"
+  },
+  "e.g. Month": {
+    "es": "e.g. Month",
+    "pt": "e.g. Month"
+  },
+  "#3b82f6 / rgb(59,130,246)…": {
+    "es": "#3b82f6 / rgb(59,130,246)…",
+    "pt": "#3b82f6 / rgb(59,130,246)…"
+  },
+  "Writing": {
+    "es": "Writing",
+    "pt": "Writing"
+  },
+  "White": {
+    "es": "White",
+    "pt": "White"
+  },
+  "{{noun}}{{a}}–{{b}}": {
+    "es": "{{noun}}{{a}}–{{b}}",
+    "pt": "{{noun}}{{a}}–{{b}}"
+  },
+  "Stroke": {
+    "es": "Stroke",
+    "pt": "Stroke"
+  },
+  "e.g. */5 8-18 * * 1-5 or @daily (5 fields, 6 with seconds)": {
+    "es": "e.g. */5 8-18 * * 1-5 or @daily (5 fields, 6 with seconds)",
+    "pt": "e.g. */5 8-18 * * 1-5 or @daily (5 fields, 6 with seconds)"
+  },
+  "Yellow": {
+    "es": "Yellow",
+    "pt": "Yellow"
+  },
+  "{ \"sub\": \"123\", \"name\": \"Alice\" }": {
+    "es": "{ \"sub\": \"123\", \"name\": \"Alice\" }",
+    "pt": "{ \"sub\": \"123\", \"name\": \"Alice\" }"
+  },
+  "Subject": {
+    "es": "Subject",
+    "pt": "Subject"
+  },
+  "minutes": {
+    "es": "minutes",
+    "pt": "minutes"
+  },
+  "Weight": {
+    "es": "Weight",
+    "pt": "Weight"
+  },
+  "Email": {
+    "es": "Email",
+    "pt": "Email"
+  },
+  "Broadcast": {
+    "es": "Broadcast",
+    "pt": "Broadcast"
+  },
+  "{{year}}-{{month}}": {
+    "es": "{{year}}-{{month}}",
+    "pt": "{{year}}-{{month}}"
+  },
+  "Header": {
+    "es": "Header",
+    "pt": "Header"
+  },
+  "Footer": {
+    "es": "Footer",
+    "pt": "Footer"
+  },
+  "milliseconds": {
+    "es": "milliseconds",
+    "pt": "milliseconds"
+  },
+  "Scale": {
+    "es": "Scale",
+    "pt": "Scale"
+  },
+  "https://example.com/path?a=1&b=2": {
+    "es": "https://example.com/path?a=1&b=2",
+    "pt": "https://example.com/path?a=1&b=2"
+  },
+  "{{count}} {{unit}} from now": {
+    "es": "{{count}} {{unit}} from now",
+    "pt": "{{count}} {{unit}} from now"
+  },
+  "e.g. #3b82f6, rgb(59,130,246), hsl(217,91%,60%)…": {
+    "es": "e.g. #3b82f6, rgb(59,130,246), hsl(217,91%,60%)…",
+    "pt": "e.g. #3b82f6, rgb(59,130,246), hsl(217,91%,60%)…"
+  },
+  "Timing": {
+    "es": "Timing",
+    "pt": "Timing"
+  },
+  "{{count}} match(es)": {
+    "es": "{{count}} match(es)",
+    "pt": "{{count}} match(es)"
+  },
+  "Spectrum": {
+    "es": "Spectrum",
+    "pt": "Spectrum"
+  },
+  "e.g. 192.168.1.0/24": {
+    "es": "e.g. 192.168.1.0/24",
+    "pt": "e.g. 192.168.1.0/24"
+  },
+  "label,value\napple,30\nbanana,20": {
+    "es": "label,value\napple,30\nbanana,20",
+    "pt": "label,value\napple,30\nbanana,20"
+  },
+  "Winter": {
+    "es": "Winter",
+    "pt": "Winter"
+  },
+  "e.g. 255, 0xff, 0b11111111, 0377…": {
+    "es": "e.g. 255, 0xff, 0b11111111, 0377…",
+    "pt": "e.g. 255, 0xff, 0b11111111, 0377…"
+  },
+  "{{n}} annotation(s)": {
+    "es": "{{n}} annotation(s)",
+    "pt": "{{n}} annotation(s)"
+  },
+  "CONSTANT_CASE": {
+    "es": "CONSTANT_CASE",
+    "pt": "CONSTANT_CASE"
+  },
+  "e.g. E = mc^2 or \\frac{a}{b}": {
+    "es": "e.g. E = mc^2 or \\frac{a}{b}",
+    "pt": "e.g. E = mc^2 or \\frac{a}{b}"
+  },
+  "years": {
+    "es": "years",
+    "pt": "years"
+  },
+  "Match": {
+    "es": "Match",
+    "pt": "Match"
+  },
+  "Vibrant": {
+    "es": "Vibrant",
+    "pt": "Vibrant"
+  },
+  "Shape": {
+    "es": "Shape",
+    "pt": "Shape"
+  },
+  "lowercase": {
+    "es": "lowercase",
+    "pt": "lowercase"
+  },
+  "seconds": {
+    "es": "seconds",
+    "pt": "seconds"
+  },
+  "months": {
+    "es": "months",
+    "pt": "months"
+  },
+  "e.g. 1725000000 or 1725000000000": {
+    "es": "e.g. 1725000000 or 1725000000000",
+    "pt": "e.g. 1725000000 or 1725000000000"
+  },
+  "base64": {
+    "es": "base64",
+    "pt": "base64"
+  },
+  "v7 (time-ordered)": {
+    "es": "v7 (time-ordered)",
+    "pt": "v7 (time-ordered)"
+  },
+  "v4 (random)": {
+    "es": "v4 (random)",
+    "pt": "v4 (random)"
+  },
+  "Wildcard": {
+    "es": "Wildcard",
+    "pt": "Wildcard"
+  },
+  "{{count}} {{unit}} ago": {
+    "es": "{{count}} {{unit}} ago",
+    "pt": "{{count}} {{unit}} ago"
+  },
+  "Start": {
+    "es": "Start",
+    "pt": "Start"
+  },
+  "Label": {
+    "es": "Label",
+    "pt": "Label"
+  },
+  "Scope": {
+    "es": "Scope",
+    "pt": "Scope"
+  },
+  "Title": {
+    "es": "Title",
+    "pt": "Title"
+  },
+  "Cauchy–Schwarz": {
+    "es": "Cauchy–Schwarz",
+    "pt": "Cauchy–Schwarz"
+  },
+  "Total": {
+    "es": "Total",
+    "pt": "Total"
+  },
+  "UPPERCASE": {
+    "es": "UPPERCASE",
+    "pt": "UPPERCASE"
+  },
+  "e.g. 1.5": {
+    "es": "e.g. 1.5",
+    "pt": "e.g. 1.5"
+  },
+  "Version": {
+    "es": "Version",
+    "pt": "Version"
+  },
+  "Width": {
+    "es": "Width",
+    "pt": "Width"
+  },
+  "{{w}}×{{h}} · {{n}} frames": {
+    "es": "{{w}}×{{h}} · {{n}} frames",
+    "pt": "{{w}}×{{h}} · {{n}} frames"
+  },
+  "\\u escape (\\u4E2D)": {
+    "es": "\\u escape (\\u4E2D)",
+    "pt": "\\u escape (\\u4E2D)"
+  },
+  "Reverse": {
+    "es": "Reverse",
+    "pt": "Reverse"
+  },
+  "Spread": {
+    "es": "Spread",
+    "pt": "Spread"
+  },
+  "two's complement": {
+    "es": "two's complement",
+    "pt": "two's complement"
+  },
+  "sWAP cASE": {
+    "es": "sWAP cASE",
+    "pt": "sWAP cASE"
+  },
+  "Source": {
+    "es": "Source",
+    "pt": "Source"
+  },
+  "Range": {
+    "es": "Range",
+    "pt": "Range"
+  },
+  "Vertical": {
+    "es": "Vertical",
+    "pt": "Vertical"
+  },
+  "kebab-case": {
+    "es": "kebab-case",
+    "pt": "kebab-case"
+  },
+  "camelCase": {
+    "es": "camelCase",
+    "pt": "camelCase"
+  },
+  "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----": {
+    "es": "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----",
+    "pt": "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----"
+  },
+  "Strong": {
+    "es": "Strong",
+    "pt": "Strong"
+  },
+  "Spring": {
+    "es": "Spring",
+    "pt": "Spring"
+  },
+  "Vignette": {
+    "es": "Vignette",
+    "pt": "Vignette"
+  },
+  "e.g. 1,3,5": {
+    "es": "e.g. 1,3,5",
+    "pt": "e.g. 1,3,5"
+  },
+  "{{size}} bytes": {
+    "es": "{{size}} bytes",
+    "pt": "{{size}} bytes"
+  },
+  "{{noun}}{{values}}": {
+    "es": "{{noun}}{{values}}",
+    "pt": "{{noun}}{{values}}"
+  },
+  "Format": {
+    "es": "Format",
+    "pt": "Format"
+  },
+  "Translate": {
+    "es": "Translate",
+    "pt": "Translate"
+  },
+  "Search": {
+    "es": "Search",
+    "pt": "Search"
+  },
+  "{{n}} pages": {
+    "es": "{{n}} pages",
+    "pt": "{{n}} pages"
+  },
+  "hex (hexadecimal)": {
+    "es": "hex (hexadecimal)",
+    "pt": "hex (hexadecimal)"
+  }
+}

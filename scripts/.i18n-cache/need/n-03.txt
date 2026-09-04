@@ -1,0 +1,100 @@
+Email
+Enable tones
+Encode
+Encode (text → Base64)
+Encode failed: input contains unpaired surrogate characters
+Encode/decode HTML special characters: named / decimal / hex / \u escapes
+Encoded text
+Encoding
+Encrypt
+Encrypt & download
+Encrypt PDF
+Encrypt output: base64(salt|iv|ciphertext+tag); passphrase uses PBKDF2-SHA256
+Encrypted
+Encryption failed
+End of line
+Engine
+Enter 6/8-digit code…
+Enter Base64 or choose an image
+Enter Chinese, e.g. 你好世界…
+Enter Markdown headings or lists to generate a map
+Enter Markdown, e.g. # Heading…
+Enter Mermaid syntax to render
+Enter Simplified Chinese…
+Enter Traditional Chinese…
+Enter \u4e2d, U+4E2D, &#x4E2D;, or E4 B8 AD…
+Enter a formula to preview
+Enter a title or body to preview
+Enter a valid height and weight
+Enter a valid hours / minutes / seconds
+Enter allowed characters…
+Enter annotation text
+Enter content to encode…
+Enter content…
+Enter passphrase…
+Enter text for the card…
+Enter text or URL, e.g. https://example.com…
+Enter text to convert…
+Enter text to encode…
+Enter text to hash…
+Enter text, e.g. 中 / A / 😀…
+Enter the content to encode
+Enter the open password
+Entropy ≈ {{bits}} bits
+Eraser
+Error correction
+Euler's identity
+Evening
+Every (*)
+Every minute
+Exclude ambiguous characters (0 O 1 l I etc.)
+Expiration exp
+Expired
+Export JPG
+Export PDF
+Export PNG
+Export SVG
+Export annotated PDF
+Export failed; try another image
+Export images
+Exporting…
+Expression
+Extra
+Extract & download
+Extract PDF Pages
+Extract selected pages into a new PDF
+Extracted {{n}} sizes from {{name}}
+Extraversion E / Introversion I
+Failed to decode the image
+Failed to load PDF
+Failed to load the image
+Failed to load the image: please make sure it is a valid image file
+Failed to parse GIF
+Failed to parse header: not valid base64url-encoded JSON
+Failed to parse input: please check the syntax
+Failed to parse payload: not valid base64url-encoded JSON
+Failed to read file contents
+Fairy pink
+Fake Data Generator
+Favorites
+Field
+Field breakdown
+File exceeds the {{max}} limit (current {{size}})
+File hash failed: {{message}}
+File is empty
+File mode: file → Base64 (ArrayBuffer chunks)
+File too large (recommend < 50MB)
+Fill current (seconds)
+Filter
+Filter tools
+Filter…
+Fire sky
+First host
+Fit images to A3/A4/A5/Letter and export PDF
+Flags
+Flame
+Font size
+Font size / width / padding / line height out of range
+Foot ft
+Footer
+Foreground

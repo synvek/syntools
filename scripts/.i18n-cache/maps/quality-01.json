@@ -1,0 +1,402 @@
+{
+  "Color Converter": {
+    "es": "Conversor de color",
+    "pt": "Conversor de cores"
+  },
+  "Color must be #RGB or #RRGGBB": {
+    "es": "El color debe ser #RGB o #RRGGBB",
+    "pt": "A cor deve ser #RGB ou #RRGGBB"
+  },
+  "Color preview": {
+    "es": "Vista previa del color",
+    "pt": "Pré-visualização da cor"
+  },
+  "Color scheme": {
+    "es": "Esquema de color",
+    "pt": "Esquema de cores"
+  },
+  "Combine images into a PDF": {
+    "es": "Combinar imágenes en un PDF",
+    "pt": "Combinar imagens num PDF"
+  },
+  "Combined text exceeds {{limit}}K character limit; diff stopped (long-run protection)": {
+    "es": "El texto combinado supera el límite de {{limit}}K caracteres; se detuvo el diff (protección de ejecución larga)",
+    "pt": "O texto combinado excede o limite de {{limit}}K caracteres; o diff parou (proteção de execução longa)"
+  },
+  "Compile failed: {{message}}": {
+    "es": "Error de compilación: {{message}}",
+    "pt": "Falha de compilação: {{message}}"
+  },
+  "Compress (text → base64)": {
+    "es": "Comprimir (texto → base64)",
+    "pt": "Comprimir (texto → base64)"
+  },
+  "Compute BMI from height and weight with WHO adult categories": {
+    "es": "Calcula el IMC a partir de altura y peso con categorías WHO para adultos",
+    "pt": "Calcula o IMC a partir da altura e do peso com categorias WHO para adultos"
+  },
+  "Computing…": {
+    "es": "Calculando…",
+    "pt": "A calcular…"
+  },
+  "Config Data Format Converter": {
+    "es": "Conversor de formatos de datos de configuración",
+    "pt": "Conversor de formatos de dados de configuração"
+  },
+  "Contain": {
+    "es": "Contener",
+    "pt": "Conter"
+  },
+  "Content is too long for a QR code: shorten it or lower the error correction level": {
+    "es": "El contenido es demasiado largo para un código QR: acórtalo o baja el nivel de corrección de errores",
+    "pt": "O conteúdo é demasiado longo para um código QR: encurte-o ou baixe o nível de correção de erros"
+  },
+  "Content too long (> 2KB), cannot create share link": {
+    "es": "Contenido demasiado largo (> 2KB); no se puede crear el enlace para compartir",
+    "pt": "Conteúdo demasiado longo (> 2KB); não é possível criar a ligação de partilha"
+  },
+  "Contrast": {
+    "es": "Contraste",
+    "pt": "Contraste"
+  },
+  "Control characters without glyphs show as ·; copy the char or \\xHH": {
+    "es": "Los caracteres de control sin glifo se muestran como ·; copia el carácter o \\xHH",
+    "pt": "Os caracteres de controlo sem glifo mostram-se como ·; copie o carácter ou \\xHH"
+  },
+  "Conversion failed; check the SVG or reduce scale": {
+    "es": "La conversión falló; comprueba el SVG o reduce la escala",
+    "pt": "A conversão falhou; verifique o SVG ou reduza a escala"
+  },
+  "Conversion failed; try another image": {
+    "es": "La conversión falló; prueba con otra imagen",
+    "pt": "A conversão falhou; tente outra imagem"
+  },
+  "Convert & download": {
+    "es": "Convertir y descargar",
+    "pt": "Converter e transferir"
+  },
+  "Convert Chinese to pinyin with optional tones, separator, and case": {
+    "es": "Convierte chino a pinyin con tonos, separador y mayúsculas opcionales",
+    "pt": "Converte chinês para pinyin com tons, separador e maiúsculas opcionais"
+  },
+  "Convert PDF to visual grayscale": {
+    "es": "Convertir PDF a escala de grises visual",
+    "pt": "Converter PDF para escala de cinzentos visual"
+  },
+  "Convert SVG markup or files to PNG with scale and transparency": {
+    "es": "Convierte marcado o archivos SVG a PNG con escala y transparencia",
+    "pt": "Converte marcação ou ficheiros SVG para PNG com escala e transparência"
+  },
+  "Convert YAML ⇄ JSON ⇄ TOML via a lossless JS value intermediate": {
+    "es": "Convierte YAML ⇄ JSON ⇄ TOML mediante un valor JS intermedio sin pérdida",
+    "pt": "Converte YAML ⇄ JSON ⇄ TOML através de um valor JS intermédio sem perda"
+  },
+  "Convert and preview HEX / RGB / HSL color formats": {
+    "es": "Convierte y previsualiza formatos de color HEX / RGB / HSL",
+    "pt": "Converte e pré-visualiza formatos de cor HEX / RGB / HSL"
+  },
+  "Convert and preview RGB, HSV, CMYK, and HEX color spaces": {
+    "es": "Convierte y previsualiza espacios de color RGB, HSV, CMYK y HEX",
+    "pt": "Converte e pré-visualiza espaços de cor RGB, HSV, CMYK e HEX"
+  },
+  "Convert base 2/8/10/16 and visualize bitwise ops for 64-bit signed integers": {
+    "es": "Convierte bases 2/8/10/16 y visualiza operaciones bit a bit para enteros con signo de 64 bits",
+    "pt": "Converte bases 2/8/10/16 e visualiza operações bit a bit para inteiros com sinal de 64 bits"
+  },
+  "Convert between Simplified and Traditional Chinese": {
+    "es": "Convierte entre chino simplificado y tradicional",
+    "pt": "Converte entre chinês simplificado e tradicional"
+  },
+  "Convert case and naming styles (camel / snake / kebab, etc.)": {
+    "es": "Convierte mayúsculas/minúsculas y estilos de nombres (camel / snake / kebab, etc.)",
+    "pt": "Converte maiúsculas/minúsculas e estilos de nomes (camel / snake / kebab, etc.)"
+  },
+  "Convert images to Base64 / Data URL and back, entirely locally": {
+    "es": "Convierte imágenes a Base64 / Data URL y viceversa, totalmente en local",
+    "pt": "Converte imagens para Base64 / Data URL e vice-versa, totalmente em local"
+  },
+  "Convert images to multi-size ICO (favicon), or extract PNG from ICO": {
+    "es": "Convierte imágenes a ICO multi-tamaño (favicon), o extrae PNG desde ICO",
+    "pt": "Converte imagens para ICO multi-tamanho (favicon), ou extrai PNG de ICO"
+  },
+  "Convert metric and imperial length units (mm, cm, m, km, in, ft, and more)": {
+    "es": "Convierte unidades de longitud métricas e imperiales (mm, cm, m, km, in, ft y más)",
+    "pt": "Converte unidades de comprimento métricas e imperiais (mm, cm, m, km, in, ft e mais)"
+  },
+  "Convert metric and imperial weight units (mg, g, kg, t, oz, lb, st)": {
+    "es": "Convierte unidades de peso métricas e imperiales (mg, g, kg, t, oz, lb, st)",
+    "pt": "Converte unidades de peso métricas e imperiais (mg, g, kg, t, oz, lb, st)"
+  },
+  "Convert text and Base64 with Unicode-safe encoding; URL Safe and file mode supported": {
+    "es": "Convierte texto y Base64 con codificación Unicode segura; admite URL Safe y modo archivo",
+    "pt": "Converte texto e Base64 com codificação Unicode segura; suporta URL Safe e modo ficheiro"
+  },
+  "Convert text to/from \\uXXXX, code points, HTML entities, and UTF-8 bytes": {
+    "es": "Convierte texto a/desde \\uXXXX, puntos de código, entidades HTML y bytes UTF-8",
+    "pt": "Converte texto para/de \\uXXXX, pontos de código, entidades HTML e bytes UTF-8"
+  },
+  "Copy Data URL": {
+    "es": "Copiar Data URL",
+    "pt": "Copiar Data URL"
+  },
+  "Copy HTML": {
+    "es": "Copiar HTML",
+    "pt": "Copiar HTML"
+  },
+  "Copy SVG": {
+    "es": "Copiar SVG",
+    "pt": "Copiar SVG"
+  },
+  "Copy code": {
+    "es": "Copiar código",
+    "pt": "Copiar código"
+  },
+  "Count": {
+    "es": "Cantidad",
+    "pt": "Quantidade"
+  },
+  "Count characters, words, lines, paragraphs, CJK chars, and UTF-8 bytes": {
+    "es": "Cuenta caracteres, palabras, líneas, párrafos, caracteres CJK y bytes UTF-8",
+    "pt": "Conta caracteres, palavras, linhas, parágrafos, caracteres CJK e bytes UTF-8"
+  },
+  "Count must be an integer from 1 to 100": {
+    "es": "La cantidad debe ser un entero de 1 a 100",
+    "pt": "A quantidade deve ser um inteiro de 1 a 100"
+  },
+  "Count must be an integer from 1 to 1000": {
+    "es": "La cantidad debe ser un entero de 1 a 1000",
+    "pt": "A quantidade deve ser um inteiro de 1 a 1000"
+  },
+  "Count must be an integer from 1 to 50": {
+    "es": "La cantidad debe ser un entero de 1 a 50",
+    "pt": "A quantidade deve ser um inteiro de 1 a 50"
+  },
+  "Count must be an integer ≥ 1": {
+    "es": "La cantidad debe ser un entero ≥ 1",
+    "pt": "A quantidade deve ser um inteiro ≥ 1"
+  },
+  "Countdown Timer": {
+    "es": "Temporizador de cuenta atrás",
+    "pt": "Temporizador de contagem decrescente"
+  },
+  "Cover": {
+    "es": "Cubrir",
+    "pt": "Cobrir"
+  },
+  "Create PDF": {
+    "es": "Crear PDF",
+    "pt": "Criar PDF"
+  },
+  "Creator": {
+    "es": "Creador",
+    "pt": "Criador"
+  },
+  "Cron Expression Parser": {
+    "es": "Analizador de expresiones Cron",
+    "pt": "Analisador de expressões Cron"
+  },
+  "Crontab Generator": {
+    "es": "Generador de Crontab",
+    "pt": "Gerador de Crontab"
+  },
+  "Crop & download": {
+    "es": "Recortar y descargar",
+    "pt": "Recortar e transferir"
+  },
+  "Crop PDF": {
+    "es": "Recortar PDF",
+    "pt": "Recortar PDF"
+  },
+  "Crop failed; please retry": {
+    "es": "Error al recortar; inténtalo de nuevo",
+    "pt": "Falha ao recortar; tente novamente"
+  },
+  "Crop images freeform or with fixed aspect ratios to PNG": {
+    "es": "Recorta imágenes a mano alzada o con proporciones fijas a PNG",
+    "pt": "Recorta imagens à mão livre ou com proporções fixas para PNG"
+  },
+  "Crop page margins via cropBox": {
+    "es": "Recorta márgenes de página mediante cropBox",
+    "pt": "Recorta margens de página via cropBox"
+  },
+  "Curated prompts by category with search and one-click copy": {
+    "es": "Prompts seleccionados por categoría con búsqueda y copia en un clic",
+    "pt": "Prompts selecionados por categoria com pesquisa e cópia com um clique"
+  },
+  "Current code": {
+    "es": "Código actual",
+    "pt": "Código atual"
+  },
+  "Current time": {
+    "es": "Hora actual",
+    "pt": "Hora atual"
+  },
+  "Custom": {
+    "es": "Personalizado",
+    "pt": "Personalizado"
+  },
+  "Custom chars": {
+    "es": "Caracteres personalizados",
+    "pt": "Caracteres personalizados"
+  },
+  "DER length": {
+    "es": "Longitud DER",
+    "pt": "Comprimento DER"
+  },
+  "Daily at 00:00": {
+    "es": "Diario a las 00:00",
+    "pt": "Diariamente às 00:00"
+  },
+  "Dash -": {
+    "es": "Guion -",
+    "pt": "Travessão -"
+  },
+  "Data (CSV)": {
+    "es": "Datos (CSV)",
+    "pt": "Dados (CSV)"
+  },
+  "Date (yyyy-mm-dd)": {
+    "es": "Fecha (yyyy-mm-dd)",
+    "pt": "Data (yyyy-mm-dd)"
+  },
+  "Date/time input": {
+    "es": "Entrada de fecha/hora",
+    "pt": "Entrada de data/hora"
+  },
+  "Day of month": {
+    "es": "Día del mes",
+    "pt": "Dia do mês"
+  },
+  "Day of week": {
+    "es": "Día de la semana",
+    "pt": "Dia da semana"
+  },
+  "Day pillar {{day}}": {
+    "es": "Pilar del día {{day}}",
+    "pt": "Pilar do dia {{day}}"
+  },
+  "Day type": {
+    "es": "Tipo de día",
+    "pt": "Tipo de dia"
+  },
+  "Decimal (&#38;)": {
+    "es": "Decimal (&#38;)",
+    "pt": "Decimal (&#38;)"
+  },
+  "Decimal / hex / char / name…": {
+    "es": "Decimal / hex / carácter / nombre…",
+    "pt": "Decimal / hex / carácter / nome…"
+  },
+  "Decimals": {
+    "es": "Decimales",
+    "pt": "Decimais"
+  },
+  "Decimals must be an integer from 0 to 10": {
+    "es": "Los decimales deben ser un entero de 0 a 10",
+    "pt": "Os decimais devem ser um inteiro de 0 a 10"
+  },
+  "Decode (Base64 → text)": {
+    "es": "Decodificar (Base64 → texto)",
+    "pt": "Descodificar (Base64 → texto)"
+  },
+  "Decode QR code": {
+    "es": "Decodificar código QR",
+    "pt": "Descodificar código QR"
+  },
+  "Decode accepts mixed notations; encode uses the selected format": {
+    "es": "La decodificación acepta notaciones mixtas; la codificación usa el formato seleccionado",
+    "pt": "A descodificação aceita notações mistas; a codificação usa o formato selecionado"
+  },
+  "Decode failed: malformed percent-encoding": {
+    "es": "Error al decodificar: codificación porcentual malformada",
+    "pt": "Falha ao descodificar: codificação percentual malformada"
+  },
+  "Decode failed: not valid Base64 input": {
+    "es": "Error al decodificar: entrada Base64 no válida",
+    "pt": "Falha ao descodificar: entrada Base64 inválida"
+  },
+  "Decoded result": {
+    "es": "Resultado decodificado",
+    "pt": "Resultado descodificado"
+  },
+  "Decompress (base64 → text)": {
+    "es": "Descomprimir (base64 → texto)",
+    "pt": "Descomprimir (base64 → texto)"
+  },
+  "Decompress failed: not valid gzip data": {
+    "es": "Error al descomprimir: datos gzip no válidos",
+    "pt": "Falha ao descomprimir: dados gzip inválidos"
+  },
+  "Decrypt": {
+    "es": "Descifrar",
+    "pt": "Desencriptar"
+  },
+  "Decrypt failed: wrong key or corrupted data": {
+    "es": "Error al descifrar: clave incorrecta o datos corruptos",
+    "pt": "Falha ao desencriptar: chave incorreta ou dados corrompidos"
+  },
+  "Default": {
+    "es": "Predeterminado",
+    "pt": "Predefinição"
+  },
+  "Defaults to dimensions": {
+    "es": "Por defecto usa las dimensiones",
+    "pt": "Por predefinição usa as dimensões"
+  },
+  "Defaults to user password if empty": {
+    "es": "Si está vacío, usa la contraseña de usuario",
+    "pt": "Se estiver vazio, usa a palavra-passe do utilizador"
+  },
+  "Delay (s)": {
+    "es": "Retraso (s)",
+    "pt": "Atraso (s)"
+  },
+  "Delete & download": {
+    "es": "Eliminar y descargar",
+    "pt": "Eliminar e transferir"
+  },
+  "Delete PDF Pages": {
+    "es": "Eliminar páginas PDF",
+    "pt": "Eliminar páginas PDF"
+  },
+  "Derivative definition": {
+    "es": "Definición de derivada",
+    "pt": "Definição de derivada"
+  },
+  "Device": {
+    "es": "Dispositivo",
+    "pt": "Dispositivo"
+  },
+  "Dialect": {
+    "es": "Dialecto",
+    "pt": "Dialeto"
+  },
+  "Digit": {
+    "es": "Dígito",
+    "pt": "Dígito"
+  },
+  "Digits": {
+    "es": "Dígitos",
+    "pt": "Dígitos"
+  },
+  "Digits (0-9)": {
+    "es": "Dígitos (0-9)",
+    "pt": "Dígitos (0-9)"
+  },
+  "Direction": {
+    "es": "Dirección",
+    "pt": "Direção"
+  },
+  "Display mode": {
+    "es": "Modo de visualización",
+    "pt": "Modo de visualização"
+  },
+  "Division by zero": {
+    "es": "División por cero",
+    "pt": "Divisão por zero"
+  },
+  "Document has no pages": {
+    "es": "El documento no tiene páginas",
+    "pt": "O documento não tem páginas"
+  }
+}

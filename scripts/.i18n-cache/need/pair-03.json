@@ -1,0 +1,802 @@
+[
+  {
+    "en": "Kilometer km",
+    "it": "Chilometri (km):"
+  },
+  {
+    "en": "L (~7%)",
+    "it": "L/7"
+  },
+  {
+    "en": "LaTeX Math Editor",
+    "it": "Editor matematico LaTeX"
+  },
+  {
+    "en": "Label",
+    "it": "Label"
+  },
+  {
+    "en": "Lagoon",
+    "it": "Laguna"
+  },
+  {
+    "en": "Lake dusk",
+    "it": "Crepuscolo del lago"
+  },
+  {
+    "en": "Landscape",
+    "it": "Orizzontale"
+  },
+  {
+    "en": "Language",
+    "it": "Lingua"
+  },
+  {
+    "en": "Lap time",
+    "it": "Tempo di esecuzione"
+  },
+  {
+    "en": "Large input (> 500KB), real-time compute may slow down",
+    "it": "Ingresso di grandi dimensioni (> 500 KB), il calcolo in tempo reale potrebbe rallentare"
+  },
+  {
+    "en": "Last host",
+    "it": "Ultimo host"
+  },
+  {
+    "en": "Lavender",
+    "it": "Lavanda"
+  },
+  {
+    "en": "Lavender mist",
+    "it": "nebbia di lavanda"
+  },
+  {
+    "en": "Layout",
+    "it": "Layout"
+  },
+  {
+    "en": "Layout a title and body into a styled card and export PNG",
+    "it": "Disponi un titolo e un corpo in una carta stilizzata ed esporta PNG"
+  },
+  {
+    "en": "Leaf glow",
+    "it": "Bagliore fogliare"
+  },
+  {
+    "en": "Learning",
+    "it": "Apprendimento"
+  },
+  {
+    "en": "Leave empty for all",
+    "it": "Lasciare vuoto per tutti"
+  },
+  {
+    "en": "Legend",
+    "it": "Legend"
+  },
+  {
+    "en": "Length",
+    "it": "Lung."
+  },
+  {
+    "en": "Length Converter",
+    "it": "Convertitore di lunghezza"
+  },
+  {
+    "en": "Length must be an integer from 1 to 256",
+    "it": "La lunghezza deve essere un numero intero compreso tra 1 e 256"
+  },
+  {
+    "en": "Length must be between 4 and 128",
+    "it": "La lunghezza deve essere compresa tra 4 e 128"
+  },
+  {
+    "en": "Letters",
+    "it": "Lettere"
+  },
+  {
+    "en": "Light",
+    "it": "Chiaro"
+  },
+  {
+    "en": "Lilac",
+    "it": "Lillà"
+  },
+  {
+    "en": "Line breaks → <br>",
+    "it": "Interruzioni riga"
+  },
+  {
+    "en": "Line height",
+    "it": "Altezza della linea"
+  },
+  {
+    "en": "Line numbers",
+    "it": "Numeri di riga:"
+  },
+  {
+    "en": "Linear",
+    "it": "Lineare"
+  },
+  {
+    "en": "Linen",
+    "it": "Lino"
+  },
+  {
+    "en": "Lines",
+    "it": "Linee"
+  },
+  {
+    "en": "Link corners",
+    "it": "Collega gli angoli"
+  },
+  {
+    "en": "Live GFM rendering with DOMPurify sanitization for safe preview",
+    "it": "Rendering GFM live con sanificazione DOMPurify per un'anteprima sicura"
+  },
+  {
+    "en": "Live syntax highlighting with line numbers and HTML snippet copy",
+    "it": "Evidenziazione sintassi live con numeri di riga e HTML snippet copy"
+  },
+  {
+    "en": "Load sample",
+    "it": "Carica esempio"
+  },
+  {
+    "en": "Loading",
+    "it": "Caricamento"
+  },
+  {
+    "en": "Local only",
+    "it": "Solo locale"
+  },
+  {
+    "en": "Local preview — nothing is uploaded.",
+    "it": "Anteprima locale — non viene caricato nulla."
+  },
+  {
+    "en": "Local time",
+    "it": "Ora locale"
+  },
+  {
+    "en": "Local-first processing; data stays in your browser (CSP, zero egress) · Press <1>⌘K</1> or <3>/</3> to search",
+    "it": "Elaborazione prima locale; i dati rimangono nel browser (CSP, zero uscita) · Premi <1>⌘K</1> o <3>/</3> per cercare"
+  },
+  {
+    "en": "Local: {{local}} · {{utc}}",
+    "it": "Locale: {{local}} · {{utc}}"
+  },
+  {
+    "en": "Locale",
+    "it": "Impostazioni locali"
+  },
+  {
+    "en": "Logic",
+    "it": "Logica"
+  },
+  {
+    "en": "Lotus",
+    "it": "Loto"
+  },
+  {
+    "en": "Lowercase",
+    "it": "Minuscolo"
+  },
+  {
+    "en": "Lowercase (a-z)",
+    "it": "Minuscole (a-z)"
+  },
+  {
+    "en": "Lunar date",
+    "it": "Data lunare"
+  },
+  {
+    "en": "M (~15%)",
+    "it": "M 15"
+  },
+  {
+    "en": "MBTI Personality Test",
+    "it": "Test della personalità"
+  },
+  {
+    "en": "MD5 / SHA-1 / SHA-256 / SHA-512 for text and files (streaming), hex / base64 output",
+    "it": "MD5/SHA-1/SHA-256/SHA-512 per testo e file (streaming), output hex / base64"
+  },
+  {
+    "en": "Magnolia",
+    "it": "Magnolia"
+  },
+  {
+    "en": "Mango dusk",
+    "it": "Crepuscolo di mango"
+  },
+  {
+    "en": "Margin",
+    "it": "Margine"
+  },
+  {
+    "en": "Margin (mm)",
+    "it": "Margine (mm)"
+  },
+  {
+    "en": "Margin must be an integer from 0 to 10 (modules)",
+    "it": "Il margine deve essere un numero intero da 0 a 10 (moduli)"
+  },
+  {
+    "en": "Margins in PDF points (pt ≈ 1/72 inch).",
+    "it": "Margini in PDF punti (pt ≈ 1/72 pollici)."
+  },
+  {
+    "en": "MariaDB",
+    "it": "MariaDB"
+  },
+  {
+    "en": "Markdown",
+    "it": "Markdown"
+  },
+  {
+    "en": "Markdown Mind Map",
+    "it": "Mappa mentale Markdown"
+  },
+  {
+    "en": "Markdown Preview",
+    "it": "Anteprima ribasso"
+  },
+  {
+    "en": "Markdown editing toolbar",
+    "it": "Barra degli strumenti di modifica dei ribassi"
+  },
+  {
+    "en": "Markdown editor",
+    "it": "Editor ribassi"
+  },
+  {
+    "en": "Markdown to Image",
+    "it": "Ribasso sull'immagine"
+  },
+  {
+    "en": "Marketing",
+    "it": "Obiettivi"
+  },
+  {
+    "en": "Mass–energy",
+    "it": "Massa-energia"
+  },
+  {
+    "en": "Match",
+    "it": "Match"
+  },
+  {
+    "en": "Match highlighting, replace, capture groups, presets, and cheat sheet",
+    "it": "Evidenziazione delle corrispondenze, sostituzione, acquisizione di gruppi, preimpostazioni e cheat sheet"
+  },
+  {
+    "en": "Matcha",
+    "it": "Matcha"
+  },
+  {
+    "en": "Matches every value in this field",
+    "it": "Corrisponde a ogni valore in questo campo"
+  },
+  {
+    "en": "Matrices & vectors",
+    "it": "Matrici e vettori"
+  },
+  {
+    "en": "Max dimension",
+    "it": "MAx dimensione"
+  },
+  {
+    "en": "Max {{size}}",
+    "it": "Max: 0"
+  },
+  {
+    "en": "Maximum {{max}} UUIDs per batch",
+    "it": "Massimo {{max}} UUID per lotto"
+  },
+  {
+    "en": "Maxwell's equation",
+    "it": "Equazione di Maxwell"
+  },
+  {
+    "en": "Meadow",
+    "it": "Prato"
+  },
+  {
+    "en": "Meaning",
+    "it": "Significato"
+  },
+  {
+    "en": "Medium",
+    "it": "Medio"
+  },
+  {
+    "en": "Merge & download",
+    "it": "Unisci e scarica"
+  },
+  {
+    "en": "Merge PDF",
+    "it": "Unisci"
+  },
+  {
+    "en": "Merge failed; please retry",
+    "it": "Unione non riuscita; riprova"
+  },
+  {
+    "en": "Merge multiple PDFs into one file",
+    "it": "Unisci più PDF in un unico file"
+  },
+  {
+    "en": "Merges locally — nothing is uploaded. Prefer files < 50MB.",
+    "it": "Unisce localmente — non viene caricato nulla. Preferisci file < 50 MB."
+  },
+  {
+    "en": "Mermaid",
+    "it": "Sirena"
+  },
+  {
+    "en": "Mermaid Diagram Editor",
+    "it": "Editor di diagrammi di sirene"
+  },
+  {
+    "en": "Message",
+    "it": "Messaggio"
+  },
+  {
+    "en": "Message to authenticate…",
+    "it": "Messaggio da autenticare..."
+  },
+  {
+    "en": "Meter m",
+    "it": "Metri (m):"
+  },
+  {
+    "en": "Metric (cm / kg)",
+    "it": "Metrico (cm, kg)"
+  },
+  {
+    "en": "Midnight",
+    "it": "Mezzanotte"
+  },
+  {
+    "en": "Midnight purple",
+    "it": "Midnight Purple"
+  },
+  {
+    "en": "Mile mi",
+    "it": "Mile mi"
+  },
+  {
+    "en": "Milligram mg",
+    "it": "Milligrammo - mg"
+  },
+  {
+    "en": "Millimeter mm",
+    "it": "Millimetri (mm)"
+  },
+  {
+    "en": "Milliseconds",
+    "it": "Millisecondi"
+  },
+  {
+    "en": "Mind map",
+    "it": "Mappa mentale"
+  },
+  {
+    "en": "Minify",
+    "it": "Minify"
+  },
+  {
+    "en": "Minify and beautify CSS with 2/4-space indent options",
+    "it": "Minimizza e abbellisci CSS con opzioni di rientro a 2/4 spazi"
+  },
+  {
+    "en": "Minify and beautify HTML with 2/4-space indent options",
+    "it": "Minimizza e abbellisci HTML con opzioni di rientro a 2/4 spazi"
+  },
+  {
+    "en": "Minify and beautify JavaScript with 2/4-space indent options",
+    "it": "Minimizza e abbellisci JavaScript con opzioni di rientro a 2/4 spazi"
+  },
+  {
+    "en": "Mint ice",
+    "it": "Gelato di menta"
+  },
+  {
+    "en": "Minute",
+    "it": "Minuto"
+  },
+  {
+    "en": "Monday",
+    "it": "Lunedì"
+  },
+  {
+    "en": "Monospace",
+    "it": "Monospace"
+  },
+  {
+    "en": "Month",
+    "it": "Mese"
+  },
+  {
+    "en": "Month view with lunar/almanac for Chinese and local holidays for English",
+    "it": "Vista mensile con lunare/almanacco per il cinese e vacanze locali per l'inglese"
+  },
+  {
+    "en": "Monthly on day 1 at 00:00",
+    "it": "Mensile il giorno 1 alle 00:00"
+  },
+  {
+    "en": "Moonlight",
+    "it": "MOONLIGHT"
+  },
+  {
+    "en": "Morning",
+    "it": "Mattina"
+  },
+  {
+    "en": "Multicolor",
+    "it": "Multicolore"
+  },
+  {
+    "en": "MySQL",
+    "it": "Mysql"
+  },
+  {
+    "en": "Mysterious purple",
+    "it": "Viola misterioso"
+  },
+  {
+    "en": "Mystic purple",
+    "it": "Viola mistico"
+  },
+  {
+    "en": "Name / HEX / RGB…",
+    "it": "Nome / HEX / RGB…"
+  },
+  {
+    "en": "Named (&amp;)",
+    "it": "Con nome (&amp;)"
+  },
+  {
+    "en": "Nature green",
+    "it": "Nature Green"
+  },
+  {
+    "en": "Nautical mile nmi",
+    "it": "Miglio nautico"
+  },
+  {
+    "en": "Navier–Stokes",
+    "it": "Navier–Stokes"
+  },
+  {
+    "en": "Needs server",
+    "it": "Ha bisogno di un server"
+  },
+  {
+    "en": "Negated class",
+    "it": "Classe negata"
+  },
+  {
+    "en": "Neon multicolor",
+    "it": "Neon multicolor"
+  },
+  {
+    "en": "Netmask",
+    "it": "子网掩码"
+  },
+  {
+    "en": "Network",
+    "it": "Rete"
+  },
+  {
+    "en": "Neutral",
+    "it": "Indifferente"
+  },
+  {
+    "en": "Next month",
+    "it": "Mese successivo"
+  },
+  {
+    "en": "Next steps",
+    "it": "Prossimi passi"
+  },
+  {
+    "en": "Next {{count}} runs",
+    "it": "Prossime {{count}} corse"
+  },
+  {
+    "en": "Night",
+    "it": "Notte"
+  },
+  {
+    "en": "No QR code found in the image",
+    "it": "Nessun ⟧ codice ⟦0 trovato nell'immagine"
+  },
+  {
+    "en": "No matching colors",
+    "it": "Nessun colore corrispondente"
+  },
+  {
+    "en": "No matching prompts",
+    "it": "Nessuna richiesta corrispondente"
+  },
+  {
+    "en": "No matching tools",
+    "it": "Nessuno strumento corrispondente"
+  },
+  {
+    "en": "No matching tools found",
+    "it": "Nessuno strumento corrispondente trovato"
+  },
+  {
+    "en": "No numeric values found",
+    "it": "Nessun valore numerico trovato"
+  },
+  {
+    "en": "Normal",
+    "it": "Normale"
+  },
+  {
+    "en": "Normal distribution",
+    "it": "Distribuzione normale "
+  },
+  {
+    "en": "Normalized",
+    "it": "Normalizzato"
+  },
+  {
+    "en": "Not a valid SVG",
+    "it": "Non è uno ⟦0 valido⟧"
+  },
+  {
+    "en": "Not before nbf",
+    "it": "Non prima"
+  },
+  {
+    "en": "Not expired",
+    "it": "Non scaduto"
+  },
+  {
+    "en": "Note: non-MD5 algorithms load the whole file into memory; very large files may run out of memory",
+    "it": "Nota:⟧ algoritmi diversi da⟦ 0 caricano l'intero file in memoria; file molto grandi potrebbero esaurire la memoria"
+  },
+  {
+    "en": "Number lines",
+    "it": "Numero righe"
+  },
+  {
+    "en": "Numbered list",
+    "it": "Elenco numerato"
+  },
+  {
+    "en": "Obese",
+    "it": "Obeso"
+  },
+  {
+    "en": "Obsidian",
+    "it": "nera"
+  },
+  {
+    "en": "Ocean",
+    "it": "Mare"
+  },
+  {
+    "en": "Ocean wave",
+    "it": "onda oceanica<g id=\"1\"> </g>"
+  },
+  {
+    "en": "Offset X",
+    "it": "Offset X"
+  },
+  {
+    "en": "Offset Y",
+    "it": "Offset Y"
+  },
+  {
+    "en": "Olive",
+    "it": "Verde oliva"
+  },
+  {
+    "en": "One image per page at pixel size.",
+    "it": "Un'immagine per pagina in formato pixel."
+  },
+  {
+    "en": "One item per line…",
+    "it": "Un articolo per riga..."
+  },
+  {
+    "en": "Online stopwatch with start, pause, lap, and reset",
+    "it": "Cronometro online con avvio, pausa, giro e ripristino"
+  },
+  {
+    "en": "Opacity",
+    "it": "Opacità"
+  },
+  {
+    "en": "Open a PDF and draw annotations on the page: pen, highlight, rectangle, ellipse, circle, line, and text.",
+    "it": "Apri uno PDF e disegna annotazioni sulla pagina: penna, evidenziazione, rettangolo, ellisse, cerchio, linea e testo."
+  },
+  {
+    "en": "Open and read a PDF locally",
+    "it": "Apri e leggi uno PDF localmente"
+  },
+  {
+    "en": "Open in {{name}}",
+    "it": "Apri in {{name}}"
+  },
+  {
+    "en": "Open menu",
+    "it": "Apri menu"
+  },
+  {
+    "en": "Open page {{n}} first so it can be rendered before export",
+    "it": "Apri ⟧ prima la pagina ⟦0 in modo che possa essere visualizzata prima dell'esportazione"
+  },
+  {
+    "en": "Operand A reuses the input above; results stay within 64-bit signed integer range",
+    "it": "L'operando A riutilizza l'input di cui sopra; i risultati rimangono all'interno dell'intervallo di numeri interi con segno a 64 bit"
+  },
+  {
+    "en": "Operand B",
+    "it": "Operando B"
+  },
+  {
+    "en": "Operator",
+    "it": "Addetto alla conduzione"
+  },
+  {
+    "en": "Operators",
+    "it": "Operatori"
+  },
+  {
+    "en": "Optional IV (24 hex chars / 12 bytes); random if empty",
+    "it": "Facoltativo IV (24 caratteri esadecimali/ 12 byte); casuale se vuoto"
+  },
+  {
+    "en": "Optional title…",
+    "it": "Titolo opzionale…"
+  },
+  {
+    "en": "Orange",
+    "it": "Arancia"
+  },
+  {
+    "en": "Orchid",
+    "it": "Violetto chiaro"
+  },
+  {
+    "en": "Orientation",
+    "it": "Orientamento"
+  },
+  {
+    "en": "Origin",
+    "it": "Provenienza"
+  },
+  {
+    "en": "Origin is bottom-left; complex Unicode may be limited.",
+    "it": "L'origine è in basso a sinistra; il complesso Unicode può essere limitato."
+  },
+  {
+    "en": "Origin is the bottom-left of the page (PDF coords).",
+    "it": "L'origine è in basso a sinistra della pagina (PDF corde)."
+  },
+  {
+    "en": "Original",
+    "it": "Originale"
+  },
+  {
+    "en": "Original size",
+    "it": "Dimensione Originale"
+  },
+  {
+    "en": "Other",
+    "it": "Altro"
+  },
+  {
+    "en": "Ounce oz",
+    "it": "Oncia oz"
+  },
+  {
+    "en": "Output",
+    "it": "Output"
+  },
+  {
+    "en": "Output format",
+    "it": "Formato output"
+  },
+  {
+    "en": "Overweight",
+    "it": "Sovrappeso"
+  },
+  {
+    "en": "Owner password",
+    "it": "Proprietario Password"
+  },
+  {
+    "en": "PDF Grayscale",
+    "it": "Scala di grigi"
+  },
+  {
+    "en": "PDF Header & Footer",
+    "it": "Intestazione e Piè di pagina"
+  },
+  {
+    "en": "PDF Metadata",
+    "it": "PDF metadati"
+  },
+  {
+    "en": "PDF Page Numbers",
+    "it": "Numeri di pagina"
+  },
+  {
+    "en": "PDF Viewer",
+    "it": "Autorizzazioni di visualizzazione"
+  },
+  {
+    "en": "PDF file",
+    "it": "PDF file"
+  },
+  {
+    "en": "PDF password",
+    "it": "Password 0***"
+  },
+  {
+    "en": "PDF to Image",
+    "it": "PDF all'immagine"
+  },
+  {
+    "en": "PEM certificate",
+    "it": "Certificato PEM"
+  },
+  {
+    "en": "PL/SQL",
+    "it": "PL/SQL"
+  },
+  {
+    "en": "Pacific",
+    "it": "Pacific"
+  },
+  {
+    "en": "Padding",
+    "it": "Imbottiture"
+  },
+  {
+    "en": "Padding X",
+    "it": "Bombatura X"
+  },
+  {
+    "en": "Padding Y",
+    "it": "Bombatura Y"
+  },
+  {
+    "en": "Page or tool not found",
+    "it": "Pagina o strumento non trovato"
+  },
+  {
+    "en": "Page {{n}}",
+    "it": "Pag. 0."
+  },
+  {
+    "en": "Pages",
+    "it": "Pages"
+  },
+  {
+    "en": "Pages (optional)",
+    "it": "Pagine (facoltativo)"
+  },
+  {
+    "en": "Pages to delete",
+    "it": "Pagine da eliminare"
+  },
+  {
+    "en": "Pages to delete, e.g. 1,3-5. At least one page must remain.",
+    "it": "Pagine da eliminare, ad esempio 1,3-5. Deve rimanere almeno una pagina."
+  },
+  {
+    "en": "Pages to extract",
+    "it": "Pagine da estrarre"
+  }
+]
