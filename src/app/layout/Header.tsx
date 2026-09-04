@@ -89,7 +89,7 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
           aria-label={t('header.sourceAria')}
           className="rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
         >
-          <Icon name="globe" />
+          <Icon name="github" />
         </a>
       </div>
     </header>
