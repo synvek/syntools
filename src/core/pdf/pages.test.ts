@@ -172,6 +172,20 @@ describe('draw & security', () => {
     const doc = await loadFixture(1);
     const r = await annotatePages(doc, [
       { kind: 'highlight', pageIndex: 0, x: 10, y: 10, width: 40, height: 12 },
+      { kind: 'line', pageIndex: 0, x: 10, y: 40, width: 50, height: 0 },
+      { kind: 'rect', pageIndex: 0, x: 20, y: 50, width: 60, height: 30, borderWidth: 2 },
+      { kind: 'ellipse', pageIndex: 0, x: 100, y: 100, width: 40, height: 20 },
+      { kind: 'circle', pageIndex: 0, x: 160, y: 100, width: 25, height: 25 },
+      {
+        kind: 'pen',
+        pageIndex: 0,
+        points: [
+          { x: 10, y: 120 },
+          { x: 40, y: 130 },
+          { x: 70, y: 115 },
+        ],
+      },
+      { kind: 'text', pageIndex: 0, x: 10, y: 160, text: 'Note', fontSize: 12 },
     ]);
     expect(r.ok).toBe(true);
   });

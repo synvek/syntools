@@ -375,20 +375,72 @@ export async function cropPages(
   }
 }
 
-export type AnnotateKind = 'highlight' | 'line' | 'rect';
+export type AnnotateKind =
+  | 'highlight'
+  | 'line'
+  | 'rect'
+  | 'ellipse'
+  | 'circle'
+  | 'pen'
+  | 'text';
+
+export type PdfAnnotation =
+  | {
+      kind: 'highlight' | 'rect';
+      pageIndex: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      color?: string;
+      opacity?: number;
+      borderWidth?: number;
+    }
+  | {
+      kind: 'line';
+      pageIndex: number;
+      x: number;
+      y: number;
+      width: number; // dx
+      height: number; // dy
+      color?: string;
+      opacity?: number;
+      borderWidth?: number;
+    }
+  | {
+      kind: 'ellipse' | 'circle';
+      pageIndex: number;
+      x: number; // center x
+      y: number; // center y
+      width: number; // radiusX (*2 stored as diameter for circle consistency: use as xScale)
+      height: number; // radiusY
+      color?: string;
+      opacity?: number;
+      borderWidth?: number;
+      filled?: boolean;
+    }
+  | {
+      kind: 'pen';
+      pageIndex: number;
+      points: Array<{ x: number; y: number }>;
+      color?: string;
+      opacity?: number;
+      borderWidth?: number;
+    }
+  | {
+      kind: 'text';
+      pageIndex: number;
+      x: number;
+      y: number;
+      text: string;
+      fontSize?: number;
+      color?: string;
+      opacity?: number;
+    };
 
 export async function annotatePages(
   doc: PDFDocument,
-  annotations: Array<{
-    kind: AnnotateKind;
-    pageIndex: number;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    color?: string;
-    opacity?: number;
-  }>,
+  annotations: PdfAnnotation[],
 ): Promise<ToolResult<Uint8Array>> {
   if (annotations.length === 0) return { ok: false, error: 'EMPTY' };
   try {
@@ -396,15 +448,79 @@ export async function annotatePages(
     for (const a of annotations) {
       if (a.pageIndex < 0 || a.pageIndex >= pages.length) continue;
       const page = pages[a.pageIndex];
-      const color = parseColor(a.color ?? (a.kind === 'highlight' ? '#facc15' : '#ef4444'));
-      const opacity = a.opacity ?? (a.kind === 'highlight' ? 0.35 : 0.9);
       beginVisualDraw(page);
       try {
+        if (a.kind === 'pen') {
+          const color = parseColor(a.color ?? '#ef4444');
+          const thickness = a.borderWidth ?? 2;
+          const opacity = a.opacity ?? 0.95;
+          const pts = a.points;
+          for (let i = 1; i < pts.length; i++) {
+            page.drawLine({
+              start: pts[i - 1],
+              end: pts[i],
+              thickness,
+              color,
+              opacity,
+            });
+          }
+          continue;
+        }
+
+        if (a.kind === 'text') {
+          const text = a.text.trim();
+          if (!text) continue;
+          const size = a.fontSize ?? 14;
+          const color = parseColor(a.color ?? '#111111');
+          if (needsUnicodeFont(text)) {
+            const raster = await embedRasterizedText(doc, text, size, color);
+            page.drawImage(raster.image, {
+              x: a.x,
+              y: a.y,
+              width: raster.width,
+              height: raster.height,
+              opacity: a.opacity ?? 1,
+            });
+          } else {
+            const font = await doc.embedFont(StandardFonts.Helvetica);
+            page.drawText(text, {
+              x: a.x,
+              y: a.y,
+              size,
+              font,
+              color,
+              opacity: a.opacity ?? 1,
+            });
+          }
+          continue;
+        }
+
+        if (a.kind === 'ellipse' || a.kind === 'circle') {
+          const color = parseColor(a.color ?? '#3b82f6');
+          const opacity = a.opacity ?? 0.9;
+          const xScale = Math.abs(a.width);
+          const yScale = a.kind === 'circle' ? xScale : Math.abs(a.height);
+          page.drawEllipse({
+            x: a.x,
+            y: a.y,
+            xScale,
+            yScale,
+            borderColor: color,
+            borderWidth: a.borderWidth ?? 2,
+            borderOpacity: opacity,
+            color: a.filled ? color : undefined,
+            opacity: a.filled ? Math.min(opacity, 0.35) : 0,
+          });
+          continue;
+        }
+
+        const color = parseColor(a.color ?? (a.kind === 'highlight' ? '#facc15' : '#ef4444'));
+        const opacity = a.opacity ?? (a.kind === 'highlight' ? 0.35 : 0.9);
         if (a.kind === 'line') {
           page.drawLine({
             start: { x: a.x, y: a.y },
             end: { x: a.x + a.width, y: a.y + a.height },
-            thickness: 2,
+            thickness: a.borderWidth ?? 2,
             color,
             opacity,
           });
@@ -425,7 +541,7 @@ export async function annotatePages(
             width: a.width,
             height: a.height,
             borderColor: color,
-            borderWidth: 2,
+            borderWidth: a.borderWidth ?? 2,
             opacity,
           });
         }
