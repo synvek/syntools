@@ -16,10 +16,14 @@ const en = {
   sidebar: {
     nav: 'Tool navigation',
     closeMenu: 'Close menu',
+    filter: 'Filter tools',
+    filterPlaceholder: 'Filter…',
+    filterEmpty: 'No matching tools',
   },
   home: {
     title: 'Developer Online Toolbox',
-    tagline: 'Your data never leaves the browser · Press <1>⌘K</1> or <3>/</3> to search',
+    tagline:
+      'Local-first processing; data stays in your browser (CSP, zero egress) · Press <1>⌘K</1> or <3>/</3> to search',
     favorites: 'Favorites',
     recent: 'Recently used',
     favoriteAria: 'Add to favorites',
@@ -90,6 +94,12 @@ const en = {
   },
   tool: {
     errorTitle: 'Tool runtime error',
+    localBadge: 'Local only',
+    serverBadge: 'Needs server',
+    related: 'Related tools',
+    nextSteps: 'Next steps',
+    openIn: 'Open in {{name}}',
+    progress: 'Progress {{current}} / {{total}}',
   },
   notFound: {
     message: 'Page or tool not found',
@@ -139,6 +149,54 @@ const en = {
       name: 'JWT Parser',
       description:
         'Parse header / payload / signature and read exp and other time claims (read-only, no verify)',
+    },
+    'aes-crypto': {
+      name: 'AES Encrypt / Decrypt',
+      description: 'AES-GCM with PBKDF2 passphrase or raw key; output base64(salt|iv|ciphertext)',
+    },
+    hmac: {
+      name: 'HMAC',
+      description: 'HMAC-SHA256 / SHA512 with hex / base64 output',
+    },
+    totp: {
+      name: 'TOTP',
+      description: 'RFC 6238 TOTP: generate / verify, 6/8 digits, remaining seconds',
+    },
+    'x509-decode': {
+      name: 'X.509 Certificate Decoder',
+      description: 'Parse PEM: SHA-256/SHA-1 fingerprints, type, DER length, CN',
+    },
+    'cidr-calc': {
+      name: 'CIDR Calculator',
+      description: 'IPv4 CIDR: network / broadcast / host range / mask / host count',
+    },
+    'text-lines': {
+      name: 'Text Line Tools',
+      description: 'Sort / unique / reverse / number / trim empty lines',
+    },
+    'hex-codec': {
+      name: 'Hex Encode / Decode',
+      description: 'Hex ↔ UTF-8 text with optional spaces',
+    },
+    'url-query': {
+      name: 'URL Query Parser',
+      description: 'Parse URL parts and query params; rebuild after edits',
+    },
+    'json-path': {
+      name: 'JSONPath Query',
+      description: 'Simple path queries like a.b[0].c',
+    },
+    'gzip-tool': {
+      name: 'Gzip Compress',
+      description: 'Gzip text to base64 / decompress back to text',
+    },
+    'exif-strip': {
+      name: 'Strip EXIF',
+      description: 'Read basic JPEG EXIF and strip APP1; download cleaned file',
+    },
+    'fake-data': {
+      name: 'Fake Data Generator',
+      description: 'Generate names / emails / UUIDs / lorem in zh/en, 1–50 items',
     },
     'password-gen': {
       name: 'Password Generator',
@@ -647,6 +705,8 @@ const en = {
       computing: 'Computing…',
       fileHint:
         'Drag & drop a file here, or click to choose (MD5 streams; large files stay memory-safe)',
+      limitHint:
+        'Note: non-MD5 algorithms load the whole file into memory; very large files may run out of memory',
       err: {
         UNSUPPORTED: 'Hash failed: algorithm not supported in this environment',
         FILE_HASH: 'File hash failed: {{message}}',
@@ -654,6 +714,13 @@ const en = {
       },
     },
     jwt: {
+      mode: 'Mode',
+      modes: { parse: 'Parse', sign: 'Sign (HS256)' },
+      secretPlaceholder: 'HMAC secret…',
+      payloadJson: 'Payload JSON',
+      payloadPlaceholder: '{ "sub": "123", "name": "Alice" }',
+      signedToken: 'Signed token',
+      signNote: 'Signs with HS256 in your browser; the secret never leaves the device',
       inputLabel: 'JWT input',
       inputPlaceholder: 'Paste a JWT (Bearer prefix supported), e.g. eyJhbGci…',
       header: 'Header',
@@ -673,6 +740,182 @@ const en = {
         INVALID_PARTS: 'Invalid format: a JWT consists of header.payload.signature',
         INVALID_HEADER: 'Failed to parse header: not valid base64url-encoded JSON',
         INVALID_PAYLOAD: 'Failed to parse payload: not valid base64url-encoded JSON',
+        SIGN_FAILED: 'Signing failed',
+      },
+    },
+
+    'aes-crypto': {
+      encrypt: 'Encrypt',
+      decrypt: 'Decrypt',
+      keyMode: 'Key mode',
+      passphrase: 'Passphrase (PBKDF2)',
+      rawKey: 'Raw key (hex)',
+      passphrasePlaceholder: 'Enter passphrase…',
+      keyHexPlaceholder: '32 or 64 hex chars (AES-128/256)…',
+      ivPlaceholder: 'Optional IV (24 hex chars / 12 bytes); random if empty',
+      plaintext: 'Plaintext',
+      ciphertext: 'Ciphertext (base64)',
+      inputPlaceholder: 'Enter content…',
+      note: 'Encrypt output: base64(salt|iv|ciphertext+tag); passphrase uses PBKDF2-SHA256',
+      err: {
+        EMPTY: 'Please enter content',
+        INVALID_KEY: 'Invalid key: check passphrase or hex key length',
+        DECRYPT_FAILED: 'Decrypt failed: wrong key or corrupted data',
+        INVALID_INPUT: 'Invalid input: bad ciphertext or IV',
+      },
+    },
+    hmac: {
+      algorithm: 'Algorithm',
+      encoding: 'Output',
+      secretPlaceholder: 'HMAC secret…',
+      message: 'Message',
+      messagePlaceholder: 'Message to authenticate…',
+      err: {
+        EMPTY: 'Please enter a message',
+        INVALID_KEY: 'Please enter a valid secret',
+      },
+    },
+    totp: {
+      digits: 'Digits',
+      secret: 'Base32 secret',
+      secretPlaceholder: 'Paste Authenticator secret (Base32)…',
+      code: 'Current code',
+      remaining: 'Seconds left',
+      verify: 'Verify code (optional)',
+      verifyPlaceholder: 'Enter 6/8-digit code…',
+      verifyOk: 'Verified',
+      verifyFail: 'Verification failed',
+      err: {
+        EMPTY: 'Please enter secret or code',
+        INVALID_SECRET: 'Secret is not valid Base32',
+      },
+    },
+    'cidr-calc': {
+      input: 'CIDR',
+      placeholder: 'e.g. 192.168.1.0/24',
+      fields: {
+        network: 'Network',
+        broadcast: 'Broadcast',
+        firstHost: 'First host',
+        lastHost: 'Last host',
+        netmask: 'Netmask',
+        wildcard: 'Wildcard',
+        prefix: 'Prefix',
+        hostCount: 'Host count',
+        totalAddresses: 'Total addresses',
+      },
+      err: {
+        EMPTY: 'Please enter a CIDR',
+        INVALID: 'Invalid CIDR (IPv4/prefix, e.g. 10.0.0.0/8)',
+      },
+    },
+    'text-lines': {
+      placeholder: 'One item per line…',
+      ops: {
+        'sort-asc': 'Sort ascending',
+        'sort-desc': 'Sort descending',
+        unique: 'Unique',
+        reverse: 'Reverse',
+        number: 'Number lines',
+        'trim-empty': 'Trim empty lines',
+      },
+      err: {
+        EMPTY: 'Please enter text',
+      },
+    },
+    'hex-codec': {
+      spaced: 'Space-separated bytes',
+      placeholder: 'Text or hex…',
+      err: {
+        EMPTY: 'Please enter content',
+        INVALID_HEX: 'Invalid hex (even length, 0-9a-f)',
+      },
+    },
+    'url-query': {
+      input: 'URL',
+      placeholder: 'https://example.com/path?a=1&b=2',
+      addParam: 'Add param',
+      key: 'Key',
+      value: 'Value',
+      rebuilt: 'Rebuilt URL',
+      parts: {
+        protocol: 'Protocol',
+        hostname: 'Host',
+        port: 'Port',
+        pathname: 'Path',
+        hash: 'Hash',
+        origin: 'Origin',
+      },
+      err: {
+        EMPTY: 'Please enter a URL',
+        INVALID_URL: 'Invalid URL',
+      },
+    },
+    'json-path': {
+      pathPlaceholder: 'Path, e.g. a.b[0].c or $.a.b[0]',
+      json: 'JSON',
+      jsonPlaceholder: 'Paste JSON…',
+      err: {
+        EMPTY: 'Please enter JSON and a path',
+        INVALID_JSON: 'JSON parse failed',
+        NOT_FOUND: 'Path not found',
+      },
+    },
+    'gzip-tool': {
+      compress: 'Compress (text → base64)',
+      decompress: 'Decompress (base64 → text)',
+      placeholder: 'Text or gzip base64…',
+      err: {
+        EMPTY: 'Please enter content',
+        INVALID: 'Invalid input',
+        DECOMPRESS_FAILED: 'Decompress failed: not valid gzip data',
+      },
+    },
+    'x509-decode': {
+      input: 'PEM certificate',
+      placeholder: '-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----',
+      fields: {
+        pemType: 'Type',
+        derLength: 'DER length',
+        sha256: 'SHA-256',
+        sha1: 'SHA-1',
+        subject: 'Subject CN',
+        issuer: 'Issuer CN',
+      },
+      err: {
+        EMPTY: 'Please paste PEM',
+        INVALID_PEM: 'Invalid PEM',
+      },
+    },
+    'exif-strip': {
+      hint: 'JPEG only: strip APP1 (EXIF) and download.',
+      drop: 'Drop a JPEG image',
+      hasExif: 'Has EXIF',
+      orientation: 'Orientation',
+      make: 'Camera make',
+      yes: 'Yes',
+      no: 'No',
+      download: 'Download stripped file',
+      err: {
+        EMPTY: 'Please choose a file',
+        UNSUPPORTED: 'JPEG only',
+        PROCESS_FAILED: 'Processing failed',
+      },
+    },
+    'fake-data': {
+      kind: 'Kind',
+      locale: 'Locale',
+      count: 'Count',
+      generate: 'Generate',
+      kinds: {
+        name: 'Name',
+        email: 'Email',
+        uuid: 'UUID',
+        lorem: 'Paragraph',
+      },
+      err: {
+        EMPTY: 'Please complete options',
+        INVALID_COUNT: 'Count must be an integer from 1 to 50',
       },
     },
     password: {
@@ -2180,6 +2423,7 @@ const en = {
     },
     'pdf-split': {
       hint: 'Splits into one PDF per page and downloads each.',
+      asZip: 'Download as ZIP',
       drop: 'Drop a PDF',
       run: 'Split & download',
       errors: {

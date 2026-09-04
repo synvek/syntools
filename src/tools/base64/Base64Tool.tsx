@@ -4,16 +4,22 @@ import { IOTextArea } from '@/core/components/IOTextArea';
 import { CopyButton } from '@/core/components/CopyButton';
 import { ClearButton, OptionBar, SwapButton } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
+import { OpenInToolButton } from '@/core/components/OpenInToolButton';
 import { FileDropZone } from '@/core/components/FileDropZone';
 import { translateToolError } from '@/core/i18n/helpers';
 import { readSharedState } from '@/core/lib/share';
+import { consumeHandoff } from '@/core/lib/handoff';
 import { bytesToBase64, decodeBase64, encodeBase64 } from './core';
 
 type Direction = 'encode' | 'decode';
 
 export default function Base64Tool() {
   const { t } = useTranslation();
-  const init = useMemo(() => readSharedState({ i: '', d: 'encode', u: false }), []);
+  const init = useMemo(() => {
+    const shared = readSharedState({ i: '', d: 'encode', u: false });
+    const handoff = consumeHandoff('base64');
+    return { ...shared, i: handoff ?? shared.i };
+  }, []);
   const [input, setInput] = useState(init.i);
   const [direction, setDirection] = useState<Direction>(init.d === 'decode' ? 'decode' : 'encode');
   const [urlSafe, setUrlSafe] = useState(init.u);
@@ -102,7 +108,13 @@ export default function Base64Tool() {
           }
           value={output}
           readOnly
-          actions={<CopyButton text={output} disabled={!output} />}
+          actions={
+            <div className="flex flex-wrap items-center gap-1">
+              <CopyButton text={output} disabled={!output} />
+              <OpenInToolButton targetId="json-format" text={output} disabled={!output} />
+              <OpenInToolButton targetId="hex-codec" text={output} disabled={!output} />
+            </div>
+          }
         />
       </div>
 

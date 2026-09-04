@@ -4,15 +4,21 @@ import { IOTextArea } from '@/core/components/IOTextArea';
 import { CopyButton } from '@/core/components/CopyButton';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
+import { OpenInToolButton } from '@/core/components/OpenInToolButton';
 import { translateToolError } from '@/core/i18n/helpers';
 import { readSharedState } from '@/core/lib/share';
+import { consumeHandoff } from '@/core/lib/handoff';
 import { compressJson, formatJson, validateJson, type IndentSize } from './core';
 
 type Action = 'format' | 'compress' | 'validate';
 
 export default function JsonFormatTool() {
   const { t } = useTranslation();
-  const init = useMemo(() => readSharedState({ i: '', a: 'format', n: 2 }), []);
+  const init = useMemo(() => {
+    const shared = readSharedState({ i: '', a: 'format', n: 2 });
+    const handoff = consumeHandoff('json-format');
+    return { ...shared, i: handoff ?? shared.i };
+  }, []);
   const [input, setInput] = useState(init.i);
   const [action, setAction] = useState<Action>(
     init.a === 'compress' || init.a === 'validate' ? init.a : 'format',
@@ -71,7 +77,14 @@ export default function JsonFormatTool() {
           label={action === 'validate' ? t('tools.json.validateResult') : t('common.output')}
           value={output}
           readOnly
-          actions={<CopyButton text={output} disabled={!output} />}
+          actions={
+            <div className="flex flex-wrap items-center gap-1">
+              <CopyButton text={output} disabled={!output} />
+              {action !== 'validate' && (
+                <OpenInToolButton targetId="base64" text={output} disabled={!output} />
+              )}
+            </div>
+          }
         />
       </div>
 

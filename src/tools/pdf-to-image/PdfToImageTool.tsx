@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '@/core/components/FileDropZone';
 import { FilePreviewList } from '@/core/components/FilePreviewList';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
+import { PdfNextSteps } from '@/core/components/PdfNextSteps';
 import {
   PDF_MAX_BYTES,
   downloadDataUrl,
@@ -11,7 +12,7 @@ import {
   pdfToolErrorMessage,
   usePdfPassword,
 } from '@/core/pdf';
-import { PdfRunButton, PdfField, pdfInputClass } from '@/core/pdf/ui';
+import { PdfProgress, PdfRunButton, PdfField, pdfInputClass } from '@/core/pdf/ui';
 import { pdfPagesToImages, type ImageFormat } from './core';
 
 const TOOL_ID = 'pdf-to-image';
@@ -24,6 +25,8 @@ export default function PdfToImageTool() {
   const [selection, setSelection] = useState('');
   const [previews, setPreviews] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const pdfPwd = usePdfPassword();
@@ -33,6 +36,8 @@ export default function PdfToImageTool() {
     setPreviews([]);
     setError(null);
     setErrorCode(null);
+    setDone(false);
+    setProgress(null);
     pdfPwd.resetPassword();
   };
 
@@ -41,6 +46,7 @@ export default function PdfToImageTool() {
     setPreviews([]);
     setError(null);
     setErrorCode(null);
+    setDone(false);
     const probe = await pdfPwd.onPdfSelected(f);
     if (!probe.ok && probe.error !== 'NEED_PASSWORD') {
       setErrorCode(probe.error);
@@ -51,15 +57,22 @@ export default function PdfToImageTool() {
   const run = async () => {
     if (!file) return;
     setBusy(true);
+    setDone(false);
     setError(null);
     setErrorCode(null);
-    const r = await pdfPagesToImages(file, {
-      format,
-      scale,
-      selection: selection || undefined,
-      password: pdfPwd.password,
-    });
+    setProgress({ current: 0, total: 1 });
+    const r = await pdfPagesToImages(
+      file,
+      {
+        format,
+        scale,
+        selection: selection || undefined,
+        password: pdfPwd.password,
+      },
+      (current, total) => setProgress({ current, total }),
+    );
     setBusy(false);
+    setProgress(null);
     if (!r.ok) {
       pdfPwd.notePdfError(r.error);
       setErrorCode(r.error);
@@ -69,6 +82,7 @@ export default function PdfToImageTool() {
     setPreviews(r.value);
     const ext = format === 'image/jpeg' ? 'jpg' : 'png';
     r.value.forEach((url, i) => downloadDataUrl(url, `page-${i + 1}.${ext}`));
+    setDone(true);
   };
 
   return (
@@ -87,13 +101,33 @@ export default function PdfToImageTool() {
           <input type="radio" checked={format === 'image/jpeg'} onChange={() => setFormat('image/jpeg')} /> JPG
         </label>
         <PdfField label={t('tools.pdf-to-image.scale')}>
-          <input className={pdfInputClass + ' w-24'} type="number" min={0.5} max={3} step={0.25} value={scale} onChange={(e) => setScale(Number(e.target.value) || 1.5)} />
+          <input
+            className={pdfInputClass + ' w-24'}
+            type="number"
+            min={0.5}
+            max={3}
+            step={0.25}
+            value={scale}
+            onChange={(e) => setScale(Number(e.target.value) || 1.5)}
+          />
         </PdfField>
       </OptionBar>
       <PdfField label={t('tools.pdf-to-image.pages')}>
-        <input className={pdfInputClass} value={selection} onChange={(e) => setSelection(e.target.value)} placeholder={t('tools.pdf-to-image.pagesAll')} />
+        <input
+          className={pdfInputClass}
+          value={selection}
+          onChange={(e) => setSelection(e.target.value)}
+          placeholder={t('tools.pdf-to-image.pagesAll')}
+        />
       </PdfField>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {progress && (
+        <PdfProgress
+          current={progress.current}
+          total={progress.total}
+          label={t('tool.progress', { current: progress.current, total: progress.total })}
+        />
+      )}
       <div className="flex flex-wrap gap-2">
         <PdfRunButton
           label={busy ? t('common.loading') : t('tools.pdf-to-image.run')}
@@ -109,6 +143,7 @@ export default function PdfToImageTool() {
           ))}
         </div>
       )}
+      {done && <PdfNextSteps toolIds={['images-to-pdf', 'image-compress', 'pdf-grayscale', 'pdf-viewer']} />}
     </div>
   );
 }

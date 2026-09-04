@@ -4,6 +4,7 @@ import type { ToolMeta } from '@/core/types';
 import { useHistoryStore } from '@/stores/history';
 import { ErrorBoundary } from '@/core/components/ErrorBoundary';
 import { Icon } from '@/core/components/Icon';
+import { RelatedTools } from '@/core/components/RelatedTools';
 import { useToolMeta } from '@/core/i18n/helpers';
 
 function ToolSkeleton() {
@@ -18,12 +19,17 @@ function ToolSkeleton() {
 
 /**
  * 所有工具的统一外壳（技术设计 §6.1）：
- * 标题渲染、Suspense 加载态、ErrorBoundary 兜底、document.title 与最近使用记录。
+ * 标题渲染、本地徽章、收藏、Suspense、ErrorBoundary、相关推荐。
  */
 export function ToolPage({ tool }: { tool: ToolMeta }) {
   const LazyTool = useMemo(() => lazy(tool.component), [tool]);
+  const { t } = useTranslation();
   const recordUse = useHistoryStore((s) => s.recordUse);
+  const favorites = useHistoryStore((s) => s.favorites);
+  const toggleFavorite = useHistoryStore((s) => s.toggleFavorite);
   const { name, description } = useToolMeta(tool);
+  const isFavorite = favorites.includes(tool.id);
+  const mode = tool.mode ?? 'client';
 
   useEffect(() => {
     document.title = `${name} · SynTools`;
@@ -37,8 +43,31 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
           name={tool.icon}
           className="mt-0.5 h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400"
         />
-        <div>
-          <h1 className="text-xl font-bold">{name}</h1>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold">{name}</h1>
+            {mode === 'client' ? (
+              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                {t('tool.localBadge')}
+              </span>
+            ) : (
+              <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                {t('tool.serverBadge')}
+              </span>
+            )}
+            <button
+              type="button"
+              aria-label={t(isFavorite ? 'home.unfavoriteAria' : 'home.favoriteAria')}
+              onClick={() => toggleFavorite(tool.id)}
+              className={`rounded p-1 ${
+                isFavorite
+                  ? 'text-amber-500'
+                  : 'text-gray-300 hover:text-amber-500 dark:text-gray-600'
+              }`}
+            >
+              <Icon name="star" className="h-5 w-5" />
+            </button>
+          </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>
         </div>
       </header>
@@ -47,6 +76,7 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
           <LazyTool />
         </Suspense>
       </ErrorBoundary>
+      <RelatedTools tool={tool} />
     </div>
   );
 }

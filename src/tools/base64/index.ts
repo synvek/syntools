@@ -9,4 +9,5 @@ export const base64Tool: ToolMeta = {
   icon: 'binary',
   component: () => import('./Base64Tool'),
   weight: 1,
+  relatedIds: ['hex-codec', 'url-codec'],
 };

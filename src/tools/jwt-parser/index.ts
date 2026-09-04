@@ -9,4 +9,5 @@ export const jwtParserTool: ToolMeta = {
   icon: 'key',
   component: () => import('./JwtParserTool'),
   weight: 2,
+  relatedIds: ['aes-crypto', 'hmac', 'hash'],
 };

@@ -5,8 +5,8 @@ import 'prismjs/components/prism-markup';
 import 'prismjs/components/prism-markdown';
 import { useTranslation } from 'react-i18next';
 import { ClearButton } from '@/core/components/ActionButtons';
-import { MarkdownToolbar, runMarkdownAction, type MarkdownJarLike } from './MarkdownToolbar';
-import type { MarkdownAction } from './editor';
+import { MarkdownToolbar } from './MarkdownToolbar';
+import { runMarkdownAction, type MarkdownAction, type MarkdownJarLike } from './editor';
 
 interface MarkdownEditorProps {
   value: string;

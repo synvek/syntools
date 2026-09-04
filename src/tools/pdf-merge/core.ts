@@ -7,16 +7,20 @@ export { isPdfFile, PDF_MAX_BYTES };
 export async function mergePdfFiles(
   files: File[],
   password?: string,
+  onProgress?: (current: number, total: number) => void,
 ): Promise<ToolResult<Uint8Array>> {
   if (files.length < 2) return { ok: false, error: 'EMPTY' };
   const docs: PDFDocument[] = [];
-  for (const f of files) {
+  const total = files.length;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i]!;
     if (!isPdfFile(f)) return { ok: false, error: 'NOT_PDF' };
     if (f.size > PDF_MAX_BYTES) return { ok: false, error: 'TOO_LARGE' };
     const bytes = await fileToBytes(f);
     const loaded = await loadPdfFromBytes(bytes, { password });
     if (!loaded.ok) return loaded;
     docs.push(loaded.value);
+    onProgress?.(i + 1, total);
   }
   return mergePdfs(docs);
 }

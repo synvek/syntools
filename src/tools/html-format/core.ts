@@ -28,6 +28,7 @@ export function minifyHtml(input: string): string {
     .replace(/\s{2,}/g, ' ');
   // 再次折叠因占位符两侧残留的空白
   result = result.replace(/>\s+/g, '>').replace(/\s+</g, '<');
+  // eslint-disable-next-line no-control-regex -- sentinel placeholders use NUL delimiters
   result = result.replace(/\u0000BLOCK(\d+)\u0000/g, (_, i) => blocks[Number(i)]);
   return result;
 }

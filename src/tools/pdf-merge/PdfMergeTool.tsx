@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '@/core/components/FileDropZone';
 import { FilePreviewList } from '@/core/components/FilePreviewList';
 import { ClearButton } from '@/core/components/ActionButtons';
+import { PdfNextSteps } from '@/core/components/PdfNextSteps';
 import {
   PDF_MAX_BYTES,
   downloadBytes,
@@ -12,7 +13,7 @@ import {
   probePdfFile,
   usePdfPassword,
 } from '@/core/pdf';
-import { PdfRunButton } from '@/core/pdf/ui';
+import { PdfProgress, PdfRunButton } from '@/core/pdf/ui';
 import { mergePdfFiles, isPdfFile } from './core';
 
 const TOOL_ID = 'pdf-merge';
@@ -21,6 +22,8 @@ export default function PdfMergeTool() {
   const { t } = useTranslation();
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const pdfPwd = usePdfPassword();
@@ -29,6 +32,8 @@ export default function PdfMergeTool() {
     setFiles([]);
     setError(null);
     setErrorCode(null);
+    setDone(false);
+    setProgress(null);
     pdfPwd.resetPassword();
   };
 
@@ -41,6 +46,7 @@ export default function PdfMergeTool() {
     }
     setError(null);
     setErrorCode(null);
+    setDone(false);
     const wasEmpty = files.length === 0;
     setFiles((prev) => [...prev, ...pdfs]);
 
@@ -64,10 +70,15 @@ export default function PdfMergeTool() {
 
   const run = async () => {
     setBusy(true);
+    setDone(false);
     setError(null);
     setErrorCode(null);
-    const r = await mergePdfFiles(files, pdfPwd.password);
+    setProgress({ current: 0, total: files.length });
+    const r = await mergePdfFiles(files, pdfPwd.password, (current, total) => {
+      setProgress({ current, total });
+    });
     setBusy(false);
+    setProgress(null);
     if (!r.ok) {
       pdfPwd.notePdfError(r.error);
       setErrorCode(r.error);
@@ -75,6 +86,7 @@ export default function PdfMergeTool() {
       return;
     }
     downloadBytes(r.value, 'merged.pdf');
+    setDone(true);
   };
 
   return (
@@ -102,6 +114,13 @@ export default function PdfMergeTool() {
         />
       )}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {progress && (
+        <PdfProgress
+          current={progress.current}
+          total={progress.total}
+          label={t('tool.progress', { current: progress.current, total: progress.total })}
+        />
+      )}
       <div className="flex flex-wrap gap-2">
         <PdfRunButton
           label={busy ? t('common.loading') : t('tools.pdf-merge.run')}
@@ -110,6 +129,7 @@ export default function PdfMergeTool() {
         />
         <ClearButton onClick={clear} disabled={files.length === 0} />
       </div>
+      {done && <PdfNextSteps toolIds={['pdf-split', 'pdf-encrypt', 'pdf-page-numbers', 'pdf-to-image']} />}
     </div>
   );
 }

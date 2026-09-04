@@ -1,19 +1,33 @@
 import type { ToolMeta } from '@/core/types';
 import { base64Tool } from '@/tools/base64';
 import { urlCodecTool } from '@/tools/url-codec';
+import { unicodeCodecTool } from '@/tools/unicode-codec';
+import { asciiTableTool } from '@/tools/ascii-table';
+import { hexCodecTool } from '@/tools/hex-codec';
+import { urlQueryTool } from '@/tools/url-query';
+import { gzipTool } from '@/tools/gzip-tool';
 import { regexTesterTool } from '@/tools/regex-tester';
 import { textDiffTool } from '@/tools/text-diff';
+import { textCounterTool } from '@/tools/text-counter';
+import { textLinesTool } from '@/tools/text-lines';
+import { caseConvertTool } from '@/tools/case-convert';
 import { jsonFormatTool } from '@/tools/json-format';
+import { jsonConvertTool } from '@/tools/json-convert';
+import { jsonPathTool } from '@/tools/json-path';
 import { timestampTool } from '@/tools/timestamp';
 import { uuidTool } from '@/tools/uuid';
 import { hashTool } from '@/tools/hash';
 import { jwtParserTool } from '@/tools/jwt-parser';
+import { aesCryptoTool } from '@/tools/aes-crypto';
+import { hmacTool } from '@/tools/hmac';
+import { totpTool } from '@/tools/totp';
+import { x509DecodeTool } from '@/tools/x509-decode';
 import { passwordGenTool } from '@/tools/password-gen';
+import { fakeDataTool } from '@/tools/fake-data';
 import { entityCodecTool } from '@/tools/entity-codec';
 import { cronParserTool } from '@/tools/cron-parser';
 import { cronGeneratorTool } from '@/tools/cron-generator';
 import { convertDataTool } from '@/tools/convert-data';
-import { caseConvertTool } from '@/tools/case-convert';
 import { bmiCalculatorTool } from '@/tools/bmi-calculator';
 import { placeholderImageTool } from '@/tools/placeholder-image';
 import { imageMergeTool } from '@/tools/image-merge';
@@ -26,17 +40,14 @@ import { imageCompressTool } from '@/tools/image-compress';
 import { htmlFormatTool } from '@/tools/html-format';
 import { jsFormatTool } from '@/tools/js-format';
 import { cssFormatTool } from '@/tools/css-format';
-import { jsonConvertTool } from '@/tools/json-convert';
 import { xmlFormatTool } from '@/tools/xml-format';
 import { xmlJsonTool } from '@/tools/xml-json';
-import { unicodeCodecTool } from '@/tools/unicode-codec';
 import { htmlColorPickerTool } from '@/tools/html-color-picker';
 import { webColorTableTool } from '@/tools/web-color-table';
 import { pinyinTool } from '@/tools/pinyin';
 import { lengthConverterTool } from '@/tools/length-converter';
 import { zhConvertTool } from '@/tools/zh-convert';
 import { weightConverterTool } from '@/tools/weight-converter';
-import { textCounterTool } from '@/tools/text-counter';
 import { calendarTool } from '@/tools/calendar';
 import { cssButtonTool } from '@/tools/css-button';
 import { randomNumberTool } from '@/tools/random-number';
@@ -46,7 +57,6 @@ import { calculatorTool } from '@/tools/calculator';
 import { codeImageTool } from '@/tools/code-image';
 import { codeHighlightTool } from '@/tools/code-highlight';
 import { imageColorPickerTool } from '@/tools/image-color-picker';
-import { asciiTableTool } from '@/tools/ascii-table';
 import { imageWatermarkTool } from '@/tools/image-watermark';
 import { uaParserTool } from '@/tools/ua-parser';
 import { latexEditorTool } from '@/tools/latex-editor';
@@ -72,6 +82,8 @@ import { mdToImageTool } from '@/tools/md-to-image';
 import { chartGeneratorTool } from '@/tools/chart-generator';
 import { css3GeneratorTool } from '@/tools/css3-generator';
 import { xsltTransformTool } from '@/tools/xslt-transform';
+import { cidrCalcTool } from '@/tools/cidr-calc';
+import { exifStripTool } from '@/tools/exif-strip';
 import { pdfMergeTool } from '@/tools/pdf-merge';
 import { pdfSplitTool } from '@/tools/pdf-split';
 import { pdfDeletePagesTool } from '@/tools/pdf-delete-pages';
@@ -101,12 +113,17 @@ export const tools: ToolMeta[] = [
   urlCodecTool,
   unicodeCodecTool,
   asciiTableTool,
+  hexCodecTool,
+  urlQueryTool,
+  gzipTool,
   regexTesterTool,
   textDiffTool,
   textCounterTool,
+  textLinesTool,
   caseConvertTool,
   jsonFormatTool,
   jsonConvertTool,
+  jsonPathTool,
   timestampTool,
   calendarTool,
   countdownTool,
@@ -114,9 +131,14 @@ export const tools: ToolMeta[] = [
   uuidTool,
   hashTool,
   jwtParserTool,
+  aesCryptoTool,
+  hmacTool,
+  totpTool,
+  x509DecodeTool,
   passwordGenTool,
   randomNumberTool,
   randomStringTool,
+  fakeDataTool,
   entityCodecTool,
   cronParserTool,
   cronGeneratorTool,
@@ -148,6 +170,7 @@ export const tools: ToolMeta[] = [
   imageBase64Tool,
   imageIcoTool,
   imageToPaperTool,
+  exifStripTool,
   textCardTool,
   imageCardTool,
   mdToImageTool,
@@ -167,6 +190,7 @@ export const tools: ToolMeta[] = [
   aiPromptsTool,
   hsvCmykTool,
   xsltTransformTool,
+  cidrCalcTool,
   pdfMergeTool,
   pdfSplitTool,
   pdfDeletePagesTool,

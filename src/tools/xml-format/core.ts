@@ -22,6 +22,7 @@ export function minifyXml(input: string): string {
     .replace(/^\s+|\s+$/g, '')
     .replace(/\s{2,}/g, ' ');
   result = result.replace(/>\s+/g, '>').replace(/\s+</g, '<');
+  // eslint-disable-next-line no-control-regex -- sentinel placeholders use NUL delimiters
   result = result.replace(/\u0000CDATA(\d+)\u0000/g, (_, i) => blocks[Number(i)]);
   return result;
 }

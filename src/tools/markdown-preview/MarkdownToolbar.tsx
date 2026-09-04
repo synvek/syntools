@@ -1,14 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { applyMarkdownAction, type MarkdownAction } from './editor';
-
-/** CodeJar 实例上需要的最小接口（避免把编辑器实现泄漏到工具栏） */
-export interface MarkdownJarLike {
-  toString: () => string;
-  save: () => { start: number; end: number; dir?: '->' | '<-' };
-  restore: (pos: { start: number; end: number; dir?: '->' | '<-' }) => void;
-  updateCode: (code: string, callOnUpdate?: boolean) => void;
-  recordHistory: () => void;
-}
+import { runMarkdownAction, type MarkdownAction, type MarkdownJarLike } from './editor';
 
 interface MarkdownToolbarProps {
   getJar: () => MarkdownJarLike | null;
@@ -34,16 +25,6 @@ const ACTIONS: { id: MarkdownAction; label: string; tipKey: string }[] = [
   { id: 'hr', label: '—', tipKey: 'tools.markdown.toolbar.hr' },
   { id: 'table', label: 'tbl', tipKey: 'tools.markdown.toolbar.table' },
 ];
-
-/** 在 CodeJar 上应用 Markdown 动作并精确恢复选区 */
-export function runMarkdownAction(jar: MarkdownJarLike, action: MarkdownAction): boolean {
-  const pos = jar.save();
-  const result = applyMarkdownAction(jar.toString(), pos.start, pos.end, action);
-  jar.updateCode(result.text);
-  jar.restore({ start: result.selectionStart, end: result.selectionEnd, dir: '->' });
-  jar.recordHistory();
-  return true;
-}
 
 /** Markdown 快捷工具栏：点击按钮对选区应用语法 */
 export function MarkdownToolbar({ getJar }: MarkdownToolbarProps) {

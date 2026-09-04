@@ -72,7 +72,7 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
           <Icon name={isDark ? 'sun' : 'moon'} />
         </button>
         <a
-          href="https://github.com"
+          href="https://github.com/synvek/syntools"
           target="_blank"
           rel="noreferrer"
           aria-label={t('header.sourceAria')}

@@ -5,8 +5,9 @@ export const pdfToImageTool: ToolMeta = {
   name: 'PDF 转图片',
   description: '将 PDF 页面渲染为 JPG/PNG',
   category: 'pdf',
-  keywords: ["pdf","image","转图片","jpg","png"],
+  keywords: ['pdf', 'image', '转图片', 'jpg', 'png'],
   icon: 'pdfToImage',
   component: () => import('./PdfToImageTool'),
   weight: 7,
+  relatedIds: ['images-to-pdf', 'pdf-grayscale', 'image-compress', 'pdf-viewer'],
 };

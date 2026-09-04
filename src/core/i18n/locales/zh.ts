@@ -14,10 +14,13 @@ export default {
   sidebar: {
     nav: '工具导航',
     closeMenu: '关闭菜单',
+    filter: '筛选工具',
+    filterPlaceholder: '筛选…',
+    filterEmpty: '无匹配工具',
   },
   home: {
     title: '开发者在线工具集',
-    tagline: '数据不出浏览器 · 按 <1>⌘K</1> 或 <3>/</3> 快速搜索',
+    tagline: '默认本地计算、数据不出浏览器（CSP 零外发）· 按 <1>⌘K</1> 或 <3>/</3> 快速搜索',
     favorites: '我的收藏',
     recent: '最近使用',
     favoriteAria: '收藏',
@@ -88,6 +91,12 @@ export default {
   },
   tool: {
     errorTitle: '工具运行出错',
+    localBadge: '本地处理',
+    serverBadge: '需服务端',
+    related: '相关工具',
+    nextSteps: '下一步',
+    openIn: '在 {{name}} 中打开',
+    progress: '进度 {{current}} / {{total}}',
   },
   notFound: {
     message: '页面或工具不存在',
@@ -133,6 +142,54 @@ export default {
     'jwt-parser': {
       name: 'JWT 解析',
       description: '解析 header / payload / signature，读取 exp 等时间声明（只读不验签）',
+    },
+    'aes-crypto': {
+      name: 'AES 加解密',
+      description: 'AES-GCM 加解密：口令 PBKDF2 或原始密钥，输出 base64(salt|iv|密文)',
+    },
+    hmac: {
+      name: 'HMAC',
+      description: 'HMAC-SHA256 / SHA512，hex / base64 输出',
+    },
+    totp: {
+      name: 'TOTP 动态口令',
+      description: 'RFC 6238 TOTP：生成 / 校验，6/8 位，剩余秒数',
+    },
+    'x509-decode': {
+      name: 'X.509 证书解析',
+      description: '解析 PEM：指纹 SHA-256/SHA-1、类型、DER 长度与 CN',
+    },
+    'cidr-calc': {
+      name: 'CIDR 计算器',
+      description: 'IPv4 CIDR：网络 / 广播 / 主机范围 / 掩码 / 主机数',
+    },
+    'text-lines': {
+      name: '文本行处理',
+      description: '行排序 / 去重 / 反转 / 编号 / 去空行',
+    },
+    'hex-codec': {
+      name: 'Hex 编解码',
+      description: 'Hex ↔ UTF-8 文本，可选空格分隔',
+    },
+    'url-query': {
+      name: 'URL Query 解析',
+      description: '解析 URL 各部分与查询参数，编辑后重建',
+    },
+    'json-path': {
+      name: 'JSONPath 查询',
+      description: '简易路径查询 a.b[0].c，提取 JSON 字段',
+    },
+    'gzip-tool': {
+      name: 'Gzip 压缩',
+      description: '文本 Gzip 压缩为 base64 / 解压还原',
+    },
+    'exif-strip': {
+      name: 'EXIF 清除',
+      description: 'JPEG 读取基础 EXIF 并剥离 APP1，下载无 EXIF 文件',
+    },
+    'fake-data': {
+      name: '假数据生成',
+      description: '生成姓名 / 邮箱 / UUID / 段落，中英模板，1–50 条',
     },
     'password-gen': {
       name: '随机密码生成器',
@@ -622,6 +679,7 @@ export default {
       result: '{{algorithm}} 结果',
       computing: '计算中…',
       fileHint: '拖拽文件到此处，或点击选择（MD5 流式计算，大文件不占内存）',
+      limitHint: '注意：非 MD5 算法会将整文件读入内存，超大文件可能导致内存不足',
       err: {
         UNSUPPORTED: '哈希计算失败：当前环境不支持该算法',
         FILE_HASH: '文件哈希计算失败：{{message}}',
@@ -629,6 +687,13 @@ export default {
       },
     },
     jwt: {
+      mode: '模式',
+      modes: { parse: '解析', sign: '签发（HS256）' },
+      secretPlaceholder: 'HMAC 密钥…',
+      payloadJson: 'Payload JSON',
+      payloadPlaceholder: '{ "sub": "123", "name": "Alice" }',
+      signedToken: '签发结果',
+      signNote: '使用 HS256 在浏览器内签发；密钥不会上传',
       inputLabel: 'JWT 输入',
       inputPlaceholder: '粘贴 JWT（支持 Bearer 前缀），如 eyJhbGci…',
       header: 'Header（头部）',
@@ -648,6 +713,182 @@ export default {
         INVALID_PARTS: '格式错误：JWT 由 header.payload.signature 三段组成',
         INVALID_HEADER: 'Header 段解析失败：不是合法的 base64url 编码 JSON',
         INVALID_PAYLOAD: 'Payload 段解析失败：不是合法的 base64url 编码 JSON',
+        SIGN_FAILED: '签发失败',
+      },
+    },
+
+    'aes-crypto': {
+      encrypt: '加密',
+      decrypt: '解密',
+      keyMode: '密钥方式',
+      passphrase: '口令（PBKDF2）',
+      rawKey: '原始密钥（hex）',
+      passphrasePlaceholder: '输入口令…',
+      keyHexPlaceholder: '32 或 64 位十六进制密钥（AES-128/256）…',
+      ivPlaceholder: '可选 IV（24 位 hex，12 字节）；留空则随机',
+      plaintext: '明文',
+      ciphertext: '密文（base64）',
+      inputPlaceholder: '输入内容…',
+      note: '加密输出格式：base64(salt|iv|ciphertext+tag)；口令模式使用 PBKDF2-SHA256',
+      err: {
+        EMPTY: '请输入内容',
+        INVALID_KEY: '密钥无效：请检查口令或 hex 密钥长度',
+        DECRYPT_FAILED: '解密失败：口令/密钥错误或数据损坏',
+        INVALID_INPUT: '输入无效：密文格式或 IV 不正确',
+      },
+    },
+    hmac: {
+      algorithm: '算法',
+      encoding: '输出',
+      secretPlaceholder: 'HMAC 密钥…',
+      message: '消息',
+      messagePlaceholder: '输入要计算 HMAC 的消息…',
+      err: {
+        EMPTY: '请输入消息',
+        INVALID_KEY: '请输入有效密钥',
+      },
+    },
+    totp: {
+      digits: '位数',
+      secret: 'Base32 密钥',
+      secretPlaceholder: '粘贴 Authenticator 密钥（Base32）…',
+      code: '当前口令',
+      remaining: '剩余秒数',
+      verify: '校验口令（可选）',
+      verifyPlaceholder: '输入要校验的 6/8 位码…',
+      verifyOk: '校验通过',
+      verifyFail: '校验失败',
+      err: {
+        EMPTY: '请输入密钥或校验码',
+        INVALID_SECRET: '密钥不是合法的 Base32',
+      },
+    },
+    'cidr-calc': {
+      input: 'CIDR',
+      placeholder: '例如 192.168.1.0/24',
+      fields: {
+        network: '网络地址',
+        broadcast: '广播地址',
+        firstHost: '首主机',
+        lastHost: '末主机',
+        netmask: '子网掩码',
+        wildcard: '通配掩码',
+        prefix: '前缀长度',
+        hostCount: '可用主机数',
+        totalAddresses: '总地址数',
+      },
+      err: {
+        EMPTY: '请输入 CIDR',
+        INVALID: 'CIDR 格式无效（需为 IPv4/前缀，如 10.0.0.0/8）',
+      },
+    },
+    'text-lines': {
+      placeholder: '每行一段文本…',
+      ops: {
+        'sort-asc': '升序排序',
+        'sort-desc': '降序排序',
+        unique: '去重',
+        reverse: '反转行序',
+        number: '添加行号',
+        'trim-empty': '去除空行',
+      },
+      err: {
+        EMPTY: '请输入文本',
+      },
+    },
+    'hex-codec': {
+      spaced: '空格分隔字节',
+      placeholder: '文本或十六进制…',
+      err: {
+        EMPTY: '请输入内容',
+        INVALID_HEX: '非法十六进制（需偶数位 0-9a-f）',
+      },
+    },
+    'url-query': {
+      input: 'URL',
+      placeholder: 'https://example.com/path?a=1&b=2',
+      addParam: '添加参数',
+      key: '键',
+      value: '值',
+      rebuilt: '重建后的 URL',
+      parts: {
+        protocol: '协议',
+        hostname: '主机',
+        port: '端口',
+        pathname: '路径',
+        hash: '哈希',
+        origin: 'Origin',
+      },
+      err: {
+        EMPTY: '请输入 URL',
+        INVALID_URL: 'URL 无效',
+      },
+    },
+    'json-path': {
+      pathPlaceholder: '路径，如 a.b[0].c 或 $.a.b[0]',
+      json: 'JSON',
+      jsonPlaceholder: '粘贴 JSON…',
+      err: {
+        EMPTY: '请输入 JSON 与路径',
+        INVALID_JSON: 'JSON 解析失败',
+        NOT_FOUND: '路径未匹配到值',
+      },
+    },
+    'gzip-tool': {
+      compress: '压缩（文本 → base64）',
+      decompress: '解压（base64 → 文本）',
+      placeholder: '输入文本或 Gzip 的 base64…',
+      err: {
+        EMPTY: '请输入内容',
+        INVALID: '输入无效',
+        DECOMPRESS_FAILED: '解压失败：不是合法的 Gzip 数据',
+      },
+    },
+    'x509-decode': {
+      input: 'PEM 证书',
+      placeholder: '-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----',
+      fields: {
+        pemType: '类型',
+        derLength: 'DER 长度',
+        sha256: 'SHA-256',
+        sha1: 'SHA-1',
+        subject: 'Subject CN',
+        issuer: 'Issuer CN',
+      },
+      err: {
+        EMPTY: '请粘贴 PEM',
+        INVALID_PEM: '不是合法的 PEM',
+      },
+    },
+    'exif-strip': {
+      hint: '仅支持 JPEG：剥离 APP1（EXIF）后下载。',
+      drop: '拖入 JPEG 图片',
+      hasExif: '含 EXIF',
+      orientation: '方向',
+      make: '相机制造商',
+      yes: '是',
+      no: '否',
+      download: '下载无 EXIF 文件',
+      err: {
+        EMPTY: '请选择文件',
+        UNSUPPORTED: '仅支持 JPEG',
+        PROCESS_FAILED: '处理失败',
+      },
+    },
+    'fake-data': {
+      kind: '类型',
+      locale: '语言',
+      count: '数量',
+      generate: '生成',
+      kinds: {
+        name: '姓名',
+        email: '邮箱',
+        uuid: 'UUID',
+        lorem: '段落',
+      },
+      err: {
+        EMPTY: '请完善选项',
+        INVALID_COUNT: '数量需为 1–50 的整数',
       },
     },
     password: {
@@ -2152,6 +2393,7 @@ export default {
     },
     'pdf-split': {
       hint: '按页拆分为多个 PDF 并依次下载。',
+      asZip: '打包为 ZIP 下载',
       drop: '拖入 PDF',
       run: '拆分并下载',
       errors: {

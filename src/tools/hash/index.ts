@@ -9,4 +9,5 @@ export const hashTool: ToolMeta = {
   icon: 'hash',
   component: () => import('./HashTool'),
   weight: 1,
+  relatedIds: ['aes-crypto', 'hmac', 'jwt-parser'],
 };

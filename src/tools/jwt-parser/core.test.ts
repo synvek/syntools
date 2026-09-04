@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { isExpired, normalizeToken, parseJwt, readTimeClaim } from './core';
+import {
+  encodeJwtUnsigned,
+  isExpired,
+  normalizeToken,
+  parseJwt,
+  readTimeClaim,
+  signJwtHs256,
+} from './core';
 
 /** jwt.io 官方示例 token（HS256） */
 const VALID_TOKEN =
@@ -67,7 +74,6 @@ describe('parseJwt', () => {
       ok: false,
       error: 'INVALID_HEADER',
     });
-    // header 解码为数组而非对象
     expect(parseJwt(`${enc([1, 2])}.${enc({ a: 1 })}.sig`)).toEqual({
       ok: false,
       error: 'INVALID_HEADER',
@@ -103,5 +109,48 @@ describe('时间声明', () => {
     expect(isExpired({ exp: 1699999999 }, now)).toBe(true);
     expect(isExpired({ exp: 1700000001 }, now)).toBe(false);
     expect(isExpired({}, now)).toBeNull();
+  });
+});
+
+describe('signJwtHs256', () => {
+  it('签发后可解析且 alg 为 HS256', async () => {
+    const r = await signJwtHs256('{"sub":"1","name":"Ada"}', 'secret');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const parsed = parseJwt(r.value);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.alg).toBe('HS256');
+    expect(parsed.value.payload).toEqual({ sub: '1', name: 'Ada' });
+  });
+
+  it('空 payload / 空密钥 EMPTY', async () => {
+    expect(await signJwtHs256('', 's')).toEqual({ ok: false, error: 'EMPTY' });
+    expect(await signJwtHs256('{}', '')).toEqual({ ok: false, error: 'EMPTY' });
+  });
+
+  it('非法 JSON INVALID_PAYLOAD', async () => {
+    expect(await signJwtHs256('{', 's')).toEqual({ ok: false, error: 'INVALID_PAYLOAD' });
+  });
+
+  it('与 jwt.io 示例密钥签发匹配已知签名', async () => {
+    const r = await signJwtHs256(
+      '{"sub":"1234567890","name":"John Doe","iat":1516239022}',
+      'your-256-bit-secret',
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value).toBe(VALID_TOKEN);
+  });
+});
+
+describe('encodeJwtUnsigned', () => {
+  it('无签名编码', () => {
+    const r = encodeJwtUnsigned('{"a":1}');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.endsWith('.')).toBe(true);
+    const parsed = parseJwt(r.value);
+    expect(parsed.ok).toBe(true);
   });
 });

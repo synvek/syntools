@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ProgressBar } from '@/core/components/ProgressBar';
 
 /** 共享：PDF 工具主操作按钮 */
 export function PdfRunButton({
@@ -20,6 +21,19 @@ export function PdfRunButton({
       {label}
     </button>
   );
+}
+
+export function PdfProgress({
+  current,
+  total,
+  label,
+}: {
+  current: number;
+  total: number;
+  label?: string;
+}) {
+  if (total <= 0) return null;
+  return <ProgressBar value={current / total} label={label} />;
 }
 
 export function PdfField({ label, children }: { label: string; children: ReactNode }) {

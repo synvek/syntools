@@ -33,6 +33,8 @@ export interface ToolMeta {
   mode?: ToolMode;
   /** 排序权重，同分类内升序 */
   weight?: number;
+  /** 相关工具 id（工具页推荐）；缺省时按同分类补齐 */
+  relatedIds?: string[];
 }
 
 /** 工具计算统一返回契约（技术设计 §8.2）：core.ts 永不向调用方抛异常 */

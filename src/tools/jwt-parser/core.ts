@@ -80,3 +80,80 @@ export function isExpired(payload: Record<string, unknown>, nowMs = Date.now()):
   if (exp === null) return null;
   return exp * 1000 <= nowMs;
 }
+
+export type JwtSignErrorCode = 'EMPTY' | 'INVALID_PAYLOAD' | 'SIGN_FAILED';
+
+function utf8ToBase64Url(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Encode JWT segments without signing (signature empty) */
+export function encodeJwtUnsigned(
+  payloadJson: string,
+  headerExtras?: Record<string, unknown>,
+): ToolResult<string> {
+  const trimmed = payloadJson.trim();
+  if (!trimmed) return { ok: false, error: 'EMPTY' };
+  let payload: unknown;
+  try {
+    payload = JSON.parse(trimmed);
+  } catch {
+    return { ok: false, error: 'INVALID_PAYLOAD' };
+  }
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { ok: false, error: 'INVALID_PAYLOAD' };
+  }
+  const header = { alg: 'none', typ: 'JWT', ...headerExtras };
+  const h = utf8ToBase64Url(JSON.stringify(header));
+  const p = utf8ToBase64Url(JSON.stringify(payload));
+  return { ok: true, value: `${h}.${p}.` };
+}
+
+/** Sign JWT with HS256 (WebCrypto HMAC-SHA256) */
+export async function signJwtHs256(
+  payloadJson: string,
+  secret: string,
+  headerExtras?: Record<string, unknown>,
+): Promise<ToolResult<string>> {
+  const trimmed = payloadJson.trim();
+  if (!trimmed) return { ok: false, error: 'EMPTY' };
+  if (!secret) return { ok: false, error: 'EMPTY' };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(trimmed);
+  } catch {
+    return { ok: false, error: 'INVALID_PAYLOAD' };
+  }
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { ok: false, error: 'INVALID_PAYLOAD' };
+  }
+
+  const header = { alg: 'HS256', typ: 'JWT', ...headerExtras };
+  const h = utf8ToBase64Url(JSON.stringify(header));
+  const p = utf8ToBase64Url(JSON.stringify(payload));
+  const data = new TextEncoder().encode(`${h}.${p}`);
+
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, data));
+    return { ok: true, value: `${h}.${p}.${bytesToBase64Url(sig)}` };
+  } catch {
+    return { ok: false, error: 'SIGN_FAILED' };
+  }
+}
