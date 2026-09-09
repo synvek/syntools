@@ -39,6 +39,9 @@ test-results
 scripts/.en-locale.json
 scripts/locale-chunks/
 
+# Tauri
+src-tauri/target
+
 # AI Tools
 .cursor/
 

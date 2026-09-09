@@ -34,6 +34,7 @@ SynTools 把日常常用的工具收拢到同一入口：编解码、格式化�
 - **国际化就绪**：已具备中英文文案
 - **工具懒加载**：应用外壳保持轻量，各工具按需加载
 - **静态部署**：支持 GitHub Pages、Vercel、Cloudflare Pages 等任意静态托管
+- **桌面应用**：可选 Tauri 打包（macOS / Windows / Linux）
 
 ---
 
@@ -205,6 +206,17 @@ pnpm preview
 pnpm build
 pnpm preview   # 可选：本地预览
 ```
+
+### 桌面应用（Tauri）
+
+需已安装 [Rust](https://www.rust-lang.org/tools/install) 与各平台系统依赖（见 [Tauri 前置条件](https://v2.tauri.app/start/prerequisites/)）。
+
+```bash
+pnpm tauri:dev     # 开发：Vite + 桌面窗口热更新
+pnpm tauri:build   # 产物在 src-tauri/target/release/bundle/
+```
+
+桌面端同样加载纯前端工具，数据默认不离开本机。
 
 ---
 

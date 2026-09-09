@@ -5,7 +5,7 @@ import { prerenderPlugin } from './scripts/prerender';
 
 /**
  * 部署子路径（GitHub Pages 项目站为 /<repo>/）。
- * 默认 `/`（Vercel / Cloudflare / 本地）；Pages 构建时设置 BASE_PATH=/syntools/
+ * 默认 `/`（Vercel / Cloudflare / 本地 / Tauri）；Pages 构建时设置 BASE_PATH=/syntools/
  */
 function resolveBase(): string {
   const raw = process.env.BASE_PATH?.trim() || '/';
@@ -16,12 +16,23 @@ function resolveBase(): string {
 // https://vitejs.dev/config/
 export default defineConfig({
   base: resolveBase(),
+  // Tauri 期望固定端口，且避免清屏打乱 Rust 编译日志
+  clearScreen: false,
   plugins: [react(), prerenderPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  server: {
+    port: 5173,
+    strictPort: true,
+    host: process.env.TAURI_DEV_HOST || false,
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
+  },
+  envPrefix: ['VITE_', 'TAURI_'],
   build: {
     rollupOptions: {
       output: {

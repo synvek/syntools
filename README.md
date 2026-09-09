@@ -34,6 +34,7 @@ SynTools is a unified collection of everyday utilities — encoding, formatting,
 - **i18n-ready** — Chinese and English locale strings
 - **Lazy-loaded tools** — the app shell stays small; each tool loads on demand
 - **Static deploy** — works on GitHub Pages, Vercel, Cloudflare Pages, or any static host
+- **Desktop app** — optional Tauri packaging for macOS / Windows / Linux
 
 ---
 
@@ -204,6 +205,17 @@ pnpm preview
 pnpm build
 pnpm preview   # optional local check
 ```
+
+### Desktop (Tauri)
+
+Requires [Rust](https://www.rust-lang.org/tools/install) and platform prerequisites ([Tauri docs](https://v2.tauri.app/start/prerequisites/)).
+
+```bash
+pnpm tauri:dev     # Vite + native window with HMR
+pnpm tauri:build   # artifacts under src-tauri/target/release/bundle/
+```
+
+The desktop shell loads the same client-only tools; data stays on the machine by default.
 
 ---
 
