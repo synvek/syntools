@@ -33,7 +33,7 @@ SynTools 把日常常用的工具收拢到同一入口：编解码、格式化�
 - **亮色 / 暗色主题**：默认跟随系统，刷新无闪烁
 - **国际化就绪**：已具备中英文文案
 - **工具懒加载**：应用外壳保持轻量，各工具按需加载
-- **静态部署**：支持 Vercel、Cloudflare Pages 等任意静态托管
+- **静态部署**：支持 GitHub Pages、Vercel、Cloudflare Pages 等任意静态托管
 
 ---
 
@@ -187,7 +187,17 @@ syntools/
 
 构建产物为 `dist/` 下的静态 SPA。
 
-**Vercel** — `vercel.json` 已配置 `buildCommand`、`outputDirectory`、SPA 重写与安全响应头。
+**GitHub Pages** — 推送 `main` 后由 [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) 自动构建并发布到  
+`https://synvek.github.io/syntools/`（需在仓库 **Settings → Pages** 将 Source 设为 **GitHub Actions**）。
+
+本地预览 Pages 构建：
+
+```bash
+pnpm build:pages
+pnpm preview
+```
+
+**Vercel** — `vercel.json` 已配置 `buildCommand`、`outputDirectory`、SPA 重写与安全响应头（`BASE_PATH` 默认为 `/`）。
 
 **其他托管** — 托管 `dist/`，将未知路径重写到 `index.html`，并对带 hash 的 `/assets/*` 做长缓存。
 

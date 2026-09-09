@@ -31,7 +31,13 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
       </button>
 
       <Link to="/" className="flex items-center gap-2 text-lg font-bold">
-        <img src="/logo.svg" alt="" width={20} height={20} className="h-5 w-5" />
+        <img
+          src={`${import.meta.env.BASE_URL}logo.svg`}
+          alt=""
+          width={20}
+          height={20}
+          className="h-5 w-5"
+        />
         SynTools
       </Link>
 

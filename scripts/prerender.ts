@@ -147,8 +147,13 @@ export function prerenderPlugin(): Plugin {
         await writeFile(resolvePath(distDir, 'sitemap.xml'), buildSitemap(siteUrl, paths), 'utf-8');
       }
 
+      // GitHub Pages：无服务端 SPA fallback，用 404.html 回退到应用壳
+      await writeFile(resolvePath(distDir, '404.html'), await readFile(indexPath, 'utf-8'), 'utf-8');
+      // 禁止 Jekyll 处理，保留 _headers 等以下划线开头的文件
+      await writeFile(resolvePath(distDir, '.nojekyll'), '', 'utf-8');
+
       console.log(
-        `预渲染完成：首页 + ${tools.length} 个工具页 + robots.txt${siteUrl ? ' + sitemap.xml' : ''}`,
+        `预渲染完成：首页 + ${tools.length} 个工具页 + robots.txt${siteUrl ? ' + sitemap.xml' : ''} + 404.html`,
       );
     },
   };

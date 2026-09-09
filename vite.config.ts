@@ -3,8 +3,19 @@ import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { prerenderPlugin } from './scripts/prerender';
 
+/**
+ * 部署子路径（GitHub Pages 项目站为 /<repo>/）。
+ * 默认 `/`（Vercel / Cloudflare / 本地）；Pages 构建时设置 BASE_PATH=/syntools/
+ */
+function resolveBase(): string {
+  const raw = process.env.BASE_PATH?.trim() || '/';
+  if (raw === '/') return '/';
+  return `/${raw.replace(/^\/+|\/+$/g, '')}/`;
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: resolveBase(),
   plugins: [react(), prerenderPlugin()],
   resolve: {
     alias: {

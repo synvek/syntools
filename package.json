@@ -20,6 +20,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:pages": "BASE_PATH=/syntools/ SITE_URL=https://synvek.github.io/syntools pnpm build",
     "preview": "vite preview",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --fix",

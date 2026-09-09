@@ -33,7 +33,7 @@ SynTools is a unified collection of everyday utilities — encoding, formatting,
 - **Light / dark theme** — system preference by default, no flash on load
 - **i18n-ready** — Chinese and English locale strings
 - **Lazy-loaded tools** — the app shell stays small; each tool loads on demand
-- **Static deploy** — works on Vercel, Cloudflare Pages, or any static host
+- **Static deploy** — works on GitHub Pages, Vercel, Cloudflare Pages, or any static host
 
 ---
 
@@ -186,7 +186,17 @@ Tools must use `component: () => import(...)` so they stay out of the initial bu
 
 The build output is a static SPA in `dist/`.
 
-**Vercel** — `vercel.json` already defines `buildCommand`, `outputDirectory`, SPA rewrites, and security headers.
+**GitHub Pages** — pushes to `main` are built and published by [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) to  
+`https://synvek.github.io/syntools/` (set **Settings → Pages → Source** to **GitHub Actions**).
+
+Preview a Pages build locally:
+
+```bash
+pnpm build:pages
+pnpm preview
+```
+
+**Vercel** — `vercel.json` already defines `buildCommand`, `outputDirectory`, SPA rewrites, and security headers (`BASE_PATH` defaults to `/`).
 
 **Other hosts** — serve `dist/`, rewrite unknown paths to `index.html`, and cache hashed `/assets/*` aggressively.
 
