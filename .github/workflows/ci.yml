@@ -1,9 +1,7 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   ci:
@@ -12,7 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 读取 package.json 的 packageManager 字段安装对应 pnpm
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -20,31 +17,31 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: 安装依赖
+      - name: install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: 代码检查（ESLint）
+      - name: Code linting (ESLint)
         run: pnpm lint
 
-      - name: 类型检查
+      - name: Type checking
         run: pnpm typecheck
 
-      - name: 单元测试（含覆盖率）
+      - name: Unit tests (with coverage)
         run: pnpm test -- --coverage
 
-      - name: 构建
+      - name: Build
         run: pnpm build
 
-      - name: 产物体积预算检查
+      - name: Size budget check
         run: pnpm size
 
-      - name: 安装 Playwright Chromium
+      - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: E2E 冒烟测试
+      - name: E2E smoke tests
         run: pnpm e2e
 
-      - name: 上传 Playwright 报告
+      - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -52,10 +49,74 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-      - name: 上传体积报告
+      - name: Upload size report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: size-report
           path: dist/size-report.md
           retention-days: 30
+
+  tauri:
+    name: tauri (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-24.04
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+          - name: windows-x64
+            os: windows-latest
+          - name: windows-arm64
+            os: windows-11-arm
+          - name: macos-x64
+            os: macos-15-intel
+          - name: macos-arm64
+            os: macos-15
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: tauri-${{ matrix.name }}
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install npm dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 各矩阵项使用对应架构的原生 runner，无需交叉编译
+      - name: Tauri build
+        run: pnpm tauri:build
+
+      - name: Upload desktop bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-${{ matrix.name }}
+          path: src-tauri/target/release/bundle
+          if-no-files-found: warn
+          retention-days: 14

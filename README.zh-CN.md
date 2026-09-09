@@ -188,19 +188,9 @@ syntools/
 
 构建产物为 `dist/` 下的静态 SPA。
 
-**GitHub Pages** — 推送 `main` 后由 [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) 自动构建并发布到  
-`https://synvek.github.io/syntools/`（需在仓库 **Settings → Pages** 将 Source 设为 **GitHub Actions**）。
-
-本地预览 Pages 构建：
-
-```bash
-pnpm build:pages
-pnpm preview
-```
-
 **Vercel** — `vercel.json` 已配置 `buildCommand`、`outputDirectory`、SPA 重写与安全响应头（`BASE_PATH` 默认为 `/`）。
 
-**其他托管** — 托管 `dist/`，将未知路径重写到 `index.html`，并对带 hash 的 `/assets/*` 做长缓存。
+**其他托管** — 托管 `dist/`，将未知路径重写到 `index.html`，并对带 hash 的 `/assets/*` 做长缓存。若部署到 GitHub 项目站子路径，可用 `pnpm build:pages`（设置 `BASE_PATH=/syntools/`）。
 
 ```bash
 pnpm build
@@ -216,7 +206,7 @@ pnpm tauri:dev     # 开发：Vite + 桌面窗口热更新
 pnpm tauri:build   # 产物在 src-tauri/target/release/bundle/
 ```
 
-桌面端同样加载纯前端工具，数据默认不离开本机。
+CI 会在 **Linux / Windows / macOS** × **x64 / arm64**（共 6 个 runner）上执行 `pnpm tauri:build`，并上传各平台安装包产物。
 
 ---
 

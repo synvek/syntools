@@ -187,19 +187,9 @@ Tools must use `component: () => import(...)` so they stay out of the initial bu
 
 The build output is a static SPA in `dist/`.
 
-**GitHub Pages** — pushes to `main` are built and published by [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) to  
-`https://synvek.github.io/syntools/` (set **Settings → Pages → Source** to **GitHub Actions**).
-
-Preview a Pages build locally:
-
-```bash
-pnpm build:pages
-pnpm preview
-```
-
 **Vercel** — `vercel.json` already defines `buildCommand`, `outputDirectory`, SPA rewrites, and security headers (`BASE_PATH` defaults to `/`).
 
-**Other hosts** — serve `dist/`, rewrite unknown paths to `index.html`, and cache hashed `/assets/*` aggressively.
+**Other hosts** — serve `dist/`, rewrite unknown paths to `index.html`, and cache hashed `/assets/*` aggressively. For GitHub project pages under a subpath, build with `pnpm build:pages` (sets `BASE_PATH=/syntools/`).
 
 ```bash
 pnpm build
@@ -215,7 +205,7 @@ pnpm tauri:dev     # Vite + native window with HMR
 pnpm tauri:build   # artifacts under src-tauri/target/release/bundle/
 ```
 
-The desktop shell loads the same client-only tools; data stays on the machine by default.
+CI runs `pnpm tauri:build` on **Linux / Windows / macOS** × **x64 / arm64** (6 runners) and uploads platform bundles as artifacts.
 
 ---
 
