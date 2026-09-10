@@ -42,6 +42,22 @@ test('语言切换与刷新持久化', async ({ page }) => {
   await expect(langSelect).toHaveValue('en');
 });
 
+/** 旧数据只有 lang、无 langExplicit 时不锁死，按系统 locale 重检 */
+test('无 langExplicit 的旧设置会重新检测语言', async ({ browser }) => {
+  const context = await browser.newContext({ locale: 'zh-CN' });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'syntools:settings.v1',
+      JSON.stringify({ theme: 'system', lang: 'en' }),
+    );
+  });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: '开发者在线工具集' })).toBeVisible();
+  await expect(page.locator('#header-lang')).toHaveValue('zh');
+  await context.close();
+});
+
 test('可切换到法语并显示本地化标题', async ({ page }) => {
   await page.goto('/');
   const langSelect = page.locator('#header-lang');

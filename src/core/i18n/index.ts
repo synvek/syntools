@@ -5,6 +5,7 @@ import {
   detectBrowserLang,
   isLang,
   isSyncLang,
+  normalizeLang,
   type Lang,
 } from '@/core/i18n/types';
 
@@ -13,10 +14,12 @@ export {
   LANGS,
   LANG_META,
   SYNC_LANGS,
+  collectBrowserLocales,
   detectBrowserLang,
   isLang,
   isSyncLang,
   mapBrowserLocale,
+  normalizeLang,
 } from '@/core/i18n/types';
 export { ensureLangLoaded } from '@/core/i18n/locales';
 
@@ -24,16 +27,21 @@ const SETTINGS_KEY = 'syntools:settings.v1';
 
 /**
  * 解析用户语言：
- * 1. localStorage 中用户显式选过的语言（优先）
- * 2. 否则检测浏览器语言
+ * 1. 用户曾在下拉框中显式选择过（settings.langExplicit === true）
+ * 2. 否则检测系统区域 + 浏览器语言（系统区域优先）
  * 3. 仍无匹配则 English
  */
 export function readStoredLang(): Lang {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
-      const lang = JSON.parse(raw).lang;
-      if (isLang(lang)) return lang;
+      const parsed = JSON.parse(raw) as { lang?: unknown; langExplicit?: unknown };
+      // 仅采纳「用户手动选过」的语言，避免主题切换等把误检结果写死
+      if (parsed.langExplicit === true && typeof parsed.lang === 'string') {
+        const normalized = normalizeLang(parsed.lang);
+        if (normalized) return normalized;
+        if (isLang(parsed.lang)) return parsed.lang;
+      }
     }
   } catch {
     // ignore corrupt storage

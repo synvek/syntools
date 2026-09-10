@@ -5,18 +5,32 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 const SETTINGS_KEY = 'syntools:settings.v1';
 
-function persist(theme: ThemeMode, lang: Lang) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme, lang }));
+type SettingsBlob = {
+  theme?: ThemeMode;
+  lang?: Lang;
+  /** 用户是否在 UI 中显式选择过语言（未设置则每次按系统/浏览器检测） */
+  langExplicit?: boolean;
+};
+
+function readSettingsBlob(): SettingsBlob {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as SettingsBlob;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSettingsBlob(patch: SettingsBlob) {
+  const prev = readSettingsBlob();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...prev, ...patch }));
 }
 
 function readStoredTheme(): ThemeMode {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    const theme = raw ? (JSON.parse(raw).theme as ThemeMode) : 'system';
-    return theme === 'light' || theme === 'dark' || theme === 'system' ? theme : 'system';
-  } catch {
-    return 'system';
-  }
+  const theme = readSettingsBlob().theme;
+  return theme === 'light' || theme === 'dark' || theme === 'system' ? theme : 'system';
 }
 
 /** 与 index.html 内联脚本保持一致的主题应用逻辑（技术设计 §6.3） */
@@ -38,7 +52,8 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   theme: readStoredTheme(),
   setTheme: (theme) => {
-    persist(theme, get().lang);
+    // 只写 theme，不把当前检测语言误标为「用户选择」
+    writeSettingsBlob({ theme });
     applyTheme(theme);
     set({ theme });
   },
@@ -48,7 +63,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   lang: readStoredLang(),
   setLang: async (lang) => {
-    persist(get().theme, lang);
+    writeSettingsBlob({ theme: get().theme, lang, langExplicit: true });
     await changeAppLanguage(lang);
     set({ lang });
   },

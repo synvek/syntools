@@ -31,7 +31,15 @@ export const LANG_META: Record<Lang, { nativeLabel: string }> = {
 };
 
 export function isLang(value: unknown): value is Lang {
-  return typeof value === 'string' && (LANGS as readonly string[]).includes(value);
+  if (typeof value !== 'string') return false;
+  return (LANGS as readonly string[]).some((l) => l.toLowerCase() === value.toLowerCase());
+}
+
+/** 归一化为规范 Lang 码（如 zh-tw → zh-TW） */
+export function normalizeLang(value: string): Lang | null {
+  const lower = value.trim().toLowerCase();
+  const found = LANGS.find((l) => l.toLowerCase() === lower);
+  return found ?? null;
 }
 
 export function isSyncLang(lang: Lang): boolean {
@@ -46,11 +54,11 @@ export function mapBrowserLocale(tag: string): Lang | null {
   const raw = tag.trim().toLowerCase().replace(/_/g, '-');
   if (!raw) return null;
 
-  // 精确或前缀匹配已支持代码（如 pt-br → pt）
-  if (isLang(raw)) return raw;
+  const exact = normalizeLang(raw);
+  if (exact) return exact;
+
   const primary = raw.split('-')[0] ?? '';
   if (primary === 'zh') {
-    // zh-Hant* / zh-TW / zh-HK / zh-MO → 繁体
     if (
       raw.includes('hant') ||
       raw.endsWith('-tw') ||
@@ -64,21 +72,53 @@ export function mapBrowserLocale(tag: string): Lang | null {
     }
     return 'zh';
   }
-  if (isLang(primary)) return primary;
-  return null;
+  return normalizeLang(primary);
 }
 
-/** 按 navigator.languages 优先序检测；全无匹配时返回 English */
+/** 收集检测用的 locale 列表：系统区域优先，再浏览器语言偏好 */
+export function collectBrowserLocales(
+  languages?: readonly string[],
+  systemLocale?: string | null,
+): string[] {
+  const out: string[] = [];
+  const push = (tag: string | null | undefined) => {
+    if (!tag) return;
+    const t = tag.trim();
+    if (t && !out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
+  };
+
+  if (systemLocale !== undefined) {
+    push(systemLocale);
+  } else {
+    try {
+      push(Intl.DateTimeFormat().resolvedOptions().locale);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (languages !== undefined) {
+    for (const tag of languages) push(tag);
+  } else if (typeof navigator !== 'undefined') {
+    if (navigator.languages?.length) {
+      for (const tag of navigator.languages) push(tag);
+    } else {
+      push(navigator.language);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * 按 locale 列表优先序检测；全无匹配时返回 English。
+ * 系统区域（Intl）排在浏览器 UI 语言之前，避免「中文系统 + 英文 Chrome」误选 English。
+ */
 export function detectBrowserLang(
-  languages: readonly string[] = typeof navigator !== 'undefined'
-    ? navigator.languages?.length
-      ? navigator.languages
-      : navigator.language
-        ? [navigator.language]
-        : []
-    : [],
+  languages?: readonly string[],
+  systemLocale?: string | null,
 ): Lang {
-  for (const tag of languages) {
+  for (const tag of collectBrowserLocales(languages, systemLocale)) {
     const mapped = mapBrowserLocale(tag);
     if (mapped) return mapped;
   }
