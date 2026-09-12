@@ -11,6 +11,7 @@ const de = {
     "searchAria": "Tools suchen",
     "themeAria": "Design umschalten",
     "langAria": "Sprache wechseln",
+    "downloadAria": "Desktop-App herunterladen",
     "sourceAria": "Quellcode"
   },
   "sidebar": {

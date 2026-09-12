@@ -11,6 +11,7 @@ const es = {
     "searchAria": "Buscar herramientas",
     "themeAria": "Cambiar tema",
     "langAria": "Cambiar idioma",
+    "downloadAria": "Descargar app de escritorio",
     "sourceAria": "Código fuente"
   },
   "sidebar": {

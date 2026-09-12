@@ -11,6 +11,7 @@ const ja = {
     "searchAria": "ツールを検索",
     "themeAria": "テーマを切り替え",
     "langAria": "言語を切り替え",
+    "downloadAria": "デスクトップ版をダウンロード",
     "sourceAria": "ソースコード"
   },
   "sidebar": {

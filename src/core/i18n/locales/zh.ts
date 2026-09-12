@@ -9,6 +9,7 @@ export default {
     searchAria: '搜索工具',
     themeAria: '切换主题',
     langAria: '切换语言',
+    downloadAria: '下载桌面版',
     sourceAria: '源码',
   },
   sidebar: {

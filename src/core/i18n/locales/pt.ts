@@ -11,6 +11,7 @@ const pt = {
     "searchAria": "Pesquisar ferramentas",
     "themeAria": "Alternar tema",
     "langAria": "Mudar idioma",
+    "downloadAria": "Baixar app para desktop",
     "sourceAria": "Código-fonte"
   },
   "sidebar": {

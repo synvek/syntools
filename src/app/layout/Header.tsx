@@ -58,6 +58,7 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
           type="button"
           onClick={onSearch}
           aria-label={t('header.searchAria')}
+          title={t('header.searchAria')}
           className="rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 sm:hidden"
         >
           <Icon name="search" />
@@ -69,6 +70,7 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
           id="header-lang"
           value={lang}
           aria-label={t('header.langAria')}
+          title={t('header.langAria')}
           onChange={(e) => {
             void setLang(e.target.value as Lang);
           }}
@@ -84,15 +86,27 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
           type="button"
           onClick={toggleTheme}
           aria-label={t('header.themeAria')}
+          title={t('header.themeAria')}
           className="rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
         >
           <Icon name={isDark ? 'sun' : 'moon'} />
         </button>
         <a
+          href="https://github.com/synvek/syntools/releases"
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t('header.downloadAria')}
+          title={t('header.downloadAria')}
+          className="rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
+        >
+          <Icon name="download" />
+        </a>
+        <a
           href="https://github.com/synvek/syntools"
           target="_blank"
           rel="noreferrer"
           aria-label={t('header.sourceAria')}
+          title={t('header.sourceAria')}
           className="rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
         >
           <Icon name="github" />

@@ -6,6 +6,8 @@
 
 SynTools is a unified collection of everyday utilities — encoding, formatting, hashing, image/PDF processing, generators, and more — that run entirely in your browser. No install, no account, and by default **your data never leaves the device**.
 
+You can access online: www.syntools.net
+
 ---
 
 ## Why SynTools?

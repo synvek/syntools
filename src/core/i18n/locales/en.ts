@@ -11,6 +11,7 @@ const en = {
     searchAria: 'Search tools',
     themeAria: 'Toggle theme',
     langAria: 'Switch language',
+    downloadAria: 'Download desktop app',
     sourceAria: 'Source code',
   },
   sidebar: {

@@ -11,6 +11,7 @@ const fr = {
     "searchAria": "Rechercher des outils",
     "themeAria": "Changer de thème",
     "langAria": "Changer de langue",
+    "downloadAria": "Télécharger l'application de bureau",
     "sourceAria": "Code source"
   },
   "sidebar": {
