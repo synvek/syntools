@@ -100,7 +100,7 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Open [http://localhost:9999](http://localhost:9999).
 
 ### Scripts
 

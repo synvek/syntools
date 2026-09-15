@@ -100,7 +100,7 @@ pnpm install
 pnpm dev
 ```
 
-打开 [http://localhost:5173](http://localhost:5173)。
+打开 [http://localhost:9999](http://localhost:9999)。
 
 ### 常用脚本
 

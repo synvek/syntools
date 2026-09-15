@@ -25,7 +25,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // 9999：避开 5173（Vite 默认，易与其它本地项目冲突）
+    port: 9999,
     strictPort: true,
     host: process.env.TAURI_DEV_HOST || false,
     watch: {
