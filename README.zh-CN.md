@@ -12,11 +12,11 @@ SynTools 把日常常用的工具收拢到同一入口：编解码、格式化�
 
 ## 为什么选择 SynTools？
 
-| 痛点 | SynTools 如何解决 |
-| --- | --- |
-| 工具散落在多个广告密集的网站 | 统一界面与单一搜索入口 |
-| 敏感文本需上传到第三方服务器 | 默认纯前端本地计算 |
-| 常用工具反复搜索、收藏困难 | 收藏、最近使用与 ⌘K 搜索 |
+| 痛点                         | SynTools 如何解决        |
+| ---------------------------- | ------------------------ |
+| 工具散落在多个广告密集的网站 | 统一界面与单一搜索入口   |
+| 敏感文本需上传到第三方服务器 | 默认纯前端本地计算       |
+| 常用工具反复搜索、收藏困难   | 收藏、最近使用与 ⌘K 搜索 |
 
 **核心价值**
 
@@ -42,18 +42,19 @@ SynTools 把日常常用的工具收拢到同一入口：编解码、格式化�
 
 ## 工具分类
 
-| 分类 | 示例 |
-| --- | --- |
-| 编码转换 | Base64、URL 编解码、Unicode、HTML 实体、ASCII 表 |
-| 文本处理 | 正则测试、文本对比、大小写转换、字数统计、拼音、简繁转换 |
-| 格式化 | JSON / SQL / HTML / JS / CSS / XML 格式化、Markdown 预览 |
-| 加密哈希 | 哈希计算、JWT 解析、密码生成 |
-| 时间日期 | 时间戳、日历、倒计时、秒表、Cron 解析/生成 |
-| 生成器 | UUID、二维码、随机字符串/数字、占位图、CSS 渐变 |
-| 图片处理 | 压缩、裁剪、合并、水印、GIF 帧、SVG→PNG、Base64、ICO |
-| PDF 工具 | 合并、拆分、旋转、加密、批注、图文互转、页码、签名 |
-| 网络 | UA 解析 |
-| 其他 | 计算器、MBTI、AI 提示词、Mermaid、思维导图、图表生成 … |
+| 分类     | 示例                                                                                                         |
+| -------- | ------------------------------------------------------------------------------------------------------------ |
+| 高级工具 | 富文本编辑器（Word .docx 导入导出、双模式 PDF 导出）、电子表格编辑器（Excel .xlsx 导入导出、公式与多工作表） |
+| 编码转换 | Base64、URL 编解码、Unicode、HTML 实体、ASCII 表                                                             |
+| 文本处理 | 正则测试、文本对比、大小写转换、字数统计、拼音、简繁转换                                                     |
+| 格式化   | JSON / SQL / HTML / JS / CSS / XML 格式化、Markdown 预览                                                     |
+| 加密哈希 | 哈希计算、JWT 解析、密码生成                                                                                 |
+| 时间日期 | 时间戳、日历、倒计时、秒表、Cron 解析/生成                                                                   |
+| 生成器   | UUID、二维码、随机字符串/数字、占位图、CSS 渐变                                                              |
+| 图片处理 | 压缩、裁剪、合并、水印、GIF 帧、SVG→PNG、Base64、ICO                                                         |
+| PDF 工具 | 合并、拆分、旋转、加密、批注、图文互转、页码、签名                                                           |
+| 网络     | UA 解析                                                                                                      |
+| 其他     | 计算器、MBTI、AI 提示词、Mermaid、思维导图、图表生成 …                                                       |
 
 完整列表见首页，或查看 `src/core/registry/index.ts`。
 
@@ -61,18 +62,18 @@ SynTools 把日常常用的工具收拢到同一入口：编解码、格式化�
 
 ## 技术栈
 
-| 层级 | 选型 |
-| --- | --- |
-| 语言 | TypeScript（strict） |
-| UI | React 18 |
-| 构建 | Vite 6 |
-| 路由 | React Router 7 |
-| 样式 | Tailwind CSS 3（`darkMode: 'class'`） |
-| 状态 | Zustand |
-| 国际化 | i18next / react-i18next |
-| 单元测试 | Vitest + Testing Library |
-| E2E | Playwright |
-| 包管理 | pnpm 11 |
+| 层级     | 选型                                  |
+| -------- | ------------------------------------- |
+| 语言     | TypeScript（strict）                  |
+| UI       | React 18                              |
+| 构建     | Vite 6                                |
+| 路由     | React Router 7                        |
+| 样式     | Tailwind CSS 3（`darkMode: 'class'`） |
+| 状态     | Zustand                               |
+| 国际化   | i18next / react-i18next               |
+| 单元测试 | Vitest + Testing Library              |
+| E2E      | Playwright                            |
+| 包管理   | pnpm 11                               |
 
 架构为**注册表驱动（Registry-Driven）**：侧边栏、首页卡片、搜索索引与路由均由 `src/core/registry/index.ts` 中的单一 `tools` 数组派生。
 
@@ -80,10 +81,10 @@ SynTools 把日常常用的工具收拢到同一入口：编解码、格式化�
 
 ## 环境要求
 
-| 依赖 | 版本 |
-| --- | --- |
-| Node.js | ≥ 20（推荐 22.x） |
-| pnpm | 11.x（由 `packageManager` 锁定） |
+| 依赖    | 版本                             |
+| ------- | -------------------------------- |
+| Node.js | ≥ 20（推荐 22.x）                |
+| pnpm    | 11.x（由 `packageManager` 锁定） |
 
 如需启用 Corepack：
 
@@ -104,20 +105,20 @@ pnpm dev
 
 ### 常用脚本
 
-| 命令 | 说明 |
-| --- | --- |
-| `pnpm dev` | 启动 Vite 开发服务器 |
-| `pnpm build` | 类型检查（`tsc -b`）+ 生产构建 |
-| `pnpm preview` | 本地预览生产构建产物 |
-| `pnpm test` | 运行单元测试（Vitest） |
-| `pnpm test:watch` | Vitest 监听模式 |
-| `pnpm e2e` | 运行 Playwright 端到端测试 |
-| `pnpm lint` | ESLint 检查（零警告策略） |
-| `pnpm lint:fix` | ESLint 自动修复 |
-| `pnpm format` | Prettier 格式化写入 |
-| `pnpm format:check` | Prettier 检查 |
-| `pnpm typecheck` | 仅 TypeScript 类型检查 |
-| `pnpm size` | 包体积预算检查 |
+| 命令                | 说明                           |
+| ------------------- | ------------------------------ |
+| `pnpm dev`          | 启动 Vite 开发服务器           |
+| `pnpm build`        | 类型检查（`tsc -b`）+ 生产构建 |
+| `pnpm preview`      | 本地预览生产构建产物           |
+| `pnpm test`         | 运行单元测试（Vitest）         |
+| `pnpm test:watch`   | Vitest 监听模式                |
+| `pnpm e2e`          | 运行 Playwright 端到端测试     |
+| `pnpm lint`         | ESLint 检查（零警告策略）      |
+| `pnpm lint:fix`     | ESLint 自动修复                |
+| `pnpm format`       | Prettier 格式化写入            |
+| `pnpm format:check` | Prettier 检查                  |
+| `pnpm typecheck`    | 仅 TypeScript 类型检查         |
+| `pnpm size`         | 包体积预算检查                 |
 
 提交前钩子（Husky + lint-staged）会对暂存文件执行 `eslint --fix` 与 `prettier --write`。
 
@@ -163,7 +164,6 @@ syntools/
 
 注册完成后，`/tools/<id>`、侧边栏分组、首页卡片与 ⌘K 搜索会自动生效。
 
-
 ---
 
 ## 隐私与安全
@@ -177,9 +177,9 @@ syntools/
 
 ## 性能预算
 
-| 指标 | 预算 |
-| --- | --- |
-| 应用外壳（gzip） | ≤ 150 KB |
+| 指标                 | 预算                 |
+| -------------------- | -------------------- |
+| 应用外壳（gzip）     | ≤ 150 KB             |
 | 单工具 chunk（gzip） | ≤ 100 KB（尽量更小） |
 
 工具必须通过 `component: () => import(...)` 懒加载，避免进入首屏包。图标优先使用内置 `Icon` 组件，勿引入大型图标库。

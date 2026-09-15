@@ -8,6 +8,7 @@ export interface Category {
 }
 
 export const categories: Category[] = [
+  { id: 'advanced', name: '高级工具', order: 0 },
   { id: 'encoding', name: '编码转换', order: 1 },
   { id: 'text', name: '文本处理', order: 2 },
   { id: 'formatting', name: '格式化', order: 3 },

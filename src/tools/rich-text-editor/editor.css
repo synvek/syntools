@@ -1,0 +1,264 @@
+/**
+ * 富文本编辑器样式（替代 @tailwindcss/typography，避免为单个工具改动框架层）：
+ * 1. 编辑器正文排版（标题 / 列表 / 表格 / 引用 / 代码块）；
+ * 2. 打印分页样式（@page A4）——打印式 PDF 与截图式 PDF 共用同一套版式；
+ * 3. 深色模式适配。
+ */
+
+.rte-surface .tiptap {
+  min-height: 420px;
+  outline: none;
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.rte-surface .tiptap > * + * {
+  margin-top: 0.75em;
+}
+
+.rte-surface .tiptap h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.rte-surface .tiptap h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rte-surface .tiptap h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.rte-surface .tiptap h4,
+.rte-surface .tiptap h5,
+.rte-surface .tiptap h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.rte-surface .tiptap p {
+  margin: 0;
+}
+
+.rte-surface .tiptap ul,
+.rte-surface .tiptap ol {
+  padding-left: 1.4rem;
+}
+
+.rte-surface .tiptap ul {
+  list-style: disc;
+}
+
+.rte-surface .tiptap ol {
+  list-style: decimal;
+}
+
+.rte-surface .tiptap ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rte-surface .tiptap ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.rte-surface .tiptap ul[data-type='taskList'] li > label {
+  margin-top: 0.35rem;
+}
+
+.rte-surface .tiptap blockquote {
+  border-left: 3px solid #93c5fd;
+  padding-left: 0.9rem;
+  color: #4b5563;
+}
+
+.rte-surface .tiptap pre {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.rte-surface .tiptap code {
+  background: #f3f4f6;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.875em;
+}
+
+.rte-surface .tiptap pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.rte-surface .tiptap hr {
+  border-top: 1px solid #e5e7eb;
+}
+
+.rte-surface .tiptap a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.rte-surface .tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+}
+
+.rte-surface .tiptap img.ProseMirror-selectednode {
+  outline: 2px solid #2563eb;
+}
+
+.rte-surface .tiptap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.rte-surface .tiptap th,
+.rte-surface .tiptap td {
+  border: 1px solid #e5e7eb;
+  padding: 0.4rem 0.6rem;
+  vertical-align: top;
+}
+
+.rte-surface .tiptap th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+.rte-surface .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.dark .rte-surface .tiptap {
+  color: #f3f4f6;
+}
+
+.dark .rte-surface .tiptap blockquote {
+  color: #d1d5db;
+}
+
+.dark .rte-surface .tiptap code {
+  background: #1f2937;
+}
+
+.dark .rte-surface .tiptap th {
+  background: #1f2937;
+}
+
+.dark .rte-surface .tiptap th,
+.dark .rte-surface .tiptap td,
+.dark .rte-surface .tiptap hr {
+  border-color: #374151;
+}
+
+/* ---- 打印 / 导出容器：屏幕外渲染，仅打印时可见 ---- */
+
+.rte-print-root {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 210mm;
+  background: #ffffff;
+  z-index: -1;
+}
+
+.rte-print-flow {
+  width: 170mm;
+  margin: 0 auto;
+  padding: 0;
+  background: #ffffff;
+  color: #111827;
+  font-size: 12pt;
+  line-height: 1.7;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.rte-print-flow > * + * {
+  margin-top: 0.7em;
+}
+
+.rte-print-flow h1 {
+  font-size: 20pt;
+}
+
+.rte-print-flow h2 {
+  font-size: 16pt;
+}
+
+.rte-print-flow h3 {
+  font-size: 14pt;
+}
+
+.rte-print-flow img {
+  max-width: 100%;
+}
+
+.rte-print-flow pre {
+  background: #f3f4f6;
+  padding: 8px 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.rte-print-flow table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rte-print-flow th,
+.rte-print-flow td {
+  border: 1px solid #d1d5db;
+  padding: 4px 6px;
+}
+
+.rte-print-flow blockquote {
+  border-left: 3px solid #93c5fd;
+  padding-left: 10px;
+  color: #374151;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  body > *:not(.rte-print-root) {
+    display: none !important;
+  }
+
+  .rte-print-root {
+    position: static;
+    left: auto;
+    width: auto;
+    z-index: auto;
+  }
+
+  .rte-print-flow {
+    width: auto;
+  }
+}

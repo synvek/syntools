@@ -575,6 +575,18 @@ const icons: Record<string, ReactNode> = {
       <path d="M14 3v5h5M8 15h5M9 12h7" />
     </>
   ),
+  richText: (
+    <>
+      <path d="M4 6h16M4 11h10M4 16h16" />
+      <path d="M15 9h6M18 9v12" />
+    </>
+  ),
+  sheet: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18M3 14.5h18M9 9v11M15 9v11" />
+    </>
+  ),
 };
 
 interface IconProps {

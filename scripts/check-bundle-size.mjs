@@ -14,6 +14,12 @@ const DIST = path.resolve(process.cwd(), 'dist');
 // 工具增多后适当放宽：首屏仍尽量紧凑，单 chunk 允许重依赖（mermaid / jspdf 等）
 const ENTRY_BUDGET = 180 * 1024;
 const CHUNK_BUDGET = 500 * 1024;
+// 电子表格工具依赖的 Univer / exceljs 天然是「重 chunk」：
+// 单个包体远超常规预算且无法再拆，单独放宽上限并记录在报告中，其余 chunk 仍受 500KB 约束。
+const HEAVY_CHUNK_BUDGET = 2 * 1024 * 1024;
+const HEAVY_CHUNK_PATTERNS = [/^vendor-univer-/, /^vendor-exceljs-/];
+const budgetFor = (file) =>
+  HEAVY_CHUNK_PATTERNS.some((pattern) => pattern.test(file)) ? HEAVY_CHUNK_BUDGET : CHUNK_BUDGET;
 
 const gzipSize = (buffer) => gzipSync(buffer, { level: 9 }).length;
 const kb = (bytes) => `${(bytes / 1024).toFixed(2)} KB`;
@@ -41,7 +47,9 @@ let entryTotal = 0;
 const lines = [];
 lines.push('# 产物体积报告（gzip）');
 lines.push('');
-lines.push(`预算：首屏 ≤ ${kb(ENTRY_BUDGET)}，单 chunk ≤ ${kb(CHUNK_BUDGET)}`);
+lines.push(
+  `预算：首屏 ≤ ${kb(ENTRY_BUDGET)}，单 chunk ≤ ${kb(CHUNK_BUDGET)}（Univer / exceljs 重 chunk ≤ ${kb(HEAVY_CHUNK_BUDGET)}）`,
+);
 lines.push('');
 lines.push('| 文件 | 类型 | gzip 体积 | 状态 |');
 lines.push('| ---- | ---- | --------- | ---- |');
@@ -50,10 +58,11 @@ for (const file of assets.sort()) {
   const bytes = gzipSize(readFileSync(path.join(assetsDir, file)));
   const isEntry = entryFiles.has(file);
   if (isEntry) entryTotal += bytes;
-  const over = bytes > CHUNK_BUDGET;
+  const budget = budgetFor(file);
+  const over = bytes > budget;
   if (over) failed = true;
   lines.push(
-    `| ${file} | ${isEntry ? '首屏入口' : '懒加载'} | ${kb(bytes)} | ${mark(bytes, CHUNK_BUDGET)} |`,
+    `| ${file} | ${isEntry ? '首屏入口' : '懒加载'} | ${kb(bytes)} | ${mark(bytes, budget)} |`,
   );
 }
 

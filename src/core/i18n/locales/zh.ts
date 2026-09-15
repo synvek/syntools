@@ -33,6 +33,7 @@ export default {
     empty: '未找到匹配的工具',
   },
   categories: {
+    advanced: '高级工具',
     encoding: '编码转换',
     text: '文本处理',
     formatting: '格式化',
@@ -443,6 +444,14 @@ export default {
     'xslt-transform': {
       name: 'XSLT 转换',
       description: '用 XSLT 将 XML 转换为 HTML，浏览器本地完成',
+    },
+    'rich-text-editor': {
+      name: '富文本编辑器',
+      description: '本地富文本编排，支持导入导出 Word(.docx) 与两种模式导出 PDF',
+    },
+    'spreadsheet-editor': {
+      name: '电子表格编辑器',
+      description: '本地编辑表格并导入导出 Excel(.xlsx)，支持公式与多工作表',
     },
     'pdf-merge': { name: 'PDF 合并', description: '将多个 PDF 合并为一个文件' },
     'pdf-split': { name: 'PDF 拆分', description: '将 PDF 按页拆分为多个文件' },
@@ -1379,7 +1388,8 @@ export default {
       yi: '宜',
       ji: '忌',
       legendZh: '红字多为周末或节日；角标「休」法定休息、「班」调休上班。右侧可见宜忌。',
-      legendEn: 'Red days are weekends or holidays. US public holidays shown for English (en-GB uses UK bank holidays).',
+      legendEn:
+        'Red days are weekends or holidays. US public holidays shown for English (en-GB uses UK bank holidays).',
       rest: {
         off: '休',
         work: '班',

@@ -1,0 +1,31 @@
+/**
+ * 电子表格工具样式：
+ * 1. 给 Univer 显式高度（否则画布高度为 0）；
+ * 2. 收口 Univer 与 Tailwind / 项目暗色模式的样式冲突。
+ */
+
+.sheet-canvas {
+  height: 72vh;
+  min-height: 460px;
+  width: 100%;
+}
+
+/* Univer 的工作台撑满容器，避免出现双重滚动条 */
+.sheet-canvas > .univer-app-container,
+.sheet-canvas > div {
+  height: 100%;
+}
+
+/* 暗色模式下让 Univer 自身的浅色面板与本工具容器背景对齐 */
+.dark .sheet-canvas {
+  background-color: #111827;
+  color-scheme: dark;
+}
+
+/* 移动端给出更矮但可用的高度 */
+@media (max-width: 768px) {
+  .sheet-canvas {
+    height: 62vh;
+    min-height: 380px;
+  }
+}

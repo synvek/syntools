@@ -36,6 +36,7 @@ const en = {
     empty: 'No matching tools found',
   },
   categories: {
+    advanced: 'Advanced',
     encoding: 'Encoding',
     text: 'Text',
     formatting: 'Formatting',
@@ -122,7 +123,8 @@ const en = {
     },
     'text-diff': {
       name: 'Text Diff',
-      description: 'Side-by-side editors with inline line highlights, line numbers, and whitespace ignore',
+      description:
+        'Side-by-side editors with inline line highlights, line numbers, and whitespace ignore',
     },
     'json-format': {
       name: 'JSON Formatter',
@@ -206,8 +208,7 @@ const en = {
     },
     'entity-codec': {
       name: 'HTML Encode / Decode',
-      description:
-        'Encode/decode HTML special characters: named / decimal / hex / \\u escapes',
+      description: 'Encode/decode HTML special characters: named / decimal / hex / \\u escapes',
     },
     'cron-parser': {
       name: 'Cron Expression Parser',
@@ -243,8 +244,7 @@ const en = {
     },
     qrcode: {
       name: 'QR Code',
-      description:
-        'Generate and decode QR codes with ECC, size, colors, and margin options',
+      description: 'Generate and decode QR codes with ECC, size, colors, and margin options',
     },
     'color-converter': {
       name: 'Color Converter',
@@ -317,7 +317,8 @@ const en = {
     },
     calculator: {
       name: 'Calculator',
-      description: 'Safe expression calculator with arithmetic, power, modulo, and common functions',
+      description:
+        'Safe expression calculator with arithmetic, power, modulo, and common functions',
     },
     'code-image': {
       name: 'Code to Image',
@@ -353,7 +354,8 @@ const en = {
     },
     'cron-generator': {
       name: 'Crontab Generator',
-      description: 'Build a standard 5-field Cron expression from minute/hour/day/month/weekday options',
+      description:
+        'Build a standard 5-field Cron expression from minute/hour/day/month/weekday options',
     },
     'ua-parser': {
       name: 'User-Agent Parser',
@@ -441,11 +443,13 @@ const en = {
     },
     'md-to-image': {
       name: 'Markdown to Image',
-      description: 'Render Markdown to a styled card and export PNG with font, size, width, and colors',
+      description:
+        'Render Markdown to a styled card and export PNG with font, size, width, and colors',
     },
     'chart-generator': {
       name: 'Chart Generator',
-      description: 'Build bar/line/area/pie/doughnut/scatter charts from CSV with legends and palettes',
+      description:
+        'Build bar/line/area/pie/doughnut/scatter charts from CSV with legends and palettes',
     },
     'css3-generator': {
       name: 'CSS3 Code Generator',
@@ -455,10 +459,24 @@ const en = {
       name: 'XSLT Transform',
       description: 'Transform XML to HTML with XSLT in the browser',
     },
+    'rich-text-editor': {
+      name: 'Rich Text Editor',
+      description: 'Write locally with Word (.docx) import/export and two PDF export modes',
+    },
+    'spreadsheet-editor': {
+      name: 'Spreadsheet Editor',
+      description: 'Edit sheets locally with Excel (.xlsx) import/export, formulas and multi-sheet',
+    },
     'pdf-merge': { name: 'Merge PDF', description: 'Merge multiple PDFs into one file' },
     'pdf-split': { name: 'Split PDF', description: 'Split a PDF into one file per page' },
-    'pdf-delete-pages': { name: 'Delete PDF Pages', description: 'Remove selected pages from a PDF' },
-    'pdf-extract-pages': { name: 'Extract PDF Pages', description: 'Extract selected pages into a new PDF' },
+    'pdf-delete-pages': {
+      name: 'Delete PDF Pages',
+      description: 'Remove selected pages from a PDF',
+    },
+    'pdf-extract-pages': {
+      name: 'Extract PDF Pages',
+      description: 'Extract selected pages into a new PDF',
+    },
     'pdf-reorder': { name: 'Reorder PDF Pages', description: 'Reorder pages in a PDF' },
     'pdf-rotate': { name: 'Rotate PDF Pages', description: 'Rotate selected or all pages' },
     'pdf-to-image': { name: 'PDF to Image', description: 'Render PDF pages as JPG/PNG' },
@@ -466,14 +484,23 @@ const en = {
     'pdf-viewer': { name: 'PDF Viewer', description: 'Open and read a PDF locally' },
     'pdf-page-numbers': { name: 'PDF Page Numbers', description: 'Add page numbers to a PDF' },
     'pdf-header-footer': { name: 'PDF Header & Footer', description: 'Add header and footer text' },
-    'pdf-insert-image': { name: 'Insert Image into PDF', description: 'Place an image on PDF pages' },
+    'pdf-insert-image': {
+      name: 'Insert Image into PDF',
+      description: 'Place an image on PDF pages',
+    },
     'pdf-add-text': { name: 'Add Text to PDF', description: 'Add text onto PDF pages' },
-    'pdf-sign': { name: 'Sign PDF', description: 'Draw or upload a signature image (visual, not certificate)' },
+    'pdf-sign': {
+      name: 'Sign PDF',
+      description: 'Draw or upload a signature image (visual, not certificate)',
+    },
     'pdf-metadata': { name: 'PDF Metadata', description: 'View and edit PDF metadata' },
     'pdf-encrypt': { name: 'Encrypt PDF', description: 'Set password and permission flags' },
     'pdf-crop': { name: 'Crop PDF', description: 'Crop page margins via cropBox' },
     'pdf-grayscale': { name: 'PDF Grayscale', description: 'Convert PDF to visual grayscale' },
-    'pdf-annotate': { name: 'Annotate PDF', description: 'Draw highlights, freehand, shapes, and text on PDF pages' },
+    'pdf-annotate': {
+      name: 'Annotate PDF',
+      description: 'Draw highlights, freehand, shapes, and text on PDF pages',
+    },
   },
   tools: {
     base64: {
@@ -1168,7 +1195,8 @@ const en = {
       input: 'Markdown editor',
       placeholder: 'Enter Markdown, e.g. # Heading…',
       preview: 'Preview',
-      shortcuts: 'Shortcuts: ⌘/Ctrl+B bold · ⌘/Ctrl+I italic · ⌘/Ctrl+K link · ⌘/Ctrl+E inline code',
+      shortcuts:
+        'Shortcuts: ⌘/Ctrl+B bold · ⌘/Ctrl+I italic · ⌘/Ctrl+K link · ⌘/Ctrl+E inline code',
       toolbar: {
         aria: 'Markdown editing toolbar',
         bold: 'Bold (**)',
@@ -1207,7 +1235,8 @@ const en = {
       increased: 'Size increased by {{ratio}}%',
       err: {
         NOT_IMAGE: 'Please choose an image file',
-        ENCODE: 'Image encode failed: ensure the browser supports this format, or try another image',
+        ENCODE:
+          'Image encode failed: ensure the browser supports this format, or try another image',
       },
     },
     jsonConvert: {

@@ -72,6 +72,40 @@ export default defineConfig({
           if (/[/\\]node_modules[/\\]lunar-javascript[/\\]/.test(id)) return 'vendor-lunar';
           if (/[/\\]node_modules[/\\]@cantoo[/\\]pdf-lib[/\\]/.test(id)) return 'vendor-pdf-lib';
           if (/[/\\]node_modules[/\\]pdfjs-dist[/\\]/.test(id)) return 'vendor-pdfjs';
+          // 富文本编辑器：tiptap + prosemirror 传递依赖必须独立于 mermaid / jspdf
+          if (/[/\\]node_modules[/\\](@tiptap|prosemirror-[^/\\]+)[/\\]/.test(id)) {
+            return 'vendor-tiptap';
+          }
+          if (/[/\\]node_modules[/\\]docx[/\\]/.test(id)) return 'vendor-docx';
+          if (/[/\\]node_modules[/\\]mammoth[/\\]/.test(id)) return 'vendor-mammoth';
+          // 电子表格（Univer）体积远超常规预算，按职责拆分为多个 chunk（体积预算见 size 脚本）
+          if (/[/\\]node_modules[/\\]@univerjs[/\\](core|protocol|rpc|network)[/\\]/.test(id)) {
+            return 'vendor-univer-core';
+          }
+          if (/[/\\]node_modules[/\\](@wendellhu[/\\]redi|rxjs)[/\\]/.test(id)) {
+            return 'vendor-univer-core';
+          }
+          if (/[/\\]node_modules[/\\]@univerjs[/\\]engine-render[/\\]/.test(id)) {
+            return 'vendor-univer-render';
+          }
+          if (/[/\\]node_modules[/\\]@univerjs[/\\]engine-formula[/\\]/.test(id)) {
+            return 'vendor-univer-formula';
+          }
+          if (
+            /[/\\]node_modules[/\\]@univerjs[/\\](design|ui|docs|docs-ui|sheets-ui|sheets-formula-ui|sheets-numfmt-ui)[/\\]/.test(
+              id,
+            )
+          ) {
+            return 'vendor-univer-ui';
+          }
+          if (
+            /[/\\]node_modules[/\\]@univerjs[/\\](sheets|sheets-formula|sheets-numfmt)[/\\]/.test(
+              id,
+            )
+          ) {
+            return 'vendor-univer-sheets';
+          }
+          if (/[/\\]node_modules[/\\]exceljs[/\\]/.test(id)) return 'vendor-exceljs';
         },
       },
     },
