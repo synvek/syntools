@@ -36,7 +36,7 @@ const es = {
     empty: 'No se encontraron herramientas coincidentes',
   },
   categories: {
-    advanced: 'Herramientas avanzadas',
+    advanced: 'Herramientas de oficina',
     encoding: 'Codificación',
     text: 'Texto',
     formatting: 'Formato',
@@ -470,7 +470,7 @@ const es = {
       description: 'Transforma XML a HTML con XSLT en el navegador',
     },
     'rich-text-editor': {
-      name: 'Editor de texto enriquecido',
+      name: 'Editor de documentos',
       description:
         'Escritura local con importación y exportación de Word (.docx) y dos modos de exportación PDF',
     },

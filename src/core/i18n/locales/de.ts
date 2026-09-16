@@ -36,7 +36,7 @@ const de = {
     empty: 'Keine passenden Tools gefunden',
   },
   categories: {
-    advanced: 'Erweiterte Tools',
+    advanced: 'Büro-Tools',
     encoding: 'Kodierung',
     text: 'Text',
     formatting: 'Formatierung',
@@ -465,7 +465,7 @@ const de = {
       description: 'XML mit XSLT im Browser nach HTML transformieren',
     },
     'rich-text-editor': {
-      name: 'Rich-Text-Editor',
+      name: 'Dokument-Editor',
       description: 'Lokale Texterstellung mit Word-Import/Export (.docx) und zwei PDF-Exportmodi',
     },
     'spreadsheet-editor': {

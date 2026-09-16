@@ -33,7 +33,7 @@ export default {
     empty: '未找到匹配的工具',
   },
   categories: {
-    advanced: '高级工具',
+    advanced: '办公工具',
     encoding: '编码转换',
     text: '文本处理',
     formatting: '格式化',
@@ -446,8 +446,8 @@ export default {
       description: '用 XSLT 将 XML 转换为 HTML，浏览器本地完成',
     },
     'rich-text-editor': {
-      name: '富文本编辑器',
-      description: '本地富文本编排，支持导入导出 Word(.docx) 与两种模式导出 PDF',
+      name: '文档编辑器',
+      description: '本地文档编排，支持导入导出 Word(.docx) 与两种模式导出 PDF',
     },
     'spreadsheet-editor': {
       name: '电子表格编辑器',

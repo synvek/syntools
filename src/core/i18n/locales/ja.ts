@@ -36,7 +36,7 @@ const ja = {
     empty: '一致するツールが見つかりません',
   },
   categories: {
-    advanced: '高度なツール',
+    advanced: 'オフィスツール',
     encoding: 'エンコード',
     text: 'テキスト',
     formatting: 'フォーマット',
@@ -453,7 +453,7 @@ const ja = {
       description: 'ブラウザ内で XSLT により XML を HTML に変換',
     },
     'rich-text-editor': {
-      name: 'リッチテキストエディター',
+      name: 'ドキュメントエディター',
       description:
         'ブラウザ内で編集し、Word(.docx) の読み込み／書き出しと 2 種類の PDF 書き出しに対応',
     },

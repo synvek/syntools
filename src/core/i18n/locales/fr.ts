@@ -36,7 +36,7 @@ const fr = {
     empty: 'Aucun outil correspondant trouvé',
   },
   categories: {
-    advanced: 'Outils avancés',
+    advanced: 'Outils de bureau',
     encoding: 'Encodage',
     text: 'Texte',
     formatting: 'Formatage',
@@ -474,7 +474,7 @@ const fr = {
       description: 'Transformer XML en HTML avec XSLT dans le navigateur',
     },
     'rich-text-editor': {
-      name: 'Éditeur de texte enrichi',
+      name: 'Éditeur de documents',
       description: "Rédaction locale avec import/export Word (.docx) et deux modes d'export PDF",
     },
     'spreadsheet-editor': {

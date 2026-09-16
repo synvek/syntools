@@ -66,19 +66,31 @@ export default function SpreadsheetTool() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    let handle: UniverHandle;
-    try {
-      handle = createUniverInstance(container, { locale: univerLocale, dark });
-    } catch {
-      setRuntimeError(true);
-      return;
-    }
-    if (pendingRef.current) handle.loadSnapshot(pendingRef.current);
-    handleRef.current = handle;
+    let cancelled = false;
+    // 延后一拍创建：StrictMode 下 effect 会同步挂载→卸载→再挂载，
+    // 若在 effect 内同步实例化，卸载阶段会在 React 渲染中同步 unmount Univer 的 React root，
+    // 导致第二次实例渲染不出来（开发环境表格空白）。
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      let handle: UniverHandle;
+      try {
+        handle = createUniverInstance(container, { locale: univerLocale, dark });
+      } catch {
+        setRuntimeError(true);
+        return;
+      }
+      if (pendingRef.current) handle.loadSnapshot(pendingRef.current);
+      handleRef.current = handle;
+    }, 0);
     return () => {
-      pendingRef.current = handle.getSnapshot();
-      handle.dispose();
-      handleRef.current = null;
+      cancelled = true;
+      window.clearTimeout(timer);
+      const current = handleRef.current;
+      if (current) {
+        pendingRef.current = current.getSnapshot();
+        current.dispose();
+        handleRef.current = null;
+      }
     };
   }, [univerLocale, dark]);
 

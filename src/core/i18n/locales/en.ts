@@ -36,7 +36,7 @@ const en = {
     empty: 'No matching tools found',
   },
   categories: {
-    advanced: 'Advanced',
+    advanced: 'Office Tools',
     encoding: 'Encoding',
     text: 'Text',
     formatting: 'Formatting',
@@ -460,7 +460,7 @@ const en = {
       description: 'Transform XML to HTML with XSLT in the browser',
     },
     'rich-text-editor': {
-      name: 'Rich Text Editor',
+      name: 'Document Editor',
       description: 'Write locally with Word (.docx) import/export and two PDF export modes',
     },
     'spreadsheet-editor': {

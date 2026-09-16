@@ -35,7 +35,7 @@ const zhTW = {
     empty: '未找到匹配的工具',
   },
   categories: {
-    advanced: '高級工具',
+    advanced: '辦公工具',
     encoding: '編碼轉換',
     text: '文本處理',
     formatting: '格式化',
@@ -448,8 +448,8 @@ const zhTW = {
       description: '用 XSLT 將 XML 轉換為 HTML，瀏覽器本地完成',
     },
     'rich-text-editor': {
-      name: '富文字編輯器',
-      description: '本地富文字編排，支援匯入匯出 Word(.docx) 與兩種 PDF 匯出模式',
+      name: '文檔編輯器',
+      description: '本地文檔編排，支援匯入匯出 Word(.docx) 與兩種 PDF 匯出模式',
     },
     'spreadsheet-editor': {
       name: '電子表格編輯器',
