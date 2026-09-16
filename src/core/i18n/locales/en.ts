@@ -460,7 +460,7 @@ const en = {
       description: 'Transform XML to HTML with XSLT in the browser',
     },
     'rich-text-editor': {
-      name: 'Document Editor',
+      name: 'Word Processor',
       description: 'Write locally with Word (.docx) import/export and two PDF export modes',
     },
     'spreadsheet-editor': {

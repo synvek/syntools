@@ -42,19 +42,19 @@ You can access online: www.syntools.net
 
 ## Tool categories
 
-| Category     | Examples                                                                                                                                 |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Office Tools | Document editor (Word .docx import/export, two PDF export modes), spreadsheet editor (Excel .xlsx import/export, formulas & multi-sheet) |
-| Encoding     | Base64, URL codec, Unicode, HTML entities, ASCII table                                                                                   |
-| Text         | Regex tester, text diff, case convert, counter, pinyin, zh convert                                                                       |
-| Formatting   | JSON / SQL / HTML / JS / CSS / XML formatters, Markdown preview                                                                          |
-| Crypto       | Hash, JWT parser, password generator                                                                                                     |
-| Date & time  | Timestamp, calendar, countdown, stopwatch, cron parse/generate                                                                           |
-| Generators   | UUID, QR code, random string/number, placeholder image, CSS gradient                                                                     |
-| Image        | Compress, crop, merge, watermark, GIF frames, SVG→PNG, Base64, ICO                                                                       |
-| PDF          | Merge, split, rotate, encrypt, annotate, to/from image, page numbers, sign                                                               |
-| Network      | UA parser                                                                                                                                |
-| Other        | Calculator, MBTI, AI prompts, Mermaid, mind map, chart generator, …                                                                      |
+| Category     | Examples                                                                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Office Tools | Word Processor (Word .docx import/export, two PDF export modes), spreadsheet editor (Excel .xlsx import/export, formulas & multi-sheet) |
+| Encoding     | Base64, URL codec, Unicode, HTML entities, ASCII table                                                                                  |
+| Text         | Regex tester, text diff, case convert, counter, pinyin, zh convert                                                                      |
+| Formatting   | JSON / SQL / HTML / JS / CSS / XML formatters, Markdown preview                                                                         |
+| Crypto       | Hash, JWT parser, password generator                                                                                                    |
+| Date & time  | Timestamp, calendar, countdown, stopwatch, cron parse/generate                                                                          |
+| Generators   | UUID, QR code, random string/number, placeholder image, CSS gradient                                                                    |
+| Image        | Compress, crop, merge, watermark, GIF frames, SVG→PNG, Base64, ICO                                                                      |
+| PDF          | Merge, split, rotate, encrypt, annotate, to/from image, page numbers, sign                                                              |
+| Network      | UA parser                                                                                                                               |
+| Other        | Calculator, MBTI, AI prompts, Mermaid, mind map, chart generator, …                                                                     |
 
 Browse the full list on the home page or in `src/core/registry/index.ts`.
 

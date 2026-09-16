@@ -446,8 +446,8 @@ export default {
       description: '用 XSLT 将 XML 转换为 HTML，浏览器本地完成',
     },
     'rich-text-editor': {
-      name: '文档编辑器',
-      description: '本地文档编排，支持导入导出 Word(.docx) 与两种模式导出 PDF',
+      name: '文字处理器',
+      description: '本地文字处理，支持导入导出 Word(.docx) 与两种模式导出 PDF',
     },
     'spreadsheet-editor': {
       name: '电子表格编辑器',

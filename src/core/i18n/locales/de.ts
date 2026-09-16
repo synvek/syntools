@@ -465,7 +465,7 @@ const de = {
       description: 'XML mit XSLT im Browser nach HTML transformieren',
     },
     'rich-text-editor': {
-      name: 'Dokument-Editor',
+      name: 'Textverarbeitung',
       description: 'Lokale Texterstellung mit Word-Import/Export (.docx) und zwei PDF-Exportmodi',
     },
     'spreadsheet-editor': {

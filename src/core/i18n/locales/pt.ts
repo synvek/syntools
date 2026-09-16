@@ -473,7 +473,7 @@ const pt = {
       description: 'Transforma XML para HTML com XSLT no browser',
     },
     'rich-text-editor': {
-      name: 'Editor de documentos',
+      name: 'Processador de texto',
       description:
         'Escrita local com importação e exportação Word (.docx) e dois modos de exportação PDF',
     },

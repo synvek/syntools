@@ -448,8 +448,8 @@ const zhTW = {
       description: '用 XSLT 將 XML 轉換為 HTML，瀏覽器本地完成',
     },
     'rich-text-editor': {
-      name: '文檔編輯器',
-      description: '本地文檔編排，支援匯入匯出 Word(.docx) 與兩種 PDF 匯出模式',
+      name: '文字處理器',
+      description: '本地文字處理，支援匯入匯出 Word(.docx) 與兩種 PDF 匯出模式',
     },
     'spreadsheet-editor': {
       name: '電子表格編輯器',

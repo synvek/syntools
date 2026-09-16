@@ -467,7 +467,7 @@ const it = {
       description: 'Trasforma XML in HTML con XSLT nel browser',
     },
     'rich-text-editor': {
-      name: 'Editor di documenti',
+      name: 'Elaboratore di testo',
       description:
         'Scrittura locale con import/export Word (.docx) e due modalità di esportazione PDF',
     },
