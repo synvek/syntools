@@ -468,6 +468,11 @@ const de = {
       name: 'Textverarbeitung',
       description: 'Lokale Texterstellung mit Word-Import/Export (.docx) und zwei PDF-Exportmodi',
     },
+    'slide-editor': {
+      name: 'Präsentations-Editor',
+      description:
+        'Folien lokal bearbeiten mit PowerPoint-Import/Export (.pptx) und Präsentationsmodus',
+    },
     'spreadsheet-editor': {
       name: 'Tabellen-Editor',
       description:

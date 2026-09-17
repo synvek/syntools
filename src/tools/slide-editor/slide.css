@@ -1,0 +1,76 @@
+/**
+ * 幻灯片编辑器样式：画布容器与面板细节。
+ * 配色沿用项目既有语义色，深色模式下画布舞台保持中性，避免干扰内容判读。
+ */
+
+.slide-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background-color: #f1f5f9;
+  background-image:
+    linear-gradient(0deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  touch-action: none;
+}
+
+.dark .slide-stage {
+  background-color: #0b1220;
+  background-image:
+    linear-gradient(0deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+}
+
+.slide-thumb {
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+.slide-thumb:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -12px rgba(15, 23, 42, 0.5);
+}
+
+.slide-thumb-active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.45);
+}
+
+.slide-glass {
+  background-color: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.dark .slide-glass {
+  background-color: rgba(15, 23, 42, 0.72);
+}
+
+.slide-panel-card {
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out;
+}
+
+.slide-present-enter {
+  animation: slide-fade-in 180ms ease-out;
+}
+
+@keyframes slide-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 行内文本编辑层：由 render/textEditor.ts 动态插入 */
+.slide-stage textarea {
+  font-family: inherit;
+}

@@ -104,6 +104,7 @@ import { pdfCropTool } from '@/tools/pdf-crop';
 import { pdfGrayscaleTool } from '@/tools/pdf-grayscale';
 import { pdfAnnotateTool } from '@/tools/pdf-annotate';
 import { richTextEditorTool } from '@/tools/rich-text-editor';
+import { slideEditorTool } from '@/tools/slide-editor';
 import { spreadsheetEditorTool } from '@/tools/spreadsheet-editor';
 
 /**
@@ -217,6 +218,7 @@ export const tools: ToolMeta[] = [
   uaParserTool,
   richTextEditorTool,
   spreadsheetEditorTool,
+  slideEditorTool,
 ];
 
 export const toolMap = new Map(tools.map((t) => [t.id, t]));

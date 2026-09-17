@@ -581,6 +581,12 @@ const icons: Record<string, ReactNode> = {
       <path d="M15 9h6M18 9v12" />
     </>
   ),
+  slides: (
+    <>
+      <rect x="3" y="4" width="18" height="13" rx="2" />
+      <path d="M9 21h6M12 17v4" />
+    </>
+  ),
   sheet: (
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />

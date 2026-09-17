@@ -451,6 +451,10 @@ const zhTW = {
       name: '文字處理器',
       description: '本地文字處理，支援匯入匯出 Word(.docx) 與兩種 PDF 匯出模式',
     },
+    'slide-editor': {
+      name: '投影片編輯器',
+      description: '本機 Canvas 編輯投影片，支援 PPTX(.pptx) 匯入匯出與放映預覽',
+    },
     'spreadsheet-editor': {
       name: '電子表格編輯器',
       description: '本地編輯表格並匯入匯出 Excel(.xlsx)，支援公式與多工作表',

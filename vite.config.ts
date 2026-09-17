@@ -105,6 +105,7 @@ export default defineConfig({
           ) {
             return 'vendor-univer-sheets';
           }
+          if (/[/\\]node_modules[/\\]konva[/\\]/.test(id)) return 'vendor-konva';
           if (/[/\\]node_modules[/\\]exceljs[/\\]/.test(id)) return 'vendor-exceljs';
         },
       },

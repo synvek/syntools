@@ -97,6 +97,7 @@
     "jsqr": "^1.4.0",
     "jszip": "^3.10.1",
     "katex": "^0.18.5",
+    "konva": "^9.3.22",
     "lunar-javascript": "^1.7.7",
     "mammoth": "^1.12.3",
     "marked": "^18.0.11",

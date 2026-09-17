@@ -457,6 +457,11 @@ const ja = {
       description:
         'ブラウザ内で編集し、Word(.docx) の読み込み／書き出しと 2 種類の PDF 書き出しに対応',
     },
+    'slide-editor': {
+      name: 'スライドエディター',
+      description:
+        'ブラウザ内でスライドを編集し、PowerPoint(.pptx) の読み込み／書き出しとスライドショーに対応',
+    },
     'spreadsheet-editor': {
       name: 'スプレッドシートエディター',
       description:

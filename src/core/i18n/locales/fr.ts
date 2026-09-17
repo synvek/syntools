@@ -477,6 +477,11 @@ const fr = {
       name: 'Traitement de texte',
       description: "Rédaction locale avec import/export Word (.docx) et deux modes d'export PDF",
     },
+    'slide-editor': {
+      name: 'Éditeur de diapositives',
+      description:
+        'Édition locale sur canvas avec import/export PowerPoint (.pptx) et mode diaporama',
+    },
     'spreadsheet-editor': {
       name: 'Éditeur de tableur',
       description:

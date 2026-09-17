@@ -57,3 +57,28 @@ test('哈希计算：SHA-256 与标准向量一致', async ({ page }) => {
     'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
   );
 });
+
+// 办公工具类的界面文案按浏览器语言切换，固定为简体中文以便断言
+test.describe('幻灯片编辑器（zh-CN）', () => {
+  test.use({ locale: 'zh-CN' });
+
+  test('画布挂载 → 插入文本框 → 导出 pptx → 放映', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+    // Konva 会注入 3 个 canvas（背景 / 内容 / 覆盖层）
+    expect(await page.locator('canvas').count()).toBeGreaterThanOrEqual(3);
+
+    await page.getByRole('button', { name: '文本框' }).click();
+    await expect(page.getByText('已选中 1 个元素')).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出 PPTX' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.pptx$/);
+
+    await page.getByRole('button', { name: '放映', exact: true }).click();
+    await expect(page.getByText('1 / 1')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: '放映', exact: true })).toBeVisible();
+  });
+});

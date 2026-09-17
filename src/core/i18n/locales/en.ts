@@ -463,6 +463,10 @@ const en = {
       name: 'Word Processor',
       description: 'Write locally with Word (.docx) import/export and two PDF export modes',
     },
+    'slide-editor': {
+      name: 'Slides Editor',
+      description: 'Edit slides locally with PowerPoint (.pptx) import/export and slideshow',
+    },
     'spreadsheet-editor': {
       name: 'Spreadsheet Editor',
       description: 'Edit sheets locally with Excel (.xlsx) import/export, formulas and multi-sheet',

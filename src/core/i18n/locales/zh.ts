@@ -449,6 +449,10 @@ export default {
       name: '文字处理器',
       description: '本地文字处理，支持导入导出 Word(.docx) 与两种模式导出 PDF',
     },
+    'slide-editor': {
+      name: '幻灯片编辑器',
+      description: '本地编辑幻灯片，支持 PPTX(.pptx) 导入导出与放映',
+    },
     'spreadsheet-editor': {
       name: '电子表格编辑器',
       description: '本地编辑表格并导入导出 Excel(.xlsx)，支持公式与多工作表',

@@ -477,6 +477,11 @@ const pt = {
       description:
         'Escrita local com importação e exportação Word (.docx) e dois modos de exportação PDF',
     },
+    'slide-editor': {
+      name: 'Editor de diapositivos',
+      description:
+        'Edição local em canvas com importação e exportação PowerPoint (.pptx) e modo apresentação',
+    },
     'spreadsheet-editor': {
       name: 'Editor de folhas de cálculo',
       description:
