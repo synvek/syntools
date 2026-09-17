@@ -89,17 +89,128 @@ export function SlideToolbar({
   };
 
   return (
-    <div className="slide-glass flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 p-2 shadow-sm dark:border-gray-700">
-      <input
-        type="text"
-        value={doc.name}
-        aria-label={t('tools.slide.docTitle')}
-        placeholder={t('tools.slide.titlePlaceholder')}
-        onChange={(event) => setDocName(event.target.value)}
-        className="h-8 min-w-[160px] flex-1 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-      />
+    <div className="flex flex-col gap-2">
+      <div className="slide-glass flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 p-2 shadow-sm dark:border-gray-700">
+        <input
+          type="text"
+          value={doc.name}
+          aria-label={t('tools.slide.docTitle')}
+          placeholder={t('tools.slide.titlePlaceholder')}
+          onChange={(event) => setDocName(event.target.value)}
+          className="h-8 min-w-[160px] flex-1 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+        />
 
-      <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
+          <ToolButton label={t('tools.slide.insertText')} icon="text" onClick={insertText} />
+          {SHAPES.map((shape) => (
+            <button
+              key={shape.key}
+              type="button"
+              title={t(`tools.slide.${shape.key}`)}
+              aria-label={t(`tools.slide.${shape.key}`)}
+              onClick={() => insertShape(shape.geom)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <ShapeGlyph geom={shape.geom} />
+            </button>
+          ))}
+          <ToolButton label={t('tools.slide.insertLine')} icon="pen" onClick={insertLine} />
+          <ToolButton
+            label={t('tools.slide.insertImage')}
+            icon="image"
+            onClick={() => fileInputRef.current?.click()}
+          />
+          <ToolButton label={t('tools.slide.insertTable')} icon="table" onClick={insertTable} />
+        </div>
+
+        <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
+          <button
+            type="button"
+            title={t('tools.slide.zoomOut')}
+            aria-label={t('tools.slide.zoomOut')}
+            onClick={() => setScale(Math.max(0.1, Math.round((scale - 0.1) * 100) / 100))}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-base leading-none text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            −
+          </button>
+          <span className="w-10 text-center text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            type="button"
+            title={t('tools.slide.zoomIn')}
+            aria-label={t('tools.slide.zoomIn')}
+            onClick={() => setScale(Math.min(3, Math.round((scale + 0.1) * 100) / 100))}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-base leading-none text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            +
+          </button>
+          <ToolButton
+            label={t('tools.slide.zoomFit')}
+            icon="ruler"
+            onClick={() => setViewport({ scale: 0 })}
+          />
+        </div>
+
+        <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
+          <ToolButton
+            label={t('tools.slide.moveUp')}
+            icon="swap"
+            onClick={() => moveSlide(slideIndex, Math.max(0, slideIndex - 1))}
+          />
+          <button
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-2.5 text-[12px] text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            disabled={busy !== null}
+          >
+            <Icon name="upload" className="h-4 w-4" />
+            {busy === 'import' ? t('tools.slide.importing') : t('tools.slide.importPptx')}
+          </button>
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={busy !== null}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-2.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Icon name="download" className="h-4 w-4" />
+            {busy === 'export' ? t('tools.slide.exporting') : t('tools.slide.exportPptx')}
+          </button>
+          <button
+            type="button"
+            onClick={onPresent}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-2.5 text-[12px] text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Icon name="slides" className="h-4 w-4" />
+            {t('tools.slide.present')}
+          </button>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file) void handleImage(file);
+          }}
+        />
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".pptx"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file) onImportFile(file);
+          }}
+        />
+      </div>
+
+      <div className="slide-glass flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 p-2 shadow-sm dark:border-gray-700">
         <ToolButton label={t('tools.slide.newDoc')} icon="slides" onClick={onNew} />
         <ToolButton
           label={t('tools.slide.undo')}
@@ -114,115 +225,6 @@ export function SlideToolbar({
           disabled={!canRedo}
         />
       </div>
-
-      <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
-        <ToolButton label={t('tools.slide.insertText')} icon="text" onClick={insertText} />
-        {SHAPES.map((shape) => (
-          <button
-            key={shape.key}
-            type="button"
-            title={t(`tools.slide.${shape.key}`)}
-            aria-label={t(`tools.slide.${shape.key}`)}
-            onClick={() => insertShape(shape.geom)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            <ShapeGlyph geom={shape.geom} />
-          </button>
-        ))}
-        <ToolButton label={t('tools.slide.insertLine')} icon="pen" onClick={insertLine} />
-        <ToolButton
-          label={t('tools.slide.insertImage')}
-          icon="image"
-          onClick={() => fileInputRef.current?.click()}
-        />
-        <ToolButton label={t('tools.slide.insertTable')} icon="table" onClick={insertTable} />
-      </div>
-
-      <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
-        <button
-          type="button"
-          title={t('tools.slide.zoomOut')}
-          aria-label={t('tools.slide.zoomOut')}
-          onClick={() => setScale(Math.max(0.1, Math.round((scale - 0.1) * 100) / 100))}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-base leading-none text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          −
-        </button>
-        <span className="w-10 text-center text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
-          {Math.round(scale * 100)}%
-        </span>
-        <button
-          type="button"
-          title={t('tools.slide.zoomIn')}
-          aria-label={t('tools.slide.zoomIn')}
-          onClick={() => setScale(Math.min(3, Math.round((scale + 0.1) * 100) / 100))}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-base leading-none text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          +
-        </button>
-        <ToolButton
-          label={t('tools.slide.zoomFit')}
-          icon="ruler"
-          onClick={() => setViewport({ scale: 0 })}
-        />
-      </div>
-
-      <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
-        <ToolButton
-          label={t('tools.slide.moveUp')}
-          icon="swap"
-          onClick={() => moveSlide(slideIndex, Math.max(0, slideIndex - 1))}
-        />
-        <button
-          type="button"
-          onClick={() => importInputRef.current?.click()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-2.5 text-[12px] text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          disabled={busy !== null}
-        >
-          <Icon name="upload" className="h-4 w-4" />
-          {busy === 'import' ? t('tools.slide.importing') : t('tools.slide.importPptx')}
-        </button>
-        <button
-          type="button"
-          onClick={onExport}
-          disabled={busy !== null}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-2.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Icon name="download" className="h-4 w-4" />
-          {busy === 'export' ? t('tools.slide.exporting') : t('tools.slide.exportPptx')}
-        </button>
-        <button
-          type="button"
-          onClick={onPresent}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-2.5 text-[12px] text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          <Icon name="slides" className="h-4 w-4" />
-          {t('tools.slide.present')}
-        </button>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = '';
-          if (file) void handleImage(file);
-        }}
-      />
-      <input
-        ref={importInputRef}
-        type="file"
-        accept=".pptx"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = '';
-          if (file) onImportFile(file);
-        }}
-      />
     </div>
   );
 }

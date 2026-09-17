@@ -52,7 +52,12 @@ const it = {
     copy: 'Copia',
     copied: 'Copiato',
     clear: 'Cancella',
+    discardConfirm:
+      'Il documento corrente non è salvato. Crearne uno nuovo lo scarterà. Sei sicuro?',
     swap: 'Scambia',
+    newDoc: 'Nuovo documento',
+    saved: 'Salvato nella bozza locale',
+    saving: 'Salvataggio automatico dopo la digitazione',
     download: 'Scarica',
     share: 'Condividi',
     shareTooLong: 'Contenuto troppo lungo (> 2KB), impossibile creare link di condivisione',

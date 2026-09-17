@@ -52,7 +52,12 @@ const pt = {
     copy: 'Copiar',
     copied: 'Copiado',
     clear: 'Limpar',
+    discardConfirm:
+      'O documento atual não está guardado. Criar um novo irá descartá-lo. Tem certeza?',
     swap: 'Trocar',
+    newDoc: 'Novo documento',
+    saved: 'Guardado no rascunho local',
+    saving: 'Guarda automaticamente após parar de escrever',
     download: 'Transferir',
     share: 'Partilhar',
     shareTooLong: 'Conteúdo demasiado longo (> 2KB); não é possível criar a ligação de partilha',

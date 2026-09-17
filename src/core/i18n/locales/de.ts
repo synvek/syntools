@@ -52,7 +52,12 @@ const de = {
     copy: 'Kopieren',
     copied: 'Kopiert',
     clear: 'Leeren',
+    discardConfirm:
+      'Das aktuelle Dokument ist nicht gespeichert. Ein neues Dokument verwirft es. Sicher?',
     swap: 'Tauschen',
+    newDoc: 'Neues Dokument',
+    saved: 'Im lokalen Entwurf gespeichert',
+    saving: 'Automatische Speicherung nach der Eingabe',
     download: 'Herunterladen',
     share: 'Teilen',
     shareTooLong: 'Inhalt zu lang (> 2 KB), Freigabelink kann nicht erstellt werden',

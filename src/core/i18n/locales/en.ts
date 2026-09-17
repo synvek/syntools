@@ -52,7 +52,12 @@ const en = {
     copy: 'Copy',
     copied: 'Copied',
     clear: 'Clear',
+    discardConfirm:
+      'The current document is not saved. Creating a new one will discard it. Are you sure?',
     swap: 'Swap',
+    newDoc: 'New document',
+    saved: 'Saved to local draft',
+    saving: 'Auto-saves after you stop typing',
     download: 'Download',
     share: 'Share',
     shareTooLong: 'Content too long (> 2KB), cannot create share link',

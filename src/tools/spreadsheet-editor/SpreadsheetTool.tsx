@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OptionBar } from '@/core/components/ActionButtons';
-import { FileDropZone } from '@/core/components/FileDropZone';
+import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
+import { clearDraft, readDraft, writeDraft } from './draft';
 import { Icon } from '@/core/components/Icon';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
@@ -9,14 +9,14 @@ import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes } from '@/core/pdf/download';
 import { useSettingsStore } from '@/stores/settings';
 import type { ToolResult } from '@/core/types';
-import {
-  MAX_IMPORT_BYTES,
-  buildExportFilename,
-  summarizeWorkbook,
-  type WorkbookSummary,
-} from './core';
+import { buildExportFilename, summarizeWorkbook, type WorkbookSummary } from './core';
 import { registerSpreadsheetStrings } from './strings';
-import { exportSnapshotToBytes, importXlsxToSnapshot, type WorkbookSnapshot } from './xlsx-io';
+import {
+  createEmptySnapshot,
+  exportSnapshotToBytes,
+  importXlsxToSnapshot,
+  type WorkbookSnapshot,
+} from './xlsx-io';
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
 import { SheetTabs } from './SheetTabs';
 import './sheet.css';
@@ -38,6 +38,7 @@ const STATS_INTERVAL_MS = 2000;
 export default function SpreadsheetTool() {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const handleRef = useRef<UniverHandle | null>(null);
   /** 重建实例（主题/语言切换）时用来接力当前数据 */
   const pendingRef = useRef<WorkbookSnapshot | null>(null);
@@ -52,6 +53,7 @@ export default function SpreadsheetTool() {
   const [sheets, setSheets] = useState<SheetInfo[]>([]);
   const [activeSheetId, setActiveSheetId] = useState<string | null>(null);
   const [busy, setBusy] = useState<BusyKind>(null);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [runtimeError, setRuntimeError] = useState(false);
 
@@ -77,7 +79,8 @@ export default function SpreadsheetTool() {
         setRuntimeError(true);
         return;
       }
-      if (pendingRef.current) handle.loadSnapshot(pendingRef.current);
+      const pending = pendingRef.current ?? readDraft();
+      if (pending) handle.loadSnapshot(pending);
       handleRef.current = handle;
       const syncSheets = () => {
         setSheets(handle.getSheets());
@@ -111,9 +114,15 @@ export default function SpreadsheetTool() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(refreshSummary, STATS_INTERVAL_MS);
+    const timer = window.setInterval(() => {
+      const handle = handleRef.current;
+      if (!handle) return;
+      const snapshot = handle.getSnapshot();
+      setSummary(summarizeWorkbook(snapshot));
+      setDraftSaved(writeDraft(snapshot));
+    }, STATS_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [refreshSummary]);
+  }, []);
 
   const handleImport = async (file: File) => {
     setBusy('import');
@@ -171,6 +180,25 @@ export default function SpreadsheetTool() {
     downloadBytes(result.value, buildExportFilename(title || 'workbook', 'xlsx'), XLSX_MIME);
   };
 
+  const loadEmptyWorkbook = () => {
+    handleRef.current?.loadSnapshot(createEmptySnapshot('', univerLocale));
+    setTitle('');
+    clearDraft();
+    setDraftSaved(false);
+    refreshSummary();
+    refreshSheets();
+  };
+
+  const handleClear = () => {
+    loadEmptyWorkbook();
+  };
+
+  const handleNew = () => {
+    const hasContent = summary.cells > 0 || title.trim().length > 0;
+    if (hasContent && !window.confirm(t('common.discardConfirm'))) return;
+    loadEmptyWorkbook();
+  };
+
   const stats = useMemo(
     () => [
       { label: t('tools.sheet.sheets'), value: summary.sheets },
@@ -195,13 +223,39 @@ export default function SpreadsheetTool() {
             className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900"
           />
         </label>
-        <FileDropZone
-          accept=".xlsx"
-          maxBytes={MAX_IMPORT_BYTES}
-          onFile={(file) => void handleImport(file)}
-          hint={t('tools.sheet.importHint')}
-        />
+        <button
+          type="button"
+          onClick={handleNew}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          <Icon name="sheet" className="h-4 w-4" />
+          {t('common.newDoc')}
+        </button>
       </OptionBar>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+        <button
+          type="button"
+          onClick={() => importInputRef.current?.click()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          <Icon name="upload" className="h-4 w-4" />
+          {t('tools.sheet.importXlsx')}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => void handleExport()}
+          disabled={busy !== null || summary.cells === 0}
+          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Icon name="download" className="h-4 w-4" />
+          {busy === 'export' ? t('tools.sheet.exporting') : t('tools.sheet.exportXlsx')}
+        </button>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {t('tools.sheet.unsupportedTip')}
+        </p>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
         <div className="flex flex-wrap gap-3">
@@ -211,7 +265,10 @@ export default function SpreadsheetTool() {
             </span>
           ))}
         </div>
-        <span>{t('tools.sheet.ready')}</span>
+        <div className="flex items-center gap-2">
+          <span>{draftSaved ? t('common.saved') : t('common.saving')}</span>
+          <ClearButton onClick={handleClear} disabled={summary.cells === 0 && !title.trim()} />
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
@@ -228,30 +285,19 @@ export default function SpreadsheetTool() {
         onDuplicate={handleDuplicateSheet}
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
-        <button
-          type="button"
-          onClick={handleAddSheet}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          <Icon name="sheet" className="h-4 w-4" />
-          {t('tools.sheet.addSheet')}
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleExport()}
-          disabled={busy !== null || summary.cells === 0}
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Icon name="download" className="h-4 w-4" />
-          {busy === 'export' ? t('tools.sheet.exporting') : t('tools.sheet.exportXlsx')}
-        </button>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {t('tools.sheet.unsupportedTip')}
-        </p>
-      </div>
-
       {busy !== null && <ProgressBar indeterminate label={t('tools.sheet.exporting')} />}
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".xlsx"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void handleImport(file);
+        }}
+      />
 
       {runtimeError && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

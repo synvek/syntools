@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/core/components/ProgressBar';
+import { ClearButton } from '@/core/components/ActionButtons';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes } from '@/core/pdf/download';
@@ -99,6 +100,18 @@ export default function SlideTool() {
   }, []);
 
   const handleNew = useCallback(() => {
+    if (
+      useSlideStore.getState().doc.slides.length > 0 &&
+      !window.confirm(t('common.discardConfirm'))
+    ) {
+      return;
+    }
+    loadDoc(createDoc(''), null);
+    clearDraft();
+    setDraftSaved(false);
+  }, [loadDoc, t]);
+
+  const handleClear = useCallback(() => {
     loadDoc(createDoc(''), null);
     clearDraft();
     setDraftSaved(false);
@@ -178,6 +191,7 @@ export default function SlideTool() {
             ) : null}
             <span className="text-gray-400">{t('tools.slide.unsupportedTip')}</span>
             <span>{draftSaved ? t('tools.slide.saved') : t('tools.slide.saving')}</span>
+            <ClearButton onClick={handleClear} />
           </footer>
         </main>
 

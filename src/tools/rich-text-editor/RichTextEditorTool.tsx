@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
-import { FileDropZone } from '@/core/components/FileDropZone';
 import { Icon } from '@/core/components/Icon';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
@@ -11,13 +10,7 @@ import { downloadBytes } from '@/core/pdf/download';
 import type { ToolResult } from '@/core/types';
 import { PrintLayer } from './A4Page';
 import { EditorToolbar } from './EditorToolbar';
-import {
-  MAX_IMPORT_BYTES,
-  buildExportFilename,
-  countDocStats,
-  createEmptyDocHtml,
-  htmlToPlain,
-} from './core';
+import { buildExportFilename, countDocStats, createEmptyDocHtml, htmlToPlain } from './core';
 import { clearDraft, readDraft, writeDraft } from './draft';
 import { exportDocxBlob, importDocx } from './docx';
 import { createExtensions } from './extensions';
@@ -66,6 +59,7 @@ export default function RichTextEditorTool() {
   const [printReady, setPrintReady] = useState(false);
   const [saved, setSaved] = useState(Boolean(initial));
   const flowRef = useRef<HTMLDivElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const titleRef = useRef(title);
   titleRef.current = title;
 
@@ -178,6 +172,12 @@ export default function RichTextEditorTool() {
     setFailure(null);
   };
 
+  const handleNew = () => {
+    const hasContent = stats.chars > 0 || title.trim().length > 0;
+    if (hasContent && !window.confirm(t('common.discardConfirm'))) return;
+    handleClear();
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <OptionBar>
@@ -191,41 +191,26 @@ export default function RichTextEditorTool() {
             className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900"
           />
         </label>
-        <FileDropZone
-          accept=".docx"
-          maxBytes={MAX_IMPORT_BYTES}
-          onFile={(file) => void handleImport(file)}
-          hint={t('tools.richText.importHint')}
-        />
+        <button
+          type="button"
+          onClick={handleNew}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          <Icon name="text" className="h-4 w-4" />
+          {t('common.newDoc')}
+        </button>
       </OptionBar>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-        <div className="flex flex-wrap gap-3">
-          <span>
-            {t('tools.richText.chars')}: {stats.chars}
-          </span>
-          <span>
-            {t('tools.richText.words')}: {stats.words}
-          </span>
-          <span>
-            {t('tools.richText.paragraphs')}: {stats.paragraphs}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>{saved ? t('tools.richText.saved') : t('tools.richText.saving')}</span>
-          <ClearButton onClick={handleClear} disabled={isEmpty && !title} />
-        </div>
-      </div>
-
-      <EditorToolbar editor={editor} />
-
-      <div className="mx-auto w-full max-w-[860px]">
-        <div className="rte-surface rounded-lg border border-gray-200 bg-white px-8 py-8 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <EditorContent editor={editor} />
-        </div>
-      </div>
-
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+        <button
+          type="button"
+          onClick={() => importInputRef.current?.click()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          <Icon name="upload" className="h-4 w-4" />
+          {t('tools.richText.importDocx')}
+        </button>
+
         <button
           type="button"
           onClick={() => void handleExportDocx()}
@@ -265,7 +250,45 @@ export default function RichTextEditorTool() {
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex flex-wrap gap-3">
+          <span>
+            {t('tools.richText.chars')}: {stats.chars}
+          </span>
+          <span>
+            {t('tools.richText.words')}: {stats.words}
+          </span>
+          <span>
+            {t('tools.richText.paragraphs')}: {stats.paragraphs}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span>{saved ? t('tools.richText.saved') : t('tools.richText.saving')}</span>
+          <ClearButton onClick={handleClear} disabled={isEmpty && !title} />
+        </div>
+      </div>
+
+      <EditorToolbar editor={editor} />
+
+      <div className="mx-auto w-full max-w-[860px]">
+        <div className="rte-surface rounded-lg border border-gray-200 bg-white px-8 py-8 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <EditorContent editor={editor} />
+        </div>
+      </div>
+
       {busy === 'pdf' && <ProgressBar value={progress} label={t('tools.richText.exporting')} />}
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".docx"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void handleImport(file);
+        }}
+      />
 
       {failure && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

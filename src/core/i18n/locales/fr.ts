@@ -52,7 +52,12 @@ const fr = {
     copy: 'Copier',
     copied: 'Copié',
     clear: 'Effacer',
+    discardConfirm:
+      "Le document actuel n'est pas enregistré. En créer un nouveau l'abandonnera. Êtes-vous sûr ?",
     swap: 'Échanger',
+    newDoc: 'Nouveau document',
+    saved: 'Enregistré dans le brouillon local',
+    saving: 'Enregistrement automatique après la saisie',
     download: 'Télécharger',
     share: 'Partager',
     shareTooLong: 'Contenu trop long (> 2 Ko), impossible de créer un lien de partage',
