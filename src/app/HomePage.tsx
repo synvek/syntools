@@ -74,7 +74,7 @@ export function HomePage() {
     .filter((t): t is ToolMeta => Boolean(t));
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8">
+    <div className="w-full px-6 py-8">
       <h1 className="text-2xl font-bold">{t('home.title')}</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         <Trans

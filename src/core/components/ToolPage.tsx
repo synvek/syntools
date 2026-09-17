@@ -37,7 +37,7 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
   }, [tool, recordUse, name]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6">
+    <div className="w-full px-6 py-6">
       <header className="mb-6 flex items-start gap-3">
         <Icon
           name={tool.icon}
