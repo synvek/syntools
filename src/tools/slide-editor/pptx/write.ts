@@ -83,7 +83,7 @@ function strokeXml(stroke: Stroke | undefined): string {
   if (!stroke) return '<a:noFill/>';
   const width = Math.max(1, Math.round(stroke.width * 12700));
   const color = stroke.color.replace(/^#/, '').toUpperCase();
-  return `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="solid"/><a:omitArrowheads/></a:ln>`;
+  return `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="solid"/></a:ln>`;
 }
 
 function runXml(text: string, style: RunStyle | undefined): string {
@@ -201,7 +201,7 @@ function imageXml(
   return [
     '<p:pic>',
     `<p:nvPicPr><p:cNvPr id="${id}" name="Image ${id}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>`,
-    `<p:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch>${srcRect}</p:blipFill>`,
+    `<p:blipFill><a:blip r:embed="${rId}"/>${srcRect}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`,
     `<p:spPr>${xfrmXml(element)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>`,
     '</p:pic>',
   ].join('');
@@ -221,7 +221,10 @@ function lineXml(element: {
   const flipV = (element.points[3] ?? 0) < 0;
   return [
     '<p:cxnSp>',
-    `<p:nvCxnSpPr><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr>`,
+    (() => {
+      const lid = nextShapeId();
+      return `<p:nvCxnSpPr><p:cNvPr id="${lid}" name="Line ${lid}"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr>`;
+    })(),
     `<p:spPr>${xfrmXml({ ...element, flipX: flipH, flipY: flipV })}<a:prstGeom prst="line"><a:avLst/></a:prstGeom>${strokeXml(element.stroke ?? { color: '#000000', width: 1 })}</p:spPr>`,
     '</p:cxnSp>',
   ].join('');
@@ -307,7 +310,10 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
       const children = element.children.map((child) => elementXml(child, relMap)).join('');
       return [
         '<p:grpSp>',
-        '<p:nvGrpSpPr><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>',
+        (() => {
+          const gid = nextShapeId();
+          return `<p:nvGrpSpPr><p:cNvPr id="${gid}" name="Group ${gid}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>`;
+        })(),
         `<p:grpSpPr><a:xfrm><a:off x="${pxToEmu(element.x)}" y="${pxToEmu(element.y)}"/><a:ext cx="${pxToEmu(element.width)}" cy="${pxToEmu(element.height)}"/><a:chOff x="${pxToEmu(element.x)}" y="${pxToEmu(element.y)}"/><a:chExt cx="${pxToEmu(element.width)}" cy="${pxToEmu(element.height)}"/></a:xfrm></p:grpSpPr>`,
         children,
         '</p:grpSp>',
@@ -365,7 +371,7 @@ export function slideXml(
     '<p:cSld>',
     bg,
     '<p:spTree>',
-    '<p:nvGrpSpPr><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>',
+    '<p:nvGrpSpPr><p:cNvPr id="1" name="Group 1"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>',
     '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>',
     body,
     '</p:spTree>',

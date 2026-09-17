@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import {
   createDoc,
+  createLineElement,
   createShapeElement,
   createTableElement,
   createTextElement,
@@ -53,6 +54,44 @@ describe('pptx 导出包结构', () => {
     expect(xml).toContain('/ppt/slideMasters/slideMaster1.xml');
     expect(xml).toContain('/ppt/slideLayouts/slideLayout1.xml');
     expect(xml).toContain('/ppt/theme/theme1.xml');
+  });
+
+  it('slideMaster 不得包含非法的 clrMapOvr（否则 PowerPoint 提示修复）', async () => {
+    const { zip } = await exported();
+    const master = (await zip.file('ppt/slideMasters/slideMaster1.xml')?.async('string')) ?? '';
+    expect(master).not.toContain('clrMapOvr');
+  });
+
+  it('spTree 的 nvGrpSpPr 必须包含必需的 cNvPr（否则提示修复）', async () => {
+    const { zip } = await exported();
+    for (const part of [
+      'ppt/slides/slide1.xml',
+      'ppt/slideMasters/slideMaster1.xml',
+      'ppt/slideLayouts/slideLayout1.xml',
+    ]) {
+      const xml = (await zip.file(part)?.async('string')) ?? '';
+      expect(xml).toMatch(/<p:nvGrpSpPr><p:cNvPr id="1"[^>]*>/);
+    }
+  });
+
+  it('不得出现 DrawingML 中不存在的 omitArrowheads（否则提示修复）', async () => {
+    const { zip } = await exported();
+    const files = Object.keys(zip.files).filter((f) => f.endsWith('.xml'));
+    for (const f of files) {
+      const xml = (await zip.file(f)?.async('string')) ?? '';
+      expect(xml).not.toContain('omitArrowheads');
+    }
+  });
+
+  it('connector（线条）的 nvCxnSpPr 必须包含 cNvPr', async () => {
+    const doc = createDoc('line');
+    doc.slides[0].elements = [createLineElement(doc)];
+    const result = await exportPptx(doc);
+    expect(result.ok).toBe(true);
+    const bytes = (result as { ok: true; value: Uint8Array }).value;
+    const zip = await JSZip.loadAsync(bytes);
+    const xml = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+    expect(xml).toMatch(/<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="\d+"[^>]*>/);
   });
 
   it('presentation rels 与 sldIdLst 的 rId 一一对应', async () => {
