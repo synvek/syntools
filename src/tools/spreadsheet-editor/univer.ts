@@ -43,10 +43,31 @@ import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
  * 本模块只会被懒加载的 SpreadsheetTool 引用，因此 Univer 不会进入首屏包。
  */
 
+export interface SheetInfo {
+  id: string;
+  name: string;
+  hidden: boolean;
+  tabColor?: string;
+}
+
 export interface UniverHandle {
   loadSnapshot(snapshot: WorkbookSnapshot): void;
   getSnapshot(): WorkbookSnapshot;
   dispose(): void;
+  /** 列出当前工作簿的全部工作表（按展示顺序） */
+  getSheets(): SheetInfo[];
+  /** 当前激活工作表 id */
+  getActiveSheetId(): string | null;
+  /** 切换激活的工作表 */
+  setActiveSheet(id: string): void;
+  /** 在末尾新增一张工作表，缺省名称交给 Univer 自动生成 */
+  addSheet(name?: string): void;
+  /** 删除指定工作表（至少保留一张，最后一张会被忽略） */
+  deleteSheet(id: string): void;
+  /** 重命名工作表 */
+  renameSheet(id: string, name: string): void;
+  /** 复制工作表（在源表之后插入副本） */
+  duplicateSheet(id: string): void;
 }
 
 const ZH_LOCALE = mergeLocales(
@@ -110,10 +131,62 @@ export function createUniverInstance(
     return (workbook?.save() ?? {}) as unknown as WorkbookSnapshot;
   };
 
+  const getSheets = (): SheetInfo[] => {
+    const workbook = univerAPI.getActiveWorkbook();
+    if (!workbook) return [];
+    return workbook.getSheets().map((sheet) => ({
+      id: sheet.getSheetId(),
+      name: sheet.getSheetName(),
+      hidden: sheet.isSheetHidden(),
+      tabColor: sheet.getTabColor(),
+    }));
+  };
+
+  const getActiveSheetId = (): string | null => {
+    return univerAPI.getActiveWorkbook()?.getActiveSheet()?.getSheetId() ?? null;
+  };
+
+  const setActiveSheet = (id: string): void => {
+    univerAPI.getActiveWorkbook()?.setActiveSheet(id);
+  };
+
+  const addSheet = (name?: string): void => {
+    univerAPI.getActiveWorkbook()?.insertSheet(name);
+  };
+
+  const deleteSheet = (id: string): void => {
+    const workbook = univerAPI.getActiveWorkbook();
+    if (!workbook || workbook.getNumSheets() <= 1) return;
+    workbook.deleteSheet(id);
+  };
+
+  const renameSheet = (id: string, name: string): void => {
+    const sheet = univerAPI.getActiveWorkbook()?.getSheetBySheetId(id);
+    sheet?.setName(name);
+  };
+
+  const duplicateSheet = (id: string): void => {
+    const workbook = univerAPI.getActiveWorkbook();
+    if (!workbook) return;
+    const sheet = workbook.getSheetBySheetId(id);
+    if (sheet) workbook.duplicateSheet(sheet);
+  };
+
   const dispose = (): void => {
     univer.dispose();
     container.replaceChildren();
   };
 
-  return { loadSnapshot, getSnapshot, dispose };
+  return {
+    loadSnapshot,
+    getSnapshot,
+    dispose,
+    getSheets,
+    getActiveSheetId,
+    setActiveSheet,
+    addSheet,
+    deleteSheet,
+    renameSheet,
+    duplicateSheet,
+  };
 }

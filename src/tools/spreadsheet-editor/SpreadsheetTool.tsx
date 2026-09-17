@@ -16,13 +16,9 @@ import {
   type WorkbookSummary,
 } from './core';
 import { registerSpreadsheetStrings } from './strings';
-import {
-  createEmptySnapshot,
-  exportSnapshotToBytes,
-  importXlsxToSnapshot,
-  type WorkbookSnapshot,
-} from './xlsx-io';
-import { createUniverInstance, type UniverHandle } from './univer';
+import { exportSnapshotToBytes, importXlsxToSnapshot, type WorkbookSnapshot } from './xlsx-io';
+import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
+import { SheetTabs } from './SheetTabs';
 import './sheet.css';
 
 // 工具文案随本 chunk 懒加载注册，不占用首屏语言包体积
@@ -53,6 +49,8 @@ export default function SpreadsheetTool() {
     cells: 0,
     formulas: 0,
   });
+  const [sheets, setSheets] = useState<SheetInfo[]>([]);
+  const [activeSheetId, setActiveSheetId] = useState<string | null>(null);
   const [busy, setBusy] = useState<BusyKind>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [runtimeError, setRuntimeError] = useState(false);
@@ -81,6 +79,11 @@ export default function SpreadsheetTool() {
       }
       if (pendingRef.current) handle.loadSnapshot(pendingRef.current);
       handleRef.current = handle;
+      const syncSheets = () => {
+        setSheets(handle.getSheets());
+        setActiveSheetId(handle.getActiveSheetId());
+      };
+      syncSheets();
     }, 0);
     return () => {
       cancelled = true;
@@ -100,6 +103,13 @@ export default function SpreadsheetTool() {
     setSummary(summarizeWorkbook(handle.getSnapshot()));
   }, []);
 
+  const refreshSheets = useCallback(() => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    setSheets(handle.getSheets());
+    setActiveSheetId(handle.getActiveSheetId());
+  }, []);
+
   useEffect(() => {
     const timer = window.setInterval(refreshSummary, STATS_INTERVAL_MS);
     return () => window.clearInterval(timer);
@@ -117,14 +127,33 @@ export default function SpreadsheetTool() {
     handleRef.current?.loadSnapshot(result.value);
     if (!title.trim()) setTitle(result.value.name);
     refreshSummary();
+    refreshSheets();
   };
 
-  const handleNew = () => {
-    const snapshot = createEmptySnapshot(t('tools.sheet.titlePlaceholder'), univerLocale);
-    handleRef.current?.loadSnapshot(snapshot);
-    setTitle('');
+  const handleAddSheet = () => {
+    handleRef.current?.addSheet();
+    refreshSheets();
     setFailure(null);
-    refreshSummary();
+  };
+
+  const handleSelectSheet = (id: string) => {
+    handleRef.current?.setActiveSheet(id);
+    refreshSheets();
+  };
+
+  const handleRenameSheet = (id: string, name: string) => {
+    handleRef.current?.renameSheet(id, name);
+    refreshSheets();
+  };
+
+  const handleDeleteSheet = (id: string) => {
+    handleRef.current?.deleteSheet(id);
+    refreshSheets();
+  };
+
+  const handleDuplicateSheet = (id: string) => {
+    handleRef.current?.duplicateSheet(id);
+    refreshSheets();
   };
 
   const handleExport = async () => {
@@ -189,14 +218,24 @@ export default function SpreadsheetTool() {
         <div ref={containerRef} className="sheet-canvas" />
       </div>
 
+      <SheetTabs
+        sheets={sheets}
+        activeId={activeSheetId}
+        onSelect={handleSelectSheet}
+        onAdd={handleAddSheet}
+        onRename={handleRenameSheet}
+        onDelete={handleDeleteSheet}
+        onDuplicate={handleDuplicateSheet}
+      />
+
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
         <button
           type="button"
-          onClick={handleNew}
+          onClick={handleAddSheet}
           className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
         >
           <Icon name="sheet" className="h-4 w-4" />
-          {t('tools.sheet.newSheet')}
+          {t('tools.sheet.addSheet')}
         </button>
         <button
           type="button"
