@@ -139,8 +139,6 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         connectionMode={ConnectionMode.Loose}
         snapToGrid
         snapGrid={[8, 8]}
-        fitView
-        fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
         minZoom={0.2}
         maxZoom={2.5}
         proOptions={{ hideAttribution: true }}

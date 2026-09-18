@@ -87,23 +87,36 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
 test.describe('流程图编辑器（zh-CN）', () => {
   test.use({ locale: 'zh-CN' });
 
-  test('画布挂载 → 添加图形 → 节点计数增加 → 导出按钮可见', async ({ page }) => {
+  test('画布挂载 → 拖放元素落在鼠标处（不被居中）→ 模板载入', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     // React Flow 会挂载画布（含 .react-flow 容器）
     await expect(page.locator('.react-flow')).toBeVisible();
     await expect(page.getByRole('button', { name: '导出 PNG' })).toBeVisible();
     await expect(page.getByRole('button', { name: '导出 SVG' })).toBeVisible();
 
-    // 从图形库点击「过程」添加一个矩形节点
-    await page.getByRole('button', { name: '过程' }).click();
+    const canvas = page.locator('.react-flow');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+
+    // 拖放到画布左上区域：节点应落在鼠标处
+    await page.getByRole('button', { name: '过程' }).dragTo(canvas, {
+      targetPosition: { x: 90, y: 90 },
+    });
+
     await expect(page.locator('.react-flow__node')).toHaveCount(1);
     const node = page.locator('.react-flow__node').first();
     await expect(node).toBeVisible();
     await expect(node).toContainText('过程');
     // 防止「节点被撑成 0 尺寸而不可见」回归：必须有实际的宽高
-    const box = await node.boundingBox();
-    expect(box?.width).toBeGreaterThan(0);
-    expect(box?.height).toBeGreaterThan(0);
+    const nodeBox = await node.boundingBox();
+    expect(nodeBox?.width).toBeGreaterThan(0);
+    expect(nodeBox?.height).toBeGreaterThan(0);
+    // 防止「首个元素被 fitView 居中」回归：节点中心必须落在画布左上象限
+    const cx = nodeBox!.x + nodeBox!.width / 2 - canvasBox!.x;
+    const cy = nodeBox!.y + nodeBox!.height / 2 - canvasBox!.y;
+    // 用 1/3 而非 1/2：被居中时坐标约等于画布正中，必须留足区分度
+    expect(cx).toBeLessThan(canvasBox!.width / 3);
+    expect(cy).toBeLessThan(canvasBox!.height / 3);
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
 
     // 载入模板应替换画布内容且节点数增加

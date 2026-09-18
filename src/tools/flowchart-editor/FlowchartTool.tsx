@@ -23,7 +23,7 @@ const DRAFT_DEBOUNCE_MS = 1200;
 
 function FlowchartInner() {
   const { t } = useTranslation();
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const nodes = useFlowStore((s) => s.nodes);
@@ -37,6 +37,14 @@ function FlowchartInner() {
   const [failure, setFailure] = useState<string | null>(null);
   const [draftSaved, setDraftSaved] = useState(false);
   const saveTimer = useRef<number | null>(null);
+  const firstSave = useRef(true);
+
+  // 只在「载入整张图」（草稿 / 模板）时适配视图。
+  // 不能用 fitView prop：它会在首个节点测量完成后自动适配，
+  // 导致新图的第一个元素无论拖到哪里都被居中显示。
+  const fitViewSoon = useCallback(() => {
+    requestAnimationFrame(() => fitView({ padding: 0.3, maxZoom: 1 }));
+  }, [fitView]);
 
   // 首次挂载恢复本地草稿
   useEffect(() => {
@@ -44,11 +52,18 @@ function FlowchartInner() {
     if (draft && draft.nodes.length > 0) {
       useFlowStore.getState().load(draft);
       setDraftSaved(true);
+      fitViewSoon();
     }
-  }, []);
+  }, [fitViewSoon]);
 
-  // 变更后防抖写入本地草稿
+  // 变更后防抖写入本地草稿（编辑 → 未保存 → 1.2s 后落盘为已保存）
   useEffect(() => {
+    // 首次挂载的数据本身就来自草稿，不必再写一次
+    if (firstSave.current) {
+      firstSave.current = false;
+      return;
+    }
+    setDraftSaved(false);
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       setDraftSaved(writeDraft(useFlowStore.getState().getDoc()));
@@ -99,9 +114,13 @@ function FlowchartInner() {
     if (!result.ok) setFailure(result.error);
   }, []);
 
-  const handleTemplate = useCallback((kind: TemplateKind) => {
-    useFlowStore.getState().load(buildTemplate(kind));
-  }, []);
+  const handleTemplate = useCallback(
+    (kind: TemplateKind) => {
+      useFlowStore.getState().load(buildTemplate(kind));
+      fitViewSoon();
+    },
+    [fitViewSoon],
+  );
 
   const handleDelete = useCallback(() => useFlowStore.getState().removeSelected(), []);
   const handleDuplicate = useCallback(() => useFlowStore.getState().duplicateSelected(), []);
