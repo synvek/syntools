@@ -82,3 +82,33 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByRole('button', { name: '放映', exact: true })).toBeVisible();
   });
 });
+
+// 流程图编辑器（zh-CN）
+test.describe('流程图编辑器（zh-CN）', () => {
+  test.use({ locale: 'zh-CN' });
+
+  test('画布挂载 → 添加图形 → 节点计数增加 → 导出按钮可见', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    // React Flow 会挂载画布（含 .react-flow 容器）
+    await expect(page.locator('.react-flow')).toBeVisible();
+    await expect(page.getByRole('button', { name: '导出 PNG' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '导出 SVG' })).toBeVisible();
+
+    // 从图形库点击「过程」添加一个矩形节点
+    await page.getByRole('button', { name: '过程' }).click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(1);
+    const node = page.locator('.react-flow__node').first();
+    await expect(node).toBeVisible();
+    await expect(node).toContainText('过程');
+    // 防止「节点被撑成 0 尺寸而不可见」回归：必须有实际的宽高
+    const box = await node.boundingBox();
+    expect(box?.width).toBeGreaterThan(0);
+    expect(box?.height).toBeGreaterThan(0);
+    await expect(page.getByText(/节点:\s*1/)).toBeVisible();
+
+    // 载入模板应替换画布内容且节点数增加
+    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '基础流程' }).click();
+    await expect(page.getByText(/节点:\s*4/)).toBeVisible();
+  });
+});

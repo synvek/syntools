@@ -114,6 +114,11 @@ const pt = {
     back: 'Voltar ao início',
   },
   toolsMeta: {
+    'flowchart-editor': {
+      name: 'Editor de fluxogramas',
+      description:
+        'Crie fluxogramas localmente: nós, conexões, modelos, auto layout e exportação PNG/SVG',
+    },
     base64: {
       name: 'Codificar / descodificar Base64',
       description:

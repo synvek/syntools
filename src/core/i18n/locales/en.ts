@@ -113,6 +113,11 @@ const en = {
     back: 'Back to home',
   },
   toolsMeta: {
+    'flowchart-editor': {
+      name: 'Flowchart Editor',
+      description:
+        'Draw flowcharts locally: nodes, connectors, templates, auto-layout and PNG/SVG export',
+    },
     base64: {
       name: 'Base64 Encode / Decode',
       description:

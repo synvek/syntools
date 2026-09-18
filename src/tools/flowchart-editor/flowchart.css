@@ -1,0 +1,33 @@
+/* 流程图编辑器自定义样式（依赖 @xyflow/react/dist/style.css，于 FlowchartTool 引入） */
+
+/* 泳道顶部标题条填充 */
+.swimlane-header {
+  fill: rgba(71, 85, 105, 0.14);
+}
+
+/* 隐藏自定义节点的默认外边距，让 SVG 形状填满容器 */
+.react-flow__node-shape {
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
+.react-flow__node-shape.selected {
+  box-shadow: none;
+}
+
+/* 连线标签：浅底圆角，避免遮挡 */
+.react-flow__edge-text {
+  font-size: 12px;
+  fill: #334155;
+}
+
+.react-flow__edge-textbg {
+  fill: #ffffff;
+}
+
+/* 让拖拽中的节点保持抓取手型 */
+.react-flow__node-shape:active {
+  cursor: grabbing;
+}

@@ -113,6 +113,11 @@ const es = {
     back: 'Volver al inicio',
   },
   toolsMeta: {
+    'flowchart-editor': {
+      name: 'Editor de diagramas',
+      description:
+        'Crea diagramas de flujo localmente: nodos, conexiones, plantillas, auto diseño y exportación PNG/SVG',
+    },
     base64: {
       name: 'Codificar / decodificar Base64',
       description:

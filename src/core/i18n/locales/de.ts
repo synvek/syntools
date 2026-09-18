@@ -113,6 +113,11 @@ const de = {
     },
   },
   toolsMeta: {
+    'flowchart-editor': {
+      name: 'Flussdiagramm-Editor',
+      description:
+        'Flussdiagramme lokal erstellen: Knoten, Verbindungen, Vorlagen, Auto-Layout und PNG/SVG-Export',
+    },
     base64: {
       name: 'Base64 kodieren / dekodieren',
       description: 'Text und Base64 Unicode-sicher umwandeln; URL Safe und Dateimodus unterstützt',

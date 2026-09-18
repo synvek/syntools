@@ -111,6 +111,10 @@ const zhTW = {
     back: '返回首頁',
   },
   toolsMeta: {
+    'flowchart-editor': {
+      name: '流程圖編輯器',
+      description: '本地繪製流程圖，支援節點連線、模板、自動排版與 PNG/SVG 匯出',
+    },
     base64: {
       name: 'Base64 編解碼',
       description: '文本與 Base64 互轉，Unicode 安全，支持 URL Safe 與文件模式',

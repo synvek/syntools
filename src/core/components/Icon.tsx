@@ -8,6 +8,13 @@ const icons: Record<string, ReactNode> = {
   wrench: (
     <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5 2.5-2.5Z" />
   ),
+  diagram: (
+    <>
+      <rect x="3" y="4" width="7" height="5" rx="1" />
+      <circle cx="17" cy="17" r="3" />
+      <path d="M7 9v3a3 3 0 0 0 3 3h4" />
+    </>
+  ),
   binary: (
     <>
       <rect x="4" y="4" width="6" height="6" rx="1" />

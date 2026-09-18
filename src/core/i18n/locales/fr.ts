@@ -114,6 +114,11 @@ const fr = {
     },
   },
   toolsMeta: {
+    'flowchart-editor': {
+      name: 'Éditeur de diagrammes',
+      description:
+        'Créez des diagrammes en local : nœuds, liens, modèles, disposition auto et export PNG/SVG',
+    },
     base64: {
       name: 'Encodage / décodage Base64',
       description:

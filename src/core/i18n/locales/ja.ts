@@ -113,6 +113,11 @@ const ja = {
     },
   },
   toolsMeta: {
+    'flowchart-editor': {
+      name: 'フローチャートエディタ',
+      description:
+        'ローカルでフローチャートを作成：ノード接続、テンプレート、自動配置、PNG/SVG 書き出し',
+    },
     base64: {
       name: 'Base64 エンコード / デコード',
       description: 'Unicode 安全なテキストと Base64 の相互変換。URL Safe とファイルモード対応',

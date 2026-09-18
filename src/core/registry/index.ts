@@ -106,6 +106,7 @@ import { pdfAnnotateTool } from '@/tools/pdf-annotate';
 import { richTextEditorTool } from '@/tools/rich-text-editor';
 import { slideEditorTool } from '@/tools/slide-editor';
 import { spreadsheetEditorTool } from '@/tools/spreadsheet-editor';
+import { flowchartEditorTool } from '@/tools/flowchart-editor';
 
 /**
  * 全项目唯一的聚合注册入口：新增工具仅需在此追加一行。
@@ -219,6 +220,7 @@ export const tools: ToolMeta[] = [
   richTextEditorTool,
   spreadsheetEditorTool,
   slideEditorTool,
+  flowchartEditorTool,
 ];
 
 export const toolMap = new Map(tools.map((t) => [t.id, t]));
