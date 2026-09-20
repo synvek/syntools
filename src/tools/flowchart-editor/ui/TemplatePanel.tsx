@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { type TemplateKind } from '../core';
 
-const TEMPLATES: TemplateKind[] = ['basic', 'decision', 'swimlane', 'bpmn'];
+const TEMPLATES: TemplateKind[] = ['basic', 'decision', 'swimlane', 'swimlaneV', 'bpmn'];
 
 interface TemplatePanelProps {
   open: boolean;
@@ -41,7 +41,7 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
         <p className="mb-4 text-[12px] text-gray-500 dark:text-gray-400">
           {t('tools.flowchart.templateHint')}
         </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {TEMPLATES.map((kind) => (
             <button
               key={kind}
@@ -78,12 +78,24 @@ function TemplateThumb({ kind }: { kind: TemplateKind }) {
     );
   }
   if (kind === 'swimlane') {
+    // 横向泳道：标题栏在左侧
     return (
       <svg viewBox="0 0 80 50" className="h-16 w-full" aria-hidden="true">
         <rect x={6} y={8} width={68} height={34} rx={4} {...c} />
-        <rect x={6} y={8} width={68} height={10} rx={4} fill="#dbeafe" />
-        <ellipse cx={24} cy={36} rx={9} ry={5} {...c} />
-        <ellipse cx={52} cy={36} rx={9} ry={5} {...c} />
+        <rect x={6} y={8} width={10} height={34} rx={4} fill="#dbeafe" />
+        <ellipse cx={32} cy={25} rx={9} ry={5} {...c} />
+        <ellipse cx={58} cy={25} rx={9} ry={5} {...c} />
+      </svg>
+    );
+  }
+  if (kind === 'swimlaneV') {
+    // 纵向泳道：标题栏在顶部
+    return (
+      <svg viewBox="0 0 80 50" className="h-16 w-full" aria-hidden="true">
+        <rect x={26} y={4} width={28} height={42} rx={4} {...c} />
+        <rect x={26} y={4} width={28} height={9} rx={4} fill="#dbeafe" />
+        <ellipse cx={40} cy={27} rx={9} ry={4.5} {...c} />
+        <ellipse cx={40} cy={39} rx={9} ry={4.5} {...c} />
       </svg>
     );
   }

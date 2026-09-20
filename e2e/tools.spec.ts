@@ -124,4 +124,63 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await page.getByRole('button', { name: '基础流程' }).click();
     await expect(page.getByText(/节点:\s*4/)).toBeVisible();
   });
+
+  test('泳道是容器：拖入的元素会放进泳道内', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    // 泳道模板：1 条泳道 + 4 个内部节点
+    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '横向泳道流程' }).click();
+    await expect(page.getByText(/节点:\s*5/)).toBeVisible();
+
+    const canvas = page.locator('.react-flow');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+
+    // 拖到画布中心（模板 fitView 后泳道覆盖画布中心区域）
+    await page.getByRole('button', { name: '过程' }).dragTo(canvas, {
+      targetPosition: { x: canvasBox!.width / 2, y: canvasBox!.height / 2 },
+    });
+    await expect(page.getByText(/节点:\s*6/)).toBeVisible();
+
+    // 新节点应被泳道包围（证明它确实被放进了泳道，而不是叠在外面）
+    const newNode = page.locator('.react-flow__node').filter({ hasText: '过程' });
+    await expect(newNode).toHaveCount(1);
+    const lane = page.locator('.react-flow__node').filter({ hasText: '泳道' }).first();
+    const nb = await newNode.first().boundingBox();
+    const lb = await lane.boundingBox();
+    expect(nb).toBeTruthy();
+    expect(lb).toBeTruthy();
+    expect(nb!.x).toBeGreaterThanOrEqual(lb!.x - 1);
+    expect(nb!.y).toBeGreaterThanOrEqual(lb!.y - 1);
+    expect(nb!.x + nb!.width).toBeLessThanOrEqual(lb!.x + lb!.width + 1);
+    expect(nb!.y + nb!.height).toBeLessThanOrEqual(lb!.y + lb!.height + 1);
+  });
+
+  test('纵向泳道同样是容器：拖入的元素会放进泳道内', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '纵向泳道流程' }).click();
+    await expect(page.getByText(/节点:\s*5/)).toBeVisible();
+
+    const canvas = page.locator('.react-flow');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+
+    await page.getByRole('button', { name: '过程' }).dragTo(canvas, {
+      targetPosition: { x: canvasBox!.width / 2, y: canvasBox!.height / 2 },
+    });
+    await expect(page.getByText(/节点:\s*6/)).toBeVisible();
+
+    const newNode = page.locator('.react-flow__node').filter({ hasText: '过程' });
+    await expect(newNode).toHaveCount(1);
+    const lane = page.locator('.react-flow__node').filter({ hasText: '纵向泳道' }).first();
+    const nb = await newNode.first().boundingBox();
+    const lb = await lane.boundingBox();
+    expect(nb).toBeTruthy();
+    expect(lb).toBeTruthy();
+    expect(nb!.x).toBeGreaterThanOrEqual(lb!.x - 1);
+    expect(nb!.y).toBeGreaterThanOrEqual(lb!.y - 1);
+    expect(nb!.x + nb!.width).toBeLessThanOrEqual(lb!.x + lb!.width + 1);
+    expect(nb!.y + nb!.height).toBeLessThanOrEqual(lb!.y + lb!.height + 1);
+  });
 });

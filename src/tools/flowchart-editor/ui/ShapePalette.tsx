@@ -24,6 +24,7 @@ const GROUPS: Array<{ titleKey: string; items: PaletteItem[] }> = [
     titleKey: 'groupBpmn',
     items: [
       { kind: 'swimlane', key: 'shape_swimlane' },
+      { kind: 'swimlaneV', key: 'shape_swimlaneV' },
       { kind: 'bpmnTask', key: 'shape_bpmnTask' },
     ],
   },
@@ -39,7 +40,39 @@ function ShapeGlyph({ kind }: { kind: ShapeKind }) {
     case 'data':
       return <polygon points="10,4 44,4 34,36 0,36" {...common} />;
     case 'swimlane':
-      return <rect x={4} y={8} width={40} height={24} rx={3} {...common} />;
+      // 横向泳道：标题栏在左侧
+      return (
+        <g>
+          <rect x={4} y={8} width={40} height={24} rx={3} {...common} />
+          <rect
+            x={4}
+            y={8}
+            width={6}
+            height={24}
+            rx={3}
+            fill="#dbeafe"
+            stroke="#2563EB"
+            strokeWidth={2}
+          />
+        </g>
+      );
+    case 'swimlaneV':
+      // 纵向泳道：标题栏在顶部
+      return (
+        <g>
+          <rect x={17} y={5} width={14} height={30} rx={3} {...common} />
+          <rect
+            x={17}
+            y={5}
+            width={14}
+            height={6}
+            rx={3}
+            fill="#dbeafe"
+            stroke="#2563EB"
+            strokeWidth={2}
+          />
+        </g>
+      );
     case 'bpmnTask':
       return <rect x={4} y={8} width={40} height={24} rx={4} {...common} />;
     case 'rect':

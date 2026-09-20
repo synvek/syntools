@@ -15,12 +15,22 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react';
-import { createId, defaultData, serializeDoc, type HelperLines } from './core';
+import {
+  absolutePositionOf,
+  absoluteRectOf,
+  createId,
+  defaultData,
+  orderNodesByHierarchy,
+  resolvePlacement,
+  serializeDoc,
+  type HelperLines,
+} from './core';
 import {
   type FlowDoc,
   type FlowNodeData,
   type FlowNodePatch,
   type ShapeKind,
+  isContainerKind,
   shapeSize,
 } from './model/types';
 import { layoutGraph } from './layout';
@@ -35,15 +45,20 @@ interface Snapshot {
   edges: FlowEdge[];
 }
 
-function makeNode(kind: ShapeKind, position: { x: number; y: number }, id?: string): FlowNode {
+function makeNode(
+  kind: ShapeKind,
+  position: { x: number; y: number },
+  opts?: { id?: string; parentId?: string },
+): FlowNode {
   const size = shapeSize(kind);
   return {
-    id: id ?? createId('n'),
+    id: opts?.id ?? createId('n'),
     type: 'shape',
     position,
     // 显式尺寸：让 React Flow 在测量前就有正确包围盒（fitView / 导出 / 自动布局均依赖）
     width: size.width,
     height: size.height,
+    parentId: opts?.parentId,
     data: defaultData(kind),
   };
 }
@@ -79,6 +94,7 @@ interface FlowState {
   onSelectionChange: (selection: { nodes: FlowNode[]; edges: FlowEdge[] }) => void;
 
   addNode: (kind: ShapeKind, position: { x: number; y: number }) => void;
+  reparentNode: (id: string) => void;
   setNodeLabel: (id: string, label: string, history?: boolean) => void;
   patchSelected: (patch: FlowNodePatch, history?: boolean) => void;
   patchEdgeLabel: (id: string, label: string) => void;
@@ -103,17 +119,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       set({ nodes: [], edges: [], past: [], future: [], selectedNodes: [], selectedEdges: [] });
       return;
     }
-    const nodes: FlowNode[] = doc.nodes.map((n) => {
-      const size = shapeSize(n.data.kind);
-      return {
-        id: n.id,
-        type: 'shape',
-        position: { ...n.position },
-        width: size.width,
-        height: size.height,
-        data: { kind: n.data.kind, label: n.data.label, style: { ...n.data.style } },
-      };
-    });
+    const nodes = orderNodesByHierarchy(
+      doc.nodes.map((n) => {
+        const size = shapeSize(n.data.kind);
+        return {
+          id: n.id,
+          type: 'shape' as const,
+          position: { ...n.position },
+          width: size.width,
+          height: size.height,
+          parentId: n.parentId ?? undefined,
+          data: { kind: n.data.kind, label: n.data.label, style: { ...n.data.style } },
+        };
+      }),
+    );
     const edges: FlowEdge[] = doc.edges.map((e) => ({
       id: e.id,
       source: e.source,
@@ -137,7 +156,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   getDoc: () => {
     const { nodes, edges } = get();
     return serializeDoc(
-      nodes.map((n) => ({ id: n.id, position: n.position, data: n.data })),
+      nodes.map((n) => ({ id: n.id, position: n.position, parentId: n.parentId, data: n.data })),
       edges.map((e) => ({
         id: e.id,
         source: e.source,
@@ -211,8 +230,49 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   addNode: (kind, position) => {
     get().commit();
-    const node = makeNode(kind, position);
-    set((s) => ({ nodes: [...s.nodes, node], selectedNodes: [node.id] }));
+    const size = shapeSize(kind);
+    let parentId: string | undefined;
+    let finalPosition = position;
+    if (!isContainerKind(kind)) {
+      const current = get().nodes;
+      const byId = new Map(current.map((n) => [n.id, n] as const));
+      const lanes = current
+        .filter((n) => isContainerKind(n.data.kind))
+        .map((n) => ({ id: n.id, rect: absoluteRectOf(n, byId) }));
+      const placement = resolvePlacement({ x: position.x, y: position.y, ...size }, lanes);
+      parentId = placement.parentId;
+      finalPosition = placement.position;
+    }
+    const node = makeNode(kind, finalPosition, { parentId });
+    set((s) => ({
+      nodes: orderNodesByHierarchy([...s.nodes, node]),
+      selectedNodes: [node.id],
+    }));
+  },
+
+  reparentNode: (id) => {
+    const current = get().nodes;
+    const node = current.find((n) => n.id === id);
+    if (!node || isContainerKind(node.data.kind)) return;
+    const byId = new Map(current.map((n) => [n.id, n] as const));
+    const rect = absoluteRectOf(node, byId);
+    const lanes = current
+      .filter((n) => isContainerKind(n.data.kind) && n.id !== id)
+      .map((n) => ({ id: n.id, rect: absoluteRectOf(n, byId) }));
+    const placement = resolvePlacement(rect, lanes);
+    const nextParentId = placement.parentId;
+    const sameParent = (node.parentId ?? undefined) === nextParentId;
+    const samePos =
+      node.position.x === placement.position.x && node.position.y === placement.position.y;
+    if (sameParent && samePos) return;
+    get().commit();
+    set((s) => ({
+      nodes: orderNodesByHierarchy(
+        s.nodes.map((n) =>
+          n.id === id ? { ...n, parentId: nextParentId, position: placement.position } : n,
+        ),
+      ),
+    }));
   },
 
   setNodeLabel: (id, label, history = false) => {
@@ -243,6 +303,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
     get().commit();
     const nodeSet = new Set(selectedNodes);
+    // 删除泳道时，其内部子节点一并删除，避免出现孤儿
+    for (const n of get().nodes) {
+      if (n.parentId && nodeSet.has(n.parentId)) nodeSet.add(n.id);
+    }
     const edgeSet = new Set(selectedEdges);
     set((s) => ({
       nodes: s.nodes.filter((n) => !nodeSet.has(n.id)),
@@ -267,12 +331,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         selected: false,
         data: { ...n.data, style: { ...n.data.style } },
       }));
-    set((s) => ({ nodes: [...s.nodes, ...copies], selectedNodes: copies.map((c) => c.id) }));
+    set((s) => ({
+      nodes: orderNodesByHierarchy([...s.nodes, ...copies]),
+      selectedNodes: copies.map((c) => c.id),
+    }));
   },
 
   applyAutoLayout: (direction = 'TB') => {
     get().commit();
-    set((s) => ({ nodes: layoutGraph(s.nodes, s.edges, direction) }));
+    set((s) => {
+      // 自动布局会整体重排：先把子节点提升为绝对坐标并解除泳道归属
+      const byId = new Map(s.nodes.map((n) => [n.id, n] as const));
+      const detached = s.nodes.map((n) => {
+        if (!n.parentId) return { ...n, parentId: undefined };
+        return { ...n, position: absolutePositionOf(n, byId), parentId: undefined };
+      });
+      return { nodes: layoutGraph(detached, s.edges, direction) };
+    });
   },
 
   clear: () => {

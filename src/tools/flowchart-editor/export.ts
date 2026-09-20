@@ -6,6 +6,7 @@
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
 import { toPng, toSvg } from 'html-to-image';
 import { downloadDataUrl } from '@/core/pdf/download';
+import { absolutePositionOf } from './core';
 import { type FlowNodeData } from './model/types';
 
 export type ExportFormat = 'png' | 'svg';
@@ -20,7 +21,10 @@ export async function exportFlowchart(
     const viewport = document.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!viewport) return { ok: false, error: 'EMPTY' };
 
-    const bounds = getNodesBounds(nodes);
+    // 子节点坐标相对泳道，导出前转为绝对坐标，保证包围盒正确
+    const byId = new Map(nodes.map((n) => [n.id, n] as const));
+    const absoluteNodes = nodes.map((n) => ({ ...n, position: absolutePositionOf(n, byId) }));
+    const bounds = getNodesBounds(absoluteNodes);
     const width = Math.max(1, Math.ceil(bounds.width));
     const height = Math.max(1, Math.ceil(bounds.height));
     const transform = getViewportForBounds(bounds, width, height, 0.5, 2, 0);

@@ -9,12 +9,11 @@ import {
   ReactFlow,
   useReactFlow,
   useViewport,
-  type Node,
   type NodeChange,
 } from '@xyflow/react';
 import { useFlowStore, type FlowNode } from '../store';
 import { ShapeNode } from '../nodes/ShapeNode';
-import { computeHelperLines, type Rect } from '../core';
+import { absolutePositionOf, absoluteRectOf, computeHelperLines } from '../core';
 import { shapeSize, type FlowNodeData, type ShapeKind } from '../model/types';
 
 const nodeTypes = { shape: ShapeNode };
@@ -25,16 +24,6 @@ const defaultEdgeOptions = {
 };
 
 const DROP_MIME = 'application/flowchart-kind';
-
-function rectOf(node: Node<FlowNodeData>): Rect {
-  const size =
-    node.width && node.height
-      ? { width: node.width, height: node.height }
-      : node.measured && node.measured.width && node.measured.height
-        ? { width: node.measured.width, height: node.measured.height }
-        : shapeSize(node.data.kind);
-  return { x: node.position.x, y: node.position.y, width: size.width, height: size.height };
-}
 
 function HelperLines() {
   const { x: vx, y: vy, zoom } = useViewport();
@@ -72,25 +61,30 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     (changes: NodeChange[]) => {
       onNodesChangeStore(changes);
       const drag = changes.find(
-        (
-          c,
-        ): c is NodeChange & {
-          type: 'position';
-          dragging: boolean;
-          position?: { x: number; y: number };
-        } => c.type === 'position' && (c as { dragging?: boolean }).dragging === true,
+        (c): c is NodeChange & { type: 'position'; dragging: boolean } =>
+          c.type === 'position' && (c as { dragging?: boolean }).dragging === true,
       );
-      if (drag && drag.position) {
+      if (drag) {
         const all = useFlowStore.getState().nodes;
         const dragged = all.find((n) => n.id === drag.id);
         if (dragged) {
-          const others = all.filter((n) => n.id !== dragged.id).map(rectOf);
-          const lines = computeHelperLines(rectOf(dragged), others);
+          const byId = new Map(all.map((n) => [n.id, n] as const));
+          const draggedRect = absoluteRectOf(dragged, byId);
+          // 只在同一层级（同一泳道内或同在画布顶层）之间显示对齐参考线
+          const others = all
+            .filter(
+              (n) => n.id !== dragged.id && (n.parentId ?? null) === (dragged.parentId ?? null),
+            )
+            .map((n) => absoluteRectOf(n, byId));
+          const lines = computeHelperLines(draggedRect, others);
           useFlowStore.getState().setHelperLines(lines);
           if (lines.x !== undefined || lines.y !== undefined) {
+            // helper lines 返回的是绝对吸附坐标，需转换回节点自身坐标系
+            const parent = dragged.parentId ? byId.get(dragged.parentId) : undefined;
+            const parentAbs = parent ? absolutePositionOf(parent, byId) : { x: 0, y: 0 };
             const snapped = {
-              x: lines.x ?? dragged.position.x,
-              y: lines.y ?? dragged.position.y,
+              x: (lines.x ?? draggedRect.x) - parentAbs.x,
+              y: (lines.y ?? draggedRect.y) - parentAbs.y,
             };
             useFlowStore.setState((s) => ({
               nodes: s.nodes.map((n) => (n.id === dragged.id ? { ...n, position: snapped } : n)),
@@ -136,6 +130,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
         onNodeDragStart={() => useFlowStore.getState().commit()}
+        onNodeDragStop={(_, node) => useFlowStore.getState().reparentNode(node.id)}
         connectionMode={ConnectionMode.Loose}
         snapToGrid
         snapGrid={[8, 8]}

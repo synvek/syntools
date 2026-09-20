@@ -9,6 +9,9 @@ import {
   type FlowNodeData,
   type FlowNodeStyle,
   type ShapeKind,
+  type ShapeSize,
+  isContainerKind,
+  shapeSize,
   SHAPE_LABELS,
 } from './model/types';
 
@@ -53,7 +56,7 @@ export function defaultData(kind: ShapeKind, label?: string): FlowNodeData {
   } else if (kind === 'decision') {
     base.fill = '#FEFCE8';
     base.stroke = '#D97706';
-  } else if (kind === 'swimlane') {
+  } else if (isContainerKind(kind)) {
     base.fill = '#F8FAFC';
     base.stroke = '#475569';
     base.align = 'left';
@@ -162,6 +165,92 @@ export function computeHelperLines(dragging: Rect, others: Rect[], tolerance = 5
   return result;
 }
 
+/* --------------------------- 容器（泳道）层级 --------------------------- */
+
+/** 参与层级计算的最小节点形状 */
+export interface HierarchyNode {
+  id: string;
+  position: { x: number; y: number };
+  width?: number | null;
+  height?: number | null;
+  parentId?: string | null;
+  data: { kind: ShapeKind };
+}
+
+function nodeSize(node: HierarchyNode): ShapeSize {
+  return {
+    width: node.width ?? shapeSize(node.data.kind).width,
+    height: node.height ?? shapeSize(node.data.kind).height,
+  };
+}
+
+/** 计算节点在画布坐标系中的绝对位置（叠加父节点偏移） */
+export function absolutePositionOf<T extends HierarchyNode>(
+  node: T,
+  byId: Map<string, T>,
+): { x: number; y: number } {
+  if (!node.parentId) return { x: node.position.x, y: node.position.y };
+  const parent = byId.get(node.parentId);
+  if (!parent) return { x: node.position.x, y: node.position.y };
+  const base = absolutePositionOf(parent, byId);
+  return { x: base.x + node.position.x, y: base.y + node.position.y };
+}
+
+/** 节点在画布坐标系中的绝对包围盒 */
+export function absoluteRectOf<T extends HierarchyNode>(node: T, byId: Map<string, T>): Rect {
+  const pos = absolutePositionOf(node, byId);
+  const size = nodeSize(node);
+  return { x: pos.x, y: pos.y, width: size.width, height: size.height };
+}
+
+export interface Placement {
+  /** 命中泳道时为其 id；否则为 undefined（画布顶层） */
+  parentId?: string;
+  /** 命中泳道时为相对坐标，否则为绝对坐标 */
+  position: { x: number; y: number };
+}
+
+/**
+ * 判断元素落点是否位于某个泳道内：
+ * 命中则返回泳道 id 与相对坐标，否则原样返回绝对坐标。
+ * 多条泳道重叠时取面积最小者。
+ */
+export function resolvePlacement(
+  rect: Rect,
+  lanes: ReadonlyArray<{ id: string; rect: Rect }>,
+): Placement {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  let hit: { id: string; rect: Rect } | undefined;
+  for (const lane of lanes) {
+    const r = lane.rect;
+    if (cx >= r.x && cx <= r.x + r.width && cy >= r.y && cy <= r.y + r.height) {
+      if (!hit || r.width * r.height < hit.rect.width * hit.rect.height) hit = lane;
+    }
+  }
+  if (!hit) return { position: { x: rect.x, y: rect.y } };
+  return {
+    parentId: hit.id,
+    position: { x: rect.x - hit.rect.x, y: rect.y - hit.rect.y },
+  };
+}
+
+/**
+ * 排序：泳道（容器）最底层 → 其它顶层节点 → 子节点。
+ * React Flow 要求父节点在数组中先于子节点，且数组顺序决定堆叠层级。
+ */
+export function orderNodesByHierarchy<T extends HierarchyNode>(nodes: readonly T[]): T[] {
+  const lanes: T[] = [];
+  const tops: T[] = [];
+  const children: T[] = [];
+  for (const n of nodes) {
+    if (n.parentId) children.push(n);
+    else if (isContainerKind(n.data.kind)) lanes.push(n);
+    else tops.push(n);
+  }
+  return [...lanes, ...tops, ...children];
+}
+
 /* --------------------------- 序列化 / 校验 --------------------------- */
 
 export interface SerializeResult {
@@ -186,6 +275,7 @@ export function validateDoc(raw: unknown): raw is FlowDoc {
     if (!node.data || typeof node.data.kind !== 'string' || typeof node.data.label !== 'string')
       return false;
     if (!node.data.style || typeof node.data.style.fill !== 'string') return false;
+    if (node.parentId != null && typeof node.parentId !== 'string') return false;
   }
   for (const edge of doc.edges) {
     if (!edge || typeof edge.id !== 'string') return false;
@@ -199,6 +289,7 @@ export function serializeDoc(
   nodes: ReadonlyArray<{
     id: string;
     position: { x: number; y: number };
+    parentId?: string | null;
     data: FlowNodeData;
   }>,
   edges: ReadonlyArray<{
@@ -217,6 +308,7 @@ export function serializeDoc(
       id: n.id,
       type: 'shape',
       position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
+      parentId: n.parentId ?? null,
       data: {
         kind: n.data.kind,
         label: n.data.label,
@@ -242,7 +334,7 @@ export function deserializeDoc(raw: unknown): SerializeResult {
 
 /* --------------------------- 模板 --------------------------- */
 
-export type TemplateKind = 'basic' | 'decision' | 'swimlane' | 'bpmn';
+export type TemplateKind = 'basic' | 'decision' | 'swimlane' | 'swimlaneV' | 'bpmn';
 
 /**
  * 生成起始模板图（节点位置基于 shapeSize 居中排布）。
@@ -284,18 +376,44 @@ export function buildTemplate(kind: TemplateKind): FlowDoc {
     link(c, f);
     link(e, f);
   } else if (kind === 'swimlane') {
-    const lane = add('swimlane', '泳道：流程', 120, 40);
-    const a = add('startEnd', '开始', 150, 90);
-    const b = add('rect', '步骤 1', 150, 170);
-    const c = add('rect', '步骤 2', 150, 260);
-    const d = add('startEnd', '结束', 150, 350);
-    // 把泳道放最底层（数组靠前）
-    nodes.unshift({
-      id: lane,
-      type: 'shape',
-      position: { x: 120, y: 40 },
-      data: defaultData('swimlane', '泳道：流程'),
-    });
+    // 标准横向泳道：泳道绝对位于 (60,60)，内部元素坐标相对泳道
+    const lane = add('swimlane', '横向泳道', 60, 60);
+    const addChild = (n: ShapeKind, label: string, x: number, y: number): string => {
+      const id = createId('t');
+      nodes.push({
+        id,
+        type: 'shape',
+        position: { x, y },
+        parentId: lane,
+        data: defaultData(n, label),
+      });
+      return id;
+    };
+    const a = addChild('startEnd', '开始', 50, 82);
+    const b = addChild('rect', '步骤 1', 220, 78);
+    const c = addChild('rect', '步骤 2', 410, 78);
+    const d = addChild('startEnd', '结束', 600, 82);
+    link(a, b);
+    link(b, c);
+    link(c, d);
+  } else if (kind === 'swimlaneV') {
+    // 标准纵向泳道：泳道绝对位于 (60,60)，标题栏在左侧，内部元素纵向排列
+    const lane = add('swimlaneV', '纵向泳道', 60, 60);
+    const addChild = (n: ShapeKind, label: string, x: number, y: number): string => {
+      const id = createId('t');
+      nodes.push({
+        id,
+        type: 'shape',
+        position: { x, y },
+        parentId: lane,
+        data: defaultData(n, label),
+      });
+      return id;
+    };
+    const a = addChild('startEnd', '开始', 55, 65);
+    const b = addChild('rect', '步骤 1', 45, 170);
+    const c = addChild('rect', '步骤 2', 45, 300);
+    const d = addChild('startEnd', '结束', 55, 430);
     link(a, b);
     link(b, c);
     link(c, d);

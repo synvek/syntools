@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   __resetIdCounter,
+  absolutePositionOf,
+  absoluteRectOf,
   buildTemplate,
   computeHelperLines,
   createId,
   defaultData,
   deserializeDoc,
   normalizeColor,
+  orderNodesByHierarchy,
+  resolvePlacement,
   serializeDoc,
   validateDoc,
 } from './core';
+import { isContainerKind, isVerticalLane } from './model/types';
 
 describe('createId', () => {
   it('生成唯一且带前缀的 id', () => {
@@ -113,5 +118,96 @@ describe('buildTemplate', () => {
     const doc = buildTemplate('basic');
     const ids = new Set(doc.nodes.map((n) => n.id));
     expect(ids.size).toBe(doc.nodes.length);
+  });
+});
+
+describe('容器（泳道）层级', () => {
+  const lane = {
+    id: 'lane1',
+    position: { x: 100, y: 100 },
+    width: 760,
+    height: 220,
+    data: { kind: 'swimlane' as const },
+  };
+  const byId = new Map<string, typeof lane>([[lane.id, lane]]);
+
+  it('元素中心落在泳道内 → 归属泳道并返回相对坐标', () => {
+    const placement = resolvePlacement({ x: 200, y: 200, width: 150, height: 64 }, [
+      { id: lane.id, rect: absoluteRectOf(lane, byId) },
+    ]);
+    expect(placement.parentId).toBe('lane1');
+    expect(placement.position).toEqual({ x: 100, y: 100 });
+  });
+
+  it('元素中心在泳道外 → 保持绝对坐标且无父', () => {
+    const placement = resolvePlacement({ x: 1000, y: 1000, width: 150, height: 64 }, [
+      { id: lane.id, rect: absoluteRectOf(lane, byId) },
+    ]);
+    expect(placement.parentId).toBeUndefined();
+    expect(placement.position).toEqual({ x: 1000, y: 1000 });
+  });
+
+  it('绝对坐标叠加父节点偏移', () => {
+    const child = {
+      id: 'c1',
+      position: { x: 20, y: 30 },
+      parentId: 'lane1',
+      data: { kind: 'rect' as const },
+    };
+    const map = new Map<string, typeof lane | typeof child>([
+      [lane.id, lane],
+      [child.id, child],
+    ]);
+    expect(absolutePositionOf(child, map)).toEqual({ x: 120, y: 130 });
+    expect(absoluteRectOf(child, map)).toEqual({ x: 120, y: 130, width: 150, height: 64 });
+  });
+
+  it('层级排序把泳道放底层、子节点放顶层', () => {
+    const nodes = [
+      { id: 'c', position: { x: 0, y: 0 }, parentId: 'lane1', data: { kind: 'rect' as const } },
+      { id: 'top', position: { x: 0, y: 0 }, data: { kind: 'rect' as const } },
+      { id: 'lane1', position: { x: 0, y: 0 }, data: { kind: 'swimlane' as const } },
+    ];
+    expect(orderNodesByHierarchy(nodes).map((n) => n.id)).toEqual(['lane1', 'top', 'c']);
+  });
+
+  it('泳道模板使用父子结构且父节点排在最前', () => {
+    const doc = buildTemplate('swimlane');
+    const laneNode = doc.nodes.find((n) => n.data.kind === 'swimlane');
+    expect(laneNode).toBeDefined();
+    expect(doc.nodes[0].id).toBe(laneNode!.id);
+    expect(doc.nodes.filter((n) => n.parentId === laneNode!.id)).toHaveLength(4);
+    expect(validateDoc(doc)).toBe(true);
+  });
+
+  it('序列化保留 parentId 并可往返', () => {
+    const child = {
+      id: 'c1',
+      position: { x: 20, y: 30 },
+      parentId: 'lane1',
+      data: defaultData('rect'),
+    };
+    const doc = serializeDoc([child], [], 1);
+    expect(doc.nodes[0].parentId).toBe('lane1');
+    const restored = deserializeDoc(doc);
+    expect(restored.ok).toBe(true);
+    expect(restored.doc!.nodes[0].parentId).toBe('lane1');
+  });
+
+  it('横向与纵向泳道都是容器', () => {
+    expect(isContainerKind('swimlane')).toBe(true);
+    expect(isContainerKind('swimlaneV')).toBe(true);
+    expect(isContainerKind('rect')).toBe(false);
+    expect(isVerticalLane('swimlaneV')).toBe(true);
+    expect(isVerticalLane('swimlane')).toBe(false);
+  });
+
+  it('纵向泳道模板同样使用父子结构', () => {
+    const doc = buildTemplate('swimlaneV');
+    const laneNode = doc.nodes.find((n) => n.data.kind === 'swimlaneV');
+    expect(laneNode).toBeDefined();
+    expect(doc.nodes[0].id).toBe(laneNode!.id);
+    expect(doc.nodes.filter((n) => n.parentId === laneNode!.id)).toHaveLength(4);
+    expect(validateDoc(doc)).toBe(true);
   });
 });

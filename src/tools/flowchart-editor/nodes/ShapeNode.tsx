@@ -1,7 +1,15 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useFlowStore } from '../store';
-import { type FlowNodeData, type ShapeKind, shapeSize } from '../model/types';
+import {
+  type FlowNodeData,
+  type ShapeKind,
+  isContainerKind,
+  isVerticalLane,
+  shapeSize,
+  SWIMLANE_HEADER_HEIGHT,
+  SWIMLANE_HEADER_WIDTH,
+} from '../model/types';
 
 const HANDLES: Array<{ id: string; position: Position }> = [
   { id: 't', position: Position.Top },
@@ -19,12 +27,23 @@ function shapeGeometry(kind: ShapeKind, w: number, h: number) {
     case 'data':
       return <polygon points={`${h / 4},0 ${w},0 ${w - h / 4},${h} 0,${h}`} />;
     case 'swimlane':
-      // 泳道：外侧圆角矩形 + 顶部标题条
+      // 横向泳道（长边水平）：标题栏在左侧竖条
       return (
         <g>
           <rect x={0} y={0} width={w} height={h} rx={10} ry={10} />
           <path
-            d={`M0,10 a10,10 0 0 1 10,-10 h${w - 20} a10,10 0 0 1 10,10 v22 h-${w} z`}
+            d={`M10,0 H${SWIMLANE_HEADER_WIDTH} V${h} H10 A10,10 0 0 1 0,${h - 10} V10 A10,10 0 0 1 10,0 Z`}
+            className="swimlane-header"
+          />
+        </g>
+      );
+    case 'swimlaneV':
+      // 纵向泳道（长边垂直）：标题栏在顶部横条
+      return (
+        <g>
+          <rect x={0} y={0} width={w} height={h} rx={10} ry={10} />
+          <path
+            d={`M0,10 a10,10 0 0 1 10,-10 h${w - 20} a10,10 0 0 1 10,10 v${SWIMLANE_HEADER_HEIGHT - 10} h-${w} z`}
             className="swimlane-header"
           />
         </g>
@@ -64,12 +83,14 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const style = d.style;
   const strokeColor = selected ? '#1D4ED8' : style.stroke;
   const strokeWidth = selected ? style.strokeWidth + 1.5 : style.strokeWidth;
-  const isSwimlane = d.kind === 'swimlane';
+  const isContainer = isContainerKind(d.kind);
+  // 横向泳道标题栏在左侧（竖排文字）；纵向泳道标题栏在顶部（横排文字）
+  const headerOnTop = isVerticalLane(d.kind);
 
   return (
     <div
       className="group relative"
-      onDoubleClick={() => !isSwimlane && setEditing(true)}
+      onDoubleClick={() => !isContainer && setEditing(true)}
       style={{ width: w, height: h, cursor: 'grab' }}
     >
       <svg
@@ -88,13 +109,27 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         </g>
       </svg>
 
-      {isSwimlane ? (
-        <div
-          className="absolute left-0 top-0 flex h-[32px] items-center px-3 text-[13px] font-semibold"
-          style={{ color: style.stroke, width: w }}
-        >
-          {d.label || '泳道'}
-        </div>
+      {isContainer ? (
+        headerOnTop ? (
+          <div
+            className="absolute left-0 top-0 flex items-center px-3 text-[13px] font-semibold"
+            style={{ height: SWIMLANE_HEADER_HEIGHT, width: w, color: style.stroke }}
+          >
+            {d.label || '泳道'}
+          </div>
+        ) : (
+          <div
+            className="absolute left-0 top-0 flex items-center justify-center text-[13px] font-semibold"
+            style={{
+              width: SWIMLANE_HEADER_WIDTH,
+              height: h,
+              color: style.stroke,
+              writingMode: 'vertical-rl',
+            }}
+          >
+            {d.label || '泳道'}
+          </div>
+        )
       ) : editing ? (
         <input
           ref={inputRef}
@@ -128,17 +163,19 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         </div>
       )}
 
-      {HANDLES.map((handle) => (
-        <Handle
-          key={handle.id}
-          id={handle.id}
-          type="source"
-          position={handle.position}
-          className={`!h-2.5 !w-2.5 !border-2 !border-white !bg-blue-500 opacity-0 transition-opacity group-hover:opacity-100 ${
-            selected ? '!opacity-100' : ''
-          }`}
-        />
-      ))}
+      {/* 泳道是容器，不提供连线锚点 */}
+      {!isContainer &&
+        HANDLES.map((handle) => (
+          <Handle
+            key={handle.id}
+            id={handle.id}
+            type="source"
+            position={handle.position}
+            className={`!h-2.5 !w-2.5 !border-2 !border-white !bg-blue-500 opacity-0 transition-opacity group-hover:opacity-100 ${
+              selected ? '!opacity-100' : ''
+            }`}
+          />
+        ))}
     </div>
   );
 }
