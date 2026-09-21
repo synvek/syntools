@@ -2,17 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { i18n } from '@/core/i18n';
-import { translateToolError } from '@/core/i18n/helpers';
-import { buildTemplate, type TemplateKind } from './core';
+import { buildTemplateDoc, type TemplateKind } from './model/templates';
+import { copySelection, groupSelected, pasteClipboard, ungroupSelected } from './flowOps';
 import { useFlowStore } from './store';
 import { readDraft, writeDraft, clearDraft } from './draft';
 import { registerFlowchartStrings } from './strings';
-import { exportFlowchart, type ExportFormat } from './export';
-import { shapeSize, type ShapeKind } from './model/types';
+import { type ShapeKind } from './model/types';
+import { shapeSize } from './model/shapes';
+import { activePageOf } from './model/migrate';
 import { FlowCanvas } from './ui/FlowCanvas';
 import { ShapePalette } from './ui/ShapePalette';
 import { Toolbar } from './ui/Toolbar';
 import { PropertyPanel } from './ui/PropertyPanel';
+import { LayerPanel } from './ui/LayerPanel';
+import { SnapshotPanel } from './ui/SnapshotPanel';
+import { PageTabs } from './ui/PageTabs';
 import { TemplatePanel } from './ui/TemplatePanel';
 import './flowchart.css';
 import '@xyflow/react/dist/style.css';
@@ -20,6 +24,10 @@ import '@xyflow/react/dist/style.css';
 registerFlowchartStrings(i18n);
 
 const DRAFT_DEBOUNCE_MS = 1200;
+
+/** 右侧面板：属性 / 图层 / 历史快照 */
+const PANELS = ['prop', 'layer', 'history'] as const;
+type PanelKey = (typeof PANELS)[number];
 
 function FlowchartInner() {
   const { t } = useTranslation();
@@ -35,6 +43,7 @@ function FlowchartInner() {
   const [busy, setBusy] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [panel, setPanel] = useState<PanelKey>('prop');
   const [draftSaved, setDraftSaved] = useState(false);
   const saveTimer = useRef<number | null>(null);
   const firstSave = useRef(true);
@@ -49,7 +58,8 @@ function FlowchartInner() {
   // 首次挂载恢复本地草稿
   useEffect(() => {
     const draft = readDraft();
-    if (draft && draft.nodes.length > 0) {
+    const page = activePageOf(draft);
+    if (draft && page && page.nodes.length > 0) {
       useFlowStore.getState().load(draft);
       setDraftSaved(true);
       fitViewSoon();
@@ -106,17 +116,9 @@ function FlowchartInner() {
     setDraftSaved(false);
   }, []);
 
-  const handleExport = useCallback(async (format: ExportFormat) => {
-    setFailure(null);
-    setBusy(true);
-    const result = await exportFlowchart(useFlowStore.getState().nodes, format, 'flowchart');
-    setBusy(false);
-    if (!result.ok) setFailure(result.error);
-  }, []);
-
   const handleTemplate = useCallback(
     (kind: TemplateKind) => {
-      useFlowStore.getState().load(buildTemplate(kind));
+      useFlowStore.getState().load(buildTemplateDoc(kind));
       fitViewSoon();
     },
     [fitViewSoon],
@@ -138,6 +140,16 @@ function FlowchartInner() {
       } else if (mod && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         useFlowStore.getState().duplicateSelected();
+      } else if (mod && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        copySelection();
+      } else if (mod && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        pasteClipboard();
+      } else if (mod && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) ungroupSelected();
+        else groupSelected();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         useFlowStore.getState().removeSelected();
@@ -157,30 +169,55 @@ function FlowchartInner() {
         onRedo={() => useFlowStore.getState().redo()}
         onDuplicate={handleDuplicate}
         onDelete={handleDelete}
-        onExportPng={() => void handleExport('png')}
-        onExportSvg={() => void handleExport('svg')}
         onClear={handleClear}
         canUndo={canUndo}
         canRedo={canRedo}
         busy={busy}
+        setBusy={setBusy}
+        onError={setFailure}
       />
 
       <div className="flex min-h-0 flex-1 gap-3">
         <ShapePalette onAddNode={addNodeAtCenter} />
 
-        <main className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <FlowCanvas containerRef={canvasRef} />
-          {nodes.length === 0 && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <p className="rounded-lg bg-white/80 px-4 py-2 text-sm text-gray-500 dark:bg-gray-900/80 dark:text-gray-400">
-                {t('tools.flowchart.emptyHint')}
-              </p>
-            </div>
-          )}
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <div className="relative min-h-0 flex-1">
+            <FlowCanvas containerRef={canvasRef} />
+            {nodes.length === 0 && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <p className="rounded-lg bg-white/80 px-4 py-2 text-sm text-gray-500 dark:bg-gray-900/80 dark:text-gray-400">
+                  {t('tools.flowchart.emptyHint')}
+                </p>
+              </div>
+            )}
+          </div>
+          <PageTabs />
         </main>
 
-        <aside className="w-[248px] shrink-0 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800/40">
-          <PropertyPanel />
+        <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800/40">
+          <div className="flex gap-1">
+            {PANELS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPanel(key)}
+                className={`flex-1 rounded-md px-2 py-1 text-[12px] font-medium transition-colors ${
+                  panel === key
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-blue-50 dark:bg-gray-900/60 dark:text-gray-300 dark:hover:bg-blue-500/10'
+                }`}
+              >
+                {t(
+                  `tools.flowchart.${key === 'prop' ? 'panelTitle' : key === 'layer' ? 'layers' : 'history'}`,
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {panel === 'prop' ? <PropertyPanel /> : null}
+            {panel === 'layer' ? <LayerPanel /> : null}
+            {panel === 'history' ? <SnapshotPanel /> : null}
+          </div>
         </aside>
       </div>
 
@@ -195,7 +232,7 @@ function FlowchartInner() {
 
       {failure ? (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-          {translateToolError('tools.flowchart', { ok: false, error: failure })}
+          {failure}
         </p>
       ) : null}
 

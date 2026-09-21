@@ -3,7 +3,6 @@ import {
   __resetIdCounter,
   absolutePositionOf,
   absoluteRectOf,
-  buildTemplate,
   computeHelperLines,
   createId,
   defaultData,
@@ -14,7 +13,9 @@ import {
   serializeDoc,
   validateDoc,
 } from './core';
+import { buildTemplate } from './model/templates';
 import { isContainerKind, isVerticalLane } from './model/types';
+import { activePageOf } from './model/migrate';
 
 describe('createId', () => {
   it('生成唯一且带前缀的 id', () => {
@@ -76,18 +77,30 @@ describe('序列化 / 校验', () => {
   ];
   const edges = [{ id: 'e1', source: 'n1', target: 'n2' }];
 
-  it('序列化后字段被取整且不丢信息', () => {
-    const doc = serializeDoc(nodes, edges, 3);
-    expect(doc.version).toBe(3);
-    expect(doc.nodes).toHaveLength(2);
-    expect(doc.edges[0].source).toBe('n1');
-    expect(doc.nodes[0].type).toBe('shape');
+  it('序列化为 v2 文档并保留字段', () => {
+    const doc = serializeDoc(nodes, edges);
+    expect(doc.version).toBe(2);
+    expect(doc.pages).toHaveLength(1);
+    const page = activePageOf(doc)!;
+    expect(page.nodes).toHaveLength(2);
+    expect(page.edges[0].source).toBe('n1');
+    expect(page.nodes[0].type).toBe('shape');
   });
 
-  it('合法文档通过校验', () => {
-    const doc = serializeDoc(nodes, edges, 1);
+  it('合法文档通过校验并归一为 v2', () => {
+    const doc = serializeDoc(nodes, edges);
     expect(validateDoc(doc)).toBe(true);
-    expect(deserializeDoc(doc).ok).toBe(true);
+    const restored = deserializeDoc(doc);
+    expect(restored.ok).toBe(true);
+    expect(activePageOf(restored.doc!)!.nodes).toHaveLength(2);
+  });
+
+  it('旧版 v1 文档可迁移读取（草稿不丢）', () => {
+    const v1 = { version: 1, nodes, edges };
+    const restored = deserializeDoc(v1);
+    expect(restored.ok).toBe(true);
+    expect(restored.doc!.version).toBe(2);
+    expect(activePageOf(restored.doc!)!.nodes).toHaveLength(2);
   });
 
   it('残缺文档被拒绝', () => {
@@ -187,11 +200,11 @@ describe('容器（泳道）层级', () => {
       parentId: 'lane1',
       data: defaultData('rect'),
     };
-    const doc = serializeDoc([child], [], 1);
-    expect(doc.nodes[0].parentId).toBe('lane1');
+    const doc = serializeDoc([child], []);
+    expect(activePageOf(doc)!.nodes[0].parentId).toBe('lane1');
     const restored = deserializeDoc(doc);
     expect(restored.ok).toBe(true);
-    expect(restored.doc!.nodes[0].parentId).toBe('lane1');
+    expect(activePageOf(restored.doc!)!.nodes[0].parentId).toBe('lane1');
   });
 
   it('横向与纵向泳道都是容器', () => {

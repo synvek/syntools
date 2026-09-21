@@ -1,63 +1,54 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { useFlowStore } from '../store';
 import {
   type FlowNodeData,
-  type ShapeKind,
   isContainerKind,
-  isVerticalLane,
-  shapeSize,
   SWIMLANE_HEADER_HEIGHT,
   SWIMLANE_HEADER_WIDTH,
 } from '../model/types';
+import { shapeDefOf, shapeSize } from '../model/shapes';
+import { drawDecor, drawShape } from './shapeDraw';
+import { nodeDashArrayOf } from '../ops';
+import { useQuickConnect } from '../quickConnect';
 
-const HANDLES: Array<{ id: string; position: Position }> = [
-  { id: 't', position: Position.Top },
-  { id: 'r', position: Position.Right },
-  { id: 'b', position: Position.Bottom },
-  { id: 'l', position: Position.Left },
+/**
+ * 自由连线锚点：上下边各 3 个（含靠近两角的位置）、左右边各 1 个，共 8 个。
+ * 配合 ConnectionMode.Loose，任意锚点都可作为起点或终点，接近 Draw.io 的自由连线体验。
+ */
+const HANDLES: Array<{ id: string; position: Position; offset: string }> = [
+  { id: 't-l', position: Position.Top, offset: '25%' },
+  { id: 't', position: Position.Top, offset: '50%' },
+  { id: 't-r', position: Position.Top, offset: '75%' },
+  { id: 'b-l', position: Position.Bottom, offset: '25%' },
+  { id: 'b', position: Position.Bottom, offset: '50%' },
+  { id: 'b-r', position: Position.Bottom, offset: '75%' },
+  { id: 'l', position: Position.Left, offset: '50%' },
+  { id: 'r', position: Position.Right, offset: '50%' },
 ];
 
-function shapeGeometry(kind: ShapeKind, w: number, h: number) {
-  switch (kind) {
-    case 'startEnd':
-      return <rect x={0} y={0} width={w} height={h} rx={h / 2} ry={h / 2} />;
-    case 'decision':
-      return <polygon points={`${w / 2},0 ${w},${h / 2} ${w / 2},${h} 0,${h / 2}`} />;
-    case 'data':
-      return <polygon points={`${h / 4},0 ${w},0 ${w - h / 4},${h} 0,${h}`} />;
-    case 'swimlane':
-      // 横向泳道（长边水平）：标题栏在左侧竖条
-      return (
-        <g>
-          <rect x={0} y={0} width={w} height={h} rx={10} ry={10} />
-          <path
-            d={`M10,0 H${SWIMLANE_HEADER_WIDTH} V${h} H10 A10,10 0 0 1 0,${h - 10} V10 A10,10 0 0 1 10,0 Z`}
-            className="swimlane-header"
-          />
-        </g>
-      );
-    case 'swimlaneV':
-      // 纵向泳道（长边垂直）：标题栏在顶部横条
-      return (
-        <g>
-          <rect x={0} y={0} width={w} height={h} rx={10} ry={10} />
-          <path
-            d={`M0,10 a10,10 0 0 1 10,-10 h${w - 20} a10,10 0 0 1 10,10 v${SWIMLANE_HEADER_HEIGHT - 10} h-${w} z`}
-            className="swimlane-header"
-          />
-        </g>
-      );
-    case 'bpmnTask':
-      return <rect x={0} y={0} width={w} height={h} rx={8} ry={8} />;
-    case 'rect':
-    default:
-      return <rect x={0} y={0} width={w} height={h} rx={4} ry={4} />;
-  }
-}
+/**
+ * 悬停快速连线箭头（类 draw.io / ProcessOn）：点击即朝该方向生成同类型相连图形并自动连线。
+ * 仅对普通图形显示；容器（泳道/编组）不提供。
+ */
+const QUICK_DIRS: Array<{
+  dir: 'up' | 'down' | 'left' | 'right';
+  pos: React.CSSProperties;
+  rotate: number;
+}> = [
+  { dir: 'up', pos: { left: '50%', top: -18, transform: 'translate(-50%, -50%)' }, rotate: 0 },
+  {
+    dir: 'down',
+    pos: { left: '50%', bottom: -18, transform: 'translate(-50%, 50%)' },
+    rotate: 180,
+  },
+  { dir: 'left', pos: { left: -18, top: '50%', transform: 'translate(-50%, -50%)' }, rotate: -90 },
+  { dir: 'right', pos: { right: -18, top: '50%', transform: 'translate(50%, -50%)' }, rotate: 90 },
+];
 
 function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const d = data as FlowNodeData;
+  const def = shapeDefOf(d.kind);
   // 必须给出确定尺寸：若依赖父容器的百分比高度，节点会被撑成 0 高度而不可见
   const fallback = shapeSize(d.kind);
   const w = width ?? fallback.width;
@@ -83,13 +74,15 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const style = d.style;
   const strokeColor = selected ? '#1D4ED8' : style.stroke;
   const strokeWidth = selected ? style.strokeWidth + 1.5 : style.strokeWidth;
+  const textColor = style.textColor ?? strokeColor;
   const isContainer = isContainerKind(d.kind);
-  // 横向泳道标题栏在左侧（竖排文字）；纵向泳道标题栏在顶部（横排文字）
-  const headerOnTop = isVerticalLane(d.kind);
+  const isGroup = d.kind === 'group';
+  // 纵向泳道与编组的标题栏在顶部；横向泳道在左侧
+  const headerOnTop = def?.draw === 'laneV' || isGroup;
 
   return (
     <div
-      className="group relative"
+      className="group/node relative"
       onDoubleClick={() => !isContainer && setEditing(true)}
       style={{ width: w, height: h, cursor: 'grab' }}
     >
@@ -98,24 +91,36 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         height={h}
         viewBox={`0 0 ${w} ${h}`}
         className="absolute inset-0 overflow-visible"
+        style={style.shadow ? { filter: 'drop-shadow(0 2px 5px rgba(15,23,42,0.25))' } : undefined}
       >
         <g
           fill={style.fill}
           stroke={strokeColor}
           strokeWidth={strokeWidth}
+          fillOpacity={style.opacity ?? 1}
+          strokeDasharray={nodeDashArrayOf(style.lineDash, strokeWidth)}
           style={{ transition: 'stroke 120ms ease' }}
         >
-          {shapeGeometry(d.kind, w, h)}
+          {def ? drawShape(def, w, h, style) : <rect x={0} y={0} width={w} height={h} rx={4} />}
         </g>
+        {def ? (
+          <g stroke={strokeColor} strokeWidth={Math.max(1.5, strokeWidth - 0.5)}>
+            {drawDecor(def, w, h)}
+          </g>
+        ) : null}
       </svg>
 
       {isContainer ? (
         headerOnTop ? (
           <div
             className="absolute left-0 top-0 flex items-center px-3 text-[13px] font-semibold"
-            style={{ height: SWIMLANE_HEADER_HEIGHT, width: w, color: style.stroke }}
+            style={{
+              height: isGroup ? 26 : SWIMLANE_HEADER_HEIGHT,
+              width: w,
+              color: style.stroke,
+            }}
           >
-            {d.label || '泳道'}
+            {d.label || (isGroup ? '编组' : '泳道')}
           </div>
         ) : (
           <div
@@ -142,7 +147,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           }}
           className="absolute inset-0 z-10 bg-white/90 px-2 text-center text-[13px] outline-none dark:bg-gray-900/90"
           style={{
-            color: style.stroke,
+            color: textColor,
             fontWeight: style.bold ? 700 : 400,
             fontStyle: style.italic ? 'italic' : 'normal',
             textAlign: style.align,
@@ -152,18 +157,28 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         <div
           className="pointer-events-none absolute inset-0 flex items-center justify-center px-2 leading-tight"
           style={{
-            color: style.stroke,
+            color: textColor,
             fontSize: style.fontSize,
             fontWeight: style.bold ? 700 : 400,
             fontStyle: style.italic ? 'italic' : 'normal',
             textAlign: style.align,
+            fontFamily: style.fontFamily,
           }}
         >
           {d.label || ' '}
         </div>
       )}
 
-      {/* 泳道是容器，不提供连线锚点 */}
+      {/* 尺寸调整：容器（泳道 / 编组）同样可缩放，只是最小尺寸更大 */}
+      {selected ? (
+        <NodeResizer
+          minWidth={isContainer ? 200 : 48}
+          minHeight={isContainer ? 140 : 32}
+          onResizeStart={() => useFlowStore.getState().commit()}
+        />
+      ) : null}
+
+      {/* 容器不提供连线锚点 */}
       {!isContainer &&
         HANDLES.map((handle) => (
           <Handle
@@ -171,10 +186,49 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             id={handle.id}
             type="source"
             position={handle.position}
-            className={`!h-2.5 !w-2.5 !border-2 !border-white !bg-blue-500 opacity-0 transition-opacity group-hover:opacity-100 ${
-              selected ? '!opacity-100' : ''
-            }`}
+            style={
+              handle.position === Position.Top || handle.position === Position.Bottom
+                ? { left: handle.offset }
+                : { top: handle.offset }
+            }
+            className="!h-3 !w-3 !rounded-full !border-2 !border-white !bg-blue-500 !ring-2 !ring-blue-300/70 opacity-0 transition-opacity group-hover/node:opacity-100"
           />
+        ))}
+
+      {/* 悬停快速连线箭头：按住拖出连线，松手弹出图形选择弹窗 */}
+      {!isContainer &&
+        QUICK_DIRS.map((q) => (
+          <button
+            key={q.dir}
+            type="button"
+            aria-label={`快速连线-${q.dir}`}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              useQuickConnect
+                .getState()
+                .start({ sourceId: id, dir: q.dir, x: e.clientX, y: e.clientY });
+            }}
+            className={`quick-connect nodrag nopan absolute z-20 flex cursor-crosshair items-center justify-center rounded-full bg-blue-500 text-white shadow-md ring-2 ring-white transition ${
+              selected ? 'opacity-100' : 'opacity-0 group-hover/node:opacity-100'
+            }`}
+            style={q.pos}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3 w-3"
+              style={{ transform: `rotate(${q.rotate}deg)` }}
+            >
+              <path
+                d="M12 4 L12 20 M6 10 L12 4 L18 10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         ))}
     </div>
   );

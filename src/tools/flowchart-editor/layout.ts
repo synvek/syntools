@@ -4,7 +4,8 @@
 
 import dagre from '@dagrejs/dagre';
 import type { Edge, Node } from '@xyflow/react';
-import { type FlowNodeData, shapeSize } from './model/types';
+import { type FlowNodeData } from './model/types';
+import { shapeSize } from './model/shapes';
 
 function sizeOf(node: Node<FlowNodeData>): { width: number; height: number } {
   if (node.width && node.height) return { width: node.width, height: node.height };

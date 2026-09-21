@@ -1,84 +1,50 @@
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DROP_MIME } from './FlowCanvas';
-import { type ShapeKind } from '../model/types';
+import type { ShapeKind } from '../model/types';
+import {
+  SHAPE_CATEGORY_ORDER,
+  shapesOfCategory,
+  type ShapeCategory,
+  type ShapeDef,
+} from '../model/shapes';
+import { drawShape } from '../nodes/shapeDraw';
 
-interface PaletteItem {
-  kind: ShapeKind;
-  key: string;
+/** 缩略图直接复用画布的绘制逻辑，保证预览与画上去的效果一致 */
+function ShapeGlyph({ def }: { def: ShapeDef }) {
+  const w = def.size.width;
+  const h = def.size.height;
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="h-7 w-7"
+      preserveAspectRatio="xMidYMid meet"
+      aria-hidden="true"
+    >
+      <g fill="#EFF6FF" stroke="#2563EB" strokeWidth={Math.max(2, w / 38)}>
+        {drawShape(def, w, h)}
+      </g>
+    </svg>
+  );
 }
 
-const GROUPS: Array<{ titleKey: string; items: PaletteItem[] }> = [
-  {
-    titleKey: 'groupBasic',
-    items: [
-      { kind: 'rect', key: 'shape_rect' },
-      { kind: 'startEnd', key: 'shape_startEnd' },
-      { kind: 'data', key: 'shape_data' },
-    ],
-  },
-  {
-    titleKey: 'groupFlow',
-    items: [{ kind: 'decision', key: 'shape_decision' }],
-  },
-  {
-    titleKey: 'groupBpmn',
-    items: [
-      { kind: 'swimlane', key: 'shape_swimlane' },
-      { kind: 'swimlaneV', key: 'shape_swimlaneV' },
-      { kind: 'bpmnTask', key: 'shape_bpmnTask' },
-    ],
-  },
-];
-
-function ShapeGlyph({ kind }: { kind: ShapeKind }) {
-  const common = { fill: '#EFF6FF', stroke: '#2563EB', strokeWidth: 2 };
-  switch (kind) {
-    case 'startEnd':
-      return <rect x={4} y={12} width={40} height={16} rx={8} {...common} />;
-    case 'decision':
-      return <polygon points="24,4 44,20 24,36 4,20" {...common} />;
-    case 'data':
-      return <polygon points="10,4 44,4 34,36 0,36" {...common} />;
-    case 'swimlane':
-      // 横向泳道：标题栏在左侧
-      return (
-        <g>
-          <rect x={4} y={8} width={40} height={24} rx={3} {...common} />
-          <rect
-            x={4}
-            y={8}
-            width={6}
-            height={24}
-            rx={3}
-            fill="#dbeafe"
-            stroke="#2563EB"
-            strokeWidth={2}
-          />
-        </g>
-      );
-    case 'swimlaneV':
-      // 纵向泳道：标题栏在顶部
-      return (
-        <g>
-          <rect x={17} y={5} width={14} height={30} rx={3} {...common} />
-          <rect
-            x={17}
-            y={5}
-            width={14}
-            height={6}
-            rx={3}
-            fill="#dbeafe"
-            stroke="#2563EB"
-            strokeWidth={2}
-          />
-        </g>
-      );
-    case 'bpmnTask':
-      return <rect x={4} y={8} width={40} height={24} rx={4} {...common} />;
-    case 'rect':
-    default:
-      return <rect x={4} y={10} width={40} height={20} rx={2} {...common} />;
-  }
+function ShapeButton({ def, onAddNode }: { def: ShapeDef; onAddNode: (kind: ShapeKind) => void }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      draggable
+      onClick={() => onAddNode(def.kind)}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DROP_MIME, def.kind);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      title={t(`tools.flowchart.shape_${def.kind}`)}
+      className="flex cursor-grab items-center justify-center rounded-lg border border-gray-200 bg-white p-1 text-gray-600 transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-sm active:cursor-grabbing dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300 dark:hover:border-blue-500"
+    >
+      <ShapeGlyph def={def} />
+    </button>
+  );
 }
 
 interface ShapePaletteProps {
@@ -87,41 +53,121 @@ interface ShapePaletteProps {
 
 export function ShapePalette({ onAddNode }: ShapePaletteProps) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState<Record<ShapeCategory, boolean>>(
+    () =>
+      Object.fromEntries(SHAPE_CATEGORY_ORDER.map((c) => [c, true])) as Record<
+        ShapeCategory,
+        boolean
+      >,
+  );
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+
+  // 侧边栏宽度可拖拽调整（默认 248，约 5 列）
+  const [width, setWidth] = useState(248);
+  const resizing = useRef(false);
+  const onResizeStart = (e: ReactPointerEvent) => {
+    e.preventDefault();
+    resizing.current = true;
+    const startX = e.clientX;
+    const startW = width;
+    const onMove = (ev: PointerEvent) => {
+      if (!resizing.current) return;
+      setWidth(Math.min(460, Math.max(180, startW + (ev.clientX - startX))));
+    };
+    const onUp = () => {
+      resizing.current = false;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const sections = useMemo(() => {
+    return SHAPE_CATEGORY_ORDER.map((c) => {
+      const all = shapesOfCategory(c);
+      const items = q
+        ? all.filter((def) => {
+            const name = t(`tools.flowchart.shape_${def.kind}`);
+            return name.toLowerCase().includes(q) || def.kind.toLowerCase().includes(q);
+          })
+        : all;
+      return { c, items };
+    });
+  }, [q, t]);
+
+  const hasResult = q ? sections.some((s) => s.items.length > 0) : true;
+
   return (
-    <aside className="flex w-[208px] shrink-0 flex-col gap-3 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800/40">
-      <h2 className="px-1 text-[12px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        {t('tools.flowchart.paletteTitle')}
-      </h2>
-      {GROUPS.map((group) => (
-        <div key={group.titleKey} className="flex flex-col gap-1.5">
-          <p className="px-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">
-            {t(`tools.flowchart.${group.titleKey}`)}
-          </p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {group.items.map((item) => (
+    <aside
+      className="relative flex shrink-0 flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800/40"
+      style={{ width }}
+    >
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t('tools.flowchart.searchShape')}
+        className="h-8 w-full rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+      />
+
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-0.5">
+        {sections.map(({ c, items }) => {
+          if (q && items.length === 0) return null;
+          const open = expanded[c];
+          return (
+            <section key={c} className="rounded-lg">
               <button
-                key={item.kind}
                 type="button"
-                draggable
-                onClick={() => onAddNode(item.kind)}
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(DROP_MIME, item.kind);
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                title={t(`tools.flowchart.${item.key}`)}
-                className="group flex cursor-grab flex-col items-center gap-1 rounded-lg border border-gray-200 bg-white px-1.5 py-2 text-[11px] text-gray-600 transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300 dark:hover:border-blue-500 dark:hover:bg-blue-500/10 active:cursor-grabbing"
+                onClick={() => setExpanded((m) => ({ ...m, [c]: !m[c] }))}
+                className="flex w-full items-center justify-between rounded-md px-1.5 py-1.5 text-[12px] font-semibold text-gray-700 hover:bg-blue-50 dark:text-gray-200 dark:hover:bg-blue-500/10"
               >
-                <svg viewBox="0 0 48 40" className="h-9 w-12" aria-hidden="true">
-                  <ShapeGlyph kind={item.kind} />
+                <span>{t(`tools.flowchart.cat_${c}`)}</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`h-3.5 w-3.5 text-gray-400 transition-transform ${open ? 'rotate-90' : ''}`}
+                >
+                  <path d="M9 6l6 6-6 6" />
                 </svg>
-                <span className="truncate text-center leading-tight">
-                  {t(`tools.flowchart.${item.key}`)}
-                </span>
               </button>
-            ))}
-          </div>
-        </div>
-      ))}
+              {open ? (
+                <div
+                  className="grid gap-1.5 pb-1.5 pl-0.5 pr-0.5"
+                  style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(38px, 1fr))' }}
+                >
+                  {items.map((def) => (
+                    <ShapeButton key={def.kind} def={def} onAddNode={onAddNode} />
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          );
+        })}
+      </div>
+
+      {!hasResult ? (
+        <p className="py-2 text-center text-[11px] text-gray-400 dark:text-gray-500">
+          {t('tools.flowchart.noShape')}
+        </p>
+      ) : null}
+
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        onPointerDown={onResizeStart}
+        title={t('tools.flowchart.resizeSidebar')}
+        className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize hover:bg-blue-400/50"
+      />
     </aside>
   );
 }

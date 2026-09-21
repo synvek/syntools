@@ -1,7 +1,22 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFlowStore } from '../store';
-import { type Align, type FlowNodePatch } from '../model/types';
+import { patchSelectedEdgeStyle, selectedEdgeStyle } from '../flowOps';
+import { shapeDefOf } from '../model/shapes';
+import {
+  EDGE_ARROW_LABEL_KEY,
+  EDGE_ARROW_OPTIONS,
+  EDGE_DASH_OPTIONS,
+  EDGE_TYPE_OPTIONS,
+  type Align,
+  type FlowEdgeStyle,
+  type FlowNodePatch,
+} from '../model/types';
+import { NodeAppearanceSection } from './NodeAppearanceSection';
+
+const EDGE_TYPES = EDGE_TYPE_OPTIONS;
+const DASHES = EDGE_DASH_OPTIONS;
+const ARROWS = EDGE_ARROW_OPTIONS;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -44,11 +59,13 @@ export function PropertyPanel() {
       : undefined;
 
   if (edge) {
+    const s = selectedEdgeStyle();
     return (
       <div className="flex flex-col gap-3 p-1">
         <h2 className="text-[12px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          {t('tools.flowchart.edgeLabel')}
+          {t('tools.flowchart.edgeStyle')}
         </h2>
+
         <Field label={t('tools.flowchart.label')}>
           <input
             className={inputCls}
@@ -57,6 +74,94 @@ export function PropertyPanel() {
             onChange={(e) => useFlowStore.getState().patchEdgeLabel(edge.id, e.target.value)}
           />
         </Field>
+
+        <Field label={t('tools.flowchart.edgeType')}>
+          <select
+            className={inputCls}
+            value={s.type}
+            onChange={(e) =>
+              patchSelectedEdgeStyle({ type: e.target.value as FlowEdgeStyle['type'] })
+            }
+          >
+            {EDGE_TYPES.map((v) => (
+              <option key={v} value={v}>
+                {t(`tools.flowchart.${v}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t('tools.flowchart.stroke')}>
+            <input
+              type="color"
+              className="h-8 w-full cursor-pointer rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+              value={s.stroke}
+              onChange={(e) => patchSelectedEdgeStyle({ stroke: e.target.value })}
+            />
+          </Field>
+          <Field label={t('tools.flowchart.strokeWidth')}>
+            <input
+              type="number"
+              min={1}
+              max={8}
+              className={inputCls}
+              value={s.strokeWidth}
+              onChange={(e) => patchSelectedEdgeStyle({ strokeWidth: Number(e.target.value) })}
+            />
+          </Field>
+        </div>
+
+        <Field label={t('tools.flowchart.edgeDash')}>
+          <select
+            className={inputCls}
+            value={s.dash}
+            onChange={(e) =>
+              patchSelectedEdgeStyle({ dash: e.target.value as FlowEdgeStyle['dash'] })
+            }
+          >
+            {DASHES.map((v) => (
+              <option key={v} value={v}>
+                {t(`tools.flowchart.${v}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t('tools.flowchart.edgeStartArrow')}>
+            <select
+              className={inputCls}
+              value={s.startArrow}
+              onChange={(e) =>
+                patchSelectedEdgeStyle({
+                  startArrow: e.target.value as FlowEdgeStyle['startArrow'],
+                })
+              }
+            >
+              {ARROWS.map((v) => (
+                <option key={v} value={v}>
+                  {t(`tools.flowchart.${EDGE_ARROW_LABEL_KEY[v]}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t('tools.flowchart.edgeEndArrow')}>
+            <select
+              className={inputCls}
+              value={s.endArrow}
+              onChange={(e) =>
+                patchSelectedEdgeStyle({ endArrow: e.target.value as FlowEdgeStyle['endArrow'] })
+              }
+            >
+              {ARROWS.map((v) => (
+                <option key={v} value={v}>
+                  {t(`tools.flowchart.${EDGE_ARROW_LABEL_KEY[v]}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
       </div>
     );
   }
@@ -70,6 +175,7 @@ export function PropertyPanel() {
   }
 
   const style = node.data.style;
+  const def = shapeDefOf(node.data.kind);
   const aligns: Align[] = ['left', 'center', 'right'];
 
   return (
@@ -178,6 +284,8 @@ export function PropertyPanel() {
           {t('tools.flowchart.italic')}
         </button>
       </div>
+
+      <NodeAppearanceSection style={style} draw={def?.draw} patch={patch} onEnd={end} />
     </div>
   );
 }

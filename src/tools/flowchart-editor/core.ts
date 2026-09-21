@@ -6,14 +6,18 @@
 import {
   type Align,
   type FlowDoc,
+  type FlowEdgeRec,
+  type FlowEdgeStyle,
   type FlowNodeData,
+  type FlowNodeRec,
   type FlowNodeStyle,
   type ShapeKind,
   type ShapeSize,
   isContainerKind,
-  shapeSize,
   SHAPE_LABELS,
 } from './model/types';
+import { shapeDefOf, shapeSize } from './model/shapes';
+import { migrateDoc, toDocV2 } from './model/migrate';
 
 let idCounter = 0;
 
@@ -47,23 +51,12 @@ export const DEFAULT_STYLE: FlowNodeStyle = {
   align: 'center',
 };
 
-/** 各形状的默认标签与基础样式微调 */
+/** 各形状的默认标签与基础配色（配色统一登记在图形目录，新增形状无需改这里） */
 export function defaultData(kind: ShapeKind, label?: string): FlowNodeData {
   const base: FlowNodeStyle = { ...DEFAULT_STYLE };
-  if (kind === 'startEnd') {
-    base.fill = '#ECFDF5';
-    base.stroke = '#16A34A';
-  } else if (kind === 'decision') {
-    base.fill = '#FEFCE8';
-    base.stroke = '#D97706';
-  } else if (isContainerKind(kind)) {
-    base.fill = '#F8FAFC';
-    base.stroke = '#475569';
-    base.align = 'left';
-  } else if (kind === 'bpmnTask') {
-    base.fill = '#FDF2F8';
-    base.stroke = '#DB2777';
-  }
+  const def = shapeDefOf(kind);
+  if (def?.defaultStyle) Object.assign(base, def.defaultStyle);
+  if (isContainerKind(kind)) base.align = 'left';
   return {
     kind,
     label: label ?? SHAPE_LABELS[kind],
@@ -89,6 +82,10 @@ export interface HelperLines {
   vertical?: number;
   /** 水平参考线的画布 y 坐标 */
   horizontal?: number;
+  /** 竖直参考线是否为中心点对齐（用于区分样式） */
+  verticalCenter?: boolean;
+  /** 水平参考线是否为中心点对齐 */
+  horizontalCenter?: boolean;
 }
 
 interface Bounds {
@@ -123,42 +120,45 @@ export function computeHelperLines(dragging: Rect, others: Rect[], tolerance = 5
 
   for (const other of others) {
     const ob = toBounds(other);
-    const xPairs: Array<[number, number]> = [
-      [ob.left, db.left],
-      [ob.right, db.left],
-      [ob.centerX, db.left],
-      [ob.left, db.right],
-      [ob.right, db.right],
-      [ob.centerX, db.right],
-      [ob.left, db.centerX],
-      [ob.right, db.centerX],
-      [ob.centerX, db.centerX],
+    // [目标坐标, 拖拽方坐标, 是否中心对齐]
+    const xPairs: Array<[number, number, boolean]> = [
+      [ob.left, db.left, false],
+      [ob.right, db.left, false],
+      [ob.centerX, db.left, false],
+      [ob.left, db.right, false],
+      [ob.right, db.right, false],
+      [ob.centerX, db.right, false],
+      [ob.left, db.centerX, true],
+      [ob.right, db.centerX, true],
+      [ob.centerX, db.centerX, true],
     ];
-    for (const [target, moving] of xPairs) {
+    for (const [target, moving, isCenter] of xPairs) {
       const dist = Math.abs(target - moving);
       if (dist < minX) {
         minX = dist;
         result.x = dragging.x + (target - moving);
         result.vertical = target;
+        result.verticalCenter = isCenter;
       }
     }
-    const yPairs: Array<[number, number]> = [
-      [ob.top, db.top],
-      [ob.bottom, db.top],
-      [ob.centerY, db.top],
-      [ob.top, db.bottom],
-      [ob.bottom, db.bottom],
-      [ob.centerY, db.bottom],
-      [ob.top, db.centerY],
-      [ob.bottom, db.centerY],
-      [ob.centerY, db.centerY],
+    const yPairs: Array<[number, number, boolean]> = [
+      [ob.top, db.top, false],
+      [ob.bottom, db.top, false],
+      [ob.centerY, db.top, false],
+      [ob.top, db.bottom, false],
+      [ob.bottom, db.bottom, false],
+      [ob.centerY, db.bottom, false],
+      [ob.top, db.centerY, true],
+      [ob.bottom, db.centerY, true],
+      [ob.centerY, db.centerY, true],
     ];
-    for (const [target, moving] of yPairs) {
+    for (const [target, moving, isCenter] of yPairs) {
       const dist = Math.abs(target - moving);
       if (dist < minY) {
         minY = dist;
         result.y = dragging.y + (target - moving);
         result.horizontal = target;
+        result.horizontalCenter = isCenter;
       }
     }
   }
@@ -259,38 +259,22 @@ export interface SerializeResult {
   error?: string;
 }
 
-function isFiniteNum(v: unknown): v is number {
-  return typeof v === 'number' && Number.isFinite(v);
-}
-
-/** 宽松校验一个对象是否为合法 FlowDoc */
+/** 宽松校验：能归一为 v2 即视为合法（兼容旧版 v1 文档） */
 export function validateDoc(raw: unknown): raw is FlowDoc {
-  if (!raw || typeof raw !== 'object') return false;
-  const doc = raw as Partial<FlowDoc>;
-  if (!Array.isArray(doc.nodes) || !Array.isArray(doc.edges)) return false;
-  for (const node of doc.nodes) {
-    if (!node || typeof node.id !== 'string') return false;
-    if (!node.position || !isFiniteNum(node.position.x) || !isFiniteNum(node.position.y))
-      return false;
-    if (!node.data || typeof node.data.kind !== 'string' || typeof node.data.label !== 'string')
-      return false;
-    if (!node.data.style || typeof node.data.style.fill !== 'string') return false;
-    if (node.parentId != null && typeof node.parentId !== 'string') return false;
-  }
-  for (const edge of doc.edges) {
-    if (!edge || typeof edge.id !== 'string') return false;
-    if (typeof edge.source !== 'string' || typeof edge.target !== 'string') return false;
-  }
-  return true;
+  return migrateDoc(raw) !== null;
 }
 
-/** 把内部状态序列化为可持久化的 FlowDoc（version 自增） */
+/** 把内部状态序列化为可持久化的 v2 文档（当前为单页） */
 export function serializeDoc(
   nodes: ReadonlyArray<{
     id: string;
     position: { x: number; y: number };
     parentId?: string | null;
     data: FlowNodeData;
+    width?: number;
+    height?: number;
+    hidden?: boolean;
+    locked?: boolean;
   }>,
   edges: ReadonlyArray<{
     id: string;
@@ -299,137 +283,45 @@ export function serializeDoc(
     sourceHandle?: string | null;
     targetHandle?: string | null;
     label?: string;
+    style?: FlowEdgeStyle;
   }>,
-  version = 1,
+  pageName?: string,
 ): FlowDoc {
-  return {
-    version,
-    nodes: nodes.map((n) => ({
-      id: n.id,
-      type: 'shape',
-      position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
-      parentId: n.parentId ?? null,
-      data: {
-        kind: n.data.kind,
-        label: n.data.label,
-        style: { ...n.data.style },
-      },
-    })),
-    edges: edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle ?? null,
-      targetHandle: e.targetHandle ?? null,
-      label: e.label,
-    })),
-  };
+  const recNodes: FlowNodeRec[] = nodes.map((n) => ({
+    id: n.id,
+    type: 'shape',
+    position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
+    parentId: n.parentId ?? null,
+    width: n.width,
+    height: n.height,
+    hidden: n.hidden === true,
+    locked: n.locked === true,
+    data: {
+      kind: n.data.kind,
+      label: n.data.label,
+      style: { ...n.data.style },
+    },
+  }));
+  const recEdges: FlowEdgeRec[] = edges.map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    sourceHandle: e.sourceHandle ?? null,
+    targetHandle: e.targetHandle ?? null,
+    label: e.label,
+    style: e.style ? { ...e.style } : undefined,
+  }));
+  return toDocV2(recNodes, recEdges, pageName);
 }
 
-/** 反序列化并校验；非法返回 { ok:false }，调用方降级为空图 */
+/** 反序列化并归一为 v2；非法返回 { ok:false }，调用方降级为空图 */
 export function deserializeDoc(raw: unknown): SerializeResult {
-  if (!validateDoc(raw)) return { ok: false, error: 'INVALID_DOC' };
-  return { ok: true, doc: raw as FlowDoc };
+  const doc = migrateDoc(raw);
+  if (!doc) return { ok: false, error: 'INVALID_DOC' };
+  return { ok: true, doc };
 }
 
-/* --------------------------- 模板 --------------------------- */
-
-export type TemplateKind = 'basic' | 'decision' | 'swimlane' | 'swimlaneV' | 'bpmn';
-
-/**
- * 生成起始模板图（节点位置基于 shapeSize 居中排布）。
- * 返回全新 id，避免与现有图冲突。
- */
-export function buildTemplate(kind: TemplateKind): FlowDoc {
-  const nodes: FlowDoc['nodes'] = [];
-  const edges: FlowDoc['edges'] = [];
-  const add = (n: ShapeKind, label: string, x: number, y: number): string => {
-    const id = createId('t');
-    nodes.push({
-      id,
-      type: 'shape',
-      position: { x, y },
-      data: defaultData(n, label),
-    });
-    return id;
-  };
-  const link = (source: string, target: string) =>
-    edges.push({ id: createId('te'), source, target });
-
-  if (kind === 'basic') {
-    const a = add('startEnd', '开始', 240, 40);
-    const b = add('rect', '处理步骤', 215, 140);
-    const c = add('rect', '处理步骤', 215, 240);
-    const d = add('startEnd', '结束', 240, 340);
-    link(a, b);
-    link(b, c);
-    link(c, d);
-  } else if (kind === 'decision') {
-    const a = add('startEnd', '开始', 260, 40);
-    const b = add('decision', '条件成立?', 235, 140);
-    const c = add('rect', '分支 A', 80, 280);
-    const e = add('rect', '分支 B', 410, 280);
-    const f = add('startEnd', '结束', 260, 380);
-    link(a, b);
-    link(b, c);
-    link(b, e);
-    link(c, f);
-    link(e, f);
-  } else if (kind === 'swimlane') {
-    // 标准横向泳道：泳道绝对位于 (60,60)，内部元素坐标相对泳道
-    const lane = add('swimlane', '横向泳道', 60, 60);
-    const addChild = (n: ShapeKind, label: string, x: number, y: number): string => {
-      const id = createId('t');
-      nodes.push({
-        id,
-        type: 'shape',
-        position: { x, y },
-        parentId: lane,
-        data: defaultData(n, label),
-      });
-      return id;
-    };
-    const a = addChild('startEnd', '开始', 50, 82);
-    const b = addChild('rect', '步骤 1', 220, 78);
-    const c = addChild('rect', '步骤 2', 410, 78);
-    const d = addChild('startEnd', '结束', 600, 82);
-    link(a, b);
-    link(b, c);
-    link(c, d);
-  } else if (kind === 'swimlaneV') {
-    // 标准纵向泳道：泳道绝对位于 (60,60)，标题栏在左侧，内部元素纵向排列
-    const lane = add('swimlaneV', '纵向泳道', 60, 60);
-    const addChild = (n: ShapeKind, label: string, x: number, y: number): string => {
-      const id = createId('t');
-      nodes.push({
-        id,
-        type: 'shape',
-        position: { x, y },
-        parentId: lane,
-        data: defaultData(n, label),
-      });
-      return id;
-    };
-    const a = addChild('startEnd', '开始', 55, 65);
-    const b = addChild('rect', '步骤 1', 45, 170);
-    const c = addChild('rect', '步骤 2', 45, 300);
-    const d = addChild('startEnd', '结束', 55, 430);
-    link(a, b);
-    link(b, c);
-    link(c, d);
-  } else {
-    // bpmn
-    const a = add('bpmnTask', '开始事件', 235, 40);
-    const b = add('bpmnTask', '用户任务', 220, 150);
-    const c = add('bpmnTask', '服务任务', 220, 250);
-    const d = add('bpmnTask', '结束事件', 235, 360);
-    link(a, b);
-    link(b, c);
-    link(c, d);
-  }
-
-  return { version: 1, nodes, edges };
-}
+/* 模板已迁移到 `./model/templates`（按图种分类的模板库） */
 
 /** 仅暴露给测试：用于重置内部计数器 */
 export function __resetIdCounter(): void {

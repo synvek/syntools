@@ -1,7 +1,35 @@
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type TemplateKind } from '../core';
+import {
+  TEMPLATE_CATEGORIES,
+  TEMPLATES,
+  buildTemplate,
+  type TemplateCategory,
+  type TemplateKind,
+} from '../model/templates';
+import { shapeDefOf } from '../model/shapes';
+import { drawShape } from '../nodes/shapeDraw';
+import type { ShapeKind } from '../model/types';
 
-const TEMPLATES: TemplateKind[] = ['basic', 'decision', 'swimlane', 'swimlaneV', 'bpmn'];
+/** 缩略图：直接用模板首个节点的形状绘制，与画布效果一致 */
+function TemplateThumb({ kind }: { kind: ShapeKind }) {
+  const def = shapeDefOf(kind);
+  if (!def) return null;
+  const w = def.size.width;
+  const h = def.size.height;
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="h-12 w-full"
+      preserveAspectRatio="xMidYMid meet"
+      aria-hidden="true"
+    >
+      <g fill="#EFF6FF" stroke="#2563EB" strokeWidth={Math.max(2, w / 38)}>
+        {drawShape(def, w, h)}
+      </g>
+    </svg>
+  );
+}
 
 interface TemplatePanelProps {
   open: boolean;
@@ -11,7 +39,20 @@ interface TemplatePanelProps {
 
 export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
   const { t } = useTranslation();
+  const [category, setCategory] = useState<TemplateCategory>('flow');
+
+  // 每个模板取首个节点的形状作为缩略图（仅计算一次）
+  const previews = useMemo(() => {
+    const map = new Map<TemplateKind, ShapeKind>();
+    for (const item of TEMPLATES) {
+      const tpl = buildTemplate(item.kind);
+      map.set(item.kind, tpl.nodes[0]?.data.kind ?? 'rect');
+    }
+    return map;
+  }, []);
+
   if (!open) return null;
+  const items = TEMPLATES.filter((item) => item.category === category);
 
   return (
     <div
@@ -22,7 +63,7 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+        className="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-1 flex items-center justify-between">
@@ -38,87 +79,48 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
             ✕
           </button>
         </div>
-        <p className="mb-4 text-[12px] text-gray-500 dark:text-gray-400">
+        <p className="mb-3 text-[12px] text-gray-500 dark:text-gray-400">
           {t('tools.flowchart.templateHint')}
         </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {TEMPLATES.map((kind) => (
+
+        <div className="mb-4 flex flex-wrap gap-1">
+          {TEMPLATE_CATEGORIES.map((c) => (
             <button
-              key={kind}
+              key={c}
+              type="button"
+              onClick={() => setCategory(c)}
+              className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                category === c
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-blue-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-blue-500/10'
+              }`}
+            >
+              {t(`tools.flowchart.cat_${c}`)}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {items.map((item) => (
+            <button
+              key={item.kind}
               type="button"
               onClick={() => {
-                onSelect(kind);
+                onSelect(item.kind);
                 onClose();
               }}
               className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md dark:border-gray-700 dark:bg-gray-800/60 dark:hover:border-blue-500"
             >
-              <div className="flex h-20 items-center justify-center rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-                <TemplateThumb kind={kind} />
+              <div className="flex h-16 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 dark:border-gray-700 dark:bg-gray-900">
+                <TemplateThumb kind={previews.get(item.kind) ?? 'rect'} />
               </div>
               <span className="text-[13px] font-medium text-gray-700 dark:text-gray-200">
-                {t(`tools.flowchart.template${kind[0].toUpperCase()}${kind.slice(1)}`)}
+                {t(`tools.flowchart.template${item.kind[0].toUpperCase()}${item.kind.slice(1)}`)}
               </span>
             </button>
           ))}
         </div>
       </div>
     </div>
-  );
-}
-
-function TemplateThumb({ kind }: { kind: TemplateKind }) {
-  const c = { fill: '#EFF6FF', stroke: '#2563EB', strokeWidth: 1.5 };
-  if (kind === 'decision') {
-    return (
-      <svg viewBox="0 0 80 50" className="h-16 w-full" aria-hidden="true">
-        <ellipse cx={40} cy={12} rx={14} ry={7} {...c} />
-        <polygon points="40,22 62,37 40,52 18,37" {...c} />
-        <line x1={54} y1={16} x2={45} y2={30} stroke="#475569" strokeWidth={1} />
-      </svg>
-    );
-  }
-  if (kind === 'swimlane') {
-    // 横向泳道：标题栏在左侧
-    return (
-      <svg viewBox="0 0 80 50" className="h-16 w-full" aria-hidden="true">
-        <rect x={6} y={8} width={68} height={34} rx={4} {...c} />
-        <rect x={6} y={8} width={10} height={34} rx={4} fill="#dbeafe" />
-        <ellipse cx={32} cy={25} rx={9} ry={5} {...c} />
-        <ellipse cx={58} cy={25} rx={9} ry={5} {...c} />
-      </svg>
-    );
-  }
-  if (kind === 'swimlaneV') {
-    // 纵向泳道：标题栏在顶部
-    return (
-      <svg viewBox="0 0 80 50" className="h-16 w-full" aria-hidden="true">
-        <rect x={26} y={4} width={28} height={42} rx={4} {...c} />
-        <rect x={26} y={4} width={28} height={9} rx={4} fill="#dbeafe" />
-        <ellipse cx={40} cy={27} rx={9} ry={4.5} {...c} />
-        <ellipse cx={40} cy={39} rx={9} ry={4.5} {...c} />
-      </svg>
-    );
-  }
-  if (kind === 'bpmn') {
-    return (
-      <svg viewBox="0 0 80 50" className="h-16 w-full" aria-hidden="true">
-        <rect x={14} y={8} width={16} height={12} rx={6} {...c} />
-        <rect x={44} y={8} width={22} height={12} rx={3} {...c} />
-        <rect x={44} y={30} width={22} height={12} rx={3} {...c} />
-        <line x1={30} y1={14} x2={44} y2={14} stroke="#475569" strokeWidth={1} />
-        <line x1={55} y1={20} x2={55} y2={30} stroke="#475569" strokeWidth={1} />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 80 50" className="h-16 w-full" aria-hidden="true">
-      <ellipse cx={16} cy={14} rx={11} ry={6} {...c} />
-      <rect x={32} y={8} width={16} height={12} rx={2} {...c} />
-      <rect x={32} y={30} width={16} height={12} rx={2} {...c} />
-      <ellipse cx={64} cy={36} rx={11} ry={6} {...c} />
-      <line x1={27} y1={14} x2={32} y2={14} stroke="#475569" strokeWidth={1} />
-      <line x1={48} y1={20} x2={48} y2={30} stroke="#475569" strokeWidth={1} />
-      <line x1={48} y1={36} x2={53} y2={36} stroke="#475569" strokeWidth={1} />
-    </svg>
   );
 }
