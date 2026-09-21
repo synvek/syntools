@@ -108,7 +108,9 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(1);
     const node = page.locator('.react-flow__node').first();
     await expect(node).toBeVisible();
-    await expect(node).toContainText('过程');
+    // 新建图形默认无文案：节点不应带「过程」等占位文字，但形状已渲染为矩形
+    await expect(node).not.toContainText(/\S/);
+    await expect(node.locator('svg rect').first()).toBeVisible();
     // 防止「节点被撑成 0 尺寸而不可见」回归：必须有实际的宽高
     const nodeBox = await node.boundingBox();
     expect(nodeBox?.width).toBeGreaterThan(0);
@@ -146,7 +148,8 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.getByText(/节点:\s*6/)).toBeVisible();
 
     // 新节点应被泳道包围（证明它确实被放进了泳道，而不是叠在外面）
-    const newNode = page.locator('.react-flow__node').filter({ hasText: '过程' });
+    // 新建图形默认无文本，故用「无文案的节点」定位它（模板里的节点都带标题）
+    const newNode = page.locator('.react-flow__node').filter({ hasNotText: /\S/ });
     await expect(newNode).toHaveCount(1);
     const lane = page.locator('.react-flow__node').filter({ hasText: '泳道' }).first();
     const nb = await newNode.first().boundingBox();
@@ -189,7 +192,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     });
     await expect(page.getByText(/节点:\s*6/)).toBeVisible();
 
-    const newNode = page.locator('.react-flow__node').filter({ hasText: '过程' });
+    const newNode = page.locator('.react-flow__node').filter({ hasNotText: /\S/ });
     await expect(newNode).toHaveCount(1);
     const lane = page.locator('.react-flow__node').filter({ hasText: '纵向泳道' }).first();
     const nb = await newNode.first().boundingBox();
@@ -326,9 +329,9 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(picker).toBeVisible();
     await expect(page.locator('.react-flow__node')).toHaveCount(2);
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-    // 在弹窗中选择图形后，新节点类型被替换为该图形
+    // 在弹窗中选择图形后，新节点类型被替换为该图形（默认无文案，按渲染形状断言）
     await picker.getByRole('button', { name: '圆角矩形', exact: true }).click();
-    await expect(page.locator('.react-flow__node').filter({ hasText: '圆角矩形' })).toHaveCount(1);
+    await expect(page.locator('.react-flow__node svg rect[rx="10"]')).toHaveCount(1);
   });
 
   test('自由连线：拖到空白画布只连已有图形，不新增图形', async ({ page }) => {
@@ -367,7 +370,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(2);
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
     await picker.getByRole('button', { name: '椭圆', exact: true }).click();
-    await expect(page.locator('.react-flow__node').filter({ hasText: '椭圆' })).toHaveCount(1);
+    await expect(page.locator('.react-flow__node svg ellipse')).toHaveCount(1);
   });
 
   test('工具栏连线样式：选中连线后调整下拉立即生效', async ({ page }) => {
@@ -411,7 +414,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     // 选中后通过工具栏下拉调整样式，应立即应用到该连线（属性面板同步反映）
     await page.getByLabel('开始箭头').selectOption('arrowclosed');
     await page.getByLabel('连线样式').selectOption('dashed');
-    await expect(page.getByLabel('起点')).toHaveValue('arrowclosed');
+    await expect(page.getByLabel('起点箭头')).toHaveValue('arrowclosed');
     await expect(page.getByLabel('线条')).toHaveValue('dashed');
   });
 
@@ -442,5 +445,179 @@ test.describe('流程图编辑器（zh-CN）', () => {
 
     // 内容超出视口时出现滚动条
     await expect(page.getByTestId('canvas-scrollbar-y')).toBeVisible();
+  });
+
+  test('连线选中：高亮显示并可调整 source/target', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    const canvas = page.locator('.react-flow');
+    const proc = page.getByRole('button', { name: '过程', exact: true });
+    await proc.dragTo(canvas, { targetPosition: { x: 110, y: 80 } });
+    await proc.dragTo(canvas, { targetPosition: { x: 380, y: 80 } });
+    await proc.dragTo(canvas, { targetPosition: { x: 250, y: 210 } });
+    await expect(page.locator('.react-flow__node')).toHaveCount(3);
+
+    // 连 1 → 2
+    const n1 = page.locator('.react-flow__node').nth(0);
+    await n1.hover();
+    const hb = (await n1.locator('.react-flow__handle-right').boundingBox())!;
+    const n2b = (await page.locator('.react-flow__node').nth(1).boundingBox())!;
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(n2b.x + n2b.width / 2, n2b.y + n2b.height / 2, { steps: 10 });
+    await page.mouse.up();
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+
+    // 未选中时：不应出现自绘的重连端点方块
+    await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(0);
+
+    // 点击连线路径中点选中该连线
+    const mid = await page
+      .locator('.react-flow__edge-interaction')
+      .first()
+      .evaluate((el) => {
+        const path = el as SVGPathElement;
+        const p = path.getPointAtLength(path.getTotalLength() / 2);
+        const m = path.getScreenCTM();
+        if (!m) return null;
+        const sp = new DOMPoint(p.x, p.y).matrixTransform(m);
+        return { x: sp.x, y: sp.y };
+      });
+    await page.mouse.click(mid!.x, mid!.y);
+
+    // 选中后：描边高亮为蓝色 + 两端出现「小方块」重连端点
+    const endpoints = page.locator('[data-testid="edge-endpoint"]');
+    await expect(endpoints).toHaveCount(2);
+    const stroke = await page
+      .locator('.react-flow__edge-path')
+      .first()
+      .evaluate((el) => getComputedStyle(el).stroke);
+    expect(stroke).toBe('rgb(37, 99, 235)');
+    const box = (await endpoints.first().boundingBox())!;
+    // 正方形且尺寸更小
+    expect(Math.abs(box.width - box.height)).toBeLessThan(1);
+    expect(box.width).toBeLessThanOrEqual(12);
+
+    // 通过属性面板把「终点节点」改为第 3 个图形，连线几何应改变
+    const dBefore = await page.locator('.react-flow__edge-path').first().getAttribute('d');
+    await page.getByLabel('终点节点').selectOption({ index: 2 });
+    await expect
+      .poll(() => page.locator('.react-flow__edge-path').first().getAttribute('d'))
+      .not.toBe(dBefore);
+  });
+
+  test('连线重连：选中后直接拖拽端点改接另一图形（节点锚点与快连箭头不抢指针）', async ({
+    page,
+  }) => {
+    await page.goto('/tools/flowchart-editor');
+    const canvas = page.locator('.react-flow');
+    const proc = page.getByRole('button', { name: '过程', exact: true });
+    await proc.dragTo(canvas, { targetPosition: { x: 110, y: 80 } });
+    await proc.dragTo(canvas, { targetPosition: { x: 390, y: 80 } });
+    await proc.dragTo(canvas, { targetPosition: { x: 250, y: 240 } });
+    await expect(page.locator('.react-flow__node')).toHaveCount(3);
+
+    // 连 1 → 2
+    const n1 = page.locator('.react-flow__node').nth(0);
+    await n1.hover();
+    const hb = (await n1.locator('.react-flow__handle-right').boundingBox())!;
+    const n2b = (await page.locator('.react-flow__node').nth(1).boundingBox())!;
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(n2b.x + n2b.width / 2, n2b.y + n2b.height / 2, { steps: 10 });
+    await page.mouse.up();
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+
+    // 点击连线路径中点选中该连线
+    const mid = await page
+      .locator('.react-flow__edge-interaction')
+      .first()
+      .evaluate((el) => {
+        const path = el as SVGPathElement;
+        const p = path.getPointAtLength(path.getTotalLength() / 2);
+        const m = path.getScreenCTM();
+        if (!m) return null;
+        const sp = new DOMPoint(p.x, p.y).matrixTransform(m);
+        return { x: sp.x, y: sp.y };
+      });
+    await page.mouse.click(mid!.x, mid!.y);
+
+    // 两端的方块端点应出现，且方块自身可按下（命中自己）
+    await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(2);
+    const ub = (await page.locator('[data-testid="edge-endpoint"]').nth(1).boundingBox())!;
+    const scx = ub.x + ub.width / 2;
+    const scy = ub.y + ub.height / 2;
+    const hitClass = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.getAttribute('class') ?? '',
+      [scx, scy] as [number, number],
+    );
+    expect(hitClass).toContain('edge-endpoint');
+
+    // 方块中心即连线终点：正好落在图形边缘上（不再偏外）
+    expect(
+      Math.min(
+        Math.abs(scy - n2b.y),
+        Math.abs(scy - (n2b.y + n2b.height)),
+        Math.abs(scx - n2b.x),
+        Math.abs(scx - (n2b.x + n2b.width)),
+      ),
+    ).toBeLessThanOrEqual(1);
+
+    // 连线终点也与该方块中心重合（即终点落在图形边缘，不再偏外约 6px）
+    const pathEnd = await page
+      .locator('.react-flow__edge-path')
+      .first()
+      .evaluate((el) => {
+        const p = el as SVGPathElement;
+        const pt = p.getPointAtLength(p.getTotalLength());
+        const m = p.getScreenCTM()!;
+        const sp = new DOMPoint(pt.x, pt.y).matrixTransform(m);
+        return { x: sp.x, y: sp.y };
+      });
+    expect(Math.abs(pathEnd.x - scx)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pathEnd.y - scy)).toBeLessThanOrEqual(1);
+
+    // 方块只盖住箭头根部：沿该边向外露出的长度不足箭头全长(16)的一半，箭头仍可见
+    const outward =
+      scy < n2b.y + n2b.height / 2
+        ? n2b.y - ub.y
+        : scy > n2b.y + n2b.height / 2
+          ? ub.y + ub.height - (n2b.y + n2b.height)
+          : scx < n2b.x + n2b.width / 2
+            ? n2b.x - ub.x
+            : ub.x + ub.width - (n2b.x + n2b.width);
+    expect(outward).toBeLessThan(8);
+
+    // 拖拽终点端点改接到第 3 个图形
+    const id3 = await page.locator('.react-flow__node').nth(2).getAttribute('data-id');
+    const n3b = (await page.locator('.react-flow__node').nth(2).boundingBox())!;
+    await page.mouse.move(ub.x + ub.width / 2, ub.y + ub.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(n3b.x + n3b.width / 2, n3b.y + n3b.height / 2, { steps: 12 });
+    await page.mouse.up();
+
+    // 未新增连线，且终点已改为第 3 个图形
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+    await expect(page.getByLabel('终点节点')).toHaveValue(id3!);
+
+    // 选中连线不抑制节点侧连线 UI：锚点圆点悬停即显、锚点可接收指针
+    await n1.hover();
+    // 端点方块落在该连线自己的锚点上（右侧），故换用底边中点锚点拉新连线
+    const handleAgain = n1.locator('.react-flow__handle-bottom[data-handleid="b"]');
+    const pointerEvents = await handleAgain.evaluate((el) => getComputedStyle(el).pointerEvents);
+    expect(pointerEvents).not.toBe('none');
+    await expect
+      .poll(() => handleAgain.locator('span').evaluate((el) => getComputedStyle(el).opacity))
+      .toBe('1');
+
+    // 连线仍选中（两端端点方块在）时，从该锚点拉出新连线
+    await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(2);
+    const hb2 = (await handleAgain.boundingBox())!;
+    await page.mouse.move(hb2.x + hb2.width / 2, hb2.y + hb2.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(n2b.x + n2b.width / 2, n2b.y + n2b.height / 2, { steps: 10 });
+    await page.mouse.up();
+    // 新建了连线，且原连线选中态被取消（端点方块消失）
+    await expect(page.locator('.react-flow__edge')).toHaveCount(2);
+    await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(0);
   });
 });

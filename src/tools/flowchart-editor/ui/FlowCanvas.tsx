@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useRef, type DragEvent } from 'react';
+import { forwardRef, useCallback, useEffect, useRef, type DragEvent } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -10,9 +10,10 @@ import {
   ReactFlow,
   useReactFlow,
   useViewport,
+  type Connection,
   type NodeChange,
 } from '@xyflow/react';
-import { useFlowStore, type FlowNode } from '../store';
+import { useFlowStore, type FlowEdge, type FlowNode } from '../store';
 import { ShapeNode } from '../nodes/ShapeNode';
 import { FlowEdgeLine } from '../nodes/FlowEdgeLine';
 import { absolutePositionOf, absoluteRectOf, computeHelperLines } from '../core';
@@ -25,6 +26,7 @@ import {
 import { shapeSize } from '../model/shapes';
 import { QuickConnectOverlay } from './QuickConnectOverlay';
 import { CanvasScrollbars } from './CanvasScrollbars';
+import { EdgeEndpointHandles } from './EdgeEndpointHandles';
 
 const nodeTypes = { shape: ShapeNode };
 const edgeTypes = { flow: FlowEdgeLine };
@@ -103,11 +105,35 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const edges = useFlowStore((s) => s.edges);
   const onNodesChangeStore = useFlowStore((s) => s.onNodesChange);
   const onEdgesChange = useFlowStore((s) => s.onEdgesChange);
-  const onConnect = useFlowStore((s) => s.onConnect);
+  const storeOnConnect = useFlowStore((s) => s.onConnect);
   const onSelectionChange = useFlowStore((s) => s.onSelectionChange);
+  /** onConnect 是否已为本次拖拽创建过连线（避免 onConnectEnd 重复补建） */
+  const connectedRef = useRef(false);
+  /** 是否处于「重连端点」拖拽（此时不应用补建逻辑） */
+  const reconnectingRef = useRef(false);
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      connectedRef.current = true;
+      storeOnConnect(connection);
+    },
+    [storeOnConnect],
+  );
+
+  const onReconnect = useCallback((oldEdge: FlowEdge, connection: Connection) => {
+    useFlowStore.getState().reconnectEdge(oldEdge.id, connection);
+  }, []);
   const addNode = useFlowStore((s) => s.addNode);
   const defaultEdge = useFlowStore((s) => s.defaultEdge);
   const connectionLineType = CONNECTION_LINE_TYPES[defaultEdge.type];
+
+  /** 离开编辑器时清理连线拖拽标记 */
+  useEffect(
+    () => () => {
+      document.body.classList.remove('flow-connecting');
+    },
+    [],
+  );
 
   /** 自由连线起点（onConnectEnd 据此判断落点：目标图形 / 空白处） */
   const connectingFrom = useRef<{
@@ -119,6 +145,9 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
 
   const onConnectStart = useCallback((e: unknown, params: unknown) => {
     document.body.classList.add('flow-connecting');
+    connectedRef.current = false;
+    // 从锚点开始新建连线：让出已有连线的选中态（重连拖拽不在此列，由 onReconnectStart 先行标记）
+    if (!reconnectingRef.current) useFlowStore.getState().deselectEdges();
     const p = params as { nodeId?: string | null; handleId?: string | null } | undefined;
     const ev = e as MouseEvent | TouchEvent | undefined;
     let x: number | undefined;
@@ -143,6 +172,12 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     document.body.classList.remove('flow-connecting');
     const from = connectingFrom.current;
     connectingFrom.current = null;
+    const alreadyConnected = connectedRef.current;
+    connectedRef.current = false;
+    // 重连拖拽由其自身逻辑处理
+    if (reconnectingRef.current) return;
+    // onConnect 已创建连线（落点吸附到锚点）：不再补建
+    if (alreadyConnected) return;
     if (!from?.nodeId) return;
     const pt =
       'changedTouches' in event ? (event as TouchEvent).changedTouches[0] : (event as MouseEvent);
@@ -284,6 +319,13 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
+        onReconnectStart={() => {
+          reconnectingRef.current = true;
+        }}
+        onReconnectEnd={() => {
+          reconnectingRef.current = false;
+        }}
         onSelectionChange={onSelectionChange}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
@@ -291,6 +333,11 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         onNodeDragStop={(_, node) => useFlowStore.getState().reparentNode(node.id)}
         connectionMode={ConnectionMode.Loose}
         connectionRadius={32}
+        edgesReconnectable
+        // 端点圆始终不可见，只作为「重连拖拽」的承载元素：
+        // EdgeEndpointHandles 自绘方块按下时会向它派发 mousedown，之后由 React Flow 完成拖拽。
+        // 取较小半径以减少不可见的挡点击区域。
+        reconnectRadius={10}
         connectionLineType={connectionLineType}
         connectionLineStyle={{ stroke: '#2563EB', strokeWidth: 2, strokeDasharray: '5 4' }}
         snapToGrid
@@ -320,6 +367,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         />
       </ReactFlow>
       <HelperLines />
+      <EdgeEndpointHandles />
       <QuickConnectOverlay />
       <CanvasScrollbars />
       <SketchFilter />

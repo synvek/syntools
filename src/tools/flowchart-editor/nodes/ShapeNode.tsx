@@ -54,6 +54,16 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const w = width ?? fallback.width;
   const h = height ?? fallback.height;
   const setNodeLabel = useFlowStore((s) => s.setNodeLabel);
+  /**
+   * 本图形是否为「已选中连线的端点」。是则临时隐藏四向快连箭头：
+   * 箭头与连线重连端点圆在同一位置重叠（且节点层级更高），会抢走拖拽端点的指针。
+   * 只影响端点图形，其它图形的快连箭头、以及所有连线锚点始终可用。
+   */
+  const endpointOfSelectedEdge = useFlowStore((s) => {
+    if (s.selectedEdges.length === 0) return false;
+    const sel = new Set(s.selectedEdges);
+    return s.edges.some((e) => sel.has(e.id) && (e.source === id || e.target === id));
+  });
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(d.label);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,7 +130,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
               color: style.stroke,
             }}
           >
-            {d.label || (isGroup ? '编组' : '泳道')}
+            {d.label}
           </div>
         ) : (
           <div
@@ -132,7 +142,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
               writingMode: 'vertical-rl',
             }}
           >
-            {d.label || '泳道'}
+            {d.label}
           </div>
         )
       ) : editing ? (
@@ -186,13 +196,22 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             id={handle.id}
             type="source"
             position={handle.position}
+            /**
+             * 锚点盒收成 1px 且整体置于图形内侧：React Flow 以「锚点盒外沿」计算连线终点，
+             * 盒子越大终点越偏外（12px 盒会让终点跑到图形外约 6px）；
+             * 盒子外沿与图形边缘重合后，连线终点正好落在图形边缘上。
+             * 不能取 0 尺寸：React Flow 会因缺少锚点测量而无法从锚点起手连线。
+             */
             style={
               handle.position === Position.Top || handle.position === Position.Bottom
-                ? { left: handle.offset }
-                : { top: handle.offset }
+                ? { left: handle.offset, transform: 'translate(-50%, 0)' }
+                : { top: handle.offset, transform: 'translate(0, -50%)' }
             }
-            className="!h-3 !w-3 !rounded-full !border-2 !border-white !bg-blue-500 !ring-2 !ring-blue-300/70 opacity-0 transition-opacity group-hover/node:opacity-100"
-          />
+            className="!h-px !w-px !min-h-0 !min-w-0 !border-0 !bg-transparent"
+          >
+            {/* 可见圆点（12px）：居中于锚点中心（即图形边缘），承担实际点击 */}
+            <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-blue-500 ring-2 ring-blue-300/70 opacity-0 transition-opacity group-hover/node:opacity-100" />
+          </Handle>
         ))}
 
       {/* 悬停快速连线箭头：按住拖出连线，松手弹出图形选择弹窗 */}
@@ -205,12 +224,18 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             onPointerDown={(e) => {
               e.stopPropagation();
               e.preventDefault();
+              // 从快连箭头拉线：让出已有连线的选中态
+              useFlowStore.getState().deselectEdges();
               useQuickConnect
                 .getState()
                 .start({ sourceId: id, dir: q.dir, x: e.clientX, y: e.clientY });
             }}
             className={`quick-connect nodrag nopan absolute z-20 flex cursor-crosshair items-center justify-center rounded-full bg-blue-500 text-white shadow-md ring-2 ring-white transition ${
-              selected ? 'opacity-100' : 'opacity-0 group-hover/node:opacity-100'
+              endpointOfSelectedEdge
+                ? 'pointer-events-none opacity-0'
+                : selected
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover/node:opacity-100'
             }`}
             style={q.pos}
           >

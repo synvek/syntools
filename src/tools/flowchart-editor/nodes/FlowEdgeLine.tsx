@@ -72,6 +72,10 @@ export function FlowEdgeLine(props: EdgeProps) {
     ...DEFAULT_EDGE_STYLE,
     ...(props.data as { style?: Partial<FlowEdgeStyle> } | undefined)?.style,
   };
+  // 选中态：加粗并高亮描边（自定义边用内联样式，故在此显式处理选中反馈）
+  const selected = props.selected === true;
+  const strokeColor = selected ? '#2563EB' : style.stroke;
+  const strokeWidth = selected ? style.strokeWidth + 1.5 : style.strokeWidth;
 
   const params = { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition };
   let path: string;
@@ -95,10 +99,10 @@ export function FlowEdgeLine(props: EdgeProps) {
     <>
       <defs>
         {style.startArrow !== 'none' ? (
-          <EdgeMarker id={startId} kind={style.startArrow} color={style.stroke} />
+          <EdgeMarker id={startId} kind={style.startArrow} color={strokeColor} />
         ) : null}
         {style.endArrow !== 'none' ? (
-          <EdgeMarker id={endId} kind={style.endArrow} color={style.stroke} />
+          <EdgeMarker id={endId} kind={style.endArrow} color={strokeColor} />
         ) : null}
       </defs>
       <BaseEdge
@@ -106,7 +110,7 @@ export function FlowEdgeLine(props: EdgeProps) {
         path={path}
         markerStart={style.startArrow !== 'none' ? `url(#${startId})` : undefined}
         markerEnd={style.endArrow !== 'none' ? `url(#${endId})` : undefined}
-        style={edgeStyleOf(style)}
+        style={edgeStyleOf({ ...style, stroke: strokeColor, strokeWidth })}
         interactionWidth={20}
         label={label}
         labelX={labelX}

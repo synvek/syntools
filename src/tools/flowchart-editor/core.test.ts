@@ -37,8 +37,9 @@ describe('normalizeColor', () => {
 });
 
 describe('defaultData', () => {
-  it('按形状给出默认标签与配色', () => {
-    expect(defaultData('rect').label).toBe('过程');
+  it('按形状给出基础配色，默认文本为空', () => {
+    expect(defaultData('rect').label).toBe('');
+    expect(defaultData('rect', '自定义').label).toBe('自定义');
     expect(defaultData('startEnd').style.stroke).toBe('#16A34A');
     expect(defaultData('decision').style.stroke).toBe('#D97706');
   });

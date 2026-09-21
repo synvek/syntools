@@ -172,7 +172,13 @@ interface FlowState {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
+  /** 重连：把已有连线的一端拖到新的节点/锚点 */
+  reconnectEdge: (edgeId: string, connection: Connection) => void;
+  /** 修改连线起点/终点连接的节点（属性面板下拉） */
+  setEdgeEndpoint: (edgeId: string, end: 'source' | 'target', nodeId: string) => void;
   onSelectionChange: (selection: { nodes: FlowNode[]; edges: FlowEdge[] }) => void;
+  /** 仅取消连线选中（保留节点选中）：用于「开始新建连线」时让出连线选择态 */
+  deselectEdges: () => void;
 
   /** 新建连线的默认样式（工具栏可调：线型 / 线宽 / 线样式 / 起止箭头） */
   defaultEdge: FlowEdgeStyle;
@@ -368,6 +374,67 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set((s) => ({ edges: addEdge(edge, s.edges) }));
   },
 
+  reconnectEdge: (edgeId, connection) => {
+    const edge = get().edges.find((e) => e.id === edgeId);
+    if (!edge) return;
+    const nextSource = connection.source ?? edge.source;
+    const nextTarget = connection.target ?? edge.target;
+    const nextSourceHandle = connection.sourceHandle ?? null;
+    const nextTargetHandle = connection.targetHandle ?? null;
+    // 无变化则不写入历史
+    if (
+      edge.source === nextSource &&
+      edge.target === nextTarget &&
+      (edge.sourceHandle ?? null) === nextSourceHandle &&
+      (edge.targetHandle ?? null) === nextTargetHandle
+    ) {
+      return;
+    }
+    get().commit();
+    set((s) => ({
+      edges: s.edges.map((e) =>
+        e.id === edgeId
+          ? {
+              ...e,
+              source: nextSource,
+              target: nextTarget,
+              sourceHandle: nextSourceHandle,
+              targetHandle: nextTargetHandle,
+            }
+          : e,
+      ),
+    }));
+  },
+
+  setEdgeEndpoint: (edgeId, end, nodeId) => {
+    const state = get();
+    const edge = state.edges.find((e) => e.id === edgeId);
+    if (!edge) return;
+    const otherId = end === 'source' ? edge.target : edge.source;
+    if (nodeId === otherId) return; // 不允许自连
+    if ((end === 'source' ? edge.source : edge.target) === nodeId) return;
+    const nodes = state.nodes;
+    const node = nodes.find((n) => n.id === nodeId);
+    const other = nodes.find((n) => n.id === otherId);
+    if (!node || !other) return;
+    const byId = new Map(nodes.map((n) => [n.id, n] as const));
+    const a = absoluteRectOf(node, byId);
+    const b = absoluteRectOf(other, byId);
+    const dx = b.x + b.width / 2 - (a.x + a.width / 2);
+    const dy = b.y + b.height / 2 - (a.y + a.height / 2);
+    // 新节点朝向对端的一侧锚点
+    const handle = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : dy >= 0 ? 'b' : 't';
+    get().commit();
+    set((s) => ({
+      edges: s.edges.map((e) => {
+        if (e.id !== edgeId) return e;
+        return end === 'source'
+          ? { ...e, source: nodeId, sourceHandle: handle }
+          : { ...e, target: nodeId, targetHandle: handle };
+      }),
+    }));
+  },
+
   setDefaultEdge: (patch) => set((s) => ({ defaultEdge: { ...s.defaultEdge, ...patch } })),
 
   spawnConnectedNode: (sourceId, position, kindOverride) => {
@@ -425,7 +492,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     get().commit();
     set((s) => ({
       nodes: s.nodes.map((n) =>
-        n.id === id ? { ...n, width: size.width, height: size.height, data: defaultData(kind) } : n,
+        n.id === id
+          ? {
+              ...n,
+              width: size.width,
+              height: size.height,
+              // 换形状保留已有文本
+              data: defaultData(kind, n.data.label),
+            }
+          : n,
       ),
     }));
   },
@@ -435,6 +510,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       selectedNodes: selection.nodes.map((n) => n.id),
       selectedEdges: selection.edges.map((e) => e.id),
     }),
+
+  deselectEdges: () => {
+    const { edges, selectedEdges } = get();
+    if (selectedEdges.length === 0) return;
+    const ids = new Set(selectedEdges);
+    set({
+      edges: edges.map((e) => (ids.has(e.id) ? { ...e, selected: false } : e)),
+      selectedEdges: [],
+    });
+  },
 
   addNode: (kind, position) => {
     get().commit();

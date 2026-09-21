@@ -11,6 +11,7 @@ import {
   type Align,
   type FlowEdgeStyle,
   type FlowNodePatch,
+  isContainerKind,
 } from '../model/types';
 import { NodeAppearanceSection } from './NodeAppearanceSection';
 
@@ -60,6 +61,13 @@ export function PropertyPanel() {
 
   if (edge) {
     const s = selectedEdgeStyle();
+    const connectableNodes = nodes.filter((n) => !isContainerKind(n.data.kind));
+    const nodeOptions = connectableNodes.map((n) => (
+      <option key={n.id} value={n.id}>
+        {/* 图形默认无文案，故无标签时回退为形状名，避免下拉出现空选项 */}
+        {n.data.label || t(`tools.flowchart.shape_${n.data.kind}`)} · {n.id.slice(-4)}
+      </option>
+    ));
     return (
       <div className="flex flex-col gap-3 p-1">
         <h2 className="text-[12px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -74,6 +82,32 @@ export function PropertyPanel() {
             onChange={(e) => useFlowStore.getState().patchEdgeLabel(edge.id, e.target.value)}
           />
         </Field>
+
+        {/* 重连：直接选择起点/终点节点（与画布上拖拽端点等效） */}
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t('tools.flowchart.edgeSourceNode')}>
+            <select
+              className={inputCls}
+              value={edge.source}
+              onChange={(e) =>
+                useFlowStore.getState().setEdgeEndpoint(edge.id, 'source', e.target.value)
+              }
+            >
+              {nodeOptions}
+            </select>
+          </Field>
+          <Field label={t('tools.flowchart.edgeTargetNode')}>
+            <select
+              className={inputCls}
+              value={edge.target}
+              onChange={(e) =>
+                useFlowStore.getState().setEdgeEndpoint(edge.id, 'target', e.target.value)
+              }
+            >
+              {nodeOptions}
+            </select>
+          </Field>
+        </div>
 
         <Field label={t('tools.flowchart.edgeType')}>
           <select

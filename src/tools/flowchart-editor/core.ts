@@ -14,7 +14,6 @@ import {
   type ShapeKind,
   type ShapeSize,
   isContainerKind,
-  SHAPE_LABELS,
 } from './model/types';
 import { shapeDefOf, shapeSize } from './model/shapes';
 import { migrateDoc, toDocV2 } from './model/migrate';
@@ -51,17 +50,16 @@ export const DEFAULT_STYLE: FlowNodeStyle = {
   align: 'center',
 };
 
-/** 各形状的默认标签与基础配色（配色统一登记在图形目录，新增形状无需改这里） */
-export function defaultData(kind: ShapeKind, label?: string): FlowNodeData {
+/**
+ * 各形状的基础配色（配色统一登记在图形目录，新增形状无需改这里）。
+ * 默认文本为空串：新建图形不带任何文案，避免出现与用户无关的占位文字。
+ */
+export function defaultData(kind: ShapeKind, label = ''): FlowNodeData {
   const base: FlowNodeStyle = { ...DEFAULT_STYLE };
   const def = shapeDefOf(kind);
   if (def?.defaultStyle) Object.assign(base, def.defaultStyle);
   if (isContainerKind(kind)) base.align = 'left';
-  return {
-    kind,
-    label: label ?? SHAPE_LABELS[kind],
-    style: base,
-  };
+  return { kind, label, style: base };
 }
 
 /* --------------------------- 对齐辅助线 --------------------------- */

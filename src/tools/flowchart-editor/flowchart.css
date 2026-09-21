@@ -76,6 +76,20 @@ body.flow-connecting .react-flow__handle {
   opacity: 1 !important;
 }
 
+/**
+ * 连线重连端点：React Flow 原生端点只作为拖拽命中区，始终不可见；
+ * 视觉由 EdgeEndpointHandles 自绘的小方块呈现（更小、方形、且避开箭头）。
+ */
+.react-flow__edgeupdater {
+  fill: transparent !important;
+  stroke: transparent !important;
+  cursor: grab;
+}
+
+.react-flow__edgeupdater:active {
+  cursor: grabbing;
+}
+
 /* 悬停快速连线箭头（四向） */
 .quick-connect {
   width: 18px;
