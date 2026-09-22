@@ -20,6 +20,9 @@ const it = {
     filter: 'Filtra strumenti',
     filterPlaceholder: 'Filtra…',
     filterEmpty: 'Nessuno strumento corrispondente',
+    categoryActions: 'Azioni categoria',
+    expandAll: 'Espandi tutte le categorie',
+    collapseAll: 'Comprimi tutte le categorie',
   },
   home: {
     title: 'Toolbox online per sviluppatori',
@@ -124,6 +127,11 @@ const it = {
       name: 'Editor di mappe mentali',
       description:
         'Crea mappe mentali in locale: nodi da tastiera, rami comprimibili, layout, temi ed esportazione PNG/SVG/Markdown',
+    },
+    'photo-editor': {
+      name: 'Editor di foto',
+      description:
+        'Ritocco foto multistrato nel browser: livelli, selezioni, ritaglio, regolazioni, filtri, pennello e testo, con progetto riapribile',
     },
     base64: {
       name: 'Codifica / Decodifica Base64',

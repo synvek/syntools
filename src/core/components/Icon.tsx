@@ -124,6 +124,13 @@ const icons: Record<string, ReactNode> = {
   ),
   moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  more: (
+    <>
+      <circle cx="12" cy="5" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none" />
+    </>
+  ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
   chevron: <path d="m6 9 6 6 6-6" />,
   star: <path d="m12 3 2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.5l6.3-.9L12 3Z" />,
@@ -613,6 +620,85 @@ const icons: Record<string, ReactNode> = {
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M3 9h18M3 14.5h18M9 9v11M15 9v11" />
+    </>
+  ),
+  photoEditor: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m5 16 4.5-4.5 3 3 3-3 3.5 3.5" />
+      <circle cx="9" cy="9.5" r="1.4" />
+    </>
+  ),
+  cursor: <path d="m5 3 14 8-6 1.5L10 19 5 3Z" />,
+  lasso: (
+    <>
+      <path d="M12 4c4.4 0 8 2.2 8 5s-3.6 5-8 5-8-2.2-8-5 3.6-5 8-5Z" />
+      <path d="M15 14c1.5 1.2 1.5 2.4 0 3.6" />
+      <circle cx="13.6" cy="18.4" r="1.1" />
+    </>
+  ),
+  brush: (
+    <>
+      <path d="M17 3.5 20.5 7 11 16.5H7.5V13L17 3.5Z" />
+      <path d="M7.5 16.5 5 21l4.5-2.5" />
+    </>
+  ),
+  eraser: (
+    <>
+      <path d="M8 20h11" />
+      <path d="M15.5 4.5 20 9l-8.5 8.5H7l-2.5-2.5 11-10.5Z" />
+    </>
+  ),
+  bucket: (
+    <>
+      <path d="M4 12 11 5l7 7-7 7-7-7Z" />
+      <path d="M19 15c1.2 1.6 1.8 2.6 1.8 3.4a1.8 1.8 0 0 1-3.6 0c0-.8.6-1.8 1.8-3.4Z" />
+    </>
+  ),
+  hand: (
+    <>
+      <path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11" />
+      <path d="M11 11V5.5a1.5 1.5 0 0 1 3 0V11" />
+      <path d="M14 11V7.5a1.5 1.5 0 0 1 3 0V14" />
+      <path d="M17 10.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-2.5a5 5 0 0 1-4.3-2.4L5 15.5a1.6 1.6 0 0 1 2.6-1.9L8 14" />
+    </>
+  ),
+  shapes: (
+    <>
+      <rect x="3" y="12" width="8" height="8" rx="1" />
+      <circle cx="16" cy="8" r="4" />
+    </>
+  ),
+  layers: (
+    <>
+      <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 13 9 5 9-5" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <path d="M4 4l16 16" />
+      <path d="M9.5 9.7A2.5 2.5 0 0 0 12 14.5" />
+      <path d="M6.3 6.7C3.9 8.3 2 12 2 12s3.6 6 10 6c1.6 0 3-.4 4.2-1" />
+      <path d="M9.9 6.2A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-2.7 3.4" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  unlock: (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 7.5-2" />
     </>
   ),
 };

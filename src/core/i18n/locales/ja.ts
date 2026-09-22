@@ -20,6 +20,9 @@ const ja = {
     filter: 'ツールを絞り込み',
     filterPlaceholder: '絞り込み…',
     filterEmpty: '一致するツールがありません',
+    categoryActions: 'カテゴリ操作',
+    expandAll: 'すべてのカテゴリを展開',
+    collapseAll: 'すべてのカテゴリを折りたたむ',
   },
   home: {
     title: '開発者向けオンラインツールボックス',
@@ -122,6 +125,11 @@ const ja = {
       name: 'マインドマップエディタ',
       description:
         'ローカルでマインドマップを作成：キーボード操作、ブランチの折りたたみ、レイアウトとテーマ、PNG/SVG/Markdown 書き出し',
+    },
+    'photo-editor': {
+      name: '写真エディタ',
+      description:
+        'ブラウザ内で完結する多レイヤー写真編集：レイヤー、選択範囲、トリミング、補正とフィルター、ブラシとテキスト、プロジェクトの再編集に対応',
     },
     base64: {
       name: 'Base64 エンコード / デコード',

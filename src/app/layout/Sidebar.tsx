@@ -41,6 +41,8 @@ export function Sidebar({ mobile = false, onClose }: SidebarProps) {
   const { pathname } = useLocation();
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState<Set<CategoryId>>(readCollapsed);
+  /** 当前展开「分类操作」弹窗的分类 id（同时只允许一个） */
+  const [menuFor, setMenuFor] = useState<CategoryId | null>(null);
   const query = filter.trim().toLowerCase();
   const filtering = query.length > 0;
 
@@ -88,6 +90,37 @@ export function Sidebar({ mobile = false, onClose }: SidebarProps) {
     });
   };
 
+  const applyCollapsed = (ids: Set<CategoryId>) => {
+    writeCollapsed(ids);
+    setCollapsed(ids);
+    setMenuFor(null);
+  };
+
+  const expandAll = () => applyCollapsed(new Set());
+
+  const collapseAll = () => applyCollapsed(new Set(categories.map((c) => c.id)));
+
+  // 点击弹窗外部或按 Esc 时关闭
+  useEffect(() => {
+    if (!menuFor) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-sidebar-category-menu]')) return;
+      setMenuFor(null);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuFor(null);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuFor]);
+
   const content = (
     <nav
       aria-label={t('sidebar.nav')}
@@ -113,22 +146,65 @@ export function Sidebar({ mobile = false, onClose }: SidebarProps) {
           grouped.map(({ category, items }) => {
             const isCollapsed = !filtering && collapsed.has(category.id);
             const label = t(`categories.${category.id}`);
+            const menuOpen = menuFor === category.id;
             return (
               <div key={category.id} className="mb-2">
-                <button
-                  type="button"
-                  onClick={() => toggleCategory(category.id)}
-                  aria-expanded={!isCollapsed}
-                  aria-controls={`sidebar-cat-${category.id}`}
-                  className="mb-0.5 flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-                >
-                  <Icon
-                    name="chevron"
-                    className={`h-3 w-3 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                  <span className="tabular-nums text-[10px] opacity-70">{items.length}</span>
-                </button>
+                <div className="mb-0.5 flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(category.id)}
+                    aria-expanded={!isCollapsed}
+                    aria-controls={`sidebar-cat-${category.id}`}
+                    className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                  >
+                    <Icon
+                      name="chevron"
+                      className={`h-3 w-3 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                    <span className="tabular-nums text-[10px] opacity-70">{items.length}</span>
+                  </button>
+                  <div className="relative shrink-0" data-sidebar-category-menu>
+                    <button
+                      type="button"
+                      onClick={() => setMenuFor(menuOpen ? null : category.id)}
+                      aria-label={t('sidebar.categoryActions')}
+                      aria-haspopup="menu"
+                      aria-expanded={menuOpen}
+                      className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                    >
+                      <Icon name="more" className="h-3.5 w-3.5" />
+                    </button>
+                    {menuOpen && (
+                      <div
+                        role="menu"
+                        aria-label={t('sidebar.categoryActions')}
+                        className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={expandAll}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                        >
+                          <Icon name="chevron" className="h-3 w-3 shrink-0" />
+                          <span className="min-w-0 flex-1 truncate">{t('sidebar.expandAll')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={collapseAll}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                        >
+                          <Icon name="chevron" className="h-3 w-3 shrink-0 -rotate-90" />
+                          <span className="min-w-0 flex-1 truncate">
+                            {t('sidebar.collapseAll')}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <ul
                   id={`sidebar-cat-${category.id}`}
                   hidden={isCollapsed}

@@ -20,6 +20,9 @@ const fr = {
     filter: 'Filtrer les outils',
     filterPlaceholder: 'Filtrer…',
     filterEmpty: 'Aucun outil correspondant',
+    categoryActions: 'Actions de catégorie',
+    expandAll: 'Développer toutes les catégories',
+    collapseAll: 'Replier toutes les catégories',
   },
   home: {
     title: 'Boîte à outils en ligne pour développeurs',
@@ -123,6 +126,11 @@ const fr = {
       name: 'Éditeur de carte mentale',
       description:
         'Créez des cartes mentales en local : nœuds au clavier, branches repliables, mises en page, thèmes et export PNG/SVG/Markdown',
+    },
+    'photo-editor': {
+      name: 'Éditeur de photo',
+      description:
+        'Retouche photo multi-calques dans le navigateur : calques, sélections, recadrage, réglages, filtres, pinceau et texte, avec projet rééditable',
     },
     base64: {
       name: 'Encodage / décodage Base64',

@@ -1,0 +1,54 @@
+/**
+ * 照片编辑器私有样式：画布容器（棋盘透明底）、就地文字编辑层。
+ * 只在本工具 chunk 内引入，不污染全局。
+ */
+
+.photo-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  /* 透明通道的棋盘底：两层 45° 渐变错开形成 8px 方格 */
+  background-image:
+    linear-gradient(
+      45deg,
+      rgba(148, 163, 184, 0.25) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgba(148, 163, 184, 0.25) 75%
+    ),
+    linear-gradient(
+      45deg,
+      rgba(148, 163, 184, 0.25) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgba(148, 163, 184, 0.25) 75%
+    );
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    8px 8px;
+}
+
+.photo-canvas-wrapper {
+  min-height: 420px;
+}
+
+/* 就地文字编辑：透明 textarea 叠加在画布上，位置由 JS 按视口缩放计算 */
+.photo-text-editor {
+  z-index: 20;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed #2563eb;
+  border-radius: 2px;
+  background: transparent;
+  overflow: hidden;
+  resize: none;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.photo-text-editor::selection {
+  background: rgba(37, 99, 235, 0.3);
+}

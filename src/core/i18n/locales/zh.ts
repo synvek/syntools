@@ -18,6 +18,9 @@ export default {
     filter: '筛选工具',
     filterPlaceholder: '筛选…',
     filterEmpty: '无匹配工具',
+    categoryActions: '分类操作',
+    expandAll: '展开所有分类',
+    collapseAll: '收起所有分类',
   },
   home: {
     title: '开发者在线工具集',
@@ -116,6 +119,10 @@ export default {
     'mindmap-editor': {
       name: '脑图编辑器',
       description: '本地绘制思维导图，支持键盘建节点、折叠分支、多布局主题与 PNG/SVG/Markdown 导出',
+    },
+    'photo-editor': {
+      name: '照片编辑器',
+      description: '浏览器本地多图层修图：图层、选区、裁剪、调色滤镜、画笔文字与工程文件续编',
     },
     base64: {
       name: 'Base64 编解码',

@@ -20,6 +20,9 @@ const zhTW = {
     filter: '篩選工具',
     filterPlaceholder: '篩選…',
     filterEmpty: '無匹配工具',
+    categoryActions: '分類操作',
+    expandAll: '展開所有分類',
+    collapseAll: '收合所有分類',
   },
   home: {
     title: '開發者在線工具集',
@@ -119,6 +122,10 @@ const zhTW = {
       name: '心智圖編輯器',
       description:
         '本機繪製心智圖，支援鍵盤建立節點、摺疊分支、多種版面與主題，並可匯出 PNG/SVG/Markdown',
+    },
+    'photo-editor': {
+      name: '照片編輯器',
+      description: '瀏覽器本機多圖層修圖：圖層、選取、裁剪、調色濾鏡、畫筆文字，並可匯出專案檔續編',
     },
     base64: {
       name: 'Base64 編解碼',

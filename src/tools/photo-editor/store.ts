@@ -1,0 +1,570 @@
+import { create } from 'zustand';
+import { clampRect, clampUnit, intersectRect, polygonBounds, simplifyPath } from './core';
+import {
+  cloneAsset,
+  collectUsedAssets,
+  createCanvasElement,
+  getCanvas,
+  registerCanvas,
+  releaseExcept,
+} from './model/assets';
+import { paintDoc, paintLayer } from './render/paint';
+import {
+  cloneDoc,
+  cloneLayer,
+  createAdjustments,
+  createDoc,
+  createId,
+  createRasterLayer,
+  createShapeLayer,
+  createTextLayer,
+  nextLayerName,
+} from './model/factory';
+import { createBlankAsset } from './model/assets';
+import type { Layer, PhotoDoc, Rect, Selection, ShapeKind, ToolId, Viewport } from './model/types';
+
+/**
+ * 照片编辑器状态：唯一真相源是 `doc`，其余（当前工具 / 选区 / 视口 / 历史）是会话态。
+ *
+ * 与 slide-editor 一致：所有改 doc 的 action 先 `commit()` 压快照，保证 undo 可回放。
+ * 额外约定：**像素级操作必须先 `commitPixels(layerId)`** —— 它会把该图层的位图复制一份，
+ * 让历史快照指向「落笔前」的像素，否则撤销只能还原坐标而无法还原笔迹。
+ */
+
+const HISTORY_LIMIT = 24;
+
+export interface BrushConfig {
+  color: string;
+  size: number;
+  /** 0~1，1 为硬边 */
+  hardness: number;
+  opacity: number;
+}
+
+interface PhotoState {
+  doc: PhotoDoc;
+  tool: ToolId;
+  brush: BrushConfig;
+  eraserSize: number;
+  shapeKind: ShapeKind;
+  selection: Selection | null;
+  cropRect: Rect | null;
+  viewport: Viewport;
+  clipboard: Layer | null;
+  past: PhotoDoc[];
+  future: PhotoDoc[];
+
+  loadDoc: (doc: PhotoDoc) => void;
+  resetDoc: () => void;
+  setDocName: (name: string) => void;
+  setBackground: (background: PhotoDoc['background']) => void;
+  resizeCanvas: (width: number, height: number) => void;
+
+  setTool: (tool: ToolId) => void;
+  patchBrush: (patch: Partial<BrushConfig>) => void;
+  setEraserSize: (size: number) => void;
+  setShapeKind: (kind: ShapeKind) => void;
+
+  setSelection: (selection: Selection | null) => void;
+  setCropRect: (rect: Rect | null) => void;
+  applyCrop: () => void;
+
+  setViewport: (patch: Partial<Viewport>) => void;
+  setScale: (scale: number) => void;
+
+  selectLayer: (id: string | null) => void;
+  addLayer: (layer: Layer) => void;
+  patchLayer: (id: string, patch: Partial<Layer>, history?: boolean) => void;
+  patchActive: (patch: Partial<Layer>, history?: boolean) => void;
+  removeLayer: (id: string) => void;
+  duplicateLayer: (id: string) => void;
+  reorderLayer: (id: string, toIndex: number) => void;
+  mergeDown: (id: string) => void;
+  flattenVisible: () => void;
+  copyLayer: () => void;
+  pasteLayer: () => void;
+  /** 保证存在一个可落笔的位图图层（没有就新建整画布大小的空白图层） */
+  ensurePaintLayer: () => string | null;
+  addTextLayer: (x: number, y: number) => string | null;
+  addShapeLayer: (rect: Rect) => string | null;
+  addImageLayer: (assetId: string, width: number, height: number, name: string) => void;
+  /** 位图被就地改写后调用：自增 rev 使烘焙缓存失效 */
+  bumpRev: (id: string) => void;
+
+  commit: () => void;
+  commitPixels: (id: string) => void;
+  undo: () => void;
+  redo: () => void;
+}
+
+/** 历史中被引用到的资产：回收时必须一并保留，否则撤销会拿到已释放的画布 */
+function usedAssetsAcrossHistory(state: Pick<PhotoState, 'doc' | 'past' | 'future'>): Set<string> {
+  const used = new Set<string>();
+  const collect = (doc: PhotoDoc) => {
+    for (const id of collectUsedAssets(doc.layers)) used.add(id);
+  };
+  collect(state.doc);
+  state.past.forEach(collect);
+  state.future.forEach(collect);
+  return used;
+}
+
+export const usePhotoStore = create<PhotoState>((set, get) => ({
+  doc: createDoc(),
+  tool: 'move',
+  brush: { color: '#111827', size: 12, hardness: 0.9, opacity: 1 },
+  eraserSize: 24,
+  shapeKind: 'rect',
+  selection: null,
+  cropRect: null,
+  viewport: { scale: 0, x: 0, y: 0 },
+  clipboard: null,
+  past: [],
+  future: [],
+
+  loadDoc: (doc) => {
+    set((s) => ({
+      doc,
+      selection: null,
+      cropRect: null,
+      viewport: { ...s.viewport, scale: 0 },
+      past: [],
+      future: [],
+    }));
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  resetDoc: () => {
+    set({
+      selection: null,
+      cropRect: null,
+      past: [],
+      future: [],
+      viewport: { scale: 0, x: 0, y: 0 },
+    });
+    get().loadDoc(createDoc());
+  },
+
+  setDocName: (name) => set((s) => ({ doc: { ...s.doc, name } })),
+
+  setBackground: (background) => set((s) => ({ doc: { ...s.doc, background } })),
+
+  resizeCanvas: (width, height) => {
+    get().commit();
+    set((s) => ({ doc: { ...s.doc, width, height } }));
+  },
+
+  setTool: (tool) =>
+    set((s) => ({
+      tool,
+      // 切走裁剪工具时丢弃未应用的裁剪框；选区则保留（移动 / 画笔 / 填充都受其约束）
+      cropRect: tool === 'crop' ? s.cropRect : null,
+    })),
+
+  patchBrush: (patch) =>
+    set((s) => ({
+      brush: {
+        ...s.brush,
+        ...patch,
+        ...(patch.opacity !== undefined ? { opacity: clampUnit(patch.opacity) } : {}),
+      },
+    })),
+
+  setEraserSize: (size) => set({ eraserSize: size }),
+  setShapeKind: (kind) => set({ shapeKind: kind }),
+
+  setSelection: (selection) => set({ selection }),
+
+  setCropRect: (rect) =>
+    set((s) => ({
+      cropRect: rect ? clampRect(rect, { width: s.doc.width, height: s.doc.height }) : null,
+    })),
+
+  applyCrop: () => {
+    const state = get();
+    const rect = state.cropRect;
+    if (!rect || rect.width < 2 || rect.height < 2) return;
+    const inner = intersectRect(rect, {
+      x: 0,
+      y: 0,
+      width: state.doc.width,
+      height: state.doc.height,
+    });
+    if (!inner) return;
+    get().commit();
+    const doc = get().doc;
+    const layers: Layer[] = [];
+    for (const layer of doc.layers) {
+      const bounds = { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+      if (layer.kind === 'raster') {
+        const asset = getCanvas(layer.assetId);
+        const inter = intersectRect(bounds, inner);
+        if (!asset || !inter) continue;
+        const scaleX = asset.width / Math.max(1, layer.width);
+        const scaleY = asset.height / Math.max(1, layer.height);
+        const sx = (inter.x - layer.x) * scaleX;
+        const sy = (inter.y - layer.y) * scaleY;
+        const sw = Math.max(1, Math.round(inter.width * scaleX));
+        const sh = Math.max(1, Math.round(inter.height * scaleY));
+        const canvas = createCanvasElement(sw, sh);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) continue;
+        ctx.drawImage(asset, sx, sy, sw, sh, 0, 0, sw, sh);
+        layers.push({
+          ...layer,
+          assetId: registerCanvas(canvas),
+          rev: layer.rev + 1,
+          x: inter.x - inner.x,
+          y: inter.y - inner.y,
+          width: inter.width,
+          height: inter.height,
+        });
+      } else {
+        layers.push({ ...layer, x: layer.x - inner.x, y: layer.y - inner.y });
+      }
+    }
+    set({
+      doc: { ...doc, width: Math.round(inner.width), height: Math.round(inner.height), layers },
+      cropRect: null,
+      tool: 'move',
+    });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  setViewport: (patch) => set((s) => ({ viewport: { ...s.viewport, ...patch } })),
+
+  setScale: (scale) =>
+    set((s) => ({
+      viewport: {
+        ...s.viewport,
+        scale: Math.min(8, Math.max(0.02, Math.round(scale * 1000) / 1000)),
+      },
+    })),
+
+  selectLayer: (id) => set((s) => ({ doc: { ...s.doc, activeLayerId: id } })),
+
+  addLayer: (layer) => {
+    get().commit();
+    set((s) => ({
+      doc: { ...s.doc, layers: [...s.doc.layers, layer], activeLayerId: layer.id },
+    }));
+  },
+
+  patchLayer: (id, patch, history = true) => {
+    if (history) get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        layers: s.doc.layers.map((layer) =>
+          layer.id === id ? ({ ...layer, ...patch } as Layer) : layer,
+        ),
+      },
+    }));
+  },
+
+  patchActive: (patch, history = true) => {
+    const id = get().doc.activeLayerId;
+    if (!id) return;
+    get().patchLayer(id, patch, history);
+  },
+
+  removeLayer: (id) => {
+    get().commit();
+    set((s) => {
+      const layers = s.doc.layers.filter((layer) => layer.id !== id);
+      return {
+        doc: {
+          ...s.doc,
+          layers,
+          activeLayerId:
+            s.doc.activeLayerId === id
+              ? (layers[layers.length - 1]?.id ?? null)
+              : s.doc.activeLayerId,
+        },
+      };
+    });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  duplicateLayer: (id) => {
+    const layer = get().doc.layers.find((item) => item.id === id);
+    if (!layer) return;
+    get().commit();
+    const copy = cloneLayer(layer, true);
+    if (copy.kind === 'raster') {
+      const clonedAsset = cloneAsset(layer.kind === 'raster' ? layer.assetId : '');
+      if (clonedAsset) copy.assetId = clonedAsset;
+      copy.rev = layer.kind === 'raster' ? layer.rev : 1;
+    }
+    copy.name = `${layer.name} 副本`;
+    copy.x = layer.x + 12;
+    copy.y = layer.y + 12;
+    set((s) => {
+      const index = s.doc.layers.findIndex((item) => item.id === id);
+      const layers = [...s.doc.layers];
+      layers.splice(index + 1, 0, copy);
+      return { doc: { ...s.doc, layers, activeLayerId: copy.id } };
+    });
+  },
+
+  reorderLayer: (id, toIndex) => {
+    get().commit();
+    set((s) => {
+      const layers = [...s.doc.layers];
+      const from = layers.findIndex((layer) => layer.id === id);
+      if (from < 0) return {};
+      const target = Math.max(0, Math.min(layers.length - 1, toIndex));
+      if (from === target) return {};
+      const [moved] = layers.splice(from, 1);
+      layers.splice(target, 0, moved);
+      return { doc: { ...s.doc, layers } };
+    });
+  },
+
+  mergeDown: (id) => {
+    const state = get();
+    const index = state.doc.layers.findIndex((layer) => layer.id === id);
+    if (index <= 0) return;
+    // 仅支持「位图向下合并」：下方是文字 / 形状时不合并，避免出现内容丢失的假象
+    if (
+      state.doc.layers[index].kind !== 'raster' ||
+      state.doc.layers[index - 1].kind !== 'raster'
+    ) {
+      return;
+    }
+    get().commit();
+    const doc = get().doc;
+    const currentTop = doc.layers.find((l) => l.id === id);
+    const currentBottom = doc.layers[index - 1];
+    if (!currentTop || !currentBottom) return;
+    const merged = mergeRasterPair(currentBottom, currentTop);
+    if (!merged) return;
+    const layers = doc.layers.filter((layer) => layer.id !== id);
+    set({
+      doc: {
+        ...doc,
+        layers: layers.map((layer) => (layer.id === currentBottom.id ? merged : layer)),
+        activeLayerId: currentBottom.id,
+      },
+    });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  flattenVisible: () => {
+    const doc = get().doc;
+    if (doc.layers.length === 0) return;
+    get().commit();
+    const current = get().doc;
+    const flat = flattenLayers(current);
+    if (!flat) return;
+    set({
+      doc: {
+        ...current,
+        layers: [flat],
+        activeLayerId: flat.id,
+      },
+    });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  copyLayer: () => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
+    set({ clipboard: layer ? cloneLayer(layer, true) : null });
+  },
+
+  pasteLayer: () => {
+    const state = get();
+    if (!state.clipboard) return;
+    const source = state.clipboard;
+    const copy = cloneLayer(source, true);
+    if (copy.kind === 'raster' && source.kind === 'raster') {
+      const clonedAsset = cloneAsset(source.assetId);
+      if (clonedAsset) copy.assetId = clonedAsset;
+    }
+    copy.name = nextLayerName(state.doc.layers, copy.kind);
+    get().addLayer(copy);
+  },
+
+  ensurePaintLayer: () => {
+    const state = get();
+    const active = state.doc.layers.find((layer) => layer.id === state.doc.activeLayerId);
+    if (active && active.kind === 'raster' && !active.locked) return active.id;
+    const top = [...state.doc.layers]
+      .reverse()
+      .find((layer) => layer.kind === 'raster' && !layer.locked);
+    if (top) {
+      set((s) => ({ doc: { ...s.doc, activeLayerId: top.id } }));
+      return top.id;
+    }
+    const assetId = createBlankAsset(state.doc.width, state.doc.height);
+    const layer = createRasterLayer({
+      assetId,
+      width: state.doc.width,
+      height: state.doc.height,
+      name: nextLayerName(state.doc.layers, 'raster'),
+    });
+    get().addLayer(layer);
+    return layer.id;
+  },
+
+  addTextLayer: (x, y) => {
+    const layer = createTextLayer({ doc: get().doc, x, y });
+    get().addLayer(layer);
+    return layer.id;
+  },
+
+  addShapeLayer: (rect) => {
+    const doc = get().doc;
+    const layer = createShapeLayer({ doc, shape: get().shapeKind });
+    const next: typeof layer = {
+      ...layer,
+      x: rect.x,
+      y: rect.y,
+      width: Math.max(8, rect.width),
+      height: Math.max(8, rect.height),
+    };
+    get().addLayer(next);
+    return next.id;
+  },
+
+  addImageLayer: (assetId, width, height, name) => {
+    const doc = get().doc;
+    // 超出画布的大图按「适应画布」缩放，避免打开 4000px 照片后只能看到局部
+    const scale = Math.min(1, doc.width / width, doc.height / height);
+    const layer = createRasterLayer({
+      assetId,
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale)),
+      name,
+      x: Math.round((doc.width - width * scale) / 2),
+      y: Math.round((doc.height - height * scale) / 2),
+    });
+    get().addLayer(layer);
+  },
+
+  bumpRev: (id) =>
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        layers: s.doc.layers.map((layer) =>
+          layer.id === id && layer.kind === 'raster' ? { ...layer, rev: layer.rev + 1 } : layer,
+        ),
+      },
+    })),
+
+  commit: () =>
+    set((s) => ({ past: [...s.past, cloneDoc(s.doc)].slice(-HISTORY_LIMIT), future: [] })),
+
+  /**
+   * 像素操作前的快照：把目标图层的位图复制一份，
+   * 使历史中的 doc 指向「改写前」的画布（资产不可变，撤销即可还原笔迹）。
+   */
+  commitPixels: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer || layer.kind !== 'raster') {
+      state.commit();
+      return;
+    }
+    const clonedAsset = cloneAsset(layer.assetId);
+    const snapshot = cloneDoc(state.doc);
+    const target = snapshot.layers.find((item) => item.id === id);
+    if (target && target.kind === 'raster' && clonedAsset) target.assetId = clonedAsset;
+    set({ past: [...state.past, snapshot].slice(-HISTORY_LIMIT), future: [] });
+  },
+
+  undo: () => {
+    const state = get();
+    const previous = state.past[state.past.length - 1];
+    if (!previous) return;
+    set({
+      past: state.past.slice(0, -1),
+      future: [cloneDoc(state.doc), ...state.future].slice(0, HISTORY_LIMIT),
+      doc: previous,
+      selection: null,
+      cropRect: null,
+    });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  redo: () => {
+    const state = get();
+    const next = state.future[0];
+    if (!next) return;
+    set({
+      past: [...state.past, cloneDoc(state.doc)].slice(-HISTORY_LIMIT),
+      future: state.future.slice(1),
+      doc: next,
+      selection: null,
+      cropRect: null,
+    });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+}));
+
+/* --------------------------- 合并 / 拼合辅助 --------------------------- */
+
+/** 把上方位图图层按几何、不透明度与混合模式烘焙进下方位图图层 */
+function mergeRasterPair(bottom: Layer, top: Layer): Layer | null {
+  if (bottom.kind !== 'raster' || top.kind !== 'raster') return null;
+  // 以两图层并集为合并后画布，避免裁掉超出底图的部分
+  const minX = Math.min(bottom.x, top.x);
+  const minY = Math.min(bottom.y, top.y);
+  const maxX = Math.max(bottom.x + bottom.width, top.x + top.width);
+  const maxY = Math.max(bottom.y + bottom.height, top.y + top.height);
+  const width = Math.max(1, Math.round(maxX - minX));
+  const height = Math.max(1, Math.round(maxY - minY));
+  const canvas = createCanvasElement(width, height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.translate(-minX, -minY);
+  paintLayer(ctx, bottom);
+  paintLayer(ctx, top);
+  return {
+    ...bottom,
+    assetId: registerCanvas(canvas),
+    rev: bottom.rev + 1,
+    x: minX,
+    y: minY,
+    width,
+    height,
+  };
+}
+
+/** 拼合所有可见图层为一张位图（等价于 PS 的「合并可见图层」） */
+export function flattenLayers(doc: PhotoDoc): Layer | null {
+  const canvas = createCanvasElement(doc.width, doc.height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  paintDoc(ctx, doc, { signaturePrefix: 'flat' });
+  return {
+    id: createId('raster'),
+    kind: 'raster',
+    name: '合并图层',
+    visible: true,
+    locked: false,
+    opacity: 1,
+    blend: 'normal',
+    x: 0,
+    y: 0,
+    width: doc.width,
+    height: doc.height,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+    assetId: registerCanvas(canvas),
+    rev: 1,
+    adjustments: createAdjustments(),
+    filters: [],
+  };
+}
+
+/** 套索顶点 → 选区（顺带算外接矩形并抽稀） */
+export function selectionFromPath(path: number[], feather: number): Selection | null {
+  const simplified = simplifyPath(path);
+  if (simplified.length < 6) return null;
+  const bounds = polygonBounds(simplified);
+  if (bounds.width < 2 || bounds.height < 2) return null;
+  return { kind: 'lasso', ...bounds, path: simplified, feather };
+}

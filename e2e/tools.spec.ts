@@ -622,6 +622,44 @@ test.describe('流程图编辑器（zh-CN）', () => {
   });
 });
 
+// 照片编辑器（zh-CN）
+test.describe('照片编辑器（zh-CN）', () => {
+  test.use({ locale: 'zh-CN' });
+
+  test('画布挂载 → 画笔落笔自动建图层 → 导出 PNG', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    // Konva 会注入 3 个 canvas（背景 / 内容 / 覆盖层）
+    expect(await page.locator('canvas').count()).toBeGreaterThanOrEqual(3);
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 0');
+
+    // 画笔工具：在没有图层时落笔会自动新建位图图层
+    await page.getByRole('button', { name: '画笔', exact: true }).click();
+    const canvasBox = (await page.getByLabel('photo canvas').boundingBox())!;
+    await page.mouse.move(canvasBox.x + 120, canvasBox.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox.x + 220, canvasBox.y + 200, { steps: 8 });
+    await page.mouse.up();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    // 导出对话框 → 下载 PNG
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出图片' }).click();
+    await page.getByRole('button', { name: '下载', exact: true }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.png$/);
+  });
+
+  test('新建画布对话框：指定尺寸后画布统计更新', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await page.getByRole('button', { name: '新建画布' }).click();
+    await page.getByLabel('宽度').fill('800');
+    await page.getByLabel('高度').fill('600');
+    await page.getByRole('button', { name: '创建' }).click();
+    await expect(page.getByTestId('photo-stats')).toContainText('800 × 600');
+  });
+});
+
 // 脑图编辑器（zh-CN）
 test.describe('脑图编辑器（zh-CN）', () => {
   test.use({ locale: 'zh-CN' });

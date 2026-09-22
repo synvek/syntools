@@ -20,6 +20,9 @@ const de = {
     filter: 'Tools filtern',
     filterPlaceholder: 'Filtern…',
     filterEmpty: 'Keine passenden Tools',
+    categoryActions: 'Kategorieaktionen',
+    expandAll: 'Alle Kategorien erweitern',
+    collapseAll: 'Alle Kategorien einklappen',
   },
   home: {
     title: 'Online-Toolbox für Entwickler',
@@ -122,6 +125,11 @@ const de = {
       name: 'Mindmap-Editor',
       description:
         'Mindmaps lokal erstellen: Bedienung per Tastatur, einklappbare Zweige, Layouts, Themen und PNG/SVG/Markdown-Export',
+    },
+    'photo-editor': {
+      name: 'Foto-Editor',
+      description:
+        'Mehrschichtige Bildbearbeitung im Browser: Ebenen, Auswahlen, Zuschneiden, Anpassungen, Filter, Pinsel und Text mit weiterbearbeitbarer Projektdatei',
     },
     base64: {
       name: 'Base64 kodieren / dekodieren',

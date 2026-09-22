@@ -108,6 +108,7 @@ import { slideEditorTool } from '@/tools/slide-editor';
 import { spreadsheetEditorTool } from '@/tools/spreadsheet-editor';
 import { flowchartEditorTool } from '@/tools/flowchart-editor';
 import { mindmapEditorTool } from '@/tools/mindmap-editor';
+import { photoEditorTool } from '@/tools/photo-editor';
 
 /**
  * 全项目唯一的聚合注册入口：新增工具仅需在此追加一行。
@@ -223,6 +224,7 @@ export const tools: ToolMeta[] = [
   slideEditorTool,
   flowchartEditorTool,
   mindmapEditorTool,
+  photoEditorTool,
 ];
 
 export const toolMap = new Map(tools.map((t) => [t.id, t]));

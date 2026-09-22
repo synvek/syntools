@@ -20,6 +20,9 @@ const en = {
     filter: 'Filter tools',
     filterPlaceholder: 'Filter…',
     filterEmpty: 'No matching tools',
+    categoryActions: 'Category actions',
+    expandAll: 'Expand all categories',
+    collapseAll: 'Collapse all categories',
   },
   home: {
     title: 'Developer Online Toolbox',
@@ -122,6 +125,11 @@ const en = {
       name: 'Mind Map Editor',
       description:
         'Draw mind maps locally: keyboard-first nodes, collapsible branches, layouts, themes and PNG/SVG/Markdown export',
+    },
+    'photo-editor': {
+      name: 'Photo Editor',
+      description:
+        'Multi-layer photo editing in your browser: layers, selections, crop, adjustments, filters, brush and text, with re-editable project files',
     },
     base64: {
       name: 'Base64 Encode / Decode',

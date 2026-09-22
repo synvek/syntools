@@ -20,6 +20,9 @@ const es = {
     filter: 'Filtrar herramientas',
     filterPlaceholder: 'Filtrar…',
     filterEmpty: 'No hay herramientas coincidentes',
+    categoryActions: 'Acciones de categoría',
+    expandAll: 'Expandir todas las categorías',
+    collapseAll: 'Contraer todas las categorías',
   },
   home: {
     title: 'Caja de herramientas online para desarrolladores',
@@ -122,6 +125,11 @@ const es = {
       name: 'Editor de mapas mentales',
       description:
         'Crea mapas mentales en local: nodos por teclado, ramas plegables, diseños, temas y exportación PNG/SVG/Markdown',
+    },
+    'photo-editor': {
+      name: 'Editor de fotos',
+      description:
+        'Edición de fotos por capas en el navegador: capas, selecciones, recorte, ajustes, filtros, pincel y texto, con proyecto re-editable',
     },
     base64: {
       name: 'Codificar / decodificar Base64',
