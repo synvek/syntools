@@ -134,6 +134,12 @@ const icons: Record<string, ReactNode> = {
     </>
   ),
   check: <path d="m5 12 5 5 9-10" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
   download: <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" />,
   upload: <path d="M12 15V3m0 0 4 4m-4-4L8 7M4 21h16" />,
   swap: <path d="M7 4v13m0 0-3-3m3 3 3-3M17 20V7m0 0-3 3m3-3 3-3" />,

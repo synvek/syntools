@@ -10,6 +10,7 @@ import {
   addChild,
   addSibling,
   childrenOf,
+  createId,
   duplicateSubtree,
   emptyDoc,
   findNode,
@@ -23,9 +24,65 @@ import {
   toggleCollapse,
   visibleChildrenOf,
 } from './model/tree';
-import type { MindDoc, MindLayoutDirection, MindNodeRec, MindSide } from './model/types';
+import { serializeDoc } from './io/projectJson';
+import type {
+  MindDoc,
+  MindLayoutDirection,
+  MindNodeRec,
+  MindProject,
+  MindSheet,
+  MindSide,
+} from './model/types';
 
 const HISTORY_LIMIT = 50;
+
+/** 默认首页 id（新建文档与清空后使用） */
+export const DEFAULT_SHEET_ID = 'sheet-1';
+/** 默认首页名称 */
+export const DEFAULT_SHEET_NAME = '画布 1';
+
+/** 归一化输入为工程：null → 单张空白画布；v1 扁平文档 → 单画布；v2 多画布原样补默认 */
+function normalizeProject(input: MindProject | MindDoc | null): MindProject {
+  if (!input) {
+    const doc = emptyDoc();
+    return {
+      version: 2,
+      sheets: [{ id: DEFAULT_SHEET_ID, name: DEFAULT_SHEET_NAME, doc }],
+      activeSheetId: DEFAULT_SHEET_ID,
+    };
+  }
+  if ((input as MindProject).version === 2 && Array.isArray((input as MindProject).sheets)) {
+    const p = input as MindProject;
+    const sheets =
+      p.sheets.length > 0
+        ? p.sheets
+        : [{ id: DEFAULT_SHEET_ID, name: DEFAULT_SHEET_NAME, doc: emptyDoc() }];
+    const id =
+      p.activeSheetId && sheets.some((s) => s.id === p.activeSheetId)
+        ? p.activeSheetId
+        : sheets[0].id;
+    return {
+      version: 2,
+      ...(p.name === undefined ? {} : { name: p.name }),
+      sheets,
+      activeSheetId: id,
+    };
+  }
+  // 扁平 v1 文档 → 单画布
+  const doc = input as MindDoc;
+  return {
+    version: 2,
+    ...(doc.name === undefined ? {} : { name: doc.name }),
+    sheets: [{ id: doc.rootId, name: DEFAULT_SHEET_NAME, doc }],
+    activeSheetId: doc.rootId,
+  };
+}
+
+/** 取活动画布（无活动标记时取第一张） */
+function activeSheetOf(project: MindProject): MindSheet {
+  const id = project.activeSheetId;
+  return (id ? project.sheets.find((s) => s.id === id) : project.sheets[0]) ?? project.sheets[0];
+}
 
 /** 快照深拷贝：撤销栈只存纯数据，不含派生坐标 */
 function snapshotOf(doc: MindDoc): MindDoc {
@@ -52,8 +109,21 @@ interface MindState {
   past: MindDoc[];
   future: MindDoc[];
 
-  load: (doc: MindDoc | null) => void;
-  getDoc: () => MindDoc;
+  /** 多画布：文档标题 + 页面顺序与名称；活动页内容在 doc，其余页缓存在 sheetData */
+  docName: string;
+  sheetOrder: { id: string; name: string }[];
+  activeSheetId: string;
+  sheetData: Record<string, MindDoc>;
+  addSheet: (name?: string) => void;
+  switchSheet: (id: string) => void;
+  renameSheet: (id: string, name: string) => void;
+  removeSheet: (id: string) => void;
+  moveSheet: (id: string, dir: -1 | 1) => void;
+
+  load: (doc: MindProject | MindDoc | null) => void;
+  getDoc: () => MindProject;
+  /** 文档标题（导出文件名来源，不计入撤销历史） */
+  setDocName: (name: string) => void;
 
   commit: () => void;
   undo: () => void;
@@ -144,20 +214,146 @@ export const useMindStore = create<MindState>((set, get) => {
     editingId: null,
     past: [],
     future: [],
+    docName: '',
+    sheetOrder: [{ id: DEFAULT_SHEET_ID, name: DEFAULT_SHEET_NAME }],
+    activeSheetId: DEFAULT_SHEET_ID,
+    sheetData: {},
 
     load: (doc) => {
-      const next = doc ?? emptyDoc();
+      const project = normalizeProject(doc);
+      const sheet = activeSheetOf(project);
+      const sheetData: Record<string, MindDoc> = {};
+      for (const s of project.sheets) if (s.id !== sheet.id) sheetData[s.id] = s.doc;
       set({
-        doc: next,
-        layout: layoutMindmap(next),
-        selectedId: next.rootId,
+        doc: sheet.doc,
+        layout: layoutMindmap(sheet.doc),
+        selectedId: sheet.doc.rootId,
+        editingId: null,
+        past: [],
+        future: [],
+        docName: project.name ?? '',
+        sheetOrder: project.sheets.map((s) => ({ id: s.id, name: s.name })),
+        activeSheetId: sheet.id,
+        sheetData,
+      });
+    },
+
+    getDoc: () => {
+      const { doc, docName, sheetOrder, activeSheetId, sheetData } = get();
+      const active = serializeDoc(doc);
+      const sheets: MindSheet[] = sheetOrder.map((meta) => {
+        if (meta.id === activeSheetId) return { id: meta.id, name: meta.name, doc: active };
+        const cached = sheetData[meta.id];
+        return { id: meta.id, name: meta.name, doc: cached ?? emptyDoc() };
+      });
+      return {
+        version: 2,
+        ...(docName ? { name: docName } : {}),
+        sheets,
+        activeSheetId,
+      };
+    },
+
+    setDocName: (name) => set({ docName: name }),
+
+    addSheet: (name) => {
+      const state = get();
+      const project = state.getDoc();
+      const cur = project.sheets.find((s) => s.id === state.activeSheetId);
+      const blank = emptyDoc();
+      const id = createId('sheet');
+      set({
+        sheetOrder: [
+          ...state.sheetOrder,
+          { id, name: name?.trim() || `画布 ${state.sheetOrder.length + 1}` },
+        ],
+        activeSheetId: id,
+        sheetData: { ...state.sheetData, ...(cur ? { [state.activeSheetId]: cur.doc } : {}) },
+        doc: blank,
+        docName: state.docName,
+        layout: layoutMindmap(blank),
+        selectedId: blank.rootId,
         editingId: null,
         past: [],
         future: [],
       });
     },
 
-    getDoc: () => get().doc,
+    switchSheet: (id) => {
+      const state = get();
+      if (id === state.activeSheetId) return;
+      const project = state.getDoc();
+      const cur = project.sheets.find((s) => s.id === state.activeSheetId);
+      const target = project.sheets.find((s) => s.id === id);
+      if (!target) return;
+      const sheetData = { ...state.sheetData };
+      if (cur) sheetData[state.activeSheetId] = cur.doc;
+      delete sheetData[id];
+      set({
+        doc: target.doc,
+        docName: state.docName,
+        sheetOrder: state.sheetOrder,
+        activeSheetId: id,
+        sheetData,
+        layout: layoutMindmap(target.doc),
+        selectedId: target.doc.rootId,
+        editingId: null,
+        past: [],
+        future: [],
+      });
+    },
+
+    renameSheet: (id, name) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      set((s) => ({
+        sheetOrder: s.sheetOrder.map((p) => (p.id === id ? { ...p, name: trimmed } : p)),
+      }));
+    },
+
+    removeSheet: (id) => {
+      const state = get();
+      if (state.sheetOrder.length <= 1) return;
+      const idx = state.sheetOrder.findIndex((p) => p.id === id);
+      if (idx < 0) return;
+      const sheetOrder = state.sheetOrder.filter((p) => p.id !== id);
+      const sheetData = { ...state.sheetData };
+      delete sheetData[id];
+      if (id !== state.activeSheetId) {
+        set({ sheetOrder, sheetData });
+        return;
+      }
+      const next = sheetOrder[Math.min(idx, sheetOrder.length - 1)];
+      const project = state.getDoc();
+      const target = project.sheets.find((s) => s.id === next.id) ?? {
+        id: next.id,
+        name: next.name,
+        doc: emptyDoc(),
+      };
+      set({
+        sheetOrder,
+        sheetData,
+        activeSheetId: next.id,
+        doc: target.doc,
+        docName: state.docName,
+        layout: layoutMindmap(target.doc),
+        selectedId: target.doc.rootId,
+        editingId: null,
+        past: [],
+        future: [],
+      });
+    },
+
+    moveSheet: (id, dir) => {
+      set((s) => {
+        const idx = s.sheetOrder.findIndex((p) => p.id === id);
+        const nextIdx = idx + dir;
+        if (idx < 0 || nextIdx < 0 || nextIdx >= s.sheetOrder.length) return s;
+        const sheetOrder = [...s.sheetOrder];
+        [sheetOrder[idx], sheetOrder[nextIdx]] = [sheetOrder[nextIdx], sheetOrder[idx]];
+        return { sheetOrder };
+      });
+    },
 
     commit: () =>
       set((s) => ({ past: [...s.past, snapshotOf(s.doc)].slice(-HISTORY_LIMIT), future: [] })),

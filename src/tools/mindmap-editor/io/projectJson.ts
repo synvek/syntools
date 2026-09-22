@@ -11,6 +11,8 @@ import type {
   MindNodeRec,
   MindNodeShape,
   MindNodeStyle,
+  MindProject,
+  MindSheet,
   MindSide,
 } from '../model/types';
 
@@ -116,8 +118,10 @@ export function migrateDoc(input: unknown): MindDoc | null {
   }
 
   const themeId = asString(raw.themeId, DEFAULT_THEME_ID);
+  const name = typeof raw.name === 'string' ? raw.name : undefined;
   return {
     version: 1,
+    ...(name === undefined ? {} : { name }),
     rootId: root.id,
     nodes,
     direction: asDirection(raw.direction),
@@ -129,6 +133,7 @@ export function migrateDoc(input: unknown): MindDoc | null {
 export function serializeDoc(doc: MindDoc): MindDoc {
   return {
     version: 1,
+    ...(doc.name === undefined ? {} : { name: doc.name }),
     rootId: doc.rootId,
     nodes: doc.nodes.map((n) => ({
       id: n.id,
@@ -172,5 +177,79 @@ export function reassignIds(doc: MindDoc): MindDoc {
       parentId: n.parentId ? (map.get(n.parentId) ?? n.parentId) : null,
       style: n.style ? { ...n.style } : undefined,
     })),
+  };
+}
+
+/** 取工程的活动画布内容（无活动标记时取第一张） */
+export function activeSheetOf(project: MindProject): MindSheet {
+  const id = project.activeSheetId;
+  return (id ? project.sheets.find((s) => s.id === id) : project.sheets[0]) ?? project.sheets[0];
+}
+
+/** 规范化工程：兼容 v1 扁平文档与 v2 多画布，坏数据返回 null */
+export function migrateProject(input: unknown): MindProject | null {
+  if (!input || typeof input !== 'object') return null;
+  const raw = input as Record<string, unknown>;
+  const name = typeof raw.name === 'string' ? raw.name : undefined;
+
+  // v2 多画布
+  if (Array.isArray(raw.sheets)) {
+    const sheets: MindSheet[] = [];
+    raw.sheets.forEach((item, index) => {
+      if (!item || typeof item !== 'object') return;
+      const rec = item as Record<string, unknown>;
+      const doc = migrateDoc(rec.doc ?? rec); // 兼容 sheet.doc 嵌套或整段即 doc
+      if (!doc) return;
+      const id = asString(rec.id) || doc.rootId;
+      const sheetName = asString(rec.name) || `画布 ${index + 1}`;
+      sheets.push({ id, name: sheetName, doc });
+    });
+    if (sheets.length === 0) return null;
+    const declared = asString(raw.activeSheetId);
+    const activeSheetId = sheets.some((s) => s.id === declared) ? declared : sheets[0].id;
+    return { version: 2, ...(name === undefined ? {} : { name }), sheets, activeSheetId };
+  }
+
+  // v1 扁平文档 → 单画布
+  const doc = migrateDoc(raw);
+  if (!doc) return null;
+  return {
+    version: 2,
+    ...(name === undefined ? {} : { name }),
+    sheets: [{ id: doc.rootId, name: '画布 1', doc }],
+    activeSheetId: doc.rootId,
+  };
+}
+
+/** 深拷贝一份干净工程用于保存（每张画布丢弃内部字段） */
+export function serializeProject(project: MindProject): MindProject {
+  return {
+    version: 2,
+    ...(project.name === undefined ? {} : { name: project.name }),
+    ...(project.activeSheetId === undefined ? {} : { activeSheetId: project.activeSheetId }),
+    sheets: project.sheets.map((s) => ({ id: s.id, name: s.name, doc: serializeDoc(s.doc) })),
+  };
+}
+
+/** 导出为多画布工程文件文本（缩进 JSON） */
+export function toProjectJsonV2(project: MindProject): string {
+  return JSON.stringify(serializeProject(project), null, 2);
+}
+
+export function parseProjectJsonV2(text: string): MindProject | null {
+  try {
+    return migrateProject(JSON.parse(text));
+  } catch {
+    return null;
+  }
+}
+
+/** 把单张扁平文档包装为单画布工程 */
+export function singleSheetProject(doc: MindDoc): MindProject {
+  return {
+    version: 2,
+    ...(doc.name === undefined ? {} : { name: doc.name }),
+    sheets: [{ id: doc.rootId, name: '画布 1', doc }],
+    activeSheetId: doc.rootId,
   };
 }

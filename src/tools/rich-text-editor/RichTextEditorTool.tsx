@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
-import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
+import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
 import { Icon } from '@/core/components/Icon';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
@@ -180,93 +180,86 @@ export default function RichTextEditorTool() {
 
   return (
     <div className="flex flex-col gap-4">
-      <OptionBar>
-        <label className="flex min-w-[220px] flex-1 items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-          <span className="shrink-0">{t('tools.richText.docTitle')}</span>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t('tools.richText.titlePlaceholder')}
-            className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={handleNew}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          <Icon name="text" className="h-4 w-4" />
-          {t('common.newDoc')}
-        </button>
-      </OptionBar>
+      <DocumentHeader
+        titleLabel={t('tools.richText.docTitle')}
+        titlePlaceholder={t('tools.richText.titlePlaceholder')}
+        title={title}
+        onTitleChange={setTitle}
+        newLabel={t('common.newDoc')}
+        newIcon="text"
+        onNew={handleNew}
+        io={
+          <>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              title={t('tools.richText.importHint')}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="upload" className="h-4 w-4" />
+              {t('tools.richText.importDocx')}
+            </button>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
-        <button
-          type="button"
-          onClick={() => importInputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          <Icon name="upload" className="h-4 w-4" />
-          {t('tools.richText.importDocx')}
-        </button>
+            <button
+              type="button"
+              onClick={() => void handleExportDocx()}
+              disabled={busy !== null || isEmpty}
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="download" className="h-4 w-4" />
+              {busy === 'docx' ? t('tools.richText.exporting') : t('tools.richText.exportDocx')}
+            </button>
 
-        <button
-          type="button"
-          onClick={() => void handleExportDocx()}
-          disabled={busy !== null || isEmpty}
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Icon name="download" className="h-4 w-4" />
-          {busy === 'docx' ? t('tools.richText.exporting') : t('tools.richText.exportDocx')}
-        </button>
+            <label className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300">
+              {t('tools.richText.pdfMode')}
+              <select
+                value={pdfMode}
+                onChange={(e) => setPdfMode(e.target.value as PdfMode)}
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
+              >
+                <option value="text">{t('tools.richText.modeText')}</option>
+                <option value="snapshot">{t('tools.richText.modeSnapshot')}</option>
+              </select>
+            </label>
 
-        <label className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300">
-          {t('tools.richText.pdfMode')}
-          <select
-            value={pdfMode}
-            onChange={(e) => setPdfMode(e.target.value as PdfMode)}
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
-          >
-            <option value="text">{t('tools.richText.modeText')}</option>
-            <option value="snapshot">{t('tools.richText.modeSnapshot')}</option>
-          </select>
-        </label>
+            <button
+              type="button"
+              onClick={() => void handleExportPdf()}
+              disabled={busy !== null || isEmpty}
+              className="inline-flex items-center gap-1.5 rounded-md border border-blue-600 px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950"
+            >
+              <Icon name="pdf" className="h-4 w-4" />
+              {busy === 'pdf' ? t('tools.richText.exporting') : t('tools.richText.exportPdf')}
+            </button>
 
-        <button
-          type="button"
-          onClick={() => void handleExportPdf()}
-          disabled={busy !== null || isEmpty}
-          className="inline-flex items-center gap-1.5 rounded-md border border-blue-600 px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950"
-        >
-          <Icon name="pdf" className="h-4 w-4" />
-          {busy === 'pdf' ? t('tools.richText.exporting') : t('tools.richText.exportPdf')}
-        </button>
-
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {pdfMode === 'text'
-            ? t('tools.richText.modeTextHint')
-            : t('tools.richText.modeSnapshotHint')}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-        <div className="flex flex-wrap gap-3">
-          <span>
-            {t('tools.richText.chars')}: {stats.chars}
-          </span>
-          <span>
-            {t('tools.richText.words')}: {stats.words}
-          </span>
-          <span>
-            {t('tools.richText.paragraphs')}: {stats.paragraphs}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>{saved ? t('tools.richText.saved') : t('tools.richText.saving')}</span>
-          <ClearButton onClick={handleClear} disabled={isEmpty && !title} />
-        </div>
-      </div>
+            {/* 导出模式说明改为 tooltip，避免占用行内空间 */}
+            <HintTip
+              label={t('tools.richText.pdfMode')}
+              text={
+                pdfMode === 'text'
+                  ? t('tools.richText.modeTextHint')
+                  : t('tools.richText.modeSnapshotHint')
+              }
+            />
+          </>
+        }
+        stats={
+          <>
+            <span>
+              {t('tools.richText.chars')}: {stats.chars}
+            </span>
+            <span>
+              {t('tools.richText.words')}: {stats.words}
+            </span>
+            <span>
+              {t('tools.richText.paragraphs')}: {stats.paragraphs}
+            </span>
+          </>
+        }
+        status={saved ? t('tools.richText.saved') : t('tools.richText.saving')}
+        onClear={handleClear}
+        clearDisabled={isEmpty && !title}
+      />
 
       <EditorToolbar editor={editor} />
 

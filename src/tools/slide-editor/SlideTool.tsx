@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/core/components/ProgressBar';
-import { ClearButton } from '@/core/components/ActionButtons';
+import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
+import { Icon } from '@/core/components/Icon';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes } from '@/core/pdf/download';
@@ -50,6 +51,7 @@ export default function SlideTool() {
   const duplicateSelected = useSlideStore((s) => s.duplicateSelected);
   const patchSelected = useSlideStore((s) => s.patchSelected);
   const select = useSlideStore((s) => s.select);
+  const setDocName = useSlideStore((s) => s.setDocName);
 
   const [busy, setBusy] = useState<BusyKind>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -58,6 +60,7 @@ export default function SlideTool() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [rightTab, setRightTab] = useState<'element' | 'theme'>('element');
   const saveTimer = useRef<number | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const fail = useCallback((error: string, params?: Record<string, string | number>) => {
     setFailure({ error, params });
@@ -159,22 +162,53 @@ export default function SlideTool() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-13rem)] min-h-[520px] flex-col gap-3">
-      <SlideToolbar
-        busy={busy}
+    <div className="flex flex-col gap-3">
+      <DocumentHeader
+        titleLabel={t('tools.slide.docTitle')}
+        titlePlaceholder={t('tools.slide.titlePlaceholder')}
+        title={doc.name}
+        onTitleChange={setDocName}
+        newLabel={t('tools.slide.newDoc')}
+        newIcon="slides"
         onNew={handleNew}
-        onImportFile={(file) => void handleImport(file)}
-        onExport={() => void handleExport()}
-        onPresent={() => setPresenting(true)}
-        onFailure={(error) => fail(error)}
-      />
+        afterNew={
+          <button
+            type="button"
+            onClick={() => setPresenting(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Icon name="slides" className="h-4 w-4" />
+            {t('tools.slide.present')}
+          </button>
+        }
+        io={
+          <>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              disabled={busy !== null}
+              title={t('tools.slide.importHint')}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="upload" className="h-4 w-4" />
+              {busy === 'import' ? t('tools.slide.importing') : t('tools.slide.importPptx')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExport()}
+              disabled={busy !== null}
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="download" className="h-4 w-4" />
+              {busy === 'export' ? t('tools.slide.exporting') : t('tools.slide.exportPptx')}
+            </button>
 
-      <div className="flex min-h-0 flex-1 gap-3">
-        <ThumbnailRail />
-
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <SlideCanvas onRuntimeFailure={() => setRuntimeError(true)} />
-          <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-3 py-1.5 text-[11px] text-gray-500 dark:border-gray-700 dark:text-gray-400">
+            {/* 兼容性说明改为 tooltip，避免占用行内空间 */}
+            <HintTip text={t('tools.slide.unsupportedTip')} />
+          </>
+        }
+        stats={
+          <>
             <span>
               {t('tools.slide.slidesLabel')}: {doc.slides.length} · {slideIndex + 1}/
               {doc.slides.length}
@@ -189,10 +223,20 @@ export default function SlideTool() {
                 {t('tools.slide.downgraded', { count: report.placeholders })}
               </span>
             ) : null}
-            <span className="text-gray-400">{t('tools.slide.unsupportedTip')}</span>
-            <span>{draftSaved ? t('tools.slide.saved') : t('tools.slide.saving')}</span>
-            <ClearButton onClick={handleClear} />
-          </footer>
+          </>
+        }
+        status={draftSaved ? t('tools.slide.saved') : t('tools.slide.saving')}
+        onClear={handleClear}
+        clearDisabled={doc.slides.length === 0 && !doc.name.trim()}
+      />
+
+      <SlideToolbar onFailure={(error) => fail(error)} />
+
+      <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
+        <ThumbnailRail />
+
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <SlideCanvas onRuntimeFailure={() => setRuntimeError(true)} />
         </main>
 
         <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/40">
@@ -238,6 +282,18 @@ export default function SlideTool() {
           {translateToolError('tools.slide', { ok: false, error: 'RUNTIME_FAILED' })}
         </p>
       ) : null}
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".pptx"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) void handleImport(file);
+        }}
+      />
 
       {presenting ? <PresentOverlay onClose={() => setPresenting(false)} /> : null}
     </div>

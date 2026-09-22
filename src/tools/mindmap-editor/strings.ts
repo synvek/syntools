@@ -12,6 +12,10 @@ const zh: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: '新建脑图',
+      addSheet: '新建画布',
+      renameHint: '双击可重命名',
+      docTitle: '脑图标题',
+      titlePlaceholder: '未命名脑图',
       templates: '模板',
       undo: '撤销',
       redo: '重做',
@@ -98,6 +102,10 @@ const en: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: 'New map',
+      addSheet: 'New canvas',
+      renameHint: 'Double-click to rename',
+      docTitle: 'Mind map title',
+      titlePlaceholder: 'Untitled mind map',
       templates: 'Templates',
       undo: 'Undo',
       redo: 'Redo',
@@ -184,6 +192,10 @@ const zhTW: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: '新增心智圖',
+      addSheet: '新增畫布',
+      renameHint: '雙擊可重新命名',
+      docTitle: '心智圖標題',
+      titlePlaceholder: '未命名心智圖',
       templates: '模板',
       undo: '復原',
       redo: '重做',
@@ -270,6 +282,10 @@ const ja: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: '新規マインドマップ',
+      addSheet: '新規キャンバス',
+      renameHint: 'ダブルクリックで名前変更',
+      docTitle: 'マインドマップのタイトル',
+      titlePlaceholder: '無題のマインドマップ',
       templates: 'テンプレート',
       undo: '元に戻す',
       redo: 'やり直し',
@@ -356,6 +372,10 @@ const fr: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: 'Nouvelle carte',
+      addSheet: 'Nouveau canevas',
+      renameHint: 'Double-cliquez pour renommer',
+      docTitle: 'Titre de la carte',
+      titlePlaceholder: 'Carte sans titre',
       templates: 'Modèles',
       undo: 'Annuler',
       redo: 'Rétablir',
@@ -442,6 +462,10 @@ const de: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: 'Neue Map',
+      addSheet: 'Neue Fläche',
+      renameHint: 'Doppelklick zum Umbenennen',
+      docTitle: 'Map-Titel',
+      titlePlaceholder: 'Unbenannte Map',
       templates: 'Vorlagen',
       undo: 'Rückgängig',
       redo: 'Wiederholen',
@@ -528,6 +552,10 @@ const it: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: 'Nuova mappa',
+      addSheet: 'Nuova tela',
+      renameHint: 'Doppio clic per rinominare',
+      docTitle: 'Titolo della mappa',
+      titlePlaceholder: 'Mappa senza titolo',
       templates: 'Modelli',
       undo: 'Annulla',
       redo: 'Ripeti',
@@ -614,6 +642,10 @@ const es: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: 'Nuevo mapa',
+      addSheet: 'Nuevo lienzo',
+      renameHint: 'Doble clic para renombrar',
+      docTitle: 'Título del mapa',
+      titlePlaceholder: 'Mapa sin título',
       templates: 'Plantillas',
       undo: 'Deshacer',
       redo: 'Rehacer',
@@ -700,6 +732,10 @@ const pt: ResourceTree = {
   tools: {
     mindmap: {
       newDoc: 'Novo mapa',
+      addSheet: 'Nova tela',
+      renameHint: 'Duplo clique para renomear',
+      docTitle: 'Título do mapa',
+      titlePlaceholder: 'Mapa sem título',
       templates: 'Modelos',
       undo: 'Desfazer',
       redo: 'Refazer',

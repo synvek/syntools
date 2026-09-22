@@ -249,6 +249,8 @@ export interface FlowPage {
 /** v2：多页文档（当前规范形态） */
 export interface FlowDocV2 {
   version: 2;
+  /** 文档标题：导出文件名来源（与工具栏标题输入框一致） */
+  name?: string;
   pages: FlowPage[];
   activePageId?: string;
 }

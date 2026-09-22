@@ -3,7 +3,6 @@ import { useReactFlow } from '@xyflow/react';
 import { useMindStore } from '../store';
 import { MIND_DIRECTIONS } from '../model/types';
 import type { MindLayoutDirection } from '../model/types';
-import { IoMenu } from './IoMenu';
 
 interface ToolbarButtonProps {
   label: string;
@@ -54,14 +53,10 @@ const DIRECTION_GLYPH: Record<MindLayoutDirection, string> = {
 };
 
 interface ToolbarProps {
-  onNew: () => void;
   onTemplates: () => void;
-  busy: boolean;
-  setBusy: (v: boolean) => void;
-  onError: (message: string | null) => void;
 }
 
-export function Toolbar({ onNew, onTemplates, busy, setBusy, onError }: ToolbarProps) {
+export function Toolbar({ onTemplates }: ToolbarProps) {
   const { t } = useTranslation();
   const { fitView } = useReactFlow();
   const canUndo = useMindStore((s) => s.past.length > 0);
@@ -76,7 +71,6 @@ export function Toolbar({ onNew, onTemplates, busy, setBusy, onError }: ToolbarP
   return (
     <div className="flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900">
       <div className="flex flex-wrap items-center gap-1.5">
-        <ToolbarButton label={t('tools.mindmap.newDoc')} onClick={onNew} primary glyph="＋" />
         <ToolbarButton label={t('tools.mindmap.templates')} onClick={onTemplates} />
 
         {sep}
@@ -103,10 +97,6 @@ export function Toolbar({ onNew, onTemplates, busy, setBusy, onError }: ToolbarP
           onClick={() => useMindStore.getState().removeAt()}
           disabled={isRoot}
         />
-
-        <div className="ml-auto flex items-center">
-          <IoMenu busy={busy} setBusy={setBusy} onError={onError} />
-        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1">

@@ -14,6 +14,8 @@ const zh: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: '新建画布',
+      docTitle: '流程图标题',
+      titlePlaceholder: '未命名流程图',
       clear: '清空',
       exportPng: '导出 PNG',
       exportSvg: '导出 SVG',
@@ -158,6 +160,8 @@ const en: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: 'New canvas',
+      docTitle: 'Diagram title',
+      titlePlaceholder: 'Untitled diagram',
       clear: 'Clear',
       exportPng: 'Export PNG',
       exportSvg: 'Export SVG',
@@ -302,6 +306,8 @@ const zhTW: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: '新增畫布',
+      docTitle: '流程圖標題',
+      titlePlaceholder: '未命名流程圖',
       clear: '清空',
       exportPng: '匯出 PNG',
       exportSvg: '匯出 SVG',
@@ -426,6 +432,8 @@ const ja: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: '新規キャンバス',
+      docTitle: 'フローチャートのタイトル',
+      titlePlaceholder: '無題のフローチャート',
       clear: 'クリア',
       exportPng: 'PNG 書き出し',
       exportSvg: 'SVG 書き出し',
@@ -550,6 +558,8 @@ const fr: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: 'Nouveau canevas',
+      docTitle: 'Titre du diagramme',
+      titlePlaceholder: 'Diagramme sans titre',
       clear: 'Effacer',
       exportPng: 'Exporter PNG',
       exportSvg: 'Exporter SVG',
@@ -674,6 +684,8 @@ const de: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: 'Neue Fläche',
+      docTitle: 'Diagrammtitel',
+      titlePlaceholder: 'Unbenanntes Diagramm',
       clear: 'Leeren',
       exportPng: 'PNG exportieren',
       exportSvg: 'SVG exportieren',
@@ -798,6 +810,8 @@ const it: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: 'Nuova tela',
+      docTitle: 'Titolo del diagramma',
+      titlePlaceholder: 'Diagramma senza titolo',
       clear: 'Pulisci',
       exportPng: 'Esporta PNG',
       exportSvg: 'Esporta SVG',
@@ -922,6 +936,8 @@ const es: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: 'Nuevo lienzo',
+      docTitle: 'Título del diagrama',
+      titlePlaceholder: 'Diagrama sin título',
       clear: 'Vaciar',
       exportPng: 'Exportar PNG',
       exportSvg: 'Exportar SVG',
@@ -1046,6 +1062,8 @@ const pt: ResourceTree = {
   tools: {
     flowchart: {
       newDoc: 'Nova tela',
+      docTitle: 'Título do diagrama',
+      titlePlaceholder: 'Diagrama sem título',
       clear: 'Limpar',
       exportPng: 'Exportar PNG',
       exportSvg: 'Exportar SVG',

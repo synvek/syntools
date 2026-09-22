@@ -31,30 +31,14 @@ const SHAPES: { key: string; geom: ShapeGeometry }[] = [
   },
 ];
 
-/** 顶部工具栏：文稿标题、撤销重做、插入、缩放、放映与导入导出 */
-export function SlideToolbar({
-  busy,
-  onNew,
-  onImportFile,
-  onExport,
-  onPresent,
-  onFailure,
-}: {
-  busy: 'import' | 'export' | null;
-  onNew: () => void;
-  onImportFile: (file: File) => void;
-  onExport: () => void;
-  onPresent: () => void;
-  onFailure: (errorCode: string) => void;
-}) {
+/** 工具栏行：插入元素 / 撤销重做 / 缩放 / 页面调整 */
+export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => void }) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
   const doc = useSlideStore((s) => s.doc);
   const scale = useSlideStore((s) => s.viewport.scale);
   const canUndo = useSlideStore((s) => s.past.length > 0);
   const canRedo = useSlideStore((s) => s.future.length > 0);
-  const setDocName = useSlideStore((s) => s.setDocName);
   const setScale = useSlideStore((s) => s.setScale);
   const setViewport = useSlideStore((s) => s.setViewport);
   const addElement = useSlideStore((s) => s.addElement);
@@ -91,16 +75,7 @@ export function SlideToolbar({
   return (
     <div className="flex flex-col gap-2">
       <div className="slide-glass flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 p-2 shadow-sm dark:border-gray-700">
-        <input
-          type="text"
-          value={doc.name}
-          aria-label={t('tools.slide.docTitle')}
-          placeholder={t('tools.slide.titlePlaceholder')}
-          onChange={(event) => setDocName(event.target.value)}
-          className="h-8 min-w-[160px] flex-1 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-        />
-
-        <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
+        <div className="flex items-center gap-1">
           <ToolButton label={t('tools.slide.insertText')} icon="text" onClick={insertText} />
           {SHAPES.map((shape) => (
             <button
@@ -124,6 +99,23 @@ export function SlideToolbar({
         </div>
 
         <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
+          <ToolButton
+            label={t('tools.slide.undo')}
+            icon="chevron"
+            onClick={undo}
+            disabled={!canUndo}
+          />
+          <ToolButton
+            label={t('tools.slide.redo')}
+            icon="chevron"
+            onClick={redo}
+            disabled={!canRedo}
+          />
+        </div>
+      </div>
+
+      <div className="slide-glass flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 p-2 shadow-sm dark:border-gray-700">
+        <div className="flex items-center gap-1">
           <button
             type="button"
             title={t('tools.slide.zoomOut')}
@@ -158,73 +150,20 @@ export function SlideToolbar({
             icon="swap"
             onClick={() => moveSlide(slideIndex, Math.max(0, slideIndex - 1))}
           />
-          <button
-            type="button"
-            onClick={() => importInputRef.current?.click()}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-2.5 text-[12px] text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            disabled={busy !== null}
-          >
-            <Icon name="upload" className="h-4 w-4" />
-            {busy === 'import' ? t('tools.slide.importing') : t('tools.slide.importPptx')}
-          </button>
-          <button
-            type="button"
-            onClick={onExport}
-            disabled={busy !== null}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-2.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Icon name="download" className="h-4 w-4" />
-            {busy === 'export' ? t('tools.slide.exporting') : t('tools.slide.exportPptx')}
-          </button>
-          <button
-            type="button"
-            onClick={onPresent}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-2.5 text-[12px] text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            <Icon name="slides" className="h-4 w-4" />
-            {t('tools.slide.present')}
-          </button>
         </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (file) void handleImage(file);
-          }}
-        />
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".pptx"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (file) onImportFile(file);
-          }}
-        />
       </div>
 
-      <div className="slide-glass flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 p-2 shadow-sm dark:border-gray-700">
-        <ToolButton label={t('tools.slide.newDoc')} icon="slides" onClick={onNew} />
-        <ToolButton
-          label={t('tools.slide.undo')}
-          icon="chevron"
-          onClick={undo}
-          disabled={!canUndo}
-        />
-        <ToolButton
-          label={t('tools.slide.redo')}
-          icon="chevron"
-          onClick={redo}
-          disabled={!canRedo}
-        />
-      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) void handleImage(file);
+        }}
+      />
     </div>
   );
 }

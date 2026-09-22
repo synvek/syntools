@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
+import { DocumentHeader } from '@/core/components/DocumentHeader';
 import { i18n } from '@/core/i18n';
 import { useMindStore } from './store';
 import { clearDraft, readDraft, writeDraft } from './draft';
@@ -8,10 +9,12 @@ import { registerMindmapStrings } from './strings';
 import { buildMindTemplate, type MindTemplateKind } from './model/templates';
 import { countOf } from './model/tree';
 import { MindCanvas } from './ui/MindCanvas';
+import { IoMenu } from './ui/IoMenu';
 import { Toolbar } from './ui/Toolbar';
 import { OutlinePanel } from './ui/OutlinePanel';
 import { Inspector } from './ui/Inspector';
 import { TemplatePanel } from './ui/TemplatePanel';
+import { SheetTabs } from './ui/SheetTabs';
 import './mindmap.css';
 import '@xyflow/react/dist/style.css';
 
@@ -26,6 +29,8 @@ function MindmapInner() {
 
   const doc = useMindStore((s) => s.doc);
   const selectedId = useMindStore((s) => s.selectedId);
+  const docName = useMindStore((s) => s.docName);
+  const setDocName = useMindStore((s) => s.setDocName);
 
   const [busy, setBusy] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -77,6 +82,13 @@ function MindmapInner() {
     setDraftSaved(false);
     fitViewSoon();
   }, [t, fitViewSoon]);
+
+  const handleClear = useCallback(() => {
+    useMindStore.getState().load(null);
+    clearDraft();
+    setDraftSaved(false);
+    fitViewSoon();
+  }, [fitViewSoon]);
 
   const handleTemplate = useCallback(
     (kind: MindTemplateKind) => {
@@ -151,16 +163,35 @@ function MindmapInner() {
   const onlyRoot = doc.nodes.length <= 1;
 
   return (
-    <div className="flex h-[calc(100vh-13rem)] min-h-[520px] flex-col gap-3">
-      <Toolbar
+    <div className="flex flex-col gap-3">
+      <DocumentHeader
+        titleLabel={t('tools.mindmap.docTitle')}
+        titlePlaceholder={t('tools.mindmap.titlePlaceholder')}
+        title={docName}
+        onTitleChange={setDocName}
+        newLabel={t('tools.mindmap.newDoc')}
+        newIcon="mindmap"
         onNew={handleNew}
-        onTemplates={() => setTemplatesOpen(true)}
-        busy={busy}
-        setBusy={setBusy}
-        onError={setFailure}
+        io={<IoMenu busy={busy} setBusy={setBusy} onError={setFailure} />}
+        stats={
+          <>
+            <span>
+              {t('tools.mindmap.nodesLabel')}: {counts.nodes} · {t('tools.mindmap.branchesLabel')}:{' '}
+              {counts.edges}
+              {selectedId ? ` · ${t('tools.mindmap.selectedOne')}` : ''}
+            </span>
+          </>
+        }
+        status={draftSaved ? t('tools.mindmap.saved') : t('tools.mindmap.saving')}
+        onClear={handleClear}
+        clearDisabled={onlyRoot && !docName.trim()}
       />
 
-      <div className="flex min-h-0 flex-1 gap-3">
+      <Toolbar onTemplates={() => setTemplatesOpen(true)} />
+
+      <SheetTabs />
+
+      <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
         <OutlinePanel />
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
@@ -179,15 +210,6 @@ function MindmapInner() {
 
         <Inspector />
       </div>
-
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-1 py-1 text-[11px] text-gray-500 dark:border-gray-700 dark:text-gray-400">
-        <span>
-          {t('tools.mindmap.nodesLabel')}: {counts.nodes} · {t('tools.mindmap.branchesLabel')}:{' '}
-          {counts.edges}
-          {selectedId ? ` · ${t('tools.mindmap.selectedOne')}` : ''}
-        </span>
-        <span>{draftSaved ? t('tools.mindmap.saved') : t('tools.mindmap.saving')}</span>
-      </footer>
 
       {failure ? (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

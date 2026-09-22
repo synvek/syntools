@@ -135,6 +135,9 @@ function edgesFromPage(page: FlowPage): FlowEdge[] {
 }
 
 interface FlowState {
+  /** 文档标题：导出文件名来源 */
+  docName: string;
+  setDocName: (name: string) => void;
   nodes: FlowNode[];
   edges: FlowEdge[];
   selectedNodes: string[];
@@ -205,6 +208,8 @@ interface FlowState {
 }
 
 export const useFlowStore = create<FlowState>((set, get) => ({
+  docName: '',
+  setDocName: (name) => set({ docName: name }),
   nodes: [],
   edges: [],
   selectedNodes: [],
@@ -252,14 +257,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       pageData: {} as Record<string, FlowPage>,
     };
     if (!doc) {
-      set({ ...empty, ...defaultPages });
+      set({ ...empty, ...defaultPages, docName: '' });
       return;
     }
     // 迁移到 v2 后按页恢复：旧版 v1 草稿也能正常读取，多页结构一并保留
     const normalized = migrateDoc(doc);
     const page = activePageOf(normalized);
     if (!normalized || !page) {
-      set({ ...empty, ...defaultPages });
+      set({ ...empty, ...defaultPages, docName: '' });
       return;
     }
     const pageData: Record<string, FlowPage> = {};
@@ -269,6 +274,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set((s) => ({
       nodes: nodesFromPage(page),
       edges: edgesFromPage(page),
+      docName: normalized.name ?? '',
       pageOrder: normalized.pages.map((p) => ({ id: p.id, name: p.name })),
       activePageId: page.id,
       pageData,
@@ -280,7 +286,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   getDoc: () => {
-    const { nodes, edges, pageOrder, activePageId, pageData } = get();
+    const { nodes, edges, pageOrder, activePageId, pageData, docName } = get();
     // 活动页即时序列化（拿到最新的 FlowNodeRec / FlowEdgeRec）
     const current = serializeDoc(
       nodes.map((n) => ({
@@ -316,7 +322,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         edges: cached?.edges ?? [],
       };
     });
-    return { version: 2, pages, activePageId };
+    return {
+      version: 2,
+      ...(docName ? { name: docName } : {}),
+      pages,
+      activePageId,
+    };
   },
 
   commit: () =>

@@ -100,7 +100,13 @@ export function migrateDoc(raw: unknown): FlowDoc | null {
     const wanted = raw.activePageId;
     const active =
       typeof wanted === 'string' && pages.some((p) => p.id === wanted) ? wanted : pages[0].id;
-    return { version: 2, pages, activePageId: active };
+    const name = typeof raw.name === 'string' ? raw.name : undefined;
+    return {
+      version: 2,
+      ...(name === undefined ? {} : { name }),
+      pages,
+      activePageId: active,
+    };
   }
 
   if (Array.isArray(raw.nodes)) {

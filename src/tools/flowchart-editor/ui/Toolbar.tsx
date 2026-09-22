@@ -22,7 +22,6 @@ import {
   type EdgeType,
   type FlowEdgeStyle,
 } from '../model/types';
-import { IoMenu } from './IoMenu';
 
 /** 连线宽度可选值（与 normalizeEdgeStyle 的 1~8 限制一致） */
 const EDGE_WIDTH_OPTIONS = ['1', '2', '3', '4', '5', '6', '8'];
@@ -154,19 +153,14 @@ const LAYER_BUTTONS: Array<{ op: LayerOp; glyph: string; key: string }> = [
 ];
 
 interface ToolbarProps {
-  onNew: () => void;
   onTemplates: () => void;
   onAutoLayout: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  onClear: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  busy: boolean;
-  setBusy: (v: boolean) => void;
-  onError: (message: string | null) => void;
 }
 
 export function Toolbar(props: ToolbarProps) {
@@ -204,14 +198,8 @@ export function Toolbar(props: ToolbarProps) {
   return (
     <div className="flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900">
       <div className="flex flex-wrap items-center gap-1.5">
-        <ToolbarButton
-          label={t('tools.flowchart.newDoc')}
-          onClick={props.onNew}
-          icon={<span className="text-base leading-none">＋</span>}
-        />
         <ToolbarButton label={t('tools.flowchart.templates')} onClick={props.onTemplates} />
         <ToolbarButton label={t('tools.flowchart.autoLayout')} onClick={props.onAutoLayout} />
-        <ToolbarButton label={t('tools.flowchart.clear')} onClick={props.onClear} />
 
         {sep}
 
@@ -227,10 +215,6 @@ export function Toolbar(props: ToolbarProps) {
         />
         <ToolbarButton label={t('tools.flowchart.duplicate')} onClick={props.onDuplicate} />
         <ToolbarButton label={t('tools.flowchart.delete')} onClick={props.onDelete} />
-
-        <div className="ml-auto flex items-center">
-          <IoMenu busy={props.busy} setBusy={props.setBusy} onError={props.onError} />
-        </div>
       </div>
 
       {/* 排列：对齐 / 分布 / 层级 / 编组 */}

@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Icon } from '@/core/components/Icon';
 import { useFlowStore } from '../store';
 import {
   DEFAULT_RASTER_OPTIONS,
@@ -32,9 +33,11 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
     setOpen(false);
     onError(null);
     const state = useFlowStore.getState();
+    // 导出文件名取自工具栏的文档标题
+    const filename = state.docName.trim() || 'flowchart';
 
     if (TEXT_KINDS.includes(kind)) {
-      const ok = exportText(state.getDoc(), kind, 'flowchart');
+      const ok = exportText(state.getDoc(), kind, filename);
       if (!ok) onError(t('tools.flowchart.err.EXPORT_FAILED'));
       return;
     }
@@ -46,7 +49,7 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
     const result = await exportRaster(
       nodes,
       { ...options, format: kind as RasterFormat },
-      'flowchart',
+      filename,
     );
     setBusy(false);
     if (!result.ok) {
@@ -81,15 +84,17 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
           type="button"
           onClick={() => setOpen((v) => !v)}
           disabled={busy}
-          className="h-8 rounded-lg bg-blue-600 px-3 text-[13px] font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
+          <Icon name="download" className="h-4 w-4" />
           {t('tools.flowchart.exportPanel')}
         </button>
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="h-8 rounded-lg border border-gray-200 bg-white px-3 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
         >
+          <Icon name="upload" className="h-4 w-4" />
           {t('tools.flowchart.importFile')}
         </button>
         <input

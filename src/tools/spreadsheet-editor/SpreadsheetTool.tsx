@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
+import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
 import { clearDraft, readDraft, writeDraft } from './draft';
 import { Icon } from '@/core/components/Icon';
 import { ProgressBar } from '@/core/components/ProgressBar';
@@ -212,64 +212,49 @@ export default function SpreadsheetTool() {
 
   return (
     <div className="flex flex-col gap-4">
-      <OptionBar>
-        <label className="flex min-w-[220px] flex-1 items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-          <span className="shrink-0">{t('tools.sheet.docTitle')}</span>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t('tools.sheet.titlePlaceholder')}
-            className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={handleNew}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          <Icon name="sheet" className="h-4 w-4" />
-          {t('common.newDoc')}
-        </button>
-      </OptionBar>
+      <DocumentHeader
+        titleLabel={t('tools.sheet.docTitle')}
+        titlePlaceholder={t('tools.sheet.titlePlaceholder')}
+        title={title}
+        onTitleChange={setTitle}
+        newLabel={t('common.newDoc')}
+        newIcon="sheet"
+        onNew={handleNew}
+        io={
+          <>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              title={t('tools.sheet.importHint')}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="upload" className="h-4 w-4" />
+              {t('tools.sheet.importXlsx')}
+            </button>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
-        <button
-          type="button"
-          onClick={() => importInputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          <Icon name="upload" className="h-4 w-4" />
-          {t('tools.sheet.importXlsx')}
-        </button>
+            <button
+              type="button"
+              onClick={() => void handleExport()}
+              disabled={busy !== null || summary.cells === 0}
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="download" className="h-4 w-4" />
+              {busy === 'export' ? t('tools.sheet.exporting') : t('tools.sheet.exportXlsx')}
+            </button>
 
-        <button
-          type="button"
-          onClick={() => void handleExport()}
-          disabled={busy !== null || summary.cells === 0}
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Icon name="download" className="h-4 w-4" />
-          {busy === 'export' ? t('tools.sheet.exporting') : t('tools.sheet.exportXlsx')}
-        </button>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {t('tools.sheet.unsupportedTip')}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-        <div className="flex flex-wrap gap-3">
-          {stats.map((item) => (
-            <span key={item.label}>
-              {item.label}: {item.value}
-            </span>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <span>{draftSaved ? t('common.saved') : t('common.saving')}</span>
-          <ClearButton onClick={handleClear} disabled={summary.cells === 0 && !title.trim()} />
-        </div>
-      </div>
+            {/* 兼容性说明改为 tooltip，避免占用行内空间 */}
+            <HintTip text={t('tools.sheet.unsupportedTip')} />
+          </>
+        }
+        stats={stats.map((item) => (
+          <span key={item.label}>
+            {item.label}: {item.value}
+          </span>
+        ))}
+        status={draftSaved ? t('common.saved') : t('common.saving')}
+        onClear={handleClear}
+        clearDisabled={summary.cells === 0 && !title.trim()}
+      />
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div ref={containerRef} className="sheet-canvas" />

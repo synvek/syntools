@@ -9,9 +9,18 @@ import {
   type RasterExportOptions,
   type RasterFormat,
 } from './raster';
-import { parseProjectJson, serializeDoc, toProjectJson } from './projectJson';
+import {
+  activeSheetOf,
+  parseProjectJson,
+  parseProjectJsonV2,
+  serializeDoc,
+  serializeProject,
+  singleSheetProject,
+  toProjectJson,
+  toProjectJsonV2,
+} from './projectJson';
 import { fromMarkdown, toMarkdown } from './markdown';
-import type { MindDoc } from '../model/types';
+import type { MindProject } from '../model/types';
 
 export type ExportKind = 'png' | 'jpeg' | 'svg' | 'pdf' | 'project' | 'markdown';
 
@@ -42,11 +51,11 @@ export function downloadText(text: string, filename: string, mime: string): void
   URL.revokeObjectURL(url);
 }
 
-/** 文本文件类导出（项目 JSON / Markdown 大纲） */
-export function exportText(doc: MindDoc, kind: ExportKind, filename: string): boolean {
+/** 文本文件类导出（工程 JSON / Markdown 大纲） */
+export function exportText(project: MindProject, kind: ExportKind, filename: string): boolean {
   let text = '';
-  if (kind === 'project') text = toProjectJson(doc);
-  else if (kind === 'markdown') text = toMarkdown(doc);
+  if (kind === 'project') text = toProjectJsonV2(project);
+  else if (kind === 'markdown') text = toMarkdown(activeSheetOf(project).doc);
   else return false;
   if (!text) return false;
   const meta = metaOf(kind);
@@ -55,13 +64,19 @@ export function exportText(doc: MindDoc, kind: ExportKind, filename: string): bo
 }
 
 /** 按文件内容猜测并解析：JSON → 工程文件，否则按 Markdown 大纲 */
-export function parseImportedFile(name: string, text: string): MindDoc | null {
+export function parseImportedFile(name: string, text: string): MindProject | null {
   const lower = name.toLowerCase();
-  if (lower.endsWith('.json')) return parseProjectJson(text);
   if (lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.txt')) {
-    return fromMarkdown(text);
+    const doc = fromMarkdown(text);
+    return doc ? singleSheetProject(doc) : null;
   }
-  return parseProjectJson(text) ?? fromMarkdown(text);
+  return (
+    parseProjectJsonV2(text) ??
+    (() => {
+      const doc = fromMarkdown(text);
+      return doc ? singleSheetProject(doc) : null;
+    })()
+  );
 }
 
 export {
@@ -69,8 +84,12 @@ export {
   exportRaster,
   fromMarkdown,
   parseProjectJson,
+  parseProjectJsonV2,
   serializeDoc,
+  serializeProject,
+  singleSheetProject,
   toMarkdown,
   toProjectJson,
+  toProjectJsonV2,
 };
 export type { RasterExportOptions, RasterFormat };

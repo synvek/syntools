@@ -42,6 +42,8 @@ export interface MindNodeRec {
 
 export interface MindDoc {
   version: 1;
+  /** 文档标题：导出文件名来源（与工具栏标题输入框一致） */
+  name?: string;
   rootId: string;
   nodes: MindNodeRec[];
   direction: MindLayoutDirection;
@@ -53,3 +55,19 @@ export const MIND_DIRECTIONS: MindLayoutDirection[] = ['right', 'both', 'down'];
 export const MIND_SHAPES: MindNodeShape[] = ['rounded', 'pill', 'underline', 'rect', 'ellipse'];
 
 export const MIND_ALIGNS: MindAlign[] = ['left', 'center', 'right'];
+
+/** 单张画布（脑图一个 sheet）复用 MindDoc 作为内容载体 */
+export interface MindSheet {
+  id: string;
+  name: string;
+  doc: MindDoc;
+}
+
+/** 多画布工程（持久化形态）：文档标题 + 多张画布 */
+export interface MindProject {
+  version: 2;
+  /** 文档标题：导出文件名来源（与工具栏标题输入框一致） */
+  name?: string;
+  sheets: MindSheet[];
+  activeSheetId?: string;
+}
