@@ -1,9 +1,11 @@
 import { forwardRef, useCallback, useEffect, useRef, type DragEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
   ConnectionMode,
+  ControlButton,
   Controls,
   MiniMap,
   PanOnScrollMode,
@@ -100,7 +102,8 @@ function HelperLines() {
 }
 
 const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
-  const { screenToFlowPosition } = useReactFlow();
+  const { t } = useTranslation();
+  const { screenToFlowPosition, fitView, zoomTo } = useReactFlow();
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
   const onNodesChangeStore = useFlowStore((s) => s.onNodesChange);
@@ -358,7 +361,30 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         className="bg-gray-50 dark:bg-gray-950"
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cbd5e1" />
-        <Controls showInteractive={false} />
+        <Controls showZoom showFitView={false} showInteractive={false}>
+          <ControlButton
+            onClick={() => fitView({ padding: 0.3, minZoom: 0.2, maxZoom: 2.5 })}
+            title={t('tools.flowchart.fitView')}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+              <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+              <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+              <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+            </svg>
+          </ControlButton>
+          <ControlButton onClick={() => zoomTo(1)} title={t('tools.flowchart.zoomActual')}>
+            <span className="text-[11px] font-semibold">1:1</span>
+          </ControlButton>
+        </Controls>
         <MiniMap
           pannable
           zoomable

@@ -55,8 +55,9 @@ function FlowchartInner() {
   // 只在「载入整张图」（草稿 / 模板）时适配视图。
   // 不能用 fitView prop：它会在首个节点测量完成后自动适配，
   // 导致新图的第一个元素无论拖到哪里都被居中显示。
+  // 默认以 100%（实际大小）呈现：文字与元件尺寸贴近设计时的大小，避免一进来被无限缩小看不清。
   const fitViewSoon = useCallback(() => {
-    requestAnimationFrame(() => fitView({ padding: 0.3, maxZoom: 1 }));
+    requestAnimationFrame(() => fitView({ padding: 0.3, minZoom: 1, maxZoom: 1 }));
   }, [fitView]);
 
   // 首次挂载恢复本地草稿
