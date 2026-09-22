@@ -415,6 +415,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M8 12h6M14 12l2-4M14 12l2 4" />
     </>
   ),
+  mindmap: (
+    <>
+      <rect x="2" y="9.5" width="6" height="5" rx="2.5" />
+      <rect x="16" y="3" width="6" height="4.5" rx="2.25" />
+      <rect x="16" y="9.75" width="6" height="4.5" rx="2.25" />
+      <rect x="16" y="16.5" width="6" height="4.5" rx="2.25" />
+      <path d="M8 12h3.5v-6.5H16M11.5 12v6.5H16M11.5 12H16" />
+    </>
+  ),
   mermaid: (
     <>
       <path d="M5 8h5v4H5zM14 8h5v4h-5zM9.5 16h5v4h-5z" />

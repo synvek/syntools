@@ -115,6 +115,11 @@ const zhTW = {
       name: '流程圖編輯器',
       description: '本地繪製流程圖，支援節點連線、模板、自動排版與 PNG/SVG 匯出',
     },
+    'mindmap-editor': {
+      name: '心智圖編輯器',
+      description:
+        '本機繪製心智圖，支援鍵盤建立節點、摺疊分支、多種版面與主題，並可匯出 PNG/SVG/Markdown',
+    },
     base64: {
       name: 'Base64 編解碼',
       description: '文本與 Base64 互轉，Unicode 安全，支持 URL Safe 與文件模式',

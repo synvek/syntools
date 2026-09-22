@@ -113,6 +113,10 @@ export default {
       name: '流程图编辑器',
       description: '本地绘制流程图，支持节点连线、模板、自动布局与 PNG/SVG 导出',
     },
+    'mindmap-editor': {
+      name: '脑图编辑器',
+      description: '本地绘制思维导图，支持键盘建节点、折叠分支、多布局主题与 PNG/SVG/Markdown 导出',
+    },
     base64: {
       name: 'Base64 编解码',
       description: '文本与 Base64 互转，Unicode 安全，支持 URL Safe 与文件模式',

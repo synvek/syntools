@@ -621,3 +621,142 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(0);
   });
 });
+
+// 脑图编辑器（zh-CN）
+test.describe('脑图编辑器（zh-CN）', () => {
+  test.use({ locale: 'zh-CN' });
+
+  test('画布挂载 → Tab 建子主题 → 模板载入 → 折叠分支', async ({ page }) => {
+    await page.goto('/tools/mindmap-editor');
+    // React Flow 画布与导出/导入入口
+    await expect(page.locator('.react-flow')).toBeVisible();
+    await expect(page.getByRole('button', { name: '导出' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '导入' })).toBeVisible();
+    // 初始只有中心主题，且应被适配到画布中央（而非默认贴在左上角）
+    await expect(page.locator('.react-flow__node')).toHaveCount(1);
+    await expect(page.getByText(/节点:\s*1/)).toBeVisible();
+    const canvasBox = (await page.locator('.react-flow').boundingBox())!;
+    const rootBox = (await page.locator('.react-flow__node').first().boundingBox())!;
+    expect(
+      Math.abs(rootBox.x + rootBox.width / 2 - (canvasBox.x + canvasBox.width / 2)),
+    ).toBeLessThan(canvasBox.width * 0.12);
+    expect(
+      Math.abs(rootBox.y + rootBox.height / 2 - (canvasBox.y + canvasBox.height / 2)),
+    ).toBeLessThan(canvasBox.height * 0.12);
+    // 默认文案不应被截成省略号（宽度需容纳 "Central Topic"）
+    await expect(page.locator('.react-flow__node').first()).toContainText('Central Topic');
+    const clipped = await page
+      .locator('.react-flow__node')
+      .first()
+      .locator('span')
+      .first()
+      .evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    expect(clipped).toBe(false);
+
+    // 空态提示条不得盖住中心主题（应位于其下方）
+    const hint = page.getByText(/按 Tab 添加子主题/);
+    await expect(hint).toBeVisible();
+    const hintBox = (await hint.boundingBox())!;
+    expect(hintBox.y).toBeGreaterThan(rootBox.y + rootBox.height);
+
+    // Tab 新建子主题：节点 +1，且生成一条分支连线
+    await page.locator('.react-flow__pane').click({ position: { x: 40, y: 40 } });
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.react-flow__node')).toHaveCount(2);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+
+    // 新节点带默认英文文案
+    await expect(page.getByText('Subtopic', { exact: true })).toBeVisible();
+
+    // Enter 新建同级主题（编辑态下 Enter 同样建同级）
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.react-flow__node')).toHaveCount(3);
+    await expect(page.getByText('Topic', { exact: true })).toBeVisible();
+
+    // 载入模板应替换整张脑图（项目规划：中心 + 4 分支 + 13 子节点）
+    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '项目规划' }).click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(18);
+
+    // 二级及以下节点默认下划线形状：底边可见（2px），其余边为 0
+    const borders = await page.locator('.react-flow__node').evaluateAll((els) =>
+      els.map((el) => {
+        const box = el.firstElementChild?.firstElementChild as HTMLElement | undefined;
+        if (!box) return null;
+        const s = getComputedStyle(box);
+        return {
+          top: s.borderTopWidth,
+          bottom: s.borderBottomWidth,
+          left: s.borderLeftWidth,
+          style: s.borderBottomStyle,
+        };
+      }),
+    );
+    expect(
+      borders.some(
+        (b) =>
+          b && b.bottom === '2px' && b.top === '0px' && b.left === '0px' && b.style === 'solid',
+      ),
+    ).toBe(true);
+
+    // 全部折叠后只剩中心主题与一级分支
+    await page.getByRole('button', { name: '全部折叠' }).click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(5);
+    await page.getByRole('button', { name: '全部展开' }).click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(18);
+  });
+
+  test('切换布局方向后分支数不变且朝向正确', async ({ page }) => {
+    await page.goto('/tools/mindmap-editor');
+    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '读书笔记' }).click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(13);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(12);
+
+    await page.getByRole('button', { name: '向下' }).click();
+    await expect(page.locator('.react-flow__edge')).toHaveCount(12);
+    // 布局切换有 150ms 过渡动画，等落位后再比较坐标
+    await page.waitForTimeout(400);
+    // 向下布局：一级分支应位于中心主题下方
+    const nodes = await page.locator('.react-flow__node').evaluateAll((els) =>
+      els.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { text: el.textContent ?? '', x: r.x, y: r.y };
+      }),
+    );
+    const root = nodes.find((n) => n.text.includes('Reading Notes'));
+    expect(root).toBeTruthy();
+    const below = nodes.filter((n) => n.text.includes('Key ideas'))[0];
+    expect(below).toBeTruthy();
+    expect(below!.y).toBeGreaterThan(root!.y);
+  });
+
+  test('双击节点编辑文本：可连续输入，Esc 取消回滚', async ({ page }) => {
+    await page.goto('/tools/mindmap-editor');
+    const root = page.locator('.react-flow__node').first();
+    await expect(root).toContainText('Central Topic');
+
+    // 双击进入编辑态，连续输入完整文本后提交
+    // 断言限定在画布内：大纲面板里同样会出现该文本
+    const onCanvas = (text: string) => page.locator('.react-flow').getByText(text, { exact: true });
+    await root.dblclick();
+    await page.keyboard.type('Hello Map');
+    await page.keyboard.press('Enter');
+    await expect(onCanvas('Hello Map')).toBeVisible();
+
+    // F2 再次编辑：Esc 应回滚，不落库
+    await onCanvas('Hello Map').click();
+    await page.keyboard.press('F2');
+    await page.keyboard.type('Changed');
+    await page.keyboard.press('Escape');
+    await expect(onCanvas('Hello Map')).toBeVisible();
+    await expect(onCanvas('Changed')).toHaveCount(0);
+
+    // 单击已选中的节点也能进入编辑（覆盖「两次单击间隔过长、不算双击」的场景）
+    const second = page.locator('.react-flow__node').nth(1);
+    await second.click();
+    await page.keyboard.press('Escape');
+    await second.click();
+    await expect(second.locator('input')).toHaveCount(1);
+  });
+});

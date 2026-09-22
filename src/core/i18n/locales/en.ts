@@ -118,6 +118,11 @@ const en = {
       description:
         'Draw flowcharts locally: nodes, connectors, templates, auto-layout and PNG/SVG export',
     },
+    'mindmap-editor': {
+      name: 'Mind Map Editor',
+      description:
+        'Draw mind maps locally: keyboard-first nodes, collapsible branches, layouts, themes and PNG/SVG/Markdown export',
+    },
     base64: {
       name: 'Base64 Encode / Decode',
       description:

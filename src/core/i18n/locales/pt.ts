@@ -119,6 +119,11 @@ const pt = {
       description:
         'Crie fluxogramas localmente: nós, conexões, modelos, auto layout e exportação PNG/SVG',
     },
+    'mindmap-editor': {
+      name: 'Editor de mapas mentais',
+      description:
+        'Crie mapas mentais localmente: nós por teclado, ramificações recolhíveis, layouts, temas e exportação PNG/SVG/Markdown',
+    },
     base64: {
       name: 'Codificar / descodificar Base64',
       description:

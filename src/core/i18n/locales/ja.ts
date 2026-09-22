@@ -118,6 +118,11 @@ const ja = {
       description:
         'ローカルでフローチャートを作成：ノード接続、テンプレート、自動配置、PNG/SVG 書き出し',
     },
+    'mindmap-editor': {
+      name: 'マインドマップエディタ',
+      description:
+        'ローカルでマインドマップを作成：キーボード操作、ブランチの折りたたみ、レイアウトとテーマ、PNG/SVG/Markdown 書き出し',
+    },
     base64: {
       name: 'Base64 エンコード / デコード',
       description: 'Unicode 安全なテキストと Base64 の相互変換。URL Safe とファイルモード対応',

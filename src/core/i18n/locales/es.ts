@@ -118,6 +118,11 @@ const es = {
       description:
         'Crea diagramas de flujo localmente: nodos, conexiones, plantillas, auto diseño y exportación PNG/SVG',
     },
+    'mindmap-editor': {
+      name: 'Editor de mapas mentales',
+      description:
+        'Crea mapas mentales en local: nodos por teclado, ramas plegables, diseños, temas y exportación PNG/SVG/Markdown',
+    },
     base64: {
       name: 'Codificar / decodificar Base64',
       description:

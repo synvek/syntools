@@ -119,6 +119,11 @@ const fr = {
       description:
         'Créez des diagrammes en local : nœuds, liens, modèles, disposition auto et export PNG/SVG',
     },
+    'mindmap-editor': {
+      name: 'Éditeur de carte mentale',
+      description:
+        'Créez des cartes mentales en local : nœuds au clavier, branches repliables, mises en page, thèmes et export PNG/SVG/Markdown',
+    },
     base64: {
       name: 'Encodage / décodage Base64',
       description:

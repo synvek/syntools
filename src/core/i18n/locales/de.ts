@@ -118,6 +118,11 @@ const de = {
       description:
         'Flussdiagramme lokal erstellen: Knoten, Verbindungen, Vorlagen, Auto-Layout und PNG/SVG-Export',
     },
+    'mindmap-editor': {
+      name: 'Mindmap-Editor',
+      description:
+        'Mindmaps lokal erstellen: Bedienung per Tastatur, einklappbare Zweige, Layouts, Themen und PNG/SVG/Markdown-Export',
+    },
     base64: {
       name: 'Base64 kodieren / dekodieren',
       description: 'Text und Base64 Unicode-sicher umwandeln; URL Safe und Dateimodus unterstützt',
