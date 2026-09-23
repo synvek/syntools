@@ -1,5 +1,6 @@
+import { pointInSelection, traceSelection } from '../core';
 import { getCanvas } from '../model/assets';
-import type { RasterLayer, Selection } from '../model/types';
+import type { RasterLayer, Rect, Selection } from '../model/types';
 
 /**
  * 落笔：直接改写图层位图的 2D 上下文。
@@ -35,34 +36,13 @@ function assetScale(layer: RasterLayer): { sx: number; sy: number } | null {
   };
 }
 
-function applySelectionClip(
-  ctx: CanvasRenderingContext2D,
-  selection: Selection,
-  layer: RasterLayer,
-): void {
-  ctx.beginPath();
-  if (selection.kind === 'ellipse') {
-    ctx.ellipse(
-      selection.x + selection.width / 2,
-      selection.y + selection.height / 2,
-      selection.width / 2,
-      selection.height / 2,
-      0,
-      0,
-      Math.PI * 2,
-    );
-  } else if (selection.kind === 'lasso' && selection.path.length >= 6) {
-    ctx.moveTo(selection.path[0], selection.path[1]);
-    for (let i = 2; i < selection.path.length; i += 2)
-      ctx.lineTo(selection.path[i], selection.path[i + 1]);
-    ctx.closePath();
-  } else {
-    ctx.rect(selection.x, selection.y, selection.width, selection.height);
-  }
-  // 选区坐标是文档坐标：先平移到图层局部坐标系再裁剪
-  ctx.translate(-layer.x, -layer.y);
-  ctx.clip();
-  ctx.translate(layer.x, layer.y);
+/**
+ * 把当前上下文裁剪到选区（调用前上下文必须已经被平移到「文档坐标」）。
+ * 一律用 even-odd：反选产生的「外框 + 内洞」两条轮廓才能正确挖空。
+ */
+function clipToSelection(ctx: CanvasRenderingContext2D, selection: Selection): void {
+  traceSelection(ctx, selection);
+  ctx.clip('evenodd');
 }
 
 export function createStrokeSession(
@@ -78,9 +58,10 @@ export function createStrokeSession(
   const sx = scale.sx;
   const sy = scale.sy;
   ctx.save();
-  // 统一在「文档坐标」下作画：把资产像素放大回图层尺寸
+  // 统一在「文档坐标」下作画：先放大回图层尺寸，再把图层原点平移到文档原点
   ctx.scale(sx, sy);
-  if (options.selection) applySelectionClip(ctx, options.selection, layer);
+  ctx.translate(-layer.x, -layer.y);
+  if (options.selection) clipToSelection(ctx, options.selection);
   ctx.globalCompositeOperation = options.mode === 'eraser' ? 'destination-out' : 'source-over';
   ctx.globalAlpha = options.opacity;
   ctx.lineCap = 'round';
@@ -115,6 +96,50 @@ export function createStrokeSession(
       last = null;
     },
   };
+}
+
+/**
+ * 选区内的整块填充 / 清除（右键菜单「填充选区」「清除选区内容」）。
+ * fill：以前景色覆盖；clear：destination-out 擦成透明。
+ */
+export function paintSelection(
+  layer: RasterLayer,
+  selection: Selection,
+  mode: 'fill' | 'clear',
+  color: string,
+): boolean {
+  const asset = getCanvas(layer.assetId);
+  const scale = assetScale(layer);
+  if (!asset || !scale) return false;
+  const ctx = asset.getContext('2d');
+  if (!ctx) return false;
+
+  ctx.save();
+  ctx.scale(scale.sx, scale.sy);
+  ctx.translate(-layer.x, -layer.y);
+  clipToSelection(ctx, selection);
+  ctx.globalCompositeOperation = mode === 'clear' ? 'destination-out' : 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.fillRect(layer.x, layer.y, layer.width, layer.height);
+  ctx.restore();
+  return true;
+}
+
+/** 选区遮罩：把非选区部分涂成透明（反选的洞也按 even-odd 处理） */
+export function maskToSelection(
+  canvas: HTMLCanvasElement,
+  selection: Selection,
+  region: Rect,
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.translate(-region.x, -region.y);
+  traceSelection(ctx, selection);
+  ctx.fill('evenodd');
+  ctx.restore();
 }
 
 /** 油漆桶：从落点开始做扫描线漫水填充（容差内同色连通区域） */
@@ -232,36 +257,8 @@ function insideSelectionDoc(
   assetX: number,
   assetY: number,
 ): boolean {
-  const docX = layer.x + assetX / scale.sx;
-  const docY = layer.y + assetY / scale.sy;
-  if (
-    docX < selection.x ||
-    docY < selection.y ||
-    docX > selection.x + selection.width ||
-    docY > selection.y + selection.height
-  ) {
-    return false;
-  }
-  if (selection.kind === 'rect') return true;
-  if (selection.kind === 'ellipse') {
-    const rx = selection.width / 2;
-    const ry = selection.height / 2;
-    const nx = (docX - (selection.x + rx)) / rx;
-    const ny = (docY - (selection.y + ry)) / ry;
-    return nx * nx + ny * ny <= 1;
-  }
-  // 套索：奇偶规则射线法
-  let inside = false;
-  const path = selection.path;
-  for (let i = 0, j = path.length - 2; i < path.length; j = i, i += 2) {
-    const xi = path[i];
-    const yi = path[i + 1];
-    const xj = path[j];
-    const yj = path[j + 1];
-    if (yi > docY !== yj > docY && docX < ((xj - xi) * (docY - yi)) / (yj - yi) + xi)
-      inside = !inside;
-  }
-  return inside;
+  // 复用 core 的命中判定：它已处理矩形 / 椭圆 / 套索以及反选产生的「洞」
+  return pointInSelection(selection, layer.x + assetX / scale.sx, layer.y + assetY / scale.sy);
 }
 
 function hexToRgba(hex: string): [number, number, number, number] {

@@ -20,13 +20,25 @@ export function drawSelection(layer: Konva.Layer, selection: Selection, scale: n
   const dash = [6 * strokeWidth, 4 * strokeWidth];
   const shape =
     selection.kind === 'lasso'
-      ? new Konva.Line({
-          points: selection.path,
-          closed: true,
+      ? new Konva.Shape({
           stroke: '#2563EB',
           strokeWidth,
           dash,
-          dashOffset: 0,
+          // 自绘：反选时的「外框 + 内洞」是两条独立闭合子路径，
+          // 用 Konva.Line 会把它们首尾连成一条斜线
+          sceneFunc: (ctx: Konva.Context, node: Konva.Shape) => {
+            const raw = ctx as unknown as CanvasRenderingContext2D;
+            const trace = (points: number[]) => {
+              if (points.length < 6) return;
+              raw.moveTo(points[0], points[1]);
+              for (let i = 2; i < points.length; i += 2) raw.lineTo(points[i], points[i + 1]);
+              raw.closePath();
+            };
+            raw.beginPath();
+            trace(selection.path);
+            if (selection.hole) trace(selection.hole);
+            ctx.strokeShape(node);
+          },
         })
       : selection.kind === 'ellipse'
         ? new Konva.Ellipse({

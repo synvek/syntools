@@ -36,6 +36,11 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
       state.pasteLayer();
       return;
     }
+    if (meta && key === 'a') {
+      event.preventDefault();
+      state.selectAll();
+      return;
+    }
     if (meta && key === 'd') {
       event.preventDefault();
       state.setSelection(null);
@@ -47,10 +52,10 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
       return;
     }
     if (key === 'delete' || key === 'backspace') {
-      if (state.doc.activeLayerId) {
-        event.preventDefault();
-        state.removeLayer(state.doc.activeLayerId);
-      }
+      event.preventDefault();
+      // 有选区时「删除」清除选区内容（与右键菜单一致），否则删除当前图层
+      if (state.selection) state.fillSelectionArea('clear');
+      else if (state.doc.activeLayerId) state.removeLayer(state.doc.activeLayerId);
       return;
     }
     if (key === 'escape') {

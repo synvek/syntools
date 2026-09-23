@@ -138,6 +138,8 @@ export interface Selection {
   height: number;
   /** 套索顶点（文档坐标，[x0,y0,x1,y1,...]），矩形 / 椭圆选区为空 */
   path: number[];
+  /** 内轮廓（挖洞）：反选时保存原始选区形状，命中判定与裁剪都按奇偶规则挖空 */
+  hole?: number[];
   /** 羽化半径（像素） */
   feather: number;
 }

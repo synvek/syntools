@@ -52,3 +52,30 @@
 .photo-text-editor::selection {
   background: rgba(37, 99, 235, 0.3);
 }
+
+/* 光标随当前工具变化：在画布上直观反馈「现在能做什么」 */
+.photo-stage[data-tool='move'] {
+  cursor: move;
+}
+.photo-stage[data-tool='rectSelect'],
+.photo-stage[data-tool='ellipseSelect'],
+.photo-stage[data-tool='lasso'],
+.photo-stage[data-tool='crop'],
+.photo-stage[data-tool='brush'],
+.photo-stage[data-tool='eraser'],
+.photo-stage[data-tool='eyedropper'],
+.photo-stage[data-tool='shape'] {
+  cursor: crosshair;
+}
+.photo-stage[data-tool='fill'] {
+  cursor: copy;
+}
+.photo-stage[data-tool='text'] {
+  cursor: text;
+}
+.photo-stage[data-tool='hand'] {
+  cursor: grab;
+}
+.photo-stage[data-tool='hand']:active {
+  cursor: grabbing;
+}

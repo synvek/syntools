@@ -809,6 +809,138 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByText('我的图层').first()).toBeVisible();
   });
 
+  test('画布右键菜单：选区后续操作（填充 / 反选 / 通过拷贝新建图层）', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    const paintedPixels = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let count = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count += 1;
+        return count;
+      });
+
+    const menu = page.getByTestId('canvas-context-menu');
+    const openMenu = async () => {
+      const canvas = page.getByLabel('photo canvas');
+      await canvas.scrollIntoViewIfNeeded();
+      const box = (await canvas.boundingBox())!;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+      await expect(menu).toBeVisible();
+    };
+
+    // 无选区：菜单只有画布级操作
+    await openMenu();
+    await expect(menu.getByRole('menuitem', { name: '全选' })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: '填充选区（前景色）' })).toHaveCount(0);
+
+    // 全选 → 选区操作出现，填充整块画布
+    await menu.getByRole('menuitem', { name: '全选' }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(page.getByText('选区 1280 × 720')).toBeVisible();
+    await openMenu();
+    await expect(menu.getByRole('menuitem', { name: '清除选区内容' })).toBeVisible();
+    await menu.getByRole('menuitem', { name: '填充选区（前景色）' }).click();
+    await page.waitForTimeout(200);
+    const filled = await paintedPixels();
+    expect(filled).toBeGreaterThan(0);
+
+    // 矩形选区 → 反选 → 清除：只有原选区内像素保留
+    await page.keyboard.press('Control+a');
+    await page.getByRole('button', { name: '矩形选区', exact: true }).click();
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    await page.mouse.move(box.x + 120, box.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 320, box.y + 260, { steps: 8 });
+    await page.mouse.up();
+
+    await openMenu();
+    await menu.getByRole('menuitem', { name: '反选' }).click();
+    await openMenu();
+    await menu.getByRole('menuitem', { name: '清除选区内容' }).click();
+    await page.waitForTimeout(200);
+    const afterClear = await paintedPixels();
+    expect(afterClear).toBeGreaterThan(0);
+    expect(afterClear).toBeLessThan(filled);
+
+    // 通过拷贝新建图层
+    await page.keyboard.press('Control+a');
+    await openMenu();
+    await menu.getByRole('menuitem', { name: '通过拷贝新建图层' }).click();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
+  });
+
+  test('吸管：取色有反馈，透明像素不覆盖前景色，Alt+点击可临时取色', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    /** 文档坐标 → 屏幕坐标：data-transform = "scale,tx,ty" */
+    const stage = async () => {
+      const box = (await page.getByLabel('photo canvas').boundingBox())!;
+      const raw = await page.evaluate(
+        () => (document.querySelector('.photo-stage') as HTMLElement).dataset.transform!,
+      );
+      const [scale, tx, ty] = raw.split(',').map(Number);
+      return {
+        at: (dx: number, dy: number) => ({
+          x: box.x + tx + dx * scale,
+          y: box.y + ty + dy * scale,
+        }),
+      };
+    };
+
+    // 涂一段红色笔迹（文档坐标 (200,200) → (600,400)）
+    await page.getByRole('button', { name: '画笔', exact: true }).click();
+    await page.getByRole('button', { name: '#DC2626' }).click();
+    let s = await stage();
+    const from = s.at(200, 200);
+    const to = s.at(600, 400);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(150);
+
+    // 吸管取色：参数条显示前景色，并给出「已吸取」反馈
+    await page.getByRole('button', { name: '吸管', exact: true }).click();
+    await expect(page.getByTestId('eyedropper-bar')).toBeVisible();
+    s = await stage();
+    const onStroke = s.at(400, 300);
+    await page.mouse.click(onStroke.x, onStroke.y);
+    await expect(page.getByTestId('photo-notice')).toContainText('已吸取 #DC2626');
+    await expect(page.getByTestId('eyedropper-bar')).toContainText('#DC2626');
+
+    // 白底空白处 → 吸到白色
+    const onWhite = s.at(1100, 400);
+    await page.mouse.click(onWhite.x, onWhite.y);
+    await expect(page.getByTestId('photo-notice')).toContainText('已吸取 #FFFFFF');
+
+    // 透明画布：空白处提示透明，且不覆盖前景色
+    await page.getByRole('button', { name: '新建画布' }).click();
+    await page.getByLabel('画布背景').selectOption('transparent');
+    await page.getByRole('button', { name: '创建' }).click();
+    await page.waitForTimeout(250);
+    await page.getByRole('button', { name: '吸管', exact: true }).click();
+    s = await stage();
+    const onEmpty = s.at(1100, 400);
+    await page.mouse.click(onEmpty.x, onEmpty.y);
+    await expect(page.getByTestId('photo-notice')).toContainText('透明像素');
+    await expect(page.getByTestId('eyedropper-bar')).toContainText('#FFFFFF');
+
+    // Alt + 左键：在画笔工具下临时取色，且不切换工具
+    await page.getByRole('button', { name: '画笔', exact: true }).click();
+    await page.keyboard.down('Alt');
+    await page.mouse.click(onEmpty.x, onEmpty.y);
+    await page.keyboard.up('Alt');
+    await expect(page.getByRole('button', { name: '画笔', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   test('新建画布对话框：指定尺寸后画布统计更新', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await page.getByRole('button', { name: '新建画布' }).click();

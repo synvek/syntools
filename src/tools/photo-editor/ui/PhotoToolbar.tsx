@@ -159,12 +159,28 @@ export function PhotoToolbar({
         </div>
       ) : null}
 
-      {tool === 'move' || tool === 'hand' || tool === 'text' || tool === 'eyedropper' ? (
+      {tool === 'eyedropper' ? (
+        <div className="flex items-center gap-2" data-testid="eyedropper-bar">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {t('tools.photo.foreground')}
+          </span>
+          <span
+            data-testid="foreground-swatch"
+            className="h-6 w-6 rounded border border-gray-300 dark:border-gray-600"
+            style={{ backgroundColor: brush.color }}
+          />
+          <span className="font-mono text-xs text-gray-600 dark:text-gray-300">{brush.color}</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            {t('tools.photo.eyedropperHint')}
+          </span>
+        </div>
+      ) : null}
+
+      {tool === 'move' || tool === 'hand' || tool === 'text' ? (
         <span className="text-xs text-gray-400 dark:text-gray-500">
           {tool === 'move' ? t('tools.photo.toolMove') : null}
           {tool === 'hand' ? t('tools.photo.toolHand') : null}
           {tool === 'text' ? t('tools.photo.openHint') : null}
-          {tool === 'eyedropper' ? t('tools.photo.toolEyedropper') : null}
         </span>
       ) : null}
 

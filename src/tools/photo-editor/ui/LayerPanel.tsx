@@ -34,6 +34,8 @@ export function LayerPanel() {
   const addShapeLayer = usePhotoStore((s) => s.addShapeLayer);
 
   const dragIndex = useRef<number | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [menu, setMenu] = useState<{ id: string | null; left: number; top: number } | null>(null);
 
@@ -41,24 +43,33 @@ export function LayerPanel() {
   const active = doc.layers.find((item) => item.id === activeId) ?? null;
   const menuLayer = menu?.id ? (doc.layers.find((item) => item.id === menu.id) ?? null) : null;
 
-  // 菜单：点外部 / 按 Esc / 视口变化时关闭（面板内部与触发按钮自己要阻止冒泡）
+  // 菜单：点外部 / 按 Esc / 视口变化时关闭。
+  // 用 DOM 包含关系判断内外——靠 stopPropagation 会在 pointerdown 阶段就把菜单卸载，
+  // 紧随其后的 click 落不到菜单项上（触发按钮单独用 ref 放行，以便切换开关）。
   useEffect(() => {
     if (!menu) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      setMenu(null);
+    };
     const close = () => setMenu(null);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setMenu(null);
     };
-    window.addEventListener('pointerdown', close);
+    window.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('keydown', onKey);
     window.addEventListener('resize', close);
     return () => {
-      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', close);
     };
   }, [menu]);
 
   const openMenu = (id: string | null, event: React.MouseEvent<HTMLElement>) => {
+    triggerRef.current = event.currentTarget;
     const rect = event.currentTarget.getBoundingClientRect();
     setMenu((prev) =>
       prev?.id === id
@@ -73,8 +84,6 @@ export function LayerPanel() {
           },
     );
   };
-
-  const keepOpen = (event: React.SyntheticEvent) => event.stopPropagation();
 
   const toOriginalIndex = (reversedIndex: number) => doc.layers.length - 1 - reversedIndex;
 
@@ -111,7 +120,6 @@ export function LayerPanel() {
             <MenuTrigger
               label={t('tools.photo.layerMenu')}
               onClick={(event) => openMenu(null, event)}
-              onPointerDown={keepOpen}
             />
           </div>
         ) : (
@@ -182,7 +190,6 @@ export function LayerPanel() {
                     <MenuTrigger
                       label={t('tools.photo.layerMenu')}
                       onClick={(event) => openMenu(layer.id, event)}
-                      onPointerDown={keepOpen}
                     />
                   </div>
                 </li>
@@ -194,10 +201,9 @@ export function LayerPanel() {
 
       {menu ? (
         <div
+          ref={menuRef}
           role="menu"
           aria-label={t('tools.photo.layerMenu')}
-          onPointerDown={keepOpen}
-          onClick={keepOpen}
           style={{ left: menu.left, top: menu.top, width: MENU_WIDTH }}
           className="fixed z-40 flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         >
@@ -316,11 +322,9 @@ function RowIconButton({
 function MenuTrigger({
   label,
   onClick,
-  onPointerDown,
 }: {
   label: string;
   onClick: (event: React.MouseEvent<HTMLElement>) => void;
-  onPointerDown: (event: React.SyntheticEvent) => void;
 }) {
   return (
     <button
@@ -330,7 +334,6 @@ function MenuTrigger({
       aria-haspopup="menu"
       data-testid="layer-menu-trigger"
       onClick={onClick}
-      onPointerDown={onPointerDown}
       className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200"
     >
       <Icon name="more" className="h-4 w-4" />

@@ -15,14 +15,17 @@ import {
   clampUnit,
   computeFitScale,
   formatBytes,
+  fullSelection,
   hexToRgb,
   intersectRect,
+  invertSelection,
   needsPixelPass,
   normalizeRect,
   pointInSelection,
   polygonBounds,
   rgbToHex,
   sanitizeFilename,
+  selectionPolygon,
   simplifyPath,
 } from './core';
 import { createAdjustments } from './model/factory';
@@ -179,6 +182,45 @@ describe('选区命中', () => {
   it('套索按多边形判定', () => {
     expect(pointInSelection(lasso, 50, 25)).toBe(true);
     expect(pointInSelection(lasso, -5, 25)).toBe(false);
+  });
+});
+
+describe('选区续操作辅助', () => {
+  const canvas = { width: 200, height: 100 };
+  const rect: Selection = {
+    kind: 'rect',
+    x: 50,
+    y: 25,
+    width: 100,
+    height: 50,
+    path: [],
+    feather: 0,
+  };
+
+  it('全选覆盖整块画布', () => {
+    const all = fullSelection(canvas);
+    expect(all.kind).toBe('rect');
+    expect(all.width).toBe(200);
+    expect(pointInSelection(all, 199, 99)).toBe(true);
+  });
+
+  it('反选：原选区内变成「洞」，其余区域命中', () => {
+    const inverted = invertSelection(rect, canvas);
+    expect(inverted.hole?.length).toBeGreaterThan(0);
+    // 原选区中心落在洞里 → 不属于反选结果
+    expect(pointInSelection(inverted, 100, 50)).toBe(false);
+    // 画布其它位置属于反选结果
+    expect(pointInSelection(inverted, 10, 10)).toBe(true);
+    expect(pointInSelection(inverted, 190, 90)).toBe(true);
+  });
+
+  it('椭圆选区转多边形顶点（32 边）', () => {
+    const points = selectionPolygon({ ...rect, kind: 'ellipse' });
+    expect(points.length).toBe(64);
+  });
+
+  it('矩形选区转多边形顶点', () => {
+    expect(selectionPolygon(rect)).toEqual([50, 25, 150, 25, 150, 75, 50, 75]);
   });
 });
 

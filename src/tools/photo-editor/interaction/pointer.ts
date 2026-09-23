@@ -19,6 +19,10 @@ export interface PointerContext {
   onSurfaceChange: () => void;
   /** 抓手平移：宿主立即写入变换并落库 */
   onPan: (x: number, y: number) => void;
+  /** 右键菜单：坐标为视口坐标（clientX / clientY） */
+  onContextMenu: (position: { x: number; y: number }) => void;
+  /** 吸管取色结果（null = 画布外），由宿主更新前景色并给出反馈 */
+  onPickColor: (picked: PickedColor | null) => void;
 }
 
 type Drag =
@@ -69,9 +73,14 @@ export function attachPointer(
       return;
     }
 
+    // Alt + 左键：任意工具下临时吸取前景色（与桌面修图软件一致，不切换当前工具）
+    if (event.altKey) {
+      context.onPickColor(pickColor(doc, point.x, point.y));
+      return;
+    }
+
     if (tool === 'eyedropper') {
-      const hex = pickColor(doc, point.x, point.y);
-      if (hex) state.patchBrush({ color: hex });
+      context.onPickColor(pickColor(doc, point.x, point.y));
       return;
     }
 
@@ -276,11 +285,18 @@ export function attachPointer(
     }
   };
 
+  /** 右键：屏蔽浏览器默认菜单，交给宿主的画布右键菜单 */
+  const onContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    context.onContextMenu({ x: event.clientX, y: event.clientY });
+  };
+
   container.addEventListener('pointerdown', onPointerDown);
   container.addEventListener('pointermove', onPointerMove);
   container.addEventListener('pointerup', onPointerUp);
   container.addEventListener('pointercancel', onPointerUp);
   container.addEventListener('dblclick', onDoubleClick);
+  container.addEventListener('contextmenu', onContextMenu);
 
   return () => {
     container.removeEventListener('pointerdown', onPointerDown);
@@ -288,6 +304,7 @@ export function attachPointer(
     container.removeEventListener('pointerup', onPointerUp);
     container.removeEventListener('pointercancel', onPointerUp);
     container.removeEventListener('dblclick', onDoubleClick);
+    container.removeEventListener('contextmenu', onContextMenu);
   };
 }
 
@@ -318,8 +335,14 @@ function boundsOf(path: number[]): Rect {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-/** 吸管：合成整份文档后取色（点击才触发，成本可接受） */
-export function pickColor(doc: PhotoDoc, x: number, y: number): string | null {
+export interface PickedColor {
+  hex: string;
+  /** 0~255：透明像素不该覆盖前景色，UI 据此给出提示 */
+  alpha: number;
+}
+
+/** 吸管：合成整份文档后在落点取色（点击才触发，成本可接受） */
+export function pickColor(doc: PhotoDoc, x: number, y: number): PickedColor | null {
   const px = Math.floor(x);
   const py = Math.floor(y);
   if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) return null;
@@ -327,5 +350,5 @@ export function pickColor(doc: PhotoDoc, x: number, y: number): string | null {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
   const data = ctx.getImageData(0, 0, 1, 1).data;
-  return rgbToHex(data[0], data[1], data[2]);
+  return { hex: rgbToHex(data[0], data[1], data[2]), alpha: data[3] };
 }

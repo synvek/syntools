@@ -184,6 +184,94 @@ export function intersectRect(a: Rect, b: Rect): Rect | null {
   return { x, y, width: right - x, height: bottom - y };
 }
 
+/** 把选区轮廓写入当前路径（文档坐标）：矩形 / 椭圆 / 套索统一入口 */
+export function traceSelection(ctx: CanvasRenderingContext2D, selection: Selection): void {
+  ctx.beginPath();
+  if (selection.kind === 'ellipse') {
+    const rx = selection.width / 2;
+    const ry = selection.height / 2;
+    ctx.ellipse(
+      selection.x + rx,
+      selection.y + ry,
+      Math.max(0, rx),
+      Math.max(0, ry),
+      0,
+      0,
+      Math.PI * 2,
+    );
+    return;
+  }
+  if (selection.kind === 'lasso' && selection.path.length >= 6) {
+    ctx.moveTo(selection.path[0], selection.path[1]);
+    for (let i = 2; i < selection.path.length; i += 2)
+      ctx.lineTo(selection.path[i], selection.path[i + 1]);
+    ctx.closePath();
+    // 内轮廓作为独立子路径加入：even-odd 下即「挖洞」
+    if (selection.hole && selection.hole.length >= 6) {
+      ctx.moveTo(selection.hole[0], selection.hole[1]);
+      for (let i = 2; i < selection.hole.length; i += 2) {
+        ctx.lineTo(selection.hole[i], selection.hole[i + 1]);
+      }
+      ctx.closePath();
+    }
+    return;
+  }
+  ctx.rect(selection.x, selection.y, selection.width, selection.height);
+}
+
+/** 选区 → 等效多边形顶点（用于反选等需要拼接路径的场合） */
+export function selectionPolygon(selection: Selection): number[] {
+  if (selection.kind === 'lasso' && selection.path.length >= 6) return [...selection.path];
+  if (selection.kind === 'ellipse') {
+    const rx = selection.width / 2;
+    const ry = selection.height / 2;
+    const cx = selection.x + rx;
+    const cy = selection.y + ry;
+    const points: number[] = [];
+    for (let i = 0; i < 32; i += 1) {
+      const angle = (i / 32) * Math.PI * 2;
+      points.push(cx + Math.cos(angle) * rx, cy + Math.sin(angle) * ry);
+    }
+    return points;
+  }
+  const { x, y, width, height } = selection;
+  return [x, y, x + width, y, x + width, y + height, x, y + height];
+}
+
+/**
+ * 反选：用「画布外框 + 原选区内框」的两条闭合轮廓表示带洞区域，
+ * 依赖奇偶规则（even-odd）——命中判定与裁剪都按 even-odd 处理，见
+ * `pointInPolygon` 与 `render/brush.ts` 的裁剪。
+ */
+export function invertSelection(
+  selection: Selection,
+  canvas: { width: number; height: number },
+): Selection {
+  return {
+    kind: 'lasso',
+    x: 0,
+    y: 0,
+    width: canvas.width,
+    height: canvas.height,
+    path: [0, 0, canvas.width, 0, canvas.width, canvas.height, 0, canvas.height],
+    hole: selectionPolygon(selection),
+    feather: selection.feather,
+  };
+}
+
+/** 整块画布作为矩形选区 */
+export function fullSelection(canvas: { width: number; height: number }): Selection {
+  return {
+    kind: 'rect',
+    x: 0,
+    y: 0,
+    width: canvas.width,
+    height: canvas.height,
+    path: [],
+    feather: 0,
+  };
+}
+
 /** 选区是否命中某点：矩形 / 椭圆走解析式，套索走奇偶规则射线法 */
 export function pointInSelection(selection: Selection, px: number, py: number): boolean {
   const { x, y, width, height } = selection;
@@ -197,7 +285,10 @@ export function pointInSelection(selection: Selection, px: number, py: number): 
     const ny = (py - (y + ry)) / ry;
     return nx * nx + ny * ny <= 1;
   }
-  return pointInPolygon(selection.path, px, py);
+  if (!pointInPolygon(selection.path, px, py)) return false;
+  // 反选的「洞」：落在外轮廓内但命中内轮廓的点属于选区之外
+  if (selection.hole && selection.hole.length >= 6) return !pointInPolygon(selection.hole, px, py);
+  return true;
 }
 
 export function pointInPolygon(path: number[], px: number, py: number): boolean {

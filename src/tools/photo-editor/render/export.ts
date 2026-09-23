@@ -1,7 +1,8 @@
 import { downloadDataUrl } from '@/core/pdf/download';
 import { createCanvasElement } from '../model/assets';
+import { maskToSelection } from './brush';
 import { paintDoc } from './paint';
-import type { PhotoDoc, Rect } from '../model/types';
+import type { PhotoDoc, Rect, Selection } from '../model/types';
 
 /** 导出：把文档合成到离屏画布再编码，不改动用户视口与缩放。 */
 
@@ -61,6 +62,30 @@ export function downloadCanvas(
   options: ExportOptions,
 ): void {
   downloadDataUrl(canvasToDataUrl(canvas, options), filename);
+}
+
+/**
+ * 把选区内容烘焙成一张画布（按选区形状遮罩，反选的洞也会挖空）。
+ * 供「通过拷贝新建图层」与「导出选区」共用。
+ */
+export function rasterizeSelection(doc: PhotoDoc, selection: Selection): HTMLCanvasElement | null {
+  const region: Rect = {
+    x: Math.round(selection.x),
+    y: Math.round(selection.y),
+    width: Math.max(1, Math.round(selection.width)),
+    height: Math.max(1, Math.round(selection.height)),
+  };
+  const intersect = {
+    x: Math.max(0, region.x),
+    y: Math.max(0, region.y),
+    width: Math.min(doc.width, region.x + region.width) - Math.max(0, region.x),
+    height: Math.min(doc.height, region.y + region.height) - Math.max(0, region.y),
+  };
+  if (intersect.width < 1 || intersect.height < 1) return null;
+
+  const canvas = compositeDoc(doc, region, 1);
+  maskToSelection(canvas, selection, region);
+  return canvas;
 }
 
 /** 图层缩略图：单边最长 48px，按内容比例自适应 */

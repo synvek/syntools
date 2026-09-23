@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { computeFitScale } from '../core';
-import { attachPointer } from '../interaction/pointer';
+import { attachPointer, type PickedColor } from '../interaction/pointer';
 import { openTextEditor, type TextEditorHandle } from '../render/textEditor';
 import { createStage, type StageHandle } from '../render/stage';
 import { refreshLayerNode } from '../render/sync';
@@ -27,9 +27,13 @@ const MIN_HOST_SIZE = 64;
 export function PhotoCanvas({
   onRuntimeFailure,
   onCursorMove,
+  onContextMenu,
+  onPickColor,
 }: {
   onRuntimeFailure: () => void;
   onCursorMove: (point: { x: number; y: number } | null) => void;
+  onContextMenu: (position: { x: number; y: number }) => void;
+  onPickColor: (picked: PickedColor | null) => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -38,6 +42,7 @@ export function PhotoCanvas({
   const transformRef = useRef({ scale: 1, x: 0, y: 0 });
 
   const doc = usePhotoStore((s) => s.doc);
+  const tool = usePhotoStore((s) => s.tool);
   const scale = usePhotoStore((s) => s.viewport.scale);
   const selection = usePhotoStore((s) => s.selection);
   const cropRect = usePhotoStore((s) => s.cropRect);
@@ -47,6 +52,10 @@ export function PhotoCanvas({
   onRuntimeFailureRef.current = onRuntimeFailure;
   const onCursorMoveRef = useRef(onCursorMove);
   onCursorMoveRef.current = onCursorMove;
+  const onContextMenuRef = useRef(onContextMenu);
+  onContextMenuRef.current = onContextMenu;
+  const onPickColorRef = useRef(onPickColor);
+  onPickColorRef.current = onPickColor;
 
   /**
    * 应用视口变换（挂载、容器尺寸变化、用户缩放共用同一份逻辑）。
@@ -200,6 +209,8 @@ export function PhotoCanvas({
           usePhotoStore.getState().setViewport({ x, y });
           applyPan(x, y);
         },
+        onContextMenu: (position) => onContextMenuRef.current(position),
+        onPickColor: (picked) => onPickColorRef.current(picked),
       });
       cleanupRefs.push(detach);
     }, 0);
@@ -241,6 +252,12 @@ export function PhotoCanvas({
       handleRef.current = null;
     };
   }, [applyTransform, applyPan]);
+
+  // 光标随工具变化（CSS 里按 data-tool 匹配），让「当前工具」在画布上也有反馈
+  useEffect(() => {
+    const host = canvasRef.current;
+    if (host) host.dataset.tool = tool;
+  }, [tool]);
 
   // 画布尺寸 / 背景 / 缩放变化：只重设变换与背景，不重建节点
   useEffect(() => {

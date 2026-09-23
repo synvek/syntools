@@ -1,5 +1,13 @@
 import { create } from 'zustand';
-import { clampRect, clampUnit, intersectRect, polygonBounds, simplifyPath } from './core';
+import {
+  clampRect,
+  clampUnit,
+  fullSelection,
+  intersectRect,
+  invertSelection,
+  polygonBounds,
+  simplifyPath,
+} from './core';
 import {
   cloneAsset,
   collectUsedAssets,
@@ -8,6 +16,8 @@ import {
   registerCanvas,
   releaseExcept,
 } from './model/assets';
+import { paintSelection } from './render/brush';
+import { rasterizeSelection } from './render/export';
 import { paintDoc, paintLayer } from './render/paint';
 import {
   cloneDoc,
@@ -68,6 +78,14 @@ interface PhotoState {
   setShapeKind: (kind: ShapeKind) => void;
 
   setSelection: (selection: Selection | null) => void;
+  /** 全选（Ctrl+A） */
+  selectAll: () => void;
+  /** 反选：画布外框 + 原选区内框（奇偶规则） */
+  invertSelection: () => void;
+  /** 填充 / 清除当前选区内容（作用于位图图层） */
+  fillSelectionArea: (mode: 'fill' | 'clear') => void;
+  /** 通过拷贝新建图层：选区内容 → 新位图图层 */
+  copySelectionToLayer: () => void;
   setCropRect: (rect: Rect | null) => void;
   applyCrop: () => void;
 
@@ -186,6 +204,53 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   setShapeKind: (kind) => set({ shapeKind: kind }),
 
   setSelection: (selection) => set({ selection }),
+
+  selectAll: () => set((s) => ({ selection: fullSelection(s.doc) })),
+
+  invertSelection: () =>
+    set((s) => ({
+      selection: s.selection ? invertSelection(s.selection, s.doc) : fullSelection(s.doc),
+    })),
+
+  /**
+   * 填充 / 清除选区：作用于当前位图图层。
+   * 先 commitPixels 复制落笔前的像素，保证一次撤销能还原。
+   */
+  fillSelectionArea: (mode) => {
+    const state = get();
+    if (!state.selection) return;
+    const layerId = state.ensurePaintLayer();
+    if (!layerId) return;
+    get().commitPixels(layerId);
+    const layer = get().doc.layers.find((item) => item.id === layerId);
+    if (!layer || layer.kind !== 'raster') return;
+    const changed = paintSelection(
+      layer,
+      state.selection,
+      mode,
+      mode === 'clear' ? '#000000' : state.brush.color,
+    );
+    if (changed) get().bumpRev(layerId);
+  },
+
+  /** 通过拷贝新建图层：把选区内的合成结果拷成一个新位图图层 */
+  copySelectionToLayer: () => {
+    const state = get();
+    const selection = state.selection;
+    if (!selection || selection.width < 1 || selection.height < 1) return;
+    const masked = rasterizeSelection(state.doc, selection);
+    if (!masked) return;
+
+    const layer = createRasterLayer({
+      assetId: registerCanvas(masked),
+      x: Math.round(selection.x),
+      y: Math.round(selection.y),
+      width: masked.width,
+      height: masked.height,
+      name: nextLayerName(state.doc.layers, 'raster'),
+    });
+    get().addLayer(layer);
+  },
 
   setCropRect: (rect) =>
     set((s) => ({

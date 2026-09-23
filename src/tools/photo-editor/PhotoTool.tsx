@@ -8,6 +8,7 @@ import { translateToolError } from '@/core/i18n/helpers';
 import { buildExportFilename, checkImageFile, checkProjectFile } from './core';
 import { clearDraft, readDraft, writeDraft } from './draft';
 import { attachKeyboard } from './interaction/keyboard';
+import type { PickedColor } from './interaction/pointer';
 import { loadImageFile } from './model/assets';
 import { createDoc } from './model/factory';
 import { buildProjectJson, projectFilename, readProjectFile } from './project';
@@ -15,6 +16,7 @@ import { downloadCanvas, exportDoc, type ExportFormat } from './render/export';
 import { registerPhotoStrings } from './strings';
 import { usePhotoStore } from './store';
 import { AdjustPanel } from './ui/AdjustPanel';
+import { CanvasContextMenu } from './ui/CanvasContextMenu';
 import { ExportDialog, NewCanvasDialog } from './ui/Dialogs';
 import { FilterPanel } from './ui/FilterPanel';
 import { LayerPanel } from './ui/LayerPanel';
@@ -62,12 +64,39 @@ export default function PhotoTool() {
   const [degraded, setDegraded] = useState(false);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [restored, setRestored] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
 
   const fail = useCallback((result: Failure) => setFailure(result), []);
+
+  /**
+   * 吸管结果：写入前景色并给出瞬时反馈。
+   * 单独做一层反馈是因为「只改笔刷颜色」在界面上看不出任何变化，
+   * 用户会以为吸管没反应（尤其吸到透明像素时）。
+   */
+  const handlePickColor = useCallback(
+    (picked: PickedColor | null) => {
+      if (!picked) return;
+      if (picked.alpha === 0) {
+        setNotice(t('tools.photo.pickTransparent'));
+        return;
+      }
+      usePhotoStore.getState().patchBrush({ color: picked.hex });
+      setNotice(t('tools.photo.picked', { color: picked.hex }));
+    },
+    [t],
+  );
+
+  // 提示 2 秒后自动消失
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 2000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   /* ------------------------------ 草稿 ------------------------------ */
 
@@ -328,10 +357,25 @@ export default function PhotoTool() {
 
       <PhotoToolbar onFit={fitToWindow} onZoom={zoomBy} onActual={zoomActual} />
 
+      {notice ? (
+        <p
+          role="status"
+          data-testid="photo-notice"
+          className="self-start rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white shadow-lg dark:bg-gray-100 dark:text-gray-900"
+        >
+          {notice}
+        </p>
+      ) : null}
+
       <div className="flex min-h-[520px] gap-3">
         <ToolPalette />
         <div ref={canvasHostRef} className="flex min-w-0 flex-1 flex-col">
-          <PhotoCanvas onRuntimeFailure={() => setRuntimeError(true)} onCursorMove={setCursor} />
+          <PhotoCanvas
+            onRuntimeFailure={() => setRuntimeError(true)}
+            onCursorMove={setCursor}
+            onContextMenu={setContextMenu}
+            onPickColor={handlePickColor}
+          />
         </div>
         <aside className="flex w-72 shrink-0 flex-col gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex gap-1">
@@ -379,6 +423,15 @@ export default function PhotoTool() {
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           {translateToolError('tools.photo', { ok: false, error: 'RUNTIME_FAILED' })}
         </p>
+      ) : null}
+
+      {contextMenu ? (
+        <CanvasContextMenu
+          position={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onFit={fitToWindow}
+          onActual={zoomActual}
+        />
       ) : null}
 
       {dialog === 'new' ? (
