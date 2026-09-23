@@ -28,7 +28,6 @@ import {
   createRasterLayer,
   createShapeLayer,
   createTextLayer,
-  nextLayerName,
 } from './model/factory';
 import { createBlankAsset } from './model/assets';
 import type { Layer, PhotoDoc, Rect, Selection, ShapeKind, ToolId, Viewport } from './model/types';
@@ -97,7 +96,8 @@ interface PhotoState {
   patchLayer: (id: string, patch: Partial<Layer>, history?: boolean) => void;
   patchActive: (patch: Partial<Layer>, history?: boolean) => void;
   removeLayer: (id: string) => void;
-  duplicateLayer: (id: string) => void;
+  /** copySuffix：复制出的图层名后缀（由 UI 传入当前语言，如「 副本」） */
+  duplicateLayer: (id: string, copySuffix?: string) => void;
   reorderLayer: (id: string, toIndex: number) => void;
   mergeDown: (id: string) => void;
   flattenVisible: () => void;
@@ -105,7 +105,8 @@ interface PhotoState {
   pasteLayer: () => void;
   /** 保证存在一个可落笔的位图图层（没有就新建整画布大小的空白图层） */
   ensurePaintLayer: () => string | null;
-  addTextLayer: (x: number, y: number) => string | null;
+  /** text：新建文字图层的默认内容（由 UI 传入当前语言） */
+  addTextLayer: (x: number, y: number, text?: string) => string | null;
   addShapeLayer: (rect: Rect) => string | null;
   addImageLayer: (assetId: string, width: number, height: number, name: string) => void;
   /** 位图被就地改写后调用：自增 rev 使烘焙缓存失效 */
@@ -247,7 +248,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       y: Math.round(selection.y),
       width: masked.width,
       height: masked.height,
-      name: nextLayerName(state.doc.layers, 'raster'),
+      name: '',
     });
     get().addLayer(layer);
   },
@@ -365,7 +366,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     releaseExcept(usedAssetsAcrossHistory(get()));
   },
 
-  duplicateLayer: (id) => {
+  duplicateLayer: (id, copySuffix = '') => {
     const layer = get().doc.layers.find((item) => item.id === id);
     if (!layer) return;
     get().commit();
@@ -375,7 +376,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       if (clonedAsset) copy.assetId = clonedAsset;
       copy.rev = layer.kind === 'raster' ? layer.rev : 1;
     }
-    copy.name = `${layer.name} 副本`;
+    copy.name = layer.name ? `${layer.name}${copySuffix}` : '';
     copy.x = layer.x + 12;
     copy.y = layer.y + 12;
     set((s) => {
@@ -461,7 +462,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const clonedAsset = cloneAsset(source.assetId);
       if (clonedAsset) copy.assetId = clonedAsset;
     }
-    copy.name = nextLayerName(state.doc.layers, copy.kind);
+    // 粘贴出的图层用自动命名，避免把来源名称带成重复项
+    copy.name = '';
     get().addLayer(copy);
   },
 
@@ -488,14 +490,14 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       assetId,
       width: state.doc.width,
       height: state.doc.height,
-      name: nextLayerName(state.doc.layers, 'raster'),
+      name: '',
     });
     get().addLayer(layer);
     return layer.id;
   },
 
-  addTextLayer: (x, y) => {
-    const layer = createTextLayer({ doc: get().doc, x, y });
+  addTextLayer: (x, y, text) => {
+    const layer = createTextLayer({ doc: get().doc, x, y, text });
     get().addLayer(layer);
     return layer.id;
   },
@@ -627,7 +629,7 @@ export function flattenLayers(doc: PhotoDoc): Layer | null {
   return {
     id: createId('raster'),
     kind: 'raster',
-    name: '合并图层',
+    name: '',
     visible: true,
     locked: false,
     opacity: 1,

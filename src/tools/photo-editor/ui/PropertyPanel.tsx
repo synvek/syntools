@@ -11,15 +11,16 @@ import {
 import { usePhotoStore } from '../store';
 import type { TextAlign } from '../model/types';
 
+/** 字体名是专有名词，直接按原名展示，不做翻译 */
 const FONT_FAMILIES = [
-  { id: 'PingFang SC', label: '苹方 / PingFang SC' },
-  { id: 'Microsoft YaHei', label: '微软雅黑' },
-  { id: 'Noto Serif SC', label: '宋体 / Serif' },
-  { id: 'Helvetica', label: 'Helvetica' },
-  { id: 'Arial', label: 'Arial' },
-  { id: 'Georgia', label: 'Georgia' },
-  { id: 'Courier New', label: 'Courier New' },
-];
+  'PingFang SC',
+  'Microsoft YaHei',
+  'Noto Serif SC',
+  'Helvetica',
+  'Arial',
+  'Georgia',
+  'Courier New',
+].map((name) => ({ id: name, label: name }));
 
 /** 属性面板：几何 + 文字 / 形状各自的样式属性。 */
 export function PropertyPanel() {

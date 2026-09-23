@@ -1,5 +1,13 @@
 import type { ToolResult } from '@/core/types';
-import type { Adjustments, BlendMode, FilterId, PhotoDoc, Rect, Selection } from './model/types';
+import type {
+  Adjustments,
+  BlendMode,
+  FilterId,
+  PhotoDoc,
+  Rect,
+  Selection,
+  ShapeKind,
+} from './model/types';
 
 /**
  * 纯函数层：不引用 Konva、不触碰 DOM（便于单测，且可被 prerender 安全载入）。
@@ -20,52 +28,52 @@ export interface CanvasPreset {
   height: number;
 }
 
-/** 常用画布预设：正方形 / 横版 / 竖版 / 纸张 */
+/**
+ * 常用画布预设：正方形 / 横版 / 竖版 / 纸张。
+ * 标签只用「数字 + 比例 + 纸张代号」，不含自然语言，因此无需翻译
+ * （文案见 `CanvasPreset.label`，其余枚举的名字统一由 UI 走 i18n，见 `blend.*` / `shape.*`）。
+ */
 export const CANVAS_PRESETS: CanvasPreset[] = [
-  { id: 'hd', label: '1280 × 720（16:9）', width: 1280, height: 720 },
-  { id: 'square', label: '1080 × 1080（1:1）', width: 1080, height: 1080 },
-  { id: 'photo43', label: '1024 × 768（4:3）', width: 1024, height: 768 },
-  { id: 'portrait', label: '1080 × 1350（4:5）', width: 1080, height: 1350 },
-  { id: 'a4', label: 'A4 竖版（2480 × 3508）', width: 2480, height: 3508 },
+  { id: 'hd', label: '1280 × 720 · 16:9', width: 1280, height: 720 },
+  { id: 'square', label: '1080 × 1080 · 1:1', width: 1080, height: 1080 },
+  { id: 'photo43', label: '1024 × 768 · 4:3', width: 1024, height: 768 },
+  { id: 'portrait', label: '1080 × 1350 · 4:5', width: 1080, height: 1350 },
+  { id: 'a4', label: 'A4 · 2480 × 3508', width: 2480, height: 3508 },
 ];
 
-export const BLEND_MODES: { id: BlendMode; label: string }[] = [
-  { id: 'normal', label: '正常' },
-  { id: 'multiply', label: '正片叠底' },
-  { id: 'screen', label: '滤色' },
-  { id: 'overlay', label: '叠加' },
-  { id: 'darken', label: '变暗' },
-  { id: 'lighten', label: '变亮' },
-  { id: 'color-dodge', label: '颜色减淡' },
-  { id: 'difference', label: '差值' },
-  { id: 'exclusion', label: '排除' },
-  { id: 'hue', label: '色相' },
-  { id: 'saturation', label: '饱和度' },
-  { id: 'color', label: '颜色' },
-  { id: 'luminosity', label: '明度' },
+/** 混合模式：只声明 id，名称由 UI 通过 `tools.photo.blend.<id>` 取当前语言 */
+export const BLEND_MODES: BlendMode[] = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'difference',
+  'exclusion',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
 ];
 
-export const FILTERS: { id: FilterId; label: string; hint: string }[] = [
-  { id: 'grayscale', label: '灰度', hint: '去掉全部色彩，转为黑白' },
-  { id: 'sepia', label: '复古', hint: '棕褐色调，模拟老照片' },
-  { id: 'invert', label: '反相', hint: '颜色取反，生成负片' },
-  { id: 'blur', label: '模糊', hint: '高斯柔化，弱化细节' },
-  { id: 'sharpen', label: '锐化', hint: '增强边缘对比，画面更清晰' },
-  { id: 'emboss', label: '浮雕', hint: '突出轮廓，形成立体压印感' },
-  { id: 'edge', label: '边缘', hint: '只保留轮廓线条' },
-  { id: 'noise', label: '噪点', hint: '叠加颗粒，模拟胶片质感' },
-  { id: 'pixelate', label: '像素化', hint: '马赛克化，隐藏细节' },
-  { id: 'posterize', label: '色调分离', hint: '压缩色阶，形成色块' },
+/** 滤镜：只声明 id，名称与说明由 UI 通过 `tools.photo.filter*` / `hint*` 取当前语言 */
+export const FILTERS: FilterId[] = [
+  'grayscale',
+  'sepia',
+  'invert',
+  'blur',
+  'sharpen',
+  'emboss',
+  'edge',
+  'noise',
+  'pixelate',
+  'posterize',
 ];
 
-export const SHAPE_KINDS = [
-  { id: 'rect', label: '矩形' },
-  { id: 'roundRect', label: '圆角矩形' },
-  { id: 'ellipse', label: '椭圆' },
-  { id: 'line', label: '直线' },
-  { id: 'arrow', label: '箭头' },
-  { id: 'star', label: '星形' },
-] as const;
+/** 形状：只声明 id，名称由 UI 通过 `tools.photo.shape.<id>` 取当前语言 */
+export const SHAPE_KINDS: ShapeKind[] = ['rect', 'roundRect', 'ellipse', 'line', 'arrow', 'star'];
 
 /** 数值钳制：非法值回落到 min（与 doodle-board 的 clampBrushSize 一致） */
 export function clampNumber(value: number, min: number, max: number): number {
@@ -138,6 +146,109 @@ export function bakeSignature(
 
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
+}
+
+/* ------------------------------ 视口滚动 / 缩放 ------------------------------ */
+
+/** 缩放上下限：滚轮缩放与 store 共用同一套钳制，避免两处各写一份 */
+export const MIN_ZOOM = 0.02;
+export const MAX_ZOOM = 8;
+
+export function clampScale(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) return MIN_ZOOM;
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(scale * 1000) / 1000));
+}
+
+/** 越界余量（屏幕像素）：画布四周留出可滚动余白，而不是贴死在视口边缘 */
+export const OVERSCROLL_SCREEN = 160;
+
+export interface ScrollMetrics {
+  /** 视口尺寸（文档坐标单位 = 屏幕像素 / scale） */
+  viewW: number;
+  viewH: number;
+  /** 可滚动世界（文档矩形 + 越界余量，且不小于视口）在文档坐标中的位置与大小 */
+  worldLeft: number;
+  worldTop: number;
+  worldW: number;
+  worldH: number;
+  /** 当前视口左上角在世界中的位置（已钳制） */
+  left: number;
+  top: number;
+  /** 可滚动范围（世界尺寸 − 视口尺寸，≥ 0） */
+  rangeX: number;
+  rangeY: number;
+}
+
+/**
+ * 滚动几何：把「文档 + 视口」换算成滚动条需要的一组量。
+ * 世界 = 文档矩形四周各留 `overscroll`（屏幕像素）余量，并与视口尺寸取最大值——
+ * 这样文档小于视口时范围为 0（不显示滚动条），且「居中」正好落在合法区间内。
+ */
+export function scrollMetrics(
+  doc: { width: number; height: number },
+  viewport: { width: number; height: number; scale: number; x: number; y: number },
+  overscroll = OVERSCROLL_SCREEN,
+): ScrollMetrics {
+  const scale = viewport.scale > 0 ? viewport.scale : 1;
+  const viewW = Math.max(1, viewport.width) / scale;
+  const viewH = Math.max(1, viewport.height) / scale;
+  const pad = overscroll / scale;
+  const worldW = Math.max(doc.width + pad * 2, viewW);
+  const worldH = Math.max(doc.height + pad * 2, viewH);
+  const worldLeft = (doc.width - worldW) / 2;
+  const worldTop = (doc.height - worldH) / 2;
+  const rangeX = Math.max(0, worldW - viewW);
+  const rangeY = Math.max(0, worldH - viewH);
+  return {
+    viewW,
+    viewH,
+    worldLeft,
+    worldTop,
+    worldW,
+    worldH,
+    left: clampNumber(-viewport.x / scale, worldLeft, worldLeft + rangeX),
+    top: clampNumber(-viewport.y / scale, worldTop, worldTop + rangeY),
+    rangeX,
+    rangeY,
+  };
+}
+
+/** 世界坐标（视口左上角）→ 屏幕平移量 */
+export function viewportFromScroll(
+  left: number,
+  top: number,
+  scale: number,
+): { x: number; y: number } {
+  const safe = scale > 0 ? scale : 1;
+  return { x: Math.round(-left * safe), y: Math.round(-top * safe) };
+}
+
+/** 把候选视口钳制进可滚动世界（滚轮滚动 / 抓手平移共用） */
+export function clampViewport(
+  viewport: { x: number; y: number; scale: number },
+  doc: { width: number; height: number },
+  size: { width: number; height: number },
+  overscroll = OVERSCROLL_SCREEN,
+): { x: number; y: number } {
+  const metrics = scrollMetrics(doc, { ...size, ...viewport }, overscroll);
+  return viewportFromScroll(metrics.left, metrics.top, viewport.scale);
+}
+
+/** 以某点为锚点缩放：让该点下的文档坐标保持不动（滚轮缩放共用） */
+export function zoomAtPoint(
+  viewport: { x: number; y: number; scale: number },
+  nextScale: number,
+  anchor: { x: number; y: number },
+): { x: number; y: number; scale: number } {
+  const scale = viewport.scale > 0 ? viewport.scale : 1;
+  const target = clampScale(nextScale);
+  const docX = (anchor.x - viewport.x) / scale;
+  const docY = (anchor.y - viewport.y) / scale;
+  return {
+    scale: target,
+    x: Math.round(anchor.x - docX * target),
+    y: Math.round(anchor.y - docY * target),
+  };
 }
 
 /** 画布适配缩放：留 padding 且不超过 1（小图不放大，避免糊） */

@@ -1,10 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { Icon } from '@/core/components/Icon';
 import { clampBrushSize } from '../core';
 import { SHAPE_KINDS } from '../core';
 import { Button, IconTextButton, Slider } from './controls';
 import { usePhotoStore } from '../store';
-import type { ShapeKind } from '../model/types';
 
 const SWATCHES = [
   '#111827',
@@ -124,13 +122,13 @@ export function PhotoToolbar({
 
       {tool === 'shape' ? (
         <div className="flex flex-wrap items-center gap-1">
-          {SHAPE_KINDS.map((item) => (
+          {SHAPE_KINDS.map((id) => (
             <IconTextButton
-              key={item.id}
+              key={id}
               icon="shapes"
-              label={item.label}
-              active={shapeKind === item.id}
-              onClick={() => setShapeKind(item.id as ShapeKind)}
+              label={t(`tools.photo.shape.${id}`)}
+              active={shapeKind === id}
+              onClick={() => setShapeKind(id)}
             />
           ))}
         </div>
@@ -184,9 +182,10 @@ export function PhotoToolbar({
         </span>
       ) : null}
 
+      {/* 缩放控件：全部走图标按钮，文字说明放 tooltip / aria-label */}
       <div className="ml-auto flex items-center gap-1">
         <IconTextButton
-          icon="search"
+          icon="zoomOut"
           title={t('tools.photo.zoomOut')}
           onClick={() => onZoom(-0.1)}
         />
@@ -196,12 +195,19 @@ export function PhotoToolbar({
         >
           {zoomPercent}%
         </span>
-        <IconTextButton icon="search" title={t('tools.photo.zoomIn')} onClick={() => onZoom(0.1)} />
-        <Button onClick={onFit}>{t('tools.photo.zoomFit')}</Button>
-        <Button onClick={onActual}>
-          <Icon name="globe" className="h-3.5 w-3.5" />
-          {t('tools.photo.zoomActual')}
-        </Button>
+        <IconTextButton icon="zoomIn" title={t('tools.photo.zoomIn')} onClick={() => onZoom(0.1)} />
+        <IconTextButton
+          icon="fitScreen"
+          title={t('tools.photo.zoomFit')}
+          onClick={onFit}
+          testId="photo-fit"
+        />
+        <IconTextButton
+          icon="actualSize"
+          title={t('tools.photo.zoomActual')}
+          onClick={onActual}
+          testId="photo-actual"
+        />
       </div>
     </div>
   );

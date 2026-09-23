@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
+import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
@@ -10,7 +11,13 @@ import { downloadBytes } from '@/core/pdf/download';
 import type { ToolResult } from '@/core/types';
 import { PrintLayer } from './A4Page';
 import { EditorToolbar } from './EditorToolbar';
-import { buildExportFilename, countDocStats, createEmptyDocHtml, htmlToPlain } from './core';
+import {
+  buildExportFilename,
+  countDocStats,
+  createEmptyDocHtml,
+  htmlToPlain,
+  sanitizeDocHtml,
+} from './core';
 import { clearDraft, readDraft, writeDraft } from './draft';
 import { exportDocxBlob, importDocx } from './docx';
 import { createExtensions } from './extensions';
@@ -57,6 +64,7 @@ export default function RichTextEditorTool() {
   const [progress, setProgress] = useState(0);
   const [pdfMode, setPdfMode] = useState<PdfMode>('text');
   const [printReady, setPrintReady] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const [saved, setSaved] = useState(Boolean(initial));
   const flowRef = useRef<HTMLDivElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -95,6 +103,12 @@ export default function RichTextEditorTool() {
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [title, editor]);
+
+  // 放映用只读 HTML：复用导出 PDF 的同一套净化逻辑，避免注入风险
+  const presentHtml = useMemo(() => {
+    const result = sanitizeDocHtml(snapshotHtml);
+    return result.ok ? result.value : '';
+  }, [snapshotHtml]);
 
   const stats = useMemo(() => countDocStats(htmlToPlain(snapshotHtml)), [snapshotHtml]);
   const isEmpty = stats.chars === 0;
@@ -188,6 +202,18 @@ export default function RichTextEditorTool() {
         newLabel={t('common.newDoc')}
         newIcon="text"
         onNew={handleNew}
+        afterNew={
+          <button
+            type="button"
+            data-testid="rich-text-present"
+            onClick={() => setPresenting(true)}
+            disabled={isEmpty}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Icon name="present" className="h-4 w-4" />
+            {t('tools.richText.present')}
+          </button>
+        }
         io={
           <>
             <button
@@ -270,6 +296,24 @@ export default function RichTextEditorTool() {
       </div>
 
       {busy === 'pdf' && <ProgressBar value={progress} label={t('tools.richText.exporting')} />}
+
+      {presenting ? (
+        <PresentOverlay
+          title={title.trim() || t('tools.richText.titlePlaceholder')}
+          onClose={() => setPresenting(false)}
+          exitLabel={t('tools.richText.exitPresent')}
+          failedLabel={t('tools.richText.presentFailed')}
+          failed={!presentHtml}
+          align="top"
+        >
+          {/* 只读页面：直接复用打印版式（170mm 白纸 + 文档字体），不改动编辑器本身 */}
+          <div
+            data-testid="present-document"
+            className="rte-print-flow max-h-full overflow-auto rounded-lg px-10 py-10 shadow-2xl"
+            dangerouslySetInnerHTML={{ __html: presentHtml }}
+          />
+        </PresentOverlay>
+      ) : null}
 
       <input
         ref={importInputRef}

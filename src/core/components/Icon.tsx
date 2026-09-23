@@ -133,6 +133,16 @@ const icons: Record<string, ReactNode> = {
   ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
   chevron: <path d="m6 9 6 6 6-6" />,
+  chevronLeft: <path d="m14.5 5-7 7 7 7" />,
+  chevronRight: <path d="m9.5 5 7 7-7 7" />,
+  grid: (
+    <>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+    </>
+  ),
   star: <path d="m12 3 2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.5l6.3-.9L12 3Z" />,
   copy: (
     <>
@@ -620,6 +630,41 @@ const icons: Record<string, ReactNode> = {
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M3 9h18M3 14.5h18M9 9v11M15 9v11" />
+    </>
+  ),
+  present: (
+    <>
+      <rect x="2.5" y="4" width="19" height="13" rx="2" />
+      <path d="m10.5 8.4 4 2.6-4 2.6V8.4Z" fill="currentColor" stroke="none" />
+      <path d="M8 20.5h8" />
+    </>
+  ),
+  zoomIn: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+      <path d="M11 8.2v5.6M8.2 11h5.6" />
+    </>
+  ),
+  zoomOut: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+      <path d="M8.2 11h5.6" />
+    </>
+  ),
+  fitScreen: (
+    <>
+      <path d="M4 9V4h5" />
+      <path d="M20 9V4h-5" />
+      <path d="M4 15v5h5" />
+      <path d="M20 15v5h-5" />
+    </>
+  ),
+  actualSize: (
+    <>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" stroke="none" />
     </>
   ),
   photoEditor: (

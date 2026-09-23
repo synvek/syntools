@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { DocumentHeader } from '@/core/components/DocumentHeader';
+import { Icon } from '@/core/components/Icon';
 import { i18n } from '@/core/i18n';
 import { buildTemplateDoc, type TemplateKind } from './model/templates';
 import { copySelection, groupSelected, pasteClipboard, ungroupSelected } from './flowOps';
@@ -18,8 +19,11 @@ import { Toolbar } from './ui/Toolbar';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { LayerPanel } from './ui/LayerPanel';
 import { SnapshotPanel } from './ui/SnapshotPanel';
-import { PageTabs } from './ui/PageTabs';
+import { PageBrowser } from '@/core/components/PageBrowser';
+import { PageThumbnail } from './model/PageThumbnail';
+import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { TemplatePanel } from './ui/TemplatePanel';
+import { captureViewportDataUrl, DEFAULT_RASTER_OPTIONS } from './io/raster';
 import './flowchart.css';
 import '@xyflow/react/dist/style.css';
 
@@ -43,12 +47,47 @@ function FlowchartInner() {
   const canUndo = useFlowStore((s) => s.past.length > 0);
   const canRedo = useFlowStore((s) => s.future.length > 0);
   const selectedCount = useFlowStore((s) => s.selectedNodes.length + s.selectedEdges.length);
+  const pageOrder = useFlowStore((s) => s.pageOrder);
+  const activePageId = useFlowStore((s) => s.activePageId);
+  const pageData = useFlowStore((s) => s.pageData);
+
+  /**
+   * 各页的即时快照（活动页现场序列化），仅供总览缩略图使用。
+   * 依赖 nodes/edges/pageData，编辑过程中缩略图也会跟着更新。
+   */
+  const pages = useMemo(
+    () => useFlowStore.getState().getDoc().pages,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pageOrder, activePageId, pageData, nodes, edges],
+  );
 
   const [busy, setBusy] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelKey>('prop');
   const [draftSaved, setDraftSaved] = useState(false);
+  const [presenting, setPresenting] = useState(false);
+  const [presentSrc, setPresentSrc] = useState<string | null>(null);
+  const [presentFailed, setPresentFailed] = useState(false);
+
+  /** 放映：先渲染放映层（显示「生成中」），下一帧再截图，避免大图卡住首次绘制 */
+  const openPresent = () => {
+    setPresentSrc(null);
+    setPresentFailed(false);
+    setPresenting(true);
+    window.setTimeout(() => {
+      void captureViewportDataUrl(useFlowStore.getState().nodes, {
+        ...DEFAULT_RASTER_OPTIONS,
+        format: 'png',
+        transparent: false,
+        padding: 40,
+      }).then((url) => {
+        if (url) setPresentSrc(url);
+        else setPresentFailed(true);
+      });
+    }, 0);
+  };
+
   const saveTimer = useRef<number | null>(null);
   const firstSave = useRef(true);
 
@@ -140,6 +179,15 @@ function FlowchartInner() {
       const tag = (document.activeElement?.tagName ?? '').toUpperCase();
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       const mod = e.metaKey || e.ctrlKey;
+      // Ctrl/⌘ + PageUp/PageDown：上一页 / 下一页（与表格软件切换工作表的手感一致）
+      if (mod && (e.key === 'PageUp' || e.key === 'PageDown')) {
+        e.preventDefault();
+        const st = useFlowStore.getState();
+        const index = st.pageOrder.findIndex((page) => page.id === st.activePageId);
+        const next = st.pageOrder[index + (e.key === 'PageDown' ? 1 : -1)];
+        if (next) st.switchPage(next.id);
+        return;
+      }
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) useFlowStore.getState().redo();
@@ -176,6 +224,19 @@ function FlowchartInner() {
         newLabel={t('tools.flowchart.newDoc')}
         newIcon="diagram"
         onNew={handleNew}
+        afterNew={
+          <button
+            type="button"
+            data-testid="flowchart-present"
+            onClick={openPresent}
+            disabled={nodes.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Icon name="present" className="h-4 w-4" />
+            {t('tools.flowchart.present')}
+          </button>
+        }
+
         io={<IoMenu busy={busy} setBusy={setBusy} onError={setFailure} />}
         stats={
           <>
@@ -218,7 +279,35 @@ function FlowchartInner() {
               </div>
             )}
           </div>
-          <PageTabs />
+          <PageBrowser
+            pages={pageOrder}
+            activeId={activePageId}
+            labels={{
+              add: t('tools.flowchart.addPage'),
+              renameHint: t('tools.flowchart.renameHint'),
+              moveLeft: t('tools.flowchart.movePageLeft'),
+              moveRight: t('tools.flowchart.movePageRight'),
+              remove: t('tools.flowchart.removePage'),
+              prev: t('tools.flowchart.prevPage'),
+              next: t('tools.flowchart.nextPage'),
+              openOverview: t('tools.flowchart.openPageOverview'),
+              overviewTitle: t('tools.flowchart.pageOverview'),
+              close: t('tools.flowchart.closeOverview'),
+              empty: t('tools.flowchart.emptyPage'),
+              counter: t('tools.flowchart.pageCounter'),
+            }}
+            thumbnail={(id) => {
+              const page = pages.find((item) => item.id === id);
+              // 空页返回 null，总览卡片才会显示「空白页」提示
+              const hasContent = page?.nodes.some((node) => !node.hidden) ?? false;
+              return page && hasContent ? <PageThumbnail page={page} /> : null;
+            }}
+            onSelect={(id) => useFlowStore.getState().switchPage(id)}
+            onAdd={() => useFlowStore.getState().addPage()}
+            onRename={(id, name) => useFlowStore.getState().renamePage(id, name)}
+            onRemove={(id) => useFlowStore.getState().removePage(id)}
+            onMove={(id, dir) => useFlowStore.getState().movePage(id, dir)}
+          />
         </main>
 
         <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800/40">
@@ -252,6 +341,27 @@ function FlowchartInner() {
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           {failure}
         </p>
+      ) : null}
+
+      {presenting ? (
+        <PresentOverlay
+          title={docName.trim() || t('tools.flowchart.titlePlaceholder')}
+          onClose={() => setPresenting(false)}
+          exitLabel={t('tools.flowchart.exitPresent')}
+          loadingLabel={t('tools.flowchart.presentLoading')}
+          failedLabel={t('tools.flowchart.presentFailed')}
+          loading={!presentSrc && !presentFailed}
+          failed={presentFailed}
+        >
+          {presentSrc ? (
+            <img
+              src={presentSrc}
+              alt=""
+              data-testid="present-image"
+              className="max-h-full max-w-full rounded-lg bg-white shadow-2xl"
+            />
+          ) : null}
+        </PresentOverlay>
       ) : null}
 
       <TemplatePanel

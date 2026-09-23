@@ -41,15 +41,15 @@ export function FilterPanel() {
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      {FILTERS.map((filter) => {
-        const on = active.includes(filter.id);
+      {FILTERS.map((id) => {
+        const on = active.includes(id);
         return (
           <button
-            key={filter.id}
+            key={id}
             type="button"
-            onClick={() => toggle(filter.id)}
+            onClick={() => toggle(id)}
             aria-pressed={on}
-            title={t(`tools.photo.${HINT_KEYS[filter.id]}`)}
+            title={t(`tools.photo.${HINT_KEYS[id]}`)}
             className={`flex flex-col items-start gap-1 rounded-lg border p-2 text-left transition-all duration-100 active:scale-[0.98] ${
               on
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
@@ -62,11 +62,11 @@ export function FilterPanel() {
                 className={`h-3.5 w-3.5 ${on ? 'text-blue-600' : 'text-gray-400'}`}
               />
               <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                {t(`tools.photo.filter${filter.id.charAt(0).toUpperCase()}${filter.id.slice(1)}`)}
+                {t(`tools.photo.filter${id.charAt(0).toUpperCase()}${id.slice(1)}`)}
               </span>
             </span>
             <span className="text-[10px] leading-tight text-gray-400 dark:text-gray-500">
-              {t(`tools.photo.${HINT_KEYS[filter.id]}`)}
+              {t(`tools.photo.${HINT_KEYS[id]}`)}
             </span>
           </button>
         );

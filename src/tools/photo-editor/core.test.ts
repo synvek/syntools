@@ -4,9 +4,14 @@ import {
   CANVAS_PRESETS,
   FILTERS,
   MAX_CANVAS_SIZE,
+  MAX_ZOOM,
   MIN_CANVAS_SIZE,
+  MIN_ZOOM,
+  OVERSCROLL_SCREEN,
   bakeSignature,
   buildFilterString,
+  clampScale,
+  clampViewport,
   checkImageFile,
   checkProjectFile,
   clampBrushSize,
@@ -25,10 +30,14 @@ import {
   polygonBounds,
   rgbToHex,
   sanitizeFilename,
+  scrollMetrics,
   selectionPolygon,
   simplifyPath,
+  viewportFromScroll,
+  zoomAtPoint,
 } from './core';
 import { createAdjustments } from './model/factory';
+import { photoStrings } from './strings';
 import type { Selection } from './model/types';
 
 describe('钳制与格式化', () => {
@@ -185,6 +194,70 @@ describe('选区命中', () => {
   });
 });
 
+describe('视口滚动与缩放', () => {
+  const doc = { width: 1280, height: 720 };
+  const size = { width: 650, height: 518 };
+
+  it('缩放钳制在上下限内，非法值回落下限', () => {
+    expect(clampScale(100)).toBe(MAX_ZOOM);
+    expect(clampScale(0.0001)).toBe(MIN_ZOOM);
+    expect(clampScale(Number.NaN)).toBe(MIN_ZOOM);
+    expect(clampScale(0.5)).toBe(0.5);
+  });
+
+  it('内容装不下时产生滚动范围，装得下时为 0', () => {
+    // 100%：1280×720 画布放进 650×518 视口 → 两轴都能滚
+    const big = scrollMetrics(doc, { ...size, scale: 1, x: 0, y: 0 });
+    expect(big.rangeX).toBeGreaterThan(0);
+    expect(big.rangeY).toBeGreaterThan(0);
+    expect(big.worldW).toBe(1280 + 2 * OVERSCROLL_SCREEN);
+    expect(big.worldW - big.rangeX).toBeCloseTo(big.viewW, 5);
+
+    // 5%：整幅画布都在视口里 → 范围为 0（滚动条不显示）
+    const small = scrollMetrics(doc, { ...size, scale: 0.05, x: 0, y: 0 });
+    expect(small.rangeX).toBe(0);
+    expect(small.rangeY).toBe(0);
+  });
+
+  it('视口位置被钳制在世界范围内', () => {
+    const metrics = scrollMetrics(doc, { ...size, scale: 1, x: 99999, y: -99999 });
+    expect(metrics.left).toBe(metrics.worldLeft);
+    expect(metrics.top).toBe(metrics.worldTop + metrics.rangeY);
+
+    const clamped = clampViewport({ x: -99999, y: 99999, scale: 1 }, doc, size);
+    expect(clamped.x).toBe(-(metrics.worldLeft + metrics.rangeX));
+    expect(clamped.y).toBe(-metrics.worldTop);
+  });
+
+  it('世界坐标 ↔ 屏幕平移互为逆运算（允许整数像素取整误差）', () => {
+    // 取范围内部的值：世界坐标 [-320, 300]（横向）/ [-320, 4]（纵向）
+    const { x, y } = viewportFromScroll(-100, -100, 0.5);
+    expect({ x, y }).toEqual({ x: 50, y: 50 });
+
+    const back = scrollMetrics(doc, { ...size, scale: 0.5, x, y });
+    // 屏幕像素取整 → 换算回文档单位最多差 1/scale
+    expect(Math.abs(back.left + 100)).toBeLessThanOrEqual(1 / 0.5);
+    expect(Math.abs(back.top + 100)).toBeLessThanOrEqual(1 / 0.5);
+  });
+
+  it('以光标为锚点缩放：锚点下的文档坐标保持不动', () => {
+    const before = { x: 28, y: 92, scale: 0.5 };
+    const anchor = { x: 300, y: 200 };
+    const docX = (anchor.x - before.x) / before.scale;
+    const docY = (anchor.y - before.y) / before.scale;
+
+    const next = zoomAtPoint(before, 1.25, anchor);
+    expect(next.scale).toBe(1.25);
+    expect((anchor.x - next.x) / next.scale).toBeCloseTo(docX, 3);
+    expect((anchor.y - next.y) / next.scale).toBeCloseTo(docY, 3);
+  });
+
+  it('锚点缩放同样受上下限约束', () => {
+    const next = zoomAtPoint({ x: 0, y: 0, scale: 1 }, 100, { x: 0, y: 0 });
+    expect(next.scale).toBe(MAX_ZOOM);
+  });
+});
+
 describe('选区续操作辅助', () => {
   const canvas = { width: 200, height: 100 };
   const rect: Selection = {
@@ -246,6 +319,40 @@ describe('文件校验', () => {
   });
 });
 
+describe('文案完整性', () => {
+  const flatten = (tree: Record<string, unknown>, prefix = ''): string[] =>
+    Object.entries(tree).flatMap(([key, value]) =>
+      typeof value === 'string'
+        ? [`${prefix}${key}`]
+        : flatten(value as Record<string, unknown>, `${prefix}${key}.`),
+    );
+
+  it('九种语言与简体中文的键集合完全一致（防止漏翻）', () => {
+    const keys = Object.keys(photoStrings);
+    expect(keys).toHaveLength(9);
+
+    const base = flatten(photoStrings.zh).sort();
+    expect(base.length).toBeGreaterThan(120);
+    for (const [lang, tree] of Object.entries(photoStrings)) {
+      expect({ lang, keys: flatten(tree).sort() }).toEqual({ lang, keys: base });
+    }
+  });
+
+  it('每种语言都没有空文案', () => {
+    const values = (tree: Record<string, unknown>): string[] =>
+      Object.values(tree).flatMap((value) =>
+        typeof value === 'string' ? [value] : values(value as Record<string, unknown>),
+      );
+
+    for (const [lang, tree] of Object.entries(photoStrings)) {
+      expect({ lang, empty: values(tree).filter((text) => !text.trim()) }).toEqual({
+        lang,
+        empty: [],
+      });
+    }
+  });
+});
+
 describe('工具常量', () => {
   it('预设尺寸都在合法范围内', () => {
     for (const preset of CANVAS_PRESETS) {
@@ -255,8 +362,8 @@ describe('工具常量', () => {
   });
 
   it('混合模式与滤镜枚举可用于下拉', () => {
-    expect(BLEND_MODES[0].id).toBe('normal');
+    expect(BLEND_MODES[0]).toBe('normal');
     expect(FILTERS.length).toBeGreaterThanOrEqual(10);
-    expect(FILTERS.map((item) => item.id)).toContain('grayscale');
+    expect(FILTERS).toContain('grayscale');
   });
 });

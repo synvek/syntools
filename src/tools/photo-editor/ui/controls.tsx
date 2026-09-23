@@ -211,17 +211,20 @@ export function Button({
   disabled,
   title,
   primary,
+  testId,
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   title?: string;
   primary?: boolean;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
       title={title}
+      data-testid={testId}
       onClick={onClick}
       disabled={disabled}
       className={primary ? PRIMARY_CLASS : BUTTON_CLASS}
@@ -238,6 +241,7 @@ export function IconTextButton({
   disabled,
   title,
   active,
+  testId,
 }: {
   icon: string;
   label?: string;
@@ -245,13 +249,16 @@ export function IconTextButton({
   disabled?: boolean;
   title?: string;
   active?: boolean;
+  testId?: string;
 }) {
+  const accessibleName = title ?? label ?? icon;
   return (
     <button
       type="button"
-      title={title ?? label}
-      aria-label={title ?? label}
+      title={accessibleName}
+      aria-label={accessibleName}
       aria-pressed={active}
+      data-testid={testId}
       onClick={onClick}
       disabled={disabled}
       className={`${BUTTON_CLASS} ${active ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-300' : ''}`}

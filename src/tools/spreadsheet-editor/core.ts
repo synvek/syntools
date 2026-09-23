@@ -371,6 +371,145 @@ export function summarizeWorkbook(snapshot: WorkbookSnapshotLite): WorkbookSumma
   return { sheets: sheetIds.length, rows, columns, cells, formulas };
 }
 
+/* ------------------------------ 放映（只读表格） ------------------------------ */
+
+/** 放映最多展示的行 / 列：超出只提示截断，避免把 DOM 撑爆 */
+export const PRESENT_MAX_ROWS = 120;
+export const PRESENT_MAX_COLS = 30;
+
+/** 空工作簿放映时的空白网格规模（看起来像一张空表，而不是孤零零一个单元格） */
+export const PRESENT_BLANK_ROWS = 16;
+export const PRESENT_BLANK_COLS = 8;
+
+export interface PresentCell {
+  row: number;
+  col: number;
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  fontSize?: number;
+  color?: string;
+  background?: string;
+  align?: 'left' | 'center' | 'right';
+}
+
+export interface PresentMerge {
+  row: number;
+  col: number;
+  rowSpan: number;
+  colSpan: number;
+}
+
+export interface PresentGrid {
+  sheetName: string;
+  rows: number;
+  cols: number;
+  cells: PresentCell[];
+  merges: PresentMerge[];
+  /** 内容超出展示上限（行列被截断） */
+  truncated: boolean;
+}
+
+function alignOf(style: UniverStyleLite | undefined): PresentCell['align'] {
+  if (style?.ht === 2) return 'center';
+  if (style?.ht === 3) return 'right';
+  if (style?.ht === 1) return 'left';
+  return undefined;
+}
+
+/**
+ * 快照 → 只读表格数据（纯函数，便于单测）。
+ * 用于「放映」模式：不依赖 Univer 实例，直接渲染成 HTML 表格。
+ */
+export function buildPresentGrid(
+  snapshot: WorkbookSnapshotLite,
+  sheetId: string | null,
+  maxRows = PRESENT_MAX_ROWS,
+  maxCols = PRESENT_MAX_COLS,
+): PresentGrid | null {
+  const withData = (id: string) => {
+    const sheet = snapshot.sheets?.[id];
+    if (!sheet) return { rows: 0, cols: 0 };
+    let rows = 0;
+    let cols = 0;
+    for (const [rowKey, rowCells] of Object.entries(sheet.cellData ?? {})) {
+      const rowIndex = Number(rowKey);
+      if (!Number.isFinite(rowIndex)) continue;
+      rows = Math.max(rows, rowIndex + 1);
+      for (const colKey of Object.keys(rowCells ?? {})) {
+        const colIndex = Number(colKey);
+        if (Number.isFinite(colIndex)) cols = Math.max(cols, colIndex + 1);
+      }
+    }
+    return { rows, cols };
+  };
+
+  const order = snapshot.sheetOrder?.length
+    ? snapshot.sheetOrder
+    : Object.keys(snapshot.sheets ?? {});
+  // 指定的工作表为空时，回退到第一张有内容的表
+  const target =
+    sheetId && snapshot.sheets?.[sheetId]
+      ? sheetId
+      : (order.find((id) => withData(id).rows > 0) ?? order[0] ?? null);
+  if (!target) return null;
+  const sheet = snapshot.sheets?.[target];
+  if (!sheet) return null;
+
+  const used = withData(target);
+  // 有内容就按内容范围展示；完全空的工作簿给一张空白网格，避免只剩一个单元格
+  const hasData = used.rows > 0 || used.cols > 0;
+  const rows = hasData ? Math.max(1, Math.min(used.rows, maxRows)) : PRESENT_BLANK_ROWS;
+  const cols = hasData ? Math.max(1, Math.min(used.cols, maxCols)) : PRESENT_BLANK_COLS;
+  const cells: PresentCell[] = [];
+
+  for (const [rowKey, rowCells] of Object.entries(sheet.cellData ?? {})) {
+    const row = Number(rowKey);
+    if (!Number.isFinite(row) || row >= rows) continue;
+    for (const [colKey, cell] of Object.entries(rowCells ?? {})) {
+      const col = Number(colKey);
+      if (!Number.isFinite(col) || col >= cols) continue;
+      const value = cell?.v ?? cell?.f;
+      if (value === undefined || value === null || value === '') continue;
+      const text =
+        cell?.f && (cell.v === undefined || cell.v === null) ? `=${cell.f}` : String(value);
+      const style = (cell as { s?: UniverStyleLite }).s;
+      cells.push({
+        row,
+        col,
+        text,
+        ...(style?.bl === 1 ? { bold: true } : {}),
+        ...(style?.it === 1 ? { italic: true } : {}),
+        ...(style?.ul?.s === 1 ? { underline: true } : {}),
+        ...(style?.fs !== undefined ? { fontSize: Math.round(style.fs) } : {}),
+        ...(style?.cl?.rgb ? { color: style.cl.rgb } : {}),
+        ...(style?.bg?.rgb ? { background: style.bg.rgb } : {}),
+        ...(alignOf(style) ? { align: alignOf(style) } : {}),
+      });
+    }
+  }
+
+  const merges: PresentMerge[] = ((sheet as { mergeData?: MergeRange[] }).mergeData ?? [])
+    .filter((range) => range.startRow < rows && range.startColumn < cols)
+    .map((range) => ({
+      row: range.startRow,
+      col: range.startColumn,
+      rowSpan: Math.max(1, Math.min(range.endRow, rows - 1) - range.startRow + 1),
+      colSpan: Math.max(1, Math.min(range.endColumn, cols - 1) - range.startColumn + 1),
+    }));
+
+  return {
+    sheetName: sheet.name ?? '',
+    rows,
+    cols,
+    // 按行列排序，便于渲染时按顺序填充
+    cells: cells.sort((a, b) => a.row - b.row || a.col - b.col),
+    merges,
+    truncated: used.rows > rows || used.cols > cols,
+  };
+}
+
 /** 清洗非法文件名字符并限制长度 */
 export function sanitizeFilename(name: string): string {
   const cleaned = name

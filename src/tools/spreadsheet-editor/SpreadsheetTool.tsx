@@ -3,13 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
 import { clearDraft, readDraft, writeDraft } from './draft';
 import { Icon } from '@/core/components/Icon';
+import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes } from '@/core/pdf/download';
 import { useSettingsStore } from '@/stores/settings';
 import type { ToolResult } from '@/core/types';
-import { buildExportFilename, summarizeWorkbook, type WorkbookSummary } from './core';
+import {
+  buildExportFilename,
+  buildPresentGrid,
+  summarizeWorkbook,
+  type PresentGrid,
+  type WorkbookSummary,
+} from './core';
 import { registerSpreadsheetStrings } from './strings';
 import {
   createEmptySnapshot,
@@ -18,6 +25,7 @@ import {
   type WorkbookSnapshot,
 } from './xlsx-io';
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
+import { PresentSheet } from './ui/PresentSheet';
 import { SheetTabs } from './SheetTabs';
 import './sheet.css';
 
@@ -43,6 +51,31 @@ export default function SpreadsheetTool() {
   /** 重建实例（主题/语言切换）时用来接力当前数据 */
   const pendingRef = useRef<WorkbookSnapshot | null>(null);
   const [title, setTitle] = useState('');
+  const [presenting, setPresenting] = useState(false);
+  const [presentGrid, setPresentGrid] = useState<PresentGrid | null>(null);
+  const [presentFailed, setPresentFailed] = useState(false);
+
+  /**
+   * 放映：读取当前工作簿快照 → 转成只读表格。
+   * 不走 Univer 实例渲染，因此完全不影响正在编辑的工作簿状态。
+   */
+  const openPresent = () => {
+    setPresentGrid(null);
+    setPresentFailed(false);
+    setPresenting(true);
+    try {
+      const handle = handleRef.current;
+      const snapshot = handle?.getSnapshot();
+      const grid = snapshot
+        ? buildPresentGrid(snapshot, handleRef.current?.getActiveSheetId() ?? null)
+        : null;
+      if (grid) setPresentGrid(grid);
+      else setPresentFailed(true);
+    } catch {
+      setPresentFailed(true);
+    }
+  };
+
   const [summary, setSummary] = useState<WorkbookSummary>({
     sheets: 0,
     rows: 0,
@@ -220,6 +253,17 @@ export default function SpreadsheetTool() {
         newLabel={t('common.newDoc')}
         newIcon="sheet"
         onNew={handleNew}
+        afterNew={
+          <button
+            type="button"
+            data-testid="sheet-present"
+            onClick={openPresent}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Icon name="present" className="h-4 w-4" />
+            {t('tools.sheet.present')}
+          </button>
+        }
         io={
           <>
             <button
@@ -295,6 +339,18 @@ export default function SpreadsheetTool() {
           {translateToolError('tools.sheet', failure)}
         </p>
       )}
+
+      {presenting ? (
+        <PresentOverlay
+          title={title.trim() || t('tools.sheet.titlePlaceholder')}
+          onClose={() => setPresenting(false)}
+          exitLabel={t('tools.sheet.exitPresent')}
+          failedLabel={t('tools.sheet.presentFailed')}
+          failed={presentFailed}
+        >
+          {presentGrid ? <PresentSheet grid={presentGrid} /> : null}
+        </PresentOverlay>
+      ) : null}
     </div>
   );
 }

@@ -18,6 +18,10 @@ const zh: ResourceTree = {
   tools: {
     richText: {
       docTitle: '文档标题',
+      present: '放映',
+      exitPresent: '退出放映（Esc）',
+      presentLoading: '正在生成放映画面…',
+      presentFailed: '放映画面生成失败',
       titlePlaceholder: '未命名文档',
       importHint: '拖入或选择 .docx 文件导入 Word 内容',
       importDocx: '导入 Word (.docx)',
@@ -80,6 +84,10 @@ const en: ResourceTree = {
   tools: {
     richText: {
       docTitle: 'Title',
+      present: 'Present',
+      exitPresent: 'Exit (Esc)',
+      presentLoading: 'Preparing the slideshow…',
+      presentFailed: 'Failed to build the slideshow',
       titlePlaceholder: 'Untitled document',
       importHint: 'Drop or pick a .docx file to import Word content',
       importDocx: 'Import Word (.docx)',
@@ -143,6 +151,10 @@ const zhTW: ResourceTree = {
   tools: {
     richText: {
       docTitle: '文檔標題',
+      present: '放映',
+      exitPresent: '結束放映（Esc）',
+      presentLoading: '正在產生放映畫面…',
+      presentFailed: '放映畫面產生失敗',
       titlePlaceholder: '未命名文檔',
       importHint: '拖曳或選擇 .docx 檔案匯入 Word 內容',
       importDocx: '匯入 Word (.docx)',
@@ -205,6 +217,10 @@ const ja: ResourceTree = {
   tools: {
     richText: {
       docTitle: 'タイトル',
+      present: 'スライドショー',
+      exitPresent: '終了（Esc）',
+      presentLoading: '表示用の画像を生成中…',
+      presentFailed: '表示用の画像の生成に失敗しました',
       titlePlaceholder: '無題の文書',
       importHint: '.docx ファイルをドロップまたは選択して Word の内容を読み込む',
       importDocx: 'Word (.docx) を読み込む',
@@ -269,6 +285,10 @@ const fr: ResourceTree = {
   tools: {
     richText: {
       docTitle: 'Titre',
+      present: 'Présenter',
+      exitPresent: 'Quitter (Échap)',
+      presentLoading: 'Préparation du diaporama…',
+      presentFailed: 'Échec de la préparation du diaporama',
       titlePlaceholder: 'Document sans titre',
       importHint: 'Déposez ou choisissez un fichier .docx pour importer le contenu Word',
       importDocx: 'Importer Word (.docx)',
@@ -333,6 +353,10 @@ const de: ResourceTree = {
   tools: {
     richText: {
       docTitle: 'Titel',
+      present: 'Präsentieren',
+      exitPresent: 'Beenden (Esc)',
+      presentLoading: 'Präsentationsansicht wird erstellt…',
+      presentFailed: 'Präsentationsansicht fehlgeschlagen',
       titlePlaceholder: 'Unbenanntes Dokument',
       importHint: '.docx-Datei hierher ziehen oder auswählen, um Word-Inhalte zu importieren',
       importDocx: 'Word importieren (.docx)',
@@ -397,6 +421,10 @@ const it: ResourceTree = {
   tools: {
     richText: {
       docTitle: 'Titolo',
+      present: 'Presenta',
+      exitPresent: 'Esci (Esc)',
+      presentLoading: 'Preparazione della presentazione…',
+      presentFailed: 'Impossibile preparare la presentazione',
       titlePlaceholder: 'Documento senza titolo',
       importHint: 'Trascina o scegli un file .docx per importare il contenuto di Word',
       importDocx: 'Importa Word (.docx)',
@@ -461,6 +489,10 @@ const es: ResourceTree = {
   tools: {
     richText: {
       docTitle: 'Título',
+      present: 'Presentar',
+      exitPresent: 'Salir (Esc)',
+      presentLoading: 'Preparando la presentación…',
+      presentFailed: 'No se pudo preparar la presentación',
       titlePlaceholder: 'Documento sin título',
       importHint: 'Arrastra o elige un archivo .docx para importar el contenido de Word',
       importDocx: 'Importar Word (.docx)',
@@ -525,6 +557,10 @@ const pt: ResourceTree = {
   tools: {
     richText: {
       docTitle: 'Título',
+      present: 'Apresentar',
+      exitPresent: 'Sair (Esc)',
+      presentLoading: 'A preparar a apresentação…',
+      presentFailed: 'Falha ao preparar a apresentação',
       titlePlaceholder: 'Documento sem título',
       importHint: 'Arraste ou escolha um ficheiro .docx para importar o conteúdo do Word',
       importDocx: 'Importar Word (.docx)',

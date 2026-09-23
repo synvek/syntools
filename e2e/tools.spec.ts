@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /** 每个工具 1 条冒烟用例：打开 → 输入 → 断言输出（Tasks T24） */
 
@@ -765,8 +765,8 @@ test.describe('照片编辑器（zh-CN）', () => {
     await stroke();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 等草稿落盘后刷新：恢复出来的图层必须还能继续画
-    await page.waitForTimeout(1500);
+    // 等草稿落盘（状态栏出现「已保存到本地草稿」）后刷新：恢复出来的图层必须还能继续画
+    await expect(page.getByText('已保存到本地草稿')).toBeVisible({ timeout: 5000 });
     await page.reload();
     await expect(page.getByLabel('photo canvas')).toBeVisible();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
@@ -941,6 +941,100 @@ test.describe('照片编辑器（zh-CN）', () => {
     );
   });
 
+  test('滚动条与滚轮：上下 / 左右滚动、Ctrl+滚轮锚点缩放、拖动滑块、适应窗口后隐藏', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    const transform = async () => {
+      const raw = await page.evaluate(
+        () => (document.querySelector('.photo-stage') as HTMLElement).dataset.transform!,
+      );
+      const [scale, x, y] = raw.split(',').map(Number);
+      return { scale, x, y, raw };
+    };
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+    // 1) 100% 放大后内容必然超出视口 → 两条滚动条都出现
+    await page.getByRole('button', { name: '100%', exact: true }).click();
+    await expect(page.getByTestId('canvas-scrollbar-x')).toBeVisible();
+    await expect(page.getByTestId('canvas-scrollbar-y')).toBeVisible();
+
+    // 2) 普通滚轮 = 平移（内容向上/向左移动）
+    const before = await transform();
+    await page.mouse.move(center.x, center.y);
+    await page.mouse.wheel(0, 200);
+    await page.waitForTimeout(100);
+    const afterY = await transform();
+    expect(afterY.y).toBeLessThan(before.y - 10);
+
+    await page.mouse.wheel(200, 0);
+    await page.waitForTimeout(100);
+    const afterX = await transform();
+    expect(afterX.x).toBeLessThan(before.x - 10);
+
+    // 3) Ctrl + 滚轮 = 以光标为锚点缩放：光标下的文档坐标保持不动
+    await page.getByRole('button', { name: '适应窗口' }).click();
+    await page.waitForTimeout(150);
+    const anchor = { x: box.x + box.width * 0.3, y: box.y + box.height * 0.35 };
+    const docPoint = async () => {
+      const { scale, x, y } = await transform();
+      return { x: (anchor.x - box.x - x) / scale, y: (anchor.y - box.y - y) / scale, scale };
+    };
+    const docBefore = await docPoint();
+    await page.mouse.move(anchor.x, anchor.y);
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, -240);
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(150);
+    const docAfter = await docPoint();
+    expect(docAfter.scale).toBeGreaterThan(docBefore.scale);
+    expect(Math.abs(docAfter.x - docBefore.x)).toBeLessThan(6);
+    expect(Math.abs(docAfter.y - docBefore.y)).toBeLessThan(6);
+
+    // 4) 拖动纵向滚动条滑块 → 视口平移
+    const vBefore = (await transform()).y;
+    const thumb = page.getByTestId('canvas-scrollbar-y').locator('div').first();
+    const tb = (await thumb.boundingBox())!;
+    await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2 + 120, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+    const vAfter = (await transform()).y;
+    expect(vAfter).toBeLessThan(vBefore - 20);
+
+    // 5) 适应窗口后内容小于视口 → 滚动条隐藏
+    await page.getByRole('button', { name: '适应窗口' }).click();
+    await page.waitForTimeout(200);
+    await expect(page.getByTestId('canvas-scrollbar-y')).toHaveCount(0);
+  });
+
+  test('缩放控件：四个图标按钮图形各不相同，文字说明走 tooltip', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByTestId('photo-zoom')).toBeVisible();
+
+    const markup = async (name: string) =>
+      (await page.getByRole('button', { name }).innerHTML()).replace(/\s+/g, '');
+
+    // 放大 / 缩小必须是不同的图形（曾经两个按钮共用一个放大镜图标）
+    expect(await markup('放大')).not.toBe(await markup('缩小'));
+
+    // 适应窗口 / 100%：图标按钮 + tooltip，不再有可见文字
+    for (const [testId, label] of [
+      ['photo-fit', '适应窗口'],
+      ['photo-actual', '100%'],
+    ] as const) {
+      const button = page.getByTestId(testId);
+      await expect(button).toHaveAttribute('title', label);
+      await expect(button).toHaveText('');
+    }
+    expect(await markup('适应窗口')).not.toBe(await markup('100%'));
+  });
+
   test('新建画布对话框：指定尺寸后画布统计更新', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await page.getByRole('button', { name: '新建画布' }).click();
@@ -948,6 +1042,77 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.getByLabel('高度').fill('600');
     await page.getByRole('button', { name: '创建' }).click();
     await expect(page.getByTestId('photo-stats')).toContainText('800 × 600');
+  });
+});
+
+// 照片编辑器国际化（en-US）：界面语言切换后不得残留中文
+test.describe('照片编辑器国际化（en-US）', () => {
+  test.use({ locale: 'en-US' });
+
+  test('英文界面无残留中文（含各标签页 / 弹窗 / 右键菜单）', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    await expect(page.getByLabel('Canvas name')).toHaveAttribute('placeholder', 'Untitled canvas');
+
+    // 空白图层 → 自动名应为英文
+    await page.getByTestId('layer-menu-trigger').click();
+    await page.getByRole('menuitem', { name: 'Blank layer' }).click();
+    await page.getByTestId('layer-menu-trigger').first().click();
+    await page.getByRole('menuitem', { name: 'Text layer' }).click();
+    await page.getByTestId('layer-menu-trigger').first().click();
+    await page.getByRole('menuitem', { name: 'Shape layer' }).click();
+    await expect(page.getByText('Layer 1').first()).toBeVisible();
+    await expect(page.getByText('Text 1').first()).toBeVisible();
+    await expect(page.getByText('Shape 1').first()).toBeVisible();
+
+    // 混合模式下拉为英文
+    const mix = page.getByLabel('Blend mode');
+    await expect(mix.locator('option')).toContainText(['Normal', 'Multiply']);
+
+    // 形状下拉为英文
+    await page.getByRole('button', { name: 'Shape', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Rounded rectangle' })).toBeVisible();
+
+    // 新建画布对话框：预设为中性文本，按钮为英文
+    await page.getByRole('button', { name: 'New canvas' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByLabel('Preset').locator('option').first()).toHaveText(
+      '1280 × 720 · 16:9',
+    );
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    // 逐个标签页 / 菜单 / 弹窗扫描：不应出现 CJK
+    const scan = () =>
+      page.evaluate(() => {
+        const main = document.querySelector('main') ?? document.body;
+        const text = (main as HTMLElement).innerText;
+        return text.split('\n').filter((line) => /[\u3400-\u9FFF\uF900-\uFAFF]/.test(line));
+      });
+    const found: string[] = [];
+    for (const tab of ['Properties', 'Adjust', 'Filters', 'Layers']) {
+      await page.getByRole('button', { name: tab, exact: true }).click();
+      await page.waitForTimeout(120);
+      found.push(...(await scan()).map((line) => `${tab}: ${line}`));
+    }
+    await page.getByRole('button', { name: 'Export image' }).click();
+    found.push(...(await scan()).map((line) => `export: ${line}`));
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+    await expect(page.getByTestId('canvas-context-menu')).toBeVisible();
+    found.push(...(await scan()).map((line) => `ctx: ${line}`));
+    await page.keyboard.press('Escape');
+
+    // 扫描工具区所有可见文本：不应出现 CJK
+    const cjk = await page.evaluate(() => {
+      const main = document.querySelector('main') ?? document.body;
+      const text = (main as HTMLElement).innerText;
+      return text.split('\n').filter((line) => /[\u3400-\u9FFF\uF900-\uFAFF]/.test(line));
+    });
+    expect(found).toEqual([]);
+    expect(cjk).toEqual([]);
   });
 });
 
@@ -1087,5 +1252,144 @@ test.describe('脑图编辑器（zh-CN）', () => {
     await page.keyboard.press('Escape');
     await second.click();
     await expect(second.locator('input')).toHaveCount(1);
+  });
+});
+
+// 办公工具「放映」：与幻灯片工具同一套入口（DocumentHeader afterNew）
+test.describe('办公工具放映（zh-CN）', () => {
+  test.use({ locale: 'zh-CN' });
+
+  const overlay = (page: Page) => page.getByTestId('present-overlay');
+
+  test('照片编辑器：放映合成位图并可 Esc 退出', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/photo-editor');
+    await page.getByTestId('photo-present').click();
+    await expect(overlay(page)).toBeVisible();
+    await expect(page.getByTestId('present-image')).toBeVisible({ timeout: 10000 });
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('文字处理器：放映只读文档', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('放映冒烟内容');
+    const button = page.getByTestId('rich-text-present');
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(overlay(page)).toBeVisible();
+    await expect(page.getByTestId('present-document')).toContainText('放映冒烟内容');
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('电子表格：放映只读表格', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/spreadsheet-editor');
+    await page.getByTestId('sheet-present').click();
+    await expect(overlay(page)).toBeVisible();
+    // 空工作簿也要呈现表头 + 空表
+    await expect(page.getByRole('table')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('流程图：放映画布截图', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/flowchart-editor');
+    await page.getByRole('button', { name: '过程', exact: true }).click();
+    await expect(page.getByText(/节点:\s*1/)).toBeVisible();
+    await page.getByTestId('flowchart-present').click();
+    await expect(overlay(page)).toBeVisible();
+    await expect(page.getByTestId('present-image')).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('脑图：放映画布截图', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/mindmap-editor');
+    await expect(page.locator('.react-flow__node')).toHaveCount(1);
+    await page.getByTestId('mindmap-present').click();
+    await expect(overlay(page)).toBeVisible();
+    await expect(page.getByTestId('present-image')).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+});
+
+// 多页浏览：页签条翻页 + 缩略图总览（流程图 / 脑图）
+test.describe('多页浏览（zh-CN）', () => {
+  test.use({ locale: 'zh-CN' });
+
+  test('流程图：总览 / 翻页 / 页码', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/flowchart-editor');
+
+    // 加一个节点，再加一页
+    await page.getByRole('button', { name: '过程', exact: true }).click();
+    await expect(page.getByText(/节点:\s*1/)).toBeVisible();
+    await page.getByTestId('page-counter').scrollIntoViewIfNeeded();
+    await expect(page.getByTestId('page-counter')).toContainText('1');
+    await page.getByRole('button', { name: '新建页面' }).click();
+    await expect(page.getByTestId('page-counter')).toContainText('2');
+
+    // 上一页 / 下一页
+    await page.getByTestId('page-prev').click();
+    await expect(page.getByText(/节点:\s*1/)).toBeVisible();
+    await page.getByTestId('page-next').click();
+    await expect(page.getByText(/节点:\s*0/)).toBeVisible();
+
+    // 总览：两页缩略图都在，第一页有内容
+    await page.getByTestId('page-overview-open').click();
+    const overview = page.getByTestId('page-overview');
+    await expect(overview).toBeVisible();
+    await expect(overview.getByTestId('page-thumb')).toHaveCount(1);
+    // 第二页还没有内容 → 卡片上给出「空白页」提示
+    await expect(overview.getByText('空白页')).toBeVisible();
+
+    // 点第一页卡片跳转并关闭总览
+    await page.getByTestId('page-card-select-0').click();
+    await expect(overview).toHaveCount(0);
+    await expect(page.getByText(/节点:\s*1/)).toBeVisible();
+
+    // Ctrl+PageDown 翻页
+    await page.keyboard.press('Control+PageDown');
+    await expect(page.getByText(/节点:\s*0/)).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
+  test('脑图：总览 / 翻页 / 页码', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/mindmap-editor');
+    await expect(page.locator('.react-flow__node')).toHaveCount(1);
+
+    await page.getByRole('button', { name: '新建画布' }).click();
+    await expect(page.getByTestId('page-counter')).toContainText('2');
+
+    await page.getByTestId('page-overview-open').click();
+    await expect(page.getByTestId('page-overview')).toBeVisible();
+    await expect(page.getByTestId('page-thumb')).toHaveCount(2);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('page-overview')).toHaveCount(0);
+
+    await page.getByTestId('page-prev').click();
+    await expect(page.getByTestId('page-counter')).toContainText('1');
+    expect(errors).toEqual([]);
   });
 });

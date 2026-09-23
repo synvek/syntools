@@ -23,6 +23,8 @@ export interface PointerContext {
   onContextMenu: (position: { x: number; y: number }) => void;
   /** 吸管取色结果（null = 画布外），由宿主更新前景色并给出反馈 */
   onPickColor: (picked: PickedColor | null) => void;
+  /** 新建文字图层的默认内容（由宿主按当前语言提供） */
+  defaultText: string;
 }
 
 type Drag =
@@ -130,7 +132,7 @@ export function attachPointer(
     }
 
     if (tool === 'text') {
-      const id = state.addTextLayer(point.x, point.y);
+      const id = state.addTextLayer(point.x, point.y, context.defaultText);
       if (id) context.onRequestTextEdit(id);
       state.setTool('move');
       return;

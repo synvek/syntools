@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_IMPORT_BYTES,
   argbToHex,
+  PRESENT_BLANK_COLS,
+  PRESENT_BLANK_ROWS,
+  PRESENT_MAX_COLS,
+  PRESENT_MAX_ROWS,
   buildExportFilename,
+  buildPresentGrid,
   checkImportFile,
   columnIndexToName,
   columnNameToIndex,
@@ -222,5 +227,83 @@ describe('文件名与单位换算', () => {
     expect(rowHeightToPx(15)).toBe(20);
     expect(pxToColumnWidth(0)).toBeUndefined();
     expect(pxToRowHeight(undefined)).toBeUndefined();
+  });
+});
+
+describe('放映（只读表格）', () => {
+  const snapshot = {
+    sheetOrder: ['s1', 's2'],
+    sheets: {
+      s1: {
+        name: '明细',
+        cellData: {
+          '0': {
+            '0': { v: '姓名', s: { bl: 1 as const, bg: { rgb: '#ffee00' } } },
+            '1': { v: '金额', s: { ht: 3 as const } },
+          },
+          '1': { '0': { v: '张三' }, '1': { v: 128.5 } },
+          '2': { '0': { f: 'SUM(B2:B2)' } },
+        },
+        mergeData: [{ startRow: 1, startColumn: 0, endRow: 1, endColumn: 1 }],
+      },
+      s2: { name: '空表', cellData: {} },
+    },
+  };
+
+  it('把快照转成只读表格数据（含样式与公式）', () => {
+    const grid = buildPresentGrid(snapshot, 's1');
+    expect(grid).not.toBeNull();
+    expect(grid!.sheetName).toBe('明细');
+    expect(grid!.rows).toBe(3);
+    expect(grid!.cols).toBe(2);
+    expect(grid!.truncated).toBe(false);
+
+    const header = grid!.cells.find((cell) => cell.row === 0 && cell.col === 0);
+    expect(header).toMatchObject({ text: '姓名', bold: true, background: '#ffee00' });
+    expect(grid!.cells.find((cell) => cell.row === 0 && cell.col === 1)?.align).toBe('right');
+    expect(grid!.cells.find((cell) => cell.row === 1 && cell.col === 1)?.text).toBe('128.5');
+    // 只有公式没有计算值时按 =公式 展示
+    expect(grid!.cells.find((cell) => cell.row === 2)?.text).toBe('=SUM(B2:B2)');
+  });
+
+  it('合并单元格按 rowSpan / colSpan 还原', () => {
+    const grid = buildPresentGrid(snapshot, 's1');
+    expect(grid!.merges).toEqual([{ row: 1, col: 0, rowSpan: 1, colSpan: 2 }]);
+  });
+
+  it('超出展示上限时截断并标记', () => {
+    const grid = buildPresentGrid(snapshot, 's1', 2, PRESENT_MAX_COLS);
+    expect(grid!.rows).toBe(2);
+    expect(grid!.truncated).toBe(true);
+  });
+
+  it('指定当前工作表优先；工作表 id 失效时回退到第一张有内容的表', () => {
+    // 当前就是空表：如实呈现空表，而不是跳到别的表
+    const empty = buildPresentGrid(snapshot, 's2');
+    expect(empty).toMatchObject({
+      sheetName: '空表',
+      rows: PRESENT_BLANK_ROWS,
+      cols: PRESENT_BLANK_COLS,
+      cells: [],
+    });
+
+    const unknown = buildPresentGrid(snapshot, 'missing');
+    expect(unknown!.sheetName).toBe('明细');
+  });
+
+  it('空工作簿给出一张空白网格，而不是孤零零一个单元格', () => {
+    const grid = buildPresentGrid({ sheets: { s1: { name: '空', cellData: {} } } }, 's1');
+    expect(grid).toMatchObject({
+      rows: PRESENT_BLANK_ROWS,
+      cols: PRESENT_BLANK_COLS,
+      cells: [],
+      truncated: false,
+    });
+    expect(buildPresentGrid({}, null)).toBeNull();
+  });
+
+  it('展示上限为常量且大于常规表宽', () => {
+    expect(PRESENT_MAX_ROWS).toBeGreaterThan(50);
+    expect(PRESENT_MAX_COLS).toBeGreaterThan(20);
   });
 });

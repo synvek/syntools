@@ -76,6 +76,24 @@ function viewportEl(): HTMLElement | null {
 }
 
 /**
+ * 把当前画布截成 dataURL（不落盘）。
+ * 放映模式复用同一条 DOM 截图管线，保证与导出结果一致。
+ */
+export async function captureViewportDataUrl(
+  nodes: Node<FlowNodeData>[],
+  options: RasterExportOptions = DEFAULT_RASTER_OPTIONS,
+): Promise<string | null> {
+  try {
+    if (nodes.length === 0) return null;
+    const viewport = viewportEl();
+    if (!viewport) return null;
+    return await toPng(viewport, captureOptions(exportBoundsOf(nodes, options.padding), options));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 导出当前画布为 PNG / JPEG / PDF。
  * nodes 为要导出的节点集合（传入选中节点即可实现「仅导出选中」）。
  */

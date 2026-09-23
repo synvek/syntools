@@ -71,7 +71,8 @@ export function createNewDoc(options: NewDocOptions): ToolResult<PhotoDoc> {
     ok: true,
     value: {
       id: createId('doc'),
-      name: options.name?.trim() || '未命名画布',
+      // 空名称表示「未命名」：由 UI 用当前语言渲染占位名（见 PhotoTool 的 titlePlaceholder）
+      name: options.name?.trim() ?? '',
       width,
       height,
       background: options.background ?? 'white',
@@ -91,7 +92,7 @@ export function createDoc(): PhotoDoc {
 function emptyDoc(): PhotoDoc {
   return {
     id: createId('doc'),
-    name: '未命名画布',
+    name: '',
     width: 1280,
     height: 720,
     background: 'white',
@@ -104,14 +105,15 @@ export function createRasterLayer(input: {
   assetId: string;
   width: number;
   height: number;
-  name: string;
+  /** 空字符串 = 自动命名（UI 按类型 + 序号展示当前语言的名字） */
+  name?: string;
   x?: number;
   y?: number;
 }): RasterLayer {
   return {
     id: createId('raster'),
     kind: 'raster',
-    name: input.name,
+    name: input.name ?? '',
     visible: true,
     locked: false,
     opacity: 1,
@@ -140,7 +142,7 @@ export function createTextLayer(input: {
   return {
     id: createId('text'),
     kind: 'text',
-    name: '文字图层',
+    name: '',
     visible: true,
     locked: false,
     opacity: 1,
@@ -152,7 +154,8 @@ export function createTextLayer(input: {
     rotation: 0,
     flipX: false,
     flipY: false,
-    text: input.text ?? '双击编辑文字',
+    // 空文本交给调用方用当前语言填写默认内容（见 store.addTextLayer 的 text 参数）
+    text: input.text ?? '',
     fontSize,
     fontFamily: 'PingFang SC',
     fill: '#111827',
@@ -174,7 +177,7 @@ export function createShapeLayer(input: {
   return {
     id: createId('shape'),
     kind: 'shape',
-    name: '形状图层',
+    name: '',
     visible: true,
     locked: false,
     opacity: 1,
@@ -192,11 +195,4 @@ export function createShapeLayer(input: {
     strokeWidth: 0,
     cornerRadius: 12,
   };
-}
-
-/** 图层默认命名：按类型 + 同类型序号（「图层 3」） */
-export function nextLayerName(layers: Layer[], kind: Layer['kind']): string {
-  const base = kind === 'raster' ? '图层' : kind === 'text' ? '文字图层' : '形状图层';
-  const count = layers.filter((layer) => layer.kind === kind).length;
-  return `${base} ${count + 1}`;
 }

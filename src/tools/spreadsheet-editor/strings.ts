@@ -16,6 +16,10 @@ const zh: ResourceTree = {
   tools: {
     sheet: {
       docTitle: '工作簿名称',
+      present: '放映',
+      exitPresent: '退出放映（Esc）',
+      presentLoading: '正在生成放映画面…',
+      presentFailed: '放映画面生成失败',
       titlePlaceholder: '未命名工作簿',
       importHint: '拖入或选择 .xlsx 文件导入 Excel 内容',
       importXlsx: '导入 Excel (.xlsx)',
@@ -52,6 +56,10 @@ const en: ResourceTree = {
   tools: {
     sheet: {
       docTitle: 'Workbook name',
+      present: 'Present',
+      exitPresent: 'Exit (Esc)',
+      presentLoading: 'Preparing the slideshow…',
+      presentFailed: 'Failed to build the slideshow',
       titlePlaceholder: 'Untitled workbook',
       importHint: 'Drop or pick a .xlsx file to import Excel content',
       importXlsx: 'Import Excel (.xlsx)',
@@ -89,6 +97,10 @@ const zhTW: ResourceTree = {
   tools: {
     sheet: {
       docTitle: '活頁簿名稱',
+      present: '放映',
+      exitPresent: '結束放映（Esc）',
+      presentLoading: '正在產生放映畫面…',
+      presentFailed: '放映畫面產生失敗',
       titlePlaceholder: '未命名活頁簿',
       importHint: '拖曳或選擇 .xlsx 檔案匯入 Excel 內容',
       importXlsx: '匯入 Excel (.xlsx)',
@@ -125,6 +137,10 @@ const ja: ResourceTree = {
   tools: {
     sheet: {
       docTitle: 'ブック名',
+      present: 'スライドショー',
+      exitPresent: '終了（Esc）',
+      presentLoading: '表示用の画像を生成中…',
+      presentFailed: '表示用の画像の生成に失敗しました',
       titlePlaceholder: '無題のブック',
       importHint: '.xlsx ファイルをドロップまたは選択して Excel の内容を読み込む',
       importXlsx: 'Excel (.xlsx) を読み込む',
@@ -163,6 +179,10 @@ const fr: ResourceTree = {
   tools: {
     sheet: {
       docTitle: 'Nom du classeur',
+      present: 'Présenter',
+      exitPresent: 'Quitter (Échap)',
+      presentLoading: 'Préparation du diaporama…',
+      presentFailed: 'Échec de la préparation du diaporama',
       titlePlaceholder: 'Classeur sans titre',
       importHint: 'Déposez ou choisissez un fichier .xlsx pour importer le contenu Excel',
       importXlsx: 'Importer Excel (.xlsx)',
@@ -201,6 +221,10 @@ const de: ResourceTree = {
   tools: {
     sheet: {
       docTitle: 'Arbeitsmappenname',
+      present: 'Präsentieren',
+      exitPresent: 'Beenden (Esc)',
+      presentLoading: 'Präsentationsansicht wird erstellt…',
+      presentFailed: 'Präsentationsansicht fehlgeschlagen',
       titlePlaceholder: 'Unbenannte Arbeitsmappe',
       importHint: '.xlsx-Datei hierher ziehen oder auswählen, um Excel-Inhalte zu importieren',
       importXlsx: 'Excel importieren (.xlsx)',
@@ -239,6 +263,10 @@ const it: ResourceTree = {
   tools: {
     sheet: {
       docTitle: 'Nome della cartella di lavoro',
+      present: 'Presenta',
+      exitPresent: 'Esci (Esc)',
+      presentLoading: 'Preparazione della presentazione…',
+      presentFailed: 'Impossibile preparare la presentazione',
       titlePlaceholder: 'Cartella di lavoro senza titolo',
       importHint: 'Trascina o scegli un file .xlsx per importare il contenuto di Excel',
       importXlsx: 'Importa Excel (.xlsx)',
@@ -277,6 +305,10 @@ const es: ResourceTree = {
   tools: {
     sheet: {
       docTitle: 'Nombre del libro',
+      present: 'Presentar',
+      exitPresent: 'Salir (Esc)',
+      presentLoading: 'Preparando la presentación…',
+      presentFailed: 'No se pudo preparar la presentación',
       titlePlaceholder: 'Libro sin título',
       importHint: 'Arrastra o elige un archivo .xlsx para importar el contenuto de Excel',
       importXlsx: 'Importar Excel (.xlsx)',
@@ -315,6 +347,10 @@ const pt: ResourceTree = {
   tools: {
     sheet: {
       docTitle: 'Nome do livro',
+      present: 'Apresentar',
+      exitPresent: 'Sair (Esc)',
+      presentLoading: 'A preparar a apresentação…',
+      presentFailed: 'Falha ao preparar a apresentação',
       titlePlaceholder: 'Livro sem título',
       importHint: 'Arraste ou escolha um ficheiro .xlsx para importar o conteúdo do Excel',
       importXlsx: 'Importar Excel (.xlsx)',

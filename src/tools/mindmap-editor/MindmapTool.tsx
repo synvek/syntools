@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactFlowProvider, useReactFlow, type Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { DocumentHeader } from '@/core/components/DocumentHeader';
+import { Icon } from '@/core/components/Icon';
 import { i18n } from '@/core/i18n';
 import { useMindStore } from './store';
 import { clearDraft, readDraft, writeDraft } from './draft';
@@ -13,8 +14,12 @@ import { IoMenu } from './ui/IoMenu';
 import { Toolbar } from './ui/Toolbar';
 import { OutlinePanel } from './ui/OutlinePanel';
 import { Inspector } from './ui/Inspector';
+import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { TemplatePanel } from './ui/TemplatePanel';
-import { SheetTabs } from './ui/SheetTabs';
+import { captureViewportDataUrl, DEFAULT_RASTER_OPTIONS } from './io/raster';
+import type { MindNodeData } from './nodes/MindNode';
+import { PageBrowser } from '@/core/components/PageBrowser';
+import { SheetThumbnail } from './model/SheetThumbnail';
 import './mindmap.css';
 import '@xyflow/react/dist/style.css';
 
@@ -24,18 +29,50 @@ const DRAFT_DEBOUNCE_MS = 1200;
 
 function MindmapInner() {
   const { t } = useTranslation();
-  const { fitView } = useReactFlow();
+  const { fitView, getNodes } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const doc = useMindStore((s) => s.doc);
   const selectedId = useMindStore((s) => s.selectedId);
   const docName = useMindStore((s) => s.docName);
   const setDocName = useMindStore((s) => s.setDocName);
+  const sheetOrder = useMindStore((s) => s.sheetOrder);
+  const activeSheetId = useMindStore((s) => s.activeSheetId);
+  const sheetData = useMindStore((s) => s.sheetData);
+
+  /** 各画布的即时快照（活动画布现场序列化），仅供总览缩略图使用 */
+  const sheets = useMemo(
+    () => useMindStore.getState().getDoc().sheets,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sheetOrder, activeSheetId, sheetData, doc],
+  );
 
   const [busy, setBusy] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [presenting, setPresenting] = useState(false);
+  const [presentSrc, setPresentSrc] = useState<string | null>(null);
+  const [presentFailed, setPresentFailed] = useState(false);
+
+  /** 放映：先渲染放映层（显示「生成中」），下一帧再截图，避免大图卡住首次绘制 */
+  const openPresent = () => {
+    setPresentSrc(null);
+    setPresentFailed(false);
+    setPresenting(true);
+    window.setTimeout(() => {
+      void captureViewportDataUrl(getNodes() as Node<MindNodeData>[], {
+        ...DEFAULT_RASTER_OPTIONS,
+        format: 'png',
+        transparent: false,
+        padding: 40,
+      }).then((url) => {
+        if (url) setPresentSrc(url);
+        else setPresentFailed(true);
+      });
+    }, 0);
+  };
+
   const saveTimer = useRef<number | null>(null);
   const firstSave = useRef(true);
 
@@ -105,6 +142,15 @@ function MindmapInner() {
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       const st = useMindStore.getState();
       const mod = e.metaKey || e.ctrlKey;
+      // Ctrl/⌘ + PageUp/PageDown：上一张 / 下一张画布
+      if (mod && (e.key === 'PageUp' || e.key === 'PageDown')) {
+        e.preventDefault();
+        const st = useMindStore.getState();
+        const index = st.sheetOrder.findIndex((sheet) => sheet.id === st.activeSheetId);
+        const next = st.sheetOrder[index + (e.key === 'PageDown' ? 1 : -1)];
+        if (next) st.switchSheet(next.id);
+        return;
+      }
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) st.redo();
@@ -172,6 +218,19 @@ function MindmapInner() {
         newLabel={t('tools.mindmap.newDoc')}
         newIcon="mindmap"
         onNew={handleNew}
+        afterNew={
+          <button
+            type="button"
+            data-testid="mindmap-present"
+            onClick={openPresent}
+            disabled={counts.nodes === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Icon name="present" className="h-4 w-4" />
+            {t('tools.mindmap.present')}
+          </button>
+        }
+
         io={<IoMenu busy={busy} setBusy={setBusy} onError={setFailure} />}
         stats={
           <>
@@ -189,7 +248,34 @@ function MindmapInner() {
 
       <Toolbar onTemplates={() => setTemplatesOpen(true)} />
 
-      <SheetTabs />
+      <PageBrowser
+        pages={sheetOrder}
+        activeId={activeSheetId}
+        labels={{
+          add: t('tools.mindmap.addSheet'),
+          renameHint: t('tools.mindmap.renameHint'),
+          moveLeft: t('tools.mindmap.movePageLeft'),
+          moveRight: t('tools.mindmap.movePageRight'),
+          remove: t('tools.mindmap.removePage'),
+          prev: t('tools.mindmap.prevPage'),
+          next: t('tools.mindmap.nextPage'),
+          openOverview: t('tools.mindmap.openPageOverview'),
+          overviewTitle: t('tools.mindmap.pageOverview'),
+          close: t('tools.mindmap.closeOverview'),
+          empty: t('tools.mindmap.emptyPage'),
+          counter: t('tools.mindmap.pageCounter'),
+        }}
+        thumbnail={(id) => {
+          const sheet = sheets.find((item) => item.id === id);
+          // 空画布返回 null，总览卡片才会显示「空白画布」提示
+          return sheet && sheet.doc.nodes.length > 0 ? <SheetThumbnail doc={sheet.doc} /> : null;
+        }}
+        onSelect={(id) => useMindStore.getState().switchSheet(id)}
+        onAdd={() => useMindStore.getState().addSheet()}
+        onRename={(id, name) => useMindStore.getState().renameSheet(id, name)}
+        onRemove={(id) => useMindStore.getState().removeSheet(id)}
+        onMove={(id, dir) => useMindStore.getState().moveSheet(id, dir)}
+      />
 
       <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
         <OutlinePanel />
@@ -215,6 +301,27 @@ function MindmapInner() {
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           {failure}
         </p>
+      ) : null}
+
+      {presenting ? (
+        <PresentOverlay
+          title={docName.trim() || t('tools.mindmap.titlePlaceholder')}
+          onClose={() => setPresenting(false)}
+          exitLabel={t('tools.mindmap.exitPresent')}
+          loadingLabel={t('tools.mindmap.presentLoading')}
+          failedLabel={t('tools.mindmap.presentFailed')}
+          loading={!presentSrc && !presentFailed}
+          failed={presentFailed}
+        >
+          {presentSrc ? (
+            <img
+              src={presentSrc}
+              alt=""
+              data-testid="present-image"
+              className="max-h-full max-w-full rounded-lg bg-white shadow-2xl"
+            />
+          ) : null}
+        </PresentOverlay>
       ) : null}
 
       <TemplatePanel

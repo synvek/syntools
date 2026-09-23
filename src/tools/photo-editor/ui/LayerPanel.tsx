@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
-import { BLEND_MODES, SHAPE_KINDS } from '../core';
+import { BLEND_MODES } from '../core';
 import { layerThumbnail } from '../render/export';
 import { CompactSlider, Select } from './controls';
+import { layerDisplayName } from './layerName';
 import { usePhotoStore } from '../store';
 import type { BlendMode, Layer, PhotoDoc } from '../model/types';
 
@@ -95,7 +96,7 @@ export function LayerPanel() {
           <Select
             ariaLabel={t('tools.photo.blend')}
             value={active?.blend ?? 'normal'}
-            options={BLEND_MODES}
+            options={BLEND_MODES.map((id) => ({ id, label: t(`tools.photo.blendMode.${id}`) }))}
             disabled={!active}
             onChange={(blend: BlendMode) => active && patchLayer(active.id, { blend })}
           />
@@ -165,15 +166,14 @@ export function LayerPanel() {
                       <LayerThumb doc={doc} layer={layer} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-xs font-medium text-gray-700 dark:text-gray-200">
-                          {layer.name}
+                          {layerDisplayName(layer, doc.layers, t)}
                         </span>
                         <span className="block text-[10px] uppercase text-gray-400">
                           {layer.kind === 'raster'
                             ? `${Math.round(layer.width)}×${Math.round(layer.height)}`
                             : layer.kind === 'text'
                               ? 'T'
-                              : (SHAPE_KINDS.find((item) => item.id === layer.shape)?.label ??
-                                layer.shape)}
+                              : t(`tools.photo.shape.${layer.shape}`)}
                         </span>
                       </span>
                     </button>
@@ -212,6 +212,7 @@ export function LayerPanel() {
               <input
                 type="text"
                 aria-label={t('tools.photo.rename')}
+                placeholder={layerDisplayName(menuLayer, doc.layers, t)}
                 value={menuLayer.name}
                 onChange={(event) => patchLayer(menuLayer.id, { name: event.target.value }, false)}
                 onBlur={() => usePhotoStore.getState().commit()}
@@ -233,7 +234,11 @@ export function LayerPanel() {
             icon="text"
             label={t('tools.photo.addText')}
             onClick={() => {
-              addTextLayer(Math.round(doc.width * 0.1), Math.round(doc.height * 0.4));
+              addTextLayer(
+                Math.round(doc.width * 0.1),
+                Math.round(doc.height * 0.4),
+                t('tools.photo.textPlaceholder'),
+              );
               setMenu(null);
             }}
           />
@@ -258,7 +263,7 @@ export function LayerPanel() {
                 icon="copy"
                 label={t('tools.photo.duplicate')}
                 onClick={() => {
-                  duplicateLayer(menuLayer.id);
+                  duplicateLayer(menuLayer.id, t('tools.photo.copySuffix'));
                   setMenu(null);
                 }}
               />

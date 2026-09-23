@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Icon } from '@/core/components/Icon';
 import { buildExportFilename } from '../core';
 import { downloadCanvas, exportDoc, rasterizeSelection } from '../render/export';
 import { usePhotoStore } from '../store';
+import { docDisplayName } from './layerName';
 
 /**
  * 画布右键菜单。
@@ -77,7 +79,7 @@ export function CanvasContextMenu({
     // 按选区形状遮罩导出（矩形 / 椭圆 / 套索 / 反选的洞都正确挖空）
     const canvas = rasterizeSelection(doc, selection);
     if (!canvas) return;
-    downloadCanvas(canvas, buildExportFilename(`${doc.name || 'photo'}-selection`, 'png'), {
+    downloadCanvas(canvas, buildExportFilename(`${docDisplayName(doc.name, t)}-selection`, 'png'), {
       format: 'png',
       quality: 1,
     });
@@ -155,7 +157,7 @@ export function CanvasContextMenu({
         icon="download"
         label={t('tools.photo.exportImage')}
         hint="Ctrl+S"
-        onClick={run(() => exportCurrent(doc))}
+        onClick={run(() => exportCurrent(doc, t))}
       />
       <MenuDivider />
       <MenuItem icon="search" label={t('tools.photo.zoomFit')} onClick={run(() => onFit())} />
@@ -165,9 +167,9 @@ export function CanvasContextMenu({
 }
 
 /** 画布右键的「导出图片」：按 PNG 直接下载当前合成结果 */
-function exportCurrent(doc: Parameters<typeof exportDoc>[0]): void {
+function exportCurrent(doc: Parameters<typeof exportDoc>[0], t: TFunction): void {
   const canvas = exportDoc(doc, { format: 'png', quality: 1 });
-  downloadCanvas(canvas, buildExportFilename(doc.name || 'photo', 'png'), {
+  downloadCanvas(canvas, buildExportFilename(docDisplayName(doc.name, t), 'png'), {
     format: 'png',
     quality: 1,
   });

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { formatBytes } from '../core';
 import { estimateMemoryBytes } from '../model/assets';
 import { usePhotoStore } from '../store';
+import { layerDisplayName } from './layerName';
 
 /** 底部状态栏：画布尺寸、缩放、光标坐标、选区尺寸与内存占用。 */
 export function StatusBar({ cursor }: { cursor: { x: number; y: number } | null }) {
@@ -27,7 +28,9 @@ export function StatusBar({ cursor }: { cursor: { x: number; y: number } | null 
           })}
         </span>
       ) : null}
-      <span className="truncate">{layer ? layer.name : t('tools.photo.noLayer')}</span>
+      <span className="truncate">
+        {layer ? layerDisplayName(layer, doc.layers, t) : t('tools.photo.noLayer')}
+      </span>
       <span className="ml-auto">
         {t('tools.photo.statusMemory', { size: formatBytes(estimateMemoryBytes()) })}
       </span>

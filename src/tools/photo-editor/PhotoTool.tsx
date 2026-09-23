@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
+import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
 import { OptionBar } from '@/core/components/ActionButtons';
 import { i18n } from '@/core/i18n';
@@ -17,6 +18,7 @@ import { registerPhotoStrings } from './strings';
 import { usePhotoStore } from './store';
 import { AdjustPanel } from './ui/AdjustPanel';
 import { CanvasContextMenu } from './ui/CanvasContextMenu';
+import { docDisplayName } from './ui/layerName';
 import { ExportDialog, NewCanvasDialog } from './ui/Dialogs';
 import { FilterPanel } from './ui/FilterPanel';
 import { LayerPanel } from './ui/LayerPanel';
@@ -66,12 +68,30 @@ export default function PhotoTool() {
   const [restored, setRestored] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [presenting, setPresenting] = useState(false);
+  const [presentSrc, setPresentSrc] = useState<string | null>(null);
+  const [presentFailed, setPresentFailed] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
 
   const fail = useCallback((result: Failure) => setFailure(result), []);
+
+  /** 放映：先渲染放映层（显示「生成中」），下一帧再合成整幅位图，避免大图卡住首次绘制 */
+  const openPresent = useCallback(() => {
+    setPresentSrc(null);
+    setPresentFailed(false);
+    setPresenting(true);
+    window.setTimeout(() => {
+      try {
+        const canvas = exportDoc(usePhotoStore.getState().doc, { format: 'png', quality: 1 });
+        setPresentSrc(canvas.toDataURL('image/png'));
+      } catch {
+        setPresentFailed(true);
+      }
+    }, 0);
+  }, []);
 
   /**
    * 吸管结果：写入前景色并给出瞬时反馈。
@@ -188,7 +208,7 @@ export default function PhotoTool() {
           quality,
           clip: selectionOnly ? selection : null,
         });
-        downloadCanvas(canvas, buildExportFilename(current.name || 'photo', format), {
+        downloadCanvas(canvas, buildExportFilename(docDisplayName(current.name, t), format), {
           format,
           quality,
         });
@@ -197,7 +217,7 @@ export default function PhotoTool() {
         fail({ error: 'EXPORT_FAILED' });
       }
     },
-    [fail, selection],
+    [fail, selection, t],
   );
 
   const handleExportProject = useCallback(() => {
@@ -206,10 +226,10 @@ export default function PhotoTool() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = projectFilename(current.name || 'photo');
+    a.download = projectFilename(docDisplayName(current.name, t));
     a.click();
     URL.revokeObjectURL(url);
-  }, []);
+  }, [t]);
 
   const handleNewCanvas = useCallback(
     (width: number, height: number, background: CanvasBackground) => {
@@ -274,6 +294,12 @@ export default function PhotoTool() {
         newLabel={t('tools.photo.newCanvas')}
         newIcon="photoEditor"
         onNew={() => setDialog('new')}
+        afterNew={
+          <Button onClick={openPresent} testId="photo-present">
+            <Icon name="present" className="h-3.5 w-3.5" />
+            {t('tools.photo.present')}
+          </Button>
+        }
         io={
           <>
             <input
@@ -375,6 +401,7 @@ export default function PhotoTool() {
             onCursorMove={setCursor}
             onContextMenu={setContextMenu}
             onPickColor={handlePickColor}
+            defaultText={t('tools.photo.textPlaceholder')}
           />
         </div>
         <aside className="flex w-72 shrink-0 flex-col gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -432,6 +459,27 @@ export default function PhotoTool() {
           onFit={fitToWindow}
           onActual={zoomActual}
         />
+      ) : null}
+
+      {presenting ? (
+        <PresentOverlay
+          title={docDisplayName(doc.name, t)}
+          onClose={() => setPresenting(false)}
+          exitLabel={t('tools.photo.exitPresent')}
+          loadingLabel={t('tools.photo.presentLoading')}
+          failedLabel={t('tools.photo.presentFailed')}
+          loading={!presentSrc && !presentFailed}
+          failed={presentFailed}
+        >
+          {presentSrc ? (
+            <img
+              src={presentSrc}
+              alt=""
+              data-testid="present-image"
+              className="max-h-full max-w-full rounded-lg bg-white shadow-2xl"
+            />
+          ) : null}
+        </PresentOverlay>
       ) : null}
 
       {dialog === 'new' ? (
