@@ -32,6 +32,8 @@ import type { Layer, PhotoDoc, Rect, Selection, ShapeKind, ToolId, Viewport } fr
  */
 
 const HISTORY_LIMIT = 24;
+/** 缩放下限：允许缩到 2% 以观察超大画布全貌，但不会把「待适配」哨兵值也钳到这里 */
+const MIN_ZOOM = 0.02;
 
 export interface BrushConfig {
   color: string;
@@ -95,6 +97,16 @@ interface PhotoState {
   commitPixels: (id: string) => void;
   undo: () => void;
   redo: () => void;
+}
+
+/** 给缺失位图的图层补一张空白画布 */
+function repairRasterAsset(get: () => PhotoState, id: string): string {
+  const layer = get().doc.layers.find((item) => item.id === id);
+  const width = Math.max(1, Math.round(layer?.width ?? get().doc.width));
+  const height = Math.max(1, Math.round(layer?.height ?? get().doc.height));
+  get().patchLayer(id, { assetId: createBlankAsset(width, height) }, false);
+  get().bumpRev(id);
+  return id;
 }
 
 /** 历史中被引用到的资产：回收时必须一并保留，否则撤销会拿到已释放的画布 */
@@ -237,7 +249,9 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     set((s) => ({
       viewport: {
         ...s.viewport,
-        scale: Math.min(8, Math.max(0.02, Math.round(scale * 1000) / 1000)),
+        // scale === 0 是「尚未适配」哨兵值，不能被钳制——否则适应窗口会被锁在最小比例。
+        // 画布宿主按容器算出真实比例后会写回，此后始终是正数。
+        scale: scale <= 0 ? 0 : Math.min(8, Math.max(MIN_ZOOM, Math.round(scale * 1000) / 1000)),
       },
     })),
 
@@ -389,10 +403,17 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   ensurePaintLayer: () => {
     const state = get();
     const active = state.doc.layers.find((layer) => layer.id === state.doc.activeLayerId);
-    if (active && active.kind === 'raster' && !active.locked) return active.id;
+    if (active && active.kind === 'raster' && !active.locked) {
+      // 位图缺失（例如超大草稿只恢复了结构）：就地补一张空白画布，
+      // 否则落笔会写进「空资产」，表现为「选了画笔却画不出东西」
+      if (!getCanvas(active.assetId)) return repairRasterAsset(get, active.id);
+      return active.id;
+    }
     const top = [...state.doc.layers]
       .reverse()
-      .find((layer) => layer.kind === 'raster' && !layer.locked);
+      .find(
+        (layer) => layer.kind === 'raster' && !layer.locked && Boolean(getCanvas(layer.assetId)),
+      );
     if (top) {
       set((s) => ({ doc: { ...s.doc, activeLayerId: top.id } }));
       return top.id;

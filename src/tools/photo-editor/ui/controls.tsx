@@ -85,6 +85,47 @@ export function Slider({
   );
 }
 
+/** 单行滑杆：用于顶部工具条这类横向空间紧张的位置（标签只作无障碍名，不占宽度） */
+export function CompactSlider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  suffix,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="flex shrink-0 items-center gap-1.5" title={label}>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        aria-label={label}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-1.5 w-16 cursor-pointer appearance-none rounded-full bg-gray-200 accent-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-700"
+      />
+      <span className="w-9 shrink-0 text-right font-mono text-[11px] text-gray-400 dark:text-gray-500">
+        {value}
+        {suffix ?? ''}
+      </span>
+    </label>
+  );
+}
+
 export function NumberInput({
   value,
   min,
@@ -138,19 +179,22 @@ export function Select<T extends string>({
   value,
   options,
   ariaLabel,
+  disabled,
   onChange,
 }: {
   value: T;
   options: { id: T; label: string }[];
   ariaLabel: string;
+  disabled?: boolean;
   onChange: (value: T) => void;
 }) {
   return (
     <select
       value={value}
       aria-label={ariaLabel}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value as T)}
-      className={`${INPUT_CLASS} cursor-pointer`}
+      className={`${INPUT_CLASS} cursor-pointer disabled:cursor-not-allowed disabled:opacity-40`}
     >
       {options.map((option) => (
         <option key={option.id} value={option.id}>

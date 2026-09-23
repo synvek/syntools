@@ -211,16 +211,20 @@ export default function PhotoTool() {
 
   /* ------------------------------ 缩放 ------------------------------ */
 
-  const zoomBy = useCallback((delta: number) => setScale((scale || 1) + delta), [scale, setScale]);
+  const zoomBy = useCallback(
+    (delta: number) => setScale((scale > 0 ? scale : 1) + delta),
+    [scale, setScale],
+  );
 
+  /** 适应窗口：置回「待适配」哨兵值，画布宿主按容器算出真实比例后写回 */
   const fitToWindow = useCallback(() => {
     setScale(0);
     setViewport({ x: 0, y: 0 });
   }, [setScale, setViewport]);
 
+  /** 100%：回到原始像素，并重新居中 */
   const zoomActual = useCallback(() => {
     setScale(1);
-    // 以画布中心为锚点回到 100%
     setViewport({ x: 0, y: 0 });
   }, [setScale, setViewport]);
 

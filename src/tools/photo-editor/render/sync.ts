@@ -44,14 +44,17 @@ function sameKind(node: Konva.Node, layer: Layer): boolean {
   );
 }
 
-/** 同步单个图层（落笔后只需刷新这一层，避免整树重算） */
-export function refreshLayerNode(layer: Konva.Layer, item: Layer): void {
+/**
+ * 同步单个图层（落笔后只需刷新这一层，避免整树重算）。
+ * `live = true` 表示像素正在被改写：必须绕过 bake 缓存取最新像素。
+ */
+export function refreshLayerNode(layer: Konva.Layer, item: Layer, live = false): void {
   const node = layer.getChildren().find((child) => child.getAttr(LAYER_ID_ATTR) === item.id);
   if (!node) {
     layer.batchDraw();
     return;
   }
-  updateLayerNode(node, item);
+  updateLayerNode(node, item, live);
   layer.batchDraw();
 }
 

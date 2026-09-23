@@ -1,7 +1,7 @@
 import Konva from 'konva';
 import { bakeSignature } from '../core';
 import { getCanvas } from '../model/assets';
-import { bakeRaster } from './filters';
+import { bakeRaster, bakeRasterLive } from './filters';
 import { starPath } from './paint';
 import type { Layer, ShapeLayer, TextLayer } from '../model/types';
 
@@ -38,13 +38,22 @@ export function createLayerNode(layer: Layer): Konva.Shape {
   return node;
 }
 
-/** 就地更新：类型未变时只改属性，避免整树重建导致闪烁 */
-export function updateLayerNode(node: Konva.Node, layer: Layer): void {
+/**
+ * 就地更新：类型未变时只改属性，避免整树重建导致闪烁。
+ *
+ * `live = true` 用于落笔过程中：签名（rev）没变但像素已经变了，
+ * 必须绕过 bake 缓存重新取图，否则画面要到松手才刷新。
+ */
+export function updateLayerNode(node: Konva.Node, layer: Layer, live = false): void {
   if (layer.kind === 'raster' && node instanceof Konva.Image) {
     const asset = getCanvas(layer.assetId);
     const key = bakeKeyOf(layer);
-    if (asset && node.getAttr(BAKE_KEY_ATTR) !== key) {
-      node.image(bakeRaster(asset, key, layer.adjustments, layer.filters));
+    if (asset && (live || node.getAttr(BAKE_KEY_ATTR) !== key)) {
+      node.image(
+        live
+          ? bakeRasterLive(asset, layer.adjustments, layer.filters)
+          : bakeRaster(asset, key, layer.adjustments, layer.filters),
+      );
       node.setAttr(BAKE_KEY_ATTR, key);
     }
   } else if (layer.kind === 'text' && node instanceof Konva.Text) {

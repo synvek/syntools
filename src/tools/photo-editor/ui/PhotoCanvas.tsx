@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { computeFitScale } from '../core';
 import { attachPointer } from '../interaction/pointer';
 import { openTextEditor, type TextEditorHandle } from '../render/textEditor';
@@ -14,6 +14,16 @@ import { usePhotoStore } from '../store';
  * 2. 容器原生事件负责交互（Konva 节点 listening: false），统一做「屏幕 → 文档」坐标换算；
  * 3. 双击文字图层 → 叠一个 DOM textarea 做就地编辑。
  */
+/** 视口变换落到 DOM 属性上：便于 e2e 断言缩放 / 平移 */
+function markTransform(host: HTMLElement, transform: { scale: number; x: number; y: number }) {
+  host.dataset.transform = `${transform.scale.toFixed(4)},${Math.round(transform.x)},${Math.round(transform.y)}`;
+}
+
+/** 适配时四周留白 */
+const FIT_PADDING = 28;
+/** 容器小于此尺寸视为「尚未完成布局」，不参与适配计算 */
+const MIN_HOST_SIZE = 64;
+
 export function PhotoCanvas({
   onRuntimeFailure,
   onCursorMove,
@@ -38,32 +48,62 @@ export function PhotoCanvas({
   const onCursorMoveRef = useRef(onCursorMove);
   onCursorMoveRef.current = onCursorMove;
 
+  /**
+   * 应用视口变换（挂载、容器尺寸变化、用户缩放共用同一份逻辑）。
+   * - `scale === 0` 是「待适配」哨兵值：按容器算一次 fit **并写回 store**，工具栏才显示真实比例；
+   * - 容器尚未完成布局（宽或高过小）时直接放弃，等 ResizeObserver 下一次回调再算，
+   *   避免把「0 尺寸下算出的极小比例」当成用户缩放固定下来。
+   */
+  const applyTransform = useCallback(() => {
+    const handle = handleRef.current;
+    const host = canvasRef.current;
+    if (!handle || !host) return;
+    const width = host.clientWidth;
+    const height = host.clientHeight;
+    if (width < MIN_HOST_SIZE || height < MIN_HOST_SIZE) return;
+
+    const state = usePhotoStore.getState();
+    const prev = transformRef.current;
+    let nextScale = state.viewport.scale;
+    let x = state.viewport.x;
+    let y = state.viewport.y;
+
+    if (nextScale <= 0) {
+      // 待适配：算出比例并居中，一次写回 store（此后 x / y 就是权威值，不再用「0 即未设置」的隐式约定）
+      nextScale = computeFitScale(state.doc, { width, height }, FIT_PADDING);
+      x = Math.max(0, (width - state.doc.width * nextScale) / 2);
+      y = Math.max(0, (height - state.doc.height * nextScale) / 2);
+      state.setScale(nextScale);
+      state.setViewport({ x, y });
+    } else if (prev.scale > 0 && Math.abs(prev.scale - nextScale) > 0.0005) {
+      // 用户缩放：保持视口中心对应的文档坐标不变（否则每次缩放都会往左上角跑）
+      const centerX = (width / 2 - prev.x) / prev.scale;
+      const centerY = (height / 2 - prev.y) / prev.scale;
+      x = width / 2 - centerX * nextScale;
+      y = height / 2 - centerY * nextScale;
+      state.setViewport({ x, y });
+    }
+
+    transformRef.current = { scale: nextScale, x, y };
+    handle.setTransform({ scale: nextScale, x, y });
+    markTransform(host, transformRef.current);
+  }, []);
+
+  /** 抓手平移：直接把变换写进画布，不等 React 渲染（平移是高频连续操作） */
+  const applyPan = useCallback((x: number, y: number) => {
+    const handle = handleRef.current;
+    const host = canvasRef.current;
+    if (!handle) return;
+    transformRef.current = { ...transformRef.current, x, y };
+    handle.setTransform(transformRef.current);
+    if (host) markTransform(host, transformRef.current);
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let cancelled = false;
     let observer: ResizeObserver | null = null;
-
-    const applyTransform = () => {
-      const handle = handleRef.current;
-      const host = canvasRef.current;
-      if (!handle || !host) return;
-      const state = usePhotoStore.getState();
-      const fitted = computeFitScale(
-        state.doc,
-        { width: host.clientWidth, height: host.clientHeight },
-        28,
-      );
-      // scale === 0 表示「尚未适配」：算一次 fit 并写回 store，工具栏即可显示真实比例
-      const nextScale = state.viewport.scale > 0 ? state.viewport.scale : fitted;
-      if (state.viewport.scale <= 0) state.setScale(nextScale);
-      const x =
-        state.viewport.x || Math.max(0, (host.clientWidth - state.doc.width * nextScale) / 2);
-      const y =
-        state.viewport.y || Math.max(0, (host.clientHeight - state.doc.height * nextScale) / 2);
-      transformRef.current = { scale: nextScale, x, y };
-      handle.setTransform({ scale: nextScale, x, y });
-    };
 
     const syncNow = () => {
       const handle = handleRef.current;
@@ -114,6 +154,30 @@ export function PhotoCanvas({
 
     const cleanupRefs: (() => void)[] = [];
 
+    /**
+     * 像素变化后的重绘：用 rAF 合帧。
+     * 落笔时 pointermove 可能一帧来好几次，逐次重烘焙（含卷积滤镜）会掉帧；
+     * 合到每帧一次既保证「边画边显示」，又把成本压在 1 次烘焙 / 帧。
+     */
+    let surfaceFrame: number | null = null;
+    const flushSurface = () => {
+      surfaceFrame = null;
+      const current = handleRef.current;
+      if (!current) return;
+      const state = usePhotoStore.getState();
+      const layer = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
+      if (layer) refreshLayerNode(current.contentLayer, layer, true);
+      else current.contentLayer.batchDraw();
+    };
+    const onSurfaceChange = () => {
+      if (surfaceFrame !== null) return;
+      surfaceFrame = requestAnimationFrame(flushSurface);
+    };
+    cleanupRefs.push(() => {
+      if (surfaceFrame !== null) cancelAnimationFrame(surfaceFrame);
+      surfaceFrame = null;
+    });
+
     const timer = window.setTimeout(() => {
       if (cancelled) return;
       let handle: StageHandle;
@@ -131,14 +195,10 @@ export function PhotoCanvas({
       const detach = attachPointer(canvas, handle, {
         getTransform: () => transformRef.current,
         onRequestTextEdit: (id) => startEditing(id),
-        onSurfaceChange: () => {
-          const current = handleRef.current;
-          if (!current) return;
-          const layer = usePhotoStore
-            .getState()
-            .doc.layers.find((item) => item.id === usePhotoStore.getState().doc.activeLayerId);
-          if (layer) refreshLayerNode(current.contentLayer, layer);
-          else current.contentLayer.batchDraw();
+        onSurfaceChange,
+        onPan: (x, y) => {
+          usePhotoStore.getState().setViewport({ x, y });
+          applyPan(x, y);
         },
       });
       cleanupRefs.push(detach);
@@ -180,27 +240,15 @@ export function PhotoCanvas({
       handleRef.current?.destroy();
       handleRef.current = null;
     };
-  }, []);
+  }, [applyTransform, applyPan]);
 
-  // 画布尺寸 / 缩放变化：只重设变换与背景，不重建节点
+  // 画布尺寸 / 背景 / 缩放变化：只重设变换与背景，不重建节点
   useEffect(() => {
     const handle = handleRef.current;
-    const host = canvasRef.current;
-    if (!handle || !host) return;
-    const state = usePhotoStore.getState();
-    const fitted = computeFitScale(
-      state.doc,
-      { width: host.clientWidth, height: host.clientHeight },
-      28,
-    );
-    const nextScale = state.viewport.scale > 0 ? state.viewport.scale : fitted;
-    const x = state.viewport.x || Math.max(0, (host.clientWidth - state.doc.width * nextScale) / 2);
-    const y =
-      state.viewport.y || Math.max(0, (host.clientHeight - state.doc.height * nextScale) / 2);
-    transformRef.current = { scale: nextScale, x, y };
-    handle.setTransform({ scale: nextScale, x, y });
-    handle.renderBackground(state.doc);
-  }, [doc.width, doc.height, doc.background, scale]);
+    if (!handle) return;
+    applyTransform();
+    handle.renderBackground(usePhotoStore.getState().doc);
+  }, [doc.width, doc.height, doc.background, scale, applyTransform]);
 
   // 文档变化（增删改图层 / 调整参数）：增量同步节点
   useEffect(() => {

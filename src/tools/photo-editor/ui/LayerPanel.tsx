@@ -3,14 +3,21 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { BLEND_MODES, SHAPE_KINDS } from '../core';
 import { layerThumbnail } from '../render/export';
-import { Button, IconTextButton, Select, Slider } from './controls';
+import { CompactSlider, Select } from './controls';
 import { usePhotoStore } from '../store';
 import type { BlendMode, Layer, PhotoDoc } from '../model/types';
 
 /**
- * 图层面板：缩略图 + 可见性 / 锁定 + 拖拽排序 + 混合模式 / 不透明度 + 合并操作。
+ * 图层面板。
+ *
+ * 布局刻意保持「一行一图层」的紧凑密度：
+ * 1. 顶部一行是「仅作用于当前选中图层」的混合模式 + 不透明度（不再塞进每条图层里展开）；
+ * 2. 每条图层右侧的 ⋯ 弹窗菜单承载重命名、新建各类图层与复制 / 合并 / 删除等操作。
  * 列表顺序与文档一致（数组尾部为最上层），展示时倒序呈现。
  */
+
+const MENU_WIDTH = 208;
+
 export function LayerPanel() {
   const { t } = useTranslation();
   const doc = usePhotoStore((s) => s.doc);
@@ -28,23 +35,90 @@ export function LayerPanel() {
 
   const dragIndex = useRef<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [menu, setMenu] = useState<{ id: string | null; left: number; top: number } | null>(null);
 
   const reversed = [...doc.layers].reverse();
+  const active = doc.layers.find((item) => item.id === activeId) ?? null;
+  const menuLayer = menu?.id ? (doc.layers.find((item) => item.id === menu.id) ?? null) : null;
+
+  // 菜单：点外部 / 按 Esc / 视口变化时关闭（面板内部与触发按钮自己要阻止冒泡）
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenu(null);
+    };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', close);
+    };
+  }, [menu]);
+
+  const openMenu = (id: string | null, event: React.MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMenu((prev) =>
+      prev?.id === id
+        ? null
+        : {
+            id,
+            left: Math.max(
+              8,
+              Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8),
+            ),
+            top: Math.min(rect.bottom + 4, Math.max(8, window.innerHeight - 300)),
+          },
+    );
+  };
+
+  const keepOpen = (event: React.SyntheticEvent) => event.stopPropagation();
 
   const toOriginalIndex = (reversedIndex: number) => doc.layers.length - 1 - reversedIndex;
 
   return (
     <div className="flex min-h-0 flex-col gap-2">
+      {/* 顶部一行：混合模式 + 不透明度，只作用于当前选中图层 */}
+      <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 dark:border-gray-800">
+        <div className="min-w-0 flex-1">
+          <Select
+            ariaLabel={t('tools.photo.blend')}
+            value={active?.blend ?? 'normal'}
+            options={BLEND_MODES}
+            disabled={!active}
+            onChange={(blend: BlendMode) => active && patchLayer(active.id, { blend })}
+          />
+        </div>
+        <CompactSlider
+          label={t('tools.photo.opacity')}
+          value={Math.round((active?.opacity ?? 1) * 100)}
+          min={0}
+          max={100}
+          suffix="%"
+          disabled={!active}
+          onChange={(value) => active && patchLayer(active.id, { opacity: value / 100 }, false)}
+        />
+      </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto">
         {reversed.length === 0 ? (
-          <p className="px-1 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
-            {t('tools.photo.noLayer')}
-          </p>
+          <div className="flex items-center justify-between rounded-lg border border-dashed border-gray-300 px-2 py-3 dark:border-gray-700">
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {t('tools.photo.noLayer')}
+            </span>
+            <MenuTrigger
+              label={t('tools.photo.layerMenu')}
+              onClick={(event) => openMenu(null, event)}
+              onPointerDown={keepOpen}
+            />
+          </div>
         ) : (
           <ul className="flex flex-col gap-1">
             {reversed.map((layer, reversedIndex) => {
               const index = toOriginalIndex(reversedIndex);
-              const active = layer.id === activeId;
+              const isActive = layer.id === activeId;
               return (
                 <li
                   key={layer.id}
@@ -69,12 +143,12 @@ export function LayerPanel() {
                     setDropIndex(null);
                   }}
                   className={`rounded-lg border transition-colors ${
-                    active
+                    isActive
                       ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40'
                       : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-800'
                   } ${dropIndex === index ? 'ring-1 ring-blue-400' : ''}`}
                 >
-                  <div className="flex items-center gap-2 p-1.5">
+                  <div className="flex items-center gap-1.5 p-1.5">
                     <button
                       type="button"
                       onClick={() => selectLayer(layer.id)}
@@ -95,55 +169,22 @@ export function LayerPanel() {
                         </span>
                       </span>
                     </button>
-                    <button
-                      type="button"
-                      aria-label={
-                        layer.visible ? t('tools.photo.visible') : t('tools.photo.hidden')
-                      }
-                      title={layer.visible ? t('tools.photo.visible') : t('tools.photo.hidden')}
+                    <RowIconButton
+                      label={layer.visible ? t('tools.photo.visible') : t('tools.photo.hidden')}
+                      icon={layer.visible ? 'eye' : 'eyeOff'}
                       onClick={() => patchLayer(layer.id, { visible: !layer.visible })}
-                      className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700"
-                    >
-                      <Icon name={layer.visible ? 'eye' : 'eyeOff'} className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={layer.locked ? t('tools.photo.unlock') : t('tools.photo.lock')}
-                      title={layer.locked ? t('tools.photo.unlock') : t('tools.photo.lock')}
+                    />
+                    <RowIconButton
+                      label={layer.locked ? t('tools.photo.unlock') : t('tools.photo.lock')}
+                      icon={layer.locked ? 'lock' : 'unlock'}
                       onClick={() => patchLayer(layer.id, { locked: !layer.locked })}
-                      className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700"
-                    >
-                      <Icon name={layer.locked ? 'lock' : 'unlock'} className="h-4 w-4" />
-                    </button>
+                    />
+                    <MenuTrigger
+                      label={t('tools.photo.layerMenu')}
+                      onClick={(event) => openMenu(layer.id, event)}
+                      onPointerDown={keepOpen}
+                    />
                   </div>
-                  {active ? (
-                    <div className="flex flex-col gap-2 border-t border-gray-200 px-2 py-2 dark:border-gray-700">
-                      <input
-                        type="text"
-                        aria-label={t('tools.photo.rename')}
-                        value={layer.name}
-                        onChange={(event) =>
-                          patchLayer(layer.id, { name: event.target.value }, false)
-                        }
-                        onBlur={() => usePhotoStore.getState().commit()}
-                        className="h-7 w-full rounded border border-gray-300 bg-white px-2 text-xs dark:border-gray-700 dark:bg-gray-900"
-                      />
-                      <Select
-                        ariaLabel={t('tools.photo.blend')}
-                        value={layer.blend}
-                        options={BLEND_MODES}
-                        onChange={(blend: BlendMode) => patchLayer(layer.id, { blend })}
-                      />
-                      <Slider
-                        label={t('tools.photo.opacity')}
-                        value={Math.round(layer.opacity * 100)}
-                        min={0}
-                        max={100}
-                        suffix="%"
-                        onChange={(value) => patchLayer(layer.id, { opacity: value / 100 }, false)}
-                      />
-                    </div>
-                  ) : null}
                 </li>
               );
             })}
@@ -151,59 +192,185 @@ export function LayerPanel() {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1 border-t border-gray-200 pt-2 dark:border-gray-800">
-        <IconTextButton
-          icon="placeholder"
-          label={t('tools.photo.addRaster')}
-          onClick={() => ensurePaintLayer()}
-        />
-        <IconTextButton
-          icon="text"
-          label={t('tools.photo.addText')}
-          onClick={() => addTextLayer(Math.round(doc.width * 0.1), Math.round(doc.height * 0.4))}
-        />
-        <IconTextButton
-          icon="shapes"
-          label={t('tools.photo.addShape')}
-          onClick={() =>
-            addShapeLayer({
-              x: Math.round(doc.width * 0.2),
-              y: Math.round(doc.height * 0.2),
-              width: Math.round(doc.width * 0.3),
-              height: Math.round(doc.height * 0.3),
-            })
-          }
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-1">
-        <IconTextButton
-          icon="copy"
-          label={t('tools.photo.duplicate')}
-          onClick={() => activeId && duplicateLayer(activeId)}
-          disabled={!activeId}
-        />
-        <IconTextButton
-          icon="layers"
-          label={t('tools.photo.mergeDown')}
-          onClick={() => activeId && mergeDown(activeId)}
-          disabled={!activeId}
-        />
-        <IconTextButton
-          icon="imageMerge"
-          label={t('tools.photo.flatten')}
-          onClick={() => flattenVisible()}
-          disabled={doc.layers.length === 0}
-        />
-        <Button
-          onClick={() => activeId && removeLayer(activeId)}
-          disabled={!activeId}
-          title={t('tools.photo.delete')}
+      {menu ? (
+        <div
+          role="menu"
+          aria-label={t('tools.photo.layerMenu')}
+          onPointerDown={keepOpen}
+          onClick={keepOpen}
+          style={{ left: menu.left, top: menu.top, width: MENU_WIDTH }}
+          className="fixed z-40 flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         >
-          <Icon name="close" className="h-3.5 w-3.5" />
-        </Button>
-      </div>
+          {menuLayer ? (
+            <div className="px-1 pb-1">
+              <input
+                type="text"
+                aria-label={t('tools.photo.rename')}
+                value={menuLayer.name}
+                onChange={(event) => patchLayer(menuLayer.id, { name: event.target.value }, false)}
+                onBlur={() => usePhotoStore.getState().commit()}
+                className="h-7 w-full rounded border border-gray-300 bg-white px-2 text-xs outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              />
+            </div>
+          ) : null}
+
+          <MenuSection label={t('tools.photo.newLayer')} />
+          <MenuItem
+            icon="placeholder"
+            label={t('tools.photo.addRaster')}
+            onClick={() => {
+              ensurePaintLayer();
+              setMenu(null);
+            }}
+          />
+          <MenuItem
+            icon="text"
+            label={t('tools.photo.addText')}
+            onClick={() => {
+              addTextLayer(Math.round(doc.width * 0.1), Math.round(doc.height * 0.4));
+              setMenu(null);
+            }}
+          />
+          <MenuItem
+            icon="shapes"
+            label={t('tools.photo.addShape')}
+            onClick={() => {
+              addShapeLayer({
+                x: Math.round(doc.width * 0.2),
+                y: Math.round(doc.height * 0.2),
+                width: Math.round(doc.width * 0.3),
+                height: Math.round(doc.height * 0.3),
+              });
+              setMenu(null);
+            }}
+          />
+
+          {menuLayer ? (
+            <>
+              <MenuSection label={t('tools.photo.layerOps')} />
+              <MenuItem
+                icon="copy"
+                label={t('tools.photo.duplicate')}
+                onClick={() => {
+                  duplicateLayer(menuLayer.id);
+                  setMenu(null);
+                }}
+              />
+              <MenuItem
+                icon="layers"
+                label={t('tools.photo.mergeDown')}
+                onClick={() => {
+                  mergeDown(menuLayer.id);
+                  setMenu(null);
+                }}
+              />
+              <MenuItem
+                icon="imageMerge"
+                label={t('tools.photo.flatten')}
+                onClick={() => {
+                  flattenVisible();
+                  setMenu(null);
+                }}
+              />
+              <MenuItem
+                icon="close"
+                label={t('tools.photo.delete')}
+                danger
+                onClick={() => {
+                  removeLayer(menuLayer.id);
+                  setMenu(null);
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/** 行内图标按钮（可见性 / 锁定）：尺寸与间距保持一致 */
+function RowIconButton({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+    >
+      <Icon name={icon} className="h-4 w-4" />
+    </button>
+  );
+}
+
+/** 菜单触发按钮：固定在锁定按钮右侧 */
+function MenuTrigger({
+  label,
+  onClick,
+  onPointerDown,
+}: {
+  label: string;
+  onClick: (event: React.MouseEvent<HTMLElement>) => void;
+  onPointerDown: (event: React.SyntheticEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-haspopup="menu"
+      data-testid="layer-menu-trigger"
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+    >
+      <Icon name="more" className="h-4 w-4" />
+    </button>
+  );
+}
+
+function MenuSection({ label }: { label: string }) {
+  return (
+    <div className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+      {label}
+    </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: string;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={`flex h-8 items-center gap-2 rounded-md px-2 text-xs transition-colors ${
+        danger
+          ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950'
+          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'
+      }`}
+    >
+      <Icon name={icon} className="h-3.5 w-3.5" />
+      {label}
+    </button>
   );
 }
 

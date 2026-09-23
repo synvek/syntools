@@ -174,7 +174,10 @@ export function PhotoToolbar({
           title={t('tools.photo.zoomOut')}
           onClick={() => onZoom(-0.1)}
         />
-        <span className="w-14 text-center font-mono text-xs text-gray-500 dark:text-gray-400">
+        <span
+          data-testid="photo-zoom"
+          className="w-14 text-center font-mono text-xs text-gray-500 dark:text-gray-400"
+        >
           {zoomPercent}%
         </span>
         <IconTextButton icon="search" title={t('tools.photo.zoomIn')} onClick={() => onZoom(0.1)} />

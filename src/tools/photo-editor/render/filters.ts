@@ -18,6 +18,14 @@ export function clearBakeCache(): void {
   cache.clear();
 }
 
+/** 是否真的需要烘焙（无调整 / 无滤镜时可直接显示源画布） */
+function needsBake(adjustments: Adjustments, filters: FilterId[]): boolean {
+  return (
+    Boolean([...cssParts(adjustments), ...filterParts(filters)].join(' ')) ||
+    needsPixelPass(adjustments, filters)
+  );
+}
+
 export function bakeRaster(
   source: HTMLCanvasElement,
   signature: string,
@@ -26,6 +34,35 @@ export function bakeRaster(
 ): HTMLCanvasElement {
   const cached = cache.get(signature);
   if (cached) return cached;
+  const out = renderBake(source, adjustments, filters);
+
+  if (cache.size >= CACHE_LIMIT) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
+  cache.set(signature, out);
+  return out;
+}
+
+/**
+ * 落笔过程中的实时烘焙：像素每帧都在变，签名却不变，
+ * 因此必须**绕过缓存**重画一次，否则画面要等到松手（rev 自增）才更新。
+ * 无调整 / 无滤镜时直接返回源画布，零拷贝。
+ */
+export function bakeRasterLive(
+  source: HTMLCanvasElement,
+  adjustments: Adjustments,
+  filters: FilterId[],
+): HTMLCanvasElement {
+  if (!needsBake(adjustments, filters)) return source;
+  return renderBake(source, adjustments, filters);
+}
+
+function renderBake(
+  source: HTMLCanvasElement,
+  adjustments: Adjustments,
+  filters: FilterId[],
+): HTMLCanvasElement {
   const out = document.createElement('canvas');
   out.width = source.width;
   out.height = source.height;
@@ -38,12 +75,6 @@ export function bakeRaster(
   ctx.filter = 'none';
 
   if (needsPixelPass(adjustments, filters)) applyPixelPass(ctx, source, adjustments, filters);
-
-  if (cache.size >= CACHE_LIMIT) {
-    const oldest = cache.keys().next().value;
-    if (oldest) cache.delete(oldest);
-  }
-  cache.set(signature, out);
   return out;
 }
 

@@ -9,7 +9,12 @@ import type { PhotoDoc } from './model/types';
  */
 
 const DRAFT_KEY = 'syntools:photo-editor.draft.v1';
-const DRAFT_MEDIA_LIMIT = 3 * 1024 * 1024; // 3MB（按原始像素估算）
+/**
+ * 草稿预算：按 **编码后（PNG dataURL）** 的体量计，而不是原始像素。
+ * 空白图层原始像素动辄数 MB（1280×720 就有 3.7MB），但压成 PNG 只有几 KB；
+ * 用像素估算会让几乎所有草稿都被判定为「过大」而丢掉像素，恢复后就画不了。
+ */
+const DRAFT_BUDGET = 4 * 1024 * 1024; // 4MB（localStorage 常见配额 5MB）
 
 export interface PhotoDraft {
   doc: PhotoDoc;
@@ -21,19 +26,20 @@ export interface PhotoDraft {
 type SerializedLayer = Record<string, unknown> & { data?: string };
 
 export function writeDraft(doc: PhotoDoc): boolean {
-  let total = 0;
-  for (const layer of doc.layers) {
-    if (layer.kind !== 'raster') continue;
-    const canvas = getCanvas(layer.assetId);
-    if (canvas) total += canvas.width * canvas.height * 4;
-  }
-  const keepPixels = total <= DRAFT_MEDIA_LIMIT;
-  const layers = doc.layers.map((layer) => {
-    if (layer.kind !== 'raster') return layer;
-    if (!keepPixels) return { ...layer, assetId: '' };
-    const url = assetToDataUrl(layer.assetId, 'image/png');
-    return url ? { ...layer, data: url } : { ...layer, assetId: '' };
+  // 先编码再量体：超出预算就整体丢弃像素，保证 localStorage 不被撑爆
+  const encoded = doc.layers.map((layer) => {
+    if (layer.kind !== 'raster') return { layer, data: null as string | null };
+    const url = getCanvas(layer.assetId) ? assetToDataUrl(layer.assetId, 'image/png') : null;
+    return { layer, data: url };
   });
+  const bytes = encoded.reduce((sum, item) => sum + (item.data ? item.data.length : 0), 0);
+  const keepPixels = bytes <= DRAFT_BUDGET;
+  const layers = encoded.map(({ layer, data }) => {
+    if (layer.kind !== 'raster') return layer;
+    if (!keepPixels || !data) return { ...layer, assetId: '' };
+    return { ...layer, data };
+  });
+
   try {
     localStorage.setItem(
       DRAFT_KEY,

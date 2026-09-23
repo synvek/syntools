@@ -650,6 +650,165 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(download.suggestedFilename()).toMatch(/\.png$/);
   });
 
+  test('适应窗口：算出容器真实比例（不退化到最小缩放）→ 100% 复原', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    const readZoom = async () =>
+      Number((await page.getByTestId('photo-zoom').textContent())?.replace(/\D/g, '') ?? '0');
+
+    const initial = await readZoom();
+    expect(initial).toBeGreaterThan(10);
+    expect(initial).toBeLessThanOrEqual(100);
+
+    // 1280×720 画布放进 ~650×518 的容器，适配结果应稳定复现（而非被下限钳成 2%）
+    await page.getByRole('button', { name: '适应窗口' }).click();
+    await expect(page.getByTestId('photo-zoom')).toContainText(`${initial}%`);
+
+    await page.getByRole('button', { name: '100%', exact: true }).click();
+    await expect(page.getByTestId('photo-zoom')).toContainText('100%');
+  });
+
+  test('画笔 / 橡皮：拖动过程中即时生效（不等松手）', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    /** 统计内容层画布上「有颜色」的像素数（每次现取画布位置，避免页面滚动导致坐标失效） */
+    const paintedPixels = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let count = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count += 1;
+        return count;
+      });
+
+    await page.getByRole('button', { name: '画笔', exact: true }).click();
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const y = box.y + Math.min(box.height - 40, Math.max(40, box.height / 2));
+
+    await page.mouse.move(box.x + 80, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 320, y, { steps: 12 });
+    await page.waitForTimeout(150);
+    // 松手前就该看到笔迹：烘焙缓存不能把画面冻在笔画开始那一刻
+    expect(await paintedPixels()).toBeGreaterThan(0);
+    await page.mouse.up();
+    await page.waitForTimeout(150);
+    const painted = await paintedPixels();
+    expect(painted).toBeGreaterThan(0);
+
+    // 橡皮沿同一条线擦回：松手前像素就应该减少
+    await page.getByRole('button', { name: '橡皮', exact: true }).click();
+    const box2 = (await page.getByLabel('photo canvas').boundingBox())!;
+    const y2 = box2.y + Math.min(box2.height - 40, Math.max(40, box2.height / 2));
+    await page.mouse.move(box2.x + 80, y2);
+    await page.mouse.down();
+    await page.mouse.move(box2.x + 320, y2, { steps: 12 });
+    await page.waitForTimeout(150);
+    expect(await paintedPixels()).toBeLessThan(painted);
+    await page.mouse.up();
+  });
+
+  test('抓手：拖动过程中即时平移视口', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    const transform = () =>
+      page.evaluate(
+        () => (document.querySelector('.photo-stage') as HTMLElement).dataset.transform,
+      );
+    const panX = async () => Number((await transform())?.split(',')[1] ?? '0');
+
+    await page.getByRole('button', { name: '抓手', exact: true }).click();
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const before = await panX();
+
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.mouse.move(cx + 100, cy, { steps: 10 });
+    await page.waitForTimeout(150);
+    // 松手前视口就已经平移，且松手后保持
+    expect(await panX()).toBeGreaterThanOrEqual(before + 60);
+    await page.mouse.up();
+    await page.waitForTimeout(150);
+    expect(await panX()).toBeGreaterThanOrEqual(before + 60);
+  });
+
+  test('刷新后从草稿恢复仍能落笔（草稿不得把像素丢成空图层）', async ({ page }) => {
+    const paintedPixels = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let count = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count += 1;
+        return count;
+      });
+
+    const stroke = async () => {
+      await page.getByRole('button', { name: '画笔', exact: true }).click();
+      const box = (await page.getByLabel('photo canvas').boundingBox())!;
+      const y = box.y + Math.min(box.height - 40, Math.max(40, box.height / 2));
+      await page.mouse.move(box.x + 80, y);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 320, y, { steps: 12 });
+      await page.mouse.up();
+      await page.waitForTimeout(200);
+    };
+
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await stroke();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    // 等草稿落盘后刷新：恢复出来的图层必须还能继续画
+    await page.waitForTimeout(1500);
+    await page.reload();
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+    const restored = await paintedPixels();
+    expect(restored).toBeGreaterThan(0);
+
+    await page.getByRole('button', { name: '橡皮', exact: true }).click();
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const y = box.y + Math.min(box.height - 40, Math.max(40, box.height / 2));
+    await page.mouse.move(box.x + 80, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 320, y, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    expect(await paintedPixels()).toBeLessThan(restored);
+  });
+
+  test('图层面板：混合模式 / 不透明度置于顶部一行，⋯ 菜单承载重命名与新建图层', async ({
+    page,
+  }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    // 空态下也能通过 ⋯ 菜单创建第一个图层
+    await page.getByTestId('layer-menu-trigger').click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    await page.getByRole('menuitem', { name: '空白图层' }).click();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    // 顶部一行只作用于当前选中图层
+    await page.getByLabel('混合模式').selectOption('multiply');
+    await expect(page.getByLabel('混合模式')).toHaveValue('multiply');
+    await page.getByRole('slider', { name: '不透明度' }).fill('60');
+    await expect(page.getByRole('slider', { name: '不透明度' })).toHaveValue('60');
+
+    // ⋯ 菜单内的重命名文本框
+    await page.getByTestId('layer-menu-trigger').first().click();
+    await page.getByRole('menu').getByLabel('重命名').fill('我的图层');
+    await page.keyboard.press('Escape');
+    await expect(page.getByText('我的图层').first()).toBeVisible();
+  });
+
   test('新建画布对话框：指定尺寸后画布统计更新', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await page.getByRole('button', { name: '新建画布' }).click();

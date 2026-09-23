@@ -15,7 +15,10 @@ import type { Layer, PhotoDoc, Rect, Selection } from '../model/types';
 export interface PointerContext {
   getTransform: () => { scale: number; x: number; y: number };
   onRequestTextEdit: (id: string) => void;
+  /** 像素被改写（落笔 / 填充）：宿主以 rAF 合帧重绘该图层 */
   onSurfaceChange: () => void;
+  /** 抓手平移：宿主立即写入变换并落库 */
+  onPan: (x: number, y: number) => void;
 }
 
 type Drag =
@@ -171,10 +174,10 @@ export function attachPointer(
     if (!drag) return;
 
     if (drag.kind === 'pan') {
-      state.setViewport({
-        x: drag.originX + (event.clientX - drag.startX),
-        y: drag.originY + (event.clientY - drag.startY),
-      });
+      context.onPan(
+        drag.originX + (event.clientX - drag.startX),
+        drag.originY + (event.clientY - drag.startY),
+      );
       return;
     }
 
