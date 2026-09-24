@@ -1,0 +1,550 @@
+{
+  "tools": {
+    "csv-tool": {
+      "meta": {
+        "zh": {
+          "name": "CSV 工具",
+          "description": "CSV ↔ JSON 互转，支持自定义分隔符、表头与引号转义（RFC 4180）"
+        },
+        "en": {
+          "name": "CSV Tool",
+          "description": "CSV ↔ JSON conversion with custom delimiter, header and quoting (RFC 4180)"
+        },
+        "zh-TW": {
+          "name": "CSV 工具",
+          "description": "CSV ↔ JSON 互轉，支援自訂分隔符、表頭與引號轉義（RFC 4180）"
+        },
+        "ja": {
+          "name": "CSV ツール",
+          "description": "CSV ↔ JSON 変換。区切り文字・ヘッダー・引用符に対応（RFC 4180）"
+        },
+        "fr": {
+          "name": "Outil CSV",
+          "description": "Conversion CSV ↔ JSON avec délimiteur, en-tête et guillemets (RFC 4180)"
+        },
+        "de": {
+          "name": "CSV-Werkzeug",
+          "description": "CSV ↔ JSON mit eigenem Trennzeichen, Kopfzeile und Quoting (RFC 4180)"
+        },
+        "it": {
+          "name": "Strumento CSV",
+          "description": "Conversione CSV ↔ JSON con delimitatore, intestazione e quoting (RFC 4180)"
+        },
+        "es": {
+          "name": "Herramienta CSV",
+          "description": "Conversión CSV ↔ JSON con delimitador, cabecera y comillas (RFC 4180)"
+        },
+        "pt": {
+          "name": "Ferramenta CSV",
+          "description": "Conversão CSV ↔ JSON com delimitador, cabeçalho e aspas (RFC 4180)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "direction": "转换方向",
+          "delimiter": "分隔符",
+          "hasHeader": "首行为表头",
+          "convert": "转换",
+          "inputPlaceholder": "粘贴 CSV 或 JSON 内容",
+          "errors.EMPTY": "请输入内容",
+          "errors.INVALID_JSON": "JSON 格式不正确",
+          "errors.NOT_ARRAY": "JSON 需为数组"
+        },
+        "en": {
+          "direction": "Direction",
+          "delimiter": "Delimiter",
+          "hasHeader": "First row is header",
+          "convert": "Convert",
+          "inputPlaceholder": "Paste CSV or JSON",
+          "errors.EMPTY": "Please enter content",
+          "errors.INVALID_JSON": "Invalid JSON",
+          "errors.NOT_ARRAY": "JSON must be an array"
+        },
+        "zh-TW": {
+          "direction": "轉換方向",
+          "delimiter": "分隔符",
+          "hasHeader": "首列為表頭",
+          "convert": "轉換",
+          "inputPlaceholder": "貼上 CSV 或 JSON 內容",
+          "errors.EMPTY": "請輸入內容",
+          "errors.INVALID_JSON": "JSON 格式不正確",
+          "errors.NOT_ARRAY": "JSON 需為陣列"
+        },
+        "ja": {
+          "direction": "変換方向",
+          "delimiter": "区切り文字",
+          "hasHeader": "先頭行をヘッダー",
+          "convert": "変換",
+          "inputPlaceholder": "CSV または JSON を貼り付け",
+          "errors.EMPTY": "内容を入力してください",
+          "errors.INVALID_JSON": "JSON が不正です",
+          "errors.NOT_ARRAY": "JSON は配列である必要があります"
+        },
+        "fr": {
+          "direction": "Sens",
+          "delimiter": "Délimiteur",
+          "hasHeader": "Première ligne = en-tête",
+          "convert": "Convertir",
+          "inputPlaceholder": "Collez du CSV ou JSON",
+          "errors.EMPTY": "Saisissez du contenu",
+          "errors.INVALID_JSON": "JSON invalide",
+          "errors.NOT_ARRAY": "Le JSON doit être un tableau"
+        },
+        "de": {
+          "direction": "Richtung",
+          "delimiter": "Trennzeichen",
+          "hasHeader": "Erste Zeile ist Kopfzeile",
+          "convert": "Konvertieren",
+          "inputPlaceholder": "CSV oder JSON einfügen",
+          "errors.EMPTY": "Bitte Inhalt eingeben",
+          "errors.INVALID_JSON": "Ungültiges JSON",
+          "errors.NOT_ARRAY": "JSON muss ein Array sein"
+        },
+        "it": {
+          "direction": "Direzione",
+          "delimiter": "Delimitatore",
+          "hasHeader": "Prima riga = intestazione",
+          "convert": "Converti",
+          "inputPlaceholder": "Incolla CSV o JSON",
+          "errors.EMPTY": "Inserisci contenuto",
+          "errors.INVALID_JSON": "JSON non valido",
+          "errors.NOT_ARRAY": "Il JSON deve essere un array"
+        },
+        "es": {
+          "direction": "Dirección",
+          "delimiter": "Delimitador",
+          "hasHeader": "Primera fila = cabecera",
+          "convert": "Convertir",
+          "inputPlaceholder": "Pega CSV o JSON",
+          "errors.EMPTY": "Introduce contenido",
+          "errors.INVALID_JSON": "JSON no válido",
+          "errors.NOT_ARRAY": "El JSON debe ser un array"
+        },
+        "pt": {
+          "direction": "Direção",
+          "delimiter": "Delimitador",
+          "hasHeader": "Primeira linha = cabeçalho",
+          "convert": "Converter",
+          "inputPlaceholder": "Cole CSV ou JSON",
+          "errors.EMPTY": "Digite conteúdo",
+          "errors.INVALID_JSON": "JSON inválido",
+          "errors.NOT_ARRAY": "O JSON deve ser um array"
+        }
+      }
+    },
+    "code-minify": {
+      "meta": {
+        "zh": {
+          "name": "代码压缩",
+          "description": "CSS / HTML / JS / JSON 代码压缩（CSS 基于 csso，JS/HTML 为保守实现）"
+        },
+        "en": {
+          "name": "Code Minifier",
+          "description": "Minify CSS / HTML / JS / JSON (CSS via csso; JS/HTML conservative)"
+        },
+        "zh-TW": {
+          "name": "程式碼壓縮",
+          "description": "CSS / HTML / JS / JSON 壓縮（CSS 基於 csso，JS/HTML 為保守實作）"
+        },
+        "ja": {
+          "name": "コード圧縮",
+          "description": "CSS / HTML / JS / JSON の圧縮（CSS は csso、JS/HTML は保守的）"
+        },
+        "fr": {
+          "name": "Minificateur",
+          "description": "Minifier CSS / HTML / JS / JSON (CSS via csso ; JS/HTML conservateur)"
+        },
+        "de": {
+          "name": "Code-Minifier",
+          "description": "CSS / HTML / JS / JSON minifizieren (CSS über csso; JS/HTML konservativ)"
+        },
+        "it": {
+          "name": "Minificatore",
+          "description": "Minifica CSS / HTML / JS / JSON (CSS con csso; JS/HTML conservativo)"
+        },
+        "es": {
+          "name": "Minificador",
+          "description": "Minifica CSS / HTML / JS / JSON (CSS con csso; JS/HTML conservador)"
+        },
+        "pt": {
+          "name": "Minificador",
+          "description": "Minifica CSS / HTML / JS / JSON (CSS com csso; JS/HTML conservador)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "language": "语言",
+          "minify": "压缩",
+          "working": "处理中…",
+          "conservativeHint": "JS / HTML 采用保守压缩：仅移除注释与多余空白以确保安全。",
+          "input": "源代码",
+          "output": "压缩结果",
+          "placeholder": "粘贴待压缩代码",
+          "saved": "已减少 {{percent}}%",
+          "errors.EMPTY": "请输入代码",
+          "errors.INVALID_JSON": "JSON 格式不正确",
+          "errors.MINIFY_FAILED": "压缩失败，请检查代码"
+        },
+        "en": {
+          "language": "Language",
+          "minify": "Minify",
+          "working": "Working…",
+          "conservativeHint": "JS / HTML use conservative minification (comments and extra whitespace only) for safety.",
+          "input": "Source",
+          "output": "Minified",
+          "placeholder": "Paste code to minify",
+          "saved": "{{percent}}% smaller",
+          "errors.EMPTY": "Please enter code",
+          "errors.INVALID_JSON": "Invalid JSON",
+          "errors.MINIFY_FAILED": "Minify failed, check the code"
+        },
+        "zh-TW": {
+          "language": "語言",
+          "minify": "壓縮",
+          "working": "處理中…",
+          "conservativeHint": "JS / HTML 採保守壓縮：僅移除註解與多餘空白以確保安全。",
+          "input": "原始碼",
+          "output": "壓縮結果",
+          "placeholder": "貼上待壓縮程式碼",
+          "saved": "已減少 {{percent}}%",
+          "errors.EMPTY": "請輸入程式碼",
+          "errors.INVALID_JSON": "JSON 格式不正確",
+          "errors.MINIFY_FAILED": "壓縮失敗，請檢查程式碼"
+        },
+        "ja": {
+          "language": "言語",
+          "minify": "圧縮",
+          "working": "処理中…",
+          "conservativeHint": "JS / HTML は安全のため保守的に圧縮（コメントと余分な空白のみ削除）。",
+          "input": "ソース",
+          "output": "圧縮結果",
+          "placeholder": "圧縮するコードを貼り付け",
+          "saved": "{{percent}}% 削減",
+          "errors.EMPTY": "コードを入力してください",
+          "errors.INVALID_JSON": "JSON が不正です",
+          "errors.MINIFY_FAILED": "圧縮に失敗しました"
+        },
+        "fr": {
+          "language": "Langage",
+          "minify": "Minifier",
+          "working": "Traitement…",
+          "conservativeHint": "JS / HTML utilisent une minification conservatrice (commentaires et espaces uniquement).",
+          "input": "Source",
+          "output": "Résultat",
+          "placeholder": "Collez le code à minifier",
+          "saved": "{{percent}}% plus petit",
+          "errors.EMPTY": "Saisissez du code",
+          "errors.INVALID_JSON": "JSON invalide",
+          "errors.MINIFY_FAILED": "Échec de la minification"
+        },
+        "de": {
+          "language": "Sprache",
+          "minify": "Minifizieren",
+          "working": "Verarbeiten…",
+          "conservativeHint": "JS / HTML werden konservativ minifiziert (nur Kommentare und Leerzeichen).",
+          "input": "Quellcode",
+          "output": "Ergebnis",
+          "placeholder": "Code zum Minifizieren einfügen",
+          "saved": "{{percent}} % kleiner",
+          "errors.EMPTY": "Bitte Code eingeben",
+          "errors.INVALID_JSON": "Ungültiges JSON",
+          "errors.MINIFY_FAILED": "Minifizierung fehlgeschlagen"
+        },
+        "it": {
+          "language": "Linguaggio",
+          "minify": "Minifica",
+          "working": "Elaborazione…",
+          "conservativeHint": "JS / HTML usano minificazione conservativa (solo commenti e spazi).",
+          "input": "Sorgente",
+          "output": "Risultato",
+          "placeholder": "Incolla il codice",
+          "saved": "{{percent}}% in meno",
+          "errors.EMPTY": "Inserisci codice",
+          "errors.INVALID_JSON": "JSON non valido",
+          "errors.MINIFY_FAILED": "Minificazione fallita"
+        },
+        "es": {
+          "language": "Lenguaje",
+          "minify": "Minificar",
+          "working": "Procesando…",
+          "conservativeHint": "JS / HTML usan minificación conservadora (solo comentarios y espacios).",
+          "input": "Código",
+          "output": "Resultado",
+          "placeholder": "Pega el código a minificar",
+          "saved": "{{percent}}% menos",
+          "errors.EMPTY": "Introduce código",
+          "errors.INVALID_JSON": "JSON no válido",
+          "errors.MINIFY_FAILED": "Minificación fallida"
+        },
+        "pt": {
+          "language": "Linguagem",
+          "minify": "Minificar",
+          "working": "Processando…",
+          "conservativeHint": "JS / HTML usam minificação conservadora (apenas comentários e espaços).",
+          "input": "Código",
+          "output": "Resultado",
+          "placeholder": "Cole o código para minificar",
+          "saved": "{{percent}}% menor",
+          "errors.EMPTY": "Digite código",
+          "errors.INVALID_JSON": "JSON inválido",
+          "errors.MINIFY_FAILED": "Falha ao minificar"
+        }
+      }
+    },
+    "id-generator": {
+      "meta": {
+        "zh": {
+          "name": "ID 生成器",
+          "description": "生成 ULID / NanoID / Snowflake / MongoDB ObjectId，支持批量与解析"
+        },
+        "en": {
+          "name": "ID Generator",
+          "description": "Generate ULID / NanoID / Snowflake / MongoDB ObjectId in batch"
+        },
+        "zh-TW": {
+          "name": "ID 產生器",
+          "description": "產生 ULID / NanoID / Snowflake / MongoDB ObjectId，支援批量"
+        },
+        "ja": {
+          "name": "ID 生成",
+          "description": "ULID / NanoID / Snowflake / MongoDB ObjectId を一括生成"
+        },
+        "fr": {
+          "name": "Générateur d'ID",
+          "description": "Génère des ULID / NanoID / Snowflake / ObjectId MongoDB en lot"
+        },
+        "de": {
+          "name": "ID-Generator",
+          "description": "ULID / NanoID / Snowflake / MongoDB ObjectId stapelweise erzeugen"
+        },
+        "it": {
+          "name": "Generatore ID",
+          "description": "Genera ULID / NanoID / Snowflake / ObjectId MongoDB in blocco"
+        },
+        "es": {
+          "name": "Generador de ID",
+          "description": "Genera ULID / NanoID / Snowflake / ObjectId de MongoDB en lote"
+        },
+        "pt": {
+          "name": "Gerador de ID",
+          "description": "Gera ULID / NanoID / Snowflake / ObjectId do MongoDB em lote"
+        }
+      },
+      "ui": {
+        "zh": {
+          "type": "类型",
+          "count": "数量",
+          "size": "长度",
+          "generate": "生成",
+          "output": "结果",
+          "errors.INVALID_COUNT": "数量需在 1–1000 之间"
+        },
+        "en": {
+          "type": "Type",
+          "count": "Count",
+          "size": "Size",
+          "generate": "Generate",
+          "output": "Result",
+          "errors.INVALID_COUNT": "Count must be 1–1000"
+        },
+        "zh-TW": {
+          "type": "類型",
+          "count": "數量",
+          "size": "長度",
+          "generate": "產生",
+          "output": "結果",
+          "errors.INVALID_COUNT": "數量需在 1–1000 之間"
+        },
+        "ja": {
+          "type": "種類",
+          "count": "個数",
+          "size": "長さ",
+          "generate": "生成",
+          "output": "結果",
+          "errors.INVALID_COUNT": "個数は 1–1000"
+        },
+        "fr": {
+          "type": "Type",
+          "count": "Nombre",
+          "size": "Taille",
+          "generate": "Générer",
+          "output": "Résultat",
+          "errors.INVALID_COUNT": "Le nombre doit être entre 1 et 1000"
+        },
+        "de": {
+          "type": "Typ",
+          "count": "Anzahl",
+          "size": "Länge",
+          "generate": "Erzeugen",
+          "output": "Ergebnis",
+          "errors.INVALID_COUNT": "Anzahl muss 1–1000 sein"
+        },
+        "it": {
+          "type": "Tipo",
+          "count": "Quantità",
+          "size": "Lunghezza",
+          "generate": "Genera",
+          "output": "Risultato",
+          "errors.INVALID_COUNT": "La quantità deve essere 1–1000"
+        },
+        "es": {
+          "type": "Tipo",
+          "count": "Cantidad",
+          "size": "Longitud",
+          "generate": "Generar",
+          "output": "Resultado",
+          "errors.INVALID_COUNT": "La cantidad debe ser 1–1000"
+        },
+        "pt": {
+          "type": "Tipo",
+          "count": "Quantidade",
+          "size": "Tamanho",
+          "generate": "Gerar",
+          "output": "Resultado",
+          "errors.INVALID_COUNT": "A quantidade deve ser 1–1000"
+        }
+      }
+    },
+    "barcode": {
+      "meta": {
+        "zh": {
+          "name": "条形码生成",
+          "description": "生成 Code 39 / Code 128 / EAN-13 条形码（SVG，纯前端）"
+        },
+        "en": {
+          "name": "Barcode Generator",
+          "description": "Generate Code 39 / Code 128 / EAN-13 barcodes as SVG (pure frontend)"
+        },
+        "zh-TW": {
+          "name": "條碼產生器",
+          "description": "產生 Code 39 / Code 128 / EAN-13 條碼（SVG，純前端）"
+        },
+        "ja": {
+          "name": "バーコード生成",
+          "description": "Code 39 / Code 128 / EAN-13 バーコードを SVG で生成"
+        },
+        "fr": {
+          "name": "Générateur de codes-barres",
+          "description": "Génère des codes-barres Code 39 / Code 128 / EAN-13 en SVG"
+        },
+        "de": {
+          "name": "Barcode-Generator",
+          "description": "Code 39 / Code 128 / EAN-13 Barcodes als SVG erzeugen"
+        },
+        "it": {
+          "name": "Generatore barcode",
+          "description": "Genera barcode Code 39 / Code 128 / EAN-13 in SVG"
+        },
+        "es": {
+          "name": "Generador de códigos de barras",
+          "description": "Genera códigos Code 39 / Code 128 / EAN-13 en SVG"
+        },
+        "pt": {
+          "name": "Gerador de código de barras",
+          "description": "Gera códigos Code 39 / Code 128 / EAN-13 em SVG"
+        }
+      },
+      "ui": {
+        "zh": {
+          "type": "类型",
+          "moduleWidth": "模块宽度",
+          "height": "高度",
+          "content": "内容",
+          "placeholder": "输入条码内容",
+          "preview": "预览",
+          "errors.EMPTY": "请输入内容",
+          "errors.INVALID_CHARS": "包含不支持的字符",
+          "errors.INVALID_CHECKSUM": "EAN-13 校验位错误"
+        },
+        "en": {
+          "type": "Type",
+          "moduleWidth": "Module width",
+          "height": "Height",
+          "content": "Content",
+          "placeholder": "Enter barcode content",
+          "preview": "Preview",
+          "errors.EMPTY": "Please enter content",
+          "errors.INVALID_CHARS": "Contains unsupported characters",
+          "errors.INVALID_CHECKSUM": "Invalid EAN-13 check digit"
+        },
+        "zh-TW": {
+          "type": "類型",
+          "moduleWidth": "模組寬度",
+          "height": "高度",
+          "content": "內容",
+          "placeholder": "輸入條碼內容",
+          "preview": "預覽",
+          "errors.EMPTY": "請輸入內容",
+          "errors.INVALID_CHARS": "包含不支援的字元",
+          "errors.INVALID_CHECKSUM": "EAN-13 校驗位錯誤"
+        },
+        "ja": {
+          "type": "種類",
+          "moduleWidth": "モジュール幅",
+          "height": "高さ",
+          "content": "内容",
+          "placeholder": "バーコードの内容を入力",
+          "preview": "プレビュー",
+          "errors.EMPTY": "内容を入力してください",
+          "errors.INVALID_CHARS": "未対応の文字が含まれます",
+          "errors.INVALID_CHECKSUM": "EAN-13 チェックディジットが不正"
+        },
+        "fr": {
+          "type": "Type",
+          "moduleWidth": "Largeur module",
+          "height": "Hauteur",
+          "content": "Contenu",
+          "placeholder": "Saisissez le contenu",
+          "preview": "Aperçu",
+          "errors.EMPTY": "Saisissez du contenu",
+          "errors.INVALID_CHARS": "Caractères non pris en charge",
+          "errors.INVALID_CHECKSUM": "Clé de contrôle EAN-13 invalide"
+        },
+        "de": {
+          "type": "Typ",
+          "moduleWidth": "Modulbreite",
+          "height": "Höhe",
+          "content": "Inhalt",
+          "placeholder": "Barcode-Inhalt eingeben",
+          "preview": "Vorschau",
+          "errors.EMPTY": "Bitte Inhalt eingeben",
+          "errors.INVALID_CHARS": "Enthält nicht unterstützte Zeichen",
+          "errors.INVALID_CHECKSUM": "Ungültige EAN-13-Prüfziffer"
+        },
+        "it": {
+          "type": "Tipo",
+          "moduleWidth": "Larghezza modulo",
+          "height": "Altezza",
+          "content": "Contenuto",
+          "placeholder": "Inserisci il contenuto",
+          "preview": "Anteprima",
+          "errors.EMPTY": "Inserisci contenuto",
+          "errors.INVALID_CHARS": "Contiene caratteri non supportati",
+          "errors.INVALID_CHECKSUM": "Cifra di controllo EAN-13 non valida"
+        },
+        "es": {
+          "type": "Tipo",
+          "moduleWidth": "Ancho de módulo",
+          "height": "Altura",
+          "content": "Contenido",
+          "placeholder": "Introduce el contenido",
+          "preview": "Vista previa",
+          "errors.EMPTY": "Introduce contenido",
+          "errors.INVALID_CHARS": "Contiene caracteres no admitidos",
+          "errors.INVALID_CHECKSUM": "Dígito de control EAN-13 no válido"
+        },
+        "pt": {
+          "type": "Tipo",
+          "moduleWidth": "Largura do módulo",
+          "height": "Altura",
+          "content": "Conteúdo",
+          "placeholder": "Digite o conteúdo",
+          "preview": "Pré-visualização",
+          "errors.EMPTY": "Digite conteúdo",
+          "errors.INVALID_CHARS": "Contém caracteres não suportados",
+          "errors.INVALID_CHECKSUM": "Dígito verificador EAN-13 inválido"
+        }
+      }
+    }
+  }
+}

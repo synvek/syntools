@@ -1,0 +1,1420 @@
+{
+  "tools": {
+    "ip-calc": {
+      "meta": {
+        "zh": {
+          "name": "IP 计算器",
+          "description": "IPv4/IPv6 地址、子网划分（VLSM）、超网与通配符掩码计算"
+        },
+        "en": {
+          "name": "IP Calculator",
+          "description": "IPv4/IPv6 addressing, subnetting (VLSM), supernet and wildcard mask"
+        },
+        "zh-TW": {
+          "name": "IP 計算器",
+          "description": "IPv4/IPv6 位址、子網劃分（VLSM）、超網與萬用字元遮罩計算"
+        },
+        "ja": {
+          "name": "IP 計算機",
+          "description": "IPv4/IPv6 のアドレス、サブネット分割（VLSM）、スーパーネット、ワイルドカードマスク"
+        },
+        "fr": {
+          "name": "Calculateur IP",
+          "description": "Adressage IPv4/IPv6, sous-réseaux (VLSM), super-réseau et masque générique"
+        },
+        "de": {
+          "name": "IP-Rechner",
+          "description": "IPv4/IPv6-Adressierung, Subnetting (VLSM), Supernet und Wildcard-Maske"
+        },
+        "it": {
+          "name": "Calcolatore IP",
+          "description": "Indirizzamento IPv4/IPv6, subnetting (VLSM), supernet e wildcard mask"
+        },
+        "es": {
+          "name": "Calculadora de IP",
+          "description": "Direccionamiento IPv4/IPv6, subnetting (VLSM), supernet y máscara comodín"
+        },
+        "pt": {
+          "name": "Calculadora de IP",
+          "description": "Endereçamento IPv4/IPv6, subnetting (VLSM), supernet e máscara curinga"
+        }
+      },
+      "ui": {
+        "zh": {
+          "input": "输入",
+          "placeholder": "192.168.1.100/24 或 2001:db8::1/64",
+          "fields.network": "网络地址",
+          "fields.lastAddress": "最后地址",
+          "fields.firstHost": "首可用主机",
+          "fields.lastHost": "末可用主机",
+          "fields.netmask": "子网掩码",
+          "fields.wildcard": "通配符掩码",
+          "fields.total": "地址总数",
+          "fields.usable": "可用主机",
+          "fields.decimal": "十进制",
+          "fields.hex": "十六进制",
+          "fields.binary": "二进制",
+          "splitTitle": "子网划分（VLSM / 等长子网）",
+          "splitPlaceholder": "目标前缀，如 26",
+          "err.EMPTY": "请输入 IP",
+          "err.INVALID_PREFIX": "前缀非法",
+          "err.INVALID_ADDRESS": "地址非法",
+          "err.INVALID_SPLIT_PREFIX": "目标前缀必须大于原前缀",
+          "err.TOO_MANY_SUBNETS": "子网数量超过上限 {{max}}"
+        },
+        "en": {
+          "input": "Input",
+          "placeholder": "192.168.1.100/24 or 2001:db8::1/64",
+          "fields.network": "Network",
+          "fields.lastAddress": "Last address",
+          "fields.firstHost": "First host",
+          "fields.lastHost": "Last host",
+          "fields.netmask": "Subnet mask",
+          "fields.wildcard": "Wildcard mask",
+          "fields.total": "Total addresses",
+          "fields.usable": "Usable hosts",
+          "fields.decimal": "Decimal",
+          "fields.hex": "Hexadecimal",
+          "fields.binary": "Binary",
+          "splitTitle": "Subnet split (VLSM / equal)",
+          "splitPlaceholder": "Target prefix, e.g. 26",
+          "err.EMPTY": "Please enter an IP",
+          "err.INVALID_PREFIX": "Invalid prefix",
+          "err.INVALID_ADDRESS": "Invalid address",
+          "err.INVALID_SPLIT_PREFIX": "Target prefix must be larger than the original",
+          "err.TOO_MANY_SUBNETS": "Too many subnets (max {{max}})"
+        },
+        "zh-TW": {
+          "input": "輸入",
+          "placeholder": "192.168.1.100/24 或 2001:db8::1/64",
+          "fields.network": "網路位址",
+          "fields.lastAddress": "最後位址",
+          "fields.firstHost": "首個可用主機",
+          "fields.lastHost": "最後可用主機",
+          "fields.netmask": "子網路遮罩",
+          "fields.wildcard": "萬用字元遮罩",
+          "fields.total": "位址總數",
+          "fields.usable": "可用主機",
+          "fields.decimal": "十進位",
+          "fields.hex": "十六進位",
+          "fields.binary": "二進位",
+          "splitTitle": "子網劃分（VLSM / 等長子網）",
+          "splitPlaceholder": "目標前綴，如 26",
+          "err.EMPTY": "請輸入 IP",
+          "err.INVALID_PREFIX": "前綴非法",
+          "err.INVALID_ADDRESS": "位址非法",
+          "err.INVALID_SPLIT_PREFIX": "目標前綴必須大於原前綴",
+          "err.TOO_MANY_SUBNETS": "子網數量超過上限 {{max}}"
+        },
+        "ja": {
+          "input": "入力",
+          "placeholder": "192.168.1.100/24 または 2001:db8::1/64",
+          "fields.network": "ネットワーク",
+          "fields.lastAddress": "最後のアドレス",
+          "fields.firstHost": "最初のホスト",
+          "fields.lastHost": "最後のホスト",
+          "fields.netmask": "サブネットマスク",
+          "fields.wildcard": "ワイルドカードマスク",
+          "fields.total": "アドレス総数",
+          "fields.usable": "使用可能ホスト",
+          "fields.decimal": "10進数",
+          "fields.hex": "16進数",
+          "fields.binary": "2進数",
+          "splitTitle": "サブネット分割（VLSM / 等長）",
+          "splitPlaceholder": "ターゲット接頭辞、例 26",
+          "err.EMPTY": "IP を入力してください",
+          "err.INVALID_PREFIX": "接頭辞が不正",
+          "err.INVALID_ADDRESS": "アドレスが不正",
+          "err.INVALID_SPLIT_PREFIX": "ターゲット接頭辞は元より大きく",
+          "err.TOO_MANY_SUBNETS": "サブネット数が上限 {{max}} を超過"
+        },
+        "fr": {
+          "input": "Entrée",
+          "placeholder": "192.168.1.100/24 ou 2001:db8::1/64",
+          "fields.network": "Réseau",
+          "fields.lastAddress": "Dernière adresse",
+          "fields.firstHost": "Premier hôte",
+          "fields.lastHost": "Dernier hôte",
+          "fields.netmask": "Masque de sous-réseau",
+          "fields.wildcard": "Masque générique",
+          "fields.total": "Nombre d'adresses",
+          "fields.usable": "Hôtes utilisables",
+          "fields.decimal": "Décimal",
+          "fields.hex": "Hexadécimal",
+          "fields.binary": "Binaire",
+          "splitTitle": "Fractionnement (VLSM / égal)",
+          "splitPlaceholder": "Préfixe cible, ex. 26",
+          "err.EMPTY": "Veuillez saisir une IP",
+          "err.INVALID_PREFIX": "Préfixe invalide",
+          "err.INVALID_ADDRESS": "Adresse invalide",
+          "err.INVALID_SPLIT_PREFIX": "Le préfixe cible doit être plus grand",
+          "err.TOO_MANY_SUBNETS": "Trop de sous-réseaux (max {{max}})"
+        },
+        "de": {
+          "input": "Eingabe",
+          "placeholder": "192.168.1.100/24 oder 2001:db8::1/64",
+          "fields.network": "Netzwerk",
+          "fields.lastAddress": "Letzte Adresse",
+          "fields.firstHost": "Erster Host",
+          "fields.lastHost": "Letzter Host",
+          "fields.netmask": "Subnetzmaske",
+          "fields.wildcard": "Wildcard-Maske",
+          "fields.total": "Gesamtadressen",
+          "fields.usable": "Nutzbare Hosts",
+          "fields.decimal": "Dezimal",
+          "fields.hex": "Hexadezimal",
+          "fields.binary": "Binär",
+          "splitTitle": "Subnet-Aufteilung (VLSM / gleich)",
+          "splitPlaceholder": "Zielpräfix, z. B. 26",
+          "err.EMPTY": "Bitte eine IP eingeben",
+          "err.INVALID_PREFIX": "Ungültiges Präfix",
+          "err.INVALID_ADDRESS": "Ungültige Adresse",
+          "err.INVALID_SPLIT_PREFIX": "Zielpräfix muss größer sein",
+          "err.TOO_MANY_SUBNETS": "Zu viele Subnetze (max {{max}})"
+        },
+        "it": {
+          "input": "Inserisci",
+          "placeholder": "192.168.1.100/24 o 2001:db8::1/64",
+          "fields.network": "Rete",
+          "fields.lastAddress": "Ultimo indirizzo",
+          "fields.firstHost": "Primo host",
+          "fields.lastHost": "Ultimo host",
+          "fields.netmask": "Maschera di sottorete",
+          "fields.wildcard": "Maschera wildcard",
+          "fields.total": "Indirizzi totali",
+          "fields.usable": "Host utilizzabili",
+          "fields.decimal": "Decimale",
+          "fields.hex": "Esadecimale",
+          "fields.binary": "Binario",
+          "splitTitle": "Suddivisione (VLSM / uguale)",
+          "splitPlaceholder": "Prefisso target, es. 26",
+          "err.EMPTY": "Inserisci un IP",
+          "err.INVALID_PREFIX": "Prefisso non valido",
+          "err.INVALID_ADDRESS": "Indirizzo non valido",
+          "err.INVALID_SPLIT_PREFIX": "Il prefisso target deve essere maggiore",
+          "err.TOO_MANY_SUBNETS": "Troppi subnet (max {{max}})"
+        },
+        "es": {
+          "input": "Entrada",
+          "placeholder": "192.168.1.100/24 o 2001:db8::1/64",
+          "fields.network": "Red",
+          "fields.lastAddress": "Última dirección",
+          "fields.firstHost": "Primer host",
+          "fields.lastHost": "Último host",
+          "fields.netmask": "Máscara de subred",
+          "fields.wildcard": "Máscara comodín",
+          "fields.total": "Total de direcciones",
+          "fields.usable": "Hosts utilizables",
+          "fields.decimal": "Decimal",
+          "fields.hex": "Hexadecimal",
+          "fields.binary": "Binario",
+          "splitTitle": "División de subred (VLSM / igual)",
+          "splitPlaceholder": "Prefijo objetivo, ej. 26",
+          "err.EMPTY": "Introduce una IP",
+          "err.INVALID_PREFIX": "Prefijo no válido",
+          "err.INVALID_ADDRESS": "Dirección no válida",
+          "err.INVALID_SPLIT_PREFIX": "El prefijo objetivo debe ser mayor",
+          "err.TOO_MANY_SUBNETS": "Demasiadas subredes (máx. {{max}})"
+        },
+        "pt": {
+          "input": "Entrada",
+          "placeholder": "192.168.1.100/24 ou 2001:db8::1/64",
+          "fields.network": "Rede",
+          "fields.lastAddress": "Último endereço",
+          "fields.firstHost": "Primeiro host",
+          "fields.lastHost": "Último host",
+          "fields.netmask": "Máscara de sub-rede",
+          "fields.wildcard": "Máscara curinga",
+          "fields.total": "Total de endereços",
+          "fields.usable": "Hosts utilizáveis",
+          "fields.decimal": "Decimal",
+          "fields.hex": "Hexadecimal",
+          "fields.binary": "Binário",
+          "splitTitle": "Divisão de sub-rede (VLSM / iguais)",
+          "splitPlaceholder": "Prefixo alvo, ex. 26",
+          "err.EMPTY": "Insira um IP",
+          "err.INVALID_PREFIX": "Prefixo inválido",
+          "err.INVALID_ADDRESS": "Endereço inválido",
+          "err.INVALID_SPLIT_PREFIX": "O prefixo alvo deve ser maior",
+          "err.TOO_MANY_SUBNETS": "Sub-redes demais (máx. {{max}})"
+        }
+      }
+    },
+    "mac-address": {
+      "meta": {
+        "zh": {
+          "name": "MAC 地址工具",
+          "description": "MAC 地址格式化、厂商（OUI）查询、EUI-64 与随机批量生成"
+        },
+        "en": {
+          "name": "MAC Address Tool",
+          "description": "MAC formatting, vendor (OUI) lookup, EUI-64 and bulk random generation"
+        },
+        "zh-TW": {
+          "name": "MAC 位址工具",
+          "description": "MAC 位址格式化、廠商（OUI）查詢、EUI-64 與隨機批量生成"
+        },
+        "ja": {
+          "name": "MAC アドレス ツール",
+          "description": "MAC の整形、ベンダー（OUI）検索、EUI-64 と一括乱数生成"
+        },
+        "fr": {
+          "name": "Outil d'adresse MAC",
+          "description": "Formatage MAC, recherche de fabricant (OUI), EUI-64 et génération en masse"
+        },
+        "de": {
+          "name": "MAC-Adressen-Tool",
+          "description": "MAC-Formatierung, Hersteller (OUI) suchen, EUI-64 und Massenerzeugung"
+        },
+        "it": {
+          "name": "Strumento MAC",
+          "description": "Formattazione MAC, ricerca vendor (OUI), EUI-64 e generazione in massa"
+        },
+        "es": {
+          "name": "Herramienta MAC",
+          "description": "Formato MAC, búsqueda de fabricante (OUI), EUI-64 y generación masiva"
+        },
+        "pt": {
+          "name": "Ferramenta MAC",
+          "description": "Formatação MAC, busca de fabricante (OUI), EUI-64 e geração em massa"
+        }
+      },
+      "ui": {
+        "zh": {
+          "input": "输入 MAC",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "格式变体",
+          "formats": "格式",
+          "flags": "标志位",
+          "multicast": "组播位",
+          "locallyAdministered": "本地管理位",
+          "broadcast": "广播地址",
+          "vendor": "厂商",
+          "oui": "OUI 前缀",
+          "eui64": "EUI-64",
+          "linkLocal": "链路本地地址",
+          "generateTitle": "批量生成",
+          "count": "数量",
+          "separator": "分隔符",
+          "caseLabel": "大写",
+          "generate": "生成",
+          "err.EMPTY": "请输入 MAC",
+          "err.INVALID": "MAC 格式非法",
+          "err.INVALID_COUNT": "数量须在 1–200"
+        },
+        "en": {
+          "input": "Enter MAC",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "Variants",
+          "formats": "Format",
+          "flags": "Flags",
+          "multicast": "Multicast",
+          "locallyAdministered": "Locally administered",
+          "broadcast": "Broadcast",
+          "vendor": "Vendor",
+          "oui": "OUI prefix",
+          "eui64": "EUI-64",
+          "linkLocal": "Link-local address",
+          "generateTitle": "Bulk generate",
+          "count": "Count",
+          "separator": "Separator",
+          "caseLabel": "Uppercase",
+          "generate": "Generate",
+          "err.EMPTY": "Please enter a MAC",
+          "err.INVALID": "Invalid MAC format",
+          "err.INVALID_COUNT": "Count must be 1–200"
+        },
+        "zh-TW": {
+          "input": "輸入 MAC",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "格式變體",
+          "formats": "格式",
+          "flags": "旗標",
+          "multicast": "群播位",
+          "locallyAdministered": "本地管理位",
+          "broadcast": "廣播位址",
+          "vendor": "廠商",
+          "oui": "OUI 前綴",
+          "eui64": "EUI-64",
+          "linkLocal": "鏈路本地位址",
+          "generateTitle": "批量生成",
+          "count": "數量",
+          "separator": "分隔符",
+          "caseLabel": "大寫",
+          "generate": "生成",
+          "err.EMPTY": "請輸入 MAC",
+          "err.INVALID": "MAC 格式非法",
+          "err.INVALID_COUNT": "數量須在 1–200"
+        },
+        "ja": {
+          "input": "MAC を入力",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "フォーマット",
+          "formats": "フォーマット",
+          "flags": "フラグ",
+          "multicast": "マルチキャスト",
+          "locallyAdministered": "ローカル管理",
+          "broadcast": "ブロードキャスト",
+          "vendor": "ベンダー",
+          "oui": "OUI プレフィックス",
+          "eui64": "EUI-64",
+          "linkLocal": "リンクローカル",
+          "generateTitle": "一括生成",
+          "count": "件数",
+          "separator": "区切り文字",
+          "caseLabel": "大文字",
+          "generate": "生成",
+          "err.EMPTY": "MAC を入力",
+          "err.INVALID": "MAC 形式が不正",
+          "err.INVALID_COUNT": "件数は 1–200"
+        },
+        "fr": {
+          "input": "Saisir MAC",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "Variantes",
+          "formats": "Format",
+          "flags": "Drapeaux",
+          "multicast": "Multicast",
+          "locallyAdministered": "Localement administré",
+          "broadcast": "Diffusion",
+          "vendor": "Fabricant",
+          "oui": "Préfixe OUI",
+          "eui64": "EUI-64",
+          "linkLocal": "Adresse link-local",
+          "generateTitle": "Générer en masse",
+          "count": "Nombre",
+          "separator": "Séparateur",
+          "caseLabel": "Majuscules",
+          "generate": "Générer",
+          "err.EMPTY": "Saisir une MAC",
+          "err.INVALID": "Format MAC invalide",
+          "err.INVALID_COUNT": "Nombre 1–200"
+        },
+        "de": {
+          "input": "MAC eingeben",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "Varianten",
+          "formats": "Format",
+          "flags": "Flags",
+          "multicast": "Multicast",
+          "locallyAdministered": "Lokal verwaltet",
+          "broadcast": "Broadcast",
+          "vendor": "Hersteller",
+          "oui": "OUI-Präfix",
+          "eui64": "EUI-64",
+          "linkLocal": "Link-Local-Adresse",
+          "generateTitle": "Massenerzeugung",
+          "count": "Anzahl",
+          "separator": "Trennzeichen",
+          "caseLabel": "Großbuchstaben",
+          "generate": "Generieren",
+          "err.EMPTY": "MAC eingeben",
+          "err.INVALID": "Ungültiges MAC-Format",
+          "err.INVALID_COUNT": "Anzahl 1–200"
+        },
+        "it": {
+          "input": "Inserisci MAC",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "Varianti",
+          "formats": "Formato",
+          "flags": "Flag",
+          "multicast": "Multicast",
+          "locallyAdministered": "Localmente amministrato",
+          "broadcast": "Broadcast",
+          "vendor": "Vendor",
+          "oui": "Prefisso OUI",
+          "eui64": "EUI-64",
+          "linkLocal": "Indirizzo link-local",
+          "generateTitle": "Genera in massa",
+          "count": "Numero",
+          "separator": "Separatore",
+          "caseLabel": "Maiuscole",
+          "generate": "Genera",
+          "err.EMPTY": "Inserisci una MAC",
+          "err.INVALID": "Formato MAC non valido",
+          "err.INVALID_COUNT": "Numero 1–200"
+        },
+        "es": {
+          "input": "Introduce MAC",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "Variantes",
+          "formats": "Formato",
+          "flags": "Indicadores",
+          "multicast": "Multicast",
+          "locallyAdministered": "Administrado localmente",
+          "broadcast": "Difusión",
+          "vendor": "Fabricante",
+          "oui": "Prefijo OUI",
+          "eui64": "EUI-64",
+          "linkLocal": "Dirección link-local",
+          "generateTitle": "Generar en masa",
+          "count": "Cantidad",
+          "separator": "Separador",
+          "caseLabel": "Mayúsculas",
+          "generate": "Generar",
+          "err.EMPTY": "Introduce una MAC",
+          "err.INVALID": "Formato MAC no válido",
+          "err.INVALID_COUNT": "Cantidad 1–200"
+        },
+        "pt": {
+          "input": "Insira MAC",
+          "placeholder": "00:1A:2B:3C:4D:5E / 001A.2B3C.4D5E",
+          "variants": "Variantes",
+          "formats": "Formato",
+          "flags": "Sinalizadores",
+          "multicast": "Multicast",
+          "locallyAdministered": "Administrado localmente",
+          "broadcast": "Broadcast",
+          "vendor": "Fabricante",
+          "oui": "Prefixo OUI",
+          "eui64": "EUI-64",
+          "linkLocal": "Endereço link-local",
+          "generateTitle": "Gerar em massa",
+          "count": "Quantidade",
+          "separator": "Separador",
+          "caseLabel": "Maiúsculas",
+          "generate": "Gerar",
+          "err.EMPTY": "Insira uma MAC",
+          "err.INVALID": "Formato MAC inválido",
+          "err.INVALID_COUNT": "Quantidade 1–200"
+        }
+      }
+    },
+    "url-parser": {
+      "meta": {
+        "zh": {
+          "name": "URL 解析器",
+          "description": "拆解 URL 的协议、主机、端口、路径、查询参数与锚点"
+        },
+        "en": {
+          "name": "URL Parser",
+          "description": "Break down URL into protocol, host, port, path, query params and hash"
+        },
+        "zh-TW": {
+          "name": "URL 解析器",
+          "description": "拆解 URL 的協定、主機、連接埠、路徑、查詢參數與錨點"
+        },
+        "ja": {
+          "name": "URL パーサー",
+          "description": "URL をプロトコル・ホスト・ポート・パス・クエリ・ハッシュに分解"
+        },
+        "fr": {
+          "name": "Analyseur d'URL",
+          "description": "Décompose l'URL en protocole, hôte, port, chemin, paramètres et ancre"
+        },
+        "de": {
+          "name": "URL-Parser",
+          "description": "Zerlegt die URL in Protokoll, Host, Port, Pfad, Parameter und Anker"
+        },
+        "it": {
+          "name": "Parser URL",
+          "description": "Scompone l'URL in protocollo, host, porta, percorso, parametri e ancoraggio"
+        },
+        "es": {
+          "name": "Analizador de URL",
+          "description": "Descompone la URL en protocolo, host, puerto, ruta, parámetros y ancla"
+        },
+        "pt": {
+          "name": "Analisador de URL",
+          "description": "Divide a URL em protocolo, host, porta, caminho, parâmetros e âncora"
+        }
+      },
+      "ui": {
+        "zh": {
+          "input": "输入 URL",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "结构",
+          "params": "查询参数",
+          "protocol": "协议",
+          "host": "主机",
+          "hostname": "主机名",
+          "port": "端口",
+          "pathname": "路径",
+          "search": "查询字符串",
+          "hash": "锚点",
+          "origin": "源",
+          "username": "用户名",
+          "password": "密码",
+          "err.EMPTY": "请输入 URL",
+          "err.INVALID": "URL 非法"
+        },
+        "en": {
+          "input": "Enter URL",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "Structure",
+          "params": "Query params",
+          "protocol": "Protocol",
+          "host": "Host",
+          "hostname": "Hostname",
+          "port": "Port",
+          "pathname": "Path",
+          "search": "Query string",
+          "hash": "Hash",
+          "origin": "Origin",
+          "username": "Username",
+          "password": "Password",
+          "err.EMPTY": "Please enter a URL",
+          "err.INVALID": "Invalid URL"
+        },
+        "zh-TW": {
+          "input": "輸入 URL",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "結構",
+          "params": "查詢參數",
+          "protocol": "協定",
+          "host": "主機",
+          "hostname": "主機名",
+          "port": "連接埠",
+          "pathname": "路徑",
+          "search": "查詢字串",
+          "hash": "錨點",
+          "origin": "來源",
+          "username": "使用者名稱",
+          "password": "密碼",
+          "err.EMPTY": "請輸入 URL",
+          "err.INVALID": "URL 非法"
+        },
+        "ja": {
+          "input": "URL を入力",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "構造",
+          "params": "クエリパラメータ",
+          "protocol": "プロトコル",
+          "host": "ホスト",
+          "hostname": "ホスト名",
+          "port": "ポート",
+          "pathname": "パス",
+          "search": "クエリ文字列",
+          "hash": "ハッシュ",
+          "origin": "オリジン",
+          "username": "ユーザー名",
+          "password": "パスワード",
+          "err.EMPTY": "URL を入力",
+          "err.INVALID": "URL が不正"
+        },
+        "fr": {
+          "input": "Saisir URL",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "Structure",
+          "params": "Paramètres",
+          "protocol": "Protocole",
+          "host": "Hôte",
+          "hostname": "Nom d'hôte",
+          "port": "Port",
+          "pathname": "Chemin",
+          "search": "Chaîne de requête",
+          "hash": "Ancre",
+          "origin": "Origine",
+          "username": "Nom d'utilisateur",
+          "password": "Mot de passe",
+          "err.EMPTY": "Saisir une URL",
+          "err.INVALID": "URL invalide"
+        },
+        "de": {
+          "input": "URL eingeben",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "Struktur",
+          "params": "Parameter",
+          "protocol": "Protokoll",
+          "host": "Host",
+          "hostname": "Hostname",
+          "port": "Port",
+          "pathname": "Pfad",
+          "search": "Abfragezeichenfolge",
+          "hash": "Anker",
+          "origin": "Ursprung",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "err.EMPTY": "URL eingeben",
+          "err.INVALID": "Ungültige URL"
+        },
+        "it": {
+          "input": "Inserisci URL",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "Struttura",
+          "params": "Parametri",
+          "protocol": "Protocollo",
+          "host": "Host",
+          "hostname": "Hostname",
+          "port": "Porta",
+          "pathname": "Percorso",
+          "search": "Stringa di query",
+          "hash": "Anchor",
+          "origin": "Origine",
+          "username": "Nome utente",
+          "password": "Password",
+          "err.EMPTY": "Inserisci una URL",
+          "err.INVALID": "URL non valido"
+        },
+        "es": {
+          "input": "Introduce URL",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "Estructura",
+          "params": "Parámetros",
+          "protocol": "Protocolo",
+          "host": "Host",
+          "hostname": "Nombre de host",
+          "port": "Puerto",
+          "pathname": "Ruta",
+          "search": "Cadena de consulta",
+          "hash": "Ancla",
+          "origin": "Origen",
+          "username": "Usuario",
+          "password": "Contraseña",
+          "err.EMPTY": "Introduce una URL",
+          "err.INVALID": "URL no válida"
+        },
+        "pt": {
+          "input": "Insira URL",
+          "placeholder": "https://example.com:8080/path?x=1#top",
+          "sections": "Estrutura",
+          "params": "Parâmetros",
+          "protocol": "Protocolo",
+          "host": "Host",
+          "hostname": "Nome do host",
+          "port": "Porta",
+          "pathname": "Caminho",
+          "search": "String de consulta",
+          "hash": "Âncora",
+          "origin": "Origem",
+          "username": "Usuário",
+          "password": "Senha",
+          "err.EMPTY": "Insira uma URL",
+          "err.INVALID": "URL inválida"
+        }
+      }
+    },
+    "ua-generator": {
+      "meta": {
+        "zh": {
+          "name": "User-Agent 生成器",
+          "description": "按浏览器 / 系统组合生成 User-Agent，附常见 UA 库"
+        },
+        "en": {
+          "name": "User-Agent Generator",
+          "description": "Generate User-Agent by browser/OS combo, with a common UA library"
+        },
+        "zh-TW": {
+          "name": "User-Agent 產生器",
+          "description": "依瀏覽器 / 系統組合產生 User-Agent，附常見 UA 庫"
+        },
+        "ja": {
+          "name": "User-Agent ジェネレーター",
+          "description": "ブラウザ/OS の組み合わせで UA を生成、定番ライブラリ付き"
+        },
+        "fr": {
+          "name": "Générateur User-Agent",
+          "description": "Génère un User-Agent selon le navigateur/OS, avec une bibliothèque"
+        },
+        "de": {
+          "name": "User-Agent-Generator",
+          "description": "Erzeugt User-Agent nach Browser/OS, mit gängiger UA-Bibliothek"
+        },
+        "it": {
+          "name": "Generatore User-Agent",
+          "description": "Genera User-Agent per browser/OS, con libreria UA comune"
+        },
+        "es": {
+          "name": "Generador de User-Agent",
+          "description": "Genera User-Agent por navegador/SO, con librería UA común"
+        },
+        "pt": {
+          "name": "Gerador de User-Agent",
+          "description": "Gera User-Agent por navegador/SO, com biblioteca UA comum"
+        }
+      },
+      "ui": {
+        "zh": { "generate": "重新生成", "copyAll": "下载全部" },
+        "en": { "generate": "Regenerate", "copyAll": "Download all" },
+        "zh-TW": { "generate": "重新產生", "copyAll": "下載全部" },
+        "ja": { "generate": "再生成", "copyAll": "すべてダウンロード" },
+        "fr": { "generate": "Régénérer", "copyAll": "Tout télécharger" },
+        "de": { "generate": "Neu generieren", "copyAll": "Alle herunterladen" },
+        "it": { "generate": "Rigenera", "copyAll": "Scarica tutto" },
+        "es": { "generate": "Regenerar", "copyAll": "Descargar todo" },
+        "pt": { "generate": "Gerar novamente", "copyAll": "Baixar tudo" }
+      }
+    },
+    "http-headers": {
+      "meta": {
+        "zh": {
+          "name": "安全响应头生成器",
+          "description": "生成 CSP / HSTS / Referrer-Policy 等安全响应头（nginx / Apache / Express / Vercel）"
+        },
+        "en": {
+          "name": "Security Headers Generator",
+          "description": "Generate CSP / HSTS / Referrer-Policy headers (nginx / Apache / Express / Vercel)"
+        },
+        "zh-TW": {
+          "name": "安全回應頭生成器",
+          "description": "產生 CSP / HSTS / Referrer-Policy 等安全回應頭（nginx / Apache / Express / Vercel）"
+        },
+        "ja": {
+          "name": "セキュリティヘッダ生成",
+          "description": "CSP / HSTS / Referrer-Policy などのヘッダを生成（nginx / Apache / Express / Vercel）"
+        },
+        "fr": {
+          "name": "Générateur d'en-têtes de sécurité",
+          "description": "Génère CSP / HSTS / Referrer-Policy (nginx / Apache / Express / Vercel)"
+        },
+        "de": {
+          "name": "Sicherheits-Header-Generator",
+          "description": "Erzeugt CSP / HSTS / Referrer-Policy (nginx / Apache / Express / Vercel)"
+        },
+        "it": {
+          "name": "Generatore header di sicurezza",
+          "description": "Genera CSP / HSTS / Referrer-Policy (nginx / Apache / Express / Vercel)"
+        },
+        "es": {
+          "name": "Generador de cabeceras de seguridad",
+          "description": "Genera CSP / HSTS / Referrer-Policy (nginx / Apache / Express / Vercel)"
+        },
+        "pt": {
+          "name": "Gerador de cabeçalhos de segurança",
+          "description": "Gera CSP / HSTS / Referrer-Policy (nginx / Apache / Express / Vercel)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "options": "选项",
+          "target": "目标平台",
+          "opt.hsts": "启用 HSTS",
+          "opt.hstsMaxAge": "HSTS 最大年龄",
+          "opt.includeSubDomains": "包含子域名",
+          "opt.preload": "预加载",
+          "opt.csp": "启用 CSP",
+          "opt.cspDirectives": "CSP 指令",
+          "opt.frameOptions": "点击劫持防护",
+          "opt.contentTypeOptions": "防 MIME 嗅探",
+          "opt.permissionsPolicy": "权限策略",
+          "opt.referrerPolicy": "引用策略",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "CORS 来源"
+        },
+        "en": {
+          "options": "Options",
+          "target": "Target",
+          "opt.hsts": "Enable HSTS",
+          "opt.hstsMaxAge": "HSTS max-age",
+          "opt.includeSubDomains": "Include subdomains",
+          "opt.preload": "Preload",
+          "opt.csp": "Enable CSP",
+          "opt.cspDirectives": "CSP directives",
+          "opt.frameOptions": "Frame options",
+          "opt.contentTypeOptions": "No MIME sniffing",
+          "opt.permissionsPolicy": "Permissions policy",
+          "opt.referrerPolicy": "Referrer policy",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "CORS origin"
+        },
+        "zh-TW": {
+          "options": "選項",
+          "target": "目標平台",
+          "opt.hsts": "啟用 HSTS",
+          "opt.hstsMaxAge": "HSTS 最大年齡",
+          "opt.includeSubDomains": "包含子網域",
+          "opt.preload": "預載入",
+          "opt.csp": "啟用 CSP",
+          "opt.cspDirectives": "CSP 指令",
+          "opt.frameOptions": "點擊劫持防護",
+          "opt.contentTypeOptions": "防 MIME 嗅探",
+          "opt.permissionsPolicy": "權限策略",
+          "opt.referrerPolicy": "引用策略",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "CORS 來源"
+        },
+        "ja": {
+          "options": "オプション",
+          "target": "ターゲット",
+          "opt.hsts": "HSTS を有効",
+          "opt.hstsMaxAge": "HSTS 最大年齢",
+          "opt.includeSubDomains": "サブドメインを含む",
+          "opt.preload": "プリロード",
+          "opt.csp": "CSP を有効",
+          "opt.cspDirectives": "CSP ディレクティブ",
+          "opt.frameOptions": "フレーム保護",
+          "opt.contentTypeOptions": "MIME スニッフィング防止",
+          "opt.permissionsPolicy": "権限ポリシー",
+          "opt.referrerPolicy": "リファラポリシー",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "CORS オリジン"
+        },
+        "fr": {
+          "options": "Options",
+          "target": "Cible",
+          "opt.hsts": "Activer HSTS",
+          "opt.hstsMaxAge": "HSTS max-age",
+          "opt.includeSubDomains": "Inclure les sous-domaines",
+          "opt.preload": "Précharger",
+          "opt.csp": "Activer CSP",
+          "opt.cspDirectives": "Directives CSP",
+          "opt.frameOptions": "Option frame",
+          "opt.contentTypeOptions": "Pas de sniffing",
+          "opt.permissionsPolicy": "Permissions policy",
+          "opt.referrerPolicy": "Politique de référent",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "Origine CORS"
+        },
+        "de": {
+          "options": "Optionen",
+          "target": "Ziel",
+          "opt.hsts": "HSTS aktivieren",
+          "opt.hstsMaxAge": "HSTS max-age",
+          "opt.includeSubDomains": "Subdomains einbeziehen",
+          "opt.preload": "Preload",
+          "opt.csp": "CSP aktivieren",
+          "opt.cspDirectives": "CSP-Direktiven",
+          "opt.frameOptions": "Frame-Option",
+          "opt.contentTypeOptions": "Kein MIME-Sniffing",
+          "opt.permissionsPolicy": "Permissions-Policy",
+          "opt.referrerPolicy": "Referrer-Policy",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "CORS-Origin"
+        },
+        "it": {
+          "options": "Opzioni",
+          "target": "Destinazione",
+          "opt.hsts": "Abilita HSTS",
+          "opt.hstsMaxAge": "HSTS max-age",
+          "opt.includeSubDomains": "Includi sottodomini",
+          "opt.preload": "Preload",
+          "opt.csp": "Abilita CSP",
+          "opt.cspDirectives": "Direttive CSP",
+          "opt.frameOptions": "Opzione frame",
+          "opt.contentTypeOptions": "Nessun sniffing",
+          "opt.permissionsPolicy": "Permissions policy",
+          "opt.referrerPolicy": "Referrer policy",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "Origine CORS"
+        },
+        "es": {
+          "options": "Opciones",
+          "target": "Destino",
+          "opt.hsts": "Habilitar HSTS",
+          "opt.hstsMaxAge": "HSTS max-age",
+          "opt.includeSubDomains": "Incluir subdominios",
+          "opt.preload": "Precarga",
+          "opt.csp": "Habilitar CSP",
+          "opt.cspDirectives": "Directivas CSP",
+          "opt.frameOptions": "Opción frame",
+          "opt.contentTypeOptions": "Sin sniffing",
+          "opt.permissionsPolicy": "Permissions policy",
+          "opt.referrerPolicy": "Política de referencia",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "Origen CORS"
+        },
+        "pt": {
+          "options": "Opções",
+          "target": "Destino",
+          "opt.hsts": "Habilitar HSTS",
+          "opt.hstsMaxAge": "HSTS max-age",
+          "opt.includeSubDomains": "Incluir subdomínios",
+          "opt.preload": "Pré-carga",
+          "opt.csp": "Habilitar CSP",
+          "opt.cspDirectives": "Diretrizes CSP",
+          "opt.frameOptions": "Opção frame",
+          "opt.contentTypeOptions": "Sem sniffing",
+          "opt.permissionsPolicy": "Permissions policy",
+          "opt.referrerPolicy": "Política de referência",
+          "opt.coop": "COOP",
+          "opt.coep": "COEP",
+          "opt.corsOrigin": "Origem CORS"
+        }
+      }
+    },
+    "http-request": {
+      "meta": {
+        "zh": {
+          "name": "HTTP 请求调试器",
+          "description": "浏览器内发起 HTTP 请求，查看状态码、耗时、响应头与正文（注意 CORS 限制）"
+        },
+        "en": {
+          "name": "HTTP Request Debugger",
+          "description": "Send HTTP requests in-browser, inspect status, timing, headers and body (mind CORS)"
+        },
+        "zh-TW": {
+          "name": "HTTP 請求除錯器",
+          "description": "於瀏覽器內發送 HTTP 請求，檢視狀態碼、耗時、回應頭與正文（注意 CORS 限制）"
+        },
+        "ja": {
+          "name": "HTTP リクエストデバッガー",
+          "description": "ブラウザ内で HTTP を送信し、ステータス・時間・ヘッダ・本文を確認（CORS に注意）"
+        },
+        "fr": {
+          "name": "Débogueur HTTP",
+          "description": "Envoie des requêtes HTTP dans le navigateur, inspecte statut, durée, en-têtes (CORS)"
+        },
+        "de": {
+          "name": "HTTP-Request-Debugger",
+          "description": "HTTP-Anfragen im Browser senden, Status, Dauer, Header und Body prüfen (CORS beachten)"
+        },
+        "it": {
+          "name": "Debugger HTTP",
+          "description": "Invia richieste HTTP nel browser, ispeziona stato, durata, header e body (CORS)"
+        },
+        "es": {
+          "name": "Depurador HTTP",
+          "description": "Envía peticiones HTTP en el navegador, inspecciona estado, tiempo, cabeceras (CORS)"
+        },
+        "pt": {
+          "name": "Depurador HTTP",
+          "description": "Envia requisições HTTP no navegador, inspeciona status, tempo, cabeçalhos (CORS)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "method": "方法",
+          "url": "请求 URL",
+          "headers": "请求头",
+          "body": "请求体",
+          "send": "发送",
+          "fromCurl": "从 curl 导入",
+          "duration": "耗时",
+          "size": "大小",
+          "err.protocol": "请输入以 http:// 或 https:// 开头的地址",
+          "err.EMPTY": "请输入 curl 命令",
+          "err.NOT_CURL": "不是有效的 curl 命令",
+          "err.NO_URL": "curl 命令缺少 URL"
+        },
+        "en": {
+          "method": "Method",
+          "url": "Request URL",
+          "headers": "Headers",
+          "body": "Body",
+          "send": "Send",
+          "fromCurl": "Import from curl",
+          "duration": "Duration",
+          "size": "Size",
+          "err.protocol": "Enter a URL starting with http(s)://",
+          "err.EMPTY": "Please enter a curl command",
+          "err.NOT_CURL": "Not a valid curl command",
+          "err.NO_URL": "curl command has no URL"
+        },
+        "zh-TW": {
+          "method": "方法",
+          "url": "請求 URL",
+          "headers": "請求頭",
+          "body": "請求體",
+          "send": "傳送",
+          "fromCurl": "從 curl 匯入",
+          "duration": "耗時",
+          "size": "大小",
+          "err.protocol": "請輸入以 http:// 或 https:// 開頭的位址",
+          "err.EMPTY": "請輸入 curl 指令",
+          "err.NOT_CURL": "非有效的 curl 指令",
+          "err.NO_URL": "curl 指令缺少 URL"
+        },
+        "ja": {
+          "method": "メソッド",
+          "url": "リクエスト URL",
+          "headers": "ヘッダー",
+          "body": "ボディ",
+          "send": "送信",
+          "fromCurl": "curl から",
+          "duration": "時間",
+          "size": "サイズ",
+          "err.protocol": "http(s):// で始まる URL を入力",
+          "err.EMPTY": "curl コマンドを入力",
+          "err.NOT_CURL": "有効な curl ではない",
+          "err.NO_URL": "curl に URL がありません"
+        },
+        "fr": {
+          "method": "Méthode",
+          "url": "URL",
+          "headers": "En-têtes",
+          "body": "Corps",
+          "send": "Envoyer",
+          "fromCurl": "Depuis curl",
+          "duration": "Durée",
+          "size": "Taille",
+          "err.protocol": "URL commençant par http(s)://",
+          "err.EMPTY": "Saisir une commande curl",
+          "err.NOT_CURL": "Commande curl invalide",
+          "err.NO_URL": "URL manquante dans curl"
+        },
+        "de": {
+          "method": "Methode",
+          "url": "Request-URL",
+          "headers": "Header",
+          "body": "Body",
+          "send": "Senden",
+          "fromCurl": "Aus curl",
+          "duration": "Dauer",
+          "size": "Größe",
+          "err.protocol": "URL mit http(s):// eingeben",
+          "err.EMPTY": "curl-Befehl eingeben",
+          "err.NOT_CURL": "Kein gültiger curl-Befehl",
+          "err.NO_URL": "curl ohne URL"
+        },
+        "it": {
+          "method": "Metodo",
+          "url": "URL",
+          "headers": "Header",
+          "body": "Body",
+          "send": "Invia",
+          "fromCurl": "Da curl",
+          "duration": "Durata",
+          "size": "Dimensione",
+          "err.protocol": "Inserisci URL che inizia con http(s)://",
+          "err.EMPTY": "Inserisci un comando curl",
+          "err.NOT_CURL": "Comando curl non valido",
+          "err.NO_URL": "curl senza URL"
+        },
+        "es": {
+          "method": "Método",
+          "url": "URL",
+          "headers": "Cabeceras",
+          "body": "Cuerpo",
+          "send": "Enviar",
+          "fromCurl": "Desde curl",
+          "duration": "Duración",
+          "size": "Tamaño",
+          "err.protocol": "Introduce URL que empiece por http(s)://",
+          "err.EMPTY": "Introduce un comando curl",
+          "err.NOT_CURL": "No es un comando curl válido",
+          "err.NO_URL": "Falta URL en curl"
+        },
+        "pt": {
+          "method": "Método",
+          "url": "URL",
+          "headers": "Cabeçalhos",
+          "body": "Corpo",
+          "send": "Enviar",
+          "fromCurl": "De curl",
+          "duration": "Duração",
+          "size": "Tamanho",
+          "err.protocol": "Insira URL começando com http(s)://",
+          "err.EMPTY": "Insira um comando curl",
+          "err.NOT_CURL": "Não é um comando curl válido",
+          "err.NO_URL": "curl sem URL"
+        }
+      }
+    },
+    "websocket-tester": {
+      "meta": {
+        "zh": {
+          "name": "WebSocket 测试器",
+          "description": "连接 WebSocket 服务，收发文本 / 二进制消息并查看实时日志"
+        },
+        "en": {
+          "name": "WebSocket Tester",
+          "description": "Connect to WebSocket, send/receive text/binary messages with live log"
+        },
+        "zh-TW": {
+          "name": "WebSocket 測試器",
+          "description": "連線 WebSocket 服務，收發文字 / 二進位訊息並檢視即時日誌"
+        },
+        "ja": {
+          "name": "WebSocket テスター",
+          "description": "WebSocket に接続し、テキスト/バイナリ送受信とリアルタイムログ"
+        },
+        "fr": {
+          "name": "Testeur WebSocket",
+          "description": "Connexion WebSocket, envoi/réception texte/binaire avec journal"
+        },
+        "de": {
+          "name": "WebSocket-Tester",
+          "description": "WebSocket verbinden, Text/Binär senden/empfangen mit Live-Log"
+        },
+        "it": {
+          "name": "Tester WebSocket",
+          "description": "Connetti a WebSocket, invia/ricevi testo/binario con log live"
+        },
+        "es": {
+          "name": "Probador de WebSocket",
+          "description": "Conecta a WebSocket, envía/recibe texto/binario con registro"
+        },
+        "pt": {
+          "name": "Testador de WebSocket",
+          "description": "Conecta a WebSocket, envia/recebe texto/binário com log"
+        }
+      },
+      "ui": {
+        "zh": {
+          "url": "服务地址",
+          "connect": "连接",
+          "disconnect": "断开",
+          "message": "消息内容",
+          "mode": "编码模式",
+          "send": "发送",
+          "log": "日志",
+          "open": "已连接",
+          "closed": "已关闭",
+          "connecting": "连接中…",
+          "err.EMPTY": "请输入 WebSocket 地址",
+          "err.INVALID_URL": "地址非法",
+          "err.INVALID_SCHEME": "仅支持 ws / wss 协议"
+        },
+        "en": {
+          "url": "Server URL",
+          "connect": "Connect",
+          "disconnect": "Disconnect",
+          "message": "Message",
+          "mode": "Mode",
+          "send": "Send",
+          "log": "Log",
+          "open": "Connected",
+          "closed": "Closed",
+          "connecting": "Connecting…",
+          "err.EMPTY": "Please enter a WebSocket URL",
+          "err.INVALID_URL": "Invalid URL",
+          "err.INVALID_SCHEME": "Only ws / wss allowed"
+        },
+        "zh-TW": {
+          "url": "服務位址",
+          "connect": "連線",
+          "disconnect": "斷開",
+          "message": "訊息內容",
+          "mode": "編碼模式",
+          "send": "傳送",
+          "log": "日誌",
+          "open": "已連線",
+          "closed": "已關閉",
+          "connecting": "連線中…",
+          "err.EMPTY": "請輸入 WebSocket 位址",
+          "err.INVALID_URL": "位址非法",
+          "err.INVALID_SCHEME": "僅支援 ws / wss 協定"
+        },
+        "ja": {
+          "url": "サーバーURL",
+          "connect": "接続",
+          "disconnect": "切断",
+          "message": "メッセージ",
+          "mode": "モード",
+          "send": "送信",
+          "log": "ログ",
+          "open": "接続しました",
+          "closed": "切断しました",
+          "connecting": "接続中…",
+          "err.EMPTY": "WebSocket URL を入力",
+          "err.INVALID_URL": "URL が不正",
+          "err.INVALID_SCHEME": "ws/wss のみ"
+        },
+        "fr": {
+          "url": "URL du serveur",
+          "connect": "Connecter",
+          "disconnect": "Déconnecter",
+          "message": "Message",
+          "mode": "Mode",
+          "send": "Envoyer",
+          "log": "Journal",
+          "open": "Connecté",
+          "closed": "Fermé",
+          "connecting": "Connexion…",
+          "err.EMPTY": "Saisir une URL WebSocket",
+          "err.INVALID_URL": "URL invalide",
+          "err.INVALID_SCHEME": "Seuls ws/wss autorisés"
+        },
+        "de": {
+          "url": "Server-URL",
+          "connect": "Verbinden",
+          "disconnect": "Trennen",
+          "message": "Nachricht",
+          "mode": "Modus",
+          "send": "Senden",
+          "log": "Protokoll",
+          "open": "Verbunden",
+          "closed": "Geschlossen",
+          "connecting": "Verbinden…",
+          "err.EMPTY": "WebSocket-URL eingeben",
+          "err.INVALID_URL": "Ungültige URL",
+          "err.INVALID_SCHEME": "Nur ws/wss erlaubt"
+        },
+        "it": {
+          "url": "URL server",
+          "connect": "Connetti",
+          "disconnect": "Disconnetti",
+          "message": "Messaggio",
+          "mode": "Modalità",
+          "send": "Invia",
+          "log": "Registro",
+          "open": "Connesso",
+          "closed": "Chiuso",
+          "connecting": "Connessione…",
+          "err.EMPTY": "Inserisci URL WebSocket",
+          "err.INVALID_URL": "URL non valida",
+          "err.INVALID_SCHEME": "Solo ws/wss consentiti"
+        },
+        "es": {
+          "url": "URL del servidor",
+          "connect": "Conectar",
+          "disconnect": "Desconectar",
+          "message": "Mensaje",
+          "mode": "Modo",
+          "send": "Enviar",
+          "log": "Registro",
+          "open": "Conectado",
+          "closed": "Cerrado",
+          "connecting": "Conectando…",
+          "err.EMPTY": "Introduce URL WebSocket",
+          "err.INVALID_URL": "URL no válida",
+          "err.INVALID_SCHEME": "Solo ws/wss permitidos"
+        },
+        "pt": {
+          "url": "URL do servidor",
+          "connect": "Conectar",
+          "disconnect": "Desconectar",
+          "message": "Mensagem",
+          "mode": "Modo",
+          "send": "Enviar",
+          "log": "Registro",
+          "open": "Conectado",
+          "closed": "Fechado",
+          "connecting": "Conectando…",
+          "err.EMPTY": "Insira URL WebSocket",
+          "err.INVALID_URL": "URL inválida",
+          "err.INVALID_SCHEME": "Apenas ws/wss permitidos"
+        }
+      }
+    },
+    "random-port": {
+      "meta": {
+        "zh": {
+          "name": "随机端口与地址生成",
+          "description": "生成随机端口、内网 IPv4、MAC 与 IPv6 地址（可选去重与避开常见端口）"
+        },
+        "en": {
+          "name": "Random Port & Address",
+          "description": "Generate random ports, private IPv4, MAC and IPv6 (optional dedupe and avoid common ports)"
+        },
+        "zh-TW": {
+          "name": "隨機連接埠與位址生成",
+          "description": "產生隨機連接埠、內網 IPv4、MAC 與 IPv6（可去重與避開常見連接埠）"
+        },
+        "ja": {
+          "name": "ランダムポートとアドレス",
+          "description": "ランダムポート・プライベート IPv4・MAC・IPv6 を生成（重複排除・定番ポート回避可）"
+        },
+        "fr": {
+          "name": "Port et adresse aléatoires",
+          "description": "Génère ports, IPv4 privée, MAC et IPv6 (déduplication et ports courants évités)"
+        },
+        "de": {
+          "name": "Zufälliger Port & Adresse",
+          "description": "Erzeugt Ports, private IPv4, MAC und IPv6 (Deduplizierung, meidet gängige Ports)"
+        },
+        "it": {
+          "name": "Porta e indirizzo casuali",
+          "description": "Genera porte, IPv4 privata, MAC e IPv6 (deduplica ed evita porte comuni)"
+        },
+        "es": {
+          "name": "Puerto y dirección aleatorios",
+          "description": "Genera puertos, IPv4 privada, MAC e IPv6 (deduplica y evita puertos comunes)"
+        },
+        "pt": {
+          "name": "Porta e endereço aleatórios",
+          "description": "Gera portas, IPv4 privada, MAC e IPv6 (deduplica e evita portas comuns)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "count": "数量",
+          "range": "范围",
+          "unique": "去重",
+          "excludeSystem": "避开常见端口",
+          "generate": "生成",
+          "ports": "端口",
+          "err.INVALID_COUNT": "数量须在 1–500",
+          "err.INVALID_RANGE": "范围非法（1–65535）",
+          "err.RANGE_TOO_SMALL": "范围不足以去重"
+        },
+        "en": {
+          "count": "Count",
+          "range": "Range",
+          "unique": "Unique",
+          "excludeSystem": "Avoid common ports",
+          "generate": "Generate",
+          "ports": "Ports",
+          "err.INVALID_COUNT": "Count must be 1–500",
+          "err.INVALID_RANGE": "Invalid range (1–65535)",
+          "err.RANGE_TOO_SMALL": "Range too small to dedupe"
+        },
+        "zh-TW": {
+          "count": "數量",
+          "range": "範圍",
+          "unique": "去重",
+          "excludeSystem": "避開常見連接埠",
+          "generate": "生成",
+          "ports": "連接埠",
+          "err.INVALID_COUNT": "數量須在 1–500",
+          "err.INVALID_RANGE": "範圍非法（1–65535）",
+          "err.RANGE_TOO_SMALL": "範圍不足以去重"
+        },
+        "ja": {
+          "count": "件数",
+          "range": "範囲",
+          "unique": "重複排除",
+          "excludeSystem": "定番ポートを避ける",
+          "generate": "生成",
+          "ports": "ポート",
+          "err.INVALID_COUNT": "件数は 1–500",
+          "err.INVALID_RANGE": "範囲が不正（1–65535）",
+          "err.RANGE_TOO_SMALL": "重複排除には範囲不足"
+        },
+        "fr": {
+          "count": "Nombre",
+          "range": "Plage",
+          "unique": "Unique",
+          "excludeSystem": "Éviter les ports courants",
+          "generate": "Générer",
+          "ports": "Ports",
+          "err.INVALID_COUNT": "Nombre 1–500",
+          "err.INVALID_RANGE": "Plage invalide (1–65535)",
+          "err.RANGE_TOO_SMALL": "Plage trop petite"
+        },
+        "de": {
+          "count": "Anzahl",
+          "range": "Bereich",
+          "unique": "Eindeutig",
+          "excludeSystem": "Gängige Ports meiden",
+          "generate": "Generieren",
+          "ports": "Ports",
+          "err.INVALID_COUNT": "Anzahl 1–500",
+          "err.INVALID_RANGE": "Ungültiger Bereich (1–65535)",
+          "err.RANGE_TOO_SMALL": "Bereich zu klein"
+        },
+        "it": {
+          "count": "Numero",
+          "range": "Intervallo",
+          "unique": "Unico",
+          "excludeSystem": "Evita porte comuni",
+          "generate": "Genera",
+          "ports": "Porte",
+          "err.INVALID_COUNT": "Numero 1–500",
+          "err.INVALID_RANGE": "Intervallo non valido (1–65535)",
+          "err.RANGE_TOO_SMALL": "Intervallo troppo piccolo"
+        },
+        "es": {
+          "count": "Cantidad",
+          "range": "Rango",
+          "unique": "Único",
+          "excludeSystem": "Evitar puertos comunes",
+          "generate": "Generar",
+          "ports": "Puertos",
+          "err.INVALID_COUNT": "Cantidad 1–500",
+          "err.INVALID_RANGE": "Rango no válido (1–65535)",
+          "err.RANGE_TOO_SMALL": "Rango demasiado pequeño"
+        },
+        "pt": {
+          "count": "Quantidade",
+          "range": "Intervalo",
+          "unique": "Único",
+          "excludeSystem": "Evitar portas comuns",
+          "generate": "Gerar",
+          "ports": "Portas",
+          "err.INVALID_COUNT": "Quantidade 1–500",
+          "err.INVALID_RANGE": "Intervalo inválido (1–65535)",
+          "err.RANGE_TOO_SMALL": "Intervalo muito pequeno"
+        }
+      }
+    }
+  }
+}

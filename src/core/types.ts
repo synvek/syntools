@@ -15,7 +15,10 @@ export type CategoryId =
   | 'network' // 网络
   | 'image' // 图片处理
   | 'pdf' // PDF 工具
-  | 'other'; // 其他
+  | 'other' // 其他
+  | 'file' // 文件工具
+  | 'media' // 音视频
+  | 'cheatsheet'; // 速查表
 
 /** 工具注册契约：所有工具必须声明此元数据 */
 export interface ToolMeta {

@@ -1,0 +1,442 @@
+{
+  "tools": {
+    "subtitle-tool": {
+      "meta": {
+        "zh": {
+          "name": "字幕转换",
+          "description": "SRT / WebVTT 字幕互转，支持整体平移时间轴与逐条预览"
+        },
+        "en": {
+          "name": "Subtitle Converter",
+          "description": "Convert between SRT / WebVTT subtitles with time shifting"
+        },
+        "zh-TW": {
+          "name": "字幕轉換",
+          "description": "SRT / WebVTT 字幕互轉，支援整體平移時間軸與逐條預覽"
+        },
+        "ja": { "name": "字幕変換", "description": "SRT / WebVTT 字幕の相互変換と時間軸シフト" },
+        "fr": {
+          "name": "Convertisseur de sous-titres",
+          "description": "Convertir entre SRT / WebVTT avec décalage du temps"
+        },
+        "de": {
+          "name": "Untertitel-Konverter",
+          "description": "Zwischen SRT / WebVTT konvertieren, mit Zeitverschiebung"
+        },
+        "it": {
+          "name": "Convertitore sottotitoli",
+          "description": "Converti tra SRT / WebVTT con spostamento temporale"
+        },
+        "es": {
+          "name": "Conversor de subtítulos",
+          "description": "Convierte entre SRT / WebVTT con desplazamiento de tiempo"
+        },
+        "pt": {
+          "name": "Conversor de legendas",
+          "description": "Converte entre SRT / WebVTT com deslocamento de tempo"
+        }
+      },
+      "ui": {
+        "zh": {
+          "target": "目标格式",
+          "offset": "平移 (ms)",
+          "cueCount": "共 {{count}} 条字幕",
+          "input": "字幕输入",
+          "output": "转换结果",
+          "errors.EMPTY": "请输入字幕内容",
+          "errors.INVALID": "无法解析字幕内容"
+        },
+        "en": {
+          "target": "Target format",
+          "offset": "Shift (ms)",
+          "cueCount": "{{count}} cues",
+          "input": "Subtitle input",
+          "output": "Result",
+          "errors.EMPTY": "Please enter subtitles",
+          "errors.INVALID": "Cannot parse subtitles"
+        },
+        "zh-TW": {
+          "target": "目標格式",
+          "offset": "平移 (ms)",
+          "cueCount": "共 {{count}} 條字幕",
+          "input": "字幕輸入",
+          "output": "轉換結果",
+          "errors.EMPTY": "請輸入字幕內容",
+          "errors.INVALID": "無法解析字幕內容"
+        },
+        "ja": {
+          "target": "出力形式",
+          "offset": "シフト (ms)",
+          "cueCount": "{{count}} 件の字幕",
+          "input": "字幕入力",
+          "output": "変換結果",
+          "errors.EMPTY": "字幕を入力してください",
+          "errors.INVALID": "字幕を解析できません"
+        },
+        "fr": {
+          "target": "Format cible",
+          "offset": "Décalage (ms)",
+          "cueCount": "{{count}} sous-titres",
+          "input": "Sous-titres",
+          "output": "Résultat",
+          "errors.EMPTY": "Saisissez des sous-titres",
+          "errors.INVALID": "Analyse impossible"
+        },
+        "de": {
+          "target": "Zielformat",
+          "offset": "Verschiebung (ms)",
+          "cueCount": "{{count}} Einträge",
+          "input": "Untertitel",
+          "output": "Ergebnis",
+          "errors.EMPTY": "Bitte Untertitel eingeben",
+          "errors.INVALID": "Untertitel nicht lesbar"
+        },
+        "it": {
+          "target": "Formato destinazione",
+          "offset": "Spostamento (ms)",
+          "cueCount": "{{count}} sottotitoli",
+          "input": "Sottotitoli",
+          "output": "Risultato",
+          "errors.EMPTY": "Inserisci i sottotitoli",
+          "errors.INVALID": "Impossibile analizzare"
+        },
+        "es": {
+          "target": "Formato destino",
+          "offset": "Desplazamiento (ms)",
+          "cueCount": "{{count}} subtítulos",
+          "input": "Subtítulos",
+          "output": "Resultado",
+          "errors.EMPTY": "Introduce subtítulos",
+          "errors.INVALID": "No se puede analizar"
+        },
+        "pt": {
+          "target": "Formato destino",
+          "offset": "Deslocamento (ms)",
+          "cueCount": "{{count}} legendas",
+          "input": "Legendas",
+          "output": "Resultado",
+          "errors.EMPTY": "Digite as legendas",
+          "errors.INVALID": "Não foi possível analisar"
+        }
+      }
+    },
+    "audio-convert": {
+      "meta": {
+        "zh": {
+          "name": "音频转 WAV",
+          "description": "将任意浏览器可解码的音频转换为 WAV（可设采样率、声道与位深）"
+        },
+        "en": {
+          "name": "Audio to WAV",
+          "description": "Convert any decodable audio to WAV with sample rate, channels and bit depth"
+        },
+        "zh-TW": {
+          "name": "音訊轉 WAV",
+          "description": "將瀏覽器可解碼的音訊轉為 WAV（可設取樣率、聲道與位元深度）"
+        },
+        "ja": {
+          "name": "音声 → WAV",
+          "description": "ブラウザで再生可能な音声を WAV に変換（サンプルレート・チャンネル・ビット深度）"
+        },
+        "fr": {
+          "name": "Audio vers WAV",
+          "description": "Convertir tout audio décodable en WAV (fréquence, canaux, profondeur)"
+        },
+        "de": {
+          "name": "Audio zu WAV",
+          "description": "Dekodierbares Audio in WAV umwandeln (Abtastrate, Kanäle, Bittiefe)"
+        },
+        "it": {
+          "name": "Audio in WAV",
+          "description": "Converti audio decodificabile in WAV (frequenza, canali, bit depth)"
+        },
+        "es": {
+          "name": "Audio a WAV",
+          "description": "Convierte audio decodificable a WAV (frecuencia, canales, profundidad)"
+        },
+        "pt": {
+          "name": "Áudio para WAV",
+          "description": "Converte áudio decodificável em WAV (taxa, canais, profundidade)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "sampleRate": "采样率",
+          "channels": "声道",
+          "bitDepth": "位深",
+          "keep": "保持原样",
+          "mono": "单声道",
+          "stereo": "立体声",
+          "dropHint": "拖入音频文件以转换",
+          "processing": "处理中…",
+          "info": "{{rate}} Hz · {{channels}} 声道 · {{bitDepth}} bit · {{duration}} 秒",
+          "downloadWav": "下载 WAV",
+          "errors.DECODE": "音频解码失败（格式可能不受支持）"
+        },
+        "en": {
+          "sampleRate": "Sample rate",
+          "channels": "Channels",
+          "bitDepth": "Bit depth",
+          "keep": "Keep",
+          "mono": "Mono",
+          "stereo": "Stereo",
+          "dropHint": "Drop an audio file to convert",
+          "processing": "Processing…",
+          "info": "{{rate}} Hz · {{channels}} ch · {{bitDepth}} bit · {{duration}}s",
+          "downloadWav": "Download WAV",
+          "errors.DECODE": "Audio decoding failed (unsupported format?)"
+        },
+        "zh-TW": {
+          "sampleRate": "取樣率",
+          "channels": "聲道",
+          "bitDepth": "位元深度",
+          "keep": "保持原樣",
+          "mono": "單聲道",
+          "stereo": "立體聲",
+          "dropHint": "拖入音訊檔案以轉換",
+          "processing": "處理中…",
+          "info": "{{rate}} Hz · {{channels}} 聲道 · {{bitDepth}} bit · {{duration}} 秒",
+          "downloadWav": "下載 WAV",
+          "errors.DECODE": "音訊解碼失敗（格式可能不受支援）"
+        },
+        "ja": {
+          "sampleRate": "サンプルレート",
+          "channels": "チャンネル",
+          "bitDepth": "ビット深度",
+          "keep": "そのまま",
+          "mono": "モノラル",
+          "stereo": "ステレオ",
+          "dropHint": "音声ファイルをドロップして変換",
+          "processing": "処理中…",
+          "info": "{{rate}} Hz · {{channels}} ch · {{bitDepth}} bit · {{duration}} 秒",
+          "downloadWav": "WAV をダウンロード",
+          "errors.DECODE": "音声のデコードに失敗（非対応形式？）"
+        },
+        "fr": {
+          "sampleRate": "Fréquence",
+          "channels": "Canaux",
+          "bitDepth": "Profondeur",
+          "keep": "Conserver",
+          "mono": "Mono",
+          "stereo": "Stéréo",
+          "dropHint": "Déposez un fichier audio à convertir",
+          "processing": "Traitement…",
+          "info": "{{rate}} Hz · {{channels}} canaux · {{bitDepth}} bits · {{duration}} s",
+          "downloadWav": "Télécharger le WAV",
+          "errors.DECODE": "Échec du décodage audio (format non pris en charge ?)"
+        },
+        "de": {
+          "sampleRate": "Abtastrate",
+          "channels": "Kanäle",
+          "bitDepth": "Bittiefe",
+          "keep": "Beibehalten",
+          "mono": "Mono",
+          "stereo": "Stereo",
+          "dropHint": "Audiodatei zum Konvertieren ablegen",
+          "processing": "Verarbeiten…",
+          "info": "{{rate}} Hz · {{channels}} Kanäle · {{bitDepth}} Bit · {{duration}} s",
+          "downloadWav": "WAV herunterladen",
+          "errors.DECODE": "Audio-Dekodierung fehlgeschlagen (Format nicht unterstützt?)"
+        },
+        "it": {
+          "sampleRate": "Frequenza",
+          "channels": "Canali",
+          "bitDepth": "Bit depth",
+          "keep": "Mantieni",
+          "mono": "Mono",
+          "stereo": "Stereo",
+          "dropHint": "Trascina un file audio da convertire",
+          "processing": "Elaborazione…",
+          "info": "{{rate}} Hz · {{channels}} canali · {{bitDepth}} bit · {{duration}} s",
+          "downloadWav": "Scarica WAV",
+          "errors.DECODE": "Decodifica audio fallita (formato non supportato?)"
+        },
+        "es": {
+          "sampleRate": "Frecuencia",
+          "channels": "Canales",
+          "bitDepth": "Profundidad",
+          "keep": "Mantener",
+          "mono": "Mono",
+          "stereo": "Estéreo",
+          "dropHint": "Suelta un archivo de audio para convertir",
+          "processing": "Procesando…",
+          "info": "{{rate}} Hz · {{channels}} canales · {{bitDepth}} bits · {{duration}} s",
+          "downloadWav": "Descargar WAV",
+          "errors.DECODE": "Fallo al decodificar el audio (¿formato no admitido?)"
+        },
+        "pt": {
+          "sampleRate": "Taxa de amostragem",
+          "channels": "Canais",
+          "bitDepth": "Profundidade",
+          "keep": "Manter",
+          "mono": "Mono",
+          "stereo": "Estéreo",
+          "dropHint": "Solte um arquivo de áudio para converter",
+          "processing": "Processando…",
+          "info": "{{rate}} Hz · {{channels}} canais · {{bitDepth}} bits · {{duration}} s",
+          "downloadWav": "Baixar WAV",
+          "errors.DECODE": "Falha ao decodificar o áudio (formato não suportado?)"
+        }
+      }
+    },
+    "video-to-gif": {
+      "meta": {
+        "zh": {
+          "name": "视频转 GIF",
+          "description": "截取视频片段并生成 GIF 动图（纯前端，自实现 GIF 编码，无需上传）"
+        },
+        "en": {
+          "name": "Video to GIF",
+          "description": "Trim a video clip into an animated GIF (pure frontend, built-in GIF encoder)"
+        },
+        "zh-TW": {
+          "name": "影片轉 GIF",
+          "description": "截取影片片段並產生 GIF 動圖（純前端，自製 GIF 編碼）"
+        },
+        "ja": {
+          "name": "動画 → GIF",
+          "description": "動画の一部を GIF アニメに変換（フロントエンド完結の GIF エンコーダ）"
+        },
+        "fr": {
+          "name": "Vidéo en GIF",
+          "description": "Découper une vidéo en GIF animé (100 % navigateur, encodeur intégré)"
+        },
+        "de": {
+          "name": "Video zu GIF",
+          "description": "Videoclip in ein animiertes GIF umwandeln (rein im Browser)"
+        },
+        "it": {
+          "name": "Video in GIF",
+          "description": "Ritaglia un video in GIF animata (tutto nel browser)"
+        },
+        "es": {
+          "name": "Vídeo a GIF",
+          "description": "Recorta un vídeo en GIF animado (todo en el navegador)"
+        },
+        "pt": {
+          "name": "Vídeo para GIF",
+          "description": "Recorta um vídeo em GIF animado (tudo no navegador)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "start": "起始 (s)",
+          "duration": "时长 (s)",
+          "fps": "帧率",
+          "width": "宽度",
+          "dropHint": "拖入视频文件以生成 GIF",
+          "processing": "生成中 {{percent}}%",
+          "preview": "预览",
+          "downloadGif": "下载 GIF",
+          "errors.EMPTY": "没有可用的帧",
+          "errors.INVALID_FPS": "帧率无效",
+          "errors.PROCESS": "视频处理失败"
+        },
+        "en": {
+          "start": "Start (s)",
+          "duration": "Duration (s)",
+          "fps": "FPS",
+          "width": "Width",
+          "dropHint": "Drop a video file to make a GIF",
+          "processing": "Generating {{percent}}%",
+          "preview": "Preview",
+          "downloadGif": "Download GIF",
+          "errors.EMPTY": "No frames available",
+          "errors.INVALID_FPS": "Invalid FPS",
+          "errors.PROCESS": "Video processing failed"
+        },
+        "zh-TW": {
+          "start": "起始 (s)",
+          "duration": "時長 (s)",
+          "fps": "影格率",
+          "width": "寬度",
+          "dropHint": "拖入影片檔案以產生 GIF",
+          "processing": "產生中 {{percent}}%",
+          "preview": "預覽",
+          "downloadGif": "下載 GIF",
+          "errors.EMPTY": "沒有可用的影格",
+          "errors.INVALID_FPS": "影格率無效",
+          "errors.PROCESS": "影片處理失敗"
+        },
+        "ja": {
+          "start": "開始 (s)",
+          "duration": "長さ (s)",
+          "fps": "FPS",
+          "width": "幅",
+          "dropHint": "動画をドロップして GIF を作成",
+          "processing": "生成中 {{percent}}%",
+          "preview": "プレビュー",
+          "downloadGif": "GIF をダウンロード",
+          "errors.EMPTY": "フレームがありません",
+          "errors.INVALID_FPS": "FPS が無効",
+          "errors.PROCESS": "動画処理に失敗"
+        },
+        "fr": {
+          "start": "Début (s)",
+          "duration": "Durée (s)",
+          "fps": "IPS",
+          "width": "Largeur",
+          "dropHint": "Déposez une vidéo pour créer un GIF",
+          "processing": "Génération {{percent}} %",
+          "preview": "Aperçu",
+          "downloadGif": "Télécharger le GIF",
+          "errors.EMPTY": "Aucune image disponible",
+          "errors.INVALID_FPS": "IPS invalide",
+          "errors.PROCESS": "Échec du traitement vidéo"
+        },
+        "de": {
+          "start": "Start (s)",
+          "duration": "Dauer (s)",
+          "fps": "FPS",
+          "width": "Breite",
+          "dropHint": "Video zum Erstellen eines GIF ablegen",
+          "processing": "Erzeugen {{percent}} %",
+          "preview": "Vorschau",
+          "downloadGif": "GIF herunterladen",
+          "errors.EMPTY": "Keine Frames verfügbar",
+          "errors.INVALID_FPS": "Ungültige FPS",
+          "errors.PROCESS": "Videoverarbeitung fehlgeschlagen"
+        },
+        "it": {
+          "start": "Inizio (s)",
+          "duration": "Durata (s)",
+          "fps": "FPS",
+          "width": "Larghezza",
+          "dropHint": "Trascina un video per creare una GIF",
+          "processing": "Generazione {{percent}}%",
+          "preview": "Anteprima",
+          "downloadGif": "Scarica GIF",
+          "errors.EMPTY": "Nessun frame disponibile",
+          "errors.INVALID_FPS": "FPS non valido",
+          "errors.PROCESS": "Elaborazione video non riuscita"
+        },
+        "es": {
+          "start": "Inicio (s)",
+          "duration": "Duración (s)",
+          "fps": "FPS",
+          "width": "Ancho",
+          "dropHint": "Suelta un vídeo para crear un GIF",
+          "processing": "Generando {{percent}}%",
+          "preview": "Vista previa",
+          "downloadGif": "Descargar GIF",
+          "errors.EMPTY": "No hay fotogramas",
+          "errors.INVALID_FPS": "FPS no válidos",
+          "errors.PROCESS": "Fallo al procesar el vídeo"
+        },
+        "pt": {
+          "start": "Início (s)",
+          "duration": "Duração (s)",
+          "fps": "FPS",
+          "width": "Largura",
+          "dropHint": "Solte um vídeo para criar um GIF",
+          "processing": "Gerando {{percent}}%",
+          "preview": "Pré-visualização",
+          "downloadGif": "Baixar GIF",
+          "errors.EMPTY": "Nenhum quadro disponível",
+          "errors.INVALID_FPS": "FPS inválidos",
+          "errors.PROCESS": "Falha no processamento do vídeo"
+        }
+      }
+    }
+  }
+}

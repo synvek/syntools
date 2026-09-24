@@ -1,0 +1,661 @@
+{
+  "tools": {
+    "zip-manager": {
+      "meta": {
+        "zh": {
+          "name": "ZIP 压缩管理",
+          "description": "将多个文件打包为 ZIP，或解压查看并下载 ZIP 内单个文件（基于 JSZip）"
+        },
+        "en": {
+          "name": "ZIP Manager",
+          "description": "Pack multiple files into a ZIP, or inspect and download individual entries (JSZip)"
+        },
+        "zh-TW": {
+          "name": "ZIP 壓縮管理",
+          "description": "將多個檔案打包為 ZIP，或解壓檢視並下載 ZIP 內單一檔案（基於 JSZip）"
+        },
+        "ja": {
+          "name": "ZIP マネージャー",
+          "description": "複数ファイルを ZIP にまとめる、または展開して個別ファイルを取得（JSZip）"
+        },
+        "fr": {
+          "name": "Gestionnaire ZIP",
+          "description": "Regrouper des fichiers en ZIP, ou inspecter et extraire les entrées (JSZip)"
+        },
+        "de": {
+          "name": "ZIP-Manager",
+          "description": "Mehrere Dateien zu ZIP packen oder Einträge ansehen/herunterladen (JSZip)"
+        },
+        "it": {
+          "name": "Gestore ZIP",
+          "description": "Crea un ZIP da più file o estrae singoli elementi (JSZip)"
+        },
+        "es": {
+          "name": "Gestor ZIP",
+          "description": "Empaqueta varios archivos en ZIP o extrae entradas individuales (JSZip)"
+        },
+        "pt": {
+          "name": "Gerenciador ZIP",
+          "description": "Empacota vários arquivos em ZIP ou extrai entradas individuais (JSZip)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "mode": "模式",
+          "modes.create": "打包 ZIP",
+          "modes.extract": "解压查看",
+          "archiveName": "压缩包名称",
+          "createHint": "拖入或选择多个文件以打包",
+          "extractHint": "拖入 .zip 文件以查看内容",
+          "downloadZip": "下载 ZIP",
+          "errors.NO_FILES": "请至少选择一个文件",
+          "errors.CREATE_FAILED": "打包失败",
+          "errors.INVALID_ZIP": "不是有效的 ZIP 文件",
+          "errors.NOT_FOUND": "未找到该条目"
+        },
+        "en": {
+          "mode": "Mode",
+          "modes.create": "Create ZIP",
+          "modes.extract": "Extract",
+          "archiveName": "Archive name",
+          "createHint": "Drop or select multiple files to pack",
+          "extractHint": "Drop a .zip file to inspect",
+          "downloadZip": "Download ZIP",
+          "errors.NO_FILES": "Select at least one file",
+          "errors.CREATE_FAILED": "Failed to create archive",
+          "errors.INVALID_ZIP": "Not a valid ZIP file",
+          "errors.NOT_FOUND": "Entry not found"
+        },
+        "zh-TW": {
+          "mode": "模式",
+          "modes.create": "打包 ZIP",
+          "modes.extract": "解壓檢視",
+          "archiveName": "壓縮檔名稱",
+          "createHint": "拖入或選擇多個檔案以打包",
+          "extractHint": "拖入 .zip 檔案以檢視內容",
+          "downloadZip": "下載 ZIP",
+          "errors.NO_FILES": "請至少選擇一個檔案",
+          "errors.CREATE_FAILED": "打包失敗",
+          "errors.INVALID_ZIP": "不是有效的 ZIP 檔案",
+          "errors.NOT_FOUND": "找不到該項目"
+        },
+        "ja": {
+          "mode": "モード",
+          "modes.create": "ZIP 作成",
+          "modes.extract": "展開",
+          "archiveName": "ファイル名",
+          "createHint": "複数のファイルをドロップしてまとめる",
+          "extractHint": ".zip をドロップして内容を確認",
+          "downloadZip": "ZIP をダウンロード",
+          "errors.NO_FILES": "ファイルを1つ以上選択してください",
+          "errors.CREATE_FAILED": "作成に失敗しました",
+          "errors.INVALID_ZIP": "有効な ZIP ではありません",
+          "errors.NOT_FOUND": "項目が見つかりません"
+        },
+        "fr": {
+          "mode": "Mode",
+          "modes.create": "Créer un ZIP",
+          "modes.extract": "Extraire",
+          "archiveName": "Nom de l'archive",
+          "createHint": "Déposez plusieurs fichiers à regrouper",
+          "extractHint": "Déposez un .zip pour inspecter",
+          "downloadZip": "Télécharger le ZIP",
+          "errors.NO_FILES": "Sélectionnez au moins un fichier",
+          "errors.CREATE_FAILED": "Échec de la création",
+          "errors.INVALID_ZIP": "ZIP invalide",
+          "errors.NOT_FOUND": "Entrée introuvable"
+        },
+        "de": {
+          "mode": "Modus",
+          "modes.create": "ZIP erstellen",
+          "modes.extract": "Entpacken",
+          "archiveName": "Archivname",
+          "createHint": "Mehrere Dateien zum Packen ablegen",
+          "extractHint": ".zip ablegen zum Prüfen",
+          "downloadZip": "ZIP herunterladen",
+          "errors.NO_FILES": "Mindestens eine Datei auswählen",
+          "errors.CREATE_FAILED": "Erstellen fehlgeschlagen",
+          "errors.INVALID_ZIP": "Keine gültige ZIP-Datei",
+          "errors.NOT_FOUND": "Eintrag nicht gefunden"
+        },
+        "it": {
+          "mode": "Modalità",
+          "modes.create": "Crea ZIP",
+          "modes.extract": "Estrai",
+          "archiveName": "Nome archivio",
+          "createHint": "Trascina più file da comprimere",
+          "extractHint": "Trascina un .zip per ispezionare",
+          "downloadZip": "Scarica ZIP",
+          "errors.NO_FILES": "Seleziona almeno un file",
+          "errors.CREATE_FAILED": "Creazione non riuscita",
+          "errors.INVALID_ZIP": "ZIP non valido",
+          "errors.NOT_FOUND": "Elemento non trovato"
+        },
+        "es": {
+          "mode": "Modo",
+          "modes.create": "Crear ZIP",
+          "modes.extract": "Extraer",
+          "archiveName": "Nombre del archivo",
+          "createHint": "Suelta varios archivos para empaquetar",
+          "extractHint": "Suelta un .zip para inspeccionar",
+          "downloadZip": "Descargar ZIP",
+          "errors.NO_FILES": "Selecciona al menos un archivo",
+          "errors.CREATE_FAILED": "Error al crear",
+          "errors.INVALID_ZIP": "ZIP no válido",
+          "errors.NOT_FOUND": "Entrada no encontrada"
+        },
+        "pt": {
+          "mode": "Modo",
+          "modes.create": "Criar ZIP",
+          "modes.extract": "Extrair",
+          "archiveName": "Nome do arquivo",
+          "createHint": "Solte vários arquivos para empacotar",
+          "extractHint": "Solte um .zip para inspecionar",
+          "downloadZip": "Baixar ZIP",
+          "errors.NO_FILES": "Selecione ao menos um arquivo",
+          "errors.CREATE_FAILED": "Falha ao criar",
+          "errors.INVALID_ZIP": "ZIP inválido",
+          "errors.NOT_FOUND": "Entrada não encontrada"
+        }
+      }
+    },
+    "file-split-merge": {
+      "meta": {
+        "zh": {
+          "name": "文件切分 / 合并",
+          "description": "将大文件按大小或数量切分为多个分片，或按文件名顺序合并分片还原"
+        },
+        "en": {
+          "name": "File Split / Merge",
+          "description": "Split a large file by size or count, or merge parts back in name order"
+        },
+        "zh-TW": {
+          "name": "檔案切分 / 合併",
+          "description": "將大檔案按大小或數量切分為多個分片，或按檔名順序合併還原"
+        },
+        "ja": {
+          "name": "ファイル分割 / 結合",
+          "description": "大きなファイルをサイズまたは数で分割、または名前順で結合"
+        },
+        "fr": {
+          "name": "Découpe / Fusion",
+          "description": "Découper un gros fichier par taille ou nombre, ou fusionner les parties"
+        },
+        "de": {
+          "name": "Datei teilen / zusammenfügen",
+          "description": "Große Datei nach Größe oder Anzahl teilen bzw. Teile zusammenfügen"
+        },
+        "it": {
+          "name": "Dividi / Unisci file",
+          "description": "Dividi un file per dimensione o numero, o unisci le parti"
+        },
+        "es": {
+          "name": "Dividir / Unir archivo",
+          "description": "Divide un archivo por tamaño o número, o une las partes"
+        },
+        "pt": {
+          "name": "Dividir / Juntar arquivo",
+          "description": "Divide um arquivo por tamanho ou número, ou junta as partes"
+        }
+      },
+      "ui": {
+        "zh": {
+          "mode": "模式",
+          "modes.split": "切分",
+          "modes.merge": "合并",
+          "splitBy": "切分方式",
+          "bySize": "按大小",
+          "byCount": "按数量",
+          "sizeKb": "每片 (KB)",
+          "count": "分片数量",
+          "outputName": "输出文件名",
+          "splitHint": "拖入要切分的文件",
+          "mergeHint": "拖入要合并的分片（按文件名排序）",
+          "partsCount": "已生成 {{count}} 个分片",
+          "mergedSize": "合并后大小 {{size}} 字节",
+          "mergeTip": "依次下载所有分片，合并时按文件名排序选择即可还原。",
+          "mergeOrder": "将按文件名顺序合并 {{count}} 个分片",
+          "errors.EMPTY": "内容为空",
+          "errors.INVALID_SIZE": "分片大小需大于 0",
+          "errors.INVALID_COUNT": "分片数量需 ≥ 2"
+        },
+        "en": {
+          "mode": "Mode",
+          "modes.split": "Split",
+          "modes.merge": "Merge",
+          "splitBy": "Split by",
+          "bySize": "Size",
+          "byCount": "Count",
+          "sizeKb": "Per part (KB)",
+          "count": "Parts",
+          "outputName": "Output name",
+          "splitHint": "Drop the file to split",
+          "mergeHint": "Drop the parts to merge (sorted by name)",
+          "partsCount": "{{count}} parts generated",
+          "mergedSize": "Merged size {{size}} bytes",
+          "mergeTip": "Download all parts; merging sorts them by name to restore the file.",
+          "mergeOrder": "Merging {{count}} parts in name order",
+          "errors.EMPTY": "Content is empty",
+          "errors.INVALID_SIZE": "Part size must be > 0",
+          "errors.INVALID_COUNT": "Parts must be ≥ 2"
+        },
+        "zh-TW": {
+          "mode": "模式",
+          "modes.split": "切分",
+          "modes.merge": "合併",
+          "splitBy": "切分方式",
+          "bySize": "按大小",
+          "byCount": "按數量",
+          "sizeKb": "每片 (KB)",
+          "count": "分片數量",
+          "outputName": "輸出檔名",
+          "splitHint": "拖入要切分的檔案",
+          "mergeHint": "拖入要合併的分片（按檔名排序）",
+          "partsCount": "已產生 {{count}} 個分片",
+          "mergedSize": "合併後大小 {{size}} 位元組",
+          "mergeTip": "依序下載所有分片，合併時按檔名排序即可還原。",
+          "mergeOrder": "將按檔名順序合併 {{count}} 個分片",
+          "errors.EMPTY": "內容為空",
+          "errors.INVALID_SIZE": "分片大小需大於 0",
+          "errors.INVALID_COUNT": "分片數量需 ≥ 2"
+        },
+        "ja": {
+          "mode": "モード",
+          "modes.split": "分割",
+          "modes.merge": "結合",
+          "splitBy": "分割方法",
+          "bySize": "サイズ",
+          "byCount": "個数",
+          "sizeKb": "1 片 (KB)",
+          "count": "分割数",
+          "outputName": "出力ファイル名",
+          "splitHint": "分割するファイルをドロップ",
+          "mergeHint": "結合する分割ファイルをドロップ（名前順）",
+          "partsCount": "{{count}} 個の分割を生成しました",
+          "mergedSize": "結合後 {{size}} バイト",
+          "mergeTip": "すべての分割をダウンロードし、名前順で選択すると復元できます。",
+          "mergeOrder": "名前順に {{count}} 個を結合します",
+          "errors.EMPTY": "内容が空です",
+          "errors.INVALID_SIZE": "分割サイズは 0 より大きい必要があります",
+          "errors.INVALID_COUNT": "分割数は 2 以上"
+        },
+        "fr": {
+          "mode": "Mode",
+          "modes.split": "Découper",
+          "modes.merge": "Fusionner",
+          "splitBy": "Découper par",
+          "bySize": "Taille",
+          "byCount": "Nombre",
+          "sizeKb": "Par partie (Ko)",
+          "count": "Parties",
+          "outputName": "Nom de sortie",
+          "splitHint": "Déposez le fichier à découper",
+          "mergeHint": "Déposez les parties à fusionner (triées par nom)",
+          "partsCount": "{{count}} parties générées",
+          "mergedSize": "Taille fusionnée {{size}} octets",
+          "mergeTip": "Téléchargez toutes les parties ; la fusion les trie par nom pour restaurer le fichier.",
+          "mergeOrder": "Fusion de {{count}} parties par ordre de nom",
+          "errors.EMPTY": "Contenu vide",
+          "errors.INVALID_SIZE": "La taille doit être > 0",
+          "errors.INVALID_COUNT": "Les parties doivent être ≥ 2"
+        },
+        "de": {
+          "mode": "Modus",
+          "modes.split": "Teilen",
+          "modes.merge": "Zusammenfügen",
+          "splitBy": "Teilen nach",
+          "bySize": "Größe",
+          "byCount": "Anzahl",
+          "sizeKb": "Pro Teil (KB)",
+          "count": "Teile",
+          "outputName": "Ausgabename",
+          "splitHint": "Zu teilende Datei ablegen",
+          "mergeHint": "Zu verbindende Teile ablegen (nach Name sortiert)",
+          "partsCount": "{{count}} Teile erzeugt",
+          "mergedSize": "Zusammengefügt {{size}} Bytes",
+          "mergeTip": "Alle Teile herunterladen; beim Zusammenfügen werden sie nach Name sortiert.",
+          "mergeOrder": "{{count}} Teile werden nach Name verbunden",
+          "errors.EMPTY": "Inhalt ist leer",
+          "errors.INVALID_SIZE": "Teilgröße muss > 0 sein",
+          "errors.INVALID_COUNT": "Teile müssen ≥ 2 sein"
+        },
+        "it": {
+          "mode": "Modalità",
+          "modes.split": "Dividi",
+          "modes.merge": "Unisci",
+          "splitBy": "Dividi per",
+          "bySize": "Dimensione",
+          "byCount": "Numero",
+          "sizeKb": "Per parte (KB)",
+          "count": "Parti",
+          "outputName": "Nome output",
+          "splitHint": "Trascina il file da dividere",
+          "mergeHint": "Trascina le parti da unire (ordinate per nome)",
+          "partsCount": "{{count}} parti generate",
+          "mergedSize": "Dimensione unita {{size}} byte",
+          "mergeTip": "Scarica tutte le parti; l'unione le ordina per nome.",
+          "mergeOrder": "Unione di {{count}} parti in ordine di nome",
+          "errors.EMPTY": "Contenuto vuoto",
+          "errors.INVALID_SIZE": "La dimensione deve essere > 0",
+          "errors.INVALID_COUNT": "Le parti devono essere ≥ 2"
+        },
+        "es": {
+          "mode": "Modo",
+          "modes.split": "Dividir",
+          "modes.merge": "Unir",
+          "splitBy": "Dividir por",
+          "bySize": "Tamaño",
+          "byCount": "Cantidad",
+          "sizeKb": "Por parte (KB)",
+          "count": "Partes",
+          "outputName": "Nombre de salida",
+          "splitHint": "Suelta el archivo a dividir",
+          "mergeHint": "Suelta las partes a unir (ordenadas por nombre)",
+          "partsCount": "{{count}} partes generadas",
+          "mergedSize": "Tamaño unido {{size}} bytes",
+          "mergeTip": "Descarga todas las partes; la unión las ordena por nombre.",
+          "mergeOrder": "Uniendo {{count}} partes por orden de nombre",
+          "errors.EMPTY": "El contenido está vacío",
+          "errors.INVALID_SIZE": "El tamaño debe ser > 0",
+          "errors.INVALID_COUNT": "Las partes deben ser ≥ 2"
+        },
+        "pt": {
+          "mode": "Modo",
+          "modes.split": "Dividir",
+          "modes.merge": "Juntar",
+          "splitBy": "Dividir por",
+          "bySize": "Tamanho",
+          "byCount": "Quantidade",
+          "sizeKb": "Por parte (KB)",
+          "count": "Partes",
+          "outputName": "Nome de saída",
+          "splitHint": "Solte o arquivo a dividir",
+          "mergeHint": "Solte as partes a juntar (ordenadas por nome)",
+          "partsCount": "{{count}} partes geradas",
+          "mergedSize": "Tamanho unido {{size}} bytes",
+          "mergeTip": "Baixe todas as partes; a junção as ordena por nome.",
+          "mergeOrder": "Juntando {{count}} partes por ordem de nome",
+          "errors.EMPTY": "Conteúdo vazio",
+          "errors.INVALID_SIZE": "O tamanho deve ser > 0",
+          "errors.INVALID_COUNT": "As partes devem ser ≥ 2"
+        }
+      }
+    },
+    "bulk-rename": {
+      "meta": {
+        "zh": {
+          "name": "批量重命名",
+          "description": "按前后缀、查找替换（支持正则）、编号、扩展名与大小写规则批量生成新文件名"
+        },
+        "en": {
+          "name": "Bulk Rename",
+          "description": "Batch-generate new filenames via prefix/suffix, find-replace (regex), numbering, extension and case rules"
+        },
+        "zh-TW": {
+          "name": "批量重新命名",
+          "description": "依前後綴、尋找取代（支援正則）、編號、副檔名與大小寫規則批量產生新檔名"
+        },
+        "ja": {
+          "name": "一括リネーム",
+          "description": "前後辞・置換（正規表現）・連番・拡張子・大文字小文字でファイル名を一括生成"
+        },
+        "fr": {
+          "name": "Renommage en lot",
+          "description": "Générer des noms via préfixe/suffixe, remplacement (regex), numérotation, extension et casse"
+        },
+        "de": {
+          "name": "Stapel-Umbenennung",
+          "description": "Dateinamen per Präfix/Suffix, Ersetzen (Regex), Nummerierung, Endung und Groß-/Kleinschreibung erstellen"
+        },
+        "it": {
+          "name": "Rinomina in blocco",
+          "description": "Genera nomi con prefisso/suffisso, sostituzione (regex), numerazione, estensione e maiuscole"
+        },
+        "es": {
+          "name": "Renombrado masivo",
+          "description": "Genera nombres con prefijo/sufijo, reemplazo (regex), numeración, extensión y mayúsculas"
+        },
+        "pt": {
+          "name": "Renomeação em massa",
+          "description": "Gera nomes com prefixo/sufixo, substituição (regex), numeração, extensão e maiúsculas"
+        }
+      },
+      "ui": {
+        "zh": {
+          "prefix": "前缀",
+          "suffix": "后缀",
+          "extension": "扩展名",
+          "search": "查找",
+          "replace": "替换",
+          "useRegex": "正则",
+          "case": "大小写",
+          "cases.none": "保持",
+          "cases.lower": "小写",
+          "cases.upper": "大写",
+          "cases.title": "首字母大写",
+          "numbering": "编号",
+          "start": "起始",
+          "padding": "补零",
+          "position": "位置",
+          "positions.prefix": "前缀",
+          "positions.suffix": "后缀",
+          "dropHint": "拖入文件以获取文件名列表",
+          "names": "文件名列表（每行一个）",
+          "namesPlaceholder": "每行一个文件名",
+          "output": "重命名预览",
+          "duplicateWarning": "⚠️ 存在重名：{{names}}",
+          "errors.EMPTY": "请至少输入一个文件名",
+          "errors.INVALID_REGEX": "正则表达式无效"
+        },
+        "en": {
+          "prefix": "Prefix",
+          "suffix": "Suffix",
+          "extension": "Extension",
+          "search": "Find",
+          "replace": "Replace",
+          "useRegex": "Regex",
+          "case": "Case",
+          "cases.none": "Keep",
+          "cases.lower": "lower",
+          "cases.upper": "UPPER",
+          "cases.title": "Title",
+          "numbering": "Numbering",
+          "start": "Start",
+          "padding": "Padding",
+          "position": "Position",
+          "positions.prefix": "Prefix",
+          "positions.suffix": "Suffix",
+          "dropHint": "Drop files to fill the name list",
+          "names": "File names (one per line)",
+          "namesPlaceholder": "One file name per line",
+          "output": "Rename preview",
+          "duplicateWarning": "⚠️ Duplicate names: {{names}}",
+          "errors.EMPTY": "Enter at least one file name",
+          "errors.INVALID_REGEX": "Invalid regular expression"
+        },
+        "zh-TW": {
+          "prefix": "前綴",
+          "suffix": "後綴",
+          "extension": "副檔名",
+          "search": "尋找",
+          "replace": "取代",
+          "useRegex": "正則",
+          "case": "大小寫",
+          "cases.none": "保持",
+          "cases.lower": "小寫",
+          "cases.upper": "大寫",
+          "cases.title": "首字母大寫",
+          "numbering": "編號",
+          "start": "起始",
+          "padding": "補零",
+          "position": "位置",
+          "positions.prefix": "前綴",
+          "positions.suffix": "後綴",
+          "dropHint": "拖入檔案以取得檔名清單",
+          "names": "檔名清單（每行一個）",
+          "namesPlaceholder": "每行一個檔名",
+          "output": "重新命名預覽",
+          "duplicateWarning": "⚠️ 存在重名：{{names}}",
+          "errors.EMPTY": "請至少輸入一個檔名",
+          "errors.INVALID_REGEX": "正規表達式無效"
+        },
+        "ja": {
+          "prefix": "接頭辞",
+          "suffix": "接尾辞",
+          "extension": "拡張子",
+          "search": "検索",
+          "replace": "置換",
+          "useRegex": "正規表現",
+          "case": "大文字小文字",
+          "cases.none": "そのまま",
+          "cases.lower": "小文字",
+          "cases.upper": "大文字",
+          "cases.title": "先頭大文字",
+          "numbering": "連番",
+          "start": "開始",
+          "padding": "桁揃え",
+          "position": "位置",
+          "positions.prefix": "先頭",
+          "positions.suffix": "末尾",
+          "dropHint": "ファイルをドロップして名前を取得",
+          "names": "ファイル名（1 行に 1 つ）",
+          "namesPlaceholder": "1 行に 1 つ",
+          "output": "リネームプレビュー",
+          "duplicateWarning": "⚠️ 重複名：{{names}}",
+          "errors.EMPTY": "ファイル名を 1 つ以上入力してください",
+          "errors.INVALID_REGEX": "正規表現が無効です"
+        },
+        "fr": {
+          "prefix": "Préfixe",
+          "suffix": "Suffixe",
+          "extension": "Extension",
+          "search": "Rechercher",
+          "replace": "Remplacer",
+          "useRegex": "Regex",
+          "case": "Casse",
+          "cases.none": "Conserver",
+          "cases.lower": "minuscule",
+          "cases.upper": "MAJUSCULE",
+          "cases.title": "Titre",
+          "numbering": "Numérotation",
+          "start": "Début",
+          "padding": "Remplissage",
+          "position": "Position",
+          "positions.prefix": "Préfixe",
+          "positions.suffix": "Suffixe",
+          "dropHint": "Déposez des fichiers pour remplir la liste",
+          "names": "Noms de fichiers (un par ligne)",
+          "namesPlaceholder": "Un nom par ligne",
+          "output": "Aperçu du renommage",
+          "duplicateWarning": "⚠️ Doublons : {{names}}",
+          "errors.EMPTY": "Saisissez au moins un nom",
+          "errors.INVALID_REGEX": "Expression régulière invalide"
+        },
+        "de": {
+          "prefix": "Präfix",
+          "suffix": "Suffix",
+          "extension": "Endung",
+          "search": "Suchen",
+          "replace": "Ersetzen",
+          "useRegex": "Regex",
+          "case": "Schreibung",
+          "cases.none": "Beibehalten",
+          "cases.lower": "klein",
+          "cases.upper": "GROSS",
+          "cases.title": "Titel",
+          "numbering": "Nummerierung",
+          "start": "Start",
+          "padding": "Auffüllen",
+          "position": "Position",
+          "positions.prefix": "Präfix",
+          "positions.suffix": "Suffix",
+          "dropHint": "Dateien ablegen, um Namen zu füllen",
+          "names": "Dateinamen (eine pro Zeile)",
+          "namesPlaceholder": "Ein Name pro Zeile",
+          "output": "Umbenennungsvorschau",
+          "duplicateWarning": "⚠️ Doppelte Namen: {{names}}",
+          "errors.EMPTY": "Mindestens einen Namen eingeben",
+          "errors.INVALID_REGEX": "Ungültiger regulärer Ausdruck"
+        },
+        "it": {
+          "prefix": "Prefisso",
+          "suffix": "Suffisso",
+          "extension": "Estensione",
+          "search": "Trova",
+          "replace": "Sostituisci",
+          "useRegex": "Regex",
+          "case": "Maiuscole",
+          "cases.none": "Mantieni",
+          "cases.lower": "minuscolo",
+          "cases.upper": "MAIUSCOLO",
+          "cases.title": "Iniziali",
+          "numbering": "Numerazione",
+          "start": "Inizio",
+          "padding": "Padding",
+          "position": "Posizione",
+          "positions.prefix": "Prefisso",
+          "positions.suffix": "Suffisso",
+          "dropHint": "Trascina file per riempire l'elenco",
+          "names": "Nomi file (uno per riga)",
+          "namesPlaceholder": "Un nome per riga",
+          "output": "Anteprima rinomina",
+          "duplicateWarning": "⚠️ Nomi duplicati: {{names}}",
+          "errors.EMPTY": "Inserisci almeno un nome",
+          "errors.INVALID_REGEX": "Espressione regolare non valida"
+        },
+        "es": {
+          "prefix": "Prefijo",
+          "suffix": "Sufijo",
+          "extension": "Extensión",
+          "search": "Buscar",
+          "replace": "Reemplazar",
+          "useRegex": "Regex",
+          "case": "Mayúsculas",
+          "cases.none": "Mantener",
+          "cases.lower": "minúsculas",
+          "cases.upper": "MAYÚSCULAS",
+          "cases.title": "Título",
+          "numbering": "Numeración",
+          "start": "Inicio",
+          "padding": "Relleno",
+          "position": "Posición",
+          "positions.prefix": "Prefijo",
+          "positions.suffix": "Sufijo",
+          "dropHint": "Suelta archivos para llenar la lista",
+          "names": "Nombres (uno por línea)",
+          "namesPlaceholder": "Un nombre por línea",
+          "output": "Vista previa",
+          "duplicateWarning": "⚠️ Nombres duplicados: {{names}}",
+          "errors.EMPTY": "Introduce al menos un nombre",
+          "errors.INVALID_REGEX": "Expresión regular no válida"
+        },
+        "pt": {
+          "prefix": "Prefixo",
+          "suffix": "Sufixo",
+          "extension": "Extensão",
+          "search": "Localizar",
+          "replace": "Substituir",
+          "useRegex": "Regex",
+          "case": "Maiúsculas",
+          "cases.none": "Manter",
+          "cases.lower": "minúsculas",
+          "cases.upper": "MAIÚSCULAS",
+          "cases.title": "Título",
+          "numbering": "Numeração",
+          "start": "Início",
+          "padding": "Preenchimento",
+          "position": "Posição",
+          "positions.prefix": "Prefixo",
+          "positions.suffix": "Sufixo",
+          "dropHint": "Solte arquivos para preencher a lista",
+          "names": "Nomes de arquivo (um por linha)",
+          "namesPlaceholder": "Um nome por linha",
+          "output": "Pré-visualização",
+          "duplicateWarning": "⚠️ Nomes duplicados: {{names}}",
+          "errors.EMPTY": "Digite ao menos um nome",
+          "errors.INVALID_REGEX": "Expressão regular inválida"
+        }
+      }
+    }
+  }
+}

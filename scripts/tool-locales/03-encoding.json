@@ -1,0 +1,589 @@
+{
+  "tools": {
+    "base-encoding": {
+      "meta": {
+        "zh": {
+          "name": "Base 系列编码",
+          "description": "Base16/32/32Hex/58/64/64URL 编码与解码（纯前端，零依赖）"
+        },
+        "en": {
+          "name": "Base Encoder",
+          "description": "Encode/decode Base16/32/32Hex/58/64/64URL (pure frontend, zero dependency)"
+        },
+        "zh-TW": {
+          "name": "Base 系列編碼",
+          "description": "Base16/32/32Hex/58/64/64URL 編碼與解碼（純前端，零依賴）"
+        },
+        "ja": {
+          "name": "Base エンコーダ",
+          "description": "Base16/32/32Hex/58/64/64URL のエンコード・デコード（フロントエンド完結）"
+        },
+        "fr": {
+          "name": "Encodeur Base",
+          "description": "Encodage/décodage Base16/32/32Hex/58/64/64URL (100 % navigateur)"
+        },
+        "de": {
+          "name": "Base-Kodierer",
+          "description": "Kodieren/Dekodieren von Base16/32/32Hex/58/64/64URL (rein im Browser)"
+        },
+        "it": {
+          "name": "Codificatore Base",
+          "description": "Codifica/decodifica Base16/32/32Hex/58/64/64URL (tutto nel browser)"
+        },
+        "es": {
+          "name": "Codificador Base",
+          "description": "Codifica/decodifica Base16/32/32Hex/58/64/64URL (en el navegador)"
+        },
+        "pt": {
+          "name": "Codificador Base",
+          "description": "Codifica/decodifica Base16/32/32Hex/58/64/64URL (no navegador)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "modes.encode": "编码",
+          "modes.decode": "解码",
+          "alphabet": "算法",
+          "input": "输入",
+          "placeholder": "输入要转换的文本",
+          "output": "输出",
+          "errors.EMPTY": "请输入内容",
+          "errors.INVALID": "输入不是合法的编码"
+        },
+        "en": {
+          "modes.encode": "Encode",
+          "modes.decode": "Decode",
+          "alphabet": "Alphabet",
+          "input": "Input",
+          "placeholder": "Enter text to convert",
+          "output": "Output",
+          "errors.EMPTY": "Please enter something",
+          "errors.INVALID": "Input is not valid encoding"
+        },
+        "zh-TW": {
+          "modes.encode": "編碼",
+          "modes.decode": "解碼",
+          "alphabet": "演算法",
+          "input": "輸入",
+          "placeholder": "輸入要轉換的文字",
+          "output": "輸出",
+          "errors.EMPTY": "請輸入內容",
+          "errors.INVALID": "輸入不是合法的編碼"
+        },
+        "ja": {
+          "modes.encode": "エンコード",
+          "modes.decode": "デコード",
+          "alphabet": "アルゴリズム",
+          "input": "入力",
+          "placeholder": "変換するテキストを入力",
+          "output": "出力",
+          "errors.EMPTY": "入力してください",
+          "errors.INVALID": "不正なエンコードです"
+        },
+        "fr": {
+          "modes.encode": "Encoder",
+          "modes.decode": "Décoder",
+          "alphabet": "Algorithme",
+          "input": "Entrée",
+          "placeholder": "Texte à convertir",
+          "output": "Sortie",
+          "errors.EMPTY": "Veuillez saisir un texte",
+          "errors.INVALID": "Encodage invalide"
+        },
+        "de": {
+          "modes.encode": "Kodieren",
+          "modes.decode": "Dekodieren",
+          "alphabet": "Algorithmus",
+          "input": "Eingabe",
+          "placeholder": "Text zum Konvertieren",
+          "output": "Ausgabe",
+          "errors.EMPTY": "Bitte eingeben",
+          "errors.INVALID": "Ungültige Kodierung"
+        },
+        "it": {
+          "modes.encode": "Codifica",
+          "modes.decode": "Decodifica",
+          "alphabet": "Algoritmo",
+          "input": "Input",
+          "placeholder": "Testo da convertire",
+          "output": "Output",
+          "errors.EMPTY": "Inserisci qualcosa",
+          "errors.INVALID": "Codifica non valida"
+        },
+        "es": {
+          "modes.encode": "Codificar",
+          "modes.decode": "Decodificar",
+          "alphabet": "Algoritmo",
+          "input": "Entrada",
+          "placeholder": "Texto a convertir",
+          "output": "Salida",
+          "errors.EMPTY": "Introduce algo",
+          "errors.INVALID": "Codificación no válida"
+        },
+        "pt": {
+          "modes.encode": "Codificar",
+          "modes.decode": "Decodificar",
+          "alphabet": "Algoritmo",
+          "input": "Entrada",
+          "placeholder": "Texto para converter",
+          "output": "Saída",
+          "errors.EMPTY": "Insira algo",
+          "errors.INVALID": "Codificação inválida"
+        }
+      }
+    },
+    "morse-code": {
+      "meta": {
+        "zh": { "name": "摩斯电码", "description": "文本与摩斯电码互转，支持字母、数字与空格分词" },
+        "en": {
+          "name": "Morse Code",
+          "description": "Convert text to/from Morse code, with letter, digit and space support"
+        },
+        "zh-TW": {
+          "name": "摩斯電碼",
+          "description": "文字與摩斯電碼互轉，支援字母、數字與空格分詞"
+        },
+        "ja": {
+          "name": "モールス信号",
+          "description": "テキストとモールス信号の相互変換（文字・数字・空白対応）"
+        },
+        "fr": {
+          "name": "Code Morse",
+          "description": "Conversion texte/Morse, avec lettres, chiffres et espaces"
+        },
+        "de": {
+          "name": "Morsecode",
+          "description": "Wandelt Text in Morsecode und zurück (Buchstaben, Ziffern, Leerzeichen)"
+        },
+        "it": {
+          "name": "Codice Morse",
+          "description": "Converti testo e codice Morse, con lettere, cifre e spazi"
+        },
+        "es": {
+          "name": "Código Morse",
+          "description": "Convierte texto y código Morse, con letras, dígitos y espacios"
+        },
+        "pt": {
+          "name": "Código Morse",
+          "description": "Converte texto e código Morse, com letras, dígitos e espaços"
+        }
+      },
+      "ui": {
+        "zh": {
+          "modes.encode": "文本转摩斯",
+          "modes.decode": "摩斯转文本",
+          "input": "输入",
+          "placeholder": "例如 SOS 或 ... --- ...",
+          "output": "输出",
+          "errors.INVALID": "包含无法识别的摩斯符号"
+        },
+        "en": {
+          "modes.encode": "Text to Morse",
+          "modes.decode": "Morse to Text",
+          "input": "Input",
+          "placeholder": "e.g. SOS or ... --- ...",
+          "output": "Output",
+          "errors.INVALID": "Unrecognized Morse symbol"
+        },
+        "zh-TW": {
+          "modes.encode": "文字轉摩斯",
+          "modes.decode": "摩斯轉文字",
+          "input": "輸入",
+          "placeholder": "例如 SOS 或 ... --- ...",
+          "output": "輸出",
+          "errors.INVALID": "包含無法辨識的摩斯符號"
+        },
+        "ja": {
+          "modes.encode": "文字→モールス",
+          "modes.decode": "モールス→文字",
+          "input": "入力",
+          "placeholder": "例：SOS または ... --- ...",
+          "output": "出力",
+          "errors.INVALID": "認識できないモールス記号"
+        },
+        "fr": {
+          "modes.encode": "Texte → Morse",
+          "modes.decode": "Morse → Texte",
+          "input": "Entrée",
+          "placeholder": "ex. SOS ou ... --- ...",
+          "output": "Sortie",
+          "errors.INVALID": "Symbole Morse non reconnu"
+        },
+        "de": {
+          "modes.encode": "Text → Morse",
+          "modes.decode": "Morse → Text",
+          "input": "Eingabe",
+          "placeholder": "z. B. SOS oder ... --- ...",
+          "output": "Ausgabe",
+          "errors.INVALID": "Unbekanntes Morsesymbol"
+        },
+        "it": {
+          "modes.encode": "Testo → Morse",
+          "modes.decode": "Morse → Testo",
+          "input": "Input",
+          "placeholder": "es. SOS o ... --- ...",
+          "output": "Output",
+          "errors.INVALID": "Simbolo Morse sconosciuto"
+        },
+        "es": {
+          "modes.encode": "Texto → Morse",
+          "modes.decode": "Morse → Texto",
+          "input": "Entrada",
+          "placeholder": "p. ej. SOS o ... --- ...",
+          "output": "Salida",
+          "errors.INVALID": "Símbolo Morse no reconocido"
+        },
+        "pt": {
+          "modes.encode": "Texto → Morse",
+          "modes.decode": "Morse → Texto",
+          "input": "Entrada",
+          "placeholder": "ex. SOS ou ... --- ...",
+          "output": "Saída",
+          "errors.INVALID": "Símbolo Morse desconhecido"
+        }
+      }
+    },
+    "caesar-cipher": {
+      "meta": {
+        "zh": {
+          "name": "凯撒 / ROT13 / 栅栏",
+          "description": "凯撒密码、ROT13、Atbash 与栅栏密码的加密与解密"
+        },
+        "en": {
+          "name": "Caesar / ROT13 / Rail",
+          "description": "Caesar cipher, ROT13, Atbash and Rail Fence encryption/decryption"
+        },
+        "zh-TW": {
+          "name": "凱撒 / ROT13 / 柵欄",
+          "description": "凱撒密碼、ROT13、Atbash 與柵欄密碼的加密與解密"
+        },
+        "ja": {
+          "name": "シーザー / ROT13 / 柵",
+          "description": "シーザー暗号、ROT13、Atbash、欄栅暗号の暗号化・復号"
+        },
+        "fr": {
+          "name": "César / ROT13 / Rail",
+          "description": "Chiffre de César, ROT13, Atbash et Rail Fence"
+        },
+        "de": {
+          "name": "Caesar / ROT13 / Rail",
+          "description": "Caesar-Verschlüsselung, ROT13, Atbash und Rail Fence"
+        },
+        "it": {
+          "name": "Cesare / ROT13 / Rail",
+          "description": "Cifrario di Cesare, ROT13, Atbash e Rail Fence"
+        },
+        "es": {
+          "name": "César / ROT13 / Rail",
+          "description": "Cifrado César, ROT13, Atbash y Rail Fence"
+        },
+        "pt": {
+          "name": "César / ROT13 / Rail",
+          "description": "Cifra de César, ROT13, Atbash e Rail Fence"
+        }
+      },
+      "ui": {
+        "zh": {
+          "mode": "算法",
+          "shift": "位移",
+          "rails": "栏数",
+          "decrypt": "解密",
+          "input": "输入",
+          "placeholder": "输入明文或密文",
+          "output": "输出",
+          "errors.RAILS_TOO_SMALL": "栏数需 ≥ 2"
+        },
+        "en": {
+          "mode": "Algorithm",
+          "shift": "Shift",
+          "rails": "Rails",
+          "decrypt": "Decrypt",
+          "input": "Input",
+          "placeholder": "Enter text or cipher",
+          "output": "Output",
+          "errors.RAILS_TOO_SMALL": "Rails must be ≥ 2"
+        },
+        "zh-TW": {
+          "mode": "演算法",
+          "shift": "位移",
+          "rails": "欄數",
+          "decrypt": "解密",
+          "input": "輸入",
+          "placeholder": "輸入明文或密文",
+          "output": "輸出",
+          "errors.RAILS_TOO_SMALL": "欄數需 ≥ 2"
+        },
+        "ja": {
+          "mode": "アルゴリズム",
+          "shift": "シフト",
+          "rails": "段数",
+          "decrypt": "復号",
+          "input": "入力",
+          "placeholder": "平文または暗号文を入力",
+          "output": "出力",
+          "errors.RAILS_TOO_SMALL": "段数は 2 以上"
+        },
+        "fr": {
+          "mode": "Algorithme",
+          "shift": "Décalage",
+          "rails": "Lignes",
+          "decrypt": "Déchiffrer",
+          "input": "Entrée",
+          "placeholder": "Texte ou chiffré",
+          "output": "Sortie",
+          "errors.RAILS_TOO_SMALL": "Lignes ≥ 2"
+        },
+        "de": {
+          "mode": "Algorithmus",
+          "shift": "Versatz",
+          "rails": "Zeilen",
+          "decrypt": "Entschlüsseln",
+          "input": "Eingabe",
+          "placeholder": "Text oder Chiffre",
+          "output": "Ausgabe",
+          "errors.RAILS_TOO_SMALL": "Zeilen ≥ 2"
+        },
+        "it": {
+          "mode": "Algoritmo",
+          "shift": "Spostamento",
+          "rails": "Righe",
+          "decrypt": "Decifra",
+          "input": "Input",
+          "placeholder": "Testo o cifrato",
+          "output": "Output",
+          "errors.RAILS_TOO_SMALL": "Righe ≥ 2"
+        },
+        "es": {
+          "mode": "Algoritmo",
+          "shift": "Desplazamiento",
+          "rails": "Filas",
+          "decrypt": "Descifrar",
+          "input": "Entrada",
+          "placeholder": "Texto o cifrado",
+          "output": "Salida",
+          "errors.RAILS_TOO_SMALL": "Filas ≥ 2"
+        },
+        "pt": {
+          "mode": "Algoritmo",
+          "shift": "Deslocamento",
+          "rails": "Linhas",
+          "decrypt": "Decifrar",
+          "input": "Entrada",
+          "placeholder": "Texto ou cifra",
+          "output": "Saída",
+          "errors.RAILS_TOO_SMALL": "Linhas ≥ 2"
+        }
+      }
+    },
+    "escape-unescape": {
+      "meta": {
+        "zh": {
+          "name": "转义 / 反转义",
+          "description": "JSON / JS / HTML / XML / URL 的转义与反转义"
+        },
+        "en": {
+          "name": "Escape / Unescape",
+          "description": "Escape and unescape JSON / JS / HTML / XML / URL"
+        },
+        "zh-TW": {
+          "name": "轉義 / 反轉義",
+          "description": "JSON / JS / HTML / XML / URL 的轉義與反轉義"
+        },
+        "ja": {
+          "name": "エスケープ / 解除",
+          "description": "JSON / JS / HTML / XML / URL のエスケープと解除"
+        },
+        "fr": {
+          "name": "Échappement / Annulation",
+          "description": "Échappe et annule JSON / JS / HTML / XML / URL"
+        },
+        "de": {
+          "name": "Escapen / Unescapen",
+          "description": "Escaped und entescaped JSON / JS / HTML / XML / URL"
+        },
+        "it": {
+          "name": "Escape / Unescape",
+          "description": "Escapa e annulla JSON / JS / HTML / XML / URL"
+        },
+        "es": {
+          "name": "Escape / Unescape",
+          "description": "Escapa y desescapa JSON / JS / HTML / XML / URL"
+        },
+        "pt": {
+          "name": "Escape / Unescape",
+          "description": "Escapa e desescapa JSON / JS / HTML / XML / URL"
+        }
+      },
+      "ui": {
+        "zh": {
+          "modes.escape": "转义",
+          "modes.unescape": "反转义",
+          "kind": "类型",
+          "input": "输入",
+          "placeholder": "输入待转义文本",
+          "output": "输出"
+        },
+        "en": {
+          "modes.escape": "Escape",
+          "modes.unescape": "Unescape",
+          "kind": "Type",
+          "input": "Input",
+          "placeholder": "Text to escape",
+          "output": "Output"
+        },
+        "zh-TW": {
+          "modes.escape": "轉義",
+          "modes.unescape": "反轉義",
+          "kind": "類型",
+          "input": "輸入",
+          "placeholder": "輸入待轉義文字",
+          "output": "輸出"
+        },
+        "ja": {
+          "modes.escape": "エスケープ",
+          "modes.unescape": "解除",
+          "kind": "種類",
+          "input": "入力",
+          "placeholder": "エスケープするテキスト",
+          "output": "出力"
+        },
+        "fr": {
+          "modes.escape": "Échapper",
+          "modes.unescape": "Annuler",
+          "kind": "Type",
+          "input": "Entrée",
+          "placeholder": "Texte à échapper",
+          "output": "Sortie"
+        },
+        "de": {
+          "modes.escape": "Escapen",
+          "modes.unescape": "Entescapen",
+          "kind": "Typ",
+          "input": "Eingabe",
+          "placeholder": "Zu escapender Text",
+          "output": "Ausgabe"
+        },
+        "it": {
+          "modes.escape": "Escapa",
+          "modes.unescape": "Annulla",
+          "kind": "Tipo",
+          "input": "Input",
+          "placeholder": "Testo da escapare",
+          "output": "Output"
+        },
+        "es": {
+          "modes.escape": "Escapar",
+          "modes.unescape": "Desescapar",
+          "kind": "Tipo",
+          "input": "Entrada",
+          "placeholder": "Texto a escapar",
+          "output": "Salida"
+        },
+        "pt": {
+          "modes.escape": "Escapar",
+          "modes.unescape": "Desescapar",
+          "kind": "Tipo",
+          "input": "Entrada",
+          "placeholder": "Texto para escapar",
+          "output": "Saída"
+        }
+      }
+    },
+    "encoding-rescue": {
+      "meta": {
+        "zh": {
+          "name": "乱码修复",
+          "description": "用 GBK / Big5 / Shift-JIS 等编码重新解读 UTF-8 误读产生的乱码"
+        },
+        "en": {
+          "name": "Mojibake Fixer",
+          "description": "Re-decode garbled text caused by UTF-8 misreading with GBK / Big5 / Shift-JIS"
+        },
+        "zh-TW": {
+          "name": "亂碼修復",
+          "description": "用 GBK / Big5 / Shift-JIS 等編碼重新解讀 UTF-8 誤讀產生的亂碼"
+        },
+        "ja": {
+          "name": "文字化け修復",
+          "description": "UTF-8 の誤読で生じた文字化けを GBK / Big5 / Shift-JIS 等で再解釈"
+        },
+        "fr": {
+          "name": "Réparation de mojibake",
+          "description": "Re-décode le texte corrompu (UTF-8 mal lu) avec GBK / Big5 / Shift-JIS"
+        },
+        "de": {
+          "name": "Mojibake-Reparatur",
+          "description": "Dekodiert Text erneut mit GBK / Big5 / Shift-JIS, der durch UTF-8-Fehlleitung kaputt ist"
+        },
+        "it": {
+          "name": "Riparatore mojibake",
+          "description": "Ridecodifica testo corrotto (UTF-8 mal letto) con GBK / Big5 / Shift-JIS"
+        },
+        "es": {
+          "name": "Reparador de mojibake",
+          "description": "Recodifica texto corrupto (UTF-8 mal leído) con GBK / Big5 / Shift-JIS"
+        },
+        "pt": {
+          "name": "Corretor de mojibake",
+          "description": "Recodifica texto corrompido (UTF-8 mal lido) com GBK / Big5 / Shift-JIS"
+        }
+      },
+      "ui": {
+        "zh": {
+          "input": "乱码输入",
+          "placeholder": "粘贴显示异常的乱码文本，如「ä¸­æ–‡」",
+          "errors.EMPTY": "请输入内容",
+          "errors.NO_CANDIDATE": "未找到可恢复的编码"
+        },
+        "en": {
+          "input": "Garbled input",
+          "placeholder": "Paste the broken text, e.g. 'ä¸­æ–‡'",
+          "errors.EMPTY": "Please enter something",
+          "errors.NO_CANDIDATE": "No recoverable encoding found"
+        },
+        "zh-TW": {
+          "input": "亂碼輸入",
+          "placeholder": "貼上顯示異常的亂碼文字，如「ä¸­æ–‡」",
+          "errors.EMPTY": "請輸入內容",
+          "errors.NO_CANDIDATE": "找不到可復原的編碼"
+        },
+        "ja": {
+          "input": "文字化け入力",
+          "placeholder": "化けたテキストを貼り付け（例「ä¸­æ–‡」）",
+          "errors.EMPTY": "入力してください",
+          "errors.NO_CANDIDATE": "復元可能なエンコードなし"
+        },
+        "fr": {
+          "input": "Texte corrompu",
+          "placeholder": "Collez le texte cassé, ex. 'ä¸­æ–‡'",
+          "errors.EMPTY": "Veuillez saisir un texte",
+          "errors.NO_CANDIDATE": "Aucun encodage récupérable"
+        },
+        "de": {
+          "input": "Korrumpierter Text",
+          "placeholder": "Text einfügen, z. B. 'ä¸­æ–‡'",
+          "errors.EMPTY": "Bitte eingeben",
+          "errors.NO_CANDIDATE": "Keine wiederherstellbare Kodierung"
+        },
+        "it": {
+          "input": "Testo corrotto",
+          "placeholder": "Incolla il testo rotto, es. 'ä¸­æ–‡'",
+          "errors.EMPTY": "Inserisci qualcosa",
+          "errors.NO_CANDIDATE": "Nessuna codifica recuperabile"
+        },
+        "es": {
+          "input": "Texto corrupto",
+          "placeholder": "Pega el texto roto, p. ej. 'ä¸­æ–‡'",
+          "errors.EMPTY": "Introduce algo",
+          "errors.NO_CANDIDATE": "No se encontró codificación"
+        },
+        "pt": {
+          "input": "Texto corrompido",
+          "placeholder": "Cole o texto quebrado, ex. 'ä¸­æ–‡'",
+          "errors.EMPTY": "Insira algo",
+          "errors.NO_CANDIDATE": "Nenhuma codificação recuperável"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,838 @@
+{
+  "tools": {
+    "pdf-extract-text": {
+      "meta": {
+        "zh": {
+          "name": "PDF 提取文本",
+          "description": "从 PDF 中提取全部页面的可复制文本（本地运行，支持加密文件）"
+        },
+        "en": {
+          "name": "PDF Text Extractor",
+          "description": "Extract copyable text from all PDF pages (local, supports encrypted files)"
+        },
+        "zh-TW": {
+          "name": "PDF 提取文字",
+          "description": "從 PDF 擷取所有頁面的可複製文字（本地執行，支援加密檔案）"
+        },
+        "ja": {
+          "name": "PDF テキスト抽出",
+          "description": "PDF 全ページからコピー可能なテキストを抽出（ローカル、暗号化対応）"
+        },
+        "fr": {
+          "name": "Extraction de texte PDF",
+          "description": "Extrait le texte de toutes les pages PDF (local, fichiers chiffrés pris en charge)"
+        },
+        "de": {
+          "name": "PDF-Text extrahieren",
+          "description": "Extrahiert kopierbaren Text aus allen PDF-Seiten (lokal, verschlüsselt unterstützt)"
+        },
+        "it": {
+          "name": "Estrattore testo PDF",
+          "description": "Estrae testo copiabile da tutte le pagine PDF (locale, supporta file crittografati)"
+        },
+        "es": {
+          "name": "Extractor de texto PDF",
+          "description": "Extrae texto copiable de todas las páginas PDF (local, soporta cifrados)"
+        },
+        "pt": {
+          "name": "Extrator de texto PDF",
+          "description": "Extrai texto copiável de todas as páginas PDF (local, suporta criptografados)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "hint": "上传 PDF 后一键提取全部页面文本，结果可直接复制或下载为 .txt。",
+          "password": "密码（可选）",
+          "passwordHint": "加密文件需填写打开密码",
+          "run": "提取文本",
+          "pages": "共 {{count}} 页",
+          "errors.NOT_PDF": "仅支持 PDF 文件",
+          "errors.TOO_LARGE": "文件过大",
+          "errors.NEED_PASSWORD": "该文件已加密，请输入密码",
+          "errors.WRONG_PASSWORD": "密码错误",
+          "errors.LOAD_FAILED": "无法解析该 PDF",
+          "errors.NO_PAGES": "该 PDF 没有页面",
+          "errors.PROCESS_FAILED": "处理失败，请重试"
+        },
+        "en": {
+          "hint": "Upload a PDF to extract text from all pages; copy or download as .txt.",
+          "password": "Password (optional)",
+          "passwordHint": "Encrypted files need the open password",
+          "run": "Extract text",
+          "pages": "{{count}} pages",
+          "errors.NOT_PDF": "Only PDF files are supported",
+          "errors.TOO_LARGE": "File is too large",
+          "errors.NEED_PASSWORD": "This file is encrypted, please enter a password",
+          "errors.WRONG_PASSWORD": "Wrong password",
+          "errors.LOAD_FAILED": "Failed to parse the PDF",
+          "errors.NO_PAGES": "The PDF has no pages",
+          "errors.PROCESS_FAILED": "Processing failed, please retry"
+        },
+        "zh-TW": {
+          "hint": "上傳 PDF 後一鍵擷取全部頁面文字，結果可直接複製或下載為 .txt。",
+          "password": "密碼（選填）",
+          "passwordHint": "加密檔案需填寫開啟密碼",
+          "run": "擷取文字",
+          "pages": "共 {{count}} 頁",
+          "errors.NOT_PDF": "僅支援 PDF 檔案",
+          "errors.TOO_LARGE": "檔案過大",
+          "errors.NEED_PASSWORD": "該檔案已加密，請輸入密碼",
+          "errors.WRONG_PASSWORD": "密碼錯誤",
+          "errors.LOAD_FAILED": "無法解析該 PDF",
+          "errors.NO_PAGES": "該 PDF 沒有頁面",
+          "errors.PROCESS_FAILED": "處理失敗，請重試"
+        },
+        "ja": {
+          "hint": "PDF をアップロードすると全ページのテキストを抽出、.txt にコピーまたは保存できます。",
+          "password": "パスワード（任意）",
+          "passwordHint": "暗号化ファイルは開くパスワードが必要",
+          "run": "テキスト抽出",
+          "pages": "{{count}} ページ",
+          "errors.NOT_PDF": "PDF のみ対応",
+          "errors.TOO_LARGE": "ファイルが大きすぎ",
+          "errors.NEED_PASSWORD": "このファイルは暗号化されています",
+          "errors.WRONG_PASSWORD": "パスワードが違います",
+          "errors.LOAD_FAILED": "PDF を解析できません",
+          "errors.NO_PAGES": "この PDF にはページがありません",
+          "errors.PROCESS_FAILED": "処理に失敗しました"
+        },
+        "fr": {
+          "hint": "Importez un PDF pour extraire le texte de toutes les pages, copiez ou téléchargez en .txt.",
+          "password": "Mot de passe (optionnel)",
+          "passwordHint": "Les fichiers chiffrés nécessitent le mot de passe",
+          "run": "Extraire le texte",
+          "pages": "{{count}} pages",
+          "errors.NOT_PDF": "Seuls les PDF sont pris en charge",
+          "errors.TOO_LARGE": "Fichier trop volumineux",
+          "errors.NEED_PASSWORD": "Fichier chiffré, mot de passe requis",
+          "errors.WRONG_PASSWORD": "Mot de passe incorrect",
+          "errors.LOAD_FAILED": "Échec de l'analyse",
+          "errors.NO_PAGES": "Le PDF n'a pas de pages",
+          "errors.PROCESS_FAILED": "Échec du traitement"
+        },
+        "de": {
+          "hint": "Lade ein PDF hoch, um Text aller Seiten zu extrahieren, kopiere oder speichere als .txt.",
+          "password": "Passwort (optional)",
+          "passwordHint": "Verschlüsselte Dateien brauchen das Öffnen-Passwort",
+          "run": "Text extrahieren",
+          "pages": "{{count}} Seiten",
+          "errors.NOT_PDF": "Nur PDF-Dateien",
+          "errors.TOO_LARGE": "Datei zu groß",
+          "errors.NEED_PASSWORD": "Datei verschlüsselt, Passwort nötig",
+          "errors.WRONG_PASSWORD": "Falsches Passwort",
+          "errors.LOAD_FAILED": "PDF konnte nicht gelesen werden",
+          "errors.NO_PAGES": "PDF hat keine Seiten",
+          "errors.PROCESS_FAILED": "Verarbeitung fehlgeschlagen"
+        },
+        "it": {
+          "hint": "Carica un PDF per estrarre il testo di tutte le pagine, copia o scarica in .txt.",
+          "password": "Password (opzionale)",
+          "passwordHint": "I file crittografati richiedono la password",
+          "run": "Estrai testo",
+          "pages": "{{count}} pagine",
+          "errors.NOT_PDF": "Solo file PDF",
+          "errors.TOO_LARGE": "File troppo grande",
+          "errors.NEED_PASSWORD": "File crittografato, password richiesta",
+          "errors.WRONG_PASSWORD": "Password errata",
+          "errors.LOAD_FAILED": "Impossibile leggere il PDF",
+          "errors.NO_PAGES": "PDF senza pagine",
+          "errors.PROCESS_FAILED": "Elaborazione fallita"
+        },
+        "es": {
+          "hint": "Sube un PDF para extraer el texto de todas las páginas, copia o descarga como .txt.",
+          "password": "Contraseña (opcional)",
+          "passwordHint": "Los cifrados necesitan la contraseña",
+          "run": "Extraer texto",
+          "pages": "{{count}} páginas",
+          "errors.NOT_PDF": "Solo se admiten PDF",
+          "errors.TOO_LARGE": "Archivo demasiado grande",
+          "errors.NEED_PASSWORD": "Archivo cifrado, introduce la contraseña",
+          "errors.WRONG_PASSWORD": "Contraseña incorrecta",
+          "errors.LOAD_FAILED": "No se pudo analizar el PDF",
+          "errors.NO_PAGES": "El PDF no tiene páginas",
+          "errors.PROCESS_FAILED": "Error de procesamiento"
+        },
+        "pt": {
+          "hint": "Envie um PDF para extrair o texto de todas as páginas, copie ou baixe como .txt.",
+          "password": "Senha (opcional)",
+          "passwordHint": "Arquivos criptografados exigem a senha",
+          "run": "Extrair texto",
+          "pages": "{{count}} páginas",
+          "errors.NOT_PDF": "Apenas arquivos PDF",
+          "errors.TOO_LARGE": "Arquivo muito grande",
+          "errors.NEED_PASSWORD": "Arquivo criptografado, insira a senha",
+          "errors.WRONG_PASSWORD": "Senha incorreta",
+          "errors.LOAD_FAILED": "Falha ao ler o PDF",
+          "errors.NO_PAGES": "O PDF não tem páginas",
+          "errors.PROCESS_FAILED": "Falha no processamento"
+        }
+      }
+    },
+    "pdf-decrypt": {
+      "meta": {
+        "zh": {
+          "name": "PDF 移除密码",
+          "description": "用密码加载后导出无保护 PDF（等效 qpdf --decrypt，纯本地）"
+        },
+        "en": {
+          "name": "PDF Unlock",
+          "description": "Load with password then export an unprotected PDF (like qpdf --decrypt, fully local)"
+        },
+        "zh-TW": {
+          "name": "PDF 移除密碼",
+          "description": "用密碼載入後匯出無保護 PDF（等同 qpdf --decrypt，純本地）"
+        },
+        "ja": {
+          "name": "PDF パスワード解除",
+          "description": "パスワードで読み込み、保護なし PDF を書き出し（qpdf --decrypt 同等、ローカル）"
+        },
+        "fr": {
+          "name": "Déverrouillage PDF",
+          "description": "Charge avec le mot de passe puis exporte un PDF non protégé (comme qpdf --decrypt)"
+        },
+        "de": {
+          "name": "PDF entsperren",
+          "description": "Mit Passwort laden und ungeschütztes PDF exportieren (wie qpdf --decrypt)"
+        },
+        "it": {
+          "name": "Sblocco PDF",
+          "description": "Carica con password ed esporta un PDF non protetto (come qpdf --decrypt)"
+        },
+        "es": {
+          "name": "Desbloqueo de PDF",
+          "description": "Carga con contraseña y exporta un PDF sin protección (como qpdf --decrypt)"
+        },
+        "pt": {
+          "name": "Desbloqueio de PDF",
+          "description": "Carrega com senha e exporta um PDF sem proteção (como qpdf --decrypt)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "hint": "上传受密码保护的 PDF，填写打开密码后导出无保护副本。",
+          "password": "打开密码",
+          "passwordHint": "填写该 PDF 的用户密码",
+          "run": "移除密码并下载",
+          "errors.NOT_PDF": "仅支持 PDF 文件",
+          "errors.TOO_LARGE": "文件过大",
+          "errors.NEED_PASSWORD": "该文件已加密，请输入密码",
+          "errors.WRONG_PASSWORD": "密码错误",
+          "errors.LOAD_FAILED": "无法解析该 PDF",
+          "errors.NO_PAGES": "该 PDF 没有页面",
+          "errors.PROCESS_FAILED": "处理失败，请重试"
+        },
+        "en": {
+          "hint": "Upload a password-protected PDF, enter the open password and export an unprotected copy.",
+          "password": "Open password",
+          "passwordHint": "Enter the user password of this PDF",
+          "run": "Remove password & download",
+          "errors.NOT_PDF": "Only PDF files are supported",
+          "errors.TOO_LARGE": "File is too large",
+          "errors.NEED_PASSWORD": "This file is encrypted, please enter a password",
+          "errors.WRONG_PASSWORD": "Wrong password",
+          "errors.LOAD_FAILED": "Failed to parse the PDF",
+          "errors.NO_PAGES": "The PDF has no pages",
+          "errors.PROCESS_FAILED": "Processing failed, please retry"
+        },
+        "zh-TW": {
+          "hint": "上傳受密碼保護的 PDF，填寫開啟密碼後匯出無保護副本。",
+          "password": "開啟密碼",
+          "passwordHint": "填寫該 PDF 的使用者密碼",
+          "run": "移除密碼並下載",
+          "errors.NOT_PDF": "僅支援 PDF 檔案",
+          "errors.TOO_LARGE": "檔案過大",
+          "errors.NEED_PASSWORD": "該檔案已加密，請輸入密碼",
+          "errors.WRONG_PASSWORD": "密碼錯誤",
+          "errors.LOAD_FAILED": "無法解析該 PDF",
+          "errors.NO_PAGES": "該 PDF 沒有頁面",
+          "errors.PROCESS_FAILED": "處理失敗，請重試"
+        },
+        "ja": {
+          "hint": "パスワード付き PDF をアップロードし、開くパスワードで保護なし副本を書き出し。",
+          "password": "開くパスワード",
+          "passwordHint": "この PDF のユーザーパスワード",
+          "run": "パスワード解除して保存",
+          "errors.NOT_PDF": "PDF のみ対応",
+          "errors.TOO_LARGE": "ファイルが大きすぎ",
+          "errors.NEED_PASSWORD": "このファイルは暗号化されています",
+          "errors.WRONG_PASSWORD": "パスワードが違います",
+          "errors.LOAD_FAILED": "PDF を解析できません",
+          "errors.NO_PAGES": "この PDF にはページがありません",
+          "errors.PROCESS_FAILED": "処理に失敗しました"
+        },
+        "fr": {
+          "hint": "Importez un PDF protégé, saisissez le mot de passe et exportez une copie non protégée.",
+          "password": "Mot de passe",
+          "passwordHint": "Mot de passe utilisateur du PDF",
+          "run": "Retirer le mot de passe",
+          "errors.NOT_PDF": "Seuls les PDF sont pris en charge",
+          "errors.TOO_LARGE": "Fichier trop volumineux",
+          "errors.NEED_PASSWORD": "Fichier chiffré, mot de passe requis",
+          "errors.WRONG_PASSWORD": "Mot de passe incorrect",
+          "errors.LOAD_FAILED": "Échec de l'analyse",
+          "errors.NO_PAGES": "Le PDF n'a pas de pages",
+          "errors.PROCESS_FAILED": "Échec du traitement"
+        },
+        "de": {
+          "hint": "Lade ein passwortgeschütztes PDF hoch, gib das Passwort ein und exportiere eine ungeschützte Kopie.",
+          "password": "Öffnen-Passwort",
+          "passwordHint": "Das Benutzerpasswort des PDF",
+          "run": "Passwort entfernen",
+          "errors.NOT_PDF": "Nur PDF-Dateien",
+          "errors.TOO_LARGE": "Datei zu groß",
+          "errors.NEED_PASSWORD": "Datei verschlüsselt, Passwort nötig",
+          "errors.WRONG_PASSWORD": "Falsches Passwort",
+          "errors.LOAD_FAILED": "PDF konnte nicht gelesen werden",
+          "errors.NO_PAGES": "PDF hat keine Seiten",
+          "errors.PROCESS_FAILED": "Verarbeitung fehlgeschlagen"
+        },
+        "it": {
+          "hint": "Carica un PDF protetto, inserisci la password ed esporta una copia non protetta.",
+          "password": "Password di apertura",
+          "passwordHint": "La password utente del PDF",
+          "run": "Rimuovi password",
+          "errors.NOT_PDF": "Solo file PDF",
+          "errors.TOO_LARGE": "File troppo grande",
+          "errors.NEED_PASSWORD": "File crittografato, password richiesta",
+          "errors.WRONG_PASSWORD": "Password errata",
+          "errors.LOAD_FAILED": "Impossibile leggere il PDF",
+          "errors.NO_PAGES": "PDF senza pagine",
+          "errors.PROCESS_FAILED": "Elaborazione fallita"
+        },
+        "es": {
+          "hint": "Sube un PDF protegido, introduce la contraseña y exporta una copia sin protección.",
+          "password": "Contraseña de apertura",
+          "passwordHint": "La contraseña de usuario del PDF",
+          "run": "Quitar contraseña",
+          "errors.NOT_PDF": "Solo se admiten PDF",
+          "errors.TOO_LARGE": "Archivo demasiado grande",
+          "errors.NEED_PASSWORD": "Archivo cifrado, introduce la contraseña",
+          "errors.WRONG_PASSWORD": "Contraseña incorrecta",
+          "errors.LOAD_FAILED": "No se pudo analizar el PDF",
+          "errors.NO_PAGES": "El PDF no tiene páginas",
+          "errors.PROCESS_FAILED": "Error de procesamiento"
+        },
+        "pt": {
+          "hint": "Envie um PDF protegido, insira a senha e exporte uma cópia sem proteção.",
+          "password": "Senha de abertura",
+          "passwordHint": "A senha de usuário do PDF",
+          "run": "Remover senha",
+          "errors.NOT_PDF": "Apenas arquivos PDF",
+          "errors.TOO_LARGE": "Arquivo muito grande",
+          "errors.NEED_PASSWORD": "Arquivo criptografado, insira a senha",
+          "errors.WRONG_PASSWORD": "Senha incorreta",
+          "errors.LOAD_FAILED": "Falha ao ler o PDF",
+          "errors.NO_PAGES": "O PDF não tem páginas",
+          "errors.PROCESS_FAILED": "Falha no processamento"
+        }
+      }
+    },
+    "pdf-watermark": {
+      "meta": {
+        "zh": {
+          "name": "PDF 水印",
+          "description": "为 PDF 添加文字水印，支持平铺、旋转、透明度与页面范围（本地运行）"
+        },
+        "en": {
+          "name": "PDF Watermark",
+          "description": "Add text watermarks to PDF with tiling, rotation, opacity and page range (local)"
+        },
+        "zh-TW": {
+          "name": "PDF 浮水印",
+          "description": "為 PDF 加入文字浮水印，支援平鋪、旋轉、透明度與頁面範圍（本地執行）"
+        },
+        "ja": {
+          "name": "PDF ウォーターマーク",
+          "description": "PDF にテキスト透かしを追加（タイル・回転・透明度・ページ範囲対応）"
+        },
+        "fr": {
+          "name": "Filigrane PDF",
+          "description": "Ajoute un filigrane texte au PDF (mosaïque, rotation, opacité, plage de pages)"
+        },
+        "de": {
+          "name": "PDF-Wasserzeichen",
+          "description": "Fügt PDF ein Text-Wasserzeichen hinzu (Kacheln, Drehung, Transparenz, Seitenbereich)"
+        },
+        "it": {
+          "name": "Filigrana PDF",
+          "description": "Aggiunge filigrana testuale al PDF (mosaico, rotazione, opacità, intervallo pagine)"
+        },
+        "es": {
+          "name": "Marca de agua PDF",
+          "description": "Añade marca de agua de texto al PDF (mosaico, rotación, opacidad, rango de páginas)"
+        },
+        "pt": {
+          "name": "Marca d'água PDF",
+          "description": "Adiciona marca d'água de texto ao PDF (ladrilho, rotação, opacidade, intervalo)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "password": "密码（可选）",
+          "text": "水印文字",
+          "fontSize": "字号",
+          "color": "颜色",
+          "opacity": "透明度",
+          "rotation": "旋转角度",
+          "mode": "应用范围",
+          "modes.all": "全部页面",
+          "modes.first": "仅首页",
+          "modes.custom": "自定义",
+          "pageSelection": "页面范围（如 1-3,5）",
+          "tiled": "平铺",
+          "spacing": "平铺间距",
+          "run": "添加水印并下载",
+          "errors.NOT_PDF": "仅支持 PDF 文件",
+          "errors.TOO_LARGE": "文件过大",
+          "errors.EMPTY_TEXT": "请输入水印文字",
+          "errors.INVALID_COLOR": "颜色格式非法",
+          "errors.NEED_PASSWORD": "该文件已加密，请输入密码",
+          "errors.WRONG_PASSWORD": "密码错误",
+          "errors.LOAD_FAILED": "无法解析该 PDF",
+          "errors.NO_PAGES": "该 PDF 没有页面",
+          "errors.PROCESS_FAILED": "处理失败，请重试",
+          "errors.EMPTY": "请填写页面范围",
+          "errors.INVALID_RANGE": "页面范围非法"
+        },
+        "en": {
+          "password": "Password (optional)",
+          "text": "Watermark text",
+          "fontSize": "Font size",
+          "color": "Color",
+          "opacity": "Opacity",
+          "rotation": "Rotation",
+          "mode": "Apply to",
+          "modes.all": "All pages",
+          "modes.first": "First page",
+          "modes.custom": "Custom",
+          "pageSelection": "Page range (e.g. 1-3,5)",
+          "tiled": "Tile",
+          "spacing": "Tile spacing",
+          "run": "Add watermark & download",
+          "errors.NOT_PDF": "Only PDF files are supported",
+          "errors.TOO_LARGE": "File is too large",
+          "errors.EMPTY_TEXT": "Please enter watermark text",
+          "errors.INVALID_COLOR": "Invalid color",
+          "errors.NEED_PASSWORD": "This file is encrypted, please enter a password",
+          "errors.WRONG_PASSWORD": "Wrong password",
+          "errors.LOAD_FAILED": "Failed to parse the PDF",
+          "errors.NO_PAGES": "The PDF has no pages",
+          "errors.PROCESS_FAILED": "Processing failed, please retry",
+          "errors.EMPTY": "Please enter page range",
+          "errors.INVALID_RANGE": "Invalid page range"
+        },
+        "zh-TW": {
+          "password": "密碼（選填）",
+          "text": "浮水印文字",
+          "fontSize": "字號",
+          "color": "顏色",
+          "opacity": "透明度",
+          "rotation": "旋轉角度",
+          "mode": "套用範圍",
+          "modes.all": "全部頁面",
+          "modes.first": "僅首頁",
+          "modes.custom": "自訂",
+          "pageSelection": "頁面範圍（如 1-3,5）",
+          "tiled": "平鋪",
+          "spacing": "平鋪間距",
+          "run": "加入浮水印並下載",
+          "errors.NOT_PDF": "僅支援 PDF 檔案",
+          "errors.TOO_LARGE": "檔案過大",
+          "errors.EMPTY_TEXT": "請輸入浮水印文字",
+          "errors.INVALID_COLOR": "顏色格式非法",
+          "errors.NEED_PASSWORD": "該檔案已加密，請輸入密碼",
+          "errors.WRONG_PASSWORD": "密碼錯誤",
+          "errors.LOAD_FAILED": "無法解析該 PDF",
+          "errors.NO_PAGES": "該 PDF 沒有頁面",
+          "errors.PROCESS_FAILED": "處理失敗，請重試",
+          "errors.EMPTY": "請填寫頁面範圍",
+          "errors.INVALID_RANGE": "頁面範圍非法"
+        },
+        "ja": {
+          "password": "パスワード（任意）",
+          "text": "透かし文字",
+          "fontSize": "フォントサイズ",
+          "color": "色",
+          "opacity": "不透明度",
+          "rotation": "回転",
+          "mode": "適用先",
+          "modes.all": "全ページ",
+          "modes.first": "最初のページ",
+          "modes.custom": "指定",
+          "pageSelection": "ページ範囲（例 1-3,5）",
+          "tiled": "タイル",
+          "spacing": "タイル間隔",
+          "run": "透かしを追加して保存",
+          "errors.NOT_PDF": "PDF のみ対応",
+          "errors.TOO_LARGE": "ファイルが大きすぎ",
+          "errors.EMPTY_TEXT": "透かし文字を入力",
+          "errors.INVALID_COLOR": "色形式が不正",
+          "errors.NEED_PASSWORD": "このファイルは暗号化されています",
+          "errors.WRONG_PASSWORD": "パスワードが違います",
+          "errors.LOAD_FAILED": "PDF を解析できません",
+          "errors.NO_PAGES": "この PDF にはページがありません",
+          "errors.PROCESS_FAILED": "処理に失敗しました",
+          "errors.EMPTY": "ページ範囲を入力",
+          "errors.INVALID_RANGE": "ページ範囲が不正"
+        },
+        "fr": {
+          "password": "Mot de passe (optionnel)",
+          "text": "Texte du filigrane",
+          "fontSize": "Taille",
+          "color": "Couleur",
+          "opacity": "Opacité",
+          "rotation": "Rotation",
+          "mode": "Appliquer à",
+          "modes.all": "Toutes les pages",
+          "modes.first": "Première page",
+          "modes.custom": "Personnalisé",
+          "pageSelection": "Plage (ex. 1-3,5)",
+          "tiled": "Mosaïque",
+          "spacing": "Espacement",
+          "run": "Ajouter et télécharger",
+          "errors.NOT_PDF": "Seuls les PDF sont pris en charge",
+          "errors.TOO_LARGE": "Fichier trop volumineux",
+          "errors.EMPTY_TEXT": "Saisir un texte",
+          "errors.INVALID_COLOR": "Couleur invalide",
+          "errors.NEED_PASSWORD": "Fichier chiffré, mot de passe requis",
+          "errors.WRONG_PASSWORD": "Mot de passe incorrect",
+          "errors.LOAD_FAILED": "Échec de l'analyse",
+          "errors.NO_PAGES": "Le PDF n'a pas de pages",
+          "errors.PROCESS_FAILED": "Échec du traitement",
+          "errors.EMPTY": "Plage requise",
+          "errors.INVALID_RANGE": "Plage invalide"
+        },
+        "de": {
+          "password": "Passwort (optional)",
+          "text": "Wasserzeichen-Text",
+          "fontSize": "Schriftgröße",
+          "color": "Farbe",
+          "opacity": "Deckkraft",
+          "rotation": "Drehung",
+          "mode": "Anwenden auf",
+          "modes.all": "Alle Seiten",
+          "modes.first": "Erste Seite",
+          "modes.custom": "Benutzerdefiniert",
+          "pageSelection": "Seitenbereich (z. B. 1-3,5)",
+          "tiled": "Kacheln",
+          "spacing": "Kachelabstand",
+          "run": "Wasserzeichen hinzufügen",
+          "errors.NOT_PDF": "Nur PDF-Dateien",
+          "errors.TOO_LARGE": "Datei zu groß",
+          "errors.EMPTY_TEXT": "Wasserzeichen-Text eingeben",
+          "errors.INVALID_COLOR": "Ungültige Farbe",
+          "errors.NEED_PASSWORD": "Datei verschlüsselt, Passwort nötig",
+          "errors.WRONG_PASSWORD": "Falsches Passwort",
+          "errors.LOAD_FAILED": "PDF konnte nicht gelesen werden",
+          "errors.NO_PAGES": "PDF hat keine Seiten",
+          "errors.PROCESS_FAILED": "Verarbeitung fehlgeschlagen",
+          "errors.EMPTY": "Bereich erforderlich",
+          "errors.INVALID_RANGE": "Ungültiger Bereich"
+        },
+        "it": {
+          "password": "Password (opzionale)",
+          "text": "Testo filigrana",
+          "fontSize": "Dimensione",
+          "color": "Colore",
+          "opacity": "Opacità",
+          "rotation": "Rotazione",
+          "mode": "Applica a",
+          "modes.all": "Tutte le pagine",
+          "modes.first": "Prima pagina",
+          "modes.custom": "Personalizzato",
+          "pageSelection": "Intervallo (es. 1-3,5)",
+          "tiled": "Mosaico",
+          "spacing": "Spaziatura",
+          "run": "Aggiungi filigrana",
+          "errors.NOT_PDF": "Solo file PDF",
+          "errors.TOO_LARGE": "File troppo grande",
+          "errors.EMPTY_TEXT": "Inserisci il testo",
+          "errors.INVALID_COLOR": "Colore non valido",
+          "errors.NEED_PASSWORD": "File crittografato, password richiesta",
+          "errors.WRONG_PASSWORD": "Password errata",
+          "errors.LOAD_FAILED": "Impossibile leggere il PDF",
+          "errors.NO_PAGES": "PDF senza pagine",
+          "errors.PROCESS_FAILED": "Elaborazione fallita",
+          "errors.EMPTY": "Intervallo richiesto",
+          "errors.INVALID_RANGE": "Intervallo non valido"
+        },
+        "es": {
+          "password": "Contraseña (opcional)",
+          "text": "Texto de marca de agua",
+          "fontSize": "Tamaño",
+          "color": "Color",
+          "opacity": "Opacidad",
+          "rotation": "Rotación",
+          "mode": "Aplicar a",
+          "modes.all": "Todas las páginas",
+          "modes.first": "Primera página",
+          "modes.custom": "Personalizado",
+          "pageSelection": "Rango (ej. 1-3,5)",
+          "tiled": "Mosaico",
+          "spacing": "Espaciado",
+          "run": "Añadir marca de agua",
+          "errors.NOT_PDF": "Solo se admiten PDF",
+          "errors.TOO_LARGE": "Archivo demasiado grande",
+          "errors.EMPTY_TEXT": "Introduce el texto",
+          "errors.INVALID_COLOR": "Color no válido",
+          "errors.NEED_PASSWORD": "Archivo cifrado, introduce la contraseña",
+          "errors.WRONG_PASSWORD": "Contraseña incorrecta",
+          "errors.LOAD_FAILED": "No se pudo analizar el PDF",
+          "errors.NO_PAGES": "El PDF no tiene páginas",
+          "errors.PROCESS_FAILED": "Error de procesamiento",
+          "errors.EMPTY": "Introduce un rango",
+          "errors.INVALID_RANGE": "Rango no válido"
+        },
+        "pt": {
+          "password": "Senha (opcional)",
+          "text": "Texto da marca d'água",
+          "fontSize": "Tamanho",
+          "color": "Cor",
+          "opacity": "Opacidade",
+          "rotation": "Rotação",
+          "mode": "Aplicar a",
+          "modes.all": "Todas as páginas",
+          "modes.first": "Primeira página",
+          "modes.custom": "Personalizado",
+          "pageSelection": "Intervalo (ex. 1-3,5)",
+          "tiled": "Ladrilho",
+          "spacing": "Espaçamento",
+          "run": "Adicionar marca d'água",
+          "errors.NOT_PDF": "Apenas arquivos PDF",
+          "errors.TOO_LARGE": "Arquivo muito grande",
+          "errors.EMPTY_TEXT": "Insira o texto",
+          "errors.INVALID_COLOR": "Cor inválida",
+          "errors.NEED_PASSWORD": "Arquivo criptografado, insira a senha",
+          "errors.WRONG_PASSWORD": "Senha incorreta",
+          "errors.LOAD_FAILED": "Falha ao ler o PDF",
+          "errors.NO_PAGES": "O PDF não tem páginas",
+          "errors.PROCESS_FAILED": "Falha no processamento",
+          "errors.EMPTY": "Insira o intervalo",
+          "errors.INVALID_RANGE": "Intervalo inválido"
+        }
+      }
+    },
+    "pdf-compress": {
+      "meta": {
+        "zh": {
+          "name": "PDF 压缩",
+          "description": "压缩 PDF：对象流无损压缩，或逐页重编码为 JPEG 的有损压缩"
+        },
+        "en": {
+          "name": "PDF Compressor",
+          "description": "Compress PDF: lossless object-stream or lossy per-page JPEG re-encoding"
+        },
+        "zh-TW": {
+          "name": "PDF 壓縮",
+          "description": "壓縮 PDF：物件流無損壓縮，或逐頁重編碼為 JPEG 的有損壓縮"
+        },
+        "ja": {
+          "name": "PDF 圧縮",
+          "description": "PDF を圧縮：オブジェクトストリームの可逆、または各ページ JPEG 再エンコードの非可逆"
+        },
+        "fr": {
+          "name": "Compression PDF",
+          "description": "Compresse le PDF : flux d'objets sans perte ou réencodage JPEG par page avec perte"
+        },
+        "de": {
+          "name": "PDF-Komprimierung",
+          "description": "Komprimiert PDF: verlustfreie Objektströme oder verlustbehaftete JPEG-Neucodierung"
+        },
+        "it": {
+          "name": "Compressione PDF",
+          "description": "Comprimi PDF: flussi di oggetti senza perdita o ricodifica JPEG con perdita"
+        },
+        "es": {
+          "name": "Compresor de PDF",
+          "description": "Comprime PDF: flujos de objetos sin pérdida o recodificación JPEG con pérdida"
+        },
+        "pt": {
+          "name": "Compressor de PDF",
+          "description": "Comprime PDF: fluxo de objetos sem perda ou re-codificação JPEG com perda"
+        }
+      },
+      "ui": {
+        "zh": {
+          "password": "密码（可选）",
+          "level": "压缩方式",
+          "levels.objects": "对象流（无损）",
+          "levels.raster": "逐页 JPEG（有损）",
+          "quality": "JPEG 质量",
+          "scale": "渲染缩放",
+          "rasterHint": "有损模式会丢弃文字层、把每页重画成图片，体积更小但不可选文字。",
+          "run": "压缩并下载",
+          "result": "已{{lossy}}压缩 {{percent}}%（约 {{bytes}} 字节）",
+          "lossy": "有损",
+          "lossless": "无损",
+          "errors.NOT_PDF": "仅支持 PDF 文件",
+          "errors.TOO_LARGE": "文件过大",
+          "errors.NEED_PASSWORD": "该文件已加密，请输入密码",
+          "errors.WRONG_PASSWORD": "密码错误",
+          "errors.LOAD_FAILED": "无法解析该 PDF",
+          "errors.NO_PAGES": "该 PDF 没有页面",
+          "errors.PROCESS_FAILED": "处理失败，请重试"
+        },
+        "en": {
+          "password": "Password (optional)",
+          "level": "Method",
+          "levels.objects": "Object streams (lossless)",
+          "levels.raster": "Per-page JPEG (lossy)",
+          "quality": "JPEG quality",
+          "scale": "Render scale",
+          "rasterHint": "Lossy mode drops the text layer and re-draws each page as an image: smaller but not selectable.",
+          "run": "Compress & download",
+          "result": "{{lossy}} compressed by {{percent}}% (~{{bytes}} bytes)",
+          "lossy": "Lossy",
+          "lossless": "Lossless",
+          "errors.NOT_PDF": "Only PDF files are supported",
+          "errors.TOO_LARGE": "File is too large",
+          "errors.NEED_PASSWORD": "This file is encrypted, please enter a password",
+          "errors.WRONG_PASSWORD": "Wrong password",
+          "errors.LOAD_FAILED": "Failed to parse the PDF",
+          "errors.NO_PAGES": "The PDF has no pages",
+          "errors.PROCESS_FAILED": "Processing failed, please retry"
+        },
+        "zh-TW": {
+          "password": "密碼（選填）",
+          "level": "壓縮方式",
+          "levels.objects": "物件流（無損）",
+          "levels.raster": "逐頁 JPEG（有損）",
+          "quality": "JPEG 品質",
+          "scale": "渲染縮放",
+          "rasterHint": "有損模式會捨棄文字層、把每頁重畫成圖片，體積更小但不可選文字。",
+          "run": "壓縮並下載",
+          "result": "已{{lossy}}壓縮 {{percent}}%（約 {{bytes}} 位元組）",
+          "lossy": "有損",
+          "lossless": "無損",
+          "errors.NOT_PDF": "僅支援 PDF 檔案",
+          "errors.TOO_LARGE": "檔案過大",
+          "errors.NEED_PASSWORD": "該檔案已加密，請輸入密碼",
+          "errors.WRONG_PASSWORD": "密碼錯誤",
+          "errors.LOAD_FAILED": "無法解析該 PDF",
+          "errors.NO_PAGES": "該 PDF 沒有頁面",
+          "errors.PROCESS_FAILED": "處理失敗，請重試"
+        },
+        "ja": {
+          "password": "パスワード（任意）",
+          "level": "方式",
+          "levels.objects": "オブジェクトストリーム（可逆）",
+          "levels.raster": "各ページ JPEG（非可逆）",
+          "quality": "JPEG 品質",
+          "scale": "描画倍率",
+          "rasterHint": "非可逆モードはテキスト層を破棄し各ページを画像化、軽いが選択不可。",
+          "run": "圧縮して保存",
+          "result": "{{lossy}}圧縮 {{percent}}%（約 {{bytes}} バイト）",
+          "lossy": "非可逆",
+          "lossless": "可逆",
+          "errors.NOT_PDF": "PDF のみ対応",
+          "errors.TOO_LARGE": "ファイルが大きすぎ",
+          "errors.NEED_PASSWORD": "このファイルは暗号化されています",
+          "errors.WRONG_PASSWORD": "パスワードが違います",
+          "errors.LOAD_FAILED": "PDF を解析できません",
+          "errors.NO_PAGES": "この PDF にはページがありません",
+          "errors.PROCESS_FAILED": "処理に失敗しました"
+        },
+        "fr": {
+          "password": "Mot de passe (optionnel)",
+          "level": "Méthode",
+          "levels.objects": "Flux d'objets (sans perte)",
+          "levels.raster": "JPEG par page (avec perte)",
+          "quality": "Qualité JPEG",
+          "scale": "Échelle",
+          "rasterHint": "Le mode avec perte supprime le texte et redessine chaque page en image : plus léger mais non sélectionnable.",
+          "run": "Compresser et télécharger",
+          "result": "{{lossy}} compressé de {{percent}}% (~{{bytes}} octets)",
+          "lossy": "Avec perte",
+          "lossless": "Sans perte",
+          "errors.NOT_PDF": "Seuls les PDF sont pris en charge",
+          "errors.TOO_LARGE": "Fichier trop volumineux",
+          "errors.NEED_PASSWORD": "Fichier chiffré, mot de passe requis",
+          "errors.WRONG_PASSWORD": "Mot de passe incorrect",
+          "errors.LOAD_FAILED": "Échec de l'analyse",
+          "errors.NO_PAGES": "Le PDF n'a pas de pages",
+          "errors.PROCESS_FAILED": "Échec du traitement"
+        },
+        "de": {
+          "password": "Passwort (optional)",
+          "level": "Methode",
+          "levels.objects": "Objektströme (verlustfrei)",
+          "levels.raster": "JPEG pro Seite (verlustbehaftet)",
+          "quality": "JPEG-Qualität",
+          "scale": "Render-Skalierung",
+          "rasterHint": "Verlustbehaftet verwirft die Textebene und zeichnet jede Seite als Bild: kleiner, aber nicht auswählbar.",
+          "run": "Komprimieren",
+          "result": "{{lossy}} um {{percent}}% komprimiert (~{{bytes}} Byte)",
+          "lossy": "Verlustbehaftet",
+          "lossless": "Verlustfrei",
+          "errors.NOT_PDF": "Nur PDF-Dateien",
+          "errors.TOO_LARGE": "Datei zu groß",
+          "errors.NEED_PASSWORD": "Datei verschlüsselt, Passwort nötig",
+          "errors.WRONG_PASSWORD": "Falsches Passwort",
+          "errors.LOAD_FAILED": "PDF konnte nicht gelesen werden",
+          "errors.NO_PAGES": "PDF hat keine Seiten",
+          "errors.PROCESS_FAILED": "Verarbeitung fehlgeschlagen"
+        },
+        "it": {
+          "password": "Password (opzionale)",
+          "level": "Metodo",
+          "levels.objects": "Flussi di oggetti (senza perdita)",
+          "levels.raster": "JPEG per pagina (con perdita)",
+          "quality": "Qualità JPEG",
+          "scale": "Scala rendering",
+          "rasterHint": "La modalità con perdita elimina il testo e ridisegna ogni pagina come immagine: più leggera ma non selezionabile.",
+          "run": "Comprimi",
+          "result": "{{lossy}} compresso del {{percent}}% (~{{bytes}} byte)",
+          "lossy": "Con perdita",
+          "lossless": "Senza perdita",
+          "errors.NOT_PDF": "Solo file PDF",
+          "errors.TOO_LARGE": "File troppo grande",
+          "errors.NEED_PASSWORD": "File crittografato, password richiesta",
+          "errors.WRONG_PASSWORD": "Password errata",
+          "errors.LOAD_FAILED": "Impossibile leggere il PDF",
+          "errors.NO_PAGES": "PDF senza pagine",
+          "errors.PROCESS_FAILED": "Elaborazione fallita"
+        },
+        "es": {
+          "password": "Contraseña (opcional)",
+          "level": "Método",
+          "levels.objects": "Flujos de objetos (sin pérdida)",
+          "levels.raster": "JPEG por página (con pérdida)",
+          "quality": "Calidad JPEG",
+          "scale": "Escala de render",
+          "rasterHint": "El modo con pérdida elimina el texto y redibuja cada página como imagen: más ligero pero no seleccionable.",
+          "run": "Comprimir",
+          "result": "{{lossy}} comprimido un {{percent}}% (~{{bytes}} bytes)",
+          "lossy": "Con pérdida",
+          "lossless": "Sin pérdida",
+          "errors.NOT_PDF": "Solo se admiten PDF",
+          "errors.TOO_LARGE": "Archivo demasiado grande",
+          "errors.NEED_PASSWORD": "Archivo cifrado, introduce la contraseña",
+          "errors.WRONG_PASSWORD": "Contraseña incorrecta",
+          "errors.LOAD_FAILED": "No se pudo analizar el PDF",
+          "errors.NO_PAGES": "El PDF no tiene páginas",
+          "errors.PROCESS_FAILED": "Error de procesamiento"
+        },
+        "pt": {
+          "password": "Senha (opcional)",
+          "level": "Método",
+          "levels.objects": "Fluxo de objetos (sem perda)",
+          "levels.raster": "JPEG por página (com perda)",
+          "quality": "Qualidade JPEG",
+          "scale": "Escala de render",
+          "rasterHint": "O modo com perda descarta o texto e redesenha cada página como imagem: menor, mas não selecionável.",
+          "run": "Comprimir",
+          "result": "{{lossy}} comprimido em {{percent}}% (~{{bytes}} bytes)",
+          "lossy": "Com perda",
+          "lossless": "Sem perda",
+          "errors.NOT_PDF": "Apenas arquivos PDF",
+          "errors.TOO_LARGE": "Arquivo muito grande",
+          "errors.NEED_PASSWORD": "Arquivo criptografado, insira a senha",
+          "errors.WRONG_PASSWORD": "Senha incorreta",
+          "errors.LOAD_FAILED": "Falha ao ler o PDF",
+          "errors.NO_PAGES": "O PDF não tem páginas",
+          "errors.PROCESS_FAILED": "Falha no processamento"
+        }
+      }
+    }
+  }
+}

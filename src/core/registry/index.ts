@@ -109,6 +109,47 @@ import { spreadsheetEditorTool } from '@/tools/spreadsheet-editor';
 import { flowchartEditorTool } from '@/tools/flowchart-editor';
 import { mindmapEditorTool } from '@/tools/mindmap-editor';
 import { photoEditorTool } from '@/tools/photo-editor';
+import { ipCalcTool } from '@/tools/ip-calc';
+import { macAddressTool } from '@/tools/mac-address';
+import { urlParserTool } from '@/tools/url-parser';
+import { uaGeneratorTool } from '@/tools/ua-generator';
+import { httpHeadersTool } from '@/tools/http-headers';
+import { httpRequestTool } from '@/tools/http-request';
+import { websocketTesterTool } from '@/tools/websocket-tester';
+import { randomPortTool } from '@/tools/random-port';
+import { pdfExtractTextTool } from '@/tools/pdf-extract-text';
+import { pdfDecryptTool } from '@/tools/pdf-decrypt';
+import { pdfWatermarkTool } from '@/tools/pdf-watermark';
+import { pdfCompressTool } from '@/tools/pdf-compress';
+import { baseEncodingTool } from '@/tools/base-encoding';
+import { morseCodeTool } from '@/tools/morse-code';
+import { caesarCipherTool } from '@/tools/caesar-cipher';
+import { escapeUnescapeTool } from '@/tools/escape-unescape';
+import { encodingRescueTool } from '@/tools/encoding-rescue';
+import { rsaCryptoTool } from '@/tools/rsa-crypto';
+import { keyConverterTool } from '@/tools/key-converter';
+import { passwordHashTool } from '@/tools/password-hash';
+import { checksumTool } from '@/tools/checksum';
+import { passwordStrengthTool } from '@/tools/password-strength';
+import { csvTool } from '@/tools/csv-tool';
+import { codeMinifyTool } from '@/tools/code-minify';
+import { idGeneratorTool } from '@/tools/id-generator';
+import { barcodeTool } from '@/tools/barcode';
+import { zipManagerTool } from '@/tools/zip-manager';
+import { fileSplitMergeTool } from '@/tools/file-split-merge';
+import { bulkRenameTool } from '@/tools/bulk-rename';
+import { imageGridCutTool } from '@/tools/image-grid-cut';
+import { idPhotoTool } from '@/tools/id-photo';
+import { imageAsciiTool } from '@/tools/image-ascii';
+import { unitConverterTool } from '@/tools/unit-converter';
+import { timezoneConverterTool } from '@/tools/timezone-converter';
+import { taxLoanCalculatorTool } from '@/tools/tax-loan-calculator';
+import { httpStatusTool } from '@/tools/http-status';
+import { mimeTypesTool } from '@/tools/mime-types';
+import { gitCheatsheetTool } from '@/tools/git-cheatsheet';
+import { audioConvertTool } from '@/tools/audio-convert';
+import { videoToGifTool } from '@/tools/video-to-gif';
+import { subtitleTool } from '@/tools/subtitle-tool';
 
 /**
  * 全项目唯一的聚合注册入口：新增工具仅需在此追加一行。
@@ -197,6 +238,47 @@ export const tools: ToolMeta[] = [
   hsvCmykTool,
   xsltTransformTool,
   cidrCalcTool,
+  ipCalcTool,
+  macAddressTool,
+  urlParserTool,
+  uaGeneratorTool,
+  httpHeadersTool,
+  httpRequestTool,
+  websocketTesterTool,
+  randomPortTool,
+  pdfExtractTextTool,
+  pdfDecryptTool,
+  pdfWatermarkTool,
+  pdfCompressTool,
+  baseEncodingTool,
+  morseCodeTool,
+  caesarCipherTool,
+  escapeUnescapeTool,
+  encodingRescueTool,
+  rsaCryptoTool,
+  keyConverterTool,
+  passwordHashTool,
+  checksumTool,
+  passwordStrengthTool,
+  csvTool,
+  codeMinifyTool,
+  idGeneratorTool,
+  barcodeTool,
+  zipManagerTool,
+  fileSplitMergeTool,
+  bulkRenameTool,
+  imageGridCutTool,
+  idPhotoTool,
+  imageAsciiTool,
+  unitConverterTool,
+  timezoneConverterTool,
+  taxLoanCalculatorTool,
+  httpStatusTool,
+  mimeTypesTool,
+  gitCheatsheetTool,
+  audioConvertTool,
+  videoToGifTool,
+  subtitleTool,
   pdfMergeTool,
   pdfSplitTool,
   pdfDeletePagesTool,

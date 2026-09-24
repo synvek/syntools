@@ -88,6 +88,7 @@ const icons: Record<string, ReactNode> = {
     </>
   ),
   text: <path d="M4 6h16M4 12h10M4 18h7" />,
+  code: <path d="M9 8l-4 4 4 4M15 8l4 4-4 4" />,
   globe: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -158,6 +159,25 @@ const icons: Record<string, ReactNode> = {
     </>
   ),
   download: <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" />,
+  file: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+      <path d="M14 3v5h5" />
+    </>
+  ),
+  view: (
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  'view-off': (
+    <>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.3 4M6.2 6.2A17 17 0 0 0 2 12s3.5 7 10 7a10.5 10.5 0 0 0 4.6-1.1" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </>
+  ),
   upload: <path d="M12 15V3m0 0 4 4m-4-4L8 7M4 21h16" />,
   swap: <path d="M7 4v13m0 0-3-3m3 3 3-3M17 20V7m0 0-3 3m3-3 3-3" />,
   share: (
@@ -744,6 +764,87 @@ const icons: Record<string, ReactNode> = {
     <>
       <rect x="5" y="11" width="14" height="9" rx="2" />
       <path d="M8 11V8a4 4 0 0 1 7.5-2" />
+    </>
+  ),
+  shield: <path d="M12 3l7 3v6c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6l7-3Z" />,
+  plug: (
+    <>
+      <path d="M9 3v6M15 3v6" />
+      <path d="M6 9h12v3a6 6 0 0 1-12 0V9Z" />
+      <path d="M12 18v3" />
+    </>
+  ),
+  terminal: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m7 9 3 3-3 3M13 15h4" />
+    </>
+  ),
+  film: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M7 4v16M17 4v16M3 12h18" />
+    </>
+  ),
+  music: (
+    <>
+      <path d="M9 18V6l10-2v12" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="17" cy="16" r="2" />
+    </>
+  ),
+  archive: (
+    <>
+      <rect x="3" y="4" width="18" height="5" rx="1" />
+      <path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4" />
+    </>
+  ),
+  scissors: (
+    <>
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M20 4 8.1 15.9M14.5 12.5 20 20M8.1 8.1 12 12" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z" />
+      <path d="M4 19a2 2 0 0 1 2-2h13" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M20.6 13.4 12 22l-9-9 8.6-8.6a2 2 0 0 1 1.4-.6H20a2 2 0 0 1 2 2v6.2a2 2 0 0 1-.6 1.4Z" />
+      <circle cx="16.5" cy="7.5" r="1.5" />
+    </>
+  ),
+  idCard: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="11" r="2" />
+      <path d="M5.5 16c.6-1.4 1.9-2 3.5-2s2.9.6 3.5 2M15 10h3M15 14h3" />
+    </>
+  ),
+  fingerprint: (
+    <>
+      <path d="M12 4a8 8 0 0 0-8 8v3" />
+      <path d="M20 15v-3a8 8 0 0 0-4-6.9" />
+      <path d="M8 20a12 12 0 0 1-1-4" />
+      <path d="M17 20a12 12 0 0 0 1-4" />
+      <path d="M12 8a4 4 0 0 0-4 4v4" />
+      <path d="M16 16v-4a4 4 0 0 0-2-3.5" />
+    </>
+  ),
+  barcode: (
+    <>
+      <path d="M4 5v14M8 5v14M11 5v14M14 5v14M17 5v14M20 5v14" />
+      <path d="M6 5v10" />
+    </>
+  ),
+  listCheck: (
+    <>
+      <path d="M8 6h12M8 12h12M8 18h12" />
+      <path d="m3 6 1.2 1.2L6 5.5M3 12l1.2 1.2L6 11.5M3 18l1.2 1.2L6 17.5" />
     </>
   ),
 };

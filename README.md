@@ -41,7 +41,7 @@ SynTools started as a developer toolbox, but it is no longer developer-only:
 
 ## Features
 
-- **110+ tools** across encoding, text, formatting, crypto, datetime, generators, network, image, PDF, office documents, and more
+- **150+ tools** across encoding, text, formatting, crypto, datetime, generators, network, file, image, media, PDF, office documents, cheatsheets, and more
 - **Global search** — `⌘/Ctrl + K` or `/` (when not typing in an input)
 - **Recent & favorites** — stored in `localStorage` on your machine
 - **Light / dark theme** — system preference by default, no flash on load
@@ -57,16 +57,19 @@ SynTools started as a developer toolbox, but it is no longer developer-only:
 | Category     | Examples                                                                                                                                                                                                                                             |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Office Tools | Word processor (.docx), spreadsheets (.xlsx, formulas & multi-sheet), slides (.pptx & slideshow), flowcharts (multi-page), mind maps (multi-canvas), photo editor (layers, masks, adjustment layers, PSD export) — see [Office tools](#office-tools) |
-| Encoding     | Base64, URL codec, Unicode, HTML entities, ASCII table                                                                                                                                                                                               |
+| Encoding     | Base64, URL codec, Unicode, HTML entities, ASCII table, base16/32/58, Morse, Caesar/ROT13/rail fence, escape/unescape, garbled-text rescue                                                                                                           |
 | Text         | Regex tester, text diff, case convert, counter, pinyin, zh convert                                                                                                                                                                                   |
-| Formatting   | JSON / SQL / HTML / JS / CSS / XML formatters, Markdown preview                                                                                                                                                                                      |
-| Crypto       | Hash, JWT parser, password generator                                                                                                                                                                                                                 |
-| Date & time  | Timestamp, calendar, countdown, stopwatch, cron parse/generate                                                                                                                                                                                       |
-| Generators   | UUID, QR code, random string/number, placeholder image, CSS gradient                                                                                                                                                                                 |
-| Image        | Compress, crop, merge, watermark, GIF frames, SVG→PNG, Base64, ICO                                                                                                                                                                                   |
-| PDF          | Merge, split, rotate, encrypt, annotate, to/from image, page numbers, sign                                                                                                                                                                           |
-| Network      | UA parser                                                                                                                                                                                                                                            |
-| Other        | Calculator, MBTI, AI prompts, Mermaid, chart generator, …                                                                                                                                                                                            |
+| Formatting   | JSON / SQL / HTML / JS / CSS / XML formatters, Markdown preview, CSV↔JSON, code minifier (CSS/HTML/JS/JSON)                                                                                                                                          |
+| Crypto       | Hash, HMAC, JWT parser, password generator/strength, AES, RSA encrypt + sign, key format converter (PEM/DER/JWK/OpenSSH), PBKDF2, CRC-32/Adler-32/FNV                                                                                                |
+| Date & time  | Timestamp, calendar, countdown, stopwatch, cron parse/generate, time zone converter                                                                                                                                                                  |
+| Generators   | UUID, QR code, barcode (Code 39/128/EAN-13), ID generator (ULID/NanoID/Snowflake/ObjectId), random string/number, placeholder image, CSS gradient                                                                                                    |
+| Image        | Compress, crop, merge, watermark, GIF frames, SVG→PNG, Base64, ICO, grid cut, ID photo, image→ASCII                                                                                                                                                  |
+| PDF          | Merge, split, rotate, encrypt/decrypt, compress, extract text, watermark, annotate, to/from image, page numbers, sign                                                                                                                                |
+| Network      | IP calculator (VLSM), CIDR, MAC, URL parser, UA parser/generator, HTTP headers/request, WebSocket tester, random port                                                                                                                                |
+| File         | ZIP create/extract, file split/merge, bulk rename                                                                                                                                                                                                    |
+| Media        | Audio→WAV, video→GIF, subtitle (SRT/WebVTT) converter                                                                                                                                                                                                |
+| Cheatsheet   | HTTP status codes, MIME types, Git commands                                                                                                                                                                                                          |
+| Other        | Calculator, unit converter, loan/tax calculator, MBTI, AI prompts, Mermaid, chart generator, …                                                                                                                                                       |
 
 Browse the full list on the home page or in `src/core/registry/index.ts`.
 

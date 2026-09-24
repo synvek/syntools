@@ -1,0 +1,37 @@
+{
+  "categories": {
+    "file": {
+      "zh": "文件工具",
+      "en": "Files",
+      "zh-TW": "檔案工具",
+      "ja": "ファイル",
+      "fr": "Fichiers",
+      "de": "Dateien",
+      "it": "File",
+      "es": "Archivos",
+      "pt": "Arquivos"
+    },
+    "media": {
+      "zh": "音视频",
+      "en": "Audio & Video",
+      "zh-TW": "影音",
+      "ja": "音声・動画",
+      "fr": "Audio & Vidéo",
+      "de": "Audio & Video",
+      "it": "Audio e video",
+      "es": "Audio y vídeo",
+      "pt": "Áudio e vídeo"
+    },
+    "cheatsheet": {
+      "zh": "速查表",
+      "en": "Cheat Sheets",
+      "zh-TW": "速查表",
+      "ja": "チートシート",
+      "fr": "Aide-mémoire",
+      "de": "Spickzettel",
+      "it": "Promemoria",
+      "es": "Hojas de referencia",
+      "pt": "Folhas de consulta"
+    }
+  }
+}

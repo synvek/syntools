@@ -19,4 +19,7 @@ export const categories: Category[] = [
   { id: 'image', name: '图片处理', order: 8 },
   { id: 'pdf', name: 'PDF 工具', order: 9 },
   { id: 'other', name: '其他', order: 10 },
+  { id: 'file', name: '文件工具', order: 11 },
+  { id: 'media', name: '音视频', order: 12 },
+  { id: 'cheatsheet', name: '速查表', order: 13 },
 ];

@@ -1,0 +1,1402 @@
+{
+  "tools": {
+    "unit-converter": {
+      "meta": {
+        "zh": {
+          "name": "单位换算",
+          "description": "长度 / 质量 / 面积 / 体积 / 温度 / 速度 / 数据 / 时间 单位互转"
+        },
+        "en": {
+          "name": "Unit Converter",
+          "description": "Convert length / mass / area / volume / temperature / speed / data / time units"
+        },
+        "zh-TW": {
+          "name": "單位換算",
+          "description": "長度 / 質量 / 面積 / 體積 / 溫度 / 速度 / 資料 / 時間 單位互轉"
+        },
+        "ja": {
+          "name": "単位変換",
+          "description": "長さ・質量・面積・体積・温度・速度・データ・時間の単位変換"
+        },
+        "fr": {
+          "name": "Convertisseur d'unités",
+          "description": "Convertir longueur / masse / surface / volume / température / vitesse / données / temps"
+        },
+        "de": {
+          "name": "Einheitenrechner",
+          "description": "Länge / Masse / Fläche / Volumen / Temperatur / Geschwindigkeit / Daten / Zeit umrechnen"
+        },
+        "it": {
+          "name": "Convertitore di unità",
+          "description": "Converti lunghezza / massa / area / volume / temperatura / velocità / dati / tempo"
+        },
+        "es": {
+          "name": "Conversor de unidades",
+          "description": "Convierte longitud / masa / área / volumen / temperatura / velocidad / datos / tiempo"
+        },
+        "pt": {
+          "name": "Conversor de unidades",
+          "description": "Converte comprimento / massa / área / volume / temperatura / velocidade / dados / tempo"
+        }
+      },
+      "ui": {
+        "zh": {
+          "category": "类别",
+          "from": "源单位",
+          "value": "数值",
+          "placeholder": "输入数值",
+          "categories.length": "长度",
+          "categories.mass": "质量",
+          "categories.area": "面积",
+          "categories.volume": "体积",
+          "categories.temperature": "温度",
+          "categories.speed": "速度",
+          "categories.data": "数据",
+          "categories.time": "时间",
+          "errors.EMPTY": "请输入数值",
+          "errors.INVALID": "数值或单位无效"
+        },
+        "en": {
+          "category": "Category",
+          "from": "From",
+          "value": "Value",
+          "placeholder": "Enter a value",
+          "categories.length": "Length",
+          "categories.mass": "Mass",
+          "categories.area": "Area",
+          "categories.volume": "Volume",
+          "categories.temperature": "Temperature",
+          "categories.speed": "Speed",
+          "categories.data": "Data",
+          "categories.time": "Time",
+          "errors.EMPTY": "Please enter a value",
+          "errors.INVALID": "Invalid value or unit"
+        },
+        "zh-TW": {
+          "category": "類別",
+          "from": "來源單位",
+          "value": "數值",
+          "placeholder": "輸入數值",
+          "categories.length": "長度",
+          "categories.mass": "質量",
+          "categories.area": "面積",
+          "categories.volume": "體積",
+          "categories.temperature": "溫度",
+          "categories.speed": "速度",
+          "categories.data": "資料",
+          "categories.time": "時間",
+          "errors.EMPTY": "請輸入數值",
+          "errors.INVALID": "數值或單位無效"
+        },
+        "ja": {
+          "category": "カテゴリ",
+          "from": "変換元",
+          "value": "値",
+          "placeholder": "値を入力",
+          "categories.length": "長さ",
+          "categories.mass": "質量",
+          "categories.area": "面積",
+          "categories.volume": "体積",
+          "categories.temperature": "温度",
+          "categories.speed": "速度",
+          "categories.data": "データ",
+          "categories.time": "時間",
+          "errors.EMPTY": "値を入力してください",
+          "errors.INVALID": "値または単位が無効"
+        },
+        "fr": {
+          "category": "Catégorie",
+          "from": "De",
+          "value": "Valeur",
+          "placeholder": "Saisir une valeur",
+          "categories.length": "Longueur",
+          "categories.mass": "Masse",
+          "categories.area": "Surface",
+          "categories.volume": "Volume",
+          "categories.temperature": "Température",
+          "categories.speed": "Vitesse",
+          "categories.data": "Données",
+          "categories.time": "Temps",
+          "errors.EMPTY": "Saisissez une valeur",
+          "errors.INVALID": "Valeur ou unité invalide"
+        },
+        "de": {
+          "category": "Kategorie",
+          "from": "Von",
+          "value": "Wert",
+          "placeholder": "Wert eingeben",
+          "categories.length": "Länge",
+          "categories.mass": "Masse",
+          "categories.area": "Fläche",
+          "categories.volume": "Volumen",
+          "categories.temperature": "Temperatur",
+          "categories.speed": "Geschwindigkeit",
+          "categories.data": "Daten",
+          "categories.time": "Zeit",
+          "errors.EMPTY": "Bitte Wert eingeben",
+          "errors.INVALID": "Ungültiger Wert oder Einheit"
+        },
+        "it": {
+          "category": "Categoria",
+          "from": "Da",
+          "value": "Valore",
+          "placeholder": "Inserisci un valore",
+          "categories.length": "Lunghezza",
+          "categories.mass": "Massa",
+          "categories.area": "Area",
+          "categories.volume": "Volume",
+          "categories.temperature": "Temperatura",
+          "categories.speed": "Velocità",
+          "categories.data": "Dati",
+          "categories.time": "Tempo",
+          "errors.EMPTY": "Inserisci un valore",
+          "errors.INVALID": "Valore o unità non valido"
+        },
+        "es": {
+          "category": "Categoría",
+          "from": "De",
+          "value": "Valor",
+          "placeholder": "Introduce un valor",
+          "categories.length": "Longitud",
+          "categories.mass": "Masa",
+          "categories.area": "Área",
+          "categories.volume": "Volumen",
+          "categories.temperature": "Temperatura",
+          "categories.speed": "Velocidad",
+          "categories.data": "Datos",
+          "categories.time": "Tiempo",
+          "errors.EMPTY": "Introduce un valor",
+          "errors.INVALID": "Valor o unidad no válidos"
+        },
+        "pt": {
+          "category": "Categoria",
+          "from": "De",
+          "value": "Valor",
+          "placeholder": "Digite um valor",
+          "categories.length": "Comprimento",
+          "categories.mass": "Massa",
+          "categories.area": "Área",
+          "categories.volume": "Volume",
+          "categories.temperature": "Temperatura",
+          "categories.speed": "Velocidade",
+          "categories.data": "Dados",
+          "categories.time": "Tempo",
+          "errors.EMPTY": "Digite um valor",
+          "errors.INVALID": "Valor ou unidade inválidos"
+        }
+      }
+    },
+    "tax-loan-calculator": {
+      "meta": {
+        "zh": {
+          "name": "贷款 / 个税计算",
+          "description": "房贷等额本息 / 等额本金还款计划与工资薪金个税估算"
+        },
+        "en": {
+          "name": "Loan / Tax Calculator",
+          "description": "Mortgage amortization (equal payment / equal principal) and salary income tax estimate"
+        },
+        "zh-TW": {
+          "name": "貸款 / 個稅計算",
+          "description": "房貸等額本息 / 等額本金還款計畫與薪資個稅估算"
+        },
+        "ja": {
+          "name": "ローン / 税計算",
+          "description": "元利均等 / 元金均等返済と給与所得税の概算"
+        },
+        "fr": {
+          "name": "Prêt / Impôt",
+          "description": "Amortissement de prêt (mensualité constante / capital constant) et estimation d'impôt"
+        },
+        "de": {
+          "name": "Kredit / Steuer",
+          "description": "Annuitäten- / Tilgungsdarlehen und Lohnsteuerschätzung"
+        },
+        "it": {
+          "name": "Prestito / Tasse",
+          "description": "Ammortamento (rata costante / quota capitale costante) e stima imposta"
+        },
+        "es": {
+          "name": "Préstamo / Impuestos",
+          "description": "Amortización (cuota constante / capital constante) y estimación de impuesto"
+        },
+        "pt": {
+          "name": "Empréstimo / Imposto",
+          "description": "Amortização (prestação fixa / capital fixo) e estimativa de imposto"
+        }
+      },
+      "ui": {
+        "zh": {
+          "mode": "模式",
+          "modes.loan": "贷款",
+          "modes.tax": "个税",
+          "loanMode": "还款方式",
+          "equalPayment": "等额本息",
+          "equalPrincipal": "等额本金",
+          "principal": "贷款金额",
+          "rate": "年利率 (%)",
+          "months": "期数 (月)",
+          "firstPayment": "首期月供",
+          "lastPayment": "末期月供",
+          "totalInterest": "总利息",
+          "totalPayment": "还款总额",
+          "period": "期数",
+          "payment": "月供",
+          "principalCol": "本金",
+          "interest": "利息",
+          "balance": "剩余本金",
+          "gross": "税前月薪",
+          "insurance": "社保公积金",
+          "deduction": "专项附加扣除",
+          "taxable": "应纳税所得额",
+          "tax": "个税",
+          "net": "税后收入",
+          "effectiveRate": "实际税率",
+          "errors.INVALID_PRINCIPAL": "贷款金额需大于 0",
+          "errors.INVALID_MONTHS": "期数需在 1–1200",
+          "errors.INVALID_RATE": "年利率不能为负",
+          "errors.INVALID_GROSS": "收入不能为负",
+          "errors.INVALID_DEDUCTION": "扣除项不能为负"
+        },
+        "en": {
+          "mode": "Mode",
+          "modes.loan": "Loan",
+          "modes.tax": "Tax",
+          "loanMode": "Repayment",
+          "equalPayment": "Equal payment",
+          "equalPrincipal": "Equal principal",
+          "principal": "Principal",
+          "rate": "Annual rate (%)",
+          "months": "Months",
+          "firstPayment": "First payment",
+          "lastPayment": "Last payment",
+          "totalInterest": "Total interest",
+          "totalPayment": "Total payment",
+          "period": "No.",
+          "payment": "Payment",
+          "principalCol": "Principal",
+          "interest": "Interest",
+          "balance": "Balance",
+          "gross": "Gross salary",
+          "insurance": "Social insurance",
+          "deduction": "Special deductions",
+          "taxable": "Taxable",
+          "tax": "Tax",
+          "net": "Net income",
+          "effectiveRate": "Effective rate",
+          "errors.INVALID_PRINCIPAL": "Principal must be > 0",
+          "errors.INVALID_MONTHS": "Months must be 1–1200",
+          "errors.INVALID_RATE": "Rate cannot be negative",
+          "errors.INVALID_GROSS": "Income cannot be negative",
+          "errors.INVALID_DEDUCTION": "Deductions cannot be negative"
+        },
+        "zh-TW": {
+          "mode": "模式",
+          "modes.loan": "貸款",
+          "modes.tax": "個稅",
+          "loanMode": "還款方式",
+          "equalPayment": "等額本息",
+          "equalPrincipal": "等額本金",
+          "principal": "貸款金額",
+          "rate": "年利率 (%)",
+          "months": "期數 (月)",
+          "firstPayment": "首期月付",
+          "lastPayment": "末期月付",
+          "totalInterest": "總利息",
+          "totalPayment": "還款總額",
+          "period": "期數",
+          "payment": "月付",
+          "principalCol": "本金",
+          "interest": "利息",
+          "balance": "剩餘本金",
+          "gross": "稅前月薪",
+          "insurance": "社保公積金",
+          "deduction": "專項附加扣除",
+          "taxable": "應納稅所得額",
+          "tax": "個稅",
+          "net": "稅後收入",
+          "effectiveRate": "實際稅率",
+          "errors.INVALID_PRINCIPAL": "貸款金額需大於 0",
+          "errors.INVALID_MONTHS": "期數需在 1–1200",
+          "errors.INVALID_RATE": "年利率不能為負",
+          "errors.INVALID_GROSS": "收入不能為負",
+          "errors.INVALID_DEDUCTION": "扣除項不能為負"
+        },
+        "ja": {
+          "mode": "モード",
+          "modes.loan": "ローン",
+          "modes.tax": "税金",
+          "loanMode": "返済方式",
+          "equalPayment": "元利均等",
+          "equalPrincipal": "元金均等",
+          "principal": "借入額",
+          "rate": "年利率 (%)",
+          "months": "回数 (月)",
+          "firstPayment": "初回返済",
+          "lastPayment": "最終返済",
+          "totalInterest": "利息総額",
+          "totalPayment": "返済総額",
+          "period": "回",
+          "payment": "返済額",
+          "principalCol": "元金",
+          "interest": "利息",
+          "balance": "残高",
+          "gross": "額面月収",
+          "insurance": "社会保険",
+          "deduction": "特別控除",
+          "taxable": "課税所得",
+          "tax": "税額",
+          "net": "手取り",
+          "effectiveRate": "実効税率",
+          "errors.INVALID_PRINCIPAL": "借入額は 0 より大きい必要があります",
+          "errors.INVALID_MONTHS": "回数は 1–1200",
+          "errors.INVALID_RATE": "年利率は負にできません",
+          "errors.INVALID_GROSS": "収入は負にできません",
+          "errors.INVALID_DEDUCTION": "控除は負にできません"
+        },
+        "fr": {
+          "mode": "Mode",
+          "modes.loan": "Prêt",
+          "modes.tax": "Impôt",
+          "loanMode": "Remboursement",
+          "equalPayment": "Mensualité constante",
+          "equalPrincipal": "Capital constant",
+          "principal": "Capital",
+          "rate": "Taux annuel (%)",
+          "months": "Mois",
+          "firstPayment": "1re échéance",
+          "lastPayment": "Dernière échéance",
+          "totalInterest": "Intérêts totaux",
+          "totalPayment": "Total remboursé",
+          "period": "N°",
+          "payment": "Échéance",
+          "principalCol": "Capital",
+          "interest": "Intérêts",
+          "balance": "Solde",
+          "gross": "Salaire brut",
+          "insurance": "Cotisations",
+          "deduction": "Déductions",
+          "taxable": "Imposable",
+          "tax": "Impôt",
+          "net": "Net",
+          "effectiveRate": "Taux effectif",
+          "errors.INVALID_PRINCIPAL": "Le capital doit être > 0",
+          "errors.INVALID_MONTHS": "Les mois doivent être entre 1 et 1200",
+          "errors.INVALID_RATE": "Le taux ne peut être négatif",
+          "errors.INVALID_GROSS": "Le revenu ne peut être négatif",
+          "errors.INVALID_DEDUCTION": "Les déductions ne peuvent être négatives"
+        },
+        "de": {
+          "mode": "Modus",
+          "modes.loan": "Kredit",
+          "modes.tax": "Steuer",
+          "loanMode": "Tilgung",
+          "equalPayment": "Annuität",
+          "equalPrincipal": "Tilgungsdarlehen",
+          "principal": "Darlehen",
+          "rate": "Jahreszins (%)",
+          "months": "Monate",
+          "firstPayment": "Erste Rate",
+          "lastPayment": "Letzte Rate",
+          "totalInterest": "Zinsen gesamt",
+          "totalPayment": "Gesamtzahlung",
+          "period": "Nr.",
+          "payment": "Rate",
+          "principalCol": "Tilgung",
+          "interest": "Zinsen",
+          "balance": "Restschuld",
+          "gross": "Bruttogehalt",
+          "insurance": "Sozialabgaben",
+          "deduction": "Abzüge",
+          "taxable": "Steuerpflichtig",
+          "tax": "Steuer",
+          "net": "Netto",
+          "effectiveRate": "Effektivsatz",
+          "errors.INVALID_PRINCIPAL": "Darlehen muss > 0 sein",
+          "errors.INVALID_MONTHS": "Monate müssen 1–1200 sein",
+          "errors.INVALID_RATE": "Zins darf nicht negativ sein",
+          "errors.INVALID_GROSS": "Einkommen darf nicht negativ sein",
+          "errors.INVALID_DEDUCTION": "Abzüge dürfen nicht negativ sein"
+        },
+        "it": {
+          "mode": "Modalità",
+          "modes.loan": "Prestito",
+          "modes.tax": "Tasse",
+          "loanMode": "Rimborso",
+          "equalPayment": "Rata costante",
+          "equalPrincipal": "Capitale costante",
+          "principal": "Importo",
+          "rate": "Tasso annuo (%)",
+          "months": "Mesi",
+          "firstPayment": "Prima rata",
+          "lastPayment": "Ultima rata",
+          "totalInterest": "Interessi totali",
+          "totalPayment": "Totale",
+          "period": "N.",
+          "payment": "Rata",
+          "principalCol": "Capitale",
+          "interest": "Interessi",
+          "balance": "Residuo",
+          "gross": "Lordo",
+          "insurance": "Contributi",
+          "deduction": "Detrazioni",
+          "taxable": "Imponibile",
+          "tax": "Tassa",
+          "net": "Netto",
+          "effectiveRate": "Aliquota effettiva",
+          "errors.INVALID_PRINCIPAL": "L'importo deve essere > 0",
+          "errors.INVALID_MONTHS": "I mesi devono essere 1–1200",
+          "errors.INVALID_RATE": "Il tasso non può essere negativo",
+          "errors.INVALID_GROSS": "Il reddito non può essere negativo",
+          "errors.INVALID_DEDUCTION": "Le detrazioni non possono essere negative"
+        },
+        "es": {
+          "mode": "Modo",
+          "modes.loan": "Préstamo",
+          "modes.tax": "Impuesto",
+          "loanMode": "Amortización",
+          "equalPayment": "Cuota constante",
+          "equalPrincipal": "Capital constante",
+          "principal": "Importe",
+          "rate": "Tasa anual (%)",
+          "months": "Meses",
+          "firstPayment": "Primera cuota",
+          "lastPayment": "Última cuota",
+          "totalInterest": "Intereses totales",
+          "totalPayment": "Total a pagar",
+          "period": "N.º",
+          "payment": "Cuota",
+          "principalCol": "Capital",
+          "interest": "Interés",
+          "balance": "Saldo",
+          "gross": "Salario bruto",
+          "insurance": "Cotizaciones",
+          "deduction": "Deducciones",
+          "taxable": "Base imponible",
+          "tax": "Impuesto",
+          "net": "Neto",
+          "effectiveRate": "Tasa efectiva",
+          "errors.INVALID_PRINCIPAL": "El importe debe ser > 0",
+          "errors.INVALID_MONTHS": "Los meses deben ser 1–1200",
+          "errors.INVALID_RATE": "La tasa no puede ser negativa",
+          "errors.INVALID_GROSS": "El ingreso no puede ser negativo",
+          "errors.INVALID_DEDUCTION": "Las deducciones no pueden ser negativas"
+        },
+        "pt": {
+          "mode": "Modo",
+          "modes.loan": "Empréstimo",
+          "modes.tax": "Imposto",
+          "loanMode": "Amortização",
+          "equalPayment": "Prestação fixa",
+          "equalPrincipal": "Capital fixo",
+          "principal": "Valor",
+          "rate": "Taxa anual (%)",
+          "months": "Meses",
+          "firstPayment": "Primeira prestação",
+          "lastPayment": "Última prestação",
+          "totalInterest": "Juros totais",
+          "totalPayment": "Total a pagar",
+          "period": "N.º",
+          "payment": "Prestação",
+          "principalCol": "Capital",
+          "interest": "Juros",
+          "balance": "Saldo",
+          "gross": "Salário bruto",
+          "insurance": "Contribuições",
+          "deduction": "Deduções",
+          "taxable": "Base tributável",
+          "tax": "Imposto",
+          "net": "Líquido",
+          "effectiveRate": "Taxa efetiva",
+          "errors.INVALID_PRINCIPAL": "O valor deve ser > 0",
+          "errors.INVALID_MONTHS": "Os meses devem ser 1–1200",
+          "errors.INVALID_RATE": "A taxa não pode ser negativa",
+          "errors.INVALID_GROSS": "A renda não pode ser negativa",
+          "errors.INVALID_DEDUCTION": "As deduções não podem ser negativas"
+        }
+      }
+    },
+    "timezone-converter": {
+      "meta": {
+        "zh": {
+          "name": "时区转换",
+          "description": "在多个 IANA 时区之间转换时间，显示本地时间与 UTC 偏移"
+        },
+        "en": {
+          "name": "Time Zone Converter",
+          "description": "Convert times across IANA time zones with local time and UTC offset"
+        },
+        "zh-TW": {
+          "name": "時區轉換",
+          "description": "在多個 IANA 時區之間轉換時間，顯示本地時間與 UTC 偏移"
+        },
+        "ja": {
+          "name": "タイムゾーン変換",
+          "description": "複数の IANA タイムゾーン間で時刻を変換し、UTC オフセットを表示"
+        },
+        "fr": {
+          "name": "Convertisseur de fuseaux",
+          "description": "Convertir les heures entre fuseaux IANA avec décalage UTC"
+        },
+        "de": {
+          "name": "Zeitzonenrechner",
+          "description": "Zeiten zwischen IANA-Zeitzonen mit UTC-Versatz umrechnen"
+        },
+        "it": {
+          "name": "Convertitore di fuso",
+          "description": "Converti orari tra fusi IANA con offset UTC"
+        },
+        "es": {
+          "name": "Conversor de zonas",
+          "description": "Convierte horas entre zonas IANA con desplazamiento UTC"
+        },
+        "pt": {
+          "name": "Conversor de fuso",
+          "description": "Converte horários entre fusos IANA com deslocamento UTC"
+        }
+      },
+      "ui": {
+        "zh": {
+          "datetime": "时间",
+          "sourceZone": "源时区",
+          "errors.INVALID_DATE": "日期无效",
+          "errors.INVALID_ZONE": "时区无效"
+        },
+        "en": {
+          "datetime": "Date & time",
+          "sourceZone": "Source zone",
+          "errors.INVALID_DATE": "Invalid date",
+          "errors.INVALID_ZONE": "Invalid time zone"
+        },
+        "zh-TW": {
+          "datetime": "時間",
+          "sourceZone": "來源時區",
+          "errors.INVALID_DATE": "日期無效",
+          "errors.INVALID_ZONE": "時區無效"
+        },
+        "ja": {
+          "datetime": "日時",
+          "sourceZone": "元のタイムゾーン",
+          "errors.INVALID_DATE": "日付が無効",
+          "errors.INVALID_ZONE": "タイムゾーンが無効"
+        },
+        "fr": {
+          "datetime": "Date et heure",
+          "sourceZone": "Fuseau source",
+          "errors.INVALID_DATE": "Date invalide",
+          "errors.INVALID_ZONE": "Fuseau invalide"
+        },
+        "de": {
+          "datetime": "Datum & Zeit",
+          "sourceZone": "Quellzone",
+          "errors.INVALID_DATE": "Ungültiges Datum",
+          "errors.INVALID_ZONE": "Ungültige Zeitzone"
+        },
+        "it": {
+          "datetime": "Data e ora",
+          "sourceZone": "Fuso di origine",
+          "errors.INVALID_DATE": "Data non valida",
+          "errors.INVALID_ZONE": "Fuso non valido"
+        },
+        "es": {
+          "datetime": "Fecha y hora",
+          "sourceZone": "Zona de origen",
+          "errors.INVALID_DATE": "Fecha no válida",
+          "errors.INVALID_ZONE": "Zona no válida"
+        },
+        "pt": {
+          "datetime": "Data e hora",
+          "sourceZone": "Fuso de origem",
+          "errors.INVALID_DATE": "Data inválida",
+          "errors.INVALID_ZONE": "Fuso inválido"
+        }
+      }
+    },
+    "image-ascii": {
+      "meta": {
+        "zh": {
+          "name": "图片转 ASCII",
+          "description": "将图片转换为 ASCII 字符画，支持多种字符集、宽度与反色"
+        },
+        "en": {
+          "name": "Image to ASCII",
+          "description": "Convert images into ASCII art with charset, width and invert options"
+        },
+        "zh-TW": {
+          "name": "圖片轉 ASCII",
+          "description": "將圖片轉換為 ASCII 字元畫，支援多種字元集、寬度與反色"
+        },
+        "ja": {
+          "name": "画像 → ASCII",
+          "description": "画像を ASCII アートに変換（文字セット・幅・反転）"
+        },
+        "fr": {
+          "name": "Image en ASCII",
+          "description": "Convertir des images en art ASCII (jeu de caractères, largeur, inversion)"
+        },
+        "de": {
+          "name": "Bild zu ASCII",
+          "description": "Bilder in ASCII-Kunst umwandeln (Zeichensatz, Breite, Invertierung)"
+        },
+        "it": {
+          "name": "Immagine in ASCII",
+          "description": "Converti immagini in ASCII art (set di caratteri, larghezza, inversione)"
+        },
+        "es": {
+          "name": "Imagen a ASCII",
+          "description": "Convierte imágenes a arte ASCII (juego de caracteres, ancho, inversión)"
+        },
+        "pt": {
+          "name": "Imagem para ASCII",
+          "description": "Converte imagens em arte ASCII (conjunto de caracteres, largura, inversão)"
+        }
+      },
+      "ui": {
+        "zh": {
+          "charset": "字符集",
+          "width": "宽度（列）",
+          "invert": "反色",
+          "dropHint": "拖入图片以转换为字符画",
+          "output": "ASCII 字符画",
+          "errors.EMPTY": "图片尺寸无效",
+          "errors.INVALID": "像素数据无效",
+          "errors.LOAD": "图片加载失败"
+        },
+        "en": {
+          "charset": "Charset",
+          "width": "Width (cols)",
+          "invert": "Invert",
+          "dropHint": "Drop an image to convert",
+          "output": "ASCII art",
+          "errors.EMPTY": "Invalid image size",
+          "errors.INVALID": "Invalid pixel data",
+          "errors.LOAD": "Failed to load image"
+        },
+        "zh-TW": {
+          "charset": "字元集",
+          "width": "寬度（欄）",
+          "invert": "反色",
+          "dropHint": "拖入圖片以轉換為字元畫",
+          "output": "ASCII 字元畫",
+          "errors.EMPTY": "圖片尺寸無效",
+          "errors.INVALID": "像素資料無效",
+          "errors.LOAD": "圖片載入失敗"
+        },
+        "ja": {
+          "charset": "文字セット",
+          "width": "幅（列）",
+          "invert": "反転",
+          "dropHint": "画像をドロップして変換",
+          "output": "ASCII アート",
+          "errors.EMPTY": "画像サイズが無効",
+          "errors.INVALID": "ピクセルデータが無効",
+          "errors.LOAD": "画像の読み込みに失敗"
+        },
+        "fr": {
+          "charset": "Jeu de caractères",
+          "width": "Largeur (colonnes)",
+          "invert": "Inverser",
+          "dropHint": "Déposez une image à convertir",
+          "output": "Art ASCII",
+          "errors.EMPTY": "Taille d'image invalide",
+          "errors.INVALID": "Pixels invalides",
+          "errors.LOAD": "Échec du chargement"
+        },
+        "de": {
+          "charset": "Zeichensatz",
+          "width": "Breite (Spalten)",
+          "invert": "Invertieren",
+          "dropHint": "Bild zum Konvertieren ablegen",
+          "output": "ASCII-Kunst",
+          "errors.EMPTY": "Ungültige Bildgröße",
+          "errors.INVALID": "Ungültige Pixeldaten",
+          "errors.LOAD": "Bild konnte nicht geladen werden"
+        },
+        "it": {
+          "charset": "Set caratteri",
+          "width": "Larghezza (colonne)",
+          "invert": "Inverti",
+          "dropHint": "Trascina un'immagine da convertire",
+          "output": "ASCII art",
+          "errors.EMPTY": "Dimensione immagine non valida",
+          "errors.INVALID": "Pixel non validi",
+          "errors.LOAD": "Caricamento immagine non riuscito"
+        },
+        "es": {
+          "charset": "Juego de caracteres",
+          "width": "Ancho (columnas)",
+          "invert": "Invertir",
+          "dropHint": "Suelta una imagen para convertir",
+          "output": "Arte ASCII",
+          "errors.EMPTY": "Tamaño de imagen no válido",
+          "errors.INVALID": "Píxeles no válidos",
+          "errors.LOAD": "Error al cargar la imagen"
+        },
+        "pt": {
+          "charset": "Conjunto de caracteres",
+          "width": "Largura (colunas)",
+          "invert": "Inverter",
+          "dropHint": "Solte uma imagem para converter",
+          "output": "Arte ASCII",
+          "errors.EMPTY": "Tamanho de imagem inválido",
+          "errors.INVALID": "Pixels inválidos",
+          "errors.LOAD": "Falha ao carregar a imagem"
+        }
+      }
+    },
+    "image-grid-cut": {
+      "meta": {
+        "zh": {
+          "name": "图片九宫格切图",
+          "description": "将图片按行列切分为多块（九宫格 / 拼图），逐块下载"
+        },
+        "en": {
+          "name": "Image Grid Cut",
+          "description": "Slice an image into a grid of tiles (e.g. 3×3) and download each"
+        },
+        "zh-TW": {
+          "name": "圖片九宮格切圖",
+          "description": "將圖片按行列切分為多塊（九宮格 / 拼圖），逐塊下載"
+        },
+        "ja": {
+          "name": "画像グリッド分割",
+          "description": "画像を行列で分割し、各タイルをダウンロード"
+        },
+        "fr": {
+          "name": "Découpe en grille",
+          "description": "Découper une image en grille (ex. 3×3) et télécharger chaque tuile"
+        },
+        "de": {
+          "name": "Bild-Raster schneiden",
+          "description": "Bild in Rasterkacheln schneiden (z. B. 3×3) und einzeln herunterladen"
+        },
+        "it": {
+          "name": "Taglia in griglia",
+          "description": "Dividi un'immagine in griglia (es. 3×3) e scarica ogni riquadro"
+        },
+        "es": {
+          "name": "Cortar en cuadrícula",
+          "description": "Divide una imagen en cuadrícula (p. ej. 3×3) y descarga cada parte"
+        },
+        "pt": {
+          "name": "Cortar em grade",
+          "description": "Divide uma imagem em grade (ex. 3×3) e baixa cada parte"
+        }
+      },
+      "ui": {
+        "zh": {
+          "cols": "列数",
+          "rows": "行数",
+          "gap": "间隔 (px)",
+          "dropHint": "拖入图片以切分",
+          "downloadTile": "下载第 {{row}} 行第 {{col}} 列",
+          "errors.EMPTY": "图片尺寸无效",
+          "errors.TOO_MANY": "行列数过多，单块尺寸不足 1px",
+          "errors.LOAD": "图片加载失败"
+        },
+        "en": {
+          "cols": "Columns",
+          "rows": "Rows",
+          "gap": "Gap (px)",
+          "dropHint": "Drop an image to slice",
+          "downloadTile": "Download row {{row}}, column {{col}}",
+          "errors.EMPTY": "Invalid image size",
+          "errors.TOO_MANY": "Too many rows/columns; tiles would be < 1px",
+          "errors.LOAD": "Failed to load image"
+        },
+        "zh-TW": {
+          "cols": "欄數",
+          "rows": "列數",
+          "gap": "間隔 (px)",
+          "dropHint": "拖入圖片以切分",
+          "downloadTile": "下載第 {{row}} 列第 {{col}} 欄",
+          "errors.EMPTY": "圖片尺寸無效",
+          "errors.TOO_MANY": "行列數過多，單塊尺寸不足 1px",
+          "errors.LOAD": "圖片載入失敗"
+        },
+        "ja": {
+          "cols": "列数",
+          "rows": "行数",
+          "gap": "間隔 (px)",
+          "dropHint": "画像をドロップして分割",
+          "downloadTile": "{{row}} 行 {{col}} 列をダウンロード",
+          "errors.EMPTY": "画像サイズが無効",
+          "errors.TOO_MANY": "行/列が多すぎます（1px 未満）",
+          "errors.LOAD": "画像の読み込みに失敗"
+        },
+        "fr": {
+          "cols": "Colonnes",
+          "rows": "Lignes",
+          "gap": "Espace (px)",
+          "dropHint": "Déposez une image à découper",
+          "downloadTile": "Télécharger ligne {{row}}, colonne {{col}}",
+          "errors.EMPTY": "Taille d'image invalide",
+          "errors.TOO_MANY": "Trop de lignes/colonnes (< 1px)",
+          "errors.LOAD": "Échec du chargement"
+        },
+        "de": {
+          "cols": "Spalten",
+          "rows": "Zeilen",
+          "gap": "Abstand (px)",
+          "dropHint": "Bild zum Schneiden ablegen",
+          "downloadTile": "Zeile {{row}}, Spalte {{col}} herunterladen",
+          "errors.EMPTY": "Ungültige Bildgröße",
+          "errors.TOO_MANY": "Zu viele Zeilen/Spalten (< 1px)",
+          "errors.LOAD": "Bild konnte nicht geladen werden"
+        },
+        "it": {
+          "cols": "Colonne",
+          "rows": "Righe",
+          "gap": "Spazio (px)",
+          "dropHint": "Trascina un'immagine da tagliare",
+          "downloadTile": "Scarica riga {{row}}, colonna {{col}}",
+          "errors.EMPTY": "Dimensione immagine non valida",
+          "errors.TOO_MANY": "Troppe righe/colonne (< 1px)",
+          "errors.LOAD": "Caricamento immagine non riuscito"
+        },
+        "es": {
+          "cols": "Columnas",
+          "rows": "Filas",
+          "gap": "Separación (px)",
+          "dropHint": "Suelta una imagen para cortar",
+          "downloadTile": "Descargar fila {{row}}, columna {{col}}",
+          "errors.EMPTY": "Tamaño de imagen no válido",
+          "errors.TOO_MANY": "Demasiadas filas/columnas (< 1px)",
+          "errors.LOAD": "Error al cargar la imagen"
+        },
+        "pt": {
+          "cols": "Colunas",
+          "rows": "Linhas",
+          "gap": "Espaço (px)",
+          "dropHint": "Solte uma imagem para cortar",
+          "downloadTile": "Baixar linha {{row}}, coluna {{col}}",
+          "errors.EMPTY": "Tamanho de imagem inválido",
+          "errors.TOO_MANY": "Muitas linhas/colunas (< 1px)",
+          "errors.LOAD": "Falha ao carregar a imagem"
+        }
+      }
+    },
+    "id-photo": {
+      "meta": {
+        "zh": {
+          "name": "证件照制作",
+          "description": "按 1 寸 / 2 寸 / 护照等标准尺寸裁剪证件照，可设背景色与 DPI"
+        },
+        "en": {
+          "name": "ID Photo Maker",
+          "description": "Crop photos to standard ID sizes (1-inch, 2-inch, passport) with background and DPI"
+        },
+        "zh-TW": {
+          "name": "證件照製作",
+          "description": "依 1 吋 / 2 吋 / 護照等標準尺寸裁切證件照，可設背景色與 DPI"
+        },
+        "ja": {
+          "name": "証明写真作成",
+          "description": "1 寸 / 2 寸 / パスポートなど標準サイズで切り抜き、背景色と DPI を設定"
+        },
+        "fr": {
+          "name": "Photo d'identité",
+          "description": "Recadrer aux formats standards (1 pouce, 2 pouces, passeport) avec fond et DPI"
+        },
+        "de": {
+          "name": "Passfoto-Ersteller",
+          "description": "Auf Standardgrößen zuschneiden (1 Zoll, 2 Zoll, Pass) mit Hintergrund und DPI"
+        },
+        "it": {
+          "name": "Foto tessera",
+          "description": "Ritaglia a formati standard (1”, 2”, passaporto) con sfondo e DPI"
+        },
+        "es": {
+          "name": "Foto carnet",
+          "description": "Recorta a tamaños estándar (1”, 2”, pasaporte) con fondo y DPI"
+        },
+        "pt": {
+          "name": "Foto 3x4",
+          "description": "Recorta para tamanhos padrão (1”, 2”, passaporte) com fundo e DPI"
+        }
+      },
+      "ui": {
+        "zh": {
+          "size": "尺寸",
+          "dpi": "DPI",
+          "background": "背景色",
+          "format": "格式",
+          "dropHint": "拖入图片以制作证件照",
+          "preview": "预览",
+          "sizes.one-inch": "1 寸 ({{w}}×{{h}}mm)",
+          "sizes.small-one": "小 1 寸 ({{w}}×{{h}}mm)",
+          "sizes.large-one": "大 1 寸 ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 寸 ({{w}}×{{h}}mm)",
+          "sizes.small-two": "小 2 寸 ({{w}}×{{h}}mm)",
+          "sizes.passport": "护照 ({{w}}×{{h}}mm)",
+          "sizes.visa": "签证 ({{w}}×{{h}}mm)",
+          "sizes.driver": "驾照 ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "未知尺寸",
+          "errors.INVALID_DPI": "DPI 需在 30–1200",
+          "errors.LOAD": "图片加载失败"
+        },
+        "en": {
+          "size": "Size",
+          "dpi": "DPI",
+          "background": "Background",
+          "format": "Format",
+          "dropHint": "Drop a photo to process",
+          "preview": "Preview",
+          "sizes.one-inch": "1 inch ({{w}}×{{h}}mm)",
+          "sizes.small-one": "Small 1 inch ({{w}}×{{h}}mm)",
+          "sizes.large-one": "Large 1 inch ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 inch ({{w}}×{{h}}mm)",
+          "sizes.small-two": "Small 2 inch ({{w}}×{{h}}mm)",
+          "sizes.passport": "Passport ({{w}}×{{h}}mm)",
+          "sizes.visa": "Visa ({{w}}×{{h}}mm)",
+          "sizes.driver": "Driver license ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "Unknown size",
+          "errors.INVALID_DPI": "DPI must be 30–1200",
+          "errors.LOAD": "Failed to load image"
+        },
+        "zh-TW": {
+          "size": "尺寸",
+          "dpi": "DPI",
+          "background": "背景色",
+          "format": "格式",
+          "dropHint": "拖入圖片以製作證件照",
+          "preview": "預覽",
+          "sizes.one-inch": "1 吋 ({{w}}×{{h}}mm)",
+          "sizes.small-one": "小 1 吋 ({{w}}×{{h}}mm)",
+          "sizes.large-one": "大 1 吋 ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 吋 ({{w}}×{{h}}mm)",
+          "sizes.small-two": "小 2 吋 ({{w}}×{{h}}mm)",
+          "sizes.passport": "護照 ({{w}}×{{h}}mm)",
+          "sizes.visa": "簽證 ({{w}}×{{h}}mm)",
+          "sizes.driver": "駕照 ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "未知尺寸",
+          "errors.INVALID_DPI": "DPI 需在 30–1200",
+          "errors.LOAD": "圖片載入失敗"
+        },
+        "ja": {
+          "size": "サイズ",
+          "dpi": "DPI",
+          "background": "背景色",
+          "format": "形式",
+          "dropHint": "写真をドロップして作成",
+          "preview": "プレビュー",
+          "sizes.one-inch": "1 寸 ({{w}}×{{h}}mm)",
+          "sizes.small-one": "小 1 寸 ({{w}}×{{h}}mm)",
+          "sizes.large-one": "大 1 寸 ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 寸 ({{w}}×{{h}}mm)",
+          "sizes.small-two": "小 2 寸 ({{w}}×{{h}}mm)",
+          "sizes.passport": "パスポート ({{w}}×{{h}}mm)",
+          "sizes.visa": "ビザ ({{w}}×{{h}}mm)",
+          "sizes.driver": "運転免許 ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "不明なサイズ",
+          "errors.INVALID_DPI": "DPI は 30–1200",
+          "errors.LOAD": "画像の読み込みに失敗"
+        },
+        "fr": {
+          "size": "Taille",
+          "dpi": "DPI",
+          "background": "Fond",
+          "format": "Format",
+          "dropHint": "Déposez une photo à traiter",
+          "preview": "Aperçu",
+          "sizes.one-inch": "1 pouce ({{w}}×{{h}}mm)",
+          "sizes.small-one": "Petit 1 pouce ({{w}}×{{h}}mm)",
+          "sizes.large-one": "Grand 1 pouce ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 pouces ({{w}}×{{h}}mm)",
+          "sizes.small-two": "Petit 2 pouces ({{w}}×{{h}}mm)",
+          "sizes.passport": "Passeport ({{w}}×{{h}}mm)",
+          "sizes.visa": "Visa ({{w}}×{{h}}mm)",
+          "sizes.driver": "Permis ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "Taille inconnue",
+          "errors.INVALID_DPI": "DPI entre 30 et 1200",
+          "errors.LOAD": "Échec du chargement"
+        },
+        "de": {
+          "size": "Größe",
+          "dpi": "DPI",
+          "background": "Hintergrund",
+          "format": "Format",
+          "dropHint": "Foto zum Verarbeiten ablegen",
+          "preview": "Vorschau",
+          "sizes.one-inch": "1 Zoll ({{w}}×{{h}}mm)",
+          "sizes.small-one": "Klein 1 Zoll ({{w}}×{{h}}mm)",
+          "sizes.large-one": "Groß 1 Zoll ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 Zoll ({{w}}×{{h}}mm)",
+          "sizes.small-two": "Klein 2 Zoll ({{w}}×{{h}}mm)",
+          "sizes.passport": "Reisepass ({{w}}×{{h}}mm)",
+          "sizes.visa": "Visum ({{w}}×{{h}}mm)",
+          "sizes.driver": "Führerschein ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "Unbekannte Größe",
+          "errors.INVALID_DPI": "DPI muss 30–1200 sein",
+          "errors.LOAD": "Bild konnte nicht geladen werden"
+        },
+        "it": {
+          "size": "Dimensione",
+          "dpi": "DPI",
+          "background": "Sfondo",
+          "format": "Formato",
+          "dropHint": "Trascina una foto da elaborare",
+          "preview": "Anteprima",
+          "sizes.one-inch": "1 pollice ({{w}}×{{h}}mm)",
+          "sizes.small-one": "Piccolo 1 pollice ({{w}}×{{h}}mm)",
+          "sizes.large-one": "Grande 1 pollice ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 pollici ({{w}}×{{h}}mm)",
+          "sizes.small-two": "Piccolo 2 pollici ({{w}}×{{h}}mm)",
+          "sizes.passport": "Passaporto ({{w}}×{{h}}mm)",
+          "sizes.visa": "Visto ({{w}}×{{h}}mm)",
+          "sizes.driver": "Patente ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "Dimensione sconosciuta",
+          "errors.INVALID_DPI": "DPI tra 30 e 1200",
+          "errors.LOAD": "Caricamento immagine non riuscito"
+        },
+        "es": {
+          "size": "Tamaño",
+          "dpi": "DPI",
+          "background": "Fondo",
+          "format": "Formato",
+          "dropHint": "Suelta una foto para procesar",
+          "preview": "Vista previa",
+          "sizes.one-inch": "1 pulgada ({{w}}×{{h}}mm)",
+          "sizes.small-one": "Pequeña 1 pulgada ({{w}}×{{h}}mm)",
+          "sizes.large-one": "Grande 1 pulgada ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 pulgadas ({{w}}×{{h}}mm)",
+          "sizes.small-two": "Pequeña 2 pulgadas ({{w}}×{{h}}mm)",
+          "sizes.passport": "Pasaporte ({{w}}×{{h}}mm)",
+          "sizes.visa": "Visado ({{w}}×{{h}}mm)",
+          "sizes.driver": "Carné ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "Tamaño desconocido",
+          "errors.INVALID_DPI": "DPI entre 30 y 1200",
+          "errors.LOAD": "Error al cargar la imagen"
+        },
+        "pt": {
+          "size": "Tamanho",
+          "dpi": "DPI",
+          "background": "Fundo",
+          "format": "Formato",
+          "dropHint": "Solte uma foto para processar",
+          "preview": "Pré-visualização",
+          "sizes.one-inch": "1 polegada ({{w}}×{{h}}mm)",
+          "sizes.small-one": "Pequena 1 polegada ({{w}}×{{h}}mm)",
+          "sizes.large-one": "Grande 1 polegada ({{w}}×{{h}}mm)",
+          "sizes.two-inch": "2 polegadas ({{w}}×{{h}}mm)",
+          "sizes.small-two": "Pequena 2 polegadas ({{w}}×{{h}}mm)",
+          "sizes.passport": "Passaporte ({{w}}×{{h}}mm)",
+          "sizes.visa": "Visto ({{w}}×{{h}}mm)",
+          "sizes.driver": "Carteira ({{w}}×{{h}}mm)",
+          "errors.UNKNOWN_SIZE": "Tamanho desconhecido",
+          "errors.INVALID_DPI": "DPI entre 30 e 1200",
+          "errors.LOAD": "Falha ao carregar a imagem"
+        }
+      }
+    },
+    "http-status": {
+      "meta": {
+        "zh": {
+          "name": "HTTP 状态码速查",
+          "description": "HTTP 状态码大全：分类、标准名称与含义，支持搜索"
+        },
+        "en": {
+          "name": "HTTP Status Codes",
+          "description": "HTTP status code reference with class, name and meaning, searchable"
+        },
+        "zh-TW": {
+          "name": "HTTP 狀態碼速查",
+          "description": "HTTP 狀態碼大全：分類、標準名稱與含義，支援搜尋"
+        },
+        "ja": {
+          "name": "HTTP ステータスコード",
+          "description": "HTTP ステータスコード一覧（分類・名称・意味、検索対応）"
+        },
+        "fr": {
+          "name": "Codes HTTP",
+          "description": "Référence des codes de statut HTTP avec classe, nom et signification"
+        },
+        "de": {
+          "name": "HTTP-Statuscodes",
+          "description": "HTTP-Statuscode-Referenz mit Klasse, Name und Bedeutung, durchsuchbar"
+        },
+        "it": {
+          "name": "Codici HTTP",
+          "description": "Riferimento dei codici di stato HTTP con classe, nome e significato"
+        },
+        "es": {
+          "name": "Códigos HTTP",
+          "description": "Referencia de códigos de estado HTTP con clase, nombre y significado"
+        },
+        "pt": {
+          "name": "Códigos HTTP",
+          "description": "Referência de códigos de status HTTP com classe, nome e significado"
+        }
+      },
+      "ui": {
+        "zh": {
+          "search": "搜索",
+          "searchPlaceholder": "搜索状态码、名称或说明",
+          "count": "共 {{count}} 条"
+        },
+        "en": {
+          "search": "Search",
+          "searchPlaceholder": "Search code, name or description",
+          "count": "{{count}} results"
+        },
+        "zh-TW": {
+          "search": "搜尋",
+          "searchPlaceholder": "搜尋狀態碼、名稱或說明",
+          "count": "共 {{count}} 筆"
+        },
+        "ja": {
+          "search": "検索",
+          "searchPlaceholder": "コード・名称・説明で検索",
+          "count": "{{count}} 件"
+        },
+        "fr": {
+          "search": "Rechercher",
+          "searchPlaceholder": "Rechercher code, nom ou description",
+          "count": "{{count}} résultats"
+        },
+        "de": {
+          "search": "Suchen",
+          "searchPlaceholder": "Code, Name oder Beschreibung suchen",
+          "count": "{{count}} Ergebnisse"
+        },
+        "it": {
+          "search": "Cerca",
+          "searchPlaceholder": "Cerca codice, nome o descrizione",
+          "count": "{{count}} risultati"
+        },
+        "es": {
+          "search": "Buscar",
+          "searchPlaceholder": "Buscar código, nombre o descripción",
+          "count": "{{count}} resultados"
+        },
+        "pt": {
+          "search": "Pesquisar",
+          "searchPlaceholder": "Pesquisar código, nome ou descrição",
+          "count": "{{count}} resultados"
+        }
+      }
+    },
+    "mime-types": {
+      "meta": {
+        "zh": {
+          "name": "MIME 类型速查",
+          "description": "常见文件扩展名与 MIME 类型对照表，支持搜索与反查"
+        },
+        "en": {
+          "name": "MIME Types",
+          "description": "Common file extension to MIME type reference, searchable"
+        },
+        "zh-TW": {
+          "name": "MIME 類型速查",
+          "description": "常見副檔名與 MIME 類型對照表，支援搜尋與反查"
+        },
+        "ja": { "name": "MIME タイプ", "description": "拡張子と MIME タイプの対応表（検索対応）" },
+        "fr": {
+          "name": "Types MIME",
+          "description": "Table de correspondance extension / type MIME, avec recherche"
+        },
+        "de": {
+          "name": "MIME-Typen",
+          "description": "Tabelle Dateiendung ↔ MIME-Typ, durchsuchbar"
+        },
+        "it": { "name": "Tipi MIME", "description": "Tabella estensione ↔ tipo MIME, con ricerca" },
+        "es": { "name": "Tipos MIME", "description": "Tabla extensión ↔ tipo MIME, con búsqueda" },
+        "pt": { "name": "Tipos MIME", "description": "Tabela extensão ↔ tipo MIME, com pesquisa" }
+      },
+      "ui": {
+        "zh": {
+          "search": "搜索",
+          "searchPlaceholder": "搜索扩展名或 MIME 类型",
+          "count": "共 {{count}} 条"
+        },
+        "en": {
+          "search": "Search",
+          "searchPlaceholder": "Search extension or MIME type",
+          "count": "{{count}} results"
+        },
+        "zh-TW": {
+          "search": "搜尋",
+          "searchPlaceholder": "搜尋副檔名或 MIME 類型",
+          "count": "共 {{count}} 筆"
+        },
+        "ja": {
+          "search": "検索",
+          "searchPlaceholder": "拡張子または MIME で検索",
+          "count": "{{count}} 件"
+        },
+        "fr": {
+          "search": "Rechercher",
+          "searchPlaceholder": "Rechercher une extension ou un type MIME",
+          "count": "{{count}} résultats"
+        },
+        "de": {
+          "search": "Suchen",
+          "searchPlaceholder": "Endung oder MIME-Typ suchen",
+          "count": "{{count}} Ergebnisse"
+        },
+        "it": {
+          "search": "Cerca",
+          "searchPlaceholder": "Cerca estensione o tipo MIME",
+          "count": "{{count}} risultati"
+        },
+        "es": {
+          "search": "Buscar",
+          "searchPlaceholder": "Buscar extensión o tipo MIME",
+          "count": "{{count}} resultados"
+        },
+        "pt": {
+          "search": "Pesquisar",
+          "searchPlaceholder": "Pesquisar extensão ou tipo MIME",
+          "count": "{{count}} resultados"
+        }
+      }
+    },
+    "git-cheatsheet": {
+      "meta": {
+        "zh": {
+          "name": "Git 命令速查",
+          "description": "按分类整理的常用 Git 命令速查表，支持搜索"
+        },
+        "en": {
+          "name": "Git Cheatsheet",
+          "description": "Categorized common Git commands with search"
+        },
+        "zh-TW": {
+          "name": "Git 命令速查",
+          "description": "按分類整理的常用 Git 命令速查表，支援搜尋"
+        },
+        "ja": {
+          "name": "Git コマンド一覧",
+          "description": "カテゴリ別のよく使う Git コマンド集（検索対応）"
+        },
+        "fr": {
+          "name": "Aide-mémoire Git",
+          "description": "Commandes Git courantes classées par catégorie, avec recherche"
+        },
+        "de": { "name": "Git-Spickzettel", "description": "Kategorisierte Git-Befehle mit Suche" },
+        "it": {
+          "name": "Cheatsheet Git",
+          "description": "Comandi Git comuni per categoria, con ricerca"
+        },
+        "es": {
+          "name": "Chuleta de Git",
+          "description": "Comandos Git comunes por categoría, con búsqueda"
+        },
+        "pt": {
+          "name": "Cola do Git",
+          "description": "Comandos Git comuns por categoria, com pesquisa"
+        }
+      },
+      "ui": {
+        "zh": {
+          "search": "搜索",
+          "searchPlaceholder": "搜索 Git 命令或说明",
+          "categories.setup": "配置与初始化",
+          "categories.commit": "提交与暂存",
+          "categories.branch": "分支",
+          "categories.remote": "远程",
+          "categories.undo": "撤销与回退",
+          "categories.log": "查看与日志",
+          "categories.stash": "暂存 (stash)",
+          "categories.tag": "标签"
+        },
+        "en": {
+          "search": "Search",
+          "searchPlaceholder": "Search a Git command or description",
+          "categories.setup": "Setup",
+          "categories.commit": "Commit & staging",
+          "categories.branch": "Branching",
+          "categories.remote": "Remote",
+          "categories.undo": "Undo & reset",
+          "categories.log": "Inspect & log",
+          "categories.stash": "Stash",
+          "categories.tag": "Tags"
+        },
+        "zh-TW": {
+          "search": "搜尋",
+          "searchPlaceholder": "搜尋 Git 命令或說明",
+          "categories.setup": "設定與初始化",
+          "categories.commit": "提交與暫存",
+          "categories.branch": "分支",
+          "categories.remote": "遠端",
+          "categories.undo": "撤銷與回退",
+          "categories.log": "檢視與日誌",
+          "categories.stash": "暫存 (stash)",
+          "categories.tag": "標籤"
+        },
+        "ja": {
+          "search": "検索",
+          "searchPlaceholder": "Git コマンドまたは説明で検索",
+          "categories.setup": "設定と初期化",
+          "categories.commit": "コミットとステージ",
+          "categories.branch": "ブランチ",
+          "categories.remote": "リモート",
+          "categories.undo": "取り消しとリセット",
+          "categories.log": "確認と履歴",
+          "categories.stash": "スタッシュ",
+          "categories.tag": "タグ"
+        },
+        "fr": {
+          "search": "Rechercher",
+          "searchPlaceholder": "Rechercher une commande ou description",
+          "categories.setup": "Configuration",
+          "categories.commit": "Commit et index",
+          "categories.branch": "Branches",
+          "categories.remote": "Dépôt distant",
+          "categories.undo": "Annuler et réinitialiser",
+          "categories.log": "Inspection et journal",
+          "categories.stash": "Remisage",
+          "categories.tag": "Étiquettes"
+        },
+        "de": {
+          "search": "Suchen",
+          "searchPlaceholder": "Git-Befehl oder Beschreibung suchen",
+          "categories.setup": "Einrichtung",
+          "categories.commit": "Commit & Staging",
+          "categories.branch": "Branches",
+          "categories.remote": "Remote",
+          "categories.undo": "Rückgängig & Reset",
+          "categories.log": "Prüfen & Log",
+          "categories.stash": "Stash",
+          "categories.tag": "Tags"
+        },
+        "it": {
+          "search": "Cerca",
+          "searchPlaceholder": "Cerca un comando Git o descrizione",
+          "categories.setup": "Configurazione",
+          "categories.commit": "Commit e staging",
+          "categories.branch": "Branch",
+          "categories.remote": "Remoto",
+          "categories.undo": "Annulla e reset",
+          "categories.log": "Ispezione e log",
+          "categories.stash": "Stash",
+          "categories.tag": "Tag"
+        },
+        "es": {
+          "search": "Buscar",
+          "searchPlaceholder": "Busca un comando Git o descripción",
+          "categories.setup": "Configuración",
+          "categories.commit": "Commit y staging",
+          "categories.branch": "Ramas",
+          "categories.remote": "Remoto",
+          "categories.undo": "Deshacer y reset",
+          "categories.log": "Inspección y log",
+          "categories.stash": "Stash",
+          "categories.tag": "Etiquetas"
+        },
+        "pt": {
+          "search": "Pesquisar",
+          "searchPlaceholder": "Pesquise um comando Git ou descrição",
+          "categories.setup": "Configuração",
+          "categories.commit": "Commit e staging",
+          "categories.branch": "Branches",
+          "categories.remote": "Remoto",
+          "categories.undo": "Desfazer e reset",
+          "categories.log": "Inspeção e log",
+          "categories.stash": "Stash",
+          "categories.tag": "Tags"
+        }
+      }
+    }
+  }
+}
