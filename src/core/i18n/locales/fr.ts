@@ -3,7 +3,7 @@ import type { TranslationResources } from '../types';
 /** French translation resources */
 const fr = {
   app: {
-    docTitle: 'SynTools · Boîte à outils en ligne pour développeurs',
+    docTitle: 'SynTools · Boîte à outils en ligne',
   },
   header: {
     openMenu: 'Ouvrir le menu',
@@ -25,7 +25,7 @@ const fr = {
     collapseAll: 'Replier toutes les catégories',
   },
   home: {
-    title: 'Boîte à outils en ligne pour développeurs',
+    title: 'Boîte à outils en ligne',
     tagline:
       'Traitement local d’abord ; les données restent dans votre navigateur (CSP, zéro envoi) · Appuyez sur <1>⌘K</1> ou <3>/</3> pour rechercher',
     favorites: 'Favoris',

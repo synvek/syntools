@@ -3,7 +3,7 @@ import type { TranslationResources } from '../types';
 /** Italian translation resources */
 const it = {
   app: {
-    docTitle: 'SynTools · Toolbox online per sviluppatori',
+    docTitle: 'SynTools · Toolbox online',
   },
   header: {
     openMenu: 'Apri menu',
@@ -25,7 +25,7 @@ const it = {
     collapseAll: 'Comprimi tutte le categorie',
   },
   home: {
-    title: 'Toolbox online per sviluppatori',
+    title: 'Toolbox online',
     tagline:
       'Elaborazione prima locale; i dati rimangono nel browser (CSP, zero uscita) · Premi <1>⌘K</1> o <3>/</3> per cercare',
     favorites: 'Preferiti',

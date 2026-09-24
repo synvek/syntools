@@ -2,9 +2,9 @@
 
 **English** | [简体中文](./README.zh-CN.md)
 
-**A privacy-first, browser-local toolkit for developers.**
+**A privacy-first, browser-local toolkit for everyone — developers, office users, and anyone handling documents.**
 
-SynTools is a unified collection of everyday utilities — encoding, formatting, hashing, image/PDF processing, generators, and more — that run entirely in your browser. No install, no account, and by default **your data never leaves the device**.
+SynTools is a unified collection of everyday utilities — office documents (Word / Excel / PowerPoint), PDF processing, image & photo editing, encoding, formatting, hashing, generators, and more — that run entirely in your browser. No install, no account, and by default **your data never leaves the device**.
 
 You can access online: www.syntools.net
 
@@ -12,11 +12,14 @@ You can access online: www.syntools.net
 
 ## Why SynTools?
 
-| Pain point                                      | How SynTools helps                          |
-| ----------------------------------------------- | ------------------------------------------- |
-| Tools scattered across many ad-heavy sites      | One consistent UI and a single search entry |
-| Uploading sensitive text to third-party servers | Pure client-side computation (default)      |
-| Re-finding the same utilities every day         | Favorites, recent history, and ⌘K search    |
+| Pain point                                         | How SynTools helps                                  |
+| -------------------------------------------------- | --------------------------------------------------- |
+| Tools scattered across many ad-heavy sites         | One consistent UI and a single search entry         |
+| Uploading sensitive text to third-party servers    | Pure client-side computation (default)              |
+| Re-finding the same utilities every day            | Favorites, recent history, and ⌘K search            |
+| Editing a `.docx` / `.xlsx` / `.pptx` needs Office | Browser-based editors — no install, no license      |
+| PDF and image tasks behind sign-up or paywalls     | Full PDF and photo toolsets, free and local         |
+| Contracts or reports uploaded to online converters | Files are parsed and exported on-device, end to end |
 
 **Core values**
 
@@ -25,15 +28,24 @@ You can access online: www.syntools.net
 3. **Consistency** — shared layout, IO panels, copy/download, and error handling
 4. **Extensibility** — registry-driven plugins; add a tool with one directory + one registration line
 
+### Who is it for?
+
+SynTools started as a developer toolbox, but it is no longer developer-only:
+
+- **Developers** — encoding, formatters, regex, hashes, JWT, UUIDs, cron, …
+- **Office & document work** — Word / Excel / PowerPoint editors, flowcharts, mind maps, full PDF toolset
+- **Design & media** — photo editor with layers and PSD export, image compress / crop / watermark, GIF frames
+- **Everyday tasks** — calculators, unit & length converters, BMI, QR codes, countdowns, charts
+
 ---
 
 ## Features
 
-- **90+ tools** across encoding, text, formatting, crypto, datetime, generators, network, image, PDF, and more
+- **110+ tools** across encoding, text, formatting, crypto, datetime, generators, network, image, PDF, office documents, and more
 - **Global search** — `⌘/Ctrl + K` or `/` (when not typing in an input)
 - **Recent & favorites** — stored in `localStorage` on your machine
 - **Light / dark theme** — system preference by default, no flash on load
-- **i18n-ready** — Chinese and English locale strings
+- **i18n-ready** — 9 locales: 简体中文 / English / 繁體中文 / 日本語 / Français / Deutsch / Italiano / Español / Português
 - **Lazy-loaded tools** — the app shell stays small; each tool loads on demand
 - **Static deploy** — works on GitHub Pages, Vercel, Cloudflare Pages, or any static host
 - **Desktop app** — optional Tauri packaging for macOS / Windows / Linux
@@ -42,21 +54,36 @@ You can access online: www.syntools.net
 
 ## Tool categories
 
-| Category     | Examples                                                                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Office Tools | Word Processor (Word .docx import/export, two PDF export modes), spreadsheet editor (Excel .xlsx import/export, formulas & multi-sheet), slides editor (PPTX import/export, Konva canvas editing & slideshow) |
-| Encoding     | Base64, URL codec, Unicode, HTML entities, ASCII table                                                                                                                                                        |
-| Text         | Regex tester, text diff, case convert, counter, pinyin, zh convert                                                                                                                                            |
-| Formatting   | JSON / SQL / HTML / JS / CSS / XML formatters, Markdown preview                                                                                                                                               |
-| Crypto       | Hash, JWT parser, password generator                                                                                                                                                                          |
-| Date & time  | Timestamp, calendar, countdown, stopwatch, cron parse/generate                                                                                                                                                |
-| Generators   | UUID, QR code, random string/number, placeholder image, CSS gradient                                                                                                                                          |
-| Image        | Compress, crop, merge, watermark, GIF frames, SVG→PNG, Base64, ICO                                                                                                                                            |
-| PDF          | Merge, split, rotate, encrypt, annotate, to/from image, page numbers, sign                                                                                                                                    |
-| Network      | UA parser                                                                                                                                                                                                     |
-| Other        | Calculator, MBTI, AI prompts, Mermaid, mind map, chart generator, …                                                                                                                                           |
+| Category     | Examples                                                                                                                                                                                                                                             |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Office Tools | Word processor (.docx), spreadsheets (.xlsx, formulas & multi-sheet), slides (.pptx & slideshow), flowcharts (multi-page), mind maps (multi-canvas), photo editor (layers, masks, adjustment layers, PSD export) — see [Office tools](#office-tools) |
+| Encoding     | Base64, URL codec, Unicode, HTML entities, ASCII table                                                                                                                                                                                               |
+| Text         | Regex tester, text diff, case convert, counter, pinyin, zh convert                                                                                                                                                                                   |
+| Formatting   | JSON / SQL / HTML / JS / CSS / XML formatters, Markdown preview                                                                                                                                                                                      |
+| Crypto       | Hash, JWT parser, password generator                                                                                                                                                                                                                 |
+| Date & time  | Timestamp, calendar, countdown, stopwatch, cron parse/generate                                                                                                                                                                                       |
+| Generators   | UUID, QR code, random string/number, placeholder image, CSS gradient                                                                                                                                                                                 |
+| Image        | Compress, crop, merge, watermark, GIF frames, SVG→PNG, Base64, ICO                                                                                                                                                                                   |
+| PDF          | Merge, split, rotate, encrypt, annotate, to/from image, page numbers, sign                                                                                                                                                                           |
+| Network      | UA parser                                                                                                                                                                                                                                            |
+| Other        | Calculator, MBTI, AI prompts, Mermaid, chart generator, …                                                                                                                                                                                            |
 
 Browse the full list on the home page or in `src/core/registry/index.ts`.
+
+### Office tools
+
+A growing family of document-class editors — all run locally, all keep drafts on-device.
+
+| Tool               | Route                       | Highlights                                                                                                                                        |
+| ------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Word Processor     | `/tools/rich-text-editor`   | Word `.docx` import/export, two PDF export modes                                                                                                  |
+| Spreadsheet Editor | `/tools/spreadsheet-editor` | Excel `.xlsx` import/export, formulas, multi-sheet                                                                                                |
+| Slides Editor      | `/tools/slide-editor`       | PowerPoint `.pptx` import/export, Konva canvas editing, slideshow                                                                                 |
+| Flowchart Editor   | `/tools/flowchart-editor`   | Shapes & connectors, templates, auto-layout, **multi-page with thumbnail overview**, PNG/SVG                                                      |
+| Mind Map Editor    | `/tools/mindmap-editor`     | Keyboard-first editing, collapsible branches, themes, **multi-canvas with thumbnail overview**, PNG/SVG/Markdown                                  |
+| Photo Editor       | `/tools/photo-editor`       | Non-destructive layers (groups, masks, adjustment layers, smart objects), selections & crop, adjustments & filters, history panel, **PSD export** |
+
+Common traits: drafts autosave to `localStorage`, and exports stay editable in their target format (`.docx` / `.xlsx` / `.pptx` / PNG·SVG / PSD). Editors with several pages or canvases add a thumbnail overview plus `Ctrl/⌘ + PageUp / PageDown` to browse them; the flowchart and photo editors can also save a re-editable project JSON.
 
 ---
 
@@ -168,8 +195,8 @@ After registration, `/tools/<id>`, the sidebar group, home cards, and ⌘K searc
 
 ## Privacy & security
 
-- Client tools process input in the browser only; they must not send user content to remote endpoints.
-- Favorites, recent tools, and theme preference live in `localStorage` (`syntools:*` keys).
+- Client tools process input in the browser only — text, office documents, PDFs, and images alike — they must not send user content to remote endpoints.
+- Favorites, recent tools, and theme preference live in `localStorage` (`syntools:*` keys); editor drafts stay on-device too.
 - Production headers (CSP, COOP, Referrer-Policy, etc.) are configured in `vercel.json`.
 - Future server-backed tools (`ToolMeta.mode = 'server'`) will be labeled clearly before any data leaves the browser.
 
@@ -177,12 +204,12 @@ After registration, `/tools/<id>`, the sidebar group, home cards, and ⌘K searc
 
 ## Performance budget
 
-| Metric                       | Budget                        |
-| ---------------------------- | ----------------------------- |
-| App shell (gzip)             | ≤ 150 KB                      |
-| Individual tool chunk (gzip) | ≤ 100 KB (prefer far smaller) |
+| Metric                       | Budget                                                |
+| ---------------------------- | ----------------------------------------------------- |
+| First-screen entry (gzip)    | ≤ 185 KB                                              |
+| Individual lazy chunk (gzip) | ≤ 500 KB (heavy deps such as Univer / exceljs ≤ 2 MB) |
 
-Tools must use `component: () => import(...)` so they stay out of the initial bundle. Prefer the built-in `Icon` component over icon libraries.
+Enforced by `pnpm size` (`scripts/check-bundle-size.mjs`). Tools must use `component: () => import(...)` so they stay out of the initial bundle — heavy third-party dependencies belong in a tool's own async chunk (for example the photo editor's PSD writer loads `ag-psd` only when you export). Prefer the built-in `Icon` component over icon libraries.
 
 ---
 
@@ -222,5 +249,5 @@ CI runs `pnpm tauri:build` on **Linux / Windows / macOS** × **x64 / arm64** (6 
 ---
 
 <p align="center">
-  <sub>Built for developers who want fast, private, local tools in one place.</sub>
+  <sub>Built for anyone who wants fast, private, local tools — from code snippets to office documents and PDFs — in one place.</sub>
 </p>

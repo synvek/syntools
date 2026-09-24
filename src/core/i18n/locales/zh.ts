@@ -1,7 +1,7 @@
 /** 简体中文文案资源 */
 export default {
   app: {
-    docTitle: 'SynTools · 开发者在线工具集',
+    docTitle: 'SynTools · 在线工具集',
   },
   header: {
     openMenu: '打开菜单',
@@ -23,7 +23,7 @@ export default {
     collapseAll: '收起所有分类',
   },
   home: {
-    title: '开发者在线工具集',
+    title: '在线工具集',
     tagline: '默认本地计算、数据不出浏览器（CSP 零外发）· 按 <1>⌘K</1> 或 <3>/</3> 快速搜索',
     favorites: '我的收藏',
     recent: '最近使用',

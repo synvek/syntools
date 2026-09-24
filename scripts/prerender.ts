@@ -60,9 +60,9 @@ function buildSitemap(siteUrl: string, paths: string[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
-const SITE_NAME = 'SynTools - 开发者在线工具集';
+const SITE_NAME = 'SynTools - 在线工具集';
 const SITE_DESCRIPTION =
-  'SynTools 是免费的开发者在线工具集：JSON 格式化、Base64/URL 编解码、正则测试、文本对比、时间戳转换、UUID/密码生成、哈希计算、二维码、颜色与进制转换、Markdown 预览、图片压缩等，纯前端处理，数据不离开浏览器。';
+  'SynTools 是免费的在线工具集：JSON 格式化、Base64/URL 编解码、正则测试、文本对比、时间戳转换、UUID/密码生成、哈希计算、二维码、颜色与进制转换、Markdown 预览、图片压缩、PDF 合并拆分加密、Word/Excel/PPT 在线编辑等，纯前端处理，数据不离开浏览器。';
 
 /** 经编程式 dev server 的 SSR 管线加载注册表（解析 @/ 别名） */
 async function loadTools(root: string): Promise<Pick<ToolMeta, 'id' | 'name' | 'description'>[]> {
@@ -148,7 +148,11 @@ export function prerenderPlugin(): Plugin {
       }
 
       // GitHub Pages：无服务端 SPA fallback，用 404.html 回退到应用壳
-      await writeFile(resolvePath(distDir, '404.html'), await readFile(indexPath, 'utf-8'), 'utf-8');
+      await writeFile(
+        resolvePath(distDir, '404.html'),
+        await readFile(indexPath, 'utf-8'),
+        'utf-8',
+      );
       // 禁止 Jekyll 处理，保留 _headers 等以下划线开头的文件
       await writeFile(resolvePath(distDir, '.nojekyll'), '', 'utf-8');
 

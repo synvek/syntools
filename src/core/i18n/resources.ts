@@ -6,7 +6,7 @@
 
 export const zh = {
   app: {
-    docTitle: 'SynTools · 开发者在线工具集',
+    docTitle: 'SynTools · 在线工具集',
   },
   header: {
     openMenu: '打开菜单',
@@ -21,7 +21,7 @@ export const zh = {
     closeMenu: '关闭菜单',
   },
   home: {
-    title: '开发者在线工具集',
+    title: '在线工具集',
     tagline: '数据不出浏览器 · 按 <1>⌘K</1> 或 <3>/</3> 快速搜索',
     favorites: '我的收藏',
     recent: '最近使用',
@@ -330,7 +330,7 @@ export const zh = {
 
 export const en: typeof zh = {
   app: {
-    docTitle: 'SynTools · Developer Online Toolbox',
+    docTitle: 'SynTools · Online Toolkit',
   },
   header: {
     openMenu: 'Open menu',
@@ -345,7 +345,7 @@ export const en: typeof zh = {
     closeMenu: 'Close menu',
   },
   home: {
-    title: 'Developer Online Toolbox',
+    title: 'Online Toolkit',
     tagline: 'Your data never leaves the browser · Press <1>⌘K</1> or <3>/</3> to search',
     favorites: 'Favorites',
     recent: 'Recently used',

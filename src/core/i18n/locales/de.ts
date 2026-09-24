@@ -3,7 +3,7 @@ import type { TranslationResources } from '../types';
 /** German translation resources */
 const de = {
   app: {
-    docTitle: 'SynTools · Online-Toolbox für Entwickler',
+    docTitle: 'SynTools · Online-Toolbox',
   },
   header: {
     openMenu: 'Menü öffnen',
@@ -25,7 +25,7 @@ const de = {
     collapseAll: 'Alle Kategorien einklappen',
   },
   home: {
-    title: 'Online-Toolbox für Entwickler',
+    title: 'Online-Toolbox',
     tagline:
       'Lokale Verarbeitung zuerst; Daten bleiben im Browser (CSP, kein Abfluss) · Drücken Sie <1>⌘K</1> oder <3>/</3> zum Suchen',
     favorites: 'Favoriten',

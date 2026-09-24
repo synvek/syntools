@@ -3,7 +3,7 @@ import type { TranslationResources } from '../types';
 /** Traditional Chinese — generated from zh (tify + TW phrase tweaks) */
 const zhTW = {
   app: {
-    docTitle: 'SynTools · 開發者在線工具集',
+    docTitle: 'SynTools · 在線工具集',
   },
   header: {
     openMenu: '打開選單',
@@ -25,7 +25,7 @@ const zhTW = {
     collapseAll: '收合所有分類',
   },
   home: {
-    title: '開發者在線工具集',
+    title: '在線工具集',
     tagline: '預設本地計算、資料不出瀏覽器（CSP 零外發）· 按 <1>⌘K</1> 或 <3>/</3> 快速搜尋',
     favorites: '我的收藏',
     recent: '最近使用',

@@ -3,7 +3,7 @@ import type { TranslationResources } from '../types';
 /** Portuguese translation resources */
 const pt = {
   app: {
-    docTitle: 'SynTools · Caixa de ferramentas online para programadores',
+    docTitle: 'SynTools · Caixa de ferramentas online',
   },
   header: {
     openMenu: 'Abrir menu',
@@ -25,7 +25,7 @@ const pt = {
     collapseAll: 'Recolher todas as categorias',
   },
   home: {
-    title: 'Caixa de ferramentas online para programadores',
+    title: 'Caixa de ferramentas online',
     tagline:
       'Processamento local primeiro; os dados ficam no seu browser (CSP, sem saída) · Prima <1>⌘K</1> ou <3>/</3> para pesquisar',
     favorites: 'Favoritos',

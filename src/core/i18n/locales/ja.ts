@@ -3,7 +3,7 @@ import type { TranslationResources } from '../types';
 /** Japanese translation resources */
 const ja = {
   app: {
-    docTitle: 'SynTools · 開発者向けオンラインツールボックス',
+    docTitle: 'SynTools · オンラインツールボックス',
   },
   header: {
     openMenu: 'メニューを開く',
@@ -25,7 +25,7 @@ const ja = {
     collapseAll: 'すべてのカテゴリを折りたたむ',
   },
   home: {
-    title: '開発者向けオンラインツールボックス',
+    title: 'オンラインツールボックス',
     tagline:
       'ローカル優先の処理；データはブラウザ内に留まります（CSP、ゼロ外送）· <1>⌘K</1> または <3>/</3> で検索',
     favorites: 'お気に入り',

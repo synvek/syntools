@@ -3,7 +3,7 @@ import type { TranslationResources } from '../types';
 /** English translation resources */
 const en = {
   app: {
-    docTitle: 'SynTools · Developer Online Toolbox',
+    docTitle: 'SynTools · Online Toolkit',
   },
   header: {
     openMenu: 'Open menu',
@@ -25,7 +25,7 @@ const en = {
     collapseAll: 'Collapse all categories',
   },
   home: {
-    title: 'Developer Online Toolbox',
+    title: 'Online Toolkit',
     tagline:
       'Local-first processing; data stays in your browser (CSP, zero egress) · Press <1>⌘K</1> or <3>/</3> to search',
     favorites: 'Favorites',

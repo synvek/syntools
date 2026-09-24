@@ -6,7 +6,7 @@ test('无偏好时跟随浏览器语言（en）', async ({ page }) => {
     localStorage.removeItem('syntools:settings.v1');
   });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Developer Online Toolbox' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Online Toolkit' })).toBeVisible();
   await expect(page.locator('#header-lang')).toHaveValue('en');
 });
 
@@ -18,7 +18,7 @@ test('浏览器 zh-CN 时默认简体中文', async ({ browser }) => {
     localStorage.removeItem('syntools:settings.v1');
   });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '开发者在线工具集' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '在线工具集' })).toBeVisible();
   await expect(page.locator('#header-lang')).toHaveValue('zh');
   await context.close();
 });
@@ -32,13 +32,13 @@ test('语言切换与刷新持久化', async ({ page }) => {
   const langSelect = page.locator('#header-lang');
 
   await langSelect.selectOption('zh');
-  await expect(page.getByRole('heading', { name: '开发者在线工具集' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '在线工具集' })).toBeVisible();
 
   await langSelect.selectOption('en');
-  await expect(page.getByRole('heading', { name: 'Developer Online Toolbox' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Online Toolkit' })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Developer Online Toolbox' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Online Toolkit' })).toBeVisible();
   await expect(langSelect).toHaveValue('en');
 });
 
@@ -47,13 +47,10 @@ test('无 langExplicit 的旧设置会重新检测语言', async ({ browser }) =
   const context = await browser.newContext({ locale: 'zh-CN' });
   const page = await context.newPage();
   await page.addInitScript(() => {
-    localStorage.setItem(
-      'syntools:settings.v1',
-      JSON.stringify({ theme: 'system', lang: 'en' }),
-    );
+    localStorage.setItem('syntools:settings.v1', JSON.stringify({ theme: 'system', lang: 'en' }));
   });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '开发者在线工具集' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '在线工具集' })).toBeVisible();
   await expect(page.locator('#header-lang')).toHaveValue('zh');
   await context.close();
 });
@@ -62,8 +59,8 @@ test('可切换到法语并显示本地化标题', async ({ page }) => {
   await page.goto('/');
   const langSelect = page.locator('#header-lang');
   await langSelect.selectOption('fr');
-  await expect(
-    page.getByRole('heading', { name: 'Boîte à outils en ligne pour développeurs' }),
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: 'Boîte à outils en ligne' })).toBeVisible({
+    timeout: 15000,
+  });
   await expect(langSelect).toHaveValue('fr');
 });
