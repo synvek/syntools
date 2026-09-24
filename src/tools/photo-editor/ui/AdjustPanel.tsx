@@ -24,7 +24,10 @@ export function AdjustPanel() {
   const patchActive = usePhotoStore((s) => s.patchActive);
   const layer = doc.layers.find((item) => item.id === doc.activeLayerId);
 
-  if (!layer || layer.kind !== 'raster') {
+  // 双模式：既可调「位图图层自带的调整」，也可调「调整图层」（后者作用于其下方全部内容）
+  const adjustable =
+    layer && (layer.kind === 'raster' || layer.kind === 'adjustment') ? layer : null;
+  if (!adjustable) {
     return (
       <div className="flex flex-col gap-2">
         <p className="px-1 py-4 text-center text-xs text-gray-400 dark:text-gray-500">
@@ -34,7 +37,7 @@ export function AdjustPanel() {
     );
   }
 
-  const value = layer.adjustments;
+  const value = adjustable.adjustments;
 
   return (
     <div className="flex flex-col gap-3">

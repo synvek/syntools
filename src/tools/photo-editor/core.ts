@@ -3,6 +3,10 @@ import type {
   Adjustments,
   BlendMode,
   FilterId,
+  GroupLayer,
+  HistoryEntry,
+  HistoryLabel,
+  Layer,
   PhotoDoc,
   Rect,
   Selection,
@@ -533,5 +537,213 @@ export function checkProjectFile(file: { name: string; size: number }): ToolResu
   return { ok: true, value: undefined };
 }
 
-/** 工程文件版本号：导入时据此拒绝未来 / 过旧格式 */
-export const PROJECT_VERSION = 1;
+/** 工程文件版本号：导入时据此拒绝未来格式，旧版本走 `model/migrate.ts` 归一 */
+export const PROJECT_VERSION = 2;
+
+/* ------------------------------------------------------------------ *
+ * 层栈：扁平数组 + parentId → 合成指令序列
+ * ------------------------------------------------------------------ */
+
+export type StackStep =
+  | { kind: 'group-begin'; layer: GroupLayer }
+  | { kind: 'group-end'; layer: GroupLayer }
+  | { kind: 'layer'; layer: Layer };
+
+/**
+ * 把 `doc.layers`（扁平、尾部为最上层）展开成可顺序合成的指令序列。
+ *
+ * 表示法约定：编组的子图层紧随编组之后，并用 `parentId` 指回编组；
+ * 因此这里按 parentId 建索引后递归即可。`parentId` 指向不存在 / 非编组时降级为顶层
+ * （旧工程或迁移异常时不至于丢图层）。
+ */
+export function flattenStack(doc: PhotoDoc): StackStep[] {
+  const knownIds = new Set(doc.layers.map((layer) => layer.id));
+  const childrenOf = new Map<string, Layer[]>();
+  const roots: Layer[] = [];
+
+  for (const layer of doc.layers) {
+    const parentId = layer.parentId ?? null;
+    if (parentId && knownIds.has(parentId)) {
+      const list = childrenOf.get(parentId);
+      if (list) list.push(layer);
+      else childrenOf.set(parentId, [layer]);
+    } else {
+      roots.push(layer);
+    }
+  }
+
+  const steps: StackStep[] = [];
+  const walk = (list: Layer[]) => {
+    for (const layer of list) {
+      if (layer.kind === 'group') {
+        steps.push({ kind: 'group-begin', layer });
+        walk(childrenOf.get(layer.id) ?? []);
+        steps.push({ kind: 'group-end', layer });
+      } else {
+        steps.push({ kind: 'layer', layer });
+      }
+    }
+  };
+  walk(roots);
+  return steps;
+}
+
+/** 子树 id（自身 + 全部后代），按 `doc.layers` 顺序 */
+export function subtreeIdsOf(doc: PhotoDoc, id: string): string[] {
+  const childrenOf = new Map<string, string[]>();
+  for (const layer of doc.layers) {
+    const parentId = layer.parentId ?? null;
+    if (!parentId) continue;
+    const list = childrenOf.get(parentId);
+    if (list) list.push(layer.id);
+    else childrenOf.set(parentId, [layer.id]);
+  }
+  const out: string[] = [];
+  const walk = (current: string) => {
+    out.push(current);
+    for (const child of childrenOf.get(current) ?? []) walk(child);
+  };
+  walk(id);
+  return out;
+}
+
+/** 编组的直接子图层（按层栈顺序） */
+export function childrenOfLayer(doc: PhotoDoc, id: string): Layer[] {
+  return doc.layers.filter((layer) => (layer.parentId ?? null) === id);
+}
+
+/**
+ * 把某图层（连同其子树）移动到目标父级下，返回新的层数组。
+ *
+ * 纯函数：不动原数组。落位规则——
+ * - 目标父级为 null → 移到最顶层（数组末尾）；
+ * - 目标为编组 → 紧跟在该编组子树之后（即成为组内最上层）；
+ * - 目标是自己的后代时拒绝（会形成环），原样返回。
+ */
+export function moveSubtree(layers: Layer[], id: string, targetParentId: string | null): Layer[] {
+  const byId = new Map(layers.map((layer) => [layer.id, layer] as const));
+  const moving = layers.find((layer) => layer.id === id);
+  if (!moving) return layers;
+
+  // 环检测：目标父级不能是自己的后代
+  if (targetParentId) {
+    const descendants = new Set<string>();
+    const walk = (current: string) => {
+      for (const child of layers.filter((layer) => (layer.parentId ?? null) === current)) {
+        descendants.add(child.id);
+        walk(child.id);
+      }
+    };
+    walk(id);
+    if (targetParentId === id || descendants.has(targetParentId)) return layers;
+    if (!byId.has(targetParentId)) return layers;
+  }
+
+  const movingIds = new Set<string>();
+  {
+    const walk = (current: string) => {
+      movingIds.add(current);
+      for (const child of layers.filter((layer) => (layer.parentId ?? null) === current)) {
+        walk(child.id);
+      }
+    };
+    walk(id);
+  }
+
+  const rest = layers.filter((layer) => !movingIds.has(layer.id));
+  const moved = layers
+    .filter((layer) => movingIds.has(layer.id))
+    .map((layer) => (layer.id === id ? { ...layer, parentId: targetParentId } : layer));
+
+  if (!targetParentId) return [...rest, ...moved];
+
+  // 落点：目标编组子树之后
+  const targetIds = new Set<string>();
+  {
+    const walk = (current: string) => {
+      targetIds.add(current);
+      for (const child of layers.filter((layer) => (layer.parentId ?? null) === current)) {
+        walk(child.id);
+      }
+    };
+    walk(targetParentId);
+  }
+  const at = rest.findIndex((layer) => targetIds.has(layer.id));
+  let insertAt = rest.length;
+  if (at >= 0) {
+    insertAt = at + 1;
+    while (insertAt < rest.length && targetIds.has(rest[insertAt].id)) insertAt += 1;
+  }
+  return [...rest.slice(0, insertAt), ...moved, ...rest.slice(insertAt)];
+}
+
+/** 祖先链（由外到内） */
+export function ancestorChainOf(doc: PhotoDoc, layer: Layer): Layer[] {
+  const byId = new Map(doc.layers.map((item) => [item.id, item] as const));
+  const chain: Layer[] = [];
+  let cursor = layer.parentId ?? null;
+  const guard = new Set<string>();
+  while (cursor && !guard.has(cursor)) {
+    guard.add(cursor);
+    const parent = byId.get(cursor);
+    if (!parent) break;
+    chain.unshift(parent);
+    cursor = parent.parentId ?? null;
+  }
+  return chain;
+}
+
+/** 编组会向下继承可见性：任一祖先不可见 → 子图层不可见 */
+export function effectiveVisible(doc: PhotoDoc, layer: Layer): boolean {
+  if (!layer.visible) return false;
+  return ancestorChainOf(doc, layer).every((parent) => parent.visible);
+}
+
+/** 锁定同样向下继承（Photoshop 行为：锁住的组内子图层也不可编辑） */
+export function effectiveLocked(doc: PhotoDoc, layer: Layer): boolean {
+  if (layer.locked) return true;
+  return ancestorChainOf(doc, layer).some((parent) => parent.locked);
+}
+
+/** 蒙版烘焙缓存键：蒙版像素或参数一变就换键；无蒙版返回 null */
+export function maskSignature(layer: Layer): string | null {
+  const mask = layer.mask;
+  if (!mask || !mask.assetId || !mask.enabled) return null;
+  return `${mask.assetId}:${mask.rev}:${mask.inverted ? 1 : 0}:${mask.density.toFixed(3)}:${mask.feather}`;
+}
+
+/** 历史面板的一行（纯展示数据：操作名键 + 时间 + 是否当前状态） */
+export interface HistoryRow {
+  label: HistoryLabel;
+  at: number;
+  current: boolean;
+}
+
+/**
+ * 由 past / future 推导面板行序列。
+ * 行序列即「时间轴」：0 = 最初状态，past.length = 当前，末尾 = 可重做的最远状态。
+ * 面板点击第 i 行 → `jumpTo(i)`。
+ */
+export function historyTimeline(past: HistoryEntry[], future: HistoryEntry[]): HistoryRow[] {
+  const rows: HistoryRow[] = past.map((entry, index) => ({
+    label: index === 0 ? 'histOpen' : past[index - 1].label,
+    at: index === 0 ? entry.at : past[index - 1].at,
+    current: false,
+  }));
+  rows.push({
+    label: past.length > 0 ? past[past.length - 1].label : 'histOpen',
+    at: past.length > 0 ? past[past.length - 1].at : 0,
+    current: true,
+  });
+  for (const entry of future) rows.push({ label: entry.label, at: entry.at, current: false });
+  return rows;
+}
+
+/** 图层引用的全部资产 id（位图 / 智能对象源 / 蒙版），供资产回收与序列化使用 */
+export function layerAssetIds(layer: Layer): string[] {
+  const ids: string[] = [];
+  if (layer.kind === 'raster' && layer.assetId) ids.push(layer.assetId);
+  if (layer.kind === 'smart' && layer.sourceAssetId) ids.push(layer.sourceAssetId);
+  if (layer.mask?.assetId) ids.push(layer.mask.assetId);
+  return ids;
+}

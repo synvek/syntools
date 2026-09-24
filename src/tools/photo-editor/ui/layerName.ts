@@ -12,7 +12,17 @@ export function layerDisplayName(layer: Layer, layers: Layer[], t: TFunction): s
   const sameKind = layers.filter((item) => item.kind === layer.kind);
   const index = Math.max(1, sameKind.indexOf(layer) + 1);
   const key =
-    layer.kind === 'text' ? 'layerText' : layer.kind === 'shape' ? 'layerShape' : 'layerRaster';
+    layer.kind === 'text'
+      ? 'layerText'
+      : layer.kind === 'shape'
+        ? 'layerShape'
+        : layer.kind === 'group'
+          ? 'layerGroup'
+          : layer.kind === 'adjustment'
+            ? 'layerAdjust'
+            : layer.kind === 'smart'
+              ? 'layerSmart'
+              : 'layerRaster';
   return t(`tools.photo.${key}`, { n: index });
 }
 

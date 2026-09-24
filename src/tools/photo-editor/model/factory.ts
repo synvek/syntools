@@ -2,11 +2,16 @@ import type { ToolResult } from '@/core/types';
 import { CANVAS_PRESETS, MAX_CANVAS_SIZE, MIN_CANVAS_SIZE } from '../core';
 import type {
   Adjustments,
+  FilterId,
+  AdjustmentLayer,
+  GroupLayer,
   Layer,
+  MaskRef,
   PhotoDoc,
   RasterLayer,
   ShapeKind,
   ShapeLayer,
+  SmartLayer,
   TextLayer,
 } from './types';
 
@@ -36,10 +41,28 @@ export function cloneDoc(doc: PhotoDoc): PhotoDoc {
   return JSON.parse(JSON.stringify(doc)) as PhotoDoc;
 }
 
+/**
+ * 深拷贝图层（JSON 往返，与 cloneDoc 同一策略）。
+ * 注意：**只复制 `assetId` / `mask.assetId` 引用，不复制像素**——
+ * 调用方若需要独立像素（复制图层、像素级撤销快照），须额外 `cloneAsset()` 克隆画布。
+ */
 export function cloneLayer(layer: Layer, newId = false): Layer {
   const copy = JSON.parse(JSON.stringify(layer)) as Layer;
   if (newId) copy.id = createId(layer.kind);
   return copy;
+}
+
+/** 新蒙版引用：白色满蒙版（全部显示）由调用方填充像素后传入 assetId */
+export function createMaskRef(assetId: string, patch: Partial<MaskRef> = {}): MaskRef {
+  return {
+    assetId,
+    rev: 1,
+    enabled: true,
+    inverted: false,
+    density: 1,
+    feather: 0,
+    ...patch,
+  };
 }
 
 export interface NewDocOptions {
@@ -164,6 +187,101 @@ export function createTextLayer(input: {
     underline: false,
     align: 'left',
     lineHeight: 1.4,
+  };
+}
+
+/**
+ * 编组：新建时为空组（随后由 UI 把选中图层移入）。
+ * 默认「穿透」= true，与 Photoshop 新建组的默认行为一致。
+ */
+export function createGroupLayer(input: {
+  doc: PhotoDoc;
+  name?: string;
+  passThrough?: boolean;
+}): GroupLayer {
+  return {
+    id: createId('group'),
+    kind: 'group',
+    name: input.name ?? '',
+    visible: true,
+    locked: false,
+    opacity: 1,
+    blend: 'normal',
+    x: 0,
+    y: 0,
+    width: input.doc.width,
+    height: input.doc.height,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+    parentId: null,
+    expanded: true,
+    mask: null,
+    passThrough: input.passThrough ?? true,
+  };
+}
+
+/** 调整图层：默认参数全 0（等于不影响），作用范围是其下方所有图层 */
+export function createAdjustmentLayer(input: {
+  doc: PhotoDoc;
+  adjustments?: Partial<Adjustments>;
+  filters?: FilterId[];
+  name?: string;
+}): AdjustmentLayer {
+  return {
+    id: createId('adjust'),
+    kind: 'adjustment',
+    name: input.name ?? '',
+    visible: true,
+    locked: false,
+    opacity: 1,
+    blend: 'normal',
+    x: 0,
+    y: 0,
+    width: input.doc.width,
+    height: input.doc.height,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+    parentId: null,
+    expanded: true,
+    mask: null,
+    adjustments: { ...createAdjustments(), ...input.adjustments },
+    filters: input.filters ?? [],
+  };
+}
+
+/** 智能对象：源像素尺寸与呈现尺寸分离，缩放不重采样 */
+export function createSmartLayer(input: {
+  doc: PhotoDoc;
+  sourceAssetId: string;
+  sourceWidth: number;
+  sourceHeight: number;
+  name?: string;
+  x?: number;
+  y?: number;
+}): SmartLayer {
+  return {
+    id: createId('smart'),
+    kind: 'smart',
+    name: input.name ?? '',
+    visible: true,
+    locked: false,
+    opacity: 1,
+    blend: 'normal',
+    x: input.x ?? 0,
+    y: input.y ?? 0,
+    width: input.sourceWidth,
+    height: input.sourceHeight,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+    parentId: null,
+    expanded: true,
+    mask: null,
+    sourceAssetId: input.sourceAssetId,
+    sourceWidth: input.sourceWidth,
+    sourceHeight: input.sourceHeight,
   };
 }
 

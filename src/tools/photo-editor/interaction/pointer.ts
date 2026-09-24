@@ -3,7 +3,7 @@ import { createStrokeSession, floodFill, type StrokeSession } from '../render/br
 import { compositeDoc } from '../render/export';
 import type { StageHandle } from '../render/stage';
 import { selectionFromPath as toSelection, usePhotoStore } from '../store';
-import type { Layer, PhotoDoc, Rect, Selection } from '../model/types';
+import type { RasterLayer, Layer, PhotoDoc, Rect, Selection } from '../model/types';
 
 /**
  * 指针交互：直接监听容器原生事件（Konva 节点一律 `listening: false`）。
@@ -44,6 +44,7 @@ export function attachPointer(
   let drag: Drag = null;
   let stroke: StrokeSession | null = null;
   let strokeLayerId: string | null = null;
+  let strokeIsMask = false;
 
   const toDoc = (event: PointerEvent | MouseEvent): { x: number; y: number } => {
     const rect = container.getBoundingClientRect();
@@ -90,7 +91,7 @@ export function attachPointer(
       const hit = hitTest(doc, point.x, point.y);
       if (hit) {
         state.selectLayer(hit.id);
-        state.commit();
+        state.commit('histMove');
         drag = {
           kind: 'move',
           id: hit.id,
@@ -143,7 +144,7 @@ export function attachPointer(
       if (!layerId) return;
       const layer = usePhotoStore.getState().doc.layers.find((item) => item.id === layerId);
       if (!layer || layer.kind !== 'raster') return;
-      usePhotoStore.getState().commitPixels(layerId);
+      usePhotoStore.getState().commitPixels(layerId, 'histFill');
       const changed = floodFill(layer, point.x, point.y, state.brush.color, 32, state.selection);
       if (changed) {
         usePhotoStore.getState().bumpRev(layerId);
@@ -153,11 +154,34 @@ export function attachPointer(
     }
 
     if (tool === 'brush' || tool === 'eraser') {
+      // 蒙版编辑：笔迹写入蒙版画布（画笔涂白 = 显示，橡皮涂黑 = 隐藏）
+      const active = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
+      if (state.maskEditing && active?.mask) {
+        state.commitMask(active.id);
+        const maskLayer = {
+          ...(active as RasterLayer),
+          assetId: active.mask.assetId,
+        } as RasterLayer;
+        stroke = createStrokeSession(maskLayer, {
+          color: tool === 'eraser' ? '#000000' : '#ffffff',
+          size: tool === 'eraser' ? state.eraserSize : state.brush.size,
+          hardness: state.brush.hardness,
+          opacity: 1,
+          mode: 'brush',
+          selection: null,
+        });
+        strokeLayerId = active.id;
+        strokeIsMask = true;
+        stroke?.move(point.x, point.y);
+        context.onSurfaceChange();
+        return;
+      }
+
       const layerId = state.ensurePaintLayer();
       if (!layerId) return;
       const layer = usePhotoStore.getState().doc.layers.find((item) => item.id === layerId);
       if (!layer || layer.kind !== 'raster') return;
-      usePhotoStore.getState().commitPixels(layerId);
+      usePhotoStore.getState().commitPixels(layerId, tool === 'eraser' ? 'histErase' : 'histBrush');
       stroke = createStrokeSession(layer, {
         color: state.brush.color,
         size: tool === 'eraser' ? state.eraserSize : state.brush.size,
@@ -247,8 +271,16 @@ export function attachPointer(
     if (stroke) {
       stroke.end();
       stroke = null;
-      if (strokeLayerId) state.bumpRev(strokeLayerId);
+      if (strokeLayerId) {
+        if (strokeIsMask) {
+          const layer = state.doc.layers.find((item) => item.id === strokeLayerId);
+          if (layer?.mask) state.patchMask(layer.id, { rev: layer.mask.rev + 1 }, false);
+        } else {
+          state.bumpRev(strokeLayerId);
+        }
+      }
       strokeLayerId = null;
+      strokeIsMask = false;
       context.onSurfaceChange();
     }
     if (!drag) return;

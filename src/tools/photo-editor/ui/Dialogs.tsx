@@ -117,10 +117,14 @@ export function ExportDialog({
   hasSelection,
   onClose,
   onExport,
+  onExportPsd,
+  psdBusy = false,
 }: {
   hasSelection: boolean;
   onClose: () => void;
   onExport: (format: ExportFormat, quality: number, selectionOnly: boolean) => void;
+  onExportPsd: () => void;
+  psdBusy?: boolean;
 }) {
   const { t } = useTranslation();
   const [format, setFormat] = useState<ExportFormat>('png');
@@ -171,6 +175,20 @@ export function ExportDialog({
             />
             {t('tools.photo.exportSelectionOnly')}
           </label>
+        </div>
+        <div className="mt-3 rounded-lg border border-dashed border-gray-300 px-2 py-2 dark:border-gray-700">
+          <button
+            type="button"
+            data-testid="export-psd"
+            disabled={psdBusy}
+            onClick={onExportPsd}
+            className="w-full rounded-md bg-gray-900 px-2 py-1.5 text-xs text-white transition-colors hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200"
+          >
+            {psdBusy ? t('tools.photo.psdExporting') : t('tools.photo.psdExport')}
+          </button>
+          <p className="mt-1 text-[10px] leading-4 text-gray-400 dark:text-gray-500">
+            {t('tools.photo.psdHint')}
+          </p>
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={onClose}>{t('tools.photo.cancel')}</Button>

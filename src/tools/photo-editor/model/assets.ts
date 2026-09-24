@@ -136,11 +136,25 @@ export async function loadImageFile(file: File): Promise<ToolResult<LoadedImage>
   }
 }
 
-/** 收集文档当前引用到的全部资产 id（供 releaseExcept 使用） */
-export function collectUsedAssets(layers: { kind: string; assetId?: string }[]): Set<string> {
+/**
+ * 收集文档当前引用到的全部资产 id（供 releaseExcept 使用）。
+ *
+ * 除了位图本体，还必须包含**蒙版画布**与**智能对象源像素**——
+ * 否则一次 `releaseExcept`（撤销 / 重做 / 删除图层都会触发）就会把蒙版回收成空白。
+ */
+export function collectUsedAssets(
+  layers: {
+    kind: string;
+    assetId?: string;
+    sourceAssetId?: string;
+    mask?: { assetId?: string } | null;
+  }[],
+): Set<string> {
   const used = new Set<string>();
   for (const layer of layers) {
     if (layer.kind === 'raster' && layer.assetId) used.add(layer.assetId);
+    if (layer.kind === 'smart' && layer.sourceAssetId) used.add(layer.sourceAssetId);
+    if (layer.mask?.assetId) used.add(layer.mask.assetId);
   }
   return used;
 }

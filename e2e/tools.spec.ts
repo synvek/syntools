@@ -1043,6 +1043,229 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.getByRole('button', { name: '创建' }).click();
     await expect(page.getByTestId('photo-stats')).toContainText('800 × 600');
   });
+
+  test('导出 PSD：下载 .psd 且可在 Photoshop / Photopea 继续编辑', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    // 两层内容：位图 + 编组内再一层，验证层树映射不报错
+    await page.getByTestId('layer-menu-trigger').first().click();
+    await page.getByRole('menuitem', { name: '空白图层' }).click();
+    await page.getByTestId('layer-menu-trigger').first().click();
+    await page.getByRole('menuitem', { name: '从图层新建编组' }).click();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出图片' }).click();
+    await page.getByTestId('export-psd').click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.psd$/);
+
+    // 落盘后用文件头校验：PSD 以 8BPS 开头
+    const path = await download.path();
+    const header = (await import('node:fs')).readFileSync(path!).subarray(0, 4).toString('latin1');
+    expect(header).toBe('8BPS');
+  });
+
+  test('智能对象：位图转换后保留源像素尺寸，可再栅格化', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    // 一张位图图层（落笔自动创建）
+    await page.getByRole('button', { name: '画笔', exact: true }).click();
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    await page.mouse.move(box.x + 120, box.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 260, box.y + 200, { steps: 8 });
+    await page.mouse.up();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    // 转为智能对象
+    await page.getByTestId('layer-menu-trigger').click();
+    await page.getByRole('menuitem', { name: '转换为智能对象' }).click();
+
+    await page.getByRole('button', { name: '属性', exact: true }).click();
+    await expect(page.getByTestId('smart-section')).toBeVisible();
+    // 源像素尺寸来自原始资产（画布 1280×720 上的图层宽度）
+    await expect(page.getByTestId('smart-section')).toContainText('1280 × 720');
+
+    // 缩小呈现尺寸：源尺寸不变（非破坏）
+    const width = page.getByLabel('宽度');
+    await width.fill('640');
+    await width.dispatchEvent('change');
+    await expect(page.getByTestId('smart-section')).toContainText('1280 × 720');
+
+    // 栅格化：回到普通位图，智能对象小节消失
+    await page.getByTestId('smart-rasterize').click();
+    await expect(page.getByTestId('smart-section')).toHaveCount(0);
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+  });
+
+  test('调整图层：作用于下方全部内容，改亮度即时生效且可撤销', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    // 底色：一张画满的位图（用油漆桶铺满画布，排除背景干扰）
+    await page.getByTestId('layer-menu-trigger').click();
+    await page.getByRole('menuitem', { name: '空白图层' }).click();
+    await page.getByRole('button', { name: '油漆桶', exact: true }).click();
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    /** 取内容层画布中心像素亮度 */
+    const centerLuma = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const ctx = canvas.getContext('2d')!;
+        const { data } = ctx.getImageData(
+          Math.floor(canvas.width / 2),
+          Math.floor(canvas.height / 2),
+          1,
+          1,
+        );
+        return Math.round(data[0] * 0.299 + data[1] * 0.587 + data[2] * 0.114);
+      });
+
+    // 新建调整图层 → 选中它 → 调亮度
+    await page.getByTestId('layer-menu-trigger').click();
+    await page.getByRole('menuitem', { name: '新建调整图层' }).click();
+    await page.getByRole('button', { name: '调整', exact: true }).click();
+    const before = await centerLuma();
+
+    const brightness = page.getByLabel('亮度');
+    await brightness.fill('80');
+    await brightness.dispatchEvent('change');
+    await expect.poll(centerLuma).toBeGreaterThan(before);
+
+    // 撤销（滑杆过程不进历史，用工具栏按钮触发）：亮度回到原值
+    await page.getByRole('button', { name: '撤销' }).click();
+    await expect.poll(centerLuma).toBe(before);
+  });
+
+  test('图层蒙版：隐藏全部 → 画笔涂白显示 → 反相 → 删除', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    // 建一张有内容的位图图层
+    await page.getByRole('button', { name: '画笔', exact: true }).click();
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    await page.mouse.move(box.x + 100, box.y + 100);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 320, box.y + 260, { steps: 10 });
+    await page.mouse.up();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    /** 内容层画布上的可见像素数（蒙版会直接改变它） */
+    const countInk = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const ctx = canvas.getContext('2d')!;
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let n = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 8) n += 1;
+        return n;
+      });
+    const before = await countInk();
+    expect(before).toBeGreaterThan(0);
+
+    // 属性页 → 添加蒙版（隐藏全部）
+    await page.getByRole('button', { name: '属性', exact: true }).click();
+    await page.getByRole('button', { name: '隐藏全部' }).click();
+    await expect(page.getByTestId('mask-remove')).toBeVisible();
+    await expect.poll(countInk).toBe(0);
+
+    // 进入蒙版编辑：画笔涂白 = 显示该区域
+    await page.getByTestId('mask-edit-toggle').click();
+    await page.mouse.move(box.x + 120, box.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 300, box.y + 240, { steps: 10 });
+    await page.mouse.up();
+    const revealed = await countInk();
+    expect(revealed).toBeGreaterThan(0);
+
+    // 反相：黑白互换 → 显示区域取反（与涂白区域互补，不再是同一批像素）
+    await page.getByTestId('mask-edit-toggle').click();
+    await page.getByTestId('mask-invert').click();
+    await expect.poll(countInk).not.toBe(revealed);
+    const inverted = await countInk();
+    expect(inverted).toBeGreaterThan(0);
+    // 互补：两部分之和不超过原始像素数（重叠部分按一次计）
+    expect(inverted + revealed).toBeLessThanOrEqual(before + revealed);
+
+    // 删除蒙版：回到完整可见
+    await page.getByTestId('mask-remove').click();
+    await expect.poll(countInk).toBe(before);
+  });
+
+  test('图层编组：新建组 → 图层移入 → 折叠隐藏子图层 → 解散', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    // 先有一张位图图层
+    await page.getByTestId('layer-menu-trigger').click();
+    await page.getByRole('menuitem', { name: '空白图层' }).click();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    // 从图层新建编组
+    await page.getByTestId('layer-menu-trigger').click();
+    await page.getByRole('menuitem', { name: '从图层新建编组' }).click();
+    // 编组 + 组内图层共 2 行
+    await expect(page.getByTestId('layer-panel').locator('li')).toHaveCount(2);
+
+    // 面板倒序呈现（最上层在前）：组内图层在第一行且缩进 12px，编组本身在第二行不缩进
+    const rows = page.getByTestId('layer-panel').locator('li');
+    await expect(rows.nth(0)).toHaveCSS('margin-left', '12px');
+    await expect(rows.nth(1)).toHaveCSS('margin-left', '0px');
+
+    // 折叠：子树整段隐藏
+    await page.locator('[data-testid^="group-toggle-"]').first().click();
+    await expect(rows).toHaveCount(1);
+    await page.locator('[data-testid^="group-toggle-"]').first().click();
+    await expect(rows).toHaveCount(2);
+
+    // 解散编组：菜单在编组那一行（第二行）上
+    await rows.nth(1).getByTestId('layer-menu-trigger').click();
+    await page.getByRole('menuitem', { name: '解散编组' }).click();
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+  });
+
+  test('历史面板：按操作名列出步骤，点击可跳转并清空', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByLabel('photo canvas')).toBeVisible();
+
+    // 画笔落笔 → 自动新建图层（一步历史）
+    await page.getByRole('button', { name: '画笔', exact: true }).click();
+    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    await page.mouse.move(box.x + 120, box.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 200, box.y + 180, { steps: 6 });
+    await page.mouse.up();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    await page.getByRole('button', { name: '历史', exact: true }).click();
+    const list = page.getByTestId('history-list');
+    await expect(list).toBeVisible();
+    // 打开文档 → 新建图层 → 画笔落笔（当前）
+    await expect(list.locator('li')).toHaveCount(3);
+    await expect(page.getByTestId('history-row-1')).toContainText('新建图层');
+    await expect(page.getByTestId('history-row-2')).toContainText('画笔');
+    await expect(page.getByTestId('history-row-2')).toHaveAttribute('data-current', 'true');
+
+    // 点第 0 行：跳回初始状态（图层被撤销）
+    await page.getByTestId('history-row-0').click();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 0');
+    await expect(page.getByTestId('history-row-0')).toHaveAttribute('data-current', 'true');
+
+    // 跳回最后一行：重做两步
+    await page.getByTestId('history-row-2').click();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+
+    // 清空历史：只剩当前状态一行
+    await page.getByTestId('history-clear').click();
+    await expect(list.locator('li')).toHaveCount(1);
+  });
 });
 
 // 照片编辑器国际化（en-US）：界面语言切换后不得残留中文

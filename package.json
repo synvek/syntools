@@ -81,6 +81,7 @@
     "@univerjs/sheets-ui": "0.25.1",
     "@univerjs/ui": "0.25.1",
     "@xyflow/react": "^12.11.6",
+    "ag-psd": "^31.0.2",
     "chinese-conv": "^4.0.0",
     "codejar": "^4.3.0",
     "cron-parser": "^5.10.0",

@@ -1,5 +1,6 @@
 import { bakeSignature } from '../core';
 import { getCanvas } from '../model/assets';
+import { compositeLayers, groupComposite } from './composite';
 import { bakeRaster } from './filters';
 import type { Layer, PhotoDoc, ShapeKind } from '../model/types';
 
@@ -12,6 +13,8 @@ import type { Layer, PhotoDoc, ShapeKind } from '../model/types';
 export interface PaintOptions {
   /** 位图烘焙结果缓存键前缀（默认按文档烘焙；缩略图可传自己的前缀避免互相覆盖） */
   signaturePrefix?: string;
+  /** 文档：编组整体合成需要它来取组内子树 */
+  doc?: PhotoDoc;
 }
 
 export function paintLayer(
@@ -37,28 +40,45 @@ export function paintLayer(
     }
   } else if (layer.kind === 'text') {
     paintText(ctx, layer);
-  } else {
+  } else if (layer.kind === 'shape') {
     paintShape(ctx, layer);
+  } else if (layer.kind === 'group') {
+    // 穿透模式下子图层由调用方逐个绘制；否则整体合成后再绘制
+    if (!layer.passThrough && options.doc) {
+      ctx.drawImage(
+        groupComposite(options.doc, layer),
+        0,
+        0,
+        options.doc.width,
+        options.doc.height,
+      );
+    }
+  } else if (layer.kind === 'smart') {
+    const source = getCanvas(layer.sourceAssetId);
+    if (source) ctx.drawImage(source, layer.x, layer.y, layer.width, layer.height);
   }
+  // adjustment 由 render/composite.ts 在「作用于下方合成结果」时处理
   ctx.restore();
 }
 
-/** 按文档顺序绘制全部可见图层（导出 / 拼合的主体） */
+/**
+ * 按文档顺序绘制全部图层（导出 / 拼合的主体）。
+ *
+ * 走与画布预览同一条 `compositeLayers` 管线，编组整体合成、蒙版、调整图层才不会被漏掉——
+ * 否则「预览正确、导出少一层调整」这类不一致很难排查。
+ */
 export function paintDoc(
   ctx: CanvasRenderingContext2D,
   doc: PhotoDoc,
   options: PaintOptions = {},
 ): void {
+  const canvas = compositeLayers(doc, doc.layers, {
+    background: doc.background,
+    signaturePrefix: options.signaturePrefix,
+  });
   ctx.save();
   ctx.clearRect(0, 0, doc.width, doc.height);
-  if (doc.background === 'white') {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, doc.width, doc.height);
-  } else if (doc.background === 'black') {
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, doc.width, doc.height);
-  }
-  for (const layer of doc.layers) paintLayer(ctx, layer, options);
+  ctx.drawImage(canvas, 0, 0, doc.width, doc.height);
   ctx.restore();
 }
 

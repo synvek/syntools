@@ -19,6 +19,14 @@ import {
   clampRect,
   clampUnit,
   computeFitScale,
+  effectiveLocked,
+  effectiveVisible,
+  flattenStack,
+  historyTimeline,
+  layerAssetIds,
+  maskSignature,
+  moveSubtree,
+  subtreeIdsOf,
   formatBytes,
   fullSelection,
   hexToRgb,
@@ -39,6 +47,7 @@ import {
 import { createAdjustments } from './model/factory';
 import { photoStrings } from './strings';
 import type { Selection } from './model/types';
+import type { GroupLayer, HistoryEntry, HistoryLabel, Layer, PhotoDoc } from './model/types';
 
 describe('钳制与格式化', () => {
   it('笔刷尺寸落在合法区间，非法值回落最小值', () => {
@@ -365,5 +374,267 @@ describe('工具常量', () => {
     expect(BLEND_MODES[0]).toBe('normal');
     expect(FILTERS.length).toBeGreaterThanOrEqual(10);
     expect(FILTERS).toContain('grayscale');
+  });
+});
+
+describe('层栈展开与继承（编组 / 蒙版前置）', () => {
+  const base = {
+    name: '',
+    visible: true,
+    locked: false,
+    opacity: 1,
+    blend: 'normal' as const,
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+  };
+
+  function makeDoc(layers: Layer[]): PhotoDoc {
+    return {
+      id: 'd',
+      name: '',
+      width: 800,
+      height: 600,
+      background: 'white',
+      layers,
+      activeLayerId: null,
+    };
+  }
+
+  const raster = (id: string, patch: Partial<Layer> = {}): Layer =>
+    ({
+      ...base,
+      id,
+      kind: 'raster',
+      assetId: `a-${id}`,
+      rev: 1,
+      adjustments: {} as never,
+      filters: [],
+      ...patch,
+    }) as Layer;
+  const group = (id: string, patch: Partial<Layer> = {}): Layer =>
+    ({ ...base, id, kind: 'group', passThrough: true, ...patch }) as Layer;
+
+  it('扁平层栈按 parentId 展开成 begin/end 包裹的序列', () => {
+    const doc = makeDoc([
+      raster('bottom'),
+      group('g', { parentId: null }),
+      raster('in1', { parentId: 'g' }),
+      raster('in2', { parentId: 'g' }),
+      raster('top'),
+    ]);
+    const steps = flattenStack(doc);
+    expect(steps.map((step) => `${step.kind}:${step.layer.id}`)).toEqual([
+      'layer:bottom',
+      'group-begin:g',
+      'layer:in1',
+      'layer:in2',
+      'group-end:g',
+      'layer:top',
+    ]);
+  });
+
+  it('组可以嵌套，空组也成对出现', () => {
+    const doc = makeDoc([
+      group('outer'),
+      group('inner', { parentId: 'outer' }),
+      raster('deep', { parentId: 'inner' }),
+      group('empty', { parentId: 'outer' }),
+    ]);
+    expect(flattenStack(doc).map((step) => `${step.kind}:${step.layer.id}`)).toEqual([
+      'group-begin:outer',
+      'group-begin:inner',
+      'layer:deep',
+      'group-end:inner',
+      'group-begin:empty',
+      'group-end:empty',
+      'group-end:outer',
+    ]);
+  });
+
+  it('parentId 指向缺失图层时该图层降级为顶层，不会消失', () => {
+    const doc = makeDoc([raster('orphan', { parentId: 'ghost' })]);
+    expect(flattenStack(doc).map((step) => step.layer.id)).toEqual(['orphan']);
+  });
+
+  it('可见性 / 锁定沿祖先继承', () => {
+    const doc = makeDoc([
+      group('g', { visible: false }),
+      raster('child', { parentId: 'g' }),
+      raster('free'),
+    ]);
+    const child = doc.layers[1];
+    const free = doc.layers[2];
+    expect(effectiveVisible(doc, child)).toBe(false);
+    expect(effectiveVisible(doc, free)).toBe(true);
+
+    const lockedDoc = makeDoc([group('g', { locked: true }), raster('child', { parentId: 'g' })]);
+    expect(effectiveLocked(lockedDoc, lockedDoc.layers[1])).toBe(true);
+    expect(effectiveLocked(doc, free)).toBe(false);
+  });
+
+  it('自身不可见 / 锁定同样生效', () => {
+    const doc = makeDoc([raster('a', { visible: false }), raster('b', { locked: true })]);
+    expect(effectiveVisible(doc, doc.layers[0])).toBe(false);
+    expect(effectiveLocked(doc, doc.layers[1])).toBe(true);
+  });
+
+  it('蒙版签名：无蒙版 / 停用为 null，像素或参数变化就换键', () => {
+    const plain = raster('a');
+    expect(maskSignature(plain)).toBeNull();
+
+    const masked = raster('b', {
+      mask: { assetId: 'm1', rev: 2, enabled: true, inverted: false, density: 1, feather: 3 },
+    });
+    const key = maskSignature(masked)!;
+    expect(key).toContain('m1');
+    expect(maskSignature(raster('b', { mask: { ...masked.mask!, enabled: false } }))).toBeNull();
+    expect(maskSignature(raster('b', { mask: { ...masked.mask!, rev: 3 } }))).not.toBe(key);
+    expect(maskSignature(raster('b', { mask: { ...masked.mask!, inverted: true } }))).not.toBe(key);
+  });
+
+  it('资产收集覆盖位图、智能对象源与蒙版', () => {
+    expect(layerAssetIds(raster('a'))).toEqual(['a-a']);
+    expect(
+      layerAssetIds({
+        ...base,
+        id: 's',
+        kind: 'smart',
+        sourceAssetId: 'src',
+        sourceWidth: 10,
+        sourceHeight: 10,
+        mask: { assetId: 'm', rev: 1, enabled: true, inverted: false, density: 1, feather: 0 },
+      } as Layer),
+    ).toEqual(['src', 'm']);
+    expect(layerAssetIds(group('g'))).toEqual([]);
+  });
+});
+
+describe('历史时间轴（面板数据源）', () => {
+  const entry = (label: HistoryLabel, at: number): HistoryEntry => ({
+    doc: {
+      id: 'd',
+      name: '',
+      width: 10,
+      height: 10,
+      background: 'white',
+      layers: [],
+      activeLayerId: null,
+    },
+    label,
+    at,
+  });
+
+  it('只有当前状态时是一行「打开文档」', () => {
+    const rows = historyTimeline([], []);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ label: 'histOpen', current: true });
+  });
+
+  it('每行展示「产生该状态的操作名」，当前行取最后一次操作', () => {
+    const rows = historyTimeline([entry('histAddLayer', 100), entry('histBrush', 200)], []);
+    expect(rows.map((row) => row.label)).toEqual(['histOpen', 'histAddLayer', 'histBrush']);
+    expect(rows.map((row) => row.current)).toEqual([false, false, true]);
+  });
+
+  it('可重做的行排在末尾且标记为非当前', () => {
+    const rows = historyTimeline([entry('histBrush', 100)], [entry('histBrush', 300)]);
+    expect(rows).toHaveLength(3);
+    expect(rows[1].current).toBe(true);
+    expect(rows[2]).toMatchObject({ label: 'histBrush', current: false });
+  });
+
+  it('行索引即 jumpTo 的目标：past.length 为当前', () => {
+    const past = [entry('histAddLayer', 1), entry('histMerge', 2)];
+    const rows = historyTimeline(past, []);
+    expect(rows.findIndex((row) => row.current)).toBe(past.length);
+  });
+});
+
+describe('编组层栈操作（纯函数）', () => {
+  const base = {
+    name: '',
+    visible: true,
+    locked: false,
+    opacity: 1,
+    blend: 'normal' as const,
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+  };
+  const leaf = (id: string, parentId: string | null = null): Layer =>
+    ({
+      ...base,
+      id,
+      kind: 'raster',
+      parentId,
+      assetId: `a-${id}`,
+      rev: 1,
+      adjustments: {} as never,
+      filters: [],
+    }) as Layer;
+  const grp = (id: string, parentId: string | null = null, passThrough = true): GroupLayer =>
+    ({ ...base, id, kind: 'group', parentId, passThrough }) as GroupLayer;
+
+  const docOf = (layers: Layer[]): PhotoDoc => ({
+    id: 'd',
+    name: '',
+    width: 800,
+    height: 600,
+    background: 'white',
+    layers,
+    activeLayerId: null,
+  });
+
+  it('子树包含自身与全部后代', () => {
+    const doc = docOf([grp('g'), leaf('c1', 'g'), grp('g2', 'g'), leaf('c2', 'g2'), leaf('out')]);
+    expect(subtreeIdsOf(doc, 'g')).toEqual(['g', 'c1', 'g2', 'c2']);
+    expect(subtreeIdsOf(doc, 'out')).toEqual(['out']);
+  });
+
+  it('移入编组：图层连同子树紧跟编组之后，且 parentId 更新', () => {
+    const doc = docOf([leaf('a'), grp('g'), leaf('b')]);
+    const next = moveSubtree(doc.layers, 'a', 'g');
+    expect(next.map((l) => l.id)).toEqual(['g', 'a', 'b']);
+    expect(next.find((l) => l.id === 'a')!.parentId).toBe('g');
+  });
+
+  it('移到顶层：落在数组末尾（最上层）', () => {
+    const doc = docOf([grp('g'), leaf('c', 'g'), leaf('b')]);
+    const next = moveSubtree(doc.layers, 'c', null);
+    expect(next.map((l) => l.id)).toEqual(['g', 'b', 'c']);
+    expect(next.find((l) => l.id === 'c')!.parentId).toBeNull();
+  });
+
+  it('移动编组会带着整棵子树', () => {
+    const doc = docOf([leaf('bottom'), grp('g'), leaf('c1', 'g'), leaf('c2', 'g'), leaf('top')]);
+    const next = moveSubtree(doc.layers, 'g', null);
+    expect(next.map((l) => l.id)).toEqual(['bottom', 'top', 'g', 'c1', 'c2']);
+  });
+
+  it('拒绝把编组移入自己的后代（否则成环）', () => {
+    const layers = [grp('g'), grp('inner', 'g'), leaf('c', 'inner')];
+    expect(moveSubtree(layers, 'g', 'inner')).toBe(layers);
+    expect(moveSubtree(layers, 'g', 'g')).toBe(layers);
+  });
+
+  it('目标父级不存在时原样返回', () => {
+    const layers = [leaf('a')];
+    expect(moveSubtree(layers, 'a', 'ghost')).toBe(layers);
+  });
+
+  it('纯函数：不修改入参数组', () => {
+    const layers = [grp('g'), leaf('a')];
+    moveSubtree(layers, 'a', 'g');
+    expect(layers.map((l) => l.id)).toEqual(['g', 'a']);
+    expect(layers[1].parentId).toBeNull();
   });
 });

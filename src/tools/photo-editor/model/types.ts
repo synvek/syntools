@@ -35,7 +35,31 @@ export type FilterId =
   | 'pixelate'
   | 'posterize';
 
-export type LayerKind = 'raster' | 'text' | 'shape';
+/**
+ * 图层类型：
+ * - `raster` 位图（像素在资产注册表）
+ * - `text` / `shape` 矢量呈现（导出时位图化）
+ * - `group` 编组（组内子图层作为整体再合成，再套用本组的 opacity / blend）
+ * - `adjustment` 调整图层（作用于其下方所有图层的合成结果，参数可反复改）
+ * - `smart` 智能对象（保留源像素，缩放 / 变换不重采样）
+ */
+export type LayerKind = 'raster' | 'text' | 'shape' | 'group' | 'adjustment' | 'smart';
+
+/**
+ * 图层蒙版：灰度画布，同样放在资产注册表里（像素不进文档）。
+ * 白 = 显示、黑 = 隐藏；`inverted` 为真时反相。
+ */
+export interface MaskRef {
+  assetId: string;
+  /** 蒙版像素版本号：绘制 / 填充后自增，驱动烘焙缓存失效 */
+  rev: number;
+  enabled: boolean;
+  inverted: boolean;
+  /** 浓度 0~1（1 = 完全按蒙版灰度） */
+  density: number;
+  /** 羽化半径（像素） */
+  feather: number;
+}
 
 export type ShapeKind = 'rect' | 'roundRect' | 'ellipse' | 'line' | 'arrow' | 'star';
 
@@ -76,6 +100,15 @@ export interface LayerBase {
   rotation: number;
   flipX: boolean;
   flipY: boolean;
+  /**
+   * 所属编组 id（扁平数组表示法：组内子图层紧随编组之后，子图层用 parentId 指回编组）。
+   * 顶层图层为 null / 缺省。
+   */
+  parentId?: string | null;
+  /** 编组展开态（仅 group 有意义） */
+  expanded?: boolean;
+  /** 图层蒙版；null / 缺省表示无蒙版 */
+  mask?: MaskRef | null;
 }
 
 export interface RasterLayer extends LayerBase {
@@ -110,7 +143,36 @@ export interface ShapeLayer extends LayerBase {
   cornerRadius: number;
 }
 
-export type Layer = RasterLayer | TextLayer | ShapeLayer;
+/** 编组：自身不承载像素，语义是「把子图层先合成成一个整体」 */
+export interface GroupLayer extends LayerBase {
+  kind: 'group';
+  /**
+   * 穿透：组内子图层各自按自己的混合模式与下方内容混合（Photoshop 的「穿透」）。
+   * 关闭时，组内先合成到离屏画布，再整体按本组的 blend / opacity 与下方混合。
+   */
+  passThrough: boolean;
+}
+
+/** 调整图层：作用于其下方栈的合成结果，参数可随时改（非破坏性） */
+export interface AdjustmentLayer extends LayerBase {
+  kind: 'adjustment';
+  adjustments: Adjustments;
+  filters: FilterId[];
+}
+
+/**
+ * 智能对象：保留源像素（`sourceAssetId` + 原始尺寸），
+ * 画布上的 width / height / rotation 只是「呈现变换」，不重采样源数据。
+ */
+export interface SmartLayer extends LayerBase {
+  kind: 'smart';
+  sourceAssetId: string;
+  sourceWidth: number;
+  sourceHeight: number;
+}
+
+export type Layer =
+  RasterLayer | TextLayer | ShapeLayer | GroupLayer | AdjustmentLayer | SmartLayer;
 
 export type CanvasBackground = 'transparent' | 'white' | 'black';
 
@@ -142,6 +204,43 @@ export interface Selection {
   hole?: number[];
   /** 羽化半径（像素） */
   feather: number;
+}
+
+/**
+ * 操作名（i18n 键后缀，展示时拼成 `tools.photo.<label>`）。
+ * 存键而不是文案，切换语言时历史面板才会跟着变。
+ */
+export type HistoryLabel =
+  | 'histOpen'
+  | 'histEdit'
+  | 'histBrush'
+  | 'histErase'
+  | 'histFill'
+  | 'histCrop'
+  | 'histResize'
+  | 'histAddLayer'
+  | 'histDeleteLayer'
+  | 'histDuplicate'
+  | 'histReorder'
+  | 'histMerge'
+  | 'histFlatten'
+  | 'histMove'
+  | 'histRename'
+  | 'histGroup'
+  | 'histMask'
+  | 'histAdjust';
+
+/**
+ * 历史条目。
+ *
+ * 语义约定：`past[i].doc` 是「执行 past[i].label 之前」的状态，
+ * 因此面板第 i 行展示的**操作名**取自 `past[i-1].label`（第 0 行为 `histOpen`）；
+ * `future[j]` 存的是「做完该操作之后」的状态，操作名即其自身的 `label`。
+ */
+export interface HistoryEntry {
+  doc: PhotoDoc;
+  label: HistoryLabel;
+  at: number;
 }
 
 export interface Viewport {

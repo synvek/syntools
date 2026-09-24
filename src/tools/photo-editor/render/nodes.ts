@@ -1,9 +1,15 @@
 import Konva from 'konva';
-import { bakeSignature } from '../core';
+import { bakeSignature, maskSignature } from '../core';
 import { getCanvas } from '../model/assets';
+import {
+  groupComposite,
+  groupCompositeKey,
+  maskedLayerCanvas,
+  maskedLayerOrigin,
+} from './composite';
 import { bakeRaster, bakeRasterLive } from './filters';
 import { starPath } from './paint';
-import type { Layer, ShapeLayer, TextLayer } from '../model/types';
+import type { GroupLayer, Layer, PhotoDoc, ShapeLayer, TextLayer } from '../model/types';
 
 /**
  * 图层 → Konva 节点工厂。
@@ -22,14 +28,44 @@ export function bakeKeyOf(layer: Layer): string {
   return bakeSignature(layer.assetId, layer.rev, layer.adjustments, layer.filters);
 }
 
-/** 返回值统一为 `Konva.Shape`：Konva 的 `Layer.add` 只接受 Shape / Group */
-export function createLayerNode(layer: Layer): Konva.Shape {
-  const node: Konva.Shape =
+/**
+ * 创建图层节点。
+ * `group` / `adjustment` / `smart` 目前返回空 Group 占位（S3/S5/S6 接入离屏合成后的真实内容），
+ * 这样在它们尚未可被创建时就已类型完备，后续只需替换分支实现。
+ */
+export function createLayerNode(layer: Layer, doc?: PhotoDoc): Konva.Shape | Konva.Group {
+  // 带蒙版：整体先合成为一张图（蒙版必须作用在「该图层自己的像素」上）
+  if (doc && layer.mask?.enabled) {
+    const canvas = maskedLayerCanvas(doc, layer);
+    if (canvas) {
+      const origin = maskedLayerOrigin(doc, layer);
+      const node = new Konva.Image({
+        image: canvas,
+        x: origin.x,
+        y: origin.y,
+        width: canvas.width,
+        height: canvas.height,
+        listening: false,
+        perfectDrawEnabled: false,
+      });
+      node.setAttr(LAYER_ID_ATTR, layer.id);
+      node.setAttr(LAYER_KIND_ATTR, `masked:${layer.kind}`);
+      applyCommon(node, layer, origin);
+      return node;
+    }
+  }
+  const node: Konva.Shape | Konva.Group =
     layer.kind === 'raster'
       ? createRasterNode(layer)
       : layer.kind === 'text'
         ? createTextNode(layer)
-        : createShapeNode(layer);
+        : layer.kind === 'shape'
+          ? createShapeNode(layer)
+          : layer.kind === 'smart'
+            ? createSmartNode(layer)
+            : layer.kind === 'group' && doc
+              ? createGroupNode(layer, doc)
+              : new Konva.Group({ listening: false });
   node.setAttr(LAYER_ID_ATTR, layer.id);
   // 形状按具体图形区分：更换图形类型时必须重建节点
   node.setAttr(LAYER_KIND_ATTR, layer.kind === 'shape' ? `shape:${layer.shape}` : layer.kind);
@@ -44,7 +80,29 @@ export function createLayerNode(layer: Layer): Konva.Shape {
  * `live = true` 用于落笔过程中：签名（rev）没变但像素已经变了，
  * 必须绕过 bake 缓存重新取图，否则画面要到松手才刷新。
  */
-export function updateLayerNode(node: Konva.Node, layer: Layer, live = false): void {
+export function updateLayerNode(
+  node: Konva.Node,
+  layer: Layer,
+  live = false,
+  doc?: PhotoDoc,
+): void {
+  if (doc && layer.mask?.enabled && node instanceof Konva.Image) {
+    const key = maskSignature(layer) ?? '';
+    if (live || node.getAttr(BAKE_KEY_ATTR) !== key) {
+      const canvas = maskedLayerCanvas(doc, layer);
+      if (canvas) {
+        const origin = maskedLayerOrigin(doc, layer);
+        node.image(canvas);
+        node.size({ width: canvas.width, height: canvas.height });
+        node.position(origin);
+        node.setAttr(BAKE_KEY_ATTR, key);
+      }
+    }
+    node.opacity(layer.opacity);
+    node.rotation(0);
+    node.visible(layer.visible);
+    return;
+  }
   if (layer.kind === 'raster' && node instanceof Konva.Image) {
     const asset = getCanvas(layer.assetId);
     const key = bakeKeyOf(layer);
@@ -56,6 +114,13 @@ export function updateLayerNode(node: Konva.Node, layer: Layer, live = false): v
       );
       node.setAttr(BAKE_KEY_ATTR, key);
     }
+  } else if (layer.kind === 'group' && node instanceof Konva.Image && doc) {
+    const key = groupCompositeKey(doc, layer);
+    if (live || node.getAttr(BAKE_KEY_ATTR) !== key) {
+      node.image(groupComposite(doc, layer));
+      node.setAttr(BAKE_KEY_ATTR, key);
+    }
+    node.size({ width: Math.max(1, doc.width), height: Math.max(1, doc.height) });
   } else if (layer.kind === 'text' && node instanceof Konva.Text) {
     node.text(layer.text);
     node.fontSize(layer.fontSize);
@@ -72,8 +137,8 @@ export function updateLayerNode(node: Konva.Node, layer: Layer, live = false): v
   applyCommon(node, layer);
 }
 
-function applyCommon(node: Konva.Node, layer: Layer): void {
-  node.position({ x: layer.x, y: layer.y });
+function applyCommon(node: Konva.Node, layer: Layer, origin?: { x: number; y: number }): void {
+  node.position(origin ?? { x: layer.x, y: layer.y });
   node.opacity(layer.opacity);
   node.rotation(layer.rotation);
   node.scale({ x: layer.flipX ? -1 : 1, y: layer.flipY ? -1 : 1 });
@@ -91,6 +156,28 @@ function createRasterNode(layer: Extract<Layer, { kind: 'raster' }>): Konva.Imag
   const image = asset ? bakeRaster(asset, key, layer.adjustments, layer.filters) : undefined;
   return new Konva.Image({
     image,
+    width: Math.max(1, layer.width),
+    height: Math.max(1, layer.height),
+    listening: false,
+    perfectDrawEnabled: false,
+  });
+}
+
+/** 编组（整体合成模式）：一张离屏合成结果的图片节点 */
+function createGroupNode(layer: GroupLayer, doc: PhotoDoc): Konva.Image {
+  return new Konva.Image({
+    image: groupComposite(doc, layer),
+    width: Math.max(1, doc.width),
+    height: Math.max(1, doc.height),
+    listening: false,
+    perfectDrawEnabled: false,
+  });
+}
+
+function createSmartNode(layer: Extract<Layer, { kind: 'smart' }>): Konva.Image {
+  const source = getCanvas(layer.sourceAssetId);
+  return new Konva.Image({
+    image: source,
     width: Math.max(1, layer.width),
     height: Math.max(1, layer.height),
     listening: false,

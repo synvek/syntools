@@ -21,6 +21,7 @@ import { CanvasContextMenu } from './ui/CanvasContextMenu';
 import { docDisplayName } from './ui/layerName';
 import { ExportDialog, NewCanvasDialog } from './ui/Dialogs';
 import { FilterPanel } from './ui/FilterPanel';
+import { HistoryPanel } from './ui/HistoryPanel';
 import { LayerPanel } from './ui/LayerPanel';
 import { PhotoCanvas } from './ui/PhotoCanvas';
 import { PhotoToolbar } from './ui/PhotoToolbar';
@@ -35,7 +36,7 @@ import './photo.css';
 registerPhotoStrings(i18n);
 
 type Failure = { error: string; params?: Record<string, string | number> };
-type RightTab = 'layers' | 'property' | 'adjust' | 'filter';
+type RightTab = 'layers' | 'property' | 'adjust' | 'filter' | 'history';
 type DialogKind = 'new' | 'export' | null;
 
 const DRAFT_DEBOUNCE_MS = 1200;
@@ -69,6 +70,8 @@ export default function PhotoTool() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
+  /** PSD 导出进行中（只有这个分支会异步载入 ag-psd） */
+  const [psdBusy, setPsdBusy] = useState(false);
   const [presentSrc, setPresentSrc] = useState<string | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
 
@@ -220,6 +223,23 @@ export default function PhotoTool() {
     [fail, selection, t],
   );
 
+  /** PSD 导出：动态载入 writer（ag-psd 只在这一次使用时才下载） */
+  const handleExportPsd = useCallback(async () => {
+    setFailure(null);
+    setPsdBusy(true);
+    try {
+      const current = usePhotoStore.getState().doc;
+      const { exportPsdFile, psdFilename } = await import('./psd/writer');
+      await exportPsdFile(current, psdFilename(docDisplayName(current.name, t)));
+      setDialog(null);
+      setNotice(t('tools.photo.psdDone'));
+    } catch {
+      fail({ error: 'PSD_FAILED' });
+    } finally {
+      setPsdBusy(false);
+    }
+  }, [fail, t]);
+
   const handleExportProject = useCallback(() => {
     const current = usePhotoStore.getState().doc;
     const blob = new Blob([buildProjectJson(current)], { type: 'application/json' });
@@ -282,6 +302,7 @@ export default function PhotoTool() {
     { id: 'property', label: t('tools.photo.tabProperty') },
     { id: 'adjust', label: t('tools.photo.tabAdjust') },
     { id: 'filter', label: t('tools.photo.tabFilter') },
+    { id: 'history', label: t('tools.photo.tabHistory') },
   ];
 
   return (
@@ -427,6 +448,7 @@ export default function PhotoTool() {
             {rightTab === 'property' ? <PropertyPanel /> : null}
             {rightTab === 'adjust' ? <AdjustPanel /> : null}
             {rightTab === 'filter' ? <FilterPanel /> : null}
+            {rightTab === 'history' ? <HistoryPanel /> : null}
           </div>
         </aside>
       </div>
@@ -490,6 +512,8 @@ export default function PhotoTool() {
           hasSelection={Boolean(selection)}
           onClose={() => setDialog(null)}
           onExport={handleExportImage}
+          onExportPsd={handleExportPsd}
+          psdBusy={psdBusy}
         />
       ) : null}
     </div>

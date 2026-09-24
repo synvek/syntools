@@ -19,6 +19,43 @@ import type { BlendMode, Layer, PhotoDoc } from '../model/types';
 
 const MENU_WIDTH = 208;
 
+/** 面板行：图层 + 缩进深度 + 在 doc.layers 中的下标 */
+interface LayerRow {
+  layer: Layer;
+  depth: number;
+  index: number;
+}
+
+/**
+ * 扁平层栈 → 面板行（最上层在前）。
+ * 编组折叠时其子树整段隐藏——这正是「编组」在面板上的意义。
+ */
+function buildRows(doc: PhotoDoc): LayerRow[] {
+  const childrenOf = new Map<string, Layer[]>();
+  const roots: Layer[] = [];
+  for (const layer of doc.layers) {
+    const parentId = layer.parentId ?? null;
+    if (parentId) {
+      const list = childrenOf.get(parentId);
+      if (list) list.push(layer);
+      else childrenOf.set(parentId, [layer]);
+    } else {
+      roots.push(layer);
+    }
+  }
+  const rows: LayerRow[] = [];
+  const walk = (list: Layer[], depth: number) => {
+    for (const layer of list) {
+      rows.push({ layer, depth, index: doc.layers.indexOf(layer) });
+      if (layer.kind === 'group' && (layer.expanded ?? true)) {
+        walk(childrenOf.get(layer.id) ?? [], depth + 1);
+      }
+    }
+  };
+  walk(roots, 0);
+  return rows.reverse();
+}
+
 export function LayerPanel() {
   const { t } = useTranslation();
   const doc = usePhotoStore((s) => s.doc);
@@ -33,6 +70,15 @@ export function LayerPanel() {
   const ensurePaintLayer = usePhotoStore((s) => s.ensurePaintLayer);
   const addTextLayer = usePhotoStore((s) => s.addTextLayer);
   const addShapeLayer = usePhotoStore((s) => s.addShapeLayer);
+  const addGroup = usePhotoStore((s) => s.addGroup);
+  const addAdjustment = usePhotoStore((s) => s.addAdjustment);
+  const convertToSmart = usePhotoStore((s) => s.convertToSmart);
+  const rasterizeSmart = usePhotoStore((s) => s.rasterizeSmart);
+  const groupActive = usePhotoStore((s) => s.groupActive);
+  const ungroup = usePhotoStore((s) => s.ungroup);
+  const moveIntoGroup = usePhotoStore((s) => s.moveIntoGroup);
+  const toggleGroupExpanded = usePhotoStore((s) => s.toggleGroupExpanded);
+  const setGroupPassThrough = usePhotoStore((s) => s.setGroupPassThrough);
 
   const dragIndex = useRef<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -40,7 +86,7 @@ export function LayerPanel() {
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [menu, setMenu] = useState<{ id: string | null; left: number; top: number } | null>(null);
 
-  const reversed = [...doc.layers].reverse();
+  const rows = buildRows(doc);
   const active = doc.layers.find((item) => item.id === activeId) ?? null;
   const menuLayer = menu?.id ? (doc.layers.find((item) => item.id === menu.id) ?? null) : null;
 
@@ -86,8 +132,6 @@ export function LayerPanel() {
     );
   };
 
-  const toOriginalIndex = (reversedIndex: number) => doc.layers.length - 1 - reversedIndex;
-
   return (
     <div className="flex min-h-0 flex-col gap-2">
       {/* 顶部一行：混合模式 + 不透明度，只作用于当前选中图层 */}
@@ -113,7 +157,7 @@ export function LayerPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {reversed.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="flex items-center justify-between rounded-lg border border-dashed border-gray-300 px-2 py-3 dark:border-gray-700">
             <span className="text-xs text-gray-400 dark:text-gray-500">
               {t('tools.photo.noLayer')}
@@ -124,10 +168,11 @@ export function LayerPanel() {
             />
           </div>
         ) : (
-          <ul className="flex flex-col gap-1">
-            {reversed.map((layer, reversedIndex) => {
-              const index = toOriginalIndex(reversedIndex);
+          <ul className="flex flex-col gap-1" data-testid="layer-panel">
+            {rows.map(({ layer, depth, index }) => {
               const isActive = layer.id === activeId;
+              const isGroup = layer.kind === 'group';
+              const expanded = layer.expanded ?? true;
               return (
                 <li
                   key={layer.id}
@@ -145,12 +190,18 @@ export function LayerPanel() {
                     const from = dragIndex.current;
                     setDropIndex(null);
                     dragIndex.current = null;
-                    if (from !== null && from !== index) reorderLayer(layer.id, index);
+                    if (from === null || from === index) return;
+                    const dragged = doc.layers[from];
+                    if (!dragged) return;
+                    // 落在编组上 = 移入组内；否则按层栈顺序重排
+                    if (isGroup) moveIntoGroup(dragged.id, layer.id);
+                    else reorderLayer(dragged.id, index);
                   }}
                   onDragEnd={() => {
                     dragIndex.current = null;
                     setDropIndex(null);
                   }}
+                  style={{ marginLeft: depth * 12 }}
                   className={`rounded-lg border transition-colors ${
                     isActive
                       ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40'
@@ -158,6 +209,20 @@ export function LayerPanel() {
                   } ${dropIndex === index ? 'ring-1 ring-blue-400' : ''}`}
                 >
                   <div className="flex items-center gap-1.5 p-1.5">
+                    {isGroup ? (
+                      <button
+                        type="button"
+                        data-testid={`group-toggle-${layer.id}`}
+                        aria-label={expanded ? t('tools.photo.collapse') : t('tools.photo.expand')}
+                        aria-expanded={expanded}
+                        onClick={() => toggleGroupExpanded(layer.id)}
+                        className="w-4 shrink-0 text-[10px] text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+                      >
+                        {expanded ? '▾' : '▸'}
+                      </button>
+                    ) : (
+                      <span className="w-4 shrink-0" />
+                    )}
                     <button
                       type="button"
                       onClick={() => selectLayer(layer.id)}
@@ -173,7 +238,13 @@ export function LayerPanel() {
                             ? `${Math.round(layer.width)}×${Math.round(layer.height)}`
                             : layer.kind === 'text'
                               ? 'T'
-                              : t(`tools.photo.shape.${layer.shape}`)}
+                              : layer.kind === 'shape'
+                                ? t(`tools.photo.shape.${layer.shape}`)
+                                : layer.kind === 'group'
+                                  ? t('tools.photo.kindGroup')
+                                  : layer.kind === 'adjustment'
+                                    ? t('tools.photo.kindAdjust')
+                                    : t('tools.photo.kindSmart')}
                         </span>
                       </span>
                     </button>
@@ -204,8 +275,14 @@ export function LayerPanel() {
           ref={menuRef}
           role="menu"
           aria-label={t('tools.photo.layerMenu')}
-          style={{ left: menu.left, top: menu.top, width: MENU_WIDTH }}
-          className="fixed z-40 flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+          style={{
+            left: menu.left,
+            top: menu.top,
+            width: MENU_WIDTH,
+            // 菜单项会随功能增加：限制高度并可滚动，避免溢出视口后点不到下面的项
+            maxHeight: Math.max(120, window.innerHeight - menu.top - 12),
+          }}
+          className="fixed z-40 flex flex-col gap-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         >
           {menuLayer ? (
             <div className="px-1 pb-1">
@@ -215,13 +292,29 @@ export function LayerPanel() {
                 placeholder={layerDisplayName(menuLayer, doc.layers, t)}
                 value={menuLayer.name}
                 onChange={(event) => patchLayer(menuLayer.id, { name: event.target.value }, false)}
-                onBlur={() => usePhotoStore.getState().commit()}
+                onBlur={() => usePhotoStore.getState().commit('histRename')}
                 className="h-7 w-full rounded border border-gray-300 bg-white px-2 text-xs outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
               />
             </div>
           ) : null}
 
           <MenuSection label={t('tools.photo.newLayer')} />
+          <MenuItem
+            icon="layers"
+            label={t('tools.photo.addGroup')}
+            onClick={() => {
+              addGroup();
+              setMenu(null);
+            }}
+          />
+          <MenuItem
+            icon="palette"
+            label={t('tools.photo.addAdjustment')}
+            onClick={() => {
+              addAdjustment();
+              setMenu(null);
+            }}
+          />
           <MenuItem
             icon="placeholder"
             label={t('tools.photo.addRaster')}
@@ -267,6 +360,73 @@ export function LayerPanel() {
                   setMenu(null);
                 }}
               />
+              {menuLayer.kind !== 'group' && doc.activeLayerId ? (
+                <MenuItem
+                  icon="layers"
+                  label={t('tools.photo.groupFromLayer')}
+                  onClick={() => {
+                    groupActive();
+                    setMenu(null);
+                  }}
+                />
+              ) : null}
+              {menuLayer.kind === 'raster' ? (
+                <MenuItem
+                  icon="imageFrame"
+                  label={t('tools.photo.toSmart')}
+                  onClick={() => {
+                    convertToSmart(menuLayer.id);
+                    setMenu(null);
+                  }}
+                />
+              ) : null}
+              {menuLayer.kind === 'smart' ? (
+                <MenuItem
+                  icon="imageFrame"
+                  label={t('tools.photo.rasterize')}
+                  onClick={() => {
+                    rasterizeSmart(menuLayer.id);
+                    setMenu(null);
+                  }}
+                />
+              ) : null}
+              {menuLayer.parentId ? (
+                <MenuItem
+                  icon="unlock"
+                  label={t('tools.photo.leaveGroup')}
+                  onClick={() => {
+                    moveIntoGroup(menuLayer.id, null);
+                    setMenu(null);
+                  }}
+                />
+              ) : null}
+              {menuLayer.kind === 'group' ? (
+                <>
+                  <MenuItem
+                    icon="shapes"
+                    label={
+                      menuLayer.kind === 'group' && menuLayer.passThrough
+                        ? t('tools.photo.groupIsolate')
+                        : t('tools.photo.groupPassThrough')
+                    }
+                    onClick={() => {
+                      setGroupPassThrough(
+                        menuLayer.id,
+                        !(menuLayer.kind === 'group' && menuLayer.passThrough),
+                      );
+                      setMenu(null);
+                    }}
+                  />
+                  <MenuItem
+                    icon="unlock"
+                    label={t('tools.photo.ungroup')}
+                    onClick={() => {
+                      ungroup(menuLayer.id);
+                      setMenu(null);
+                    }}
+                  />
+                </>
+              ) : null}
               <MenuItem
                 icon="layers"
                 label={t('tools.photo.mergeDown')}

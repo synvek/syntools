@@ -24,7 +24,10 @@ export function FilterPanel() {
   const patchActive = usePhotoStore((s) => s.patchActive);
   const layer = doc.layers.find((item) => item.id === doc.activeLayerId);
 
-  if (!layer || layer.kind !== 'raster') {
+  // 双模式：既可调「位图图层自带的调整」，也可调「调整图层」（后者作用于其下方全部内容）
+  const adjustable =
+    layer && (layer.kind === 'raster' || layer.kind === 'adjustment') ? layer : null;
+  if (!adjustable) {
     return (
       <p className="px-1 py-4 text-center text-xs text-gray-400 dark:text-gray-500">
         {t('tools.photo.noLayer')}
@@ -32,7 +35,7 @@ export function FilterPanel() {
     );
   }
 
-  const active = layer.filters;
+  const active = adjustable.filters;
 
   const toggle = (id: FilterId) => {
     const next = active.includes(id) ? active.filter((item) => item !== id) : [...active, id];

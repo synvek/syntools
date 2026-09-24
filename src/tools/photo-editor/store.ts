@@ -5,7 +5,9 @@ import {
   fullSelection,
   intersectRect,
   invertSelection,
+  moveSubtree,
   polygonBounds,
+  selectionPolygon,
   simplifyPath,
 } from './core';
 import {
@@ -23,14 +25,30 @@ import {
   cloneDoc,
   cloneLayer,
   createAdjustments,
+  createAdjustmentLayer,
   createDoc,
+  createGroupLayer,
   createId,
+  createMaskRef,
   createRasterLayer,
   createShapeLayer,
+  createSmartLayer,
   createTextLayer,
 } from './model/factory';
 import { createBlankAsset } from './model/assets';
-import type { Layer, PhotoDoc, Rect, Selection, ShapeKind, ToolId, Viewport } from './model/types';
+import { createMaskCanvas, createMaskCanvasFromPolygon } from './render/mask';
+import type {
+  HistoryEntry,
+  HistoryLabel,
+  MaskRef,
+  Layer,
+  PhotoDoc,
+  Rect,
+  Selection,
+  ShapeKind,
+  ToolId,
+  Viewport,
+} from './model/types';
 
 /**
  * 照片编辑器状态：唯一真相源是 `doc`，其余（当前工具 / 选区 / 视口 / 历史）是会话态。
@@ -62,8 +80,9 @@ interface PhotoState {
   cropRect: Rect | null;
   viewport: Viewport;
   clipboard: Layer | null;
-  past: PhotoDoc[];
-  future: PhotoDoc[];
+  /** 历史：快照 + 操作名 + 时间（面板按此展示，可跳转） */
+  past: HistoryEntry[];
+  future: HistoryEntry[];
 
   loadDoc: (doc: PhotoDoc) => void;
   resetDoc: () => void;
@@ -98,6 +117,32 @@ interface PhotoState {
   removeLayer: (id: string) => void;
   /** copySuffix：复制出的图层名后缀（由 UI 传入当前语言，如「 副本」） */
   duplicateLayer: (id: string, copySuffix?: string) => void;
+  /** 新建空编组（置于最上层） */
+  addGroup: () => string | null;
+  /** 用当前图层新建编组：图层被移入组内 */
+  groupActive: () => string | null;
+  /** 解散编组：子图层上移一层，编组本身删除 */
+  ungroup: (id: string) => void;
+  /** 把图层（连同子树）移入编组；groupId 为 null 表示移到顶层 */
+  moveIntoGroup: (layerId: string, groupId: string | null) => void;
+  toggleGroupExpanded: (id: string) => void;
+  /** 给图层加蒙版：show = 全部显示，hide = 全部隐藏，selection = 按当前选区 */
+  /** 新建调整图层（置于最上层，作用于其下方全部内容） */
+  addAdjustment: () => string | null;
+  /** 位图 → 智能对象：保留源像素，画布上的尺寸只是呈现变换 */
+  convertToSmart: (id: string) => void;
+  /** 智能对象 → 普通位图（栅格化），像素按当前呈现尺寸重采样 */
+  rasterizeSmart: (id: string) => void;
+  addMask: (id: string, mode?: 'show' | 'hide' | 'selection') => void;
+  removeMask: (id: string) => void;
+  /** 改蒙版参数（浓度 / 羽化 / 反相 / 启用） */
+  patchMask: (id: string, patch: Partial<MaskRef>, history?: boolean) => void;
+  /** 蒙版像素级快照（绘制前调用） */
+  commitMask: (id: string) => void;
+  /** 画笔是否写入蒙版（而非图层本体） */
+  maskEditing: boolean;
+  setMaskEditing: (value: boolean) => void;
+  setGroupPassThrough: (id: string, passThrough: boolean) => void;
   reorderLayer: (id: string, toIndex: number) => void;
   mergeDown: (id: string) => void;
   flattenVisible: () => void;
@@ -112,8 +157,13 @@ interface PhotoState {
   /** 位图被就地改写后调用：自增 rev 使烘焙缓存失效 */
   bumpRev: (id: string) => void;
 
-  commit: () => void;
-  commitPixels: (id: string) => void;
+  /** `label` 为该操作在历史面板中的名字（缺省 `histEdit`） */
+  commit: (label?: HistoryLabel) => void;
+  commitPixels: (id: string, label?: HistoryLabel) => void;
+  /** 跳到时间轴第 index 行（0 = 最初状态，past.length = 当前） */
+  jumpTo: (index: number) => void;
+  /** 清空历史（释放可回收资产） */
+  clearHistory: () => void;
   undo: () => void;
   redo: () => void;
 }
@@ -135,8 +185,8 @@ function usedAssetsAcrossHistory(state: Pick<PhotoState, 'doc' | 'past' | 'futur
     for (const id of collectUsedAssets(doc.layers)) used.add(id);
   };
   collect(state.doc);
-  state.past.forEach(collect);
-  state.future.forEach(collect);
+  for (const entry of state.past) collect(entry.doc);
+  for (const entry of state.future) collect(entry.doc);
   return used;
 }
 
@@ -150,6 +200,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   cropRect: null,
   viewport: { scale: 0, x: 0, y: 0 },
   clipboard: null,
+  maskEditing: false,
   past: [],
   future: [],
 
@@ -181,7 +232,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   setBackground: (background) => set((s) => ({ doc: { ...s.doc, background } })),
 
   resizeCanvas: (width, height) => {
-    get().commit();
+    get().commit('histResize');
     set((s) => ({ doc: { ...s.doc, width, height } }));
   },
 
@@ -222,7 +273,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     if (!state.selection) return;
     const layerId = state.ensurePaintLayer();
     if (!layerId) return;
-    get().commitPixels(layerId);
+    get().commitPixels(layerId, mode === 'fill' ? 'histFill' : 'histErase');
     const layer = get().doc.layers.find((item) => item.id === layerId);
     if (!layer || layer.kind !== 'raster') return;
     const changed = paintSelection(
@@ -269,7 +320,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       height: state.doc.height,
     });
     if (!inner) return;
-    get().commit();
+    get().commit('histCrop');
     const doc = get().doc;
     const layers: Layer[] = [];
     for (const layer of doc.layers) {
@@ -324,14 +375,14 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   selectLayer: (id) => set((s) => ({ doc: { ...s.doc, activeLayerId: id } })),
 
   addLayer: (layer) => {
-    get().commit();
+    get().commit('histAddLayer');
     set((s) => ({
       doc: { ...s.doc, layers: [...s.doc.layers, layer], activeLayerId: layer.id },
     }));
   },
 
   patchLayer: (id, patch, history = true) => {
-    if (history) get().commit();
+    if (history) get().commit('histEdit');
     set((s) => ({
       doc: {
         ...s.doc,
@@ -349,7 +400,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   removeLayer: (id) => {
-    get().commit();
+    get().commit('histDeleteLayer');
     set((s) => {
       const layers = s.doc.layers.filter((layer) => layer.id !== id);
       return {
@@ -369,7 +420,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   duplicateLayer: (id, copySuffix = '') => {
     const layer = get().doc.layers.find((item) => item.id === id);
     if (!layer) return;
-    get().commit();
+    get().commit('histDuplicate');
     const copy = cloneLayer(layer, true);
     if (copy.kind === 'raster') {
       const clonedAsset = cloneAsset(layer.kind === 'raster' ? layer.assetId : '');
@@ -387,8 +438,235 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     });
   },
 
+  addGroup: () => {
+    const state = get();
+    state.commit('histGroup');
+    const group = createGroupLayer({ doc: state.doc });
+    set({
+      doc: { ...state.doc, layers: [...state.doc.layers, group], activeLayerId: group.id },
+    });
+    return group.id;
+  },
+
+  groupActive: () => {
+    const state = get();
+    const activeId = state.doc.activeLayerId;
+    if (!activeId) return null;
+    state.commit('histGroup');
+    const group = createGroupLayer({ doc: state.doc });
+    // 编组先入栈，再把图层（及其子树）移到组内
+    const withGroup = [...state.doc.layers, group];
+    const layers = moveSubtree(withGroup, activeId, group.id);
+    set({ doc: { ...state.doc, layers, activeLayerId: group.id } });
+    return group.id;
+  },
+
+  ungroup: (id) => {
+    const state = get();
+    const group = state.doc.layers.find((item) => item.id === id);
+    if (!group || group.kind !== 'group') return;
+    state.commit('histGroup');
+    const parentId = group.parentId ?? null;
+    const layers = state.doc.layers
+      .filter((item) => item.id !== id)
+      .map((item) => ((item.parentId ?? null) === id ? { ...item, parentId } : item));
+    set({
+      doc: {
+        ...state.doc,
+        layers,
+        activeLayerId: layers.some((item) => item.id === group.id)
+          ? group.id
+          : (layers[0]?.id ?? null),
+      },
+    });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  moveIntoGroup: (layerId, groupId) => {
+    const state = get();
+    if (layerId === groupId) return;
+    const layers = moveSubtree(state.doc.layers, layerId, groupId);
+    if (layers === state.doc.layers) return;
+    state.commit('histGroup');
+    set({ doc: { ...state.doc, layers } });
+  },
+
+  toggleGroupExpanded: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer || layer.kind !== 'group') return;
+    // 展开态属于视图状态，不进撤销历史
+    set({
+      doc: {
+        ...state.doc,
+        layers: state.doc.layers.map((item) =>
+          item.id === id ? { ...item, expanded: !(item.expanded ?? true) } : item,
+        ),
+      },
+    });
+  },
+
+  setGroupPassThrough: (id, passThrough) => {
+    get().patchLayer(id, { passThrough } as Partial<Layer>);
+  },
+
+  addAdjustment: () => {
+    const state = get();
+    state.commit('histAdjust');
+    const layer = createAdjustmentLayer({ doc: state.doc });
+    set({
+      doc: { ...state.doc, layers: [...state.doc.layers, layer], activeLayerId: layer.id },
+    });
+    return layer.id;
+  },
+
+  convertToSmart: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer || layer.kind !== 'raster') return;
+    const asset = getCanvas(layer.assetId);
+    if (!asset) return;
+    state.commit('histEdit');
+    const smart = createSmartLayer({
+      doc: state.doc,
+      sourceAssetId: layer.assetId,
+      sourceWidth: asset.width,
+      sourceHeight: asset.height,
+      name: layer.name,
+      x: layer.x,
+      y: layer.y,
+    });
+    // 呈现尺寸沿用原图层的显示尺寸（不重采样）
+    const smartLayer: Layer = {
+      ...smart,
+      // 保留原 id：选中态、蒙版引用与层栈关系都不变
+      id: layer.id,
+      width: layer.width,
+      height: layer.height,
+      rotation: layer.rotation,
+      flipX: layer.flipX,
+      flipY: layer.flipY,
+      opacity: layer.opacity,
+      blend: layer.blend,
+      visible: layer.visible,
+      locked: layer.locked,
+      parentId: layer.parentId ?? null,
+      mask: layer.mask ?? null,
+    };
+    set({
+      doc: {
+        ...state.doc,
+        layers: state.doc.layers.map((item) => (item.id === id ? smartLayer : item)),
+      },
+    });
+  },
+
+  rasterizeSmart: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer || layer.kind !== 'smart') return;
+    const source = getCanvas(layer.sourceAssetId);
+    if (!source) return;
+    state.commit('histEdit');
+    // 按当前呈现尺寸重采样一份新像素，之后就是普通位图
+    const canvas = createCanvasElement(
+      Math.max(1, Math.round(layer.width)),
+      Math.max(1, Math.round(layer.height)),
+    );
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    const assetId = registerCanvas(canvas);
+    const width = layer.sourceWidth;
+    const height = layer.sourceHeight;
+    const raster: Layer = {
+      ...createRasterLayer({ assetId, width, height, name: layer.name, x: layer.x, y: layer.y }),
+      id: layer.id,
+      width: layer.width,
+      height: layer.height,
+      rotation: layer.rotation,
+      flipX: layer.flipX,
+      flipY: layer.flipY,
+      opacity: layer.opacity,
+      blend: layer.blend,
+      visible: layer.visible,
+      locked: layer.locked,
+      parentId: layer.parentId ?? null,
+      mask: layer.mask ?? null,
+    };
+    set({
+      doc: {
+        ...state.doc,
+        layers: state.doc.layers.map((item) => (item.id === id ? raster : item)),
+      },
+    });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  addMask: (id, mode = 'show') => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer || layer.mask) return;
+    state.commit('histMask');
+    const width = Math.max(1, Math.round(layer.width));
+    const height = Math.max(1, Math.round(layer.height));
+    const assetId =
+      mode === 'selection' && state.selection
+        ? createMaskCanvasFromPolygon(width, height, selectionPolygon(state.selection))
+        : createMaskCanvas(width, height, mode === 'hide' ? 'hide' : 'show');
+    const layers = state.doc.layers.map((item) =>
+      item.id === id ? { ...item, mask: createMaskRef(assetId) } : item,
+    );
+    set({ doc: { ...state.doc, layers } });
+  },
+
+  removeMask: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer?.mask) return;
+    state.commit('histMask');
+    const layers = state.doc.layers.map((item) =>
+      item.id === id ? { ...item, mask: null } : item,
+    );
+    set({ doc: { ...state.doc, layers }, maskEditing: false });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  patchMask: (id, patch, history = true) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer?.mask) return;
+    if (history) state.commit('histMask');
+    const layers = state.doc.layers.map((item) =>
+      item.id === id && item.mask ? { ...item, mask: { ...item.mask, ...patch } } : item,
+    );
+    set({ doc: { ...state.doc, layers } });
+  },
+
+  commitMask: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer?.mask) {
+      state.commit('histMask');
+      return;
+    }
+    const cloned = cloneAsset(layer.mask.assetId);
+    const snapshot = cloneDoc(state.doc);
+    const target = snapshot.layers.find((item) => item.id === id);
+    if (target?.mask && cloned) target.mask.assetId = cloned;
+    set({
+      past: [
+        ...state.past,
+        { doc: snapshot, label: 'histMask' as HistoryLabel, at: Date.now() },
+      ].slice(-HISTORY_LIMIT),
+      future: [],
+    });
+  },
+
+  setMaskEditing: (value) => set({ maskEditing: value }),
+
   reorderLayer: (id, toIndex) => {
-    get().commit();
+    get().commit('histReorder');
     set((s) => {
       const layers = [...s.doc.layers];
       const from = layers.findIndex((layer) => layer.id === id);
@@ -412,7 +690,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     ) {
       return;
     }
-    get().commit();
+    get().commit('histMerge');
     const doc = get().doc;
     const currentTop = doc.layers.find((l) => l.id === id);
     const currentBottom = doc.layers[index - 1];
@@ -433,7 +711,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   flattenVisible: () => {
     const doc = get().doc;
     if (doc.layers.length === 0) return;
-    get().commit();
+    get().commit('histFlatten');
     const current = get().doc;
     const flat = flattenLayers(current);
     if (!flat) return;
@@ -541,25 +819,52 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       },
     })),
 
-  commit: () =>
-    set((s) => ({ past: [...s.past, cloneDoc(s.doc)].slice(-HISTORY_LIMIT), future: [] })),
+  commit: (label = 'histEdit') =>
+    set((s) => ({
+      past: [...s.past, { doc: cloneDoc(s.doc), label, at: Date.now() }].slice(-HISTORY_LIMIT),
+      future: [],
+    })),
 
   /**
    * 像素操作前的快照：把目标图层的位图复制一份，
    * 使历史中的 doc 指向「改写前」的画布（资产不可变，撤销即可还原笔迹）。
    */
-  commitPixels: (id) => {
+  commitPixels: (id, label = 'histEdit') => {
     const state = get();
     const layer = state.doc.layers.find((item) => item.id === id);
-    if (!layer || layer.kind !== 'raster') {
-      state.commit();
+    if (!layer) {
+      state.commit(label);
+      return;
+    }
+    // 蒙版绘制：只克隆蒙版画布，位图不动
+    if (layer.kind !== 'raster') {
+      if (!layer.mask?.assetId) {
+        state.commit(label);
+        return;
+      }
+      const clonedMask = cloneAsset(layer.mask.assetId);
+      const snapshot = cloneDoc(state.doc);
+      const target = snapshot.layers.find((item) => item.id === id);
+      if (target?.mask && clonedMask) target.mask.assetId = clonedMask;
+      set({
+        past: [...state.past, { doc: snapshot, label, at: Date.now() }].slice(-HISTORY_LIMIT),
+        future: [],
+      });
       return;
     }
     const clonedAsset = cloneAsset(layer.assetId);
     const snapshot = cloneDoc(state.doc);
     const target = snapshot.layers.find((item) => item.id === id);
     if (target && target.kind === 'raster' && clonedAsset) target.assetId = clonedAsset;
-    set({ past: [...state.past, snapshot].slice(-HISTORY_LIMIT), future: [] });
+    // 位图图层也可能带蒙版，蒙版像素同样要独立快照
+    if (target?.mask?.assetId) {
+      const clonedMask = cloneAsset(target.mask.assetId);
+      if (clonedMask) target.mask.assetId = clonedMask;
+    }
+    set({
+      past: [...state.past, { doc: snapshot, label, at: Date.now() }].slice(-HISTORY_LIMIT),
+      future: [],
+    });
   },
 
   undo: () => {
@@ -568,8 +873,12 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     if (!previous) return;
     set({
       past: state.past.slice(0, -1),
-      future: [cloneDoc(state.doc), ...state.future].slice(0, HISTORY_LIMIT),
-      doc: previous,
+      // 被撤销的状态进 future：它携带「产生它的操作名」
+      future: [
+        { doc: cloneDoc(state.doc), label: previous.label, at: Date.now() },
+        ...state.future,
+      ].slice(0, HISTORY_LIMIT),
+      doc: previous.doc,
       selection: null,
       cropRect: null,
     });
@@ -581,12 +890,34 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const next = state.future[0];
     if (!next) return;
     set({
-      past: [...state.past, cloneDoc(state.doc)].slice(-HISTORY_LIMIT),
+      // 离开的状态进 past：它的 label 就是即将重做的操作
+      past: [...state.past, { doc: cloneDoc(state.doc), label: next.label, at: Date.now() }].slice(
+        -HISTORY_LIMIT,
+      ),
       future: state.future.slice(1),
-      doc: next,
+      doc: next.doc,
       selection: null,
       cropRect: null,
     });
+    releaseExcept(usedAssetsAcrossHistory(get()));
+  },
+
+  jumpTo: (index) => {
+    const state = get();
+    const current = state.past.length;
+    const max = current + state.future.length;
+    const target = Math.max(0, Math.min(max, Math.round(index)));
+    if (target === current) return;
+    // 线性跳转：落到目标行之前逐步 undo / redo（步数受 HISTORY_LIMIT 约束，开销可忽略）
+    if (target < current) {
+      for (let step = 0; step < current - target; step += 1) get().undo();
+    } else {
+      for (let step = 0; step < target - current; step += 1) get().redo();
+    }
+  },
+
+  clearHistory: () => {
+    set({ past: [], future: [] });
     releaseExcept(usedAssetsAcrossHistory(get()));
   },
 }));

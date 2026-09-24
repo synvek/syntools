@@ -8,6 +8,7 @@ import {
   TextInput,
   ToggleChip,
 } from './controls';
+import { MaskPanel } from './MaskPanel';
 import { usePhotoStore } from '../store';
 import type { TextAlign } from '../model/types';
 
@@ -27,6 +28,7 @@ export function PropertyPanel() {
   const { t } = useTranslation();
   const doc = usePhotoStore((s) => s.doc);
   const patchActive = usePhotoStore((s) => s.patchActive);
+  const rasterizeSmart = usePhotoStore((s) => s.rasterizeSmart);
   const layer = doc.layers.find((item) => item.id === doc.activeLayerId);
 
   if (!layer) {
@@ -38,7 +40,32 @@ export function PropertyPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
+      <MaskPanel layer={layer} />
+      {layer.kind === 'smart' ? (
+        <div
+          data-testid="smart-section"
+          className="rounded-lg border border-gray-200 p-2 dark:border-gray-800"
+        >
+          <div className="mb-1.5 text-xs font-medium text-gray-600 dark:text-gray-300">
+            {t('tools.photo.smartTitle')}
+          </div>
+          <p className="mb-1.5 text-[10px] text-gray-400 dark:text-gray-500">
+            {t('tools.photo.smartSource', {
+              w: Math.round(layer.sourceWidth),
+              h: Math.round(layer.sourceHeight),
+            })}
+          </p>
+          <button
+            type="button"
+            data-testid="smart-rasterize"
+            onClick={() => rasterizeSmart(layer.id)}
+            className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {t('tools.photo.rasterize')}
+          </button>
+        </div>
+      ) : null}
       <PanelSection title={t('tools.photo.tabProperty')}>
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('tools.photo.posX')}>
