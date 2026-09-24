@@ -36,6 +36,8 @@ export default defineConfig({
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
     rollupOptions: {
+      // 限制 transform 并行度，降低大数据量依赖（univer/mermaid）时的内存峰值
+      maxParallelFileOps: 2,
       output: {
         // 拆分首屏与重依赖；单 chunk 预算见 scripts/check-bundle-size.mjs
         // onlyExplicitManualChunks：避免把 mermaid 的传递依赖（cytoscape 等）并进同一 chunk，

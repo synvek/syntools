@@ -81,6 +81,9 @@ jobs:
           - name: macos-arm64
             os: macos-15
     runs-on: ${{ matrix.os }}
+    env:
+      # vite build 在 macOS runner 上会顶到 Node 默认堆上限（heap OOM），统一提高子进程堆上限
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v4
 
