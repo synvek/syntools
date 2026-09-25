@@ -33,7 +33,7 @@ You can access online: www.syntools.net
 SynTools started as a developer toolbox, but it is no longer developer-only:
 
 - **Developers** — encoding, formatters, regex, hashes, JWT, UUIDs, cron, …
-- **Documents & creative work** — Word / Excel / PowerPoint editors, flowcharts, mind maps, Markdown preview, LaTeX formulas, whiteboard, full PDF toolset
+- **Documents & creative work** — Word / Excel / PowerPoint editors, flowcharts, mind maps, Markdown editor, LaTeX formulas, whiteboard, full PDF toolset
 - **Design & media** — photo editor with layers and PSD export, image compress / crop / watermark, GIF frames
 - **Everyday tasks** — calculators, unit & length converters, BMI, QR codes, countdowns, charts
 
@@ -54,22 +54,22 @@ SynTools started as a developer toolbox, but it is no longer developer-only:
 
 ## Tool categories
 
-| Category             | Examples                                                                                                                                                                                                                                                                                                                            |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Documents & Creative | Word processor (.docx), spreadsheets (.xlsx, formulas & multi-sheet), slides (.pptx & slideshow), flowcharts (multi-page), mind maps (multi-canvas), photo editor (layers, masks, adjustment layers, PSD export), Markdown preview, LaTeX formula editor, whiteboard — see [Documents & Creative tools](#documents--creative-tools) |
-| Encoding             | Base64, URL codec, Unicode, HTML entities, ASCII table, base16/32/58, Morse, Caesar/ROT13/rail fence, escape/unescape, garbled-text rescue                                                                                                                                                                                          |
-| Text                 | Regex tester, text diff, case convert, counter, pinyin, zh convert                                                                                                                                                                                                                                                                  |
-| Formatting           | JSON / SQL / HTML / JS / CSS / XML formatters, Markdown preview, CSV↔JSON, code minifier (CSS/HTML/JS/JSON)                                                                                                                                                                                                                         |
-| Crypto               | Hash, HMAC, JWT parser, password generator/strength, AES, RSA encrypt + sign, key format converter (PEM/DER/JWK/OpenSSH), PBKDF2, CRC-32/Adler-32/FNV                                                                                                                                                                               |
-| Date & time          | Timestamp, calendar, countdown, stopwatch, cron parse/generate, time zone converter                                                                                                                                                                                                                                                 |
-| Generators           | UUID, QR code, barcode (Code 39/128/EAN-13), ID generator (ULID/NanoID/Snowflake/ObjectId), random string/number, placeholder image, CSS gradient                                                                                                                                                                                   |
-| Image                | Compress, crop, merge, watermark, GIF frames, SVG→PNG, Base64, ICO, grid cut, ID photo, image→ASCII                                                                                                                                                                                                                                 |
-| PDF                  | Merge, split, rotate, encrypt/decrypt, compress, extract text, watermark, annotate, to/from image, page numbers, sign                                                                                                                                                                                                               |
-| Network              | IP calculator (VLSM), CIDR, MAC, URL parser, UA parser/generator, HTTP headers/request, WebSocket tester, random port                                                                                                                                                                                                               |
-| File                 | ZIP create/extract, file split/merge, bulk rename                                                                                                                                                                                                                                                                                   |
-| Media                | Video / audio transcoding (WebCodecs-first, ffmpeg.wasm fallback), video→GIF, subtitle (SRT/WebVTT) converter                                                                                                                                                                                                                       |
-| Cheatsheet           | HTTP status codes, MIME types, Git commands                                                                                                                                                                                                                                                                                         |
-| Other                | Calculator, unit converter, loan/tax calculator, MBTI, AI prompts, Mermaid, chart generator, …                                                                                                                                                                                                                                      |
+| Category             | Examples                                                                                                                                                                                                                                                                                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Documents & Creative | Word processor (.docx), spreadsheets (.xlsx, formulas & multi-sheet), slides (.pptx & slideshow), code editor, flowcharts (multi-page), mind maps (multi-canvas), photo editor (layers, masks, adjustment layers, PSD export), Markdown editor, LaTeX formula editor, whiteboard — see [Documents & Creative tools](#documents--creative-tools) |
+| Encoding             | Base64, URL codec, Unicode, HTML entities, ASCII table, base16/32/58, Morse, Caesar/ROT13/rail fence, escape/unescape, garbled-text rescue                                                                                                                                                                                                      |
+| Text                 | Regex tester, text diff, case convert, counter, pinyin, zh convert                                                                                                                                                                                                                                                                              |
+| Formatting           | JSON / SQL / HTML / JS / CSS / XML formatters, CSV↔JSON, code minifier (CSS/HTML/JS/JSON)                                                                                                                                                                                                                                                       |
+| Crypto               | Hash, HMAC, JWT parser, password generator/strength, AES, RSA encrypt + sign, key format converter (PEM/DER/JWK/OpenSSH), PBKDF2, CRC-32/Adler-32/FNV                                                                                                                                                                                           |
+| Date & time          | Timestamp, calendar, countdown, stopwatch, cron parse/generate, time zone converter                                                                                                                                                                                                                                                             |
+| Generators           | UUID, QR code, barcode (Code 39/128/EAN-13), ID generator (ULID/NanoID/Snowflake/ObjectId), random string/number, placeholder image, CSS gradient                                                                                                                                                                                               |
+| Image                | Compress, crop, merge, watermark, GIF frames, SVG→PNG, Base64, ICO, grid cut, ID photo, image→ASCII                                                                                                                                                                                                                                             |
+| PDF                  | Merge, split, rotate, encrypt/decrypt, compress, extract text, watermark, annotate, to/from image, page numbers, sign                                                                                                                                                                                                                           |
+| Network              | IP calculator (VLSM), CIDR, MAC, URL parser, UA parser/generator, HTTP headers/request, WebSocket tester, random port                                                                                                                                                                                                                           |
+| File                 | ZIP create/extract, file split/merge, bulk rename                                                                                                                                                                                                                                                                                               |
+| Media                | Video / audio transcoding (WebCodecs-first, ffmpeg.wasm fallback), video→GIF, subtitle (SRT/WebVTT) converter                                                                                                                                                                                                                                   |
+| Cheatsheet           | HTTP status codes, MIME types, Git commands                                                                                                                                                                                                                                                                                                     |
+| Other                | Calculator, unit converter, loan/tax calculator, MBTI, AI prompts, Mermaid, chart generator, …                                                                                                                                                                                                                                                  |
 
 Browse the full list on the home page or in `src/core/registry/index.ts`.
 
@@ -77,19 +77,22 @@ Browse the full list on the home page or in `src/core/registry/index.ts`.
 
 A family of document-class editors plus lightweight authoring tools — everything runs locally, nothing leaves your device.
 
-| Tool                 | Route                       | Highlights                                                                                                                                        |
-| -------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Word Processor       | `/tools/rich-text-editor`   | Word `.docx` import/export, two PDF export modes                                                                                                  |
-| Spreadsheet Editor   | `/tools/spreadsheet-editor` | Excel `.xlsx` import/export, formulas, multi-sheet                                                                                                |
-| Slides Editor        | `/tools/slide-editor`       | PowerPoint `.pptx` import/export, Konva canvas editing, slideshow                                                                                 |
-| Flowchart Editor     | `/tools/flowchart-editor`   | Shapes & connectors, templates, auto-layout, **multi-page with thumbnail overview**, PNG/SVG                                                      |
-| Mind Map Editor      | `/tools/mindmap-editor`     | Keyboard-first editing, collapsible branches, themes, **multi-canvas with thumbnail overview**, PNG/SVG/Markdown                                  |
-| Photo Editor         | `/tools/photo-editor`       | Non-destructive layers (groups, masks, adjustment layers, smart objects), selections & crop, adjustments & filters, history panel, **PSD export** |
-| Markdown Preview     | `/tools/markdown-preview`   | GFM live rendering, output sanitized with DOMPurify, safe preview                                                                                 |
-| LaTeX Formula Editor | `/tools/latex-editor`       | Symbol palette & classic formulas, KaTeX preview, PNG / JPG / SVG export                                                                          |
-| Whiteboard           | `/tools/doodle-board`       | Freehand brush & eraser, PNG export                                                                                                               |
+| Tool                 | Route                       | Highlights                                                                                                                                                                                                                                    |
+| -------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Word Processor       | `/tools/rich-text-editor`   | Word `.docx` import/export, two PDF export modes                                                                                                                                                                                              |
+| Spreadsheet Editor   | `/tools/spreadsheet-editor` | Excel `.xlsx` import/export, formulas, multi-sheet                                                                                                                                                                                            |
+| Slides Editor        | `/tools/slide-editor`       | PowerPoint `.pptx` import/export, Konva canvas editing, slideshow                                                                                                                                                                             |
+| Code Editor          | `/tools/code-editor`        | Prism syntax highlighting, per-language formatting (Prettier), 10 themes, line numbers & word wrap, source / HTML / PNG / JPG / SVG export, autosaved drafts                                                                                  |
+| Flowchart Editor     | `/tools/flowchart-editor`   | Shapes & connectors, templates, auto-layout, **multi-page with thumbnail overview**, PNG/SVG                                                                                                                                                  |
+| Mind Map Editor      | `/tools/mindmap-editor`     | Keyboard-first editing, collapsible branches, themes, **multi-canvas with thumbnail overview**, PNG/SVG/Markdown                                                                                                                              |
+| Photo Editor         | `/tools/photo-editor`       | Non-destructive layers (groups, masks, adjustment layers, smart objects), selections & crop, adjustments & filters, history panel, **PSD export**                                                                                             |
+| Markdown Editor      | `/tools/markdown-preview`   | Syntax-highlighted editing, GFM live preview, edit / split / preview modes, scroll sync, outline navigation, word count, open & save `.md`, single-file HTML export, autosaved drafts                                                         |
+| LaTeX Formula Editor | `/tools/latex-editor`       | Symbol palette & classic formulas, KaTeX preview, PNG / JPG / SVG export                                                                                                                                                                      |
+| Whiteboard           | `/tools/doodle-board`       | Pen / highlighter / eraser with pen pressure, shapes & free polygon, text, eyedropper, foreground & background colors, move and zoom (10–800%), grid or transparent canvas, undo / redo, PNG / transparent PNG / JPG export, autosaved drafts |
 
-Common traits: the **document editors** autosave drafts to `localStorage` and export files that stay editable in their target format (`.docx` / `.xlsx` / `.pptx` / PNG·SVG / PSD); editors with several pages or canvases add a thumbnail overview plus `Ctrl/⌘ + PageUp / PageDown` to browse them, and the flowchart and photo editors can also save a re-editable project JSON. The **lightweight authoring tools** — Markdown preview, LaTeX formula editor and whiteboard — are stateless: they render or produce content and export it (text / PNG / SVG) without keeping a draft.
+Common traits: every editor here autosaves drafts to `localStorage` unless noted, and the **document editors** export files that stay editable in their target format (`.docx` / `.xlsx` / `.pptx` / PNG·SVG / PSD); editors with several pages or canvases add a thumbnail overview plus `Ctrl/⌘ + PageUp / PageDown` to browse them, and the flowchart and photo editors can also save a re-editable project JSON. The **lightweight authoring tools** — Markdown editor, LaTeX formula editor and whiteboard — pair live preview with formatting shortcuts and export text / PNG / SVG; the Markdown editor and the whiteboard keep a local draft too, while the LaTeX editor renders on the fly without one.
+
+Tool routes are permanent: a few legacy ids are kept stable so existing links and bookmarks keep working (for example the Markdown editor still lives at `/tools/markdown-preview`).
 
 ---
 
@@ -164,17 +167,21 @@ syntools/
 ├── index.html                 # Entry + inline theme bootstrap (no FOUC)
 ├── vite.config.ts             # Vite + Vitest (@ → src)
 ├── vercel.json                # SPA rewrites + security headers
+├── e2e/                       # Playwright end-to-end specs
+├── scripts/                   # Bundle budget, prerender + sitemap, locale injection
+├── src-tauri/                 # Optional Tauri desktop shell
 └── src/
     ├── main.tsx
     ├── app/                   # Shell: layout, home, search, routes
     ├── core/                  # Types, registry, shared UI, hooks, PDF helpers
-    ├── stores/                # Theme, history, favorites
+    ├── stores/                # Theme & language, recent tools, favorites
     └── tools/                 # One directory per tool
         ├── _template/         # Copy-paste starter
         └── <tool-id>/
             ├── index.ts       # ToolMeta
             ├── *Tool.tsx      # Lazy-loaded UI
             ├── core.ts        # Pure logic (ToolResult)
+            ├── draft.ts       # Optional: localStorage draft (editors)
             └── core.test.ts
 ```
 
@@ -230,7 +237,7 @@ Multi-threaded ffmpeg.wasm needs `SharedArrayBuffer`, which requires cross-origi
 
 ## Deployment
 
-The build output is a static SPA in `dist/`.
+The build output is a static SPA in `dist/`. `pnpm build` also prerenders the home page and every tool page to static HTML (`scripts/prerender.ts`) and emits `sitemap.xml`, `robots.txt` and `404.html`, so crawlers get real content on first load.
 
 **Vercel** — `vercel.json` already defines `buildCommand`, `outputDirectory`, SPA rewrites, and security headers (`BASE_PATH` defaults to `/`).
 

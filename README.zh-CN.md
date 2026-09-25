@@ -33,7 +33,7 @@ SynTools 把日常常用的工具收拢到同一入口：办公文档（Word / E
 SynTools 从开发者工具箱起步，但早已不再只面向开发者：
 
 - **开发者** — 编解码、格式化、正则、哈希、JWT、UUID、Cron …
-- **文档与创作** — Word / Excel / PowerPoint 编辑器、流程图、脑图、Markdown 预览、LaTeX 公式编辑器、在线涂鸦画板，以及完整 PDF 工具集
+- **文档与创作** — Word / Excel / PowerPoint 编辑器、流程图、脑图、Markdown 编辑器、LaTeX 公式编辑器、在线涂鸦画板，以及完整 PDF 工具集
 - **设计与图像** — 带图层与 PSD 导出的照片编辑器，图片压缩 / 裁剪 / 水印、GIF 拆帧
 - **日常使用** — 计算器、单位换算、BMI、二维码、倒计时、图表生成
 
@@ -54,22 +54,22 @@ SynTools 从开发者工具箱起步，但早已不再只面向开发者：
 
 ## 工具分类
 
-| 分类       | 示例                                                                                                                                                                                                                                               |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 文档与创作 | 文字处理器（.docx）、电子表格（.xlsx、公式与多工作表）、幻灯片（.pptx 与放映）、流程图（多页）、脑图（多画布）、照片编辑器（图层、蒙版、调整图层、PSD 导出）、Markdown 预览、LaTeX 公式编辑器、在线涂鸦画板——详见[文档与创作工具](#文档与创作工具) |
-| 编码转换   | Base64、URL 编解码、Unicode、HTML 实体、ASCII 表、base16/32/58、摩斯、凯撒/ROT13/栅栏、转义/反转义、乱码修复                                                                                                                                       |
-| 文本处理   | 正则测试、文本对比、大小写转换、字数统计、拼音、简繁转换                                                                                                                                                                                           |
-| 格式化     | JSON / SQL / HTML / JS / CSS / XML 格式化、Markdown 预览、CSV↔JSON、代码压缩（CSS/HTML/JS/JSON）                                                                                                                                                   |
-| 加密哈希   | 哈希、HMAC、JWT 解析、密码生成/强度检测、AES、RSA 加解密与签名、密钥格式转换（PEM/DER/JWK/OpenSSH）、PBKDF2、CRC-32/Adler-32/FNV                                                                                                                   |
-| 时间日期   | 时间戳、日历、倒计时、秒表、Cron 解析/生成、时区转换                                                                                                                                                                                               |
-| 生成器     | UUID、二维码、条形码（Code 39/128/EAN-13）、ID 生成（ULID/NanoID/Snowflake/ObjectId）、随机字符串/数字、占位图、CSS 渐变                                                                                                                           |
-| 图片处理   | 压缩、裁剪、合并、水印、GIF 帧、SVG→PNG、Base64、ICO、九宫格切图、证件照、图片转 ASCII                                                                                                                                                             |
-| PDF 工具   | 合并、拆分、旋转、加密/解密、压缩、文本提取、水印、批注、图文互转、页码、签名                                                                                                                                                                      |
-| 网络       | IP 计算（VLSM）、CIDR、MAC、URL 解析、UA 解析/生成、HTTP 标头/请求、WebSocket 测试、随机端口                                                                                                                                                       |
-| 文件       | ZIP 打包/解压、文件切分/合并、批量重命名                                                                                                                                                                                                           |
-| 音视频     | 视频/音频转码（WebCodecs 优先，ffmpeg.wasm 兜底）、视频转 GIF、字幕（SRT/WebVTT）转换                                                                                                                                                              |
-| 速查表     | HTTP 状态码、MIME 类型、Git 命令                                                                                                                                                                                                                   |
-| 其他       | 计算器、单位换算、贷款/个税计算、MBTI、AI 提示词、Mermaid、图表生成 …                                                                                                                                                                              |
+| 分类       | 示例                                                                                                                                                                                                                                                             |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文档与创作 | 文字处理器（.docx）、电子表格（.xlsx、公式与多工作表）、幻灯片（.pptx 与放映）、代码编辑器、流程图（多页）、脑图（多画布）、照片编辑器（图层、蒙版、调整图层、PSD 导出）、Markdown 编辑器、LaTeX 公式编辑器、在线涂鸦画板——详见[文档与创作工具](#文档与创作工具) |
+| 编码转换   | Base64、URL 编解码、Unicode、HTML 实体、ASCII 表、base16/32/58、摩斯、凯撒/ROT13/栅栏、转义/反转义、乱码修复                                                                                                                                                     |
+| 文本处理   | 正则测试、文本对比、大小写转换、字数统计、拼音、简繁转换                                                                                                                                                                                                         |
+| 格式化     | JSON / SQL / HTML / JS / CSS / XML 格式化、CSV↔JSON、代码压缩（CSS/HTML/JS/JSON）                                                                                                                                                                                |
+| 加密哈希   | 哈希、HMAC、JWT 解析、密码生成/强度检测、AES、RSA 加解密与签名、密钥格式转换（PEM/DER/JWK/OpenSSH）、PBKDF2、CRC-32/Adler-32/FNV                                                                                                                                 |
+| 时间日期   | 时间戳、日历、倒计时、秒表、Cron 解析/生成、时区转换                                                                                                                                                                                                             |
+| 生成器     | UUID、二维码、条形码（Code 39/128/EAN-13）、ID 生成（ULID/NanoID/Snowflake/ObjectId）、随机字符串/数字、占位图、CSS 渐变                                                                                                                                         |
+| 图片处理   | 压缩、裁剪、合并、水印、GIF 帧、SVG→PNG、Base64、ICO、九宫格切图、证件照、图片转 ASCII                                                                                                                                                                           |
+| PDF 工具   | 合并、拆分、旋转、加密/解密、压缩、文本提取、水印、批注、图文互转、页码、签名                                                                                                                                                                                    |
+| 网络       | IP 计算（VLSM）、CIDR、MAC、URL 解析、UA 解析/生成、HTTP 标头/请求、WebSocket 测试、随机端口                                                                                                                                                                     |
+| 文件       | ZIP 打包/解压、文件切分/合并、批量重命名                                                                                                                                                                                                                         |
+| 音视频     | 视频/音频转码（WebCodecs 优先，ffmpeg.wasm 兜底）、视频转 GIF、字幕（SRT/WebVTT）转换                                                                                                                                                                            |
+| 速查表     | HTTP 状态码、MIME 类型、Git 命令                                                                                                                                                                                                                                 |
+| 其他       | 计算器、单位换算、贷款/个税计算、MBTI、AI 提示词、Mermaid、图表生成 …                                                                                                                                                                                            |
 
 完整列表见首页，或查看 `src/core/registry/index.ts`。
 
@@ -77,19 +77,22 @@ SynTools 从开发者工具箱起步，但早已不再只面向开发者：
 
 一组「文档级」编辑器与轻量创作工具，全部本地运行，内容不出本机。
 
-| 工具             | 路由                        | 能力要点                                                                                      |
-| ---------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
-| 文字处理器       | `/tools/rich-text-editor`   | Word `.docx` 导入导出、双模式 PDF 导出                                                        |
-| 电子表格编辑器   | `/tools/spreadsheet-editor` | Excel `.xlsx` 导入导出、公式、多工作表                                                        |
-| 幻灯片编辑器     | `/tools/slide-editor`       | PowerPoint `.pptx` 导入导出、Konva 画布编辑、放映                                             |
-| 流程图编辑器     | `/tools/flowchart-editor`   | 图形与连线、模板、自动布局、**多页 + 缩略图总览**、PNG/SVG 导出                               |
-| 脑图编辑器       | `/tools/mindmap-editor`     | 键盘优先编辑、折叠分支、主题、**多画布 + 缩略图总览**、PNG/SVG/Markdown 导出                  |
-| 照片编辑器       | `/tools/photo-editor`       | 非破坏性图层（编组 / 蒙版 / 调整图层 / 智能对象）、选区裁剪、调色滤镜、历史面板、**PSD 导出** |
-| Markdown 预览    | `/tools/markdown-preview`   | GFM 实时渲染，输出经 DOMPurify 消毒，安全预览                                                 |
-| LaTeX 公式编辑器 | `/tools/latex-editor`       | 快捷符号与经典公式、KaTeX 预览、PNG / JPG / SVG 导出                                          |
-| 在线涂鸦画板     | `/tools/doodle-board`       | 自由画笔与橡皮、导出 PNG                                                                      |
+| 工具             | 路由                        | 能力要点                                                                                                                                                                       |
+| ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 文字处理器       | `/tools/rich-text-editor`   | Word `.docx` 导入导出、双模式 PDF 导出                                                                                                                                         |
+| 电子表格编辑器   | `/tools/spreadsheet-editor` | Excel `.xlsx` 导入导出、公式、多工作表                                                                                                                                         |
+| 幻灯片编辑器     | `/tools/slide-editor`       | PowerPoint `.pptx` 导入导出、Konva 画布编辑、放映                                                                                                                              |
+| 代码编辑器       | `/tools/code-editor`        | Prism 语法高亮、多语言格式化（Prettier）、10 套主题、行号与自动换行、源码 / HTML / PNG / JPG / SVG 导出、草稿自动保存                                                          |
+| 流程图编辑器     | `/tools/flowchart-editor`   | 图形与连线、模板、自动布局、**多页 + 缩略图总览**、PNG/SVG 导出                                                                                                                |
+| 脑图编辑器       | `/tools/mindmap-editor`     | 键盘优先编辑、折叠分支、主题、**多画布 + 缩略图总览**、PNG/SVG/Markdown 导出                                                                                                   |
+| 照片编辑器       | `/tools/photo-editor`       | 非破坏性图层（编组 / 蒙版 / 调整图层 / 智能对象）、选区裁剪、调色滤镜、历史面板、**PSD 导出**                                                                                  |
+| Markdown 编辑器  | `/tools/markdown-preview`   | 语法高亮编辑、GFM 实时预览、编辑 / 分屏 / 预览三种视图、同步滚动、大纲导航、字数统计、打开与保存 `.md`、单文件 HTML 导出、草稿自动保存                                         |
+| LaTeX 公式编辑器 | `/tools/latex-editor`       | 快捷符号与经典公式、KaTeX 预览、PNG / JPG / SVG 导出                                                                                                                           |
+| 在线涂鸦画板     | `/tools/doodle-board`       | 画笔 / 荧光笔 / 橡皮（支持压感）、形状与自由多边形、文字、吸管取色、前景与背景色、整体移动与缩放（10–800%）、网格或透明画布、撤销重做、PNG / 透明 PNG / JPG 导出、草稿自动保存 |
 
-共同特性：**文档级编辑器**的草稿自动存入 `localStorage`，导出结果保持目标格式可继续编辑（`.docx` / `.xlsx` / `.pptx` / PNG·SVG / PSD）；有多页 / 多画布的编辑器另提供缩略图总览与 `Ctrl/⌘ + PageUp / PageDown` 翻页；流程图与照片编辑器还可导出可续编的工程 JSON。**轻量创作工具**（Markdown 预览、LaTeX 公式编辑器、在线涂鸦画板）为无状态：仅渲染或生成内容后直接导出（文本 / PNG / SVG），不保留草稿。
+共同特性：各编辑器默认把草稿自动存入 `localStorage`；**文档级编辑器**的导出结果保持目标格式可继续编辑（`.docx` / `.xlsx` / `.pptx` / PNG·SVG / PSD）；有多页 / 多画布的编辑器另提供缩略图总览与 `Ctrl/⌘ + PageUp / PageDown` 翻页；流程图与照片编辑器还可导出可续编的工程 JSON。**轻量创作工具**（Markdown 编辑器、LaTeX 公式编辑器、在线涂鸦画板）提供实时预览与快捷排版，导出文本 / PNG / SVG；其中 Markdown 编辑器与在线涂鸦画板同样保留本地草稿，LaTeX 编辑器即时渲染、不留草稿。
+
+工具路由保持稳定：少数历史 id 会沿用旧值，以免破坏既有链接与书签（例如 Markdown 编辑器仍位于 `/tools/markdown-preview`）。
 
 ---
 
@@ -164,17 +167,21 @@ syntools/
 ├── index.html                 # 入口 + 内联主题初始化（防首帧闪烁）
 ├── vite.config.ts             # Vite + Vitest（@ → src）
 ├── vercel.json                # SPA 重写 + 安全响应头
+├── e2e/                       # Playwright 端到端用例
+├── scripts/                   # 体积预算、预渲染 + sitemap、文案注入
+├── src-tauri/                 # 可选的 Tauri 桌面外壳
 └── src/
     ├── main.tsx
     ├── app/                   # 应用外壳：布局、首页、搜索、路由
     ├── core/                  # 类型、注册表、通用 UI、hooks、PDF 辅助
-    ├── stores/                # 主题、最近使用、收藏
+    ├── stores/                # 主题与语言、最近使用、收藏
     └── tools/                 # 每个工具一个目录
         ├── _template/         # 可复制的起步模板
         └── <tool-id>/
             ├── index.ts       # ToolMeta
             ├── *Tool.tsx      # 懒加载 UI
             ├── core.ts        # 纯函数逻辑（ToolResult）
+            ├── draft.ts       # 可选：localStorage 草稿（编辑器类）
             └── core.test.ts
 ```
 
@@ -230,7 +237,7 @@ wasm 核心约 31 MB，因此**绝不进 bundle**：`pnpm ffmpeg:fetch` 会把�
 
 ## 部署
 
-构建产物为 `dist/` 下的静态 SPA。
+构建产物为 `dist/` 下的静态 SPA。`pnpm build` 还会把首页与全部工具页预渲染为静态 HTML（`scripts/prerender.ts`），并生成 `sitemap.xml`、`robots.txt` 与 `404.html`，让搜索引擎首次抓取即拿到真实内容。
 
 **Vercel** — `vercel.json` 已配置 `buildCommand`、`outputDirectory`、SPA 重写与安全响应头（`BASE_PATH` 默认为 `/`）。
 
