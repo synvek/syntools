@@ -29,8 +29,20 @@ export default defineConfig({
     port: 9999,
     strictPort: true,
     host: process.env.TAURI_DEV_HOST || false,
+    // 多线程 ffmpeg.wasm（core-mt）需要 SharedArrayBuffer → cross-origin isolated。
+    // 生产环境对应配置见 vercel.json / public/_headers。
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
     watch: {
       ignored: ['**/src-tauri/**'],
+    },
+  },
+  preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
   envPrefix: ['VITE_', 'TAURI_'],

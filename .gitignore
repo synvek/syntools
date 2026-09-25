@@ -39,6 +39,10 @@ test-results
 scripts/.en-locale.json
 scripts/locale-chunks/
 
+# Self-hosted ffmpeg.wasm core (~31 MB, fetched via `pnpm ffmpeg:fetch`, never committed)
+public/ffmpeg/*
+!public/ffmpeg/.gitkeep
+
 # Tauri
 src-tauri/target
 

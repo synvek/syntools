@@ -120,13 +120,19 @@ const pt = {
     back: 'Voltar ao início',
   },
   toolsMeta: {
+    'video-convert': {
+      name: 'Conversor de vídeo',
+      description:
+        'Transcodificação WebCodecs primeiro (MP4 / WebM / MKV) com fallback para ffmpeg.wasm',
+    },
     'video-to-gif': {
       name: 'Vídeo para GIF',
       description: 'Recorta um vídeo em GIF animado (tudo no navegador)',
     },
     'audio-convert': {
-      name: 'Áudio para WAV',
-      description: 'Converte áudio decodificável em WAV (taxa, canais, profundidade)',
+      name: 'Conversor de áudio',
+      description:
+        'Conversão de áudio: WAV (nativo) e MP3 / M4A / OGG / FLAC (WebCodecs primeiro, fallback ffmpeg.wasm)',
     },
     'subtitle-tool': {
       name: 'Conversor de legendas',
@@ -760,7 +766,51 @@ const pt = {
     },
   },
   tools: {
+    'video-convert': {
+      formats:
+        'Formatos suportados: MP4 / MOV / WebM / MKV / AVI / MPEG-TS (recorre ao ffmpeg.wasm se necessário)',
+      target: 'Formato destino',
+      quality: 'Qualidade',
+      qualities: {
+        low: 'Baixa',
+        medium: 'Média',
+        high: 'Alta',
+      },
+      width: 'Largura (px)',
+      trimStart: 'Início (s)',
+      trimEnd: 'Fim (s)',
+      dropHint: 'Solte um vídeo para transcodificar',
+      engines: 'Motores: WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}',
+      available: 'disponível',
+      unavailable: 'indisponível',
+      probe: '{{duration}} · {{size}} · vídeo {{video}} / áudio {{audio}}',
+      convert: 'Converter',
+      converting: 'Convertendo…',
+      cancel: 'Cancelar',
+      progress: 'Processando {{percent}}%',
+      download: 'Baixar {{name}}',
+      usedEngine: 'Motor: {{engine}}',
+      errors: {
+        INVALID_TARGET: 'Formato de destino não suportado',
+        INVALID_QUALITY: 'Qualidade inválida',
+        INVALID_TRIM: 'Intervalo de corte inválido (fim após início)',
+        PROBE_FAILED: 'Não foi possível ler as informações',
+        WEBCodecs_VIDEO_MISSING: 'WebCodecs de vídeo indisponível e ffmpeg.wasm não está pronto',
+        WEBCodecs_AUDIO_MISSING: 'WebCodecs de áudio indisponível e ffmpeg.wasm não está pronto',
+        NO_ENCODABLE_CODEC: 'Nenhum codificador utilizável',
+        WEBCodecs_FAILED: 'Falha no processamento WebCodecs',
+        UNSUPPORTED: 'ffmpeg.wasm não é suportado aqui',
+        NEED_ISOLATION:
+          'É necessário isolamento cross-origin (COOP/COEP) para ffmpeg.wasm multithread',
+        LOAD_FAILED: 'Falha ao carregar o núcleo ffmpeg.wasm',
+        EXEC_FAILED: 'Falha na execução do ffmpeg',
+        OUTPUT_MISSING: 'Nenhum arquivo gerado',
+        CONVERT_FAILED: 'Falha na conversão',
+      },
+    },
     'video-to-gif': {
+      formats: 'Formatos suportados: MP4 / MOV / WebM / MKV / AVI / MPEG-TS',
+      usedEngine: 'Motor de quadros: {{engine}}',
       start: 'Início (s)',
       duration: 'Duração (s)',
       fps: 'FPS',
@@ -776,6 +826,19 @@ const pt = {
       },
     },
     'audio-convert': {
+      formats: 'Formatos suportados: WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF',
+      target: 'Formato destino',
+      quality: 'Qualidade',
+      qualities: {
+        low: 'Baixa',
+        medium: 'Média',
+        high: 'Alta',
+      },
+      convert: 'Converter',
+      cancel: 'Cancelar',
+      progress: 'Processando {{percent}}%',
+      download: 'Baixar',
+      usedEngine: 'Motor: {{engine}}',
       sampleRate: 'Taxa de amostragem',
       channels: 'Canais',
       bitDepth: 'Profundidade',

@@ -67,7 +67,7 @@ SynTools 从开发者工具箱起步，但早已不再只面向开发者：
 | PDF 工具 | 合并、拆分、旋转、加密/解密、压缩、文本提取、水印、批注、图文互转、页码、签名                                                                                                           |
 | 网络     | IP 计算（VLSM）、CIDR、MAC、URL 解析、UA 解析/生成、HTTP 标头/请求、WebSocket 测试、随机端口                                                                                            |
 | 文件     | ZIP 打包/解压、文件切分/合并、批量重命名                                                                                                                                                |
-| 音视频   | 音频转 WAV、视频转 GIF、字幕（SRT/WebVTT）转换                                                                                                                                          |
+| 音视频   | 视频/音频转码（WebCodecs 优先，ffmpeg.wasm 兜底）、视频转 GIF、字幕（SRT/WebVTT）转换                                                                                                   |
 | 速查表   | HTTP 状态码、MIME 类型、Git 命令                                                                                                                                                        |
 | 其他     | 计算器、单位换算、贷款/个税计算、MBTI、AI 提示词、Mermaid、图表生成 …                                                                                                                   |
 
@@ -207,12 +207,21 @@ syntools/
 
 ## 性能预算
 
-| 指标                     | 预算                                         |
-| ------------------------ | -------------------------------------------- |
-| 首屏入口资源（gzip）     | ≤ 185 KB                                     |
-| 单个懒加载 chunk（gzip） | ≤ 500 KB（Univer / exceljs 等重依赖 ≤ 2 MB） |
+| 指标                     | 预算                                              |
+| ------------------------ | ------------------------------------------------- |
+| 首屏入口资源（gzip）     | ≤ 210 KB（随同步打包的 zh+en 工具文案增长而调整） |
+| 单个懒加载 chunk（gzip） | ≤ 500 KB（Univer / exceljs 等重依赖 ≤ 2 MB）      |
+| 静态资源（不进 bundle）  | ≤ 40 MB（自托管 ffmpeg.wasm 核心，按需下载）      |
 
 由 `pnpm size`（`scripts/check-bundle-size.mjs`）强制校验。工具必须通过 `component: () => import(...)` 懒加载，避免进入首屏包；重量级第三方依赖应落在工具自己的异步 chunk 里（例如照片编辑器只在导出 PSD 时才载入 `ag-psd`）。图标优先使用内置 `Icon` 组件，勿引入大型图标库。
+
+### 媒体引擎（WebCodecs 优先，ffmpeg.wasm 兜底）
+
+音视频工具（`video-convert`、`audio-convert`、`video-to-gif`）优先使用浏览器原生的 **WebCodecs**（经由 [Mediabunny](https://mediabunny.dev)）：零下载、可硬件加速、支持精确抽帧。当 WebCodecs 无法处理某容器/编码时，自动回退到 **ffmpeg.wasm**（`@ffmpeg/core-mt`，多线程版）。
+
+wasm 核心约 31 MB，因此**绝不进 bundle**：`pnpm ffmpeg:fetch` 会把它下载到 `public/ffmpeg/<版本>/`（已 gitignore，构建时原样复制进 `dist/`），仅在真正走兜底路径时才按需拉取。`predev`/`prebuild` 会自动触发下载（离线时软失败）。
+
+多线程 ffmpeg.wasm 依赖 `SharedArrayBuffer`，需要跨域隔离，因此 `vercel.json`、`public/_headers` 以及 Vite 的 dev/preview 服务器都发送 `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`。CSP 额外放开 `'wasm-unsafe-eval'`（编译 wasm）以及 `worker-src`、`img-src`、`media-src`、`connect-src` 的 `blob:`/`data:`（画布与 object URL 预览）。所有资源仍保持同源。
 
 ---
 

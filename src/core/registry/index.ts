@@ -149,6 +149,7 @@ import { mimeTypesTool } from '@/tools/mime-types';
 import { gitCheatsheetTool } from '@/tools/git-cheatsheet';
 import { audioConvertTool } from '@/tools/audio-convert';
 import { videoToGifTool } from '@/tools/video-to-gif';
+import { videoConvertTool } from '@/tools/video-convert';
 import { subtitleTool } from '@/tools/subtitle-tool';
 
 /**
@@ -278,6 +279,7 @@ export const tools: ToolMeta[] = [
   gitCheatsheetTool,
   audioConvertTool,
   videoToGifTool,
+  videoConvertTool,
   subtitleTool,
   pdfMergeTool,
   pdfSplitTool,

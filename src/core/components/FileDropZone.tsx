@@ -14,10 +14,13 @@ interface FileDropZoneProps {
   /** 透传给 input[type=file].accept，如 ".txt,.json" */
   accept?: string;
   hint?: string;
+  /** 支持格式说明（展示在提示与大小限制之间），帮助用户理解可拖入的文件类型 */
+  formats?: string;
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)}GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)}MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
   return `${bytes}B`;
 }
@@ -30,6 +33,7 @@ export function FileDropZone({
   maxBytes = DEFAULT_MAX_BYTES,
   accept,
   hint,
+  formats,
 }: FileDropZoneProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,9 +45,7 @@ export function FileDropZone({
     if (files.length === 0) return;
     const oversized = files.find((f) => f.size > maxBytes);
     if (oversized) {
-      setError(
-        t('file.over', { max: formatBytes(maxBytes), size: formatBytes(oversized.size) }),
-      );
+      setError(t('file.over', { max: formatBytes(maxBytes), size: formatBytes(oversized.size) }));
       return;
     }
     setError(null);
@@ -84,6 +86,9 @@ export function FileDropZone({
       >
         <Icon name="upload" className="h-6 w-6 text-gray-400" />
         <span className="text-gray-600 dark:text-gray-300">{hint ?? t('file.hint')}</span>
+        {formats && (
+          <span className="text-center text-xs text-gray-500 dark:text-gray-400">{formats}</span>
+        )}
         <span className="text-xs text-gray-400 dark:text-gray-500">
           {t('file.max', { size: formatBytes(maxBytes) })}
         </span>

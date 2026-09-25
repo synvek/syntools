@@ -1,0 +1,71 @@
+{
+  "tools": {
+    "video-convert": {
+      "ui": {
+        "zh": {
+          "formats": "支持格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS（不支持时自动回退 ffmpeg.wasm）"
+        },
+        "en": {
+          "formats": "Supported: MP4 / MOV / WebM / MKV / AVI / MPEG-TS (falls back to ffmpeg.wasm when needed)"
+        },
+        "zh-TW": {
+          "formats": "支援格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS（不支援時自動回退 ffmpeg.wasm）"
+        },
+        "ja": {
+          "formats": "対応形式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS（非対応時は ffmpeg.wasm にフォールバック）"
+        },
+        "fr": {
+          "formats": "Formats pris en charge : MP4 / MOV / WebM / MKV / AVI / MPEG-TS (repli sur ffmpeg.wasm si besoin)"
+        },
+        "de": {
+          "formats": "Unterstützte Formate: MP4 / MOV / WebM / MKV / AVI / MPEG-TS (Fallback auf ffmpeg.wasm)"
+        },
+        "it": {
+          "formats": "Formati supportati: MP4 / MOV / WebM / MKV / AVI / MPEG-TS (fallback su ffmpeg.wasm se serve)"
+        },
+        "es": {
+          "formats": "Formatos admitidos: MP4 / MOV / WebM / MKV / AVI / MPEG-TS (si no, usa ffmpeg.wasm)"
+        },
+        "pt": {
+          "formats": "Formatos suportados: MP4 / MOV / WebM / MKV / AVI / MPEG-TS (recorre ao ffmpeg.wasm se necessário)"
+        }
+      }
+    },
+    "audio-convert": {
+      "ui": {
+        "zh": { "formats": "支持格式：WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF" },
+        "en": { "formats": "Supported: WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF" },
+        "zh-TW": { "formats": "支援格式：WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF" },
+        "ja": { "formats": "対応形式：WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF" },
+        "fr": {
+          "formats": "Formats pris en charge : WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF"
+        },
+        "de": {
+          "formats": "Unterstützte Formate: WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF"
+        },
+        "it": {
+          "formats": "Formati supportati: WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF"
+        },
+        "es": {
+          "formats": "Formatos admitidos: WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF"
+        },
+        "pt": {
+          "formats": "Formatos suportados: WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF"
+        }
+      }
+    },
+    "video-to-gif": {
+      "ui": {
+        "zh": { "formats": "支持格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS" },
+        "en": { "formats": "Supported: MP4 / MOV / WebM / MKV / AVI / MPEG-TS" },
+        "zh-TW": { "formats": "支援格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS" },
+        "ja": { "formats": "対応形式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS" },
+        "fr": { "formats": "Formats pris en charge : MP4 / MOV / WebM / MKV / AVI / MPEG-TS" },
+        "de": { "formats": "Unterstützte Formate: MP4 / MOV / WebM / MKV / AVI / MPEG-TS" },
+        "it": { "formats": "Formati supportati: MP4 / MOV / WebM / MKV / AVI / MPEG-TS" },
+        "es": { "formats": "Formatos admitidos: MP4 / MOV / WebM / MKV / AVI / MPEG-TS" },
+        "pt": { "formats": "Formatos suportados: MP4 / MOV / WebM / MKV / AVI / MPEG-TS" }
+      }
+    }
+  }
+}

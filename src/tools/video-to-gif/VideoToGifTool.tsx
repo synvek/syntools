@@ -4,6 +4,8 @@ import { OptionBar } from '@/core/components/ActionButtons';
 import { FileDropZone } from '@/core/components/FileDropZone';
 import { Icon } from '@/core/components/Icon';
 import { downloadBlob } from '@/core/lib/download';
+import { extractFramesWebCodecs } from '@/core/media/frames';
+import { MEDIA_MAX_BYTES } from '@/core/media/support';
 import { framesToGif } from './core';
 
 interface Frame {
@@ -23,6 +25,65 @@ function seek(video: HTMLVideoElement, time: number): Promise<void> {
   });
 }
 
+interface FallbackOptions {
+  start: number;
+  duration: number;
+  fps: number;
+  width: number;
+  onProgress: (percent: number) => void;
+}
+
+/**
+ * 兜底抽帧：`<video>` + seek + canvas。
+ * 精度与速度都不如 WebCodecs，但几乎全浏览器可用（含不支持 WebCodecs 的环境）。
+ */
+async function extractViaVideoElement(
+  file: File,
+  options: FallbackOptions,
+): Promise<{ ok: true; value: Frame[] } | { ok: false; error: string }> {
+  const url = URL.createObjectURL(file);
+  const video = document.createElement('video');
+  video.muted = true;
+  video.preload = 'auto';
+  video.src = url;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('load'));
+    });
+
+    const aspect = video.videoHeight / video.videoWidth || 0.5625;
+    const targetW = Math.min(options.width, video.videoWidth || options.width);
+    const targetH = Math.max(1, Math.round(targetW * aspect));
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('ctx');
+
+    const safeStart = Math.max(0, Math.min(options.start, video.duration || 0));
+    const safeDuration = Math.max(
+      0.1,
+      Math.min(options.duration, Math.max(0.1, (video.duration || 1) - safeStart)),
+    );
+    const frameCount = Math.max(1, Math.min(Math.round(safeDuration * options.fps), 200));
+    const frames: Frame[] = [];
+    for (let i = 0; i < frameCount; i += 1) {
+      const time = safeStart + i / options.fps;
+      await seek(video, Math.min(time, video.duration || time));
+      ctx.drawImage(video, 0, 0, targetW, targetH);
+      const { data } = ctx.getImageData(0, 0, targetW, targetH);
+      frames.push({ rgba: data, width: targetW, height: targetH });
+      options.onProgress(Math.round(((i + 1) / frameCount) * 100));
+    }
+    return { ok: true, value: frames };
+  } catch {
+    return { ok: false, error: 'PROCESS' };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export default function VideoToGifTool() {
   const { t } = useTranslation();
   const [start, setStart] = useState(0);
@@ -32,6 +93,7 @@ export default function VideoToGifTool() {
   const [gif, setGif] = useState<{ blob: Blob; url: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [engine, setEngine] = useState<'webcodecs' | 'video' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const process = async (file: File) => {
@@ -39,42 +101,36 @@ export default function VideoToGifTool() {
     setGif(null);
     setBusy(true);
     setProgress(0);
-    const url = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.muted = true;
-    video.preload = 'auto';
-    video.src = url;
+    setEngine(null);
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        video.onloadedmetadata = () => resolve();
-        video.onerror = () => reject(new Error('load'));
+      // 优先 WebCodecs：帧更准、速度更快；不支持时回退 <video> + seek
+      let frames: Frame[];
+      const viaWebCodecs = await extractFramesWebCodecs(file, {
+        start,
+        duration,
+        fps,
+        width,
+        maxFrames: 200,
+        onProgress: (ratio) => setProgress(Math.round(ratio * 100)),
       });
-
-      const aspect = video.videoHeight / video.videoWidth || 0.5625;
-      const targetW = Math.min(width, video.videoWidth || width);
-      const targetH = Math.max(1, Math.round(targetW * aspect));
-      const canvas = document.createElement('canvas');
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('ctx');
-
-      const safeStart = Math.max(0, Math.min(start, video.duration || 0));
-      const safeDuration = Math.max(
-        0.1,
-        Math.min(duration, Math.max(0.1, (video.duration || 1) - safeStart)),
-      );
-      const frameCount = Math.max(1, Math.min(Math.round(safeDuration * fps), 200));
-      const frames: Frame[] = [];
-
-      for (let i = 0; i < frameCount; i += 1) {
-        const time = safeStart + i / fps;
-        await seek(video, Math.min(time, video.duration || time));
-        ctx.drawImage(video, 0, 0, targetW, targetH);
-        const { data } = ctx.getImageData(0, 0, targetW, targetH);
-        frames.push({ rgba: data, width: targetW, height: targetH });
-        setProgress(Math.round(((i + 1) / frameCount) * 100));
+      if (viaWebCodecs.ok) {
+        frames = viaWebCodecs.value;
+        setEngine('webcodecs');
+      } else {
+        const viaVideo = await extractViaVideoElement(file, {
+          start,
+          duration,
+          fps,
+          width,
+          onProgress: setProgress,
+        });
+        if (!viaVideo.ok) {
+          setError(t(`tools.video-to-gif.errors.${viaVideo.error}`));
+          return;
+        }
+        frames = viaVideo.value;
+        setEngine('video');
       }
 
       const r = framesToGif(frames, fps);
@@ -88,7 +144,6 @@ export default function VideoToGifTool() {
     } catch {
       setError(t('tools.video-to-gif.errors.PROCESS'));
     } finally {
-      URL.revokeObjectURL(url);
       setBusy(false);
     }
   };
@@ -142,7 +197,13 @@ export default function VideoToGifTool() {
         </label>
       </OptionBar>
 
-      <FileDropZone onFile={process} accept="video/*" hint={t('tools.video-to-gif.dropHint')} />
+      <FileDropZone
+        onFile={process}
+        accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.ts,.mts,.m2ts"
+        maxBytes={MEDIA_MAX_BYTES}
+        hint={t('tools.video-to-gif.dropHint')}
+        formats={t('tools.video-to-gif.formats')}
+      />
 
       {busy && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -171,6 +232,13 @@ export default function VideoToGifTool() {
             <Icon name="download" className="h-4 w-4" />
             {t('tools.video-to-gif.downloadGif')}
           </button>
+          {engine && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {t('tools.video-to-gif.usedEngine', {
+                engine: engine === 'webcodecs' ? 'WebCodecs' : '<video>',
+              })}
+            </span>
+          )}
         </div>
       )}
     </div>

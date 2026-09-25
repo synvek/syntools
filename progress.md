@@ -63,4 +63,23 @@
   - README.md / README.zh-CN.md：工具数量 110+ → 150+，工具分类表补齐编码/加密/格式化/生成器/PDF/网络新增能力，并新增 **File（文件）/ Media（音视频）/ Cheatsheet（速查表）** 三个分类行；已通过 prettier。
   - prerender：`scripts/prerender.ts` 从 `@/core/registry` 的 `mod.tools` 派生所有工具页与 sitemap，新增 41 个工具自动收录，无需手工维护路由清单。
   - 最终门禁：`tsc -b --noEmit` 零错误、`eslint . --max-warnings 0` 零警告、`vitest run` 180 files / 1200 tests 全绿、`pnpm size` 首屏 184.27KB ≤ 185KB。
+    ⚠️ 事后发现该 184.27KB 读数来自**过期的 dist**（当时未重建，读到的是很久以前构建的产物）。真实基线以最新一次全量 build 为准。
+
+- **批次 10（音视频增强：WebCodecs 优先 + ffmpeg.wasm 兜底）完成**
+  - 架构决策：**WebCodecs 优先**（浏览器原生、零下载、可硬解），**ffmpeg.wasm 兜底**（冷门容器/编码/滤镜）；wasm 核心**自托管**到 `public/ffmpeg/<版本>/`，按需加载，绝不进 bundle。
+  - 依赖：引入 `mediabunny@1.59.1`（解复用 + 复用 + WebCodecs 集成，tree-shakable，实测共享 chunk 111.29KB gzip）、`@ffmpeg/ffmpeg@0.12.15`、`@ffmpeg/util@0.12.2`。原本评估的 `mp4box` + `mp4-muxer` + `webm-muxer` 已弃用（后两者被 Mediabunny 取代），故改用 Mediabunny 单库。
+  - 自托管脚本 `scripts/fetch-ffmpeg-core.mjs`：下载 `@ffmpeg/core-mt@0.12.10` 的 **ESM** 构建（`@ffmpeg/ffmpeg` 以 `{type:'module'}` 建 Worker，模块 Worker 无 `importScripts`，会回退到 `await import(coreURL)`，故必须 ESM），逐文件校验 size + SHA-256，已存在则跳过；失败默认软失败（`FFMPEG_FETCH_STRICT=1` 可硬失败）。接入 `predev` / `prebuild`。`public/ffmpeg/*` 已 gitignore。
+  - 全站跨域隔离：`vercel.json`、`public/_headers`、`vite.config.ts` 的 `server.headers` 与 `preview.headers` 统一加 `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`（SharedArrayBuffer 前提）。CSP 放开 `'wasm-unsafe-eval'`，并为 `worker-src`/`img-src`/`media-src`/`connect-src` 补 `blob:`/`data:`（画布与 object URL 预览、`data:` fetch 下载）。这同时修掉了既有 CSP 缺 `blob:` 导致图片/媒体预览在**生产环境**会被拦截的隐患。
+  - 新增 `src/core/media/`：`support.ts`（WebCodecs/ffmpeg/isolated 能力探测）、`ffmpeg.ts`（懒加载单例 + `runFfmpeg`，进度回调单例转发、执行后清理虚拟 FS）、`convert.ts`（`probeMedia` + `convertMedia`：WebCodecs 失败自动回退 ffmpeg，返回所用引擎）、`frames.ts`（`extractFramesWebCodecs`：`CanvasSink.canvasesAtTimestamps` 精确抽帧）。
+  - 工具：新增 **`video-convert`**（MP4/WebM/MKV，画质/缩放/裁剪 + 引擎提示 + 取消）；**`audio-convert`** 升级为多格式（WAV 走原生精修可控位深；MP3/M4A/OGG/FLAC 走引擎）；**`video-to-gif`** 抽帧改为 WebCodecs 优先、`<video>`+seek 兜底，并展示所用引擎。
+  - 体积（真实数据，全新构建）：**首屏 206.06KB**（其中 zh+en 同步语言包约 66.7KB gzip；已确认音视频代码**零泄漏**进首屏——`AudioContext`/`probeMedia`/`convertMedia`/`mediabunny` 在入口 chunk 中均为 0）。旧 185KB 预算在工具数达 152 后已不适用，按项目既有惯例（注释中记录过 180→185 的先例）调整为 **210KB**。新增**静态资源预算 40MB**，实测 `dist/ffmpeg` 31.3MB ✅（此前 wasm 完全不在统计口径内，属"隐形体积"）。
+  - 门禁：`tsc` 零错误、`eslint`（全量 + `--max-warnings 0`）零警告、`vitest` 181 files / 1207 tests 全绿、`pnpm size` 通过（首屏 206.06/210KB、静态 31.3/40MB）。prerender 收录 **152** 个工具页。
+  - 新增 .eslintignore / .prettierignore 排除 `public/ffmpeg`（vendor 产物）。
+  - **待真实浏览器验证（本环境无法验证）**：① core-mt 是否真正多线程加载（`crossOriginIsolated === true`）；② WebCodecs 各目标格式的编码可用性与产物可播放性；③ ffmpeg 兜底各格式的参数（libx264/libvpx-vp9/libmp3lame 等是否包含在预编译 core 中）；④ COEP 全站生效后是否有资源被拦截。
+
+- **补丁：媒体拖放区提示可拖入格式**
+  - `FileDropZone` 新增可选 `formats` 属性（渲染在提示文案与大小限制之间的浅色小字），并让 `formatBytes` 支持 GB 级展示。
+  - 三个媒体工具补充支持格式说明（9 语言）：`video-convert` / `video-to-gif` 列出 MP4 / MOV / WebM / MKV / AVI / MPEG-TS，`audio-convert` 列出 WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF；`video-convert` 额外说明"不支持时自动回退 ffmpeg.wasm"。
+  - **同时修掉一个真实缺陷**：`FileDropZone` 默认上限 10MB，会直接拒掉绝大多数真实音视频文件。新增 `MEDIA_MAX_BYTES = 2GB`（WebAssembly / ffmpeg.wasm 硬上限）并用于三个媒体工具；`accept` 也补充了常见扩展名，避免部分系统 MIME 识别不准导致选不到文件。
+  - 门禁：tsc 零错误、eslint 全量零警告、vitest 181 files / 1207 tests 全绿、`pnpm size` 首屏 206.20KB ≤ 210KB、静态 31.3MB ≤ 40MB。
   - 依赖政策核对：8 个批次全部零新增依赖（复用已有 jszip / csso / pdfjs-dist / @cantoo/pdf-lib 等），未引入 ffmpeg.wasm，故无需调整 `vercel.json` CSP 与 2MB 豁免规则。

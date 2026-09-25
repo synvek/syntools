@@ -1,13 +1,24 @@
 # Cloudflare Pages / Netlify 自定义响应头（随构建产物发布）
 # 安全策略见技术设计 §10.1：零数据外发、无第三方脚本
+#
+# Cross-Origin-Embedder-Policy: require-corp 与 Cross-Origin-Opener-Policy: same-origin 一起
+# 让页面进入 cross-origin isolated 状态，从而启用 SharedArrayBuffer —— 这是多线程版
+# ffmpeg.wasm（core-mt）的必要条件。站内资源全部同源，无需第三方 CORP 例外。
+# script-src 的 'wasm-unsafe-eval' 用于编译 ffmpeg.wasm；worker-src/connect-src/img-src/media-src
+# 放开 blob:（工具预览）与 data:（画布导出）以便纯前端处理媒体。
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' data: blob:; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
 
 # 带哈希的静态资源可长期强缓存
 /assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 自托管的 ffmpeg.wasm 核心按版本分目录，可长期强缓存
+/ffmpeg/*
   Cache-Control: public, max-age=31536000, immutable

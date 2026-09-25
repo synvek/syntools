@@ -16,8 +16,13 @@
  * - meta → 注入 toolsMeta.<id>.{name,description}
  * - ui   → 注入 tools.<id>.*（支持 a.b.c 点号路径，自动展开为嵌套对象）
  * - categories → 注入 categories.<id>
- * 已存在同名键则跳过（可重复执行）。注入后需运行 prettier 统一格式。
  *
+ * 行为：
+ * - 新工具 id → 整块插入（沿用旧行为）。
+ * - 已存在的 id → **合并模式**：只补充缺失的一级键；`meta` 的 name/description 会被刷新。
+ *   这样可以为已上线的工具增补文案，而不会覆盖既有翻译。
+ *
+ * 注入后需运行 prettier 统一格式。
  * 用法：node scripts/inject-tool-locales.mjs scripts/tool-locales/xxx.json [...]
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -67,6 +72,82 @@ function findAnchor(lines, anchor) {
   return idx;
 }
 
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * 定位 `'<id>': {` 对象块（从 from 行开始搜索）。
+ * 通过匹配「同级缩进的 `},` 收尾行」确定边界，避免解析字符串中的花括号。
+ */
+function findObjectRange(lines, id, from = 0) {
+  const openRe = new RegExp(`^(\\s*)'?${escapeRegExp(id)}'?: \\{$`);
+  for (let i = from; i < lines.length; i += 1) {
+    const m = lines[i].match(openRe);
+    if (!m) continue;
+    const indent = m[1];
+    const closeLine = `${indent}},`;
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (lines[j] === closeLine) return { start: i, end: j, indent };
+    }
+  }
+  return null;
+}
+
+/** 收集对象块内的一级键名 */
+function topLevelKeys(lines, range) {
+  const keys = new Set();
+  const keyIndent = range.indent.length + 2;
+  for (let i = range.start + 1; i < range.end; i += 1) {
+    const line = lines[i];
+    const lead = (line.match(/^(\s*)/) ?? ['', ''])[1].length;
+    if (lead !== keyIndent) continue;
+    const m = line.match(/^(?:\s*)(?:'([^']+)'|([A-Za-z_$][\w$]*)): /);
+    if (m) keys.add(m[1] ?? m[2]);
+  }
+  return keys;
+}
+
+/**
+ * 合并一批键到已存在的对象块。
+ * - 缺失的一级键 → 插入；
+ * - `overwrite` 中的键 → 覆盖既有行（用于刷新 meta）。
+ * 返回是否发生改动。
+ */
+function mergeObject(lines, range, obj, overwrite = []) {
+  const existing = topLevelKeys(lines, range);
+  const keyIndent = range.indent.length + 2;
+  const inserts = [];
+  let index = range.end;
+
+  // 先按原位置覆盖，避免插入导致的位移
+  for (const key of overwrite) {
+    if (!(key in obj) || !existing.has(key)) continue;
+    const serialized = serialize({ [key]: obj[key] }, keyIndent)[0];
+    for (let i = range.start + 1; i < index; i += 1) {
+      const lead = (lines[i].match(/^(\s*)/) ?? ['', ''])[1].length;
+      if (lead !== keyIndent) continue;
+      const m = lines[i].match(/^(?:\s*)(?:'([^']+)'|([A-Za-z_$][\w$]*)): /);
+      if ((m?.[1] ?? m?.[2]) === key) {
+        lines[i] = serialized;
+        break;
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (overwrite.includes(key)) continue;
+    if (existing.has(key)) continue;
+    if (value && typeof value === 'object') {
+      inserts.push(...serialize({ [key]: value }, keyIndent));
+    } else {
+      inserts.push(...serialize({ [key]: value }, keyIndent));
+    }
+  }
+
+  if (inserts.length === 0) return false;
+  lines.splice(range.start + 1, 0, ...inserts);
+  return true;
+}
+
 function main() {
   const files = process.argv.slice(2);
   if (files.length === 0) {
@@ -78,8 +159,8 @@ function main() {
     const data = JSON.parse(readFileSync(file, 'utf8'));
     for (const lang of LANGS) {
       const localePath = path.join(LOCALE_DIR, `${lang}.ts`);
-      let content = readFileSync(localePath, 'utf8');
-      let lines = content.split('\n');
+      const content = readFileSync(localePath, 'utf8');
+      const lines = content.split('\n');
       let changed = false;
 
       if (data.categories) {
@@ -97,35 +178,41 @@ function main() {
         }
         if (block.length) {
           lines.splice(anchor + 1, 0, ...block);
-          content = lines.join('\n');
           changed = true;
         }
       }
 
       if (data.tools) {
         for (const [id, entry] of Object.entries(data.tools)) {
-          if (content.includes(`'${id}': {`)) continue;
-
+          // 1) meta：已存在则刷新 name/description，否则整块插入
           if (entry.meta?.[lang]) {
-            const anchorIdx = findAnchor(lines, 'toolsMeta: {');
-            const block = serialize({ [id]: entry.meta[lang] }, 4);
-            lines.splice(anchorIdx + 1, 0, ...block);
-            content = lines.join('\n');
-            changed = true;
+            const metaAnchor = findAnchor(lines, 'toolsMeta: {');
+            const range = findObjectRange(lines, id, metaAnchor);
+            if (range) {
+              if (mergeObject(lines, range, entry.meta[lang], ['name', 'description']))
+                changed = true;
+            } else {
+              lines.splice(metaAnchor + 1, 0, ...serialize({ [id]: entry.meta[lang] }, 4));
+              changed = true;
+            }
           }
 
+          // 2) ui：已存在则合并缺失键，否则整块插入
           if (entry.ui?.[lang]) {
-            const anchorIdx = findAnchor(lines, 'tools: {');
-            const block = serialize({ [id]: nest(entry.ui[lang]) }, 4);
-            lines.splice(anchorIdx + 1, 0, ...block);
-            content = lines.join('\n');
-            changed = true;
+            const toolsAnchor = findAnchor(lines, 'tools: {');
+            const range = findObjectRange(lines, id, toolsAnchor);
+            if (range) {
+              if (mergeObject(lines, range, nest(entry.ui[lang]))) changed = true;
+            } else {
+              lines.splice(toolsAnchor + 1, 0, ...serialize({ [id]: nest(entry.ui[lang]) }, 4));
+              changed = true;
+            }
           }
         }
       }
 
       if (changed) {
-        writeFileSync(localePath, content);
+        writeFileSync(localePath, lines.join('\n'));
         console.log(`已注入 ${lang}.ts`);
       }
     }

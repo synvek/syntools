@@ -67,7 +67,7 @@ SynTools started as a developer toolbox, but it is no longer developer-only:
 | PDF          | Merge, split, rotate, encrypt/decrypt, compress, extract text, watermark, annotate, to/from image, page numbers, sign                                                                                                                                |
 | Network      | IP calculator (VLSM), CIDR, MAC, URL parser, UA parser/generator, HTTP headers/request, WebSocket tester, random port                                                                                                                                |
 | File         | ZIP create/extract, file split/merge, bulk rename                                                                                                                                                                                                    |
-| Media        | Audio→WAV, video→GIF, subtitle (SRT/WebVTT) converter                                                                                                                                                                                                |
+| Media        | Video / audio transcoding (WebCodecs-first, ffmpeg.wasm fallback), video→GIF, subtitle (SRT/WebVTT) converter                                                                                                                                        |
 | Cheatsheet   | HTTP status codes, MIME types, Git commands                                                                                                                                                                                                          |
 | Other        | Calculator, unit converter, loan/tax calculator, MBTI, AI prompts, Mermaid, chart generator, …                                                                                                                                                       |
 
@@ -207,12 +207,21 @@ After registration, `/tools/<id>`, the sidebar group, home cards, and ⌘K searc
 
 ## Performance budget
 
-| Metric                       | Budget                                                |
-| ---------------------------- | ----------------------------------------------------- |
-| First-screen entry (gzip)    | ≤ 185 KB                                              |
-| Individual lazy chunk (gzip) | ≤ 500 KB (heavy deps such as Univer / exceljs ≤ 2 MB) |
+| Metric                       | Budget                                                      |
+| ---------------------------- | ----------------------------------------------------------- |
+| First-screen entry (gzip)    | ≤ 210 KB (grows with the bundled `zh`+`en` tool copy)       |
+| Individual lazy chunk (gzip) | ≤ 500 KB (heavy deps such as Univer / exceljs ≤ 2 MB)       |
+| Static asset (not bundled)   | ≤ 40 MB (self-hosted `ffmpeg.wasm` core, fetched on demand) |
 
 Enforced by `pnpm size` (`scripts/check-bundle-size.mjs`). Tools must use `component: () => import(...)` so they stay out of the initial bundle — heavy third-party dependencies belong in a tool's own async chunk (for example the photo editor's PSD writer loads `ag-psd` only when you export). Prefer the built-in `Icon` component over icon libraries.
+
+### Media engine (WebCodecs-first, ffmpeg.wasm fallback)
+
+Audio/video tools (`video-convert`, `audio-convert`, `video-to-gif`) prefer the browser-native **WebCodecs** API through [Mediabunny](https://mediabunny.dev) — zero download, hardware-accelerated, with precise frame access. When WebCodecs cannot handle a container/codec, they fall back to **ffmpeg.wasm** (`@ffmpeg/core-mt`, multi-threaded).
+
+Because the wasm core is ~31 MB it is **never bundled**: `pnpm ffmpeg:fetch` downloads it into `public/ffmpeg/<version>/` (git-ignored, copied verbatim into `dist/`), and it is fetched only when a fallback actually runs. `predev`/`prebuild` invoke the fetch automatically (fail-soft offline).
+
+Multi-threaded ffmpeg.wasm needs `SharedArrayBuffer`, which requires cross-origin isolation — that is why `vercel.json`, `public/_headers` and Vite's dev/preview server all send `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`. The CSP also allows `'wasm-unsafe-eval'` (compiling wasm) plus `blob:`/`data:` for `worker-src`, `img-src`, `media-src` and `connect-src` (canvas/object-URL previews). Everything stays same-origin.
 
 ---
 

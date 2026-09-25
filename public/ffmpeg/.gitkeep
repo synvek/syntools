@@ -1,0 +1,2 @@
+# ffmpeg.wasm core 由 `pnpm ffmpeg:fetch` 下载到此目录（随静态产物发布，不入库）。
+# 详见 scripts/fetch-ffmpeg-core.mjs

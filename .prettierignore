@@ -1,3 +1,6 @@
 dist
 node_modules
 pnpm-lock.yaml
+
+# 自托管的 ffmpeg.wasm 核心（vendor 产物，由 `pnpm ffmpeg:fetch` 下载）
+public/ffmpeg
