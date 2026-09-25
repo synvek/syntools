@@ -54,6 +54,7 @@ import { randomNumberTool } from '@/tools/random-number';
 import { randomStringTool } from '@/tools/random-string';
 import { doodleBoardTool } from '@/tools/doodle-board';
 import { calculatorTool } from '@/tools/calculator';
+import { codeEditorTool } from '@/tools/code-editor';
 import { codeImageTool } from '@/tools/code-image';
 import { codeHighlightTool } from '@/tools/code-highlight';
 import { imageColorPickerTool } from '@/tools/image-color-picker';
@@ -304,6 +305,7 @@ export const tools: ToolMeta[] = [
   mbtiTestTool,
   uaParserTool,
   richTextEditorTool,
+  codeEditorTool,
   spreadsheetEditorTool,
   slideEditorTool,
   flowchartEditorTool,

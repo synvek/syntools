@@ -1339,6 +1339,52 @@ test.describe('照片编辑器国际化（en-US）', () => {
   });
 });
 
+// 代码编辑器（zh-CN）
+test.describe('代码编辑器（zh-CN）', () => {
+  test.use({ locale: 'zh-CN' });
+
+  test('挂载高亮编辑器 → 切换语言改扩展名 → 格式化 → 导出源码 / HTML', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/code-editor');
+
+    const editor = page.getByRole('textbox', { name: '编辑器' });
+    await expect(editor).toBeVisible();
+    // 默认 Java 示例已着色（Prism token 落进可编辑区）+ 行号槽
+    await expect(page.locator('.ce-surface .token.keyword').first()).toBeVisible();
+    await expect(page.locator('.ce-gutter')).toContainText('1');
+
+    // 导出文件名随语言变化
+    await expect(page.getByText('将导出为 snippet.java')).toBeVisible();
+    await page.getByLabel('语言', { exact: true }).selectOption('rust');
+    await expect(page.getByText('将导出为 snippet.rs')).toBeVisible();
+
+    // 格式化：压缩成一行后重排
+    await page.getByLabel('语言', { exact: true }).selectOption('java');
+    await editor.click();
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type(
+      'class A{public static void main(String[] args){System.out.println(1);}}',
+    );
+    await page.getByRole('button', { name: '格式化', exact: true }).click();
+    await expect(page.locator('.ce-surface')).toContainText('class A {');
+    await expect(page.locator('.ce-surface')).toContainText('  public static void main');
+
+    // 导出源码：扩展名跟随语言
+    const sourceDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出 .java' }).click();
+    expect((await sourceDownload).suggestedFilename()).toBe('snippet.java');
+
+    // 导出 HTML：独立高亮文档
+    const htmlDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出 HTML' }).click();
+    expect((await htmlDownload).suggestedFilename()).toBe('snippet.html');
+
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+});
+
 // 脑图编辑器（zh-CN）
 test.describe('脑图编辑器（zh-CN）', () => {
   test.use({ locale: 'zh-CN' });

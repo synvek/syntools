@@ -1,181 +1,171 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OptionBar } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
-import { clampBrushSize } from './core';
+import {
+  DEFAULT_COLOR,
+  DEFAULT_OPACITY,
+  DEFAULT_SECONDARY,
+  DEFAULT_WIDTH,
+  clampBrushSize,
+  clampUnit,
+  type ToolId,
+} from './core';
+import { clearDraft, readDraft, writeDraft } from './draft';
+import { useBoardStore } from './store';
+import BoardCanvas from './ui/BoardCanvas';
+import BoardToolbar from './ui/BoardToolbar';
 
-const COLORS = ['#0f172a', '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ffffff'];
+/** 数字键 1~9 对应的工具顺序（与工具栏一致） */
+const TOOL_ORDER: ToolId[] = [
+  'pen',
+  'marker',
+  'eraser',
+  'line',
+  'arrow',
+  'rect',
+  'ellipse',
+  'polygon',
+  'text',
+];
+
+/** 字母快捷键：吸管 / 移动（对齐常见图像编辑器的 I / V） */
+const LETTER_TOOLS: Record<string, ToolId> = { i: 'picker', v: 'move' };
 
 /** 在线涂鸦画板 */
 export default function DoodleBoardTool() {
   const { t } = useTranslation();
-  const init = useMemo(() => readSharedState({ c: '#0f172a', s: 4 }), []);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-  const last = useRef<{ x: number; y: number } | null>(null);
-  const [color, setColor] = useState(String(init.c || '#0f172a'));
-  const [size, setSize] = useState(clampBrushSize(Number(init.s) || 4));
-  const [eraser, setEraser] = useState(false);
+  const init = useMemo(
+    () =>
+      readSharedState({
+        c: DEFAULT_COLOR,
+        s: DEFAULT_WIDTH,
+        o: DEFAULT_OPACITY,
+        b: 'solid',
+        sc: DEFAULT_SECONDARY,
+      }),
+    [],
+  );
+  const [restored, setRestored] = useState(false);
+  const tool = useBoardStore((s) => s.tool);
+  const brush = useBoardStore((s) => s.brush);
+  const secondary = useBoardStore((s) => s.secondary);
+  const background = useBoardStore((s) => s.scene.background.kind);
 
+  // 多边形 / 移动 / 吸管这类「操作方式特殊」的工具给出针对性提示
+  const contextualHint =
+    tool === 'polygon'
+      ? t('tools.doodle.polygonHint')
+      : tool === 'move'
+        ? t('tools.doodle.moveHint')
+        : tool === 'picker'
+          ? t('tools.doodle.pickerHint')
+          : null;
+
+  // 本地草稿：进入时先恢复（分享链接的参数随后覆盖，保证链接所见即所得）
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const resize = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-      const dpr = window.devicePixelRatio || 1;
-      const w = parent.clientWidth;
-      const h = Math.max(360, Math.min(520, Math.round(w * 0.6)));
-      const prev = document.createElement('canvas');
-      prev.width = canvas.width;
-      prev.height = canvas.height;
-      const pctx = prev.getContext('2d');
-      if (pctx && canvas.width) pctx.drawImage(canvas, 0, 0);
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-      if (pctx && prev.width) ctx.drawImage(prev, 0, 0, w, h);
+    const draft = readDraft();
+    if (draft && draft.ops.length > 0) {
+      const state = useBoardStore.getState();
+      state.replaceScene(draft);
+      // 草稿自带尺寸：切到自定义，避免自适应的首帧把尺寸改掉
+      state.setPreset('custom');
+      setRestored(true);
+      window.setTimeout(() => setRestored(false), 2400);
+    }
+    let timer: number | undefined;
+    const unsubscribe = useBoardStore.subscribe((next, prev) => {
+      if (next.scene === prev.scene) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (next.scene.ops.length > 0) writeDraft(next.scene);
+        else clearDraft();
+      }, 600);
+    });
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
     };
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
   }, []);
 
-  const pos = (e: ReactPointerEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
+  // 分享链接里的画笔 / 背景参数：在草稿恢复之后应用，链接参数优先
+  useEffect(() => {
+    const state = useBoardStore.getState();
+    state.setPrimaryColor(init.c);
+    state.patchBrush({
+      width: clampBrushSize(init.s),
+      opacity: clampUnit(init.o),
+    });
+    state.setSecondaryColor(init.sc);
+    if (init.b !== 'solid') {
+      state.setBackground({ kind: init.b === 'grid' ? 'grid' : 'transparent' });
+    }
+  }, [init]);
 
-  const stroke = (from: { x: number; y: number }, to: { x: number; y: number }) => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = size;
-    ctx.strokeStyle = eraser ? '#ffffff' : color;
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
-  };
-
-  const clear = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-    const dpr = window.devicePixelRatio || 1;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, w, h);
-  };
-
-  const download = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
-    a.download = `doodle-${Date.now()}.png`;
-    a.click();
-  };
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return;
+      }
+      const meta = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+      if (meta && key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) useBoardStore.getState().redo();
+        else useBoardStore.getState().undo();
+        return;
+      }
+      if (meta && key === 'y') {
+        e.preventDefault();
+        useBoardStore.getState().redo();
+        return;
+      }
+      if (meta || e.altKey) return;
+      const index = Number(e.key);
+      if (Number.isInteger(index) && index >= 1 && index <= TOOL_ORDER.length) {
+        e.preventDefault();
+        useBoardStore.getState().setTool(TOOL_ORDER[index - 1]);
+        return;
+      }
+      const letter = LETTER_TOOLS[key];
+      if (letter) {
+        e.preventDefault();
+        useBoardStore.getState().setTool(letter);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   return (
-    <div className="flex flex-col gap-4">
-      <OptionBar>
-        <div className="flex flex-wrap items-center gap-1">
-          {COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              title={c}
-              onClick={() => {
-                setColor(c);
-                setEraser(false);
-              }}
-              className={`h-7 w-7 rounded-full border-2 ${
-                color === c && !eraser ? 'border-blue-500' : 'border-gray-200 dark:border-gray-700'
-              }`}
-              style={{ backgroundColor: c }}
-            />
-          ))}
-        </div>
-        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-          {t('tools.doodle.size')}
-          <input
-            type="range"
-            min={1}
-            max={32}
-            value={size}
-            onChange={(e) => setSize(clampBrushSize(Number(e.target.value)))}
+    <div className="flex flex-col gap-3">
+      <BoardToolbar />
+      <BoardCanvas />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          {contextualHint ?? `${t('tools.doodle.hint')} · ${t('tools.doodle.hintKeys')}`}
+        </p>
+        <div className="flex items-center gap-2">
+          {restored ? (
+            <span className="animate-pulse rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
+              {t('tools.doodle.draftRestored')}
+            </span>
+          ) : null}
+          <ShareButton
+            getState={() => ({
+              c: brush.color,
+              s: brush.width,
+              o: Math.round(brush.opacity * 100) / 100,
+              b: background,
+              sc: secondary,
+            })}
           />
-          <span className="w-6 font-mono text-xs">{size}</span>
-        </label>
-        <button
-          type="button"
-          onClick={() => setEraser((v) => !v)}
-          className={`rounded-md border px-2 py-1 text-sm ${
-            eraser
-              ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-              : 'border-gray-300 dark:border-gray-700'
-          }`}
-        >
-          {t('tools.doodle.eraser')}
-        </button>
-        <button
-          type="button"
-          onClick={clear}
-          className="rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-700"
-        >
-          {t('tools.doodle.clear')}
-        </button>
-        <button
-          type="button"
-          onClick={download}
-          className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {t('tools.doodle.download')}
-        </button>
-        <ShareButton getState={() => ({ c: color, s: size })} />
-      </OptionBar>
-
-      <div className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
-        <canvas
-          ref={canvasRef}
-          className="block w-full touch-none cursor-crosshair"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            drawing.current = true;
-            last.current = pos(e);
-          }}
-          onPointerMove={(e) => {
-            if (!drawing.current || !last.current) return;
-            const next = pos(e);
-            stroke(last.current, next);
-            last.current = next;
-          }}
-          onPointerUp={() => {
-            drawing.current = false;
-            last.current = null;
-          }}
-          onPointerCancel={() => {
-            drawing.current = false;
-            last.current = null;
-          }}
-        />
+        </div>
       </div>
-      <p className="text-xs text-gray-400 dark:text-gray-500">{t('tools.doodle.hint')}</p>
     </div>
   );
 }

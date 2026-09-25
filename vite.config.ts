@@ -73,6 +73,14 @@ export default defineConfig({
           }
           if (/[/\\]node_modules[/\\](i18next|react-i18next)[/\\]/.test(id)) return 'vendor-i18n';
           if (/[/\\]node_modules[/\\]js-beautify[/\\]/.test(id)) return 'vendor-beautify';
+          // 代码编辑器：prettier 核心与 Java 插件（tree-sitter wasm）单独成 chunk，
+          // 各语言插件随分组动态 import 自动成 chunk，避免任一 chunk 超过 500KB 预算
+          if (/[/\\]node_modules[/\\]prettier[/\\](?!plugins[/\\])/.test(id))
+            return 'vendor-prettier';
+          if (/[/\\]node_modules[/\\]prettier-plugin-java[/\\]/.test(id)) {
+            return 'vendor-prettier-java';
+          }
+          if (/[/\\]node_modules[/\\]web-tree-sitter[/\\]/.test(id)) return 'vendor-tree-sitter';
           if (/[/\\]node_modules[/\\]csso[/\\]/.test(id)) return 'vendor-csso';
           if (/[/\\]node_modules[/\\]fast-xml-parser[/\\]/.test(id)) return 'vendor-fxp';
           if (/[/\\]node_modules[/\\]prismjs[/\\]/.test(id)) return 'vendor-prism';

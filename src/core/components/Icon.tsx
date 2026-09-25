@@ -847,6 +847,13 @@ const icons: Record<string, ReactNode> = {
       <path d="m3 6 1.2 1.2L6 5.5M3 12l1.2 1.2L6 11.5M3 18l1.2 1.2L6 17.5" />
     </>
   ),
+  codeEditor: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M8.5 4v16" />
+      <path d="m11.5 10-2 2 2 2M15.5 10l2 2-2 2" />
+    </>
+  ),
 };
 
 interface IconProps {

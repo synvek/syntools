@@ -1,0 +1,177 @@
+/*
+ * 代码编辑器样式：配色由 themes.ts 注入的 `--ce-*` 自定义属性驱动，
+ * 编辑区 / 导出预览卡片 / 导出的独立 HTML 共用同一套变量，保证所见即所得。
+ */
+
+.ce-code {
+  position: relative;
+  border: 1px solid var(--ce-border);
+  border-radius: 12px;
+  background: var(--ce-bg);
+  color: var(--ce-fg);
+  overflow: hidden;
+}
+
+.ce-scroll {
+  display: flex;
+  max-height: 30rem;
+  min-height: 20rem;
+  overflow: auto;
+}
+
+.ce-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: 0 0 auto;
+  padding: 12px 10px 12px 14px;
+  border-right: 1px solid var(--ce-border);
+  background: var(--ce-bg);
+  color: var(--ce-gutter);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: right;
+  white-space: pre;
+  user-select: none;
+}
+
+.ce-surface {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 2;
+  caret-color: var(--ce-fg);
+  outline: none;
+}
+
+.ce-code.ce-wrap .ce-surface {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ce-placeholder {
+  position: absolute;
+  top: 12px;
+  left: calc(var(--ce-gutter-w, 0px) + 16px);
+  color: var(--ce-gutter);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+/* 导出预览卡片 */
+.ce-card {
+  border: 1px solid var(--ce-border);
+  border-radius: 12px;
+  background: var(--ce-bg);
+  color: var(--ce-fg);
+  padding: 14px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+  max-height: 30rem;
+}
+
+.ce-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--ce-gutter);
+}
+
+.ce-card pre {
+  margin: 0;
+  white-space: pre;
+}
+
+/* Prism token 着色 */
+.ce-code .token.comment,
+.ce-card .token.comment {
+  color: var(--ce-comment);
+  font-style: italic;
+}
+.ce-code .token.keyword,
+.ce-code .token.atrule,
+.ce-code .token.rule,
+.ce-code .token.important,
+.ce-card .token.keyword,
+.ce-card .token.atrule,
+.ce-card .token.rule,
+.ce-card .token.important {
+  color: var(--ce-keyword);
+}
+.ce-code .token.string,
+.ce-code .token.char,
+.ce-code .token.regex,
+.ce-code .token.url,
+.ce-code .token.attr-value,
+.ce-card .token.string,
+.ce-card .token.char,
+.ce-card .token.regex,
+.ce-card .token.url,
+.ce-card .token.attr-value {
+  color: var(--ce-string);
+}
+.ce-code .token.number,
+.ce-code .token.boolean,
+.ce-code .token.constant,
+.ce-code .token.symbol,
+.ce-card .token.number,
+.ce-card .token.boolean,
+.ce-card .token.constant,
+.ce-card .token.symbol {
+  color: var(--ce-number);
+}
+.ce-code .token.function,
+.ce-code .token.class-name,
+.ce-code .token.maybe-class-name,
+.ce-code .token.builtin,
+.ce-card .token.function,
+.ce-card .token.class-name,
+.ce-card .token.maybe-class-name,
+.ce-card .token.builtin {
+  color: var(--ce-function);
+}
+.ce-code .token.operator,
+.ce-code .token.entity,
+.ce-card .token.operator,
+.ce-card .token.entity {
+  color: var(--ce-operator);
+}
+.ce-code .token.punctuation,
+.ce-code .token.plain-text,
+.ce-card .token.punctuation,
+.ce-card .token.plain-text {
+  color: var(--ce-punctuation);
+}
+.ce-code .token.variable,
+.ce-code .token.property,
+.ce-code .token.attr-name,
+.ce-code .token.tag,
+.ce-code .token.selector,
+.ce-code .token.parameter,
+.ce-card .token.variable,
+.ce-card .token.property,
+.ce-card .token.attr-name,
+.ce-card .token.tag,
+.ce-card .token.selector,
+.ce-card .token.parameter {
+  color: var(--ce-variable);
+}
+.ce-code .token.inserted,
+.ce-card .token.inserted {
+  color: #16a34a;
+}
+.ce-code .token.deleted,
+.ce-card .token.deleted {
+  color: #dc2626;
+}
