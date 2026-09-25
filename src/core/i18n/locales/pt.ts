@@ -467,9 +467,9 @@ const pt = {
         'Converte bases 2/8/10/16 e visualiza operações bit a bit para inteiros com sinal de 64 bits',
     },
     'markdown-preview': {
-      name: 'Pré-visualização Markdown',
+      name: 'Editor de Markdown',
       description:
-        'Renderização GFM em direto com sanitização DOMPurify para pré-visualização segura',
+        'Edição e pré-visualização ao vivo, estrutura, contagem de palavras, abrir/salvar .md e exportar HTML',
     },
     'image-compress': {
       name: 'Comprimir imagem',
@@ -2240,14 +2240,43 @@ const pt = {
       },
     },
     markdown: {
+      mode: {
+        aria: 'Modo de exibição',
+        edit: 'Edição',
+        split: 'Dividido',
+        preview: 'Pré-visualização',
+      },
+      syncScroll: 'Rolagem sincronizada',
+      outline: 'Estrutura',
+      outlineEmpty: 'Sem títulos',
+      file: {
+        open: 'Abrir .md',
+        save: 'Salvar .md',
+        copyMd: 'Copiar Markdown',
+        copyHtml: 'Copiar HTML',
+        exportHtml: 'Exportar HTML',
+      },
+      stats: {
+        words: 'Palavras',
+        chars: 'Caracteres',
+        lines: 'Linhas',
+        reading: 'Tempo de leitura',
+        minutes: 'min',
+      },
+      draftRestored: 'Rascunho anterior restaurado',
+      copied: 'Copiado para a área de transferência',
+      fileTooLarge: 'Arquivo muito grande (limite de 2 MB)',
+      fileError: 'A operação falhou, tente novamente',
+      dropHint: 'Arraste um arquivo .md aqui para abri-lo',
       gfm: 'GFM (tabelas / rasurado / listas de tarefas)',
       breaks: 'Interruções linha',
       input: 'Editor ribassi',
       placeholder: 'Introduza Markdown, p. ex. # Heading…',
       preview: 'Pré-visualização',
       shortcuts:
-        'Scorciatoie: + Ctrl+B grassetto · + Ctrl+I corsivo · + Ctrl+K link · + Ctrl+E codice inline',
+        'Atalhos: Ctrl/⌘+B negrito · Ctrl/⌘+I itálico · Ctrl/⌘+K link · Ctrl/⌘+E código embutido · Ctrl/⌘+S salvar',
       toolbar: {
+        task: 'Lista de tarefas',
         aria: 'Barra de ferramentas do editor Markdown',
         bold: 'Negrito (**)',
         italic: 'Corsivo',

@@ -50,4 +50,14 @@ describe('applyMarkdownAction', () => {
     expect(r.text).toContain('| Column 1 | Column 2 |');
     expect(r.text).toContain('| -------- | -------- |');
   });
+
+  it('任务列表：普通行转待办', () => {
+    const r = applyMarkdownAction('todo\nother', 0, 10, 'task');
+    expect(r.text).toBe('- [ ] todo\n- [ ] other');
+  });
+
+  it('任务列表：已是待办则切换勾选', () => {
+    expect(applyMarkdownAction('- [ ] done', 0, 11, 'task').text).toBe('- [x] done');
+    expect(applyMarkdownAction('- [x] undo', 0, 11, 'task').text).toBe('- [ ] undo');
+  });
 });

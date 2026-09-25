@@ -466,8 +466,9 @@ const es = {
         'Convierte bases 2/8/10/16 y visualiza operaciones bit a bit para enteros con signo de 64 bits',
     },
     'markdown-preview': {
-      name: 'Vista previa Markdown',
-      description: 'Renderizado GFM en vivo con sanitización DOMPurify para vista previa segura',
+      name: 'Editor de Markdown',
+      description:
+        'Edición y vista previa en vivo, esquema, recuento de palabras, abrir/guardar .md y exportar HTML',
     },
     'image-compress': {
       name: 'Comprimir imagen',
@@ -2230,14 +2231,43 @@ const es = {
       },
     },
     markdown: {
+      mode: {
+        aria: 'Modo de vista',
+        edit: 'Edición',
+        split: 'Dividido',
+        preview: 'Vista previa',
+      },
+      syncScroll: 'Desplazamiento sincronizado',
+      outline: 'Esquema',
+      outlineEmpty: 'Sin títulos',
+      file: {
+        open: 'Abrir .md',
+        save: 'Guardar .md',
+        copyMd: 'Copiar Markdown',
+        copyHtml: 'Copiar HTML',
+        exportHtml: 'Exportar HTML',
+      },
+      stats: {
+        words: 'Palabras',
+        chars: 'Caracteres',
+        lines: 'Líneas',
+        reading: 'Tiempo de lectura',
+        minutes: 'min',
+      },
+      draftRestored: 'Borrador anterior restaurado',
+      copied: 'Copiado al portapapeles',
+      fileTooLarge: 'Archivo demasiado grande (máx. 2 MB)',
+      fileError: 'La operación falló, inténtalo de nuevo',
+      dropHint: 'Arrastra un archivo .md aquí para abrirlo',
       gfm: 'GFM (tablas / tachado / listas de tareas)',
       breaks: 'Interruciones línea',
       input: 'Editor ribassi',
       placeholder: 'Introduce Markdown, p. ej. # Heading…',
       preview: 'Vista previa',
       shortcuts:
-        'Scorciatoie: + Ctrl+B grassetto · + Ctrl+I corsivo · + Ctrl+K link · + Ctrl+E codice inline',
+        'Atajos: Ctrl/⌘+B negrita · Ctrl/⌘+I cursiva · Ctrl/⌘+K enlace · Ctrl/⌘+E código en línea · Ctrl/⌘+S guardar',
       toolbar: {
+        task: 'Lista de tareas',
         aria: 'Barra de los herramientas de modifica de los ribassi',
         bold: 'Negrita (**)',
         italic: 'Corsivo',

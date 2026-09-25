@@ -468,8 +468,9 @@ const de = {
         'Basen 2/8/10/16 konvertieren und bitweise Ops für 64-Bit-Ganzzahlen visualisieren',
     },
     'markdown-preview': {
-      name: 'Markdown-Vorschau',
-      description: 'Live-GFM-Rendering mit DOMPurify-Bereinigung für sichere Vorschau',
+      name: 'Markdown-Editor',
+      description:
+        'Live-Hervorhebung und Vorschau, Gliederung, Wortzählung, .md öffnen/speichern und HTML exportieren',
     },
     'image-compress': {
       name: 'Bildkompression',
@@ -2226,14 +2227,43 @@ const de = {
       },
     },
     markdown: {
+      mode: {
+        aria: 'Ansichtsmodus',
+        edit: 'Bearbeiten',
+        split: 'Geteilt',
+        preview: 'Vorschau',
+      },
+      syncScroll: 'Synchrones Scrollen',
+      outline: 'Gliederung',
+      outlineEmpty: 'Keine Überschriften',
+      file: {
+        open: '.md öffnen',
+        save: '.md speichern',
+        copyMd: 'Markdown kopieren',
+        copyHtml: 'HTML kopieren',
+        exportHtml: 'HTML exportieren',
+      },
+      stats: {
+        words: 'Wörter',
+        chars: 'Zeichen',
+        lines: 'Zeilen',
+        reading: 'Lesezeit',
+        minutes: 'Min.',
+      },
+      draftRestored: 'Letzter Entwurf wiederhergestellt',
+      copied: 'In die Zwischenablage kopiert',
+      fileTooLarge: 'Datei zu groß (max. 2 MB)',
+      fileError: 'Vorgang fehlgeschlagen, bitte erneut versuchen',
+      dropHint: '.md-Datei hierher ziehen, um sie zu öffnen',
       gfm: 'GFM (Tabellen / Durchstreichung / Aufgabenlisten)',
       breaks: 'Weiche Zeilenumbrüche',
       input: 'Markdown-Editor',
       placeholder: 'Markdown, e.g. # Heading… eingeben',
       preview: 'Vorschau',
       shortcuts:
-        'Shortcuts: ⌘/Strg+B fett · ⌘/Strg+I kursiv · ⌘/Strg+K Link · ⌘/Strg+E Inline-Code',
+        'Tastenkürzel: Strg/⌘+B fett · Strg/⌘+I kursiv · Strg/⌘+K Link · Strg/⌘+E Inline-Code · Strg/⌘+S speichern',
       toolbar: {
+        task: 'Aufgabenliste',
         aria: 'Markdown-Bearbeitungsleiste',
         bold: 'Fett (**)',
         italic: 'Kursiv (*)',

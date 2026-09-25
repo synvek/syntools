@@ -2,12 +2,12 @@ import type { ToolMeta } from '@/core/types';
 
 export const markdownPreviewTool: ToolMeta = {
   id: 'markdown-preview',
-  name: 'Markdown 预览',
-  description: 'GFM 实时渲染，输出经 DOMPurify 消毒，安全预览',
+  name: 'Markdown 编辑器',
+  description: '实时高亮编辑与预览、大纲导航、字数统计，支持打开/保存 .md 与导出 HTML',
   category: 'advanced',
-  keywords: ['markdown', 'md', '预览', 'preview', '渲染', 'gfm', '标记语言'],
+  keywords: ['markdown', 'md', '编辑器', 'editor', '预览', 'preview', 'gfm', '大纲', '标记语言'],
   icon: 'markdown',
-  component: () => import('./MarkdownPreviewTool'),
+  component: () => import('./MarkdownEditorTool'),
   weight: 6,
   relatedIds: ['latex-editor', 'rich-text-editor', 'md-to-image'],
 };

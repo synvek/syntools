@@ -25,6 +25,7 @@ export type MarkdownAction =
   | 'image'
   | 'ul'
   | 'ol'
+  | 'task'
   | 'hr'
   | 'table';
 
@@ -134,6 +135,14 @@ export function applyMarkdownAction(
       return prefixLines(text, start, end, (i, line) => {
         const stripped = line.replace(/^(\s*)([-*+]|\d+\.)\s+/, '$1');
         return `${i + 1}. ${stripped}`;
+      });
+    case 'task':
+      return prefixLines(text, start, end, (_, line) => {
+        // 已是任务项则切换勾选状态，否则把普通行变成待办
+        const done = /^(\s*)[-*+]\s+\[([ xX])\]\s+(.*)$/.exec(line);
+        if (done) return `${done[1]}${done[2] === ' ' ? '- [x]' : '- [ ]'} ${done[3]}`;
+        const stripped = line.replace(/^(\s*)([-*+]|\d+\.)\s+/, '$1');
+        return `- [ ] ${stripped}`;
       });
     case 'hr': {
       const needsLeading = start > 0 && text[start - 1] !== '\n';

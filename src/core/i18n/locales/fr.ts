@@ -475,8 +475,9 @@ const fr = {
         'Convertir bases 2/8/10/16 et visualiser les opérations bit à bit sur entiers signés 64 bits',
     },
     'markdown-preview': {
-      name: 'Aperçu Markdown',
-      description: 'Rendu GFM en direct avec assainissement DOMPurify pour un aperçu sûr',
+      name: 'Éditeur Markdown',
+      description:
+        'Édition et aperçu en direct, plan, comptage de mots, ouverture/enregistrement .md et export HTML',
     },
     'image-compress': {
       name: 'Compression d’image',
@@ -2239,14 +2240,43 @@ const fr = {
       },
     },
     markdown: {
+      mode: {
+        aria: 'Mode d’affichage',
+        edit: 'Édition',
+        split: 'Partagé',
+        preview: 'Aperçu',
+      },
+      syncScroll: 'Défilement synchronisé',
+      outline: 'Plan',
+      outlineEmpty: 'Aucun titre',
+      file: {
+        open: 'Ouvrir un .md',
+        save: 'Enregistrer le .md',
+        copyMd: 'Copier le Markdown',
+        copyHtml: 'Copier le HTML',
+        exportHtml: 'Exporter en HTML',
+      },
+      stats: {
+        words: 'Mots',
+        chars: 'Caractères',
+        lines: 'Lignes',
+        reading: 'Temps de lecture',
+        minutes: 'min',
+      },
+      draftRestored: 'Brouillon précédent restauré',
+      copied: 'Copié dans le presse-papiers',
+      fileTooLarge: 'Fichier trop volumineux (2 Mo max)',
+      fileError: 'Échec de l’opération, réessayez',
+      dropHint: 'Déposez un fichier .md ici pour l’ouvrir',
       gfm: 'GFM (tableaux / barré / listes de tâches)',
       breaks: 'Sauts de ligne souples',
       input: 'Éditeur Markdown',
       placeholder: 'Saisissez Markdown, e.g. # Heading…',
       preview: 'Aperçu',
       shortcuts:
-        'Raccourcis : ⌘/Ctrl+B gras · ⌘/Ctrl+I italique · ⌘/Ctrl+K lien · ⌘/Ctrl+E code en ligne',
+        'Raccourcis : Ctrl/⌘+B gras · Ctrl/⌘+I italique · Ctrl/⌘+K lien · Ctrl/⌘+E code en ligne · Ctrl/⌘+S enregistrer',
       toolbar: {
+        task: 'Liste de tâches',
         aria: 'Barre d’outils Markdown',
         bold: 'Gras (**)',
         italic: 'Italique (*)',

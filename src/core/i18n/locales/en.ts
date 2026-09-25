@@ -467,8 +467,9 @@ const en = {
       description: 'Convert base 2/8/10/16 and visualize bitwise ops for 64-bit signed integers',
     },
     'markdown-preview': {
-      name: 'Markdown Preview',
-      description: 'Live GFM rendering with DOMPurify sanitization for safe preview',
+      name: 'Markdown Editor',
+      description:
+        'Live highlighted editing and preview, outline navigation, word count, open/save .md and export HTML',
     },
     'image-compress': {
       name: 'Image Compress',
@@ -2150,14 +2151,43 @@ const en = {
       },
     },
     markdown: {
+      mode: {
+        aria: 'View mode',
+        edit: 'Edit',
+        split: 'Split',
+        preview: 'Preview',
+      },
+      syncScroll: 'Sync scroll',
+      outline: 'Outline',
+      outlineEmpty: 'No headings',
+      file: {
+        open: 'Open .md',
+        save: 'Save .md',
+        copyMd: 'Copy Markdown',
+        copyHtml: 'Copy HTML',
+        exportHtml: 'Export HTML',
+      },
+      stats: {
+        words: 'Words',
+        chars: 'Characters',
+        lines: 'Lines',
+        reading: 'Reading time',
+        minutes: 'min',
+      },
+      draftRestored: 'Restored your last draft',
+      copied: 'Copied to clipboard',
+      fileTooLarge: 'File too large (2 MB limit)',
+      fileError: 'Operation failed, please retry',
+      dropHint: 'Drop a .md file here to open it',
       gfm: 'GFM (tables / strikethrough / task lists)',
       breaks: 'Soft line breaks',
       input: 'Markdown editor',
       placeholder: 'Enter Markdown, e.g. # Heading…',
       preview: 'Preview',
       shortcuts:
-        'Shortcuts: ⌘/Ctrl+B bold · ⌘/Ctrl+I italic · ⌘/Ctrl+K link · ⌘/Ctrl+E inline code',
+        'Shortcuts: Ctrl/⌘+B bold · Ctrl/⌘+I italic · Ctrl/⌘+K link · Ctrl/⌘+E inline code · Ctrl/⌘+S save',
       toolbar: {
+        task: 'Task list',
         aria: 'Markdown editing toolbar',
         bold: 'Bold (**)',
         italic: 'Italic (*)',

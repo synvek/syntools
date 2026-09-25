@@ -467,8 +467,9 @@ const it = {
       description: 'Converti basi 2/8/10/16 e visualizza ops bitwise per interi signed a 64 bit',
     },
     'markdown-preview': {
-      name: 'Anteprima Markdown',
-      description: 'Rendering GFM live con sanitizzazione DOMPurify per anteprima sicura',
+      name: 'Editor Markdown',
+      description:
+        'Modifica e anteprima in tempo reale, struttura, conteggio parole, apertura/salvataggio .md ed esportazione HTML',
     },
     'image-compress': {
       name: 'Comprimi immagine',
@@ -2228,14 +2229,43 @@ const it = {
       },
     },
     markdown: {
+      mode: {
+        aria: 'Modalità di visualizzazione',
+        edit: 'Modifica',
+        split: 'Diviso',
+        preview: 'Anteprima',
+      },
+      syncScroll: 'Scorrimento sincronizzato',
+      outline: 'Struttura',
+      outlineEmpty: 'Nessun titolo',
+      file: {
+        open: 'Apri .md',
+        save: 'Salva .md',
+        copyMd: 'Copia Markdown',
+        copyHtml: 'Copia HTML',
+        exportHtml: 'Esporta HTML',
+      },
+      stats: {
+        words: 'Parole',
+        chars: 'Caratteri',
+        lines: 'Righe',
+        reading: 'Tempo di lettura',
+        minutes: 'min',
+      },
+      draftRestored: 'Bozza precedente ripristinata',
+      copied: 'Copiato negli appunti',
+      fileTooLarge: 'File troppo grande (max 2 MB)',
+      fileError: 'Operazione non riuscita, riprova',
+      dropHint: 'Trascina qui un file .md per aprirlo',
       gfm: 'GFM (tabelle / barrato /elenchi attività)',
       breaks: 'Interruzioni riga',
       input: 'Editor ribassi',
       placeholder: 'Inserisci Markdown, ad es. # Heading...',
       preview: 'Anteprima',
       shortcuts:
-        'Scorciatoie: + Ctrl+B grassetto · + Ctrl+I corsivo · + Ctrl+K link · + Ctrl+E codice inline',
+        'Scorciatoie: Ctrl/⌘+B grassetto · Ctrl/⌘+I corsivo · Ctrl/⌘+K link · Ctrl/⌘+E codice inline · Ctrl/⌘+S salva',
       toolbar: {
+        task: 'Elenco attività',
         aria: 'Barra degli strumenti di modifica dei ribassi',
         bold: 'Grassetto',
         italic: 'Corsivo',

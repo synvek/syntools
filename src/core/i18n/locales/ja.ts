@@ -457,8 +457,9 @@ const ja = {
       description: '2/8/10/16 進変換と 64 ビット符号付き整数のビット演算可視化',
     },
     'markdown-preview': {
-      name: 'Markdown プレビュー',
-      description: 'DOMPurify でサニタイズした安全な GFM ライブレンダリング',
+      name: 'Markdown エディター',
+      description:
+        'リアルタイムのハイライト編集とプレビュー、アウトライン、文字数カウント、.md の開閉と HTML 書き出し',
     },
     'image-compress': {
       name: '画像圧縮',
@@ -2196,14 +2197,43 @@ const ja = {
       },
     },
     markdown: {
+      mode: {
+        aria: '表示モード',
+        edit: '編集',
+        split: '分割',
+        preview: 'プレビュー',
+      },
+      syncScroll: 'スクロール同期',
+      outline: 'アウトライン',
+      outlineEmpty: '見出しがありません',
+      file: {
+        open: '.md を開く',
+        save: '.md を保存',
+        copyMd: 'Markdown をコピー',
+        copyHtml: 'HTML をコピー',
+        exportHtml: 'HTML を書き出す',
+      },
+      stats: {
+        words: '語数',
+        chars: '文字数',
+        lines: '行数',
+        reading: '読了時間',
+        minutes: '分',
+      },
+      draftRestored: '前回の下書きを復元しました',
+      copied: 'クリップボードにコピーしました',
+      fileTooLarge: 'ファイルが大きすぎます（上限 2 MB）',
+      fileError: '失敗しました。もう一度お試しください',
+      dropHint: '.md ファイルをここにドロップして開けます',
       gfm: 'GFM（表 / 取り消し線 / タスクリスト）',
       breaks: 'ソフト改行',
       input: 'Markdown エディタ',
       placeholder: 'Markdown, e.g. # Heading…を入力',
       preview: 'プレビュー',
       shortcuts:
-        'ショートカット：⌘/Ctrl+B 太字 · ⌘/Ctrl+I 斜体 · ⌘/Ctrl+K リンク · ⌘/Ctrl+E インラインコード',
+        'ショートカット：Ctrl/⌘+B 太字 · Ctrl/⌘+I 斜体 · Ctrl/⌘+K リンク · Ctrl/⌘+E インラインコード · Ctrl/⌘+S 保存',
       toolbar: {
+        task: 'タスクリスト',
         aria: 'Markdown 編集ツールバー',
         bold: '太字（**）',
         italic: '斜体（*）',
