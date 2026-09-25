@@ -141,22 +141,26 @@ pnpm dev
 
 ### 常用脚本
 
-| 命令                | 说明                           |
-| ------------------- | ------------------------------ |
-| `pnpm dev`          | 启动 Vite 开发服务器           |
-| `pnpm build`        | 类型检查（`tsc -b`）+ 生产构建 |
-| `pnpm preview`      | 本地预览生产构建产物           |
-| `pnpm test`         | 运行单元测试（Vitest）         |
-| `pnpm test:watch`   | Vitest 监听模式                |
-| `pnpm e2e`          | 运行 Playwright 端到端测试     |
-| `pnpm lint`         | ESLint 检查（零警告策略）      |
-| `pnpm lint:fix`     | ESLint 自动修复                |
-| `pnpm format`       | Prettier 格式化写入            |
-| `pnpm format:check` | Prettier 检查                  |
-| `pnpm typecheck`    | 仅 TypeScript 类型检查         |
-| `pnpm size`         | 包体积预算检查                 |
+| 命令                 | 说明                                          |
+| -------------------- | --------------------------------------------- |
+| `pnpm dev`           | 启动 Vite 开发服务器                          |
+| `pnpm build`         | 类型检查（`tsc -b`）+ 生产构建                |
+| `pnpm preview`       | 本地预览生产构建产物                          |
+| `pnpm test`          | 运行单元测试（Vitest）                        |
+| `pnpm test:watch`    | Vitest 监听模式                               |
+| `pnpm e2e`           | 运行 Playwright 端到端测试                    |
+| `pnpm lint`          | ESLint 检查（零警告策略）                     |
+| `pnpm lint:fix`      | ESLint 自动修复                               |
+| `pnpm format`        | Prettier 格式化写入                           |
+| `pnpm format:check`  | Prettier 检查                                 |
+| `pnpm typecheck`     | 仅 TypeScript 类型检查                        |
+| `pnpm size`          | 包体积预算检查                                |
+| `pnpm version:sync`  | 以 `package.json` 为准同步 Cargo / Tauri 版本 |
+| `pnpm version:check` | 校验各处版本是否一致（CI 守卫）               |
 
 提交前钩子（Husky + lint-staged）会对暂存文件执行 `eslint --fix` 与 `prettier --write`。
+
+**版本号** —— 以 `package.json` 为唯一来源：`pnpm version:sync` 会把版本写入 `src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 与 `src-tauri/tauri.conf.json`；`pnpm version:check` 在版本不一致时报错，并已接入 CI。使用 `pnpm version <patch|minor|major>` 升版本时会通过 npm `version` 生命周期钩子自动同步。
 
 ---
 
@@ -258,6 +262,8 @@ pnpm tauri:build   # 产物在 src-tauri/target/release/bundle/
 ```
 
 CI 会在 **Linux / Windows / macOS** × **x64 / arm64**（共 6 个 runner）上执行 `pnpm tauri:build`，并上传各平台安装包产物。
+
+发布方式：在 Actions 中手动运行 **CI** 工作流即可（Run workflow），**无需填写任何参数** —— 版本号从 `package.json` 读取，缺失时自动创建 `v<version>` 标签，并把各平台安装包汇总为一个草稿 Release。
 
 ---
 

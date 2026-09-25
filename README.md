@@ -141,22 +141,26 @@ Open [http://localhost:9999](http://localhost:9999).
 
 ### Scripts
 
-| Command             | Description                             |
-| ------------------- | --------------------------------------- |
-| `pnpm dev`          | Start Vite dev server                   |
-| `pnpm build`        | Typecheck (`tsc -b`) + production build |
-| `pnpm preview`      | Preview the production build locally    |
-| `pnpm test`         | Run unit tests (Vitest)                 |
-| `pnpm test:watch`   | Vitest watch mode                       |
-| `pnpm e2e`          | Run Playwright end-to-end tests         |
-| `pnpm lint`         | ESLint (zero warnings allowed)          |
-| `pnpm lint:fix`     | ESLint with auto-fix                    |
-| `pnpm format`       | Prettier write                          |
-| `pnpm format:check` | Prettier check                          |
-| `pnpm typecheck`    | TypeScript only                         |
-| `pnpm size`         | Bundle size budget check                |
+| Command              | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `pnpm dev`           | Start Vite dev server                           |
+| `pnpm build`         | Typecheck (`tsc -b`) + production build         |
+| `pnpm preview`       | Preview the production build locally            |
+| `pnpm test`          | Run unit tests (Vitest)                         |
+| `pnpm test:watch`    | Vitest watch mode                               |
+| `pnpm e2e`           | Run Playwright end-to-end tests                 |
+| `pnpm lint`          | ESLint (zero warnings allowed)                  |
+| `pnpm lint:fix`      | ESLint with auto-fix                            |
+| `pnpm format`        | Prettier write                                  |
+| `pnpm format:check`  | Prettier check                                  |
+| `pnpm typecheck`     | TypeScript only                                 |
+| `pnpm size`          | Bundle size budget check                        |
+| `pnpm version:sync`  | Sync Cargo / Tauri versions from `package.json` |
+| `pnpm version:check` | Verify versions match `package.json` (CI guard) |
 
 Pre-commit hooks (Husky + lint-staged) run `eslint --fix` and `prettier --write` on staged files.
+
+**Versioning** — `package.json` is the single source of truth. `pnpm version:sync` writes that version into `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and `src-tauri/tauri.conf.json`; `pnpm version:check` fails on any drift and runs in CI. Bumping with `pnpm version <patch|minor|major>` triggers the sync automatically via the npm `version` lifecycle hook.
 
 ---
 
@@ -258,6 +262,8 @@ pnpm tauri:build   # artifacts under src-tauri/target/release/bundle/
 ```
 
 CI runs `pnpm tauri:build` on **Linux / Windows / macOS** × **x64 / arm64** (6 runners) and uploads platform bundles as artifacts.
+
+Releases are cut by running the **CI** workflow manually (Actions → CI → Run workflow). There are no inputs: the version is read from `package.json`, the `v<version>` tag is created when missing, and the desktop installers are assembled into a draft GitHub Release.
 
 ---
 

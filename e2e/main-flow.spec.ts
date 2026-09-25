@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+// 断言使用简体中文文案，而界面语言跟随浏览器语言（默认 en-US）
+test.use({ locale: 'zh-CN' });
+
 /** 主链路：首页 → 搜索 → 打开工具 → 输入 → 复制（Tasks T24） */
 test('主链路：首页 → 搜索 → 打开工具 → 输入 → 复制', async ({ page }) => {
   await page.goto('/');
@@ -12,7 +15,8 @@ test('主链路：首页 → 搜索 → 打开工具 → 输入 → 复制', asy
 
   // 按 / 唤起搜索，输入关键词并回车跳转
   await page.keyboard.press('/');
-  const searchInput = page.getByRole('combobox');
+  // 语言切换下拉（#header-lang）同样是 combobox，须按名称区分
+  const searchInput = page.getByRole('combobox', { name: '搜索工具' });
   await expect(searchInput).toBeVisible();
   await searchInput.fill('json');
   await searchInput.press('Enter');

@@ -1,12 +1,8 @@
 name: CI
 
 on:
+  # 无需任何输入：版本号统一从根目录 package.json 读取（tag = v<version>）
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g. v0.1.0)'
-        required: true
-        type: string
 
 jobs:
   ci:
@@ -30,6 +26,10 @@ jobs:
 
       - name: Type checking
         run: pnpm typecheck
+
+      # 版本号以 package.json 为准；此步防止 Cargo 清单/锁文件漂移进发布
+      - name: Version consistency (package.json vs Cargo)
+        run: pnpm version:check
 
       - name: Unit tests (with coverage)
         run: pnpm test -- --coverage
@@ -117,6 +117,10 @@ jobs:
       - name: Install npm dependencies
         run: pnpm install --frozen-lockfile
 
+      # 安装包内嵌的版本来自 tauri.conf.json / Cargo，先确保与 package.json 一致
+      - name: Version consistency (package.json vs Cargo)
+        run: pnpm version:check
+
       - name: Tauri build
         run: pnpm tauri:build
 
@@ -157,10 +161,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 版本号唯一来源：package.json（与 tauri.conf.json 内嵌版本由 version:check 保证一致）
+      - name: Resolve version from package.json
+        id: version
+        run: |
+          VERSION="$(jq -r '.version' package.json)"
+          if [ -z "${VERSION}" ] || [ "${VERSION}" = "null" ]; then
+            echo "::error::package.json 中缺少 version 字段"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${VERSION} (tag: v${VERSION})"
+
       - name: Check if tag exists
         id: tag_check
         run: |
-          TAG="${{ github.event.inputs.tag }}"
+          TAG="${{ steps.version.outputs.tag }}"
           if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "Tag ${TAG} already exists, skipping tag creation"
@@ -172,7 +189,7 @@ jobs:
       - name: Create and push tag
         if: steps.tag_check.outputs.exists == 'false'
         run: |
-          TAG="${{ github.event.inputs.tag }}"
+          TAG="${{ steps.version.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$TAG"
@@ -191,14 +208,6 @@ jobs:
       - name: List release assets
         run: find artifacts -type f | sort
 
-      - name: Extract version from tag
-        id: version
-        run: |
-          TAG="${{ github.event.inputs.tag }}"
-          VERSION="${TAG#v}"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Version: ${VERSION}"
-
       - name: Prepare release notes
         id: notes
         run: |
@@ -216,12 +225,11 @@ jobs:
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag }}
-          name: ${{ github.event.inputs.tag }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           body_path: release_notes.md
           draft: true
-          prerelease: ${{ contains(github.event.inputs.tag, '-') }}
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           # Stage 后每平台目录下为扁平安装包：artifacts/tauri-*/SynTools_*.{dmg,msi,exe,...}
           files: artifacts/tauri-*/*
           token: ${{ secrets.GITHUB_TOKEN }}
-

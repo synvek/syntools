@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// 界面文案跟随浏览器语言（Playwright 默认 en-US），下面这些用例断言简体中文
+test.use({ locale: 'zh-CN' });
+
 /** 每个工具 1 条冒烟用例：打开 → 输入 → 断言输出（Tasks T24） */
 
 test('Base64：编码输出正确', async ({ page }) => {
@@ -44,7 +47,8 @@ test('时间戳：秒级时间戳解析', async ({ page }) => {
 
 test('UUID：生成 v4 格式正确', async ({ page }) => {
   await page.goto('/tools/uuid');
-  await page.getByRole('button', { name: '生成' }).click();
+  // exact：避免子串匹配到侧边栏「生成器」分类按钮，并顺带等待懒加载的工具挂载
+  await page.getByRole('button', { name: '生成', exact: true }).click();
   await expect(page.getByRole('textbox', { name: '生成结果（每行一个）' })).toHaveValue(
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
   );
@@ -231,6 +235,10 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await page.getByRole('button', { name: '模板' }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
+
+    // 横向泳道宽 760px，而编辑器默认「100% 呈现」：画布较窄时标题条会被裁到视口外，
+    // 直接点击会命中左侧图形面板。先「适应画布」把整张图缩进视口（用户看到全貌的常规路径）。
+    await page.getByRole('button', { name: '适应画布' }).click();
 
     const lane = page.locator('.react-flow__node').filter({ hasText: '泳道' }).first();
     // 点击泳道标题栏选中泳道（避开内部子节点），随后出现 8 个缩放把手
