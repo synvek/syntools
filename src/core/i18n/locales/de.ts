@@ -42,7 +42,7 @@ const de = {
     file: 'Dateien',
     media: 'Audio & Video',
     cheatsheet: 'Spickzettel',
-    advanced: 'Büro-Tools',
+    advanced: 'Dokumente & Kreatives',
     encoding: 'Kodierung',
     text: 'Text',
     formatting: 'Formatierung',

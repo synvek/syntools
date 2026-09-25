@@ -58,7 +58,7 @@ test('哈希计算：SHA-256 与标准向量一致', async ({ page }) => {
   );
 });
 
-// 办公工具类的界面文案按浏览器语言切换，固定为简体中文以便断言
+// 文档类编辑器的界面文案按浏览器语言切换，固定为简体中文以便断言
 test.describe('幻灯片编辑器（zh-CN）', () => {
   test.use({ locale: 'zh-CN' });
 
@@ -1478,8 +1478,8 @@ test.describe('脑图编辑器（zh-CN）', () => {
   });
 });
 
-// 办公工具「放映」：与幻灯片工具同一套入口（DocumentHeader afterNew）
-test.describe('办公工具放映（zh-CN）', () => {
+// 文档类编辑器「放映」：与幻灯片工具同一套入口（DocumentHeader afterNew）
+test.describe('文档类编辑器放映（zh-CN）', () => {
   test.use({ locale: 'zh-CN' });
 
   const overlay = (page: Page) => page.getByTestId('present-overlay');

@@ -1,7 +1,7 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 照片编辑器（「办公工具」分类第六个重工具）：
+ * 照片编辑器（「文档与创作」分类重工具）：
  * Konva 多图层画布 + 浏览器本地的调色 / 滤镜 / 绘制，支持导出 PNG / JPEG / WEBP 与工程文件续编。
  */
 export const photoEditorTool: ToolMeta = {
@@ -27,5 +27,5 @@ export const photoEditorTool: ToolMeta = {
   icon: 'photoEditor',
   component: () => import('./PhotoTool'),
   weight: 5,
-  relatedIds: ['image-adjust', 'image-crop', 'image-watermark'],
+  relatedIds: ['image-adjust', 'image-crop', 'image-watermark', 'doodle-board'],
 };

@@ -5,7 +5,7 @@ export type ToolMode = 'client' | 'server';
 
 /** 工具分类（技术设计 §5.1） */
 export type CategoryId =
-  | 'advanced' // 办公工具
+  | 'advanced' // 文档与创作
   | 'encoding' // 编码转换
   | 'text' // 文本处理
   | 'formatting' // 格式化

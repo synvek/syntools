@@ -42,7 +42,7 @@ const pt = {
     file: 'Arquivos',
     media: 'Áudio e vídeo',
     cheatsheet: 'Folhas de consulta',
-    advanced: 'Ferramentas de escritório',
+    advanced: 'Documentos e criação',
     encoding: 'Codificação',
     text: 'Texto',
     formatting: 'Formatação',

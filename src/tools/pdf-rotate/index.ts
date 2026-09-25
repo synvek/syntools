@@ -5,7 +5,7 @@ export const pdfRotateTool: ToolMeta = {
   name: 'PDF 旋转页面',
   description: '旋转 PDF 指定或全部页面',
   category: 'pdf',
-  keywords: ["pdf","rotate","旋转"],
+  keywords: ['pdf', 'rotate', '旋转'],
   icon: 'pdfRotate',
   component: () => import('./PdfRotateTool'),
   weight: 6,

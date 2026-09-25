@@ -1,7 +1,7 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 文字处理器（首个「办公工具」）：TipTap 编辑 + Word(.docx) 导入导出
+ * 文字处理器（「文档与创作」分类首个重工具）：TipTap 编辑 + Word(.docx) 导入导出
  * + 两种模式 PDF 导出，全部在浏览器本地完成。
  */
 export const richTextEditorTool: ToolMeta = {
@@ -24,4 +24,5 @@ export const richTextEditorTool: ToolMeta = {
   icon: 'richText',
   component: () => import('./RichTextEditorTool'),
   weight: 1,
+  relatedIds: ['markdown-preview', 'latex-editor', 'slide-editor'],
 };

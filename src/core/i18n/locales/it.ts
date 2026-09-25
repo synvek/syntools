@@ -42,7 +42,7 @@ const it = {
     file: 'File',
     media: 'Audio e video',
     cheatsheet: 'Promemoria',
-    advanced: 'Strumenti per ufficio',
+    advanced: 'Documenti e creazione',
     encoding: 'Codifica',
     text: 'Testo',
     formatting: 'Formattazione',

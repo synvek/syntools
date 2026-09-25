@@ -41,7 +41,7 @@ const zhTW = {
     file: '檔案工具',
     media: '影音',
     cheatsheet: '速查表',
-    advanced: '辦公工具',
+    advanced: '文件與創作',
     encoding: '編碼轉換',
     text: '文本處理',
     formatting: '格式化',

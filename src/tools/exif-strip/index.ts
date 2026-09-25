@@ -5,7 +5,7 @@ export const exifStripTool: ToolMeta = {
   name: 'EXIF 清除',
   description: 'JPEG 读取基础 EXIF 并剥离 APP1，下载无 EXIF 文件',
   category: 'image',
-  keywords: ["exif","jpeg","metadata","隐私","strip"],
+  keywords: ['exif', 'jpeg', 'metadata', '隐私', 'strip'],
   icon: 'image',
   component: () => import('./ExifStripTool'),
   weight: 12,

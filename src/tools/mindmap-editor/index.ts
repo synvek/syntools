@@ -1,7 +1,7 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 脑图编辑器（「办公工具」分类重工具）：
+ * 脑图编辑器（「文档与创作」分类重工具）：
  * 自研 Canvas 同样采用 React Flow（@xyflow/react）渲染引擎，配合自研 tidy-tree 布局，
  * 提供类 XMind / MindMaster 的思维导图编辑能力——键盘快速建节点、分支折叠、
  * 多种布局与配色主题、拖拽改挂父节点、撤销重做，并支持 PNG / SVG / PDF / JSON /

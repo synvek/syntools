@@ -42,7 +42,7 @@ const ja = {
     file: 'ファイル',
     media: '音声・動画',
     cheatsheet: 'チートシート',
-    advanced: 'オフィスツール',
+    advanced: 'ドキュメントと制作',
     encoding: 'エンコード',
     text: 'テキスト',
     formatting: 'フォーマット',

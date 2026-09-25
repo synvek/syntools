@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { Icon } from '@/core/components/Icon';
 
 /**
- * 办公工具通用的「放映」全屏层（幻灯片工具是最早的实现，这里抽成公共组件）。
+ * 文档类编辑器通用的「放映」全屏层（幻灯片工具是最早的实现，这里抽成公共组件）。
  *
  * 约定：
  * - 整屏深色背景 + 居中内容，内容自身决定底色（如白底 A4 / 白底表格）；

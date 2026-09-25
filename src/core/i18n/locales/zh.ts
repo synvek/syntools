@@ -39,7 +39,7 @@ export default {
     file: '文件工具',
     media: '音视频',
     cheatsheet: '速查表',
-    advanced: '办公工具',
+    advanced: '文档与创作',
     encoding: '编码转换',
     text: '文本处理',
     formatting: '格式化',

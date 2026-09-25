@@ -1,7 +1,7 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 幻灯片编辑器（「办公工具」分类第三个重工具）：
+ * 幻灯片编辑器（「文档与创作」分类重工具）：
  * 自研 Canvas（Konva）编辑画布 + 浏览器本地 .pptx 导入导出，数据不离开浏览器。
  */
 export const slideEditorTool: ToolMeta = {
@@ -24,5 +24,5 @@ export const slideEditorTool: ToolMeta = {
   icon: 'slides',
   component: () => import('./SlideTool'),
   weight: 3,
-  relatedIds: ['rich-text-editor', 'spreadsheet-editor'],
+  relatedIds: ['rich-text-editor', 'spreadsheet-editor', 'latex-editor'],
 };

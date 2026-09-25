@@ -3,7 +3,7 @@ import { Icon } from '@/core/components/Icon';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
 
 /**
- * 办公工具（文字处理器 / 电子表格 / 幻灯片 / 流程图 / 脑图）的统一文档头部。
+ * 文档类编辑器（文字处理器 / 电子表格 / 幻灯片 / 流程图 / 脑图）的统一文档头部。
  *
  * 行结构（自上而下）：
  * 1. 文档标题（输入框宽度固定 200px）+ 新建该类型文档按钮 + 导入 / 导出相关按钮（io 插槽，置于行尾）；

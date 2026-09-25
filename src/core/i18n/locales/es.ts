@@ -42,7 +42,7 @@ const es = {
     file: 'Archivos',
     media: 'Audio y vídeo',
     cheatsheet: 'Hojas de referencia',
-    advanced: 'Herramientas de oficina',
+    advanced: 'Documentos y creación',
     encoding: 'Codificación',
     text: 'Texto',
     formatting: 'Formato',

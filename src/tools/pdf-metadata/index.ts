@@ -5,7 +5,7 @@ export const pdfMetadataTool: ToolMeta = {
   name: 'PDF 元数据',
   description: '查看与编辑 PDF 元数据',
   category: 'pdf',
-  keywords: ["pdf","metadata","元数据","标题"],
+  keywords: ['pdf', 'metadata', '元数据', '标题'],
   icon: 'pdfMetadata',
   component: () => import('./PdfMetadataTool'),
   weight: 15,

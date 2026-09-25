@@ -1,7 +1,7 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 电子表格编辑器（「办公工具」分类）：基于 Univer 的表格编辑
+ * 电子表格编辑器（「文档与创作」分类）：基于 Univer 的表格编辑
  * + 浏览器本地 .xlsx 导入导出，数据不离开浏览器。
  */
 export const spreadsheetEditorTool: ToolMeta = {
@@ -24,4 +24,5 @@ export const spreadsheetEditorTool: ToolMeta = {
   icon: 'sheet',
   component: () => import('./SpreadsheetTool'),
   weight: 2,
+  relatedIds: ['rich-text-editor', 'slide-editor', 'csv-tool'],
 };

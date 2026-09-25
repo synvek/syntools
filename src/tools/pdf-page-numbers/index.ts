@@ -5,7 +5,7 @@ export const pdfPageNumbersTool: ToolMeta = {
   name: 'PDF 添加页码',
   description: '为 PDF 添加页码',
   category: 'pdf',
-  keywords: ["pdf","页码","page number"],
+  keywords: ['pdf', '页码', 'page number'],
   icon: 'pdfPageNumbers',
   component: () => import('./PdfPageNumbersTool'),
   weight: 10,

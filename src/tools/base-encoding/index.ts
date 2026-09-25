@@ -8,5 +8,5 @@ export const baseEncodingTool: ToolMeta = {
   keywords: ['base64', 'base32', 'base58', 'base16', '编码', '解码', 'hex'],
   icon: 'binary',
   component: () => import('./BaseEncodingTool'),
-  relatedIds: ['base64', 'url'],
+  relatedIds: ['base64', 'url-codec'],
 };

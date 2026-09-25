@@ -42,7 +42,7 @@ const en = {
     file: 'Files',
     media: 'Audio & Video',
     cheatsheet: 'Cheat Sheets',
-    advanced: 'Office Tools',
+    advanced: 'Documents & Creative',
     encoding: 'Encoding',
     text: 'Text',
     formatting: 'Formatting',
