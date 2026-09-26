@@ -201,3 +201,75 @@ export function computePageBreaks(
   }
   return cuts;
 }
+
+/**
+ * 规划编辑态分页：返回「从新一页开始」的块级元素索引（第 1 页不计入）。
+ * 与 computePageBreaks 同策略：块不跨页切开，超长块允许溢出。
+ */
+export function planPageBlocks(
+  items: { top: number; height: number }[],
+  pageHeight: number,
+): number[] {
+  if (pageHeight <= 0) return [];
+  const starts: number[] = [];
+  let pageStart = 0;
+  items.forEach((item, index) => {
+    if (item.height <= 0) return;
+    if (item.top < pageStart) return;
+    const bottom = item.top + item.height;
+    if (bottom - pageStart <= pageHeight) return;
+    // 页内首个块就超过一页：允许溢出，不因此新建页（否则会死循环/空页）
+    if (item.top <= pageStart && item.height >= pageHeight) {
+      pageStart = bottom;
+      return;
+    }
+    pageStart = item.top;
+    starts.push(index);
+  });
+  return starts;
+}
+
+/** Word 导出时的已知损耗清单 */
+export interface DocxExportLosses {
+  /** 外链图片（非 base64 内嵌）无法写入 .docx，将被跳过 */
+  externalImages: number;
+  /** docx 不支持的 webp 图片将被跳过 */
+  webpImages: number;
+  /** 嵌套超过 8 层的列表项会并入最深层级 */
+  deepListItems: number;
+}
+
+const DOCX_IMAGE_MIME_RE = /^data:image\/([a-z+]+);base64,/i;
+
+/**
+ * 导出前差异扫描：列出本次导出会丢失或降级的内容（ToolResult 契约）。
+ * 供 UI 在导出后提示，替代静默丢弃。
+ */
+export function scanDocxExportLosses(html: string): ToolResult<DocxExportLosses> {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const losses: DocxExportLosses = { externalImages: 0, webpImages: 0, deepListItems: 0 };
+  doc.querySelectorAll('img').forEach((img) => {
+    const src = img.getAttribute('src') ?? '';
+    const match = DOCX_IMAGE_MIME_RE.exec(src);
+    if (!match) {
+      losses.externalImages += 1;
+    } else if (match[1].toLowerCase() === 'webp') {
+      losses.webpImages += 1;
+    }
+  });
+  const walkList = (list: Element, depth: number): void => {
+    Array.from(list.children).forEach((li) => {
+      if (li.tagName !== 'LI') return;
+      if (depth > 8) losses.deepListItems += 1;
+      Array.from(li.children).forEach((nested) => {
+        if (nested.tagName === 'UL' || nested.tagName === 'OL') walkList(nested, depth + 1);
+      });
+    });
+  };
+  doc.querySelectorAll('ul, ol').forEach((list) => {
+    // 只从顶层列表开始遍历（嵌套列表由 walkList 递归处理）；closest 含自身，故从父级查起
+    if (list.parentElement?.closest('ul, ol')) return;
+    walkList(list, 0);
+  });
+  return { ok: true, value: losses };
+}

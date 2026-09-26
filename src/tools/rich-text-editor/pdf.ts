@@ -1,5 +1,6 @@
 import type { ToolResult } from '@/core/types';
 import { CONTENT_HEIGHT_MM, CONTENT_WIDTH_MM, PAGE_MARGIN_MM, computePageBreaks } from './core';
+import { applyPagedBreaks } from './PageView';
 
 /**
  * PDF 导出适配层：
@@ -20,8 +21,22 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-/** 打印<整篇文档：依赖用户在打印对话框中选择「另存为 PDF」 */
-export function printToPdf(): void {
+/**
+ * 当前环境是否支持打印对话框。
+ * Tauri 等桌面 WebView（WKWebView / WebView2）中 window.print() 静默无效，
+ * 此时导出 PDF 应回退到快照模式。
+ */
+export function printSupported(): boolean {
+  return !('__TAURI_INTERNALS__' in window) && !('__TAURI__' in window);
+}
+
+/**
+ * 打印整篇文档（依赖用户在打印对话框中选择「另存为 PDF」）。
+ * @param flow 页面视图下传入打印流容器：套用与屏幕页面视图同一套块级分页，
+ *             配合 CSS `break-before: page` 使打印分页与所见一致。
+ */
+export function printToPdf(flow?: HTMLElement | null): void {
+  if (flow) applyPagedBreaks(flow);
   window.print();
 }
 

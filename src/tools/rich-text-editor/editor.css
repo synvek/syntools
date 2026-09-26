@@ -6,7 +6,7 @@
  */
 
 .rte-surface .tiptap {
-  min-height: 420px;
+  min-height: 320px;
   outline: none;
   color: #111827;
   font-size: 15px;
@@ -42,8 +42,11 @@
   color: #374151;
 }
 
+/* 段间距由上面的 `> * + *`（0.75em）统一给出，与打印流完全一致。
+   这里若写 margin: 0 会因选择器权重更高而吃掉段间距，
+   导致编辑器比打印流更"紧凑"，同一份文档在两处的分页结果不同。 */
 .rte-surface .tiptap p {
-  margin: 0;
+  margin-bottom: 0;
 }
 
 .rte-surface .tiptap ul,
@@ -88,6 +91,9 @@
   overflow-x: auto;
   font-size: 0.85rem;
   line-height: 1.6;
+  /* 与打印流保持一致：代码块同样折行，否则打印时高度不同而分页错位 */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .rte-surface .tiptap code {
@@ -130,6 +136,7 @@
 
 .rte-surface .tiptap th,
 .rte-surface .tiptap td {
+  position: relative;
   border: 1px solid #e5e7eb;
   padding: 0.4rem 0.6rem;
   vertical-align: top;
@@ -140,12 +147,184 @@
   font-weight: 600;
 }
 
+/* 表格列宽拖拽（Table resizable） */
+.rte-surface .tiptap .selectedCell:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(37, 99, 235, 0.12);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.rte-surface .tiptap .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -2px;
+  width: 4px;
+  background: #2563eb;
+  pointer-events: none;
+}
+
+.rte-surface .tiptap.resize-cursor {
+  cursor: col-resize;
+}
+
 .rte-surface .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: #9ca3af;
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* ---- 分页符节点 ---- */
+
+/* 分页符节点用「高度」而不是上下外边距占位：
+   外边距会参与相邻块的合并，而页面视图里分页符后插入的页间空白会打断合并，
+   使得编辑器量到的自然位置与打印流不一致（每处差 ~11px），最终分页点错位。 */
+.rte-surface .tiptap .rte-page-break-node {
+  position: relative;
+  border-top: 2px dashed #93c5fd;
+  margin: 0;
+  height: 3rem;
+}
+
+.rte-surface .tiptap .rte-page-break-node::after {
+  content: attr(data-page-break-label);
+  position: absolute;
+  right: 0;
+  top: -9px;
+  font-size: 10px;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+/* 打印与页面视图中真正分页 */
+@media print {
+  .rte-page-break-node {
+    break-after: page;
+  }
+}
+
+/* ---- 编辑工作区：固定高度内部滚动，长文档不再把页面无限撑高 ---- */
+
+/* 高度由 JS 按可用空间精确设置（见 RichTextEditorTool 的 viewportMax），
+   这里的 max-height 只是脚本执行前的兜底，避免首帧撑满整页。 */
+.rte-editor-viewport {
+  max-height: calc(100vh - 400px);
+  min-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 给滚动条留出视觉空间 */
+  padding-right: 2px;
+}
+
+/* ---- 页面视图：Word 式多页 A4 纸面 ---- */
+
+.rte-page-area {
+  background: #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  /* 纸面宽度固定为 210mm：窗口/侧栏变窄时横向滚动，而不是把纸压缩变形。
+     一旦内容宽被压缩，块的换行与高度就和打印流不同，分页点必然分叉。 */
+  overflow-x: auto;
+}
+
+.dark .rte-page-area {
+  background: #1f2937;
+}
+
+.rte-surface.rte-paged {
+  width: 210mm;
+  /* 不做 max-width 收缩：内容区必须恒为 170mm，与打印流同宽。
+     窗口不够宽时由 .rte-page-area 横向滚动。 */
+  max-width: none;
+  /* 居中：工作台比纸面宽时，左右留白必须对称 */
+  margin: 0 auto;
+  padding: 20mm;
+  border-color: transparent;
+  /* 去掉 1px 边框：内容区必须正好 170mm，与打印流同宽，否则换行不同→分页不同 */
+  border-width: 0;
+  box-shadow: none;
+  background: transparent;
+  /* 建立独立层叠上下文：负 z-index 的纸面只垫在本文档内容之下，
+     不会被外部祖先（灰色工作台）的背景盖住 */
+  isolation: isolate;
+}
+
+/* 页间空白 widget（ProseMirror Decoration 渲染，高度由内联样式给出） */
+.rte-surface .tiptap .rte-page-gap {
+  display: block;
+  pointer-events: none;
+  /* 必须清掉外边距：上面 `> * + *` 的块间距会误加到它身上，
+     使测量出的「自然位置」比打印流多出 0.75em，分页点随之错位。 */
+  margin: 0;
+}
+
+/* 一张 A4 纸：210mm × 297mm，落在内容之后。
+   注意：纸面必须用负 z-index 而非给 .tiptap 加定位——
+   一旦 .tiptap 成为定位元素，子块 offsetTop 坐标系改变，分页测量即失效。 */
+.rte-page-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 297mm;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.12),
+    0 8px 24px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.dark .rte-page-sheet {
+  background: #111827;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.rte-page-badge {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #9ca3af;
+}
+
+@media print {
+  .rte-page-sheet,
+  .rte-page-badge {
+    display: none;
+  }
+}
+
+/* ---- 查找替换高亮（find-replace.ts 的 decoration） ---- */
+
+.rte-surface .tiptap .rte-find-match {
+  background-color: rgba(250, 204, 21, 0.55);
+  border-radius: 2px;
+}
+
+.rte-surface .tiptap .rte-find-current {
+  background-color: #f59e0b;
+  border-radius: 2px;
+  color: #111827;
+}
+
+.dark .rte-surface .tiptap .rte-find-match {
+  background-color: rgba(250, 204, 21, 0.3);
+}
+
+.dark .rte-surface .tiptap .rte-find-current {
+  background-color: #d97706;
+  color: #f9fafb;
 }
 
 .dark .rte-surface .tiptap {
@@ -181,65 +360,159 @@
   z-index: -1;
 }
 
+/* 打印/放映层排版与编辑器 .rte-surface .tiptap 严格一致（WYSIWYG）：
+   字号、行高、块间距、标题层级必须逐项相同，否则打印分页位置与页面视图不符。 */
 .rte-print-flow {
   width: 170mm;
   margin: 0 auto;
   padding: 0;
   background: #ffffff;
   color: #111827;
-  font-size: 12pt;
-  line-height: 1.7;
-  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  /* WYSIWYG 关键：字体必须继承正文（与编辑器 .tiptap 完全一致）。
+     写死字体栈会让打印/导出时的换行与屏幕不同，进而导致分页位置不一致。 */
+  font-family: inherit;
 }
 
 .rte-print-flow > * + * {
-  margin-top: 0.7em;
+  margin-top: 0.75em;
 }
 
 .rte-print-flow h1 {
-  font-size: 20pt;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .rte-print-flow h2 {
-  font-size: 16pt;
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .rte-print-flow h3 {
-  font-size: 14pt;
+  font-size: 1.15rem;
+  font-weight: 600;
 }
 
-.rte-print-flow img {
-  max-width: 100%;
+.rte-print-flow h4,
+.rte-print-flow h5,
+.rte-print-flow h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.rte-print-flow ul,
+.rte-print-flow ol {
+  padding-left: 1.4rem;
+}
+
+.rte-print-flow ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rte-print-flow ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.rte-print-flow blockquote {
+  border-left: 3px solid #93c5fd;
+  padding-left: 0.9rem;
+  color: #4b5563;
 }
 
 .rte-print-flow pre {
   background: #f3f4f6;
-  padding: 8px 10px;
-  border-radius: 4px;
+  color: #111827;
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.rte-print-flow code {
+  background: #f3f4f6;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.875em;
+}
+
+.rte-print-flow pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+/* 空块必须保留一行高度。
+   editor.getHTML() 序列化时会丢掉 ProseMirror 的尾随 <br>，空段落在 HTML 里是
+   <p></p>，浏览器渲染高度为 0——打印/放映里空行会凭空消失，而且因为高度和编辑器
+   不一致，分页点与页数也会与页面视图对不上。 */
+.rte-print-flow
+  :where(p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, pre, code):empty::before {
+  content: '\200B';
+}
+
+.rte-print-flow hr {
+  border-top: 1px solid #e5e7eb;
+}
+
+/* 分页符节点在打印流中必须与编辑器占用完全相同的纵向空间（3rem），
+   否则两条路径量到的块位置不同，分页结果就会分叉 */
+.rte-print-flow .rte-page-break-node {
+  margin: 0;
+  height: 3rem;
+}
+
+.rte-print-flow a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.rte-print-flow img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
 }
 
 .rte-print-flow table {
   width: 100%;
   border-collapse: collapse;
+  /* 与编辑器表格同字号，避免行高差异造成分页错位 */
+  font-size: 0.9rem;
 }
 
 .rte-print-flow th,
 .rte-print-flow td {
-  border: 1px solid #d1d5db;
-  padding: 4px 6px;
+  position: static;
+  border: 1px solid #e5e7eb;
+  padding: 0.4rem 0.6rem;
+  vertical-align: top;
 }
 
-.rte-print-flow blockquote {
-  border-left: 3px solid #93c5fd;
-  padding-left: 10px;
-  color: #374151;
+.rte-print-flow th {
+  background: #f9fafb;
+  font-weight: 600;
 }
 
 @media print {
   @page {
     size: A4;
     margin: 20mm;
+  }
+
+  /* 页面视图的所见即所得：与屏幕同一套块级分页分配，页起始块强制换页。
+     必须同时清掉页起始块的上外边距：实测 Chrome 在强制断页处**不会**截断 margin，
+     多出来的 0.75em（约 11px）会让该页内容高出可打印高度，从而多印出一张空白页 */
+  .rte-print-flow [data-page-start] {
+    break-before: page;
+    margin-top: 0;
   }
 
   html,

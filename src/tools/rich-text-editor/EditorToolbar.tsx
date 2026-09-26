@@ -2,6 +2,7 @@ import { useRef, type ChangeEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { Icon } from '@/core/components/Icon';
+import type { ViewMode } from './draft';
 
 interface ToolButtonProps {
   label: string;
@@ -49,15 +50,55 @@ function AlignBars({ widths }: { widths: string[] }) {
   );
 }
 
+interface ToolbarSelectProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}
+
+/** 工具栏内联下拉：与 pdfMode 选择器同风格，紧凑高度 */
+function ToolbarSelect({ label, value, onChange, options }: ToolbarSelectProps) {
+  return (
+    <select
+      aria-label={label}
+      title={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-8 max-w-32 rounded-md border border-gray-300 bg-white px-1.5 text-xs text-gray-700 outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 interface EditorToolbarProps {
   editor: Editor | null;
+  onToggleFind: () => void;
+  findOpen: boolean;
+  onToggleOutline: () => void;
+  outlineOpen: boolean;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
 }
 
 /**
  * 富文本工具栏：按「历史 / 段落 / 标记 / 列表 / 插入 / 对齐」分组。
  * 通过 useEditorState 精确订阅激活态，避免整棵树随输入频繁重渲染。
  */
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({
+  editor,
+  onToggleFind,
+  findOpen,
+  onToggleOutline,
+  outlineOpen,
+  viewMode,
+  onViewModeChange,
+}: EditorToolbarProps) {
   const { t } = useTranslation();
   const fileRef = useRef<HTMLInputElement>(null);
   const state = useEditorState({
@@ -65,13 +106,17 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     selector: (ctx) => {
       const e = ctx.editor;
       if (!e) return null;
+      const headingLevel = ([1, 2, 3, 4, 5, 6] as const).find((level) =>
+        e.isActive('heading', { level }),
+      );
       return {
         canUndo: e.can().undo(),
         canRedo: e.can().redo(),
+        headingLevel,
         paragraph: e.isActive('paragraph'),
-        h1: e.isActive('heading', { level: 1 }),
-        h2: e.isActive('heading', { level: 2 }),
-        h3: e.isActive('heading', { level: 3 }),
+        fontSize: String(e.getAttributes('textStyle').fontSize ?? ''),
+        fontFamily: String(e.getAttributes('textStyle').fontFamily ?? ''),
+        lineHeight: String(e.getAttributes('textStyle').lineHeight ?? ''),
         bold: e.isActive('bold'),
         italic: e.isActive('italic'),
         underline: e.isActive('underline'),
@@ -87,6 +132,10 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         alignCenter: e.isActive('textAlign', { textAlign: 'center' }),
         alignRight: e.isActive('textAlign', { textAlign: 'right' }),
         alignJustify: e.isActive('textAlign', { textAlign: 'justify' }),
+        inTable: e.isActive('table'),
+        headerRow: e.isActive('tableHeader'),
+        canMergeCells: e.can().mergeCells(),
+        canSplitCell: e.can().splitCell(),
       };
     },
   });
@@ -140,27 +189,71 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
 
       <div className="flex items-center gap-1">
+        <ToolbarSelect
+          label={t('tools.richText.headingSelect')}
+          value={state.headingLevel ? String(state.headingLevel) : 'paragraph'}
+          onChange={(value) =>
+            value === 'paragraph'
+              ? chain().setParagraph().run()
+              : chain()
+                  .toggleHeading({ level: Number(value) as 1 | 2 | 3 | 4 | 5 | 6 })
+                  .run()
+          }
+          options={[
+            { value: 'paragraph', label: t('tools.richText.paragraph') },
+            ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
+              value: String(level),
+              label: t(`tools.richText.h${level}`),
+            })),
+          ]}
+        />
+        <ToolbarSelect
+          label={t('tools.richText.fontFamily')}
+          value={state.fontFamily}
+          onChange={(value) =>
+            value ? chain().setFontFamily(value).run() : chain().unsetFontFamily().run()
+          }
+          options={[
+            { value: '', label: t('tools.richText.fontDefault') },
+            { value: '"Arial", "Helvetica Neue", sans-serif', label: t('tools.richText.fontSans') },
+            { value: 'Georgia, "Times New Roman", serif', label: t('tools.richText.fontSerif') },
+            { value: '"Courier New", monospace', label: t('tools.richText.fontMono') },
+            { value: 'SimSun, "Songti SC", serif', label: t('tools.richText.fontSong') },
+            { value: 'KaiTi, "Kaiti SC", "STKaiti", serif', label: t('tools.richText.fontKai') },
+          ]}
+        />
+        <ToolbarSelect
+          label={t('tools.richText.fontSize')}
+          value={state.fontSize}
+          onChange={(value) =>
+            value ? chain().setFontSize(value).run() : chain().unsetFontSize().run()
+          }
+          options={[
+            { value: '', label: t('tools.richText.sizeDefault') },
+            ...['12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px'].map((size) => ({
+              value: size,
+              label: size.replace('px', ''),
+            })),
+          ]}
+        />
+        <ToolbarSelect
+          label={t('tools.richText.lineHeight')}
+          value={state.lineHeight}
+          onChange={(value) =>
+            value ? chain().setLineHeight(value).run() : chain().unsetLineHeight().run()
+          }
+          options={[
+            { value: '', label: t('tools.richText.spacingDefault') },
+            ...['1.15', '1.5', '1.75', '2'].map((value) => ({ value, label: value })),
+          ]}
+        />
         <ToolButton
-          label={t('tools.richText.paragraph')}
-          active={state.paragraph}
-          onClick={() => chain().setParagraph().run()}
+          label={t('tools.richText.findReplace')}
+          active={findOpen}
+          onClick={onToggleFind}
         >
-          P
+          <Icon name="search" className="h-4 w-4" />
         </ToolButton>
-        {[1, 2, 3].map((level) => (
-          <ToolButton
-            key={level}
-            label={t(`tools.richText.h${level}`)}
-            active={state[`h${level}` as 'h1' | 'h2' | 'h3']}
-            onClick={() =>
-              chain()
-                .toggleHeading({ level: level as 1 | 2 | 3 })
-                .run()
-            }
-          >
-            H{level}
-          </ToolButton>
-        ))}
       </div>
 
       <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
@@ -274,6 +367,24 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           <span className="text-base leading-none">&mdash;</span>
         </ToolButton>
         <ToolButton
+          label={t('tools.richText.pageBreak')}
+          onClick={() => chain().setPageBreak().run()}
+        >
+          {/* 与分隔线/对齐按钮同风格的单色线条图标（虚线断页） */}
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M2 5.5h12" strokeDasharray="3 2" />
+            <path d="M2 10.5h12" strokeDasharray="3 2" />
+          </svg>
+        </ToolButton>
+        <ToolButton
           label={t('tools.richText.table')}
           onClick={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
         >
@@ -281,6 +392,78 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </ToolButton>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
       </div>
+
+      <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
+
+      {state.inTable && (
+        <div className="flex items-center gap-1 rounded-md bg-blue-50 px-1 dark:bg-blue-950/40">
+          <ToolButton
+            label={t('tools.richText.rowAbove')}
+            onClick={() => chain().addRowBefore().run()}
+          >
+            <span className="text-xs leading-none">+&#8593;</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.rowBelow')}
+            onClick={() => chain().addRowAfter().run()}
+          >
+            <span className="text-xs leading-none">+&#8595;</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.columnLeft')}
+            onClick={() => chain().addColumnBefore().run()}
+          >
+            <span className="text-xs leading-none">+&#8592;</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.columnRight')}
+            onClick={() => chain().addColumnAfter().run()}
+          >
+            <span className="text-xs leading-none">+&#8594;</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.deleteRow')}
+            onClick={() => chain().deleteRow().run()}
+          >
+            <span className="text-xs leading-none">&minus;&#8595;</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.deleteColumn')}
+            onClick={() => chain().deleteColumn().run()}
+          >
+            <span className="text-xs leading-none">&minus;&#8594;</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.headerRow')}
+            active={state.headerRow}
+            onClick={() => chain().toggleHeaderRow().run()}
+          >
+            <span className="text-xs font-semibold leading-none">TH</span>
+          </ToolButton>
+          {state.canMergeCells && (
+            <ToolButton
+              label={t('tools.richText.mergeCells')}
+              onClick={() => chain().mergeCells().run()}
+            >
+              <span className="text-xs leading-none">&#8862;</span>
+            </ToolButton>
+          )}
+          {state.canSplitCell && (
+            <ToolButton
+              label={t('tools.richText.splitCell')}
+              onClick={() => chain().splitCell().run()}
+            >
+              <span className="text-xs leading-none">&#8863;</span>
+            </ToolButton>
+          )}
+          <ToolButton
+            label={t('tools.richText.deleteTable')}
+            onClick={() => chain().deleteTable().run()}
+          >
+            <Icon name="close" className="h-4 w-4" />
+          </ToolButton>
+        </div>
+      )}
 
       <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
 
@@ -313,6 +496,27 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         >
           <AlignBars widths={['100%', '100%', '100%']} />
         </ToolButton>
+      </div>
+
+      <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
+
+      <div className="flex items-center gap-1">
+        <ToolButton
+          label={t('tools.richText.outline')}
+          active={outlineOpen}
+          onClick={onToggleOutline}
+        >
+          <Icon name="menu" className="h-4 w-4" />
+        </ToolButton>
+        <ToolbarSelect
+          label={t('tools.richText.viewMode')}
+          value={viewMode}
+          onChange={(value) => onViewModeChange(value as ViewMode)}
+          options={[
+            { value: 'flow', label: t('tools.richText.viewFlow') },
+            { value: 'paged', label: t('tools.richText.viewPaged') },
+          ]}
+        />
       </div>
     </div>
   );
