@@ -26,7 +26,7 @@ function relationshipKind(tag: string): 'comments' | 'vmlDrawing' | null {
 }
 
 /** 把关系 Target 解析为归档内路径（支持绝对路径与相对路径） */
-function resolvePartPath(target: string, baseDir: string): string | null {
+export function resolvePartPath(target: string, baseDir: string): string | null {
   const raw = target.trim();
   if (!raw) return null;
   if (raw.startsWith('/')) return raw.replace(/^\/+/, '');

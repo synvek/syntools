@@ -17,10 +17,11 @@ import {
   checkImportFile,
   summarizeWorkbook,
   type PresentGrid,
+  type WorkbookSnapshotLite,
   type WorkbookSummary,
 } from './core';
 import { csvToSnapshot, snapshotToCsv } from './csv';
-import { buildChartData, type ChartData } from './charts';
+import { buildChartData, type ChartConfig, type ChartData } from './charts';
 import { registerChartStrings } from './chartStrings';
 import { registerStoreStrings } from './storeStrings';
 import {
@@ -46,7 +47,9 @@ import {
 } from './xlsx-io';
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
 import { PresentSheet } from './ui/PresentSheet';
-import { ChartPanel } from './ui/ChartPanel';
+import { ChartOverlay } from './ui/ChartOverlay';
+import { readWorkbookExtras, withWorkbookExtras, type WorkbookExtras } from './xlsx-extras';
+import type { RawChartParts } from './rawChartParts';
 import { SheetTabs } from './SheetTabs';
 import './sheet.css';
 
@@ -79,9 +82,26 @@ export default function SpreadsheetTool() {
   const [presenting, setPresenting] = useState(false);
   const [presentGrid, setPresentGrid] = useState<PresentGrid | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
-  /** 图表：当前数据与「选区不合法」提示 */
-  const [chartData, setChartData] = useState<ChartData | null>(null);
+  /** 工作表内浮动图表：配置（随快照持久化）+ 派生数据 + 选区提示 */
+  const [charts, setCharts] = useState<ChartConfig[]>([]);
+  const chartsRef = useRef<ChartConfig[]>([]);
+  chartsRef.current = charts;
+  const [chartDataMap, setChartDataMap] = useState<Record<string, ChartData | null>>({});
+  const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
   const [chartNotice, setChartNotice] = useState(false);
+  /** 工作表区域尺寸：图表拖拽 / 缩放的边界 */
+  const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
+  const chartSeqRef = useRef(0);
+  /**
+   * 持久化触发器：图表的新增 / 移动 / 缩放 / 删除都不是 Univer MUTATION，
+   * 不会走脏跟踪，需要主动触发防抖落盘。（在 scheduleSave 创建后赋值）
+   */
+  const scheduleSaveRef = useRef<() => void>(() => {});
+  /** 条件格式 / 数据验证等「随快照往返保留、未做语义映射」的内容 */
+  const extrasRef = useRef<WorkbookExtras | null>(null);
+  /** 导入文件里原有的 Excel 原生图表部件（原样回填，不解析） */
+  const rawPartsRef = useRef<RawChartParts | null>(null);
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
 
   /**
    * 放映：读取当前工作簿快照 → 转成只读表格。
@@ -104,21 +124,104 @@ export default function SpreadsheetTool() {
     }
   };
 
-  /** 用当前选区数据打开图表；选区为空或没有可绘制数值时给出提示 */
-  const openChart = () => {
+  const setChartList = useCallback((next: ChartConfig[]) => {
+    chartsRef.current = next;
+    setCharts(next);
+  }, []);
+
+  /** 按当前工作簿内容重算所有图表的派生数据（单元格改动后调用） */
+  const applyChartData = useCallback((snapshot: WorkbookSnapshotLite, sheetId: string | null) => {
+    const configs = chartsRef.current;
+    if (configs.length === 0) {
+      setChartDataMap({});
+      return;
+    }
+    const next: Record<string, ChartData | null> = {};
+    for (const config of configs) {
+      const result = buildChartData(snapshot, config.sheetId ?? sheetId, config.range);
+      next[config.id] = result.ok ? result.value : null;
+    }
+    setChartDataMap(next);
+  }, []);
+
+  /** 在表格区域内插入浮动图表：数据取当前选区，位置/尺寸给默认值 */
+  const openChart = useCallback(() => {
     const handle = handleRef.current;
     if (!handle) return;
-    setChartNotice(false);
     const range = handle.getActiveRange();
-    const result = range
-      ? buildChartData(handle.getSnapshot(), handle.getActiveSheetId(), range)
-      : null;
-    if (!result || !result.ok) {
+    if (!range) {
       setChartNotice(true);
       return;
     }
-    setChartData(result.value);
-  };
+    const sheetId = handle.getActiveSheetId();
+    const result = buildChartData(handle.getSnapshot(), sheetId, range);
+    if (!result.ok) {
+      setChartNotice(true);
+      return;
+    }
+    setChartNotice(false);
+    chartSeqRef.current += 1;
+    const offset = (chartsRef.current.length % 5) * 24;
+    const config: ChartConfig = {
+      id: `chart-${Date.now().toString(36)}-${chartSeqRef.current}`,
+      type: 'bar',
+      range,
+      sheetId: sheetId ?? undefined,
+      x: 24 + offset,
+      y: 24 + offset,
+      width: Math.max(260, Math.min(420, (chartBounds.width || 460) - 48)),
+      height: Math.max(200, Math.min(280, (chartBounds.height || 320) - 48)),
+    };
+    setChartList([...chartsRef.current, config]);
+    setSelectedChartId(config.id);
+    setChartDataMap((prev) => ({ ...prev, [config.id]: result.value }));
+    scheduleSaveRef.current();
+  }, [chartBounds.height, chartBounds.width, setChartList]);
+
+  /** 更新图表配置；数据区域变化时立即重算数据 */
+  const updateChart = useCallback(
+    (id: string, patch: Partial<ChartConfig>) => {
+      setChartList(
+        chartsRef.current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+      );
+      if (patch.range) {
+        const handle = handleRef.current;
+        if (handle) applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
+      }
+      scheduleSaveRef.current();
+    },
+    [applyChartData, setChartList],
+  );
+
+  const removeChart = useCallback(
+    (id: string) => {
+      setChartList(chartsRef.current.filter((item) => item.id !== id));
+      setSelectedChartId((prev) => (prev === id ? null : prev));
+      setChartDataMap((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      scheduleSaveRef.current();
+    },
+    [setChartList],
+  );
+
+  /** 用当前表格选区更新某个图表的数据区域 */
+  const pickRangeForChart = useCallback(
+    (id: string) => {
+      const handle = handleRef.current;
+      if (!handle) return;
+      const range = handle.getActiveRange();
+      if (!range) {
+        setChartNotice(true);
+        return;
+      }
+      setChartNotice(false);
+      updateChart(id, { range, sheetId: handle.getActiveSheetId() ?? undefined });
+    },
+    [updateChart],
+  );
 
   const [summary, setSummary] = useState<WorkbookSummary>({
     sheets: 0,
@@ -148,29 +251,46 @@ export default function SpreadsheetTool() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
+   * 把「本工具自有、Univer 不认识」的内容并入快照：
+   * 条件格式 / 数据验证（往返保留）+ 工作表内图表配置。
+   */
+  const withDocOwnedContent = useCallback((base: WorkbookSnapshot): WorkbookSnapshot => {
+    let next: WorkbookSnapshot = base;
+    if (chartsRef.current.length) next = { ...next, syntoolsCharts: chartsRef.current };
+    if (rawPartsRef.current) next = { ...next, syntoolsRawParts: rawPartsRef.current };
+    return withWorkbookExtras(next, extrasRef.current);
+  }, []);
+
+  /**
    * 统一持久化：localStorage 草稿（同步兜底）+ IndexedDB 文档库（多文档 / 版本历史）。
    * 只在真正编辑过或显式操作后调用，替代原先「每 2 秒全量 save() + stringify」的轮询。
    */
-  const persistNow = useCallback((nextTitle?: string): void => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    const snapshot = handle.getSnapshot();
-    const result = writeDraftSafe(snapshot);
-    setDraftSaved(result.ok);
-    setDraftNotice(result.ok ? null : result.degraded ? 'degraded' : 'failed');
-    setSummary(summarizeWorkbook(snapshot));
-    // 惰性分配文档 id：首次保存时才入库
-    let id = docIdRef.current;
-    if (!id) {
-      id = createDocId();
-      docIdRef.current = id;
-      setDocId(id);
-      setCurrentDocId(id);
-    }
-    void saveDocument(id, nextTitle ?? titleRef.current, snapshot).then(() => {
-      void listDocuments().then(setDocs);
-    });
-  }, []);
+  const persistNow = useCallback(
+    (nextTitle?: string): void => {
+      const handle = handleRef.current;
+      if (!handle) return;
+      const base = handle.getSnapshot();
+      // 图表数据跟随单元格内容变化
+      applyChartData(base, handle.getActiveSheetId());
+      const snapshot = withDocOwnedContent(base);
+      const result = writeDraftSafe(snapshot);
+      setDraftSaved(result.ok);
+      setDraftNotice(result.ok ? null : result.degraded ? 'degraded' : 'failed');
+      setSummary(summarizeWorkbook(base));
+      // 惰性分配文档 id：首次保存时才入库
+      let id = docIdRef.current;
+      if (!id) {
+        id = createDocId();
+        docIdRef.current = id;
+        setDocId(id);
+        setCurrentDocId(id);
+      }
+      void saveDocument(id, nextTitle ?? titleRef.current, snapshot).then(() => {
+        void listDocuments().then(setDocs);
+      });
+    },
+    [applyChartData, withDocOwnedContent],
+  );
 
   /** 编辑事件 → 防抖落盘 */
   const scheduleSave = useCallback((): void => {
@@ -180,6 +300,10 @@ export default function SpreadsheetTool() {
       persistNow();
     }, SAVE_DEBOUNCE_MS);
   }, [persistNow]);
+  // 图表等「非 Univer 变更」通过该 ref 触发落盘（避免回调声明顺序依赖）
+  useEffect(() => {
+    scheduleSaveRef.current = scheduleSave;
+  }, [scheduleSave]);
 
   const lang = useSettingsStore((s) => s.lang);
   const theme = useSettingsStore((s) => s.theme);
@@ -204,13 +328,30 @@ export default function SpreadsheetTool() {
         return;
       }
       const pending = pendingRef.current ?? readDraft();
-      if (pending) handle.loadSnapshot(pending);
+      if (pending) {
+        handle.loadSnapshot(pending);
+        // 自有内容（条件格式 / 数据验证 + 图表）：
+        // 仅在「首次从草稿恢复」时读取。实例重建（StrictMode 二次挂载、主题/语言切换）
+        // 时 pending 是 Univer 原始快照、并不含这些字段，覆盖会直接丢内容。
+        if (!extrasRef.current) extrasRef.current = readWorkbookExtras(pending);
+        if (!rawPartsRef.current) rawPartsRef.current = pending.syntoolsRawParts ?? null;
+        if (chartsRef.current.length === 0) {
+          const configs = pending.syntoolsCharts ?? [];
+          if (configs.length > 0) {
+            chartsRef.current = configs;
+            setCharts(configs);
+            setSelectedChartId(configs[0]?.id ?? null);
+          }
+        }
+      }
       handleRef.current = handle;
       // 脏跟踪：仅「会写入快照的修改」触发防抖落盘
       unsubscribeRef.current = handle.onMutation(scheduleSave);
       setSheets(handle.getSheets());
       setActiveSheetId(handle.getActiveSheetId());
-      setSummary(summarizeWorkbook(handle.getSnapshot()));
+      const initial = handle.getSnapshot();
+      setSummary(summarizeWorkbook(initial));
+      applyChartData(initial, handle.getActiveSheetId());
     }, 0);
     return () => {
       cancelled = true;
@@ -225,7 +366,18 @@ export default function SpreadsheetTool() {
         handleRef.current = null;
       }
     };
-  }, [univerLocale, dark, scheduleSave]);
+  }, [univerLocale, dark, scheduleSave, applyChartData]);
+
+  // 工作表区域尺寸：图表拖拽 / 缩放需要边界
+  useEffect(() => {
+    const el = surfaceRef.current;
+    if (!el) return;
+    const update = () => setChartBounds({ width: el.clientWidth, height: el.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const refreshSummary = useCallback(() => {
     const handle = handleRef.current;
@@ -240,6 +392,12 @@ export default function SpreadsheetTool() {
     setActiveSheetId(handle.getActiveSheetId());
   }, []);
 
+  /** 当前工作表上可见的图表（图表绑定所属工作表） */
+  const visibleCharts = useMemo(
+    () => charts.filter((item) => !item.sheetId || item.sheetId === activeSheetId),
+    [charts, activeSheetId],
+  );
+
   /** 装载一份快照并刷新派生状态（文档库 / 版本历史 / 导入共用） */
   const applySnapshot = useCallback(
     (snapshot: WorkbookSnapshot, nextTitle: string) => {
@@ -248,12 +406,19 @@ export default function SpreadsheetTool() {
       handle.loadSnapshot(snapshot);
       setTitle(nextTitle);
       setFailure(null);
-      setChartData(null);
       setChartNotice(false);
+      // 随快照保存的自有内容：条件格式 / 数据验证 + 图表 + 原生图表部件
+      extrasRef.current = readWorkbookExtras(snapshot);
+      rawPartsRef.current = snapshot.syntoolsRawParts ?? null;
+      const configs = snapshot.syntoolsCharts ?? [];
+      chartsRef.current = configs;
+      setCharts(configs);
+      setSelectedChartId(configs[0]?.id ?? null);
+      applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
       refreshSummary();
       refreshSheets();
     },
-    [refreshSummary, refreshSheets],
+    [applyChartData, refreshSummary, refreshSheets],
   );
 
   // 启动：接管文档库指针（内容已由 localStorage 草稿恢复，避免与实例创建竞态）
@@ -332,8 +497,7 @@ export default function SpreadsheetTool() {
     if (!handle) return;
     setBusy('export');
     setFailure(null);
-    const snapshot = handle.getSnapshot();
-    const result = await exportSnapshotToBytes(snapshot);
+    const result = await exportSnapshotToBytes(withDocOwnedContent(handle.getSnapshot()));
     setBusy(null);
     if (!result.ok) {
       setFailure(result);
@@ -558,15 +722,31 @@ export default function SpreadsheetTool() {
         />
       ) : null}
 
-      {chartData ? <ChartPanel data={chartData} onClose={() => setChartData(null)} /> : null}
       {chartNotice ? (
         <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
           {t('tools.sheet.chartEmpty')}
         </p>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      {/* 工作表区域：图表以浮层形式贴在同一区域内，可拖动 / 缩放 / 改数据 */}
+      <div
+        ref={surfaceRef}
+        className="relative overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+      >
         <div ref={containerRef} className="sheet-canvas" />
+        {visibleCharts.map((config) => (
+          <ChartOverlay
+            key={config.id}
+            config={config}
+            data={chartDataMap[config.id] ?? null}
+            selected={config.id === selectedChartId}
+            bounds={chartBounds}
+            onSelect={() => setSelectedChartId(config.id)}
+            onChange={(patch) => updateChart(config.id, patch)}
+            onPickRange={() => pickRangeForChart(config.id)}
+            onClose={() => removeChart(config.id)}
+          />
+        ))}
       </div>
 
       <SheetTabs

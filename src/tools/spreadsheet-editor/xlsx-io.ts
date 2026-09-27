@@ -30,10 +30,14 @@ import {
   applySheetExtras,
   collectSheetExtras,
   readWorkbookExtras,
-  withWorkbookExtras,
   type SheetExtras,
+  type SnapshotWithExtras,
+  type WorkbookExtras,
   type WorksheetExtrasLike,
 } from './xlsx-extras';
+import type { ChartConfig } from './charts';
+import { buildChartPlan, injectChartsIntoXlsx } from './chartXml';
+import { collectRawChartParts, type RawChartParts } from './rawChartParts';
 
 /**
  * xlsx 适配层：exceljs 全部走动态 import，不进入首屏包
@@ -91,7 +95,7 @@ export interface SheetSnapshot {
 }
 
 /** 与 Univer IWorkbookData 对齐的最小工作簿快照 */
-export interface WorkbookSnapshot {
+export interface WorkbookSnapshot extends SnapshotWithExtras {
   id: string;
   name: string;
   appVersion: string;
@@ -100,10 +104,14 @@ export interface WorkbookSnapshot {
   sheets: Record<string, SheetSnapshot>;
   styles: Record<string, unknown>;
   /**
-   * Univer 会原样保留 workbook 级 resources；本工具用它承载
-   * 暂不做语义映射、但需往返保留的内容（条件格式 / 数据验证，见 xlsx-extras）。
+   * 条件格式 / 数据验证等「暂不做语义映射但需往返保留」的内容。
+   * 放在自有字段而非 Univer resources：未注册插件的 resource 会在加载时被丢弃。
    */
-  resources?: { name: string; data: string }[];
+  syntoolsExtras?: WorkbookExtras;
+  /** 工作表内的图表：导出时写成 Excel 原生图表（DrawingML） */
+  syntoolsCharts?: ChartConfig[];
+  /** 导入文件里原有的原生图表部件（不解析，导出时原样回填） */
+  syntoolsRawParts?: RawChartParts;
 }
 
 export function createEmptySheet(id: string, name: string): SheetSnapshot {
@@ -294,13 +302,28 @@ function collectStructure(
   }
 }
 
+/**
+ * 从归档中收集「原生图表」部件（drawings / charts / media 及其 .rels）。
+ * 失败或没有图表时返回 null —— 收集失败不影响正常导入。
+ */
+async function collectRawChartPartsFrom(buffer: ArrayBuffer): Promise<RawChartParts | null> {
+  try {
+    const JSZip = (await import('jszip')).default;
+    return await collectRawChartParts(await JSZip.loadAsync(buffer));
+  } catch {
+    return null;
+  }
+}
+
 /** 导入 .xlsx：exceljs 解析 → Univer 工作簿快照 */
 export async function importXlsxToSnapshot(file: File): Promise<ToolResult<WorkbookSnapshot>> {
   const check = checkImportFile(file);
   if (!check.ok) return check;
   try {
     const buffer = await file.arrayBuffer();
-    // 先归一化批注关系：openpyxl 等写入器的写法会让 exceljs 直接抛错、整份文件无法导入
+    // 先收集原生图表部件（不解析，仅原样保留给导出回填）
+    const rawParts = await collectRawChartPartsFrom(buffer);
+    // 再归一化批注关系：openpyxl 等写入者的写法会让 exceljs 直接抛错、整份文件无法导入
     const normalized = await normalizeXlsxArchive(buffer);
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
@@ -358,7 +381,10 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
         sheetOrder,
         sheets,
         styles: {},
-        resources: withWorkbookExtras(undefined, { version: 1, sheets: sheetExtras }),
+        ...(Object.keys(sheetExtras).length > 0
+          ? { syntoolsExtras: { version: 1 as const, sheets: sheetExtras } }
+          : {}),
+        ...(rawParts ? { syntoolsRawParts: rawParts } : {}),
       },
     };
   } catch {
@@ -376,7 +402,7 @@ export async function exportSnapshotToBytes(
     workbook.creator = 'SynTools';
     workbook.created = new Date();
     // 条件格式 / 数据验证：导入时随快照保存，这里写回
-    const extras = readWorkbookExtras(snapshot.resources);
+    const extras = readWorkbookExtras(snapshot);
 
     let firstWorksheet: ReturnType<typeof workbook.addWorksheet> | null = null;
     let worksheetCount = 0;
@@ -484,8 +510,12 @@ export async function exportSnapshotToBytes(
       firstWorksheet.state = 'visible';
     }
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    return { ok: true, value: new Uint8Array(buffer as ArrayBuffer) };
+    const buffer = (await workbook.xlsx.writeBuffer()) as ArrayBuffer;
+    // 图表：站内图表写成 Excel 原生图表（DrawingML），导入时保留的原生图表原样回填
+    const plan = buildChartPlan(snapshot);
+    const needsInjection = Object.keys(plan.chartsBySheet).length > 0 || plan.passthrough !== null;
+    const bytes = needsInjection ? await injectChartsIntoXlsx(buffer, plan) : buffer;
+    return { ok: true, value: new Uint8Array(bytes) };
   } catch {
     return { ok: false, error: 'EXPORT_FAILED' };
   }

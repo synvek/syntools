@@ -39,7 +39,7 @@ const zh: ResourceTree = {
       exporting: '处理中…',
       ready: '编辑内容会自动保留在当前页面',
       unsupportedTip:
-        '暂不支持图片与透视表；本工具内新建的图表、条件格式与数据验证不会写入导出文件',
+        '暂不支持图片与透视表；新建的条件格式/数据验证不会写入导出文件，导入的原生图表会保留',
       err: err({
         EMPTY: '工作簿为空',
         NOT_XLSX: '仅支持 .xlsx 文件',
@@ -81,7 +81,7 @@ const en: ResourceTree = {
       exporting: 'Working…',
       ready: 'Edits stay on this page',
       unsupportedTip:
-        'Images and pivot tables are not supported; charts, conditional formatting and data validation created in this tool are not written to exported files',
+        'Images and pivot tables are not supported; new conditional formatting / data validation are not written to exports, while charts imported from a file are preserved',
       err: err({
         EMPTY: 'The workbook is empty',
         NOT_XLSX: 'Only .xlsx files are supported',
@@ -123,7 +123,7 @@ const zhTW: ResourceTree = {
       exporting: '處理中…',
       ready: '編輯內容會保留在目前頁面',
       unsupportedTip:
-        '不支援圖片與樞紐分析表；本工具內新建的圖表、條件式格式與資料驗證不會寫入匯出檔案',
+        '不支援圖片與樞紐分析表；新建的條件式格式/資料驗證不會寫入匯出檔案，匯入的原生圖表會保留',
       err: err({
         EMPTY: '活頁簿為空',
         NOT_XLSX: '僅支援 .xlsx 檔案',
@@ -165,7 +165,7 @@ const ja: ResourceTree = {
       exporting: '処理中…',
       ready: '編集内容はこのページに保持されます',
       unsupportedTip:
-        '画像とピボットテーブルには対応していません。本ツールで作成したグラフ・条件付き書式・データ検証は書き出しファイルに含まれません',
+        '画像とピボットテーブルには対応していません。新規作成した条件付き書式・データ検証は書き出しファイルに含まれませんが、読み込んだネイティブグラフは保持されます',
       err: err({
         EMPTY: 'ブックが空です',
         NOT_XLSX: '.xlsx ファイルのみ対応しています',
@@ -208,7 +208,7 @@ const fr: ResourceTree = {
       exporting: 'Traitement…',
       ready: 'Les modifications restent sur cette page',
       unsupportedTip:
-        'Images et tableaux croisés dynamiques non pris en charge ; les graphiques, la mise en forme conditionnelle et la validation des données créés ici ne sont pas exportés',
+        'Images et tableaux croisés dynamiques non pris en charge ; la mise en forme conditionnelle / validation des données créées ici ne sont pas exportées, les graphiques importés sont conservés',
       err: err({
         EMPTY: 'Le classeur est vide',
         NOT_XLSX: 'Seuls les fichiers .xlsx sont pris en charge',
@@ -251,7 +251,7 @@ const de: ResourceTree = {
       exporting: 'Wird verarbeitet…',
       ready: 'Änderungen bleiben auf dieser Seite',
       unsupportedTip:
-        'Bilder und Pivot-Tabellen werden nicht unterstützt; hier erstellte Diagramme, bedingte Formatierungen und Datenvalidierungen werden nicht exportiert',
+        'Bilder und Pivot-Tabellen werden nicht unterstützt; neu erstellte bedingte Formatierungen / Datenvalidierungen werden nicht exportiert, importierte Diagramme bleiben erhalten',
       err: err({
         EMPTY: 'Die Arbeitsmappe ist leer',
         NOT_XLSX: 'Nur .xlsx-Dateien werden unterstützt',
@@ -294,7 +294,7 @@ const it: ResourceTree = {
       exporting: 'Elaborazione…',
       ready: 'Le modifiche restano in questa pagina',
       unsupportedTip:
-        'Immagini e tabelle pivot non sono supportati; grafici, formattazione condizionale e convalida dati creati qui non vengono esportati',
+        'Immagini e tabelle pivot non sono supportati; formattazione condizionale / convalida dati create qui non vengono esportate, i grafici importati vengono conservati',
       err: err({
         EMPTY: 'La cartella di lavoro è vuota',
         NOT_XLSX: 'Sono supportati solo i file .xlsx',
@@ -337,7 +337,7 @@ const es: ResourceTree = {
       exporting: 'Procesando…',
       ready: 'Los cambios se mantienen en esta página',
       unsupportedTip:
-        'No se admiten imágenes ni tablas dinámicas; los gráficos, el formato condicional y la validación de datos creados aquí no se exportan',
+        'No se admiten imágenes ni tablas dinámicas; el formato condicional / la validación de datos creados aquí no se exportan, los gráficos importados se conservan',
       err: err({
         EMPTY: 'El libro está vacío',
         NOT_XLSX: 'Solo se admiten archivos .xlsx',
@@ -380,7 +380,7 @@ const pt: ResourceTree = {
       exporting: 'A processar…',
       ready: 'As alterações permanecem nesta página',
       unsupportedTip:
-        'Imagens e tabelas dinâmicas não são suportados; gráficos, formatação condicional e validação de dados criados aqui não são exportados',
+        'Imagens e tabelas dinâmicas não são suportados; formatação condicional / validação de dados criados aqui não são exportados, gráficos importados são preservados',
       err: err({
         EMPTY: 'O livro está vazio',
         NOT_XLSX: 'Apenas são suportados ficheiros .xlsx',

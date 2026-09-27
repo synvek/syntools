@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { exportSnapshotToBytes, importXlsxToSnapshot } from './xlsx-io';
 import {
-  EXTRAS_RESOURCE_NAME,
   applySheetExtras,
   collectSheetExtras,
   countExtras,
@@ -54,23 +53,26 @@ describe('xlsx-extras 纯逻辑', () => {
     expect(assigned.B2).toEqual({ type: 'whole', formulae: [1, 5] });
   });
 
-  it('resources 读写与损坏兜底', () => {
-    const resources = withWorkbookExtras(undefined, {
+  it('快照自有字段读写与损坏兜底', () => {
+    const base = { id: 'w' };
+    const snapshot = withWorkbookExtras(base, {
       version: 1,
       sheets: { S: { dataValidations: { A1: { type: 'list', formulae: [] } } } },
     });
-    expect(resources?.[0].name).toBe(EXTRAS_RESOURCE_NAME);
-    expect(readWorkbookExtras(resources)?.sheets.S.dataValidations).toBeTruthy();
+    expect(readWorkbookExtras(snapshot)?.sheets.S.dataValidations).toBeTruthy();
+    // 空内容：移除字段，恢复为原对象形态
+    expect(withWorkbookExtras(snapshot, { version: 1, sheets: {} })).toEqual(base);
     // 损坏 / 缺失
     expect(readWorkbookExtras(undefined)).toBeNull();
-    expect(readWorkbookExtras([{ name: EXTRAS_RESOURCE_NAME, data: '{' }])).toBeNull();
-    expect(readWorkbookExtras([{ name: EXTRAS_RESOURCE_NAME, data: '{"version":2}' }])).toBeNull();
+    expect(readWorkbookExtras({})).toBeNull();
+    expect(readWorkbookExtras({ syntoolsExtras: { version: 2, sheets: {} } as never })).toBeNull();
+    expect(readWorkbookExtras({ syntoolsExtras: { version: 1 } as never })).toBeNull();
   });
 
-  it('无内容时不写资源', () => {
-    expect(withWorkbookExtras(undefined, { version: 1, sheets: {} })).toBeUndefined();
-    const existing = [{ name: 'OTHER', data: '{}' }];
-    expect(withWorkbookExtras(existing, { version: 1, sheets: {} })).toEqual(existing);
+  it('无内容时不新增字段', () => {
+    const base = { id: 'w' };
+    expect(withWorkbookExtras(base, { version: 1, sheets: {} })).toBe(base);
+    expect(withWorkbookExtras(base, null)).toBe(base);
   });
 
   it('统计规模', () => {
@@ -93,7 +95,7 @@ describe('xlsx-extras 纯逻辑', () => {
 });
 
 describe('条件格式 / 数据验证：xlsx 往返保留', () => {
-  it('导入后存于快照 resources，导出时写回文件', async () => {
+  it('导入后存于快照自有字段，导出时写回文件', async () => {
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Data');
@@ -120,7 +122,7 @@ describe('条件格式 / 数据验证：xlsx 往返保留', () => {
     const imported = await importXlsxToSnapshot(fakeFile(buffer, 'cf.xlsx'));
     expect(imported.ok).toBe(true);
     if (!imported.ok) return;
-    expect(countExtras(readWorkbookExtras(imported.value.resources))).toEqual({
+    expect(countExtras(readWorkbookExtras(imported.value))).toEqual({
       conditionalFormattings: 1,
       dataValidations: 1,
     });
@@ -137,7 +139,7 @@ describe('条件格式 / 数据验证：xlsx 往返保留', () => {
     expect(sheet.dataValidations?.model?.B1.type).toBe('list');
   });
 
-  it('普通文件不产生 extras 资源', async () => {
+  it('普通文件不产生 extras 字段', async () => {
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
     workbook.addWorksheet('Data').getCell('A1').value = 'plain';
@@ -146,6 +148,6 @@ describe('条件格式 / 数据验证：xlsx 往返保留', () => {
     const imported = await importXlsxToSnapshot(fakeFile(buffer, 'plain.xlsx'));
     expect(imported.ok).toBe(true);
     if (!imported.ok) return;
-    expect(imported.value.resources ?? []).toHaveLength(0);
+    expect(imported.value.syntoolsExtras).toBeUndefined();
   });
 });
