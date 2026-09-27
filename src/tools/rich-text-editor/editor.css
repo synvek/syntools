@@ -157,6 +157,93 @@
   z-index: 1;
 }
 
+/* 批注高亮与修订标记（Mark 渲染，本地数据） */
+.rte-surface .tiptap .rte-comment {
+  background: rgba(250, 204, 21, 0.35);
+  border-bottom: 2px solid #f59e0b;
+  cursor: pointer;
+}
+
+.rte-surface .tiptap ins.rte-track-insert {
+  color: #15803d;
+  text-decoration: underline;
+}
+
+.rte-surface .tiptap del.rte-track-delete {
+  color: #b91c1c;
+  text-decoration: line-through;
+}
+
+.dark .rte-surface .tiptap .rte-comment {
+  background: rgba(250, 204, 21, 0.25);
+}
+
+.dark .rte-surface .tiptap ins.rte-track-insert {
+  color: #4ade80;
+}
+
+.dark .rte-surface .tiptap del.rte-track-delete {
+  color: #f87171;
+}
+
+/* 表格样式：边框开关与斑马纹（data 属性由 TableStyle 扩展写入） */
+.rte-surface .tiptap table[data-bordered='false'] th,
+.rte-surface .tiptap table[data-bordered='false'] td {
+  border-color: transparent;
+}
+
+.rte-surface .tiptap table[data-zebra='true'] tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.dark .rte-surface .tiptap table[data-zebra='true'] tbody tr:nth-child(even) {
+  background: rgba(55, 65, 81, 0.4);
+}
+
+/* 图片层级：浮动层绝对定位在内容区（不影响文字排版与分页），可拖动调整位置 */
+.rte-surface .tiptap img[data-layer='front'],
+.rte-surface .tiptap img[data-layer='behind'] {
+  position: absolute;
+  margin: 0;
+  cursor: move;
+  /* 浮动定位以内容区左上角为原点（ProseMirror 的内容元素本身是定位元素） */
+  z-index: 2;
+}
+
+.rte-surface .tiptap img[data-layer='behind'] {
+  /* 衬于文字下方：绘制在正文之下，但仍在纸面之上 */
+  z-index: -1;
+}
+
+/* 打印流同样支持浮动图片（与屏幕同一套定位规则） */
+.rte-print-flow {
+  position: relative;
+}
+
+.rte-print-flow img[data-layer='front'],
+.rte-print-flow img[data-layer='behind'] {
+  position: absolute;
+  margin: 0;
+  z-index: 2;
+}
+
+.rte-print-flow img[data-layer='behind'] {
+  z-index: -1;
+}
+
+/* 图片对齐 */
+.rte-surface .tiptap img[data-align='center'] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.rte-surface .tiptap img[data-align='right'] {
+  display: block;
+  margin-left: auto;
+  margin-right: 0;
+}
+
 .rte-surface .tiptap .column-resize-handle {
   position: absolute;
   top: 0;
@@ -212,15 +299,115 @@
 
 /* ---- 编辑工作区：固定高度内部滚动，长文档不再把页面无限撑高 ---- */
 
-/* 高度由 JS 按可用空间精确设置（见 RichTextEditorTool 的 viewportMax），
-   这里的 max-height 只是脚本执行前的兜底，避免首帧撑满整页。 */
+/* 高度由 JS 按「首屏剩余空间」精确设置（见 RichTextEditorTool 的 viewportMax），
+   这里的高度只是脚本执行前的兜底。工作区是固定高度的滚动容器。 */
 .rte-editor-viewport {
-  max-height: calc(100vh - 400px);
+  height: calc(100vh - 400px);
   min-height: 320px;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* 给滚动条留出视觉空间 */
   padding-right: 2px;
+  /* 图片缩放手柄覆盖层的定位基准（覆盖层按内容坐标系定位，滚动自动跟随） */
+  position: relative;
+}
+
+/* ---- 图片缩放手柄（四角 + 四边中点） ---- */
+
+.rte-image-frame {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  outline: 1.5px solid #2563eb;
+  outline-offset: 0;
+}
+
+.rte-image-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid #2563eb;
+  border-radius: 2px;
+  background: #fff;
+  pointer-events: auto;
+}
+
+.rte-image-frame .rte-image-handle--nw {
+  left: -5px;
+  top: -5px;
+  cursor: nwse-resize;
+}
+
+.rte-image-frame .rte-image-handle--n {
+  left: 50%;
+  top: -5px;
+  margin-left: -5px;
+  cursor: ns-resize;
+}
+
+.rte-image-frame .rte-image-handle--ne {
+  right: -5px;
+  top: -5px;
+  cursor: nesw-resize;
+}
+
+.rte-image-frame .rte-image-handle--e {
+  right: -5px;
+  top: 50%;
+  margin-top: -5px;
+  cursor: ew-resize;
+}
+
+.rte-image-frame .rte-image-handle--se {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+
+.rte-image-frame .rte-image-handle--s {
+  left: 50%;
+  bottom: -5px;
+  margin-left: -5px;
+  cursor: ns-resize;
+}
+
+.rte-image-frame .rte-image-handle--sw {
+  left: -5px;
+  bottom: -5px;
+  cursor: nesw-resize;
+}
+
+.rte-image-frame .rte-image-handle--w {
+  left: -5px;
+  top: 50%;
+  margin-top: -5px;
+  cursor: ew-resize;
+}
+
+.dark .rte-image-frame {
+  outline-color: #60a5fa;
+}
+
+.dark .rte-image-handle {
+  border-color: #60a5fa;
+  background: #111827;
+}
+
+@media print {
+  .rte-image-frame {
+    display: none;
+  }
+}
+
+/* 页面视图：灰色工作台由「滚动容器」承担，因此始终铺满整个可滚动区域——
+   内容不足一屏时底部也不会露出页面背景（与 Word / WPS / 石墨的页面视图一致）。 */
+.rte-editor-viewport.rte-viewport-paged {
+  background: #e5e7eb;
+  border-radius: 8px;
+}
+
+.dark .rte-editor-viewport.rte-viewport-paged {
+  background: #1f2937;
 }
 
 /* ---- 页面视图：Word 式多页 A4 纸面 ---- */
@@ -238,14 +425,23 @@
   background: #1f2937;
 }
 
+/* 内容区自建层叠上下文：让「衬于文字下方」的浮动图片（z-index: -1）
+   只垫在正文与纸面背景之下，而不会被 .rte-surface 自身背景盖住。
+   （流式与页面视图都要生效，因此放在基础选择器上。） */
+.rte-surface {
+  isolation: isolate;
+}
+
 .rte-surface.rte-paged {
-  width: 210mm;
-  /* 不做 max-width 收缩：内容区必须恒为 170mm，与打印流同宽。
+  /* 纸张尺寸与页边距由页面设置（CSS 变量）驱动，默认 A4 + 20mm */
+  width: var(--rte-page-width, 210mm);
+  /* 不做 max-width 收缩：内容区必须与打印流同宽。
      窗口不够宽时由 .rte-page-area 横向滚动。 */
   max-width: none;
   /* 居中：工作台比纸面宽时，左右留白必须对称 */
   margin: 0 auto;
-  padding: 20mm;
+  padding: var(--rte-page-margin-top, 20mm) var(--rte-page-margin-right, 20mm)
+    var(--rte-page-margin-bottom, 20mm) var(--rte-page-margin-left, 20mm);
   border-color: transparent;
   /* 去掉 1px 边框：内容区必须正好 170mm，与打印流同宽，否则换行不同→分页不同 */
   border-width: 0;
@@ -265,14 +461,14 @@
   margin: 0;
 }
 
-/* 一张 A4 纸：210mm × 297mm，落在内容之后。
+/* 一张纸（默认 A4 210mm × 297mm，随页面设置变化），落在内容之后。
    注意：纸面必须用负 z-index 而非给 .tiptap 加定位——
    一旦 .tiptap 成为定位元素，子块 offsetTop 坐标系改变，分页测量即失效。 */
 .rte-page-sheet {
   position: absolute;
   left: 0;
   right: 0;
-  height: 297mm;
+  height: var(--rte-page-height, 297mm);
   background: #fff;
   border-radius: 2px;
   box-shadow:
@@ -295,6 +491,36 @@
   bottom: 10px;
   font-size: 11px;
   line-height: 1.4;
+  color: #9ca3af;
+}
+
+/* 页眉 / 页脚（屏幕纸面层，与 Word 导出、快照 PDF 共用同一份设置） */
+.rte-page-header,
+.rte-page-footer {
+  position: absolute;
+  left: var(--rte-page-margin-left, 20mm);
+  right: var(--rte-page-margin-right, 20mm);
+  font-size: 11px;
+  line-height: 1.4;
+  color: #6b7280;
+}
+
+.rte-page-header {
+  top: calc(var(--rte-page-margin-top, 20mm) / 2 - 7px);
+}
+
+.rte-page-footer {
+  bottom: calc(var(--rte-page-margin-bottom, 20mm) / 2 - 7px);
+  display: flex;
+  justify-content: space-between;
+}
+
+.rte-page-footer-number {
+  margin-left: auto;
+}
+
+.dark .rte-page-header,
+.dark .rte-page-footer {
   color: #9ca3af;
 }
 
@@ -363,7 +589,8 @@
 /* 打印/放映层排版与编辑器 .rte-surface .tiptap 严格一致（WYSIWYG）：
    字号、行高、块间距、标题层级必须逐项相同，否则打印分页位置与页面视图不符。 */
 .rte-print-flow {
-  width: 170mm;
+  /* 必须与编辑器内容区同宽（随页面设置变化），否则换行不同→分页分叉 */
+  width: var(--rte-content-width, 170mm);
   margin: 0 auto;
   padding: 0;
   background: #ffffff;

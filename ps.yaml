@@ -1,0 +1,832 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e4]:
+    - link "SynTools" [ref=f1e5] [cursor=pointer]:
+      - /url: /
+    - button "Search tools… ⌘K" [ref=f1e6] [cursor=pointer]:
+      - text: Search tools…
+      - generic [ref=f1e10]: ⌘K
+    - generic [ref=f1e11]:
+      - generic [ref=f1e12]: Switch language
+      - combobox "Switch language" [ref=f1e13]:
+        - option "简体中文"
+        - option "繁體中文"
+        - option "English" [selected]
+        - option "日本語"
+        - option "Français"
+        - option "Deutsch"
+        - option "Italiano"
+        - option "Español"
+        - option "Português"
+      - button "Toggle theme" [ref=f1e14] [cursor=pointer]
+      - link "Download desktop app" [ref=f1e17] [cursor=pointer]:
+        - /url: https://github.com/synvek/syntools/releases
+      - link "Source code" [ref=f1e20] [cursor=pointer]:
+        - /url: https://github.com/synvek/syntools
+  - generic [ref=f1e23]:
+    - complementary [ref=f1e24]:
+      - navigation "Tool navigation" [ref=f1e26]:
+        - generic [ref=f1e27]:
+          - generic [ref=f1e28]: Filter tools
+          - searchbox "Filter tools" [ref=f1e29]
+        - generic [ref=f1e30]:
+          - generic [ref=f1e31]:
+            - generic [ref=f1e32]:
+              - button "Documents & Creative 10" [expanded] [ref=f1e33] [cursor=pointer]:
+                - generic [ref=f1e36]: Documents & Creative
+                - generic [ref=f1e37]: "10"
+              - button "Category actions" [ref=f1e39] [cursor=pointer]
+            - list [ref=f1e44]:
+              - listitem [ref=f1e45]:
+                - link "Word Processor" [ref=f1e46] [cursor=pointer]:
+                  - /url: /tools/rich-text-editor
+              - listitem [ref=f1e51]:
+                - link "Code Editor" [ref=f1e52] [cursor=pointer]:
+                  - /url: /tools/code-editor
+              - listitem [ref=f1e57]:
+                - link "Spreadsheet Editor" [ref=f1e58] [cursor=pointer]:
+                  - /url: /tools/spreadsheet-editor
+              - listitem [ref=f1e63]:
+                - link "Slides Editor" [ref=f1e64] [cursor=pointer]:
+                  - /url: /tools/slide-editor
+              - listitem [ref=f1e69]:
+                - link "Flowchart Editor" [ref=f1e70] [cursor=pointer]:
+                  - /url: /tools/flowchart-editor
+              - listitem [ref=f1e76]:
+                - link "Mind Map Editor" [ref=f1e77] [cursor=pointer]:
+                  - /url: /tools/mindmap-editor
+              - listitem [ref=f1e85]:
+                - link "Photo Editor" [ref=f1e86] [cursor=pointer]:
+                  - /url: /tools/photo-editor
+              - listitem [ref=f1e92]:
+                - link "Markdown Editor" [ref=f1e93] [cursor=pointer]:
+                  - /url: /tools/markdown-preview
+              - listitem [ref=f1e98]:
+                - link "LaTeX Math Editor" [ref=f1e99] [cursor=pointer]:
+                  - /url: /tools/latex-editor
+              - listitem [ref=f1e104]:
+                - link "Doodle Board" [ref=f1e105] [cursor=pointer]:
+                  - /url: /tools/doodle-board
+          - generic [ref=f1e109]:
+            - generic [ref=f1e110]:
+              - button "Encoding 14" [expanded] [ref=f1e111] [cursor=pointer]:
+                - generic [ref=f1e114]: Encoding
+                - generic [ref=f1e115]: "14"
+              - button "Category actions" [ref=f1e117] [cursor=pointer]
+            - list [ref=f1e122]:
+              - listitem [ref=f1e123]:
+                - link "Base Encoder" [ref=f1e124] [cursor=pointer]:
+                  - /url: /tools/base-encoding
+              - listitem [ref=f1e130]:
+                - link "Morse Code" [ref=f1e131] [cursor=pointer]:
+                  - /url: /tools/morse-code
+              - listitem [ref=f1e135]:
+                - link "Caesar / ROT13 / Rail" [ref=f1e136] [cursor=pointer]:
+                  - /url: /tools/caesar-cipher
+              - listitem [ref=f1e141]:
+                - link "Escape / Unescape" [ref=f1e142] [cursor=pointer]:
+                  - /url: /tools/escape-unescape
+              - listitem [ref=f1e146]:
+                - link "Mojibake Fixer" [ref=f1e147] [cursor=pointer]:
+                  - /url: /tools/encoding-rescue
+              - listitem [ref=f1e152]:
+                - link "Base64 Encode / Decode" [ref=f1e153] [cursor=pointer]:
+                  - /url: /tools/base64
+              - listitem [ref=f1e159]:
+                - link "URL Encode / Decode" [ref=f1e160] [cursor=pointer]:
+                  - /url: /tools/url-codec
+              - listitem [ref=f1e165]:
+                - link "HTML Encode / Decode" [ref=f1e166] [cursor=pointer]:
+                  - /url: /tools/entity-codec
+              - listitem [ref=f1e172]:
+                - link "URL Query Parser" [ref=f1e173] [cursor=pointer]:
+                  - /url: /tools/url-query
+              - listitem [ref=f1e178]:
+                - link "Unicode Codec" [ref=f1e179] [cursor=pointer]:
+                  - /url: /tools/unicode-codec
+              - listitem [ref=f1e184]:
+                - link "Hex Encode / Decode" [ref=f1e185] [cursor=pointer]:
+                  - /url: /tools/hex-codec
+              - listitem [ref=f1e191]:
+                - link "Gzip Compress" [ref=f1e192] [cursor=pointer]:
+                  - /url: /tools/gzip-tool
+              - listitem [ref=f1e198]:
+                - link "ASCII Table" [ref=f1e199] [cursor=pointer]:
+                  - /url: /tools/ascii-table
+              - listitem [ref=f1e204]:
+                - link "QR Code" [ref=f1e205] [cursor=pointer]:
+                  - /url: /tools/qrcode
+          - generic [ref=f1e212]:
+            - generic [ref=f1e213]:
+              - button "Text 10" [expanded] [ref=f1e214] [cursor=pointer]:
+                - generic [ref=f1e217]: Text
+                - generic [ref=f1e218]: "10"
+              - button "Category actions" [ref=f1e220] [cursor=pointer]
+            - list [ref=f1e225]:
+              - listitem [ref=f1e226]:
+                - link "Regex Tool" [ref=f1e227] [cursor=pointer]:
+                  - /url: /tools/regex-tester
+              - listitem [ref=f1e231]:
+                - link "Text Diff" [ref=f1e232] [cursor=pointer]:
+                  - /url: /tools/text-diff
+              - listitem [ref=f1e238]:
+                - link "Text Counter" [ref=f1e239] [cursor=pointer]:
+                  - /url: /tools/text-counter
+              - listitem [ref=f1e244]:
+                - link "Text Line Tools" [ref=f1e245] [cursor=pointer]:
+                  - /url: /tools/text-lines
+              - listitem [ref=f1e249]:
+                - link "Chinese to Pinyin" [ref=f1e250] [cursor=pointer]:
+                  - /url: /tools/pinyin
+              - listitem [ref=f1e255]:
+                - link "Traditional Chinese Converter" [ref=f1e256] [cursor=pointer]:
+                  - /url: /tools/zh-convert
+              - listitem [ref=f1e260]:
+                - link "Case Converter" [ref=f1e261] [cursor=pointer]:
+                  - /url: /tools/case-convert
+              - listitem [ref=f1e266]:
+                - link "AI Prompt Library" [ref=f1e267] [cursor=pointer]:
+                  - /url: /tools/ai-prompts
+              - listitem [ref=f1e272]:
+                - link "Markdown to Image" [ref=f1e273] [cursor=pointer]:
+                  - /url: /tools/md-to-image
+              - listitem [ref=f1e278]:
+                - link "Markdown Mind Map" [ref=f1e279] [cursor=pointer]:
+                  - /url: /tools/md-mindmap
+          - generic [ref=f1e286]:
+            - generic [ref=f1e287]:
+              - button "Formatting 15" [expanded] [ref=f1e288] [cursor=pointer]:
+                - generic [ref=f1e291]: Formatting
+                - generic [ref=f1e292]: "15"
+              - button "Category actions" [ref=f1e294] [cursor=pointer]
+            - list [ref=f1e299]:
+              - listitem [ref=f1e300]:
+                - link "CSV Tool" [ref=f1e301] [cursor=pointer]:
+                  - /url: /tools/csv-tool
+              - listitem [ref=f1e306]:
+                - link "Code Minifier" [ref=f1e307] [cursor=pointer]:
+                  - /url: /tools/code-minify
+              - listitem [ref=f1e311]:
+                - link "JSON Formatter" [ref=f1e312] [cursor=pointer]:
+                  - /url: /tools/json-format
+              - listitem [ref=f1e316]:
+                - link "JSON Converter" [ref=f1e317] [cursor=pointer]:
+                  - /url: /tools/json-convert
+              - listitem [ref=f1e321]:
+                - link "Config Data Format Converter" [ref=f1e322] [cursor=pointer]:
+                  - /url: /tools/convert-data
+              - listitem [ref=f1e326]:
+                - link "SQL Formatter" [ref=f1e327] [cursor=pointer]:
+                  - /url: /tools/sql-format
+              - listitem [ref=f1e333]:
+                - link "HTML Minify / Beautify" [ref=f1e334] [cursor=pointer]:
+                  - /url: /tools/html-format
+              - listitem [ref=f1e339]:
+                - link "JS Minify / Beautify" [ref=f1e340] [cursor=pointer]:
+                  - /url: /tools/js-format
+              - listitem [ref=f1e344]:
+                - link "JSONPath Query" [ref=f1e345] [cursor=pointer]:
+                  - /url: /tools/json-path
+              - listitem [ref=f1e349]:
+                - link "CSS Minify / Beautify" [ref=f1e350] [cursor=pointer]:
+                  - /url: /tools/css-format
+              - listitem [ref=f1e355]:
+                - link "XML Minify / Beautify" [ref=f1e356] [cursor=pointer]:
+                  - /url: /tools/xml-format
+              - listitem [ref=f1e361]:
+                - link "CSS Button Generator" [ref=f1e362] [cursor=pointer]:
+                  - /url: /tools/css-button
+              - listitem [ref=f1e366]:
+                - link "XML to JSON" [ref=f1e367] [cursor=pointer]:
+                  - /url: /tools/xml-json
+              - listitem [ref=f1e372]:
+                - link "Code Highlighter" [ref=f1e373] [cursor=pointer]:
+                  - /url: /tools/code-highlight
+              - listitem [ref=f1e378]:
+                - link "XSLT Transform" [ref=f1e379] [cursor=pointer]:
+                  - /url: /tools/xslt-transform
+          - generic [ref=f1e384]:
+            - generic [ref=f1e385]:
+              - button "Crypto & Hash 11" [expanded] [ref=f1e386] [cursor=pointer]:
+                - generic [ref=f1e389]: Crypto & Hash
+                - generic [ref=f1e390]: "11"
+              - button "Category actions" [ref=f1e392] [cursor=pointer]
+            - list [ref=f1e397]:
+              - listitem [ref=f1e398]:
+                - link "RSA Encrypt/Decrypt" [ref=f1e399] [cursor=pointer]:
+                  - /url: /tools/rsa-crypto
+              - listitem [ref=f1e404]:
+                - link "Key Format Converter" [ref=f1e405] [cursor=pointer]:
+                  - /url: /tools/key-converter
+              - listitem [ref=f1e410]:
+                - link "Password Hash (PBKDF2)" [ref=f1e411] [cursor=pointer]:
+                  - /url: /tools/password-hash
+              - listitem [ref=f1e415]:
+                - link "Checksum" [ref=f1e416] [cursor=pointer]:
+                  - /url: /tools/checksum
+              - listitem [ref=f1e425]:
+                - link "Password Strength" [ref=f1e426] [cursor=pointer]:
+                  - /url: /tools/password-strength
+              - listitem [ref=f1e430]:
+                - link "Hash Calculator" [ref=f1e431] [cursor=pointer]:
+                  - /url: /tools/hash
+              - listitem [ref=f1e435]:
+                - link "JWT Parser" [ref=f1e436] [cursor=pointer]:
+                  - /url: /tools/jwt-parser
+              - listitem [ref=f1e441]:
+                - link "AES Encrypt / Decrypt" [ref=f1e442] [cursor=pointer]:
+                  - /url: /tools/aes-crypto
+              - listitem [ref=f1e447]:
+                - link "HMAC" [ref=f1e448] [cursor=pointer]:
+                  - /url: /tools/hmac
+              - listitem [ref=f1e452]:
+                - link "TOTP" [ref=f1e453] [cursor=pointer]:
+                  - /url: /tools/totp
+              - listitem [ref=f1e458]:
+                - link "X.509 Certificate Decoder" [ref=f1e459] [cursor=pointer]:
+                  - /url: /tools/x509-decode
+          - generic [ref=f1e464]:
+            - generic [ref=f1e465]:
+              - button "Date & Time 7" [expanded] [ref=f1e466] [cursor=pointer]:
+                - generic [ref=f1e469]: Date & Time
+                - generic [ref=f1e470]: "7"
+              - button "Category actions" [ref=f1e472] [cursor=pointer]
+            - list [ref=f1e477]:
+              - listitem [ref=f1e478]:
+                - link "Time Zone Converter" [ref=f1e479] [cursor=pointer]:
+                  - /url: /tools/timezone-converter
+              - listitem [ref=f1e484]:
+                - link "Timestamp Converter" [ref=f1e485] [cursor=pointer]:
+                  - /url: /tools/timestamp
+              - listitem [ref=f1e490]:
+                - link "Cron Expression Parser" [ref=f1e491] [cursor=pointer]:
+                  - /url: /tools/cron-parser
+              - listitem [ref=f1e496]:
+                - link "Crontab Generator" [ref=f1e497] [cursor=pointer]:
+                  - /url: /tools/cron-generator
+              - listitem [ref=f1e502]:
+                - link "Calendar" [ref=f1e503] [cursor=pointer]:
+                  - /url: /tools/calendar
+              - listitem [ref=f1e508]:
+                - link "Countdown Timer" [ref=f1e509] [cursor=pointer]:
+                  - /url: /tools/countdown
+              - listitem [ref=f1e514]:
+                - link "Stopwatch" [ref=f1e515] [cursor=pointer]:
+                  - /url: /tools/stopwatch
+          - generic [ref=f1e520]:
+            - generic [ref=f1e521]:
+              - button "Generators 12" [expanded] [ref=f1e522] [cursor=pointer]:
+                - generic [ref=f1e525]: Generators
+                - generic [ref=f1e526]: "12"
+              - button "Category actions" [ref=f1e528] [cursor=pointer]
+            - list [ref=f1e533]:
+              - listitem [ref=f1e534]:
+                - link "ID Generator" [ref=f1e535] [cursor=pointer]:
+                  - /url: /tools/id-generator
+              - listitem [ref=f1e543]:
+                - link "Barcode Generator" [ref=f1e544] [cursor=pointer]:
+                  - /url: /tools/barcode
+              - listitem [ref=f1e548]:
+                - link "UUID Generator" [ref=f1e549] [cursor=pointer]:
+                  - /url: /tools/uuid
+              - listitem [ref=f1e557]:
+                - link "Password Generator" [ref=f1e558] [cursor=pointer]:
+                  - /url: /tools/password-gen
+              - listitem [ref=f1e566]:
+                - link "Random Number Generator" [ref=f1e567] [cursor=pointer]:
+                  - /url: /tools/random-number
+              - listitem [ref=f1e571]:
+                - link "Random String Generator" [ref=f1e572] [cursor=pointer]:
+                  - /url: /tools/random-string
+              - listitem [ref=f1e576]:
+                - link "Fake Data Generator" [ref=f1e577] [cursor=pointer]:
+                  - /url: /tools/fake-data
+              - listitem [ref=f1e585]:
+                - link "CSS Gradient Generator" [ref=f1e586] [cursor=pointer]:
+                  - /url: /tools/css-gradient
+              - listitem [ref=f1e590]:
+                - link "Text to Card" [ref=f1e591] [cursor=pointer]:
+                  - /url: /tools/text-card
+              - listitem [ref=f1e596]:
+                - link "CSS3 Code Generator" [ref=f1e597] [cursor=pointer]:
+                  - /url: /tools/css3-generator
+              - listitem [ref=f1e602]:
+                - link "Chart Generator" [ref=f1e603] [cursor=pointer]:
+                  - /url: /tools/chart-generator
+              - listitem [ref=f1e608]:
+                - link "Mermaid Diagram Editor" [ref=f1e609] [cursor=pointer]:
+                  - /url: /tools/mermaid-editor
+          - generic [ref=f1e614]:
+            - generic [ref=f1e615]:
+              - button "Network 10" [expanded] [ref=f1e616] [cursor=pointer]:
+                - generic [ref=f1e619]: Network
+                - generic [ref=f1e620]: "10"
+              - button "Category actions" [ref=f1e622] [cursor=pointer]
+            - list [ref=f1e627]:
+              - listitem [ref=f1e628]:
+                - link "IP Calculator" [ref=f1e629] [cursor=pointer]:
+                  - /url: /tools/ip-calc
+              - listitem [ref=f1e634]:
+                - link "CIDR Calculator" [ref=f1e635] [cursor=pointer]:
+                  - /url: /tools/cidr-calc
+              - listitem [ref=f1e640]:
+                - link "MAC Address Tool" [ref=f1e641] [cursor=pointer]:
+                  - /url: /tools/mac-address
+              - listitem [ref=f1e647]:
+                - link "URL Parser" [ref=f1e648] [cursor=pointer]:
+                  - /url: /tools/url-parser
+              - listitem [ref=f1e653]:
+                - link "User-Agent Generator" [ref=f1e654] [cursor=pointer]:
+                  - /url: /tools/ua-generator
+              - listitem [ref=f1e659]:
+                - link "Security Headers Generator" [ref=f1e660] [cursor=pointer]:
+                  - /url: /tools/http-headers
+              - listitem [ref=f1e664]:
+                - link "HTTP Request Debugger" [ref=f1e665] [cursor=pointer]:
+                  - /url: /tools/http-request
+              - listitem [ref=f1e670]:
+                - link "WebSocket Tester" [ref=f1e671] [cursor=pointer]:
+                  - /url: /tools/websocket-tester
+              - listitem [ref=f1e676]:
+                - link "Random Port & Address" [ref=f1e677] [cursor=pointer]:
+                  - /url: /tools/random-port
+              - listitem [ref=f1e685]:
+                - link "User-Agent Parser" [ref=f1e686] [cursor=pointer]:
+                  - /url: /tools/ua-parser
+          - generic [ref=f1e691]:
+            - generic [ref=f1e692]:
+              - button "Images 19" [expanded] [ref=f1e693] [cursor=pointer]:
+                - generic [ref=f1e696]: Images
+                - generic [ref=f1e697]: "19"
+              - button "Category actions" [ref=f1e699] [cursor=pointer]
+            - list [ref=f1e704]:
+              - listitem [ref=f1e705]:
+                - link "Image Grid Cut" [ref=f1e706] [cursor=pointer]:
+                  - /url: /tools/image-grid-cut
+              - listitem [ref=f1e713]:
+                - link "ID Photo Maker" [ref=f1e714] [cursor=pointer]:
+                  - /url: /tools/id-photo
+              - listitem [ref=f1e720]:
+                - link "Image to ASCII" [ref=f1e721] [cursor=pointer]:
+                  - /url: /tools/image-ascii
+              - listitem [ref=f1e727]:
+                - link "Image Compress" [ref=f1e728] [cursor=pointer]:
+                  - /url: /tools/image-compress
+              - listitem [ref=f1e734]:
+                - link "Code to Image" [ref=f1e735] [cursor=pointer]:
+                  - /url: /tools/code-image
+              - listitem [ref=f1e741]:
+                - link "Image Color Picker" [ref=f1e742] [cursor=pointer]:
+                  - /url: /tools/image-color-picker
+              - listitem [ref=f1e747]:
+                - link "Image Watermark" [ref=f1e748] [cursor=pointer]:
+                  - /url: /tools/image-watermark
+              - listitem [ref=f1e753]:
+                - link "Image Merge" [ref=f1e754] [cursor=pointer]:
+                  - /url: /tools/image-merge
+              - listitem [ref=f1e760]:
+                - link "Strip EXIF" [ref=f1e761] [cursor=pointer]:
+                  - /url: /tools/exif-strip
+              - listitem [ref=f1e767]:
+                - link "Placeholder Image" [ref=f1e768] [cursor=pointer]:
+                  - /url: /tools/placeholder-image
+              - listitem [ref=f1e773]:
+                - link "SVG to PNG" [ref=f1e774] [cursor=pointer]:
+                  - /url: /tools/svg-to-png
+              - listitem [ref=f1e780]:
+                - link "Image Border / Radius / Shadow" [ref=f1e781] [cursor=pointer]:
+                  - /url: /tools/image-frame
+              - listitem [ref=f1e785]:
+                - link "Image to Card" [ref=f1e786] [cursor=pointer]:
+                  - /url: /tools/image-card
+              - listitem [ref=f1e791]:
+                - link "Image Color Adjust" [ref=f1e792] [cursor=pointer]:
+                  - /url: /tools/image-adjust
+              - listitem [ref=f1e797]:
+                - link "GIF Frame Extractor" [ref=f1e798] [cursor=pointer]:
+                  - /url: /tools/gif-frames
+              - listitem [ref=f1e804]:
+                - link "Image Crop" [ref=f1e805] [cursor=pointer]:
+                  - /url: /tools/image-crop
+              - listitem [ref=f1e810]:
+                - link "Image ↔ Base64" [ref=f1e811] [cursor=pointer]:
+                  - /url: /tools/image-base64
+              - listitem [ref=f1e816]:
+                - link "ICO Converter" [ref=f1e817] [cursor=pointer]:
+                  - /url: /tools/image-ico
+              - listitem [ref=f1e824]:
+                - link "Image to Paper PDF" [ref=f1e825] [cursor=pointer]:
+                  - /url: /tools/image-to-paper
+          - generic [ref=f1e830]:
+            - generic [ref=f1e831]:
+              - button "PDF 23" [expanded] [ref=f1e832] [cursor=pointer]:
+                - generic [ref=f1e835]: PDF
+                - generic [ref=f1e836]: "23"
+              - button "Category actions" [ref=f1e838] [cursor=pointer]
+            - list [ref=f1e843]:
+              - listitem [ref=f1e844]:
+                - link "PDF Text Extractor" [ref=f1e845] [cursor=pointer]:
+                  - /url: /tools/pdf-extract-text
+              - listitem [ref=f1e849]:
+                - link "PDF Unlock" [ref=f1e850] [cursor=pointer]:
+                  - /url: /tools/pdf-decrypt
+              - listitem [ref=f1e855]:
+                - link "PDF Watermark" [ref=f1e856] [cursor=pointer]:
+                  - /url: /tools/pdf-watermark
+              - listitem [ref=f1e861]:
+                - link "PDF Compressor" [ref=f1e862] [cursor=pointer]:
+                  - /url: /tools/pdf-compress
+              - listitem [ref=f1e867]:
+                - link "Merge PDF" [ref=f1e868] [cursor=pointer]:
+                  - /url: /tools/pdf-merge
+              - listitem [ref=f1e874]:
+                - link "Split PDF" [ref=f1e875] [cursor=pointer]:
+                  - /url: /tools/pdf-split
+              - listitem [ref=f1e880]:
+                - link "Delete PDF Pages" [ref=f1e881] [cursor=pointer]:
+                  - /url: /tools/pdf-delete-pages
+              - listitem [ref=f1e887]:
+                - link "Extract PDF Pages" [ref=f1e888] [cursor=pointer]:
+                  - /url: /tools/pdf-extract-pages
+              - listitem [ref=f1e893]:
+                - link "Reorder PDF Pages" [ref=f1e894] [cursor=pointer]:
+                  - /url: /tools/pdf-reorder
+              - listitem [ref=f1e898]:
+                - link "Rotate PDF Pages" [ref=f1e899] [cursor=pointer]:
+                  - /url: /tools/pdf-rotate
+              - listitem [ref=f1e904]:
+                - link "PDF to Image" [ref=f1e905] [cursor=pointer]:
+                  - /url: /tools/pdf-to-image
+              - listitem [ref=f1e911]:
+                - link "Images to PDF" [ref=f1e912] [cursor=pointer]:
+                  - /url: /tools/images-to-pdf
+              - listitem [ref=f1e918]:
+                - link "PDF Viewer" [ref=f1e919] [cursor=pointer]:
+                  - /url: /tools/pdf-viewer
+              - listitem [ref=f1e924]:
+                - link "PDF Page Numbers" [ref=f1e925] [cursor=pointer]:
+                  - /url: /tools/pdf-page-numbers
+              - listitem [ref=f1e930]:
+                - link "PDF Header & Footer" [ref=f1e931] [cursor=pointer]:
+                  - /url: /tools/pdf-header-footer
+              - listitem [ref=f1e936]:
+                - link "Insert Image into PDF" [ref=f1e937] [cursor=pointer]:
+                  - /url: /tools/pdf-insert-image
+              - listitem [ref=f1e942]:
+                - link "Add Text to PDF" [ref=f1e943] [cursor=pointer]:
+                  - /url: /tools/pdf-add-text
+              - listitem [ref=f1e948]:
+                - link "Sign PDF" [ref=f1e949] [cursor=pointer]:
+                  - /url: /tools/pdf-sign
+              - listitem [ref=f1e954]:
+                - link "PDF Metadata" [ref=f1e955] [cursor=pointer]:
+                  - /url: /tools/pdf-metadata
+              - listitem [ref=f1e960]:
+                - link "Encrypt PDF" [ref=f1e961] [cursor=pointer]:
+                  - /url: /tools/pdf-encrypt
+              - listitem [ref=f1e968]:
+                - link "Crop PDF" [ref=f1e969] [cursor=pointer]:
+                  - /url: /tools/pdf-crop
+              - listitem [ref=f1e973]:
+                - link "PDF Grayscale" [ref=f1e974] [cursor=pointer]:
+                  - /url: /tools/pdf-grayscale
+              - listitem [ref=f1e979]:
+                - link "Annotate PDF" [ref=f1e980] [cursor=pointer]:
+                  - /url: /tools/pdf-annotate
+          - generic [ref=f1e985]:
+            - generic [ref=f1e986]:
+              - button "Other 12" [expanded] [ref=f1e987] [cursor=pointer]:
+                - generic [ref=f1e990]: Other
+                - generic [ref=f1e991]: "12"
+              - button "Category actions" [ref=f1e993] [cursor=pointer]
+            - list [ref=f1e998]:
+              - listitem [ref=f1e999]:
+                - link "Unit Converter" [ref=f1e1000] [cursor=pointer]:
+                  - /url: /tools/unit-converter
+              - listitem [ref=f1e1005]:
+                - link "Loan / Tax Calculator" [ref=f1e1006] [cursor=pointer]:
+                  - /url: /tools/tax-loan-calculator
+              - listitem [ref=f1e1010]:
+                - link "Color Converter" [ref=f1e1011] [cursor=pointer]:
+                  - /url: /tools/color-converter
+              - listitem [ref=f1e1018]:
+                - link "Radix Converter" [ref=f1e1019] [cursor=pointer]:
+                  - /url: /tools/radix-converter
+              - listitem [ref=f1e1024]:
+                - link "HSV / CMYK Converter" [ref=f1e1025] [cursor=pointer]:
+                  - /url: /tools/hsv-cmyk
+              - listitem [ref=f1e1031]:
+                - link "Calculator" [ref=f1e1032] [cursor=pointer]:
+                  - /url: /tools/calculator
+              - listitem [ref=f1e1037]:
+                - link "HTML Color Picker" [ref=f1e1038] [cursor=pointer]:
+                  - /url: /tools/html-color-picker
+              - listitem [ref=f1e1043]:
+                - link "Web Color Table" [ref=f1e1044] [cursor=pointer]:
+                  - /url: /tools/web-color-table
+              - listitem [ref=f1e1053]:
+                - link "Length Converter" [ref=f1e1054] [cursor=pointer]:
+                  - /url: /tools/length-converter
+              - listitem [ref=f1e1059]:
+                - link "Weight Converter" [ref=f1e1060] [cursor=pointer]:
+                  - /url: /tools/weight-converter
+              - listitem [ref=f1e1065]:
+                - link "BMI Calculator" [ref=f1e1066] [cursor=pointer]:
+                  - /url: /tools/bmi-calculator
+              - listitem [ref=f1e1071]:
+                - link "MBTI Personality Test" [ref=f1e1072] [cursor=pointer]:
+                  - /url: /tools/mbti-test
+          - generic [ref=f1e1078]:
+            - generic [ref=f1e1079]:
+              - button "Files 3" [expanded] [ref=f1e1080] [cursor=pointer]:
+                - generic [ref=f1e1083]: Files
+                - generic [ref=f1e1084]: "3"
+              - button "Category actions" [ref=f1e1086] [cursor=pointer]
+            - list [ref=f1e1091]:
+              - listitem [ref=f1e1092]:
+                - link "ZIP Manager" [ref=f1e1093] [cursor=pointer]:
+                  - /url: /tools/zip-manager
+              - listitem [ref=f1e1098]:
+                - link "File Split / Merge" [ref=f1e1099] [cursor=pointer]:
+                  - /url: /tools/file-split-merge
+              - listitem [ref=f1e1106]:
+                - link "Bulk Rename" [ref=f1e1107] [cursor=pointer]:
+                  - /url: /tools/bulk-rename
+          - generic [ref=f1e1112]:
+            - generic [ref=f1e1113]:
+              - button "Audio & Video 4" [expanded] [ref=f1e1114] [cursor=pointer]:
+                - generic [ref=f1e1117]: Audio & Video
+                - generic [ref=f1e1118]: "4"
+              - button "Category actions" [ref=f1e1120] [cursor=pointer]
+            - list [ref=f1e1125]:
+              - listitem [ref=f1e1126]:
+                - link "Audio Converter" [ref=f1e1127] [cursor=pointer]:
+                  - /url: /tools/audio-convert
+              - listitem [ref=f1e1133]:
+                - link "Video to GIF" [ref=f1e1134] [cursor=pointer]:
+                  - /url: /tools/video-to-gif
+              - listitem [ref=f1e1139]:
+                - link "Video Converter" [ref=f1e1140] [cursor=pointer]:
+                  - /url: /tools/video-convert
+              - listitem [ref=f1e1145]:
+                - link "Subtitle Converter" [ref=f1e1146] [cursor=pointer]:
+                  - /url: /tools/subtitle-tool
+          - generic [ref=f1e1150]:
+            - generic [ref=f1e1151]:
+              - button "Cheat Sheets 3" [expanded] [ref=f1e1152] [cursor=pointer]:
+                - generic [ref=f1e1155]: Cheat Sheets
+                - generic [ref=f1e1156]: "3"
+              - button "Category actions" [ref=f1e1158] [cursor=pointer]
+            - list [ref=f1e1163]:
+              - listitem [ref=f1e1164]:
+                - link "HTTP Status Codes" [ref=f1e1165] [cursor=pointer]:
+                  - /url: /tools/http-status
+              - listitem [ref=f1e1170]:
+                - link "MIME Types" [ref=f1e1171] [cursor=pointer]:
+                  - /url: /tools/mime-types
+              - listitem [ref=f1e1176]:
+                - link "Git Cheatsheet" [ref=f1e1177] [cursor=pointer]:
+                  - /url: /tools/git-cheatsheet
+    - main [ref=f1e1181]:
+      - generic [ref=f1e1182]:
+        - generic [ref=f1e1187]:
+          - generic [ref=f1e1188]:
+            - heading "Word Processor" [level=1] [ref=f1e1189]
+            - generic [ref=f1e1190]: Local only
+            - button "Add to favorites" [ref=f1e1191] [cursor=pointer]
+          - paragraph [ref=f1e1194]: Write locally with Word (.docx) import/export and two PDF export modes
+        - generic [ref=f1e1232]:
+          - generic [ref=f1e1233]:
+            - generic [ref=f1e1234]:
+              - generic [ref=f1e1235]: Title
+              - textbox "Title" [ref=f1e1236]:
+                - /placeholder: Untitled document
+            - button "New document" [ref=f1e1237] [cursor=pointer]
+            - button "Present" [ref=f1e1240] [cursor=pointer]
+            - button "Library" [ref=f1e1244] [cursor=pointer]
+            - button "Page setup" [active] [ref=f1e1248] [cursor=pointer]
+            - generic [ref=f1e1252]:
+              - text: Zoom
+              - combobox "Zoom" [ref=f1e1253]:
+                - option "50%"
+                - option "75%"
+                - option "100%" [selected]
+                - option "125%"
+                - option "150%"
+                - option "200%"
+            - button "Version history" [ref=f1e1254] [cursor=pointer]
+            - generic [ref=f1e1258]:
+              - button "Import Word (.docx)" [ref=f1e1259] [cursor=pointer]
+              - button "Export Word (.docx)" [ref=f1e1262] [cursor=pointer]
+              - generic [ref=f1e1265]:
+                - text: PDF mode
+                - combobox "PDF mode" [ref=f1e1266]:
+                  - option "Text (selectable & searchable)" [selected]
+                  - option "Snapshot (pixel-perfect)"
+              - button "Export PDF" [ref=f1e1267] [cursor=pointer]
+              - img "PDF mode" [ref=f1e1271]
+          - generic [ref=f1e1275]:
+            - generic [ref=f1e1276]:
+              - generic [ref=f1e1277]: "Characters: 910"
+              - generic [ref=f1e1278]: "Words: 200"
+              - generic [ref=f1e1279]: "Paragraphs: 40"
+            - generic [ref=f1e1280]:
+              - text: Saved to local draft
+              - button "Clear" [ref=f1e1281] [cursor=pointer]
+          - generic [ref=f1e1284]:
+            - generic [ref=f1e1285]:
+              - button "Undo" [ref=f1e1286] [cursor=pointer]:
+                - generic [ref=f1e1287]: ↶
+              - button "Redo" [disabled] [ref=f1e1288]:
+                - generic [ref=f1e1289]: ↷
+            - generic [ref=f1e1291]:
+              - combobox "Heading style" [ref=f1e1292]:
+                - option "Body text" [selected]
+                - option "Heading 1"
+                - option "Heading 2"
+                - option "Heading 3"
+                - option "Heading 4"
+                - option "Heading 5"
+                - option "Heading 6"
+              - combobox "Font" [ref=f1e1293]:
+                - option "Default font" [selected]
+                - option "Sans-serif"
+                - option "Serif"
+                - option "Monospace"
+                - option "Songti"
+                - option "Kaiti"
+              - combobox "Font size" [ref=f1e1294]:
+                - option "Default size" [selected]
+                - option "12"
+                - option "14"
+                - option "16"
+                - option "18"
+                - option "20"
+                - option "24"
+                - option "30"
+                - option "36"
+              - combobox "Line height" [ref=f1e1295]:
+                - option "Default spacing" [selected]
+                - option "1.15"
+                - option "1.5"
+                - option "1.75"
+                - option "2"
+              - button "Find & replace (Ctrl/⌘+F)" [ref=f1e1296] [cursor=pointer]
+            - generic [ref=f1e1301]:
+              - button "Bold" [ref=f1e1302] [cursor=pointer]:
+                - generic [ref=f1e1303]: B
+              - button "Italic" [ref=f1e1304] [cursor=pointer]:
+                - generic [ref=f1e1305]: I
+              - button "Underline" [ref=f1e1306] [cursor=pointer]:
+                - generic [ref=f1e1307]: U
+              - button "Strikethrough" [ref=f1e1308] [cursor=pointer]:
+                - generic [ref=f1e1309]: S
+              - button "Inline code" [ref=f1e1310] [cursor=pointer]:
+                - generic [ref=f1e1311]: </>
+              - generic [ref=f1e1312]:
+                - generic [aria-hidden] [ref=f1e1313]: Text color
+                - textbox "Text color" [ref=f1e1314] [cursor=pointer]: "#000000"
+              - button "Highlight" [ref=f1e1315] [cursor=pointer]:
+                - generic [ref=f1e1316]: A
+            - generic [ref=f1e1318]:
+              - button "Bulleted list" [ref=f1e1319] [cursor=pointer]:
+                - generic [ref=f1e1320]: •
+              - button "Numbered list" [ref=f1e1321] [cursor=pointer]:
+                - generic [ref=f1e1322]: "1."
+              - button "Task list" [ref=f1e1323] [cursor=pointer]
+              - button "Quote" [ref=f1e1326] [cursor=pointer]:
+                - generic [ref=f1e1327]: ”
+              - button "Code block" [ref=f1e1328] [cursor=pointer]:
+                - generic [ref=f1e1329]: "{}"
+            - generic [ref=f1e1331]:
+              - button "Link" [ref=f1e1332] [cursor=pointer]
+              - button "Insert image" [ref=f1e1336] [cursor=pointer]
+              - button "Divider" [ref=f1e1341] [cursor=pointer]:
+                - generic [ref=f1e1342]: —
+              - button "Insert page break" [ref=f1e1343] [cursor=pointer]
+              - button "Insert table" [ref=f1e1345] [cursor=pointer]
+            - generic [ref=f1e1351]:
+              - button "Align left" [ref=f1e1352] [cursor=pointer]
+              - button "Align center" [ref=f1e1357] [cursor=pointer]
+              - button "Align right" [ref=f1e1362] [cursor=pointer]
+              - button "Justify" [ref=f1e1367] [cursor=pointer]
+            - generic [ref=f1e1373]:
+              - button "Document outline" [ref=f1e1374] [cursor=pointer]
+              - combobox "View mode" [ref=f1e1377]:
+                - option "Flow view"
+                - option "Page view" [selected]
+          - generic [ref=f1e1379]:
+            - generic [ref=f1e1380]:
+              - generic [ref=f1e1381]:
+                - generic [ref=f1e1382]: Page setup
+                - button "Close page setup" [ref=f1e1383] [cursor=pointer]
+              - generic [ref=f1e1386]:
+                - generic [ref=f1e1387]:
+                  - generic [ref=f1e1388]: Paper size
+                  - combobox "Paper size" [ref=f1e1389]:
+                    - option "A4" [selected]
+                    - option "Letter"
+                - generic [ref=f1e1390]:
+                  - generic [ref=f1e1391]: Orientation
+                  - combobox "Orientation" [ref=f1e1392]:
+                    - option "Portrait" [selected]
+                    - option "Landscape"
+                - generic [ref=f1e1393]:
+                  - generic [ref=f1e1394]: Margins
+                  - generic [ref=f1e1395]:
+                    - button "Normal" [ref=f1e1396] [cursor=pointer]
+                    - button "Narrow" [ref=f1e1397] [cursor=pointer]
+                    - button "Wide" [ref=f1e1398] [cursor=pointer]
+                - generic [ref=f1e1399]:
+                  - generic [ref=f1e1400]: Top
+                  - spinbutton "Top" [ref=f1e1401]: "20"
+                - generic [ref=f1e1402]:
+                  - generic [ref=f1e1403]: Right
+                  - spinbutton "Right" [ref=f1e1404]: "20"
+                - generic [ref=f1e1405]:
+                  - generic [ref=f1e1406]: Bottom
+                  - spinbutton "Bottom" [ref=f1e1407]: "20"
+                - generic [ref=f1e1408]:
+                  - generic [ref=f1e1409]: Left
+                  - spinbutton "Left" [ref=f1e1410]: "20"
+              - generic [ref=f1e1411]:
+                - generic [ref=f1e1412]:
+                  - generic [ref=f1e1413]: Header
+                  - textbox "Header" [ref=f1e1414]:
+                    - /placeholder: Header text (empty to hide)
+                - generic [ref=f1e1415]:
+                  - generic [ref=f1e1416]: Footer
+                  - textbox "Footer" [ref=f1e1417]:
+                    - /placeholder: Footer text (empty to hide)
+                - generic [ref=f1e1418]:
+                  - checkbox "Page numbers" [checked] [ref=f1e1419]
+                  - generic [ref=f1e1420]: Page numbers
+            - generic [ref=f1e1424]:
+              - generic [aria-hidden]:
+                - generic: Page 1
+                - generic: Page 1
+              - generic [aria-hidden]:
+                - generic: Page 2
+                - generic: Page 2
+              - textbox [ref=f1e1426]:
+                - paragraph [ref=f1e1427]: page setup test line 0
+                - paragraph [ref=f1e1428]: page setup test line 1
+                - paragraph [ref=f1e1429]: page setup test line 2
+                - paragraph [ref=f1e1430]: page setup test line 3
+                - paragraph [ref=f1e1431]: page setup test line 4
+                - paragraph [ref=f1e1432]: page setup test line 5
+                - paragraph [ref=f1e1433]: page setup test line 6
+                - paragraph [ref=f1e1434]: page setup test line 7
+                - paragraph [ref=f1e1435]: page setup test line 8
+                - paragraph [ref=f1e1436]: page setup test line 9
+                - paragraph [ref=f1e1437]: page setup test line 10
+                - paragraph [ref=f1e1438]: page setup test line 11
+                - paragraph [ref=f1e1439]: page setup test line 12
+                - paragraph [ref=f1e1440]: page setup test line 13
+                - paragraph [ref=f1e1441]: page setup test line 14
+                - paragraph [ref=f1e1442]: page setup test line 15
+                - paragraph [ref=f1e1443]: page setup test line 16
+                - paragraph [ref=f1e1444]: page setup test line 17
+                - paragraph [ref=f1e1445]: page setup test line 18
+                - paragraph [ref=f1e1446]: page setup test line 19
+                - paragraph [ref=f1e1447]: page setup test line 20
+                - paragraph [ref=f1e1448]: page setup test line 21
+                - paragraph [ref=f1e1449]: page setup test line 22
+                - paragraph [ref=f1e1450]: page setup test line 23
+                - paragraph [ref=f1e1451]: page setup test line 24
+                - paragraph [ref=f1e1452]: page setup test line 25
+                - paragraph [ref=f1e1453]: page setup test line 26
+                - paragraph [ref=f1e1454]: page setup test line 27
+                - paragraph [ref=f1e1455]: page setup test line 28
+                - paragraph [ref=f1e1456]: page setup test line 29
+                - paragraph [ref=f1e1457]: page setup test line 30
+                - paragraph [ref=f1e1458]: page setup test line 31
+                - paragraph [ref=f1e1459]: page setup test line 32
+                - paragraph [ref=f1e1460]: page setup test line 33
+                - paragraph [ref=f1e1461]: page setup test line 34
+                - paragraph [ref=f1e1462]: page setup test line 35
+                - paragraph [ref=f1e1463]: page setup test line 36
+                - paragraph [ref=f1e1464]: page setup test line 37
+                - paragraph [ref=f1e1465]: page setup test line 38
+                - paragraph [ref=f1e1466]: page setup test line 39
+                - paragraph [ref=f1e1467]
+        - region "Related tools" [ref=f1e1198]:
+          - heading "Related tools" [level=2] [ref=f1e1199]
+          - list [ref=f1e1200]:
+            - listitem [ref=f1e1201]:
+              - link "Markdown Editor" [ref=f1e1202] [cursor=pointer]:
+                - /url: /tools/markdown-preview
+            - listitem [ref=f1e1206]:
+              - link "LaTeX Math Editor" [ref=f1e1207] [cursor=pointer]:
+                - /url: /tools/latex-editor
+            - listitem [ref=f1e1211]:
+              - link "Slides Editor" [ref=f1e1212] [cursor=pointer]:
+                - /url: /tools/slide-editor
+            - listitem [ref=f1e1216]:
+              - link "Code Editor" [ref=f1e1217] [cursor=pointer]:
+                - /url: /tools/code-editor
+            - listitem [ref=f1e1221]:
+              - link "Spreadsheet Editor" [ref=f1e1222] [cursor=pointer]:
+                - /url: /tools/spreadsheet-editor
+            - listitem [ref=f1e1226]:
+              - link "Flowchart Editor" [ref=f1e1227] [cursor=pointer]:
+                - /url: /tools/flowchart-editor

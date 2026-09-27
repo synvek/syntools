@@ -1,5 +1,14 @@
 import type { ToolResult } from '@/core/types';
-import { checkExportSize, checkImportFile, sanitizeDocHtml } from './core';
+import { CONTENT_WIDTH_PX, checkExportSize, checkImportFile, sanitizeDocHtml } from './core';
+import {
+  DEFAULT_PAGE_SETUP,
+  mmToTwip,
+  normalizePageSetup,
+  resolvePageMetrics,
+  type PageSetupConfig,
+} from './pageSetup';
+import { firstFontFamily, pxToHalfPoints } from './typography';
+import { isFloatingImageLayer, normalizeImageLayer, pxToEmu } from './imageLayer';
 
 /**
  * Word 双向适配层（重度依赖 mammoth / docx 均走动态 import，
@@ -111,6 +120,8 @@ interface Mark {
   color?: string;
   highlight?: DocxHighlight;
   font?: string;
+  /** 字号（半磅值，Word 的 w:sz） */
+  size?: number;
 }
 
 /** 十六进制 → 最近的 docx 高亮色名 */
@@ -166,11 +177,68 @@ function mergeMark(parent: Mark, el: Element): Mark {
   if (tag === 'S' || tag === 'DEL' || tag === 'STRIKE') next.strike = true;
   if (tag === 'CODE') next.font = 'Consolas';
   if (tag === 'MARK') next.highlight = 'yellow';
+  // 显式设置的字体/字号需写入 Word 行属性，否则导出后选择失效
+  const family = firstFontFamily(style?.fontFamily);
+  if (family) next.font = family;
+  const sizePx = Number.parseFloat(style?.fontSize ?? '');
+  const halfPoints = pxToHalfPoints(sizePx);
+  if (halfPoints !== null) next.size = halfPoints;
   const color = normalizeColor(style?.color);
   if (color) next.color = color;
   const background = style?.backgroundColor ? normalizeColor(style.backgroundColor) : undefined;
   if (background) next.highlight = nearestHighlight(background);
   return next;
+}
+
+/**
+ * 单个 <img> → docx ImageRun（图片节点自身，不依赖子节点）。
+ * 层级（浮于文字上方 / 衬于文字下方）→ Word 浮动图片，嵌入型保持随文排版。
+ */
+function imageRun(D: DocxNs, el: Element): InstanceType<DocxNs['ImageRun']> | null {
+  const decoded = decodeDataUrl(el.getAttribute('src') ?? '');
+  if (!decoded) return null;
+  const size = readImageSize(decoded.bytes);
+  const ratio = size ? size.height / Math.max(1, size.width) : 0.62;
+  // 优先使用编辑器中显式指定的宽度（style width / width 属性，px）
+  const styleWidth = (el as HTMLElement).style.width;
+  const rawWidth = styleWidth || el.getAttribute('width') || '';
+  const parsedWidth = Number.parseFloat(rawWidth);
+  const specified = Number.isFinite(parsedWidth)
+    ? // 兼容旧数据：百分比宽度换算成像素（Word 里需要绝对尺寸）
+      styleWidth.includes('%')
+      ? (parsedWidth / 100) * CONTENT_WIDTH_PX
+      : parsedWidth
+    : undefined;
+  const width = specified
+    ? Math.min(MAX_IMAGE_WIDTH * 1.3, Math.max(16, specified))
+    : size
+      ? Math.min(MAX_IMAGE_WIDTH, size.width)
+      : MAX_IMAGE_WIDTH;
+  // 浮动图片锚定在所属段落，偏移相对分栏与段落，与编辑器的绝对定位语义一致
+  const layer = normalizeImageLayer(el.getAttribute('data-layer'));
+  const offsetX = Number.parseFloat((el as HTMLElement).style.left ?? '');
+  const offsetY = Number.parseFloat((el as HTMLElement).style.top ?? '');
+  const floating = isFloatingImageLayer(layer)
+    ? {
+        horizontalPosition: {
+          relative: D.HorizontalPositionRelativeFrom.COLUMN,
+          offset: pxToEmu(Number.isFinite(offsetX) ? offsetX : 0),
+        },
+        verticalPosition: {
+          relative: D.VerticalPositionRelativeFrom.PARAGRAPH,
+          offset: pxToEmu(Number.isFinite(offsetY) ? offsetY : 0),
+        },
+        wrap: { type: D.TextWrappingType.NONE },
+        behindDocument: layer === 'behind',
+        allowOverlap: true,
+      }
+    : undefined;
+  return new D.ImageRun({
+    data: decoded.bytes,
+    type: decoded.type,
+    transformation: { width, height: Math.round(width * ratio) },
+    floating,
+  });
 }
 
 /** 行内节点 → docx 行（TextRun / ImageRun） */
@@ -194,6 +262,7 @@ function collectRuns(
           color: mark.color,
           highlight: mark.highlight,
           font: mark.font,
+          size: mark.size,
         }),
       );
       return;
@@ -205,31 +274,8 @@ function collectRuns(
       return;
     }
     if (el.tagName === 'IMG') {
-      const decoded = decodeDataUrl(el.getAttribute('src') ?? '');
-      if (decoded) {
-        const size = readImageSize(decoded.bytes);
-        const ratio = size ? size.height / Math.max(1, size.width) : 0.62;
-        // 优先使用编辑器中显式指定的宽度（style width / width 属性，px）
-        const styleWidth = Number.parseInt((el as HTMLElement).style.width, 10);
-        const attrWidth = Number.parseInt(el.getAttribute('width') ?? '', 10);
-        const specified = Number.isFinite(styleWidth)
-          ? styleWidth
-          : Number.isFinite(attrWidth)
-            ? attrWidth
-            : undefined;
-        const width = specified
-          ? Math.min(MAX_IMAGE_WIDTH * 1.3, Math.max(16, specified))
-          : size
-            ? Math.min(MAX_IMAGE_WIDTH, size.width)
-            : MAX_IMAGE_WIDTH;
-        runs.push(
-          new D.ImageRun({
-            data: decoded.bytes,
-            type: decoded.type,
-            transformation: { width, height: Math.round(width * ratio) },
-          }),
-        );
-      }
+      const run = imageRun(D, el);
+      if (run) runs.push(run);
       return;
     }
     runs.push(...collectRuns(D, el, mergeMark(mark, el)));
@@ -279,12 +325,17 @@ function buildTable(D: DocxNs, table: Element): InstanceType<DocxNs['Table']> {
         ),
       ),
     );
+  // 表格样式：边框开关与斑马纹（data 属性由 TableStyle 扩展写入）
+  const bordered = table.getAttribute('data-bordered') !== 'false';
+  const zebra = table.getAttribute('data-zebra') === 'true';
   const rows: InstanceType<DocxNs['TableRow']>[] = [];
-  Array.from(table.querySelectorAll('tr')).forEach((tr) => {
+  Array.from(table.querySelectorAll('tr')).forEach((tr, rowIndex) => {
+    const zebraFill = zebra && rowIndex % 2 === 1 ? 'F9FAFB' : undefined;
     const cells = Array.from(tr.children).map((child) => {
       const isHeader = child.tagName === 'TH';
       const background =
         normalizeColor((child as HTMLElement).style.backgroundColor) ??
+        zebraFill ??
         (isHeader ? 'F3F4F6' : undefined);
       const colspan = Math.max(1, Number(child.getAttribute('colspan')) || 1);
       const rowspan = Math.max(1, Number(child.getAttribute('rowspan')) || 1);
@@ -311,6 +362,16 @@ function buildTable(D: DocxNs, table: Element): InstanceType<DocxNs['Table']> {
     rows,
     width: { size: 100, type: D.WidthType.PERCENTAGE },
     columnWidths: readColumnWidthsDxa(table, colCount),
+    borders: bordered
+      ? undefined
+      : {
+          top: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          bottom: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          left: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          right: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideHorizontal: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideVertical: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        },
   });
 }
 
@@ -418,6 +479,18 @@ function htmlToDocxChildren(
       out.push(new D.Paragraph({ children: [], pageBreakBefore: true }));
       return;
     }
+    // 图片在编辑器里是块级节点（独占一行）：必须包一层段落输出，否则导出时整张图被丢弃。
+    // 注意要处理 <img> 元素本身（它没有子节点），不能沿用遍历子节点的 collectRuns。
+    if (el.tagName === 'IMG') {
+      const run = imageRun(D, el);
+      out.push(
+        new D.Paragraph({
+          children: run ? [run] : [],
+          alignment: alignmentType(D, blockAlignment(el)),
+        }),
+      );
+      return;
+    }
     if (el.tagName === 'TABLE') {
       out.push(buildTable(D, el));
       return;
@@ -445,11 +518,30 @@ function htmlToDocxChildren(
       );
       return;
     }
+    // 段落排版：首行缩进与段前段后（内联样式为 px，需换算成 twip：1px = 15 twip）
+    const PX_TO_TWIP = 15;
+    const style = (el as HTMLElement).style;
+    const textIndent = style?.textIndent
+      ? Math.round(Number.parseFloat(style.textIndent) * PX_TO_TWIP)
+      : 0;
+    // 未设置内联样式时沿用原有默认间距（120 twip）
+    const spaceBefore = style?.marginTop
+      ? Math.round(Number.parseFloat(style.marginTop) * PX_TO_TWIP)
+      : 120;
+    const spaceAfter = style?.marginBottom
+      ? Math.round(Number.parseFloat(style.marginBottom) * PX_TO_TWIP)
+      : 120;
+
     const paragraphOptions: ParagraphOptions = {
       children: collectRuns(D, el, {}),
       alignment: alignmentType(D, blockAlignment(el)),
       heading: heading ? headingLevel(D, heading) : undefined,
-      spacing: { before: 120, after: 120, line: 300 },
+      indent: textIndent > 0 ? { firstLine: textIndent } : undefined,
+      spacing: {
+        before: Math.max(0, spaceBefore),
+        after: Math.max(0, spaceAfter),
+        line: 300,
+      },
     };
     out.push(
       el.tagName === 'BLOCKQUOTE'
@@ -484,21 +576,34 @@ export async function importDocx(file: File): Promise<ToolResult<string>> {
   try {
     const buffer = await file.arrayBuffer();
     const mammoth = (await import('mammoth')).default;
+    // mammoth 的浏览器构建认 `arrayBuffer`，Node 构建只认 `buffer`（且 buffer 优先），
+    // 一次传入两种形态即可在两种环境都命中，无需失败重试（重试会产生未处理拒绝）
+    const nodeBuffer =
+      typeof Buffer === 'undefined' ? undefined : Buffer.from(new Uint8Array(buffer));
     const parsed = await mammoth.convertToHtml(
-      { arrayBuffer: buffer },
+      (nodeBuffer ? { arrayBuffer: buffer, buffer: nodeBuffer } : { arrayBuffer: buffer }) as {
+        arrayBuffer: ArrayBuffer;
+      },
       { styleMap: MAMMOTH_STYLE_MAP },
     );
     return sanitizeDocHtml(parsed.value);
-  } catch {
+  } catch (error) {
+    console.error('[richText] docx import failed:', error);
     return { ok: false, error: 'IMPORT_FAILED' };
   }
 }
 
-/** 导出 .docx：编辑器 HTML → Word 文档 Blob */
-export async function exportDocxBlob(html: string, title: string): Promise<ToolResult<Blob>> {
+/** 导出 .docx：编辑器 HTML → Word 文档 Blob（含页面设置与页眉页脚） */
+export async function exportDocxBlob(
+  html: string,
+  title: string,
+  setupInput?: PageSetupConfig | null,
+): Promise<ToolResult<Blob>> {
   const check = checkExportSize(html);
   if (!check.ok) return check;
   try {
+    const setup = normalizePageSetup(setupInput ?? DEFAULT_PAGE_SETUP);
+    const metrics = resolvePageMetrics(setup);
     const D = await import('docx');
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const children = htmlToDocxChildren(D, doc.body);
@@ -514,10 +619,69 @@ export async function exportDocxBlob(html: string, title: string): Promise<ToolR
           { reference: 'rte-number', levels: buildNumberingLevels(D, false) },
         ],
       },
-      sections: [{ children }],
+      sections: [
+        {
+          properties: {
+            page: {
+              // Word 约定：pgSz 始终写纵向尺寸，靠 orient 标志表达横向
+              size: {
+                width: mmToTwip(
+                  setup.orientation === 'landscape' ? metrics.heightMm : metrics.widthMm,
+                ),
+                height: mmToTwip(
+                  setup.orientation === 'landscape' ? metrics.widthMm : metrics.heightMm,
+                ),
+                orientation:
+                  setup.orientation === 'landscape'
+                    ? D.PageOrientation.LANDSCAPE
+                    : D.PageOrientation.PORTRAIT,
+              },
+              margin: {
+                top: mmToTwip(setup.margin.top),
+                right: mmToTwip(setup.margin.right),
+                bottom: mmToTwip(setup.margin.bottom),
+                left: mmToTwip(setup.margin.left),
+              },
+            },
+          },
+          headers: buildHeaderFooter(D, setup, 'header'),
+          footers: buildHeaderFooter(D, setup, 'footer'),
+          children,
+        },
+      ],
     });
     return { ok: true, value: await D.Packer.toBlob(document) };
-  } catch {
+  } catch (error) {
+    console.error('[richText] docx export failed:', error);
     return { ok: false, error: 'EXPORT_FAILED' };
   }
+}
+
+/** 生成 docx 页眉/页脚（无内容时返回 undefined，避免出现空页眉） */
+function buildHeaderFooter(
+  D: DocxNs,
+  setup: PageSetupConfig,
+  kind: 'header' | 'footer',
+): { default: InstanceType<DocxNs['Header'] | DocxNs['Footer']> } | undefined {
+  const text = (kind === 'header' ? setup.header : setup.footer).trim();
+  const pageNumber = kind === 'footer' && setup.showPageNumber;
+  if (!text && !pageNumber) return undefined;
+  const children: InstanceType<DocxNs['Paragraph']>[] = [
+    new D.Paragraph({
+      alignment: pageNumber && !text ? D.AlignmentType.CENTER : D.AlignmentType.LEFT,
+      children: [
+        ...(text ? [new D.TextRun({ text })] : []),
+        ...(pageNumber
+          ? [
+              new D.TextRun({
+                children: [text ? '  ' : '', D.PageNumber.CURRENT],
+              }),
+            ]
+          : []),
+      ],
+    }),
+  ];
+  return {
+    default: kind === 'header' ? new D.Header({ children }) : new D.Footer({ children }),
+  } as { default: InstanceType<DocxNs['Header'] | DocxNs['Footer']> };
 }

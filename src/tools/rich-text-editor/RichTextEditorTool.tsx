@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
-import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
+import { DocumentHeader } from '@/core/components/DocumentHeader';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
 import { ProgressBar } from '@/core/components/ProgressBar';
@@ -37,10 +37,23 @@ import {
   type StoredVersion,
 } from './docStore';
 import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
+import { ImageResizeOverlay } from './ImageResizeOverlay';
+import { handleFloatingImagePointerDown } from './imageLayer';
 import { exportDocxBlob, importDocx } from './docx';
-import { PAGE_HEIGHT_PX } from './PageView';
 import { printSupported, snapshotToPdf, printToPdf } from './pdf';
 import { createExtensions } from './extensions';
+import { PageSetupPanel } from './PageSetupPanel';
+import { ReviewPanel } from './ReviewPanel';
+import { StylePanel } from './StylePanel';
+import { buildTableOfContents, htmlToMarkdown, type DocComment, type TrackedChange } from './docs';
+import {
+  DEFAULT_PAGE_SETUP,
+  buildPrintPageCss,
+  normalizePageSetup,
+  pageMetricsToPx,
+  resolvePageMetrics,
+  type PageSetupConfig,
+} from './pageSetup';
 import { registerRichTextStrings } from './strings';
 import './editor.css';
 
@@ -48,7 +61,7 @@ import './editor.css';
 registerRichTextStrings(i18n);
 
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
-type PdfMode = 'text' | 'snapshot';
+import { PdfModeDialog, type PdfMode } from './PdfModeDialog';
 type BusyKind = 'import' | 'docx' | 'pdf' | null;
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -86,12 +99,24 @@ export default function RichTextEditorTool() {
   const [losses, setLosses] = useState<DocxExportLosses | null>(null);
   const [sheetTops, setSheetTops] = useState<number[]>([]);
   const [printNotice, setPrintNotice] = useState(false);
+  const [pageSetup, setPageSetup] = useState<PageSetupConfig>(() =>
+    normalizePageSetup(initial?.pageSetup ?? DEFAULT_PAGE_SETUP),
+  );
+  const [pageSetupOpen, setPageSetupOpen] = useState(false);
+  const [zoom, setZoom] = useState(initial?.zoom ?? 1);
+  const [stylesOpen, setStylesOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [comments, setComments] = useState<DocComment[]>([]);
+  const [changes, setChanges] = useState<TrackedChange[]>([]);
   // 分页插件在编辑器创建（渲染期）即开始回调，需等组件挂载后再 setState
   const mountedRef = useRef(false);
   const pendingTopsRef = useRef<number[] | null>(null);
   const [busy, setBusy] = useState<BusyKind>(null);
   const [progress, setProgress] = useState(0);
-  const [pdfMode, setPdfMode] = useState<PdfMode>('text');
+  const [pdfMode, setPdfMode] = useState<PdfMode>(
+    initial?.pdfMode === 'snapshot' ? 'snapshot' : 'text',
+  );
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [printReady, setPrintReady] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
@@ -113,12 +138,17 @@ export default function RichTextEditorTool() {
   const viewRef = useRef(viewMode);
   viewRef.current = viewMode;
   const surfaceRef = useRef<HTMLDivElement | null>(null);
+  // 页面几何（mm）→ 像素：随页面设置变化，插件通过 getter 读取最新值
+  const metrics = useMemo(() => resolvePageMetrics(pageSetup), [pageSetup]);
+  const metricsRef = useRef(metrics);
+  metricsRef.current = metrics;
+  const getMetrics = useCallback(() => metricsRef.current, []);
   // 纸面是绝对定位元素，不参与父级高度计算：内容不足整页时灰色工作台会提前结束。
   // 这里按最后一张纸的下沿给内容区补一个最小高度，让灰色背景铺满到最后一页。
   const sheetBottomPx = useMemo(() => {
     if (sheetTops.length === 0) return 0;
-    return Math.round(sheetTops[sheetTops.length - 1] + PAGE_HEIGHT_PX + 12);
-  }, [sheetTops]);
+    return Math.round(sheetTops[sheetTops.length - 1] + pageMetricsToPx(metrics).heightPx + 12);
+  }, [sheetTops, metrics]);
 
   const placeholder = useMemo(() => t('tools.richText.placeholder'), [t]);
   const handleSheetTops = useCallback((tops: number[]) => {
@@ -133,11 +163,21 @@ export default function RichTextEditorTool() {
     );
   }, []);
   const extensions = useMemo(
-    () => createExtensions(placeholder, handleSheetTops),
-    [placeholder, handleSheetTops],
+    () => createExtensions(placeholder, handleSheetTops, getMetrics),
+    [placeholder, handleSheetTops, getMetrics],
   );
 
   const editor = useEditor({ extensions, content: snapshotHtml });
+
+  // 页面设置/缩放变化后强制重排：页高与内容宽变化会改变分页点
+  useEffect(() => {
+    if (!editor || viewMode !== 'paged') return;
+    const id = window.setTimeout(() => {
+      // 空事务触发插件 update → 重新测量与规划
+      editor.view.dispatch(editor.state.tr);
+    }, 0);
+    return () => clearTimeout(id);
+  }, [editor, viewMode, metrics, zoom]);
 
   // 挂载后应用插件在渲染期缓存的纸面位置
   useEffect(() => {
@@ -175,7 +215,7 @@ export default function RichTextEditorTool() {
       observer.disconnect();
       window.removeEventListener('resize', compute);
     };
-  }, [findOpen, outlineOpen, libraryOpen, versionsOpen]);
+  }, [findOpen, outlineOpen, pageSetupOpen, stylesOpen, reviewOpen, libraryOpen, versionsOpen]);
 
   const docIdRef = useRef<string | null>(null);
   docIdRef.current = docId;
@@ -192,16 +232,20 @@ export default function RichTextEditorTool() {
   };
 
   /** 统一持久化：localStorage 草稿（同步兜底 + 降级）+ IndexedDB 文档库（多文档/版本历史） */
-  const persistNow = useCallback((draft: RichTextDraft): void => {
-    const result = writeDraftSafe(draft);
-    setSaved(result.ok);
-    setDraftNotice(result.ok ? (result.degraded ? 'degraded' : null) : 'failed');
-    const id = ensureDocId();
-    void saveDocument(id, draft).then(() => {
-      void listDocuments().then(setDocs);
-    });
-    // ensureDocId/setSaved/setDraftNotice 依赖稳定，无需加入依赖
-  }, []);
+  const persistNow = useCallback(
+    (draft: RichTextDraft): void => {
+      const withPrefs: RichTextDraft = { ...draft, pageSetup, zoom, pdfMode };
+      const result = writeDraftSafe(withPrefs);
+      setSaved(result.ok);
+      setDraftNotice(result.ok ? (result.degraded ? 'degraded' : null) : 'failed');
+      const id = ensureDocId();
+      void saveDocument(id, withPrefs).then(() => {
+        void listDocuments().then(setDocs);
+      });
+      // ensureDocId/setSaved/setDraftNotice 依赖稳定，无需加入依赖
+    },
+    [pageSetup, zoom, pdfMode],
+  );
 
   // 启动：恢复指针文档或迁移 v1 草稿到文档库
   useEffect(() => {
@@ -314,7 +358,7 @@ export default function RichTextEditorTool() {
     setFailure(null);
     setLosses(null);
     const html = editor.getHTML();
-    const result = await exportDocxBlob(html, title);
+    const result = await exportDocxBlob(html, title, pageSetup);
     setBusy(null);
     if (!result.ok) {
       setFailure(result);
@@ -329,14 +373,15 @@ export default function RichTextEditorTool() {
     }
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (mode: PdfMode = pdfMode) => {
+    setPdfMode(mode);
     setFailure(null);
     setPrintNotice(false);
     setProgress(0);
     setPrintReady(true);
     await nextFrame();
     try {
-      if (pdfMode === 'text') {
+      if (mode === 'text') {
         // 打印视图中的文字可选可检索，且中文无需嵌入字体。
         // 等待字体就绪后，把页面视图的块级分页同步到打印流，保证所见即所得。
         try {
@@ -355,7 +400,7 @@ export default function RichTextEditorTool() {
           try {
             // 流式视图同样要按块级边界分页：否则打印预览会由浏览器自由断行，
             // 出现段落被拦腰截断、与页面视图不一致的分页
-            printToPdf(flowRef.current);
+            printToPdf(flowRef.current, pageSetup);
             return;
           } catch {
             // 打印对话框打开失败：回退到快照模式
@@ -369,7 +414,7 @@ export default function RichTextEditorTool() {
         return;
       }
       setBusy('pdf');
-      const result = await snapshotToPdf(flow, setProgress);
+      const result = await snapshotToPdf(flow, setProgress, pageSetup);
       setBusy(null);
       if (!result.ok) {
         setFailure(result);
@@ -388,6 +433,96 @@ export default function RichTextEditorTool() {
       setBusy(null);
       setPrintReady(false);
     }
+  };
+
+  /** 插入自动目录：按大纲生成，页码取自当前纸面分页 */
+  const handleInsertToc = () => {
+    if (!editor) return;
+    const headings: { level: number; text: string }[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'heading') {
+        headings.push({ level: Number(node.attrs.level ?? 1), text: node.textContent });
+      }
+    });
+    const pageOf = () => 0; // 分页位置依赖渲染，导出/打印时由分页算法给出
+    const result = buildTableOfContents(headings, pageOf);
+    if (!result.ok) {
+      setFailure({ ok: false, error: 'EMPTY' });
+      return;
+    }
+    const lines = result.value.entries
+      .map((entry) => `${'  '.repeat(entry.level - 1)}${entry.text}`)
+      .join('\n');
+    editor
+      .chain()
+      .focus()
+      .insertContent(
+        `<h2>${t('tools.richText.tocTitle')}</h2><p>${lines.replace(/\n/g, '<br>')}</p>`,
+      )
+      .run();
+  };
+
+  /** 新建批注：以选区文字为引用，正文用简单的 prompt 输入（本地存储） */
+  const handleAddComment = () => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const quote = editor.state.doc.textBetween(from, to, ' ');
+    if (!quote.trim()) return;
+    const text = window.prompt(t('tools.richText.commentPrompt'));
+    if (!text) return;
+    const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    editor.chain().focus().setComment(id).run();
+    setComments((prev) => [
+      ...prev,
+      {
+        id,
+        quote,
+        text,
+        author: t('tools.richText.commentAuthor'),
+        createdAt: Date.now(),
+        resolved: false,
+      },
+    ]);
+  };
+
+  const handleRemoveComment = (id: string) => {
+    setComments((prev) => prev.filter((comment) => comment.id !== id));
+  };
+
+  /** 修订追踪：对选区标记插入/删除（本地记录 + Mark） */
+  const handleTrackChange = (kind: 'insert' | 'delete') => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const text = editor.state.doc.textBetween(from, to, ' ');
+    if (!text.trim()) return;
+    if (kind === 'insert') editor.chain().focus().markTrackedInsert().run();
+    else editor.chain().focus().markTrackedDelete().run();
+    setChanges((prev) => [
+      ...prev,
+      {
+        id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        kind,
+        text,
+        author: t('tools.richText.commentAuthor'),
+        createdAt: Date.now(),
+      },
+    ]);
+  };
+
+  /** 导出 Markdown（纯函数 htmlToMarkdown） */
+  const handleExportMarkdown = () => {
+    if (!editor) return;
+    const markdown = htmlToMarkdown(editor.getHTML());
+    const bytes = new TextEncoder().encode(markdown);
+    downloadBytes(bytes, buildExportFilename(title || 'document', 'md'), 'text/markdown');
+  };
+
+  /** 导出单文件 HTML（内联样式，可直接打开/分享） */
+  const handleExportHtml = () => {
+    if (!editor) return;
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}img{max-width:100%}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}</style></head><body>${editor.getHTML()}</body></html>`;
+    const bytes = new TextEncoder().encode(html);
+    downloadBytes(bytes, buildExportFilename(title || 'document', 'html'), 'text/html');
   };
 
   const resetEditorContent = (doc: { title: string; html: string }) => {
@@ -419,6 +554,17 @@ export default function RichTextEditorTool() {
     setCurrentDocId(id);
     handleClear();
     void listDocuments().then(setDocs);
+  };
+
+  type ToolPanel = 'pageSetup' | 'styles' | 'review';
+
+  /** 工具栏面板互斥切换：同一时间只展开一个，避免工作区被挤压 */
+  const togglePanel = (panel: ToolPanel) => {
+    setLibraryOpen(false);
+    setVersionsOpen(false);
+    setPageSetupOpen(panel === 'pageSetup' ? !pageSetupOpen : false);
+    setStylesOpen(panel === 'styles' ? !stylesOpen : false);
+    setReviewOpen(panel === 'review' ? !reviewOpen : false);
   };
 
   const openLibrary = () => {
@@ -510,70 +656,76 @@ export default function RichTextEditorTool() {
               <Icon name="file" className="h-4 w-4" />
               {t('tools.richText.library')}
             </button>
-            <button
-              type="button"
-              onClick={openVersions}
-              disabled={!docId}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="clock" className="h-4 w-4" />
-              {t('tools.richText.versionHistory')}
-            </button>
           </>
         }
         io={
           <>
+            {/* 导出区：图标按钮 + tooltip，避免文字占位 */}
             <button
               type="button"
               onClick={() => importInputRef.current?.click()}
-              title={t('tools.richText.importHint')}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              title={t('tools.richText.importDocx')}
+              aria-label={t('tools.richText.importDocx')}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
             >
               <Icon name="upload" className="h-4 w-4" />
-              {t('tools.richText.importDocx')}
             </button>
+
+            <span className="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" />
 
             <button
               type="button"
               onClick={() => void handleExportDocx()}
               disabled={busy !== null || isEmpty}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              title={t('tools.richText.exportDocx')}
+              aria-label={t('tools.richText.exportDocx')}
+              className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Icon name="download" className="h-4 w-4" />
-              {busy === 'docx' ? t('tools.richText.exporting') : t('tools.richText.exportDocx')}
+              {busy === 'docx' ? (
+                <span className="text-xs leading-none">…</span>
+              ) : (
+                <Icon name="download" className="h-4 w-4" />
+              )}
             </button>
-
-            <label className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300">
-              {t('tools.richText.pdfMode')}
-              <select
-                value={pdfMode}
-                onChange={(e) => setPdfMode(e.target.value as PdfMode)}
-                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
-              >
-                <option value="text">{t('tools.richText.modeText')}</option>
-                <option value="snapshot">{t('tools.richText.modeSnapshot')}</option>
-              </select>
-            </label>
 
             <button
               type="button"
-              onClick={() => void handleExportPdf()}
+              onClick={() => setPdfDialogOpen(true)}
               disabled={busy !== null || isEmpty}
-              className="inline-flex items-center gap-1.5 rounded-md border border-blue-600 px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950"
+              title={t('tools.richText.exportPdf')}
+              aria-label={t('tools.richText.exportPdf')}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-blue-600 text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950"
             >
-              <Icon name="pdf" className="h-4 w-4" />
-              {busy === 'pdf' ? t('tools.richText.exporting') : t('tools.richText.exportPdf')}
+              {busy === 'pdf' ? (
+                <span className="text-xs leading-none">…</span>
+              ) : (
+                <Icon name="pdf" className="h-4 w-4" />
+              )}
             </button>
 
-            {/* 导出模式说明改为 tooltip，避免占用行内空间 */}
-            <HintTip
-              label={t('tools.richText.pdfMode')}
-              text={
-                pdfMode === 'text'
-                  ? t('tools.richText.modeTextHint')
-                  : t('tools.richText.modeSnapshotHint')
-              }
-            />
+            <span className="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" />
+
+            <button
+              type="button"
+              onClick={handleExportMarkdown}
+              disabled={isEmpty}
+              title={t('tools.richText.exportMarkdown')}
+              aria-label={t('tools.richText.exportMarkdown')}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="markdown" className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportHtml}
+              disabled={isEmpty}
+              title={t('tools.richText.exportHtml')}
+              aria-label={t('tools.richText.exportHtml')}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="html" className="h-4 w-4" />
+            </button>
           </>
         }
         stats={
@@ -602,53 +754,144 @@ export default function RichTextEditorTool() {
         onToggleOutline={() => setOutlineOpen((open) => !open)}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        pageSetupOpen={pageSetupOpen}
+        onTogglePageSetup={() => togglePanel('pageSetup')}
+        onInsertToc={handleInsertToc}
+        tocDisabled={isEmpty}
+        stylesOpen={stylesOpen}
+        onToggleStyles={() => togglePanel('styles')}
+        reviewOpen={reviewOpen}
+        onToggleReview={() => togglePanel('review')}
+        onOpenVersions={openVersions}
+        versionsDisabled={!docId}
+        zoom={zoom}
+        onZoomChange={setZoom}
       />
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        {/* 左列：编辑器 + 导出状态 */}
+        {/* 左列：大纲（文档左侧；窄屏回落到文档上方） */}
+        {outlineOpen && editor ? (
+          <aside className="w-full shrink-0 xl:sticky xl:top-4 xl:w-64 xl:self-start">
+            <OutlinePanel editor={editor} />
+          </aside>
+        ) : null}
+
+        {/* 中间列：编辑器 + 仍位于上方的编辑类面板（查找 / 样式 / 修订） */}
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           {findOpen && editor ? (
             <FindReplacePanel editor={editor} onClose={() => setFindOpen(false)} />
           ) : null}
-          {outlineOpen && editor ? <OutlinePanel editor={editor} /> : null}
 
-          {/* 编辑工作区：按首屏剩余空间定高、内部滚动，长文档不再把页面撑高 */}
-          <div
-            className="rte-editor-viewport"
-            ref={viewportRef}
-            style={viewportMax ? { maxHeight: `${viewportMax}px` } : undefined}
-          >
-            <div
-              className={`mx-auto w-full max-w-[860px] ${
-                viewMode === 'paged' ? 'rte-page-area' : ''
-              }`}
-            >
-              <div
-                ref={surfaceRef}
-                className={`rte-surface relative rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 ${
-                  viewMode === 'paged' ? 'rte-paged' : 'px-8 py-8'
-                }`}
-                style={
-                  viewMode === 'paged' && sheetBottomPx > 0
-                    ? { minHeight: `${sheetBottomPx}px` }
-                    : undefined
-                }
+          {/* 打印纸张尺寸/边距：@page 不支持 CSS 变量，按当前设置动态注入 */}
+          <style>{buildPrintPageCss(metrics, pageSetup.margin)}</style>
+
+          {stylesOpen ? <StylePanel editor={editor} onClose={() => setStylesOpen(false)} /> : null}
+          {reviewOpen ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => handleTrackChange('insert')}
+                className="h-7 rounded-md border border-gray-300 px-2 text-xs transition-colors hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
               >
-                {/* 页视图：每页一张真实 A4 纸面，内容连续流动 */}
-                {viewMode === 'paged' &&
-                  sheetTops.map((top, index) => (
-                    <div
-                      key={index}
-                      className="rte-page-sheet"
-                      style={{ top: `${top}px` }}
-                      aria-hidden="true"
-                    >
-                      <span className="rte-page-badge">
-                        {t('tools.richText.pageBadge', { page: index + 1 })}
-                      </span>
-                    </div>
-                  ))}
-                <EditorContent editor={editor} />
+                {t('tools.richText.markInsert')}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTrackChange('delete')}
+                className="h-7 rounded-md border border-gray-300 px-2 text-xs transition-colors hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                {t('tools.richText.markDelete')}
+              </button>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {t('tools.richText.markHint')}
+              </span>
+            </div>
+          ) : null}
+          {reviewOpen ? (
+            <ReviewPanel
+              comments={comments}
+              changes={changes}
+              onAddComment={handleAddComment}
+              onRemoveComment={handleRemoveComment}
+              onAcceptAll={() => {
+                editor?.chain().focus().acceptAllTracked().run();
+                setChanges([]);
+              }}
+              onRejectAll={() => {
+                editor?.chain().focus().rejectAllTracked().run();
+                setChanges([]);
+              }}
+              onClose={() => setReviewOpen(false)}
+            />
+          ) : null}
+
+          {/* 编辑工作区：固定为「首屏剩余空间」高度并内部滚动（长文档不撑高页面）。
+              页面视图的灰色工作台挂在此容器上，保证铺满整个可滚动区域。 */}
+          <div
+            className={`rte-editor-viewport${viewMode === 'paged' ? ' rte-viewport-paged' : ''}`}
+            ref={viewportRef}
+            style={viewportMax ? { height: `${viewportMax}px` } : undefined}
+            onMouseDown={(event) => {
+              if (!editor) return;
+              // 编辑器内部的点击由 ProseMirror 插件处理；
+              // 这里兜底浮动图片绘制在内容盒子之外（工作台区域）时的选中与拖动
+              if (editor.view.dom.contains(event.target as Node)) return;
+              handleFloatingImagePointerDown(editor.view, event.nativeEvent);
+            }}
+          >
+            {/* 图片缩放手柄：覆盖层（内容坐标系，滚动自动跟随） */}
+            <ImageResizeOverlay editor={editor} viewportRef={viewportRef} />
+            {/* 缩放层：CSS zoom 参与布局（滚动高度正确），data-rte-zoom 供分页测量还原 */}
+            <div data-rte-zoom={zoom} style={{ zoom, ...(metrics.cssVars as React.CSSProperties) }}>
+              <div
+                className={`mx-auto w-full max-w-[860px] ${
+                  viewMode === 'paged' ? 'rte-page-area' : ''
+                }`}
+              >
+                <div
+                  ref={surfaceRef}
+                  className={`rte-surface relative rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 ${
+                    viewMode === 'paged' ? 'rte-paged' : 'px-8 py-8'
+                  }`}
+                  style={
+                    viewMode === 'paged' && sheetBottomPx > 0
+                      ? { minHeight: `${sheetBottomPx}px` }
+                      : undefined
+                  }
+                >
+                  {/* 页视图：每页一张真实纸面，内容连续流动 */}
+                  {viewMode === 'paged' &&
+                    sheetTops.map((top, index) => (
+                      <div
+                        key={index}
+                        className="rte-page-sheet"
+                        style={{ top: `${top}px` }}
+                        aria-hidden="true"
+                      >
+                        {/* 页眉 / 页脚 / 页码：与 Word 导出、快照 PDF 共用同一份设置 */}
+                        {pageSetup.header.trim() ? (
+                          <span className="rte-page-header">{pageSetup.header}</span>
+                        ) : null}
+                        {pageSetup.footer.trim() || pageSetup.showPageNumber ? (
+                          <span className="rte-page-footer">
+                            {pageSetup.footer.trim()}
+                            {pageSetup.showPageNumber ? (
+                              <span className="rte-page-footer-number">
+                                {t('tools.richText.pageBadge', { page: index + 1 })}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : null}
+                        {/* 角标仅在页脚未显示页码时出现，避免重复 */}
+                        {!pageSetup.showPageNumber && !pageSetup.footer.trim() ? (
+                          <span className="rte-page-badge">
+                            {t('tools.richText.pageBadge', { page: index + 1 })}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))}
+                  <EditorContent editor={editor} />
+                </div>
               </div>
             </div>
           </div>
@@ -656,9 +899,16 @@ export default function RichTextEditorTool() {
           {busy === 'pdf' && <ProgressBar value={progress} label={t('tools.richText.exporting')} />}
         </div>
 
-        {/* 右侧栏：文档库 / 历史版本（工具栏之下、编辑器右侧；窄屏回落到编辑器上方） */}
-        {libraryOpen || versionsOpen ? (
+        {/* 右列：页面设置 + 文档库 / 历史版本（文档右侧；窄屏回落到下方） */}
+        {pageSetupOpen || libraryOpen || versionsOpen ? (
           <aside className="w-full shrink-0 xl:w-80">
+            {pageSetupOpen ? (
+              <PageSetupPanel
+                setup={pageSetup}
+                onChange={setPageSetup}
+                onClose={() => setPageSetupOpen(false)}
+              />
+            ) : null}
             {libraryOpen ? (
               <DocLibraryPanel
                 currentDocId={docId}
@@ -748,6 +998,17 @@ export default function RichTextEditorTool() {
             .join(' ')}
         </p>
       )}
+
+      <PdfModeDialog
+        open={pdfDialogOpen}
+        initialMode={pdfMode}
+        busy={busy !== null}
+        onCancel={() => setPdfDialogOpen(false)}
+        onConfirm={(mode) => {
+          setPdfDialogOpen(false);
+          void handleExportPdf(mode);
+        }}
+      />
 
       {printReady && <PrintLayer html={snapshotHtml} flowRef={flowRef} />}
     </div>

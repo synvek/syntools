@@ -1,8 +1,24 @@
+import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
-import { planPageBlocks, scanDocxExportLosses } from './core';
+import { CONTENT_WIDTH_PX, planPageBlocks, scanDocxExportLosses } from './core';
 import { exportDocxBlob } from './docx';
 
 /** docx 导出层测试：嵌套列表 / 合并单元格 / 丢失清单 / 分页符（jsdom 环境） */
+
+// jsdom 的 Blob 没有 arrayBuffer()，用 FileReader 读二进制
+const blobToArrayBuffer = (blob: Blob): Promise<ArrayBuffer> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+
+/** 读取导出文档的 word/document.xml */
+async function readDocumentXml(blob: Blob): Promise<string> {
+  const zip = await JSZip.loadAsync(await blobToArrayBuffer(blob));
+  return (await zip.file('word/document.xml')?.async('string')) ?? '';
+}
 
 describe('planPageBlocks（编辑态分页规划）', () => {
   it('内容不足一页时不分页', () => {
@@ -91,5 +107,88 @@ describe('exportDocxBlob', () => {
       't',
     );
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('docx 导出：行内字体与字号', () => {
+  it('显式设置的字体名与字号写入 Word 行属性', async () => {
+    const html =
+      '<p><span style="font-family: &quot;Songti SC&quot;, serif; font-size: 24px;">样张</span></p>';
+    const result = await exportDocxBlob(html, '字体测试');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('Songti SC');
+    // 24px → 36 半磅（1px = 0.75pt，半磅 = pt × 2）
+    expect(xml).toContain('w:sz w:val="36"');
+  });
+
+  it('通用族关键字不会被当成具体字体写入', async () => {
+    const result = await exportDocxBlob(
+      '<p><span style="font-family: sans-serif;">plain</span></p>',
+      't',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).not.toContain('sans-serif');
+  });
+});
+
+describe('docx 导出：图片层级', () => {
+  // 1×1 透明 PNG
+  const PNG =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
+
+  it('嵌入型图片导出为行内图片（wp:inline）', async () => {
+    const result = await exportDocxBlob(`<p><img src="${PNG}"></p>`, 'inline');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('<wp:inline');
+    expect(xml).not.toContain('<wp:anchor');
+  });
+
+  it('衬于文字下方导出为浮动图片（anchor + behindDoc）', async () => {
+    const floating = `<img src="${PNG}" data-layer="behind" style="left: 10px; top: 20px">`;
+    const result = await exportDocxBlob(`<p>文字</p>${floating}`, 'float');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('<wp:anchor');
+    expect(xml).toContain('behindDoc="1"');
+    expect(xml).toContain('wrapNone');
+  });
+
+  it('图片像素宽度写入 Word 尺寸（px → EMU）', async () => {
+    const result = await exportDocxBlob(
+      `<img src="${PNG}" style="width: 300px; height: auto">`,
+      'w',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    // 300px × 9525 EMU/px
+    expect(xml).toContain('cx="2857500"');
+  });
+
+  it('旧版百分比宽度导出时换算为绝对尺寸', async () => {
+    const result = await exportDocxBlob(`<img src="${PNG}" style="width: 50%">`, 'w');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    // 换算链路：50% → 像素 → EMU（docx 用未取整的像素值换算 EMU）
+    const expected = Math.round(0.5 * CONTENT_WIDTH_PX * 9525);
+    expect(xml).toContain(`cx="${expected}"`);
+  });
+
+  it('浮于文字上方保持不遮挡文字排版的 wrapNone，但不 behindDoc', async () => {
+    const floating = `<img src="${PNG}" data-layer="front" style="left: 0px; top: 0px">`;
+    const result = await exportDocxBlob(`<p>文字</p>${floating}`, 'front');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('<wp:anchor');
+    expect(xml).not.toContain('behindDoc="1"');
   });
 });

@@ -50,7 +50,7 @@ export function OutlinePanel({ editor }: OutlinePanelProps) {
     <nav
       data-testid="rich-text-outline"
       aria-label={t('tools.richText.outline')}
-      className="max-h-44 overflow-auto rounded-lg border border-gray-200 bg-white p-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+      className="max-h-[70vh] w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
     >
       {items.map((item, index) => (
         <button

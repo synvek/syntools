@@ -4,6 +4,8 @@ import type { Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { planPageBlocks } from './core';
+import { isFloatingImageElement } from './imageLayer';
+import { MM_TO_PX, SHEET_GAP_MM, pageMetricsToPx, type PageMetrics } from './pageSetup';
 
 /**
  * Word 式分页编辑视图（ProseMirror 正统实现）：
@@ -19,15 +21,20 @@ import { planPageBlocks } from './core';
  * 4. 把每页对齐到一张真实 A4 纸面（210mm × 297mm）。
  */
 
-/** CSS 规范：1in = 96px，1mm = 96/25.4px */
-const MM_TO_PX = 96 / 25.4;
-/** A4 纸高 297mm；内容区高 = 297 - 20*2 = 257mm */
+/** 默认页高（A4 纵向），供未接入页面设置时的兜底 */
 export const PAGE_HEIGHT_PX = 297 * MM_TO_PX;
-export const PAGE_CONTENT_PX = 257 * MM_TO_PX;
-/** 页间空白 = 页边距补偿 40mm + 纸间留白 12mm */
-export const PAGE_GAP_PX = PAGE_HEIGHT_PX - PAGE_CONTENT_PX + 12 * MM_TO_PX;
 
 const pageLayoutKey = new PluginKey<PageLayoutState>('richTextPageLayout');
+
+/** 当前页面几何（mm）→ 像素，随页面设置变化 */
+export type PageMetricsGetter = () => PageMetrics;
+
+/** 读取视图缩放系数（CSS zoom）：rect 会按缩放放大，测量时必须还原成 CSS px */
+function readZoomScale(view: EditorView): number {
+  const host = view.dom.closest('[data-rte-zoom]');
+  const raw = Number.parseFloat(host?.getAttribute('data-rte-zoom') ?? '1');
+  return Number.isFinite(raw) && raw > 0 ? raw : 1;
+}
 
 interface PageLayoutState {
   /** 分页起始块的文档位置 */
@@ -37,10 +44,8 @@ interface PageLayoutState {
   deco: DecorationSet;
 }
 
-/** 相邻两页纸的固定间距 = 纸间留白 12mm */
-const SHEET_GAP_PX = 12 * MM_TO_PX;
-/** 相邻两页页首块自然位置之差的期望值 = 纸高 + 纸间留白 */
-const PAGE_ADVANCE_PX = PAGE_HEIGHT_PX + SHEET_GAP_PX;
+/** 相邻两页纸的固定间距 = 纸间留白 12mm（px） */
+const SHEET_GAP_PX = SHEET_GAP_MM * MM_TO_PX;
 
 function isGapElement(el: Element): boolean {
   return el.hasAttribute('data-page-gap');
@@ -84,9 +89,14 @@ function makeGapElement(height: number): HTMLElement {
   return el;
 }
 
-function buildDecorations(doc: PMNode, positions: number[], heights: number[]): DecorationSet {
+function buildDecorations(
+  doc: PMNode,
+  positions: number[],
+  heights: number[],
+  fallbackGap: number,
+): DecorationSet {
   const widgets = positions.map((pos, i) =>
-    Decoration.widget(pos, () => makeGapElement(heights[i] ?? PAGE_GAP_PX), { side: -1 }),
+    Decoration.widget(pos, () => makeGapElement(heights[i] ?? fallbackGap), { side: -1 }),
   );
   return DecorationSet.create(doc, widgets);
 }
@@ -96,7 +106,10 @@ function buildDecorations(doc: PMNode, positions: number[], heights: number[]): 
  * widget 高度按需计算：让每页首块恰好落在 k × (纸高 + 留白) 的自然位置上——
  * 短页（显式分页符等）自动加高空白，保证纸面间距恒定、永不重叠。
  */
-function planLayout(view: EditorView): { positions: number[]; heights: number[] } | null {
+function planLayout(
+  view: EditorView,
+  metrics: PageMetrics,
+): { positions: number[]; heights: number[] } | null {
   const state = pageLayoutKey.getState(view.state) ?? {
     positions: [],
     heights: [],
@@ -106,8 +119,10 @@ function planLayout(view: EditorView): { positions: number[]; heights: number[] 
   if (!paged) {
     return state.positions.length > 0 ? { positions: [], heights: [] } : null;
   }
+  const px = pageMetricsToPx(metrics);
+  const scale = readZoomScale(view);
   // 读取块几何（用 rect 取亚像素值，避免 offsetTop 取整逐块累积误差）：
-  // widget 高度从自然位置中扣除，保证规划输入与打印路径完全一致
+  // 1) 除以缩放系数还原为 CSS px；2) 扣除页间空白高度，还原「自然排版」位置
   const domTop = view.dom.getBoundingClientRect().top;
   let gapPx = 0;
   const elements: HTMLElement[] = [];
@@ -115,14 +130,21 @@ function planLayout(view: EditorView): { positions: number[]; heights: number[] 
   Array.from(view.dom.children).forEach((node) => {
     const el = node as HTMLElement;
     const rect = el.getBoundingClientRect();
+    const height = rect.height / scale;
     if (isGapElement(el)) {
-      gapPx += rect.height;
+      gapPx += height;
       return;
     }
     elements.push(el);
-    items.push({ top: rect.top - domTop - gapPx, height: rect.height });
+    // 浮动图片（浮于文字上方 / 衬于文字下方）脱离文字流：按零高度参与，
+    // 否则图片的绝对位置会被误判成「块跨页」而插入多余页间空白。
+    if (isFloatingImageElement(el)) {
+      items.push({ top: 0, height: 0 });
+      return;
+    }
+    items.push({ top: (rect.top - domTop) / scale - gapPx, height });
   });
-  const starts = planPageStarts(elements, items, PAGE_CONTENT_PX);
+  const starts = planPageStarts(elements, items, px.contentHeightPx);
 
   // 块索引 → 文档位置 + 每个页间空白的高度
   const positions: number[] = [];
@@ -132,7 +154,7 @@ function planLayout(view: EditorView): { positions: number[]; heights: number[] 
   view.state.doc.forEach((_, offset) => {
     if (starts.includes(index)) {
       positions.push(offset);
-      heights.push(Math.max(SHEET_GAP_PX, PAGE_ADVANCE_PX - (items[index].top - prevNaturalTop)));
+      heights.push(Math.max(SHEET_GAP_PX, px.advancePx - (items[index].top - prevNaturalTop)));
       prevNaturalTop = items[index].top;
     }
     index += 1;
@@ -152,22 +174,26 @@ function planLayout(view: EditorView): { positions: number[]; heights: number[] 
 }
 
 /** 每页纸面的 top（wrapper 坐标）：解析式，恒定间距 */
-function sheetTopsFor(count: number): number[] {
-  return Array.from({ length: count }, (_, i) => i * PAGE_ADVANCE_PX);
+function sheetTopsFor(count: number, metrics: PageMetrics): number[] {
+  const px = pageMetricsToPx(metrics);
+  return Array.from({ length: count }, (_, i) => i * px.advancePx);
 }
 
 /**
  * 页面布局插件：仅在 .rte-paged 容器内生效。
  * onSheetTops 把每页纸面位置回调给 React（渲染纸面层）。
+ * getMetrics 提供当前页面设置（纸张/边距/方向），随设置变化自动重排。
  */
 export function createPageLayoutPlugin(
   onSheetTops: (tops: number[]) => void,
+  getMetrics: PageMetricsGetter,
 ): Plugin<PageLayoutState> {
   let raf = 0;
   let fontTimer = 0;
 
   const measure = (view: EditorView) => {
-    const plan = planLayout(view);
+    const metrics = getMetrics();
+    const plan = planLayout(view, metrics);
     if (plan) {
       const { positions, heights } = plan;
       // 延迟到宏任务后 dispatch，避免在 PM update 流程内同步 dispatch
@@ -190,7 +216,7 @@ export function createPageLayoutPlugin(
     }
     const state = pageLayoutKey.getState(view.state);
     const pageCount = (plan ? plan.positions.length : (state?.positions.length ?? 0)) + 1;
-    onSheetTops(sheetTopsFor(pageCount));
+    onSheetTops(sheetTopsFor(pageCount, metrics));
   };
   const schedule = (view: EditorView) => {
     cancelAnimationFrame(raf);
@@ -208,7 +234,12 @@ export function createPageLayoutPlugin(
           return {
             positions: meta.positions,
             heights: meta.heights,
-            deco: buildDecorations(tr.doc, meta.positions, meta.heights),
+            deco: buildDecorations(
+              tr.doc,
+              meta.positions,
+              meta.heights,
+              pageMetricsToPx(getMetrics()).gapPx,
+            ),
           };
         }
         if (!tr.docChanged) return value;
@@ -244,20 +275,24 @@ export function createPageLayoutPlugin(
  * 一旦用 margin 把块"顶"到目标位置，打印预览就会多出空白页或整段下移，
  * 与屏幕分页明显不一致。
  */
-export function applyPagedBreaks(dom: HTMLElement): void {
+export function applyPagedBreaks(dom: HTMLElement, metrics: PageMetrics): void {
   const children = Array.from(dom.children) as HTMLElement[];
   children.forEach((el) => {
     el.style.marginTop = '';
     el.removeAttribute('data-page-start');
   });
   if (children.length === 0) return;
-  // 归一化到内容原点（打印流的 offsetParent 未必是容器本身）
-  const base = children[0].getBoundingClientRect().top;
+  // 归一化到内容原点（打印流的 offsetParent 未必是容器本身）。
+  // 原点取第一个「参与文字流」的块：浮动图片是绝对定位，不能作为基准。
+  const flowChild = children.find((el) => !isFloatingImageElement(el)) ?? children[0];
+  const base = flowChild.getBoundingClientRect().top;
   const items = children.map((el) => {
+    // 浮动图片脱离文字流：按零高度参与，不参与打印分页
+    if (isFloatingImageElement(el)) return { top: 0, height: 0 };
     const rect = el.getBoundingClientRect();
     return { top: rect.top - base, height: rect.height };
   });
-  const starts = planPageStarts(children, items, PAGE_CONTENT_PX);
+  const starts = planPageStarts(children, items, pageMetricsToPx(metrics).contentHeightPx);
   starts.forEach((index) => {
     children[index].setAttribute('data-page-start', 'true');
   });

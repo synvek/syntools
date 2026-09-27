@@ -174,7 +174,9 @@ export function sanitizeFilename(name: string): string {
 }
 
 /** 生成导出文件名（保留用户原标题） */
-export function buildExportFilename(title: string, ext: 'docx' | 'pdf'): string {
+export type ExportExt = 'docx' | 'pdf' | 'md' | 'html';
+
+export function buildExportFilename(title: string, ext: ExportExt): string {
   return `${sanitizeFilename(title)}.${ext}`;
 }
 
@@ -228,6 +230,12 @@ export function planPageBlocks(
   });
   return starts;
 }
+
+/**
+ * A4 正文内容宽度（170mm = 页宽 210mm − 左右各 20mm）对应的 CSS 像素。
+ * 图片宽度统一以像素存储，工具栏的百分比预设、旧版百分比数据的换算都用它作基准。
+ */
+export const CONTENT_WIDTH_PX = Math.round((170 * 96) / 25.4);
 
 /** Word 导出时的已知损耗清单 */
 export interface DocxExportLosses {

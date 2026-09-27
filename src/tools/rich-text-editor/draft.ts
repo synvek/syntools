@@ -1,4 +1,5 @@
 import { MAX_IMPORT_BYTES } from './core';
+import type { PageSetupConfig } from './pageSetup';
 
 /** 本地草稿存储：键遵循 syntools:* 规范，内容不离开浏览器 */
 
@@ -14,6 +15,12 @@ export interface RichTextDraft {
   html: string;
   /** 视图偏好（可选，向后兼容 v1 旧草稿） */
   view?: ViewMode;
+  /** 页面设置（纸张/边距/方向/页眉页脚），可选 */
+  pageSetup?: Partial<PageSetupConfig>;
+  /** 视图缩放（1 = 100%），可选 */
+  zoom?: number;
+  /** 上次选择的 PDF 导出模式，可选 */
+  pdfMode?: 'text' | 'snapshot';
 }
 
 export function readDraft(): RichTextDraft | null {
@@ -26,6 +33,10 @@ export function readDraft(): RichTextDraft | null {
       title: typeof parsed.title === 'string' ? parsed.title : '',
       html: parsed.html,
       view: parsed.view === 'paged' ? 'paged' : 'flow',
+      pageSetup:
+        typeof parsed.pageSetup === 'object' && parsed.pageSetup ? parsed.pageSetup : undefined,
+      zoom: typeof parsed.zoom === 'number' && parsed.zoom > 0 ? parsed.zoom : 1,
+      pdfMode: parsed.pdfMode === 'snapshot' ? 'snapshot' : 'text',
     };
   } catch {
     return null;
