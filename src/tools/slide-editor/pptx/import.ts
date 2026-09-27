@@ -528,7 +528,12 @@ async function parseSpTreeNode(
   }
 }
 
-/** grpSp：先解析子节点，再按 chOff/chExt 把子坐标换算到组内绝对坐标 */
+/**
+ * grpSp：先解析子节点，再按 chOff/chExt 把子坐标换算到**组内相对坐标**。
+ *
+ * 模型约定 children 相对 group 原点存储（见 `GroupElement` 注释），
+ * 因此这里不再叠加 groupX/groupY —— 否则渲染时会被二次偏移。
+ */
 async function parseGroup(
   node: XmlNode,
   ctx: ImportContext,
@@ -562,8 +567,8 @@ async function parseGroup(
 
   const mapped = children.map((child) => {
     const next = { ...child } as SlideElement;
-    next.x = groupX + (child.x - offX) * sx;
-    next.y = groupY + (child.y - offY) * sy;
+    next.x = (child.x - offX) * sx;
+    next.y = (child.y - offY) * sy;
     next.width = child.width * sx;
     next.height = child.height * sy;
     return next;

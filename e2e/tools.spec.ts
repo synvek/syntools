@@ -85,6 +85,63 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: '放映', exact: true })).toBeVisible();
   });
+
+  /** 属性面板按分区标题定位：「对齐」分区与「文字」分区都有左/中/右按钮，需限定作用域 */
+  function section(page: Page, title: string) {
+    return page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
+  }
+
+  test('对齐：全选两个元素后左对齐，X 坐标收敛到最左侧元素', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    await page.getByRole('button', { name: '文本框' }).click();
+    await page.getByRole('button', { name: '矩形', exact: true }).click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(page.getByText('已选中 2 个元素')).toBeVisible();
+
+    // 面板展示最后选中的矩形（居中 240 宽 → x=520），文本框 x=400 更靠左
+    const xInput = page.getByLabel('X 坐标').first();
+    await expect(xInput).toHaveValue('520');
+
+    await section(page, '对齐').getByRole('button', { name: '左对齐' }).click();
+    await expect(xInput).toHaveValue('400');
+  });
+
+  test('组合 → 取消组合：选中数 2 → 1 → 2', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    await page.getByRole('button', { name: '文本框' }).click();
+    await page.getByRole('button', { name: '矩形', exact: true }).click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(page.getByText('已选中 2 个元素')).toBeVisible();
+
+    const arrange = section(page, '排列');
+    await arrange.getByRole('button', { name: '组合', exact: true }).click();
+    await expect(page.getByText('已选中 1 个元素')).toBeVisible();
+
+    await arrange.getByRole('button', { name: '取消组合' }).click();
+    await expect(page.getByText('已选中 2 个元素')).toBeVisible();
+  });
+
+  test('剪贴板：复制粘贴后元素数增加', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    await page.getByRole('button', { name: '文本框' }).click();
+    await expect(page.getByText('已选中 1 个元素')).toBeVisible();
+
+    await page.keyboard.press('ControlOrMeta+c');
+    await page.keyboard.press('ControlOrMeta+v');
+    await expect(page.getByText('已选中 1 个元素')).toBeVisible();
+
+    // 全选应命中原件 + 副本
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(page.getByText('已选中 2 个元素')).toBeVisible();
+  });
 });
 
 // 流程图编辑器（zh-CN）

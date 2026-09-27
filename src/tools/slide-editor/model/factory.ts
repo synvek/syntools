@@ -220,9 +220,19 @@ export function cloneDoc(doc: SlideDoc): SlideDoc {
   };
 }
 
-/** 深拷贝单个元素（复制/粘贴与历史回放使用） */
+/**
+ * 深拷贝单个元素（复制/粘贴与历史回放使用）。
+ *
+ * `newId` 为真时**递归**为组合元素的所有后代换新 id —— 否则复制一个 group 后，
+ * 副本与原件（以及取消组合后的两个副本）会出现重复 id，导致选中与命中错乱。
+ */
 export function cloneElement<T extends SlideElement>(element: T, newId = false): T {
   const copy = deepClone(element);
-  if (newId) copy.id = createId('el');
+  if (newId) {
+    copy.id = createId('el');
+    if (copy.type === 'group') {
+      copy.children = copy.children.map((child) => cloneElement(child, true));
+    }
+  }
   return copy;
 }

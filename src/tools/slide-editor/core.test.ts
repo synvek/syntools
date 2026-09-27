@@ -12,10 +12,14 @@ import {
   resolvePresetGeometry,
   starPoints,
   computeSnap,
+  computeAlign,
+  computeDistribute,
+  unionBounds,
   normalizeAngle,
   containInto,
   fitScale,
   buildExportFilename,
+  type AlignBox,
   type Guide,
 } from './core';
 
@@ -150,5 +154,78 @@ describe('工具函数', () => {
   it('导出文件名清洗', () => {
     expect(buildExportFilename('我的 演示/v1', 'pptx')).toBe('我的 演示v1.pptx');
     expect(buildExportFilename('   ', 'pptx')).toBe('presentation.pptx');
+  });
+});
+
+describe('对齐与分布', () => {
+  const page: AlignBox = { x: 0, y: 0, width: 1280, height: 720 };
+
+  it('unionBounds 求并集包围盒', () => {
+    expect(
+      unionBounds([
+        { x: 10, y: 20, width: 100, height: 50 },
+        { x: 200, y: 5, width: 60, height: 40 },
+      ]),
+    ).toEqual({ x: 10, y: 5, width: 250, height: 65 });
+    expect(unionBounds([])).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+  });
+
+  it('多选左对齐：对齐到选中元素的包围盒左边缘', () => {
+    const targets = [
+      { x: 10, y: 0, width: 100, height: 50 },
+      { x: 300, y: 80, width: 60, height: 40 },
+    ];
+    expect(computeAlign('left', targets, unionBounds(targets))).toEqual([
+      { dx: 0, dy: 0 },
+      { dx: -290, dy: 0 },
+    ]);
+  });
+
+  it('单选对齐：对齐到页面', () => {
+    const single = [{ x: 120, y: 60, width: 200, height: 100 }];
+    expect(computeAlign('left', single, page)).toEqual([{ dx: -120, dy: 0 }]);
+    expect(computeAlign('right', single, page)).toEqual([{ dx: 960, dy: 0 }]);
+    expect(computeAlign('hcenter', single, page)).toEqual([{ dx: 420, dy: 0 }]);
+    expect(computeAlign('top', single, page)).toEqual([{ dx: 0, dy: -60 }]);
+    expect(computeAlign('bottom', single, page)).toEqual([{ dx: 0, dy: 560 }]);
+    expect(computeAlign('vcenter', single, page)).toEqual([{ dx: 0, dy: 250 }]);
+  });
+
+  it('等间距分布：首末不动，中间间隙相等', () => {
+    // 三个等宽 100 的盒子，跨度 500 → 间隙 (500-300)/2 = 100
+    const targets = [
+      { x: 0, y: 0, width: 100, height: 50 },
+      { x: 50, y: 0, width: 100, height: 50 },
+      { x: 400, y: 0, width: 100, height: 50 },
+    ];
+    const deltas = computeDistribute('horizontal', targets);
+    expect(deltas[0]).toEqual({ dx: 0, dy: 0 });
+    expect(deltas[2]).toEqual({ dx: 0, dy: 0 });
+    expect(targets[1].x + deltas[1].dx).toBe(200);
+  });
+
+  it('少于 3 个对象时分布为空操作', () => {
+    const targets = [
+      { x: 0, y: 0, width: 100, height: 50 },
+      { x: 400, y: 0, width: 100, height: 50 },
+    ];
+    expect(computeDistribute('horizontal', targets)).toEqual([
+      { dx: 0, dy: 0 },
+      { dx: 0, dy: 0 },
+    ]);
+  });
+
+  it('纵向分布按 y 轴排序', () => {
+    const targets = [
+      { x: 0, y: 0, width: 100, height: 40 },
+      { x: 0, y: 30, width: 100, height: 40 },
+      { x: 0, y: 300, width: 100, height: 40 },
+    ];
+    const deltas = computeDistribute('vertical', targets);
+    // 跨度 340、总高 120 → 间隙 110，中间元素落到 y=150（首末保持 0 与 300）
+    expect(deltas[0].dy).toBe(0);
+    expect(deltas[2].dy).toBe(0);
+    expect(targets[1].y + deltas[1].dy).toBe(150);
+    expect(deltas.every((item) => item.dx === 0)).toBe(true);
   });
 });

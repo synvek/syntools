@@ -415,6 +415,111 @@ export function computeSnap(
   return { x: moving.x + dx, y: moving.y + dy, guides };
 }
 
+/* ----------------------------- 对齐与分布 ----------------------------- */
+
+/** 元素对齐方式：left/right/top/bottom 对齐到基准边，hcenter/vcenter 对齐到基准中线 */
+export type AlignMode = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+
+/** 分布轴向：等间距分布（首末元素位置不变） */
+export type DistributeAxis = 'horizontal' | 'vertical';
+
+export interface AlignBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** 一组矩形的并集包围盒 */
+export function unionBounds(boxes: AlignBox[]): AlignBox {
+  if (boxes.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const box of boxes) {
+    minX = Math.min(minX, box.x);
+    minY = Math.min(minY, box.y);
+    maxX = Math.max(maxX, box.x + box.width);
+    maxY = Math.max(maxY, box.y + box.height);
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/**
+ * 计算对齐位移：把每个矩形按 mode 对齐到 bounds 的对应边/中线。
+ *
+ * 调用方决定 bounds 语义：多选时传选中元素的并集包围盒（对齐所选对象），
+ * 单选时传页面矩形（对齐到幻灯片），与 PowerPoint / WPS 的行为一致。
+ */
+export function computeAlign(
+  mode: AlignMode,
+  targets: AlignBox[],
+  bounds: AlignBox,
+): { dx: number; dy: number }[] {
+  return targets.map((target) => {
+    let dx = 0;
+    let dy = 0;
+    switch (mode) {
+      case 'left':
+        dx = bounds.x - target.x;
+        break;
+      case 'right':
+        dx = bounds.x + bounds.width - (target.x + target.width);
+        break;
+      case 'hcenter':
+        dx = bounds.x + bounds.width / 2 - (target.x + target.width / 2);
+        break;
+      case 'top':
+        dy = bounds.y - target.y;
+        break;
+      case 'bottom':
+        dy = bounds.y + bounds.height - (target.y + target.height);
+        break;
+      case 'vcenter':
+        dy = bounds.y + bounds.height / 2 - (target.y + target.height / 2);
+        break;
+    }
+    return { dx: Math.round(dx), dy: Math.round(dy) };
+  });
+}
+
+/**
+ * 计算等间距分布位移：保持首末元素不动，让中间元素的间隙相等。
+ * 少于 3 个对象时无可分布间隙，返回零位移。
+ */
+export function computeDistribute(
+  axis: DistributeAxis,
+  targets: AlignBox[],
+): { dx: number; dy: number }[] {
+  const zeros = targets.map(() => ({ dx: 0, dy: 0 }));
+  if (targets.length < 3) return zeros;
+
+  const horizontal = axis === 'horizontal';
+  const order = targets
+    .map((box, index) => ({ box, index }))
+    .sort((a, b) =>
+      horizontal ? a.box.x - b.box.x || a.box.y - b.box.y : a.box.y - b.box.y || a.box.x - b.box.x,
+    );
+
+  const first = order[0].box;
+  const last = order[order.length - 1].box;
+  const span = horizontal ? last.x + last.width - first.x : last.y + last.height - first.y;
+  const total = targets.reduce((sum, box) => sum + (horizontal ? box.width : box.height), 0);
+  const gap = (span - total) / (targets.length - 1);
+
+  let cursor = horizontal ? first.x : first.y;
+  for (const entry of order) {
+    const size = horizontal ? entry.box.width : entry.box.height;
+    const offset = cursor - (horizontal ? entry.box.x : entry.box.y);
+    zeros[entry.index] = horizontal
+      ? { dx: Math.round(offset), dy: 0 }
+      : { dx: 0, dy: Math.round(offset) };
+    cursor += size + gap;
+  }
+  return zeros;
+}
+
 /** 把角度收敛到 [0,360) */
 export function normalizeAngle(deg: number): number {
   const value = deg % 360;

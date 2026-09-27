@@ -13,8 +13,41 @@ interface Offscreen {
   layer: Konva.Layer;
 }
 
+/** 缓存条目上限（LRU）：长文档下避免 dataURL 无限堆积 */
+const CACHE_LIMIT = 240;
+
 let offscreen: Offscreen | null = null;
 const cache = new Map<string, string>();
+
+/** 命中后移到队尾，保持 Map 的插入顺序即 LRU 顺序 */
+function touch(key: string, value: string): void {
+  cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > CACHE_LIMIT) {
+    const oldest = cache.keys().next();
+    if (oldest.done) break;
+    cache.delete(oldest.value);
+  }
+}
+
+/**
+ * 单页内容指纹：只依赖「会影响这一页渲染结果」的字段。
+ *
+ * 不能用 doc.version —— 它是全局自增的，改任意一页都会让全部页的缓存失效。
+ * 也不能带上 media 的 bytes/url 等运行态字段，否则必然 miss。
+ */
+function slideFingerprint(slide: Slide): string {
+  const payload = JSON.stringify({
+    background: slide.background ?? '',
+    elements: slide.elements,
+  });
+  let hash = 2166136261;
+  for (let i = 0; i < payload.length; i += 1) {
+    hash ^= payload.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
 
 function ensureOffscreen(): Offscreen | null {
   if (offscreen) return offscreen;
@@ -40,9 +73,12 @@ function ensureOffscreen(): Offscreen | null {
 export function renderThumbnail(doc: SlideDoc, slide: Slide, width = 240): string | undefined {
   const target = ensureOffscreen();
   if (!target) return undefined;
-  const key = `${slide.id}:${doc.version}:${width}`;
+  const key = `${slide.id}:${slideFingerprint(slide)}:${width}`;
   const cached = cache.get(key);
-  if (cached) return cached;
+  if (cached) {
+    touch(key, cached);
+    return cached;
+  }
 
   const scale = width / doc.width;
   const height = Math.round(doc.height * scale);
@@ -59,13 +95,15 @@ export function renderThumbnail(doc: SlideDoc, slide: Slide, width = 240): strin
   target.layer.add(background);
 
   for (const element of slide.elements) {
+    // 隐藏元素不渲染，与画布 / 导出保持一致
+    if (element.visible === false) continue;
     const node = createElementNode(element, { media: doc.media, onImageReady: () => undefined });
     node.listening(false);
     target.layer.add(node);
   }
   target.layer.draw();
   const url = target.stage.toDataURL({ pixelRatio: 1, mimeType: 'image/png' });
-  cache.set(key, url);
+  touch(key, url);
   return url;
 }
 

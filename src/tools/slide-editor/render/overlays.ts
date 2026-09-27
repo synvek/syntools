@@ -7,14 +7,34 @@ import type { Guide } from '../core';
  * 框选矩形放在未缩放的覆盖层内，坐标即 stage 坐标。
  */
 
+export interface TransformChange {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+
 export interface TransformerOptions {
-  onTransformEnd: (change: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    rotation: number;
-  }) => void;
+  /** 多选时返回全部受影响元素的落点，调用方需逐个写回（否则未写回的元素会在下次 sync 复位） */
+  onTransformEnd: (changes: TransformChange[]) => void;
+}
+
+/** Shift 键状态：按下时 Transformer 走等比缩放（与 PowerPoint / WPS 一致） */
+let shiftHeld = false;
+let shiftBound = false;
+function bindShiftTracker(): void {
+  if (shiftBound || typeof window === 'undefined') return;
+  shiftBound = true;
+  const sync = (event: KeyboardEvent) => {
+    shiftHeld = event.shiftKey;
+  };
+  window.addEventListener('keydown', sync);
+  window.addEventListener('keyup', sync);
+  window.addEventListener('blur', () => {
+    shiftHeld = false;
+  });
 }
 
 export function createTransformer(
@@ -36,15 +56,25 @@ export function createTransformer(
     anchorFill: '#FFFFFF',
   });
   transformer.on('transformend', () => {
-    const node = transformer.nodes()[0];
-    if (!node) return;
-    options.onTransformEnd({
-      x: Math.round(node.x()),
-      y: Math.round(node.y()),
-      width: Math.round(node.width() * Math.abs(node.scaleX())),
-      height: Math.round(node.height() * Math.abs(node.scaleY())),
-      rotation: Math.round(node.rotation()),
-    });
+    // 多选时逐个节点取出落点：Konva 已把群组变换应用到每个成员节点上
+    const changes: TransformChange[] = [];
+    for (const node of transformer.nodes()) {
+      if (!node.id()) continue;
+      changes.push({
+        id: node.id(),
+        x: Math.round(node.x()),
+        y: Math.round(node.y()),
+        width: Math.round(node.width() * Math.abs(node.scaleX())),
+        height: Math.round(node.height() * Math.abs(node.scaleY())),
+        rotation: Math.round(node.rotation()),
+      });
+    }
+    if (changes.length > 0) options.onTransformEnd(changes);
+  });
+  bindShiftTracker();
+  // 变换过程中持续跟随 Shift：按住等比、松开自由，无需重新进入变换
+  transformer.on('transformstart transform', () => {
+    transformer.keepRatio(shiftHeld);
   });
   contentLayer.add(transformer);
   return transformer;

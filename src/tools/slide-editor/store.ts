@@ -1,5 +1,13 @@
 import { create } from 'zustand';
-import { clampBounds } from './core';
+import {
+  clampBounds,
+  computeAlign,
+  computeDistribute,
+  unionBounds,
+  type AlignMode,
+  type AlignBox,
+  type DistributeAxis,
+} from './core';
 import { cloneDoc, cloneElement, createDoc, createSlide, createId } from './model/factory';
 import type { Slide, SlideDoc, SlideElement } from './model/types';
 
@@ -32,6 +40,8 @@ interface SlideState {
   past: SlideDoc[];
   future: SlideDoc[];
   report: ImportReport | null;
+  /** 会话内剪贴板：不入 doc、不进 undo，关闭页面即失效 */
+  clipboard: SlideElement[];
 
   loadDoc: (doc: SlideDoc, report?: ImportReport | null) => void;
   setDocName: (name: string) => void;
@@ -55,6 +65,18 @@ interface SlideState {
   duplicateSelected: () => void;
   bringForward: () => void;
   sendBackward: () => void;
+  bringToFront: () => void;
+  sendToBack: () => void;
+  alignSelected: (mode: AlignMode) => void;
+  distributeSelected: (axis: DistributeAxis) => void;
+  groupSelected: () => void;
+  ungroupSelected: () => void;
+  toggleLockSelected: () => void;
+  toggleVisibleSelected: () => void;
+
+  copySelected: () => void;
+  cutSelected: () => void;
+  pasteClipboard: () => void;
 
   commit: () => void;
   undo: () => void;
@@ -62,6 +84,29 @@ interface SlideState {
 }
 
 const emptyReport: ImportReport | null = null;
+
+/** 按 id 批量打补丁到当前页元素（只改命中的元素，其余保持引用不变） */
+function withPatches(
+  slides: Slide[],
+  slideIndex: number,
+  patches: Map<string, Partial<SlideElement>>,
+): Slide[] {
+  return slides.map((slide, i) =>
+    i !== slideIndex
+      ? slide
+      : {
+          ...slide,
+          elements: slide.elements.map((el) => {
+            const patch = patches.get(el.id);
+            return patch ? ({ ...el, ...patch } as SlideElement) : el;
+          }),
+        },
+  );
+}
+
+function toBox(element: SlideElement): AlignBox {
+  return { x: element.x, y: element.y, width: element.width, height: element.height };
+}
 
 export const useSlideStore = create<SlideState>((set, get) => ({
   doc: createDoc(),
@@ -72,6 +117,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   past: [],
   future: [],
   report: emptyReport,
+  clipboard: [],
 
   loadDoc: (doc, report) =>
     set((s) => ({
@@ -346,6 +392,245 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       });
       return { doc: { ...s.doc, slides, version: s.doc.version + 1 } };
     });
+  },
+
+  bringToFront: () => {
+    get().commit();
+    set((s) => {
+      const slides = s.doc.slides.map((slide, i) => {
+        if (i !== s.slideIndex) return slide;
+        const picked = slide.elements.filter((el) => s.selection.includes(el.id));
+        if (picked.length === 0) return slide;
+        const rest = slide.elements.filter((el) => !s.selection.includes(el.id));
+        // 选中项整体移到末尾，内部保持原有相对顺序
+        return { ...slide, elements: [...rest, ...picked] };
+      });
+      return { doc: { ...s.doc, slides, version: s.doc.version + 1 } };
+    });
+  },
+
+  sendToBack: () => {
+    get().commit();
+    set((s) => {
+      const slides = s.doc.slides.map((slide, i) => {
+        if (i !== s.slideIndex) return slide;
+        const picked = slide.elements.filter((el) => s.selection.includes(el.id));
+        if (picked.length === 0) return slide;
+        const rest = slide.elements.filter((el) => !s.selection.includes(el.id));
+        return { ...slide, elements: [...picked, ...rest] };
+      });
+      return { doc: { ...s.doc, slides, version: s.doc.version + 1 } };
+    });
+  },
+
+  alignSelected: (mode) => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const targets = slide.elements.filter((el) => state.selection.includes(el.id));
+    if (targets.length === 0) return;
+    const boxes = targets.map(toBox);
+    // 多选：对齐到选中元素的并集包围盒（对齐所选对象）；单选：对齐到幻灯片
+    const bounds =
+      targets.length > 1
+        ? unionBounds(boxes)
+        : { x: 0, y: 0, width: state.doc.width, height: state.doc.height };
+    const deltas = computeAlign(mode, boxes, bounds);
+    const patches = new Map<string, Partial<SlideElement>>();
+    targets.forEach((element, index) => {
+      const { dx, dy } = deltas[index];
+      if (dx === 0 && dy === 0) return;
+      patches.set(element.id, { x: element.x + dx, y: element.y + dy });
+    });
+    if (patches.size === 0) return;
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: withPatches(s.doc.slides, s.slideIndex, patches),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  distributeSelected: (axis) => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const targets = slide.elements.filter((el) => state.selection.includes(el.id));
+    if (targets.length < 3) return;
+    const deltas = computeDistribute(axis, targets.map(toBox));
+    const patches = new Map<string, Partial<SlideElement>>();
+    targets.forEach((element, index) => {
+      const { dx, dy } = deltas[index];
+      if (dx === 0 && dy === 0) return;
+      patches.set(element.id, { x: element.x + dx, y: element.y + dy });
+    });
+    if (patches.size === 0) return;
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: withPatches(s.doc.slides, s.slideIndex, patches),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  groupSelected: () => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const picked = slide.elements.filter((el) => state.selection.includes(el.id));
+    if (picked.length < 2) return;
+    const bounds = unionBounds(picked.map(toBox));
+    // children 存相对 group 原点的坐标（见 GroupElement 注释）
+    const children = picked.map(
+      (element) =>
+        ({
+          ...cloneElement(element),
+          x: element.x - bounds.x,
+          y: element.y - bounds.y,
+        }) as SlideElement,
+    );
+    const group: SlideElement = {
+      id: createId('el'),
+      type: 'group',
+      x: Math.round(bounds.x),
+      y: Math.round(bounds.y),
+      width: Math.round(bounds.width),
+      height: Math.round(bounds.height),
+      children,
+    };
+    const rest = slide.elements.filter((el) => !state.selection.includes(el.id));
+    // 插入位置沿用被选中元素中最靠前的那个，保持原有 z-order 直觉
+    const firstIndex = slide.elements.findIndex((el) => state.selection.includes(el.id));
+    const elements = [...rest];
+    elements.splice(Math.min(Math.max(firstIndex, 0), rest.length), 0, group);
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: s.doc.slides.map((item, i) => (i === s.slideIndex ? { ...item, elements } : item)),
+        version: s.doc.version + 1,
+      },
+      selection: [group.id],
+    }));
+  },
+
+  ungroupSelected: () => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const hasGroup = slide.elements.some(
+      (el) => state.selection.includes(el.id) && el.type === 'group',
+    );
+    if (!hasGroup) return;
+    const elements: SlideElement[] = [];
+    const restored: string[] = [];
+    for (const element of slide.elements) {
+      if (!state.selection.includes(element.id) || element.type !== 'group') {
+        elements.push(element);
+        continue;
+      }
+      for (const child of element.children) {
+        // 相对坐标还原为页面绝对坐标
+        const abs = {
+          ...cloneElement(child),
+          x: element.x + child.x,
+          y: element.y + child.y,
+        } as SlideElement;
+        elements.push(abs);
+        restored.push(abs.id);
+      }
+    }
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: s.doc.slides.map((item, i) => (i === s.slideIndex ? { ...item, elements } : item)),
+        version: s.doc.version + 1,
+      },
+      selection: restored,
+    }));
+  },
+
+  toggleLockSelected: () => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const targets = slide.elements.filter((el) => state.selection.includes(el.id));
+    if (targets.length === 0) return;
+    // 只要有一个未锁定就整体锁定，否则整体解锁
+    const next = targets.some((el) => !el.locked);
+    const patches = new Map<string, Partial<SlideElement>>(
+      targets.map((el) => [el.id, { locked: next }]),
+    );
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: withPatches(s.doc.slides, s.slideIndex, patches),
+        version: s.doc.version + 1,
+      },
+      // 锁定后不应继续处于选中态
+      selection: next ? [] : s.selection,
+    }));
+  },
+
+  toggleVisibleSelected: () => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const targets = slide.elements.filter((el) => state.selection.includes(el.id));
+    if (targets.length === 0) return;
+    const next = targets.some((el) => el.visible !== false);
+    const patches = new Map<string, Partial<SlideElement>>(
+      targets.map((el) => [el.id, { visible: !next }]),
+    );
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: withPatches(s.doc.slides, s.slideIndex, patches),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  copySelected: () => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const picked = slide.elements
+      .filter((el) => state.selection.includes(el.id))
+      .map((el) => cloneElement(el, true));
+    if (picked.length === 0) return;
+    set({ clipboard: picked });
+  },
+
+  cutSelected: () => {
+    get().copySelected();
+    get().removeSelected();
+  },
+
+  pasteClipboard: () => {
+    const state = get();
+    if (state.clipboard.length === 0) return;
+    const copies = state.clipboard.map(
+      (el) => ({ ...cloneElement(el, true), x: el.x + 16, y: el.y + 16 }) as SlideElement,
+    );
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: s.doc.slides.map((item, i) =>
+          i === s.slideIndex ? { ...item, elements: [...item.elements, ...copies] } : item,
+        ),
+        version: s.doc.version + 1,
+      },
+      selection: copies.map((el) => el.id),
+    }));
   },
 }));
 

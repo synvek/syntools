@@ -16,6 +16,14 @@ export function PropertyPanel() {
   const duplicateSelected = useSlideStore((s) => s.duplicateSelected);
   const bringForward = useSlideStore((s) => s.bringForward);
   const sendBackward = useSlideStore((s) => s.sendBackward);
+  const bringToFront = useSlideStore((s) => s.bringToFront);
+  const sendToBack = useSlideStore((s) => s.sendToBack);
+  const alignSelected = useSlideStore((s) => s.alignSelected);
+  const distributeSelected = useSlideStore((s) => s.distributeSelected);
+  const groupSelected = useSlideStore((s) => s.groupSelected);
+  const ungroupSelected = useSlideStore((s) => s.ungroupSelected);
+  const toggleLockSelected = useSlideStore((s) => s.toggleLockSelected);
+  const toggleVisibleSelected = useSlideStore((s) => s.toggleVisibleSelected);
 
   const slide = doc.slides[slideIndex];
   const element = slide?.elements.find((item) => item.id === selection[selection.length - 1]);
@@ -52,6 +60,12 @@ export function PropertyPanel() {
     element.type === 'text' ? element.body : element.type === 'shape' ? element.body : undefined;
   const firstStyle: RunStyle | undefined = body?.paragraphs[0]?.runs[0]?.style;
   const align: TextAlign = body?.paragraphs[0]?.align ?? 'left';
+
+  // 组合/锁定/隐藏作用于整个选中集合，判断依据取全部选中元素而非最后一个
+  const selectedElements = slide?.elements.filter((item) => selection.includes(item.id)) ?? [];
+  const hasGroup = selectedElements.some((item) => item.type === 'group');
+  const allLocked = selectedElements.length > 0 && selectedElements.every((item) => item.locked);
+  const anyHidden = selectedElements.some((item) => item.visible === false);
 
   const patchFill = (next: Fill) => apply({ fill: next } as Partial<SlideElement>);
   const patchStroke = (next: Stroke | undefined) =>
@@ -159,6 +173,98 @@ export function PropertyPanel() {
             active={false}
             onClick={sendBackward}
             text="↓"
+          />
+        </ActionRow>
+        <ActionRow>
+          <ToggleGlyph
+            label={t('tools.slide.bringToFront')}
+            active={false}
+            onClick={bringToFront}
+            text="⇈"
+          />
+          <ToggleGlyph
+            label={t('tools.slide.sendToBack')}
+            active={false}
+            onClick={sendToBack}
+            text="⇊"
+          />
+        </ActionRow>
+      </Section>
+
+      <Section title={t('tools.slide.alignTitle')}>
+        <ActionRow>
+          <ToggleGlyph
+            label={t('tools.slide.alignLeft')}
+            active={false}
+            onClick={() => alignSelected('left')}
+            text="⇤"
+          />
+          <ToggleGlyph
+            label={t('tools.slide.alignCenter')}
+            active={false}
+            onClick={() => alignSelected('hcenter')}
+            text="↔"
+          />
+          <ToggleGlyph
+            label={t('tools.slide.alignRight')}
+            active={false}
+            onClick={() => alignSelected('right')}
+            text="⇥"
+          />
+          <ToggleGlyph
+            label={t('tools.slide.alignTop')}
+            active={false}
+            onClick={() => alignSelected('top')}
+            text="⇡"
+          />
+          <ToggleGlyph
+            label={t('tools.slide.alignMiddle')}
+            active={false}
+            onClick={() => alignSelected('vcenter')}
+            text="↕"
+          />
+          <ToggleGlyph
+            label={t('tools.slide.alignBottom')}
+            active={false}
+            onClick={() => alignSelected('bottom')}
+            text="⇣"
+          />
+        </ActionRow>
+        <ActionRow>
+          <ActionButton
+            label={t('tools.slide.distributeH')}
+            disabled={selection.length < 3}
+            onClick={() => distributeSelected('horizontal')}
+          />
+          <ActionButton
+            label={t('tools.slide.distributeV')}
+            disabled={selection.length < 3}
+            onClick={() => distributeSelected('vertical')}
+          />
+        </ActionRow>
+      </Section>
+
+      <Section title={t('tools.slide.arrangeTitle')}>
+        <ActionRow>
+          <ActionButton
+            label={t('tools.slide.group')}
+            disabled={selection.length < 2}
+            onClick={groupSelected}
+          />
+          <ActionButton
+            label={t('tools.slide.ungroup')}
+            disabled={!hasGroup}
+            onClick={ungroupSelected}
+          />
+        </ActionRow>
+        <ActionRow>
+          <ActionButton
+            label={allLocked ? t('tools.slide.unlock') : t('tools.slide.lock')}
+            onClick={toggleLockSelected}
+          />
+          <ActionButton
+            label={anyHidden ? t('tools.slide.show') : t('tools.slide.hide')}
+            onClick={toggleVisibleSelected}
           />
         </ActionRow>
       </Section>
@@ -292,6 +398,30 @@ export function PropertyPanel() {
         </ActionRow>
       </Section>
     </div>
+  );
+}
+
+/** 文字型动作按钮（对齐/组合/锁定等），禁用态统一置灰 */
+function ActionButton({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex h-7 items-center rounded-md border border-gray-300 px-2 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+    >
+      {label}
+    </button>
   );
 }
 

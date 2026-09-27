@@ -1,7 +1,7 @@
 import Konva from 'konva';
 import { computeSnap, type Guide, type SnapCandidate } from '../core';
 import type { StageHandle } from '../render/stage';
-import { updateMarquee } from '../render/overlays';
+import { updateMarquee, type TransformChange } from '../render/overlays';
 
 /**
  * 画布交互：选择 / 拖拽（含吸附）/ 框选 / 双击进入文本编辑。
@@ -9,13 +9,7 @@ import { updateMarquee } from '../render/overlays';
  * 便于后续把吸附、多选拖拽等逻辑抽成纯函数单独测试。
  */
 
-export interface TransformChange {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-}
+export type { TransformChange };
 
 export interface SnapContext {
   page: { width: number; height: number };
@@ -27,7 +21,7 @@ export interface StageCallbacks {
   onDragStart: () => void;
   onDragMove: (id: string, x: number, y: number, guides: Guide[]) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
-  onTransformEnd: (change: TransformChange) => void;
+  onTransformEnd: (changes: TransformChange[]) => void;
   onBackgroundClick: () => void;
   onTextEdit: (id: string) => void;
   getSnapContext: () => SnapContext;
@@ -88,7 +82,11 @@ export function attachInteraction(handle: StageHandle): void {
     };
     const ids = contentLayer
       .getChildren()
-      .filter((child) => child.name() === 'element' && intersects(child, rect))
+      // 锁定元素不参与框选
+      .filter(
+        (child) =>
+          child.name() === 'element' && !child.getAttr('elLocked') && intersects(child, rect),
+      )
       .map((child) => child.id());
     // 标记为本轮框选落点，抑制紧随其后的背景 click 把刚选中的对象清空
     marqueeJustEnded = true;
@@ -108,6 +106,7 @@ export function attachInteraction(handle: StageHandle): void {
     }
     const element = ancestorElement(event.target);
     if (!element) return; // Transformer 手柄等：不处理、不清选
+    if (element.getAttr('elLocked')) return; // 锁定元素不可选中
     const additive = Boolean(
       event.evt instanceof MouseEvent && (event.evt.shiftKey || event.evt.metaKey),
     );

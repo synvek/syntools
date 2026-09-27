@@ -47,7 +47,7 @@ export function createStage(container: HTMLDivElement, callbacks: StageCallbacks
   stage.add(bgLayer, contentLayer, overlayLayer);
 
   const transformer = createTransformer(contentLayer, {
-    onTransformEnd: (change) => callbacks.onTransformEnd(change),
+    onTransformEnd: (changes) => callbacks.onTransformEnd(changes),
   });
   const marquee = createMarquee(overlayLayer);
 

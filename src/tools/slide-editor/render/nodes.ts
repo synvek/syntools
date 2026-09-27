@@ -229,10 +229,12 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
     scaleY: element.flipY ? -1 : 1,
     opacity: element.opacity ?? 1,
     listening: true,
-    draggable: true,
+    draggable: !element.locked,
     dragDistance: 3,
   });
   group.setAttr('elType', element.type);
+  // 锁定标记写在节点上：命中与框选在 pointer.ts 里读它来决定是否跳过
+  group.setAttr('elLocked', Boolean(element.locked));
 
   switch (element.type) {
     case 'text': {
@@ -308,7 +310,22 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       break;
     }
     case 'group': {
-      for (const child of element.children) group.add(createElementNode(child, ctx));
+      // 子坐标是相对 group 原点的（见 GroupElement 注释），直接挂进已定位的 Group 即可。
+      // 子元素关闭命中：MVP 采用 PowerPoint 的「整组选中」语义，避免点到组内单个子元素。
+      for (const child of element.children) {
+        const node = createElementNode(child, ctx);
+        node.listening(false);
+        group.add(node);
+      }
+      // 子元素已不参与命中，靠这块透明矩形保证整组可被点击 / 拖拽 / 框选
+      group.add(
+        new Konva.Rect({
+          width: element.width,
+          height: element.height,
+          fill: 'rgba(0,0,0,0)',
+          listening: true,
+        }),
+      );
       break;
     }
     case 'placeholder': {

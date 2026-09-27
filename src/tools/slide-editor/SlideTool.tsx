@@ -52,6 +52,11 @@ export default function SlideTool() {
   const patchSelected = useSlideStore((s) => s.patchSelected);
   const select = useSlideStore((s) => s.select);
   const setDocName = useSlideStore((s) => s.setDocName);
+  const copySelected = useSlideStore((s) => s.copySelected);
+  const cutSelected = useSlideStore((s) => s.cutSelected);
+  const pasteClipboard = useSlideStore((s) => s.pasteClipboard);
+  const groupSelected = useSlideStore((s) => s.groupSelected);
+  const ungroupSelected = useSlideStore((s) => s.ungroupSelected);
 
   const [busy, setBusy] = useState<BusyKind>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -154,11 +159,29 @@ export default function SlideTool() {
           select(state.doc.slides[state.slideIndex]?.elements.map((el) => el.id) ?? []);
         },
         onEscape: () => select([]),
+        onCopy: () => copySelected(),
+        onCut: () => cutSelected(),
+        onPaste: () => pasteClipboard(),
+        onGroup: () => groupSelected(),
+        onUngroup: () => ungroupSelected(),
         onPrevSlide: () => selectSlide(useSlideStore.getState().slideIndex - 1),
         onNextSlide: () => selectSlide(useSlideStore.getState().slideIndex + 1),
         onPresent: () => setPresenting(true),
       }),
-    [duplicateSelected, patchSelected, redo, removeSelected, select, selectSlide, undo],
+    [
+      copySelected,
+      cutSelected,
+      duplicateSelected,
+      groupSelected,
+      patchSelected,
+      pasteClipboard,
+      redo,
+      removeSelected,
+      select,
+      selectSlide,
+      undo,
+      ungroupSelected,
+    ],
   );
 
   return (

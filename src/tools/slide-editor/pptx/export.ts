@@ -89,14 +89,13 @@ export async function exportPptx(doc: SlideDoc): Promise<ToolResult<Uint8Array>>
 
   resetShapeIds();
   doc.slides.forEach((slide, index) => {
-    const relMap = relMapFor(slide.elements, mediaEntries);
+    // 隐藏元素不导出，与画布渲染保持一致
+    const elements = slide.elements.filter((element) => element.visible !== false);
+    const relMap = relMapFor(elements, mediaEntries);
     const rels = mediaEntries
       .filter((entry) => relMap.has(entry.mediaId))
       .map((entry) => ({ rId: relMap.get(entry.mediaId) as string, target: entry.fileName }));
-    zip.file(
-      `ppt/slides/slide${index + 1}.xml`,
-      slideXml(slide.elements, relMap, slide.background),
-    );
+    zip.file(`ppt/slides/slide${index + 1}.xml`, slideXml(elements, relMap, slide.background));
     zip.file(`ppt/slides/_rels/slide${index + 1}.xml.rels`, slideRelsXml(rels));
   });
 

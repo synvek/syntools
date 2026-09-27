@@ -134,11 +134,16 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
         draggingRef.current = false;
         syncNow();
       },
-      onTransformEnd: (change: TransformChange) => {
+      onTransformEnd: (changes: TransformChange[]) => {
         const state = useSlideStore.getState();
-        const target = state.selection[state.selection.length - 1];
         draggingRef.current = false;
-        if (target) state.patchElement(target, change as never, false);
+        if (changes.length === 0) return;
+        // 变换期间不写 store，这里统一压一次历史快照，多选变换只占一步撤销
+        state.commit();
+        for (const change of changes) {
+          const { id, ...patch } = change;
+          state.patchElement(id, patch as never, false);
+        }
         syncNow();
       },
       onBackgroundClick: () => {

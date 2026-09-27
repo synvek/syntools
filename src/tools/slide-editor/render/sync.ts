@@ -19,7 +19,10 @@ export function syncElements(
     if (id && child instanceof Konva.Group) existing.set(id, child);
   }
 
-  elements.forEach((element, index) => {
+  // 隐藏元素不建节点：画布、缩略图、导出三端统一过滤，保证「隐藏」语义一致
+  const visible = elements.filter((element) => element.visible !== false);
+
+  visible.forEach((element, index) => {
     const current = existing.get(element.id);
     if (current && sameKind(current, element) && isUpdatable(element)) {
       patchElementNode(current, element, ctx);
@@ -45,7 +48,8 @@ export function syncElements(
  * 这类元素每次重建以保证与模型一致（元素数量可控，代价可接受）。
  */
 function isUpdatable(element: SlideElement): boolean {
-  return element.type === 'image' || element.type === 'line' || element.type === 'group';
+  // group 的子元素走组合/取消组合后会变化，属性快路径更新不到 children，故一并重建
+  return element.type === 'image' || element.type === 'line';
 }
 
 /** 依据布局/母版占位符渲染「不可选中」的底层提示层 */

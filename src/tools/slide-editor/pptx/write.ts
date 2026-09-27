@@ -314,7 +314,9 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
           const gid = nextShapeId();
           return `<p:nvGrpSpPr><p:cNvPr id="${gid}" name="Group ${gid}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>`;
         })(),
-        `<p:grpSpPr><a:xfrm><a:off x="${pxToEmu(element.x)}" y="${pxToEmu(element.y)}"/><a:ext cx="${pxToEmu(element.width)}" cy="${pxToEmu(element.height)}"/><a:chOff x="${pxToEmu(element.x)}" y="${pxToEmu(element.y)}"/><a:chExt cx="${pxToEmu(element.width)}" cy="${pxToEmu(element.height)}"/></a:xfrm></p:grpSpPr>`,
+        // 子元素以「相对 group 原点」存储，故子坐标系原点取 (0,0)、范围取组自身尺寸，
+        // 这样 chExt 与 ext 相同、缩放比为 1，子元素写回后落在正确的页面位置。
+        `<p:grpSpPr><a:xfrm><a:off x="${pxToEmu(element.x)}" y="${pxToEmu(element.y)}"/><a:ext cx="${pxToEmu(element.width)}" cy="${pxToEmu(element.height)}"/><a:chOff x="0" y="0"/><a:chExt cx="${pxToEmu(element.width)}" cy="${pxToEmu(element.height)}"/></a:xfrm></p:grpSpPr>`,
         children,
         '</p:grpSp>',
       ].join('');

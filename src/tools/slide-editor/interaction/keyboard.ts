@@ -11,6 +11,11 @@ export interface KeyboardCallbacks {
   onNudge: (dx: number, dy: number) => void;
   onSelectAll: () => void;
   onEscape: () => void;
+  onCopy: () => void;
+  onCut: () => void;
+  onPaste: () => void;
+  onGroup: () => void;
+  onUngroup: () => void;
   onPrevSlide: () => void;
   onNextSlide: () => void;
   onPresent: () => void;
@@ -47,6 +52,27 @@ export function handleShortcut(event: KeyboardEvent, callbacks: KeyboardCallback
   if (meta && event.key.toLowerCase() === 'a') {
     event.preventDefault();
     callbacks.onSelectAll();
+    return true;
+  }
+  if (meta && event.key.toLowerCase() === 'c') {
+    event.preventDefault();
+    callbacks.onCopy();
+    return true;
+  }
+  if (meta && event.key.toLowerCase() === 'x') {
+    event.preventDefault();
+    callbacks.onCut();
+    return true;
+  }
+  if (meta && event.key.toLowerCase() === 'v') {
+    event.preventDefault();
+    callbacks.onPaste();
+    return true;
+  }
+  if (meta && event.key.toLowerCase() === 'g') {
+    event.preventDefault();
+    if (event.shiftKey) callbacks.onUngroup();
+    else callbacks.onGroup();
     return true;
   }
   if (event.key === 'Delete' || event.key === 'Backspace') {

@@ -116,7 +116,10 @@ interface ElementBase {
   flipY?: boolean;
   opacity?: number;
   name?: string;
+  /** 锁定：不可选中、不可拖拽，但仍渲染与导出 */
   locked?: boolean;
+  /** 隐藏：不渲染、不导出（默认可见，字段缺省即视为可见） */
+  visible?: boolean;
   placeholder?: PlaceholderRef;
 }
 
@@ -176,6 +179,13 @@ export interface TableElement extends ElementBase {
   borderColor?: string;
 }
 
+/**
+ * 组合元素。
+ *
+ * 坐标约定：`children` 的 x/y 是**相对 group 原点**的坐标，与 DrawingML
+ * `p:grpSp` 的 chOff/chExt 子坐标系语义一致（导出写 chOff=(0,0)、chExt=(w,h)）。
+ * 渲染时子元素直接挂进已位于 group.x/y 的 Konva.Group，不需要再叠加一次原点。
+ */
 export interface GroupElement extends ElementBase {
   type: 'group';
   children: SlideElement[];
