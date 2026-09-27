@@ -1,4 +1,4 @@
-import { LocaleType, mergeLocales, Univer, type IWorkbookData } from '@univerjs/core';
+import { CommandType, LocaleType, mergeLocales, Univer, type IWorkbookData } from '@univerjs/core';
 import { FUniver } from '@univerjs/core/facade';
 import DesignEnUS from '@univerjs/design/locale/en-US';
 import DesignZhCN from '@univerjs/design/locale/zh-CN';
@@ -26,16 +26,59 @@ import SheetsUIZhCN from '@univerjs/sheets-ui/locale/zh-CN';
 import { UniverUIPlugin } from '@univerjs/ui';
 import UIEnUS from '@univerjs/ui/locale/en-US';
 import UIZhCN from '@univerjs/ui/locale/zh-CN';
+// P1 功能插件：条件格式 / 数据验证 / 筛选 / 排序 / 超链接 / 查找替换
+import { UniverSheetsConditionalFormattingPlugin } from '@univerjs/sheets-conditional-formatting';
+import { UniverSheetsConditionalFormattingUIPlugin } from '@univerjs/sheets-conditional-formatting-ui';
+import ConditionalFormattingUIEnUS from '@univerjs/sheets-conditional-formatting-ui/locale/en-US';
+import ConditionalFormattingUIZhCN from '@univerjs/sheets-conditional-formatting-ui/locale/zh-CN';
+import { UniverSheetsDataValidationPlugin } from '@univerjs/sheets-data-validation';
+import { UniverSheetsDataValidationUIPlugin } from '@univerjs/sheets-data-validation-ui';
+import DataValidationEnUS from '@univerjs/sheets-data-validation/locale/en-US';
+import DataValidationZhCN from '@univerjs/sheets-data-validation/locale/zh-CN';
+import DataValidationUIEnUS from '@univerjs/sheets-data-validation-ui/locale/en-US';
+import DataValidationUIZhCN from '@univerjs/sheets-data-validation-ui/locale/zh-CN';
+import { UniverSheetsFilterPlugin } from '@univerjs/sheets-filter';
+import { UniverSheetsFilterUIPlugin } from '@univerjs/sheets-filter-ui';
+import FilterEnUS from '@univerjs/sheets-filter/locale/en-US';
+import FilterZhCN from '@univerjs/sheets-filter/locale/zh-CN';
+import FilterUIEnUS from '@univerjs/sheets-filter-ui/locale/en-US';
+import FilterUIZhCN from '@univerjs/sheets-filter-ui/locale/zh-CN';
+import { UniverSheetsSortPlugin } from '@univerjs/sheets-sort';
+import { UniverSheetsSortUIPlugin } from '@univerjs/sheets-sort-ui';
+import SortUIEnUS from '@univerjs/sheets-sort-ui/locale/en-US';
+import SortUIZhCN from '@univerjs/sheets-sort-ui/locale/zh-CN';
+import { UniverSheetsHyperLinkPlugin } from '@univerjs/sheets-hyper-link';
+import { UniverSheetsHyperLinkUIPlugin } from '@univerjs/sheets-hyper-link-ui';
+import HyperLinkEnUS from '@univerjs/sheets-hyper-link/locale/en-US';
+import HyperLinkZhCN from '@univerjs/sheets-hyper-link/locale/zh-CN';
+import HyperLinkUIEnUS from '@univerjs/sheets-hyper-link-ui/locale/en-US';
+import HyperLinkUIZhCN from '@univerjs/sheets-hyper-link-ui/locale/zh-CN';
+import { UniverFindReplacePlugin } from '@univerjs/find-replace';
+import FindReplaceEnUS from '@univerjs/find-replace/locale/en-US';
+import FindReplaceZhCN from '@univerjs/find-replace/locale/zh-CN';
+import { UniverSheetsFindReplacePlugin } from '@univerjs/sheets-find-replace';
 // 副作用导入：给 FUniver 追加 createWorkbook / getActiveWorkbook 等工作簿方法
 import '@univerjs/sheets/facade';
 import '@univerjs/sheets-ui/facade';
-// 样式必须按 design → ui → docs-ui → sheets-ui → formula-ui → numfmt-ui 的顺序引入
+import '@univerjs/sheets-conditional-formatting/facade';
+import '@univerjs/sheets-data-validation/facade';
+import '@univerjs/sheets-filter/facade';
+import '@univerjs/sheets-sort/facade';
+import '@univerjs/sheets-hyper-link/facade';
+import '@univerjs/sheets-find-replace/facade';
+// 样式必须按 design → ui → docs-ui → sheets-ui → formula-ui → numfmt-ui → 功能插件 的顺序引入
 import '@univerjs/design/lib/index.css';
 import '@univerjs/ui/lib/index.css';
 import '@univerjs/docs-ui/lib/index.css';
 import '@univerjs/sheets-ui/lib/index.css';
 import '@univerjs/sheets-formula-ui/lib/index.css';
 import '@univerjs/sheets-numfmt-ui/lib/index.css';
+import '@univerjs/sheets-conditional-formatting-ui/lib/index.css';
+import '@univerjs/sheets-data-validation-ui/lib/index.css';
+import '@univerjs/sheets-filter-ui/lib/index.css';
+import '@univerjs/sheets-sort-ui/lib/index.css';
+import '@univerjs/sheets-hyper-link-ui/lib/index.css';
+import '@univerjs/find-replace/lib/index.css';
 import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
 
 /**
@@ -60,6 +103,18 @@ export interface UniverHandle {
   getActiveSheetId(): string | null;
   /** 切换激活的工作表 */
   setActiveSheet(id: string): void;
+  /**
+   * 订阅「会写入快照的修改」（Univer MUTATION）。
+   * 用于按编辑事件做脏跟踪，替代定时全量 save() 轮询；返回取消订阅函数。
+   */
+  onMutation(listener: () => void): () => void;
+  /** 当前选区（0 基闭区间）；没有选区时返回 null */
+  getActiveRange(): {
+    startRow: number;
+    startColumn: number;
+    endRow: number;
+    endColumn: number;
+  } | null;
   /** 在末尾新增一张工作表，缺省名称交给 Univer 自动生成 */
   addSheet(name?: string): void;
   /** 删除指定工作表（至少保留一张，最后一张会被忽略） */
@@ -78,6 +133,15 @@ const ZH_LOCALE = mergeLocales(
   SheetsUIZhCN,
   SheetsFormulaUIZhCN,
   SheetsNumfmtUIZhCN,
+  ConditionalFormattingUIZhCN,
+  DataValidationZhCN,
+  DataValidationUIZhCN,
+  FilterZhCN,
+  FilterUIZhCN,
+  SortUIZhCN,
+  HyperLinkZhCN,
+  HyperLinkUIZhCN,
+  FindReplaceZhCN,
 );
 const EN_LOCALE = mergeLocales(
   DesignEnUS,
@@ -87,6 +151,15 @@ const EN_LOCALE = mergeLocales(
   SheetsUIEnUS,
   SheetsFormulaUIEnUS,
   SheetsNumfmtUIEnUS,
+  ConditionalFormattingUIEnUS,
+  DataValidationEnUS,
+  DataValidationUIEnUS,
+  FilterEnUS,
+  FilterUIEnUS,
+  SortUIEnUS,
+  HyperLinkEnUS,
+  HyperLinkUIEnUS,
+  FindReplaceEnUS,
 );
 
 /**
@@ -115,15 +188,50 @@ export function createUniverInstance(
   univer.registerPlugin(UniverSheetsFormulaUIPlugin);
   univer.registerPlugin(UniverSheetsNumfmtPlugin);
   univer.registerPlugin(UniverSheetsNumfmtUIPlugin);
+  // P1 功能插件：条件格式 / 数据验证 / 超链接 / 筛选 / 排序 / 查找替换
+  univer.registerPlugin(UniverSheetsConditionalFormattingPlugin);
+  univer.registerPlugin(UniverSheetsConditionalFormattingUIPlugin);
+  univer.registerPlugin(UniverSheetsDataValidationPlugin);
+  univer.registerPlugin(UniverSheetsDataValidationUIPlugin);
+  univer.registerPlugin(UniverSheetsHyperLinkPlugin);
+  univer.registerPlugin(UniverSheetsHyperLinkUIPlugin);
+  univer.registerPlugin(UniverSheetsFilterPlugin);
+  univer.registerPlugin(UniverSheetsFilterUIPlugin);
+  univer.registerPlugin(UniverSheetsSortPlugin);
+  univer.registerPlugin(UniverSheetsSortUIPlugin);
+  univer.registerPlugin(UniverFindReplacePlugin);
+  univer.registerPlugin(UniverSheetsFindReplacePlugin);
 
   const univerAPI = FUniver.newAPI(univer);
   // 必须存在工作簿实例，否则 Univer 只渲染外壳而不出网格画布
   univerAPI.createWorkbook(createEmptySnapshot() as unknown as Partial<IWorkbookData>);
 
+  // 脏跟踪：MUTATION 才会写入快照；加载新工作簿后需重新订阅（旧实例已销毁）
+  let mutationListener: (() => void) | null = null;
+  let mutationDisposable: { dispose: () => void } | null = null;
+  const resubscribe = (): void => {
+    mutationDisposable?.dispose();
+    mutationDisposable =
+      univerAPI.getActiveWorkbook()?.onCommandExecuted((info) => {
+        if (info.type === CommandType.MUTATION) mutationListener?.();
+      }) ?? null;
+  };
+
+  const onMutation = (listener: () => void): (() => void) => {
+    mutationListener = listener;
+    resubscribe();
+    return () => {
+      mutationListener = null;
+      mutationDisposable?.dispose();
+      mutationDisposable = null;
+    };
+  };
+
   const loadSnapshot = (snapshot: WorkbookSnapshot): void => {
     const current = univerAPI.getActiveWorkbook();
     if (current) univerAPI.disposeUnit(current.getId());
     univerAPI.createWorkbook(snapshot as unknown as Partial<IWorkbookData>);
+    resubscribe();
   };
 
   const getSnapshot = (): WorkbookSnapshot => {
@@ -150,6 +258,23 @@ export function createUniverInstance(
     univerAPI.getActiveWorkbook()?.setActiveSheet(id);
   };
 
+  const getActiveRange = (): {
+    startRow: number;
+    startColumn: number;
+    endRow: number;
+    endColumn: number;
+  } | null => {
+    const range = univerAPI.getActiveWorkbook()?.getActiveSheet()?.getActiveRange();
+    if (!range) return null;
+    const model = range.getRange();
+    return {
+      startRow: model.startRow,
+      startColumn: model.startColumn,
+      endRow: model.endRow,
+      endColumn: model.endColumn,
+    };
+  };
+
   const addSheet = (name?: string): void => {
     univerAPI.getActiveWorkbook()?.insertSheet(name);
   };
@@ -173,6 +298,9 @@ export function createUniverInstance(
   };
 
   const dispose = (): void => {
+    mutationDisposable?.dispose();
+    mutationDisposable = null;
+    mutationListener = null;
     univer.dispose();
     container.replaceChildren();
   };
@@ -184,6 +312,8 @@ export function createUniverInstance(
     getSheets,
     getActiveSheetId,
     setActiveSheet,
+    getActiveRange,
+    onMutation,
     addSheet,
     deleteSheet,
     renameSheet,

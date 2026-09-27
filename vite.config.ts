@@ -114,14 +114,14 @@ export default defineConfig({
             return 'vendor-univer-formula';
           }
           if (
-            /[/\\]node_modules[/\\]@univerjs[/\\](design|ui|docs|docs-ui|sheets-ui|sheets-formula-ui|sheets-numfmt-ui)[/\\]/.test(
+            /[/\\]node_modules[/\\]@univerjs[/\\](design|ui|docs|docs-ui|sheets-ui|sheets-formula-ui|sheets-numfmt-ui|sheets-conditional-formatting-ui|sheets-data-validation-ui|sheets-filter-ui|sheets-sort-ui|sheets-hyper-link-ui|find-replace)[/\\]/.test(
               id,
             )
           ) {
             return 'vendor-univer-ui';
           }
           if (
-            /[/\\]node_modules[/\\]@univerjs[/\\](sheets|sheets-formula|sheets-numfmt)[/\\]/.test(
+            /[/\\]node_modules[/\\]@univerjs[/\\](sheets|sheets-formula|sheets-numfmt|sheets-conditional-formatting|sheets-data-validation|sheets-filter|sheets-sort|sheets-hyper-link|sheets-find-replace)[/\\]/.test(
               id,
             )
           ) {
@@ -129,6 +129,8 @@ export default defineConfig({
           }
           if (/[/\\]node_modules[/\\]konva[/\\]/.test(id)) return 'vendor-konva';
           if (/[/\\]node_modules[/\\]exceljs[/\\]/.test(id)) return 'vendor-exceljs';
+          // 图表：ECharts 按需引入，独立 chunk（只在打开图表面板时加载）
+          if (/[/\\]node_modules[/\\](echarts|zrender)[/\\]/.test(id)) return 'vendor-echarts';
         },
       },
     },

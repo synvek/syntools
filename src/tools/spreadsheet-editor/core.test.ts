@@ -6,23 +6,32 @@ import {
   PRESENT_BLANK_ROWS,
   PRESENT_MAX_COLS,
   PRESENT_MAX_ROWS,
+  booleanNumberToViewFlag,
   buildExportFilename,
   buildPresentGrid,
+  cellDocumentToRichText,
   checkImportFile,
   columnIndexToName,
   columnNameToIndex,
   columnWidthToPx,
+  dateToExcelSerial,
   excelStyleToUniver,
   hexToArgb,
+  hiddenToWorksheetState,
   parseCellRef,
   parseMergeRange,
   pxToColumnWidth,
   pxToRowHeight,
   resolveImportKind,
+  richTextFontToStyle,
+  richTextToCellDocument,
   rowHeightToPx,
   sanitizeFilename,
+  styleToRichTextFont,
   summarizeWorkbook,
   univerStyleToExcel,
+  viewFlagToBooleanNumber,
+  worksheetStateToHidden,
 } from './core';
 
 describe('列名与坐标', () => {
@@ -93,9 +102,10 @@ describe('导入校验', () => {
     expect(resolveImportKind('macro.xlsm')).toBe('xlsx');
   });
 
-  it('旧版 xls / csv 归类为 legacy-xls', () => {
+  it('csv 单独归类；旧版 xls / et 归为 legacy-xls', () => {
+    expect(resolveImportKind('data.csv')).toBe('csv');
     expect(resolveImportKind('old.xls')).toBe('legacy-xls');
-    expect(resolveImportKind('data.csv')).toBe('legacy-xls');
+    expect(resolveImportKind('wps.et')).toBe('legacy-xls');
   });
 
   it('其它扩展名不支持', () => {
@@ -104,6 +114,7 @@ describe('导入校验', () => {
 
   it('checkImportFile 的错误分支', () => {
     expect(checkImportFile({ name: 'a.xlsx', size: 1024 })).toEqual({ ok: true, value: 'xlsx' });
+    expect(checkImportFile({ name: 'a.csv', size: 1024 })).toEqual({ ok: true, value: 'csv' });
     expect(checkImportFile({ name: 'a.xls', size: 1024 })).toEqual({
       ok: false,
       error: 'UNSUPPORTED_LEGACY_XLS',
@@ -305,5 +316,86 @@ describe('放映（只读表格）', () => {
   it('展示上限为常量且大于常规表宽', () => {
     expect(PRESENT_MAX_ROWS).toBeGreaterThan(50);
     expect(PRESENT_MAX_COLS).toBeGreaterThan(20);
+  });
+});
+
+describe('工作表结构映射（可见状态 / 视图开关）', () => {
+  it('Excel 可见状态 → Univer hidden 标记', () => {
+    expect(worksheetStateToHidden('visible')).toBe(0);
+    expect(worksheetStateToHidden('hidden')).toBe(1);
+    // veryHidden（VBA 隐藏）同样归一为隐藏
+    expect(worksheetStateToHidden('veryHidden')).toBe(1);
+    // 缺失按可见处理，避免导入后整表消失
+    expect(worksheetStateToHidden(undefined)).toBe(0);
+  });
+
+  it('Univer hidden 标记 → Excel 可见状态', () => {
+    expect(hiddenToWorksheetState(0)).toBe('visible');
+    expect(hiddenToWorksheetState(1)).toBe('hidden');
+    expect(hiddenToWorksheetState(undefined)).toBe('visible');
+  });
+
+  it('视图布尔：缺省时保留 fallback，不把「未设置」误判为 false', () => {
+    // 网格线默认显示（1）
+    expect(viewFlagToBooleanNumber(undefined, 1)).toBe(1);
+    expect(viewFlagToBooleanNumber(false, 1)).toBe(0);
+    expect(viewFlagToBooleanNumber(true, 1)).toBe(1);
+    // RTL 默认关闭（0）
+    expect(viewFlagToBooleanNumber(undefined, 0)).toBe(0);
+    expect(viewFlagToBooleanNumber(true, 0)).toBe(1);
+  });
+
+  it('0/1 → 视图布尔', () => {
+    expect(booleanNumberToViewFlag(1)).toBe(true);
+    expect(booleanNumberToViewFlag(0)).toBe(false);
+    expect(booleanNumberToViewFlag(undefined)).toBe(false);
+  });
+});
+
+describe('单元格富文本与日期', () => {
+  it('字体子集 ↔ Univer 文本样式双向映射', () => {
+    expect(richTextFontToStyle({ bold: true, size: 14, color: { argb: 'FFFF0000' } })).toEqual({
+      bl: 1,
+      fs: 14,
+      cl: { rgb: '#FF0000' },
+    });
+    expect(styleToRichTextFont({ bl: 1, fs: 14, cl: { rgb: '#FF0000' } })).toEqual({
+      bold: true,
+      size: 14,
+      color: { argb: 'FFFF0000' },
+    });
+    expect(styleToRichTextFont({})).toBeUndefined();
+  });
+
+  it('richText → 单元格文档数据（含 run 区间与段落标记）', () => {
+    const doc = richTextToCellDocument(
+      [{ text: 'Hello', font: { bold: true } }, { text: ' world' }],
+      'c1',
+    );
+    expect(doc).not.toBeNull();
+    expect(doc!.body.dataStream).toBe('Hello world\r\n');
+    expect(doc!.body.textRuns).toEqual([{ st: 0, ed: 5, ts: { bl: 1 } }]);
+    expect(doc!.body.paragraphs).toEqual([{ startIndex: 11 }]);
+  });
+
+  it('无样式富文本不生成文档数据（退化为纯文本）', () => {
+    expect(richTextToCellDocument([{ text: 'plain' }], 'c1')).toBeNull();
+    expect(richTextToCellDocument([], 'c1')).toBeNull();
+  });
+
+  it('单元格文档数据 → richText（按 run 边界切分）', () => {
+    const doc = richTextToCellDocument(
+      [{ text: 'Hello', font: { bold: true } }, { text: ' world' }],
+      'c1',
+    )!;
+    expect(cellDocumentToRichText(doc)).toEqual([
+      { text: 'Hello', font: { bold: true } },
+      { text: ' world' },
+    ]);
+  });
+
+  it('日期 → Excel 序列号（1900 日期系统，与 ExcelJS 精确互逆）', () => {
+    // 2024-01-15 → 45306
+    expect(dateToExcelSerial(new Date(Date.UTC(2024, 0, 15)))).toBeCloseTo(45306, 6);
   });
 });

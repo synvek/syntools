@@ -18,16 +18,36 @@ export function readDraft(): WorkbookSnapshot | null {
   }
 }
 
-/** 写入草稿，返回是否成功（超限时放弃写入而非静默失败） */
-export function writeDraft(snapshot: WorkbookSnapshot): boolean {
+/**
+ * 写入草稿的结果：
+ * - `ok:false, degraded:false` → 内容超出体积上限（本次未保存）
+ * - `ok:false, degraded:true`  → localStorage 不可用 / 配额不足
+ */
+export interface DraftWriteResult {
+  ok: boolean;
+  degraded: boolean;
+}
+
+/** 写入草稿并返回可区分的原因（供 UI 明确提示，而不是永远停在「保存中」） */
+export function writeDraftSafe(snapshot: WorkbookSnapshot): DraftWriteResult {
+  let raw: string;
   try {
-    const raw = JSON.stringify(snapshot);
-    if (raw.length > MAX_DRAFT_BYTES) return false;
-    localStorage.setItem(DRAFT_KEY, raw);
-    return true;
+    raw = JSON.stringify(snapshot);
   } catch {
-    return false;
+    return { ok: false, degraded: false };
   }
+  if (raw.length > MAX_DRAFT_BYTES) return { ok: false, degraded: false };
+  try {
+    localStorage.setItem(DRAFT_KEY, raw);
+    return { ok: true, degraded: false };
+  } catch {
+    return { ok: false, degraded: true };
+  }
+}
+
+/** 便捷布尔版（失败原因不关心时使用） */
+export function writeDraft(snapshot: WorkbookSnapshot): boolean {
+  return writeDraftSafe(snapshot).ok;
 }
 
 export function clearDraft(): void {
@@ -37,3 +57,5 @@ export function clearDraft(): void {
     // localStorage 不可用时忽略
   }
 }
+
+export { DRAFT_KEY };
