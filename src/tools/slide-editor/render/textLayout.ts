@@ -69,12 +69,20 @@ interface Atom {
   width: number;
 }
 
+/**
+ * 中文/日文避头尾：这些标点不能出现在行首（否则会「孤立」在下一行最前面）。
+ * 命中时宁可让当前行略微溢出，也不在该标点前断行。
+ */
+const NO_LINE_START = /^[，。、；：！？）」』】》〉…、·,.!?;:)\]}]$/;
+
 /** 单段落拆行：返回行内片段（已合并相邻同 run 的原子） */
 function layoutParagraph(
   paragraph: Paragraph,
   available: number,
   ctx: CanvasRenderingContext2D,
   startY: number,
+  /** 段落序号（从 1 开始），仅编号列表使用 */
+  ordinal = 1,
 ): { lines: LayoutLine[]; height: number } {
   const runs = paragraph.runs.length > 0 ? paragraph.runs : [{ text: '' }];
   const atoms: Atom[] = [];
@@ -98,7 +106,8 @@ function layoutParagraph(
 
   for (const atom of atoms) atom.width = measure(ctx, atom.text, atom.style);
 
-  const bullet = paragraph.bullet ? '• ' : '';
+  // 编号列表优先于项目符号：两者互斥（numbering 由 buAutoNum 解析而来）
+  const bullet = paragraph.numbering ? `${ordinal}. ` : paragraph.bullet ? '• ' : '';
   const bulletWidth = bullet ? measure(ctx, bullet, runs[0]?.style ?? {}) : 0;
 
   const lineHeightof = (line: Atom[]) => {
@@ -116,6 +125,12 @@ function layoutParagraph(
     if (isFirst && atom.kind === 'space') continue;
     const projected = currentWidth + atom.width;
     if (current.length > 0 && projected > available) {
+      // 避头尾：标点不停留在行首，跟随上一行（行首只有一个原子时不强行吞并，避免死循环）
+      if (current.length > 1 && NO_LINE_START.test(atom.text)) {
+        current.push(atom);
+        currentWidth += atom.width;
+        continue;
+      }
       // 行尾的空格不下沉到下一行
       while (current.length > 0 && current[current.length - 1].kind === 'space') {
         const dropped = current.pop();
@@ -204,13 +219,16 @@ export function layoutTextBody(body: TextBody, box: { width: number; height: num
   if (!ctx) {
     // 无 canvas 环境（如 SSR / 测试）退化为等距估算，保证不崩
     let y = margins.top;
+    let ordinal = 0;
     const lines: LayoutLine[] = paragraphs.map((paragraph) => {
+      ordinal = paragraph.numbering ? ordinal + 1 : 0;
       const height = (paragraph.runs[0]?.style?.size ?? DEFAULT_SIZE) * 1.2;
+      const prefix = paragraph.numbering ? `${ordinal}. ` : paragraph.bullet ? '• ' : '';
       const line: LayoutLine = {
         y,
         height,
-        segments: paragraph.runs.map((run) => ({
-          text: run.text,
+        segments: paragraph.runs.map((run, index) => ({
+          text: index === 0 ? prefix + run.text : run.text,
           style: run.style ?? {},
           x: margins.left,
           y,
@@ -224,9 +242,11 @@ export function layoutTextBody(body: TextBody, box: { width: number; height: num
     return { lines, height: y + margins.bottom };
   }
 
+  // 编号在同一组连续编号段落内递增，遇到普通段落则重置（与 PowerPoint 一致）
+  let ordinal = 0;
   const measured = paragraphs.map((paragraph) => {
-    const result = layoutParagraph(paragraph, innerWidth, ctx, 0);
-    return result;
+    ordinal = paragraph.numbering ? ordinal + 1 : 0;
+    return layoutParagraph(paragraph, innerWidth, ctx, 0, ordinal || 1);
   });
   const totalTextHeight = measured.reduce((sum, item) => sum + item.height, 0);
   const freeHeight = Math.max(0, box.height - margins.top - margins.bottom - totalTextHeight);

@@ -3,7 +3,13 @@ import type { Guide } from '../core';
 import type { SlideDoc, SlideElement } from '../model/types';
 import { attachInteraction, type StageCallbacks } from '../interaction/pointer';
 import { createElementNode } from './nodes';
-import { createMarquee, createTransformer, drawGuides, clearGuides } from './overlays';
+import {
+  createMarquee,
+  createTransformer,
+  drawCustomGuides,
+  drawGuides,
+  clearGuides,
+} from './overlays';
 import { syncElements } from './sync';
 
 /**
@@ -32,6 +38,11 @@ export interface StageHandle {
   sync: (elements: SlideElement[], doc: SlideDoc) => void;
   showGuides: (guides: Guide[], size: { width: number; height: number }) => void;
   hideGuides: () => void;
+  /** 绘制持久的手动参考线（与拖拽时的临时参考线分开，样式不同） */
+  renderCustomGuides: (
+    guides: { id: string; axis: 'x' | 'y'; position: number }[],
+    size: { width: number; height: number },
+  ) => void;
   setSelection: (ids: string[]) => void;
   destroy: () => void;
 }
@@ -109,6 +120,7 @@ export function createStage(container: HTMLDivElement, callbacks: StageCallbacks
     },
     showGuides: (guides, size) => drawGuides(contentLayer, guides, size),
     hideGuides: () => clearGuides(contentLayer),
+    renderCustomGuides: (guides, size) => drawCustomGuides(contentLayer, guides, size),
     setSelection: (ids) => {
       const nodes = ids
         .map((id) => contentLayer.findOne<Konva.Node>(`#${id}`))

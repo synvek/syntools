@@ -111,6 +111,36 @@ export function clearGuides(contentLayer: Konva.Layer): void {
   if (group) group.destroy();
 }
 
+/** 手动参考线：蓝色实线 + 端点小方块，与拖拽时的红色虚线区分 */
+export function drawCustomGuides(
+  contentLayer: Konva.Layer,
+  guides: { id: string; axis: 'x' | 'y'; position: number }[],
+  size: { width: number; height: number },
+): void {
+  const existing = contentLayer.findOne<Konva.Group>(`#customGuides`);
+  if (existing) existing.destroy();
+  if (guides.length === 0) return;
+  const scale = Math.max(0.1, contentLayer.scaleX());
+  const width = 1 / scale;
+  const next = new Konva.Group({ id: 'customGuides', listening: false });
+  for (const guide of guides) {
+    const points =
+      guide.axis === 'x'
+        ? [guide.position, 0, guide.position, size.height]
+        : [0, guide.position, size.width, guide.position];
+    next.add(
+      new Konva.Line({
+        points,
+        stroke: '#0EA5E9',
+        strokeWidth: width,
+        dash: [6 / scale, 4 / scale],
+        listening: false,
+      }),
+    );
+  }
+  contentLayer.add(next);
+}
+
 /** 框选矩形（stage 坐标系） */
 export function createMarquee(overlayLayer: Konva.Layer): Konva.Rect {
   const rect = new Konva.Rect({

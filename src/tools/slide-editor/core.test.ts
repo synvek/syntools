@@ -151,6 +151,42 @@ describe('工具函数', () => {
     );
   });
 
+  it('网格吸附：无对齐命中时吸附到最近网格线', () => {
+    const result = computeSnap(
+      { x: 103, y: 47, width: 50, height: 30 },
+      [],
+      { width: 400, height: 300 },
+      6,
+      { grid: 24 },
+    );
+    // 103 → 96（24 的倍数），47 → 48
+    expect(result.x).toBe(96);
+    expect(result.y).toBe(48);
+    // 网格吸附不产生参考线
+    expect(result.guides).toHaveLength(0);
+  });
+
+  it('手动参考线参与吸附并产生参考线', () => {
+    const result = computeSnap(
+      { x: 197, y: 10, width: 40, height: 20 },
+      [],
+      { width: 400, height: 300 },
+      6,
+      { extraX: [200], extraY: [] },
+    );
+    expect(result.x).toBe(200);
+    expect(result.guides.some((guide) => guide.axis === 'x' && guide.position === 200)).toBe(true);
+  });
+
+  it('网格关闭时不吸附', () => {
+    const result = computeSnap({ x: 103, y: 47, width: 50, height: 30 }, [], {
+      width: 400,
+      height: 300,
+    });
+    expect(result.x).toBe(103);
+    expect(result.y).toBe(47);
+  });
+
   it('导出文件名清洗', () => {
     expect(buildExportFilename('我的 演示/v1', 'pptx')).toBe('我的 演示v1.pptx');
     expect(buildExportFilename('   ', 'pptx')).toBe('presentation.pptx');

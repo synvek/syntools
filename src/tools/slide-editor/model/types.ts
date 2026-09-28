@@ -64,6 +64,8 @@ export interface Paragraph {
   runs: TextRun[];
   align?: TextAlign;
   bullet?: boolean;
+  /** 编号列表（DrawingML buAutoNum），与 bullet 互斥 */
+  numbering?: boolean;
   /** 行距倍数（1.2 = 120%） */
   lineSpacing?: number;
   /** 段前/段后（px） */
@@ -166,6 +168,14 @@ export interface TableCell {
   valign?: VAlign;
   colSpan?: number;
   rowSpan?: number;
+  /**
+   * 被合并覆盖的单元格（DrawingML 的 hMerge / vMerge="1"）。
+   * OOXML 要求这些格子仍然存在（只是不绘制内容），因此模型里保留它们并打标记，
+   * 而不是从行数组里删掉 —— 删掉会让 colWidths 的下标与网格列号错位。
+   */
+  covered?: boolean;
+  /** 被覆盖的方向：h = 横向合并且来自左邻、v = 纵向合并且来自上方 */
+  coveredBy?: 'h' | 'v';
 }
 
 export interface TableElement extends ElementBase {

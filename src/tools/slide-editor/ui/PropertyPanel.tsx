@@ -2,7 +2,37 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import type { Fill, RunStyle, SlideElement, Stroke, TextAlign } from '../model/types';
 import { useSlideStore } from '../store';
-import { ActionRow, ColorInput, Field, NumberInput, Section, ToggleGroup } from './controls';
+import {
+  ActionRow,
+  ColorInput,
+  Field,
+  NumberInput,
+  Section,
+  SelectInput,
+  TextArea,
+  TextInput,
+  ToggleGroup,
+} from './controls';
+
+/** 中西文混排常用字体（无联网字体加载，只列系统常见族） */
+const FONT_OPTIONS = [
+  'Arial',
+  'Helvetica',
+  'Times New Roman',
+  'Georgia',
+  'Courier New',
+  'Verdana',
+  'Tahoma',
+  'Impact',
+  'PingFang SC',
+  'Microsoft YaHei',
+  'SimSun',
+  'SimHei',
+  'Noto Sans',
+  'sans-serif',
+  'serif',
+  'monospace',
+];
 
 /** 右侧属性面板：无选中时编辑页面，选中时编辑元素（位置/填充/文字/层序） */
 export function PropertyPanel() {
@@ -14,19 +44,14 @@ export function PropertyPanel() {
   const updateSlide = useSlideStore((s) => s.updateSlide);
   const removeSelected = useSlideStore((s) => s.removeSelected);
   const duplicateSelected = useSlideStore((s) => s.duplicateSelected);
-  const bringForward = useSlideStore((s) => s.bringForward);
-  const sendBackward = useSlideStore((s) => s.sendBackward);
-  const bringToFront = useSlideStore((s) => s.bringToFront);
-  const sendToBack = useSlideStore((s) => s.sendToBack);
-  const alignSelected = useSlideStore((s) => s.alignSelected);
-  const distributeSelected = useSlideStore((s) => s.distributeSelected);
-  const groupSelected = useSlideStore((s) => s.groupSelected);
-  const ungroupSelected = useSlideStore((s) => s.ungroupSelected);
-  const toggleLockSelected = useSlideStore((s) => s.toggleLockSelected);
-  const toggleVisibleSelected = useSlideStore((s) => s.toggleVisibleSelected);
 
   const slide = doc.slides[slideIndex];
   const element = slide?.elements.find((item) => item.id === selection[selection.length - 1]);
+  const activeCell = useSlideStore((s) => s.activeCell);
+  const setTableSize = useSlideStore((s) => s.setTableSize);
+  const patchTableCell = useSlideStore((s) => s.patchTableCell);
+  const mergeCellRight = useSlideStore((s) => s.mergeCellRight);
+  const splitCell = useSlideStore((s) => s.splitCell);
 
   if (!element) {
     return (
@@ -42,6 +67,15 @@ export function PropertyPanel() {
           <p className="text-[11px] text-gray-400 dark:text-gray-500">
             {t('tools.slide.noSelection')}
           </p>
+        </Section>
+        {/* 备注是页级属性，放在「未选中元素」分支下语义最自然 */}
+        <Section title={t('tools.slide.notes')}>
+          <TextArea
+            ariaLabel={t('tools.slide.notes')}
+            value={slide?.notes ?? ''}
+            placeholder={t('tools.slide.notesHint')}
+            onChange={(notes) => updateSlide({ notes })}
+          />
         </Section>
       </div>
     );
@@ -61,11 +95,18 @@ export function PropertyPanel() {
   const firstStyle: RunStyle | undefined = body?.paragraphs[0]?.runs[0]?.style;
   const align: TextAlign = body?.paragraphs[0]?.align ?? 'left';
 
-  // 组合/锁定/隐藏作用于整个选中集合，判断依据取全部选中元素而非最后一个
-  const selectedElements = slide?.elements.filter((item) => selection.includes(item.id)) ?? [];
-  const hasGroup = selectedElements.some((item) => item.type === 'group');
-  const allLocked = selectedElements.length > 0 && selectedElements.every((item) => item.locked);
-  const anyHidden = selectedElements.some((item) => item.visible === false);
+  const cornerRadiusValue =
+    element.type === 'text' || element.type === 'image' ? (element.cornerRadius ?? 0) : 0;
+
+  const cropValue = (side: 'left' | 'top' | 'right' | 'bottom'): number =>
+    element.type === 'image' ? (element.crop?.[side] ?? 0) : 0;
+
+  const patchCrop = (side: 'left' | 'top' | 'right' | 'bottom', value: number) => {
+    if (element.type !== 'image') return;
+    apply({
+      crop: { left: 0, top: 0, right: 0, bottom: 0, ...element.crop, [side]: value },
+    } as Partial<SlideElement>);
+  };
 
   const patchFill = (next: Fill) => apply({ fill: next } as Partial<SlideElement>);
   const patchStroke = (next: Stroke | undefined) =>
@@ -91,6 +132,18 @@ export function PropertyPanel() {
     if (!body) return;
     apply({
       body: { ...body, paragraphs: body.paragraphs.map((p) => ({ ...p, align: next })) },
+    } as Partial<SlideElement>);
+  };
+  /** 段落级属性（行距/缩进/段前后）写回全部段落：这类字段在 Paragraph 上而非 RunStyle 上 */
+  const patchParagraph = (patch: {
+    lineSpacing?: number;
+    indent?: number;
+    spaceBefore?: number;
+    spaceAfter?: number;
+  }) => {
+    if (!body) return;
+    apply({
+      body: { ...body, paragraphs: body.paragraphs.map((p) => ({ ...p, ...patch })) },
     } as Partial<SlideElement>);
   };
 
@@ -147,127 +200,70 @@ export function PropertyPanel() {
             />
           </Field>
         </div>
-        <ActionRow>
-          <button
-            type="button"
-            onClick={() => apply({ flipX: !element.flipX })}
-            className="h-7 rounded-md border border-gray-300 px-2 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            {t('tools.slide.flipH')}
-          </button>
-          <button
-            type="button"
-            onClick={() => apply({ flipY: !element.flipY })}
-            className="h-7 rounded-md border border-gray-300 px-2 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            {t('tools.slide.flipV')}
-          </button>
-          <ToggleGlyph
-            label={t('tools.slide.bringForward')}
-            active={false}
-            onClick={bringForward}
-            text="↑"
-          />
-          <ToggleGlyph
-            label={t('tools.slide.sendBackward')}
-            active={false}
-            onClick={sendBackward}
-            text="↓"
-          />
-        </ActionRow>
-        <ActionRow>
-          <ToggleGlyph
-            label={t('tools.slide.bringToFront')}
-            active={false}
-            onClick={bringToFront}
-            text="⇈"
-          />
-          <ToggleGlyph
-            label={t('tools.slide.sendToBack')}
-            active={false}
-            onClick={sendToBack}
-            text="⇊"
-          />
-        </ActionRow>
+        {/* 层级 / 对齐 / 分布 / 组合 / 翻转 / 锁定 / 隐藏 都是「选中态操作」，
+            已统一收进顶部工具栏的「排列」行；这里只保留数值属性，语义更干净。 */}
       </Section>
 
-      <Section title={t('tools.slide.alignTitle')}>
-        <ActionRow>
-          <ToggleGlyph
-            label={t('tools.slide.alignLeft')}
-            active={false}
-            onClick={() => alignSelected('left')}
-            text="⇤"
-          />
-          <ToggleGlyph
-            label={t('tools.slide.alignCenter')}
-            active={false}
-            onClick={() => alignSelected('hcenter')}
-            text="↔"
-          />
-          <ToggleGlyph
-            label={t('tools.slide.alignRight')}
-            active={false}
-            onClick={() => alignSelected('right')}
-            text="⇥"
-          />
-          <ToggleGlyph
-            label={t('tools.slide.alignTop')}
-            active={false}
-            onClick={() => alignSelected('top')}
-            text="⇡"
-          />
-          <ToggleGlyph
-            label={t('tools.slide.alignMiddle')}
-            active={false}
-            onClick={() => alignSelected('vcenter')}
-            text="↕"
-          />
-          <ToggleGlyph
-            label={t('tools.slide.alignBottom')}
-            active={false}
-            onClick={() => alignSelected('bottom')}
-            text="⇣"
-          />
-        </ActionRow>
-        <ActionRow>
-          <ActionButton
-            label={t('tools.slide.distributeH')}
-            disabled={selection.length < 3}
-            onClick={() => distributeSelected('horizontal')}
-          />
-          <ActionButton
-            label={t('tools.slide.distributeV')}
-            disabled={selection.length < 3}
-            onClick={() => distributeSelected('vertical')}
-          />
-        </ActionRow>
-      </Section>
-
-      <Section title={t('tools.slide.arrangeTitle')}>
-        <ActionRow>
-          <ActionButton
-            label={t('tools.slide.group')}
-            disabled={selection.length < 2}
-            onClick={groupSelected}
-          />
-          <ActionButton
-            label={t('tools.slide.ungroup')}
-            disabled={!hasGroup}
-            onClick={ungroupSelected}
-          />
-        </ActionRow>
-        <ActionRow>
-          <ActionButton
-            label={allLocked ? t('tools.slide.unlock') : t('tools.slide.lock')}
-            onClick={toggleLockSelected}
-          />
-          <ActionButton
-            label={anyHidden ? t('tools.slide.show') : t('tools.slide.hide')}
-            onClick={toggleVisibleSelected}
-          />
-        </ActionRow>
-      </Section>
+      {element.type === 'table' ? (
+        <Section title={t('tools.slide.tableTitle')}>
+          <Field label={t('tools.slide.tableRows')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.tableRows')}
+              value={element.rows.length}
+              min={1}
+              max={50}
+              onChange={(rows) => setTableSize(rows, element.colWidths.length)}
+            />
+          </Field>
+          <Field label={t('tools.slide.tableCols')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.tableCols')}
+              value={element.colWidths.length}
+              min={1}
+              max={50}
+              onChange={(cols) => setTableSize(element.rows.length, cols)}
+            />
+          </Field>
+          <ActionRow>
+            <ActionButton
+              label={t('tools.slide.headerRow')}
+              onClick={() => apply({ headerRow: !element.headerRow } as Partial<SlideElement>)}
+            />
+            <ActionButton
+              label={t('tools.slide.bandRow')}
+              onClick={() => apply({ bandRow: !element.bandRow } as Partial<SlideElement>)}
+            />
+          </ActionRow>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">
+            {activeCell
+              ? `${t('tools.slide.activeCell')}: ${activeCell.row + 1}, ${activeCell.col + 1}`
+              : t('tools.slide.cellHint')}
+          </p>
+          {activeCell ? (
+            <>
+              <Field label={t('tools.slide.cellText')}>
+                <TextInput
+                  ariaLabel={t('tools.slide.cellText')}
+                  value={element.rows[activeCell.row]?.[activeCell.col]?.text ?? ''}
+                  onChange={(text) => patchTableCell(activeCell.row, activeCell.col, { text })}
+                />
+              </Field>
+              <ActionRow>
+                <ActionButton
+                  label={t('tools.slide.mergeRight')}
+                  disabled={activeCell.col >= element.rows[activeCell.row].length - 1}
+                  onClick={mergeCellRight}
+                />
+                <ActionButton
+                  label={t('tools.slide.splitCell')}
+                  disabled={(element.rows[activeCell.row]?.[activeCell.col]?.colSpan ?? 1) <= 1}
+                  onClick={splitCell}
+                />
+              </ActionRow>
+            </>
+          ) : null}
+        </Section>
+      ) : null}
 
       {element.type !== 'line' && element.type !== 'table' ? (
         <Section title={t('tools.slide.fill')}>
@@ -298,11 +294,47 @@ export function PropertyPanel() {
               }
             />
           </Field>
+          {/* 圆角：文本框与图片都支持（渲染与导出均已打通，此前只是没有入口） */}
+          {element.type === 'text' || element.type === 'image' ? (
+            <Field label={t('tools.slide.cornerRadius')}>
+              <NumberInput
+                ariaLabel={t('tools.slide.cornerRadius')}
+                value={Math.round(cornerRadiusValue)}
+                min={0}
+                max={200}
+                onChange={(value) => apply({ cornerRadius: value } as Partial<SlideElement>)}
+              />
+            </Field>
+          ) : null}
+          {element.type === 'image' ? (
+            <>
+              {(['left', 'top', 'right', 'bottom'] as const).map((side) => (
+                <Field key={side} label={`${t('tools.slide.crop')}·${sideLabel(side)}`}>
+                  <NumberInput
+                    ariaLabel={`${t('tools.slide.crop')} ${side}`}
+                    value={Math.round(cropValue(side) * 100)}
+                    min={0}
+                    max={90}
+                    suffix="%"
+                    onChange={(value) => patchCrop(side, value / 100)}
+                  />
+                </Field>
+              ))}
+            </>
+          ) : null}
         </Section>
       ) : null}
 
       {body ? (
         <Section title={t('tools.slide.panelText')}>
+          <Field label={t('tools.slide.fontFamily')}>
+            <SelectInput
+              ariaLabel={t('tools.slide.fontFamily')}
+              value={firstStyle?.font ?? 'Arial'}
+              options={FONT_OPTIONS}
+              onChange={(font) => patchStyle({ font })}
+            />
+          </Field>
           <Field label={t('tools.slide.fontSize')}>
             <NumberInput
               ariaLabel={t('tools.slide.fontSize')}
@@ -310,6 +342,43 @@ export function PropertyPanel() {
               min={6}
               max={200}
               onChange={(size) => patchStyle({ size })}
+            />
+          </Field>
+          <Field label={t('tools.slide.lineHeight')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.lineHeight')}
+              value={Number((body.paragraphs[0]?.lineSpacing ?? 1.2).toFixed(2))}
+              min={0.5}
+              max={5}
+              step={0.1}
+              onChange={(lineSpacing) => patchParagraph({ lineSpacing })}
+            />
+          </Field>
+          <Field label={t('tools.slide.indent')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.indent')}
+              value={Math.round(body.paragraphs[0]?.indent ?? 0)}
+              min={0}
+              max={400}
+              onChange={(indent) => patchParagraph({ indent })}
+            />
+          </Field>
+          <Field label={t('tools.slide.spaceBefore')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.spaceBefore')}
+              value={Math.round(body.paragraphs[0]?.spaceBefore ?? 0)}
+              min={0}
+              max={400}
+              onChange={(spaceBefore) => patchParagraph({ spaceBefore })}
+            />
+          </Field>
+          <Field label={t('tools.slide.spaceAfter')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.spaceAfter')}
+              value={Math.round(body.paragraphs[0]?.spaceAfter ?? 0)}
+              min={0}
+              max={400}
+              onChange={(spaceAfter) => patchParagraph({ spaceAfter })}
             />
           </Field>
           <Field label={t('tools.slide.color')}>
@@ -352,19 +421,42 @@ export function PropertyPanel() {
               underline
             />
             <ToggleGlyph
+              label={t('tools.slide.strike')}
+              active={Boolean(firstStyle?.strike)}
+              onClick={() => patchStyle({ strike: !firstStyle?.strike })}
+              text="S"
+              strike
+            />
+            <ToggleGlyph
               label={t('tools.slide.bullet')}
               active={Boolean(body.paragraphs[0]?.bullet)}
               onClick={() =>
                 apply({
                   body: {
                     ...body,
+                    // 项目符号与编号互斥：开启其一时清掉另一个
                     paragraphs: body.paragraphs.map((p, index) =>
-                      index === 0 ? { ...p, bullet: !p.bullet } : p,
+                      index === 0 ? { ...p, bullet: !p.bullet, numbering: false } : p,
                     ),
                   },
                 } as Partial<SlideElement>)
               }
               text="•"
+            />
+            <ToggleGlyph
+              label={t('tools.slide.numbering')}
+              active={Boolean(body.paragraphs[0]?.numbering)}
+              onClick={() =>
+                apply({
+                  body: {
+                    ...body,
+                    paragraphs: body.paragraphs.map((p, index) =>
+                      index === 0 ? { ...p, numbering: !p.numbering, bullet: false } : p,
+                    ),
+                  },
+                } as Partial<SlideElement>)
+              }
+              text="1."
             />
           </ActionRow>
         </Section>
@@ -433,6 +525,7 @@ function ToggleGlyph({
   bold,
   italic,
   underline,
+  strike,
 }: {
   label: string;
   active: boolean;
@@ -441,6 +534,7 @@ function ToggleGlyph({
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  strike?: boolean;
 }) {
   return (
     <button
@@ -453,9 +547,16 @@ function ToggleGlyph({
         active
           ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300'
           : 'border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800'
-      } ${bold ? 'font-bold' : ''} ${italic ? 'italic' : ''} ${underline ? 'underline' : ''}`}
+      } ${bold ? 'font-bold' : ''} ${italic ? 'italic' : ''} ${underline ? 'underline' : ''} ${
+        strike ? 'line-through' : ''
+      }`}
     >
       {text}
     </button>
   );
+}
+
+/** 裁剪四边的方向标记（语言无关，避免为四个方向各加 9 语文案） */
+function sideLabel(side: 'left' | 'top' | 'right' | 'bottom'): string {
+  return side === 'left' ? '←' : side === 'top' ? '↑' : side === 'right' ? '→' : '↓';
 }

@@ -9,7 +9,8 @@ import {
   type DistributeAxis,
 } from './core';
 import { cloneDoc, cloneElement, createDoc, createSlide, createId } from './model/factory';
-import type { Slide, SlideDoc, SlideElement } from './model/types';
+import { findTemplate, instantiateTemplate } from './model/templates';
+import type { Slide, SlideDoc, SlideElement, TableCell } from './model/types';
 
 /**
  * 幻灯片编辑器状态：唯一真相源是 doc，其余（选中 / 视口 / 历史）是会话态。
@@ -23,6 +24,9 @@ export interface Viewport {
   scale: number;
   width: number;
   height: number;
+  /** 相对「页面居中位置」的平移偏移（滚轮平移 / 抓手拖动产生） */
+  panX: number;
+  panY: number;
 }
 
 export interface ImportReport {
@@ -42,6 +46,14 @@ interface SlideState {
   report: ImportReport | null;
   /** 会话内剪贴板：不入 doc、不进 undo，关闭页面即失效 */
   clipboard: SlideElement[];
+  /** 表格当前活动单元格（点击画布单元格设置，供属性面板编辑文字） */
+  activeCell: { row: number; col: number } | null;
+  /** 网格吸附开关（开启后拖动会额外吸附到 GRID_SIZE 的整数倍） */
+  gridSnap: boolean;
+  /** 标尺与参考线显示开关 */
+  showRulers: boolean;
+  /** 手动参考线（会话态，不入 doc / 不进 undo） */
+  guides: { id: string; axis: 'x' | 'y'; position: number }[];
 
   loadDoc: (doc: SlideDoc, report?: ImportReport | null) => void;
   setDocName: (name: string) => void;
@@ -74,9 +86,35 @@ interface SlideState {
   toggleLockSelected: () => void;
   toggleVisibleSelected: () => void;
 
+  toggleGridSnap: () => void;
+  toggleRulers: () => void;
+  addGuide: (axis: 'x' | 'y', position: number) => void;
+  moveGuide: (id: string, position: number) => void;
+  removeGuide: (id: string) => void;
+
   copySelected: () => void;
   cutSelected: () => void;
   pasteClipboard: () => void;
+
+  setActiveCell: (cell: { row: number; col: number } | null) => void;
+  setTableSize: (rows: number, cols: number) => void;
+  patchTableCell: (row: number, col: number, patch: Partial<TableCell>) => void;
+  /** 把活动单元格与其右侧相邻单元格横向合并 */
+  mergeCellRight: () => void;
+  /** 拆分活动单元格（还原被覆盖的右侧格子） */
+  splitCell: () => void;
+
+  /** 把当前选中元素提升为母版元素（提升后所有页都会显示） */
+  promoteSelectedToMaster: () => void;
+  /** 清空母版公共元素 */
+  clearMasterElements: () => void;
+  setMasterBackground: (color: string | undefined) => void;
+
+  /** 用一批新页整体替换（Markdown 大纲生成用） */
+  replaceSlides: (slides: Slide[]) => void;
+  applyTemplate: (templateId: string) => void;
+  applyThemeColor: (key: string, color: string) => void;
+  setThemeFont: (scope: 'major' | 'minor', font: string) => void;
 
   commit: () => void;
   undo: () => void;
@@ -112,12 +150,16 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   doc: createDoc(),
   slideIndex: 0,
   selection: [],
-  viewport: { scale: 0, width: 0, height: 0 },
+  viewport: { scale: 0, width: 0, height: 0, panX: 0, panY: 0 },
   showPlaceholders: true,
   past: [],
   future: [],
   report: emptyReport,
   clipboard: [],
+  activeCell: null,
+  gridSnap: false,
+  showRulers: true,
+  guides: [],
 
   loadDoc: (doc, report) =>
     set((s) => ({
@@ -255,6 +297,8 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   select: (ids, additive = false) =>
     set((s) => ({
       selection: additive ? Array.from(new Set([...s.selection, ...ids])) : ids,
+      // 换选中元素时清掉表格活动单元格，避免面板继续指向已经取消选中的表格
+      activeCell: null,
     })),
 
   addElement: (element) => {
@@ -630,6 +674,280 @@ export const useSlideStore = create<SlideState>((set, get) => ({
         version: s.doc.version + 1,
       },
       selection: copies.map((el) => el.id),
+    }));
+  },
+
+  setActiveCell: (cell) => set({ activeCell: cell }),
+
+  toggleGridSnap: () => set((s) => ({ gridSnap: !s.gridSnap })),
+
+  toggleRulers: () => set((s) => ({ showRulers: !s.showRulers })),
+
+  addGuide: (axis, position) =>
+    set((s) => ({
+      guides: [...s.guides, { id: createId('guide'), axis, position: Math.round(position) }],
+    })),
+
+  moveGuide: (id, position) =>
+    set((s) => ({
+      guides: s.guides.map((guide) =>
+        guide.id === id ? { ...guide, position: Math.round(position) } : guide,
+      ),
+    })),
+
+  removeGuide: (id) => set((s) => ({ guides: s.guides.filter((guide) => guide.id !== id) })),
+
+  setTableSize: (rows, cols) => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    const target = slide?.elements.find(
+      (el) => state.selection.includes(el.id) && el.type === 'table',
+    );
+    if (!slide || !target || target.type !== 'table') return;
+    const nextRows = Math.max(1, Math.min(50, Math.round(rows)));
+    const nextCols = Math.max(1, Math.min(50, Math.round(cols)));
+    if (nextRows === target.rows.length && nextCols === target.colWidths.length) return;
+
+    const emptyCell = (): TableCell => ({ text: '', align: 'left', valign: 'middle' });
+    // 保留已有内容：多出来的行/列补空单元格，减少的行/列直接裁掉
+    const nextCells = target.rows.slice(0, nextRows).map((row) => {
+      const copy = row.slice(0, nextCols);
+      while (copy.length < nextCols) copy.push(emptyCell());
+      return copy;
+    });
+    while (nextCells.length < nextRows) {
+      nextCells.push(Array.from({ length: nextCols }, emptyCell));
+    }
+    // 行列尺寸按新数量均分（当前没有单独调整列宽的入口，均分最可预期）
+    const colWidths = Array.from({ length: nextCols }, () => Math.round(target.width / nextCols));
+    const rowHeights = Array.from({ length: nextRows }, () => Math.round(target.height / nextRows));
+    const patches = new Map<string, Partial<SlideElement>>();
+    patches.set(target.id, { rows: nextCells, colWidths, rowHeights });
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: withPatches(s.doc.slides, s.slideIndex, patches),
+        version: s.doc.version + 1,
+      },
+      activeCell: null,
+    }));
+  },
+
+  patchTableCell: (row, col, patch) => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    const target = slide?.elements.find(
+      (el) => state.selection.includes(el.id) && el.type === 'table',
+    );
+    if (!target || target.type !== 'table') return;
+    if (!target.rows[row]?.[col]) return;
+    const rows = target.rows.map((cells, rowIndex) =>
+      rowIndex === row
+        ? cells.map((cell, colIndex) => (colIndex === col ? { ...cell, ...patch } : cell))
+        : cells,
+    );
+    const patches = new Map<string, Partial<SlideElement>>();
+    patches.set(target.id, { rows });
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: withPatches(s.doc.slides, s.slideIndex, patches),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  promoteSelectedToMaster: () => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    const master = state.doc.masters[0];
+    if (!slide || !master || state.selection.length === 0) return;
+    const picked = slide.elements.filter((el) => state.selection.includes(el.id));
+    if (picked.length === 0) return;
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        // 母版元素坐标即页面坐标，无需换算
+        masters: s.doc.masters.map((item, index) =>
+          index === 0 ? { ...item, elements: [...item.elements, ...picked] } : item,
+        ),
+        slides: s.doc.slides.map((item, index) =>
+          index === s.slideIndex
+            ? { ...item, elements: item.elements.filter((el) => !s.selection.includes(el.id)) }
+            : item,
+        ),
+        version: s.doc.version + 1,
+      },
+      selection: [],
+    }));
+  },
+
+  clearMasterElements: () => {
+    const master = get().doc.masters[0];
+    if (!master || master.elements.length === 0) return;
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        masters: s.doc.masters.map((item, index) =>
+          index === 0 ? { ...item, elements: [] } : item,
+        ),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  setMasterBackground: (color) => {
+    const master = get().doc.masters[0];
+    if (!master) return;
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        masters: s.doc.masters.map((item, index) =>
+          index === 0 ? { ...item, background: color } : item,
+        ),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  replaceSlides: (slides) => {
+    if (slides.length === 0) return;
+    get().commit();
+    set((s) => ({
+      doc: { ...s.doc, slides, version: s.doc.version + 1 },
+      slideIndex: 0,
+      selection: [],
+      activeCell: null,
+    }));
+  },
+
+  mergeCellRight: () => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    const target = slide?.elements.find(
+      (el) => state.selection.includes(el.id) && el.type === 'table',
+    );
+    const cell = state.activeCell;
+    if (!target || target.type !== 'table' || !cell) return;
+    const row = target.rows[cell.row];
+    const current = row?.[cell.col];
+    const next = row?.[cell.col + 1];
+    // 只允许向右吞并「尚未被覆盖」的相邻格
+    if (!current || !next || next.covered) return;
+    const consume = Math.max(1, next.colSpan ?? 1);
+    const rows = target.rows.map((cells, rowIndex) =>
+      rowIndex !== cell.row
+        ? cells
+        : cells.map((item, colIndex) => {
+            if (colIndex === cell.col) {
+              return { ...item, colSpan: (item.colSpan ?? 1) + consume };
+            }
+            if (colIndex > cell.col && colIndex <= cell.col + consume) {
+              return {
+                ...item,
+                covered: true,
+                coveredBy: 'h' as const,
+                colSpan: undefined,
+                text: '',
+              };
+            }
+            return item;
+          }),
+    );
+    const patches = new Map<string, Partial<SlideElement>>();
+    patches.set(target.id, { rows });
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: withPatches(s.doc.slides, s.slideIndex, patches),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  splitCell: () => {
+    const state = get();
+    const slide = state.doc.slides[state.slideIndex];
+    const target = slide?.elements.find(
+      (el) => state.selection.includes(el.id) && el.type === 'table',
+    );
+    const cell = state.activeCell;
+    if (!target || target.type !== 'table' || !cell) return;
+    const current = target.rows[cell.row]?.[cell.col];
+    const span = current?.colSpan ?? 1;
+    if (!current || span <= 1) return;
+    const rows = target.rows.map((cells, rowIndex) =>
+      rowIndex !== cell.row
+        ? cells
+        : cells.map((item, colIndex) => {
+            if (colIndex === cell.col) return { ...item, colSpan: undefined };
+            if (colIndex > cell.col && colIndex < cell.col + span) {
+              return { ...item, covered: undefined, coveredBy: undefined };
+            }
+            return item;
+          }),
+    );
+    const patches = new Map<string, Partial<SlideElement>>();
+    patches.set(target.id, { rows });
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        slides: withPatches(s.doc.slides, s.slideIndex, patches),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  applyTemplate: (templateId) => {
+    const template = findTemplate(templateId);
+    if (!template) return;
+    const { theme, masters, layouts } = instantiateTemplate(template);
+    const defaultLayoutId = layouts[0]?.id;
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        theme,
+        masters,
+        layouts,
+        // 换模板后原有 layoutId 已不存在，统一指向新模板的首个版式，避免悬空引用
+        slides: s.doc.slides.map((slide) => ({ ...slide, layoutId: defaultLayoutId })),
+        version: s.doc.version + 1,
+      },
+      selection: [],
+    }));
+  },
+
+  applyThemeColor: (key, color) => {
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        theme: { ...s.doc.theme, colors: { ...s.doc.theme.colors, [key]: color } },
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  setThemeFont: (scope, font) => {
+    const fonts = { latin: font, ea: font, cs: font };
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        theme: {
+          ...s.doc.theme,
+          [scope === 'major' ? 'majorFont' : 'minorFont']: fonts,
+        },
+        version: s.doc.version + 1,
+      },
     }));
   },
 }));

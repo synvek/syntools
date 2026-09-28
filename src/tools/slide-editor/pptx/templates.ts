@@ -33,6 +33,7 @@ export const SLIDE_LAYOUT_TYPE = `${APP}.slideLayout+xml`;
 export const SLIDE_TYPE = `${APP}.slide+xml`;
 export const THEME_TYPE = `${APP}.theme+xml`;
 export const PRESENTATION_TYPE = `${APP}.presentation.main+xml`;
+export const NOTES_SLIDE_TYPE = `${APP}.notesSlide+xml`;
 
 export const XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 
@@ -57,7 +58,54 @@ export function rootRels(): string {
   ].join('');
 }
 
-export function contentTypes(doc: SlideDoc): string {
+/**
+ * 演讲者备注部件（ppt/notesSlides/notesSlideN.xml）。
+ * 结构：p:notes → p:cSld → p:spTree，其中备注正文放在 type="body" idx="1" 的占位符里。
+ */
+export function notesSlideXml(text: string): string {
+  const paragraphs = text.split('\n');
+  const body = paragraphs
+    .map(
+      (line) =>
+        `<a:p><a:r><a:rPr lang="en-US" dirty="0"/><a:t>${escapeXml(line)}</a:t></a:r></a:p>`,
+    )
+    .join('');
+  return [
+    XML_DECLARATION,
+    `<p:notes xmlns:a="${XMLNS.drawingml}" xmlns:r="${XMLNS.relationships}" xmlns:p="${XMLNS.presentationml}">`,
+    '<p:cSld>',
+    '<p:spTree>',
+    '<p:nvGrpSpPr><p:cNvPr id="1" name="Group 1"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>',
+    '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>',
+    '<p:sp>',
+    '<p:nvSpPr><p:cNvPr id="2" name="Notes Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>',
+    '<p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>',
+    '<p:spPr/>',
+    `<p:txBody><a:bodyPr/><a:lstStyle/>${body}</p:txBody>`,
+    '</p:sp>',
+    '</p:spTree>',
+    '</p:cSld>',
+    '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>',
+    '</p:notes>',
+  ].join('');
+}
+
+/** 备注部件的 rels：必须反向指回所属幻灯片 */
+export function notesSlideRels(slideNumber: number): string {
+  return [
+    XML_DECLARATION,
+    `<Relationships xmlns="${XMLNS.packageRelationships}">`,
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="../slides/slide${slideNumber}.xml"/>`,
+    '</Relationships>',
+  ].join('');
+}
+
+export function contentTypes(
+  doc: SlideDoc,
+  layoutCount = 1,
+  masterCount = 1,
+  notesSlideNumbers: number[] = [],
+): string {
   const extensions = new Set<string>(
     Object.keys(CONTENT_TYPE_DEFAULTS).filter((k) => k !== 'rels' && k !== 'xml'),
   );
@@ -72,30 +120,45 @@ export function contentTypes(doc: SlideDoc): string {
   }
   parts.push(`<Override PartName="/ppt/presentation.xml" ContentType="${PRESENTATION_TYPE}"/>`);
   parts.push(`<Override PartName="/ppt/theme/theme1.xml" ContentType="${THEME_TYPE}"/>`);
-  parts.push(
-    `<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="${SLIDE_MASTER_TYPE}"/>`,
-  );
-  parts.push(
-    `<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="${SLIDE_LAYOUT_TYPE}"/>`,
-  );
+  for (let index = 0; index < Math.max(1, masterCount); index += 1) {
+    parts.push(
+      `<Override PartName="/ppt/slideMasters/slideMaster${index + 1}.xml" ContentType="${SLIDE_MASTER_TYPE}"/>`,
+    );
+  }
+  for (let index = 0; index < Math.max(1, layoutCount); index += 1) {
+    parts.push(
+      `<Override PartName="/ppt/slideLayouts/slideLayout${index + 1}.xml" ContentType="${SLIDE_LAYOUT_TYPE}"/>`,
+    );
+  }
   doc.slides.forEach((_, index) => {
     parts.push(
       `<Override PartName="/ppt/slides/slide${index + 1}.xml" ContentType="${SLIDE_TYPE}"/>`,
     );
   });
+  for (const number of notesSlideNumbers) {
+    parts.push(
+      `<Override PartName="/ppt/notesSlides/notesSlide${number}.xml" ContentType="${NOTES_SLIDE_TYPE}"/>`,
+    );
+  }
   parts.push('</Types>');
   return parts.join('');
 }
 
-export function presentationXml(slideCount: number, doc: SlideDoc): string {
+export function presentationXml(slideCount: number, doc: SlideDoc, masterCount = 1): string {
+  const masters = Math.max(1, masterCount);
   return [
     XML_DECLARATION,
     `<p:presentation xmlns:a="${XMLNS.drawingml}" xmlns:r="${XMLNS.relationships}" xmlns:p="${XMLNS.presentationml}" saveSubsetFonts="true">`,
-    '<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>',
+    '<p:sldMasterIdLst>',
+    Array.from(
+      { length: masters },
+      (_, index) => `<p:sldMasterId id="${2147483648 + index}" r:id="rId${index + 1}"/>`,
+    ).join(''),
+    '</p:sldMasterIdLst>',
     '<p:sldIdLst>',
     Array.from(
       { length: slideCount },
-      (_, index) => `<p:sldId id="${256 + index}" r:id="rId${index + 2}"/>`,
+      (_, index) => `<p:sldId id="${256 + index}" r:id="rId${masters + 1 + index}"/>`,
     ).join(''),
     '</p:sldIdLst>',
     `<p:sldSz cx="${pxToEmu(doc.width)}" cy="${pxToEmu(doc.height)}"/>`,
@@ -104,23 +167,32 @@ export function presentationXml(slideCount: number, doc: SlideDoc): string {
   ].join('');
 }
 
-export function presentationRels(slideCount: number): string {
+export function presentationRels(slideCount: number, masterCount = 1): string {
+  const masters = Math.max(1, masterCount);
   const lines = [
     XML_DECLARATION,
     `<Relationships xmlns="${XMLNS.packageRelationships}">`,
-    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>`,
+    Array.from(
+      { length: masters },
+      (_, index) =>
+        `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster${index + 1}.xml"/>`,
+    ).join(''),
   ];
   for (let index = 0; index < slideCount; index += 1) {
     lines.push(
-      `<Relationship Id="rId${index + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${index + 1}.xml"/>`,
+      `<Relationship Id="rId${masters + 1 + index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${index + 1}.xml"/>`,
     );
   }
   lines.push('</Relationships>');
   return lines.join('');
 }
 
-export function slideMasterXml(layoutCount = 1): string {
-  const relIds = Array.from({ length: layoutCount }, (_, index) => `rId${index + 1}`);
+/**
+ * 母版。`extraShapes` 是要写进 spTree 的母版元素 DrawingML（由调用方用 elementXml 生成），
+ * 放在这里而不是直接 import write.ts，避免 templates ↔ write 的循环依赖。
+ */
+export function slideMasterXml(layoutCount = 1, extraShapes = ''): string {
+  const relIds = Array.from({ length: Math.max(1, layoutCount) }, (_, index) => `rId${index + 1}`);
   return [
     XML_DECLARATION,
     `<p:sldMaster xmlns:a="${XMLNS.drawingml}" xmlns:r="${XMLNS.relationships}" xmlns:p="${XMLNS.presentationml}">`,
@@ -128,6 +200,7 @@ export function slideMasterXml(layoutCount = 1): string {
     '<p:spTree>',
     '<p:nvGrpSpPr><p:cNvPr id="1" name="Group 1"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>',
     '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>',
+    extraShapes,
     '</p:spTree>',
     '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>',
     '</p:cSld>',
@@ -140,18 +213,25 @@ export function slideMasterXml(layoutCount = 1): string {
   ].join('');
 }
 
-export function slideMasterRels(): string {
+/** 母版 rels：先依次挂各版式，最后挂主题（主题 rId 必须排在所有版式之后） */
+export function slideMasterRels(layoutCount = 1): string {
+  const layouts = Array.from(
+    { length: Math.max(1, layoutCount) },
+    (_, index) =>
+      `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout${index + 1}.xml"/>`,
+  );
   return [
     XML_DECLARATION,
     `<Relationships xmlns="${XMLNS.packageRelationships}">`,
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>',
-    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>',
+    ...layouts,
+    `<Relationship Id="rId${Math.max(1, layoutCount) + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>`,
     '</Relationships>',
   ].join('');
 }
 
 /** 空白版式：只有一个内在 spTree，占位符由 slide 自行携带 */
-export function slideLayoutXml(name: string, type: string): string {
+/** 版式。`extraShapes` 为写进 spTree 的版式元素 DrawingML */
+export function slideLayoutXml(name: string, type: string, extraShapes = ''): string {
   return [
     XML_DECLARATION,
     `<p:sldLayout xmlns:a="${XMLNS.drawingml}" xmlns:r="${XMLNS.relationships}" xmlns:p="${XMLNS.presentationml}" type="${type}" preserve="1">`,
@@ -159,6 +239,7 @@ export function slideLayoutXml(name: string, type: string): string {
     '<p:spTree>',
     '<p:nvGrpSpPr><p:cNvPr id="1" name="Group 1"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>',
     '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>',
+    extraShapes,
     '</p:spTree>',
     '</p:cSld>',
     '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>',
@@ -166,11 +247,11 @@ export function slideLayoutXml(name: string, type: string): string {
   ].join('');
 }
 
-export function slideLayoutRels(): string {
+export function slideLayoutRels(masterIndex = 0): string {
   return [
     XML_DECLARATION,
     `<Relationships xmlns="${XMLNS.packageRelationships}">`,
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>',
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster${masterIndex + 1}.xml"/>`,
     '</Relationships>',
   ].join('');
 }

@@ -10,6 +10,7 @@ import type {
   TableElement,
   TextBody,
 } from '../model/types';
+import { scaleBodyFonts } from '../model/text';
 import { acquireImage } from './imageCache';
 import { layoutTextBody } from './textLayout';
 
@@ -96,8 +97,17 @@ function applyStroke(node: Konva.Shape, stroke: Stroke | undefined): void {
 /** 文本 body → Konva.Group（内部按 run 片段分段，保留混排样式） */
 export function createTextNodes(body: TextBody, width: number, height: number): Konva.Group {
   const group = new Konva.Group({ listening: false });
-  const layout = layoutTextBody(body, { width, height });
-  // 内容超出盒子时按比例压缩，模拟 pptx 的 normAutofit
+
+  // normAutofit：超框时先等比缩小字号重新排版（最多迭代 3 次），
+  // 这与 PowerPoint「自动调整文字大小」的行为一致；直接压缩 Y 轴会把文字压扁。
+  let effective = body;
+  let layout = layoutTextBody(effective, { width, height });
+  for (let attempt = 0; attempt < 3 && height > 0 && layout.height > height; attempt += 1) {
+    const factor = Math.max(0.2, (height / layout.height) * 0.98);
+    effective = scaleBodyFonts(effective, factor);
+    layout = layoutTextBody(effective, { width, height });
+  }
+  // 缩到下限仍溢出时退回纵向压缩兜底，至少保证内容都在框内
   if (layout.height > height && height > 0) {
     group.scaleY(height / layout.height);
   }
@@ -165,27 +175,74 @@ function createShapeNode(element: ShapeElement): Konva.Shape {
   });
 }
 
+/**
+ * 表格渲染。
+ *
+ * 必须消费 cell.colSpan / rowSpan：早期实现只按行列下标取 colWidths[rowHeights]，
+ * 合并单元格会被画成错位/空洞（而导出反而是正确的），导致「看到的和导出的不一致」。
+ * 这里用占用矩阵跳过被合并覆盖的格子，并把跨列/跨行的宽高累加起来。
+ */
 function createTableNode(element: TableElement): Konva.Group {
-  const group = new Konva.Group({ listening: false });
+  const group = new Konva.Group({ listening: true });
   const { rows, colWidths, rowHeights } = element;
   const border = element.borderColor ?? '#BFBFBF';
-  let y = 0;
-  rows.forEach((row, rowIndex) => {
-    const height = rowHeights[rowIndex] ?? element.height / rows.length;
-    let x = 0;
-    row.forEach((cell, colIndex) => {
-      const width = colWidths[colIndex] ?? element.width / Math.max(1, element.colWidths.length);
+  const colCount = Math.max(colWidths.length, ...rows.map((row) => row.length), 1);
+  const fallbackWidth = element.width / colCount;
+  const fallbackHeight = element.height / Math.max(1, rows.length);
+
+  /** 累加前 n 列的宽度（网格列号，而不是数组下标） */
+  const widthBefore = (gridCol: number): number => {
+    let total = 0;
+    for (let c = 0; c < gridCol; c += 1) total += colWidths[c] ?? fallbackWidth;
+    return total;
+  };
+
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    // 关键：列位置用「网格列号」推进，而不是数组下标 ——
+    // 否则一行里出现 gridSpan 后，后面所有单元格都会左移错位。
+    let gridCol = 0;
+    let y = 0;
+    for (let r = 0; r < rowIndex; r += 1) y += rowHeights[r] ?? fallbackHeight;
+
+    for (let arrayIndex = 0; arrayIndex < rows[rowIndex].length; arrayIndex += 1) {
+      const cell = rows[rowIndex][arrayIndex];
+      const colSpan = Math.max(1, cell.colSpan ?? 1);
+      const rowSpan = Math.max(1, cell.rowSpan ?? 1);
+      const x = widthBefore(gridCol);
+      let width = 0;
+      for (let c = gridCol; c < gridCol + colSpan; c += 1) {
+        width += colWidths[c] ?? fallbackWidth;
+      }
+      let height = 0;
+      for (let r = rowIndex; r < rowIndex + rowSpan; r += 1) {
+        height += rowHeights[r] ?? fallbackHeight;
+      }
+      // 命中标记用「数组下标」：store 的 patchTableCell / activeCell 都按数组槽位操作
+      const colIndex = arrayIndex;
+      gridCol += colSpan;
+
+      // 被合并覆盖的格子不绘制（但仍占据网格位置）
+      if (cell.covered) continue;
+
+      const isHeader = element.headerRow && rowIndex === 0;
+      const isBanded = element.bandRow && rowIndex % 2 === 1;
+      const fill = cell.fill ?? (isHeader ? '#E7E6E6' : isBanded ? '#F2F2F2' : '#FFFFFF');
       const rect = new Konva.Rect({
         x,
         y,
         width,
         height,
-        fill: cell.fill ?? (rowIndex % 2 === 1 && element.bandRow ? '#F2F2F2' : '#FFFFFF'),
+        fill,
         stroke: border,
         strokeWidth: 1,
-        listening: false,
+        // 单元格可点击：属性面板需要知道当前活动单元格以便编辑文字
+        name: 'cell',
+        listening: true,
       });
+      rect.setAttr('cellRow', rowIndex);
+      rect.setAttr('cellCol', colIndex);
       group.add(rect);
+
       if (cell.text) {
         const pad = 4;
         const text = new Konva.Text({
@@ -196,7 +253,8 @@ function createTableNode(element: TableElement): Konva.Group {
           text: cell.text,
           fontSize: cell.size ?? 14,
           fontFamily: DEFAULT_FONT,
-          fontStyle: cell.bold ? 'bold' : 'normal',
+          // 表头默认加粗（与 PowerPoint 的表头行样式一致）
+          fontStyle: cell.bold || isHeader ? 'bold' : 'normal',
           fill: cell.color ?? '#000000',
           align: cell.align ?? 'left',
           verticalAlign: cell.valign ?? 'middle',
@@ -206,10 +264,8 @@ function createTableNode(element: TableElement): Konva.Group {
         });
         group.add(text);
       }
-      x += width;
-    });
-    y += height;
-  });
+    }
+  }
   return group;
 }
 
@@ -387,6 +443,19 @@ export function patchElementNode(
       if (image && imageNode.image() !== image) imageNode.image(image);
       imageNode.width(element.width);
       imageNode.height(element.height);
+      // 图片走属性快路径，圆角与裁剪必须在这里同步，否则改了不刷新
+      imageNode.cornerRadius(element.cornerRadius ?? 0);
+      const crop = element.crop;
+      if (crop) {
+        imageNode.crop({
+          x: asset.width * crop.left,
+          y: asset.height * crop.top,
+          width: asset.width * (1 - crop.left - crop.right),
+          height: asset.height * (1 - crop.top - crop.bottom),
+        });
+      } else {
+        imageNode.crop({ x: 0, y: 0, width: 0, height: 0 });
+      }
     }
   } else if (element.type === 'line') {
     const lineNode = node.findOne('Line') as Konva.Line | undefined;

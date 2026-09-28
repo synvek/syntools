@@ -11,6 +11,28 @@ import {
 import { createMediaFromFile } from '../model/media';
 import type { ShapeGeometry } from '../model/types';
 import { useSlideStore } from '../store';
+import { MenuButton, type MenuItem } from './MenuButton';
+import {
+  AlignIcon,
+  DistributeIcon,
+  FlipIcon,
+  GroupIcon,
+  LayerIcon,
+  RedoIcon,
+  UndoIcon,
+  UngroupIcon,
+} from './toolIcons';
+
+/**
+ * 工具栏：与文字处理器 / 电子表格处理器保持同一套按钮语言 ——
+ *
+ * - **绝大部分按钮只有图标**，文字只作为 tooltip（title / aria-label），
+ *   空闲态无边框、激活态蓝底填充（沿用 EditorToolbar 的约定）；
+ * - **少数「分类入口」下拉**保留图标 + 文字（形状 / 对齐 / 分布 / 翻转），
+ *   因为纯图标很难区分这四者；下拉菜单项仍显示文字。
+ *
+ * 三行分组：插入 / 排列 / 视图。其中「排列」全部是**选中态操作**，未选中时整行禁用。
+ */
 
 const SHAPES: { key: string; geom: ShapeGeometry }[] = [
   { key: 'shapeRect', geom: { kind: 'rect', prst: 'rect' } },
@@ -31,12 +53,24 @@ const SHAPES: { key: string; geom: ShapeGeometry }[] = [
   },
 ];
 
-/** 工具栏行：插入元素 / 撤销重做 / 缩放 / 页面调整 */
+const ROW =
+  'slide-glass flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 p-1.5 shadow-sm dark:border-gray-700';
+const GROUP = 'flex flex-wrap items-center gap-0.5';
+/** 分组竖线，与文字处理器工具栏一致 */
+const SEP = <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />;
+
+const BTN_BASE =
+  'flex h-8 min-w-8 items-center justify-center rounded-md border px-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+const BTN_IDLE =
+  'border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800';
+const BTN_ACTIVE = 'border-blue-600 bg-blue-600 text-white';
+
 export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => void }) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const doc = useSlideStore((s) => s.doc);
   const scale = useSlideStore((s) => s.viewport.scale);
+  const selection = useSlideStore((s) => s.selection);
   const canUndo = useSlideStore((s) => s.past.length > 0);
   const canRedo = useSlideStore((s) => s.future.length > 0);
   const setScale = useSlideStore((s) => s.setScale);
@@ -46,13 +80,28 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
   const redo = useSlideStore((s) => s.redo);
   const moveSlide = useSlideStore((s) => s.moveSlide);
   const slideIndex = useSlideStore((s) => s.slideIndex);
+  const gridSnap = useSlideStore((s) => s.gridSnap);
+  const showRulers = useSlideStore((s) => s.showRulers);
+  const toggleGridSnap = useSlideStore((s) => s.toggleGridSnap);
+  const toggleRulers = useSlideStore((s) => s.toggleRulers);
+
+  const bringToFront = useSlideStore((s) => s.bringToFront);
+  const sendToBack = useSlideStore((s) => s.sendToBack);
+  const bringForward = useSlideStore((s) => s.bringForward);
+  const sendBackward = useSlideStore((s) => s.sendBackward);
+  const alignSelected = useSlideStore((s) => s.alignSelected);
+  const distributeSelected = useSlideStore((s) => s.distributeSelected);
+  const groupSelected = useSlideStore((s) => s.groupSelected);
+  const ungroupSelected = useSlideStore((s) => s.ungroupSelected);
+  const toggleLockSelected = useSlideStore((s) => s.toggleLockSelected);
+  const toggleVisibleSelected = useSlideStore((s) => s.toggleVisibleSelected);
+  const patchSelected = useSlideStore((s) => s.patchSelected);
+
+  const hasSelection = selection.length > 0;
 
   const insertText = () => addElement(createTextElement(doc, t('tools.slide.insertText')));
-
   const insertShape = (geom: ShapeGeometry) => addElement(createShapeElement(doc, geom));
-
   const insertLine = () => addElement(createLineElement(doc));
-
   const insertTable = () => addElement(createTableElement(doc));
 
   const handleImage = async (file: File) => {
@@ -72,84 +121,270 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
     addElement(createImageElement(doc, asset));
   };
 
+  const shapeItems: MenuItem[] = SHAPES.map((shape) => ({
+    key: shape.key,
+    label: t(`tools.slide.${shape.key}`),
+    glyph: <ShapeGlyph geom={shape.geom} />,
+    onClick: () => insertShape(shape.geom),
+  }));
+
+  const alignItems: MenuItem[] = [
+    { key: 'left', label: t('tools.slide.alignLeft'), onClick: () => alignSelected('left') },
+    {
+      key: 'hcenter',
+      label: t('tools.slide.alignCenter'),
+      onClick: () => alignSelected('hcenter'),
+    },
+    { key: 'right', label: t('tools.slide.alignRight'), onClick: () => alignSelected('right') },
+    { key: 'top', label: t('tools.slide.alignTop'), onClick: () => alignSelected('top') },
+    {
+      key: 'vcenter',
+      label: t('tools.slide.alignMiddle'),
+      onClick: () => alignSelected('vcenter'),
+    },
+    { key: 'bottom', label: t('tools.slide.alignBottom'), onClick: () => alignSelected('bottom') },
+  ];
+
+  const distributeItems: MenuItem[] = [
+    {
+      key: 'h',
+      label: t('tools.slide.distributeH'),
+      disabled: selection.length < 3,
+      onClick: () => distributeSelected('horizontal'),
+    },
+    {
+      key: 'v',
+      label: t('tools.slide.distributeV'),
+      disabled: selection.length < 3,
+      onClick: () => distributeSelected('vertical'),
+    },
+  ];
+
+  const flipItems: MenuItem[] = [
+    { key: 'flipH', label: t('tools.slide.flipH'), onClick: () => toggleFlip('flipX') },
+    { key: 'flipV', label: t('tools.slide.flipV'), onClick: () => toggleFlip('flipY') },
+  ];
+
+  /** 翻转是「取反」语义，必须读当前值：patchSelected 同时适用于多选 */
+  function toggleFlip(axis: 'flipX' | 'flipY') {
+    const state = useSlideStore.getState();
+    const slide = state.doc.slides[state.slideIndex];
+    const target = slide?.elements.find(
+      (el) => el.id === state.selection[state.selection.length - 1],
+    );
+    if (!target) return;
+    patchSelected({ [axis]: !target[axis] } as never);
+  }
+
+  /** 锁定/隐藏按钮的激活态：选中元素全部处于该状态才算「已开启」 */
+  const allLocked = (): boolean => {
+    const state = useSlideStore.getState();
+    const slide = state.doc.slides[state.slideIndex];
+    const picked = (slide?.elements ?? []).filter((el) => state.selection.includes(el.id));
+    return picked.length > 0 && picked.every((el) => el.locked);
+  };
+
+  const anyHidden = (): boolean => {
+    const state = useSlideStore.getState();
+    const slide = state.doc.slides[state.slideIndex];
+    const picked = (slide?.elements ?? []).filter((el) => state.selection.includes(el.id));
+    return picked.length > 0 && picked.every((el) => el.visible === false);
+  };
+
   return (
     <div className="flex flex-col gap-2">
-      <div className="slide-glass flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 p-2 shadow-sm dark:border-gray-700">
-        <div className="flex items-center gap-1">
-          <ToolButton label={t('tools.slide.insertText')} icon="text" onClick={insertText} />
-          {SHAPES.map((shape) => (
-            <button
-              key={shape.key}
-              type="button"
-              title={t(`tools.slide.${shape.key}`)}
-              aria-label={t(`tools.slide.${shape.key}`)}
-              onClick={() => insertShape(shape.geom)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <ShapeGlyph geom={shape.geom} />
-            </button>
-          ))}
-          <ToolButton label={t('tools.slide.insertLine')} icon="pen" onClick={insertLine} />
-          <ToolButton
-            label={t('tools.slide.insertImage')}
-            icon="image"
-            onClick={() => fileInputRef.current?.click()}
+      {/* ── 插入 ── */}
+      <div className={ROW}>
+        <div className={GROUP}>
+          <IconButton label={t('tools.slide.insertText')} onClick={insertText}>
+            <Icon name="text" className="h-4 w-4" />
+          </IconButton>
+          {/* 下拉是「分类入口」，保留文字更易懂 */}
+          <MenuButton
+            label={t('tools.slide.insertShape')}
+            icon="shapes"
+            items={shapeItems}
+            size="md"
+            showLabel
           />
-          <ToolButton label={t('tools.slide.insertTable')} icon="table" onClick={insertTable} />
+          <IconButton label={t('tools.slide.insertLine')} onClick={insertLine}>
+            <Icon name="pen" className="h-4 w-4" />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.insertImage')}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Icon name="image" className="h-4 w-4" />
+          </IconButton>
+          <IconButton label={t('tools.slide.insertTable')} onClick={insertTable}>
+            <Icon name="table" className="h-4 w-4" />
+          </IconButton>
         </div>
 
-        <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
-          <ToolButton
-            label={t('tools.slide.undo')}
-            icon="chevron"
-            onClick={undo}
-            disabled={!canUndo}
-          />
-          <ToolButton
-            label={t('tools.slide.redo')}
-            icon="chevron"
-            onClick={redo}
-            disabled={!canRedo}
-          />
+        {SEP}
+
+        <div className={GROUP}>
+          <IconButton label={t('tools.slide.undo')} onClick={undo} disabled={!canUndo}>
+            <UndoIcon />
+          </IconButton>
+          <IconButton label={t('tools.slide.redo')} onClick={redo} disabled={!canRedo}>
+            <RedoIcon />
+          </IconButton>
         </div>
       </div>
 
-      <div className="slide-glass flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 p-2 shadow-sm dark:border-gray-700">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            title={t('tools.slide.zoomOut')}
-            aria-label={t('tools.slide.zoomOut')}
-            onClick={() => setScale(Math.max(0.1, Math.round((scale - 0.1) * 100) / 100))}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-base leading-none text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            −
-          </button>
-          <span className="w-10 text-center text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
-            {Math.round(scale * 100)}%
-          </span>
-          <button
-            type="button"
-            title={t('tools.slide.zoomIn')}
-            aria-label={t('tools.slide.zoomIn')}
-            onClick={() => setScale(Math.min(3, Math.round((scale + 0.1) * 100) / 100))}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-base leading-none text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            +
-          </button>
-          <ToolButton
-            label={t('tools.slide.zoomFit')}
-            icon="ruler"
-            onClick={() => setViewport({ scale: 0 })}
+      {/* ── 排列：全部是选中态操作，未选中时整行禁用 ── */}
+      <div className={ROW}>
+        <div className={GROUP}>
+          <MenuButton
+            label={t('tools.slide.alignTitle')}
+            glyph={<AlignIcon />}
+            items={alignItems}
+            disabled={!hasSelection}
+            showLabel
+          />
+          <MenuButton
+            label={t('tools.slide.distributeTitle')}
+            glyph={<DistributeIcon />}
+            items={distributeItems}
+            disabled={selection.length < 3}
+            showLabel
           />
         </div>
 
-        <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-700">
-          <ToolButton
-            label={t('tools.slide.moveUp')}
-            icon="swap"
-            onClick={() => moveSlide(slideIndex, Math.max(0, slideIndex - 1))}
+        {SEP}
+
+        <div className={GROUP}>
+          <IconButton
+            label={t('tools.slide.bringToFront')}
+            disabled={!hasSelection}
+            onClick={bringToFront}
+          >
+            <LayerIcon variant="front" />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.bringForward')}
+            disabled={!hasSelection}
+            onClick={bringForward}
+          >
+            <LayerIcon variant="forward" />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.sendBackward')}
+            disabled={!hasSelection}
+            onClick={sendBackward}
+          >
+            <LayerIcon variant="backward" />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.sendToBack')}
+            disabled={!hasSelection}
+            onClick={sendToBack}
+          >
+            <LayerIcon variant="back" />
+          </IconButton>
+        </div>
+
+        {SEP}
+
+        <div className={GROUP}>
+          <IconButton
+            label={t('tools.slide.group')}
+            disabled={selection.length < 2}
+            onClick={groupSelected}
+          >
+            <GroupIcon />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.ungroup')}
+            disabled={!hasSelection}
+            onClick={ungroupSelected}
+          >
+            <UngroupIcon />
+          </IconButton>
+          <MenuButton
+            label={t('tools.slide.flipTitle')}
+            glyph={<FlipIcon />}
+            items={flipItems}
+            disabled={!hasSelection}
+            showLabel
           />
+        </div>
+
+        {SEP}
+
+        <div className={GROUP}>
+          <IconButton
+            label={t('tools.slide.lock')}
+            active={allLocked()}
+            disabled={!hasSelection}
+            onClick={toggleLockSelected}
+          >
+            <Icon name={allLocked() ? 'lock' : 'unlock'} className="h-4 w-4" />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.hide')}
+            active={anyHidden()}
+            disabled={!hasSelection}
+            onClick={toggleVisibleSelected}
+          >
+            <Icon name={anyHidden() ? 'eyeOff' : 'eye'} className="h-4 w-4" />
+          </IconButton>
+        </div>
+      </div>
+
+      {/* ── 视图 ── */}
+      <div className={ROW}>
+        <div className={GROUP}>
+          <IconButton
+            label={t('tools.slide.zoomOut')}
+            onClick={() => setScale(Math.max(0.1, Math.round((scale - 0.1) * 100) / 100))}
+          >
+            <Icon name="zoomOut" className="h-4 w-4" />
+          </IconButton>
+          {/* 百分比是数值显示而非按钮，保留文字 */}
+          <span className="w-10 text-center text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
+            {Math.round(scale * 100)}%
+          </span>
+          <IconButton
+            label={t('tools.slide.zoomIn')}
+            onClick={() => setScale(Math.min(3, Math.round((scale + 0.1) * 100) / 100))}
+          >
+            <Icon name="zoomIn" className="h-4 w-4" />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.zoomFit')}
+            // 适应窗口同时复位平移，否则会被误认为「点了没反应」
+            onClick={() => setViewport({ scale: 0, panX: 0, panY: 0 })}
+          >
+            <Icon name="fitScreen" className="h-4 w-4" />
+          </IconButton>
+        </div>
+
+        {SEP}
+
+        <div className={GROUP}>
+          <IconButton label={t('tools.slide.gridSnap')} active={gridSnap} onClick={toggleGridSnap}>
+            <Icon name="grid" className="h-4 w-4" />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.showRulers')}
+            active={showRulers}
+            onClick={toggleRulers}
+          >
+            <Icon name="ruler" className="h-4 w-4" />
+          </IconButton>
+        </div>
+
+        {SEP}
+
+        <div className={GROUP}>
+          <IconButton
+            label={t('tools.slide.moveUp')}
+            onClick={() => moveSlide(slideIndex, Math.max(0, slideIndex - 1))}
+          >
+            <Icon name="swap" className="h-4 w-4" />
+          </IconButton>
         </div>
       </div>
 
@@ -168,33 +403,36 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
   );
 }
 
-function ToolButton({
+/** 工具栏图标按钮：仅图标，文字走 tooltip；激活态蓝底填充 */
+function IconButton({
   label,
-  icon,
   onClick,
   disabled,
+  active,
+  children,
 }: {
   label: string;
-  icon: string;
   onClick: () => void;
   disabled?: boolean;
+  active?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
+      aria-pressed={active}
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-8 items-center gap-1 rounded-md border border-gray-300 px-2 text-[12px] text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+      className={`${BTN_BASE} ${active ? BTN_ACTIVE : BTN_IDLE}`}
     >
-      <Icon name={icon} className="h-4 w-4" />
-      <span className="hidden xl:inline">{label}</span>
+      {children}
     </button>
   );
 }
 
-/** 形状按钮内的几何缩略图（内联 SVG，避免额外依赖） */
+/** 形状缩略图（内联 SVG，避免额外依赖） */
 function ShapeGlyph({ geom }: { geom: ShapeGeometry }) {
   const common = { width: 16, height: 16, viewBox: '0 0 16 16' } as const;
   if (geom.kind === 'ellipse') {

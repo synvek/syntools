@@ -40,6 +40,7 @@ import {
 import { parseBackgroundColor, parseTheme } from './theme';
 import {
   attr,
+  boolAttr,
   childOf,
   childrenNamed,
   childrenOf,
@@ -169,6 +170,11 @@ function parseTextBody(
       if (kind === 'r') {
         const text = textOf(childOf(item, 't'));
         runs.push({ text, style: parseRunStyle(childOf(item, 'rPr'), palette, theme) });
+      } else if (kind === 'fld') {
+        // 字段（页码 / 日期 / 幻灯片编号）：结构与 a:r 一致（rPr + t），
+        // 此前被整段忽略，导致「第 X 页」这类内容凭空消失
+        const text = textOf(childOf(item, 't'));
+        runs.push({ text, style: parseRunStyle(childOf(item, 'rPr'), palette, theme) });
       } else if (kind === 'br') {
         runs.push({ text: '\n' });
       }
@@ -179,7 +185,9 @@ function parseTextBody(
     paragraphs.push({
       runs: runs.length > 0 ? runs : [{ text: '' }],
       align: ALIGN_MAP[attr(pPr, 'algn') ?? ''] ?? 'left',
-      bullet: Boolean(childOf(pPr, 'buChar') || childOf(pPr, 'buAutoNum')),
+      bullet: Boolean(childOf(pPr, 'buChar')),
+      // buAutoNum 是「自动编号」，此前被误当作项目符号，导致 1./2. 变成 •
+      numbering: Boolean(childOf(pPr, 'buAutoNum')),
       lineSpacing: lineSpacingPct ? lineSpacingPct / 1000 : undefined,
       spaceBefore: spaceBef === undefined ? undefined : (spaceBef / 100) * (96 / 72),
       spaceAfter: spaceAft === undefined ? undefined : (spaceAft / 100) * (96 / 72),
@@ -387,6 +395,13 @@ function parseTableCells(node: XmlNode, palette: Palette, theme: SlideTheme): Ta
         valign: ANCHOR_MAP[attr(tcPr, 'anchor') ?? ''] ?? 'middle',
         colSpan: numAttr(tcNode, 'gridSpan'),
         rowSpan: numAttr(tcNode, 'rowSpan'),
+        // hMerge / vMerge 表示该格被左上方的合并单元格覆盖，不参与绘制
+        ...(boolAttr(tcNode, 'hMerge') || boolAttr(tcNode, 'vMerge')
+          ? {
+              covered: true,
+              coveredBy: (boolAttr(tcNode, 'hMerge') ? 'h' : 'v') as 'h' | 'v',
+            }
+          : {}),
       });
     }
     rows.push(row);
@@ -404,6 +419,7 @@ function parseTable(
   // 列宽定义在 a:tblGrid 下；少数第三方生成的文件会省略 tblGrid，故兼容直接子节点
   const gridNode = childOf(node, 'tblGrid') ?? node;
   const cols = childrenNamed(gridNode, 'gridCol');
+  const tblPr = childOf(node, 'tblPr');
   const colWidths = cols.map((col) => emuPx(numAttr(col, 'w')) || 100);
   const rows = parseTableCells(node, palette, theme);
   const rectWidth = emuPx(xfrm?.width) || colWidths.reduce((a, b) => a + b, 0);
@@ -420,6 +436,9 @@ function parseTable(
     rows,
     colWidths: colWidths.length > 0 ? colWidths : (rows[0]?.map(() => 100) ?? []),
     rowHeights: rowHeights.length > 0 ? rowHeights : rows.map(() => 32),
+    // a:tblPr 的 firstRow / bandRow 决定表头与斑马纹，此前被丢弃导致导入后样式变化
+    headerRow: tblPr ? boolAttr(tblPr, 'firstRow') : true,
+    bandRow: tblPr ? boolAttr(tblPr, 'bandRow') : false,
     borderColor: '#BFBFBF',
   };
   return element;
@@ -446,16 +465,29 @@ async function ensureMedia(
   return result.value.id;
 }
 
-function noteUnsupported(ctx: ImportContext, kind: string, label: string): SlideElement {
+/**
+ * 降级为占位框。
+ *
+ * 必须带上原始几何：此前固定 240×160 @(0,0)，导致图表 / SmartArt / OLE 全部
+ * 堆叠在页面左上角，用户完全看不出原文档的版面结构。
+ */
+function noteUnsupported(
+  ctx: ImportContext,
+  kind: string,
+  label: string,
+  rect?: { x: number; y: number; width: number; height: number },
+): SlideElement {
   ctx.placeholders += 1;
   ctx.skipped.add(kind);
+  const width = rect && rect.width > 0 ? rect.width : 240;
+  const height = rect && rect.height > 0 ? rect.height : 160;
   return {
     id: nextId(ctx, 'ph'),
     type: 'placeholder',
-    x: 0,
-    y: 0,
-    width: 240,
-    height: 160,
+    x: rect && rect.width > 0 ? rect.x : 0,
+    y: rect && rect.height > 0 ? rect.y : 0,
+    width,
+    height,
     sourceKind: kind,
     label,
   };
@@ -483,12 +515,13 @@ async function parseGraphicFrame(
     const table = parseTable(tableNode, ctx, xfrm, palette, theme) as TableElement;
     return { ...table, ...base };
   }
-  if (uri.includes('chart')) return noteUnsupported(ctx, 'chart', '图表');
-  if (uri.includes('diagram')) return noteUnsupported(ctx, 'diagram', 'SmartArt');
-  if (uri.includes('ole')) return noteUnsupported(ctx, 'ole', '嵌入对象');
+  // 占位框沿用原对象的矩形，保住版面结构
+  if (uri.includes('chart')) return noteUnsupported(ctx, 'chart', '图表', base);
+  if (uri.includes('diagram')) return noteUnsupported(ctx, 'diagram', 'SmartArt', base);
+  if (uri.includes('ole')) return noteUnsupported(ctx, 'ole', '嵌入对象', base);
   void slidePart;
   void rels;
-  return noteUnsupported(ctx, uri || 'unknown', '图形框架');
+  return noteUnsupported(ctx, uri || 'unknown', '图形框架', base);
 }
 
 async function parseSpTreeNode(
@@ -584,6 +617,36 @@ async function parseGroup(
     rotation: xfrm?.rotation === undefined ? undefined : xfrm.rotation / 60000,
     children: mapped,
   };
+}
+
+/**
+ * 解析演讲者备注：从幻灯片的 rels 找到 notesSlide 部件，取 body 占位符的文本。
+ * 找不到（或为空）时返回 undefined，不写空备注字段。
+ */
+async function parseNotesText(
+  ctx: ImportContext,
+  slidePart: string,
+  rels: Map<string, Relationship>,
+): Promise<string | undefined> {
+  const notesRel = [...rels.values()].find((rel) => rel.type.includes('notesSlide'));
+  if (!notesRel) return undefined;
+  const notesPart = normalizePartPath(slidePart, notesRel.target);
+  const notesXml = await readXmlPart(ctx.zip, notesPart);
+  if (!notesXml) return undefined;
+  const spTree = childOf(childOf(notesXml, 'cSld'), 'spTree');
+  for (const sp of childrenNamed(spTree, 'sp')) {
+    const ph = childOf(childOf(childOf(sp, 'nvSpPr'), 'nvPr'), 'ph');
+    if (!ph) continue;
+    // 备注正文的占位符是 type="body" idx="1"；其它（页码、幻灯片缩略图）跳过
+    if (attr(ph, 'type') !== 'body' && attr(ph, 'idx') !== '1') continue;
+    const body = childOf(sp, 'txBody');
+    const text = childrenNamed(body, 'p')
+      .map((paragraph) => textOf(paragraph) ?? '')
+      .join('\n')
+      .trim();
+    if (text) return text;
+  }
+  return undefined;
 }
 
 /** 解析一层 spTree（保持文档顺序即 z-order） */
@@ -862,6 +925,7 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
       layoutId: layoutId || undefined,
       elements,
       background,
+      notes: await parseNotesText(ctx, slidePart, rels),
     });
   }
 

@@ -98,6 +98,61 @@ export function TextInput({
   );
 }
 
+/** 下拉选择（字体等枚举项）。value 不在 options 内时追加，避免静默丢值 */
+export function SelectInput({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  ariaLabel: string;
+}) {
+  const list = options.includes(value) ? options : [value, ...options];
+  return (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className={`${inputClass} max-w-[130px]`}
+    >
+      {list.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** 多行文本（演讲者备注等页级长文本） */
+export function TextArea({
+  value,
+  onChange,
+  ariaLabel,
+  rows = 6,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  ariaLabel: string;
+  rows?: number;
+  placeholder?: string;
+}) {
+  return (
+    <textarea
+      aria-label={ariaLabel}
+      rows={rows}
+      placeholder={placeholder}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className={`${inputClass} h-auto w-full resize-y py-1.5 leading-relaxed`}
+    />
+  );
+}
+
 export function ColorInput({
   value,
   onChange,

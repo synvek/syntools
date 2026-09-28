@@ -173,6 +173,7 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
     ]),
     prst: 'rtTriangle',
   },
+  // 等腰三角形（尖朝上）。此前 prst 被误写为 rtTriangle，导出时会把形状改掉
   isoTriangle: {
     kind: 'polygon',
     points: poly([
@@ -180,7 +181,7 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
       [1, 1],
       [0, 1],
     ]),
-    prst: 'rtTriangle',
+    prst: 'isoTriangle',
   },
   // 菱形 / 梯形
   diamond: {
@@ -203,7 +204,20 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
     ]),
     prst: 'trapezoid',
   },
+  // 正五边形（尖朝上，顶点在半径 0.5 的外接圆上）
   pentagon: {
+    kind: 'polygon',
+    points: poly([
+      [0.5, 0],
+      [0.976, 0.345],
+      [0.794, 0.905],
+      [0.206, 0.905],
+      [0.024, 0.345],
+    ]),
+    prst: 'pentagon',
+  },
+  // 本垒板形（DrawingML homePlate）：此前被错误地当作 pentagon 的几何
+  homePlate: {
     kind: 'polygon',
     points: poly([
       [0.5, 0],
@@ -365,15 +379,28 @@ function candidatesOf(rect: SnapCandidate, axis: 'x' | 'y'): number[] {
   return [rect.y, rect.y + rect.height / 2, rect.y + rect.height];
 }
 
+/** 网格吸附步长（px @96dpi），与画布背景网格保持一致 */
+export const GRID_SIZE = 24;
+
+export interface SnapOptions {
+  /** 额外静态吸附位置（手动参考线） */
+  extraX?: number[];
+  extraY?: number[];
+  /** 网格吸附步长；传 0 / 不传表示关闭 */
+  grid?: number;
+}
+
 /**
  * 计算移动元素的吸附落点：
- * 比较「当前边/中线」与「页面中心 + 其它元素的边/中线」，距离 ≤ tolerance 时吸附并产生参考线。
+ * 比较「当前边/中线」与「页面中心 + 其它元素的边/中线 + 手动参考线」，距离 ≤ tolerance 时吸附并产生参考线。
+ * 某个轴没有对齐命中时，若开启网格吸附，则退化为吸附到最近的网格线。
  */
 export function computeSnap(
   moving: Rect,
   others: SnapCandidate[],
   page: { width: number; height: number },
   tolerance = 6,
+  options: SnapOptions = {},
 ): SnapResult {
   let dx = 0;
   let dy = 0;
@@ -381,8 +408,8 @@ export function computeSnap(
   let bestX: { delta: number; position: number } | null = null;
   let bestY: { delta: number; position: number } | null = null;
 
-  const staticX = [0, page.width / 2, page.width];
-  const staticY = [0, page.height / 2, page.height];
+  const staticX = [0, page.width / 2, page.width, ...(options.extraX ?? [])];
+  const staticY = [0, page.height / 2, page.height, ...(options.extraY ?? [])];
   for (const other of others) {
     staticX.push(...candidatesOf(other, 'x'));
     staticY.push(...candidatesOf(other, 'y'));
@@ -406,10 +433,15 @@ export function computeSnap(
   if (bestX) {
     dx = bestX.delta;
     guides.push({ axis: 'x', position: bestX.position });
+  } else if (options.grid && options.grid > 0) {
+    // 没有对齐命中时退化到网格吸附（不画参考线，避免视觉噪音）
+    dx = Math.round(moving.x / options.grid) * options.grid - moving.x;
   }
   if (bestY) {
     dy = bestY.delta;
     guides.push({ axis: 'y', position: bestY.position });
+  } else if (options.grid && options.grid > 0) {
+    dy = Math.round(moving.y / options.grid) * options.grid - moving.y;
   }
 
   return { x: moving.x + dx, y: moving.y + dy, guides };
@@ -583,6 +615,6 @@ export function sanitizeFilename(name: string): string {
   return cleaned.slice(0, 60) || 'presentation';
 }
 
-export function buildExportFilename(title: string, ext: 'pptx'): string {
+export function buildExportFilename(title: string, ext: 'pptx' | 'pdf' | 'png' | 'sld'): string {
   return `${sanitizeFilename(title)}.${ext}`;
 }

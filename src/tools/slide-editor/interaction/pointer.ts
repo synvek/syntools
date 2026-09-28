@@ -14,6 +14,11 @@ export type { TransformChange };
 export interface SnapContext {
   page: { width: number; height: number };
   others: SnapCandidate[];
+  /** 手动参考线的吸附位置 */
+  extraX: number[];
+  extraY: number[];
+  /** 网格吸附步长（0 = 关闭） */
+  grid: number;
 }
 
 export interface StageCallbacks {
@@ -24,6 +29,10 @@ export interface StageCallbacks {
   onTransformEnd: (changes: TransformChange[]) => void;
   onBackgroundClick: () => void;
   onTextEdit: (id: string) => void;
+  /** 点到表格单元格时回传坐标（null 表示点到的不是单元格） */
+  onCellSelect: (cell: { row: number; col: number } | null) => void;
+  /** 平移画布（中键拖动） */
+  onPan: (dx: number, dy: number) => void;
   getSnapContext: () => SnapContext;
   getSelection: () => string[];
 }
@@ -37,6 +46,8 @@ function ancestorElement(node: Konva.Node): Konva.Node | undefined {
 export function attachInteraction(handle: StageHandle): void {
   const { stage, contentLayer, marquee, callbacks } = handle;
   let marqueeStart: { x: number; y: number } | null = null;
+  /** 中键拖动平移：与框选互斥，按下时优先 */
+  let panStart: { x: number; y: number } | null = null;
   /** 本帧是否由框选落点触发，用于抑制随后误发的背景 click 清选 */
   let marqueeJustEnded = false;
   let dragOrigin = new Map<string, { x: number; y: number }>();
@@ -48,6 +59,12 @@ export function attachInteraction(handle: StageHandle): void {
 
   stage.on('mousedown touchstart', (event) => {
     const target = event.target;
+    // 中键按下即进入平移（即使落在元素上），浏览器默认中键是自动滚动，这里拦掉
+    if (event.evt instanceof MouseEvent && event.evt.button === 1) {
+      event.evt.preventDefault();
+      panStart = pointerPosition();
+      return;
+    }
     const element = ancestorElement(target);
     // 任何按下动作都会让上一轮「框选落点」标记失效，避免误吞后续正常点击
     marqueeJustEnded = false;
@@ -58,6 +75,12 @@ export function attachInteraction(handle: StageHandle): void {
   });
 
   stage.on('mousemove touchmove', () => {
+    if (panStart) {
+      const current = pointerPosition();
+      callbacks.onPan(current.x - panStart.x, current.y - panStart.y);
+      panStart = current;
+      return;
+    }
     if (!marqueeStart) return;
     const current = pointerPosition();
     updateMarquee(marquee, {
@@ -69,6 +92,10 @@ export function attachInteraction(handle: StageHandle): void {
   });
 
   stage.on('mouseup touchend', () => {
+    if (panStart) {
+      panStart = null;
+      return;
+    }
     if (!marqueeStart) return;
     const box = marquee.getAttrs();
     marqueeStart = null;
@@ -111,6 +138,12 @@ export function attachInteraction(handle: StageHandle): void {
       event.evt instanceof MouseEvent && (event.evt.shiftKey || event.evt.metaKey),
     );
     callbacks.onSelect([element.id()], additive);
+    // 点到表格单元格时记下坐标，属性面板据此编辑该单元格文字
+    const row = event.target.getAttr('cellRow');
+    const col = event.target.getAttr('cellCol');
+    callbacks.onCellSelect(
+      typeof row === 'number' && typeof col === 'number' ? { row, col } : null,
+    );
   });
 
   contentLayer.on('dblclick dbltap', (event) => {
@@ -184,6 +217,7 @@ function snapNode(
     context.others,
     context.page,
     tolerance,
+    { extraX: context.extraX, extraY: context.extraY, grid: context.grid },
   );
   node.position({ x: result.x, y: result.y });
   if (result.guides.length > 0) {

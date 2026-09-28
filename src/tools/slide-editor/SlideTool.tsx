@@ -5,9 +5,12 @@ import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
 import { Icon } from '@/core/components/Icon';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
-import { downloadBytes } from '@/core/pdf/download';
+import { downloadBytes, downloadDataUrl } from '@/core/pdf/download';
 import { buildExportFilename } from './core';
 import { clearDraft, readDraft, writeDraft } from './draft';
+import { disposeRaster, exportSlidesToPdf, renderSlideToDataUrl } from './io/raster';
+import { buildDeck, parseOutline } from './io/outline';
+import { openProject, saveProject } from './io/project';
 import { attachKeyboard } from './interaction/keyboard';
 import { disposeThumbnails } from './render/thumbnail';
 import { revokeAllMediaUrls } from './model/media';
@@ -16,6 +19,7 @@ import { checkImportFile, importPptxFile } from './pptx/import';
 import { exportPptx } from './pptx/export';
 import { registerSlideStrings } from './strings';
 import { useSlideStore } from './store';
+import { LayerPanel } from './ui/LayerPanel';
 import { PresentOverlay } from './ui/PresentOverlay';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { SlideCanvas } from './ui/SlideCanvas';
@@ -63,9 +67,12 @@ export default function SlideTool() {
   const [runtimeError, setRuntimeError] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
-  const [rightTab, setRightTab] = useState<'element' | 'theme'>('element');
+  const [rightTab, setRightTab] = useState<'element' | 'layers' | 'theme'>('element');
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [outlineText, setOutlineText] = useState('');
   const saveTimer = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const projectInputRef = useRef<HTMLInputElement | null>(null);
 
   const fail = useCallback((error: string, params?: Record<string, string | number>) => {
     setFailure({ error, params });
@@ -107,6 +114,89 @@ export default function SlideTool() {
     );
   }, []);
 
+  /** 导出 PDF：逐页光栅后合成，复用 core/pdf 的 imagesToPdf */
+  const handleExportPdf = useCallback(async () => {
+    setFailure(null);
+    setBusy('export');
+    const state = useSlideStore.getState();
+    const result = await exportSlidesToPdf(state.doc);
+    setBusy(null);
+    if (!result.ok) {
+      setFailure(result as Failure);
+      return;
+    }
+    downloadBytes(
+      result.value,
+      buildExportFilename(state.doc.name || 'presentation', 'pdf'),
+      'application/pdf',
+    );
+  }, []);
+
+  /** 导出当前页 PNG（2 倍以上分辨率） */
+  const handleExportPng = useCallback(() => {
+    setFailure(null);
+    const state = useSlideStore.getState();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const dataUrl = renderSlideToDataUrl(state.doc, slide);
+    if (!dataUrl) {
+      setFailure({ error: 'RENDER_FAILED' });
+      return;
+    }
+    downloadDataUrl(
+      dataUrl,
+      buildExportFilename(`${state.doc.name || 'presentation'}-${state.slideIndex + 1}`, 'png'),
+    );
+  }, []);
+
+  /** 打开 .sld 工程文件：无损还原（含图片原始字节） */
+  const handleOpenProject = useCallback(
+    async (file: File) => {
+      setFailure(null);
+      setBusy('import');
+      const result = await openProject(file);
+      setBusy(null);
+      if (!result.ok) {
+        setFailure(result as Failure);
+        return;
+      }
+      loadDoc(result.value, null);
+    },
+    [loadDoc],
+  );
+
+  /** 另存为 .sld 工程文件（图片字节一并打包，不经过 OOXML 损耗） */
+  const handleSaveProject = useCallback(async () => {
+    setFailure(null);
+    setBusy('export');
+    const state = useSlideStore.getState();
+    const result = await saveProject(state.doc);
+    setBusy(null);
+    if (!result.ok) {
+      setFailure(result as Failure);
+      return;
+    }
+    downloadBytes(
+      result.value,
+      buildExportFilename(state.doc.name || 'presentation', 'sld'),
+      'application/zip',
+    );
+  }, []);
+
+  /** 大纲 → 幻灯片：解析后整体替换当前页集合 */
+  const handleOutlineGenerate = useCallback(() => {
+    const state = useSlideStore.getState();
+    const slides = buildDeck(state.doc, parseOutline(outlineText), state.doc.layouts[0]?.id);
+    if (slides.length === 0) {
+      setFailure({ error: 'EMPTY' });
+      return;
+    }
+    setFailure(null);
+    state.replaceSlides(slides);
+    setOutlineOpen(false);
+    setOutlineText('');
+  }, [outlineText]);
+
   const handleNew = useCallback(() => {
     if (
       useSlideStore.getState().doc.slides.length > 0 &&
@@ -132,6 +222,7 @@ export default function SlideTool() {
     return () => {
       revokeAllMediaUrls();
       disposeThumbnails();
+      disposeRaster();
     };
   }, [loadDoc]);
 
@@ -225,6 +316,51 @@ export default function SlideTool() {
               <Icon name="download" className="h-4 w-4" />
               {busy === 'export' ? t('tools.slide.exporting') : t('tools.slide.exportPptx')}
             </button>
+            <button
+              type="button"
+              onClick={() => void handleExportPdf()}
+              disabled={busy !== null}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="download" className="h-4 w-4" />
+              {t('tools.slide.exportPdf')}
+            </button>
+            <button
+              type="button"
+              onClick={() => projectInputRef.current?.click()}
+              disabled={busy !== null}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="upload" className="h-4 w-4" />
+              {t('tools.slide.openProject')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSaveProject()}
+              disabled={busy !== null}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="download" className="h-4 w-4" />
+              {t('tools.slide.saveProject')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOutlineOpen(true)}
+              disabled={busy !== null}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="text" className="h-4 w-4" />
+              {t('tools.slide.outlineImport')}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportPng}
+              disabled={busy !== null}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="image" className="h-4 w-4" />
+              {t('tools.slide.exportImage')}
+            </button>
 
             {/* 兼容性说明改为 tooltip，避免占用行内空间 */}
             <HintTip text={t('tools.slide.unsupportedTip')} />
@@ -264,7 +400,7 @@ export default function SlideTool() {
 
         <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/40">
           <div className="flex gap-1">
-            {(['element', 'theme'] as const).map((tab) => (
+            {(['element', 'layers', 'theme'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -275,11 +411,21 @@ export default function SlideTool() {
                     : 'text-gray-500 hover:bg-white/60 dark:text-gray-400 dark:hover:bg-gray-700'
                 }`}
               >
-                {tab === 'element' ? t('tools.slide.panelElement') : t('tools.slide.panelTheme')}
+                {tab === 'element'
+                  ? t('tools.slide.panelElement')
+                  : tab === 'layers'
+                    ? t('tools.slide.panelLayers')
+                    : t('tools.slide.panelTheme')}
               </button>
             ))}
           </div>
-          {rightTab === 'element' ? <PropertyPanel /> : <ThemePanel />}
+          {rightTab === 'element' ? (
+            <PropertyPanel />
+          ) : rightTab === 'layers' ? (
+            <LayerPanel />
+          ) : (
+            <ThemePanel />
+          )}
         </aside>
       </div>
 
@@ -317,6 +463,54 @@ export default function SlideTool() {
           if (file) void handleImport(file);
         }}
       />
+
+      <input
+        ref={projectInputRef}
+        type="file"
+        accept=".sld"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) void handleOpenProject(file);
+        }}
+      />
+
+      {outlineOpen ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex w-full max-w-xl flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              {t('tools.slide.outlineImport')}
+            </h2>
+            <p className="text-[12px] text-gray-500 dark:text-gray-400">
+              {t('tools.slide.outlineHint')}
+            </p>
+            <textarea
+              aria-label={t('tools.slide.outlineImport')}
+              rows={12}
+              value={outlineText}
+              onChange={(event) => setOutlineText(event.target.value)}
+              className="w-full resize-y rounded-md border border-gray-300 bg-white px-2 py-1.5 font-mono text-[12px] leading-relaxed text-gray-800 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOutlineOpen(false)}
+                className="h-8 rounded-md border border-gray-300 px-3 text-[12px] text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                {t('tools.slide.outlineCancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleOutlineGenerate}
+                className="h-8 rounded-md bg-blue-600 px-3 text-[12px] font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                {t('tools.slide.outlineGenerate')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {presenting ? <PresentOverlay onClose={() => setPresenting(false)} /> : null}
     </div>

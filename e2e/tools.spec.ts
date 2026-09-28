@@ -86,11 +86,10 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByRole('button', { name: '放映', exact: true })).toBeVisible();
   });
 
-  /** 属性面板按分区标题定位：「对齐」分区与「文字」分区都有左/中/右按钮，需限定作用域 */
-  function section(page: Page, title: string) {
-    return page
-      .locator('section')
-      .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
+  /** 形状已收进工具栏「形状」下拉，插入前需先展开菜单 */
+  async function insertShape(page: Page, name: string) {
+    await page.getByRole('button', { name: '形状', exact: true }).click();
+    await page.getByRole('menuitem', { name, exact: true }).click();
   }
 
   test('对齐：全选两个元素后左对齐，X 坐标收敛到最左侧元素', async ({ page }) => {
@@ -98,7 +97,7 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
     await page.getByRole('button', { name: '文本框' }).click();
-    await page.getByRole('button', { name: '矩形', exact: true }).click();
+    await insertShape(page, '矩形');
     await page.keyboard.press('ControlOrMeta+a');
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
 
@@ -106,7 +105,9 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     const xInput = page.getByLabel('X 坐标').first();
     await expect(xInput).toHaveValue('520');
 
-    await section(page, '对齐').getByRole('button', { name: '左对齐' }).click();
+    // 对齐属于选中态操作，已移到顶部工具栏「排列」行的下拉里
+    await page.getByRole('button', { name: '对齐', exact: true }).click();
+    await page.getByRole('menuitem', { name: '左对齐', exact: true }).click();
     await expect(xInput).toHaveValue('400');
   });
 
@@ -115,15 +116,14 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
     await page.getByRole('button', { name: '文本框' }).click();
-    await page.getByRole('button', { name: '矩形', exact: true }).click();
+    await insertShape(page, '矩形');
     await page.keyboard.press('ControlOrMeta+a');
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
 
-    const arrange = section(page, '排列');
-    await arrange.getByRole('button', { name: '组合', exact: true }).click();
+    await page.getByRole('button', { name: '组合', exact: true }).click();
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
-    await arrange.getByRole('button', { name: '取消组合' }).click();
+    await page.getByRole('button', { name: '取消组合', exact: true }).click();
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
   });
 
@@ -141,6 +141,119 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     // 全选应命中原件 + 副本
     await page.keyboard.press('ControlOrMeta+a');
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
+  });
+
+  test('演讲者备注：编辑后保留在面板中', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    const notes = page.getByLabel('演讲者备注');
+    await expect(notes).toBeVisible();
+    await notes.fill('开场先讲背景');
+    await expect(notes).toHaveValue('开场先讲背景');
+  });
+
+  test('模板：套用后出现该模板的版式列表', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    // 切到右侧「主题与母版」页签
+    await page.getByRole('button', { name: '主题与母版' }).click();
+    await page.getByRole('button', { name: '商务蓝' }).click();
+
+    // 模板自带 6 个版式，套用后版式区出现可点击按钮
+    await expect(page.getByRole('button', { name: 'Title Slide' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Section Header' })).toBeVisible();
+  });
+
+  test('表格：插入后可直接调整行数', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    await page.getByRole('button', { name: '表格', exact: true }).click();
+    await expect(page.getByText('已选中 1 个元素')).toBeVisible();
+
+    const rows = page.getByLabel('行数');
+    await expect(rows).toHaveValue('3');
+    await rows.fill('4');
+    await expect(rows).toHaveValue('4');
+    // 列数保持不变
+    await expect(page.getByLabel('列数')).toHaveValue('3');
+  });
+
+  test('图层面板：列出本页元素并可切换显隐', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    await page.getByRole('button', { name: '文本框' }).click();
+    await page.getByRole('button', { name: '图层', exact: true }).click();
+
+    const row = page.getByRole('button', { name: '图层: 文本框' });
+    await expect(row).toBeVisible();
+
+    // 切换显隐后行标题带删除线（aria-pressed 反映隐藏态）
+    const hide = page.getByRole('button', { name: /文本框 隐藏/ });
+    await hide.click();
+    await expect(page.getByRole('button', { name: /文本框 显示/ })).toBeVisible();
+  });
+
+  test('大纲生成：Markdown 生成多页', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+    // 初始 1 页
+    await expect(page.locator('.slide-thumb')).toHaveCount(1);
+
+    await page.getByRole('button', { name: '从大纲生成' }).click();
+    const editor = page.getByRole('textbox', { name: '从大纲生成' });
+    await editor.fill('# 第一页\n- 要点\n# 第二页');
+    await page.getByRole('button', { name: '生成幻灯片' }).click();
+
+    await expect(page.locator('.slide-thumb')).toHaveCount(2);
+  });
+
+  test('导出 PDF / 图片 / 工程文件：文件名后缀正确', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    for (const [button, pattern] of [
+      ['导出 PDF', /\.pdf$/],
+      ['导出图片', /\.png$/],
+      ['另存为工程', /\.sld$/],
+    ] as const) {
+      const downloadPromise = page.waitForEvent('download');
+      await page.getByRole('button', { name: button, exact: true }).click();
+      const download = await downloadPromise;
+      expect(download.suggestedFilename()).toMatch(pattern);
+    }
+  });
+
+  test('网格吸附与标尺开关可切换', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    const grid = page.getByRole('button', { name: '网格吸附' });
+    await expect(grid).toHaveAttribute('aria-pressed', 'false');
+    await grid.click();
+    await expect(grid).toHaveAttribute('aria-pressed', 'true');
+
+    const rulers = page.getByRole('button', { name: '显示标尺' });
+    await expect(rulers).toHaveAttribute('aria-pressed', 'true');
+    await rulers.click();
+    await expect(rulers).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('放映：矢量舞台 + 跳页 + Esc 退出', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    await page.getByRole('button', { name: '放映', exact: true }).click();
+    // 矢量舞台代替了原来的位图 <img>
+    await expect(page.getByLabel('present stage')).toBeVisible();
+    await expect(page.getByLabel('跳转到页')).toHaveValue('1');
+    await expect(page.getByLabel('计时')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: '放映', exact: true })).toBeVisible();
   });
 });
 

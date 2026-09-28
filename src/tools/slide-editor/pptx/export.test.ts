@@ -164,3 +164,134 @@ describe('往返一致性', () => {
     expect(allText).toContain('Hello 幻灯片');
   });
 });
+
+describe('母版 / 版式 / 备注保真', () => {
+  it('母版元素被写回 spTree，而不是只写空母版', async () => {
+    const doc = sampleDoc();
+    doc.masters[0].elements = [createTextElement(doc, '母版页脚')];
+    const result = await exportPptx(doc);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    const master = (await zip.file('ppt/slideMasters/slideMaster1.xml')?.async('string')) ?? '';
+    expect(master).toContain('母版页脚');
+  });
+
+  it('版式内容被写回，且 rels 指向正确的母版', async () => {
+    const doc = sampleDoc();
+    doc.layouts[0].name = 'Title and Content';
+    doc.layouts[0].elements = [createTextElement(doc, '版式占位')];
+    const result = await exportPptx(doc);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    const layout = (await zip.file('ppt/slideLayouts/slideLayout1.xml')?.async('string')) ?? '';
+    expect(layout).toContain('版式占位');
+    expect(layout).toContain('Title and Content');
+    const rels =
+      (await zip.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels')?.async('string')) ?? '';
+    expect(rels).toContain('../slideMasters/slideMaster1.xml');
+  });
+
+  it('含备注的页会写出 notesSlide 部件与关系，并能往返导入', async () => {
+    const doc = sampleDoc();
+    doc.slides[0].notes = '开场先讲背景\n再讲结论';
+    const result = await exportPptx(doc);
+    const bytes = (result as { ok: true; value: Uint8Array }).value;
+    const zip = await JSZip.loadAsync(bytes);
+
+    const notes = (await zip.file('ppt/notesSlides/notesSlide1.xml')?.async('string')) ?? '';
+    expect(notes).toContain('开场先讲背景');
+    expect(notes).toContain('type="body" idx="1"');
+    const rels =
+      (await zip.file('ppt/notesSlides/_rels/notesSlide1.xml.rels')?.async('string')) ?? '';
+    expect(rels).toContain('../slides/slide1.xml');
+    const slideRels = (await zip.file('ppt/slides/_rels/slide1.xml.rels')?.async('string')) ?? '';
+    expect(slideRels).toContain('notesSlide');
+    const contentTypes = (await zip.file('[Content_Types].xml')?.async('string')) ?? '';
+    expect(contentTypes).toContain('/ppt/notesSlides/notesSlide1.xml');
+
+    const imported = await importPptxFile(new File([bytes], 'notes.pptx'));
+    expect(imported.ok).toBe(true);
+    const back = (imported as { ok: true; value: { doc: SlideDoc } }).value.doc;
+    expect(back.slides[0].notes).toBe('开场先讲背景\n再讲结论');
+  });
+
+  it('无备注的页不产生 notesSlide 部件', async () => {
+    const { zip } = await exported();
+    expect(zip.file('ppt/notesSlides/notesSlide1.xml')).toBeNull();
+  });
+
+  it('多版式导出时每页 rels 指向自己的版式', async () => {
+    const doc = sampleDoc();
+    doc.layouts.push({
+      id: 'layout-secondary',
+      masterId: doc.masters[0].id,
+      name: 'Section Header',
+      elements: [],
+    });
+    doc.slides.push({
+      id: 'slide-2',
+      layoutId: 'layout-secondary',
+      elements: [createTextElement(doc, '第二页')],
+    });
+    const result = await exportPptx(doc);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    expect(zip.file('ppt/slideLayouts/slideLayout2.xml')).not.toBeNull();
+    const rels = (await zip.file('ppt/slides/_rels/slide2.xml.rels')?.async('string')) ?? '';
+    expect(rels).toContain('../slideLayouts/slideLayout2.xml');
+    const contentTypes = (await zip.file('[Content_Types].xml')?.async('string')) ?? '';
+    expect(contentTypes).toContain('/ppt/slideLayouts/slideLayout2.xml');
+  });
+});
+
+describe('合并单元格', () => {
+  it('被覆盖的格子写成 hMerge/vMerge，且跨列格写 gridSpan', async () => {
+    const doc = sampleDoc();
+    const table = doc.slides[0].elements.find((element) => element.type === 'table');
+    if (table?.type === 'table') {
+      table.rows[0][0].colSpan = 2;
+      table.rows[0][1] = { ...table.rows[0][1], covered: true, text: '' };
+    }
+    const result = await exportPptx(doc);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    const slide = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+    // gridSpan 必须是 a:tc 的属性（写在 a:tcPr 上会被 PowerPoint 忽略）
+    expect(slide).toContain('<a:tc gridSpan="2">');
+    expect(slide).toContain('hMerge="1"');
+    // 横向合并不应写成纵向覆盖
+    expect(slide).not.toContain('vMerge="1"');
+  });
+
+  it('合并单元格往返后 colSpan / covered 保持', async () => {
+    const doc = sampleDoc();
+    const table = doc.slides[0].elements.find((element) => element.type === 'table');
+    if (table?.type === 'table') {
+      table.rows[0][0].colSpan = 2;
+      table.rows[0][1] = { ...table.rows[0][1], covered: true, text: '' };
+    }
+    const result = await exportPptx(doc);
+    const bytes = (result as { ok: true; value: Uint8Array }).value;
+    const imported = await importPptxFile(new File([bytes], 'merge.pptx'));
+    expect(imported.ok).toBe(true);
+    const back = (imported as { ok: true; value: { doc: SlideDoc } }).value.doc;
+    const backTable = back.slides[0].elements.find((element) => element.type === 'table');
+    expect(backTable?.type).toBe('table');
+    if (backTable?.type === 'table') {
+      expect(backTable.rows[0][0].colSpan).toBe(2);
+      expect(backTable.rows[0][1].covered).toBe(true);
+    }
+  });
+});
+
+describe('表格样式写回', () => {
+  it('表头 / 斑马纹按元素设置写入，而非硬编码', async () => {
+    const doc = sampleDoc();
+    const table = doc.slides[0].elements.find((element) => element.type === 'table');
+    if (table?.type === 'table') {
+      table.headerRow = false;
+      table.bandRow = true;
+    }
+    const result = await exportPptx(doc);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    const slide = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+    expect(slide).not.toContain('firstRow="1"');
+    expect(slide).toContain('bandRow="1"');
+  });
+});

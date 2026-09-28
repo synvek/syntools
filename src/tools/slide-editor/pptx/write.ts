@@ -115,9 +115,12 @@ function paragraphXml(paragraph: Paragraph): string {
   const pPrAttrs = [];
   if (paragraph.align) pPrAttrs.push(`algn="${ALIGN_ATTR[paragraph.align]}"`);
   if (paragraph.indent) pPrAttrs.push(`marL="${pxToEmu(paragraph.indent)}"`);
-  const bullet = paragraph.bullet
-    ? '<a:buClrTx/><a:buSzPct val="100000"/><a:buFontTx/><a:buChar char="•"/>'
-    : '';
+  // 编号列表（buAutoNum 阿拉伯数字）与项目符号互斥
+  const bullet = paragraph.numbering
+    ? '<a:buClrTx/><a:buSzPct val="100000"/><a:buFontTx/><a:buAutoNum type="arabicPeriod"/>'
+    : paragraph.bullet
+      ? '<a:buClrTx/><a:buSzPct val="100000"/><a:buFontTx/><a:buChar char="•"/>'
+      : '';
   const lnSpc = paragraph.lineSpacing
     ? `<a:lnSpc><a:spcPct val="${Math.round(paragraph.lineSpacing * 1000)}"/></a:lnSpc>`
     : '';
@@ -243,6 +246,11 @@ function tableXml(element: TableElement): string {
       const height = element.rowHeights[rowIndex] ?? 32;
       const cells = row
         .map((cell) => {
+          // 被合并覆盖的格子：OOXML 要求保留占位，且必须带 hMerge/vMerge 标记
+          if (cell.covered) {
+            const mergeAttr = cell.coveredBy === 'v' ? 'vMerge="1"' : 'hMerge="1"';
+            return `<a:tc ${mergeAttr}><a:txBody><a:bodyPr/><a:lstStyle/><a:p/></a:txBody><a:tcPr/></a:tc>`;
+          }
           const body: TextBody = {
             paragraphs: [
               {
@@ -264,15 +272,19 @@ function tableXml(element: TableElement): string {
             autoFit: 'none',
             margins: { left: 5, top: 3, right: 5, bottom: 3 },
           };
-          const tcPrAttrs = [
-            `anchor="${cell.valign === 'top' ? 't' : cell.valign === 'bottom' ? 'b' : 'ctr'}"`,
-            'marL="68580" marR="68580" marT="34290" marB="34290"',
+          // gridSpan / rowSpan 是 a:tc 自身的属性（不是 tcPr 的）——
+          // 早先误写在 tcPr 上，导致合并信息在 PowerPoint 里被忽略、往返也丢失
+          const tcAttrs = [
             cell.colSpan && cell.colSpan > 1 ? `gridSpan="${cell.colSpan}"` : '',
             cell.rowSpan && cell.rowSpan > 1 ? `rowSpan="${cell.rowSpan}"` : '',
           ]
             .filter(Boolean)
             .join(' ');
-          return `<a:tc>${textBodyXml(body, 'a')}<a:tcPr ${tcPrAttrs}/></a:tc>`;
+          const tcPrAttrs = [
+            `anchor="${cell.valign === 'top' ? 't' : cell.valign === 'bottom' ? 'b' : 'ctr'}"`,
+            'marL="68580" marR="68580" marT="34290" marB="34290"',
+          ].join(' ');
+          return `<a:tc${tcAttrs ? ` ${tcAttrs}` : ''}>${textBodyXml(body, 'a')}<a:tcPr ${tcPrAttrs}/></a:tc>`;
         })
         .join('');
       return `<a:tr h="${pxToEmu(height)}">${cells}</a:tr>`;
@@ -283,7 +295,10 @@ function tableXml(element: TableElement): string {
     `<p:nvGraphicFramePr><p:cNvPr id="${id}" name="Table ${id}"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>`,
     xfrmXml(element, 'p:xfrm'),
     '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">',
-    `<a:tbl><a:tblPr firstRow="1" bandRow="1"/>${gridCols}${rowsXml}</a:tbl>`,
+    // 表头/斑马纹按元素自身设置写回，不再硬编码（否则导入的表格样式会被强行改写）
+    `<a:tbl><a:tblPr${element.headerRow ? ' firstRow="1"' : ''}${
+      element.bandRow ? ' bandRow="1"' : ''
+    }/>${gridCols}${rowsXml}</a:tbl>`,
     '</a:graphicData></a:graphic>',
     '</p:graphicFrame>',
   ].join('');
@@ -384,11 +399,25 @@ export function slideXml(
 }
 
 /** slide rels：layout rId1 + 用到的媒体 */
-export function slideRelsXml(mediaRels: { rId: string; target: string }[]): string {
+/**
+ * 幻灯片的 rels。
+ *
+ * @param mediaRels  图片关系（rId 从 rId2 起，由 relMapFor 分配）
+ * @param layoutIndex 该页引用的版式序号（多版式导出时不能一律指向 slideLayout1）
+ * @param notes      备注关系；rId 由调用方保证不与图片冲突
+ */
+export function slideRelsXml(
+  mediaRels: { rId: string; target: string }[],
+  layoutIndex = 0,
+  notes: { rId: string; target: string } | null = null,
+): string {
   return [
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>',
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout${layoutIndex + 1}.xml"/>`,
+    notes
+      ? `<Relationship Id="${notes.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/${notes.target}"/>`
+      : '',
     mediaRels
       .map(
         (rel) =>
