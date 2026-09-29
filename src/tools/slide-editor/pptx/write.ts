@@ -1,9 +1,18 @@
-import { pxToEmu, ptToHundredthsPt, resolvePresetGeometry } from '../core';
+import {
+  ALPHA_UNIT,
+  EMU_PER_PX,
+  normalizeBackground,
+  pxToEmu,
+  ptToHundredthsPt,
+  resolvePresetGeometry,
+} from '../core';
 import type {
   Fill,
   Paragraph,
   RunStyle,
+  ShadowStyle,
   ShapeElement,
+  SlideBackground,
   SlideElement,
   Stroke,
   TableElement,
@@ -96,6 +105,11 @@ function runXml(text: string, style: RunStyle | undefined): string {
     style?.italic ? 'i="1"' : '',
     style?.underline ? 'u="sng"' : '',
     style?.strike ? 'strike="sng"' : '',
+    // 字距（a:spc，单位 1/100 pt）与上下标（baseline，单位 0.1%）
+    style?.spacing ? `spc="${ptToHundredthsPt(style.spacing)}"` : '',
+    typeof style?.baseline === 'number' && style.baseline !== 0
+      ? `baseline="${Math.round(style.baseline * 10)}"`
+      : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -106,6 +120,14 @@ function runXml(text: string, style: RunStyle | undefined): string {
     );
   }
   if (style?.font) parts.push(`<a:latin typeface="${escapeXml(style.font)}"/>`);
+  // 字符高亮（a:highlight）必须紧跟 latin，位于 uLn 之后
+  if (style?.highlight) {
+    parts.push(
+      `<a:highlight><a:srgbClr val="${style.highlight.replace(/^#/, '').toUpperCase()}"/></a:highlight>`,
+    );
+  }
+  // 注：run 级超链接需要 OPC 关系项（rId）支撑，legacy 通道不维护 hyperlink rels，
+  // 因此这里不写 a:hlinkClick —— 超链接由 pptxgen 通道完整导出。
   const children =
     parts.length > 0 ? `<a:rPr ${attrs}>${parts.join('')}</a:rPr>` : `<a:rPr ${attrs}/>`;
   return `<a:r>${children}<a:t>${escapeXml(text)}</a:t></a:r>`;
@@ -142,6 +164,7 @@ function bodyXml(body: TextBody): string {
   const margins = body.margins ?? { left: 9, top: 5, right: 9, bottom: 5 };
   const wrap = body.wrap === false ? ' wrap="none"' : '';
   const anchor = ` anchor="${anchors[body.anchor ?? 'top']}"`;
+  const vert = body.vert && body.vert !== 'horz' ? ` vert="${escapeXml(body.vert)}"` : '';
   const attrs = [
     `lIns="${pxToEmu(margins.left)}"`,
     `tIns="${pxToEmu(margins.top)}"`,
@@ -149,7 +172,23 @@ function bodyXml(body: TextBody): string {
     `bIns="${pxToEmu(margins.bottom)}"`,
   ].join(' ');
   const autoFit = body.autoFit === 'autofit' ? '<a:spAutoFit/>' : '<a:noAutofit/>';
-  return `<a:bodyPr ${attrs}${wrap}${anchor}>${autoFit}</a:bodyPr>`;
+  return `<a:bodyPr ${attrs}${wrap}${anchor}${vert}>${autoFit}</a:bodyPr>`;
+}
+
+/** 投影 → a:outerShdw（放在 spPr 的 effectLst 内） */
+function shadowXml(shadow: ShadowStyle | undefined): string {
+  if (!shadow) return '';
+  const alpha = Math.round((shadow.opacity ?? 1) * ALPHA_UNIT);
+  const dist = Math.round(Math.sqrt(shadow.offsetX ** 2 + shadow.offsetY ** 2) * EMU_PER_PX);
+  const dir = Math.round((Math.atan2(shadow.offsetX, -shadow.offsetY) * 60000 * 180) / Math.PI);
+  const color = shadow.color.replace(/^#/, '').toUpperCase();
+  return [
+    '<a:effectLst>',
+    `<a:outerShdw blurRad="${pxToEmu(shadow.blur)}" dist="${dist}" dir="${dir}" rotWithShape="0">`,
+    `<a:srgbClr val="${color}"><a:alpha val="${alpha}"/></a:srgbClr>`,
+    '</a:outerShdw>',
+    '</a:effectLst>',
+  ].join('');
 }
 
 /** 完整 txBody（命名限定：形状/表格/图片文本框分别用不同前缀） */
@@ -171,7 +210,7 @@ function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${prstGeomXml(element.geom.prst)}${fillXml(element.fill)}${strokeXml(element.stroke)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${prstGeomXml(element.geom.prst)}${fillXml(element.fill)}${strokeXml(element.stroke)}${shadowXml(element.shadow)}</p:spPr>`,
   ];
   if (body) parts.push(textBodyXml(body, 'p'));
   return `<p:sp>${parts.join('')}</p:sp>`;
@@ -186,7 +225,7 @@ function textXml(element: TextElement): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fillXml(element.fill)}${strokeXml(element.stroke)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fillXml(element.fill)}${strokeXml(element.stroke)}${shadowXml(element.shadow)}</p:spPr>`,
     textBodyXml(element.body, 'p'),
     '</p:sp>',
   ].join('');
@@ -364,6 +403,50 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
       };
       return shapeXml(pseudo, pseudo.body);
     }
+    case 'chart':
+    case 'formula': {
+      // legacy 通道没有原生图表/公式对象：图表降级为占位框（数据不丢，标注类型），
+      // 公式降级为展示 LaTeX 源码的文本框。原生能力由 pptxgen 通道提供。
+      const pseudo: ShapeElement = {
+        id: element.id,
+        type: 'shape',
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+        rotation: element.rotation,
+        geom: { kind: 'rect', prst: 'rect' },
+        fill: { type: 'solid', color: '#F8FAFC' },
+        stroke: { color: '#CBD5E1', width: 1 },
+        body: {
+          paragraphs: [
+            {
+              runs: [
+                {
+                  text: element.type === 'chart' ? `Chart: ${element.chartType}` : element.latex,
+                  style:
+                    element.type === 'chart'
+                      ? { size: 14, color: '#64748B' }
+                      : {
+                          size: element.fontSize ? element.fontSize / 2 : 18,
+                          color: element.color,
+                        },
+                },
+              ],
+              align: 'center',
+            },
+          ],
+          anchor: 'middle',
+          wrap: true,
+          autoFit: 'none',
+          margins: { left: 8, top: 4, right: 8, bottom: 4 },
+        },
+      };
+      return shapeXml(pseudo, pseudo.body);
+    }
+    case 'icon':
+      // 内置 SVG 图标在 legacy 通道没有矢量化路径，导出为空占位框
+      return '';
     default:
       return '';
   }
@@ -376,12 +459,15 @@ const SLIDE_NS =
 export function slideXml(
   elements: SlideElement[],
   relMap: Map<string, string>,
-  background?: string,
+  background?: SlideBackground,
 ): string {
   const body = elements.map((element) => elementXml(element, relMap)).join('');
-  const bg = background
-    ? `<p:bg><p:bgPr>${fillXml({ type: 'solid', color: background })}<a:effectLst/></p:bgPr></p:bg>`
-    : '';
+  // 背景支持纯色与渐变（v2）；旧数据的纯色字符串在此归一化
+  const fill = normalizeBackground(background);
+  const bg =
+    fill && fill.type !== 'none'
+      ? `<p:bg><p:bgPr>${fillXml(fill)}<a:effectLst/></p:bgPr></p:bg>`
+      : '';
   return [
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
     `<p:sld ${SLIDE_NS}>`,

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { backgroundToColor } from '../core';
 import { createDefaultTheme } from '../model/factory';
 import { SLIDE_TEMPLATES } from '../model/templates';
 import { useSlideStore } from '../store';
@@ -48,6 +49,7 @@ export function ThemePanel() {
   const promoteSelectedToMaster = useSlideStore((s) => s.promoteSelectedToMaster);
   const clearMasterElements = useSlideStore((s) => s.clearMasterElements);
   const setMasterBackground = useSlideStore((s) => s.setMasterBackground);
+  const setViewMode = useSlideStore((s) => s.setViewMode);
   const master = doc.masters[0];
 
   const applyBackground = (color: string, scope: 'current' | 'all') => {
@@ -68,7 +70,10 @@ export function ThemePanel() {
     <div className="flex flex-col gap-3">
       {/* 本地模板库：纯数据、不联网，一键替换主题 + 母版 + 版式 */}
       <Section title={t('tools.slide.templateTitle')}>
-        <div className="flex flex-col gap-1.5">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+          {t('tools.slide.templateHint')}
+        </p>
+        <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
           {SLIDE_TEMPLATES.map((template) => (
             <button
               key={template.id}
@@ -87,6 +92,9 @@ export function ThemePanel() {
                 ))}
               </span>
               <span className="truncate">{t(`tools.slide.tpl${template.nameKey}`)}</span>
+              <span className="ml-auto shrink-0 text-[10px] text-gray-400">
+                {t(`tools.slide.tplCat${template.category}`)}
+              </span>
             </button>
           ))}
         </div>
@@ -165,20 +173,19 @@ export function ThemePanel() {
         </ActionRow>
       </Section>
 
-      {/* 母版编辑：MVP 采用「提升选中元素 → 母版」的路径，避免把全部 store action
-          抽象成「当前编辑容器」的大改造；提升后的元素会出现在每一页上 */}
+      {/* 母版编辑：完整能力在「母版视图」（MasterView）里，这里只保留快捷入口与常用动作 */}
       <Section title={t('tools.slide.masterElements')}>
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
           {t('tools.slide.masterElements')}: {master?.elements.length ?? 0}
         </p>
-        <Field label={t('tools.slide.masterBackground')}>
-          <ColorInput
-            ariaLabel={t('tools.slide.masterBackground')}
-            value={master?.background ?? doc.theme.colors.lt1 ?? '#FFFFFF'}
-            onChange={(color) => setMasterBackground(color)}
-          />
-        </Field>
         <ActionRow>
+          <button
+            type="button"
+            onClick={() => setViewMode('master')}
+            className="h-7 rounded-md bg-blue-600 px-2 text-[11px] font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            {t('tools.slide.viewMaster')}
+          </button>
           <button
             type="button"
             disabled={selection.length === 0}
@@ -187,6 +194,15 @@ export function ThemePanel() {
           >
             {t('tools.slide.promoteToMaster')}
           </button>
+        </ActionRow>
+        <Field label={t('tools.slide.masterBackground')}>
+          <ColorInput
+            ariaLabel={t('tools.slide.masterBackground')}
+            value={backgroundToColor(master?.background, doc.theme.colors.lt1 ?? '#FFFFFF')}
+            onChange={(color) => setMasterBackground(color)}
+          />
+        </Field>
+        <ActionRow>
           <button
             type="button"
             disabled={(master?.elements.length ?? 0) === 0}

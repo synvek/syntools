@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { SlideElement } from '../model/types';
-import { useSlideStore } from '../store';
+import { containerElements, useSlideStore } from '../store';
 import { Section } from './controls';
 
 /**
@@ -11,7 +11,10 @@ import { Section } from './controls';
  * 选中 / 显隐 / 锁定 / 上移下移，够覆盖日常「找不到被压住的元素」的场景。
  */
 
-/** 图层行标题：优先展示元素里的文字，其次退回类型名 */
+/**
+ * 图层行标题：优先展示元素自带的内容（文字、图表标题、公式源码），
+ * 其次退回该元素类型在工具栏里的名称。
+ */
 function elementLabel(element: SlideElement, t: (key: string) => string): string {
   if (element.type === 'text' || element.type === 'shape') {
     const text = element.body?.paragraphs
@@ -25,6 +28,18 @@ function elementLabel(element: SlideElement, t: (key: string) => string): string
   if (element.type === 'group') return t('tools.slide.group');
   if (element.type === 'line') return t('tools.slide.insertLine');
   if (element.type === 'placeholder') return element.label;
+  // 图表/公式/图标此前会落到「文本框」这个兜底分支，与工具栏的命名口径不一致
+  if (element.type === 'chart') {
+    const title = element.title?.trim();
+    return title || t('tools.slide.insertChart');
+  }
+  if (element.type === 'formula') {
+    const latex = element.latex.trim();
+    return latex
+      ? `${t('tools.slide.insertFormula')}: ${latex.length > 14 ? `${latex.slice(0, 14)}…` : latex}`
+      : t('tools.slide.insertFormula');
+  }
+  if (element.type === 'icon') return t('tools.slide.insertIcon');
   return t('tools.slide.insertText');
 }
 
@@ -32,14 +47,23 @@ export function LayerPanel() {
   const { t } = useTranslation();
   const doc = useSlideStore((s) => s.doc);
   const slideIndex = useSlideStore((s) => s.slideIndex);
+  // 母版视图下图层列表展示的是母版/版式元素，因此统一走容器读取
+  const viewMode = useSlideStore((s) => s.viewMode);
+  const masterKind = useSlideStore((s) => s.masterKind);
+  const masterIndex = useSlideStore((s) => s.masterIndex);
   const selection = useSlideStore((s) => s.selection);
   const select = useSlideStore((s) => s.select);
   const patchElement = useSlideStore((s) => s.patchElement);
   const bringForward = useSlideStore((s) => s.bringForward);
   const sendBackward = useSlideStore((s) => s.sendBackward);
 
-  const slide = doc.slides[slideIndex];
-  const elements = slide?.elements ?? [];
+  const elements = containerElements({
+    doc,
+    viewMode,
+    slideIndex,
+    masterKind,
+    masterIndex,
+  });
 
   if (elements.length === 0) {
     return (

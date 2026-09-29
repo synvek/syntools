@@ -1,3 +1,4 @@
+import { migrateDoc } from './model/migrate';
 import type { MediaAsset, SlideDoc } from './model/types';
 
 /**
@@ -68,7 +69,8 @@ function restore(raw: string): SlideDraft | null {
       bytes: entry.data ? base64ToBytes(entry.data) : undefined,
     };
   }
-  return { doc: { ...doc, media }, savedAt: parsed.savedAt ?? Date.now() };
+  // 旧草稿（写入时还是 v1 schema）在此升到当前 schema
+  return { doc: migrateDoc({ ...doc, media }), savedAt: parsed.savedAt ?? Date.now() };
 }
 
 export function readDraft(): SlideDraft | null {

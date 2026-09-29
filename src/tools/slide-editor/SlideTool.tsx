@@ -18,12 +18,15 @@ import { createDoc } from './model/factory';
 import { checkImportFile, importPptxFile } from './pptx/import';
 import { exportPptx } from './pptx/export';
 import { registerSlideStrings } from './strings';
-import { useSlideStore } from './store';
+import { containerElements, useSlideStore } from './store';
+import { FindReplaceBar } from './ui/FindReplaceBar';
 import { LayerPanel } from './ui/LayerPanel';
+import { MasterView } from './ui/MasterView';
 import { PresentOverlay } from './ui/PresentOverlay';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { SlideCanvas } from './ui/SlideCanvas';
 import { SlideToolbar } from './ui/SlideToolbar';
+import { TemplateGallery } from './ui/TemplateGallery';
 import { ThemePanel } from './ui/ThemePanel';
 import { ThumbnailRail } from './ui/ThumbnailRail';
 import './slide.css';
@@ -47,13 +50,14 @@ export default function SlideTool() {
   const slideIndex = useSlideStore((s) => s.slideIndex);
   const selection = useSlideStore((s) => s.selection);
   const report = useSlideStore((s) => s.report);
+  const viewMode = useSlideStore((s) => s.viewMode);
+  const setViewMode = useSlideStore((s) => s.setViewMode);
   const loadDoc = useSlideStore((s) => s.loadDoc);
   const selectSlide = useSlideStore((s) => s.selectSlide);
   const undo = useSlideStore((s) => s.undo);
   const redo = useSlideStore((s) => s.redo);
   const removeSelected = useSlideStore((s) => s.removeSelected);
   const duplicateSelected = useSlideStore((s) => s.duplicateSelected);
-  const patchSelected = useSlideStore((s) => s.patchSelected);
   const select = useSlideStore((s) => s.select);
   const setDocName = useSlideStore((s) => s.setDocName);
   const copySelected = useSlideStore((s) => s.copySelected);
@@ -67,9 +71,10 @@ export default function SlideTool() {
   const [runtimeError, setRuntimeError] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
-  const [rightTab, setRightTab] = useState<'element' | 'layers' | 'theme'>('element');
+  const [rightTab, setRightTab] = useState<'element' | 'layers' | 'theme' | 'template'>('element');
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [outlineText, setOutlineText] = useState('');
+  const [findOpen, setFindOpen] = useState(false);
   const saveTimer = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
@@ -245,10 +250,7 @@ export default function SlideTool() {
         onRedo: () => redo(),
         onDuplicate: () => duplicateSelected(),
         onNudge: (dx, dy) => moveBy(dx, dy),
-        onSelectAll: () => {
-          const state = useSlideStore.getState();
-          select(state.doc.slides[state.slideIndex]?.elements.map((el) => el.id) ?? []);
-        },
+        onSelectAll: () => select(containerElements(useSlideStore.getState()).map((el) => el.id)),
         onEscape: () => select([]),
         onCopy: () => copySelected(),
         onCut: () => cutSelected(),
@@ -258,18 +260,23 @@ export default function SlideTool() {
         onPrevSlide: () => selectSlide(useSlideStore.getState().slideIndex - 1),
         onNextSlide: () => selectSlide(useSlideStore.getState().slideIndex + 1),
         onPresent: () => setPresenting(true),
+        onFind: () => setFindOpen(true),
+        onCopyFormat: () => useSlideStore.getState().copyFormat(),
+        onPasteFormat: () => useSlideStore.getState().applyFormat(),
+        onToggleMaster: () =>
+          setViewMode(useSlideStore.getState().viewMode === 'master' ? 'normal' : 'master'),
       }),
     [
       copySelected,
       cutSelected,
       duplicateSelected,
       groupSelected,
-      patchSelected,
       pasteClipboard,
       redo,
       removeSelected,
       select,
       selectSlide,
+      setViewMode,
       undo,
       ungroupSelected,
     ],
@@ -286,14 +293,34 @@ export default function SlideTool() {
         newIcon="slides"
         onNew={handleNew}
         afterNew={
-          <button
-            type="button"
-            onClick={() => setPresenting(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            <Icon name="slides" className="h-4 w-4" />
-            {t('tools.slide.present')}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setPresenting(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="slides" className="h-4 w-4" />
+              {t('tools.slide.present')}
+            </button>
+            {/* 视图切换：普通编辑 / 母版编辑（对应 PPT 的「幻灯片母版」视图） */}
+            <div className="flex rounded-md border border-gray-300 p-0.5 dark:border-gray-600">
+              {(['normal', 'master'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={viewMode === mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`rounded px-2 py-1 text-[12px] transition-colors ${
+                    viewMode === mode
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  {mode === 'normal' ? t('tools.slide.viewNormal') : t('tools.slide.viewMaster')}
+                </button>
+              ))}
+            </div>
+          </>
         }
         io={
           <>
@@ -391,43 +418,53 @@ export default function SlideTool() {
 
       <SlideToolbar onFailure={(error) => fail(error)} />
 
-      <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
-        <ThumbnailRail />
+      {viewMode === 'master' ? (
+        <MasterView onRuntimeFailure={() => setRuntimeError(true)} />
+      ) : (
+        <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
+          <ThumbnailRail />
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <SlideCanvas onRuntimeFailure={() => setRuntimeError(true)} />
-        </main>
+          <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <SlideCanvas onRuntimeFailure={() => setRuntimeError(true)} />
+          </main>
 
-        <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/40">
-          <div className="flex gap-1">
-            {(['element', 'layers', 'theme'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setRightTab(tab)}
-                className={`h-7 flex-1 rounded-md text-[12px] transition-colors ${
-                  rightTab === tab
-                    ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-900 dark:text-blue-300'
-                    : 'text-gray-500 hover:bg-white/60 dark:text-gray-400 dark:hover:bg-gray-700'
-                }`}
-              >
-                {tab === 'element'
-                  ? t('tools.slide.panelElement')
-                  : tab === 'layers'
-                    ? t('tools.slide.panelLayers')
-                    : t('tools.slide.panelTheme')}
-              </button>
-            ))}
-          </div>
-          {rightTab === 'element' ? (
-            <PropertyPanel />
-          ) : rightTab === 'layers' ? (
-            <LayerPanel />
-          ) : (
-            <ThemePanel />
-          )}
-        </aside>
-      </div>
+          <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/40">
+            <div className="flex gap-1">
+              {(['element', 'layers', 'theme', 'template'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setRightTab(tab)}
+                  className={`h-7 flex-1 rounded-md text-[12px] transition-colors ${
+                    rightTab === tab
+                      ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-900 dark:text-blue-300'
+                      : 'text-gray-500 hover:bg-white/60 dark:text-gray-400 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {tab === 'element'
+                    ? t('tools.slide.panelElement')
+                    : tab === 'layers'
+                      ? t('tools.slide.panelLayers')
+                      : tab === 'theme'
+                        ? t('tools.slide.panelTheme')
+                        : t('tools.slide.panelTemplate')}
+                </button>
+              ))}
+            </div>
+            {rightTab === 'element' ? (
+              <PropertyPanel />
+            ) : rightTab === 'layers' ? (
+              <LayerPanel />
+            ) : rightTab === 'theme' ? (
+              <ThemePanel />
+            ) : (
+              <TemplateGallery />
+            )}
+          </aside>
+        </div>
+      )}
+
+      {findOpen ? <FindReplaceBar onClose={() => setFindOpen(false)} /> : null}
 
       {busy !== null ? (
         <ProgressBar
@@ -517,28 +554,10 @@ export default function SlideTool() {
   );
 }
 
-/** 方向键微调：整体平移当前选中的所有元素 */
+/** 方向键微调：整体平移当前选中的所有元素（走 store 的容器感知 action，母版视图下同样生效） */
 function moveBy(dx: number, dy: number): void {
   const state = useSlideStore.getState();
-  const slide = state.doc.slides[state.slideIndex];
-  if (!slide || state.selection.length === 0) return;
+  if (state.selection.length === 0) return;
   state.commit();
-  useSlideStore.setState((current) => ({
-    doc: {
-      ...current.doc,
-      slides: current.doc.slides.map((item, index) =>
-        index === current.slideIndex
-          ? {
-              ...item,
-              elements: item.elements.map((element) =>
-                current.selection.includes(element.id)
-                  ? { ...element, x: element.x + dx, y: element.y + dy }
-                  : element,
-              ),
-            }
-          : item,
-      ),
-      version: current.doc.version + 1,
-    },
-  }));
+  state.moveSelected(dx, dy);
 }

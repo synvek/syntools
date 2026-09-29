@@ -9,7 +9,9 @@ import {
 } from '../model/factory';
 import type { SlideDoc, SlideElement, TextElement } from '../model/types';
 import { importPptxFile } from './import';
-import { exportPptx } from './export';
+// 本文件断言的是**自研 DrawingML 通道**的输出结构，因此显式走 legacy。
+// pptxgen 通道的断言见 exportPptxgen.test.ts。
+import { exportPptxLegacy } from './export';
 import { elementXml, slideXml } from './write';
 
 function sampleDoc(): SlideDoc {
@@ -27,7 +29,7 @@ function sampleDoc(): SlideDoc {
 }
 
 async function exported(): Promise<{ bytes: Uint8Array; zip: JSZip }> {
-  const result = await exportPptx(sampleDoc());
+  const result = await exportPptxLegacy(sampleDoc());
   expect(result.ok).toBe(true);
   const bytes = (result as { ok: true; value: Uint8Array }).value;
   return { bytes, zip: await JSZip.loadAsync(bytes) };
@@ -86,7 +88,7 @@ describe('pptx 导出包结构', () => {
   it('connector（线条）的 nvCxnSpPr 必须包含 cNvPr', async () => {
     const doc = createDoc('line');
     doc.slides[0].elements = [createLineElement(doc)];
-    const result = await exportPptx(doc);
+    const result = await exportPptxLegacy(doc);
     expect(result.ok).toBe(true);
     const bytes = (result as { ok: true; value: Uint8Array }).value;
     const zip = await JSZip.loadAsync(bytes);
@@ -169,7 +171,7 @@ describe('母版 / 版式 / 备注保真', () => {
   it('母版元素被写回 spTree，而不是只写空母版', async () => {
     const doc = sampleDoc();
     doc.masters[0].elements = [createTextElement(doc, '母版页脚')];
-    const result = await exportPptx(doc);
+    const result = await exportPptxLegacy(doc);
     const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
     const master = (await zip.file('ppt/slideMasters/slideMaster1.xml')?.async('string')) ?? '';
     expect(master).toContain('母版页脚');
@@ -179,7 +181,7 @@ describe('母版 / 版式 / 备注保真', () => {
     const doc = sampleDoc();
     doc.layouts[0].name = 'Title and Content';
     doc.layouts[0].elements = [createTextElement(doc, '版式占位')];
-    const result = await exportPptx(doc);
+    const result = await exportPptxLegacy(doc);
     const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
     const layout = (await zip.file('ppt/slideLayouts/slideLayout1.xml')?.async('string')) ?? '';
     expect(layout).toContain('版式占位');
@@ -192,7 +194,7 @@ describe('母版 / 版式 / 备注保真', () => {
   it('含备注的页会写出 notesSlide 部件与关系，并能往返导入', async () => {
     const doc = sampleDoc();
     doc.slides[0].notes = '开场先讲背景\n再讲结论';
-    const result = await exportPptx(doc);
+    const result = await exportPptxLegacy(doc);
     const bytes = (result as { ok: true; value: Uint8Array }).value;
     const zip = await JSZip.loadAsync(bytes);
 
@@ -231,7 +233,7 @@ describe('母版 / 版式 / 备注保真', () => {
       layoutId: 'layout-secondary',
       elements: [createTextElement(doc, '第二页')],
     });
-    const result = await exportPptx(doc);
+    const result = await exportPptxLegacy(doc);
     const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
     expect(zip.file('ppt/slideLayouts/slideLayout2.xml')).not.toBeNull();
     const rels = (await zip.file('ppt/slides/_rels/slide2.xml.rels')?.async('string')) ?? '';
@@ -249,7 +251,7 @@ describe('合并单元格', () => {
       table.rows[0][0].colSpan = 2;
       table.rows[0][1] = { ...table.rows[0][1], covered: true, text: '' };
     }
-    const result = await exportPptx(doc);
+    const result = await exportPptxLegacy(doc);
     const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
     const slide = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
     // gridSpan 必须是 a:tc 的属性（写在 a:tcPr 上会被 PowerPoint 忽略）
@@ -266,7 +268,7 @@ describe('合并单元格', () => {
       table.rows[0][0].colSpan = 2;
       table.rows[0][1] = { ...table.rows[0][1], covered: true, text: '' };
     }
-    const result = await exportPptx(doc);
+    const result = await exportPptxLegacy(doc);
     const bytes = (result as { ok: true; value: Uint8Array }).value;
     const imported = await importPptxFile(new File([bytes], 'merge.pptx'));
     expect(imported.ok).toBe(true);
@@ -288,7 +290,7 @@ describe('表格样式写回', () => {
       table.headerRow = false;
       table.bandRow = true;
     }
-    const result = await exportPptx(doc);
+    const result = await exportPptxLegacy(doc);
     const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
     const slide = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
     expect(slide).not.toContain('firstRow="1"');

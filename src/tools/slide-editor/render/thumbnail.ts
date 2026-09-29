@@ -1,5 +1,6 @@
 import Konva from 'konva';
 import type { Slide, SlideDoc } from '../model/types';
+import { backgroundFillProps } from './background';
 import { createElementNode } from './nodes';
 
 /**
@@ -90,7 +91,7 @@ export function renderThumbnail(doc: SlideDoc, slide: Slide, width = 240): strin
   const background = new Konva.Rect({
     width: doc.width,
     height: doc.height,
-    fill: slide.background ?? '#FFFFFF',
+    ...backgroundFillProps(slide.background, doc.width, doc.height),
   });
   target.layer.add(background);
 

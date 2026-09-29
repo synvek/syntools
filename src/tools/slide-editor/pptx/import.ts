@@ -1,9 +1,13 @@
 import type { ToolResult } from '@/core/types';
 import JSZip from 'jszip';
 import { emuToPx, pxToEmu, resolvePresetGeometry } from '../core';
-import { createDoc, createId } from '../model/factory';
+import { createDoc, createId, SCHEMA_VERSION } from '../model/factory';
 import { createMediaFromBytes, mimeFromFilename } from '../model/media';
+import { normalizeChartData } from '../model/chart';
 import type {
+  ChartElement,
+  ChartSeries,
+  ChartType,
   Fill,
   ImageElement,
   LineElement,
@@ -493,7 +497,130 @@ function noteUnsupported(
   };
 }
 
-/** graphicFrame：表格 → TableElement；图表 / SmartArt / OLE → 占位框 */
+/* ------------------------------- 图表 ------------------------------- */
+
+/** c:chart 的 plotArea 下第一个图表类型节点 → ChartType */
+function chartTypeOf(plotArea: XmlNode | undefined): ChartType {
+  const kinds: { tag: string; type: ChartType }[] = [
+    { tag: 'barChart', type: 'bar' },
+    { tag: 'lineChart', type: 'line' },
+    { tag: 'areaChart', type: 'area' },
+    { tag: 'pieChart', type: 'pie' },
+    { tag: 'doughnutChart', type: 'doughnut' },
+    { tag: 'scatterChart', type: 'scatter' },
+    { tag: 'radarChart', type: 'radar' },
+  ];
+  for (const kind of kinds) {
+    const node = childOf(plotArea, kind.tag);
+    if (!node) continue;
+    if (kind.tag === 'barChart') {
+      const grouping = attr(childOf(node, 'grouping'), 'val') ?? 'clustered';
+      if (grouping === 'stacked') return 'barStacked';
+      if (grouping === 'percentStacked') return 'barPercent';
+    }
+    return kind.type;
+  }
+  return 'bar';
+}
+
+/** c:pt 的值：c:pt 本身只有 idx 属性，真实内容在子节点的 c:v 里 */
+function pointValueOf(pt: XmlNode | undefined): string | undefined {
+  if (!pt) return undefined;
+  return textOf(childOf(pt, 'v'));
+}
+
+/**
+ * 收集缓存里的 c:pt 节点。
+ *
+ * 类别轴有两种写法：单级 `c:strCache/c:pt`，以及 pptxgenjs / PowerPoint 常用的
+ * 多级 `c:multiLvlStrCache/c:lvl/c:pt`。这里向下找第一层有 pt 的位置，
+ * 对两种写法都成立。
+ */
+function collectPoints(node: XmlNode | undefined): XmlNode[] {
+  if (!node) return [];
+  const direct = childrenNamed(node, 'pt');
+  if (direct.length > 0) return direct;
+  for (const child of childrenOf(node)) {
+    const deeper = collectPoints(child);
+    if (deeper.length > 0) return deeper;
+  }
+  return [];
+}
+
+/** c:cat → 类别文本数组（取缓存值，忽略 c:f 公式）；numRef 时也能取到数字标签 */
+function categoryLabelsOf(seriesNode: XmlNode): string[] {
+  const cat = childOf(seriesNode, 'cat');
+  const points = collectPoints(cat);
+  if (points.length === 0) return [];
+  return points.map((pt, index) => {
+    const value = pointValueOf(pt);
+    return value && value.trim() ? value.trim() : String(index + 1);
+  });
+}
+
+/** c:val → 数值数组 */
+function seriesValuesOf(seriesNode: XmlNode): number[] {
+  const val = childOf(seriesNode, 'val');
+  return collectPoints(val).map((pt) => {
+    const parsed = Number.parseFloat(pointValueOf(pt) ?? '');
+    return Number.isFinite(parsed) ? parsed : 0;
+  });
+}
+
+/** 系列名：优先 c:tx 的缓存文本，回落到 c:f 的引用串 */
+function seriesNameOf(seriesNode: XmlNode, index: number): string {
+  const ref = childOf(childOf(seriesNode, 'tx'), 'strRef');
+  const cache = childOf(ref, 'strCache');
+  const first = childrenNamed(cache, 'pt')[0];
+  const named = first ? pointValueOf(first) : undefined;
+  if (named && named.trim()) return named.trim();
+  const formula = textOf(childOf(ref, 'f'));
+  return formula && formula.trim() ? formula.trim() : `Series ${index + 1}`;
+}
+
+/** 读取 chart 部件 → ChartElement 的数据部分；解析不出数据时返回 null */
+async function readChartData(
+  ctx: ImportContext,
+  slidePart: string,
+  rels: Map<string, Relationship>,
+  chartRId: string,
+): Promise<{ chartType: ChartType; categories: string[]; series: ChartSeries[] } | null> {
+  const rel = rels.get(chartRId);
+  if (!rel) return null;
+  const partPath = normalizePartPath(slidePart, rel.target);
+  const xml = await readTextPart(ctx.zip, partPath);
+  if (!xml) return null;
+  const root = parseXml(xml)[0] as XmlNode | undefined;
+  // 根节点可能是任意命名空间前缀的 chartSpace，统一剥掉前缀再取子节点
+  const chart = childOf(root, 'chart');
+  const plotArea = childOf(chart, 'plotArea');
+  const chartType = chartTypeOf(plotArea);
+
+  const seriesNodes: XmlNode[] = [];
+  for (const tag of [
+    'barChart',
+    'lineChart',
+    'areaChart',
+    'pieChart',
+    'doughnutChart',
+    'scatterChart',
+    'radarChart',
+  ]) {
+    for (const node of childrenNamed(plotArea, tag) ?? []) {
+      for (const ser of childrenNamed(node, 'ser') ?? []) seriesNodes.push(ser);
+    }
+  }
+  if (seriesNodes.length === 0) return null;
+
+  const categories = categoryLabelsOf(seriesNodes[0]!);
+  const series = seriesNodes.map((node, index) => ({
+    name: seriesNameOf(node, index),
+    values: seriesValuesOf(node),
+  }));
+  return { chartType, categories, series };
+}
+
+/** graphicFrame：表格 → TableElement；图表 → ChartElement；SmartArt / OLE → 占位框 */
 async function parseGraphicFrame(
   node: XmlNode,
   ctx: ImportContext,
@@ -515,12 +642,33 @@ async function parseGraphicFrame(
     const table = parseTable(tableNode, ctx, xfrm, palette, theme) as TableElement;
     return { ...table, ...base };
   }
+
+  // 图表：读取关联的 chart 部件，取出类别与系列数值，在画布上重绘成可编辑图表。
+  // 只有拿不到数据（关系缺失 / 部件损坏 / 无系列）时才降级为占位框。
+  const chartNode = childOf(graphicData, 'chart');
+  const chartRId = chartNode ? (attr(chartNode, 'id') ?? attr(chartNode, 'r:id')) : undefined;
+  if (chartRId) {
+    const data = await readChartData(ctx, slidePart, rels, chartRId);
+    if (data) {
+      const normalized = normalizeChartData(data.categories, data.series, data.chartType);
+      const element: ChartElement = {
+        ...base,
+        type: 'chart',
+        chartType: data.chartType,
+        categories: normalized.categories,
+        series: normalized.series,
+        options: { legend: true, dataLabels: false, gridLines: true },
+        title: '',
+        revision: 1,
+      };
+      return element;
+    }
+  }
+
   // 占位框沿用原对象的矩形，保住版面结构
   if (uri.includes('chart')) return noteUnsupported(ctx, 'chart', '图表', base);
   if (uri.includes('diagram')) return noteUnsupported(ctx, 'diagram', 'SmartArt', base);
   if (uri.includes('ole')) return noteUnsupported(ctx, 'ole', '嵌入对象', base);
-  void slidePart;
-  void rels;
   return noteUnsupported(ctx, uri || 'unknown', '图形框架', base);
 }
 
@@ -883,6 +1031,7 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
     slides: [],
     media: ctx.media,
     version: 1,
+    schemaVersion: SCHEMA_VERSION,
   };
 
   const layoutCache = new Map<string, SlideLayout>();

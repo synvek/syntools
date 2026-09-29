@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import type { ToolResult } from '@/core/types';
 import { extensionForMime } from '../model/media';
+import { migrateDoc } from '../model/migrate';
 import type { MediaAsset, SlideDoc } from '../model/types';
 
 /**
@@ -11,7 +12,14 @@ import type { MediaAsset, SlideDoc } from '../model/types';
  * 工程文件把图片原样带上，且不经过 OOXML 的保真损耗，是真正无损的中间态。
  */
 
-export const PROJECT_VERSION = 1;
+/**
+ * 工程文件格式版本。
+ *
+ * v2 = 引入 Fill 背景 + chart/formula/icon 元素 + run 级扩展属性。
+ * 旧 v1 文件仍可读（`payload.version <= PROJECT_VERSION` 放行），
+ * 读取后统一经 `migrateDoc()` 升到当前 schema，保证背景等字段不丢失。
+ */
+export const PROJECT_VERSION = 2;
 export const PROJECT_FORMAT = 'syntools-slide';
 export const PROJECT_EXTENSION = 'sld';
 const PROJECT_ENTRY = 'project.json';
@@ -79,7 +87,8 @@ export async function openProject(file: File): Promise<ToolResult<SlideDoc>> {
       const bytes = name ? await zip.file(`media/${name}`)?.async('uint8array') : undefined;
       media[id] = { ...asset, bytes: bytes ?? undefined };
     }
-    const doc: SlideDoc = { ...payload.doc, media };
+    // 旧版本工程（v1）在此升到当前 schema：背景 string→Fill、补齐新增可选字段
+    const doc: SlideDoc = migrateDoc({ ...payload.doc, media });
     if (!doc.slides || doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
     return { ok: true, value: doc };
   } catch {

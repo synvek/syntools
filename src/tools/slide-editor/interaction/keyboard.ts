@@ -19,6 +19,14 @@ export interface KeyboardCallbacks {
   onPrevSlide: () => void;
   onNextSlide: () => void;
   onPresent: () => void;
+  /** ⌘/Ctrl + F：打开查找替换浮层 */
+  onFind: () => void;
+  /** ⌘/Ctrl + Shift + C：复制格式（格式刷第一步） */
+  onCopyFormat: () => void;
+  /** ⌘/Ctrl + Shift + V：套用格式（格式刷第二步） */
+  onPasteFormat: () => void;
+  /** ⌘/Ctrl + M：在普通视图与母版视图之间切换 */
+  onToggleMaster: () => void;
 }
 
 const EDIT_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
@@ -54,7 +62,18 @@ export function handleShortcut(event: KeyboardEvent, callbacks: KeyboardCallback
     callbacks.onSelectAll();
     return true;
   }
-  if (meta && event.key.toLowerCase() === 'c') {
+  // 注意顺序：带 Shift 的组合（格式刷）必须排在普通复制/粘贴之前判断
+  if (meta && event.shiftKey && event.key.toLowerCase() === 'c') {
+    event.preventDefault();
+    callbacks.onCopyFormat();
+    return true;
+  }
+  if (meta && event.shiftKey && event.key.toLowerCase() === 'v') {
+    event.preventDefault();
+    callbacks.onPasteFormat();
+    return true;
+  }
+  if (meta && !event.shiftKey && event.key.toLowerCase() === 'c') {
     event.preventDefault();
     callbacks.onCopy();
     return true;
@@ -64,7 +83,7 @@ export function handleShortcut(event: KeyboardEvent, callbacks: KeyboardCallback
     callbacks.onCut();
     return true;
   }
-  if (meta && event.key.toLowerCase() === 'v') {
+  if (meta && !event.shiftKey && event.key.toLowerCase() === 'v') {
     event.preventDefault();
     callbacks.onPaste();
     return true;
@@ -73,6 +92,16 @@ export function handleShortcut(event: KeyboardEvent, callbacks: KeyboardCallback
     event.preventDefault();
     if (event.shiftKey) callbacks.onUngroup();
     else callbacks.onGroup();
+    return true;
+  }
+  if (meta && event.key.toLowerCase() === 'f') {
+    event.preventDefault();
+    callbacks.onFind();
+    return true;
+  }
+  if (meta && event.key.toLowerCase() === 'm') {
+    event.preventDefault();
+    callbacks.onToggleMaster();
     return true;
   }
   if (event.key === 'Delete' || event.key === 'Backspace') {

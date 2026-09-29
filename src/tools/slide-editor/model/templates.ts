@@ -13,6 +13,8 @@ export interface SlideTemplate {
   id: string;
   /** i18n 键后缀：tools.slide.tpl<Name> */
   nameKey: string;
+  /** 画廊分组：商务 / 科技 / 学术 / 教育 / 简约 / 创意 */
+  category: string;
   theme: SlideTheme;
   /** 母版公共元素（Logo / 页码等） */
   masterElements: SlideElement[];
@@ -123,6 +125,7 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
   {
     id: 'business-blue',
     nameKey: 'BusinessBlue',
+    category: '商务',
     theme: theme(
       'Business Blue',
       {
@@ -149,6 +152,7 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
   {
     id: 'graphite',
     nameKey: 'Graphite',
+    category: '简约',
     theme: theme(
       'Graphite',
       {
@@ -175,6 +179,7 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
   {
     id: 'forest',
     nameKey: 'Forest',
+    category: '简约',
     theme: theme(
       'Forest & Moss',
       {
@@ -201,6 +206,7 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
   {
     id: 'warm-sand',
     nameKey: 'WarmSand',
+    category: '创意',
     theme: theme(
       'Warm Terracotta',
       {
@@ -227,6 +233,7 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
   {
     id: 'deep-indigo',
     nameKey: 'DeepIndigo',
+    category: '商务',
     theme: theme(
       'Midnight Executive',
       {
@@ -253,6 +260,7 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
   {
     id: 'cherry',
     nameKey: 'Cherry',
+    category: '创意',
     theme: theme(
       'Cherry Bold',
       {
@@ -276,7 +284,211 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
     masterElements: [],
     layouts: standardLayouts('#2B0E14', '#5C2A34'),
   },
+
+  /* ── 第二批：中文商务 / 学术 / 科技 / 教育 / 极简 / 创意 ── */
+  {
+    id: 'teal-trust',
+    nameKey: 'TealTrust',
+    category: '商务',
+    theme: theme(
+      'Teal Trust',
+      {
+        dk1: '#03303A',
+        lt1: '#FFFFFF',
+        dk2: '#0B5563',
+        lt2: '#E6F4F1',
+        accent1: '#028090',
+        accent2: '#00A896',
+        accent3: '#02C39A',
+        accent4: '#F0B429',
+        accent5: '#05668D',
+        accent6: '#5FA8A0',
+        hlink: '#00708A',
+        folHlink: '#7A4E8C',
+        phClr: '#000000',
+      },
+      'Arial',
+      'Arial',
+    ),
+    masterElements: [],
+    layouts: standardLayouts('#03303A', '#0B5563'),
+  },
+  {
+    id: 'academic-navy',
+    nameKey: 'AcademicNavy',
+    category: '学术',
+    theme: theme(
+      'Academic Navy',
+      {
+        dk1: '#101C3D',
+        lt1: '#FFFFFF',
+        dk2: '#33406B',
+        lt2: '#EEF1F8',
+        accent1: '#21386E',
+        accent2: '#4A6FA5',
+        accent3: '#8FA6C8',
+        accent4: '#B08D3F',
+        accent5: '#2C4B7C',
+        accent6: '#6B7A99',
+        hlink: '#2F5CA8',
+        folHlink: '#7B5290',
+        phClr: '#000000',
+      },
+      'Times New Roman',
+      'Georgia',
+    ),
+    masterElements: [],
+    layouts: standardLayouts('#101C3D', '#33406B'),
+  },
+  {
+    id: 'tech-gradient',
+    nameKey: 'TechGradient',
+    category: '科技',
+    theme: theme(
+      'Tech Gradient',
+      {
+        dk1: '#050B1F',
+        lt1: '#FFFFFF',
+        dk2: '#1C7293',
+        lt2: '#E3F0F6',
+        accent1: '#065A82',
+        accent2: '#1C7293',
+        accent3: '#4FA3C7',
+        accent4: '#00E5C0',
+        accent5: '#21295C',
+        accent6: '#7ED3E8',
+        hlink: '#1C9BD4',
+        folHlink: '#8E6BD8',
+        phClr: '#000000',
+      },
+      'Consolas',
+      'Arial',
+    ),
+    masterElements: [],
+    layouts: standardLayouts('#050B1F', '#1C7293'),
+  },
+  {
+    id: 'education-coral',
+    nameKey: 'EducationCoral',
+    category: '教育',
+    theme: theme(
+      'Education Coral',
+      {
+        dk1: '#2F3C7E',
+        lt1: '#FFFFFF',
+        dk2: '#5A6699',
+        lt2: '#FDF3E7',
+        accent1: '#F96167',
+        accent2: '#F9E795',
+        accent3: '#2F3C7E',
+        accent4: '#3FA796',
+        accent5: '#E8845F',
+        accent6: '#7E8CC4',
+        hlink: '#E0555B',
+        folHlink: '#8A5AA8',
+        phClr: '#000000',
+      },
+      'Verdana',
+      'Verdana',
+    ),
+    masterElements: [],
+    layouts: standardLayouts('#2F3C7E', '#5A6699'),
+  },
+  {
+    id: 'minimal-charcoal',
+    nameKey: 'MinimalCharcoal',
+    category: '简约',
+    theme: theme(
+      'Charcoal Minimal',
+      {
+        dk1: '#212121',
+        lt1: '#FFFFFF',
+        dk2: '#36454F',
+        lt2: '#F2F2F2',
+        accent1: '#36454F',
+        accent2: '#7A8A94',
+        accent3: '#B0BEC5',
+        accent4: '#D97706',
+        accent5: '#546E7A',
+        accent6: '#9AA5AB',
+        hlink: '#3273A8',
+        folHlink: '#7B5290',
+        phClr: '#000000',
+      },
+      'Helvetica',
+      'Helvetica',
+    ),
+    masterElements: [],
+    layouts: standardLayouts('#212121', '#36454F'),
+  },
+  {
+    id: 'sage-calm',
+    nameKey: 'SageCalm',
+    category: '简约',
+    theme: theme(
+      'Sage Calm',
+      {
+        dk1: '#27403A',
+        lt1: '#FFFFFF',
+        dk2: '#50808E',
+        lt2: '#EFF5F2',
+        accent1: '#84B59F',
+        accent2: '#69A297',
+        accent3: '#50808E',
+        accent4: '#C4A35A',
+        accent5: '#3F6E63',
+        accent6: '#A3C4B8',
+        hlink: '#3E7C93',
+        folHlink: '#7A6AA8',
+        phClr: '#000000',
+      },
+      'Georgia',
+      'Georgia',
+    ),
+    masterElements: [],
+    layouts: standardLayouts('#27403A', '#50808E'),
+  },
+  {
+    id: 'berry-cream',
+    nameKey: 'BerryCream',
+    category: '创意',
+    theme: theme(
+      'Berry & Cream',
+      {
+        dk1: '#3B1729',
+        lt1: '#FFFFFF',
+        dk2: '#6D2E46',
+        lt2: '#F6EEE4',
+        accent1: '#6D2E46',
+        accent2: '#A26769',
+        accent3: '#ECE2D0',
+        accent4: '#C9A227',
+        accent5: '#8C4A5E',
+        accent6: '#BFA6A0',
+        hlink: '#A03A62',
+        folHlink: '#6E4A8E',
+        phClr: '#000000',
+      },
+      'Georgia',
+      'Trebuchet MS',
+    ),
+    masterElements: [],
+    layouts: standardLayouts('#3B1729', '#6D2E46'),
+  },
 ];
+
+/** 画廊分组（顺序即展示顺序，取模板中实际出现过的分类去重） */
+export const TEMPLATE_CATEGORIES: string[] = Array.from(
+  new Set(SLIDE_TEMPLATES.map((template) => template.category)),
+);
+
+/** 画廊卡片的配色预览（取主题里最能代表风格的四色） */
+export function templateSwatch(template: SlideTemplate): string[] {
+  const { colors } = template.theme;
+  return ['accent1', 'accent2', 'accent3', 'accent4']
+    .map((key) => colors[key])
+    .filter((value): value is string => Boolean(value));
+}
 
 export function findTemplate(id: string): SlideTemplate | undefined {
   return SLIDE_TEMPLATES.find((template) => template.id === id);

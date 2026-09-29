@@ -104,11 +104,14 @@ export function SelectInput({
   options,
   onChange,
   ariaLabel,
+  labels,
 }: {
   value: string;
   options: string[];
   onChange: (value: string) => void;
   ariaLabel: string;
+  /** 与 options 一一对应的展示文案；缺省时直接显示取值 */
+  labels?: string[];
 }) {
   const list = options.includes(value) ? options : [value, ...options];
   return (
@@ -120,7 +123,7 @@ export function SelectInput({
     >
       {list.map((option) => (
         <option key={option} value={option}>
-          {option}
+          {labels?.[options.indexOf(option)] ?? option}
         </option>
       ))}
     </select>

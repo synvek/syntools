@@ -1,4 +1,4 @@
-import type { ShapeGeometry } from './model/types';
+import type { Fill, ShapeGeometry, SlideBackground, SlideDoc, SlideElement } from './model/types';
 
 /**
  * 幻灯片编辑器纯逻辑层（技术设计 §8.2 契约在本工具内的延续）：
@@ -136,6 +136,39 @@ export function withAlpha(hex: string, alpha?: number): string {
   if (alpha === undefined || alpha >= 1) return hex;
   const [r, g, b] = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${clamp01(alpha).toFixed(3)})`;
+}
+
+/* ----------------------------- 背景归一化 ----------------------------- */
+
+/**
+ * 把页面背景归一化为 `Fill`。
+ *
+ * `background` 在 v1 是纯色字符串，v2 起可以是 `Fill`（渐变/无填充）。
+ * 读取路径（`.sld` 打开、localStorage 草稿、母版继承）统一走这里，
+ * 渲染与导出只处理 `Fill` 一种形态。
+ */
+export function normalizeBackground(bg: SlideBackground | undefined): Fill | undefined {
+  if (bg === undefined || bg === null) return undefined;
+  if (typeof bg === 'string') {
+    const color = normalizeHex(bg);
+    return color ? { type: 'solid', color } : undefined;
+  }
+  return bg;
+}
+
+/** 取背景的「代表色」：纯色取自身，渐变取首色，无填充返回 fallback */
+export function backgroundToColor(bg: SlideBackground | undefined, fallback = '#FFFFFF'): string {
+  const fill = normalizeBackground(bg);
+  if (!fill) return fallback;
+  if (fill.type === 'solid') return fill.color;
+  if (fill.type === 'gradient' && fill.stops.length > 0) return fill.stops[0].color;
+  return fallback;
+}
+
+/** 背景是否为纯色（用于属性面板决定显示取色器还是渐变编辑器） */
+export function isSolidBackground(bg: SlideBackground | undefined): boolean {
+  const fill = normalizeBackground(bg);
+  return fill?.type === 'solid';
 }
 
 /* ------------------------- DrawingML 预设几何映射 ------------------------- */
@@ -603,6 +636,49 @@ export function clampBounds(rect: Rect, page: { width: number; height: number })
     y: Math.round(rect.y),
     width: Math.round(width),
     height: Math.round(height),
+  };
+}
+
+/**
+ * 页面尺寸切换：把已有内容等比缩放并重新居中到新尺寸。
+ *
+ * 纯函数（不改原对象），返回新 SlideDoc。
+ * 缩放系数取宽高比例的较小值（contain 语义），保证内容不会溢出新页面；
+ * 缩放后整体平移到新页面中心，视觉上等价于 PowerPoint 的「最大化/确保适合」。
+ * 组合元素只缩放外框，子元素随 Konva.Group 变换自动跟随。
+ */
+export function scaleDocForSize(doc: SlideDoc, width: number, height: number): SlideDoc {
+  const targetWidth = Math.max(1, Math.round(width));
+  const targetHeight = Math.max(1, Math.round(height));
+  const scaleX = targetWidth / (doc.width || 1);
+  const scaleY = targetHeight / (doc.height || 1);
+  const ratio = Math.min(scaleX, scaleY);
+
+  const remap = (elements: SlideElement[]): SlideElement[] =>
+    elements.map((element) => {
+      const nextWidth = Math.max(1, Math.round(element.width * ratio));
+      const nextHeight = Math.max(1, Math.round(element.height * ratio));
+      return {
+        ...element,
+        width: nextWidth,
+        height: nextHeight,
+        x: Math.round(
+          (targetWidth - nextWidth) / 2 + (element.x - (doc.width - element.width) / 2) * ratio,
+        ),
+        y: Math.round(
+          (targetHeight - nextHeight) / 2 + (element.y - (doc.height - element.height) / 2) * ratio,
+        ),
+      };
+    });
+
+  return {
+    ...doc,
+    width: targetWidth,
+    height: targetHeight,
+    masters: doc.masters.map((master) => ({ ...master, elements: remap(master.elements) })),
+    layouts: doc.layouts.map((layout) => ({ ...layout, elements: remap(layout.elements) })),
+    slides: doc.slides.map((slide) => ({ ...slide, elements: remap(slide.elements) })),
+    version: doc.version + 1,
   };
 }
 

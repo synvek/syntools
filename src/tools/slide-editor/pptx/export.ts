@@ -20,9 +20,27 @@ import {
 } from './templates';
 import { elementXml, resetShapeIds, slideRelsXml, slideXml } from './write';
 
-/** PPTX 导出：SlideDoc → 可被 PowerPoint / WPS / LibreOffice 打开的 OPC 包 */
+/**
+ * PPTX 导出调度器：SlideDoc → 可被 PowerPoint / WPS / LibreOffice 打开的 OPC 包。
+ *
+ * 双通道：
+ * - `pptxgen`（默认）：走 pptxgenjs，拿到原生可编辑图表、母版、表格合并、
+ *   run 级字距/上下标/高亮/超链接等能力；pptxgenjs 动态 import，不占首屏体积。
+ * - `legacy`（兼容模式 / 降级）：走自研 DrawingML 写出，行为与 v1 完全一致。
+ *
+ * 默认通道失败时自动降级到 legacy，保证「导出」这个动作不会因为新引擎
+ * 遇到非预期数据而彻底不可用。
+ */
 
 export type SlideExportErrorCode = 'EMPTY' | 'EXPORT_FAILED';
+
+/** 导出通道 */
+export type PptxExportChannel = 'pptxgen' | 'legacy';
+
+/** 导出选项：兼容模式强制走自研通道 */
+export interface PptxExportOptions {
+  channel?: PptxExportChannel;
+}
 
 interface MediaEntry {
   mediaId: string;
@@ -69,7 +87,31 @@ function relMapFor(
   return result;
 }
 
-export async function exportPptx(doc: SlideDoc): Promise<ToolResult<Uint8Array>> {
+/**
+ * 导出入口。
+ *
+ * `channel` 缺省为 `pptxgen`；该通道返回 EXPORT_FAILED 时自动回落到 legacy。
+ * 两个通道共享 `EMPTY` 判定：空文档无论走哪条路都没有可导出内容。
+ */
+export async function exportPptx(
+  doc: SlideDoc,
+  options: PptxExportOptions = {},
+): Promise<ToolResult<Uint8Array>> {
+  if (!doc.slides || doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
+
+  if (options.channel !== 'legacy') {
+    const { exportPptxPptxGen } = await import('./exportPptxgen');
+    const result = await exportPptxPptxGen(doc);
+    if (result.ok) return result;
+    // 空文档无需降级（legacy 也会返回 EMPTY），其余失败才回落
+    if (result.error !== 'EMPTY') return exportPptxLegacy(doc);
+    return result;
+  }
+  return exportPptxLegacy(doc);
+}
+
+/** 自研通道：手写 DrawingML（兼容模式） */
+export async function exportPptxLegacy(doc: SlideDoc): Promise<ToolResult<Uint8Array>> {
   if (doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
   const zip = new JSZip();
   const mediaEntries = collectMedia(doc);

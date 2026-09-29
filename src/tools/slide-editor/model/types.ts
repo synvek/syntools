@@ -33,6 +33,15 @@ export interface GradientFill {
 
 export type Fill = NoFill | SolidFill | GradientFill;
 
+/**
+ * 页面背景形态。
+ *
+ * 历史上 `background` 是纯色字符串，v2 起升级为 `Fill`（支持渐变）。
+ * 读取旧工程/草稿时由 `normalizeBackground()` 统一归一化，因此这里保留
+ * `string` 分支以兼容存量数据。
+ */
+export type SlideBackground = string | Fill;
+
 export interface Stroke {
   color: string;
   /** px 线宽 */
@@ -53,6 +62,17 @@ export interface RunStyle {
   size?: number;
   font?: string;
   color?: string;
+  /** 字间距（pt），对应 DrawingML `a:spc` */
+  spacing?: number;
+  /**
+   * 基线偏移（DrawingML `baseline`，单位为 0.1%）。
+   * 正值上标、负值下标；0 表示正常。
+   */
+  baseline?: number;
+  /** 字符高亮底色（#RRGGBB） */
+  highlight?: string;
+  /** run 级超链接（DrawingML `a:hlinkClick`） */
+  hyperlink?: string;
 }
 
 export interface TextRun {
@@ -82,7 +102,12 @@ export interface TextBody {
   autoFit?: 'none' | 'autofit';
   /** 内边距（px） */
   margins?: { left: number; top: number; right: number; bottom: number };
+  /** 竖排文本（DrawingML `a:bodyPr vert`） */
+  vert?: TextVert;
 }
+
+/** 文本排列方向 */
+export type TextVert = 'horz' | 'vert' | 'vert270' | 'wordArtVert';
 
 /** DrawingML prstGeom → 渲染可用的几何描述 */
 export interface ShapeGeometry {
@@ -106,6 +131,17 @@ export interface PlaceholderRef {
   index?: string;
 }
 
+/** 投影样式（DrawingML `a:outerShdw` 的子集） */
+export interface ShadowStyle {
+  color: string;
+  /** 模糊半径（px，EMU 换算后的值） */
+  blur: number;
+  offsetX: number;
+  offsetY: number;
+  /** 0~1，缺省 1 */
+  opacity?: number;
+}
+
 interface ElementBase {
   id: string;
   x: number;
@@ -123,6 +159,10 @@ interface ElementBase {
   /** 隐藏：不渲染、不导出（默认可见，字段缺省即视为可见） */
   visible?: boolean;
   placeholder?: PlaceholderRef;
+  /** 元素级超链接（DrawingML `a:hlinkClick`，作用于整个元素） */
+  hyperlink?: string;
+  /** 投影 */
+  shadow?: ShadowStyle;
 }
 
 export interface TextElement extends ElementBase {
@@ -208,6 +248,60 @@ export interface PlaceholderElement extends ElementBase {
   label: string;
 }
 
+/**
+ * 图表类型。命名与 pptxgenjs 的 `ChartType` 对齐，导出时直接查表映射。
+ * 渲染侧由 echarts 离屏绘制成位图。
+ */
+export type ChartType =
+  'bar' | 'barStacked' | 'barPercent' | 'line' | 'pie' | 'doughnut' | 'area' | 'scatter' | 'radar';
+
+export interface ChartSeries {
+  name: string;
+  values: number[];
+}
+
+/** 图表视觉开关，字段与 pptxgenjs 的 chart 选项同名以便直接透传 */
+export interface ChartOptions {
+  legend?: boolean;
+  dataLabels?: boolean;
+  gridLines?: boolean;
+  /** 自定义配色（#RRGGBB），缺省走主题 accent 色 */
+  palette?: string[];
+}
+
+export interface ChartElement extends ElementBase {
+  type: 'chart';
+  chartType: ChartType;
+  /** 类别轴标签 */
+  categories: string[];
+  series: ChartSeries[];
+  options?: ChartOptions;
+  /** 标题（可选） */
+  title?: string;
+  /**
+   * 渲染缓存失效标记：数据或配色变化时自增，
+   * 渲染层据此决定是否重建 echarts 实例。
+   */
+  revision?: number;
+}
+
+export interface FormulaElement extends ElementBase {
+  type: 'formula';
+  /** LaTeX 源码 */
+  latex: string;
+  /** 渲染字号（px） */
+  fontSize?: number;
+  color?: string;
+}
+
+export interface IconElement extends ElementBase {
+  type: 'icon';
+  /** `model/icons.ts` 内置图标 id */
+  iconId: string;
+  /** 单色图标着色（#RRGGBB）；缺省用 SVG 自带颜色 */
+  color?: string;
+}
+
 export type SlideElement =
   | TextElement
   | ShapeElement
@@ -215,13 +309,16 @@ export type SlideElement =
   | LineElement
   | TableElement
   | GroupElement
-  | PlaceholderElement;
+  | PlaceholderElement
+  | ChartElement
+  | FormulaElement
+  | IconElement;
 
 export interface Slide {
   id: string;
   layoutId?: string;
-  /** 页面背景色；未设置时沿用 layout/master */
-  background?: string;
+  /** 页面背景；未设置时沿用 layout/master */
+  background?: SlideBackground;
   elements: SlideElement[];
   notes?: string;
 }
@@ -232,7 +329,7 @@ export interface SlideLayout {
   name?: string;
   /** 布局上的占位符几何（必然带 PlaceholderRef） */
   elements: SlideElement[];
-  background?: string;
+  background?: SlideBackground;
 }
 
 export interface SlideMaster {
@@ -240,7 +337,7 @@ export interface SlideMaster {
   name?: string;
   /** 母版上的公共元素（Logo、页码占位符等） */
   elements: SlideElement[];
-  background?: string;
+  background?: SlideBackground;
 }
 
 export interface ThemeFonts {
@@ -280,4 +377,10 @@ export interface SlideDoc {
   media: Record<string, MediaAsset>;
   /** 每次结构性变更自增，用于缩略图缓存失效 */
   version: number;
+  /**
+   * 文档结构版本号（区别于 `version` 的「变更计数」）。
+   * v1 = 纯色背景；v2 = 支持 Fill 背景 + chart/formula/icon 元素 + run 级扩展属性。
+   * 读取旧数据时由 `model/migrate.ts` 升到 `CURRENT_SCHEMA_VERSION`。
+   */
+  schemaVersion?: number;
 }

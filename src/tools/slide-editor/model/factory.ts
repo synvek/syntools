@@ -1,6 +1,10 @@
 import { pxToEmu } from '../core';
 import type {
+  ChartElement,
+  ChartType,
   Fill,
+  FormulaElement,
+  IconElement,
   MediaAsset,
   Paragraph,
   ShapeGeometry,
@@ -27,6 +31,36 @@ export function createId(prefix: string): string {
 
 export const DEFAULT_WIDTH = 1280;
 export const DEFAULT_HEIGHT = 720;
+
+/** 文档结构版本号：与 `model/migrate.ts` 的 `CURRENT_SCHEMA_VERSION` 保持一致 */
+export const SCHEMA_VERSION = 2;
+
+/** 页面尺寸预设标识 */
+export type PageSizeId = '16:9' | '16:10' | '4:3' | 'a4' | 'custom';
+
+export interface PageSizePreset {
+  id: PageSizeId;
+  width: number;
+  height: number;
+}
+
+/** 页面尺寸预设表（px @96dpi） */
+export const PAGE_SIZES: Record<PageSizeId, PageSizePreset> = {
+  '16:9': { id: '16:9', width: 1280, height: 720 },
+  '16:10': { id: '16:10', width: 1280, height: 800 },
+  '4:3': { id: '4:3', width: 960, height: 720 },
+  a4: { id: 'a4', width: 794, height: 1123 },
+  custom: { id: 'custom', width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
+};
+
+/** 依据宽高反查预设 id，非标准尺寸返回 custom */
+export function resolvePageSizeId(width: number, height: number): PageSizeId {
+  for (const preset of Object.values(PAGE_SIZES)) {
+    if (preset.id === 'custom') continue;
+    if (preset.width === width && preset.height === height) return preset.id;
+  }
+  return 'custom';
+}
 
 /** 默认主题（Office 主题色板的近似默认：蓝/灰） */
 export function createDefaultTheme(): SlideTheme {
@@ -99,21 +133,23 @@ export function createSlide(layoutId?: string): Slide {
   return { id: createId('slide'), layoutId, elements: [] };
 }
 
-export function createDoc(name = 'presentation'): SlideDoc {
+export function createDoc(name = 'presentation', sizeId: PageSizeId = '16:9'): SlideDoc {
   const master = createMaster();
   const layout = createLayout();
   layout.masterId = master.id;
+  const preset = PAGE_SIZES[sizeId] ?? PAGE_SIZES['16:9'];
   return {
     id: createId('doc'),
     name,
-    width: DEFAULT_WIDTH,
-    height: DEFAULT_HEIGHT,
+    width: preset.width,
+    height: preset.height,
     theme: createDefaultTheme(),
     masters: [master],
     layouts: [layout],
     slides: [createSlide(layout.id)],
     media: {},
     version: 1,
+    schemaVersion: SCHEMA_VERSION,
   };
 }
 
@@ -190,6 +226,53 @@ export function createTableElement(doc: SlideDoc, rows = 3, cols = 3): TableElem
     rowHeights: Array.from({ length: rows }, () => Math.round(height / rows)),
     headerRow: true,
     borderColor: '#BFBFBF',
+  };
+}
+
+/** 新建图表元素：默认 3 类别 × 2 系列柱状图 */
+export function createChartElement(
+  doc: SlideDoc,
+  chartType: ChartType = 'bar',
+  palette?: string[],
+): ChartElement {
+  return {
+    id: createId('el'),
+    type: 'chart',
+    ...centerRect(doc, Math.round(doc.width * 0.56), Math.round(doc.height * 0.5)),
+    chartType,
+    categories: ['A', 'B', 'C'],
+    series: [
+      { name: 'Series 1', values: [32, 45, 28] },
+      { name: 'Series 2', values: [21, 38, 52] },
+    ],
+    options: { legend: true, dataLabels: false, gridLines: true, palette },
+    title: '',
+    revision: 1,
+  };
+}
+
+/** 新建公式元素：默认渲染一个示例公式，便于用户直接改写 */
+export function createFormulaElement(doc: SlideDoc, latex = 'E = mc^2'): FormulaElement {
+  const height = 80;
+  const width = Math.round(doc.width * 0.35);
+  return {
+    id: createId('el'),
+    type: 'formula',
+    ...centerRect(doc, width, height),
+    latex,
+    fontSize: 32,
+    color: '#111827',
+  };
+}
+
+/** 新建图标元素：内置素材库图标 */
+export function createIconElement(doc: SlideDoc, iconId: string): IconElement {
+  const size = Math.round(Math.min(doc.width, doc.height) * 0.12);
+  return {
+    id: createId('el'),
+    type: 'icon',
+    ...centerRect(doc, size, size),
+    iconId,
   };
 }
 

@@ -11,6 +11,8 @@ import type {
   TextBody,
 } from '../model/types';
 import { scaleBodyFonts } from '../model/text';
+import { createChartNode } from './chartNode';
+import { createFormulaNode, createIconNode } from './shapeNodes';
 import { acquireImage } from './imageCache';
 import { layoutTextBody } from './textLayout';
 
@@ -382,6 +384,40 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
           listening: true,
         }),
       );
+      break;
+    }
+    case 'chart': {
+      // 透明命中区：图表节点 listening:false，整框仍需可选中/可拖拽
+      const hit = new Konva.Rect({
+        width: element.width,
+        height: element.height,
+        fill: 'rgba(0,0,0,0)',
+        listening: true,
+      });
+      group.add(hit);
+      group.add(createChartNode(element));
+      break;
+    }
+    case 'formula': {
+      const hit = new Konva.Rect({
+        width: element.width,
+        height: element.height,
+        fill: 'rgba(0,0,0,0)',
+        listening: true,
+      });
+      group.add(hit);
+      group.add(createFormulaNode(element));
+      break;
+    }
+    case 'icon': {
+      const hit = new Konva.Rect({
+        width: element.width,
+        height: element.height,
+        fill: 'rgba(0,0,0,0)',
+        listening: true,
+      });
+      group.add(hit);
+      group.add(createIconNode(element));
       break;
     }
     case 'placeholder': {

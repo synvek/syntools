@@ -2,6 +2,7 @@ import Konva from 'konva';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
+import { backgroundFillProps } from '../render/background';
 import { createElementNode } from '../render/nodes';
 import { useSlideStore } from '../store';
 
@@ -62,7 +63,7 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
       new Konva.Rect({
         width: doc.width,
         height: doc.height,
-        fill: slide.background ?? '#FFFFFF',
+        ...backgroundFillProps(slide.background, doc.width, doc.height),
       }),
     );
     for (const element of slide.elements) {

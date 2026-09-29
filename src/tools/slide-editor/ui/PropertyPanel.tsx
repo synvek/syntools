@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
+import { backgroundToColor } from '../core';
 import type { Fill, RunStyle, SlideElement, Stroke, TextAlign } from '../model/types';
-import { useSlideStore } from '../store';
+import { containerElements, useSlideStore } from '../store';
+import { ChartEditor } from './ChartEditor';
 import {
   ActionRow,
   ColorInput,
@@ -39,19 +41,31 @@ export function PropertyPanel() {
   const { t } = useTranslation();
   const doc = useSlideStore((s) => s.doc);
   const slideIndex = useSlideStore((s) => s.slideIndex);
+  const viewMode = useSlideStore((s) => s.viewMode);
+  const masterKind = useSlideStore((s) => s.masterKind);
+  const masterIndex = useSlideStore((s) => s.masterIndex);
   const selection = useSlideStore((s) => s.selection);
   const patchElement = useSlideStore((s) => s.patchElement);
   const updateSlide = useSlideStore((s) => s.updateSlide);
   const removeSelected = useSlideStore((s) => s.removeSelected);
   const duplicateSelected = useSlideStore((s) => s.duplicateSelected);
 
-  const slide = doc.slides[slideIndex];
-  const element = slide?.elements.find((item) => item.id === selection[selection.length - 1]);
+  // 统一按「当前编辑容器」取元素：母版视图下编辑的是母版/版式元素
+  const element = containerElements({ doc, viewMode, slideIndex, masterKind, masterIndex }).find(
+    (item) => item.id === selection[selection.length - 1],
+  );
   const activeCell = useSlideStore((s) => s.activeCell);
   const setTableSize = useSlideStore((s) => s.setTableSize);
   const patchTableCell = useSlideStore((s) => s.patchTableCell);
   const mergeCellRight = useSlideStore((s) => s.mergeCellRight);
   const splitCell = useSlideStore((s) => s.splitCell);
+
+  // 页级背景/备注始终取「当前页」，与正在编辑的容器无关（母版视图下这两项不展示）
+  const currentSlide = doc.slides[slideIndex];
+  const pageBackground =
+    currentSlide?.background ??
+    doc.layouts.find((layout) => layout.id === currentSlide?.layoutId)?.background ??
+    doc.masters[0]?.background;
 
   if (!element) {
     return (
@@ -60,7 +74,7 @@ export function PropertyPanel() {
           <Field label={t('tools.slide.background')}>
             <ColorInput
               ariaLabel={t('tools.slide.background')}
-              value={slide?.background ?? doc.theme.colors.lt1 ?? '#FFFFFF'}
+              value={backgroundToColor(pageBackground, doc.theme.colors.lt1 ?? '#FFFFFF')}
               onChange={(color) => updateSlide({ background: color })}
             />
           </Field>
@@ -72,7 +86,7 @@ export function PropertyPanel() {
         <Section title={t('tools.slide.notes')}>
           <TextArea
             ariaLabel={t('tools.slide.notes')}
-            value={slide?.notes ?? ''}
+            value={currentSlide?.notes ?? ''}
             placeholder={t('tools.slide.notesHint')}
             onChange={(notes) => updateSlide({ notes })}
           />
@@ -459,36 +473,212 @@ export function PropertyPanel() {
               text="1."
             />
           </ActionRow>
+
+          {/* run 级扩展属性：字距 / 上下标 / 高亮（DrawingML a:spc / baseline / highlight） */}
+          <Field label={t('tools.slide.charSpacing')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.charSpacing')}
+              value={Number((firstStyle?.spacing ?? 0).toFixed(1))}
+              min={-10}
+              max={40}
+              step={0.5}
+              onChange={(spacing) => patchStyle({ spacing })}
+            />
+          </Field>
+          <Field label={t('tools.slide.highlight')}>
+            <ColorInput
+              ariaLabel={t('tools.slide.highlight')}
+              value={firstStyle?.highlight ?? '#FFFFFF'}
+              onChange={(highlight) => patchStyle({ highlight })}
+            />
+          </Field>
+          <ActionRow>
+            <ToggleGlyph
+              label={t('tools.slide.superscript')}
+              active={(firstStyle?.baseline ?? 0) > 0}
+              onClick={() => patchStyle({ baseline: (firstStyle?.baseline ?? 0) > 0 ? 0 : 30 })}
+              text="x²"
+            />
+            <ToggleGlyph
+              label={t('tools.slide.subscript')}
+              active={(firstStyle?.baseline ?? 0) < 0}
+              onClick={() => patchStyle({ baseline: (firstStyle?.baseline ?? 0) < 0 ? 0 : -25 })}
+              text="x₂"
+            />
+            <ToggleGlyph
+              label={t('tools.slide.textVertical')}
+              active={Boolean(body.vert && body.vert !== 'horz')}
+              onClick={() =>
+                apply({
+                  body: {
+                    ...body,
+                    vert: body.vert && body.vert !== 'horz' ? 'horz' : 'vert',
+                  },
+                } as Partial<SlideElement>)
+              }
+              text="▤"
+            />
+          </ActionRow>
         </Section>
       ) : null}
 
-      <Section title={t('tools.slide.panelPage')}>
-        <Field label={t('tools.slide.background')}>
-          <ColorInput
-            ariaLabel={t('tools.slide.background')}
-            value={slide?.background ?? doc.theme.colors.lt1 ?? '#FFFFFF'}
-            onChange={(color) => updateSlide({ background: color })}
+      {element.type === 'chart' ? <ChartEditor element={element} /> : null}
+
+      {element.type === 'formula' ? (
+        <Section title={t('tools.slide.panelFormula')}>
+          <Field label={t('tools.slide.formulaLabel')}>
+            <TextArea
+              ariaLabel={t('tools.slide.formulaLabel')}
+              value={element.latex}
+              onChange={(latex) => apply({ latex } as Partial<SlideElement>)}
+            />
+          </Field>
+          <Field label={t('tools.slide.fontSize')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.fontSize')}
+              value={Math.round(element.fontSize ?? 32)}
+              min={8}
+              max={160}
+              onChange={(fontSize) => apply({ fontSize } as Partial<SlideElement>)}
+            />
+          </Field>
+          <Field label={t('tools.slide.color')}>
+            <ColorInput
+              ariaLabel={t('tools.slide.color')}
+              value={element.color ?? '#111827'}
+              onChange={(color) => apply({ color } as Partial<SlideElement>)}
+            />
+          </Field>
+        </Section>
+      ) : null}
+
+      {element.type === 'icon' ? (
+        <Section title={t('tools.slide.panelIcon')}>
+          <Field label={t('tools.slide.color')}>
+            <ColorInput
+              ariaLabel={t('tools.slide.color')}
+              value={element.color ?? '#2563EB'}
+              onChange={(color) => apply({ color } as Partial<SlideElement>)}
+            />
+          </Field>
+        </Section>
+      ) : null}
+
+      {/* 元素级超链接（DrawingML a:hlinkClick）：导出时由 pptxgen 通道写出 */}
+      <Section title={t('tools.slide.panelLink')}>
+        <Field label={t('tools.slide.hyperlink')}>
+          <TextInput
+            ariaLabel={t('tools.slide.hyperlink')}
+            value={element.hyperlink ?? ''}
+            placeholder={t('tools.slide.hyperlinkHint')}
+            onChange={(hyperlink) => apply({ hyperlink: hyperlink || undefined })}
           />
         </Field>
-        <ActionRow>
-          <button
-            type="button"
-            onClick={duplicateSelected}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-300 px-2 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            <Icon name="copy" className="h-3.5 w-3.5" />
-            {t('tools.slide.duplicate')}
-          </button>
-          <button
-            type="button"
-            onClick={removeSelected}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-red-300 px-2 text-[11px] text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-          >
-            <Icon name="close" className="h-3.5 w-3.5" />
-            {t('tools.slide.deleteSlide')}
-          </button>
-        </ActionRow>
       </Section>
+
+      <Section title={t('tools.slide.panelShadow')}>
+        <Field label={t('tools.slide.shadowColor')}>
+          <ColorInput
+            ariaLabel={t('tools.slide.shadowColor')}
+            value={element.shadow?.color ?? '#000000'}
+            onChange={(color) =>
+              apply({
+                shadow: { color, blur: 8, offsetX: 2, offsetY: 2, ...element.shadow },
+              })
+            }
+          />
+        </Field>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label={t('tools.slide.shadowBlur')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.shadowBlur')}
+              value={Math.round(element.shadow?.blur ?? 0)}
+              min={0}
+              max={80}
+              onChange={(blur) =>
+                apply({
+                  shadow: {
+                    color: '#000000',
+                    offsetX: 2,
+                    offsetY: 2,
+                    ...element.shadow,
+                    blur,
+                  },
+                })
+              }
+            />
+          </Field>
+          <Field label={t('tools.slide.shadowOffsetX')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.shadowOffsetX')}
+              value={Math.round(element.shadow?.offsetX ?? 0)}
+              min={-60}
+              max={60}
+              onChange={(offsetX) =>
+                apply({
+                  shadow: {
+                    color: '#000000',
+                    blur: 8,
+                    offsetY: 2,
+                    ...element.shadow,
+                    offsetX,
+                  },
+                })
+              }
+            />
+          </Field>
+          <Field label={t('tools.slide.shadowOffsetY')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.shadowOffsetY')}
+              value={Math.round(element.shadow?.offsetY ?? 0)}
+              min={-60}
+              max={60}
+              onChange={(offsetY) =>
+                apply({
+                  shadow: {
+                    color: '#000000',
+                    blur: 8,
+                    offsetX: 2,
+                    ...element.shadow,
+                    offsetY,
+                  },
+                })
+              }
+            />
+          </Field>
+        </div>
+      </Section>
+
+      {/* 页面级设置只在普通视图出现：母版视图下母版背景由 MasterView 提供入口 */}
+      {viewMode === 'normal' ? (
+        <Section title={t('tools.slide.panelPage')}>
+          <Field label={t('tools.slide.background')}>
+            <ColorInput
+              ariaLabel={t('tools.slide.background')}
+              value={backgroundToColor(pageBackground, doc.theme.colors.lt1 ?? '#FFFFFF')}
+              onChange={(color) => updateSlide({ background: color })}
+            />
+          </Field>
+          <ActionRow>
+            <button
+              type="button"
+              onClick={duplicateSelected}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-300 px-2 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="copy" className="h-3.5 w-3.5" />
+              {t('tools.slide.duplicate')}
+            </button>
+            <button
+              type="button"
+              onClick={removeSelected}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-red-300 px-2 text-[11px] text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+            >
+              <Icon name="close" className="h-3.5 w-3.5" />
+              {t('tools.slide.deleteSlide')}
+            </button>
+          </ActionRow>
+        </Section>
+      ) : null}
     </div>
   );
 }

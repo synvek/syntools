@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import {
@@ -11,6 +11,7 @@ import {
 import { createMediaFromFile } from '../model/media';
 import type { ShapeGeometry } from '../model/types';
 import { useSlideStore } from '../store';
+import { InsertPanel, type InsertPanelTab } from './InsertPanel';
 import { MenuButton, type MenuItem } from './MenuButton';
 import {
   AlignIcon,
@@ -68,6 +69,7 @@ const BTN_ACTIVE = 'border-blue-600 bg-blue-600 text-white';
 export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => void }) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [panel, setPanel] = useState<InsertPanelTab | null>(null);
   const doc = useSlideStore((s) => s.doc);
   const scale = useSlideStore((s) => s.viewport.scale);
   const selection = useSlideStore((s) => s.selection);
@@ -96,6 +98,10 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
   const toggleLockSelected = useSlideStore((s) => s.toggleLockSelected);
   const toggleVisibleSelected = useSlideStore((s) => s.toggleVisibleSelected);
   const patchSelected = useSlideStore((s) => s.patchSelected);
+  const formatPainter = useSlideStore((s) => s.formatPainter);
+  const copyFormat = useSlideStore((s) => s.copyFormat);
+  const applyFormat = useSlideStore((s) => s.applyFormat);
+  const clearFormatPainter = useSlideStore((s) => s.clearFormatPainter);
 
   const hasSelection = selection.length > 0;
 
@@ -219,6 +225,26 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
           <IconButton label={t('tools.slide.insertTable')} onClick={insertTable}>
             <Icon name="table" className="h-4 w-4" />
           </IconButton>
+          {SEP}
+          <IconButton label={t('tools.slide.insertChart')} onClick={() => setPanel('chart')}>
+            <ChartIcon />
+          </IconButton>
+          <IconButton label={t('tools.slide.insertFormula')} onClick={() => setPanel('formula')}>
+            <FormulaIcon />
+          </IconButton>
+          <IconButton label={t('tools.slide.insertIcon')} onClick={() => setPanel('icon')}>
+            <IconSparkIcon />
+          </IconButton>
+          <button
+            type="button"
+            onClick={() => setPanel('shape')}
+            title={t('tools.slide.insertShapeLib')}
+            aria-label={t('tools.slide.insertShapeLib')}
+            className={`${BTN_BASE} ${BTN_IDLE}`}
+          >
+            <Icon name="shapes" className="h-4 w-4" />
+            <span className="ml-1">{t('tools.slide.insertShapeLib')}</span>
+          </button>
         </div>
 
         {SEP}
@@ -331,6 +357,35 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
             <Icon name={anyHidden() ? 'eyeOff' : 'eye'} className="h-4 w-4" />
           </IconButton>
         </div>
+
+        {SEP}
+
+        {/* 格式刷：先「复制格式」再「套用格式」，两步之间按钮保持激活态 */}
+        <div className={GROUP}>
+          <IconButton
+            label={t('tools.slide.copyFormat')}
+            active={formatPainter !== null}
+            disabled={!hasSelection}
+            onClick={copyFormat}
+          >
+            <FormatPainterIcon active={formatPainter !== null} />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.applyFormat')}
+            active={formatPainter !== null}
+            disabled={formatPainter === null || !hasSelection}
+            onClick={applyFormat}
+          >
+            <Icon name="brush" className="h-4 w-4" />
+          </IconButton>
+          <IconButton
+            label={t('tools.slide.clearFormat')}
+            disabled={formatPainter === null}
+            onClick={clearFormatPainter}
+          >
+            <Icon name="close" className="h-4 w-4" />
+          </IconButton>
+        </div>
       </div>
 
       {/* ── 视图 ── */}
@@ -399,7 +454,54 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
           if (file) void handleImage(file);
         }}
       />
+
+      {panel ? <InsertPanel initialTab={panel} onClose={() => setPanel(null)} /> : null}
     </div>
+  );
+}
+
+/** 格式刷图标：激活态在刷头右侧加一个小「+」，提示已复制样式 */
+function FormatPainterIcon({ active }: { active: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+      <path d="M3 2h7a1 1 0 0 1 1 1v3H3z" />
+      <path d="M5 7h4v2H5z" />
+      <path d="M6 10h2v4H6z" />
+      {active ? <path d="M12 9h1.5v1.5H15V12h-1.5v1.5H12V12h-1.5v-1.5H12z" /> : null}
+    </svg>
+  );
+}
+
+/** 图表图标（内联 SVG，沿用 toolIcons 的 16×16 约定） */
+function ChartIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+      <rect x="1" y="9" width="3" height="6" />
+      <rect x="6" y="5" width="3" height="10" />
+      <rect x="11" y="2" width="3" height="13" />
+    </svg>
+  );
+}
+
+/** 公式图标 */
+function FormulaIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
+      <text x="8" y="12" textAnchor="middle" fontSize="11" fontStyle="italic" fill="currentColor">
+        ƒx
+      </text>
+    </svg>
+  );
+}
+
+/** 图标素材库图标 */
+function IconSparkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="5" r="2.2" opacity="0.9" />
+      <rect x="9" y="2.5" width="5" height="5" rx="1" opacity="0.65" />
+      <polygon points="8,11 12,15 4,15" opacity="0.8" />
+    </svg>
   );
 }
 

@@ -4,7 +4,7 @@ import { fitScale, GRID_SIZE } from '../core';
 import type { StageCallbacks, TransformChange } from '../interaction/pointer';
 import { createStage, type StageHandle } from '../render/stage';
 import { openTextEditor, type TextEditorHandle } from '../render/textEditor';
-import { useSlideStore } from '../store';
+import { containerElements, useSlideStore } from '../store';
 import type { SlideElement } from '../model/types';
 import { Rulers } from './Rulers';
 
@@ -37,6 +37,9 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   const panX = useSlideStore((s) => s.viewport.panX);
   const panY = useSlideStore((s) => s.viewport.panY);
   const showPlaceholders = useSlideStore((s) => s.showPlaceholders);
+  const viewMode = useSlideStore((s) => s.viewMode);
+  const masterKind = useSlideStore((s) => s.masterKind);
+  const masterIndex = useSlideStore((s) => s.masterIndex);
   // 参考线/标尺是 store 状态，需要订阅才能触发重绘
   const showRulers = useSlideStore((s) => s.showRulers);
   const guides = useSlideStore((s) => s.guides);
@@ -69,6 +72,17 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     const handle = handleRef.current;
     if (!handle) return;
     const state = useSlideStore.getState();
+    if (state.viewMode === 'master') {
+      // 母版视图：直接编辑母版/版式元素，不再叠加继承层（否则会和自己重影）
+      handle.renderBackground(state.doc, []);
+      handle.sync(containerElements(state), state.doc);
+      handle.renderCustomGuides(state.showRulers ? state.guides : [], {
+        width: state.doc.width,
+        height: state.doc.height,
+      });
+      handle.setSelection(state.selection);
+      return;
+    }
     const slide = state.doc.slides[state.slideIndex];
     if (!slide) return;
     const layout = state.doc.layouts.find((item) => item.id === slide.layoutId);
@@ -140,7 +154,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       const wrapper = wrapperRef.current;
       if (!wrapper) return;
       const state = useSlideStore.getState();
-      const element = state.doc.slides[state.slideIndex]?.elements.find((item) => item.id === id);
+      const element = containerElements(state).find((item) => item.id === id);
       const body =
         element?.type === 'text'
           ? element.body
@@ -223,8 +237,8 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       },
       getSnapContext: () => {
         const state = useSlideStore.getState();
-        const slide = state.doc.slides[state.slideIndex];
-        const others = (slide?.elements ?? [])
+        // 吸附对象取自「当前编辑容器」：母版视图下吸附到母版元素而不是页面元素
+        const others = containerElements(state)
           .filter((element) => !state.selection.includes(element.id))
           .map((element) => ({
             x: element.x,
@@ -292,7 +306,17 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   useEffect(() => {
     if (draggingRef.current) return;
     syncNow();
-  }, [doc, guides, showPlaceholders, showRulers, slideIndex, syncNow]);
+  }, [
+    doc,
+    guides,
+    showPlaceholders,
+    showRulers,
+    slideIndex,
+    viewMode,
+    masterKind,
+    masterIndex,
+    syncNow,
+  ]);
 
   useEffect(() => {
     handleRef.current?.setSelection(selection);

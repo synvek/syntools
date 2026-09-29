@@ -2,6 +2,7 @@ import Konva from 'konva';
 import { imagesToPdf } from '@/core/pdf/convert';
 import type { ToolResult } from '@/core/types';
 import type { Slide, SlideDoc } from '../model/types';
+import { backgroundFillProps } from '../render/background';
 import { createElementNode } from '../render/nodes';
 
 /**
@@ -58,7 +59,7 @@ export function renderSlideToDataUrl(
     new Konva.Rect({
       width: doc.width,
       height: doc.height,
-      fill: slide.background ?? '#FFFFFF',
+      ...backgroundFillProps(slide.background, doc.width, doc.height),
     }),
   );
   for (const element of slide.elements) {
