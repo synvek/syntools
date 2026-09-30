@@ -247,11 +247,14 @@ wasm 核心约 31 MB，因此**绝不进 bundle**：`pnpm ffmpeg:fetch` 会把�
 
 **Vercel** — `vercel.json` 已配置 `buildCommand`、`outputDirectory`、SPA 重写与安全响应头（`BASE_PATH` 默认为 `/`）。
 
+**Cloudflare Pages** — Pages 拒绝部署任何超过 25 MiB 的单文件，而 `ffmpeg-core.wasm` 有 31.2 MB。用 `pnpm build:cf`（即 `FFMPEG_PAGES=1`）构建：获取脚本只发布 `ffmpeg-core.wasm.gz`（约 9.8 MB）并删除产物中的原始 wasm。运行时**仅当某个工具真的回退到 ffmpeg 时**才下载这份副本，用 `DecompressionStream`（不可用时回退 pako）解压，再以同源 `blob:` URL 交给 `@ffmpeg/ffmpeg` —— 不引入第三方域，也不需要放宽 CSP；首屏与其它工具完全不受影响。`pnpm size` 会在任一资源越过 25 MiB 线时直接失败。
+
 **其他托管** — 托管 `dist/`，将未知路径重写到 `index.html`，并对带 hash 的 `/assets/*` 做长缓存。若部署到 GitHub 项目站子路径，可用 `pnpm build:pages`（设置 `BASE_PATH=/syntools/`）。
 
 ```bash
 pnpm build
-pnpm preview   # 可选：本地预览
+pnpm build:cf   # Cloudflare Pages：只发布 gzip 版 ffmpeg 核心
+pnpm preview    # 可选：本地预览
 ```
 
 ### 桌面应用（Tauri）

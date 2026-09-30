@@ -19,6 +19,9 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# 自托管的 ffmpeg.wasm 核心按版本分目录，可长期强缓存
+# 自托管的 ffmpeg.wasm 核心按版本分目录，可长期强缓存。
+# 原始 ffmpeg-core.wasm 为 31.2MB，超过 Cloudflare Pages 单文件 25 MiB 上限，
+# 因此 Pages 构建（FFMPEG_PAGES=1 / pnpm build:cf）只发布 ffmpeg-core.wasm.gz（~9.8MB），
+# 由前端在用到 ffmpeg 兜底时下载并用 DecompressionStream 解压成 blob: URL（同源，无需放行 CSP）。
 /ffmpeg/*
   Cache-Control: public, max-age=31536000, immutable

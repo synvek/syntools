@@ -247,11 +247,14 @@ The build output is a static SPA in `dist/`. `pnpm build` also prerenders the ho
 
 **Vercel** — `vercel.json` already defines `buildCommand`, `outputDirectory`, SPA rewrites, and security headers (`BASE_PATH` defaults to `/`).
 
+**Cloudflare Pages** — Pages rejects any single asset above 25 MiB, and `ffmpeg-core.wasm` is 31.2 MB. Build with `pnpm build:cf` (`FFMPEG_PAGES=1`): the fetch script then publishes only `ffmpeg-core.wasm.gz` (~9.8 MB) and removes the raw wasm from the output. At runtime that copy is downloaded **only when a tool actually falls back to ffmpeg**, inflated with `DecompressionStream` (pako as fallback) and handed to `@ffmpeg/ffmpeg` as a same-origin `blob:` URL — no third-party domain and no CSP change. First screen and every other tool stay untouched. `pnpm size` fails if any asset crosses the 25 MiB line.
+
 **Other hosts** — serve `dist/`, rewrite unknown paths to `index.html`, and cache hashed `/assets/*` aggressively. For GitHub project pages under a subpath, build with `pnpm build:pages` (sets `BASE_PATH=/syntools/`).
 
 ```bash
 pnpm build
-pnpm preview   # optional local check
+pnpm build:cf   # Cloudflare Pages: gzip-only ffmpeg core
+pnpm preview    # optional local check
 ```
 
 ### Desktop (Tauri)

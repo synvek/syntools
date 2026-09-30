@@ -35,6 +35,9 @@ const budgetFor = (file) =>
 // 它体量巨大（~31.2MB wasm + ~0.13MB js），既不属于首屏也不属于 chunk，
 // 若不做单独约束就会成为「看不见的体积」，因此这里显式纳入预算与报告。
 const STATIC_ASSET_BUDGET = 40 * 1024 * 1024; // 40 MB
+// Cloudflare Pages 对单个静态资源有 25 MiB 硬限（部署会被直接拒绝），逐文件约束。
+// 原始 wasm（31.2MB）正是靠 gzip 副本（~9.8MB，运行时解压）满足这条线。
+const STATIC_ASSET_MAX_FILE = 25 * 1024 * 1024;
 const STATIC_DIRS = ['ffmpeg'];
 
 /** 递归收集目录下所有文件（返回绝对路径）。 */
@@ -111,21 +114,26 @@ lines.push(
 lines.push('');
 lines.push('## 静态资源（运行时按需下载，不计入首屏 / JS chunk）');
 lines.push('');
-lines.push(`预算：合计 ≤ ${kb(STATIC_ASSET_BUDGET)}`);
+lines.push(
+  `预算：单文件 ≤ ${kb(STATIC_ASSET_MAX_FILE)}（Cloudflare Pages 硬限），合计 ≤ ${kb(STATIC_ASSET_BUDGET)}`,
+);
 lines.push('');
 lines.push('| 文件 | 原始体积 | 状态 |');
 lines.push('| ---- | -------- | ---- |');
 let staticTotal = 0;
+let staticFileOver = false;
 for (const dirName of STATIC_DIRS) {
   const files = walkFiles(path.join(DIST, dirName));
   for (const file of files.sort()) {
     const size = statSync(file).size;
     staticTotal += size;
+    if (size > STATIC_ASSET_MAX_FILE) staticFileOver = true;
     lines.push(
-      `| ${path.relative(DIST, file)} | ${kb(size)} | ${mark(size, STATIC_ASSET_BUDGET)} |`,
+      `| ${path.relative(DIST, file)} | ${kb(size)} | ${mark(size, STATIC_ASSET_MAX_FILE)} |`,
     );
   }
 }
+if (staticFileOver) failed = true;
 if (staticTotal === 0) {
   lines.push('| _（未下载，请运行 `pnpm ffmpeg:fetch`）_ | - | - |');
 } else if (staticTotal > STATIC_ASSET_BUDGET) {

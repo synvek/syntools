@@ -11,6 +11,85 @@ export function ffmpegCoreUrl(file: string): string {
   return `${base.endsWith('/') ? base : `${base}/`}ffmpeg/${FFMPEG_CORE_VERSION}/${file}`;
 }
 
+/** gzip 魔数（1f 8b）：用于确认下载到的确实是压缩副本，而不是 SPA fallback 返回的 HTML。 */
+const GZIP_MAGIC = [0x1f, 0x8b];
+/** wasm 魔数（00 61 73 6d，即 "\0asm"）：服务端已把 gzip 副本透明解码成原始 wasm 时出现。 */
+const WASM_MAGIC = [0x00, 0x61, 0x73, 0x6d];
+
+function startsWith(bytes: Uint8Array, magic: number[]): boolean {
+  if (bytes.length < magic.length) return false;
+  return magic.every((byte, index) => bytes[index] === byte);
+}
+
+/** `DecompressionStream` 在部分 TS lib 版本里缺失类型声明，这里给出一个最小签名。 */
+type DecompressionStreamCtor = new (format: 'gzip') => TransformStream<Uint8Array, Uint8Array>;
+
+/**
+ * 解压 gzip 字节。
+ * 优先用原生 DecompressionStream（流式、不阻塞主线程），缺失或失败时回退 pako（已随 gzip 工具打包）。
+ */
+async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
+  const Native =
+    (globalThis as unknown as { DecompressionStream?: DecompressionStreamCtor })
+      .DecompressionStream ?? undefined;
+  if (Native) {
+    try {
+      const stream = new Response(bytes).body?.pipeThrough(new Native('gzip'));
+      if (stream) return new Uint8Array(await new Response(stream).arrayBuffer());
+    } catch {
+      // 落到 pako
+    }
+  }
+  const { ungzip } = await import('pako');
+  return ungzip(bytes);
+}
+
+/**
+ * 下载 gzip 版 wasm，必要时解压，并返回同源 blob: URL。
+ *
+ * 服务端行为有两种，都要兼容：
+ * - 原样返回压缩副本（Pages 的常见行为）→ 前端解压；
+ * - 带 Content-Encoding: gzip 返回（如 vite preview 把 .gz 当预压缩变体）→ fetch 已透明解码，
+ *   直接拿到原始 wasm 字节，跳过解压。
+ * 两种之外（404、SPA fallback 的 HTML）返回 null，由调用方回退到原始文件。
+ */
+async function loadCompressedWasm(): Promise<string | null> {
+  let buffer: Uint8Array;
+  try {
+    const res = await fetch(ffmpegCoreUrl('ffmpeg-core.wasm.gz'));
+    if (!res.ok) return null;
+    buffer = new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+
+  try {
+    let wasm: Uint8Array | null = null;
+    if (startsWith(buffer, GZIP_MAGIC)) wasm = await gunzip(buffer);
+    else if (startsWith(buffer, WASM_MAGIC)) wasm = buffer;
+    if (!wasm) return null;
+    // blob: 与页面同源，不受 COEP / CSP 限制，core 及其 pthread worker 都能直接 fetch。
+    // 不主动 revoke：多线程 core 会在每个 worker 里再次取这个 URL。
+    return URL.createObjectURL(new Blob([wasm], { type: 'application/wasm' }));
+  } catch {
+    return null;
+  }
+}
+
+let wasmUrl: Promise<string> | null = null;
+
+/**
+ * 解析 wasmURL：优先用 gzip 自托管副本（~9.8MB，Cloudflare Pages 单文件上限 25 MiB，
+ * 原始 31.2MB 无法直接发布），运行时解压；副本缺失或解压失败时回退原始 ffmpeg-core.wasm。
+ * 结果按会话缓存：只有真正用到 ffmpeg 兜底时才会下载并解压，平时零开销。
+ */
+export function resolveFfmpegWasmUrl(): Promise<string> {
+  if (!wasmUrl) {
+    wasmUrl = (async () => (await loadCompressedWasm()) ?? ffmpegCoreUrl('ffmpeg-core.wasm'))();
+  }
+  return wasmUrl;
+}
+
 let instance: FFmpeg | null = null;
 let pending: Promise<FFmpeg> | null = null;
 
@@ -47,7 +126,7 @@ export async function loadFfmpeg(): Promise<ToolResult<FFmpeg>> {
       });
       await ff.load({
         coreURL: ffmpegCoreUrl('ffmpeg-core.js'),
-        wasmURL: ffmpegCoreUrl('ffmpeg-core.wasm'),
+        wasmURL: await resolveFfmpegWasmUrl(),
         workerURL: ffmpegCoreUrl('ffmpeg-core.worker.js'),
       });
       instance = ff;
