@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
 // 界面文案跟随浏览器语言（Playwright 默认 en-US），下面这些用例断言简体中文
@@ -1557,6 +1558,389 @@ test.describe('代码编辑器（zh-CN）', () => {
     const htmlDownload = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出 HTML' }).click();
     expect((await htmlDownload).suggestedFilename()).toBe('snippet.html');
+
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('当前行高亮与行号按整数行高对齐，自动换行时覆盖层关闭', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/code-editor');
+
+    const editor = page.getByRole('textbox', { name: '编辑器' });
+    const surface = page.locator('.ce-surface');
+    const band = page.locator('.ce-line-active');
+    await expect(surface).toBeVisible();
+
+    // 用工具自身的「清空」保证跨平台确定性，再键入 3 行（光标停在末行）
+    await page.getByRole('button', { name: '清空' }).click();
+    await editor.click();
+    await page.keyboard.type('a\nb\nc');
+    await expect(page.locator('.ce-gutter')).toBeVisible();
+    await expect
+      .poll(() =>
+        page.locator('.ce-gutter').evaluate((el) => (el.textContent ?? '').split('\n').length),
+      )
+      .toBe(3);
+
+    // 覆盖层与文字行严格对齐：首行 y = padding-top（12），第 3 行 y = 12 + 2 × 21
+    const bandOffset = async () => {
+      const bandBox = await band.boundingBox();
+      const surfaceBox = await surface.boundingBox();
+      if (!bandBox || !surfaceBox) return Number.NaN;
+      return bandBox.y - surfaceBox.y;
+    };
+    await expect.poll(bandOffset).toBeGreaterThan(53);
+    await expect.poll(bandOffset).toBeLessThan(55);
+
+    // 光标上移一行 → 高亮跟随到第 2 行（12 + 21 = 33）
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(bandOffset).toBeGreaterThan(32);
+    await expect.poll(bandOffset).toBeLessThan(34);
+
+    // 输入稳定性：连续输入 200 字符不丢内容、行数不变
+    const filler = 'x'.repeat(200);
+    await page.keyboard.type(filler);
+    await expect
+      .poll(() => surface.evaluate((el, text) => (el.textContent ?? '').includes(text), filler))
+      .toBe(true);
+    await expect
+      .poll(() =>
+        page.locator('.ce-gutter').evaluate((el) => (el.textContent ?? '').split('\n').length),
+      )
+      .toBe(3);
+
+    // 切换语言与主题后内容不被重置（受控同步不产生抖动）
+    const before = await surface.evaluate((el) => el.textContent);
+    await page.getByLabel('语言', { exact: true }).selectOption('javascript');
+    await page.getByLabel('风格主题').selectOption('dracula');
+    await expect.poll(() => surface.evaluate((el) => el.textContent)).toBe(before);
+
+    // 自动换行时行号与行级覆盖层一并隐藏（行↔视觉行不再一一对应）
+    await page.getByLabel('自动换行').check();
+    await expect(page.locator('.ce-line-active')).toHaveCount(0);
+    await expect(page.locator('.ce-gutter')).toHaveCount(0);
+    await page.getByLabel('自动换行').uncheck();
+    await expect(page.locator('.ce-line-active')).toHaveCount(1);
+
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('行操作：注释切换快捷键 → 工具栏移动 / 复制 → 跳转行 → 撤销', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+    await page.goto('/tools/code-editor');
+
+    const editor = page.getByRole('textbox', { name: '编辑器' });
+    const surface = page.locator('.ce-surface');
+    const text = async () => surface.evaluate((el) => el.textContent);
+
+    await page.getByRole('button', { name: '清空' }).click();
+    await editor.click();
+    await page.keyboard.type('a\nb\nc');
+    // 空编辑区输入不应出现填充字符（历史实现会多出一个前导空格并带进导出内容）
+    await expect.poll(text).toBe('a\nb\nc');
+    // 等 CodeJar 的历史记录落盘（keyup 后 300ms 防抖），保证撤销能回到键入后的状态
+    await page.waitForTimeout(400);
+
+    // 快捷键切换行注释：光标停在末行 → 只注释该行，再按一次取消
+    await page.keyboard.press(`${mod}+/`);
+    await expect.poll(text).toBe('a\nb\n// c');
+    await page.keyboard.press(`${mod}+/`);
+    await expect.poll(text).toBe('a\nb\nc');
+
+    // 工具栏「跳转行」把光标放到首行，再下移 / 复制
+    await page.getByRole('button', { name: '跳转行' }).click();
+    const gotoInput = page.getByLabel('跳转行');
+    await expect(gotoInput).toBeVisible();
+    await gotoInput.fill('1');
+    await gotoInput.press('Enter');
+    await expect(gotoInput).toHaveCount(0);
+
+    await page.getByRole('button', { name: '下移行' }).click();
+    await expect.poll(text).toBe('b\na\nc');
+    await page.getByRole('button', { name: '复制行' }).click();
+    await expect.poll(text).toBe('b\na\na\nc');
+
+    // 工具栏操作后编辑器仍是焦点目标（否则撤销无效），且撤销能回到复制前
+    await page.keyboard.press(`${mod}+z`);
+    await expect.poll(text).toBe('b\na\nc');
+    // 撤销后受控状态同步（统计随内容刷新，而非停留在复制后的长度）
+    await expect(page.getByText(/5 字符/)).toBeVisible();
+
+    // 注释按钮：先跳转到首行再注释，验证跳转与工具栏动作可组合
+    await expect(page.getByRole('button', { name: '注释' })).toBeEnabled();
+    await page.getByRole('button', { name: '跳转行' }).click();
+    await page.getByLabel('跳转行').fill('1');
+    await page.getByLabel('跳转行').press('Enter');
+    await page.getByRole('button', { name: '注释' }).click();
+    await expect.poll(text).toBe('// b\na\nc');
+
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('查找替换：⌘F 打开栏 → 计数与循环定位 → 正则校验 → 全部替换', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+    await page.goto('/tools/code-editor');
+
+    const editor = page.getByRole('textbox', { name: '编辑器' });
+    const surface = page.locator('.ce-surface');
+    const text = async () => surface.evaluate((el) => el.textContent);
+    const counter = page.locator('.ce-find-counter');
+
+    await page.getByRole('button', { name: '清空' }).click();
+    await editor.click();
+    await page.keyboard.type('foo\nbar\nfoo');
+    await expect.poll(text).toBe('foo\nbar\nfoo');
+
+    // ⌘F 打开查找栏并聚焦查询框
+    await page.keyboard.press(`${mod}+f`);
+    const query = page.getByLabel('查找', { exact: true });
+    await expect(query).toBeFocused();
+    await query.fill('foo');
+    await expect(counter).toHaveText('–/2');
+
+    // Enter 循环定位，计数随之推进（末尾回绕）
+    await page.keyboard.press('Enter');
+    await expect(counter).toHaveText('1/2');
+    const matchTop = async () => {
+      const box = await page.locator('.ce-match-current').boundingBox();
+      const surfaceBox = await surface.boundingBox();
+      if (!box || !surfaceBox) return Number.NaN;
+      return box.y - surfaceBox.y;
+    };
+    await expect.poll(matchTop).toBeGreaterThan(11);
+    await expect.poll(matchTop).toBeLessThan(13);
+
+    await page.keyboard.press('Enter');
+    await expect(counter).toHaveText('2/2');
+    // 当前命中跳到第 3 行：12 + 2 × 21 = 54
+    await expect.poll(matchTop).toBeGreaterThan(53);
+    await expect.poll(matchTop).toBeLessThan(55);
+
+    await page.keyboard.press('Enter');
+    await expect(counter).toHaveText('1/2');
+    // 连续定位期间焦点保留在查找框、内容不被改写（回归：定位不得把焦点交还编辑区）
+    await expect(query).toBeFocused();
+    await expect.poll(text).toBe('foo\nbar\nfoo');
+
+    // 正则无效时给出可读提示
+    await page.getByLabel('正则表达式', { exact: true }).click();
+    await query.fill('[');
+    await expect(counter).toHaveText('正则无效');
+    await page.getByLabel('正则表达式', { exact: true }).click();
+
+    // 全部替换：内容、预览与统计同步
+    await query.fill('foo');
+    await page.getByLabel('替换为', { exact: true }).fill('x');
+    await page.getByRole('button', { name: '全部替换' }).click();
+    await expect.poll(text).toBe('x\nbar\nx');
+    await expect(page.getByText('已全部替换')).toBeVisible();
+    await expect(page.locator('.ce-card')).not.toContainText('foo');
+
+    // Esc 关闭查找栏
+    await query.press('Escape');
+    await expect(query).toHaveCount(0);
+
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('视觉辅助：缩进引导线 / 括号配对与跳转 / 折叠范围标记', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+    await page.goto('/tools/code-editor');
+
+    const editor = page.getByRole('textbox', { name: '编辑器' });
+    const surface = page.locator('.ce-surface');
+    // prettier-plugin-java 会在嵌套块后补空行，这里按格式化后的实际形态断言（含结尾换行）
+    const code = ['class A {', '', '  void f() {', '    g();', '  }', '}', ''].join('\n');
+    const caretTop = async () => {
+      const box = await page.locator('.ce-line-active').boundingBox();
+      const surfaceBox = await surface.boundingBox();
+      if (!box || !surfaceBox) return Number.NaN;
+      return box.y - surfaceBox.y;
+    };
+
+    await page.getByRole('button', { name: '清空' }).click();
+    await editor.click();
+    // 单行输入后用 Prettier 格式化，避免依赖 CodeJar 的自动缩进行为
+    await page.keyboard.type('class A{void f(){g();}}');
+    await page.getByRole('button', { name: '格式化', exact: true }).click();
+    await expect.poll(() => surface.evaluate((el) => el.textContent)).toBe(code);
+
+    // 缩进引导线：第 2/4 行各 1 条、第 3 行 2 条（列 0 与列 2），第 5 行无缩进
+    await expect(page.locator('.ce-guide')).toHaveCount(4);
+
+    // 折叠标记：第 1、2 行各一个可折叠范围
+    const markers = page.locator('.ce-fold-marker');
+    await expect(markers).toHaveCount(2);
+
+    // 点击第 1 个标记 → 整段范围高亮 + 行数徽标（隐藏式折叠不在本内核支持范围内）
+    await markers.first().click();
+    await expect(page.locator('.ce-fold-band')).toHaveCount(1);
+    await expect(page.getByText('6 行')).toBeVisible();
+    const bandBox = await page.locator('.ce-fold-band').boundingBox();
+    expect(Math.round(bandBox?.height ?? 0)).toBe(6 * 21);
+
+    // 括号配对 + 跳转：光标在文末 '}' 上按 ⌘⇧\ 跳到配对的 '{'（第 1 行）
+    await editor.click();
+    await page.keyboard.press(`${mod}+End`);
+    await page.keyboard.press(`${mod}+Shift+\\`);
+    await expect(page.locator('.ce-bracket')).toHaveCount(2);
+    await expect.poll(caretTop).toBeGreaterThan(11);
+    await expect.poll(caretTop).toBeLessThan(13);
+
+    // 再按一次跳回闭合括号（第 6 行：12 + 5 × 21 = 117）
+    await page.keyboard.press(`${mod}+Shift+\\`);
+    await expect.poll(caretTop).toBeGreaterThan(116);
+    await expect.poll(caretTop).toBeLessThan(118);
+
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('批量编辑：选择同词 → 统一替换多处', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/code-editor');
+
+    const editor = page.getByRole('textbox', { name: '编辑器' });
+    const surface = page.locator('.ce-surface');
+    const text = async () => surface.evaluate((el) => el.textContent);
+
+    await page.getByRole('button', { name: '清空' }).click();
+    await editor.click();
+    await page.keyboard.type('total = 1;');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('sum = total;');
+    // 光标移到末行词尾，落在 'total' 上
+    await page.keyboard.press('ArrowLeft');
+    await expect.poll(text).toBe('total = 1;\nsum = total;');
+
+    // 选择同词：两处命中被标出
+    await page.getByRole('button', { name: '选择同词' }).click();
+    await expect(page.getByText('2 处')).toBeVisible();
+    await expect(page.locator('.ce-multi')).toHaveCount(2);
+
+    // 统一替换：两处同时改写
+    const input = page.getByLabel('统一替换');
+    await input.fill('count');
+    await page.getByRole('button', { name: '应用' }).click();
+    await expect.poll(text).toBe('count = 1;\nsum = count;');
+    await expect(page.locator('.ce-multi')).toHaveCount(0);
+
+    // 光标不在词上时给出说明而非静默失败（行尾补一个空格，光标两侧都不是词字符）
+    await editor.click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' + ');
+    await page.getByRole('button', { name: '选择同词' }).click();
+    await expect(page.getByText('光标不在可批量替换的词上')).toBeVisible();
+
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('导出卡片样式化：窗口样式 / 行号 / 指定行高亮 / 水印 → 预览与导出一致', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/code-editor');
+
+    const surface = page.locator('.ce-surface');
+    const text = async () => surface.evaluate((el) => el.textContent);
+    await page.getByRole('button', { name: '清空' }).click();
+    await page.getByRole('textbox', { name: '编辑器' }).click();
+    await page.keyboard.type('const a = 1;\nconst b = 2;\nconst c = 3;');
+    await expect.poll(text).toBe('const a = 1;\nconst b = 2;\nconst c = 3;');
+
+    // 打开卡片样式面板并调整选项
+    await page.getByRole('button', { name: '卡片样式' }).click();
+    const panel = page.getByTestId('card-panel');
+    await panel.getByRole('checkbox').check();
+    await panel.getByLabel('高亮行').fill('2-3');
+    await panel.getByLabel('水印', { exact: true }).fill('syntools');
+    await panel.getByLabel('窗口').selectOption('title');
+
+    // 预览卡片即时反映选项
+    await expect(page.locator('.ce-card .code-title')).toHaveCount(1);
+    await expect(page.locator('.ce-card .code-dot')).toHaveCount(0);
+    await expect(page.locator('.ce-card .code-line-no')).toHaveCount(3);
+    await expect(page.locator('.ce-card .code-line-hit')).toHaveCount(2);
+    await expect(page.locator('.ce-card .code-watermark')).toHaveText('syntools');
+
+    // 导出 HTML 与预览共用同一份正文结构
+    const htmlPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出 HTML' }).click();
+    const htmlDownload = await htmlPromise;
+    expect(htmlDownload.suggestedFilename()).toBe('snippet.html');
+    const html = fs.readFileSync(await htmlDownload.path(), 'utf8');
+    expect(html).toContain('syntools');
+    expect(html).toContain('code-line-no');
+    expect(html).toContain('code-line-hit');
+    expect(html).toContain('code-watermark');
+    // title 样式不渲染三点（样式表里仍保留 .code-dot-* 规则）
+    expect(html).not.toContain('class="code-dot code-dot-red"');
+
+    // 图片导出使用当前倍率
+    const pngPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出 PNG' }).click();
+    expect((await pngPromise).suggestedFilename()).toBe('snippet.png');
+
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('分享扩容：压缩链接可还原长代码与卡片样式', async ({ page, context }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const longCode = Array.from(
+      { length: 120 },
+      (_, index) => `const value${index} = ${index};`,
+    ).join('\n');
+    const text = () => page.locator('.ce-surface').evaluate((el) => el.textContent);
+
+    // 用草稿预置长代码（未压缩分享会超过 2048 上限）
+    await page.goto('/tools/code-editor');
+    await page.evaluate((code) => {
+      localStorage.setItem(
+        'syntools:code-editor.draft.v1',
+        JSON.stringify({
+          code,
+          language: 'javascript',
+          theme: 'dracula',
+          indent: '2',
+          filename: 'snippet',
+          lineNumbers: true,
+          wordWrap: false,
+        }),
+      );
+    }, longCode);
+    await page.reload();
+    await expect.poll(text).toBe(longCode);
+
+    // 调整一个可观察的卡片样式项（随链接一并分享）
+    await page.getByRole('button', { name: '卡片样式' }).click();
+    await page.getByTestId('card-panel').getByLabel('留白').fill('64');
+
+    await page.getByRole('button', { name: /分享/ }).click();
+    const sharedUrl = await page.evaluate(() => navigator.clipboard.readText());
+    // 压缩参数以 z 前缀标记
+    expect(sharedUrl).toContain('?s=z');
+
+    // 打开链接：长代码与卡片样式完整还原
+    await page.goto(sharedUrl);
+    await expect.poll(text).toBe(longCode);
+    expect(await page.locator('.ce-card').evaluate((el) => getComputedStyle(el).paddingLeft)).toBe(
+      '64px',
+    );
 
     await expect(page.getByRole('alert')).toHaveCount(0);
     expect(errors).toEqual([]);

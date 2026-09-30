@@ -37,12 +37,18 @@ export function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** 高亮为 HTML 字符串；`none` 或缺失语法时仅转义 */
+/**
+ * 高亮为 HTML 字符串；`none` 或缺失语法时仅转义。
+ *
+ * 注意：空文本必须返回空串。历史上这里用 `code || ' '` 为空编辑区「撑」出行高，
+ * 但编辑区内容是 CodeJar 的 `textContent`，注入的空格会被当成真实内容——
+ * 清空后输入的第一个字符会变成 ` a`，并一路带进预览、统计与导出文件。
+ * 行高由 `.ce-surface` 的 padding 与 line-height 保证，无需填充字符。
+ */
 export function highlightCode(code: string, prismKey: string): string {
-  const source = code || ' ';
   const grammar = prismKey === 'none' ? undefined : Prism.languages[prismKey];
-  if (!grammar) return escapeHtml(source);
-  return Prism.highlight(source, grammar, prismKey);
+  if (!grammar) return escapeHtml(code);
+  return Prism.highlight(code, grammar, prismKey);
 }
 
 export { Prism };

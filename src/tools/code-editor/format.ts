@@ -118,8 +118,9 @@ function fallbackOptionsOf(spec: LangSpec, indent: IndentOption): FallbackOption
   return {
     indentUnit: indentUnitOf(indent),
     mode: spec.fallbackMode ?? 'brackets',
-    hashComment: spec.hashComment ?? false,
-    dashComment: spec.dashComment ?? false,
+    // 由统一的行注释符推导（见 core.ts 的 COMMENT_SPECS），避免注释语法两处维护
+    hashComment: spec.lineComment === '#',
+    dashComment: spec.lineComment === '--',
   };
 }
 

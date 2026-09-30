@@ -8,6 +8,7 @@ import {
   detectLanguageByExt,
   getLangSpec,
   isLangId,
+  LANG_SPECS,
   MAX_IMPORT_BYTES,
   sanitizeFilename,
 } from './core';
@@ -177,5 +178,25 @@ describe('formatFallback（内置格式化器）', () => {
 
   it('空输入返回 EMPTY 而非抛异常', () => {
     expect(formatFallback('   ', { indentUnit: '  ' })).toEqual({ ok: false, error: 'EMPTY' });
+  });
+});
+
+describe('语言注释符', () => {
+  it('按语言给出行 / 块注释符', () => {
+    expect(getLangSpec('java').lineComment).toBe('//');
+    expect(getLangSpec('java').blockComment).toEqual(['/*', '*/']);
+    expect(getLangSpec('python').lineComment).toBe('#');
+    expect(getLangSpec('lua').lineComment).toBe('--');
+    expect(getLangSpec('html').blockComment).toEqual(['<!--', '-->']);
+    // CSS 只有块注释
+    expect(getLangSpec('css').lineComment).toBeUndefined();
+    expect(getLangSpec('css').blockComment).toEqual(['/*', '*/']);
+  });
+
+  it('仅 JSON 与纯文本没有任何注释语法', () => {
+    const noComment = LANG_SPECS.filter((spec) => !spec.lineComment && !spec.blockComment).map(
+      (spec) => spec.id,
+    );
+    expect(noComment.sort()).toEqual(['json', 'plaintext']);
   });
 });

@@ -1,29 +1,56 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
-import { buildShareUrl, type ShareState } from '@/core/lib/share';
+import {
+  SHARE_LIMIT,
+  buildShareUrlWithLimit,
+  encodeShareState,
+  type ShareState,
+} from '@/core/lib/share';
 
 interface ShareButtonProps {
   /** 点击时读取工具当前可分享状态（输入/参数） */
   getState: () => ShareState;
   label?: string;
+  /**
+   * 自定义参数编码（阶段 7 新增）：默认 base64url（`encodeShareState`），
+   * 需要压缩等扩展编码的工具可传入（如 code-editor 的 deflate）。
+   */
+  encodeParam?: (state: ShareState) => string;
+  /** 参数长度上限；默认 `SHARE_LIMIT`（2048） */
+  maxLength?: number;
+  /** 超长提示文案；默认通用提示（工具可给出去向更明确的说明） */
+  tooLongHint?: string;
 }
 
 /**
  * 分享当前工具状态（Tasks T28）：
  * 生成 ?s= 链接 → 复制到剪贴板 → 地址栏同步（history.replaceState）。
- * 内容超过 2KB 时降级：就近提示，不生成链接。
+ * 内容超过上限时降级：就近提示，不生成链接。
  */
-export function ShareButton({ getState, label }: ShareButtonProps) {
+export function ShareButton({
+  getState,
+  label,
+  encodeParam,
+  maxLength,
+  tooLongHint,
+}: ShareButtonProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<number>();
 
   const share = async () => {
-    const result = buildShareUrl(window.location.pathname, getState());
+    const param = encodeParam ? encodeParam(getState()) : encodeShareState(getState());
+    const result = buildShareUrlWithLimit(
+      window.location.pathname,
+      param,
+      maxLength ?? SHARE_LIMIT,
+    );
     if (!result.ok) {
-      setError(result.error === 'TOO_LONG' ? t('common.shareTooLong') : result.error);
+      setError(
+        result.error === 'TOO_LONG' ? (tooLongHint ?? t('common.shareTooLong')) : result.error,
+      );
       return;
     }
     setError(null);

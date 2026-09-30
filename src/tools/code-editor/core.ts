@@ -34,13 +34,14 @@ export interface LangSpec {
   parser?: string;
   /** 内置格式化器模式：缩进本身即语义的语言（Python / Ruby / Shell）用 indent */
   fallbackMode?: 'indent';
-  /** `#` 为行注释（Python / Ruby / Shell） */
-  hashComment?: boolean;
-  /** `--` 为行注释（Lua / SQL） */
-  dashComment?: boolean;
+  /** 行注释符（`//` / `#` / `--`）；未定义表示该语言不支持行注释 */
+  lineComment?: string;
+  /** 块注释包裹符 `[开始, 结束]`；未定义表示不支持块注释 */
+  blockComment?: [string, string];
 }
 
-export const LANG_SPECS: LangSpec[] = [
+/** 语言基础配置：注释符由 `COMMENT_SPECS` 合并进来，见文件末尾的 `LANG_SPECS` */
+const LANG_BASE: LangSpec[] = [
   // Web
   {
     id: 'javascript',
@@ -143,7 +144,6 @@ export const LANG_SPECS: LangSpec[] = [
     group: 'system',
     format: 'fallback',
     fallbackMode: 'indent',
-    hashComment: true,
   },
   {
     id: 'ruby',
@@ -153,7 +153,6 @@ export const LANG_SPECS: LangSpec[] = [
     group: 'system',
     format: 'fallback',
     fallbackMode: 'indent',
-    hashComment: true,
   },
   { id: 'dart', label: 'Dart', prism: 'dart', ext: '.dart', group: 'system', format: 'fallback' },
   {
@@ -171,7 +170,6 @@ export const LANG_SPECS: LangSpec[] = [
     ext: '.lua',
     group: 'system',
     format: 'fallback',
-    dashComment: true,
   },
   {
     id: 'bash',
@@ -181,7 +179,6 @@ export const LANG_SPECS: LangSpec[] = [
     group: 'system',
     format: 'fallback',
     fallbackMode: 'indent',
-    hashComment: true,
   },
   // 数据
   {
@@ -236,6 +233,50 @@ export const LANG_SPECS: LangSpec[] = [
     format: 'none',
   },
 ];
+
+/** 语言的注释符：集中维护，既供行注释切换（阶段 2）使用，也供内置格式化器跳过注释 */
+interface CommentSpec {
+  /** 行注释符 */
+  line?: string;
+  /** 块注释包裹符 */
+  block?: [string, string];
+}
+
+const COMMENT_SPECS: Partial<Record<string, CommentSpec>> = {
+  javascript: { line: '//', block: ['/*', '*/'] },
+  typescript: { line: '//', block: ['/*', '*/'] },
+  jsx: { line: '//', block: ['/*', '*/'] },
+  tsx: { line: '//', block: ['/*', '*/'] },
+  css: { block: ['/*', '*/'] },
+  scss: { line: '//', block: ['/*', '*/'] },
+  php: { line: '//', block: ['/*', '*/'] },
+  java: { line: '//', block: ['/*', '*/'] },
+  rust: { line: '//', block: ['/*', '*/'] },
+  go: { line: '//', block: ['/*', '*/'] },
+  c: { line: '//', block: ['/*', '*/'] },
+  cpp: { line: '//', block: ['/*', '*/'] },
+  csharp: { line: '//', block: ['/*', '*/'] },
+  kotlin: { line: '//', block: ['/*', '*/'] },
+  swift: { line: '//', block: ['/*', '*/'] },
+  dart: { line: '//', block: ['/*', '*/'] },
+  scala: { line: '//', block: ['/*', '*/'] },
+  python: { line: '#' },
+  ruby: { line: '#', block: ['=begin', '=end'] },
+  bash: { line: '#' },
+  lua: { line: '--', block: ['--[[', ']]'] },
+  yaml: { line: '#' },
+  sql: { line: '--', block: ['/*', '*/'] },
+  html: { block: ['<!--', '-->'] },
+  xml: { block: ['<!--', '-->'] },
+  markdown: { block: ['<!--', '-->'] },
+  // json / plaintext 无注释语法
+};
+
+/** 语言表：核心字段 + 注释符合并（注释符见 `COMMENT_SPECS`） */
+export const LANG_SPECS: LangSpec[] = LANG_BASE.map((spec) => {
+  const comment = COMMENT_SPECS[spec.id];
+  return comment ? { ...spec, lineComment: comment.line, blockComment: comment.block } : spec;
+});
 
 export const DEFAULT_LANG_ID = 'java';
 export const DEFAULT_FILENAME = 'snippet';
@@ -331,14 +372,24 @@ function escapeHtml(text: string): string {
 /**
  * 生成可独立打开的 HTML 文档：内嵌主题样式 + Prism 高亮片段。
  * 高亮片段由 Prism 生成（`<` 已被转义），此处不再二次转义。
+ *
+ * `bodyHtml` 用于样式化导出卡片（逐行渲染 / 水印等），
+ * 由 `cardOptions.buildCardBodyHtml` 产出；不传则沿用默认的整段 `<pre>`。
  */
 export function buildStandaloneHtml(
   highlightedHtml: string,
   spec: LangSpec,
   cssBlock: string,
   title: string,
+  bodyHtml?: string,
 ): string {
   const langClass = spec.prism === 'none' ? 'text' : spec.prism;
+  const body =
+    bodyHtml ??
+    `
+  <div class="code-lang">${escapeHtml(spec.label)}</div>
+  <pre class="language-${langClass}"><code class="language-${langClass}">${highlightedHtml}</code></pre>
+`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -350,10 +401,7 @@ ${cssBlock}
 </style>
 </head>
 <body>
-<div class="code-card">
-  <div class="code-lang">${escapeHtml(spec.label)}</div>
-  <pre class="language-${langClass}"><code class="language-${langClass}">${highlightedHtml}</code></pre>
-</div>
+<div class="code-card">${body}</div>
 </body>
 </html>
 `;

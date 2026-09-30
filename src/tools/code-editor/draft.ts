@@ -1,4 +1,5 @@
 import { MAX_IMPORT_BYTES } from './core';
+import type { CodeCardStyle } from './cardOptions';
 
 /** 本地草稿存储：键遵循 syntools:* 规范，代码内容不离开浏览器 */
 
@@ -14,6 +15,10 @@ export interface CodeDraft {
   filename: string;
   lineNumbers: boolean;
   wordWrap: boolean;
+  /** 导出卡片样式（阶段 6 新增；旧草稿缺该字段时由 normalizeCardStyle 兜底） */
+  card?: Partial<CodeCardStyle>;
+  /** 导出倍率（1x / 2x / 4x） */
+  cardScale?: number;
 }
 
 export function readDraft(): CodeDraft | null {
@@ -30,6 +35,8 @@ export function readDraft(): CodeDraft | null {
       filename: typeof parsed.filename === 'string' ? parsed.filename : '',
       lineNumbers: parsed.lineNumbers !== false,
       wordWrap: parsed.wordWrap === true,
+      card: typeof parsed.card === 'object' && parsed.card !== null ? parsed.card : undefined,
+      cardScale: typeof parsed.cardScale === 'number' ? parsed.cardScale : undefined,
     };
   } catch {
     return null;

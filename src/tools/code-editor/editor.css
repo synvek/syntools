@@ -1,6 +1,10 @@
 /*
  * 代码编辑器样式：配色由 themes.ts 注入的 `--ce-*` 自定义属性驱动，
  * 编辑区 / 导出预览卡片 / 导出的独立 HTML 共用同一套变量，保证所见即所得。
+ *
+ * 行高由 `lineHeight.ts` 的 LINE_HEIGHT_PX 以内联 `--ce-line-h` 注入：
+ * 覆盖层（当前行、查找命中、缩进引导线）按行号换算像素位置，
+ * 因此这里不能再写 `line-height: 1.6`（20.8px 会产生亚像素漂移）。
  */
 
 .ce-code {
@@ -19,10 +23,19 @@
   overflow: auto;
 }
 
+/* 编辑区与覆盖层的共同定位基准：宽度跟随内容（横向可滚），覆盖层随之滚动 */
+.ce-stage {
+  position: relative;
+  display: flex;
+  flex: 1 0 auto;
+  min-width: 0;
+}
+
 .ce-gutter {
   position: sticky;
   left: 0;
-  z-index: 1;
+  /* 高于 .ce-surface（z-index: 1）：横向滚动时行号槽始终压在代码之上 */
+  z-index: 2;
   flex: 0 0 auto;
   padding: 12px 10px 12px 14px;
   border-right: 1px solid var(--ce-border);
@@ -30,19 +43,22 @@
   color: var(--ce-gutter);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: var(--ce-line-h, 21px);
   text-align: right;
   white-space: pre;
   user-select: none;
 }
 
 .ce-surface {
-  flex: 1 1 auto;
+  position: relative;
+  /* 高于覆盖层：当前行底色透在文字下方而不遮挡文字 */
+  z-index: 1;
+  flex: 1 0 auto;
   min-width: 0;
   padding: 12px 16px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: var(--ce-line-h, 21px);
   white-space: pre;
   tab-size: 2;
   caret-color: var(--ce-fg);
@@ -54,6 +70,142 @@
   overflow-wrap: anywhere;
 }
 
+/* 覆盖层：与 .ce-surface 同级、位于滚动内容内 —— CodeJar 每次重绘都会重写
+   编辑区的 innerHTML，装饰节点只能放在 contenteditable 之外。
+   不设 z-index 与 overflow：装饰节点留在文字下方（.ce-surface 为 z-index: 1），
+   而折叠标记 / 徽标自带更高 z-index 且允许伸进行号槽。 */
+.ce-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* 当前行高亮：整行低透明度底色（深浅主题下由 --ce-fg 自动适配） */
+.ce-line-active {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--ce-line-h, 21px);
+  background: var(--ce-fg);
+  opacity: 0.08;
+}
+
+/* 查找命中：行级淡底（编辑区是 contenteditable，无法安全地插入行内高亮节点，
+   命中范围由原生选区承担，行级底色用于指示「还有哪些行有命中」） */
+.ce-match {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--ce-line-h, 21px);
+  background: var(--ce-fg);
+  opacity: 0.05;
+}
+
+/* 当前命中：加深底色 + 左侧主题色强调条 */
+.ce-match-current {
+  opacity: 0.14;
+  border-left: 3px solid var(--ce-keyword);
+}
+
+/* 批量替换目标（同词多处）：比普通命中更强，且用另一主题色区分 */
+.ce-multi {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--ce-line-h, 21px);
+  background: var(--ce-fg);
+  opacity: 0.16;
+  border-left: 3px solid var(--ce-function);
+}
+
+/* 缩进引导线：按列定位的浅色竖线（列宽用 ch，等宽字体下与前导空格严格对齐） */
+.ce-guide {
+  position: absolute;
+  width: 1px;
+  height: var(--ce-line-h, 21px);
+  background: var(--ce-fg);
+  opacity: 0.12;
+}
+
+/* 括号配对：按 DOM 实测像素描边（含 CJK 的行也能对齐） */
+.ce-bracket {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--ce-keyword);
+  border-radius: 2px;
+  opacity: 0.55;
+}
+
+/* 折叠范围：整段淡底 + 左侧强调条（CodeJar 无法隐藏行，故以范围标记呈现） */
+.ce-fold-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--ce-fg);
+  opacity: 0.06;
+  border-left: 3px solid var(--ce-keyword);
+}
+
+/* 折叠标记：位于行号槽内，点击切换范围高亮 */
+.ce-fold-marker {
+  position: absolute;
+  left: -18px;
+  z-index: 3;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--ce-gutter);
+  opacity: 0.45;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ce-fold-marker:hover {
+  opacity: 0.9;
+}
+
+.ce-fold-marker-active,
+.ce-fold-marker[aria-expanded='true'] {
+  background: var(--ce-keyword);
+  opacity: 1;
+}
+
+/* 折叠徽标：行数 + 一键复制该段 */
+.ce-fold-badge {
+  position: absolute;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 1px;
+  padding: 0 2px 0 6px;
+  border: 1px solid var(--ce-border);
+  border-radius: 4px;
+  background: var(--ce-bg);
+  color: var(--ce-gutter);
+  font-size: 11px;
+  line-height: 16px;
+  pointer-events: auto;
+}
+
+.ce-fold-close {
+  padding: 0 3px;
+  border: none;
+  background: none;
+  color: var(--ce-gutter);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ce-fold-close:hover {
+  color: var(--ce-fg);
+}
+
 .ce-placeholder {
   position: absolute;
   top: 12px;
@@ -61,25 +213,28 @@
   color: var(--ce-gutter);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: var(--ce-line-h, 21px);
   pointer-events: none;
 }
 
-/* 导出预览卡片 */
+/* 导出预览卡片：版式由 cardOptions.ts 的 --ce-card-* 变量驱动，
+   正文结构与独立 HTML 共用（见 cardOptions.buildCardBodyHtml），保证所见即所得 */
 .ce-card {
+  position: relative;
   border: 1px solid var(--ce-border);
-  border-radius: 12px;
-  background: var(--ce-bg);
+  border-radius: var(--ce-card-radius, 12px);
+  background-color: var(--ce-bg);
   color: var(--ce-fg);
-  padding: 14px 16px;
+  padding: var(--ce-card-padding, 20px);
+  box-shadow: var(--ce-card-shadow, none);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--ce-card-font-size, 13px);
+  line-height: var(--ce-line-h, 21px);
   overflow-x: auto;
   max-height: 30rem;
 }
 
-.ce-card-title {
+.code-title {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -88,9 +243,57 @@
   color: var(--ce-gutter);
 }
 
-.ce-card pre {
+.code-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+}
+
+.code-dot-red {
+  background: #f87171;
+}
+
+.code-dot-amber {
+  background: #fbbf24;
+}
+
+.code-dot-green {
+  background: #34d399;
+}
+
+.code-lines {
   margin: 0;
   white-space: pre;
+}
+
+.code-line {
+  display: flex;
+  gap: 12px;
+  height: var(--ce-line-h, 21px);
+}
+
+.code-line-no {
+  min-width: 2ch;
+  color: var(--ce-gutter);
+  text-align: right;
+  user-select: none;
+}
+
+.code-line-code {
+  flex: 1 1 auto;
+}
+
+.code-line-hit {
+  background: rgba(127, 127, 127, 0.18);
+}
+
+.code-watermark {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  font-size: 12px;
+  color: var(--ce-gutter);
 }
 
 /* Prism token 着色 */

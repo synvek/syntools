@@ -86,3 +86,19 @@ export function buildShareUrl(pathname: string, state: ShareState): ToolResult<s
   }
   return { ok: true, value: `${window.location.origin}${pathname}?${SHARE_PARAM}=${param}` };
 }
+
+/**
+ * 用「已编码参数 + 自定义上限」生成分享链接（阶段 7 新增）。
+ * 既有 `buildShareUrl` 与全部调用点保持原样：默认编码仍是 base64url、默认上限仍是
+ * `SHARE_LIMIT`；需要压缩等自定义编码的工具（如 code-editor）使用本函数。
+ */
+export function buildShareUrlWithLimit(
+  pathname: string,
+  param: string,
+  limit: number,
+): ToolResult<string> {
+  if (param.length > limit) {
+    return { ok: false, error: 'TOO_LONG' };
+  }
+  return { ok: true, value: `${window.location.origin}${pathname}?${SHARE_PARAM}=${param}` };
+}
