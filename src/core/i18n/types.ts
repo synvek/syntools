@@ -1,17 +1,16 @@
-import zh from '@/core/i18n/locales/zh';
+/**
+ * 只做类型推导，不产生运行时 import。
+ *
+ * 语言资源被刻意拆成两半：
+ * - `locales/<lang>`：外壳（导航/首页/搜索/错误）+ `toolsMeta.*`，进首屏；
+ * - `locales/<lang>.tools`：各工具 UI 文案 `tools.*`，随工具页按需加载。
+ * 两者合计才是完整资源，所以这里取交叉类型。
+ */
+import type zh from '@/core/i18n/locales/zh';
+import type zhTools from '@/core/i18n/locales/zh.tools';
 
 /** 已支持的语言代码（扩展新语言时在此与 LANG_META / loaders 同步追加） */
-export const LANGS = [
-  'zh',
-  'zh-TW',
-  'en',
-  'ja',
-  'fr',
-  'de',
-  'it',
-  'es',
-  'pt',
-] as const;
+export const LANGS = ['zh', 'zh-TW', 'en', 'ja', 'fr', 'de', 'it', 'es', 'pt'] as const;
 
 export type Lang = (typeof LANGS)[number];
 
@@ -134,8 +133,14 @@ type DeepStringRecord<T> = T extends string
       ? { [K in keyof T]: DeepStringRecord<T[K]> }
       : T;
 
-/** 翻译资源结构（以 zh 的键结构为 schema 源） */
-export type TranslationResources = DeepStringRecord<typeof zh>;
+/** 外壳资源结构（以 zh 的键结构为 schema 源）：导航 / 首页 / 搜索 / 工具元数据 */
+export type ShellResources = DeepStringRecord<typeof zh>;
 
-/** 新增语言文件时使用：const xx = { ... } satisfies TranslationResources */
+/** 工具 UI 文案结构（以 zh.tools 的键结构为 schema 源）：`tools.*` */
+export type ToolStringsResources = DeepStringRecord<typeof zhTools>;
+
+/** 翻译资源结构 = 外壳 + 工具文案（i18next 运行时看到的完整结构） */
+export type TranslationResources = ShellResources & ToolStringsResources;
+
+/** 新增语言文件时使用：const xx = { ... } satisfies ShellResources / ToolStringsResources */
 export type LocaleResource = TranslationResources;

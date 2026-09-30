@@ -11,6 +11,7 @@ import {
 import { createMediaFromFile } from '../model/media';
 import type { ShapeGeometry } from '../model/types';
 import { useSlideStore } from '../store';
+import { FormatBar } from './FormatBar';
 import { InsertPanel, type InsertPanelTab } from './InsertPanel';
 import { MenuButton, type MenuItem } from './MenuButton';
 import {
@@ -32,7 +33,9 @@ import {
  * - **少数「分类入口」下拉**保留图标 + 文字（形状 / 对齐 / 分布 / 翻转），
  *   因为纯图标很难区分这四者；下拉菜单项仍显示文字。
  *
- * 三行分组：插入 / 排列 / 视图。其中「排列」全部是**选中态操作**，未选中时整行禁用。
+ * 两行分组：格式 / 插入·排列·视图。
+ * 后三者各自成簇（CLUSTER），窄屏时整簇换行、不被拆散；
+ * 其中「排列」全部是**选中态操作**，未选中时降级为禁用。
  */
 
 const SHAPES: { key: string; geom: ShapeGeometry }[] = [
@@ -57,6 +60,8 @@ const SHAPES: { key: string; geom: ShapeGeometry }[] = [
 const ROW =
   'slide-glass flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 p-1.5 shadow-sm dark:border-gray-700';
 const GROUP = 'flex flex-wrap items-center gap-0.5';
+/** 逻辑簇：把若干 GROUP 绑成一个整体参与换行，避免窄屏时被拆到不同行 */
+const CLUSTER = 'flex shrink-0 items-center gap-1';
 /** 分组竖线，与文字处理器工具栏一致 */
 const SEP = <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />;
 
@@ -199,247 +204,250 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
 
   return (
     <div className="flex flex-col gap-2">
-      {/* ── 插入 ── */}
+      {/* ── 格式：字体/字号/字形/颜色/填充/轮廓/段落/效果，未选中元素时整行禁用 ── */}
+      <FormatBar />
+
+      {/* ── 插入 + 排列 + 视图：三簇各自整体换行；「排列」为选中态操作，未选中时降级为禁用 ── */}
       <div className={ROW}>
-        <div className={GROUP}>
-          <IconButton label={t('tools.slide.insertText')} onClick={insertText}>
-            <Icon name="text" className="h-4 w-4" />
-          </IconButton>
-          {/* 下拉是「分类入口」，保留文字更易懂 */}
-          <MenuButton
-            label={t('tools.slide.insertShape')}
-            icon="shapes"
-            items={shapeItems}
-            size="md"
-            showLabel
-          />
-          <IconButton label={t('tools.slide.insertLine')} onClick={insertLine}>
-            <Icon name="pen" className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.insertImage')}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Icon name="image" className="h-4 w-4" />
-          </IconButton>
-          <IconButton label={t('tools.slide.insertTable')} onClick={insertTable}>
-            <Icon name="table" className="h-4 w-4" />
-          </IconButton>
+        {/* 插入（含撤销/重做）：与「排列」合并到同一行，窄屏时整块换行不被拆散 */}
+        <div className={CLUSTER}>
+          <div className={GROUP}>
+            <IconButton label={t('tools.slide.insertText')} onClick={insertText}>
+              <Icon name="text" className="h-4 w-4" />
+            </IconButton>
+            {/* 下拉是「分类入口」，保留文字更易懂 */}
+            <MenuButton
+              label={t('tools.slide.insertShape')}
+              icon="shapes"
+              items={shapeItems}
+              size="md"
+              showLabel
+            />
+            <IconButton label={t('tools.slide.insertLine')} onClick={insertLine}>
+              <Icon name="pen" className="h-4 w-4" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.insertImage')}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Icon name="image" className="h-4 w-4" />
+            </IconButton>
+            <IconButton label={t('tools.slide.insertTable')} onClick={insertTable}>
+              <Icon name="table" className="h-4 w-4" />
+            </IconButton>
+            {SEP}
+            <IconButton label={t('tools.slide.insertChart')} onClick={() => setPanel('chart')}>
+              <ChartIcon />
+            </IconButton>
+            <IconButton label={t('tools.slide.insertFormula')} onClick={() => setPanel('formula')}>
+              <FormulaIcon />
+            </IconButton>
+            <IconButton label={t('tools.slide.insertIcon')} onClick={() => setPanel('icon')}>
+              <IconSparkIcon />
+            </IconButton>
+            {/* 形状库：与「形状 ▾」区分开用专用图形；同为纯图标按钮，本组风格才统一 */}
+            <IconButton label={t('tools.slide.insertShapeLib')} onClick={() => setPanel('shape')}>
+              <ShapeLibraryIcon />
+            </IconButton>
+          </div>
+
           {SEP}
-          <IconButton label={t('tools.slide.insertChart')} onClick={() => setPanel('chart')}>
-            <ChartIcon />
-          </IconButton>
-          <IconButton label={t('tools.slide.insertFormula')} onClick={() => setPanel('formula')}>
-            <FormulaIcon />
-          </IconButton>
-          <IconButton label={t('tools.slide.insertIcon')} onClick={() => setPanel('icon')}>
-            <IconSparkIcon />
-          </IconButton>
-          <button
-            type="button"
-            onClick={() => setPanel('shape')}
-            title={t('tools.slide.insertShapeLib')}
-            aria-label={t('tools.slide.insertShapeLib')}
-            className={`${BTN_BASE} ${BTN_IDLE}`}
-          >
-            <Icon name="shapes" className="h-4 w-4" />
-            <span className="ml-1">{t('tools.slide.insertShapeLib')}</span>
-          </button>
+
+          <div className={GROUP}>
+            <IconButton label={t('tools.slide.undo')} onClick={undo} disabled={!canUndo}>
+              <UndoIcon />
+            </IconButton>
+            <IconButton label={t('tools.slide.redo')} onClick={redo} disabled={!canRedo}>
+              <RedoIcon />
+            </IconButton>
+          </div>
         </div>
 
-        {SEP}
+        {/* 视图：缩放 / 网格 / 标尺 / 页面。排在插入之后，正好与插入簇共处一行 */}
+        <div className={CLUSTER}>
+          <div className={GROUP}>
+            <IconButton
+              label={t('tools.slide.zoomOut')}
+              onClick={() => setScale(Math.max(0.1, Math.round((scale - 0.1) * 100) / 100))}
+            >
+              <Icon name="zoomOut" className="h-4 w-4" />
+            </IconButton>
+            {/* 百分比是数值显示而非按钮，保留文字 */}
+            <span className="w-10 text-center text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
+              {Math.round(scale * 100)}%
+            </span>
+            <IconButton
+              label={t('tools.slide.zoomIn')}
+              onClick={() => setScale(Math.min(3, Math.round((scale + 0.1) * 100) / 100))}
+            >
+              <Icon name="zoomIn" className="h-4 w-4" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.zoomFit')}
+              // 适应窗口同时复位平移，否则会被误认为「点了没反应」
+              onClick={() => setViewport({ scale: 0, panX: 0, panY: 0 })}
+            >
+              <Icon name="fitScreen" className="h-4 w-4" />
+            </IconButton>
+          </div>
 
-        <div className={GROUP}>
-          <IconButton label={t('tools.slide.undo')} onClick={undo} disabled={!canUndo}>
-            <UndoIcon />
-          </IconButton>
-          <IconButton label={t('tools.slide.redo')} onClick={redo} disabled={!canRedo}>
-            <RedoIcon />
-          </IconButton>
-        </div>
-      </div>
+          {SEP}
 
-      {/* ── 排列：全部是选中态操作，未选中时整行禁用 ── */}
-      <div className={ROW}>
-        <div className={GROUP}>
-          <MenuButton
-            label={t('tools.slide.alignTitle')}
-            glyph={<AlignIcon />}
-            items={alignItems}
-            disabled={!hasSelection}
-            showLabel
-          />
-          <MenuButton
-            label={t('tools.slide.distributeTitle')}
-            glyph={<DistributeIcon />}
-            items={distributeItems}
-            disabled={selection.length < 3}
-            showLabel
-          />
-        </div>
+          <div className={GROUP}>
+            <IconButton
+              label={t('tools.slide.gridSnap')}
+              active={gridSnap}
+              onClick={toggleGridSnap}
+            >
+              <Icon name="grid" className="h-4 w-4" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.showRulers')}
+              active={showRulers}
+              onClick={toggleRulers}
+            >
+              <Icon name="ruler" className="h-4 w-4" />
+            </IconButton>
+          </div>
 
-        {SEP}
+          {SEP}
 
-        <div className={GROUP}>
-          <IconButton
-            label={t('tools.slide.bringToFront')}
-            disabled={!hasSelection}
-            onClick={bringToFront}
-          >
-            <LayerIcon variant="front" />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.bringForward')}
-            disabled={!hasSelection}
-            onClick={bringForward}
-          >
-            <LayerIcon variant="forward" />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.sendBackward')}
-            disabled={!hasSelection}
-            onClick={sendBackward}
-          >
-            <LayerIcon variant="backward" />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.sendToBack')}
-            disabled={!hasSelection}
-            onClick={sendToBack}
-          >
-            <LayerIcon variant="back" />
-          </IconButton>
+          <div className={GROUP}>
+            <IconButton
+              label={t('tools.slide.moveUp')}
+              onClick={() => moveSlide(slideIndex, Math.max(0, slideIndex - 1))}
+            >
+              <Icon name="swap" className="h-4 w-4" />
+            </IconButton>
+          </div>
         </div>
 
-        {SEP}
+        <div className={CLUSTER}>
+          <div className={GROUP}>
+            <MenuButton
+              label={t('tools.slide.alignTitle')}
+              glyph={<AlignIcon />}
+              items={alignItems}
+              disabled={!hasSelection}
+              showLabel
+            />
+            <MenuButton
+              label={t('tools.slide.distributeTitle')}
+              glyph={<DistributeIcon />}
+              items={distributeItems}
+              disabled={selection.length < 3}
+              showLabel
+            />
+          </div>
 
-        <div className={GROUP}>
-          <IconButton
-            label={t('tools.slide.group')}
-            disabled={selection.length < 2}
-            onClick={groupSelected}
-          >
-            <GroupIcon />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.ungroup')}
-            disabled={!hasSelection}
-            onClick={ungroupSelected}
-          >
-            <UngroupIcon />
-          </IconButton>
-          <MenuButton
-            label={t('tools.slide.flipTitle')}
-            glyph={<FlipIcon />}
-            items={flipItems}
-            disabled={!hasSelection}
-            showLabel
-          />
-        </div>
+          {SEP}
 
-        {SEP}
+          <div className={GROUP}>
+            <IconButton
+              label={t('tools.slide.bringToFront')}
+              disabled={!hasSelection}
+              onClick={bringToFront}
+            >
+              <LayerIcon variant="front" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.bringForward')}
+              disabled={!hasSelection}
+              onClick={bringForward}
+            >
+              <LayerIcon variant="forward" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.sendBackward')}
+              disabled={!hasSelection}
+              onClick={sendBackward}
+            >
+              <LayerIcon variant="backward" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.sendToBack')}
+              disabled={!hasSelection}
+              onClick={sendToBack}
+            >
+              <LayerIcon variant="back" />
+            </IconButton>
+          </div>
 
-        <div className={GROUP}>
-          <IconButton
-            label={t('tools.slide.lock')}
-            active={allLocked()}
-            disabled={!hasSelection}
-            onClick={toggleLockSelected}
-          >
-            <Icon name={allLocked() ? 'lock' : 'unlock'} className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.hide')}
-            active={anyHidden()}
-            disabled={!hasSelection}
-            onClick={toggleVisibleSelected}
-          >
-            <Icon name={anyHidden() ? 'eyeOff' : 'eye'} className="h-4 w-4" />
-          </IconButton>
-        </div>
+          {SEP}
 
-        {SEP}
+          <div className={GROUP}>
+            <IconButton
+              label={t('tools.slide.group')}
+              disabled={selection.length < 2}
+              onClick={groupSelected}
+            >
+              <GroupIcon />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.ungroup')}
+              disabled={!hasSelection}
+              onClick={ungroupSelected}
+            >
+              <UngroupIcon />
+            </IconButton>
+            <MenuButton
+              label={t('tools.slide.flipTitle')}
+              glyph={<FlipIcon />}
+              items={flipItems}
+              disabled={!hasSelection}
+              showLabel
+            />
+          </div>
 
-        {/* 格式刷：先「复制格式」再「套用格式」，两步之间按钮保持激活态 */}
-        <div className={GROUP}>
-          <IconButton
-            label={t('tools.slide.copyFormat')}
-            active={formatPainter !== null}
-            disabled={!hasSelection}
-            onClick={copyFormat}
-          >
-            <FormatPainterIcon active={formatPainter !== null} />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.applyFormat')}
-            active={formatPainter !== null}
-            disabled={formatPainter === null || !hasSelection}
-            onClick={applyFormat}
-          >
-            <Icon name="brush" className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.clearFormat')}
-            disabled={formatPainter === null}
-            onClick={clearFormatPainter}
-          >
-            <Icon name="close" className="h-4 w-4" />
-          </IconButton>
-        </div>
-      </div>
+          {SEP}
 
-      {/* ── 视图 ── */}
-      <div className={ROW}>
-        <div className={GROUP}>
-          <IconButton
-            label={t('tools.slide.zoomOut')}
-            onClick={() => setScale(Math.max(0.1, Math.round((scale - 0.1) * 100) / 100))}
-          >
-            <Icon name="zoomOut" className="h-4 w-4" />
-          </IconButton>
-          {/* 百分比是数值显示而非按钮，保留文字 */}
-          <span className="w-10 text-center text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
-            {Math.round(scale * 100)}%
-          </span>
-          <IconButton
-            label={t('tools.slide.zoomIn')}
-            onClick={() => setScale(Math.min(3, Math.round((scale + 0.1) * 100) / 100))}
-          >
-            <Icon name="zoomIn" className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.zoomFit')}
-            // 适应窗口同时复位平移，否则会被误认为「点了没反应」
-            onClick={() => setViewport({ scale: 0, panX: 0, panY: 0 })}
-          >
-            <Icon name="fitScreen" className="h-4 w-4" />
-          </IconButton>
-        </div>
+          <div className={GROUP}>
+            <IconButton
+              label={t('tools.slide.lock')}
+              active={allLocked()}
+              disabled={!hasSelection}
+              onClick={toggleLockSelected}
+            >
+              <Icon name={allLocked() ? 'lock' : 'unlock'} className="h-4 w-4" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.hide')}
+              active={anyHidden()}
+              disabled={!hasSelection}
+              onClick={toggleVisibleSelected}
+            >
+              <Icon name={anyHidden() ? 'eyeOff' : 'eye'} className="h-4 w-4" />
+            </IconButton>
+          </div>
 
-        {SEP}
+          {SEP}
 
-        <div className={GROUP}>
-          <IconButton label={t('tools.slide.gridSnap')} active={gridSnap} onClick={toggleGridSnap}>
-            <Icon name="grid" className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label={t('tools.slide.showRulers')}
-            active={showRulers}
-            onClick={toggleRulers}
-          >
-            <Icon name="ruler" className="h-4 w-4" />
-          </IconButton>
-        </div>
-
-        {SEP}
-
-        <div className={GROUP}>
-          <IconButton
-            label={t('tools.slide.moveUp')}
-            onClick={() => moveSlide(slideIndex, Math.max(0, slideIndex - 1))}
-          >
-            <Icon name="swap" className="h-4 w-4" />
-          </IconButton>
+          {/* 格式刷：先「复制格式」再「套用格式」，两步之间按钮保持激活态 */}
+          <div className={GROUP}>
+            <IconButton
+              label={t('tools.slide.copyFormat')}
+              active={formatPainter !== null}
+              disabled={!hasSelection}
+              onClick={copyFormat}
+            >
+              <FormatPainterIcon active={formatPainter !== null} />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.applyFormat')}
+              active={formatPainter !== null}
+              disabled={formatPainter === null || !hasSelection}
+              onClick={applyFormat}
+            >
+              <Icon name="brush" className="h-4 w-4" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.clearFormat')}
+              disabled={formatPainter === null}
+              onClick={clearFormatPainter}
+            >
+              <Icon name="close" className="h-4 w-4" />
+            </IconButton>
+          </div>
         </div>
       </div>
 
@@ -490,6 +498,21 @@ function FormulaIcon() {
       <text x="8" y="12" textAnchor="middle" fontSize="11" fontStyle="italic" fill="currentColor">
         ƒx
       </text>
+    </svg>
+  );
+}
+
+/**
+ * 形状库图标：2×2 的「方形 / 圆形 / 三角 / 菱形」组合，
+ * 与「形状 ▾」下拉共用的 `shapes` 图标区分开（两者相邻，同图标会撞脸）。
+ */
+function ShapeLibraryIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+      <rect x="1.2" y="1.2" width="5.6" height="5.6" rx="1" />
+      <circle cx="11.8" cy="4" r="2.8" />
+      <polygon points="4,8.8 7.2,15 0.8,15" />
+      <polygon points="11.8,8.9 15.1,12.2 11.8,15.5 8.5,12.2" />
     </svg>
   );
 }

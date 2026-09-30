@@ -99,6 +99,17 @@ interface SlideState {
   addElement: (element: SlideElement) => void;
   patchElement: (id: string, patch: Partial<SlideElement>, history?: boolean) => void;
   patchSelected: (patch: Partial<SlideElement>, history?: boolean) => void;
+  /**
+   * 按**各自当前值**计算补丁后批量应用（`updater` 返回 `null` 表示该元素不适用）。
+   *
+   * `patchSelected` 只能下发同一个补丁，适合「设成同一个值」；而「按各自当前值取反」
+   * （加粗开关）或「基于各自 body 派生新 body」（字体/对齐）必须逐元素计算，
+   * 否则多选时会把首个元素的 body 覆盖掉其它元素的文字。
+   */
+  patchSelectedWith: (
+    updater: (element: SlideElement) => Partial<SlideElement> | null,
+    history?: boolean,
+  ) => void;
   moveSelected: (dx: number, dy: number) => void;
   removeSelected: () => void;
   duplicateSelected: () => void;
@@ -530,6 +541,22 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       for (const id of s.selection) patches.set(id, patch);
       return { doc: writeContainerElements(s, (current) => patchElements(current, patches)) };
     });
+  },
+
+  patchSelectedWith: (updater, history = true) => {
+    const state = get();
+    const patches = new Map<string, Partial<SlideElement>>();
+    for (const element of containerElements(state)) {
+      if (!state.selection.includes(element.id)) continue;
+      const patch = updater(element);
+      // 空补丁（例如字号已达上下限）不计入，避免制造一次「什么都没变」的撤销点
+      if (patch && Object.keys(patch).length > 0) patches.set(element.id, patch);
+    }
+    if (patches.size === 0) return;
+    if (history) get().commit();
+    set((s) => ({
+      doc: writeContainerElements(s, (current) => patchElements(current, patches)),
+    }));
   },
 
   moveSelected: (dx, dy) =>

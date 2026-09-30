@@ -12,12 +12,17 @@ import { gzipSync } from 'node:zlib';
 
 const DIST = path.resolve(process.cwd(), 'dist');
 // 工具增多后适当放宽：首屏仍尽量紧凑，单 chunk 允许重依赖（mermaid / jspdf 等）。
-// 180KB → 185KB：工具数超过 100 个后，首屏同步语言包（zh + en）中的 toolsMeta（名称+描述）
-//   与 tools.*（工具 UI 文案）随之线性增长，2026-09 旧上限已被顶到。
-// 185KB → 210KB：工具数达到 152 个，同步打包的 zh+en 文案合计约 67KB（gzip），实测首屏 206.06KB。
-//   此处沿用既有惯例（配额随工具数增长而调整）放宽到 210KB，并留出约 4KB 余量。
-// 注意：真正的收敛手段是 i18n 按需加载（把 tools.* 文案随工具 chunk 拆分），已列入后续优化项。
-const ENTRY_BUDGET = 210 * 1024;
+// 配额变迁：
+//   180KB → 185KB：工具数超过 100 个后，首屏同步语言包（zh + en）中的 toolsMeta（名称+描述）
+//     与 tools.*（工具 UI 文案）随之线性增长，2026-09 旧上限已被顶到。
+//   185KB → 210KB：工具数达到 152 个，同步打包的 zh+en 文案合计约 67KB（gzip），实测首屏 206.06KB。
+//   210KB → 175KB（收紧）：语言资源改为「外壳 / 工具文案」两段加载 ——
+//     src/core/i18n/locales/<lang>.ts      外壳（导航/首页/搜索 + toolsMeta），zh/en 同步进首屏；
+//     src/core/i18n/locales/<lang>.tools.ts 各工具 UI 文案 tools.*，进工具页时按需加载。
+//     tools.* 占语言包约 82%，剥离后首屏 209.03KB → 158.37KB（-50.66KB / -24%）。
+//     收紧到 175KB 是为了把这部分收益锁住：语言包/工具元数据再膨胀时先被这条门禁挡住，
+//     而不是继续抬上限。当前实测约 158KB，余量约 17KB。
+const ENTRY_BUDGET = 175 * 1024;
 const CHUNK_BUDGET = 500 * 1024;
 // 电子表格工具依赖的 Univer / exceljs 天然是「重 chunk」：
 // 单个包体远超常规预算且无法再拆，单独放宽上限并记录在报告中，其余 chunk 仍受 500KB 约束。

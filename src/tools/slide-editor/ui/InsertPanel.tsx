@@ -82,6 +82,9 @@ export function InsertPanel({
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('tools.slide.insertPanelTitle')}
     >
       <div
         className="flex w-full max-w-2xl flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900"

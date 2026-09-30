@@ -1,13 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { ensureLangLoaded, localeResources } from '@/core/i18n/locales';
-import {
-  detectBrowserLang,
-  isLang,
-  isSyncLang,
-  normalizeLang,
-  type Lang,
-} from '@/core/i18n/types';
+import { ensureLangLoaded, ensureToolStringsLoaded, localeResources } from '@/core/i18n/locales';
+import { detectBrowserLang, isLang, isSyncLang, normalizeLang, type Lang } from '@/core/i18n/types';
 
 export type { Lang } from '@/core/i18n/types';
 export {
@@ -21,7 +15,7 @@ export {
   mapBrowserLocale,
   normalizeLang,
 } from '@/core/i18n/types';
-export { ensureLangLoaded } from '@/core/i18n/locales';
+export { ensureLangLoaded, hasToolStrings } from '@/core/i18n/locales';
 
 const SETTINGS_KEY = 'syntools:settings.v1';
 
@@ -67,6 +61,18 @@ export async function changeAppLanguage(lang: Lang): Promise<void> {
     i18n.addResourceBundle(lng, ns, resources, true, true);
   });
   await i18n.changeLanguage(lang);
+}
+
+/**
+ * 加载并注册工具 UI 文案（`tools.*`）。
+ *
+ * 单独成 chunk 的理由见 `locales/index.ts`：它占语言包约 82%，只有工具页需要。
+ * 这里把 addResourceBundle 的细节收在 core 内，工具页只关心「是否就绪」。
+ */
+export async function loadToolStrings(lang: Lang): Promise<void> {
+  await ensureToolStringsLoaded(lang, (lng, ns, resources) => {
+    i18n.addResourceBundle(lng, ns, resources, true, true);
+  });
 }
 
 // 若偏好语言需懒加载，启动后再异步切过去

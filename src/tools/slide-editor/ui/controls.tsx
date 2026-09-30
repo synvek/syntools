@@ -33,7 +33,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 const inputClass =
-  'h-7 w-full min-w-0 rounded-md border border-gray-300 bg-white px-2 text-[12px] text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100';
+  'h-7 w-full min-w-0 rounded-md border border-gray-300 bg-white px-2 text-[12px] text-gray-800 outline-none transition-colors focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100';
 
 export function NumberInput({
   value,
@@ -44,6 +44,7 @@ export function NumberInput({
   suffix,
   ariaLabel,
   disabled,
+  widthClass,
 }: {
   value: number;
   onChange: (value: number) => void;
@@ -53,13 +54,15 @@ export function NumberInput({
   suffix?: string;
   ariaLabel: string;
   disabled?: boolean;
+  /** 覆盖默认宽度（工具栏比面板窄），如 'w-12' */
+  widthClass?: string;
 }) {
   return (
     <div className="flex items-center gap-1">
       <input
         type="number"
         aria-label={ariaLabel}
-        className={`${inputClass} w-16 ${suffix ? 'w-14' : ''}`}
+        className={`${inputClass} ${widthClass ?? (suffix ? 'w-14' : 'w-16')}`}
         value={Number.isFinite(value) ? value : 0}
         min={min}
         max={max}
@@ -105,6 +108,8 @@ export function SelectInput({
   onChange,
   ariaLabel,
   labels,
+  widthClass,
+  disabled,
 }: {
   value: string;
   options: string[];
@@ -112,14 +117,18 @@ export function SelectInput({
   ariaLabel: string;
   /** 与 options 一一对应的展示文案；缺省时直接显示取值 */
   labels?: string[];
+  /** 覆盖默认宽度（工具栏比面板窄），如 'max-w-[104px]' */
+  widthClass?: string;
+  disabled?: boolean;
 }) {
   const list = options.includes(value) ? options : [value, ...options];
   return (
     <select
       aria-label={ariaLabel}
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      className={`${inputClass} max-w-[130px]`}
+      className={`${inputClass} ${widthClass ?? 'max-w-[130px]'}`}
     >
       {list.map((option) => (
         <option key={option} value={option}>

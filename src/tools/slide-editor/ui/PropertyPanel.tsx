@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { backgroundToColor } from '../core';
-import type { Fill, RunStyle, SlideElement, Stroke, TextAlign } from '../model/types';
+import type { RunStyle, SlideElement, Stroke } from '../model/types';
 import { containerElements, useSlideStore } from '../store';
 import { ChartEditor } from './ChartEditor';
 import {
@@ -10,31 +10,10 @@ import {
   Field,
   NumberInput,
   Section,
-  SelectInput,
   TextArea,
   TextInput,
   ToggleGroup,
 } from './controls';
-
-/** 中西文混排常用字体（无联网字体加载，只列系统常见族） */
-const FONT_OPTIONS = [
-  'Arial',
-  'Helvetica',
-  'Times New Roman',
-  'Georgia',
-  'Courier New',
-  'Verdana',
-  'Tahoma',
-  'Impact',
-  'PingFang SC',
-  'Microsoft YaHei',
-  'SimSun',
-  'SimHei',
-  'Noto Sans',
-  'sans-serif',
-  'serif',
-  'monospace',
-];
 
 /** 右侧属性面板：无选中时编辑页面，选中时编辑元素（位置/填充/文字/层序） */
 export function PropertyPanel() {
@@ -97,7 +76,6 @@ export function PropertyPanel() {
 
   const apply = (patch: Partial<SlideElement>) => patchElement(element.id, patch);
 
-  const fill = element.type === 'shape' || element.type === 'text' ? element.fill : undefined;
   const stroke =
     element.type === 'shape' || element.type === 'text' || element.type === 'image'
       ? element.stroke
@@ -107,11 +85,6 @@ export function PropertyPanel() {
   const body =
     element.type === 'text' ? element.body : element.type === 'shape' ? element.body : undefined;
   const firstStyle: RunStyle | undefined = body?.paragraphs[0]?.runs[0]?.style;
-  const align: TextAlign = body?.paragraphs[0]?.align ?? 'left';
-
-  const cornerRadiusValue =
-    element.type === 'text' || element.type === 'image' ? (element.cornerRadius ?? 0) : 0;
-
   const cropValue = (side: 'left' | 'top' | 'right' | 'bottom'): number =>
     element.type === 'image' ? (element.crop?.[side] ?? 0) : 0;
 
@@ -122,7 +95,6 @@ export function PropertyPanel() {
     } as Partial<SlideElement>);
   };
 
-  const patchFill = (next: Fill) => apply({ fill: next } as Partial<SlideElement>);
   const patchStroke = (next: Stroke | undefined) =>
     apply({ stroke: next } as Partial<SlideElement>);
   const patchStyle = (patch: Partial<RunStyle>) => {
@@ -141,12 +113,6 @@ export function PropertyPanel() {
       ),
     };
     apply({ body: next } as Partial<SlideElement>);
-  };
-  const patchAlign = (next: TextAlign) => {
-    if (!body) return;
-    apply({
-      body: { ...body, paragraphs: body.paragraphs.map((p) => ({ ...p, align: next })) },
-    } as Partial<SlideElement>);
   };
   /** 段落级属性（行距/缩进/段前后）写回全部段落：这类字段在 Paragraph 上而非 RunStyle 上 */
   const patchParagraph = (patch: {
@@ -204,18 +170,10 @@ export function PropertyPanel() {
               onChange={(value) => apply({ rotation: value })}
             />
           </Field>
-          <Field label={t('tools.slide.opacity')}>
-            <NumberInput
-              ariaLabel={t('tools.slide.opacity')}
-              value={Math.round((element.opacity ?? 1) * 100)}
-              min={0}
-              max={100}
-              onChange={(value) => apply({ opacity: value / 100 })}
-            />
-          </Field>
         </div>
         {/* 层级 / 对齐 / 分布 / 组合 / 翻转 / 锁定 / 隐藏 都是「选中态操作」，
-            已统一收进顶部工具栏的「排列」行；这里只保留数值属性，语义更干净。 */}
+            已统一收进顶部工具栏的「排列」行；不透明度/圆角在「格式」行；
+            这里只保留需要精确数值的几何属性，语义更干净。 */}
       </Section>
 
       {element.type === 'table' ? (
@@ -279,95 +237,56 @@ export function PropertyPanel() {
         </Section>
       ) : null}
 
-      {element.type !== 'line' && element.type !== 'table' ? (
-        <Section title={t('tools.slide.fill')}>
-          <Field label={t('tools.slide.fill')}>
-            <ColorInput
-              ariaLabel={t('tools.slide.fill')}
-              value={fill && fill.type === 'solid' ? fill.color : '#FFFFFF'}
-              onChange={(color) => patchFill({ type: 'solid', color })}
-            />
-          </Field>
-          <Field label={t('tools.slide.stroke')}>
-            <ColorInput
-              ariaLabel={t('tools.slide.stroke')}
-              value={stroke?.color ?? '#000000'}
-              onChange={(color) =>
-                patchStroke({ color, width: stroke?.width ?? 1, dash: stroke?.dash })
-              }
-            />
-          </Field>
-          <Field label={t('tools.slide.strokeWidth')}>
-            <NumberInput
-              ariaLabel={t('tools.slide.strokeWidth')}
-              value={stroke?.width ?? 0}
-              min={0}
-              step={0.5}
-              onChange={(width) =>
-                patchStroke({ color: stroke?.color ?? '#000000', width, dash: stroke?.dash })
-              }
-            />
-          </Field>
-          {/* 圆角：文本框与图片都支持（渲染与导出均已打通，此前只是没有入口） */}
-          {element.type === 'text' || element.type === 'image' ? (
-            <Field label={t('tools.slide.cornerRadius')}>
+      {/*
+        填充色 / 描边色 / 线宽 / 圆角已移到顶部工具栏的「格式」行（高频改色不该来回跑面板）。
+        这里只保留需要精确数值的裁剪四边与描边线宽之外的细节。
+      */}
+      {element.type === 'image' ? (
+        <Section title={t('tools.slide.panelImage')}>
+          {(['left', 'top', 'right', 'bottom'] as const).map((side) => (
+            <Field key={side} label={`${t('tools.slide.crop')}·${sideLabel(side)}`}>
               <NumberInput
-                ariaLabel={t('tools.slide.cornerRadius')}
-                value={Math.round(cornerRadiusValue)}
+                ariaLabel={`${t('tools.slide.crop')} ${side}`}
+                value={Math.round(cropValue(side) * 100)}
                 min={0}
-                max={200}
-                onChange={(value) => apply({ cornerRadius: value } as Partial<SlideElement>)}
+                max={90}
+                suffix="%"
+                onChange={(value) => patchCrop(side, value / 100)}
               />
             </Field>
-          ) : null}
-          {element.type === 'image' ? (
-            <>
-              {(['left', 'top', 'right', 'bottom'] as const).map((side) => (
-                <Field key={side} label={`${t('tools.slide.crop')}·${sideLabel(side)}`}>
-                  <NumberInput
-                    ariaLabel={`${t('tools.slide.crop')} ${side}`}
-                    value={Math.round(cropValue(side) * 100)}
-                    min={0}
-                    max={90}
-                    suffix="%"
-                    onChange={(value) => patchCrop(side, value / 100)}
-                  />
-                </Field>
-              ))}
-            </>
-          ) : null}
+          ))}
         </Section>
       ) : null}
 
+      {/* 线条：颜色与粗细在工具栏的「轮廓」下拉里，这里只留线型（虚/实线） */}
+      {element.type === 'line' ? (
+        <Section title={t('tools.slide.panelLine')}>
+          <Field label={t('tools.slide.strokeStyle')}>
+            <ToggleGroup
+              ariaLabel={t('tools.slide.strokeStyle')}
+              value={stroke?.dash?.length ? 'dashed' : 'solid'}
+              onChange={(value) =>
+                patchStroke({
+                  color: stroke?.color ?? '#000000',
+                  width: stroke?.width ?? 2,
+                  dash: value === 'dashed' ? [8, 6] : undefined,
+                })
+              }
+              options={[
+                { value: 'solid', label: t('tools.slide.strokeSolid') },
+                { value: 'dashed', label: t('tools.slide.strokeDashed') },
+              ]}
+            />
+          </Field>
+        </Section>
+      ) : null}
+
+      {/*
+        文字：字体 / 字号 / 字形 / 颜色 / 高亮 / 对齐 / 行距 / 项目符号 已移到顶部工具栏
+        「格式」行；这里保留需要精确数值或低频的项（缩进、段距、字距、上下标、竖排）。
+      */}
       {body ? (
         <Section title={t('tools.slide.panelText')}>
-          <Field label={t('tools.slide.fontFamily')}>
-            <SelectInput
-              ariaLabel={t('tools.slide.fontFamily')}
-              value={firstStyle?.font ?? 'Arial'}
-              options={FONT_OPTIONS}
-              onChange={(font) => patchStyle({ font })}
-            />
-          </Field>
-          <Field label={t('tools.slide.fontSize')}>
-            <NumberInput
-              ariaLabel={t('tools.slide.fontSize')}
-              value={Math.round(firstStyle?.size ?? 18)}
-              min={6}
-              max={200}
-              onChange={(size) => patchStyle({ size })}
-            />
-          </Field>
-          <Field label={t('tools.slide.lineHeight')}>
-            <NumberInput
-              ariaLabel={t('tools.slide.lineHeight')}
-              value={Number((body.paragraphs[0]?.lineSpacing ?? 1.2).toFixed(2))}
-              min={0.5}
-              max={5}
-              step={0.1}
-              onChange={(lineSpacing) => patchParagraph({ lineSpacing })}
-            />
-          </Field>
           <Field label={t('tools.slide.indent')}>
             <NumberInput
               ariaLabel={t('tools.slide.indent')}
@@ -395,86 +314,8 @@ export function PropertyPanel() {
               onChange={(spaceAfter) => patchParagraph({ spaceAfter })}
             />
           </Field>
-          <Field label={t('tools.slide.color')}>
-            <ColorInput
-              ariaLabel={t('tools.slide.color')}
-              value={firstStyle?.color ?? '#000000'}
-              onChange={(color) => patchStyle({ color })}
-            />
-          </Field>
-          <ToggleGroup
-            ariaLabel={t('tools.slide.panelText')}
-            value={align}
-            onChange={(value) => patchAlign(value)}
-            options={[
-              { value: 'left', label: t('tools.slide.alignLeft') },
-              { value: 'center', label: t('tools.slide.alignCenter') },
-              { value: 'right', label: t('tools.slide.alignRight') },
-            ]}
-          />
-          <ActionRow>
-            <ToggleGlyph
-              label={t('tools.slide.bold')}
-              active={Boolean(firstStyle?.bold)}
-              onClick={() => patchStyle({ bold: !firstStyle?.bold })}
-              text="B"
-              bold
-            />
-            <ToggleGlyph
-              label={t('tools.slide.italic')}
-              active={Boolean(firstStyle?.italic)}
-              onClick={() => patchStyle({ italic: !firstStyle?.italic })}
-              text="I"
-              italic
-            />
-            <ToggleGlyph
-              label={t('tools.slide.underline')}
-              active={Boolean(firstStyle?.underline)}
-              onClick={() => patchStyle({ underline: !firstStyle?.underline })}
-              text="U"
-              underline
-            />
-            <ToggleGlyph
-              label={t('tools.slide.strike')}
-              active={Boolean(firstStyle?.strike)}
-              onClick={() => patchStyle({ strike: !firstStyle?.strike })}
-              text="S"
-              strike
-            />
-            <ToggleGlyph
-              label={t('tools.slide.bullet')}
-              active={Boolean(body.paragraphs[0]?.bullet)}
-              onClick={() =>
-                apply({
-                  body: {
-                    ...body,
-                    // 项目符号与编号互斥：开启其一时清掉另一个
-                    paragraphs: body.paragraphs.map((p, index) =>
-                      index === 0 ? { ...p, bullet: !p.bullet, numbering: false } : p,
-                    ),
-                  },
-                } as Partial<SlideElement>)
-              }
-              text="•"
-            />
-            <ToggleGlyph
-              label={t('tools.slide.numbering')}
-              active={Boolean(body.paragraphs[0]?.numbering)}
-              onClick={() =>
-                apply({
-                  body: {
-                    ...body,
-                    paragraphs: body.paragraphs.map((p, index) =>
-                      index === 0 ? { ...p, numbering: !p.numbering, bullet: false } : p,
-                    ),
-                  },
-                } as Partial<SlideElement>)
-              }
-              text="1."
-            />
-          </ActionRow>
 
-          {/* run 级扩展属性：字距 / 上下标 / 高亮（DrawingML a:spc / baseline / highlight） */}
+          {/* run 级扩展属性：字距 / 上下标（DrawingML a:spc / baseline），工具栏未覆盖的低频项 */}
           <Field label={t('tools.slide.charSpacing')}>
             <NumberInput
               ariaLabel={t('tools.slide.charSpacing')}
@@ -483,13 +324,6 @@ export function PropertyPanel() {
               max={40}
               step={0.5}
               onChange={(spacing) => patchStyle({ spacing })}
-            />
-          </Field>
-          <Field label={t('tools.slide.highlight')}>
-            <ColorInput
-              ariaLabel={t('tools.slide.highlight')}
-              value={firstStyle?.highlight ?? '#FFFFFF'}
-              onChange={(highlight) => patchStyle({ highlight })}
             />
           </Field>
           <ActionRow>

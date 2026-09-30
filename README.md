@@ -221,13 +221,15 @@ After registration, `/tools/<id>`, the sidebar group, home cards, and ⌘K searc
 
 ## Performance budget
 
-| Metric                       | Budget                                                      |
-| ---------------------------- | ----------------------------------------------------------- |
-| First-screen entry (gzip)    | ≤ 210 KB (grows with the bundled `zh`+`en` tool copy)       |
-| Individual lazy chunk (gzip) | ≤ 500 KB (heavy deps such as Univer / exceljs ≤ 2 MB)       |
-| Static asset (not bundled)   | ≤ 40 MB (self-hosted `ffmpeg.wasm` core, fetched on demand) |
+| Metric                       | Budget                                                             |
+| ---------------------------- | ------------------------------------------------------------------ |
+| First-screen entry (gzip)    | ≤ 175 KB (shell + `toolsMeta` only; per-tool copy loads on demand) |
+| Individual lazy chunk (gzip) | ≤ 500 KB (heavy deps such as Univer / exceljs ≤ 2 MB)              |
+| Static asset (not bundled)   | ≤ 40 MB (self-hosted `ffmpeg.wasm` core, fetched on demand)        |
 
 Enforced by `pnpm size` (`scripts/check-bundle-size.mjs`). Tools must use `component: () => import(...)` so they stay out of the initial bundle — heavy third-party dependencies belong in a tool's own async chunk (for example the photo editor's PSD writer loads `ag-psd` only when you export). Prefer the built-in `Icon` component over icon libraries.
+
+**Locale loading is two-stage.** Each language is split into a shell (`locales/<lang>.ts`: navigation, home, search plus `toolsMeta.*`) and a per-tool copy bundle (`locales/<lang>.tools.ts`: the `tools.*` namespace, ~82% of the locale). `zh`/`en` shells ship with the first screen; every `tools.*` bundle is fetched when a tool page opens, in parallel with that tool's own chunk. The home page and the tool-less shell therefore never pay for the UI copy of 152 tools — and a tool page still renders fully translated on first paint.
 
 ### Media engine (WebCodecs-first, ffmpeg.wasm fallback)
 

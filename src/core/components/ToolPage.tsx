@@ -1,10 +1,11 @@
-import { Suspense, lazy, useEffect, useMemo } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ToolMeta } from '@/core/types';
 import { useHistoryStore } from '@/stores/history';
 import { ErrorBoundary } from '@/core/components/ErrorBoundary';
 import { Icon } from '@/core/components/Icon';
 import { RelatedTools } from '@/core/components/RelatedTools';
+import { hasToolStrings, loadToolStrings, normalizeLang, type Lang } from '@/core/i18n';
 import { useToolMeta } from '@/core/i18n/helpers';
 
 function ToolSkeleton() {
@@ -23,13 +24,44 @@ function ToolSkeleton() {
  */
 export function ToolPage({ tool }: { tool: ToolMeta }) {
   const LazyTool = useMemo(() => lazy(tool.component), [tool]);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const recordUse = useHistoryStore((s) => s.recordUse);
   const favorites = useHistoryStore((s) => s.favorites);
   const toggleFavorite = useHistoryStore((s) => s.toggleFavorite);
   const { name, description } = useToolMeta(tool);
   const isFavorite = favorites.includes(tool.id);
   const mode = tool.mode ?? 'client';
+  const lang: Lang = normalizeLang(i18n.resolvedLanguage ?? 'en') ?? 'en';
+
+  /**
+   * 工具 UI 文案（`tools.*`）不在首屏包里，它占语言包约 82%，只有工具页需要。
+   *
+   * 这里与工具 chunk **并行**预取：`tool.component()` 提前触发动态 import
+   * （后续 React.lazy 复用同一模块缓存，不会重复下载），文案与工具代码同时在路上，
+   * 因此相比改造前只是多了一个可缓存的小 chunk，而不是多一次串行往返。
+   *
+   * 一旦就绪就永久为 true：语言切换时不再回落到骨架屏，
+   * 否则会把工具组件的 state（例如正在编辑的幻灯片）连带卸载掉。
+   */
+  const [stringsReady, setStringsReady] = useState(() => hasToolStrings(lang));
+
+  useEffect(() => {
+    if (stringsReady && hasToolStrings(lang)) return;
+    let alive = true;
+    void (async () => {
+      try {
+        await Promise.all([loadToolStrings(lang), tool.component()]);
+      } catch (error) {
+        // 文案失败可退回已加载语言；工具 chunk 失败留给 ErrorBoundary 呈现
+        console.error('[ToolPage] 预取工具资源失败', error);
+      } finally {
+        if (alive) setStringsReady(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [lang, tool, stringsReady]);
 
   useEffect(() => {
     document.title = `${name} · SynTools`;
@@ -73,7 +105,8 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
       </header>
       <ErrorBoundary key={tool.id}>
         <Suspense fallback={<ToolSkeleton />}>
-          <LazyTool />
+          {/* 文案就绪前先占位：否则会先闪一屏未翻译的 key */}
+          {stringsReady ? <LazyTool /> : <ToolSkeleton />}
         </Suspense>
       </ErrorBoundary>
       <RelatedTools tool={tool} />
