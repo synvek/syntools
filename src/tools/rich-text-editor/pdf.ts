@@ -44,7 +44,9 @@ export function printSupported(): boolean {
  *             配合 CSS `break-before: page` 使打印分页与所见一致。
  */
 export function printToPdf(flow?: HTMLElement | null, setup?: PageSetupConfig | null): void {
-  if (flow) applyPagedBreaks(flow, resolvePageMetrics(setup ?? DEFAULT_PAGE_SETUP));
+  const metrics = resolvePageMetrics(setup ?? DEFAULT_PAGE_SETUP);
+  // 多栏时交给浏览器/打印引擎按列自然流排，块级强制换页会把列布局切错
+  if (flow && metrics.columns === 1) applyPagedBreaks(flow, metrics);
   window.print();
 }
 
@@ -71,7 +73,15 @@ export async function snapshotToPdf(
       const rect = child.getBoundingClientRect();
       return { top: rect.top - baseTop, height: rect.height };
     });
-    const cuts = computePageBreaks(items, pageHeightPx);
+    // 分栏排版由浏览器/Word 自行流排，块级切页算法在列布局下会错位，
+    // 因此多栏时按固定页高切片，与打印/Word 的列流保持一致
+    const cuts =
+      metrics.columns > 1
+        ? Array.from(
+            { length: Math.max(0, Math.ceil(height / pageHeightPx) - 1) },
+            (_, index) => (index + 1) * pageHeightPx,
+          )
+        : computePageBreaks(items, pageHeightPx);
     const bounds = [0, ...cuts, height];
     const pages = bounds
       .slice(0, -1)
@@ -82,7 +92,8 @@ export async function snapshotToPdf(
 
     // 大文档按高度分片光栅化，避免单张超大 canvas（浏览器尺寸上限/内存）
     const pixelRatio = height > CHUNK_HEIGHT_PX ? 1.5 : 2;
-    const source = await rasterize(container, width, height, pixelRatio, onProgress);
+    const background = setup.background ?? '#ffffff';
+    const source = await rasterize(container, width, height, pixelRatio, onProgress, background);
     const renderedRatio = source.height / height;
 
     const { jsPDF } = await import('jspdf');
@@ -92,6 +103,11 @@ export async function snapshotToPdf(
       orientation: 'portrait',
       compress: true,
     });
+    // 页面背景：快照已按背景色填充，这里只需补内容区之外的纸张边距
+    if (setup.background) {
+      doc.setFillColor(setup.background);
+      doc.rect(0, 0, metrics.widthMm, metrics.heightMm, 'F');
+    }
 
     for (let i = 0; i < pages.length; i += 1) {
       const page = pages[i];
@@ -108,7 +124,7 @@ export async function snapshotToPdf(
       canvas.height = sliceHeightPx;
       const ctx = canvas.getContext('2d');
       if (!ctx) return { ok: false, error: 'RENDER_FAILED' };
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = background;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(source, 0, -Math.round(page.start * renderedRatio));
       const pageUrl = canvas.toDataURL('image/jpeg', 0.92);
@@ -121,6 +137,8 @@ export async function snapshotToPdf(
         metrics.contentWidthMm,
         pageHeightMm,
       );
+      // 水印：文本层叠在快照之上，保证透明度与旋转可控
+      drawWatermark(doc, setup, metrics);
       // 页眉 / 页脚 / 页码（文本层叠在快照之上）
       drawHeaderFooter(doc, setup, metrics, i + 1);
       onProgress?.((i + 1) / pages.length);
@@ -143,6 +161,7 @@ async function rasterize(
   heightPx: number,
   ratio: number,
   onProgress?: (value: number) => void,
+  background = '#ffffff',
 ): Promise<HTMLCanvasElement> {
   const { toPng } = await import('html-to-image');
   const canvas = document.createElement('canvas');
@@ -150,13 +169,13 @@ async function rasterize(
   canvas.height = Math.max(1, Math.round(heightPx * ratio));
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('CANVAS_UNAVAILABLE');
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = background;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   if (heightPx <= CHUNK_HEIGHT_PX) {
     const url = await toPng(container, {
       pixelRatio: ratio,
-      backgroundColor: '#ffffff',
+      backgroundColor: background,
       cacheBust: true,
     });
     const image = await loadImage(url);
@@ -169,7 +188,7 @@ async function rasterize(
     const chunk = Math.min(CHUNK_HEIGHT_PX, heightPx - offset);
     const url = await toPng(container, {
       pixelRatio: ratio,
-      backgroundColor: '#ffffff',
+      backgroundColor: background,
       cacheBust: true,
       width: widthPx,
       height: chunk,
@@ -190,6 +209,44 @@ async function rasterize(
     onProgress?.((index + 1) / (total + 1));
   }
   return canvas;
+}
+
+/** 十六进制颜色 → RGB 三元组（jsPDF 需要分通道设置颜色） */
+function hexToRgb(hex: string): [number, number, number] {
+  const value = hex.replace('#', '');
+  return [
+    Number.parseInt(value.slice(0, 2), 16) || 0,
+    Number.parseInt(value.slice(2, 4), 16) || 0,
+    Number.parseInt(value.slice(4, 6), 16) || 0,
+  ];
+}
+
+/**
+ * 在快照页上绘制文字水印。
+ * 与屏幕/打印一致：位于内容区中心、按 rotation 反向倾斜、透明度由 GState 控制。
+ */
+function drawWatermark(
+  doc: import('jspdf').jsPDF,
+  setup: PageSetupConfig,
+  metrics: { widthMm: number; heightMm: number; contentWidthMm: number; contentHeightMm: number },
+): void {
+  const watermark = setup.watermark;
+  if (!watermark || !watermark.text.trim()) return;
+  const [r, g, b] = hexToRgb(watermark.color);
+  doc.saveGraphicsState();
+  // 字号随内容宽度缩放：与屏幕用 vw 级字号保持同样的视觉比例
+  doc.setFontSize(Math.max(24, Math.round(metrics.contentWidthMm * 0.9)));
+  doc.setTextColor(r, g, b);
+  const gState = (doc as unknown as { GState?: new (options: { opacity: number }) => unknown })
+    .GState;
+  const setGState = (doc as unknown as { setGState?: (state: unknown) => void }).setGState;
+  if (gState && setGState) setGState.call(doc, new gState({ opacity: watermark.opacity }));
+  doc.text(watermark.text, metrics.widthMm / 2, metrics.heightMm / 2, {
+    align: 'center',
+    baseline: 'middle',
+    angle: -watermark.rotation,
+  });
+  doc.restoreGraphicsState();
 }
 
 /** 在快照页上绘制页眉 / 页脚 / 页码（页眉位于上边距中部，页脚位于下边距中部） */

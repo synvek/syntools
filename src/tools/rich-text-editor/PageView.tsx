@@ -1,9 +1,9 @@
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
-import type { Transaction } from '@tiptap/pm/state';
+import type { EditorState, Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
-import { planPageBlocks } from './core';
+import { countPages, pageIndexOfPosition, planPageBlocks } from './core';
 import { isFloatingImageElement } from './imageLayer';
 import { MM_TO_PX, SHEET_GAP_MM, pageMetricsToPx, type PageMetrics } from './pageSetup';
 
@@ -28,6 +28,30 @@ const pageLayoutKey = new PluginKey<PageLayoutState>('richTextPageLayout');
 
 /** 当前页面几何（mm）→ 像素，随页面设置变化 */
 export type PageMetricsGetter = () => PageMetrics;
+
+/**
+ * 页码查询契约：目录等需要「文档位置 → 页码」的消费者统一走它。
+ * 数据源是分页插件的 state（各页起始块的文档位置），因此查询是
+ * 「当前 state 的快照」——调用方在 state 变化后重新取一次即可。
+ */
+export interface PageLayoutQuery {
+  /** 文档位置 → 页码（1 起；未分页时恒为 1） */
+  pageIndexOfPos(pos: number): number;
+  /** 总页数 */
+  pageCount(): number;
+  /** 是否已有分页信息（流式视图下没有页码） */
+  paginated: boolean;
+}
+
+/** 从当前编辑器状态创建页码查询（二分查找，可安全用于每次渲染） */
+export function createPageLayoutQuery(state: EditorState): PageLayoutQuery {
+  const positions = pageLayoutKey.getState(state)?.positions ?? [];
+  return {
+    pageIndexOfPos: (pos: number) => pageIndexOfPosition(positions, pos),
+    pageCount: () => countPages(positions),
+    paginated: positions.length > 0,
+  };
+}
 
 /** 读取视图缩放系数（CSS zoom）：rect 会按缩放放大，测量时必须还原成 CSS px */
 function readZoomScale(view: EditorView): number {
@@ -180,12 +204,23 @@ function sheetTopsFor(count: number, metrics: PageMetrics): number[] {
 }
 
 /**
+ * 分页结果快照：把「纸面位置」与「每页起始块的文档位置」一并交给 React。
+ * 后者是目录计算真实页码的依据（页码只存在于分页插件 state 中）。
+ */
+export interface PageLayoutSnapshot {
+  /** 每页纸面的 top（px，wrapper 坐标，恒定间距） */
+  sheetTops: number[];
+  /** 每页起始块在文档中的位置（升序，至少含第 1 页的隐含起点） */
+  pageStarts: number[];
+}
+
+/**
  * 页面布局插件：仅在 .rte-paged 容器内生效。
- * onSheetTops 把每页纸面位置回调给 React（渲染纸面层）。
+ * onLayout 把分页快照回调给 React（渲染纸面层 + 目录页码）。
  * getMetrics 提供当前页面设置（纸张/边距/方向），随设置变化自动重排。
  */
 export function createPageLayoutPlugin(
-  onSheetTops: (tops: number[]) => void,
+  onLayout: (snapshot: PageLayoutSnapshot) => void,
   getMetrics: PageMetricsGetter,
 ): Plugin<PageLayoutState> {
   let raf = 0;
@@ -215,8 +250,9 @@ export function createPageLayoutPlugin(
       }, 0);
     }
     const state = pageLayoutKey.getState(view.state);
-    const pageCount = (plan ? plan.positions.length : (state?.positions.length ?? 0)) + 1;
-    onSheetTops(sheetTopsFor(pageCount, metrics));
+    const pageStarts = plan ? plan.positions : (state?.positions ?? []);
+    const pageCount = pageStarts.length + 1;
+    onLayout({ sheetTops: sheetTopsFor(pageCount, metrics), pageStarts });
   };
   const schedule = (view: EditorView) => {
     cancelAnimationFrame(raf);

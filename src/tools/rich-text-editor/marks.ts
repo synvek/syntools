@@ -67,6 +67,8 @@ declare module '@tiptap/core' {
     docMarks: {
       /** 给选区加批注标记 */
       setComment: (id: string) => ReturnType;
+      /** 移除指定批注的正文标记（保留同节点上的其它批注） */
+      removeCommentMark: (id: string) => ReturnType;
       /** 以修订方式标记选区为插入/删除 */
       markTrackedInsert: () => ReturnType;
       markTrackedDelete: () => ReturnType;
@@ -86,6 +88,28 @@ export const DocMarkCommands = Mark.create({
         (id: string) =>
         ({ commands }) =>
           commands.setMark('comment', { commentId: id }),
+      removeCommentMark:
+        (id: string) =>
+        ({ state, tr }) => {
+          const commentType = state.schema.marks.comment;
+          let changed = false;
+          state.doc.descendants((node, pos) => {
+            if (!node.isText) return;
+            const hasTarget = node.marks.some(
+              (mark) => mark.type.name === 'comment' && mark.attrs.commentId === id,
+            );
+            if (!hasTarget) return;
+            changed = true;
+            const from = pos;
+            const to = pos + node.nodeSize;
+            tr.removeMark(from, to, commentType);
+            // 同一段文本上可能叠加了其它批注：移除目标后按序补回
+            node.marks
+              .filter((mark) => mark.type.name === 'comment' && mark.attrs.commentId !== id)
+              .forEach((mark) => tr.addMark(from, to, mark));
+          });
+          return changed;
+        },
       markTrackedInsert:
         () =>
         ({ commands }) =>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { NodeSelection } from '@tiptap/pm/state';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { DocumentHeader } from '@/core/components/DocumentHeader';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
@@ -20,9 +21,19 @@ import {
   htmlToPlain,
   sanitizeDocHtml,
   scanDocxExportLosses,
+  scanMarkdownExportLosses,
   type DocxExportLosses,
+  type MarkdownExportLosses,
 } from './core';
-import { clearDraft, readDraft, writeDraftSafe, type RichTextDraft, type ViewMode } from './draft';
+import {
+  clearDraft,
+  readDraft,
+  readReviewerName,
+  writeDraftSafe,
+  writeReviewerName,
+  type RichTextDraft,
+  type ViewMode,
+} from './draft';
 import {
   createDocId,
   deleteDocument,
@@ -32,11 +43,13 @@ import {
   listVersions,
   loadDocument,
   saveDocument,
+  saveManualVersion,
   setCurrentDocId,
   type DocMeta,
   type StoredVersion,
 } from './docStore';
 import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
+import { VersionDiffPanel } from './VersionDiffPanel';
 import { ImageResizeOverlay } from './ImageResizeOverlay';
 import { handleFloatingImagePointerDown } from './imageLayer';
 import { exportDocxBlob, importDocx } from './docx';
@@ -45,12 +58,39 @@ import { createExtensions } from './extensions';
 import { PageSetupPanel } from './PageSetupPanel';
 import { ReviewPanel } from './ReviewPanel';
 import { StylePanel } from './StylePanel';
-import { buildTableOfContents, htmlToMarkdown, type DocComment, type TrackedChange } from './docs';
+import { htmlToMarkdown, type DocComment, type TrackedChange } from './docs';
+import { pageIndexOfPosition } from './core';
+import { FootnoteDialog } from './FootnoteDialog';
+import {
+  FOOTNOTE_EDIT_EVENT,
+  findSelectedFootnote,
+  injectFootnotes,
+  type FootnoteEditDetail,
+  type FootnoteLabels,
+} from './footnotes';
+import { injectMath } from './math';
+import { MathDialog } from './MathDialog';
+import {
+  addUserWord,
+  collectDocIssues,
+  createWordIndex,
+  loadDictionary,
+  removeUserWord,
+  suggest,
+  type DocSpellIssue,
+  type WordIndex,
+} from './spellcheck';
+import { SpellcheckPanel } from './SpellcheckPanel';
+import type { PageLayoutSnapshot } from './PageView';
+import { buildTemplateApplication, type DocumentTemplate } from './templates';
+import { TemplatePanel } from './TemplatePanel';
+import { buildTocEntries, injectTocHtml, renderTocHtml, type TocLabels } from './toc';
 import {
   DEFAULT_PAGE_SETUP,
   buildPrintPageCss,
   normalizePageSetup,
   pageMetricsToPx,
+  watermarkCssVars,
   resolvePageMetrics,
   type PageSetupConfig,
 } from './pageSetup';
@@ -69,6 +109,17 @@ const SAVE_DEBOUNCE_MS = 600;
 const MIN_VIEWPORT_PX = 320;
 /** 底部给「相关工具」等页脚内容预留的空间，保证它们始终在首屏可见 */
 const BOTTOM_RESERVE_PX = 150;
+
+/** 拼写面板最多展示的问题数：超出部分不渲染，避免长文档铺开上百条 */
+const SPELL_ISSUE_LIMIT = 100;
+
+/** 单文件 HTML 导出不携带编辑器样式表，目录样式需内联补齐（与 editor.css 保持一致） */
+const TOC_EXPORT_CSS =
+  '.rte-toc{margin:.75em 0 1.25em}.rte-toc-title{margin:0 0 .5em;font-weight:600}' +
+  '.rte-toc-list{list-style:none;margin:0;padding:0}' +
+  '.rte-toc-item{display:flex;align-items:baseline;gap:.5em;border-bottom:1px dotted #e5e7eb;padding:.15em 0}' +
+  '.rte-toc-text{flex:1;min-width:0;overflow-wrap:anywhere}' +
+  '.rte-toc-page{flex-shrink:0;color:#6b7280}';
 
 /** 等待下一帧渲染完成（打印/截图前必须完成布局） */
 function nextFrame(): Promise<void> {
@@ -97,7 +148,9 @@ export default function RichTextEditorTool() {
   const [snapshotHtml, setSnapshotHtml] = useState(initial?.html ?? createEmptyDocHtml());
   const [failure, setFailure] = useState<Failure | null>(null);
   const [losses, setLosses] = useState<DocxExportLosses | null>(null);
-  const [sheetTops, setSheetTops] = useState<number[]>([]);
+  const [markdownLosses, setMarkdownLosses] = useState<MarkdownExportLosses | null>(null);
+  // 分页快照：纸面位置 + 每页起始块的文档位置（目录据后者算真实页码）
+  const [layout, setLayout] = useState<PageLayoutSnapshot>({ sheetTops: [], pageStarts: [] });
   const [printNotice, setPrintNotice] = useState(false);
   const [pageSetup, setPageSetup] = useState<PageSetupConfig>(() =>
     normalizePageSetup(initial?.pageSetup ?? DEFAULT_PAGE_SETUP),
@@ -105,18 +158,48 @@ export default function RichTextEditorTool() {
   const [pageSetupOpen, setPageSetupOpen] = useState(false);
   const [zoom, setZoom] = useState(initial?.zoom ?? 1);
   const [stylesOpen, setStylesOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [spellcheckOpen, setSpellcheckOpen] = useState(false);
+  const [spellcheckEnabled, setSpellcheckEnabled] = useState(false);
+  /** 英文词表（按需从静态资源加载，未加载时只依据自定义词典判断） */
+  const [dictionary, setDictionary] = useState<ReadonlySet<string>>(() => new Set());
+  const [dictionaryLoading, setDictionaryLoading] = useState(false);
+  const [dictionaryFailed, setDictionaryFailed] = useState(false);
+  const [userWords, setUserWords] = useState<string[]>(() => initial?.userWords ?? []);
+  /** 本次会话内忽略的单词（不落盘：属于临时判断） */
+  const [ignoredWords, setIgnoredWords] = useState<string[]>([]);
+  /** 最近套用的模板 id（随草稿落盘，面板据此标记当前模板） */
+  const [templateId, setTemplateId] = useState(initial?.templateId ?? '');
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [comments, setComments] = useState<DocComment[]>([]);
-  const [changes, setChanges] = useState<TrackedChange[]>([]);
+  // 批注 / 修订元数据随草稿落盘：初始化时直接取回上次会话的内容
+  const [comments, setComments] = useState<DocComment[]>(() => initial?.comments ?? []);
+  const [changes, setChanges] = useState<TrackedChange[]>(() => initial?.changes ?? []);
+  /** 正在撰写的新批注引文（null 表示未在撰写） */
+  const [pendingQuote, setPendingQuote] = useState<string | null>(null);
+  const [author, setAuthor] = useState(() => readReviewerName());
+  const [diffVersion, setDiffVersion] = useState<StoredVersion | null>(null);
   // 分页插件在编辑器创建（渲染期）即开始回调，需等组件挂载后再 setState
   const mountedRef = useRef(false);
-  const pendingTopsRef = useRef<number[] | null>(null);
+  const pendingLayoutRef = useRef<PageLayoutSnapshot | null>(null);
   const [busy, setBusy] = useState<BusyKind>(null);
   const [progress, setProgress] = useState(0);
   const [pdfMode, setPdfMode] = useState<PdfMode>(
     initial?.pdfMode === 'snapshot' ? 'snapshot' : 'text',
   );
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  /** 脚注弹窗：null 关闭；pos 为 null 表示新建 */
+  const [footnoteDialog, setFootnoteDialog] = useState<{
+    mode: 'insert' | 'edit';
+    pos: number | null;
+    note: string;
+  } | null>(null);
+  /** 公式弹窗：null 关闭；pos 为 null 表示新建 */
+  const [mathDialog, setMathDialog] = useState<{
+    mode: 'insert' | 'edit';
+    pos: number | null;
+    latex: string;
+    display: boolean;
+  } | null>(null);
   const [printReady, setPrintReady] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
@@ -146,25 +229,71 @@ export default function RichTextEditorTool() {
   // 纸面是绝对定位元素，不参与父级高度计算：内容不足整页时灰色工作台会提前结束。
   // 这里按最后一张纸的下沿给内容区补一个最小高度，让灰色背景铺满到最后一页。
   const sheetBottomPx = useMemo(() => {
-    if (sheetTops.length === 0) return 0;
-    return Math.round(sheetTops[sheetTops.length - 1] + pageMetricsToPx(metrics).heightPx + 12);
-  }, [sheetTops, metrics]);
+    const tops = layout.sheetTops;
+    if (tops.length === 0) return 0;
+    return Math.round(tops[tops.length - 1] + pageMetricsToPx(metrics).heightPx + 12);
+  }, [layout, metrics]);
 
   const placeholder = useMemo(() => t('tools.richText.placeholder'), [t]);
-  const handleSheetTops = useCallback((tops: number[]) => {
+  /** 分页快照回调：纸面位置或分页点变化才更新，避免无意义的重渲染 */
+  const handleLayout = useCallback((next: PageLayoutSnapshot) => {
     if (!mountedRef.current) {
-      pendingTopsRef.current = tops;
+      pendingLayoutRef.current = next;
       return;
     }
-    setSheetTops((prev) =>
-      prev.length === tops.length && prev.every((top, i) => Math.abs(top - tops[i]) < 0.5)
+    setLayout((prev) =>
+      prev.sheetTops.length === next.sheetTops.length &&
+      prev.sheetTops.every((top, index) => Math.abs(top - next.sheetTops[index]) < 0.5) &&
+      prev.pageStarts.length === next.pageStarts.length &&
+      prev.pageStarts.every((pos, index) => pos === next.pageStarts[index])
         ? prev
-        : tops,
+        : next,
     );
   }, []);
+  const tocLabels = useMemo<TocLabels>(
+    () => ({ title: t('tools.richText.tocTitle'), empty: t('tools.richText.tocEmpty') }),
+    [t],
+  );
+  const footnoteLabels = useMemo<FootnoteLabels>(
+    () => ({ name: t('tools.richText.footnote'), empty: t('tools.richText.footnoteEmpty') }),
+    [t],
+  );
+  /** 点击正文中的公式（NodeView 回调）→ 打开编辑弹窗 */
+  const handleMathSelect = useCallback((pos: number, latex: string, display: boolean) => {
+    setMathDialog({ mode: 'edit', pos, latex, display });
+  }, []);
+  // 拼写检查的词典与开关经 ref + getter 暴露给 PM 插件（词表加载后无需重建编辑器）。
+  // 必须声明在 useEditor 之前：编辑器在渲染期同步构造，插件 state.init 会立即调用 getter 读取这两个 ref。
+  const userWordsRef = useRef<string[]>(initial?.userWords ?? []);
+  const dictionaryRef = useRef<ReadonlySet<string>>(dictionary);
+  const spellcheckEnabledRef = useRef(false);
+  /** 拼写检查读取实时词典与开关（getter 身份稳定，插件不需要重建） */
+  const getSpellDictionary = useCallback(
+    () => ({ words: dictionaryRef.current, userWords: userWordsRef.current }),
+    [],
+  );
+  const isSpellcheckEnabled = useCallback(() => spellcheckEnabledRef.current, []);
   const extensions = useMemo(
-    () => createExtensions(placeholder, handleSheetTops, getMetrics),
-    [placeholder, handleSheetTops, getMetrics],
+    () =>
+      createExtensions({
+        placeholder,
+        onLayout: handleLayout,
+        getPageMetrics: getMetrics,
+        tocLabels,
+        footnoteLabels,
+        onMathSelect: handleMathSelect,
+        spellcheck: { getDictionary: getSpellDictionary, isEnabled: isSpellcheckEnabled },
+      }),
+    [
+      placeholder,
+      handleLayout,
+      getMetrics,
+      tocLabels,
+      footnoteLabels,
+      handleMathSelect,
+      getSpellDictionary,
+      isSpellcheckEnabled,
+    ],
   );
 
   const editor = useEditor({ extensions, content: snapshotHtml });
@@ -179,13 +308,13 @@ export default function RichTextEditorTool() {
     return () => clearTimeout(id);
   }, [editor, viewMode, metrics, zoom]);
 
-  // 挂载后应用插件在渲染期缓存的纸面位置
+  // 挂载后应用插件在渲染期缓存的分页快照
   useEffect(() => {
     mountedRef.current = true;
-    if (pendingTopsRef.current) {
-      const tops = pendingTopsRef.current;
-      pendingTopsRef.current = null;
-      setSheetTops(tops);
+    if (pendingLayoutRef.current) {
+      const pending = pendingLayoutRef.current;
+      pendingLayoutRef.current = null;
+      setLayout(pending);
     }
     return () => {
       mountedRef.current = false;
@@ -215,10 +344,24 @@ export default function RichTextEditorTool() {
       observer.disconnect();
       window.removeEventListener('resize', compute);
     };
-  }, [findOpen, outlineOpen, pageSetupOpen, stylesOpen, reviewOpen, libraryOpen, versionsOpen]);
+  }, [
+    findOpen,
+    outlineOpen,
+    pageSetupOpen,
+    stylesOpen,
+    reviewOpen,
+    libraryOpen,
+    versionsOpen,
+    diffVersion,
+  ]);
 
   const docIdRef = useRef<string | null>(null);
   docIdRef.current = docId;
+  // 审阅元数据经 ref 读取：persistNow 依赖保持稳定，
+  // 否则每次批注变化都会让编辑器 update 监听重新注册
+  const commentsRef = useRef<DocComment[]>(comments);
+  const changesRef = useRef<TrackedChange[]>(changes);
+  const templateIdRef = useRef<string>(initial?.templateId ?? '');
 
   /** 惰性分配文档 id：首次保存时才入库 */
   const ensureDocId = (): string => {
@@ -234,7 +377,16 @@ export default function RichTextEditorTool() {
   /** 统一持久化：localStorage 草稿（同步兜底 + 降级）+ IndexedDB 文档库（多文档/版本历史） */
   const persistNow = useCallback(
     (draft: RichTextDraft): void => {
-      const withPrefs: RichTextDraft = { ...draft, pageSetup, zoom, pdfMode };
+      const withPrefs: RichTextDraft = {
+        ...draft,
+        pageSetup,
+        zoom,
+        pdfMode,
+        comments: commentsRef.current,
+        changes: changesRef.current,
+        userWords: userWordsRef.current,
+        templateId: templateIdRef.current || undefined,
+      };
       const result = writeDraftSafe(withPrefs);
       setSaved(result.ok);
       setDraftNotice(result.ok ? (result.degraded ? 'degraded' : null) : 'failed');
@@ -245,6 +397,26 @@ export default function RichTextEditorTool() {
       // ensureDocId/setSaved/setDraftNotice 依赖稳定，无需加入依赖
     },
     [pageSetup, zoom, pdfMode],
+  );
+
+  /** 同步审阅元数据（状态 + ref 双写，供持久化读 ref） */
+  const applyReview = useCallback(
+    (source: {
+      comments: DocComment[];
+      changes: TrackedChange[];
+      userWords?: string[];
+      templateId?: string;
+    }) => {
+      commentsRef.current = source.comments;
+      changesRef.current = source.changes;
+      userWordsRef.current = source.userWords ?? [];
+      templateIdRef.current = source.templateId ?? '';
+      setComments(source.comments);
+      setChanges(source.changes);
+      setUserWords(source.userWords ?? []);
+      setTemplateId(source.templateId ?? '');
+    },
+    [],
   );
 
   // 启动：恢复指针文档或迁移 v1 草稿到文档库
@@ -258,11 +430,12 @@ export default function RichTextEditorTool() {
         setTitle(init.doc.title);
         editor.commands.setContent(init.doc.html);
         setSnapshotHtml(init.doc.html);
+        applyReview(init.doc);
         setSaved(true);
       }
     });
     // 仅在编辑器就绪后执行一次
-  }, [editor]);
+  }, [editor, applyReview]);
 
   // 延迟/异步回调可能落在已销毁的编辑器上（React 严格模式双挂载），读取前先判定
   const readHtml = useCallback((): string | null => {
@@ -273,6 +446,23 @@ export default function RichTextEditorTool() {
       return null;
     }
   }, [editor]);
+
+  // 批注 / 修订变化后落盘（此前它们只存在于组件态，刷新即丢失）
+  const reviewMountedRef = useRef(false);
+  useEffect(() => {
+    commentsRef.current = comments;
+    changesRef.current = changes;
+    if (!reviewMountedRef.current) {
+      reviewMountedRef.current = true;
+      return;
+    }
+    const html = readHtml();
+    if (html === null) return;
+    const timer = setTimeout(() => {
+      persistNow({ title: titleRef.current, html, view: viewRef.current });
+    }, SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [comments, changes, persistNow, readHtml]);
 
   useEffect(() => {
     if (!editor) return;
@@ -312,11 +502,41 @@ export default function RichTextEditorTool() {
     persistNow({ title: titleRef.current, html, view: viewMode });
   }, [viewMode, editor, persistNow, readHtml]);
 
+  /**
+   * 目录导出内容：目录节点是 atom，`getHTML()` 只输出空外壳。
+   * 这里按「当前文档 + 当前分页结果」渲染出可直接分发的目录 HTML；
+   * sheetTops 参与依赖，分页收敛后页码变化会触发重算。
+   */
+  const tocHtml = useMemo(() => {
+    // snapshotHtml 是正文变化的信号；空文档无需渲染目录
+    if (!editor || editor.isDestroyed || !snapshotHtml) return '';
+    const { entries, headings } = buildTocEntries(editor.state.doc, (pos) =>
+      pageIndexOfPosition(layout.pageStarts, pos),
+    );
+    return renderTocHtml(entries, headings, tocLabels);
+  }, [editor, snapshotHtml, layout, tocLabels]);
+
+  /**
+   * 导出前的统一整理：补齐目录内容 + 脚注编号与文末汇总区。
+   * 目录与脚注都是「渲染期派生」的内容（atom 节点序列化为空外壳、脚注汇总区是 widget），
+   * 不在导出前补齐，打印 / PDF / Word / Markdown 里就会缺内容。
+   */
+  const prepareExportHtml = useCallback(
+    (html: string): string => injectFootnotes(injectTocHtml(html, tocHtml), footnoteLabels),
+    [tocHtml, footnoteLabels],
+  );
+
+  /** 打印 / 快照 PDF / 放映 / 单文件 HTML 共用：整理后的 HTML */
+  const printHtml = useMemo(
+    () => injectMath(prepareExportHtml(snapshotHtml)),
+    [prepareExportHtml, snapshotHtml],
+  );
+
   // 放映用只读 HTML：复用导出 PDF 的同一套净化逻辑，避免注入风险
   const presentHtml = useMemo(() => {
-    const result = sanitizeDocHtml(snapshotHtml);
+    const result = sanitizeDocHtml(printHtml);
     return result.ok ? result.value : '';
-  }, [snapshotHtml]);
+  }, [printHtml]);
 
   // ⌘/Ctrl+F 打开查找替换，Esc 关闭（编辑器聚焦时同样生效）
   useEffect(() => {
@@ -357,8 +577,14 @@ export default function RichTextEditorTool() {
     setBusy('docx');
     setFailure(null);
     setLosses(null);
-    const html = editor.getHTML();
-    const result = await exportDocxBlob(html, title, pageSetup);
+    // 目录字段的缓存条目取自已渲染的目录内容，因此先补齐再导出
+    const html = prepareExportHtml(editor.getHTML());
+    // 批注与修订元数据一并写入，Word 侧可原生审阅
+    const result = await exportDocxBlob(html, title, pageSetup, {
+      comments: commentsRef.current,
+      changes: changesRef.current,
+      author: resolveAuthor(),
+    });
     setBusy(null);
     if (!result.ok) {
       setFailure(result);
@@ -366,10 +592,19 @@ export default function RichTextEditorTool() {
     }
     downloadBlob(result.value, buildExportFilename(title || 'document', 'docx'));
     // 导出后提示已知损耗，替代静默丢弃
-    const scanned = scanDocxExportLosses(html);
+    const scanned = scanDocxExportLosses(html, commentsRef.current);
     if (scanned.ok) {
-      const { externalImages, webpImages, deepListItems } = scanned.value;
-      setLosses(externalImages > 0 || webpImages > 0 || deepListItems > 0 ? scanned.value : null);
+      const { externalImages, webpImages, deepListItems, unlinkedComments, mathAsImages } =
+        scanned.value;
+      setLosses(
+        externalImages > 0 ||
+          webpImages > 0 ||
+          deepListItems > 0 ||
+          unlinkedComments > 0 ||
+          mathAsImages > 0
+          ? scanned.value
+          : null,
+      );
     }
   };
 
@@ -435,58 +670,240 @@ export default function RichTextEditorTool() {
     }
   };
 
-  /** 插入自动目录：按大纲生成，页码取自当前纸面分页 */
+  /** 插入动态目录：页码与条目由渲染时的分页结果实时派生 */
   const handleInsertToc = () => {
     if (!editor) return;
-    const headings: { level: number; text: string }[] = [];
-    editor.state.doc.descendants((node) => {
-      if (node.type.name === 'heading') {
-        headings.push({ level: Number(node.attrs.level ?? 1), text: node.textContent });
-      }
-    });
-    const pageOf = () => 0; // 分页位置依赖渲染，导出/打印时由分页算法给出
-    const result = buildTableOfContents(headings, pageOf);
-    if (!result.ok) {
-      setFailure({ ok: false, error: 'EMPTY' });
-      return;
-    }
-    const lines = result.value.entries
-      .map((entry) => `${'  '.repeat(entry.level - 1)}${entry.text}`)
-      .join('\n');
-    editor
-      .chain()
-      .focus()
-      .insertContent(
-        `<h2>${t('tools.richText.tocTitle')}</h2><p>${lines.replace(/\n/g, '<br>')}</p>`,
-      )
-      .run();
+    editor.chain().focus().insertTableOfContents().run();
   };
 
-  /** 新建批注：以选区文字为引用，正文用简单的 prompt 输入（本地存储） */
+  /** 刷新目录：触发分页重算，条目与页码随之更新（字体/图片异步加载后尤其需要） */
+  const handleRefreshToc = () => {
+    if (!editor) return;
+    editor.chain().focus().refreshTableOfContents().run();
+  };
+
+  // 点击正文中的脚注引用（NodeView 冒泡派发）→ 打开编辑弹窗
+  useEffect(() => {
+    const onEditFootnote = (event: Event) => {
+      const detail = (event as CustomEvent<FootnoteEditDetail>).detail;
+      if (!detail) return;
+      setFootnoteDialog({ mode: 'edit', pos: detail.pos, note: detail.note });
+    };
+    document.addEventListener(FOOTNOTE_EDIT_EVENT, onEditFootnote);
+    return () => document.removeEventListener(FOOTNOTE_EDIT_EVENT, onEditFootnote);
+  }, []);
+
+  /** 工具栏入口：选中已有脚注则编辑，否则新建 */
+  const handleFootnoteAction = () => {
+    if (!editor) return;
+    const selected = findSelectedFootnote(editor.state);
+    if (selected) setFootnoteDialog({ mode: 'edit', pos: selected.pos, note: selected.note });
+    else setFootnoteDialog({ mode: 'insert', pos: null, note: '' });
+  };
+
+  const handleFootnoteSubmit = (note: string) => {
+    if (!editor || !footnoteDialog) return;
+    if (footnoteDialog.mode === 'insert') {
+      editor.chain().focus().insertFootnote(note).run();
+    } else if (footnoteDialog.pos !== null) {
+      editor.chain().focus().updateFootnote(footnoteDialog.pos, note).run();
+    }
+    setFootnoteDialog(null);
+  };
+
+  const handleFootnoteRemove = () => {
+    if (!editor || !footnoteDialog || footnoteDialog.pos === null) return;
+    editor.chain().focus().removeFootnote(footnoteDialog.pos).run();
+    setFootnoteDialog(null);
+  };
+
+  const handleFootnoteCancel = () => setFootnoteDialog(null);
+
+  /** 工具栏入口：选中已有公式则编辑，否则新建 */
+  const handleMathAction = () => {
+    if (!editor) return;
+    const { selection } = editor.state;
+    const node =
+      selection instanceof NodeSelection &&
+      (selection.node.type.name === 'mathInline' || selection.node.type.name === 'mathBlock')
+        ? selection.node
+        : null;
+    if (node) {
+      setMathDialog({
+        mode: 'edit',
+        pos: selection.from,
+        latex: String(node.attrs.latex ?? ''),
+        display: node.attrs.display === true,
+      });
+      return;
+    }
+    setMathDialog({ mode: 'insert', pos: null, latex: '', display: false });
+  };
+
+  /**
+   * 提交公式：新建时按弹窗选择插入行内或块级；
+   * 编辑时保持原有行内/块级形态（切换展示模式会让节点类型变化，容易产生意外）。
+   */
+  const handleMathSubmit = (latex: string, display: boolean) => {
+    if (!editor || !mathDialog) return;
+    if (mathDialog.mode === 'insert') {
+      if (display) editor.chain().focus().insertBlockMath(latex).run();
+      else editor.chain().focus().insertInlineMath(latex).run();
+    } else if (mathDialog.pos !== null) {
+      editor.chain().focus().updateMath(mathDialog.pos, latex).run();
+    }
+    setMathDialog(null);
+  };
+
+  const handleMathRemove = () => {
+    if (!editor || !mathDialog || mathDialog.pos === null) return;
+    editor.chain().focus().removeMath(mathDialog.pos).run();
+    setMathDialog(null);
+  };
+
+  const handleMathCancel = () => setMathDialog(null);
+
+  // 词典与开关同步到 ref，供 PM 插件的 getter 读取
+  dictionaryRef.current = dictionary;
+  spellcheckEnabledRef.current = spellcheckEnabled;
+
+  const refreshSpellcheck = useCallback(() => {
+    if (!editor || editor.isDestroyed) return;
+    editor.commands.refreshSpellcheck();
+  }, [editor]);
+
+  /** 加载英文词表（按需下载，不进打包产物；失败时只影响判定覆盖面） */
+  const handleLoadDictionary = useCallback(async () => {
+    if (dictionaryRef.current.size > 0 || dictionaryLoading) return;
+    setDictionaryLoading(true);
+    setDictionaryFailed(false);
+    const result = await loadDictionary();
+    setDictionaryLoading(false);
+    if (!result.ok) {
+      setDictionaryFailed(true);
+      return;
+    }
+    setDictionary(result.value);
+    // 词表就绪后重算装饰（ref 已指向新词表）
+    if (editor && !editor.isDestroyed) editor.commands.refreshSpellcheck();
+  }, [dictionaryLoading, editor]);
+
+  const handleToggleSpellcheck = () => {
+    const next = !spellcheckEnabled;
+    setSpellcheckEnabled(next);
+    spellcheckEnabledRef.current = next;
+    if (next) void handleLoadDictionary();
+    refreshSpellcheck();
+  };
+
+  const handleReplaceIssue = (issue: DocSpellIssue, replacement: string) => {
+    if (!editor) return;
+    editor.chain().focus().insertContentAt({ from: issue.from, to: issue.to }, replacement).run();
+  };
+
+  const handleAddToDictionary = (word: string) => {
+    const next = addUserWord(userWordsRef.current, word);
+    userWordsRef.current = next;
+    setUserWords(next);
+    persistNow({
+      title: titleRef.current,
+      html: readHtml() ?? snapshotHtml,
+      view: viewRef.current,
+    });
+    refreshSpellcheck();
+  };
+
+  const handleRemoveUserWord = (word: string) => {
+    const next = removeUserWord(userWordsRef.current, word);
+    userWordsRef.current = next;
+    setUserWords(next);
+    persistNow({
+      title: titleRef.current,
+      html: readHtml() ?? snapshotHtml,
+      view: viewRef.current,
+    });
+    refreshSpellcheck();
+  };
+
+  const handleIgnoreWord = (word: string) => {
+    setIgnoredWords((prev) => (prev.includes(word) ? prev : [...prev, word]));
+  };
+
+  /** 建议索引按需构建并缓存：二十多万词的分桶索引只建一次 */
+  const wordIndexRef = useRef<WordIndex | null>(null);
+  const suggestionsFor = useCallback(
+    (word: string): string[] => {
+      if (dictionary.size === 0) return [];
+      if (!wordIndexRef.current) wordIndexRef.current = createWordIndex(dictionary);
+      return suggest(word, wordIndexRef.current, 5, userWordsRef.current);
+    },
+    [dictionary],
+  );
+
+  /** 当前文档的拼写问题（排除本轮忽略的词，数量上限保护渲染） */
+  const spellIssues = useMemo(() => {
+    // snapshotHtml 既是「文档有内容」的判断，也是正文变化的信号
+    if (!editor || editor.isDestroyed || !spellcheckEnabled || !snapshotHtml) return [];
+    const issues = collectDocIssues(
+      editor.state.doc,
+      { words: dictionary, userWords },
+      SPELL_ISSUE_LIMIT,
+    );
+    return issues.filter((issue) => !ignoredWords.includes(issue.word));
+    // snapshotHtml 是正文变化信号；dictionary / userWords / ignoredWords 直接参与判定
+  }, [editor, snapshotHtml, spellcheckEnabled, dictionary, userWords, ignoredWords]);
+
+  /** 新批注署名：未填写时回退到默认文案 */
+  const resolveAuthor = () => author.trim() || t('tools.richText.commentAuthor');
+
+  /**
+   * 新建批注：记录选区引文后展开面板内联编辑（不再使用浏览器原生弹窗）。
+   * 选区为空时允许创建「文档级」批注，不写入正文标记。
+   */
   const handleAddComment = () => {
     if (!editor) return;
     const { from, to } = editor.state.selection;
-    const quote = editor.state.doc.textBetween(from, to, ' ');
-    if (!quote.trim()) return;
-    const text = window.prompt(t('tools.richText.commentPrompt'));
-    if (!text) return;
+    setPendingQuote(editor.state.doc.textBetween(from, to, ' ').trim());
+  };
+
+  /** 提交批注：写入标记 + 落盘元数据 */
+  const handleSubmitComment = (text: string) => {
+    if (!editor) return;
+    const quote = pendingQuote ?? '';
     const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    editor.chain().focus().setComment(id).run();
+    if (quote) editor.chain().focus().setComment(id).run();
     setComments((prev) => [
       ...prev,
       {
         id,
         quote,
         text,
-        author: t('tools.richText.commentAuthor'),
+        author: resolveAuthor(),
         createdAt: Date.now(),
         resolved: false,
       },
     ]);
+    setPendingQuote(null);
   };
 
+  const handleCancelComment = () => setPendingQuote(null);
+
+  /** 删除批注：同时移除正文标记，避免留下孤立高亮 */
   const handleRemoveComment = (id: string) => {
+    editor?.chain().focus().removeCommentMark(id).run();
     setComments((prev) => prev.filter((comment) => comment.id !== id));
+  };
+
+  /**
+   * 标记已解决 / 重新打开。
+   * 解决时移除正文标记（条目与引文保留），附件不再干扰阅读；
+   * 重新打开只翻状态——正文选区已不可复现，不重建标记。
+   */
+  const handleToggleResolved = (id: string, resolved: boolean) => {
+    if (resolved) editor?.chain().focus().removeCommentMark(id).run();
+    setComments((prev) =>
+      prev.map((comment) => (comment.id === id ? { ...comment, resolved } : comment)),
+    );
   };
 
   /** 修订追踪：对选区标记插入/删除（本地记录 + Mark） */
@@ -503,34 +920,89 @@ export default function RichTextEditorTool() {
         id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         kind,
         text,
-        author: t('tools.richText.commentAuthor'),
+        author: resolveAuthor(),
         createdAt: Date.now(),
       },
     ]);
   };
 
-  /** 导出 Markdown（纯函数 htmlToMarkdown） */
+  /** 手动打快照：先冲刷当前内容再留档，可附备注 */
+  const handleManualSnapshot = (note: string) => {
+    const id = docIdRef.current;
+    if (!id) return;
+    const html = readHtml() ?? snapshotHtml;
+    void saveDocument(id, {
+      title: titleRef.current,
+      html,
+      view: viewRef.current,
+      pageSetup,
+      zoom,
+      pdfMode,
+      comments: commentsRef.current,
+      changes: changesRef.current,
+      userWords: userWordsRef.current,
+    })
+      .then(() => saveManualVersion(id, note || undefined))
+      .then(() => listVersions(id))
+      .then((list) => {
+        setVersions(list);
+        setSaved(true);
+      });
+  };
+
+  /** 打开版本差异视图（与历史版本面板互斥，避免同时挤压编辑区） */
+  const handleCompareVersion = (version: StoredVersion) => {
+    setDiffVersion(version);
+    setVersionsOpen(false);
+    setLibraryOpen(false);
+  };
+
+  const handleAuthorChange = (next: string) => {
+    setAuthor(next);
+    writeReviewerName(next);
+  };
+
+  /** 导出 Markdown（纯函数 htmlToMarkdown：下划线/高亮/行内样式以 GFM 内联 HTML 保留） */
   const handleExportMarkdown = () => {
     if (!editor) return;
-    const markdown = htmlToMarkdown(editor.getHTML());
+    // 先补齐目录与脚注，否则 atom 节点 / widget 派生内容在 Markdown 里会消失
+    const html = prepareExportHtml(editor.getHTML());
+    const markdown = htmlToMarkdown(html);
     const bytes = new TextEncoder().encode(markdown);
     downloadBytes(bytes, buildExportFilename(title || 'document', 'md'), 'text/markdown');
+    const scanned = scanMarkdownExportLosses(html, pageSetup);
+    if (scanned.ok) {
+      const { comments, trackedChanges, paragraphSpacing, floatingImages, pageSetupFields } =
+        scanned.value;
+      const total = comments + trackedChanges + paragraphSpacing + floatingImages + pageSetupFields;
+      setMarkdownLosses(total > 0 ? scanned.value : null);
+    }
   };
 
   /** 导出单文件 HTML（内联样式，可直接打开/分享） */
   const handleExportHtml = () => {
     if (!editor) return;
-    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}img{max-width:100%}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}</style></head><body>${editor.getHTML()}</body></html>`;
+    // 单文件 HTML 用 KaTeX MathML：无需携带样式表即可正确显示公式
+    const body = injectMath(prepareExportHtml(editor.getHTML()));
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}img{max-width:100%}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}${TOC_EXPORT_CSS}</style></head><body>${body}</body></html>`;
     const bytes = new TextEncoder().encode(html);
     downloadBytes(bytes, buildExportFilename(title || 'document', 'html'), 'text/html');
   };
 
-  const resetEditorContent = (doc: { title: string; html: string }) => {
+  const resetEditorContent = (doc: {
+    title: string;
+    html: string;
+    comments?: DocComment[];
+    changes?: TrackedChange[];
+  }) => {
     setTitle(doc.title);
     editor?.commands.setContent(doc.html);
     setSnapshotHtml(doc.html);
+    applyReview({ comments: doc.comments ?? [], changes: doc.changes ?? [] });
+    setPendingQuote(null);
     setFailure(null);
     setLosses(null);
+    setMarkdownLosses(null);
   };
 
   const handleClear = () => {
@@ -538,9 +1010,12 @@ export default function RichTextEditorTool() {
     clearDraft();
     setTitle('');
     setSnapshotHtml(createEmptyDocHtml());
+    applyReview({ comments: [], changes: [] });
+    setPendingQuote(null);
     setSaved(false);
     setFailure(null);
     setLosses(null);
+    setMarkdownLosses(null);
     setDraftNotice(null);
   };
 
@@ -556,19 +1031,43 @@ export default function RichTextEditorTool() {
     void listDocuments().then(setDocs);
   };
 
-  type ToolPanel = 'pageSetup' | 'styles' | 'review';
+  /**
+   * 套用模板：页面设置与模板声明合并（未声明的字段沿用当前选择），
+   * 正文被替换为模板骨架；已有内容时先确认，避免误覆盖。
+   */
+  const handleApplyTemplate = (template: DocumentTemplate) => {
+    if (!editor) return;
+    const hasContent = stats.chars > 0;
+    if (hasContent && !window.confirm(t('tools.richText.templateOverwriteConfirm'))) return;
+    const application = buildTemplateApplication(template, { title, pageSetup }, (key) =>
+      String(t(`tools.richText.${key}`)),
+    );
+    setPageSetup(normalizePageSetup(application.pageSetup));
+    editor.commands.setContent(application.html);
+    setSnapshotHtml(application.html);
+    templateIdRef.current = application.templateId;
+    setTemplateId(application.templateId);
+    persistNow({ title: titleRef.current, html: application.html, view: viewRef.current });
+    setTemplatesOpen(false);
+  };
+
+  type ToolPanel = 'pageSetup' | 'styles' | 'review' | 'templates' | 'spellcheck';
 
   /** 工具栏面板互斥切换：同一时间只展开一个，避免工作区被挤压 */
   const togglePanel = (panel: ToolPanel) => {
     setLibraryOpen(false);
     setVersionsOpen(false);
+    setDiffVersion(null);
     setPageSetupOpen(panel === 'pageSetup' ? !pageSetupOpen : false);
     setStylesOpen(panel === 'styles' ? !stylesOpen : false);
     setReviewOpen(panel === 'review' ? !reviewOpen : false);
+    setTemplatesOpen(panel === 'templates' ? !templatesOpen : false);
+    setSpellcheckOpen(panel === 'spellcheck' ? !spellcheckOpen : false);
   };
 
   const openLibrary = () => {
     setVersionsOpen(false);
+    setDiffVersion(null);
     setLibraryOpen(true);
     void listDocuments().then(setDocs);
   };
@@ -579,8 +1078,10 @@ export default function RichTextEditorTool() {
       docIdRef.current = id;
       setDocId(id);
       setCurrentDocId(id);
-      resetEditorContent({ title: doc.title, html: doc.html });
+      // StoredDocument 已归一化为 v2，直接带出批注与修订元数据
+      resetEditorContent(doc);
       setLibraryOpen(false);
+      setDiffVersion(null);
     });
   };
 
@@ -613,6 +1114,7 @@ export default function RichTextEditorTool() {
 
   const openVersions = () => {
     setLibraryOpen(false);
+    setDiffVersion(null);
     setVersionsOpen(true);
     const id = docIdRef.current;
     if (id) void listVersions(id).then(setVersions);
@@ -621,9 +1123,15 @@ export default function RichTextEditorTool() {
 
   const handleRestoreVersion = (version: StoredVersion) => {
     if (!window.confirm(t('tools.richText.restoreConfirm'))) return;
-    resetEditorContent({ title: version.title, html: version.html });
+    resetEditorContent(version);
+    // 先同步审阅元数据再落盘，避免 restore 用旧的 ref 覆盖快照里的批注
+    commentsRef.current = version.comments;
+    changesRef.current = version.changes;
+    userWordsRef.current = version.userWords ?? [];
+    templateIdRef.current = version.templateId ?? '';
     persistNow({ title: version.title, html: version.html, view: viewRef.current });
     setVersionsOpen(false);
+    setDiffVersion(null);
   };
 
   return (
@@ -757,9 +1265,16 @@ export default function RichTextEditorTool() {
         pageSetupOpen={pageSetupOpen}
         onTogglePageSetup={() => togglePanel('pageSetup')}
         onInsertToc={handleInsertToc}
+        onRefreshToc={handleRefreshToc}
         tocDisabled={isEmpty}
+        onFootnote={handleFootnoteAction}
+        onMath={handleMathAction}
         stylesOpen={stylesOpen}
         onToggleStyles={() => togglePanel('styles')}
+        templatesOpen={templatesOpen}
+        onToggleTemplates={() => togglePanel('templates')}
+        spellcheckOpen={spellcheckOpen}
+        onToggleSpellcheck={() => togglePanel('spellcheck')}
         reviewOpen={reviewOpen}
         onToggleReview={() => togglePanel('review')}
         onOpenVersions={openVersions}
@@ -785,7 +1300,37 @@ export default function RichTextEditorTool() {
           {/* 打印纸张尺寸/边距：@page 不支持 CSS 变量，按当前设置动态注入 */}
           <style>{buildPrintPageCss(metrics, pageSetup.margin)}</style>
 
+          {diffVersion ? (
+            <VersionDiffPanel
+              key={diffVersion.id}
+              versions={versions}
+              initialVersionId={diffVersion.id}
+              currentHtml={snapshotHtml}
+              currentTitle={title}
+              onRestore={handleRestoreVersion}
+              onClose={() => setDiffVersion(null)}
+            />
+          ) : null}
+
           {stylesOpen ? <StylePanel editor={editor} onClose={() => setStylesOpen(false)} /> : null}
+          {spellcheckOpen ? (
+            <SpellcheckPanel
+              enabled={spellcheckEnabled}
+              onToggle={handleToggleSpellcheck}
+              dictionaryLoaded={dictionary.size > 0}
+              loading={dictionaryLoading}
+              loadFailed={dictionaryFailed}
+              onLoadDictionary={() => void handleLoadDictionary()}
+              issues={spellIssues}
+              suggestionsFor={suggestionsFor}
+              onReplace={handleReplaceIssue}
+              onAddToDictionary={handleAddToDictionary}
+              onIgnore={handleIgnoreWord}
+              userWords={userWords}
+              onRemoveUserWord={handleRemoveUserWord}
+              onClose={() => setSpellcheckOpen(false)}
+            />
+          ) : null}
           {reviewOpen ? (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <button
@@ -811,8 +1356,14 @@ export default function RichTextEditorTool() {
             <ReviewPanel
               comments={comments}
               changes={changes}
+              pendingQuote={pendingQuote}
+              author={author}
+              onAuthorChange={handleAuthorChange}
+              onSubmitComment={handleSubmitComment}
+              onCancelComment={handleCancelComment}
               onAddComment={handleAddComment}
               onRemoveComment={handleRemoveComment}
+              onToggleResolved={handleToggleResolved}
               onAcceptAll={() => {
                 editor?.chain().focus().acceptAllTracked().run();
                 setChanges([]);
@@ -850,24 +1401,47 @@ export default function RichTextEditorTool() {
               >
                 <div
                   ref={surfaceRef}
-                  className={`rte-surface relative rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 ${
+                  className={`rte-surface relative rounded-lg border border-gray-200 shadow-sm dark:border-gray-700 ${
                     viewMode === 'paged' ? 'rte-paged' : 'px-8 py-8'
-                  }`}
-                  style={
-                    viewMode === 'paged' && sheetBottomPx > 0
+                  } ${viewMode === 'flow' && metrics.columns > 1 ? 'rte-columns' : ''}`}
+                  style={{
+                    // 页面背景色：深色主题下也以用户显式选择为准（打印/导出以它为准）
+                    background: pageSetup.background ?? undefined,
+                    ...(viewMode === 'paged' && sheetBottomPx > 0
                       ? { minHeight: `${sheetBottomPx}px` }
-                      : undefined
-                  }
+                      : {}),
+                  }}
                 >
+                  {/* 流式视图的水印：覆盖整个编辑区（页面视图下逐页渲染） */}
+                  {viewMode === 'flow' && pageSetup.watermark?.text.trim() ? (
+                    <div
+                      className="rte-watermark"
+                      style={watermarkCssVars(pageSetup.watermark) as React.CSSProperties}
+                    >
+                      <span>{pageSetup.watermark.text}</span>
+                    </div>
+                  ) : null}
                   {/* 页视图：每页一张真实纸面，内容连续流动 */}
                   {viewMode === 'paged' &&
-                    sheetTops.map((top, index) => (
+                    layout.sheetTops.map((top, index) => (
                       <div
                         key={index}
                         className="rte-page-sheet"
-                        style={{ top: `${top}px` }}
+                        style={{
+                          top: `${top}px`,
+                          ...(pageSetup.background ? { background: pageSetup.background } : {}),
+                        }}
                         aria-hidden="true"
                       >
+                        {/* 每张纸面各渲染一次水印（与打印逐页重复一致） */}
+                        {pageSetup.watermark?.text.trim() ? (
+                          <span
+                            className="rte-watermark"
+                            style={watermarkCssVars(pageSetup.watermark) as React.CSSProperties}
+                          >
+                            <span>{pageSetup.watermark.text}</span>
+                          </span>
+                        ) : null}
                         {/* 页眉 / 页脚 / 页码：与 Word 导出、快照 PDF 共用同一份设置 */}
                         {pageSetup.header.trim() ? (
                           <span className="rte-page-header">{pageSetup.header}</span>
@@ -900,8 +1474,15 @@ export default function RichTextEditorTool() {
         </div>
 
         {/* 右列：页面设置 + 文档库 / 历史版本（文档右侧；窄屏回落到下方） */}
-        {pageSetupOpen || libraryOpen || versionsOpen ? (
+        {pageSetupOpen || libraryOpen || versionsOpen || templatesOpen ? (
           <aside className="w-full shrink-0 xl:w-80">
+            {templatesOpen ? (
+              <TemplatePanel
+                activeId={templateId || undefined}
+                onApply={handleApplyTemplate}
+                onClose={() => setTemplatesOpen(false)}
+              />
+            ) : null}
             {pageSetupOpen ? (
               <PageSetupPanel
                 setup={pageSetup}
@@ -923,7 +1504,10 @@ export default function RichTextEditorTool() {
             {versionsOpen ? (
               <VersionHistoryPanel
                 versions={versions}
+                canSnapshot={Boolean(docId)}
                 onRestore={handleRestoreVersion}
+                onCompare={handleCompareVersion}
+                onManualSnapshot={handleManualSnapshot}
                 onClose={() => setVersionsOpen(false)}
               />
             ) : null}
@@ -993,6 +1577,36 @@ export default function RichTextEditorTool() {
             losses.deepListItems > 0
               ? t('tools.richText.lossDeepLists', { count: losses.deepListItems })
               : null,
+            losses.unlinkedComments > 0
+              ? t('tools.richText.lossUnlinkedComments', { count: losses.unlinkedComments })
+              : null,
+            losses.mathAsImages > 0
+              ? t('tools.richText.lossMathAsImages', { count: losses.mathAsImages })
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        </p>
+      )}
+
+      {markdownLosses && !failure && (
+        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
+          {[
+            markdownLosses.comments > 0
+              ? t('tools.richText.lossMdComments', { count: markdownLosses.comments })
+              : null,
+            markdownLosses.trackedChanges > 0
+              ? t('tools.richText.lossMdTracked', { count: markdownLosses.trackedChanges })
+              : null,
+            markdownLosses.paragraphSpacing > 0
+              ? t('tools.richText.lossMdSpacing', { count: markdownLosses.paragraphSpacing })
+              : null,
+            markdownLosses.floatingImages > 0
+              ? t('tools.richText.lossMdFloating', { count: markdownLosses.floatingImages })
+              : null,
+            markdownLosses.pageSetupFields > 0
+              ? t('tools.richText.lossMdPageSetup', { count: markdownLosses.pageSetupFields })
+              : null,
           ]
             .filter(Boolean)
             .join(' ')}
@@ -1010,7 +1624,26 @@ export default function RichTextEditorTool() {
         }}
       />
 
-      {printReady && <PrintLayer html={snapshotHtml} flowRef={flowRef} />}
+      <FootnoteDialog
+        mode={footnoteDialog?.mode ?? null}
+        initialNote={footnoteDialog?.note ?? ''}
+        onCancel={handleFootnoteCancel}
+        onConfirm={handleFootnoteSubmit}
+        onRemove={handleFootnoteRemove}
+      />
+
+      <MathDialog
+        mode={mathDialog?.mode ?? null}
+        initialLatex={mathDialog?.latex ?? ''}
+        initialDisplay={mathDialog?.display ?? false}
+        onCancel={handleMathCancel}
+        onConfirm={handleMathSubmit}
+        onRemove={handleMathRemove}
+      />
+
+      {printReady && (
+        <PrintLayer html={printHtml} flowRef={flowRef} watermark={pageSetup.watermark} />
+      )}
     </div>
   );
 }

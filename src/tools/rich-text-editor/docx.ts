@@ -1,14 +1,21 @@
 import type { ToolResult } from '@/core/types';
 import { CONTENT_WIDTH_PX, checkExportSize, checkImportFile, sanitizeDocHtml } from './core';
 import {
+  COLUMN_GAP_MM,
   DEFAULT_PAGE_SETUP,
+  MM_TO_PX,
   mmToTwip,
   normalizePageSetup,
   resolvePageMetrics,
   type PageSetupConfig,
 } from './pageSetup';
+import { renderWatermarkImage, type WatermarkImage } from './watermarkImage';
 import { firstFontFamily, pxToHalfPoints } from './typography';
 import { isFloatingImageLayer, normalizeImageLayer, pxToEmu } from './imageLayer';
+import { FOOTNOTE_ATTR } from './footnotes';
+import { latexToOmml } from './mathOmml';
+import { renderLatexImages, type MathImage, type MathImageRequest } from './mathImage';
+import type { DocComment, TrackedChange } from './docs';
 
 /**
  * Word 双向适配层（重度依赖 mammoth / docx 均走动态 import，
@@ -241,54 +248,213 @@ function imageRun(D: DocxNs, el: Element): InstanceType<DocxNs['ImageRun']> | nu
   });
 }
 
-/** 行内节点 → docx 行（TextRun / ImageRun） */
-function collectRuns(
-  D: DocxNs,
+/** 行内内容节点：在文本/图片之外补充超链接、修订与批注标记 */
+type RunChild = InstanceType<
+  | DocxNs['TextRun']
+  | DocxNs['ImageRun']
+  | DocxNs['ExternalHyperlink']
+  | DocxNs['InsertedTextRun']
+  | DocxNs['DeletedTextRun']
+>;
+type ParagraphChild = import('docx').ParagraphChild;
+
+/**
+ * 行内内容 + 其覆盖的批注集合。
+ * 批注范围需要「合并连续同批注的 run」，因此在收集阶段先记录、渲染阶段再成对包裹。
+ */
+interface InlineRun {
+  node: RunChild;
+  /** 该 run 覆盖的批注 id（文档顺序） */
+  commentIds: string[];
+}
+
+/** 修订追踪状态：进入 <ins>/<del> 后其内部文本节点直接生成 Word 修订运行 */
+type TrackedKind = 'insert' | 'delete' | null;
+
+/** 导出上下文：把 docx 命名空间与批注 / 修订 / 脚注所需的全局状态一并传递 */
+interface ExportContext {
+  D: DocxNs;
+  /** 编辑器批注 id → Word 批注数字 id（仅包含有元数据的批注） */
+  commentIds: Map<string, number>;
+  /** 修订与批注署名 */
+  author: string;
+  /** 修订时间（统一取导出时刻，避免逐处新建 Date） */
+  date: string;
+  /** 修订 id 计数器：Word 要求文档内唯一 */
+  revisionId: { value: number };
+  /** 按正文顺序收集的脚注正文（编号 = 下标 + 1） */
+  footnoteNotes: string[];
+  /** OMML 表达不了的公式 → 预渲染图片（按 mathKey 索引） */
+  mathImages: Map<string, MathImage>;
+}
+
+/** 超链接默认样式：docx 未内置 Hyperlink 字符样式，显式补蓝色下划线 */
+function hyperlinkMark(mark: Mark): Mark {
+  return { ...mark, color: mark.color ?? '0563C1', underline: mark.underline ?? true };
+}
+
+/** 生成一个文本运行（自动套用修订包装） */
+function createTextRun(
+  ctx: ExportContext,
+  mark: Mark,
+  tracked: TrackedKind,
+  text: string,
+): RunChild {
+  const { D } = ctx;
+  const options = {
+    text,
+    bold: mark.bold,
+    italics: mark.italics,
+    strike: mark.strike,
+    underline: mark.underline ? {} : undefined,
+    color: mark.color,
+    highlight: mark.highlight,
+    font: mark.font,
+    size: mark.size,
+  };
+  if (!tracked) return new D.TextRun(options);
+  const revision = {
+    id: (ctx.revisionId.value += 1),
+    author: ctx.author,
+    date: ctx.date,
+    ...options,
+  };
+  return tracked === 'insert' ? new D.InsertedTextRun(revision) : new D.DeletedTextRun(revision);
+}
+
+/**
+ * 行内节点 → docx 行。
+ * 覆盖：文本 / 换行 / 图片 / 超链接（ExternalHyperlink）/
+ * 修订（ins → InsertedTextRun、del → DeletedTextRun）/ 批注范围（commentId 向后传递）。
+ */
+function collectInlineRuns(
+  ctx: ExportContext,
   parent: Element,
   mark: Mark,
-): InstanceType<DocxNs['TextRun'] | DocxNs['ImageRun']>[] {
-  const runs: InstanceType<DocxNs['TextRun'] | DocxNs['ImageRun']>[] = [];
+  commentIds: string[],
+  tracked: TrackedKind,
+): InlineRun[] {
+  const { D } = ctx;
+  const runs: InlineRun[] = [];
   parent.childNodes.forEach((node) => {
     if (node.nodeType === 3) {
       const text = node.textContent ?? '';
       if (!text) return;
-      runs.push(
-        new D.TextRun({
-          text,
-          bold: mark.bold,
-          italics: mark.italics,
-          strike: mark.strike,
-          underline: mark.underline ? {} : undefined,
-          color: mark.color,
-          highlight: mark.highlight,
-          font: mark.font,
-          size: mark.size,
-        }),
-      );
+      runs.push({ node: createTextRun(ctx, mark, tracked, text), commentIds });
       return;
     }
     if (node.nodeType !== 1) return;
     const el = node as Element;
-    if (el.tagName === 'BR') {
-      runs.push(new D.TextRun({ text: '', break: 1 }));
+
+    // 修订追踪：内部文本直接产出 Word 原生修订运行
+    if (el.tagName === 'INS' && el.getAttribute('data-track') === 'insert') {
+      runs.push(...collectInlineRuns(ctx, el, mergeMark(mark, el), commentIds, 'insert'));
       return;
     }
+    if (el.tagName === 'DEL' && el.getAttribute('data-track') === 'delete') {
+      runs.push(...collectInlineRuns(ctx, el, mergeMark(mark, el), commentIds, 'delete'));
+      return;
+    }
+
+    if (el.tagName === 'A') {
+      const href = (el.getAttribute('href') ?? '').trim();
+      const inner = collectInlineRuns(ctx, el, hyperlinkMark(mark), commentIds, tracked);
+      // 无 href 的锚点退化为普通文本，避免生成空链接
+      if (!href || inner.length === 0) {
+        runs.push(...inner);
+        return;
+      }
+      runs.push({
+        node: new D.ExternalHyperlink({
+          link: href,
+          children: inner.map((run) => run.node) as ParagraphChild[],
+        }),
+        commentIds,
+      });
+      return;
+    }
+
+    if (el.tagName === 'BR') {
+      runs.push({
+        node: tracked
+          ? createTextRun(ctx, mark, tracked, '')
+          : new D.TextRun({ text: '', break: 1 }),
+        commentIds,
+      });
+      return;
+    }
+
+    // 行内公式 → 原生公式（OMML）或降级图片
+    if (el.hasAttribute('data-math') && el.getAttribute('data-display') !== 'true') {
+      runs.push({ node: buildMathRun(ctx, el), commentIds });
+      return;
+    }
+
+    // 脚注引用 → Word 脚注：编号取正文顺序（权威来源是遍历顺序，不信任 HTML 里的编号）
+    if (el.tagName === 'SUP' && el.hasAttribute(FOOTNOTE_ATTR)) {
+      ctx.footnoteNotes.push((el.getAttribute('data-note') ?? '').trim());
+      runs.push({
+        node: new D.FootnoteReferenceRun(ctx.footnoteNotes.length),
+        commentIds,
+      });
+      return;
+    }
+
     if (el.tagName === 'IMG') {
       const run = imageRun(D, el);
-      if (run) runs.push(run);
+      if (run) runs.push({ node: run, commentIds });
       return;
     }
-    runs.push(...collectRuns(D, el, mergeMark(mark, el)));
+
+    // 批注标记：把 id 叠加到后续内容，渲染阶段再成对包裹
+    const commentId = el.getAttribute('data-comment-id');
+    const nested =
+      commentId && ctx.commentIds.has(commentId) ? [...commentIds, commentId] : commentIds;
+    runs.push(...collectInlineRuns(ctx, el, mergeMark(mark, el), nested, tracked));
   });
   return runs;
 }
 
-interface CellRunOptions {
-  children: InstanceType<DocxNs['TextRun'] | DocxNs['ImageRun']>[];
+/**
+ * 把行内内容渲染为段落子节点，并为连续的批注内容成对插入
+ * CommentRangeStart / CommentRangeEnd / CommentReference（Word 批注必需的三段标记）。
+ * 批注集合发生变化时整体收合再重开，保证范围严格嵌套（Word 不接受交叉范围）。
+ */
+function runsToChildren(ctx: ExportContext, runs: readonly InlineRun[]): ParagraphChild[] {
+  const { D } = ctx;
+  const children: ParagraphChild[] = [];
+  let open: string[] = [];
+  const sameSet = (a: readonly string[], b: readonly string[]) =>
+    a.length === b.length && a.every((id, index) => id === b[index]);
+
+  runs.forEach((run) => {
+    if (!sameSet(open, run.commentIds)) {
+      [...open].reverse().forEach((id) => {
+        const numeric = ctx.commentIds.get(id);
+        if (numeric === undefined) return;
+        children.push(new D.CommentRangeEnd(numeric), new D.CommentReference(numeric));
+      });
+      run.commentIds.forEach((id) => {
+        const numeric = ctx.commentIds.get(id);
+        if (numeric !== undefined) children.push(new D.CommentRangeStart(numeric));
+      });
+      open = [...run.commentIds];
+    }
+    children.push(run.node as ParagraphChild);
+  });
+
+  [...open].reverse().forEach((id) => {
+    const numeric = ctx.commentIds.get(id);
+    if (numeric === undefined) return;
+    children.push(new D.CommentRangeEnd(numeric), new D.CommentReference(numeric));
+  });
+
+  return children;
 }
 
-function cellRuns(D: DocxNs, cell: Element): CellRunOptions {
-  return { children: collectRuns(D, cell, {}) };
+/** 单元格/段落级别的一站式转换 */
+function blockChildren(ctx: ExportContext, parent: Element): ParagraphChild[] {
+  return runsToChildren(ctx, collectInlineRuns(ctx, parent, {}, [], null));
 }
 
 /** A4 内容宽度（170mm）换算为 twip（1mm ≈ 56.7 twip），用于按百分比列宽换算 */
@@ -313,7 +479,8 @@ function readColumnWidthsDxa(table: Element, columnCount: number): number[] {
 }
 
 /** 表格 → docx Table（保留列宽 / 合并单元格 / 单元格底色） */
-function buildTable(D: DocxNs, table: Element): InstanceType<DocxNs['Table']> {
+function buildTable(ctx: ExportContext, table: Element): InstanceType<DocxNs['Table']> {
+  const D = ctx.D;
   const colCount =
     table.querySelectorAll('colgroup > col').length ||
     Math.max(
@@ -340,7 +507,7 @@ function buildTable(D: DocxNs, table: Element): InstanceType<DocxNs['Table']> {
       const colspan = Math.max(1, Number(child.getAttribute('colspan')) || 1);
       const rowspan = Math.max(1, Number(child.getAttribute('rowspan')) || 1);
       const paragraph = new D.Paragraph({
-        children: cellRuns(D, child).children,
+        children: blockChildren(ctx, child),
       });
       return new D.TableCell({
         children: [paragraph],
@@ -397,11 +564,12 @@ function buildNumberingLevels(D: DocxNs, bullet: boolean) {
 
 /** 列表（有序/无序/任务清单）→ docx 段落集合，保留嵌套层级 */
 function buildList(
-  D: DocxNs,
+  ctx: ExportContext,
   list: Element,
   ordered: boolean,
   depth = 0,
 ): InstanceType<DocxNs['Paragraph']>[] {
+  const D = ctx.D;
   const reference = ordered ? 'rte-number' : 'rte-bullet';
   const level = Math.min(depth, MAX_LIST_LEVEL);
   const isTaskList = list.getAttribute('data-type') === 'taskList';
@@ -409,19 +577,19 @@ function buildList(
   Array.from(list.children)
     .filter((child) => child.tagName === 'LI')
     .forEach((li) => {
-      const children = Array.from(li.children).filter(
+      const inline = Array.from(li.children).filter(
         (c) => c.tagName !== 'UL' && c.tagName !== 'OL',
       );
-      const host = children.length > 0 ? children : [li];
-      const runs = host.flatMap((piece) => collectRuns(D, piece, {}));
+      const host = inline.length > 0 ? inline : [li];
+      const children = host.flatMap((piece) => blockChildren(ctx, piece));
       // 任务清单：复选框状态转为前缀符号
       if (isTaskList) {
         const checked = li.getAttribute('data-checked') === 'true';
-        runs.unshift(new D.TextRun({ text: checked ? '\u2611 ' : '\u2610 ' }));
+        children.unshift(new D.TextRun({ text: checked ? '\u2611 ' : '\u2610 ' }));
       }
       out.push(
         new D.Paragraph({
-          children: runs,
+          children,
           bullet: ordered ? undefined : { level },
           numbering: ordered ? { reference, level } : undefined,
         }),
@@ -430,7 +598,7 @@ function buildList(
       Array.from(li.children)
         .filter((c) => c.tagName === 'UL' || c.tagName === 'OL')
         .forEach((nested) => {
-          out.push(...buildList(D, nested, nested.tagName === 'OL', depth + 1));
+          out.push(...buildList(ctx, nested, nested.tagName === 'OL', depth + 1));
         });
     });
   return out;
@@ -466,21 +634,56 @@ function blockAlignment(el: Element): string | undefined {
   return (el.getAttribute('style') ?? '').match(/text-align:\s*(\w+)/)?.[1];
 }
 
+/** 区块级子节点：段落 / 表格 / 目录域 */
+type BlockChild = InstanceType<DocxNs['Paragraph'] | DocxNs['Table'] | DocxNs['TableOfContents']>;
+
+/**
+ * 目录节点 → Word 目录域（TOC field）。
+ * 条目文本取自导出 HTML 中已渲染的 `li[data-level]`，
+ * 作为 cachedEntries 让文档打开即显示目录；页码由 Word 更新域时重算，
+ * 因此编辑器侧算出的页码只是「打开前的预览值」。
+ */
+function buildTocField(D: DocxNs, el: Element): InstanceType<DocxNs['TableOfContents']> {
+  const caption = el.querySelector('.rte-toc-title')?.textContent?.trim() ?? '';
+  const cachedEntries = Array.from(el.querySelectorAll('li[data-level]')).map((item) => {
+    const text = item.querySelector('.rte-toc-text')?.textContent?.trim() ?? '';
+    const page = Number.parseInt(item.querySelector('.rte-toc-page')?.textContent ?? '', 10);
+    return {
+      title: text,
+      level: Math.max(1, Number(item.getAttribute('data-level')) || 1),
+      page: Number.isFinite(page) && page > 0 ? page : 1,
+    };
+  });
+  return new D.TableOfContents(caption || undefined, {
+    hyperlink: true,
+    headingStyleRange: '1-6',
+    cachedEntries,
+    beginDirty: true,
+  });
+}
+
 /** 正文 HTML → docx 文档内容数组 */
-function htmlToDocxChildren(
-  D: DocxNs,
-  root: Element,
-): (InstanceType<DocxNs['Paragraph']> | InstanceType<DocxNs['Table']>)[] {
-  const out: (InstanceType<DocxNs['Paragraph']> | InstanceType<DocxNs['Table']>)[] = [];
+function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
+  const D = ctx.D;
+  const out: BlockChild[] = [];
   Array.from(root.children).forEach((el) => {
     const heading = HEADING_LEVEL[el.tagName];
+    if (el.hasAttribute('data-toc')) {
+      out.push(buildTocField(D, el));
+      return;
+    }
+    // 块级公式：独占一行，Word 中作为独立公式段落
+    if (el.hasAttribute('data-math')) {
+      out.push(new D.Paragraph({ children: [buildMathRun(ctx, el) as ParagraphChild] }));
+      return;
+    }
     if (el.hasAttribute('data-page-break')) {
       // 分页符：空段落 + pageBreakBefore
       out.push(new D.Paragraph({ children: [], pageBreakBefore: true }));
       return;
     }
     // 图片在编辑器里是块级节点（独占一行）：必须包一层段落输出，否则导出时整张图被丢弃。
-    // 注意要处理 <img> 元素本身（它没有子节点），不能沿用遍历子节点的 collectRuns。
+    // 注意要处理 <img> 元素本身（它没有子节点），不能沿用遍历子节点的 collectInlineRuns。
     if (el.tagName === 'IMG') {
       const run = imageRun(D, el);
       out.push(
@@ -492,11 +695,11 @@ function htmlToDocxChildren(
       return;
     }
     if (el.tagName === 'TABLE') {
-      out.push(buildTable(D, el));
+      out.push(buildTable(ctx, el));
       return;
     }
     if (el.tagName === 'UL' || el.tagName === 'OL') {
-      out.push(...buildList(D, el, el.tagName === 'OL'));
+      out.push(...buildList(ctx, el, el.tagName === 'OL'));
       return;
     }
     if (el.tagName === 'HR') {
@@ -533,7 +736,7 @@ function htmlToDocxChildren(
       : 120;
 
     const paragraphOptions: ParagraphOptions = {
-      children: collectRuns(D, el, {}),
+      children: blockChildren(ctx, el),
       alignment: alignmentType(D, blockAlignment(el)),
       heading: heading ? headingLevel(D, heading) : undefined,
       indent: textIndent > 0 ? { firstLine: textIndent } : undefined,
@@ -593,11 +796,101 @@ export async function importDocx(file: File): Promise<ToolResult<string>> {
   }
 }
 
-/** 导出 .docx：编辑器 HTML → Word 文档 Blob（含页面设置与页眉页脚） */
+/** 审阅元数据：批注清单、修订条目与署名 */
+export interface DocxReviewOptions {
+  comments?: DocComment[];
+  changes?: TrackedChange[];
+  /** 批注与修订的署名 */
+  author?: string;
+}
+
+/** 公式去重键：同一条公式（含展示模式）只渲染一次 */
+function mathKey(latex: string, display: boolean): string {
+  return `${display ? 'block' : 'inline'}|${latex}`;
+}
+
+/**
+ * 公式节点 → Word 内容。
+ * 优先输出原生公式（OMML，Word 中可继续编辑）；
+ * 语法不支持时用预渲染的图片降级，保证视觉一致；
+ * 图片也拿不到时退回 LaTeX 源码文本，绝不静默丢内容。
+ */
+function buildMathRun(
+  ctx: ExportContext,
+  el: Element,
+): InstanceType<DocxNs['TextRun'] | DocxNs['ImageRun'] | DocxNs['Math']> {
+  const { D } = ctx;
+  const latex = (el.getAttribute('data-latex') ?? '').trim();
+  const display = el.getAttribute('data-display') === 'true';
+  const omml = latexToOmml(D, latex);
+  if (omml) return omml;
+
+  const image = ctx.mathImages.get(mathKey(latex, display));
+  if (image) {
+    const decoded = decodeDataUrl(image.dataUrl);
+    if (decoded) {
+      const width = Math.min(MAX_IMAGE_WIDTH * 1.3, Math.max(16, image.width));
+      const ratio = image.height / Math.max(1, image.width);
+      return new D.ImageRun({
+        data: decoded.bytes,
+        type: decoded.type,
+        transformation: {
+          width: Math.round(width),
+          height: Math.max(8, Math.round(width * ratio)),
+        },
+      });
+    }
+  }
+  // 兜底：原样输出源码，至少内容不丢
+  return new D.TextRun({ text: display ? `$$${latex}$$` : `$${latex}$` });
+}
+
+type CommentsOptions = NonNullable<import('docx').ICommentsOptions>;
+
+/**
+ * 生成 Word 原生批注：正文标记由 runsToChildren 写入，此处只提供批注内容。
+ *
+ * 注意：当前 docx 版本只序列化 `comments.xml`（批注正文 / 作者 / 时间），
+ * `resolved` 标志不会落盘；已解决的批注在编辑器侧已移除正文标记，
+ * 因此不会出现在导出文档中，行为与 Word「已解决批注默认隐藏」一致。
+ */
+function buildComments(
+  D: DocxNs,
+  comments: readonly DocComment[],
+  author: string,
+): CommentsOptions | undefined {
+  if (comments.length === 0) return undefined;
+  return {
+    // ICommentsOptions 接收的是普通选项对象（docx 内部再构造 Comment 组件）
+    children: comments.map((comment, index) => {
+      const byline = comment.author.trim() || author;
+      return {
+        id: index,
+        author: byline,
+        initials: byline.slice(0, 2),
+        date: comment.createdAt > 0 ? new Date(comment.createdAt) : new Date(),
+        resolved: comment.resolved,
+        children: [
+          ...(comment.quote.trim()
+            ? [
+                new D.Paragraph({
+                  children: [new D.TextRun({ text: comment.quote.trim(), italics: true })],
+                }),
+              ]
+            : []),
+          new D.Paragraph({ children: [new D.TextRun({ text: comment.text })] }),
+        ],
+      };
+    }),
+  };
+}
+
+/** 导出 .docx：编辑器 HTML → Word 文档 Blob（含页面设置、页眉页脚、批注与修订） */
 export async function exportDocxBlob(
   html: string,
   title: string,
   setupInput?: PageSetupConfig | null,
+  review?: DocxReviewOptions | null,
 ): Promise<ToolResult<Blob>> {
   const check = checkExportSize(html);
   if (!check.ok) return check;
@@ -605,11 +898,67 @@ export async function exportDocxBlob(
     const setup = normalizePageSetup(setupInput ?? DEFAULT_PAGE_SETUP);
     const metrics = resolvePageMetrics(setup);
     const D = await import('docx');
+    const comments = review?.comments ?? [];
+    const ctx: ExportContext = {
+      D,
+      // 仅正文中确实引用了的批注才需要数字 id；顺序即 Word 批注窗格顺序
+      commentIds: new Map(comments.map((comment, index) => [comment.id, index])),
+      author: review?.author?.trim() || 'SynTools',
+      date: new Date().toISOString(),
+      revisionId: { value: 1000 },
+      footnoteNotes: [],
+      mathImages: new Map(),
+    };
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const children = htmlToDocxChildren(D, doc.body);
+
+    // 先把「OMML 表达不了」的公式离屏渲染为图片（异步），再进入同步的遍历阶段
+    const mathRequests: MathImageRequest[] = [];
+    const seenMath = new Set<string>();
+    Array.from(doc.querySelectorAll('[data-math]')).forEach((el) => {
+      const latex = (el.getAttribute('data-latex') ?? '').trim();
+      if (!latex) return;
+      const display = el.getAttribute('data-display') === 'true';
+      const key = mathKey(latex, display);
+      if (seenMath.has(key)) return;
+      seenMath.add(key);
+      if (latexToOmml(D, latex)) return;
+      mathRequests.push({ key, latex, display });
+    });
+    ctx.mathImages = await renderLatexImages(mathRequests);
+
+    const children = htmlToDocxChildren(ctx, doc.body);
     if (children.length === 0) {
       children.push(new D.Paragraph({ children: [] }));
     }
+    // 水印：Word 行属性不支持文字旋转，改为页眉中的浮动透明图片（衬于文字下方）
+    const watermarkImage = await renderWatermarkImage(
+      setup.watermark,
+      metrics.contentWidthMm * MM_TO_PX,
+      metrics.contentHeightMm * MM_TO_PX,
+    );
+    const watermarkChild = watermarkImage
+      ? (buildWatermarkRun(D, watermarkImage) ?? undefined)
+      : undefined;
+
+    const commentOptions = buildComments(D, comments, ctx.author);
+    // 脚注正文由遍历正文时收集，编号即数组下标 + 1（与 FootnoteReferenceRun 一致）
+    const footnoteOptions =
+      ctx.footnoteNotes.length > 0
+        ? Object.fromEntries(
+            ctx.footnoteNotes.map((note, index) => [
+              String(index + 1),
+              {
+                // docx 会自动在脚注段落前插入 w:footnoteRef（引用序号），
+                // 这里只写正文，避免出现两个序号
+                children: [
+                  new D.Paragraph({
+                    children: [new D.TextRun({ text: note || ' ', size: 18 })],
+                  }),
+                ],
+              },
+            ]),
+          )
+        : undefined;
     const document = new D.Document({
       title: title || 'SynTools Document',
       creator: 'SynTools',
@@ -619,6 +968,16 @@ export async function exportDocxBlob(
           { reference: 'rte-number', levels: buildNumberingLevels(D, false) },
         ],
       },
+      // 修订追踪：正文中的 ins/del 已映射为 Word 修订运行，
+      // 打开开关让 Word 以「修订」模式呈现并允许接受/拒绝
+      features: {
+        trackRevisions: (review?.changes?.length ?? 0) > 0,
+        updateFields: true,
+      },
+      ...(commentOptions ? { comments: commentOptions } : {}),
+      ...(footnoteOptions ? { footnotes: footnoteOptions } : {}),
+      // 页面背景色（Word 打开时铺满纸张）
+      ...(setup.background ? { background: { color: setup.background } } : {}),
       sections: [
         {
           properties: {
@@ -643,8 +1002,21 @@ export async function exportDocxBlob(
                 left: mmToTwip(setup.margin.left),
               },
             },
+            // 分栏：Word 自行按栏流排（与屏幕流式视图 / 打印一致）
+            ...(setup.columns > 1
+              ? {
+                  column: {
+                    count: setup.columns,
+                    space: mmToTwip(COLUMN_GAP_MM),
+                    equalWidth: true,
+                    separate: false,
+                  },
+                }
+              : {}),
+            // 首页不同：为 true 时首页不再显示页眉页脚（与 Word「首页不同」一致）
+            ...(setup.differentFirstPage ? { titlePage: true } : {}),
           },
-          headers: buildHeaderFooter(D, setup, 'header'),
+          headers: buildHeaderFooter(D, setup, 'header', watermarkChild),
           footers: buildHeaderFooter(D, setup, 'footer'),
           children,
         },
@@ -657,15 +1029,40 @@ export async function exportDocxBlob(
   }
 }
 
+/**
+ * 水印 → 页眉中锚定到页面的浮动图片（衬于文字下方）。
+ * Word 的水印本质上就是页眉里的 behindDoc 图形，因此这一做法与 Word 行为一致。
+ */
+function buildWatermarkRun(
+  D: DocxNs,
+  image: WatermarkImage,
+): InstanceType<DocxNs['ImageRun']> | null {
+  const decoded = decodeDataUrl(image.dataUrl);
+  if (!decoded) return null;
+  return new D.ImageRun({
+    data: decoded.bytes,
+    type: decoded.type,
+    transformation: { width: image.width, height: image.height },
+    floating: {
+      horizontalPosition: { relative: D.HorizontalPositionRelativeFrom.PAGE, offset: 0 },
+      verticalPosition: { relative: D.VerticalPositionRelativeFrom.PAGE, offset: 0 },
+      wrap: { type: D.TextWrappingType.NONE },
+      behindDocument: true,
+      allowOverlap: true,
+    },
+  });
+}
+
 /** 生成 docx 页眉/页脚（无内容时返回 undefined，避免出现空页眉） */
 function buildHeaderFooter(
   D: DocxNs,
   setup: PageSetupConfig,
   kind: 'header' | 'footer',
+  extra: InstanceType<DocxNs['ImageRun']> | undefined = undefined,
 ): { default: InstanceType<DocxNs['Header'] | DocxNs['Footer']> } | undefined {
   const text = (kind === 'header' ? setup.header : setup.footer).trim();
   const pageNumber = kind === 'footer' && setup.showPageNumber;
-  if (!text && !pageNumber) return undefined;
+  if (!text && !pageNumber && !extra) return undefined;
   const children: InstanceType<DocxNs['Paragraph']>[] = [
     new D.Paragraph({
       alignment: pageNumber && !text ? D.AlignmentType.CENTER : D.AlignmentType.LEFT,
@@ -678,6 +1075,7 @@ function buildHeaderFooter(
               }),
             ]
           : []),
+        ...(extra ? [extra] : []),
       ],
     }),
   ];

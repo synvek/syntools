@@ -14,8 +14,17 @@ import { FindReplace } from './find-replace';
 import { ImageLayerCommands } from './imageLayer';
 import { BlockStyleCommands, ImageStyle, ParagraphStyle, TableStyle } from './blockStyles';
 import { Comment, DocMarkCommands, TrackedDelete, TrackedInsert } from './marks';
-import { createPageLayoutPlugin } from './PageView';
+import { createPageLayoutPlugin, type PageLayoutSnapshot } from './PageView';
 import { resolvePageMetrics, type PageMetrics } from './pageSetup';
+import { DEFAULT_TOC_LABELS, TableOfContents, type TocLabels } from './toc';
+import {
+  DEFAULT_FOOTNOTE_LABELS,
+  FootnoteList,
+  FootnoteRef,
+  type FootnoteLabels,
+} from './footnotes';
+import { MathBlock, MathCommands, MathInline } from './math';
+import { Spellcheck, SpellcheckCommands, type SpellDictionary } from './spellcheck';
 
 /**
  * 编辑器扩展组合（技术设计 §8.3）：
@@ -56,27 +65,50 @@ declare module '@tiptap/core' {
 
 /** 页面布局插件（Word 式分页）：仅页面视图启用，通过 Decoration.widget 渲染页间空白 */
 const PageLayout = Extension.create<{
-  onSheetTops?: (tops: number[]) => void;
+  onLayout?: (snapshot: PageLayoutSnapshot) => void;
   getPageMetrics?: () => PageMetrics;
 }>({
   name: 'pageLayout',
   addOptions() {
-    return { onSheetTops: undefined, getPageMetrics: undefined };
+    return { onLayout: undefined, getPageMetrics: undefined };
   },
   addProseMirrorPlugins() {
-    const { onSheetTops, getPageMetrics } = this.options;
-    if (!onSheetTops) return [];
-    return [
-      createPageLayoutPlugin(onSheetTops, getPageMetrics ?? (() => resolvePageMetrics(null))),
-    ];
+    const { onLayout, getPageMetrics } = this.options;
+    if (!onLayout) return [];
+    return [createPageLayoutPlugin(onLayout, getPageMetrics ?? (() => resolvePageMetrics(null)))];
   },
 });
 
-export function createExtensions(
-  placeholder: string,
-  onPageLayout?: (tops: number[]) => void,
-  getPageMetrics?: () => PageMetrics,
-) {
+/** 扩展集合的构造选项：文案与宿主回调都由工具层按当前语言/页面状态注入 */
+export interface RichTextExtensionOptions {
+  /** 空文档占位文案 */
+  placeholder: string;
+  /** 分页快照回调（纸面位置 + 每页起始块位置） */
+  onLayout?: (snapshot: PageLayoutSnapshot) => void;
+  /** 当前页面设置（纸张 / 边距 / 方向） */
+  getPageMetrics?: () => PageMetrics;
+  /** 目录文案 */
+  tocLabels?: TocLabels;
+  /** 脚注文案 */
+  footnoteLabels?: FootnoteLabels;
+  /** 点击公式时回调（工具层打开编辑弹窗） */
+  onMathSelect?: (pos: number, latex: string, display: boolean) => void;
+  /** 拼写检查：词典与开关都以 getter 传入，词表加载完成后无需重建编辑器 */
+  spellcheck?: {
+    getDictionary: () => SpellDictionary;
+    isEnabled: () => boolean;
+  };
+}
+
+export function createExtensions({
+  placeholder,
+  onLayout: onPageLayout,
+  getPageMetrics,
+  tocLabels,
+  footnoteLabels,
+  onMathSelect,
+  spellcheck,
+}: RichTextExtensionOptions) {
   return [
     StarterKit.configure({
       // 链接点击不跳转，交由工具栏编辑
@@ -109,6 +141,18 @@ export function createExtensions(
     TrackedInsert,
     TrackedDelete,
     DocMarkCommands,
-    PageLayout.configure({ onSheetTops: onPageLayout, getPageMetrics: getPageMetrics }),
+    // 目录 / 脚注文案随语言注入：节点不含属性，切换语言后标题同步本地化
+    TableOfContents.configure({ labels: tocLabels ?? DEFAULT_TOC_LABELS }),
+    FootnoteRef.configure({ labels: footnoteLabels ?? DEFAULT_FOOTNOTE_LABELS }),
+    FootnoteList.configure({ labels: footnoteLabels ?? DEFAULT_FOOTNOTE_LABELS }),
+    MathInline.configure({ onSelect: onMathSelect }),
+    MathBlock.configure({ onSelect: onMathSelect }),
+    MathCommands,
+    Spellcheck.configure({
+      getDictionary: spellcheck?.getDictionary,
+      isEnabled: spellcheck?.isEnabled,
+    }),
+    SpellcheckCommands,
+    PageLayout.configure({ onLayout: onPageLayout, getPageMetrics: getPageMetrics }),
   ];
 }

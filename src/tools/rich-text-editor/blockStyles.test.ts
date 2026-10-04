@@ -12,7 +12,10 @@ import { createExtensions } from './extensions';
 const editors: Editor[] = [];
 
 function createEditor(content: string): Editor {
-  const editor = new Editor({ extensions: createExtensions('输入内容…'), content });
+  const editor = new Editor({
+    extensions: createExtensions({ placeholder: '输入内容…' }),
+    content,
+  });
   editors.push(editor);
   return editor;
 }

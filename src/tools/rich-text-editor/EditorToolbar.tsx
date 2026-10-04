@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { Icon } from '@/core/components/Icon';
 import type { ViewMode } from './draft';
+import { findSelectedFootnote } from './footnotes';
 import { normalizeImageLayer } from './imageLayer';
 import {
   DEFAULT_FONT_SIZE_PX,
@@ -92,6 +93,47 @@ function RedoIcon({ className }: { className?: string }) {
   );
 }
 
+/** 刷新图标：顺时针箭头 + 缺口圆环（与撤销/重做图标同一套描边参数） */
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M20 11a8 8 0 1 0-2.5 6.3" />
+      <path d="M20 5v6h-6" />
+    </svg>
+  );
+}
+
+/** 脚注图标：基线 + 上标数字，与 Word「插入脚注」的视觉语义一致 */
+function FootnoteIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* 上标数字 1 */}
+      <path d="M14 4.6 16 3.2v5.9" />
+      {/* 分隔线 + 正文基线，表达「脚注落在页面底部」 */}
+      <path d="M5.5 12.5h6" />
+      <path d="M4 19.5h16" />
+    </svg>
+  );
+}
+
 /** 图片对齐图标：方框 + 三条对齐线（左/中/右各不相同，避免三个按钮长得一样） */
 function ImageAlignIcon({ position }: { position: 'left' | 'center' | 'right' }) {
   const bars =
@@ -175,10 +217,22 @@ interface EditorToolbarProps {
   onTogglePageSetup: () => void;
   /** 插入目录 */
   onInsertToc: () => void;
+  /** 刷新目录（重算分页与页码） */
+  onRefreshToc: () => void;
   tocDisabled: boolean;
+  /** 脚注：选中已有脚注时为编辑，否则为新建 */
+  onFootnote: () => void;
+  /** 公式：选中已有公式时为编辑，否则为新建 */
+  onMath: () => void;
   /** 样式面板 */
   stylesOpen: boolean;
   onToggleStyles: () => void;
+  /** 模板面板 */
+  templatesOpen: boolean;
+  onToggleTemplates: () => void;
+  /** 拼写检查面板 */
+  spellcheckOpen: boolean;
+  onToggleSpellcheck: () => void;
   /** 批注与修订 */
   reviewOpen: boolean;
   onToggleReview: () => void;
@@ -207,9 +261,16 @@ export function EditorToolbar({
   pageSetupOpen,
   onTogglePageSetup,
   onInsertToc,
+  onRefreshToc,
   tocDisabled,
+  onFootnote,
+  onMath,
   stylesOpen,
   onToggleStyles,
+  templatesOpen,
+  onToggleTemplates,
+  spellcheckOpen,
+  onToggleSpellcheck,
   reviewOpen,
   onToggleReview,
   onOpenVersions,
@@ -303,6 +364,8 @@ export function EditorToolbar({
           const after = Number(attrs.spacingAfter ?? 0);
           return `${before}-${after}`;
         })(),
+        footnoteSelected: findSelectedFootnote(e.state) !== null,
+        mathSelected: e.isActive('mathInline') || e.isActive('mathBlock'),
       };
     },
   });
@@ -547,6 +610,15 @@ export function EditorToolbar({
         <div className="flex items-center gap-1">
           <ToolButton label={t('tools.richText.link')} active={state.link} onClick={toggleLink}>
             <Icon name="link" className="h-4 w-4" />
+          </ToolButton>
+          <ToolButton
+            label={
+              state.mathSelected ? t('tools.richText.mathEdit') : t('tools.richText.mathInsert')
+            }
+            active={state.mathSelected}
+            onClick={onMath}
+          >
+            <span className="font-serif text-sm italic leading-none">fx</span>
           </ToolButton>
           <ToolButton label={t('tools.richText.image')} onClick={() => fileRef.current?.click()}>
             <Icon name="image" className="h-4 w-4" />
@@ -828,8 +900,40 @@ export function EditorToolbar({
         >
           <Icon name="listCheck" className="h-4 w-4" />
         </ToolButton>
+        <ToolButton
+          label={t('tools.richText.refreshToc')}
+          disabled={tocDisabled}
+          onClick={onRefreshToc}
+        >
+          <RefreshIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton
+          label={
+            state.footnoteSelected
+              ? t('tools.richText.footnoteEdit')
+              : t('tools.richText.footnoteInsert')
+          }
+          active={state.footnoteSelected}
+          onClick={onFootnote}
+        >
+          <FootnoteIcon className="h-4 w-4" />
+        </ToolButton>
         <ToolButton label={t('tools.richText.styles')} active={stylesOpen} onClick={onToggleStyles}>
           <Icon name="palette" className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton
+          label={t('tools.richText.templates')}
+          active={templatesOpen}
+          onClick={onToggleTemplates}
+        >
+          <Icon name="grid" className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton
+          label={t('tools.richText.spellcheck')}
+          active={spellcheckOpen}
+          onClick={onToggleSpellcheck}
+        >
+          <Icon name="book" className="h-4 w-4" />
         </ToolButton>
         <ToolButton label={t('tools.richText.review')} active={reviewOpen} onClick={onToggleReview}>
           <Icon name="pen" className="h-4 w-4" />

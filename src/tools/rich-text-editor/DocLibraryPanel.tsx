@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import type { DocMeta, StoredVersion } from './docStore';
@@ -106,13 +107,31 @@ export function DocLibraryPanel({
 
 interface VersionHistoryPanelProps {
   versions: StoredVersion[];
+  /** 是否已有可打快照的文档（新建但未保存的文档没有 id） */
+  canSnapshot: boolean;
   onRestore: (version: StoredVersion) => void;
+  onCompare: (version: StoredVersion) => void;
+  onManualSnapshot: (note: string) => void;
   onClose: () => void;
 }
 
-/** 版本历史面板：快照列表 + 恢复 */
-export function VersionHistoryPanel({ versions, onRestore, onClose }: VersionHistoryPanelProps) {
+/** 版本历史面板：快照列表 + 手动打快照 + 差异对比 + 恢复 */
+export function VersionHistoryPanel({
+  versions,
+  canSnapshot,
+  onRestore,
+  onCompare,
+  onManualSnapshot,
+  onClose,
+}: VersionHistoryPanelProps) {
   const { t } = useTranslation();
+  const [note, setNote] = useState('');
+
+  const submitSnapshot = () => {
+    onManualSnapshot(note.trim());
+    setNote('');
+  };
+
   return (
     <div
       data-testid="rich-text-versions"
@@ -131,6 +150,32 @@ export function VersionHistoryPanel({ versions, onRestore, onClose }: VersionHis
           <Icon name="close" className="h-4 w-4" />
         </button>
       </div>
+
+      <div className="mb-2 flex items-center gap-1">
+        <input
+          type="text"
+          value={note}
+          maxLength={40}
+          onChange={(event) => setNote(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              submitSnapshot();
+            }
+          }}
+          placeholder={t('tools.richText.snapshotNotePlaceholder')}
+          className="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+        />
+        <button
+          type="button"
+          disabled={!canSnapshot}
+          onClick={submitSnapshot}
+          className="h-7 shrink-0 rounded-md bg-blue-600 px-2 text-xs text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t('tools.richText.snapshotNow')}
+        </button>
+      </div>
+
       {versions.length === 0 ? (
         <p className="px-1 py-2 text-sm text-gray-400 dark:text-gray-500">
           {t('tools.richText.noVersions')}
@@ -138,20 +183,29 @@ export function VersionHistoryPanel({ versions, onRestore, onClose }: VersionHis
       ) : (
         <ul className="max-h-56 overflow-auto">
           {versions.map((version) => (
-            <li key={version.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
+            <li key={version.id} className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm">
               <span className="flex min-w-0 flex-1 flex-col items-start text-left">
                 <span className="max-w-full truncate text-gray-800 dark:text-gray-100">
-                  {version.title || t('tools.richText.untitledDoc')}
+                  {version.note || version.title || t('tools.richText.untitledDoc')}
                 </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
+                <span className="max-w-full truncate text-xs text-gray-400 dark:text-gray-500">
                   {new Date(version.savedAt).toLocaleString()} ·{' '}
                   {t('tools.richText.versionChars', { count: version.html.length })}
                 </span>
               </span>
               <button
                 type="button"
+                title={t('tools.richText.versionDiffTitle')}
+                aria-label={t('tools.richText.versionDiffTitle')}
+                onClick={() => onCompare(version)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                <Icon name="diff" className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={() => onRestore(version)}
-                className="h-7 rounded-md border border-gray-300 px-2 text-xs text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                className="h-7 shrink-0 rounded-md border border-gray-300 px-2 text-xs text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
               >
                 {t('tools.richText.restoreVersion')}
               </button>

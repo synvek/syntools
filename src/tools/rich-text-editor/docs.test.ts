@@ -74,4 +74,64 @@ describe('htmlToMarkdown', () => {
     expect(md).toContain('[链接](https://a.b)');
     expect(md).toContain('![图](x.png)');
   });
+
+  it('下划线 / 高亮 / 修订插入以 GFM 内联 HTML 保留', () => {
+    const md = htmlToMarkdown(
+      '<p><u>下划线</u><mark>高亮</mark><ins data-track="insert">新增</ins><ins>普通插入</ins></p>',
+    );
+    expect(md).toContain('<u>下划线</u>');
+    expect(md).toContain('<mark>高亮</mark>');
+    expect(md).toContain('<ins>新增</ins>');
+    expect(md).toContain('<ins>普通插入</ins>');
+  });
+
+  it('记入白名单的行内样式保留，其余样式丢弃', () => {
+    const md = htmlToMarkdown(
+      '<p><span style="color: rgb(255, 0, 0); font-size: 20px; padding: 4px">彩色</span></p>',
+    );
+    expect(md).toContain('color: rgb(255, 0, 0)');
+    expect(md).toContain('font-size: 20px');
+    expect(md).not.toContain('padding');
+  });
+
+  it('批注标记丢弃但保留文本', () => {
+    const md = htmlToMarkdown('<p>前<span data-comment-id="c-1">待审</span>后</p>');
+    expect(md).toContain('前待审后');
+    expect(md).not.toContain('data-comment-id');
+  });
+
+  it('分页符输出可还原的 HTML 注释', () => {
+    const md = htmlToMarkdown('<p>第一页</p><div data-page-break="true"></div><p>第二页</p>');
+    expect(md).toContain('<!-- page-break -->');
+    expect(md.indexOf('第一页')).toBeLessThan(md.indexOf('<!-- page-break -->'));
+    expect(md.indexOf('<!-- page-break -->')).toBeLessThan(md.indexOf('第二页'));
+  });
+
+  it('目录展开为带层级缩进与页码的列表', () => {
+    const md = htmlToMarkdown(
+      '<div data-toc="true" class="rte-toc"><p class="rte-toc-title">目录</p><ul class="rte-toc-list">' +
+        '<li data-level="1"><span class="rte-toc-text">引言</span><span class="rte-toc-page">1</span></li>' +
+        '<li data-level="2"><span class="rte-toc-text">背景</span><span class="rte-toc-page">2</span></li>' +
+        '</ul></div>',
+    );
+    expect(md).toContain('**目录**');
+    expect(md).toContain('- 引言 … 1');
+    expect(md).toContain('  - 背景 … 2');
+  });
+
+  it('空目录不产生任何输出', () => {
+    const md = htmlToMarkdown('<div data-toc="true" class="rte-toc"></div><p>正文</p>');
+    expect(md).toBe('正文');
+  });
+
+  it('脚注上标与汇总区展开为编号列表', () => {
+    const md = htmlToMarkdown(
+      '<p>结论<sup data-footnote="true" data-note="来源" data-number="1">[1]</sup></p>' +
+        '<section class="rte-footnote-list" data-footnote-list="true">' +
+        '<p class="rte-footnote-list-title">脚注</p><ol><li>来源</li></ol></section>',
+    );
+    expect(md).toContain('结论[1]');
+    expect(md).toContain('**脚注**');
+    expect(md).toContain('1. 来源');
+  });
 });

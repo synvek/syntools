@@ -8,8 +8,11 @@ import {
   computePageBreaks,
   countDocStats,
   createEmptyDocHtml,
+  countPages,
   htmlToPlain,
+  pageIndexOfPosition,
   resolveImportKind,
+  scanMarkdownExportLosses,
   sanitizeDocHtml,
   sanitizeFilename,
 } from './core';
@@ -167,5 +170,70 @@ describe('computePageBreaks', () => {
 describe('createEmptyDocHtml', () => {
   it('返回空段落 HTML', () => {
     expect(createEmptyDocHtml()).toBe('<p></p>');
+  });
+});
+
+describe('pageIndexOfPosition / countPages', () => {
+  it('未分页时全部落在第 1 页', () => {
+    expect(pageIndexOfPosition([], 0)).toBe(1);
+    expect(pageIndexOfPosition([], 5000)).toBe(1);
+    expect(countPages([])).toBe(1);
+  });
+
+  it('按页起始位置二分定位页码', () => {
+    const starts = [100, 250, 900];
+    expect(pageIndexOfPosition(starts, 0)).toBe(1);
+    expect(pageIndexOfPosition(starts, 99)).toBe(1);
+    // 分页点本身属于新的一页
+    expect(pageIndexOfPosition(starts, 100)).toBe(2);
+    expect(pageIndexOfPosition(starts, 249)).toBe(2);
+    expect(pageIndexOfPosition(starts, 250)).toBe(3);
+    expect(pageIndexOfPosition(starts, 100000)).toBe(4);
+    expect(countPages(starts)).toBe(4);
+  });
+
+  it('对大量分页点保持对数复杂度结果正确', () => {
+    // 分页点从第 2 页起才有（第 1 页起点是文档开头，不入数组）
+    const starts = Array.from({ length: 500 }, (_, index) => (index + 1) * 100);
+    expect(pageIndexOfPosition(starts, 0)).toBe(1);
+    expect(pageIndexOfPosition(starts, 99)).toBe(1);
+    expect(pageIndexOfPosition(starts, 100)).toBe(2);
+    expect(pageIndexOfPosition(starts, 49900)).toBe(500);
+    expect(pageIndexOfPosition(starts, 50000)).toBe(501);
+    expect(countPages(starts)).toBe(501);
+  });
+});
+
+describe('scanMarkdownExportLosses', () => {
+  it('统计批注 / 修订 / 段落排版 / 浮动图片', () => {
+    const html = [
+      '<p style="text-indent: 24px"><span data-comment-id="c-1">批注</span></p>',
+      '<p><ins data-track="insert">新增</ins><del data-track="delete">删除</del></p>',
+      '<p style="margin-top: 12px">间距</p>',
+      '<img src="data:image/png;base64,iVBORw0KGgo=" data-layer="front">',
+    ].join('');
+    const result = scanMarkdownExportLosses(html);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.comments).toBe(1);
+    expect(result.value.trackedChanges).toBe(2);
+    expect(result.value.paragraphSpacing).toBe(2);
+    expect(result.value.floatingImages).toBe(1);
+  });
+
+  it('嵌入型图片不算浮动损耗', () => {
+    const result = scanMarkdownExportLosses('<img src="x.png" data-layer="inline">');
+    expect(result.ok && result.value.floatingImages).toBe(0);
+  });
+
+  it('默认页面设置不计入损耗，非默认项才计数', () => {
+    const defaults = scanMarkdownExportLosses('<p>x</p>');
+    expect(defaults.ok && defaults.value.pageSetupFields).toBe(0);
+    const custom = scanMarkdownExportLosses('<p>x</p>', {
+      header: '内部资料',
+      footer: '第 1 页',
+      margin: { top: 12.7, right: 12.7, bottom: 12.7, left: 12.7 },
+    });
+    expect(custom.ok && custom.value.pageSetupFields).toBe(3);
   });
 });
