@@ -11,12 +11,15 @@ import {
   ungroupSelected,
 } from '../flowOps';
 import { normalizeEdgeStyle, type AlignMode, type LayerOp } from '../ops';
+import { LAYOUT_DIRECTIONS, type LayoutDensity, type LayoutDirection } from '../layout';
 import { useFlowStore } from '../store';
+import { ThemePanel } from './ThemePanel';
 import {
   EDGE_ARROW_LABEL_KEY,
   EDGE_ARROW_OPTIONS,
   EDGE_DASH_OPTIONS,
   EDGE_TYPE_OPTIONS,
+  GRID_SIZE_OPTIONS,
   type EdgeArrow,
   type EdgeDash,
   type EdgeType,
@@ -36,17 +39,24 @@ function EdgeSelect({
   options,
   onChange,
   renderOption,
+  testId,
 }: {
   label: string;
   value: string;
   options: readonly string[];
   onChange: (value: string) => void;
   renderOption?: (value: string) => string;
+  testId?: string;
 }) {
   return (
     <label className="flex items-center gap-1 text-[12px] text-gray-500 dark:text-gray-400">
       <span className="whitespace-nowrap">{label}</span>
-      <select className={selectCls} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select
+        className={selectCls}
+        data-testid={testId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
         {options.map((v) => (
           <option key={v} value={v}>
             {renderOption ? renderOption(v) : v}
@@ -64,14 +74,24 @@ interface ToolbarButtonProps {
   primary?: boolean;
   icon?: ReactNode;
   compact?: boolean;
+  testId?: string;
 }
 
-function ToolbarButton({ label, onClick, disabled, primary, icon, compact }: ToolbarButtonProps) {
+function ToolbarButton({
+  label,
+  onClick,
+  disabled,
+  primary,
+  icon,
+  compact,
+  testId,
+}: ToolbarButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-testid={testId}
       title={label}
       aria-label={label}
       className={`flex items-center justify-center rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -170,6 +190,11 @@ export function Toolbar(props: ToolbarProps) {
   const nodes = useFlowStore((s) => s.nodes);
   const selectedEdges = useFlowStore((s) => s.selectedEdges);
   const selectedNodes = useFlowStore((s) => s.selectedNodes);
+  const gridEnabled = useFlowStore((s) => s.gridEnabled);
+  const gridSize = useFlowStore((s) => s.gridSize);
+  const layoutDirection = useFlowStore((s) => s.layoutDirection);
+  const layoutDensity = useFlowStore((s) => s.layoutDensity);
+  const alignTolerance = useFlowStore((s) => s.alignTolerance);
   const sep = <span className="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" />;
 
   // 选中节点的锁定/隐藏状态（用于图标切换）
@@ -199,7 +224,60 @@ export function Toolbar(props: ToolbarProps) {
     <div className="flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900">
       <div className="flex flex-wrap items-center gap-1.5">
         <ToolbarButton label={t('tools.flowchart.templates')} onClick={props.onTemplates} />
+        <ThemePanel />
         <ToolbarButton label={t('tools.flowchart.autoLayout')} onClick={props.onAutoLayout} />
+        <EdgeSelect
+          testId="flowchart-layout-direction"
+          label={t('tools.flowchart.layoutDirection')}
+          value={layoutDirection}
+          options={LAYOUT_DIRECTIONS}
+          onChange={(v) => useFlowStore.getState().setLayoutDirection(v as LayoutDirection)}
+          renderOption={(v) => t(`tools.flowchart.dir${v}`)}
+        />
+        <EdgeSelect
+          testId="flowchart-layout-density"
+          label={t('tools.flowchart.layoutDensity')}
+          value={layoutDensity}
+          options={['compact', 'normal', 'loose']}
+          onChange={(v) => useFlowStore.getState().setLayoutDensity(v as LayoutDensity)}
+          renderOption={(v) => t(`tools.flowchart.density${v[0].toUpperCase()}${v.slice(1)}`)}
+        />
+
+        {sep}
+
+        {/* 网格吸附：可开关并可选网格尺寸 */}
+        <ToolbarButton
+          testId="flowchart-grid-toggle"
+          label={t('tools.flowchart.snapToGrid')}
+          onClick={() => useFlowStore.getState().setGridEnabled(!gridEnabled)}
+          primary={gridEnabled}
+          icon={
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+            >
+              <path d="M4 8h16M4 16h16M8 4v16M16 4v16" />
+            </svg>
+          }
+        />
+        <EdgeSelect
+          testId="flowchart-grid-size"
+          label={t('tools.flowchart.gridSize')}
+          value={String(gridSize)}
+          options={GRID_SIZE_OPTIONS.map(String)}
+          onChange={(v) => useFlowStore.getState().setGridSize(Number(v))}
+        />
+        <EdgeSelect
+          testId="flowchart-align-tolerance"
+          label={t('tools.flowchart.alignTolerance')}
+          value={String(alignTolerance)}
+          options={['4', '6', '8', '10']}
+          onChange={(v) => useFlowStore.getState().setAlignTolerance(Number(v))}
+          renderOption={(v) => `${v}px`}
+        />
 
         {sep}
 

@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  commonValue,
   computeAlign,
   computeDistribute,
   dashArrayOf,
+  dropCollinear,
   groupBounds,
   normalizeEdgeStyle,
+  polylineMidpoint,
+  polylinePath,
   reorderLayers,
+  routeOrthogonal,
   type LayoutBox,
 } from './ops';
 import type { ShapeKind } from './model/types';
@@ -14,6 +19,104 @@ const A: LayoutBox = { id: 'a', x: 0, y: 0, width: 100, height: 50 };
 const B: LayoutBox = { id: 'b', x: 200, y: 100, width: 100, height: 50 };
 const C: LayoutBox = { id: 'c', x: 50, y: 300, width: 60, height: 40 };
 const BOXES = [A, B, C];
+
+describe('多选批量取值', () => {
+  it('全部相同返回该值', () => {
+    expect(commonValue(['a', 'a', 'a'])).toBe('a');
+    expect(commonValue([2])).toBe(2);
+  });
+
+  it('存在差异或空集合返回 undefined', () => {
+    expect(commonValue(['a', 'b'])).toBeUndefined();
+    expect(commonValue([])).toBeUndefined();
+    expect(commonValue([true, true])).toBe(true);
+    expect(commonValue([true, false])).toBeUndefined();
+  });
+});
+
+describe('折点与正交路由', () => {
+  it('dropCollinear 去掉重复点与共线中间点', () => {
+    expect(
+      dropCollinear([
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 20, y: 0 },
+        { x: 20, y: 10 },
+      ]),
+    ).toEqual([
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 10 },
+    ]);
+  });
+
+  it('共线时不需要折点', () => {
+    expect(routeOrthogonal({ x: 0, y: 0 }, { x: 100, y: 0 })).toEqual([]);
+    expect(routeOrthogonal({ x: 0, y: 0 }, { x: 0, y: 100 })).toEqual([]);
+  });
+
+  it('无遮挡时生成 H-V-H 中点折线（两点折点）', () => {
+    const points = routeOrthogonal({ x: 0, y: 0 }, { x: 100, y: 60 });
+    expect(points).toHaveLength(2);
+    expect(points[0]).toEqual({ x: 50, y: 0 });
+    expect(points[1]).toEqual({ x: 50, y: 60 });
+  });
+
+  it('遇到障碍时绕行，路径不再穿过障碍包围盒', () => {
+    const from = { x: 0, y: 0 };
+    const target = { x: 200, y: 60 };
+    const obstacle = { x: 60, y: -40, width: 80, height: 200 };
+    const points = routeOrthogonal(from, target, [obstacle]);
+    const path = [from, ...points, target];
+    expect(path.length).toBeGreaterThan(2);
+    // 折线不得穿过障碍物
+    for (let i = 1; i < path.length; i += 1) {
+      const a = path[i - 1];
+      const b = path[i];
+      const minX = Math.min(a.x, b.x);
+      const maxX = Math.max(a.x, b.x);
+      const minY = Math.min(a.y, b.y);
+      const maxY = Math.max(a.y, b.y);
+      const hits =
+        minX < obstacle.x + obstacle.width &&
+        maxX > obstacle.x &&
+        minY < obstacle.y + obstacle.height &&
+        maxY > obstacle.y;
+      expect(hits).toBe(false);
+    }
+  });
+
+  it('polylinePath 生成折线（圆角半径 > 0 时使用二次贝塞尔）', () => {
+    const sharp = polylinePath([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+    ]);
+    expect(sharp.startsWith('M 0,0')).toBe(true);
+    expect(sharp).toContain('L 10,0');
+    expect(sharp).not.toContain('Q');
+
+    const rounded = polylinePath(
+      [
+        { x: 0, y: 0 },
+        { x: 40, y: 0 },
+        { x: 40, y: 40 },
+      ],
+      8,
+    );
+    expect(rounded).toContain('Q');
+  });
+
+  it('polylineMidpoint 取折线长度中点', () => {
+    const mid = polylineMidpoint([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+    ]);
+    expect(mid).toEqual({ x: 10, y: 0 });
+  });
+});
 
 describe('对齐', () => {
   it('左对齐统一到集合最左边界', () => {

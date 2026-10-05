@@ -1,6 +1,10 @@
 /**
  * 流程图编辑器状态：单一真相源是 nodes / edges，其余（选中 / 历史）是会话态。
- * 所有结构性变更前先 commit() 压入历史快照，保证 undo / redo 可回放（复用 slide-editor 模式）。
+ *
+ * 结构：
+ * - `store/helpers.ts`  共享纯工具（节点/边构造、页面互转、选择归一化）
+ * - `store/history.ts`  撤销/重做（结构 diff，见该文件说明）
+ * - 本文件：文档编辑（doc/UI）与多页、快照的组合根；对外 API 与调用点保持不变。
  */
 
 import { create } from 'zustand';
@@ -9,46 +13,58 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
   type Connection,
-  type Edge,
   type EdgeChange,
-  type Node,
   type NodeChange,
 } from '@xyflow/react';
 import {
   absolutePositionOf,
   absoluteRectOf,
+  anchorOf,
   createId,
   defaultData,
   orderNodesByHierarchy,
   resolvePlacement,
   serializeDoc,
+  stubPoint,
   type HelperLines,
 } from './core';
 import {
   DEFAULT_EDGE_STYLE,
   type FlowDoc,
+  type FlowEdgeData,
   type FlowEdgeStyle,
   type FlowNodeData,
   type FlowNodePatch,
+  type FlowNodeStyle,
+  type FlowNodeType,
   type FlowPage,
   type ShapeKind,
+  type Waypoint,
   isContainerKind,
 } from './model/types';
 import { DEFAULT_PAGE_NAME } from './model/migrate';
-import { edgePropsOf, normalizeEdgeStyle } from './ops';
+import { dropCollinear, routeOrthogonal } from './ops';
 import { shapeSize } from './model/shapes';
 import { activePageOf, migrateDoc } from './model/migrate';
-import { layoutGraph } from './layout';
-
-const HISTORY_LIMIT = 50;
-
-export type FlowNode = Node<FlowNodeData>;
-export type FlowEdge = Edge;
-
-interface Snapshot {
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-}
+import {
+  layoutGraph,
+  type LayoutDensity,
+  type LayoutDirection,
+  type LayoutOptions,
+} from './layout';
+import {
+  DEFAULT_PAGE_ID,
+  defaultPageName,
+  edgesFromPage,
+  makeEdge,
+  makeNode,
+  nodesFromPage,
+  selectOnly,
+  type FlowEdge,
+  type FlowNode,
+  type PageMeta,
+} from './store/helpers';
+import { createHistorySlice, type HistoryDiff } from './store/history';
 
 /** 版本快照：与内存态撤销栈相互独立，可命名、预览与回滚 */
 export interface SnapshotRec {
@@ -56,82 +72,6 @@ export interface SnapshotRec {
   name: string;
   doc: FlowDoc;
   savedAt: number;
-}
-
-function makeNode(
-  kind: ShapeKind,
-  position: { x: number; y: number },
-  opts?: { id?: string; parentId?: string },
-): FlowNode {
-  const size = shapeSize(kind);
-  return {
-    id: opts?.id ?? createId('n'),
-    type: 'shape',
-    position,
-    // 显式尺寸：让 React Flow 在测量前就有正确包围盒（fitView / 导出 / 自动布局均依赖）
-    width: size.width,
-    height: size.height,
-    parentId: opts?.parentId,
-    data: defaultData(kind),
-  };
-}
-
-function makeEdge(connection: Connection | FlowEdge, override?: Partial<FlowEdgeStyle>): FlowEdge {
-  const style = normalizeEdgeStyle({ ...DEFAULT_EDGE_STYLE, ...override });
-  return {
-    ...connection,
-    id: (connection as FlowEdge).id ?? createId('e'),
-    ...edgePropsOf(style),
-    data: { style },
-  } as FlowEdge;
-}
-
-/** 页面元数据（名称与顺序，数据另存） */
-export interface PageMeta {
-  id: string;
-  name: string;
-}
-
-/** 默认首页 id（新建文档与清空后使用） */
-export const DEFAULT_PAGE_ID = 'page-1';
-
-/** 把持久化的页面记录转换为 React Flow 节点 */
-function nodesFromPage(page: FlowPage): FlowNode[] {
-  return orderNodesByHierarchy(
-    page.nodes.map((n) => {
-      const size = shapeSize(n.data.kind);
-      return {
-        id: n.id,
-        type: 'shape' as const,
-        position: { ...n.position },
-        width: n.width ?? size.width,
-        height: n.height ?? size.height,
-        parentId: n.parentId ?? undefined,
-        hidden: n.hidden === true,
-        // React Flow 无 locked 字段，用 draggable/selectable 表达
-        draggable: n.locked === true ? false : undefined,
-        selectable: n.locked === true ? false : undefined,
-        data: { kind: n.data.kind, label: n.data.label, style: { ...n.data.style } },
-      };
-    }),
-  );
-}
-
-/** 把持久化的连线记录转换为 React Flow 边（含样式） */
-function edgesFromPage(page: FlowPage): FlowEdge[] {
-  return page.edges.map((e) => {
-    const style = normalizeEdgeStyle(e.style);
-    return {
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle ?? null,
-      targetHandle: e.targetHandle ?? null,
-      label: e.label,
-      data: { style },
-      ...edgePropsOf(style),
-    };
-  });
 }
 
 interface FlowState {
@@ -142,8 +82,9 @@ interface FlowState {
   edges: FlowEdge[];
   selectedNodes: string[];
   selectedEdges: string[];
-  past: Snapshot[];
-  future: Snapshot[];
+  /** 撤销栈：每条记录只包含本次变更涉及的节点/边（结构 diff） */
+  past: HistoryDiff[];
+  future: HistoryDiff[];
   helperLines: HelperLines | null;
   /** 复制粘贴的剪贴板（会话态，不持久化） */
   clipboard: { nodes: FlowNode[]; edges: FlowEdge[] } | null;
@@ -153,6 +94,27 @@ interface FlowState {
   saveSnapshot: (name: string) => void;
   restoreSnapshot: (id: string) => void;
   deleteSnapshot: (id: string) => void;
+
+  /** 画布网格吸附：开关与网格尺寸（会话态，不落文档） */
+  gridEnabled: boolean;
+  gridSize: number;
+  setGridEnabled: (v: boolean) => void;
+  setGridSize: (v: number) => void;
+  /** 自动布局参数：方向与间距预设 */
+  layoutDirection: LayoutDirection;
+  layoutDensity: LayoutDensity;
+  setLayoutDirection: (v: LayoutDirection) => void;
+  setLayoutDensity: (v: LayoutDensity) => void;
+  /** 对齐辅助线吸附阈值（px） */
+  alignTolerance: number;
+  setAlignTolerance: (v: number) => void;
+  /** 格式刷：已复制的节点样式（会话态，不持久化） */
+  styleBrush: FlowNodeStyle | null;
+  setStyleBrush: (style: FlowNodeStyle | null) => void;
+  /** 全选当前页的节点与连线（锁定节点除外） */
+  selectAll: () => void;
+  /** 按方向键微移选中节点（不写历史，由调用方合并为一次撤销） */
+  nudgeSelected: (dx: number, dy: number) => void;
 
   /** 多页：页面顺序与名称；活动页数据在 nodes/edges，其余页缓存在 pageData */
   pageOrder: PageMeta[];
@@ -171,6 +133,8 @@ interface FlowState {
   commit: () => void;
   undo: () => void;
   redo: () => void;
+  /** 载入文档后重建历史基线（keep 为真时保留撤销栈） */
+  resetHistory: (keep?: boolean) => void;
 
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -179,6 +143,10 @@ interface FlowState {
   reconnectEdge: (edgeId: string, connection: Connection) => void;
   /** 修改连线起点/终点连接的节点（属性面板下拉） */
   setEdgeEndpoint: (edgeId: string, end: 'source' | 'target', nodeId: string) => void;
+  /** 写入/清除连线折点（传入空数组等于清除） */
+  setEdgeWaypoints: (edgeId: string, waypoints: Waypoint[] | undefined, history?: boolean) => void;
+  /** 对选中连线执行正交自动布线（避开其它节点包围盒） */
+  autoRouteSelectedEdges: () => void;
   onSelectionChange: (selection: { nodes: FlowNode[]; edges: FlowEdge[] }) => void;
   /** 仅取消连线选中（保留节点选中）：用于「开始新建连线」时让出连线选择态 */
   deselectEdges: () => void;
@@ -196,35 +164,81 @@ interface FlowState {
   changeNodeKind: (id: string, kind: ShapeKind) => void;
 
   addNode: (kind: ShapeKind, position: { x: number; y: number }) => void;
+  /** 插入非图形节点（图片 / 图标 / 公式），返回新节点 id */
+  addTypedNode: (
+    type: FlowNodeType,
+    data: FlowNodeData,
+    size: { width: number; height: number },
+    position: { x: number; y: number },
+  ) => string;
+  /** 改写公式节点的 LaTeX 源码 */
+  setNodeFormula: (id: string, formula: string, history?: boolean) => void;
   reparentNode: (id: string) => void;
+  /** 拖拽结束后的归属判定（图层面板：拖入容器 / 拖回画布顶层） */
+  reparentNodeTo: (id: string, parentId?: string) => void;
+  /** 图层排序：把节点移动到目标节点之前（保持父在子前的层级不变量） */
+  reorderNode: (id: string, targetId: string) => void;
   setNodeLabel: (id: string, label: string, history?: boolean) => void;
   patchSelected: (patch: FlowNodePatch, history?: boolean) => void;
-  patchEdgeLabel: (id: string, label: string) => void;
+  patchEdgeLabel: (id: string, label: string, history?: boolean) => void;
   removeSelected: () => void;
   duplicateSelected: () => void;
-  applyAutoLayout: (direction?: 'TB' | 'LR') => void;
+  applyAutoLayout: (options?: LayoutOptions) => void;
   clear: () => void;
   setHelperLines: (lines: HelperLines | null) => void;
 }
 
 export const useFlowStore = create<FlowState>((set, get) => ({
+  // 撤销/重做：结构 diff 历史（见 store/history.ts）
+  ...createHistorySlice<FlowState>(set, get),
   docName: '',
   setDocName: (name) => set({ docName: name }),
   nodes: [],
   edges: [],
   selectedNodes: [],
   selectedEdges: [],
-  past: [],
-  future: [],
   helperLines: null,
   defaultEdge: { ...DEFAULT_EDGE_STYLE },
   clipboard: null,
   snapshots: [],
+  gridEnabled: true,
+  gridSize: 10,
+  layoutDirection: 'TB',
+  layoutDensity: 'normal',
+  alignTolerance: 5,
+  styleBrush: null,
   pageOrder: [{ id: DEFAULT_PAGE_ID, name: DEFAULT_PAGE_NAME }],
   activePageId: DEFAULT_PAGE_ID,
   pageData: {},
 
   setClipboard: (clip) => set({ clipboard: clip }),
+
+  setGridEnabled: (v) => set({ gridEnabled: v }),
+  setGridSize: (v) => set({ gridSize: v }),
+  setLayoutDirection: (v) => set({ layoutDirection: v }),
+  setLayoutDensity: (v) => set({ layoutDensity: v }),
+  setAlignTolerance: (v) => set({ alignTolerance: v }),
+  setStyleBrush: (style) => set({ styleBrush: style }),
+
+  selectAll: () =>
+    set((s) => ({
+      nodes: s.nodes.map((n) => (n.selectable === false ? n : { ...n, selected: true })),
+      edges: s.edges.map((e) => ({ ...e, selected: true })),
+      selectedNodes: s.nodes.filter((n) => n.selectable !== false).map((n) => n.id),
+      selectedEdges: s.edges.map((e) => e.id),
+    })),
+
+  nudgeSelected: (dx, dy) => {
+    const ids = new Set(get().selectedNodes);
+    if (ids.size === 0) return;
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        ids.has(n.id) && n.draggable !== false
+          ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
+          : n,
+      ),
+    }));
+  },
 
   saveSnapshot: (name) => {
     const doc = get().getDoc();
@@ -246,18 +260,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const empty = {
       nodes: [],
       edges: [],
-      past: [],
-      future: [],
       selectedNodes: [],
       selectedEdges: [],
     };
     const defaultPages = {
-      pageOrder: [{ id: DEFAULT_PAGE_ID, name: DEFAULT_PAGE_NAME }],
+      pageOrder: [{ id: DEFAULT_PAGE_ID, name: defaultPageName(1) }],
       activePageId: DEFAULT_PAGE_ID,
       pageData: {} as Record<string, FlowPage>,
     };
     if (!doc) {
       set({ ...empty, ...defaultPages, docName: '' });
+      get().resetHistory(keepHistory);
       return;
     }
     // 迁移到 v2 后按页恢复：旧版 v1 草稿也能正常读取，多页结构一并保留
@@ -265,24 +278,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const page = activePageOf(normalized);
     if (!normalized || !page) {
       set({ ...empty, ...defaultPages, docName: '' });
+      get().resetHistory(keepHistory);
       return;
     }
     const pageData: Record<string, FlowPage> = {};
     for (const p of normalized.pages) {
       if (p.id !== page.id) pageData[p.id] = p;
     }
-    set((s) => ({
+    set({
       nodes: nodesFromPage(page),
       edges: edgesFromPage(page),
       docName: normalized.name ?? '',
       pageOrder: normalized.pages.map((p) => ({ id: p.id, name: p.name })),
       activePageId: page.id,
       pageData,
-      past: keepHistory ? s.past : [],
-      future: keepHistory ? s.future : [],
       selectedNodes: [],
       selectedEdges: [],
-    }));
+    });
+    // 载入即新的历史基线：未显式保留时清空撤销栈
+    get().resetHistory(keepHistory);
   },
 
   getDoc: () => {
@@ -298,16 +312,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         height: n.height,
         hidden: n.hidden === true,
         locked: n.draggable === false,
+        type: n.type as FlowNodeType | undefined,
+        mxStyle: n.data.mxStyle,
       })),
-      edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourceHandle: e.sourceHandle,
-        targetHandle: e.targetHandle,
-        label: typeof e.label === 'string' ? e.label : undefined,
-        style: (e.data as { style?: FlowEdgeStyle } | undefined)?.style,
-      })),
+      edges.map((e) => {
+        const data = e.data as FlowEdgeData | undefined;
+        return {
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle,
+          targetHandle: e.targetHandle,
+          label: typeof e.label === 'string' ? e.label : undefined,
+          style: data?.style,
+          waypoints: data?.waypoints,
+          mxStyle: data?.mxStyle,
+        };
+      }),
     );
     const currentPage = current.pages[0];
     const pages: FlowPage[] = pageOrder.map((meta) => {
@@ -329,40 +350,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       activePageId,
     };
   },
-
-  commit: () =>
-    set((s) => ({
-      past: [...s.past, { nodes: s.nodes, edges: s.edges }].slice(-HISTORY_LIMIT),
-      future: [],
-    })),
-
-  undo: () =>
-    set((s) => {
-      const previous = s.past[s.past.length - 1];
-      if (!previous) return s;
-      return {
-        past: s.past.slice(0, -1),
-        future: [{ nodes: s.nodes, edges: s.edges }, ...s.future].slice(0, HISTORY_LIMIT),
-        nodes: previous.nodes,
-        edges: previous.edges,
-        selectedNodes: [],
-        selectedEdges: [],
-      };
-    }),
-
-  redo: () =>
-    set((s) => {
-      const next = s.future[0];
-      if (!next) return s;
-      return {
-        past: [...s.past, { nodes: s.nodes, edges: s.edges }].slice(-HISTORY_LIMIT),
-        future: s.future.slice(1),
-        nodes: next.nodes,
-        edges: next.edges,
-        selectedNodes: [],
-        selectedEdges: [],
-      };
-    }),
 
   onNodesChange: (changes) => {
     set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) as FlowNode[] }));
@@ -446,6 +433,56 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }));
   },
 
+  setEdgeWaypoints: (edgeId, waypoints, history = true) => {
+    const next =
+      waypoints && waypoints.length > 0
+        ? waypoints.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }))
+        : undefined;
+    if (history) get().commit();
+    set((s) => ({
+      edges: s.edges.map((e) => {
+        if (e.id !== edgeId) return e;
+        const data: FlowEdgeData = { ...(e.data as FlowEdgeData | undefined) };
+        if (next) data.waypoints = next;
+        else delete data.waypoints;
+        return { ...e, data };
+      }),
+    }));
+  },
+
+  autoRouteSelectedEdges: () => {
+    const { edges, selectedEdges, nodes } = get();
+    if (selectedEdges.length === 0) return;
+    const ids = new Set(selectedEdges);
+    const byId = new Map(nodes.map((n) => [n.id, n] as const));
+    const obstacles = nodes
+      .filter((n) => n.hidden !== true)
+      .map((n) => ({ id: n.id, rect: absoluteRectOf(n, byId) }));
+
+    let changed = false;
+    const nextEdges = edges.map((e) => {
+      if (!ids.has(e.id)) return e;
+      const source = byId.get(e.source);
+      const target = byId.get(e.target);
+      if (!source || !target) return e;
+      const from = anchorOf(source, byId, e.sourceHandle, target);
+      const to = anchorOf(target, byId, e.targetHandle, source);
+      const fromStub = stubPoint(from.point, from.side);
+      const toStub = stubPoint(to.point, to.side);
+      const boxes = obstacles
+        .filter((o) => o.id !== e.source && o.id !== e.target)
+        .map((o) => o.rect);
+      const middle = routeOrthogonal(fromStub, toStub, boxes);
+      const waypoints = dropCollinear([fromStub, ...middle, toStub]);
+      const data: FlowEdgeData = { ...(e.data as FlowEdgeData | undefined), waypoints };
+      changed = true;
+      return { ...e, data };
+    });
+    if (!changed) return;
+    get().commit();
+    set({ edges: nextEdges });
+  },
+
   setDefaultEdge: (patch) => set((s) => ({ defaultEdge: { ...s.defaultEdge, ...patch } })),
 
   spawnConnectedNode: (sourceId, position, kindOverride) => {
@@ -489,7 +526,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       get().defaultEdge,
     );
     set((s) => ({
-      nodes: orderNodesByHierarchy([...s.nodes, node]),
+      nodes: selectOnly(orderNodesByHierarchy([...s.nodes, node]), [newId]),
       edges: addEdge(edge, s.edges),
       selectedNodes: [newId],
     }));
@@ -549,8 +586,39 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
     const node = makeNode(kind, finalPosition, { parentId });
     set((s) => ({
-      nodes: orderNodesByHierarchy([...s.nodes, node]),
+      nodes: selectOnly(orderNodesByHierarchy([...s.nodes, node]), [node.id]),
       selectedNodes: [node.id],
+    }));
+  },
+
+  addTypedNode: (type, data, size, position) => {
+    get().commit();
+    const current = get().nodes;
+    const byId = new Map(current.map((n) => [n.id, n] as const));
+    const lanes = current
+      .filter((n) => isContainerKind(n.data.kind))
+      .map((n) => ({ id: n.id, rect: absoluteRectOf(n, byId) }));
+    const placement = resolvePlacement({ x: position.x, y: position.y, ...size }, lanes);
+    const node: FlowNode = {
+      id: createId('n'),
+      type,
+      position: placement.position,
+      width: size.width,
+      height: size.height,
+      parentId: placement.parentId,
+      data,
+    };
+    set((s) => ({
+      nodes: selectOnly(orderNodesByHierarchy([...s.nodes, node]), [node.id]),
+      selectedNodes: [node.id],
+    }));
+    return node.id;
+  },
+
+  setNodeFormula: (id, formula, history = true) => {
+    if (history) get().commit();
+    set((s) => ({
+      nodes: s.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, formula } } : n)),
     }));
   },
 
@@ -579,6 +647,58 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }));
   },
 
+  reparentNodeTo: (id, parentId) => {
+    const { nodes } = get();
+    const node = nodes.find((n) => n.id === id);
+    if (!node) return;
+    // 容器之间不支持嵌套（与画布拖拽保持一致）
+    if (parentId && isContainerKind(node.data.kind)) return;
+    const byId = new Map(nodes.map((n) => [n.id, n] as const));
+    const abs = absolutePositionOf(node, byId);
+    let next: { parentId: string | undefined; position: { x: number; y: number } };
+    if (parentId) {
+      const parent = byId.get(parentId);
+      if (!parent || !isContainerKind(parent.data.kind)) return;
+      const parentAbs = absolutePositionOf(parent, byId);
+      const size = {
+        width: parent.width ?? shapeSize(parent.data.kind).width,
+        height: parent.height ?? shapeSize(parent.data.kind).height,
+      };
+      // 相对坐标保持视觉位置，并夹进容器内部（避免子节点落在容器之外）
+      const rel = { x: Math.round(abs.x - parentAbs.x), y: Math.round(abs.y - parentAbs.y) };
+      next = {
+        parentId,
+        position: {
+          x: Math.min(Math.max(rel.x, 12), Math.max(12, size.width - 60)),
+          y: Math.min(Math.max(rel.y, 12), Math.max(12, size.height - 50)),
+        },
+      };
+    } else {
+      next = { parentId: undefined, position: { x: Math.round(abs.x), y: Math.round(abs.y) } };
+    }
+    const sameParent = (node.parentId ?? undefined) === next.parentId;
+    if (sameParent && node.position.x === next.position.x && node.position.y === next.position.y) {
+      return;
+    }
+    get().commit();
+    set((s) => ({
+      nodes: orderNodesByHierarchy(s.nodes.map((n) => (n.id === id ? { ...n, ...next } : n))),
+    }));
+  },
+
+  reorderNode: (id, targetId) => {
+    if (id === targetId) return;
+    const { nodes } = get();
+    const from = nodes.findIndex((n) => n.id === id);
+    const to = nodes.findIndex((n) => n.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...nodes];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    get().commit();
+    set({ nodes: orderNodesByHierarchy(next) });
+  },
+
   setNodeLabel: (id, label, history = false) => {
     if (history) get().commit();
     set((s) => ({
@@ -597,8 +717,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }));
   },
 
-  patchEdgeLabel: (id, label) => {
-    get().commit();
+  patchEdgeLabel: (id, label, history = true) => {
+    if (history) get().commit();
     set((s) => ({ edges: s.edges.map((e) => (e.id === id ? { ...e, label } : e)) }));
   },
 
@@ -635,23 +755,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         selected: false,
         data: { ...n.data, style: { ...n.data.style } },
       }));
-    set((s) => ({
-      nodes: orderNodesByHierarchy([...s.nodes, ...copies]),
-      selectedNodes: copies.map((c) => c.id),
-    }));
+    set((s) => {
+      const ids = copies.map((c) => c.id);
+      return {
+        nodes: selectOnly(orderNodesByHierarchy([...s.nodes, ...copies]), ids),
+        selectedNodes: ids,
+      };
+    });
   },
 
-  applyAutoLayout: (direction = 'TB') => {
+  applyAutoLayout: (options = {}) => {
     get().commit();
-    set((s) => {
-      // 自动布局会整体重排：先把子节点提升为绝对坐标并解除泳道归属
-      const byId = new Map(s.nodes.map((n) => [n.id, n] as const));
-      const detached = s.nodes.map((n) => {
-        if (!n.parentId) return { ...n, parentId: undefined };
-        return { ...n, position: absolutePositionOf(n, byId), parentId: undefined };
-      });
-      return { nodes: layoutGraph(detached, s.edges, direction) };
-    });
+    // 两段式布局默认保留泳道/编组层级，容器位置与内部相对坐标一起重排
+    set((s) => ({ nodes: layoutGraph(s.nodes, s.edges, options) }));
   },
 
   clear: () => {
@@ -667,7 +783,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       pageOrder: [
         ...state.pageOrder,
-        { id, name: name?.trim() || `页面 ${state.pageOrder.length + 1}` },
+        { id, name: name?.trim() || defaultPageName(state.pageOrder.length + 1) },
       ],
       activePageId: id,
       // 先把当前页内容缓存起来，再切换到空白新页
@@ -748,3 +864,22 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   setHelperLines: (lines) => set({ helperLines: lines }),
 }));
+
+/* ------------------------------ 兼容导出 ------------------------------ */
+// 实现已下沉到 store/helpers.ts 与 store/history.ts；对外 API 保持不变，
+// 调用点（UI / flowOps / 单测）无需改动。
+
+export {
+  DEFAULT_PAGE_ID,
+  DEFAULT_PAGE_NAME,
+  defaultPageName,
+  edgesFromPage,
+  makeEdge,
+  makeNode,
+  nodesFromPage,
+  selectOnly,
+  type FlowEdge,
+  type FlowNode,
+  type PageMeta,
+} from './store/helpers';
+export { applyListDiff, diffList, type HistoryDiff, type ListEntry } from './store/history';

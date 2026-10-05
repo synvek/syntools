@@ -64,6 +64,140 @@ describe('多页', () => {
   });
 });
 
+describe('批量编辑与微移', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(buildTemplateDoc('basic'));
+  });
+
+  it('selectAll 选中全部节点与连线', () => {
+    const st = useFlowStore.getState();
+    const nodeCount = st.nodes.length;
+    const edgeCount = st.edges.length;
+    st.selectAll();
+    expect(useFlowStore.getState().selectedNodes).toHaveLength(nodeCount);
+    expect(useFlowStore.getState().selectedEdges).toHaveLength(edgeCount);
+  });
+
+  it('nudgeSelected 按位移移动选中节点（锁定节点除外）', () => {
+    const st = useFlowStore.getState();
+    const target = st.nodes[0];
+    useFlowStore.setState({ selectedNodes: [target.id] });
+    useFlowStore.getState().nudgeSelected(5, -3);
+    const moved = useFlowStore.getState().nodes.find((n) => n.id === target.id)!;
+    expect(moved.position).toEqual({ x: target.position.x + 5, y: target.position.y - 3 });
+  });
+
+  it('patchSelected 批量写入样式（一次撤销即可整体回退）', () => {
+    const st = useFlowStore.getState();
+    const ids = st.nodes.slice(0, 2).map((n) => n.id);
+    const before = ids.map((id) => st.nodes.find((n) => n.id === id)!.data.style.fill);
+    useFlowStore.setState({ selectedNodes: ids });
+
+    st.patchSelected({ style: { fill: '#abcdef' } }, true);
+    for (const id of ids) {
+      expect(useFlowStore.getState().nodes.find((n) => n.id === id)!.data.style.fill).toBe(
+        '#abcdef',
+      );
+    }
+
+    // 一次 undo 把两个节点一起还原（批量改动只产生一条历史记录）
+    useFlowStore.getState().undo();
+    ids.forEach((id, i) => {
+      expect(useFlowStore.getState().nodes.find((n) => n.id === id)!.data.style.fill).toBe(
+        before[i],
+      );
+    });
+  });
+
+  it('撤销/重做：删除节点后可完整恢复（含层级顺序）', () => {
+    const ids = useFlowStore.getState().nodes.map((n) => n.id);
+    useFlowStore.setState({ selectedNodes: [ids[1]] });
+    useFlowStore.getState().removeSelected();
+    expect(useFlowStore.getState().nodes.some((n) => n.id === ids[1])).toBe(false);
+
+    useFlowStore.getState().undo();
+    expect(useFlowStore.getState().nodes.map((n) => n.id)).toEqual(ids);
+
+    useFlowStore.getState().redo();
+    expect(useFlowStore.getState().nodes.some((n) => n.id === ids[1])).toBe(false);
+  });
+
+  it('历史记录只包含变更条目（结构 diff，而非整图快照）', () => {
+    const st = useFlowStore.getState();
+    const first = st.nodes[0].id;
+    useFlowStore.setState({ selectedNodes: [first] });
+    st.patchSelected({ style: { fill: '#123456' } }, true);
+
+    // 第二次改动触发上一条变更的结算
+    useFlowStore.setState({ selectedNodes: [st.nodes[1].id] });
+    useFlowStore.getState().patchSelected({ style: { fill: '#654321' } }, true);
+
+    const past = useFlowStore.getState().past;
+    expect(past).toHaveLength(1);
+    expect(past[0].nodes).toHaveLength(1);
+    expect(past[0].nodes[0].id).toBe(first);
+    expect(past[0].edges).toHaveLength(0);
+    expect(past[0].nodes[0].before).toBeDefined();
+    expect(past[0].nodes[0].after).toBeDefined();
+  });
+
+  it('网格吸附设置可读写', () => {
+    expect(useFlowStore.getState().gridEnabled).toBe(true);
+    useFlowStore.getState().setGridEnabled(false);
+    useFlowStore.getState().setGridSize(20);
+    expect(useFlowStore.getState().gridEnabled).toBe(false);
+    expect(useFlowStore.getState().gridSize).toBe(20);
+    // 复原，避免影响其它用例
+    useFlowStore.getState().setGridEnabled(true);
+    useFlowStore.getState().setGridSize(10);
+  });
+});
+
+describe('图层面板拖放', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(buildTemplateDoc('swimlane'));
+  });
+
+  it('reparentNodeTo 把顶层节点放进泳道并夹进容器内部', () => {
+    const lane = useFlowStore.getState().nodes.find((n) => n.data.kind === 'swimlane')!;
+    useFlowStore.getState().addNode('rect', { x: 3000, y: 3000 });
+    const added = useFlowStore.getState().selectedNodes[0];
+
+    useFlowStore.getState().reparentNodeTo(added, lane.id);
+    const moved = useFlowStore.getState().nodes.find((n) => n.id === added)!;
+    expect(moved.parentId).toBe(lane.id);
+    expect(moved.position.x).toBeGreaterThanOrEqual(0);
+    expect(moved.position.y).toBeGreaterThanOrEqual(0);
+  });
+
+  it('reparentNodeTo(id, undefined) 移出容器并保留画布绝对位置', () => {
+    const child = useFlowStore.getState().nodes.find((n) => n.parentId)!;
+    useFlowStore.getState().reparentNodeTo(child.id, undefined);
+    const moved = useFlowStore.getState().nodes.find((n) => n.id === child.id)!;
+    expect(moved.parentId ?? null).toBeNull();
+  });
+
+  it('容器不能被放进另一个容器', () => {
+    const lane = useFlowStore.getState().nodes.find((n) => n.data.kind === 'swimlane')!;
+    useFlowStore.getState().addNode('swimlane', { x: 3000, y: 3000 });
+    const added = useFlowStore.getState().selectedNodes[0];
+    useFlowStore.getState().reparentNodeTo(added, lane.id);
+    expect(useFlowStore.getState().nodes.find((n) => n.id === added)!.parentId ?? null).toBeNull();
+  });
+
+  it('reorderNode 调整顺序且容器仍排在子节点之前', () => {
+    const ids = useFlowStore.getState().nodes.map((n) => n.id);
+    const lakeId = ids[0];
+    const lastId = ids[ids.length - 1];
+    useFlowStore.getState().reorderNode(lakeId, lastId);
+    const after = useFlowStore.getState().nodes;
+    const childIndexes = after.map((n, i) => (n.parentId ? i : -1)).filter((i) => i >= 0);
+    expect(Math.min(...childIndexes)).toBeGreaterThan(
+      after.findIndex((n) => n.data.kind === 'swimlane'),
+    );
+  });
+});
+
 describe('版本快照', () => {
   beforeEach(() => {
     useFlowStore.getState().load(null);

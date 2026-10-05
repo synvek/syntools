@@ -4,9 +4,14 @@
  * 这样旧的 v1 草稿（{version:1, nodes, edges}）仍然可读，不会被丢弃。
  */
 
-import type { FlowDoc, FlowEdgeRec, FlowNodeRec, FlowPage } from './types';
+import type { FlowDoc, FlowEdgeRec, FlowNodeRec, FlowNodeType, FlowPage } from './types';
 
-export const DEFAULT_PAGE_NAME = '页面 1';
+/**
+ * 页面默认名占位符（语言中立）。
+ * 新建页面时由 store 层按当前语言本地化（`tools.flowchart.defaultPageName`）；
+ * 此常量仅用于兼容缺失页名的历史数据。
+ */
+export const DEFAULT_PAGE_NAME = 'Page 1';
 
 let seq = 0;
 
@@ -40,10 +45,17 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const NODE_TYPES: FlowNodeType[] = ['shape', 'image', 'icon', 'formula'];
+
+/** 未知/缺失的节点类型回退为 shape（保证旧文档与脏数据都能打开） */
+function normalizeNodeType(value: unknown): FlowNodeType {
+  return NODE_TYPES.includes(value as FlowNodeType) ? (value as FlowNodeType) : 'shape';
+}
+
 function normalizeNode(v: FlowNodeRec): FlowNodeRec {
   return {
     ...v,
-    type: 'shape',
+    type: normalizeNodeType(v.type),
     position: { x: num(v.position?.x), y: num(v.position?.y) },
     parentId: v.parentId ?? null,
     hidden: v.hidden === true,

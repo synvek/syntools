@@ -2,15 +2,28 @@ import { fitScene, PAGE_THUMB_SIZE } from '@/core/components/pageThumbnail';
 import { pageSceneOf } from './pageScene';
 import type { FlowPage } from './types';
 
-export function PageThumbnail({ page }: { page: FlowPage }) {
+/**
+ * 页面缩略图：直接由 `pageSceneOf` 的纯函数场景渲染。
+ * 非活动页没有 DOM，因此不走截图——任意页都能即时预览。
+ * `box` 可覆盖尺寸（模板卡片用更扁的框）。
+ */
+export function PageThumbnail({
+  page,
+  box = PAGE_THUMB_SIZE,
+  testId = 'page-thumb',
+}: {
+  page: FlowPage;
+  box?: { width: number; height: number };
+  testId?: string;
+}) {
   const scene = pageSceneOf(page);
   if (!scene) return null;
-  const { width, height } = PAGE_THUMB_SIZE;
-  const { scale, x, y } = fitScene(scene);
+  const { width, height } = box;
+  const { scale, x, y } = fitScene(scene, box);
 
   return (
     <svg
-      data-testid="page-thumb"
+      data-testid={testId}
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}

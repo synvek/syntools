@@ -2,6 +2,11 @@
  * 位图 / 矢量 / PDF 导出。
  * 统一走「DOM 截图」方案（html-to-image），比自绘保真度高：
  * React Flow 渲染结果就是 DOM + SVG，截图即可还原样式。
+ *
+ * 导出范围（`range`）：
+ * - `selection` 仅导出选中节点；
+ * - `current`   导出当前页全部节点；
+ * - `all`       逐页导出（由 UI 切换页面并调用 `capturePage`），多页结果打包为 ZIP 或合并 PDF。
  */
 
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
@@ -13,6 +18,9 @@ import type { FlowNodeData } from '../model/types';
 
 export type RasterFormat = 'png' | 'jpeg' | 'svg' | 'pdf';
 
+/** 导出范围 */
+export type ExportRange = 'selection' | 'current' | 'all';
+
 export interface RasterExportOptions {
   format: RasterFormat;
   /** 导出倍率，越大越清晰（也越占内存） */
@@ -21,6 +29,8 @@ export interface RasterExportOptions {
   transparent: boolean;
   /** 内容外留白 */
   padding: number;
+  /** 导出范围 */
+  range: ExportRange;
 }
 
 export const DEFAULT_RASTER_OPTIONS: RasterExportOptions = {
@@ -28,7 +38,14 @@ export const DEFAULT_RASTER_OPTIONS: RasterExportOptions = {
   scale: 2,
   transparent: false,
   padding: 24,
+  range: 'current',
 };
+
+/** 倍率可选值（含 1x/2x/3x 常用预设） */
+export const SCALE_OPTIONS = [0.5, 1, 1.5, 2, 3, 4];
+/** 边距可调范围 */
+export const PADDING_MIN = 0;
+export const PADDING_MAX = 200;
 
 const EXT: Record<RasterFormat, string> = { png: 'png', jpeg: 'jpg', svg: 'svg', pdf: 'pdf' };
 
@@ -49,7 +66,7 @@ export function exportBoundsOf(
   };
 }
 
-/** 生成截图参数（供 toPng / toJpeg 复用） */
+/** 生成截图参数（供 toPng / toJpeg / toSvg 复用） */
 function captureOptions(
   bounds: { x: number; y: number; width: number; height: number },
   opts: RasterExportOptions,
@@ -83,18 +100,60 @@ export async function captureViewportDataUrl(
   nodes: Node<FlowNodeData>[],
   options: RasterExportOptions = DEFAULT_RASTER_OPTIONS,
 ): Promise<string | null> {
+  const captured = await capturePage('', nodes, { ...options, format: 'png' });
+  return captured?.dataUrl ?? null;
+}
+
+/** 已捕获的一页（dataUrl 的格式由 options.format 决定，pdf 内部使用 png） */
+export interface CapturedPage {
+  name: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * 截取「当前画布上已渲染的那一页」。
+ * 多页导出时由调用方逐页切换后调用；返回 null 表示画布不存在或该页不可导出。
+ */
+export async function capturePage(
+  name: string,
+  nodes: Node<FlowNodeData>[],
+  options: RasterExportOptions,
+): Promise<CapturedPage | null> {
   try {
     if (nodes.length === 0) return null;
     const viewport = viewportEl();
     if (!viewport) return null;
-    return await toPng(viewport, captureOptions(exportBoundsOf(nodes, options.padding), options));
+    const capture = captureOptions(exportBoundsOf(nodes, options.padding), options);
+    let dataUrl: string;
+    if (options.format === 'svg') dataUrl = await toSvg(viewport, capture);
+    else if (options.format === 'jpeg') dataUrl = await toJpeg(viewport, capture);
+    else dataUrl = await toPng(viewport, capture);
+    return { name, dataUrl, width: capture.width, height: capture.height };
   } catch {
     return null;
   }
 }
 
+/** dataURL → 二进制（ZIP 打包用） */
+function dataUrlToUint8(dataUrl: string): Uint8Array {
+  const comma = dataUrl.indexOf(',');
+  const payload = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+/** 文件名安全化（页名可能含空格或斜杠） */
+function safeName(name: string, fallback: string): string {
+  const cleaned = name.replace(/[\\/:*?"<>|]+/g, '_').trim();
+  return cleaned || fallback;
+}
+
 /**
- * 导出当前画布为 PNG / JPEG / PDF。
+ * 单页导出（PNG / JPEG / SVG / PDF）。
  * nodes 为要导出的节点集合（传入选中节点即可实现「仅导出选中」）。
  */
 export async function exportRaster(
@@ -102,38 +161,63 @@ export async function exportRaster(
   options: RasterExportOptions,
   filename: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    if (nodes.length === 0) return { ok: false, error: 'EMPTY' };
-    const viewport = viewportEl();
-    if (!viewport) return { ok: false, error: 'EMPTY' };
+  if (nodes.length === 0) return { ok: false, error: 'EMPTY' };
+  const page = await capturePage(filename, nodes, options);
+  if (!page) return { ok: false, error: nodes.length === 0 ? 'EMPTY' : 'EXPORT_FAILED' };
 
-    const bounds = exportBoundsOf(nodes, options.padding);
-    const capture = captureOptions(bounds, options);
-
-    if (options.format === 'pdf') {
-      const dataUrl = await toPng(viewport, capture);
-      const orientation = capture.width >= capture.height ? 'landscape' : 'portrait';
-      const pdf = new jsPDF({
-        orientation,
-        unit: 'px',
-        format: [capture.width, capture.height],
-      });
-      pdf.addImage(dataUrl, 'PNG', 0, 0, capture.width, capture.height);
-      pdf.save(`${filename}.pdf`);
-      return { ok: true };
-    }
-
-    let dataUrl: string;
-    if (options.format === 'svg') {
-      dataUrl = await toSvg(viewport, capture);
-    } else if (options.format === 'jpeg') {
-      dataUrl = await toJpeg(viewport, capture);
-    } else {
-      dataUrl = await toPng(viewport, capture);
-    }
-    downloadDataUrl(dataUrl, `${filename}.${EXT[options.format]}`);
+  if (options.format === 'pdf') {
+    const pdf = new jsPDF({
+      orientation: page.width >= page.height ? 'landscape' : 'portrait',
+      unit: 'px',
+      format: [page.width, page.height],
+    });
+    pdf.addImage(page.dataUrl, 'PNG', 0, 0, page.width, page.height);
+    pdf.save(`${filename}.pdf`);
     return { ok: true };
-  } catch {
-    return { ok: false, error: 'EXPORT_FAILED' };
   }
+
+  downloadDataUrl(page.dataUrl, `${filename}.${EXT[options.format]}`);
+  return { ok: true };
+}
+
+/**
+ * 多页导出：ZIP 打包（png/jpeg/svg）或合并为多页 PDF。
+ * 调用方需保证每个 `dataUrl` 是在对应页处于活动状态时截取的。
+ */
+export async function exportRasterSet(
+  pages: CapturedPage[],
+  options: RasterExportOptions,
+  filename: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (pages.length === 0) return { ok: false, error: 'EMPTY' };
+
+  if (options.format === 'pdf') {
+    const first = pages[0];
+    const pdf = new jsPDF({
+      orientation: first.width >= first.height ? 'landscape' : 'portrait',
+      unit: 'px',
+      format: [first.width, first.height],
+    });
+    pages.forEach((page, index) => {
+      if (index > 0) pdf.addPage([page.width, page.height]);
+      pdf.addImage(page.dataUrl, 'PNG', 0, 0, page.width, page.height);
+    });
+    pdf.save(`${filename}.pdf`);
+    return { ok: true };
+  }
+
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+  const ext = EXT[options.format];
+  pages.forEach((page, index) => {
+    zip.file(
+      `${String(index + 1).padStart(2, '0')}-${safeName(page.name, 'page')}.${ext}`,
+      dataUrlToUint8(page.dataUrl),
+    );
+  });
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  downloadDataUrl(url, `${filename}.zip`);
+  URL.revokeObjectURL(url);
+  return { ok: true };
 }

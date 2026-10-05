@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useViewport } from '@xyflow/react';
 import { useFlowStore } from '../store';
 import { absoluteRectOf } from '../core';
@@ -36,7 +37,10 @@ function EndpointSquare(props: {
   size: number;
 }) {
   const { edgeId, end, left, top, size } = props;
+  const { t } = useTranslation();
   const ref = useRef<HTMLButtonElement>(null);
+  const label =
+    end === 'source' ? t('tools.flowchart.reconnectSource') : t('tools.flowchart.reconnectTarget');
 
   useEffect(() => {
     const el = ref.current;
@@ -68,8 +72,8 @@ function EndpointSquare(props: {
       type="button"
       data-testid="edge-endpoint"
       data-end={end}
-      aria-label={end === 'source' ? '重连起点' : '重连终点'}
-      title={end === 'source' ? '重连起点' : '重连终点'}
+      aria-label={label}
+      title={label}
       className="edge-endpoint pointer-events-auto absolute cursor-grab rounded-[2px] border border-white bg-blue-600 shadow-sm transition-colors hover:bg-blue-700 active:cursor-grabbing"
       style={{ left, top, width: size, height: size }}
     />

@@ -4,13 +4,23 @@ import { useTranslation } from 'react-i18next';
 import { DocumentHeader } from '@/core/components/DocumentHeader';
 import { Icon } from '@/core/components/Icon';
 import { i18n } from '@/core/i18n';
-import { buildTemplateDoc, type TemplateKind } from './model/templates';
+import { buildTemplateDoc, type TemplateKind, type TemplateTranslator } from './model/templates';
+import { LAYOUT_DENSITY } from './layout';
 import { copySelection, groupSelected, pasteClipboard, ungroupSelected } from './flowOps';
 import { useFlowStore } from './store';
 import { readDraft, writeDraft, clearDraft } from './draft';
-import { registerFlowchartStrings } from './strings';
-import { type ShapeKind } from './model/types';
+import { hasFlowchartStrings, registerFlowchartStrings } from './strings';
+import {
+  FORMULA_NODE_SIZE,
+  ICON_NODE_SIZE,
+  IMAGE_NODE_SIZE,
+  type FlowNodeData,
+  type FlowNodeType,
+  type ShapeKind,
+} from './model/types';
 import { shapeSize } from './model/shapes';
+import { absoluteRectOf, formulaData, iconData, imageData } from './core';
+import { fitInto, loadImageFile } from './model/image';
 import { activePageOf } from './model/migrate';
 import { FlowCanvas } from './ui/FlowCanvas';
 import { IoMenu } from './ui/IoMenu';
@@ -27,8 +37,6 @@ import { captureViewportDataUrl, DEFAULT_RASTER_OPTIONS } from './io/raster';
 import './flowchart.css';
 import '@xyflow/react/dist/style.css';
 
-registerFlowchartStrings(i18n);
-
 const DRAFT_DEBOUNCE_MS = 1200;
 
 /** 右侧面板：属性 / 图层 / 历史快照 */
@@ -36,9 +44,13 @@ const PANELS = ['prop', 'layer', 'history'] as const;
 type PanelKey = (typeof PANELS)[number];
 
 function FlowchartInner() {
-  const { t } = useTranslation();
+  const { t, i18n: i18nInstance } = useTranslation();
   const { screenToFlowPosition, fitView } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
+  /** 当前语言的文案是否已按需加载完成 */
+  const [stringsReady, setStringsReady] = useState(() =>
+    hasFlowchartStrings(i18nInstance.language),
+  );
 
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
@@ -99,16 +111,30 @@ function FlowchartInner() {
     requestAnimationFrame(() => fitView({ padding: 0.3, minZoom: 1, maxZoom: 1 }));
   }, [fitView]);
 
-  // 首次挂载恢复本地草稿
+  // 文案按语种按需加载：就绪后再渲染，避免闪现键名
   useEffect(() => {
+    let alive = true;
+    void registerFlowchartStrings(i18n, i18nInstance.language).then(() => {
+      if (alive) setStringsReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [i18nInstance.language]);
+
+  // 文案就绪后载入：恢复本地草稿；无草稿时重置为「本地化页名」的空文档
+  useEffect(() => {
+    if (!stringsReady) return;
     const draft = readDraft();
     const page = activePageOf(draft);
     if (draft && page && page.nodes.length > 0) {
       useFlowStore.getState().load(draft);
       setDraftSaved(true);
       fitViewSoon();
+      return;
     }
-  }, [fitViewSoon]);
+    useFlowStore.getState().load(null);
+  }, [fitViewSoon, stringsReady]);
 
   // 变更后防抖写入本地草稿（编辑 → 未保存 → 1.2s 后落盘为已保存）
   useEffect(() => {
@@ -120,13 +146,16 @@ function FlowchartInner() {
     setDraftSaved(false);
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
-      setDraftSaved(writeDraft(useFlowStore.getState().getDoc()));
+      const result = writeDraft(useFlowStore.getState().getDoc());
+      setDraftSaved(result.saved);
+      // 体积超限时图片不会写进草稿，明确提示改用项目文件保存
+      if (result.droppedImages) setFailure(t('tools.flowchart.draftTooLarge'));
     }, DRAFT_DEBOUNCE_MS);
     return () => {
       if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     };
     // docName 参与依赖：只改标题时也要落盘
-  }, [nodes, edges, docName]);
+  }, [nodes, edges, docName, t]);
 
   const addNodeAtCenter = useCallback(
     (kind: ShapeKind) => {
@@ -146,6 +175,52 @@ function FlowchartInner() {
     [screenToFlowPosition],
   );
 
+  /** 在画布中心插入非图形节点（图片 / 图标 / 公式） */
+  const addMediaAtCenter = useCallback(
+    (type: FlowNodeType, data: FlowNodeData, size: { width: number; height: number }) => {
+      const el = canvasRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const point = screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+      useFlowStore.getState().addTypedNode(type, data, size, {
+        x: Math.round(point.x - size.width / 2),
+        y: Math.round(point.y - size.height / 2),
+      });
+    },
+    [screenToFlowPosition],
+  );
+
+  const handleAddIcon = useCallback(
+    (iconId: string) => addMediaAtCenter('icon', iconData(iconId), ICON_NODE_SIZE),
+    [addMediaAtCenter],
+  );
+
+  const handleAddFormula = useCallback(
+    () => addMediaAtCenter('formula', formulaData('E = mc^2'), FORMULA_NODE_SIZE),
+    [addMediaAtCenter],
+  );
+
+  const imageRef = useRef<HTMLInputElement>(null);
+  const handleImageFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      setFailure(null);
+      const loaded = await loadImageFile(file);
+      if (!loaded) {
+        setFailure(t('tools.flowchart.imageFailed'));
+        return;
+      }
+      const size = fitInto({ width: loaded.width, height: loaded.height }, IMAGE_NODE_SIZE);
+      addMediaAtCenter('image', imageData(loaded.src), size);
+    },
+    [addMediaAtCenter, t],
+  );
+
   const handleNew = useCallback(() => {
     if (useFlowStore.getState().nodes.length > 0 && !window.confirm(t('common.discardConfirm'))) {
       return;
@@ -162,18 +237,53 @@ function FlowchartInner() {
     setDraftSaved(false);
   }, []);
 
+  /** 模板内文案走 i18n（token 见 model/templateLabels.ts），缺键回退英文 */
+  const translateTemplate = useCallback<TemplateTranslator>(
+    (key) => String(i18n.t(`tools.flowchart.tpl_${key}`)),
+    [],
+  );
+
   const handleTemplate = useCallback(
     (kind: TemplateKind) => {
-      useFlowStore.getState().load(buildTemplateDoc(kind));
+      useFlowStore.getState().load(buildTemplateDoc(kind, translateTemplate));
       fitViewSoon();
     },
-    [fitViewSoon],
+    [fitViewSoon, translateTemplate],
   );
 
   const handleDelete = useCallback(() => useFlowStore.getState().removeSelected(), []);
   const handleDuplicate = useCallback(() => useFlowStore.getState().duplicateSelected(), []);
 
-  // 键盘快捷键：撤销/重做/复制/删除（输入框聚焦时不拦截）
+  /** 方向键微移的合并计时器：一次连续按键只产生一条撤销记录 */
+  const nudgeTimer = useRef<number | null>(null);
+  const nudge = useCallback((dx: number, dy: number) => {
+    const st = useFlowStore.getState();
+    if (st.selectedNodes.length === 0) return;
+    if (nudgeTimer.current !== null) window.clearTimeout(nudgeTimer.current);
+    else st.commit();
+    nudgeTimer.current = window.setTimeout(() => {
+      nudgeTimer.current = null;
+    }, 600);
+    st.nudgeSelected(dx, dy);
+  }, []);
+
+  /** Tab / Enter：以选中的单个节点为源，在右侧 / 下方生成相连节点 */
+  const spawnFromSelection = useCallback((dir: 'right' | 'bottom'): boolean => {
+    const st = useFlowStore.getState();
+    if (st.selectedNodes.length !== 1) return false;
+    const node = st.nodes.find((n) => n.id === st.selectedNodes[0]);
+    if (!node) return false;
+    const byId = new Map(st.nodes.map((n) => [n.id, n] as const));
+    const rect = absoluteRectOf(node, byId);
+    const gap = 60;
+    const position =
+      dir === 'right'
+        ? { x: rect.x + rect.width + gap, y: rect.y }
+        : { x: rect.x, y: rect.y + rect.height + gap };
+    return st.spawnConnectedNode(node.id, position) !== undefined;
+  }, []);
+
+  // 键盘快捷键：撤销/重做/复制/删除/微移/全选/建节点（输入框聚焦时不拦截）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (document.activeElement?.tagName ?? '').toUpperCase();
@@ -205,14 +315,34 @@ function FlowchartInner() {
         e.preventDefault();
         if (e.shiftKey) ungroupSelected();
         else groupSelected();
+      } else if (mod && e.key.toLowerCase() === 'a') {
+        // 全选当前页节点与连线
+        e.preventDefault();
+        useFlowStore.getState().selectAll();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         useFlowStore.getState().removeSelected();
+      } else if (!mod && !e.altKey && e.key.startsWith('Arrow')) {
+        // 方向键微移选中节点（默认 1px，按住 ⇧ 加速为 10px）
+        const st = useFlowStore.getState();
+        if (st.selectedNodes.length === 0) return;
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        e.preventDefault();
+        nudge(dx, dy);
+      } else if (!mod && !e.shiftKey && e.key === 'Tab') {
+        if (spawnFromSelection('right')) e.preventDefault();
+      } else if (!mod && !e.shiftKey && e.key === 'Enter') {
+        if (spawnFromSelection('bottom')) e.preventDefault();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [nudge, spawnFromSelection]);
+
+  // 文案未就绪时先不渲染（只有当前语言的小 chunk 需要等待）
+  if (!stringsReady) return null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -256,7 +386,14 @@ function FlowchartInner() {
 
       <Toolbar
         onTemplates={() => setTemplatesOpen(true)}
-        onAutoLayout={() => useFlowStore.getState().applyAutoLayout('TB')}
+        onAutoLayout={() => {
+          const st = useFlowStore.getState();
+          // 两段式布局：保留泳道 / 编组层级，方向与间距取工具栏设置
+          st.applyAutoLayout({
+            direction: st.layoutDirection,
+            ...LAYOUT_DENSITY[st.layoutDensity],
+          });
+        }}
         onUndo={() => useFlowStore.getState().undo()}
         onRedo={() => useFlowStore.getState().redo()}
         onDuplicate={handleDuplicate}
@@ -266,7 +403,20 @@ function FlowchartInner() {
       />
 
       <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
-        <ShapePalette onAddNode={addNodeAtCenter} />
+        <ShapePalette
+          onAddNode={addNodeAtCenter}
+          onAddIcon={handleAddIcon}
+          onAddImage={() => imageRef.current?.click()}
+          onAddFormula={handleAddFormula}
+        />
+        <input
+          ref={imageRef}
+          data-testid="flowchart-image-input"
+          type="file"
+          accept="image/*"
+          onChange={(e) => void handleImageFile(e)}
+          className="hidden"
+        />
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           <div className="relative min-h-0 flex-1">

@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import { useFlowStore } from '../store';
 import {
   type FlowNodeData,
@@ -47,6 +48,7 @@ const QUICK_DIRS: Array<{
 ];
 
 function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
+  const { t } = useTranslation();
   const d = data as FlowNodeData;
   const def = shapeDefOf(d.kind);
   // 必须给出确定尺寸：若依赖父容器的百分比高度，节点会被撑成 0 高度而不可见
@@ -66,7 +68,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   });
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(d.label);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (editing) {
@@ -123,7 +125,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
       {isContainer ? (
         headerOnTop ? (
           <div
-            className="absolute left-0 top-0 flex items-center px-3 text-[13px] font-semibold"
+            className="absolute left-0 top-0 flex items-center truncate px-3 text-[13px] font-semibold"
             style={{
               height: isGroup ? 26 : SWIMLANE_HEADER_HEIGHT,
               width: w,
@@ -146,16 +148,20 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           </div>
         )
       ) : editing ? (
-        <input
+        // 用 textarea 支持多行：Enter 提交、Shift+Enter 换行
+        <textarea
           ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commit();
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              commit();
+            }
             if (e.key === 'Escape') setEditing(false);
           }}
-          className="absolute inset-0 z-10 bg-white/90 px-2 text-center text-[13px] outline-none dark:bg-gray-900/90"
+          className="nodrag absolute inset-0 z-10 resize-none bg-white/90 px-2 py-1 text-[13px] outline-none dark:bg-gray-900/90"
           style={{
             color: textColor,
             fontWeight: style.bold ? 700 : 400,
@@ -165,7 +171,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         />
       ) : (
         <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center px-2 leading-tight"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden px-2 leading-tight"
           style={{
             color: textColor,
             fontSize: style.fontSize,
@@ -173,6 +179,8 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             fontStyle: style.italic ? 'italic' : 'normal',
             textAlign: style.align,
             fontFamily: style.fontFamily,
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
           }}
         >
           {d.label || ' '}
@@ -220,7 +228,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           <button
             key={q.dir}
             type="button"
-            aria-label={`快速连线-${q.dir}`}
+            aria-label={`${t('tools.flowchart.quickConnect')}-${q.dir}`}
             onPointerDown={(e) => {
               e.stopPropagation();
               e.preventDefault();

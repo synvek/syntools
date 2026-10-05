@@ -11,8 +11,10 @@ import {
   type FlowNodeData,
   type FlowNodeRec,
   type FlowNodeStyle,
+  type FlowNodeType,
   type ShapeKind,
   type ShapeSize,
+  type Waypoint,
   isContainerKind,
 } from './model/types';
 import { shapeDefOf, shapeSize } from './model/shapes';
@@ -60,6 +62,36 @@ export function defaultData(kind: ShapeKind, label = ''): FlowNodeData {
   if (def?.defaultStyle) Object.assign(base, def.defaultStyle);
   if (isContainerKind(kind)) base.align = 'left';
   return { kind, label, style: base };
+}
+
+/** 图标节点数据（颜色取 stroke，其余绘制由 IconNode 决定） */
+export function iconData(iconId: string, label = ''): FlowNodeData {
+  return {
+    kind: 'rect',
+    label,
+    iconId,
+    style: { ...DEFAULT_STYLE, fill: '#FFFFFF', stroke: '#0F172A', strokeWidth: 0, fontSize: 12 },
+  };
+}
+
+/** 图片节点数据（dataURL 直接内联，不离开浏览器） */
+export function imageData(src: string, label = ''): FlowNodeData {
+  return {
+    kind: 'rect',
+    label,
+    src,
+    style: { ...DEFAULT_STYLE, fill: '#FFFFFF', stroke: '#CBD5E1', strokeWidth: 1, fontSize: 12 },
+  };
+}
+
+/** 公式节点数据（LaTeX 源码，渲染时动态加载 KaTeX） */
+export function formulaData(formula: string, label = ''): FlowNodeData {
+  return {
+    kind: 'rect',
+    label,
+    formula,
+    style: { ...DEFAULT_STYLE, fill: '#FFFFFF', stroke: '#0F172A', strokeWidth: 0, fontSize: 16 },
+  };
 }
 
 /* --------------------------- 对齐辅助线 --------------------------- */
@@ -249,6 +281,71 @@ export function orderNodesByHierarchy<T extends HierarchyNode>(nodes: readonly T
   return [...lanes, ...tops, ...children];
 }
 
+export type AnchorSide = 't' | 'b' | 'l' | 'r';
+
+/** 锚点 id → 图形内的相对位置（与 ShapeNode 的 HANDLES 保持一致） */
+const HANDLE_ANCHORS: Record<string, { fx: number; fy: number }> = {
+  't-l': { fx: 0.25, fy: 0 },
+  t: { fx: 0.5, fy: 0 },
+  't-r': { fx: 0.75, fy: 0 },
+  'b-l': { fx: 0.25, fy: 1 },
+  b: { fx: 0.5, fy: 1 },
+  'b-r': { fx: 0.75, fy: 1 },
+  l: { fx: 0, fy: 0.5 },
+  r: { fx: 1, fy: 0.5 },
+};
+
+/**
+ * 连线端点在画布坐标系中的位置与所在边。
+ * 无锚点信息（导入数据 / 自由连线）时，取朝向对端的一侧中点。
+ */
+export function anchorOf<T extends HierarchyNode>(
+  node: T,
+  byId: Map<string, T>,
+  handleId?: string | null,
+  other?: T,
+): { point: { x: number; y: number }; side: AnchorSide } {
+  const rect = absoluteRectOf(node, byId);
+  const anchor = handleId ? HANDLE_ANCHORS[handleId] : undefined;
+  if (anchor) {
+    const side: AnchorSide =
+      anchor.fy === 0 ? 't' : anchor.fy === 1 ? 'b' : anchor.fx === 0 ? 'l' : 'r';
+    return {
+      point: { x: rect.x + rect.width * anchor.fx, y: rect.y + rect.height * anchor.fy },
+      side,
+    };
+  }
+  const otherRect = other ? absoluteRectOf(other, byId) : rect;
+  const dx = otherRect.x + otherRect.width / 2 - (rect.x + rect.width / 2);
+  const dy = otherRect.y + otherRect.height / 2 - (rect.y + rect.height / 2);
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0
+      ? { point: { x: rect.x + rect.width, y: rect.y + rect.height / 2 }, side: 'r' }
+      : { point: { x: rect.x, y: rect.y + rect.height / 2 }, side: 'l' };
+  }
+  return dy >= 0
+    ? { point: { x: rect.x + rect.width / 2, y: rect.y + rect.height }, side: 'b' }
+    : { point: { x: rect.x + rect.width / 2, y: rect.y }, side: 't' };
+}
+
+/** 从锚点沿所在边法线方向外推一段距离（正交路由的起止「短桩」） */
+export function stubPoint(
+  point: { x: number; y: number },
+  side: AnchorSide,
+  distance = 24,
+): { x: number; y: number } {
+  switch (side) {
+    case 't':
+      return { x: point.x, y: point.y - distance };
+    case 'b':
+      return { x: point.x, y: point.y + distance };
+    case 'l':
+      return { x: point.x - distance, y: point.y };
+    default:
+      return { x: point.x + distance, y: point.y };
+  }
+}
+
 /* --------------------------- 序列化 / 校验 --------------------------- */
 
 export interface SerializeResult {
@@ -273,6 +370,9 @@ export function serializeDoc(
     height?: number;
     hidden?: boolean;
     locked?: boolean;
+    /** 节点类型（缺省视为图形节点，兼容旧文档） */
+    type?: FlowNodeType;
+    mxStyle?: string[];
   }>,
   edges: ReadonlyArray<{
     id: string;
@@ -282,22 +382,28 @@ export function serializeDoc(
     targetHandle?: string | null;
     label?: string;
     style?: FlowEdgeStyle;
+    waypoints?: Waypoint[];
+    mxStyle?: string[];
   }>,
   pageName?: string,
 ): FlowDoc {
   const recNodes: FlowNodeRec[] = nodes.map((n) => ({
     id: n.id,
-    type: 'shape',
+    type: n.type ?? 'shape',
     position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
     parentId: n.parentId ?? null,
     width: n.width,
     height: n.height,
     hidden: n.hidden === true,
     locked: n.locked === true,
+    ...(n.mxStyle && n.mxStyle.length > 0 ? { mxStyle: [...n.mxStyle] } : {}),
     data: {
       kind: n.data.kind,
       label: n.data.label,
       style: { ...n.data.style },
+      ...(n.data.src ? { src: n.data.src } : {}),
+      ...(n.data.iconId ? { iconId: n.data.iconId } : {}),
+      ...(n.data.formula ? { formula: n.data.formula } : {}),
     },
   }));
   const recEdges: FlowEdgeRec[] = edges.map((e) => ({
@@ -308,6 +414,10 @@ export function serializeDoc(
     targetHandle: e.targetHandle ?? null,
     label: e.label,
     style: e.style ? { ...e.style } : undefined,
+    ...(e.waypoints && e.waypoints.length > 0
+      ? { waypoints: e.waypoints.map((p) => ({ x: p.x, y: p.y })) }
+      : {}),
+    ...(e.mxStyle && e.mxStyle.length > 0 ? { mxStyle: [...e.mxStyle] } : {}),
   }));
   return toDocV2(recNodes, recEdges, pageName);
 }

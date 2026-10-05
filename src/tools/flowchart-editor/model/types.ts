@@ -126,14 +126,47 @@ export interface FlowNodeStyle {
   foldSize?: number;
 }
 
+/** 节点类型：图形 / 图片 / 内置图标 / 公式 */
+export type FlowNodeType = 'shape' | 'image' | 'icon' | 'formula';
+
+/** 非图形节点的默认尺寸 */
+export const IMAGE_NODE_SIZE: ShapeSize = { width: 240, height: 160 };
+export const ICON_NODE_SIZE: ShapeSize = { width: 64, height: 64 };
+export const FORMULA_NODE_SIZE: ShapeSize = { width: 200, height: 64 };
+
+/** 单张图片的最大边长（超过则等比压缩，控制草稿体积） */
+export const IMAGE_MAX_EDGE = 1600;
+/** 草稿体积上限（字符数，约 4MB）；超限时降级为「不含图片」的草稿 */
+export const DRAFT_SIZE_LIMIT = 4_000_000;
+
 export interface FlowNodeData extends Record<string, unknown> {
   kind: ShapeKind;
   label: string;
   style: FlowNodeStyle;
+  /** 图片节点的 dataURL（type === 'image'） */
+  src?: string;
+  /** 图标节点的图标 id（type === 'icon'） */
+  iconId?: string;
+  /** 公式节点的 LaTeX 源码（type === 'formula'） */
+  formula?: string;
+  /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写，减少样式丢失） */
+  mxStyle?: string[];
+}
+
+/** 连线折点（画布绝对坐标） */
+export interface Waypoint {
+  x: number;
+  y: number;
 }
 
 export interface FlowEdgeData extends Record<string, unknown> {
   label?: string;
+  /** 连线样式（渲染层读取，展示于属性面板） */
+  style?: FlowEdgeStyle;
+  /** 手动/导入的折点；缺省表示无折点 */
+  waypoints?: Waypoint[];
+  /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
+  mxStyle?: string[];
 }
 
 /** 连线线型 */
@@ -203,10 +236,16 @@ export type FlowNodePatch = Partial<Omit<FlowNodeData, 'style'>> & {
   style?: Partial<FlowNodeStyle>;
 };
 
+/** 节点样式视图：字段缺省表示多选批次内取值不一致（混合态） */
+export type FlowNodeStyleView = Partial<FlowNodeStyle>;
+
+/** 画布网格吸附尺寸可选值 */
+export const GRID_SIZE_OPTIONS = [5, 10, 20, 25] as const;
+
 /** 画布上一个节点的持久化记录 */
 export interface FlowNodeRec {
   id: string;
-  type: 'shape';
+  type: FlowNodeType;
   /** 有 parentId 时，坐标是相对父节点（泳道/编组）的左上角 */
   position: { x: number; y: number };
   parentId?: string | null;
@@ -218,6 +257,8 @@ export interface FlowNodeRec {
   hidden?: boolean;
   /** 图层：锁定（不可拖动/编辑） */
   locked?: boolean;
+  /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
+  mxStyle?: string[];
 }
 
 /** 画布上一条连线的持久化记录 */
@@ -229,6 +270,10 @@ export interface FlowEdgeRec {
   targetHandle?: string | null;
   label?: string;
   style?: FlowEdgeStyle;
+  /** 折点（画布绝对坐标）；旧文档缺省即无折点 */
+  waypoints?: Waypoint[];
+  /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
+  mxStyle?: string[];
 }
 
 /** v1：单页文档（历史草稿与旧项目文件） */

@@ -7,29 +7,11 @@ import {
   type TemplateCategory,
   type TemplateKind,
 } from '../model/templates';
-import { shapeDefOf } from '../model/shapes';
-import { drawShape } from '../nodes/shapeDraw';
-import type { ShapeKind } from '../model/types';
+import { PageThumbnail } from '../model/PageThumbnail';
+import type { FlowPage } from '../model/types';
 
-/** 缩略图：直接用模板首个节点的形状绘制，与画布效果一致 */
-function TemplateThumb({ kind }: { kind: ShapeKind }) {
-  const def = shapeDefOf(kind);
-  if (!def) return null;
-  const w = def.size.width;
-  const h = def.size.height;
-  return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="h-12 w-full"
-      preserveAspectRatio="xMidYMid meet"
-      aria-hidden="true"
-    >
-      <g fill="#EFF6FF" stroke="#2563EB" strokeWidth={Math.max(2, w / 38)}>
-        {drawShape(def, w, h)}
-      </g>
-    </svg>
-  );
-}
+/** 模板卡片缩略图：与「页面总览」同一套真实场景渲染（节点形状 + 连线） */
+const PREVIEW_BOX = { width: 168, height: 56 };
 
 interface TemplatePanelProps {
   open: boolean;
@@ -41,12 +23,17 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
   const { t } = useTranslation();
   const [category, setCategory] = useState<TemplateCategory>('flow');
 
-  // 每个模板取首个节点的形状作为缩略图（仅计算一次）
+  // 每个模板构建一次真实场景（仅几何，与语言无关）
   const previews = useMemo(() => {
-    const map = new Map<TemplateKind, ShapeKind>();
+    const map = new Map<TemplateKind, FlowPage>();
     for (const item of TEMPLATES) {
       const tpl = buildTemplate(item.kind);
-      map.set(item.kind, tpl.nodes[0]?.data.kind ?? 'rect');
+      map.set(item.kind, {
+        id: `preview-${item.kind}`,
+        name: item.labelKey,
+        nodes: tpl.nodes,
+        edges: tpl.edges,
+      });
     }
     return map;
   }, []);
@@ -111,11 +98,16 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
               }}
               className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md dark:border-gray-700 dark:bg-gray-800/60 dark:hover:border-blue-500"
             >
-              <div className="flex h-16 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 dark:border-gray-700 dark:bg-gray-900">
-                <TemplateThumb kind={previews.get(item.kind) ?? 'rect'} />
+              <div className="flex h-16 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white px-1 dark:border-gray-700 dark:bg-gray-900">
+                {(() => {
+                  const page = previews.get(item.kind);
+                  return page ? (
+                    <PageThumbnail page={page} box={PREVIEW_BOX} testId="template-thumb" />
+                  ) : null;
+                })()}
               </div>
               <span className="text-[13px] font-medium text-gray-700 dark:text-gray-200">
-                {t(`tools.flowchart.template${item.kind[0].toUpperCase()}${item.kind.slice(1)}`)}
+                {t(`tools.flowchart.template${item.labelKey}`)}
               </span>
             </button>
           ))}

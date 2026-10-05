@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import type { FlowNodePatch, FlowNodeStyle } from '../model/types';
+import type { FlowNodePatch, FlowNodeStyleView } from '../model/types';
 import type { ShapeDraw } from '../model/shapes';
 
 const FONT_FAMILIES = [
@@ -11,7 +11,7 @@ const FONT_FAMILIES = [
   'KaiTi, STKaiti, serif',
 ];
 
-const DASHES: Array<NonNullable<FlowNodeStyle['lineDash']>> = ['solid', 'dashed', 'dotted'];
+const DASHES: Array<NonNullable<FlowNodeStyleView['lineDash']>> = ['solid', 'dashed', 'dotted'];
 
 const inputCls =
   'h-8 rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
@@ -28,35 +28,50 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/** 节点「外观」分组：透明度 / 文字色 / 线型 / 字体 / 阴影 / 圆角 / 折角 */
+/**
+ * 节点「外观」分组：透明度 / 文字色 / 线型 / 字体 / 阴影 / 圆角 / 折角。
+ * 多选批量编辑时 `style` 中缺省的字段表示「取值不一致」，UI 回退到 fallback 并提示混合态。
+ */
 export function NodeAppearanceSection({
   style,
   draw,
   patch,
   onEnd,
+  fallback,
+  mixed = false,
 }: {
-  style: FlowNodeStyle;
+  style: FlowNodeStyleView;
+  /** 多选时若各节点图形不一致则传入 undefined（隐藏圆角/折角等与图形强相关的项） */
   draw?: ShapeDraw;
   patch: (p: FlowNodePatch) => void;
   onEnd: () => void;
+  /** 混合态下用于回显的基准样式（通常取首个选中节点） */
+  fallback: FlowNodeStyleView;
+  mixed?: boolean;
 }) {
   const { t } = useTranslation();
   const corner = style.cornerRadius ?? (draw === 'roundRect' ? 10 : 4);
   const fold = style.foldSize ?? 16;
+  const opacity = style.opacity ?? fallback.opacity ?? 1;
 
   return (
     <div className="mt-1 flex flex-col gap-3 border-t border-gray-100 pt-3 dark:border-gray-800">
-      <h3 className="text-[12px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      <h3 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {t('tools.flowchart.appearance')}
+        {mixed ? (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-normal normal-case text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+            {t('tools.flowchart.mixed')}
+          </span>
+        ) : null}
       </h3>
 
-      <Field label={`${t('tools.flowchart.opacity')} ${Math.round((style.opacity ?? 1) * 100)}%`}>
+      <Field label={`${t('tools.flowchart.opacity')} ${Math.round(opacity * 100)}%`}>
         <input
           type="range"
           min={0}
           max={1}
           step={0.05}
-          value={style.opacity ?? 1}
+          value={opacity}
           onChange={(e) => patch({ style: { opacity: Number(e.target.value) } })}
           onBlur={onEnd}
           className="w-full accent-blue-500"
@@ -67,7 +82,7 @@ export function NodeAppearanceSection({
         <input
           type="color"
           className={colorCls}
-          value={style.textColor ?? style.stroke}
+          value={style.textColor ?? fallback.textColor ?? fallback.stroke ?? '#2563EB'}
           onChange={(e) => patch({ style: { textColor: e.target.value } })}
           onBlur={onEnd}
         />
@@ -80,7 +95,7 @@ export function NodeAppearanceSection({
             value={style.lineDash ?? 'solid'}
             onChange={(e) =>
               patch({
-                style: { lineDash: e.target.value as NonNullable<FlowNodeStyle['lineDash']> },
+                style: { lineDash: e.target.value as NonNullable<FlowNodeStyleView['lineDash']> },
               })
             }
             onBlur={onEnd}
@@ -110,10 +125,10 @@ export function NodeAppearanceSection({
 
       <button
         type="button"
-        onClick={() => patch({ style: { shadow: !style.shadow } })}
+        onClick={() => patch({ style: { shadow: style.shadow !== true } })}
         onBlur={onEnd}
         className={`w-full rounded-md border px-2 py-1.5 text-[12px] transition-colors ${
-          style.shadow
+          style.shadow === true
             ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
             : 'border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
         }`}

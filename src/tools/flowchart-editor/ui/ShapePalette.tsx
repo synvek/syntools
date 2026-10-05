@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DROP_MIME } from './FlowCanvas';
+import { ICON_GROUPS, iconsOfGroup, type IconDef } from '../model/icons';
 import type { ShapeKind } from '../model/types';
 import {
   SHAPE_CATEGORY_ORDER,
@@ -47,12 +48,48 @@ function ShapeButton({ def, onAddNode }: { def: ShapeDef; onAddNode: (kind: Shap
   );
 }
 
-interface ShapePaletteProps {
-  onAddNode: (kind: ShapeKind) => void;
+/** 图标按钮：点击即在画布中心插入图标节点 */
+function IconButton({ def, onAddIcon }: { def: IconDef; onAddIcon: (id: string) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onAddIcon(def.id)}
+      title={def.id}
+      data-testid={`icon-${def.id}`}
+      className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:text-blue-600 hover:shadow-sm dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {def.paths.map((p, i) => (
+          <path key={i} d={p} />
+        ))}
+      </svg>
+    </button>
+  );
 }
 
-export function ShapePalette({ onAddNode }: ShapePaletteProps) {
+interface ShapePaletteProps {
+  onAddNode: (kind: ShapeKind) => void;
+  onAddIcon: (iconId: string) => void;
+  onAddImage: () => void;
+  onAddFormula: () => void;
+}
+
+export function ShapePalette({
+  onAddNode,
+  onAddIcon,
+  onAddImage,
+  onAddFormula,
+}: ShapePaletteProps) {
   const { t } = useTranslation();
+  const [iconsOpen, setIconsOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<ShapeCategory, boolean>>(
     () =>
       Object.fromEntries(SHAPE_CATEGORY_ORDER.map((c) => [c, true])) as Record<
@@ -115,6 +152,55 @@ export function ShapePalette({ onAddNode }: ShapePaletteProps) {
         placeholder={t('tools.flowchart.searchShape')}
         className="h-8 w-full rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
       />
+
+      {/* 插入：图片 / 图标 / 公式 */}
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          data-testid="insert-image"
+          onClick={onAddImage}
+          className="h-8 flex-1 rounded-md border border-gray-200 bg-white text-[12px] text-gray-700 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200"
+        >
+          {t('tools.flowchart.insertImage')}
+        </button>
+        <button
+          type="button"
+          data-testid="insert-icon"
+          onClick={() => setIconsOpen((v) => !v)}
+          className={`h-8 flex-1 rounded-md border text-[12px] transition-colors ${
+            iconsOpen
+              ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
+              : 'border-gray-200 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200'
+          }`}
+        >
+          {t('tools.flowchart.insertIcon')}
+        </button>
+        <button
+          type="button"
+          data-testid="insert-formula"
+          onClick={onAddFormula}
+          className="h-8 flex-1 rounded-md border border-gray-200 bg-white text-[12px] text-gray-700 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200"
+        >
+          {t('tools.flowchart.insertFormula')}
+        </button>
+      </div>
+
+      {iconsOpen ? (
+        <div className="max-h-40 shrink-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1.5 dark:border-gray-700 dark:bg-gray-900/60">
+          {ICON_GROUPS.map((group) => (
+            <div key={group} className="mb-1">
+              <p className="px-1 pb-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                {t(`tools.flowchart.iconGroup_${group}`)}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {iconsOfGroup(group).map((def) => (
+                  <IconButton key={def.id} def={def} onAddIcon={onAddIcon} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-0.5">
         {sections.map(({ c, items }) => {

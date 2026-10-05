@@ -202,6 +202,176 @@ export function nodeDashArrayOf(
   }
 }
 
+/**
+ * 多选批量编辑：取集合内的公共值。
+ * 全部相同 → 返回该值；存在差异 → 返回 undefined（UI 显示为「混合」）。
+ */
+export function commonValue<T>(values: readonly T[]): T | undefined {
+  if (values.length === 0) return undefined;
+  const [first, ...rest] = values;
+  return rest.every((v) => v === first) ? first : undefined;
+}
+
+/* --------------------------- 连线折点与正交路由 --------------------------- */
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** 轴对齐矩形（障碍物只需包围盒，不要求 id） */
+export interface OrthogonalBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** 轴对齐线段是否与矩形相交（折线均为水平/竖直段，可直接用包围盒判定） */
+function segmentHitsRect(a: Point, b: Point, r: OrthogonalBox): boolean {
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  return minX < r.x + r.width && maxX > r.x && minY < r.y + r.height && maxY > r.y;
+}
+
+function countHits(path: readonly Point[], obstacles: readonly OrthogonalBox[]): number {
+  let hits = 0;
+  for (let i = 1; i < path.length; i += 1) {
+    for (const box of obstacles) {
+      if (segmentHitsRect(path[i - 1], path[i], box)) hits += 1;
+    }
+  }
+  return hits;
+}
+
+/** 去掉重复点与共线的中间点 */
+export function dropCollinear(points: readonly Point[]): Point[] {
+  const out: Point[] = [];
+  for (const p of points) {
+    const last = out[out.length - 1];
+    if (last && last.x === p.x && last.y === p.y) continue;
+    out.push({ x: p.x, y: p.y });
+  }
+  for (let i = out.length - 2; i >= 1; i -= 1) {
+    const prev = out[i - 1];
+    const cur = out[i];
+    const next = out[i + 1];
+    const collinear =
+      (prev.x === cur.x && cur.x === next.x) || (prev.y === cur.y && cur.y === next.y);
+    if (collinear) out.splice(i, 1);
+  }
+  return out;
+}
+
+/**
+ * 正交（曼哈顿）路由：在起点与终点之间生成折点，尽量避开障碍包围盒。
+ * 返回的是「中间折点」（不含起点与终点），可直接写入 `FlowEdgeRec.waypoints`。
+ * 候选策略：H-V-H / V-H-V 中点折线，必要时从障碍并集的四侧绕行，取穿过障碍最少者。
+ */
+export function routeOrthogonal(
+  from: Point,
+  to: Point,
+  obstacles: readonly OrthogonalBox[] = [],
+): Point[] {
+  if (Math.round(from.x) === Math.round(to.x) || Math.round(from.y) === Math.round(to.y)) return [];
+
+  const near = obstacles.filter(
+    (r) =>
+      !(
+        r.x > Math.max(from.x, to.x) ||
+        r.x + r.width < Math.min(from.x, to.x) ||
+        r.y > Math.max(from.y, to.y) ||
+        r.y + r.height < Math.min(from.y, to.y)
+      ),
+  );
+
+  const midX = Math.round((from.x + to.x) / 2);
+  const midY = Math.round((from.y + to.y) / 2);
+  const candidates: Point[][] = [
+    [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to],
+    [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to],
+  ];
+
+  if (near.length > 0) {
+    const gap = 28;
+    const top = Math.round(Math.min(...near.map((o) => o.y), from.y, to.y) - gap);
+    const bottom = Math.round(Math.max(...near.map((o) => o.y + o.height), from.y, to.y) + gap);
+    const left = Math.round(Math.min(...near.map((o) => o.x), from.x, to.x) - gap);
+    const right = Math.round(Math.max(...near.map((o) => o.x + o.width), from.x, to.x) + gap);
+    candidates.push(
+      [from, { x: from.x, y: top }, { x: to.x, y: top }, to],
+      [from, { x: from.x, y: bottom }, { x: to.x, y: bottom }, to],
+      [from, { x: left, y: from.y }, { x: left, y: to.y }, to],
+      [from, { x: right, y: from.y }, { x: right, y: to.y }, to],
+    );
+  }
+
+  let best = candidates[0];
+  let bestHits = Number.POSITIVE_INFINITY;
+  for (const candidate of candidates) {
+    const hits = countHits(candidate, obstacles);
+    if (hits < bestHits) {
+      bestHits = hits;
+      best = candidate;
+    }
+    if (bestHits === 0) break;
+  }
+  return dropCollinear(best).slice(1, -1);
+}
+
+function distance(a: Point, b: Point): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function pointToward(from: Point, to: Point, length: number): Point {
+  const d = distance(from, to);
+  if (d === 0) return { ...from };
+  const t = Math.min(length, d) / d;
+  return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+}
+
+/** 折线 → SVG path（radius > 0 时拐角用二次贝塞尔倒角） */
+export function polylinePath(points: readonly Point[], radius = 0): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
+  let d = `M ${points[0].x},${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    const next = points[i + 1];
+    const r = radius > 0 ? Math.min(radius, distance(prev, cur) / 2, distance(cur, next) / 2) : 0;
+    if (r <= 0.5) {
+      d += ` L ${cur.x},${cur.y}`;
+      continue;
+    }
+    const a = pointToward(cur, prev, r);
+    const b = pointToward(cur, next, r);
+    d += ` L ${a.x},${a.y} Q ${cur.x},${cur.y} ${b.x},${b.y}`;
+  }
+  const last = points[points.length - 1];
+  d += ` L ${last.x},${last.y}`;
+  return d;
+}
+
+/** 折线上按长度取中点（供连线标签定位） */
+export function polylineMidpoint(points: readonly Point[]): Point {
+  if (points.length === 0) return { x: 0, y: 0 };
+  if (points.length === 1) return { ...points[0] };
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) total += distance(points[i - 1], points[i]);
+  let remain = total / 2;
+  for (let i = 1; i < points.length; i += 1) {
+    const len = distance(points[i - 1], points[i]);
+    if (remain <= len || i === points.length - 1) {
+      return pointToward(points[i - 1], points[i], remain);
+    }
+    remain -= len;
+  }
+  return { ...points[points.length - 1] };
+}
+
 /** 连线路径的描边样式（供自定义边组件 BaseEdge 使用） */
 export function edgeStyleOf(style: FlowEdgeStyle): {
   stroke: string;

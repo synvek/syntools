@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFlowStore } from '../store';
 import { patchSelectedEdgeStyle, selectedEdgeStyle } from '../flowOps';
+import { commonValue } from '../ops';
 import { shapeDefOf } from '../model/shapes';
 import {
   EDGE_ARROW_LABEL_KEY,
@@ -9,8 +10,11 @@ import {
   EDGE_DASH_OPTIONS,
   EDGE_TYPE_OPTIONS,
   type Align,
+  type FlowEdgeData,
   type FlowEdgeStyle,
   type FlowNodePatch,
+  type FlowNodeStyle,
+  type FlowNodeStyleView,
   isContainerKind,
 } from '../model/types';
 import { NodeAppearanceSection } from './NodeAppearanceSection';
@@ -28,8 +32,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function MixedBadge({ show }: { show: boolean }) {
+  const { t } = useTranslation();
+  if (!show) return null;
+  return (
+    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-normal text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+      {t('tools.flowchart.mixed')}
+    </span>
+  );
+}
+
+/** 连线上已有折点数量（用于回显与按钮禁用） */
+function edgeWaypointCount(edge: { data?: unknown }): number {
+  const data = edge.data as FlowEdgeData | undefined;
+  return data?.waypoints?.length ?? 0;
+}
+
 const inputCls =
   'h-8 rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
+
+const colorCls =
+  'h-8 w-full cursor-pointer rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900';
 
 export function PropertyPanel() {
   const { t } = useTranslation();
@@ -38,6 +61,10 @@ export function PropertyPanel() {
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
 
+  /**
+   * 连续编辑（拖动滑块 / 输入文字）合并为一次撤销：
+   * 会话内第一次改动前 commit，焦点离开后结束会话。
+   */
   const session = useRef(false);
   const begin = () => {
     if (!session.current) {
@@ -53,7 +80,8 @@ export function PropertyPanel() {
     useFlowStore.getState().patchSelected(p, false);
   };
 
-  const node = selectedNodes.length > 0 ? nodes.find((n) => n.id === selectedNodes[0]) : undefined;
+  /** 选中节点集合（保持画布上的顺序） */
+  const selNodes = nodes.filter((n) => selectedNodes.includes(n.id));
   const edge =
     selectedNodes.length === 0 && selectedEdges.length === 1
       ? edges.find((e) => e.id === selectedEdges[0])
@@ -79,7 +107,11 @@ export function PropertyPanel() {
             className={inputCls}
             value={typeof edge.label === 'string' ? edge.label : ''}
             placeholder="—"
-            onChange={(e) => useFlowStore.getState().patchEdgeLabel(edge.id, e.target.value)}
+            onChange={(e) => {
+              begin();
+              useFlowStore.getState().patchEdgeLabel(edge.id, e.target.value, false);
+            }}
+            onBlur={end}
           />
         </Field>
 
@@ -129,7 +161,7 @@ export function PropertyPanel() {
           <Field label={t('tools.flowchart.stroke')}>
             <input
               type="color"
-              className="h-8 w-full cursor-pointer rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+              className={colorCls}
               value={s.stroke}
               onChange={(e) => patchSelectedEdgeStyle({ stroke: e.target.value })}
             />
@@ -161,6 +193,37 @@ export function PropertyPanel() {
             ))}
           </select>
         </Field>
+
+        {/* 折点：正交自动布线 / 清除 */}
+        <div className="flex flex-col gap-2 rounded-md border border-gray-100 p-2 dark:border-gray-800">
+          <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+            {t('tools.flowchart.waypoints')}
+            {' · '}
+            {t('tools.flowchart.waypointCount', { count: edgeWaypointCount(edge) })}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              data-testid="flowchart-auto-route"
+              onClick={() => useFlowStore.getState().autoRouteSelectedEdges()}
+              className="flex-1 rounded-md border border-gray-200 px-2 py-1 text-[12px] text-gray-600 transition-colors hover:bg-blue-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-blue-500/10"
+            >
+              {t('tools.flowchart.autoRoute')}
+            </button>
+            <button
+              type="button"
+              data-testid="flowchart-clear-waypoints"
+              onClick={() => useFlowStore.getState().setEdgeWaypoints(edge.id, undefined)}
+              disabled={edgeWaypointCount(edge) === 0}
+              className="flex-1 rounded-md border border-gray-200 px-2 py-1 text-[12px] text-gray-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-blue-500/10"
+            >
+              {t('tools.flowchart.clearWaypoints')}
+            </button>
+          </div>
+          <p className="text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+            {t('tools.flowchart.waypointHint')}
+          </p>
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('tools.flowchart.edgeStartArrow')}>
@@ -200,7 +263,7 @@ export function PropertyPanel() {
     );
   }
 
-  if (!node) {
+  if (selNodes.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-center text-[12px] text-gray-400 dark:text-gray-500">
         {t('tools.flowchart.noSelection')}
@@ -208,31 +271,84 @@ export function PropertyPanel() {
     );
   }
 
-  const style = node.data.style;
-  const def = shapeDefOf(node.data.kind);
+  const isBatch = selNodes.length > 1;
+  const first = selNodes[0];
+  const base = first.data.style;
+
+  /** 批次内的公共值：不一致返回 undefined（混合态） */
+  const pick = <K extends keyof FlowNodeStyle>(key: K): FlowNodeStyle[K] | undefined =>
+    commonValue(selNodes.map((n) => n.data.style[key]));
+
+  const view: FlowNodeStyleView = {
+    fill: pick('fill'),
+    stroke: pick('stroke'),
+    strokeWidth: pick('strokeWidth'),
+    fontSize: pick('fontSize'),
+    bold: pick('bold'),
+    italic: pick('italic'),
+    align: pick('align'),
+    opacity: pick('opacity'),
+    shadow: pick('shadow'),
+    lineDash: pick('lineDash'),
+    fontFamily: pick('fontFamily'),
+    textColor: pick('textColor'),
+    cornerRadius: pick('cornerRadius'),
+    foldSize: pick('foldSize'),
+  };
+  const label = commonValue(selNodes.map((n) => n.data.label));
+  // 多选且图形种类不一致时，隐藏与具体图形强相关的项（圆角 / 折角）
+  const draw = commonValue(selNodes.map((n) => shapeDefOf(n.data.kind)?.draw));
   const aligns: Align[] = ['left', 'center', 'right'];
+  // 只有「必然存在」的字段取值不一致才算混合态（可选字段缺省属正常）
+  const hasMixed =
+    isBatch &&
+    (label === undefined ||
+      (['fill', 'stroke', 'strokeWidth', 'fontSize', 'bold', 'italic', 'align'] as const).some(
+        (k) => view[k] === undefined,
+      ));
 
   return (
     <div className="flex flex-col gap-3 overflow-y-auto p-1">
-      <h2 className="text-[12px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        {t('tools.flowchart.panelTitle')}
+      <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {isBatch
+          ? t('tools.flowchart.nodesSelected', { count: selNodes.length })
+          : t('tools.flowchart.panelTitle')}
+        <MixedBadge show={hasMixed} />
       </h2>
 
       <Field label={t('tools.flowchart.label')}>
         <input
           className={inputCls}
-          value={node.data.label}
+          value={label ?? ''}
+          placeholder={label === undefined ? t('tools.flowchart.mixed') : undefined}
           onChange={(e) => patch({ label: e.target.value })}
           onBlur={end}
         />
       </Field>
 
+      {/* 公式节点：编辑 LaTeX 源码（仅单选时提供） */}
+      {selNodes.length === 1 && first.data.formula !== undefined ? (
+        <Field label={t('tools.flowchart.formula')}>
+          <textarea
+            data-testid="flowchart-formula-input"
+            rows={2}
+            className="resize-none rounded-md border border-gray-200 bg-white px-2 py-1 font-mono text-[12px] text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            value={first.data.formula}
+            onChange={(e) => {
+              begin();
+              useFlowStore.getState().setNodeFormula(first.id, e.target.value, false);
+            }}
+            onBlur={end}
+          />
+        </Field>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('tools.flowchart.fill')}>
           <input
             type="color"
-            className="h-8 w-full cursor-pointer rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-            value={style.fill}
+            className={colorCls}
+            value={view.fill ?? base.fill}
             onChange={(e) => patch({ style: { fill: e.target.value } })}
             onBlur={end}
           />
@@ -240,8 +356,8 @@ export function PropertyPanel() {
         <Field label={t('tools.flowchart.stroke')}>
           <input
             type="color"
-            className="h-8 w-full cursor-pointer rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-            value={style.stroke}
+            className={colorCls}
+            value={view.stroke ?? base.stroke}
             onChange={(e) => patch({ style: { stroke: e.target.value } })}
             onBlur={end}
           />
@@ -255,7 +371,7 @@ export function PropertyPanel() {
             min={0}
             max={12}
             className={inputCls}
-            value={style.strokeWidth}
+            value={view.strokeWidth ?? base.strokeWidth}
             onChange={(e) => patch({ style: { strokeWidth: Number(e.target.value) || 0 } })}
             onBlur={end}
           />
@@ -266,7 +382,7 @@ export function PropertyPanel() {
             min={8}
             max={48}
             className={inputCls}
-            value={style.fontSize}
+            value={view.fontSize ?? base.fontSize}
             onChange={(e) => patch({ style: { fontSize: Number(e.target.value) || 12 } })}
             onBlur={end}
           />
@@ -281,7 +397,7 @@ export function PropertyPanel() {
               type="button"
               onClick={() => patch({ style: { align: a } })}
               className={`flex-1 rounded-md border px-2 py-1.5 text-[12px] transition-colors ${
-                style.align === a
+                view.align === a
                   ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
                   : 'border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
               }`}
@@ -297,9 +413,9 @@ export function PropertyPanel() {
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => patch({ style: { bold: !style.bold } })}
+          onClick={() => patch({ style: { bold: view.bold !== true } })}
           className={`flex-1 rounded-md border px-2 py-1.5 text-[12px] font-bold transition-colors ${
-            style.bold
+            view.bold === true
               ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
               : 'border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
@@ -308,9 +424,9 @@ export function PropertyPanel() {
         </button>
         <button
           type="button"
-          onClick={() => patch({ style: { italic: !style.italic } })}
+          onClick={() => patch({ style: { italic: view.italic !== true } })}
           className={`flex-1 rounded-md border px-2 py-1.5 text-[12px] italic transition-colors ${
-            style.italic
+            view.italic === true
               ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
               : 'border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
@@ -319,7 +435,14 @@ export function PropertyPanel() {
         </button>
       </div>
 
-      <NodeAppearanceSection style={style} draw={def?.draw} patch={patch} onEnd={end} />
+      <NodeAppearanceSection
+        style={view}
+        draw={draw}
+        patch={patch}
+        onEnd={end}
+        fallback={base}
+        mixed={hasMixed}
+      />
     </div>
   );
 }

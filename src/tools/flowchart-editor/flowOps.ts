@@ -3,7 +3,7 @@
  * 通过 store 的 setState/getState 操作，避免在单个 store 文件里堆叠过多逻辑。
  */
 
-import { useFlowStore } from './store';
+import { selectOnly, useFlowStore } from './store';
 import {
   absolutePositionOf,
   absoluteRectOf,
@@ -12,6 +12,7 @@ import {
   orderNodesByHierarchy,
 } from './core';
 import { isContainerKind, type FlowEdgeStyle } from './model/types';
+import { themeOf, type ThemeId } from './model/themes';
 import {
   computeAlign,
   computeDistribute,
@@ -124,7 +125,7 @@ export function groupSelected(): void {
 
   useFlowStore.getState().commit();
   useFlowStore.setState({
-    nodes: orderNodesByHierarchy([...updated, groupNode]),
+    nodes: selectOnly(orderNodesByHierarchy([...updated, groupNode]), [groupId]),
     selectedNodes: [groupId],
   });
 }
@@ -147,7 +148,7 @@ export function ungroupSelected(): void {
       }),
   );
   useFlowStore.getState().commit();
-  useFlowStore.setState({ nodes: next, selectedNodes: [] });
+  useFlowStore.setState({ nodes: selectOnly(next, []), selectedNodes: [] });
 }
 
 export function copySelection(): void {
@@ -183,11 +184,12 @@ export function pasteClipboard(): void {
   }));
 
   const state = useFlowStore.getState();
+  const ids = copies.map((c) => c.id);
   state.commit();
   useFlowStore.setState({
-    nodes: orderNodesByHierarchy([...state.nodes, ...copies]),
+    nodes: selectOnly(orderNodesByHierarchy([...state.nodes, ...copies]), ids),
     edges: [...state.edges, ...copyEdges],
-    selectedNodes: copies.map((c) => c.id),
+    selectedNodes: ids,
   });
 }
 
@@ -250,6 +252,57 @@ export function renameNode(id: string, name: string): void {
   useFlowStore.setState({
     nodes: nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, label: name } } : n)),
   });
+}
+
+/** 主题 / 样式预设的应用范围 */
+export type ThemeScope = 'all' | 'selection';
+
+/**
+ * 应用主题（样式预设）到整图或选中元素。
+ * 只覆盖预设声明的字段，其余样式保持原样；整个操作合并为一次撤销。
+ */
+export function applyTheme(themeId: ThemeId, scope: ThemeScope): void {
+  const theme = themeOf(themeId);
+  if (!theme) return;
+  const { nodes, edges, selectedNodes, selectedEdges } = useFlowStore.getState();
+  const nodeIds = scope === 'selection' ? new Set(selectedNodes) : null;
+  const edgeIds = scope === 'selection' ? new Set(selectedEdges) : null;
+  if (scope === 'selection' && (nodeIds?.size ?? 0) === 0 && (edgeIds?.size ?? 0) === 0) return;
+
+  useFlowStore.getState().commit();
+  useFlowStore.setState({
+    nodes: nodes.map((n) =>
+      !nodeIds || nodeIds.has(n.id)
+        ? { ...n, data: { ...n.data, style: { ...n.data.style, ...theme.node } } }
+        : n,
+    ),
+    edges: edges.map((e) => {
+      if (edgeIds && !edgeIds.has(e.id)) return e;
+      const current = normalizeEdgeStyle(
+        (e.data as { style?: Partial<FlowEdgeStyle> } | undefined)?.style,
+      );
+      const next = normalizeEdgeStyle({ ...current, ...theme.edge });
+      return { ...e, data: { ...(e.data ?? {}), style: next }, ...edgePropsOf(next) };
+    }),
+  });
+}
+
+/** 格式刷：复制第一个选中节点的样式 */
+export function copyNodeStyle(): boolean {
+  const { nodes, selectedNodes } = useFlowStore.getState();
+  const source = nodes.find((n) => n.id === selectedNodes[0]);
+  if (!source) return false;
+  useFlowStore.getState().setStyleBrush({ ...source.data.style });
+  return true;
+}
+
+/** 格式刷：把已复制的样式套用到选中节点（一次撤销） */
+export function pasteNodeStyle(): void {
+  const brush = useFlowStore.getState().styleBrush;
+  if (!brush) return;
+  const { selectedNodes } = useFlowStore.getState();
+  if (selectedNodes.length === 0) return;
+  useFlowStore.getState().patchSelected({ style: { ...brush } }, true);
 }
 
 /** 单个节点的层级调整（图层面板的上下箭头） */

@@ -1,12 +1,22 @@
 /**
  * 本地草稿（不离开浏览器）：停止编辑后防抖写入 localStorage，
- * 刷新后自动恢复。读写均 try/catch 容错，超限时静默忽略。
+ * 刷新后自动恢复。读写均 try/catch 容错，超限时降级处理。
+ *
+ * 体积策略：图片以 dataURL 内联，可能迅速撑爆 localStorage（约 5MB）。
+ * 因此写入前先估算体积，超限时**丢弃图片内容**再写一次，并回报「已降级」，
+ * 由 UI 提示用户改用「导出项目文件」保存含图片的版本。
  */
 
-import { type FlowDoc } from './model/types';
+import { DRAFT_SIZE_LIMIT, type FlowDoc, type FlowPage } from './model/types';
 import { activePageOf, migrateDoc } from './model/migrate';
 
 const DRAFT_KEY = 'syntools:flowchart-editor.draft.v1';
+
+export interface DraftWriteResult {
+  saved: boolean;
+  /** 因超限丢弃了图片内容（草稿仍已保存，但图片不完整） */
+  droppedImages: boolean;
+}
 
 export function readDraft(): FlowDoc | null {
   try {
@@ -22,18 +32,47 @@ export function readDraft(): FlowDoc | null {
   }
 }
 
-export function writeDraft(doc: FlowDoc): boolean {
+/** 去掉所有图片节点的 dataURL（保留节点位置与其它样式） */
+function withoutImages(doc: FlowDoc): FlowDoc {
+  const pages: FlowPage[] = doc.pages.map((page) => ({
+    ...page,
+    nodes: page.nodes.map((node) =>
+      node.data.src ? { ...node, data: { ...node.data, src: undefined } } : node,
+    ),
+  }));
+  return { ...doc, pages };
+}
+
+function payloadSize(payload: string): number {
+  return payload.length;
+}
+
+export function writeDraft(doc: FlowDoc): DraftWriteResult {
   try {
     // 空画布不保留草稿：用户主动清空后刷新不应再恢复出内容
     const page = activePageOf(doc);
     if (!page || page.nodes.length === 0) {
       localStorage.removeItem(DRAFT_KEY);
-      return false;
+      return { saved: false, droppedImages: false };
     }
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ doc, savedAt: Date.now() }));
-    return true;
+
+    const payload = (value: FlowDoc) => JSON.stringify({ doc: value, savedAt: Date.now() });
+    let text = payload(doc);
+    let droppedImages = false;
+    if (payloadSize(text) > DRAFT_SIZE_LIMIT) {
+      text = payload(withoutImages(doc));
+      droppedImages = true;
+      if (payloadSize(text) > DRAFT_SIZE_LIMIT) {
+        // 仍未通过：放弃写入，避免抛异常导致草稿永久损坏
+        localStorage.removeItem(DRAFT_KEY);
+        return { saved: false, droppedImages };
+      }
+    }
+
+    localStorage.setItem(DRAFT_KEY, text);
+    return { saved: true, droppedImages };
   } catch {
-    return false;
+    return { saved: false, droppedImages: false };
   }
 }
 

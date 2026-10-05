@@ -18,6 +18,9 @@ import {
 import { useFlowStore, type FlowEdge, type FlowNode } from '../store';
 import { ShapeNode } from '../nodes/ShapeNode';
 import { FlowEdgeLine } from '../nodes/FlowEdgeLine';
+import { ImageNode } from '../nodes/ImageNode';
+import { IconNode } from '../nodes/IconNode';
+import { FormulaNode } from '../nodes/FormulaNode';
 import { absolutePositionOf, absoluteRectOf, computeHelperLines } from '../core';
 import {
   type FlowEdgeStyle,
@@ -29,8 +32,14 @@ import { shapeSize } from '../model/shapes';
 import { QuickConnectOverlay } from './QuickConnectOverlay';
 import { CanvasScrollbars } from './CanvasScrollbars';
 import { EdgeEndpointHandles } from './EdgeEndpointHandles';
+import { EdgeWaypointEditor } from './EdgeWaypointEditor';
 
-const nodeTypes = { shape: ShapeNode };
+const nodeTypes = {
+  shape: ShapeNode,
+  image: ImageNode,
+  icon: IconNode,
+  formula: FormulaNode,
+};
 const edgeTypes = { flow: FlowEdgeLine };
 
 /** 默认线型 → React Flow 连接线型（自由锚点拖拽时跟随工具栏线型） */
@@ -128,6 +137,9 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   }, []);
   const addNode = useFlowStore((s) => s.addNode);
   const defaultEdge = useFlowStore((s) => s.defaultEdge);
+  const gridEnabled = useFlowStore((s) => s.gridEnabled);
+  const gridSize = useFlowStore((s) => s.gridSize);
+  const alignTolerance = useFlowStore((s) => s.alignTolerance);
   const connectionLineType = CONNECTION_LINE_TYPES[defaultEdge.type];
 
   /** 离开编辑器时清理连线拖拽标记 */
@@ -247,13 +259,21 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         if (dragged) {
           const byId = new Map(all.map((n) => [n.id, n] as const));
           const draggedRect = absoluteRectOf(dragged, byId);
-          // 只在同一层级（同一泳道内或同在画布顶层）之间显示对齐参考线
+          // 跨容器对齐：与同页所有可见节点比较，但排除自身与自身后代（否则会自我吸附）
+          const descendants = new Set<string>();
+          const collectChildren = (id: string) => {
+            for (const n of all) {
+              if (n.parentId === id && !descendants.has(n.id)) {
+                descendants.add(n.id);
+                collectChildren(n.id);
+              }
+            }
+          };
+          collectChildren(dragged.id);
           const others = all
-            .filter(
-              (n) => n.id !== dragged.id && (n.parentId ?? null) === (dragged.parentId ?? null),
-            )
+            .filter((n) => n.id !== dragged.id && !descendants.has(n.id) && n.hidden !== true)
             .map((n) => absoluteRectOf(n, byId));
-          const lines = computeHelperLines(draggedRect, others);
+          const lines = computeHelperLines(draggedRect, others, alignTolerance);
           useFlowStore.getState().setHelperLines(lines);
           if (lines.x !== undefined || lines.y !== undefined) {
             // helper lines 返回的是绝对吸附坐标，需转换回节点自身坐标系
@@ -272,7 +292,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         useFlowStore.getState().setHelperLines(null);
       }
     },
-    [onNodesChangeStore],
+    [onNodesChangeStore, alignTolerance],
   );
 
   const onDrop = useCallback(
@@ -343,8 +363,8 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         reconnectRadius={10}
         connectionLineType={connectionLineType}
         connectionLineStyle={{ stroke: '#2563EB', strokeWidth: 2, strokeDasharray: '5 4' }}
-        snapToGrid
-        snapGrid={[10, 10]}
+        snapToGrid={gridEnabled}
+        snapGrid={[gridSize, gridSize]}
         // 绘图工具习惯：左键拖出选框，中键/右键平移画布
         selectionOnDrag
         panOnDrag={[1, 2]}
@@ -394,6 +414,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       </ReactFlow>
       <HelperLines />
       <EdgeEndpointHandles />
+      <EdgeWaypointEditor />
       <QuickConnectOverlay />
       <CanvasScrollbars />
       <SketchFilter />

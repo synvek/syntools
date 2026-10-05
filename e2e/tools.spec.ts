@@ -429,7 +429,21 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await page.goto('/tools/flowchart-editor');
     // 通用图形为侧边栏第一个分类
     const palette = page.locator('aside').filter({ has: page.getByPlaceholder('搜索图形') });
-    await expect(palette.getByRole('button').first()).toContainText('通用图形');
+    // 侧边栏顶部新增了「插入图片/图标/公式」入口，分类按钮中第一个仍应是「通用图形」
+    // 等侧边栏渲染完成再统计（allInnerTexts 不会自动等待）
+    await expect(palette.getByPlaceholder('搜索图形')).toBeVisible();
+    const categories = [
+      '通用图形',
+      '流程图',
+      'UML',
+      'BPMN',
+      '网络与云',
+      '组织结构',
+      '思维导图',
+      'ER 图',
+    ];
+    const texts = await palette.getByRole('button').allInnerTexts();
+    expect(texts.find((text) => categories.includes(text.trim()))).toBe('通用图形');
     // 默认展开：可见通用图形下的「圆角矩形」
     await expect(page.getByRole('button', { name: '圆角矩形', exact: true })).toBeVisible();
     // 点击收起该分类，其下图形隐藏（其它分类不受影响）
