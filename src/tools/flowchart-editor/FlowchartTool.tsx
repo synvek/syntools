@@ -9,8 +9,10 @@ import { LAYOUT_DENSITY } from './layout';
 import {
   copySelection,
   cutSelection,
+  flipSelected,
   groupSelected,
   pasteClipboard,
+  rotateSelected,
   ungroupSelected,
 } from './flowOps';
 import { useFlowStore } from './store';
@@ -34,7 +36,7 @@ import {
   type ShapeKind,
 } from './model/types';
 import { shapeSize } from './model/shapes';
-import { absoluteRectOf, formulaData, iconData, imageData } from './core';
+import { absolutePositionOf, absoluteRectOf, formulaData, iconData, imageData } from './core';
 import { fitInto, loadImageFile } from './model/image';
 import { activePageOf } from './model/migrate';
 import { FlowCanvas } from './ui/FlowCanvas';
@@ -44,23 +46,34 @@ import { Toolbar } from './ui/Toolbar';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { LayerPanel } from './ui/LayerPanel';
 import { SnapshotPanel } from './ui/SnapshotPanel';
+import { SearchPanel } from './ui/SearchPanel';
+import { ShortcutHelpDialog } from './ui/ShortcutHelpDialog';
 import { PageBrowser } from '@/core/components/PageBrowser';
 import { PageThumbnail } from './model/PageThumbnail';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { TemplatePanel } from './ui/TemplatePanel';
 import { captureViewportDataUrl, DEFAULT_RASTER_OPTIONS } from './io/raster';
+import { parseDrawioXmlAsync } from './io/drawio';
 import './flowchart.css';
 import '@xyflow/react/dist/style.css';
 
 const DRAFT_DEBOUNCE_MS = 1200;
 
-/** 右侧面板：属性 / 图层 / 历史快照 */
-const PANELS = ['prop', 'layer', 'history'] as const;
+/** 右侧面板：属性 / 图层 / 历史快照 / 全图搜索 */
+const PANELS = ['prop', 'layer', 'history', 'search'] as const;
 type PanelKey = (typeof PANELS)[number];
+
+/** 面板 → i18n 键后缀 */
+const PANEL_LABEL_KEY: Record<PanelKey, string> = {
+  prop: 'panelTitle',
+  layer: 'layers',
+  history: 'history',
+  search: 'searchNodes',
+};
 
 function FlowchartInner() {
   const { t, i18n: i18nInstance } = useTranslation();
-  const { screenToFlowPosition, fitView } = useReactFlow();
+  const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
   /** 当前语言的文案是否已按需加载完成 */
   const [stringsReady, setStringsReady] = useState(() =>
@@ -83,6 +96,12 @@ function FlowchartInner() {
   const layoutDirection = useFlowStore((s) => s.layoutDirection);
   const layoutDensity = useFlowStore((s) => s.layoutDensity);
   const alignTolerance = useFlowStore((s) => s.alignTolerance);
+  const wheelMode = useFlowStore((s) => s.wheelMode);
+  const canvasBackground = useFlowStore((s) => s.canvasBackground);
+  const gridStyle = useFlowStore((s) => s.gridStyle);
+  const guides = useFlowStore((s) => s.guides);
+  const rulersVisible = useFlowStore((s) => s.rulersVisible);
+  const pageSize = useFlowStore((s) => s.pageSize);
   const snapshots = useFlowStore((s) => s.snapshots);
 
   /**
@@ -101,6 +120,7 @@ function FlowchartInner() {
   const [failure, setFailure] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelKey>('prop');
   const [draftSaved, setDraftSaved] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [presentSrc, setPresentSrc] = useState<string | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
@@ -207,8 +227,26 @@ function FlowchartInner() {
       layoutDensity,
       alignTolerance,
       panel,
+      wheelMode,
+      canvasBackground,
+      gridStyle,
+      guides,
+      rulersVisible,
     });
-  }, [hydrated, gridEnabled, gridSize, layoutDirection, layoutDensity, alignTolerance, panel]);
+  }, [
+    hydrated,
+    gridEnabled,
+    gridSize,
+    layoutDirection,
+    layoutDensity,
+    alignTolerance,
+    panel,
+    wheelMode,
+    canvasBackground,
+    gridStyle,
+    guides,
+    rulersVisible,
+  ]);
 
   // 命名快照变更后持久化
   useEffect(() => {
@@ -387,6 +425,23 @@ function FlowchartInner() {
     void persistNow();
   }, [persistNow]);
 
+  /** 全图搜索定位：把视口居中到该节点（含父容器偏移的绝对坐标） */
+  const locateNode = useCallback(
+    (nodeId: string) => {
+      const st = useFlowStore.getState();
+      const node = st.nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      const byId = new Map(st.nodes.map((n) => [n.id, n] as const));
+      const abs = absolutePositionOf(node, byId);
+      const size = {
+        width: node.width ?? 120,
+        height: node.height ?? 60,
+      };
+      setCenter(abs.x + size.width / 2, abs.y + size.height / 2, { zoom: 1.1, duration: 300 });
+    },
+    [setCenter],
+  );
+
   // 键盘快捷键：撤销/重做/剪切复制粘贴/保存/导出/删除/微移/全选/重命名/建节点（输入框聚焦时不拦截）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -409,6 +464,10 @@ function FlowchartInner() {
         // Esc 取消选择。延迟到本次事件派发结束再更新 store：
         // 同步的 store 更新会让其它弹层（如页面总览）在派发中途重挂监听而收不到 Esc。
         queueMicrotask(() => useFlowStore.getState().clearSelection());
+      } else if (!mod && e.key === 'F1') {
+        // F1 打开快捷键帮助（`?`/`/` 已被全局工具搜索占用，避免抢占）
+        e.preventDefault();
+        setHelpOpen(true);
       } else if (!mod && e.key === 'F2') {
         // F2 重命名选中节点：聚焦属性面板的文本输入框
         const labelInput = document.querySelector<HTMLInputElement>(
@@ -456,6 +515,18 @@ function FlowchartInner() {
         // 全选当前页节点与连线
         e.preventDefault();
         useFlowStore.getState().selectAll();
+      } else if (mod && e.key.toLowerCase() === 'r') {
+        // Ctrl/⌘+R 顺时针 90°，加 Shift 逆时针 90°（与 draw.io 的旋转快捷键一致）
+        e.preventDefault();
+        rotateSelected(e.shiftKey ? -90 : 90);
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === 'h') {
+        // Ctrl/⌘+Shift+H 水平镜像
+        e.preventDefault();
+        flipSelected('h');
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === 'j') {
+        // Ctrl/⌘+Shift+J 垂直镜像
+        e.preventDefault();
+        flipSelected('v');
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         useFlowStore.getState().removeSelected();
@@ -477,6 +548,39 @@ function FlowchartInner() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [nudge, spawnFromSelection, handleSave]);
+
+  /**
+   * 从 draw.io 直接粘贴：识别系统剪贴板中的 mxGraph 内容并插入当前页。
+   *
+   * - 只在画布空闲（非输入框 / 无模态弹层）时接管，普通文本粘贴不受影响；
+   * - 复用既有 `parseDrawioXmlAsync`（支持未压缩、base64+deflate、URI 编码）；
+   * - 解析纯属 XML 数据解析，不执行任何脚本；节点数量有上限保护。
+   */
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const tag = (document.activeElement?.tagName ?? '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      if (!text || !/mxGraphModel|mxfile|<mxCell/i.test(text)) return;
+      e.preventDefault();
+      void (async () => {
+        const doc = await parseDrawioXmlAsync(text);
+        if (!doc) {
+          setFailure(t('tools.flowchart.pasteFailed'));
+          return;
+        }
+        const host = canvasRef.current?.getBoundingClientRect();
+        const center = host
+          ? { x: host.left + host.width / 2, y: host.top + host.height / 2 }
+          : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        const point = screenToFlowPosition(center);
+        useFlowStore.getState().insertDoc(doc, point);
+      })();
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [screenToFlowPosition, t]);
 
   // 文案未就绪时先不渲染（只有当前语言的小 chunk 需要等待）
   if (!stringsReady) return null;
@@ -531,6 +635,7 @@ function FlowchartInner() {
 
       <Toolbar
         onTemplates={() => setTemplatesOpen(true)}
+        onShortcutHelp={() => setHelpOpen(true)}
         onAutoLayout={() => {
           const st = useFlowStore.getState();
           // 两段式布局：保留泳道 / 编组层级，方向与间距取工具栏设置
@@ -573,6 +678,21 @@ function FlowchartInner() {
                 </p>
               </div>
             )}
+          </div>
+          <div className="flex items-center gap-2 border-t border-gray-100 px-2 py-1 dark:border-gray-800">
+            <button
+              type="button"
+              data-testid="flowchart-duplicate-page"
+              onClick={() => useFlowStore.getState().duplicatePage(activePageId)}
+              className="rounded-md border border-gray-200 px-2 py-0.5 text-[11px] text-gray-600 transition-colors hover:bg-blue-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-blue-500/10"
+            >
+              {t('tools.flowchart.duplicatePage')}
+            </button>
+            {pageSize ? (
+              <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                {`${pageSize.width} × ${pageSize.height}`}
+              </span>
+            ) : null}
           </div>
           <PageBrowser
             pages={pageOrder}
@@ -618,9 +738,7 @@ function FlowchartInner() {
                     : 'bg-white text-gray-600 hover:bg-blue-50 dark:bg-gray-900/60 dark:text-gray-300 dark:hover:bg-blue-500/10'
                 }`}
               >
-                {t(
-                  `tools.flowchart.${key === 'prop' ? 'panelTitle' : key === 'layer' ? 'layers' : 'history'}`,
-                )}
+                {t(`tools.flowchart.${PANEL_LABEL_KEY[key]}`)}
               </button>
             ))}
           </div>
@@ -628,6 +746,7 @@ function FlowchartInner() {
             {panel === 'prop' ? <PropertyPanel /> : null}
             {panel === 'layer' ? <LayerPanel /> : null}
             {panel === 'history' ? <SnapshotPanel /> : null}
+            {panel === 'search' ? <SearchPanel onLocate={locateNode} /> : null}
           </div>
         </aside>
       </div>
@@ -658,6 +777,8 @@ function FlowchartInner() {
           ) : null}
         </PresentOverlay>
       ) : null}
+
+      {helpOpen ? <ShortcutHelpDialog onClose={() => setHelpOpen(false)} /> : null}
 
       <TemplatePanel
         open={templatesOpen}

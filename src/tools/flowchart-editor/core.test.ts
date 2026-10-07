@@ -3,15 +3,21 @@ import {
   __resetIdCounter,
   absolutePositionOf,
   absoluteRectOf,
+  angleFromCenter,
   cachedAbsoluteRectOf,
   computeHelperLines,
   createId,
   defaultData,
   deserializeDoc,
+  nodeTransformCss,
   normalizeColor,
+  normalizeRotation,
   orderNodesByHierarchy,
   resolvePlacement,
+  safeLinkHref,
+  scaleChildren,
   serializeDoc,
+  snapRotation,
   validateDoc,
 } from './core';
 import { buildTemplate } from './model/templates';
@@ -25,6 +31,96 @@ describe('createId', () => {
     const b = createId('n');
     expect(a).not.toBe(b);
     expect(a.startsWith('n_')).toBe(true);
+  });
+});
+
+describe('容器缩放联动（scaleChildren）', () => {
+  const child = {
+    id: 'c1',
+    kind: 'rect' as ShapeKind,
+    position: { x: 20, y: 40 },
+    width: 100,
+    height: 50,
+  };
+
+  it('按比例换算子节点的相对坐标与尺寸', () => {
+    const out = scaleChildren([child], { width: 200, height: 200 }, { width: 400, height: 400 });
+    expect(out).toHaveLength(1);
+    expect(out[0].position).toEqual({ x: 40, y: 80 });
+    expect(out[0].width).toBe(200);
+    expect(out[0].height).toBe(100);
+  });
+
+  it('非等比缩放时宽高各按自身比例换算', () => {
+    const out = scaleChildren([child], { width: 200, height: 200 }, { width: 400, height: 100 });
+    expect(out[0].position).toEqual({ x: 40, y: 20 });
+    expect(out[0].width).toBe(200);
+    // 50 * 0.5 = 25，低于 rect 的最小高度 32 → 夹取
+    expect(out[0].height).toBe(32);
+  });
+
+  it('尺寸缩小时夹取到该形状的最小尺寸', () => {
+    const out = scaleChildren([child], { width: 200, height: 200 }, { width: 20, height: 20 });
+    expect(out[0].width).toBeGreaterThanOrEqual(48);
+    expect(out[0].height).toBeGreaterThanOrEqual(32);
+  });
+
+  it('比例未变化或入参非法时返回空数组（调用方据此跳过写入）', () => {
+    expect(
+      scaleChildren([child], { width: 200, height: 200 }, { width: 200, height: 200 }),
+    ).toEqual([]);
+    expect(scaleChildren([child], { width: 0, height: 200 }, { width: 100, height: 200 })).toEqual(
+      [],
+    );
+    expect(scaleChildren([], { width: 100, height: 100 }, { width: 200, height: 200 })).toEqual([]);
+  });
+});
+
+describe('节点变换纯函数', () => {
+  it('normalizeRotation 归一到 [0,360)', () => {
+    expect(normalizeRotation(0)).toBe(0);
+    expect(normalizeRotation(370)).toBe(10);
+    expect(normalizeRotation(-90)).toBe(270);
+    expect(normalizeRotation(Number.NaN)).toBe(0);
+  });
+
+  it('snapRotation 吸附到步长倍数', () => {
+    expect(snapRotation(47, 15)).toBe(45);
+    expect(snapRotation(8, 15)).toBe(15);
+    expect(snapRotation(47, 0)).toBe(47);
+    expect(snapRotation(-1, 15)).toBe(0);
+  });
+
+  it('angleFromCenter 以正右方为 0 且顺时针增大', () => {
+    expect(angleFromCenter(0, 0, 10, 0)).toBeCloseTo(0);
+    expect(angleFromCenter(0, 0, 0, 10)).toBeCloseTo(90);
+    expect(angleFromCenter(0, 0, -10, 0)).toBeCloseTo(180);
+    expect(angleFromCenter(0, 0, 0, -10)).toBeCloseTo(270);
+  });
+
+  it('nodeTransformCss 无变换时返回 undefined', () => {
+    expect(nodeTransformCss(undefined)).toBeUndefined();
+    expect(nodeTransformCss({})).toBeUndefined();
+    expect(nodeTransformCss({ rotation: 0, flipH: false, flipV: false })).toBeUndefined();
+  });
+
+  it('nodeTransformCss 组合旋转与镜像', () => {
+    expect(nodeTransformCss({ rotation: 90 })).toBe('rotate(90deg)');
+    expect(nodeTransformCss({ flipH: true })).toBe('scale(-1, 1)');
+    expect(nodeTransformCss({ flipV: true })).toBe('scale(1, -1)');
+    expect(nodeTransformCss({ rotation: 45, flipH: true, flipV: true })).toBe(
+      'rotate(45deg) scale(-1, -1)',
+    );
+  });
+
+  it('safeLinkHref 仅放行 http/https/mailto', () => {
+    expect(safeLinkHref('https://example.com')).toBe('https://example.com');
+    expect(safeLinkHref('example.com')).toBe('https://example.com');
+    expect(safeLinkHref('mailto:a@b.com')).toBe('mailto:a@b.com');
+    expect(safeLinkHref('javascript:alert(1)')).toBeUndefined();
+    expect(safeLinkHref('data:text/html,x')).toBeUndefined();
+    expect(safeLinkHref('')).toBeUndefined();
+    expect(safeLinkHref(undefined)).toBeUndefined();
   });
 });
 

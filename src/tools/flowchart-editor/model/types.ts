@@ -189,7 +189,49 @@ export interface FlowNodeStyle {
    * 键与取值范围由图形目录的 `ShapeDef.adjust` 声明，见 `model/shapes/adjust.ts`。
    */
   shapeParams?: Record<string, number>;
+  /* ------------------------------ 节点变换 ------------------------------ */
+  /**
+   * 旋转角度（度，0~360 顺时针）。
+   * 以节点包围盒中心为原点做纯 CSS transform，**不改动几何与连线锚点**：
+   * 连线仍吸附未旋转的轴对齐包围盒，与 draw.io 的 bbox 行为一致。
+   */
+  rotation?: number;
+  /** 水平镜像（左右翻转） */
+  flipH?: boolean;
+  /** 垂直镜像（上下翻转） */
+  flipV?: boolean;
+  /* ------------------------------ 文本排版 ------------------------------ */
+  /** 文本垂直对齐（缺省 middle，与历史行为一致） */
+  verticalAlign?: VerticalAlign;
+  /** 行高（倍数，缺省 1.25） */
+  lineHeight?: number;
+  /** 文字自动缩放以适应框体（缺省关闭） */
+  autoShrink?: boolean;
+  /** 标签背景色（缺省透明） */
+  labelBackground?: string;
+  /** 超链接（仅允许 http/https/mailto 协议，渲染时校验） */
+  link?: string;
 }
+
+/** 文本垂直对齐 */
+export type VerticalAlign = 'top' | 'middle' | 'bottom';
+
+/** 垂直对齐下拉选项 */
+export const VERTICAL_ALIGN_OPTIONS: VerticalAlign[] = ['top', 'middle', 'bottom'];
+
+/** 垂直对齐 → 弹性主轴映射（面板与渲染共用，避免散落魔术字符串） */
+export const VERTICAL_ALIGN_FLEX: Record<VerticalAlign, string> = {
+  top: 'flex-start',
+  middle: 'center',
+  bottom: 'flex-end',
+};
+
+/** 旋转默认吸附步长（度）；按住 Shift 使用精细步长 */
+export const ROTATION_SNAP_STEP = 15;
+/** 旋转精细步长（按住 Shift，度） */
+export const ROTATION_FINE_STEP = 45;
+/** 默认行高倍数（与历史 CSS 行为一致） */
+export const DEFAULT_LINE_HEIGHT = 1.25;
 
 /** 节点类型：图形 / 图片 / 内置图标 / 公式 */
 export type FlowNodeType = 'shape' | 'image' | 'icon' | 'formula';
@@ -204,6 +246,9 @@ export const IMAGE_MAX_EDGE = 1600;
 /** 草稿体积上限（字符数，约 4MB）；超限时降级为「不含图片」的草稿 */
 export const DRAFT_SIZE_LIMIT = 4_000_000;
 
+/** 单次粘贴/导入可插入的最大节点数（防止异常内容拖垮画布） */
+export const MAX_PASTE_NODES = 500;
+
 export interface FlowNodeData extends Record<string, unknown> {
   kind: ShapeKind;
   label: string;
@@ -214,6 +259,11 @@ export interface FlowNodeData extends Record<string, unknown> {
   iconId?: string;
   /** 公式节点的 LaTeX 源码（type === 'formula'） */
   formula?: string;
+  /**
+   * 容器（泳道 / 编组）折叠：仅保留标题栏并隐藏子节点。
+   * 放在 data 上以便随 React Flow 节点自动流转；缺省即展开，子节点数据完整保留。
+   */
+  collapsed?: boolean;
   /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写，减少样式丢失） */
   mxStyle?: string[];
 }
@@ -226,6 +276,12 @@ export interface Waypoint {
 
 export interface FlowEdgeData extends Record<string, unknown> {
   label?: string;
+  /** 起点侧标签（缺省不显示）；与主标签、终点标签互相独立 */
+  sourceLabel?: string;
+  /** 终点侧标签（缺省不显示） */
+  targetLabel?: string;
+  /** 主标签在路径上的位置：居中（缺省）/ 靠近起点 / 靠近终点 */
+  labelPosition?: EdgeLabelPosition;
   /** 连线样式（渲染层读取，展示于属性面板） */
   style?: FlowEdgeStyle;
   /** 手动/导入的折点；缺省表示无折点 */
@@ -233,6 +289,22 @@ export interface FlowEdgeData extends Record<string, unknown> {
   /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
   mxStyle?: string[];
 }
+
+/** 主标签在连线路径上的位置 */
+export type EdgeLabelPosition = 'center' | 'nearSource' | 'nearTarget';
+
+export const EDGE_LABEL_POSITION_OPTIONS: EdgeLabelPosition[] = [
+  'center',
+  'nearSource',
+  'nearTarget',
+];
+
+/** 标签位置 → 路径长度比例（用于按路径取点渲染） */
+export const EDGE_LABEL_POSITION_RATIO: Record<EdgeLabelPosition, number> = {
+  center: 0.5,
+  nearSource: 0.2,
+  nearTarget: 0.8,
+};
 
 /** 连线线型 */
 export type EdgeType = 'straight' | 'smoothstep' | 'step' | 'bezier';
@@ -252,6 +324,12 @@ export type EdgeArrow =
   | 'square'
   | 'bar';
 
+/** 连线跳线样式：不跳 / 弧线跨越 */
+export type EdgeJumpStyle = 'none' | 'arc';
+
+/** 跳线下拉选项 */
+export const EDGE_JUMP_OPTIONS: EdgeJumpStyle[] = ['none', 'arc'];
+
 /** 连线样式（工具栏 / 属性面板可编辑） */
 export interface FlowEdgeStyle {
   /** straight 直线 / smoothstep 圆角折线 / step 直角折线 / bezier 曲线 */
@@ -261,6 +339,8 @@ export interface FlowEdgeStyle {
   dash: EdgeDash;
   startArrow: EdgeArrow;
   endArrow: EdgeArrow;
+  /** 跳线样式（缺省 none，与历史行为一致） */
+  jumpStyle?: EdgeJumpStyle;
 }
 
 export const DEFAULT_EDGE_STYLE: FlowEdgeStyle = {
@@ -270,10 +350,57 @@ export const DEFAULT_EDGE_STYLE: FlowEdgeStyle = {
   dash: 'solid',
   startArrow: 'none',
   endArrow: 'arrowclosed',
+  jumpStyle: 'none',
 };
 
 /** 连线类型下拉选项 */
 export const EDGE_TYPE_OPTIONS: EdgeType[] = ['smoothstep', 'straight', 'step', 'bezier'];
+
+/** UML 关系预设：一键把连线切到该关系的线型 / 线样式 / 箭头组合 */
+export interface EdgeRelationPreset {
+  id: string;
+  /** i18n 键后缀（tools.flowchart.relation*） */
+  labelKey: string;
+  patch: Partial<FlowEdgeStyle>;
+}
+
+/**
+ * 关系预设一览（纯数据，零渲染成本）。
+ * 箭头方向按 UML 约定：泛化 / 实现 / 依赖的空心三角与开放箭头指向「被指向方」（终点），
+ * 聚合 / 组合的菱形位于「整体」一端（起点）。
+ */
+export const EDGE_RELATION_PRESETS: EdgeRelationPreset[] = [
+  {
+    id: 'association',
+    labelKey: 'relationAssociation',
+    patch: { type: 'straight', dash: 'solid', startArrow: 'none', endArrow: 'arrow' },
+  },
+  {
+    id: 'generalization',
+    labelKey: 'relationGeneralization',
+    patch: { type: 'straight', dash: 'solid', startArrow: 'none', endArrow: 'triangle' },
+  },
+  {
+    id: 'realization',
+    labelKey: 'relationRealization',
+    patch: { type: 'straight', dash: 'dashed', startArrow: 'none', endArrow: 'triangle' },
+  },
+  {
+    id: 'dependency',
+    labelKey: 'relationDependency',
+    patch: { type: 'straight', dash: 'dashed', startArrow: 'none', endArrow: 'arrow' },
+  },
+  {
+    id: 'aggregation',
+    labelKey: 'relationAggregation',
+    patch: { type: 'straight', dash: 'solid', startArrow: 'diamondHollow', endArrow: 'arrow' },
+  },
+  {
+    id: 'composition',
+    labelKey: 'relationComposition',
+    patch: { type: 'straight', dash: 'solid', startArrow: 'diamond', endArrow: 'arrow' },
+  },
+];
 /** 线样式下拉选项 */
 export const EDGE_DASH_OPTIONS: EdgeDash[] = [
   'solid',
@@ -320,6 +447,53 @@ export type FlowNodeStyleView = Partial<FlowNodeStyle>;
 /** 画布网格吸附尺寸可选值 */
 export const GRID_SIZE_OPTIONS = [5, 10, 20, 25] as const;
 
+/** 画布网格样式（背景绘制方式） */
+export type GridStyle = 'dots' | 'lines' | 'cross' | 'none';
+
+export const GRID_STYLE_OPTIONS: GridStyle[] = ['dots', 'lines', 'cross', 'none'];
+
+/** 画布背景预设色（含透明） */
+export const CANVAS_BACKGROUND_OPTIONS = [
+  'transparent',
+  '#FFFFFF',
+  '#F8FAFC',
+  '#F1F5F9',
+  '#0F172A',
+] as const;
+
+/** 鼠标滚轮行为：平移（历史默认）/ 缩放（draw.io 习惯） */
+export type WheelMode = 'pan' | 'zoom';
+
+/** 标尺与参考线的轴向 */
+export type GuideAxis = 'x' | 'y';
+
+/**
+ * 持久参考线（画布坐标系）。
+ * `x` 轴参考线为竖直直线（记住 x 坐标），`y` 轴为水平直线。
+ */
+export interface CanvasGuide {
+  axis: GuideAxis;
+  pos: number;
+}
+
+/** 纸张预设（px @96dpi 的常见规格，页面边界用） */
+export interface PaperPreset {
+  id: string;
+  width: number;
+  height: number;
+}
+
+export const PAPER_PRESETS: PaperPreset[] = [
+  { id: 'a4l', width: 1123, height: 794 },
+  { id: 'a4p', width: 794, height: 1123 },
+  { id: 'a3l', width: 1587, height: 1123 },
+  { id: 'letterl', width: 1056, height: 816 },
+  { id: 'letterp', width: 816, height: 1056 },
+];
+
+/** 页面尺寸下限（避免纸张被压成不可用尺寸） */
+export const MIN_PAGE_SIZE = 200;
+
 /** 画布上一个节点的持久化记录 */
 export interface FlowNodeRec {
   id: string;
@@ -347,6 +521,12 @@ export interface FlowEdgeRec {
   sourceHandle?: string | null;
   targetHandle?: string | null;
   label?: string;
+  /** 起点侧标签（旧文档缺省即不显示） */
+  sourceLabel?: string;
+  /** 终点侧标签（旧文档缺省即不显示） */
+  targetLabel?: string;
+  /** 主标签位置（缺省 center） */
+  labelPosition?: EdgeLabelPosition;
   style?: FlowEdgeStyle;
   /** 折点（画布绝对坐标）；旧文档缺省即无折点 */
   waypoints?: Waypoint[];
@@ -367,6 +547,8 @@ export interface FlowPage {
   name: string;
   nodes: FlowNodeRec[];
   edges: FlowEdgeRec[];
+  /** 纸张/画布尺寸（缺省即无页边界，与历史行为一致） */
+  size?: ShapeSize;
 }
 
 /** v2：多页文档（当前规范形态） */
@@ -551,6 +733,25 @@ export interface NodeGeometryPatch {
   y?: number;
   width?: number;
   height?: number;
+}
+
+/** 多选整体缩放时单个节点的几何快照（画布绝对坐标 + 实际尺寸） */
+export interface GroupScaleItem {
+  id: string;
+  absX: number;
+  absY: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * 节点变换补丁（旋转 / 镜像）。
+ * 值为 `undefined` 表示「清除该字段」；为具体值表示写入。
+ */
+export interface NodeTransformPatch {
+  rotation?: number | undefined;
+  flipH?: boolean | undefined;
+  flipV?: boolean | undefined;
 }
 
 /** 几何编辑的尺寸下限（与 NodeResizer 的最小尺寸保持一致：容器更大） */

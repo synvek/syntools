@@ -1,4 +1,13 @@
-import { forwardRef, useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Background,
@@ -37,6 +46,9 @@ import { shapeSize } from '../model/shapes';
 import { QuickConnectOverlay } from './QuickConnectOverlay';
 import { CanvasScrollbars } from './CanvasScrollbars';
 import { EdgeEndpointHandles } from './EdgeEndpointHandles';
+import { EdgeJumpOverlay } from './EdgeJumpOverlay';
+import { GuideLines, Ruler } from './Ruler';
+import { SelectionResizer } from './SelectionResizer';
 import { EdgeWaypointEditor } from './EdgeWaypointEditor';
 import { FlowContextMenu, type FlowContextTarget } from './FlowContextMenu';
 
@@ -57,6 +69,12 @@ const CONNECTION_LINE_TYPES: Record<FlowEdgeStyle['type'], ConnectionLineType> =
 };
 
 const defaultEdgeOptions = { type: 'flow' };
+
+/**
+ * 启用大图虚拟化的节点数阈值。
+ * 实测 150 以内全量渲染更快且无闪烁；超过后仅渲染可视区域收益明显。
+ */
+const VIRTUALIZE_THRESHOLD = 150;
 
 /** 手绘线型使用的油漆抖动滤镜（全局定义一次，供连线 url(#flow-sketch) 引用） */
 function SketchFilter() {
@@ -144,11 +162,52 @@ function HelperLines() {
   );
 }
 
+/** 纸张页边界：按 viewport 换算的绝对定位矩形（置于画布最底层） */
+function PageBoundary() {
+  const size = useFlowStore((s) => s.pageSize);
+  const { x: vx, y: vy, zoom } = useViewport();
+  if (!size) return null;
+  return (
+    <div
+      data-testid="flowchart-page-boundary"
+      className="pointer-events-none absolute"
+      style={{
+        left: vx,
+        top: vy,
+        width: size.width * zoom,
+        height: size.height * zoom,
+        boxShadow: '0 0 0 1px rgba(148, 163, 184, 0.7)',
+      }}
+      aria-hidden="true"
+    />
+  );
+}
+
 const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const { t } = useTranslation();
   const { screenToFlowPosition, fitView, zoomTo } = useReactFlow();
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
+  /**
+   * 渲染用节点：把「折叠容器」的子节点置为 hidden。
+   *
+   * 仅派生视图、不改 store：折叠是视图态，子节点数据必须完整保留；
+   * 无折叠容器时直接复用原数组引用，避免无谓的重渲染。
+   */
+  const displayNodes = useMemo(() => {
+    const collapsed = new Set<string>();
+    for (const n of nodes) {
+      if (n.data.collapsed === true) collapsed.add(n.id);
+    }
+    if (collapsed.size === 0) return nodes;
+    return nodes.map((n) =>
+      n.parentId && collapsed.has(n.parentId) && n.hidden !== true ? { ...n, hidden: true } : n,
+    );
+  }, [nodes]);
+  const canvasBackground = useFlowStore((s) => s.canvasBackground);
+  const gridStyle = useFlowStore((s) => s.gridStyle);
+  const wheelMode = useFlowStore((s) => s.wheelMode);
+  const rulersVisible = useFlowStore((s) => s.rulersVisible);
   const onNodesChangeStore = useFlowStore((s) => s.onNodesChange);
   const onEdgesChange = useFlowStore((s) => s.onEdgesChange);
   const storeOnConnect = useFlowStore((s) => s.onConnect);
@@ -441,15 +500,33 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  /** 网格样式 → React Flow 背景变体 */
+  const bgVariant =
+    gridStyle === 'lines'
+      ? BackgroundVariant.Lines
+      : gridStyle === 'cross'
+        ? BackgroundVariant.Cross
+        : BackgroundVariant.Dots;
+
   return (
     <div
       ref={setHostRef}
       className="relative h-full w-full"
+      data-testid="flowchart-canvas"
+      style={
+        {
+          // 画布背景色 + 供跳线遮罩使用的同名变量（保证「跨线留白」与背景一致）
+          background: canvasBackground === 'transparent' ? undefined : canvasBackground,
+          '--flow-canvas-bg': canvasBackground === 'transparent' ? '#ffffff' : canvasBackground,
+        } as CSSProperties
+      }
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
+      {/* 纸张页边界：置于 React Flow 之下，仅在设置了页面尺寸时显示 */}
+      <PageBoundary />
       <ReactFlow
-        nodes={nodes}
+        nodes={displayNodes}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -493,19 +570,32 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         // 绘图工具习惯：左键拖出选框，中键/右键平移画布
         selectionOnDrag
         panOnDrag={[1, 2]}
-        // 滚轮/触控板滚动 = 平移（上下滚上下、左右滚左右），缩放改由 Ctrl/⌘+滚轮 或双指捏合触发
-        panOnScroll
+        /**
+         * 滚轮行为可切换（会话设置，默认保持历史行为）：
+         * - `pan`：滚轮平移、Ctrl/⌘+滚轮缩放（原行为）
+         * - `zoom`：滚轮缩放（draw.io 习惯），平移改用中键/右键拖拽
+         */
+        panOnScroll={wheelMode === 'pan'}
         panOnScrollMode={PanOnScrollMode.Free}
-        zoomOnScroll={false}
+        zoomOnScroll={wheelMode === 'zoom'}
         zoomOnPinch
         multiSelectionKeyCode={['Meta', 'Control']}
         minZoom={0.2}
         maxZoom={2.5}
+        /**
+         * 大图虚拟化：只渲染可视区域内的节点/连线。
+         * 小图不开启，避免首帧测量造成的闪烁与额外开销；阈值以内的图全量渲染最稳。
+         */
+        onlyRenderVisibleElements={nodes.length > VIRTUALIZE_THRESHOLD}
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={['Backspace', 'Delete']}
-        className="bg-gray-50 dark:bg-gray-950"
+        className={
+          canvasBackground === 'transparent' ? 'bg-gray-50 dark:bg-gray-950' : 'bg-transparent'
+        }
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cbd5e1" />
+        {gridStyle === 'none' ? null : (
+          <Background variant={bgVariant} gap={gridSize} size={1} color="#cbd5e1" />
+        )}
         <Controls showZoom showFitView={false} showInteractive={false}>
           <ControlButton
             onClick={() => fitView({ padding: 0.3, minZoom: 0.2, maxZoom: 2.5 })}
@@ -537,6 +627,10 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
           className="!bottom-2 !right-2 !h-24 !w-36 rounded-md border border-gray-200 bg-white/90 dark:border-gray-700 dark:bg-gray-900/90"
         />
       </ReactFlow>
+      {rulersVisible ? <Ruler /> : null}
+      <GuideLines />
+      <EdgeJumpOverlay />
+      <SelectionResizer />
       <HelperLines />
       <EdgeEndpointHandles />
       <EdgeWaypointEditor />

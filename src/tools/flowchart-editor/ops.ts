@@ -161,6 +161,7 @@ export function normalizeEdgeStyle(input?: Partial<FlowEdgeStyle> | null): FlowE
     dash: input.dash ?? d.dash,
     startArrow: input.startArrow ?? d.startArrow,
     endArrow: input.endArrow ?? d.endArrow,
+    jumpStyle: input.jumpStyle ?? d.jumpStyle ?? 'none',
   };
 }
 

@@ -22,15 +22,25 @@ import {
   anchorOf,
   createId,
   defaultData,
+  normalizeRotation,
   orderNodesByHierarchy,
   resolvePlacement,
+  scaleChildren,
   serializeDoc,
   stubPoint,
   type HelperLines,
+  type ScaledChild,
 } from './core';
 import {
   DEFAULT_EDGE_STYLE,
+  MAX_PASTE_NODES,
+  MIN_PAGE_SIZE,
+  type CanvasGuide,
+  type EdgeLabelPosition,
   type FlowDoc,
+  type GridStyle,
+  type ShapeSize,
+  type WheelMode,
   type FlowEdgeData,
   type FlowEdgeRec,
   type FlowEdgeStyle,
@@ -40,7 +50,9 @@ import {
   type FlowNodeStyle,
   type FlowNodeType,
   type FlowPage,
+  type GroupScaleItem,
   type NodeGeometryPatch,
+  type NodeTransformPatch,
   type ShapeKind,
   type Waypoint,
   isContainerKind,
@@ -58,6 +70,7 @@ import {
 } from './layout';
 import {
   DEFAULT_PAGE_ID,
+  copyPageName,
   defaultPageName,
   edgesFromPage,
   makeEdge,
@@ -127,14 +140,42 @@ interface FlowState {
   activePageId: string;
   pageData: Record<string, FlowPage>;
   addPage: (name?: string) => void;
+  /** 复制页面（含全部节点/连线，id 重映射）并切换到副本 */
+  duplicatePage: (id: string) => void;
   switchPage: (id: string) => void;
   renamePage: (id: string, name: string) => void;
   removePage: (id: string) => void;
   movePage: (id: string, dir: -1 | 1) => void;
+  /** 当前页的纸张尺寸（缺省即无页边界） */
+  pageSize: ShapeSize | undefined;
+  /** 写入当前页的纸张尺寸（传 undefined 清除页边界） */
+  setPageSize: (size: ShapeSize | undefined) => void;
+
+  /** 鼠标滚轮行为（会话态，持久化） */
+  wheelMode: WheelMode;
+  setWheelMode: (v: WheelMode) => void;
+  /** 画布背景色（会话态，持久化；`transparent` 表示透明） */
+  canvasBackground: string;
+  setCanvasBackground: (v: string) => void;
+  /** 画布网格样式（会话态，持久化） */
+  gridStyle: GridStyle;
+  setGridStyle: (v: GridStyle) => void;
+  /** 持久参考线（会话态，持久化） */
+  guides: CanvasGuide[];
+  setGuides: (guides: CanvasGuide[]) => void;
+  /** 是否显示标尺 */
+  rulersVisible: boolean;
+  setRulersVisible: (v: boolean) => void;
 
   /** keepHistory 为 true 时保留撤销栈（用于快照回滚） */
   load: (doc: FlowDoc | null, keepHistory?: boolean) => void;
   getDoc: () => FlowDoc;
+  /**
+   * 把外部文档（如从 draw.io 粘贴的 mxGraph）插入当前页。
+   * 会重映射全部节点/连线 id（含父子关系），把内容平移到 `at` 并选中新元素。
+   * 返回插入的节点数（0 表示内容为空或超出上限）。
+   */
+  insertDoc: (doc: FlowDoc, at: { x: number; y: number }) => number;
 
   commit: () => void;
   undo: () => void;
@@ -179,6 +220,8 @@ interface FlowState {
   ) => string;
   /** 改写公式节点的 LaTeX 源码 */
   setNodeFormula: (id: string, formula: string, history?: boolean) => void;
+  /** 容器（泳道 / 编组）折叠 / 展开：折叠时画布隐藏其子节点 */
+  toggleContainerCollapsed: (id: string, collapsed?: boolean) => void;
   reparentNode: (id: string) => void;
   /** 拖拽结束后的归属判定（图层面板：拖入容器 / 拖回画布顶层） */
   reparentNodeTo: (id: string, parentId?: string) => void;
@@ -190,9 +233,36 @@ interface FlowState {
   setNodeGeometry: (ids: string[], patch: NodeGeometryPatch, history?: boolean) => void;
   /** 写入形状可调参数（合并到 style.shapeParams，键为图形目录声明的参数 key） */
   setNodeParams: (ids: string[], params: Record<string, number>, history?: boolean) => void;
+  /**
+   * 写入节点变换（旋转 / 镜像）。
+   * 传 `undefined` 表示清除该字段（回到默认：0° / 不镜像）。
+   */
+  setNodeTransform: (ids: string[], patch: NodeTransformPatch, history?: boolean) => void;
+  /**
+   * 多选整体缩放：按包围盒比例换算各节点的绝对坐标与尺寸。
+   * `originals` 为拖拽开始时的快照（绝对坐标 + 尺寸），避免累积误差。
+   */
+  scaleSelection: (
+    originals: GroupScaleItem[],
+    box: { x: number; y: number },
+    sx: number,
+    sy: number,
+  ) => void;
   /** 清除某个形状可调参数（回到图形目录默认值） */
   clearNodeParam: (ids: string[], key: string, history?: boolean) => void;
   patchEdgeLabel: (id: string, label: string, history?: boolean) => void;
+  /**
+   * 写入连线标签字段：主标签（label）/ 起点标签 / 终点标签。
+   * 空串视为清除，避免文档里留下无意义的空字符串。
+   */
+  setEdgeLabelField: (
+    id: string,
+    field: 'label' | 'sourceLabel' | 'targetLabel',
+    value: string,
+    history?: boolean,
+  ) => void;
+  /** 写入主标签在路径上的位置（center / nearSource / nearTarget） */
+  setEdgeLabelPosition: (id: string, position: EdgeLabelPosition, history?: boolean) => void;
   removeSelected: () => void;
   duplicateSelected: () => void;
   applyAutoLayout: (options?: LayoutOptions) => void;
@@ -233,10 +303,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   layoutDirection: 'TB',
   layoutDensity: 'normal',
   alignTolerance: 5,
+  wheelMode: 'pan',
+  canvasBackground: 'transparent',
+  gridStyle: 'dots',
+  guides: [],
+  rulersVisible: false,
   styleBrush: null,
   pageOrder: [{ id: DEFAULT_PAGE_ID, name: DEFAULT_PAGE_NAME }],
   activePageId: DEFAULT_PAGE_ID,
   pageData: {},
+  pageSize: undefined,
 
   setClipboard: (clip) => set({ clipboard: clip }),
 
@@ -245,6 +321,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setLayoutDirection: (v) => set({ layoutDirection: v }),
   setLayoutDensity: (v) => set({ layoutDensity: v }),
   setAlignTolerance: (v) => set({ alignTolerance: v }),
+  setWheelMode: (v) => set({ wheelMode: v }),
+  setCanvasBackground: (v) => set({ canvasBackground: v }),
+  setGridStyle: (v) => set({ gridStyle: v }),
+  setGuides: (guides) => set({ guides }),
+  setRulersVisible: (v) => set({ rulersVisible: v }),
   setStyleBrush: (style) => set({ styleBrush: style }),
 
   selectAll: () =>
@@ -302,6 +383,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: [],
       selectedNodes: [],
       selectedEdges: [],
+      pageSize: undefined as ShapeSize | undefined,
     };
     const defaultPages = {
       pageOrder: [{ id: DEFAULT_PAGE_ID, name: defaultPageName(1) }],
@@ -332,6 +414,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       pageOrder: normalized.pages.map((p) => ({ id: p.id, name: p.name })),
       activePageId: page.id,
       pageData,
+      pageSize: page.size,
       selectedNodes: [],
       selectedEdges: [],
     });
@@ -370,6 +453,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             sourceHandle: e.sourceHandle,
             targetHandle: e.targetHandle,
             label: typeof e.label === 'string' ? e.label : undefined,
+            sourceLabel: data?.sourceLabel,
+            targetLabel: data?.targetLabel,
+            labelPosition: data?.labelPosition,
             style: data?.style,
             waypoints: data?.waypoints,
             mxStyle: data?.mxStyle,
@@ -383,7 +469,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
     const pages: FlowPage[] = pageOrder.map((meta) => {
       if (meta.id === activePageId) {
-        return { id: meta.id, name: meta.name, nodes: recNodes, edges: recEdges };
+        return {
+          id: meta.id,
+          name: meta.name,
+          nodes: recNodes,
+          edges: recEdges,
+          ...(get().pageSize ? { size: get().pageSize } : {}),
+        };
       }
       const cached = pageData[meta.id];
       return {
@@ -401,8 +493,87 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     };
   },
 
+  insertDoc: (doc, at) => {
+    const page = activePageOf(doc);
+    if (!page || page.nodes.length === 0) return 0;
+    // 上限保护：避免把异常大的剪贴板内容一次性塞进当前页
+    const source = page.nodes.slice(0, MAX_PASTE_NODES);
+    const idMap = new Map<string, string>();
+    for (const n of source) idMap.set(n.id, createId('n'));
+    const minX = Math.min(...source.map((n) => n.position.x));
+    const minY = Math.min(...source.map((n) => n.position.y));
+    const nextNodes: FlowNodeRec[] = source.map((n) => ({
+      ...n,
+      id: idMap.get(n.id)!,
+      // 平移到目标点：以内容左上角对齐 `at`
+      position: {
+        x: Math.round(n.position.x - minX + at.x),
+        y: Math.round(n.position.y - minY + at.y),
+      },
+      parentId: n.parentId ? (idMap.get(n.parentId) ?? null) : null,
+    }));
+    const nextEdges: FlowEdgeRec[] = page.edges
+      .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+      .map((e) => ({
+        ...e,
+        id: createId('e'),
+        source: idMap.get(e.source)!,
+        target: idMap.get(e.target)!,
+      }));
+    const nextPage: FlowPage = { ...page, nodes: nextNodes, edges: nextEdges };
+    const createdNodes = nodesFromPage(nextPage);
+    const createdEdges = edgesFromPage(nextPage);
+    const ids = createdNodes.map((n) => n.id);
+    get().commit();
+    set((s) => ({
+      nodes: selectOnly(orderNodesByHierarchy([...s.nodes, ...createdNodes]), ids),
+      edges: [...s.edges, ...createdEdges],
+      selectedNodes: ids,
+      selectedEdges: [],
+    }));
+    return createdNodes.length;
+  },
+
   onNodesChange: (changes) => {
-    set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) as FlowNode[] }));
+    /**
+     * 容器缩放联动：NodeResizer 拖拽期间（resizing + setAttributes）按比例换算子节点。
+     * 只处理「尺寸真的变化」的容器，O(子节点数)，不影响普通拖拽/选择流程。
+     */
+    const before = get().nodes;
+    const childPatches = new Map<string, ScaledChild>();
+    for (const change of changes) {
+      if (change.type !== 'dimensions' || change.resizing !== true || !change.dimensions) continue;
+      const container = before.find((n) => n.id === change.id);
+      if (!container || !isContainerKind(container.data.kind)) continue;
+      const prev = {
+        width: container.width ?? shapeSize(container.data.kind).width,
+        height: container.height ?? shapeSize(container.data.kind).height,
+      };
+      const next = { width: change.dimensions.width, height: change.dimensions.height };
+      const children = before
+        .filter((n) => n.parentId === container.id)
+        .map((n) => ({
+          id: n.id,
+          kind: n.data.kind,
+          position: n.position,
+          width: n.width,
+          height: n.height,
+        }));
+      for (const patch of scaleChildren(children, prev, next)) childPatches.set(patch.id, patch);
+    }
+
+    set((s) => {
+      let nodes = applyNodeChanges(changes, s.nodes) as FlowNode[];
+      if (childPatches.size > 0) {
+        nodes = nodes.map((n) => {
+          const patch = childPatches.get(n.id);
+          return patch
+            ? { ...n, position: patch.position, width: patch.width, height: patch.height }
+            : n;
+        });
+      }
+      return { nodes };
+    });
     const selected = get()
       .nodes.filter((n) => n.selected)
       .map((n) => n.id);
@@ -776,6 +947,39 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set((s) => ({ edges: s.edges.map((e) => (e.id === id ? { ...e, label } : e)) }));
   },
 
+  setEdgeLabelField: (id, field, value, history = true) => {
+    const current = get().edges.find((e) => e.id === id);
+    if (!current) return;
+    const prev =
+      field === 'label' ? (typeof current.label === 'string' ? current.label : '') : undefined;
+    if (field === 'label' && prev === value) return;
+    if (history) get().commit();
+    set((s) => ({
+      edges: s.edges.map((e) => {
+        if (e.id !== id) return e;
+        if (field === 'label') return { ...e, label: value };
+        const data: FlowEdgeData = { ...(e.data as FlowEdgeData | undefined) };
+        if (value) data[field] = value;
+        else delete data[field];
+        return { ...e, data };
+      }),
+    }));
+  },
+
+  setEdgeLabelPosition: (id, position, history = true) => {
+    if (history) get().commit();
+    set((s) => ({
+      edges: s.edges.map((e) => {
+        if (e.id !== id) return e;
+        const data: FlowEdgeData = { ...(e.data as FlowEdgeData | undefined) };
+        // center 为默认值，不写入字段
+        if (position === 'center') delete data.labelPosition;
+        else data.labelPosition = position;
+        return { ...e, data };
+      }),
+    }));
+  },
+
   setNodeGeometry: (ids, patch, history = true) => {
     const target = new Set(ids);
     if (target.size === 0) return;
@@ -853,6 +1057,86 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }));
   },
 
+  scaleSelection: (originals, box, sx, sy) => {
+    if (originals.length === 0) return;
+    if (!Number.isFinite(sx) || !Number.isFinite(sy) || sx <= 0 || sy <= 0) return;
+    const state = get();
+    const byId = new Map(state.nodes.map((n) => [n.id, n] as const));
+    const next = new Map<string, GroupScaleItem>();
+    for (const item of originals) {
+      const node = byId.get(item.id);
+      if (!node || node.draggable === false) continue;
+      const min = minNodeSize(node.data.kind);
+      next.set(item.id, {
+        id: item.id,
+        absX: box.x + (item.absX - box.x) * sx,
+        absY: box.y + (item.absY - box.y) * sy,
+        width: Math.max(min.width, item.width * sx),
+        height: Math.max(min.height, item.height * sy),
+      });
+    }
+    if (next.size === 0) return;
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        const item = next.get(n.id);
+        if (!item) return n;
+        const parent = n.parentId ? byId.get(n.parentId) : undefined;
+        const base = parent ? absolutePositionOf(parent, byId) : { x: 0, y: 0 };
+        return {
+          ...n,
+          position: {
+            x: Math.round(item.absX - base.x),
+            y: Math.round(item.absY - base.y),
+          },
+          width: Math.round(item.width),
+          height: Math.round(item.height),
+        };
+      }),
+    }));
+  },
+
+  toggleContainerCollapsed: (id, collapsed) => {
+    const node = get().nodes.find((n) => n.id === id);
+    if (!node || !isContainerKind(node.data.kind)) return;
+    const next = collapsed ?? node.data.collapsed !== true;
+    if ((node.data.collapsed === true) === next) return;
+    get().commit();
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, collapsed: next ? true : undefined } } : n,
+      ),
+    }));
+  },
+
+  setNodeTransform: (ids, patch, history = true) => {
+    const target = new Set(ids);
+    if (target.size === 0) return;
+    const keys = Object.keys(patch) as Array<keyof NodeTransformPatch>;
+    if (keys.length === 0) return;
+    if (history) get().commit();
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (!target.has(n.id)) return n;
+        const style = { ...n.data.style };
+        for (const key of keys) {
+          const value = patch[key];
+          if (key === 'rotation') {
+            if (value === undefined) delete style.rotation;
+            // 归一后为 0 时清除字段，避免文档里出现冗余的 rotation: 0
+            else style.rotation = normalizeRotation(value as number) || undefined;
+          } else if (key === 'flipH') {
+            if (value) style.flipH = true;
+            else delete style.flipH;
+          } else {
+            if (value) style.flipV = true;
+            else delete style.flipV;
+          }
+        }
+        return { ...n, data: { ...n.data, style } };
+      }),
+    }));
+  },
+
   removeSelected: () => {
     const { selectedNodes, selectedEdges } = get();
     if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
@@ -923,6 +1207,64 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: [],
       selectedNodes: [],
       selectedEdges: [],
+      // 新页继承当前页的纸张设置，便于连续排版
+      pageSize: state.pageSize,
+    });
+  },
+
+  duplicatePage: (id) => {
+    const state = get();
+    const doc = state.getDoc();
+    const source = doc.pages.find((p) => p.id === id);
+    if (!source) return;
+    const newId = createId('page');
+    // 深拷贝并重映射 id，避免与源页共用标识
+    const idMap = new Map<string, string>();
+    for (const n of source.nodes) idMap.set(n.id, createId('n'));
+    const nodes = source.nodes.map((n) => ({
+      ...n,
+      id: idMap.get(n.id)!,
+      position: { ...n.position },
+      data: { ...n.data, style: { ...n.data.style } },
+      parentId: n.parentId ? (idMap.get(n.parentId) ?? null) : null,
+    }));
+    const edges = source.edges
+      .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+      .map((e) => ({
+        ...e,
+        id: createId('e'),
+        source: idMap.get(e.source)!,
+        target: idMap.get(e.target)!,
+      }));
+    const copy: FlowPage = { id: newId, name: copyPageName(source.name), nodes, edges };
+    const idx = doc.pages.findIndex((p) => p.id === id);
+    const nextOrder = [...state.pageOrder];
+    nextOrder.splice(idx < 0 ? nextOrder.length : idx + 1, 0, {
+      id: newId,
+      name: copy.name,
+    });
+    const cur = doc.pages.find((p) => p.id === state.activePageId);
+    set({
+      pageOrder: nextOrder,
+      activePageId: newId,
+      pageData: {
+        ...state.pageData,
+        ...(cur ? { [state.activePageId]: cur } : {}),
+      },
+      nodes: nodesFromPage(copy),
+      edges: edgesFromPage(copy),
+      pageSize: source.size,
+      selectedNodes: [],
+      selectedEdges: [],
+    });
+  },
+
+  setPageSize: (size) => {
+    set({
+      pageSize:
+        size && size.width >= MIN_PAGE_SIZE && size.height >= MIN_PAGE_SIZE
+          ? { width: Math.round(size.width), height: Math.round(size.height) }
+          : undefined,
     });
   },
 
@@ -941,6 +1283,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: edgesFromPage(target),
       activePageId: id,
       pageData,
+      pageSize: target.size,
       selectedNodes: [],
       selectedEdges: [],
     });
@@ -977,6 +1320,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       activePageId: next.id,
       nodes: nodesFromPage(target),
       edges: edgesFromPage(target),
+      pageSize: target.size,
       selectedNodes: [],
       selectedEdges: [],
     });

@@ -130,6 +130,117 @@ body.flow-connecting .react-flow__handle {
   background: #b45309;
 }
 
+/* 节点旋转手柄：位于顶边上方，与缩放把手错开 */
+.shape-rotate {
+  position: absolute;
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.shape-rotate:active {
+  cursor: grabbing;
+}
+
+.shape-rotate__dot {
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border: 2px solid #f59e0b;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
+  transition:
+    transform 100ms ease,
+    background-color 100ms ease;
+}
+
+.shape-rotate:hover .shape-rotate__dot {
+  background: #fef3c7;
+  transform: scale(1.15);
+}
+
+.shape-rotate:active .shape-rotate__dot {
+  background: #f59e0b;
+}
+
+/* 拖拽时的角度读数：浮在手柄右上方，不参与命中 */
+.shape-rotate__readout {
+  position: absolute;
+  left: 22px;
+  top: -2px;
+  pointer-events: none;
+  white-space: nowrap;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 1px 5px;
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+/* 多选整体缩放：包围盒虚线 + 8 个圆形把手（屏幕坐标覆盖层） */
+.selection-resizer {
+  position: absolute;
+  z-index: 25;
+  border: 1px dashed #6366f1;
+  pointer-events: none;
+}
+
+.selection-resizer__handle {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 2px solid #2563eb;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.selection-resizer__handle:hover {
+  background: #2563eb;
+}
+
+/* 全图搜索命中：短暂高亮目标节点（由 SearchPanel 添加/移除类） */
+@keyframes flow-node-highlight {
+  0%,
+  100% {
+    filter: none;
+  }
+  30% {
+    filter: drop-shadow(0 0 0 3px rgba(37, 99, 235, 0.55))
+      drop-shadow(0 0 10px rgba(37, 99, 235, 0.45));
+  }
+}
+
+.flow-node-highlight {
+  animation: flow-node-highlight 700ms ease-in-out 2;
+}
+
+/* 容器折叠态：虚线边框提示「子节点被隐藏」，不影响命中 */
+.flow-node-collapsed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1.5px dashed #94a3b8;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
 /* 悬停快速连线箭头（四向） */
 .quick-connect {
   width: 18px;

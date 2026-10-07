@@ -70,9 +70,10 @@ describe('文案按语种懒加载', () => {
   });
 
   it('每个语种都能独立加载且图形名齐全', async () => {
-    __resetFlowchartStrings();
     const expected = Object.keys(SHAPE_LABELS).length;
     for (const lng of FLOWCHART_LANGS) {
+      // 逐语种重置模块级注册缓存：每个用例使用独立的 i18n 实例
+      __resetFlowchartStrings();
       const i18n = fakeI18n(lng);
       await registerFlowchartStrings(i18n, lng);
       const keys = keysOf(i18n.bundles[lng]);
@@ -80,5 +81,18 @@ describe('文案按语种懒加载', () => {
       // UI 文案不能只加载图形名/f图形名之外的少量键
       expect(keys).toContain('exportPanel');
     }
+  });
+
+  it('非英文语种同时注册英文兜底包（避免缺键显示原始键名）', async () => {
+    __resetFlowchartStrings();
+    const i18n = fakeI18n('ja');
+    await registerFlowchartStrings(i18n, 'ja');
+    expect(keysOf(i18n.bundles.ja)).toContain('transform');
+    expect(keysOf(i18n.bundles.en)).toContain('transform');
+    // 英文自身不额外注册第二份
+    __resetFlowchartStrings();
+    const en = fakeI18n('en');
+    await registerFlowchartStrings(en, 'en');
+    expect(en.calls).toBe(1);
   });
 });

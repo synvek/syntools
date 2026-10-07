@@ -14,12 +14,14 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
 import { defaultData } from '../core';
 import { normalizeEdgeStyle } from '../ops';
+import { normalizeRotation } from '../core';
 import { createPage, toDocV2 } from '../model/migrate';
 import { SHAPE_DEFS, adjustsFor, paramValue, shapeSize } from '../model/shapes';
 import type {
   Align,
   EdgeArrow,
   EdgeDash,
+  EdgeLabelPosition,
   EdgeType,
   FlowDoc,
   FlowEdgeRec,
@@ -28,6 +30,7 @@ import type {
   FlowNodeStyle,
   FlowPage,
   ShapeKind,
+  VerticalAlign,
   Waypoint,
 } from '../model/types';
 
@@ -70,8 +73,18 @@ const KNOWN_STYLE_KEYS = new Set([
   'endSize',
   'jettySize',
   'orthogonalLoop',
+  // 跳线：draw.io 使用 jumpStyle / jumpSize
+  'jumpStyle',
+  'jumpSize',
   'horizontal',
   'shape',
+  // 节点镜像：由 FlowNodeStyle.flipH/flipV 承载，纳入已知键避免与 mxStyle 重复回写
+  'flipH',
+  'flipV',
+  // 起止标签 / 标签位置：mxGraph 无对应概念，用自定义 token 承载
+  'synSourceLabel',
+  'synTargetLabel',
+  'synLabelPos',
 ]);
 
 function attr(cell: XmlNode, key: string): string | undefined {
@@ -84,6 +97,11 @@ function geoNum(cell: XmlNode, key: string, fallback: number): number {
   if (!geo || typeof geo !== 'object') return fallback;
   const n = Number((geo as XmlNode)[key]);
   return Number.isFinite(n) ? n : fallback;
+}
+
+/** 取整到 2 位小数：旋转角度导出用，避免浮点尾数污染 XML */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function asArray<T>(v: T | T[] | undefined): T[] {
@@ -149,155 +167,164 @@ function parseStyleMap(style: string | undefined): {
   return { map, bare, unknown };
 }
 
+/** 大小写不敏感地取 style 值（不同工具写出的键名大小写可能不一致） */
+function mapGetCI(map: Map<string, string>, key: string): string | undefined {
+  const direct = map.get(key);
+  if (direct !== undefined) return direct;
+  const lower = key.toLowerCase();
+  for (const [k, v] of map) {
+    if (k.toLowerCase() === lower) return v;
+  }
+  return undefined;
+}
+
+/** 起止标签 / 标签位置的自定义 token 键 */
+const SYN_SOURCE_LABEL = 'synSourceLabel';
+const SYN_TARGET_LABEL = 'synTargetLabel';
+const SYN_LABEL_POS = 'synLabelPos';
+
+/** 连线记录 → 自定义标签 token（值做 URL 编码，避免 `;` / `=` 破坏样式串） */
+function edgeLabelTokens(e: FlowEdgeRec): string[] {
+  const parts: string[] = [];
+  if (e.sourceLabel) parts.push(`${SYN_SOURCE_LABEL}=${encodeURIComponent(e.sourceLabel)}`);
+  if (e.targetLabel) parts.push(`${SYN_TARGET_LABEL}=${encodeURIComponent(e.targetLabel)}`);
+  if (e.labelPosition && e.labelPosition !== 'center') {
+    parts.push(`${SYN_LABEL_POS}=${e.labelPosition}`);
+  }
+  return parts;
+}
+
+/** 从 mxGraph style 还原起止标签与标签位置，并给出应从 mxStyle 兜底中剔除的键 */
+function edgeLabelsFromMx(style: string | undefined): {
+  sourceLabel?: string;
+  targetLabel?: string;
+  labelPosition?: EdgeLabelPosition;
+  consumed: Set<string>;
+} {
+  const { map } = parseStyleMap(style);
+  const consumed = new Set<string>();
+  const out: {
+    sourceLabel?: string;
+    targetLabel?: string;
+    labelPosition?: EdgeLabelPosition;
+    consumed: Set<string>;
+  } = { consumed };
+  const decode = (raw: string | undefined): string | undefined => {
+    if (!raw) return undefined;
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  };
+  const src = mapGetCI(map, SYN_SOURCE_LABEL);
+  if (src !== undefined) {
+    consumed.add(SYN_SOURCE_LABEL);
+    const value = decode(src);
+    if (value) out.sourceLabel = value;
+  }
+  const tgt = mapGetCI(map, SYN_TARGET_LABEL);
+  if (tgt !== undefined) {
+    consumed.add(SYN_TARGET_LABEL);
+    const value = decode(tgt);
+    if (value) out.targetLabel = value;
+  }
+  const pos = mapGetCI(map, SYN_LABEL_POS);
+  if (pos !== undefined) {
+    consumed.add(SYN_LABEL_POS);
+    if (pos === 'nearSource' || pos === 'nearTarget') out.labelPosition = pos;
+  }
+  return out;
+}
+
+/** 从 mxStyle 兜底列表中剔除已语义化的 token */
+function dropConsumedTokens(tokens: string[], consumed: Set<string>): string[] {
+  if (consumed.size === 0) return tokens;
+  const lower = new Set([...consumed].map((k) => k.toLowerCase()));
+  return tokens.filter((t) => {
+    const eq = t.indexOf('=');
+    const key = (eq < 0 ? t : t.slice(0, eq)).trim().toLowerCase();
+    return !lower.has(key);
+  });
+}
+
 /* ------------------------------ 形状映射 ------------------------------ */
+
+/**
+ * draw.io 原生 token → 图形：仅登记「往返无歧义」的映射。
+ *
+ * 未登记（含 draw.io 无对应、或被其它 token 遮蔽）的图形统一走 `shape=syntools.<kind>`，
+ * 由 `kindOfStyle` 反向精确还原。这样既最大化 draw.io 可读性，又保证本工具往返不丢形状
+ * （不变量由 `io.test.ts` 的全量往返测试守护）。
+ */
+const DRAWIO_TOKEN: Partial<Record<ShapeKind, string>> = {
+  roundRect: 'rounded=1',
+  rect: 'rounded=0',
+  decision: 'rhombus',
+  data: 'parallelogram',
+  display: 'shape=invParallelogram',
+  document: 'document',
+  predefined: 'shape=process',
+  database: 'cylinder',
+  note: 'note',
+  star: 'star',
+  cloud: 'cloud',
+  card: 'card',
+  callout: 'callout',
+  triangle: 'triangle',
+  hexagon: 'hexagon',
+  ellipse: 'ellipse',
+  umlActor: 'shape=umlActor',
+  umlPackage: 'shape=folder',
+  umlComponent: 'shape=component',
+  swimlane: 'swimlane',
+  swimlaneV: 'swimlane;horizontal=0',
+  group: 'group',
+  netServer: 'shape=server',
+  netClient: 'shape=desktop',
+  netRouter: 'shape=mxgraph.networks.router',
+  netSwitch: 'shape=mxgraph.networks.switch',
+  netFirewall: 'shape=mxgraph.networks.firewall',
+  netLoadBalancer: 'shape=mxgraph.networks.load_balancer',
+};
 
 /** 形状 → mxGraph 基础样式 token（不含颜色等通用样式） */
 function shapeTokenOf(kind: ShapeKind): string {
-  switch (kind) {
-    case 'decision':
-      return 'rhombus';
-    case 'ellipse':
-    case 'startEnd':
-    case 'terminator':
-      return 'ellipse';
-    case 'data':
-      return 'parallelogram';
-    case 'trapezoid':
-      return 'trapezoid';
-    case 'hexagon':
-      return 'shape=hexagon';
-    case 'triangle':
-      return 'triangle';
-    case 'star':
-      return 'shape=star';
-    case 'cloud':
-    case 'netCloud':
-      return 'shape=cloud';
-    case 'note':
-    case 'umlNote':
-      return 'shape=note';
-    case 'callout':
-      return 'shape=callout';
-    case 'card':
-      return 'shape=card';
-    case 'database':
-    case 'netDatabase':
-      return 'shape=cylinder';
-    case 'document':
-      return 'shape=document';
-    case 'predefined':
-      return 'shape=process';
-    case 'manualInput':
-      return 'shape=manualInput';
-    case 'manualOperation':
-      return 'shape=trapezoid;direction=north';
-    case 'preparation':
-      return 'shape=hexagon';
-    case 'display':
-      return 'shape=display';
-    case 'onPageConnector':
-      return 'ellipse';
-    case 'offPageConnector':
-      return 'shape=offPageConnector';
-    case 'parallelMode':
-      return 'shape=parallelMarker';
-    case 'loopLimit':
-      return 'shape=loopLimit';
-    case 'umlActor':
-      return 'shape=umlActor';
-    case 'umlUseCase':
-      return 'ellipse';
-    case 'umlPackage':
-      return 'shape=folder';
-    case 'umlState':
-    case 'umlActivity':
-    case 'umlAction':
-    case 'umlSendSignal':
-    case 'umlReceiveSignal':
-      return 'rounded=1';
-    case 'umlComponent':
-    case 'umlSubsystem':
-      return 'shape=component';
-    case 'umlNode':
-    case 'umlDevice':
-    case 'umlExecutionEnvironment':
-      return 'shape=cube';
-    case 'umlArtifact':
-      return 'shape=note';
-    case 'umlDecisionMerge':
-    case 'umlChoice':
-      return 'rhombus';
-    case 'umlStateInitial':
-    case 'umlStateFinal':
-    case 'umlInitialNode':
-    case 'umlActivityFinal':
-    case 'umlFlowFinal':
-    case 'umlJunction':
-    case 'umlEntryPoint':
-    case 'umlExitPoint':
-    case 'umlHistory':
-    case 'umlHistoryDeep':
-    case 'umlBoundary':
-    case 'umlControl':
-    case 'umlEntity':
-    case 'umlProvidedInterface':
-    case 'umlRequiredInterface':
-      return 'ellipse';
-    case 'bpmnEventStart':
-    case 'bpmnEventIntermediate':
-    case 'bpmnEventEnd':
-      return 'ellipse';
-    case 'bpmnGatewayExclusive':
-      return 'rhombus';
-    case 'bpmnGatewayParallel':
-      return 'rhombus';
-    case 'bpmnGatewayInclusive':
-      return 'rhombus';
-    case 'bpmnTask':
-      return 'rounded=1';
-    case 'bpmnSubProcess':
-      return 'rounded=1';
-    case 'netServer':
-      return 'shape=server';
-    case 'netClient':
-      return 'shape=desktop';
-    case 'netRouter':
-      return 'shape=mxgraph.networks.router';
-    case 'netSwitch':
-      return 'shape=mxgraph.networks.switch';
-    case 'netFirewall':
-      return 'shape=mxgraph.networks.firewall';
-    case 'netLoadBalancer':
-      return 'shape=mxgraph.networks.load_balancer';
-    case 'netCdn':
-      return 'cloud';
-    case 'netStorage':
-      return 'shape=cylinder';
-    case 'mindCenter':
-      return 'ellipse';
-    case 'erEntity':
-      return 'rounded=0';
-    case 'erAttribute':
-      return 'ellipse';
-    case 'erRelationship':
-      return 'rhombus';
-    case 'roundRect':
-      return 'rounded=1';
-    case 'swimlane':
-      return 'swimlane';
-    case 'swimlaneV':
-      return 'swimlane;horizontal=0';
-    case 'group':
-      return 'group';
-    default:
-      return 'rounded=0';
-  }
+  return DRAWIO_TOKEN[kind] ?? exactTokenOf(kind);
+}
+
+/**
+ * 精确形状 token 前缀。
+ *
+ * draw.io 没有覆盖本工具全部 84 个图形（尤其 UML 2.5 细分图形），
+ * 且部分 draw.io 原生 token 之间互相歧义（如 `ellipse` 同时被椭圆与开始/结束使用）。
+ * 因此对「无对应 / 有歧义」的图形，统一写出 `shape=syntools.<kind>`：
+ * - 本工具往返 100% 精确（见 io.test 的往返不变量测试）；
+ * - draw.io 打开时会退化为矩形（与其原有的未知形状行为一致），不会破坏文件。
+ */
+const SYNTOOLS_SHAPE_PREFIX = 'shape=syntools.';
+
+/** 小写形状名 → 规范 kind（用于反解 `shape=syntools.<kind>`） */
+const KINDS_BY_LOWER = new Map<string, ShapeKind>(
+  (Object.keys(SHAPE_DEFS) as ShapeKind[]).map((k) => [k.toLowerCase(), k]),
+);
+
+/** 无 draw.io 对应（或有歧义）时的精确 token */
+function exactTokenOf(kind: ShapeKind): string {
+  return `${SYNTOOLS_SHAPE_PREFIX}${kind}`;
 }
 
 /** mxGraph style → 形状（无法识别时按矩形处理） */
 export function kindOfStyle(style: string | undefined): ShapeKind {
   if (!style) return 'rect';
   const s = style.toLowerCase();
+  // 本工具写出的精确 token 优先（避免与 draw.io 原生 token 的歧义）
+  const at = s.indexOf(SYNTOOLS_SHAPE_PREFIX);
+  if (at >= 0) {
+    const name = s.slice(at + SYNTOOLS_SHAPE_PREFIX.length).split(/[;,\s]/)[0];
+    const kind = KINDS_BY_LOWER.get(name);
+    if (kind) return kind;
+  }
   if (s.includes('swimlane')) {
     return s.includes('horizontal=0') ? 'swimlaneV' : 'swimlane';
   }
@@ -313,9 +340,12 @@ export function kindOfStyle(style: string | undefined): ShapeKind {
   if (s.includes('shape=component')) return 'umlComponent';
   if (s.includes('shape=cube')) return 'umlNode';
   if (s.includes('rhombus')) return 'decision';
-  if (s.includes('ellipse')) return 'startEnd';
+  // 椭圆：draw.io 的 `ellipse` 字面映射为本工具的椭圆（开始/结束为胶囊，走精确 token）
+  if (s.includes('ellipse')) return 'ellipse';
   if (s.includes('cylinder')) return 'database';
   if (s.includes('document')) return 'document';
+  // 反斜切平行四边形需先于「平行四边形」判断，否则会被误判为数据
+  if (s.includes('invparallelogram')) return 'display';
   if (s.includes('parallelogram')) return 'data';
   if (s.includes('triangle')) return 'triangle';
   if (s.includes('hexagon')) return 'hexagon';
@@ -335,6 +365,19 @@ export function kindOfStyle(style: string | undefined): ShapeKind {
 
 const ALIGN_TO_MX: Record<Align, string> = { left: 'left', center: 'center', right: 'right' };
 const MX_TO_ALIGN: Record<string, Align> = { left: 'left', center: 'center', right: 'right' };
+
+const MX_TO_VERTICAL: Record<VerticalAlign, string> = {
+  top: 'top',
+  middle: 'middle',
+  bottom: 'bottom',
+};
+/** 解析：兼容 draw.io 与其它工具写出的 `center` 变体 */
+const MX_VERTICAL_TO_STYLE: Record<string, VerticalAlign> = {
+  top: 'top',
+  middle: 'middle',
+  center: 'middle',
+  bottom: 'bottom',
+};
 
 /** 形状可调参数 → mxGraph token（含圆角 arcSize）；仅写用户显式设置过的项 */
 function shapeParamTokens(kind: ShapeKind, style?: Partial<FlowNodeStyle>): string[] {
@@ -376,6 +419,9 @@ function styleOf(kind: ShapeKind, style?: Partial<FlowNodeStyle>, extra: string[
   if (style?.shadow) parts.push('shadow=1');
   if (style?.bold) parts.push('fontStyle=1');
   if (style?.italic) parts.push('fontStyle=2');
+  if (style?.verticalAlign) parts.push(`verticalAlign=${MX_TO_VERTICAL[style.verticalAlign]}`);
+  if (style?.flipH) parts.push('flipH=1');
+  if (style?.flipV) parts.push('flipV=1');
   parts.push(...shapeParamTokens(kind, style));
   parts.push(...extra);
   return `${parts.filter(Boolean).join(';')};`;
@@ -417,6 +463,14 @@ function nodeStyleFromMx(
   if (dashed) {
     out.lineDash = map.get('dashPattern') === '1 1' ? 'dotted' : 'dashed';
   }
+  const vertical = map.get('verticalAlign');
+  if (vertical) {
+    const mapped = MX_VERTICAL_TO_STYLE[vertical.toLowerCase()];
+    // middle 是历史默认值，不写入字段，保持文档精简
+    if (mapped && mapped !== 'middle') out.verticalAlign = mapped;
+  }
+  if (map.get('flipH') === '1') out.flipH = true;
+  if (map.get('flipV') === '1') out.flipV = true;
   // 形状可调参数：把 size / arcSize 等 token 还原为 shapeParams（已消费的 token 不再进 mxStyle）
   const consumed = new Set<string>();
   const def = kind ? SHAPE_DEFS[kind] : undefined;
@@ -486,6 +540,8 @@ function edgeStyleOf(style: FlowEdgeStyle | undefined, extra: string[] = []): st
   const endToken = ARROW_TO_MX[s.endArrow];
   parts.push(`endArrow=${endToken ?? 'none'}`);
   parts.push(`endFill=${isHollowArrow(s.endArrow) ? 0 : 1}`);
+  // 跳线：draw.io 的原生 token
+  if (s.jumpStyle === 'arc') parts.push('jumpStyle=arc');
   parts.push(...extra);
   return `${parts.join(';')};`;
 }
@@ -528,6 +584,7 @@ function edgeStyleFromMx(rawStyle: string | undefined): {
     return 'arrowclosed';
   };
 
+  const jumpToken = (map.get('jumpStyle') ?? '').toLowerCase();
   const style: FlowEdgeStyle = {
     type,
     stroke: map.get('strokeColor') || '#475569',
@@ -535,6 +592,7 @@ function edgeStyleFromMx(rawStyle: string | undefined): {
     dash,
     startArrow: arrowOf(map.get('startArrow'), map.get('startFill') !== '0'),
     endArrow: arrowOf(map.get('endArrow'), map.get('endFill') !== '0'),
+    jumpStyle: jumpToken && jumpToken !== 'none' ? 'arc' : 'none',
   };
   return { style: normalizeEdgeStyle(style), mxStyle: unknown, rounded };
 }
@@ -571,6 +629,10 @@ function pageToCells(page: FlowPage): XmlNode[] {
         '@_y': Math.round(n.position.y),
         '@_width': Math.round(n.width ?? def.width),
         '@_height': Math.round(n.height ?? def.height),
+        // 旋转在 mxGraph 中是几何属性（绕包围盒中心），不是样式 token
+        ...(n.data.style.rotation
+          ? { '@_rotation': String(round2(normalizeRotation(n.data.style.rotation))) }
+          : {}),
         '@_as': 'geometry',
       },
     });
@@ -583,7 +645,7 @@ function pageToCells(page: FlowPage): XmlNode[] {
       '@_parent': '1',
       '@_source': e.source,
       '@_target': e.target,
-      '@_style': edgeStyleOf(e.style, e.mxStyle ?? []),
+      '@_style': edgeStyleOf(e.style, [...edgeLabelTokens(e), ...(e.mxStyle ?? [])]),
       mxGeometry: {
         '@_relative': '1',
         '@_as': 'geometry',
@@ -659,6 +721,9 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
         width,
         height,
       );
+      // 旋转存于 mxGeometry.rotation（绕包围盒中心），归一后写回 style
+      const rotation = normalizeRotation(geoNum(cell, '@_rotation', 0));
+      if (rotation !== 0) nodeStyle.rotation = rotation;
       nodes.push({
         id,
         type: 'shape',
@@ -678,15 +743,20 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
       if (!source || !target) continue;
       const rawStyle = attr(cell, '@_style');
       const { style: edgeStyle, mxStyle: edgeMxStyle } = edgeStyleFromMx(rawStyle);
+      const labels = edgeLabelsFromMx(rawStyle);
+      const keptMxStyle = dropConsumedTokens(edgeMxStyle, labels.consumed);
       const waypoints = pointsOf(cell.mxGeometry);
       edges.push({
         id,
         source,
         target,
         label: labelOf(cell, rawStyle) || undefined,
+        ...(labels.sourceLabel ? { sourceLabel: labels.sourceLabel } : {}),
+        ...(labels.targetLabel ? { targetLabel: labels.targetLabel } : {}),
+        ...(labels.labelPosition ? { labelPosition: labels.labelPosition } : {}),
         style: edgeStyle,
         ...(waypoints.length > 0 ? { waypoints } : {}),
-        ...(edgeMxStyle.length > 0 ? { mxStyle: edgeMxStyle } : {}),
+        ...(keptMxStyle.length > 0 ? { mxStyle: keptMxStyle } : {}),
       });
     }
   }
@@ -698,11 +768,23 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
 }
 
 /** 解析 .drawio XML → FlowDoc（多页）；失败或无法识别时返回 null */
+/**
+ * 取文档中的 diagram 列表。
+ * draw.io 的剪贴板内容通常没有 `mxfile` 外壳，只有裸 `mxGraphModel`，
+ * 这里统一包成单页，使粘贴与导入共用同一条解析路径。
+ */
+function diagramsOf(parsed: XmlNode | undefined): XmlNode[] {
+  const mxfile = parsed?.mxfile as XmlNode | undefined;
+  const bare = !mxfile && parsed?.mxGraphModel ? (parsed.mxGraphModel as XmlNode) : undefined;
+  if (bare) return [{ '@_name': 'Page 1', '@_id': 'p1', mxGraphModel: bare }];
+  return asArray(mxfile?.diagram as XmlNode | XmlNode[] | undefined);
+}
+
+/** 解析 .drawio XML → FlowDoc（多页）；失败或无法识别时返回 null */
 export function parseDrawioXml(xml: string): FlowDoc | null {
   try {
     const parsed = PARSER.parse(xml) as XmlNode | undefined;
-    const mxfile = parsed?.mxfile as XmlNode | undefined;
-    const diagrams = asArray(mxfile?.diagram as XmlNode | XmlNode[] | undefined);
+    const diagrams = diagramsOf(parsed);
     if (diagrams.length === 0) return null;
 
     const pages = diagrams.map((d, i) => buildPage(d, i)).filter((p) => p.nodes.length > 0);
@@ -770,8 +852,7 @@ export async function parseDrawioXmlAsync(xml: string): Promise<FlowDoc | null> 
 
   try {
     const parsed = PARSER.parse(xml) as XmlNode | undefined;
-    const mxfile = parsed?.mxfile as XmlNode | undefined;
-    const diagrams = asArray(mxfile?.diagram as XmlNode | XmlNode[] | undefined);
+    const diagrams = diagramsOf(parsed);
     if (diagrams.length === 0) return null;
 
     const rebuilt: XmlNode[] = [];

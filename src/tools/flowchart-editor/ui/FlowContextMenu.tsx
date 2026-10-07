@@ -3,9 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useReactFlow } from '@xyflow/react';
 import { useFlowStore } from '../store';
 import {
+  alignSelected,
+  copySelection,
+  cutSelection,
+  flipSelected,
   groupSelected,
   layerOp,
+  patchSelectedEdgeStyle,
   pasteClipboard,
+  rotateSelected,
   toggleHidden,
   toggleLocked,
   ungroupSelected,
@@ -16,7 +22,7 @@ import {
   shapesOfCategory,
   type ShapeCategory,
 } from '../model/shapes';
-import { isContainerKind } from '../model/types';
+import { EDGE_RELATION_PRESETS, isContainerKind } from '../model/types';
 import { ShapeGlyph } from './ShapeGlyph';
 
 /**
@@ -215,11 +221,80 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
             ))}
           </div>
 
+          <Row testId="context-cut" label={t('tools.flowchart.cut')} onClick={run(cutSelection)} />
+          <Row
+            testId="context-copy"
+            label={t('tools.flowchart.copy')}
+            onClick={run(copySelection)}
+          />
+          <Row
+            testId="context-paste"
+            label={t('tools.flowchart.paste')}
+            onClick={run(pasteClipboard)}
+          />
+          <Row
+            testId="context-edit-label"
+            label={t('tools.flowchart.editText')}
+            onClick={run(() => {
+              // 复用画布上的就地编辑：向节点派发一次 dblclick
+              const el = document.querySelector(`.react-flow__node[data-id="${node.id}"]`);
+              el?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+            })}
+          />
           <Row
             testId="context-duplicate"
             label={t('tools.flowchart.duplicate')}
             onClick={run(() => useFlowStore.getState().duplicateSelected())}
           />
+
+          {/* 对齐：与工具栏同一套动作，右键即可快速对齐 */}
+          <div className="mb-1 flex flex-wrap gap-1 border-y border-gray-100 px-1 py-1.5 dark:border-gray-800">
+            {(
+              [
+                ['left', '⇤'],
+                ['hcenter', '↔'],
+                ['right', '⇥'],
+                ['top', '⇡'],
+                ['vcenter', '⇕'],
+                ['bottom', '⇣'],
+              ] as const
+            ).map(([mode, glyph]) => (
+              <button
+                key={mode}
+                type="button"
+                data-testid={`context-align-${mode}`}
+                title={t(
+                  `tools.flowchart.align${mode === 'hcenter' ? 'Center' : mode === 'vcenter' ? 'Middle' : mode[0].toUpperCase() + mode.slice(1)}`,
+                )}
+                onClick={run(() => alignSelected(mode))}
+                className="flex h-7 flex-1 items-center justify-center rounded-md border border-gray-200 text-[13px] text-gray-600 transition-colors hover:bg-blue-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-blue-500/10"
+              >
+                {glyph}
+              </button>
+            ))}
+          </div>
+
+          {/* 变换：旋转与镜像 */}
+          <div className="mb-1 flex flex-wrap gap-1 px-1">
+            {(
+              [
+                ['context-rotate-cw', '⟳', () => rotateSelected(90)],
+                ['context-rotate-ccw', '⟲', () => rotateSelected(-90)],
+                ['context-flip-h', '⇄', () => flipSelected('h')],
+                ['context-flip-v', '⇅', () => flipSelected('v')],
+              ] as const
+            ).map(([id, glyph, action]) => (
+              <button
+                key={id}
+                type="button"
+                data-testid={id}
+                onClick={run(action)}
+                className="flex h-7 flex-1 items-center justify-center rounded-md border border-gray-200 text-[13px] text-gray-600 transition-colors hover:bg-blue-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-blue-500/10"
+              >
+                {glyph}
+              </button>
+            ))}
+          </div>
           {canGroup ? (
             <Row
               testId="context-group"
@@ -275,6 +350,21 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
             label={t('tools.flowchart.clearWaypoints')}
             onClick={run(() => useFlowStore.getState().setEdgeWaypoints(edge.id, undefined))}
           />
+          <Separator />
+          {/* 关系预设：一键切换 UML 关系样式 */}
+          <div className="mb-1 flex flex-wrap gap-1 px-1">
+            {EDGE_RELATION_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                data-testid={`context-relation-${preset.id}`}
+                onClick={run(() => patchSelectedEdgeStyle(preset.patch))}
+                className="rounded-md border border-gray-200 px-1.5 py-0.5 text-[11px] text-gray-600 transition-colors hover:bg-blue-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-blue-500/10"
+              >
+                {t(`tools.flowchart.${preset.labelKey}`)}
+              </button>
+            ))}
+          </div>
           <Separator />
           <Row
             testId="context-delete"

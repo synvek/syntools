@@ -71,12 +71,8 @@ interface I18nLike {
   ) => void;
 }
 
-/**
- * 注册指定语种（缺省取 i18next 当前语言）的文案。
- * 返回实际注册的语种码，便于调用方判断就绪状态。
- */
-export function registerFlowchartStrings(instance: I18nLike, lng?: string): Promise<string> {
-  const target = resolveFlowchartLang(lng ?? instance.language);
+/** 注册单个语种（去重 + 并发共享 Promise） */
+function ensureRegistered(instance: I18nLike, target: string): Promise<string> {
   if (registered.has(target)) return Promise.resolve(target);
   const running = pending.get(target);
   if (running) return running;
@@ -98,6 +94,21 @@ export function registerFlowchartStrings(instance: I18nLike, lng?: string): Prom
     });
   pending.set(target, task);
   return task;
+}
+
+/**
+ * 注册指定语种（缺省取 i18next 当前语言）的文案。
+ * 返回实际注册的语种码，便于调用方判断就绪状态。
+ *
+ * 非英文语种会**同时注册英文包作为兜底**：少数语种尚未覆盖全部键时，
+ * i18next 的 `fallbackLng: ['en','zh']` 才能命中英文而不是回退到原始键名。
+ * 两个包都就绪后才 resolve，避免首帧出现键名闪烁。
+ */
+export function registerFlowchartStrings(instance: I18nLike, lng?: string): Promise<string> {
+  const target = resolveFlowchartLang(lng ?? instance.language);
+  const base =
+    target === 'en' ? Promise.resolve('en') : ensureRegistered(instance, 'en').catch(() => 'en');
+  return base.then(() => ensureRegistered(instance, target));
 }
 
 /** 当前语言文案是否已注册（UI 用它决定是否延迟渲染，避免闪现键名） */

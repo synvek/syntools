@@ -47,6 +47,8 @@ async function selectFirstEdge(page: Page) {
 
 test.describe('流程图编辑器增强（zh-CN）', () => {
   test.use({ locale: 'zh-CN' });
+  // 更大的视口：画布两侧有图形库与属性面板，节点/手柄需要足够的可点击区域
+  test.use({ viewport: { width: 1600, height: 1000 } });
 
   test('多选批量编辑：属性面板聚合展示并一次写入全部选中节点', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
@@ -576,5 +578,200 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
 
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
     await expect(page.locator(NODE).filter({ hasText: '开始' })).toHaveCount(1);
+  });
+
+  test('旋转手柄：拖拽旋转并与属性面板同步，双击复位', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await dropProcess(page, 300, 220);
+    await page.locator(NODE).first().click();
+
+    const handle = page.getByTestId('flowchart-rotate-handle');
+    await expect(handle).toBeVisible();
+    const slider = page.getByTestId('flowchart-param-rotation');
+    await expect(slider).toHaveValue('0');
+
+    // 从顶边手柄拖到右侧：角度应显著变化，并在拖动中显示读数
+    const box = (await handle.boundingBox())!;
+    const node = (await page.locator(NODE).first().boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(node.x + node.width + 10, node.y + node.height / 2, { steps: 12 });
+    await page.mouse.up();
+
+    const rotated = Number(await slider.inputValue());
+    expect(rotated).toBeGreaterThan(0);
+    await expect(page.getByTestId('flowchart-node-transform').first()).toHaveAttribute(
+      'data-rotation',
+      String(rotated),
+    );
+
+    // 双击手柄复位
+    await handle.dblclick();
+    await expect(slider).toHaveValue('0');
+  });
+
+  test('容器折叠：隐藏子节点并显示角标，可再次展开', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page.getByRole('button', { name: '模板', exact: true }).click();
+    await page.getByRole('button', { name: '横向泳道流程' }).click();
+    await expect(page.locator(NODE)).toHaveCount(5);
+
+    const toggle = page.getByTestId('flowchart-collapse-toggle');
+    await expect(toggle).toHaveCount(1);
+    await toggle.click();
+    // 折叠后仅剩泳道本身可见（子节点被隐藏）
+    await expect(page.locator(NODE)).toHaveCount(1);
+    await expect(page.getByTestId('flowchart-collapsed-count')).toHaveText('4');
+
+    await page.getByTestId('flowchart-collapse-toggle').click();
+    await expect(page.locator(NODE)).toHaveCount(5);
+  });
+
+  test('连线双标签与标签位置：面板输入即时生效', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await dropProcess(page, 110, 80);
+    await dropProcess(page, 400, 240);
+    await connectNodes(page, 0, 1);
+    await selectFirstEdge(page);
+
+    const source = page.getByTestId('edge-source-label-input');
+    await expect(source).toBeVisible();
+    await source.fill('请求');
+    await source.blur();
+    await expect(page.getByTestId('edge-label-source')).toHaveText('请求');
+
+    const target = page.getByTestId('edge-target-label-input');
+    await target.fill('响应');
+    await target.blur();
+    await expect(page.getByTestId('edge-label-target')).toHaveText('响应');
+
+    await page.getByTestId('edge-label-position').selectOption('nearTarget');
+    await expect(page.getByTestId('edge-label-position')).toHaveValue('nearTarget');
+  });
+
+  test('UML 关系预设：一键把连线切到聚合关系', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await dropProcess(page, 110, 80);
+    await dropProcess(page, 400, 240);
+    await connectNodes(page, 0, 1);
+    await selectFirstEdge(page);
+
+    await page.getByTestId('edge-relation-aggregation').click();
+    // 聚合：起端空心菱形 + 终点箭头
+    await expect(page.getByTestId('edge-jump')).toBeVisible();
+    const startArrow = page.getByLabel('起点箭头');
+    await expect(startArrow).toHaveValue('diamondHollow');
+  });
+
+  test('多选整体缩放：包围盒把手可见并改变尺寸', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await dropProcess(page, 180, 140);
+    await dropProcess(page, 520, 140);
+    await page.keyboard.press('Control+a');
+    await expect(page.getByText(/已选中 2 个元素/)).toBeVisible();
+
+    const resizer = page.getByTestId('flowchart-selection-resizer');
+    await expect(resizer).toBeVisible();
+    // 用属性面板的宽度输入读取 store 真值（.react-flow__node 的外框由 React Flow 测量缓存决定）
+    const widthInput = page.getByTestId('flowchart-geo-width');
+    const before = Number(await widthInput.inputValue());
+
+    const handle = (await page.getByTestId('flowchart-selection-handle-e').boundingBox())!;
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(handle.x + handle.width / 2 + 120, handle.y + handle.height / 2, {
+      steps: 10,
+    });
+    await page.mouse.up();
+
+    await expect
+      .poll(async () => Number(await widthInput.inputValue()))
+      .toBeGreaterThan(before + 10);
+  });
+
+  test('页面与画布：复制页面、纸张边界与网格样式', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await dropProcess(page, 140, 120);
+
+    await page.getByTestId('flowchart-duplicate-page').click();
+    await expect(page.getByText(/节点:\s*1/)).toBeVisible();
+    await expect(page.locator(NODE)).toHaveCount(1);
+
+    await page.getByTestId('flowchart-paper-size').selectOption('a4l');
+    await expect(page.getByTestId('flowchart-page-boundary')).toBeVisible();
+
+    await page.getByTestId('flowchart-grid-style').selectOption('lines');
+    await expect(page.getByTestId('flowchart-grid-style')).toHaveValue('lines');
+    await page.getByTestId('flowchart-wheel-mode').selectOption('zoom');
+    await expect(page.getByTestId('flowchart-wheel-mode')).toHaveValue('zoom');
+  });
+
+  test('标尺与参考线：可从标尺拉出参考线并双击删除', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await dropProcess(page, 200, 160);
+    await page.getByTestId('flowchart-rulers-toggle').click();
+    await expect(page.getByTestId('flowchart-ruler-top')).toBeVisible();
+
+    const ruler = (await page.getByTestId('flowchart-ruler-top').boundingBox())!;
+    await page.mouse.move(ruler.x + 200, ruler.y + ruler.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(ruler.x + 200, ruler.y + 160, { steps: 6 });
+    await page.mouse.up();
+
+    const guide = page.getByTestId('flowchart-guide-y').first();
+    await expect(guide).toBeVisible();
+    await guide.dblclick();
+    await expect(page.getByTestId('flowchart-guide-y')).toHaveCount(0);
+  });
+
+  test('快捷键帮助浮层：F1 打开、Esc 关闭', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page.getByTestId('flowchart-canvas').click();
+    await page.keyboard.press('F1');
+    const dialog = page.getByTestId('flowchart-shortcut-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('撤销');
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+
+    // 工具栏按钮同样可以打开
+    await page.getByTestId('flowchart-shortcut-help').click();
+    await expect(dialog).toBeVisible();
+    await page.getByTestId('flowchart-shortcut-close').click();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('全图搜索：按文字定位并选中节点', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page.getByRole('button', { name: '模板', exact: true }).click();
+    await page.getByRole('button', { name: '横向泳道流程' }).click();
+    await expect(page.locator(NODE)).toHaveCount(5);
+
+    await page.getByRole('button', { name: '搜索', exact: true }).click();
+    await page.getByTestId('flowchart-node-search').fill('步骤 2');
+    await expect(page.getByTestId('flowchart-node-search-item')).toHaveCount(1);
+    await page.getByTestId('flowchart-node-search-item').first().click();
+    await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
+  });
+
+  test('从 draw.io 粘贴 mxGraph：解析后插入并选中', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    const xml =
+      '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>' +
+      '<mxCell id="n1" value="粘贴节点" style="rounded=0;html=1;" vertex="1" parent="1">' +
+      '<mxGeometry x="10" y="20" width="120" height="60" as="geometry"/></mxCell>' +
+      '</root></mxGraphModel>';
+
+    await page.getByTestId('flowchart-canvas').click();
+    await page.evaluate((payload) => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', payload);
+      window.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt }));
+    }, xml);
+
+    await expect(page.locator(NODE)).toHaveCount(1);
+    await expect(page.locator(NODE).filter({ hasText: '粘贴节点' })).toHaveCount(1);
+    await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
   });
 });

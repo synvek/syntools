@@ -1,11 +1,18 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useFlowStore } from '../store';
-import { type FlowNodeData, isContainerKind } from '../model/types';
+import { nodeTransformCss, safeLinkHref } from '../core';
+import {
+  DEFAULT_LINE_HEIGHT,
+  VERTICAL_ALIGN_FLEX,
+  type FlowNodeData,
+  isContainerKind,
+} from '../model/types';
 import { paramValue, shapeDefOf, shapeSize } from '../model/shapes';
 import { drawDecor, drawShape } from './shapeDraw';
 import { ShapeAdjustHandles } from './ShapeAdjustHandles';
+import { ShapeRotateHandle } from './ShapeRotateHandle';
 import { nodeDashArrayOf } from '../ops';
 import { useQuickConnect } from '../quickConnect';
 
@@ -43,6 +50,37 @@ const QUICK_DIRS: Array<{
   { dir: 'right', pos: { right: -18, top: '50%', transform: 'translate(50%, -50%)' }, rotate: 90 },
 ];
 
+/**
+ * 按住 Shift 时等比缩放：NodeResizer 只有静态 `keepAspectRatio`，
+ * 因此监听全局 Shift 状态并按需传入。仅在节点选中时才挂载监听。
+ */
+function useShiftHeld(enabled: boolean): boolean {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!enabled) {
+      setHeld(false);
+      return;
+    }
+    const isShift = (e: KeyboardEvent) => e.key === 'Shift';
+    const onDown = (e: KeyboardEvent) => {
+      if (isShift(e)) setHeld(true);
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (isShift(e)) setHeld(false);
+    };
+    const onBlur = () => setHeld(false);
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [enabled]);
+  return held;
+}
+
 function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const { t } = useTranslation();
   const d = data as FlowNodeData;
@@ -66,10 +104,19 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const soleSelected = useFlowStore(
     (s) => s.selectedNodes.length === 1 && s.selectedNodes.includes(id),
   );
+  /** 按住 Shift 等比缩放（仅选中时监听键盘） */
+  const shiftHeld = useShiftHeld(selected === true);
+  /** 容器内的直接子节点数量（折叠时在标题栏显示；非容器恒为 0） */
+  const childCount = useFlowStore((s) =>
+    isContainerKind(d.kind) ? s.nodes.filter((n) => n.parentId === id).length : 0,
+  );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(d.label);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const labelRef = useRef<HTMLDivElement>(null);
+  /** 自动缩放后的实际字号（null 表示按原字号渲染即不溢出） */
+  const [fitFontSize, setFitFontSize] = useState<number | null>(null);
 
   useEffect(() => {
     if (editing) {
@@ -94,112 +141,235 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const headerOnTop = def?.draw === 'laneV' || isGroup;
   // 泳道标题条厚度（可调参数 laneHeader）
   const laneHeader = def ? paramValue(def, style, 'laneHeader', w, h) : 40;
+  /**
+   * 节点变换（旋转 / 镜像）：纯 CSS transform，仅作用在「图形 + 文本」内层容器上。
+   * 几何与连线锚点保持未旋转的轴对齐包围盒（与 draw.io 的 bbox 行为一致）；
+   * 缩放框 / 调整手柄 / 连线锚点留在外层，始终轴对齐可正常命中。
+   */
+  const transform = nodeTransformCss(style);
+  /** 容器折叠：仅保留标题栏，子节点由画布层隐藏（见 FlowCanvas 的派生节点） */
+  const collapsed = isContainer && d.collapsed === true;
+  /** 文本垂直对齐（缺省 middle，与历史行为一致） */
+  const justify = VERTICAL_ALIGN_FLEX[style.verticalAlign ?? 'middle'];
+  const textLineHeight = style.lineHeight ?? DEFAULT_LINE_HEIGHT;
+  const href = safeLinkHref(style.link);
+
+  /**
+   * 文字自动缩放：内容溢出时二分搜索能容纳的最大字号（下限 8px）。
+   *
+   * 直接在 DOM 上试写字号测量（避免每轮候选都触发 React 重渲染），
+   * 仅在收敛后写入一次状态。节点尺寸变化会随 width/height 依赖重新计算，
+   * 因此无需额外的 ResizeObserver。
+   */
+  useLayoutEffect(() => {
+    const el = labelRef.current;
+    if (!el || editing || style.autoShrink !== true) {
+      setFitFontSize(null);
+      return;
+    }
+    const base = style.fontSize;
+    const restore = () => {
+      el.style.fontSize = `${base}px`;
+    };
+    const fits = (size: number) => {
+      el.style.fontSize = `${size}px`;
+      return el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1;
+    };
+    if (fits(base)) {
+      restore();
+      setFitFontSize(null);
+      return;
+    }
+    let lo = 8;
+    let hi = base;
+    for (let i = 0; i < 8 && hi - lo > 0.5; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) lo = mid;
+      else hi = mid;
+    }
+    restore();
+    setFitFontSize(Math.max(8, Math.round(lo * 2) / 2));
+  }, [style.autoShrink, style.fontSize, style.lineHeight, d.label, w, h, editing]);
 
   return (
     <div
       ref={rootRef}
-      className="group/node relative"
-      // 便于样式钩子与端到端断言「当前图形类型」
+      className={`group/node relative${collapsed ? ' flow-node-collapsed' : ''}`}
+      // 便于样式钩子与端到端断言「当前图形类型 / 折叠态」
       data-kind={d.kind}
+      data-collapsed={collapsed ? 'true' : undefined}
       onDoubleClick={() => !isContainer && setEditing(true)}
       style={{ width: w, height: h, cursor: 'grab' }}
     >
-      <svg
-        width={w}
-        height={h}
-        viewBox={`0 0 ${w} ${h}`}
-        className="absolute inset-0 overflow-visible"
-        style={style.shadow ? { filter: 'drop-shadow(0 2px 5px rgba(15,23,42,0.25))' } : undefined}
+      <div
+        className="absolute inset-0"
+        data-testid="flowchart-node-transform"
+        data-rotation={style.rotation ? String(style.rotation) : undefined}
+        style={{ transform, transformOrigin: 'center' }}
       >
-        <g
-          fill={style.fill}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-          fillOpacity={style.opacity ?? 1}
-          strokeDasharray={nodeDashArrayOf(style.lineDash, strokeWidth)}
-          style={{ transition: 'stroke 120ms ease' }}
+        <svg
+          width={w}
+          height={h}
+          viewBox={`0 0 ${w} ${h}`}
+          className="absolute inset-0 overflow-visible"
+          style={
+            style.shadow ? { filter: 'drop-shadow(0 2px 5px rgba(15,23,42,0.25))' } : undefined
+          }
         >
-          {def ? drawShape(def, w, h, style) : <rect x={0} y={0} width={w} height={h} rx={4} />}
-        </g>
-        {def ? (
-          // fill 取描边色：让「活动结束」的实心内圆等装饰符号随主题着色；
-          // 现有装饰均显式 fill:'none'，不受影响。
-          <g stroke={strokeColor} fill={strokeColor} strokeWidth={Math.max(1.5, strokeWidth - 0.5)}>
-            {drawDecor(def, w, h, style)}
-          </g>
-        ) : null}
-      </svg>
-
-      {isContainer ? (
-        headerOnTop ? (
-          <div
-            className="absolute left-0 top-0 flex items-center truncate px-3 text-[13px] font-semibold"
-            style={{
-              height: isGroup ? 26 : laneHeader,
-              width: w,
-              color: style.stroke,
-            }}
+          <g
+            fill={style.fill}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            fillOpacity={style.opacity ?? 1}
+            strokeDasharray={nodeDashArrayOf(style.lineDash, strokeWidth)}
+            style={{ transition: 'stroke 120ms ease' }}
           >
-            {d.label}
-          </div>
+            {def ? drawShape(def, w, h, style) : <rect x={0} y={0} width={w} height={h} rx={4} />}
+          </g>
+          {def ? (
+            // fill 取描边色：让「活动结束」的实心内圆等装饰符号随主题着色；
+            // 现有装饰均显式 fill:'none'，不受影响。
+            <g
+              stroke={strokeColor}
+              fill={strokeColor}
+              strokeWidth={Math.max(1.5, strokeWidth - 0.5)}
+            >
+              {drawDecor(def, w, h, style)}
+            </g>
+          ) : null}
+        </svg>
+
+        {isContainer ? (
+          headerOnTop ? (
+            <div
+              className="absolute left-0 top-0 flex items-center gap-1 truncate px-3 text-[13px] font-semibold"
+              style={{
+                height: isGroup ? 26 : laneHeader,
+                width: w,
+                color: style.stroke,
+              }}
+            >
+              <span className="truncate">{d.label}</span>
+            </div>
+          ) : (
+            <div
+              className="absolute left-0 top-0 flex items-center justify-center text-[13px] font-semibold"
+              style={{
+                width: laneHeader,
+                height: h,
+                color: style.stroke,
+                writingMode: 'vertical-rl',
+              }}
+            >
+              {d.label}
+            </div>
+          )
+        ) : editing ? (
+          // 用 textarea 支持多行：Enter 提交、Shift+Enter 换行
+          <textarea
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                commit();
+              }
+              if (e.key === 'Escape') setEditing(false);
+            }}
+            className="nodrag absolute inset-0 z-10 resize-none bg-white/90 px-2 py-1 text-[13px] outline-none dark:bg-gray-900/90"
+            style={{
+              color: textColor,
+              fontWeight: style.bold ? 700 : 400,
+              fontStyle: style.italic ? 'italic' : 'normal',
+              textAlign: style.align,
+              lineHeight: textLineHeight,
+            }}
+          />
         ) : (
           <div
-            className="absolute left-0 top-0 flex items-center justify-center text-[13px] font-semibold"
+            ref={labelRef}
+            className="pointer-events-none absolute inset-0 flex flex-col overflow-hidden px-2"
             style={{
-              width: laneHeader,
-              height: h,
-              color: style.stroke,
-              writingMode: 'vertical-rl',
+              color: textColor,
+              fontSize: fitFontSize ?? style.fontSize,
+              fontWeight: style.bold ? 700 : 400,
+              fontStyle: style.italic ? 'italic' : 'normal',
+              textAlign: style.align,
+              fontFamily: style.fontFamily,
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              lineHeight: textLineHeight,
+              justifyContent: justify,
+              background: style.labelBackground,
+              borderRadius: style.labelBackground ? 3 : undefined,
             }}
           >
-            {d.label}
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`pointer-events-auto inline-block underline decoration-dotted underline-offset-2${
+                  style.align === 'center'
+                    ? ' self-center'
+                    : style.align === 'right'
+                      ? ' self-end'
+                      : ' self-start'
+                }`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {d.label || href}
+              </a>
+            ) : (
+              d.label || ' '
+            )}
           </div>
-        )
-      ) : editing ? (
-        // 用 textarea 支持多行：Enter 提交、Shift+Enter 换行
-        <textarea
-          ref={inputRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              commit();
-            }
-            if (e.key === 'Escape') setEditing(false);
-          }}
-          className="nodrag absolute inset-0 z-10 resize-none bg-white/90 px-2 py-1 text-[13px] outline-none dark:bg-gray-900/90"
-          style={{
-            color: textColor,
-            fontWeight: style.bold ? 700 : 400,
-            fontStyle: style.italic ? 'italic' : 'normal',
-            textAlign: style.align,
-          }}
-        />
-      ) : (
-        <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden px-2 leading-tight"
-          style={{
-            color: textColor,
-            fontSize: style.fontSize,
-            fontWeight: style.bold ? 700 : 400,
-            fontStyle: style.italic ? 'italic' : 'normal',
-            textAlign: style.align,
-            fontFamily: style.fontFamily,
-            whiteSpace: 'pre-wrap',
-            overflowWrap: 'anywhere',
+        )}
+      </div>
+
+      {/* 折叠角标：提示被隐藏的子节点数量，避免误以为内容丢失 */}
+      {collapsed && childCount > 0 ? (
+        <span
+          className="nodrag absolute z-30 rounded bg-slate-200 px-1 text-[10px] leading-4 text-slate-600 dark:bg-slate-700 dark:text-slate-200"
+          style={{ right: 22, top: 3 }}
+          data-testid="flowchart-collapsed-count"
+        >
+          {childCount}
+        </span>
+      ) : null}
+
+      {/* 容器折叠 / 展开开关：常驻显示，不依赖选中态 */}
+      {isContainer ? (
+        <button
+          type="button"
+          data-testid="flowchart-collapse-toggle"
+          aria-label={t(
+            collapsed ? 'tools.flowchart.expandContainer' : 'tools.flowchart.collapseContainer',
+          )}
+          title={t(
+            collapsed ? 'tools.flowchart.expandContainer' : 'tools.flowchart.collapseContainer',
+          )}
+          className="nodrag nopan absolute z-30 flex h-4 w-4 items-center justify-center rounded border border-gray-300 bg-white text-[11px] font-bold leading-none text-gray-600 shadow-sm transition-colors hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+          style={{ right: 3, top: 3 }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            useFlowStore.getState().toggleContainerCollapsed(id);
           }}
         >
-          {d.label || ' '}
-        </div>
-      )}
+          {collapsed ? '+' : '−'}
+        </button>
+      ) : null}
 
       {/* 尺寸调整：容器（泳道 / 编组）同样可缩放，只是最小尺寸更大 */}
       {selected ? (
         <NodeResizer
           minWidth={isContainer ? 200 : 48}
           minHeight={isContainer ? 140 : 32}
+          // 按住 Shift 等比缩放（见 useShiftHeld）
+          keepAspectRatio={shiftHeld}
           onResizeStart={() => useFlowStore.getState().commit()}
         />
       ) : null}
@@ -214,6 +384,11 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           h={h}
           containerRef={rootRef}
         />
+      ) : null}
+
+      {/* 旋转手柄：仅单选图形时出现（容器由工具栏旋转，避免与标题栏重叠） */}
+      {soleSelected && !isContainer ? (
+        <ShapeRotateHandle nodeId={id} style={style} containerRef={rootRef} />
       ) : null}
 
       {/* 容器不提供连线锚点 */}

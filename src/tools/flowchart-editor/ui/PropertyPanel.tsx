@@ -9,8 +9,12 @@ import {
   EDGE_ARROW_LABEL_KEY,
   EDGE_ARROW_OPTIONS,
   EDGE_DASH_OPTIONS,
+  EDGE_JUMP_OPTIONS,
+  EDGE_LABEL_POSITION_OPTIONS,
+  EDGE_RELATION_PRESETS,
   EDGE_TYPE_OPTIONS,
   type Align,
+  type EdgeJumpStyle,
   type FlowEdgeData,
   type FlowEdgeStyle,
   type FlowNodePatch,
@@ -21,6 +25,8 @@ import {
 } from '../model/types';
 import { NodeAppearanceSection } from './NodeAppearanceSection';
 import { NodeShapeParamsSection } from './NodeShapeParamsSection';
+import { NodeTextSection } from './NodeTextSection';
+import { NodeTransformSection } from './NodeTransformSection';
 
 const EDGE_TYPES = EDGE_TYPE_OPTIONS;
 const DASHES = EDGE_DASH_OPTIONS;
@@ -92,6 +98,7 @@ export function PropertyPanel() {
 
   if (edge) {
     const s = selectedEdgeStyle();
+    const edgeData = edge.data as FlowEdgeData | undefined;
     const connectableNodes = nodes.filter((n) => !isContainerKind(n.data.kind));
     const nodeOptions = connectableNodes.map((n) => (
       <option key={n.id} value={n.id}>
@@ -105,17 +112,74 @@ export function PropertyPanel() {
           {t('tools.flowchart.edgeStyle')}
         </h2>
 
-        <Field label={t('tools.flowchart.label')}>
+        <Field label={t('tools.flowchart.edgeLabel')}>
           <input
             className={inputCls}
             value={typeof edge.label === 'string' ? edge.label : ''}
             placeholder="—"
+            data-testid="edge-label-input"
             onChange={(e) => {
               begin();
-              useFlowStore.getState().patchEdgeLabel(edge.id, e.target.value, false);
+              useFlowStore.getState().setEdgeLabelField(edge.id, 'label', e.target.value, false);
             }}
             onBlur={end}
           />
+        </Field>
+
+        {/* 起止标签与主标签位置：UML 时序/流程语义表达 */}
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t('tools.flowchart.edgeSourceLabel')}>
+            <input
+              className={inputCls}
+              value={edgeData?.sourceLabel ?? ''}
+              placeholder="—"
+              data-testid="edge-source-label-input"
+              onChange={(e) => {
+                begin();
+                useFlowStore
+                  .getState()
+                  .setEdgeLabelField(edge.id, 'sourceLabel', e.target.value, false);
+              }}
+              onBlur={end}
+            />
+          </Field>
+          <Field label={t('tools.flowchart.edgeTargetLabel')}>
+            <input
+              className={inputCls}
+              value={edgeData?.targetLabel ?? ''}
+              placeholder="—"
+              data-testid="edge-target-label-input"
+              onChange={(e) => {
+                begin();
+                useFlowStore
+                  .getState()
+                  .setEdgeLabelField(edge.id, 'targetLabel', e.target.value, false);
+              }}
+              onBlur={end}
+            />
+          </Field>
+        </div>
+
+        <Field label={t('tools.flowchart.edgeLabelPosition')}>
+          <select
+            className={inputCls}
+            data-testid="edge-label-position"
+            value={edgeData?.labelPosition ?? 'center'}
+            onChange={(e) =>
+              useFlowStore
+                .getState()
+                .setEdgeLabelPosition(
+                  edge.id,
+                  e.target.value as (typeof EDGE_LABEL_POSITION_OPTIONS)[number],
+                )
+            }
+          >
+            {EDGE_LABEL_POSITION_OPTIONS.map((v) => (
+              <option key={v} value={v}>
+                {t(`tools.flowchart.labelPos_${v}`)}
+              </option>
+            ))}
+          </select>
         </Field>
 
         {/* 重连：直接选择起点/终点节点（与画布上拖拽端点等效） */}
@@ -262,6 +326,38 @@ export function PropertyPanel() {
             </select>
           </Field>
         </div>
+
+        {/* 关系预设：一键切到常见 UML 关系（线型 + 线样式 + 起止箭头） */}
+        <Field label={t('tools.flowchart.relationPreset')}>
+          <div className="flex flex-wrap gap-1">
+            {EDGE_RELATION_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                data-testid={`edge-relation-${preset.id}`}
+                onClick={() => patchSelectedEdgeStyle(preset.patch)}
+                className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-600 transition-colors hover:bg-blue-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-blue-500/10"
+              >
+                {t(`tools.flowchart.${preset.labelKey}`)}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label={t('tools.flowchart.edgeJump')}>
+          <select
+            className={inputCls}
+            data-testid="edge-jump"
+            value={s.jumpStyle ?? 'none'}
+            onChange={(e) => patchSelectedEdgeStyle({ jumpStyle: e.target.value as EdgeJumpStyle })}
+          >
+            {EDGE_JUMP_OPTIONS.map((v) => (
+              <option key={v} value={v}>
+                {t(`tools.flowchart.jump_${v}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
       </div>
     );
   }
@@ -297,6 +393,14 @@ export function PropertyPanel() {
     textColor: pick('textColor'),
     cornerRadius: pick('cornerRadius'),
     foldSize: pick('foldSize'),
+    rotation: pick('rotation'),
+    flipH: pick('flipH'),
+    flipV: pick('flipV'),
+    verticalAlign: pick('verticalAlign'),
+    lineHeight: pick('lineHeight'),
+    autoShrink: pick('autoShrink'),
+    labelBackground: pick('labelBackground'),
+    link: pick('link'),
   };
   const label = commonValue(selNodes.map((n) => n.data.label));
   // 单选时提供该图形专属的可调参数分组（圆角 / 折角 / 斜切 / 分栏高 ……）
@@ -507,6 +611,16 @@ export function PropertyPanel() {
           h={geos[0].height}
         />
       ) : null}
+
+      <NodeTextSection
+        style={view}
+        patch={patch}
+        onEnd={end}
+        fallback={base}
+        isContainer={selNodes.some((n) => isContainerKind(n.data.kind))}
+      />
+
+      <NodeTransformSection style={view} patch={patch} onEnd={end} fallback={base} />
 
       <NodeAppearanceSection
         style={view}

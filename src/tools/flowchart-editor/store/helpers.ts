@@ -42,6 +42,17 @@ export function defaultPageName(index: number): string {
   return typeof value === 'string' && value && value !== key ? value : `Page ${index}`;
 }
 
+/**
+ * 复制页面的名称：`<原名> 副本`（i18n 缺失时回退语言中立的 `Copy`）。
+ * 与 `defaultPageName` 同理，避免在 store 里硬编码文案。
+ */
+export function copyPageName(name: string): string {
+  const key = 'tools.flowchart.pageCopySuffix';
+  const suffix = i18n.t(key);
+  const text = typeof suffix === 'string' && suffix && suffix !== key ? suffix : 'Copy';
+  return `${name} ${text}`;
+}
+
 export function makeNode(
   kind: ShapeKind,
   position: { x: number; y: number },
@@ -108,6 +119,7 @@ export function nodesFromPage(page: FlowPage): FlowNode[] {
           kind: n.data.kind,
           label: n.data.label,
           style: { ...n.data.style },
+          ...(n.data.collapsed ? { collapsed: true } : {}),
           ...(n.data.src ? { src: n.data.src } : {}),
           ...(n.data.iconId ? { iconId: n.data.iconId } : {}),
           ...(n.data.formula ? { formula: n.data.formula } : {}),
@@ -131,6 +143,9 @@ export function edgesFromPage(page: FlowPage): FlowEdge[] {
       label: e.label,
       data: {
         style,
+        ...(e.sourceLabel ? { sourceLabel: e.sourceLabel } : {}),
+        ...(e.targetLabel ? { targetLabel: e.targetLabel } : {}),
+        ...(e.labelPosition ? { labelPosition: e.labelPosition } : {}),
         ...(e.waypoints && e.waypoints.length > 0
           ? { waypoints: e.waypoints.map((p) => ({ x: p.x, y: p.y })) }
           : {}),

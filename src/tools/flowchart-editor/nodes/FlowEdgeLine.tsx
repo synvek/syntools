@@ -12,12 +12,52 @@ import { edgeStyleOf, polylineMidpoint, polylinePath, type Point } from '../ops'
 import { useFlowStore } from '../store';
 import {
   DEFAULT_EDGE_STYLE,
+  EDGE_LABEL_POSITION_RATIO,
   type EdgeArrow,
   type FlowEdgeData,
+  type EdgeLabelPosition,
   type FlowEdgeStyle,
 } from '../model/types';
 
 const BOX = 10;
+
+/** 连线标签槽位：主标签 + 起点 / 终点标签 */
+type LabelSlot = 'main' | 'source' | 'target';
+
+/** 路径取点缓存（键为 path 字符串）：避免同一路径反复建 DOM 测量 */
+const pathPointCache = new Map<string, { el: SVGPathElement; length: number }>();
+
+/**
+ * 取路径上指定比例处的点（0=起点，1=终点）。
+ *
+ * 用离屏 `<path>` 的 `getPointAtLength` 求解，因此对直线 / 折线 / 折点正交路由 / 贝塞尔
+ * 都成立，不需要为每种线型分别推导参数方程。路径字符串作为缓存键，
+ * 结果在连续缩放/平移（path 不变）时直接复用；缓存过大时整体清空，避免无界增长。
+ */
+function pointOnPath(d: string, fraction: number): { x: number; y: number } | null {
+  if (!d || typeof document === 'undefined') return null;
+  let entry = pathPointCache.get(d);
+  if (!entry) {
+    try {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      el.setAttribute('d', d);
+      const length = el.getTotalLength();
+      if (!Number.isFinite(length) || length <= 0) return null;
+      if (pathPointCache.size > 400) pathPointCache.clear();
+      entry = { el, length };
+      pathPointCache.set(d, entry);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const t = Math.min(1, Math.max(0, fraction));
+    const p = entry.el.getPointAtLength(entry.length * t);
+    return { x: p.x, y: p.y };
+  } catch {
+    return null;
+  }
+}
 
 /** 折线拐角倒角半径（仅 smoothstep 使用；step 保持直角） */
 const POLYLINE_RADIUS = 10;
@@ -111,7 +151,8 @@ export function FlowEdgeLine(props: EdgeProps) {
   const selected = props.selected === true;
   const strokeColor = selected ? '#2563EB' : style.stroke;
   const strokeWidth = selected ? style.strokeWidth + 1.5 : style.strokeWidth;
-  const [editing, setEditing] = useState(false);
+  /** 正在就地编辑的标签槽位（null 表示无） */
+  const [editingSlot, setEditingSlot] = useState<LabelSlot | null>(null);
   const [draft, setDraft] = useState('');
 
   const waypoints = data?.waypoints ?? [];
@@ -146,10 +187,56 @@ export function FlowEdgeLine(props: EdgeProps) {
   const startId = `${id}__start`;
   const endId = `${id}__end`;
   const text = typeof label === 'string' ? label : '';
+  const sourceText = data?.sourceLabel ?? '';
+  const targetText = data?.targetLabel ?? '';
+  const labelPosition: EdgeLabelPosition = data?.labelPosition ?? 'center';
 
-  const commitLabel = () => {
-    setEditing(false);
-    if (draft !== text) useFlowStore.getState().patchEdgeLabel(id, draft);
+  /** 三处标签的文本与落点：无文本的槽位不计算路径取点（零开销） */
+  const slots: Array<{
+    slot: LabelSlot;
+    text: string;
+    x: number;
+    y: number;
+    testId: string;
+  }> = [
+    {
+      slot: 'main',
+      text,
+      ...(labelPosition === 'center'
+        ? { x: labelX, y: labelY }
+        : (pointOnPath(path, EDGE_LABEL_POSITION_RATIO[labelPosition]) ?? {
+            x: labelX,
+            y: labelY,
+          })),
+      testId: 'edge-label',
+    },
+  ];
+  if (sourceText) {
+    const p = pointOnPath(path, EDGE_LABEL_POSITION_RATIO.nearSource) ?? {
+      x: sourceX,
+      y: sourceY,
+    };
+    slots.push({ slot: 'source', text: sourceText, x: p.x, y: p.y, testId: 'edge-label-source' });
+  }
+  if (targetText) {
+    const p = pointOnPath(path, EDGE_LABEL_POSITION_RATIO.nearTarget) ?? {
+      x: targetX,
+      y: targetY,
+    };
+    slots.push({ slot: 'target', text: targetText, x: p.x, y: p.y, testId: 'edge-label-target' });
+  }
+
+  const commitLabel = (slot: LabelSlot) => {
+    setEditingSlot(null);
+    if (slot === 'main') {
+      if (draft !== text) useFlowStore.getState().patchEdgeLabel(id, draft);
+      return;
+    }
+    const prev = slot === 'source' ? sourceText : targetText;
+    if (draft !== prev)
+      useFlowStore
+        .getState()
+        .setEdgeLabelField(id, `${slot}Label` as 'sourceLabel' | 'targetLabel', draft);
   };
 
   return (
@@ -171,44 +258,47 @@ export function FlowEdgeLine(props: EdgeProps) {
         interactionWidth={20}
       />
 
-      {/* 连线标签：双击就地编辑（不再走 BaseEdge 的 SVG 文本，便于富交互） */}
+      {/* 连线标签：主标签 + 起点 / 终点标签，双击就地编辑（不走 BaseEdge 的 SVG 文本，便于富交互） */}
       <EdgeLabelRenderer>
-        <div
-          className="nodrag nopan absolute"
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-        >
-          {editing ? (
-            <input
-              autoFocus
-              value={draft}
-              placeholder={t('tools.flowchart.edgeLabel')}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commitLabel}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitLabel();
-                if (e.key === 'Escape') setEditing(false);
-              }}
-              className="pointer-events-auto w-24 rounded border border-blue-400 bg-white px-1 py-0.5 text-center text-[11px] outline-none dark:bg-gray-900 dark:text-gray-100"
-            />
-          ) : text || selected ? (
-            <button
-              type="button"
-              data-testid="edge-label"
-              title={t('tools.flowchart.edgeLabel')}
-              onDoubleClick={() => {
-                setDraft(text);
-                setEditing(true);
-              }}
-              className={`pointer-events-auto rounded border px-1 py-0.5 text-[11px] leading-tight shadow-sm transition-colors ${
-                text
-                  ? 'border-gray-200 bg-white/95 text-gray-700 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-200'
-                  : 'border-dashed border-blue-300 bg-white/70 text-blue-500 dark:bg-gray-900/70'
-              }`}
-            >
-              {text || '＋'}
-            </button>
-          ) : null}
-        </div>
+        {slots.map((s) => (
+          <div
+            key={s.slot}
+            className="nodrag nopan absolute"
+            style={{ transform: `translate(-50%, -50%) translate(${s.x}px, ${s.y}px)` }}
+          >
+            {editingSlot === s.slot ? (
+              <input
+                autoFocus
+                value={draft}
+                placeholder={t('tools.flowchart.edgeLabel')}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={() => commitLabel(s.slot)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitLabel(s.slot);
+                  if (e.key === 'Escape') setEditingSlot(null);
+                }}
+                className="pointer-events-auto w-24 rounded border border-blue-400 bg-white px-1 py-0.5 text-center text-[11px] outline-none dark:bg-gray-900 dark:text-gray-100"
+              />
+            ) : s.text || (s.slot === 'main' && selected) ? (
+              <button
+                type="button"
+                data-testid={s.testId}
+                title={t('tools.flowchart.edgeLabel')}
+                onDoubleClick={() => {
+                  setDraft(s.text);
+                  setEditingSlot(s.slot);
+                }}
+                className={`pointer-events-auto rounded border px-1 py-0.5 text-[11px] leading-tight shadow-sm transition-colors ${
+                  s.text
+                    ? 'border-gray-200 bg-white/95 text-gray-700 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-200'
+                    : 'border-dashed border-blue-300 bg-white/70 text-blue-500 dark:bg-gray-900/70'
+                }`}
+              >
+                {s.text || '＋'}
+              </button>
+            ) : null}
+          </div>
+        ))}
       </EdgeLabelRenderer>
     </>
   );

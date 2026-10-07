@@ -13,7 +13,7 @@
 import { activePageOf, migrateDoc } from '../model/migrate';
 import type { LayoutDensity, LayoutDirection } from '../layout';
 import type { ThemeId } from '../model/themes';
-import type { FlowDoc } from '../model/types';
+import type { CanvasGuide, FlowDoc, GridStyle, WheelMode } from '../model/types';
 
 /** 与 store.SnapshotRec 结构一致；此处独立声明以避免 store ↔ persist 的循环依赖 */
 export interface PersistedSnapshot {
@@ -24,9 +24,9 @@ export interface PersistedSnapshot {
 }
 
 /** 侧栏面板 key（与 FlowchartTool 的 PanelKey 一致） */
-export type PersistedPanelKey = 'prop' | 'layer' | 'history';
+export type PersistedPanelKey = 'prop' | 'layer' | 'history' | 'search';
 
-/** 会话设置：网格 / 布局 / 对齐阈值 / 主题 / 侧栏面板 */
+/** 会话设置：网格 / 布局 / 对齐阈值 / 主题 / 侧栏面板 / 画布观感 */
 export interface PersistedSession {
   gridEnabled: boolean;
   gridSize: number;
@@ -35,6 +35,16 @@ export interface PersistedSession {
   alignTolerance: number;
   theme?: ThemeId;
   panel?: PersistedPanelKey;
+  /** 鼠标滚轮行为：平移（默认）/ 缩放 */
+  wheelMode?: WheelMode;
+  /** 画布背景色（`transparent` 表示透明） */
+  canvasBackground?: string;
+  /** 网格样式 */
+  gridStyle?: GridStyle;
+  /** 持久参考线（可手动拉出） */
+  guides?: CanvasGuide[];
+  /** 是否显示标尺 */
+  rulersVisible?: boolean;
 }
 
 const DB_NAME = 'syntools-flowchart-editor';

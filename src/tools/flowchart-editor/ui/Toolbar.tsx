@@ -4,9 +4,11 @@ import {
   alignSelected,
   applyUniformSize,
   distributeSelected,
+  flipSelected,
   groupSelected,
   layerOp,
   patchSelectedEdgeStyle,
+  rotateSelected,
   snapSelectedToGrid,
   toggleHidden,
   toggleLocked,
@@ -17,15 +19,23 @@ import { LAYOUT_DIRECTIONS, type LayoutDensity, type LayoutDirection } from '../
 import { useFlowStore } from '../store';
 import { ThemePanel } from './ThemePanel';
 import {
+  CANVAS_BACKGROUND_OPTIONS,
   EDGE_ARROW_LABEL_KEY,
   EDGE_ARROW_OPTIONS,
   EDGE_DASH_OPTIONS,
+  EDGE_JUMP_OPTIONS,
+  EDGE_RELATION_PRESETS,
   EDGE_TYPE_OPTIONS,
   GRID_SIZE_OPTIONS,
+  GRID_STYLE_OPTIONS,
+  PAPER_PRESETS,
   type EdgeArrow,
   type EdgeDash,
+  type EdgeJumpStyle,
   type EdgeType,
   type FlowEdgeStyle,
+  type GridStyle,
+  type WheelMode,
 } from '../model/types';
 
 /** 连线宽度可选值（与 normalizeEdgeStyle 的 1~8 限制一致） */
@@ -176,6 +186,7 @@ const LAYER_BUTTONS: Array<{ op: LayerOp; glyph: string; key: string }> = [
 
 interface ToolbarProps {
   onTemplates: () => void;
+  onShortcutHelp: () => void;
   onAutoLayout: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -197,6 +208,18 @@ export function Toolbar(props: ToolbarProps) {
   const layoutDirection = useFlowStore((s) => s.layoutDirection);
   const layoutDensity = useFlowStore((s) => s.layoutDensity);
   const alignTolerance = useFlowStore((s) => s.alignTolerance);
+  const pageSize = useFlowStore((s) => s.pageSize);
+  const wheelMode = useFlowStore((s) => s.wheelMode);
+  const gridStyle = useFlowStore((s) => s.gridStyle);
+  const canvasBackground = useFlowStore((s) => s.canvasBackground);
+  const rulersVisible = useFlowStore((s) => s.rulersVisible);
+  /** 命令式写会话设置（工具栏控件即时生效） */
+  const st = useFlowStore.getState();
+  /** 当前纸张：命中预设取其 id，否则为 custom / none */
+  const pageSizeKey = !pageSize
+    ? 'none'
+    : (PAPER_PRESETS.find((p) => p.width === pageSize.width && p.height === pageSize.height)?.id ??
+      'custom');
   const sep = <span className="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" />;
 
   // 选中节点的锁定/隐藏状态（用于图标切换）
@@ -281,6 +304,55 @@ export function Toolbar(props: ToolbarProps) {
           renderOption={(v) => `${v}px`}
         />
 
+        {/* 纸张尺寸：设置后画布显示页边界 */}
+        <EdgeSelect
+          testId="flowchart-paper-size"
+          label={t('tools.flowchart.paperSize')}
+          value={pageSizeKey}
+          options={['none', ...PAPER_PRESETS.map((p) => p.id), 'custom']}
+          onChange={(id) => {
+            if (id === 'none') {
+              st.setPageSize(undefined);
+              return;
+            }
+            const preset = PAPER_PRESETS.find((p) => p.id === id);
+            if (preset) st.setPageSize({ width: preset.width, height: preset.height });
+          }}
+          renderOption={(v) => t(`tools.flowchart.paper_${v}`)}
+        />
+        <EdgeSelect
+          testId="flowchart-wheel-mode"
+          label={t('tools.flowchart.wheelMode')}
+          value={wheelMode}
+          options={['pan', 'zoom']}
+          onChange={(v) => st.setWheelMode(v as WheelMode)}
+          renderOption={(v) => t(`tools.flowchart.wheel_${v}`)}
+        />
+        <EdgeSelect
+          testId="flowchart-grid-style"
+          label={t('tools.flowchart.gridStyle')}
+          value={gridStyle}
+          options={GRID_STYLE_OPTIONS}
+          onChange={(v) => st.setGridStyle(v as GridStyle)}
+          renderOption={(v) => t(`tools.flowchart.grid_${v}`)}
+        />
+        <EdgeSelect
+          testId="flowchart-canvas-bg"
+          label={t('tools.flowchart.canvasBackground')}
+          value={canvasBackground}
+          options={[...CANVAS_BACKGROUND_OPTIONS]}
+          onChange={(v) => st.setCanvasBackground(v)}
+          renderOption={(v) => (v === 'transparent' ? t('tools.flowchart.bgTransparent') : v)}
+        />
+        <ToolbarButton
+          compact
+          testId="flowchart-rulers-toggle"
+          label={t('tools.flowchart.rulers')}
+          onClick={() => st.setRulersVisible(!rulersVisible)}
+          primary={rulersVisible}
+          icon={<span>⌐</span>}
+        />
+
         {sep}
 
         <ToolbarButton
@@ -295,6 +367,13 @@ export function Toolbar(props: ToolbarProps) {
         />
         <ToolbarButton label={t('tools.flowchart.duplicate')} onClick={props.onDuplicate} />
         <ToolbarButton label={t('tools.flowchart.delete')} onClick={props.onDelete} />
+        <ToolbarButton
+          compact
+          testId="flowchart-shortcut-help"
+          label={t('tools.flowchart.shortcutHelp')}
+          onClick={props.onShortcutHelp}
+          icon={<span>?</span>}
+        />
       </div>
 
       {/* 排列：对齐 / 分布 / 层级 / 编组 */}
@@ -363,6 +442,39 @@ export function Toolbar(props: ToolbarProps) {
         {sep}
         <ToolbarButton
           compact
+          testId="flowchart-tb-rotate-ccw"
+          label={t('tools.flowchart.rotateCcw')}
+          onClick={() => rotateSelected(-90)}
+          disabled={selectedNodes.length === 0}
+          icon={<span>⟲</span>}
+        />
+        <ToolbarButton
+          compact
+          testId="flowchart-tb-rotate-cw"
+          label={t('tools.flowchart.rotateCw')}
+          onClick={() => rotateSelected(90)}
+          disabled={selectedNodes.length === 0}
+          icon={<span>⟳</span>}
+        />
+        <ToolbarButton
+          compact
+          testId="flowchart-tb-flip-h"
+          label={t('tools.flowchart.flipH')}
+          onClick={() => flipSelected('h')}
+          disabled={selectedNodes.length === 0}
+          icon={<span>⇄</span>}
+        />
+        <ToolbarButton
+          compact
+          testId="flowchart-tb-flip-v"
+          label={t('tools.flowchart.flipV')}
+          onClick={() => flipSelected('v')}
+          disabled={selectedNodes.length === 0}
+          icon={<span>⇅</span>}
+        />
+        {sep}
+        <ToolbarButton
+          compact
           label={t('tools.flowchart.toggleLock')}
           onClick={() => toggleLocked(useFlowStore.getState().selectedNodes)}
           disabled={selectedNodes.length === 0}
@@ -409,6 +521,28 @@ export function Toolbar(props: ToolbarProps) {
           options={EDGE_ARROW_OPTIONS}
           onChange={(v) => applyEdge({ endArrow: v as EdgeArrow })}
           renderOption={arrowLabel}
+        />
+        <EdgeSelect
+          testId="flowchart-relation-preset"
+          label={t('tools.flowchart.relationPreset')}
+          value=""
+          options={EDGE_RELATION_PRESETS.map((p) => p.id)}
+          onChange={(id) => {
+            const preset = EDGE_RELATION_PRESETS.find((p) => p.id === id);
+            if (preset) applyEdge(preset.patch);
+          }}
+          renderOption={(id) => {
+            const preset = EDGE_RELATION_PRESETS.find((p) => p.id === id);
+            return preset ? t(`tools.flowchart.${preset.labelKey}`) : id;
+          }}
+        />
+        <EdgeSelect
+          testId="flowchart-edge-jump"
+          label={t('tools.flowchart.edgeJump')}
+          value={shown.jumpStyle ?? 'none'}
+          options={EDGE_JUMP_OPTIONS}
+          onChange={(v) => applyEdge({ jumpStyle: v as EdgeJumpStyle })}
+          renderOption={(v) => t(`tools.flowchart.jump_${v}`)}
         />
       </div>
     </div>

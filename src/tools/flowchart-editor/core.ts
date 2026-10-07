@@ -5,6 +5,7 @@
 
 import {
   type Align,
+  type EdgeLabelPosition,
   type FlowDoc,
   type FlowEdgeRec,
   type FlowEdgeStyle,
@@ -16,6 +17,7 @@ import {
   type ShapeSize,
   type Waypoint,
   isContainerKind,
+  minNodeSize,
 } from './model/types';
 import { shapeDefOf, shapeSize } from './model/shapes';
 import { migrateDoc, toDocV2 } from './model/migrate';
@@ -40,6 +42,113 @@ export function normalizeColor(input: string | undefined | null, fallback = '#00
     : text;
   if (/^[0-9a-fA-F]{6}$/.test(full)) return `#${full.toLowerCase()}`;
   return fallback;
+}
+
+/* --------------------------- 节点变换（旋转 / 镜像） --------------------------- */
+
+/** 把任意角度归一到 [0, 360) */
+export function normalizeRotation(deg: number): number {
+  if (!Number.isFinite(deg)) return 0;
+  const r = deg % 360;
+  return r < 0 ? r + 360 : r;
+}
+
+/** 把角度吸附到步长倍数（step <= 0 时归一到整数度） */
+export function snapRotation(deg: number, step: number): number {
+  const base = normalizeRotation(deg);
+  if (!Number.isFinite(step) || step <= 0) return Math.round(base);
+  return normalizeRotation(Math.round(base / step) * step);
+}
+
+/**
+ * 由「中心点 + 指针位置」求角度（度，0=正右方，顺时针增大）。
+ * 手柄渲染与拖拽共用，保证几何一致。
+ */
+export function angleFromCenter(cx: number, cy: number, px: number, py: number): number {
+  return normalizeRotation((Math.atan2(py - cy, px - cx) * 180) / Math.PI);
+}
+
+/**
+ * 节点变换的 CSS transform（旋转 + 镜像）。
+ * 以包围盒中心为原点；无变换时返回 undefined，避免无谓的合成层。
+ */
+export function nodeTransformCss(style: Partial<FlowNodeStyle> | undefined): string | undefined {
+  const rotation = normalizeRotation(style?.rotation ?? 0);
+  const sx = style?.flipH === true ? -1 : 1;
+  const sy = style?.flipV === true ? -1 : 1;
+  const parts: string[] = [];
+  if (rotation !== 0) parts.push(`rotate(${round(rotation, 3)}deg)`);
+  if (sx !== 1 || sy !== 1) parts.push(`scale(${sx}, ${sy})`);
+  return parts.length > 0 ? parts.join(' ') : undefined;
+}
+
+function round(value: number, digits: number): number {
+  const f = 10 ** digits;
+  return Math.round(value * f) / f;
+}
+
+/* --------------------------- 容器缩放联动 --------------------------- */
+
+/** 容器缩放后子节点的换算结果 */
+export interface ScaledChild {
+  id: string;
+  position: { x: number; y: number };
+  width?: number;
+  height?: number;
+}
+
+/**
+ * 容器（泳道 / 编组）缩放时按比例换算子节点的相对坐标与尺寸。
+ *
+ * 子节点坐标是相对容器的，因此直接按缩放比换算即可保持视觉布局；
+ * 尺寸按同一比例缩放并夹取到各自的最小尺寸，避免缩小时把子节点压成不可见。
+ * 尺寸未变化、或比例非法时返回空数组（调用方据此跳过写入）。
+ */
+export function scaleChildren(
+  children: ReadonlyArray<{
+    id: string;
+    kind: ShapeKind;
+    position: { x: number; y: number };
+    width?: number;
+    height?: number;
+  }>,
+  prev: ShapeSize,
+  next: ShapeSize,
+): ScaledChild[] {
+  if (children.length === 0) return [];
+  if (prev.width <= 0 || prev.height <= 0 || next.width <= 0 || next.height <= 0) return [];
+  const sx = next.width / prev.width;
+  const sy = next.height / prev.height;
+  if (!Number.isFinite(sx) || !Number.isFinite(sy)) return [];
+  if (Math.abs(sx - 1) < 1e-6 && Math.abs(sy - 1) < 1e-6) return [];
+  return children.map((child) => {
+    const min = minNodeSize(child.kind);
+    const base = shapeSize(child.kind);
+    const width = child.width ?? base.width;
+    const height = child.height ?? base.height;
+    return {
+      id: child.id,
+      position: {
+        x: Math.round(child.position.x * sx),
+        y: Math.round(child.position.y * sy),
+      },
+      width: Math.max(min.width, Math.round(width * sx)),
+      height: Math.max(min.height, Math.round(height * sy)),
+    };
+  });
+}
+
+/**
+ * 超链接协议白名单：仅放行 http / https / mailto，其余（含 javascript:）视为无效。
+ * 返回可直接用于 href 的字符串；无效返回 undefined。
+ */
+export function safeLinkHref(link: string | undefined): string | undefined {
+  if (!link) return undefined;
+  const trimmed = link.trim();
+  if (!trimmed) return undefined;
+  // 无协议时按 https 补全，便于用户只输入域名
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return /^(https?|mailto):/i.test(withScheme) ? withScheme : undefined;
 }
 
 export const DEFAULT_STYLE: FlowNodeStyle = {
@@ -402,6 +511,9 @@ export function serializeDoc(
     sourceHandle?: string | null;
     targetHandle?: string | null;
     label?: string;
+    sourceLabel?: string;
+    targetLabel?: string;
+    labelPosition?: EdgeLabelPosition;
     style?: FlowEdgeStyle;
     waypoints?: Waypoint[];
     mxStyle?: string[];
@@ -422,6 +534,7 @@ export function serializeDoc(
       kind: n.data.kind,
       label: n.data.label,
       style: { ...n.data.style },
+      ...(n.data.collapsed ? { collapsed: true } : {}),
       ...(n.data.src ? { src: n.data.src } : {}),
       ...(n.data.iconId ? { iconId: n.data.iconId } : {}),
       ...(n.data.formula ? { formula: n.data.formula } : {}),
@@ -434,6 +547,9 @@ export function serializeDoc(
     sourceHandle: e.sourceHandle ?? null,
     targetHandle: e.targetHandle ?? null,
     label: e.label,
+    ...(e.sourceLabel ? { sourceLabel: e.sourceLabel } : {}),
+    ...(e.targetLabel ? { targetLabel: e.targetLabel } : {}),
+    ...(e.labelPosition ? { labelPosition: e.labelPosition } : {}),
     style: e.style ? { ...e.style } : undefined,
     ...(e.waypoints && e.waypoints.length > 0
       ? { waypoints: e.waypoints.map((p) => ({ x: p.x, y: p.y })) }

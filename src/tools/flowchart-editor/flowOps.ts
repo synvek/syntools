@@ -9,6 +9,7 @@ import {
   absoluteRectOf,
   createId,
   defaultData,
+  normalizeRotation,
   orderNodesByHierarchy,
 } from './core';
 import { isContainerKind, type FlowEdgeStyle } from './model/types';
@@ -133,6 +134,46 @@ export function layerOp(op: LayerOp): void {
   const reordered = orderNodesByHierarchy(reorderLayers(nodes, selected, op));
   useFlowStore.getState().commit();
   useFlowStore.setState({ nodes: reordered });
+}
+
+/**
+ * 旋转选中节点（度，叠加到各自当前角度上，容器一并参与）。
+ * 归一后为 0 时清除字段，避免文档里出现冗余的 `rotation: 0`。
+ */
+export function rotateSelected(delta: number): void {
+  const { selectedNodes } = useFlowStore.getState();
+  if (selectedNodes.length === 0 || delta === 0) return;
+  const target = new Set(selectedNodes);
+  useFlowStore.getState().commit();
+  useFlowStore.setState((s) => ({
+    nodes: s.nodes.map((n) => {
+      if (!target.has(n.id)) return n;
+      const rotation = normalizeRotation((n.data.style.rotation ?? 0) + delta) || undefined;
+      return { ...n, data: { ...n.data, style: { ...n.data.style, rotation } } };
+    }),
+  }));
+}
+
+/**
+ * 水平 / 垂直镜像。
+ * 切换语义与「锁定 / 隐藏」一致：只要有一个选中节点未镜像就整体镜像，否则整体取消。
+ */
+export function flipSelected(axis: 'h' | 'v'): void {
+  const { nodes, selectedNodes } = useFlowStore.getState();
+  if (selectedNodes.length === 0) return;
+  const key = axis === 'h' ? 'flipH' : 'flipV';
+  const target = new Set(selectedNodes);
+  const shouldFlip = nodes.some((n) => target.has(n.id) && n.data.style[key] !== true);
+  useFlowStore.getState().commit();
+  useFlowStore.setState((s) => ({
+    nodes: s.nodes.map((n) => {
+      if (!target.has(n.id)) return n;
+      const style = { ...n.data.style };
+      if (shouldFlip) style[key] = true;
+      else delete style[key];
+      return { ...n, data: { ...n.data, style } };
+    }),
+  }));
 }
 
 /** 把选中的普通节点装进一个新的编组容器 */

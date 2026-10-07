@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { buildTemplateDoc } from '../model/templates';
 import { activePageOf, migrateDoc, toDocV2 } from '../model/migrate';
 import { defaultData } from '../core';
+import { SHAPE_DEFS } from '../model/shapes';
 import {
   DEFAULT_EDGE_STYLE,
   type FlowDoc,
   type FlowEdgeRec,
   type FlowNodeRec,
+  type ShapeKind,
 } from '../model/types';
 import { parseProjectJson, toProjectJson } from './projectJson';
 import { parseMermaidFlowchart, toMermaid } from './mermaidIo';
@@ -200,7 +202,10 @@ describe('Draw.io XML', () => {
 
   it('样式到形状的映射', () => {
     expect(kindOfStyle('rhombus;whiteSpace=wrap;')).toBe('decision');
-    expect(kindOfStyle('ellipse;')).toBe('startEnd');
+    // draw.io 的 ellipse 字面映射为椭圆（开始/结束是胶囊，走 shape=syntools.* 精确 token）
+    expect(kindOfStyle('ellipse;')).toBe('ellipse');
+    expect(kindOfStyle('shape=syntools.startEnd;')).toBe('startEnd');
+    expect(kindOfStyle('shape=invParallelogram;')).toBe('display');
     expect(kindOfStyle('shape=cylinder;')).toBe('database');
     expect(kindOfStyle('parallelogram;')).toBe('data');
     expect(kindOfStyle(undefined)).toBe('rect');
@@ -209,6 +214,25 @@ describe('Draw.io XML', () => {
   it('非法 XML 返回 null', () => {
     expect(parseDrawioXml('<not-xml')).toBeNull();
     expect(parseDrawioXml('')).toBeNull();
+  });
+
+  it('全部图形导出→导入后 kind 不变（往返不变量）', () => {
+    const kinds = Object.keys(SHAPE_DEFS) as ShapeKind[];
+    const nodes: FlowNodeRec[] = kinds.map((kind, i) => ({
+      id: `k${i}`,
+      type: 'shape',
+      position: { x: (i % 10) * 200, y: Math.floor(i / 10) * 160 },
+      data: defaultData(kind),
+    }));
+    const page = activePageOf(parseDrawioXml(toDrawioXml(toDocV2(nodes, [])))!)!;
+    const byId = new Map(page.nodes.map((n) => [n.id, n] as const));
+    const failures = kinds
+      .map((kind, i) => {
+        const back = byId.get(`k${i}`);
+        return back?.data.kind === kind ? null : `${kind} → ${back?.data.kind ?? 'missing'}`;
+      })
+      .filter((v): v is string => v !== null);
+    expect(failures).toEqual([]);
   });
 
   it('多页导出后能完整再导入', () => {
@@ -265,6 +289,37 @@ describe('Draw.io XML', () => {
     expect(style.lineDash).toBe('dashed');
   });
 
+  it('节点变换与垂直对齐往返（rotation / flipH·flipV / verticalAlign）', () => {
+    const node: FlowNodeRec = {
+      id: 'n1',
+      type: 'shape',
+      position: { x: 10, y: 20 },
+      width: 120,
+      height: 60,
+      data: {
+        ...defaultData('rect', 'R'),
+        style: {
+          ...defaultData('rect').style,
+          rotation: 45,
+          flipH: true,
+          verticalAlign: 'top',
+        },
+      },
+    };
+    const xml = toDrawioXml(toDocV2([node], []));
+    // 旋转是几何属性，镜像与垂直对齐是样式 token
+    expect(xml).toContain('rotation="45"');
+    expect(xml).toContain('flipH=1');
+    expect(xml).toContain('verticalAlign=top');
+
+    const back = activePageOf(parseDrawioXml(xml)!)!.nodes[0].data.style;
+    expect(back.rotation).toBe(45);
+    expect(back.flipH).toBe(true);
+    expect(back.verticalAlign).toBe('top');
+    // 未显式设置的镜像 / 对齐不写入字段
+    expect(back.flipV).toBeUndefined();
+  });
+
   it('形状可调参数往返（便签折角 / 预定义竖线宽 / 生命线标题框）', () => {
     const nodes: FlowNodeRec[] = [
       {
@@ -313,8 +368,10 @@ describe('Draw.io XML', () => {
     // 已语义化的 size token 不再进入 mxStyle 兜底
     expect(byId.get('n1')!.mxStyle ?? []).not.toContain('size=24');
     expect(byId.get('n2')!.mxStyle ?? []).not.toContain('size=22');
-    // 生命线形状本身尚未与 draw.io 的 umlLifeline token 互认，size 作为未识别 token 无损保留
-    expect(byId.get('n3')!.mxStyle ?? []).toContain('size=56');
+    // 生命线现已与 shape=syntools.umlLifeline 互认，size 被语义化为 lifelineHeader 参数
+    expect(byId.get('n3')!.data.kind).toBe('umlLifeline');
+    expect(byId.get('n3')!.data.style.shapeParams?.lifelineHeader).toBe(56);
+    expect(byId.get('n3')!.mxStyle ?? []).not.toContain('size=56');
   });
 
   it('圆角导入还原（修复 arcSize 丢失）', () => {
@@ -359,6 +416,34 @@ describe('Draw.io XML', () => {
     expect(back.style?.endArrow).toBe('diamond');
     expect(back.label).toBe('flow');
     expect(back.waypoints).toEqual([{ x: 80, y: 100 }]);
+  });
+
+  it('连线起止标签与标签位置往返（自定义 token）', () => {
+    const nodes: FlowNodeRec[] = [
+      { id: 'a', type: 'shape', position: { x: 0, y: 0 }, data: defaultData('rect', 'A') },
+      { id: 'b', type: 'shape', position: { x: 0, y: 200 }, data: defaultData('rect', 'B') },
+    ];
+    const edge: FlowEdgeRec = {
+      id: 'e1',
+      source: 'a',
+      target: 'b',
+      label: '中',
+      sourceLabel: '起;点', // 含分隔符，验证 URL 编码
+      targetLabel: '终点',
+      labelPosition: 'nearTarget',
+      style: { ...DEFAULT_EDGE_STYLE },
+    };
+    const xml = toDrawioXml(toDocV2(nodes, [edge]));
+    expect(xml).toContain('synSourceLabel=');
+    expect(xml).toContain('synLabelPos=nearTarget');
+
+    const back = activePageOf(parseDrawioXml(xml)!)!.edges[0];
+    expect(back.label).toBe('中');
+    expect(back.sourceLabel).toBe('起;点');
+    expect(back.targetLabel).toBe('终点');
+    expect(back.labelPosition).toBe('nearTarget');
+    // 已语义化的自定义 token 不再进 mxStyle 兜底
+    expect(back.mxStyle ?? []).not.toContain('synLabelPos=nearTarget');
   });
 
   it('未识别的样式 token 存进 mxStyle 并在导出时回写', () => {

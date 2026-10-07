@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useFlowStore } from './store';
-import { absolutePositionOf } from './core';
+import { absolutePositionOf, defaultData } from './core';
+import { toDocV2 } from './model/migrate';
 import { buildTemplateDoc } from './model/templates';
 
 describe('多页', () => {
@@ -62,6 +63,35 @@ describe('多页', () => {
     expect(doc.version).toBe(2);
     expect(doc.pages).toHaveLength(2);
     expect(doc.activePageId).toBe(useFlowStore.getState().activePageId);
+  });
+});
+
+describe('页面复制与纸张', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(null);
+  });
+
+  it('duplicatePage 复制内容、重映射 id 并切换到副本', () => {
+    useFlowStore.getState().addNode('rect', { x: 40, y: 40 });
+    useFlowStore.getState().addNode('ellipse', { x: 200, y: 40 });
+    const sourceIds = useFlowStore.getState().nodes.map((n) => n.id);
+    const sourcePageId = useFlowStore.getState().activePageId;
+
+    useFlowStore.getState().duplicatePage(sourcePageId);
+    const st = useFlowStore.getState();
+    expect(st.pageOrder).toHaveLength(2);
+    expect(st.activePageId).not.toBe(sourcePageId);
+    expect(st.nodes).toHaveLength(2);
+    for (const n of st.nodes) expect(sourceIds).not.toContain(n.id);
+  });
+
+  it('setPageSize 写入当前页纸张并可清除', () => {
+    useFlowStore.getState().setPageSize({ width: 1123, height: 794 });
+    expect(useFlowStore.getState().pageSize).toEqual({ width: 1123, height: 794 });
+    expect(useFlowStore.getState().getDoc().pages[0].size).toEqual({ width: 1123, height: 794 });
+    useFlowStore.getState().setPageSize(undefined);
+    expect(useFlowStore.getState().pageSize).toBeUndefined();
+    expect(useFlowStore.getState().getDoc().pages[0].size).toBeUndefined();
   });
 });
 
@@ -326,6 +356,51 @@ describe('形状可调参数写入', () => {
     expect(styleOf(id).shapeParams?.barWidth).toBe(20);
     useFlowStore.getState().undo();
     expect(styleOf(id).shapeParams?.barWidth).toBeUndefined();
+  });
+});
+
+describe('插入外部文档（粘贴 draw.io）', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(null);
+  });
+
+  it('重映射 id、平移到目标点并选中新元素', () => {
+    useFlowStore.getState().addNode('rect', { x: 0, y: 0 });
+    const existing = new Map(useFlowStore.getState().nodes.map((n) => [n.id, n] as const));
+
+    const incoming = toDocV2(
+      [
+        { id: 'a', type: 'shape', position: { x: 500, y: 400 }, data: defaultData('rect', 'A') },
+        { id: 'b', type: 'shape', position: { x: 560, y: 480 }, data: defaultData('rect', 'B') },
+      ],
+      [{ id: 'e', source: 'a', target: 'b' }],
+    );
+    const added = useFlowStore.getState().insertDoc(incoming, { x: 100, y: 200 });
+
+    expect(added).toBe(2);
+    const st = useFlowStore.getState();
+    expect(st.nodes).toHaveLength(3);
+    expect(st.edges).toHaveLength(1);
+    // 既有节点保持不变；插入的节点使用全新 id
+    expect(st.nodes.filter((n) => existing.has(n.id))).toHaveLength(1);
+    const insertedIds = st.nodes.filter((n) => !existing.has(n.id)).map((n) => n.id);
+    expect(new Set(insertedIds).size).toBe(insertedIds.length);
+    for (const id of insertedIds) expect(existing.has(id)).toBe(false);
+    // 内容左上角对齐到目标点
+    const inserted = st.nodes.filter((n) => st.selectedNodes.includes(n.id));
+    expect(inserted).toHaveLength(2);
+    expect(Math.min(...inserted.map((n) => n.position.x))).toBe(100);
+    expect(Math.min(...inserted.map((n) => n.position.y))).toBe(200);
+    // 连线端点也指向新 id
+    const edge = st.edges[0];
+    expect(st.selectedNodes).toContain(edge.source);
+    expect(st.selectedNodes).toContain(edge.target);
+  });
+
+  it('空文档不产生任何变更', () => {
+    const before = useFlowStore.getState().nodes.length;
+    expect(useFlowStore.getState().insertDoc({ version: 2, pages: [] }, { x: 0, y: 0 })).toBe(0);
+    expect(useFlowStore.getState().nodes).toHaveLength(before);
   });
 });
 
