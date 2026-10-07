@@ -12,6 +12,7 @@ import {
   orderNodesByHierarchy,
 } from './core';
 import { isContainerKind, type FlowEdgeStyle } from './model/types';
+import { shapeSize } from './model/shapes';
 import { themeOf, type ThemeId } from './model/themes';
 import {
   computeAlign,
@@ -68,6 +69,60 @@ export function distributeSelected(axis: 'h' | 'v'): void {
   if (boxes.length < 3) return;
   useFlowStore.getState().commit();
   applyAbsoluteMoves(computeDistribute(boxes, axis));
+}
+
+/**
+ * 对齐增强：把选中节点的位置吸附到画布网格。
+ * 位置按网格取整后写回（容器内的子节点自动换算回相对坐标）；
+ * 未开启网格吸附、或已对齐时不产生历史记录。
+ */
+export function snapSelectedToGrid(): void {
+  const { nodes, selectedNodes, gridEnabled, gridSize } = useFlowStore.getState();
+  if (!gridEnabled || gridSize < 2) return;
+  const targets = nodes.filter((n) => selectedNodes.includes(n.id) && n.draggable !== false);
+  if (targets.length === 0) return;
+  const byId = new Map(nodes.map((n) => [n.id, n] as const));
+
+  const moves: MoveMap = {};
+  let changed = false;
+  for (const node of targets) {
+    const abs = absolutePositionOf(node, byId);
+    const snapped = {
+      x: Math.round(abs.x / gridSize) * gridSize,
+      y: Math.round(abs.y / gridSize) * gridSize,
+    };
+    moves[node.id] = snapped;
+    if (Math.abs(abs.x - snapped.x) > 0.5 || Math.abs(abs.y - snapped.y) > 0.5) changed = true;
+  }
+  if (!changed) return;
+  useFlowStore.getState().commit();
+  applyAbsoluteMoves(moves);
+}
+
+/**
+ * 统一尺寸：把选中的普通节点宽高统一为「第一个选中节点」的尺寸。
+ * 容器不参与（容器尺寸由内容决定），至少需要两个可缩放节点；已一致时不写历史。
+ */
+export function applyUniformSize(): void {
+  const { nodes, selectedNodes } = useFlowStore.getState();
+  const targets = nodes.filter(
+    (n) => selectedNodes.includes(n.id) && !isContainerKind(n.data.kind),
+  );
+  if (targets.length < 2) return;
+  const ref = targets[0];
+  const width = ref.width ?? shapeSize(ref.data.kind).width;
+  const height = ref.height ?? shapeSize(ref.data.kind).height;
+  const sameSize = targets.every(
+    (n) =>
+      (n.width ?? shapeSize(n.data.kind).width) === width &&
+      (n.height ?? shapeSize(n.data.kind).height) === height,
+  );
+  if (sameSize) return;
+  useFlowStore.getState().setNodeGeometry(
+    targets.map((n) => n.id),
+    { width, height },
+    true,
+  );
 }
 
 /** 层级调整后重新归一顺序，确保容器仍在子节点之前 */
@@ -158,6 +213,17 @@ export function copySelection(): void {
   const picked = nodes.filter((n) => ids.has(n.id));
   const pickedEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
   useFlowStore.setState({ clipboard: { nodes: picked, edges: pickedEdges } });
+}
+
+/**
+ * 剪切：先把选中节点复制进剪贴板，再删除。
+ * 仅选中连线（无节点）时退化为删除连线（连线无法脱离节点单独粘贴）。
+ */
+export function cutSelection(): void {
+  const { selectedNodes, selectedEdges } = useFlowStore.getState();
+  if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+  copySelection();
+  useFlowStore.getState().removeSelected();
 }
 
 export function pasteClipboard(): void {

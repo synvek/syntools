@@ -3,6 +3,7 @@ import {
   __resetIdCounter,
   absolutePositionOf,
   absoluteRectOf,
+  cachedAbsoluteRectOf,
   computeHelperLines,
   createId,
   defaultData,
@@ -14,7 +15,7 @@ import {
   validateDoc,
 } from './core';
 import { buildTemplate } from './model/templates';
-import { isContainerKind, isVerticalLane } from './model/types';
+import { isContainerKind, isVerticalLane, type ShapeKind } from './model/types';
 import { activePageOf } from './model/migrate';
 
 describe('createId', () => {
@@ -223,5 +224,60 @@ describe('容器（泳道）层级', () => {
     expect(doc.nodes[0].id).toBe(laneNode!.id);
     expect(doc.nodes.filter((n) => n.parentId === laneNode!.id)).toHaveLength(4);
     expect(validateDoc(doc)).toBe(true);
+  });
+});
+
+describe('cachedAbsoluteRectOf', () => {
+  interface HN {
+    id: string;
+    position: { x: number; y: number };
+    width: number;
+    height: number;
+    parentId?: string;
+    data: { kind: ShapeKind };
+  }
+
+  const parent: HN = {
+    id: 'p',
+    position: { x: 0, y: 0 },
+    width: 100,
+    height: 100,
+    data: { kind: 'group' },
+  };
+  const child: HN = {
+    id: 'c',
+    position: { x: 10, y: 10 },
+    parentId: 'p',
+    width: 20,
+    height: 20,
+    data: { kind: 'rect' },
+  };
+
+  it('未变动时复用同一包围盒引用', () => {
+    const byId = new Map([
+      ['p', parent],
+      ['c', child],
+    ]);
+    const first = cachedAbsoluteRectOf(child, byId);
+    expect(cachedAbsoluteRectOf(child, byId)).toBe(first);
+  });
+
+  it('父节点移动后缓存失效并按新位置计算', () => {
+    const byId = new Map([
+      ['p', parent],
+      ['c', child],
+    ]);
+    const before = cachedAbsoluteRectOf(child, byId);
+
+    const movedParent: HN = { ...parent, position: { x: 50, y: 0 } };
+    const nextById = new Map([
+      ['p', movedParent],
+      ['c', child],
+    ]);
+    const moved = cachedAbsoluteRectOf(child, nextById);
+    expect(moved.x).toBe(60);
+    expect(moved).not.toBe(before);
+    // 同一父引用再次调用命中缓存
+    expect(cachedAbsoluteRectOf(child, nextById)).toBe(moved);
   });
 });

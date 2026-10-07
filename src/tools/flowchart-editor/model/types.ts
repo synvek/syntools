@@ -414,3 +414,16 @@ export function isContainerKind(kind: ShapeKind): boolean {
 export function isVerticalLane(kind: ShapeKind): boolean {
   return kind === 'swimlaneV';
 }
+
+/** 几何编辑补丁（属性面板 X / Y / W / H）：X / Y 为画布绝对坐标；仅修改传入字段 */
+export interface NodeGeometryPatch {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+
+/** 几何编辑的尺寸下限（与 NodeResizer 的最小尺寸保持一致：容器更大） */
+export function minNodeSize(kind: ShapeKind): ShapeSize {
+  return isContainerKind(kind) ? { width: 200, height: 140 } : { width: 48, height: 32 };
+}

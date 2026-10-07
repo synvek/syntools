@@ -113,3 +113,22 @@ export function pageSceneOf(page: FlowPage): PageScene | null {
     })),
   };
 }
+
+/**
+ * `pageSceneOf` 的记忆化版本（性能优化）。
+ *
+ * 缩略图会在编辑过程中反复重算；非活动页的 nodes/edges 数组引用在多次取文档间保持稳定，
+ * 因此以「nodes 数组 → { edges 数组, 场景 }」缓存：引用未变直接复用，
+ * 数组引用变化（活动页每次编辑都会新建）则自动失效。
+ * WeakMap 使缓存随数组回收，无需手动清理。
+ */
+const sceneCache = new WeakMap<object, { edges: object; scene: PageScene | null }>();
+
+export function cachedPageSceneOf(page: FlowPage): PageScene | null {
+  const key = page.nodes as unknown as object;
+  const hit = sceneCache.get(key);
+  if (hit && hit.edges === (page.edges as unknown as object)) return hit.scene;
+  const scene = pageSceneOf(page);
+  sceneCache.set(key, { edges: page.edges as unknown as object, scene });
+  return scene;
+}

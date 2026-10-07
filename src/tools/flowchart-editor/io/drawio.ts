@@ -7,6 +7,8 @@
  * - **样式映射**：填充色 / 描边色 / 描边宽度 / 字号 / 文字色 / 对齐 / 圆角 / 虚线 / 透明度 / 阴影，
  *   连线线型 / 线性 / 起止箭头 / 折点。
  * - **无损兜底**：未识别的 mxGraph 样式 token 存入 `mxStyle`，导出时原样回写，减少往返丢失。
+ * - **HTML 标签**：`html=1` 的 `<br>` / `<div>` 换行与实体在导入时还原为纯文本，导出时再转回。
+ * - **压缩文件**：`<diagram>` 文本为 base64+deflate 的压缩形式由 `parseDrawioXmlAsync` 解码。
  */
 
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
@@ -87,6 +89,39 @@ function geoNum(cell: XmlNode, key: string, fallback: number): number {
 function asArray<T>(v: T | T[] | undefined): T[] {
   if (v === undefined || v === null) return [];
   return Array.isArray(v) ? v : [v];
+}
+
+/**
+ * Draw.io 的 `html=1` 标签（HTML 片段）→ 纯文本。
+ * 行内换行与块级边界转 \n，其余成对标签剥离，常见实体解码；
+ * 仅匹配「像标签」的片段（`<` 后跟字母或 `/`），孤立的 `<` `>` 原样保留。
+ */
+export function htmlToPlain(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(?:div|p|li|tr)[^>]*>/gi, '\n')
+    .replace(/<[a-zA-Z/][^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_m, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&amp;/g, '&')
+    .replace(/\n{2,}/g, '\n')
+    .replace(/^\n+|\n+$/g, '');
+}
+
+/** 纯文本标签 → Draw.io `html=1` 值（换行转 `<br>`；XML 实体转义交给 XMLBuilder） */
+export function toMxHtmlLabel(label: string): string {
+  return label.replace(/\r\n?/g, '\n').replace(/\n/g, '<br>');
+}
+
+/** 读取 cell 的显示文本：`html=1` 时按 HTML 解析回纯文本 */
+function labelOf(cell: XmlNode, rawStyle: string | undefined): string {
+  const raw = attr(cell, '@_value') ?? '';
+  if (!raw) return '';
+  return parseStyleMap(rawStyle).map.get('html') === '1' ? htmlToPlain(raw) : raw;
 }
 
 /** `k=v;k2=v2;bare;` → Map；键统一小写以便比较 */
@@ -438,7 +473,7 @@ function pageToCells(page: FlowPage): XmlNode[] {
     const def = shapeSize(n.data.kind);
     cells.push({
       '@_id': n.id,
-      '@_value': n.data.label,
+      '@_value': toMxHtmlLabel(n.data.label),
       '@_style': styleOf(n.data.kind, n.data.style, n.mxStyle ?? []),
       '@_vertex': '1',
       '@_parent': n.parentId ?? '1',
@@ -473,7 +508,7 @@ function pageToCells(page: FlowPage): XmlNode[] {
           : {}),
       },
     };
-    if (e.label) cell['@_value'] = e.label;
+    if (e.label) cell['@_value'] = toMxHtmlLabel(e.label);
     cells.push(cell);
   }
   return cells;
@@ -507,7 +542,8 @@ export function toDrawioXml(doc: FlowDoc): string {
 type ParsedCell = XmlNode;
 
 function cellsOfDiagram(diagram: XmlNode): ParsedCell[] {
-  // 压缩过的 .drawio 会把 mxGraphModel 放在节点文本里；此处只支持未压缩形式
+  // 未压缩形式：mxGraphModel 是 diagram 的子节点。
+  // 压缩形式（mxGraphModel 藏于文本、base64+deflate）走 `parseDrawioXmlAsync` 预处理后再进来。
   const model = diagram.mxGraphModel as XmlNode | undefined;
   const root = model?.root as XmlNode | undefined;
   return asArray(root?.mxCell as XmlNode | XmlNode[] | undefined);
@@ -536,7 +572,7 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
         height: geoNum(cell, '@_height', def.height),
         ...(nodeMxStyle.length > 0 ? { mxStyle: nodeMxStyle } : {}),
         data: {
-          ...defaultData(kind, attr(cell, '@_value') ?? ''),
+          ...defaultData(kind, labelOf(cell, rawStyle)),
           style: { ...defaultData(kind).style, ...nodeStyle },
         },
       });
@@ -544,13 +580,14 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
       const source = attr(cell, '@_source');
       const target = attr(cell, '@_target');
       if (!source || !target) continue;
-      const { style: edgeStyle, mxStyle: edgeMxStyle } = edgeStyleFromMx(attr(cell, '@_style'));
+      const rawStyle = attr(cell, '@_style');
+      const { style: edgeStyle, mxStyle: edgeMxStyle } = edgeStyleFromMx(rawStyle);
       const waypoints = pointsOf(cell.mxGeometry);
       edges.push({
         id,
         source,
         target,
-        label: attr(cell, '@_value'),
+        label: labelOf(cell, rawStyle) || undefined,
         style: edgeStyle,
         ...(waypoints.length > 0 ? { waypoints } : {}),
         ...(edgeMxStyle.length > 0 ? { mxStyle: edgeMxStyle } : {}),
@@ -579,6 +616,84 @@ export function parseDrawioXml(xml: string): FlowDoc | null {
       return toDocV2(only.nodes, only.edges, only.name);
     }
     return { version: 2, pages, activePageId: pages[0].id };
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------ 压缩形式导入 ------------------------------ */
+
+/** 解压原始 deflate 字节：优先原生 DecompressionStream，缺失/失败时回退 pako（动态加载） */
+async function inflateRawBytes(bytes: Uint8Array): Promise<string | null> {
+  const DS = (globalThis as { DecompressionStream?: typeof DecompressionStream })
+    .DecompressionStream;
+  if (typeof DS === 'function' && typeof Response === 'function') {
+    try {
+      const stream = new Blob([bytes]).stream().pipeThrough(new DS('deflate-raw'));
+      return await new Response(stream).text();
+    } catch {
+      // 落到 pako
+    }
+  }
+  try {
+    const { inflateRaw } = await import('pako');
+    const out = inflateRaw(bytes);
+    // pako v3 的 to:'string' 已不再生效，统一用 TextDecoder 解码
+    return typeof out === 'string' ? out : new TextDecoder().decode(out);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 解压压缩形式的 `<diagram>` 文本。
+ * Draw.io 的压缩格式为 `base64(deflateRaw(encodeURIComponent(xml)))`。
+ */
+async function inflateDiagramText(encoded: string): Promise<string | null> {
+  try {
+    const binary = atob(encoded.replace(/\s+/g, ''));
+    const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+    const xml = await inflateRawBytes(bytes);
+    return xml === null ? null : decodeURIComponent(xml);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 解析 .drawio XML（支持未压缩与压缩两种形式）。
+ *
+ * 优先直接解析；若失败则按压缩形式处理：逐个解压 `<diagram>` 文本、
+ * 重新拼成未压缩 XML 后再复用同步解析器。
+ * 解压依赖仅在需要时动态加载（原生 DecompressionStream 优先，pako 兜底），
+ * 避免把解析依赖并入工具主 chunk。
+ */
+export async function parseDrawioXmlAsync(xml: string): Promise<FlowDoc | null> {
+  const direct = parseDrawioXml(xml);
+  if (direct) return direct;
+
+  try {
+    const parsed = PARSER.parse(xml) as XmlNode | undefined;
+    const mxfile = parsed?.mxfile as XmlNode | undefined;
+    const diagrams = asArray(mxfile?.diagram as XmlNode | XmlNode[] | undefined);
+    if (diagrams.length === 0) return null;
+
+    const rebuilt: XmlNode[] = [];
+    for (const diagram of diagrams) {
+      const text = diagram['#text'];
+      if (typeof text !== 'string' || !text.trim()) return null;
+      const inner = await inflateDiagramText(text);
+      if (!inner) return null;
+      const innerParsed = PARSER.parse(inner) as XmlNode | undefined;
+      const model = innerParsed?.mxGraphModel as XmlNode | undefined;
+      if (!model) return null;
+      rebuilt.push({
+        ...(attr(diagram, '@_name') !== undefined ? { '@_name': attr(diagram, '@_name') } : {}),
+        ...(attr(diagram, '@_id') !== undefined ? { '@_id': attr(diagram, '@_id') } : {}),
+        mxGraphModel: model,
+      });
+    }
+    return parseDrawioXml(BUILDER.build({ mxfile: { diagram: rebuilt } }) as string);
   } catch {
     return null;
   }

@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useRef, type DragEvent } from 'react';
+import { forwardRef, useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Background,
@@ -21,7 +21,12 @@ import { FlowEdgeLine } from '../nodes/FlowEdgeLine';
 import { ImageNode } from '../nodes/ImageNode';
 import { IconNode } from '../nodes/IconNode';
 import { FormulaNode } from '../nodes/FormulaNode';
-import { absolutePositionOf, absoluteRectOf, computeHelperLines } from '../core';
+import {
+  absolutePositionOf,
+  absoluteRectOf,
+  cachedAbsoluteRectOf,
+  computeHelperLines,
+} from '../core';
 import {
   type FlowEdgeStyle,
   type FlowNodeData,
@@ -33,6 +38,7 @@ import { QuickConnectOverlay } from './QuickConnectOverlay';
 import { CanvasScrollbars } from './CanvasScrollbars';
 import { EdgeEndpointHandles } from './EdgeEndpointHandles';
 import { EdgeWaypointEditor } from './EdgeWaypointEditor';
+import { FlowContextMenu, type FlowContextTarget } from './FlowContextMenu';
 
 const nodeTypes = {
   shape: ShapeNode,
@@ -80,6 +86,34 @@ function SketchFilter() {
 
 const DROP_MIME = 'application/flowchart-kind';
 
+/** 右键命中未选中节点时：将其设为唯一选中项（同步 React Flow 内部的 selected 标记） */
+function selectOnlyNode(id: string): void {
+  useFlowStore.setState((s) => ({
+    selectedNodes: [id],
+    selectedEdges: [],
+    nodes: s.nodes.map((n) =>
+      Boolean(n.selected) === (n.id === id) ? n : { ...n, selected: n.id === id },
+    ),
+    edges: s.edges.some((e) => e.selected)
+      ? s.edges.map((e) => (e.selected ? { ...e, selected: false } : e))
+      : s.edges,
+  }));
+}
+
+/** 右键命中未选中连线时：将其设为唯一选中项 */
+function selectOnlyEdge(id: string): void {
+  useFlowStore.setState((s) => ({
+    selectedEdges: [id],
+    selectedNodes: [],
+    edges: s.edges.map((e) =>
+      Boolean(e.selected) === (e.id === id) ? e : { ...e, selected: e.id === id },
+    ),
+    nodes: s.nodes.some((n) => n.selected)
+      ? s.nodes.map((n) => (n.selected ? { ...n, selected: false } : n))
+      : s.nodes,
+  }));
+}
+
 function HelperLines() {
   const { x: vx, y: vy, zoom } = useViewport();
   const lines = useFlowStore((s) => s.helperLines);
@@ -123,6 +157,41 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const connectedRef = useRef(false);
   /** 是否处于「重连端点」拖拽（此时不应用补建逻辑） */
   const reconnectingRef = useRef(false);
+  /** 本容器的 DOM 引用：既转交给外部（画布中心插入定位），也用于右键菜单的坐标换算 */
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [contextMenu, setContextMenu] = useState<FlowContextTarget | null>(null);
+
+  const setHostRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      hostRef.current = el;
+      if (typeof ref === 'function') ref(el);
+      // 对象 ref：React 类型把 current 标为只读，这里按可写引用转交
+      else if (ref) (ref as { current: HTMLDivElement | null }).current = el;
+    },
+    [ref],
+  );
+
+  /** 打开右键菜单：把指针位置换算成相对画布容器的坐标 */
+  const openContextMenu = useCallback(
+    (
+      event: React.MouseEvent | MouseEvent,
+      target: Pick<FlowContextTarget, 'kind' | 'nodeId' | 'edgeId'>,
+    ) => {
+      const host = hostRef.current;
+      if (!host) return;
+      event.preventDefault();
+      const rect = host.getBoundingClientRect();
+      setContextMenu({
+        ...target,
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+        bounds: { width: rect.width, height: rect.height },
+      });
+    },
+    [],
+  );
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -139,7 +208,6 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const defaultEdge = useFlowStore((s) => s.defaultEdge);
   const gridEnabled = useFlowStore((s) => s.gridEnabled);
   const gridSize = useFlowStore((s) => s.gridSize);
-  const alignTolerance = useFlowStore((s) => s.alignTolerance);
   const connectionLineType = CONNECTION_LINE_TYPES[defaultEdge.type];
 
   /** 离开编辑器时清理连线拖拽标记 */
@@ -246,6 +314,73 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     // 落在自身图形 / 空白画布：不生成任何内容
   }, []);
 
+  /** 正在拖动的节点 id（rAF 收口时读取；null 表示未拖动） */
+  const draggingIdRef = useRef<string | null>(null);
+  /** 待执行的辅助线计算帧（rAF 句柄） */
+  const helperRafRef = useRef<number | null>(null);
+
+  /**
+   * 计算对齐辅助线并把落点吸附到辅助线（读取最新 store 状态）。
+   * 抽成独立函数以便用 rAF 节流：一次拖拽在一帧内可能触发多次位置变更，
+   * 只保留最后一次计算，配合 cachedAbsoluteRectOf 复用未移动节点的包围盒。
+   */
+  const applyHelperSnap = useCallback(() => {
+    const state = useFlowStore.getState();
+    const draggedId = draggingIdRef.current;
+    if (!draggedId) return;
+    const all = state.nodes;
+    const dragged = all.find((n) => n.id === draggedId);
+    if (!dragged) return;
+    const byId = new Map(all.map((n) => [n.id, n] as const));
+    const draggedRect = absoluteRectOf(dragged, byId);
+    // 跨容器对齐：与同页所有可见节点比较，但排除自身与自身后代（否则会自我吸附）
+    const descendants = new Set<string>();
+    const collectChildren = (id: string) => {
+      for (const n of all) {
+        if (n.parentId === id && !descendants.has(n.id)) {
+          descendants.add(n.id);
+          collectChildren(n.id);
+        }
+      }
+    };
+    collectChildren(dragged.id);
+    const others = all
+      .filter((n) => n.id !== dragged.id && !descendants.has(n.id) && n.hidden !== true)
+      .map((n) => cachedAbsoluteRectOf(n, byId));
+    const lines = computeHelperLines(draggedRect, others, state.alignTolerance);
+    state.setHelperLines(lines);
+    if (lines.x !== undefined || lines.y !== undefined) {
+      // helper lines 返回的是绝对吸附坐标，需转换回节点自身坐标系
+      const parent = dragged.parentId ? byId.get(dragged.parentId) : undefined;
+      const parentAbs = parent ? absolutePositionOf(parent, byId) : { x: 0, y: 0 };
+      const snapped = {
+        x: (lines.x ?? draggedRect.x) - parentAbs.x,
+        y: (lines.y ?? draggedRect.y) - parentAbs.y,
+      };
+      useFlowStore.setState((s) => ({
+        nodes: s.nodes.map((n) => (n.id === dragged.id ? { ...n, position: snapped } : n)),
+      }));
+    }
+  }, []);
+
+  const cancelHelperSnap = useCallback(() => {
+    if (helperRafRef.current !== null) {
+      cancelAnimationFrame(helperRafRef.current);
+      helperRafRef.current = null;
+    }
+  }, []);
+
+  const scheduleHelperSnap = useCallback(() => {
+    if (helperRafRef.current !== null) return;
+    helperRafRef.current = requestAnimationFrame(() => {
+      helperRafRef.current = null;
+      applyHelperSnap();
+    });
+  }, [applyHelperSnap]);
+
+  // 卸载时取消待执行帧，避免对已销毁画布写入
+  useEffect(() => () => cancelHelperSnap(), [cancelHelperSnap]);
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       onNodesChangeStore(changes);
@@ -254,45 +389,20 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
           c.type === 'position' && (c as { dragging?: boolean }).dragging === true,
       );
       if (drag) {
-        const all = useFlowStore.getState().nodes;
-        const dragged = all.find((n) => n.id === drag.id);
-        if (dragged) {
-          const byId = new Map(all.map((n) => [n.id, n] as const));
-          const draggedRect = absoluteRectOf(dragged, byId);
-          // 跨容器对齐：与同页所有可见节点比较，但排除自身与自身后代（否则会自我吸附）
-          const descendants = new Set<string>();
-          const collectChildren = (id: string) => {
-            for (const n of all) {
-              if (n.parentId === id && !descendants.has(n.id)) {
-                descendants.add(n.id);
-                collectChildren(n.id);
-              }
-            }
-          };
-          collectChildren(dragged.id);
-          const others = all
-            .filter((n) => n.id !== dragged.id && !descendants.has(n.id) && n.hidden !== true)
-            .map((n) => absoluteRectOf(n, byId));
-          const lines = computeHelperLines(draggedRect, others, alignTolerance);
-          useFlowStore.getState().setHelperLines(lines);
-          if (lines.x !== undefined || lines.y !== undefined) {
-            // helper lines 返回的是绝对吸附坐标，需转换回节点自身坐标系
-            const parent = dragged.parentId ? byId.get(dragged.parentId) : undefined;
-            const parentAbs = parent ? absolutePositionOf(parent, byId) : { x: 0, y: 0 };
-            const snapped = {
-              x: (lines.x ?? draggedRect.x) - parentAbs.x,
-              y: (lines.y ?? draggedRect.y) - parentAbs.y,
-            };
-            useFlowStore.setState((s) => ({
-              nodes: s.nodes.map((n) => (n.id === dragged.id ? { ...n, position: snapped } : n)),
-            }));
-          }
-        }
+        draggingIdRef.current = drag.id;
+        // rAF 节流：一帧内多次位置变更只计算一次（拖拽 O(n)/帧 → 每帧至多一次增量计算）
+        scheduleHelperSnap();
       } else if (changes.some((c) => c.type === 'position')) {
+        // 拖拽结束：先同步收口一次吸附，避免松手瞬间被还原，再清理辅助线
+        if (draggingIdRef.current) {
+          cancelHelperSnap();
+          applyHelperSnap();
+        }
+        draggingIdRef.current = null;
         useFlowStore.getState().setHelperLines(null);
       }
     },
-    [onNodesChangeStore, alignTolerance],
+    [onNodesChangeStore, scheduleHelperSnap, cancelHelperSnap, applyHelperSnap],
   );
 
   const onDrop = useCallback(
@@ -332,7 +442,12 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   }, []);
 
   return (
-    <div ref={ref} className="relative h-full w-full" onDrop={onDrop} onDragOver={onDragOver}>
+    <div
+      ref={setHostRef}
+      className="relative h-full w-full"
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -354,6 +469,16 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         onConnectEnd={onConnectEnd}
         onNodeDragStart={() => useFlowStore.getState().commit()}
         onNodeDragStop={(_, node) => useFlowStore.getState().reparentNode(node.id)}
+        // 右键菜单：节点（切换形状 / 编辑动作）、连线（布线动作）、空白（粘贴 / 全选等）
+        onNodeContextMenu={(event, node) => {
+          if (!useFlowStore.getState().selectedNodes.includes(node.id)) selectOnlyNode(node.id);
+          openContextMenu(event, { kind: 'node', nodeId: node.id });
+        }}
+        onEdgeContextMenu={(event, edge) => {
+          if (!useFlowStore.getState().selectedEdges.includes(edge.id)) selectOnlyEdge(edge.id);
+          openContextMenu(event, { kind: 'edge', edgeId: edge.id });
+        }}
+        onPaneContextMenu={(event) => openContextMenu(event, { kind: 'pane' })}
         connectionMode={ConnectionMode.Loose}
         connectionRadius={32}
         edgesReconnectable
@@ -416,6 +541,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       <EdgeEndpointHandles />
       <EdgeWaypointEditor />
       <QuickConnectOverlay />
+      <FlowContextMenu target={contextMenu} onClose={closeContextMenu} />
       <CanvasScrollbars />
       <SketchFilter />
     </div>

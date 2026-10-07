@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   TEMPLATE_CATEGORIES,
@@ -38,6 +38,49 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
     return map;
   }, []);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * 无鼠标场景的可用性：打开时把焦点移入弹窗，Tab 在弹窗内循环，
+   * Esc 关闭。用捕获阶段监听，避免画布上的全局快捷键抢走按键。
+   */
+  useEffect(() => {
+    if (!open) return;
+    const container = dialogRef.current;
+    if (!container) return;
+    const focusables = () =>
+      Array.from(
+        container.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null);
+
+    focusables()[0]?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const list = focusables();
+      if (list.length === 0) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || !container.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [open, onClose]);
+
   if (!open) return null;
   const items = TEMPLATES.filter((item) => item.category === category);
 
@@ -50,6 +93,8 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        data-testid="flowchart-template-dialog"
         className="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         onClick={(e) => e.stopPropagation()}
       >
@@ -61,7 +106,7 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
             type="button"
             onClick={onClose}
             className="rounded-md px-2 py-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-            aria-label="close"
+            aria-label={t('tools.flowchart.closeDialog')}
           >
             ✕
           </button>

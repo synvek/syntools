@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFlowStore } from '../store';
+import { loadPersistedSession, savePersistedSession } from '../store/persist';
 import { applyTheme, copyNodeStyle, pasteNodeStyle } from '../flowOps';
 import { THEMES, type ThemeId } from '../model/themes';
 
@@ -12,8 +13,29 @@ export function ThemePanel() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeId>('business');
+  /** 主题是否已从本地恢复（避免用默认值覆盖已存选择） */
+  const [ready, setReady] = useState(false);
   const brush = useFlowStore((s) => s.styleBrush);
   const selectedCount = useFlowStore((s) => s.selectedNodes.length);
+
+  // 恢复上次选择的主题；IndexedDB 不可用则保持默认
+  useEffect(() => {
+    let alive = true;
+    void loadPersistedSession().then((s) => {
+      if (!alive) return;
+      if (s?.theme) setTheme(s.theme);
+      setReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 主题变更后持久化
+  useEffect(() => {
+    if (!ready) return;
+    void savePersistedSession({ theme });
+  }, [ready, theme]);
 
   return (
     <div className="relative">

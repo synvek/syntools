@@ -233,6 +233,27 @@ export function absoluteRectOf<T extends HierarchyNode>(node: T, byId: Map<strin
   return { x: pos.x, y: pos.y, width: size.width, height: size.height };
 }
 
+/**
+ * 绝对包围盒的记忆化版本（性能优化）。
+ *
+ * 拖拽辅助线每帧都要对同页大量节点求包围盒；未移动的节点对象引用不变，
+ * 其父节点对象引用同样不变，因此可复用上一帧结果。
+ * 缓存以「节点对象 → { 父对象, 包围盒 }」组成：父节点移动会产生新的父对象引用，
+ * 缓存自动失效，避免容器拖动后子节点包围盒过期。
+ * WeakMap 使缓存随节点对象回收，无需手动清理。
+ */
+const rectCache = new WeakMap<object, { parent: object | null; rect: Rect }>();
+
+export function cachedAbsoluteRectOf<T extends HierarchyNode>(node: T, byId: Map<string, T>): Rect {
+  const parent = node.parentId ? (byId.get(node.parentId) ?? null) : null;
+  const key = node as unknown as object;
+  const hit = rectCache.get(key);
+  if (hit && hit.parent === (parent as unknown as object | null)) return hit.rect;
+  const rect = absoluteRectOf(node, byId);
+  rectCache.set(key, { parent: parent as unknown as object | null, rect });
+  return rect;
+}
+
 export interface Placement {
   /** 命中泳道时为其 id；否则为 undefined（画布顶层） */
   parentId?: string;
@@ -359,7 +380,7 @@ export function validateDoc(raw: unknown): raw is FlowDoc {
   return migrateDoc(raw) !== null;
 }
 
-/** 把内部状态序列化为可持久化的 v2 文档（当前为单页） */
+/** 把内部状态序列化为可持久化的 v2 文档（单页记录；多页由 store 按页组装） */
 export function serializeDoc(
   nodes: ReadonlyArray<{
     id: string;

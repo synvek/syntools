@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useFlowStore } from '../store';
 import { patchSelectedEdgeStyle, selectedEdgeStyle } from '../flowOps';
 import { commonValue } from '../ops';
-import { shapeDefOf } from '../model/shapes';
+import { absolutePositionOf } from '../core';
+import { shapeDefOf, shapeSize } from '../model/shapes';
 import {
   EDGE_ARROW_LABEL_KEY,
   EDGE_ARROW_OPTIONS,
@@ -15,6 +16,7 @@ import {
   type FlowNodePatch,
   type FlowNodeStyle,
   type FlowNodeStyleView,
+  type NodeGeometryPatch,
   isContainerKind,
 } from '../model/types';
 import { NodeAppearanceSection } from './NodeAppearanceSection';
@@ -299,6 +301,49 @@ export function PropertyPanel() {
   // 多选且图形种类不一致时，隐藏与具体图形强相关的项（圆角 / 折角）
   const draw = commonValue(selNodes.map((n) => shapeDefOf(n.data.kind)?.draw));
   const aligns: Align[] = ['left', 'center', 'right'];
+
+  /** 各选中节点的几何（画布绝对坐标 + 实际尺寸），用于 X / Y / W / H 输入与混合态判定 */
+  const byId = new Map(nodes.map((n) => [n.id, n] as const));
+  const geos = selNodes.map((n) => {
+    const abs = absolutePositionOf(n, byId);
+    return {
+      x: Math.round(abs.x),
+      y: Math.round(abs.y),
+      width: Math.round(n.width ?? shapeSize(n.data.kind).width),
+      height: Math.round(n.height ?? shapeSize(n.data.kind).height),
+    };
+  });
+
+  /** 几何字段：多选时取公共值，取值不一致则留空并提示「混合」 */
+  const geoField = (key: keyof NodeGeometryPatch, label: string) => {
+    const value = commonValue(geos.map((g) => g[key]));
+    return (
+      <Field label={label}>
+        <input
+          type="number"
+          data-testid={`flowchart-geo-${key}`}
+          className={inputCls}
+          value={value ?? ''}
+          placeholder={value === undefined ? t('tools.flowchart.mixed') : undefined}
+          onChange={(e) => {
+            const raw = e.target.value.trim();
+            if (raw === '') return;
+            const num = Number(raw);
+            if (!Number.isFinite(num)) return;
+            begin();
+            const patch: NodeGeometryPatch = {};
+            patch[key] = num;
+            useFlowStore.getState().setNodeGeometry(
+              selNodes.map((n) => n.id),
+              patch,
+              false,
+            );
+          }}
+          onBlur={end}
+        />
+      </Field>
+    );
+  };
   // 只有「必然存在」的字段取值不一致才算混合态（可选字段缺省属正常）
   const hasMixed =
     isBatch &&
@@ -318,6 +363,7 @@ export function PropertyPanel() {
 
       <Field label={t('tools.flowchart.label')}>
         <input
+          data-testid="flowchart-label-input"
           className={inputCls}
           value={label ?? ''}
           placeholder={label === undefined ? t('tools.flowchart.mixed') : undefined}
@@ -342,6 +388,21 @@ export function PropertyPanel() {
           />
         </Field>
       ) : null}
+
+      {/* 几何：画布绝对坐标与尺寸（多选取公共值，混合态留空） */}
+      <div className="flex flex-col gap-2 rounded-md border border-gray-100 p-2 dark:border-gray-800">
+        <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+          {t('tools.flowchart.geometry')}
+        </span>
+        <div className="grid grid-cols-2 gap-2">
+          {geoField('x', t('tools.flowchart.posX'))}
+          {geoField('y', t('tools.flowchart.posY'))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {geoField('width', t('tools.flowchart.geoWidth'))}
+          {geoField('height', t('tools.flowchart.geoHeight'))}
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('tools.flowchart.fill')}>

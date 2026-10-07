@@ -14,8 +14,14 @@ import {
 } from './raster';
 import { PROJECT_FILE_EXT, parseProjectJson, toProjectJson } from './projectJson';
 import { parseMermaidFlowchart, toMermaid } from './mermaidIo';
-import { parseDrawioXml, toDrawioXml } from './drawio';
-import { DEFAULT_PRINT_OPTIONS, PAPER_OPTIONS, exportPrintPdf, printGrid } from './print';
+import { parseDrawioXml, parseDrawioXmlAsync, toDrawioXml } from './drawio';
+import {
+  DEFAULT_PRINT_OPTIONS,
+  PAPER_OPTIONS,
+  exportPrintPdf,
+  exportPrintPdfSet,
+  printGrid,
+} from './print';
 import type { FlowDoc } from '../model/types';
 
 export type ExportKind = 'png' | 'jpeg' | 'svg' | 'pdf' | 'project' | 'drawio' | 'mermaid';
@@ -53,11 +59,12 @@ export function exportText(
   doc: Parameters<typeof toProjectJson>[0],
   kind: ExportKind,
   filename: string,
+  options: { mermaidPages?: 'current' | 'all' } = {},
 ): boolean {
   let text = '';
   if (kind === 'project') text = toProjectJson(doc);
   else if (kind === 'drawio') text = toDrawioXml(doc);
-  else if (kind === 'mermaid') text = toMermaid(doc);
+  else if (kind === 'mermaid') text = toMermaid(doc, { pages: options.mermaidPages });
   else return false;
   if (!text) return false;
   const meta = metaOf(kind);
@@ -96,6 +103,18 @@ export function parseImportedFile(filename: string, text: string): FlowDoc | nul
   }
 }
 
+/**
+ * 异步版导入解析：在同步版基础上支持 Draw.io 压缩文件
+ * （`<diagram>` 文本为 base64+deflate，需要异步解压）。
+ */
+export async function parseImportedFileAsync(
+  filename: string,
+  text: string,
+): Promise<FlowDoc | null> {
+  if (importKindOf(filename) !== 'drawio') return parseImportedFile(filename, text);
+  return parseDrawioXmlAsync(text);
+}
+
 export {
   DEFAULT_RASTER_OPTIONS,
   exportRaster,
@@ -108,10 +127,12 @@ export {
   toMermaid,
   toProjectJson,
   parseDrawioXml,
+  parseDrawioXmlAsync,
   parseProjectJson,
   parseMermaidFlowchart,
 };
-export { DEFAULT_PRINT_OPTIONS, PAPER_OPTIONS, exportPrintPdf, printGrid };
+export type { MermaidExportOptions } from './mermaidIo';
+export { DEFAULT_PRINT_OPTIONS, PAPER_OPTIONS, exportPrintPdf, exportPrintPdfSet, printGrid };
 export type { MermaidParseResult } from './mermaidIo';
 export type { CapturedPage, ExportRange, RasterExportOptions, RasterFormat } from './raster';
 export type { PaperSize, PrintOptions } from './print';

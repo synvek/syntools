@@ -2,9 +2,9 @@
  * 模板内节点/连线文案（占位内容，用户可自由改写）。
  *
  * 模板内容是「起始素材」而非 UI 文案，因此不放进 strings.ts 的 9 语种大表：
- * - zh 与 en 在此完整维护；
- * - 其余语种缺键时由 i18next 的 `fallbackLng: ['en','zh']` 兜底为英文，
- *   后续如需补齐，只需在此追加同名 token 即可（键名前缀统一为 `tpl_`）。
+ * - zh / en / zh-TW 在此完整维护（键集合必须与 en 保持一致，见 templates.test.ts）；
+ * - 其余语种缺键时回退英文（`bundleToResource` 按 `TEMPLATE_LABELS_I18N[lng] ?? en` 注册），
+ *   后续补齐只需在此追加同名 token 的整表（键名前缀统一为 `tpl_`）。
  */
 
 /** 模板文案 token → 文案；键与模板中的占位内容一一对应 */
@@ -151,6 +151,78 @@ export const TEMPLATE_LABELS_I18N: Record<string, Record<string, string>> = {
     message: 'Message',
     subnet: 'Subnet',
     gateway: 'Gateway',
+  },
+
+  'zh-TW': {
+    start: '開始',
+    end: '結束',
+    step: '處理步驟',
+    step1: '步驟 1',
+    step2: '步驟 2',
+    condition: '條件成立？',
+    branchA: '分支 A',
+    branchB: '分支 B',
+    yes: '是',
+    no: '否',
+    pass: '通過',
+    laneH: '橫向泳道',
+    laneV: '縱向泳道',
+    user: '使用者',
+    service: '服務',
+    login: '登入系統',
+    report: '檢視報表',
+    order: '訂單',
+    orderItem: '訂單明細',
+    request: '請求',
+    query: '查詢',
+    result: '結果',
+    submit: '提交申請',
+    approved: '審核通過？',
+    archive: '歸檔',
+    pendingPay: '待支付',
+    paid: '已支付',
+    paySuccess: '支付成功',
+    startEvent: '開始事件',
+    endEvent: '結束事件',
+    userTask: '使用者任務',
+    serviceTask: '服務任務',
+    autoPass: '自動通過',
+    manualReview: '人工審核',
+    amountSmall: '金額 < 1k',
+    amountLarge: '金額 ≥ 1k',
+    publicNet: '公網',
+    edgeRouter: '邊界路由',
+    firewall: '防火牆',
+    coreSwitch: '核心交換',
+    appServer: '應用伺服器',
+    database: '資料庫',
+    gm: '總經理',
+    techDept: '技術部',
+    marketDept: '市場部',
+    devTeam: '開發組',
+    salesTeam: '銷售組',
+    topic: '主題',
+    topic1: '分支一',
+    topic2: '分支二',
+    topic3: '分支三',
+    point: '要點',
+    placeOrder: '下單',
+    userId: '使用者ID',
+    orderTime: '下單時間',
+    draft: '擬稿',
+    review: '審批',
+    reject: '駁回',
+    onboard: '入職報到',
+    training: '培訓',
+    probation: '試用期',
+    confirm: '轉正',
+    laneSales: '銷售部',
+    laneFinance: '財務部',
+    component: '組件',
+    pool: '協作池',
+    message: '訊息',
+    subnet: '子網',
+    gateway: '閘道',
   },
 };
 

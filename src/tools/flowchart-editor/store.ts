@@ -32,15 +32,19 @@ import {
   DEFAULT_EDGE_STYLE,
   type FlowDoc,
   type FlowEdgeData,
+  type FlowEdgeRec,
   type FlowEdgeStyle,
   type FlowNodeData,
   type FlowNodePatch,
+  type FlowNodeRec,
   type FlowNodeStyle,
   type FlowNodeType,
   type FlowPage,
+  type NodeGeometryPatch,
   type ShapeKind,
   type Waypoint,
   isContainerKind,
+  minNodeSize,
 } from './model/types';
 import { DEFAULT_PAGE_NAME } from './model/migrate';
 import { dropCollinear, routeOrthogonal } from './ops';
@@ -113,6 +117,8 @@ interface FlowState {
   setStyleBrush: (style: FlowNodeStyle | null) => void;
   /** 全选当前页的节点与连线（锁定节点除外） */
   selectAll: () => void;
+  /** 清空所有选中（Esc）：同时复位节点/连线的 selected 标记 */
+  clearSelection: () => void;
   /** 按方向键微移选中节点（不写历史，由调用方合并为一次撤销） */
   nudgeSelected: (dx: number, dy: number) => void;
 
@@ -180,6 +186,8 @@ interface FlowState {
   reorderNode: (id: string, targetId: string) => void;
   setNodeLabel: (id: string, label: string, history?: boolean) => void;
   patchSelected: (patch: FlowNodePatch, history?: boolean) => void;
+  /** 几何编辑（属性面板 X / Y / W / H）：X / Y 为画布绝对坐标，仅修改传入字段 */
+  setNodeGeometry: (ids: string[], patch: NodeGeometryPatch, history?: boolean) => void;
   patchEdgeLabel: (id: string, label: string, history?: boolean) => void;
   removeSelected: () => void;
   duplicateSelected: () => void;
@@ -187,6 +195,21 @@ interface FlowState {
   clear: () => void;
   setHelperLines: (lines: HelperLines | null) => void;
 }
+
+/**
+ * `getDoc` 的活动页序列化缓存（性能优化）。
+ *
+ * 缩略图派生（FlowchartTool 的 `pages` useMemo）会在每次 nodes/edges 变动时调用 getDoc，
+ * 而活动页序列化需要遍历全部节点、拷贝样式并处理图片 base64。
+ * 以 nodes/edges 的数组引用为键记忆化：未发生编辑（例如仅改标题、切换侧栏面板）时直接复用，
+ * 编辑后数组引用变化即自动失效。
+ */
+let activePageMemo: {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  recNodes: FlowNodeRec[];
+  recEdges: FlowEdgeRec[];
+} | null = null;
 
 export const useFlowStore = create<FlowState>((set, get) => ({
   // 撤销/重做：结构 diff 历史（见 store/history.ts）
@@ -227,6 +250,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       selectedNodes: s.nodes.filter((n) => n.selectable !== false).map((n) => n.id),
       selectedEdges: s.edges.map((e) => e.id),
     })),
+
+  clearSelection: () => {
+    const { nodes, edges, selectedNodes, selectedEdges } = get();
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+    const nodeSet = new Set(selectedNodes);
+    const edgeSet = new Set(selectedEdges);
+    set({
+      nodes: nodes.map((n) => (nodeSet.has(n.id) && n.selected ? { ...n, selected: false } : n)),
+      edges: edges.map((e) => (edgeSet.has(e.id) && e.selected ? { ...e, selected: false } : e)),
+      selectedNodes: [],
+      selectedEdges: [],
+    });
+  },
 
   nudgeSelected: (dx, dy) => {
     const ids = new Set(get().selectedNodes);
@@ -301,39 +337,49 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   getDoc: () => {
     const { nodes, edges, pageOrder, activePageId, pageData, docName } = get();
-    // 活动页即时序列化（拿到最新的 FlowNodeRec / FlowEdgeRec）
-    const current = serializeDoc(
-      nodes.map((n) => ({
-        id: n.id,
-        position: n.position,
-        parentId: n.parentId,
-        data: n.data,
-        width: n.width,
-        height: n.height,
-        hidden: n.hidden === true,
-        locked: n.draggable === false,
-        type: n.type as FlowNodeType | undefined,
-        mxStyle: n.data.mxStyle,
-      })),
-      edges.map((e) => {
-        const data = e.data as FlowEdgeData | undefined;
-        return {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          sourceHandle: e.sourceHandle,
-          targetHandle: e.targetHandle,
-          label: typeof e.label === 'string' ? e.label : undefined,
-          style: data?.style,
-          waypoints: data?.waypoints,
-          mxStyle: data?.mxStyle,
-        };
-      }),
-    );
-    const currentPage = current.pages[0];
+    // 活动页即时序列化；nodes/edges 引用未变时复用上次结果（见 activePageMemo 说明）
+    let recNodes: FlowNodeRec[];
+    let recEdges: FlowEdgeRec[];
+    if (activePageMemo && activePageMemo.nodes === nodes && activePageMemo.edges === edges) {
+      recNodes = activePageMemo.recNodes;
+      recEdges = activePageMemo.recEdges;
+    } else {
+      const current = serializeDoc(
+        nodes.map((n) => ({
+          id: n.id,
+          position: n.position,
+          parentId: n.parentId,
+          data: n.data,
+          width: n.width,
+          height: n.height,
+          hidden: n.hidden === true,
+          locked: n.draggable === false,
+          type: n.type as FlowNodeType | undefined,
+          mxStyle: n.data.mxStyle,
+        })),
+        edges.map((e) => {
+          const data = e.data as FlowEdgeData | undefined;
+          return {
+            id: e.id,
+            source: e.source,
+            target: e.target,
+            sourceHandle: e.sourceHandle,
+            targetHandle: e.targetHandle,
+            label: typeof e.label === 'string' ? e.label : undefined,
+            style: data?.style,
+            waypoints: data?.waypoints,
+            mxStyle: data?.mxStyle,
+          };
+        }),
+      );
+      const currentPage = current.pages[0];
+      recNodes = currentPage.nodes;
+      recEdges = currentPage.edges;
+      activePageMemo = { nodes, edges, recNodes, recEdges };
+    }
     const pages: FlowPage[] = pageOrder.map((meta) => {
       if (meta.id === activePageId) {
-        return { id: meta.id, name: meta.name, nodes: currentPage.nodes, edges: currentPage.edges };
+        return { id: meta.id, name: meta.name, nodes: recNodes, edges: recEdges };
       }
       const cached = pageData[meta.id];
       return {
@@ -434,9 +480,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   setEdgeWaypoints: (edgeId, waypoints, history = true) => {
+    // 折点跟随网格吸附设置：开启时对齐到网格，否则仅取整
+    const { gridEnabled, gridSize } = get();
+    const snap = (v: number) =>
+      gridEnabled && gridSize > 1 ? Math.round(v / gridSize) * gridSize : Math.round(v);
     const next =
       waypoints && waypoints.length > 0
-        ? waypoints.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }))
+        ? waypoints.map((p) => ({ x: snap(p.x), y: snap(p.y) }))
         : undefined;
     if (history) get().commit();
     set((s) => ({
@@ -545,8 +595,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               ...n,
               width: size.width,
               height: size.height,
-              // 换形状保留已有文本
-              data: defaultData(kind, n.data.label),
+              // 换形状只替换图形种类与尺寸：文本、用户配色与其它样式原样保留
+              data: { ...n.data, kind, style: { ...n.data.style } },
             }
           : n,
       ),
@@ -720,6 +770,41 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   patchEdgeLabel: (id, label, history = true) => {
     if (history) get().commit();
     set((s) => ({ edges: s.edges.map((e) => (e.id === id ? { ...e, label } : e)) }));
+  },
+
+  setNodeGeometry: (ids, patch, history = true) => {
+    const target = new Set(ids);
+    if (target.size === 0) return;
+    const hasMove = patch.x !== undefined || patch.y !== undefined;
+    const hasSize = patch.width !== undefined || patch.height !== undefined;
+    if (!hasMove && !hasSize) return;
+    const { nodes } = get();
+    const byId = new Map(nodes.map((n) => [n.id, n] as const));
+    if (history) get().commit();
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (!target.has(n.id)) return n;
+        const next = { ...n };
+        if (hasSize) {
+          const min = minNodeSize(n.data.kind);
+          if (patch.width !== undefined) {
+            next.width = Math.max(min.width, Math.round(patch.width));
+          }
+          if (patch.height !== undefined) {
+            next.height = Math.max(min.height, Math.round(patch.height));
+          }
+        }
+        if (hasMove) {
+          // 输入框给的是画布绝对坐标：有父容器时换算回相对坐标
+          const parent = n.parentId ? byId.get(n.parentId) : undefined;
+          const base = parent ? absolutePositionOf(parent, byId) : { x: 0, y: 0 };
+          const absX = patch.x ?? base.x + n.position.x;
+          const absY = patch.y ?? base.y + n.position.y;
+          next.position = { x: Math.round(absX - base.x), y: Math.round(absY - base.y) };
+        }
+        return next;
+      }),
+    }));
   },
 
   removeSelected: () => {

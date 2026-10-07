@@ -4,10 +4,13 @@ import { buildTemplateDoc } from './model/templates';
 import {
   alignSelected,
   applyTheme,
+  applyUniformSize,
   copyNodeStyle,
+  cutSelection,
   groupSelected,
   layerOp,
   pasteNodeStyle,
+  snapSelectedToGrid,
   toggleHidden,
   toggleLocked,
   ungroupSelected,
@@ -77,6 +80,111 @@ describe('格式刷', () => {
     pasteNodeStyle();
     expect(useFlowStore.getState().past).toHaveLength(0);
     expect(copyNodeStyle()).toBe(false);
+  });
+});
+
+describe('剪切', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(buildTemplateDoc('basic'));
+  });
+
+  it('剪切把选中节点放入剪贴板并删除，撤销可恢复', () => {
+    const target = useFlowStore.getState().nodes[0].id;
+    selectNodes([target]);
+    cutSelection();
+
+    expect(useFlowStore.getState().nodes.some((n) => n.id === target)).toBe(false);
+    expect(useFlowStore.getState().clipboard?.nodes.map((n) => n.id)).toContain(target);
+
+    useFlowStore.getState().undo();
+    expect(useFlowStore.getState().nodes.some((n) => n.id === target)).toBe(true);
+  });
+
+  it('无选中时剪切不产生历史记录，也不污染剪贴板', () => {
+    useFlowStore.setState({ selectedNodes: [], selectedEdges: [], clipboard: null });
+    cutSelection();
+    expect(useFlowStore.getState().past).toHaveLength(0);
+    expect(useFlowStore.getState().clipboard).toBeNull();
+  });
+});
+
+describe('统一尺寸', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(null);
+  });
+
+  it('把选中节点统一为第一个选中节点的尺寸，且可撤销', () => {
+    useFlowStore.getState().addNode('rect', { x: 0, y: 0 });
+    const a = useFlowStore.getState().selectedNodes[0];
+    useFlowStore.getState().addNode('diamond', { x: 500, y: 0 });
+    const b = useFlowStore.getState().selectedNodes[0];
+    // 先把 a 调成自定义尺寸作为参考
+    useFlowStore.getState().setNodeGeometry([a], { width: 260, height: 90 });
+    selectNodes([a, b]);
+
+    applyUniformSize();
+    const na = useFlowStore.getState().nodes.find((n) => n.id === a)!;
+    const nb = useFlowStore.getState().nodes.find((n) => n.id === b)!;
+    expect(na.width).toBe(260);
+    expect(nb.width).toBe(260);
+    expect(nb.height).toBe(90);
+
+    useFlowStore.getState().undo();
+    expect(useFlowStore.getState().nodes.find((n) => n.id === b)!.width).not.toBe(260);
+  });
+
+  it('少于两个可缩放节点时不产生改动', () => {
+    useFlowStore.getState().addNode('rect', { x: 0, y: 0 });
+    const only = useFlowStore.getState().selectedNodes[0];
+    selectNodes([only]);
+    const before = useFlowStore.getState().nodes.find((n) => n.id === only)!.width;
+    applyUniformSize();
+    expect(useFlowStore.getState().past).toHaveLength(0);
+    expect(useFlowStore.getState().nodes.find((n) => n.id === only)!.width).toBe(before);
+  });
+});
+
+describe('对齐到网格', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(null);
+    useFlowStore.getState().setGridEnabled(true);
+    useFlowStore.getState().setGridSize(10);
+  });
+
+  it('把选中节点吸附到网格，且可撤销回原位', () => {
+    useFlowStore.getState().addNode('rect', { x: 3, y: 7 });
+    const id = useFlowStore.getState().selectedNodes[0];
+    selectNodes([id]);
+
+    snapSelectedToGrid();
+    const node = useFlowStore.getState().nodes.find((n) => n.id === id)!;
+    expect(node.position.x % 10).toBe(0);
+    expect(node.position.y % 10).toBe(0);
+
+    useFlowStore.getState().undo();
+    expect(useFlowStore.getState().nodes.find((n) => n.id === id)!.position).toEqual({
+      x: 3,
+      y: 7,
+    });
+  });
+
+  it('已对齐时不写历史；关闭网格吸附时不改变位置', () => {
+    useFlowStore.getState().addNode('rect', { x: 0, y: 0 });
+    const id = useFlowStore.getState().selectedNodes[0];
+    selectNodes([id]);
+
+    snapSelectedToGrid();
+    expect(useFlowStore.getState().past).toHaveLength(0);
+
+    useFlowStore.getState().setGridEnabled(false);
+    useFlowStore.getState().setNodeGeometry([id], { x: 3, y: 7 });
+    useFlowStore.setState({ past: [], future: [] });
+
+    snapSelectedToGrid();
+    expect(useFlowStore.getState().nodes.find((n) => n.id === id)!.position).toEqual({
+      x: 3,
+      y: 7,
+    });
   });
 });
 

@@ -4,9 +4,9 @@ import { useReactFlow } from '@xyflow/react';
 import { useFlowStore } from '../store';
 import { useQuickConnect } from '../quickConnect';
 import { absolutePositionOf } from '../core';
-import { shapeDefOf, shapesOfCategory, shapeSize, type ShapeDef } from '../model/shapes';
+import { shapeDefOf, shapesOfCategory, shapeSize } from '../model/shapes';
 import type { FlowEdgeStyle, ShapeKind } from '../model/types';
-import { drawShape } from '../nodes/shapeDraw';
+import { ShapeGlyph } from './ShapeGlyph';
 
 /** 弹窗尺寸估算，用于边界收敛 */
 const PICKER_W = 228;
@@ -46,23 +46,6 @@ function previewPath(
       ].join(' ');
     }
   }
-}
-
-function Glyph({ def }: { def: ShapeDef }) {
-  const w = def.size.width;
-  const h = def.size.height;
-  return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="h-6 w-6"
-      preserveAspectRatio="xMidYMid meet"
-      aria-hidden="true"
-    >
-      <g fill="#EFF6FF" stroke="#2563EB" strokeWidth={Math.max(2, w / 38)}>
-        {drawShape(def, w, h)}
-      </g>
-    </svg>
-  );
 }
 
 /**
@@ -209,7 +192,7 @@ export function QuickConnectOverlay() {
                   onClick={() => pick(def.kind)}
                   className="flex cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white p-1 transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800/60"
                 >
-                  <Glyph def={def} />
+                  <ShapeGlyph def={def} className="h-6 w-6" />
                 </button>
               ))}
             </div>

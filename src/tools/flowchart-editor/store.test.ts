@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useFlowStore } from './store';
+import { absolutePositionOf } from './core';
 import { buildTemplateDoc } from './model/templates';
 
 describe('多页', () => {
@@ -150,6 +151,137 @@ describe('批量编辑与微移', () => {
     // 复原，避免影响其它用例
     useFlowStore.getState().setGridEnabled(true);
     useFlowStore.getState().setGridSize(10);
+  });
+});
+
+describe('选择清空与形状切换', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(buildTemplateDoc('basic'));
+  });
+
+  it('clearSelection 清空节点与连线的选中态', () => {
+    useFlowStore.getState().selectAll();
+    expect(useFlowStore.getState().selectedNodes.length).toBeGreaterThan(0);
+    expect(useFlowStore.getState().selectedEdges.length).toBeGreaterThan(0);
+
+    useFlowStore.getState().clearSelection();
+    const st = useFlowStore.getState();
+    expect(st.selectedNodes).toEqual([]);
+    expect(st.selectedEdges).toEqual([]);
+    expect(st.nodes.every((n) => !n.selected)).toBe(true);
+    expect(st.edges.every((e) => !e.selected)).toBe(true);
+  });
+
+  it('changeNodeKind 仅替换图形与尺寸，保留文本与用户样式', () => {
+    const target = useFlowStore.getState().nodes[0];
+    useFlowStore.setState({ selectedNodes: [target.id] });
+    useFlowStore
+      .getState()
+      .patchSelected({ label: '我的步骤', style: { fill: '#abcdef', fontSize: 20 } }, true);
+
+    const nextKind = target.data.kind === 'rect' ? 'ellipse' : 'rect';
+    useFlowStore.getState().changeNodeKind(target.id, nextKind);
+
+    const changed = useFlowStore.getState().nodes.find((n) => n.id === target.id)!;
+    expect(changed.data.kind).toBe(nextKind);
+    expect(changed.data.label).toBe('我的步骤');
+    expect(changed.data.style.fill).toBe('#abcdef');
+    expect(changed.data.style.fontSize).toBe(20);
+
+    // 换形状可撤销回原图形
+    useFlowStore.getState().undo();
+    expect(useFlowStore.getState().nodes.find((n) => n.id === target.id)!.data.kind).toBe(
+      target.data.kind,
+    );
+  });
+});
+
+describe('getDoc 序列化记忆化', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(buildTemplateDoc('basic'));
+  });
+
+  it('未编辑时复用同一活动页记录，编辑后反映最新内容', () => {
+    const doc1 = useFlowStore.getState().getDoc();
+    const doc2 = useFlowStore.getState().getDoc();
+    expect(doc2.pages[0].nodes).toBe(doc1.pages[0].nodes);
+
+    useFlowStore.getState().addNode('rect', { x: 0, y: 0 });
+    const doc3 = useFlowStore.getState().getDoc();
+    expect(doc3.pages[0].nodes).toHaveLength(doc1.pages[0].nodes.length + 1);
+  });
+});
+
+describe('几何编辑与折点吸附', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(buildTemplateDoc('swimlane'));
+    useFlowStore.getState().setGridEnabled(true);
+    useFlowStore.getState().setGridSize(10);
+  });
+
+  it('setNodeGeometry 写入绝对坐标与尺寸，且一次撤销可回退', () => {
+    useFlowStore.getState().addNode('rect', { x: 900, y: 900 });
+    const id = useFlowStore.getState().selectedNodes[0];
+    const absOf = (nodeId: string) => {
+      const nodes = useFlowStore.getState().nodes;
+      const byId = new Map(nodes.map((n) => [n.id, n] as const));
+      return absolutePositionOf(byId.get(nodeId)!, byId);
+    };
+
+    useFlowStore.getState().setNodeGeometry([id], { x: 123, y: 45, width: 300, height: 120 });
+    const changed = useFlowStore.getState().nodes.find((n) => n.id === id)!;
+    expect(absOf(id)).toEqual({ x: 123, y: 45 });
+    expect(changed.width).toBe(300);
+    expect(changed.height).toBe(120);
+
+    useFlowStore.getState().undo();
+    expect(absOf(id)).toEqual({ x: 900, y: 900 });
+  });
+
+  it('子节点按画布绝对坐标换算为相对坐标', () => {
+    const st = useFlowStore.getState();
+    const child = st.nodes.find((n) => n.parentId)!;
+    const byId = new Map(st.nodes.map((n) => [n.id, n] as const));
+    const abs = absolutePositionOf(child, byId);
+
+    useFlowStore.getState().setNodeGeometry([child.id], { x: abs.x + 60, y: abs.y + 30 });
+    const next = useFlowStore.getState().nodes.find((n) => n.id === child.id)!;
+    const nextById = new Map(useFlowStore.getState().nodes.map((n) => [n.id, n] as const));
+    const nextAbs = absolutePositionOf(next, nextById);
+    expect(nextAbs.x).toBeCloseTo(abs.x + 60);
+    expect(nextAbs.y).toBeCloseTo(abs.y + 30);
+  });
+
+  it('尺寸不小于下限（普通节点）', () => {
+    useFlowStore.getState().addNode('rect', { x: 900, y: 900 });
+    const id = useFlowStore.getState().selectedNodes[0];
+    useFlowStore.getState().setNodeGeometry([id], { width: 1, height: 1 });
+    const changed = useFlowStore.getState().nodes.find((n) => n.id === id)!;
+    expect(changed.width).toBe(48);
+    expect(changed.height).toBe(32);
+  });
+
+  it('setEdgeWaypoints 在网格吸附开启时对齐到网格', () => {
+    const st = useFlowStore.getState();
+    useFlowStore.getState().setEdgeWaypoints(st.edges[0].id, [
+      { x: 13, y: 27 },
+      { x: 108, y: 92 },
+    ]);
+    const edge = useFlowStore.getState().edges[0];
+    const waypoints = (edge.data as { waypoints?: Array<{ x: number; y: number }> }).waypoints;
+    expect(waypoints).toEqual([
+      { x: 10, y: 30 },
+      { x: 110, y: 90 },
+    ]);
+  });
+
+  it('网格吸附关闭时折点仅取整', () => {
+    useFlowStore.getState().setGridEnabled(false);
+    const st = useFlowStore.getState();
+    useFlowStore.getState().setEdgeWaypoints(st.edges[0].id, [{ x: 13.4, y: 27.6 }]);
+    const edge = useFlowStore.getState().edges[0];
+    const waypoints = (edge.data as { waypoints?: Array<{ x: number; y: number }> }).waypoints;
+    expect(waypoints).toEqual([{ x: 13, y: 28 }]);
   });
 });
 

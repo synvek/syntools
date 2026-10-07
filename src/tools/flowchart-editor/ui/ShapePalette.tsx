@@ -9,25 +9,7 @@ import {
   type ShapeCategory,
   type ShapeDef,
 } from '../model/shapes';
-import { drawShape } from '../nodes/shapeDraw';
-
-/** 缩略图直接复用画布的绘制逻辑，保证预览与画上去的效果一致 */
-function ShapeGlyph({ def }: { def: ShapeDef }) {
-  const w = def.size.width;
-  const h = def.size.height;
-  return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="h-7 w-7"
-      preserveAspectRatio="xMidYMid meet"
-      aria-hidden="true"
-    >
-      <g fill="#EFF6FF" stroke="#2563EB" strokeWidth={Math.max(2, w / 38)}>
-        {drawShape(def, w, h)}
-      </g>
-    </svg>
-  );
-}
+import { ShapeGlyph } from './ShapeGlyph';
 
 function ShapeButton({ def, onAddNode }: { def: ShapeDef; onAddNode: (kind: ShapeKind) => void }) {
   const { t } = useTranslation();

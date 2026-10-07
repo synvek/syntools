@@ -95,6 +95,8 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   return (
     <div
       className="group/node relative"
+      // 便于样式钩子与端到端断言「当前图形类型」
+      data-kind={d.kind}
       onDoubleClick={() => !isContainer && setEditing(true)}
       style={{ width: w, height: h, cursor: 'grab' }}
     >

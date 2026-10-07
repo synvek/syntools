@@ -13,10 +13,11 @@ import {
   SCALE_OPTIONS,
   capturePage,
   exportPrintPdf,
+  exportPrintPdfSet,
   exportRaster,
   exportRasterSet,
   exportText,
-  parseImportedFile,
+  parseImportedFileAsync,
   type CapturedPage,
   type ExportKind,
   type ExportRange,
@@ -45,11 +46,16 @@ interface IoMenuProps {
   busy: boolean;
   setBusy: (v: boolean) => void;
   onError: (message: string | null) => void;
+  /** 受控展开态（快捷键 Ctrl+P / Ctrl+E 打开导出面板时使用）；缺省则组件内部自管 */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
+export function IoMenu({ busy, setBusy, onError, open: openProp, onOpenChange }: IoMenuProps) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
   const [options, setOptions] = useState<RasterExportOptions>(DEFAULT_RASTER_OPTIONS);
   const [printOptions, setPrintOptions] = useState<PrintOptions>(DEFAULT_PRINT_OPTIONS);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -102,7 +108,10 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
     const filename = state.docName.trim() || 'flowchart';
 
     if (TEXT_KINDS.includes(kind)) {
-      const ok = exportText(state.getDoc(), kind, filename);
+      // Mermaid 无栅格概念：导出范围中的「全部页」映射为多段 flowchart
+      const ok = exportText(state.getDoc(), kind, filename, {
+        mermaidPages: options.range === 'all' ? 'all' : 'current',
+      });
       if (!ok) onError(t('tools.flowchart.err.EXPORT_FAILED'));
       return;
     }
@@ -132,7 +141,7 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
     }
   };
 
-  /** 分页打印：整图按纸张切片导出多页 PDF */
+  /** 分页打印：整图按纸张切片导出多页 PDF；范围=全部页时逐页切片合并 */
   const runPrint = async () => {
     setOpen(false);
     onError(null);
@@ -140,6 +149,24 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
     const filename = state.docName.trim() || 'flowchart';
     setBusy(true);
     try {
+      if (options.range === 'all' && state.pageOrder.length > 1) {
+        // 打印截图参数固定为 PNG（print.ts 内部按 PNG 贴图），倍率取打印清晰度
+        const captured = await captureAllPages({
+          ...options,
+          format: 'png',
+          scale: printOptions.scale,
+          transparent: false,
+          padding: 8,
+          range: 'current',
+        });
+        if (captured.length === 0) {
+          reportError('EMPTY');
+          return;
+        }
+        const result = await exportPrintPdfSet(captured, printOptions, filename);
+        if (!result.ok) reportError(result.error);
+        return;
+      }
       const result = await exportPrintPdf(state.nodes, printOptions, filename);
       if (!result.ok) reportError(result.error);
     } finally {
@@ -153,7 +180,7 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
     if (!file) return;
     onError(null);
     const text = await file.text();
-    const doc = parseImportedFile(file.name, text);
+    const doc = await parseImportedFileAsync(file.name, text);
     if (!doc) {
       onError(t('tools.flowchart.err.IMPORT_FAILED'));
       return;
@@ -166,7 +193,7 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
       <div className="flex items-center gap-1.5">
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(!open)}
           disabled={busy}
           className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >

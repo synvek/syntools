@@ -2,10 +2,12 @@ import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 import {
   alignSelected,
+  applyUniformSize,
   distributeSelected,
   groupSelected,
   layerOp,
   patchSelectedEdgeStyle,
+  snapSelectedToGrid,
   toggleHidden,
   toggleLocked,
   ungroupSelected,
@@ -318,6 +320,22 @@ export function Toolbar(props: ToolbarProps) {
           label={t('tools.flowchart.distributeV')}
           onClick={() => distributeSelected('v')}
           icon={<span>⇻</span>}
+        />
+        <ToolbarButton
+          compact
+          testId="flowchart-uniform-size"
+          label={t('tools.flowchart.uniformSize')}
+          onClick={applyUniformSize}
+          disabled={selectedNodes.length < 2}
+          icon={<span>▭</span>}
+        />
+        <ToolbarButton
+          compact
+          testId="flowchart-snap-selection-grid"
+          label={t('tools.flowchart.snapSelectionToGrid')}
+          onClick={snapSelectedToGrid}
+          disabled={selectedNodes.length === 0 || !gridEnabled}
+          icon={<span>⌗</span>}
         />
         {sep}
         {LAYER_BUTTONS.map((item) => (

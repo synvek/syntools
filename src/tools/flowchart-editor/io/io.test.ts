@@ -1,11 +1,23 @@
+import { deflateRaw } from 'pako';
 import { describe, expect, it } from 'vitest';
 import { buildTemplateDoc } from '../model/templates';
 import { activePageOf, migrateDoc, toDocV2 } from '../model/migrate';
 import { defaultData } from '../core';
-import type { FlowDoc, FlowEdgeRec, FlowNodeRec } from '../model/types';
+import {
+  DEFAULT_EDGE_STYLE,
+  type FlowDoc,
+  type FlowEdgeRec,
+  type FlowNodeRec,
+} from '../model/types';
 import { parseProjectJson, toProjectJson } from './projectJson';
 import { parseMermaidFlowchart, toMermaid } from './mermaidIo';
-import { kindOfStyle, parseDrawioXml, toDrawioXml } from './drawio';
+import {
+  htmlToPlain,
+  kindOfStyle,
+  parseDrawioXml,
+  parseDrawioXmlAsync,
+  toDrawioXml,
+} from './drawio';
 import { importKindOf, parseImportedFile } from './index';
 
 const basic = () => buildTemplateDoc('basic');
@@ -112,6 +124,48 @@ describe('Mermaid 导出', () => {
 
   it('空文档导出空串', () => {
     expect(toMermaid({ version: 2, pages: [] })).toBe('');
+  });
+
+  it('导出节点样式为 classDef、连线样式为 linkStyle', () => {
+    const doc = basic();
+    const page = activePageOf(doc)!;
+    page.nodes[0].data.style = { ...page.nodes[0].data.style, fill: '#ff0000' };
+    page.edges[0].style = { ...DEFAULT_EDGE_STYLE, dash: 'dashed' };
+
+    const md = toMermaid(doc);
+    expect(md).toContain('classDef c0 fill:#ff0000;');
+    expect(md).toContain(`class ${page.nodes[0].id} c0;`);
+    expect(md).toContain('linkStyle 0 stroke-dasharray:6 4;');
+  });
+
+  it('样式导出后再导入可还原填充与虚线', () => {
+    const doc = basic();
+    const page = activePageOf(doc)!;
+    page.nodes[0].data.style = { ...page.nodes[0].data.style, fill: '#ff0000' };
+    page.edges[0].style = { ...DEFAULT_EDGE_STYLE, dash: 'dashed' };
+
+    const res = parseMermaidFlowchart(toMermaid(doc));
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const back = activePageOf(res.doc)!;
+    expect(back.nodes.find((n) => n.id === page.nodes[0].id)!.data.style.fill).toBe('#ff0000');
+    expect(back.edges[0].style?.dash).toBe('dashed');
+  });
+
+  it('多页导出为多段 flowchart，导入后恢复为多页', () => {
+    const doc = basic();
+    const extra = buildTemplateDoc('decision');
+    doc.pages.push({ ...extra.pages[0], id: 'page2', name: '第二页' });
+
+    const md = toMermaid(doc, { pages: 'all' });
+    expect(md.match(/flowchart TD/g)?.length).toBe(2);
+    expect(md).toContain('%% page: 第二页');
+
+    const res = parseMermaidFlowchart(md);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.doc.pages).toHaveLength(2);
+    expect(res.doc.pages[1].name).toBe('第二页');
   });
 });
 
@@ -253,6 +307,55 @@ describe('Draw.io XML', () => {
     const doc = parseDrawioXml(xml)!;
     expect(activePageOf(doc)!.nodes[0].mxStyle).toContain('customToken=42');
     expect(toDrawioXml(doc)).toContain('customToken=42');
+  });
+
+  it('htmlToPlain：行内换行、块级边界与实体还原为纯文本', () => {
+    // 输入是 XML 解析器已解码的 HTML 片段
+    expect(htmlToPlain('a<br>b')).toBe('a\nb');
+    expect(htmlToPlain('<div>第一行</div><div>第二行</div>')).toBe('第一行\n第二行');
+    expect(htmlToPlain('A &amp; B &lt;C&gt;')).toBe('A & B <C>');
+    // 非标签形态的孤立尖括号原样保留
+    expect(htmlToPlain('普通文本 < 10')).toBe('普通文本 < 10');
+  });
+
+  it('HTML 标签往返：换行在导入时还原为纯文本', () => {
+    const node: FlowNodeRec = {
+      id: 'n1',
+      type: 'shape',
+      position: { x: 10, y: 20 },
+      data: defaultData('rect', '第一行\n第二行'),
+    };
+    const xml = toDrawioXml(toDocV2([node], []));
+    // 导出为 html=1 值：换行转 <br>，XMLBuilder 再把尖括号转义
+    expect(xml).toContain('第一行&lt;br&gt;第二行');
+    const back = activePageOf(parseDrawioXml(xml)!)!;
+    expect(back.nodes[0].data.label).toBe('第一行\n第二行');
+  });
+
+  it('解析压缩形式（base64 + deflateRaw + URI 编码）的 .drawio', async () => {
+    // jsdom 可能带 Node 的 DecompressionStream：显式移除以走 pako 兜底分支
+    Reflect.deleteProperty(globalThis, 'DecompressionStream');
+
+    const inner =
+      '<mxGraphModel dx="0" dy="0" grid="1" page="1"><root>' +
+      '<mxCell id="0"/><mxCell id="1" parent="0"/>' +
+      '<mxCell id="n1" value="开始" style="rounded=0;html=1;" vertex="1" parent="1">' +
+      '<mxGeometry x="40" y="60" width="120" height="60" as="geometry"/></mxCell>' +
+      '</root></mxGraphModel>';
+    const bytes = deflateRaw(encodeURIComponent(inner));
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    const xml = `<mxfile host="x"><diagram name="页 1" id="p1">${btoa(binary)}</diagram></mxfile>`;
+
+    // 同步解析器不认压缩格式，异步解析器负责解码
+    expect(parseDrawioXml(xml)).toBeNull();
+    const doc = await parseDrawioXmlAsync(xml);
+    expect(doc).not.toBeNull();
+    const page = activePageOf(doc!)!;
+    expect(page.name).toBe('页 1');
+    expect(page.nodes).toHaveLength(1);
+    expect(page.nodes[0].data.label).toBe('开始');
+    expect(page.nodes[0].position).toEqual({ x: 40, y: 60 });
   });
 });
 

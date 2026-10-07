@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fitScene } from '@/core/components/pageThumbnail';
-import { pageSceneOf } from './pageScene';
+import { cachedPageSceneOf, pageSceneOf } from './pageScene';
 import { defaultData, DEFAULT_STYLE } from '../core';
 import type { FlowNodeRec, FlowPage } from './types';
 
@@ -89,5 +89,31 @@ describe('页面缩略图场景（多页浏览）', () => {
     const small = fitScene({ width: 10, height: 10 });
     expect(small.scale).toBe(1);
     expect(small.x).toBeGreaterThan(0);
+  });
+});
+
+describe('缩略图场景记忆化', () => {
+  it('同一 nodes/edges 引用复用同一场景对象', () => {
+    const p = page([node({ id: 'a' })]);
+    const first = cachedPageSceneOf(p);
+    expect(first).not.toBeNull();
+    // 用同一 nodes/edges 引用重组 FlowPage（模拟 getDoc 每页组装）
+    const again = cachedPageSceneOf({ id: 'p1', name: '页面 1', nodes: p.nodes, edges: p.edges });
+    expect(again).toBe(first);
+  });
+
+  it('nodes 引用变化后重新计算', () => {
+    const first = cachedPageSceneOf(page([node({ id: 'a' })]));
+    const second = cachedPageSceneOf(
+      page([node({ id: 'a' }), node({ id: 'b', position: { x: 200, y: 0 } })]),
+    );
+    expect(second).not.toBe(first);
+    expect(second!.nodes).toHaveLength(2);
+  });
+
+  it('空页缓存 null 结果', () => {
+    const p = page([]);
+    expect(cachedPageSceneOf(p)).toBeNull();
+    expect(cachedPageSceneOf({ id: 'p1', name: 'x', nodes: p.nodes, edges: p.edges })).toBeNull();
   });
 });

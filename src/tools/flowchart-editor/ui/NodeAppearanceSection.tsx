@@ -72,6 +72,7 @@ export function NodeAppearanceSection({
           max={1}
           step={0.05}
           value={opacity}
+          aria-label={t('tools.flowchart.opacity')}
           onChange={(e) => patch({ style: { opacity: Number(e.target.value) } })}
           onBlur={onEnd}
           className="w-full accent-blue-500"
@@ -82,6 +83,7 @@ export function NodeAppearanceSection({
         <input
           type="color"
           className={colorCls}
+          aria-label={t('tools.flowchart.textColor')}
           value={style.textColor ?? fallback.textColor ?? fallback.stroke ?? '#2563EB'}
           onChange={(e) => patch({ style: { textColor: e.target.value } })}
           onBlur={onEnd}
@@ -144,6 +146,7 @@ export function NodeAppearanceSection({
             max={40}
             step={1}
             value={corner}
+            aria-label={t('tools.flowchart.cornerRadius')}
             onChange={(e) => patch({ style: { cornerRadius: Number(e.target.value) } })}
             onBlur={onEnd}
             className="w-full accent-blue-500"
@@ -159,6 +162,7 @@ export function NodeAppearanceSection({
             max={60}
             step={1}
             value={fold}
+            aria-label={t('tools.flowchart.foldSize')}
             onChange={(e) => patch({ style: { foldSize: Number(e.target.value) } })}
             onBlur={onEnd}
             className="w-full accent-blue-500"

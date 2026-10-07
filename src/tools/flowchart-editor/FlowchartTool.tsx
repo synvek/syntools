@@ -6,9 +6,24 @@ import { Icon } from '@/core/components/Icon';
 import { i18n } from '@/core/i18n';
 import { buildTemplateDoc, type TemplateKind, type TemplateTranslator } from './model/templates';
 import { LAYOUT_DENSITY } from './layout';
-import { copySelection, groupSelected, pasteClipboard, ungroupSelected } from './flowOps';
+import {
+  copySelection,
+  cutSelection,
+  groupSelected,
+  pasteClipboard,
+  ungroupSelected,
+} from './flowOps';
 import { useFlowStore } from './store';
 import { readDraft, writeDraft, clearDraft } from './draft';
+import {
+  clearPersistedDoc,
+  loadPersistedDoc,
+  loadPersistedSession,
+  loadPersistedSnapshots,
+  savePersistedDoc,
+  savePersistedSession,
+  savePersistedSnapshots,
+} from './store/persist';
 import { hasFlowchartStrings, registerFlowchartStrings } from './strings';
 import {
   FORMULA_NODE_SIZE,
@@ -62,6 +77,13 @@ function FlowchartInner() {
   const pageOrder = useFlowStore((s) => s.pageOrder);
   const activePageId = useFlowStore((s) => s.activePageId);
   const pageData = useFlowStore((s) => s.pageData);
+  // 需持久化的会话设置（网格 / 布局 / 对齐阈值）与命名快照
+  const gridEnabled = useFlowStore((s) => s.gridEnabled);
+  const gridSize = useFlowStore((s) => s.gridSize);
+  const layoutDirection = useFlowStore((s) => s.layoutDirection);
+  const layoutDensity = useFlowStore((s) => s.layoutDensity);
+  const alignTolerance = useFlowStore((s) => s.alignTolerance);
+  const snapshots = useFlowStore((s) => s.snapshots);
 
   /**
    * 各页的即时快照（活动页现场序列化），仅供总览缩略图使用。
@@ -75,12 +97,15 @@ function FlowchartInner() {
 
   const [busy, setBusy] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelKey>('prop');
   const [draftSaved, setDraftSaved] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [presentSrc, setPresentSrc] = useState<string | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
+  /** 会话设置 / 快照是否已从 IndexedDB 恢复完成（避免用默认值覆盖已存设置） */
+  const [hydrated, setHydrated] = useState(false);
 
   /** 放映：先渲染放映层（显示「生成中」），下一帧再截图，避免大图卡住首次绘制 */
   const openPresent = () => {
@@ -122,19 +147,87 @@ function FlowchartInner() {
     };
   }, [i18nInstance.language]);
 
-  // 文案就绪后载入：恢复本地草稿；无草稿时重置为「本地化页名」的空文档
+  // 文案就绪后载入：优先恢复 IndexedDB 完整草稿（含图片），回退 localStorage 草稿；都无则重置为空文档
   useEffect(() => {
     if (!stringsReady) return;
-    const draft = readDraft();
-    const page = activePageOf(draft);
-    if (draft && page && page.nodes.length > 0) {
-      useFlowStore.getState().load(draft);
-      setDraftSaved(true);
-      fitViewSoon();
-      return;
-    }
-    useFlowStore.getState().load(null);
+    let alive = true;
+    void (async () => {
+      const persisted = await loadPersistedDoc();
+      if (!alive) return;
+      if (persisted && (activePageOf(persisted)?.nodes.length ?? 0) > 0) {
+        useFlowStore.getState().load(persisted);
+        setDraftSaved(true);
+        fitViewSoon();
+        return;
+      }
+      // 回退：旧版 localStorage 草稿（可能已丢弃图片）
+      const draft = readDraft();
+      const page = activePageOf(draft);
+      if (draft && page && page.nodes.length > 0) {
+        useFlowStore.getState().load(draft);
+        setDraftSaved(true);
+        fitViewSoon();
+        return;
+      }
+      useFlowStore.getState().load(null);
+    })();
+    return () => {
+      alive = false;
+    };
   }, [fitViewSoon, stringsReady]);
+
+  // 恢复会话设置与命名快照（IndexedDB 不可用时静默降级为默认值）
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const [session, snaps] = await Promise.all([
+        loadPersistedSession(),
+        loadPersistedSnapshots(),
+      ]);
+      if (!alive) return;
+      if (session) {
+        useFlowStore.setState(session);
+        if (session.panel) setPanel(session.panel);
+      }
+      if (snaps.length > 0) useFlowStore.setState({ snapshots: snaps });
+      setHydrated(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 会话设置变更后持久化（hydrated 之前不写，避免默认值覆盖已存设置）
+  useEffect(() => {
+    if (!hydrated) return;
+    void savePersistedSession({
+      gridEnabled,
+      gridSize,
+      layoutDirection,
+      layoutDensity,
+      alignTolerance,
+      panel,
+    });
+  }, [hydrated, gridEnabled, gridSize, layoutDirection, layoutDensity, alignTolerance, panel]);
+
+  // 命名快照变更后持久化
+  useEffect(() => {
+    if (!hydrated) return;
+    void savePersistedSnapshots(snapshots);
+  }, [hydrated, snapshots]);
+
+  /**
+   * 落盘：先写 localStorage（同步、可即时恢复，体积受限可能丢图），
+   * 再写 IndexedDB（异步、完整含图片）。任一成功即视为「已保存」；
+   * 仅当 IndexedDB 也失败且 localStorage 丢图时才提示改用项目文件。
+   */
+  const persistNow = useCallback(async () => {
+    const doc = useFlowStore.getState().getDoc();
+    const local = writeDraft(doc);
+    const persisted = await savePersistedDoc(doc);
+    setDraftSaved(local.saved || persisted);
+    if (local.droppedImages && !persisted) setFailure(t('tools.flowchart.draftTooLarge'));
+  }, [t]);
 
   // 变更后防抖写入本地草稿（编辑 → 未保存 → 1.2s 后落盘为已保存）
   useEffect(() => {
@@ -146,16 +239,13 @@ function FlowchartInner() {
     setDraftSaved(false);
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
-      const result = writeDraft(useFlowStore.getState().getDoc());
-      setDraftSaved(result.saved);
-      // 体积超限时图片不会写进草稿，明确提示改用项目文件保存
-      if (result.droppedImages) setFailure(t('tools.flowchart.draftTooLarge'));
+      void persistNow();
     }, DRAFT_DEBOUNCE_MS);
     return () => {
       if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     };
     // docName 参与依赖：只改标题时也要落盘
-  }, [nodes, edges, docName, t]);
+  }, [nodes, edges, docName, persistNow]);
 
   const addNodeAtCenter = useCallback(
     (kind: ShapeKind) => {
@@ -227,6 +317,7 @@ function FlowchartInner() {
     }
     useFlowStore.getState().load(null);
     clearDraft();
+    void clearPersistedDoc();
     setDraftSaved(false);
   }, [t]);
 
@@ -234,6 +325,7 @@ function FlowchartInner() {
     useFlowStore.getState().clear();
     useFlowStore.getState().setDocName('');
     clearDraft();
+    void clearPersistedDoc();
     setDraftSaved(false);
   }, []);
 
@@ -283,11 +375,26 @@ function FlowchartInner() {
     return st.spawnConnectedNode(node.id, position) !== undefined;
   }, []);
 
-  // 键盘快捷键：撤销/重做/复制/删除/微移/全选/建节点（输入框聚焦时不拦截）
+  /**
+   * Ctrl/⌘+S：跳过防抖，立即把当前文档写入本地存储。
+   * 本工具无服务端，「保存」即把草稿落盘（localStorage + IndexedDB）。
+   */
+  const handleSave = useCallback(() => {
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    void persistNow();
+  }, [persistNow]);
+
+  // 键盘快捷键：撤销/重做/剪切复制粘贴/保存/导出/删除/微移/全选/重命名/建节点（输入框聚焦时不拦截）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (document.activeElement?.tagName ?? '').toUpperCase();
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      // 任意模态弹层（放映 / 模板 / 页面总览）打开时让位：
+      // 编辑器快捷键不应作用于被遮挡的画布，也不应抢走弹层的 Esc。
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       const mod = e.metaKey || e.ctrlKey;
       // Ctrl/⌘ + PageUp/PageDown：上一页 / 下一页（与表格软件切换工作表的手感一致）
       if (mod && (e.key === 'PageUp' || e.key === 'PageDown')) {
@@ -298,7 +405,37 @@ function FlowchartInner() {
         if (next) st.switchPage(next.id);
         return;
       }
-      if (mod && e.key.toLowerCase() === 'z') {
+      if (!mod && e.key === 'Escape') {
+        // Esc 取消选择。延迟到本次事件派发结束再更新 store：
+        // 同步的 store 更新会让其它弹层（如页面总览）在派发中途重挂监听而收不到 Esc。
+        queueMicrotask(() => useFlowStore.getState().clearSelection());
+      } else if (!mod && e.key === 'F2') {
+        // F2 重命名选中节点：聚焦属性面板的文本输入框
+        const labelInput = document.querySelector<HTMLInputElement>(
+          '[data-testid="flowchart-label-input"]',
+        );
+        if (labelInput) {
+          e.preventDefault();
+          labelInput.focus();
+          labelInput.select();
+        }
+      } else if (mod && e.key.toLowerCase() === 'y') {
+        // Ctrl/⌘+Y 重做（与 Ctrl/⌘+Shift+Z 等效）
+        e.preventDefault();
+        useFlowStore.getState().redo();
+      } else if (mod && e.key.toLowerCase() === 's') {
+        // Ctrl/⌘+S 立即保存草稿
+        e.preventDefault();
+        handleSave();
+      } else if (mod && (e.key.toLowerCase() === 'p' || e.key.toLowerCase() === 'e')) {
+        // Ctrl/⌘+P / Ctrl/⌘+E 打开导出面板
+        e.preventDefault();
+        setExportOpen(true);
+      } else if (mod && e.key.toLowerCase() === 'x') {
+        // Ctrl/⌘+X 剪切选中元素
+        e.preventDefault();
+        cutSelection();
+      } else if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) useFlowStore.getState().redo();
         else useFlowStore.getState().undo();
@@ -339,7 +476,7 @@ function FlowchartInner() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [nudge, spawnFromSelection]);
+  }, [nudge, spawnFromSelection, handleSave]);
 
   // 文案未就绪时先不渲染（只有当前语言的小 chunk 需要等待）
   if (!stringsReady) return null;
@@ -367,7 +504,15 @@ function FlowchartInner() {
           </button>
         }
 
-        io={<IoMenu busy={busy} setBusy={setBusy} onError={setFailure} />}
+        io={
+          <IoMenu
+            busy={busy}
+            setBusy={setBusy}
+            onError={setFailure}
+            open={exportOpen}
+            onOpenChange={setExportOpen}
+          />
+        }
         stats={
           <>
             <span>

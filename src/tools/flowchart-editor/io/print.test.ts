@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PRINT_OPTIONS, PAPER_OPTIONS, printGrid } from './print';
+import { DEFAULT_PRINT_OPTIONS, PAPER_OPTIONS, exportPrintPdfSet, printGrid } from './print';
 
 describe('分页打印网格', () => {
   it('A4 纵向：按内容尺寸计算行列', () => {
@@ -39,5 +39,12 @@ describe('分页打印网格', () => {
 
   it('支持的纸张枚举', () => {
     expect(PAPER_OPTIONS).toEqual(['a4', 'a3']);
+  });
+
+  it('多页打印：无可用页面时返回 EMPTY', async () => {
+    await expect(exportPrintPdfSet([], DEFAULT_PRINT_OPTIONS, 'chart')).resolves.toEqual({
+      ok: false,
+      error: 'EMPTY',
+    });
   });
 });
