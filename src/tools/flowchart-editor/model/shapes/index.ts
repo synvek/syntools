@@ -15,8 +15,24 @@ import { ER_SHAPES } from './er';
 import { CONTAINER_SHAPES } from './container';
 import { GENERAL_SHAPES } from './general';
 
-/** 形状分类（侧边栏以此分组） */
-export type ShapeCategory = 'general' | 'flow' | 'uml' | 'bpmn' | 'network' | 'org' | 'mind' | 'er';
+/** 形状分类（侧边栏以此分组）；UML 按 2.5 图种细分为 9 类 */
+export type ShapeCategory =
+  | 'general'
+  | 'flow'
+  | 'umlCommon'
+  | 'umlUseCase'
+  | 'umlClass'
+  | 'umlObject'
+  | 'umlSequence'
+  | 'umlActivity'
+  | 'umlState'
+  | 'umlComponent'
+  | 'umlDeployment'
+  | 'bpmn'
+  | 'network'
+  | 'org'
+  | 'mind'
+  | 'er';
 
 /** 基础外形 */
 export type ShapeDraw =
@@ -73,7 +89,10 @@ export type ShapeDecor =
   | 'disk'
   | 'compartments'
   | 'plusBox'
-  | 'person';
+  | 'person'
+  | 'bullseye'
+  | 'history'
+  | 'historyDeep';
 
 export interface ShapeDef {
   kind: ShapeKind;
@@ -109,7 +128,15 @@ export const SHAPE_DEFS = Object.fromEntries(ALL_SHAPES.map((def) => [def.kind, 
 export const SHAPE_CATEGORY_ORDER: ShapeCategory[] = [
   'general',
   'flow',
-  'uml',
+  'umlCommon',
+  'umlUseCase',
+  'umlClass',
+  'umlObject',
+  'umlSequence',
+  'umlActivity',
+  'umlState',
+  'umlComponent',
+  'umlDeployment',
   'bpmn',
   'network',
   'org',

@@ -42,6 +42,28 @@ function arrowShape(kind: EdgeArrow, color: string): ReactElement | null {
       return <circle cx={5} cy={5} r={4.2} fill={color} />;
     case 'diamond':
       return <path d="M0,5 L5,0 L10,5 L5,10 Z" fill={color} />;
+    case 'diamondHollow':
+      // 聚合：空心菱形（UML 聚合关系）
+      return (
+        <path
+          d="M0,5 L5,0 L10,5 L5,10 Z"
+          fill="none"
+          stroke={color}
+          strokeWidth={1.4}
+          strokeLinejoin="round"
+        />
+      );
+    case 'triangle':
+      // 泛化 / 实现：空心三角（尖端朝外）
+      return (
+        <path
+          d="M9.4,5 L0.6,0.6 L0.6,9.4 Z"
+          fill="none"
+          stroke={color}
+          strokeWidth={1.4}
+          strokeLinejoin="round"
+        />
+      );
     case 'square':
       return <rect x={0.6} y={0.6} width={8.8} height={8.8} rx={1.2} fill={color} />;
     case 'bar':
@@ -53,7 +75,7 @@ function arrowShape(kind: EdgeArrow, color: string): ReactElement | null {
 
 /** 箭头尖端对齐路径端点：三角类对齐尖端，其它几何形居中对齐 */
 function refXOf(kind: EdgeArrow): number {
-  return kind === 'arrowclosed' || kind === 'arrow' ? BOX : BOX / 2;
+  return kind === 'arrowclosed' || kind === 'arrow' || kind === 'triangle' ? BOX : BOX / 2;
 }
 
 function EdgeMarker({ id, kind, color }: { id: string; kind: EdgeArrow; color: string }) {

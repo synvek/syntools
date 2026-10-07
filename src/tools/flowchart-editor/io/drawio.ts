@@ -210,9 +210,38 @@ function shapeTokenOf(kind: ShapeKind): string {
     case 'umlPackage':
       return 'shape=folder';
     case 'umlState':
+    case 'umlActivity':
+    case 'umlAction':
+    case 'umlSendSignal':
+    case 'umlReceiveSignal':
       return 'rounded=1';
+    case 'umlComponent':
+    case 'umlSubsystem':
+      return 'shape=component';
+    case 'umlNode':
+    case 'umlDevice':
+    case 'umlExecutionEnvironment':
+      return 'shape=cube';
+    case 'umlArtifact':
+      return 'shape=note';
+    case 'umlDecisionMerge':
+    case 'umlChoice':
+      return 'rhombus';
     case 'umlStateInitial':
     case 'umlStateFinal':
+    case 'umlInitialNode':
+    case 'umlActivityFinal':
+    case 'umlFlowFinal':
+    case 'umlJunction':
+    case 'umlEntryPoint':
+    case 'umlExitPoint':
+    case 'umlHistory':
+    case 'umlHistoryDeep':
+    case 'umlBoundary':
+    case 'umlControl':
+    case 'umlEntity':
+    case 'umlProvidedInterface':
+    case 'umlRequiredInterface':
       return 'ellipse';
     case 'bpmnEventStart':
     case 'bpmnEventIntermediate':
@@ -281,6 +310,8 @@ export function kindOfStyle(style: string | undefined): ShapeKind {
   if (s.includes('shape=server')) return 'netServer';
   if (s.includes('shape=desktop')) return 'netClient';
   if (s.includes('shape=folder')) return 'umlPackage';
+  if (s.includes('shape=component')) return 'umlComponent';
+  if (s.includes('shape=cube')) return 'umlNode';
   if (s.includes('rhombus')) return 'decision';
   if (s.includes('ellipse')) return 'startEnd';
   if (s.includes('cylinder')) return 'database';
@@ -377,9 +408,16 @@ const ARROW_TO_MX: Record<EdgeArrow, string | null> = {
   arrow: 'open',
   circle: 'oval',
   diamond: 'diamond',
+  diamondHollow: 'diamond',
+  triangle: 'block',
   square: 'box',
   bar: 'line',
 };
+
+/** 空心箭头（泛化 / 实现 / 聚合）：mxGraph 端以 fill=0 表达 */
+function isHollowArrow(kind: EdgeArrow): boolean {
+  return kind === 'arrow' || kind === 'triangle' || kind === 'diamondHollow';
+}
 
 /** 连线样式 → mxGraph style */
 function edgeStyleOf(style: FlowEdgeStyle | undefined, extra: string[] = []): string {
@@ -392,10 +430,10 @@ function edgeStyleOf(style: FlowEdgeStyle | undefined, extra: string[] = []): st
   parts.push(`strokeWidth=${s.strokeWidth}`);
   const startToken = ARROW_TO_MX[s.startArrow];
   parts.push(`startArrow=${startToken ?? 'none'}`);
-  parts.push(`startFill=${s.startArrow === 'arrow' ? 0 : 1}`);
+  parts.push(`startFill=${isHollowArrow(s.startArrow) ? 0 : 1}`);
   const endToken = ARROW_TO_MX[s.endArrow];
   parts.push(`endArrow=${endToken ?? 'none'}`);
-  parts.push(`endFill=${s.endArrow === 'arrow' ? 0 : 1}`);
+  parts.push(`endFill=${isHollowArrow(s.endArrow) ? 0 : 1}`);
   parts.push(...extra);
   return `${parts.join(';')};`;
 }
@@ -430,12 +468,11 @@ function edgeStyleFromMx(rawStyle: string | undefined): {
     if (!t || t === 'none') return 'none';
     if (t.startsWith('open')) return 'arrow';
     if (t.startsWith('oval') || t.startsWith('ellipse')) return 'circle';
-    if (t.startsWith('diamond')) return 'diamond';
+    if (t.startsWith('diamond')) return filled === false ? 'diamondHollow' : 'diamond';
     if (t.startsWith('box')) return 'square';
     if (t.startsWith('line') || t.startsWith('dash') || t.startsWith('async')) return 'bar';
-    if (t.startsWith('classic') || t.startsWith('block')) {
-      return filled === false ? 'arrow' : 'arrowclosed';
-    }
+    if (t.startsWith('block')) return filled === false ? 'triangle' : 'arrowclosed';
+    if (t.startsWith('classic')) return filled === false ? 'arrow' : 'arrowclosed';
     return 'arrowclosed';
   };
 

@@ -240,6 +240,13 @@ export function drawDecor(def: ShapeDef, w: number, h: number): ReactElement | n
   const cy = h / 2;
   const m = Math.min(w, h);
   const common = { fill: 'none' } as const;
+  // 历史伪状态的 H / H* 文字以描边路径绘制，避免依赖字体与颜色继承。
+  const histE = m * 0.22;
+  const histF = m * 0.26;
+  const histH =
+    `M${cx - histE},${cy - histF} V${cy + histF} ` +
+    `M${cx + histE},${cy - histF} V${cy + histF} ` +
+    `M${cx - histE},${cy} H${cx + histE}`;
 
   switch (def.decor) {
     case 'x': {
@@ -311,6 +318,27 @@ export function drawDecor(def: ShapeDef, w: number, h: number): ReactElement | n
       const d = 9;
       const y = h * 0.82;
       return <path {...common} d={`M${cx - d},${y} H${cx + d} M${cx},${y - d} V${y + d}`} />;
+    }
+    case 'bullseye':
+      // 活动结束：实心内圆（填充色由外层 g 提供）
+      return <circle cx={cx} cy={cy} r={Math.min(w, h) * 0.28} />;
+    case 'history':
+      return <path {...common} d={histH} />;
+    case 'historyDeep': {
+      const ax = cx + histE * 1.15;
+      const ay = cy - histF * 1.15;
+      const ar = histF * 0.42;
+      return (
+        <path
+          {...common}
+          d={
+            `${histH} ` +
+            `M${ax - ar},${ay - ar} L${ax + ar},${ay + ar} ` +
+            `M${ax + ar},${ay - ar} L${ax - ar},${ay + ar} ` +
+            `M${ax - ar},${ay} H${ax + ar}`
+          }
+        />
+      );
     }
     case 'none':
     default:

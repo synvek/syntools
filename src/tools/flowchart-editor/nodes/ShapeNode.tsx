@@ -118,7 +118,9 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           {def ? drawShape(def, w, h, style) : <rect x={0} y={0} width={w} height={h} rx={4} />}
         </g>
         {def ? (
-          <g stroke={strokeColor} strokeWidth={Math.max(1.5, strokeWidth - 0.5)}>
+          // fill 取描边色：让「活动结束」的实心内圆等装饰符号随主题着色；
+          // 现有装饰均显式 fill:'none'，不受影响。
+          <g stroke={strokeColor} fill={strokeColor} strokeWidth={Math.max(1.5, strokeWidth - 0.5)}>
             {drawDecor(def, w, h)}
           </g>
         ) : null}

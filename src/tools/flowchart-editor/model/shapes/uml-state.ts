@@ -1,0 +1,87 @@
+import type { ShapeDef } from './index';
+
+/** UML 状态图：状态、初始/终止、选择、汇合、终止、入口/出口点、浅/深历史、组合状态 */
+export const UML_STATE_SHAPES: ShapeDef[] = [
+  {
+    kind: 'umlState',
+    category: 'umlState',
+    draw: 'roundRect',
+    size: { width: 160, height: 72 },
+    defaultStyle: { fill: '#EFF6FF', stroke: '#2563EB' },
+  },
+  {
+    kind: 'umlStateInitial',
+    category: 'umlState',
+    draw: 'circle',
+    size: { width: 44, height: 44 },
+    defaultStyle: { fill: '#0F172A', stroke: '#0F172A' },
+  },
+  {
+    kind: 'umlStateFinal',
+    category: 'umlState',
+    draw: 'circle',
+    size: { width: 46, height: 46 },
+    decor: 'doubleCircle',
+    defaultStyle: { fill: '#FFFFFF', stroke: '#0F172A' },
+  },
+  {
+    kind: 'umlChoice',
+    category: 'umlState',
+    draw: 'diamond',
+    size: { width: 48, height: 48 },
+    defaultStyle: { fill: '#EFF6FF', stroke: '#2563EB' },
+  },
+  {
+    kind: 'umlJunction',
+    category: 'umlState',
+    draw: 'circle',
+    size: { width: 22, height: 22 },
+    defaultStyle: { fill: '#0F172A', stroke: '#0F172A' },
+  },
+  {
+    kind: 'umlTerminate',
+    category: 'umlState',
+    draw: 'cross',
+    size: { width: 40, height: 40 },
+    defaultStyle: { fill: 'transparent', stroke: '#0F172A', strokeWidth: 3 },
+  },
+  {
+    kind: 'umlEntryPoint',
+    category: 'umlState',
+    draw: 'circle',
+    size: { width: 28, height: 28 },
+    defaultStyle: { fill: '#FFFFFF', stroke: '#2563EB' },
+  },
+  {
+    kind: 'umlExitPoint',
+    category: 'umlState',
+    draw: 'circle',
+    size: { width: 28, height: 28 },
+    decor: 'x',
+    defaultStyle: { fill: '#FFFFFF', stroke: '#2563EB' },
+  },
+  {
+    kind: 'umlHistory',
+    category: 'umlState',
+    draw: 'circle',
+    size: { width: 34, height: 34 },
+    decor: 'history',
+    defaultStyle: { fill: '#FFFFFF', stroke: '#2563EB' },
+  },
+  {
+    kind: 'umlHistoryDeep',
+    category: 'umlState',
+    draw: 'circle',
+    size: { width: 38, height: 38 },
+    decor: 'historyDeep',
+    defaultStyle: { fill: '#FFFFFF', stroke: '#2563EB' },
+  },
+  {
+    kind: 'umlCompositeState',
+    category: 'umlState',
+    draw: 'roundRect',
+    size: { width: 180, height: 130 },
+    decor: 'compartments',
+    defaultStyle: { fill: '#EFF6FF', stroke: '#2563EB' },
+  },
+];

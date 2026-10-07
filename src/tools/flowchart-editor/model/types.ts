@@ -46,18 +46,78 @@ export type ShapeKind =
   | 'terminator'
   | 'parallelMode'
   | 'loopLimit'
-  // UML
+  // UML 通用
   | 'umlActor'
+  | 'umlNote'
+  | 'umlBoundary'
+  | 'umlControl'
+  | 'umlEntity'
+  | 'umlFrame'
+  // UML 用例图
   | 'umlUseCase'
+  | 'umlSubject'
+  | 'umlInclude'
+  | 'umlExtend'
+  | 'umlExtensionPoint'
+  // UML 类图
   | 'umlClass'
   | 'umlInterface'
+  | 'umlEnumeration'
+  | 'umlDataType'
+  | 'umlAbstractClass'
+  | 'umlActiveClass'
+  | 'umlTemplateClass'
+  | 'umlAssociationClass'
+  // UML 对象/包图
   | 'umlPackage'
-  | 'umlNote'
+  | 'umlObject'
+  | 'umlObjectSlot'
+  | 'umlModel'
+  | 'umlProfile'
+  // UML 时序图
   | 'umlLifeline'
+  | 'umlActivation'
+  | 'umlDestroy'
+  | 'umlCombinedFragment'
+  | 'umlInteractionUse'
+  | 'umlStateInvariant'
+  | 'umlGate'
+  // UML 活动图
+  | 'umlForkJoin'
+  | 'umlAction'
+  | 'umlActivity'
+  | 'umlDecisionMerge'
+  | 'umlInitialNode'
+  | 'umlActivityFinal'
+  | 'umlFlowFinal'
+  | 'umlObjectNode'
+  | 'umlSendSignal'
+  | 'umlReceiveSignal'
+  | 'umlActivityPartition'
+  // UML 状态图
   | 'umlState'
   | 'umlStateInitial'
   | 'umlStateFinal'
-  | 'umlForkJoin'
+  | 'umlChoice'
+  | 'umlJunction'
+  | 'umlTerminate'
+  | 'umlEntryPoint'
+  | 'umlExitPoint'
+  | 'umlHistory'
+  | 'umlHistoryDeep'
+  | 'umlCompositeState'
+  // UML 组件图
+  | 'umlComponent'
+  | 'umlProvidedInterface'
+  | 'umlRequiredInterface'
+  | 'umlPort'
+  | 'umlSubsystem'
+  // UML 部署图
+  | 'umlNode'
+  | 'umlDevice'
+  | 'umlExecutionEnvironment'
+  | 'umlArtifact'
+  | 'umlDeploymentSpec'
   // BPMN 2.0
   | 'bpmnEventStart'
   | 'bpmnEventIntermediate'
@@ -176,7 +236,16 @@ export type EdgeType = 'straight' | 'smoothstep' | 'step' | 'bezier';
 export type EdgeDash = 'solid' | 'dashed' | 'dotted' | 'dashdot' | 'sketch' | 'sketchDashed';
 
 /** 连线箭头风格 */
-export type EdgeArrow = 'none' | 'arrowclosed' | 'arrow' | 'circle' | 'diamond' | 'square' | 'bar';
+export type EdgeArrow =
+  | 'none'
+  | 'arrowclosed'
+  | 'arrow'
+  | 'circle'
+  | 'diamond'
+  | 'diamondHollow'
+  | 'triangle'
+  | 'square'
+  | 'bar';
 
 /** 连线样式（工具栏 / 属性面板可编辑） */
 export interface FlowEdgeStyle {
@@ -216,6 +285,8 @@ export const EDGE_ARROW_OPTIONS: EdgeArrow[] = [
   'arrow',
   'circle',
   'diamond',
+  'diamondHollow',
+  'triangle',
   'square',
   'bar',
 ];
@@ -227,6 +298,8 @@ export const EDGE_ARROW_LABEL_KEY: Record<EdgeArrow, string> = {
   arrow: 'arrowOpen',
   circle: 'arrowCircle',
   diamond: 'arrowDiamond',
+  diamondHollow: 'arrowDiamondHollow',
+  triangle: 'arrowTriangle',
   square: 'arrowSquare',
   bar: 'arrowBar',
 };
@@ -350,16 +423,68 @@ export const SHAPE_LABELS: Record<ShapeKind, string> = {
   parallelMode: '并行模式',
   loopLimit: '循环上限',
   umlActor: '角色',
+  umlNote: '注释',
+  umlBoundary: '边界',
+  umlControl: '控制',
+  umlEntity: '实体',
+  umlFrame: '图框',
   umlUseCase: '用例',
+  umlSubject: '系统边界',
+  umlInclude: '包含关系',
+  umlExtend: '扩展关系',
+  umlExtensionPoint: '扩展点',
   umlClass: '类',
   umlInterface: '接口',
+  umlEnumeration: '枚举',
+  umlDataType: '数据类型',
+  umlAbstractClass: '抽象类',
+  umlActiveClass: '活动类',
+  umlTemplateClass: '模板类',
+  umlAssociationClass: '关联类',
   umlPackage: '包',
-  umlNote: '注释',
+  umlObject: '对象',
+  umlObjectSlot: '对象（带槽）',
+  umlModel: '模型',
+  umlProfile: '剖面',
   umlLifeline: '生命线',
+  umlActivation: '激活条',
+  umlDestroy: '销毁',
+  umlCombinedFragment: '组合片段',
+  umlInteractionUse: '交互引用',
+  umlStateInvariant: '状态不变式',
+  umlGate: '门',
+  umlForkJoin: '分叉/汇合',
+  umlAction: '动作',
+  umlActivity: '活动',
+  umlDecisionMerge: '判断/合并',
+  umlInitialNode: '初始节点',
+  umlActivityFinal: '活动结束',
+  umlFlowFinal: '流结束',
+  umlObjectNode: '对象节点',
+  umlSendSignal: '发送信号',
+  umlReceiveSignal: '接收信号',
+  umlActivityPartition: '活动分区',
   umlState: '状态',
   umlStateInitial: '初始状态',
   umlStateFinal: '终止状态',
-  umlForkJoin: '分叉/汇合',
+  umlChoice: '选择',
+  umlJunction: '汇合点',
+  umlTerminate: '终止',
+  umlEntryPoint: '入口点',
+  umlExitPoint: '出口点',
+  umlHistory: '浅历史',
+  umlHistoryDeep: '深历史',
+  umlCompositeState: '组合状态',
+  umlComponent: '组件',
+  umlProvidedInterface: '提供接口',
+  umlRequiredInterface: '需求接口',
+  umlPort: '端口',
+  umlSubsystem: '子系统',
+  umlNode: '节点',
+  umlDevice: '设备',
+  umlExecutionEnvironment: '运行环境',
+  umlArtifact: '制品',
+  umlDeploymentSpec: '部署规范',
   bpmnEventStart: '开始事件',
   bpmnEventIntermediate: '中间事件',
   bpmnEventEnd: '结束事件',

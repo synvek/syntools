@@ -1,6 +1,6 @@
 import { absolutePositionOf } from '../core';
-import { shapeSize } from './shapes';
-import type { FlowPage } from './types';
+import { shapeDefOf, shapeSize } from './shapes';
+import type { FlowPage, ShapeKind } from './types';
 
 /**
  * 页面缩略图：多页浏览用。
@@ -40,11 +40,19 @@ export interface PageScene {
   edges: SceneEdge[];
 }
 
-function outlineOf(kind: string): SceneNode['shape'] {
-  if (kind === 'ellipse' || kind === 'startEnd' || kind === 'terminator' || kind === 'display') {
-    return 'ellipse';
+function outlineOf(kind: ShapeKind): SceneNode['shape'] {
+  // 由图形目录的 draw 驱动，自动覆盖圆形/椭圆/菱形类（含 UML 的用例、伪状态、判断等）
+  switch (shapeDefOf(kind)?.draw) {
+    case 'ellipse':
+    case 'circle':
+      return 'ellipse';
+    case 'diamond':
+      return 'diamond';
+    default:
+      break;
   }
-  if (kind === 'diamond' || kind === 'decision') return 'diamond';
+  // 兜底：胶囊体与斜四边形在缩略图里按椭圆近似（保持历史观感）
+  if (kind === 'startEnd' || kind === 'terminator' || kind === 'display') return 'ellipse';
   return 'rect';
 }
 
