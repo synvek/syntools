@@ -2,14 +2,10 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useFlowStore } from '../store';
-import {
-  type FlowNodeData,
-  isContainerKind,
-  SWIMLANE_HEADER_HEIGHT,
-  SWIMLANE_HEADER_WIDTH,
-} from '../model/types';
-import { shapeDefOf, shapeSize } from '../model/shapes';
+import { type FlowNodeData, isContainerKind } from '../model/types';
+import { paramValue, shapeDefOf, shapeSize } from '../model/shapes';
 import { drawDecor, drawShape } from './shapeDraw';
+import { ShapeAdjustHandles } from './ShapeAdjustHandles';
 import { nodeDashArrayOf } from '../ops';
 import { useQuickConnect } from '../quickConnect';
 
@@ -66,9 +62,14 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
     const sel = new Set(s.selectedEdges);
     return s.edges.some((e) => sel.has(e.id) && (e.source === id || e.target === id));
   });
+  /** 单选且为本节点时才渲染调整手柄，避免多选时手柄堆叠 */
+  const soleSelected = useFlowStore(
+    (s) => s.selectedNodes.length === 1 && s.selectedNodes.includes(id),
+  );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(d.label);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (editing) {
@@ -91,9 +92,12 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const isGroup = d.kind === 'group';
   // 纵向泳道与编组的标题栏在顶部；横向泳道在左侧
   const headerOnTop = def?.draw === 'laneV' || isGroup;
+  // 泳道标题条厚度（可调参数 laneHeader）
+  const laneHeader = def ? paramValue(def, style, 'laneHeader', w, h) : 40;
 
   return (
     <div
+      ref={rootRef}
       className="group/node relative"
       // 便于样式钩子与端到端断言「当前图形类型」
       data-kind={d.kind}
@@ -121,7 +125,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           // fill 取描边色：让「活动结束」的实心内圆等装饰符号随主题着色；
           // 现有装饰均显式 fill:'none'，不受影响。
           <g stroke={strokeColor} fill={strokeColor} strokeWidth={Math.max(1.5, strokeWidth - 0.5)}>
-            {drawDecor(def, w, h)}
+            {drawDecor(def, w, h, style)}
           </g>
         ) : null}
       </svg>
@@ -131,7 +135,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           <div
             className="absolute left-0 top-0 flex items-center truncate px-3 text-[13px] font-semibold"
             style={{
-              height: isGroup ? 26 : SWIMLANE_HEADER_HEIGHT,
+              height: isGroup ? 26 : laneHeader,
               width: w,
               color: style.stroke,
             }}
@@ -142,7 +146,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           <div
             className="absolute left-0 top-0 flex items-center justify-center text-[13px] font-semibold"
             style={{
-              width: SWIMLANE_HEADER_WIDTH,
+              width: laneHeader,
               height: h,
               color: style.stroke,
               writingMode: 'vertical-rl',
@@ -197,6 +201,18 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
           minWidth={isContainer ? 200 : 48}
           minHeight={isContainer ? 140 : 32}
           onResizeStart={() => useFlowStore.getState().commit()}
+        />
+      ) : null}
+
+      {/* 形状可调参数手柄（类 draw.io 黄色顶点）：单选时出现，拖拽即改 */}
+      {soleSelected && def ? (
+        <ShapeAdjustHandles
+          nodeId={id}
+          def={def}
+          style={style}
+          w={w}
+          h={h}
+          containerRef={rootRef}
         />
       ) : null}
 

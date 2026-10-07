@@ -188,6 +188,10 @@ interface FlowState {
   patchSelected: (patch: FlowNodePatch, history?: boolean) => void;
   /** 几何编辑（属性面板 X / Y / W / H）：X / Y 为画布绝对坐标，仅修改传入字段 */
   setNodeGeometry: (ids: string[], patch: NodeGeometryPatch, history?: boolean) => void;
+  /** 写入形状可调参数（合并到 style.shapeParams，键为图形目录声明的参数 key） */
+  setNodeParams: (ids: string[], params: Record<string, number>, history?: boolean) => void;
+  /** 清除某个形状可调参数（回到图形目录默认值） */
+  clearNodeParam: (ids: string[], key: string, history?: boolean) => void;
   patchEdgeLabel: (id: string, label: string, history?: boolean) => void;
   removeSelected: () => void;
   duplicateSelected: () => void;
@@ -803,6 +807,48 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           next.position = { x: Math.round(absX - base.x), y: Math.round(absY - base.y) };
         }
         return next;
+      }),
+    }));
+  },
+
+  setNodeParams: (ids, params, history = true) => {
+    const target = new Set(ids);
+    if (target.size === 0 || Object.keys(params).length === 0) return;
+    if (history) get().commit();
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        target.has(n.id)
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                style: {
+                  ...n.data.style,
+                  shapeParams: { ...n.data.style.shapeParams, ...params },
+                },
+              },
+            }
+          : n,
+      ),
+    }));
+  },
+
+  clearNodeParam: (ids, key, history = true) => {
+    const target = new Set(ids);
+    if (target.size === 0) return;
+    if (history) get().commit();
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (!target.has(n.id)) return n;
+        const prev = n.data.style.shapeParams;
+        if (!prev || prev[key] === undefined) return n;
+        const next = { ...prev };
+        delete next[key];
+        // 兼容旧字段：清除折角/圆角时同时移除旧字段，避免回落到旧值
+        const style = { ...n.data.style, shapeParams: next };
+        if (key === 'foldSize') delete style.foldSize;
+        if (key === 'cornerRadius') delete style.cornerRadius;
+        return { ...n, data: { ...n.data, style } };
       }),
     }));
   },

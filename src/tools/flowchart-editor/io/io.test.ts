@@ -265,6 +265,70 @@ describe('Draw.io XML', () => {
     expect(style.lineDash).toBe('dashed');
   });
 
+  it('形状可调参数往返（便签折角 / 预定义竖线宽 / 生命线标题框）', () => {
+    const nodes: FlowNodeRec[] = [
+      {
+        id: 'n1',
+        type: 'shape',
+        position: { x: 0, y: 0 },
+        width: 150,
+        height: 90,
+        data: {
+          ...defaultData('note', 'N'),
+          style: { ...defaultData('note').style, shapeParams: { foldSize: 24 } },
+        },
+      },
+      {
+        id: 'n2',
+        type: 'shape',
+        position: { x: 0, y: 120 },
+        width: 170,
+        height: 64,
+        data: {
+          ...defaultData('predefined'),
+          style: { ...defaultData('predefined').style, shapeParams: { barWidth: 22 } },
+        },
+      },
+      {
+        id: 'n3',
+        type: 'shape',
+        position: { x: 0, y: 220 },
+        width: 120,
+        height: 300,
+        data: {
+          ...defaultData('umlLifeline'),
+          style: { ...defaultData('umlLifeline').style, shapeParams: { lifelineHeader: 56 } },
+        },
+      },
+    ];
+    const xml = toDrawioXml(toDocV2(nodes, []));
+    expect(xml).toContain('size=24');
+    expect(xml).toContain('size=22');
+    expect(xml).toContain('size=56');
+
+    const page = activePageOf(parseDrawioXml(xml)!)!;
+    const byId = new Map(page.nodes.map((n) => [n.id, n] as const));
+    expect(byId.get('n1')!.data.style.shapeParams?.foldSize).toBe(24);
+    expect(byId.get('n2')!.data.style.shapeParams?.barWidth).toBe(22);
+    // 已语义化的 size token 不再进入 mxStyle 兜底
+    expect(byId.get('n1')!.mxStyle ?? []).not.toContain('size=24');
+    expect(byId.get('n2')!.mxStyle ?? []).not.toContain('size=22');
+    // 生命线形状本身尚未与 draw.io 的 umlLifeline token 互认，size 作为未识别 token 无损保留
+    expect(byId.get('n3')!.mxStyle ?? []).toContain('size=56');
+  });
+
+  it('圆角导入还原（修复 arcSize 丢失）', () => {
+    const xml = `<mxfile><diagram name="P" id="d1"><mxGraphModel><root>
+      <mxCell id="0"/><mxCell id="1" parent="0"/>
+      <mxCell id="n1" value="R" style="rounded=1;arcSize=6;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1" y="2" width="120" height="60" as="geometry"/>
+      </mxCell>
+    </root></mxGraphModel></diagram></mxfile>`;
+    const page = activePageOf(parseDrawioXml(xml)!)!;
+    // arcSize=6 → cornerRadius = 12
+    expect(page.nodes[0].data.style.shapeParams?.cornerRadius).toBe(12);
+  });
+
   it('连线样式往返（线型 / 虚线 / 起止箭头 / 颜色 / 折点）', () => {
     const nodes: FlowNodeRec[] = [
       { id: 'a', type: 'shape', position: { x: 0, y: 0 }, data: defaultData('rect', 'A') },

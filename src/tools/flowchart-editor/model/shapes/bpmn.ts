@@ -1,10 +1,17 @@
 import type { ShapeDef } from './index';
+import { axisAdjust, foldAdjust, pxMx, type ParamGetter } from './adjust';
 
-/** 数据对象：右上角折角矩形 */
-const dataObjectPath = (w: number, h: number): string => `M0,0 H${w - 14} L${w},14 V${h} H0 Z`;
+/** 数据对象：右上角折角矩形（折角可调） */
+const dataObjectPath = (w: number, h: number, p: ParamGetter): string => {
+  const c = p('foldSize');
+  return `M0,0 H${w - c} L${w},${c} V${h} H0 Z`;
+};
 
-/** 文本注释：左侧开放括号形 */
-const textAnnotationPath = (w: number, h: number): string => `M${w * 0.24},0 H0 V${h} H${w * 0.24}`;
+/** 文本注释：左侧开放括号形（括号宽可调） */
+const textAnnotationPath = (_w: number, h: number, p: ParamGetter): string => {
+  const bw = p('annotationBracket');
+  return `M${bw},0 H0 V${h} H${bw}`;
+};
 
 const EVENT_GREEN = { fill: '#ECFDF5', stroke: '#16A34A' } as const;
 const EVENT_RED = { fill: '#FEF2F2', stroke: '#DC2626' } as const;
@@ -87,6 +94,7 @@ export const BPMN_SHAPES: ShapeDef[] = [
     draw: 'path',
     size: { width: 140, height: 72 },
     path: dataObjectPath,
+    adjust: [foldAdjust('foldSize', () => 14)],
     defaultStyle: { fill: '#F0FDF4', stroke: '#15803D' },
   },
   {
@@ -102,6 +110,17 @@ export const BPMN_SHAPES: ShapeDef[] = [
     draw: 'path',
     size: { width: 160, height: 84 },
     path: textAnnotationPath,
+    adjust: [
+      axisAdjust({
+        key: 'annotationBracket',
+        labelKey: 'annotationBracket',
+        axis: 'x',
+        cross: (_w, h) => h / 2,
+        default: (w) => w * 0.24,
+        max: (w) => w * 0.6,
+        mx: pxMx((w) => w),
+      }),
+    ],
     defaultStyle: { fill: 'transparent', stroke: '#64748B' },
   },
 ];

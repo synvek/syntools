@@ -4,7 +4,7 @@ import { useFlowStore } from '../store';
 import { patchSelectedEdgeStyle, selectedEdgeStyle } from '../flowOps';
 import { commonValue } from '../ops';
 import { absolutePositionOf } from '../core';
-import { shapeDefOf, shapeSize } from '../model/shapes';
+import { hasAdjusts, shapeDefOf, shapeSize } from '../model/shapes';
 import {
   EDGE_ARROW_LABEL_KEY,
   EDGE_ARROW_OPTIONS,
@@ -20,6 +20,7 @@ import {
   isContainerKind,
 } from '../model/types';
 import { NodeAppearanceSection } from './NodeAppearanceSection';
+import { NodeShapeParamsSection } from './NodeShapeParamsSection';
 
 const EDGE_TYPES = EDGE_TYPE_OPTIONS;
 const DASHES = EDGE_DASH_OPTIONS;
@@ -298,8 +299,8 @@ export function PropertyPanel() {
     foldSize: pick('foldSize'),
   };
   const label = commonValue(selNodes.map((n) => n.data.label));
-  // 多选且图形种类不一致时，隐藏与具体图形强相关的项（圆角 / 折角）
-  const draw = commonValue(selNodes.map((n) => shapeDefOf(n.data.kind)?.draw));
+  // 单选时提供该图形专属的可调参数分组（圆角 / 折角 / 斜切 / 分栏高 ……）
+  const soleDef = selNodes.length === 1 ? shapeDefOf(first.data.kind) : undefined;
   const aligns: Align[] = ['left', 'center', 'right'];
 
   /** 各选中节点的几何（画布绝对坐标 + 实际尺寸），用于 X / Y / W / H 输入与混合态判定 */
@@ -496,9 +497,19 @@ export function PropertyPanel() {
         </button>
       </div>
 
+      {/* 形状专属可调参数（类 draw.io 调整顶点）：单选时按图形目录声明列出 */}
+      {soleDef && hasAdjusts(soleDef) ? (
+        <NodeShapeParamsSection
+          def={soleDef}
+          style={base}
+          ids={[first.id]}
+          w={geos[0].width}
+          h={geos[0].height}
+        />
+      ) : null}
+
       <NodeAppearanceSection
         style={view}
-        draw={draw}
         patch={patch}
         onEnd={end}
         fallback={base}

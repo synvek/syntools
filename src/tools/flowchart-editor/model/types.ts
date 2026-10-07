@@ -184,6 +184,11 @@ export interface FlowNodeStyle {
   cornerRadius?: number;
   /** 便签（note）右上折角三角块大小 */
   foldSize?: number;
+  /**
+   * 形状可调参数（类 draw.io 调整顶点）：键 → 数值，仅记录被用户改动过的键。
+   * 键与取值范围由图形目录的 `ShapeDef.adjust` 声明，见 `model/shapes/adjust.ts`。
+   */
+  shapeParams?: Record<string, number>;
 }
 
 /** 节点类型：图形 / 图片 / 内置图标 / 公式 */

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
-import type { ShapeDef } from '../model/shapes';
-import { type FlowNodeStyle, SWIMLANE_HEADER_HEIGHT, SWIMLANE_HEADER_WIDTH } from '../model/types';
+import { paramGetterFor, type ShapeDef } from '../model/shapes';
+import type { FlowNodeStyle } from '../model/types';
 
 /** 正 n 边形顶点（默认顶点朝上） */
 function regularPolygon(sides: number, w: number, h: number, rotDeg = -90): string {
@@ -33,10 +33,10 @@ function starPoints(points: number, w: number, h: number, inner = 0.44, rotDeg =
   return arr.join(' ');
 }
 
-/** 加号/十字形多边形（厚度按尺寸比例） */
-function plusPoints(w: number, h: number): string {
-  const wx = w * 0.34;
-  const hy = h * 0.34;
+/** 加号/十字形多边形（厚度按尺寸比例，可由 plusArm 参数调整） */
+function plusPoints(w: number, h: number, ratio = 0.34): string {
+  const wx = w * ratio;
+  const hy = h * ratio;
   return [
     `${wx},0`,
     `${w - wx},0`,
@@ -53,20 +53,25 @@ function plusPoints(w: number, h: number): string {
   ].join(' ');
 }
 
-/** 生成形状的基础外形（SVG 子元素），由图形目录的 draw 字段驱动；style 可选，用于圆角/折角 */
+/**
+ * 生成形状的基础外形（SVG 子元素），由图形目录的 draw 字段驱动。
+ * `style` 可选：其中的 `shapeParams` / `cornerRadius` / `foldSize` 经 `paramValue` 解析
+ * （缺省时取图形目录声明的默认值），绘制结果与改造前完全一致。
+ */
 export function drawShape(
   def: ShapeDef,
   w: number,
   h: number,
   style?: Partial<FlowNodeStyle>,
 ): ReactElement {
+  const p = paramGetterFor(def, style, w, h);
   switch (def.draw) {
     case 'rect': {
-      const r = style?.cornerRadius ?? 4;
+      const r = p('cornerRadius');
       return <rect x={0} y={0} width={w} height={h} rx={r} ry={r} />;
     }
     case 'roundRect': {
-      const r = style?.cornerRadius ?? 10;
+      const r = p('cornerRadius');
       return <rect x={0} y={0} width={w} height={h} rx={r} ry={r} />;
     }
     case 'capsule':
@@ -77,22 +82,30 @@ export function drawShape(
       return <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} />;
     case 'diamond':
       return <polygon points={`${w / 2},0 ${w},${h / 2} ${w / 2},${h} 0,${h / 2}`} />;
-    case 'parallelogram':
-      return <polygon points={`${h / 4},0 ${w},0 ${w - h / 4},${h} 0,${h}`} />;
-    case 'invParallelogram':
-      return <polygon points={`0,0 ${w - h / 4},0 ${w},${h} ${h / 4},${h}`} />;
-    case 'trapezoid':
-      return <polygon points={`${w * 0.16},0 ${w * 0.84},0 ${w},${h} 0,${h}`} />;
-    case 'invTrapezoid':
-      return <polygon points={`0,0 ${w},0 ${w * 0.84},${h} ${w * 0.16},${h}`} />;
-    case 'hexagon':
+    case 'parallelogram': {
+      const s = p('skew');
+      return <polygon points={`${s},0 ${w},0 ${w - s},${h} 0,${h}`} />;
+    }
+    case 'invParallelogram': {
+      const s = p('skew');
+      return <polygon points={`0,0 ${w - s},0 ${w},${h} ${s},${h}`} />;
+    }
+    case 'trapezoid': {
+      const s = p('inset');
+      return <polygon points={`${s},0 ${w - s},0 ${w},${h} 0,${h}`} />;
+    }
+    case 'invTrapezoid': {
+      const s = p('inset');
+      return <polygon points={`0,0 ${w},0 ${w - s},${h} ${s},${h}`} />;
+    }
+    case 'hexagon': {
+      const s = p('inset');
       return (
-        <polygon
-          points={`${w * 0.16},0 ${w * 0.84},0 ${w},${h / 2} ${w * 0.84},${h} ${w * 0.16},${h} 0,${h / 2}`}
-        />
+        <polygon points={`${s},0 ${w - s},0 ${w},${h / 2} ${w - s},${h} ${s},${h} 0,${h / 2}`} />
       );
+    }
     case 'cylinder': {
-      const ry = Math.min(h * 0.16, w * 0.22);
+      const ry = p('capHeight');
       return (
         <path
           d={
@@ -103,7 +116,7 @@ export function drawShape(
       );
     }
     case 'document': {
-      const wave = Math.min(14, h * 0.2);
+      const wave = p('waveHeight');
       return (
         <path
           d={`M0,0 H${w} V${h - wave} a${w / 4},${wave} 0 0,1 -${w / 2},0 a${w / 4},${wave} 0 0,1 -${w / 2},0 Z`}
@@ -111,30 +124,27 @@ export function drawShape(
       );
     }
     case 'note': {
-      const c = Math.max(
-        0,
-        Math.min(style?.foldSize ?? Math.min(16, w * 0.13), Math.min(w, h) * 0.9),
-      );
+      const c = p('foldSize');
       if (c < 0.5) return <rect x={0} y={0} width={w} height={h} />;
       return <path d={`M0,0 H${w - c} L${w},${c} V${h} H0 Z M${w - c},0 V${c} H${w}`} />;
     }
     case 'triangle':
       return <polygon points={`${w / 2},1 ${w - 1},${h - 1} 1,${h - 1}`} />;
     case 'star':
-      return <polygon points={starPoints(5, w, h)} />;
+      return <polygon points={starPoints(5, w, h, p('starInner'))} />;
     case 'pentagon':
       return <polygon points={regularPolygon(5, w, h)} />;
     case 'octagon':
       return <polygon points={regularPolygon(8, w, h)} />;
-    case 'chevron':
-      // 右向雪佛龙箭头
-      return (
-        <path d={`M0,0 H${w * 0.62} L${w},${h / 2} L${w * 0.62},${h} H0 L${w * 0.38},${h / 2} Z`} />
-      );
+    case 'chevron': {
+      // 右向雪佛龙箭头；depth 为箭头尖深（左右凹口一致）
+      const d2 = p('chevronDepth');
+      return <path d={`M0,0 H${w - d2} L${w},${h / 2} L${w - d2},${h} H0 L${d2},${h / 2} Z`} />;
+    }
     case 'card': {
       // 圆角矩形 + 右上折角（名片/卡片）
       const r = Math.min(12, w / 2, h / 2);
-      const c = Math.min(22, w * 0.22, h * 0.5);
+      const c = p('foldSize');
       return (
         <path
           d={`M${r},0 H${w - c} L${w},${c} V${h - r} Q${w},${h} ${w - r},${h} H${r} Q0,${h} 0,${h - r} V${r} Q0,0 ${r},0 Z`}
@@ -142,9 +152,9 @@ export function drawShape(
       );
     }
     case 'callout': {
-      // 圆角气泡 + 左下尾巴（标注）
+      // 圆角气泡 + 左下尾巴（标注）；calloutTail 为尾巴高度
       const r = Math.min(12, w / 2, h / 2);
-      const bh = h * 0.8;
+      const bh = h - p('calloutTail');
       return (
         <path
           d={`M${r},0 H${w - r} Q${w},0 ${w},${r} V${bh - r} Q${w},${bh} ${w - r},${bh} H${r} Q0,${bh} 0,${bh - r} V${r} Q0,0 ${r},0 Z M${w * 0.28},${bh} L${w * 0.2},${h} L${w * 0.46},${bh} Z`}
@@ -161,12 +171,12 @@ export function drawShape(
       );
     }
     case 'plus':
-      return <polygon points={plusPoints(w, h)} />;
+      return <polygon points={plusPoints(w, h, p('plusArm'))} />;
     case 'cross':
       // 十字旋转 45° 即为 X 形
       return (
         <g transform={`rotate(45 ${w / 2} ${h / 2})`}>
-          <polygon points={plusPoints(w, h)} />
+          <polygon points={plusPoints(w, h, p('plusArm'))} />
         </g>
       );
     case 'flag': {
@@ -185,16 +195,18 @@ export function drawShape(
           points={`${w * 0.55},0 ${w * 0.2},${h * 0.55} ${w * 0.46},${h * 0.55} ${w * 0.34},${h} ${w * 0.84},${h * 0.4} ${w * 0.56},${h * 0.4}`}
         />
       );
-    case 'arrow':
-      // 右向块状箭头
+    case 'arrow': {
+      // 右向块状箭头；arrowHead 为箭头头部长度
+      const hs = w - p('arrowHead');
       return (
         <polygon
-          points={`0,${h * 0.35} ${w * 0.62},${h * 0.35} ${w * 0.62},${h * 0.15} ${w},${h / 2} ${w * 0.62},${h * 0.85} ${w * 0.62},${h * 0.65} 0,${h * 0.65}`}
+          points={`0,${h * 0.35} ${hs},${h * 0.35} ${hs},${h * 0.15} ${w},${h / 2} ${hs},${h * 0.85} ${hs},${h * 0.65} 0,${h * 0.65}`}
         />
       );
+    }
     case 'bracket': {
-      // 左方括号 [ 形
-      const t = Math.min(w * 0.3, h * 0.28);
+      // 左方括号 [ 形；armThickness 为上下臂厚度
+      const t = p('bracketArm');
       return (
         <polygon
           points={`0,0 ${w},0 ${w},${t} ${t},${t} ${t},${h - t} ${w},${h - t} ${w},${h} 0,${h}`}
@@ -203,39 +215,49 @@ export function drawShape(
     }
     case 'bar':
       return <rect x={0} y={0} width={w} height={h} rx={2} ry={2} />;
-    case 'laneH':
+    case 'laneH': {
       // 横向泳道：外框 + 左侧竖条标题栏
+      const hw = p('laneHeader');
       return (
         <g>
           <rect x={0} y={0} width={w} height={h} rx={10} ry={10} />
           <path
-            d={`M10,0 H${SWIMLANE_HEADER_WIDTH} V${h} H10 A10,10 0 0 1 0,${h - 10} V10 A10,10 0 0 1 10,0 Z`}
+            d={`M10,0 H${hw} V${h} H10 A10,10 0 0 1 0,${h - 10} V10 A10,10 0 0 1 10,0 Z`}
             className="swimlane-header"
           />
         </g>
       );
-    case 'laneV':
+    }
+    case 'laneV': {
       // 纵向泳道：外框 + 顶部横条标题栏
+      const hh = p('laneHeader');
       return (
         <g>
           <rect x={0} y={0} width={w} height={h} rx={10} ry={10} />
           <path
-            d={`M0,10 a10,10 0 0 1 10,-10 h${w - 20} a10,10 0 0 1 10,10 v${SWIMLANE_HEADER_HEIGHT - 10} h-${w} z`}
+            d={`M0,10 a10,10 0 0 1 10,-10 h${w - 20} a10,10 0 0 1 10,10 v${hh - 10} h-${w} z`}
             className="swimlane-header"
           />
         </g>
       );
+    }
     case 'group':
       // 编组：虚线框 + 淡背景（fill 由外层 g 继承）
       return <rect x={0} y={0} width={w} height={h} rx={8} ry={8} strokeDasharray="7 5" />;
     case 'path':
     default:
-      return <path d={def.path ? def.path(w, h) : `M0,0 H${w} V${h} H0 Z`} />;
+      return <path d={def.path ? def.path(w, h, p) : `M0,0 H${w} V${h} H0 Z`} />;
   }
 }
 
-/** 生成外形内部的装饰符号（网关 X/+、事件内圈、机架线等） */
-export function drawDecor(def: ShapeDef, w: number, h: number): ReactElement | null {
+/** 生成外形内部的装饰符号（网关 X/+、事件内圈、机架线、类图分栏等） */
+export function drawDecor(
+  def: ShapeDef,
+  w: number,
+  h: number,
+  style?: Partial<FlowNodeStyle>,
+): ReactElement | null {
+  const p = paramGetterFor(def, style, w, h);
   const cx = w / 2;
   const cy = h / 2;
   const m = Math.min(w, h);
@@ -312,8 +334,12 @@ export function drawDecor(def: ShapeDef, w: number, h: number): ReactElement | n
       );
     case 'disk':
       return <path {...common} d={`M0,${h * 0.4} H${w} M0,${h * 0.62} H${w}`} />;
-    case 'compartments':
-      return <path {...common} d={`M0,${h * 0.34} H${w} M0,${h * 0.67} H${w}`} />;
+    case 'compartments': {
+      // 分栏线：上/下两处高度可调（dividerTop / dividerBottom），并保证互不重叠
+      const d1 = p('dividerTop');
+      const d2 = Math.max(d1 + 6, p('dividerBottom'));
+      return <path {...common} d={`M0,${d1} H${w} M0,${d2} H${w}`} />;
+    }
     case 'plusBox': {
       const d = 9;
       const y = h * 0.82;

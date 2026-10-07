@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { SHAPE_CATEGORY_ORDER, SHAPE_DEFS, shapeSize, shapesOfCategory } from './index';
+import {
+  SHAPE_CATEGORY_ORDER,
+  SHAPE_DEFS,
+  adjustsFor,
+  paramValue,
+  shapeSize,
+  shapesOfCategory,
+} from './index';
 import type { ShapeKind } from '../types';
 import { SHAPE_LABELS } from '../types';
 
@@ -27,9 +34,26 @@ describe('图形目录', () => {
     for (const kind of ALL_KINDS) {
       const def = SHAPE_DEFS[kind];
       if (def.draw !== 'path' || !def.path) continue;
-      const d = def.path(def.size.width, def.size.height);
+      const { width, height } = def.size;
+      const getter = (key: string) => paramValue(def, undefined, key, width, height);
+      const d = def.path(width, height, getter);
       expect(d.length).toBeGreaterThan(0);
       expect(d).not.toMatch(/NaN|undefined/);
+    }
+  });
+
+  it('每个可调参数默认值均在 [min, max] 内且能反推手柄位置', () => {
+    for (const kind of ALL_KINDS) {
+      const def = SHAPE_DEFS[kind];
+      const { width, height } = def.size;
+      for (const adj of adjustsFor(def)) {
+        const v = adj.default(width, height);
+        expect(Number.isFinite(v)).toBe(true);
+        expect(v).toBeGreaterThanOrEqual(adj.min(width, height));
+        expect(v).toBeLessThanOrEqual(adj.max(width, height));
+        const { x, y } = adj.anchor(width, height, v);
+        expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+      }
     }
   });
 

@@ -15,7 +15,7 @@ import { XMLBuilder, XMLParser } from 'fast-xml-parser';
 import { defaultData } from '../core';
 import { normalizeEdgeStyle } from '../ops';
 import { createPage, toDocV2 } from '../model/migrate';
-import { shapeSize } from '../model/shapes';
+import { SHAPE_DEFS, adjustsFor, paramValue, shapeSize } from '../model/shapes';
 import type {
   Align,
   EdgeArrow,
@@ -336,7 +336,30 @@ export function kindOfStyle(style: string | undefined): ShapeKind {
 const ALIGN_TO_MX: Record<Align, string> = { left: 'left', center: 'center', right: 'right' };
 const MX_TO_ALIGN: Record<string, Align> = { left: 'left', center: 'center', right: 'right' };
 
-/** 形状 + 样式 → mxGraph style（保留填充/描边/线型/字号/透明度/圆角/阴影） */
+/** 形状可调参数 → mxGraph token（含圆角 arcSize）；仅写用户显式设置过的项 */
+function shapeParamTokens(kind: ShapeKind, style?: Partial<FlowNodeStyle>): string[] {
+  const def = SHAPE_DEFS[kind];
+  if (!def) return [];
+  const sp = style?.shapeParams;
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const adj of adjustsFor(def)) {
+    const mx = adj.mx;
+    if (!mx || seen.has(mx.key)) continue;
+    const explicit =
+      sp?.[adj.key] !== undefined ||
+      (adj.key === 'foldSize' && style?.foldSize !== undefined) ||
+      (adj.key === 'cornerRadius' && style?.cornerRadius !== undefined);
+    if (!explicit) continue;
+    const value = paramValue(def, style, adj.key, def.size.width, def.size.height);
+    seen.add(mx.key);
+    if (mx.key === 'arcSize') parts.push('rounded=1');
+    parts.push(`${mx.key}=${mx.to(value, def.size.width, def.size.height)}`);
+  }
+  return parts;
+}
+
+/** 形状 + 样式 → mxGraph style（保留填充/描边/线型/字号/透明度/圆角/阴影/可调参数） */
 function styleOf(kind: ShapeKind, style?: Partial<FlowNodeStyle>, extra: string[] = []): string {
   const parts = [shapeTokenOf(kind), 'whiteSpace=wrap', 'html=1'];
   if (style?.fill) parts.push(`fillColor=${style.fill}`);
@@ -353,16 +376,18 @@ function styleOf(kind: ShapeKind, style?: Partial<FlowNodeStyle>, extra: string[
   if (style?.shadow) parts.push('shadow=1');
   if (style?.bold) parts.push('fontStyle=1');
   if (style?.italic) parts.push('fontStyle=2');
-  if ((kind === 'roundRect' || kind === 'rect') && style?.cornerRadius !== undefined) {
-    parts.push('rounded=1');
-    parts.push(`arcSize=${Math.round((style.cornerRadius / 2) * 100) / 100}`);
-  }
+  parts.push(...shapeParamTokens(kind, style));
   parts.push(...extra);
   return `${parts.filter(Boolean).join(';')};`;
 }
 
 /** mxGraph style → 节点样式（只写与默认不同的字段） */
-function nodeStyleFromMx(style: string | undefined): {
+function nodeStyleFromMx(
+  style: string | undefined,
+  kind?: ShapeKind,
+  w?: number,
+  h?: number,
+): {
   style: Partial<FlowNodeStyle>;
   mxStyle: string[];
 } {
@@ -392,7 +417,34 @@ function nodeStyleFromMx(style: string | undefined): {
   if (dashed) {
     out.lineDash = map.get('dashPattern') === '1 1' ? 'dotted' : 'dashed';
   }
-  return { style: out, mxStyle: unknown };
+  // 形状可调参数：把 size / arcSize 等 token 还原为 shapeParams（已消费的 token 不再进 mxStyle）
+  const consumed = new Set<string>();
+  const def = kind ? SHAPE_DEFS[kind] : undefined;
+  if (def) {
+    const dw = w ?? def.size.width;
+    const dh = h ?? def.size.height;
+    const params: Record<string, number> = {};
+    for (const adj of adjustsFor(def)) {
+      const mx = adj.mx;
+      if (!mx || consumed.has(mx.key)) continue;
+      const raw = map.get(mx.key);
+      if (raw === undefined) continue;
+      const value = mx.from(raw, dw, dh);
+      if (value === null || !Number.isFinite(value)) continue;
+      consumed.add(mx.key);
+      params[adj.key] = value;
+    }
+    if (Object.keys(params).length > 0) out.shapeParams = params;
+  }
+  const mxStyle =
+    consumed.size === 0
+      ? unknown
+      : unknown.filter((t) => {
+          const eq = t.indexOf('=');
+          const key = eq < 0 ? t : t.slice(0, eq).trim();
+          return !consumed.has(key);
+        });
+  return { style: out, mxStyle };
 }
 
 const EDGE_STYLE_TOKEN: Record<EdgeType, string> = {
@@ -599,14 +651,21 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
       const kind = kindOfStyle(rawStyle);
       const def = shapeSize(kind);
       const parent = attr(cell, '@_parent');
-      const { style: nodeStyle, mxStyle: nodeMxStyle } = nodeStyleFromMx(rawStyle);
+      const width = geoNum(cell, '@_width', def.width);
+      const height = geoNum(cell, '@_height', def.height);
+      const { style: nodeStyle, mxStyle: nodeMxStyle } = nodeStyleFromMx(
+        rawStyle,
+        kind,
+        width,
+        height,
+      );
       nodes.push({
         id,
         type: 'shape',
         position: { x: geoNum(cell, '@_x', 0), y: geoNum(cell, '@_y', 0) },
         parentId: parent && parent !== '1' ? parent : null,
-        width: geoNum(cell, '@_width', def.width),
-        height: geoNum(cell, '@_height', def.height),
+        width,
+        height,
         ...(nodeMxStyle.length > 0 ? { mxStyle: nodeMxStyle } : {}),
         data: {
           ...defaultData(kind, labelOf(cell, rawStyle)),

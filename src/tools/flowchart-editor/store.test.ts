@@ -285,6 +285,50 @@ describe('几何编辑与折点吸附', () => {
   });
 });
 
+describe('形状可调参数写入', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(null);
+  });
+
+  const styleOf = (id: string) =>
+    useFlowStore.getState().nodes.find((n) => n.id === id)!.data.style;
+
+  it('setNodeParams 合并写入，clearNodeParam 单独回退', () => {
+    useFlowStore.getState().addNode('note', { x: 100, y: 100 });
+    const id = useFlowStore.getState().selectedNodes[0];
+    useFlowStore.getState().setNodeParams([id], { foldSize: 30 });
+    expect(styleOf(id).shapeParams).toEqual({ foldSize: 30 });
+    useFlowStore.getState().setNodeParams([id], { extra: 5 });
+    expect(styleOf(id).shapeParams).toEqual({ foldSize: 30, extra: 5 });
+    useFlowStore.getState().clearNodeParam([id], 'foldSize');
+    expect(styleOf(id).shapeParams).toEqual({ extra: 5 });
+  });
+
+  it('clearNodeParam 同时清除历史折角字段，避免回落旧值', () => {
+    useFlowStore.getState().addNode('note', { x: 0, y: 0 });
+    const id = useFlowStore.getState().selectedNodes[0];
+    useFlowStore.getState().setNodeParams([id], { foldSize: 24 });
+    // 模拟旧草稿：同时存在历史字段
+    useFlowStore.setState((s) => ({
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, style: { ...n.data.style, foldSize: 24 } } } : n,
+      ),
+    }));
+    useFlowStore.getState().clearNodeParam([id], 'foldSize');
+    expect(styleOf(id).foldSize).toBeUndefined();
+    expect(styleOf(id).shapeParams?.foldSize).toBeUndefined();
+  });
+
+  it('一次撤销即可整体回退参数变更', () => {
+    useFlowStore.getState().addNode('predefined', { x: 0, y: 0 });
+    const id = useFlowStore.getState().selectedNodes[0];
+    useFlowStore.getState().setNodeParams([id], { barWidth: 20 });
+    expect(styleOf(id).shapeParams?.barWidth).toBe(20);
+    useFlowStore.getState().undo();
+    expect(styleOf(id).shapeParams?.barWidth).toBeUndefined();
+  });
+});
+
 describe('图层面板拖放', () => {
   beforeEach(() => {
     useFlowStore.getState().load(buildTemplateDoc('swimlane'));

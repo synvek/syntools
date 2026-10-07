@@ -1,9 +1,12 @@
 /**
  * UML 形状共享的 SVG path 生成函数。
  *
- * 约定：入参 `w` / `h` 为节点像素尺寸；所有函数对尺寸做防御处理（不产生 NaN），
- * 输出可直接用于 `ShapeDef.path`，由 `nodes/shapeDraw.tsx` 的 `path` 分支渲染。
+ * 约定：入参 `w` / `h` 为节点像素尺寸，`p` 为可调参数读取器（默认值由 `ShapeDef.adjust` 声明）；
+ * 所有函数对尺寸做防御处理（不产生 NaN），输出可直接用于 `ShapeDef.path`，
+ * 由 `nodes/shapeDraw.tsx` 的 `path` 分支渲染。
  */
+
+import type { ParamGetter } from './adjust';
 
 /** 角色（火柴人）：头 + 躯干 + 手臂 + 腿 */
 export const actorPath = (w: number, h: number): string => {
@@ -17,13 +20,20 @@ export const actorPath = (w: number, h: number): string => {
   );
 };
 
-/** 包：左上角标签 + 主体矩形 */
-export const packagePath = (w: number, h: number): string =>
-  `M0,${h * 0.32} V${h} H${w} V${h * 0.32} H${w * 0.45} V0 H0 Z`;
+/** 包：左上角标签 + 主体矩形（tabHeight 可调） */
+export const packagePath = (w: number, h: number, p: ParamGetter): string => {
+  const th = p('tabHeight');
+  return `M0,${th} V${h} H${w} V${th} H${w * 0.45} V0 H0 Z`;
+};
 
-/** 生命线：顶部对象框 + 向下竖虚线 */
-export const lifelinePath = (w: number, h: number): string =>
-  `M${w * 0.2},0 H${w * 0.8} V${h * 0.16} H${w * 0.2} Z M${w * 0.5},${h * 0.16} V${h}`;
+/**
+ * 生命线：顶部对象框 + 向下竖虚线。
+ * 标题框高度 `lifelineHeader` 为固定像素（默认 40px），不再随生命线高度等比缩放。
+ */
+export const lifelinePath = (w: number, h: number, p: ParamGetter): string => {
+  const hh = p('lifelineHeader');
+  return `M${w * 0.2},0 H${w * 0.8} V${hh} H${w * 0.2} Z M${w * 0.5},${hh} V${h}`;
+};
 
 /** 正圆（两条半圆弧），供无需填充的圆形图标复用 */
 const circlePath = (cx: number, cy: number, r: number): string =>
@@ -65,18 +75,18 @@ export const entityPath = (w: number, h: number): string => {
   );
 };
 
-/** 图框（frame）：外框矩形 + 左上角五边形名称标签 */
-export const framePath = (w: number, h: number): string => {
+/** 图框（frame）：外框矩形 + 左上角五边形名称标签（tabHeight 可调） */
+export const framePath = (w: number, h: number, p: ParamGetter): string => {
   const tabW = Math.min(w * 0.42, 160);
-  const tabH = Math.min(h * 0.16, 26);
+  const tabH = p('tabHeight');
   const clip = tabH * 0.7;
   return `M0,0 H${w} V${h} H0 Z M0,0 H${tabW} L${tabW - clip},${tabH} H0 Z`;
 };
 
-/** 系统边界 / 主体（subject）：带左上角名称栏的矩形 */
-export const subjectPath = (w: number, h: number): string => {
+/** 系统边界 / 主体（subject）：带左上角名称栏的矩形（tabHeight 可调） */
+export const subjectPath = (w: number, h: number, p: ParamGetter): string => {
   const tabW = Math.min(w * 0.46, 180);
-  const tabH = Math.min(h * 0.18, 28);
+  const tabH = p('tabHeight');
   return `M0,0 H${tabW} V${tabH} H${w} V${h} H0 Z`;
 };
 
@@ -109,22 +119,22 @@ export const extendPath = (w: number, h: number): string => {
   );
 };
 
-/** 活动类：矩形 + 左右两侧的双竖线 */
-export const activeClassPath = (w: number, h: number): string => {
-  const inset = Math.max(5, w * 0.05);
+/** 活动类：矩形 + 左右两侧的双竖线（inset 可调） */
+export const activeClassPath = (w: number, h: number, p: ParamGetter): string => {
+  const inset = p('activeClassInset');
   return `M0,0 H${w} V${h} H0 Z M${inset},0 V${h} M${w - inset},0 V${h}`;
 };
 
-/** 模板类：矩形 + 右上角虚线小框 */
-export const templateClassPath = (w: number, h: number): string => {
+/** 模板类：矩形 + 右上角虚线小框（tabHeight 可调） */
+export const templateClassPath = (w: number, h: number, p: ParamGetter): string => {
   const tw = Math.min(w * 0.34, 70);
-  const th = Math.min(h * 0.24, 26);
+  const th = p('tabHeight');
   return `M0,0 H${w} V${h} H0 Z ` + `M${w - tw - 4},4 H${w - 4} V${4 + th} H${w - tw - 4} Z`;
 };
 
-/** 组件：主体矩形 + 左侧两个小凸块 */
-export const componentPath = (w: number, h: number): string => {
-  const tw = Math.min(w * 0.18, 34);
+/** 组件：主体矩形 + 左侧两个小凸块（tabWidth 可调） */
+export const componentPath = (w: number, h: number, p: ParamGetter): string => {
+  const tw = p('componentTab');
   const ty = h * 0.16;
   const t1a = h * 0.3;
   const t1b = h * 0.44;
@@ -170,18 +180,18 @@ export const destroyPath = (w: number, h: number): string => {
   );
 };
 
-/** 组合片段 / 图框：外框 + 左上角被切角的五边形标签 */
-export const combinedFragmentPath = (w: number, h: number): string => {
+/** 组合片段 / 图框：外框 + 左上角被切角的五边形标签（tabHeight 可调） */
+export const combinedFragmentPath = (w: number, h: number, p: ParamGetter): string => {
   const tabW = Math.min(w * 0.4, 150);
-  const tabH = Math.min(h * 0.2, 26);
+  const tabH = p('tabHeight');
   const clip = tabH * 0.7;
   return `M0,0 H${w} V${h} H0 Z M0,0 H${tabW} L${tabW - clip},${tabH} H0 Z`;
 };
 
-/** 交互引用（ref）：外框 + 左上角矩形标签 */
-export const interactionUsePath = (w: number, h: number): string => {
+/** 交互引用（ref）：外框 + 左上角矩形标签（tabHeight 可调） */
+export const interactionUsePath = (w: number, h: number, p: ParamGetter): string => {
   const tabW = Math.min(w * 0.4, 150);
-  const tabH = Math.min(h * 0.2, 26);
+  const tabH = p('tabHeight');
   return `M0,0 H${w} V${h} H0 Z M0,0 H${tabW} V${tabH} H0 Z`;
 };
 
@@ -193,15 +203,15 @@ export const sendSignalPath = (w: number, h: number): string =>
 export const receiveSignalPath = (w: number, h: number): string =>
   `M${w * 0.3},0 H${w} V${h} H${w * 0.3} L0,${h / 2} Z`;
 
-/** 活动分区：外框 + 左侧竖向分隔线 */
-export const activityPartitionPath = (w: number, h: number): string => {
-  const hw = Math.min(w * 0.2, 44);
+/** 活动分区：外框 + 左侧竖向分隔线（左栏宽可调） */
+export const activityPartitionPath = (w: number, h: number, p: ParamGetter): string => {
+  const hw = p('partitionHeader');
   return `M0,0 H${w} V${h} H0 Z M${hw},0 V${h}`;
 };
 
-/** 部署节点：3D 立方体（前/上/右三面） */
-export const nodePath = (w: number, h: number): string => {
-  const d = Math.min(w, h) * 0.18;
+/** 部署节点：3D 立方体（前/上/右三面；深度可调） */
+export const nodePath = (w: number, h: number, p: ParamGetter): string => {
+  const d = p('cubeDepth');
   return (
     `M0,${d} L${d},0 H${w} V${h - d} L${w - d},${h} H0 Z ` +
     `M0,${d} H${w - d} V${h} M${w - d},${d} L${w},0`
@@ -209,19 +219,19 @@ export const nodePath = (w: number, h: number): string => {
 };
 
 /** 设备：3D 立方体 + 前表面上方的一条横线（与普通节点区分） */
-export const devicePath = (w: number, h: number): string => {
-  const d = Math.min(w, h) * 0.18;
-  return `${nodePath(w, h)} M0,${d + h * 0.18} H${w - d}`;
+export const devicePath = (w: number, h: number, p: ParamGetter): string => {
+  const d = p('cubeDepth');
+  return `${nodePath(w, h, p)} M0,${d + h * 0.18} H${w - d}`;
 };
 
 /** 运行环境：3D 立方体 + 前表面下方的双横线 */
-export const executionEnvironmentPath = (w: number, h: number): string => {
-  const d = Math.min(w, h) * 0.18;
-  return `${nodePath(w, h)} M0,${h * 0.66} H${w - d} M0,${h * 0.76} H${w - d}`;
+export const executionEnvironmentPath = (w: number, h: number, p: ParamGetter): string => {
+  const d = p('cubeDepth');
+  return `${nodePath(w, h, p)} M0,${h * 0.66} H${w - d} M0,${h * 0.76} H${w - d}`;
 };
 
-/** 制品：右上角折角的矩形 */
-export const artifactPath = (w: number, h: number): string => {
-  const c = Math.max(0, Math.min(16, w * 0.16, h * 0.24));
+/** 制品：右上角折角的矩形（折角可调） */
+export const artifactPath = (w: number, h: number, p: ParamGetter): string => {
+  const c = p('foldSize');
   return `M0,0 H${w - c} L${w},${c} V${h} H0 Z M${w - c},0 V${c} H${w}`;
 };

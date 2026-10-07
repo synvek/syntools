@@ -1,4 +1,5 @@
 import type { ShapeDef } from './index';
+import { axisAdjust, pxMx } from './adjust';
 import { activityPartitionPath, receiveSignalPath, sendSignalPath } from './uml-paths';
 
 /** UML 活动图：动作、活动、判断/合并、初始/结束、流结束、对象节点、信号、分区、分叉/汇合 */
@@ -83,6 +84,18 @@ export const UML_ACTIVITY_SHAPES: ShapeDef[] = [
     draw: 'path',
     size: { width: 240, height: 180 },
     path: activityPartitionPath,
+    adjust: [
+      axisAdjust({
+        key: 'partitionHeader',
+        labelKey: 'partitionHeader',
+        axis: 'x',
+        cross: (_w, h) => h / 2,
+        default: (w) => Math.min(w * 0.2, 44),
+        min: () => 12,
+        max: (w) => w * 0.5,
+        mx: pxMx((w) => w),
+      }),
+    ],
     defaultStyle: { fill: 'transparent', stroke: '#2563EB' },
   },
 ];

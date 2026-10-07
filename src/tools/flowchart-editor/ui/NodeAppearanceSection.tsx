@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 import type { FlowNodePatch, FlowNodeStyleView } from '../model/types';
-import type { ShapeDraw } from '../model/shapes';
 
 const FONT_FAMILIES = [
   'system-ui, sans-serif',
@@ -34,15 +33,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  */
 export function NodeAppearanceSection({
   style,
-  draw,
   patch,
   onEnd,
   fallback,
   mixed = false,
 }: {
   style: FlowNodeStyleView;
-  /** 多选时若各节点图形不一致则传入 undefined（隐藏圆角/折角等与图形强相关的项） */
-  draw?: ShapeDraw;
   patch: (p: FlowNodePatch) => void;
   onEnd: () => void;
   /** 混合态下用于回显的基准样式（通常取首个选中节点） */
@@ -50,8 +46,6 @@ export function NodeAppearanceSection({
   mixed?: boolean;
 }) {
   const { t } = useTranslation();
-  const corner = style.cornerRadius ?? (draw === 'roundRect' ? 10 : 4);
-  const fold = style.foldSize ?? 16;
   const opacity = style.opacity ?? fallback.opacity ?? 1;
 
   return (
@@ -137,38 +131,6 @@ export function NodeAppearanceSection({
       >
         {t('tools.flowchart.shadow')}
       </button>
-
-      {draw === 'roundRect' || draw === 'rect' ? (
-        <Field label={`${t('tools.flowchart.cornerRadius')} ${corner}`}>
-          <input
-            type="range"
-            min={0}
-            max={40}
-            step={1}
-            value={corner}
-            aria-label={t('tools.flowchart.cornerRadius')}
-            onChange={(e) => patch({ style: { cornerRadius: Number(e.target.value) } })}
-            onBlur={onEnd}
-            className="w-full accent-blue-500"
-          />
-        </Field>
-      ) : null}
-
-      {draw === 'note' ? (
-        <Field label={`${t('tools.flowchart.foldSize')} ${fold}`}>
-          <input
-            type="range"
-            min={0}
-            max={60}
-            step={1}
-            value={fold}
-            aria-label={t('tools.flowchart.foldSize')}
-            onChange={(e) => patch({ style: { foldSize: Number(e.target.value) } })}
-            onBlur={onEnd}
-            className="w-full accent-blue-500"
-          />
-        </Field>
-      ) : null}
     </div>
   );
 }

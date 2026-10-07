@@ -1,16 +1,23 @@
 import type { ShapeDef } from './index';
+import { axisAdjust, pxMx, type ParamGetter } from './adjust';
 
-/** 预定义过程：矩形 + 两侧竖线 */
-const predefinedPath = (w: number, h: number): string =>
-  `M0,0 H${w} V${h} H0 Z M14,0 V${h} M${w - 14},0 V${h}`;
+/** 预定义过程：矩形 + 两侧竖线（竖线内缩量 barWidth 可调） */
+const predefinedPath = (w: number, h: number, p: ParamGetter): string => {
+  const bw = p('barWidth');
+  return `M0,0 H${w} V${h} H0 Z M${bw},0 V${h} M${w - bw},0 V${h}`;
+};
 
-/** 离页连接符：房屋形五边形 */
-const offPagePath = (w: number, h: number): string =>
-  `M0,${h} V${h * 0.45} L${w / 2},0 L${w},${h * 0.45} V${h} Z`;
+/** 离页连接符：房屋形五边形（屋脊高度可调） */
+const offPagePath = (w: number, h: number, p: ParamGetter): string => {
+  const roof = p('roofHeight');
+  return `M0,${h} V${roof} L${w / 2},0 L${w},${roof} V${h} Z`;
+};
 
-/** 循环上限：左下角缺角矩形 */
-const loopLimitPath = (w: number, h: number): string =>
-  `M0,0 H${w} V${h} H${h * 0.3} L0,${h * 0.7} Z`;
+/** 循环上限：左下角缺角矩形（缺角尺寸可调） */
+const loopLimitPath = (w: number, h: number, p: ParamGetter): string => {
+  const notch = p('loopNotch');
+  return `M0,0 H${w} V${h} H${notch} L0,${h - notch} Z`;
+};
 
 export const FLOW_SHAPES: ShapeDef[] = [
   {
@@ -35,6 +42,18 @@ export const FLOW_SHAPES: ShapeDef[] = [
     draw: 'path',
     size: { width: 170, height: 64 },
     path: predefinedPath,
+    adjust: [
+      axisAdjust({
+        key: 'barWidth',
+        labelKey: 'barWidth',
+        axis: 'x',
+        cross: (_w, h) => h / 2,
+        default: () => 14,
+        min: () => 4,
+        max: (w) => w * 0.4,
+        mx: pxMx((w) => w),
+      }),
+    ],
   },
   { kind: 'manualInput', category: 'flow', draw: 'trapezoid', size: { width: 150, height: 64 } },
   {
@@ -64,6 +83,17 @@ export const FLOW_SHAPES: ShapeDef[] = [
     draw: 'path',
     size: { width: 96, height: 76 },
     path: offPagePath,
+    adjust: [
+      axisAdjust({
+        key: 'roofHeight',
+        labelKey: 'roofHeight',
+        axis: 'y',
+        cross: (w) => w / 2,
+        default: (_w, h) => h * 0.45,
+        max: (_w, h) => h * 0.9,
+        mx: pxMx((_w, h) => h),
+      }),
+    ],
   },
   { kind: 'terminator', category: 'flow', draw: 'capsule', size: { width: 130, height: 56 } },
   {
@@ -79,5 +109,16 @@ export const FLOW_SHAPES: ShapeDef[] = [
     draw: 'path',
     size: { width: 170, height: 64 },
     path: loopLimitPath,
+    adjust: [
+      axisAdjust({
+        key: 'loopNotch',
+        labelKey: 'loopNotch',
+        axis: 'x',
+        cross: (_w, h) => h,
+        default: (_w, h) => h * 0.3,
+        max: (_w, h) => h * 0.9,
+        mx: pxMx((_w, h) => h),
+      }),
+    ],
   },
 ];

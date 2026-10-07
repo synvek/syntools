@@ -90,6 +90,46 @@ body.flow-connecting .react-flow__handle {
   cursor: grabbing;
 }
 
+/* 形状可调参数手柄：仿 Draw.io 的琥珀色菱形调整顶点 */
+.shape-adjust {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.shape-adjust__dot {
+  width: 9px;
+  height: 9px;
+  background: #f59e0b;
+  border: 1.5px solid #ffffff;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(180, 83, 9, 0.45);
+  transform: rotate(45deg);
+  transition:
+    transform 100ms ease,
+    background-color 100ms ease;
+}
+
+.shape-adjust:hover .shape-adjust__dot {
+  background: #d97706;
+  transform: rotate(45deg) scale(1.25);
+}
+
+.shape-adjust:active .shape-adjust__dot {
+  background: #b45309;
+}
+
 /* 悬停快速连线箭头（四向） */
 .quick-connect {
   width: 18px;

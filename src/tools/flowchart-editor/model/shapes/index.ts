@@ -5,6 +5,7 @@
  */
 
 import type { FlowNodeStyle, ShapeKind, ShapeSize } from '../types';
+import type { ParamGetter, ShapeAdjustDef } from './adjust';
 import { FLOW_SHAPES } from './flow';
 import { UML_SHAPES } from './uml';
 import { BPMN_SHAPES } from './bpmn';
@@ -101,10 +102,18 @@ export interface ShapeDef {
   size: ShapeSize;
   /** 内部装饰符号（网关 X/+、事件圈等） */
   decor?: ShapeDecor;
-  /** draw === 'path' 时的 SVG path 生成函数 */
-  path?: (w: number, h: number) => string;
+  /**
+   * draw === 'path' 时的 SVG path 生成函数。
+   * 第三个参数为可调参数读取器（`p('tabHeight')` 等），默认值由 `ShapeDef.adjust` 声明。
+   */
+  path?: (w: number, h: number, p: ParamGetter) => string;
   isContainer?: boolean;
   defaultStyle?: Partial<FlowNodeStyle>;
+  /**
+   * 形状专属的可调参数（类 draw.io 调整顶点）。
+   * 通用参数（圆角/折角/斜切/分栏高……）由 `adjust.ts` 按 draw / decor 自动派生，无需在此重复声明。
+   */
+  adjust?: ShapeAdjustDef[];
 }
 
 const ALL_SHAPES: ShapeDef[] = [
@@ -156,3 +165,6 @@ export function shapeDefOf(kind: ShapeKind): ShapeDef | undefined {
 export function shapeSize(kind: ShapeKind): ShapeSize {
   return SHAPE_DEFS[kind]?.size ?? { width: 150, height: 64 };
 }
+
+export type { AdjustPoint, AdjustMx, ParamGetter, ShapeAdjustDef } from './adjust';
+export { adjustsFor, hasAdjusts, paramGetterFor, paramValue, projectAdjust } from './adjust';

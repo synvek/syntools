@@ -1,4 +1,5 @@
 import type { ShapeDef } from './index';
+import { axisAdjust, pxMx } from './adjust';
 import { extendPath, includePath, subjectPath } from './uml-paths';
 
 /** UML 用例图：用例、系统边界、包含/扩展关系、扩展点 */
@@ -16,6 +17,18 @@ export const UML_USECASE_SHAPES: ShapeDef[] = [
     draw: 'path',
     size: { width: 340, height: 220 },
     path: subjectPath,
+    adjust: [
+      axisAdjust({
+        key: 'tabHeight',
+        labelKey: 'tabHeight',
+        axis: 'y',
+        cross: (w) => w / 2,
+        default: (_w, h) => Math.min(h * 0.18, 28),
+        min: () => 10,
+        max: (_w, h) => h * 0.5,
+        mx: pxMx((_w, h) => h),
+      }),
+    ],
     defaultStyle: { fill: 'transparent', stroke: '#4F46E5' },
   },
   {

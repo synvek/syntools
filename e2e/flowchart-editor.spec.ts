@@ -209,7 +209,8 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
 
   test('图层面板：容器树形、搜索过滤与拖拽改父级入口', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    await page.getByRole('button', { name: '模板' }).click();
+    // 精确匹配：图形库里另有「模板类」图形按钮
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
 
@@ -247,7 +248,8 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
 
   test('自动布局：方向可选且保留泳道层级', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    await page.getByRole('button', { name: '模板' }).click();
+    // 精确匹配：图形库里另有「模板类」图形按钮
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
 
@@ -346,7 +348,8 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
 
   test('模板弹窗：焦点陷阱与 Esc 关闭', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    await page.getByRole('button', { name: '模板' }).click();
+    // 精确匹配：图形库里另有「模板类」图形按钮
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     const dialog = page.getByTestId('flowchart-template-dialog');
     await expect(dialog).toBeVisible();
     // 打开后焦点进入弹窗
@@ -480,6 +483,77 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await page.getByTestId('context-auto-route').click();
     await expect(page.getByTestId('flow-context-menu')).toHaveCount(0);
     await expect(page.getByTestId('edge-waypoint').first()).toBeVisible();
+  });
+
+  test('形状调整手柄：便签折角可拖拽并与属性面板同步', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page
+      .getByRole('button', { name: '便签', exact: true })
+      .dragTo(page.locator('.react-flow'), { targetPosition: { x: 300, y: 200 } });
+    await expect(page.locator(NODE)).toHaveCount(1);
+
+    const node = page.locator(NODE).first();
+    await node.click();
+    const handle = page.getByTestId('flowchart-adjust-foldSize');
+    await expect(handle).toBeVisible();
+
+    const slider = page.getByTestId('flowchart-param-foldSize');
+    await expect(slider).toBeVisible();
+    const before = Number(await slider.inputValue());
+    const pathBefore = await node.locator('svg path').first().getAttribute('d');
+
+    // 向左拖拽折角顶点：折角变大（value = w - x）
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 - 40, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.up();
+
+    await expect.poll(async () => Number(await slider.inputValue())).toBeGreaterThan(before);
+    // 图形本体（折角路径）随之改变
+    await expect
+      .poll(async () => node.locator('svg path').first().getAttribute('d'))
+      .not.toBe(pathBefore);
+
+    // 双击顶点回到默认值
+    await handle.dblclick();
+    await expect.poll(async () => Number(await slider.inputValue())).toBe(before);
+  });
+
+  test('形状调整手柄：预定义过程左右竖线宽度可拖拽', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page
+      .getByRole('button', { name: '预定义过程', exact: true })
+      .dragTo(page.locator('.react-flow'), { targetPosition: { x: 300, y: 220 } });
+    await expect(page.locator(NODE)).toHaveCount(1);
+    await page.locator(NODE).first().click();
+
+    const handle = page.getByTestId('flowchart-adjust-barWidth');
+    await expect(handle).toBeVisible();
+    const slider = page.getByTestId('flowchart-param-barWidth');
+    const before = Number(await slider.inputValue());
+
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 24, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.up();
+
+    await expect.poll(async () => Number(await slider.inputValue())).toBeGreaterThan(before);
+  });
+
+  test('多选时不显示调整手柄（避免堆叠）', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page
+      .getByRole('button', { name: '便签', exact: true })
+      .dragTo(page.locator('.react-flow'), { targetPosition: { x: 220, y: 160 } });
+    await page
+      .getByRole('button', { name: '便签', exact: true })
+      .dragTo(page.locator('.react-flow'), { targetPosition: { x: 480, y: 160 } });
+    await expect(page.locator(NODE)).toHaveCount(2);
+    await page.keyboard.press('Control+a');
+    await expect(page.getByText(/已选中 2 个元素/)).toBeVisible();
+    await expect(page.getByTestId('flowchart-adjust-foldSize')).toHaveCount(0);
   });
 
   test('导入压缩形式（base64 + deflate）的 .drawio', async ({ page }) => {
