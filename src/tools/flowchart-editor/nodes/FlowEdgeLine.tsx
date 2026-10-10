@@ -274,7 +274,12 @@ export function FlowEdgeLine(props: EdgeProps) {
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={() => commitLabel(s.slot)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitLabel(s.slot);
+                  // 阻止冒泡：提交后输入框卸载，避免全局快捷键误判为画布操作
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitLabel(s.slot);
+                  }
                   if (e.key === 'Escape') setEditingSlot(null);
                 }}
                 className="pointer-events-auto w-24 rounded border border-blue-400 bg-white px-1 py-0.5 text-center text-[11px] outline-none dark:bg-gray-900 dark:text-gray-100"

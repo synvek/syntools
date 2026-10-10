@@ -7,7 +7,9 @@
  *   强行近似会出现跳线错位，因此跳过（见 `polylineOf`）。
  * - 跳线只作用于「声明了 arc」的连线，且跳过数组中更靠前（更底层）的连线，
  *   与 draw.io 中「上层线跳过下层线」的观感一致。
- * - 连线上限超过阈值时整体降级为不绘制，避免 O(E²·S²) 失控。
+ * - 性能：线段相交检测走空间网格哈希，把 O(E²·S²) 降为近似 O(E·S)；
+ *   连线数超过 `JUMP_EDGE_LIMIT` 时按比例分级降级（而非整体丢弃），
+ *   保证大图仍保留可读的跳线表现且开销可控。
  */
 
 import { anchorOf } from '../core';
@@ -53,7 +55,7 @@ export interface JumpMark {
   stroke: string;
 }
 
-/** 可绘制跳线的连线数上限（超过则整体降级） */
+/** 可绘制跳线的连线数上限（超过则按比例降级） */
 export const JUMP_EDGE_LIMIT = 150;
 /** 跳线弧半径（画布单位） */
 const ARC_RADIUS = 5;
@@ -61,6 +63,10 @@ const ARC_RADIUS = 5;
 const ENDPOINT_MARGIN = 8;
 /** 同一位置去重阈值 */
 const DEDUPE_DISTANCE = 3;
+/** 空间网格边长（画布单位）：越大候选越少但格子越大，取 64 折中 */
+const GRID_CELL = 64;
+/** 标记去重网格边长 */
+const MARK_CELL = DEDUPE_DISTANCE * 2;
 
 /** 两条线段的真交点；共线 / 平行 / 仅端点相接时返回 null */
 export function segmentIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point2 | null {
@@ -106,9 +112,64 @@ function polylineOf(
   return { points, style };
 }
 
+interface SegEntry {
+  a: Point2;
+  b: Point2;
+  owner: number;
+}
+
+function cellKey(cx: number, cy: number): string {
+  return `${cx},${cy}`;
+}
+
+/** 把一条线段按其 AABB 覆盖的网格单元登记（供查询） */
+function insertSegment(grid: Map<string, SegEntry[]>, entry: SegEntry): void {
+  const minX = Math.min(entry.a.x, entry.b.x);
+  const maxX = Math.max(entry.a.x, entry.b.x);
+  const minY = Math.min(entry.a.y, entry.b.y);
+  const maxY = Math.max(entry.a.y, entry.b.y);
+  const cx0 = Math.floor(minX / GRID_CELL);
+  const cx1 = Math.floor(maxX / GRID_CELL);
+  const cy0 = Math.floor(minY / GRID_CELL);
+  const cy1 = Math.floor(maxY / GRID_CELL);
+  for (let cy = cy0; cy <= cy1; cy += 1) {
+    for (let cx = cx0; cx <= cx1; cx += 1) {
+      const key = cellKey(cx, cy);
+      const list = grid.get(key);
+      if (list) list.push(entry);
+      else grid.set(key, [entry]);
+    }
+  }
+}
+
+/** 收集查询线段 AABB 覆盖单元内的候选段（自动去重） */
+function querySegments(
+  grid: Map<string, SegEntry[]>,
+  a: Point2,
+  b: Point2,
+  out: Set<SegEntry>,
+): void {
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  const cx0 = Math.floor(minX / GRID_CELL);
+  const cx1 = Math.floor(maxX / GRID_CELL);
+  const cy0 = Math.floor(minY / GRID_CELL);
+  const cy1 = Math.floor(maxY / GRID_CELL);
+  for (let cy = cy0; cy <= cy1; cy += 1) {
+    for (let cx = cx0; cx <= cx1; cx += 1) {
+      const list = grid.get(cellKey(cx, cy));
+      if (!list) continue;
+      for (const entry of list) out.add(entry);
+    }
+  }
+}
+
 /**
  * 计算全部跳线标记。
- * 只在「声明 arc 的连线」与「数组中更靠前的连线」的交叉处生成标记。
+ * 只在「声明 arc 的连线」与「数组中更靠前的连线」的交叉处生成标记；
+ * 连线数超过 `limit` 时按比例降级（保留前 limit/2 条连线参与绘制）。
  */
 export function computeEdgeJumps(
   nodes: readonly JumpNode[],
@@ -116,59 +177,89 @@ export function computeEdgeJumps(
   limit = JUMP_EDGE_LIMIT,
 ): JumpMark[] {
   const visible = edges.filter((e) => e.hidden !== true);
-  if (visible.length === 0 || visible.length > limit) return [];
+  if (visible.length === 0) return [];
+  const drawCount = visible.length <= limit ? visible.length : Math.floor(limit / 2);
+  if (drawCount <= 0) return [];
+
   const byId = new Map(nodes.map((n) => [n.id, n] as const));
+  const lines = visible.map((e) => polylineOf(e, byId));
 
-  const lines = visible.map((e) => (e.hidden === true ? null : polylineOf(e, byId)));
+  // 1) 空间网格：装入「更底层」（索引 < drawCount）的所有线段
+  const grid = new Map<string, SegEntry[]>();
+  for (let i = 0; i < drawCount; i += 1) {
+    const line = lines[i];
+    if (!line) continue;
+    for (let seg = 1; seg < line.points.length; seg += 1) {
+      insertSegment(grid, { a: line.points[seg - 1], b: line.points[seg], owner: i });
+    }
+  }
+
   const marks: JumpMark[] = [];
-
-  visible.forEach((edge, i) => {
-    const jump: EdgeJumpStyle = normalizeEdgeStyle(edge.data?.style).jumpStyle ?? 'none';
-    if (jump !== 'arc') return;
-    const self = lines[i];
-    if (!self) return;
-    for (let seg = 1; seg < self.points.length; seg += 1) {
-      const a1 = self.points[seg - 1];
-      const a2 = self.points[seg];
-      const segLen = Math.hypot(a2.x - a1.x, a2.y - a1.y);
-      if (segLen < ENDPOINT_MARGIN * 2) continue;
-      for (let j = 0; j < i; j += 1) {
-        const other = lines[j];
-        if (!other) continue;
-        for (let oseg = 1; oseg < other.points.length; oseg += 1) {
-          const b1 = other.points[oseg - 1];
-          const b2 = other.points[oseg];
-          const hit = segmentIntersection(a1, a2, b1, b2);
-          if (!hit) continue;
-          // 太靠近自身线段端点：跳过（避免与节点/箭头视觉冲突）
-          if (
-            Math.hypot(hit.x - a1.x, hit.y - a1.y) < ENDPOINT_MARGIN ||
-            Math.hypot(hit.x - a2.x, hit.y - a2.y) < ENDPOINT_MARGIN
-          ) {
-            continue;
-          }
-          const ownAngle = Math.atan2(a2.y - a1.y, a2.x - a1.x);
-          const otherAngle = Math.atan2(b2.y - b1.y, b2.x - b1.x);
-          // 用叉积判断被穿越连线相对本线的方位，决定弧线鼓起方向
-          const cross = Math.sin(otherAngle - ownAngle);
-          if (Math.abs(cross) < 1e-6) continue;
-          const duplicate = marks.some(
-            (m) => Math.hypot(m.x - hit.x, m.y - hit.y) < DEDUPE_DISTANCE,
-          );
-          if (duplicate) continue;
-          marks.push({
-            x: hit.x,
-            y: hit.y,
-            // 弧线沿「本线方向」张弦，避免斜向交叉时弧线方向错乱
-            angle: ownAngle,
-            sweep: cross > 0 ? 1 : 0,
-            radius: ARC_RADIUS,
-            stroke: self.style.stroke,
-          });
+  const markGrid = new Map<string, JumpMark[]>();
+  const hasNearbyMark = (x: number, y: number): boolean => {
+    const cx = Math.floor(x / MARK_CELL);
+    const cy = Math.floor(y / MARK_CELL);
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const list = markGrid.get(cellKey(cx + dx, cy + dy));
+        if (!list) continue;
+        for (const m of list) {
+          if (Math.hypot(m.x - x, m.y - y) < DEDUPE_DISTANCE) return true;
         }
       }
     }
-  });
+    return false;
+  };
+  const addMark = (mark: JumpMark): void => {
+    marks.push(mark);
+    const key = cellKey(Math.floor(mark.x / MARK_CELL), Math.floor(mark.y / MARK_CELL));
+    const list = markGrid.get(key);
+    if (list) list.push(mark);
+    else markGrid.set(key, [mark]);
+  };
+
+  const candidates = new Set<SegEntry>();
+  for (let i = 0; i < drawCount; i += 1) {
+    const edge = visible[i];
+    const jump: EdgeJumpStyle = normalizeEdgeStyle(edge.data?.style).jumpStyle ?? 'none';
+    if (jump !== 'arc') continue;
+    const self = lines[i];
+    if (!self) continue;
+    for (let seg = 1; seg < self.points.length; seg += 1) {
+      const a1 = self.points[seg - 1];
+      const a2 = self.points[seg];
+      if (Math.hypot(a2.x - a1.x, a2.y - a1.y) < ENDPOINT_MARGIN * 2) continue;
+      candidates.clear();
+      querySegments(grid, a1, a2, candidates);
+      for (const entry of candidates) {
+        if (entry.owner >= i) continue;
+        const hit = segmentIntersection(a1, a2, entry.a, entry.b);
+        if (!hit) continue;
+        // 太靠近自身线段端点：跳过（避免与节点/箭头视觉冲突）
+        if (
+          Math.hypot(hit.x - a1.x, hit.y - a1.y) < ENDPOINT_MARGIN ||
+          Math.hypot(hit.x - a2.x, hit.y - a2.y) < ENDPOINT_MARGIN
+        ) {
+          continue;
+        }
+        const ownAngle = Math.atan2(a2.y - a1.y, a2.x - a1.x);
+        const otherAngle = Math.atan2(entry.b.y - entry.a.y, entry.b.x - entry.a.x);
+        // 用叉积判断被穿越连线相对本线的方位，决定弧线鼓起方向
+        const cross = Math.sin(otherAngle - ownAngle);
+        if (Math.abs(cross) < 1e-6) continue;
+        if (hasNearbyMark(hit.x, hit.y)) continue;
+        addMark({
+          x: hit.x,
+          y: hit.y,
+          // 弧线沿「本线方向」张弦，避免斜向交叉时弧线方向错乱
+          angle: ownAngle,
+          sweep: cross > 0 ? 1 : 0,
+          radius: ARC_RADIUS,
+          stroke: self.style.stroke,
+        });
+      }
+    }
+  }
   return marks;
 }
 

@@ -104,6 +104,30 @@ export function NodeTextSection({
           >
             {t('tools.flowchart.autoShrink')}
           </button>
+
+          {/* 文本格式：纯文本 / Markdown（行内语法在 ShapeNode 中渲染） */}
+          <button
+            type="button"
+            data-testid="flowchart-text-format"
+            aria-pressed={style.textFormat === 'markdown'}
+            onClick={() =>
+              patch({
+                style: { textFormat: style.textFormat === 'markdown' ? 'plain' : 'markdown' },
+              })
+            }
+            onBlur={onEnd}
+            className={`w-full rounded-md border px-2 py-1.5 text-[12px] transition-colors ${
+              style.textFormat === 'markdown'
+                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+          >
+            {`${t('tools.flowchart.textFormat')}: ${
+              style.textFormat === 'markdown'
+                ? t('tools.flowchart.textFormatMarkdown')
+                : t('tools.flowchart.textFormatPlain')
+            }`}
+          </button>
         </>
       )}
 

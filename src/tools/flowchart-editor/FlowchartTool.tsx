@@ -27,23 +27,53 @@ import {
   savePersistedSnapshots,
 } from './store/persist';
 import { hasFlowchartStrings, registerFlowchartStrings } from './strings';
+
+/** 元素是否处于文本输入态（输入框 / 文本域 / 可编辑区域） */
+function isTypingElement(el: unknown): boolean {
+  if (!el || !(el instanceof HTMLElement)) return false;
+  const tag = el.tagName.toUpperCase();
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+}
+
+/**
+ * 当前是否处于文本编辑：同时看「事件目标」与「焦点元素」。
+ *
+ * 内联编辑器（图形文字 / 表格单元格 / 连线标签 / 图层重命名）在 Enter 提交时会同步卸载，
+ * 此时 `document.activeElement` 已回落到 body，只看焦点元素会把「提交」误判为画布操作
+ * （典型表现：在节点里按 Enter 提交后，又触发了「Enter 生成下方节点」）。
+ */
+function isTypingContext(e: KeyboardEvent): boolean {
+  return isTypingElement(e.target) || isTypingElement(document.activeElement);
+}
 import {
   FORMULA_NODE_SIZE,
   ICON_NODE_SIZE,
   IMAGE_NODE_SIZE,
+  TABLE_NODE_SIZE,
   type FlowNodeData,
   type FlowNodeType,
   type ShapeKind,
 } from './model/types';
 import { shapeSize } from './model/shapes';
-import { absolutePositionOf, absoluteRectOf, formulaData, iconData, imageData } from './core';
+import {
+  absolutePositionOf,
+  absoluteRectOf,
+  formulaData,
+  iconData,
+  imageData,
+  tableData,
+} from './core';
 import { fitInto, loadImageFile } from './model/image';
 import { activePageOf } from './model/migrate';
 import { FlowCanvas } from './ui/FlowCanvas';
 import { IoMenu } from './ui/IoMenu';
 import { ShapePalette } from './ui/ShapePalette';
+import { NARROW_QUERY, useMediaQuery } from './ui/useMediaQuery';
+import { Onboarding } from './ui/Onboarding';
+import { hasSeenOnboarding } from './ui/onboardingStorage';
 import { Toolbar } from './ui/Toolbar';
 import { PropertyPanel } from './ui/PropertyPanel';
+import { ArrangePanel } from './ui/ArrangePanel';
 import { LayerPanel } from './ui/LayerPanel';
 import { SnapshotPanel } from './ui/SnapshotPanel';
 import { SearchPanel } from './ui/SearchPanel';
@@ -59,13 +89,14 @@ import '@xyflow/react/dist/style.css';
 
 const DRAFT_DEBOUNCE_MS = 1200;
 
-/** 右侧面板：属性 / 图层 / 历史快照 / 全图搜索 */
-const PANELS = ['prop', 'layer', 'history', 'search'] as const;
+/** 右侧面板：属性 / 排列 / 图层 / 历史快照 / 全图搜索 */
+const PANELS = ['prop', 'arrange', 'layer', 'history', 'search'] as const;
 type PanelKey = (typeof PANELS)[number];
 
 /** 面板 → i18n 键后缀 */
 const PANEL_LABEL_KEY: Record<PanelKey, string> = {
   prop: 'panelTitle',
+  arrange: 'arrangePanel',
   layer: 'layers',
   history: 'history',
   search: 'searchNodes',
@@ -119,6 +150,14 @@ function FlowchartInner() {
   const [exportOpen, setExportOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelKey>('prop');
+  /** 窄屏（<lg）下把左右两栏改为抽屉；宽屏保持三栏 */
+  const isNarrow = useMediaQuery(NARROW_QUERY);
+  const [drawer, setDrawer] = useState<null | 'palette' | 'panel'>(null);
+  /** 首启引导：仅首次进入自动弹出，可由空状态或快捷键帮助再次打开 */
+  const [guideOpen, setGuideOpen] = useState(false);
+  useEffect(() => {
+    if (!hasSeenOnboarding()) setGuideOpen(true);
+  }, []);
   const [draftSaved, setDraftSaved] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
@@ -331,6 +370,11 @@ function FlowchartInner() {
     [addMediaAtCenter],
   );
 
+  const handleAddTable = useCallback(
+    () => addMediaAtCenter('table', tableData(3, 3), TABLE_NODE_SIZE),
+    [addMediaAtCenter],
+  );
+
   const imageRef = useRef<HTMLInputElement>(null);
   const handleImageFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -442,11 +486,10 @@ function FlowchartInner() {
     [setCenter],
   );
 
-  // 键盘快捷键：撤销/重做/剪切复制粘贴/保存/导出/删除/微移/全选/重命名/建节点（输入框聚焦时不拦截）
+  // 键盘快捷键：撤销/重做/剪切复制粘贴/保存/导出/删除/微移/全选/重命名/建节点（文本编辑态不拦截）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (document.activeElement?.tagName ?? '').toUpperCase();
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (isTypingContext(e)) return;
       // 任意模态弹层（放映 / 模板 / 页面总览）打开时让位：
       // 编辑器快捷键不应作用于被遮挡的画布，也不应抢走弹层的 Esc。
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
@@ -652,13 +695,66 @@ function FlowchartInner() {
         canRedo={canRedo}
       />
 
-      <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
-        <ShapePalette
-          onAddNode={addNodeAtCenter}
-          onAddIcon={handleAddIcon}
-          onAddImage={() => imageRef.current?.click()}
-          onAddFormula={handleAddFormula}
+      {/* 窄屏：左右两栏改为抽屉，底部提供开关 */}
+      {isNarrow ? (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          <button
+            type="button"
+            data-testid="flowchart-drawer-palette"
+            aria-expanded={drawer === 'palette'}
+            onClick={() => setDrawer(drawer === 'palette' ? null : 'palette')}
+            className={`shrink-0 rounded-md border px-2.5 py-1 text-[12px] transition-colors ${
+              drawer === 'palette'
+                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
+                : 'border-gray-200 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300'
+            }`}
+          >
+            {t('tools.flowchart.paletteTitle')}
+          </button>
+          <button
+            type="button"
+            data-testid="flowchart-drawer-panel"
+            aria-expanded={drawer === 'panel'}
+            onClick={() => setDrawer(drawer === 'panel' ? null : 'panel')}
+            className={`shrink-0 rounded-md border px-2.5 py-1 text-[12px] transition-colors ${
+              drawer === 'panel'
+                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
+                : 'border-gray-200 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300'
+            }`}
+          >
+            {t('tools.flowchart.panelTitle')}
+          </button>
+        </div>
+      ) : null}
+
+      {isNarrow && drawer ? (
+        <button
+          type="button"
+          aria-label={t('tools.flowchart.closeDialog')}
+          data-testid="flowchart-drawer-backdrop"
+          onClick={() => setDrawer(null)}
+          className="fixed inset-0 z-30 bg-black/30"
         />
+      ) : null}
+
+      <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
+        <div
+          className={
+            isNarrow
+              ? `fixed inset-y-0 left-0 z-40 w-[280px] overflow-y-auto bg-gray-50 p-2 shadow-2xl transition-transform duration-200 dark:bg-gray-900 ${
+                  drawer === 'palette' ? 'translate-x-0' : '-translate-x-full'
+                }`
+              : 'contents'
+          }
+        >
+          <ShapePalette
+            onAddNode={addNodeAtCenter}
+            onAddIcon={handleAddIcon}
+            onAddImage={() => imageRef.current?.click()}
+            onAddFormula={handleAddFormula}
+            onAddTable={handleAddTable}
+          />
+        </div>
         <input
           ref={imageRef}
           data-testid="flowchart-image-input"
@@ -672,10 +768,18 @@ function FlowchartInner() {
           <div className="relative min-h-0 flex-1">
             <FlowCanvas containerRef={canvasRef} />
             {nodes.length === 0 && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
                 <p className="rounded-lg bg-white/80 px-4 py-2 text-sm text-gray-500 dark:bg-gray-900/80 dark:text-gray-400">
                   {t('tools.flowchart.emptyHint')}
                 </p>
+                <button
+                  type="button"
+                  data-testid="flowchart-show-guide"
+                  onClick={() => setGuideOpen(true)}
+                  className="pointer-events-auto rounded-md border border-blue-200 bg-white/90 px-2.5 py-1 text-[12px] font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:border-blue-500/40 dark:bg-gray-900/90 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                >
+                  {t('tools.flowchart.showGuide')}
+                </button>
               </div>
             )}
           </div>
@@ -725,14 +829,22 @@ function FlowchartInner() {
           />
         </main>
 
-        <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800/40">
-          <div className="flex gap-1">
+        <aside
+          className={`flex shrink-0 flex-col gap-2 overflow-hidden border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800/40 ${
+            isNarrow
+              ? `fixed inset-y-0 right-0 z-40 w-[280px] rounded-none transition-transform duration-200 ${
+                  drawer === 'panel' ? 'translate-x-0' : 'translate-x-full'
+                }`
+              : 'w-[248px] rounded-xl'
+          }`}
+        >
+          <div className="flex flex-wrap gap-1">
             {PANELS.map((key) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setPanel(key)}
-                className={`flex-1 rounded-md px-2 py-1 text-[12px] font-medium transition-colors ${
+                className={`min-w-[46px] flex-1 rounded-md px-2 py-1 text-[12px] font-medium transition-colors ${
                   panel === key
                     ? 'bg-blue-600 text-white'
                     : 'bg-white text-gray-600 hover:bg-blue-50 dark:bg-gray-900/60 dark:text-gray-300 dark:hover:bg-blue-500/10'
@@ -744,6 +856,7 @@ function FlowchartInner() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {panel === 'prop' ? <PropertyPanel /> : null}
+            {panel === 'arrange' ? <ArrangePanel /> : null}
             {panel === 'layer' ? <LayerPanel /> : null}
             {panel === 'history' ? <SnapshotPanel /> : null}
             {panel === 'search' ? <SearchPanel onLocate={locateNode} /> : null}
@@ -779,6 +892,8 @@ function FlowchartInner() {
       ) : null}
 
       {helpOpen ? <ShortcutHelpDialog onClose={() => setHelpOpen(false)} /> : null}
+
+      {guideOpen ? <Onboarding onClose={() => setGuideOpen(false)} /> : null}
 
       <TemplatePanel
         open={templatesOpen}

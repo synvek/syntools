@@ -19,10 +19,10 @@ describe('模板库', () => {
     }
   });
 
-  it('模板文档是合法的 v2 文档', () => {
+  it('模板文档是合法的 v3 文档', () => {
     for (const item of TEMPLATES) {
       const doc = buildTemplateDoc(item.kind);
-      expect(doc.version).toBe(2);
+      expect(doc.version).toBe(3);
       expect(validateDoc(doc)).toBe(true);
       expect(activePageOf(doc)!.nodes.length).toBeGreaterThan(0);
     }

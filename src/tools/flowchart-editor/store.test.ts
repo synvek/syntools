@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useFlowStore } from './store';
 import { absolutePositionOf, defaultData } from './core';
-import { toDocV2 } from './model/migrate';
+import { toDocV3 } from './model/migrate';
 import { buildTemplateDoc } from './model/templates';
 
 describe('多页', () => {
@@ -60,7 +60,7 @@ describe('多页', () => {
     useFlowStore.getState().load(buildTemplateDoc('basic'));
     useFlowStore.getState().addPage('第二页');
     const doc = useFlowStore.getState().getDoc();
-    expect(doc.version).toBe(2);
+    expect(doc.version).toBe(3);
     expect(doc.pages).toHaveLength(2);
     expect(doc.activePageId).toBe(useFlowStore.getState().activePageId);
   });
@@ -368,7 +368,7 @@ describe('插入外部文档（粘贴 draw.io）', () => {
     useFlowStore.getState().addNode('rect', { x: 0, y: 0 });
     const existing = new Map(useFlowStore.getState().nodes.map((n) => [n.id, n] as const));
 
-    const incoming = toDocV2(
+    const incoming = toDocV3(
       [
         { id: 'a', type: 'shape', position: { x: 500, y: 400 }, data: defaultData('rect', 'A') },
         { id: 'b', type: 'shape', position: { x: 560, y: 480 }, data: defaultData('rect', 'B') },
@@ -399,7 +399,7 @@ describe('插入外部文档（粘贴 draw.io）', () => {
 
   it('空文档不产生任何变更', () => {
     const before = useFlowStore.getState().nodes.length;
-    expect(useFlowStore.getState().insertDoc({ version: 2, pages: [] }, { x: 0, y: 0 })).toBe(0);
+    expect(useFlowStore.getState().insertDoc({ version: 3, pages: [] }, { x: 0, y: 0 })).toBe(0);
     expect(useFlowStore.getState().nodes).toHaveLength(before);
   });
 });
@@ -477,5 +477,35 @@ describe('版本快照', () => {
     expect(useFlowStore.getState().snapshots).toHaveLength(2);
     useFlowStore.getState().deleteSnapshot(useFlowStore.getState().snapshots[0].id);
     expect(useFlowStore.getState().snapshots).toHaveLength(1);
+  });
+});
+
+describe('正交避障布线动作', () => {
+  beforeEach(() => {
+    useFlowStore.getState().load(null);
+  });
+
+  it('全页布线为所有连线写入 routing=orthogonal', () => {
+    useFlowStore.getState().load(buildTemplateDoc('basic'));
+    expect(useFlowStore.getState().edges.length).toBeGreaterThan(0);
+    useFlowStore.getState().autoRouteEdges('all');
+    for (const e of useFlowStore.getState().edges) {
+      expect((e.data as { routing?: string } | undefined)?.routing).toBe('orthogonal');
+    }
+  });
+
+  it('selected 范围只影响选中连线', () => {
+    useFlowStore.getState().load(buildTemplateDoc('basic'));
+    const edges = useFlowStore.getState().edges;
+    expect(edges.length).toBeGreaterThan(0);
+    useFlowStore.getState().onSelectionChange({ nodes: [], edges: [edges[0]] });
+    useFlowStore.getState().autoRouteEdges('selected');
+
+    const after = useFlowStore.getState().edges;
+    const first = after.find((e) => e.id === edges[0].id)!;
+    expect((first.data as { routing?: string }).routing).toBe('orthogonal');
+    for (const e of after.filter((item) => item.id !== edges[0].id)) {
+      expect((e.data as { routing?: string } | undefined)?.routing).toBeUndefined();
+    }
   });
 });

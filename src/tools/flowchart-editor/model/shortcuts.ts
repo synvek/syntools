@@ -29,6 +29,8 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: '⌘/Ctrl + A', labelKey: 'scSelectAll' },
       { keys: 'Delete / Backspace', labelKey: 'scDelete' },
       { keys: '⌘/Ctrl + S', labelKey: 'scSave' },
+      { keys: 'Enter / ⇧ + Enter', labelKey: 'scTextNewline' },
+      { keys: '⌘/Ctrl + Enter', labelKey: 'scTextCommit' },
     ],
   },
   {

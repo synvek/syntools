@@ -299,7 +299,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
 
     // 载入模板应替换画布内容且节点数增加
-    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '基础流程' }).click();
     await expect(page.getByText(/节点:\s*4/)).toBeVisible();
   });
@@ -307,7 +307,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
   test('泳道是容器：拖入的元素会放进泳道内', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     // 泳道模板：1 条泳道 + 4 个内部节点
-    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
 
@@ -353,7 +353,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
 
   test('纵向泳道同样是容器：拖入的元素会放进泳道内', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '纵向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
 
@@ -403,7 +403,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
 
   test('泳道缩放把手：选中泳道后出现 8 个缩放把手', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
 
@@ -621,7 +621,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
 
   test('画布滚动：滚轮平移视图并显示滚动条', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '基础流程' }).click();
     await expect(page.getByText(/节点:\s*4/)).toBeVisible();
 
@@ -2021,7 +2021,7 @@ test.describe('脑图编辑器（zh-CN）', () => {
     await expect(page.getByText('Topic', { exact: true })).toBeVisible();
 
     // 载入模板应替换整张脑图（项目规划：中心 + 4 分支 + 13 子节点）
-    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '项目规划' }).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(18);
 
@@ -2055,7 +2055,7 @@ test.describe('脑图编辑器（zh-CN）', () => {
 
   test('切换布局方向后分支数不变且朝向正确', async ({ page }) => {
     await page.goto('/tools/mindmap-editor');
-    await page.getByRole('button', { name: '模板' }).click();
+    await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '读书笔记' }).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(13);
     await expect(page.locator('.react-flow__edge')).toHaveCount(12);

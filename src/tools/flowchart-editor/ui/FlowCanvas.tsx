@@ -30,6 +30,7 @@ import { FlowEdgeLine } from '../nodes/FlowEdgeLine';
 import { ImageNode } from '../nodes/ImageNode';
 import { IconNode } from '../nodes/IconNode';
 import { FormulaNode } from '../nodes/FormulaNode';
+import { TableNode } from '../nodes/TableNode';
 import {
   absolutePositionOf,
   absoluteRectOf,
@@ -43,6 +44,7 @@ import {
   type ShapeKind,
 } from '../model/types';
 import { shapeSize } from '../model/shapes';
+import { virtualizeThresholdOf } from '../model/perf';
 import { QuickConnectOverlay } from './QuickConnectOverlay';
 import { CanvasScrollbars } from './CanvasScrollbars';
 import { EdgeEndpointHandles } from './EdgeEndpointHandles';
@@ -57,6 +59,7 @@ const nodeTypes = {
   image: ImageNode,
   icon: IconNode,
   formula: FormulaNode,
+  table: TableNode,
 };
 const edgeTypes = { flow: FlowEdgeLine };
 
@@ -70,11 +73,7 @@ const CONNECTION_LINE_TYPES: Record<FlowEdgeStyle['type'], ConnectionLineType> =
 
 const defaultEdgeOptions = { type: 'flow' };
 
-/**
- * 启用大图虚拟化的节点数阈值。
- * 实测 150 以内全量渲染更快且无闪烁；超过后仅渲染可视区域收益明显。
- */
-const VIRTUALIZE_THRESHOLD = 150;
+/* 自适应虚拟化阈值见 `model/perf.ts`（纯函数，便于单测）。 */
 
 /** 手绘线型使用的油漆抖动滤镜（全局定义一次，供连线 url(#flow-sketch) 引用） */
 function SketchFilter() {
@@ -188,6 +187,18 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const { screenToFlowPosition, fitView, zoomTo } = useReactFlow();
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
+  /**
+   * 视口面积（窗口尺寸）：用于自适应虚拟化阈值。
+   * 只在窗口尺寸变化时更新，避免拖拽节点时反复计算。
+   */
+  const [viewportArea, setViewportArea] = useState(() =>
+    typeof window === 'undefined' ? 1_200_000 : window.innerWidth * window.innerHeight,
+  );
+  useEffect(() => {
+    const onResize = () => setViewportArea(window.innerWidth * window.innerHeight);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   /**
    * 渲染用节点：把「折叠容器」的子节点置为 hidden。
    *
@@ -585,8 +596,9 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         /**
          * 大图虚拟化：只渲染可视区域内的节点/连线。
          * 小图不开启，避免首帧测量造成的闪烁与额外开销；阈值以内的图全量渲染最稳。
+         * 阈值随视口面积自适应：大屏可容纳更多节点而全量渲染更快，小屏更早切换虚拟化。
          */
-        onlyRenderVisibleElements={nodes.length > VIRTUALIZE_THRESHOLD}
+        onlyRenderVisibleElements={nodes.length > virtualizeThresholdOf(viewportArea)}
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={['Backspace', 'Delete']}
         className={

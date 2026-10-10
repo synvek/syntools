@@ -132,6 +132,8 @@ export {
   parseMermaidFlowchart,
 };
 export type { MermaidExportOptions } from './mermaidIo';
+export { exportVectorSvg, pageToVectorSvg, pageHasFormula, vectorSvgToPngDataUrl } from './vector';
+export type { VectorExportOptions } from './vector';
 export { DEFAULT_PRINT_OPTIONS, PAPER_OPTIONS, exportPrintPdf, exportPrintPdfSet, printGrid };
 export type { MermaidParseResult } from './mermaidIo';
 export type { CapturedPage, ExportRange, RasterExportOptions, RasterFormat } from './raster';

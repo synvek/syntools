@@ -212,7 +212,10 @@ export function LayerPanel() {
                     setEditingId(null);
                   }}
                   onKeyDown={(e) => {
+                    // 阻止冒泡：提交后输入框卸载，避免全局快捷键误判为画布操作
+                    e.stopPropagation();
                     if (e.key === 'Enter') {
+                      e.preventDefault();
                       renameNode(node.id, draft.trim() || node.data.label);
                       setEditingId(null);
                     }

@@ -62,6 +62,7 @@ interface ShapePaletteProps {
   onAddIcon: (iconId: string) => void;
   onAddImage: () => void;
   onAddFormula: () => void;
+  onAddTable: () => void;
 }
 
 export function ShapePalette({
@@ -69,6 +70,7 @@ export function ShapePalette({
   onAddIcon,
   onAddImage,
   onAddFormula,
+  onAddTable,
 }: ShapePaletteProps) {
   const { t } = useTranslation();
   const [iconsOpen, setIconsOpen] = useState(false);
@@ -135,7 +137,7 @@ export function ShapePalette({
         className="h-8 w-full rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
       />
 
-      {/* 插入：图片 / 图标 / 公式 */}
+      {/* 插入：图片 / 图标 / 公式 / 表格 */}
       <div className="flex gap-1.5">
         <button
           type="button"
@@ -164,6 +166,14 @@ export function ShapePalette({
           className="h-8 flex-1 rounded-md border border-gray-200 bg-white text-[12px] text-gray-700 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200"
         >
           {t('tools.flowchart.insertFormula')}
+        </button>
+        <button
+          type="button"
+          data-testid="insert-table"
+          onClick={onAddTable}
+          className="h-8 flex-1 rounded-md border border-gray-200 bg-white text-[12px] text-gray-700 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200"
+        >
+          {t('tools.flowchart.insertTable')}
         </button>
       </div>
 

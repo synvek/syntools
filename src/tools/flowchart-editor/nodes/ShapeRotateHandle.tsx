@@ -4,8 +4,12 @@ import { useFlowStore } from '../store';
 import { angleFromCenter, normalizeRotation, snapRotation } from '../core';
 import { ROTATION_FINE_STEP, ROTATION_SNAP_STEP, type FlowNodeStyle } from '../model/types';
 
-/** 手柄相对节点顶边的距离（px）：避开顶边中点的缩放把手 */
-const HANDLE_OFFSET = 26;
+/**
+ * 手柄相对节点顶边的距离（px）。
+ * 需同时避开顶边中点的缩放把手与「向上」快连箭头（18×18、中心在顶边上方 18px）：
+ * 取 40 让手柄底边（-31）位于快连箭头顶边（-27）之上，否则手柄会抢走箭头的指针事件。
+ */
+const HANDLE_OFFSET = 40;
 
 /**
  * 节点旋转手柄（类 Figma / draw.io 的旋转顶点）。

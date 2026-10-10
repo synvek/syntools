@@ -26,6 +26,7 @@ import {
 import { NodeAppearanceSection } from './NodeAppearanceSection';
 import { NodeShapeParamsSection } from './NodeShapeParamsSection';
 import { NodeTextSection } from './NodeTextSection';
+import { NodeTableSection } from './NodeTableSection';
 import { NodeTransformSection } from './NodeTransformSection';
 
 const EDGE_TYPES = EDGE_TYPE_OPTIONS;
@@ -619,6 +620,11 @@ export function PropertyPanel() {
         fallback={base}
         isContainer={selNodes.some((n) => isContainerKind(n.data.kind))}
       />
+
+      {/* 表格节点专属：行列数量调整 */}
+      {selNodes.length === 1 && selNodes[0].type === 'table' ? (
+        <NodeTableSection node={selNodes[0]} />
+      ) : null}
 
       <NodeTransformSection style={view} patch={patch} onEnd={end} fallback={base} />
 

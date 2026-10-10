@@ -1,10 +1,18 @@
 /**
- * 文档迁移与归一化：把任意历史 / 外部文档统一成 v2（多页）结构。
+ * 文档迁移与归一化：把任意历史 / 外部文档统一成 v3（多页）结构。
  * 纯函数，不向调用方抛异常；无法识别时返回 null，由调用方降级为空图。
- * 这样旧的 v1 草稿（{version:1, nodes, edges}）仍然可读，不会被丢弃。
+ * 这样旧的 v1 草稿（{version:1, nodes, edges}）与 v2 文档仍然可读，不会被丢弃。
  */
 
-import type { FlowDoc, FlowEdgeRec, FlowNodeRec, FlowNodeType, FlowPage } from './types';
+import type {
+  FlowDoc,
+  FlowEdgeRec,
+  FlowNodeRec,
+  FlowNodeType,
+  FlowPage,
+  TableCellData,
+  TableData,
+} from './types';
 
 /**
  * 页面默认名占位符（语言中立）。
@@ -45,14 +53,33 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-const NODE_TYPES: FlowNodeType[] = ['shape', 'image', 'icon', 'formula'];
+const NODE_TYPES: FlowNodeType[] = ['shape', 'image', 'icon', 'formula', 'table'];
 
 /** 未知/缺失的节点类型回退为 shape（保证旧文档与脏数据都能打开） */
 function normalizeNodeType(value: unknown): FlowNodeType {
   return NODE_TYPES.includes(value as FlowNodeType) ? (value as FlowNodeType) : 'shape';
 }
 
+/** 归一表格数据：行列数至少为 1，非法的从属单元格记为 null */
+function normalizeTable(table: unknown): TableData | undefined {
+  if (!isPlainObject(table)) return undefined;
+  const rows = Math.max(1, Math.round(num(table.rows) || 1));
+  const cols = Math.max(1, Math.round(num(table.cols) || 1));
+  const result: TableData = { rows, cols };
+  if (Array.isArray(table.cells)) {
+    result.cells = table.cells.map((row) =>
+      Array.isArray(row)
+        ? row.map((cell) => (isPlainObject(cell) ? (cell as TableCellData) : null))
+        : [],
+    );
+  }
+  if (Array.isArray(table.rowWeights)) result.rowWeights = table.rowWeights.map((w) => num(w));
+  if (Array.isArray(table.colWeights)) result.colWeights = table.colWeights.map((w) => num(w));
+  return result;
+}
+
 function normalizeNode(v: FlowNodeRec): FlowNodeRec {
+  const table = normalizeTable((v.data as { table?: unknown }).table);
   return {
     ...v,
     type: normalizeNodeType(v.type),
@@ -60,6 +87,7 @@ function normalizeNode(v: FlowNodeRec): FlowNodeRec {
     parentId: v.parentId ?? null,
     hidden: v.hidden === true,
     locked: v.locked === true,
+    ...(table ? { data: { ...v.data, table } } : {}),
   };
 }
 
@@ -85,19 +113,19 @@ export function createPage(name: string = DEFAULT_PAGE_NAME, id?: string): FlowP
   return { id: id ?? newId('page'), name, nodes: [], edges: [] };
 }
 
-/** 把单页 nodes/edges 包成 v2 文档 */
-export function toDocV2(
+/** 把单页 nodes/edges 包成 v3 文档 */
+export function toDocV3(
   nodes: FlowNodeRec[],
   edges: FlowEdgeRec[],
   pageName: string = DEFAULT_PAGE_NAME,
 ): FlowDoc {
   const page = createPage(pageName);
-  return { version: 2, pages: [{ ...page, nodes, edges }], activePageId: page.id };
+  return { version: 3, pages: [{ ...page, nodes, edges }], activePageId: page.id };
 }
 
 /**
- * 归一为 v2 文档：
- * - v2（含 pages）：补齐缺失字段与 activePageId
+ * 归一为 v3 文档：
+ * - v3 / v2（含 pages）：补齐缺失字段与 activePageId
  * - v1（含 nodes/edges）：包装成单页
  * - 其它：返回 null
  */
@@ -114,7 +142,7 @@ export function migrateDoc(raw: unknown): FlowDoc | null {
       typeof wanted === 'string' && pages.some((p) => p.id === wanted) ? wanted : pages[0].id;
     const name = typeof raw.name === 'string' ? raw.name : undefined;
     return {
-      version: 2,
+      version: 3,
       ...(name === undefined ? {} : { name }),
       pages,
       activePageId: active,
@@ -124,7 +152,7 @@ export function migrateDoc(raw: unknown): FlowDoc | null {
   if (Array.isArray(raw.nodes)) {
     const nodes = raw.nodes.filter(isNodeRec).map(normalizeNode);
     const edges = Array.isArray(raw.edges) ? raw.edges.filter(isEdgeRec).map(normalizeEdge) : [];
-    return toDocV2(nodes, edges);
+    return toDocV3(nodes, edges);
   }
 
   return null;

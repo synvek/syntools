@@ -24,7 +24,7 @@ export interface PersistedSnapshot {
 }
 
 /** 侧栏面板 key（与 FlowchartTool 的 PanelKey 一致） */
-export type PersistedPanelKey = 'prop' | 'layer' | 'history' | 'search';
+export type PersistedPanelKey = 'prop' | 'arrange' | 'layer' | 'history' | 'search';
 
 /** 会话设置：网格 / 布局 / 对齐阈值 / 主题 / 侧栏面板 / 画布观感 */
 export interface PersistedSession {

@@ -123,6 +123,7 @@ export function nodesFromPage(page: FlowPage): FlowNode[] {
           ...(n.data.src ? { src: n.data.src } : {}),
           ...(n.data.iconId ? { iconId: n.data.iconId } : {}),
           ...(n.data.formula ? { formula: n.data.formula } : {}),
+          ...(n.data.table ? { table: n.data.table } : {}),
           ...(n.mxStyle ? { mxStyle: [...n.mxStyle] } : {}),
         },
       };
@@ -149,6 +150,8 @@ export function edgesFromPage(page: FlowPage): FlowEdge[] {
         ...(e.waypoints && e.waypoints.length > 0
           ? { waypoints: e.waypoints.map((p) => ({ x: p.x, y: p.y })) }
           : {}),
+        ...(e.routing ? { routing: e.routing } : {}),
+        ...(e.avoidObstacles ? { avoidObstacles: true } : {}),
         ...(e.mxStyle ? { mxStyle: [...e.mxStyle] } : {}),
       },
       ...edgePropsOf(style),

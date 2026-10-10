@@ -17,6 +17,8 @@ import {
   exportRaster,
   exportRasterSet,
   exportText,
+  exportVectorSvg,
+  pageHasFormula,
   parseImportedFileAsync,
   type CapturedPage,
   type ExportKind,
@@ -117,6 +119,34 @@ export function IoMenu({ busy, setBusy, onError, open: openProp, onOpenChange }:
     }
 
     const opts: RasterExportOptions = { ...options, format: kind as RasterFormat };
+
+    // SVG：优先自绘矢量（真矢量、文字可选、无需逐页切换）；
+    // 公式节点无法矢量化为 SVG 文本，含公式时回退到 DOM 截图路径。
+    if (kind === 'svg') {
+      const doc = state.getDoc();
+      const selection = opts.range === 'selection' ? [...state.selectedNodes] : undefined;
+      const relevant =
+        opts.range === 'all'
+          ? doc.pages
+          : ([doc.pages.find((p) => p.id === doc.activePageId) ?? doc.pages[0]].filter(
+              Boolean,
+            ) as typeof doc.pages);
+      if (!relevant.some(pageHasFormula)) {
+        setBusy(true);
+        try {
+          const result = await exportVectorSvg(doc, filename, {
+            range: opts.range,
+            padding: opts.padding,
+            transparent: opts.transparent,
+            selection,
+          });
+          if (result.ok) return;
+        } finally {
+          setBusy(false);
+        }
+      }
+    }
+
     setBusy(true);
     try {
       if (opts.range === 'all' && state.pageOrder.length > 1) {

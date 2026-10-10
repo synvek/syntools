@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   commonValue,
   computeAlign,
+  computeAlignToRect,
   computeDistribute,
+  computeDistributeInRect,
   dashArrayOf,
   dropCollinear,
   groupBounds,
@@ -222,5 +224,34 @@ describe('节点尺寸', () => {
     expect(boxSizeOf(mk(undefined)).width).toBe(150);
     expect(boxSizeOf(mk(320)).width).toBe(320);
     expect(boxSizeOf(mk(undefined, 'swimlane')).width).toBe(760);
+  });
+});
+
+describe('对齐到参照矩形与贴边分布', () => {
+  const RECT = { x: 0, y: 0, width: 400, height: 300 };
+
+  it('对齐到页面左边与垂直居中', () => {
+    const moves = computeAlignToRect(BOXES, 'left', RECT);
+    expect(moves.a.x).toBe(0);
+    expect(moves.b.x).toBe(0);
+
+    const vcenter = computeAlignToRect(BOXES, 'vcenter', RECT);
+    expect(vcenter.a.y).toBe(150 - 25);
+  });
+
+  it('对齐到页面右边时右边缘贴住矩形右边缘', () => {
+    const moves = computeAlignToRect(BOXES, 'right', RECT);
+    expect(moves.a.x).toBe(300);
+    expect(moves.c.x).toBe(340);
+  });
+
+  it('贴边分布时首尾贴住矩形两端', () => {
+    const moves = computeDistributeInRect(BOXES, 'h', RECT);
+    expect(moves.a.x).toBe(0);
+    expect(moves.b.x).toBe(400 - 100);
+  });
+
+  it('贴边分布少于 2 个节点时返回空', () => {
+    expect(computeDistributeInRect([A], 'h', RECT)).toEqual({});
   });
 });

@@ -189,7 +189,10 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await waypoints.first().dblclick();
     await expect.poll(() => page.getByTestId('edge-waypoint').count()).toBeLessThan(count);
 
-    // 清除折点
+    // 重新布线后「清除折点」可用，可一次清空全部折点
+    // （布线按端点法线走最少的拐点：两节点对角相邻时可能只有一个折点）
+    await page.getByTestId('flowchart-auto-route').click();
+    await expect(page.getByTestId('edge-waypoint').first()).toBeVisible();
     await page.getByTestId('flowchart-clear-waypoints').click();
     await expect(page.getByTestId('edge-waypoint')).toHaveCount(0);
   });
@@ -773,5 +776,73 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.locator(NODE)).toHaveCount(1);
     await expect(page.locator(NODE).filter({ hasText: '粘贴节点' })).toHaveCount(1);
     await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
+  });
+
+  test('插入表格并就地编辑单元格', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page.getByTestId('insert-table').click();
+
+    await expect(page.getByTestId('flowchart-table')).toHaveCount(1);
+    // 默认 3×3：末格存在
+    await expect(page.getByTestId('table-cell-2-2')).toHaveCount(1);
+
+    // 双击首个单元格 → 输入文本 → ⌘/Ctrl+Enter 提交（Enter 为换行）
+    await page.getByTestId('table-cell-0-0').dblclick();
+    const editor = page.locator('[data-testid="table-cell-0-0"] textarea');
+    await expect(editor).toBeVisible();
+    await editor.fill('表头');
+    await page.keyboard.press('Control+Enter');
+    await expect(page.getByTestId('table-cell-0-0')).toHaveText('表头');
+  });
+
+  test('节点文字：Enter 换行支持多行，且不会误生成相连节点', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await dropProcess(page, 140, 120);
+    await expect(page.locator(NODE)).toHaveCount(1);
+
+    await page.locator(NODE).first().dblclick();
+    const editor = page.locator('.react-flow__node textarea');
+    await expect(editor).toBeVisible();
+
+    await editor.fill('第一行');
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('第二行');
+    await page.keyboard.press('Control+Enter');
+
+    // 关键回归点：Enter 只换行，不应触发「生成下方节点」
+    await expect(page.locator(NODE)).toHaveCount(1);
+    await expect(page.locator(NODE).first()).toContainText('第一行');
+    await expect(page.locator(NODE).first()).toContainText('第二行');
+  });
+
+  test('全页布线：右键空白触发 autoRouteEdges(all)', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await dropProcess(page, 110, 90);
+    await dropProcess(page, 420, 90);
+    await connectNodes(page, 0, 1);
+    await expect(page.locator(EDGE)).toHaveCount(1);
+
+    await page.locator('.react-flow__pane').click({ button: 'right', position: { x: 10, y: 10 } });
+    await page.getByTestId('context-route-all').click();
+    await expect(page.locator(EDGE)).toHaveCount(1);
+  });
+
+  test('首启引导：首次进入自动弹出，跳过后不再出现', async ({ page }) => {
+    await page.goto('/tools/flowchart-editor');
+    await page.evaluate(() =>
+      window.localStorage.removeItem('syntools:flowchart-editor.onboarding.v1'),
+    );
+    await page.reload();
+
+    const guide = page.getByTestId('flowchart-onboarding');
+    await expect(guide).toBeVisible();
+    await expect(page.getByTestId('onboarding-step')).toBeVisible();
+
+    await page.getByTestId('onboarding-skip').click();
+    await expect(guide).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByTestId('flowchart-onboarding')).toHaveCount(0);
   });
 });

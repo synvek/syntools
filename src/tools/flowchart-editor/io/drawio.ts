@@ -15,8 +15,9 @@ import { XMLBuilder, XMLParser } from 'fast-xml-parser';
 import { defaultData } from '../core';
 import { normalizeEdgeStyle } from '../ops';
 import { normalizeRotation } from '../core';
-import { createPage, toDocV2 } from '../model/migrate';
+import { createPage, toDocV3 } from '../model/migrate';
 import { SHAPE_DEFS, adjustsFor, paramValue, shapeSize } from '../model/shapes';
+import { normalizeTable } from '../model/table';
 import type {
   Align,
   EdgeArrow,
@@ -30,6 +31,7 @@ import type {
   FlowNodeStyle,
   FlowPage,
   ShapeKind,
+  TableData,
   VerticalAlign,
   Waypoint,
 } from '../model/types';
@@ -182,6 +184,29 @@ function mapGetCI(map: Map<string, string>, key: string): string | undefined {
 const SYN_SOURCE_LABEL = 'synSourceLabel';
 const SYN_TARGET_LABEL = 'synTargetLabel';
 const SYN_LABEL_POS = 'synLabelPos';
+
+/** 表格节点的自定义 token 键：值做 URL 编码后可安全放在样式串中 */
+const SYN_TABLE = 'synTable';
+
+/** 表格节点 → mxGraph 样式 token（整表数据 URL 编码，drawio 打开时忽略即可） */
+function tableTokenOf(table: TableData | undefined): string {
+  return `${SYN_TABLE}=${encodeURIComponent(JSON.stringify(normalizeTable(table)))}`;
+}
+
+/** 从 mxGraph 样式串中还原表格数据（无该 token 时返回 undefined） */
+function tableFromStyle(rawStyle: string | undefined): TableData | undefined {
+  if (!rawStyle) return undefined;
+  const eq = rawStyle.search(new RegExp(`${SYN_TABLE}=`, 'i'));
+  if (eq < 0) return undefined;
+  const from = rawStyle.indexOf('=', eq) + 1;
+  const end = rawStyle.indexOf(';', from);
+  const raw = rawStyle.slice(from, end < 0 ? undefined : end);
+  try {
+    return normalizeTable(JSON.parse(decodeURIComponent(raw)) as TableData);
+  } catch {
+    return undefined;
+  }
+}
 
 /** 连线记录 → 自定义标签 token（值做 URL 编码，避免 `;` / `=` 破坏样式串） */
 function edgeLabelTokens(e: FlowEdgeRec): string[] {
@@ -621,7 +646,10 @@ function pageToCells(page: FlowPage): XmlNode[] {
     cells.push({
       '@_id': n.id,
       '@_value': toMxHtmlLabel(n.data.label),
-      '@_style': styleOf(n.data.kind, n.data.style, n.mxStyle ?? []),
+      '@_style': styleOf(n.data.kind, n.data.style, [
+        ...(n.type === 'table' ? [tableTokenOf(n.data.table)] : []),
+        ...(n.mxStyle ?? []),
+      ]),
       '@_vertex': '1',
       '@_parent': n.parentId ?? '1',
       mxGeometry: {
@@ -724,16 +752,22 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
       // 旋转存于 mxGeometry.rotation（绕包围盒中心），归一后写回 style
       const rotation = normalizeRotation(geoNum(cell, '@_rotation', 0));
       if (rotation !== 0) nodeStyle.rotation = rotation;
+      // 表格节点：由自定义 token 还原整表数据（drawio 打开时退化为普通矩形）
+      const table = tableFromStyle(rawStyle);
+      const keptMxStyle = table
+        ? dropConsumedTokens(nodeMxStyle, new Set([SYN_TABLE]))
+        : nodeMxStyle;
       nodes.push({
         id,
-        type: 'shape',
+        type: table ? 'table' : 'shape',
         position: { x: geoNum(cell, '@_x', 0), y: geoNum(cell, '@_y', 0) },
         parentId: parent && parent !== '1' ? parent : null,
         width,
         height,
-        ...(nodeMxStyle.length > 0 ? { mxStyle: nodeMxStyle } : {}),
+        ...(keptMxStyle.length > 0 ? { mxStyle: keptMxStyle } : {}),
         data: {
           ...defaultData(kind, labelOf(cell, rawStyle)),
+          ...(table ? { table } : {}),
           style: { ...defaultData(kind).style, ...nodeStyle },
         },
       });
@@ -791,9 +825,9 @@ export function parseDrawioXml(xml: string): FlowDoc | null {
     if (pages.length === 0) return null;
     if (pages.length === 1) {
       const only = pages[0];
-      return toDocV2(only.nodes, only.edges, only.name);
+      return toDocV3(only.nodes, only.edges, only.name);
     }
-    return { version: 2, pages, activePageId: pages[0].id };
+    return { version: 3, pages, activePageId: pages[0].id };
   } catch {
     return null;
   }

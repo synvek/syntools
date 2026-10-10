@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearDraft, readDraft, writeDraft } from './draft';
 import { buildTemplateDoc } from './model/templates';
-import { activePageOf, toDocV2 } from './model/migrate';
+import { activePageOf, toDocV3 } from './model/migrate';
 import { defaultData, imageData } from './core';
 import { DRAFT_SIZE_LIMIT, type FlowDoc } from './model/types';
 
@@ -12,7 +12,7 @@ function draftKey(): string | undefined {
 /** 构造一张体积巨大的图片节点（base64 字符数超过草稿上限） */
 function hugeImageDoc(): FlowDoc {
   const src = `data:image/png;base64,${'A'.repeat(DRAFT_SIZE_LIMIT)}`;
-  return toDocV2(
+  return toDocV3(
     [
       {
         id: 'img',
@@ -54,7 +54,7 @@ describe('本地草稿读写', () => {
   });
 
   it('空画布不保留草稿（清空后刷新不应恢复出内容）', () => {
-    expect(writeDraft(toDocV2([], [])).saved).toBe(false);
+    expect(writeDraft(toDocV3([], [])).saved).toBe(false);
     expect(readDraft()).toBeNull();
   });
 
@@ -75,7 +75,7 @@ describe('本地草稿读写', () => {
   });
 
   it('图片节点会随草稿一起保存', () => {
-    const doc = toDocV2(
+    const doc = toDocV3(
       [
         {
           id: 'img',

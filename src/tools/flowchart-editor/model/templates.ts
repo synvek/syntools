@@ -7,7 +7,7 @@
  */
 
 import { createId, defaultData } from '../core';
-import { toDocV2 } from './migrate';
+import { toDocV3 } from './migrate';
 import { TEMPLATE_LABELS_I18N, type TemplateLabelKey } from './templateLabels';
 import type { FlowDoc, FlowEdgeRec, FlowNodeRec, ShapeKind } from './types';
 
@@ -380,11 +380,11 @@ export function buildTemplate(
   return { nodes, edges };
 }
 
-/** 模板内容包成完整 v2 文档（供 store.load 使用） */
+/** 模板内容包成完整 v3 文档（供 store.load 使用） */
 export function buildTemplateDoc(
   kind: TemplateKind,
   tr: TemplateTranslator = fallbackTemplateTranslator,
 ): FlowDoc {
   const tpl = buildTemplate(kind, tr);
-  return toDocV2(tpl.nodes, tpl.edges);
+  return toDocV3(tpl.nodes, tpl.edges);
 }

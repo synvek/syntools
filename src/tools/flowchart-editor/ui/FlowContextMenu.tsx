@@ -391,6 +391,11 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
             label={t('tools.flowchart.deselect')}
             onClick={run(() => useFlowStore.getState().clearSelection())}
           />
+          <Row
+            testId="context-route-all"
+            label={t('tools.flowchart.routeAll')}
+            onClick={run(() => useFlowStore.getState().autoRouteEdges('all'))}
+          />
           <Separator />
           <Row
             testId="context-fit-view"

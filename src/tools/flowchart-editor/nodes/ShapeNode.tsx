@@ -10,6 +10,7 @@ import {
   isContainerKind,
 } from '../model/types';
 import { paramValue, shapeDefOf, shapeSize } from '../model/shapes';
+import { renderInlineMarkdown } from '../model/markdown';
 import { drawDecor, drawShape } from './shapeDraw';
 import { ShapeAdjustHandles } from './ShapeAdjustHandles';
 import { ShapeRotateHandle } from './ShapeRotateHandle';
@@ -265,18 +266,24 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             </div>
           )
         ) : editing ? (
-          // 用 textarea 支持多行：Enter 提交、Shift+Enter 换行
+          // 多行文本：Enter / ⇧+Enter 换行，⌘/Ctrl+Enter 提交，Esc 取消，失焦自动提交
           <textarea
             ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              // 必须阻止冒泡：提交会同步卸载 textarea，事件若继续冒泡到 window，
+              // 全局快捷键会误判为画布操作（Enter 会再生成一个相连节点）
+              e.stopPropagation();
+              if (e.key === 'Escape') {
+                setEditing(false);
+                return;
+              }
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 commit();
               }
-              if (e.key === 'Escape') setEditing(false);
             }}
             className="nodrag absolute inset-0 z-10 resize-none bg-white/90 px-2 py-1 text-[13px] outline-none dark:bg-gray-900/90"
             style={{
@@ -322,6 +329,12 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
               >
                 {d.label || href}
               </a>
+            ) : style.textFormat === 'markdown' && d.label ? (
+              <span
+                data-testid="flowchart-markdown-label"
+                className="pointer-events-none [&_a]:pointer-events-auto [&_a]:underline [&_a]:decoration-dotted [&_a]:underline-offset-2 [&_code]:rounded [&_code]:bg-black/5 [&_code]:px-0.5"
+                dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(d.label) }}
+              />
             ) : (
               d.label || ' '
             )}

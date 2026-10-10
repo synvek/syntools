@@ -17,12 +17,15 @@ import { shapeSize } from './model/shapes';
 import { themeOf, type ThemeId } from './model/themes';
 import {
   computeAlign,
+  computeAlignToRect,
   computeDistribute,
+  computeDistributeInRect,
   edgePropsOf,
   groupBounds,
   normalizeEdgeStyle,
   reorderLayers,
   type AlignMode,
+  type AlignRect,
   type LayerOp,
   type LayoutBox,
 } from './ops';
@@ -70,6 +73,61 @@ export function distributeSelected(axis: 'h' | 'v'): void {
   if (boxes.length < 3) return;
   useFlowStore.getState().commit();
   applyAbsoluteMoves(computeDistribute(boxes, axis));
+}
+
+/** 对齐参照范围：选中集合 / 画布整体 / 页面纸张 */
+export type ArrangeScope = 'selection' | 'canvas' | 'page';
+
+/** 分布方式：保持两端不动等间距 / 首尾贴住参照矩形两端 */
+export type DistributeMode = 'spacing' | 'edges';
+
+/** 画布参照矩形：所有可见节点的整体包围盒 */
+function canvasRect(): AlignRect | null {
+  const { nodes } = useFlowStore.getState();
+  const byId = new Map(nodes.map((n) => [n.id, n] as const));
+  const boxes: LayoutBox[] = nodes
+    .filter((n) => n.hidden !== true)
+    .map((n) => ({ id: n.id, ...absoluteRectOf(n, byId) }));
+  return groupBounds(boxes);
+}
+
+/** 页面参照矩形：纸张尺寸（未设置页面尺寸时返回 null） */
+function pageRect(): AlignRect | null {
+  const size = useFlowStore.getState().pageSize;
+  return size ? { x: 0, y: 0, width: size.width, height: size.height } : null;
+}
+
+/** 按参照范围对齐选中节点 */
+export function alignSelectedToScope(mode: AlignMode, scope: ArrangeScope = 'selection'): void {
+  if (scope === 'selection') {
+    alignSelected(mode);
+    return;
+  }
+  const boxes = selectedBoxes();
+  if (boxes.length === 0) return;
+  const rect = scope === 'canvas' ? canvasRect() : pageRect();
+  if (!rect) return;
+  useFlowStore.getState().commit();
+  applyAbsoluteMoves(computeAlignToRect(boxes, mode, rect));
+}
+
+/** 按参照范围分布选中节点（等间距或贴合两端） */
+export function distributeSelectedInScope(
+  axis: 'h' | 'v',
+  scope: ArrangeScope = 'selection',
+  mode: DistributeMode = 'spacing',
+): void {
+  if (scope === 'selection' && mode === 'spacing') {
+    distributeSelected(axis);
+    return;
+  }
+  const boxes = selectedBoxes();
+  if (boxes.length < 2) return;
+  const rect =
+    scope === 'canvas' ? canvasRect() : scope === 'page' ? pageRect() : groupBounds(boxes);
+  if (!rect) return;
+  useFlowStore.getState().commit();
+  applyAbsoluteMoves(computeDistributeInRect(boxes, axis, rect));
 }
 
 /**

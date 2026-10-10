@@ -211,7 +211,15 @@ export interface FlowNodeStyle {
   labelBackground?: string;
   /** 超链接（仅允许 http/https/mailto 协议，渲染时校验） */
   link?: string;
+  /** 标签文本格式：纯文本（缺省）/ Markdown 轻量渲染 */
+  textFormat?: TextFormat;
 }
+
+/** 标签文本格式 */
+export type TextFormat = 'plain' | 'markdown';
+
+/** 标签文本格式下拉选项 */
+export const TEXT_FORMAT_OPTIONS: TextFormat[] = ['plain', 'markdown'];
 
 /** 文本垂直对齐 */
 export type VerticalAlign = 'top' | 'middle' | 'bottom';
@@ -233,13 +241,14 @@ export const ROTATION_FINE_STEP = 45;
 /** 默认行高倍数（与历史 CSS 行为一致） */
 export const DEFAULT_LINE_HEIGHT = 1.25;
 
-/** 节点类型：图形 / 图片 / 内置图标 / 公式 */
-export type FlowNodeType = 'shape' | 'image' | 'icon' | 'formula';
+/** 节点类型：图形 / 图片 / 内置图标 / 公式 / 表格 */
+export type FlowNodeType = 'shape' | 'image' | 'icon' | 'formula' | 'table';
 
 /** 非图形节点的默认尺寸 */
 export const IMAGE_NODE_SIZE: ShapeSize = { width: 240, height: 160 };
 export const ICON_NODE_SIZE: ShapeSize = { width: 64, height: 64 };
 export const FORMULA_NODE_SIZE: ShapeSize = { width: 200, height: 64 };
+export const TABLE_NODE_SIZE: ShapeSize = { width: 320, height: 168 };
 
 /** 单张图片的最大边长（超过则等比压缩，控制草稿体积） */
 export const IMAGE_MAX_EDGE = 1600;
@@ -248,6 +257,38 @@ export const DRAFT_SIZE_LIMIT = 4_000_000;
 
 /** 单次粘贴/导入可插入的最大节点数（防止异常内容拖垮画布） */
 export const MAX_PASTE_NODES = 500;
+
+/** 表格单元格（合并时仅左上角保留内容，被覆盖的从属格为 null） */
+export interface TableCellData {
+  text?: string;
+  /** 跨列数（≥1，缺省 1） */
+  colspan?: number;
+  /** 跨行数（≥1，缺省 1） */
+  rowspan?: number;
+  /** 单元格内文本水平对齐（缺省继承节点样式 align） */
+  align?: Align;
+  /** 单元格填充色（缺省继承节点样式 fill） */
+  fill?: string;
+  /** 单元格文本加粗（缺省继承节点样式 bold） */
+  bold?: boolean;
+}
+
+/** 表格节点数据（type === 'table'） */
+export interface TableData {
+  /** 行数（≥1） */
+  rows: number;
+  /** 列数（≥1） */
+  cols: number;
+  /**
+   * 单元格内容，按 [行][列] 索引；行/列长度与 rows/cols 一致，
+   * 被合并覆盖的从属单元格为 null；缺省时渲染为空表格。
+   */
+  cells?: (TableCellData | null)[][];
+  /** 各行高度权重（缺省等分） */
+  rowWeights?: number[];
+  /** 各列宽度权重（缺省等分） */
+  colWeights?: number[];
+}
 
 export interface FlowNodeData extends Record<string, unknown> {
   kind: ShapeKind;
@@ -259,6 +300,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   iconId?: string;
   /** 公式节点的 LaTeX 源码（type === 'formula'） */
   formula?: string;
+  /** 表格节点的表格数据（type === 'table'） */
+  table?: TableData;
   /**
    * 容器（泳道 / 编组）折叠：仅保留标题栏并隐藏子节点。
    * 放在 data 上以便随 React Flow 节点自动流转；缺省即展开，子节点数据完整保留。
@@ -274,6 +317,9 @@ export interface Waypoint {
   y: number;
 }
 
+/** 连线路由来源：默认（由线型决定）/ 手动折点 / 正交自动布线（避障） */
+export type EdgeRoutingMode = 'default' | 'manual' | 'orthogonal';
+
 export interface FlowEdgeData extends Record<string, unknown> {
   label?: string;
   /** 起点侧标签（缺省不显示）；与主标签、终点标签互相独立 */
@@ -286,6 +332,10 @@ export interface FlowEdgeData extends Record<string, unknown> {
   style?: FlowEdgeStyle;
   /** 手动/导入的折点；缺省表示无折点 */
   waypoints?: Waypoint[];
+  /** 路由来源（缺省 default）；orthogonal 表示由避障正交布线生成 */
+  routing?: EdgeRoutingMode;
+  /** 该连线是否参与避障正交布线（缺省不参与） */
+  avoidObstacles?: boolean;
   /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
   mxStyle?: string[];
 }
@@ -530,6 +580,10 @@ export interface FlowEdgeRec {
   style?: FlowEdgeStyle;
   /** 折点（画布绝对坐标）；旧文档缺省即无折点 */
   waypoints?: Waypoint[];
+  /** 路由来源（缺省 default）；orthogonal 表示由避障正交布线生成 */
+  routing?: EdgeRoutingMode;
+  /** 该连线是否参与避障正交布线（缺省不参与） */
+  avoidObstacles?: boolean;
   /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
   mxStyle?: string[];
 }
@@ -551,7 +605,7 @@ export interface FlowPage {
   size?: ShapeSize;
 }
 
-/** v2：多页文档（当前规范形态） */
+/** v2：多页文档（历史规范，读取时归一为 v3） */
 export interface FlowDocV2 {
   version: 2;
   /** 文档标题：导出文件名来源（与工具栏标题输入框一致） */
@@ -560,8 +614,20 @@ export interface FlowDocV2 {
   activePageId?: string;
 }
 
-/** 内部统一使用 v2；v1 读取时经 `model/migrate.ts` 归一 */
-export type FlowDoc = FlowDocV2;
+/**
+ * v3：多页文档（当前规范形态）。
+ * 相对 v2 新增表格节点、富文本/Markdown 标签与连线路由字段，均为可选，读写向后兼容。
+ */
+export interface FlowDocV3 {
+  version: 3;
+  /** 文档标题：导出文件名来源（与工具栏标题输入框一致） */
+  name?: string;
+  pages: FlowPage[];
+  activePageId?: string;
+}
+
+/** 内部统一使用 v3；v1 / v2 读取时经 `model/migrate.ts` 归一 */
+export type FlowDoc = FlowDocV3;
 
 /** 各形状的默认尺寸（像素） */
 export interface ShapeSize {

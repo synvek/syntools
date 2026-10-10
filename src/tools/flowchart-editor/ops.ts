@@ -41,13 +41,20 @@ export function groupBounds(boxes: LayoutBox[]): Omit<LayoutBox, 'id'> | null {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** 对齐：以选中集合的整体边界为基准，返回每个节点的新位置 */
-export function computeAlign(
+/** 对齐参照矩形（画布 / 页面边界） */
+export interface AlignRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** 以给定参照矩形对齐：返回每个节点的新位置 */
+function alignBoxes(
   boxes: LayoutBox[],
   mode: AlignMode,
+  bounds: AlignRect,
 ): Record<string, { x: number; y: number }> {
-  const bounds = groupBounds(boxes);
-  if (!bounds) return {};
   const right = bounds.x + bounds.width;
   const bottom = bounds.y + bounds.height;
   const hcenter = bounds.x + bounds.width / 2;
@@ -81,6 +88,26 @@ export function computeAlign(
   return out;
 }
 
+/** 对齐：以选中集合的整体边界为基准，返回每个节点的新位置 */
+export function computeAlign(
+  boxes: LayoutBox[],
+  mode: AlignMode,
+): Record<string, { x: number; y: number }> {
+  const bounds = groupBounds(boxes);
+  if (!bounds) return {};
+  return alignBoxes(boxes, mode, bounds);
+}
+
+/** 对齐到指定矩形（画布 / 页面边界） */
+export function computeAlignToRect(
+  boxes: LayoutBox[],
+  mode: AlignMode,
+  rect: AlignRect,
+): Record<string, { x: number; y: number }> {
+  if (boxes.length === 0) return {};
+  return alignBoxes(boxes, mode, rect);
+}
+
 /** 等距分布：少于 3 个节点时无意义，返回空 */
 export function computeDistribute(
   boxes: LayoutBox[],
@@ -98,6 +125,36 @@ export function computeDistribute(
 
   const out: Record<string, { x: number; y: number }> = {};
   let cursor = startOf(first);
+  for (const b of sorted) {
+    out[b.id] =
+      axis === 'h'
+        ? { x: Math.round(cursor), y: Math.round(b.y) }
+        : { x: Math.round(b.x), y: Math.round(cursor) };
+    cursor += sizeOf(b) + gap;
+  }
+  return out;
+}
+
+/**
+ * 分布到指定矩形两端：首尾节点贴住矩形两侧边缘，其余节点在其间等间距。
+ * 少于 2 个节点时无意义（返回空）。
+ */
+export function computeDistributeInRect(
+  boxes: LayoutBox[],
+  axis: 'h' | 'v',
+  rect: AlignRect,
+): Record<string, { x: number; y: number }> {
+  if (boxes.length < 2) return {};
+  const sizeOf = (b: LayoutBox) => (axis === 'h' ? b.width : b.height);
+  const startOf = (b: LayoutBox) => (axis === 'h' ? b.x : b.y);
+  const sorted = [...boxes].sort((a, b) => startOf(a) - startOf(b));
+  const total = sorted.reduce((sum, b) => sum + sizeOf(b), 0);
+  const spanStart = axis === 'h' ? rect.x : rect.y;
+  const spanEnd = axis === 'h' ? rect.x + rect.width : rect.y + rect.height;
+  const gap = (spanEnd - spanStart - total) / (sorted.length - 1);
+
+  const out: Record<string, { x: number; y: number }> = {};
+  let cursor = spanStart;
   for (const b of sorted) {
     out[b.id] =
       axis === 'h'

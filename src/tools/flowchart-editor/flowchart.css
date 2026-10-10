@@ -260,3 +260,37 @@ body.flow-connecting .react-flow__handle {
 .quick-connect:hover svg {
   transform: rotate(var(--qc-rot, 0deg)) scale(1.05);
 }
+
+/* ---------------------------- 触控与窄屏增强 ---------------------------- */
+
+/*
+ * 粗指针（触控 / 手写笔）设备：放大连线锚点与快连箭头的命中区域，
+ * 避免手指点不中 12px 的圆点；同时收紧画布手势，防止拖动时误触发浏览器滚动/缩放。
+ */
+@media (pointer: coarse) {
+  .react-flow__handle > span {
+    height: 22px !important;
+    width: 22px !important;
+  }
+
+  .quick-connect {
+    width: 28px;
+    height: 28px;
+  }
+
+  .react-flow__node {
+    touch-action: none;
+  }
+}
+
+/* 画布：单指拖动平移、双指缩放旋转交由 React Flow 处理 */
+.react-flow__pane {
+  touch-action: none;
+}
+
+/* 窄屏下画布铺满、面板以抽屉形式覆盖（见 FlowchartTool 的 isNarrow 分支） */
+@media (max-width: 1023px) {
+  .react-flow__minimap {
+    display: none;
+  }
+}

@@ -175,9 +175,9 @@ describe('序列化 / 校验', () => {
   ];
   const edges = [{ id: 'e1', source: 'n1', target: 'n2' }];
 
-  it('序列化为 v2 文档并保留字段', () => {
+  it('序列化为 v3 文档并保留字段', () => {
     const doc = serializeDoc(nodes, edges);
-    expect(doc.version).toBe(2);
+    expect(doc.version).toBe(3);
     expect(doc.pages).toHaveLength(1);
     const page = activePageOf(doc)!;
     expect(page.nodes).toHaveLength(2);
@@ -185,7 +185,7 @@ describe('序列化 / 校验', () => {
     expect(page.nodes[0].type).toBe('shape');
   });
 
-  it('合法文档通过校验并归一为 v2', () => {
+  it('合法文档通过校验并归一为 v3', () => {
     const doc = serializeDoc(nodes, edges);
     expect(validateDoc(doc)).toBe(true);
     const restored = deserializeDoc(doc);
@@ -197,7 +197,7 @@ describe('序列化 / 校验', () => {
     const v1 = { version: 1, nodes, edges };
     const restored = deserializeDoc(v1);
     expect(restored.ok).toBe(true);
-    expect(restored.doc!.version).toBe(2);
+    expect(restored.doc!.version).toBe(3);
     expect(activePageOf(restored.doc!)!.nodes).toHaveLength(2);
   });
 

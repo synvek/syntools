@@ -39,7 +39,7 @@ describe('persist（jsdom 无 IndexedDB：静默降级）', () => {
 
   it('空文档写入视为清除草稿（返回 false）', async () => {
     const empty = {
-      version: 2 as const,
+      version: 3 as const,
       pages: [{ id: 'p', name: '页面 1', nodes: [], edges: [] }],
     };
     await expect(savePersistedDoc(empty)).resolves.toBe(false);

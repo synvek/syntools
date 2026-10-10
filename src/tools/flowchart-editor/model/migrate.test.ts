@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activePageOf, createPage, migrateDoc, toDocV2 } from './migrate';
+import { activePageOf, createPage, migrateDoc, toDocV3 } from './migrate';
 import { buildTemplate } from './templates';
 import { defaultData } from '../core';
 
@@ -8,10 +8,10 @@ function v1Node(id: string, x: unknown, y: unknown) {
 }
 
 describe('文档迁移', () => {
-  it('v1 文档迁移为 v2 单页', () => {
+  it('v1 文档迁移为 v3 单页', () => {
     const doc = migrateDoc({ version: 1, nodes: [v1Node('n1', 1, 2)], edges: [] });
     expect(doc).not.toBeNull();
-    expect(doc!.version).toBe(2);
+    expect(doc!.version).toBe(3);
     expect(doc!.pages).toHaveLength(1);
     const page = activePageOf(doc!)!;
     expect(page.nodes).toHaveLength(1);
@@ -51,11 +51,46 @@ describe('文档迁移', () => {
     expect(migrateDoc({ version: 2, pages: [] })).toBeNull();
   });
 
-  it('toDocV2 生成带名称的单页文档', () => {
+  it('toDocV3 生成带名称的单页文档', () => {
     const tpl = buildTemplate('basic');
-    const doc = toDocV2(tpl.nodes, tpl.edges, '流程图');
+    const doc = toDocV3(tpl.nodes, tpl.edges, '流程图');
     const page = activePageOf(doc)!;
     expect(page.name).toBe('流程图');
     expect(page.nodes).toHaveLength(tpl.nodes.length);
+  });
+
+  it('v2 文档升级为 v3（版本号归一）', () => {
+    const doc = migrateDoc({ version: 2, pages: [createPage('A', 'p1')], activePageId: 'p1' });
+    expect(doc).not.toBeNull();
+    expect(doc!.version).toBe(3);
+    expect(doc!.pages[0].id).toBe('p1');
+  });
+
+  it('表格节点行列归一为至少 1，非法从属格记为 null', () => {
+    const doc = migrateDoc({
+      version: 3,
+      pages: [
+        {
+          ...createPage('T', 'p1'),
+          nodes: [
+            {
+              id: 't1',
+              type: 'table',
+              position: { x: 0, y: 0 },
+              data: {
+                ...defaultData('rect'),
+                table: { rows: 0, cols: '2', cells: [[{ text: 'a' }], 'bad'] },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const node = activePageOf(doc!)!.nodes[0];
+    expect(node.type).toBe('table');
+    expect(node.data.table?.rows).toBe(1);
+    expect(node.data.table?.cols).toBe(2);
+    expect(node.data.table?.cells?.[0]).toEqual([{ text: 'a' }]);
+    expect(node.data.table?.cells?.[1]).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { deflateRaw } from 'pako';
 import { describe, expect, it } from 'vitest';
 import { buildTemplateDoc } from '../model/templates';
-import { activePageOf, migrateDoc, toDocV2 } from '../model/migrate';
+import { activePageOf, migrateDoc, toDocV3 } from '../model/migrate';
 import { defaultData } from '../core';
 import { SHAPE_DEFS } from '../model/shapes';
 import {
@@ -78,7 +78,7 @@ describe('项目 JSON', () => {
     const edges: FlowEdgeRec[] = [
       { id: 'e1', source: 'a', target: 'img', waypoints: [{ x: 40, y: 100 }] },
     ];
-    const doc = toDocV2(nodes, edges);
+    const doc = toDocV3(nodes, edges);
     const page = activePageOf(parseProjectJson(toProjectJson(doc))!)!;
 
     expect(page.nodes.map((n) => n.type)).toEqual(['shape', 'image', 'icon', 'formula']);
@@ -125,7 +125,7 @@ describe('Mermaid 导出', () => {
   });
 
   it('空文档导出空串', () => {
-    expect(toMermaid({ version: 2, pages: [] })).toBe('');
+    expect(toMermaid({ version: 3, pages: [] })).toBe('');
   });
 
   it('导出节点样式为 classDef、连线样式为 linkStyle', () => {
@@ -224,7 +224,7 @@ describe('Draw.io XML', () => {
       position: { x: (i % 10) * 200, y: Math.floor(i / 10) * 160 },
       data: defaultData(kind),
     }));
-    const page = activePageOf(parseDrawioXml(toDrawioXml(toDocV2(nodes, [])))!)!;
+    const page = activePageOf(parseDrawioXml(toDrawioXml(toDocV3(nodes, [])))!)!;
     const byId = new Map(page.nodes.map((n) => [n.id, n] as const));
     const failures = kinds
       .map((kind, i) => {
@@ -243,7 +243,7 @@ describe('Draw.io XML', () => {
       { id: 'b', type: 'shape', position: { x: 10, y: 20 }, data: defaultData('decision', 'B') },
     ];
     const doc: FlowDoc = {
-      version: 2,
+      version: 3,
       pages: [
         { id: 'p1', name: 'First', nodes: p1, edges: [] },
         { id: 'p2', name: 'Second', nodes: p2, edges: [] },
@@ -278,7 +278,7 @@ describe('Draw.io XML', () => {
         },
       },
     };
-    const page = activePageOf(parseDrawioXml(toDrawioXml(toDocV2([node], [])))!)!;
+    const page = activePageOf(parseDrawioXml(toDrawioXml(toDocV3([node], [])))!)!;
     const style = page.nodes[0].data.style;
     expect(page.nodes[0].data.kind).toBe('roundRect');
     expect(style.fill).toBe('#ff0000');
@@ -306,7 +306,7 @@ describe('Draw.io XML', () => {
         },
       },
     };
-    const xml = toDrawioXml(toDocV2([node], []));
+    const xml = toDrawioXml(toDocV3([node], []));
     // 旋转是几何属性，镜像与垂直对齐是样式 token
     expect(xml).toContain('rotation="45"');
     expect(xml).toContain('flipH=1');
@@ -356,7 +356,7 @@ describe('Draw.io XML', () => {
         },
       },
     ];
-    const xml = toDrawioXml(toDocV2(nodes, []));
+    const xml = toDrawioXml(toDocV3(nodes, []));
     expect(xml).toContain('size=24');
     expect(xml).toContain('size=22');
     expect(xml).toContain('size=56');
@@ -406,7 +406,7 @@ describe('Draw.io XML', () => {
       },
       waypoints: [{ x: 80, y: 100 }],
     };
-    const page = activePageOf(parseDrawioXml(toDrawioXml(toDocV2(nodes, [edge])))!)!;
+    const page = activePageOf(parseDrawioXml(toDrawioXml(toDocV3(nodes, [edge])))!)!;
     const back = page.edges[0];
     expect(back.style?.type).toBe('step');
     expect(back.style?.stroke).toBe('#123456');
@@ -433,7 +433,7 @@ describe('Draw.io XML', () => {
       labelPosition: 'nearTarget',
       style: { ...DEFAULT_EDGE_STYLE },
     };
-    const xml = toDrawioXml(toDocV2(nodes, [edge]));
+    const xml = toDrawioXml(toDocV3(nodes, [edge]));
     expect(xml).toContain('synSourceLabel=');
     expect(xml).toContain('synLabelPos=nearTarget');
 
@@ -474,7 +474,7 @@ describe('Draw.io XML', () => {
       position: { x: 10, y: 20 },
       data: defaultData('rect', '第一行\n第二行'),
     };
-    const xml = toDrawioXml(toDocV2([node], []));
+    const xml = toDrawioXml(toDocV3([node], []));
     // 导出为 html=1 值：换行转 <br>，XMLBuilder 再把尖括号转义
     expect(xml).toContain('第一行&lt;br&gt;第二行');
     const back = activePageOf(parseDrawioXml(xml)!)!;
@@ -633,5 +633,84 @@ describe('导入分发', () => {
     expect(activePageOf(doc!)!.nodes).toHaveLength(2);
     expect(parseImportedFile('x.mmd', 'not mermaid')).toBeNull();
     expect(parseImportedFile('x.json', '{oops')).toBeNull();
+  });
+});
+
+describe('Mermaid 形状种子往返', () => {
+  const mk = (kind: ShapeKind, label: string, id: string): FlowNodeRec => ({
+    id,
+    type: 'shape',
+    position: { x: 0, y: 0 },
+    data: defaultData(kind, label),
+  });
+
+  it('导出平行四边形 / 梯形 / 预定义 / 卡片', () => {
+    const md = toMermaid(
+      toDocV3(
+        [
+          mk('parallelogram', 'A', 'a'),
+          mk('trapezoid', 'B', 'b'),
+          mk('predefined', 'C', 'c'),
+          mk('card', 'D', 'd'),
+        ],
+        [],
+      ),
+    );
+    expect(md).toContain('a[/A/]');
+    expect(md).toContain('b[/B\\]');
+    expect(md).toContain('c[[C]]');
+    expect(md).toContain('d>D]');
+  });
+
+  it('导入时还原平行四边形 / 梯形 / 数据库 / 双圆 / 预定义', () => {
+    const text = [
+      'flowchart TD',
+      '  a[/A/]',
+      '  b[/B\\]',
+      '  c[(C)]',
+      '  d(((D)))',
+      '  e[[E]]',
+    ].join('\n');
+    const result = parseMermaidFlowchart(text);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const page = activePageOf(result.doc)!;
+    const kindOf = (id: string) => page.nodes.find((n) => n.id === id)?.data.kind;
+    expect(kindOf('a')).toBe('data');
+    expect(kindOf('b')).toBe('trapezoid');
+    expect(kindOf('c')).toBe('database');
+    expect(kindOf('d')).toBe('ellipse');
+    expect(kindOf('e')).toBe('predefined');
+  });
+});
+
+describe('Drawio 表格节点往返', () => {
+  it('表格数据经 drawio 往返后完整保留', () => {
+    const tableNode: FlowNodeRec = {
+      id: 't1',
+      type: 'table',
+      position: { x: 10, y: 20 },
+      data: {
+        ...defaultData('rect', 'T'),
+        table: {
+          rows: 2,
+          cols: 2,
+          cells: [
+            [{ text: 'A' }, {}],
+            [{}, { text: 'D' }],
+          ],
+        },
+      },
+    };
+    const xml = toDrawioXml(toDocV3([tableNode], []));
+    expect(xml).toContain('synTable=');
+
+    const back = parseDrawioXml(xml);
+    expect(back).not.toBeNull();
+    const node = activePageOf(back!)!.nodes[0];
+    expect(node.type).toBe('table');
+    expect(node.data.table?.rows).toBe(2);
+    expect(node.data.table?.cols).toBe(2);
+    expect(node.data.table?.cells?.[1][1]?.text).toBe('D');
   });
 });

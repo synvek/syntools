@@ -54,12 +54,14 @@ import {
   type NodeGeometryPatch,
   type NodeTransformPatch,
   type ShapeKind,
+  type TableData,
   type Waypoint,
   isContainerKind,
   minNodeSize,
 } from './model/types';
 import { DEFAULT_PAGE_NAME } from './model/migrate';
-import { dropCollinear, routeOrthogonal } from './ops';
+import { routeEdges } from './model/routing';
+import { normalizeTable, setCellText } from './model/table';
 import { shapeSize } from './model/shapes';
 import { activePageOf, migrateDoc } from './model/migrate';
 import {
@@ -194,6 +196,8 @@ interface FlowState {
   setEdgeWaypoints: (edgeId: string, waypoints: Waypoint[] | undefined, history?: boolean) => void;
   /** 对选中连线执行正交自动布线（避开其它节点包围盒） */
   autoRouteSelectedEdges: () => void;
+  /** 正交避障布线：对选中连线或整页连线批量布线，并标记 routing=orthogonal */
+  autoRouteEdges: (scope: 'selected' | 'all') => void;
   onSelectionChange: (selection: { nodes: FlowNode[]; edges: FlowEdge[] }) => void;
   /** 仅取消连线选中（保留节点选中）：用于「开始新建连线」时让出连线选择态 */
   deselectEdges: () => void;
@@ -228,6 +232,10 @@ interface FlowState {
   /** 图层排序：把节点移动到目标节点之前（保持父在子前的层级不变量） */
   reorderNode: (id: string, targetId: string) => void;
   setNodeLabel: (id: string, label: string, history?: boolean) => void;
+  /** 写入表格节点的表格数据（行列增删 / 合并拆分 / 样式） */
+  setNodeTable: (id: string, table: TableData, history?: boolean) => void;
+  /** 写入表格单元格文本 */
+  setTableCellText: (id: string, row: number, col: number, text: string, history?: boolean) => void;
   patchSelected: (patch: FlowNodePatch, history?: boolean) => void;
   /** 几何编辑（属性面板 X / Y / W / H）：X / Y 为画布绝对坐标，仅修改传入字段 */
   setNodeGeometry: (ids: string[], patch: NodeGeometryPatch, history?: boolean) => void;
@@ -486,7 +494,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
     });
     return {
-      version: 2,
+      version: 3,
       ...(docName ? { name: docName } : {}),
       pages,
       activePageId,
@@ -675,32 +683,49 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }));
   },
 
-  autoRouteSelectedEdges: () => {
+  autoRouteSelectedEdges: () => get().autoRouteEdges('selected'),
+
+  autoRouteEdges: (scope) => {
     const { edges, selectedEdges, nodes } = get();
-    if (selectedEdges.length === 0) return;
-    const ids = new Set(selectedEdges);
+    const selected = new Set(selectedEdges);
+    const targets = edges.filter((e) => scope === 'all' || selected.has(e.id));
+    if (targets.length === 0) return;
     const byId = new Map(nodes.map((n) => [n.id, n] as const));
     const obstacles = nodes
       .filter((n) => n.hidden !== true)
-      .map((n) => ({ id: n.id, rect: absoluteRectOf(n, byId) }));
+      .map((n) => ({ id: n.id, ...absoluteRectOf(n, byId) }));
 
-    let changed = false;
-    const nextEdges = edges.map((e) => {
-      if (!ids.has(e.id)) return e;
+    const requests = targets.flatMap((e) => {
       const source = byId.get(e.source);
       const target = byId.get(e.target);
-      if (!source || !target) return e;
+      if (!source || !target) return [];
       const from = anchorOf(source, byId, e.sourceHandle, target);
       const to = anchorOf(target, byId, e.targetHandle, source);
-      const fromStub = stubPoint(from.point, from.side);
-      const toStub = stubPoint(to.point, to.side);
-      const boxes = obstacles
-        .filter((o) => o.id !== e.source && o.id !== e.target)
-        .map((o) => o.rect);
-      const middle = routeOrthogonal(fromStub, toStub, boxes);
-      const waypoints = dropCollinear([fromStub, ...middle, toStub]);
-      const data: FlowEdgeData = { ...(e.data as FlowEdgeData | undefined), waypoints };
+      return [
+        {
+          id: e.id,
+          from: stubPoint(from.point, from.side),
+          to: stubPoint(to.point, to.side),
+          fromSide: from.side,
+          toSide: to.side,
+          exclude: [e.source, e.target],
+        },
+      ];
+    });
+    if (requests.length === 0) return;
+
+    const results = routeEdges({ edges: requests, obstacles });
+    const byEdge = new Map(results.map((r) => [r.edgeId, r] as const));
+    let changed = false;
+    const nextEdges = edges.map((e) => {
+      const result = byEdge.get(e.id);
+      if (!result) return e;
       changed = true;
+      const data: FlowEdgeData = {
+        ...(e.data as FlowEdgeData | undefined),
+        waypoints: result.waypoints,
+        routing: 'orthogonal',
+      };
       return { ...e, data };
     });
     if (!changed) return;
@@ -929,6 +954,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, label } } : n)),
     }));
+  },
+
+  setNodeTable: (id, table, history = true) => {
+    if (history) get().commit();
+    set((s) => ({
+      nodes: s.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, table } } : n)),
+    }));
+  },
+
+  setTableCellText: (id, row, col, text, history = true) => {
+    const node = get().nodes.find((n) => n.id === id);
+    const table = normalizeTable((node?.data as FlowNodeData | undefined)?.table);
+    get().setNodeTable(id, setCellText(table, row, col, text), history);
   },
 
   patchSelected: (patch, history = true) => {

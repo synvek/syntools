@@ -1,21 +1,23 @@
 /**
  * Mermaid flowchart 文本的双向转换。
  *
- * 导出：便于粘贴到 Markdown / 文档 / GitHub；只导出结构（节点文本与连线），样式无法表达。
+ * 导出：结构与可表达的样式（classDef / class / linkStyle）一并写出，便于粘贴到 Markdown 与往返。
  * 导入：自研轻量解析器（不引入 mermaid 运行时，避免 ~500KB gzip 依赖），
  *      覆盖 `flowchart` / `graph` 的常用子集：
  *        - 方向：TD / TB / BT / LR / RL
- *        - 节点：`id`、`id[文本]`、`id(圆角)`、`id([终止])`、`id((圆形))`、`id{判断}`、
- *                `id{{六边形}}`、`id[(数据库)]`、`id[[预定义]]`、`id[/数据/]`、`id>非对称]`
+ *        - 节点：`id`、`id[矩形]`、`id(圆角)`、`id([终止])`、`id((圆形))`、`id(((双圆)))`、`id{判断}`、
+ *                `id{{六边形}}`、`id[(数据库)]`、`id[[预定义]]`、`id>非对称]`、
+ *                `id[/平行四边形/]`、`id[\平行四边形\]`、`id[/梯形\]`、`id[\梯形/]`
  *        - 连线：`-->` `---` `-.->` `-.-` `==>` `===` `--x` `--o`，标签 `|文本|` 或 `-- 文本 -->`
+ *        - 样式：`classDef` 定义 + `class` 指派 + `style` 内联 + `linkStyle`（按连线序号）
  *        - 容器：`subgraph 名称 ... end`（映射为编组容器）
- *      未识别指令（classDef / style / linkStyle / click 等）安全忽略。
+ *      其余指令（click / direction / accTitle / accDescr 等）安全忽略。
  *      由于 Mermaid 不携带坐标，导入后必然经过一次 dagre 自动布局。
  */
 
 import { createId, defaultData } from '../core';
 import { layoutGraph } from '../layout';
-import { activePageOf, toDocV2 } from '../model/migrate';
+import { activePageOf, toDocV3 } from '../model/migrate';
 import { shapeSize } from '../model/shapes';
 import { normalizeEdgeStyle } from '../ops';
 import {
@@ -57,7 +59,15 @@ function bodyOf(kind: ShapeKind, label: string): string {
     case 'database':
       return `[(${text})]`;
     case 'document':
+    case 'predefined':
       return `[[${text}]]`;
+    case 'parallelogram':
+      return `[/${text}/]`;
+    case 'trapezoid':
+      return `[/${text}\\]`;
+    case 'card':
+    case 'note':
+      return `>${text}]`;
     case 'roundRect':
       return `(${text})`;
     case 'hexagon':
@@ -178,18 +188,42 @@ export type MermaidParseResult =
 
 /** 形状包裹语法 → 图形目录（顺序即优先级，先长后短、先复合后简单） */
 const WRAPPERS: Array<[RegExp, ShapeKind]> = [
+  [/^\(\(\(([\s\S]*)\)\)\)$/, 'ellipse'],
   [/^\(\(([\s\S]*)\)\)$/, 'ellipse'],
   [/^\(\[([\s\S]*)\]\)$/, 'startEnd'],
   [/^\{\{([\s\S]*)\}\}$/, 'hexagon'],
-  [/^\[\(([\s\S]*)\)\]$/, 'database'],
-  [/^\[\[([\s\S]*)\]\]$/, 'predefined'],
-  [/^\[\/([\s\S]*)\/\]$/, 'data'],
-  [/^\[\\\\([\s\S]*)\\\\]$/, 'data'],
-  [/^\[([\s\S]*)\]$/, 'rect'],
   [/^\(([\s\S]*)\)$/, 'roundRect'],
   [/^\{(.*)\}$/, 'decision'],
   [/^>([\s\S]*)\]$/, 'card'],
 ];
+
+/**
+ * `[...]` 系列按首尾分隔符判定形状：
+ * `[[x]]` 预定义、`[(x)]` 数据库、`[/x/]` 与 `[\x\]` 平行四边形、
+ * `[/x\]` 与 `[\x/]` 梯形、`[x]` 矩形。
+ */
+function squareBracketShape(rest: string): { kind: ShapeKind; label: string } | null {
+  if (!rest.startsWith('[') || !rest.endsWith(']')) return null;
+  if (rest.startsWith('[[') && rest.endsWith(']]')) {
+    return { kind: 'predefined', label: unquote(rest.slice(2, -2)) };
+  }
+  if (rest.startsWith('[(') && rest.endsWith(')]')) {
+    return { kind: 'database', label: unquote(rest.slice(2, -2)) };
+  }
+  const inner = rest.slice(1, -1);
+  if (inner.length >= 2) {
+    const left = inner[0];
+    const right = inner[inner.length - 1];
+    const body = unquote(inner.slice(1, -1));
+    if ((left === '/' && right === '/') || (left === '\\' && right === '\\')) {
+      return { kind: 'data', label: body };
+    }
+    if ((left === '/' && right === '\\') || (left === '\\' && right === '/')) {
+      return { kind: 'trapezoid', label: body };
+    }
+  }
+  return { kind: 'rect', label: unquote(inner) };
+}
 
 /** 语句中可出现的连线标记（含可选 |标签|） */
 const LINK_SPLIT = /\s*((?:-->|---|-\.->|-\.-|==>|===|--x|--o)\s*(?:\|[^|]*\|)?)\s*/;
@@ -230,6 +264,8 @@ function parseNodeExpr(expr: string): ParsedNodeExpr | null {
   const rest = (m[2] ?? '').trim();
   if (!id) return null;
   if (!rest) return { id };
+  const square = squareBracketShape(rest);
+  if (square) return { id, kind: square.kind, label: square.label };
   for (const [re, kind] of WRAPPERS) {
     const hit = re.exec(rest);
     if (hit) return { id, kind, label: unquote(hit[1]) };
@@ -552,7 +588,7 @@ function parseMermaidPage(text: string): MermaidParseResult {
     style: normalizeEdgeStyle({ ...e.style, ...edgeStyleFromMermaid(linkStyles.get(index)) }),
   }));
 
-  return { ok: true, doc: toDocV2(recs, edgeRecs) };
+  return { ok: true, doc: toDocV3(recs, edgeRecs) };
 }
 
 /* ------------------------------ 多页入口 ------------------------------ */
@@ -610,5 +646,5 @@ export function parseMermaidFlowchart(text: string): MermaidParseResult {
 
   if (docs.length === 1) return { ok: true, doc: docs[0] };
   const pages = docs.flatMap((doc) => doc.pages);
-  return { ok: true, doc: { version: 2, pages, activePageId: pages[0].id } };
+  return { ok: true, doc: { version: 3, pages, activePageId: pages[0].id } };
 }

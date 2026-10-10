@@ -6,6 +6,7 @@
 import {
   type Align,
   type EdgeLabelPosition,
+  type EdgeRoutingMode,
   type FlowDoc,
   type FlowEdgeRec,
   type FlowEdgeStyle,
@@ -20,7 +21,8 @@ import {
   minNodeSize,
 } from './model/types';
 import { shapeDefOf, shapeSize } from './model/shapes';
-import { migrateDoc, toDocV2 } from './model/migrate';
+import { migrateDoc, toDocV3 } from './model/migrate';
+import { emptyTable } from './model/table';
 
 let idCounter = 0;
 
@@ -200,6 +202,16 @@ export function formulaData(formula: string, label = ''): FlowNodeData {
     label,
     formula,
     style: { ...DEFAULT_STYLE, fill: '#FFFFFF', stroke: '#0F172A', strokeWidth: 0, fontSize: 16 },
+  };
+}
+
+/** 表格节点数据（缺省 3×3 空表格，渲染为可编辑网格） */
+export function tableData(rows = 3, cols = 3, label = ''): FlowNodeData {
+  return {
+    kind: 'rect',
+    label,
+    table: emptyTable(rows, cols),
+    style: { ...DEFAULT_STYLE, fill: '#FFFFFF', stroke: '#334155', strokeWidth: 1, fontSize: 12 },
   };
 }
 
@@ -489,7 +501,7 @@ export function validateDoc(raw: unknown): raw is FlowDoc {
   return migrateDoc(raw) !== null;
 }
 
-/** 把内部状态序列化为可持久化的 v2 文档（单页记录；多页由 store 按页组装） */
+/** 把内部状态序列化为可持久化的 v3 文档（单页记录；多页由 store 按页组装） */
 export function serializeDoc(
   nodes: ReadonlyArray<{
     id: string;
@@ -516,6 +528,8 @@ export function serializeDoc(
     labelPosition?: EdgeLabelPosition;
     style?: FlowEdgeStyle;
     waypoints?: Waypoint[];
+    routing?: EdgeRoutingMode;
+    avoidObstacles?: boolean;
     mxStyle?: string[];
   }>,
   pageName?: string,
@@ -538,6 +552,7 @@ export function serializeDoc(
       ...(n.data.src ? { src: n.data.src } : {}),
       ...(n.data.iconId ? { iconId: n.data.iconId } : {}),
       ...(n.data.formula ? { formula: n.data.formula } : {}),
+      ...(n.data.table ? { table: n.data.table } : {}),
     },
   }));
   const recEdges: FlowEdgeRec[] = edges.map((e) => ({
@@ -554,9 +569,11 @@ export function serializeDoc(
     ...(e.waypoints && e.waypoints.length > 0
       ? { waypoints: e.waypoints.map((p) => ({ x: p.x, y: p.y })) }
       : {}),
+    ...(e.routing ? { routing: e.routing } : {}),
+    ...(e.avoidObstacles ? { avoidObstacles: true } : {}),
     ...(e.mxStyle && e.mxStyle.length > 0 ? { mxStyle: [...e.mxStyle] } : {}),
   }));
-  return toDocV2(recNodes, recEdges, pageName);
+  return toDocV3(recNodes, recEdges, pageName);
 }
 
 /** 反序列化并归一为 v2；非法返回 { ok:false }，调用方降级为空图 */
