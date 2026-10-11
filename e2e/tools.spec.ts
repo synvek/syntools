@@ -2147,6 +2147,39 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
+  test('文字处理器：链接可在右键菜单里查看 / 编辑 / 移除', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('示例链接文字');
+
+    // 先用工具栏按钮创建链接（该入口走原生 prompt）
+    page.once('dialog', (dialog) => void dialog.accept('https://example.com/a'));
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.getByRole('button', { name: '链接', exact: true }).click();
+    await expect(page.locator('.tiptap a[href="https://example.com/a"]')).toHaveCount(1);
+
+    // 右键链接：菜单给出查看 / 编辑 / 移除入口
+    await page.locator('.tiptap a[href="https://example.com/a"]').click({ button: 'right' });
+    await expect(page.getByTestId('rich-text-context-menu')).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: '复制链接地址' })).toBeVisible();
+
+    // 编辑链接地址
+    await page.getByRole('menuitem', { name: '编辑链接' }).click();
+    const input = page.getByRole('textbox', { name: '链接地址' });
+    await expect(input).toHaveValue('https://example.com/a');
+    await input.fill('https://example.org/b');
+    await page.getByRole('button', { name: '确定' }).click();
+    await expect(page.locator('.tiptap a[href="https://example.org/b"]')).toHaveCount(1);
+
+    // 移除链接
+    await page.locator('.tiptap a[href="https://example.org/b"]').click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '移除链接' }).click();
+    await expect(page.locator('.tiptap a[href]')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
   test('电子表格：放映只读表格', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));

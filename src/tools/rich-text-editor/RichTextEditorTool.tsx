@@ -12,6 +12,7 @@ import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes } from '@/core/pdf/download';
 import type { ToolResult } from '@/core/types';
 import { PrintLayer } from './A4Page';
+import { EditorContextMenu, type EditorContextTarget } from './EditorContextMenu';
 import { EditorToolbar } from './EditorToolbar';
 import { FindReplacePanel } from './FindReplacePanel';
 import { OutlinePanel } from './OutlinePanel';
@@ -222,6 +223,8 @@ export default function RichTextEditorTool() {
   const viewRef = useRef(viewMode);
   viewRef.current = viewMode;
   const surfaceRef = useRef<HTMLDivElement | null>(null);
+  /** 编辑区右键菜单：命中的对象与位置（视口坐标） */
+  const [contextMenu, setContextMenu] = useState<EditorContextTarget | null>(null);
   // 页面几何（mm）→ 像素：随页面设置变化，插件通过 getter 读取最新值
   const metrics = useMemo(() => resolvePageMetrics(pageSetup), [pageSetup]);
   const metricsRef = useRef(metrics);
@@ -1135,6 +1138,39 @@ export default function RichTextEditorTool() {
     setDiffVersion(null);
   };
 
+  /**
+   * 编辑区右键：接管原生菜单（桌面端本来就没有），按命中的对象决定菜单内容。
+   * 链接与图片走 DOM 命中（对应 mark / 节点），其余按是否有选区区分。
+   */
+  const openContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!editor) return;
+    event.preventDefault();
+    const element = event.target as HTMLElement;
+    const anchor = element.closest('a[href]');
+    if (anchor && editor.view.dom.contains(anchor)) {
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        kind: 'link',
+        href: anchor.getAttribute('href') ?? '',
+      });
+      return;
+    }
+    const image = element.closest('img');
+    if (image && editor.view.dom.contains(image)) {
+      let imagePos: number | undefined;
+      try {
+        imagePos = editor.view.posAtDOM(image, 0);
+      } catch {
+        imagePos = undefined;
+      }
+      setContextMenu({ x: event.clientX, y: event.clientY, kind: 'image', imagePos });
+      return;
+    }
+    const { from, to } = editor.state.selection;
+    setContextMenu({ x: event.clientX, y: event.clientY, kind: from !== to ? 'text' : 'empty' });
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <DocumentHeader
@@ -1392,6 +1428,7 @@ export default function RichTextEditorTool() {
               >
                 <div
                   ref={surfaceRef}
+                  onContextMenu={openContextMenu}
                   className={`rte-surface relative rounded-lg border border-gray-200 shadow-sm dark:border-gray-700 ${
                     viewMode === 'paged' ? 'rte-paged' : 'px-8 py-8'
                   } ${viewMode === 'flow' && metrics.columns > 1 ? 'rte-columns' : ''}`}
@@ -1631,6 +1668,14 @@ export default function RichTextEditorTool() {
         onConfirm={handleMathSubmit}
         onRemove={handleMathRemove}
       />
+
+      {contextMenu && editor ? (
+        <EditorContextMenu
+          editor={editor}
+          target={contextMenu}
+          onClose={() => setContextMenu(null)}
+        />
+      ) : null}
 
       {printReady && (
         <PrintLayer html={printHtml} flowRef={flowRef} watermark={pageSetup.watermark} />
