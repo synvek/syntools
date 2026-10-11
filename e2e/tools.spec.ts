@@ -2180,6 +2180,32 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
+  test('文字处理器：嵌入型图片留在文字中间，不再独占一行', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('前文');
+
+    // 与工具栏「插入图片」同一入口：直接向隐藏的 file input 投放图片
+    await page.setInputFiles('input[type="file"][accept="image/*"]', {
+      name: 'dot.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAKUlEQVR42u3NMQEAAAgDoC251a3gLwSgcyfTVFVVVVVVVVVVVVVVVVVV1S8DLQABAVXMpwAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+    await page.keyboard.type('后文');
+
+    // 图片与前后文字同处一个段落
+    await expect(page.locator('.tiptap p')).toHaveCount(1);
+    const html = await page.locator('.tiptap p').innerHTML();
+    expect(html.startsWith('前文<img')).toBe(true);
+    expect(html.endsWith('后文')).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   test('电子表格：放映只读表格', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));

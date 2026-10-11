@@ -115,6 +115,16 @@ const BOTTOM_RESERVE_PX = 150;
 /** 拼写面板最多展示的问题数：超出部分不渲染，避免长文档铺开上百条 */
 const SPELL_ISSUE_LIMIT = 100;
 
+/**
+ * 单文件 HTML 导出的图片样式：不携带编辑器样式表，需内联补齐，
+ * 否则四周型 / 上下型环绕与行内图片的对齐都会在导出文件里失效。
+ */
+const IMAGE_EXPORT_CSS =
+  'img{max-width:100%;height:auto;vertical-align:baseline}' +
+  "img[data-layer='wrap-left']{float:left;margin:4px 12px 8px 0}" +
+  "img[data-layer='wrap-right']{float:right;margin:4px 0 8px 12px}" +
+  "img[data-layer='top-bottom']{display:block;margin:8px auto}";
+
 /** 单文件 HTML 导出不携带编辑器样式表，目录样式需内联补齐（与 editor.css 保持一致） */
 const TOC_EXPORT_CSS =
   '.rte-toc{margin:.75em 0 1.25em}.rte-toc-title{margin:0 0 .5em;font-weight:600}' +
@@ -988,7 +998,7 @@ export default function RichTextEditorTool() {
     if (!editor) return;
     // 单文件 HTML 用 KaTeX MathML：无需携带样式表即可正确显示公式
     const body = injectMath(prepareExportHtml(editor.getHTML()));
-    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}img{max-width:100%}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}${TOC_EXPORT_CSS}</style></head><body>${body}</body></html>`;
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}${IMAGE_EXPORT_CSS}${TOC_EXPORT_CSS}</style></head><body>${body}</body></html>`;
     const bytes = new TextEncoder().encode(html);
     downloadBytes(bytes, buildExportFilename(title || 'document', 'html'), 'text/html');
   };

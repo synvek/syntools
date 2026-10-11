@@ -119,6 +119,13 @@
 }
 
 .rte-surface .tiptap img {
+  /* Tailwind preflight 把 img 定为 display: block + vertical-align: middle：
+     块级化会让「嵌入型」图片照样独占一行、把后续文字挤到下一行，这里显式恢复为行内。
+     垂直对齐用 baseline（Word 嵌入型的行为：图片坐在基线上，文字在图片底部一侧），
+     middle 会把文字排到图片高度正中，与常见的「图片+文字同行」观感不符。
+     需要独占一行的居中/右对齐在下方按 data-align 覆盖。 */
+  display: inline-block;
+  vertical-align: baseline;
   max-width: 100%;
   height: auto;
   border-radius: 0.375rem;
@@ -126,6 +133,17 @@
 
 .rte-surface .tiptap img.ProseMirror-selectednode {
   outline: 2px solid #2563eb;
+}
+
+/* 行内图片是 atom 节点：光标记位置需要时 ProseMirror 会在其后插入占位分隔符 img。
+   必须让它零尺寸且不吃图片样式，否则正文里会多出一个小圆点（项目未引入 prosemirror 默认样式）。 */
+.rte-surface .tiptap img.ProseMirror-separator {
+  display: inline !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
 }
 
 .rte-surface .tiptap table {
@@ -215,6 +233,24 @@
   z-index: -1;
 }
 
+/* 环绕方式：四周型 —— 图片浮动到一侧，文字在另一侧与下方环绕（对应 Word 的「四周型环绕」） */
+.rte-surface .tiptap img[data-layer='wrap-left'] {
+  float: left;
+  margin: 4px 12px 8px 0;
+}
+
+.rte-surface .tiptap img[data-layer='wrap-right'] {
+  float: right;
+  margin: 4px 0 8px 12px;
+}
+
+/* 环绕方式：上下型 —— 图片独占一行，文字只出现在其上下（对应 Word 的「上下型环绕」） */
+.rte-surface .tiptap img[data-layer='top-bottom'] {
+  display: block;
+  float: none;
+  margin: 8px auto;
+}
+
 /* 打印流同样支持浮动图片（与屏幕同一套定位规则） */
 .rte-print-flow {
   position: relative;
@@ -229,6 +265,23 @@
 
 .rte-print-flow img[data-layer='behind'] {
   z-index: -1;
+}
+
+/* 打印流与编辑器保持同一套环绕排版 */
+.rte-print-flow img[data-layer='wrap-left'] {
+  float: left;
+  margin: 4px 12px 8px 0;
+}
+
+.rte-print-flow img[data-layer='wrap-right'] {
+  float: right;
+  margin: 4px 0 8px 12px;
+}
+
+.rte-print-flow img[data-layer='top-bottom'] {
+  display: block;
+  float: none;
+  margin: 8px auto;
 }
 
 /* 图片对齐 */
@@ -703,9 +756,25 @@
 }
 
 .rte-print-flow img {
+  /* 与编辑器一致：行内图片不能被 preflight 块级化，否则打印 / PDF 里图片会独占一行 */
+  display: inline-block;
+  vertical-align: baseline;
   max-width: 100%;
   height: auto;
   border-radius: 0.375rem;
+}
+
+/* 打印流补齐对齐规则，避免「编辑器里居中、导出后靠左」 */
+.rte-print-flow img[data-align='center'] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.rte-print-flow img[data-align='right'] {
+  display: block;
+  margin-left: auto;
+  margin-right: 0;
 }
 
 .rte-print-flow table {

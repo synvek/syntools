@@ -833,6 +833,9 @@ export function EditorToolbar({
                 onChange={(value) => chain().setImageLayer(normalizeImageLayer(value)).run()}
                 options={[
                   { value: 'inline', label: t('tools.richText.imageLayerInline') },
+                  { value: 'wrap-left', label: t('tools.richText.imageLayerWrapLeft') },
+                  { value: 'wrap-right', label: t('tools.richText.imageLayerWrapRight') },
+                  { value: 'top-bottom', label: t('tools.richText.imageLayerTopBottom') },
                   { value: 'front', label: t('tools.richText.imageLayerFront') },
                   { value: 'behind', label: t('tools.richText.imageLayerBehind') },
                 ]}

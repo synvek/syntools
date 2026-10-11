@@ -2,7 +2,13 @@ import Image from '@tiptap/extension-image';
 import { Table } from '@tiptap/extension-table';
 import { Extension } from '@tiptap/core';
 import { CONTENT_WIDTH_PX } from './core';
-import { findSelectedImage, isFloatingImageLayer, normalizeImageLayer } from './imageLayer';
+import {
+  findSelectedImage,
+  hasImageLayerAttr,
+  isFloatingImageLayer,
+  keepImageSelected,
+  normalizeImageLayer,
+} from './imageLayer';
 
 /**
  * 排版细节扩展（Word 对标）：
@@ -76,7 +82,14 @@ const ParagraphStyle = Extension.create({
   },
 });
 
-/** 图片：宽度（%）、对齐、层级（嵌入 / 浮于文字上方 / 衬于文字下方）与浮动偏移 */
+/**
+ * 图片：宽度（px）、对齐、层级（嵌入 / 浮于文字上方 / 衬于文字下方）与浮动偏移。
+ *
+ * 节点是行内还是块级由配置项 `inline` 决定（见 extensions.ts 的 configure）：
+ * TipTap 的 `group()` / `inline()` 都读 `this.options.inline`，因此**只能**通过 configure 打开，
+ * 直接在这里写 spec 字段 `inline: true` 会让节点同时落在 block group 与 inline 语义上，
+ * schema 会以 `Mixing inline and block content` 直接构建失败。
+ */
 const ImageStyle = Image.extend({
   addAttributes() {
     return {
@@ -112,8 +125,9 @@ const ImageStyle = Image.extend({
       layer: {
         default: 'inline',
         parseHTML: (el: HTMLElement) => normalizeImageLayer(el.getAttribute('data-layer')),
+        // 嵌入型是默认样式：只有其它环绕方式才写 data-layer
         renderHTML: (attrs: StyleAttrs) =>
-          isFloatingImageLayer(attrs.layer) ? { 'data-layer': attrs.layer } : {},
+          hasImageLayerAttr(attrs.layer) ? { 'data-layer': attrs.layer } : {},
       },
       offsetX: {
         default: null,
@@ -210,8 +224,7 @@ export const BlockStyleCommands = Extension.create({
       setImageStyle:
         (width: number | null, align: string | null) =>
         ({ state, tr }) => {
-          // 复用统一的图片定位：块级图片被选中（NodeSelection）时父节点是 doc，
-          // 只看 $from.parent.descendants 会导致命令永远失败、宽度改不动。
+          // 复用统一的图片定位：图片被选中（NodeSelection）或光标落在图片所在段落时都可命中
           const found = findSelectedImage(state);
           if (!found) return false;
           tr.setNodeMarkup(found.pos, undefined, {
@@ -219,6 +232,7 @@ export const BlockStyleCommands = Extension.create({
             width: width ? Math.max(16, Math.round(width)) : null,
             align,
           });
+          keepImageSelected(tr, found.pos);
           return true;
         },
       setImageWidth:
@@ -230,6 +244,7 @@ export const BlockStyleCommands = Extension.create({
             ...found.node.attrs,
             width: width ? Math.max(16, Math.round(width)) : null,
           });
+          keepImageSelected(tr, found.pos);
           return true;
         },
       toggleTableBorders:

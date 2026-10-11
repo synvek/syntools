@@ -1,19 +1,36 @@
 import { Extension } from '@tiptap/core';
-import { NodeSelection, Plugin, PluginKey, type EditorState } from '@tiptap/pm/state';
+import {
+  NodeSelection,
+  Plugin,
+  PluginKey,
+  type EditorState,
+  type Transaction,
+} from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 
 /**
- * 图片层级（对标 Word 的「环绕方式」）：
- * - inline：嵌入型，图片在文字流里，占位并参与分页（默认）
- * - front ：浮于文字上方，脱离文字流，可拖动定位
- * - behind：衬于文字下方，脱离文字流，绘制在正文之下，可拖动定位
+ * 图片环绕方式（对标 Word）：
+ * - inline    ：嵌入型，图片在文字流里，占位并参与分页（默认）
+ * - wrap-left ：四周型，图片靠左浮动，文字在右侧与下方环绕
+ * - wrap-right：四周型，图片靠右浮动，文字在左侧与下方环绕
+ * - top-bottom：上下型，图片独占一行，文字只出现在其上下
+ * - front     ：浮于文字上方，脱离文字流，可拖动定位
+ * - behind    ：衬于文字下方，脱离文字流，绘制在正文之下，可拖动定位
  *
- * 浮动层用绝对定位实现（偏移量相对内容区左上角，px），因此不影响文字排版与分页，
- * 与 Word 的浮动对象行为一致；偏移量写进节点属性，导入导出、撤销重做都走同一套数据。
+ * front / behind 用绝对定位实现（偏移量相对内容区左上角，px），不影响文字排版与分页；
+ * wrap-* / top-bottom 用 CSS 浮动与块级排版实现，仍参与文档流。所有取值都写进节点属性，
+ * 导入导出、撤销重做走同一套数据。
  */
 
-export const IMAGE_LAYERS = ['inline', 'front', 'behind'] as const;
+export const IMAGE_LAYERS = [
+  'inline',
+  'wrap-left',
+  'wrap-right',
+  'top-bottom',
+  'front',
+  'behind',
+] as const;
 export type ImageLayer = (typeof IMAGE_LAYERS)[number];
 
 export const imageLayerKey = new PluginKey('imageLayer');
@@ -23,11 +40,23 @@ export function normalizeImageLayer(value: string | null | undefined): ImageLaye
   return IMAGE_LAYERS.includes(value as ImageLayer) ? (value as ImageLayer) : 'inline';
 }
 
-/** 是否为浮动层（浮于文字上方 / 衬于文字下方） */
+/** 是否为绝对定位的浮动层（浮于文字上方 / 衬于文字下方） */
 export function isFloatingImageLayer(
   layer: string | null | undefined,
 ): layer is 'front' | 'behind' {
   return layer === 'front' || layer === 'behind';
+}
+
+/** 四周型环绕：图片浮动到一侧，文字在另一侧环绕（仍参与文档流） */
+export function isWrappedImageLayer(
+  layer: string | null | undefined,
+): layer is 'wrap-left' | 'wrap-right' {
+  return layer === 'wrap-left' || layer === 'wrap-right';
+}
+
+/** 需要显式写出 data-layer 的环绕方式（嵌入型是默认样式，不输出属性） */
+export function hasImageLayerAttr(layer: string | null | undefined): layer is ImageLayer {
+  return Boolean(layer) && layer !== 'inline';
 }
 
 /** DOM 上的浮动图片判定（分页测量需跳过：浮动图片脱离文字流，不影响分页） */
@@ -62,6 +91,19 @@ export function findSelectedImage(state: EditorState): { pos: number; node: PMNo
     return false;
   });
   return found;
+}
+
+/**
+ * 修改图片属性后重新选中该图片。
+ *
+ * 行内图片（嵌入型）在事务映射时会从 NodeSelection 退化成光标——ProseMirror 只对块级 atom
+ * 保持节点选中。若不重新选中，改完宽度 / 对齐后工具栏的图片控件会立刻消失，
+ * 用户无法连续调整（比如先设宽度再挑环绕方式）。
+ */
+export function keepImageSelected(tr: Transaction, pos: number): void {
+  const node = tr.doc.nodeAt(pos);
+  if (!node || node.type.name !== 'image') return;
+  tr.setSelection(NodeSelection.create(tr.doc, pos));
 }
 
 /**
@@ -239,6 +281,8 @@ export const ImageLayerCommands = Extension.create({
             attrs.offsetY = null;
           }
           tr.setNodeMarkup(pos, undefined, attrs);
+          // 切层后保持选中：否则行内图片的节点选中会退化为光标，无法继续调整
+          keepImageSelected(tr, pos);
           return true;
         },
     };

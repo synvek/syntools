@@ -11,7 +11,12 @@ import {
 } from './pageSetup';
 import { renderWatermarkImage, type WatermarkImage } from './watermarkImage';
 import { firstFontFamily, pxToHalfPoints } from './typography';
-import { isFloatingImageLayer, normalizeImageLayer, pxToEmu } from './imageLayer';
+import {
+  isFloatingImageLayer,
+  isWrappedImageLayer,
+  normalizeImageLayer,
+  pxToEmu,
+} from './imageLayer';
 import { FOOTNOTE_ATTR } from './footnotes';
 import { latexToOmml } from './mathOmml';
 import { renderLatexImages, type MathImage, type MathImageRequest } from './mathImage';
@@ -221,7 +226,13 @@ function imageRun(D: DocxNs, el: Element): InstanceType<DocxNs['ImageRun']> | nu
     : size
       ? Math.min(MAX_IMAGE_WIDTH, size.width)
       : MAX_IMAGE_WIDTH;
-  // 浮动图片锚定在所属段落，偏移相对分栏与段落，与编辑器的绝对定位语义一致
+  /*
+   * 环绕方式 → Word 浮动图片参数（与编辑器的 CSS 实现一一对应）：
+   * - 浮于文字上方 / 衬于文字下方：绝对偏移 + 不环绕，允许重叠
+   * - 四周型：靠左 / 靠右 + 方框环绕
+   * - 上下型：居中 + 仅上下环绕
+   * 嵌入型不加 floating，保持随文排版。
+   */
   const layer = normalizeImageLayer(el.getAttribute('data-layer'));
   const offsetX = Number.parseFloat((el as HTMLElement).style.left ?? '');
   const offsetY = Number.parseFloat((el as HTMLElement).style.top ?? '');
@@ -239,7 +250,29 @@ function imageRun(D: DocxNs, el: Element): InstanceType<DocxNs['ImageRun']> | nu
         behindDocument: layer === 'behind',
         allowOverlap: true,
       }
-    : undefined;
+    : isWrappedImageLayer(layer)
+      ? {
+          horizontalPosition: {
+            relative: D.HorizontalPositionRelativeFrom.COLUMN,
+            align:
+              layer === 'wrap-left'
+                ? D.HorizontalPositionAlign.LEFT
+                : D.HorizontalPositionAlign.RIGHT,
+          },
+          // docx 要求水平 / 垂直位置都必须给出 align 或 offset，否则导出直接抛错
+          verticalPosition: { relative: D.VerticalPositionRelativeFrom.PARAGRAPH, offset: 0 },
+          wrap: { type: D.TextWrappingType.SQUARE, side: D.TextWrappingSide.BOTH_SIDES },
+        }
+      : layer === 'top-bottom'
+        ? {
+            horizontalPosition: {
+              relative: D.HorizontalPositionRelativeFrom.COLUMN,
+              align: D.HorizontalPositionAlign.CENTER,
+            },
+            verticalPosition: { relative: D.VerticalPositionRelativeFrom.PARAGRAPH, offset: 0 },
+            wrap: { type: D.TextWrappingType.TOP_AND_BOTTOM },
+          }
+        : undefined;
   return new D.ImageRun({
     data: decoded.bytes,
     type: decoded.type,

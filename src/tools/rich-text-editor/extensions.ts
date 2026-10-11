@@ -1,4 +1,5 @@
 import { Extension, Node } from '@tiptap/core';
+import { dropCursor } from '@tiptap/pm/dropcursor';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -63,6 +64,20 @@ declare module '@tiptap/core' {
   }
 }
 
+/**
+ * 拖动落点光标：拖动图片 / 文本块时在插入位置画一条竖线，用来判断会插到哪个文字前面。
+ *
+ * StarterKit 虽然内置 dropcursor，但在本项目里始终没有生效（拖动过程中
+ * `.ProseMirror-dropcursor` 元素从未出现），所以这里直接注册 ProseMirror 的插件，
+ * 顺带把颜色 / 粗细调成可见（默认 1px 黑色在正文里几乎看不出来）。
+ */
+const DropIndicator = Extension.create({
+  name: 'dropIndicator',
+  addProseMirrorPlugins() {
+    return [dropCursor({ color: '#2563eb', width: 2 })];
+  },
+});
+
 /** 页面布局插件（Word 式分页）：仅页面视图启用，通过 Decoration.widget 渲染页间空白 */
 const PageLayout = Extension.create<{
   onLayout?: (snapshot: PageLayoutSnapshot) => void;
@@ -113,6 +128,8 @@ export function createExtensions({
     StarterKit.configure({
       // 链接点击不跳转，交由工具栏编辑
       link: { openOnClick: false, autolink: true },
+      // 落点光标改由下面的 DropIndicator 提供（可配置颜色 / 粗细）
+      dropcursor: false,
     }),
     TextStyle,
     FontSize,
@@ -129,7 +146,9 @@ export function createExtensions({
     TableCell,
     TableHeader,
     // ImageStyle 同理替代原 Image
-    ImageStyle.configure({ allowBase64: true }),
+    // inline: true → 「嵌入型」是真正的行内节点：插入后留在文字中间，不再独占一行。
+    // 浮于文字上方 / 衬于文字下方仍靠绝对定位（editor.css 的 [data-layer]），不受影响。
+    ImageStyle.configure({ inline: true, allowBase64: true }),
     ImageLayerCommands,
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     Placeholder.configure({ placeholder }),
@@ -153,6 +172,7 @@ export function createExtensions({
       isEnabled: spellcheck?.isEnabled,
     }),
     SpellcheckCommands,
+    DropIndicator,
     PageLayout.configure({ onLayout: onPageLayout, getPageMetrics: getPageMetrics }),
   ];
 }

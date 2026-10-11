@@ -214,6 +214,33 @@ describe('docx 导出：图片层级', () => {
     expect(xml).toContain('<wp:anchor');
     expect(xml).not.toContain('behindDoc="1"');
   });
+
+  it('四周型环绕导出为方框环绕，并按靠左 / 靠右给出水平对齐', async () => {
+    const left = `<img src="${PNG}" data-layer="wrap-left">`;
+    const result = await exportDocxBlob(`<p>文字</p>${left}`, 'wrap-left');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('<wp:anchor');
+    expect(xml).toContain('wrapSquare');
+    expect(xml).toContain('>left<');
+
+    const right = `<img src="${PNG}" data-layer="wrap-right">`;
+    const rightResult = await exportDocxBlob(`<p>文字</p>${right}`, 'wrap-right');
+    expect(rightResult.ok).toBe(true);
+    if (!rightResult.ok) return;
+    expect(await readDocumentXml(rightResult.value)).toContain('>right<');
+  });
+
+  it('上下型环绕导出为上下环绕（wrapTopAndBottom）', async () => {
+    const topBottom = `<img src="${PNG}" data-layer="top-bottom">`;
+    const result = await exportDocxBlob(`<p>文字</p>${topBottom}`, 'top-bottom');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('<wp:anchor');
+    expect(xml).toContain('wrapTopAndBottom');
+  });
 });
 
 describe('docx 导出：超链接', () => {

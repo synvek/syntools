@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/react';
-import { findSelectedImage, readZoom } from './imageLayer';
+import { findSelectedImage, keepImageSelected, readZoom } from './imageLayer';
 
 /**
  * 图片缩放手柄：选中图片后，四角 + 四边中点共 8 个手柄，拖动等比调整尺寸。
@@ -135,6 +135,8 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
         width: Math.round(width),
       });
       if (!history) tr.setMeta('addToHistory', false);
+      // 行内图片的节点选中在映射后会退化成光标：不选回来，手柄会跳到同段落的第一张图片上
+      keepImageSelected(tr, pos);
       editor.view.dispatch(tr);
     };
 
