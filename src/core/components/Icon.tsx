@@ -231,6 +231,13 @@ const icons: Record<string, ReactNode> = {
       <path d="m7 10 1 1M9 8l1 1M11 6l1 1M13 12l1 1M11 14l1 1" />
     </>
   ),
+  /** 横向标尺（刻度条）：用于切换文字处理器的标尺显示 */
+  rulerTicks: (
+    <>
+      <path d="M2.5 9.5h19v5h-19z" />
+      <path d="M6 9.5v2.5M9.5 9.5v3.5M13 9.5v2.5M16.5 9.5v3.5" />
+    </>
+  ),
   pinyin: (
     <>
       <path d="M5 18V8l4 6 4-6v10" />

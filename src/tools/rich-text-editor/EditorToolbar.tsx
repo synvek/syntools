@@ -216,6 +216,9 @@ interface EditorToolbarProps {
   /** 页面设置 */
   pageSetupOpen: boolean;
   onTogglePageSetup: () => void;
+  /** 水平标尺显示开关 */
+  rulerOpen: boolean;
+  onToggleRuler: () => void;
   /** 插入目录 */
   onInsertToc: () => void;
   /** 刷新目录（重算分页与页码） */
@@ -261,6 +264,8 @@ export function EditorToolbar({
   onViewModeChange,
   pageSetupOpen,
   onTogglePageSetup,
+  rulerOpen,
+  onToggleRuler,
   onInsertToc,
   onRefreshToc,
   tocDisabled,
@@ -886,6 +891,9 @@ export function EditorToolbar({
           onClick={onTogglePageSetup}
         >
           <Icon name="ruler" className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label={t('tools.richText.ruler')} active={rulerOpen} onClick={onToggleRuler}>
+          <Icon name="rulerTicks" className="h-4 w-4" />
         </ToolButton>
         <ToolButton
           label={t('tools.richText.insertToc')}

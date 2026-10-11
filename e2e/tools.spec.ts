@@ -2206,6 +2206,33 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
+  test('文字处理器：标尺显示毫米刻度，可随开关显隐', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/rich-text-editor');
+    await page.waitForSelector('.tiptap');
+
+    const ruler = page.getByTestId('rich-text-ruler');
+    await expect(ruler).toBeVisible();
+    // 主刻度间隔 = 1cm（96/25.4 × 10 ≈ 37.8px），小刻度 = 1mm
+    const [major, minor] = await ruler.evaluate((el) => {
+      const size = (selector: string) =>
+        Number.parseFloat(getComputedStyle(el.querySelector(selector)!).backgroundSize);
+      return [size('.rte-ruler-ticks--major'), size('.rte-ruler-ticks--minor')];
+    });
+    expect(major).toBeGreaterThan(37);
+    expect(major).toBeLessThan(38.5);
+    expect(minor).toBeGreaterThan(3.5);
+    expect(minor).toBeLessThan(4);
+
+    const toggle = page.getByRole('button', { name: '标尺', exact: true });
+    await toggle.click();
+    await expect(ruler).toHaveCount(0);
+    await toggle.click();
+    await expect(ruler).toHaveCount(1);
+    expect(errors).toEqual([]);
+  });
+
   test('电子表格：放映只读表格', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));

@@ -14,6 +14,7 @@ import type { ToolResult } from '@/core/types';
 import { PrintLayer } from './A4Page';
 import { EditorContextMenu, type EditorContextTarget } from './EditorContextMenu';
 import { EditorToolbar } from './EditorToolbar';
+import { RulerBar } from './RulerBar';
 import { FindReplacePanel } from './FindReplacePanel';
 import { OutlinePanel } from './OutlinePanel';
 import {
@@ -235,6 +236,8 @@ export default function RichTextEditorTool() {
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   /** 编辑区右键菜单：命中的对象与位置（视口坐标） */
   const [contextMenu, setContextMenu] = useState<EditorContextTarget | null>(null);
+  /** 水平标尺开关（对标 Word 标尺，默认显示） */
+  const [rulerOpen, setRulerOpen] = useState(true);
   // 页面几何（mm）→ 像素：随页面设置变化，插件通过 getter 读取最新值
   const metrics = useMemo(() => resolvePageMetrics(pageSetup), [pageSetup]);
   const metricsRef = useRef(metrics);
@@ -1301,6 +1304,8 @@ export default function RichTextEditorTool() {
         onViewModeChange={setViewMode}
         pageSetupOpen={pageSetupOpen}
         onTogglePageSetup={() => togglePanel('pageSetup')}
+        rulerOpen={rulerOpen}
+        onToggleRuler={() => setRulerOpen((open) => !open)}
         onInsertToc={handleInsertToc}
         onRefreshToc={handleRefreshToc}
         tocDisabled={isEmpty}
@@ -1427,6 +1432,17 @@ export default function RichTextEditorTool() {
               handleFloatingImagePointerDown(editor.view, event.nativeEvent);
             }}
           >
+            {/* 水平标尺：贴顶显示毫米刻度与页边距（sticky，滚动时保持可见） */}
+            {rulerOpen ? (
+              <RulerBar
+                editor={editor}
+                viewportRef={viewportRef}
+                viewMode={viewMode}
+                zoom={zoom}
+                metrics={metrics}
+                margin={pageSetup.margin}
+              />
+            ) : null}
             {/* 图片缩放手柄：覆盖层（内容坐标系，滚动自动跟随） */}
             <ImageResizeOverlay editor={editor} viewportRef={viewportRef} />
             {/* 缩放层：CSS zoom 参与布局（滚动高度正确），data-rte-zoom 供分页测量还原 */}
