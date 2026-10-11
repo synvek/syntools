@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
 import { Icon } from '@/core/components/Icon';
+import { MenuButton } from '@/core/components/MenuButton';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes, downloadDataUrl } from '@/core/pdf/download';
@@ -324,70 +325,66 @@ export default function SlideTool() {
         }
         io={
           <>
-            <button
-              type="button"
-              onClick={() => importInputRef.current?.click()}
+            {/* 导入 / 导出各收成一个下拉：入口不再随格式增加而变长 */}
+            <MenuButton
+              variant="header"
+              icon="upload"
+              label={busy === 'import' ? t('tools.slide.importing') : t('common.importFile')}
+              items={[
+                {
+                  key: 'pptx',
+                  label: t('tools.slide.importPptx'),
+                  glyph: <Icon name="slides" className="h-4 w-4" />,
+                  onClick: () => importInputRef.current?.click(),
+                },
+                {
+                  key: 'project',
+                  label: t('tools.slide.openProject'),
+                  glyph: <Icon name="file" className="h-4 w-4" />,
+                  onClick: () => projectInputRef.current?.click(),
+                },
+                {
+                  key: 'outline',
+                  label: t('tools.slide.outlineImport'),
+                  glyph: <Icon name="text" className="h-4 w-4" />,
+                  onClick: () => setOutlineOpen(true),
+                },
+              ]}
               disabled={busy !== null}
-              title={t('tools.slide.importHint')}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="upload" className="h-4 w-4" />
-              {busy === 'import' ? t('tools.slide.importing') : t('tools.slide.importPptx')}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleExport()}
+            />
+            <MenuButton
+              variant="header"
+              tone="primary"
+              icon="download"
+              label={busy === 'export' ? t('tools.slide.exporting') : t('common.exportFile')}
+              items={[
+                {
+                  key: 'pptx',
+                  label: t('tools.slide.exportPptx'),
+                  glyph: <Icon name="slides" className="h-4 w-4" />,
+                  onClick: () => void handleExport(),
+                },
+                {
+                  key: 'pdf',
+                  label: t('tools.slide.exportPdf'),
+                  glyph: <Icon name="pdf" className="h-4 w-4" />,
+                  onClick: () => void handleExportPdf(),
+                },
+                {
+                  key: 'png',
+                  label: t('tools.slide.exportImage'),
+                  glyph: <Icon name="image" className="h-4 w-4" />,
+                  onClick: handleExportPng,
+                },
+                {
+                  key: 'project',
+                  label: t('tools.slide.saveProject'),
+                  glyph: <Icon name="file" className="h-4 w-4" />,
+                  onClick: () => void handleSaveProject(),
+                },
+              ]}
               disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Icon name="download" className="h-4 w-4" />
-              {busy === 'export' ? t('tools.slide.exporting') : t('tools.slide.exportPptx')}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleExportPdf()}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="download" className="h-4 w-4" />
-              {t('tools.slide.exportPdf')}
-            </button>
-            <button
-              type="button"
-              onClick={() => projectInputRef.current?.click()}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="upload" className="h-4 w-4" />
-              {t('tools.slide.openProject')}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleSaveProject()}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="download" className="h-4 w-4" />
-              {t('tools.slide.saveProject')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setOutlineOpen(true)}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="text" className="h-4 w-4" />
-              {t('tools.slide.outlineImport')}
-            </button>
-            <button
-              type="button"
-              onClick={handleExportPng}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="image" className="h-4 w-4" />
-              {t('tools.slide.exportImage')}
-            </button>
+            />
 
             {/* 兼容性说明改为 tooltip，避免占用行内空间 */}
             <HintTip text={t('tools.slide.unsupportedTip')} />

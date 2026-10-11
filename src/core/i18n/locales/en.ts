@@ -65,6 +65,8 @@ const en = {
     saved: 'Saved to local draft',
     saving: 'Auto-saves after you stop typing',
     download: 'Download',
+    importFile: 'Import',
+    exportFile: 'Export',
     share: 'Share',
     shareTooLong: 'Content too long (> 2KB), cannot create share link',
     retry: 'Retry',

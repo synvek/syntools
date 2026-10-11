@@ -65,6 +65,8 @@ const it = {
     saved: 'Salvato nella bozza locale',
     saving: 'Salvataggio automatico dopo la digitazione',
     download: 'Scarica',
+    importFile: 'Importa',
+    exportFile: 'Esporta',
     share: 'Condividi',
     shareTooLong: 'Contenuto troppo lungo (> 2KB), impossibile creare link di condivisione',
     retry: 'Riprova',

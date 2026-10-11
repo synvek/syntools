@@ -61,6 +61,8 @@ export default {
     saved: '已保存到本地草稿',
     saving: '停止输入后自动保存',
     download: '下载',
+    importFile: '导入',
+    exportFile: '导出',
     share: '分享',
     shareTooLong: '内容过长（超过 2KB），无法生成分享链接',
     retry: '重试',

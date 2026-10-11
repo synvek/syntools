@@ -63,6 +63,8 @@ const zhTW = {
     saved: '已儲存至本機草稿',
     saving: '停止輸入後自動儲存',
     download: '下載',
+    importFile: '匯入',
+    exportFile: '匯出',
     share: '分享',
     shareTooLong: '內容過長（超過 2KB），無法生成分享鏈接',
     retry: '重試',

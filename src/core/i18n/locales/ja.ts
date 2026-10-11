@@ -65,6 +65,8 @@ const ja = {
     saved: 'ローカル下書きに保存しました',
     saving: '入力を止めると自動保存します',
     download: 'ダウンロード',
+    importFile: '読み込み',
+    exportFile: '書き出し',
     share: '共有',
     shareTooLong: '内容が長すぎます（2KB超）。共有リンクを作成できません',
     retry: '再試行',

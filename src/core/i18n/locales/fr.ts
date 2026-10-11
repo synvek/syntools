@@ -65,6 +65,8 @@ const fr = {
     saved: 'Enregistré dans le brouillon local',
     saving: 'Enregistrement automatique après la saisie',
     download: 'Télécharger',
+    importFile: 'Importer',
+    exportFile: 'Exporter',
     share: 'Partager',
     shareTooLong: 'Contenu trop long (> 2 Ko), impossible de créer un lien de partage',
     retry: 'Réessayer',

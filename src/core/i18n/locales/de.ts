@@ -65,6 +65,8 @@ const de = {
     saved: 'Im lokalen Entwurf gespeichert',
     saving: 'Automatische Speicherung nach der Eingabe',
     download: 'Herunterladen',
+    importFile: 'Importieren',
+    exportFile: 'Exportieren',
     share: 'Teilen',
     shareTooLong: 'Inhalt zu lang (> 2 KB), Freigabelink kann nicht erstellt werden',
     retry: 'Erneut versuchen',

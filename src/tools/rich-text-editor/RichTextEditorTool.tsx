@@ -5,6 +5,7 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import { DocumentHeader } from '@/core/components/DocumentHeader';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
+import { MenuButton } from '@/core/components/MenuButton';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
@@ -1168,72 +1169,62 @@ export default function RichTextEditorTool() {
         }
         io={
           <>
-            {/* 导出区：图标按钮 + tooltip，避免文字占位 */}
-            <button
-              type="button"
-              onClick={() => importInputRef.current?.click()}
-              title={t('tools.richText.importDocx')}
-              aria-label={t('tools.richText.importDocx')}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="upload" className="h-4 w-4" />
-            </button>
-
-            <span className="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-            <button
-              type="button"
-              onClick={() => void handleExportDocx()}
-              disabled={busy !== null || isEmpty}
-              title={t('tools.richText.exportDocx')}
-              aria-label={t('tools.richText.exportDocx')}
-              className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busy === 'docx' ? (
-                <span className="text-xs leading-none">…</span>
-              ) : (
-                <Icon name="download" className="h-4 w-4" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPdfDialogOpen(true)}
-              disabled={busy !== null || isEmpty}
-              title={t('tools.richText.exportPdf')}
-              aria-label={t('tools.richText.exportPdf')}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-blue-600 text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950"
-            >
-              {busy === 'pdf' ? (
-                <span className="text-xs leading-none">…</span>
-              ) : (
-                <Icon name="pdf" className="h-4 w-4" />
-              )}
-            </button>
-
-            <span className="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-            <button
-              type="button"
-              onClick={handleExportMarkdown}
-              disabled={isEmpty}
-              title={t('tools.richText.exportMarkdown')}
-              aria-label={t('tools.richText.exportMarkdown')}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="markdown" className="h-4 w-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportHtml}
-              disabled={isEmpty}
-              title={t('tools.richText.exportHtml')}
-              aria-label={t('tools.richText.exportHtml')}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="html" className="h-4 w-4" />
-            </button>
+            {/* 导入 / 导出各收成一个下拉：格式扩展时不再撑宽文档头 */}
+            <MenuButton
+              variant="header"
+              icon="upload"
+              label={t('common.importFile')}
+              items={[
+                {
+                  key: 'docx',
+                  label: t('tools.richText.importDocx'),
+                  glyph: <Icon name="upload" className="h-4 w-4" />,
+                  onClick: () => importInputRef.current?.click(),
+                },
+              ]}
+              disabled={busy !== null}
+            />
+            <MenuButton
+              variant="header"
+              tone="primary"
+              icon="download"
+              label={
+                busy === 'docx' || busy === 'pdf'
+                  ? t('tools.richText.exporting')
+                  : t('common.exportFile')
+              }
+              items={[
+                {
+                  key: 'docx',
+                  label: t('tools.richText.exportDocx'),
+                  glyph: <Icon name="download" className="h-4 w-4" />,
+                  onClick: () => void handleExportDocx(),
+                  disabled: isEmpty,
+                },
+                {
+                  key: 'pdf',
+                  label: t('tools.richText.exportPdf'),
+                  glyph: <Icon name="pdf" className="h-4 w-4" />,
+                  onClick: () => setPdfDialogOpen(true),
+                  disabled: isEmpty,
+                },
+                {
+                  key: 'markdown',
+                  label: t('tools.richText.exportMarkdown'),
+                  glyph: <Icon name="markdown" className="h-4 w-4" />,
+                  onClick: handleExportMarkdown,
+                  disabled: isEmpty,
+                },
+                {
+                  key: 'html',
+                  label: t('tools.richText.exportHtml'),
+                  glyph: <Icon name="html" className="h-4 w-4" />,
+                  onClick: handleExportHtml,
+                  disabled: isEmpty,
+                },
+              ]}
+              disabled={busy !== null}
+            />
           </>
         }
         stats={

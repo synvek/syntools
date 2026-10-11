@@ -64,6 +64,8 @@ const es = {
     saved: 'Guardado en el borrador local',
     saving: 'Se guarda automáticamente al dejar de escribir',
     download: 'Descargar',
+    importFile: 'Importar',
+    exportFile: 'Exportar',
     share: 'Compartir',
     shareTooLong: 'Contenido demasiado largo (> 2KB); no se puede crear el enlace para compartir',
     retry: 'Reintentar',

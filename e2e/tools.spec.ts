@@ -77,7 +77,9 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: '导出 PPTX' }).click();
+    // 导出已收进「导出」下拉：先展开菜单再点具体格式
+    await page.getByRole('button', { name: '导出', exact: true }).click();
+    await page.getByRole('menuitem', { name: '导出 PPTX', exact: true }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.pptx$/);
 
@@ -204,7 +206,8 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     // 初始 1 页
     await expect(page.locator('.slide-thumb')).toHaveCount(1);
 
-    await page.getByRole('button', { name: '从大纲生成' }).click();
+    await page.getByRole('button', { name: '导入', exact: true }).click();
+    await page.getByRole('menuitem', { name: '从大纲生成', exact: true }).click();
     const editor = page.getByRole('textbox', { name: '从大纲生成' });
     await editor.fill('# 第一页\n- 要点\n# 第二页');
     await page.getByRole('button', { name: '生成幻灯片' }).click();
@@ -216,13 +219,15 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    for (const [button, pattern] of [
+    // 导出已收进「导出」下拉：每轮先展开菜单再点具体格式
+    for (const [item, pattern] of [
       ['导出 PDF', /\.pdf$/],
       ['导出图片', /\.png$/],
       ['另存为工程', /\.sld$/],
     ] as const) {
       const downloadPromise = page.waitForEvent('download');
-      await page.getByRole('button', { name: button, exact: true }).click();
+      await page.getByRole('button', { name: '导出', exact: true }).click();
+      await page.getByRole('menuitem', { name: item, exact: true }).click();
       const download = await downloadPromise;
       expect(download.suggestedFilename()).toMatch(pattern);
     }

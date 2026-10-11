@@ -65,6 +65,8 @@ const pt = {
     saved: 'Guardado no rascunho local',
     saving: 'Guarda automaticamente após parar de escrever',
     download: 'Transferir',
+    importFile: 'Importar',
+    exportFile: 'Exportar',
     share: 'Partilhar',
     shareTooLong: 'Conteúdo demasiado longo (> 2KB); não é possível criar a ligação de partilha',
     retry: 'Tentar novamente',

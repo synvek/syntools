@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
 import { clearDraft, readDraft, writeDraftSafe } from './draft';
 import { Icon } from '@/core/components/Icon';
+import { MenuButton } from '@/core/components/MenuButton';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
@@ -442,6 +443,14 @@ export default function SpreadsheetTool() {
     return () => clearTimeout(timer);
   }, [title, persistNow]);
 
+  /** 按下拉所选格式限定文件对话框的默认过滤（仍可切到「所有文件」，类型校验在 handleImport 内） */
+  const openImport = (accept: string) => {
+    const input = importInputRef.current;
+    if (!input) return;
+    input.accept = accept;
+    input.click();
+  };
+
   const handleImport = async (file: File) => {
     setBusy('import');
     setFailure(null);
@@ -659,35 +668,50 @@ export default function SpreadsheetTool() {
         }
         io={
           <>
-            <button
-              type="button"
-              onClick={() => importInputRef.current?.click()}
-              title={t('tools.sheet.importHint')}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="upload" className="h-4 w-4" />
-              {t('tools.sheet.importXlsx')}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void handleExport()}
-              disabled={busy !== null || summary.cells === 0}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Icon name="download" className="h-4 w-4" />
-              {busy === 'export' ? t('tools.sheet.exporting') : t('tools.sheet.exportXlsx')}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              disabled={busy !== null || summary.cells === 0}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="file" className="h-4 w-4" />
-              {t('tools.sheet.exportCsv')}
-            </button>
+            {/* 导入 / 导出各收成一个下拉：格式扩展时不再撑宽文档头 */}
+            <MenuButton
+              variant="header"
+              icon="upload"
+              label={t('common.importFile')}
+              items={[
+                {
+                  key: 'xlsx',
+                  label: t('tools.sheet.importXlsx'),
+                  glyph: <Icon name="sheet" className="h-4 w-4" />,
+                  onClick: () => openImport('.xlsx,.xlsm'),
+                },
+                {
+                  key: 'csv',
+                  label: t('tools.sheet.importCsv'),
+                  glyph: <Icon name="file" className="h-4 w-4" />,
+                  onClick: () => openImport('.csv'),
+                },
+              ]}
+              disabled={busy !== null}
+            />
+            <MenuButton
+              variant="header"
+              tone="primary"
+              icon="download"
+              label={busy === 'export' ? t('tools.sheet.exporting') : t('common.exportFile')}
+              items={[
+                {
+                  key: 'xlsx',
+                  label: t('tools.sheet.exportXlsx'),
+                  glyph: <Icon name="download" className="h-4 w-4" />,
+                  onClick: () => void handleExport(),
+                  disabled: summary.cells === 0,
+                },
+                {
+                  key: 'csv',
+                  label: t('tools.sheet.exportCsv'),
+                  glyph: <Icon name="file" className="h-4 w-4" />,
+                  onClick: handleExportCsv,
+                  disabled: summary.cells === 0,
+                },
+              ]}
+              disabled={busy !== null}
+            />
 
             {/* 兼容性说明改为 tooltip，避免占用行内空间 */}
             <HintTip text={t('tools.sheet.unsupportedTip')} />
