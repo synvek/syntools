@@ -5,6 +5,7 @@ import { Icon } from '@/core/components/Icon';
 import type { ViewMode } from './draft';
 import { findSelectedFootnote } from './footnotes';
 import { normalizeImageLayer } from './imageLayer';
+import { TextColorPicker } from './TextColorPicker';
 import {
   DEFAULT_FONT_SIZE_PX,
   DEFAULT_LINE_HEIGHT,
@@ -333,6 +334,7 @@ export function EditorToolbar({
         fontFamily: String(e.getAttributes('textStyle').fontFamily ?? ''),
         lineHeight: String(e.getAttributes('textStyle').lineHeight ?? ''),
         color: String(e.getAttributes('textStyle').color ?? ''),
+        highlight: e.isActive('highlight'),
         bold: e.isActive('bold'),
         italic: e.isActive('italic'),
         underline: e.isActive('underline'),
@@ -396,7 +398,7 @@ export function EditorToolbar({
   };
 
   const chain = () => editor.chain().focus();
-  // 原生取色器只接受 #rrggbb：非标准值（如导入文档里的命名色）回退到默认正文色
+  // 色板与原生取色器都只认 #rrggbb：非标准值（如导入文档里的命名色）回退到默认正文色
   const currentColor = /^#[0-9a-f]{6}$/i.test(state.color) ? state.color : '#111827';
 
   // 图片宽度内部统一存像素，工具栏用百分比预设表达（换算基准 = 当前正文内容宽度）
@@ -420,10 +422,11 @@ export function EditorToolbar({
       : []),
   ];
 
+  // 根容器不能加 overflow-hidden：文字颜色等弹层是 absolute 定位，会被工具栏下边缘裁掉
   return (
     <div
       data-testid="rich-text-toolbar"
-      className="sticky top-0 z-10 -mx-1 overflow-hidden rounded-lg border border-gray-200 bg-white/95 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95"
+      className="sticky top-0 z-10 -mx-1 rounded-lg border border-gray-200 bg-white/95 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95"
     >
       {/* 第一层：内容格式 */}
       <div className="flex flex-wrap items-center gap-1 p-1">
@@ -537,28 +540,16 @@ export function EditorToolbar({
           >
             <span className="font-mono">&lt;/&gt;</span>
           </ToolButton>
-          {/* 文字颜色：只显示「A + 当前色」图标，名称走 tooltip */}
-          <label
-            title={t('tools.richText.color')}
-            className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-transparent text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            <span aria-hidden="true" className="flex w-4 flex-col items-center">
-              <span className="text-sm font-semibold leading-none">A</span>
-              <span
-                className="mt-[2px] h-[3px] w-4 rounded-full border border-black/10"
-                style={{ backgroundColor: currentColor }}
-              />
-            </span>
-            <input
-              type="color"
-              aria-label={t('tools.richText.color')}
-              value={currentColor}
-              onChange={(e) => chain().setColor(e.target.value).run()}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-          </label>
+          {/* 文字颜色：预设色板弹层，选色后自动收起（原生系统色板不会自己关） */}
+          <TextColorPicker
+            value={currentColor}
+            onPick={(color) => chain().setColor(color).run()}
+            onReset={() => chain().unsetColor().run()}
+          />
+          {/* 荧光笔：固定黄色高亮，按钮蓝底即表示 ON/OFF 状态 */}
           <ToolButton
             label={t('tools.richText.highlight')}
+            active={state.highlight}
             onClick={() => chain().toggleHighlight({ color: '#FEF08A' }).run()}
           >
             <span className="rounded bg-yellow-200 px-1 text-gray-900 dark:bg-yellow-300">A</span>
@@ -874,8 +865,8 @@ export function EditorToolbar({
         ) : null}
       </div>
 
-      {/* 第二层：文档与视图 */}
-      <div className="flex flex-wrap items-center gap-1 border-t border-gray-200 bg-gray-50/70 px-1 py-1 dark:border-gray-700 dark:bg-gray-800/40">
+      {/* 第二层：文档与视图（自带底色，需自行圆角，否则会盖住工具栏底部的圆角） */}
+      <div className="flex flex-wrap items-center gap-1 rounded-b-lg border-t border-gray-200 bg-gray-50/70 px-1 py-1 dark:border-gray-700 dark:bg-gray-800/40">
         <span className="ml-1 mr-0.5 select-none text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
           {t('tools.richText.docSection')}
         </span>
