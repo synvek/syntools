@@ -38,6 +38,6 @@ export const codeEditorTool: ToolMeta = {
   ],
   icon: 'codeEditor',
   component: () => import('./CodeEditorTool'),
-  weight: 2,
+  weight: 7,
   relatedIds: ['code-highlight', 'code-image', 'code-minify'],
 };
