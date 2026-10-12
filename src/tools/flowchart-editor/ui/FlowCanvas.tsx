@@ -557,6 +557,13 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         onConnectEnd={onConnectEnd}
         onNodeDragStart={() => useFlowStore.getState().commit()}
         onNodeDragStop={(_, node) => useFlowStore.getState().reparentNode(node.id)}
+        /**
+         * 关闭 React Flow 的「选中即置顶」默认行为（默认 true）。
+         * 本编辑器的层级由节点数组顺序决定（见 orderNodesByHierarchy / reorderLayers），
+         * 若保留该默认值，选中图形会被临时抬到 z-index 1000 之上，
+         * 出现「点一下就跑到最上层、切换选择才恢复」的错觉；关闭后所见层级即真实层级。
+         */
+        elevateNodesOnSelect={false}
         // 右键菜单：节点（切换形状 / 编辑动作）、连线（布线动作）、空白（粘贴 / 全选等）
         onNodeContextMenu={(event, node) => {
           if (!useFlowStore.getState().selectedNodes.includes(node.id)) selectOnlyNode(node.id);

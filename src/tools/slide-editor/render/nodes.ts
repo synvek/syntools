@@ -98,7 +98,9 @@ function applyStroke(node: Konva.Shape, stroke: Stroke | undefined): void {
 
 /** 文本 body → Konva.Group（内部按 run 片段分段，保留混排样式） */
 export function createTextNodes(body: TextBody, width: number, height: number): Konva.Group {
-  const group = new Konva.Group({ listening: false });
+  // 具名是为了「行内编辑期间」整组隐藏：那时文字由 DOM textarea 独占渲染，
+  // 画布若继续画一份就会重影（见 SlideCanvas 的 startEditing / closeEditor）。
+  const group = new Konva.Group({ name: 'text', listening: false });
 
   // normAutofit：超框时先等比缩小字号重新排版（最多迭代 3 次），
   // 这与 PowerPoint「自动调整文字大小」的行为一致；直接压缩 Y 轴会把文字压扁。

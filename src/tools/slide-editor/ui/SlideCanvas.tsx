@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type Konva from 'konva';
 import { fitScale, GRID_SIZE } from '../core';
 import type { StageCallbacks, TransformChange } from '../interaction/pointer';
 import { createStage, type StageHandle } from '../render/stage';
@@ -15,7 +16,8 @@ import { SlideContextMenu, type SlideContextTarget } from './SlideContextMenu';
  * 三条约定：
  * 1. Stage 延后一拍创建，规避 React 18 StrictMode 双挂载（与 Univer 宿主一致）；
  * 2. 拖拽 / 缩放过程中禁止回写 store → 避免整页重建把正在拖的节点销毁；
- * 3. 双击文本元素 → 挂载 DOM textarea 叠加层做行内编辑。
+ * 3. 双击文本元素 → 挂载 DOM textarea 叠加层做行内编辑；
+ *    叠加层必须透明（否则会遮住压在该元素上层的其它元素），文字由 textarea 独占渲染。
  */
 export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void }) {
   const { t } = useTranslation();
@@ -23,6 +25,8 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   const canvasRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<StageHandle | null>(null);
   const editorRef = useRef<TextEditorHandle | null>(null);
+  /** 正在被行内编辑的元素 id：其静态文字在编辑期间需要隐藏 */
+  const editingIdRef = useRef<string | null>(null);
   const draggingRef = useRef(false);
   const transformRef = useRef({ scale: 1, x: 0, y: 0 });
   /** 右键菜单：命中元素为 element 级，命中空白为 canvas 级 */
@@ -147,10 +151,34 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     });
   }, []);
 
-  const closeEditor = useCallback(() => {
-    editorRef.current?.destroy();
-    editorRef.current = null;
+  /**
+   * 行内编辑期间隐藏 / 恢复元素的静态文字。
+   *
+   * 编辑覆盖层是透明 DOM，文字由 textarea 独占渲染；画布若继续画一份就会重影。
+   * 命令式直接改节点（不走 store）是刻意的：开编辑不该产生一次文档变更，
+   * 否则整页 sync 会把刚挂上的 textarea 位置算错。
+   */
+  const setStaticTextVisible = useCallback((id: string, visible: boolean) => {
+    const layer = handleRef.current?.contentLayer;
+    const text = layer?.findOne<Konva.Group>(`#${id}`)?.findOne<Konva.Group>('.text');
+    if (!layer || !text) return;
+    text.visible(visible);
+    layer.batchDraw();
   }, []);
+
+  /**
+   * 收尾：恢复静态文字并销毁覆盖层。
+   * 幂等且可重入 —— 编辑器自身销毁时（Esc / 失焦）会回调进来，
+   * 因此先清 ref 再 destroy，重复进入时直接短路。
+   */
+  const closeEditor = useCallback(() => {
+    const editingId = editingIdRef.current;
+    editingIdRef.current = null;
+    if (editingId) setStaticTextVisible(editingId, true);
+    const editor = editorRef.current;
+    editorRef.current = null;
+    editor?.destroy();
+  }, [setStaticTextVisible]);
 
   const startEditing = useCallback(
     (id: string) => {
@@ -166,6 +194,9 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
             : undefined;
       if (!element || !body) return;
       closeEditor();
+      // 静止文字让位给 textarea（否则透明背景下会与画布上的同一段文字重影）
+      editingIdRef.current = element.id;
+      setStaticTextVisible(element.id, false);
       editorRef.current = openTextEditor(
         {
           id: element.id,
@@ -189,10 +220,12 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
             closeEditor();
             syncNow();
           },
+          // Esc 取消 / 无改动失焦都不会走 onCommit，仍要恢复静态文字
+          onClose: closeEditor,
         },
       );
     },
-    [closeEditor, syncNow, t],
+    [closeEditor, setStaticTextVisible, syncNow, t],
   );
 
   useEffect(() => {

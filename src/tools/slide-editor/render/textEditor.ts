@@ -40,6 +40,11 @@ export interface TextEditorHost {
   transform: { scale: number; x: number; y: number };
   onCommit: (id: string, body: TextBody) => void;
   labels?: TextEditorLabels;
+  /**
+   * 覆盖层被销毁时回调（Esc 取消、失焦后无改动等都不会走 onCommit）。
+   * 宿主借此把「编辑期间让位的静态文字」恢复回来，避免文字永久消失。
+   */
+  onClose?: () => void;
 }
 
 const DEFAULT_SIZE = 18;
@@ -60,7 +65,7 @@ function cloneBody(body: TextBody): TextBody {
 
 export function openTextEditor(
   element: EditableTextBox,
-  { host, transform, onCommit, labels }: TextEditorHost,
+  { host, transform, onCommit, labels, onClose }: TextEditorHost,
 ): TextEditorHandle {
   const style = element.body.paragraphs[0]?.runs[0]?.style;
   const margins = element.body.margins ?? { left: 9, top: 5, right: 9, bottom: 5 };
@@ -89,7 +94,10 @@ export function openTextEditor(
     outline: 'none',
     resize: 'none',
     overflow: 'hidden',
-    background: 'rgba(255,255,255,0.96)',
+    // 背景必须透明：这是盖在画布之上的一层 DOM，若加底色就会把「压在该元素上层」的
+    // 其它元素一并遮住，视觉上像是被编辑的元素跳到了顶层（关掉编辑后又恢复）。
+    // 元素的底色/边框由画布自身绘制，文字改由本 textarea 独占渲染（见调用方隐藏静态文字）。
+    background: 'transparent',
     color: style?.color ?? '#0F172A',
     fontFamily: style?.font || 'Arial, Helvetica, sans-serif',
     fontSize: `${size}px`,
@@ -202,6 +210,7 @@ export function openTextEditor(
     disposed = true;
     area.remove();
     bar.remove();
+    onClose?.();
   };
 
   area.addEventListener('input', () => {

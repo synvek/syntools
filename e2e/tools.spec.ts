@@ -248,6 +248,96 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(rulers).toHaveAttribute('aria-pressed', 'false');
   });
 
+  test('行内编辑：覆盖层透明，不遮挡压在上层的元素', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    await page.getByRole('button', { name: '文本框' }).click();
+    await insertShape(page, '矩形');
+
+    // 读取两个元素的屏幕位置（文本框在前、矩形在后，矩形压住文本框中段）
+    const [textBox, rect] = await page.evaluate(() => {
+      const Konva = (window as unknown as { Konva: { stages: unknown[] } }).Konva;
+      const stage = Konva.stages[0] as unknown as {
+        container: () => HTMLElement;
+        children: { children: { id: () => string; getClientRect: () => DOMRect }[] }[];
+      };
+      const box = stage.container().getBoundingClientRect();
+      return stage.children[1].children
+        .filter((node) => node.id())
+        .map((node) => {
+          const r = node.getClientRect();
+          return {
+            id: node.id(),
+            left: box.left + r.x,
+            top: box.top + r.y,
+            width: r.width,
+            height: r.height,
+          };
+        });
+    });
+
+    /** 元素节点的静态文字是否可见（编辑期间应隐藏，结束后恢复） */
+    const staticTextVisible = () =>
+      page.evaluate((id) => {
+        const Konva = (window as unknown as { Konva: { stages: unknown[] } }).Konva;
+        const stage = Konva.stages[0] as unknown as {
+          children: {
+            children: {
+              id: () => string;
+              findOne: (s: string) => { visible: () => boolean } | null;
+            }[];
+          }[];
+        };
+        const node = stage.children[1].children.find((child) => child.id() === id);
+        return node?.findOne('.text')?.visible();
+      }, textBox.id);
+
+    // 采样点：两元素重叠区、且避开文本框里的文字与各方元素边框
+    const clip = {
+      x: Math.round(Math.max(textBox.left, rect.left) + 20),
+      y: Math.round(Math.max(textBox.top, rect.top) + 8),
+      width: 40,
+      height: 12,
+    };
+    // 覆盖层与矩形确有重叠（否则这条用例证明不了什么）
+    expect(clip.x).toBeGreaterThan(rect.left);
+    expect(clip.x + clip.width).toBeLessThan(rect.left + rect.width);
+    await page.waitForTimeout(200);
+    const before = await page.screenshot({ clip });
+
+    // 双击文本框（左段未被矩形覆盖处）进入行内编辑
+    const enterEdit = async () => {
+      await page.mouse.dblclick(textBox.left + 10, textBox.top + textBox.height / 2);
+      await expect(area).toBeAttached();
+    };
+    const area = page.locator('textarea[aria-label="edit text"]');
+    await enterEdit();
+
+    // 覆盖层必须透明：带底色就会盖住压在该元素上层的矩形
+    await expect(area).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(area).toHaveCSS('z-index', '20');
+    // 静态文字让位给 textarea，避免透明背景下的文字重影
+    expect(await staticTextVisible()).toBe(false);
+
+    // 重叠区像素不应被编辑覆盖层改变（回归：此前白底会把矩形整块盖住）
+    await page.waitForTimeout(200);
+    const during = await page.screenshot({ clip });
+    expect(during.equals(before)).toBe(true);
+
+    // Esc 退出：覆盖层移除、静态文字恢复
+    await page.keyboard.press('Escape');
+    await expect(area).toHaveCount(0);
+    expect(await staticTextVisible()).toBe(true);
+
+    // 无改动的失焦退出（点其它元素）同样要恢复静态文字。
+    // 落点必须在文本框之外（矩形下缘），否则点到覆盖层本身不会失焦。
+    await enterEdit();
+    await page.mouse.click(rect.left + rect.width / 2, rect.top + rect.height - 8);
+    await expect(area).toHaveCount(0);
+    expect(await staticTextVisible()).toBe(true);
+  });
+
   test('右键画布：弹出菜单，可全选与 Esc 关闭', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
