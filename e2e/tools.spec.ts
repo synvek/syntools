@@ -2225,11 +2225,28 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(minor).toBeGreaterThan(3.5);
     expect(minor).toBeLessThan(4);
 
+    // 垂直标尺同样按 1cm / 1mm 绘制，并与正文内容顶部对齐
+    const verticalRuler = page.getByTestId('rich-text-ruler-v');
+    await expect(verticalRuler).toBeVisible();
+    const [vMajor, vOffset] = await verticalRuler.evaluate((el) => {
+      const size = Number.parseFloat(
+        getComputedStyle(el.querySelector('.rte-ruler-ticks--major')!).backgroundSize.split(' ')[1],
+      );
+      const track = el.querySelector('.rte-ruler-track--v')!.getBoundingClientRect().top;
+      const content = document.querySelector('.tiptap')!.getBoundingClientRect().top;
+      return [size, Math.round(track - content)];
+    });
+    expect(vMajor).toBeGreaterThan(37);
+    expect(vMajor).toBeLessThan(38.5);
+    expect(Math.abs(vOffset)).toBeLessThan(3);
+
     const toggle = page.getByRole('button', { name: '标尺', exact: true });
     await toggle.click();
     await expect(ruler).toHaveCount(0);
+    await expect(verticalRuler).toHaveCount(0);
     await toggle.click();
     await expect(ruler).toHaveCount(1);
+    await expect(verticalRuler).toHaveCount(1);
     expect(errors).toEqual([]);
   });
 

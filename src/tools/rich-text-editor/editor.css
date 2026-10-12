@@ -17,7 +17,7 @@
   margin-top: 0.75em;
 }
 
-/* ---- 水平标尺：毫米刻度 + 页边距灰区 + 光标位置（对标 Word 的标尺） ---- */
+/* ---- 标尺（水平 + 垂直）：毫米刻度 + 页边距灰区 + 光标位置（对标 Word 的标尺） ---- */
 .rte-ruler {
   /* 只作指示：不拦截编辑区的点选与拖拽 */
   position: sticky;
@@ -25,25 +25,6 @@
   z-index: 25;
   height: 20px;
   pointer-events: none;
-  --rte-ruler-minor: #d8dde5;
-  --rte-ruler-half: #9aa4b2;
-  --rte-ruler-major: #4b5563;
-  --rte-ruler-label: #6b7280;
-  --rte-ruler-border: #e5e7eb;
-  --rte-ruler-surface: #ffffff;
-  --rte-ruler-pad: #f3f4f6;
-  --rte-ruler-caret: #2563eb;
-}
-
-.dark .rte-ruler {
-  --rte-ruler-minor: #374151;
-  --rte-ruler-half: #6b7280;
-  --rte-ruler-major: #9ca3af;
-  --rte-ruler-label: #9ca3af;
-  --rte-ruler-border: #374151;
-  --rte-ruler-surface: #111827;
-  --rte-ruler-pad: #1f2937;
-  --rte-ruler-caret: #60a5fa;
 }
 
 .rte-ruler-track {
@@ -111,6 +92,94 @@
   bottom: 0;
   width: 1px;
   background: var(--rte-ruler-caret);
+}
+
+/* ---- 垂直标尺（左侧） ---- */
+
+/* absolute 的包含块是滚动容器的 padding box：纵向滚动时标尺本体不动，
+   由内部刻度层按实测的内容顶部位置上下平移，数字才会跟着正文滚动；
+   若把标尺放进滚动内容流里，滚动会把整条标尺带走。 */
+.rte-ruler-v {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 25;
+  width: 22px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rte-ruler-track--v {
+  left: 1px;
+  width: 20px;
+  height: auto;
+  flex-direction: column;
+}
+
+.rte-ruler-content--v {
+  width: 100%;
+}
+
+/* 垂直刻度从右边缘向左延伸（与 Word 一致） */
+.rte-ruler-ticks--v {
+  top: 0;
+  bottom: auto;
+  left: auto;
+  right: 0;
+  height: 100%;
+  background-repeat: repeat-y;
+  background-position: right top;
+}
+
+.rte-ruler-ticks--v.rte-ruler-ticks--minor {
+  width: 4px;
+  background-image: linear-gradient(180deg, var(--rte-ruler-minor) 0 1px, transparent 1px);
+}
+
+.rte-ruler-ticks--v.rte-ruler-ticks--half {
+  width: 7px;
+  background-image: linear-gradient(180deg, var(--rte-ruler-half) 0 1px, transparent 1px);
+}
+
+.rte-ruler-ticks--v.rte-ruler-ticks--major {
+  width: 10px;
+  background-image: linear-gradient(180deg, var(--rte-ruler-major) 0 1px, transparent 1px);
+}
+
+/* 数字放在刻度左侧（8px 字体刚好放下两位数），并与刻度线垂直居中对齐 */
+.rte-ruler-label--v {
+  left: 1px;
+  right: auto;
+  top: auto;
+  padding: 0;
+  font-size: 8px;
+  line-height: 8px;
+  transform: translateY(-50%);
+}
+
+/* 垂直标尺的光标指示：一条横线 */
+.rte-ruler-caret--v {
+  top: auto;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 1px;
+}
+
+/* 左上角交点：把两条标尺在角落收口 */
+.rte-ruler-corner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 26;
+  width: 22px;
+  height: 20px;
+  pointer-events: none;
+  background: var(--rte-ruler-pad);
+  border-right: 1px solid var(--rte-ruler-border);
+  border-bottom: 1px solid var(--rte-ruler-border);
 }
 
 @media print {
@@ -465,6 +534,31 @@
   padding-right: 2px;
   /* 图片缩放手柄覆盖层的定位基准（覆盖层按内容坐标系定位，滚动自动跟随） */
   position: relative;
+  /* 标尺配色：水平 / 垂直 / 左上角交点共用 */
+  --rte-ruler-minor: #d8dde5;
+  --rte-ruler-half: #9aa4b2;
+  --rte-ruler-major: #4b5563;
+  --rte-ruler-label: #6b7280;
+  --rte-ruler-border: #e5e7eb;
+  --rte-ruler-surface: #ffffff;
+  --rte-ruler-pad: #f3f4f6;
+  --rte-ruler-caret: #2563eb;
+}
+
+.dark .rte-editor-viewport {
+  --rte-ruler-minor: #374151;
+  --rte-ruler-half: #6b7280;
+  --rte-ruler-major: #9ca3af;
+  --rte-ruler-label: #9ca3af;
+  --rte-ruler-border: #374151;
+  --rte-ruler-surface: #111827;
+  --rte-ruler-pad: #1f2937;
+  --rte-ruler-caret: #60a5fa;
+}
+
+/* 标尺开启时给左侧垂直标尺留出位置，避免刻度压在正文上 */
+.rte-editor-viewport.rte-viewport-ruler {
+  padding-left: 24px;
 }
 
 /* ---- 图片缩放手柄（四角 + 四边中点） ---- */

@@ -1421,7 +1421,9 @@ export default function RichTextEditorTool() {
           {/* 编辑工作区：固定为「首屏剩余空间」高度并内部滚动（长文档不撑高页面）。
               页面视图的灰色工作台挂在此容器上，保证铺满整个可滚动区域。 */}
           <div
-            className={`rte-editor-viewport${viewMode === 'paged' ? ' rte-viewport-paged' : ''}`}
+            className={`rte-editor-viewport${viewMode === 'paged' ? ' rte-viewport-paged' : ''}${
+              rulerOpen ? ' rte-viewport-ruler' : ''
+            }`}
             ref={viewportRef}
             style={viewportMax ? { height: `${viewportMax}px` } : undefined}
             onMouseDown={(event) => {
