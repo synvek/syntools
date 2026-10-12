@@ -62,27 +62,32 @@ export function ThemePanel() {
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-9 z-30 w-64 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-          <div className="grid grid-cols-2 gap-1">
-            {THEMES.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                data-testid={`flowchart-theme-${item.id}`}
-                onClick={() => setTheme(item.id)}
-                className={`flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[12px] transition-colors ${
-                  theme === item.id
-                    ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
-              >
-                <span
-                  className="h-3.5 w-3.5 shrink-0 rounded-sm border"
-                  style={{ background: item.swatch.fill, borderColor: item.swatch.stroke }}
-                />
-                <span className="truncate">{t(`tools.flowchart.theme${item.labelKey}`)}</span>
-              </button>
-            ))}
+        <div className="absolute left-0 top-9 z-30 w-80 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          {/* 20 套主题：三列铺开，超出上限时纵向滚动，避免弹层过高 */}
+          <div className="grid max-h-64 grid-cols-3 gap-1 overflow-y-auto pr-0.5">
+            {THEMES.map((item) => {
+              const label = t(`tools.flowchart.theme${item.labelKey}`);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  data-testid={`flowchart-theme-${item.id}`}
+                  title={label}
+                  onClick={() => setTheme(item.id)}
+                  className={`flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[12px] transition-colors ${
+                    theme === item.id
+                      ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <span
+                    className="h-3.5 w-3.5 shrink-0 rounded-sm border"
+                    style={{ background: item.swatch.fill, borderColor: item.swatch.stroke }}
+                  />
+                  <span className="truncate">{label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="mt-2 flex gap-1.5">
