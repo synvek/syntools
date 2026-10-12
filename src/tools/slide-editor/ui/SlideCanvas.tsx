@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fitScale, GRID_SIZE } from '../core';
 import type { StageCallbacks, TransformChange } from '../interaction/pointer';
@@ -7,6 +7,7 @@ import { openTextEditor, type TextEditorHandle } from '../render/textEditor';
 import { containerElements, useSlideStore } from '../store';
 import type { SlideElement } from '../model/types';
 import { Rulers } from './Rulers';
+import { SlideContextMenu, type SlideContextTarget } from './SlideContextMenu';
 
 /**
  * 画布宿主：命令式托管 Konva Stage。
@@ -24,6 +25,8 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   const editorRef = useRef<TextEditorHandle | null>(null);
   const draggingRef = useRef(false);
   const transformRef = useRef({ scale: 1, x: 0, y: 0 });
+  /** 右键菜单：命中元素为 element 级，命中空白为 canvas 级 */
+  const [menu, setMenu] = useState<SlideContextTarget | null>(null);
 
   // onRuntimeFailure 由父组件每次渲染传入新函数，用 ref 承接，避免它进入副作用依赖，
   // 否则每次渲染都会销毁并重建整个 Konva Stage（正在拖拽的元素会被一并销毁）。
@@ -227,6 +230,8 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
         useSlideStore.getState().select([]);
       },
       onTextEdit: (id) => startEditing(id),
+      onContextMenu: ({ x, y, elementId }) =>
+        setMenu({ kind: elementId ? 'element' : 'canvas', x, y, elementId }),
       onCellSelect: (cell) => useSlideStore.getState().setActiveCell(cell),
       onPan: (dx, dy) => {
         const state = useSlideStore.getState();
@@ -322,10 +327,17 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     handleRef.current?.setSelection(selection);
   }, [selection]);
 
+  // 文档被键盘编辑 / 撤销 / 菜单动作改动后收起菜单，避免它停在已失效的目标元素上。
+  // 刻意不监听 slideIndex：右键页缩略图时会先切页再开菜单，否则会被立刻关掉。
+  useEffect(() => {
+    setMenu(null);
+  }, [doc, viewMode, masterKind, masterIndex]);
+
   return (
     <div ref={wrapperRef} className="relative min-h-[360px] flex-1 overflow-hidden">
       <div ref={canvasRef} className="slide-stage" aria-label="slide canvas" />
       <Rulers containerRef={canvasRef} />
+      <SlideContextMenu target={menu} onClose={() => setMenu(null)} onEditText={startEditing} />
     </div>
   );
 }

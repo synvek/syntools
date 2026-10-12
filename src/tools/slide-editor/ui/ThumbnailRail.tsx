@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { renderThumbnail } from '../render/thumbnail';
 import { useSlideStore } from '../store';
+import { SlideContextMenu, type SlideContextTarget } from './SlideContextMenu';
 
 /** 左侧页导航：离屏缩略图 + 增删复制排序（拖拽排序用原生 HTML5 DnD） */
 export function ThumbnailRail() {
@@ -15,6 +16,8 @@ export function ThumbnailRail() {
   const removeSlide = useSlideStore((s) => s.removeSlide);
   const moveSlide = useSlideStore((s) => s.moveSlide);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  /** 右键某页弹出的菜单（悬停按钮之外的第二条入口） */
+  const [menu, setMenu] = useState<SlideContextTarget | null>(null);
 
   const thumbs = useMemo(() => doc.slides.map((slide) => renderThumbnail(doc, slide, 200)), [doc]);
 
@@ -37,6 +40,12 @@ export function ThumbnailRail() {
               active ? 'slide-thumb-active' : 'border-gray-200 dark:border-gray-700'
             }`}
             onClick={() => selectSlide(index)}
+            onContextMenu={(event) => {
+              // 接管原生菜单；先切到该页，菜单里的动作才有个明确的「当前页」
+              event.preventDefault();
+              selectSlide(index);
+              setMenu({ kind: 'slide', x: event.clientX, y: event.clientY, slideIndex: index });
+            }}
           >
             <div className="flex items-start gap-1">
               <span className="w-4 shrink-0 pt-0.5 text-center text-[11px] text-gray-400">
@@ -84,6 +93,8 @@ export function ThumbnailRail() {
         <Icon name="slides" className="h-4 w-4" />
         {t('tools.slide.addSlide')}
       </button>
+
+      <SlideContextMenu target={menu} onClose={() => setMenu(null)} />
     </aside>
   );
 }

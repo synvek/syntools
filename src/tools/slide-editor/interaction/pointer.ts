@@ -29,6 +29,11 @@ export interface StageCallbacks {
   onTransformEnd: (changes: TransformChange[]) => void;
   onBackgroundClick: () => void;
   onTextEdit: (id: string) => void;
+  /**
+   * 右键：`x` / `y` 为视口坐标（clientX / clientY），`elementId` 为命中的元素；
+   * 未命中元素（空白 / 页面矩形 / 锁定元素）时为 null，调用方据此给出画布级菜单。
+   */
+  onContextMenu: (payload: { x: number; y: number; elementId: string | null }) => void;
   /** 点到表格单元格时回传坐标（null 表示点到的不是单元格） */
   onCellSelect: (cell: { row: number; col: number } | null) => void;
   /** 平移画布（中键拖动） */
@@ -65,6 +70,8 @@ export function attachInteraction(handle: StageHandle): void {
       panStart = pointerPosition();
       return;
     }
+    // 右键交给 contextmenu 处理（出菜单），不参与框选
+    if (event.evt instanceof MouseEvent && event.evt.button === 2) return;
     const element = ancestorElement(target);
     // 任何按下动作都会让上一轮「框选落点」标记失效，避免误吞后续正常点击
     marqueeJustEnded = false;
@@ -144,6 +151,29 @@ export function attachInteraction(handle: StageHandle): void {
     callbacks.onCellSelect(
       typeof row === 'number' && typeof col === 'number' ? { row, col } : null,
     );
+  });
+
+  stage.on('contextmenu', (event) => {
+    const evt = event.evt;
+    if (!(evt instanceof MouseEvent)) return;
+    // 接管浏览器原生菜单：画布上的右键一律走自己的菜单
+    evt.preventDefault();
+    const element = ancestorElement(event.target);
+    // 元素之外的 contentLayer 命中（Transformer 手柄、参考线）：沿用当前选中，
+    // 否则用户右键自己刚选中的对象却看到「画布菜单」，动作目标会让人意外
+    const id =
+      element?.id() ??
+      (element === undefined && event.target.getLayer() === contentLayer
+        ? callbacks.getSelection()[0]
+        : undefined);
+    // 与左键一致：锁定元素不可选中，右键也只给画布级菜单
+    if (!id || element?.getAttr('elLocked')) {
+      callbacks.onContextMenu({ x: evt.clientX, y: evt.clientY, elementId: null });
+      return;
+    }
+    // 右键未选中对象时先选中它（与 PowerPoint 一致），避免菜单动作落到别的元素上
+    if (!callbacks.getSelection().includes(id)) callbacks.onSelect([id], false);
+    callbacks.onContextMenu({ x: evt.clientX, y: evt.clientY, elementId: id });
   });
 
   contentLayer.on('dblclick dbltap', (event) => {

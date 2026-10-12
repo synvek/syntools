@@ -248,6 +248,46 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(rulers).toHaveAttribute('aria-pressed', 'false');
   });
 
+  test('右键画布：弹出菜单，可全选与 Esc 关闭', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+    await page.getByRole('button', { name: '文本框' }).click();
+    await insertShape(page, '矩形');
+
+    // 先在空白处左键取消选择，右键时菜单应给出画布级动作。
+    // 坐标必须避开标尺覆盖层（左上两条 20px 标尺 + 左上角 20×20 方块）。
+    const blank = { x: 60, y: 60 };
+    const canvas = page.getByLabel('slide canvas');
+    await canvas.click({ position: blank });
+    await canvas.click({ button: 'right', position: blank });
+
+    const menu = page.getByRole('menu', { name: '编辑操作' });
+    await expect(menu).toBeVisible();
+    await menu.getByRole('menuitem', { name: '全选' }).click();
+    await expect(page.getByText('已选中 2 个元素')).toBeVisible();
+
+    // 再右键一次，Esc 只关菜单、不触发编辑器的「取消选择」
+    await canvas.click({ button: 'right', position: blank });
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(page.getByText('已选中 2 个元素')).toBeVisible();
+  });
+
+  test('右键页缩略图：菜单可复制该页', async ({ page }) => {
+    await page.goto('/tools/slide-editor');
+    await expect(page.getByLabel('slide canvas')).toBeVisible();
+    await expect(page.locator('.slide-thumb')).toHaveCount(1);
+
+    await page.locator('.slide-thumb').first().click({ button: 'right' });
+    const menu = page.getByRole('menu', { name: '编辑操作' });
+    await expect(menu).toBeVisible();
+
+    await menu.getByRole('menuitem', { name: '复制此页' }).click();
+    await expect(page.locator('.slide-thumb')).toHaveCount(2);
+  });
+
   test('放映：矢量舞台 + 跳页 + Esc 退出', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
