@@ -22,6 +22,16 @@
   color-scheme: dark;
 }
 
+/*
+ * Univer Ribbon（classic 模式）把「开始 / 插入 / 公式 / 数据」标签栏与下方
+ * 工具条按钮都硬编码成了 justify-content: center。这里统一改为靠左排列，
+ * 与文档头的左对齐布局保持一致。
+ */
+.sheet-canvas [data-u-comp='ribbon-header-menu'] [role='tablist'],
+.sheet-canvas [data-u-comp='ribbon-toolbar'] {
+  justify-content: flex-start;
+}
+
 /* 移动端给出更矮但可用的高度 */
 @media (max-width: 768px) {
   .sheet-canvas {
