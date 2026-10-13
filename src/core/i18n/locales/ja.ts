@@ -82,6 +82,11 @@ const ja = {
     file: 'ファイル',
     remove: '削除',
     bytes: '{{size}} バイト',
+    present: {
+      zoomIn: '拡大',
+      zoomOut: '縮小',
+      zoomFit: 'ウィンドウに合わせる',
+    },
   },
   io: {
     stats: '{{chars}} 文字 / {{bytes}} バイト',

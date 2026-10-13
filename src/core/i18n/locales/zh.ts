@@ -78,6 +78,11 @@ export default {
     file: '文件',
     remove: '移除',
     bytes: '{{size}} 字节',
+    present: {
+      zoomIn: '放大',
+      zoomOut: '缩小',
+      zoomFit: '适应窗口',
+    },
   },
   io: {
     stats: '{{chars}} 字符 / {{bytes}} 字节',

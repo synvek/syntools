@@ -82,6 +82,11 @@ const fr = {
     file: 'Fichier',
     remove: 'Supprimer',
     bytes: '{{size}} octets',
+    present: {
+      zoomIn: 'Zoom avant',
+      zoomOut: 'Zoom arrière',
+      zoomFit: 'Ajuster à la fenêtre',
+    },
   },
   io: {
     stats: '{{chars}} caractères / {{bytes}} octets',

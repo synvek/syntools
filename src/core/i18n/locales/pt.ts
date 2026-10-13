@@ -82,6 +82,11 @@ const pt = {
     file: 'Ficheiro',
     remove: 'Remover',
     bytes: '{{size}} bytes',
+    present: {
+      zoomIn: 'Ampliar',
+      zoomOut: 'Reduzir',
+      zoomFit: 'Ajustar à janela',
+    },
   },
   io: {
     stats: '{{chars}} caracteres / {{bytes}} bytes',

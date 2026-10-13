@@ -82,6 +82,11 @@ const de = {
     file: 'Datei',
     remove: 'Entfernen',
     bytes: '{{size}} Bytes',
+    present: {
+      zoomIn: 'Vergrößern',
+      zoomOut: 'Verkleinern',
+      zoomFit: 'An Fenster anpassen',
+    },
   },
   io: {
     stats: '{{chars}} Zeichen / {{bytes}} Bytes',

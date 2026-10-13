@@ -81,6 +81,11 @@ const es = {
     file: 'Archivo',
     remove: 'Eliminar',
     bytes: '{{size}} bytes',
+    present: {
+      zoomIn: 'Acercar',
+      zoomOut: 'Alejar',
+      zoomFit: 'Ajustar a la ventana',
+    },
   },
   io: {
     stats: '{{chars}} caracteres / {{bytes}} bytes',

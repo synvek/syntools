@@ -2277,6 +2277,41 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
+  test('文字处理器：放映放大后内容真正变大且不跑位', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('放映放大视觉检查');
+    await page.getByTestId('rich-text-present').click();
+    await expect(overlay(page)).toBeVisible();
+
+    // 文档元素的「可视宽度」与「距可视区顶部的距离」
+    const metrics = () =>
+      page.evaluate(() => {
+        const doc = document.querySelector('[data-testid="present-document"]') as HTMLElement;
+        const host = document.querySelector('[data-testid="present-scroll"]') as HTMLElement;
+        const d = doc.getBoundingClientRect();
+        const h = host.getBoundingClientRect();
+        return { width: d.width, topGap: d.top - h.top };
+      });
+
+    const before = await metrics();
+    await page.getByTestId('present-zoom-in').click();
+    await page.getByTestId('present-zoom-in').click();
+    await expect(page.getByTestId('present-zoom-level')).toHaveText('156%');
+
+    const after = await metrics();
+    // 文字 / 表格这类固定尺寸内容必须真正放大（而不是只撑出一块空白）
+    expect(after.width).toBeGreaterThan(before.width);
+    // 居顶文档：放大后仍贴着可视区顶部，不会被推到屏幕外
+    expect(Math.abs(after.topGap - before.topGap)).toBeLessThan(4);
+
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
   test('文字处理器：链接可在右键菜单里查看 / 编辑 / 移除', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
@@ -2388,6 +2423,87 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     await expect(overlay(page)).toBeVisible();
     // 空工作簿也要呈现表头 + 空表
     await expect(page.getByRole('table')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('电子表格：放映时支持放大 / 缩小 / 适应窗口', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/spreadsheet-editor');
+    await page.getByTestId('sheet-present').click();
+    await expect(overlay(page)).toBeVisible();
+
+    const stage = page.getByTestId('present-stage');
+    const table = page.getByRole('table');
+    const level = page.getByTestId('present-zoom-level');
+    await expect(level).toHaveText('100%');
+    const baseStage = await stage.evaluate((el) => el.getBoundingClientRect().width);
+    const baseTable = await table.evaluate((el) => el.getBoundingClientRect().width);
+
+    // 放大：舞台与内容（表格）都要真正变大，而不是只多出一块空白
+    await page.getByTestId('present-zoom-in').click();
+    await expect(level).toHaveText('125%');
+    expect(await stage.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(
+      baseStage,
+    );
+    expect(await table.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(
+      baseTable,
+    );
+
+    // 适应窗口：回到 100%
+    await page.getByTestId('present-zoom-fit').click();
+    await expect(level).toHaveText('100%');
+
+    // 快捷键：`=` 放大、`-` 缩小
+    await page.keyboard.press('=');
+    await expect(level).toHaveText('125%');
+    await page.keyboard.press('-');
+    await expect(level).toHaveText('100%');
+
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('电子表格：缩放锚定可视区中心，不跑位', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/spreadsheet-editor');
+    await page.getByTestId('sheet-present').click();
+    await expect(overlay(page)).toBeVisible();
+
+    // 可视区中心落在缩放舞台内的相对位置：缩放前后应保持不变
+    const centerFraction = () =>
+      page.evaluate(() => {
+        const host = document.querySelector('[data-testid="present-scroll"]') as HTMLElement;
+        const stage = document.querySelector('[data-testid="present-stage"]') as HTMLElement;
+        const h = host.getBoundingClientRect();
+        const s = stage.getBoundingClientRect();
+        return {
+          fx: (h.left + h.width / 2 - s.left) / s.width,
+          fy: (h.top + h.height / 2 - s.top) / s.height,
+        };
+      });
+
+    const before = await centerFraction();
+    await page.getByTestId('present-zoom-in').click();
+    await page.getByTestId('present-zoom-in').click();
+    await expect(page.getByTestId('present-zoom-level')).toHaveText('156%');
+
+    // 放大后确实发生滚动补偿（否则「不跑位」只是没滚动造成的假象）
+    const scrolled = await page.getByTestId('present-scroll').evaluate((el) => ({
+      left: el.scrollLeft,
+      top: el.scrollTop,
+    }));
+    expect(scrolled.left).toBeGreaterThan(0);
+    expect(scrolled.top).toBeGreaterThan(0);
+
+    const after = await centerFraction();
+    expect(Math.abs(after.fx - before.fx)).toBeLessThan(0.02);
+    expect(Math.abs(after.fy - before.fy)).toBeLessThan(0.02);
+
     await page.keyboard.press('Escape');
     await expect(overlay(page)).toHaveCount(0);
     expect(errors).toEqual([]);

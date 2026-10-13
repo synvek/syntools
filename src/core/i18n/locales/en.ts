@@ -82,6 +82,11 @@ const en = {
     file: 'File',
     remove: 'Remove',
     bytes: '{{size}} bytes',
+    present: {
+      zoomIn: 'Zoom in',
+      zoomOut: 'Zoom out',
+      zoomFit: 'Fit to window',
+    },
   },
   io: {
     stats: '{{chars}} chars / {{bytes}} bytes',

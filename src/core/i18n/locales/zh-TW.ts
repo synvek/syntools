@@ -80,6 +80,11 @@ const zhTW = {
     file: '文件',
     remove: '移除',
     bytes: '{{size}} 字節',
+    present: {
+      zoomIn: '放大',
+      zoomOut: '縮小',
+      zoomFit: '符合視窗',
+    },
   },
   io: {
     stats: '{{chars}} 字符 / {{bytes}} 字節',
