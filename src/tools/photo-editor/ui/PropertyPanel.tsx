@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { MAX_CANVAS_SIZE, MIN_CANVAS_SIZE } from '../core';
 import {
   Field,
   NumberInput,
@@ -10,18 +11,7 @@ import {
 } from './controls';
 import { MaskPanel } from './MaskPanel';
 import { usePhotoStore } from '../store';
-import type { TextAlign } from '../model/types';
-
-/** 字体名是专有名词，直接按原名展示，不做翻译 */
-const FONT_FAMILIES = [
-  'PingFang SC',
-  'Microsoft YaHei',
-  'Noto Serif SC',
-  'Helvetica',
-  'Arial',
-  'Georgia',
-  'Courier New',
-].map((name) => ({ id: name, label: name }));
+import type { CanvasBackground } from '../model/types';
 
 /** 属性面板：几何 + 文字 / 形状各自的样式属性。 */
 export function PropertyPanel() {
@@ -29,13 +19,53 @@ export function PropertyPanel() {
   const doc = usePhotoStore((s) => s.doc);
   const patchActive = usePhotoStore((s) => s.patchActive);
   const rasterizeSmart = usePhotoStore((s) => s.rasterizeSmart);
+  const applyCanvas = usePhotoStore((s) => s.applyCanvas);
   const layer = doc.layers.find((item) => item.id === doc.activeLayerId);
 
+  // 未选中图层时展示「文档属性」：画布尺寸与背景（这一入口以前只在新建画布时出现过）
   if (!layer) {
     return (
-      <p className="px-1 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
-        {t('tools.photo.noLayer')}
-      </p>
+      <div className="flex flex-col gap-3">
+        <p className="px-1 text-center text-xs text-gray-400 dark:text-gray-500">
+          {t('tools.photo.noLayer')}
+        </p>
+        <PanelSection title={t('tools.photo.docProps')}>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label={t('tools.photo.canvasWidth')}>
+              <NumberInput
+                ariaLabel={t('tools.photo.canvasWidth')}
+                value={doc.width}
+                min={MIN_CANVAS_SIZE}
+                max={MAX_CANVAS_SIZE}
+                onChange={(width) => applyCanvas(width, doc.height, doc.background)}
+              />
+            </Field>
+            <Field label={t('tools.photo.canvasHeight')}>
+              <NumberInput
+                ariaLabel={t('tools.photo.canvasHeight')}
+                value={doc.height}
+                min={MIN_CANVAS_SIZE}
+                max={MAX_CANVAS_SIZE}
+                onChange={(height) => applyCanvas(doc.width, height, doc.background)}
+              />
+            </Field>
+          </div>
+          <Field label={t('tools.photo.canvasBackground')}>
+            <Select
+              ariaLabel={t('tools.photo.canvasBackground')}
+              value={doc.background}
+              options={[
+                { id: 'white', label: t('tools.photo.bgWhite') },
+                { id: 'black', label: t('tools.photo.bgBlack') },
+                { id: 'transparent', label: t('tools.photo.bgTransparent') },
+              ]}
+              onChange={(background: CanvasBackground) =>
+                applyCanvas(doc.width, doc.height, background)
+              }
+            />
+          </Field>
+        </PanelSection>
+      </div>
     );
   }
 
@@ -127,67 +157,10 @@ export function PropertyPanel() {
             value={layer.text}
             onChange={(text) => patchActive({ text } as never, false)}
           />
-          <div className="grid grid-cols-2 gap-2">
-            <Field label={t('tools.photo.fontSize')}>
-              <NumberInput
-                ariaLabel={t('tools.photo.fontSize')}
-                value={Math.round(layer.fontSize)}
-                min={6}
-                max={400}
-                onChange={(fontSize) => patchActive({ fontSize } as never, false)}
-              />
-            </Field>
-            <Field label={t('tools.photo.fontFamily')}>
-              <Select
-                ariaLabel={t('tools.photo.fontFamily')}
-                value={layer.fontFamily}
-                options={FONT_FAMILIES}
-                onChange={(fontFamily) => patchActive({ fontFamily } as never)}
-              />
-            </Field>
-          </div>
-          <Field label={t('tools.photo.color')}>
-            <input
-              type="color"
-              aria-label={t('tools.photo.color')}
-              value={layer.fill}
-              onChange={(event) => patchActive({ fill: event.target.value } as never)}
-              className="h-8 w-full cursor-pointer rounded border border-gray-300 bg-transparent dark:border-gray-700"
-            />
-          </Field>
-          <div className="flex flex-wrap gap-1">
-            <ToggleChip
-              label={t('tools.photo.bold')}
-              active={layer.bold}
-              onClick={() => patchActive({ bold: !layer.bold } as never)}
-            />
-            <ToggleChip
-              label={t('tools.photo.italic')}
-              active={layer.italic}
-              onClick={() => patchActive({ italic: !layer.italic } as never)}
-            />
-            <ToggleChip
-              label={t('tools.photo.underline')}
-              active={layer.underline}
-              onClick={() => patchActive({ underline: !layer.underline } as never)}
-            />
-          </div>
-          <div className="flex gap-1">
-            {(['left', 'center', 'right'] as TextAlign[]).map((align) => (
-              <ToggleChip
-                key={align}
-                label={
-                  align === 'left'
-                    ? t('tools.photo.alignLeft')
-                    : align === 'center'
-                      ? t('tools.photo.alignCenter')
-                      : t('tools.photo.alignRight')
-                }
-                active={layer.align === align}
-                onClick={() => patchActive({ align } as never)}
-              />
-            ))}
-          </div>
+          {/* 字符 / 段落 / 变形等完整参数在「文字」面板，这里只留最常用的内容编辑 */}
+          <p className="text-[10px] leading-4 text-gray-400 dark:text-gray-500">
+            {t('tools.photo.textPanelTip')}
+          </p>
         </PanelSection>
       ) : null}
 

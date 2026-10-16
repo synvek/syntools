@@ -2,7 +2,7 @@ import type { ToolResult } from '@/core/types';
 import { CANVAS_PRESETS, MAX_CANVAS_SIZE, MIN_CANVAS_SIZE } from '../core';
 import type {
   Adjustments,
-  FilterId,
+  FilterSpec,
   AdjustmentLayer,
   GroupLayer,
   Layer,
@@ -101,6 +101,7 @@ export function createNewDoc(options: NewDocOptions): ToolResult<PhotoDoc> {
       background: options.background ?? 'white',
       layers: [],
       activeLayerId: null,
+      swatches: [],
     },
   };
 }
@@ -121,6 +122,7 @@ function emptyDoc(): PhotoDoc {
     background: 'white',
     layers: [],
     activeLayerId: null,
+    swatches: [],
   };
 }
 
@@ -187,6 +189,9 @@ export function createTextLayer(input: {
     underline: false,
     align: 'left',
     lineHeight: 1.4,
+    letterSpacing: 0,
+    paragraphSpacing: 0,
+    warp: { kind: 'none', bend: 0, horizontal: 0 },
   };
 }
 
@@ -225,7 +230,7 @@ export function createGroupLayer(input: {
 export function createAdjustmentLayer(input: {
   doc: PhotoDoc;
   adjustments?: Partial<Adjustments>;
-  filters?: FilterId[];
+  filters?: FilterSpec[];
   name?: string;
 }): AdjustmentLayer {
   return {
@@ -282,6 +287,8 @@ export function createSmartLayer(input: {
     sourceAssetId: input.sourceAssetId,
     sourceWidth: input.sourceWidth,
     sourceHeight: input.sourceHeight,
+    adjustments: createAdjustments(),
+    filters: [],
   };
 }
 

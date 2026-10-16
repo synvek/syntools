@@ -6,15 +6,22 @@
  * 这样历史快照只需复制引用，撤销 / 重做不会反复深拷贝像素。
  */
 
-/** 图层混合模式：取值即 Canvas2D `globalCompositeOperation` 支持的混合模式 */
+/**
+ * 图层混合模式：取值即 Canvas2D `globalCompositeOperation` 支持的混合模式。
+ * 注意：线性加深 / 线性减淡 / 亮光 / 线性光 / 点光 / 实色混合等 PS 模式 Canvas2D 并不支持，
+ * 强行加入会退化为「正常」，因此这里只收录渲染引擎真正能表达的取值。
+ */
 export type BlendMode =
   | 'normal'
   | 'multiply'
   | 'screen'
   | 'overlay'
+  | 'soft-light'
+  | 'hard-light'
   | 'darken'
   | 'lighten'
   | 'color-dodge'
+  | 'color-burn'
   | 'difference'
   | 'exclusion'
   | 'hue'
@@ -22,18 +29,50 @@ export type BlendMode =
   | 'color'
   | 'luminosity';
 
+/** 对齐到画布的方向（作用域：当前选中图层） */
+export type AlignMode = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+
 /** 像素级滤镜（非 CSS filter 能表达的，走 ImageData 卷积 / 扫描） */
 export type FilterId =
   | 'grayscale'
   | 'sepia'
   | 'invert'
   | 'blur'
+  | 'gaussianBlur'
+  | 'motionBlur'
   | 'sharpen'
+  | 'unsharp'
   | 'emboss'
   | 'edge'
   | 'noise'
   | 'pixelate'
-  | 'posterize';
+  | 'posterize'
+  // 扭曲
+  | 'twirl'
+  | 'spherize'
+  | 'pinch'
+  // 风格化
+  | 'findEdges'
+  | 'traceContour'
+  // 渲染
+  | 'clouds'
+  | 'lensFlare'
+  // 降噪
+  | 'reduceNoise';
+
+/**
+ * 滤镜实例：`id` + 可调参数。
+ * 旧工程里 `filters: FilterId[]` 会在 `model/migrate.ts` 中升级为带默认参数的规格数组。
+ */
+export interface FilterSpec {
+  id: FilterId;
+  params?: Record<string, number>;
+  /**
+   * 是否参与烘焙；`false` 表示「保留参数但暂时关闭」（智能滤镜列表里逐个启停）。
+   * 缺省 / true = 启用。
+   */
+  enabled?: boolean;
+}
 
 /**
  * 图层类型：
@@ -63,9 +102,199 @@ export interface MaskRef {
 
 export type ShapeKind = 'rect' | 'roundRect' | 'ellipse' | 'line' | 'arrow' | 'star';
 
+/* ------------------------------ 矢量蒙版 ------------------------------ */
+
+/**
+ * 矢量蒙版：按轮廓（路径）裁切图层，与分辨率无关 —— 缩放图层不会像像素蒙版那样糊掉。
+ *
+ * 轮廓复用选区的「并集 / 差集 + nonzero」语义（`SelectionPart`）：
+ * 顶点为**图层局部坐标**（0,0 = 图层左上角），因此图层移动/缩放不影响蒙版形状。
+ *
+ * 限制：P1 只提供「从选区创建」，路径的手工编辑（钢笔）留待后续。
+ */
+export interface VectorMaskRef {
+  enabled: boolean;
+  inverted: boolean;
+  contours: SelectionPart[];
+  /** 羽化半径（像素），0 = 硬边 */
+  feather: number;
+}
+
+/* ------------------------------ 图层样式 ------------------------------ */
+
+/** 描边位置：外侧 / 居中 / 内侧 */
+export type StrokePosition = 'outside' | 'center' | 'inside';
+
+export interface DropShadowStyle {
+  enabled: boolean;
+  color: string;
+  /** 0 ~ 1 */
+  opacity: number;
+  /** 光照角度（度）：阴影落在反方向 */
+  angle: number;
+  /** 偏移距离（像素） */
+  distance: number;
+  /** 扩展半径（像素）：整体变胖 */
+  spread: number;
+  /** 模糊半径（像素） */
+  size: number;
+}
+
+export interface InnerShadowStyle {
+  enabled: boolean;
+  color: string;
+  opacity: number;
+  angle: number;
+  distance: number;
+  size: number;
+}
+
+export interface OuterGlowStyle {
+  enabled: boolean;
+  color: string;
+  opacity: number;
+  size: number;
+}
+
+export interface StrokeStyle {
+  enabled: boolean;
+  color: string;
+  opacity: number;
+  size: number;
+  position: StrokePosition;
+}
+
+export interface ColorOverlayStyle {
+  enabled: boolean;
+  color: string;
+  opacity: number;
+}
+
+/**
+ * 图层样式：非破坏的效果栈，统一作用于「图层的 alpha 剪影」。
+ * 每种效果都是可选的（缺省 = 未添加），`enabled: false` 表示「参数保留但暂时关闭」。
+ * 绘制顺序对齐 Photoshop：投影 → 外发光 → 描边（在内容之下），内容，内阴影 → 颜色叠加（在内容之上）。
+ */
+export interface LayerStyle {
+  dropShadow?: DropShadowStyle | null;
+  innerShadow?: InnerShadowStyle | null;
+  outerGlow?: OuterGlowStyle | null;
+  stroke?: StrokeStyle | null;
+  colorOverlay?: ColorOverlayStyle | null;
+}
+
 export type TextAlign = 'left' | 'center' | 'right';
 
-/** 非破坏性调整参数：均为「面板滑杆原始值」，渲染时再换算 */
+/** 色阶：输入黑白场 / 灰度系数 / 输出黑白场 */
+export interface LevelsParams {
+  inBlack: number;
+  inWhite: number;
+  gamma: number;
+  outBlack: number;
+  outWhite: number;
+}
+
+/** 曲线控制点（0~255 输入 → 0~255 输出） */
+export interface CurvePoint {
+  x: number;
+  y: number;
+}
+
+/** 曲线：RGB 主通道 + 可选单通道 */
+export interface CurvesParams {
+  rgb: CurvePoint[];
+  red?: CurvePoint[] | null;
+  green?: CurvePoint[] | null;
+  blue?: CurvePoint[] | null;
+}
+
+/** 色彩平衡：三区间 × 三条轴（青-红 / 洋红-绿 / 黄-蓝），取值 -100 ~ 100 */
+export interface ColorBalanceParams {
+  shadows: number[];
+  midtones: number[];
+  highlights: number[];
+}
+
+/** 黑白：六色权重，取值 -100 ~ 300 */
+export interface BlackWhiteParams {
+  red: number;
+  yellow: number;
+  green: number;
+  cyan: number;
+  blue: number;
+  magenta: number;
+}
+
+/** 渐变映射的色标 */
+export interface GradientStop {
+  /** 0 ~ 1 */
+  pos: number;
+  color: string;
+}
+
+export interface GradientMapParams {
+  stops: GradientStop[];
+}
+
+/** 照片滤镜：整幅叠一层带密度的彩色滤镜（模拟色温滤镜） */
+export interface PhotoFilterParams {
+  color: string;
+  /** 0 ~ 100 */
+  density: number;
+  /** 保持明度：只改色相 / 饱和度，亮度还原为原图 */
+  preserveLuminosity: boolean;
+}
+
+/**
+ * 通道混合器：每个输出通道 = 源 R/G/B 的线性组合 + 常数。
+ * 系数为百分比（-200 ~ 200），常数为百分比（-100 ~ 100，按 2.55/点 折算）。
+ */
+export interface ChannelMixerParams {
+  /** 红输出：[来自 R, 来自 G, 来自 B, 常数] */
+  red: number[];
+  green: number[];
+  blue: number[];
+}
+
+/**
+ * 阴影 / 高光：提亮暗部、压暗亮部。
+ * 简化实现（不做到「半径 / 局部对比」），用亮度加权的平滑曲线作用在全图。
+ */
+export interface ShadowsHighlightsParams {
+  /** 0 ~ 100：提亮暗部 */
+  shadows: number;
+  /** 0 ~ 100：压暗亮部 */
+  highlights: number;
+}
+
+/** 替换颜色：把接近目标色的像素按 HSL 偏移替换（容差内软过渡） */
+export interface ReplaceColorParams {
+  color: string;
+  /** -180 ~ 180 */
+  hue: number;
+  /** -100 ~ 100 */
+  saturation: number;
+  /** -100 ~ 100 */
+  lightness: number;
+  /** 0 ~ 200：颜色匹配的容差 */
+  fuzziness: number;
+}
+
+/** 可选颜色的 9 个色域 */
+export type SelectiveRange =
+  'reds' | 'yellows' | 'greens' | 'cyans' | 'blues' | 'magentas' | 'whites' | 'neutrals' | 'blacks';
+
+/** 可选颜色：每个色域 4 个值 [青, 洋红, 黄, 黑]，绝对模式，-100 ~ 100 */
+export interface SelectiveColorParams {
+  ranges: Record<SelectiveRange, number[]>;
+}
+
+/**
+ * 非破坏性调整参数：基础 7 项为「面板滑杆原始值」，扩展项为可选的参数化调整。
+ * 扩展项缺省（null/undefined）表示未启用，渲染时按顺序依次作用：
+ * 色阶 → 曲线 → 色彩平衡 → 黑白 → 阈值 → 渐变映射 → 去色 →
+ * 照片滤镜 → 通道混合器 → 阴影 / 高光 → 可选颜色 → 替换颜色。
+ */
 export interface Adjustments {
   /** -100 ~ 100 */
   brightness: number;
@@ -81,6 +310,30 @@ export interface Adjustments {
   exposure: number;
   /** 0 ~ 100 */
   sharpen: number;
+  /** 色阶 */
+  levels?: LevelsParams | null;
+  /** 曲线 */
+  curves?: CurvesParams | null;
+  /** 色彩平衡 */
+  colorBalance?: ColorBalanceParams | null;
+  /** 黑白 */
+  blackWhite?: BlackWhiteParams | null;
+  /** 阈值（0 ~ 255）；null / undefined 表示关闭 */
+  threshold?: number | null;
+  /** 渐变映射 */
+  gradientMap?: GradientMapParams | null;
+  /** 去色 */
+  desaturate?: boolean;
+  /** 照片滤镜 */
+  photoFilter?: PhotoFilterParams | null;
+  /** 通道混合器 */
+  channelMixer?: ChannelMixerParams | null;
+  /** 阴影 / 高光 */
+  shadowsHighlights?: ShadowsHighlightsParams | null;
+  /** 可选颜色 */
+  selectiveColor?: SelectiveColorParams | null;
+  /** 替换颜色 */
+  replaceColor?: ReplaceColorParams | null;
 }
 
 export interface LayerBase {
@@ -89,6 +342,10 @@ export interface LayerBase {
   kind: LayerKind;
   visible: boolean;
   locked: boolean;
+  /** 锁定位置：禁止拖拽 / 变换（仍可被选中与编辑像素） */
+  lockPosition?: boolean;
+  /** 锁定透明像素：绘制只作用于已有像素，不新增内容 */
+  lockAlpha?: boolean;
   /** 0 ~ 1 */
   opacity: number;
   blend: BlendMode;
@@ -109,6 +366,17 @@ export interface LayerBase {
   expanded?: boolean;
   /** 图层蒙版；null / 缺省表示无蒙版 */
   mask?: MaskRef | null;
+  /** 矢量蒙版；null / 缺省表示无 */
+  vectorMask?: VectorMaskRef | null;
+  /**
+   * 剪贴蒙版：为真时本图层被「下方最近的基准图层」的 alpha 裁切（Photoshop 的 ⌘⌥G）。
+   * 需要下方存在可绘制图层才生效，否则渲染时忽略。
+   */
+  clipped?: boolean;
+  /** 图层样式；null / 缺省表示无样式 */
+  style?: LayerStyle | null;
+  /** 网格变形（透视 / 扭曲 / 斜切 / 变形）；null / 缺省 / 全零表示未变形 */
+  mesh?: MeshWarp | null;
 }
 
 export interface RasterLayer extends LayerBase {
@@ -118,7 +386,43 @@ export interface RasterLayer extends LayerBase {
   /** 像素变更版本号：落笔 / 填充 / 裁剪后自增，用于烘焙缓存失效 */
   rev: number;
   adjustments: Adjustments;
-  filters: FilterId[];
+  filters: FilterSpec[];
+}
+
+/** 文字变形（变形文字）：`kind` 决定位移场，`bend` / `horizontal` 为其强度（百分比 -100~100） */
+export interface TextWarp {
+  kind: TextWarpKind;
+  bend: number;
+  horizontal: number;
+}
+
+export type TextWarpKind =
+  | 'none'
+  | 'arc'
+  | 'arcLower'
+  | 'arcUpper'
+  | 'arch'
+  | 'shellLower'
+  | 'shellUpper'
+  | 'wave'
+  | 'flag'
+  | 'rise'
+  | 'fisheye';
+
+/**
+ * 网格变形（自由变换家族的存储形态）。
+ *
+ * 统一用「控制点网格 + 归一化位移」表达四种变换模式：
+ * - 2×2 网格（四角）= **透视** / **扭曲** / **斜切**（约束不同，存储相同）；
+ * - 4×4 网格 = **变形（Warp）**，可拖任意控制点。
+ *
+ * 位移归一化到图层宽 / 高（`0.1` = 10% 宽），因此缩放图层时变形比例保持；
+ * 每点两位 `(dx, dy)`，行优先（`index = row * cols + col`）。
+ */
+export interface MeshWarp {
+  cols: number;
+  rows: number;
+  points: number[];
 }
 
 export interface TextLayer extends LayerBase {
@@ -131,7 +435,14 @@ export interface TextLayer extends LayerBase {
   italic: boolean;
   underline: boolean;
   align: TextAlign;
+  /** 行距倍数（相对字号） */
   lineHeight: number;
+  /** 字距（px，可负） */
+  letterSpacing: number;
+  /** 段间距（px）：多段文字之间的额外间距 */
+  paragraphSpacing: number;
+  /** 变形文字参数 */
+  warp: TextWarp;
 }
 
 export interface ShapeLayer extends LayerBase {
@@ -157,7 +468,7 @@ export interface GroupLayer extends LayerBase {
 export interface AdjustmentLayer extends LayerBase {
   kind: 'adjustment';
   adjustments: Adjustments;
-  filters: FilterId[];
+  filters: FilterSpec[];
 }
 
 /**
@@ -169,6 +480,16 @@ export interface SmartLayer extends LayerBase {
   sourceAssetId: string;
   sourceWidth: number;
   sourceHeight: number;
+  /** 非破坏调整参数：与位图图层同一套，作用在呈现结果上 */
+  adjustments: Adjustments;
+  /**
+   * 智能滤镜栈：作用在**呈现尺寸**上的可反复改参滤镜。
+   *
+   * 与位图图层的 `filters` 是同一套规格（`FilterSpec`），区别只在于施加时机：
+   * 位图滤镜烘焙在源像素分辨率上，智能滤镜先把源缩放到当前呈现尺寸再烘焙，
+   * 因此改缩放不会让模糊半径等参数「跟着一起缩放」。
+   */
+  filters: FilterSpec[];
 }
 
 export type Layer =
@@ -186,9 +507,24 @@ export interface PhotoDoc {
   /** 数组尾部为最上层 */
   layers: Layer[];
   activeLayerId: string | null;
+  /** 文档色板（随工程保存）：`#RRGGBB` 列表 */
+  swatches: string[];
 }
 
 export type SelectionKind = 'rect' | 'ellipse' | 'lasso';
+
+/**
+ * 选区的追加轮廓（布尔运算的结果）。
+ * `add: true` 为并集（加选），`false` 为差集（减选）；统一用多边形顶点表示。
+ *
+ * 语义：选区 = （主轮廓 ∪ 加选轮廓）∖（洞 ∪ 减选轮廓）。
+ * 渲染与裁剪统一走 **nonzero 填充规则**，因此轮廓方向必须规范化
+ * （见 `core.ts` 的 `orientPolygon`），重叠的加选轮廓才会正确取并集而不是异或。
+ */
+export interface SelectionPart {
+  path: number[];
+  add: boolean;
+}
 
 /** 选区：会话态，不进文档历史 */
 export interface Selection {
@@ -200,8 +536,10 @@ export interface Selection {
   height: number;
   /** 套索顶点（文档坐标，[x0,y0,x1,y1,...]），矩形 / 椭圆选区为空 */
   path: number[];
-  /** 内轮廓（挖洞）：反选时保存原始选区形状，命中判定与裁剪都按奇偶规则挖空 */
+  /** 内轮廓（挖洞）：反选时保存原始选区形状，命中判定与裁剪都按填充规则挖空 */
   hole?: number[];
+  /** 布尔运算追加的轮廓 */
+  parts?: SelectionPart[];
   /** 羽化半径（像素） */
   feather: number;
 }
@@ -216,6 +554,8 @@ export type HistoryLabel =
   | 'histBrush'
   | 'histErase'
   | 'histFill'
+  | 'histGradient'
+  | 'histRetouch'
   | 'histCrop'
   | 'histResize'
   | 'histAddLayer'
@@ -228,7 +568,12 @@ export type HistoryLabel =
   | 'histRename'
   | 'histGroup'
   | 'histMask'
-  | 'histAdjust';
+  | 'histAdjust'
+  | 'histStyle'
+  | 'histVectorMask'
+  | 'histClip'
+  | 'histSwatch'
+  | 'histTransform';
 
 /**
  * 历史条目。
@@ -250,16 +595,44 @@ export interface Viewport {
   y: number;
 }
 
+/** 参考线：位置统一用文档坐标（与视口缩放 / 平移无关） */
+export interface Guide {
+  axis: 'h' | 'v';
+  pos: number;
+}
+
+/** 辅助视图开关（视图态，不进文档历史） */
+export interface ViewOverlay {
+  rulers: boolean;
+  grid: boolean;
+  gridSize: number;
+  guides: Guide[];
+}
+
 export type ToolId =
   | 'move'
+  | 'transform'
   | 'rectSelect'
   | 'ellipseSelect'
   | 'lasso'
+  | 'wand'
+  | 'quickSelect'
   | 'crop'
   | 'brush'
   | 'eraser'
   | 'eyedropper'
+  | 'sampler'
   | 'fill'
+  | 'gradient'
+  | 'dodge'
+  | 'burn'
+  | 'sponge'
+  | 'cloneStamp'
+  | 'healing'
+  | 'spotHeal'
+  | 'smudge'
+  | 'blurBrush'
+  | 'sharpenBrush'
   | 'text'
   | 'shape'
   | 'hand';

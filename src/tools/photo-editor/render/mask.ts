@@ -1,5 +1,6 @@
+import { MAX_VECTOR_FEATHER, orientPolygon, traceSelection } from '../core';
 import { createCanvasElement, getCanvas, registerCanvas } from '../model/assets';
-import type { MaskRef, Rect } from '../model/types';
+import type { MaskRef, Rect, Selection, VectorMaskRef } from '../model/types';
 
 /**
  * 图层蒙版：灰度画布（白 = 显示、黑 = 隐藏）。
@@ -51,6 +52,27 @@ export function createMaskCanvasFromPolygon(
       ctx.fillStyle = '#ffffff';
       ctx.fill();
     }
+  }
+  return registerCanvas(canvas);
+}
+
+/** 按选区（支持布尔运算产生的多轮廓）生成蒙版：轮廓内为白，其余为黑 */
+export function createMaskCanvasFromSelection(
+  width: number,
+  height: number,
+  selection: Selection,
+): string {
+  const canvas = createCanvasElement(
+    Math.max(1, Math.round(width)),
+    Math.max(1, Math.round(height)),
+  );
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    traceSelection(ctx, selection);
+    ctx.fill('nonzero');
   }
   return registerCanvas(canvas);
 }
@@ -117,6 +139,68 @@ export function applyMask(
   ctx.save();
   ctx.globalCompositeOperation = 'destination-in';
   ctx.drawImage(baked, rect.x, rect.y, Math.max(1, rect.width), Math.max(1, rect.height));
+  ctx.restore();
+}
+
+/* ------------------------------ 矢量蒙版 ------------------------------ */
+
+/**
+ * 矢量蒙版 → 当前路径（本地坐标 = 图层左上角为原点）。
+ *
+ * 与选区共用 nonzero 语义：并集轮廓正向、差集轮廓反向（`orientPolygon`）。
+ * 反相时再加一圈「图层外框」（正向），使内部 winding 归零从而挖空 —— 与
+ * `core.invertSelection` 完全同一套技巧，避免维护第二份几何实现。
+ */
+export function traceVectorMask(
+  ctx: CanvasRenderingContext2D,
+  mask: VectorMaskRef,
+  size: { width: number; height: number },
+): void {
+  ctx.beginPath();
+  if (mask.inverted) {
+    ctx.moveTo(0, 0);
+    ctx.lineTo(size.width, 0);
+    ctx.lineTo(size.width, size.height);
+    ctx.lineTo(0, size.height);
+    ctx.closePath();
+  }
+  for (const contour of mask.contours) {
+    const path = orientPolygon(contour.path, mask.inverted ? !contour.add : contour.add);
+    if (path.length < 6) continue;
+    ctx.moveTo(path[0], path[1]);
+    for (let i = 2; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]);
+    ctx.closePath();
+  }
+}
+
+/**
+ * 把矢量蒙版作用到目标画布（`destination-in`，只保留轮廓内部）。
+ *
+ * 羽化只在「蒙版」上做模糊（`filter: blur`），不能直接模糊目标画布——
+ * 否则图层内容本身也会被糊掉。因此先烘焙一张同尺寸的蒙版图，再一次性裁切。
+ */
+export function applyVectorMask(
+  target: HTMLCanvasElement,
+  mask: VectorMaskRef,
+  offset: { x: number; y: number },
+  size: { width: number; height: number },
+): void {
+  const ctx = target.getContext('2d');
+  if (!ctx) return;
+  const baked = createCanvasElement(target.width, target.height);
+  const bctx = baked.getContext('2d');
+  if (!bctx) return;
+  if (mask.feather > 0) {
+    bctx.filter = `blur(${Math.min(MAX_VECTOR_FEATHER, mask.feather)}px)`;
+  }
+  bctx.translate(offset.x, offset.y);
+  traceVectorMask(bctx, mask, size);
+  bctx.fillStyle = '#ffffff';
+  // 反相轮廓的方向已被翻转，两种情形都用 nonzero
+  bctx.fill('nonzero');
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.drawImage(baked, 0, 0);
   ctx.restore();
 }
 

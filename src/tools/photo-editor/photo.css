@@ -60,10 +60,23 @@
 .photo-stage[data-tool='rectSelect'],
 .photo-stage[data-tool='ellipseSelect'],
 .photo-stage[data-tool='lasso'],
+.photo-stage[data-tool='wand'],
+.photo-stage[data-tool='quickSelect'],
 .photo-stage[data-tool='crop'],
 .photo-stage[data-tool='brush'],
 .photo-stage[data-tool='eraser'],
 .photo-stage[data-tool='eyedropper'],
+.photo-stage[data-tool='gradient'],
+.photo-stage[data-tool='sampler'],
+.photo-stage[data-tool='cloneStamp'],
+.photo-stage[data-tool='healing'],
+.photo-stage[data-tool='spotHeal'],
+.photo-stage[data-tool='smudge'],
+.photo-stage[data-tool='blurBrush'],
+.photo-stage[data-tool='sharpenBrush'],
+.photo-stage[data-tool='dodge'],
+.photo-stage[data-tool='burn'],
+.photo-stage[data-tool='sponge'],
 .photo-stage[data-tool='shape'] {
   cursor: crosshair;
 }
@@ -72,6 +85,9 @@
 }
 .photo-stage[data-tool='text'] {
   cursor: text;
+}
+.photo-stage[data-tool='transform'] {
+  cursor: default;
 }
 .photo-stage[data-tool='hand'] {
   cursor: grab;

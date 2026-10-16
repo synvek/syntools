@@ -50,6 +50,7 @@ const docOf = (layers: Layer[]): PhotoDoc => ({
   background: 'white',
   layers,
   activeLayerId: null,
+  swatches: [],
 });
 
 describe('PSD 结构映射（纯函数）', () => {

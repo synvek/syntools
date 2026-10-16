@@ -1,14 +1,21 @@
 import Konva from 'konva';
-import { bakeSignature, maskSignature } from '../core';
+import { bakeSignature, meshIsIdentity, needsTextBitmap } from '../core';
 import { getCanvas } from '../model/assets';
-import {
-  groupComposite,
-  groupCompositeKey,
-  maskedLayerCanvas,
-  maskedLayerOrigin,
-} from './composite';
+import { groupComposite, groupCompositeKey } from './composite';
 import { bakeRaster, bakeRasterLive } from './filters';
-import { starPath } from './paint';
+import {
+  clipBaseOf,
+  clipKeyOf,
+  compositeSignature,
+  composedLayerCanvas,
+  composedLayerOrigin,
+  layerNeedsComposite,
+  meshContentKey,
+  paintLayerContent,
+  starPath,
+} from './paint';
+import { meshBitmapOrigin, meshLayerBitmap } from './mesh';
+import { textBitmap, type WarpedText } from './warp';
 import type { GroupLayer, Layer, PhotoDoc, ShapeLayer, TextLayer } from '../model/types';
 
 /**
@@ -21,6 +28,8 @@ import type { GroupLayer, Layer, PhotoDoc, ShapeLayer, TextLayer } from '../mode
 export const LAYER_ID_ATTR = 'layerId';
 export const LAYER_KIND_ATTR = 'layerKind';
 export const BAKE_KEY_ATTR = 'bakeKey';
+/** 变形文字的位图（挂在节点上，避免 sceneFunc 闭包捕获过期图层） */
+const TEXT_BITMAP_ATTR = 'textBitmap';
 
 /** 位图烘焙键：资产 + 版本号 + 调整/滤镜参数 */
 export function bakeKeyOf(layer: Layer): string {
@@ -34,26 +43,49 @@ export function bakeKeyOf(layer: Layer): string {
  * 这样在它们尚未可被创建时就已类型完备，后续只需替换分支实现。
  */
 export function createLayerNode(layer: Layer, doc?: PhotoDoc): Konva.Shape | Konva.Group {
-  // 带蒙版：整体先合成为一张图（蒙版必须作用在「该图层自己的像素」上）
-  if (doc && layer.mask?.enabled) {
-    const canvas = maskedLayerCanvas(doc, layer);
+  // 带蒙版 / 图层样式：整体先合成为一张图（两者都必须作用在「该图层自己的像素」上），
+  // 复用与导出完全相同的 `composedLayerCanvas`，预览与产物不会再漂移。
+  if (doc && layerNeedsComposite(layer)) {
+    const clipBase = layer.clipped ? clipBaseOf(doc, layer) : null;
+    const canvas = composedLayerCanvas(doc, layer, { doc, clipBase });
     if (canvas) {
-      const origin = maskedLayerOrigin(doc, layer);
       const node = new Konva.Image({
         image: canvas,
-        x: origin.x,
-        y: origin.y,
         width: canvas.width,
         height: canvas.height,
         listening: false,
         perfectDrawEnabled: false,
       });
       node.setAttr(LAYER_ID_ATTR, layer.id);
-      node.setAttr(LAYER_KIND_ATTR, `masked:${layer.kind}`);
-      applyCommon(node, layer, origin);
+      node.setAttr(LAYER_KIND_ATTR, `composed:${layer.kind}`);
+      node.setAttr(BAKE_KEY_ATTR, compositeSignature(layer, clipKeyOf(clipBase)));
+      applyCommon(node, layer, composedLayerOrigin(layer), true);
       return node;
     }
   }
+  // 网格变形（无蒙版 / 样式时走这里；有蒙版 / 样式时上面的合成分支已把变形包含在内）
+  if (!layerNeedsComposite(layer) && !meshIsIdentity(layer.mesh)) {
+    const key = meshContentKey(layer, 'preview');
+    const bitmap = meshLayerBitmap(layer, key, (inner, box) => {
+      paintLayerContent(inner, { ...layer, mesh: null, x: box.x, y: box.y } as Layer, { doc });
+    });
+    if (bitmap) {
+      const node = new Konva.Image({
+        image: bitmap.canvas,
+        width: bitmap.canvas.width,
+        height: bitmap.canvas.height,
+        listening: false,
+        perfectDrawEnabled: false,
+      });
+      node.setAttr(LAYER_ID_ATTR, layer.id);
+      node.setAttr(LAYER_KIND_ATTR, 'mesh');
+      node.setAttr(BAKE_KEY_ATTR, key);
+      // 按「缓冲左上角」落位：与合成路径同一套变换（绕包围盒中心旋转 / 翻转）
+      applyCommon(node, layer, { x: bitmap.offsetX, y: bitmap.offsetY }, true);
+      return node;
+    }
+  }
+
   const node: Konva.Shape | Konva.Group =
     layer.kind === 'raster'
       ? createRasterNode(layer)
@@ -68,7 +100,14 @@ export function createLayerNode(layer: Layer, doc?: PhotoDoc): Konva.Shape | Kon
               : new Konva.Group({ listening: false });
   node.setAttr(LAYER_ID_ATTR, layer.id);
   // 形状按具体图形区分：更换图形类型时必须重建节点
-  node.setAttr(LAYER_KIND_ATTR, layer.kind === 'shape' ? `shape:${layer.shape}` : layer.kind);
+  node.setAttr(
+    LAYER_KIND_ATTR,
+    layer.kind === 'shape'
+      ? `shape:${layer.shape}`
+      : layer.kind === 'text' && needsTextBitmap(layer)
+        ? 'text:bitmap'
+        : layer.kind,
+  );
   if (layer.kind === 'raster') node.setAttr(BAKE_KEY_ATTR, bakeKeyOf(layer));
   applyCommon(node, layer);
   return node;
@@ -86,21 +125,31 @@ export function updateLayerNode(
   live = false,
   doc?: PhotoDoc,
 ): void {
-  if (doc && layer.mask?.enabled && node instanceof Konva.Image) {
-    const key = maskSignature(layer) ?? '';
+  if (node.getAttr(LAYER_KIND_ATTR) === 'mesh' && node instanceof Konva.Image) {
+    const key = meshContentKey(layer, 'preview');
     if (live || node.getAttr(BAKE_KEY_ATTR) !== key) {
-      const canvas = maskedLayerCanvas(doc, layer);
+      const bitmap = meshLayerBitmap(layer, key, (inner, box) => {
+        paintLayerContent(inner, { ...layer, mesh: null, x: box.x, y: box.y } as Layer, { doc });
+      });
+      if (bitmap) node.image(bitmap.canvas);
+      node.setAttr(BAKE_KEY_ATTR, key);
+    }
+    applyCommon(node, layer, meshBitmapOrigin(layer), true);
+    return;
+  }
+
+  if (doc && layerNeedsComposite(layer) && node instanceof Konva.Image) {
+    const clipBase = layer.clipped ? clipBaseOf(doc, layer) : null;
+    const key = compositeSignature(layer, clipKeyOf(clipBase));
+    if (live || node.getAttr(BAKE_KEY_ATTR) !== key) {
+      const canvas = composedLayerCanvas(doc, layer, { doc, clipBase });
       if (canvas) {
-        const origin = maskedLayerOrigin(doc, layer);
         node.image(canvas);
         node.size({ width: canvas.width, height: canvas.height });
-        node.position(origin);
         node.setAttr(BAKE_KEY_ATTR, key);
       }
     }
-    node.opacity(layer.opacity);
-    node.rotation(0);
-    node.visible(layer.visible);
+    applyCommon(node, layer, composedLayerOrigin(layer), true);
     return;
   }
   if (layer.kind === 'raster' && node instanceof Konva.Image) {
@@ -109,7 +158,8 @@ export function updateLayerNode(
     if (asset && (live || node.getAttr(BAKE_KEY_ATTR) !== key)) {
       node.image(
         live
-          ? bakeRasterLive(asset, layer.adjustments, layer.filters)
+          ? // live 传签名：预览走降采样，同时把「停手后算全分辨率」的任务交给 Worker
+            bakeRasterLive(asset, layer.adjustments, layer.filters, key)
           : bakeRaster(asset, key, layer.adjustments, layer.filters),
       );
       node.setAttr(BAKE_KEY_ATTR, key);
@@ -129,23 +179,48 @@ export function updateLayerNode(
     node.width(layer.width);
     node.align(layer.align);
     node.lineHeight(layer.lineHeight);
+    node.letterSpacing(layer.letterSpacing ?? 0);
     node.fontStyle(fontStyleOf(layer));
     node.textDecoration(layer.underline ? 'underline' : '');
+  } else if (layer.kind === 'text') {
+    // 变形 / 段间距：位图按签名缓存，同步时重新取一次只会命中缓存（除非参数真的变了）
+    node.setAttr(TEXT_BITMAP_ATTR, textBitmap(layer));
   } else if (layer.kind === 'shape') {
     updateShapeNode(node, layer);
   }
   applyCommon(node, layer);
 }
 
-function applyCommon(node: Konva.Node, layer: Layer, origin?: { x: number; y: number }): void {
-  node.position(origin ?? { x: layer.x, y: layer.y });
+/**
+ * 同步节点的位置与变换。
+ *
+ * `composed`（离屏合成结果 / 编组）必须用「以图层包围盒中心为轴」的写法（position = 中心 + offset = 中心到缓冲左上角），
+ * 才能与 Canvas2D 的 `applyTransform`（绕包围盒中心旋转 / 翻转）逐像素对齐；
+ * 普通节点仍按左上角落位，保持既有行为。
+ */
+function applyCommon(
+  node: Konva.Node,
+  layer: Layer,
+  origin?: { x: number; y: number },
+  composed = false,
+): void {
+  if (composed || layer.kind === 'group') {
+    const anchor = origin ?? { x: layer.x, y: layer.y };
+    const cx = layer.x + layer.width / 2;
+    const cy = layer.y + layer.height / 2;
+    node.position({ x: cx, y: cy });
+    node.offset({ x: cx - anchor.x, y: cy - anchor.y });
+  } else {
+    node.position({ x: layer.x, y: layer.y });
+    node.offset({ x: 0, y: 0 });
+  }
   node.opacity(layer.opacity);
   node.rotation(layer.rotation);
   node.scale({ x: layer.flipX ? -1 : 1, y: layer.flipY ? -1 : 1 });
   node.visible(layer.visible);
   // Konva 的 source-over 即「正常」；其余混合模式名与 Canvas2D 一致
   node.setAttr('globalCompositeOperation', layer.blend === 'normal' ? 'source-over' : layer.blend);
-  if (layer.kind === 'raster') {
+  if (!composed && layer.kind === 'raster') {
     node.size({ width: Math.max(1, layer.width), height: Math.max(1, layer.height) });
   }
 }
@@ -185,7 +260,31 @@ function createSmartNode(layer: Extract<Layer, { kind: 'smart' }>): Konva.Image 
   });
 }
 
-function createTextNode(layer: TextLayer): Konva.Text {
+/**
+ * 文字节点。
+ *
+ * 两条路径：
+ * - 常规文字 → `Konva.Text`（可缩放清晰、随时改字体）；
+ * - 变形 / 带段间距 → `Konva.Shape` + 位图（`render/warp.ts`），与导出所用的 Canvas2D 同源。
+ * 位图挂在节点属性上而不是闭包里捕获图层对象 —— 闭包会让节点永远画旧数据。
+ */
+function createTextNode(layer: TextLayer): Konva.Text | Konva.Shape {
+  if (needsTextBitmap(layer)) {
+    const shape = new Konva.Shape({
+      listening: false,
+      sceneFunc: (context, node) => {
+        const bitmap = node.getAttr(TEXT_BITMAP_ATTR) as WarpedText | undefined;
+        if (!bitmap) return;
+        (context as unknown as CanvasRenderingContext2D).drawImage(
+          bitmap.canvas,
+          bitmap.offsetX,
+          bitmap.offsetY,
+        );
+      },
+    });
+    shape.setAttr(TEXT_BITMAP_ATTR, textBitmap(layer));
+    return shape;
+  }
   return new Konva.Text({
     text: layer.text,
     width: layer.width,
@@ -196,6 +295,7 @@ function createTextNode(layer: TextLayer): Konva.Text {
     fill: layer.fill,
     align: layer.align,
     lineHeight: layer.lineHeight,
+    letterSpacing: layer.letterSpacing ?? 0,
     listening: false,
   });
 }

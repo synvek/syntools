@@ -1,12 +1,15 @@
-import { downloadDataUrl } from '@/core/pdf/download';
+import { downloadBytes, downloadDataUrl } from '@/core/pdf/download';
 import { createCanvasElement } from '../model/assets';
 import { maskToSelection } from './brush';
+import { encodeGif } from './gif';
 import { paintDoc } from './paint';
+import { encodePdf } from './pdf';
+import { encodeTiff, hasTransparency } from './tiff';
 import type { PhotoDoc, Rect, Selection } from '../model/types';
 
 /** 导出：把文档合成到离屏画布再编码，不改动用户视口与缩放。 */
 
-export type ExportFormat = 'png' | 'jpeg' | 'webp';
+export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'tiff' | 'gif' | 'pdf';
 
 export interface ExportOptions {
   format: ExportFormat;
@@ -14,16 +17,36 @@ export interface ExportOptions {
   quality: number;
   /** 只导出该区域（选区裁剪导出），缺省导出整张画布 */
   clip?: Rect | null;
+  /** 仅 pdf 生效：页面尺寸的换算基准（缺省 72 dpi = 像素与点 1:1） */
+  dpi?: number;
 }
 
 const MIME: Record<ExportFormat, string> = {
   png: 'image/png',
   jpeg: 'image/jpeg',
   webp: 'image/webp',
+  tiff: 'image/tiff',
+  gif: 'image/gif',
+  pdf: 'application/pdf',
 };
 
 export function exportMime(format: ExportFormat): string {
   return MIME[format];
+}
+
+/**
+ * 是否由浏览器原生编码。
+ *
+ * PNG / JPEG / WebP 直接交给 `canvas.toBlob`（走浏览器内建编码器，质量与性能都最好），
+ * TIFF / GIF / PDF 则没有原生编码器，需要我们自己写字节（见 `tiff.ts` / `gif.ts` / `pdf.ts`）。
+ */
+export function isNativeExportFormat(format: ExportFormat): boolean {
+  return format === 'png' || format === 'jpeg' || format === 'webp';
+}
+
+/** 导出扩展名（文件名拼装用）：jpeg → jpg，其余与格式名一致 */
+export function exportExtension(format: ExportFormat): string {
+  return format === 'jpeg' ? 'jpg' : format;
 }
 
 /** 合成文档：可选裁剪区域与缩放（缩略图用 0.x 缩放） */
@@ -62,6 +85,77 @@ export function downloadCanvas(
   options: ExportOptions,
 ): void {
   downloadDataUrl(canvasToDataUrl(canvas, options), filename);
+}
+
+/**
+ * 导出字节：原生格式走 canvas 编码，TIFF / GIF / PDF 走自研编码器。
+ *
+ * 统一返回 `Uint8Array`，调用方不必再关心「这个格式能不能用 toBlob」。
+ */
+export async function encodeExport(
+  canvas: HTMLCanvasElement,
+  options: ExportOptions,
+): Promise<Uint8Array> {
+  if (isNativeExportFormat(options.format)) {
+    const blob = await canvasToBlob(canvas, options);
+    if (blob) return new Uint8Array(await blob.arrayBuffer());
+    // 极端情况（内存不足等）：退回 data URL 解析，至少不把导出整个打断
+    const dataUrl = canvasToDataUrl(canvas, options);
+    const comma = dataUrl.indexOf(',');
+    return decodeBase64(dataUrl.slice(comma + 1));
+  }
+  const pixels = readPixels(canvas);
+  if (!pixels) return new Uint8Array();
+  switch (options.format) {
+    case 'tiff':
+      return encodeTiff(pixels, { alpha: hasTransparency(pixels) });
+    case 'gif':
+      return encodeGif(pixels, { alpha: hasTransparency(pixels) });
+    case 'pdf':
+      return encodePdf(pixels, { dpi: options.dpi ?? 72 });
+    default:
+      return new Uint8Array();
+  }
+}
+
+/**
+ * 导出并触发下载。
+ *
+ * 原生格式仍走 data URL（少一次 Blob 复制），自研编码器走 Blob 下载 ——
+ * 一条路径处理六种格式，避免调用方各写一遍分支。
+ */
+export async function downloadExport(
+  canvas: HTMLCanvasElement,
+  filename: string,
+  options: ExportOptions,
+): Promise<void> {
+  if (isNativeExportFormat(options.format)) {
+    downloadDataUrl(canvasToDataUrl(canvas, options), filename);
+    return;
+  }
+  const bytes = await encodeExport(canvas, options);
+  if (bytes.length === 0) return;
+  downloadBytes(bytes, filename, exportMime(options.format));
+}
+
+/** 读画布像素；拿不到上下文时返回 null（调用方按「导出失败」处理） */
+function readPixels(canvas: HTMLCanvasElement): {
+  data: ImageData['data'];
+  width: number;
+  height: number;
+} | null {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return { data: frame.data, width: frame.width, height: frame.height };
+}
+
+/** base64 → 字节（仅在 `toBlob` 失败时的兜底路径上用） */
+function decodeBase64(input: string): Uint8Array {
+  const binary = atob(input);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
+  return out;
 }
 
 /**

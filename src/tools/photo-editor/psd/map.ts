@@ -1,4 +1,4 @@
-import { flattenStack } from '../core';
+import { flattenStack, meshIsIdentity } from '../core';
 import type { BlendMode, Layer, PhotoDoc } from '../model/types';
 
 /**
@@ -17,9 +17,12 @@ const BLEND_TO_PSD: Record<BlendMode, string> = {
   multiply: 'multiply',
   screen: 'screen',
   overlay: 'overlay',
+  'soft-light': 'soft light',
+  'hard-light': 'hard light',
   darken: 'darken',
   lighten: 'lighten',
   'color-dodge': 'color dodge',
+  'color-burn': 'color burn',
   difference: 'difference',
   exclusion: 'exclusion',
   hue: 'hue',
@@ -32,7 +35,7 @@ export function mapBlendMode(mode: BlendMode): string {
   return BLEND_TO_PSD[mode] ?? 'normal';
 }
 
-export type PsdDegradeReason = 'adjustment' | 'smart' | 'text' | 'shape';
+export type PsdDegradeReason = 'adjustment' | 'smart' | 'text' | 'shape' | 'mesh';
 
 export interface PsdDegrade {
   layerId: string;
@@ -68,6 +71,8 @@ export interface PsdPlan {
 }
 
 function degradeReasonOf(layer: Layer): PsdDegradeReason | null {
+  // 网格变形在 PSD 里没有对应表达（PSD 只能存仿射变换）：像素被烘焙成位图，导出后不可再拖控制点
+  if (!meshIsIdentity(layer.mesh)) return 'mesh';
   if (layer.kind === 'adjustment') return 'adjustment';
   if (layer.kind === 'smart') return 'smart';
   if (layer.kind === 'text') return 'text';

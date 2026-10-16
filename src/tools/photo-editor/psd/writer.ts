@@ -1,11 +1,13 @@
 import { downloadBytes } from '@/core/pdf/download';
 import { clampRect, intersectRect } from '../core';
 import { createCanvasElement, getCanvas } from '../model/assets';
+import { meshPadding } from '../core';
 import { compositeLayers } from '../render/composite';
 import { bakeMask } from '../render/mask';
 import { compositeDoc } from '../render/export';
 import { buildPsdPlan, type PsdPlanNode } from './map';
-import type { PhotoDoc, Rect } from '../model/types';
+import { toPsdEffects } from './styleMap';
+import type { Layer, PhotoDoc, Rect } from '../model/types';
 
 /**
  * PSD 写出（只写不读）：让工程能在 Photoshop / Photopea 里继续编辑。
@@ -34,7 +36,14 @@ function renderNode(
 
   let box: Rect | null = null;
   for (const layer of layers) {
-    const rect = { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+    // 网格变形会把内容甩出图层盒：包围盒必须按最大位移扩张，否则导出结果被裁
+    const pad = meshPadding(layer.mesh, layer.width, layer.height);
+    const rect = {
+      x: layer.x - pad,
+      y: layer.y - pad,
+      width: layer.width + pad * 2,
+      height: layer.height + pad * 2,
+    };
     box = box
       ? {
           x: Math.min(box.x, rect.x),
@@ -53,7 +62,13 @@ function renderNode(
   });
   if (!region || region.width < 1 || region.height < 1) return null;
 
-  const canvas = compositeLayers(doc, layers, {
+  // PSD 的「用户蒙版」是独立通道，像素里不能再带一份，否则会叠加两次。
+  // 因此合成像素时摘掉像素蒙版（蒙版本身由 `maskFields` 写成可编辑通道）；
+  // 而矢量蒙版 / 图层样式 / 剪贴蒙版在 PSD 里没有对应通道，保持烘焙进像素。
+  const paintLayers = layers.map((layer) =>
+    layer.mask?.enabled ? ({ ...layer, mask: null } as Layer) : layer,
+  );
+  const canvas = compositeLayers(doc, paintLayers, {
     clip: region,
     background: 'none',
     signaturePrefix: `psd:${node.id}`,
@@ -63,6 +78,8 @@ function renderNode(
 
 interface AgLayer {
   name?: string;
+  /** 图层效果（`lfx2`）：由 `./styleMap.ts` 从我们的 `LayerStyle` 映射而来 */
+  effects?: ReturnType<typeof toPsdEffects>;
   top?: number;
   left?: number;
   bottom?: number;
@@ -96,6 +113,7 @@ function toAgLayers(doc: PhotoDoc, nodes: PsdPlanNode[]): AgLayer[] {
         opened: node.opened,
         children,
         ...maskFields(doc, node),
+        ...styleFields(doc, node),
       });
       continue;
     }
@@ -113,9 +131,23 @@ function toAgLayers(doc: PhotoDoc, nodes: PsdPlanNode[]): AgLayer[] {
       hidden: node.hidden,
       canvas: rendered.canvas,
       ...maskFields(doc, node),
+      ...styleFields(doc, node),
     });
   }
   return out;
+}
+
+/**
+ * 图层效果：把我们的 `LayerStyle` 写成 PSD 的图层效果（`lfx2`），在 Photoshop 里仍可继续调参。
+ *
+ * 只有「单一来源」的像素节点才写：合并节点（调整图层折进下方等）的效果已经烘焙进像素，
+ * 再写一份会在 PS 里叠加两次。
+ */
+function styleFields(doc: PhotoDoc, node: PsdPlanNode): Pick<AgLayer, 'effects'> {
+  if (node.kind === 'pixel' && node.sources.length !== 1) return {};
+  const layer = doc.layers.find((item) => item.id === node.id);
+  const effects = toPsdEffects(layer?.style);
+  return effects ? { effects } : {};
 }
 
 /** 蒙版：用 `bakeMask` 的输出——灰度已转成 alpha，正是 PSD 蒙版通道需要的形式 */

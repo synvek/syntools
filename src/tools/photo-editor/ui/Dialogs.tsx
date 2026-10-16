@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CANVAS_PRESETS } from '../core';
+import { CANVAS_PRESETS, MAX_CANVAS_SIZE, MIN_CANVAS_SIZE } from '../core';
 import { createNewDoc } from '../model/factory';
 import type { ExportFormat } from '../render/export';
 import { Button, Field, NumberInput, Select, Slider } from './controls';
@@ -112,7 +112,127 @@ export function NewCanvasDialog({
   );
 }
 
+/**
+ * 画布大小 / 背景：修改现有画布的尺寸与背景色。
+ * 只改变画布范围（图层内容不平移也不缩放），与「新建画布」是两条不同的路径。
+ */
+export function CanvasSizeDialog({
+  width,
+  height,
+  background,
+  onClose,
+  onApply,
+}: {
+  width: number;
+  height: number;
+  background: CanvasBackground;
+  onClose: () => void;
+  onApply: (width: number, height: number, background: CanvasBackground) => void;
+}) {
+  const { t } = useTranslation();
+  const [w, setW] = useState(width);
+  const [h, setH] = useState(height);
+  const [bg, setBg] = useState<CanvasBackground>(background);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = () => {
+    const inRange = (value: number) => value >= MIN_CANVAS_SIZE && value <= MAX_CANVAS_SIZE;
+    if (!inRange(w) || !inRange(h)) {
+      setError(t('tools.photo.err.INVALID_SIZE', { min: MIN_CANVAS_SIZE, max: MAX_CANVAS_SIZE }));
+      return;
+    }
+    onApply(Math.round(w), Math.round(h), bg);
+    onClose();
+  };
+
+  return (
+    <div
+      className={OVERLAY_CLASS}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('tools.photo.canvasSize')}
+    >
+      <div className={PANEL_CLASS}>
+        <h2 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-100">
+          {t('tools.photo.canvasSize')}
+        </h2>
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Field label={t('tools.photo.widthLabel')}>
+              <NumberInput
+                ariaLabel={t('tools.photo.widthLabel')}
+                value={w}
+                min={MIN_CANVAS_SIZE}
+                max={MAX_CANVAS_SIZE}
+                onChange={setW}
+              />
+            </Field>
+            <Field label={t('tools.photo.heightLabel')}>
+              <NumberInput
+                ariaLabel={t('tools.photo.heightLabel')}
+                value={h}
+                min={MIN_CANVAS_SIZE}
+                max={MAX_CANVAS_SIZE}
+                onChange={setH}
+              />
+            </Field>
+          </div>
+          <Field label={t('tools.photo.background')}>
+            <Select
+              ariaLabel={t('tools.photo.background')}
+              value={bg}
+              options={[
+                { id: 'white', label: t('tools.photo.bgWhite') },
+                { id: 'black', label: t('tools.photo.bgBlack') },
+                { id: 'transparent', label: t('tools.photo.bgTransparent') },
+              ]}
+              onChange={(value: CanvasBackground) => setBg(value)}
+            />
+          </Field>
+          {error ? (
+            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+              {error}
+            </p>
+          ) : null}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button onClick={onClose}>{t('tools.photo.cancel')}</Button>
+          <Button onClick={submit} primary>
+            {t('tools.photo.create')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** 导出图片：格式 / 质量 / 是否仅导出选区 */
+/** 导出对话框回传的参数（含仅 PDF 使用的 dpi） */
+export interface ExportSubmit {
+  format: ExportFormat;
+  /** 0~1 */
+  quality: number;
+  selectionOnly: boolean;
+  dpi: number;
+}
+
+/** 格式名是专有名词，直接按原名展示；顺序按「常用 → 专用」排列 */
+const EXPORT_FORMATS: { id: ExportFormat; label: string }[] = [
+  { id: 'png', label: 'PNG' },
+  { id: 'jpeg', label: 'JPEG' },
+  { id: 'webp', label: 'WEBP' },
+  { id: 'tiff', label: 'TIFF' },
+  { id: 'gif', label: 'GIF' },
+  { id: 'pdf', label: 'PDF' },
+];
+
+/** PDF 页面尺寸换算基准（像素 → 点） */
+const PDF_DPI_OPTIONS = [
+  { id: '72', label: '72' },
+  { id: '150', label: '150' },
+  { id: '300', label: '300' },
+];
+
 export function ExportDialog({
   hasSelection,
   onClose,
@@ -122,13 +242,14 @@ export function ExportDialog({
 }: {
   hasSelection: boolean;
   onClose: () => void;
-  onExport: (format: ExportFormat, quality: number, selectionOnly: boolean) => void;
+  onExport: (options: ExportSubmit) => void;
   onExportPsd: () => void;
   psdBusy?: boolean;
 }) {
   const { t } = useTranslation();
   const [format, setFormat] = useState<ExportFormat>('png');
   const [quality, setQuality] = useState(90);
+  const [dpi, setDpi] = useState(72);
   const [selectionOnly, setSelectionOnly] = useState(hasSelection);
 
   return (
@@ -147,15 +268,11 @@ export function ExportDialog({
             <Select
               ariaLabel={t('tools.photo.format')}
               value={format}
-              options={[
-                { id: 'png', label: 'PNG' },
-                { id: 'jpeg', label: 'JPEG' },
-                { id: 'webp', label: 'WEBP' },
-              ]}
+              options={EXPORT_FORMATS}
               onChange={(value: ExportFormat) => setFormat(value)}
             />
           </Field>
-          {format !== 'png' ? (
+          {format === 'jpeg' || format === 'webp' ? (
             <Slider
               label={t('tools.photo.quality')}
               value={quality}
@@ -164,6 +281,21 @@ export function ExportDialog({
               step={5}
               onChange={setQuality}
             />
+          ) : null}
+          {format === 'pdf' ? (
+            <Field label={t('tools.photo.exportDpi')}>
+              <Select
+                ariaLabel={t('tools.photo.exportDpi')}
+                value={String(dpi)}
+                options={PDF_DPI_OPTIONS}
+                onChange={(value: string) => setDpi(Number(value))}
+              />
+            </Field>
+          ) : null}
+          {format === 'gif' ? (
+            <p className="text-[10px] leading-4 text-gray-400 dark:text-gray-500">
+              {t('tools.photo.exportGifHint')}
+            </p>
           ) : null}
           <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
             <input
@@ -192,7 +324,10 @@ export function ExportDialog({
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={onClose}>{t('tools.photo.cancel')}</Button>
-          <Button onClick={() => onExport(format, quality / 100, selectionOnly)} primary>
+          <Button
+            onClick={() => onExport({ format, quality: quality / 100, selectionOnly, dpi })}
+            primary
+          >
             {t('tools.photo.download')}
           </Button>
         </div>

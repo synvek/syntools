@@ -1,8 +1,14 @@
 import { createCanvasElement } from '../model/assets';
-import { bakeSignature, intersectRect, maskSignature, subtreeIdsOf } from '../core';
+import {
+  NO_ADJUSTMENTS,
+  bakeSignature,
+  maskSignature,
+  styleSignature,
+  subtreeIdsOf,
+  vectorMaskSignature,
+} from '../core';
 import { bakeRaster } from './filters';
-import { applyMask } from './mask';
-import { paintLayer } from './paint';
+import { clipBaseOf, layerNeedsComposite, paintLayer } from './paint';
 import type { AdjustmentLayer, GroupLayer, Layer, PhotoDoc, Rect } from '../model/types';
 
 /**
@@ -51,12 +57,21 @@ export function compositeLayers(
     if (layer.kind === 'group') {
       // 穿透模式下子图层各自混合，由调用方（层栈展开）逐个绘制
       if (layer.passThrough || !layer.visible) continue;
-      const composed = groupComposite(doc, layer);
-      ctx.save();
-      ctx.globalAlpha = layer.opacity;
-      ctx.globalCompositeOperation = layer.blend === 'normal' ? 'source-over' : layer.blend;
-      ctx.drawImage(composed, 0, 0, doc.width, doc.height);
-      ctx.restore();
+      if (!layerNeedsComposite(layer)) {
+        // 无蒙版 / 无样式的快路径：整组先合成成一张图，再按本组的透明度与混合模式整体绘制
+        ctx.save();
+        ctx.globalAlpha = layer.opacity;
+        ctx.globalCompositeOperation = layer.blend === 'normal' ? 'source-over' : layer.blend;
+        ctx.drawImage(groupComposite(doc, layer), 0, 0, doc.width, doc.height);
+        ctx.restore();
+        continue;
+      }
+      // 有蒙版 / 图层样式 / 剪贴蒙版：统一走 `paintLayer` 的合成路径，保证与预览一致
+      paintLayer(ctx, layer, {
+        doc,
+        signaturePrefix: options.signaturePrefix ?? 'composite',
+        clipBase: clipBaseOf(doc, layer),
+      });
       continue;
     }
     if (layer.kind === 'adjustment') {
@@ -65,7 +80,11 @@ export function compositeLayers(
       applyAdjustment(canvas, ctx, layer, region, scale, options.signaturePrefix);
       continue;
     }
-    paintLayer(ctx, layer, { signaturePrefix: options.signaturePrefix ?? 'composite' });
+    paintLayer(ctx, layer, {
+      doc,
+      signaturePrefix: options.signaturePrefix ?? 'composite',
+      clipBase: clipBaseOf(doc, layer),
+    });
   }
   return canvas;
 }
@@ -98,7 +117,9 @@ export function groupCompositeKey(doc: PhotoDoc, group: GroupLayer): string {
     const adjust =
       layer.kind === 'raster' || layer.kind === 'adjustment'
         ? bakeSignature('', rev, layer.adjustments ?? ({} as never), layer.filters ?? [])
-        : '';
+        : layer.kind === 'smart'
+          ? bakeSignature('', 0, layer.adjustments ?? NO_ADJUSTMENTS, layer.filters ?? [])
+          : '';
     parts.push(
       [
         layer.id,
@@ -115,45 +136,13 @@ export function groupCompositeKey(doc: PhotoDoc, group: GroupLayer): string {
         layer.flipY ? 1 : 0,
         adjust,
         maskSignature(layer) ?? '',
+        vectorMaskSignature(layer.vectorMask),
+        layer.clipped ? 1 : 0,
+        styleSignature(layer.style),
       ].join(','),
     );
   }
   return parts.join('|');
-}
-
-/**
- * 带蒙版图层的合成结果：把该图层画到「自身包围盒 ∩ 画布」的区域里，再套蒙版。
- * 只裁剪到需要的范围，避免每个蒙版都开一张整画布大小的位图。
- */
-export function maskedLayerCanvas(doc: PhotoDoc, layer: Layer): HTMLCanvasElement | null {
-  const mask = layer.mask;
-  if (!mask || !mask.enabled) return null;
-  const region = intersectRect(
-    { x: layer.x, y: layer.y, width: layer.width, height: layer.height },
-    { x: 0, y: 0, width: doc.width, height: doc.height },
-  ) ?? { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
-  const canvas = createCanvasElement(region.width, region.height);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.translate(-region.x, -region.y);
-  paintLayer(ctx, layer, { doc, signaturePrefix: 'mask' });
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  applyMask(canvas, mask, maskSignature(layer) ?? `${mask.assetId}:${mask.rev}`, {
-    x: layer.x - region.x,
-    y: layer.y - region.y,
-    width: layer.width,
-    height: layer.height,
-  });
-  return canvas;
-}
-
-/** 蒙版图层的落位（合成结果的左上角，文档坐标） */
-export function maskedLayerOrigin(doc: PhotoDoc, layer: Layer): { x: number; y: number } {
-  const region = intersectRect(
-    { x: layer.x, y: layer.y, width: layer.width, height: layer.height },
-    { x: 0, y: 0, width: doc.width, height: doc.height },
-  ) ?? { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
-  return { x: region.x, y: region.y };
 }
 
 const groupCache = new Map<string, HTMLCanvasElement>();
@@ -172,7 +161,8 @@ function applyAdjustment(
   signaturePrefix = 'composite',
 ): void {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const signature = `${signaturePrefix}:adj:${layer.id}:${layer.adjustments.brightness}:${layer.adjustments.contrast}:${layer.adjustments.saturation}:${layer.adjustments.hue}:${layer.adjustments.temperature}:${layer.adjustments.exposure}:${layer.adjustments.sharpen}:${layer.filters.join('+')}`;
+  // 签名复用 bakeSignature：扩展调整与滤镜参数一并参与，缓存不会串味
+  const signature = `${signaturePrefix}:adj:${layer.id}:${bakeSignature('', 0, layer.adjustments, layer.filters)}`;
   const baked = bakeRaster(canvas, signature, layer.adjustments, layer.filters);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(baked, 0, 0);
@@ -235,9 +225,14 @@ export function docSignature(doc: PhotoDoc): string {
         layer.kind === 'group' ? (layer.passThrough ? 1 : 0) : 0,
         layer.kind === 'raster' || layer.kind === 'adjustment'
           ? bakeSignature('', 0, layer.adjustments ?? ({} as never), layer.filters ?? [])
-          : '',
+          : layer.kind === 'smart'
+            ? bakeSignature('', 0, layer.adjustments ?? NO_ADJUSTMENTS, layer.filters ?? [])
+            : '',
         layer.kind === 'text' ? `${layer.text}:${layer.fontSize}` : '',
         maskSignature(layer) ?? '',
+        vectorMaskSignature(layer.vectorMask),
+        layer.clipped ? 1 : 0,
+        styleSignature(layer.style),
       ].join(','),
     );
   }

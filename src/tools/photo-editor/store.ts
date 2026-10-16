@@ -1,15 +1,48 @@
 import { create } from 'zustand';
 import {
+  MAX_RETOUCH_STRENGTH,
+  MAX_SAMPLES,
+  MAX_VECTOR_CONTOURS,
+  WARP_COLS,
+  WARP_ROWS,
+  applyTransformDelta,
+  createMesh,
+  MAX_VECTOR_FEATHER,
+  clampBrushSize,
   clampRect,
+  clipBaseIndex,
+  clampSpacing,
   clampUnit,
+  createColorOverlay,
+  selectionToVectorContours,
+  createDropShadow,
+  createInnerShadow,
+  createOuterGlow,
+  createStroke,
   fullSelection,
+  hexToRgb,
   intersectRect,
   invertSelection,
   moveSubtree,
+  normalizeViewRotation,
   polygonBounds,
-  selectionPolygon,
+  rgbToHex,
+  selectionFromMask,
   simplifyPath,
 } from './core';
+import type {
+  BrushPreset,
+  ChannelView,
+  GradientKind,
+  GradientMode,
+  SamplePoint,
+  SnapGuide,
+  StyleEffectId,
+  TransformDelta,
+  TransformMode,
+} from './core';
+import { loadBrushPresets, saveBrushPresets } from './brushes';
+import { normalizeLayerStyle } from './model/migrate';
 import {
   cloneAsset,
   collectUsedAssets,
@@ -19,7 +52,12 @@ import {
   releaseExcept,
 } from './model/assets';
 import { paintSelection } from './render/brush';
-import { rasterizeSelection } from './render/export';
+import { channelViewCanvas, extractDocPalette } from './render/channels';
+import { clearMeshCache } from './render/mesh';
+import { clearWarpCache } from './render/warp';
+import { compositeDoc, rasterizeSelection } from './render/export';
+import { applySelectionOp, modifySelection as modifySelectionRaster } from './render/selection';
+import type { SelectionModify, SelectionOp } from './render/selection';
 import { paintDoc, paintLayer } from './render/paint';
 import {
   cloneDoc,
@@ -36,19 +74,25 @@ import {
   createTextLayer,
 } from './model/factory';
 import { createBlankAsset } from './model/assets';
-import { createMaskCanvas, createMaskCanvasFromPolygon } from './render/mask';
+import { createMaskCanvas, createMaskCanvasFromSelection } from './render/mask';
 import type {
+  AlignMode,
   HistoryEntry,
   HistoryLabel,
   MaskRef,
   Layer,
+  LayerStyle,
   PhotoDoc,
   Rect,
   Selection,
   ShapeKind,
   ToolId,
+  VectorMaskRef,
+  ViewOverlay,
   Viewport,
 } from './model/types';
+import { defaultPanelLayout, normalizePanelLayout } from './panels';
+import type { PanelId, PanelLayout } from './panels';
 
 /**
  * 照片编辑器状态：唯一真相源是 `doc`，其余（当前工具 / 选区 / 视口 / 历史）是会话态。
@@ -59,15 +103,47 @@ import type {
  */
 
 const HISTORY_LIMIT = 24;
+
+/** 文档色板容量上限 */
+const MAX_SWATCHES = 32;
+
+/** 图层样式各效果的默认参数（新增效果时使用，默认启用） */
+const STYLE_DEFAULTS: Record<StyleEffectId, () => NonNullable<LayerStyle[StyleEffectId]>> = {
+  dropShadow: createDropShadow,
+  innerShadow: createInnerShadow,
+  outerGlow: createOuterGlow,
+  stroke: createStroke,
+  colorOverlay: createColorOverlay,
+};
 /** 缩放下限：允许缩到 2% 以观察超大画布全貌，但不会把「待适配」哨兵值也钳到这里 */
 const MIN_ZOOM = 0.02;
 
 export interface BrushConfig {
+  /** 前景色 */
   color: string;
+  /** 背景色（渐变工具的第二个端点 / 前景↔背景切换用） */
+  background: string;
   size: number;
   /** 0~1，1 为硬边 */
   hardness: number;
   opacity: number;
+  /** 落笔间距（相对直径）：越小越连续 */
+  spacing: number;
+  /** 压感控制笔触大小 */
+  pressureSize: boolean;
+  /** 压感控制不透明度 */
+  pressureOpacity: boolean;
+}
+
+/**
+ * 快速蒙版：以「一张灰度画布」临时替代选区 —— 白 = 选中、黑 = 未选中。
+ *
+ * 与选区的关系：进入时按当前选区初始化，退出时按亮度阈值转回选区。
+ * `rev` 用于让视图层知道画布变了（画笔直接改写画布，不经过 React）。
+ */
+interface QuickMaskState {
+  assetId: string;
+  rev: number;
 }
 
 interface PhotoState {
@@ -79,23 +155,86 @@ interface PhotoState {
   selection: Selection | null;
   cropRect: Rect | null;
   viewport: Viewport;
+  /** 辅助视图（标尺 / 网格 / 参考线），视图态，不进历史 */
+  overlay: ViewOverlay;
   clipboard: Layer | null;
   /** 历史：快照 + 操作名 + 时间（面板按此展示，可跳转） */
   past: HistoryEntry[];
   future: HistoryEntry[];
+  /** 右侧面板布局（视图态，不进文档历史） */
+  panels: PanelLayout;
+  /** 油漆桶：容差 / 是否只填充连通区域 */
+  fillTolerance: number;
+  fillContiguous: boolean;
+  /** 渐变工具：形状与端点组合 */
+  gradientKind: GradientKind;
+  gradientMode: GradientMode;
+  /** 润饰 / 修复工具族（减淡加深海绵、图章、修复、涂抹、模糊锐化）：笔头大小与强度 */
+  retouchSize: number;
+  retouchStrength: number;
+  /** 自定义画笔预设（持久化） */
+  brushPresets: BrushPreset[];
+  /** 最近使用颜色（会话态） */
+  recentColors: string[];
 
   loadDoc: (doc: PhotoDoc) => void;
   resetDoc: () => void;
   setDocName: (name: string) => void;
   setBackground: (background: PhotoDoc['background']) => void;
   resizeCanvas: (width: number, height: number) => void;
+  /** 一次性应用画布尺寸与背景（单次历史提交，供「画布大小」/ 文档属性使用） */
+  applyCanvas: (width: number, height: number, background: PhotoDoc['background']) => void;
+
+  /**
+   * 设置图层样式某一效果的参数（效果不存在时按默认值创建）；值会被钳制到合法区间。
+   * `history = false` 用于滑杆拖动中：与 AdjustPanel 同一约定，避免每一帧都压一条历史。
+   */
+  setLayerStyle: (
+    id: string,
+    effect: StyleEffectId,
+    patch: Record<string, string | number | boolean>,
+    history?: boolean,
+  ) => void;
+  /** 添加 / 启停某一效果 */
+  toggleLayerStyle: (id: string, effect: StyleEffectId) => void;
+  /** 移除某一效果 */
+  removeLayerStyle: (id: string, effect: StyleEffectId) => void;
+  /** 清空整份图层样式 */
+  clearLayerStyle: (id: string) => void;
 
   setTool: (tool: ToolId) => void;
   patchBrush: (patch: Partial<BrushConfig>) => void;
   setEraserSize: (size: number) => void;
   setShapeKind: (kind: ShapeKind) => void;
+  /** 油漆桶设置 */
+  setFill: (patch: { tolerance?: number; contiguous?: boolean }) => void;
+  /** 渐变工具设置 */
+  setGradient: (patch: { kind?: GradientKind; mode?: GradientMode }) => void;
+  /** 润饰工具设置 */
+  setRetouch: (patch: { size?: number; strength?: number }) => void;
+  /** 前景 / 背景色互换（快捷键 X） */
+  swapColors: () => void;
+  /** 复位为黑前景 / 白背景（快捷键 D） */
+  resetColors: () => void;
+  /** 记录最近使用的颜色（去重，最多 12 个） */
+  pushRecentColor: (color: string) => void;
+  /** 保存当前画笔参数为自定义预设 */
+  saveBrushPreset: (name: string) => void;
+  removeBrushPreset: (id: string) => void;
+  /** 应用预设到当前画笔 */
+  applyBrushPreset: (preset: BrushPreset) => void;
 
   setSelection: (selection: Selection | null) => void;
+  /** 按布尔运算合并选区（加选 / 减选 / 交集 / 替换） */
+  applySelection: (next: Selection, op: SelectionOp) => void;
+  /** 改当前选区的羽化半径 */
+  setSelectionFeather: (feather: number) => void;
+  /** 选区形态学修改：扩展 / 收缩 / 平滑 */
+  modifySelection: (mode: SelectionModify, amount: number) => void;
+  /** 魔棒设置 */
+  wandTolerance: number;
+  wandContiguous: boolean;
+  setWand: (patch: { tolerance?: number; contiguous?: boolean }) => void;
   /** 全选（Ctrl+A） */
   selectAll: () => void;
   /** 反选：画布外框 + 原选区内框（奇偶规则） */
@@ -109,6 +248,8 @@ interface PhotoState {
 
   setViewport: (patch: Partial<Viewport>) => void;
   setScale: (scale: number) => void;
+  /** 辅助视图：合并式更新（标尺 / 网格 / 参考线） */
+  patchOverlay: (patch: Partial<ViewOverlay>) => void;
 
   selectLayer: (id: string | null) => void;
   addLayer: (layer: Layer) => void;
@@ -126,6 +267,14 @@ interface PhotoState {
   /** 把图层（连同子树）移入编组；groupId 为 null 表示移到顶层 */
   moveIntoGroup: (layerId: string, groupId: string | null) => void;
   toggleGroupExpanded: (id: string) => void;
+  /** 用当前选区创建矢量蒙版（轮廓转为图层局部坐标，与分辨率无关） */
+  addVectorMask: (id: string) => void;
+  /** 矢量蒙版参数：启停 / 反相 / 羽化 */
+  patchVectorMask: (id: string, patch: Partial<VectorMaskRef>, history?: boolean) => void;
+  removeVectorMask: (id: string) => void;
+  /** 创建 / 释放剪贴蒙版（PS 的 ⌘⌥G）；下方没有可作基准的图层时不生效 */
+  toggleClipping: (id: string) => boolean;
+
   /** 给图层加蒙版：show = 全部显示，hide = 全部隐藏，selection = 按当前选区 */
   /** 新建调整图层（置于最上层，作用于其下方全部内容） */
   addAdjustment: () => string | null;
@@ -139,11 +288,79 @@ interface PhotoState {
   patchMask: (id: string, patch: Partial<MaskRef>, history?: boolean) => void;
   /** 蒙版像素级快照（绘制前调用） */
   commitMask: (id: string) => void;
+  /** 旋转视图（度，视图态，不进历史） */
+  viewRotation: number;
+  /** 相对当前角度继续旋转（菜单按 15° 步进） */
+  rotateView: (delta: number) => void;
+  setViewRotation: (degrees: number) => void;
+  resetViewRotation: () => void;
+
+  /** 对齐吸附开关（视图态，默认开） */
+  snapEnabled: boolean;
+  setSnapEnabled: (value: boolean) => void;
+  /** 当前正在生效的吸附参考线（拖拽过程中显示，松手即清空） */
+  snapGuides: SnapGuide[];
+  setSnapGuides: (guides: SnapGuide[]) => void;
+
+  /** 图章 / 修复的取样点（文档坐标，会话态） */
+  cloneSource: { x: number; y: number } | null;
+  setCloneSource: (point: { x: number; y: number } | null) => void;
+  /** 自由变换模式：自由 / 透视 / 扭曲 / 斜切 / 变形 */
+  transformMode: TransformMode;
+  setTransformMode: (mode: TransformMode) => void;
+  /** 清空当前图层的网格变形 */
+  resetMesh: (layerId?: string) => void;
+  /** 上一次变换的增量（⌘⇧T「再次变换」用） */
+  lastTransform: TransformDelta | null;
+  /** 记录一次变换（由交互层在松手时提交） */
+  recordTransform: (delta: TransformDelta | null) => void;
+  /** 再次变换：把上次的增量再作用到当前图层 */
+  repeatTransform: () => void;
+
+  /** 快速蒙版会话（null = 未进入） */
+  quickMask: QuickMaskState | null;
+  /** 进入快速蒙版：以当前选区初始化（无选区则全为「未选中」） */
+  enterQuickMask: () => void;
+  /** 退出快速蒙版：按亮度阈值把蒙版转回选区 */
+  exitQuickMask: () => void;
+  /** Q 键切换 */
+  toggleQuickMask: () => void;
+  /** 蒙版被涂抹后提交一次视觉刷新 */
+  bumpQuickMask: () => void;
+
+  /** 通道隔离显示（仅影响画布呈现，不改文档） */
+  channelView: ChannelView;
+  setChannelView: (view: ChannelView) => void;
+  /** 把当前隔离通道的亮部载入为选区（阈值 128）；处于复合视图时不生效 */
+  loadChannelSelection: () => void;
+  /** 颜色取样点（会话态，最多 `MAX_SAMPLES` 个） */
+  samples: SamplePoint[];
+  /** 在文档坐标处取样；超过上限时挤掉最早的一个 */
+  addSample: (x: number, y: number) => void;
+  removeSample: (index: number) => void;
+  clearSamples: () => void;
+  /** 文档色板（随工程保存） */
+  addSwatch: (color: string) => void;
+  removeSwatch: (index: number) => void;
+  /** 从当前画面提取主色并并入色板 */
+  extractSwatches: () => void;
+
   /** 画笔是否写入蒙版（而非图层本体） */
   maskEditing: boolean;
   setMaskEditing: (value: boolean) => void;
+  /** 面板布局：整体替换 / 折叠 / 展开 / 显隐 / 上移下移 / 复位 */
+  setPanels: (layout: PanelLayout) => void;
+  togglePanelCollapsed: (id: PanelId) => void;
+  expandPanel: (id: PanelId) => void;
+  togglePanelVisible: (id: PanelId) => void;
+  movePanel: (id: PanelId, dir: -1 | 1) => void;
+  resetPanels: () => void;
   setGroupPassThrough: (id: string, passThrough: boolean) => void;
   reorderLayer: (id: string, toIndex: number) => void;
+  /** 在「同一父级」内上移 / 下移一层（不跨编组边界） */
+  moveLayer: (id: string, dir: -1 | 1) => void;
+  /** 把当前选中图层对齐到画布 */
+  alignLayer: (mode: AlignMode) => void;
   mergeDown: (id: string) => void;
   flattenVisible: () => void;
   copyLayer: () => void;
@@ -178,8 +395,15 @@ function repairRasterAsset(get: () => PhotoState, id: string): string {
   return id;
 }
 
-/** 历史中被引用到的资产：回收时必须一并保留，否则撤销会拿到已释放的画布 */
-function usedAssetsAcrossHistory(state: Pick<PhotoState, 'doc' | 'past' | 'future'>): Set<string> {
+/**
+ * 历史中被引用到的资产：回收时必须一并保留，否则撤销会拿到已释放的画布。
+ * 快速蒙版画布也在这里登记 —— 它不属于任何文档，但撤销 / 重做期间仍然要能继续涂抹。
+ */
+function usedAssetsAcrossHistory(
+  state: Pick<PhotoState, 'doc' | 'past' | 'future'> & {
+    quickMask?: { assetId: string } | null;
+  },
+): Set<string> {
   const used = new Set<string>();
   const collect = (doc: PhotoDoc) => {
     for (const id of collectUsedAssets(doc.layers)) used.add(id);
@@ -187,22 +411,51 @@ function usedAssetsAcrossHistory(state: Pick<PhotoState, 'doc' | 'past' | 'futur
   collect(state.doc);
   for (const entry of state.past) collect(entry.doc);
   for (const entry of state.future) collect(entry.doc);
+  if (state.quickMask) used.add(state.quickMask.assetId);
   return used;
 }
 
 export const usePhotoStore = create<PhotoState>((set, get) => ({
   doc: createDoc(),
   tool: 'move',
-  brush: { color: '#111827', size: 12, hardness: 0.9, opacity: 1 },
+  brush: {
+    color: '#111827',
+    background: '#FFFFFF',
+    size: 12,
+    hardness: 0.9,
+    opacity: 1,
+    spacing: 0.1,
+    pressureSize: false,
+    pressureOpacity: false,
+  },
   eraserSize: 24,
   shapeKind: 'rect',
   selection: null,
   cropRect: null,
   viewport: { scale: 0, x: 0, y: 0 },
+  overlay: { rulers: false, grid: false, gridSize: 40, guides: [] },
   clipboard: null,
   maskEditing: false,
   past: [],
   future: [],
+  panels: defaultPanelLayout(),
+  fillTolerance: 32,
+  fillContiguous: true,
+  gradientKind: 'linear',
+  gradientMode: 'fg-transparent',
+  retouchSize: 60,
+  retouchStrength: 30,
+  brushPresets: loadBrushPresets(),
+  recentColors: [],
+  channelView: 'rgb',
+  samples: [],
+  quickMask: null,
+  transformMode: 'free',
+  lastTransform: null,
+  cloneSource: null,
+  snapEnabled: true,
+  snapGuides: [],
+  viewRotation: 0,
 
   loadDoc: (doc) => {
     set((s) => ({
@@ -214,6 +467,9 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       future: [],
     }));
     releaseExcept(usedAssetsAcrossHistory(get()));
+    // 换文档后旧文档的变形位图不会再被命中，主动清掉避免白白占内存
+    clearMeshCache();
+    clearWarpCache();
   },
 
   resetDoc: () => {
@@ -236,6 +492,78 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     set((s) => ({ doc: { ...s.doc, width, height } }));
   },
 
+  applyCanvas: (width, height, background) => {
+    const current = get().doc;
+    if (current.width === width && current.height === height && current.background === background) {
+      return;
+    }
+    get().commit('histResize');
+    set((s) => ({ doc: { ...s.doc, width, height, background } }));
+  },
+
+  setLayerStyle: (id, effect, patch, history = true) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer) return;
+    if (history) state.commit('histStyle');
+    const current = layer.style?.[effect] ?? STYLE_DEFAULTS[effect]();
+    const merged = { ...(layer.style ?? {}), [effect]: { ...current, ...patch } };
+    const style = normalizeLayerStyle(merged);
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        layers: s.doc.layers.map((item) => (item.id === id ? { ...item, style } : item)),
+      },
+    }));
+  },
+
+  toggleLayerStyle: (id, effect) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer) return;
+    state.commit('histStyle');
+    const current = layer.style?.[effect] ?? STYLE_DEFAULTS[effect]();
+    const style = normalizeLayerStyle({
+      ...(layer.style ?? {}),
+      [effect]: { ...current, enabled: !current.enabled },
+    });
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        layers: s.doc.layers.map((item) => (item.id === id ? { ...item, style } : item)),
+      },
+    }));
+  },
+
+  removeLayerStyle: (id, effect) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer?.style) return;
+    state.commit('histStyle');
+    const next: LayerStyle = { ...layer.style };
+    delete next[effect];
+    const style = normalizeLayerStyle(next);
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        layers: s.doc.layers.map((item) => (item.id === id ? { ...item, style } : item)),
+      },
+    }));
+  },
+
+  clearLayerStyle: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer?.style) return;
+    state.commit('histStyle');
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        layers: s.doc.layers.map((item) => (item.id === id ? { ...item, style: null } : item)),
+      },
+    }));
+  },
+
   setTool: (tool) =>
     set((s) => ({
       tool,
@@ -249,13 +577,117 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         ...s.brush,
         ...patch,
         ...(patch.opacity !== undefined ? { opacity: clampUnit(patch.opacity) } : {}),
+        ...(patch.hardness !== undefined ? { hardness: clampUnit(patch.hardness) } : {}),
+        ...(patch.spacing !== undefined ? { spacing: clampSpacing(patch.spacing) } : {}),
+        ...(patch.size !== undefined ? { size: clampBrushSize(patch.size) } : {}),
       },
     })),
 
   setEraserSize: (size) => set({ eraserSize: size }),
   setShapeKind: (kind) => set({ shapeKind: kind }),
 
+  setFill: (patch) =>
+    set((s) => ({
+      fillTolerance:
+        patch.tolerance === undefined
+          ? s.fillTolerance
+          : Math.max(0, Math.min(255, Math.round(patch.tolerance))),
+      fillContiguous: patch.contiguous ?? s.fillContiguous,
+    })),
+
+  setGradient: (patch) =>
+    set((s) => ({
+      gradientKind: patch.kind ?? s.gradientKind,
+      gradientMode: patch.mode ?? s.gradientMode,
+    })),
+
+  setRetouch: (patch) =>
+    set((s) => ({
+      retouchSize: patch.size === undefined ? s.retouchSize : clampBrushSize(patch.size),
+      retouchStrength:
+        patch.strength === undefined
+          ? s.retouchStrength
+          : Math.max(1, Math.min(MAX_RETOUCH_STRENGTH, Math.round(patch.strength))),
+    })),
+
+  swapColors: () =>
+    set((s) => ({ brush: { ...s.brush, color: s.brush.background, background: s.brush.color } })),
+
+  resetColors: () =>
+    set((s) => ({ brush: { ...s.brush, color: '#000000', background: '#FFFFFF' } })),
+
+  pushRecentColor: (color) => {
+    const value = color.toUpperCase();
+    set((s) => ({
+      recentColors: [value, ...s.recentColors.filter((item) => item !== value)].slice(0, 12),
+    }));
+  },
+
+  saveBrushPreset: (name) => {
+    const { brush, brushPresets } = get();
+    const preset: BrushPreset = {
+      id: createId('brush'),
+      name: name.trim() || `#${brushPresets.length + 1}`,
+      size: brush.size,
+      hardness: brush.hardness,
+      opacity: brush.opacity,
+      spacing: brush.spacing,
+    };
+    const next = [...brushPresets, preset].slice(0, 12);
+    saveBrushPresets(next);
+    set({ brushPresets: next });
+  },
+
+  removeBrushPreset: (id) => {
+    const next = get().brushPresets.filter((item) => item.id !== id);
+    saveBrushPresets(next);
+    set({ brushPresets: next });
+  },
+
+  applyBrushPreset: (preset) =>
+    set((s) => ({
+      brush: {
+        ...s.brush,
+        size: clampBrushSize(preset.size),
+        hardness: clampUnit(preset.hardness),
+        opacity: clampUnit(preset.opacity),
+        spacing: clampSpacing(preset.spacing),
+      },
+    })),
+
   setSelection: (selection) => set({ selection }),
+
+  applySelection: (next, op) => {
+    const state = get();
+    const feather = state.selection?.feather ?? next.feather;
+    const result = applySelectionOp(state.selection, next, op, state.doc);
+    set({ selection: result ? { ...result, feather } : null });
+  },
+
+  setSelectionFeather: (feather) =>
+    set((s) =>
+      s.selection
+        ? { selection: { ...s.selection, feather: Math.max(0, Math.round(feather)) } }
+        : {},
+    ),
+
+  modifySelection: (mode, amount) =>
+    set((s) => {
+      if (!s.selection) return {};
+      const result = modifySelectionRaster(s.selection, mode, amount, s.doc);
+      return { selection: result ? { ...result, feather: s.selection.feather } : null };
+    }),
+
+  wandTolerance: 32,
+  wandContiguous: true,
+  setWand: (patch) =>
+    set((s) => ({
+      wandTolerance:
+        patch.tolerance === undefined
+          ? s.wandTolerance
+          : Math.max(0, Math.min(255, Math.round(patch.tolerance))),
+      wandContiguous: patch.contiguous ?? s.wandContiguous,
+    })),
 
   selectAll: () => set((s) => ({ selection: fullSelection(s.doc) })),
 
@@ -281,6 +713,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       state.selection,
       mode,
       mode === 'clear' ? '#000000' : state.brush.color,
+      mode === 'fill' && Boolean(layer.lockAlpha),
     );
     if (changed) get().bumpRev(layerId);
   },
@@ -361,6 +794,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   setViewport: (patch) => set((s) => ({ viewport: { ...s.viewport, ...patch } })),
+
+  patchOverlay: (patch) => set((s) => ({ overlay: { ...s.overlay, ...patch } })),
 
   setScale: (scale) =>
     set((s) => ({
@@ -552,6 +987,9 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       locked: layer.locked,
       parentId: layer.parentId ?? null,
       mask: layer.mask ?? null,
+      // 位图上的非破坏参数原样升级为智能对象参数，转换不丢数据
+      adjustments: layer.adjustments,
+      filters: layer.filters,
     };
     set({
       doc: {
@@ -593,6 +1031,9 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       locked: layer.locked,
       parentId: layer.parentId ?? null,
       mask: layer.mask ?? null,
+      // 智能滤镜作用在呈现尺寸上、新的位图也正好是呈现尺寸 → 参数原样带过去即可，画面不变
+      adjustments: layer.adjustments,
+      filters: layer.filters,
     };
     set({
       doc: {
@@ -612,7 +1053,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const height = Math.max(1, Math.round(layer.height));
     const assetId =
       mode === 'selection' && state.selection
-        ? createMaskCanvasFromPolygon(width, height, selectionPolygon(state.selection))
+        ? createMaskCanvasFromSelection(width, height, state.selection)
         : createMaskCanvas(width, height, mode === 'hide' ? 'hide' : 'show');
     const layers = state.doc.layers.map((item) =>
       item.id === id ? { ...item, mask: createMaskRef(assetId) } : item,
@@ -643,6 +1084,83 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     set({ doc: { ...state.doc, layers } });
   },
 
+  addVectorMask: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    const selection = state.selection;
+    if (!layer || !selection) return;
+    const contours = selectionToVectorContours(selection, layer.x, layer.y).slice(
+      0,
+      MAX_VECTOR_CONTOURS,
+    );
+    if (contours.length === 0) return;
+    state.commit('histVectorMask');
+    const vectorMask: VectorMaskRef = { enabled: true, inverted: false, contours, feather: 0 };
+    set({
+      doc: {
+        ...state.doc,
+        layers: state.doc.layers.map((item) => (item.id === id ? { ...item, vectorMask } : item)),
+      },
+    });
+  },
+
+  patchVectorMask: (id, patch, history = true) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer?.vectorMask) return;
+    if (history) state.commit('histVectorMask');
+    const next: VectorMaskRef = {
+      ...layer.vectorMask,
+      ...patch,
+      feather:
+        patch.feather === undefined
+          ? layer.vectorMask.feather
+          : Math.min(MAX_VECTOR_FEATHER, Math.max(0, patch.feather)),
+    };
+    set({
+      doc: {
+        ...state.doc,
+        layers: state.doc.layers.map((item) =>
+          item.id === id ? { ...item, vectorMask: next } : item,
+        ),
+      },
+    });
+  },
+
+  removeVectorMask: (id) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer?.vectorMask) return;
+    state.commit('histVectorMask');
+    set({
+      doc: {
+        ...state.doc,
+        layers: state.doc.layers.map((item) =>
+          item.id === id ? { ...item, vectorMask: null } : item,
+        ),
+      },
+    });
+  },
+
+  toggleClipping: (id) => {
+    const state = get();
+    const index = state.doc.layers.findIndex((item) => item.id === id);
+    const layer = state.doc.layers[index];
+    if (!layer) return false;
+    // 释放剪贴随时可以；新建剪贴必须存在可作基准的下方图层（否则整组剪贴不生效）
+    if (!layer.clipped && clipBaseIndex(state.doc.layers, index) < 0) return false;
+    state.commit('histClip');
+    set({
+      doc: {
+        ...state.doc,
+        layers: state.doc.layers.map((item) =>
+          item.id === id ? { ...item, clipped: !item.clipped } : item,
+        ),
+      },
+    });
+    return true;
+  },
+
   commitMask: (id) => {
     const state = get();
     const layer = state.doc.layers.find((item) => item.id === id);
@@ -665,6 +1183,202 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   setMaskEditing: (value) => set({ maskEditing: value }),
 
+  setChannelView: (view) => set({ channelView: view }),
+
+  rotateView: (delta) =>
+    set((s) => ({ viewRotation: normalizeViewRotation(s.viewRotation + delta) })),
+
+  setViewRotation: (degrees) => set({ viewRotation: normalizeViewRotation(degrees) }),
+
+  resetViewRotation: () => set({ viewRotation: 0 }),
+
+  setSnapEnabled: (value) => set({ snapEnabled: value }),
+
+  setSnapGuides: (guides) => set({ snapGuides: guides }),
+
+  setCloneSource: (point) => set({ cloneSource: point }),
+
+  setTransformMode: (mode) => {
+    const state = get();
+    set({ transformMode: mode, tool: 'transform' });
+    const active = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
+    if (!active || active.locked) return;
+    // 进入网格模式时确保网格存在（四角模式用 2×2，变形用 4×4）
+    const want = mode === 'warp' ? Math.max(WARP_COLS, WARP_ROWS) : 2;
+    const has = active.mesh?.cols === want && active.mesh?.rows === want;
+    if (mode === 'free' || has) return;
+    state.patchLayer(active.id, { mesh: createMesh(want, want) });
+  },
+
+  resetMesh: (layerId) => {
+    const state = get();
+    const id = layerId ?? state.doc.activeLayerId;
+    if (!id) return;
+    const layer = state.doc.layers.find((item) => item.id === id);
+    if (!layer?.mesh) return;
+    state.patchLayer(id, { mesh: null });
+  },
+
+  recordTransform: (delta) => set({ lastTransform: delta }),
+
+  repeatTransform: () => {
+    const state = get();
+    const delta = state.lastTransform;
+    const layer = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
+    if (!delta || !layer || layer.locked || layer.lockPosition) return;
+    state.commit('histTransform');
+    const box = applyTransformDelta(
+      {
+        x: layer.x,
+        y: layer.y,
+        width: layer.width,
+        height: layer.height,
+        rotation: layer.rotation,
+      },
+      delta,
+    );
+    state.patchLayer(layer.id, box, false);
+  },
+
+  enterQuickMask: () => {
+    const state = get();
+    if (state.quickMask) return;
+    // 以当前选区为起点：选区外为黑（未选中）、选区内为白（选中）——与 PS 的进入行为一致
+    const assetId = state.selection
+      ? createMaskCanvasFromSelection(state.doc.width, state.doc.height, state.selection)
+      : createMaskCanvas(state.doc.width, state.doc.height, 'hide');
+    // 顺手切到画笔：进入快速蒙版就是为了涂抹选区
+    set({ quickMask: { assetId, rev: 0 }, tool: 'brush' });
+  },
+
+  exitQuickMask: () => {
+    const state = get();
+    if (!state.quickMask) return;
+    const asset = getCanvas(state.quickMask.assetId);
+    const ctx = asset?.getContext('2d', { willReadFrequently: true });
+    let selection: Selection | null = null;
+    if (asset && ctx) {
+      const frame = ctx.getImageData(0, 0, asset.width, asset.height);
+      selection = selectionFromMask(frame.data, asset.width, asset.height);
+    }
+    // 画布本身交给 releaseExcept 惰性回收（quickMask 置空后它自然脱离引用集合）
+    set({ quickMask: null, selection });
+  },
+
+  toggleQuickMask: () => {
+    const state = get();
+    if (state.quickMask) state.exitQuickMask();
+    else state.enterQuickMask();
+  },
+
+  bumpQuickMask: () =>
+    set((s) => (s.quickMask ? { quickMask: { ...s.quickMask, rev: s.quickMask.rev + 1 } } : {})),
+
+  loadChannelSelection: () => {
+    const state = get();
+    if (state.channelView === 'rgb') return;
+    const canvas = channelViewCanvas(state.doc, state.channelView);
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true });
+    if (!canvas || !ctx) return;
+    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // 全黑通道（无亮部）视为「没有可载入的内容」：清空选区而不是留下一个不可见的空选区
+    set({ selection: selectionFromMask(frame.data, canvas.width, canvas.height) });
+  },
+
+  addSample: (x, y) => {
+    const state = get();
+    const px = Math.max(0, Math.min(state.doc.width - 1, Math.floor(x)));
+    const py = Math.max(0, Math.min(state.doc.height - 1, Math.floor(y)));
+    // 取样取自「合成结果」，与吸管一致：用户看到什么就取到什么
+    const canvas = compositeDoc(state.doc, { x: px, y: py, width: 1, height: 1 }, 1);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+    const data = ctx.getImageData(0, 0, 1, 1).data;
+    const sample: SamplePoint = {
+      x: px + 0.5,
+      y: py + 0.5,
+      hex: rgbToHex(data[0], data[1], data[2]),
+      alpha: data[3],
+    };
+    set({ samples: [...state.samples, sample].slice(-MAX_SAMPLES) });
+  },
+
+  removeSample: (index) => set((s) => ({ samples: s.samples.filter((_, i) => i !== index) })),
+
+  clearSamples: () => set({ samples: [] }),
+
+  addSwatch: (color) => {
+    const hex = color.trim().toUpperCase();
+    if (!hexToRgb(hex)) return;
+    const state = get();
+    if (state.doc.swatches.includes(hex)) return;
+    state.commit('histSwatch');
+    set({
+      doc: { ...state.doc, swatches: [...state.doc.swatches, hex].slice(0, MAX_SWATCHES) },
+    });
+  },
+
+  removeSwatch: (index) => {
+    const state = get();
+    state.commit('histSwatch');
+    set({
+      doc: { ...state.doc, swatches: state.doc.swatches.filter((_, i) => i !== index) },
+    });
+  },
+
+  extractSwatches: () => {
+    const state = get();
+    const picked = extractDocPalette(state.doc);
+    const next = [...state.doc.swatches];
+    for (const hex of picked) if (!next.includes(hex)) next.push(hex);
+    if (next.length === state.doc.swatches.length) return;
+    state.commit('histSwatch');
+    set({ doc: { ...state.doc, swatches: next.slice(0, MAX_SWATCHES) } });
+  },
+
+  setPanels: (panels) => set({ panels }),
+
+  togglePanelCollapsed: (id) =>
+    set((s) => ({
+      panels: {
+        ...s.panels,
+        collapsed: s.panels.collapsed.includes(id)
+          ? s.panels.collapsed.filter((item) => item !== id)
+          : [...s.panels.collapsed, id],
+      },
+    })),
+
+  expandPanel: (id) =>
+    set((s) =>
+      s.panels.collapsed.includes(id)
+        ? {
+            panels: { ...s.panels, collapsed: s.panels.collapsed.filter((item) => item !== id) },
+          }
+        : {},
+    ),
+
+  togglePanelVisible: (id) =>
+    set((s) => ({
+      panels: {
+        ...s.panels,
+        hidden: s.panels.hidden.includes(id)
+          ? s.panels.hidden.filter((item) => item !== id)
+          : [...s.panels.hidden, id],
+      },
+    })),
+
+  movePanel: (id, dir) =>
+    set((s) => {
+      const order = [...s.panels.order];
+      const from = order.indexOf(id);
+      const to = from + dir;
+      if (from < 0 || to < 0 || to >= order.length) return {};
+      [order[from], order[to]] = [order[to], order[from]];
+      return { panels: { ...s.panels, order } };
+    }),
+
+  resetPanels: () => set({ panels: normalizePanelLayout(null) }),
+
   reorderLayer: (id, toIndex) => {
     get().commit('histReorder');
     set((s) => {
@@ -677,6 +1391,52 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       layers.splice(target, 0, moved);
       return { doc: { ...s.doc, layers } };
     });
+  },
+
+  moveLayer: (id, dir) => {
+    const state = get();
+    const layers = state.doc.layers;
+    const from = layers.findIndex((layer) => layer.id === id);
+    if (from < 0) return;
+    // 只在同一父级内寻找相邻兄弟，避免把子图层移出编组（破坏「子紧随组」的层栈约定）
+    const parent = layers[from].parentId ?? null;
+    let target = from + dir;
+    while (target >= 0 && target < layers.length && (layers[target].parentId ?? null) !== parent) {
+      target += dir;
+    }
+    if (target < 0 || target >= layers.length) return;
+    state.reorderLayer(id, target);
+  },
+
+  alignLayer: (mode) => {
+    const state = get();
+    const layer = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
+    if (!layer) return;
+    const { width, height } = state.doc;
+    let x = layer.x;
+    let y = layer.y;
+    switch (mode) {
+      case 'left':
+        x = 0;
+        break;
+      case 'hcenter':
+        x = Math.round((width - layer.width) / 2);
+        break;
+      case 'right':
+        x = Math.round(width - layer.width);
+        break;
+      case 'top':
+        y = 0;
+        break;
+      case 'vcenter':
+        y = Math.round((height - layer.height) / 2);
+        break;
+      case 'bottom':
+        y = Math.round(height - layer.height);
+        break;
+    }
+    if (x === layer.x && y === layer.y) return;
+    state.patchLayer(layer.id, { x, y } as Partial<Layer>, true);
   },
 
   mergeDown: (id) => {

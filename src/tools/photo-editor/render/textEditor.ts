@@ -1,3 +1,4 @@
+import { docToScreen } from '../core';
 import type { TextLayer } from '../model/types';
 
 /**
@@ -27,12 +28,15 @@ export interface TextEditorHandle {
 export interface TextEditorOptions {
   host: HTMLElement;
   transform: { scale: number; x: number; y: number };
+  /** 视口尺寸与旋转视图角度：就地图层编辑必须跟画布一起转，否则输入框会飘在错误位置 */
+  viewSize: { width: number; height: number };
+  viewRotation: number;
   onCommit: (id: string, text: string) => void;
   onCancel?: () => void;
 }
 
 export function openTextEditor(init: TextEditorInit, options: TextEditorOptions): TextEditorHandle {
-  const { host, transform, onCommit } = options;
+  const { host, transform, viewSize, viewRotation, onCommit } = options;
   const area = document.createElement('textarea');
   area.value = init.text;
   area.spellcheck = false;
@@ -40,10 +44,14 @@ export function openTextEditor(init: TextEditorInit, options: TextEditorOptions)
   area.dataset.testid = 'photo-text-editor';
   area.className = 'photo-text-editor';
   const scale = transform.scale || 1;
+  const origin = docToScreen({ x: init.x, y: init.y }, transform, viewSize, viewRotation);
   Object.assign(area.style, {
     position: 'absolute',
-    left: `${init.x * scale + transform.x}px`,
-    top: `${init.y * scale + transform.y}px`,
+    left: `${origin.x}px`,
+    top: `${origin.y}px`,
+    // 绕左上角旋转，与画布内容的旋转保持同一角度
+    transform: viewRotation ? `rotate(${viewRotation}deg)` : '',
+    transformOrigin: '0 0',
     width: `${Math.max(40, init.width * scale)}px`,
     minHeight: `${init.fontSize * init.lineHeight * scale}px`,
     fontSize: `${Math.max(8, init.fontSize * scale)}px`,

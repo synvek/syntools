@@ -318,7 +318,7 @@ export function ToolButton({
       aria-pressed={active}
       data-tool={tool}
       title={`${label}（${shortcut}）`}
-      className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-100 active:scale-95 ${
+      className={`relative flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-100 active:scale-95 ${
         active
           ? 'bg-blue-600 text-white shadow-sm'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'

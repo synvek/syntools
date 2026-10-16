@@ -113,7 +113,54 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     )!;
     expect(result.layers[0].blend).toBe('luminosity');
     expect(result.layers[1].blend).toBe('normal');
-    expect(result.layers[1].kind === 'raster' && result.layers[1].filters).toEqual(['blur']);
+    // 旧格式 FilterId[] 会被升级为「规格 + 默认参数」
+    const filters = result.layers[1].kind === 'raster' ? result.layers[1].filters : [];
+    expect(filters).toEqual([{ id: 'blur', params: { radius: 4 } }]);
+  });
+
+  it('新格式滤镜保留参数，越界参数被钳制', () => {
+    const result = migrateDoc(
+      doc([
+        raster('a', {
+          filters: [
+            { id: 'posterize', params: { levels: 999 } },
+            { id: 'nope', params: {} },
+          ],
+        }),
+      ]),
+    )!;
+    const filters = result.layers[0].kind === 'raster' ? result.layers[0].filters : [];
+    expect(filters).toHaveLength(1);
+    expect(filters[0].id).toBe('posterize');
+    // FILTER_PARAMS 的 max 为 16
+    expect(filters[0].params?.levels).toBe(16);
+  });
+
+  it('扩展调整字段被归一化，空值回落为未启用', () => {
+    const result = migrateDoc(
+      doc([
+        raster('a', {
+          adjustments: {
+            levels: { inBlack: 10, inWhite: 240, gamma: 1.2, outBlack: 0, outWhite: 255 },
+            threshold: 999,
+            curves: {
+              rgb: [
+                { x: 0, y: 0 },
+                { x: 255, y: 200 },
+              ],
+            },
+          },
+        }),
+        raster('b', { adjustments: { threshold: 128 } }),
+      ]),
+    )!;
+    const first = result.layers[0].kind === 'raster' ? result.layers[0].adjustments : null;
+    const second = result.layers[1].kind === 'raster' ? result.layers[1].adjustments : null;
+    expect(first?.levels?.inWhite).toBe(240);
+    expect(first?.threshold).toBe(255);
+    expect(first?.curves?.rgb).toHaveLength(2);
+    expect(second?.levels ?? null).toBeNull();
+    expect(second?.threshold).toBe(128);
   });
 
   it('画布尺寸被钳到合法区间', () => {

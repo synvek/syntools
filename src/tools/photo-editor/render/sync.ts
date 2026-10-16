@@ -8,6 +8,7 @@ import {
   LAYER_KIND_ATTR,
   updateLayerNode,
 } from './nodes';
+import { layerNeedsComposite } from './paint';
 
 /**
  * 文档 → Konva 节点的增量同步（与 slide-editor 的 `syncElements` 同一策略）：
@@ -98,9 +99,9 @@ function isContainerOnly(layer: Layer): boolean {
 }
 
 function sameKind(node: Konva.Node, layer: Layer): boolean {
-  // 带蒙版的图层是一张「合成结果」图片节点，形态与普通节点不同，不能就地更新
-  const expected = layer.mask?.enabled
-    ? `masked:${layer.kind}`
+  // 带蒙版 / 图层样式的图层是一张「合成结果」图片节点，形态与普通节点不同，不能就地更新
+  const expected = layerNeedsComposite(layer)
+    ? `composed:${layer.kind}`
     : layer.kind === 'shape'
       ? `shape:${layer.shape}`
       : layer.kind;

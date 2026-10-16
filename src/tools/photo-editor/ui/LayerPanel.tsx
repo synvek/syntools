@@ -1,12 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
-import { BLEND_MODES } from '../core';
+import { BLEND_MODES, hasLayerStyle, hasVectorMask } from '../core';
 import { layerThumbnail } from '../render/export';
 import { CompactSlider, Select } from './controls';
 import { layerDisplayName } from './layerName';
 import { usePhotoStore } from '../store';
-import type { BlendMode, Layer, PhotoDoc } from '../model/types';
+import type { AlignMode, BlendMode, Layer, PhotoDoc } from '../model/types';
+
+/** 对齐到画布的菜单项（作用域：当前选中图层） */
+const ALIGN_ITEMS: { mode: AlignMode; label: string }[] = [
+  { mode: 'left', label: 'alignLeft' },
+  { mode: 'hcenter', label: 'alignHCenter' },
+  { mode: 'right', label: 'alignRight' },
+  { mode: 'top', label: 'alignTop' },
+  { mode: 'vcenter', label: 'alignVCenter' },
+  { mode: 'bottom', label: 'alignBottom' },
+];
 
 /**
  * 图层面板。
@@ -79,6 +89,11 @@ export function LayerPanel() {
   const moveIntoGroup = usePhotoStore((s) => s.moveIntoGroup);
   const toggleGroupExpanded = usePhotoStore((s) => s.toggleGroupExpanded);
   const setGroupPassThrough = usePhotoStore((s) => s.setGroupPassThrough);
+  const moveLayer = usePhotoStore((s) => s.moveLayer);
+  const alignLayer = usePhotoStore((s) => s.alignLayer);
+  const toggleClipping = usePhotoStore((s) => s.toggleClipping);
+  const addVectorMask = usePhotoStore((s) => s.addVectorMask);
+  const hasSelection = usePhotoStore((s) => s.selection !== null);
 
   const dragIndex = useRef<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -230,8 +245,37 @@ export function LayerPanel() {
                     >
                       <LayerThumb doc={doc} layer={layer} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-medium text-gray-700 dark:text-gray-200">
-                          {layerDisplayName(layer, doc.layers, t)}
+                        <span className="flex items-center gap-1">
+                          <span className="block min-w-0 truncate text-xs font-medium text-gray-700 dark:text-gray-200">
+                            {layerDisplayName(layer, doc.layers, t)}
+                          </span>
+                          {hasLayerStyle(layer.style) ? (
+                            <span
+                              data-testid={`layer-fx-${layer.id}`}
+                              title={t('tools.photo.tabStyle')}
+                              className="shrink-0 rounded bg-blue-100 px-1 text-[9px] font-semibold uppercase leading-4 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                            >
+                              fx
+                            </span>
+                          ) : null}
+                          {layer.clipped ? (
+                            <span
+                              data-testid={`layer-clip-${layer.id}`}
+                              title={t('tools.photo.clipCreate')}
+                              className="shrink-0 rounded bg-amber-100 px-1 text-[9px] font-semibold leading-4 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                            >
+                              ↳
+                            </span>
+                          ) : null}
+                          {hasVectorMask(layer.vectorMask) ? (
+                            <span
+                              data-testid={`layer-vmask-${layer.id}`}
+                              title={t('tools.photo.vectorMask')}
+                              className="shrink-0 rounded bg-emerald-100 px-1 text-[9px] font-semibold leading-4 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            >
+                              V
+                            </span>
+                          ) : null}
                         </span>
                         <span className="block text-[10px] uppercase text-gray-400">
                           {layer.kind === 'raster'
@@ -443,6 +487,77 @@ export function LayerPanel() {
                   setMenu(null);
                 }}
               />
+              <MenuSection label={t('tools.photo.lock')} />
+              <MenuItem
+                icon="lock"
+                label={t('tools.photo.lockPosition')}
+                checked={Boolean(menuLayer.lockPosition)}
+                onClick={() => {
+                  patchLayer(menuLayer.id, {
+                    lockPosition: !menuLayer.lockPosition,
+                  } as Partial<Layer>);
+                  setMenu(null);
+                }}
+              />
+              <MenuItem
+                icon="lock"
+                label={t('tools.photo.lockAlpha')}
+                checked={Boolean(menuLayer.lockAlpha)}
+                onClick={() => {
+                  patchLayer(menuLayer.id, { lockAlpha: !menuLayer.lockAlpha } as Partial<Layer>);
+                  setMenu(null);
+                }}
+              />
+              <MenuSection label={t('tools.photo.menuMask')} />
+              <MenuItem
+                icon="layers"
+                label={
+                  menuLayer.clipped ? t('tools.photo.clipRelease') : t('tools.photo.clipCreate')
+                }
+                checked={Boolean(menuLayer.clipped)}
+                onClick={() => {
+                  toggleClipping(menuLayer.id);
+                  setMenu(null);
+                }}
+              />
+              <MenuItem
+                icon="imageFrame"
+                label={t('tools.photo.vectorMaskFromSelection')}
+                disabled={!hasSelection}
+                onClick={() => {
+                  addVectorMask(menuLayer.id);
+                  setMenu(null);
+                }}
+              />
+              <MenuSection label={t('tools.photo.alignToCanvas')} />
+              {ALIGN_ITEMS.map((item) => (
+                <MenuItem
+                  key={item.mode}
+                  icon="imageFrame"
+                  label={t(`tools.photo.${item.label}`)}
+                  onClick={() => {
+                    alignLayer(item.mode);
+                    setMenu(null);
+                  }}
+                />
+              ))}
+              <MenuSection label={t('tools.photo.layerOps')} />
+              <MenuItem
+                icon="chevron"
+                label={t('tools.photo.up')}
+                onClick={() => {
+                  moveLayer(menuLayer.id, 1);
+                  setMenu(null);
+                }}
+              />
+              <MenuItem
+                icon="chevron"
+                label={t('tools.photo.down')}
+                onClick={() => {
+                  moveLayer(menuLayer.id, -1);
+                  setMenu(null);
+                }}
+              />
               <MenuItem
                 icon="close"
                 label={t('tools.photo.delete')}
@@ -519,25 +634,33 @@ function MenuItem({
   label,
   onClick,
   danger,
+  checked,
+  disabled,
 }: {
   icon: string;
   label: string;
   onClick: () => void;
   danger?: boolean;
+  /** 开关型菜单项：为真时右侧显示勾选 */
+  checked?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       role="menuitem"
+      aria-checked={checked}
+      disabled={disabled}
       onClick={onClick}
-      className={`flex h-8 items-center gap-2 rounded-md px-2 text-xs transition-colors ${
+      className={`flex h-8 items-center gap-2 rounded-md px-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         danger
           ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950'
           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'
       }`}
     >
-      <Icon name={icon} className="h-3.5 w-3.5" />
-      {label}
+      <Icon name={icon} className="h-3.5 w-3.5 shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+      {checked ? <Icon name="check" className="h-3.5 w-3.5 shrink-0 text-blue-600" /> : null}
     </button>
   );
 }

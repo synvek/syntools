@@ -2,15 +2,26 @@ import { useTranslation } from 'react-i18next';
 import { usePhotoStore } from '../store';
 import { maskThumbnail } from '../render/mask';
 import { CompactSlider } from './controls';
-import type { Layer, MaskRef } from '../model/types';
+import type { Layer, MaskRef, VectorMaskRef } from '../model/types';
 
 /**
- * 蒙版小节：挂在「属性」标签页顶部，只作用于当前选中图层。
+ * 蒙版小节：挂在「属性」面板顶部，只作用于当前选中图层。
  *
- * 蒙版本身是灰度画布：画笔涂白 = 显示、涂黑 = 隐藏（`maskEditing` 切换笔迹落点），
- * 参数（启用 / 反相 / 浓度 / 羽化）都是非破坏性的——随时改、随时删。
+ * 两类蒙版并列：
+ * - **像素蒙版**：灰度画布，画笔涂白 = 显示、涂黑 = 隐藏（`maskEditing` 切换笔迹落点）；
+ * - **矢量蒙版**：按轮廓裁切，与分辨率无关（缩放图层不会糊），P1 由「当前选区」创建。
+ * 两者的参数（启用 / 反相 / 羽化等）都是非破坏的——随时改、随时删。
  */
 export function MaskPanel({ layer }: { layer: Layer }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <PixelMaskBlock layer={layer} />
+      <VectorMaskBlock layer={layer} />
+    </div>
+  );
+}
+
+function PixelMaskBlock({ layer }: { layer: Layer }) {
   const { t } = useTranslation();
   const addMask = usePhotoStore((s) => s.addMask);
   const removeMask = usePhotoStore((s) => s.removeMask);
@@ -115,6 +126,82 @@ export function MaskPanel({ layer }: { layer: Layer }) {
           max={64}
           suffix="px"
           onChange={(value) => patchMask(layer.id, { feather: value }, false)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function VectorMaskBlock({ layer }: { layer: Layer }) {
+  const { t } = useTranslation();
+  const addVectorMask = usePhotoStore((s) => s.addVectorMask);
+  const patchVectorMask = usePhotoStore((s) => s.patchVectorMask);
+  const removeVectorMask = usePhotoStore((s) => s.removeVectorMask);
+  const hasSelection = usePhotoStore((s) => s.selection !== null);
+
+  const mask: VectorMaskRef | null = layer.vectorMask ?? null;
+
+  if (!mask) {
+    return (
+      <div className="rounded-lg border border-gray-200 p-2 dark:border-gray-800">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+            {t('tools.photo.vectorMask')}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <MaskButton
+            label={t('tools.photo.vectorMaskFromSelection')}
+            disabled={!hasSelection}
+            testId="vector-mask-add"
+            onClick={() => addVectorMask(layer.id)}
+          />
+        </div>
+        <p className="mt-1.5 text-[10px] leading-4 text-gray-400 dark:text-gray-500">
+          {t('tools.photo.vectorMaskHint')}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 p-2 dark:border-gray-800">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+          {t('tools.photo.vectorMask')}
+        </span>
+        <MaskButton
+          label={t('tools.photo.maskRemove')}
+          testId="vector-mask-remove"
+          danger
+          onClick={() => removeVectorMask(layer.id)}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <MaskButton
+          label={t('tools.photo.maskEnable')}
+          active={mask.enabled}
+          testId="vector-mask-enable"
+          onClick={() => patchVectorMask(layer.id, { enabled: !mask.enabled })}
+        />
+        <MaskButton
+          label={t('tools.photo.maskInvert')}
+          active={mask.inverted}
+          testId="vector-mask-invert"
+          onClick={() => patchVectorMask(layer.id, { inverted: !mask.inverted })}
+        />
+        <span className="text-[10px] text-gray-400 dark:text-gray-500">
+          {t('tools.photo.vectorMaskPaths', { count: mask.contours.length })}
+        </span>
+      </div>
+      <div className="mt-1.5">
+        <CompactSlider
+          label={t('tools.photo.maskFeather')}
+          value={Math.round(mask.feather)}
+          min={0}
+          max={64}
+          suffix="px"
+          onChange={(value) => patchVectorMask(layer.id, { feather: value }, false)}
         />
       </div>
     </div>

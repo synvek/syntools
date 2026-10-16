@@ -180,6 +180,18 @@ const icons: Record<string, ReactNode> = {
   ),
   upload: <path d="M12 15V3m0 0 4 4m-4-4L8 7M4 21h16" />,
   swap: <path d="M7 4v13m0 0-3-3m3 3 3-3M17 20V7m0 0-3 3m3-3 3-3" />,
+  undo: (
+    <>
+      <path d="M4 9h10a5 5 0 0 1 0 10h-4" />
+      <path d="m8 5-4 4 4 4" />
+    </>
+  ),
+  redo: (
+    <>
+      <path d="M20 9H10a5 5 0 0 0 0 10h4" />
+      <path d="m16 5 4 4-4 4" />
+    </>
+  ),
   share: (
     <>
       <circle cx="18" cy="5" r="3" />
@@ -223,6 +235,61 @@ const icons: Record<string, ReactNode> = {
     <>
       <path d="m14 6 4 4-8.5 8.5a2.1 2.1 0 0 1-3-3L14 6Z" />
       <path d="m16 8 2.5-2.5a1.5 1.5 0 0 1 2 2L18 10" />
+    </>
+  ),
+  sampler: (
+    <>
+      <path d="M4 20 20 4" />
+      <circle cx="6.5" cy="17.5" r="2.2" />
+      <path d="M13 5h6v6" />
+    </>
+  ),
+  clone: (
+    <>
+      <path d="M5 17h14v3H5z" />
+      <path d="M7 17V8a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v9" />
+      <path d="M12 5V2" />
+    </>
+  ),
+  healing: (
+    <>
+      <path d="M9.5 3.5 3.5 9.5a3 3 0 0 0 0 4.2l6.8 6.8a3 3 0 0 0 4.2 0l6-6a3 3 0 0 0 0-4.2l-6.8-6.8a3 3 0 0 0-4.2 0Z" />
+      <path d="m7 12 5 5M12 7l5 5" />
+    </>
+  ),
+  spotHeal: (
+    <>
+      <path d="M11 4.5 6.5 9a3.6 3.6 0 0 0 5 5L16 9.5" />
+      <path d="M15 4.5 19.5 9" />
+      <path d="M18 16.5h3M19.5 15v3" />
+    </>
+  ),
+  smudge: (
+    <>
+      <path d="M6 15c0-4 6-5.5 6-9a3 3 0 0 1 6 3c0 3-3 4-3 6" />
+      <path d="M6 19c2-1.5 4.5-2 8-2s5.5.5 4 2-9 2-12 0Z" />
+    </>
+  ),
+  blurBrush: (
+    <path d="M12 3c3.6 4.5 5.6 7.2 5.6 9.6A5.6 5.6 0 0 1 12 18.2a5.6 5.6 0 0 1-5.6-5.6C6.4 10.2 8.4 7.5 12 3Z" />
+  ),
+  sharpenBrush: (
+    <>
+      <path d="M12 3 20 19H4Z" />
+      <path d="M12 9v6" />
+    </>
+  ),
+  quickMask: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" strokeDasharray="3 3" />
+      <path d="M9 5v14" />
+      <path d="M3 12h6" />
+    </>
+  ),
+  channels: (
+    <>
+      <path d="M8 4h12v16H8z" />
+      <path d="M4 7v13h11" />
     </>
   ),
   ruler: (
@@ -725,6 +792,25 @@ const icons: Record<string, ReactNode> = {
     <>
       <path d="M4 12 11 5l7 7-7 7-7-7Z" />
       <path d="M19 15c1.2 1.6 1.8 2.6 1.8 3.4a1.8 1.8 0 0 1-3.6 0c0-.8.6-1.8 1.8-3.4Z" />
+    </>
+  ),
+  gradient: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M4 19 19 4M9 20l11-11M4 14 14 4" />
+    </>
+  ),
+  dodge: (
+    <>
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6.4 6.4l2.1 2.1M15.5 15.5l2.1 2.1M17.6 6.4l-2.1 2.1M8.5 15.5l-2.1 2.1" />
+    </>
+  ),
+  burn: <path d="M12 3c3 4 6 6 6 10a6 6 0 0 1-12 0c0-4 3-6 6-10Z" />,
+  sponge: (
+    <>
+      <path d="M4 14c0-3.3 3.6-6 8-6s8 2.7 8 6-3.6 6-8 6-8-2.7-8-6Z" />
+      <path d="M8.5 12.5h.01M12 10.5h.01M15.5 13.5h.01" />
     </>
   ),
   hand: (

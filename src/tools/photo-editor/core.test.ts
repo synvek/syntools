@@ -19,8 +19,12 @@ import {
   clampRect,
   clampUnit,
   computeFitScale,
+  defaultColorBalance,
+  defaultCurves,
+  defaultLevels,
   effectiveLocked,
   effectiveVisible,
+  hasExtendedAdjustments,
   flattenStack,
   historyTimeline,
   layerAssetIds,
@@ -103,10 +107,23 @@ describe('调整参数 → 滤镜管线', () => {
   });
 
   it('色温 / 锐化 / 非 CSS 滤镜需要像素通道', () => {
-    expect(needsPixelPass(createAdjustments(), ['grayscale'])).toBe(false);
+    expect(needsPixelPass(createAdjustments(), [{ id: 'grayscale' }])).toBe(false);
+    expect(needsPixelPass(createAdjustments(), [{ id: 'gaussianBlur' }])).toBe(false);
     expect(needsPixelPass({ ...createAdjustments(), temperature: 10 }, [])).toBe(true);
     expect(needsPixelPass({ ...createAdjustments(), sharpen: 40 }, [])).toBe(true);
-    expect(needsPixelPass(createAdjustments(), ['pixelate'])).toBe(true);
+    expect(needsPixelPass(createAdjustments(), [{ id: 'pixelate' }])).toBe(true);
+    expect(needsPixelPass(createAdjustments(), [{ id: 'motionBlur' }])).toBe(true);
+  });
+
+  it('启用扩展调整时同样需要像素通道', () => {
+    expect(hasExtendedAdjustments(createAdjustments())).toBe(false);
+    expect(hasExtendedAdjustments({ ...createAdjustments(), levels: defaultLevels() })).toBe(true);
+    expect(hasExtendedAdjustments({ ...createAdjustments(), desaturate: true })).toBe(true);
+    expect(hasExtendedAdjustments({ ...createAdjustments(), curves: defaultCurves() })).toBe(true);
+    expect(needsPixelPass({ ...createAdjustments(), threshold: 128 }, [])).toBe(true);
+    expect(
+      needsPixelPass({ ...createAdjustments(), colorBalance: defaultColorBalance() }, []),
+    ).toBe(true);
   });
 
   it('烘焙签名随参数与版本号变化', () => {
@@ -288,7 +305,9 @@ describe('选区续操作辅助', () => {
 
   it('反选：原选区内变成「洞」，其余区域命中', () => {
     const inverted = invertSelection(rect, canvas);
-    expect(inverted.hole?.length).toBeGreaterThan(0);
+    // 反选把原选区轮廓翻转成差集轮廓（多轮廓模型取代了早期的单一 hole 字段）
+    expect(inverted.parts?.length ?? 0).toBeGreaterThan(0);
+    expect(inverted.parts?.some((part) => part.add === false)).toBe(true);
     // 原选区中心落在洞里 → 不属于反选结果
     expect(pointInSelection(inverted, 100, 50)).toBe(false);
     // 画布其它位置属于反选结果
@@ -296,9 +315,9 @@ describe('选区续操作辅助', () => {
     expect(pointInSelection(inverted, 190, 90)).toBe(true);
   });
 
-  it('椭圆选区转多边形顶点（32 边）', () => {
+  it('椭圆选区转多边形顶点（48 边采样）', () => {
     const points = selectionPolygon({ ...rect, kind: 'ellipse' });
-    expect(points.length).toBe(64);
+    expect(points.length).toBe(96);
   });
 
   it('矩形选区转多边形顶点', () => {
@@ -402,6 +421,7 @@ describe('层栈展开与继承（编组 / 蒙版前置）', () => {
       background: 'white',
       layers,
       activeLayerId: null,
+      swatches: [],
     };
   }
 
@@ -524,6 +544,7 @@ describe('历史时间轴（面板数据源）', () => {
       background: 'white',
       layers: [],
       activeLayerId: null,
+      swatches: [],
     },
     label,
     at,
@@ -592,6 +613,7 @@ describe('编组层栈操作（纯函数）', () => {
     background: 'white',
     layers,
     activeLayerId: null,
+    swatches: [],
   });
 
   it('子树包含自身与全部后代', () => {
