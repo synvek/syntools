@@ -23,6 +23,8 @@ const de = {
     categoryActions: 'Kategorieaktionen',
     expandAll: 'Alle Kategorien erweitern',
     collapseAll: 'Alle Kategorien einklappen',
+    collapse: 'Seitenleiste einklappen',
+    expand: 'Seitenleiste ausklappen',
   },
   home: {
     title: 'Online-Toolbox',

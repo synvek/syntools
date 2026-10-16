@@ -23,6 +23,8 @@ const fr = {
     categoryActions: 'Actions de catégorie',
     expandAll: 'Développer toutes les catégories',
     collapseAll: 'Replier toutes les catégories',
+    collapse: 'Replier la barre latérale',
+    expand: 'Déplier la barre latérale',
   },
   home: {
     title: 'Boîte à outils en ligne',

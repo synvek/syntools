@@ -23,6 +23,8 @@ const zhTW = {
     categoryActions: '分類操作',
     expandAll: '展開所有分類',
     collapseAll: '收合所有分類',
+    collapse: '收合側邊欄',
+    expand: '展開側邊欄',
   },
   home: {
     title: '在線工具集',

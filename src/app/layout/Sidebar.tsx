@@ -11,6 +11,8 @@ interface SidebarProps {
   /** 移动端抽屉模式 */
   mobile?: boolean;
   onClose?: () => void;
+  /** 桌面端折叠整个侧边栏（仅桌面生效，移动抽屉不显示折叠按钮） */
+  onCollapse?: () => void;
 }
 
 const COLLAPSED_KEY = 'syntools:sidebar-collapsed.v1';
@@ -36,7 +38,7 @@ function toolIdFromPath(pathname: string): string | undefined {
 }
 
 /** 侧边栏：注册表按分类分组 + weight 排序 + 本地筛选 + 分类折叠 */
-export function Sidebar({ mobile = false, onClose }: SidebarProps) {
+export function Sidebar({ mobile = false, onClose, onCollapse }: SidebarProps) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const [filter, setFilter] = useState('');
@@ -126,7 +128,7 @@ export function Sidebar({ mobile = false, onClose }: SidebarProps) {
       aria-label={t('sidebar.nav')}
       className="flex h-full w-[220px] flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950"
     >
-      <div className="border-b border-gray-200 p-3 dark:border-gray-800">
+      <div className="flex items-center gap-2 border-b border-gray-200 p-3 dark:border-gray-800">
         <label className="sr-only" htmlFor="sidebar-filter">
           {t('sidebar.filter')}
         </label>
@@ -136,8 +138,19 @@ export function Sidebar({ mobile = false, onClose }: SidebarProps) {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder={t('sidebar.filterPlaceholder')}
-          className="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:placeholder:text-gray-500"
+          className="min-w-0 flex-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:placeholder:text-gray-500"
         />
+        {!mobile && onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label={t('sidebar.collapse')}
+            title={t('sidebar.collapse')}
+            className="shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+          >
+            <Icon name="panelLeftClose" className="h-4 w-4" />
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-3">
         {grouped.length === 0 ? (

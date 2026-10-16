@@ -23,6 +23,8 @@ const it = {
     categoryActions: 'Azioni categoria',
     expandAll: 'Espandi tutte le categorie',
     collapseAll: 'Comprimi tutte le categorie',
+    collapse: 'Comprimi la barra laterale',
+    expand: 'Espandi la barra laterale',
   },
   home: {
     title: 'Toolbox online',

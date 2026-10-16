@@ -23,6 +23,8 @@ const ja = {
     categoryActions: 'カテゴリ操作',
     expandAll: 'すべてのカテゴリを展開',
     collapseAll: 'すべてのカテゴリを折りたたむ',
+    collapse: 'サイドバーを折りたたむ',
+    expand: 'サイドバーを展開',
   },
   home: {
     title: 'オンラインツールボックス',

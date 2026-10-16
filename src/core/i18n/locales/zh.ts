@@ -21,6 +21,8 @@ export default {
     categoryActions: '分类操作',
     expandAll: '展开所有分类',
     collapseAll: '收起所有分类',
+    collapse: '收起侧边栏',
+    expand: '展开侧边栏',
   },
   home: {
     title: '在线工具集',

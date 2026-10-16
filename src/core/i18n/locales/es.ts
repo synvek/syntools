@@ -23,6 +23,8 @@ const es = {
     categoryActions: 'Acciones de categoría',
     expandAll: 'Expandir todas las categorías',
     collapseAll: 'Contraer todas las categorías',
+    collapse: 'Contraer la barra lateral',
+    expand: 'Expandir la barra lateral',
   },
   home: {
     title: 'Caja de herramientas online',

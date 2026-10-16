@@ -23,6 +23,8 @@ const en = {
     categoryActions: 'Category actions',
     expandAll: 'Expand all categories',
     collapseAll: 'Collapse all categories',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
   },
   home: {
     title: 'Online Toolkit',
