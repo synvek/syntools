@@ -5,7 +5,7 @@ import { usePhotoStore } from '../store';
 import { layerDisplayName } from './layerName';
 
 /**
- * 底部状态栏：分区呈现「色彩模式 / 画布尺寸 / 缩放 / 光标 / 选区 / 当前图层 / 内存」。
+ * 底部状态栏：分区呈现「色彩模式 / 缩放 / 光标 / 选区 / 当前图层 / 画布信息 / 内存」。
  * 与桌面端修图软件一致，把文档级信息固定在底部，避免占用画布与面板空间。
  */
 export function StatusBar({ cursor }: { cursor: { x: number; y: number } | null }) {
@@ -21,13 +21,7 @@ export function StatusBar({ cursor }: { cursor: { x: number; y: number } | null 
       <span data-testid="photo-mode" className="text-gray-400 dark:text-gray-500">
         RGB · 8-bit
       </span>
-      <span data-testid="photo-size">
-        {doc.width} × {doc.height}
-      </span>
       <span>{t('tools.photo.statusZoom', { scale: Math.round((scale || 1) * 100) })}</span>
-      <span>
-        {t('tools.photo.tabLayers')} {doc.layers.length}
-      </span>
       {cursor ? <span>{t('tools.photo.statusCursor', { x: cursor.x, y: cursor.y })}</span> : null}
       {selection ? (
         <span>
@@ -40,8 +34,15 @@ export function StatusBar({ cursor }: { cursor: { x: number; y: number } | null 
       <span className="truncate">
         {layer ? layerDisplayName(layer, doc.layers, t) : t('tools.photo.noLayer')}
       </span>
-      <span className="ml-auto">
-        {t('tools.photo.statusMemory', { size: formatBytes(estimateMemoryBytes()) })}
+      <span className="ml-auto flex items-center gap-3">
+        <span data-testid="photo-stats">
+          {t('tools.photo.stats', {
+            width: doc.width,
+            height: doc.height,
+            count: doc.layers.length,
+          })}
+        </span>
+        <span>{t('tools.photo.statusMemory', { size: formatBytes(estimateMemoryBytes()) })}</span>
       </span>
     </div>
   );

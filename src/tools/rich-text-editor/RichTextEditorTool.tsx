@@ -2,10 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NodeSelection } from '@tiptap/pm/state';
 import { EditorContent, useEditor } from '@tiptap/react';
-import { DocumentHeader } from '@/core/components/DocumentHeader';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
-import { MenuButton } from '@/core/components/MenuButton';
+import { EditorMenuBar } from '@/core/components/EditorMenuBar';
+import { EditorStatusBar } from '@/core/components/EditorStatusBar';
+import {
+  EDITOR_ICON_BUTTON_CLASS,
+  EDITOR_TITLE_INPUT_CLASS,
+  editorMenuItem,
+  estimateJsonBytes,
+  formatBytes,
+  type EditorMenu,
+} from '@/core/components/editorChrome';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
@@ -1184,114 +1192,135 @@ export default function RichTextEditorTool() {
     setContextMenu({ x: event.clientX, y: event.clientY, kind: from !== to ? 'text' : 'empty' });
   };
 
+  const menus: EditorMenu[] = [
+    {
+      id: 'file',
+      label: t('common.menuFile'),
+      entries: [
+        editorMenuItem('file-new', t('common.newDoc'), handleNew, { shortcut: '⌘N' }),
+        editorMenuItem('file-import', t('tools.richText.importDocx'), () =>
+          importInputRef.current?.click(),
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'file-export-docx',
+          t('tools.richText.exportDocx'),
+          () => void handleExportDocx(),
+          { disabled: isEmpty },
+        ),
+        editorMenuItem(
+          'file-export-pdf',
+          t('tools.richText.exportPdf'),
+          () => setPdfDialogOpen(true),
+          { disabled: isEmpty },
+        ),
+        editorMenuItem(
+          'file-export-markdown',
+          t('tools.richText.exportMarkdown'),
+          () => void handleExportMarkdown(),
+          { disabled: isEmpty },
+        ),
+        editorMenuItem(
+          'file-export-html',
+          t('tools.richText.exportHtml'),
+          () => void handleExportHtml(),
+          { disabled: isEmpty },
+        ),
+        { type: 'separator' },
+        editorMenuItem('file-library', t('tools.richText.library'), openLibrary),
+        { type: 'separator' },
+        editorMenuItem('file-clear', t('common.clear'), handleClear, {
+          danger: true,
+          disabled: isEmpty && !title,
+        }),
+      ],
+    },
+    {
+      id: 'edit',
+      label: t('common.menuEdit'),
+      entries: [
+        editorMenuItem(
+          'edit-undo',
+          t('tools.richText.undo'),
+          () => editor?.chain().focus().undo().run(),
+          { shortcut: '⌘Z', disabled: !editor?.can().undo() },
+        ),
+        editorMenuItem(
+          'edit-redo',
+          t('tools.richText.redo'),
+          () => editor?.chain().focus().redo().run(),
+          { shortcut: '⇧⌘Z', disabled: !editor?.can().redo() },
+        ),
+      ],
+    },
+  ];
+
+  const statusText = saved ? t('tools.richText.saved') : t('tools.richText.saving');
+  const memory = useMemo(() => formatBytes(estimateJsonBytes(snapshotHtml)), [snapshotHtml]);
+
   return (
     <div className="flex flex-col gap-4">
-      <DocumentHeader
-        titleLabel={t('tools.richText.docTitle')}
-        titlePlaceholder={t('tools.richText.titlePlaceholder')}
-        title={title}
-        onTitleChange={setTitle}
-        newLabel={t('common.newDoc')}
-        newIcon="text"
-        onNew={handleNew}
-        afterNew={
+      <EditorMenuBar
+        menus={menus}
+        ariaLabel={t('common.menuBar')}
+        actions={
           <>
+            <span
+              role="status"
+              title={statusText}
+              aria-label={statusText}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
+                saved ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'
+              }`}
+            >
+              <Icon name={saved ? 'check' : 'clock'} className="h-4 w-4" />
+            </span>
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={isEmpty && !title}
+              aria-label={t('common.clear')}
+              title={t('common.clear')}
+              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              <Icon name="trash" className="h-4 w-4" />
+            </button>
+          </>
+        }
+        center={
+          <input
+            type="text"
+            value={title}
+            aria-label={t('tools.richText.docTitle')}
+            placeholder={t('tools.richText.titlePlaceholder')}
+            onChange={(event) => setTitle(event.target.value)}
+            className={EDITOR_TITLE_INPUT_CLASS}
+          />
+        }
+        right={
+          <>
+            <button
+              type="button"
+              onClick={handleNew}
+              aria-label={t('common.newDoc')}
+              title={t('common.newDoc')}
+              className={EDITOR_ICON_BUTTON_CLASS}
+            >
+              <Icon name="text" className="h-4 w-4" />
+            </button>
             <button
               type="button"
               data-testid="rich-text-present"
               onClick={() => setPresenting(true)}
               disabled={isEmpty}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              aria-label={t('tools.richText.present')}
+              title={t('tools.richText.present')}
+              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
             >
               <Icon name="present" className="h-4 w-4" />
-              {t('tools.richText.present')}
-            </button>
-            <button
-              type="button"
-              onClick={openLibrary}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="file" className="h-4 w-4" />
-              {t('tools.richText.library')}
             </button>
           </>
         }
-        io={
-          <>
-            {/* 导入 / 导出各收成一个下拉：格式扩展时不再撑宽文档头 */}
-            <MenuButton
-              variant="header"
-              icon="upload"
-              label={t('common.importFile')}
-              items={[
-                {
-                  key: 'docx',
-                  label: t('tools.richText.importDocx'),
-                  glyph: <Icon name="upload" className="h-4 w-4" />,
-                  onClick: () => importInputRef.current?.click(),
-                },
-              ]}
-              disabled={busy !== null}
-            />
-            <MenuButton
-              variant="header"
-              tone="primary"
-              icon="download"
-              label={
-                busy === 'docx' || busy === 'pdf'
-                  ? t('tools.richText.exporting')
-                  : t('common.exportFile')
-              }
-              items={[
-                {
-                  key: 'docx',
-                  label: t('tools.richText.exportDocx'),
-                  glyph: <Icon name="download" className="h-4 w-4" />,
-                  onClick: () => void handleExportDocx(),
-                  disabled: isEmpty,
-                },
-                {
-                  key: 'pdf',
-                  label: t('tools.richText.exportPdf'),
-                  glyph: <Icon name="pdf" className="h-4 w-4" />,
-                  onClick: () => setPdfDialogOpen(true),
-                  disabled: isEmpty,
-                },
-                {
-                  key: 'markdown',
-                  label: t('tools.richText.exportMarkdown'),
-                  glyph: <Icon name="markdown" className="h-4 w-4" />,
-                  onClick: handleExportMarkdown,
-                  disabled: isEmpty,
-                },
-                {
-                  key: 'html',
-                  label: t('tools.richText.exportHtml'),
-                  glyph: <Icon name="html" className="h-4 w-4" />,
-                  onClick: handleExportHtml,
-                  disabled: isEmpty,
-                },
-              ]}
-              disabled={busy !== null}
-            />
-          </>
-        }
-        stats={
-          <>
-            <span>
-              {t('tools.richText.chars')}: {stats.chars}
-            </span>
-            <span>
-              {t('tools.richText.words')}: {stats.words}
-            </span>
-            <span>
-              {t('tools.richText.paragraphs')}: {stats.paragraphs}
-            </span>
-          </>
-        }
-        status={saved ? t('tools.richText.saved') : t('tools.richText.saving')}
-        onClear={handleClear}
-        clearDisabled={isEmpty && !title}
       />
 
       <EditorToolbar
@@ -1570,6 +1599,23 @@ export default function RichTextEditorTool() {
           </aside>
         ) : null}
       </div>
+
+      <EditorStatusBar
+        left={
+          <>
+            <span>
+              {t('tools.richText.chars')}: {stats.chars}
+            </span>
+            <span>
+              {t('tools.richText.words')}: {stats.words}
+            </span>
+            <span>
+              {t('tools.richText.paragraphs')}: {stats.paragraphs}
+            </span>
+          </>
+        }
+        right={<span>{t('common.memoryUsage', { size: memory })}</span>}
+      />
 
       {presenting ? (
         <PresentOverlay

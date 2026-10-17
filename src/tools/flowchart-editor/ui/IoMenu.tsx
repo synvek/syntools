@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
+import { EDITOR_ICON_BUTTON_CLASS } from '@/core/components/editorChrome';
 import { useFlowStore } from '../store';
 import {
   DEFAULT_PRINT_OPTIONS,
@@ -51,9 +52,18 @@ interface IoMenuProps {
   /** 受控展开态（快捷键 Ctrl+P / Ctrl+E 打开导出面板时使用）；缺省则组件内部自管 */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** 紧凑模式：仅显示图标按钮（tooltip 提供文案），用于顶部菜单工具栏 */
+  compact?: boolean;
 }
 
-export function IoMenu({ busy, setBusy, onError, open: openProp, onOpenChange }: IoMenuProps) {
+export function IoMenu({
+  busy,
+  setBusy,
+  onError,
+  open: openProp,
+  onOpenChange,
+  compact = false,
+}: IoMenuProps) {
   const { t } = useTranslation();
   const [openState, setOpenState] = useState(false);
   const open = openProp ?? openState;
@@ -220,25 +230,51 @@ export function IoMenu({ busy, setBusy, onError, open: openProp, onOpenChange }:
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Icon name="download" className="h-4 w-4" />
-          {busy ? t('tools.flowchart.exporting') : t('tools.flowchart.exportPanel')}
-        </button>
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          title={t('tools.flowchart.importHint')}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          <Icon name="upload" className="h-4 w-4" />
-          {t('tools.flowchart.importFile')}
-        </button>
+      <div className={compact ? 'flex items-center gap-0.5' : 'flex items-center gap-1.5'}>
+        {compact ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              disabled={busy}
+              aria-label={busy ? t('tools.flowchart.exporting') : t('tools.flowchart.exportPanel')}
+              title={busy ? t('tools.flowchart.exporting') : t('tools.flowchart.exportPanel')}
+              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              <Icon name="download" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              aria-label={t('tools.flowchart.importFile')}
+              title={t('tools.flowchart.importHint')}
+              className={EDITOR_ICON_BUTTON_CLASS}
+            >
+              <Icon name="upload" className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="download" className="h-4 w-4" />
+              {busy ? t('tools.flowchart.exporting') : t('tools.flowchart.exportPanel')}
+            </button>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              title={t('tools.flowchart.importHint')}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Icon name="upload" className="h-4 w-4" />
+              {t('tools.flowchart.importFile')}
+            </button>
+          </>
+        )}
         <input
           ref={fileRef}
           type="file"

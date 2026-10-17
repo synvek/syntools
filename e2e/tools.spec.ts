@@ -77,8 +77,8 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
-    // 导出已收进「导出」下拉：先展开菜单再点具体格式
-    await page.getByRole('button', { name: '导出', exact: true }).click();
+    // 导出已收进「文件」菜单：先展开菜单再点具体格式
+    await page.getByTestId('menubar-file').click();
     await page.getByRole('menuitem', { name: '导出 PPTX', exact: true }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.pptx$/);
@@ -206,7 +206,7 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     // 初始 1 页
     await expect(page.locator('.slide-thumb')).toHaveCount(1);
 
-    await page.getByRole('button', { name: '导入', exact: true }).click();
+    await page.getByTestId('menubar-file').click();
     await page.getByRole('menuitem', { name: '从大纲生成', exact: true }).click();
     const editor = page.getByRole('textbox', { name: '从大纲生成' });
     await editor.fill('# 第一页\n- 要点\n# 第二页');
@@ -226,7 +226,7 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
       ['另存为工程', /\.sld$/],
     ] as const) {
       const downloadPromise = page.waitForEvent('download');
-      await page.getByRole('button', { name: '导出', exact: true }).click();
+      await page.getByTestId('menubar-file').click();
       await page.getByRole('menuitem', { name: item, exact: true }).click();
       const download = await downloadPromise;
       expect(download.suggestedFilename()).toMatch(pattern);
@@ -980,7 +980,8 @@ test.describe('照片编辑器（zh-CN）', () => {
 
     // 导出对话框 → 下载 PNG
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: '导出图片' }).click();
+    await page.getByTestId('menubar-file').click();
+    await page.getByRole('menuitem', { name: '导出图片' }).click();
     await page.getByRole('button', { name: '下载', exact: true }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.png$/);
@@ -1101,8 +1102,8 @@ test.describe('照片编辑器（zh-CN）', () => {
     await stroke();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 等草稿落盘（状态栏出现「已保存到本地草稿」）后刷新：恢复出来的图层必须还能继续画
-    await expect(page.getByText('已保存到本地草稿')).toBeVisible({ timeout: 5000 });
+    // 等草稿落盘（草稿状态图标出现「已保存到本地草稿」提示）后刷新：恢复出来的图层必须还能继续画
+    await expect(page.getByLabel('已保存到本地草稿')).toBeVisible({ timeout: 5000 });
     await page.reload();
     await expect(page.getByLabel('photo canvas')).toBeVisible();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
@@ -1392,7 +1393,8 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
 
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: '导出图片' }).click();
+    await page.getByTestId('menubar-file').click();
+    await page.getByRole('menuitem', { name: '导出图片' }).click();
     await page.getByTestId('export-psd').click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.psd$/);

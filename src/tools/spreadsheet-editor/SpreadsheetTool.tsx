@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
+import { HintTip } from '@/core/components/DocumentHeader';
 import { clearDraft, readDraft, writeDraftSafe } from './draft';
 import { Icon } from '@/core/components/Icon';
-import { MenuButton } from '@/core/components/MenuButton';
+import { EditorMenuBar } from '@/core/components/EditorMenuBar';
+import { EditorStatusBar } from '@/core/components/EditorStatusBar';
+import {
+  EDITOR_ICON_BUTTON_CLASS,
+  EDITOR_TITLE_INPUT_CLASS,
+  editorMenuItem,
+  estimateJsonBytes,
+  formatBytes,
+  type EditorMenu,
+} from '@/core/components/editorChrome';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { i18n } from '@/core/i18n';
@@ -615,116 +624,123 @@ export default function SpreadsheetTool() {
     [summary, t],
   );
 
+  const menus: EditorMenu[] = [
+    {
+      id: 'file',
+      label: t('common.menuFile'),
+      entries: [
+        editorMenuItem('file-new', t('common.newDoc'), handleNew, { shortcut: '⌘N' }),
+        editorMenuItem(
+          'file-import-xlsx',
+          t('tools.sheet.importXlsx'),
+          () => openImport('.xlsx,.xlsm'),
+          { disabled: busy !== null },
+        ),
+        editorMenuItem('file-import-csv', t('tools.sheet.importCsv'), () => openImport('.csv'), {
+          disabled: busy !== null,
+        }),
+        { type: 'separator' },
+        editorMenuItem('file-export-xlsx', t('tools.sheet.exportXlsx'), () => void handleExport(), {
+          disabled: summary.cells === 0,
+        }),
+        editorMenuItem('file-export-csv', t('tools.sheet.exportCsv'), handleExportCsv, {
+          disabled: summary.cells === 0,
+        }),
+        { type: 'separator' },
+        editorMenuItem('file-library', t('tools.sheet.library'), openLibrary),
+        editorMenuItem('file-versions', t('tools.sheet.versions'), openVersions, {
+          disabled: !docId,
+        }),
+        { type: 'separator' },
+        editorMenuItem('file-clear', t('common.clear'), handleClear, {
+          danger: true,
+          disabled: summary.cells === 0 && !title.trim(),
+        }),
+      ],
+    },
+    {
+      id: 'insert',
+      label: t('common.menuInsert'),
+      entries: [editorMenuItem('insert-chart', t('tools.sheet.insertChart'), openChart)],
+    },
+  ];
+
+  const statusText = draftSaved ? t('common.saved') : t('common.saving');
+  const memory = useMemo(() => {
+    let snapshot: unknown = null;
+    try {
+      snapshot = handleRef.current?.getSnapshot() ?? null;
+    } catch {
+      snapshot = null;
+    }
+    return formatBytes(estimateJsonBytes({ summary, snapshot }));
+  }, [summary]);
+
   return (
     <div className="flex flex-col gap-4">
-      <DocumentHeader
-        titleLabel={t('tools.sheet.docTitle')}
-        titlePlaceholder={t('tools.sheet.titlePlaceholder')}
-        title={title}
-        onTitleChange={setTitle}
-        newLabel={t('common.newDoc')}
-        newIcon="sheet"
-        onNew={handleNew}
-        afterNew={
+      <EditorMenuBar
+        menus={menus}
+        ariaLabel={t('common.menuBar')}
+        actions={
           <>
+            <span
+              role="status"
+              title={statusText}
+              aria-label={statusText}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
+                draftSaved
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-gray-400 dark:text-gray-500'
+              }`}
+            >
+              <Icon name={draftSaved ? 'check' : 'clock'} className="h-4 w-4" />
+            </span>
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={summary.cells === 0 && !title.trim()}
+              aria-label={t('common.clear')}
+              title={t('common.clear')}
+              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              <Icon name="trash" className="h-4 w-4" />
+            </button>
+            <HintTip text={t('tools.sheet.unsupportedTip')} />
+          </>
+        }
+        center={
+          <input
+            type="text"
+            value={title}
+            aria-label={t('tools.sheet.docTitle')}
+            placeholder={t('tools.sheet.titlePlaceholder')}
+            onChange={(event) => setTitle(event.target.value)}
+            className={EDITOR_TITLE_INPUT_CLASS}
+          />
+        }
+        right={
+          <>
+            <button
+              type="button"
+              onClick={handleNew}
+              aria-label={t('common.newDoc')}
+              title={t('common.newDoc')}
+              className={EDITOR_ICON_BUTTON_CLASS}
+            >
+              <Icon name="sheet" className="h-4 w-4" />
+            </button>
             <button
               type="button"
               data-testid="sheet-present"
               onClick={openPresent}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              aria-label={t('tools.sheet.present')}
+              title={t('tools.sheet.present')}
+              className={EDITOR_ICON_BUTTON_CLASS}
             >
               <Icon name="present" className="h-4 w-4" />
-              {t('tools.sheet.present')}
-            </button>
-            <button
-              type="button"
-              data-testid="sheet-chart"
-              onClick={openChart}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="chart" className="h-4 w-4" />
-              {t('tools.sheet.insertChart')}
-            </button>
-            <button
-              type="button"
-              data-testid="sheet-library-open"
-              onClick={openLibrary}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="file" className="h-4 w-4" />
-              {t('tools.sheet.library')}
-            </button>
-            <button
-              type="button"
-              data-testid="sheet-versions-open"
-              onClick={openVersions}
-              disabled={!docId}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              <Icon name="clock" className="h-4 w-4" />
-              {t('tools.sheet.versions')}
             </button>
           </>
         }
-        io={
-          <>
-            {/* 导入 / 导出各收成一个下拉：格式扩展时不再撑宽文档头 */}
-            <MenuButton
-              variant="header"
-              icon="upload"
-              label={t('common.importFile')}
-              items={[
-                {
-                  key: 'xlsx',
-                  label: t('tools.sheet.importXlsx'),
-                  glyph: <Icon name="sheet" className="h-4 w-4" />,
-                  onClick: () => openImport('.xlsx,.xlsm'),
-                },
-                {
-                  key: 'csv',
-                  label: t('tools.sheet.importCsv'),
-                  glyph: <Icon name="file" className="h-4 w-4" />,
-                  onClick: () => openImport('.csv'),
-                },
-              ]}
-              disabled={busy !== null}
-            />
-            <MenuButton
-              variant="header"
-              tone="primary"
-              icon="download"
-              label={busy === 'export' ? t('tools.sheet.exporting') : t('common.exportFile')}
-              items={[
-                {
-                  key: 'xlsx',
-                  label: t('tools.sheet.exportXlsx'),
-                  glyph: <Icon name="download" className="h-4 w-4" />,
-                  onClick: () => void handleExport(),
-                  disabled: summary.cells === 0,
-                },
-                {
-                  key: 'csv',
-                  label: t('tools.sheet.exportCsv'),
-                  glyph: <Icon name="file" className="h-4 w-4" />,
-                  onClick: handleExportCsv,
-                  disabled: summary.cells === 0,
-                },
-              ]}
-              disabled={busy !== null}
-            />
-
-            {/* 兼容性说明改为 tooltip，避免占用行内空间 */}
-            <HintTip text={t('tools.sheet.unsupportedTip')} />
-          </>
-        }
-        stats={stats.map((item) => (
-          <span key={item.label}>
-            {item.label}: {item.value}
-          </span>
-        ))}
-        status={draftSaved ? t('common.saved') : t('common.saving')}
-        onClear={handleClear}
-        clearDisabled={summary.cells === 0 && !title.trim()}
       />
 
       {libraryOpen ? (
@@ -781,6 +797,15 @@ export default function SpreadsheetTool() {
         onRename={handleRenameSheet}
         onDelete={handleDeleteSheet}
         onDuplicate={handleDuplicateSheet}
+      />
+
+      <EditorStatusBar
+        left={stats.map((item) => (
+          <span key={item.label}>
+            {item.label}: {item.value}
+          </span>
+        ))}
+        right={<span>{t('common.memoryUsage', { size: memory })}</span>}
       />
 
       {busy !== null && <ProgressBar indeterminate label={t('tools.sheet.exporting')} />}

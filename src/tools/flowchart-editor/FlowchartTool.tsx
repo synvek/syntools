@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
-import { DocumentHeader } from '@/core/components/DocumentHeader';
 import { Icon } from '@/core/components/Icon';
+import { EditorMenuBar } from '@/core/components/EditorMenuBar';
+import { EditorStatusBar } from '@/core/components/EditorStatusBar';
+import {
+  EDITOR_ICON_BUTTON_CLASS,
+  EDITOR_TITLE_INPUT_CLASS,
+  editorMenuItem,
+  estimateJsonBytes,
+  formatBytes,
+  type EditorMenu,
+} from '@/core/components/editorChrome';
 import { i18n } from '@/core/i18n';
 import { buildTemplateDoc, type TemplateKind, type TemplateTranslator } from './model/templates';
 import { LAYOUT_DENSITY } from './layout';
@@ -625,55 +634,137 @@ function FlowchartInner() {
     return () => window.removeEventListener('paste', onPaste);
   }, [screenToFlowPosition, t]);
 
+  // 文档体积估算：只在节点/连线变化时重新序列化，避免拖动时反复计算
+  const memory = useMemo(() => formatBytes(estimateJsonBytes({ nodes, edges })), [nodes, edges]);
+
   // 文案未就绪时先不渲染（只有当前语言的小 chunk 需要等待）
   if (!stringsReady) return null;
 
+  const menus: EditorMenu[] = [
+    {
+      id: 'file',
+      label: t('common.menuFile'),
+      entries: [
+        editorMenuItem('file-new', t('tools.flowchart.newDoc'), handleNew, { shortcut: '⌘N' }),
+        { type: 'separator' },
+        editorMenuItem('file-clear', t('common.clear'), handleClear, {
+          danger: true,
+          disabled: nodes.length === 0 && !docName.trim(),
+        }),
+      ],
+    },
+    {
+      id: 'edit',
+      label: t('common.menuEdit'),
+      entries: [
+        editorMenuItem(
+          'edit-undo',
+          t('tools.flowchart.undo'),
+          () => useFlowStore.getState().undo(),
+          { shortcut: '⌘Z', disabled: !canUndo },
+        ),
+        editorMenuItem(
+          'edit-redo',
+          t('tools.flowchart.redo'),
+          () => useFlowStore.getState().redo(),
+          { shortcut: '⇧⌘Z', disabled: !canRedo },
+        ),
+        { type: 'separator' },
+        editorMenuItem('edit-duplicate', t('tools.flowchart.duplicate'), handleDuplicate, {
+          shortcut: '⌘D',
+        }),
+        editorMenuItem('edit-delete', t('tools.flowchart.delete'), handleDelete, {
+          shortcut: 'Del',
+          danger: true,
+        }),
+      ],
+    },
+    {
+      id: 'help',
+      label: t('common.menuHelp'),
+      entries: [
+        editorMenuItem('help-shortcuts', t('tools.flowchart.shortcutHelp'), () =>
+          setHelpOpen(true),
+        ),
+      ],
+    },
+  ];
+
+  const statusText = draftSaved ? t('tools.flowchart.saved') : t('tools.flowchart.saving');
+
   return (
     <div className="flex flex-col gap-3">
-      <DocumentHeader
-        titleLabel={t('tools.flowchart.docTitle')}
-        titlePlaceholder={t('tools.flowchart.titlePlaceholder')}
-        title={docName}
-        onTitleChange={setDocName}
-        newLabel={t('tools.flowchart.newDoc')}
-        newIcon="diagram"
-        onNew={handleNew}
-        afterNew={
-          <button
-            type="button"
-            data-testid="flowchart-present"
-            onClick={openPresent}
-            disabled={nodes.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            <Icon name="present" className="h-4 w-4" />
-            {t('tools.flowchart.present')}
-          </button>
-        }
-
-        io={
-          <IoMenu
-            busy={busy}
-            setBusy={setBusy}
-            onError={setFailure}
-            open={exportOpen}
-            onOpenChange={setExportOpen}
-          />
-        }
-        stats={
+      <EditorMenuBar
+        menus={menus}
+        ariaLabel={t('common.menuBar')}
+        actions={
           <>
-            <span>
-              {t('tools.flowchart.nodesLabel')}: {nodes.length} · {t('tools.flowchart.edgesLabel')}:{' '}
-              {edges.length}
-              {selectedCount > 0
-                ? ` · ${t('tools.flowchart.selected', { count: selectedCount })}`
-                : ''}
+            <span
+              role="status"
+              title={statusText}
+              aria-label={statusText}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
+                draftSaved
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-gray-400 dark:text-gray-500'
+              }`}
+            >
+              <Icon name={draftSaved ? 'check' : 'clock'} className="h-4 w-4" />
             </span>
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={nodes.length === 0 && !docName.trim()}
+              aria-label={t('common.clear')}
+              title={t('common.clear')}
+              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              <Icon name="trash" className="h-4 w-4" />
+            </button>
+            <IoMenu
+              compact
+              busy={busy}
+              setBusy={setBusy}
+              onError={setFailure}
+              open={exportOpen}
+              onOpenChange={setExportOpen}
+            />
           </>
         }
-        status={draftSaved ? t('tools.flowchart.saved') : t('tools.flowchart.saving')}
-        onClear={handleClear}
-        clearDisabled={nodes.length === 0 && !docName.trim()}
+        center={
+          <input
+            type="text"
+            value={docName}
+            aria-label={t('tools.flowchart.docTitle')}
+            placeholder={t('tools.flowchart.titlePlaceholder')}
+            onChange={(event) => setDocName(event.target.value)}
+            className={EDITOR_TITLE_INPUT_CLASS}
+          />
+        }
+        right={
+          <>
+            <button
+              type="button"
+              onClick={handleNew}
+              aria-label={t('tools.flowchart.newDoc')}
+              title={t('tools.flowchart.newDoc')}
+              className={EDITOR_ICON_BUTTON_CLASS}
+            >
+              <Icon name="diagram" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              data-testid="flowchart-present"
+              onClick={openPresent}
+              disabled={nodes.length === 0}
+              aria-label={t('tools.flowchart.present')}
+              title={t('tools.flowchart.present')}
+              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              <Icon name="present" className="h-4 w-4" />
+            </button>
+          </>
+        }
       />
 
       <Toolbar
@@ -863,6 +954,19 @@ function FlowchartInner() {
           </div>
         </aside>
       </div>
+
+      <EditorStatusBar
+        left={
+          <span>
+            {t('tools.flowchart.nodesLabel')}: {nodes.length} · {t('tools.flowchart.edgesLabel')}:{' '}
+            {edges.length}
+            {selectedCount > 0
+              ? ` · ${t('tools.flowchart.selected', { count: selectedCount })}`
+              : ''}
+          </span>
+        }
+        right={<span>{t('common.memoryUsage', { size: memory })}</span>}
+      />
 
       {failure ? (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

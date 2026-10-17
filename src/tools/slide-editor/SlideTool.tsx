@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/core/components/ProgressBar';
-import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
+import { HintTip } from '@/core/components/DocumentHeader';
 import { Icon } from '@/core/components/Icon';
-import { MenuButton } from '@/core/components/MenuButton';
+import { EditorMenuBar } from '@/core/components/EditorMenuBar';
+import { EditorStatusBar } from '@/core/components/EditorStatusBar';
+import {
+  EDITOR_ICON_BUTTON_CLASS,
+  EDITOR_TITLE_INPUT_CLASS,
+  editorMenuItem,
+  estimateJsonBytes,
+  formatBytes,
+  type EditorMenu,
+} from '@/core/components/editorChrome';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes, downloadDataUrl } from '@/core/pdf/download';
@@ -283,134 +292,123 @@ export default function SlideTool() {
     ],
   );
 
+  const menus: EditorMenu[] = [
+    {
+      id: 'file',
+      label: t('common.menuFile'),
+      entries: [
+        editorMenuItem('file-new', t('tools.slide.newDoc'), handleNew, { shortcut: '⌘N' }),
+        editorMenuItem('file-import-pptx', t('tools.slide.importPptx'), () =>
+          importInputRef.current?.click(),
+        ),
+        editorMenuItem('file-import-project', t('tools.slide.openProject'), () =>
+          projectInputRef.current?.click(),
+        ),
+        editorMenuItem('file-import-outline', t('tools.slide.outlineImport'), () =>
+          setOutlineOpen(true),
+        ),
+        { type: 'separator' },
+        editorMenuItem('file-export-pptx', t('tools.slide.exportPptx'), () => void handleExport()),
+        editorMenuItem('file-export-pdf', t('tools.slide.exportPdf'), () => void handleExportPdf()),
+        editorMenuItem('file-export-image', t('tools.slide.exportImage'), () => handleExportPng()),
+        editorMenuItem(
+          'file-export-project',
+          t('tools.slide.saveProject'),
+          () => void handleSaveProject(),
+        ),
+        { type: 'separator' },
+        editorMenuItem('file-clear', t('common.clear'), handleClear, {
+          danger: true,
+          disabled: doc.slides.length === 0 && !doc.name.trim(),
+        }),
+      ],
+    },
+    {
+      id: 'view',
+      label: t('common.menuView'),
+      entries: [
+        editorMenuItem(
+          'view-normal',
+          `${t('tools.slide.viewNormal')}${viewMode === 'normal' ? ' ✓' : ''}`,
+          () => setViewMode('normal'),
+        ),
+        editorMenuItem(
+          'view-master',
+          `${t('tools.slide.viewMaster')}${viewMode === 'master' ? ' ✓' : ''}`,
+          () => setViewMode('master'),
+        ),
+      ],
+    },
+  ];
+
+  const statusText = draftSaved ? t('tools.slide.saved') : t('tools.slide.saving');
+  const memory = useMemo(() => formatBytes(estimateJsonBytes(doc)), [doc]);
+
   return (
     <div className="flex flex-col gap-3">
-      <DocumentHeader
-        titleLabel={t('tools.slide.docTitle')}
-        titlePlaceholder={t('tools.slide.titlePlaceholder')}
-        title={doc.name}
-        onTitleChange={setDocName}
-        newLabel={t('tools.slide.newDoc')}
-        newIcon="slides"
-        onNew={handleNew}
-        afterNew={
+      <EditorMenuBar
+        menus={menus}
+        ariaLabel={t('common.menuBar')}
+        actions={
           <>
+            <span
+              role="status"
+              title={statusText}
+              aria-label={statusText}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
+                draftSaved
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-gray-400 dark:text-gray-500'
+              }`}
+            >
+              <Icon name={draftSaved ? 'check' : 'clock'} className="h-4 w-4" />
+            </span>
             <button
               type="button"
-              onClick={() => setPresenting(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              onClick={handleClear}
+              disabled={doc.slides.length === 0 && !doc.name.trim()}
+              aria-label={t('common.clear')}
+              title={t('common.clear')}
+              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
             >
-              <Icon name="slides" className="h-4 w-4" />
-              {t('tools.slide.present')}
+              <Icon name="trash" className="h-4 w-4" />
             </button>
-            {/* 视图切换：普通编辑 / 母版编辑（对应 PPT 的「幻灯片母版」视图） */}
-            <div className="flex rounded-md border border-gray-300 p-0.5 dark:border-gray-600">
-              {(['normal', 'master'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  aria-pressed={viewMode === mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`rounded px-2 py-1 text-[12px] transition-colors ${
-                    viewMode === mode
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  {mode === 'normal' ? t('tools.slide.viewNormal') : t('tools.slide.viewMaster')}
-                </button>
-              ))}
-            </div>
-          </>
-        }
-        io={
-          <>
-            {/* 导入 / 导出各收成一个下拉：入口不再随格式增加而变长 */}
-            <MenuButton
-              variant="header"
-              icon="upload"
-              label={busy === 'import' ? t('tools.slide.importing') : t('common.importFile')}
-              items={[
-                {
-                  key: 'pptx',
-                  label: t('tools.slide.importPptx'),
-                  glyph: <Icon name="slides" className="h-4 w-4" />,
-                  onClick: () => importInputRef.current?.click(),
-                },
-                {
-                  key: 'project',
-                  label: t('tools.slide.openProject'),
-                  glyph: <Icon name="file" className="h-4 w-4" />,
-                  onClick: () => projectInputRef.current?.click(),
-                },
-                {
-                  key: 'outline',
-                  label: t('tools.slide.outlineImport'),
-                  glyph: <Icon name="text" className="h-4 w-4" />,
-                  onClick: () => setOutlineOpen(true),
-                },
-              ]}
-              disabled={busy !== null}
-            />
-            <MenuButton
-              variant="header"
-              tone="primary"
-              icon="download"
-              label={busy === 'export' ? t('tools.slide.exporting') : t('common.exportFile')}
-              items={[
-                {
-                  key: 'pptx',
-                  label: t('tools.slide.exportPptx'),
-                  glyph: <Icon name="slides" className="h-4 w-4" />,
-                  onClick: () => void handleExport(),
-                },
-                {
-                  key: 'pdf',
-                  label: t('tools.slide.exportPdf'),
-                  glyph: <Icon name="pdf" className="h-4 w-4" />,
-                  onClick: () => void handleExportPdf(),
-                },
-                {
-                  key: 'png',
-                  label: t('tools.slide.exportImage'),
-                  glyph: <Icon name="image" className="h-4 w-4" />,
-                  onClick: handleExportPng,
-                },
-                {
-                  key: 'project',
-                  label: t('tools.slide.saveProject'),
-                  glyph: <Icon name="file" className="h-4 w-4" />,
-                  onClick: () => void handleSaveProject(),
-                },
-              ]}
-              disabled={busy !== null}
-            />
-
-            {/* 兼容性说明改为 tooltip，避免占用行内空间 */}
             <HintTip text={t('tools.slide.unsupportedTip')} />
           </>
         }
-        stats={
+        center={
+          <input
+            type="text"
+            value={doc.name}
+            aria-label={t('tools.slide.docTitle')}
+            placeholder={t('tools.slide.titlePlaceholder')}
+            onChange={(event) => setDocName(event.target.value)}
+            className={EDITOR_TITLE_INPUT_CLASS}
+          />
+        }
+        right={
           <>
-            <span>
-              {t('tools.slide.slidesLabel')}: {doc.slides.length} · {slideIndex + 1}/
-              {doc.slides.length}
-            </span>
-            <span>
-              {selection.length > 0
-                ? t('tools.slide.selected', { count: selection.length })
-                : t('tools.slide.noSelection')}
-            </span>
-            {report && report.placeholders > 0 ? (
-              <span className="text-amber-600 dark:text-amber-400">
-                {t('tools.slide.downgraded', { count: report.placeholders })}
-              </span>
-            ) : null}
+            <button
+              type="button"
+              onClick={handleNew}
+              aria-label={t('tools.slide.newDoc')}
+              title={t('tools.slide.newDoc')}
+              className={EDITOR_ICON_BUTTON_CLASS}
+            >
+              <Icon name="slides" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPresenting(true)}
+              data-testid="slide-present"
+              aria-label={t('tools.slide.present')}
+              title={t('tools.slide.present')}
+              className={EDITOR_ICON_BUTTON_CLASS}
+            >
+              <Icon name="present" className="h-4 w-4" />
+            </button>
           </>
         }
-        status={draftSaved ? t('tools.slide.saved') : t('tools.slide.saving')}
-        onClear={handleClear}
-        clearDisabled={doc.slides.length === 0 && !doc.name.trim()}
       />
 
       <SlideToolbar onFailure={(error) => fail(error)} />
@@ -460,6 +458,28 @@ export default function SlideTool() {
           </aside>
         </div>
       )}
+
+      <EditorStatusBar
+        left={
+          <>
+            <span>
+              {t('tools.slide.slidesLabel')}: {doc.slides.length} · {slideIndex + 1}/
+              {doc.slides.length}
+            </span>
+            <span>
+              {selection.length > 0
+                ? t('tools.slide.selected', { count: selection.length })
+                : t('tools.slide.noSelection')}
+            </span>
+            {report && report.placeholders > 0 ? (
+              <span className="text-amber-600 dark:text-amber-400">
+                {t('tools.slide.downgraded', { count: report.placeholders })}
+              </span>
+            ) : null}
+          </>
+        }
+        right={<span>{t('common.memoryUsage', { size: memory })}</span>}
+      />
 
       {findOpen ? <FindReplaceBar onClose={() => setFindOpen(false)} /> : null}
 

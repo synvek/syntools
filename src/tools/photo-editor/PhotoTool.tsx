@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DocumentHeader, HintTip } from '@/core/components/DocumentHeader';
+import { HintTip } from '@/core/components/DocumentHeader';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
 import { i18n } from '@/core/i18n';
@@ -56,7 +56,6 @@ import { PhotoToolbar } from './ui/PhotoToolbar';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { StatusBar } from './ui/StatusBar';
 import { ToolPalette } from './ui/ToolPalette';
-import { Button } from './ui/controls';
 import type { CanvasBackground, PhotoDoc } from './model/types';
 import './photo.css';
 
@@ -82,7 +81,8 @@ const WORK_BOTTOM_RESERVE = 200;
  * 照片编辑器：Konva 画布 + 浏览器本地的多图层图像编辑。
  * 所有 Konva / DOM 副作用都收在懒加载模块内（PhotoCanvas），避免被 prerender 的 SSR 载入触发。
  *
- * 工作区结构（自上而下）：菜单栏 → 文档头 → 工具参数条 → 左工具箱 / 画布 / 右面板停靠列 → 状态栏。
+ * 工作区结构（自上而下）：菜单栏（含画布名 / 新建 / 放映 / 状态 / 清空）→ 工具参数条
+ * → 左工具箱 / 画布 / 右面板停靠列 → 状态栏（含画布信息与内存占用）。
  */
 export default function PhotoTool() {
   const { t } = useTranslation();
@@ -779,94 +779,107 @@ export default function PhotoTool() {
     history: <HistoryPanel />,
   };
 
+  /** 草稿状态：图标 + tooltip（不再占用一行文字） */
+  const statusText = degraded
+    ? t('tools.photo.degraded')
+    : draftSaved
+      ? t('tools.photo.saved')
+      : t('tools.photo.saving');
+  const statusIcon = degraded ? 'info' : draftSaved ? 'check' : 'clock';
+  const statusClass = degraded
+    ? 'text-amber-600 dark:text-amber-400'
+    : draftSaved
+      ? 'text-green-600 dark:text-green-400'
+      : 'text-gray-400 dark:text-gray-500';
+
   return (
     <DropZone onFile={handleDropFile} testId="photo-drop">
       <div className="flex flex-col gap-3">
-        <DocumentHeader
-          titleLabel={t('tools.photo.docTitle')}
-          titlePlaceholder={t('tools.photo.titlePlaceholder')}
-          title={doc.name}
-          onTitleChange={setDocName}
-          newLabel={t('tools.photo.newCanvas')}
-          newIcon="photoEditor"
-          onNew={() => setDialog('new')}
-          afterNew={
-            <Button onClick={openPresent} testId="photo-present">
-              <Icon name="present" className="h-3.5 w-3.5" />
-              {t('tools.photo.present')}
-            </Button>
-          }
-          io={
+        {/* 隐藏的文件选择器：菜单中的「导入图片 / 导入工程」仍复用它们 */}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,.svg,.psd"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // PSD 与普通图片共用同一个选择器，按扩展名分流
+            if (file) void (checkPsdFile(file).ok ? handlePsd(file) : handleImage(file));
+            event.target.value = '';
+          }}
+        />
+        <input
+          ref={projectInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void handleProject(file);
+            event.target.value = '';
+          }}
+        />
+
+        {/* 菜单栏：左侧菜单 + 紧邻的帮助侧图标操作；中部画布名；右侧新建 / 放映 */}
+        <MenuBar
+          menus={menus}
+          ariaLabel={t('tools.photo.menuBar')}
+          actions={
             <>
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,.svg,.psd"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  // PSD 与普通图片共用同一个选择器，按扩展名分流
-                  if (file) void (checkPsdFile(file).ok ? handlePsd(file) : handleImage(file));
-                  event.target.value = '';
-                }}
-              />
-              <input
-                ref={projectInputRef}
-                type="file"
-                accept=".json,application/json"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void handleProject(file);
-                  event.target.value = '';
-                }}
-              />
-              <Button onClick={openImagePicker}>
-                <Icon name="upload" className="h-3.5 w-3.5" />
-                {t('tools.photo.importImage')}
-              </Button>
-              <Button onClick={openProjectPicker}>
-                <Icon name="upload" className="h-3.5 w-3.5" />
-                {t('tools.photo.importProject')}
-              </Button>
-              <Button onClick={() => setDialog('export')} primary>
-                <Icon name="download" className="h-3.5 w-3.5" />
-                {t('tools.photo.exportImage')}
-              </Button>
-              <Button onClick={handleExportProject}>
-                <Icon name="download" className="h-3.5 w-3.5" />
-                {t('tools.photo.exportProject')}
-              </Button>
-            </>
-          }
-          stats={
-            <>
-              <span data-testid="photo-stats">
-                {t('tools.photo.stats', {
-                  width: doc.width,
-                  height: doc.height,
-                  count: doc.layers.length,
-                })}
+              <span
+                role="status"
+                title={statusText}
+                aria-label={statusText}
+                className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${statusClass}`}
+              >
+                <Icon name={statusIcon} className="h-4 w-4" />
               </span>
+              <button
+                type="button"
+                onClick={handleClear}
+                aria-label={t('tools.photo.clear')}
+                title={t('tools.photo.clear')}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              >
+                <Icon name="trash" className="h-4 w-4" />
+              </button>
               <HintTip text={t('tools.photo.hint')} label={t('tools.photo.hint')} />
             </>
           }
-          status={
-            degraded ? (
-              <span className="text-amber-600 dark:text-amber-400">
-                {t('tools.photo.degraded')}
-              </span>
-            ) : draftSaved ? (
-              <span className="text-green-600 dark:text-green-400">{t('tools.photo.saved')}</span>
-            ) : (
-              <span>{t('tools.photo.saving')}</span>
-            )
+          center={
+            <input
+              type="text"
+              value={doc.name}
+              aria-label={t('tools.photo.docTitle')}
+              placeholder={t('tools.photo.titlePlaceholder')}
+              onChange={(event) => setDocName(event.target.value)}
+              className="w-full max-w-[240px] rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            />
           }
-          onClear={handleClear}
+          right={
+            <>
+              <button
+                type="button"
+                onClick={() => setDialog('new')}
+                aria-label={t('tools.photo.newCanvas')}
+                title={t('tools.photo.newCanvas')}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+              >
+                <Icon name="photoEditor" className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={openPresent}
+                data-testid="photo-present"
+                aria-label={t('tools.photo.present')}
+                title={t('tools.photo.present')}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+              >
+                <Icon name="present" className="h-4 w-4" />
+              </button>
+            </>
+          }
         />
-
-        {/* 菜单紧贴工具栏上方：菜单影响的是「文档级」操作，放在工作区之上、工具栏之前的层级最直观 */}
-        <MenuBar menus={menus} ariaLabel={t('tools.photo.menuBar')} />
 
         <PhotoToolbar
           onFit={fitToWindow}
