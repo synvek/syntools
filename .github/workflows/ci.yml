@@ -3,7 +3,7 @@ name: CI
 # 版本管理（简化双通道，全部由 workflow_dispatch 触发）：
 #   release 模式：tag = v<version>.<run_number>，构建版本 = <version>-<run_number>（合法 semver）
 #                 run_number 单调递增、永不复用 → 每次都是新 tag，不会覆盖历史。
-#   dev     模式：tag = v<version>.dev，构建版本 = <version>-dev
+#   dev     模式：tag = v<version>.dev，构建版本 = <version>-0（MSI/WiX 要求 pre-release 为纯数字）
 #                 一个 version 共用一个 dev tag，允许覆盖重发（删旧 Release + 强制移动 tag）。
 on:
   workflow_dispatch:
@@ -49,8 +49,10 @@ jobs:
             TAG="v${BASE}.${RUN}"
           else
             CHANNEL="dev"
-            # dev 不携带 run_number：一个 version 共用一个 dev tag，允许覆盖重发
-            BUILD="${BASE}-dev"
+            # dev 不携带 run_number：一个 version 共用一个 dev tag，允许覆盖重发。
+            # 注意：MSI(WiX) 要求 pre-release 标识必须为纯数字且 <=65535，
+            # 因此 dev 构建版本用数值型 pre-release（0.7.0-0），tag 仍保持 v0.7.0.dev。
+            BUILD="${BASE}-0"
             TAG="v${BASE}.dev"
           fi
 
