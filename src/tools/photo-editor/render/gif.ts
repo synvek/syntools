@@ -147,7 +147,6 @@ function lzwEncode(indices: Uint8Array, minCodeSize: number): Uint8Array {
     bitBuffer |= code << bitCount;
     bitCount += bits;
     while (bitCount >= 8) {
-      // eslint-disable-next-line no-bitwise
       out.push(bitBuffer & 0xff);
       bitBuffer >>= 8;
       bitCount -= 8;
