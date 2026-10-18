@@ -1,12 +1,72 @@
 name: CI
 
+# 版本管理（简化双通道，全部由 workflow_dispatch 触发）：
+#   release 模式：tag = v<version>.<run_number>，构建版本 = <version>-<run_number>（合法 semver）
+#                 run_number 单调递增、永不复用 → 每次都是新 tag，不会覆盖历史。
+#   dev     模式：tag = v<version>.dev，构建版本 = <version>-dev
+#                 一个 version 共用一个 dev tag，允许覆盖重发（删旧 Release + 强制移动 tag）。
 on:
-  # 无需任何输入：版本号统一从根目录 package.json 读取（tag = v<version>）
   workflow_dispatch:
+    inputs:
+      channel:
+        description: 'release: 正式发布（tag v<version>.<run>）；dev: 开发构建（tag v<version>.dev.<run>）'
+        type: choice
+        options:
+          - dev
+          - release
+        default: dev
+
+# 创建并推送 tag、发布 Release 需要写权限
+permissions:
+  contents: write
 
 jobs:
+  # 解析本次构建的版本 / 通道 / tag
+  version:
+    name: resolve build version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      base: ${{ steps.resolve.outputs.base }}
+      channel: ${{ steps.resolve.outputs.channel }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve version
+        id: resolve
+        run: |
+          BASE="$(jq -r '.version' package.json)"
+          if [ -z "$BASE" ] || [ "$BASE" = "null" ]; then
+            echo "::error::package.json 中缺少 version 字段"; exit 1
+          fi
+
+          RUN="${{ github.run_number }}"
+          CHANNEL="${{ github.event.inputs.channel || 'dev' }}"
+
+          if [ "$CHANNEL" = "release" ]; then
+            # tag 用四点式（任意字符串）；构建版本需合法 semver，用 pre-release 形式
+            BUILD="${BASE}-${RUN}"
+            TAG="v${BASE}.${RUN}"
+          else
+            CHANNEL="dev"
+            # dev 不携带 run_number：一个 version 共用一个 dev tag，允许覆盖重发
+            BUILD="${BASE}-dev"
+            TAG="v${BASE}.dev"
+          fi
+
+          if ! echo "$BUILD" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::非法版本号：$BUILD"; exit 1
+          fi
+
+          echo "version=${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "base=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Resolved -> build=${BUILD} tag=${TAG} channel=${CHANNEL}"
+
   ci:
     name: lint + typecheck + test + build + e2e
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,9 +87,9 @@ jobs:
       - name: Type checking
         run: pnpm typecheck
 
-      # 版本号以 package.json 为准；此步防止 Cargo 清单/锁文件漂移进发布
-      - name: Version consistency (package.json vs Cargo)
-        run: pnpm version:check
+      # 以 package.json 为来源把版本同步进 Cargo / tauri.conf（写模式，避免漂移导致构建失败）
+      - name: Sync version (package.json -> Cargo / tauri.conf)
+        run: pnpm version:sync
 
       - name: Unit tests (with coverage)
         run: pnpm test -- --coverage
@@ -64,6 +124,7 @@ jobs:
 
   tauri:
     name: tauri (${{ matrix.name }})
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -84,6 +145,8 @@ jobs:
     env:
       # vite build 在 macOS runner 上会顶到 Node 默认堆上限（heap OOM），统一提高子进程堆上限
       NODE_OPTIONS: --max-old-space-size=8192
+      # 注入本次构建版本，让安装包携带唯一/正式版本号
+      SYNTOOLS_BUILD_VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -117,9 +180,9 @@ jobs:
       - name: Install npm dependencies
         run: pnpm install --frozen-lockfile
 
-      # 安装包内嵌的版本来自 tauri.conf.json / Cargo，先确保与 package.json 一致
-      - name: Version consistency (package.json vs Cargo)
-        run: pnpm version:check
+      # 将本次构建版本（release: <v>-<run>；dev: <v>-dev.<run>）写入 Cargo / tauri.conf
+      - name: Sync build version (Cargo / tauri.conf)
+        run: pnpm version:sync
 
       - name: Tauri build
         run: pnpm tauri:build
@@ -150,52 +213,14 @@ jobs:
           retention-days: 14
 
   release:
-    name: create-tag-and-release
+    name: publish (${{ needs.version.outputs.channel }})
     runs-on: ubuntu-latest
-    needs: tauri
-    permissions:
-      contents: write
+    needs: [ci, tauri, version]
     steps:
       - name: Checkout (full history for tags)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      # 版本号唯一来源：package.json（与 tauri.conf.json 内嵌版本由 version:check 保证一致）
-      - name: Resolve version from package.json
-        id: version
-        run: |
-          VERSION="$(jq -r '.version' package.json)"
-          if [ -z "${VERSION}" ] || [ "${VERSION}" = "null" ]; then
-            echo "::error::package.json 中缺少 version 字段"
-            exit 1
-          fi
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Resolved version: ${VERSION} (tag: v${VERSION})"
-
-      - name: Check if tag exists
-        id: tag_check
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Tag ${TAG} already exists, skipping tag creation"
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Tag ${TAG} will be created"
-          fi
-
-      - name: Create and push tag
-        if: steps.tag_check.outputs.exists == 'false'
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "$TAG"
-          git push origin "$TAG"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 下载后结构：artifacts/tauri-<platform>/<installer>
       - name: Download all artifacts
@@ -211,25 +236,52 @@ jobs:
       - name: Prepare release notes
         id: notes
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ needs.version.outputs.tag }}"
+          BUILD="${{ needs.version.outputs.version }}"
           if [ -f CHANGELOG.md ]; then
-            awk '/^## \['"${VERSION}"'\]/{flag=1; next} /^## \[/{flag=0} flag' CHANGELOG.md > release_notes.md || true
+            awk '/^## \['"${BUILD}"'\]/{flag=1; next} /^## \[/{flag=0} flag' CHANGELOG.md > release_notes.md || true
           fi
           if [ ! -s release_notes.md ]; then
-            echo "Release **v${VERSION}**" > release_notes.md
+            echo "Build **${BUILD}** (tag ${TAG}, channel: ${{ needs.version.outputs.channel }})" > release_notes.md
             echo "" >> release_notes.md
             echo "See [CHANGELOG.md](CHANGELOG.md) for details." >> release_notes.md
           fi
           echo "Release notes:" && cat release_notes.md
 
-      - name: Create or update GitHub Release
+      # release 通道：run_number 唯一 → 新建并推送 tag（不会覆盖历史）
+      - name: Create and push tag (release channel)
+        if: needs.version.outputs.channel == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      # dev 通道：一个 version 共用一个 dev tag，删除旧 Release 并强制移动 tag 以覆盖重发
+      - name: Reset dev tag (dev channel, overwrite)
+        if: needs.version.outputs.channel == 'dev'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 删除旧 Release（若存在），tag 随后强制指向当前提交
+          gh release delete "$TAG" --yes || true
+          git tag -f "$TAG"
+          git push -f origin "$TAG"
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.tag }}
           body_path: release_notes.md
-          draft: true
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          # Stage 后每平台目录下为扁平安装包：artifacts/tauri-*/SynTools_*.{dmg,msi,exe,...}
+          draft: false
+          prerelease: ${{ needs.version.outputs.channel == 'dev' }}
           files: artifacts/tauri-*/*
+          fail_on_unmatched_files: true
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -151,9 +151,14 @@ const ICONS: Record<Status, string> = {
 };
 
 function main(): void {
-  const version = readVersionFrom(PKG_FILE);
+  // 允许 CI 通过环境变量注入构建版本（如 0.7.0-dev.123.abc1234），
+  // 用于开发/ nightly 构建让产物携带唯一可追踪的版本号；缺省回退到 package.json。
+  const envVersion = process.env.SYNTOOLS_BUILD_VERSION?.trim();
+  const version = envVersion && envVersion.length > 0 ? envVersion : readVersionFrom(PKG_FILE);
   if (!version || !SEMVER_RE.test(version)) {
-    console.error(`✖ package.json 的 version 不是合法 semver：${JSON.stringify(version)}`);
+    console.error(
+      `✖ 版本来源无效（env=${JSON.stringify(envVersion)}）：${JSON.stringify(version)}`,
+    );
     process.exit(1);
   }
 
