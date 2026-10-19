@@ -100,33 +100,12 @@ export default defineConfig({
           }
           if (/[/\\]node_modules[/\\]docx[/\\]/.test(id)) return 'vendor-docx';
           if (/[/\\]node_modules[/\\]mammoth[/\\]/.test(id)) return 'vendor-mammoth';
-          // 电子表格（Univer）体积远超常规预算，按职责拆分为多个 chunk（体积预算见 size 脚本）
-          if (/[/\\]node_modules[/\\]@univerjs[/\\](core|protocol|rpc|network)[/\\]/.test(id)) {
-            return 'vendor-univer-core';
-          }
-          if (/[/\\]node_modules[/\\](@wendellhu[/\\]redi|rxjs)[/\\]/.test(id)) {
-            return 'vendor-univer-core';
-          }
-          if (/[/\\]node_modules[/\\]@univerjs[/\\]engine-render[/\\]/.test(id)) {
-            return 'vendor-univer-render';
-          }
-          if (/[/\\]node_modules[/\\]@univerjs[/\\]engine-formula[/\\]/.test(id)) {
-            return 'vendor-univer-formula';
-          }
-          if (
-            /[/\\]node_modules[/\\]@univerjs[/\\](design|ui|docs|docs-ui|sheets-ui|sheets-formula-ui|sheets-numfmt-ui|sheets-conditional-formatting-ui|sheets-data-validation-ui|sheets-filter-ui|sheets-sort-ui|sheets-hyper-link-ui|find-replace)[/\\]/.test(
-              id,
-            )
-          ) {
-            return 'vendor-univer-ui';
-          }
-          if (
-            /[/\\]node_modules[/\\]@univerjs[/\\](sheets|sheets-formula|sheets-numfmt|sheets-conditional-formatting|sheets-data-validation|sheets-filter|sheets-sort|sheets-hyper-link|sheets-find-replace)[/\\]/.test(
-              id,
-            )
-          ) {
-            return 'vendor-univer-sheets';
-          }
+          // 电子表格（Univer）**不要**指定 manualChunks：@univerjs/* 之间存在循环依赖，
+          // 任何人为切分都会破坏初始化顺序，生产构建下表现为工具整体无法加载：
+          //   - 拆成多个 @univerjs-* chunk → “Cannot access 'k0' before initialization”（TDZ）；
+          //   - 合并成一个 vendor-univer → 插件注册时读取 undefined 的类型（registerSubtype）。
+          // 交给 Rollup 按动态入口自然分块（随 SpreadsheetTool 一起）才能保证 live binding 顺序；
+          // dev 态走浏览器原生 ESM，不受影响。体积预算见 scripts/check-bundle-size.mjs。
           if (/[/\\]node_modules[/\\]konva[/\\]/.test(id)) return 'vendor-konva';
           if (/[/\\]node_modules[/\\]exceljs[/\\]/.test(id)) return 'vendor-exceljs';
           // 图表：ECharts 按需引入，独立 chunk（只在打开图表面板时加载）

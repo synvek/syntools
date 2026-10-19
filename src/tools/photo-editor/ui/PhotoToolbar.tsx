@@ -134,6 +134,7 @@ export function PhotoToolbar({
               type="button"
               title={color}
               aria-label={color}
+              data-testid={`photo-swatch-${color}`}
               onClick={() => patchBrush({ color })}
               className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
                 brush.color.toUpperCase() === color

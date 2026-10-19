@@ -42,7 +42,7 @@ export function ToolPalette() {
             {startsSection ? (
               <span aria-hidden className="my-0.5 h-px w-7 bg-gray-200 dark:bg-gray-700" />
             ) : null}
-            <div className="relative">
+            <div className="relative" data-testid={`tool-group-${group.id}`}>
               <ToolButton
                 tool={current.id}
                 icon={current.icon}

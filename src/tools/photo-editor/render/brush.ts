@@ -52,6 +52,15 @@ function normalizePressure(pressure: number | undefined): number {
  * 预渲染笔尖精灵：中心不透明、边缘按硬度衰减。
  * `hardness >= 1` 时直接画实心圆（依赖画布抗锯齿得到干净边缘）。
  */
+function transparentOf(color: string): string {
+  const hex = color.trim();
+  if (/^#[0-9a-f]{6}$/i.test(hex)) return `${hex}00`;
+  if (/^#[0-9a-f]{3}$/i.test(hex)) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}00`;
+  }
+  return 'rgba(0,0,0,0)';
+}
+
 function createStampSprite(color: string, hardness: number): HTMLCanvasElement {
   const size = 128;
   const canvas = createCanvasElement(size, size);
@@ -69,7 +78,9 @@ function createStampSprite(color: string, hardness: number): HTMLCanvasElement {
   const inner = Math.max(0, Math.min(0.98, hardness)) * radius;
   const gradient = ctx.createRadialGradient(radius, radius, inner, radius, radius, radius);
   gradient.addColorStop(0, color);
-  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  // 渐隐到「同色的透明版本」而非透明黑：后者在 premultiplied 插值下会经过暗红，
+  // 多枚笔尖边缘相互叠加后笔迹中部会被压暗（吸管取色取不到原本的颜色）。
+  gradient.addColorStop(1, transparentOf(color));
   ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.arc(radius, radius, radius, 0, Math.PI * 2);

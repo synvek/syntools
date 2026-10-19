@@ -258,7 +258,9 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     // 读取两个元素的屏幕位置（文本框在前、矩形在后，矩形压住文本框中段）
     const [textBox, rect] = await page.evaluate(() => {
       const Konva = (window as unknown as { Konva: { stages: unknown[] } }).Konva;
-      const stage = Konva.stages[0] as unknown as {
+      const stage = (Konva.stages as unknown as { container: () => HTMLElement | null }[]).find(
+        (s) => s.container()?.getAttribute('aria-label') === 'slide canvas',
+      )! as unknown as {
         container: () => HTMLElement;
         children: { children: { id: () => string; getClientRect: () => DOMRect }[] }[];
       };
@@ -281,7 +283,9 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     const staticTextVisible = () =>
       page.evaluate((id) => {
         const Konva = (window as unknown as { Konva: { stages: unknown[] } }).Konva;
-        const stage = Konva.stages[0] as unknown as {
+        const stage = (Konva.stages as unknown as { container: () => HTMLElement | null }[]).find(
+          (s) => s.container()?.getAttribute('aria-label') === 'slide canvas',
+        )! as unknown as {
           children: {
             children: {
               id: () => string;
@@ -1013,7 +1017,9 @@ test.describe('照片编辑器（zh-CN）', () => {
     /** 统计内容层画布上「有颜色」的像素数（每次现取画布位置，避免页面滚动导致坐标失效） */
     const paintedPixels = () =>
       page.evaluate(() => {
-        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const canvas = document.querySelector(
+          '[data-testid="photo-content-canvas"]',
+        ) as HTMLCanvasElement;
         const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         let count = 0;
@@ -1037,7 +1043,9 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(painted).toBeGreaterThan(0);
 
     // 橡皮沿同一条线擦回：松手前像素就应该减少
-    await page.getByRole('button', { name: '橡皮', exact: true }).click();
+    // 橡皮与画笔同组，收在工具箱该行的角标浮层里
+    await page.getByTestId('tool-group-paint').locator('button[aria-haspopup]').click();
+    await page.locator('[data-tool="eraser"]').click();
     const box2 = (await page.getByLabel('photo canvas').boundingBox())!;
     const y2 = box2.y + Math.min(box2.height - 40, Math.max(40, box2.height / 2));
     await page.mouse.move(box2.x + 80, y2);
@@ -1078,7 +1086,9 @@ test.describe('照片编辑器（zh-CN）', () => {
   test('刷新后从草稿恢复仍能落笔（草稿不得把像素丢成空图层）', async ({ page }) => {
     const paintedPixels = () =>
       page.evaluate(() => {
-        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const canvas = document.querySelector(
+          '[data-testid="photo-content-canvas"]',
+        ) as HTMLCanvasElement;
         const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         let count = 0;
@@ -1110,12 +1120,42 @@ test.describe('照片编辑器（zh-CN）', () => {
     const restored = await paintedPixels();
     expect(restored).toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: '橡皮', exact: true }).click();
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
-    const y = box.y + Math.min(box.height - 40, Math.max(40, box.height / 2));
-    await page.mouse.move(box.x + 80, y);
+    await page.getByTestId('tool-group-paint').locator('button[aria-haspopup]').click();
+    await page.locator('[data-tool="eraser"]').click();
+
+    // 恢复后的视口平移/缩放不必和刷新前一致，所以按画布里真实有笔迹的那一行换算屏幕坐标再擦，
+    // 否则固定屏幕坐标可能落在空白处（像素没丢也擦不到）。
+    const row = await page.evaluate(() => {
+      const canvas = document.querySelector(
+        '[data-testid="photo-content-canvas"]',
+      ) as HTMLCanvasElement;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let bestY = 0;
+      let bestCount = 0;
+      for (let y = 0; y < canvas.height; y++) {
+        let count = 0;
+        for (let x = 0; x < canvas.width; x++) {
+          if (data[(y * canvas.width + x) * 4 + 3] > 0) count += 1;
+        }
+        if (count > bestCount) {
+          bestCount = count;
+          bestY = y;
+        }
+      }
+      const rect = canvas.getBoundingClientRect();
+      return {
+        count: bestCount,
+        y: rect.y + ((bestY + 0.5) * rect.height) / canvas.height,
+        left: rect.x + rect.width * 0.2,
+        right: rect.x + rect.width * 0.8,
+      };
+    });
+    expect(row.count).toBeGreaterThan(0);
+
+    await page.mouse.move(row.left, row.y);
     await page.mouse.down();
-    await page.mouse.move(box.x + 320, y, { steps: 12 });
+    await page.mouse.move(row.right, row.y, { steps: 12 });
     await page.mouse.up();
     await page.waitForTimeout(200);
     expect(await paintedPixels()).toBeLessThan(restored);
@@ -1152,7 +1192,9 @@ test.describe('照片编辑器（zh-CN）', () => {
 
     const paintedPixels = () =>
       page.evaluate(() => {
-        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const canvas = document.querySelector(
+          '[data-testid="photo-content-canvas"]',
+        ) as HTMLCanvasElement;
         const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         let count = 0;
@@ -1231,7 +1273,7 @@ test.describe('照片编辑器（zh-CN）', () => {
 
     // 涂一段红色笔迹（文档坐标 (200,200) → (600,400)）
     await page.getByRole('button', { name: '画笔', exact: true }).click();
-    await page.getByRole('button', { name: '#DC2626' }).click();
+    await page.getByTestId('photo-swatch-#DC2626').click();
     let s = await stage();
     const from = s.at(200, 200);
     const to = s.at(600, 400);
@@ -1258,7 +1300,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     // 透明画布：空白处提示透明，且不覆盖前景色
     await page.getByRole('button', { name: '新建画布' }).click();
     await page.getByLabel('画布背景').selectOption('transparent');
-    await page.getByRole('button', { name: '创建' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '创建' }).click();
     await page.waitForTimeout(250);
     await page.getByRole('button', { name: '吸管', exact: true }).click();
     s = await stage();
@@ -1375,9 +1417,9 @@ test.describe('照片编辑器（zh-CN）', () => {
   test('新建画布对话框：指定尺寸后画布统计更新', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await page.getByRole('button', { name: '新建画布' }).click();
-    await page.getByLabel('宽度').fill('800');
-    await page.getByLabel('高度').fill('600');
-    await page.getByRole('button', { name: '创建' }).click();
+    await page.getByRole('dialog').getByLabel('宽度').fill('800');
+    await page.getByRole('dialog').getByLabel('高度').fill('600');
+    await page.getByRole('dialog').getByRole('button', { name: '创建' }).click();
     await expect(page.getByTestId('photo-stats')).toContainText('800 × 600');
   });
 
@@ -1454,7 +1496,9 @@ test.describe('照片编辑器（zh-CN）', () => {
     /** 取内容层画布中心像素亮度 */
     const centerLuma = () =>
       page.evaluate(() => {
-        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const canvas = document.querySelector(
+          '[data-testid="photo-content-canvas"]',
+        ) as HTMLCanvasElement;
         const ctx = canvas.getContext('2d')!;
         const { data } = ctx.getImageData(
           Math.floor(canvas.width / 2),
@@ -1497,7 +1541,9 @@ test.describe('照片编辑器（zh-CN）', () => {
     /** 内容层画布上的可见像素数（蒙版会直接改变它） */
     const countInk = () =>
       page.evaluate(() => {
-        const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement;
+        const canvas = document.querySelector(
+          '[data-testid="photo-content-canvas"]',
+        ) as HTMLCanvasElement;
         const ctx = canvas.getContext('2d')!;
         const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
         let n = 0;
@@ -1631,8 +1677,10 @@ test.describe('照片编辑器国际化（en-US）', () => {
     const mix = page.getByLabel('Blend mode');
     await expect(mix.locator('option')).toContainText(['Normal', 'Multiply']);
 
-    // 形状下拉为英文
-    await page.getByRole('button', { name: 'Shape', exact: true }).click();
+    // 形状下拉为英文（「形状」与「文字」同组，先切到形状工具，种类按钮才会出现）
+    await page.getByTestId('tool-group-vector').locator('button[aria-haspopup]').click();
+    await page.locator('[data-tool="shape"]').click();
+    await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Rounded rectangle' })).toBeVisible();
 
     // 新建画布对话框：预设为中性文本，按钮为英文
@@ -1656,7 +1704,9 @@ test.describe('照片编辑器国际化（en-US）', () => {
       await page.waitForTimeout(120);
       found.push(...(await scan()).map((line) => `${tab}: ${line}`));
     }
-    await page.getByRole('button', { name: 'Export image' }).click();
+    // 导出入口收在「文件」菜单里（菜单项 role=menuitem），先展开菜单再点
+    await page.getByTestId('menubar-file').click();
+    await page.getByRole('menuitem', { name: 'Export image' }).click();
     found.push(...(await scan()).map((line) => `export: ${line}`));
     await page.getByRole('button', { name: 'Cancel' }).click();
 
@@ -2363,6 +2413,8 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
         'base64',
       ),
     });
+    // 图片节点经 FileReader 异步插入，先等 <img> 落位再继续输入，避免文字排在图片之前
+    await page.locator('.tiptap img').first().waitFor();
     await page.keyboard.type('后文');
 
     // 图片与前后文字同处一个段落

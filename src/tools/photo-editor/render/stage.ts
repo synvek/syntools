@@ -85,6 +85,12 @@ export function createStage(container: HTMLDivElement): StageHandle {
   const contentLayer = new Konva.Layer({ listening: false });
   const overlayLayer = new Konva.Layer({ listening: false });
   stage.add(bgLayer, channelLayer, contentLayer, overlayLayer);
+  // E2E 稳定读取：给内容层画布加 data-testid（图层顺序变化会改变 canvas 索引，
+  // 测试里原本用 document.querySelectorAll('canvas')[1] 会误读到空白的通道层）。
+  (contentLayer.getCanvas() as unknown as { _canvas: HTMLCanvasElement })._canvas.setAttribute(
+    'data-testid',
+    'photo-content-canvas',
+  );
   let channelNode: Konva.Image | null = null;
 
   const handle: StageHandle = {

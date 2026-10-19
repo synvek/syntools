@@ -881,15 +881,24 @@ export default function PhotoTool() {
           }
         />
 
-        <PhotoToolbar
-          onFit={fitToWindow}
-          onZoom={zoomBy}
-          onActual={zoomActual}
-          onUndo={undo}
-          onRedo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
-        />
+        {/*
+          工具参数条固定高度：不同工具显示的控件行数不同（画笔有 4 个滑杆 + 色板，
+          吸管只有一个色板），若用 `flex-wrap` 让高度随内容变化，切换工具会把下方画布上下移动。
+          画布一旦位移，指针事件里 `getBoundingClientRect()` 的屏幕→文档映射就会错位，
+          吸管取色、橡皮擦除这类按屏幕坐标定位的工具会取错点。这里锁定高度（内部超高再滚动），
+          保证画布位置在切换工具时保持稳定。
+        */}
+        <div className="h-28 shrink-0 overflow-y-auto">
+          <PhotoToolbar
+            onFit={fitToWindow}
+            onZoom={zoomBy}
+            onActual={zoomActual}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+          />
+        </div>
 
         {notice ? (
           <p

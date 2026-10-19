@@ -321,46 +321,51 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
    * - 落在 handle → onConnect 已处理，跳过；
    * - 落在空白画布 / 自身 / 未拖动 → 不生成任何内容（仅连接到已有图形）。
    */
-  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
-    document.body.classList.remove('flow-connecting');
-    const from = connectingFrom.current;
-    connectingFrom.current = null;
-    const alreadyConnected = connectedRef.current;
-    connectedRef.current = false;
-    // 重连拖拽由其自身逻辑处理
-    if (reconnectingRef.current) return;
-    // onConnect 已创建连线（落点吸附到锚点）：不再补建
-    if (alreadyConnected) return;
-    if (!from?.nodeId) return;
-    const pt =
-      'changedTouches' in event ? (event as TouchEvent).changedTouches[0] : (event as MouseEvent);
-    // 未拖动（基本是点击锚点）：不生成，避免误建
-    if (
-      from.x !== undefined &&
-      from.y !== undefined &&
-      Math.hypot(pt.clientX - from.x, pt.clientY - from.y) < 20
-    ) {
-      return;
-    }
-    const el = document.elementFromPoint(pt.clientX, pt.clientY) as HTMLElement | null;
-    if (!el) return;
-    // 落在 handle 上：onConnect 已处理，避免重复
-    if (el.closest('.react-flow__handle')) return;
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      document.body.classList.remove('flow-connecting');
+      const from = connectingFrom.current;
+      connectingFrom.current = null;
+      const alreadyConnected = connectedRef.current;
+      connectedRef.current = false;
+      // 重连拖拽由其自身逻辑处理
+      if (reconnectingRef.current) return;
+      // onConnect 已创建连线（落点吸附到锚点）：不再补建
+      if (alreadyConnected) return;
+      if (!from?.nodeId) return;
+      const pt =
+        'changedTouches' in event ? (event as TouchEvent).changedTouches[0] : (event as MouseEvent);
+      // 未拖动（基本是点击锚点）：不生成，避免误建
+      if (
+        from.x !== undefined &&
+        from.y !== undefined &&
+        Math.hypot(pt.clientX - from.x, pt.clientY - from.y) < 20
+      ) {
+        return;
+      }
+      const nodes = useFlowStore.getState().nodes;
+      const src = nodes.find((n) => n.id === from.nodeId);
+      if (!src) return;
 
-    const nodes = useFlowStore.getState().nodes;
-    const src = nodes.find((n) => n.id === from.nodeId);
-    if (!src) return;
-
-    const nodeEl = el.closest('.react-flow__node') as HTMLElement | null;
-    const targetId = nodeEl?.getAttribute('data-id');
-
-    // 命中另一个图形：连到其身上最近边
-    if (targetId && targetId !== from.nodeId) {
-      const tgt = nodes.find((n) => n.id === targetId);
-      if (!tgt || isContainerKind(tgt.data.kind)) return;
+      // 用画布坐标命中「节点包围盒」，替代 elementFromPoint / closest 的 DOM 命中测试：
+      // 后者会被节点内部元素、覆盖层（SelectionResizer / QuickConnectOverlay 等）、
+      // 8 个始终存在的锚点命中区，以及绘制时序干扰，导致偶发「落到图形身上却丢线」。
+      const flowPoint = screenToFlowPosition({ x: pt.clientX, y: pt.clientY });
       const byId = new Map(nodes.map((n) => [n.id, n] as const));
+      const target = nodes.find((n) => {
+        if (n.id === from.nodeId || isContainerKind(n.data.kind)) return false;
+        const r = absoluteRectOf(n, byId);
+        return (
+          flowPoint.x >= r.x &&
+          flowPoint.x <= r.x + r.width &&
+          flowPoint.y >= r.y &&
+          flowPoint.y <= r.y + r.height
+        );
+      });
+      if (!target) return; // 落在空白 / 自身 / 容器 → 不生成
+
       const sb = absoluteRectOf(src, byId);
-      const tb = absoluteRectOf(tgt, byId);
+      const tb = absoluteRectOf(target, byId);
       const dx = tb.x + tb.width / 2 - (sb.x + sb.width / 2);
       const dy = tb.y + tb.height / 2 - (sb.y + sb.height / 2);
       let sh = 'b';
@@ -375,14 +380,12 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       useFlowStore.getState().onConnect({
         source: from.nodeId,
         sourceHandle: sh,
-        target: targetId,
+        target: target.id,
         targetHandle: th,
       });
-      return;
-    }
-
-    // 落在自身图形 / 空白画布：不生成任何内容
-  }, []);
+    },
+    [screenToFlowPosition],
+  );
 
   /** 正在拖动的节点 id（rAF 收口时读取；null 表示未拖动） */
   const draggingIdRef = useRef<string | null>(null);

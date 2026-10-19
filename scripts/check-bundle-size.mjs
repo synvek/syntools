@@ -28,8 +28,10 @@ const ENTRY_BUDGET = 195 * 1024;
 const CHUNK_BUDGET = 500 * 1024;
 // 电子表格工具依赖的 Univer / exceljs 天然是「重 chunk」：
 // 单个包体远超常规预算且无法再拆，单独放宽上限并记录在报告中，其余 chunk 仍受 500KB 约束。
-const HEAVY_CHUNK_BUDGET = 2 * 1024 * 1024;
-const HEAVY_CHUNK_PATTERNS = [/^vendor-univer-/, /^vendor-exceljs-/];
+// 注意：Univer 不能人为切分（@univerjs/* 之间循环依赖，见 vite.config.ts），生产构建里它会
+// 自然并入动态入口 `SpreadsheetTool-*.js`（~6MB 原始 / ~1.7MB gzip），因此按该前缀放宽。
+const HEAVY_CHUNK_BUDGET = 12 * 1024 * 1024;
+const HEAVY_CHUNK_PATTERNS = [/^vendor-univer/, /^vendor-exceljs-/, /^SpreadsheetTool-/];
 const budgetFor = (file) =>
   HEAVY_CHUNK_PATTERNS.some((pattern) => pattern.test(file)) ? HEAVY_CHUNK_BUDGET : CHUNK_BUDGET;
 

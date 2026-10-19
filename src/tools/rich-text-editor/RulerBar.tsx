@@ -100,6 +100,23 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
     });
   }, [margin.bottom, margin.left, margin.right, margin.top, viewMode, viewportRef, zoom]);
 
+  /**
+   * 水平标尺要等首次 measure 后（geo 非空）才会挂载，所以不能在 effect 里用
+   * `viewport.querySelector('.rte-ruler')` 观察它（那时还查不到，垂直标尺刻度会一直按
+   * 「标尺高度为 0」的旧几何定位，与正文错开约 20px）。改用回调 ref：节点一挂载就观察。
+   */
+  const measureRef = useRef(measure);
+  measureRef.current = measure;
+  const rulerObserverRef = useRef<ResizeObserver | null>(null);
+  const attachRuler = useCallback((node: HTMLDivElement | null) => {
+    rulerObserverRef.current?.disconnect();
+    rulerObserverRef.current = null;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => measureRef.current());
+    observer.observe(node);
+    rulerObserverRef.current = observer;
+  }, []);
+
   /** 光标位置 → 两条标尺上的偏移（相对正文内容区左 / 上边缘） */
   const syncCaret = useCallback(() => {
     const geometry = geoRef.current;
@@ -117,6 +134,9 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
 
   useEffect(() => {
     measure();
+    // 布局（尤其水平标尺高度）常在首帧后才稳定，强制下一帧再算一次，
+    // 否则垂直标尺刻度会与正文错位（vOffset 偏差可达 ~20px）。
+    requestAnimationFrame(() => measure());
     const viewport = viewportRef.current;
     if (!viewport) return;
     const observer =
@@ -124,6 +144,8 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
     observer?.observe(viewport);
     const surface = viewport.querySelector<HTMLElement>('.rte-surface');
     if (surface) observer?.observe(surface);
+    // 水平标尺高度变化会把正文区整体下移，但 surface 自身尺寸不变，
+    // 需要单独观察标尺；标尺由 attachRuler 在挂载时接管观察。
     // 滚动事件不冒泡，用捕获阶段同时覆盖内层横向滚动（.rte-page-area）
     const onScroll = () => measure();
     viewport.addEventListener('scroll', onScroll, true);
@@ -181,7 +203,7 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
       {/* 左上角交点 */}
       <span className="rte-ruler-corner" aria-hidden="true" />
       {/* 水平标尺 */}
-      <div className="rte-ruler" data-testid="rich-text-ruler" aria-hidden="true">
+      <div ref={attachRuler} className="rte-ruler" data-testid="rich-text-ruler" aria-hidden="true">
         <div
           className="rte-ruler-track"
           style={{ left: `${geo.offsetLeft}px`, width: `${geo.width}px` }}
