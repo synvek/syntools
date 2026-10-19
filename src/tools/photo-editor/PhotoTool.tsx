@@ -128,6 +128,7 @@ export default function PhotoTool() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
 
   const fail = useCallback((result: Failure) => setFailure(result), []);
 
@@ -157,7 +158,14 @@ export default function PhotoTool() {
     };
     compute();
     window.addEventListener('resize', compute);
-    return () => window.removeEventListener('resize', compute);
+    // 工具参数条的行数随当前工具变化（吸管一行、画笔三行），高度一变就得重算，
+    // 否则工作区要么被顶出视口，要么在参数条下方留出一条空白带
+    const observer = new ResizeObserver(compute);
+    if (toolbarRef.current) observer.observe(toolbarRef.current);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', compute);
+    };
     // 提示条 / 空文档说明会改变上方高度，需要重算
   }, [notice, doc.layers.length]);
 
@@ -882,13 +890,12 @@ export default function PhotoTool() {
         />
 
         {/*
-          工具参数条固定高度：不同工具显示的控件行数不同（画笔有 4 个滑杆 + 色板，
-          吸管只有一个色板），若用 `flex-wrap` 让高度随内容变化，切换工具会把下方画布上下移动。
-          画布一旦位移，指针事件里 `getBoundingClientRect()` 的屏幕→文档映射就会错位，
-          吸管取色、橡皮擦除这类按屏幕坐标定位的工具会取错点。这里锁定高度（内部超高再滚动），
-          保证画布位置在切换工具时保持稳定。
+          工具参数条按内容自然撑高（不锁死高度）：各工具显示的控件行数不同——吸管只有一行、
+          画笔有三行。锁成固定高度时，控件少的工具下方会留出一条空白带，控件多的工具则把
+          缩放控件裁进内部滚动区。高度变化由上方 ResizeObserver 传导给工作区，
+          指针映射每次事件现取 `getBoundingClientRect()`，因此画布位移不会造成取点错位。
         */}
-        <div className="h-28 shrink-0 overflow-y-auto">
+        <div ref={toolbarRef} className="shrink-0">
           <PhotoToolbar
             onFit={fitToWindow}
             onZoom={zoomBy}
