@@ -5,12 +5,11 @@ import type { ToolId } from '../model/types';
 /** 面板通用控件：统一控件高度（32px）与深色模式样式，避免各面板各写一套。 */
 
 const LABEL_CLASS = 'text-xs font-medium text-gray-500 dark:text-gray-400';
-const INPUT_CLASS =
-  'h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
-const BUTTON_CLASS =
-  'inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-gray-300 px-2.5 text-xs text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800';
-const PRIMARY_CLASS =
-  'inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50';
+const FOCUS_RING =
+  'outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900';
+const INPUT_CLASS = `h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-800 transition-colors focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 ${FOCUS_RING}`;
+const BUTTON_CLASS = `inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-gray-300 px-2.5 text-xs text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 ${FOCUS_RING}`;
+const PRIMARY_CLASS = `inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING}`;
 
 export function PanelSection({
   title,
@@ -318,7 +317,7 @@ export function ToolButton({
       aria-pressed={active}
       data-tool={tool}
       title={`${label}（${shortcut}）`}
-      className={`relative flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-100 active:scale-95 ${
+      className={`relative flex h-8 w-8 items-center justify-center rounded-lg outline-none transition-all duration-100 focus-visible:ring-2 focus-visible:ring-blue-500/70 active:scale-95 ${
         active
           ? 'bg-blue-600 text-white shadow-sm'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'

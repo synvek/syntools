@@ -56,6 +56,7 @@ import { PhotoToolbar } from './ui/PhotoToolbar';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { StatusBar } from './ui/StatusBar';
 import { ToolPalette } from './ui/ToolPalette';
+import { NARROW_QUERY, useMediaQuery } from './ui/useMediaQuery';
 import type { CanvasBackground, PhotoDoc } from './model/types';
 import './photo.css';
 
@@ -124,6 +125,8 @@ export default function PhotoTool() {
   const [psdBusy, setPsdBusy] = useState(false);
   const [presentSrc, setPresentSrc] = useState<string | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
+  /** 窄屏改为纵向堆叠：固定工作区高度会把画布挤没，改由内容自然撑开 */
+  const isNarrow = useMediaQuery(NARROW_QUERY);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
@@ -224,12 +227,15 @@ export default function PhotoTool() {
   useEffect(() => {
     let cancelled = false;
     void readDraft().then((draft) => {
-      if (cancelled || !draft) {
-        setRestored(true);
-        return;
+      if (cancelled) return;
+      if (draft) {
+        loadDoc(draft.doc);
+        setDegraded(draft.degraded);
       }
-      loadDoc(draft.doc);
-      setDegraded(draft.degraded);
+      // 首次进入（无草稿）或草稿本身就是空文档：预置一张可编辑的底色图层，
+      // 与 PS / Photopea 新建即有「背景」层一致，不再另设空态提示。
+      const state = usePhotoStore.getState();
+      if (state.doc.layers.length === 0) state.ensurePaintLayer();
       setRestored(true);
     });
     return () => {
@@ -389,6 +395,8 @@ export default function PhotoTool() {
         background,
       };
       loadDoc(next);
+      // 新建画布即预置一张底色图层（与初始化 / 清空一致）
+      usePhotoStore.getState().ensurePaintLayer();
       setScale(0);
       setViewport({ x: 0, y: 0 });
       clearDraft();
@@ -408,6 +416,8 @@ export default function PhotoTool() {
 
   const handleClear = useCallback(() => {
     loadDoc(createDoc());
+    // 清空后回到「有一张底色图层」的初始态，与首次进入一致
+    usePhotoStore.getState().ensurePaintLayer();
     clearDraft();
     setDraftSaved(false);
     setDegraded(false);
@@ -911,7 +921,7 @@ export default function PhotoTool() {
           <p
             role="status"
             data-testid="photo-notice"
-            className="self-start rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white shadow-lg dark:bg-gray-100 dark:text-gray-900"
+            className="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white shadow-lg dark:bg-gray-100 dark:text-gray-900"
           >
             {notice}
           </p>
@@ -919,11 +929,21 @@ export default function PhotoTool() {
 
         <div
           data-testid="photo-work-area"
-          className="flex gap-3"
-          style={{ height: workHeight ? `${workHeight}px` : undefined, minHeight: MIN_WORK_HEIGHT }}
+          className={`flex gap-3 ${isNarrow ? 'flex-col' : ''}`}
+          style={
+            isNarrow
+              ? undefined
+              : {
+                  height: workHeight ? `${workHeight}px` : undefined,
+                  minHeight: MIN_WORK_HEIGHT,
+                }
+          }
         >
           <ToolPalette />
-          <div ref={canvasHostRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div
+            ref={canvasHostRef}
+            className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${isNarrow ? 'min-h-[360px]' : ''}`}
+          >
             <PhotoCanvas
               onRuntimeFailure={() => setRuntimeError(true)}
               onCursorMove={setCursor}
@@ -934,17 +954,15 @@ export default function PhotoTool() {
           </div>
           <aside
             data-testid="photo-panels"
-            className="flex max-h-full w-72 shrink-0 flex-col overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+            className={`flex shrink-0 flex-col overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900 ${
+              isNarrow ? 'max-h-[40vh] w-full' : 'max-h-full w-72'
+            }`}
           >
             <PanelDock content={panelContent} />
           </aside>
         </div>
 
         <StatusBar cursor={cursor} />
-
-        {doc.layers.length === 0 ? (
-          <p className="text-xs text-gray-400 dark:text-gray-500">{t('tools.photo.emptyHint')}</p>
-        ) : null}
 
         {failure ? (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">

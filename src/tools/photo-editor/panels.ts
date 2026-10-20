@@ -30,8 +30,16 @@ export interface PanelLayout {
   hidden: PanelId[];
 }
 
+/**
+ * 默认只展开「颜色 / 图层 / 历史」：其余面板可从标题栏或「窗口」菜单展开。
+ * 九个面板同时展开时右侧栏过长，首屏只能滚到一半，主任务（导入 / 图层）被挤到视口外。
+ */
 export function defaultPanelLayout(): PanelLayout {
-  return { order: [...ALL_PANELS], collapsed: [], hidden: [] };
+  return {
+    order: [...ALL_PANELS],
+    collapsed: ['style', 'text', 'channels', 'property', 'adjust', 'filter'],
+    hidden: [],
+  };
 }
 
 const STORAGE_KEY = 'syntools:photo-editor.panels.v1';
@@ -54,7 +62,8 @@ function normalizeIds(raw: unknown): PanelId[] {
  * 与 `model/migrate.ts` 同一思路——只补默认值、不猜测。
  */
 export function normalizePanelLayout(raw: unknown): PanelLayout {
-  const src = (raw && typeof raw === 'object' ? raw : {}) as Partial<PanelLayout>;
+  if (!raw || typeof raw !== 'object') return defaultPanelLayout();
+  const src = raw as Partial<PanelLayout>;
   const seen = new Set<PanelId>();
   const order: PanelId[] = [];
   if (Array.isArray(src.order)) {
@@ -68,7 +77,12 @@ export function normalizePanelLayout(raw: unknown): PanelLayout {
   for (const id of ALL_PANELS) {
     if (!seen.has(id)) order.push(id);
   }
-  return { order, collapsed: normalizeIds(src.collapsed), hidden: normalizeIds(src.hidden) };
+  // 缺省字段：无 collapsed/hidden 数组时按默认折叠策略，不把「缺字段」当成「全部展开」
+  const collapsed = Array.isArray(src.collapsed)
+    ? normalizeIds(src.collapsed)
+    : defaultPanelLayout().collapsed;
+  const hidden = Array.isArray(src.hidden) ? normalizeIds(src.hidden) : [];
+  return { order, collapsed, hidden };
 }
 
 export function loadPanelLayout(): PanelLayout {

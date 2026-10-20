@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ALL_PANELS, defaultPanelLayout, normalizePanelLayout } from './panels';
 
 describe('photo panels layout', () => {
-  it('default layout lists every panel exactly once, all expanded and visible', () => {
+  it('default layout lists every panel once and collapses secondary panels', () => {
     const layout = defaultPanelLayout();
     expect(layout.order).toEqual([...ALL_PANELS]);
-    expect(layout.collapsed).toEqual([]);
+    expect(layout.collapsed).toEqual(['style', 'text', 'channels', 'property', 'adjust', 'filter']);
     expect(layout.hidden).toEqual([]);
   });
 
@@ -34,9 +34,9 @@ describe('photo panels layout', () => {
     expect(normalizePanelLayout(42)).toEqual(defaultPanelLayout());
   });
 
-  it('normalize: non-array collapsed/hidden are treated as empty', () => {
+  it('normalize: non-array collapsed falls back to default; bad hidden becomes empty', () => {
     const layout = normalizePanelLayout({ collapsed: 'x', hidden: { a: 1 } });
-    expect(layout.collapsed).toEqual([]);
+    expect(layout.collapsed).toEqual(defaultPanelLayout().collapsed);
     expect(layout.hidden).toEqual([]);
   });
 });

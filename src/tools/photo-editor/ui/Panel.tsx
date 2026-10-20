@@ -43,7 +43,7 @@ export function Panel({
     <section
       data-testid={testId}
       data-collapsed={collapsed ? 'true' : undefined}
-      className="flex flex-col rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+      className="flex flex-col border-b border-gray-200 last:border-b-0 dark:border-gray-800"
     >
       <header className="flex items-center gap-1 px-1.5 py-1">
         <button

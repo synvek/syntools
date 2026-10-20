@@ -30,7 +30,7 @@ export function PanelDock({ content }: { content: Record<PanelId, ReactNode> }) 
   };
 
   return (
-    <div className="flex flex-col gap-2" data-testid="panel-dock">
+    <div className="flex flex-col" data-testid="panel-dock">
       {visible.map((id, index) => (
         <Panel
           key={id}

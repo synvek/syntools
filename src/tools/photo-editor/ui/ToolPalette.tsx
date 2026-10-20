@@ -29,7 +29,7 @@ export function ToolPalette() {
     <div
       data-testid="photo-tool-palette"
       // 工作区高度由视口决定，工具栏比它高时**自己内部滚动**（浮层走 portal，不受这里裁剪）
-      className="flex max-h-full w-12 shrink-0 flex-col items-center gap-1 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+      className="flex max-h-full w-12 shrink-0 flex-col items-center gap-1 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-sm dark:border-gray-800 dark:bg-gray-900 max-lg:max-h-14 max-lg:w-full max-lg:flex-row max-lg:overflow-x-auto max-lg:overflow-y-hidden"
     >
       {TOOL_GROUPS.map((group, groupIndex) => {
         const current = displayToolOf(group, tool);
@@ -40,7 +40,10 @@ export function ToolPalette() {
         return (
           <Fragment key={group.id}>
             {startsSection ? (
-              <span aria-hidden className="my-0.5 h-px w-7 bg-gray-200 dark:bg-gray-700" />
+              <span
+                aria-hidden
+                className="my-0.5 h-px w-7 bg-gray-200 dark:bg-gray-700 max-lg:mx-0.5 max-lg:my-0 max-lg:h-7 max-lg:w-px"
+              />
             ) : null}
             <div className="relative" data-testid={`tool-group-${group.id}`}>
               <ToolButton

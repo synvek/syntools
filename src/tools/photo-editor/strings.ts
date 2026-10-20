@@ -31,8 +31,7 @@ const zh: ResourceTree = {
       degraded: '草稿过大，仅保存结构（图层内容已清空）',
       hint: '所有编辑都在浏览器本地完成，图片不会上传；支持 PNG / JPEG / WEBP 导出与工程文件续编',
       openHint: '拖入或选择一张图片，将作为新图层打开',
-      emptyHint: '还没有图层：先「导入图片」，或用右下角按钮新建空白 / 文字 / 形状图层',
-      canvasAria: 'photo canvas',
+      canvasAria: '照片画布',
 
       dialogNew: '新建画布',
       preset: '预设尺寸',
@@ -578,8 +577,7 @@ const en: ResourceTree = {
       degraded: 'Draft too large: structure only, layer pixels were dropped',
       hint: 'Everything runs locally in your browser; export PNG / JPEG / WEBP or save a project to keep editing',
       openHint: 'Drop or pick an image to open it as a new layer',
-      emptyHint: 'No layers yet: import an image, or add a blank / text / shape layer',
-      canvasAria: 'photo canvas',
+      canvasAria: 'Photo canvas',
 
       dialogNew: 'New canvas',
       preset: 'Preset',
@@ -1132,8 +1130,7 @@ const zhTW: ResourceTree = {
       degraded: '草稿過大，僅儲存結構（圖層內容已清空）',
       hint: '所有編輯都在瀏覽器本機完成，圖片不會上傳；可匯出 PNG / JPEG / WEBP 或儲存專案續編',
       openHint: '拖曳或選擇一張圖片，將作為新圖層開啟',
-      emptyHint: '還沒有圖層：先「匯入圖片」，或用右下角按鈕新增空白 / 文字 / 形狀圖層',
-      canvasAria: 'photo canvas',
+      canvasAria: '照片畫布',
 
       dialogNew: '新增畫布',
       preset: '預設尺寸',
@@ -1679,9 +1676,7 @@ const ja: ResourceTree = {
       degraded: '下書きが大きすぎるため構造のみ保存（レイヤーの内容は空になります）',
       hint: 'すべてブラウザ内で処理され、画像はアップロードされません。PNG / JPEG / WEBP 書き出しとプロジェクト保存に対応',
       openHint: '画像をドロップまたは選択すると、新しいレイヤーとして開きます',
-      emptyHint:
-        'レイヤーがありません：画像を読み込むか、空白 / 文字 / 図形レイヤーを追加してください',
-      canvasAria: 'photo canvas',
+      canvasAria: 'フォトキャンバス',
 
       dialogNew: '新規キャンバス',
       preset: 'プリセット',
@@ -2234,8 +2229,7 @@ const fr: ResourceTree = {
         'Brouillon trop volumineux : structure seule, les pixels des calques ont été supprimés',
       hint: 'Tout se déroule localement dans le navigateur, aucune image n’est envoyée ; export PNG / JPEG / WEBP et projet rééditable',
       openHint: 'Déposez ou choisissez une image pour l’ouvrir comme nouveau calque',
-      emptyHint: 'Aucun calque : importez une image, ou ajoutez un calque vide / texte / forme',
-      canvasAria: 'photo canvas',
+      canvasAria: 'Canevas photo',
 
       dialogNew: 'Nouveau canevas',
       preset: 'Préréglage',
@@ -2792,9 +2786,7 @@ const de: ResourceTree = {
       degraded: 'Entwurf zu groß: nur Struktur gespeichert, Ebeneninhalte wurden verworfen',
       hint: 'Alles läuft lokal im Browser, keine Bilddaten werden hochgeladen; PNG / JPEG / WEBP Export und weiterbearbeitbare Projektdatei',
       openHint: 'Bild hierher ziehen oder auswählen, um es als neue Ebene zu öffnen',
-      emptyHint:
-        'Noch keine Ebenen: Bild importieren oder eine leere / Text- / Form-Ebene hinzufügen',
-      canvasAria: 'photo canvas',
+      canvasAria: 'Fotoleinwand',
 
       dialogNew: 'Neue Leinwand',
       preset: 'Voreinstellung',
@@ -3349,9 +3341,7 @@ const it: ResourceTree = {
         'Bozza troppo grande: salvata solo la struttura, i pixel dei livelli sono stati rimossi',
       hint: 'Tutto avviene localmente nel browser, nessuna immagine viene caricata; esporta PNG / JPEG / WEBP o salva un progetto modificabile',
       openHint: 'Trascina o scegli un’immagine per aprirla come nuovo livello',
-      emptyHint:
-        'Nessun livello: importa un’immagine oppure aggiungi un livello vuoto / di testo / forma',
-      canvasAria: 'photo canvas',
+      canvasAria: 'Tela foto',
 
       dialogNew: 'Nuova tela',
       preset: 'Predefinito',
@@ -3908,9 +3898,7 @@ const es: ResourceTree = {
         'Borrador demasiado grande: solo la estructura, se descartaron los píxeles de las capas',
       hint: 'Todo ocurre localmente en el navegador y ninguna imagen se sube; exporta PNG / JPEG / WEBP o guarda un proyecto editable',
       openHint: 'Arrastra o elige una imagen para abrirla como nueva capa',
-      emptyHint:
-        'Aún no hay capas: importa una imagen o añade una capa vacía / de texto / de forma',
-      canvasAria: 'photo canvas',
+      canvasAria: 'Lienzo de foto',
 
       dialogNew: 'Nuevo lienzo',
       preset: 'Predefinido',
@@ -4466,9 +4454,7 @@ const pt: ResourceTree = {
         'Rascunho demasiado grande: apenas a estrutura, os píxeis das camadas foram descartados',
       hint: 'Tudo corre localmente no navegador, nenhuma imagem é enviada; exporte PNG / JPEG / WEBP ou guarde um projeto editável',
       openHint: 'Arraste ou escolha uma imagem para abri-la como nova camada',
-      emptyHint:
-        'Ainda sem camadas: importe uma imagem ou adicione uma camada vazia / de texto / de forma',
-      canvasAria: 'photo canvas',
+      canvasAria: 'Tela de foto',
 
       dialogNew: 'Nova tela',
       preset: 'Predefinição',

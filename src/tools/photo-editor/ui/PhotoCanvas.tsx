@@ -539,7 +539,7 @@ export function PhotoCanvas({
       ref={wrapperRef}
       className="photo-canvas-wrapper relative flex-1 overflow-hidden rounded-xl border border-gray-200 bg-[#0B1220] dark:border-gray-800"
     >
-      <div ref={canvasRef} className="photo-stage" aria-label="photo canvas" />
+      <div ref={canvasRef} className="photo-stage" aria-label={t('tools.photo.canvasAria')} />
       {viewRotation ? (
         <button
           type="button"
