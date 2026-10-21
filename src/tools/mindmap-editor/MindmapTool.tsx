@@ -3,6 +3,7 @@ import { ReactFlowProvider, useReactFlow, type Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { DocumentHeader } from '@/core/components/DocumentHeader';
 import { Icon } from '@/core/components/Icon';
+import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
 import { useMindStore } from './store';
 import { clearDraft, readDraft, writeDraft } from './draft';
@@ -31,6 +32,9 @@ function MindmapInner() {
   const { t } = useTranslation();
   const { fitView, getNodes } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
+  /** 工作区（大纲 + 画布 + 属性面板）高度 = 首屏剩余空间 */
+  const workRowRef = useRef<HTMLDivElement | null>(null);
+  const workHeight = useViewportFill(workRowRef, { min: 360 });
 
   const doc = useMindStore((s) => s.doc);
   const selectedId = useMindStore((s) => s.selectedId);
@@ -209,7 +213,7 @@ function MindmapInner() {
   const onlyRoot = doc.nodes.length <= 1;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" data-tool-root>
       <DocumentHeader
         titleLabel={t('tools.mindmap.docTitle')}
         titlePlaceholder={t('tools.mindmap.titlePlaceholder')}
@@ -277,7 +281,11 @@ function MindmapInner() {
         onMove={(id, dir) => useMindStore.getState().moveSheet(id, dir)}
       />
 
-      <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
+      <div
+        ref={workRowRef}
+        className="flex h-[max(360px,calc(100vh-28rem))] gap-3"
+        style={workHeight ? { height: workHeight } : undefined}
+      >
         <OutlinePanel />
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">

@@ -15,6 +15,7 @@ import {
 } from '@/core/components/editorChrome';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { ProgressBar } from '@/core/components/ProgressBar';
+import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes } from '@/core/pdf/download';
@@ -83,6 +84,8 @@ const SAVE_DEBOUNCE_MS = 600;
 export default function SpreadsheetTool() {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  /** 表格区高度 = 首屏剩余空间（底部标签栏 / 状态栏可见，「相关工具」推到首屏之外） */
+  const sheetHeight = useViewportFill(containerRef, { min: 460 });
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const handleRef = useRef<UniverHandle | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -677,7 +680,7 @@ export default function SpreadsheetTool() {
   }, [summary]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-tool-root>
       <EditorMenuBar
         menus={menus}
         ariaLabel={t('common.menuBar')}
@@ -773,7 +776,11 @@ export default function SpreadsheetTool() {
         ref={surfaceRef}
         className="relative overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
       >
-        <div ref={containerRef} className="sheet-canvas" />
+        <div
+          ref={containerRef}
+          className="sheet-canvas"
+          style={sheetHeight ? { height: `${sheetHeight}px` } : undefined}
+        />
         {visibleCharts.map((config) => (
           <ChartOverlay
             key={config.id}

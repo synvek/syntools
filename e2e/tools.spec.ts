@@ -964,18 +964,21 @@ test.describe('流程图编辑器（zh-CN）', () => {
 
 // 照片编辑器（zh-CN）
 test.describe('照片编辑器（zh-CN）', () => {
-  test.use({ locale: 'zh-CN' });
+  // 工作区有 460px 最小高度：窗口再矮就会整页滚动，画布落点会随滚动位置漂移。
+  // 用常见的笔记本尺寸跑，保证用例点的是画布里真实的位置。
+  test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
 
   test('画布挂载 → 画笔落笔自动建图层 → 导出 PNG', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
     // Konva 会注入 3 个 canvas（背景 / 内容 / 覆盖层）
     expect(await page.locator('canvas').count()).toBeGreaterThanOrEqual(3);
-    await expect(page.getByTestId('photo-stats')).toContainText('图层 0');
+    // 新建文档即预置一张底色图层（与 PS / Photopea 的「背景」层一致）
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 画笔工具：在没有图层时落笔会自动新建位图图层
+    // 画笔工具：落笔写入当前（底色）图层
     await page.getByRole('button', { name: '画笔', exact: true }).click();
-    const canvasBox = (await page.getByLabel('photo canvas').boundingBox())!;
+    const canvasBox = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(canvasBox.x + 120, canvasBox.y + 120);
     await page.mouse.down();
     await page.mouse.move(canvasBox.x + 220, canvasBox.y + 200, { steps: 8 });
@@ -993,7 +996,7 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('适应窗口：算出容器真实比例（不退化到最小缩放）→ 100% 复原', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     const readZoom = async () =>
       Number((await page.getByTestId('photo-zoom').textContent())?.replace(/\D/g, '') ?? '0');
@@ -1012,7 +1015,7 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('画笔 / 橡皮：拖动过程中即时生效（不等松手）', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     /** 统计内容层画布上「有颜色」的像素数（每次现取画布位置，避免页面滚动导致坐标失效） */
     const paintedPixels = () =>
@@ -1028,7 +1031,7 @@ test.describe('照片编辑器（zh-CN）', () => {
       });
 
     await page.getByRole('button', { name: '画笔', exact: true }).click();
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     const y = box.y + Math.min(box.height - 40, Math.max(40, box.height / 2));
 
     await page.mouse.move(box.x + 80, y);
@@ -1045,19 +1048,48 @@ test.describe('照片编辑器（zh-CN）', () => {
     // 橡皮沿同一条线擦回：松手前像素就应该减少
     // 橡皮已从画笔组独立出来，工具箱里直接可点
     await page.getByTestId('photo-tool-palette').locator('[data-tool="eraser"]').click();
-    const box2 = (await page.getByLabel('photo canvas').boundingBox())!;
-    const y2 = box2.y + Math.min(box2.height - 40, Math.max(40, box2.height / 2));
-    await page.mouse.move(box2.x + 80, y2);
+
+    // 切到橡皮后工具参数条行数变化，工作区高度跟着重算，画布会整体位移，
+    // 之前记下的屏幕坐标已失效；改成从画布像素里现找笔迹所在的那一行再换算成屏幕坐标。
+    const line = await page.evaluate(() => {
+      const canvas = document.querySelector(
+        '[data-testid="photo-content-canvas"]',
+      ) as HTMLCanvasElement;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let bestY = 0;
+      let bestCount = 0;
+      for (let y = 0; y < canvas.height; y++) {
+        let count = 0;
+        for (let x = 0; x < canvas.width; x++) {
+          if (data[(y * canvas.width + x) * 4 + 3] > 0) count += 1;
+        }
+        if (count > bestCount) {
+          bestCount = count;
+          bestY = y;
+        }
+      }
+      const rect = canvas.getBoundingClientRect();
+      return {
+        count: bestCount,
+        y: rect.y + ((bestY + 0.5) * rect.height) / canvas.height,
+        left: rect.x + rect.width * 0.2,
+        right: rect.x + rect.width * 0.8,
+      };
+    });
+    expect(line.count).toBeGreaterThan(0);
+
+    await page.mouse.move(line.left, line.y);
     await page.mouse.down();
-    await page.mouse.move(box2.x + 320, y2, { steps: 12 });
-    await page.waitForTimeout(150);
-    expect(await paintedPixels()).toBeLessThan(painted);
+    await page.mouse.move(line.right, line.y, { steps: 12 });
+    // 仍未松手：只要在拖动过程中（而不是松手后）像素减少即可，给重绘留出几帧
+    await expect.poll(paintedPixels, { timeout: 1000 }).toBeLessThan(painted);
     await page.mouse.up();
   });
 
   test('抓手：拖动过程中即时平移视口', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     const transform = () =>
       page.evaluate(
@@ -1066,7 +1098,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     const panX = async () => Number((await transform())?.split(',')[1] ?? '0');
 
     await page.getByRole('button', { name: '抓手', exact: true }).click();
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
     const before = await panX();
@@ -1097,7 +1129,7 @@ test.describe('照片编辑器（zh-CN）', () => {
 
     const stroke = async () => {
       await page.getByRole('button', { name: '画笔', exact: true }).click();
-      const box = (await page.getByLabel('photo canvas').boundingBox())!;
+      const box = (await page.getByTestId('photo-canvas').boundingBox())!;
       const y = box.y + Math.min(box.height - 40, Math.max(40, box.height / 2));
       await page.mouse.move(box.x + 80, y);
       await page.mouse.down();
@@ -1107,14 +1139,14 @@ test.describe('照片编辑器（zh-CN）', () => {
     };
 
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
     await stroke();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
     // 等草稿落盘（草稿状态图标出现「已保存到本地草稿」提示）后刷新：恢复出来的图层必须还能继续画
     await expect(page.getByLabel('已保存到本地草稿')).toBeVisible({ timeout: 5000 });
     await page.reload();
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
     const restored = await paintedPixels();
     expect(restored).toBeGreaterThan(0);
@@ -1163,7 +1195,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     page,
   }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     // 空态下也能通过 ⋯ 菜单创建第一个图层
     await page.getByTestId('layer-menu-trigger').click();
@@ -1186,7 +1218,7 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('画布右键菜单：选区后续操作（填充 / 反选 / 通过拷贝新建图层）', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     const paintedPixels = () =>
       page.evaluate(() => {
@@ -1202,7 +1234,7 @@ test.describe('照片编辑器（zh-CN）', () => {
 
     const menu = page.getByTestId('canvas-context-menu');
     const openMenu = async () => {
-      const canvas = page.getByLabel('photo canvas');
+      const canvas = page.getByTestId('photo-canvas');
       await canvas.scrollIntoViewIfNeeded();
       const box = (await canvas.boundingBox())!;
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
@@ -1228,7 +1260,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     // 矩形选区 → 反选 → 清除：只有原选区内像素保留
     await page.keyboard.press('Control+a');
     await page.getByRole('button', { name: '矩形选区', exact: true }).click();
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(box.x + 120, box.y + 120);
     await page.mouse.down();
     await page.mouse.move(box.x + 320, box.y + 260, { steps: 8 });
@@ -1252,11 +1284,11 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('吸管：取色有反馈，透明像素不覆盖前景色，Alt+点击可临时取色', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     /** 文档坐标 → 屏幕坐标：data-transform = "scale,tx,ty" */
     const stage = async () => {
-      const box = (await page.getByLabel('photo canvas').boundingBox())!;
+      const box = (await page.getByTestId('photo-canvas').boundingBox())!;
       const raw = await page.evaluate(
         () => (document.querySelector('.photo-stage') as HTMLElement).dataset.transform!,
       );
@@ -1323,7 +1355,7 @@ test.describe('照片编辑器（zh-CN）', () => {
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     const transform = async () => {
       const raw = await page.evaluate(
@@ -1332,7 +1364,7 @@ test.describe('照片编辑器（zh-CN）', () => {
       const [scale, x, y] = raw.split(',').map(Number);
       return { scale, x, y, raw };
     };
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 
     // 1) 100% 放大后内容必然超出视口 → 两条滚动条都出现
@@ -1423,7 +1455,7 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('导出 PSD：下载 .psd 且可在 Photoshop / Photopea 继续编辑', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     // 两层内容：位图 + 编组内再一层，验证层树映射不报错
     await page.getByTestId('layer-menu-trigger').first().click();
@@ -1447,11 +1479,11 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('智能对象：位图转换后保留源像素尺寸，可再栅格化', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     // 一张位图图层（落笔自动创建）
     await page.getByRole('button', { name: '画笔', exact: true }).click();
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(box.x + 120, box.y + 120);
     await page.mouse.down();
     await page.mouse.move(box.x + 260, box.y + 200, { steps: 8 });
@@ -1481,13 +1513,13 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('调整图层：作用于下方全部内容，改亮度即时生效且可撤销', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     // 底色：一张画满的位图（用油漆桶铺满画布，排除背景干扰）
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '空白图层' }).click();
     await page.getByRole('button', { name: '油漆桶', exact: true }).click();
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
@@ -1525,11 +1557,11 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('图层蒙版：隐藏全部 → 画笔涂白显示 → 反相 → 删除', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     // 建一张有内容的位图图层
     await page.getByRole('button', { name: '画笔', exact: true }).click();
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(box.x + 100, box.y + 100);
     await page.mouse.down();
     await page.mouse.move(box.x + 320, box.y + 260, { steps: 10 });
@@ -1563,8 +1595,9 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.down();
     await page.mouse.move(box.x + 300, box.y + 240, { steps: 10 });
     await page.mouse.up();
+    // 蒙版合成是异步的（脏区重绘），直接读画布可能还没更新
+    await expect.poll(countInk).toBeGreaterThan(0);
     const revealed = await countInk();
-    expect(revealed).toBeGreaterThan(0);
 
     // 反相：黑白互换 → 显示区域取反（与涂白区域互补，不再是同一批像素）
     await page.getByTestId('mask-edit-toggle').click();
@@ -1582,7 +1615,7 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('图层编组：新建组 → 图层移入 → 折叠隐藏子图层 → 解散', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     // 先有一张位图图层
     await page.getByTestId('layer-menu-trigger').click();
@@ -1615,11 +1648,11 @@ test.describe('照片编辑器（zh-CN）', () => {
 
   test('历史面板：按操作名列出步骤，点击可跳转并清空', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     // 画笔落笔 → 自动新建图层（一步历史）
     await page.getByRole('button', { name: '画笔', exact: true }).click();
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(box.x + 120, box.y + 120);
     await page.mouse.down();
     await page.mouse.move(box.x + 200, box.y + 180, { steps: 6 });
@@ -1727,7 +1760,7 @@ test.describe('照片编辑器国际化（en-US）', () => {
 
   test('英文界面无残留中文（含各标签页 / 弹窗 / 右键菜单）', async ({ page }) => {
     await page.goto('/tools/photo-editor');
-    await expect(page.getByLabel('photo canvas')).toBeVisible();
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     await expect(page.getByLabel('Canvas name')).toHaveAttribute('placeholder', 'Untitled canvas');
 
@@ -1778,7 +1811,7 @@ test.describe('照片编辑器国际化（en-US）', () => {
     found.push(...(await scan()).map((line) => `export: ${line}`));
     await page.getByRole('button', { name: 'Cancel' }).click();
 
-    const box = (await page.getByLabel('photo canvas').boundingBox())!;
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
     await expect(page.getByTestId('canvas-context-menu')).toBeVisible();
     found.push(...(await scan()).map((line) => `ctx: ${line}`));
@@ -2721,4 +2754,48 @@ test.describe('多页浏览（zh-CN）', () => {
     await expect(page.getByTestId('page-counter')).toContainText('1');
     expect(errors).toEqual([]);
   });
+});
+
+/**
+ * 六个办公类编辑器统一的工作区高度规则：
+ * 工作区撑满首屏剩余空间，底部状态栏留在首屏内，「相关工具」被推到首屏之外（滚动才可见）。
+ * 这样各工具默认可见的工作区一致，也不会因为写死的 calc 常量把相关工具挤进首屏。
+ */
+test.describe('办公工具工作区（zh-CN）', () => {
+  // 工作区最小高度（320 / 460）是按常见笔记本屏幕定的，窗口更矮时按设计允许页面滚动
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  const editors = [
+    'rich-text-editor',
+    'spreadsheet-editor',
+    'slide-editor',
+    'mindmap-editor',
+    'flowchart-editor',
+    'photo-editor',
+  ];
+
+  for (const id of editors) {
+    test(`${id}：工作区撑满首屏，相关工具默认在首屏之外`, async ({ page }) => {
+      await page.goto(`/tools/${id}`);
+      await expect(page.locator('[data-tool-root]')).toBeVisible();
+
+      // 返回 'ok' 或诊断串：失败时能看到具体几何，便于判断是哪个方向溢出
+      const measure = () =>
+        page.evaluate(() => {
+          const vh = window.innerHeight;
+          const related = document.querySelector('section[aria-label="相关工具"]');
+          const relatedTop = related ? Math.round(related.getBoundingClientRect().top) : -1;
+          const bar = document.querySelector('[data-editor-statusbar]');
+          const barBottom = bar ? Math.round(bar.getBoundingClientRect().bottom) : null;
+          // 状态栏必须完整留在首屏内（±1px 舍入容差）
+          const barOk = barBottom === null || barBottom <= vh + 1;
+          const relatedOk = relatedTop >= vh;
+          return barOk && relatedOk
+            ? 'ok'
+            : `relatedTop=${relatedTop} barBottom=${barBottom} vh=${vh}`;
+        });
+
+      await expect.poll(measure, { timeout: 15_000 }).toBe('ok');
+    });
+  }
 });

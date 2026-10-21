@@ -13,6 +13,7 @@ import {
   formatBytes,
   type EditorMenu,
 } from '@/core/components/editorChrome';
+import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes, downloadDataUrl } from '@/core/pdf/download';
@@ -88,6 +89,9 @@ export default function SlideTool() {
   const saveTimer = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
+  /** 工作区（缩略图栏 + 画布 + 右侧面板）高度 = 首屏剩余空间 */
+  const workRowRef = useRef<HTMLDivElement | null>(null);
+  const workHeight = useViewportFill(workRowRef, { min: 360, signature: viewMode });
 
   const fail = useCallback((error: string, params?: Record<string, string | number>) => {
     setFailure({ error, params });
@@ -345,7 +349,7 @@ export default function SlideTool() {
   const memory = useMemo(() => formatBytes(estimateJsonBytes(doc)), [doc]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" data-tool-root>
       <EditorMenuBar
         menus={menus}
         ariaLabel={t('common.menuBar')}
@@ -416,7 +420,11 @@ export default function SlideTool() {
       {viewMode === 'master' ? (
         <MasterView onRuntimeFailure={() => setRuntimeError(true)} />
       ) : (
-        <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
+        <div
+          ref={workRowRef}
+          className="flex h-[max(360px,calc(100vh-28rem))] gap-3"
+          style={workHeight ? { height: workHeight } : undefined}
+        >
           <ThumbnailRail />
 
           <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">

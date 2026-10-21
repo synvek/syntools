@@ -12,6 +12,7 @@ import {
   formatBytes,
   type EditorMenu,
 } from '@/core/components/editorChrome';
+import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
 import { buildTemplateDoc, type TemplateKind, type TemplateTranslator } from './model/templates';
 import { LAYOUT_DENSITY } from './layout';
@@ -119,6 +120,13 @@ function FlowchartInner() {
   const [stringsReady, setStringsReady] = useState(() =>
     hasFlowchartStrings(i18nInstance.language),
   );
+  /** 工作区（图形库 + 画布 + 属性面板）高度 = 首屏剩余空间 */
+  const workRowRef = useRef<HTMLDivElement | null>(null);
+  // 文案未就绪时整个工具返回 null（工作区尚未挂载），把就绪状态作为重算信号
+  const workHeight = useViewportFill(workRowRef, {
+    min: 360,
+    signature: stringsReady ? 'ready' : 'loading',
+  });
 
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
@@ -693,7 +701,7 @@ function FlowchartInner() {
   const statusText = draftSaved ? t('tools.flowchart.saved') : t('tools.flowchart.saving');
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" data-tool-root>
       <EditorMenuBar
         menus={menus}
         ariaLabel={t('common.menuBar')}
@@ -828,7 +836,11 @@ function FlowchartInner() {
         />
       ) : null}
 
-      <div className="flex h-[max(360px,calc(100vh-28rem))] gap-3">
+      <div
+        ref={workRowRef}
+        className="flex h-[max(360px,calc(100vh-28rem))] gap-3"
+        style={workHeight ? { height: workHeight } : undefined}
+      >
         <div
           className={
             isNarrow

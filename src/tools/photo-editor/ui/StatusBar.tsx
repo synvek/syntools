@@ -17,7 +17,10 @@ export function StatusBar({ cursor }: { cursor: { x: number; y: number } | null 
   const layer = doc.layers.find((item) => item.id === activeId);
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-gray-200 bg-white px-3 py-1.5 font-mono text-[11px] text-gray-500 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+    <div
+      data-editor-statusbar
+      className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-gray-200 bg-white px-3 py-1.5 font-mono text-[11px] text-gray-500 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400"
+    >
       <span data-testid="photo-mode" className="text-gray-400 dark:text-gray-500">
         RGB · 8-bit
       </span>

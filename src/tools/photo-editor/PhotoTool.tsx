@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { HintTip } from '@/core/components/DocumentHeader';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
+import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import {
@@ -75,8 +76,6 @@ const DRAFT_DEBOUNCE_MS = 1200;
  * 比它更矮时左侧栏会出现内部滚动条，而它比改前的 520px 更小 —— 画布反而更高了。
  */
 const MIN_WORK_HEIGHT = 460;
-/** 工作区下方预留给状态栏 + 「相关工具」的高度（只留一点，提示下面还有内容） */
-const WORK_BOTTOM_RESERVE = 200;
 
 /**
  * 照片编辑器：Konva 画布 + 浏览器本地的多图层图像编辑。
@@ -118,8 +117,6 @@ export default function PhotoTool() {
   const [restored, setRestored] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  /** 工作区高度（首屏剩余空间）；null 表示尚未测量，此时用 CSS 下限兜底 */
-  const [workHeight, setWorkHeight] = useState<number | null>(null);
   const [presenting, setPresenting] = useState(false);
   /** PSD 导出进行中（只有这个分支会异步载入 ag-psd） */
   const [psdBusy, setPsdBusy] = useState(false);
@@ -131,46 +128,20 @@ export default function PhotoTool() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
-  const toolbarRef = useRef<HTMLDivElement | null>(null);
-
-  const fail = useCallback((result: Failure) => setFailure(result), []);
-
+  const workRowRef = useRef<HTMLDivElement | null>(null);
   /**
-   * 工作区高度 = 首屏剩余空间。
+   * 工作区（工具箱 + 画布 + 右侧面板）高度 = 首屏剩余空间。
    *
    * 必须测，不能写死 `calc(100vh - Npx)`：工作区上方的行数会变（提示条、降级提示、画布为空时的说明），
-   * 写死常量会在这些情况下把状态栏与「相关工具」挤出视口（同一坑在富文本编辑器里已踩过一次）。
+   * 写死常量会在这些情况下把状态栏挤出视口；宽度/高度的变化由 hook 内部的重测兜住。
    *
    * 另一重意义：**切断「左侧工具栏高度 → 工作区高度」的传导**。
    * 之前工具栏平铺 26 个工具约 1100px，它是 flex 行里最高的元素，于是整行被撑到 1100px，
    * 画布也一起被拉长，页面只能滚动 —— 工作区高度改由视口决定后，工具栏再高也只会自己内部滚动。
    */
-  useEffect(() => {
-    const host = canvasHostRef.current;
-    if (!host) return;
-    const compute = () => {
-      // 用 offsetTop 链求文档内偏移：不受当前滚动位置影响，避免滚动时高度抖动
-      let top = 0;
-      let node: HTMLElement | null = host;
-      while (node) {
-        top += node.offsetTop;
-        node = node.offsetParent as HTMLElement | null;
-      }
-      const available = window.innerHeight - top - WORK_BOTTOM_RESERVE;
-      setWorkHeight(Math.max(MIN_WORK_HEIGHT, Math.round(available)));
-    };
-    compute();
-    window.addEventListener('resize', compute);
-    // 工具参数条的行数随当前工具变化（吸管一行、画笔三行），高度一变就得重算，
-    // 否则工作区要么被顶出视口，要么在参数条下方留出一条空白带
-    const observer = new ResizeObserver(compute);
-    if (toolbarRef.current) observer.observe(toolbarRef.current);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', compute);
-    };
-    // 提示条 / 空文档说明会改变上方高度，需要重算
-  }, [notice, doc.layers.length]);
+  const workHeight = useViewportFill(workRowRef, { min: MIN_WORK_HEIGHT });
+
+  const fail = useCallback((result: Failure) => setFailure(result), []);
 
   /* --------------------------- 面板布局持久化 --------------------------- */
 
@@ -821,7 +792,7 @@ export default function PhotoTool() {
 
   return (
     <DropZone onFile={handleDropFile} testId="photo-drop">
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3" data-tool-root>
         {/* 隐藏的文件选择器：菜单中的「导入图片 / 导入工程」仍复用它们 */}
         <input
           ref={imageInputRef}
@@ -914,7 +885,7 @@ export default function PhotoTool() {
           缩放控件裁进内部滚动区。高度变化由上方 ResizeObserver 传导给工作区，
           指针映射每次事件现取 `getBoundingClientRect()`，因此画布位移不会造成取点错位。
         */}
-        <div ref={toolbarRef} className="shrink-0">
+        <div className="shrink-0">
           <PhotoToolbar
             onFit={fitToWindow}
             onZoom={zoomBy}
@@ -937,6 +908,7 @@ export default function PhotoTool() {
         ) : null}
 
         <div
+          ref={workRowRef}
           data-testid="photo-work-area"
           className={`flex gap-3 ${isNarrow ? 'flex-col' : ''}`}
           style={

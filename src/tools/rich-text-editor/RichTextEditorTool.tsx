@@ -15,6 +15,7 @@ import {
   type EditorMenu,
 } from '@/core/components/editorChrome';
 import { ProgressBar } from '@/core/components/ProgressBar';
+import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes } from '@/core/pdf/download';
@@ -118,8 +119,6 @@ type BusyKind = 'import' | 'docx' | 'pdf' | null;
 const SAVE_DEBOUNCE_MS = 600;
 /** 编辑区最小可用高度：窗口过矮时宁可让页面滚动，也不把编辑区压扁 */
 const MIN_VIEWPORT_PX = 320;
-/** 底部给「相关工具」等页脚内容预留的空间，保证它们始终在首屏可见 */
-const BOTTOM_RESERVE_PX = 150;
 
 /** 拼写面板最多展示的问题数：超出部分不渲染，避免长文档铺开上百条 */
 const SPELL_ISSUE_LIMIT = 100;
@@ -235,7 +234,8 @@ export default function RichTextEditorTool() {
   const [saved, setSaved] = useState(Boolean(initial));
   const flowRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const [viewportMax, setViewportMax] = useState<number | null>(null);
+  /** 编辑区高度 = 首屏剩余空间（底部状态栏留在首屏内，「相关工具」推到首屏之外） */
+  const viewportMax = useViewportFill(viewportRef, { min: MIN_VIEWPORT_PX });
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -345,40 +345,6 @@ export default function RichTextEditorTool() {
       mountedRef.current = false;
     };
   }, []);
-  // 编辑区高度按「首屏剩余空间」计算：头部/工具栏高度不固定（会随面板展开变化），
-  // 写死 calc(100vh - Npx) 会把底部内容（相关工具）挤出视口。
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const compute = () => {
-      // 用 offsetTop 链求文档内偏移：不受当前滚动位置影响，避免滚动时高度抖动
-      let top = 0;
-      let node: HTMLElement | null = el;
-      while (node) {
-        top += node.offsetTop;
-        node = node.offsetParent as HTMLElement | null;
-      }
-      const available = window.innerHeight - top - BOTTOM_RESERVE_PX;
-      setViewportMax(Math.max(MIN_VIEWPORT_PX, Math.round(available)));
-    };
-    compute();
-    const observer = new ResizeObserver(compute);
-    if (el.parentElement) observer.observe(el.parentElement);
-    window.addEventListener('resize', compute);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', compute);
-    };
-  }, [
-    findOpen,
-    outlineOpen,
-    pageSetupOpen,
-    stylesOpen,
-    reviewOpen,
-    libraryOpen,
-    versionsOpen,
-    diffVersion,
-  ]);
 
   const docIdRef = useRef<string | null>(null);
   docIdRef.current = docId;
@@ -1259,7 +1225,7 @@ export default function RichTextEditorTool() {
   const memory = useMemo(() => formatBytes(estimateJsonBytes(snapshotHtml)), [snapshotHtml]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-tool-root>
       <EditorMenuBar
         menus={menus}
         ariaLabel={t('common.menuBar')}
