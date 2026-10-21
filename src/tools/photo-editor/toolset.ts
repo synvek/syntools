@@ -9,8 +9,10 @@ import type { ToolId } from './model/types';
  * 真正的按键绑定仍在 `interaction/keyboard.ts`，`toolset.test.ts` 会守住两边一致。
  *
  * **分组即工具箱的一行**：26 个工具平铺会让左侧栏超过 1000px 高（把整个工作区顶高、页面只能滚动），
- * 因此按「工具家族」压缩成 11 行、4 个大区 —— 每行只显示**当前工具**
+ * 因此按「工具家族」压缩成 15 行、4 个大区 —— 每行只显示**当前工具**
  * （该组没选中过任何工具时显示 `primary`），同组其它工具收进角标浮层（与 Photoshop 的工具组一致）。
+ * 高频工具（画笔 / 橡皮 / 仿制图章 / 文字 / 形状）各自独立成行，不再藏在角标里；
+ * 行数超过工作区高度时由工具箱自己滚动（`ui/ToolPalette.tsx` 的 `max-h-full overflow-y-auto`）。
  */
 
 export interface ToolDef {
@@ -90,14 +92,18 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
     primary: 'crop',
     items: [{ id: 'crop', icon: 'imageCrop', labelKey: 'tools.photo.toolCrop', shortcut: 'C' }],
   },
+  // 画笔与橡皮互为替代工具，但使用频率都很高：各自独立成行，少一次角标展开
   {
-    id: 'paint',
+    id: 'brush',
     section: 'paint',
     primary: 'brush',
-    items: [
-      { id: 'brush', icon: 'brush', labelKey: 'tools.photo.toolBrush', shortcut: 'B' },
-      { id: 'eraser', icon: 'eraser', labelKey: 'tools.photo.toolEraser', shortcut: 'E' },
-    ],
+    items: [{ id: 'brush', icon: 'brush', labelKey: 'tools.photo.toolBrush', shortcut: 'B' }],
+  },
+  {
+    id: 'eraser',
+    section: 'paint',
+    primary: 'eraser',
+    items: [{ id: 'eraser', icon: 'eraser', labelKey: 'tools.photo.toolEraser', shortcut: 'E' }],
   },
   {
     id: 'fill',
@@ -118,14 +124,30 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       { id: 'sponge', icon: 'sponge', labelKey: 'tools.photo.toolSponge', shortcut: '⇧O' },
     ],
   },
+  // 仿制图章取样逻辑与修复类工具差异较大，单独成行
   {
-    id: 'repair',
+    id: 'clone',
     section: 'paint',
     primary: 'cloneStamp',
     items: [
       { id: 'cloneStamp', icon: 'clone', labelKey: 'tools.photo.toolCloneStamp', shortcut: 'S' },
+    ],
+  },
+  // 修复画笔 / 污点修复共用「取周边像素修补」的交互，合成一组（⇧J 循环）
+  {
+    id: 'heal',
+    section: 'paint',
+    primary: 'healing',
+    items: [
       { id: 'healing', icon: 'healing', labelKey: 'tools.photo.toolHealing', shortcut: 'J' },
       { id: 'spotHeal', icon: 'spotHeal', labelKey: 'tools.photo.toolSpotHeal', shortcut: '⇧J' },
+    ],
+  },
+  {
+    id: 'blur',
+    section: 'paint',
+    primary: 'smudge',
+    items: [
       { id: 'smudge', icon: 'smudge', labelKey: 'tools.photo.toolSmudge', shortcut: 'R' },
       { id: 'blurBrush', icon: 'blurBrush', labelKey: 'tools.photo.toolBlurBrush', shortcut: '⇧R' },
       {
@@ -150,14 +172,18 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       { id: 'sampler', icon: 'sampler', labelKey: 'tools.photo.toolSampler', shortcut: '⇧I' },
     ],
   },
+  // 文字与形状是两类对象（文本层 / 形状层），各自独立成行
   {
-    id: 'vector',
+    id: 'text',
     section: 'sample',
     primary: 'text',
-    items: [
-      { id: 'text', icon: 'text', labelKey: 'tools.photo.toolText', shortcut: 'T' },
-      { id: 'shape', icon: 'shapes', labelKey: 'tools.photo.toolShape', shortcut: 'U' },
-    ],
+    items: [{ id: 'text', icon: 'text', labelKey: 'tools.photo.toolText', shortcut: 'T' }],
+  },
+  {
+    id: 'shape',
+    section: 'sample',
+    primary: 'shape',
+    items: [{ id: 'shape', icon: 'shapes', labelKey: 'tools.photo.toolShape', shortcut: 'U' }],
   },
   {
     id: 'nav',

@@ -28,7 +28,7 @@ import { loadImageFile } from './model/assets';
 import { loadSvgFile } from './render/svg';
 import { resolveImageKind } from './core';
 import { createDoc } from './model/factory';
-import { loadPanelLayout, savePanelLayout } from './panels';
+import { PANEL_GROUPS, loadPanelLayout, savePanelLayout } from './panels';
 import type { PanelId } from './panels';
 import { buildProjectJson, projectFilename, readProjectFile } from './project';
 import { downloadCanvas, downloadExport, exportDoc, exportExtension } from './render/export';
@@ -102,7 +102,7 @@ export default function PhotoTool() {
   const setScale = usePhotoStore((s) => s.setScale);
   const setViewport = usePhotoStore((s) => s.setViewport);
   const setPanels = usePhotoStore((s) => s.setPanels);
-  const togglePanelVisible = usePhotoStore((s) => s.togglePanelVisible);
+  const showPanel = usePhotoStore((s) => s.showPanel);
   const resetPanels = usePhotoStore((s) => s.resetPanels);
   const undo = usePhotoStore((s) => s.undo);
   const redo = usePhotoStore((s) => s.redo);
@@ -174,13 +174,18 @@ export default function PhotoTool() {
 
   /* --------------------------- 面板布局持久化 --------------------------- */
 
-  useEffect(() => {
-    setPanels(loadPanelLayout());
-  }, [setPanels]);
+  const [panelsRestored, setPanelsRestored] = useState(false);
 
   useEffect(() => {
+    setPanels(loadPanelLayout());
+    setPanelsRestored(true);
+  }, [setPanels]);
+
+  // 读取完成前不回写：StrictMode 会二次挂载，先写一次默认值就会把已存的布局覆盖掉
+  useEffect(() => {
+    if (!panelsRestored) return;
     savePanelLayout(panels);
-  }, [panels]);
+  }, [panels, panelsRestored]);
 
   /** 放映：先渲染放映层（显示「生成中」），下一帧再合成整幅位图，避免大图卡住首次绘制 */
   const openPresent = useCallback(() => {
@@ -763,13 +768,17 @@ export default function PhotoTool() {
       id: 'window',
       label: t('tools.photo.menuWindow'),
       entries: [
-        ...(Object.keys(panelTitle) as PanelId[]).map((id) =>
-          menuItem(
-            `window-${id}`,
-            `${panelTitle[id]}${panels.hidden.includes(id) ? '' : ' ✓'}`,
-            () => togglePanelVisible(id),
+        // 按三个面板分组列出子 tab：点击即切到对应面板的该 tab（✓ 表示当前选中）
+        ...PANEL_GROUPS.flatMap((group, index) => [
+          ...(index > 0 ? ([{ type: 'separator' }] as const) : []),
+          ...group.panels.map((id) =>
+            menuItem(
+              `window-${id}`,
+              `${panelTitle[id]}${panels.tabs[group.id] === id ? ' ✓' : ''}`,
+              () => showPanel(id),
+            ),
           ),
-        ),
+        ]),
         { type: 'separator' },
         menuItem('window-reset', t('tools.photo.menuWindowReset'), resetPanels),
       ],
@@ -954,8 +963,8 @@ export default function PhotoTool() {
           </div>
           <aside
             data-testid="photo-panels"
-            className={`flex shrink-0 flex-col overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900 ${
-              isNarrow ? 'max-h-[40vh] w-full' : 'max-h-full w-72'
+            className={`flex min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900 ${
+              isNarrow ? 'h-[40vh] w-full' : 'h-full w-72'
             }`}
           >
             <PanelDock content={panelContent} />

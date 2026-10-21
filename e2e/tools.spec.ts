@@ -1043,9 +1043,8 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(painted).toBeGreaterThan(0);
 
     // 橡皮沿同一条线擦回：松手前像素就应该减少
-    // 橡皮与画笔同组，收在工具箱该行的角标浮层里
-    await page.getByTestId('tool-group-paint').locator('button[aria-haspopup]').click();
-    await page.locator('[data-tool="eraser"]').click();
+    // 橡皮已从画笔组独立出来，工具箱里直接可点
+    await page.getByTestId('photo-tool-palette').locator('[data-tool="eraser"]').click();
     const box2 = (await page.getByLabel('photo canvas').boundingBox())!;
     const y2 = box2.y + Math.min(box2.height - 40, Math.max(40, box2.height / 2));
     await page.mouse.move(box2.x + 80, y2);
@@ -1120,8 +1119,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     const restored = await paintedPixels();
     expect(restored).toBeGreaterThan(0);
 
-    await page.getByTestId('tool-group-paint').locator('button[aria-haspopup]').click();
-    await page.locator('[data-tool="eraser"]').click();
+    await page.getByTestId('photo-tool-palette').locator('[data-tool="eraser"]').click();
 
     // 恢复后的视口平移/缩放不必和刷新前一致，所以按画布里真实有笔迹的那一行换算屏幕坐标再擦，
     // 否则固定屏幕坐标可能落在空白处（像素没丢也擦不到）。
@@ -1464,7 +1462,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '转换为智能对象' }).click();
 
-    await page.getByRole('button', { name: '属性', exact: true }).click();
+    await page.getByRole('tab', { name: '属性', exact: true }).click();
     await expect(page.getByTestId('smart-section')).toBeVisible();
     // 源像素尺寸来自原始资产（画布 1280×720 上的图层宽度）
     await expect(page.getByTestId('smart-section')).toContainText('1280 × 720');
@@ -1512,7 +1510,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     // 新建调整图层 → 选中它 → 调亮度
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '新建调整图层' }).click();
-    await page.getByRole('button', { name: '调整', exact: true }).click();
+    await page.getByRole('tab', { name: '调整', exact: true }).click();
     const before = await centerLuma();
 
     const brightness = page.getByLabel('亮度');
@@ -1554,7 +1552,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(before).toBeGreaterThan(0);
 
     // 属性页 → 添加蒙版（隐藏全部）
-    await page.getByRole('button', { name: '属性', exact: true }).click();
+    await page.getByRole('tab', { name: '属性', exact: true }).click();
     await page.getByRole('button', { name: '隐藏全部' }).click();
     await expect(page.getByTestId('mask-remove')).toBeVisible();
     await expect.poll(countInk).toBe(0);
@@ -1628,7 +1626,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.up();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    await page.getByRole('button', { name: '历史', exact: true }).click();
+    await page.getByRole('tab', { name: '历史', exact: true }).click();
     const list = page.getByTestId('history-list');
     await expect(list).toBeVisible();
     // 打开文档 → 新建图层 → 画笔落笔（当前）
@@ -1649,6 +1647,77 @@ test.describe('照片编辑器（zh-CN）', () => {
     // 清空历史：只剩当前状态一行
     await page.getByTestId('history-clear').click();
     await expect(list.locator('li')).toHaveCount(1);
+  });
+
+  test('右侧面板：三块等分 → 拖动分割线改高度 → 各自滚动、侧栏不整体滚动', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByTestId('photo-panels')).toBeVisible();
+
+    const heights = () =>
+      page.evaluate(() =>
+        ['color', 'layers', 'info'].map((id) =>
+          Math.round(
+            document.querySelector(`[data-testid="panel-group-${id}"]`)!.getBoundingClientRect()
+              .height,
+          ),
+        ),
+      );
+
+    // 默认三等分
+    const [first, second, third] = await heights();
+    expect(Math.abs(first - second)).toBeLessThanOrEqual(2);
+    expect(Math.abs(second - third)).toBeLessThanOrEqual(2);
+
+    // 侧栏本身不产生整体滚动条（内容溢出只发生在各面板内部）
+    await expect
+      .poll(() =>
+        page.getByTestId('photo-panels').evaluate((el) => el.scrollHeight - el.clientHeight),
+      )
+      .toBeLessThanOrEqual(1);
+
+    // 拖动第一、二块之间的分割线：第一块变高、第二块变矮
+    const box = (await page.getByTestId('panel-divider-1').boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + 40, { steps: 5 });
+    await page.mouse.up();
+
+    const [grownFirst, shrunkSecond] = await heights();
+    expect(grownFirst).toBeGreaterThan(first);
+    expect(shrunkSecond).toBeLessThan(second);
+
+    // 颜色面板内容高于可视区：在自己的内容区滚动
+    const inner = await page.getByTestId('panel-group-color').evaluate((el) => {
+      const area = el.lastElementChild as HTMLElement;
+      return { scroll: area.scrollHeight, client: area.clientHeight };
+    });
+    expect(inner.scroll).toBeGreaterThan(inner.client);
+  });
+
+  test('工具箱：首次点击选中，再次点击弹出同组工具，角标只是图标', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    const palette = page.getByTestId('photo-tool-palette');
+    const bucket = palette.locator('[data-tool="fill"]');
+    await expect(bucket).toBeVisible();
+
+    // 一行只有一颗按钮：右下角小三角是图标，不再有第二颗「展开」按钮
+    await expect(page.getByTestId('tool-group-fill').locator('button')).toHaveCount(1);
+
+    // 首次点击 = 选中，不弹层
+    await bucket.click();
+    await expect(bucket).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+
+    // 再次点击同一个已选中的按钮 = 弹出组内工具
+    await bucket.click();
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem')).toHaveText([/油漆桶/, /渐变/]);
+
+    // 选完自动收起，按钮切到新工具
+    await menu.getByRole('menuitem', { name: '渐变' }).click();
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(palette.locator('[data-tool="gradient"]')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
@@ -1677,9 +1746,8 @@ test.describe('照片编辑器国际化（en-US）', () => {
     const mix = page.getByLabel('Blend mode');
     await expect(mix.locator('option')).toContainText(['Normal', 'Multiply']);
 
-    // 形状下拉为英文（「形状」与「文字」同组，先切到形状工具，种类按钮才会出现）
-    await page.getByTestId('tool-group-vector').locator('button[aria-haspopup]').click();
-    await page.locator('[data-tool="shape"]').click();
+    // 形状下拉为英文（形状已是独立按钮，点开后种类按钮才会出现）
+    await page.getByTestId('photo-tool-palette').locator('[data-tool="shape"]').click();
     await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Rounded rectangle' })).toBeVisible();
 
@@ -1700,7 +1768,7 @@ test.describe('照片编辑器国际化（en-US）', () => {
       });
     const found: string[] = [];
     for (const tab of ['Properties', 'Adjust', 'Filters', 'Layers']) {
-      await page.getByRole('button', { name: tab, exact: true }).click();
+      await page.getByRole('tab', { name: tab, exact: true }).click();
       await page.waitForTimeout(120);
       found.push(...(await scan()).map((line) => `${tab}: ${line}`));
     }

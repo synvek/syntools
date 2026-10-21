@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { Icon } from '@/core/components/Icon';
 import type { ToolId } from '../model/types';
 
@@ -293,13 +293,20 @@ export function ToggleChip({
   );
 }
 
-/** 工具箱按钮：竖排图标，当前工具高亮 */
+/**
+ * 工具箱按钮：竖排图标，当前工具高亮。
+ *
+ * 角标语义（与 Photoshop / Photopea 一致）：
+ * - 右上角：快捷键字母，仅在当前工具高亮时出现，避免 15 行都挂着一串字母；
+ * - 右下角小三角：该行还有同族工具（**纯装饰**，不能点，点击行为统一由按钮本身承担）。
+ */
 export function ToolButton({
   tool,
   icon,
   label,
   shortcut,
   active,
+  grouped = false,
   onSelect,
 }: {
   tool: ToolId;
@@ -307,12 +314,14 @@ export function ToolButton({
   label: string;
   shortcut: string;
   active: boolean;
-  onSelect: (tool: ToolId) => void;
+  /** 是否还有同组工具：有则显示右下角小三角 */
+  grouped?: boolean;
+  onSelect: (tool: ToolId, event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onSelect(tool)}
+      onClick={(event) => onSelect(tool, event)}
       aria-label={label}
       aria-pressed={active}
       data-tool={tool}
@@ -325,9 +334,17 @@ export function ToolButton({
     >
       <Icon name={icon} className="h-4 w-4" />
       {active ? (
-        <span className="absolute -bottom-0.5 right-0.5 rounded bg-blue-700/90 px-1 text-[9px] font-medium text-white">
+        <span className="absolute -right-1 -top-1 rounded bg-blue-700/95 px-1 py-px text-[9px] font-medium leading-none text-white shadow-sm">
           {shortcut}
         </span>
+      ) : null}
+      {grouped ? (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute bottom-0 right-0 h-0 w-0 border-b-[5px] border-l-[5px] border-l-transparent ${
+            active ? 'border-b-white/85' : 'border-b-gray-400 dark:border-b-gray-500'
+          }`}
+        />
       ) : null}
     </button>
   );

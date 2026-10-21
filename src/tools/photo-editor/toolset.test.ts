@@ -85,20 +85,28 @@ describe('工具箱分组', () => {
   });
 
   it('行数不回到平铺（否则左侧栏会重新长到 1000px 以上）', () => {
-    expect(TOOL_GROUPS.length).toBeLessThanOrEqual(12);
+    expect(TOOL_GROUPS.length).toBeLessThanOrEqual(16);
     expect(ALL_TOOLS.length).toBeGreaterThan(TOOL_GROUPS.length);
   });
 
+  it('高频工具各自独立成行，修复画笔与污点修复同组', () => {
+    for (const id of ['brush', 'eraser', 'cloneStamp', 'text', 'shape']) {
+      expect(groupOfTool(id as ToolId)?.items).toHaveLength(1);
+    }
+    expect(groupOfTool('healing')?.id).toBe(groupOfTool('spotHeal')?.id);
+    expect(groupOfTool('healing')?.items.map((item) => item.id)).toEqual(['healing', 'spotHeal']);
+  });
+
   it('displayToolOf：该组用过就显示用过的，否则回落到主工具', () => {
-    const paint = TOOL_GROUPS.find((group) => group.id === 'paint');
-    const repair = TOOL_GROUPS.find((group) => group.id === 'repair');
-    expect(paint).toBeDefined();
-    expect(repair).toBeDefined();
+    const heal = TOOL_GROUPS.find((group) => group.id === 'heal');
+    const blur = TOOL_GROUPS.find((group) => group.id === 'blur');
+    expect(heal).toBeDefined();
+    expect(blur).toBeDefined();
     // 当前工具不属于该组：显示该组主工具
-    expect(displayToolOf(paint!, 'move').id).toBe(paint!.primary);
+    expect(displayToolOf(heal!, 'move').id).toBe(heal!.primary);
     // 当前工具属于该组：显示它（记住用户上次的选择）
-    expect(displayToolOf(paint!, 'eraser').id).toBe('eraser');
-    expect(displayToolOf(repair!, 'smudge').id).toBe('smudge');
+    expect(displayToolOf(heal!, 'spotHeal').id).toBe('spotHeal');
+    expect(displayToolOf(blur!, 'sharpenBrush').id).toBe('sharpenBrush');
   });
 
   it('同一大区的分组必须连续（分隔线只在跨区处画，否则会出现重复线）', () => {

@@ -1,21 +1,46 @@
-import type { ReactNode } from 'react';
+import { Fragment, useCallback, useRef, useState } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PanelId } from '../panels';
+import { PANEL_GROUPS } from '../panels';
+import type { PanelGroupId, PanelId } from '../panels';
 import { usePhotoStore } from '../store';
-import { Panel } from './Panel';
+
+/** 拖动分割线时每块面板至少保留的高度（标题条 + 一行内容） */
+const MIN_PANEL_PX = 84;
+/** 键盘 ← → 微调步长 */
+const KEYBOARD_STEP_PX = 24;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 /**
- * 面板停靠列：按 `panels.order` 渲染全部面板，支持折叠 / 上移下移 / 显隐（显隐在「窗口」菜单里切换）。
- * 与旧版「5 个互斥 Tab」相比，面板可同时可见，更贴近桌面修图软件的工作区。
+ * 面板停靠区：自上而下三个固定面板（颜色 / 图层 / 信息），每个面板内部是一组子 tab。
+ *
+ * 三个面板铺满侧栏高度（默认各 1/3），之间的分割线可拖动调整高度；
+ * 面板本身不再整体滚动，内容超出时只在各自的内容区滚动，避免侧栏出现拥挤的整体滚动条。
+ * 每个面板只记录自己当前选中的子 tab（切走再切回来保持原样）。
  */
 export function PanelDock({ content }: { content: Record<PanelId, ReactNode> }) {
   const { t } = useTranslation();
   const panels = usePhotoStore((s) => s.panels);
-  const togglePanelCollapsed = usePhotoStore((s) => s.togglePanelCollapsed);
-  const expandPanel = usePhotoStore((s) => s.expandPanel);
-  const movePanel = usePhotoStore((s) => s.movePanel);
+  const setPanelTab = usePhotoStore((s) => s.setPanelTab);
 
-  const visible = panels.order.filter((id) => !panels.hidden.includes(id));
+  // 高度权重（flex-grow）：默认 1/1/1，拖动分割线时只改变相邻两块的比例
+  const [sizes, setSizes] = useState<number[]>(() => PANEL_GROUPS.map(() => 1));
+  const [dragging, setDragging] = useState(false);
+  const sectionRefs = useRef<(HTMLElement | null)[]>([]);
+  const drag = useRef<{ index: number; startY: number; startA: number; pairPx: number } | null>(
+    null,
+  );
+
+  const groupLabels: Record<PanelGroupId, string> = {
+    color: t('tools.photo.tabGroupColor'),
+    layers: t('tools.photo.tabGroupLayers'),
+    info: t('tools.photo.tabGroupInfo'),
+  };
   // 标题取既有 Tab 文案，保持与「窗口」菜单、e2e 选择器一致
   const titles: Record<PanelId, string> = {
     color: t('tools.photo.tabColor'),
@@ -29,28 +54,126 @@ export function PanelDock({ content }: { content: Record<PanelId, ReactNode> }) 
     history: t('tools.photo.tabHistory'),
   };
 
+  /** 把相邻两块的高度换算成权重：两者权重和保持不变，只改比例 */
+  const resizePair = useCallback((index: number, aPx: number, pairPx: number) => {
+    setSizes((prev) => {
+      const total = prev[index] + prev[index + 1];
+      const next = [...prev];
+      next[index] = (total * aPx) / pairPx;
+      next[index + 1] = (total * (pairPx - aPx)) / pairPx;
+      return next;
+    });
+  }, []);
+
+  const measurePair = (index: number) => {
+    const first = sectionRefs.current[index]?.getBoundingClientRect().height ?? 0;
+    const second = sectionRefs.current[index + 1]?.getBoundingClientRect().height ?? 0;
+    return { first, pairPx: first + second };
+  };
+
+  const handlePointerDown = (index: number) => (event: ReactPointerEvent<HTMLDivElement>) => {
+    const { first, pairPx } = measurePair(index);
+    if (pairPx <= MIN_PANEL_PX * 2) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { index, startY: event.clientY, startA: first, pairPx };
+    setDragging(true);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = drag.current;
+    if (!state) return;
+    const aPx = clamp(
+      state.startA + (event.clientY - state.startY),
+      MIN_PANEL_PX,
+      state.pairPx - MIN_PANEL_PX,
+    );
+    resizePair(state.index, aPx, state.pairPx);
+  };
+
+  const endDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return;
+    drag.current = null;
+    setDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const handleKeyDown = (index: number) => (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const { first, pairPx } = measurePair(index);
+    if (pairPx <= MIN_PANEL_PX * 2) return;
+    const delta = event.key === 'ArrowUp' ? -KEYBOARD_STEP_PX : KEYBOARD_STEP_PX;
+    resizePair(index, clamp(first + delta, MIN_PANEL_PX, pairPx - MIN_PANEL_PX), pairPx);
+  };
+
   return (
-    <div className="flex flex-col" data-testid="panel-dock">
-      {visible.map((id, index) => (
-        <Panel
-          key={id}
-          testId={`panel-${id}`}
-          title={titles[id]}
-          collapsed={panels.collapsed.includes(id)}
-          onToggle={() => togglePanelCollapsed(id)}
-          onReveal={() => expandPanel(id)}
-          onMoveUp={() => movePanel(id, -1)}
-          onMoveDown={() => movePanel(id, 1)}
-          canMoveUp={index > 0}
-          canMoveDown={index < visible.length - 1}
-          moveUpLabel={t('tools.photo.panelUp')}
-          moveDownLabel={t('tools.photo.panelDown')}
-          collapseLabel={t('tools.photo.collapse')}
-          expandLabel={t('tools.photo.expand')}
-        >
-          {content[id]}
-        </Panel>
-      ))}
+    <div
+      className={`flex h-full min-h-0 flex-col ${dragging ? 'select-none' : ''}`}
+      data-testid="panel-dock"
+    >
+      {PANEL_GROUPS.map((group, index) => {
+        const active = panels.tabs[group.id];
+        return (
+          <Fragment key={group.id}>
+            {index > 0 ? (
+              <div
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label={t('tools.photo.panelResize')}
+                tabIndex={0}
+                data-testid={`panel-divider-${index}`}
+                onPointerDown={handlePointerDown(index - 1)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                onKeyDown={handleKeyDown(index - 1)}
+                className="group relative flex h-2 shrink-0 cursor-row-resize touch-none items-center focus:outline-none"
+              >
+                <span className="h-px w-full bg-gray-200 transition-colors group-hover:bg-blue-400 group-focus-visible:bg-blue-500 dark:bg-gray-800 dark:group-hover:bg-blue-500" />
+              </div>
+            ) : null}
+            <section
+              ref={(node) => {
+                sectionRefs.current[index] = node;
+              }}
+              data-testid={`panel-group-${group.id}`}
+              style={{ flexGrow: sizes[index], flexBasis: 0 }}
+              className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800"
+            >
+              <div
+                role="tablist"
+                aria-label={groupLabels[group.id]}
+                className="flex shrink-0 gap-0.5 border-b border-gray-200 bg-gray-100/80 p-1 dark:border-gray-800 dark:bg-gray-800/50"
+              >
+                {group.panels.map((id) => {
+                  const selected = active === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      data-testid={`panel-tab-${id}`}
+                      onClick={() => setPanelTab(group.id, id)}
+                      className={`min-w-0 flex-1 truncate rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors ${
+                        selected
+                          ? 'bg-white text-gray-700 shadow-sm dark:bg-gray-700 dark:text-gray-100'
+                          : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      {titles[id]}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">{content[active]}</div>
+            </section>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

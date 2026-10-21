@@ -91,8 +91,8 @@ import type {
   ViewOverlay,
   Viewport,
 } from './model/types';
-import { defaultPanelLayout, normalizePanelLayout } from './panels';
-import type { PanelId, PanelLayout } from './panels';
+import { defaultPanelLayout, normalizePanelLayout, panelGroupOf } from './panels';
+import type { PanelGroupId, PanelId, PanelLayout } from './panels';
 
 /**
  * 照片编辑器状态：唯一真相源是 `doc`，其余（当前工具 / 选区 / 视口 / 历史）是会话态。
@@ -348,12 +348,10 @@ interface PhotoState {
   /** 画笔是否写入蒙版（而非图层本体） */
   maskEditing: boolean;
   setMaskEditing: (value: boolean) => void;
-  /** 面板布局：整体替换 / 折叠 / 展开 / 显隐 / 上移下移 / 复位 */
+  /** 面板布局：整体替换 / 切换某个面板内的子 tab / 显示某个子面板 / 复位 */
   setPanels: (layout: PanelLayout) => void;
-  togglePanelCollapsed: (id: PanelId) => void;
-  expandPanel: (id: PanelId) => void;
-  togglePanelVisible: (id: PanelId) => void;
-  movePanel: (id: PanelId, dir: -1 | 1) => void;
+  setPanelTab: (group: PanelGroupId, id: PanelId) => void;
+  showPanel: (id: PanelId) => void;
   resetPanels: () => void;
   setGroupPassThrough: (id: string, passThrough: boolean) => void;
   reorderLayer: (id: string, toIndex: number) => void;
@@ -1338,43 +1336,20 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   setPanels: (panels) => set({ panels }),
 
-  togglePanelCollapsed: (id) =>
-    set((s) => ({
-      panels: {
-        ...s.panels,
-        collapsed: s.panels.collapsed.includes(id)
-          ? s.panels.collapsed.filter((item) => item !== id)
-          : [...s.panels.collapsed, id],
-      },
-    })),
-
-  expandPanel: (id) =>
+  setPanelTab: (group, id) =>
     set((s) =>
-      s.panels.collapsed.includes(id)
-        ? {
-            panels: { ...s.panels, collapsed: s.panels.collapsed.filter((item) => item !== id) },
-          }
-        : {},
+      panelGroupOf(id) !== group || s.panels.tabs[group] === id
+        ? {}
+        : { panels: { tabs: { ...s.panels.tabs, [group]: id } } },
     ),
 
-  togglePanelVisible: (id) =>
-    set((s) => ({
-      panels: {
-        ...s.panels,
-        hidden: s.panels.hidden.includes(id)
-          ? s.panels.hidden.filter((item) => item !== id)
-          : [...s.panels.hidden, id],
-      },
-    })),
-
-  movePanel: (id, dir) =>
+  // 「显示该面板」的语义：切到它所在面板，并把该面板的子 tab 指向它
+  showPanel: (id) =>
     set((s) => {
-      const order = [...s.panels.order];
-      const from = order.indexOf(id);
-      const to = from + dir;
-      if (from < 0 || to < 0 || to >= order.length) return {};
-      [order[from], order[to]] = [order[to], order[from]];
-      return { panels: { ...s.panels, order } };
+      const group = panelGroupOf(id);
+      return s.panels.tabs[group] === id
+        ? {}
+        : { panels: { tabs: { ...s.panels.tabs, [group]: id } } };
     }),
 
   resetPanels: () => set({ panels: normalizePanelLayout(null) }),
