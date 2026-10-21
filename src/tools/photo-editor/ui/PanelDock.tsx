@@ -14,6 +14,14 @@ const MIN_PANEL_PX = 84;
 /** 键盘 ← → 微调步长 */
 const KEYBOARD_STEP_PX = 24;
 
+/**
+ * 需要「顶部固定 + 列表自己滚动」的面板。
+ *
+ * 其它面板整体滚动即可，但图层面板顶部那行（混合模式下拉 + 不透明度滑杆）是图层列表的
+ * 操作入口，图多到需要滚动时必须始终可见；由面板内部自己划分固定区 / 滚动区。
+ */
+const SELF_SCROLL_PANELS: ReadonlySet<PanelId> = new Set<PanelId>(['layers']);
+
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 /**
@@ -169,7 +177,15 @@ export function PanelDock({ content }: { content: Record<PanelId, ReactNode> }) 
                   );
                 })}
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">{content[active]}</div>
+              <div
+                className={`min-h-0 flex-1 px-1.5 py-2 ${
+                  SELF_SCROLL_PANELS.has(active)
+                    ? 'flex flex-col overflow-hidden'
+                    : 'overflow-y-auto'
+                }`}
+              >
+                {content[active]}
+              </div>
             </section>
           </Fragment>
         );

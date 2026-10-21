@@ -148,7 +148,7 @@ export function LayerPanel() {
   };
 
   return (
-    <div className="flex min-h-0 flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       {/* 顶部一行：混合模式 + 不透明度，只作用于当前选中图层 */}
       <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 dark:border-gray-800">
         <div className="min-w-0 flex-1">

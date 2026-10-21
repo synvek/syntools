@@ -1214,6 +1214,26 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.getByRole('menu').getByLabel('重命名').fill('我的图层');
     await page.keyboard.press('Escape');
     await expect(page.getByText('我的图层').first()).toBeVisible();
+
+    // 图层多到需要滚动时，顶部「混合模式 / 不透明度」这一行必须固定不动
+    for (let i = 0; i < 8; i += 1) {
+      await page.getByTestId('layer-menu-trigger').first().click();
+      await page.getByRole('menuitem', { name: '文字图层' }).click();
+    }
+    const blend = page.getByLabel('混合模式');
+    const opacity = page.getByRole('slider', { name: '不透明度' });
+    const before = {
+      blend: Math.round((await blend.boundingBox())!.y),
+      opacity: Math.round((await opacity.boundingBox())!.y),
+    };
+    const scrolled = await page.evaluate(() => {
+      const list = document.querySelector('[data-testid="layer-panel"]')!.parentElement!;
+      list.scrollTop = list.scrollHeight;
+      return list.scrollTop;
+    });
+    expect(scrolled).toBeGreaterThan(0);
+    expect(Math.round((await blend.boundingBox())!.y)).toBe(before.blend);
+    expect(Math.round((await opacity.boundingBox())!.y)).toBe(before.opacity);
   });
 
   test('画布右键菜单：选区后续操作（填充 / 反选 / 通过拷贝新建图层）', async ({ page }) => {
