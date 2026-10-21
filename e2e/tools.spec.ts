@@ -1772,6 +1772,130 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(palette.locator('[data-tool="gradient"]')).toHaveAttribute('aria-pressed', 'true');
   });
+
+  test('形状工具：种类在工具箱组按钮里，参数条只放形状属性', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    const palette = page.getByTestId('photo-tool-palette');
+    const row = palette.locator('[data-tool="shape"]');
+    await expect(row).toHaveAttribute('aria-label', '矩形');
+
+    // 首次点击选中形状工具，再次点击展开六种形状（组按钮在侧边栏，不在参数条）
+    await row.click();
+    await expect(row).toHaveAttribute('aria-pressed', 'true');
+    await row.click();
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem')).toHaveText([
+      /矩形/,
+      /圆角矩形/,
+      /椭圆/,
+      /直线/,
+      /箭头/,
+      /星形/,
+    ]);
+
+    // 每个形状的图标必须各不相同（之前全是通用的 shapes 图标）
+    const icons = await menu
+      .getByRole('menuitem')
+      .evaluateAll((items) => items.map((item) => item.querySelector('svg')?.innerHTML ?? ''));
+    expect(new Set(icons).size).toBe(icons.length);
+
+    await menu.getByRole('menuitem', { name: '椭圆' }).click();
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(row).toHaveAttribute('aria-label', '椭圆');
+
+    // 参数条：不再有「选形状」的按钮，改为落笔会用到的属性
+    const bar = page.getByTestId('shape-bar');
+    await expect(bar.getByRole('button')).toHaveCount(0);
+    await expect(bar.getByLabel('填充色', { exact: true })).toBeVisible();
+    await expect(bar.getByLabel('描边色', { exact: true })).toBeVisible();
+    const width = bar.getByRole('slider', { name: '描边宽度' });
+    await width.fill('8');
+    await expect(width).toHaveValue('8');
+    // 圆角只有圆角矩形才有意义
+    await expect(bar.getByRole('slider', { name: '圆角', exact: true })).toHaveCount(0);
+    await row.click();
+    await menu.getByRole('menuitem', { name: '圆角矩形' }).click();
+    await expect(bar.getByRole('slider', { name: '圆角', exact: true })).toBeVisible();
+
+    // 属性确实用于新形状：落笔后能在「属性」面板读到描边宽度
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
+    await page.mouse.move(box.x + 160, box.y + 160);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 380, box.y + 340, { steps: 10 });
+    await page.mouse.up();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
+    await expect(page.getByRole('slider', { name: '描边宽度' })).toHaveCount(2);
+    await expect(page.getByRole('slider', { name: '描边宽度' }).last()).toHaveValue('8');
+  });
+
+  test('形状落点跟随鼠标：椭圆与直线都画在拖出的框里', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    const row = page.getByTestId('photo-tool-palette').locator('[data-tool="shape"]');
+    const flyout = page.getByTestId('photo-tool-flyout');
+    const pick = async (name: string) => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await row.click();
+        if ((await flyout.count()) > 0) break;
+      }
+      await flyout.getByRole('menuitem', { name }).click();
+      await expect(flyout).toHaveCount(0);
+    };
+    // 画布上笔迹的屏幕包围盒（背景是渲染出来的，不产生像素，只有形状本身有 alpha）
+    const inkBox = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelector(
+          '[data-testid="photo-content-canvas"]',
+        ) as HTMLCanvasElement;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -1;
+        let maxY = -1;
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            if (data[(y * canvas.width + x) * 4 + 3] > 8) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        const rect = canvas.getBoundingClientRect();
+        const sx = rect.width / canvas.width;
+        const sy = rect.height / canvas.height;
+        return {
+          x: rect.x + minX * sx,
+          y: rect.y + minY * sy,
+          w: (maxX - minX) * sx,
+          h: (maxY - minY) * sy,
+        };
+      });
+
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
+    const from = { x: box.x + 240, y: box.y + 180 };
+    const to = { x: box.x + 460, y: box.y + 360 };
+
+    for (const kind of ['椭圆', '直线']) {
+      await pick(kind);
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(to.x, to.y, { steps: 10 });
+      await page.mouse.up();
+      await page.waitForTimeout(200);
+
+      const ink = await inkBox();
+      // 椭圆曾按「圆心 = 图层左上角」绘制，整体往左上偏半个身位（约 110 × 90 px）
+      expect(Math.abs(ink.x - from.x)).toBeLessThanOrEqual(6);
+      expect(Math.abs(ink.y - from.y)).toBeLessThanOrEqual(6);
+      expect(Math.abs(ink.w - (to.x - from.x))).toBeLessThanOrEqual(6);
+      expect(Math.abs(ink.h - (to.y - from.y))).toBeLessThanOrEqual(6);
+
+      await page.keyboard.press('Delete');
+      await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+    }
+  });
 });
 
 // 照片编辑器国际化（en-US）：界面语言切换后不得残留中文
@@ -1799,10 +1923,14 @@ test.describe('照片编辑器国际化（en-US）', () => {
     const mix = page.getByLabel('Blend mode');
     await expect(mix.locator('option')).toContainText(['Normal', 'Multiply']);
 
-    // 形状下拉为英文（形状已是独立按钮，点开后种类按钮才会出现）
-    await page.getByTestId('photo-tool-palette').locator('[data-tool="shape"]').click();
-    await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Rounded rectangle' })).toBeVisible();
+    // 形状：种类在工具箱组按钮里（英文），参数条显示的是形状属性
+    const shapeRow = page.getByTestId('photo-tool-palette').locator('[data-tool="shape"]');
+    await shapeRow.click();
+    await expect(shapeRow).toHaveAttribute('aria-label', 'Rectangle');
+    await shapeRow.click();
+    await page.getByRole('menu').getByRole('menuitem', { name: 'Rounded rectangle' }).click();
+    await expect(shapeRow).toHaveAttribute('aria-label', 'Rounded rectangle');
+    await expect(page.getByTestId('shape-bar').getByLabel('Fill')).toBeVisible();
 
     // 新建画布对话框：预设为中性文本，按钮为英文
     await page.getByRole('button', { name: 'New canvas' }).click();

@@ -411,8 +411,10 @@ function paintShape(ctx: CanvasRenderingContext2D, layer: Extract<Layer, { kind:
       );
       break;
     case 'line':
-      ctx.moveTo(x, y + height / 2);
-      ctx.lineTo(x + width, y + height / 2);
+      // 直线走「拖拽框的对角线」：拖出一个框就得到框内的一条斜线，
+      // 与矩形 / 箭头 / 星形一样，笔迹不会超脱框外（原先固定画在竖向中线上）
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + width, y + height);
       break;
     case 'arrow':
       ctx.moveTo(x, y + height);

@@ -849,6 +849,20 @@ const icons: Record<string, ReactNode> = {
       <circle cx="16" cy="8" r="4" />
     </>
   ),
+  // 形状家族：矩形 / 圆角矩形 / 椭圆 / 直线 / 箭头 / 星形，供照片编辑器的形状组按钮与图层徽标使用
+  shapeRect: <rect x="3" y="6" width="18" height="12" rx="1" />,
+  shapeRoundRect: <rect x="3" y="6" width="18" height="12" rx="4.5" />,
+  shapeEllipse: <ellipse cx="12" cy="12" rx="9" ry="6" />,
+  shapeLine: <path d="M4 20 20 4" />,
+  shapeArrow: (
+    <>
+      <path d="M4 20 18.5 5.5" />
+      <path d="M11 4h9v9" />
+    </>
+  ),
+  shapeStar: (
+    <path d="m12 3 2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.5l6.3-.9L12 3Z" />
+  ),
   layers: (
     <>
       <path d="m12 3 9 5-9 5-9-5 9-5Z" />

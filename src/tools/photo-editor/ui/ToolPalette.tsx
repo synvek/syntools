@@ -28,6 +28,8 @@ export function ToolPalette() {
   const { t } = useTranslation();
   const tool = usePhotoStore((s) => s.tool);
   const setTool = usePhotoStore((s) => s.setTool);
+  const shapeKind = usePhotoStore((s) => s.shapeKind);
+  const setShapeKind = usePhotoStore((s) => s.setShapeKind);
   const isNarrow = useMediaQuery(NARROW_QUERY);
   const [flyout, setFlyout] = useState<{ groupId: string; anchor: HTMLElement } | null>(null);
 
@@ -55,6 +57,8 @@ export function ToolPalette() {
   };
 
   const openGroup = flyout ? TOOL_GROUPS.find((group) => group.id === flyout.groupId) : undefined;
+  /** 形状组：组内各项是同一个工具的不同种类，浮层里返回的是种类而不是工具 id */
+  const openHasVariants = openGroup?.items.some((item) => item.variant) ?? false;
 
   return (
     <div
@@ -63,7 +67,7 @@ export function ToolPalette() {
       className="flex max-h-full w-12 shrink-0 flex-col items-center gap-1.5 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-sm dark:border-gray-800 dark:bg-gray-900 max-lg:max-h-14 max-lg:w-full max-lg:flex-row max-lg:overflow-x-auto max-lg:overflow-y-hidden"
     >
       {TOOL_GROUPS.map((group, groupIndex) => {
-        const current = displayToolOf(group, tool);
+        const current = displayToolOf(group, tool, shapeKind);
         const hasSiblings = group.items.length > 1;
         // 只有跨大区才画分隔线：逐行都画会让左侧栏多出约 50px，直接影响工作区下限
         const startsSection =
@@ -95,17 +99,23 @@ export function ToolPalette() {
         <ToolFlyout
           anchor={flyout.anchor}
           label={t('tools.photo.toolGroupMore', {
-            tool: t(displayToolOf(openGroup, tool).labelKey),
+            tool: t(displayToolOf(openGroup, tool, shapeKind).labelKey),
           })}
           items={openGroup.items.map((item) => ({
-            id: item.id,
+            // 有子种类的组：浮层里给出「种类」，选中后同时决定工具与种类
+            id: item.variant ?? item.id,
             icon: item.icon,
             label: t(item.labelKey),
             shortcut: item.shortcut,
           }))}
-          activeId={tool}
+          activeId={openHasVariants ? shapeKind : tool}
           prefer={isNarrow ? 'bottom' : 'right'}
-          onPick={setTool}
+          onPick={(id) => {
+            const item = openGroup.items.find((entry) => (entry.variant ?? entry.id) === id);
+            if (!item) return;
+            if (item.variant) setShapeKind(item.variant);
+            setTool(item.id);
+          }}
           onClose={() => setFlyout(null)}
         />
       ) : null}

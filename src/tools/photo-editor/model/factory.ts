@@ -11,6 +11,7 @@ import type {
   RasterLayer,
   ShapeKind,
   ShapeLayer,
+  ShapeStyleDefaults,
   SmartLayer,
   TextLayer,
 } from './types';
@@ -297,6 +298,8 @@ export function createShapeLayer(input: {
   shape: ShapeKind;
   x?: number;
   y?: number;
+  /** 新建形状的默认填充 / 描边（来自参数条；缺省沿用内置配色） */
+  style?: ShapeStyleDefaults;
 }): ShapeLayer {
   const size = Math.round(Math.min(input.doc.width, input.doc.height) * 0.3);
   return {
@@ -315,9 +318,9 @@ export function createShapeLayer(input: {
     flipX: false,
     flipY: false,
     shape: input.shape,
-    fill: '#2563EB',
-    stroke: '#1D4ED8',
-    strokeWidth: 0,
-    cornerRadius: 12,
+    fill: input.style?.fill ?? '#2563EB',
+    stroke: input.style?.stroke ?? '#1D4ED8',
+    strokeWidth: input.style?.strokeWidth ?? 0,
+    cornerRadius: input.style?.cornerRadius ?? 12,
   };
 }

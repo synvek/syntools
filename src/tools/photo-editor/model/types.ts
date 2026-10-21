@@ -102,6 +102,17 @@ export interface MaskRef {
 
 export type ShapeKind = 'rect' | 'roundRect' | 'ellipse' | 'line' | 'arrow' | 'star';
 
+/**
+ * 新建形状的默认样式（参数条可调，属于工具设置、不写进文档）。
+ * 画布上落笔时由 `createShapeLayer` 取用，之后再改只影响新形状。
+ */
+export interface ShapeStyleDefaults {
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  cornerRadius: number;
+}
+
 /* ------------------------------ 矢量蒙版 ------------------------------ */
 
 /**

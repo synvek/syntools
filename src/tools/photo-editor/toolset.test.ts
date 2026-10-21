@@ -75,9 +75,13 @@ describe('工具箱分组', () => {
   });
 
   it('每个工具恰好属于一个分组（新增工具忘记分组会在这里失败）', () => {
-    const grouped = TOOL_GROUPS.flatMap((group) => group.items.map((item) => item.id));
-    expect(new Set(grouped).size).toBe(grouped.length);
-    expect([...grouped].sort()).toEqual(ALL_TOOLS.map((tool) => tool.id).sort());
+    // 形状组是「一个工具 + 多个种类」，所以按 (id, variant) 判重
+    const keys = TOOL_GROUPS.flatMap((group) =>
+      group.items.map((item) => `${item.id}:${item.variant ?? ''}`),
+    );
+    expect(new Set(keys).size).toBe(keys.length);
+    const ids = [...new Set(TOOL_GROUPS.flatMap((group) => group.items.map((item) => item.id)))];
+    expect(ids.sort()).toEqual(ALL_TOOLS.map((tool) => tool.id).sort());
   });
 
   it('分组覆盖每个工具（按 tool id 反查分组不落空）', () => {
@@ -90,11 +94,30 @@ describe('工具箱分组', () => {
   });
 
   it('高频工具各自独立成行，修复画笔与污点修复同组', () => {
-    for (const id of ['brush', 'eraser', 'cloneStamp', 'text', 'shape']) {
+    for (const id of ['brush', 'eraser', 'cloneStamp', 'text']) {
       expect(groupOfTool(id as ToolId)?.items).toHaveLength(1);
     }
     expect(groupOfTool('healing')?.id).toBe(groupOfTool('spotHeal')?.id);
     expect(groupOfTool('healing')?.items.map((item) => item.id)).toEqual(['healing', 'spotHeal']);
+  });
+
+  it('形状是「一个工具 + 六个种类」：占一行，按种类在浮层里区分', () => {
+    const shape = groupOfTool('shape');
+    expect(shape?.items).toHaveLength(6);
+    expect(new Set(shape?.items.map((item) => item.id))).toEqual(new Set(['shape']));
+    expect(shape?.items.map((item) => item.variant)).toEqual([
+      'rect',
+      'roundRect',
+      'ellipse',
+      'line',
+      'arrow',
+      'star',
+    ]);
+    // 每个种类有自己的图标（此前全是通用 shapes 图标）
+    expect(new Set(shape?.items.map((item) => item.icon)).size).toBe(6);
+    // 显示哪一项由当前种类决定
+    expect(displayToolOf(shape!, 'shape', 'ellipse').variant).toBe('ellipse');
+    expect(displayToolOf(shape!, 'shape').variant).toBe('rect');
   });
 
   it('displayToolOf：该组用过就显示用过的，否则回落到主工具', () => {

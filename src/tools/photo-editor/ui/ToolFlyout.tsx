@@ -2,25 +2,26 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/core/components/Icon';
-import type { ToolId } from '../model/types';
 
-export interface ToolFlyoutItem {
-  id: ToolId;
+export interface FlyoutItem<T extends string> {
+  id: T;
   icon: string;
   label: string;
-  shortcut: string;
+  /** 展示用快捷键；形状种类这类没有独立快捷键的组可以省略 */
+  shortcut?: string;
 }
 
 /**
- * 工具组浮层：**再次点击已选中的工具按钮**时弹出（Photoshop / Photopea 的组选择器）。
+ * 组选择浮层（Photoshop / Photopea 的组选择器）：工具箱的「再次点击已选中工具」、
+ * 顶部工具条的形状组按钮都用它，保证两处的展开方式 / 键盘行为完全一致。
  *
- * 与「角标按钮」的区别：工具箱按钮右下角的小三角只是「这一行还有同族工具」的图标，
- * 不是可点的第二颗按钮；打开浮层的唯一入口是重复点击当前工具按钮本身。
+ * 与「角标按钮」的区别：按钮右下角的小三角只是「还有同族选项」的图标，
+ * 不是可点的第二颗按钮；打开浮层的入口是按钮本身。
  *
  * 浮层走 portal + fixed 定位：工具箱自己会滚动（`overflow-y-auto`），
  * 就地 absolute 会被裁剪；打开期间滚动 / 缩放 / 点外部 / Esc 都会关闭。
  */
-export function ToolFlyout({
+export function ToolFlyout<T extends string>({
   anchor,
   label,
   items,
@@ -29,15 +30,15 @@ export function ToolFlyout({
   onPick,
   onClose,
 }: {
-  /** 浮层的定位锚点（当前工具按钮） */
+  /** 浮层的定位锚点（当前选项按钮） */
   anchor: HTMLElement;
   label: string;
-  items: ToolFlyoutItem[];
-  /** 当前工具：在列表里高亮，并在打开时获得焦点 */
-  activeId: ToolId;
+  items: FlyoutItem<T>[];
+  /** 当前选项：在列表里高亮，并在打开时获得焦点 */
+  activeId: T;
   /** 竖排工具箱放右侧，窄屏横向工具箱放下方 */
   prefer?: 'right' | 'bottom';
-  onPick: (id: ToolId) => void;
+  onPick: (id: T) => void;
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -129,6 +130,7 @@ export function ToolFlyout({
     <div
       ref={panelRef}
       role="menu"
+      data-testid="photo-tool-flyout"
       aria-label={label}
       onKeyDown={handleKeyDown}
       style={{
@@ -163,9 +165,11 @@ export function ToolFlyout({
           >
             <Icon name={item.icon} className="h-4 w-4 shrink-0" />
             <span className="truncate">{item.label}</span>
-            <span className="ml-auto shrink-0 font-mono text-[10px] text-gray-400 dark:text-gray-500">
-              {item.shortcut}
-            </span>
+            {item.shortcut ? (
+              <span className="ml-auto shrink-0 font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                {item.shortcut}
+              </span>
+            ) : null}
           </button>
         );
       })}

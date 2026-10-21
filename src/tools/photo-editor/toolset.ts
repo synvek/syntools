@@ -1,4 +1,6 @@
-import type { ToolId } from './model/types';
+import { SHAPE_KINDS } from './core';
+import type { ShapeKind, ToolId } from './model/types';
+import { SHAPE_ICONS } from './shapeIcons';
 
 /**
  * 工具箱的**单一真相源**：分组、图标、文案键与展示用快捷键。
@@ -22,6 +24,13 @@ export interface ToolDef {
   labelKey: string;
   /** 工具箱角标 / 快捷键一览中展示的按键（展示用，可能是 ⇧ 组合） */
   shortcut: string;
+  /**
+   * 同一工具的**子种类**（目前只有形状）。
+   *
+   * 六种形状共用 `shape` 这一个 ToolId（落笔时由 `shapeKind` 决定画什么），
+   * 但工具箱里要按组按钮呈现、每项各有图标与名字，因此额外带上种类。
+   */
+  variant?: ShapeKind;
 }
 
 /**
@@ -39,6 +48,8 @@ export interface ToolGroupDef {
   section: ToolSection;
   /** 组内默认工具：该组尚无「当前工具」时按钮展示它 */
   primary: ToolId;
+  /** 组级文案（有子种类的组用它做整体名称，如「形状」）；缺省用 primary 的文案 */
+  labelKey?: string;
   items: ToolDef[];
 }
 
@@ -183,7 +194,16 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
     id: 'shape',
     section: 'sample',
     primary: 'shape',
-    items: [{ id: 'shape', icon: 'shapes', labelKey: 'tools.photo.toolShape', shortcut: 'U' }],
+    labelKey: 'tools.photo.toolShape',
+    // 形状按「一个工具 + 六个种类」呈现：工具行跟着当前种类换图标，
+    // 点开浮层选具体形状（角标在侧边栏，参数条只放宽度 / 颜色这类属性）。
+    items: SHAPE_KINDS.map((kind) => ({
+      id: 'shape' as ToolId,
+      variant: kind,
+      icon: SHAPE_ICONS[kind],
+      labelKey: `tools.photo.shape.${kind}`,
+      shortcut: 'U',
+    })),
   },
   {
     id: 'nav',
@@ -193,8 +213,17 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
   },
 ];
 
-/** 展平的工具列表（工具箱顺序），供快捷键一览等场景使用 */
-export const ALL_TOOLS: ToolDef[] = TOOL_GROUPS.flatMap((group) => group.items);
+/**
+ * 展平的工具列表（工具箱顺序），供快捷键一览等场景使用。
+ *
+ * 有子种类的组（形状）只保留**一条**：快捷键一览里「U = 形状」一行就够，
+ * 铺成六行「矩形 U / 椭圆 U…」只会把面板撑长。
+ */
+export const ALL_TOOLS: ToolDef[] = TOOL_GROUPS.flatMap((group) => {
+  const base = group.items.find((item) => item.id === group.primary) ?? group.items[0];
+  if (!group.items.some((item) => item.variant)) return group.items;
+  return [{ ...base, variant: undefined, labelKey: group.labelKey ?? base.labelKey }];
+});
 
 /** 工具 → 所属组（工具箱按组高亮 / 定位用） */
 export function groupOfTool(tool: ToolId): ToolGroupDef | undefined {
@@ -206,11 +235,14 @@ export function groupOfTool(tool: ToolId): ToolGroupDef | undefined {
  *
  * 规则与 Photoshop 一致：**该组已有当前工具就用它**（用户切换过就记住），否则退回 `primary`。
  * 这样「先用画笔、再切到橡皮」之后，这一行始终停在用户最近用过的那个上，而不是弹回默认。
+ *
+ * `variant` 用于同一工具下的子种类（形状）：同一 ToolId 有多项时，优先取种类匹配的那一项，
+ * 于是形状工具行的图标 / 名称会跟着「当前画哪种形状」变化。
  */
-export function displayToolOf(group: ToolGroupDef, current: ToolId): ToolDef {
-  return (
-    group.items.find((item) => item.id === current) ??
-    group.items.find((item) => item.id === group.primary) ??
-    group.items[0]
-  );
+export function displayToolOf(group: ToolGroupDef, current: ToolId, variant?: ShapeKind): ToolDef {
+  const candidates = group.items.filter((item) => item.id === current);
+  if (candidates.length > 0) {
+    return candidates.find((item) => item.variant === variant) ?? candidates[0];
+  }
+  return group.items.find((item) => item.id === group.primary) ?? group.items[0];
 }

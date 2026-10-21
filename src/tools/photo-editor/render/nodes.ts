@@ -316,12 +316,21 @@ function createShapeNode(layer: ShapeLayer): Konva.Shape {
   };
   switch (layer.shape) {
     case 'ellipse':
-      return new Konva.Ellipse({
+      // 不用 Konva.Ellipse：它的 x / y 表示**圆心**，而 applyCommon 会把节点 position 统一设成
+      // 图层左上角，结果椭圆被画到 (x−w/2, y−h/2) 去（笔迹整体往左上偏半个身位）。
+      // 统一用 sceneFunc 在节点局部坐标里落图，导出（Canvas2D）也是同一套坐标。
+      return new Konva.Shape({
         ...common,
-        x: layer.width / 2,
-        y: layer.height / 2,
-        radiusX: layer.width / 2,
-        radiusY: layer.height / 2,
+        width: layer.width,
+        height: layer.height,
+        sceneFunc: (ctx, shape) => {
+          const w = shape.width();
+          const h = shape.height();
+          ctx.beginPath();
+          ctx.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+          ctx.closePath();
+          ctx.fillStrokeShape(shape);
+        },
       });
     case 'roundRect':
       return new Konva.Rect({
@@ -333,7 +342,7 @@ function createShapeNode(layer: ShapeLayer): Konva.Shape {
     case 'line':
       return new Konva.Line({
         ...common,
-        points: [0, layer.height / 2, layer.width, layer.height / 2],
+        points: [0, 0, layer.width, layer.height],
         stroke: layer.stroke || layer.fill,
         strokeWidth: Math.max(1, layer.strokeWidth),
         fill: undefined,
@@ -351,15 +360,13 @@ function createShapeNode(layer: ShapeLayer): Konva.Shape {
     case 'star':
       return new Konva.Shape({
         ...common,
+        width: layer.width,
+        height: layer.height,
+        // 按节点自身尺寸绘制（不是闭包里的 layer），缩放 / 变形后才会跟着刷新
         sceneFunc: (ctx: Konva.Context, shape: Konva.Shape) => {
-          starPath(
-            ctx as unknown as CanvasRenderingContext2D,
-            layer.width / 2,
-            layer.height / 2,
-            layer.width / 2,
-            layer.height / 2,
-            5,
-          );
+          const w = shape.width();
+          const h = shape.height();
+          starPath(ctx as unknown as CanvasRenderingContext2D, w / 2, h / 2, w / 2, h / 2, 5);
           ctx.fillStrokeShape(shape);
         },
       });
@@ -379,26 +386,22 @@ function updateShapeNode(node: Konva.Node, layer: ShapeLayer): void {
     }
     return;
   }
-  if (node instanceof Konva.Ellipse) {
-    node.radius({ x: layer.width / 2, y: layer.height / 2 });
-    node.fill(layer.fill || undefined);
-    node.stroke(layer.strokeWidth > 0 ? layer.stroke : undefined);
-    node.strokeWidth(layer.strokeWidth);
-    return;
-  }
-  if (node instanceof Konva.Line) {
-    node.points([0, layer.height / 2, layer.width, layer.height / 2]);
-    node.stroke(layer.stroke || layer.fill);
-    node.strokeWidth(Math.max(1, layer.strokeWidth));
-    return;
-  }
+  // Arrow 继承自 Line，必须先判箭头，否则会被当成普通直线重设 points
   if (node instanceof Konva.Arrow) {
     node.points([0, layer.height, layer.width / 2, 0, layer.width, layer.height]);
     node.stroke(layer.stroke || layer.fill);
     node.strokeWidth(Math.max(1, layer.strokeWidth));
     return;
   }
-  // 星形：sceneFunc 闭包内已绑定尺寸，仅在类型切换时重建，这里只同步配色
+  if (node instanceof Konva.Line) {
+    node.points([0, 0, layer.width, layer.height]);
+    node.stroke(layer.stroke || layer.fill);
+    node.strokeWidth(Math.max(1, layer.strokeWidth));
+    return;
+  }
+  // 椭圆 / 星形：sceneFunc 按节点自身尺寸绘制，这里同步尺寸与配色
+  node.width(layer.width);
+  node.height(layer.height);
   node.setAttr('fill', layer.fill || undefined);
   node.setAttr('stroke', layer.strokeWidth > 0 ? layer.stroke : undefined);
   node.setAttr('strokeWidth', layer.strokeWidth);

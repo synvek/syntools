@@ -240,14 +240,17 @@ export function IconTextButton({
   disabled,
   title,
   active,
+  grouped = false,
   testId,
 }: {
   icon: string;
   label?: string;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   title?: string;
   active?: boolean;
+  /** 是否还有同族选项：有则显示右下角小三角（纯装饰，点击行为仍由按钮本身承担） */
+  grouped?: boolean;
   testId?: string;
 }) {
   const accessibleName = title ?? label ?? icon;
@@ -260,10 +263,16 @@ export function IconTextButton({
       data-testid={testId}
       onClick={onClick}
       disabled={disabled}
-      className={`${BUTTON_CLASS} ${active ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-300' : ''}`}
+      className={`relative ${BUTTON_CLASS} ${active ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-300' : ''}`}
     >
       <Icon name={icon} className="h-3.5 w-3.5" />
       {label ? <span>{label}</span> : null}
+      {grouped ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 right-0 h-0 w-0 border-b-[5px] border-l-[5px] border-l-transparent border-b-gray-400 dark:border-b-gray-500"
+        />
+      ) : null}
     </button>
   );
 }

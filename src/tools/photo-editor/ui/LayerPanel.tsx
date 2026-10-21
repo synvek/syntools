@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { BLEND_MODES, hasLayerStyle, hasVectorMask } from '../core';
 import { layerThumbnail } from '../render/export';
+import { SHAPE_ICONS } from '../shapeIcons';
 import { CompactSlider, Select } from './controls';
 import { layerDisplayName } from './layerName';
 import { usePhotoStore } from '../store';
@@ -698,7 +699,13 @@ function LayerThumb({ doc, layer }: { doc: PhotoDoc; layer: Layer }) {
         <img src={url} alt="" className="max-h-full max-w-full object-contain" />
       ) : (
         <Icon
-          name={layer.kind === 'text' ? 'text' : layer.kind === 'shape' ? 'shapes' : 'image'}
+          name={
+            layer.kind === 'text'
+              ? 'text'
+              : layer.kind === 'shape'
+                ? SHAPE_ICONS[layer.shape]
+                : 'image'
+          }
           className="h-4 w-4 text-gray-400"
         />
       )}

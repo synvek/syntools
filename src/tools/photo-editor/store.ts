@@ -86,6 +86,7 @@ import type {
   Rect,
   Selection,
   ShapeKind,
+  ShapeStyleDefaults,
   ToolId,
   VectorMaskRef,
   ViewOverlay,
@@ -152,6 +153,8 @@ interface PhotoState {
   brush: BrushConfig;
   eraserSize: number;
   shapeKind: ShapeKind;
+  /** 新建形状的默认填充 / 描边（参数条可调，不写进文档） */
+  shapeStyle: ShapeStyleDefaults;
   selection: Selection | null;
   cropRect: Rect | null;
   viewport: Viewport;
@@ -206,6 +209,8 @@ interface PhotoState {
   patchBrush: (patch: Partial<BrushConfig>) => void;
   setEraserSize: (size: number) => void;
   setShapeKind: (kind: ShapeKind) => void;
+  /** 修改新建形状的默认样式（填充 / 描边 / 描边宽度 / 圆角） */
+  setShapeStyle: (patch: Partial<ShapeStyleDefaults>) => void;
   /** 油漆桶设置 */
   setFill: (patch: { tolerance?: number; contiguous?: boolean }) => void;
   /** 渐变工具设置 */
@@ -428,6 +433,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
   eraserSize: 24,
   shapeKind: 'rect',
+  shapeStyle: { fill: '#2563EB', stroke: '#1D4ED8', strokeWidth: 0, cornerRadius: 12 },
   selection: null,
   cropRect: null,
   viewport: { scale: 0, x: 0, y: 0 },
@@ -583,6 +589,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   setEraserSize: (size) => set({ eraserSize: size }),
   setShapeKind: (kind) => set({ shapeKind: kind }),
+
+  setShapeStyle: (patch) => set((s) => ({ shapeStyle: { ...s.shapeStyle, ...patch } })),
 
   setFill: (patch) =>
     set((s) => ({
@@ -1517,7 +1525,11 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   addShapeLayer: (rect) => {
     const doc = get().doc;
-    const layer = createShapeLayer({ doc, shape: get().shapeKind });
+    const layer = createShapeLayer({
+      doc,
+      shape: get().shapeKind,
+      style: get().shapeStyle,
+    });
     const next: typeof layer = {
       ...layer,
       x: rect.x,

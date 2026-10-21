@@ -5,7 +5,6 @@ import {
   GRADIENT_MODES,
   MAX_RETOUCH_STRENGTH,
   REPAIR_TOOLS,
-  SHAPE_KINDS,
   TRANSFORM_MODES,
   needsCloneSource,
 } from '../core';
@@ -59,7 +58,8 @@ export function PhotoToolbar({
   const cropRect = usePhotoStore((s) => s.cropRect);
   const patchBrush = usePhotoStore((s) => s.patchBrush);
   const setEraserSize = usePhotoStore((s) => s.setEraserSize);
-  const setShapeKind = usePhotoStore((s) => s.setShapeKind);
+  const shapeStyle = usePhotoStore((s) => s.shapeStyle);
+  const setShapeStyle = usePhotoStore((s) => s.setShapeStyle);
   const setSelection = usePhotoStore((s) => s.setSelection);
   const applyCrop = usePhotoStore((s) => s.applyCrop);
   const setCropRect = usePhotoStore((s) => s.setCropRect);
@@ -328,16 +328,52 @@ export function PhotoToolbar({
       ) : null}
 
       {tool === 'shape' ? (
-        <div className="flex flex-wrap items-center gap-1">
-          {SHAPE_KINDS.map((id) => (
-            <IconTextButton
-              key={id}
-              icon="shapes"
-              label={t(`tools.photo.shape.${id}`)}
-              active={shapeKind === id}
-              onClick={() => setShapeKind(id)}
+        // 形状「种类」放在左侧工具箱（组按钮 + 角标角），参数条只放落笔用到的属性
+        <div className="flex flex-wrap items-center gap-3" data-testid="shape-bar">
+          <label className="flex shrink-0 items-center gap-1.5" title={t('tools.photo.fill')}>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {t('tools.photo.fill')}
+            </span>
+            <input
+              type="color"
+              aria-label={t('tools.photo.fill')}
+              value={shapeStyle.fill}
+              onChange={(event) => setShapeStyle({ fill: event.target.value })}
+              className="h-6 w-8 cursor-pointer rounded border border-gray-300 bg-transparent dark:border-gray-700"
             />
-          ))}
+          </label>
+          <label className="flex shrink-0 items-center gap-1.5" title={t('tools.photo.stroke')}>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {t('tools.photo.stroke')}
+            </span>
+            <input
+              type="color"
+              aria-label={t('tools.photo.stroke')}
+              value={shapeStyle.stroke}
+              onChange={(event) => setShapeStyle({ stroke: event.target.value })}
+              className="h-6 w-8 cursor-pointer rounded border border-gray-300 bg-transparent dark:border-gray-700"
+            />
+          </label>
+          <div className="w-32">
+            <Slider
+              label={t('tools.photo.strokeWidth')}
+              value={Math.round(shapeStyle.strokeWidth)}
+              min={0}
+              max={40}
+              onChange={(value) => setShapeStyle({ strokeWidth: value })}
+            />
+          </div>
+          {shapeKind === 'roundRect' ? (
+            <div className="w-32">
+              <Slider
+                label={t('tools.photo.cornerRadius')}
+                value={Math.round(shapeStyle.cornerRadius)}
+                min={0}
+                max={200}
+                onChange={(value) => setShapeStyle({ cornerRadius: value })}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
