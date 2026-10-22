@@ -38,6 +38,7 @@ import {
 import { createRetouchSession, type RetouchSession } from '../render/retouch';
 import { magicWandSelection } from '../render/selection';
 import type { SelectionOp } from '../render/selection';
+import { buildEdgeMap, snapToEdge, type EdgeMap } from './magnetic';
 import type { OverlayState, StageHandle } from '../render/stage';
 import { selectionFromPath as toSelection, usePhotoStore } from '../store';
 import type { RasterLayer, Layer, PhotoDoc, Rect, Selection } from '../model/types';
@@ -74,7 +75,7 @@ type Drag =
       startAngle: number;
     }
   | { kind: 'select'; shape: 'rect' | 'ellipse'; startX: number; startY: number }
-  | { kind: 'lasso'; path: number[] }
+  | { kind: 'lasso'; path: number[]; magnetic?: boolean }
   | { kind: 'quickSelect' }
   | { kind: 'gradient'; fromX: number; fromY: number }
   | { kind: 'retouch'; id: string }
@@ -171,6 +172,47 @@ export function attachPointer(
     drawOverlay();
   };
 
+  /** 多边形套索：已落下的顶点（文档坐标）；null = 未开始 */
+  let polygon: { points: number[] } | null = null;
+  /** 多边形套索：上一次点击的时间 / 位置（双击闭合用） */
+  let lastPolyClick = { at: 0, x: 0, y: 0 };
+  /** 多边形套索：闭合时刻（双击的第二下不要再开一个新多边形） */
+  let lastPolyCloseAt = 0;
+  /** 磁性套索：手势开始时算好的边缘图（文档在手势内不变，不必每帧重算） */
+  let edgeMap: EdgeMap | null = null;
+
+  /** 多边形套索：预览（最后一个顶点 → 光标 → 起点自动闭合） */
+  const previewPolygon = (cursor?: { x: number; y: number }) => {
+    if (!polygon) return;
+    const path = cursor ? [...polygon.points, cursor.x, cursor.y] : [...polygon.points];
+    if (path.length < 4) {
+      // 只有 1 个点时还画不出折线：保持现有选区，不要把它清掉
+      drawOverlay();
+      return;
+    }
+    const preview: Selection = { kind: 'lasso', ...boundsOf(path), path, feather: 0 };
+    drawOverlay({ selection: preview });
+  };
+
+  /** 多边形套索：闭合落子（顶点不足 3 个就当作误触丢弃） */
+  const closePolygon = (op: SelectionOp) => {
+    const points = polygon?.points ?? [];
+    polygon = null;
+    if (points.length < 6) {
+      drawOverlay();
+      return;
+    }
+    const selection = toSelection(points, 0);
+    if (selection) usePhotoStore.getState().applySelection(selection, op);
+    drawOverlay();
+  };
+
+  const cancelPolygon = () => {
+    if (!polygon) return;
+    polygon = null;
+    drawOverlay();
+  };
+
   /** 屏幕 10px 换算到文档单位的命中半径 */
   const handleRadius = () => 10 / scaleNow();
   /** 旋转柄相对顶边的文档单位距离（屏幕 26px） */
@@ -199,6 +241,8 @@ export function attachPointer(
       tool === 'rectSelect' ||
       tool === 'ellipseSelect' ||
       tool === 'lasso' ||
+      tool === 'polyLasso' ||
+      tool === 'magneticLasso' ||
       tool === 'wand' ||
       tool === 'quickSelect';
 
@@ -350,6 +394,42 @@ export function attachPointer(
 
     if (tool === 'lasso') {
       drag = { kind: 'lasso', path: [point.x, point.y] };
+      return;
+    }
+
+    if (tool === 'polyLasso') {
+      // 逐点单击建框：点回起点或双击闭合，Esc 取消
+      const doubleClick =
+        event.timeStamp - lastPolyClick.at < 320 &&
+        Math.hypot(point.x - lastPolyClick.x, point.y - lastPolyClick.y) < 6;
+      lastPolyClick = { at: event.timeStamp, x: point.x, y: point.y };
+      const first = polygon?.points;
+      const nearFirst =
+        !!first && first.length >= 6 && Math.hypot(point.x - first[0], point.y - first[1]) <= 12;
+      if (polygon && (doubleClick || nearFirst)) {
+        closePolygon(selectionOpFrom(event));
+        lastPolyCloseAt = event.timeStamp;
+        return;
+      }
+      // 双击闭合的第二下不要再起一个新多边形
+      if (!polygon && event.timeStamp - lastPolyCloseAt < 350) return;
+      if (polygon) polygon.points.push(point.x, point.y);
+      else polygon = { points: [point.x, point.y] };
+      previewPolygon();
+      return;
+    }
+
+    if (tool === 'magneticLasso') {
+      // 边缘图只在本手势内有效：文档变化（撤销 / 切图层）时下次手势会重算
+      edgeMap = buildEdgeMap(doc);
+      // 「宽度」按屏幕像素理解（Photoshop 的手感）：换算成文档像素后再去吸附
+      const snapped = snapToEdge(
+        edgeMap,
+        point,
+        state.magnetic.width / scaleNow(),
+        state.magnetic.contrast,
+      );
+      drag = { kind: 'lasso', path: [snapped.x, snapped.y], magnetic: true };
       return;
     }
 
@@ -550,7 +630,10 @@ export function attachPointer(
   };
 
   const onPointerMove = (event: PointerEvent) => {
-    if (!drag && !stroke) return;
+    // 多边形套索没有拖拽过程，但仍要跟着光标画「下一段」预览
+    const drawingPolygon =
+      !drag && !stroke && polygon !== null && usePhotoStore.getState().tool === 'polyLasso';
+    if (!drag && !stroke && !drawingPolygon) return;
     const state = usePhotoStore.getState();
     const point = toDoc(event);
 
@@ -569,7 +652,10 @@ export function attachPointer(
       context.onSurfaceChange();
       return;
     }
-    if (!drag) return;
+    if (!drag) {
+      if (drawingPolygon) previewPolygon(point);
+      return;
+    }
 
     if (drag.kind === 'pan') {
       context.onPan(
@@ -675,7 +761,22 @@ export function attachPointer(
     }
 
     if (drag.kind === 'lasso') {
-      drag.path.push(point.x, point.y);
+      if (drag.magnetic && edgeMap) {
+        // 磁性套索：吸附到附近最强边缘；间隔太小会让顶点爆炸（轮廓也变毛躁）
+        const snapped = snapToEdge(
+          edgeMap,
+          point,
+          state.magnetic.width / scaleNow(),
+          state.magnetic.contrast,
+        );
+        const lastX = drag.path[drag.path.length - 2];
+        const lastY = drag.path[drag.path.length - 1];
+        if (Math.hypot(snapped.x - lastX, snapped.y - lastY) >= 3) {
+          drag.path.push(snapped.x, snapped.y);
+        }
+      } else {
+        drag.path.push(point.x, point.y);
+      }
       const preview: Selection = {
         kind: 'lasso',
         ...boundsOf(drag.path),
@@ -785,6 +886,7 @@ export function attachPointer(
     } else if (drag.kind === 'lasso') {
       const selection = toSelection(drag.path, 0);
       if (selection) state.applySelection(selection, selectionOpFrom(event));
+      edgeMap = null;
       drawOverlay();
     } else if (drag.kind === 'shape') {
       const rect = clampRect(normalizeRect({ x: drag.startX, y: drag.startY }, toDoc(event)), {
@@ -849,6 +951,16 @@ export function attachPointer(
     context.onContextMenu({ x: event.clientX, y: event.clientY });
   };
 
+  // 多边形套索是「跨多次点击」的会话：Esc 取消、切走工具也要取消，
+  // 否则未闭合的折线会一直留在覆盖层上（换工具后看起来像卡住的选区）
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') cancelPolygon();
+  };
+  window.addEventListener('keydown', onKeyDown);
+  const unsubscribe = usePhotoStore.subscribe((state, previous) => {
+    if (state.tool !== previous.tool) cancelPolygon();
+  });
+
   container.addEventListener('pointerdown', onPointerDown);
   container.addEventListener('pointermove', onPointerMove);
   container.addEventListener('pointerup', onPointerUp);
@@ -857,6 +969,8 @@ export function attachPointer(
   container.addEventListener('contextmenu', onContextMenu);
 
   return () => {
+    window.removeEventListener('keydown', onKeyDown);
+    unsubscribe();
     container.removeEventListener('pointerdown', onPointerDown);
     container.removeEventListener('pointermove', onPointerMove);
     container.removeEventListener('pointerup', onPointerUp);

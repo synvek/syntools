@@ -30,6 +30,9 @@ export const TOOL_SHORTCUTS: Record<string, ToolId> = {
 /** ⇧O 在同族工具间循环（与工具箱角标 ⇧O 一致） */
 export const RETOUCH_CYCLE: ToolId[] = ['dodge', 'burn', 'sponge'];
 
+/** ⇧L 在套索家族里循环：手绘 → 多边形 → 磁性 */
+export const LASSO_CYCLE: ToolId[] = ['lasso', 'polyLasso', 'magneticLasso'];
+
 export interface KeyboardHooks {
   onExport: () => void;
   /** 适应窗口（⌘0） */
@@ -216,6 +219,12 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
       if (key === 'o') {
         const index = RETOUCH_CYCLE.indexOf(state.tool as ToolId);
         state.setTool(RETOUCH_CYCLE[(index + 1) % RETOUCH_CYCLE.length]);
+        return;
+      }
+      if (key === 'l') {
+        // ⇧L：手绘 → 多边形 → 磁性
+        const index = LASSO_CYCLE.indexOf(state.tool as ToolId);
+        state.setTool(LASSO_CYCLE[(index + 1) % LASSO_CYCLE.length]);
         return;
       }
     }

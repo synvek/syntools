@@ -798,6 +798,38 @@ const icons: Record<string, ReactNode> = {
       <circle cx="13.6" cy="18.4" r="1.1" />
     </>
   ),
+  // 多边形套索：折线 + 折点
+  lassoPolygon: (
+    <>
+      <path d="M4 18 8 6l8 3 4 7Z" />
+      <circle cx="4" cy="18" r="1.4" />
+      <circle cx="8" cy="6" r="1.4" />
+      <circle cx="16" cy="9" r="1.4" />
+    </>
+  ),
+  // 磁性套索：沿边缘吸附（虚线环 + 磁铁小块）
+  lassoMagnetic: (
+    <>
+      <path d="M12 4c4.4 0 8 2.2 8 5s-3.6 5-8 5-8-2.2-8-5 3.6-5 8-5Z" strokeDasharray="2.4 2.4" />
+      <path d="M9.5 17.5v2.2m5-2.2v2.2M9.5 19.7h5" />
+    </>
+  ),
+  // 魔棒：棒身 + 星芒
+  magicWand: (
+    <>
+      <path d="M5 19 15 9" />
+      <path d="m14 4 1 2.2 2.2 1-2.2 1L14 10.4l-1-2.2L10.8 7l2.2-1L14 4Z" />
+      <path d="m19.4 12 .6 1.3 1.3.6-1.3.6-.6 1.3-.6-1.3-1.3-.6 1.3-.6.6-1.3Z" />
+    </>
+  ),
+  // 快速选择：带加号的软边刷
+  quickSelect: (
+    <>
+      <path d="M5 19 12 12" />
+      <path d="M11 5.5a5 5 0 0 1 7 7l-3.5 3.5" strokeDasharray="2.2 2.2" />
+      <path d="M17 2.5v4M15 4.5h4" />
+    </>
+  ),
   brush: (
     <>
       <path d="M17 3.5 20.5 7 11 16.5H7.5V13L17 3.5Z" />

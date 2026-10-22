@@ -155,6 +155,8 @@ interface PhotoState {
   shapeKind: ShapeKind;
   /** 新建形状的默认填充 / 描边（参数条可调，不写进文档） */
   shapeStyle: ShapeStyleDefaults;
+  /** 磁性套索：吸附宽度（文档像素）与边缘对比度阈值 */
+  magnetic: { width: number; contrast: number };
   selection: Selection | null;
   cropRect: Rect | null;
   viewport: Viewport;
@@ -211,6 +213,8 @@ interface PhotoState {
   setShapeKind: (kind: ShapeKind) => void;
   /** 修改新建形状的默认样式（填充 / 描边 / 描边宽度 / 圆角） */
   setShapeStyle: (patch: Partial<ShapeStyleDefaults>) => void;
+  /** 修改磁性套索的宽度 / 对比度 */
+  setMagnetic: (patch: Partial<{ width: number; contrast: number }>) => void;
   /** 油漆桶设置 */
   setFill: (patch: { tolerance?: number; contiguous?: boolean }) => void;
   /** 渐变工具设置 */
@@ -434,6 +438,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   eraserSize: 24,
   shapeKind: 'rect',
   shapeStyle: { fill: '#2563EB', stroke: '#1D4ED8', strokeWidth: 0, cornerRadius: 12 },
+  magnetic: { width: 10, contrast: 30 },
   selection: null,
   cropRect: null,
   viewport: { scale: 0, x: 0, y: 0 },
@@ -591,6 +596,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   setShapeKind: (kind) => set({ shapeKind: kind }),
 
   setShapeStyle: (patch) => set((s) => ({ shapeStyle: { ...s.shapeStyle, ...patch } })),
+
+  setMagnetic: (patch) => set((s) => ({ magnetic: { ...s.magnetic, ...patch } })),
 
   setFill: (patch) =>
     set((s) => ({

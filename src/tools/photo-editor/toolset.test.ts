@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RETOUCH_CYCLE, TOOL_SHORTCUTS } from './interaction/keyboard';
+import { LASSO_CYCLE, RETOUCH_CYCLE, TOOL_SHORTCUTS } from './interaction/keyboard';
 import { ALL_TOOLS, TOOL_GROUPS, displayToolOf, groupOfTool } from './toolset';
 import type { ToolId } from './model/types';
 
@@ -17,6 +17,7 @@ const COMBO_SHORTCUTS: Record<string, ToolId[]> = {
   '⇧I': ['eyedropper', 'sampler'],
   '⇧J': ['healing', 'spotHeal'],
   '⇧R': ['blurBrush', 'sharpenBrush'],
+  '⇧L': LASSO_CYCLE,
 };
 
 describe('toolset', () => {
@@ -99,6 +100,19 @@ describe('工具箱分组', () => {
     }
     expect(groupOfTool('healing')?.id).toBe(groupOfTool('spotHeal')?.id);
     expect(groupOfTool('healing')?.items.map((item) => item.id)).toEqual(['healing', 'spotHeal']);
+  });
+
+  it('套索家族三项成组，魔棒与快速选择单独成组', () => {
+    expect(groupOfTool('lasso')?.items.map((item) => item.id)).toEqual([
+      'lasso',
+      'polyLasso',
+      'magneticLasso',
+    ]);
+    expect(groupOfTool('wand')?.items.map((item) => item.id)).toEqual(['wand', 'quickSelect']);
+    // 两个组各自独立成行（魔棒不再塞在套索组里）
+    expect(groupOfTool('polyLasso')?.id).toBe('lasso');
+    expect(groupOfTool('quickSelect')?.id).toBe('wand');
+    expect(new Set(groupOfTool('wand')?.items.map((item) => item.icon)).size).toBe(2);
   });
 
   it('形状是「一个工具 + 六个种类」：占一行，按种类在浮层里区分', () => {

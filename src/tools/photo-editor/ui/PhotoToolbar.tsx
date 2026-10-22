@@ -67,6 +67,8 @@ export function PhotoToolbar({
   const wandTolerance = usePhotoStore((s) => s.wandTolerance);
   const wandContiguous = usePhotoStore((s) => s.wandContiguous);
   const setWand = usePhotoStore((s) => s.setWand);
+  const magnetic = usePhotoStore((s) => s.magnetic);
+  const setMagnetic = usePhotoStore((s) => s.setMagnetic);
   const fillTolerance = usePhotoStore((s) => s.fillTolerance);
   const fillContiguous = usePhotoStore((s) => s.fillContiguous);
   const setFill = usePhotoStore((s) => s.setFill);
@@ -380,6 +382,8 @@ export function PhotoToolbar({
       {tool === 'rectSelect' ||
       tool === 'ellipseSelect' ||
       tool === 'lasso' ||
+      tool === 'polyLasso' ||
+      tool === 'magneticLasso' ||
       tool === 'wand' ||
       tool === 'quickSelect' ? (
         <div className="flex flex-wrap items-center gap-3" data-testid="selection-bar">
@@ -417,6 +421,36 @@ export function PhotoToolbar({
                 active={wandContiguous}
                 onClick={() => setWand({ contiguous: !wandContiguous })}
               />
+            </>
+          ) : null}
+          {tool === 'polyLasso' ? (
+            <span
+              className="text-xs text-gray-400 dark:text-gray-500"
+              data-testid="poly-lasso-hint"
+            >
+              {t('tools.photo.polyLassoHint')}
+            </span>
+          ) : null}
+          {tool === 'magneticLasso' ? (
+            <>
+              <div className="w-32">
+                <Slider
+                  label={t('tools.photo.magneticWidth')}
+                  value={magnetic.width}
+                  min={1}
+                  max={60}
+                  onChange={(value) => setMagnetic({ width: value })}
+                />
+              </div>
+              <div className="w-32">
+                <Slider
+                  label={t('tools.photo.magneticContrast')}
+                  value={magnetic.contrast}
+                  min={0}
+                  max={100}
+                  onChange={(value) => setMagnetic({ contrast: value })}
+                />
+              </div>
             </>
           ) : null}
         </div>

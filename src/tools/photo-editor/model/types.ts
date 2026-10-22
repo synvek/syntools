@@ -626,6 +626,8 @@ export type ToolId =
   | 'rectSelect'
   | 'ellipseSelect'
   | 'lasso'
+  | 'polyLasso'
+  | 'magneticLasso'
   | 'wand'
   | 'quickSelect'
   | 'crop'

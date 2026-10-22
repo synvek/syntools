@@ -1,5 +1,20 @@
 import fs from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+
+/**
+ * 工具箱的分组按钮：点一次选中、再点一次才展开浮层，所以这里循环点到浮层出现为止
+ * （首次点击只负责切换工具，直接点两次在有动画时容易把第二次点成「收起」）。
+ */
+async function pickFromGroup(page: Page, row: Locator, name: string) {
+  const flyout = page.getByTestId('photo-tool-flyout');
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await row.click();
+    await page.waitForTimeout(120);
+    if ((await flyout.count()) > 0) break;
+  }
+  await flyout.getByRole('menuitem', { name, exact: true }).click();
+  await expect(flyout).toHaveCount(0);
+}
 
 // 界面文案跟随浏览器语言（Playwright 默认 en-US），下面这些用例断言简体中文
 test.use({ locale: 'zh-CN' });
@@ -1895,6 +1910,122 @@ test.describe('照片编辑器（zh-CN）', () => {
       await page.keyboard.press('Delete');
       await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
     }
+  });
+
+  test('工具箱：魔棒与快速选择单独成组，套索组含多边形与磁性', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    const palette = page.getByTestId('photo-tool-palette');
+    const flyout = page.getByTestId('photo-tool-flyout');
+
+    // 魔棒组：默认魔棒，展开是魔棒 / 快速选择
+    const wandRow = palette.locator('[data-tool="wand"]');
+    await expect(wandRow).toHaveAttribute('aria-label', '魔棒');
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await wandRow.click();
+      await page.waitForTimeout(120);
+      if ((await flyout.count()) > 0) break;
+    }
+    await expect(flyout.getByRole('menuitem')).toHaveText([/魔棒/, /快速选择/]);
+    await flyout.getByRole('menuitem', { name: '快速选择' }).click();
+    // 工具行显示「当前工具」，所以 data-tool 跟着变成 quickSelect
+    await expect(palette.locator('[data-tool="quickSelect"]')).toHaveAttribute(
+      'aria-label',
+      '快速选择',
+    );
+
+    // 套索组：手绘 / 多边形 / 磁性（魔棒不再混在里面）
+    const lassoRow = palette.locator('[data-tool="lasso"]');
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await lassoRow.click();
+      await page.waitForTimeout(120);
+      if ((await flyout.count()) > 0) break;
+    }
+    await expect(flyout.getByRole('menuitem')).toHaveText([/套索/, /多边形套索/, /磁性套索/]);
+    // 三个图标各不相同（之前魔棒 / 快速选择复用了套索图标）
+    const icons = await flyout
+      .getByRole('menuitem')
+      .evaluateAll((items) => items.map((item) => item.querySelector('svg')?.innerHTML ?? ''));
+    expect(new Set(icons).size).toBe(icons.length);
+  });
+
+  test('多边形套索：逐点单击建框，双击闭合，Esc 取消', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    const row = page.getByTestId('photo-tool-palette').locator('[data-tool="lasso"]');
+    await pickFromGroup(page, row, '多边形套索');
+    await expect(page.getByTestId('poly-lasso-hint')).toBeVisible();
+
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
+    const point = (dx: number, dy: number) => ({ x: box.x + dx, y: box.y + dy });
+    const a = point(260, 200);
+    const b = point(520, 220);
+    const c = point(500, 400);
+
+    for (const p of [a, b, c]) {
+      await page.mouse.click(p.x, p.y);
+      await page.waitForTimeout(80);
+    }
+    // 还没闭合：不应该有选区
+    await expect(page.getByText(/^选区 \d+ × \d+$/)).toHaveCount(0);
+
+    // 点回起点附近 → 闭合，生成三角选区
+    await page.mouse.dblclick(a.x + 3, a.y + 3);
+    const selection = page.getByText(/^选区 \d+ × \d+$/);
+    await expect(selection).toBeVisible();
+    const [width, height] = (await selection.textContent())!.match(/\d+/g)!.map(Number);
+    expect(width).toBeGreaterThan(200);
+    expect(height).toBeGreaterThan(150);
+
+    // Esc 取消未闭合的折线：不应产生新选区
+    await page.keyboard.press('Meta+d');
+    await expect(selection).toHaveCount(0);
+    await page.mouse.click(box.x + 300, box.y + 250);
+    await page.mouse.click(box.x + 480, box.y + 300);
+    await page.keyboard.press('Escape');
+    await expect(selection).toHaveCount(0);
+  });
+
+  test('磁性套索：拖动时吸附到图层边缘', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    const palette = page.getByTestId('photo-tool-palette');
+    const box = (await page.getByTestId('photo-canvas').boundingBox())!;
+
+    // 先画一个矩形当作「边缘」
+    await palette.locator('[data-tool="shape"]').click();
+    await page.mouse.move(box.x + 300, box.y + 220);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 560, box.y + 420, { steps: 8 });
+    await page.mouse.up();
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
+
+    // 形状在文档里的尺寸（用于对比吸附结果）
+    await page.getByRole('tab', { name: '属性', exact: true }).click();
+    const shapeWidth = Number(await page.getByLabel('宽度', { exact: true }).first().inputValue());
+    const shapeHeight = Number(await page.getByLabel('高度', { exact: true }).first().inputValue());
+
+    await pickFromGroup(page, palette.locator('[data-tool="lasso"]'), '磁性套索');
+    await expect(page.getByTestId('selection-bar')).toContainText('对比度');
+
+    // 沿矩形外侧约 6px 绕一圈：吸附生效的话选区会收回到形状边缘
+    const ring = [
+      [566, 214],
+      [566, 426],
+      [294, 426],
+      [294, 214],
+      [566, 214],
+    ];
+    await page.mouse.move(box.x + ring[0][0], box.y + ring[0][1]);
+    await page.mouse.down();
+    for (const [x, y] of ring.slice(1)) {
+      await page.mouse.move(box.x + x, box.y + y, { steps: 20 });
+    }
+    await page.mouse.up();
+
+    const selection = page.getByText(/^选区 \d+ × \d+$/);
+    await expect(selection).toBeVisible();
+    const [width, height] = (await selection.textContent())!.match(/\d+/g)!.map(Number);
+    // 没吸附的话会比形状大一圈（外侧 6px ≈ 10 文档像素，两边合计 20）
+    expect(Math.abs(width - shapeWidth)).toBeLessThanOrEqual(8);
+    expect(Math.abs(height - shapeHeight)).toBeLessThanOrEqual(8);
   });
 });
 

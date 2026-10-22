@@ -87,14 +87,40 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       },
     ],
   },
+  // 套索家族：手绘 / 多边形 / 磁性（⇧L 循环），与 PS 的 L 组一致
   {
     id: 'lasso',
     section: 'select',
     primary: 'lasso',
     items: [
       { id: 'lasso', icon: 'lasso', labelKey: 'tools.photo.toolLasso', shortcut: 'L' },
-      { id: 'wand', icon: 'star', labelKey: 'tools.photo.toolWand', shortcut: 'W' },
-      { id: 'quickSelect', icon: 'lasso', labelKey: 'tools.photo.toolQuickSelect', shortcut: 'A' },
+      {
+        id: 'polyLasso',
+        icon: 'lassoPolygon',
+        labelKey: 'tools.photo.toolPolyLasso',
+        shortcut: '⇧L',
+      },
+      {
+        id: 'magneticLasso',
+        icon: 'lassoMagnetic',
+        labelKey: 'tools.photo.toolMagneticLasso',
+        shortcut: '⇧L',
+      },
+    ],
+  },
+  // 魔棒与快速选择都是「按颜色 / 相似度扩张选区」，单独成组（W）
+  {
+    id: 'wand',
+    section: 'select',
+    primary: 'wand',
+    items: [
+      { id: 'wand', icon: 'magicWand', labelKey: 'tools.photo.toolWand', shortcut: 'W' },
+      {
+        id: 'quickSelect',
+        icon: 'quickSelect',
+        labelKey: 'tools.photo.toolQuickSelect',
+        shortcut: 'A',
+      },
     ],
   },
   {
