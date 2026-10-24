@@ -422,9 +422,11 @@ export default function PhotoTool() {
 
   const handleNewCanvas = useCallback(
     (width: number, height: number, background: CanvasBackground) => {
+      // 新文档从空白开始：名称一并重置为空（UI 显示「未命名画布」占位名），
+      // 不沿用旧画布的名字，否则导出文件名会一直带着上一张图的名字。
       const next: PhotoDoc = {
         ...createDoc(),
-        name: usePhotoStore.getState().doc.name,
+        name: '',
         width,
         height,
         background,

@@ -1479,13 +1479,20 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(await markup('适应窗口')).not.toBe(await markup('100%'));
   });
 
-  test('新建画布对话框：指定尺寸后画布统计更新', async ({ page }) => {
+  test('新建画布对话框：指定尺寸后画布统计更新，画布名称重置', async ({ page }) => {
     await page.goto('/tools/photo-editor');
+    const title = page.getByLabel('画布名称');
+    await title.fill('旧画布');
+
     await page.getByRole('button', { name: '新建画布' }).click();
     await page.getByRole('dialog').getByLabel('宽度').fill('800');
     await page.getByRole('dialog').getByLabel('高度').fill('600');
     await page.getByRole('dialog').getByRole('button', { name: '创建' }).click();
     await expect(page.getByTestId('photo-stats')).toContainText('800 × 600');
+
+    // 新画布从空白开始：名称不沿用旧文档，回到「未命名画布」占位
+    await expect(title).toHaveValue('');
+    await expect(title).toHaveAttribute('placeholder', '未命名画布');
   });
 
   test('打开图片：以图片尺寸新建画布；导入图片到画布：只追加图层', async ({ page }) => {
