@@ -1488,6 +1488,52 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByTestId('photo-stats')).toContainText('800 × 600');
   });
 
+  test('打开图片：以图片尺寸新建画布；导入图片到画布：只追加图层', async ({ page }) => {
+    await page.goto('/tools/photo-editor');
+    await expect(page.getByTestId('photo-canvas')).toBeVisible();
+
+    // 16×16 的 PNG：与最小画布尺寸一致，便于校验「画布跟着图片走」
+    const png = {
+      name: 'dot.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAKUlEQVR42u3NMQEAAAgDoC251a3gLwSgcyfTVFVVVVVVVVVVVVVVVVVV1S8DLQABAVXMpwAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    };
+
+    // 导入图片到画布：画布尺寸保持不变，只多一个图层
+    let chooser = page.waitForEvent('filechooser');
+    await page.getByTestId('menubar-file').click();
+    await page.getByRole('menuitem', { name: '导入图片到画布' }).click();
+    await (await chooser).setFiles(png);
+    await expect(page.getByTestId('photo-stats')).toContainText('1280 × 720');
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
+
+    // 打开图片：以图片尺寸新建画布，文档里只剩图片这一层
+    chooser = page.waitForEvent('filechooser');
+    await page.getByTestId('menubar-file').click();
+    await page.getByRole('menuitem', { name: '打开图片' }).click();
+    await (await chooser).setFiles(png);
+    await expect(page.getByTestId('photo-stats')).toContainText('16 × 16');
+    await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
+    // 画布底色为白色：橡皮擦掉像素后露出白底，而不是舞台的深色棋盘格。
+    // 背景画在 bg 层（舞台上第一个 canvas），白底会铺满整个页面矩形。
+    const bgCanvas = await page.evaluate(() => {
+      const canvas = document.querySelector('.photo-stage canvas') as HTMLCanvasElement;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let white = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] > 248 && data[i + 1] > 248 && data[i + 2] > 248 && data[i + 3] > 248) {
+          white += 1;
+        }
+      }
+      return white;
+    });
+    expect(bgCanvas).toBeGreaterThan(0);
+  });
+
   test('导出 PSD：下载 .psd 且可在 Photoshop / Photopea 继续编辑', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();

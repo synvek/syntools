@@ -15,6 +15,7 @@ import {
   writeClipboardImage,
 } from './clipboard';
 import {
+  MAX_CANVAS_SIZE,
   VIEW_ROTATION_STEP,
   buildExportFilename,
   checkImageFile,
@@ -28,7 +29,7 @@ import type { PickedColor } from './interaction/pointer';
 import { loadImageFile } from './model/assets';
 import { loadSvgFile } from './render/svg';
 import { resolveImageKind } from './core';
-import { createDoc } from './model/factory';
+import { createDoc, createRasterLayer } from './model/factory';
 import { PANEL_GROUPS, loadPanelLayout, savePanelLayout } from './panels';
 import type { PanelId } from './panels';
 import { buildProjectJson, projectFilename, readProjectFile } from './project';
@@ -126,6 +127,8 @@ export default function PhotoTool() {
   const isNarrow = useMediaQuery(NARROW_QUERY);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  /** 图片选择器有两种用途：置入当前画布（默认）/ 作为新文档打开 */
+  const imageIntentRef = useRef<'import' | 'open'>('import');
   const projectInputRef = useRef<HTMLInputElement | null>(null);
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
   const workRowRef = useRef<HTMLDivElement | null>(null);
@@ -256,6 +259,62 @@ export default function PhotoTool() {
       setViewport({ x: 0, y: 0 });
     },
     [fail, setScale, setViewport],
+  );
+
+  /**
+   * 打开图片：以图片尺寸新建画布并载入图片（替换当前文档）。
+   *
+   * 与 `handleImage` 的区别：那个是「把图片置入当前画布」，画布尺寸不变、只多一个图层；
+   * 这里才是真正的「打开」—— 画布跟着图片走，图片铺满画布，可直接对原图做调整。
+   */
+  const handleOpenImage = useCallback(
+    async (file: File) => {
+      setFailure(null);
+      const check = checkImageFile(file);
+      if (!check.ok) {
+        fail(check as Failure);
+        return;
+      }
+      const result =
+        resolveImageKind(file.name) === 'svg' ? await loadSvgFile(file) : await loadImageFile(file);
+      if (!result.ok) {
+        fail(result as Failure);
+        return;
+      }
+      const { assetId, width, height } = result.value;
+      // 画布尺寸上限 4096：超大图按比例缩小画布，图片图层同步缩放，避免文档尺寸越界
+      const ratio = Math.min(1, MAX_CANVAS_SIZE / width, MAX_CANVAS_SIZE / height);
+      const canvasWidth = Math.max(1, Math.round(width * ratio));
+      const canvasHeight = Math.max(1, Math.round(height * ratio));
+      const name = file.name.replace(/\.[^.]+$/, '');
+      const layer = createRasterLayer({
+        assetId,
+        width: canvasWidth,
+        height: canvasHeight,
+        name,
+        x: 0,
+        y: 0,
+      });
+      // 文档与图层一次性交给 loadDoc：它会回收未被引用的资产，
+      // 先建立好引用关系，刚读进来的图片才不会被当作旧文档资产清掉。
+      loadDoc({
+        ...createDoc(),
+        name,
+        width: canvasWidth,
+        height: canvasHeight,
+        // 白底与「新建画布」一致：橡皮擦掉像素后露出的是白色，而不是舞台的深色棋盘格。
+        // 需要透明背景（例如抠好的 PNG）可用菜单「图像 → 透明」切换。
+        background: 'white',
+        layers: [layer],
+        activeLayerId: layer.id,
+      });
+      setScale(0);
+      setViewport({ x: 0, y: 0 });
+      clearDraft();
+      setDraftSaved(false);
+      setDegraded(false);
+    },
+    [fail, loadDoc, setScale, setViewport],
   );
 
   const handleProject = useCallback(
@@ -519,7 +578,14 @@ export default function PhotoTool() {
     history: t('tools.photo.tabHistory'),
   };
 
-  const openImagePicker = useCallback(() => imageInputRef.current?.click(), []);
+  const openImagePicker = useCallback(() => {
+    imageIntentRef.current = 'import';
+    imageInputRef.current?.click();
+  }, []);
+  const openImageAsDocPicker = useCallback(() => {
+    imageIntentRef.current = 'open';
+    imageInputRef.current?.click();
+  }, []);
   const openProjectPicker = useCallback(() => projectInputRef.current?.click(), []);
   const store = () => usePhotoStore.getState();
 
@@ -531,6 +597,7 @@ export default function PhotoTool() {
         menuItem('file-new', t('tools.photo.newCanvas'), () => setDialog('new'), {
           shortcut: '⌘N',
         }),
+        menuItem('file-open', t('tools.photo.openImage'), openImageAsDocPicker),
         menuItem('file-image', t('tools.photo.importImage'), openImagePicker),
         menuItem('file-project', t('tools.photo.importProject'), openProjectPicker),
         { type: 'separator' },
@@ -793,7 +860,7 @@ export default function PhotoTool() {
   return (
     <DropZone onFile={handleDropFile} testId="photo-drop">
       <div className="flex flex-col gap-3" data-tool-root>
-        {/* 隐藏的文件选择器：菜单中的「导入图片 / 导入工程」仍复用它们 */}
+        {/* 隐藏的文件选择器：菜单中的「打开图片 / 导入图片到画布 / 导入工程」仍复用它们 */}
         <input
           ref={imageInputRef}
           type="file"
@@ -801,9 +868,17 @@ export default function PhotoTool() {
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.[0];
-            // PSD 与普通图片共用同一个选择器，按扩展名分流
-            if (file) void (checkPsdFile(file).ok ? handlePsd(file) : handleImage(file));
+            // PSD 与普通图片共用同一个选择器，按扩展名分流；
+            // 普通图片再按意图分流：置入当前画布 / 以图片尺寸新建文档
+            if (file) {
+              if (checkPsdFile(file).ok) void handlePsd(file);
+              else
+                void (imageIntentRef.current === 'open'
+                  ? handleOpenImage(file)
+                  : handleImage(file));
+            }
             event.target.value = '';
+            imageIntentRef.current = 'import';
           }}
         />
         <input
