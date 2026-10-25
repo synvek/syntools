@@ -1,7 +1,7 @@
 {
   "name": "syntools",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.8.1",
   "type": "module",
   "homepage": "https://github.com/synvek/syntools",
   "repository": {
@@ -29,6 +29,9 @@
     "version:sync": "tsx scripts/sync-version.ts",
     "version:check": "tsx scripts/sync-version.ts --check",
     "ffmpeg:fetch": "node scripts/fetch-ffmpeg-core.mjs",
+    "og": "node scripts/gen-og.mjs",
+    "og:en": "node scripts/gen-og.mjs --lang=en",
+    "og:all": "node scripts/gen-og.mjs --all",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

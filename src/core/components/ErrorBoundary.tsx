@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { i18n } from '@/core/i18n';
+import { trackToolError } from '@/core/analytics';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -20,6 +21,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ToolPage] 工具运行出错', error, info.componentStack);
+    // 只上报错误摘要与当前工具 id，不上报用户输入
+    trackToolError(error.message);
   }
 
   private retry = () => {

@@ -12,6 +12,7 @@ const es = {
     themeAria: 'Cambiar tema',
     langAria: 'Cambiar idioma',
     downloadAria: 'Descargar app de escritorio',
+    downloadLabel: 'Descargar',
     sourceAria: 'Código fuente',
   },
   sidebar: {

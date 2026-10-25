@@ -91,16 +91,15 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
         >
           <Icon name={isDark ? 'sun' : 'moon'} />
         </button>
-        <a
-          href="https://github.com/synvek/syntools/releases"
-          target="_blank"
-          rel="noreferrer"
+        <Link
+          to="/download"
           aria-label={t('header.downloadAria')}
           title={t('header.downloadAria')}
-          className="rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
         >
-          <Icon name="download" />
-        </a>
+          <Icon name="download" className="h-4 w-4" />
+          <span className="hidden sm:inline">{t('header.downloadLabel')}</span>
+        </Link>
         <a
           href="https://github.com/synvek/syntools"
           target="_blank"

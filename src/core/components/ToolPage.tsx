@@ -7,6 +7,7 @@ import { Icon } from '@/core/components/Icon';
 import { RelatedTools } from '@/core/components/RelatedTools';
 import { hasToolStrings, loadToolStrings, normalizeLang, type Lang } from '@/core/i18n';
 import { useToolMeta } from '@/core/i18n/helpers';
+import { trackToolDuration, trackToolOpen } from '@/core/analytics';
 
 function ToolSkeleton() {
   const { t } = useTranslation();
@@ -67,6 +68,13 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
     document.title = `${name} · SynTools`;
     recordUse(tool.id);
   }, [tool, recordUse, name]);
+
+  // 埋点：打开与停留时长（未配置端点时为空操作，零网络请求）
+  useEffect(() => {
+    trackToolOpen(tool.id);
+    const startedAt = performance.now();
+    return () => trackToolDuration(tool.id, Math.round(performance.now() - startedAt));
+  }, [tool.id]);
 
   return (
     <div className="w-full px-6 py-6">

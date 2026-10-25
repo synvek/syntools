@@ -12,6 +12,7 @@ const fr = {
     themeAria: 'Changer de thème',
     langAria: 'Changer de langue',
     downloadAria: "Télécharger l'application de bureau",
+    downloadLabel: 'Télécharger',
     sourceAria: 'Code source',
   },
   sidebar: {

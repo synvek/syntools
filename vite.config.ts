@@ -1,7 +1,20 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { prerenderPlugin } from './scripts/prerender';
+
+/** 应用版本号（来自 package.json，供 /download 等页面展示，避免手工同步） */
+function resolveAppVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')) as {
+      version?: string;
+    };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 /**
  * 部署子路径（GitHub Pages 项目站为 /<repo>/）。
@@ -18,6 +31,9 @@ export default defineConfig({
   base: resolveBase(),
   // Tauri 期望固定端口，且避免清屏打乱 Rust 编译日志
   clearScreen: false,
+  define: {
+    __APP_VERSION__: JSON.stringify(resolveAppVersion()),
+  },
   plugins: [react(), prerenderPlugin()],
   resolve: {
     alias: {

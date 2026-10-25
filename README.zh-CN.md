@@ -8,6 +8,8 @@ SynTools 把日常常用的工具收拢到同一入口：办公文档（Word / E
 
 您可在线使用: www.syntools.net
 
+**桌面版（可选）** —— macOS（Apple Silicon / Intel）、Windows（x64 / ARM64）、Linux（deb / rpm / AppImage）安装包见 [Releases](https://github.com/synvek/syntools/releases/latest)。桌面版是同一套界面，可完全离线运行，不受浏览器内存上限约束，并能直接读写本地文件。
+
 ---
 
 ## 为什么选择 SynTools？

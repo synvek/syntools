@@ -12,6 +12,7 @@ const zhTW = {
     themeAria: '切換主題',
     langAria: '切換語言',
     downloadAria: '下載桌面版',
+    downloadLabel: '下載',
     sourceAria: '源碼',
   },
   sidebar: {

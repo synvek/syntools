@@ -8,6 +8,8 @@ SynTools is a unified collection of everyday utilities — office documents (Wor
 
 You can access online: www.syntools.net
 
+**Desktop app (optional)** — installers for macOS (Apple Silicon / Intel), Windows (x64 / ARM64) and Linux (deb / rpm / AppImage) are on the [releases page](https://github.com/synvek/syntools/releases/latest). The desktop build runs the same UI fully offline, with no browser memory ceiling and direct local file access.
+
 ---
 
 ## Why SynTools?

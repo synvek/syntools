@@ -49,6 +49,7 @@ src-tauri/target
 # AI Tools
 .cursor/
 .codebuddy/
+.workbuddy/
 
 # Internal 
 plan/

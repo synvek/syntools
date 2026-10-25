@@ -12,6 +12,7 @@ const en = {
     themeAria: 'Toggle theme',
     langAria: 'Switch language',
     downloadAria: 'Download desktop app',
+    downloadLabel: 'Download',
     sourceAria: 'Source code',
   },
   sidebar: {

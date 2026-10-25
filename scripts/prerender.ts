@@ -3,13 +3,14 @@
 import type { Plugin } from 'vitest/config';
 import type { ToolMeta } from '../src/core/types';
 import { createServer } from 'vite';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve as resolvePath } from 'node:path';
 
 /**
- * SEO 预渲染插件（Tasks T31）：构建结束后为首页与每个工具页生成含
- * title / meta description / Open Graph 的静态 HTML，并输出 robots.txt
- * 与 sitemap.xml（后者需设置 SITE_URL 环境变量，如 https://syntools.dev）。
+ * SEO 预渲染插件（Tasks T31）：构建结束后为首页、工具页与静态页生成含
+ * title / description / canonical / Open Graph / JSON-LD 的静态 HTML，
+ * 并在 `#root` 内注入可索引的正文骨架（H1 + 说明 + 站内内链），
+ * 同时输出 robots.txt 与 sitemap.xml。
  *
  * 说明：
  * - 在 closeBundle 阶段（产物已落盘）读取 dist/index.html 作为模板；
@@ -17,8 +18,14 @@ import { dirname, resolve as resolvePath } from 'node:path';
  *   模块管线，自动解析整条依赖链上的 `@/` 别名；build 环境的插件上下文不提供
  *   ssrLoadModule，vite.config.ts 又被 esbuild 打包无法静态 import 别名模块）。
  *   注册表链上只有 type-only 导入与不执行的懒加载工厂，SSR 加载安全；
- * - Cloudflare Pages / Vercel 均优先返回真实静态文件，SPA fallback 不受影响。
+ * - Cloudflare Pages / Vercel 均优先返回真实静态文件，SPA fallback 不受影响；
+ * - 注入的正文位于 `#root` 内：`createRoot().render()` 首次提交时会清空容器
+ *   已有子节点，因此不会与 React 渲染结果重复；若 JS 未加载，用户仍能看到
+ *   可读的静态内容（渐进增强，而非降级）。
  */
+
+/** 站点根地址；生产构建未显式传 SITE_URL 时用它兜底，避免 sitemap / canonical 丢失 */
+const DEFAULT_SITE_URL = 'https://www.syntools.net';
 
 /** HTML 属性值转义（工具名/描述可能含 & " < > 等字符） */
 function escapeAttr(value: string): string {
@@ -29,43 +36,162 @@ function escapeAttr(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** 站点通用 meta 标签（注入到 </head> 前） */
-function buildMetaTags(opts: {
+/** HTML 文本节点转义（比属性多处理单引号） */
+function escapeText(value: string): string {
+  return escapeAttr(value).replace(/'/g, '&#39;');
+}
+
+const SITE_NAME = 'SynTools - 在线工具集';
+const BRAND = 'SynTools';
+const SITE_DESCRIPTION =
+  'SynTools 是免费的在线工具集：JSON 格式化、Base64/URL 编解码、正则测试、文本对比、时间戳转换、UUID/密码生成、哈希计算、二维码、颜色与进制转换、Markdown 预览、图片压缩、PDF 合并拆分加密、Word/Excel/PPT 在线编辑等，纯前端处理，数据不离开浏览器。';
+
+/** 静态页（非工具页）配置：路径统一带尾斜杠，与静态托管目录结构一致 */
+interface StaticPage {
+  path: string;
+  title: string;
+  description: string;
+}
+
+const STATIC_PAGES: StaticPage[] = [
+  {
+    path: '/download/',
+    title: `下载桌面版 - ${SITE_NAME}`,
+    description:
+      'SynTools 桌面版下载：macOS（Apple Silicon / Intel）、Windows（x64 / ARM64）、Linux（deb / rpm / AppImage）。安装后全功能离线可用，文件不出本机，无需联网、无需登录。',
+  },
+];
+
+/** 预渲染正文骨架的样式：内联注入，不依赖 JS，亮/暗色都保持可读 */
+const SHELL_STYLE = `
+/* 与 theme-init.js 一致地按系统偏好铺底色，避免 React 挂载前出现反色闪光 */
+html { background: #ffffff; }
+#root > .seo-shell {
+  max-width: 56rem; margin: 0 auto; padding: 32px 24px 64px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 15px; line-height: 1.7; color: #111827;
+}
+#root > .seo-shell h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 .5rem; }
+#root > .seo-shell .seo-lead { margin: 0 0 1.25rem; color: #4b5563; }
+#root > .seo-shell h2 { font-size: 1rem; font-weight: 600; margin: 1.75rem 0 .5rem; }
+#root > .seo-shell ul { margin: 0; padding-left: 1.15rem; }
+#root > .seo-shell li { margin: .25rem 0; }
+#root > .seo-shell a { color: #2563eb; text-decoration: none; }
+#root > .seo-shell a:hover { text-decoration: underline; }
+#root > .seo-shell .seo-note {
+  margin-top: 1.5rem; padding: .75rem 1rem; border-radius: .5rem;
+  background: #f3f4f6; color: #374151; font-size: .875rem;
+}
+@media (prefers-color-scheme: dark) {
+  html { background: #030712; }
+  #root > .seo-shell { color: #e5e7eb; }
+  #root > .seo-shell .seo-lead { color: #9ca3af; }
+  #root > .seo-shell a { color: #60a5fa; }
+  #root > .seo-shell .seo-note { background: #1f2937; color: #d1d5db; }
+}
+`.trim();
+
+interface MetaOpts {
   title: string;
   description: string;
   siteUrl: string | null;
   path: string;
-}): string {
-  const { title, description, siteUrl, path } = opts;
+  /** 相对站点的 OG 图路径；不存在则回退品牌默认图，都没有则省略 */
+  ogImage: string | null;
+}
+
+/** 站点通用 meta 标签（注入到 </head> 前） */
+function buildMetaTags(opts: MetaOpts): string {
+  const { title, description, siteUrl, path, ogImage } = opts;
+  const absolute = (p: string): string => (siteUrl ? siteUrl + p : p);
   const tags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
+    `<meta name="application-name" content="${BRAND}" />`,
+    `<meta property="og:site_name" content="${BRAND}" />`,
+    `<meta property="og:locale" content="zh_CN" />`,
     `<meta property="og:title" content="${escapeAttr(title)}" />`,
     `<meta property="og:description" content="${escapeAttr(description)}" />`,
     '<meta property="og:type" content="website" />',
+    '<meta name="twitter:card" content="summary_large_image" />',
+    `<meta name="twitter:title" content="${escapeAttr(title)}" />`,
+    `<meta name="twitter:description" content="${escapeAttr(description)}" />`,
   ];
   if (siteUrl) {
-    tags.push(`<meta property="og:url" content="${escapeAttr(siteUrl + path)}" />`);
-    tags.push(`<link rel="canonical" href="${escapeAttr(siteUrl + path)}" />`);
+    tags.push(`<meta property="og:url" content="${escapeAttr(absolute(path))}" />`);
+    tags.push(`<link rel="canonical" href="${escapeAttr(absolute(path))}" />`);
+  }
+  if (ogImage) {
+    const url = escapeAttr(absolute(ogImage));
+    tags.push(`<meta property="og:image" content="${url}" />`);
+    tags.push(`<meta property="og:image:width" content="1200" />`);
+    tags.push(`<meta property="og:image:height" content="630" />`);
+    tags.push(`<meta name="twitter:image" content="${url}" />`);
   }
   return tags.join('\n    ');
 }
 
+/** 工具页结构化数据：让搜索结果有机会出富摘要（免费在线工具 + 面包屑） */
+function buildToolJsonLd(opts: {
+  siteUrl: string | null;
+  path: string;
+  name: string;
+  description: string;
+  category: string;
+}): string {
+  const { siteUrl, path, name, description, category } = opts;
+  const url = siteUrl ? siteUrl + path : path;
+  const data = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebApplication',
+        name,
+        description,
+        url,
+        applicationCategory: 'UtilitiesApplication',
+        applicationSubCategory: category,
+        operatingSystem: 'Any',
+        browserRequirements: 'Requires JavaScript',
+        inLanguage: 'zh-CN',
+        isAccessibleForFree: true,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'CNY' },
+        ...(siteUrl ? { publisher: { '@type': 'Organization', name: BRAND, url: siteUrl } } : {}),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: BRAND, item: siteUrl ? `${siteUrl}/` : '/' },
+          { '@type': 'ListItem', position: 2, name, item: url },
+        ],
+      },
+    ],
+  };
+  return `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
+}
+
+/** 正文骨架：React 挂载后被替换，但爬虫与无 JS 环境可读 */
+function buildShell(bodyHtml: string): string {
+  return `<div class="seo-shell">${bodyHtml}</div>`;
+}
+
 function buildSitemap(siteUrl: string, paths: string[]): string {
+  const today = new Date().toISOString().slice(0, 10);
   const urls = paths
     .map(
       (p) =>
-        `  <url>\n    <loc>${escapeAttr(siteUrl + p)}</loc>\n    <changefreq>weekly</changefreq>\n  </url>`,
+        `  <url>\n    <loc>${escapeAttr(siteUrl + p)}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n  </url>`,
     )
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
-const SITE_NAME = 'SynTools - 在线工具集';
-const SITE_DESCRIPTION =
-  'SynTools 是免费的在线工具集：JSON 格式化、Base64/URL 编解码、正则测试、文本对比、时间戳转换、UUID/密码生成、哈希计算、二维码、颜色与进制转换、Markdown 预览、图片压缩、PDF 合并拆分加密、Word/Excel/PPT 在线编辑等，纯前端处理，数据不离开浏览器。';
+type PrerenderTool = Pick<
+  ToolMeta,
+  'id' | 'name' | 'description' | 'category' | 'weight' | 'relatedIds'
+>;
 
 /** 经编程式 dev server 的 SSR 管线加载注册表（解析 @/ 别名） */
-async function loadTools(root: string): Promise<Pick<ToolMeta, 'id' | 'name' | 'description'>[]> {
+async function loadTools(root: string): Promise<PrerenderTool[]> {
   const server = await createServer({
     configFile: false,
     root,
@@ -75,12 +201,20 @@ async function loadTools(root: string): Promise<Pick<ToolMeta, 'id' | 'name' | '
     logLevel: 'silent',
   });
   try {
-    const mod = (await server.ssrLoadModule('@/core/registry')) as {
-      tools: Pick<ToolMeta, 'id' | 'name' | 'description'>[];
-    };
+    const mod = (await server.ssrLoadModule('@/core/registry')) as { tools: PrerenderTool[] };
     return mod.tools;
   } finally {
     await server.close();
+  }
+}
+
+/** 读取已生成的 OG 图清单（构建前放 public/og/<id>.png 即可按工具出图） */
+async function readOgImages(distDir: string): Promise<Set<string>> {
+  try {
+    const files = await readdir(resolvePath(distDir, 'og'));
+    return new Set(files.filter((f) => f.endsWith('.png')));
+  } catch {
+    return new Set();
   }
 }
 
@@ -96,7 +230,7 @@ export function prerenderPlugin(): Plugin {
       outDir = resolved.build.outDir || 'dist';
     },
     async closeBundle() {
-      const siteUrl = process.env.SITE_URL?.replace(/\/+$/, '') || null;
+      const siteUrl = (process.env.SITE_URL?.trim() || DEFAULT_SITE_URL).replace(/\/+$/, '');
       const distDir = resolvePath(root, outDir);
       const indexPath = resolvePath(distDir, 'index.html');
 
@@ -108,7 +242,7 @@ export function prerenderPlugin(): Plugin {
         return;
       }
 
-      let tools: Pick<ToolMeta, 'id' | 'name' | 'description'>[];
+      let tools: PrerenderTool[];
       try {
         tools = await loadTools(root);
       } catch (err) {
@@ -116,36 +250,124 @@ export function prerenderPlugin(): Plugin {
         return;
       }
 
-      const render = (title: string, description: string, path: string): string =>
-        template
-          .replace(/<title>[^<]*<\/title>/, `<title>${escapeAttr(title)}</title>`)
-          .replace(
-            '</head>',
-            `    ${buildMetaTags({ title, description, siteUrl, path })}\n  </head>`,
-          );
+      const ogFiles = await readOgImages(distDir);
+      const hasDefaultOg = ogFiles.has('default.png');
 
-      // 首页：注入站点级 meta（title 与模板一致）
-      await writeFile(indexPath, render(SITE_NAME, SITE_DESCRIPTION, '/'), 'utf-8');
+      /** 每个工具取同分类的其它工具作为内链（有 relatedIds 时优先），最多 8 个 */
+      const relatedOf = (tool: PrerenderTool): PrerenderTool[] => {
+        const byId = new Map(tools.map((t) => [t.id, t]));
+        if (tool.relatedIds?.length) {
+          return tool.relatedIds
+            .map((id) => byId.get(id))
+            .filter((t): t is PrerenderTool => Boolean(t))
+            .slice(0, 8);
+        }
+        return tools.filter((t) => t.id !== tool.id && t.category === tool.category).slice(0, 8);
+      };
+
+      const render = (opts: {
+        title: string;
+        description: string;
+        path: string;
+        bodyHtml: string;
+        ogImage: string | null;
+        jsonLd?: string;
+      }): string => {
+        const head = [
+          buildMetaTags({
+            title: opts.title,
+            description: opts.description,
+            siteUrl,
+            path: opts.path,
+            ogImage: opts.ogImage,
+          }),
+          opts.jsonLd ?? '',
+          `<style>${SHELL_STYLE}</style>`,
+        ]
+          .filter(Boolean)
+          .join('\n    ');
+        return template
+          .replace(/<title>[^<]*<\/title>/, `<title>${escapeAttr(opts.title)}</title>`)
+          .replace('</head>', `    ${head}\n  </head>`)
+          .replace('<div id="root"></div>', `<div id="root">${buildShell(opts.bodyHtml)}</div>`);
+      };
+
+      const defaultOg = hasDefaultOg ? '/og/default.png' : null;
+
+      // 首页：注入站点级 meta + 全量分类内链（153 条工具链接，给爬虫一张完整地图）
+      const homeNav = buildHomeBody(tools);
+      await writeFile(
+        indexPath,
+        render({
+          title: SITE_NAME,
+          description: SITE_DESCRIPTION,
+          path: '/',
+          bodyHtml: homeNav,
+          ogImage: defaultOg,
+        }),
+        'utf-8',
+      );
 
       // 工具页：/tools/<id>/index.html（静态托管优先于 SPA fallback 命中）
       for (const tool of tools) {
         const title = `${tool.name} - ${SITE_NAME}`;
         const description = `${tool.description}。纯前端处理，数据不离开浏览器。`;
+        const path = `/tools/${tool.id}/`;
+        const og = ogFiles.has(`${tool.id}.png`) ? `/og/${tool.id}.png` : defaultOg;
+        const body = buildToolBody(tool, relatedOf(tool));
         const file = resolvePath(distDir, 'tools', tool.id, 'index.html');
         await mkdir(dirname(file), { recursive: true });
-        await writeFile(file, render(title, description, `/tools/${tool.id}/`), 'utf-8');
+        await writeFile(
+          file,
+          render({
+            title,
+            description,
+            path,
+            bodyHtml: body,
+            ogImage: og,
+            jsonLd: buildToolJsonLd({
+              siteUrl,
+              path,
+              name: tool.name,
+              description: tool.description,
+              category: tool.category,
+            }),
+          }),
+          'utf-8',
+        );
       }
 
-      // robots.txt（SITE_URL 存在时附带 sitemap 声明）
-      const robots = ['User-agent: *', 'Allow: /'];
-      if (siteUrl) robots.push(`Sitemap: ${siteUrl}/sitemap.xml`);
-      await writeFile(resolvePath(distDir, 'robots.txt'), `${robots.join('\n')}\n`, 'utf-8');
-
-      // sitemap.xml（仅在配置了 SITE_URL 时生成）
-      if (siteUrl) {
-        const paths = ['/', ...tools.map((tool) => `/tools/${tool.id}/`)];
-        await writeFile(resolvePath(distDir, 'sitemap.xml'), buildSitemap(siteUrl, paths), 'utf-8');
+      // 静态页：/download/ 等
+      for (const page of STATIC_PAGES) {
+        const file = resolvePath(distDir, `${page.path.replace(/^\/+|\/+$/g, '')}/index.html`);
+        await mkdir(dirname(file), { recursive: true });
+        await writeFile(
+          file,
+          render({
+            title: page.title,
+            description: page.description,
+            path: page.path,
+            bodyHtml: `<h1>${escapeText(page.title.split(' - ')[0]!)}</h1><p class="seo-lead">${escapeText(page.description)}</p><p><a href="/">${escapeText(BRAND)} 在线版</a> · <a href="/#tools">全部 ${tools.length} 个工具</a></p>`,
+            ogImage: defaultOg,
+          }),
+          'utf-8',
+        );
       }
+
+      // robots.txt：站点根 + sitemap 声明（若托管商另有托管版 robots，
+      // 需在控制台关闭「Managed robots.txt」，否则本文件被覆盖）
+      const robots = ['User-agent: *', 'Allow: /', `Sitemap: ${siteUrl}/sitemap.xml`, ''].join(
+        '\n',
+      );
+      await writeFile(resolvePath(distDir, 'robots.txt'), robots, 'utf-8');
+
+      // sitemap.xml
+      const paths = [
+        '/',
+        ...STATIC_PAGES.map((page) => page.path),
+        ...tools.map((tool) => `/tools/${tool.id}/`),
+      ];
+      await writeFile(resolvePath(distDir, 'sitemap.xml'), buildSitemap(siteUrl, paths), 'utf-8');
 
       // GitHub Pages：无服务端 SPA fallback，用 404.html 回退到应用壳
       await writeFile(
@@ -157,8 +379,66 @@ export function prerenderPlugin(): Plugin {
       await writeFile(resolvePath(distDir, '.nojekyll'), '', 'utf-8');
 
       console.log(
-        `预渲染完成：首页 + ${tools.length} 个工具页 + robots.txt${siteUrl ? ' + sitemap.xml' : ''} + 404.html`,
+        `预渲染完成：首页 + ${tools.length} 个工具页 + ${STATIC_PAGES.length} 个静态页 + robots.txt + sitemap.xml（${paths.length} 条）+ 404.html`,
       );
     },
   };
 }
+
+/** 首页正文骨架：按分类列出全部工具，形成可抓取的站内链接图 */
+function buildHomeBody(tools: PrerenderTool[]): string {
+  const byCategory = new Map<string, PrerenderTool[]>();
+  for (const tool of tools) {
+    const list = byCategory.get(tool.category) ?? [];
+    list.push(tool);
+    byCategory.set(tool.category, list);
+  }
+  const sections = [...byCategory.entries()]
+    .map(([category, list]) => {
+      const items = list
+        .map((tool) => `<li><a href="/tools/${tool.id}/">${escapeText(tool.name)}</a></li>`)
+        .join('');
+      return `<h2>${escapeText(CATEGORY_LABELS[category] ?? category)}</h2><ul>${items}</ul>`;
+    })
+    .join('');
+  return [
+    `<h1>${escapeText(BRAND)} 在线工具集</h1>`,
+    `<p class="seo-lead">${escapeText(SITE_DESCRIPTION)}</p>`,
+    sections,
+    `<p class="seo-note">以上全部工具默认在浏览器本地计算，文件与文本不会上传到服务器。可另下载桌面版，完全离线使用。</p>`,
+  ].join('');
+}
+
+/** 工具页正文骨架：说明 + 同分类内链 + 返回入口 */
+function buildToolBody(tool: PrerenderTool, related: PrerenderTool[]): string {
+  const relatedHtml = related.length
+    ? `<h2>同类工具</h2><ul>${related
+        .map((t) => `<li><a href="/tools/${t.id}/">${escapeText(t.name)}</a></li>`)
+        .join('')}</ul>`
+    : '';
+  return [
+    `<h1>${escapeText(tool.name)}</h1>`,
+    `<p class="seo-lead">${escapeText(tool.description)}</p>`,
+    `<p class="seo-note">本工具默认在浏览器内本地计算，输入内容不会上传到服务器。若需要离线使用，可下载桌面版。</p>`,
+    relatedHtml,
+    `<p><a href="/">全部工具</a> · <a href="/download/">下载桌面版</a></p>`,
+  ].join('');
+}
+
+/** 分类中文名（与 src/core/registry/categories.ts 保持一致；仅用于静态内链标题） */
+const CATEGORY_LABELS: Record<string, string> = {
+  advanced: '文档与创作',
+  encoding: '编码转换',
+  text: '文本处理',
+  formatting: '格式化',
+  crypto: '加密哈希',
+  datetime: '时间日期',
+  generator: '生成器',
+  network: '网络',
+  image: '图片处理',
+  pdf: 'PDF 工具',
+  other: '其他',
+  file: '文件工具',
+  media: '音视频',
+  cheatsheet: '速查表',
+};

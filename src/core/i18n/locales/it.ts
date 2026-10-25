@@ -12,6 +12,7 @@ const it = {
     themeAria: 'Cambia tema',
     langAria: 'Cambia lingua',
     downloadAria: "Scarica l'app desktop",
+    downloadLabel: 'Scarica',
     sourceAria: 'Codice sorgente',
   },
   sidebar: {

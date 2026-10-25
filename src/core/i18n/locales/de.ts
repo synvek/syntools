@@ -12,6 +12,7 @@ const de = {
     themeAria: 'Design umschalten',
     langAria: 'Sprache wechseln',
     downloadAria: 'Desktop-App herunterladen',
+    downloadLabel: 'Herunterladen',
     sourceAria: 'Quellcode',
   },
   sidebar: {

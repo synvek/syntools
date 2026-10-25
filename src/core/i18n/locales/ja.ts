@@ -12,6 +12,7 @@ const ja = {
     themeAria: 'テーマを切り替え',
     langAria: '言語を切り替え',
     downloadAria: 'デスクトップ版をダウンロード',
+    downloadLabel: 'ダウンロード',
     sourceAria: 'ソースコード',
   },
   sidebar: {

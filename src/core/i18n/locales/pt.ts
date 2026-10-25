@@ -12,6 +12,7 @@ const pt = {
     themeAria: 'Alternar tema',
     langAria: 'Mudar idioma',
     downloadAria: 'Baixar app para desktop',
+    downloadLabel: 'Baixar',
     sourceAria: 'Código-fonte',
   },
   sidebar: {
