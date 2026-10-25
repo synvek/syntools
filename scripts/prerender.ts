@@ -354,11 +354,28 @@ export function prerenderPlugin(): Plugin {
         );
       }
 
-      // robots.txt：站点根 + sitemap 声明（若托管商另有托管版 robots，
-      // 需在控制台关闭「Managed robots.txt」，否则本文件被覆盖）
-      const robots = ['User-agent: *', 'Allow: /', `Sitemap: ${siteUrl}/sitemap.xml`, ''].join(
-        '\n',
-      );
+      // robots.txt
+      //
+      // 立场：允许检索与「答案引擎」抓取，但保留对训练用途的权利（EU DSM 第 4 条）。
+      // 这是刻意的选择 —— 工具站的流量全部来自「被搜到 / 被 AI 引用」，
+      // 用 Disallow 把抓取挡掉等于自断入口；而 Content-Signal 只是权利声明，
+      // 不影响抓取，两者可以同时成立。
+      //
+      // 注意：Cloudflare 的 AI Crawl Control 若开启了「托管 robots.txt /
+      // Bot Preference Sync」，会在本文件**前面**注入一大段 Disallow，
+      // 并在边缘直接返回 403（实测 GPTBot / ClaudeBot 会 403）。
+      // 那种情况下改这个文件无效，必须去控制台关掉那个开关。
+      const robots = [
+        '# 欢迎检索与答案引擎抓取，包括 Baiduspider / Bingbot / GPTBot / ClaudeBot',
+        'User-agent: *',
+        'Allow: /',
+        '',
+        '# 权利保留：允许索引与引用，不授权用于模型训练',
+        'Content-Signal: search=yes, ai-train=no, use=reference',
+        '',
+        `Sitemap: ${siteUrl}/sitemap.xml`,
+        '',
+      ].join('\n');
       await writeFile(resolvePath(distDir, 'robots.txt'), robots, 'utf-8');
 
       // sitemap.xml
