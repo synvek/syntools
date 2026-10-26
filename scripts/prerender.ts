@@ -367,6 +367,15 @@ export function prerenderPlugin(): Plugin {
       // 那种情况下改这个文件无效，必须去控制台关掉那个开关。
       const robots = [
         '# 欢迎检索与答案引擎抓取，包括 Baiduspider / Bingbot / GPTBot / ClaudeBot',
+        '',
+        '# Baiduspider 单独成组：本站无 ICP 备案（境外托管），百度后台的',
+        '# 「普通收录 → sitemap」提交配额固定为 0 条/日，按钮置灰不可用。',
+        '# 百度此时唯一可用的 sitemap 通道，是它读取 robots.txt 时发现的',
+        '# Sitemap 指令 —— 因此这条必须写在 Baiduspider 自己的分组里。',
+        'User-agent: Baiduspider',
+        'Allow: /',
+        `Sitemap: ${siteUrl}/sitemap.xml`,
+        '',
         'User-agent: *',
         'Allow: /',
         '',
