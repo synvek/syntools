@@ -140,7 +140,7 @@ const zhTW = {
     },
     'video-convert': {
       name: '影片轉碼',
-      description: 'WebCodecs 優先的影片轉碼（MP4 / WebM / MKV），不支援時自動回退 ffmpeg.wasm',
+      description: 'WebCodecs 影片轉碼（MP4 / WebM / MKV），全程在本機完成',
     },
     'video-to-gif': {
       name: '影片轉 GIF',
@@ -148,8 +148,7 @@ const zhTW = {
     },
     'audio-convert': {
       name: '音訊轉碼',
-      description:
-        '音訊格式轉換：WAV（原生精修）與 MP3 / M4A / OGG / FLAC（WebCodecs 優先，回退 ffmpeg.wasm）',
+      description: '音訊格式轉換：WAV（原生精修）與 MP3 / M4A / OGG / FLAC（WebCodecs）',
     },
     'subtitle-tool': {
       name: '字幕轉換',

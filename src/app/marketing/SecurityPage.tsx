@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { track } from '@/core/analytics';
 import {
   GITHUB_REPO_URL,
@@ -77,7 +77,7 @@ const zh: SecurityCopy = {
     },
     {
       term: "script-src 'self' 'wasm-unsafe-eval'",
-      desc: '禁止内联脚本与 CDN 脚本；wasm-unsafe-eval 仅用于编译音视频处理用的 WebAssembly（ffmpeg.wasm）。',
+      desc: '禁止内联脚本与 CDN 脚本；wasm-unsafe-eval 仅用于编译站内自带的 WebAssembly 模块（代码高亮与格式化插件），不加载任何远程代码。',
     },
     {
       term: "img-src 'self' data: blob:",
@@ -186,7 +186,7 @@ const en: SecurityCopy = {
     },
     {
       term: "script-src 'self' 'wasm-unsafe-eval'",
-      desc: 'Inline and CDN scripts are forbidden; wasm-unsafe-eval exists only to compile the WebAssembly used for media processing (ffmpeg.wasm).',
+      desc: 'Inline and CDN scripts are forbidden; wasm-unsafe-eval exists only to compile the WebAssembly modules shipped with the site (syntax highlighting and formatting plugins). No remote code is ever loaded.',
     },
     {
       term: "img-src 'self' data: blob:",
@@ -296,7 +296,7 @@ const ja: SecurityCopy = {
     },
     {
       term: "script-src 'self' 'wasm-unsafe-eval'",
-      desc: 'インラインスクリプトと CDN スクリプトを禁止。wasm-unsafe-eval はメディア処理用 WebAssembly（ffmpeg.wasm）のコンパイルにのみ使用します。',
+      desc: 'インラインスクリプトと CDN スクリプトを禁止。wasm-unsafe-eval はサイトに同梱した WebAssembly モジュール（シンタックスハイライトと整形プラグイン）のコンパイルにのみ使用し、外部コードは一切読み込みません。',
     },
     {
       term: "img-src 'self' data: blob:",
@@ -390,9 +390,8 @@ export function SecurityPage() {
   const c = useMemo(() => pickCopy(copyDict, lang), [lang]);
 
   useEffect(() => {
-    document.title = `${c.title} · SynTools`;
     track('page_view', { page: 'security' });
-  }, [c.title]);
+  }, [lang]);
 
   return (
     <PageShell title={c.title} lead={c.lead}>

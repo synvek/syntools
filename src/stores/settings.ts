@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { changeAppLanguage, readStoredLang, type Lang } from '@/core/i18n';
+import { changeAppLanguage, resolveBootLang, type Lang } from '@/core/i18n';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -61,8 +61,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const isDark = document.documentElement.classList.contains('dark');
     get().setTheme(isDark ? 'light' : 'dark');
   },
-  lang: readStoredLang(),
+  lang: resolveBootLang(),
   setLang: async (lang) => {
+    // 只写 langExplicit：路径前缀不以「用户选择」的形式落盘，
+    // 否则从 /zh/ 进来的人会被永久钉在中文，之后访问 / 也不生效了
     writeSettingsBlob({ theme: get().theme, lang, langExplicit: true });
     await changeAppLanguage(lang);
     set({ lang });

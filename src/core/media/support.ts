@@ -1,12 +1,15 @@
 /**
  * 运行时媒体能力探测。
  *
- * 音视频处理采取「WebCodecs 优先 + ffmpeg.wasm fallback」策略：
- * - WebCodecs 由浏览器原生提供，零下载、可硬件加速，覆盖常见编解码；
- * - ffmpeg.wasm 作为兜底，覆盖 WebCodecs 不支持的容器/编码与滤镜，但需下载 ~31MB 核心。
+ * 音视频处理全部走浏览器的 WebCodecs + mediabunny：
+ * - 编解码由浏览器原生提供，可硬件加速；
+ * - 容器解封装 / 封装由 mediabunny（MPL-2.0）完成，纯 JS，不需要下载 wasm 运行时。
+ *
+ * 为什么不再保留 ffmpeg.wasm 兜底：公开发布的 `@ffmpeg/core-mt` 是带
+ * `--enable-gpl --enable-libx264 --enable-libx265` 的 GPL 构建，随闭源的商业许可版本
+ * 分发会触发 GPL 的源码开放义务（见 plan/license-audit.md）。代价是少数冷门容器与老旧
+ * 编码不再支持，但失败时会明确报错，而不是静默降级。
  */
-
-export type MediaEngine = 'webcodecs' | 'ffmpeg';
 
 /** WebCodecs 视频编解码是否可用。 */
 export function hasWebCodecsVideo(): boolean {
@@ -22,47 +25,9 @@ export function hasWebCodecsAudio(): boolean {
   );
 }
 
-/** 页面是否处于 cross-origin isolated（SharedArrayBuffer 的前提）。 */
-export function isCrossOriginIsolated(): boolean {
-  return typeof globalThis.crossOriginIsolated === 'boolean' && globalThis.crossOriginIsolated;
-}
-
-/**
- * 多线程 ffmpeg.wasm（core-mt）是否可用。
- * 需要 Worker + WebAssembly + SharedArrayBuffer（即 COOP/COEP 生效）。
- */
-export function isFfmpegSupported(): boolean {
-  return (
-    typeof Worker !== 'undefined' &&
-    typeof WebAssembly !== 'undefined' &&
-    typeof globalThis.SharedArrayBuffer !== 'undefined' &&
-    isCrossOriginIsolated()
-  );
-}
-
 /**
  * 媒体文件的默认大小上限。
- * 取 2GB —— 这是 WebAssembly 的硬上限（ffmpeg.wasm 亦受此限制），
- * 而通用 FileDropZone 默认的 10MB 会直接拒掉绝大多数真实音视频文件。
+ * 取 2GB：解封装、编码、封装全程在内存中完成，再大就会先撞上单标签页的内存墙。
+ * 真正的限制来自可用内存，而不是这个数字。
  */
 export const MEDIA_MAX_BYTES = 2 * 1024 * 1024 * 1024;
-
-/** 首选引擎：WebCodecs 可用即优先，否则退到 ffmpeg。 */
-export function preferredEngine(): MediaEngine | null {
-  if (hasWebCodecsVideo() || hasWebCodecsAudio()) return 'webcodecs';
-  if (isFfmpegSupported()) return 'ffmpeg';
-  return null;
-}
-
-/** 把探针结果整理成一句给用户看的提示（引擎 + 原因）。 */
-export function describeEngineSupport(): {
-  webcodecs: boolean;
-  ffmpeg: boolean;
-  isolated: boolean;
-} {
-  return {
-    webcodecs: hasWebCodecsVideo() || hasWebCodecsAudio(),
-    ffmpeg: isFfmpegSupported(),
-    isolated: isCrossOriginIsolated(),
-  };
-}

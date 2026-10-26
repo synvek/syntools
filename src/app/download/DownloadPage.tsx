@@ -1,5 +1,5 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, type ReactNode } from 'react';
+import { Link } from '@/core/components/LocaleLink';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { normalizeLang } from '@/core/i18n';
@@ -115,10 +115,6 @@ export function DownloadPage() {
   const lang = normalizeLang(i18n.resolvedLanguage ?? 'en') ?? 'en';
   const s: DownloadStrings = useMemo(() => getDownloadStrings(lang), [lang]);
   const platform = useMemo<Platform>(() => detectPlatform(), []);
-
-  useEffect(() => {
-    document.title = `${s.title} · SynTools`;
-  }, [s.title]);
 
   const archOptions: Record<'mac' | 'win' | 'linux', ArchOption[]> = {
     mac: [

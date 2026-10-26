@@ -1,11 +1,20 @@
 <!doctype html>
-<html lang="zh-CN">
+<!--
+  默认树是英文（无前缀路径 = en），中文树在 /zh/ 下。
+  `lang` / `title` / `description` 在这里只是兜底：构建结束时
+  scripts/prerender.ts 会按语言重写它们，并在两棵树里注入 hreflang。
+-->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/logo.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2563EB" />
-    <title>SynTools - 在线工具集</title>
+    <title>SynTools - Online Toolkit</title>
+    <meta
+      name="description"
+      content="SynTools is a free online toolkit that runs entirely in your browser: JSON, Base64, regex, hashing, PDF, images and Office documents, with no uploads."
+    />
     <!-- 百度搜索资源平台站点验证：验证通过后不可删除，百度会定期复查 -->
     <meta name="baidu-site-verification" content="codeva-tIYOjt3A6N" />
     <script src="/theme-init.js"></script>

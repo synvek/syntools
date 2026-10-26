@@ -6,7 +6,7 @@
  * 超限以退出码 1 失败；报告同时写入 dist/size-report.md。
  * 用法：pnpm build && pnpm size
  */
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 
@@ -34,35 +34,6 @@ const HEAVY_CHUNK_BUDGET = 12 * 1024 * 1024;
 const HEAVY_CHUNK_PATTERNS = [/^vendor-univer/, /^vendor-exceljs-/, /^SpreadsheetTool-/];
 const budgetFor = (file) =>
   HEAVY_CHUNK_PATTERNS.some((pattern) => pattern.test(file)) ? HEAVY_CHUNK_BUDGET : CHUNK_BUDGET;
-
-// 静态资源（不经 JS bundle、由运行时按需拉取）：自托管的 ffmpeg.wasm 核心。
-// 它体量巨大（~31.2MB wasm + ~0.13MB js），既不属于首屏也不属于 chunk，
-// 若不做单独约束就会成为「看不见的体积」，因此这里显式纳入预算与报告。
-// 25 MiB 单文件 / 40 MiB 总量 是 Cloudflare Pages 的硬限，仅在 Cloudflare Pages 构建
-// （FFMPEG_PAGES=1，即 `pnpm build:cf`）时生效；其它托管（GitHub Pages / Vercel 等）
-// 允许原始 wasm 直发、没有这条限制，故采用更宽松的配额，避免默认构建被判超限。
-const IS_PAGES = process.env.FFMPEG_PAGES === '1';
-const STATIC_ASSET_MAX_FILE = IS_PAGES ? 25 * 1024 * 1024 : 40 * 1024 * 1024;
-const STATIC_ASSET_BUDGET = IS_PAGES ? 40 * 1024 * 1024 : 50 * 1024 * 1024;
-const STATIC_DIRS = ['ffmpeg'];
-
-/** 递归收集目录下所有文件（返回绝对路径）。 */
-function walkFiles(dir) {
-  const out = [];
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const entry of entries) {
-    if (entry.name.startsWith('.')) continue; // 跳过 .gitkeep 等占位文件
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walkFiles(full));
-    else if (entry.isFile()) out.push(full);
-  }
-  return out;
-}
 
 const gzipSize = (buffer) => gzipSync(buffer, { level: 9 }).length;
 const kb = (bytes) => `${(bytes / 1024).toFixed(2)} KB`;
@@ -114,40 +85,6 @@ const entryOver = entryTotal > ENTRY_BUDGET;
 if (entryOver) failed = true;
 lines.push(
   `**首屏合计：${kb(entryTotal)} ${mark(entryTotal, ENTRY_BUDGET)}（预算 ${kb(ENTRY_BUDGET)}）**`,
-);
-
-// 静态资源：不经 JS bundle，由运行时按需拉取（如自托管的 ffmpeg.wasm 核心）
-lines.push('');
-lines.push('## 静态资源（运行时按需下载，不计入首屏 / JS chunk）');
-lines.push('');
-lines.push(
-  `预算：单文件 ≤ ${kb(STATIC_ASSET_MAX_FILE)}${IS_PAGES ? '（Cloudflare Pages 硬限）' : '（非 Pages 托管，原始 wasm 直发）'}，合计 ≤ ${kb(STATIC_ASSET_BUDGET)}`,
-);
-lines.push('');
-lines.push('| 文件 | 原始体积 | 状态 |');
-lines.push('| ---- | -------- | ---- |');
-let staticTotal = 0;
-let staticFileOver = false;
-for (const dirName of STATIC_DIRS) {
-  const files = walkFiles(path.join(DIST, dirName));
-  for (const file of files.sort()) {
-    const size = statSync(file).size;
-    staticTotal += size;
-    if (size > STATIC_ASSET_MAX_FILE) staticFileOver = true;
-    lines.push(
-      `| ${path.relative(DIST, file)} | ${kb(size)} | ${mark(size, STATIC_ASSET_MAX_FILE)} |`,
-    );
-  }
-}
-if (staticFileOver) failed = true;
-if (staticTotal === 0) {
-  lines.push('| _（未下载，请运行 `pnpm ffmpeg:fetch`）_ | - | - |');
-} else if (staticTotal > STATIC_ASSET_BUDGET) {
-  failed = true;
-}
-lines.push('');
-lines.push(
-  `**静态资源合计：${kb(staticTotal)} ${mark(staticTotal, STATIC_ASSET_BUDGET)}（预算 ${kb(STATIC_ASSET_BUDGET)}）**`,
 );
 
 const report = lines.join('\n');

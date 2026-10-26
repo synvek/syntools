@@ -4,39 +4,39 @@
       "meta": {
         "zh": {
           "name": "视频转码",
-          "description": "WebCodecs 优先的视频转码（MP4 / WebM / MKV），不支持时自动回退 ffmpeg.wasm"
+          "description": "WebCodecs 视频转码（MP4 / WebM / MKV），全程在本机完成"
         },
         "en": {
           "name": "Video Converter",
-          "description": "WebCodecs-first video transcoding (MP4 / WebM / MKV) with automatic ffmpeg.wasm fallback"
+          "description": "WebCodecs video transcoding (MP4 / WebM / MKV), entirely on your machine"
         },
         "zh-TW": {
           "name": "影片轉碼",
-          "description": "WebCodecs 優先的影片轉碼（MP4 / WebM / MKV），不支援時自動回退 ffmpeg.wasm"
+          "description": "WebCodecs 影片轉碼（MP4 / WebM / MKV），全程在本機完成"
         },
         "ja": {
           "name": "動画トランスコード",
-          "description": "WebCodecs 優先の動画変換（MP4 / WebM / MKV）、非対応時は ffmpeg.wasm に自動フォールバック"
+          "description": "WebCodecs による動画トランスコード（MP4 / WebM / MKV）。すべて端末内で完結します"
         },
         "fr": {
           "name": "Convertisseur vidéo",
-          "description": "Transcodage vidéo WebCodecs d'abord (MP4 / WebM / MKV), repli automatique sur ffmpeg.wasm"
+          "description": "Transcodage vidéo avec WebCodecs (MP4 / WebM / MKV), entièrement en local"
         },
         "de": {
           "name": "Videokonverter",
-          "description": "WebCodecs-first Videotranskodierung (MP4 / WebM / MKV), automatischer ffmpeg.wasm-Fallback"
+          "description": "Videotranskodierung mit WebCodecs (MP4 / WebM / MKV), vollständig lokal"
         },
         "it": {
           "name": "Convertitore video",
-          "description": "Transcodifica video WebCodecs-first (MP4 / WebM / MKV) con fallback automatico a ffmpeg.wasm"
+          "description": "Transcodifica video con WebCodecs (MP4 / WebM / MKV), interamente in locale"
         },
         "es": {
           "name": "Convertidor de vídeo",
-          "description": "Transcodificación WebCodecs primero (MP4 / WebM / MKV) con fallback a ffmpeg.wasm"
+          "description": "Transcodificación de vídeo con WebCodecs (MP4 / WebM / MKV), todo en local"
         },
         "pt": {
           "name": "Conversor de vídeo",
-          "description": "Transcodificação WebCodecs primeiro (MP4 / WebM / MKV) com fallback para ffmpeg.wasm"
+          "description": "Transcodificação de vídeo com WebCodecs (MP4 / WebM / MKV), tudo no dispositivo"
         }
       },
       "ui": {
@@ -50,30 +50,23 @@
           "trimStart": "起始 (s)",
           "trimEnd": "结束 (s)",
           "dropHint": "拖入视频文件以转码",
-          "engines": "引擎：WebCodecs {{webcodecs}}，ffmpeg.wasm {{ffmpeg}}",
-          "available": "可用",
-          "unavailable": "不可用",
           "probe": "时长 {{duration}} · {{size}} · 视频 {{video}} / 音频 {{audio}}",
           "convert": "开始转码",
           "converting": "转码中…",
           "cancel": "取消",
           "progress": "处理中 {{percent}}%",
           "download": "下载 {{name}}",
-          "usedEngine": "使用引擎：{{engine}}",
           "errors.INVALID_TARGET": "目标格式不受支持",
           "errors.INVALID_QUALITY": "画质参数无效",
           "errors.INVALID_TRIM": "裁剪区间无效（结束需大于开始）",
           "errors.PROBE_FAILED": "无法读取媒体信息",
-          "errors.WEBCodecs_VIDEO_MISSING": "浏览器不支持 WebCodecs 视频编解码，且 ffmpeg.wasm 不可用",
-          "errors.WEBCodecs_AUDIO_MISSING": "浏览器不支持 WebCodecs 音频编解码，且 ffmpeg.wasm 不可用",
+          "errors.WEBCodecs_VIDEO_MISSING": "当前浏览器不支持 WebCodecs 视频编解码（需要 Chrome / Edge 94+ 或 Safari 16.4+）",
+          "errors.WEBCodecs_AUDIO_MISSING": "当前浏览器不支持 WebCodecs 音频编解码（需要 Chrome / Edge 94+ 或 Safari 16.4+）",
           "errors.NO_ENCODABLE_CODEC": "找不到可用的编码器",
           "errors.WEBCodecs_FAILED": "WebCodecs 处理失败",
-          "errors.UNSUPPORTED": "当前环境不支持 ffmpeg.wasm",
-          "errors.NEED_ISOLATION": "需要跨域隔离（COOP/COEP）才能启用多线程 ffmpeg.wasm",
-          "errors.LOAD_FAILED": "ffmpeg.wasm 核心加载失败",
-          "errors.EXEC_FAILED": "ffmpeg 执行失败",
           "errors.OUTPUT_MISSING": "未生成输出文件",
-          "errors.CONVERT_FAILED": "转换失败"
+          "errors.CONVERT_FAILED": "转换失败",
+          "unsupportedOption": "（浏览器不支持）"
         },
         "en": {
           "target": "Target format",
@@ -85,30 +78,23 @@
           "trimStart": "Start (s)",
           "trimEnd": "End (s)",
           "dropHint": "Drop a video file to transcode",
-          "engines": "Engines: WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}",
-          "available": "available",
-          "unavailable": "unavailable",
           "probe": "{{duration}} · {{size}} · video {{video}} / audio {{audio}}",
           "convert": "Convert",
           "converting": "Converting…",
           "cancel": "Cancel",
           "progress": "Processing {{percent}}%",
           "download": "Download {{name}}",
-          "usedEngine": "Engine: {{engine}}",
           "errors.INVALID_TARGET": "Unsupported target format",
           "errors.INVALID_QUALITY": "Invalid quality",
           "errors.INVALID_TRIM": "Invalid trim range (end must be after start)",
           "errors.PROBE_FAILED": "Cannot read media info",
-          "errors.WEBCodecs_VIDEO_MISSING": "WebCodecs video is unavailable and ffmpeg.wasm is not ready",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs audio is unavailable and ffmpeg.wasm is not ready",
+          "errors.WEBCodecs_VIDEO_MISSING": "This browser does not support WebCodecs video (Chrome / Edge 94+ or Safari 16.4+ required)",
+          "errors.WEBCodecs_AUDIO_MISSING": "This browser does not support WebCodecs audio (Chrome / Edge 94+ or Safari 16.4+ required)",
           "errors.NO_ENCODABLE_CODEC": "No usable encoder found",
           "errors.WEBCodecs_FAILED": "WebCodecs processing failed",
-          "errors.UNSUPPORTED": "ffmpeg.wasm is not supported here",
-          "errors.NEED_ISOLATION": "Cross-origin isolation (COOP/COEP) is required for multi-threaded ffmpeg.wasm",
-          "errors.LOAD_FAILED": "Failed to load ffmpeg.wasm core",
-          "errors.EXEC_FAILED": "ffmpeg execution failed",
           "errors.OUTPUT_MISSING": "No output file produced",
-          "errors.CONVERT_FAILED": "Conversion failed"
+          "errors.CONVERT_FAILED": "Conversion failed",
+          "unsupportedOption": "(unsupported here)"
         },
         "zh-TW": {
           "target": "目標格式",
@@ -120,30 +106,23 @@
           "trimStart": "起始 (s)",
           "trimEnd": "結束 (s)",
           "dropHint": "拖入影片檔案以轉碼",
-          "engines": "引擎：WebCodecs {{webcodecs}}，ffmpeg.wasm {{ffmpeg}}",
-          "available": "可用",
-          "unavailable": "不可用",
           "probe": "時長 {{duration}} · {{size}} · 視訊 {{video}} / 音訊 {{audio}}",
           "convert": "開始轉碼",
           "converting": "轉碼中…",
           "cancel": "取消",
           "progress": "處理中 {{percent}}%",
           "download": "下載 {{name}}",
-          "usedEngine": "使用引擎：{{engine}}",
           "errors.INVALID_TARGET": "目標格式不受支援",
           "errors.INVALID_QUALITY": "畫質參數無效",
           "errors.INVALID_TRIM": "裁剪區間無效（結束需大於開始）",
           "errors.PROBE_FAILED": "無法讀取媒體資訊",
-          "errors.WEBCodecs_VIDEO_MISSING": "瀏覽器不支援 WebCodecs 視訊編解碼，且 ffmpeg.wasm 不可用",
-          "errors.WEBCodecs_AUDIO_MISSING": "瀏覽器不支援 WebCodecs 音訊編解碼，且 ffmpeg.wasm 不可用",
+          "errors.WEBCodecs_VIDEO_MISSING": "目前瀏覽器不支援 WebCodecs 視訊編解碼（需 Chrome / Edge 94+ 或 Safari 16.4+）",
+          "errors.WEBCodecs_AUDIO_MISSING": "目前瀏覽器不支援 WebCodecs 音訊編解碼（需 Chrome / Edge 94+ 或 Safari 16.4+）",
           "errors.NO_ENCODABLE_CODEC": "找不到可用的編碼器",
           "errors.WEBCodecs_FAILED": "WebCodecs 處理失敗",
-          "errors.UNSUPPORTED": "目前環境不支援 ffmpeg.wasm",
-          "errors.NEED_ISOLATION": "需要跨域隔離（COOP/COEP）才能啟用多執行緒 ffmpeg.wasm",
-          "errors.LOAD_FAILED": "ffmpeg.wasm 核心載入失敗",
-          "errors.EXEC_FAILED": "ffmpeg 執行失敗",
           "errors.OUTPUT_MISSING": "未產生輸出檔案",
-          "errors.CONVERT_FAILED": "轉換失敗"
+          "errors.CONVERT_FAILED": "轉換失敗",
+          "unsupportedOption": "（瀏覽器不支援）"
         },
         "ja": {
           "target": "出力形式",
@@ -155,30 +134,23 @@
           "trimStart": "開始 (s)",
           "trimEnd": "終了 (s)",
           "dropHint": "動画ファイルをドロップして変換",
-          "engines": "エンジン：WebCodecs {{webcodecs}}、ffmpeg.wasm {{ffmpeg}}",
-          "available": "利用可",
-          "unavailable": "利用不可",
           "probe": "長さ {{duration}} · {{size}} · 映像 {{video}} / 音声 {{audio}}",
           "convert": "変換開始",
           "converting": "変換中…",
           "cancel": "キャンセル",
           "progress": "処理中 {{percent}}%",
           "download": "{{name}} をダウンロード",
-          "usedEngine": "使用エンジン：{{engine}}",
           "errors.INVALID_TARGET": "未対応の出力形式です",
           "errors.INVALID_QUALITY": "画質パラメータが無効です",
           "errors.INVALID_TRIM": "切り出し範囲が無効（終了は開始より後）",
           "errors.PROBE_FAILED": "メディア情報を読み取れません",
-          "errors.WEBCodecs_VIDEO_MISSING": "WebCodecs 映像が使えず、ffmpeg.wasm も準備できていません",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs 音声が使えず、ffmpeg.wasm も準備できていません",
+          "errors.WEBCodecs_VIDEO_MISSING": "このブラウザは WebCodecs の映像コーデックに対応していません（Chrome / Edge 94+ または Safari 16.4+ が必要）",
+          "errors.WEBCodecs_AUDIO_MISSING": "このブラウザは WebCodecs の音声コーデックに対応していません（Chrome / Edge 94+ または Safari 16.4+ が必要）",
           "errors.NO_ENCODABLE_CODEC": "利用可能なエンコーダがありません",
           "errors.WEBCodecs_FAILED": "WebCodecs の処理に失敗",
-          "errors.UNSUPPORTED": "この環境では ffmpeg.wasm を利用できません",
-          "errors.NEED_ISOLATION": "マルチスレッド ffmpeg.wasm には COOP/COEP による分離が必要です",
-          "errors.LOAD_FAILED": "ffmpeg.wasm コアの読み込みに失敗",
-          "errors.EXEC_FAILED": "ffmpeg の実行に失敗",
           "errors.OUTPUT_MISSING": "出力ファイルが生成されませんでした",
-          "errors.CONVERT_FAILED": "変換に失敗しました"
+          "errors.CONVERT_FAILED": "変換に失敗しました",
+          "unsupportedOption": "（このブラウザでは非対応）"
         },
         "fr": {
           "target": "Format cible",
@@ -190,30 +162,23 @@
           "trimStart": "Début (s)",
           "trimEnd": "Fin (s)",
           "dropHint": "Déposez une vidéo à transcoder",
-          "engines": "Moteurs : WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}",
-          "available": "disponible",
-          "unavailable": "indisponible",
           "probe": "{{duration}} · {{size}} · vidéo {{video}} / audio {{audio}}",
           "convert": "Convertir",
           "converting": "Conversion…",
           "cancel": "Annuler",
           "progress": "Traitement {{percent}} %",
           "download": "Télécharger {{name}}",
-          "usedEngine": "Moteur : {{engine}}",
           "errors.INVALID_TARGET": "Format cible non pris en charge",
           "errors.INVALID_QUALITY": "Qualité invalide",
           "errors.INVALID_TRIM": "Plage de découpe invalide (fin après début)",
           "errors.PROBE_FAILED": "Impossible de lire les informations",
-          "errors.WEBCodecs_VIDEO_MISSING": "WebCodecs vidéo indisponible et ffmpeg.wasm non prêt",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs audio indisponible et ffmpeg.wasm non prêt",
+          "errors.WEBCodecs_VIDEO_MISSING": "Ce navigateur ne prend pas en charge la vidéo WebCodecs (Chrome / Edge 94+ ou Safari 16.4+ requis)",
+          "errors.WEBCodecs_AUDIO_MISSING": "Ce navigateur ne prend pas en charge l'audio WebCodecs (Chrome / Edge 94+ ou Safari 16.4+ requis)",
           "errors.NO_ENCODABLE_CODEC": "Aucun encodeur utilisable",
           "errors.WEBCodecs_FAILED": "Échec du traitement WebCodecs",
-          "errors.UNSUPPORTED": "ffmpeg.wasm n'est pas pris en charge ici",
-          "errors.NEED_ISOLATION": "Une isolation cross-origin (COOP/COEP) est requise pour ffmpeg.wasm multithread",
-          "errors.LOAD_FAILED": "Échec du chargement du cœur ffmpeg.wasm",
-          "errors.EXEC_FAILED": "Échec de l'exécution ffmpeg",
           "errors.OUTPUT_MISSING": "Aucun fichier produit",
-          "errors.CONVERT_FAILED": "Échec de la conversion"
+          "errors.CONVERT_FAILED": "Échec de la conversion",
+          "unsupportedOption": "(non pris en charge)"
         },
         "de": {
           "target": "Zielformat",
@@ -225,30 +190,23 @@
           "trimStart": "Start (s)",
           "trimEnd": "Ende (s)",
           "dropHint": "Video zum Transkodieren ablegen",
-          "engines": "Engines: WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}",
-          "available": "verfügbar",
-          "unavailable": "nicht verfügbar",
           "probe": "{{duration}} · {{size}} · Video {{video}} / Audio {{audio}}",
           "convert": "Konvertieren",
           "converting": "Konvertieren…",
           "cancel": "Abbrechen",
           "progress": "Verarbeitung {{percent}} %",
           "download": "{{name}} herunterladen",
-          "usedEngine": "Engine: {{engine}}",
           "errors.INVALID_TARGET": "Nicht unterstütztes Zielformat",
           "errors.INVALID_QUALITY": "Ungültige Qualität",
           "errors.INVALID_TRIM": "Ungültiger Bereich (Ende nach Start)",
           "errors.PROBE_FAILED": "Medieninformationen nicht lesbar",
-          "errors.WEBCodecs_VIDEO_MISSING": "WebCodecs-Video nicht verfügbar und ffmpeg.wasm nicht bereit",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs-Audio nicht verfügbar und ffmpeg.wasm nicht bereit",
+          "errors.WEBCodecs_VIDEO_MISSING": "Dieser Browser unterstützt WebCodecs-Video nicht (Chrome / Edge 94+ oder Safari 16.4+ erforderlich)",
+          "errors.WEBCodecs_AUDIO_MISSING": "Dieser Browser unterstützt WebCodecs-Audio nicht (Chrome / Edge 94+ oder Safari 16.4+ erforderlich)",
           "errors.NO_ENCODABLE_CODEC": "Kein nutzbarer Encoder gefunden",
           "errors.WEBCodecs_FAILED": "WebCodecs-Verarbeitung fehlgeschlagen",
-          "errors.UNSUPPORTED": "ffmpeg.wasm wird hier nicht unterstützt",
-          "errors.NEED_ISOLATION": "Für mehrthreadiges ffmpeg.wasm ist Cross-Origin-Isolation (COOP/COEP) nötig",
-          "errors.LOAD_FAILED": "ffmpeg.wasm-Kern konnte nicht geladen werden",
-          "errors.EXEC_FAILED": "ffmpeg-Ausführung fehlgeschlagen",
           "errors.OUTPUT_MISSING": "Keine Ausgabedatei erzeugt",
-          "errors.CONVERT_FAILED": "Konvertierung fehlgeschlagen"
+          "errors.CONVERT_FAILED": "Konvertierung fehlgeschlagen",
+          "unsupportedOption": "(hier nicht unterstützt)"
         },
         "it": {
           "target": "Formato destinazione",
@@ -260,30 +218,23 @@
           "trimStart": "Inizio (s)",
           "trimEnd": "Fine (s)",
           "dropHint": "Trascina un video da convertire",
-          "engines": "Motori: WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}",
-          "available": "disponibile",
-          "unavailable": "non disponibile",
           "probe": "{{duration}} · {{size}} · video {{video}} / audio {{audio}}",
           "convert": "Converti",
           "converting": "Conversione…",
           "cancel": "Annulla",
           "progress": "Elaborazione {{percent}}%",
           "download": "Scarica {{name}}",
-          "usedEngine": "Motore: {{engine}}",
           "errors.INVALID_TARGET": "Formato di destinazione non supportato",
           "errors.INVALID_QUALITY": "Qualità non valida",
           "errors.INVALID_TRIM": "Intervallo di taglio non valido (fine dopo inizio)",
           "errors.PROBE_FAILED": "Impossibile leggere le informazioni",
-          "errors.WEBCodecs_VIDEO_MISSING": "WebCodecs video non disponibile e ffmpeg.wasm non pronto",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs audio non disponibile e ffmpeg.wasm non pronto",
+          "errors.WEBCodecs_VIDEO_MISSING": "Questo browser non supporta il video WebCodecs (richiede Chrome / Edge 94+ o Safari 16.4+)",
+          "errors.WEBCodecs_AUDIO_MISSING": "Questo browser non supporta l'audio WebCodecs (richiede Chrome / Edge 94+ o Safari 16.4+)",
           "errors.NO_ENCODABLE_CODEC": "Nessun encoder utilizzabile",
           "errors.WEBCodecs_FAILED": "Elaborazione WebCodecs non riuscita",
-          "errors.UNSUPPORTED": "ffmpeg.wasm non è supportato qui",
-          "errors.NEED_ISOLATION": "Serve l'isolamento cross-origin (COOP/COEP) per ffmpeg.wasm multi-thread",
-          "errors.LOAD_FAILED": "Caricamento del core ffmpeg.wasm non riuscito",
-          "errors.EXEC_FAILED": "Esecuzione ffmpeg non riuscita",
           "errors.OUTPUT_MISSING": "Nessun file prodotto",
-          "errors.CONVERT_FAILED": "Conversione non riuscita"
+          "errors.CONVERT_FAILED": "Conversione non riuscita",
+          "unsupportedOption": "(non supportato)"
         },
         "es": {
           "target": "Formato destino",
@@ -295,30 +246,23 @@
           "trimStart": "Inicio (s)",
           "trimEnd": "Fin (s)",
           "dropHint": "Suelta un vídeo para transcodificar",
-          "engines": "Motores: WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}",
-          "available": "disponible",
-          "unavailable": "no disponible",
           "probe": "{{duration}} · {{size}} · vídeo {{video}} / audio {{audio}}",
           "convert": "Convertir",
           "converting": "Convirtiendo…",
           "cancel": "Cancelar",
           "progress": "Procesando {{percent}}%",
           "download": "Descargar {{name}}",
-          "usedEngine": "Motor: {{engine}}",
           "errors.INVALID_TARGET": "Formato destino no admitido",
           "errors.INVALID_QUALITY": "Calidad no válida",
           "errors.INVALID_TRIM": "Rango de recorte no válido (fin después de inicio)",
           "errors.PROBE_FAILED": "No se puede leer la información",
-          "errors.WEBCodecs_VIDEO_MISSING": "WebCodecs de vídeo no disponible y ffmpeg.wasm no está listo",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs de audio no disponible y ffmpeg.wasm no está listo",
+          "errors.WEBCodecs_VIDEO_MISSING": "Este navegador no admite vídeo WebCodecs (se requiere Chrome / Edge 94+ o Safari 16.4+)",
+          "errors.WEBCodecs_AUDIO_MISSING": "Este navegador no admite audio WebCodecs (se requiere Chrome / Edge 94+ o Safari 16.4+)",
           "errors.NO_ENCODABLE_CODEC": "No hay codificador utilizable",
           "errors.WEBCodecs_FAILED": "Fallo al procesar con WebCodecs",
-          "errors.UNSUPPORTED": "ffmpeg.wasm no es compatible aquí",
-          "errors.NEED_ISOLATION": "Se requiere aislamiento cross-origin (COOP/COEP) para ffmpeg.wasm multihilo",
-          "errors.LOAD_FAILED": "No se pudo cargar el núcleo de ffmpeg.wasm",
-          "errors.EXEC_FAILED": "Fallo al ejecutar ffmpeg",
           "errors.OUTPUT_MISSING": "No se generó ningún archivo",
-          "errors.CONVERT_FAILED": "Conversión fallida"
+          "errors.CONVERT_FAILED": "Conversión fallida",
+          "unsupportedOption": "(no disponible)"
         },
         "pt": {
           "target": "Formato destino",
@@ -330,30 +274,23 @@
           "trimStart": "Início (s)",
           "trimEnd": "Fim (s)",
           "dropHint": "Solte um vídeo para transcodificar",
-          "engines": "Motores: WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}",
-          "available": "disponível",
-          "unavailable": "indisponível",
           "probe": "{{duration}} · {{size}} · vídeo {{video}} / áudio {{audio}}",
           "convert": "Converter",
           "converting": "Convertendo…",
           "cancel": "Cancelar",
           "progress": "Processando {{percent}}%",
           "download": "Baixar {{name}}",
-          "usedEngine": "Motor: {{engine}}",
           "errors.INVALID_TARGET": "Formato de destino não suportado",
           "errors.INVALID_QUALITY": "Qualidade inválida",
           "errors.INVALID_TRIM": "Intervalo de corte inválido (fim após início)",
           "errors.PROBE_FAILED": "Não foi possível ler as informações",
-          "errors.WEBCodecs_VIDEO_MISSING": "WebCodecs de vídeo indisponível e ffmpeg.wasm não está pronto",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs de áudio indisponível e ffmpeg.wasm não está pronto",
+          "errors.WEBCodecs_VIDEO_MISSING": "Este navegador não suporta vídeo WebCodecs (requer Chrome / Edge 94+ ou Safari 16.4+)",
+          "errors.WEBCodecs_AUDIO_MISSING": "Este navegador não suporta áudio WebCodecs (requer Chrome / Edge 94+ ou Safari 16.4+)",
           "errors.NO_ENCODABLE_CODEC": "Nenhum codificador utilizável",
           "errors.WEBCodecs_FAILED": "Falha no processamento WebCodecs",
-          "errors.UNSUPPORTED": "ffmpeg.wasm não é suportado aqui",
-          "errors.NEED_ISOLATION": "É necessário isolamento cross-origin (COOP/COEP) para ffmpeg.wasm multithread",
-          "errors.LOAD_FAILED": "Falha ao carregar o núcleo ffmpeg.wasm",
-          "errors.EXEC_FAILED": "Falha na execução do ffmpeg",
           "errors.OUTPUT_MISSING": "Nenhum arquivo gerado",
-          "errors.CONVERT_FAILED": "Falha na conversão"
+          "errors.CONVERT_FAILED": "Falha na conversão",
+          "unsupportedOption": "(não suportado)"
         }
       }
     },
@@ -361,39 +298,39 @@
       "meta": {
         "zh": {
           "name": "音频转码",
-          "description": "音频格式转换：WAV（原生精修）与 MP3 / M4A / OGG / FLAC（WebCodecs 优先，回退 ffmpeg.wasm）"
+          "description": "音频格式转换：WAV（原生精修）与 MP3 / M4A / OGG / FLAC（WebCodecs）"
         },
         "en": {
           "name": "Audio Converter",
-          "description": "Audio format conversion: WAV (native) plus MP3 / M4A / OGG / FLAC (WebCodecs-first, ffmpeg.wasm fallback)"
+          "description": "Audio conversion: WAV (native) plus MP3 / M4A / OGG / FLAC via WebCodecs"
         },
         "zh-TW": {
           "name": "音訊轉碼",
-          "description": "音訊格式轉換：WAV（原生精修）與 MP3 / M4A / OGG / FLAC（WebCodecs 優先，回退 ffmpeg.wasm）"
+          "description": "音訊格式轉換：WAV（原生精修）與 MP3 / M4A / OGG / FLAC（WebCodecs）"
         },
         "ja": {
           "name": "音声トランスコード",
-          "description": "音声形式の変換：WAV（ネイティブ）と MP3 / M4A / OGG / FLAC（WebCodecs 優先、ffmpeg.wasm フォールバック）"
+          "description": "音声形式の変換：WAV（ネイティブ）と MP3 / M4A / OGG / FLAC（WebCodecs）"
         },
         "fr": {
           "name": "Convertisseur audio",
-          "description": "Conversion audio : WAV (natif) et MP3 / M4A / OGG / FLAC (WebCodecs d'abord, repli ffmpeg.wasm)"
+          "description": "Conversion audio : WAV (natif) et MP3 / M4A / OGG / FLAC (WebCodecs)"
         },
         "de": {
           "name": "Audiokonverter",
-          "description": "Audioformat-Konvertierung: WAV (nativ) sowie MP3 / M4A / OGG / FLAC (WebCodecs zuerst, ffmpeg.wasm-Fallback)"
+          "description": "Audioformat-Konvertierung: WAV (nativ) sowie MP3 / M4A / OGG / FLAC (WebCodecs)"
         },
         "it": {
           "name": "Convertitore audio",
-          "description": "Conversione audio: WAV (nativo) e MP3 / M4A / OGG / FLAC (WebCodecs-first, fallback ffmpeg.wasm)"
+          "description": "Conversione audio: WAV (nativo) e MP3 / M4A / OGG / FLAC (WebCodecs)"
         },
         "es": {
           "name": "Convertidor de audio",
-          "description": "Conversión de audio: WAV (nativo) y MP3 / M4A / OGG / FLAC (WebCodecs primero, fallback ffmpeg.wasm)"
+          "description": "Conversión de audio: WAV (nativo) y MP3 / M4A / OGG / FLAC (WebCodecs)"
         },
         "pt": {
           "name": "Conversor de áudio",
-          "description": "Conversão de áudio: WAV (nativo) e MP3 / M4A / OGG / FLAC (WebCodecs primeiro, fallback ffmpeg.wasm)"
+          "description": "Conversão de áudio: WAV (nativo) e MP3 / M4A / OGG / FLAC (WebCodecs)"
         }
       },
       "ui": {
@@ -407,16 +344,13 @@
           "cancel": "取消",
           "progress": "处理中 {{percent}}%",
           "download": "下载",
-          "usedEngine": "使用引擎：{{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "浏览器不支持 WebCodecs 音频编解码，且 ffmpeg.wasm 不可用",
+          "errors.WEBCodecs_AUDIO_MISSING": "当前浏览器不支持 WebCodecs 音频编解码（需要 Chrome / Edge 94+ 或 Safari 16.4+）",
           "errors.NO_ENCODABLE_CODEC": "找不到可用的编码器",
           "errors.WEBCodecs_FAILED": "WebCodecs 处理失败",
-          "errors.UNSUPPORTED": "当前环境不支持 ffmpeg.wasm",
-          "errors.NEED_ISOLATION": "需要跨域隔离（COOP/COEP）才能启用多线程 ffmpeg.wasm",
-          "errors.LOAD_FAILED": "ffmpeg.wasm 核心加载失败",
-          "errors.EXEC_FAILED": "ffmpeg 执行失败",
           "errors.OUTPUT_MISSING": "未生成输出文件",
-          "errors.CONVERT_FAILED": "转换失败"
+          "errors.CONVERT_FAILED": "转换失败",
+          "errors.FAILED": "转换失败",
+          "unsupportedOption": "（浏览器不支持）"
         },
         "en": {
           "target": "Target format",
@@ -428,16 +362,13 @@
           "cancel": "Cancel",
           "progress": "Processing {{percent}}%",
           "download": "Download",
-          "usedEngine": "Engine: {{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs audio is unavailable and ffmpeg.wasm is not ready",
+          "errors.WEBCodecs_AUDIO_MISSING": "This browser does not support WebCodecs audio (Chrome / Edge 94+ or Safari 16.4+ required)",
           "errors.NO_ENCODABLE_CODEC": "No usable encoder found",
           "errors.WEBCodecs_FAILED": "WebCodecs processing failed",
-          "errors.UNSUPPORTED": "ffmpeg.wasm is not supported here",
-          "errors.NEED_ISOLATION": "Cross-origin isolation (COOP/COEP) is required for multi-threaded ffmpeg.wasm",
-          "errors.LOAD_FAILED": "Failed to load ffmpeg.wasm core",
-          "errors.EXEC_FAILED": "ffmpeg execution failed",
           "errors.OUTPUT_MISSING": "No output file produced",
-          "errors.CONVERT_FAILED": "Conversion failed"
+          "errors.CONVERT_FAILED": "Conversion failed",
+          "errors.FAILED": "Conversion failed",
+          "unsupportedOption": "(unsupported here)"
         },
         "zh-TW": {
           "target": "目標格式",
@@ -449,16 +380,13 @@
           "cancel": "取消",
           "progress": "處理中 {{percent}}%",
           "download": "下載",
-          "usedEngine": "使用引擎：{{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "瀏覽器不支援 WebCodecs 音訊編解碼，且 ffmpeg.wasm 不可用",
+          "errors.WEBCodecs_AUDIO_MISSING": "目前瀏覽器不支援 WebCodecs 音訊編解碼（需 Chrome / Edge 94+ 或 Safari 16.4+）",
           "errors.NO_ENCODABLE_CODEC": "找不到可用的編碼器",
           "errors.WEBCodecs_FAILED": "WebCodecs 處理失敗",
-          "errors.UNSUPPORTED": "目前環境不支援 ffmpeg.wasm",
-          "errors.NEED_ISOLATION": "需要跨域隔離（COOP/COEP）才能啟用多執行緒 ffmpeg.wasm",
-          "errors.LOAD_FAILED": "ffmpeg.wasm 核心載入失敗",
-          "errors.EXEC_FAILED": "ffmpeg 執行失敗",
           "errors.OUTPUT_MISSING": "未產生輸出檔案",
-          "errors.CONVERT_FAILED": "轉換失敗"
+          "errors.CONVERT_FAILED": "轉換失敗",
+          "errors.FAILED": "轉換失敗",
+          "unsupportedOption": "（瀏覽器不支援）"
         },
         "ja": {
           "target": "出力形式",
@@ -470,16 +398,13 @@
           "cancel": "キャンセル",
           "progress": "処理中 {{percent}}%",
           "download": "ダウンロード",
-          "usedEngine": "使用エンジン：{{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs 音声が使えず、ffmpeg.wasm も準備できていません",
+          "errors.WEBCodecs_AUDIO_MISSING": "このブラウザは WebCodecs の音声コーデックに対応していません（Chrome / Edge 94+ または Safari 16.4+ が必要）",
           "errors.NO_ENCODABLE_CODEC": "利用可能なエンコーダがありません",
           "errors.WEBCodecs_FAILED": "WebCodecs の処理に失敗",
-          "errors.UNSUPPORTED": "この環境では ffmpeg.wasm を利用できません",
-          "errors.NEED_ISOLATION": "マルチスレッド ffmpeg.wasm には COOP/COEP による分離が必要です",
-          "errors.LOAD_FAILED": "ffmpeg.wasm コアの読み込みに失敗",
-          "errors.EXEC_FAILED": "ffmpeg の実行に失敗",
           "errors.OUTPUT_MISSING": "出力ファイルが生成されませんでした",
-          "errors.CONVERT_FAILED": "変換に失敗しました"
+          "errors.CONVERT_FAILED": "変換に失敗しました",
+          "errors.FAILED": "変換に失敗しました",
+          "unsupportedOption": "（このブラウザでは非対応）"
         },
         "fr": {
           "target": "Format cible",
@@ -491,16 +416,13 @@
           "cancel": "Annuler",
           "progress": "Traitement {{percent}} %",
           "download": "Télécharger",
-          "usedEngine": "Moteur : {{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs audio indisponible et ffmpeg.wasm non prêt",
+          "errors.WEBCodecs_AUDIO_MISSING": "Ce navigateur ne prend pas en charge l'audio WebCodecs (Chrome / Edge 94+ ou Safari 16.4+ requis)",
           "errors.NO_ENCODABLE_CODEC": "Aucun encodeur utilisable",
           "errors.WEBCodecs_FAILED": "Échec du traitement WebCodecs",
-          "errors.UNSUPPORTED": "ffmpeg.wasm n'est pas pris en charge ici",
-          "errors.NEED_ISOLATION": "Une isolation cross-origin (COOP/COEP) est requise pour ffmpeg.wasm multithread",
-          "errors.LOAD_FAILED": "Échec du chargement du cœur ffmpeg.wasm",
-          "errors.EXEC_FAILED": "Échec de l'exécution ffmpeg",
           "errors.OUTPUT_MISSING": "Aucun fichier produit",
-          "errors.CONVERT_FAILED": "Échec de la conversion"
+          "errors.CONVERT_FAILED": "Échec de la conversion",
+          "errors.FAILED": "Échec de la conversion",
+          "unsupportedOption": "(non pris en charge)"
         },
         "de": {
           "target": "Zielformat",
@@ -512,16 +434,13 @@
           "cancel": "Abbrechen",
           "progress": "Verarbeitung {{percent}} %",
           "download": "Herunterladen",
-          "usedEngine": "Engine: {{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs-Audio nicht verfügbar und ffmpeg.wasm nicht bereit",
+          "errors.WEBCodecs_AUDIO_MISSING": "Dieser Browser unterstützt WebCodecs-Audio nicht (Chrome / Edge 94+ oder Safari 16.4+ erforderlich)",
           "errors.NO_ENCODABLE_CODEC": "Kein nutzbarer Encoder gefunden",
           "errors.WEBCodecs_FAILED": "WebCodecs-Verarbeitung fehlgeschlagen",
-          "errors.UNSUPPORTED": "ffmpeg.wasm wird hier nicht unterstützt",
-          "errors.NEED_ISOLATION": "Für mehrthreadiges ffmpeg.wasm ist Cross-Origin-Isolation (COOP/COEP) nötig",
-          "errors.LOAD_FAILED": "ffmpeg.wasm-Kern konnte nicht geladen werden",
-          "errors.EXEC_FAILED": "ffmpeg-Ausführung fehlgeschlagen",
           "errors.OUTPUT_MISSING": "Keine Ausgabedatei erzeugt",
-          "errors.CONVERT_FAILED": "Konvertierung fehlgeschlagen"
+          "errors.CONVERT_FAILED": "Konvertierung fehlgeschlagen",
+          "errors.FAILED": "Konvertierung fehlgeschlagen",
+          "unsupportedOption": "(hier nicht unterstützt)"
         },
         "it": {
           "target": "Formato destinazione",
@@ -533,16 +452,13 @@
           "cancel": "Annulla",
           "progress": "Elaborazione {{percent}}%",
           "download": "Scarica",
-          "usedEngine": "Motore: {{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs audio non disponibile e ffmpeg.wasm non pronto",
+          "errors.WEBCodecs_AUDIO_MISSING": "Questo browser non supporta l'audio WebCodecs (richiede Chrome / Edge 94+ o Safari 16.4+)",
           "errors.NO_ENCODABLE_CODEC": "Nessun encoder utilizzabile",
           "errors.WEBCodecs_FAILED": "Elaborazione WebCodecs non riuscita",
-          "errors.UNSUPPORTED": "ffmpeg.wasm non è supportato qui",
-          "errors.NEED_ISOLATION": "Serve l'isolamento cross-origin (COOP/COEP) per ffmpeg.wasm multi-thread",
-          "errors.LOAD_FAILED": "Caricamento del core ffmpeg.wasm non riuscito",
-          "errors.EXEC_FAILED": "Esecuzione ffmpeg non riuscita",
           "errors.OUTPUT_MISSING": "Nessun file prodotto",
-          "errors.CONVERT_FAILED": "Conversione non riuscita"
+          "errors.CONVERT_FAILED": "Conversione non riuscita",
+          "errors.FAILED": "Conversione non riuscita",
+          "unsupportedOption": "(non supportato)"
         },
         "es": {
           "target": "Formato destino",
@@ -554,16 +470,13 @@
           "cancel": "Cancelar",
           "progress": "Procesando {{percent}}%",
           "download": "Descargar",
-          "usedEngine": "Motor: {{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs de audio no disponible y ffmpeg.wasm no está listo",
+          "errors.WEBCodecs_AUDIO_MISSING": "Este navegador no admite audio WebCodecs (se requiere Chrome / Edge 94+ o Safari 16.4+)",
           "errors.NO_ENCODABLE_CODEC": "No hay codificador utilizable",
           "errors.WEBCodecs_FAILED": "Fallo al procesar con WebCodecs",
-          "errors.UNSUPPORTED": "ffmpeg.wasm no es compatible aquí",
-          "errors.NEED_ISOLATION": "Se requiere aislamiento cross-origin (COOP/COEP) para ffmpeg.wasm multihilo",
-          "errors.LOAD_FAILED": "No se pudo cargar el núcleo de ffmpeg.wasm",
-          "errors.EXEC_FAILED": "Fallo al ejecutar ffmpeg",
           "errors.OUTPUT_MISSING": "No se generó ningún archivo",
-          "errors.CONVERT_FAILED": "Conversión fallida"
+          "errors.CONVERT_FAILED": "Conversión fallida",
+          "errors.FAILED": "La conversión ha fallado",
+          "unsupportedOption": "(no disponible)"
         },
         "pt": {
           "target": "Formato destino",
@@ -575,30 +488,45 @@
           "cancel": "Cancelar",
           "progress": "Processando {{percent}}%",
           "download": "Baixar",
-          "usedEngine": "Motor: {{engine}}",
-          "errors.WEBCodecs_AUDIO_MISSING": "WebCodecs de áudio indisponível e ffmpeg.wasm não está pronto",
+          "errors.WEBCodecs_AUDIO_MISSING": "Este navegador não suporta áudio WebCodecs (requer Chrome / Edge 94+ ou Safari 16.4+)",
           "errors.NO_ENCODABLE_CODEC": "Nenhum codificador utilizável",
           "errors.WEBCodecs_FAILED": "Falha no processamento WebCodecs",
-          "errors.UNSUPPORTED": "ffmpeg.wasm não é suportado aqui",
-          "errors.NEED_ISOLATION": "É necessário isolamento cross-origin (COOP/COEP) para ffmpeg.wasm multithread",
-          "errors.LOAD_FAILED": "Falha ao carregar o núcleo ffmpeg.wasm",
-          "errors.EXEC_FAILED": "Falha na execução do ffmpeg",
           "errors.OUTPUT_MISSING": "Nenhum arquivo gerado",
-          "errors.CONVERT_FAILED": "Falha na conversão"
+          "errors.CONVERT_FAILED": "Falha na conversão",
+          "errors.FAILED": "A conversão falhou",
+          "unsupportedOption": "(não suportado)"
         }
       }
     },
     "video-to-gif": {
       "ui": {
-        "zh": { "usedEngine": "抽帧引擎：{{engine}}" },
-        "en": { "usedEngine": "Frame engine: {{engine}}" },
-        "zh-TW": { "usedEngine": "抽幀引擎：{{engine}}" },
-        "ja": { "usedEngine": "フレーム抽出：{{engine}}" },
-        "fr": { "usedEngine": "Moteur d'images : {{engine}}" },
-        "de": { "usedEngine": "Frame-Engine: {{engine}}" },
-        "it": { "usedEngine": "Motore frame: {{engine}}" },
-        "es": { "usedEngine": "Motor de fotogramas: {{engine}}" },
-        "pt": { "usedEngine": "Motor de quadros: {{engine}}" }
+        "zh": {
+          "usedEngine": "抽帧引擎：{{engine}}"
+        },
+        "en": {
+          "usedEngine": "Frame engine: {{engine}}"
+        },
+        "zh-TW": {
+          "usedEngine": "抽幀引擎：{{engine}}"
+        },
+        "ja": {
+          "usedEngine": "フレーム抽出：{{engine}}"
+        },
+        "fr": {
+          "usedEngine": "Moteur d'images : {{engine}}"
+        },
+        "de": {
+          "usedEngine": "Frame-Engine: {{engine}}"
+        },
+        "it": {
+          "usedEngine": "Motore frame: {{engine}}"
+        },
+        "es": {
+          "usedEngine": "Motor de fotogramas: {{engine}}"
+        },
+        "pt": {
+          "usedEngine": "Motor de quadros: {{engine}}"
+        }
       }
     }
   }

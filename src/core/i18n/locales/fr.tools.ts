@@ -5,8 +5,8 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 const frTools = {
   tools: {
     'video-convert': {
-      formats:
-        'Formats pris en charge : MP4 / MOV / WebM / MKV / AVI / MPEG-TS (repli sur ffmpeg.wasm si besoin)',
+      unsupportedOption: '(non pris en charge)',
+      formats: 'Formats pris en charge : MP4 / MOV / WebM / MKV / AVI / MPEG-TS',
       target: 'Format cible',
       quality: 'Qualité',
       qualities: {
@@ -18,30 +18,22 @@ const frTools = {
       trimStart: 'Début (s)',
       trimEnd: 'Fin (s)',
       dropHint: 'Déposez une vidéo à transcoder',
-      engines: 'Moteurs : WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}',
-      available: 'disponible',
-      unavailable: 'indisponible',
       probe: '{{duration}} · {{size}} · vidéo {{video}} / audio {{audio}}',
       convert: 'Convertir',
       converting: 'Conversion…',
       cancel: 'Annuler',
       progress: 'Traitement {{percent}} %',
       download: 'Télécharger {{name}}',
-      usedEngine: 'Moteur : {{engine}}',
       errors: {
         INVALID_TARGET: 'Format cible non pris en charge',
         INVALID_QUALITY: 'Qualité invalide',
         INVALID_TRIM: 'Plage de découpe invalide (fin après début)',
         PROBE_FAILED: 'Impossible de lire les informations',
-        WEBCodecs_VIDEO_MISSING: 'WebCodecs vidéo indisponible et ffmpeg.wasm non prêt',
-        WEBCodecs_AUDIO_MISSING: 'WebCodecs audio indisponible et ffmpeg.wasm non prêt',
+        WEBCodecs_VIDEO_MISSING:
+          'Ce navigateur ne prend pas en charge la vidéo WebCodecs (Chrome / Edge 94+ ou Safari 16.4+ requis)',
+        WEBCodecs_AUDIO_MISSING: `Ce navigateur ne prend pas en charge l'audio WebCodecs (Chrome / Edge 94+ ou Safari 16.4+ requis)`,
         NO_ENCODABLE_CODEC: 'Aucun encodeur utilisable',
         WEBCodecs_FAILED: 'Échec du traitement WebCodecs',
-        UNSUPPORTED: "ffmpeg.wasm n'est pas pris en charge ici",
-        NEED_ISOLATION:
-          'Une isolation cross-origin (COOP/COEP) est requise pour ffmpeg.wasm multithread',
-        LOAD_FAILED: 'Échec du chargement du cœur ffmpeg.wasm',
-        EXEC_FAILED: "Échec de l'exécution ffmpeg",
         OUTPUT_MISSING: 'Aucun fichier produit',
         CONVERT_FAILED: 'Échec de la conversion',
       },
@@ -64,6 +56,7 @@ const frTools = {
       },
     },
     'audio-convert': {
+      unsupportedOption: '(non pris en charge)',
       formats: 'Formats pris en charge : WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF',
       target: 'Format cible',
       quality: 'Qualité',
@@ -76,7 +69,6 @@ const frTools = {
       cancel: 'Annuler',
       progress: 'Traitement {{percent}} %',
       download: 'Télécharger',
-      usedEngine: 'Moteur : {{engine}}',
       sampleRate: 'Fréquence',
       channels: 'Canaux',
       bitDepth: 'Profondeur',
@@ -88,6 +80,9 @@ const frTools = {
       info: '{{rate}} Hz · {{channels}} canaux · {{bitDepth}} bits · {{duration}} s',
       downloadWav: 'Télécharger le WAV',
       errors: {
+        FAILED: 'Échec de la conversion',
+        WEBCodecs_AUDIO_MISSING:
+          "Ce navigateur ne prend pas en charge l'audio WebCodecs (Chrome / Edge 94+ ou Safari 16.4+ requis)",
         DECODE: 'Échec du décodage audio (format non pris en charge ?)',
       },
     },

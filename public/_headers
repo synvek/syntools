@@ -1,27 +1,19 @@
 # Cloudflare Pages / Netlify 自定义响应头（随构建产物发布）
 # 安全策略见技术设计 §10.1：零数据外发、无第三方脚本
 #
-# Cross-Origin-Embedder-Policy: require-corp 与 Cross-Origin-Opener-Policy: same-origin 一起
-# 让页面进入 cross-origin isolated 状态，从而启用 SharedArrayBuffer —— 这是多线程版
-# ffmpeg.wasm（core-mt）的必要条件。站内资源全部同源，无需第三方 CORP 例外。
-# script-src 的 'wasm-unsafe-eval' 用于编译 ffmpeg.wasm；worker-src/connect-src/img-src/media-src
-# 放开 blob:（工具预览）与 data:（画布导出）以便纯前端处理媒体。
+# script-src 的 'wasm-unsafe-eval' 用于编译站内的 wasm 模块（代码高亮 / 格式化插件等）；
+# worker-src/connect-src/img-src/media-src 放开 blob:（工具预览）与 data:（画布导出）。
+# 所有媒体处理都在浏览器内完成，不需要任何跨域请求。
+#
+# 曾为多线程 ffmpeg.wasm 启用过 COOP/COEP（SharedArrayBuffer 的前提）。移除 ffmpeg.wasm 后
+# 不再需要跨域隔离，这两个头已删除 —— 详见 plan/license-audit.md。
 
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' data: blob:; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
 
 # 带哈希的静态资源可长期强缓存
 /assets/*
-  Cache-Control: public, max-age=31536000, immutable
-
-# 自托管的 ffmpeg.wasm 核心按版本分目录，可长期强缓存。
-# 原始 ffmpeg-core.wasm 为 31.2MB，超过 Cloudflare Pages 单文件 25 MiB 上限，
-# 因此 Pages 构建（FFMPEG_PAGES=1 / pnpm build:cf）只发布 ffmpeg-core.wasm.gz（~9.8MB），
-# 由前端在用到 ffmpeg 兜底时下载并用 DecompressionStream 解压成 blob: URL（同源，无需放行 CSP）。
-/ffmpeg/*
   Cache-Control: public, max-age=31536000, immutable

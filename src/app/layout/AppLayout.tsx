@@ -6,6 +6,8 @@ import { Footer } from '@/app/layout/Footer';
 import { Sidebar } from '@/app/layout/Sidebar';
 import { Icon } from '@/core/components/Icon';
 import { SearchPalette } from '@/app/search/SearchPalette';
+import { stripLangPrefix } from '@/core/i18n';
+import { useDocumentMeta } from '@/core/seo/meta';
 
 const SIDEBAR_COLLAPSED_KEY = 'syntools:sidebar-hidden.v1';
 
@@ -21,8 +23,13 @@ export function AppLayout() {
   /**
    * 工具页不渲染页脚：照片编辑器、幻灯片、表格等按「首屏剩余高度」布局，
    * 底部多一行会把画布压矮。营销与说明页需要页脚作为常驻入口（定价 / 安全 / 隐私）。
+   *
+   * 判据用去掉语言前缀后的路径：`/zh/tools/x` 与 `/tools/x` 必须得到同一个答案。
    */
-  const showFooter = !pathname.startsWith('/tools/');
+  const showFooter = !stripLangPrefix(pathname).startsWith('/tools/');
+
+  // head 里的 lang / description / og 跟随界面语言，见 core/seo/meta.ts
+  useDocumentMeta();
 
   const toggleSidebarCollapsed = () => {
     setSidebarCollapsed((prev) => {

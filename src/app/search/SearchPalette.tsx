@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLocalizedPath } from '@/core/i18n/useLocalizedPath';
 import { searchTools } from '@/core/lib/search';
 import { Icon } from '@/core/components/Icon';
 import { getToolMeta } from '@/core/i18n/helpers';
@@ -14,6 +15,7 @@ interface SearchPaletteProps {
 export function SearchPalette({ open, onClose }: SearchPaletteProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const lp = useLocalizedPath();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +36,7 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
 
   const goTo = (id: string) => {
     onClose();
-    navigate(`/tools/${id}`);
+    navigate(lp(`/tools/${id}`));
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {

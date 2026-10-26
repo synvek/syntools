@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { useTranslation } from 'react-i18next';
 import { CopyButton } from '@/core/components/CopyButton';
 import { OptionBar } from '@/core/components/ActionButtons';
@@ -183,7 +183,9 @@ export default function CronGeneratorTool() {
       )}
 
       <div className="flex flex-wrap items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-        <span className="text-sm text-gray-500 dark:text-gray-400">{t('tools.cronGen.expression')}</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {t('tools.cronGen.expression')}
+        </span>
         <code className="font-mono text-lg text-gray-900 dark:text-gray-50">
           {expression || '—'}
         </code>

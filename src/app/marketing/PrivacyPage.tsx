@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { track } from '@/core/analytics';
 import { GITHUB_REPO_URL, pickCopy, usePageLang, type PageLang } from '@/app/marketing/copy';
 import { PageShell, Paragraphs, Section } from '@/app/marketing/ui';
@@ -180,9 +180,8 @@ export function PrivacyPage() {
   const c = useMemo(() => pickCopy(copyDict, lang), [lang]);
 
   useEffect(() => {
-    document.title = `${c.title} · SynTools`;
     track('page_view', { page: 'privacy' });
-  }, [c.title]);
+  }, [lang]);
 
   return (
     <PageShell title={c.title} lead={c.lead}>

@@ -5,8 +5,8 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 const deTools = {
   tools: {
     'video-convert': {
-      formats:
-        'Unterstützte Formate: MP4 / MOV / WebM / MKV / AVI / MPEG-TS (Fallback auf ffmpeg.wasm)',
+      unsupportedOption: '(hier nicht unterstützt)',
+      formats: 'Unterstützt: MP4 / MOV / WebM / MKV / AVI / MPEG-TS',
       target: 'Zielformat',
       quality: 'Qualität',
       qualities: {
@@ -18,30 +18,23 @@ const deTools = {
       trimStart: 'Start (s)',
       trimEnd: 'Ende (s)',
       dropHint: 'Video zum Transkodieren ablegen',
-      engines: 'Engines: WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}',
-      available: 'verfügbar',
-      unavailable: 'nicht verfügbar',
       probe: '{{duration}} · {{size}} · Video {{video}} / Audio {{audio}}',
       convert: 'Konvertieren',
       converting: 'Konvertieren…',
       cancel: 'Abbrechen',
       progress: 'Verarbeitung {{percent}} %',
       download: '{{name}} herunterladen',
-      usedEngine: 'Engine: {{engine}}',
       errors: {
         INVALID_TARGET: 'Nicht unterstütztes Zielformat',
         INVALID_QUALITY: 'Ungültige Qualität',
         INVALID_TRIM: 'Ungültiger Bereich (Ende nach Start)',
         PROBE_FAILED: 'Medieninformationen nicht lesbar',
-        WEBCodecs_VIDEO_MISSING: 'WebCodecs-Video nicht verfügbar und ffmpeg.wasm nicht bereit',
-        WEBCodecs_AUDIO_MISSING: 'WebCodecs-Audio nicht verfügbar und ffmpeg.wasm nicht bereit',
+        WEBCodecs_VIDEO_MISSING:
+          'Dieser Browser unterstützt WebCodecs-Video nicht (Chrome / Edge 94+ oder Safari 16.4+ erforderlich)',
+        WEBCodecs_AUDIO_MISSING:
+          'Dieser Browser unterstützt WebCodecs-Audio nicht (Chrome / Edge 94+ oder Safari 16.4+ erforderlich)',
         NO_ENCODABLE_CODEC: 'Kein nutzbarer Encoder gefunden',
         WEBCodecs_FAILED: 'WebCodecs-Verarbeitung fehlgeschlagen',
-        UNSUPPORTED: 'ffmpeg.wasm wird hier nicht unterstützt',
-        NEED_ISOLATION:
-          'Für mehrthreadiges ffmpeg.wasm ist Cross-Origin-Isolation (COOP/COEP) nötig',
-        LOAD_FAILED: 'ffmpeg.wasm-Kern konnte nicht geladen werden',
-        EXEC_FAILED: 'ffmpeg-Ausführung fehlgeschlagen',
         OUTPUT_MISSING: 'Keine Ausgabedatei erzeugt',
         CONVERT_FAILED: 'Konvertierung fehlgeschlagen',
       },
@@ -64,6 +57,7 @@ const deTools = {
       },
     },
     'audio-convert': {
+      unsupportedOption: '(hier nicht unterstützt)',
       formats: 'Unterstützte Formate: WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF',
       target: 'Zielformat',
       quality: 'Qualität',
@@ -76,7 +70,6 @@ const deTools = {
       cancel: 'Abbrechen',
       progress: 'Verarbeitung {{percent}} %',
       download: 'Herunterladen',
-      usedEngine: 'Engine: {{engine}}',
       sampleRate: 'Abtastrate',
       channels: 'Kanäle',
       bitDepth: 'Bittiefe',
@@ -88,6 +81,9 @@ const deTools = {
       info: '{{rate}} Hz · {{channels}} Kanäle · {{bitDepth}} Bit · {{duration}} s',
       downloadWav: 'WAV herunterladen',
       errors: {
+        FAILED: 'Konvertierung fehlgeschlagen',
+        WEBCodecs_AUDIO_MISSING:
+          'Dieser Browser unterstützt WebCodecs-Audio nicht (Chrome / Edge 94+ oder Safari 16.4+ erforderlich)',
         DECODE: 'Audio-Dekodierung fehlgeschlagen (Format nicht unterstützt?)',
       },
     },

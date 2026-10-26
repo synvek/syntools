@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
 import { FileDropZone } from '@/core/components/FileDropZone';
@@ -6,12 +6,13 @@ import { Icon } from '@/core/components/Icon';
 import { downloadBlob } from '@/core/lib/download';
 import {
   convertMedia,
+  getSupportedTargets,
   probeMedia,
   type MediaProbe,
   type MediaQuality,
   type MediaTarget,
 } from '@/core/media/convert';
-import { describeEngineSupport, MEDIA_MAX_BYTES, type MediaEngine } from '@/core/media/support';
+import { hasWebCodecsVideo, MEDIA_MAX_BYTES } from '@/core/media/support';
 import {
   buildConvertOptions,
   formatDuration,
@@ -25,7 +26,7 @@ const inputClass =
 
 export default function VideoConvertTool() {
   const { t } = useTranslation();
-  const support = useMemo(() => describeEngineSupport(), []);
+  const webcodecs = useMemo(() => hasWebCodecsVideo(), []);
 
   const [file, setFile] = useState<File | null>(null);
   const [probe, setProbe] = useState<MediaProbe | null>(null);
@@ -35,12 +36,31 @@ export default function VideoConvertTool() {
   const [trimStart, setTrimStart] = useState<number | null>(null);
   const [trimEnd, setTrimEnd] = useState<number | null>(null);
 
+  /** 当前浏览器能产出的目标格式；null 表示尚未探测完（先按全部可用渲染，避免闪烁） */
+  const [supported, setSupported] = useState<MediaTarget[] | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [engine, setEngine] = useState<MediaEngine | null>(null);
   const [result, setResult] = useState<{ blob: Blob; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void getSupportedTargets().then((list) => {
+      if (alive) setSupported(list);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 探测结果可能把当前选中项排除（例如不支持 MP3 的浏览器），自动退到第一个可用项
+  useEffect(() => {
+    if (supported && supported.length > 0 && !supported.includes(target)) {
+      setTarget(supported[0]);
+    }
+  }, [supported, target]);
 
   const onFile = async (f: File) => {
     setFile(f);
@@ -67,23 +87,18 @@ export default function VideoConvertTool() {
     setResult(null);
     setProgress(0);
     setBusy(true);
-    setEngine(null);
 
     const controller = new AbortController();
     abortRef.current = controller;
     const r = await convertMedia(file, {
       ...built.value,
       signal: controller.signal,
-      onProgress: (ratio, usedEngine) => {
-        setProgress(ratio);
-        setEngine(usedEngine);
-      },
+      onProgress: (ratio) => setProgress(ratio),
     });
     setBusy(false);
     abortRef.current = null;
 
     if (r.ok) {
-      setEngine(r.value.engine);
       setResult({ blob: r.value.blob, name: outputFileName(file.name, target) });
     } else {
       setError(t(`tools.video-convert.errors.${r.error}`, { defaultValue: r.error }));
@@ -101,7 +116,6 @@ export default function VideoConvertTool() {
     setResult(null);
     setError(null);
     setProgress(0);
-    setEngine(null);
   };
 
   return (
@@ -114,11 +128,16 @@ export default function VideoConvertTool() {
             onChange={(e) => setTarget(e.target.value as MediaTarget)}
             className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
           >
-            {VIDEO_TARGETS.map((value) => (
-              <option key={value} value={value}>
-                {value.toUpperCase()}
-              </option>
-            ))}
+            {VIDEO_TARGETS.map((value) => {
+              const ok = !supported || supported.includes(value);
+              return (
+                <option key={value} value={value} disabled={!ok}>
+                  {ok
+                    ? value.toUpperCase()
+                    : `${value.toUpperCase()} ${t('tools.video-convert.unsupportedOption')}`}
+                </option>
+              );
+            })}
           </select>
         </label>
         <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -178,16 +197,11 @@ export default function VideoConvertTool() {
         formats={t('tools.video-convert.formats')}
       />
 
-      <p className="text-xs text-gray-500 dark:text-gray-400">
-        {t('tools.video-convert.engines', {
-          webcodecs: support.webcodecs
-            ? t('tools.video-convert.available')
-            : t('tools.video-convert.unavailable'),
-          ffmpeg: support.ffmpeg
-            ? t('tools.video-convert.available')
-            : t('tools.video-convert.unavailable'),
-        })}
-      </p>
+      {!webcodecs && (
+        <p role="status" className="text-xs text-amber-700 dark:text-amber-400">
+          {t('tools.video-convert.errors.WEBCodecs_VIDEO_MISSING')}
+        </p>
+      )}
 
       {file && (
         <div className="rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
@@ -209,7 +223,7 @@ export default function VideoConvertTool() {
         <button
           type="button"
           onClick={convert}
-          disabled={!file || busy}
+          disabled={!file || busy || !webcodecs || (!!supported && !supported.includes(target))}
           className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? t('tools.video-convert.converting') : t('tools.video-convert.convert')}
@@ -226,7 +240,6 @@ export default function VideoConvertTool() {
         {busy && (
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {t('tools.video-convert.progress', { percent: Math.round(progress * 100) })}
-            {engine ? ` · ${engine === 'webcodecs' ? 'WebCodecs' : 'ffmpeg.wasm'}` : ''}
           </span>
         )}
       </div>
@@ -241,13 +254,6 @@ export default function VideoConvertTool() {
             <Icon name="download" className="h-4 w-4" />
             {t('tools.video-convert.download', { name: result.name })}
           </button>
-          {engine && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {t('tools.video-convert.usedEngine', {
-                engine: engine === 'webcodecs' ? 'WebCodecs' : 'ffmpeg.wasm',
-              })}
-            </span>
-          )}
         </div>
       )}
 

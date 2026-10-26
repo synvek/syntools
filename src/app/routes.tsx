@@ -42,60 +42,65 @@ function routerBasename(): string | undefined {
 /**
  * 路由表由注册表派生（技术设计 §5.3 / §6.2）：
  * 每个工具组件经 React.lazy 懒加载，形成独立 chunk。
+ *
+ * 同一份 children 挂两遍：无前缀树（英文，`/`、`/tools/<id>/`）与 `/zh` 树
+ * （中文，`/zh/`、`/zh/tools/<id>/`）。这样「语言」是 URL 的一部分，搜索引擎
+ * 才能分别索引两个版本；组件本身完全不感知自己挂在哪棵树上——语言由
+ * `core/i18n` 从路径解析，链接前缀由 `useLocalizedPath()` 负责。
  */
+const appRoutes = [
+  { index: true, element: <HomePage /> },
+  {
+    path: 'download',
+    element: (
+      <Suspense fallback={null}>
+        <DownloadPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: 'pricing',
+    element: (
+      <Suspense fallback={null}>
+        <PricingPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: 'security',
+    element: (
+      <Suspense fallback={null}>
+        <SecurityPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: 'privacy',
+    element: (
+      <Suspense fallback={null}>
+        <PrivacyPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: 'about',
+    element: (
+      <Suspense fallback={null}>
+        <AboutPage />
+      </Suspense>
+    ),
+  },
+  ...tools.map((tool) => ({
+    path: `tools/${tool.id}`,
+    element: <ToolPage tool={tool} />,
+  })),
+  { path: '*', element: <NotFoundPage /> },
+];
+
 export const router = createBrowserRouter(
   [
-    {
-      element: <AppLayout />,
-      children: [
-        { index: true, element: <HomePage /> },
-        {
-          path: 'download',
-          element: (
-            <Suspense fallback={null}>
-              <DownloadPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'pricing',
-          element: (
-            <Suspense fallback={null}>
-              <PricingPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'security',
-          element: (
-            <Suspense fallback={null}>
-              <SecurityPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'privacy',
-          element: (
-            <Suspense fallback={null}>
-              <PrivacyPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'about',
-          element: (
-            <Suspense fallback={null}>
-              <AboutPage />
-            </Suspense>
-          ),
-        },
-        ...tools.map((tool) => ({
-          path: `tools/${tool.id}`,
-          element: <ToolPage tool={tool} />,
-        })),
-        { path: '*', element: <NotFoundPage /> },
-      ],
-    },
+    { element: <AppLayout />, children: appRoutes },
+    { path: 'zh', element: <AppLayout />, children: appRoutes },
   ],
   { basename: routerBasename() },
 );

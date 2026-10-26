@@ -5,7 +5,8 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 const zhTWTools = {
   tools: {
     'video-convert': {
-      formats: '支援格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS（不支援時自動回退 ffmpeg.wasm）',
+      unsupportedOption: '（瀏覽器不支援）',
+      formats: '支援格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS',
       target: '目標格式',
       quality: '畫質',
       qualities: {
@@ -17,29 +18,23 @@ const zhTWTools = {
       trimStart: '起始 (s)',
       trimEnd: '結束 (s)',
       dropHint: '拖入影片檔案以轉碼',
-      engines: '引擎：WebCodecs {{webcodecs}}，ffmpeg.wasm {{ffmpeg}}',
-      available: '可用',
-      unavailable: '不可用',
       probe: '時長 {{duration}} · {{size}} · 視訊 {{video}} / 音訊 {{audio}}',
       convert: '開始轉碼',
       converting: '轉碼中…',
       cancel: '取消',
       progress: '處理中 {{percent}}%',
       download: '下載 {{name}}',
-      usedEngine: '使用引擎：{{engine}}',
       errors: {
         INVALID_TARGET: '目標格式不受支援',
         INVALID_QUALITY: '畫質參數無效',
         INVALID_TRIM: '裁剪區間無效（結束需大於開始）',
         PROBE_FAILED: '無法讀取媒體資訊',
-        WEBCodecs_VIDEO_MISSING: '瀏覽器不支援 WebCodecs 視訊編解碼，且 ffmpeg.wasm 不可用',
-        WEBCodecs_AUDIO_MISSING: '瀏覽器不支援 WebCodecs 音訊編解碼，且 ffmpeg.wasm 不可用',
+        WEBCodecs_VIDEO_MISSING:
+          '目前瀏覽器不支援 WebCodecs 視訊編解碼（需 Chrome / Edge 94+ 或 Safari 16.4+）',
+        WEBCodecs_AUDIO_MISSING:
+          '目前瀏覽器不支援 WebCodecs 音訊編解碼（需 Chrome / Edge 94+ 或 Safari 16.4+）',
         NO_ENCODABLE_CODEC: '找不到可用的編碼器',
         WEBCodecs_FAILED: 'WebCodecs 處理失敗',
-        UNSUPPORTED: '目前環境不支援 ffmpeg.wasm',
-        NEED_ISOLATION: '需要跨域隔離（COOP/COEP）才能啟用多執行緒 ffmpeg.wasm',
-        LOAD_FAILED: 'ffmpeg.wasm 核心載入失敗',
-        EXEC_FAILED: 'ffmpeg 執行失敗',
         OUTPUT_MISSING: '未產生輸出檔案',
         CONVERT_FAILED: '轉換失敗',
       },
@@ -62,6 +57,7 @@ const zhTWTools = {
       },
     },
     'audio-convert': {
+      unsupportedOption: '（瀏覽器不支援）',
       formats: '支援格式：WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF',
       target: '目標格式',
       quality: '音質',
@@ -74,7 +70,6 @@ const zhTWTools = {
       cancel: '取消',
       progress: '處理中 {{percent}}%',
       download: '下載',
-      usedEngine: '使用引擎：{{engine}}',
       sampleRate: '取樣率',
       channels: '聲道',
       bitDepth: '位元深度',
@@ -86,6 +81,9 @@ const zhTWTools = {
       info: '{{rate}} Hz · {{channels}} 聲道 · {{bitDepth}} bit · {{duration}} 秒',
       downloadWav: '下載 WAV',
       errors: {
+        FAILED: '轉換失敗',
+        WEBCodecs_AUDIO_MISSING:
+          '目前瀏覽器不支援 WebCodecs 音訊編解碼（需 Chrome / Edge 94+ 或 Safari 16.4+）',
         DECODE: '音訊解碼失敗（格式可能不受支援）',
       },
     },

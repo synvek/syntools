@@ -176,6 +176,67 @@ async function main() {
     record('http 一跳直达 https 主域', ok, `HTTP ${status}｜location ${loc}`);
   });
 
+  // 11. 两棵语言树都在，且各自的 <html lang> 与目录一致
+  await check('双语树齐备且 lang 正确', async () => {
+    const en = await get(`${SITE}/${stamp}`);
+    const zh = await get(`${SITE}/zh/${stamp}`);
+    const enLang = en.body.match(/<html[^>]*\blang="([^"]+)"/i)?.[1] || '';
+    const zhLang = zh.body.match(/<html[^>]*\blang="([^"]+)"/i)?.[1] || '';
+    const ok = en.status === 200 && zh.status === 200 && enLang === 'en' && zhLang === 'zh-CN';
+    record(
+      '双语树齐备且 lang 正确',
+      ok,
+      `/${en.status} lang=${enLang}｜/zh/ ${zh.status} lang=${zhLang}`,
+    );
+  });
+
+  // 12. hreflang 三向互指 —— 少一条 Google 就可能把两棵树当重复内容只留一棵
+  await check('hreflang 三向互指', async () => {
+    const { body } = await get(`${SITE}/${stamp}`);
+    const alts = [...body.matchAll(/<link[^>]+hreflang="([^"]+)"[^>]+href="([^"]+)"/gi)].map(
+      (m) => [m[1], m[2]],
+    );
+    const map = Object.fromEntries(alts.map(([h, href]) => [h, href]));
+    const norm = (u) => (u || '').replace(/\?.*$/, '').replace(/\/$/, '');
+    const ok =
+      norm(map.en) === norm(SITE) &&
+      norm(map['zh-CN']) === norm(`${SITE}/zh`) &&
+      norm(map['x-default']) === norm(SITE);
+    record(
+      'hreflang 三向互指',
+      ok,
+      `en=${map.en || '缺'}｜zh-CN=${map['zh-CN'] || '缺'}｜x-default=${map['x-default'] || '缺'}`,
+    );
+  });
+
+  // 13. 中文工具页有自己的标题，不是英文页的副本
+  await check('中文工具页标题独立', async () => {
+    const zh = await get(`${SITE}/zh/${SAMPLE_TOOL}${stamp}`);
+    const en = await get(`${SITE}/${SAMPLE_TOOL}${stamp}`);
+    const zhTitle = zh.body.match(/<title>([^<]*)<\/title>/i)?.[1] || '';
+    const enTitle = en.body.match(/<title>([^<]*)<\/title>/i)?.[1] || '';
+    const hasCjk = /[\u4e00-\u9fa5]/.test(zhTitle);
+    record(
+      '中文工具页标题独立',
+      zh.status === 200 && hasCjk && zhTitle !== enTitle,
+      `/zh/ ${zh.status}｜zh「${zhTitle}」｜en「${enTitle}」`,
+    );
+  });
+
+  // 14. sitemap 带 hreflang alternates，且两条树都在里面
+  await check('sitemap 含语言 alternates', async () => {
+    const { body } = await get(`${SITE}/sitemap.xml${stamp}`);
+    const hasNs = /xmlns:xhtml=/.test(body);
+    const altCount = (body.match(/<xhtml:link[^>]+hreflang=/g) || []).length;
+    const hasZh = /<loc>[^<]*\/zh\/<\/loc>/.test(body);
+    const ok = hasNs && altCount > 0 && hasZh;
+    record(
+      'sitemap 含语言 alternates',
+      ok,
+      `xhtml 命名空间 ${hasNs ? '有' : '无'}｜alternate ${altCount} 条｜/zh/ 条目 ${hasZh ? '有' : '无'}`,
+    );
+  });
+
   // ---- 输出 ----
   const pad = Math.max(...results.map((r) => r.name.length)) + 2;
   let failed = 0;

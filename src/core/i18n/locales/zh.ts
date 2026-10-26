@@ -138,7 +138,7 @@ export default {
     },
     'video-convert': {
       name: '视频转码',
-      description: 'WebCodecs 优先的视频转码（MP4 / WebM / MKV），不支持时自动回退 ffmpeg.wasm',
+      description: 'WebCodecs 视频转码（MP4 / WebM / MKV），全程在本机完成',
     },
     'video-to-gif': {
       name: '视频转 GIF',
@@ -146,8 +146,7 @@ export default {
     },
     'audio-convert': {
       name: '音频转码',
-      description:
-        '音频格式转换：WAV（原生精修）与 MP3 / M4A / OGG / FLAC（WebCodecs 优先，回退 ffmpeg.wasm）',
+      description: '音频格式转换：WAV（原生精修）与 MP3 / M4A / OGG / FLAC（WebCodecs）',
     },
     'subtitle-tool': {
       name: '字幕转换',

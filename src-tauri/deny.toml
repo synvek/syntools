@@ -1,0 +1,55 @@
+# cargo-deny 配置（Rust 侧依赖门禁）
+#
+# 只启用 licenses 检查：许可白名单之外的许可一律失败，因此 GPL / AGPL / SSPL 这类
+# 强 copyleft 组件进不来。这与 `pnpm license:check` 对 npm 侧的口径一致，
+# 目的是让「AGPL 社区版 + 商业许可版」双轨发布成立（见 plan/license-audit.md）。
+#
+# 本地执行：pnpm license:check:rust（需先 cargo install cargo-deny）
+# CI 执行：.github/workflows/ci.yml 的 licenses job
+#
+# 规则：CI 报出未列入 allow 的许可时，处理顺序是「替换/移除依赖 → 复核许可 → 才考虑加入
+# 白名单」。不要为了过门禁而放宽白名单。
+
+[licenses]
+# cargo-deny 0.14+ 的配置版本
+version = 2
+
+# 声明式许可判定需要的最低置信度：低于该值视为「无法判定」并失败，
+# 而不是默认猜一个宽松许可。
+confidence-threshold = 0.85
+
+# 白名单：全部为宽松许可、文件级 copyleft 或公共领域声明。
+# 出现的组合写法（如 `MIT OR Apache-2.0`）由 cargo-deny 按 SPDX 解析，任一侧命中即通过。
+allow = [
+  "0BSD",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSL-1.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BlueOak-1.0.0",
+  "bzip2-1.0.6",
+  "CC0-1.0",
+  "CC-BY-4.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MIT-0",
+  "MPL-2.0",
+  "NCSA",
+  "OpenSSL",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "Unlicense",
+  "Zlib",
+]
+
+# 白名单里长期用不到的条目给出警告，便于定期收敛
+unused-allowed-license = "warn"
+
+[sources]
+# 只允许 crates.io：出现 git 依赖或私有 registry 时需要显式加白，
+# 避免供应链被悄悄改道。
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

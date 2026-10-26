@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { useTranslation } from 'react-i18next';
 import type { ToolMeta } from '@/core/types';
 import { Icon } from '@/core/components/Icon';
@@ -11,8 +11,13 @@ export function RelatedTools({ tool, limit = 6 }: { tool: ToolMeta; limit?: numb
   if (related.length === 0) return null;
 
   return (
-    <section className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-800" aria-label={t('tool.related')}>
-      <h2 className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">{t('tool.related')}</h2>
+    <section
+      className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-800"
+      aria-label={t('tool.related')}
+    >
+      <h2 className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
+        {t('tool.related')}
+      </h2>
       <ul className="flex flex-wrap gap-2">
         {related.map((item) => {
           const { name } = getToolMeta(item);

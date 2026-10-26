@@ -1,11 +1,17 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OptionBar } from '@/core/components/ActionButtons';
 import { FileDropZone } from '@/core/components/FileDropZone';
 import { Icon } from '@/core/components/Icon';
 import { downloadBlob } from '@/core/lib/download';
-import { convertMedia, probeMedia, type MediaQuality } from '@/core/media/convert';
-import { MEDIA_MAX_BYTES, type MediaEngine } from '@/core/media/support';
+import {
+  convertMedia,
+  getSupportedTargets,
+  probeMedia,
+  type MediaQuality,
+  type MediaTarget,
+} from '@/core/media/convert';
+import { hasWebCodecsAudio, MEDIA_MAX_BYTES } from '@/core/media/support';
 import { downmix, encodeWav, resample, type BitDepth } from './core';
 
 type ChannelMode = 'keep' | 'mono' | 'stereo';
@@ -23,13 +29,30 @@ export default function AudioConvertTool() {
   const [bitDepth, setBitDepth] = useState<BitDepth>(16);
   const [quality, setQuality] = useState<MediaQuality>('medium');
 
+  /** 当前浏览器能产出的目标格式；null 表示尚未探测完 */
+  const [supported, setSupported] = useState<MediaTarget[] | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [result, setResult] = useState<{ blob: Blob; name: string } | null>(null);
-  const [engine, setEngine] = useState<MediaEngine | null>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void getSupportedTargets().then((list) => {
+      if (alive) setSupported(list);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (supported && supported.length > 0 && !supported.includes(target)) {
+      setTarget(supported.includes('wav') ? 'wav' : (supported[0] as AudioTarget));
+    }
+  }, [supported, target]);
 
   const channelsOf = (mode: ChannelMode): number | undefined =>
     mode === 'mono' ? 1 : mode === 'stereo' ? 2 : undefined;
@@ -95,13 +118,11 @@ export default function AudioConvertTool() {
     setError(null);
     setResult(null);
     setProgress(0);
-    setEngine(null);
 
     try {
       if (target === 'wav') {
         const out = await convertToWav(file);
         setResult(out);
-        setEngine(null);
       } else {
         const controller = new AbortController();
         abortRef.current = controller;
@@ -113,14 +134,10 @@ export default function AudioConvertTool() {
             ...(channelMode !== 'keep' ? { numberOfChannels: channelsOf(channelMode) } : {}),
             ...(sampleRate ? { sampleRate } : {}),
           },
-          onProgress: (ratio, used) => {
-            setProgress(ratio);
-            setEngine(used);
-          },
+          onProgress: (ratio) => setProgress(ratio),
         });
         if (r.ok) {
           setResult({ blob: r.value.blob, name: `converted.${target}` });
-          setEngine(r.value.engine);
         } else {
           setError(t(`tools.audio-convert.errors.${r.error}`, { defaultValue: r.error }));
         }
@@ -139,10 +156,8 @@ export default function AudioConvertTool() {
   };
 
   const isWav = target === 'wav';
-  const engineLabel = useMemo(
-    () => (engine === 'webcodecs' ? 'WebCodecs' : engine === 'ffmpeg' ? 'ffmpeg.wasm' : ''),
-    [engine],
-  );
+  const webcodecs = useMemo(() => hasWebCodecsAudio(), []);
+  const needsWebCodecs = !isWav && !webcodecs;
 
   return (
     <div className="flex flex-col gap-4">
@@ -154,11 +169,16 @@ export default function AudioConvertTool() {
             onChange={(e) => setTarget(e.target.value as AudioTarget)}
             className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
           >
-            {AUDIO_TARGETS.map((value) => (
-              <option key={value} value={value}>
-                {value.toUpperCase()}
-              </option>
-            ))}
+            {AUDIO_TARGETS.map((value) => {
+              const ok = !supported || supported.includes(value);
+              return (
+                <option key={value} value={value} disabled={!ok}>
+                  {ok
+                    ? value.toUpperCase()
+                    : `${value.toUpperCase()} ${t('tools.audio-convert.unsupportedOption')}`}
+                </option>
+              );
+            })}
           </select>
         </label>
         <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -225,6 +245,12 @@ export default function AudioConvertTool() {
         formats={t('tools.audio-convert.formats')}
       />
 
+      {needsWebCodecs && (
+        <p role="status" className="text-xs text-amber-700 dark:text-amber-400">
+          {t('tools.audio-convert.errors.WEBCodecs_AUDIO_MISSING')}
+        </p>
+      )}
+
       {file && (
         <p className="text-sm text-gray-600 dark:text-gray-300">
           {file.name}
@@ -236,7 +262,7 @@ export default function AudioConvertTool() {
         <button
           type="button"
           onClick={convert}
-          disabled={!file || busy}
+          disabled={!file || busy || needsWebCodecs || (!!supported && !supported.includes(target))}
           className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? t('tools.audio-convert.processing') : t('tools.audio-convert.convert')}
@@ -253,7 +279,6 @@ export default function AudioConvertTool() {
         {busy && !isWav && (
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {t('tools.audio-convert.progress', { percent: Math.round(progress * 100) })}
-            {engineLabel ? ` · ${engineLabel}` : ''}
           </span>
         )}
       </div>
@@ -274,11 +299,6 @@ export default function AudioConvertTool() {
             <Icon name="download" className="h-4 w-4" />
             {t('tools.audio-convert.download')}
           </button>
-          {engineLabel && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {t('tools.audio-convert.usedEngine', { engine: engineLabel })}
-            </span>
-          )}
         </div>
       )}
     </div>

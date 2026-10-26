@@ -1,7 +1,7 @@
 {
   "name": "syntools",
   "private": true,
-  "version": "0.8.2",
+  "version": "0.8.3",
   "type": "module",
   "homepage": "https://github.com/synvek/syntools",
   "repository": {
@@ -18,17 +18,14 @@
     "node": ">=20"
   },
   "scripts": {
-    "predev": "node scripts/fetch-ffmpeg-core.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/fetch-ffmpeg-core.mjs",
     "build": "tsc -b && vite build",
     "build:pages": "BASE_PATH=/syntools/ SITE_URL=https://synvek.github.io/syntools pnpm build",
-    "build:cf": "FFMPEG_PAGES=1 VITE_ANALYTICS_ENDPOINT=/api/event pnpm build",
+    "build:cf": "VITE_ANALYTICS_ENDPOINT=/api/event pnpm build",
     "preview": "vite preview",
     "version": "tsx scripts/sync-version.ts && git add src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json",
     "version:sync": "tsx scripts/sync-version.ts",
     "version:check": "tsx scripts/sync-version.ts --check",
-    "ffmpeg:fetch": "node scripts/fetch-ffmpeg-core.mjs",
     "og": "node scripts/gen-og.mjs",
     "og:en": "node scripts/gen-og.mjs --lang=en",
     "og:all": "node scripts/gen-og.mjs --all",
@@ -45,7 +42,10 @@
     "test:watch": "vitest",
     "size": "node scripts/check-bundle-size.mjs",
     "e2e": "playwright test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "license:check": "node scripts/check-licenses.mjs",
+    "license:check:rust": "cd src-tauri && cargo deny check licenses",
+    "notices": "node scripts/gen-third-party-notices.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -63,8 +63,6 @@
   "dependencies": {
     "@cantoo/pdf-lib": "^2.9.1",
     "@dagrejs/dagre": "^3.1.1",
-    "@ffmpeg/ffmpeg": "0.12.15",
-    "@ffmpeg/util": "0.12.2",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-color": "^3.31.3",
     "@tiptap/extension-highlight": "^3.31.3",
@@ -136,10 +134,10 @@
     "pako": "^3.0.1",
     "pdfjs-dist": "^6.3.289",
     "pinyin-pro": "^3.29.3",
+    "pptxgenjs": "^3.12.0",
     "prettier": "^3.9.6",
     "prettier-plugin-java": "^2.10.4",
     "prismjs": "^1.30.0",
-    "pptxgenjs": "^3.12.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -148,7 +146,7 @@
     "rxjs": "^7.8.2",
     "smol-toml": "^1.8.0",
     "sql-formatter": "^15.8.2",
-    "ua-parser-js": "^2.0.10",
+    "ua-parser-js": "^1.0.41",
     "yaml": "^2.9.0",
     "zustand": "^4.5.5"
   },

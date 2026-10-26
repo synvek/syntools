@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { track } from '@/core/analytics';
 import { tools } from '@/core/registry';
 import { Icon } from '@/core/components/Icon';
@@ -422,9 +422,8 @@ export function PricingPage() {
   const vars = useMemo(() => ({ n }), [n]);
 
   useEffect(() => {
-    document.title = `${c.title} · SynTools`;
     track('pricing_view', { lng: lang });
-  }, [c.title, lang]);
+  }, [lang]);
 
   const toTier = useMemo(
     () =>

@@ -143,8 +143,7 @@ const de = {
     },
     'video-convert': {
       name: 'Videokonverter',
-      description:
-        'WebCodecs-first Videotranskodierung (MP4 / WebM / MKV), automatischer ffmpeg.wasm-Fallback',
+      description: 'Videotranskodierung mit WebCodecs (MP4 / WebM / MKV), vollständig lokal',
     },
     'video-to-gif': {
       name: 'Video zu GIF',
@@ -153,7 +152,7 @@ const de = {
     'audio-convert': {
       name: 'Audiokonverter',
       description:
-        'Audioformat-Konvertierung: WAV (nativ) sowie MP3 / M4A / OGG / FLAC (WebCodecs zuerst, ffmpeg.wasm-Fallback)',
+        'Audioformat-Konvertierung: WAV (nativ) sowie MP3 / M4A / OGG / FLAC (WebCodecs)',
     },
     'subtitle-tool': {
       name: 'Untertitel-Konverter',

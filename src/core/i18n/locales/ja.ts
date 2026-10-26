@@ -144,7 +144,7 @@ const ja = {
     'video-convert': {
       name: '動画トランスコード',
       description:
-        'WebCodecs 優先の動画変換（MP4 / WebM / MKV）、非対応時は ffmpeg.wasm に自動フォールバック',
+        'WebCodecs による動画トランスコード（MP4 / WebM / MKV）。すべて端末内で完結します',
     },
     'video-to-gif': {
       name: '動画 → GIF',
@@ -152,8 +152,7 @@ const ja = {
     },
     'audio-convert': {
       name: '音声トランスコード',
-      description:
-        'ブラウザで再生可能な音声を WAV に変換（サンプルレート・チャンネル・ビット深度）',
+      description: '音声形式の変換：WAV（ネイティブ）と MP3 / M4A / OGG / FLAC（WebCodecs）',
     },
     'subtitle-tool': {
       name: '字幕変換',

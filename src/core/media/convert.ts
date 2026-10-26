@@ -5,6 +5,7 @@ import {
   Conversion,
   FlacOutputFormat,
   Input,
+  MkvOutputFormat,
   Mp3OutputFormat,
   Mp4OutputFormat,
   OggOutputFormat,
@@ -14,13 +15,16 @@ import {
   QUALITY_MEDIUM,
   WavOutputFormat,
   WebMOutputFormat,
+  canEncodeAudio,
+  canEncodeVideo,
+  type AudioCodec,
   type InputFormat,
   type OutputFormat,
   type Quality,
+  type VideoCodec,
 } from 'mediabunny';
 import type { ToolResult } from '@/core/types';
-import { runFfmpeg } from './ffmpeg';
-import { hasWebCodecsAudio, hasWebCodecsVideo, type MediaEngine } from './support';
+import { hasWebCodecsAudio, hasWebCodecsVideo } from './support';
 
 export type MediaTarget = 'mp4' | 'webm' | 'mkv' | 'mp3' | 'wav' | 'ogg' | 'flac' | 'm4a';
 export type MediaQuality = 'low' | 'medium' | 'high';
@@ -34,12 +38,63 @@ export const MEDIA_TARGETS: { value: MediaTarget; label: string; kind: 'video' |
   { value: 'mp3', label: 'MP3', kind: 'audio' },
   { value: 'm4a', label: 'M4A (AAC)', kind: 'audio' },
   { value: 'wav', label: 'WAV', kind: 'audio' },
-  { value: 'ogg', label: 'OGG (Vorbis)', kind: 'audio' },
+  { value: 'ogg', label: 'OGG (Opus)', kind: 'audio' },
   { value: 'flac', label: 'FLAC', kind: 'audio' },
 ];
 
 export function isAudioTarget(target: MediaTarget): boolean {
   return AUDIO_TARGETS.includes(target);
+}
+
+/**
+ * 每个目标容器实际需要的编码器（数组内为「任选其一」，全部满足才算可转）。
+ *
+ * 这不是照抄规格书，而是跟 mediabunny 的自动选码保持一致的实测口径：
+ * Chrome 只提供 AAC 与 Opus 音频编码器，MP3 / Vorbis / FLAC 根本没有，
+ * 所以「MP3」这类目标在部分浏览器上不可达 —— 与其让用户点完才发现失败，
+ * 不如在渲染选项时就把不可用的条目标出来。
+ */
+const TARGET_CAPABILITY: Record<MediaTarget, { video?: VideoCodec[]; audio?: AudioCodec[] }> = {
+  mp4: { video: ['avc'], audio: ['aac'] },
+  webm: { video: ['vp9', 'vp8'], audio: ['opus'] },
+  mkv: { video: ['avc', 'vp9'], audio: ['aac', 'opus'] },
+  mp3: { audio: ['mp3'] },
+  m4a: { audio: ['aac'] },
+  wav: {}, // 自研 PCM 编码，不依赖 WebCodecs
+  ogg: { audio: ['opus', 'vorbis'] },
+  flac: { audio: ['flac'] },
+};
+
+async function anyAudioEncodable(codecs: AudioCodec[]): Promise<boolean> {
+  for (const codec of codecs) {
+    if (await canEncodeAudio(codec)) return true;
+  }
+  return false;
+}
+
+async function anyVideoEncodable(codecs: VideoCodec[]): Promise<boolean> {
+  for (const codec of codecs) {
+    // 用 720p 探测：过低的分辨率可能命中软件编码器而高估能力
+    if (await canEncodeVideo(codec, { width: 1280, height: 720 })) return true;
+  }
+  return false;
+}
+
+/** 当前浏览器能否产出该目标格式。 */
+export async function isTargetSupported(target: MediaTarget): Promise<boolean> {
+  const need = TARGET_CAPABILITY[target];
+  if (!need.video && !need.audio) return true;
+  if (need.audio && !(await anyAudioEncodable(need.audio))) return false;
+  if (need.video && !(await anyVideoEncodable(need.video))) return false;
+  return true;
+}
+
+/** 一次性探测全部目标格式，返回可用的那部分（供下拉框过滤）。 */
+export async function getSupportedTargets(): Promise<MediaTarget[]> {
+  const results = await Promise.all(
+    MEDIA_TARGETS.map(async (item) => ((await isTargetSupported(item.value)) ? item.value : null)),
+  );
+  return results.filter((value): value is MediaTarget => value !== null);
 }
 
 export interface MediaProbe {
@@ -122,13 +177,12 @@ export interface ConvertMediaOptions {
   audio?: { numberOfChannels?: number; sampleRate?: number };
   /** 秒；end 省略表示到结尾 */
   trim?: { start?: number; end?: number };
-  onProgress?: (ratio: number, engine: MediaEngine) => void;
+  onProgress?: (ratio: number) => void;
   signal?: AbortSignal;
 }
 
 export interface ConvertMediaResult {
   blob: Blob;
-  engine: MediaEngine;
 }
 
 /** 音频专用输出格式 */
@@ -181,7 +235,7 @@ async function convertWithWebCodecs(
     if (!conversion.isValid) return { ok: false, error: 'NO_ENCODABLE_CODEC' };
 
     if (options.onProgress) {
-      conversion.onProgress = (ratio) => options.onProgress?.(ratio, 'webcodecs');
+      conversion.onProgress = (ratio) => options.onProgress?.(ratio);
     }
     if (options.signal) {
       options.signal.addEventListener('abort', () => void conversion.cancel(), { once: true });
@@ -193,7 +247,7 @@ async function convertWithWebCodecs(
     if (!buffer) return { ok: false, error: 'OUTPUT_MISSING' };
     return {
       ok: true,
-      value: { blob: new Blob([buffer], { type: mimeOf(options.target) }), engine: 'webcodecs' },
+      value: { blob: new Blob([buffer], { type: mimeOf(options.target) }) },
     };
   } catch {
     return { ok: false, error: 'WEBCodecs_FAILED' };
@@ -204,122 +258,17 @@ async function convertWithWebCodecs(
 
 function defaultVideoFormat(target: MediaTarget): OutputFormat {
   if (target === 'webm') return new WebMOutputFormat();
-  return new Mp4OutputFormat(); // mp4 / mkv 由 mp4 容器承载（mkv 由 ffmpeg 兜底）
-}
-
-function crfFor(quality: MediaQuality | undefined): string {
-  if (quality === 'low') return '30';
-  if (quality === 'high') return '20';
-  return '24';
-}
-
-function vp9CrfFor(quality: MediaQuality | undefined): string {
-  if (quality === 'low') return '40';
-  if (quality === 'high') return '28';
-  return '34';
-}
-
-async function convertWithFfmpeg(
-  file: Blob,
-  options: ConvertMediaOptions,
-): Promise<ToolResult<ConvertMediaResult>> {
-  const audioOnly = isAudioTarget(options.target);
-  const inputName = `input.${audioOnly ? 'bin' : 'bin'}`;
-  const outputName = `output.${options.target}`;
-  const args: string[] = [];
-
-  if (options.trim?.start) args.push('-ss', String(options.trim.start));
-  if (options.trim?.end != null) args.push('-to', String(options.trim.end));
-  args.push('-i', inputName);
-
-  switch (options.target) {
-    case 'mp4':
-      args.push(
-        '-c:v',
-        'libx264',
-        '-preset',
-        'veryfast',
-        '-crf',
-        crfFor(options.quality),
-        '-c:a',
-        'aac',
-        '-b:a',
-        '192k',
-      );
-      break;
-    case 'webm':
-      args.push(
-        '-c:v',
-        'libvpx-vp9',
-        '-crf',
-        vp9CrfFor(options.quality),
-        '-b:v',
-        '0',
-        '-c:a',
-        'libopus',
-        '-b:a',
-        '128k',
-      );
-      break;
-    case 'mkv':
-      args.push('-c', 'copy');
-      break;
-    case 'mp3':
-      args.push('-vn', '-c:a', 'libmp3lame', '-q:a', '2');
-      break;
-    case 'm4a':
-      args.push('-vn', '-c:a', 'aac', '-b:a', '192k');
-      break;
-    case 'wav':
-      args.push('-vn', '-c:a', 'pcm_s16le');
-      break;
-    case 'ogg':
-      args.push('-vn', '-c:a', 'libvorbis', '-q:a', '5');
-      break;
-    case 'flac':
-      args.push('-vn', '-c:a', 'flac');
-      break;
-  }
-
-  // `-c copy`（mkv）与滤镜互斥，仅在转码路径下缩放
-  if (!audioOnly && options.target !== 'mkv' && options.video?.width) {
-    args.push('-vf', `scale=${Math.max(2, Math.round(options.video.width))}:-2`);
-  }
-  args.push(outputName);
-
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const result = await runFfmpeg({
-    args,
-    inputs: [{ name: inputName, data: bytes }],
-    output: outputName,
-    onProgress: options.onProgress ? (ratio) => options.onProgress?.(ratio, 'ffmpeg') : undefined,
-  });
-  if (!result.ok) return result;
-  return {
-    ok: true,
-    value: { blob: new Blob([result.value], { type: mimeOf(options.target) }), engine: 'ffmpeg' },
-  };
+  if (target === 'mkv') return new MkvOutputFormat();
+  return new Mp4OutputFormat();
 }
 
 /**
- * 转换媒体：优先 WebCodecs（原生、零下载），失败或不支持时回退到 ffmpeg.wasm。
- * 返回值会带上实际使用的引擎，供 UI 提示用户。
+ * 转换媒体：WebCodecs 解码 + 编码，mediabunny 负责容器。
+ * 浏览器缺少对应能力时返回明确的错误码，由 UI 提示，而不是静默降级到别的引擎。
  */
 export async function convertMedia(
   file: Blob,
   options: ConvertMediaOptions,
 ): Promise<ToolResult<ConvertMediaResult>> {
-  const attempts: string[] = [];
-
-  const webcodecs = await convertWithWebCodecs(file, options);
-  if (webcodecs.ok) return webcodecs;
-  attempts.push(webcodecs.error);
-
-  const ffmpeg = await convertWithFfmpeg(file, options);
-  if (ffmpeg.ok) return ffmpeg;
-  attempts.push(ffmpeg.error);
-
-  // 优先暴露更有意义的失败原因（引擎不支持 vs 处理失败）
-  const primary = attempts.find((code) => code.includes('WEBCodecs') || code === 'NEED_ISOLATION');
-  return { ok: false, error: primary ?? attempts[0] ?? 'CONVERT_FAILED' };
+  return convertWithWebCodecs(file, options);
 }

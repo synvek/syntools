@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { NavLink } from '@/core/components/LocaleLink';
 import { useTranslation } from 'react-i18next';
+import { stripLangPrefix } from '@/core/i18n';
 import { tools, toolMap } from '@/core/registry';
 import { categories } from '@/core/registry/categories';
 import { Icon } from '@/core/components/Icon';
@@ -32,8 +34,9 @@ function writeCollapsed(ids: Set<CategoryId>) {
   localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...ids]));
 }
 
+/** 从路径里取工具 id；先剥掉语言前缀，否则 `/zh/tools/x` 匹配不到 */
 function toolIdFromPath(pathname: string): string | undefined {
-  const m = pathname.match(/^\/tools\/([^/]+)/);
+  const m = stripLangPrefix(pathname).match(/^\/tools\/([^/]+)/);
   return m?.[1];
 }
 

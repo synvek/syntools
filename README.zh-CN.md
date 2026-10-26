@@ -69,7 +69,7 @@ SynTools 从开发者工具箱起步，但早已不再只面向开发者：
 | PDF 工具   | 合并、拆分、旋转、加密/解密、压缩、文本提取、水印、批注、图文互转、页码、签名                                                                                                                                                                                    |
 | 网络       | IP 计算（VLSM）、CIDR、MAC、URL 解析、UA 解析/生成、HTTP 标头/请求、WebSocket 测试、随机端口                                                                                                                                                                     |
 | 文件       | ZIP 打包/解压、文件切分/合并、批量重命名                                                                                                                                                                                                                         |
-| 音视频     | 视频/音频转码（WebCodecs 优先，ffmpeg.wasm 兜底）、视频转 GIF、字幕（SRT/WebVTT）转换                                                                                                                                                                            |
+| 音视频     | 视频/音频转码（WebCodecs + Mediabunny）、视频转 GIF、字幕（SRT/WebVTT）转换                                                                                                                                                                                      |
 | 速查表     | HTTP 状态码、MIME 类型、Git 命令                                                                                                                                                                                                                                 |
 | 其他       | 计算器、单位换算、贷款/个税计算、MBTI、AI 提示词、Mermaid、图表生成 …                                                                                                                                                                                            |
 
@@ -225,37 +225,56 @@ syntools/
 
 | 指标                     | 预算                                                |
 | ------------------------ | --------------------------------------------------- |
-| 首屏入口资源（gzip）     | ≤ 175 KB（仅外壳 + 工具元数据，各工具文案按需加载） |
+| 首屏入口资源（gzip）     | ≤ 195 KB（仅外壳 + 工具元数据，各工具文案按需加载） |
 | 单个懒加载 chunk（gzip） | ≤ 500 KB（Univer / exceljs 等重依赖 ≤ 2 MB）        |
-| 静态资源（不进 bundle）  | ≤ 40 MB（自托管 ffmpeg.wasm 核心，按需下载）        |
 
 由 `pnpm size`（`scripts/check-bundle-size.mjs`）强制校验。工具必须通过 `component: () => import(...)` 懒加载，避免进入首屏包；重量级第三方依赖应落在工具自己的异步 chunk 里（例如照片编辑器只在导出 PSD 时才载入 `ag-psd`）。图标优先使用内置 `Icon` 组件，勿引入大型图标库。
 
 **语言资源分两段加载。** 每种语言拆成外壳（`locales/<lang>.ts`：导航、首页、搜索 + `toolsMeta.*`）与工具文案包（`locales/<lang>.tools.ts`：`tools.*` 命名空间，占语言包约 82%）。`zh`/`en` 外壳随首屏发出，其余语言的 `tools.*` 在进入工具页时与工具自身的 chunk 并行拉取。因此首页与无工具的页面不必为 152 个工具的 UI 文案买单，而工具页首帧仍然是完整译文。
 
-### 媒体引擎（WebCodecs 优先，ffmpeg.wasm 兜底）
+### 媒体引擎（WebCodecs + Mediabunny）
 
-音视频工具（`video-convert`、`audio-convert`、`video-to-gif`）优先使用浏览器原生的 **WebCodecs**（经由 [Mediabunny](https://mediabunny.dev)）：零下载、可硬件加速、支持精确抽帧。当 WebCodecs 无法处理某容器/编码时，自动回退到 **ffmpeg.wasm**（`@ffmpeg/core-mt`，多线程版）。
+音视频工具（`video-convert`、`audio-convert`、`video-to-gif`）用浏览器原生的 **WebCodecs** 做编解码、[Mediabunny](https://mediabunny.dev) 做容器解封装与封装。没有需要下载的 wasm 运行时：第一次转换就能开始，编解码可硬件加速，抽帧时间点精确。
 
-wasm 核心约 31 MB，因此**绝不进 bundle**：`pnpm ffmpeg:fetch` 会把它下载到 `public/ffmpeg/<版本>/`（已 gitignore，构建时原样复制进 `dist/`），仅在真正走兜底路径时才按需拉取。`predev`/`prebuild` 会自动触发下载（离线时软失败）。
+**为什么不再有 ffmpeg.wasm。** 公开发布的 `@ffmpeg/core-mt` 是 GPL 构建（`--enable-gpl --enable-libx264 --enable-libx265`），随包分发就等于给每一个商业构建套上 GPL 的源码开放义务。因此它被移除，而不是留作兜底。代价说清楚：少数老旧编码与容器不再支持，这类文件会明确报错，而不是静默降级。输出格式完全取决于浏览器提供的编码器 —— Chrome 只带 AAC 与 Opus，因此 MP3、FLAC 两个目标会在下拉框里标为不可用，而不是让用户点完才失败。详见 `plan/license-audit.md`。
 
-多线程 ffmpeg.wasm 依赖 `SharedArrayBuffer`，需要跨域隔离，因此 `vercel.json`、`public/_headers` 以及 Vite 的 dev/preview 服务器都发送 `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`。CSP 额外放开 `'wasm-unsafe-eval'`（编译 wasm）以及 `worker-src`、`img-src`、`media-src`、`connect-src` 的 `blob:`/`data:`（画布与 object URL 预览）。所有资源仍保持同源。
+由于不再需要 `SharedArrayBuffer`，站点**不再做跨域隔离** —— `vercel.json`、`public/_headers` 与 Vite dev/preview 里的 `COOP`/`COEP` 已删除。CSP 仍保留 `'wasm-unsafe-eval'`（站内 wasm 模块，如代码高亮）以及 `worker-src`、`img-src`、`media-src`、`connect-src` 的 `blob:`/`data:`（画布与 object URL 预览）。所有资源仍保持同源。
+
+---
+
+## 多语言与 SEO（两条语言树）
+
+界面支持 9 种语言，但**只有 en 与 zh 拥有独立 URL**：
+
+| 路径                                        | 语言     | `<html lang>` |
+| ------------------------------------------- | -------- | ------------- |
+| `/`、`/tools/<id>/`、`/pricing/` …          | 英文     | `en`          |
+| `/zh/`、`/zh/tools/<id>/`、`/zh/pricing/` … | 简体中文 | `zh-CN`       |
+
+**为什么必须这么做。** 整站原先只有一条 URL 前缀，`<html lang>`、`title` 与 `description` 全部写死成简体中文 —— 于是 Bing / Google 抓到的唯一结论是「这是一个中文站」，9 种界面语言对搜索引擎等于不存在。给 9 种语言各建 159 条路径（1400 多个页面）换不来同等收益，因此只给两个主要语言建路径，其余 7 种继续靠客户端切换。
+
+- 预渲染（`scripts/prerender.ts`）把两棵树都写入 `dist/`，每条页面带自己的 `title` / `description` / `og:locale` / JSON-LD `inLanguage`
+- 每条页面有 `hreflang` 三向互指（`en` / `zh-CN` / `x-default`），`sitemap.xml` 里每条 URL 也带 `xhtml:link` alternates
+- 站内链接由 `core/components/LocaleLink.tsx` 与 `useLocalizedPath()` 自动补前缀，漏写一处就等于把用户甩回另一种语言
+- `core/seo/meta.ts` 在路由或语言变化时同步 `<html lang>`、`meta description`、`og:locale`、`canonical` 与 hreflang —— 这既是无障碍要求（屏幕阅读器与字体 fallback 依赖 `lang`），也避免 head 与页面内容自相矛盾
+- SEO 文案集中在 `core/seo/copy.ts`（运行期）与 `core/seo/sections.ts`（只给预渲染的正文小节），后者不进首屏包
+- 语言由路径决定：`/zh/…` 一律中文；无前缀路径按「用户显式选择 → 系统/浏览器检测 → 英文」解析。**不做**按 `navigator.language` 的自动重定向 —— 那种做法对爬虫接近「隐藏内容」，是 Google 明确警告过的 cloaking 模式
 
 ---
 
 ## 部署
 
-构建产物为 `dist/` 下的静态 SPA。`pnpm build` 还会把首页与全部工具页预渲染为静态 HTML（`scripts/prerender.ts`），并生成 `sitemap.xml`、`robots.txt` 与 `404.html`，让搜索引擎首次抓取即拿到真实内容。
+构建产物为 `dist/` 下的静态 SPA。`pnpm build` 还会把首页、全部工具页与静态页按 **en / zh 两种语言**预渲染为静态 HTML（共 318 个页面，`scripts/prerender.ts`），并生成带 `hreflang` alternates 的 `sitemap.xml`、`robots.txt` 与 `404.html`，让搜索引擎首次抓取即拿到真实内容。
 
 **Vercel** — `vercel.json` 已配置 `buildCommand`、`outputDirectory`、SPA 重写与安全响应头（`BASE_PATH` 默认为 `/`）。
 
-**Cloudflare Pages** — Pages 拒绝部署任何超过 25 MiB 的单文件，而 `ffmpeg-core.wasm` 有 31.2 MB。用 `pnpm build:cf`（即 `FFMPEG_PAGES=1`）构建：获取脚本只发布 `ffmpeg-core.wasm.gz`（约 9.8 MB）并删除产物中的原始 wasm。运行时**仅当某个工具真的回退到 ffmpeg 时**才下载这份副本，用 `DecompressionStream`（不可用时回退 pako）解压，再以同源 `blob:` URL 交给 `@ffmpeg/ffmpeg` —— 不引入第三方域，也不需要放宽 CSP；首屏与其它工具完全不受影响。`pnpm size` 会在任一资源越过 25 MiB 线时直接失败。
+**Cloudflare Pages** — 用 `pnpm build:cf` 构建，与普通构建的唯一差别是构建期注入埋点端点。移除 ffmpeg 核心后，产物里已没有任何文件接近 Pages 单文件 25 MiB 的上限。
 
 **其他托管** — 托管 `dist/`，将未知路径重写到 `index.html`，并对带 hash 的 `/assets/*` 做长缓存。若部署到 GitHub 项目站子路径，可用 `pnpm build:pages`（设置 `BASE_PATH=/syntools/`）。
 
 ```bash
 pnpm build
-pnpm build:cf   # Cloudflare Pages：只发布 gzip 版 ffmpeg 核心
+pnpm build:cf   # Cloudflare Pages：同一产物 + 埋点端点
 pnpm preview    # 可选：本地预览
 ```
 

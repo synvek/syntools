@@ -5,8 +5,8 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 const jaTools = {
   tools: {
     'video-convert': {
-      formats:
-        '対応形式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS（非対応時は ffmpeg.wasm にフォールバック）',
+      unsupportedOption: '（このブラウザでは非対応）',
+      formats: '対応形式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS',
       target: '出力形式',
       quality: '画質',
       qualities: {
@@ -18,29 +18,23 @@ const jaTools = {
       trimStart: '開始 (s)',
       trimEnd: '終了 (s)',
       dropHint: '動画ファイルをドロップして変換',
-      engines: 'エンジン：WebCodecs {{webcodecs}}、ffmpeg.wasm {{ffmpeg}}',
-      available: '利用可',
-      unavailable: '利用不可',
       probe: '長さ {{duration}} · {{size}} · 映像 {{video}} / 音声 {{audio}}',
       convert: '変換開始',
       converting: '変換中…',
       cancel: 'キャンセル',
       progress: '処理中 {{percent}}%',
       download: '{{name}} をダウンロード',
-      usedEngine: '使用エンジン：{{engine}}',
       errors: {
         INVALID_TARGET: '未対応の出力形式です',
         INVALID_QUALITY: '画質パラメータが無効です',
         INVALID_TRIM: '切り出し範囲が無効（終了は開始より後）',
         PROBE_FAILED: 'メディア情報を読み取れません',
-        WEBCodecs_VIDEO_MISSING: 'WebCodecs 映像が使えず、ffmpeg.wasm も準備できていません',
-        WEBCodecs_AUDIO_MISSING: 'WebCodecs 音声が使えず、ffmpeg.wasm も準備できていません',
+        WEBCodecs_VIDEO_MISSING:
+          'このブラウザは WebCodecs の映像コーデックに対応していません（Chrome / Edge 94+ または Safari 16.4+ が必要）',
+        WEBCodecs_AUDIO_MISSING:
+          'このブラウザは WebCodecs の音声コーデックに対応していません（Chrome / Edge 94+ または Safari 16.4+ が必要）',
         NO_ENCODABLE_CODEC: '利用可能なエンコーダがありません',
         WEBCodecs_FAILED: 'WebCodecs の処理に失敗',
-        UNSUPPORTED: 'この環境では ffmpeg.wasm を利用できません',
-        NEED_ISOLATION: 'マルチスレッド ffmpeg.wasm には COOP/COEP による分離が必要です',
-        LOAD_FAILED: 'ffmpeg.wasm コアの読み込みに失敗',
-        EXEC_FAILED: 'ffmpeg の実行に失敗',
         OUTPUT_MISSING: '出力ファイルが生成されませんでした',
         CONVERT_FAILED: '変換に失敗しました',
       },
@@ -63,6 +57,7 @@ const jaTools = {
       },
     },
     'audio-convert': {
+      unsupportedOption: '（このブラウザでは非対応）',
       formats: '対応形式：WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF',
       target: '出力形式',
       quality: '音質',
@@ -75,7 +70,6 @@ const jaTools = {
       cancel: 'キャンセル',
       progress: '処理中 {{percent}}%',
       download: 'ダウンロード',
-      usedEngine: '使用エンジン：{{engine}}',
       sampleRate: 'サンプルレート',
       channels: 'チャンネル',
       bitDepth: 'ビット深度',
@@ -87,6 +81,9 @@ const jaTools = {
       info: '{{rate}} Hz · {{channels}} ch · {{bitDepth}} bit · {{duration}} 秒',
       downloadWav: 'WAV をダウンロード',
       errors: {
+        FAILED: '変換に失敗しました',
+        WEBCodecs_AUDIO_MISSING:
+          'このブラウザは WebCodecs の音声コーデックに対応していません（Chrome / Edge 94+ または Safari 16.4+ が必要）',
         DECODE: '音声のデコードに失敗（非対応形式？）',
       },
     },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { track } from '@/core/analytics';
 import { tools } from '@/core/registry';
 import {
@@ -65,7 +65,7 @@ const zh: AboutCopy = {
   techTitle: '技术形态',
   techItems: [
     'React + TypeScript + Vite，构建为纯静态站点，可托管在任何静态服务器；桌面端用 Tauri 打包，体积小、内存占用低。',
-    '文档与图像处理在本机完成：PDF 解析用 pdfjs-dist，表格用 Univer，编解码与压缩用 Canvas / WebAssembly，音视频用 ffmpeg.wasm。',
+    '文档与图像处理在本机完成：PDF 解析用 pdfjs-dist，表格用 Univer，编解码与压缩用 Canvas / WebAssembly，音视频用浏览器原生的 WebCodecs。',
     '全部资源同源分发，不依赖任何 CDN，因此可以完全离线运行 —— 这也是服务器版（社区版与企业版）能成立的技术基础。',
   ],
   note: '想直接看它能不能用？随便打开一个工具试一下，不需要注册。',
@@ -107,7 +107,7 @@ const en: AboutCopy = {
   techTitle: 'Under the hood',
   techItems: [
     'React + TypeScript + Vite, built as a static site that any static server can host; the desktop build uses Tauri for a small footprint.',
-    'Document and image work happens locally: pdfjs-dist for PDF parsing, Univer for spreadsheets, Canvas / WebAssembly for codecs and compression, ffmpeg.wasm for media.',
+    'Document and image work happens locally: pdfjs-dist for PDF parsing, Univer for spreadsheets, Canvas / WebAssembly for codecs and compression, and the browser-native WebCodecs API for audio and video.',
     'All assets are served from this origin with no CDN dependency, which is what allows genuinely offline operation — and, in turn, the server editions.',
   ],
   note: 'Want to see whether it actually works? Open any tool — no signup required.',
@@ -149,7 +149,7 @@ const ja: AboutCopy = {
   techTitle: '技術構成',
   techItems: [
     'React + TypeScript + Vite で構築した純静的サイト。任意の静的サーバーに置けます。デスクトップ版は Tauri 製で軽量です。',
-    '文書と画像の処理は端末内で完結します。PDF 解析は pdfjs-dist、表計算は Univer、エンコードと圧縮は Canvas / WebAssembly、メディアは ffmpeg.wasm。',
+    '文書と画像の処理は端末内で完結します。PDF 解析は pdfjs-dist、表計算は Univer、エンコードと圧縮は Canvas / WebAssembly、音声・動画はブラウザ標準の WebCodecs を使用します。',
     'すべての資産を同一オリジンから配信し、CDN に依存しないため完全オフラインで動作します。サーバー版（コミュニティ／エンタープライズ）が成立する技術的な土台です。',
   ],
   note: 'まず試したい場合は、任意のツールを開くだけです。登録は不要です。',
@@ -170,9 +170,8 @@ export function AboutPage() {
   const vars = useMemo(() => ({ n: tools.length }), []);
 
   useEffect(() => {
-    document.title = `${c.title} · SynTools`;
     track('page_view', { page: 'about' });
-  }, [c.title]);
+  }, [lang]);
 
   return (
     <PageShell title={c.title} lead={fill(c.lead, vars)}>

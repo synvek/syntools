@@ -143,8 +143,7 @@ const es = {
     },
     'video-convert': {
       name: 'Convertidor de vídeo',
-      description:
-        'Transcodificación WebCodecs primero (MP4 / WebM / MKV) con fallback a ffmpeg.wasm',
+      description: 'Transcodificación de vídeo con WebCodecs (MP4 / WebM / MKV), todo en local',
     },
     'video-to-gif': {
       name: 'Vídeo a GIF',
@@ -152,8 +151,7 @@ const es = {
     },
     'audio-convert': {
       name: 'Convertidor de audio',
-      description:
-        'Conversión de audio: WAV (nativo) y MP3 / M4A / OGG / FLAC (WebCodecs primero, fallback ffmpeg.wasm)',
+      description: 'Conversión de audio: WAV (nativo) y MP3 / M4A / OGG / FLAC (WebCodecs)',
     },
     'subtitle-tool': {
       name: 'Conversor de subtítulos',

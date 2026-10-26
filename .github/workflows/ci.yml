@@ -66,6 +66,44 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Resolved -> build=${BUILD} tag=${TAG} channel=${CHANNEL}"
 
+  # 依赖许可门禁（npm + Rust）。独立成 job：不阻塞 6 个平台的桌面构建矩阵，
+  # 且失败信息一眼可见 —— 许可问题必须先于打包解决。
+  licenses:
+    name: license gate (npm + cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: License gate (npm, prod + dev)
+        run: pnpm license:check
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: cargo-deny
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      # cargo-deny 只解析依赖图，不编译；白名单见 src-tauri/deny.toml
+      - name: License gate (Rust, cargo-deny)
+        run: pnpm license:check:rust
+
   ci:
     name: lint + typecheck + test + build + e2e
     needs: version
@@ -82,6 +120,11 @@ jobs:
 
       - name: install dependencies
         run: pnpm install --frozen-lockfile
+
+      # 许可门禁：出现 GPL / AGPL / SSPL 等强 copyleft 组件直接失败。
+      # 这条必须在构建前跑 —— 组件一旦进了产物，事后清理的成本远高于拦住它。
+      - name: License gate (npm)
+        run: pnpm license:check
 
       - name: Code linting (ESLint)
         run: pnpm lint
@@ -218,8 +261,9 @@ jobs:
     name: publish (${{ needs.version.outputs.channel }})
     runs-on: ubuntu-latest
     # 临时放开：publish 不再依赖 ci（lint + typecheck + test + e2e），
-    # 仅依赖 tauri 桌面包与 version 解析。后续恢复时把 ci 加回即可。
-    needs: [tauri, version]
+    # 仅依赖 tauri 桌面包、version 解析与 licenses（许可门禁）。
+    # 许可不合格的产物不允许发布，因此 licenses 必须留在依赖里。
+    needs: [tauri, version, licenses]
     steps:
       - name: Checkout (full history for tags)
         uses: actions/checkout@v4

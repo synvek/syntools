@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { Trans, useTranslation } from 'react-i18next';
 import type { ToolMeta } from '@/core/types';
 import { tools, toolMap } from '@/core/registry';
@@ -63,10 +62,6 @@ export function HomePage() {
   const { t } = useTranslation();
   const recentIds = useHistoryStore((s) => s.recent);
   const favoriteIds = useHistoryStore((s) => s.favorites);
-
-  useEffect(() => {
-    document.title = t('app.docTitle');
-  }, [t]);
 
   const recent = recentIds.map((id) => toolMap.get(id)).filter((t): t is ToolMeta => Boolean(t));
   const favorites = favoriteIds

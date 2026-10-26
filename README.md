@@ -69,7 +69,7 @@ SynTools started as a developer toolbox, but it is no longer developer-only:
 | PDF                  | Merge, split, rotate, encrypt/decrypt, compress, extract text, watermark, annotate, to/from image, page numbers, sign                                                                                                                                                                                                                           |
 | Network              | IP calculator (VLSM), CIDR, MAC, URL parser, UA parser/generator, HTTP headers/request, WebSocket tester, random port                                                                                                                                                                                                                           |
 | File                 | ZIP create/extract, file split/merge, bulk rename                                                                                                                                                                                                                                                                                               |
-| Media                | Video / audio transcoding (WebCodecs-first, ffmpeg.wasm fallback), video→GIF, subtitle (SRT/WebVTT) converter                                                                                                                                                                                                                                   |
+| Media                | Video / audio transcoding (WebCodecs + Mediabunny), video→GIF, subtitle (SRT/WebVTT) converter                                                                                                                                                                                                                                                  |
 | Cheatsheet           | HTTP status codes, MIME types, Git commands                                                                                                                                                                                                                                                                                                     |
 | Other                | Calculator, unit converter, loan/tax calculator, MBTI, AI prompts, Mermaid, chart generator, …                                                                                                                                                                                                                                                  |
 
@@ -225,37 +225,56 @@ After registration, `/tools/<id>`, the sidebar group, home cards, and ⌘K searc
 
 | Metric                       | Budget                                                             |
 | ---------------------------- | ------------------------------------------------------------------ |
-| First-screen entry (gzip)    | ≤ 175 KB (shell + `toolsMeta` only; per-tool copy loads on demand) |
+| First-screen entry (gzip)    | ≤ 195 KB (shell + `toolsMeta` only; per-tool copy loads on demand) |
 | Individual lazy chunk (gzip) | ≤ 500 KB (heavy deps such as Univer / exceljs ≤ 2 MB)              |
-| Static asset (not bundled)   | ≤ 40 MB (self-hosted `ffmpeg.wasm` core, fetched on demand)        |
 
 Enforced by `pnpm size` (`scripts/check-bundle-size.mjs`). Tools must use `component: () => import(...)` so they stay out of the initial bundle — heavy third-party dependencies belong in a tool's own async chunk (for example the photo editor's PSD writer loads `ag-psd` only when you export). Prefer the built-in `Icon` component over icon libraries.
 
 **Locale loading is two-stage.** Each language is split into a shell (`locales/<lang>.ts`: navigation, home, search plus `toolsMeta.*`) and a per-tool copy bundle (`locales/<lang>.tools.ts`: the `tools.*` namespace, ~82% of the locale). `zh`/`en` shells ship with the first screen; every `tools.*` bundle is fetched when a tool page opens, in parallel with that tool's own chunk. The home page and the tool-less shell therefore never pay for the UI copy of 152 tools — and a tool page still renders fully translated on first paint.
 
-### Media engine (WebCodecs-first, ffmpeg.wasm fallback)
+### Media engine (WebCodecs + Mediabunny)
 
-Audio/video tools (`video-convert`, `audio-convert`, `video-to-gif`) prefer the browser-native **WebCodecs** API through [Mediabunny](https://mediabunny.dev) — zero download, hardware-accelerated, with precise frame access. When WebCodecs cannot handle a container/codec, they fall back to **ffmpeg.wasm** (`@ffmpeg/core-mt`, multi-threaded).
+Audio/video tools (`video-convert`, `audio-convert`, `video-to-gif`) use the browser-native **WebCodecs** API for codecs and [Mediabunny](https://mediabunny.dev) for container demux/mux. There is no wasm runtime to download: the first conversion starts immediately, decoding and encoding can be hardware-accelerated, and frame access is exact.
 
-Because the wasm core is ~31 MB it is **never bundled**: `pnpm ffmpeg:fetch` downloads it into `public/ffmpeg/<version>/` (git-ignored, copied verbatim into `dist/`), and it is fetched only when a fallback actually runs. `predev`/`prebuild` invoke the fetch automatically (fail-soft offline).
+**Why there is no ffmpeg.wasm.** The published `@ffmpeg/core-mt` is a GPL build (`--enable-gpl --enable-libx264 --enable-libx265`), so shipping it would put the GPL's source-disclosure obligation on every commercial build. It was removed rather than kept as a fallback. The trade-off is explicit: a few legacy codecs and containers are no longer supported, and those files now fail with a clear message instead of silently degrading. Output formats follow the encoders the browser actually ships — Chrome provides AAC and Opus only, so the MP3 and FLAC targets are shown as unavailable instead of failing after the fact. See `plan/license-audit.md`.
 
-Multi-threaded ffmpeg.wasm needs `SharedArrayBuffer`, which requires cross-origin isolation — that is why `vercel.json`, `public/_headers` and Vite's dev/preview server all send `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`. The CSP also allows `'wasm-unsafe-eval'` (compiling wasm) plus `blob:`/`data:` for `worker-src`, `img-src`, `media-src` and `connect-src` (canvas/object-URL previews). Everything stays same-origin.
+Because no runtime needs `SharedArrayBuffer`, the site is **no longer cross-origin isolated** — `COOP`/`COEP` were dropped from `vercel.json`, `public/_headers` and the Vite dev/preview server. The CSP still allows `'wasm-unsafe-eval'` (in-tree wasm modules such as the syntax highlighter) plus `blob:`/`data:` for `worker-src`, `img-src`, `media-src` and `connect-src` (canvas/object-URL previews). Everything stays same-origin.
+
+---
+
+## Locales and SEO (two language trees)
+
+The UI ships 9 languages, but **only en and zh have their own URLs**:
+
+| Path                                        | Language           | `<html lang>` |
+| ------------------------------------------- | ------------------ | ------------- |
+| `/`, `/tools/<id>/`, `/pricing/` …          | English            | `en`          |
+| `/zh/`, `/zh/tools/<id>/`, `/zh/pricing/` … | Simplified Chinese | `zh-CN`       |
+
+**Why this is necessary.** The site used to have a single URL prefix with `<html lang>`, `title` and `description` hard-coded to Simplified Chinese — so the only conclusion Bing and Google could reach was "this is a Chinese site", and the 9 UI languages simply did not exist for search engines. Giving all 9 languages 159 paths each (1,400+ pages) does not pay for itself, so only the two largest are routed; the other 7 stay client-side.
+
+- Prerendering (`scripts/prerender.ts`) writes both trees into `dist/`, each page carrying its own `title` / `description` / `og:locale` / JSON-LD `inLanguage`
+- Every page declares `hreflang` three ways (`en` / `zh-CN` / `x-default`), and `sitemap.xml` repeats the alternates as `xhtml:link` entries
+- Internal links get their prefix automatically via `core/components/LocaleLink.tsx` and `useLocalizedPath()` — missing one means throwing the visitor back into the other language
+- `core/seo/meta.ts` keeps `<html lang>`, `meta description`, `og:locale`, `canonical` and hreflang in step with the route and language. That is an accessibility requirement first (screen readers and font fallback depend on `lang`) and a consistency one second
+- SEO copy lives in `core/seo/copy.ts` (runtime) and `core/seo/sections.ts` (prerender-only body sections); the latter never enters the first-screen bundle
+- Language is decided by the path: `/zh/…` is always Chinese; unprefixed paths resolve as "explicit user choice → OS/browser detection → English". There is deliberately **no** redirect on `navigator.language` — that is close to hiding content from crawlers, the cloaking pattern Google warns about
 
 ---
 
 ## Deployment
 
-The build output is a static SPA in `dist/`. `pnpm build` also prerenders the home page and every tool page to static HTML (`scripts/prerender.ts`) and emits `sitemap.xml`, `robots.txt` and `404.html`, so crawlers get real content on first load.
+The build output is a static SPA in `dist/`. `pnpm build` also prerenders the home page, every tool page and the static pages in **both en and zh** (318 pages; `scripts/prerender.ts`), and emits `sitemap.xml` with `hreflang` alternates, `robots.txt` and `404.html`, so crawlers get real content on first load.
 
 **Vercel** — `vercel.json` already defines `buildCommand`, `outputDirectory`, SPA rewrites, and security headers (`BASE_PATH` defaults to `/`).
 
-**Cloudflare Pages** — Pages rejects any single asset above 25 MiB, and `ffmpeg-core.wasm` is 31.2 MB. Build with `pnpm build:cf` (`FFMPEG_PAGES=1`): the fetch script then publishes only `ffmpeg-core.wasm.gz` (~9.8 MB) and removes the raw wasm from the output. At runtime that copy is downloaded **only when a tool actually falls back to ffmpeg**, inflated with `DecompressionStream` (pako as fallback) and handed to `@ffmpeg/ffmpeg` as a same-origin `blob:` URL — no third-party domain and no CSP change. First screen and every other tool stay untouched. `pnpm size` fails if any asset crosses the 25 MiB line.
+**Cloudflare Pages** — build with `pnpm build:cf`; the only difference from a plain build is that the analytics endpoint is injected at build time. No asset comes near Pages' 25 MiB per-file limit any more, because the ffmpeg core is gone.
 
 **Other hosts** — serve `dist/`, rewrite unknown paths to `index.html`, and cache hashed `/assets/*` aggressively. For GitHub project pages under a subpath, build with `pnpm build:pages` (sets `BASE_PATH=/syntools/`).
 
 ```bash
 pnpm build
-pnpm build:cf   # Cloudflare Pages: gzip-only ffmpeg core
+pnpm build:cf   # Cloudflare Pages: same build + analytics endpoint
 pnpm preview    # optional local check
 ```
 

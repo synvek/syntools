@@ -1,6 +1,6 @@
 [package]
 name = "syntools"
-version = "0.8.1"
+version = "0.8.3"
 description = "SynTools — privacy-first developer toolbox"
 authors = ["synvek"]
 license = "AGPL-3.0-only"

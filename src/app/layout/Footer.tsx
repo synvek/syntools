@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { GITHUB_ISSUES_URL, GITHUB_REPO_URL, pickCopy, usePageLang } from '@/app/marketing/copy';
 import type { PageLang } from '@/app/marketing/copy';
 

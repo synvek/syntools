@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from '@/core/components/LocaleLink';
 import { useTranslation } from 'react-i18next';
 import { toolMap } from '@/core/registry';
 import { Icon } from '@/core/components/Icon';
@@ -7,12 +7,16 @@ import { getToolMeta } from '@/core/i18n/helpers';
 /** 结果完成后的「下一步」chips（U5） */
 export function PdfNextSteps({ toolIds }: { toolIds: string[] }) {
   const { t } = useTranslation();
-  const items = toolIds.map((id) => toolMap.get(id)).filter((x): x is NonNullable<typeof x> => Boolean(x));
+  const items = toolIds
+    .map((id) => toolMap.get(id))
+    .filter((x): x is NonNullable<typeof x> => Boolean(x));
   if (items.length === 0) return null;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900/50">
-      <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">{t('tool.nextSteps')}</p>
+      <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+        {t('tool.nextSteps')}
+      </p>
       <ul className="flex flex-wrap gap-2">
         {items.map((item) => {
           const { name } = getToolMeta(item);

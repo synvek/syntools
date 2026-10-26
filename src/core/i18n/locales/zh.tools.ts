@@ -3,7 +3,8 @@
 const zhTools = {
   tools: {
     'video-convert': {
-      formats: '支持格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS（不支持时自动回退 ffmpeg.wasm）',
+      unsupportedOption: '（浏览器不支持）',
+      formats: '支持格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS',
       target: '目标格式',
       quality: '画质',
       qualities: {
@@ -15,29 +16,23 @@ const zhTools = {
       trimStart: '起始 (s)',
       trimEnd: '结束 (s)',
       dropHint: '拖入视频文件以转码',
-      engines: '引擎：WebCodecs {{webcodecs}}，ffmpeg.wasm {{ffmpeg}}',
-      available: '可用',
-      unavailable: '不可用',
       probe: '时长 {{duration}} · {{size}} · 视频 {{video}} / 音频 {{audio}}',
       convert: '开始转码',
       converting: '转码中…',
       cancel: '取消',
       progress: '处理中 {{percent}}%',
       download: '下载 {{name}}',
-      usedEngine: '使用引擎：{{engine}}',
       errors: {
         INVALID_TARGET: '目标格式不受支持',
         INVALID_QUALITY: '画质参数无效',
         INVALID_TRIM: '裁剪区间无效（结束需大于开始）',
         PROBE_FAILED: '无法读取媒体信息',
-        WEBCodecs_VIDEO_MISSING: '浏览器不支持 WebCodecs 视频编解码，且 ffmpeg.wasm 不可用',
-        WEBCodecs_AUDIO_MISSING: '浏览器不支持 WebCodecs 音频编解码，且 ffmpeg.wasm 不可用',
+        WEBCodecs_VIDEO_MISSING:
+          '当前浏览器不支持 WebCodecs 视频编解码（需要 Chrome / Edge 94+ 或 Safari 16.4+）',
+        WEBCodecs_AUDIO_MISSING:
+          '当前浏览器不支持 WebCodecs 音频编解码（需要 Chrome / Edge 94+ 或 Safari 16.4+）',
         NO_ENCODABLE_CODEC: '找不到可用的编码器',
         WEBCodecs_FAILED: 'WebCodecs 处理失败',
-        UNSUPPORTED: '当前环境不支持 ffmpeg.wasm',
-        NEED_ISOLATION: '需要跨域隔离（COOP/COEP）才能启用多线程 ffmpeg.wasm',
-        LOAD_FAILED: 'ffmpeg.wasm 核心加载失败',
-        EXEC_FAILED: 'ffmpeg 执行失败',
         OUTPUT_MISSING: '未生成输出文件',
         CONVERT_FAILED: '转换失败',
       },
@@ -60,6 +55,7 @@ const zhTools = {
       },
     },
     'audio-convert': {
+      unsupportedOption: '（浏览器不支持）',
       formats: '支持格式：WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF',
       target: '目标格式',
       quality: '音质',
@@ -72,7 +68,6 @@ const zhTools = {
       cancel: '取消',
       progress: '处理中 {{percent}}%',
       download: '下载',
-      usedEngine: '使用引擎：{{engine}}',
       sampleRate: '采样率',
       channels: '声道',
       bitDepth: '位深',
@@ -84,6 +79,9 @@ const zhTools = {
       info: '{{rate}} Hz · {{channels}} 声道 · {{bitDepth}} bit · {{duration}} 秒',
       downloadWav: '下载 WAV',
       errors: {
+        FAILED: '转换失败',
+        WEBCodecs_AUDIO_MISSING:
+          '当前浏览器不支持 WebCodecs 音频编解码（需要 Chrome / Edge 94+ 或 Safari 16.4+）',
         DECODE: '音频解码失败（格式可能不受支持）',
       },
     },

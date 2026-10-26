@@ -65,9 +65,8 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
   }, [lang, tool, stringsReady]);
 
   useEffect(() => {
-    document.title = `${name} · SynTools`;
     recordUse(tool.id);
-  }, [tool, recordUse, name]);
+  }, [tool, recordUse]);
 
   // 埋点：打开与停留时长（未配置端点时为空操作，零网络请求）
   useEffect(() => {

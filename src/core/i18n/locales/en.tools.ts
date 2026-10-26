@@ -5,8 +5,8 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 const enTools = {
   tools: {
     'video-convert': {
-      formats:
-        'Supported: MP4 / MOV / WebM / MKV / AVI / MPEG-TS (falls back to ffmpeg.wasm when needed)',
+      unsupportedOption: '(unsupported here)',
+      formats: 'Supported: MP4 / MOV / WebM / MKV / AVI / MPEG-TS',
       target: 'Target format',
       quality: 'Quality',
       qualities: {
@@ -18,30 +18,23 @@ const enTools = {
       trimStart: 'Start (s)',
       trimEnd: 'End (s)',
       dropHint: 'Drop a video file to transcode',
-      engines: 'Engines: WebCodecs {{webcodecs}}, ffmpeg.wasm {{ffmpeg}}',
-      available: 'available',
-      unavailable: 'unavailable',
       probe: '{{duration}} · {{size}} · video {{video}} / audio {{audio}}',
       convert: 'Convert',
       converting: 'Converting…',
       cancel: 'Cancel',
       progress: 'Processing {{percent}}%',
       download: 'Download {{name}}',
-      usedEngine: 'Engine: {{engine}}',
       errors: {
         INVALID_TARGET: 'Unsupported target format',
         INVALID_QUALITY: 'Invalid quality',
         INVALID_TRIM: 'Invalid trim range (end must be after start)',
         PROBE_FAILED: 'Cannot read media info',
-        WEBCodecs_VIDEO_MISSING: 'WebCodecs video is unavailable and ffmpeg.wasm is not ready',
-        WEBCodecs_AUDIO_MISSING: 'WebCodecs audio is unavailable and ffmpeg.wasm is not ready',
+        WEBCodecs_VIDEO_MISSING:
+          'This browser does not support WebCodecs video (Chrome / Edge 94+ or Safari 16.4+ required)',
+        WEBCodecs_AUDIO_MISSING:
+          'This browser does not support WebCodecs audio (Chrome / Edge 94+ or Safari 16.4+ required)',
         NO_ENCODABLE_CODEC: 'No usable encoder found',
         WEBCodecs_FAILED: 'WebCodecs processing failed',
-        UNSUPPORTED: 'ffmpeg.wasm is not supported here',
-        NEED_ISOLATION:
-          'Cross-origin isolation (COOP/COEP) is required for multi-threaded ffmpeg.wasm',
-        LOAD_FAILED: 'Failed to load ffmpeg.wasm core',
-        EXEC_FAILED: 'ffmpeg execution failed',
         OUTPUT_MISSING: 'No output file produced',
         CONVERT_FAILED: 'Conversion failed',
       },
@@ -64,6 +57,7 @@ const enTools = {
       },
     },
     'audio-convert': {
+      unsupportedOption: '(unsupported here)',
       formats: 'Supported: WAV / MP3 / M4A / AAC / OGG / Opus / FLAC / WMA / AIFF',
       target: 'Target format',
       quality: 'Quality',
@@ -76,7 +70,6 @@ const enTools = {
       cancel: 'Cancel',
       progress: 'Processing {{percent}}%',
       download: 'Download',
-      usedEngine: 'Engine: {{engine}}',
       sampleRate: 'Sample rate',
       channels: 'Channels',
       bitDepth: 'Bit depth',
@@ -88,6 +81,9 @@ const enTools = {
       info: '{{rate}} Hz · {{channels}} ch · {{bitDepth}} bit · {{duration}}s',
       downloadWav: 'Download WAV',
       errors: {
+        FAILED: 'Conversion failed',
+        WEBCodecs_AUDIO_MISSING:
+          'This browser does not support WebCodecs audio (Chrome / Edge 94+ or Safari 16.4+ required)',
         DECODE: 'Audio decoding failed (unsupported format?)',
       },
     },
