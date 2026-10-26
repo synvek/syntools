@@ -16,7 +16,18 @@ import { i18n } from '@/core/i18n';
  * 把 JSON body 追加写入 Workers Analytics Engine 或 KV，再导出周报。
  */
 
-type EventName = 'tool_open' | 'tool_duration' | 'tool_error' | 'download_click' | 'search_use';
+type EventName =
+  | 'tool_open'
+  | 'tool_duration'
+  | 'tool_error'
+  | 'download_click'
+  | 'search_use'
+  /** 页面浏览（仅营销/信任页，用于判断定价页是否被真实打开） */
+  | 'page_view'
+  /** 定价页浏览：与 page_view 分开，转化率只看这一个分母 */
+  | 'pricing_view'
+  /** 商务询价点击：从定价页或安全页发起的联系动作 */
+  | 'inquiry_click';
 
 interface QueuedEvent {
   /** 事件名 */

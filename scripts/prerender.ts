@@ -51,14 +51,126 @@ interface StaticPage {
   path: string;
   title: string;
   description: string;
+  /**
+   * 正文骨架的小节。除了给爬虫可读内容，它也决定了「无 JS 首屏」看到什么：
+   * 定价与安全这两页是企业采购最先打开的页面，骨架里必须出现真实结论
+   * （多少钱、CSP 限制了什么），而不是一句「请开启 JavaScript」。
+   */
+  sections?: { heading: string; items: string[] }[];
 }
 
 const STATIC_PAGES: StaticPage[] = [
   {
     path: '/download/',
-    title: `下载桌面版 - ${SITE_NAME}`,
+    title: `下载桌面社区版 - ${SITE_NAME}`,
     description:
-      'SynTools 桌面版下载：macOS（Apple Silicon / Intel）、Windows（x64 / ARM64）、Linux（deb / rpm / AppImage）。安装后全功能离线可用，文件不出本机，无需联网、无需登录。',
+      'SynTools 桌面社区版下载：macOS（Apple Silicon / Intel）、Windows（x64 / ARM64）、Linux（deb / rpm / AppImage）。按 AGPL-3.0 免费授权，全功能离线可用，文件不出本机，无需联网、无需登录。',
+  },
+  {
+    path: '/pricing/',
+    title: `定价与商业许可 - ${SITE_NAME}`,
+    description:
+      'SynTools 定价：网页版全部工具永久免费且不限次数。桌面端与服务器端各有一个免费的社区版（AGPL-3.0）；桌面专业版与企业服务器版仍在规划中，价格与授权方式确定后公布。',
+    sections: [
+      {
+        heading: '网页版（免费）',
+        items: [
+          '全部工具不限次数使用，单文件处理无限制',
+          '无需注册、无需安装，文件在浏览器内处理且不上传',
+          '不加水印、不降精度、不设等待倒计时',
+        ],
+      },
+      {
+        heading: '桌面端：社区版（免费）与专业版（规划中）',
+        items: [
+          '社区版按 AGPL-3.0 提供：没有浏览器标签页内存上限，可完全离线运行',
+          '以源码或安装包形式提供，可自行构建与改动，内部自用不受开源义务约束',
+          '专业版的功能范围、授权方式与价格仍在规划中，确定后在定价页公布',
+        ],
+      },
+      {
+        heading: '服务器端：社区服务器版（免费）与企业服务器版（规划中）',
+        items: [
+          '同一份构建产物：纯静态站点，不需要数据库，也没有服务端进程',
+          '社区服务器版按 AGPL-3.0 提供：docker-compose 或任意静态服务器自助部署，无外部请求',
+          '企业服务器版的授权方式、维保条款与价格仍在规划中',
+        ],
+      },
+    ],
+  },
+  {
+    path: '/security/',
+    title: `安全与合规 - ${SITE_NAME}`,
+    description:
+      'SynTools 安全说明：纯静态、无上传接口、CSP 限制出站请求为同源、无第三方脚本与追踪、源码公开可离线审计。含依赖许可清单与采购常见问题，可直接用于技术评审。',
+    sections: [
+      {
+        heading: '数据在哪里处理',
+        items: [
+          '网页版没有上传接口，文件在浏览器内存中由 Canvas / WebAssembly / JavaScript 处理',
+          '处理文件期间不产生任何出站请求，可在开发者工具 Network 面板验证',
+        ],
+      },
+      {
+        heading: '内容安全策略限制了哪些能力',
+        items: [
+          "default-src 'self'：只允许加载本站资源",
+          "connect-src 'self'：网络请求只能回本站，第三方统计脚本无法工作",
+          "script-src 'self' 'wasm-unsafe-eval'：禁止内联脚本与 CDN 脚本",
+          'frame-ancestors none：不允许被任何站点用 iframe 嵌套',
+        ],
+      },
+      {
+        heading: '可自行审计',
+        items: [
+          '源码以 AGPL-3.0 公开，可克隆、审阅、离线构建',
+          '依赖锁定在 pnpm-lock.yaml，可生成 SBOM 核对版本与哈希',
+          '核心依赖为 MIT / Apache-2.0 / MPL-2.0，无 GPL 传染性依赖',
+        ],
+      },
+    ],
+  },
+  {
+    path: '/privacy/',
+    title: `隐私说明 - ${SITE_NAME}`,
+    description:
+      'SynTools 隐私说明：不收集文件内容、不需要账号、不使用追踪 Cookie、不加载第三方脚本。本机只保存界面设置、收藏与草稿；统计埋点默认关闭且不含任何输入内容。',
+    sections: [
+      {
+        heading: '你的文件',
+        items: ['不会被上传：没有上传接口，处理结果在本机生成', '文件名、内容与结果不进入任何日志'],
+      },
+      {
+        heading: '本机存储与统计',
+        items: [
+          'localStorage 只保存界面设置、收藏与最近使用、未保存草稿',
+          '统计埋点默认关闭；启用后只上报事件名、工具 id、耗时与界面语言',
+          '不使用 Cookie，不做设备指纹，DNT / GPC 生效时停止采集',
+        ],
+      },
+    ],
+  },
+  {
+    path: '/about/',
+    title: `关于 ${SITE_NAME}`,
+    description:
+      'SynTools 是一个纯前端的在线工具集：编码格式化、图片与照片编辑、PDF 处理、Word/Excel/PPT 浏览器编辑等，全部在本机运行，文件不上传。源码以 AGPL-3.0 公开，另提供商业许可。',
+    sections: [
+      {
+        heading: '这是什么',
+        items: [
+          '把日常零碎工具收拢到一个入口，统一搜索、收藏与最近使用',
+          '网页版为纯静态站点；桌面社区版与专业版是同一套界面的离线形态；服务器版把同一份构建产物部署到自有机器或内网',
+        ],
+      },
+      {
+        heading: '许可',
+        items: [
+          'AGPL-3.0-only 开源，可自由使用、修改与自建',
+          '闭源或内网场景可选择商业许可，免除 AGPL 义务',
+        ],
+      },
+    ],
   },
 ];
 
@@ -337,7 +449,7 @@ export function prerenderPlugin(): Plugin {
         );
       }
 
-      // 静态页：/download/ 等
+      // 静态页：/download/ /pricing/ /security/ /privacy/ /about/
       for (const page of STATIC_PAGES) {
         const file = resolvePath(distDir, `${page.path.replace(/^\/+|\/+$/g, '')}/index.html`);
         await mkdir(dirname(file), { recursive: true });
@@ -347,7 +459,7 @@ export function prerenderPlugin(): Plugin {
             title: page.title,
             description: page.description,
             path: page.path,
-            bodyHtml: `<h1>${escapeText(page.title.split(' - ')[0]!)}</h1><p class="seo-lead">${escapeText(page.description)}</p><p><a href="/">${escapeText(BRAND)} 在线版</a> · <a href="/#tools">全部 ${tools.length} 个工具</a></p>`,
+            bodyHtml: buildStaticBody(page, tools.length),
             ogImage: defaultOg,
           }),
           'utf-8',
@@ -435,8 +547,31 @@ function buildHomeBody(tools: PrerenderTool[]): string {
   ].join('');
 }
 
-/** 工具页正文骨架：说明 + 同分类内链 + 返回入口 */
-function buildToolBody(tool: PrerenderTool, related: PrerenderTool[]): string {
+/** 静态页正文骨架：标题 + 一句话说明 + 小节 + 站内互链 */
+function buildStaticBody(page: StaticPage, toolCount: number): string {
+  const sections = (page.sections ?? [])
+    .map(
+      (section) =>
+        `<h2>${escapeText(section.heading)}</h2><ul>${section.items
+          .map((item) => `<li>${escapeText(item)}</li>`)
+          .join('')}</ul>`,
+    )
+    .join('');
+  return [
+    `<h1>${escapeText(page.title.split(' - ')[0]!)}</h1>`,
+    `<p class="seo-lead">${escapeText(page.description)}</p>`,
+    sections,
+    `<p class="seo-note">${escapeText(BRAND)} 的全部工具默认在浏览器本地计算，文件与文本不会上传到服务器。</p>`,
+    `<p>${STATIC_PAGES.filter((p) => p.path !== page.path)
+      .map((p) => `<a href="${p.path}">${escapeText(p.title.split(' - ')[0]!)}</a>`)
+      .join(' · ')} · <a href="/">全部 ${toolCount} 个工具</a></p>`,
+  ].join('');
+}
+
+/** 工具页正文骨架：说明 + 同分类内链 + 返回入口 */ function buildToolBody(
+  tool: PrerenderTool,
+  related: PrerenderTool[],
+): string {
   const relatedHtml = related.length
     ? `<h2>同类工具</h2><ul>${related
         .map((t) => `<li><a href="/tools/${t.id}/">${escapeText(t.name)}</a></li>`)

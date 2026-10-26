@@ -14,6 +14,24 @@ const DownloadPage = lazy(() =>
   import('@/app/download/DownloadPage').then((mod) => ({ default: mod.DownloadPage })),
 );
 
+/**
+ * 营销与信任页（定价 / 安全 / 隐私 / 关于）同样懒加载：
+ * 它们是访问频次最低、文案最重的页面，没有任何理由占用首屏预算。
+ * 这四页同时由 scripts/prerender.ts 输出静态 HTML，爬虫与首访无 JS 也能读到全文。
+ */
+const PricingPage = lazy(() =>
+  import('@/app/marketing/PricingPage').then((mod) => ({ default: mod.PricingPage })),
+);
+const SecurityPage = lazy(() =>
+  import('@/app/marketing/SecurityPage').then((mod) => ({ default: mod.SecurityPage })),
+);
+const PrivacyPage = lazy(() =>
+  import('@/app/marketing/PrivacyPage').then((mod) => ({ default: mod.PrivacyPage })),
+);
+const AboutPage = lazy(() =>
+  import('@/app/marketing/AboutPage').then((mod) => ({ default: mod.AboutPage })),
+);
+
 /** Vite BASE_URL 恒以 / 结尾；React Router basename 需要有前导 /、无尾部 / */
 function routerBasename(): string | undefined {
   const base = import.meta.env.BASE_URL;
@@ -36,6 +54,38 @@ export const router = createBrowserRouter(
           element: (
             <Suspense fallback={null}>
               <DownloadPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'pricing',
+          element: (
+            <Suspense fallback={null}>
+              <PricingPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'security',
+          element: (
+            <Suspense fallback={null}>
+              <SecurityPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'privacy',
+          element: (
+            <Suspense fallback={null}>
+              <PrivacyPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'about',
+          element: (
+            <Suspense fallback={null}>
+              <AboutPage />
             </Suspense>
           ),
         },

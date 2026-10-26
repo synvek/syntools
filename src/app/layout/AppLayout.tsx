@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Header } from '@/app/layout/Header';
+import { Footer } from '@/app/layout/Footer';
 import { Sidebar } from '@/app/layout/Sidebar';
 import { Icon } from '@/core/components/Icon';
 import { SearchPalette } from '@/app/search/SearchPalette';
@@ -10,11 +11,18 @@ const SIDEBAR_COLLAPSED_KEY = 'syntools:sidebar-hidden.v1';
 
 export function AppLayout() {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1',
   );
+
+  /**
+   * 工具页不渲染页脚：照片编辑器、幻灯片、表格等按「首屏剩余高度」布局，
+   * 底部多一行会把画布压矮。营销与说明页需要页脚作为常驻入口（定价 / 安全 / 隐私）。
+   */
+  const showFooter = !pathname.startsWith('/tools/');
 
   const toggleSidebarCollapsed = () => {
     setSidebarCollapsed((prev) => {
@@ -63,6 +71,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      {showFooter && <Footer />}
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
