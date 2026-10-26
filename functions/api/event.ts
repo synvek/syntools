@@ -85,7 +85,21 @@ function sanitize(raw: RawEvent): { name: string; props: string; ms: number } | 
   return { name: raw.n, props, ms };
 }
 
-export async function onRequestPost(context: PagesContext): Promise<Response> {
+/**
+ * 单一入口：按方法分派。
+ *
+ * 之前同时导出 `onRequest` 与 `onRequestPost`，依赖 Pages 的路由优先级 ——
+ * 一旦优先级不符合预期，POST 会落到 405 分支，表现为「前端在发、后端收不到」。
+ * 合并成一个入口后行为是确定的，而且 GET 会稳定返回带 `Allow: POST` 的 405，
+ * 可以当作「函数是否真的部署上线」的探针（见下方 onRequest 注释）。
+ */
+export async function onRequest(context: PagesContext): Promise<Response> {
+  if (context.request.method !== 'POST') {
+    // 探针：线上 GET /api/event 返回 405 + allow: POST = 函数已部署；
+    // 返回 404 = 静态托管接管了该路径，说明 functions/ 没被构建（函数未上线）。
+    return new Response(null, { status: 405, headers: { allow: 'POST' } });
+  }
+
   const { request, env } = context;
 
   const declared = Number(request.headers.get('content-length') ?? '0');
@@ -130,9 +144,4 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
   }
 
   return empty(204);
-}
-
-/** 非 POST 一律拒绝，避免被当成可探测的开放端点 */
-export async function onRequest(): Promise<Response> {
-  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
 }

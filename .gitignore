@@ -53,6 +53,7 @@ src-tauri/target
 
 # Internal 
 plan/
+infra/
 findings.md
 task_plan.md
 progress.md

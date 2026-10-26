@@ -1,0 +1,68 @@
+name: Deploy to Cloudflare Pages
+
+# 为什么不用网页拖拽上传：Direct Upload 的拖拽通道只上传静态产物，
+# 不会把仓库里的 functions/ 一起编译上传 —— 结果就是 /api/event 直接 404，
+# 前端埋点发了请求但被静态托管层以 405 挡回，且 sendBeacon 不报错、全程静默。
+#
+# 这个 workflow 用 `wrangler pages deploy` 部署，它会自动带上 ./functions。
+#
+# 默认只允许手动触发，避免一推提交就上线。确认稳定后可以放开 push 触发。
+on:
+  workflow_dispatch:
+    inputs:
+      branch_commit:
+        description: '把本次部署标记为预览（不更新正式域名）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: build + deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # build:cf = FFMPEG_PAGES=1 VITE_ANALYTICS_ENDPOINT=/api/event pnpm build
+      # 必须用这个脚本而不是 pnpm build，否则前端拿不到埋点端点（整条链路静默失效）。
+      - name: Build
+        run: pnpm build:cf
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Deploy to Cloudflare Pages
+        run: |
+          npx wrangler@latest pages deploy dist \
+            --project-name="$CF_PAGES_PROJECT" \
+            --branch="$DEPLOY_BRANCH" \
+            --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # 仓库 Settings → Variables 里设置，值为 Pages 项目名
+          CF_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          # 传 main = 更新正式域名；传别的分支名 = 只生成预览部署
+          DEPLOY_BRANCH: ${{ inputs.branch_commit && 'preview' || 'main' }}
+
+      # 上线后立刻自检：函数在跑的话 GET 应返回 405（带 allow: POST），
+      # 返回 404 说明 functions/ 又没被带上，构建等于白做。
+      - name: Verify Functions deployed
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://www.syntools.net/api/event")
+          echo "GET /api/event -> $CODE"
+          if [ "$CODE" != "405" ]; then
+            echo "::error::函数未上线（期望 405，实际 $CODE）。检查 functions/ 是否被包含进部署。"
+            exit 1
+          fi
