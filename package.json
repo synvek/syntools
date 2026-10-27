@@ -30,6 +30,7 @@
     "og:en": "node scripts/gen-og.mjs --lang=en",
     "og:all": "node scripts/gen-og.mjs --all",
     "check:seo": "node scripts/check-seo.mjs",
+    "report:analytics": "node scripts/report-analytics.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

@@ -21,8 +21,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ToolPage] 工具运行出错', error, info.componentStack);
-    // Report only the error summary and current tool id, never user input
-    trackToolError(error.message);
+    // Report the error type and a de-identified signature, never the raw message (it can quote user input)
+    trackToolError(error);
   }
 
   private retry = () => {

@@ -8,8 +8,8 @@ import { i18n } from '@/core/i18n';
  *   without it every call is a no-op and the page makes zero requests.
  * - **Same-origin reporting**: the endpoint must share the site's origin, otherwise the CSP `connect-src`
  *   has to be relaxed (see `public/_headers` and `vercel.json`).
- * - **No content collection**: only event name, tool id, duration and UI language; never input or file content,
- *   no cookies, no cross-site identifiers. The session id is random, lives in sessionStorage and dies with the tab.
+ * - **No content collection**: event name, tool id, duration, UI language, page name and — for search — the query
+ *   *length* and result count only; never input, file names or queries, no cookies, no cross-site identifiers. The session id is random, lives in sessionStorage and dies with the tab.
  * - **Respects user intent**: nothing is collected when `DNT: 1` or Global Privacy Control is active.
  *
  * Minimal way to wire a backend: a same-origin Cloudflare Worker / Vercel Function that
@@ -146,12 +146,63 @@ export function trackToolDuration(toolId: string, durationMs: number): void {
   track('tool_duration', { id: toolId, ms: Math.min(durationMs, 30 * 60 * 1000) });
 }
 
-/** Tool error: report only the error type and tool id, never the input */
-export function trackToolError(message: string): void {
+/**
+ * Reduce an error message to a shape that cannot carry user data.
+ *
+ * Why not just truncate: library messages routinely quote the offending value
+ * (`Unexpected token '<first line of the user's document>'`), so a plain slice
+ * ships document fragments. This strips quoted spans, file names and digits
+ * (ids, sizes, versions, timestamps) while keeping the sentence that tells us
+ * which code path broke.
+ */
+export function normalizeErrorSignature(input: unknown): string {
+  const raw =
+    typeof input === 'string'
+      ? input
+      : input instanceof Error
+        ? `${input.name}: ${input.message}`
+        : '';
+  return raw
+    .replace(/`[^`]*`|"[^"]*"|'[^']*'|「[^」]*」|“[^”]*”|『[^』]*』/g, '″')
+    .replace(
+      /[^\s/\\:*?"<>|]+\.(?:docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg|txt|csv|tsv|json|xml|zip|7z|rar|mp4|mov|mkv|mp3|wav|flac|ttf|otf|woff2?)\b/gi,
+      '‹file›',
+    )
+    .replace(/\d+/g, '#')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60);
+}
+
+/**
+ * Tool error: report the error type plus a de-identified signature — never the raw message.
+ * `currentToolId` is filled in by `trackToolOpen`, so the boundary needs no props.
+ */
+export function trackToolError(error: unknown): void {
+  const name = typeof (error as Error | null)?.name === 'string' ? (error as Error).name : 'Error';
   track('tool_error', {
     ...(currentToolId ? { id: currentToolId } : {}),
-    // Truncate and strip newlines so user data or huge stacks never leave
-    msg: message.replace(/\s+/g, ' ').slice(0, 120),
+    err: name.slice(0, 32),
+    sig: normalizeErrorSignature(error),
+  });
+}
+
+/**
+ * Search usage: the product's central assumption is "one search beats browsing the sidebar",
+ * so this is the only event that can confirm or refute it.
+ *
+ * Only the query **length** and the number of results are sent — never the query itself.
+ * `via` separates keyboard submits from mouse clicks (an empty result set is worth knowing about).
+ */
+export function trackSearchUse(
+  queryLength: number,
+  resultCount: number,
+  via: 'key' | 'click',
+): void {
+  track('search_use', {
+    len: Math.max(0, Math.min(queryLength, 200)),
+    res: Math.max(0, resultCount),
+    via,
   });
 }
 

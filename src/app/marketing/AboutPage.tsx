@@ -15,8 +15,8 @@ import { CheckList, NoteBar, PageShell, Paragraphs, Section } from '@/app/market
 /**
  * /about — about the project.
  *
- * Before pricing, enterprise reviewers and technical users usually confirm three things: who built this,
- * whether it will vanish tomorrow, and whether the license lets them use it. This page answers those three, no vision talk.
+ * Answers the questions reviewers actually ask before pricing: what this thing is (scope, no ads, no signup)
+ * and what the license lets them do. No vision talk, and no team page.
  */
 
 interface AboutCopy {
@@ -26,8 +26,6 @@ interface AboutCopy {
   whatItems: string[];
   whyTitle: string;
   whyItems: string[];
-  whoTitle: string;
-  whoItems: string[];
   licenseTitle: string;
   licenseItems: string[];
   techTitle: string;
@@ -50,11 +48,6 @@ const zh: AboutCopy = {
     '日常要转个 PDF、压张图、格式化一段 JSON，搜索结果里排在前面的往往是三件事的组合：满屏广告、上传到不明服务器、以及「免费」但限次。',
     '对个人来说这是体验问题；对处理合同、报表、病历、图纸的人来说，这是合规问题 —— 「为了转一个 PDF 把文件传到境外网站」在不少单位是明确禁止的。',
     '所以这个项目的两个目标很具体：把工具做全，并且让文件从头到尾不离开你的机器。',
-  ],
-  whoTitle: '谁在做',
-  whoItems: [
-    '由独立开发者 synvek 设计与编写，{n} 个工具、9 种界面语言、全平台桌面端均为同一套代码库。',
-    '项目在 GitHub 上公开开发，问题与建议走 Issues。没有融资、没有增长团队，也就没有把用户数据变成收入的压力 —— 这是纯本地处理能长期成立的前提。',
   ],
   licenseTitle: '许可',
   licenseItems: [
@@ -93,11 +86,6 @@ const en: AboutCopy = {
     'For individuals that is an annoyance. For people handling contracts, financial reports, medical records or drawings, it is a compliance problem — "upload that PDF to an overseas site just to convert it" is explicitly forbidden in many organisations.',
     'So the two goals are narrow and concrete: cover the tools, and keep files on your machine from start to finish.',
   ],
-  whoTitle: 'Who builds it',
-  whoItems: [
-    'Designed and written by an independent developer, synvek: {n} tools, nine interface languages and desktop builds for every major platform, all from one codebase.',
-    'Development happens in the open on GitHub; issues and suggestions go through Issues. No funding and no growth team means no pressure to monetise user data — the precondition for local-only processing to stay true.',
-  ],
   licenseTitle: 'Licensing',
   licenseItems: [
     'Open source under AGPL-3.0-only: use, modify and self-host freely; if you modify it and offer it as a network service, publish the modifications.',
@@ -134,11 +122,6 @@ const ja: AboutCopy = {
     'PDF を変換する、画像を圧縮する、JSON を整形する —— 検索の上位はたいてい「広告まみれ」「不明なサーバーへのアップロード」「無料だが回数制限」の組み合わせです。',
     '個人には不便ですが、契約書・決算資料・カルテ・図面を扱う人にとってはコンプライアンス問題です。「PDF を変換するためだけに海外のサイトへ送る」ことは多くの組織で明確に禁止されています。',
     'だから目標は 2 つだけ。ツールを網羅すること、そしてファイルを最初から最後まで端末の外に出さないことです。',
-  ],
-  whoTitle: '誰が作っているか',
-  whoItems: [
-    '個人開発者 synvek が設計・実装しています。{n} のツール、9 言語の UI、全プラットフォームのデスクトップ版が同一のコードベースです。',
-    '開発は GitHub で公開しています。不具合や要望は Issues へ。資金調達も成長チームもないため、利用者データを収益化する圧力がありません。これがローカル処理のみを長期維持できる前提です。',
   ],
   licenseTitle: 'ライセンス',
   licenseItems: [
@@ -181,10 +164,6 @@ export function AboutPage() {
 
       <Section title={c.whyTitle}>
         <Paragraphs items={c.whyItems} />
-      </Section>
-
-      <Section title={c.whoTitle}>
-        <Paragraphs items={c.whoItems.map((item) => fill(item, vars))} />
       </Section>
 
       <Section title={c.licenseTitle}>

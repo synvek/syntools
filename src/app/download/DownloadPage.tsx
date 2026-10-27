@@ -1,9 +1,9 @@
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { Link } from '@/core/components/LocaleLink';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { normalizeLang } from '@/core/i18n';
-import { trackDownloadClick } from '@/core/analytics';
+import { track, trackDownloadClick } from '@/core/analytics';
 import { getDownloadStrings, type DownloadStrings } from '@/app/download/strings';
 
 const RELEASES_URL = 'https://github.com/synvek/syntools/releases/latest';
@@ -115,6 +115,11 @@ export function DownloadPage() {
   const lang = normalizeLang(i18n.resolvedLanguage ?? 'en') ?? 'en';
   const s: DownloadStrings = useMemo(() => getDownloadStrings(lang), [lang]);
   const platform = useMemo<Platform>(() => detectPlatform(), []);
+
+  // Page views are the denominator for "visitor → installer click" (clicks are already tracked per arch)
+  useEffect(() => {
+    track('page_view', { page: 'download', os: platform });
+  }, [platform]);
 
   const archOptions: Record<'mac' | 'win' | 'linux', ArchOption[]> = {
     mac: [

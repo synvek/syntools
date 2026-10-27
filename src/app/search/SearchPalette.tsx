@@ -5,6 +5,7 @@ import { useLocalizedPath } from '@/core/i18n/useLocalizedPath';
 import { searchTools } from '@/core/lib/search';
 import { Icon } from '@/core/components/Icon';
 import { getToolMeta } from '@/core/i18n/helpers';
+import { trackSearchUse } from '@/core/analytics';
 
 interface SearchPaletteProps {
   open: boolean;
@@ -34,7 +35,9 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
 
   if (!open) return null;
 
-  const goTo = (id: string) => {
+  const goTo = (id: string, via: 'key' | 'click') => {
+    // Query text never leaves the browser; only its length and the number of hits
+    trackSearchUse(query.trim().length, results.length, via);
     onClose();
     navigate(lp(`/tools/${id}`));
   };
@@ -51,7 +54,9 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
         break;
       case 'Enter':
         e.preventDefault();
-        if (results[active]) goTo(results[active].id);
+        if (results[active]) goTo(results[active].id, 'key');
+        // A search that returns nothing is still a data point: it names a tool users expect but we lack
+        else trackSearchUse(query.trim().length, 0, 'key');
         break;
       case 'Escape':
         onClose();
@@ -104,7 +109,7 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
                 role="option"
                 aria-selected={i === active}
                 onMouseEnter={() => setActive(i)}
-                onClick={() => goTo(tool.id)}
+                onClick={() => goTo(tool.id, 'click')}
                 className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 ${
                   i === active ? 'bg-blue-50 dark:bg-blue-950' : ''
                 }`}

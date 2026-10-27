@@ -46,15 +46,17 @@ const zh: PrivacyCopy = {
     {
       title: '统计埋点',
       body: [
-        '默认关闭。只有部署方显式配置了采集端点才会生效，未配置时页面零请求。',
-        '启用后只上报四类字段：事件名（打开工具 / 处理完成 / 处理失败 / 点击下载）、工具 id、耗时、界面语言。不含输入内容、文件名、结果，也不含能跨站识别你的标识。',
-        '不使用 Cookie，不做设备指纹。浏览器发送 DNT: 1 或 Global Privacy Control 时直接停止采集。会话标识是随机值，存在 sessionStorage 中，关闭标签页即失效。',
+        '本站网页版已启用，但采集端点与站点同源（/api/event），事件写入我们自己账号下的 Cloudflare Analytics Engine，不经过任何第三方统计服务。桌面版与离线部署包默认不启用。',
+        '只上报事件名与计数用字段：打开工具、工具停留时长、工具报错、点击下载、搜索使用、页面浏览（首页 / 下载页 / 定价页 / 隐私 / 安全 / 关于）、点击询价。工具只报 id，搜索只报「查询长度 + 结果条数」，报错只报错误类型与去掉引号内容、文件名、数字后的摘要。',
+        '不含输入内容、文件名、查询词、处理结果，也不含能跨站识别你的标识。',
+        '不使用 Cookie，不做设备指纹。发送 DNT: 1 或 Global Privacy Control 时直接停止采集。会话标识是随机值，存在 sessionStorage 中，关闭标签页即失效。原始事件保留 3 个月，只以聚合形式查看（日活、工具排行、失败率），不做个体追踪。',
       ],
     },
     {
       title: '第三方',
       body: [
         '页面不加载任何第三方脚本、字体、图标库或统计服务。第三方分析在技术上无法运行 —— 站点的 CSP 把网络请求限制为同源。',
+        '统计事件的存储使用 Cloudflare 的 Analytics Engine，作为基础设施服务商只保存上述聚合事件，不接触你的文件，也不做跨站画像。',
         '桌面版唯一的联网行为是检查更新（向 GitHub Releases 查询最新版本），可以在设置中关闭；关闭后没有任何出站请求。',
       ],
     },
@@ -97,15 +99,17 @@ const en: PrivacyCopy = {
     {
       title: 'Analytics',
       body: [
-        'Off by default. It only works if the operator explicitly configures a collection endpoint; without one the page makes zero requests.',
-        'When enabled it reports four fields: event name (tool opened / export finished / tool error / download clicked), tool id, duration and UI language. Never input content, file names or results, and nothing that could identify you across sites.',
-        'No cookies, no device fingerprinting. If the browser sends DNT: 1 or Global Privacy Control, collection stops entirely. The session identifier is random, lives in sessionStorage and disappears when the tab closes.',
+        'Enabled on this site, but the collector is same-origin (/api/event) and events land in a Cloudflare Analytics Engine dataset under our own account — no third-party analytics service is involved. The desktop build and offline packages do not enable it.',
+        'Only event names and counting fields are reported: tool opened, tool dwell time, tool error, download clicked, search used, page view (home / download / pricing / privacy / security / about), inquiry clicked. Tools report an id, search reports query length plus result count, and errors report the error type plus a signature with quoted values, file names and digits removed.',
+        'Never input content, file names, search terms or results, and nothing that could identify you across sites.',
+        'No cookies, no device fingerprinting. If the browser sends DNT: 1 or Global Privacy Control, collection stops entirely. The session identifier is random, lives in sessionStorage and disappears when the tab closes. Raw events are kept for 3 months and read only in aggregate (daily actives, tool ranking, failure rate); no individual profiling.',
       ],
     },
     {
       title: 'Third parties',
       body: [
         'No third-party scripts, fonts, icon packs or analytics services are loaded. Third-party analytics cannot technically run: the Content-Security-Policy restricts network requests to the same origin.',
+        'Event storage uses Cloudflare’s Analytics Engine as an infrastructure processor: it holds the aggregate events above, never touches your files, and builds no cross-site profile.',
         'The only outbound behaviour in the desktop build is an update check against GitHub Releases, which can be disabled; after that there are no outbound requests at all.',
       ],
     },
@@ -148,15 +152,17 @@ const ja: PrivacyCopy = {
     {
       title: '計測',
       body: [
-        '既定では無効です。導入者が収集エンドポイントを明示的に設定した場合のみ動作し、未設定ならページの通信はゼロです。',
-        '有効時も送信するのは 4 項目のみ：イベント名（ツール起動／出力完了／エラー／ダウンロード）、ツール id、所要時間、表示言語。入力内容・ファイル名・結果は含まず、クロスサイトで識別できる情報も含みません。',
-        'Cookie 不使用、端末指紋の取得なし。DNT: 1 または Global Privacy Control が有効なら収集を停止します。セッション識別子はランダム値で sessionStorage に保存され、タブを閉じると消えます。',
+        '当サイトでは有効ですが、収集先は同一オリジン（/api/event）で、イベントは当方アカウントの Cloudflare Analytics Engine に書き込まれます。第三者の解析サービスは介しません。デスクトップ版とオフライン配布物では既定で無効です。',
+        '送信するのはイベント名と計数用の項目のみ：ツール起動、滞在時間、エラー、ダウンロード、検索利用、ページ閲覧（ホーム／ダウンロード／料金／プライバシー／セキュリティ／概要）、問い合わせクリック。ツールは id、検索は「検索語の長さ＋結果件数」、エラーは種類と、引用符内・ファイル名・数字を除いた要約のみです。',
+        '入力内容・ファイル名・検索語・処理結果は含まず、クロスサイトで識別できる情報も含みません。',
+        'Cookie 不使用、端末指紋の取得なし。DNT: 1 または Global Privacy Control が有効なら収集を停止します。セッション識別子はランダム値で sessionStorage に保存され、タブを閉じると消えます。生イベントは 3 か月保管し、集計（日次利用者数・ツール別順位・失敗率）としてのみ参照します。',
       ],
     },
     {
       title: '第三者',
       body: [
         '第三者のスクリプト・フォント・アイコンライブラリ・解析サービスは一切読み込みません。CSP が通信を同一オリジンに限定しているため、第三者の解析は技術的に動作できません。',
+        'イベントの保存には Cloudflare の Analytics Engine を基盤事業者として利用します。保管されるのは上記の集計イベントのみで、ファイルには触れず、クロスサイトのプロファイルも作りません。',
         'デスクトップ版で唯一の外向き通信はアップデート確認（GitHub Releases への問い合わせ）で、設定から無効化できます。無効化後は外向き通信は一切ありません。',
       ],
     },

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from '@/core/components/LocaleLink';
 import { Trans, useTranslation } from 'react-i18next';
 import type { ToolMeta } from '@/core/types';
@@ -6,6 +7,7 @@ import { categories } from '@/core/registry/categories';
 import { useHistoryStore } from '@/stores/history';
 import { Icon } from '@/core/components/Icon';
 import { useToolMeta } from '@/core/i18n/helpers';
+import { track } from '@/core/analytics';
 
 function ToolCard({ tool }: { tool: ToolMeta }) {
   const { t } = useTranslation();
@@ -62,6 +64,11 @@ export function HomePage() {
   const { t } = useTranslation();
   const recentIds = useHistoryStore((s) => s.recent);
   const favoriteIds = useHistoryStore((s) => s.favorites);
+
+  // The home page is the only page view that makes "home → tool" conversion measurable
+  useEffect(() => {
+    track('page_view', { page: 'home' });
+  }, []);
 
   const recent = recentIds.map((id) => toolMap.get(id)).filter((t): t is ToolMeta => Boolean(t));
   const favorites = favoriteIds
