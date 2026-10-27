@@ -630,6 +630,8 @@ export default function SpreadsheetTool() {
     [summary, t],
   );
 
+  const activeSheet = sheets.find((sheet) => sheet.id === activeSheetId) ?? null;
+
   const menus: EditorMenu[] = [
     {
       id: 'file',
@@ -665,9 +667,63 @@ export default function SpreadsheetTool() {
       ],
     },
     {
+      id: 'edit',
+      label: t('common.menuEdit'),
+      entries: [
+        editorMenuItem('edit-undo', t('tools.sheet.undo'), () => handleRef.current?.undo(), {
+          shortcut: '⌘Z',
+        }),
+        editorMenuItem('edit-redo', t('tools.sheet.redo'), () => handleRef.current?.redo(), {
+          shortcut: '⇧⌘Z',
+        }),
+      ],
+    },
+    {
       id: 'insert',
       label: t('common.menuInsert'),
-      entries: [editorMenuItem('insert-chart', t('tools.sheet.insertChart'), openChart)],
+      entries: [
+        editorMenuItem('insert-chart', t('tools.sheet.insertChart'), openChart, {
+          disabled: busy !== null,
+        }),
+        { type: 'separator' },
+        editorMenuItem('insert-sheet', t('tools.sheet.addSheet'), handleAddSheet, {
+          disabled: busy !== null,
+        }),
+        editorMenuItem(
+          'insert-sheet-duplicate',
+          t('tools.sheet.duplicate'),
+          () => activeSheetId && handleDuplicateSheet(activeSheetId),
+          { disabled: !activeSheetId || busy !== null },
+        ),
+        editorMenuItem(
+          'insert-sheet-rename',
+          t('tools.sheet.rename'),
+          () => {
+            if (!activeSheet) return;
+            const name = window.prompt(t('tools.sheet.rename'), activeSheet.name);
+            if (name === null) return;
+            const next = name.trim();
+            if (!next || next === activeSheet.name) return;
+            handleRenameSheet(activeSheet.id, next);
+          },
+          { disabled: !activeSheet || busy !== null },
+        ),
+        editorMenuItem(
+          'insert-sheet-delete',
+          t('tools.sheet.delete'),
+          () => activeSheetId && handleDeleteSheet(activeSheetId),
+          { danger: true, disabled: !activeSheetId || sheets.length <= 1 || busy !== null },
+        ),
+      ],
+    },
+    {
+      id: 'view',
+      label: t('common.menuView'),
+      entries: [
+        editorMenuItem('view-present', t('tools.sheet.present'), () => setPresenting(true), {
+          disabled: summary.cells === 0,
+        }),
+      ],
     },
   ];
 

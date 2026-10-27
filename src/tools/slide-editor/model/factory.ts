@@ -112,6 +112,26 @@ export function rectGeometry(): ShapeGeometry {
   return { kind: 'rect', prst: 'rect' };
 }
 
+/** Shape presets shared by the toolbar dropdown and the Insert menu so the two cannot drift apart */
+export const SHAPE_PRESETS: { key: string; geom: ShapeGeometry }[] = [
+  { key: 'shapeRect', geom: { kind: 'rect', prst: 'rect' } },
+  { key: 'shapeRoundRect', geom: { kind: 'rect', radius: 0.167, prst: 'roundRect' } },
+  { key: 'shapeEllipse', geom: { kind: 'ellipse', prst: 'ellipse' } },
+  {
+    key: 'shapeTriangle',
+    geom: { kind: 'polygon', points: [0.5, 0, 1, 1, 0, 1], prst: 'triangle' },
+  },
+  { key: 'shapeStar', geom: { kind: 'star', innerRatio: 0.382, prst: 'star' } },
+  {
+    key: 'shapeArrow',
+    geom: {
+      kind: 'polygon',
+      points: [0, 0.25, 0.6, 0.25, 0.6, 0, 1, 0.5, 0.6, 1, 0.6, 0.75, 0, 0.75],
+      prst: 'rightArrow',
+    },
+  },
+];
+
 export function createLayout(name = 'Blank'): SlideLayout {
   return {
     id: createId('layout'),

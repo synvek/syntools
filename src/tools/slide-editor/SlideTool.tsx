@@ -24,8 +24,16 @@ import { buildDeck, parseOutline } from './io/outline';
 import { openProject, saveProject } from './io/project';
 import { attachKeyboard } from './interaction/keyboard';
 import { disposeThumbnails } from './render/thumbnail';
-import { revokeAllMediaUrls } from './model/media';
-import { createDoc } from './model/factory';
+import { createMediaFromFile, revokeAllMediaUrls } from './model/media';
+import {
+  SHAPE_PRESETS,
+  createDoc,
+  createImageElement,
+  createLineElement,
+  createShapeElement,
+  createTableElement,
+  createTextElement,
+} from './model/factory';
 import { checkImportFile, importPptxFile } from './pptx/import';
 import { exportPptx } from './pptx/export';
 import { registerSlideStrings } from './strings';
@@ -76,6 +84,23 @@ export default function SlideTool() {
   const pasteClipboard = useSlideStore((s) => s.pasteClipboard);
   const groupSelected = useSlideStore((s) => s.groupSelected);
   const ungroupSelected = useSlideStore((s) => s.ungroupSelected);
+  // Menu-only actions/state (the toolbar owns its own copies of most of these)
+  const addElement = useSlideStore((s) => s.addElement);
+  const addSlide = useSlideStore((s) => s.addSlide);
+  const duplicateSlide = useSlideStore((s) => s.duplicateSlide);
+  const removeSlide = useSlideStore((s) => s.removeSlide);
+  const canUndo = useSlideStore((s) => s.past.length > 0);
+  const canRedo = useSlideStore((s) => s.future.length > 0);
+  const gridSnap = useSlideStore((s) => s.gridSnap);
+  const showRulers = useSlideStore((s) => s.showRulers);
+  const toggleGridSnap = useSlideStore((s) => s.toggleGridSnap);
+  const toggleRulers = useSlideStore((s) => s.toggleRulers);
+  const scale = useSlideStore((s) => s.viewport.scale);
+  const setScale = useSlideStore((s) => s.setScale);
+  const setViewport = useSlideStore((s) => s.setViewport);
+  const setInsertPanel = useSlideStore((s) => s.setInsertPanel);
+  const formatPainter = useSlideStore((s) => s.formatPainter);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [busy, setBusy] = useState<BusyKind>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -296,6 +321,36 @@ export default function SlideTool() {
     ],
   );
 
+  /** Menu image insert: same decode + media registration path as the toolbar picker */
+  const handleInsertImage = useCallback(
+    async (file: File) => {
+      const result = await createMediaFromFile(file);
+      if (!result.ok) {
+        fail(result.error);
+        return;
+      }
+      const asset = result.value;
+      useSlideStore.setState((state) => ({
+        doc: {
+          ...state.doc,
+          media: { ...state.doc.media, [asset.id]: asset },
+          version: state.doc.version + 1,
+        },
+      }));
+      addElement(createImageElement(useSlideStore.getState().doc, asset));
+    },
+    [addElement, fail],
+  );
+
+  const hasSelection = selection.length > 0;
+  const hasElements = (doc.slides[slideIndex]?.elements.length ?? 0) > 0;
+  const selectedElements = (doc.slides[slideIndex]?.elements ?? []).filter((el) =>
+    selection.includes(el.id),
+  );
+  const allLocked = selectedElements.length > 0 && selectedElements.every((el) => el.locked);
+  const allHidden =
+    selectedElements.length > 0 && selectedElements.every((el) => el.visible === false);
+
   const menus: EditorMenu[] = [
     {
       id: 'file',
@@ -328,6 +383,212 @@ export default function SlideTool() {
       ],
     },
     {
+      id: 'edit',
+      label: t('common.menuEdit'),
+      entries: [
+        editorMenuItem('edit-undo', t('tools.slide.undo'), undo, {
+          shortcut: '⌘Z',
+          disabled: !canUndo,
+        }),
+        editorMenuItem('edit-redo', t('tools.slide.redo'), redo, {
+          shortcut: '⇧⌘Z',
+          disabled: !canRedo,
+        }),
+        { type: 'separator' },
+        editorMenuItem('edit-cut', t('tools.slide.cut'), cutSelected, {
+          shortcut: '⌘X',
+          disabled: !hasSelection,
+        }),
+        editorMenuItem('edit-copy', t('tools.slide.copy'), copySelected, {
+          shortcut: '⌘C',
+          disabled: !hasSelection,
+        }),
+        editorMenuItem('edit-paste', t('tools.slide.paste'), pasteClipboard, { shortcut: '⌘V' }),
+        editorMenuItem('edit-duplicate', t('tools.slide.duplicateElement'), duplicateSelected, {
+          shortcut: '⌘D',
+          disabled: !hasSelection,
+        }),
+        editorMenuItem('edit-delete', t('tools.slide.deleteElement'), removeSelected, {
+          shortcut: 'Del',
+          danger: true,
+          disabled: !hasSelection,
+        }),
+        { type: 'separator' },
+        editorMenuItem(
+          'edit-select-all',
+          t('tools.slide.selectAll'),
+          () => select(containerElements(useSlideStore.getState()).map((el) => el.id)),
+          { shortcut: '⌘A', disabled: !hasElements },
+        ),
+        editorMenuItem('edit-find', t('tools.slide.findReplace'), () => setFindOpen(true), {
+          shortcut: '⌘F',
+        }),
+        { type: 'separator' },
+        editorMenuItem(
+          'edit-copy-format',
+          t('tools.slide.copyFormat'),
+          () => useSlideStore.getState().copyFormat(),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'edit-apply-format',
+          t('tools.slide.applyFormat'),
+          () => useSlideStore.getState().applyFormat(),
+          { disabled: formatPainter === null || !hasSelection },
+        ),
+      ],
+    },
+    {
+      id: 'insert',
+      label: t('common.menuInsert'),
+      entries: [
+        editorMenuItem('insert-text', t('tools.slide.insertText'), () =>
+          addElement(createTextElement(useSlideStore.getState().doc, t('tools.slide.insertText'))),
+        ),
+        editorMenuItem('insert-image', t('tools.slide.insertImage'), () =>
+          imageInputRef.current?.click(),
+        ),
+        editorMenuItem('insert-line', t('tools.slide.insertLine'), () =>
+          addElement(createLineElement(useSlideStore.getState().doc)),
+        ),
+        editorMenuItem('insert-table', t('tools.slide.insertTable'), () =>
+          addElement(createTableElement(useSlideStore.getState().doc)),
+        ),
+        { type: 'separator' },
+        ...SHAPE_PRESETS.map((preset) =>
+          editorMenuItem(`insert-${preset.key}`, t(`tools.slide.${preset.key}`), () =>
+            addElement(createShapeElement(useSlideStore.getState().doc, preset.geom)),
+          ),
+        ),
+        { type: 'separator' },
+        editorMenuItem('insert-chart', t('tools.slide.insertChart'), () => setInsertPanel('chart')),
+        editorMenuItem('insert-formula', t('tools.slide.insertFormula'), () =>
+          setInsertPanel('formula'),
+        ),
+        editorMenuItem('insert-icon', t('tools.slide.insertIcon'), () => setInsertPanel('icon')),
+        editorMenuItem('insert-shape-lib', t('tools.slide.insertShapeLib'), () =>
+          setInsertPanel('shape'),
+        ),
+        { type: 'separator' },
+        editorMenuItem('insert-slide', t('tools.slide.addSlide'), addSlide),
+        editorMenuItem('insert-slide-copy', t('tools.slide.duplicate'), () =>
+          duplicateSlide(useSlideStore.getState().slideIndex),
+        ),
+        editorMenuItem(
+          'insert-slide-delete',
+          t('tools.slide.deleteSlide'),
+          () => removeSlide(useSlideStore.getState().slideIndex),
+          { danger: true, disabled: doc.slides.length <= 1 },
+        ),
+      ],
+    },
+    {
+      id: 'arrange',
+      label: t('tools.slide.arrangeTitle'),
+      entries: [
+        editorMenuItem(
+          'arrange-front',
+          t('tools.slide.bringToFront'),
+          () => useSlideStore.getState().bringToFront(),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-forward',
+          t('tools.slide.bringForward'),
+          () => useSlideStore.getState().bringForward(),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-backward',
+          t('tools.slide.sendBackward'),
+          () => useSlideStore.getState().sendBackward(),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-back',
+          t('tools.slide.sendToBack'),
+          () => useSlideStore.getState().sendToBack(),
+          { disabled: !hasSelection },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'arrange-align-left',
+          t('tools.slide.alignLeft'),
+          () => useSlideStore.getState().alignSelected('left'),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-align-center',
+          t('tools.slide.alignCenter'),
+          () => useSlideStore.getState().alignSelected('hcenter'),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-align-right',
+          t('tools.slide.alignRight'),
+          () => useSlideStore.getState().alignSelected('right'),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-align-top',
+          t('tools.slide.alignTop'),
+          () => useSlideStore.getState().alignSelected('top'),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-align-middle',
+          t('tools.slide.alignMiddle'),
+          () => useSlideStore.getState().alignSelected('vcenter'),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-align-bottom',
+          t('tools.slide.alignBottom'),
+          () => useSlideStore.getState().alignSelected('bottom'),
+          { disabled: !hasSelection },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'arrange-distribute-h',
+          t('tools.slide.distributeH'),
+          () => useSlideStore.getState().distributeSelected('horizontal'),
+          { disabled: selection.length < 3 },
+        ),
+        editorMenuItem(
+          'arrange-distribute-v',
+          t('tools.slide.distributeV'),
+          () => useSlideStore.getState().distributeSelected('vertical'),
+          { disabled: selection.length < 3 },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'arrange-group',
+          t('tools.slide.group'),
+          () => useSlideStore.getState().groupSelected(),
+          { shortcut: '⌘G', disabled: selection.length < 2 },
+        ),
+        editorMenuItem(
+          'arrange-ungroup',
+          t('tools.slide.ungroup'),
+          () => useSlideStore.getState().ungroupSelected(),
+          { shortcut: '⇧⌘G', disabled: !hasSelection },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'arrange-lock',
+          t(allLocked ? 'tools.slide.unlock' : 'tools.slide.lock'),
+          () => useSlideStore.getState().toggleLockSelected(),
+          { disabled: !hasSelection },
+        ),
+        editorMenuItem(
+          'arrange-visibility',
+          t(allHidden ? 'tools.slide.show' : 'tools.slide.hide'),
+          () => useSlideStore.getState().toggleVisibleSelected(),
+          { disabled: !hasSelection },
+        ),
+      ],
+    },
+    {
       id: 'view',
       label: t('common.menuView'),
       entries: [
@@ -340,6 +601,38 @@ export default function SlideTool() {
           'view-master',
           `${t('tools.slide.viewMaster')}${viewMode === 'master' ? ' ✓' : ''}`,
           () => setViewMode('master'),
+        ),
+        { type: 'separator' },
+        editorMenuItem('view-present', t('tools.slide.present'), () => setPresenting(true), {
+          disabled: doc.slides.length === 0,
+        }),
+        { type: 'separator' },
+        editorMenuItem(
+          'view-grid',
+          `${t('tools.slide.gridSnap')}${gridSnap ? ' ✓' : ''}`,
+          toggleGridSnap,
+        ),
+        editorMenuItem(
+          'view-rulers',
+          `${t('tools.slide.showRulers')}${showRulers ? ' ✓' : ''}`,
+          toggleRulers,
+        ),
+        { type: 'separator' },
+        editorMenuItem('view-zoom-out', t('tools.slide.zoomOut'), () =>
+          setScale(Math.max(0.1, Math.round((scale - 0.1) * 100) / 100)),
+        ),
+        editorMenuItem('view-zoom-in', t('tools.slide.zoomIn'), () =>
+          setScale(Math.min(3, Math.round((scale + 0.1) * 100) / 100)),
+        ),
+        editorMenuItem('view-zoom-fit', t('tools.slide.zoomFit'), () =>
+          setViewport({ scale: 0, panX: 0, panY: 0 }),
+        ),
+        ...[0.5, 0.75, 1, 1.5, 2].map((level) =>
+          editorMenuItem(
+            `view-zoom-${Math.round(level * 100)}`,
+            `${Math.round(level * 100)}%${Math.abs(scale - level) < 0.001 ? ' ✓' : ''}`,
+            () => setScale(level),
+          ),
         ),
       ],
     },
@@ -535,6 +828,18 @@ export default function SlideTool() {
           const file = event.target.files?.[0];
           event.target.value = '';
           if (file) void handleOpenProject(file);
+        }}
+      />
+
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) void handleInsertImage(file);
         }}
       />
 

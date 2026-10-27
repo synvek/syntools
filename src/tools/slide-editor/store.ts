@@ -55,6 +55,8 @@ interface SlideState {
   gridSnap: boolean;
   /** Show rulers and guides */
   showRulers: boolean;
+  /** Insert flyout tab (session UI state, shared by the toolbar and the menu bar) */
+  insertPanel: 'shape' | 'chart' | 'icon' | 'formula' | null;
   /** Manual guides (session state, not part of doc / undo) */
   guides: { id: string; axis: 'x' | 'y'; position: number }[];
 
@@ -126,6 +128,7 @@ interface SlideState {
 
   toggleGridSnap: () => void;
   toggleRulers: () => void;
+  setInsertPanel: (panel: 'shape' | 'chart' | 'icon' | 'formula' | null) => void;
   addGuide: (axis: 'x' | 'y', position: number) => void;
   moveGuide: (id: string, position: number) => void;
   removeGuide: (id: string) => void;
@@ -272,6 +275,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   activeCell: null,
   gridSnap: false,
   showRulers: true,
+  insertPanel: null,
   guides: [],
   viewMode: 'normal',
   masterKind: 'master',
@@ -834,6 +838,8 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   toggleGridSnap: () => set((s) => ({ gridSnap: !s.gridSnap })),
 
   toggleRulers: () => set((s) => ({ showRulers: !s.showRulers })),
+
+  setInsertPanel: (panel) => set({ insertPanel: panel }),
 
   addGuide: (axis, position) =>
     set((s) => ({

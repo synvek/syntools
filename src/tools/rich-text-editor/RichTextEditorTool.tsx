@@ -238,6 +238,8 @@ export default function RichTextEditorTool() {
   /** Editor height = remaining first-screen space (status bar stays in view, "related tools" is pushed below the fold) */
   const viewportMax = useViewportFill(viewportRef, { min: MIN_VIEWPORT_PX });
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  /** Image picker for the Insert menu (the toolbar owns its own hidden input) */
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const titleRef = useRef(title);
   titleRef.current = title;
   const viewRef = useRef(viewMode);
@@ -1012,6 +1014,27 @@ export default function RichTextEditorTool() {
     setDraftNotice(null);
   };
 
+  /** Menu image insert: same behaviour as the toolbar picker (read as data URL, then setImage) */
+  const handleMenuImage = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        editor?.chain().focus().setImage({ src: reader.result }).run();
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /** Menu link insert: prompt for the URL; an empty value removes the link (same rule as the toolbar) */
+  const handleMenuLink = () => {
+    if (!editor) return;
+    const href = window.prompt(t('tools.richText.linkPrompt'), 'https://');
+    if (href === null) return;
+    const chain = editor.chain().focus().extendMarkRange('link');
+    if (href.trim()) chain.setLink({ href: href.trim() }).run();
+    else chain.unsetLink().run();
+  };
+
   const handleNew = () => {
     const hasContent = stats.chars > 0 || title.trim().length > 0;
     if (hasContent && !window.confirm(t('common.discardConfirm'))) return;
@@ -1218,6 +1241,227 @@ export default function RichTextEditorTool() {
           t('tools.richText.redo'),
           () => editor?.chain().focus().redo().run(),
           { shortcut: '⇧⌘Z', disabled: !editor?.can().redo() },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'edit-select-all',
+          t('tools.richText.selectAll'),
+          () => editor?.chain().focus().selectAll().run(),
+          { shortcut: '⌘A', disabled: !editor },
+        ),
+        editorMenuItem('edit-find', t('tools.richText.findReplace'), () => setFindOpen(true), {
+          shortcut: '⌘F',
+        }),
+      ],
+    },
+    {
+      id: 'insert',
+      label: t('common.menuInsert'),
+      entries: [
+        editorMenuItem('insert-image', t('tools.richText.image'), () =>
+          imageInputRef.current?.click(),
+        ),
+        editorMenuItem('insert-table', t('tools.richText.table'), () =>
+          editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+        ),
+        editorMenuItem('insert-link', t('tools.richText.link'), handleMenuLink, {
+          disabled: !editor,
+        }),
+        editorMenuItem('insert-divider', t('tools.richText.divider'), () =>
+          editor?.chain().focus().setHorizontalRule().run(),
+        ),
+        editorMenuItem('insert-page-break', t('tools.richText.pageBreak'), () =>
+          editor?.chain().focus().setPageBreak().run(),
+        ),
+        { type: 'separator' },
+        editorMenuItem('insert-toc', t('tools.richText.insertToc'), handleInsertToc, {
+          disabled: isEmpty,
+        }),
+        editorMenuItem(
+          'insert-footnote',
+          t('tools.richText.footnoteInsert'),
+          handleFootnoteAction,
+          {
+            disabled: !editor,
+          },
+        ),
+        editorMenuItem('insert-math', t('tools.richText.mathInsert'), handleMathAction, {
+          disabled: !editor,
+        }),
+      ],
+    },
+    {
+      id: 'format',
+      label: t('tools.richText.format'),
+      entries: [
+        editorMenuItem(
+          'format-bold',
+          `${t('tools.richText.bold')}${editor?.isActive('bold') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleBold().run(),
+          { shortcut: '⌘B', disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-italic',
+          `${t('tools.richText.italic')}${editor?.isActive('italic') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleItalic().run(),
+          { shortcut: '⌘I', disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-underline',
+          `${t('tools.richText.underline')}${editor?.isActive('underline') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleUnderline().run(),
+          { shortcut: '⌘U', disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-strike',
+          `${t('tools.richText.strike')}${editor?.isActive('strike') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleStrike().run(),
+          { disabled: !editor },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'format-paragraph',
+          `${t('tools.richText.paragraph')}${editor?.isActive('paragraph') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().setParagraph().run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-h1',
+          `${t('tools.richText.h1')}${editor?.isActive('heading', { level: 1 }) ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-h2',
+          `${t('tools.richText.h2')}${editor?.isActive('heading', { level: 2 }) ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-h3',
+          `${t('tools.richText.h3')}${editor?.isActive('heading', { level: 3 }) ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleHeading({ level: 3 }).run(),
+          { disabled: !editor },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'format-bullet-list',
+          `${t('tools.richText.bulletList')}${editor?.isActive('bulletList') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleBulletList().run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-ordered-list',
+          `${t('tools.richText.orderedList')}${editor?.isActive('orderedList') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleOrderedList().run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-quote',
+          `${t('tools.richText.quote')}${editor?.isActive('blockquote') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleBlockquote().run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-code-block',
+          `${t('tools.richText.codeBlock')}${editor?.isActive('codeBlock') ? ' ✓' : ''}`,
+          () => editor?.chain().focus().toggleCodeBlock().run(),
+          { disabled: !editor },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'format-align-left',
+          `${t('tools.richText.alignLeft')}${editor?.isActive({ textAlign: 'left' }) ? ' ✓' : ''}`,
+          () => editor?.chain().focus().setTextAlign('left').run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-align-center',
+          `${t('tools.richText.alignCenter')}${editor?.isActive({ textAlign: 'center' }) ? ' ✓' : ''}`,
+          () => editor?.chain().focus().setTextAlign('center').run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-align-right',
+          `${t('tools.richText.alignRight')}${editor?.isActive({ textAlign: 'right' }) ? ' ✓' : ''}`,
+          () => editor?.chain().focus().setTextAlign('right').run(),
+          { disabled: !editor },
+        ),
+        editorMenuItem(
+          'format-align-justify',
+          `${t('tools.richText.alignJustify')}${editor?.isActive({ textAlign: 'justify' }) ? ' ✓' : ''}`,
+          () => editor?.chain().focus().setTextAlign('justify').run(),
+          { disabled: !editor },
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'format-clear',
+          t('tools.richText.clearFormat'),
+          () => editor?.chain().focus().unsetAllMarks().clearNodes().run(),
+          { disabled: !editor },
+        ),
+      ],
+    },
+    {
+      id: 'view',
+      label: t('common.menuView'),
+      entries: [
+        editorMenuItem(
+          'view-outline',
+          `${t('tools.richText.outline')}${outlineOpen ? ' ✓' : ''}`,
+          () => setOutlineOpen((open) => !open),
+        ),
+        editorMenuItem(
+          'view-styles',
+          `${t('tools.richText.styles')}${stylesOpen ? ' ✓' : ''}`,
+          () => togglePanel('styles'),
+        ),
+        editorMenuItem(
+          'view-templates',
+          `${t('tools.richText.templates')}${templatesOpen ? ' ✓' : ''}`,
+          () => togglePanel('templates'),
+        ),
+        editorMenuItem(
+          'view-review',
+          `${t('tools.richText.review')}${reviewOpen ? ' ✓' : ''}`,
+          () => togglePanel('review'),
+        ),
+        editorMenuItem(
+          'view-spellcheck',
+          `${t('tools.richText.spellcheck')}${spellcheckOpen ? ' ✓' : ''}`,
+          () => togglePanel('spellcheck'),
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'view-page-setup',
+          `${t('tools.richText.pageSetup')}${pageSetupOpen ? ' ✓' : ''}`,
+          () => togglePanel('pageSetup'),
+        ),
+        editorMenuItem('view-ruler', `${t('tools.richText.ruler')}${rulerOpen ? ' ✓' : ''}`, () =>
+          setRulerOpen((open) => !open),
+        ),
+        { type: 'separator' },
+        editorMenuItem(
+          'view-flow',
+          `${t('tools.richText.viewFlow')}${viewMode === 'flow' ? ' ✓' : ''}`,
+          () => setViewMode('flow'),
+        ),
+        editorMenuItem(
+          'view-paged',
+          `${t('tools.richText.viewPaged')}${viewMode === 'paged' ? ' ✓' : ''}`,
+          () => setViewMode('paged'),
+        ),
+        { type: 'separator' },
+        editorMenuItem('view-present', t('tools.richText.present'), () => setPresenting(true), {
+          disabled: isEmpty,
+        }),
+        { type: 'separator' },
+        ...[0.5, 0.75, 1, 1.25, 1.5, 2].map((level) =>
+          editorMenuItem(
+            `view-zoom-${Math.round(level * 100)}`,
+            `${t('tools.richText.zoom')} ${Math.round(level * 100)}%${zoom === level ? ' ✓' : ''}`,
+            () => setZoom(level),
+          ),
         ),
       ],
     },
@@ -1612,6 +1856,18 @@ export default function RichTextEditorTool() {
           const file = e.target.files?.[0];
           e.target.value = '';
           if (file) void handleImport(file);
+        }}
+      />
+
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) handleMenuImage(file);
         }}
       />
 

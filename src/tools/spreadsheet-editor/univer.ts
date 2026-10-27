@@ -1,4 +1,12 @@
-import { CommandType, LocaleType, mergeLocales, Univer, type IWorkbookData } from '@univerjs/core';
+import {
+  CommandType,
+  LocaleType,
+  RedoCommandId,
+  UndoCommandId,
+  Univer,
+  mergeLocales,
+  type IWorkbookData,
+} from '@univerjs/core';
 import { FUniver } from '@univerjs/core/facade';
 import DesignEnUS from '@univerjs/design/locale/en-US';
 import DesignZhCN from '@univerjs/design/locale/zh-CN';
@@ -123,6 +131,10 @@ export interface UniverHandle {
   deleteSheet(id: string): void;
   /** Rename a sheet */
   renameSheet(id: string, name: string): void;
+  /** Undo the last document mutation (Univer's own undo stack) */
+  undo(): void;
+  /** Redo the last undone mutation */
+  redo(): void;
   /** Duplicate a sheet (the copy is inserted after the source) */
   duplicateSheet(id: string): void;
 }
@@ -278,6 +290,15 @@ export function createUniverInstance(
     };
   };
 
+  // Drive Univer's own history stack so the menu and its toolbar undo/redo stay in sync
+  const undo = (): void => {
+    void univerAPI.executeCommand(UndoCommandId);
+  };
+
+  const redo = (): void => {
+    void univerAPI.executeCommand(RedoCommandId);
+  };
+
   const addSheet = (name?: string): void => {
     univerAPI.getActiveWorkbook()?.insertSheet(name);
   };
@@ -317,6 +338,8 @@ export function createUniverInstance(
     setActiveSheet,
     getActiveRange,
     onMutation,
+    undo,
+    redo,
     addSheet,
     deleteSheet,
     renameSheet,

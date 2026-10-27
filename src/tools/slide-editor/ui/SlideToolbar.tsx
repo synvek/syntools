@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import {
+  SHAPE_PRESETS,
   createImageElement,
   createLineElement,
   createShapeElement,
@@ -12,7 +13,7 @@ import { createMediaFromFile } from '../model/media';
 import type { ShapeGeometry } from '../model/types';
 import { useSlideStore } from '../store';
 import { FormatBar } from './FormatBar';
-import { InsertPanel, type InsertPanelTab } from './InsertPanel';
+import { InsertPanel } from './InsertPanel';
 import { MenuButton, type MenuItem } from './MenuButton';
 import {
   AlignIcon,
@@ -38,25 +39,6 @@ import {
  * "arrange" is entirely a **selection-dependent** group and degrades to disabled when nothing is selected.
  */
 
-const SHAPES: { key: string; geom: ShapeGeometry }[] = [
-  { key: 'shapeRect', geom: { kind: 'rect', prst: 'rect' } },
-  { key: 'shapeRoundRect', geom: { kind: 'rect', radius: 0.167, prst: 'roundRect' } },
-  { key: 'shapeEllipse', geom: { kind: 'ellipse', prst: 'ellipse' } },
-  {
-    key: 'shapeTriangle',
-    geom: { kind: 'polygon', points: [0.5, 0, 1, 1, 0, 1], prst: 'triangle' },
-  },
-  { key: 'shapeStar', geom: { kind: 'star', innerRatio: 0.382, prst: 'star' } },
-  {
-    key: 'shapeArrow',
-    geom: {
-      kind: 'polygon',
-      points: [0, 0.25, 0.6, 0.25, 0.6, 0, 1, 0.5, 0.6, 1, 0.6, 0.75, 0, 0.75],
-      prst: 'rightArrow',
-    },
-  },
-];
-
 const ROW =
   'slide-glass flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 p-1.5 shadow-sm dark:border-gray-700';
 const GROUP = 'flex flex-wrap items-center gap-0.5';
@@ -74,7 +56,9 @@ const BTN_ACTIVE = 'border-blue-600 bg-blue-600 text-white';
 export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => void }) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [panel, setPanel] = useState<InsertPanelTab | null>(null);
+  // Insert flyout lives in the store so the menu bar can open it too
+  const panel = useSlideStore((s) => s.insertPanel);
+  const setPanel = useSlideStore((s) => s.setInsertPanel);
   const doc = useSlideStore((s) => s.doc);
   const scale = useSlideStore((s) => s.viewport.scale);
   const selection = useSlideStore((s) => s.selection);
@@ -132,7 +116,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
     addElement(createImageElement(doc, asset));
   };
 
-  const shapeItems: MenuItem[] = SHAPES.map((shape) => ({
+  const shapeItems: MenuItem[] = SHAPE_PRESETS.map((shape) => ({
     key: shape.key,
     label: t(`tools.slide.${shape.key}`),
     glyph: <ShapeGlyph geom={shape.geom} />,

@@ -84,7 +84,7 @@ export function EditorMenuBar({
                 <div
                   role="menu"
                   aria-label={menu.label}
-                  className="absolute left-0 top-full z-40 mt-0.5 flex min-w-[200px] flex-col rounded-lg border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+                  className="absolute left-0 top-full z-40 mt-0.5 flex max-h-[70vh] min-w-[200px] flex-col overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-900"
                 >
                   {menu.entries.map((entry, index) => (
                     <EditorMenuEntryView

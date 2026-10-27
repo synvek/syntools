@@ -18,6 +18,8 @@ const zh: ResourceTree = {
     sheet: {
       docTitle: '工作簿名称',
       present: '放映',
+      undo: '撤销',
+      redo: '重做',
       exitPresent: '退出放映（Esc）',
       presentLoading: '正在生成放映画面…',
       presentFailed: '放映画面生成失败',
@@ -61,6 +63,8 @@ const en: ResourceTree = {
     sheet: {
       docTitle: 'Workbook name',
       present: 'Present',
+      undo: 'Undo',
+      redo: 'Redo',
       exitPresent: 'Exit (Esc)',
       presentLoading: 'Preparing the slideshow…',
       presentFailed: 'Failed to build the slideshow',
@@ -104,6 +108,8 @@ const zhTW: ResourceTree = {
     sheet: {
       docTitle: '活頁簿名稱',
       present: '放映',
+      undo: '復原',
+      redo: '重做',
       exitPresent: '結束放映（Esc）',
       presentLoading: '正在產生放映畫面…',
       presentFailed: '放映畫面產生失敗',
@@ -147,6 +153,8 @@ const ja: ResourceTree = {
     sheet: {
       docTitle: 'ブック名',
       present: 'スライドショー',
+      undo: '元に戻す',
+      redo: 'やり直す',
       exitPresent: '終了（Esc）',
       presentLoading: '表示用の画像を生成中…',
       presentFailed: '表示用の画像の生成に失敗しました',
@@ -191,6 +199,8 @@ const fr: ResourceTree = {
     sheet: {
       docTitle: 'Nom du classeur',
       present: 'Présenter',
+      undo: 'Annuler',
+      redo: 'Rétablir',
       exitPresent: 'Quitter (Échap)',
       presentLoading: 'Préparation du diaporama…',
       presentFailed: 'Échec de la préparation du diaporama',
@@ -235,6 +245,8 @@ const de: ResourceTree = {
     sheet: {
       docTitle: 'Arbeitsmappenname',
       present: 'Präsentieren',
+      undo: 'Rückgängig',
+      redo: 'Wiederholen',
       exitPresent: 'Beenden (Esc)',
       presentLoading: 'Präsentationsansicht wird erstellt…',
       presentFailed: 'Präsentationsansicht fehlgeschlagen',
@@ -279,6 +291,8 @@ const it: ResourceTree = {
     sheet: {
       docTitle: 'Nome della cartella di lavoro',
       present: 'Presenta',
+      undo: 'Annulla',
+      redo: 'Ripeti',
       exitPresent: 'Esci (Esc)',
       presentLoading: 'Preparazione della presentazione…',
       presentFailed: 'Impossibile preparare la presentazione',
@@ -323,6 +337,8 @@ const es: ResourceTree = {
     sheet: {
       docTitle: 'Nombre del libro',
       present: 'Presentar',
+      undo: 'Deshacer',
+      redo: 'Rehacer',
       exitPresent: 'Salir (Esc)',
       presentLoading: 'Preparando la presentación…',
       presentFailed: 'No se pudo preparar la presentación',
@@ -367,6 +383,8 @@ const pt: ResourceTree = {
     sheet: {
       docTitle: 'Nome do livro',
       present: 'Apresentar',
+      undo: 'Anular',
+      redo: 'Refazer',
       exitPresent: 'Sair (Esc)',
       presentLoading: 'A preparar a apresentação…',
       presentFailed: 'Falha ao preparar a apresentação',
