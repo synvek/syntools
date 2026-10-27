@@ -1,4 +1,10 @@
 import { createCanvasElement } from '../model/assets';
+import {
+  effectiveRuns,
+  hasRichText,
+  resolveRunStyle,
+  type ResolvedRunStyle,
+} from '../model/textRuns';
 import type { Layer } from '../model/types';
 
 /**
@@ -8,18 +14,28 @@ import type { Layer } from '../model/types';
  * and export / flatten through Canvas2D (`render/paint.ts`). Warp and paragraph spacing are beyond Konva.Text,
  * requiring "draw to a bitmap, then resample", and two copies would inevitably drift.
  * So **layout + drawing** live here, shared by the bitmap path (`render/warp.ts`) and the export path.
+ *
+ * Multi-line and rich text:
+ * - plain text keeps the original fast path (`wrapText` / `layoutText`) so Konva can render it natively;
+ * - rich text (per-run styles) and vertical text use the segment-based / column-based renderers below,
+ *   reached through the bitmap path (`needsTextBitmap`) so preview and export stay identical.
  */
 
 export type TextLayerModel = Extract<Layer, { kind: 'text' }>;
 
-/** Canvas2D font shorthand (including bold / italic) */
-export function textFont(layer: TextLayerModel): string {
+/** Canvas2D font shorthand for one resolved run style */
+function fontOf(layer: TextLayerModel, style: ResolvedRunStyle): string {
   return [
-    layer.italic ? 'italic' : 'normal',
-    layer.bold ? 'bold' : 'normal',
-    `${layer.fontSize}px`,
+    style.italic ? 'italic' : 'normal',
+    style.bold ? 'bold' : 'normal',
+    `${style.fontSize}px`,
     `${layer.fontFamily}, sans-serif`,
   ].join(' ');
+}
+
+/** Canvas2D font shorthand (including bold / italic) for the layer-level style */
+export function textFont(layer: TextLayerModel): string {
+  return fontOf(layer, resolveRunStyle(layer));
 }
 
 /** CJK punctuation / kana / ideograph / full-width ranges: they break per character (escaped, no raw glyphs) */
@@ -106,10 +122,255 @@ export function layoutText(ctx: CanvasRenderingContext2D, layer: TextLayerModel)
   return out;
 }
 
+/* ------------------------------ Rich text (per-run styles) ------------------------------ */
+
+interface StyledChar {
+  ch: string;
+  style: ResolvedRunStyle;
+}
+
+interface RichSegment {
+  text: string;
+  style: ResolvedRunStyle;
+}
+
+interface RichLine {
+  segments: RichSegment[];
+  /** Measured line width (for center / right alignment) */
+  width: number;
+  y: number;
+}
+
+function styleEquals(a: ResolvedRunStyle, b: ResolvedRunStyle): boolean {
+  return (
+    a.bold === b.bold &&
+    a.italic === b.italic &&
+    a.underline === b.underline &&
+    a.fill === b.fill &&
+    a.fontSize === b.fontSize
+  );
+}
+
+function setFont(
+  ctx: CanvasRenderingContext2D,
+  layer: TextLayerModel,
+  style: ResolvedRunStyle,
+): void {
+  ctx.font = fontOf(layer, style);
+}
+
+/** The whole text as resolved styled characters (paragraphs are split later on '\n') */
+function styledChars(layer: TextLayerModel): StyledChar[] {
+  const out: StyledChar[] = [];
+  for (const run of effectiveRuns(layer)) {
+    const style = resolveRunStyle(layer, run.style);
+    for (const ch of Array.from(run.text)) out.push({ ch, style });
+  }
+  return out;
+}
+
+/** Split styled characters on '\n', preserving an empty paragraph for empty text */
+function styledParagraphs(chars: StyledChar[]): StyledChar[][] {
+  const paragraphs: StyledChar[][] = [[]];
+  for (const char of chars) {
+    if (char.ch === '\n') paragraphs.push([]);
+    else paragraphs[paragraphs.length - 1].push(char);
+  }
+  return paragraphs;
+}
+
+function measureChars(
+  ctx: CanvasRenderingContext2D,
+  layer: TextLayerModel,
+  chars: StyledChar[],
+): number {
+  let width = 0;
+  for (const char of chars) {
+    setFont(ctx, layer, char.style);
+    width += ctx.measureText(char.ch).width;
+  }
+  return width;
+}
+
+/** Tokenize styled chars (Latin words stay whole, CJK / spaces are single tokens) */
+function tokenizeStyled(chars: StyledChar[]): StyledChar[][] {
+  const tokens: StyledChar[][] = [];
+  let word: StyledChar[] = [];
+  for (const char of chars) {
+    if (CJK_PATTERN.test(char.ch) || char.ch === ' ') {
+      if (word.length > 0) {
+        tokens.push(word);
+        word = [];
+      }
+      tokens.push([char]);
+      continue;
+    }
+    word.push(char);
+  }
+  if (word.length > 0) tokens.push(word);
+  return tokens;
+}
+
+function buildRichLine(
+  ctx: CanvasRenderingContext2D,
+  layer: TextLayerModel,
+  chars: StyledChar[],
+  y: number,
+): RichLine {
+  let end = chars.length;
+  while (end > 0 && chars[end - 1].ch === ' ') end -= 1;
+  const segments: RichSegment[] = [];
+  for (const char of chars.slice(0, end)) {
+    const last = segments[segments.length - 1];
+    if (last && styleEquals(last.style, char.style)) last.text += char.ch;
+    else segments.push({ text: char.ch, style: char.style });
+  }
+  let width = 0;
+  for (const segment of segments) {
+    setFont(ctx, layer, segment.style);
+    width += ctx.measureText(segment.text).width;
+  }
+  return { segments, width, y };
+}
+
+/** Rich horizontal layout: greedy wrap by token, then merge same-style neighbors into segments */
+function layoutRichHorizontal(ctx: CanvasRenderingContext2D, layer: TextLayerModel): RichLine[] {
+  applyTextStyle(ctx, layer);
+  const lineHeight = layer.fontSize * layer.lineHeight;
+  const lines: RichLine[] = [];
+  let y = 0;
+  const paragraphs = styledParagraphs(styledChars(layer));
+  paragraphs.forEach((paragraph, index) => {
+    let current: StyledChar[] = [];
+    let currentWidth = 0;
+    const flush = () => {
+      lines.push(buildRichLine(ctx, layer, current, y));
+      y += lineHeight;
+      current = [];
+      currentWidth = 0;
+    };
+    for (const token of tokenizeStyled(paragraph)) {
+      const tokenWidth = measureChars(ctx, layer, token);
+      if (current.length > 0 && currentWidth + tokenWidth > layer.width) flush();
+      current.push(...token);
+      currentWidth += tokenWidth;
+    }
+    flush();
+    if (index < paragraphs.length - 1) y += layer.paragraphSpacing ?? 0;
+  });
+  return lines;
+}
+
+function drawRichHorizontal(
+  ctx: CanvasRenderingContext2D,
+  layer: TextLayerModel,
+  origin: { x: number; y: number },
+): void {
+  const lines = layoutRichHorizontal(ctx, layer);
+  const lineHeight = layer.fontSize * layer.lineHeight;
+  // Manual placement uses left alignment; the anchor below already accounts for center / right
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  for (const line of lines) {
+    const anchorX =
+      layer.align === 'center'
+        ? origin.x + layer.width / 2 - line.width / 2
+        : layer.align === 'right'
+          ? origin.x + layer.width - line.width
+          : origin.x;
+    let x = anchorX;
+    for (const segment of line.segments) {
+      setFont(ctx, layer, segment.style);
+      ctx.fillStyle = segment.style.fill;
+      ctx.fillText(segment.text, x, origin.y + line.y);
+      const width = ctx.measureText(segment.text).width;
+      if (segment.style.underline) {
+        ctx.fillRect(
+          x,
+          origin.y + line.y + lineHeight - 2,
+          width,
+          Math.max(1, segment.style.fontSize / 14),
+        );
+      }
+      x += width;
+    }
+  }
+}
+
+/* ------------------------------ Vertical text ------------------------------ */
+
+/**
+ * Vertical columns: characters stack top-to-bottom inside `layer.height` (the user-resizable box),
+ * then flow into new columns right-to-left. Resizing the box height re-wraps, like a real vertical text box.
+ */
+function verticalColumns(layer: TextLayerModel): { columns: StyledChar[][]; pitch: number } {
+  const pitch = Math.max(1, layer.fontSize * layer.lineHeight);
+  // The box height limits characters per column; a box shorter than one line still fits one character
+  const maxRows = Math.max(1, Math.floor((layer.height || pitch) / pitch));
+  const columns: StyledChar[][] = [];
+  for (const paragraph of styledParagraphs(styledChars(layer))) {
+    if (paragraph.length === 0) {
+      columns.push([]);
+      continue;
+    }
+    for (let index = 0; index < paragraph.length; index += maxRows) {
+      columns.push(paragraph.slice(index, index + maxRows));
+    }
+  }
+  return { columns, pitch };
+}
+
+function verticalMetrics(layer: TextLayerModel): { width: number; height: number; pitch: number } {
+  const { columns, pitch } = verticalColumns(layer);
+  let maxChars = 0;
+  for (const column of columns) maxChars = Math.max(maxChars, column.length);
+  return {
+    width: Math.max(1, columns.length) * pitch,
+    height: Math.max(1, maxChars) * pitch,
+    pitch,
+  };
+}
+
+function drawVerticalText(
+  ctx: CanvasRenderingContext2D,
+  layer: TextLayerModel,
+  origin: { x: number; y: number },
+): void {
+  applyTextStyle(ctx, layer);
+  const { columns, pitch } = verticalColumns(layer);
+  const width = Math.max(1, columns.length) * pitch;
+  columns.forEach((column, columnIndex) => {
+    // Right-to-left columns: the first column is the rightmost
+    const columnX = width - (columnIndex + 1) * pitch;
+    column.forEach((char, rowIndex) => {
+      const cx = origin.x + columnX + pitch / 2;
+      const cy = origin.y + rowIndex * pitch + pitch / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      setFont(ctx, layer, char.style);
+      ctx.fillStyle = char.style.fill;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // CJK / full-width glyphs sit upright; Latin glyphs rotate 90° clockwise (as in Photoshop)
+      if (!CJK_PATTERN.test(char.ch)) ctx.rotate(Math.PI / 2);
+      ctx.fillText(char.ch, 0, 0);
+      ctx.restore();
+    });
+  });
+}
+
+/* ------------------------------ Public dispatch ------------------------------ */
+
 /** Text block height (paragraph spacing included; empty text counts as one line) */
 export function textBlockHeight(ctx: CanvasRenderingContext2D, layer: TextLayerModel): number {
-  const lines = layoutText(ctx, layer);
+  if (layer.direction === 'vertical') return verticalMetrics(layer).height;
   const lineHeight = layer.fontSize * layer.lineHeight;
+  if (hasRichText(layer)) {
+    const lines = layoutRichHorizontal(ctx, layer);
+    if (lines.length === 0) return lineHeight;
+    return lines[lines.length - 1].y + lineHeight;
+  }
+  const lines = layoutText(ctx, layer);
   if (lines.length === 0) return lineHeight;
   const last = lines[lines.length - 1];
   return last.y + lineHeight;
@@ -125,6 +386,14 @@ export function drawText(
   layer: TextLayerModel,
   origin: { x: number; y: number } = { x: layer.x, y: layer.y },
 ): void {
+  if (layer.direction === 'vertical') {
+    drawVerticalText(ctx, layer, origin);
+    return;
+  }
+  if (hasRichText(layer)) {
+    drawRichHorizontal(ctx, layer, origin);
+    return;
+  }
   applyTextStyle(ctx, layer);
   const anchorX =
     layer.align === 'center'
@@ -166,6 +435,10 @@ export function withMeasureContext<T>(fn: (ctx: CanvasRenderingContext2D) => T):
 export function measureTextBlock(layer: TextLayerModel): { width: number; height: number } | null {
   return withMeasureContext((ctx) => {
     applyTextStyle(ctx, layer);
+    if (layer.direction === 'vertical') {
+      const metrics = verticalMetrics(layer);
+      return { width: metrics.width, height: metrics.height };
+    }
     return { width: layer.width, height: textBlockHeight(ctx, layer) };
   });
 }

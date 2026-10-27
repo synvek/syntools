@@ -6,6 +6,7 @@ import { ToolFlyout } from './ToolFlyout';
 import { usePhotoStore } from '../store';
 import { TOOL_GROUPS, displayToolOf } from '../toolset';
 import type { ToolDef, ToolGroupDef } from '../toolset';
+import type { ShapeKind, TextDirection } from '../model/types';
 import { NARROW_QUERY, useMediaQuery } from './useMediaQuery';
 
 /**
@@ -30,6 +31,8 @@ export function ToolPalette() {
   const setTool = usePhotoStore((s) => s.setTool);
   const shapeKind = usePhotoStore((s) => s.shapeKind);
   const setShapeKind = usePhotoStore((s) => s.setShapeKind);
+  const textDirection = usePhotoStore((s) => s.textDirection);
+  const setTextDirection = usePhotoStore((s) => s.setTextDirection);
   const isNarrow = useMediaQuery(NARROW_QUERY);
   const [flyout, setFlyout] = useState<{ groupId: string; anchor: HTMLElement } | null>(null);
 
@@ -57,8 +60,15 @@ export function ToolPalette() {
   };
 
   const openGroup = flyout ? TOOL_GROUPS.find((group) => group.id === flyout.groupId) : undefined;
-  /** Shape group: items are kinds of one tool, so the flyout returns a kind, not a tool id */
+  /** Shape / text groups: items are kinds of one tool, so the flyout returns a kind, not a tool id */
   const openHasVariants = openGroup?.items.some((item) => item.variant) ?? false;
+  /** Which piece of state a group's sub-kinds read from (shapes → shapeKind, text → textDirection) */
+  const variantOf = (group: ToolGroupDef): ShapeKind | TextDirection | undefined =>
+    group.variantKind === 'shape'
+      ? shapeKind
+      : group.variantKind === 'text'
+        ? textDirection
+        : undefined;
 
   return (
     <div
@@ -67,7 +77,7 @@ export function ToolPalette() {
       className="flex max-h-full w-12 shrink-0 flex-col items-center gap-1.5 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-sm dark:border-gray-800 dark:bg-gray-900 max-lg:max-h-14 max-lg:w-full max-lg:flex-row max-lg:overflow-x-auto max-lg:overflow-y-hidden"
     >
       {TOOL_GROUPS.map((group, groupIndex) => {
-        const current = displayToolOf(group, tool, shapeKind);
+        const current = displayToolOf(group, tool, variantOf(group));
         const hasSiblings = group.items.length > 1;
         // Dividers only between sections: one per row would add ~50px and raise the workspace minimum
         const startsSection =
@@ -99,7 +109,7 @@ export function ToolPalette() {
         <ToolFlyout
           anchor={flyout.anchor}
           label={t('tools.photo.toolGroupMore', {
-            tool: t(displayToolOf(openGroup, tool, shapeKind).labelKey),
+            tool: t(displayToolOf(openGroup, tool, variantOf(openGroup)).labelKey),
           })}
           items={openGroup.items.map((item) => ({
             // Groups with sub-kinds: the flyout offers kinds, and picking one sets both tool and kind
@@ -108,12 +118,15 @@ export function ToolPalette() {
             label: t(item.labelKey),
             shortcut: item.shortcut,
           }))}
-          activeId={openHasVariants ? shapeKind : tool}
+          activeId={openHasVariants ? (variantOf(openGroup) ?? tool) : tool}
           prefer={isNarrow ? 'bottom' : 'right'}
           onPick={(id) => {
             const item = openGroup.items.find((entry) => (entry.variant ?? entry.id) === id);
             if (!item) return;
-            if (item.variant) setShapeKind(item.variant);
+            if (openGroup.variantKind === 'shape') setShapeKind(item.variant as ShapeKind);
+            else if (openGroup.variantKind === 'text') {
+              setTextDirection(item.variant as TextDirection);
+            }
             setTool(item.id);
           }}
           onClose={() => setFlyout(null)}

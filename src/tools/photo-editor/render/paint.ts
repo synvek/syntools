@@ -96,7 +96,9 @@ export function clipKeyOf(base: Layer | null | undefined): string {
     base.kind === 'raster' ? base.rev : 0,
     maskSignature(base) ?? '',
     vectorMaskSignature(base.vectorMask),
-    base.kind === 'text' ? `${base.text}:${base.fontSize}` : '',
+    base.kind === 'text'
+      ? `${base.text}:${base.fontSize}:${base.direction ?? 'horizontal'}:${JSON.stringify(base.runs ?? null)}`
+      : '',
     base.visible ? 1 : 0,
   ].join(',');
 }

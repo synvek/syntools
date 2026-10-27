@@ -88,6 +88,12 @@ const icons: Record<string, ReactNode> = {
     </>
   ),
   text: <path d="M5 6h14M12 6v13" />,
+  textVertical: (
+    <>
+      <path d="M7 5h10M12 5v5" />
+      <path d="M12 12v8M9 17l3 3 3-3" />
+    </>
+  ),
   code: <path d="M9 8l-4 4 4 4M15 8l4 4-4 4" />,
   globe: (
     <>

@@ -25,6 +25,8 @@ import type {
   ReplaceColorParams,
   SelectiveColorParams,
   ShadowsHighlightsParams,
+  TextRun,
+  TextRunStyle,
   TextWarp,
   TextWarpKind,
   ColorBalanceParams,
@@ -333,6 +335,30 @@ function normalizeTextWarp(value: unknown): TextWarp {
   };
 }
 
+/** Rich-text runs: drop malformed entries, clamp sizes, and keep only known style fields */
+function normalizeTextRuns(value: unknown): TextRun[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const runs: TextRun[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as Partial<TextRun>;
+    const text = str(raw.text);
+    if (!text) continue;
+    const styleRaw = (raw.style && typeof raw.style === 'object' ? raw.style : {}) as TextRunStyle;
+    const style: TextRunStyle = {};
+    if (typeof styleRaw.bold === 'boolean') style.bold = styleRaw.bold;
+    if (typeof styleRaw.italic === 'boolean') style.italic = styleRaw.italic;
+    if (typeof styleRaw.underline === 'boolean') style.underline = styleRaw.underline;
+    const fill = color(styleRaw.fill, '');
+    if (fill) style.fill = fill;
+    if (Number.isFinite(styleRaw.fontSize)) {
+      style.fontSize = clamp(num(styleRaw.fontSize, 0), 1, 400);
+    }
+    runs.push(Object.keys(style).length > 0 ? { text, style } : { text });
+  }
+  return runs.length > 0 ? runs : undefined;
+}
+
 /** Palette normalization: keep valid `#RRGGBB`, de-duplicate, cap length (lightweight extras, dropped silently) */
 function normalizeSwatches(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -478,11 +504,13 @@ function normalizeLayer(raw: unknown): Layer | null {
       };
     case 'group':
       return { ...base, kind, passThrough: bool(raw.passThrough, true) };
-    case 'text':
+    case 'text': {
+      const text = str(raw.text);
+      const runs = normalizeTextRuns(raw.runs);
       return {
         ...base,
         kind,
-        text: str(raw.text),
+        text,
         fontSize: Math.max(1, num(raw.fontSize, 24)),
         fontFamily: str(raw.fontFamily, 'PingFang SC'),
         fill: str(raw.fill, '#111827'),
@@ -496,7 +524,11 @@ function normalizeLayer(raw: unknown): Layer | null {
         letterSpacing: num(raw.letterSpacing, 0),
         paragraphSpacing: Math.max(0, num(raw.paragraphSpacing, 0)),
         warp: normalizeTextWarp(raw.warp),
+        direction: raw.direction === 'vertical' ? 'vertical' : 'horizontal',
+        // Runs are only valid when they describe exactly the same characters as `text`
+        runs: runs && runs.map((run) => run.text).join('') === text ? runs : undefined,
       };
+    }
     default:
       return {
         ...base,

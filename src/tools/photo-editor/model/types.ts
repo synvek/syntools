@@ -196,6 +196,29 @@ export interface LayerStyle {
 
 export type TextAlign = 'left' | 'center' | 'right';
 
+/** Text flow: horizontal (normal) or vertical (characters stack top-to-bottom, columns right-to-left) */
+export type TextDirection = 'horizontal' | 'vertical';
+
+/**
+ * Per-run style overrides for rich text.
+ * Absent fields inherit the layer-level character style, so a plain text layer never needs `runs`.
+ */
+export interface TextRunStyle {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  /** Fill color (`#RRGGBB`) */
+  fill?: string;
+  /** Font size in pixels */
+  fontSize?: number;
+}
+
+/** A stretch of text sharing one style. Concatenating every run's `text` equals `TextLayer.text`. */
+export interface TextRun {
+  text: string;
+  style?: TextRunStyle;
+}
+
 /** Levels: input black / white points, gamma, output black / white points */
 export interface LevelsParams {
   inBlack: number;
@@ -454,6 +477,13 @@ export interface TextLayer extends LayerBase {
   paragraphSpacing: number;
   /** Text warp parameters */
   warp: TextWarp;
+  /** Flow direction; absent means horizontal (old projects) */
+  direction?: TextDirection;
+  /**
+   * Rich text runs (optional). When present, each run may override bold / italic / underline / fill / size.
+   * Absent or a single run means the whole layer uses the layer-level character style.
+   */
+  runs?: TextRun[];
 }
 
 export interface ShapeLayer extends LayerBase {

@@ -13,6 +13,7 @@ import type {
   ShapeLayer,
   ShapeStyleDefaults,
   SmartLayer,
+  TextDirection,
   TextLayer,
 } from './types';
 
@@ -163,8 +164,11 @@ export function createTextLayer(input: {
   text?: string;
   x?: number;
   y?: number;
+  direction?: TextDirection;
 }): TextLayer {
   const fontSize = Math.max(12, Math.round(Math.min(input.doc.width, input.doc.height) / 12));
+  const lineHeight = 1.4;
+  const vertical = input.direction === 'vertical';
   return {
     id: createId('text'),
     kind: 'text',
@@ -175,8 +179,9 @@ export function createTextLayer(input: {
     blend: 'normal',
     x: input.x ?? Math.round(input.doc.width * 0.1),
     y: input.y ?? Math.round(input.doc.height * 0.4),
-    width: Math.round(input.doc.width * 0.8),
-    height: Math.round(fontSize * 1.6),
+    // Horizontal: wide wrap box, one line tall. Vertical: one column wide, tall enough for a few characters
+    width: vertical ? Math.round(fontSize * lineHeight) : Math.round(input.doc.width * 0.8),
+    height: Math.round(vertical ? fontSize * lineHeight * 8 : fontSize * 1.6),
     rotation: 0,
     flipX: false,
     flipY: false,
@@ -189,10 +194,11 @@ export function createTextLayer(input: {
     italic: false,
     underline: false,
     align: 'left',
-    lineHeight: 1.4,
+    lineHeight,
     letterSpacing: 0,
     paragraphSpacing: 0,
     warp: { kind: 'none', bend: 0, horizontal: 0 },
+    direction: input.direction ?? 'horizontal',
   };
 }
 

@@ -1272,13 +1272,23 @@ export function warpOffset(
 /**
  * Whether text must go through the bitmap rendering path.
  *
- * Two cases Konva.Text cannot express: warp (needs mesh resampling) and paragraph spacing (needs per-line layout).
+ * Konva.Text cannot express: warp (needs mesh resampling), paragraph spacing (needs per-line layout),
+ * rich text (per-run fonts / colors) or vertical flow (columns + rotated glyphs).
  * `render/text.ts` draws that path from the **same code** as the Canvas2D export, so preview and export agree.
  */
 export function needsTextBitmap(layer: {
   paragraphSpacing: number;
   warp: { kind: string; bend: number; horizontal: number };
+  direction?: string;
+  runs?: { text: string; style?: unknown }[];
 }): boolean {
+  if (layer.direction === 'vertical') return true;
+  // Any run-level override (even a single styled run) needs the per-run renderer; Konva.Text is single-style
+  if (layer.runs && layer.runs.length > 1) return true;
+  if (layer.runs && layer.runs.length === 1) {
+    const style = layer.runs[0].style;
+    if (style && Object.keys(style).length > 0) return true;
+  }
   if (layer.paragraphSpacing > 0) return true;
   if (layer.warp.kind === 'none') return false;
   return layer.warp.bend !== 0 || layer.warp.horizontal !== 0;

@@ -2,7 +2,7 @@ import { needsTextBitmap, warpOffset } from '../core';
 import { createCanvasElement } from '../model/assets';
 import type { Layer } from '../model/types';
 import { drawMeshCells } from './mesh';
-import { applyTextStyle, layoutText, textBlockHeight } from './text';
+import { drawText, measureTextBlock } from './text';
 
 /**
  * Text warp, and the cases that need a bitmap to render at all.
@@ -46,6 +46,9 @@ function signatureOf(layer: TextLayerModel): string {
     layer.letterSpacing ?? 0,
     layer.paragraphSpacing ?? 0,
     layer.width,
+    layer.direction ?? 'horizontal',
+    // Rich text runs change pixels without changing the plain text, so they must enter the cache key
+    JSON.stringify(layer.runs ?? null),
     layer.rotation,
     layer.flipX ? 1 : 0,
     layer.flipY ? 1 : 0,
@@ -91,46 +94,27 @@ export function warpedText(layer: TextLayerModel): WarpedText | null {
 function renderSourceBitmap(
   layer: TextLayerModel,
 ): { canvas: HTMLCanvasElement; marginX: number; marginY: number } | null {
-  const probe = createCanvasElement(1, 1);
-  const probeCtx = probe.getContext('2d');
-  if (!probeCtx) return null;
-  applyTextStyle(probeCtx, layer);
-  const blockHeight = Math.max(layer.fontSize, textBlockHeight(probeCtx, layer));
-  const marginX = Math.ceil(layer.width * MARGIN_X_RATIO);
+  const measured = measureTextBlock(layer);
+  // Vertical text can be wider than `layer.width` (the columns decide the width), so measure the block
+  const blockWidth = Math.max(1, measured?.width ?? layer.width);
+  const blockHeight = Math.max(
+    layer.fontSize,
+    measured?.height ?? layer.fontSize * layer.lineHeight,
+  );
+  const marginX = Math.ceil(blockWidth * MARGIN_X_RATIO);
   const marginY = Math.ceil(blockHeight * MARGIN_Y_RATIO);
   const canvas = createCanvasElement(
-    Math.max(1, Math.round(layer.width + marginX * 2)),
+    Math.max(1, Math.round(blockWidth + marginX * 2)),
     Math.max(1, Math.round(blockHeight + marginY * 2)),
   );
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   ctx.save();
   ctx.translate(marginX, marginY);
-  // The bitmap origin is the block's top-left, so align still measures against layer.width
-  drawInto(ctx, layer);
+  // The bitmap origin is the block's top-left; `drawText` shares layout with the export path
+  drawText(ctx, layer, { x: 0, y: 0 });
   ctx.restore();
   return { canvas, marginX, marginY };
-}
-
-/** Layout drawing inside the bitmap (origin fixed at the block's top-left within the canvas) */
-function drawInto(ctx: CanvasRenderingContext2D, layer: TextLayerModel): void {
-  applyTextStyle(ctx, layer);
-  const lineHeight = layer.fontSize * layer.lineHeight;
-  const anchorX =
-    layer.align === 'center' ? layer.width / 2 : layer.align === 'right' ? layer.width : 0;
-  for (const line of layoutText(ctx, layer)) {
-    ctx.fillText(line.text, anchorX, line.y);
-    if (layer.underline) {
-      const width = ctx.measureText(line.text).width;
-      const startX =
-        layer.align === 'center'
-          ? anchorX - width / 2
-          : layer.align === 'right'
-            ? anchorX - width
-            : anchorX;
-      ctx.fillRect(startX, line.y + lineHeight - 2, width, Math.max(1, layer.fontSize / 14));
-    }
-  }
 }
 
 /**
@@ -150,9 +134,10 @@ function warpBitmap(
   const { kind, bend, horizontal } = layer.warp;
   if (!ctx) return { canvas: source, offsetX: -marginX, offsetY: -marginY };
   // The field normalizes against the text block (not the padding), so convert canvas coords back inside
-  const width = Math.max(1, layer.width);
+  // (width comes from the bitmap, so vertical columns wider than `layer.width` still warp correctly)
+  const width = Math.max(1, source.width - marginX * 2);
   const height = Math.max(1, source.height - marginY * 2);
-  const cellW = layer.width / MESH;
+  const cellW = width / MESH;
   const cellH = height / MESH;
   const disp = (x: number, y: number) => {
     const { dx, dy } = warpOffset(

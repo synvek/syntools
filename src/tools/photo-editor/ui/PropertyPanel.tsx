@@ -1,14 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { MAX_CANVAS_SIZE, MIN_CANVAS_SIZE } from '../core';
-import {
-  Field,
-  NumberInput,
-  PanelSection,
-  Select,
-  Slider,
-  TextInput,
-  ToggleChip,
-} from './controls';
+import { Field, NumberInput, PanelSection, Select, Slider, TextArea, ToggleChip } from './controls';
 import { MaskPanel } from './MaskPanel';
 import { usePhotoStore } from '../store';
 import type { CanvasBackground } from '../model/types';
@@ -152,7 +144,7 @@ export function PropertyPanel() {
 
       {layer.kind === 'text' ? (
         <PanelSection title={t('tools.photo.textContent')}>
-          <TextInput
+          <TextArea
             ariaLabel={t('tools.photo.textContent')}
             value={layer.text}
             onChange={(text) => patchActive({ text } as never, false)}

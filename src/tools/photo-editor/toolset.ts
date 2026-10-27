@@ -1,5 +1,5 @@
 import { SHAPE_KINDS } from './core';
-import type { ShapeKind, ToolId } from './model/types';
+import type { ShapeKind, TextDirection, ToolId } from './model/types';
 import { SHAPE_ICONS } from './shapeIcons';
 
 /**
@@ -25,12 +25,14 @@ export interface ToolDef {
   /** Key shown on the toolbox badge / shortcut sheet (display only, possibly a ⇧ combination) */
   shortcut: string;
   /**
-   * **Sub-kinds** of the same tool (only shapes so far).
+   * **Sub-kinds** of the same tool.
    *
-   * Six shapes share the single `shape` ToolId (`shapeKind` decides what gets drawn),
-   * but the toolbox shows them as grouped buttons with their own icons and names, hence the kinds.
+   * - Six shapes share the single `shape` ToolId (`shapeKind` decides what gets drawn);
+   * - horizontal / vertical text share the single `text` ToolId (`textDirection` decides the flow).
+   * The toolbox shows them as grouped buttons with their own icons and names, hence the kinds.
+   * `variantKind` on the group says which piece of state a variant writes to.
    */
-  variant?: ShapeKind;
+  variant?: ShapeKind | TextDirection;
 }
 
 /**
@@ -50,6 +52,11 @@ export interface ToolGroupDef {
   primary: ToolId;
   /** Group-level label (the overall name for groups with sub-kinds, e.g. "Shape"); else primary's */
   labelKey?: string;
+  /**
+   * Which state sub-kinds write to: shapes set `shapeKind`, text sets `textDirection`.
+   * Absent for groups without sub-kinds.
+   */
+  variantKind?: 'shape' | 'text';
   items: ToolDef[];
 }
 
@@ -209,18 +216,36 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       { id: 'sampler', icon: 'sampler', labelKey: 'tools.photo.toolSampler', shortcut: '⇧I' },
     ],
   },
-  // Text and shapes are different objects (text layer / shape layer), each with its own row
+  // Text and shapes are different objects (text layer / shape layer), each with its own row.
+  // Text has two flows (horizontal / vertical) sharing the `text` tool; the badge flyout switches them.
   {
     id: 'text',
     section: 'sample',
     primary: 'text',
-    items: [{ id: 'text', icon: 'text', labelKey: 'tools.photo.toolText', shortcut: 'T' }],
+    variantKind: 'text',
+    items: [
+      {
+        id: 'text',
+        variant: 'horizontal',
+        icon: 'text',
+        labelKey: 'tools.photo.toolText',
+        shortcut: 'T',
+      },
+      {
+        id: 'text',
+        variant: 'vertical',
+        icon: 'textVertical',
+        labelKey: 'tools.photo.toolTextVertical',
+        shortcut: 'T',
+      },
+    ],
   },
   {
     id: 'shape',
     section: 'sample',
     primary: 'shape',
     labelKey: 'tools.photo.toolShape',
+    variantKind: 'shape',
     // Shapes present as one tool with six kinds: the row's icon follows the current kind,
     // and the flyout picks a specific shape (the badge sits on the rail; options hold width / color).
     items: SHAPE_KINDS.map((kind) => ({
@@ -262,10 +287,14 @@ export function groupOfTool(tool: ToolId): ToolGroupDef | undefined {
  * Photoshop's rule: **use the group's current tool if there is one** (remembered once the user switches),
  * otherwise fall back to `primary`, so the row sticks to the user's last pick instead of snapping back.
  *
- * `variant` handles sub-kinds (shapes): with several entries for one ToolId, the matching kind wins,
- * so the shape row's icon and name follow the kind currently being drawn.
+ * `variant` handles sub-kinds (shapes / text flow): with several entries for one ToolId, the matching
+ * kind wins, so the row's icon and name follow the shape being drawn or the text flow in use.
  */
-export function displayToolOf(group: ToolGroupDef, current: ToolId, variant?: ShapeKind): ToolDef {
+export function displayToolOf(
+  group: ToolGroupDef,
+  current: ToolId,
+  variant?: ShapeKind | TextDirection,
+): ToolDef {
   const candidates = group.items.filter((item) => item.id === current);
   if (candidates.length > 0) {
     return candidates.find((item) => item.variant === variant) ?? candidates[0];

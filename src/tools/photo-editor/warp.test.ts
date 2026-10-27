@@ -191,6 +191,19 @@ describe('needsTextBitmap: whether the bitmap path is required', () => {
       true,
     );
   });
+
+  it('vertical flow and per-run styles need the bitmap path (Konva.Text cannot express them)', () => {
+    expect(needsTextBitmap(textLayer({ direction: 'vertical' }))).toBe(true);
+    expect(
+      needsTextBitmap(
+        textLayer({
+          runs: [{ text: 'he' }, { text: 'llo', style: { bold: true } }],
+        }),
+      ),
+    ).toBe(true);
+    // A single unstyled run is equivalent to plain text → stay native
+    expect(needsTextBitmap(textLayer({ runs: [{ text: 'hello' }] }))).toBe(false);
+  });
 });
 
 describe('render/text: layout (fake context)', () => {
@@ -239,6 +252,39 @@ describe('render/text: layout (fake context)', () => {
     expect(textBlockHeight(stubCtx(), textLayer({ text: '', fontSize: 10, lineHeight: 1.5 }))).toBe(
       15,
     );
+  });
+
+  it('vertical text stacks characters into columns and counts the tallest column', () => {
+    // Two paragraphs → two columns; 2 characters each; pitch = 10 × 1.5 = 15 → height 30
+    expect(
+      textBlockHeight(
+        stubCtx(),
+        textLayer({
+          text: 'ab\ncd',
+          fontSize: 10,
+          lineHeight: 1.5,
+          height: 30,
+          direction: 'vertical',
+        }),
+      ),
+    ).toBe(30);
+  });
+
+  it('vertical text wraps into a new column once the box height is filled', () => {
+    // Box height 30 / pitch 15 → 2 characters per column, so "abcd" becomes two columns of height 30
+    // (unwrapped it would be a single 4-character column of height 60)
+    expect(
+      textBlockHeight(
+        stubCtx(),
+        textLayer({
+          text: 'abcd',
+          fontSize: 10,
+          lineHeight: 1.5,
+          height: 30,
+          direction: 'vertical',
+        }),
+      ),
+    ).toBe(30);
   });
 });
 

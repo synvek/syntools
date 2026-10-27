@@ -174,6 +174,40 @@ export function TextInput({
   );
 }
 
+/**
+ * Multiline text control for text layers (Enter inserts a newline, which single-line inputs swallow).
+ * `onSelect` exposes the caret range so the rich-text buttons can style only the selected characters.
+ */
+export function TextArea({
+  value,
+  ariaLabel,
+  rows = 3,
+  placeholder,
+  onChange,
+  onSelect,
+}: {
+  value: string;
+  ariaLabel: string;
+  rows?: number;
+  placeholder?: string;
+  onChange: (value: string) => void;
+  onSelect?: (start: number, end: number) => void;
+}) {
+  return (
+    <textarea
+      value={value}
+      rows={rows}
+      aria-label={ariaLabel}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      onSelect={(event) =>
+        onSelect?.(event.currentTarget.selectionStart, event.currentTarget.selectionEnd)
+      }
+      className={`min-h-16 w-full resize-y rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm leading-5 text-gray-800 transition-colors focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 ${FOCUS_RING}`}
+    />
+  );
+}
+
 export function Select<T extends string>({
   value,
   options,

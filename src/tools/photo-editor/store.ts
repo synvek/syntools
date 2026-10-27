@@ -59,6 +59,8 @@ import { compositeDoc, rasterizeSelection } from './render/export';
 import { applySelectionOp, modifySelection as modifySelectionRaster } from './render/selection';
 import type { SelectionModify, SelectionOp } from './render/selection';
 import { paintDoc, paintLayer } from './render/paint';
+import { measureTextBlock } from './render/text';
+import { remapRunsAfterTextEdit } from './model/textRuns';
 import {
   cloneDoc,
   cloneLayer,
@@ -87,6 +89,8 @@ import type {
   Selection,
   ShapeKind,
   ShapeStyleDefaults,
+  TextDirection,
+  TextLayer,
   ToolId,
   VectorMaskRef,
   ViewOverlay,
@@ -153,6 +157,8 @@ interface PhotoState {
   brush: BrushConfig;
   eraserSize: number;
   shapeKind: ShapeKind;
+  /** Flow direction for new text layers (chosen from the text tool's badge flyout) */
+  textDirection: TextDirection;
   /** Default fill / stroke for new shapes (set in the options bar, not part of the document) */
   shapeStyle: ShapeStyleDefaults;
   /** Magnetic lasso: snap width (document px) and edge-contrast threshold */
@@ -211,6 +217,7 @@ interface PhotoState {
   patchBrush: (patch: Partial<BrushConfig>) => void;
   setEraserSize: (size: number) => void;
   setShapeKind: (kind: ShapeKind) => void;
+  setTextDirection: (direction: TextDirection) => void;
   /** Change the default style for new shapes (fill / stroke / stroke width / radius) */
   setShapeStyle: (patch: Partial<ShapeStyleDefaults>) => void;
   /** Change the magnetic lasso width / contrast */
@@ -422,6 +429,23 @@ function usedAssetsAcrossHistory(
   return used;
 }
 
+/**
+ * Recompute a text layer's box after content / style changes.
+ *
+ * - horizontal: the wrap width is user-controlled, so only the height grows with the number of lines;
+ * - vertical: the columns decide the width and the tallest column decides the height.
+ * A `null` measurement (no 2D context, e.g. jsdom) leaves the layer untouched instead of zeroing the box.
+ */
+function fitTextLayer(layer: TextLayer): TextLayer {
+  const size = measureTextBlock(layer);
+  if (!size) return layer;
+  if ((layer.direction ?? 'horizontal') === 'vertical') {
+    // Vertical: the box height is the user's column length, so only the width (column count) follows the content
+    return { ...layer, width: Math.max(1, Math.ceil(size.width)) };
+  }
+  return { ...layer, height: Math.max(1, Math.ceil(size.height)) };
+}
+
 export const usePhotoStore = create<PhotoState>((set, get) => ({
   doc: createDoc(),
   tool: 'move',
@@ -437,6 +461,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
   eraserSize: 24,
   shapeKind: 'rect',
+  textDirection: 'horizontal',
   shapeStyle: { fill: '#2563EB', stroke: '#1D4ED8', strokeWidth: 0, cornerRadius: 12 },
   magnetic: { width: 10, contrast: 30 },
   selection: null,
@@ -594,6 +619,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   setEraserSize: (size) => set({ eraserSize: size }),
   setShapeKind: (kind) => set({ shapeKind: kind }),
+  setTextDirection: (direction) => set({ textDirection: direction }),
 
   setShapeStyle: (patch) => set((s) => ({ shapeStyle: { ...s.shapeStyle, ...patch } })),
 
@@ -831,12 +857,55 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   patchLayer: (id, patch, history = true) => {
     if (history) get().commit('histEdit');
+    const raw = patch as Partial<TextLayer> & Partial<Layer>;
     set((s) => ({
       doc: {
         ...s.doc,
-        layers: s.doc.layers.map((layer) =>
-          layer.id === id ? ({ ...layer, ...patch } as Layer) : layer,
-        ),
+        layers: s.doc.layers.map((layer) => {
+          if (layer.id !== id) return layer;
+          let next = { ...layer, ...patch } as Layer;
+          if (next.kind === 'text' && layer.kind === 'text') {
+            // Text edits must remap the rich-text runs, or per-range styles would drift off the characters
+            if (typeof raw.text === 'string' && raw.text !== layer.text) {
+              next = { ...next, runs: remapRunsAfterTextEdit(layer, raw.text) } as Layer;
+            }
+            // Keep the selection box aligned with multi-line / rich / vertical content.
+            // Only layout-affecting patches need measurement (x/y drags would otherwise measure every frame),
+            // and an explicit height (transform resize writes width + height) wins so dragging handles still works.
+            const affectsLayout =
+              raw.text !== undefined ||
+              raw.runs !== undefined ||
+              raw.fontSize !== undefined ||
+              raw.fontFamily !== undefined ||
+              raw.bold !== undefined ||
+              raw.italic !== undefined ||
+              raw.underline !== undefined ||
+              raw.fill !== undefined ||
+              raw.lineHeight !== undefined ||
+              raw.letterSpacing !== undefined ||
+              raw.paragraphSpacing !== undefined ||
+              raw.warp !== undefined ||
+              raw.direction !== undefined ||
+              raw.width !== undefined;
+            if (affectsLayout) {
+              const textNext = next as TextLayer;
+              if ((textNext.direction ?? 'horizontal') === 'vertical') {
+                // Switching from horizontal: one line tall would wrap into 1-character columns, so give it room
+                if ((layer.direction ?? 'horizontal') !== 'vertical') {
+                  const pitch = textNext.fontSize * textNext.lineHeight;
+                  if (textNext.height < pitch * 1.5) {
+                    next = { ...textNext, height: Math.round(pitch * 8) } as Layer;
+                  }
+                }
+                // Always re-wrapped: a resized box height or new text must recompute the column count
+                next = fitTextLayer(next as TextLayer) as Layer;
+              } else if (raw.height === undefined) {
+                next = fitTextLayer(next as TextLayer) as Layer;
+              }
+            }
+          }
+          return next;
+        }),
       },
     }));
   },
@@ -1525,8 +1594,14 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 
   addTextLayer: (x, y, text) => {
-    const layer = createTextLayer({ doc: get().doc, x, y, text });
-    get().addLayer(layer);
+    const layer = createTextLayer({
+      doc: get().doc,
+      x,
+      y,
+      text,
+      direction: get().textDirection,
+    });
+    get().addLayer(fitTextLayer(layer));
     return layer.id;
   },
 

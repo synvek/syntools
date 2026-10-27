@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FONT_FAMILIES, MAX_WARP_AMOUNT, TEXT_WARP_KINDS } from '../core';
 import {
@@ -7,23 +8,43 @@ import {
   PanelSection,
   Select,
   Slider,
-  TextInput,
+  TextArea,
   ToggleChip,
 } from './controls';
 import { usePhotoStore } from '../store';
-import type { TextAlign, TextWarpKind } from '../model/types';
+import { applyRunStyleToRange, rangeRunStyle } from '../model/textRuns';
+import type {
+  TextAlign,
+  TextDirection,
+  TextLayer,
+  TextRunStyle,
+  TextWarpKind,
+} from '../model/types';
 
 /**
- * Text panel: character + paragraph + warp in three sections (mirroring Photoshop's "Character / Paragraph / Warp Text").
+ * Text panel: content + character + paragraph + warp in separate sections
+ * (mirroring Photoshop's "Character / Paragraph / Warp Text").
  *
- * The Properties panel keeps only the "content" quick edit; every layout detail is gathered here so the same parameters cannot drift apart.
- * Warp style names are proper nouns and go through i18n as `textWarp_<kind>`.
+ * Multi-line & rich text:
+ * - the content field is a textarea, so Enter inserts a real newline;
+ * - selecting part of the text and using the character buttons applies the style only to that range
+ *   (`model/textRuns.ts`); with no selection the whole layer's default is changed.
+ *
+ * The Properties panel keeps only the "content" quick edit; every layout detail is gathered here so the
+ * same parameters cannot drift apart. Warp style names are proper nouns and go through i18n as `textWarp_<kind>`.
  */
 export function TextPanel() {
   const { t } = useTranslation();
   const doc = usePhotoStore((s) => s.doc);
   const patchActive = usePhotoStore((s) => s.patchActive);
   const layer = doc.layers.find((item) => item.id === doc.activeLayerId);
+  const layerId = layer?.id;
+  const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  // Character indexes are per layer: reset when the selection moves to another text layer
+  useEffect(() => {
+    setSelection({ start: 0, end: 0 });
+  }, [layerId]);
 
   if (!layer || layer.kind !== 'text') {
     return (
@@ -42,14 +63,51 @@ export function TextPanel() {
   const warp = layer.warp;
   const warpLabel = (kind: TextWarpKind) => t(`tools.photo.textWarp_${kind}`);
 
+  const text = layer.text;
+  const hasRange = selection.end > selection.start;
+  /** No selection (or the whole text selected) → edit the layer default; otherwise only the selected chars */
+  const coversAll = !hasRange || (selection.start === 0 && selection.end >= text.length);
+
+  const styleActive = (key: 'bold' | 'italic' | 'underline'): boolean =>
+    coversAll ? layer[key] : Boolean(rangeRunStyle(layer, selection.start, selection.end)[key]);
+
+  const applyCharStyle = (patch: TextRunStyle, layerPatch: Partial<TextLayer>) => {
+    if (coversAll) {
+      patchActive(
+        {
+          ...layerPatch,
+          // Existing runs must follow the new default too, or their overrides would mask the change
+          ...(layer.runs && layer.runs.length > 0
+            ? { runs: applyRunStyleToRange(layer, 0, text.length, patch) }
+            : {}),
+        } as never,
+        false,
+      );
+      return;
+    }
+    patchActive(
+      { runs: applyRunStyleToRange(layer, selection.start, selection.end, patch) } as never,
+      false,
+    );
+  };
+
+  const toggleFlag = (key: 'bold' | 'italic' | 'underline') => {
+    const next = !styleActive(key);
+    applyCharStyle({ [key]: next }, { [key]: next } as Partial<TextLayer>);
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <PanelSection title={t('tools.photo.textContent')}>
-        <TextInput
+        <TextArea
           ariaLabel={t('tools.photo.textContent')}
-          value={layer.text}
-          onChange={(text) => patchActive({ text } as never, false)}
+          value={text}
+          onChange={(value) => patchActive({ text: value } as never, false)}
+          onSelect={(start, end) => setSelection({ start, end })}
         />
+        <p className="text-[10px] leading-4 text-gray-400 dark:text-gray-500">
+          {t('tools.photo.textMultiLineHint')}
+        </p>
       </PanelSection>
 
       <PanelSection title={t('tools.photo.textCharacter')}>
@@ -68,7 +126,7 @@ export function TextPanel() {
               value={Math.round(layer.fontSize)}
               min={6}
               max={400}
-              onChange={(fontSize) => patchActive({ fontSize } as never, false)}
+              onChange={(fontSize) => applyCharStyle({ fontSize }, { fontSize })}
             />
           </Field>
           <Field label={t('tools.photo.letterSpacing')}>
@@ -92,18 +150,18 @@ export function TextPanel() {
         <div className="flex flex-wrap gap-1">
           <ToggleChip
             label={t('tools.photo.bold')}
-            active={layer.bold}
-            onClick={() => patchActive({ bold: !layer.bold } as never)}
+            active={styleActive('bold')}
+            onClick={() => toggleFlag('bold')}
           />
           <ToggleChip
             label={t('tools.photo.italic')}
-            active={layer.italic}
-            onClick={() => patchActive({ italic: !layer.italic } as never)}
+            active={styleActive('italic')}
+            onClick={() => toggleFlag('italic')}
           />
           <ToggleChip
             label={t('tools.photo.underline')}
-            active={layer.underline}
-            onClick={() => patchActive({ underline: !layer.underline } as never)}
+            active={styleActive('underline')}
+            onClick={() => toggleFlag('underline')}
           />
         </div>
         <Field label={t('tools.photo.color')}>
@@ -111,13 +169,40 @@ export function TextPanel() {
             type="color"
             aria-label={t('tools.photo.textColor')}
             value={layer.fill}
-            onChange={(event) => patchActive({ fill: event.target.value } as never)}
+            onChange={(event) =>
+              applyCharStyle({ fill: event.target.value }, { fill: event.target.value })
+            }
             className="h-8 w-full cursor-pointer rounded border border-gray-300 bg-transparent dark:border-gray-700"
           />
         </Field>
+        <p className="text-[10px] leading-4 text-gray-400 dark:text-gray-500">
+          {t('tools.photo.richTextHint')}
+        </p>
+        <Button
+          onClick={() => patchActive({ runs: undefined } as never)}
+          title={t('tools.photo.clearFormatting')}
+        >
+          {t('tools.photo.clearFormatting')}
+        </Button>
       </PanelSection>
 
       <PanelSection title={t('tools.photo.textParagraph')}>
+        <Field label={t('tools.photo.textDirection')}>
+          <div className="flex gap-1">
+            {(['horizontal', 'vertical'] as TextDirection[]).map((direction) => (
+              <ToggleChip
+                key={direction}
+                label={
+                  direction === 'horizontal'
+                    ? t('tools.photo.textHorizontal')
+                    : t('tools.photo.textVertical')
+                }
+                active={(layer.direction ?? 'horizontal') === direction}
+                onClick={() => patchActive({ direction } as never)}
+              />
+            ))}
+          </div>
+        </Field>
         <Field label={t('tools.photo.alignment')}>
           <div className="flex gap-1">
             {aligns.map((align) => (

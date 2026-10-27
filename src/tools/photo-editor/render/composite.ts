@@ -228,7 +228,9 @@ export function docSignature(doc: PhotoDoc): string {
           : layer.kind === 'smart'
             ? bakeSignature('', 0, layer.adjustments ?? NO_ADJUSTMENTS, layer.filters ?? [])
             : '',
-        layer.kind === 'text' ? `${layer.text}:${layer.fontSize}` : '',
+        layer.kind === 'text'
+          ? `${layer.text}:${layer.fontSize}:${layer.direction ?? 'horizontal'}:${JSON.stringify(layer.runs ?? null)}`
+          : '',
         maskSignature(layer) ?? '',
         vectorMaskSignature(layer.vectorMask),
         layer.clipped ? 1 : 0,

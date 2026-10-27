@@ -95,11 +95,24 @@ describe('Toolbox grouping', () => {
   });
 
   it('high-frequency tools get their own rows; healing brush and spot healing share one', () => {
-    for (const id of ['brush', 'eraser', 'cloneStamp', 'text']) {
+    for (const id of ['brush', 'eraser', 'cloneStamp']) {
       expect(groupOfTool(id as ToolId)?.items).toHaveLength(1);
     }
     expect(groupOfTool('healing')?.id).toBe(groupOfTool('spotHeal')?.id);
     expect(groupOfTool('healing')?.items.map((item) => item.id)).toEqual(['healing', 'spotHeal']);
+  });
+
+  it('text is one tool with two flows: horizontal and vertical share the T row', () => {
+    const text = groupOfTool('text');
+    expect(text?.items).toHaveLength(2);
+    expect(new Set(text?.items.map((item) => item.id))).toEqual(new Set(['text']));
+    expect(text?.items.map((item) => item.variant)).toEqual(['horizontal', 'vertical']);
+    // Each flow has its own icon (the vertical one is the corner-badge alternative)
+    expect(new Set(text?.items.map((item) => item.icon)).size).toBe(2);
+    expect(text?.variantKind).toBe('text');
+    expect(displayToolOf(text!, 'text', 'vertical').variant).toBe('vertical');
+    expect(displayToolOf(text!, 'text', 'horizontal').variant).toBe('horizontal');
+    expect(displayToolOf(text!, 'text').variant).toBe('horizontal');
   });
 
   it('the three lasso tools form a group; wand and quick select form another', () => {

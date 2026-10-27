@@ -1,4 +1,5 @@
 import Konva from 'konva';
+import { needsTextBitmap } from '../core';
 import { adjustmentBaseIndex, compositeBelowAdjustments } from './composite';
 import type { Layer, PhotoDoc } from '../model/types';
 import {
@@ -104,7 +105,11 @@ function sameKind(node: Konva.Node, layer: Layer): boolean {
     ? `composed:${layer.kind}`
     : layer.kind === 'shape'
       ? `shape:${layer.shape}`
-      : layer.kind;
+      : // Bitmap-backed text (warp / rich / vertical) and native Konva.Text are different node shapes:
+        // toggling between them must rebuild, otherwise the old node would keep ignoring the new mode.
+        layer.kind === 'text' && needsTextBitmap(layer)
+        ? 'text:bitmap'
+        : layer.kind;
   return node.getAttr(LAYER_KIND_ATTR) === expected;
 }
 

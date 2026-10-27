@@ -20,7 +20,7 @@ import { createStage, type OverlayState, type StageHandle } from '../render/stag
 import { onBakeReady } from '../render/bakeQueue';
 import { channelViewCanvas } from '../render/channels';
 import { putBakeResult } from '../render/filters';
-import { bakeKeyOf } from '../render/nodes';
+import { bakeKeyOf, LAYER_ID_ATTR } from '../render/nodes';
 import { refreshLayerNode } from '../render/sync';
 import { usePhotoStore } from '../store';
 import { CanvasOverlay } from './CanvasOverlay';
@@ -43,6 +43,19 @@ function markTransform(
   // Rotation gets its own attribute: existing e2e assertions depend on the `data-transform` format
   if (transform.rotation) host.dataset.viewRotation = String(transform.rotation);
   else delete host.dataset.viewRotation;
+}
+
+/**
+ * Hide the layer being edited inline: the transparent textarea shows the text itself, and a vertical flow
+ * would otherwise be drawn underneath the horizontal editor box and look garbled.
+ */
+function hideEditingLayer(handle: StageHandle, id: string) {
+  const node = handle.contentLayer
+    .getChildren()
+    .find((child) => child.getAttr(LAYER_ID_ATTR) === id);
+  if (!node) return;
+  if (node.visible()) node.visible(false);
+  handle.contentLayer.batchDraw();
 }
 
 /** Padding left around the canvas when fitting */
@@ -113,6 +126,8 @@ export function PhotoCanvas({
   const canvasRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<StageHandle | null>(null);
   const editorRef = useRef<TextEditorHandle | null>(null);
+  /** Layer hidden while its inline editor is open (kept in a ref so any sync can re-hide it) */
+  const editingIdRef = useRef<string | null>(null);
   const transformRef = useRef({ scale: 1, x: 0, y: 0 });
   /** Viewport pixel size: scrollbar geometry depends on it; kept in sync by the ResizeObserver */
   const [hostRect, setHostRect] = useState({ width: 0, height: 0 });
@@ -307,11 +322,21 @@ export function PhotoCanvas({
       const state = usePhotoStore.getState();
       handle.renderBackground(state.doc);
       handle.sync(state.doc);
+      // The layer is hidden while editing, and sync would otherwise make it visible again
+      if (editingIdRef.current) hideEditingLayer(handle, editingIdRef.current);
+    };
+
+    /** Restore the layer hidden under the editor (also used when editing is cancelled with Esc) */
+    const endEditing = () => {
+      if (!editingIdRef.current) return;
+      editingIdRef.current = null;
+      syncNow();
     };
 
     const closeEditor = () => {
       editorRef.current?.destroy();
       editorRef.current = null;
+      endEditing();
     };
 
     const startEditing = (id: string) => {
@@ -328,6 +353,7 @@ export function PhotoCanvas({
           x: layer.x,
           y: layer.y,
           width: layer.width,
+          height: layer.height,
           fontSize: layer.fontSize,
           fontFamily: layer.fontFamily,
           fill: layer.fill,
@@ -335,19 +361,31 @@ export function PhotoCanvas({
           bold: layer.bold,
           italic: layer.italic,
           lineHeight: layer.lineHeight,
+          direction: layer.direction,
         },
         {
           host: wrapper,
           transform: transformRef.current,
           viewSize: { width: wrapper.clientWidth, height: wrapper.clientHeight },
           viewRotation: usePhotoStore.getState().viewRotation,
-          onCommit: (layerId, text) => {
-            usePhotoStore.getState().patchLayer(layerId, { text }, true);
+          onCommit: (layerId, text, size) => {
+            // A manually resized editor box becomes the text box (horizontal → wrap width, vertical → column length)
+            const patch = {
+              text,
+              ...(size?.width !== undefined ? { width: size.width } : {}),
+              ...(size?.height !== undefined ? { height: size.height } : {}),
+            };
+            usePhotoStore.getState().patchLayer(layerId, patch as never, true);
             closeEditor();
             syncNow();
           },
+          onCancel: endEditing,
         },
       );
+      // Hide the layer under the editor: the textarea draws the text, and for vertical flow the two would overlap
+      editingIdRef.current = id;
+      const handle = handleRef.current;
+      if (handle) hideEditingLayer(handle, id);
     };
 
     const cleanupRefs: (() => void)[] = [];
@@ -481,6 +519,8 @@ export function PhotoCanvas({
     if (!handle) return;
     const state = usePhotoStore.getState();
     handle.sync(state.doc);
+    // Editing hides the layer; a doc update (e.g. a colour change) must not pop it back under the editor
+    if (editingIdRef.current) hideEditingLayer(handle, editingIdRef.current);
   }, [doc]);
 
   /**
