@@ -87,7 +87,7 @@ const icons: Record<string, ReactNode> = {
       <path d="m4 17 5-4 3 2 4-4 4 4" />
     </>
   ),
-  text: <path d="M4 6h16M4 12h10M4 18h7" />,
+  text: <path d="M5 6h14M12 6v13" />,
   code: <path d="M9 8l-4 4 4 4M15 8l4 4-4 4" />,
   globe: (
     <>
