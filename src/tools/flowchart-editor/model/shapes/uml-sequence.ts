@@ -2,7 +2,7 @@ import type { ShapeDef } from './index';
 import { axisAdjust, pxMx } from './adjust';
 import { combinedFragmentPath, interactionUsePath, lifelinePath } from './uml-paths';
 
-/** 左上角标签高度可调（组合片段 / 交互引用） */
+/** Top-left tab height is adjustable (combined fragment / interaction use) */
 const tabHeightAdjust = (dflt: (w: number, h: number) => number) =>
   axisAdjust({
     key: 'tabHeight',
@@ -15,7 +15,7 @@ const tabHeightAdjust = (dflt: (w: number, h: number) => number) =>
     mx: pxMx((_w, h) => h),
   });
 
-/** UML 时序图：生命线、激活条、销毁、组合片段、交互引用、状态不变式、门 */
+/** UML sequence diagram: lifeline, activation, destroy, combined fragment, interaction use, state invariant, gate */
 export const UML_SEQUENCE_SHAPES: ShapeDef[] = [
   {
     kind: 'umlLifeline',
@@ -24,7 +24,7 @@ export const UML_SEQUENCE_SHAPES: ShapeDef[] = [
     size: { width: 120, height: 300 },
     path: lifelinePath,
     adjust: [
-      // 顶部对象框高度：固定像素（默认 40px），不再随生命线高度等比缩放；仍可拖拽/面板调整
+      // Header box height: fixed pixels (40px by default), no longer scaled with the lifeline height; still draggable / adjustable in the panel
       axisAdjust({
         key: 'lifelineHeader',
         labelKey: 'lifelineHeader',

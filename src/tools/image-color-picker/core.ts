@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 图片取色：从 ImageData 按坐标取样，返回 HEX/RGB。
+ * Image color picking: sample ImageData by coordinate and return HEX/RGB.
  */
 
 export type ImageColorError = 'OUT_OF_BOUNDS';

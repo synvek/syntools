@@ -5,10 +5,10 @@ import { countMatches, findInDoc } from '../model/search';
 import { useSlideStore } from '../store';
 
 /**
- * 查找替换浮层（底部居中）。
+ * Find & replace popover (bottom center).
  *
- * 命中范围是**整个文档**（跨页），与 PowerPoint 一致：概览显示总命中数，
- * 「下一个」按顺序跨页跳转并选中目标元素，方便直接看到结果。
+ * The search scope is the **whole document** (across slides), like PowerPoint: the summary shows the total hit count,
+ * and "next" steps across slides in order, selecting the target element so the result is visible right away.
  */
 
 const INPUT =

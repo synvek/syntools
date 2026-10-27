@@ -100,7 +100,7 @@ describe('大纲 → 幻灯片', () => {
       undefined,
     );
     expect(deck).toHaveLength(3);
-    // 测试文档只有一个默认版式时全部回落到首个版式，不应抛出
+    // With only one default layout in the test document, everything falls back to the first layout and must not throw
     expect(deck.every((slide) => slide.layoutId === doc.layouts[0].id)).toBe(true);
   });
 

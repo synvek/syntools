@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 
 /**
- * 幻灯片工具栏专用图标。
+ * Icons dedicated to the slide toolbar.
  *
- * 工具栏改成「以图标为主、文字走 tooltip」后，层级 / 组合 / 对齐 / 分布 / 翻转
- * 这些操作在共享 Icon 集里没有合适图形（`chevronLeft` 之类会被误读为「上一张」），
- * 因此集中在这里内联定义。画法与内置 Icon 集统一：24 视窗、currentColor 描边。
+ * Since the toolbar switched to "icon-first with text in tooltips", z-order / group / align / distribute / flip
+ * have no suitable glyph in the shared icon set (`chevronLeft` and friends read as "previous slide"), so they
+ * are defined inline here. Drawing matches the built-in icon set: 24 viewBox, currentColor stroke.
  */
 
 const svg = (children: ReactNode, extra: { dashed?: boolean } = {}) => (
@@ -24,7 +24,7 @@ const svg = (children: ReactNode, extra: { dashed?: boolean } = {}) => (
   </svg>
 );
 
-/** 撤销 / 重做：标准弯箭头造型（与文字处理器工具栏一致） */
+/** Undo / redo: the standard curved arrow (matching the word-processor toolbar) */
 export function UndoIcon() {
   return svg(
     <>
@@ -43,7 +43,7 @@ export function RedoIcon() {
   );
 }
 
-/** 对齐：外框 + 全部靠左的线 */
+/** Align: outer frame + lines all pushed left */
 export function AlignIcon() {
   return svg(
     <>
@@ -53,7 +53,7 @@ export function AlignIcon() {
   );
 }
 
-/** 分布：外框 + 三根等距竖条 */
+/** Distribute: outer frame + three evenly spaced bars */
 export function DistributeIcon() {
   return svg(
     <>
@@ -63,7 +63,7 @@ export function DistributeIcon() {
   );
 }
 
-/** 翻转：中轴 + 左右两个互为镜像的三角 */
+/** Flip: a center axis + two mirrored triangles */
 export function FlipIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
@@ -74,7 +74,7 @@ export function FlipIcon() {
   );
 }
 
-/** 层级：front=置顶、back=置底、forward=上移一层、backward=下移一层 */
+/** Z-order: front = bring to front, back = send to back, forward = bring forward, backward = send backward */
 export function LayerIcon({ variant }: { variant: 'front' | 'back' | 'forward' | 'backward' }) {
   if (variant === 'front') {
     return (
@@ -126,7 +126,7 @@ export function LayerIcon({ variant }: { variant: 'front' | 'back' | 'forward' |
   );
 }
 
-/** 组合：两个方块 + 虚线外框 */
+/** Group: two squares + a dashed outer frame */
 export function GroupIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
@@ -155,7 +155,7 @@ export function GroupIcon() {
   );
 }
 
-/** 取消组合：两个方块 + 一道斜线 */
+/** Ungroup: two squares + a slash */
 export function UngroupIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">

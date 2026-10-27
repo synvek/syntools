@@ -5,7 +5,7 @@ import { normalizeXlsxArchive, wrapCommentTextRuns } from './xlsx-normalize';
 const fakeFile = (buffer: ArrayBuffer, name: string): File =>
   ({ name, size: buffer.byteLength, arrayBuffer: async () => buffer }) as unknown as File;
 
-/** 用 exceljs 生成「带批注」的源文件（exceljs 自身写法，exceljs 能读） */
+/** Build a source file with a note using exceljs itself (so exceljs can read it back) */
 async function buildSourceWithNote(): Promise<ArrayBuffer> {
   const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
@@ -16,9 +16,9 @@ async function buildSourceWithNote(): Promise<ArrayBuffer> {
 }
 
 /**
- * 把 exceljs 风格的批注归档改造成 openpyxl 风格：
- * 批注部件放到子目录、关系 Target 用绝对路径、正文直接写 `<t>`。
- * 这正是会让 exceljs 抛 TypeError、整份文件无法导入的写法。
+ * Reshape an exceljs-style comment archive into openpyxl style: the comment part moves into a
+ * subdirectory, the relationship Target becomes absolute and the body writes `<t>` directly.
+ * This is exactly the layout that makes exceljs throw a TypeError and reject the whole file.
  */
 async function mimicOpenpyxlArchive(source: ArrayBuffer): Promise<ArrayBuffer> {
   const JSZip = (await import('jszip')).default;
@@ -51,7 +51,7 @@ async function mimicOpenpyxlArchive(source: ArrayBuffer): Promise<ArrayBuffer> {
     }),
   );
 
-  // 把 <text><r><t>…</t></r></text> 摊平成 <text><t>…</t></text>
+  // Flatten <text><r><t>…</t></r></text> into <text><t>…</t></text>
   const commentName = 'xl/comments/comment1.xml';
   const commentXml = await zip.file(commentName)!.async('string');
   zip.file(commentName, commentXml.replace(/<r>(\s*<t[^>]*>[\s\S]*?<\/t>\s*)<\/r>/g, '$1'));
@@ -73,7 +73,7 @@ describe('normalizeXlsxArchive', () => {
     const source = await buildSourceWithNote();
     const archive = await mimicOpenpyxlArchive(source);
 
-    // 未归一化：exceljs 读到的批注文本为空（内容丢失）
+    // Without normalisation, exceljs reads an empty comment body (content lost)
     const ExcelJS = (await import('exceljs')).default;
     const rawWorkbook = new ExcelJS.Workbook();
     let rawNoteText = '';
@@ -88,7 +88,7 @@ describe('normalizeXlsxArchive', () => {
     }
     expect(rawNoteText).not.toBe('批注内容');
 
-    // 归一化后：可正常导入且批注文本完整保留
+    // After normalisation it imports fine and the comment body is fully preserved
     const result = await importXlsxToSnapshot(fakeFile(archive, 'note.xlsx'));
     expect(result.ok).toBe(true);
     if (!result.ok) return;

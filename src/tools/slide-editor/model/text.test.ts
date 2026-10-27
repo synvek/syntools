@@ -45,11 +45,11 @@ describe('replaceBodyText：编辑后保留样式与段落属性', () => {
         ],
       },
     ]);
-    // 在 "Hello " 之后插入 "Big "
+    // Insert "Big " after "Hello "
     const next = replaceBodyText(source, 'Hello Big World');
     const runs = next.paragraphs[0].runs;
     expect(bodyToText(next)).toBe('Hello Big World');
-    // 插入的字符继承前一个字符（size 20，非粗体），尾部粗体 run 原样保留
+    // Inserted chars inherit the previous char (size 20, not bold); the trailing bold run is preserved as-is
     expect(runs.some((run) => run.text.includes('Big') && run.style?.size === 20)).toBe(true);
     expect(runs.some((run) => run.text === 'World' && run.style?.bold === true)).toBe(true);
   });

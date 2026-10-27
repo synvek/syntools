@@ -1,29 +1,31 @@
 import type { LangSpec } from './core';
 
 /**
- * 括号配对纯逻辑（阶段 4）：为「配对高亮」与「跳转到配对括号」提供匹配位置。
+ * Bracket matching pure logic (phase 4): supplies the matched position for "bracket pair
+ * highlighting" and "jump to matching bracket".
  *
- * 编辑区是 contenteditable，无法在行内安全地插入高亮节点，因此这里只负责**算出偏移**，
- * 由覆盖层按实际像素位置绘制（见 `CodeSurface`）。
+ * The editing surface is contenteditable, so highlight nodes cannot be inserted safely inside a
+ * line; this module only **computes offsets** and the overlay draws them at the real pixel
+ * position (see `CodeSurface`).
  *
- * 扫描时跳过字符串与注释，避免把 `"}"` 或 `// )` 里的括号计入配对。
+ * Strings and comments are skipped while scanning so brackets inside `"}"` or `// )` are ignored.
  */
 
 export interface BracketPair {
-  /** 左括号偏移 */
+  /** Offset of the opening bracket */
   open: number;
-  /** 右括号偏移 */
+  /** Offset of the closing bracket */
   close: number;
 }
 
-/** 支持的括号对（按常见语言取交集：圆括号 / 方括号 / 花括号） */
+/** Supported bracket pairs (the intersection of common languages: round / square / curly) */
 export const BRACKET_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['(', ')'],
   ['[', ']'],
   ['{', '}'],
 ];
 
-/** 单次扫描的字符上限，防止未闭合括号导致扫到文末（超长文件下退化） */
+/** Characters per scan limit, so an unclosed bracket cannot scan to EOF (degrades gracefully on huge files) */
 export const MAX_BRACKET_SCAN = 200_000;
 
 const QUOTES = new Set(['"', "'", '`']);
@@ -37,7 +39,7 @@ function ctxOf(spec: LangSpec): ScanContext {
   return { lineComment: spec.lineComment, blockComment: spec.blockComment };
 }
 
-/** 跳过字符串字面量，返回结束后的下标（未闭合则返回文末） */
+/** Skip a string literal and return the index after it (EOF when unterminated) */
 function skipString(text: string, start: number): number {
   const quote = text[start]!;
   let i = start + 1;
@@ -48,28 +50,28 @@ function skipString(text: string, start: number): number {
       continue;
     }
     if (ch === quote) return i + 1;
-    if (ch === '\n' && quote !== '`') return i; // 普通字符串不跨行
+    if (ch === '\n' && quote !== '`') return i; // plain strings do not span lines
     i += 1;
   }
   return text.length;
 }
 
-/** 跳过行注释，返回换行符下标（不含） */
+/** Skip a line comment and return the index of the newline (exclusive) */
 function skipLineComment(text: string, start: number): number {
   let i = start;
   while (i < text.length && text[i] !== '\n') i += 1;
   return i;
 }
 
-/** 跳过块注释，返回结束符之后的下标 */
+/** Skip a block comment and return the index after its closing delimiter */
 function skipBlockComment(text: string, start: number, close: string): number {
   const end = text.indexOf(close, start);
   return end < 0 ? text.length : end + close.length;
 }
 
 /**
- * 从 `from` 开始扫描，找到与 `[open, close]` 配对的另一端。
- * @param direction 1 向前（从左括号找右括号），-1 向后（从右括号找左括号）
+ * Scan from `from` to find the other end of the `[open, close]` pair.
+ * @param direction 1 scans forward (open → close), -1 scans backward (close → open)
  */
 function scanForPair(
   text: string,
@@ -119,11 +121,11 @@ function pairOf(ch: string): readonly [string, string] | null {
 }
 
 /**
- * 该偏移是否落在字符串 / 注释内部（从文首扫描判定）。
- * 光标停在 `"{ }"` 这类字面量里的括号上时不应触发配对。
+ * Whether the offset sits inside a string / comment (determined by scanning from the start).
+ * A caret on a bracket inside a literal such as `"{ }"` must not trigger matching.
  */
 function isInsideLiteral(text: string, offset: number, ctx: ScanContext): boolean {
-  if (offset > MAX_BRACKET_SCAN) return false; // 超长文件退化为「按代码处理」，避免每次移动光标全量扫描
+  if (offset > MAX_BRACKET_SCAN) return false; // huge files are treated as code to avoid a full scan on every caret move
   let i = 0;
   while (i < offset) {
     const ch = text[i]!;
@@ -151,8 +153,8 @@ function isInsideLiteral(text: string, offset: number, ctx: ScanContext): boolea
 }
 
 /**
- * 求 `offset` 处（含其前一字符）括号的配对位置。
- * 不在括号旁或括号不配对时返回 null。
+ * Find the partner of the bracket at `offset` (or at the character just before it).
+ * Returns null when the caret is not next to a bracket or the bracket is unmatched.
  */
 export function findBracketPair(text: string, offset: number, spec: LangSpec): BracketPair | null {
   const positions = [offset, offset - 1];

@@ -109,7 +109,7 @@ import {
 import { registerRichTextStrings } from './strings';
 import './editor.css';
 
-// 工具文案随本 chunk 懒加载注册，不占用首屏语言包体积
+// Tool strings are registered lazily with this chunk so they stay out of the first-screen bundle
 registerRichTextStrings(i18n);
 
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
@@ -117,15 +117,16 @@ import { PdfModeDialog, type PdfMode } from './PdfModeDialog';
 type BusyKind = 'import' | 'docx' | 'pdf' | null;
 
 const SAVE_DEBOUNCE_MS = 600;
-/** 编辑区最小可用高度：窗口过矮时宁可让页面滚动，也不把编辑区压扁 */
+/** Minimum usable editor height: on short windows let the page scroll rather than squash the editor */
 const MIN_VIEWPORT_PX = 320;
 
-/** 拼写面板最多展示的问题数：超出部分不渲染，避免长文档铺开上百条 */
+/** Maximum issues shown in the spellcheck panel: skip the rest so long documents don't render hundreds */
 const SPELL_ISSUE_LIMIT = 100;
 
 /**
- * 单文件 HTML 导出的图片样式：不携带编辑器样式表，需内联补齐，
- * 否则四周型 / 上下型环绕与行内图片的对齐都会在导出文件里失效。
+ * Image styles for single-file HTML export: the exported file carries no editor stylesheet,
+ * so these must be inlined — otherwise wrap-left / wrap-right / top-bottom floats and inline
+ * image alignment all break in the exported file.
  */
 const IMAGE_EXPORT_CSS =
   'img{max-width:100%;height:auto;vertical-align:baseline}' +
@@ -133,7 +134,7 @@ const IMAGE_EXPORT_CSS =
   "img[data-layer='wrap-right']{float:right;margin:4px 0 8px 12px}" +
   "img[data-layer='top-bottom']{display:block;margin:8px auto}";
 
-/** 单文件 HTML 导出不携带编辑器样式表，目录样式需内联补齐（与 editor.css 保持一致） */
+/** Single-file HTML export carries no editor stylesheet, so TOC styles are inlined (kept in sync with editor.css) */
 const TOC_EXPORT_CSS =
   '.rte-toc{margin:.75em 0 1.25em}.rte-toc-title{margin:0 0 .5em;font-weight:600}' +
   '.rte-toc-list{list-style:none;margin:0;padding:0}' +
@@ -141,7 +142,7 @@ const TOC_EXPORT_CSS =
   '.rte-toc-text{flex:1;min-width:0;overflow-wrap:anywhere}' +
   '.rte-toc-page{flex-shrink:0;color:#6b7280}';
 
-/** 等待下一帧渲染完成（打印/截图前必须完成布局） */
+/** Wait for the next frame to finish rendering (layout must settle before printing/screenshotting) */
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
@@ -158,8 +159,8 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /**
- * 富文本编辑器工具：本地编辑 + Word(.docx) 导入导出 + 双模式 PDF 导出。
- * 所有内容处理均在浏览器完成，不产生任何外发请求。
+ * Rich text editor tool: local editing + Word (.docx) import/export + dual-mode PDF export.
+ * All content processing happens in the browser; nothing is ever sent out.
  */
 export default function RichTextEditorTool() {
   const { t } = useTranslation();
@@ -169,7 +170,7 @@ export default function RichTextEditorTool() {
   const [failure, setFailure] = useState<Failure | null>(null);
   const [losses, setLosses] = useState<DocxExportLosses | null>(null);
   const [markdownLosses, setMarkdownLosses] = useState<MarkdownExportLosses | null>(null);
-  // 分页快照：纸面位置 + 每页起始块的文档位置（目录据后者算真实页码）
+  // Pagination snapshot: sheet positions + doc position of each page start (the TOC derives real page numbers from the latter)
   const [layout, setLayout] = useState<PageLayoutSnapshot>({ sheetTops: [], pageStarts: [] });
   const [printNotice, setPrintNotice] = useState(false);
   const [pageSetup, setPageSetup] = useState<PageSetupConfig>(() =>
@@ -181,24 +182,24 @@ export default function RichTextEditorTool() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [spellcheckOpen, setSpellcheckOpen] = useState(false);
   const [spellcheckEnabled, setSpellcheckEnabled] = useState(false);
-  /** 英文词表（按需从静态资源加载，未加载时只依据自定义词典判断） */
+  /** English word list (loaded on demand from static assets; until loaded only the custom dictionary is used) */
   const [dictionary, setDictionary] = useState<ReadonlySet<string>>(() => new Set());
   const [dictionaryLoading, setDictionaryLoading] = useState(false);
   const [dictionaryFailed, setDictionaryFailed] = useState(false);
   const [userWords, setUserWords] = useState<string[]>(() => initial?.userWords ?? []);
-  /** 本次会话内忽略的单词（不落盘：属于临时判断） */
+  /** Words ignored for this session only (not persisted: treated as a temporary decision) */
   const [ignoredWords, setIgnoredWords] = useState<string[]>([]);
-  /** 最近套用的模板 id（随草稿落盘，面板据此标记当前模板） */
+  /** Id of the last applied template (persisted with the draft; the panel marks the current template from it) */
   const [templateId, setTemplateId] = useState(initial?.templateId ?? '');
   const [reviewOpen, setReviewOpen] = useState(false);
-  // 批注 / 修订元数据随草稿落盘：初始化时直接取回上次会话的内容
+  // Comment / tracked-change metadata is persisted with the draft: restore the previous session on init
   const [comments, setComments] = useState<DocComment[]>(() => initial?.comments ?? []);
   const [changes, setChanges] = useState<TrackedChange[]>(() => initial?.changes ?? []);
-  /** 正在撰写的新批注引文（null 表示未在撰写） */
+  /** Quote of the comment being composed (null = not composing) */
   const [pendingQuote, setPendingQuote] = useState<string | null>(null);
   const [author, setAuthor] = useState(() => readReviewerName());
   const [diffVersion, setDiffVersion] = useState<StoredVersion | null>(null);
-  // 分页插件在编辑器创建（渲染期）即开始回调，需等组件挂载后再 setState
+  // The pagination plugin starts calling back while the editor is created (during render), so wait until mounted before setState
   const mountedRef = useRef(false);
   const pendingLayoutRef = useRef<PageLayoutSnapshot | null>(null);
   const [busy, setBusy] = useState<BusyKind>(null);
@@ -207,13 +208,13 @@ export default function RichTextEditorTool() {
     initial?.pdfMode === 'snapshot' ? 'snapshot' : 'text',
   );
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
-  /** 脚注弹窗：null 关闭；pos 为 null 表示新建 */
+  /** Footnote dialog: null = closed; pos null = create new */
   const [footnoteDialog, setFootnoteDialog] = useState<{
     mode: 'insert' | 'edit';
     pos: number | null;
     note: string;
   } | null>(null);
-  /** 公式弹窗：null 关闭；pos 为 null 表示新建 */
+  /** Math dialog: null = closed; pos null = create new */
   const [mathDialog, setMathDialog] = useState<{
     mode: 'insert' | 'edit';
     pos: number | null;
@@ -234,7 +235,7 @@ export default function RichTextEditorTool() {
   const [saved, setSaved] = useState(Boolean(initial));
   const flowRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  /** 编辑区高度 = 首屏剩余空间（底部状态栏留在首屏内，「相关工具」推到首屏之外） */
+  /** Editor height = remaining first-screen space (status bar stays in view, "related tools" is pushed below the fold) */
   const viewportMax = useViewportFill(viewportRef, { min: MIN_VIEWPORT_PX });
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const titleRef = useRef(title);
@@ -242,17 +243,18 @@ export default function RichTextEditorTool() {
   const viewRef = useRef(viewMode);
   viewRef.current = viewMode;
   const surfaceRef = useRef<HTMLDivElement | null>(null);
-  /** 编辑区右键菜单：命中的对象与位置（视口坐标） */
+  /** Editor context menu: hit target and position (viewport coordinates) */
   const [contextMenu, setContextMenu] = useState<EditorContextTarget | null>(null);
-  /** 水平标尺开关（对标 Word 标尺，默认显示） */
+  /** Horizontal ruler toggle (like Word's ruler, shown by default) */
   const [rulerOpen, setRulerOpen] = useState(true);
-  // 页面几何（mm）→ 像素：随页面设置变化，插件通过 getter 读取最新值
+  // Page geometry (mm) -> pixels: follows page setup changes; plugins read the latest values via getters
   const metrics = useMemo(() => resolvePageMetrics(pageSetup), [pageSetup]);
   const metricsRef = useRef(metrics);
   metricsRef.current = metrics;
   const getMetrics = useCallback(() => metricsRef.current, []);
-  // 纸面是绝对定位元素，不参与父级高度计算：内容不足整页时灰色工作台会提前结束。
-  // 这里按最后一张纸的下沿给内容区补一个最小高度，让灰色背景铺满到最后一页。
+  // Sheets are absolutely positioned and don't contribute to parent height: when content is shorter
+  // than a full page, the gray workbench would end early. Give the content area a minimum height
+  // based on the last sheet's bottom edge so the gray background fills through the last page.
   const sheetBottomPx = useMemo(() => {
     const tops = layout.sheetTops;
     if (tops.length === 0) return 0;
@@ -260,7 +262,7 @@ export default function RichTextEditorTool() {
   }, [layout, metrics]);
 
   const placeholder = useMemo(() => t('tools.richText.placeholder'), [t]);
-  /** 分页快照回调：纸面位置或分页点变化才更新，避免无意义的重渲染 */
+  /** Pagination snapshot callback: update only when sheet positions or page breaks change, avoiding pointless re-renders */
   const handleLayout = useCallback((next: PageLayoutSnapshot) => {
     if (!mountedRef.current) {
       pendingLayoutRef.current = next;
@@ -283,16 +285,16 @@ export default function RichTextEditorTool() {
     () => ({ name: t('tools.richText.footnote'), empty: t('tools.richText.footnoteEmpty') }),
     [t],
   );
-  /** 点击正文中的公式（NodeView 回调）→ 打开编辑弹窗 */
+  /** Click a formula in the body (NodeView callback) -> open the edit dialog */
   const handleMathSelect = useCallback((pos: number, latex: string, display: boolean) => {
     setMathDialog({ mode: 'edit', pos, latex, display });
   }, []);
-  // 拼写检查的词典与开关经 ref + getter 暴露给 PM 插件（词表加载后无需重建编辑器）。
-  // 必须声明在 useEditor 之前：编辑器在渲染期同步构造，插件 state.init 会立即调用 getter 读取这两个 ref。
+  // The spellcheck dictionary and toggle are exposed to the PM plugin via refs + getters (no editor rebuild after the word list loads).
+  // This must be declared before useEditor: the editor is constructed synchronously during render and plugin state.init calls these getters immediately.
   const userWordsRef = useRef<string[]>(initial?.userWords ?? []);
   const dictionaryRef = useRef<ReadonlySet<string>>(dictionary);
   const spellcheckEnabledRef = useRef(false);
-  /** 拼写检查读取实时词典与开关（getter 身份稳定，插件不需要重建） */
+  /** Spellcheck reads the live dictionary and toggle (stable getter identity, so the plugin never needs rebuilding) */
   const getSpellDictionary = useCallback(
     () => ({ words: dictionaryRef.current, userWords: userWordsRef.current }),
     [],
@@ -323,17 +325,17 @@ export default function RichTextEditorTool() {
 
   const editor = useEditor({ extensions, content: snapshotHtml });
 
-  // 页面设置/缩放变化后强制重排：页高与内容宽变化会改变分页点
+  // Force a relayout after page setup / zoom changes: page height and content width changes move the page breaks
   useEffect(() => {
     if (!editor || viewMode !== 'paged') return;
     const id = window.setTimeout(() => {
-      // 空事务触发插件 update → 重新测量与规划
+      // An empty transaction triggers the plugin's update -> re-measure and re-plan
       editor.view.dispatch(editor.state.tr);
     }, 0);
     return () => clearTimeout(id);
   }, [editor, viewMode, metrics, zoom]);
 
-  // 挂载后应用插件在渲染期缓存的分页快照
+  // Apply the pagination snapshot the plugin cached during render, now that we're mounted
   useEffect(() => {
     mountedRef.current = true;
     if (pendingLayoutRef.current) {
@@ -348,13 +350,13 @@ export default function RichTextEditorTool() {
 
   const docIdRef = useRef<string | null>(null);
   docIdRef.current = docId;
-  // 审阅元数据经 ref 读取：persistNow 依赖保持稳定，
-  // 否则每次批注变化都会让编辑器 update 监听重新注册
+  // Read review metadata through refs so persistNow keeps a stable identity;
+  // otherwise every comment change would re-register the editor update listener
   const commentsRef = useRef<DocComment[]>(comments);
   const changesRef = useRef<TrackedChange[]>(changes);
   const templateIdRef = useRef<string>(initial?.templateId ?? '');
 
-  /** 惰性分配文档 id：首次保存时才入库 */
+  /** Lazily allocate a document id: only persisted on first save */
   const ensureDocId = (): string => {
     if (!docIdRef.current) {
       const id = createDocId();
@@ -365,7 +367,7 @@ export default function RichTextEditorTool() {
     return docIdRef.current;
   };
 
-  /** 统一持久化：localStorage 草稿（同步兜底 + 降级）+ IndexedDB 文档库（多文档/版本历史） */
+  /** Unified persistence: localStorage draft (synchronous fallback + degraded mode) + IndexedDB document library (multi-doc / version history) */
   const persistNow = useCallback(
     (draft: RichTextDraft): void => {
       const withPrefs: RichTextDraft = {
@@ -385,12 +387,12 @@ export default function RichTextEditorTool() {
       void saveDocument(id, withPrefs).then(() => {
         void listDocuments().then(setDocs);
       });
-      // ensureDocId/setSaved/setDraftNotice 依赖稳定，无需加入依赖
+      // ensureDocId/setSaved/setDraftNotice have stable identities, no need to list them as deps
     },
     [pageSetup, zoom, pdfMode],
   );
 
-  /** 同步审阅元数据（状态 + ref 双写，供持久化读 ref） */
+  /** Sync review metadata (write both state and ref, since persistence reads the ref) */
   const applyReview = useCallback(
     (source: {
       comments: DocComment[];
@@ -410,7 +412,7 @@ export default function RichTextEditorTool() {
     [],
   );
 
-  // 启动：恢复指针文档或迁移 v1 草稿到文档库
+  // Startup: restore the pointed-to document, or migrate the v1 draft into the document library
   useEffect(() => {
     void initDocStore().then((init) => {
       void listDocuments().then(setDocs);
@@ -425,10 +427,10 @@ export default function RichTextEditorTool() {
         setSaved(true);
       }
     });
-    // 仅在编辑器就绪后执行一次
+    // Run only once, after the editor is ready
   }, [editor, applyReview]);
 
-  // 延迟/异步回调可能落在已销毁的编辑器上（React 严格模式双挂载），读取前先判定
+  // Deferred/async callbacks may land on an already destroyed editor (React StrictMode double mount), so check first
   const readHtml = useCallback((): string | null => {
     if (!editor || editor.isDestroyed) return null;
     try {
@@ -438,7 +440,7 @@ export default function RichTextEditorTool() {
     }
   }, [editor]);
 
-  // 批注 / 修订变化后落盘（此前它们只存在于组件态，刷新即丢失）
+  // Persist after comment / tracked-change updates (previously they only lived in component state and were lost on refresh)
   const reviewMountedRef = useRef(false);
   useEffect(() => {
     commentsRef.current = comments;
@@ -474,7 +476,7 @@ export default function RichTextEditorTool() {
     };
   }, [editor, persistNow, readHtml]);
 
-  // 标题变化同样落盘
+  // Persist title changes too
   useEffect(() => {
     if (!editor) return;
     const timer = setTimeout(() => {
@@ -485,7 +487,7 @@ export default function RichTextEditorTool() {
     return () => clearTimeout(timer);
   }, [title, editor, persistNow, readHtml]);
 
-  // 视图切换立即落盘，刷新后保持用户偏好
+  // Persist view switches immediately so the user's preference survives a refresh
   useEffect(() => {
     if (!editor) return;
     const html = readHtml();
@@ -494,12 +496,12 @@ export default function RichTextEditorTool() {
   }, [viewMode, editor, persistNow, readHtml]);
 
   /**
-   * 目录导出内容：目录节点是 atom，`getHTML()` 只输出空外壳。
-   * 这里按「当前文档 + 当前分页结果」渲染出可直接分发的目录 HTML；
-   * sheetTops 参与依赖，分页收敛后页码变化会触发重算。
+   * TOC export content: the TOC node is an atom, so `getHTML()` only outputs an empty shell.
+   * Render a directly distributable TOC HTML from "current document + current pagination";
+   * sheetTops is a dependency so page numbers are recomputed once pagination settles.
    */
   const tocHtml = useMemo(() => {
-    // snapshotHtml 是正文变化的信号；空文档无需渲染目录
+    // snapshotHtml is the signal that body content changed; an empty document needs no TOC
     if (!editor || editor.isDestroyed || !snapshotHtml) return '';
     const { entries, headings } = buildTocEntries(editor.state.doc, (pos) =>
       pageIndexOfPosition(layout.pageStarts, pos),
@@ -508,28 +510,28 @@ export default function RichTextEditorTool() {
   }, [editor, snapshotHtml, layout, tocLabels]);
 
   /**
-   * 导出前的统一整理：补齐目录内容 + 脚注编号与文末汇总区。
-   * 目录与脚注都是「渲染期派生」的内容（atom 节点序列化为空外壳、脚注汇总区是 widget），
-   * 不在导出前补齐，打印 / PDF / Word / Markdown 里就会缺内容。
+   * Unified preparation before export: fill in TOC content + footnote numbering and the end-of-document summary.
+   * Both TOC and footnotes are "render-time derived" content (atom nodes serialize to an empty shell,
+   * the footnote summary is a widget); without this step print / PDF / Word / Markdown lose content.
    */
   const prepareExportHtml = useCallback(
     (html: string): string => injectFootnotes(injectTocHtml(html, tocHtml), footnoteLabels),
     [tocHtml, footnoteLabels],
   );
 
-  /** 打印 / 快照 PDF / 放映 / 单文件 HTML 共用：整理后的 HTML */
+  /** Shared by print / snapshot PDF / present / single-file HTML: the prepared HTML */
   const printHtml = useMemo(
     () => injectMath(prepareExportHtml(snapshotHtml)),
     [prepareExportHtml, snapshotHtml],
   );
 
-  // 放映用只读 HTML：复用导出 PDF 的同一套净化逻辑，避免注入风险
+  // Read-only HTML for presentation: reuse the same sanitizing path as PDF export to avoid injection risk
   const presentHtml = useMemo(() => {
     const result = sanitizeDocHtml(printHtml);
     return result.ok ? result.value : '';
   }, [printHtml]);
 
-  // ⌘/Ctrl+F 打开查找替换，Esc 关闭（编辑器聚焦时同样生效）
+  // ⌘/Ctrl+F opens find & replace, Esc closes it (works while the editor is focused too)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
@@ -568,9 +570,9 @@ export default function RichTextEditorTool() {
     setBusy('docx');
     setFailure(null);
     setLosses(null);
-    // 目录字段的缓存条目取自已渲染的目录内容，因此先补齐再导出
+    // TOC field cache entries come from the rendered TOC, so fill it in before exporting
     const html = prepareExportHtml(editor.getHTML());
-    // 批注与修订元数据一并写入，Word 侧可原生审阅
+    // Include comment and tracked-change metadata so Word can review them natively
     const result = await exportDocxBlob(html, title, pageSetup, {
       comments: commentsRef.current,
       changes: changesRef.current,
@@ -582,7 +584,7 @@ export default function RichTextEditorTool() {
       return;
     }
     downloadBlob(result.value, buildExportFilename(title || 'document', 'docx'));
-    // 导出后提示已知损耗，替代静默丢弃
+    // Report known losses after export instead of dropping them silently
     const scanned = scanDocxExportLosses(html, commentsRef.current);
     if (scanned.ok) {
       const { externalImages, webpImages, deepListItems, unlinkedComments, mathAsImages } =
@@ -608,28 +610,28 @@ export default function RichTextEditorTool() {
     await nextFrame();
     try {
       if (mode === 'text') {
-        // 打印视图中的文字可选可检索，且中文无需嵌入字体。
-        // 等待字体就绪后，把页面视图的块级分页同步到打印流，保证所见即所得。
+        // Text in the print view is selectable and searchable, and Chinese needs no embedded font.
+        // Wait for fonts, then sync the page view's block pagination to the print flow for WYSIWYG output.
         try {
           await document.fonts.ready;
         } catch {
-          // 字体 API 不可用时忽略
+          // Ignore when the Font API is unavailable
         }
-        // 等待打印层确实挂载（最多约 20 帧），避免拿到 null
+        // Wait until the print layer is actually mounted (up to ~20 frames) to avoid getting null
         for (let i = 0; i < 20 && !flowRef.current; i += 1) {
           await nextFrame();
         }
         if (!printSupported()) {
-          // 桌面 WebView 等环境没有打印对话框：静默回退到快照模式
+          // Environments like desktop WebViews have no print dialog: fall back to snapshot mode silently
           setPrintNotice(true);
         } else {
           try {
-            // 流式视图同样要按块级边界分页：否则打印预览会由浏览器自由断行，
-            // 出现段落被拦腰截断、与页面视图不一致的分页
+            // The flow view must also paginate on block boundaries: otherwise the print preview
+            // reflows freely in the browser, splitting paragraphs mid-way and mismatching the page view
             printToPdf(flowRef.current, pageSetup);
             return;
           } catch {
-            // 打印对话框打开失败：回退到快照模式
+            // Print dialog failed to open: fall back to snapshot mode
             setPrintNotice(true);
           }
         }
@@ -652,7 +654,7 @@ export default function RichTextEditorTool() {
         'application/pdf',
       );
     } catch (error) {
-      // 任何导出异常都给出可见反馈，而不是“无反应”
+      // Any export exception gets visible feedback instead of "nothing happened"
       console.error('[richText] export pdf failed:', error);
       setFailure({ ok: false, error: 'RENDER_FAILED' });
     } finally {
@@ -661,19 +663,19 @@ export default function RichTextEditorTool() {
     }
   };
 
-  /** 插入动态目录：页码与条目由渲染时的分页结果实时派生 */
+  /** Insert a dynamic TOC: page numbers and entries are derived live from the pagination at render time */
   const handleInsertToc = () => {
     if (!editor) return;
     editor.chain().focus().insertTableOfContents().run();
   };
 
-  /** 刷新目录：触发分页重算，条目与页码随之更新（字体/图片异步加载后尤其需要） */
+  /** Refresh TOC: trigger a pagination recompute so entries and page numbers follow (needed after async font/image loads) */
   const handleRefreshToc = () => {
     if (!editor) return;
     editor.chain().focus().refreshTableOfContents().run();
   };
 
-  // 点击正文中的脚注引用（NodeView 冒泡派发）→ 打开编辑弹窗
+  // Click a footnote reference in the body (NodeView dispatches a bubbling event) -> open the edit dialog
   useEffect(() => {
     const onEditFootnote = (event: Event) => {
       const detail = (event as CustomEvent<FootnoteEditDetail>).detail;
@@ -684,7 +686,7 @@ export default function RichTextEditorTool() {
     return () => document.removeEventListener(FOOTNOTE_EDIT_EVENT, onEditFootnote);
   }, []);
 
-  /** 工具栏入口：选中已有脚注则编辑，否则新建 */
+  /** Toolbar entry: edit the selected footnote if any, otherwise create a new one */
   const handleFootnoteAction = () => {
     if (!editor) return;
     const selected = findSelectedFootnote(editor.state);
@@ -710,7 +712,7 @@ export default function RichTextEditorTool() {
 
   const handleFootnoteCancel = () => setFootnoteDialog(null);
 
-  /** 工具栏入口：选中已有公式则编辑，否则新建 */
+  /** Toolbar entry: edit the selected formula if any, otherwise create a new one */
   const handleMathAction = () => {
     if (!editor) return;
     const { selection } = editor.state;
@@ -732,8 +734,8 @@ export default function RichTextEditorTool() {
   };
 
   /**
-   * 提交公式：新建时按弹窗选择插入行内或块级；
-   * 编辑时保持原有行内/块级形态（切换展示模式会让节点类型变化，容易产生意外）。
+   * Submit formula: on insert, use the dialog's inline/block choice;
+   * on edit, keep the existing inline/block form (switching display mode changes the node type and invites surprises).
    */
   const handleMathSubmit = (latex: string, display: boolean) => {
     if (!editor || !mathDialog) return;
@@ -754,7 +756,7 @@ export default function RichTextEditorTool() {
 
   const handleMathCancel = () => setMathDialog(null);
 
-  // 词典与开关同步到 ref，供 PM 插件的 getter 读取
+  // Mirror the dictionary and toggle into refs for the PM plugin's getters
   dictionaryRef.current = dictionary;
   spellcheckEnabledRef.current = spellcheckEnabled;
 
@@ -763,7 +765,7 @@ export default function RichTextEditorTool() {
     editor.commands.refreshSpellcheck();
   }, [editor]);
 
-  /** 加载英文词表（按需下载，不进打包产物；失败时只影响判定覆盖面） */
+  /** Load the English word list (downloaded on demand, never bundled; failure only limits coverage) */
   const handleLoadDictionary = useCallback(async () => {
     if (dictionaryRef.current.size > 0 || dictionaryLoading) return;
     setDictionaryLoading(true);
@@ -775,7 +777,7 @@ export default function RichTextEditorTool() {
       return;
     }
     setDictionary(result.value);
-    // 词表就绪后重算装饰（ref 已指向新词表）
+    // Recompute decorations once the word list is ready (the ref already points at the new list)
     if (editor && !editor.isDestroyed) editor.commands.refreshSpellcheck();
   }, [dictionaryLoading, editor]);
 
@@ -820,7 +822,7 @@ export default function RichTextEditorTool() {
     setIgnoredWords((prev) => (prev.includes(word) ? prev : [...prev, word]));
   };
 
-  /** 建议索引按需构建并缓存：二十多万词的分桶索引只建一次 */
+  /** The suggestion index is built on demand and cached: the bucketed index over 200k+ words is built only once */
   const wordIndexRef = useRef<WordIndex | null>(null);
   const suggestionsFor = useCallback(
     (word: string): string[] => {
@@ -831,9 +833,9 @@ export default function RichTextEditorTool() {
     [dictionary],
   );
 
-  /** 当前文档的拼写问题（排除本轮忽略的词，数量上限保护渲染） */
+  /** Spelling issues in the current document (excluding words ignored this session, capped to protect rendering) */
   const spellIssues = useMemo(() => {
-    // snapshotHtml 既是「文档有内容」的判断，也是正文变化的信号
+    // snapshotHtml signals both "document has content" and "body changed"
     if (!editor || editor.isDestroyed || !spellcheckEnabled || !snapshotHtml) return [];
     const issues = collectDocIssues(
       editor.state.doc,
@@ -841,15 +843,15 @@ export default function RichTextEditorTool() {
       SPELL_ISSUE_LIMIT,
     );
     return issues.filter((issue) => !ignoredWords.includes(issue.word));
-    // snapshotHtml 是正文变化信号；dictionary / userWords / ignoredWords 直接参与判定
+    // snapshotHtml is the body-change signal; dictionary / userWords / ignoredWords feed the check directly
   }, [editor, snapshotHtml, spellcheckEnabled, dictionary, userWords, ignoredWords]);
 
-  /** 新批注署名：未填写时回退到默认文案 */
+  /** New comment author: falls back to the default label when empty */
   const resolveAuthor = () => author.trim() || t('tools.richText.commentAuthor');
 
   /**
-   * 新建批注：记录选区引文后展开面板内联编辑（不再使用浏览器原生弹窗）。
-   * 选区为空时允许创建「文档级」批注，不写入正文标记。
+   * New comment: record the selection quote, then edit inline in the panel (no native browser prompt any more).
+   * An empty selection allows a "document-level" comment that writes no mark into the body.
    */
   const handleAddComment = () => {
     if (!editor) return;
@@ -857,7 +859,7 @@ export default function RichTextEditorTool() {
     setPendingQuote(editor.state.doc.textBetween(from, to, ' ').trim());
   };
 
-  /** 提交批注：写入标记 + 落盘元数据 */
+  /** Submit comment: write the mark + persist metadata */
   const handleSubmitComment = (text: string) => {
     if (!editor) return;
     const quote = pendingQuote ?? '';
@@ -879,16 +881,16 @@ export default function RichTextEditorTool() {
 
   const handleCancelComment = () => setPendingQuote(null);
 
-  /** 删除批注：同时移除正文标记，避免留下孤立高亮 */
+  /** Delete a comment: also remove the body mark so no orphan highlight is left behind */
   const handleRemoveComment = (id: string) => {
     editor?.chain().focus().removeCommentMark(id).run();
     setComments((prev) => prev.filter((comment) => comment.id !== id));
   };
 
   /**
-   * 标记已解决 / 重新打开。
-   * 解决时移除正文标记（条目与引文保留），附件不再干扰阅读；
-   * 重新打开只翻状态——正文选区已不可复现，不重建标记。
+   * Mark resolved / reopen.
+   * Resolving removes the body mark (entry and quote are kept) so the anchor stops disturbing reading;
+   * reopening only flips the state — the original selection can't be reproduced, so the mark isn't rebuilt.
    */
   const handleToggleResolved = (id: string, resolved: boolean) => {
     if (resolved) editor?.chain().focus().removeCommentMark(id).run();
@@ -897,7 +899,7 @@ export default function RichTextEditorTool() {
     );
   };
 
-  /** 修订追踪：对选区标记插入/删除（本地记录 + Mark） */
+  /** Tracked changes: mark the selection as insert/delete (local record + Mark) */
   const handleTrackChange = (kind: 'insert' | 'delete') => {
     if (!editor) return;
     const { from, to } = editor.state.selection;
@@ -917,7 +919,7 @@ export default function RichTextEditorTool() {
     ]);
   };
 
-  /** 手动打快照：先冲刷当前内容再留档，可附备注 */
+  /** Manual snapshot: flush current content first, then archive it, optionally with a note */
   const handleManualSnapshot = (note: string) => {
     const id = docIdRef.current;
     if (!id) return;
@@ -941,7 +943,7 @@ export default function RichTextEditorTool() {
       });
   };
 
-  /** 打开版本差异视图（与历史版本面板互斥，避免同时挤压编辑区） */
+  /** Open the version diff view (mutually exclusive with the history panel so the editor isn't squeezed twice) */
   const handleCompareVersion = (version: StoredVersion) => {
     setDiffVersion(version);
     setVersionsOpen(false);
@@ -953,10 +955,10 @@ export default function RichTextEditorTool() {
     writeReviewerName(next);
   };
 
-  /** 导出 Markdown（纯函数 htmlToMarkdown：下划线/高亮/行内样式以 GFM 内联 HTML 保留） */
+  /** Export Markdown (pure function htmlToMarkdown: underline / highlight / inline styles are kept as GFM inline HTML) */
   const handleExportMarkdown = () => {
     if (!editor) return;
-    // 先补齐目录与脚注，否则 atom 节点 / widget 派生内容在 Markdown 里会消失
+    // Fill in TOC and footnotes first, otherwise atom-node / widget-derived content vanishes from Markdown
     const html = prepareExportHtml(editor.getHTML());
     const markdown = htmlToMarkdown(html);
     const bytes = new TextEncoder().encode(markdown);
@@ -970,10 +972,10 @@ export default function RichTextEditorTool() {
     }
   };
 
-  /** 导出单文件 HTML（内联样式，可直接打开/分享） */
+  /** Export single-file HTML (inline styles, opens/shares directly) */
   const handleExportHtml = () => {
     if (!editor) return;
-    // 单文件 HTML 用 KaTeX MathML：无需携带样式表即可正确显示公式
+    // Single-file HTML uses KaTeX MathML so formulas render correctly without shipping the stylesheet
     const body = injectMath(prepareExportHtml(editor.getHTML()));
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}${IMAGE_EXPORT_CSS}${TOC_EXPORT_CSS}</style></head><body>${body}</body></html>`;
     const bytes = new TextEncoder().encode(html);
@@ -1013,7 +1015,7 @@ export default function RichTextEditorTool() {
   const handleNew = () => {
     const hasContent = stats.chars > 0 || title.trim().length > 0;
     if (hasContent && !window.confirm(t('common.discardConfirm'))) return;
-    // 新建即建立新文档 id，旧文档仍保留在文档库中
+    // Creating a document assigns a new id; the old document stays in the library
     const id = createDocId();
     docIdRef.current = id;
     setDocId(id);
@@ -1023,8 +1025,8 @@ export default function RichTextEditorTool() {
   };
 
   /**
-   * 套用模板：页面设置与模板声明合并（未声明的字段沿用当前选择），
-   * 正文被替换为模板骨架；已有内容时先确认，避免误覆盖。
+   * Apply template: page setup is merged with the template declaration (undeclared fields keep the current choice),
+   * and the body is replaced with the template skeleton; confirm first if content exists to avoid overwriting.
    */
   const handleApplyTemplate = (template: DocumentTemplate) => {
     if (!editor) return;
@@ -1044,7 +1046,7 @@ export default function RichTextEditorTool() {
 
   type ToolPanel = 'pageSetup' | 'styles' | 'review' | 'templates' | 'spellcheck';
 
-  /** 工具栏面板互斥切换：同一时间只展开一个，避免工作区被挤压 */
+  /** Mutually exclusive toolbar panels: only one open at a time so the workspace isn't squeezed */
   const togglePanel = (panel: ToolPanel) => {
     setLibraryOpen(false);
     setVersionsOpen(false);
@@ -1069,7 +1071,7 @@ export default function RichTextEditorTool() {
       docIdRef.current = id;
       setDocId(id);
       setCurrentDocId(id);
-      // StoredDocument 已归一化为 v2，直接带出批注与修订元数据
+      // StoredDocument is already normalized to v2, so comments and tracked-change metadata come along directly
       resetEditorContent(doc);
       setLibraryOpen(false);
       setDiffVersion(null);
@@ -1115,7 +1117,7 @@ export default function RichTextEditorTool() {
   const handleRestoreVersion = (version: StoredVersion) => {
     if (!window.confirm(t('tools.richText.restoreConfirm'))) return;
     resetEditorContent(version);
-    // 先同步审阅元数据再落盘，避免 restore 用旧的 ref 覆盖快照里的批注
+    // Sync review metadata before persisting, so restore doesn't overwrite snapshot comments with stale refs
     commentsRef.current = version.comments;
     changesRef.current = version.changes;
     userWordsRef.current = version.userWords ?? [];
@@ -1126,8 +1128,8 @@ export default function RichTextEditorTool() {
   };
 
   /**
-   * 编辑区右键：接管原生菜单（桌面端本来就没有），按命中的对象决定菜单内容。
-   * 链接与图片走 DOM 命中（对应 mark / 节点），其余按是否有选区区分。
+   * Editor context menu: take over the native menu (desktop has none anyway) and pick entries by hit target.
+   * Links and images use DOM hits (matching marks / nodes); everything else depends on whether there is a selection.
    */
   const openContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!editor) return;
@@ -1321,20 +1323,20 @@ export default function RichTextEditorTool() {
       />
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        {/* 左列：大纲（文档左侧；窄屏回落到文档上方） */}
+        {/* Left column: outline (left of the document; falls back above it on narrow screens) */}
         {outlineOpen && editor ? (
           <aside className="w-full shrink-0 xl:sticky xl:top-4 xl:w-64 xl:self-start">
             <OutlinePanel editor={editor} />
           </aside>
         ) : null}
 
-        {/* 中间列：编辑器 + 仍位于上方的编辑类面板（查找 / 样式 / 修订） */}
+        {/* Middle column: editor + editing panels still on top (find / styles / review) */}
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           {findOpen && editor ? (
             <FindReplacePanel editor={editor} onClose={() => setFindOpen(false)} />
           ) : null}
 
-          {/* 打印纸张尺寸/边距：@page 不支持 CSS 变量，按当前设置动态注入 */}
+          {/* Print paper size/margins: @page doesn't support CSS variables, so inject per current setup */}
           <style>{buildPrintPageCss(metrics, pageSetup.margin)}</style>
 
           {diffVersion ? (
@@ -1413,8 +1415,8 @@ export default function RichTextEditorTool() {
             />
           ) : null}
 
-          {/* 编辑工作区：固定为「首屏剩余空间」高度并内部滚动（长文档不撑高页面）。
-              页面视图的灰色工作台挂在此容器上，保证铺满整个可滚动区域。 */}
+          {/* Editing workspace: fixed to the remaining first-screen height and scrolls internally (long documents don't stretch the page).
+              The page view's gray workbench hangs off this container so it fills the whole scrollable area. */}
           <div
             className={`rte-editor-viewport${viewMode === 'paged' ? ' rte-viewport-paged' : ''}${
               rulerOpen ? ' rte-viewport-ruler' : ''
@@ -1423,13 +1425,13 @@ export default function RichTextEditorTool() {
             style={viewportMax ? { height: `${viewportMax}px` } : undefined}
             onMouseDown={(event) => {
               if (!editor) return;
-              // 编辑器内部的点击由 ProseMirror 插件处理；
-              // 这里兜底浮动图片绘制在内容盒子之外（工作台区域）时的选中与拖动
+              // Clicks inside the editor are handled by ProseMirror plugins;
+              // this catches floating images drawn outside the content box (workbench area) for select & drag
               if (editor.view.dom.contains(event.target as Node)) return;
               handleFloatingImagePointerDown(editor.view, event.nativeEvent);
             }}
           >
-            {/* 水平标尺：贴顶显示毫米刻度与页边距（sticky，滚动时保持可见） */}
+            {/* Horizontal ruler: millimeter ticks and margins pinned to the top (sticky, stays visible while scrolling) */}
             {rulerOpen ? (
               <RulerBar
                 editor={editor}
@@ -1440,9 +1442,9 @@ export default function RichTextEditorTool() {
                 margin={pageSetup.margin}
               />
             ) : null}
-            {/* 图片缩放手柄：覆盖层（内容坐标系，滚动自动跟随） */}
+            {/* Image resize handles: overlay layer (content coordinate space, follows scrolling) */}
             <ImageResizeOverlay editor={editor} viewportRef={viewportRef} />
-            {/* 缩放层：CSS zoom 参与布局（滚动高度正确），data-rte-zoom 供分页测量还原 */}
+            {/* Zoom layer: CSS zoom participates in layout (scroll height stays correct); data-rte-zoom lets pagination undo it */}
             <div data-rte-zoom={zoom} style={{ zoom, ...(metrics.cssVars as React.CSSProperties) }}>
               <div
                 className={`mx-auto w-full max-w-[860px] ${
@@ -1456,14 +1458,14 @@ export default function RichTextEditorTool() {
                     viewMode === 'paged' ? 'rte-paged' : 'px-8 py-8'
                   } ${viewMode === 'flow' && metrics.columns > 1 ? 'rte-columns' : ''}`}
                   style={{
-                    // 页面背景色：深色主题下也以用户显式选择为准（打印/导出以它为准）
+                    // Page background: honors the user's explicit choice even in dark theme (print/export use it too)
                     background: pageSetup.background ?? undefined,
                     ...(viewMode === 'paged' && sheetBottomPx > 0
                       ? { minHeight: `${sheetBottomPx}px` }
                       : {}),
                   }}
                 >
-                  {/* 流式视图的水印：覆盖整个编辑区（页面视图下逐页渲染） */}
+                  {/* Flow view watermark: covers the whole editor (page view renders one per page) */}
                   {viewMode === 'flow' && pageSetup.watermark?.text.trim() ? (
                     <div
                       className="rte-watermark"
@@ -1472,7 +1474,7 @@ export default function RichTextEditorTool() {
                       <span>{pageSetup.watermark.text}</span>
                     </div>
                   ) : null}
-                  {/* 页视图：每页一张真实纸面，内容连续流动 */}
+                  {/* Page view: one real sheet per page, content flows continuously */}
                   {viewMode === 'paged' &&
                     layout.sheetTops.map((top, index) => (
                       <div
@@ -1484,7 +1486,7 @@ export default function RichTextEditorTool() {
                         }}
                         aria-hidden="true"
                       >
-                        {/* 每张纸面各渲染一次水印（与打印逐页重复一致） */}
+                        {/* Render the watermark once per sheet (matching repeated per-page printing) */}
                         {pageSetup.watermark?.text.trim() ? (
                           <span
                             className="rte-watermark"
@@ -1493,7 +1495,7 @@ export default function RichTextEditorTool() {
                             <span>{pageSetup.watermark.text}</span>
                           </span>
                         ) : null}
-                        {/* 页眉 / 页脚 / 页码：与 Word 导出、快照 PDF 共用同一份设置 */}
+                        {/* Header / footer / page number: shared with Word export and snapshot PDF */}
                         {pageSetup.header.trim() ? (
                           <span className="rte-page-header">{pageSetup.header}</span>
                         ) : null}
@@ -1507,7 +1509,7 @@ export default function RichTextEditorTool() {
                             ) : null}
                           </span>
                         ) : null}
-                        {/* 角标仅在页脚未显示页码时出现，避免重复 */}
+                        {/* Page badge appears only when the footer shows no page number, to avoid duplication */}
                         {!pageSetup.showPageNumber && !pageSetup.footer.trim() ? (
                           <span className="rte-page-badge">
                             {t('tools.richText.pageBadge', { page: index + 1 })}
@@ -1524,7 +1526,7 @@ export default function RichTextEditorTool() {
           {busy === 'pdf' && <ProgressBar value={progress} label={t('tools.richText.exporting')} />}
         </div>
 
-        {/* 右列：页面设置 + 文档库 / 历史版本（文档右侧；窄屏回落到下方） */}
+        {/* Right column: page setup + document library / version history (right of the document; falls back below on narrow screens) */}
         {pageSetupOpen || libraryOpen || versionsOpen || templatesOpen ? (
           <aside className="w-full shrink-0 xl:w-80">
             {templatesOpen ? (
@@ -1592,7 +1594,7 @@ export default function RichTextEditorTool() {
           failed={!presentHtml}
           align="top"
         >
-          {/* 只读页面：直接复用打印版式（170mm 白纸 + 文档字体），不改动编辑器本身 */}
+          {/* Read-only page: reuses the print layout (170mm white sheet + document font) without touching the editor itself */}
           <div
             data-testid="present-document"
             className="rte-print-flow max-h-full overflow-auto rounded-lg px-10 py-10 shadow-2xl"

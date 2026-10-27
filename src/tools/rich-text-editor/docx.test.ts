@@ -7,9 +7,9 @@ import { renderTocHtml } from './toc';
 
 const TOC_LABELS = { title: '目录', empty: '文档暂无标题' };
 
-/** docx 导出层测试：嵌套列表 / 合并单元格 / 丢失清单 / 分页符（jsdom 环境） */
+/** docx export tests: nested lists / merged cells / loss report / page breaks (jsdom) */
 
-// jsdom 的 Blob 没有 arrayBuffer()，用 FileReader 读二进制
+// jsdom Blob lacks arrayBuffer(), so read bytes via FileReader
 const blobToArrayBuffer = (blob: Blob): Promise<ArrayBuffer> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -18,19 +18,19 @@ const blobToArrayBuffer = (blob: Blob): Promise<ArrayBuffer> =>
     reader.readAsArrayBuffer(blob);
   });
 
-/** 读取导出文档中的任意 zip 条目 */
+/** Read any zip entry from an exported document */
 async function readZipEntry(blob: Blob, path: string): Promise<string> {
   const zip = await JSZip.loadAsync(await blobToArrayBuffer(blob));
   return (await zip.file(path)?.async('string')) ?? '';
 }
 
-/** 读取导出文档的 word/document.xml */
+/** Read word/document.xml from an exported document */
 async function readDocumentXml(blob: Blob): Promise<string> {
   return readZipEntry(blob, 'word/document.xml');
 }
 
-describe('planPageBlocks（编辑态分页规划）', () => {
-  it('内容不足一页时不分页', () => {
+describe('planPageBlocks (edit-mode pagination planning)', () => {
+  it('does not paginate when the content fits one page', () => {
     const items = [
       { top: 0, height: 100 },
       { top: 120, height: 100 },
@@ -38,23 +38,23 @@ describe('planPageBlocks（编辑态分页规划）', () => {
     expect(planPageBlocks(items, 971)).toEqual([]);
   });
 
-  it('超出一页时从越界块开始新页，并逐页推进', () => {
+  it('starts a new page at the overflowing block and advances page by page', () => {
     const items = [
       { top: 0, height: 600 },
-      { top: 600, height: 600 }, // 跨页 → 第 2 页起始
-      { top: 1200, height: 100 }, // 第 2 页内
-      { top: 1300, height: 600 }, // 跨页 → 第 3 页起始
+      { top: 600, height: 600 }, // spans pages → start of page 2
+      { top: 1200, height: 100 }, // inside page 2
+      { top: 1300, height: 600 }, // spans pages → start of page 3
     ];
     expect(planPageBlocks(items, 971)).toEqual([1, 3]);
   });
 
-  it('单块高于一页时允许溢出，不产生死循环', () => {
+  it('allows overflow when a block is taller than a page, without looping forever', () => {
     expect(planPageBlocks([{ top: 0, height: 3000 }], 971)).toEqual([]);
   });
 });
 
 describe('scanDocxExportLosses', () => {
-  it('外链图片计入 externalImages，data 图片不计', () => {
+  it('counts linked images as externalImages but not data images', () => {
     const html =
       '<p><img src="https://example.com/a.png"><img src="data:image/png;base64,iVBORw0KGgo="></p>';
     const result = scanDocxExportLosses(html);
@@ -65,13 +65,13 @@ describe('scanDocxExportLosses', () => {
     }
   });
 
-  it('webp 图片计入 webpImages', () => {
+  it('counts webp images as webpImages', () => {
     const result = scanDocxExportLosses('<p><img src="data:image/webp;base64,UklGRg=="></p>');
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.webpImages).toBe(1);
   });
 
-  it('顶层列表不重复计数，嵌套超过 8 层才计入 deepListItems', () => {
+  it('does not double count top-level lists and only counts nesting deeper than 8 in deepListItems', () => {
     const nested = (n: number) => {
       let html = '<li>leaf</li>';
       for (let i = 0; i < n; i += 1) html = `<li>x<ul>${html}</ul></li>`;
@@ -84,7 +84,7 @@ describe('scanDocxExportLosses', () => {
     if (deep.ok) expect(deep.value.deepListItems).toBe(2);
   });
 
-  it('有标记但缺少元数据的批注计入 unlinkedComments', () => {
+  it('counts comments that have marks but no metadata in unlinkedComments', () => {
     const html =
       '<p><span data-comment-id="c-1">有元数据</span><span data-comment-id="c-2">孤立</span></p>';
     const result = scanDocxExportLosses(html, [{ id: 'c-1' }]);
@@ -92,7 +92,7 @@ describe('scanDocxExportLosses', () => {
     if (result.ok) expect(result.value.unlinkedComments).toBe(1);
   });
 
-  it('未传入批注元数据时不报告 unlinkedComments', () => {
+  it('reports no unlinkedComments when no comment metadata is passed', () => {
     const result = scanDocxExportLosses('<p><span data-comment-id="c-1">x</span></p>');
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.unlinkedComments).toBe(0);
@@ -100,13 +100,13 @@ describe('scanDocxExportLosses', () => {
 });
 
 describe('exportDocxBlob', () => {
-  it('空内容返回 EMPTY 错误', async () => {
+  it('returns the EMPTY error for empty content', async () => {
     const result = await exportDocxBlob('<p></p>', 't');
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error).toBe('EMPTY');
   });
 
-  it('嵌套列表 + 合并单元格 + 分页符可导出为非空 docx Blob', async () => {
+  it('exports nested lists + merged cells + page breaks as a non-empty docx Blob', async () => {
     const html = [
       '<h1>标题</h1>',
       '<ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li></ul>',
@@ -124,7 +124,7 @@ describe('exportDocxBlob', () => {
     }
   });
 
-  it('webp 图片被跳过但文档仍导出成功', async () => {
+  it('skips webp images but still exports the document', async () => {
     const result = await exportDocxBlob(
       '<p><img src="data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA="></p>',
       't',
@@ -133,8 +133,8 @@ describe('exportDocxBlob', () => {
   });
 });
 
-describe('docx 导出：行内字体与字号', () => {
-  it('显式设置的字体名与字号写入 Word 行属性', async () => {
+describe('docx export: inline font family and size', () => {
+  it('writes explicit font name and size to Word run properties', async () => {
     const html =
       '<p><span style="font-family: &quot;Songti SC&quot;, serif; font-size: 24px;">样张</span></p>';
     const result = await exportDocxBlob(html, '字体测试');
@@ -142,11 +142,11 @@ describe('docx 导出：行内字体与字号', () => {
     if (!result.ok) return;
     const xml = await readDocumentXml(result.value);
     expect(xml).toContain('Songti SC');
-    // 24px → 36 半磅（1px = 0.75pt，半磅 = pt × 2）
+    // 24px → 36 half-points (1px = 0.75pt, half-point = pt × 2)
     expect(xml).toContain('w:sz w:val="36"');
   });
 
-  it('通用族关键字不会被当成具体字体写入', async () => {
+  it('does not write generic family keywords as a concrete font', async () => {
     const result = await exportDocxBlob(
       '<p><span style="font-family: sans-serif;">plain</span></p>',
       't',
@@ -158,12 +158,12 @@ describe('docx 导出：行内字体与字号', () => {
   });
 });
 
-describe('docx 导出：图片层级', () => {
-  // 1×1 透明 PNG
+describe('docx export: image layering', () => {
+  // 1x1 transparent PNG
   const PNG =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
 
-  it('嵌入型图片导出为行内图片（wp:inline）', async () => {
+  it('exports inline images as wp:inline', async () => {
     const result = await exportDocxBlob(`<p><img src="${PNG}"></p>`, 'inline');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -172,7 +172,7 @@ describe('docx 导出：图片层级', () => {
     expect(xml).not.toContain('<wp:anchor');
   });
 
-  it('衬于文字下方导出为浮动图片（anchor + behindDoc）', async () => {
+  it('exports behind-text images as floating anchors with behindDoc', async () => {
     const floating = `<img src="${PNG}" data-layer="behind" style="left: 10px; top: 20px">`;
     const result = await exportDocxBlob(`<p>文字</p>${floating}`, 'float');
     expect(result.ok).toBe(true);
@@ -183,7 +183,7 @@ describe('docx 导出：图片层级', () => {
     expect(xml).toContain('wrapNone');
   });
 
-  it('图片像素宽度写入 Word 尺寸（px → EMU）', async () => {
+  it('writes the pixel width as the Word size (px → EMU)', async () => {
     const result = await exportDocxBlob(
       `<img src="${PNG}" style="width: 300px; height: auto">`,
       'w',
@@ -195,17 +195,17 @@ describe('docx 导出：图片层级', () => {
     expect(xml).toContain('cx="2857500"');
   });
 
-  it('旧版百分比宽度导出时换算为绝对尺寸', async () => {
+  it('converts legacy percentage widths to absolute sizes on export', async () => {
     const result = await exportDocxBlob(`<img src="${PNG}" style="width: 50%">`, 'w');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const xml = await readDocumentXml(result.value);
-    // 换算链路：50% → 像素 → EMU（docx 用未取整的像素值换算 EMU）
+    // Conversion chain: 50% → pixels → EMU (docx converts from the unrounded pixel value)
     const expected = Math.round(0.5 * CONTENT_WIDTH_PX * 9525);
     expect(xml).toContain(`cx="${expected}"`);
   });
 
-  it('浮于文字上方保持不遮挡文字排版的 wrapNone，但不 behindDoc', async () => {
+  it('keeps wrapNone for in-front images so text layout is untouched, but without behindDoc', async () => {
     const floating = `<img src="${PNG}" data-layer="front" style="left: 0px; top: 0px">`;
     const result = await exportDocxBlob(`<p>文字</p>${floating}`, 'front');
     expect(result.ok).toBe(true);
@@ -215,7 +215,7 @@ describe('docx 导出：图片层级', () => {
     expect(xml).not.toContain('behindDoc="1"');
   });
 
-  it('四周型环绕导出为方框环绕，并按靠左 / 靠右给出水平对齐', async () => {
+  it('exports square wrapping as a square frame with left / right horizontal alignment', async () => {
     const left = `<img src="${PNG}" data-layer="wrap-left">`;
     const result = await exportDocxBlob(`<p>文字</p>${left}`, 'wrap-left');
     expect(result.ok).toBe(true);
@@ -232,7 +232,7 @@ describe('docx 导出：图片层级', () => {
     expect(await readDocumentXml(rightResult.value)).toContain('>right<');
   });
 
-  it('上下型环绕导出为上下环绕（wrapTopAndBottom）', async () => {
+  it('exports top-and-bottom wrapping as wrapTopAndBottom', async () => {
     const topBottom = `<img src="${PNG}" data-layer="top-bottom">`;
     const result = await exportDocxBlob(`<p>文字</p>${topBottom}`, 'top-bottom');
     expect(result.ok).toBe(true);
@@ -243,8 +243,8 @@ describe('docx 导出：图片层级', () => {
   });
 });
 
-describe('docx 导出：超链接', () => {
-  it('a[href] 导出为可点击的 Word 超链接', async () => {
+describe('docx export: hyperlinks', () => {
+  it('exports a[href] as a clickable Word hyperlink', async () => {
     const result = await exportDocxBlob(
       '<p>访问 <a href="https://example.com/docs">文档</a> 了解更多</p>',
       'link',
@@ -259,7 +259,7 @@ describe('docx 导出：超链接', () => {
     expect(rels).toContain('hyperlink');
   });
 
-  it('链接内的加粗等字符格式保持有效', async () => {
+  it('keeps character formatting such as bold inside links', async () => {
     const result = await exportDocxBlob(
       '<p><a href="https://a.dev"><strong>粗体链接</strong></a></p>',
       'l',
@@ -271,7 +271,7 @@ describe('docx 导出：超链接', () => {
     expect(xml).toContain('<w:b/>');
   });
 
-  it('缺少 href 的锚点退化为普通文本，不产生空关系', async () => {
+  it('degrades anchors without href to plain text and creates no empty relationship', async () => {
     const result = await exportDocxBlob('<p><a>纯文本</a></p>', 'l');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -281,8 +281,8 @@ describe('docx 导出：超链接', () => {
   });
 });
 
-describe('docx 导出：修订追踪', () => {
-  it('ins/del 映射为 Word 原生修订，并打开 trackRevisions', async () => {
+describe('docx export: tracked changes', () => {
+  it('maps ins/del to native Word revisions and enables trackRevisions', async () => {
     const html =
       '<p>正文<ins data-track="insert" class="rte-track-insert">新增</ins>' +
       '<del data-track="delete" class="rte-track-delete">删除</del></p>';
@@ -298,15 +298,15 @@ describe('docx 导出：修订追踪', () => {
     const xml = await readDocumentXml(result.value);
     expect(xml).toContain('<w:ins ');
     expect(xml).toContain('<w:del ');
-    // 删除内容必须使用 w:delText，否则 Word 会报文档损坏
+    // Deleted text must use w:delText, otherwise Word reports a corrupt document
     expect(xml).toContain('<w:delText');
     expect(xml).toContain('w:author="审阅人"');
     const settings = await readZipEntry(result.value, 'word/settings.xml');
-    // docx 开启时写 <w:trackRevisions/>，关闭时写 w:val="false"
+    // Enabled writes <w:trackRevisions/>, disabled writes w:val="false"
     expect(settings).toContain('<w:trackRevisions/>');
   });
 
-  it('无修订时 trackRevisions 保持关闭', async () => {
+  it('keeps trackRevisions off when there are no revisions', async () => {
     const result = await exportDocxBlob('<p>普通段落</p>', 'plain');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -315,8 +315,8 @@ describe('docx 导出：修订追踪', () => {
   });
 });
 
-describe('docx 导出：批注', () => {
-  it('有元数据的批注导出为 Word 批注（范围 + 引用 + comments.xml）', async () => {
+describe('docx export: comments', () => {
+  it('exports comments with metadata as Word comments (range + reference + comments.xml)', async () => {
     const html = '<p>前文<span data-comment-id="c-1">待审</span>后文</p>';
     const result = await exportDocxBlob(html, 'comment', null, {
       comments: [
@@ -342,7 +342,7 @@ describe('docx 导出：批注', () => {
     expect(comments).toContain('审阅人');
   });
 
-  it('批注引文以斜体写入 comments.xml，正文写入批注内容', async () => {
+  it('writes the quote in italics and the body as the comment content', async () => {
     const html = '<p><span data-comment-id="c-9">被批注的原文</span></p>';
     const result = await exportDocxBlob(html, 'quote', null, {
       comments: [
@@ -364,7 +364,7 @@ describe('docx 导出：批注', () => {
     expect(comments).toContain('<w:i/>');
   });
 
-  it('缺少元数据的批注标记不写入批注，但文本保留', async () => {
+  it('drops comment marks without metadata while keeping the text', async () => {
     const result = await exportDocxBlob(
       '<p><span data-comment-id="orphan">孤立文本</span></p>',
       'orphan',
@@ -374,14 +374,14 @@ describe('docx 导出：批注', () => {
     const xml = await readDocumentXml(result.value);
     expect(xml).not.toContain('<w:commentRangeStart');
     expect(xml).toContain('孤立文本');
-    // docx 始终产出 comments.xml 容器，此处断言其中没有批注条目
+    // docx always emits a comments.xml container; assert it holds no comment entries
     const comments = await readZipEntry(result.value, 'word/comments.xml');
     expect(comments).not.toContain('<w:comment ');
   });
 });
 
-describe('docx 导出：目录域', () => {
-  it('目录内容为空的目录节点也能导出为占位目录域', async () => {
+describe('docx export: TOC field', () => {
+  it('exports a TOC node with empty content as a placeholder TOC field', async () => {
     const result = await exportDocxBlob('<div data-toc="true" class="rte-toc"></div>', 'toc');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -389,7 +389,7 @@ describe('docx 导出：目录域', () => {
     expect(xml).toContain('<w:fldChar w:fldCharType="begin"');
   });
 
-  it('div[data-toc] 映射为可更新的 Word 目录域，并缓存条目文本与页码', async () => {
+  it('maps div[data-toc] to an updatable Word TOC field caching entry text and page numbers', async () => {
     const toc = renderTocHtml(
       [
         { level: 1, text: '引言', page: 1 },
@@ -405,25 +405,25 @@ describe('docx 导出：目录域', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const xml = await readDocumentXml(result.value);
-    // TOC 域：标题级别 1-6、带超链接、标记为待更新
+    // TOC field: heading levels 1-6, hyperlinked, marked for update
     expect(xml).toContain(
       '<w:instrText xml:space="preserve">TOC \\h \\o &quot;1-6&quot;</w:instrText>',
     );
     expect(xml).toContain('w:dirty="true"');
-    // 目录标题作为内容控件别名
+    // TOC title becomes the content control alias
     expect(xml).toContain('<w:alias w:val="目录"/>');
-    // 缓存条目：Word 打开即显示，页码在更新域时重算
+    // Cached entries: visible as soon as Word opens, page numbers recomputed on field update
     expect(xml).toContain('<w:pStyle w:val="TOC1"/>');
     expect(xml).toContain('<w:pStyle w:val="TOC2"/>');
     expect(xml).toContain('背景');
-    // 让 Word 打开文档时自动更新域
+    // Make Word update fields when opening the document
     const settings = await readZipEntry(result.value, 'word/settings.xml');
     expect(settings).toContain('<w:updateFields/>');
   });
 });
 
-describe('docx 导出：脚注', () => {
-  it('sup[data-footnote] 映射为 Word 脚注引用与 footnotes.xml', async () => {
+describe('docx export: footnotes', () => {
+  it('maps sup[data-footnote] to Word footnote references and footnotes.xml', async () => {
     const result = await exportDocxBlob(
       '<p>甲<sup data-footnote="true" data-note="第一条注释" data-number="1">[1]</sup>乙</p>',
       'footnote',
@@ -434,14 +434,14 @@ describe('docx 导出：脚注', () => {
     expect(xml).toContain('<w:footnoteReference w:id="1"');
     const notes = await readZipEntry(result.value, 'word/footnotes.xml');
     expect(notes).toContain('第一条注释');
-    // 分隔符与续行符（id -1 / 0）由 docx 固定写入，业务脚注只有 1 条
+    // docx always writes the separator and continuation entries (id -1 / 0); there is only one content footnote
     expect((notes.match(/<w:footnote w:id="\d+"/g) ?? []).length).toBe(1);
-    // 序号由 Word 自动渲染：脚注段落里只应出现一次 w:footnoteRef
+    // Word renders the number: w:footnoteRef appears only once in the footnote paragraph
     const body = notes.slice(notes.indexOf('<w:footnote w:id="1"'));
     expect((body.match(/<w:footnoteRef\/>/g) ?? []).length).toBe(1);
   });
 
-  it('多脚注按正文顺序编号，编号与 footnotes.xml 的 id 对齐', async () => {
+  it('numbers multiple footnotes in body order, matching the ids in footnotes.xml', async () => {
     const result = await exportDocxBlob(
       '<p>甲<sup data-footnote="true" data-note="一"></sup>' +
         '乙<sup data-footnote="true" data-note="二"></sup></p>',
@@ -459,7 +459,7 @@ describe('docx 导出：脚注', () => {
     expect(notes).toContain('>二<');
   });
 
-  it('没有脚注时不产生业务脚注条目', async () => {
+  it('produces no content footnote entries when there are no footnotes', async () => {
     const result = await exportDocxBlob('<p>普通段落</p>', 'nofn');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -470,8 +470,8 @@ describe('docx 导出：脚注', () => {
   });
 });
 
-describe('docx 导出：版式（分栏 / 背景 / 首页不同）', () => {
-  it('分栏写入分节属性（w:cols）', async () => {
+describe('docx export: layout (columns / background / different first page)', () => {
+  it('writes columns to section properties (w:cols)', async () => {
     const result = await exportDocxBlob('<p>正文</p>', 'cols', {
       ...DEFAULT_PAGE_SETUP,
       columns: 2,
@@ -484,7 +484,7 @@ describe('docx 导出：版式（分栏 / 背景 / 首页不同）', () => {
     expect(xml).toContain('w:equalWidth="true"');
   });
 
-  it('单栏时不写 w:cols，保持 Word 默认排版', async () => {
+  it('omits w:cols for a single column, keeping Word defaults', async () => {
     const result = await exportDocxBlob('<p>正文</p>', 'onecol', DEFAULT_PAGE_SETUP);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -492,7 +492,7 @@ describe('docx 导出：版式（分栏 / 背景 / 首页不同）', () => {
     expect(xml).not.toContain('<w:cols ');
   });
 
-  it('页面背景写入文档背景（w:background）', async () => {
+  it('writes the page background to w:background', async () => {
     const result = await exportDocxBlob('<p>正文</p>', 'bg', {
       ...DEFAULT_PAGE_SETUP,
       background: '#eef2ff',
@@ -504,7 +504,7 @@ describe('docx 导出：版式（分栏 / 背景 / 首页不同）', () => {
     expect(xml).toContain('w:color="eef2ff"');
   });
 
-  it('首页不同写入 titlePg', async () => {
+  it('writes titlePg for a different first page', async () => {
     const result = await exportDocxBlob('<p>正文</p>', 'titlepage', {
       ...DEFAULT_PAGE_SETUP,
       differentFirstPage: true,
@@ -517,8 +517,8 @@ describe('docx 导出：版式（分栏 / 背景 / 首页不同）', () => {
   });
 });
 
-describe('docx 导出：公式', () => {
-  it('可表达的公式导出为 Word 原生公式（m:oMath）', async () => {
+describe('docx export: equations', () => {
+  it('exports expressible formulas as native Word equations (m:oMath)', async () => {
     const result = await exportDocxBlob(
       '<p>前<span data-math="inline" data-display="false" data-latex="\\frac{a}{b}"></span>后</p>',
       'math',
@@ -532,7 +532,7 @@ describe('docx 导出：公式', () => {
     expect(xml).toContain('<m:den>');
   });
 
-  it('块级公式独占一个公式段落', async () => {
+  it('gives block formulas a dedicated equation paragraph', async () => {
     const result = await exportDocxBlob(
       '<div data-math="block" data-display="true" data-latex="\\sum_{i=1}^{n} a_i"></div>',
       'math-block',
@@ -545,7 +545,7 @@ describe('docx 导出：公式', () => {
     expect(xml).toContain('<m:sup>');
   });
 
-  it('上下标与根号映射为 OMML 的对应结构', async () => {
+  it('maps sub/superscripts and radicals to the matching OMML structures', async () => {
     const result = await exportDocxBlob(
       '<p><span data-math="inline" data-display="false" data-latex="x_i^2"></span>' +
         '<span data-math="inline" data-display="false" data-latex="\\sqrt{y}"></span></p>',
@@ -558,8 +558,8 @@ describe('docx 导出：公式', () => {
     expect(xml).toContain('<m:rad>');
   });
 
-  it('OMML 表达不了的公式降级为图片或源码，不丢内容', async () => {
-    // jsdom 无 canvas，图片降级会失败 → 走源码兜底；关键是内容不丢
+  it('falls back to an image or source text for formulas OMML cannot express, losing nothing', async () => {
+    // jsdom has no canvas, so the image fallback fails and source text is used; the point is that nothing is lost
     const result = await exportDocxBlob(
       '<p><span data-math="inline" data-display="false" data-latex="\\begin{matrix} a \\end{matrix}"></span></p>',
       'math-fallback',
@@ -572,8 +572,8 @@ describe('docx 导出：公式', () => {
   });
 });
 
-describe('docx 导出：批注范围', () => {
-  it('批注范围跨多个文本节点时只包裹一次（范围严格嵌套）', async () => {
+describe('docx export: comment ranges', () => {
+  it('wraps a comment range spanning multiple text nodes only once (strictly nested)', async () => {
     const html = '<p><span data-comment-id="c-1">第一段<strong>加粗</strong>结尾</span></p>';
     const result = await exportDocxBlob(html, 'range', null, {
       comments: [

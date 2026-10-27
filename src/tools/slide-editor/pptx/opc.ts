@@ -2,19 +2,19 @@ import JSZip from 'jszip';
 import { attr, childrenOf, localNameOf, parseXml, type XmlNode } from './xml';
 
 /**
- * OPC 包读写（ECMA-376 Part 2）：
- * 负责 zip 解包、关系项（_rels）解析、相对路径规范化与写出时的目录摆放。
+ * OPC package read/write (ECMA-376 Part 2):
+ * handles zip unpacking, relationship (_rels) parsing, relative path normalization and directory layout on write.
  */
 
 export interface Relationship {
   id: string;
   type: string;
   target: string;
-  /** External 关系（如外链图片） */
+  /** External relationship (e.g. a linked image) */
   external?: boolean;
 }
 
-/** part 路径 → 其 rels 文件路径 */
+/** part path → path of its rels file */
 export function relsPathFor(partPath: string): string {
   const slash = partPath.lastIndexOf('/');
   const dir = slash >= 0 ? partPath.slice(0, slash) : '';
@@ -22,7 +22,7 @@ export function relsPathFor(partPath: string): string {
   return `${dir}/_rels/${file}.rels`.replace(/^\//, '');
 }
 
-/** 解析 _rels 文件内容（按 rId 索引） */
+/** Parse a _rels file (indexed by rId) */
 export function parseRels(xml: string): Map<string, Relationship> {
   const map = new Map<string, Relationship>();
   for (const root of parseXml(xml)) {
@@ -43,8 +43,8 @@ export function parseRels(xml: string): Map<string, Relationship> {
 }
 
 /**
- * 规范化关系目标路径：
- * 关系的 Target 是相对「所在 part 的目录」的，需要去掉 /、. 与 .. 后得到包内绝对路径。
+ * Normalize a relationship target path:
+ * a relationship's Target is relative to the directory of its part, so strip `/`, `.` and `..` to get the absolute in-package path.
  */
 export function normalizePartPath(partPath: string, target: string): string {
   if (target.startsWith('/')) return target.slice(1);
@@ -59,8 +59,8 @@ export function normalizePartPath(partPath: string, target: string): string {
 }
 
 /**
- * 读取 File 内容：优先用现代的 `file.arrayBuffer()`，
- * 缺失时（旧 Safari / jsdom 环境）退化到 FileReader。
+ * Read File contents: prefer the modern `file.arrayBuffer()`,
+ * falling back to FileReader when missing (old Safari / jsdom).
  */
 export async function readFileBuffer(file: File): Promise<ArrayBuffer> {
   if (typeof file.arrayBuffer === 'function') return file.arrayBuffer();
@@ -95,17 +95,17 @@ export async function readRels(zip: JSZip, partPath: string): Promise<Map<string
   return xml ? parseRels(xml) : new Map();
 }
 
-/** 找出包内第 N 张幻灯片之外的全部 part 名（用于兜底扫描） */
+/** List the names of every slide part in the package (used for fallback scanning) */
 export function listSlidePartNames(zip: JSZip): string[] {
   return Object.keys(zip.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name));
 }
 
-/** rels → target 绝对 part 路径 */
+/** rels → absolute target part path */
 export function targetPath(partPath: string, rel: Relationship): string {
   return normalizePartPath(partPath, rel.target);
 }
 
-/** 取 xfrm 节点里的 off/ext/rot/flip */
+/** off/ext/rot/flip inside an xfrm node */
 export interface Xfrm {
   x: number;
   y: number;

@@ -1,18 +1,18 @@
 import type { Fill, ShapeGeometry, SlideBackground, SlideDoc, SlideElement } from './model/types';
 
 /**
- * 幻灯片编辑器纯逻辑层（技术设计 §8.2 契约在本工具内的延续）：
- * - 不引用 Konva / JSZip，纯函数便于单测；
- * - 单位换算、DrawingML 颜色修正、prstGeom 几何映射、吸附对齐集中在此。
+ * Slide editor pure-logic layer (continuation of the §8.2 contract inside this tool):
+ * - no Konva / JSZip imports, pure functions are easy to unit test;
+ * - unit conversion, DrawingML color correction, prstGeom mapping and snapping live here.
  */
 
-/** 1px = 9525 EMU（96dpi：1 inch = 914400 EMU = 96px，整除） */
+/** 1px = 9525 EMU (96dpi: 1 inch = 914400 EMU = 96px, exact) */
 export const EMU_PER_PX = 9525;
-/** DrawingML 字号单位为 1/100 pt */
+/** DrawingML font size is in 1/100 pt */
 export const PT_HUNDREDTHS = 100;
-/** DrawingML 百分比单位：1000 = 100% */
+/** DrawingML percentage unit: 1000 = 100% */
 export const PCT_UNIT = 1000;
-/** DrawingML alpha / lumMod 单位：100000 = 100% */
+/** DrawingML alpha / lumMod unit: 100000 = 100% */
 export const ALPHA_UNIT = 100000;
 
 export function emuToPx(emu: number): number {
@@ -23,12 +23,12 @@ export function pxToEmu(px: number): number {
   return Math.round(px * EMU_PER_PX);
 }
 
-/** DrawingML 字号（1/100 pt）→ 磅值 */
+/** DrawingML font size (1/100 pt) → points */
 export function hundredthsPtToPt(value: number): number {
   return value / 100;
 }
 
-/** 磅值 → DrawingML 字号整数（1/100 pt） */
+/** Points → DrawingML integer font size (1/100 pt) */
 export function ptToHundredthsPt(pt: number): number {
   return Math.round(pt * 100);
 }
@@ -42,12 +42,12 @@ export function pxToPt(px: number): number {
   return (px * 72) / 96;
 }
 
-/** DrawingML 千分比 → px */
+/** DrawingML permille → px */
 export function permilleToPx(value: number, base: number): number {
   return (value / PCT_UNIT) * base;
 }
 
-/* ------------------------------- 颜色 ------------------------------- */
+/* ------------------------------- Colors ------------------------------- */
 
 export interface ColorTransform {
   lumMod?: number;
@@ -86,7 +86,7 @@ function rgbToHex(r: number, g: number, b: number): string {
   return `#${to(r)}${to(g)}${to(b)}`;
 }
 
-/** 归一化 6 位十六进制色；非法输入返回 null */
+/** Normalize a 6-digit hex color; returns null for invalid input */
 export function normalizeHex(input: string | undefined | null): string | null {
   if (!input) return null;
   const text = input.trim().replace(/^#/, '');
@@ -101,7 +101,7 @@ export function normalizeHex(input: string | undefined | null): string | null {
   return null;
 }
 
-/** 依据 lumMod/lumOff/shade/tint 修正颜色（DrawingML §20.1.2.3 等价语义） */
+/** Correct a color via lumMod/lumOff/shade/tint (equivalent to DrawingML §20.1.2.3) */
 export function applyColorTransform(hex: string, tf: ColorTransform = {}): string {
   let [r, g, b] = hexToRgb(hex);
   if (typeof tf.lumMod === 'number' && Number.isFinite(tf.lumMod)) {
@@ -131,21 +131,21 @@ export function applyColorTransform(hex: string, tf: ColorTransform = {}): strin
   return rgbToHex(r, g, b);
 }
 
-/** #RRGGBB + 透明度 → rgba() 字符串（alpha=1 时返回原色） */
+/** #RRGGBB + alpha → rgba() string (returns the original color when alpha=1) */
 export function withAlpha(hex: string, alpha?: number): string {
   if (alpha === undefined || alpha >= 1) return hex;
   const [r, g, b] = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${clamp01(alpha).toFixed(3)})`;
 }
 
-/* ----------------------------- 背景归一化 ----------------------------- */
+/* --------------------------- Background normalization --------------------------- */
 
 /**
- * 把页面背景归一化为 `Fill`。
+ * Normalize a slide background to `Fill`.
  *
- * `background` 在 v1 是纯色字符串，v2 起可以是 `Fill`（渐变/无填充）。
- * 读取路径（`.sld` 打开、localStorage 草稿、母版继承）统一走这里，
- * 渲染与导出只处理 `Fill` 一种形态。
+ * In v1 `background` was a solid color string; since v2 it may be a `Fill` (gradient/none).
+ * All read paths (opening `.sld`, localStorage drafts, master inheritance) go through here, so
+ * rendering and export only ever handle one shape: `Fill`.
  */
 export function normalizeBackground(bg: SlideBackground | undefined): Fill | undefined {
   if (bg === undefined || bg === null) return undefined;
@@ -156,7 +156,7 @@ export function normalizeBackground(bg: SlideBackground | undefined): Fill | und
   return bg;
 }
 
-/** 取背景的「代表色」：纯色取自身，渐变取首色，无填充返回 fallback */
+/** Representative color of a background: solid uses itself, gradient its first stop, none returns fallback */
 export function backgroundToColor(bg: SlideBackground | undefined, fallback = '#FFFFFF'): string {
   const fill = normalizeBackground(bg);
   if (!fill) return fallback;
@@ -165,29 +165,29 @@ export function backgroundToColor(bg: SlideBackground | undefined, fallback = '#
   return fallback;
 }
 
-/** 背景是否为纯色（用于属性面板决定显示取色器还是渐变编辑器） */
+/** Whether the background is solid (the property panel picks a color picker or gradient editor from this) */
 export function isSolidBackground(bg: SlideBackground | undefined): boolean {
   const fill = normalizeBackground(bg);
   return fill?.type === 'solid';
 }
 
-/* ------------------------- DrawingML 预设几何映射 ------------------------- */
+/* ------------------------- DrawingML preset geometry mapping ------------------------- */
 
-/** 归一化多边形顶点（每点为 [x,y]，取值 0~1） */
+/** Normalized polygon vertices (each point is [x,y], values 0~1) */
 function poly(points: number[][]): number[] {
   return points.flat();
 }
 
 const PRST_GEOMS: Record<string, ShapeGeometry> = {
-  // 矩形族
+  // Rectangle family
   rect: { kind: 'rect', prst: 'rect' },
   roundRect: { kind: 'rect', radius: 0.167, prst: 'roundRect' },
   snip1Rect: { kind: 'rect', prst: 'snip1Rect' },
   snipRoundRect: { kind: 'rect', radius: 0.083, prst: 'snipRoundRect' },
   frame: { kind: 'rect', prst: 'frame' },
-  // 椭圆族
+  // Ellipse family
   ellipse: { kind: 'ellipse', prst: 'ellipse' },
-  // 三角形族
+  // Triangle family
   triangle: {
     kind: 'polygon',
     points: poly([
@@ -206,7 +206,7 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
     ]),
     prst: 'rtTriangle',
   },
-  // 等腰三角形（尖朝上）。此前 prst 被误写为 rtTriangle，导出时会把形状改掉
+  // Isosceles triangle (apex up). prst used to be mislabeled rtTriangle, which changed the shape on export
   isoTriangle: {
     kind: 'polygon',
     points: poly([
@@ -216,7 +216,7 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
     ]),
     prst: 'isoTriangle',
   },
-  // 菱形 / 梯形
+  // Diamond / trapezoid
   diamond: {
     kind: 'polygon',
     points: poly([
@@ -237,7 +237,7 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
     ]),
     prst: 'trapezoid',
   },
-  // 正五边形（尖朝上，顶点在半径 0.5 的外接圆上）
+  // Regular pentagon (apex up, vertices on a circumcircle of radius 0.5)
   pentagon: {
     kind: 'polygon',
     points: poly([
@@ -249,7 +249,7 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
     ]),
     prst: 'pentagon',
   },
-  // 本垒板形（DrawingML homePlate）：此前被错误地当作 pentagon 的几何
+  // Home plate (DrawingML homePlate): previously mistaken for a pentagon geometry
   homePlate: {
     kind: 'polygon',
     points: poly([
@@ -287,7 +287,7 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
     ]),
     prst: 'octagon',
   },
-  // 箭头族
+  // Arrow family
   rightArrow: {
     kind: 'polygon',
     points: poly([
@@ -352,7 +352,7 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
     ]),
     prst: 'chevron',
   },
-  // 星形族
+  // Star family
   star5: { kind: 'star', innerRatio: 0.382, prst: 'star' },
   star: { kind: 'star', innerRatio: 0.382, prst: 'star' },
   star4: { kind: 'star', innerRatio: 0.4, prst: 'star4' },
@@ -364,19 +364,19 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
   star32: { kind: 'star', innerRatio: 0.6, prst: 'star32' },
 };
 
-/** prstGeom → 渲染几何；未收录的形状降级为同尺寸矩形（并保留原 prst 名） */
+/** prstGeom → render geometry; unknown shapes degrade to a same-size rect (keeping the original prst name) */
 export function resolvePresetGeometry(prst: string): ShapeGeometry {
   return PRST_GEOMS[prst] ?? { kind: 'rect', prst: prst || 'rect' };
 }
 
-/** 星形顶点数（prst: star5 → 5） */
+/** Number of star points (prst: star5 → 5) */
 export function starPoints(prst: string): number {
   const direct = /^star(\d+)$/.exec(prst);
   if (direct) return Math.max(3, Number(direct[1]));
   return 5;
 }
 
-/* ----------------------------- 吸附与对齐 ----------------------------- */
+/* ----------------------------- Snapping and alignment ----------------------------- */
 
 export interface Rect {
   x: number;
@@ -387,7 +387,7 @@ export interface Rect {
 
 export interface Guide {
   axis: 'x' | 'y';
-  /** 参考线位置（页面坐标） */
+  /** Guide position (page coordinates) */
   position: number;
 }
 
@@ -404,7 +404,7 @@ export interface SnapCandidate {
   height: number;
 }
 
-/** 目标矩形各边、中线 → 候选吸附值 */
+/** Candidate snap values from each edge and center line of the target rect */
 function candidatesOf(rect: SnapCandidate, axis: 'x' | 'y'): number[] {
   if (axis === 'x') {
     return [rect.x, rect.x + rect.width / 2, rect.x + rect.width];
@@ -412,21 +412,21 @@ function candidatesOf(rect: SnapCandidate, axis: 'x' | 'y'): number[] {
   return [rect.y, rect.y + rect.height / 2, rect.y + rect.height];
 }
 
-/** 网格吸附步长（px @96dpi），与画布背景网格保持一致 */
+/** Grid snap step (px @96dpi), kept in sync with the canvas background grid */
 export const GRID_SIZE = 24;
 
 export interface SnapOptions {
-  /** 额外静态吸附位置（手动参考线） */
+  /** Extra static snap positions (manual guides) */
   extraX?: number[];
   extraY?: number[];
-  /** 网格吸附步长；传 0 / 不传表示关闭 */
+  /** Grid snap step; pass 0 / omit to disable */
   grid?: number;
 }
 
 /**
- * 计算移动元素的吸附落点：
- * 比较「当前边/中线」与「页面中心 + 其它元素的边/中线 + 手动参考线」，距离 ≤ tolerance 时吸附并产生参考线。
- * 某个轴没有对齐命中时，若开启网格吸附，则退化为吸附到最近的网格线。
+ * Compute the snap landing point for a moving element:
+ * compares its edges/center lines with the page center, other elements' edges/center lines and guides,
+ * snapping within tolerance; an unmatched axis falls back to the nearest grid line when grid snap is on.
  */
 export function computeSnap(
   moving: Rect,
@@ -467,7 +467,7 @@ export function computeSnap(
     dx = bestX.delta;
     guides.push({ axis: 'x', position: bestX.position });
   } else if (options.grid && options.grid > 0) {
-    // 没有对齐命中时退化到网格吸附（不画参考线，避免视觉噪音）
+    // No alignment hit: fall back to grid snapping (no guide, to avoid visual noise)
     dx = Math.round(moving.x / options.grid) * options.grid - moving.x;
   }
   if (bestY) {
@@ -480,12 +480,12 @@ export function computeSnap(
   return { x: moving.x + dx, y: moving.y + dy, guides };
 }
 
-/* ----------------------------- 对齐与分布 ----------------------------- */
+/* ----------------------------- Align and distribute ----------------------------- */
 
-/** 元素对齐方式：left/right/top/bottom 对齐到基准边，hcenter/vcenter 对齐到基准中线 */
+/** Alignment mode: left/right/top/bottom align to the reference edge, hcenter/vcenter to the reference center line */
 export type AlignMode = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
 
-/** 分布轴向：等间距分布（首末元素位置不变） */
+/** Distribution axis: evenly spaced (the first and last elements stay in place) */
 export type DistributeAxis = 'horizontal' | 'vertical';
 
 export interface AlignBox {
@@ -495,7 +495,7 @@ export interface AlignBox {
   height: number;
 }
 
-/** 一组矩形的并集包围盒 */
+/** Union bounding box of a set of rects */
 export function unionBounds(boxes: AlignBox[]): AlignBox {
   if (boxes.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
   let minX = Infinity;
@@ -512,10 +512,10 @@ export function unionBounds(boxes: AlignBox[]): AlignBox {
 }
 
 /**
- * 计算对齐位移：把每个矩形按 mode 对齐到 bounds 的对应边/中线。
+ * Compute alignment offsets: align each rect's matching edge/center line to bounds.
  *
- * 调用方决定 bounds 语义：多选时传选中元素的并集包围盒（对齐所选对象），
- * 单选时传页面矩形（对齐到幻灯片），与 PowerPoint / WPS 的行为一致。
+ * The caller decides what bounds means: the union of the selected elements for multi-select
+ * (align to selection), or the page rect for single-select (align to slide), as PowerPoint / WPS do.
  */
 export function computeAlign(
   mode: AlignMode,
@@ -550,8 +550,8 @@ export function computeAlign(
 }
 
 /**
- * 计算等间距分布位移：保持首末元素不动，让中间元素的间隙相等。
- * 少于 3 个对象时无可分布间隙，返回零位移。
+ * Compute equal-spacing offsets: keep the first and last elements fixed and even out the gaps.
+ * With fewer than 3 objects there is no gap to distribute, so it returns zero offsets.
  */
 export function computeDistribute(
   axis: DistributeAxis,
@@ -585,24 +585,24 @@ export function computeDistribute(
   return zeros;
 }
 
-/** 把角度收敛到 [0,360) */
+/** Normalize an angle into [0,360) */
 export function normalizeAngle(deg: number): number {
   const value = deg % 360;
   return value < 0 ? value + 360 : value;
 }
 
-/** 角度 → 弧度 */
+/** Degrees → radians */
 export function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
-/** 等比缩放：给定新宽，返回保持原始比例的高 */
+/** Proportional resize: given a new width, return the height that keeps the original ratio */
 export function scaleHeight(width: number, source: { width: number; height: number }): number {
   if (!source.width || !source.height) return width;
   return (width * source.height) / source.width;
 }
 
-/** 把等比缩放的结果收敛到页面尺寸内 */
+/** Constrain a proportional resize result to fit inside the page */
 export function containInto(
   source: { width: number; height: number },
   bounds: { width: number; height: number },
@@ -612,7 +612,7 @@ export function containInto(
   return { width: Math.round(source.width * ratio), height: Math.round(source.height * ratio) };
 }
 
-/** 依据内容 Availability 计算画布缩放比例（留白 32px） */
+/** Compute the canvas scale that fits the content (32px padding) */
 export function fitScale(
   doc: { width: number; height: number },
   viewport: { width: number; height: number },
@@ -627,7 +627,7 @@ export function fitScale(
   return Math.max(0.1, Math.round(scale * 1000) / 1000);
 }
 
-/** 元素 z-order：默认按数组顺序，绘制时自上而下 */
+/** Element z-order: array order by default, drawn top-down */
 export function clampBounds(rect: Rect, page: { width: number; height: number }): Rect {
   const width = Math.max(1, Math.min(rect.width, page.width * 4));
   const height = Math.max(1, Math.min(rect.height, page.height * 4));
@@ -640,12 +640,12 @@ export function clampBounds(rect: Rect, page: { width: number; height: number })
 }
 
 /**
- * 页面尺寸切换：把已有内容等比缩放并重新居中到新尺寸。
+ * Page size change: proportionally scale existing content and re-center it in the new size.
  *
- * 纯函数（不改原对象），返回新 SlideDoc。
- * 缩放系数取宽高比例的较小值（contain 语义），保证内容不会溢出新页面；
- * 缩放后整体平移到新页面中心，视觉上等价于 PowerPoint 的「最大化/确保适合」。
- * 组合元素只缩放外框，子元素随 Konva.Group 变换自动跟随。
+ * Pure function (does not mutate its input), returns a new SlideDoc.
+ * The scale factor is the smaller of the width/height ratios (contain semantics) so content never
+ * overflows; the whole is then shifted to the new page center, i.e. PowerPoint's "maximize / ensure fit".
+ * Groups scale only their frame; children follow automatically via the Konva.Group transform.
  */
 export function scaleDocForSize(doc: SlideDoc, width: number, height: number): SlideDoc {
   const targetWidth = Math.max(1, Math.round(width));
@@ -682,7 +682,7 @@ export function scaleDocForSize(doc: SlideDoc, width: number, height: number): S
   };
 }
 
-/** 计算导出文件名 */
+/** Compute the export file name */
 export function sanitizeFilename(name: string): string {
   const cleaned = name
     .replace(/[\\/:*?"<>|]/g, '')

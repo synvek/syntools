@@ -1,7 +1,7 @@
 /**
- * 图形目录：集中登记所有可用形状。
- * 新增形状只需在对应分类文件登记一条 ShapeDef，
- * ShapeNode 绘制、侧边栏、模板与导入导出全部由本目录驱动。
+ * Shape catalog: registers every available shape in one place.
+ * Adding a shape only takes one ShapeDef registration in the relevant category file;
+ * ShapeNode drawing, the sidebar, templates and import/export are all driven by this catalog.
  */
 
 import type { FlowNodeStyle, ShapeKind, ShapeSize } from '../types';
@@ -16,7 +16,7 @@ import { ER_SHAPES } from './er';
 import { CONTAINER_SHAPES } from './container';
 import { GENERAL_SHAPES } from './general';
 
-/** 形状分类（侧边栏以此分组）；UML 按 2.5 图种细分为 9 类 */
+/** Shape categories (the sidebar groups by these); UML is split into 9 kinds following 2.5 diagram types */
 export type ShapeCategory =
   | 'general'
   | 'flow'
@@ -35,7 +35,7 @@ export type ShapeCategory =
   | 'mind'
   | 'er';
 
-/** 基础外形 */
+/** Base outlines */
 export type ShapeDraw =
   | 'rect'
   | 'roundRect'
@@ -71,7 +71,7 @@ export type ShapeDraw =
   | 'group'
   | 'path';
 
-/** 外形内部的装饰符号 */
+/** Decorative symbols inside an outline */
 export type ShapeDecor =
   | 'none'
   | 'x'
@@ -100,18 +100,18 @@ export interface ShapeDef {
   category: ShapeCategory;
   draw: ShapeDraw;
   size: ShapeSize;
-  /** 内部装饰符号（网关 X/+、事件圈等） */
+  /** Internal decorative symbols (gateway X/+, event circles, etc.) */
   decor?: ShapeDecor;
   /**
-   * draw === 'path' 时的 SVG path 生成函数。
-   * 第三个参数为可调参数读取器（`p('tabHeight')` 等），默认值由 `ShapeDef.adjust` 声明。
+   * SVG path generator used when draw === 'path'.
+   * The third parameter is the adjustable-parameter reader (`p('tabHeight')` etc.), with defaults declared in `ShapeDef.adjust`.
    */
   path?: (w: number, h: number, p: ParamGetter) => string;
   isContainer?: boolean;
   defaultStyle?: Partial<FlowNodeStyle>;
   /**
-   * 形状专属的可调参数（类 draw.io 调整顶点）。
-   * 通用参数（圆角/折角/斜切/分栏高……）由 `adjust.ts` 按 draw / decor 自动派生，无需在此重复声明。
+   * Shape-specific adjustable parameters (draw.io-style adjustment vertices).
+   * Generic ones (corner radius/fold/shear/compartment height…) are derived in `adjust.ts` from draw / decor and need no repetition here.
    */
   adjust?: ShapeAdjustDef[];
 }
@@ -133,7 +133,7 @@ export const SHAPE_DEFS = Object.fromEntries(ALL_SHAPES.map((def) => [def.kind, 
   ShapeDef
 >;
 
-/** 侧边栏分类展示顺序 */
+/** Display order of sidebar categories */
 export const SHAPE_CATEGORY_ORDER: ShapeCategory[] = [
   'general',
   'flow',
@@ -161,7 +161,7 @@ export function shapeDefOf(kind: ShapeKind): ShapeDef | undefined {
   return SHAPE_DEFS[kind];
 }
 
-/** 形状默认尺寸；未知 kind 回退为通用矩形尺寸 */
+/** Default size per shape; unknown kinds fall back to the generic rectangle size */
 export function shapeSize(kind: ShapeKind): ShapeSize {
   return SHAPE_DEFS[kind]?.size ?? { width: 150, height: 64 };
 }

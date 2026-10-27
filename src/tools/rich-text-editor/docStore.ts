@@ -10,11 +10,12 @@ import {
 } from './migrate';
 
 /**
- * 本地文档库（IndexedDB）：多文档管理 + 版本历史。
- * 内容不出本机；IndexedDB 不可用时所有 API 静默降级（草稿 localStorage 仍兜底）。
+ * Local document library (IndexedDB): multi-document management + version history.
+ * Content never leaves the machine; when IndexedDB is unavailable every API degrades silently
+ * (the localStorage draft still acts as a fallback).
  *
- * schema 版本随草稿同步演进，DB_VERSION 升级只做版本号推进 +
- * 读取时惰性补齐（不批量重写旧记录），避免升级过程中损坏用户数据。
+ * The schema version evolves with the draft: bumping DB_VERSION only advances the number and relies on
+ * lazy backfill at read time (no bulk rewrite of old records), so an upgrade can't corrupt user data.
  */
 
 export interface StoredDocument extends RichTextDraftV2 {
@@ -27,7 +28,7 @@ export interface StoredVersion extends RichTextDraftV2 {
   id: string;
   docId: string;
   savedAt: number;
-  /** 手动快照的用户备注（自动快照为 undefined） */
+  /** User note for a manual snapshot (undefined for automatic snapshots) */
   note?: string;
 }
 
@@ -38,15 +39,15 @@ export interface DocMeta {
 }
 
 const DB_NAME = 'syntools-rich-text';
-/** v2：草稿 schema 增加批注 / 修订 / 自定义词典 / 模板 id（读取时惰性补齐） */
+/** v2: draft schema gains comments / tracked changes / custom dictionary / template id (backfilled lazily on read) */
 const DB_VERSION = 2;
 const DOC_STORE = 'documents';
 const VER_STORE = 'versions';
-/** 每篇文档保留的版本快照上限 */
+/** Maximum number of version snapshots kept per document */
 const MAX_VERSIONS = 20;
-/** 两次版本快照的最小间隔（2 分钟），避免每次输入都生成快照 */
+/** Minimum interval between version snapshots (2 minutes), so typing doesn't create one every time */
 const VERSION_MIN_INTERVAL_MS = 120_000;
-/** 当前文档指针：刷新后恢复上次编辑的文档 */
+/** Current-document pointer: restores the last edited document after a refresh */
 const CURRENT_KEY = 'syntools:rich-text-editor.current.v2';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -57,8 +58,8 @@ function openDb(): Promise<IDBDatabase> {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
-        // 仅补建缺失的 store：既有 store 内的旧记录留给读取时归一化，
-        // 升级事务中不做可能失败的批量重写
+        // Only create missing stores: old records in existing stores are normalized on read,
+        // and no failure-prone bulk rewrite happens inside the upgrade transaction
         if (!db.objectStoreNames.contains(DOC_STORE)) {
           db.createObjectStore(DOC_STORE, { keyPath: 'id' });
         }
@@ -100,14 +101,14 @@ function newId(): string {
 }
 
 /* ------------------------------------------------------------------ *
- * 读取归一化（v1 记录惰性补齐为 v2）
+ * Read normalization (v1 records lazily backfilled to v2)
  * ------------------------------------------------------------------ */
 
 function toStoredDocument(raw: unknown): StoredDocument | null {
   if (!isPlainObject(raw)) return null;
   const id = typeof raw.id === 'string' ? raw.id : '';
   if (!id) return null;
-  // migrateDraft 依据 schemaVersion 决定是否从 HTML 反推审阅信息
+  // migrateDraft uses schemaVersion to decide whether to derive review info from the HTML
   const migrated = migrateDraft(raw);
   if (!migrated.ok) return null;
   const createdAt = readPositiveNumber(raw.createdAt);
@@ -139,10 +140,10 @@ function toDocMeta(raw: unknown): DocMeta | null {
 }
 
 /* ------------------------------------------------------------------ *
- * 公开 API
+ * Public API
  * ------------------------------------------------------------------ */
 
-/** 列出全部文档（按更新时间倒序）；失败返回空列表 */
+/** List all documents (newest update first); returns an empty list on failure */
 export async function listDocuments(): Promise<DocMeta[]> {
   try {
     const all = await withStore<unknown[]>(
@@ -159,7 +160,7 @@ export async function listDocuments(): Promise<DocMeta[]> {
   }
 }
 
-/** 读取单篇文档（已归一化为 v2）；失败返回 null */
+/** Load a single document (normalized to v2); returns null on failure */
 export async function loadDocument(id: string): Promise<StoredDocument | null> {
   try {
     const raw = await withStore<unknown>(
@@ -173,7 +174,7 @@ export async function loadDocument(id: string): Promise<StoredDocument | null> {
   }
 }
 
-/** 保存文档（upsert），并按间隔生成版本快照 */
+/** Save a document (upsert) and create a version snapshot per the interval */
 export async function saveDocument(id: string, draft: RichTextDraftInput): Promise<void> {
   try {
     const now = Date.now();
@@ -187,7 +188,7 @@ export async function saveDocument(id: string, draft: RichTextDraftInput): Promi
     await withStore(DOC_STORE, 'readwrite', (store) => store.put(doc));
     await pushVersion(doc, now);
   } catch {
-    // IndexedDB 不可用：忽略（localStorage 草稿仍兜底）
+    // IndexedDB unavailable: ignore (the localStorage draft still covers it)
   }
 }
 
@@ -211,7 +212,7 @@ function buildVersion(doc: StoredDocument, savedAt: number, note?: string): Stor
   };
 }
 
-/** 写入快照并裁剪超出上限的旧快照 */
+/** Write a snapshot and trim old ones beyond the cap */
 async function putVersionBounded(version: StoredVersion): Promise<void> {
   const versions = await listVersions(version.docId);
   const db = await openDb();
@@ -233,8 +234,8 @@ async function pushVersion(doc: StoredDocument, now: number): Promise<void> {
 }
 
 /**
- * 手动打快照：不受自动快照的最小间隔限制，可附备注。
- * 用于「保存前留档 / 交付前定稿」等需要显式留存的场景。
+ * Manual snapshot: not subject to the automatic snapshot interval, optionally with a note.
+ * Used where an explicit archive is needed, e.g. before saving or finalizing for delivery.
  */
 export async function saveManualVersion(
   docId: string,
@@ -251,7 +252,7 @@ export async function saveManualVersion(
   }
 }
 
-/** 列出某文档的版本快照（按时间倒序，含当前内容）；已归一化为 v2 */
+/** List a document's version snapshots (newest first, including current content); normalized to v2 */
 export async function listVersions(docId: string): Promise<StoredVersion[]> {
   try {
     const db = await openDb();
@@ -275,11 +276,11 @@ export async function deleteDocument(id: string): Promise<void> {
     const tx = db.transaction(VER_STORE, 'readwrite');
     versions.forEach((version) => tx.objectStore(VER_STORE).delete(version.id));
   } catch {
-    // 忽略
+    // Ignore
   }
 }
 
-/** 复制文档（保留页面设置与批注修订），返回新文档 id（失败返回 null） */
+/** Duplicate a document (keeping page setup, comments and tracked changes); returns the new id (null on failure) */
 export async function duplicateDocument(id: string): Promise<string | null> {
   const source = await loadDocument(id);
   if (!source) return null;
@@ -292,7 +293,7 @@ export function setCurrentDocId(id: string): void {
   try {
     localStorage.setItem(CURRENT_KEY, id);
   } catch {
-    // 忽略
+    // Ignore
   }
 }
 
@@ -305,22 +306,23 @@ export function readCurrentDocId(): string | null {
 }
 
 export interface DocStoreInit {
-  /** 应恢复编辑的文档 id */
+  /** Id of the document to restore for editing */
   docId: string;
-  /** 应恢复的文档内容（null 表示仅记录 id） */
+  /** Document content to restore (null means only the id is recorded) */
   doc: StoredDocument | null;
 }
 
 /**
- * 初始化：优先恢复指针指向的文档；否则把 localStorage v1/v2 单文档草稿
- * 迁移为文档库首篇（一次性），并清理旧键。
+ * Initialize: restore the document the pointer refers to when possible; otherwise migrate the
+ * localStorage v1/v2 single-document draft into the library as the first document (one-off) and
+ * clean up the old key.
  */
 export async function initDocStore(): Promise<DocStoreInit | null> {
   const pointer = readCurrentDocId();
   if (pointer) {
     const doc = await loadDocument(pointer);
     if (doc) return { docId: pointer, doc };
-    // 文档已被删除但指针残留：交给下面的草稿迁移路径
+    // The document was deleted but the pointer remains: fall through to the draft migration below
   }
   const legacy = readDraft();
   if (legacy && (legacy.html !== '<p></p>' || legacy.title || legacy.comments.length > 0)) {

@@ -9,24 +9,24 @@ import {
 } from '@/core/lib/share';
 
 interface ShareButtonProps {
-  /** 点击时读取工具当前可分享状态（输入/参数） */
+  /** Reads the tool's shareable state (input / options) on click */
   getState: () => ShareState;
   label?: string;
   /**
-   * 自定义参数编码（阶段 7 新增）：默认 base64url（`encodeShareState`），
-   * 需要压缩等扩展编码的工具可传入（如 code-editor 的 deflate）。
+   * Custom param encoding (added in phase 7): base64url by default (`encodeShareState`);
+   * tools that need compaction can supply one (e.g. code-editor's deflate).
    */
   encodeParam?: (state: ShareState) => string;
-  /** 参数长度上限；默认 `SHARE_LIMIT`（2048） */
+  /** Max param length; defaults to `SHARE_LIMIT` (2048) */
   maxLength?: number;
-  /** 超长提示文案；默认通用提示（工具可给出去向更明确的说明） */
+  /** Over-length message; generic by default (tools can be more specific) */
   tooLongHint?: string;
 }
 
 /**
- * 分享当前工具状态（Tasks T28）：
- * 生成 ?s= 链接 → 复制到剪贴板 → 地址栏同步（history.replaceState）。
- * 内容超过上限时降级：就近提示，不生成链接。
+ * Share the current tool state (Tasks T28):
+ * build the ?s= link → copy to clipboard → sync the address bar (history.replaceState).
+ * Over the limit it degrades to an inline notice with no link.
  */
 export function ShareButton({
   getState,
@@ -57,7 +57,7 @@ export function ShareButton({
     try {
       await navigator.clipboard.writeText(result.value);
     } catch {
-      /* 复制失败不阻断：地址栏已更新，用户可手动复制 */
+      /* A failed copy is not fatal: the address bar is updated and users can copy manually */
     }
     window.history.replaceState(null, '', result.value);
     setCopied(true);

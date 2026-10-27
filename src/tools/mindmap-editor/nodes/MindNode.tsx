@@ -26,9 +26,9 @@ export interface MindNodeData extends Record<string, unknown> {
 const HANDLE_CLS = '!h-px !w-px !min-h-0 !min-w-0 !border-0 !bg-transparent';
 
 /**
- * 不同层级的外框：越深越轻，中心主题最重。
- * 横向留白统一由布局尺寸（PAD_X）提供，形状类不再额外加 px，
- * 否则实际可用文本宽度会小于测量值而被截成省略号。
+ * Frame per depth: deeper levels are lighter, the central topic is the heaviest.
+ * Horizontal padding comes entirely from the layout metrics (PAD_X) so shape classes add none;
+ * otherwise the usable text width would be narrower than the measured width and get ellipsised.
  */
 const SHAPE_CLASS: Record<MindNodeShape, string> = {
   rounded: 'rounded-xl',
@@ -59,14 +59,14 @@ function MindNodeComponent({ id, data, selected }: NodeProps) {
   const toggleCollapseAt = useMindStore((s) => s.toggleCollapseAt);
   const [draft, setDraft] = useState(d.text);
   const inputRef = useRef<HTMLInputElement>(null);
-  /** 进入编辑态那一刻的文本（避免输入过程中反复回写 draft 并全选） */
+  /** Text at the moment editing started (avoids rewriting the draft and re-selecting on every keystroke) */
   const textOnEdit = useRef(d.text);
   textOnEdit.current = d.text;
-  /** Esc 取消时回滚到该文本 */
+  /** Text to roll back to when Esc cancels editing */
   const originalText = useRef(d.text);
 
-  // 仅在该节点「进入 / 退出」编辑态时同步草稿并聚焦全选：
-  // 若把 d.text 作为依赖，每次按键都会重新 select()，导致后续输入覆盖已有内容。
+  // Sync the draft and select-all only when this node enters or leaves edit mode:
+  // depending on d.text would re-run select() on every keystroke, and the next input would wipe the existing content.
   useEffect(() => {
     if (!editing) return;
     originalText.current = textOnEdit.current;
@@ -82,7 +82,7 @@ function MindNodeComponent({ id, data, selected }: NodeProps) {
   const hasChildren = d.childCount > 0;
 
   return (
-    // 双击进入编辑由画布层的 onNodeDoubleClick 统一处理（节点内任意位置都生效）
+    // Double-click-to-edit is handled centrally by onNodeDoubleClick on the canvas (anywhere inside the node works)
     <div
       className="mind-node group/mind relative flex items-center justify-center"
       style={{ width: '100%', height: '100%' }}
@@ -95,8 +95,8 @@ function MindNodeComponent({ id, data, selected }: NodeProps) {
           background: isUnderline ? 'transparent' : d.fill,
           borderColor: d.stroke,
           borderStyle: 'solid',
-          // 下划线形状只保留底边（2px）；其余形状按层级递减描边。
-          // 注意：不能写成 borderWidth，否则会覆盖 Tailwind 的 border-b-2 导致下划线消失。
+          // The underline shape keeps only the bottom edge (2px); other shapes get thinner strokes with depth.
+          // Note: do not use borderWidth here — it would override Tailwind's border-b-2 and the underline would disappear.
           ...(isUnderline
             ? {
                 borderTopWidth: 0,
@@ -130,7 +130,7 @@ function MindNodeComponent({ id, data, selected }: NodeProps) {
                 else addChildOf(id);
               } else if (e.key === 'Escape') {
                 e.preventDefault();
-                // 取消编辑：回滚到进入编辑前的文本
+                // Cancel editing: roll back to the text from before edit mode
                 setText(id, originalText.current);
                 endEdit();
               }

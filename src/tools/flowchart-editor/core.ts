@@ -1,6 +1,6 @@
 /**
- * 流程图编辑器纯逻辑层：不引用 React Flow / DOM，便于单测与草稿序列化。
- * 约定：纯函数不向调用方抛异常，校验类返回布尔或 ToolResult。
+ * Flowchart editor logic layer: no React Flow / DOM references, so it can be unit-tested and drafts serialized.
+ * Convention: pure functions never throw to callers; validation helpers return a boolean or ToolResult.
  */
 
 import {
@@ -26,13 +26,13 @@ import { emptyTable } from './model/table';
 
 let idCounter = 0;
 
-/** 生成稳定且唯一的节点/连线 id（不依赖随机，便于测试） */
+/** Build a stable, unique node/edge id (no randomness, for testability) */
 export function createId(prefix = 'n'): string {
   idCounter += 1;
   return `${prefix}_${Date.now().toString(36)}_${idCounter.toString(36)}`;
 }
 
-/** 归一化 #RRGGBB 色值；非法输入回退为 fallback */
+/** Normalize a #RRGGBB color; invalid input falls back to `fallback` */
 export function normalizeColor(input: string | undefined | null, fallback = '#000000'): string {
   if (!input) return fallback;
   const text = input.trim().replace(/^#/, '');
@@ -46,16 +46,16 @@ export function normalizeColor(input: string | undefined | null, fallback = '#00
   return fallback;
 }
 
-/* --------------------------- 节点变换（旋转 / 镜像） --------------------------- */
+/* --------------------------- Node transform (rotation / mirror) --------------------------- */
 
-/** 把任意角度归一到 [0, 360) */
+/** Normalize any angle into [0, 360) */
 export function normalizeRotation(deg: number): number {
   if (!Number.isFinite(deg)) return 0;
   const r = deg % 360;
   return r < 0 ? r + 360 : r;
 }
 
-/** 把角度吸附到步长倍数（step <= 0 时归一到整数度） */
+/** Snap an angle to a multiple of `step` (normalizes to whole degrees when step <= 0) */
 export function snapRotation(deg: number, step: number): number {
   const base = normalizeRotation(deg);
   if (!Number.isFinite(step) || step <= 0) return Math.round(base);
@@ -63,16 +63,16 @@ export function snapRotation(deg: number, step: number): number {
 }
 
 /**
- * 由「中心点 + 指针位置」求角度（度，0=正右方，顺时针增大）。
- * 手柄渲染与拖拽共用，保证几何一致。
+ * Angle (degrees, 0 = pointing right, increasing clockwise) from a center point and pointer position.
+ * Shared by handle rendering and dragging so the geometry stays consistent.
  */
 export function angleFromCenter(cx: number, cy: number, px: number, py: number): number {
   return normalizeRotation((Math.atan2(py - cy, px - cx) * 180) / Math.PI);
 }
 
 /**
- * 节点变换的 CSS transform（旋转 + 镜像）。
- * 以包围盒中心为原点；无变换时返回 undefined，避免无谓的合成层。
+ * CSS transform for a node transform (rotation + mirror).
+ * Origin is the bounding-box center; returns undefined when there is no transform, avoiding needless compositing layers.
  */
 export function nodeTransformCss(style: Partial<FlowNodeStyle> | undefined): string | undefined {
   const rotation = normalizeRotation(style?.rotation ?? 0);
@@ -89,9 +89,9 @@ function round(value: number, digits: number): number {
   return Math.round(value * f) / f;
 }
 
-/* --------------------------- 容器缩放联动 --------------------------- */
+/* --------------------------- Container resize linkage --------------------------- */
 
-/** 容器缩放后子节点的换算结果 */
+/** Result of converting child nodes after a container resize */
 export interface ScaledChild {
   id: string;
   position: { x: number; y: number };
@@ -100,11 +100,11 @@ export interface ScaledChild {
 }
 
 /**
- * 容器（泳道 / 编组）缩放时按比例换算子节点的相对坐标与尺寸。
+ * Convert child relative coordinates and sizes proportionally when a container (swimlane / group) is resized.
  *
- * 子节点坐标是相对容器的，因此直接按缩放比换算即可保持视觉布局；
- * 尺寸按同一比例缩放并夹取到各自的最小尺寸，避免缩小时把子节点压成不可见。
- * 尺寸未变化、或比例非法时返回空数组（调用方据此跳过写入）。
+ * Child coordinates are relative to the container, so scaling by the ratio preserves the visual layout;
+ * sizes are scaled by the same ratio and clamped to each child's minimum so shrinking never makes them invisible.
+ * Returns an empty array when the size did not change or the ratio is invalid (callers skip the write).
  */
 export function scaleChildren(
   children: ReadonlyArray<{
@@ -141,14 +141,14 @@ export function scaleChildren(
 }
 
 /**
- * 超链接协议白名单：仅放行 http / https / mailto，其余（含 javascript:）视为无效。
- * 返回可直接用于 href 的字符串；无效返回 undefined。
+ * Hyperlink protocol allowlist: only http / https / mailto pass; anything else (including javascript:) is invalid.
+ * Returns a string usable directly as href; undefined when invalid.
  */
 export function safeLinkHref(link: string | undefined): string | undefined {
   if (!link) return undefined;
   const trimmed = link.trim();
   if (!trimmed) return undefined;
-  // 无协议时按 https 补全，便于用户只输入域名
+  // Prepend https when the input has no scheme, so users can type just a domain
   const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
   return /^(https?|mailto):/i.test(withScheme) ? withScheme : undefined;
 }
@@ -164,8 +164,8 @@ export const DEFAULT_STYLE: FlowNodeStyle = {
 };
 
 /**
- * 各形状的基础配色（配色统一登记在图形目录，新增形状无需改这里）。
- * 默认文本为空串：新建图形不带任何文案，避免出现与用户无关的占位文字。
+ * Base color scheme per shape (all palettes live in the shape catalog, so new shapes need no change here).
+ * Default text is an empty string: a new shape carries no copy, avoiding placeholder text unrelated to the user.
  */
 export function defaultData(kind: ShapeKind, label = ''): FlowNodeData {
   const base: FlowNodeStyle = { ...DEFAULT_STYLE };
@@ -175,7 +175,7 @@ export function defaultData(kind: ShapeKind, label = ''): FlowNodeData {
   return { kind, label, style: base };
 }
 
-/** 图标节点数据（颜色取 stroke，其余绘制由 IconNode 决定） */
+/** Icon node data (color comes from stroke, the rest of the drawing is decided by IconNode) */
 export function iconData(iconId: string, label = ''): FlowNodeData {
   return {
     kind: 'rect',
@@ -185,7 +185,7 @@ export function iconData(iconId: string, label = ''): FlowNodeData {
   };
 }
 
-/** 图片节点数据（dataURL 直接内联，不离开浏览器） */
+/** Image node data (dataURL inlined directly, never leaves the browser) */
 export function imageData(src: string, label = ''): FlowNodeData {
   return {
     kind: 'rect',
@@ -195,7 +195,7 @@ export function imageData(src: string, label = ''): FlowNodeData {
   };
 }
 
-/** 公式节点数据（LaTeX 源码，渲染时动态加载 KaTeX） */
+/** Formula node data (LaTeX source; KaTeX is loaded dynamically at render time) */
 export function formulaData(formula: string, label = ''): FlowNodeData {
   return {
     kind: 'rect',
@@ -205,7 +205,7 @@ export function formulaData(formula: string, label = ''): FlowNodeData {
   };
 }
 
-/** 表格节点数据（缺省 3×3 空表格，渲染为可编辑网格） */
+/** Table node data (defaults to an empty 3×3 table rendered as an editable grid) */
 export function tableData(rows = 3, cols = 3, label = ''): FlowNodeData {
   return {
     kind: 'rect',
@@ -215,7 +215,7 @@ export function tableData(rows = 3, cols = 3, label = ''): FlowNodeData {
   };
 }
 
-/* --------------------------- 对齐辅助线 --------------------------- */
+/* --------------------------- Alignment guides --------------------------- */
 
 export interface Rect {
   x: number;
@@ -225,17 +225,17 @@ export interface Rect {
 }
 
 export interface HelperLines {
-  /** 拖拽节点的吸附后 x（未吸附则为 undefined） */
+  /** Snapped x of the dragged node (undefined when not snapped) */
   x?: number;
-  /** 吸附后 y */
+  /** Snapped y */
   y?: number;
-  /** 竖直参考线的画布 x 坐标 */
+  /** Canvas x coordinate of the vertical guide */
   vertical?: number;
-  /** 水平参考线的画布 y 坐标 */
+  /** Canvas y coordinate of the horizontal guide */
   horizontal?: number;
-  /** 竖直参考线是否为中心点对齐（用于区分样式） */
+  /** Whether the vertical guide is a center alignment (used to distinguish styles) */
   verticalCenter?: boolean;
-  /** 水平参考线是否为中心点对齐 */
+  /** Whether the horizontal guide is a center alignment */
   horizontalCenter?: boolean;
 }
 
@@ -260,8 +260,8 @@ function toBounds(r: Rect): Bounds {
 }
 
 /**
- * 计算拖拽节点与其它节点的吸附落点与参考线坐标。
- * 比较「左/右/中」三条轴与「上/下/中」三条轴，距差 ≤ tolerance 时吸附。
+ * Compute the snap position and guide coordinates between the dragged node and the other nodes.
+ * Compares the left/right/center axes and the top/bottom/middle axes, snapping when the gap is ≤ tolerance.
  */
 export function computeHelperLines(dragging: Rect, others: Rect[], tolerance = 5): HelperLines {
   const db = toBounds(dragging);
@@ -271,7 +271,7 @@ export function computeHelperLines(dragging: Rect, others: Rect[], tolerance = 5
 
   for (const other of others) {
     const ob = toBounds(other);
-    // [目标坐标, 拖拽方坐标, 是否中心对齐]
+    // [target coordinate, dragged-side coordinate, is center alignment]
     const xPairs: Array<[number, number, boolean]> = [
       [ob.left, db.left, false],
       [ob.right, db.left, false],
@@ -316,9 +316,9 @@ export function computeHelperLines(dragging: Rect, others: Rect[], tolerance = 5
   return result;
 }
 
-/* --------------------------- 容器（泳道）层级 --------------------------- */
+/* --------------------------- Container (swimlane) hierarchy --------------------------- */
 
-/** 参与层级计算的最小节点形状 */
+/** Minimal node shape needed for hierarchy computation */
 export interface HierarchyNode {
   id: string;
   position: { x: number; y: number };
@@ -335,7 +335,7 @@ function nodeSize(node: HierarchyNode): ShapeSize {
   };
 }
 
-/** 计算节点在画布坐标系中的绝对位置（叠加父节点偏移） */
+/** Compute a node's absolute position on the canvas (accumulating parent offsets) */
 export function absolutePositionOf<T extends HierarchyNode>(
   node: T,
   byId: Map<string, T>,
@@ -347,7 +347,7 @@ export function absolutePositionOf<T extends HierarchyNode>(
   return { x: base.x + node.position.x, y: base.y + node.position.y };
 }
 
-/** 节点在画布坐标系中的绝对包围盒 */
+/** Absolute bounding box of a node on the canvas */
 export function absoluteRectOf<T extends HierarchyNode>(node: T, byId: Map<string, T>): Rect {
   const pos = absolutePositionOf(node, byId);
   const size = nodeSize(node);
@@ -355,13 +355,13 @@ export function absoluteRectOf<T extends HierarchyNode>(node: T, byId: Map<strin
 }
 
 /**
- * 绝对包围盒的记忆化版本（性能优化）。
+ * Memoized version of the absolute bounding box (performance optimization).
  *
- * 拖拽辅助线每帧都要对同页大量节点求包围盒；未移动的节点对象引用不变，
- * 其父节点对象引用同样不变，因此可复用上一帧结果。
- * 缓存以「节点对象 → { 父对象, 包围盒 }」组成：父节点移动会产生新的父对象引用，
- * 缓存自动失效，避免容器拖动后子节点包围盒过期。
- * WeakMap 使缓存随节点对象回收，无需手动清理。
+ * Drag guides compute bounding boxes for many nodes per frame; unmoved node objects keep their identity,
+ * as do their parent objects, so the previous frame's result can be reused.
+ * The cache maps "node object → { parent object, bbox }": moving a parent produces a new parent object reference,
+ * which invalidates the cache automatically, so child boxes never go stale after dragging a container.
+ * A WeakMap lets the cache be collected with the node objects, requiring no manual cleanup.
  */
 const rectCache = new WeakMap<object, { parent: object | null; rect: Rect }>();
 
@@ -376,16 +376,16 @@ export function cachedAbsoluteRectOf<T extends HierarchyNode>(node: T, byId: Map
 }
 
 export interface Placement {
-  /** 命中泳道时为其 id；否则为 undefined（画布顶层） */
+  /** Swimlane id when the point hits one; otherwise undefined (canvas top level) */
   parentId?: string;
-  /** 命中泳道时为相对坐标，否则为绝对坐标 */
+  /** Relative coordinates when a swimlane is hit, absolute coordinates otherwise */
   position: { x: number; y: number };
 }
 
 /**
- * 判断元素落点是否位于某个泳道内：
- * 命中则返回泳道 id 与相对坐标，否则原样返回绝对坐标。
- * 多条泳道重叠时取面积最小者。
+ * Check whether a drop point falls inside a swimlane:
+ * if so return the swimlane id and relative coordinates, otherwise return the absolute coordinates unchanged.
+ * When several swimlanes overlap, the smallest area wins.
  */
 export function resolvePlacement(
   rect: Rect,
@@ -408,8 +408,8 @@ export function resolvePlacement(
 }
 
 /**
- * 排序：泳道（容器）最底层 → 其它顶层节点 → 子节点。
- * React Flow 要求父节点在数组中先于子节点，且数组顺序决定堆叠层级。
+ * Order: swimlanes (containers) at the bottom → other top-level nodes → child nodes.
+ * React Flow requires parents to appear before children in the array, and array order defines stacking.
  */
 export function orderNodesByHierarchy<T extends HierarchyNode>(nodes: readonly T[]): T[] {
   const lanes: T[] = [];
@@ -425,7 +425,7 @@ export function orderNodesByHierarchy<T extends HierarchyNode>(nodes: readonly T
 
 export type AnchorSide = 't' | 'b' | 'l' | 'r';
 
-/** 锚点 id → 图形内的相对位置（与 ShapeNode 的 HANDLES 保持一致） */
+/** Anchor id → relative position inside the shape (kept in sync with HANDLES in ShapeNode) */
 const HANDLE_ANCHORS: Record<string, { fx: number; fy: number }> = {
   't-l': { fx: 0.25, fy: 0 },
   t: { fx: 0.5, fy: 0 },
@@ -438,8 +438,8 @@ const HANDLE_ANCHORS: Record<string, { fx: number; fy: number }> = {
 };
 
 /**
- * 连线端点在画布坐标系中的位置与所在边。
- * 无锚点信息（导入数据 / 自由连线）时，取朝向对端的一侧中点。
+ * Position of an edge endpoint on the canvas and the side it sits on.
+ * Without anchor info (imported data / free edges), takes the midpoint of the side facing the opposite end.
  */
 export function anchorOf<T extends HierarchyNode>(
   node: T,
@@ -470,7 +470,7 @@ export function anchorOf<T extends HierarchyNode>(
     : { point: { x: rect.x + rect.width / 2, y: rect.y }, side: 't' };
 }
 
-/** 从锚点沿所在边法线方向外推一段距离（正交路由的起止「短桩」） */
+/** Extend a point outward along its side's normal (the short stub at each end of orthogonal routing) */
 export function stubPoint(
   point: { x: number; y: number },
   side: AnchorSide,
@@ -488,7 +488,7 @@ export function stubPoint(
   }
 }
 
-/* --------------------------- 序列化 / 校验 --------------------------- */
+/* --------------------------- Serialization / validation --------------------------- */
 
 export interface SerializeResult {
   ok: boolean;
@@ -496,12 +496,12 @@ export interface SerializeResult {
   error?: string;
 }
 
-/** 宽松校验：能归一为 v2 即视为合法（兼容旧版 v1 文档） */
+/** Loose validation: anything that normalizes to v2 is valid (keeps legacy v1 documents readable) */
 export function validateDoc(raw: unknown): raw is FlowDoc {
   return migrateDoc(raw) !== null;
 }
 
-/** 把内部状态序列化为可持久化的 v3 文档（单页记录；多页由 store 按页组装） */
+/** Serialize internal state into a persistable v3 document (single-page records; the store assembles pages) */
 export function serializeDoc(
   nodes: ReadonlyArray<{
     id: string;
@@ -512,7 +512,7 @@ export function serializeDoc(
     height?: number;
     hidden?: boolean;
     locked?: boolean;
-    /** 节点类型（缺省视为图形节点，兼容旧文档） */
+    /** Node type (absent is treated as a shape node, for legacy documents) */
     type?: FlowNodeType;
     mxStyle?: string[];
   }>,
@@ -576,16 +576,16 @@ export function serializeDoc(
   return toDocV3(recNodes, recEdges, pageName);
 }
 
-/** 反序列化并归一为 v2；非法返回 { ok:false }，调用方降级为空图 */
+/** Deserialize and normalize to v2; returns { ok:false } when invalid so callers can fall back to an empty graph */
 export function deserializeDoc(raw: unknown): SerializeResult {
   const doc = migrateDoc(raw);
   if (!doc) return { ok: false, error: 'INVALID_DOC' };
   return { ok: true, doc };
 }
 
-/* 模板已迁移到 `./model/templates`（按图种分类的模板库） */
+/* Templates moved to `./model/templates` (a template library grouped by diagram type) */
 
-/** 仅暴露给测试：用于重置内部计数器 */
+/** Exposed for tests only: resets the internal counter */
 export function __resetIdCounter(): void {
   idCounter = 0;
 }

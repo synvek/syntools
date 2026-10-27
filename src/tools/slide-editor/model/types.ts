@@ -1,11 +1,11 @@
 /**
- * 幻灯片编辑器数据模型契约。
+ * Slide editor data model contract.
  *
- * 单位约定：模型内部统一使用画布 px（96dpi），EMU 换算只在 pptx 进出口进行
- * （1 inch = 914400 EMU = 96px → 1px = 9525 EMU，整除无损）。
+ * Units: the model uses canvas px (96dpi) internally; EMU conversion happens only at the
+ * pptx import/export boundary (1 inch = 914400 EMU = 96px → 1px = 9525 EMU, exact).
  */
 
-/** 无元素的背景/填充 */
+/** Background/fill with no paint */
 export interface NoFill {
   type: 'none';
 }
@@ -14,7 +14,7 @@ export interface SolidFill {
   type: 'solid';
   /** #RRGGBB */
   color: string;
-  /** 0~1，DrawingML 的 alpha（100000 = 100%）已换算 */
+  /** 0~1, DrawingML alpha (100000 = 100%) already converted */
   alpha?: number;
 }
 
@@ -26,7 +26,7 @@ export interface GradientStop {
 
 export interface GradientFill {
   type: 'gradient';
-  /** 线性渐变角度（度），pptx 的 lin ang 顺时针换算结果 */
+  /** Linear gradient angle in degrees; converted from pptx clockwise `lin ang` */
   angle?: number;
   stops: GradientStop[];
 }
@@ -34,17 +34,17 @@ export interface GradientFill {
 export type Fill = NoFill | SolidFill | GradientFill;
 
 /**
- * 页面背景形态。
+ * Slide background form.
  *
- * 历史上 `background` 是纯色字符串，v2 起升级为 `Fill`（支持渐变）。
- * 读取旧工程/草稿时由 `normalizeBackground()` 统一归一化，因此这里保留
- * `string` 分支以兼容存量数据。
+ * Historically `background` was a plain color string; since v2 it is a `Fill` (gradients
+ * supported). Reading old projects/drafts normalizes it via `normalizeBackground()`, so the
+ * `string` branch is kept here for compatibility with existing data.
  */
 export type SlideBackground = string | Fill;
 
 export interface Stroke {
   color: string;
-  /** px 线宽 */
+  /** Line width in px */
   width: number;
   dash?: number[];
   alpha?: number;
@@ -58,20 +58,20 @@ export interface RunStyle {
   italic?: boolean;
   underline?: boolean;
   strike?: boolean;
-  /** 磅值（pt） */
+  /** Point size (pt) */
   size?: number;
   font?: string;
   color?: string;
-  /** 字间距（pt），对应 DrawingML `a:spc` */
+  /** Letter spacing (pt), maps to DrawingML `a:spc` */
   spacing?: number;
   /**
-   * 基线偏移（DrawingML `baseline`，单位为 0.1%）。
-   * 正值上标、负值下标；0 表示正常。
+   * Baseline offset (DrawingML `baseline`, in units of 0.1%).
+   * Positive = superscript, negative = subscript; 0 = normal.
    */
   baseline?: number;
-  /** 字符高亮底色（#RRGGBB） */
+  /** Character highlight background (#RRGGBB) */
   highlight?: string;
-  /** run 级超链接（DrawingML `a:hlinkClick`） */
+  /** Run-level hyperlink (DrawingML `a:hlinkClick`) */
   hyperlink?: string;
 }
 
@@ -84,14 +84,14 @@ export interface Paragraph {
   runs: TextRun[];
   align?: TextAlign;
   bullet?: boolean;
-  /** 编号列表（DrawingML buAutoNum），与 bullet 互斥 */
+  /** Numbered list (DrawingML buAutoNum), mutually exclusive with bullet */
   numbering?: boolean;
-  /** 行距倍数（1.2 = 120%） */
+  /** Line spacing multiplier (1.2 = 120%) */
   lineSpacing?: number;
-  /** 段前/段后（px） */
+  /** Space before/after paragraph (px) */
   spaceBefore?: number;
   spaceAfter?: number;
-  /** 缩进（px） */
+  /** Indent (px) */
   indent?: number;
 }
 
@@ -100,28 +100,28 @@ export interface TextBody {
   anchor?: VAlign;
   wrap?: boolean;
   autoFit?: 'none' | 'autofit';
-  /** 内边距（px） */
+  /** Inner margins (px) */
   margins?: { left: number; top: number; right: number; bottom: number };
-  /** 竖排文本（DrawingML `a:bodyPr vert`） */
+  /** Vertical text (DrawingML `a:bodyPr vert`) */
   vert?: TextVert;
 }
 
-/** 文本排列方向 */
+/** Text direction */
 export type TextVert = 'horz' | 'vert' | 'vert270' | 'wordArtVert';
 
-/** DrawingML prstGeom → 渲染可用的几何描述 */
+/** DrawingML prstGeom → render-ready geometry description */
 export interface ShapeGeometry {
-  /** 渲染形态：矩形（可带圆角）/ 椭圆 / 星形 / 折线闭合多边形 / SVG 路径 */
+  /** Render form: rect (optionally rounded) / ellipse / star / closed polygon / SVG path */
   kind: 'rect' | 'ellipse' | 'star' | 'polygon' | 'path';
-  /** kind==='rect' 时的圆角比例（0~0.5，相对短边） */
+  /** Corner radius ratio when kind==='rect' (0~0.5, relative to the short side) */
   radius?: number;
-  /** 归一化顶点（0~1），kind==='polygon' */
+  /** Normalized vertices (0~1), kind==='polygon' */
   points?: number[];
-  /** 归一化 SVG 路径，kind==='path' */
+  /** Normalized SVG path, kind==='path' */
   path?: string;
-  /** 星形的内接比（0~1），kind==='star' */
+  /** Star inner ratio (0~1), kind==='star' */
   innerRatio?: number;
-  /** 原始 prstGeom 名称，导出时优先写回 */
+  /** Original prstGeom name, written back first on export */
   prst: string;
 }
 
@@ -131,14 +131,14 @@ export interface PlaceholderRef {
   index?: string;
 }
 
-/** 投影样式（DrawingML `a:outerShdw` 的子集） */
+/** Shadow style (subset of DrawingML `a:outerShdw`) */
 export interface ShadowStyle {
   color: string;
-  /** 模糊半径（px，EMU 换算后的值） */
+  /** Blur radius (px, value after EMU conversion) */
   blur: number;
   offsetX: number;
   offsetY: number;
-  /** 0~1，缺省 1 */
+  /** 0~1, defaults to 1 */
   opacity?: number;
 }
 
@@ -148,20 +148,20 @@ interface ElementBase {
   y: number;
   width: number;
   height: number;
-  /** 顺时针角度 */
+  /** Clockwise angle */
   rotation?: number;
   flipX?: boolean;
   flipY?: boolean;
   opacity?: number;
   name?: string;
-  /** 锁定：不可选中、不可拖拽，但仍渲染与导出 */
+  /** Locked: cannot be selected or dragged, but still rendered and exported */
   locked?: boolean;
-  /** 隐藏：不渲染、不导出（默认可见，字段缺省即视为可见） */
+  /** Hidden: not rendered, not exported (visible by default; a missing field means visible) */
   visible?: boolean;
   placeholder?: PlaceholderRef;
-  /** 元素级超链接（DrawingML `a:hlinkClick`，作用于整个元素） */
+  /** Element-level hyperlink (DrawingML `a:hlinkClick`, applies to the whole element) */
   hyperlink?: string;
-  /** 投影 */
+  /** Shadow */
   shadow?: ShadowStyle;
 }
 
@@ -183,9 +183,9 @@ export interface ShapeElement extends ElementBase {
 
 export interface ImageElement extends ElementBase {
   type: 'image';
-  /** 指向 SlideDoc.media */
+  /** Points to SlideDoc.media */
   mediaId: string;
-  /** 裁剪比例 0~1（左/上/右/下各裁掉的比例） */
+  /** Crop ratios 0~1 (fraction cropped from left/top/right/bottom) */
   crop?: { left: number; top: number; right: number; bottom: number };
   cornerRadius?: number;
   stroke?: Stroke;
@@ -193,7 +193,7 @@ export interface ImageElement extends ElementBase {
 
 export interface LineElement extends ElementBase {
   type: 'line';
-  /** 起止点（相对 x/y 的偏移，未旋转前坐标系） */
+  /** Start/end points (offsets relative to x/y, in the pre-rotation coordinate system) */
   points: number[];
   stroke: Stroke;
 }
@@ -209,19 +209,19 @@ export interface TableCell {
   colSpan?: number;
   rowSpan?: number;
   /**
-   * 被合并覆盖的单元格（DrawingML 的 hMerge / vMerge="1"）。
-   * OOXML 要求这些格子仍然存在（只是不绘制内容），因此模型里保留它们并打标记，
-   * 而不是从行数组里删掉 —— 删掉会让 colWidths 的下标与网格列号错位。
+   * Cells covered by a merge (DrawingML hMerge / vMerge="1").
+   * OOXML requires these cells to still exist (they just don't paint content), so the model keeps
+   * them with a marker: removing them from the row array would misalign colWidths against grid columns.
    */
   covered?: boolean;
-  /** 被覆盖的方向：h = 横向合并且来自左邻、v = 纵向合并且来自上方 */
+  /** Covered direction: h = horizontal merge from the left neighbor, v = vertical merge from above */
   coveredBy?: 'h' | 'v';
 }
 
 export interface TableElement extends ElementBase {
   type: 'table';
   rows: TableCell[][];
-  /** 列宽之和 ≈ width（px） */
+  /** Sum of column widths ≈ width (px) */
   colWidths: number[];
   rowHeights: number[];
   headerRow?: boolean;
@@ -230,11 +230,11 @@ export interface TableElement extends ElementBase {
 }
 
 /**
- * 组合元素。
+ * Group element.
  *
- * 坐标约定：`children` 的 x/y 是**相对 group 原点**的坐标，与 DrawingML
- * `p:grpSp` 的 chOff/chExt 子坐标系语义一致（导出写 chOff=(0,0)、chExt=(w,h)）。
- * 渲染时子元素直接挂进已位于 group.x/y 的 Konva.Group，不需要再叠加一次原点。
+ * Coordinates: `children` x/y are relative to the **group origin**, matching the DrawingML
+ * `p:grpSp` chOff/chExt sub-coordinate semantics (export writes chOff=(0,0), chExt=(w,h)).
+ * At render time children attach directly to a Konva.Group already at group.x/y — no double origin.
  */
 export interface GroupElement extends ElementBase {
   type: 'group';
@@ -243,14 +243,14 @@ export interface GroupElement extends ElementBase {
 
 export interface PlaceholderElement extends ElementBase {
   type: 'placeholder';
-  /** 原始 pptx 元素类型，如 chart / diagram / oleObj */
+  /** Original pptx element type, e.g. chart / diagram / oleObj */
   sourceKind: string;
   label: string;
 }
 
 /**
- * 图表类型。命名与 pptxgenjs 的 `ChartType` 对齐，导出时直接查表映射。
- * 渲染侧由 echarts 离屏绘制成位图。
+ * Chart type. Names align with pptxgenjs `ChartType` so export maps them via a lookup.
+ * The render side draws them offscreen with echarts into a bitmap.
  */
 export type ChartType =
   'bar' | 'barStacked' | 'barPercent' | 'line' | 'pie' | 'doughnut' | 'area' | 'scatter' | 'radar';
@@ -260,45 +260,45 @@ export interface ChartSeries {
   values: number[];
 }
 
-/** 图表视觉开关，字段与 pptxgenjs 的 chart 选项同名以便直接透传 */
+/** Chart visual toggles; field names match pptxgenjs chart options so they pass through as-is */
 export interface ChartOptions {
   legend?: boolean;
   dataLabels?: boolean;
   gridLines?: boolean;
-  /** 自定义配色（#RRGGBB），缺省走主题 accent 色 */
+  /** Custom palette (#RRGGBB); defaults to theme accent colors */
   palette?: string[];
 }
 
 export interface ChartElement extends ElementBase {
   type: 'chart';
   chartType: ChartType;
-  /** 类别轴标签 */
+  /** Category axis labels */
   categories: string[];
   series: ChartSeries[];
   options?: ChartOptions;
-  /** 标题（可选） */
+  /** Title (optional) */
   title?: string;
   /**
-   * 渲染缓存失效标记：数据或配色变化时自增，
-   * 渲染层据此决定是否重建 echarts 实例。
+   * Render cache invalidation marker: increments when data or palette changes,
+   * letting the render layer decide whether to rebuild the echarts instance.
    */
   revision?: number;
 }
 
 export interface FormulaElement extends ElementBase {
   type: 'formula';
-  /** LaTeX 源码 */
+  /** LaTeX source */
   latex: string;
-  /** 渲染字号（px） */
+  /** Render font size (px) */
   fontSize?: number;
   color?: string;
 }
 
 export interface IconElement extends ElementBase {
   type: 'icon';
-  /** `model/icons.ts` 内置图标 id */
+  /** Built-in icon id from `model/icons.ts` */
   iconId: string;
-  /** 单色图标着色（#RRGGBB）；缺省用 SVG 自带颜色 */
+  /** Monochrome icon tint (#RRGGBB); defaults to the SVG's own color */
   color?: string;
 }
 
@@ -317,7 +317,7 @@ export type SlideElement =
 export interface Slide {
   id: string;
   layoutId?: string;
-  /** 页面背景；未设置时沿用 layout/master */
+  /** Slide background; falls back to layout/master when unset */
   background?: SlideBackground;
   elements: SlideElement[];
   notes?: string;
@@ -327,7 +327,7 @@ export interface SlideLayout {
   id: string;
   masterId: string;
   name?: string;
-  /** 布局上的占位符几何（必然带 PlaceholderRef） */
+  /** Placeholder geometry on the layout (always carries a PlaceholderRef) */
   elements: SlideElement[];
   background?: SlideBackground;
 }
@@ -335,7 +335,7 @@ export interface SlideLayout {
 export interface SlideMaster {
   id: string;
   name?: string;
-  /** 母版上的公共元素（Logo、页码占位符等） */
+  /** Shared elements on the master (logo, slide-number placeholder, ...) */
   elements: SlideElement[];
   background?: SlideBackground;
 }
@@ -348,7 +348,7 @@ export interface ThemeFonts {
 
 export interface SlideTheme {
   name: string;
-  /** DrawingML clrScheme：dk1/lt1/dk2/lt2/accent1..6/hlink/folHlink → #RRGGBB */
+  /** DrawingML clrScheme: dk1/lt1/dk2/lt2/accent1..6/hlink/folHlink → #RRGGBB */
   colors: Record<string, string>;
   majorFont: ThemeFonts;
   minorFont: ThemeFonts;
@@ -360,14 +360,14 @@ export interface MediaAsset {
   width: number;
   height: number;
   bytes?: Uint8Array;
-  /** 运行时解析出的 objectURL（不参与持久化） */
+  /** Runtime-resolved objectURL (not persisted) */
   url?: string;
 }
 
 export interface SlideDoc {
   id: string;
   name: string;
-  /** 幻灯片尺寸（px @96dpi） */
+  /** Slide size (px @96dpi) */
   width: number;
   height: number;
   theme: SlideTheme;
@@ -375,12 +375,12 @@ export interface SlideDoc {
   layouts: SlideLayout[];
   slides: Slide[];
   media: Record<string, MediaAsset>;
-  /** 每次结构性变更自增，用于缩略图缓存失效 */
+  /** Increments on every structural change, used to invalidate thumbnail caches */
   version: number;
   /**
-   * 文档结构版本号（区别于 `version` 的「变更计数」）。
-   * v1 = 纯色背景；v2 = 支持 Fill 背景 + chart/formula/icon 元素 + run 级扩展属性。
-   * 读取旧数据时由 `model/migrate.ts` 升到 `CURRENT_SCHEMA_VERSION`。
+   * Document schema version (distinct from the `version` change counter).
+   * v1 = solid backgrounds; v2 = Fill backgrounds + chart/formula/icon elements + run-level extras.
+   * Reading old data upgrades to `CURRENT_SCHEMA_VERSION` via `model/migrate.ts`.
    */
   schemaVersion?: number;
 }

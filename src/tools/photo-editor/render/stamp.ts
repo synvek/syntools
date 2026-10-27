@@ -3,17 +3,17 @@ import { getCanvas } from '../model/assets';
 import type { Selection } from '../model/types';
 
 /**
- * 印章会话：润饰工具族（减淡 / 加深 / 海绵 / 图章 / 修复 / 涂抹 / 模糊锐化）的公共骨架。
+ * Stamp session: the shared skeleton of the retouch family (dodge / burn / sponge / stamp / heal / smudge / blur).
  *
- * 负责三件容易写错的事：文档坐标 → 画布像素的换算、沿笔迹的等距步进、压感归一。
- * 「每枚印章做什么」交给调用方的 `onStamp`，因此各类工具只需要关心自己的像素运算。
+ * It handles three error-prone things: document → canvas pixels, even stepping along a stroke, pressure scaling.
+ * What each stamp does is left to the caller's `onStamp`, so tools only care about their own pixel math.
  *
- * 性能约定：每枚印章只 `getImageData` 它自己的包围盒（脏矩形），大图上也不至于整层重算。
+ * Performance: each stamp only `getImageData`s its own bounding box (a dirty rect), never the whole layer.
  */
 
 export interface StampHost {
   assetId: string;
-  /** 文档坐标下的左上角与尺寸（与画布像素尺寸的比值即缩放） */
+  /** Top-left and size in document coordinates (their ratio to the canvas pixels is the scale) */
   x: number;
   y: number;
   width: number;
@@ -21,43 +21,43 @@ export interface StampHost {
 }
 
 export interface StampFrame {
-  /** 画布像素坐标下的印章包围盒 */
+  /** Stamp bounding box in canvas pixel coordinates */
   left: number;
   top: number;
   width: number;
   height: number;
-  /** 包围盒像素数据（就地修改后由 `put` 写回） */
+  /** Pixel data of the bounding box (modified in place, then written back by `put`) */
   data: Uint8ClampedArray;
-  /** 取该像素的笔头权重（圆外 / 选区外为 0），`index` 为像素序号（非字节偏移） */
+  /** Tip weight for that pixel (0 outside the circle / selection); `index` is a pixel index, not bytes */
   weightAt: (index: number) => number;
-  /** 画布像素坐标 */
+  /** Canvas pixel coordinates */
   pixelAt: (index: number) => { x: number; y: number };
-  /** 写回包围盒（仅当确实改动过时调用） */
+  /** Write the bounding box back (call only when something actually changed) */
   put: () => void;
 }
 
 export interface StampContext {
-  /** 文档坐标 */
+  /** Document coordinates */
   x: number;
   y: number;
-  /** 0~1 归一压感 */
+  /** Pressure normalized to 0~1 */
   pressure: number;
-  /** 是否为本笔画的第一个印章（图章类的源点偏移以此确定） */
+  /** Whether this is the stroke's first stamp (it fixes the source offset for cloning tools) */
   first: boolean;
 }
 
 export interface StampSessionOptions {
-  /** 文档坐标下的笔头直径 */
+  /** Tip diameter in document units */
   size: number;
-  /** 间距（相对直径） */
+  /** Spacing (relative to the diameter) */
   spacing: number;
   selection: Selection | null;
-  /** 每枚印章返回 true 表示像素有改动 */
+  /** Each stamp returns true when it changed pixels */
   onStamp: (frame: StampFrame, context: StampContext) => boolean;
 }
 
 export interface StampSession {
-  /** `pressure` 缺省按 1 处理 */
+  /** `pressure` defaults to 1 */
   move: (x: number, y: number, pressure?: number) => void;
   end: () => void;
 }
@@ -137,7 +137,7 @@ export function createStampSession(
     move: (x, y, pressure) => {
       const value = normalizePressure(pressure);
       if (!last) {
-        // 单击（未拖动）也要留下一枚印章
+        // A click (no drag) must still leave one stamp
         stamp(x, y, value);
         last = { x, y };
         travelled = step;
@@ -145,7 +145,7 @@ export function createStampSession(
       }
       const result = walkStamps(last.x, last.y, x, y, step, travelled);
       for (const position of result.positions) stamp(position.x, position.y, value);
-      // 极端跳点被截断时直接对齐到当前点，避免后续印章全部落在旧轨迹上
+      // When an extreme jump is truncated, snap to the current point so later stamps don't follow the old path
       travelled = result.positions.length >= MAX_STAMPS_PER_MOVE ? step : result.next;
       last = { x, y };
     },

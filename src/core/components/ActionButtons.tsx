@@ -8,7 +8,7 @@ interface SwapButtonProps {
   disabled?: boolean;
 }
 
-/** 交换输入输出（编解码类工具） */
+/** Swap input and output (encode/decode tools) */
 export function SwapButton({ onSwap, label, disabled = false }: SwapButtonProps) {
   const { t } = useTranslation();
   return (
@@ -30,7 +30,7 @@ interface DownloadButtonProps {
   label?: string;
 }
 
-/** 结果下载为文件 */
+/** Download the result as a file */
 export function DownloadButton({ content, filename, label }: DownloadButtonProps) {
   const { t } = useTranslation();
   const download = () => {
@@ -56,7 +56,7 @@ export function DownloadButton({ content, filename, label }: DownloadButtonProps
   );
 }
 
-/** 参数区容器：单选/开关等选项的统一布局 */
+/** Options container: shared layout for radios, toggles and the like */
 export function OptionBar({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-3">{children}</div>;
 }
@@ -67,7 +67,7 @@ interface ClearButtonProps {
   disabled?: boolean;
 }
 
-/** 清空输入（交互规范：工具需提供复制/清空/交换） */
+/** Clear input (interaction spec: tools provide copy / clear / swap) */
 export function ClearButton({ onClick, label, disabled = false }: ClearButtonProps) {
   const { t } = useTranslation();
   return (

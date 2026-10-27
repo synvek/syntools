@@ -1,6 +1,6 @@
 /**
- * 图表面板文案：与 strings.ts 分离，避免为新增功能改动整份语言文件。
- * 随工具 chunk 懒加载注册，键路径保持 `tools.sheet.*`。
+ * Chart panel copy: kept apart from strings.ts so adding a feature does not touch the whole locale
+ * file. Registered lazily with the tool chunk, with keys under `tools.sheet.*`.
  */
 
 type ResourceTree = { tools: { sheet: Record<string, string> } };
@@ -179,7 +179,7 @@ export const chartStrings: Record<string, ResourceTree> = {
   pt,
 };
 
-/** 把图表文案合并进 i18next（键路径 tools.sheet.*） */
+/** Merge the chart copy into i18next (keys under tools.sheet.*) */
 export function registerChartStrings(instance: Registrar): void {
   for (const [lng, resources] of Object.entries(chartStrings)) {
     instance.addResourceBundle(lng, 'translation', resources, true, true);

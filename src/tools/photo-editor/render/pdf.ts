@@ -1,38 +1,38 @@
 /**
- * PDF 导出（单页、内嵌位图）。
+ * PDF export (single page, embedded bitmap).
  *
- * 自己拼而不是用 jsPDF / pdf-lib：我们只需要「一页 + 一张图」，PDF 的容器结构足够简单
- * （对象 + 交叉引用表），自己写能**逐字节验证**偏移量正确性，也不必为了导出把几百 KB 的库拉进编辑器的懒加载块。
+ * Hand-assembled instead of jsPDF / pdf-lib: we only need "one page + one image", and the container is
+ * simple (objects + xref), so writing it allows **byte-level** offset checks and no heavy dependency.
  *
- * 三点值得说明的取舍：
- * 1. 用 **FlateDecode + pako** 压原始 RGB，而不是内嵌 JPEG：JPEG 会丢透明通道、并在文字 / 线条上留压缩痕迹；
- * 2. 有透明像素时额外写一个 **SMask** 灰度图，PDF 里就能保留透明（JPEG 做不到这一点）；
- * 3. 页面尺寸按 `dpi`（默认 72 = 像素与点 1:1）换算，避免某些阅读器把一张 3000px 的图铺成 40 英寸巨幅。
+ * Three trade-offs worth noting:
+ * 1. **FlateDecode + pako** over raw RGB instead of embedded JPEG: JPEG drops alpha and adds artifacts;
+ * 2. a separate **SMask** grayscale image when alpha is present, so transparency survives (JPEG can't);
+ * 3. page size derived from `dpi` (72 by default, 1:1), so a 3000px image isn't laid out 40 inches wide.
  */
 
 import { deflate } from 'pako';
 import { hasTransparency, type PixelSource } from './tiff';
 
 export interface PdfOptions {
-  /** 写入页面尺寸的换算基准（72 dpi 时 1 像素 = 1 点） */
+  /** Basis for the page size (at 72 dpi, 1 pixel = 1 point) */
   dpi?: number;
-  /** 是否需要透明通道（SMask）；缺省由调用方先用 `hasTransparency` 判断 */
+  /** Whether alpha (SMask) is needed; callers usually check `hasTransparency` first */
   alpha?: boolean;
 }
 
 interface PdfPart {
-  /** 二进制流（图片数据），可选 */
+  /** Binary stream (image data), optional */
   stream?: Uint8Array;
-  /** 流是否走 FlateDecode（这里我们始终压缩） */
+  /** Whether the stream uses FlateDecode (here it always compresses) */
   flate?: boolean;
   dict: string;
 }
 
 /**
- * RGBA 像素 → 单页 PDF 字节。
+ * RGBA pixels → single-page PDF bytes.
  *
- * 对象编号固定为：1 目录、2 页面树、3 页面、4 图像、5 内容流、6 SMask（可选）。
- * 固定编号是为了让交叉引用表可读、也便于测试直接按编号取对象。
+ * Object numbers are fixed: 1 catalog, 2 page tree, 3 page, 4 image, 5 content stream, 6 SMask (optional).
+ * Fixed numbers keep the xref readable and let tests fetch objects by number directly.
  */
 export function encodePdf(image: PixelSource, options: PdfOptions = {}): Uint8Array {
   const dpi = Math.max(1, options.dpi ?? 72);
@@ -80,7 +80,7 @@ export function encodePdf(image: PixelSource, options: PdfOptions = {}): Uint8Ar
   return assemble(parts);
 }
 
-/** 组装对象 + 交叉引用表 + 尾部 */
+/** Assemble objects + cross-reference table + trailer */
 function assemble(parts: PdfPart[]): Uint8Array {
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -89,7 +89,7 @@ function assemble(parts: PdfPart[]): Uint8Array {
     size += bytes.length;
   };
   push(latin1('%PDF-1.4\n'));
-  // 二进制标记：告诉阅读器这份文件含二进制流，不要按文本模式处理
+  // Binary marker: tells readers the file has binary streams and not to treat it as text
   push(new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a]));
 
   const offsets: number[] = [];

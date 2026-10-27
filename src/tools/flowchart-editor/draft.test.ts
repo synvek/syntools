@@ -9,7 +9,7 @@ function draftKey(): string | undefined {
   return Object.keys(localStorage).find((k) => k.includes('flowchart-editor.draft'));
 }
 
-/** 构造一张体积巨大的图片节点（base64 字符数超过草稿上限） */
+/** Build an oversized image node (base64 character count over the draft limit) */
 function hugeImageDoc(): FlowDoc {
   const src = `data:image/png;base64,${'A'.repeat(DRAFT_SIZE_LIMIT)}`;
   return toDocV3(
@@ -98,7 +98,7 @@ describe('本地草稿读写', () => {
     expect(result.droppedImages).toBe(true);
     expect(result.saved).toBe(true);
     const page = activePageOf(readDraft()!)!;
-    // 图片内容被丢弃，但节点与其它内容仍在
+    // The image payload was dropped, but the node and other content remain
     expect(page.nodes.find((n) => n.id === 'img')?.data.src).toBeUndefined();
     expect(page.nodes.find((n) => n.id === 'a')?.data.label).toBe('A');
   });

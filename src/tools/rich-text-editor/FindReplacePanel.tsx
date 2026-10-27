@@ -10,8 +10,8 @@ interface FindReplacePanelProps {
 }
 
 /**
- * 查找替换面板：decoration 高亮 + 命中跳转 + 单处/全部替换。
- * 命中状态由 find-replace 扩展的插件持有，本组件只做输入与展示。
+ * Find-and-replace panel: decoration highlights, match navigation, replace one / replace all.
+ * The find-replace plugin owns match state; this component only handles input and display.
  */
 export function FindReplacePanel({ editor, onClose }: FindReplacePanelProps) {
   const { t } = useTranslation();
@@ -22,17 +22,17 @@ export function FindReplacePanel({ editor, onClose }: FindReplacePanelProps) {
   const [current, setCurrent] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 面板打开即聚焦搜索框
+  // Focus the search field as soon as the panel opens
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  // 搜索词或大小写选项变化 → 更新插件高亮状态
+  // Search term or case option changed → update the plugin's highlight state
   useEffect(() => {
     editor.commands.setSearch(term.trim(), matchCase);
   }, [editor, term, matchCase]);
 
-  // 同步命中计数（文档或搜索状态变化时刷新）
+  // Sync the match count (refreshed on doc or search state changes)
   const refreshCount = useCallback(() => {
     const config = findReplaceKey.getState(editor.state);
     const matches = config?.term

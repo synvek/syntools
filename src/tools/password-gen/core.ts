@@ -1,8 +1,8 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 随机密码生成（Tasks T38）：crypto.getRandomValues + 拒绝采样（无模偏差）。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译（T29 约定）。
+ * Random password generation (Tasks T38): crypto.getRandomValues + rejection sampling (no modulo bias).
+ * Error codes are decoupled from copy: core returns language-agnostic error codes and the UI translates them via i18n (T29 convention).
  */
 
 export type PasswordErrorCode = 'NO_SETS' | 'INVALID_LENGTH';
@@ -13,9 +13,9 @@ export interface PasswordOptions {
   uppercase: boolean;
   digits: boolean;
   symbols: boolean;
-  /** 排除易混淆字符（0 O 1 l I | ` ' "） */
+  /** Exclude easily confused characters (0 O 1 l I | ` ' ") */
   excludeAmbiguous: boolean;
-  /** 保证每个已选字符集至少出现一个字符 */
+  /** Guarantee at least one character from every selected character set */
   ensureEach: boolean;
 }
 
@@ -41,7 +41,7 @@ const SETS = {
 
 const AMBIGUOUS = new Set('0O1lI|`\'"'.split(''));
 
-/** 按选项取各字符集（排除易混淆字符后过滤空集） */
+/** Build the character sets from the options (empty sets are dropped after excluding confusables) */
 export function poolFor(options: PasswordOptions): string[] {
   const selected = [
     options.lowercase ? SETS.lowercase : '',
@@ -56,7 +56,7 @@ export function poolFor(options: PasswordOptions): string[] {
     .filter((set) => set.length > 0);
 }
 
-/** 估算熵：length * log2(字符池大小) */
+/** Estimate entropy: length * log2(pool size) */
 export function entropyBits(length: number, poolSize: number): number {
   if (poolSize <= 1) return 0;
   return length * Math.log2(poolSize);
@@ -64,14 +64,14 @@ export function entropyBits(length: number, poolSize: number): number {
 
 export type Strength = 'weak' | 'medium' | 'strong';
 
-/** 强度分级：< 50bit 弱，< 80bit 中，否则强（OWASP 建议 ≥ 80） */
+/** Strength grading: < 50 bits weak, < 80 bits medium, otherwise strong (OWASP recommends ≥ 80) */
 export function strengthOf(bits: number): Strength {
   if (bits < 50) return 'weak';
   if (bits < 80) return 'medium';
   return 'strong';
 }
 
-/** [0, max) 均匀随机整数：拒绝采样消除模偏差 */
+/** Uniform random integer in [0, max): rejection sampling removes modulo bias */
 function randomInt(max: number): number {
   const limit = Math.floor(0x1_0000_0000 / max) * max;
   const buf = new Uint32Array(1);
@@ -83,7 +83,7 @@ function randomInt(max: number): number {
   return x % max;
 }
 
-/** 生成随机密码；错误时 error 为 PasswordErrorCode */
+/** Generate a random password; on failure error is a PasswordErrorCode */
 export function generatePassword(options: PasswordOptions): ToolResult<string> {
   const length = Math.floor(options.length);
   if (!Number.isFinite(length) || length < MIN_LENGTH || length > MAX_LENGTH) {
@@ -99,7 +99,7 @@ export function generatePassword(options: PasswordOptions): ToolResult<string> {
   }
   while (chars.length < length) chars.push(all[randomInt(all.length)]);
 
-  // Fisher-Yates 洗牌：避免「保证字符」固定在开头
+  // Fisher-Yates shuffle: stops the guaranteed characters from staying at the front
   for (let i = chars.length - 1; i > 0; i -= 1) {
     const j = randomInt(i + 1);
     [chars[i], chars[j]] = [chars[j], chars[i]];

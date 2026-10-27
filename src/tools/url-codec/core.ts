@@ -1,6 +1,6 @@
 import type { ToolResult } from '@/core/types';
 
-/** component = encodeURIComponent（编码保留字符）；full = encodeURI（保留 URL 结构字符） */
+/** component = encodeURIComponent (encodes reserved characters); full = encodeURI (keeps URL structure characters) */
 export type UrlMode = 'component' | 'full';
 
 export function urlEncode(input: string, mode: UrlMode): ToolResult<string> {

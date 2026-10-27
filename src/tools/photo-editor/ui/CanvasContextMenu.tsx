@@ -8,10 +8,10 @@ import { usePhotoStore } from '../store';
 import { docDisplayName } from './layerName';
 
 /**
- * 画布右键菜单。
+ * Canvas context menu.
  *
- * 有选区时给出「选区能做什么」的后续操作（填充 / 清除 / 通过拷贝新建图层 / 反选 / 导出…），
- * 没有选区时给出画布级操作（全选 / 粘贴 / 新建图层 / 视图控制）。
+ * With a selection it offers follow-ups for "what a selection can do" (fill / clear / layer via copy / invert / export…),
+ * without one it offers canvas-level actions (select all / paste / new layer / view controls).
  */
 
 const MENU_WIDTH = 208;
@@ -50,8 +50,8 @@ export function CanvasContextMenu({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
-    // 用「DOM 包含关系」判断内外：不能靠 stopPropagation，
-    // 否则 pointerdown 就把菜单卸载了，紧随其后的 click 根本落不到菜单项上
+    // Use DOM containment to tell inside from outside: stopPropagation will not do,
+    // otherwise pointerdown unmounts the menu and the click right after it never lands on a menu item
     const onPointerDown = (event: PointerEvent) => {
       if (menuRef.current?.contains(event.target as Node)) return;
       onClose();
@@ -76,7 +76,7 @@ export function CanvasContextMenu({
 
   const exportSelection = run(() => {
     if (!selection) return;
-    // 按选区形状遮罩导出（矩形 / 椭圆 / 套索 / 反选的洞都正确挖空）
+    // Mask the export by the selection shape (rect / ellipse / lasso / inverted holes are all punched out correctly)
     const canvas = rasterizeSelection(doc, selection);
     if (!canvas) return;
     downloadCanvas(canvas, buildExportFilename(`${docDisplayName(doc.name, t)}-selection`, 'png'), {
@@ -166,7 +166,7 @@ export function CanvasContextMenu({
   );
 }
 
-/** 画布右键的「导出图片」：按 PNG 直接下载当前合成结果 */
+/** "Export image" from the canvas menu: download the current composite directly as PNG */
 function exportCurrent(doc: Parameters<typeof exportDoc>[0], t: TFunction): void {
   const canvas = exportDoc(doc, { format: 'png', quality: 1 });
   downloadCanvas(canvas, buildExportFilename(docDisplayName(doc.name, t), 'png'), {

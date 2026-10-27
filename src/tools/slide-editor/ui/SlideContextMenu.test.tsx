@@ -13,8 +13,8 @@ import { containerElements, useSlideStore } from '../store';
 import { SlideContextMenu, type SlideContextTarget } from './SlideContextMenu';
 
 /**
- * store 是同文件内共享的单例，先把会话态（选中 / 剪贴板 / 开关）复位，
- * 否则前一条用例留下的 gridSnap 之类会串到后一条。
+ * The store is a singleton shared within the file, so reset session state (selection / clipboard / toggles) first,
+ * otherwise leftovers like gridSnap from a previous case leak into the next one.
  */
 beforeEach(() => {
   useSlideStore.setState({
@@ -29,7 +29,7 @@ beforeEach(() => {
   });
 });
 
-/** 造一份「首页 2 个元素」的文档并装进 store，返回元素列表（文本在前，矩形在后） */
+/** Build a "2 elements on the first slide" document, load it into the store, and return the elements (text first, rect second) */
 function seedDoc(): SlideElement[] {
   const doc = createDoc();
   const text = createTextElement(doc, '标题');
@@ -78,7 +78,7 @@ describe('幻灯片右键菜单', () => {
     ]) {
       expect(screen.getByRole('menuitem', { name: key })).toBeTruthy();
     }
-    // 只选中 1 个元素时不能组合；会话剪贴板为空时不能粘贴
+    // Can't group with a single element selected; can't paste with an empty session clipboard
     expect(screen.getByRole('menuitem', { name: 'tools.slide.group' })).toBeDisabled();
     expect(screen.getByRole('menuitem', { name: 'tools.slide.paste' })).toBeDisabled();
   });

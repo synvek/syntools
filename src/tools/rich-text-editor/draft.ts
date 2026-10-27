@@ -2,25 +2,26 @@ import { MAX_IMPORT_BYTES } from './core';
 import { migrateDraft, toDraftV2, type RichTextDraftInput, type RichTextDraftV2 } from './migrate';
 
 /**
- * 本地草稿存储：键遵循 syntools:* 规范，内容不离开浏览器。
+ * Local draft storage: keys follow the syntools:* convention and content never leaves the browser.
  *
- * schema v2 起新增批注 / 修订 / 自定义词典 / 模板 id，并引入版本字段；
- * v1 旧键保留只读回退（迁移成功后删除），保证升级过程零数据丢失。
+ * Since schema v2 it adds comments / tracked changes / custom dictionary / template id plus a version
+ * field; the v1 key stays as a read-only fallback (deleted after a successful migration), so upgrades
+ * never lose data.
  */
 
 const DRAFT_KEY_V2 = 'syntools:rich-text-editor.draft.v2';
-/** v1 旧键：仅用于一次性迁移 */
+/** Legacy v1 key: used only for the one-off migration */
 export const LEGACY_DRAFT_KEY = 'syntools:rich-text-editor.draft.v1';
-/** 批注/修订署名：属于本地偏好，不作为文档内容分发 */
+/** Comment/tracked-change author name: a local preference, never distributed as document content */
 const REVIEWER_KEY = 'syntools:rich-text-editor.reviewer';
-/** 单篇草稿体积上限（10MB），防止 localStorage 被撑爆 */
+/** Per-draft size limit (10MB), keeping localStorage from overflowing */
 const MAX_DRAFT_BYTES = MAX_IMPORT_BYTES;
 
-/** 编辑视图模式：流式（连续滚动）/ 页面（A4 分页参考线） */
+/** Editing view mode: flow (continuous scrolling) / paged (A4 page guides) */
 export type ViewMode = 'flow' | 'paged';
 
 export type { RichTextDraftV2, RichTextDraftInput } from './migrate';
-/** 写入侧类型别名：扩展字段可省略，由 writeDraft 归一化补齐 */
+/** Write-side type alias: extension fields are optional and backfilled by writeDraft */
 export type RichTextDraft = RichTextDraftInput;
 
 function readKey(key: string): unknown {
@@ -34,8 +35,8 @@ function readKey(key: string): unknown {
 }
 
 /**
- * 读取草稿：优先 v2；缺失时回退读取 v1 并迁移为 v2（成功后清理旧键）。
- * 两种键都无法解析时返回 null。
+ * Read the draft: prefer v2; when missing, fall back to v1 and migrate it to v2 (cleaning up the old key
+ * on success). Returns null when neither key parses.
  */
 export function readDraft(): RichTextDraftV2 | null {
   const current = migrateDraft(readKey(DRAFT_KEY_V2));
@@ -43,12 +44,12 @@ export function readDraft(): RichTextDraftV2 | null {
 
   const migrated = migrateDraft(readKey(LEGACY_DRAFT_KEY));
   if (!migrated.ok) return null;
-  // 迁移成功顺手固化为 v2 并清理旧键；写入失败也照常返回内容
+  // On success persist it as v2 and clear the old key; return the content even if writing fails
   if (writeDraft(migrated.value)) clearLegacyDraft();
   return migrated.value;
 }
 
-/** 写入草稿，返回是否成功（超限时放弃写入而非静默失败） */
+/** Write the draft, returning success (oversized drafts are rejected rather than silently dropped) */
 export function writeDraft(draft: RichTextDraftInput): boolean {
   try {
     const normalized = toDraftV2(draft);
@@ -60,12 +61,12 @@ export function writeDraft(draft: RichTextDraftInput): boolean {
   }
 }
 
-/** 清理 v1 旧键（迁移完成后调用） */
+/** Clear the legacy v1 key (called after migration) */
 export function clearLegacyDraft(): void {
   try {
     localStorage.removeItem(LEGACY_DRAFT_KEY);
   } catch {
-    // localStorage 不可用时忽略
+    // Ignore when localStorage is unavailable
   }
 }
 
@@ -74,11 +75,11 @@ export function clearDraft(): void {
     localStorage.removeItem(DRAFT_KEY_V2);
     localStorage.removeItem(LEGACY_DRAFT_KEY);
   } catch {
-    // localStorage 不可用时忽略
+    // Ignore when localStorage is unavailable
   }
 }
 
-/** 读取本地署名（批注 / 修订的作者名） */
+/** Read the local author name (for comments / tracked changes) */
 export function readReviewerName(): string {
   try {
     return localStorage.getItem(REVIEWER_KEY) ?? '';
@@ -87,31 +88,31 @@ export function readReviewerName(): string {
   }
 }
 
-/** 写入本地署名；空串表示恢复默认署名 */
+/** Write the local author name; an empty string restores the default */
 export function writeReviewerName(name: string): void {
   try {
     const trimmed = name.trim();
     if (trimmed) localStorage.setItem(REVIEWER_KEY, trimmed);
     else localStorage.removeItem(REVIEWER_KEY);
   } catch {
-    // localStorage 不可用时忽略
+    // Ignore when localStorage is unavailable
   }
 }
 
 export interface DraftWriteResult {
   ok: boolean;
-  /** 是否经过降级（剥离图片后才能放下） */
+  /** Whether it was degraded (only fit after stripping images) */
   degraded: boolean;
 }
 
-/** 剥离内嵌图片（降级策略第一步） */
+/** Strip embedded images (first degradation step) */
 function stripImages(html: string): string {
   return html.replace(/<img\b[^>]*>/gi, '');
 }
 
 /**
- * 超限降级写入：先原样写入；失败则剥离图片重试；
- * 仍失败返回 ok:false（UI 提示导出文件以保留内容）。
+ * Degraded write when over the limit: write as-is first; on failure retry without images;
+ * if that also fails, return ok:false (the UI suggests exporting a file to keep the content).
  */
 export function writeDraftSafe(draft: RichTextDraftInput): DraftWriteResult {
   if (writeDraft(draft)) return { ok: true, degraded: false };

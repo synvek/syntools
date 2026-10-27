@@ -5,47 +5,49 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView, NodeView } from '@tiptap/pm/view';
 
 /**
- * 脚注（对标 Word 脚注 / 尾注）：
+ * Footnotes (modeled on Word footnotes / endnotes):
  *
- * - 正文中是行内 atom `footnoteRef`，注释正文存在节点属性 `note` 里——单节点自包含，
- *   不引入「引用 + 列表」两个节点之间的位置耦合，撤销重做与序列化都只有一条数据；
- * - 屏幕上文末汇总区由 widget decoration 派生，不改动文档内容、不进入 getHTML；
- * - 打印 / 快照 PDF / 单文件 HTML / Markdown / Word 导出前统一走 injectFootnotes：
- *   按 DOM 顺序编号、把编号写进 HTML，并追加同一套汇总区。
+ * - The body holds an inline atom `footnoteRef`, with the note text in the node attribute `note` —
+ *   self-contained, avoiding positional coupling between a "reference + list" node pair, so undo/redo
+ *   and serialization deal with a single record;
+ * - The on-screen end-of-document summary is derived from a widget decoration: it doesn't touch the
+ *   document content and never reaches getHTML;
+ * - Print / snapshot PDF / single-file HTML / Markdown / Word export all run through injectFootnotes
+ *   beforehand: number by DOM order, write the numbers into the HTML, and append the same summary.
  */
 
 export interface FootnoteLabels {
-  /** 脚注名称：工具栏、弹窗标题与文末汇总区标题共用 */
+  /** Footnote label: shared by the toolbar, dialog title and end-of-document summary heading */
   name: string;
-  /** 空注释占位 */
+  /** Placeholder for an empty note */
   empty: string;
 }
 
 export const DEFAULT_FOOTNOTE_LABELS: FootnoteLabels = { name: '脚注', empty: '（空脚注）' };
 
-/** 汇总区标记属性：注入幂等性与样式都依赖它 */
+/** Summary section marker attribute: both injection idempotency and styling depend on it */
 const LIST_TAG = 'section';
 const LIST_ATTR = 'data-footnote-list';
 const LIST_CLASS = 'rte-footnote-list';
 
-/** 引用节点上可供外部（导出层 / 测试）读取的属性 */
+/** Attribute on the reference node that outside code (export layer / tests) can read */
 export const FOOTNOTE_ATTR = 'data-footnote';
 
-/** 点击引用时派发的自定义事件：NodeView → 工具层打开编辑弹窗 */
+/** Custom event dispatched on reference click: NodeView -> tool layer opens the edit dialog */
 export const FOOTNOTE_EDIT_EVENT = 'rte-footnote-edit';
 
 export interface FootnoteEditDetail {
-  /** 引用节点在文档中的位置 */
+  /** Document position of the reference node */
   pos: number;
-  /** 当前注释正文 */
+  /** Current note text */
   note: string;
 }
 
 /* ------------------------------------------------------------------ *
- * 纯逻辑：编号与导出注入
+ * Pure logic: numbering and export injection
  * ------------------------------------------------------------------ */
 
-/** 按文档顺序收集脚注正文 */
+/** Collect footnote notes in document order */
 export function collectFootnoteNotes(doc: PMNode): string[] {
   const notes: string[] = [];
   doc.descendants((node) => {
@@ -55,7 +57,7 @@ export function collectFootnoteNotes(doc: PMNode): string[] {
   return notes;
 }
 
-/** 生成文末汇总区 DOM（屏幕 widget 与导出注入共用同一结构） */
+/** Build the end-of-document summary DOM (shared by the on-screen widget and export injection) */
 export function renderFootnoteList(
   notes: readonly string[],
   labels: FootnoteLabels = DEFAULT_FOOTNOTE_LABELS,
@@ -83,9 +85,10 @@ export function renderFootnoteList(
 }
 
 /**
- * 为脚注引用编号并追加文末汇总区（幂等：重复调用会重新编号并替换旧汇总区）。
- * 输入 HTML 中引用形如 `<sup data-footnote data-note="…">`，
- * 输出为 `<sup data-footnote data-number="n" data-note="…">[n]</sup>` + 汇总区。
+ * Number footnote references and append the end-of-document summary (idempotent: repeat calls
+ * renumber and replace the previous summary).
+ * Input references look like `<sup data-footnote data-note="…">`,
+ * output is `<sup data-footnote data-number="n" data-note="…">[n]</sup>` + the summary.
  */
 export function injectFootnotes(
   html: string,
@@ -96,7 +99,7 @@ export function injectFootnotes(
   const refs = Array.from(doc.querySelectorAll(`sup[${FOOTNOTE_ATTR}]`));
   if (refs.length === 0) return html;
 
-  // 先清掉上一次注入的汇总区，保证可重复调用
+  // Remove the previously injected summary first so the call stays repeatable
   doc.querySelectorAll(`${LIST_TAG}[${LIST_ATTR}]`).forEach((node) => node.remove());
 
   const notes = refs.map((ref) => (ref.getAttribute('data-note') ?? '').trim());
@@ -110,10 +113,10 @@ export function injectFootnotes(
 }
 
 /* ------------------------------------------------------------------ *
- * 引用节点与屏幕汇总区
+ * Reference node and on-screen summary
  * ------------------------------------------------------------------ */
 
-/** 同一份文档只遍历一次：多个引用 NodeView 共享编号结果 */
+/** Traverse each document once: all reference NodeViews share the numbering result */
 const numberCache = new WeakMap<PMNode, Map<number, number>>();
 
 function footnoteNumbers(state: EditorState): Map<number, number> {
@@ -131,9 +134,10 @@ function footnoteNumbers(state: EditorState): Map<number, number> {
 }
 
 /**
- * 当前操作目标脚注引用：
- * 1) 引用被选中（点击 [n] 后的 NodeSelection）；
- * 2) 光标紧邻引用（插入后光标停在引用之后，是编辑的最常见形态）。
+ * The footnote reference the current action targets:
+ * 1) the reference is selected (NodeSelection right after clicking [n]);
+ * 2) the cursor sits next to a reference (after insertion the cursor rests right after it, the most
+ *    common state when editing).
  */
 export function findSelectedFootnote(state: EditorState): { pos: number; note: string } | null {
   const { selection } = state;
@@ -152,7 +156,7 @@ export function findSelectedFootnote(state: EditorState): { pos: number; note: s
   return null;
 }
 
-/** 脚注引用视图：显示实时编号，点击派发编辑事件 */
+/** Footnote reference view: shows the live number and dispatches an edit event on click */
 class FootnoteRefView implements NodeView {
   readonly dom: HTMLElement;
 
@@ -209,7 +213,7 @@ class FootnoteRefView implements NodeView {
   }
 }
 
-/** 脚注引用节点 */
+/** Footnote reference node */
 export const FootnoteRef = Node.create<{ labels: FootnoteLabels }>({
   name: 'footnoteRef',
   group: 'inline',
@@ -223,7 +227,7 @@ export const FootnoteRef = Node.create<{ labels: FootnoteLabels }>({
 
   addAttributes() {
     return {
-      /** 注释正文；空字符串表示尚未填写 */
+      /** Note text; an empty string means not filled in yet */
       note: {
         default: '',
         parseHTML: (el) => el.getAttribute('data-note') ?? '',
@@ -275,8 +279,9 @@ export const FootnoteRef = Node.create<{ labels: FootnoteLabels }>({
 });
 
 /**
- * 文末汇总区（屏幕）：以文档末尾的 widget 呈现。
- * 只在文档变化时重建装饰，避免每次选区变化都重排汇总区。
+ * End-of-document summary (on screen): presented as a widget at the end of the document.
+ * Decorations are rebuilt only when the document changes, avoiding a re-layout of the summary on
+ * every selection change.
  */
 const footnoteListKey = new PluginKey<{ deco: DecorationSet }>('footnoteList');
 
@@ -318,11 +323,11 @@ export const FootnoteList = Extension.create<{ labels?: FootnoteLabels }>({
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     footnote: {
-      /** 在光标处插入脚注引用 */
+      /** Insert a footnote reference at the cursor */
       insertFootnote: (note: string) => ReturnType;
-      /** 修改指定位置的脚注正文 */
+      /** Update the note text at the given position */
       updateFootnote: (pos: number, note: string) => ReturnType;
-      /** 删除指定位置的脚注引用 */
+      /** Remove the footnote reference at the given position */
       removeFootnote: (pos: number) => ReturnType;
     };
   }

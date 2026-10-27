@@ -4,24 +4,25 @@ import type { DocComment, TrackedChange } from './docs';
 import type { PageSetupConfig } from './pageSetup';
 
 /**
- * 草稿 / 文档库 schema 迁移（纯逻辑，不依赖 DOM 与 IndexedDB，便于单测）：
- * - v1：无版本号，仅有 title / html / view / pageSetup / zoom / pdfMode
- * - v2：新增 schemaVersion、批注、修订、自定义词典、模板 id
+ * Draft / document library schema migration (pure logic, no DOM or IndexedDB, easy to unit test):
+ * - v1: no version number, only title / html / view / pageSetup / zoom / pdfMode
+ * - v2: adds schemaVersion, comments, tracked changes, custom dictionary and template id
  *
- * 迁移契约：**读时兼容 + 惰性补齐**，绝不因迁移失败丢弃用户数据。
- * 迁移失败时保留原值并回退默认值，仅当传入值无法作为草稿使用时返回错误。
+ * Migration contract: **read-compatible + lazily backfilled**; a failed migration never discards user data.
+ * On failure the original values are kept and defaults used; an error is returned only when the input
+ * can't serve as a draft at all.
  */
 
 export const CURRENT_SCHEMA_VERSION = 2;
-/** v1 旧数据的隐含版本号 */
+/** Implicit version number for legacy v1 data */
 export const LEGACY_SCHEMA_VERSION = 1;
 
-/** 从 HTML 反推批注 / 修订条目时的上限，避免异常文档撑爆元数据 */
+/** Cap on entries derived from HTML for comments / tracked changes, so malformed documents can't blow up the metadata */
 const MAX_DERIVED_ENTRIES = 200;
 
 export type PdfExportMode = 'text' | 'snapshot';
 
-/** 草稿 schema v2：所有持久化入口共同依赖的数据契约 */
+/** Draft schema v2: the data contract every persistence entry point relies on */
 export interface RichTextDraftV2 {
   schemaVersion: number;
   title: string;
@@ -30,19 +31,19 @@ export interface RichTextDraftV2 {
   zoom?: number;
   pdfMode?: PdfExportMode;
   pageSetup?: Partial<PageSetupConfig>;
-  /** 批注元数据（Mark 之外的引用原文 / 正文 / 作者 / 时间 / 已解决状态） */
+  /** Comment metadata (quote, body, author, time, resolved state — everything outside the Mark) */
   comments: DocComment[];
-  /** 修订条目元数据（Mark 之外的变更类型 / 文本 / 作者 / 时间） */
+  /** Tracked-change metadata (change type, text, author, time — everything outside the Mark) */
   changes: TrackedChange[];
-  /** 拼写检查自定义词典 */
+  /** Custom spellcheck dictionary */
   userWords?: string[];
-  /** 最近套用的文档模板 id */
+  /** Id of the most recently applied document template */
   templateId?: string;
 }
 
 /**
- * 写入侧入参：扩展字段可省略，由 `writeDraft` 归一化补齐。
- * 读取侧统一得到完整的 `RichTextDraftV2`。
+ * Write-side input: extension fields are optional and backfilled by `writeDraft`.
+ * The read side always yields a complete `RichTextDraftV2`.
  */
 export type RichTextDraftInput = Omit<
   RichTextDraftV2,
@@ -50,7 +51,7 @@ export type RichTextDraftInput = Omit<
 > &
   Partial<Pick<RichTextDraftV2, 'comments' | 'changes' | 'userWords' | 'templateId'>>;
 
-/** 文档级扩展字段（v1 记录缺失，读取时惰性补齐） */
+/** Document-level extension fields (missing in v1 records, backfilled lazily on read) */
 export interface DocExtras {
   comments: DocComment[];
   changes: TrackedChange[];
@@ -58,12 +59,12 @@ export interface DocExtras {
   templateId?: string;
 }
 
-/** 宽松对象守卫：持久化读取时用于过滤任意 JSON 值 */
+/** Loose object guard, used to filter arbitrary JSON values on read */
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** 读取正数时间戳（缺失/非法返回 0，由调用方决定兜底） */
+/** Read a positive timestamp (missing or invalid yields 0; the caller decides the fallback) */
 export function readPositiveNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 }
@@ -73,7 +74,7 @@ function readString(value: unknown, fallback = ''): string {
 }
 
 /* ------------------------------------------------------------------ *
- * 单条记录归一化
+ * Single-record normalization
  * ------------------------------------------------------------------ */
 
 function normalizeComment(raw: unknown): DocComment | null {
@@ -94,7 +95,7 @@ function normalizeChange(raw: unknown, index: number): TrackedChange | null {
   if (!isPlainObject(raw)) return null;
   const kind = raw.kind === 'insert' || raw.kind === 'delete' ? raw.kind : null;
   if (!kind) return null;
-  // 缺 id 的历史数据用序号补一个稳定 id（同一次迁移结果可复现）
+  // Legacy data without an id gets a stable index-based id (the same migration is reproducible)
   const id = readString(raw.id) || `t-migrated-${index}`;
   return {
     id,
@@ -106,7 +107,7 @@ function normalizeChange(raw: unknown, index: number): TrackedChange | null {
 }
 
 /* ------------------------------------------------------------------ *
- * 从 HTML 反推审阅信息（仅用于无元数据的 v1 数据）
+ * Derive review info from HTML (only for v1 data lacking metadata)
  * ------------------------------------------------------------------ */
 
 const HTML_ENTITIES: Record<string, string> = {
@@ -118,7 +119,7 @@ const HTML_ENTITIES: Record<string, string> = {
   '&#39;': "'",
 };
 
-/** 去掉标签并还原常见实体（反推文本用，不追求完整 HTML 语义） */
+/** Strip tags and decode common entities (for derived text; full HTML semantics not required) */
 function innerText(html: string): string {
   return html
     .replace(/<[^>]*>/g, '')
@@ -128,9 +129,9 @@ function innerText(html: string): string {
 }
 
 /**
- * v1 文档的批注/修订 Mark 保存在 HTML 里但元数据从未落盘。
- * 升级时按 HTML 反推一份最小元数据，保证侧栏不会「有标记却无条目」。
- * 结果为尽力而为：无法还原的字段留空，不猜测作者。
+ * v1 documents kept comment / tracked-change marks in HTML while the metadata was never persisted.
+ * On upgrade a minimal metadata set is derived from the HTML so the sidebar never shows "marks but no
+ * entries". The result is best-effort: unrecoverable fields stay empty and the author is never guessed.
  */
 export function deriveReviewFromHtml(html: string): {
   comments: DocComment[];
@@ -182,13 +183,13 @@ export function deriveReviewFromHtml(html: string): {
 }
 
 /* ------------------------------------------------------------------ *
- * 扩展字段归一化
+ * Extension field normalization
  * ------------------------------------------------------------------ */
 
 /**
- * 归一化文档级扩展字段。
- * `deriveReview` 为真时（v1 数据）才从 HTML 反推审阅信息——
- * v2 数据即使批注列表为空也必须尊重用户已删除的事实，不能复活。
+ * Normalize document-level extension fields.
+ * Review info is derived from the HTML only when `deriveReview` is true (v1 data) — for v2 data an
+ * empty comment list must be respected as a deliberate deletion and never resurrected.
  */
 export function normalizeDocExtras(raw: unknown, deriveReview: boolean): DocExtras {
   const source = isPlainObject(raw) ? raw : {};
@@ -229,12 +230,12 @@ export function normalizeDocExtras(raw: unknown, deriveReview: boolean): DocExtr
 }
 
 /* ------------------------------------------------------------------ *
- * 草稿迁移
+ * Draft migration
  * ------------------------------------------------------------------ */
 
 /**
- * 把任意历史草稿（v1 / v2 / 半损坏 JSON）迁移为 v2。
- * 仅在「完全无法作为草稿使用」时失败（非对象、html 不是字符串）。
+ * Migrate any historical draft (v1 / v2 / partially corrupted JSON) to v2.
+ * Fails only when the input is completely unusable as a draft (not an object, html isn't a string).
  */
 export function migrateDraft(raw: unknown): ToolResult<RichTextDraftV2> {
   if (!isPlainObject(raw)) return { ok: false, error: 'MIGRATION_FAILED' };
@@ -265,7 +266,7 @@ export function migrateDraft(raw: unknown): ToolResult<RichTextDraftV2> {
   };
 }
 
-/** 归一化写入侧入参：补齐版本号与扩展字段默认值 */
+/** Normalize write-side input: fill in the version number and extension field defaults */
 export function toDraftV2(draft: RichTextDraftInput): RichTextDraftV2 {
   const extras = normalizeDocExtras(draft, false);
   return {

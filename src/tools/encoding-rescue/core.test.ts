@@ -3,7 +3,7 @@ import { rescueGarbled } from './core';
 
 describe('rescueGarbled', () => {
   it('还原 GBK 被误读为 Latin1 的乱码', () => {
-    // '中文' 的 GBK 字节（D6D0 CEC4）被当作 Latin1 解读得到的乱码字符串
+    // Mojibake produced by reading the GBK bytes of a Chinese string (D6D0 CEC4) as Latin1
     const garbled = String.fromCharCode(0xd6, 0xd0, 0xce, 0xc4);
     const result = rescueGarbled(garbled);
     expect(result.ok).toBe(true);

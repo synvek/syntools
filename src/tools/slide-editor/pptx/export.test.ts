@@ -9,8 +9,8 @@ import {
 } from '../model/factory';
 import type { SlideDoc, SlideElement, TextElement } from '../model/types';
 import { importPptxFile } from './import';
-// 本文件断言的是**自研 DrawingML 通道**的输出结构，因此显式走 legacy。
-// pptxgen 通道的断言见 exportPptxgen.test.ts。
+// This file asserts the output structure of the **hand-written DrawingML channel**, so it uses legacy explicitly.
+// See exportPptxgen.test.ts for the pptxgen channel assertions.
 import { exportPptxLegacy } from './export';
 import { elementXml, slideXml } from './write';
 
@@ -254,10 +254,10 @@ describe('合并单元格', () => {
     const result = await exportPptxLegacy(doc);
     const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
     const slide = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
-    // gridSpan 必须是 a:tc 的属性（写在 a:tcPr 上会被 PowerPoint 忽略）
+    // gridSpan must be an attribute of a:tc (PowerPoint ignores it on a:tcPr)
     expect(slide).toContain('<a:tc gridSpan="2">');
     expect(slide).toContain('hMerge="1"');
-    // 横向合并不应写成纵向覆盖
+    // A horizontal merge must not be written as a vertical cover
     expect(slide).not.toContain('vMerge="1"');
   });
 

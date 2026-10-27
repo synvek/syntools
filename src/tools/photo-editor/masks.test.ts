@@ -10,7 +10,7 @@ import { createAdjustmentLayer, createGroupLayer, createRasterLayer } from './mo
 import { migrateDoc } from './model/migrate';
 import type { Layer, PhotoDoc, Selection, VectorMaskRef } from './model/types';
 
-/** 工厂只需文档尺寸，这里给一个最小替身 */
+/** The factory only needs the document size, so give it a minimal stand-in */
 const docStub = { width: 200, height: 200 } as PhotoDoc;
 
 const raster = (patch: Partial<Layer> = {}): Layer =>
@@ -30,15 +30,15 @@ const rectSelection: Selection = {
   feather: 0,
 };
 
-describe('selectionToVectorContours：选区 → 矢量蒙版轮廓', () => {
-  it('把矩形选区平移到图层局部坐标', () => {
+describe('selectionToVectorContours: selection → vector mask contours', () => {
+  it('translates a rectangular selection into layer-local coordinates', () => {
     const contours = selectionToVectorContours(rectSelection, 20, 30);
     expect(contours).toHaveLength(1);
     expect(contours[0].add).toBe(true);
     expect(contours[0].path).toEqual([0, 0, 40, 0, 40, 50, 0, 50]);
   });
 
-  it('保留布尔运算的并集 / 差集标记（洞转为减选轮廓）', () => {
+  it('keeps the union / difference flags (holes become subtractive contours)', () => {
     const selection: Selection = {
       kind: 'lasso',
       x: 10,
@@ -54,7 +54,7 @@ describe('selectionToVectorContours：选区 → 矢量蒙版轮廓', () => {
     expect(contours[1].path.slice(0, 2)).toEqual([10, 10]);
   });
 
-  it('点数不足的套索回落为外接矩形（与选区的多边形展开规则一致）', () => {
+  it('a lasso with too few points falls back to its bounding box (same rule as selection polygon expansion)', () => {
     const selection: Selection = {
       kind: 'lasso',
       x: 0,
@@ -78,14 +78,14 @@ describe('vectorMaskSignature / hasVectorMask', () => {
     feather: 2,
   };
 
-  it('未启用或没有轮廓时视为不存在', () => {
+  it('disabled or contour-less masks count as absent', () => {
     expect(hasVectorMask({ ...mask, enabled: false })).toBe(false);
     expect(hasVectorMask({ ...mask, contours: [] })).toBe(false);
     expect(hasVectorMask(null)).toBe(false);
     expect(vectorMaskSignature({ ...mask, enabled: false })).toBe('');
   });
 
-  it('启用且有轮廓时签名非空，并在形状 / 参数变化时换签名', () => {
+  it('an enabled mask with contours has a signature that changes with shape / parameters', () => {
     const base = vectorMaskSignature(mask);
     expect(base.length).toBeGreaterThan(0);
     expect(vectorMaskSignature({ ...mask, inverted: true })).not.toBe(base);
@@ -98,7 +98,7 @@ describe('vectorMaskSignature / hasVectorMask', () => {
     ).not.toBe(base);
   });
 
-  it('亚像素抖动不会反复换签名（顶点取整）', () => {
+  it('sub-pixel jitter does not churn the signature (vertices are rounded)', () => {
     const jitter: VectorMaskRef = {
       ...mask,
       contours: [{ path: [0.2, 0.1, 10.3, 0.4, 10.1, 10.2, 0.3, 10.4], add: true }],
@@ -107,35 +107,35 @@ describe('vectorMaskSignature / hasVectorMask', () => {
   });
 });
 
-describe('clipBaseIndex：剪贴蒙版的基准图层', () => {
-  it('取同层内下方最近的图层', () => {
+describe('clipBaseIndex: the clipping mask base layer', () => {
+  it('takes the nearest layer below at the same level', () => {
     const layers = [raster(), raster({ clipped: true })];
     expect(clipBaseIndex(layers, 1)).toBe(0);
     expect(clipBaseIndex(layers, 0)).toBe(-1);
   });
 
-  it('连续多个剪贴图层共用同一个基准', () => {
+  it('consecutive clipping layers share one base', () => {
     const layers = [raster(), raster({ clipped: true }), raster({ clipped: true })];
     expect(clipBaseIndex(layers, 1)).toBe(0);
     expect(clipBaseIndex(layers, 2)).toBe(0);
   });
 
-  it('跳过调整图层（不产生像素，不能作基准）', () => {
+  it('skips adjustment layers (no pixels, so they cannot be a base)', () => {
     const layers = [raster(), adjustment(), raster({ clipped: true })];
     expect(clipBaseIndex(layers, 2)).toBe(0);
   });
 
-  it('跳过不可见图层', () => {
+  it('skips hidden layers', () => {
     const layers = [raster({ visible: false }), raster(), raster({ clipped: true })];
     expect(clipBaseIndex(layers, 2)).toBe(1);
   });
 
-  it('跳过穿透编组（自身没有合成结果可用作 alpha）', () => {
+  it('skips pass-through groups (no composite result to use as alpha)', () => {
     const layers = [group({ passThrough: true }), raster(), raster({ clipped: true })];
     expect(clipBaseIndex(layers, 2)).toBe(1);
   });
 
-  it('不跨编组向上找基准', () => {
+  it('never looks for a base outside the group', () => {
     const layers = [
       raster(),
       group({ id: 'g1', passThrough: false }),
@@ -144,7 +144,7 @@ describe('clipBaseIndex：剪贴蒙版的基准图层', () => {
     expect(clipBaseIndex(layers, 2)).toBe(-1);
   });
 
-  it('编组内的兄弟图层可以互为基准', () => {
+  it('sibling layers inside a group can serve as a base for each other', () => {
     const layers = [
       raster({ id: 'base', parentId: 'g1' }),
       raster({ parentId: 'g1', clipped: true }),
@@ -152,7 +152,7 @@ describe('clipBaseIndex：剪贴蒙版的基准图层', () => {
     expect(clipBaseIndex(layers, 1)).toBe(0);
   });
 
-  it('下方没有图层时返回 -1', () => {
+  it('returns -1 when nothing lies below', () => {
     expect(clipBaseIndex([raster({ clipped: true })], 0)).toBe(-1);
   });
 });
@@ -163,7 +163,7 @@ function parseDoc(input: unknown): PhotoDoc {
   return parsed;
 }
 
-describe('migrateDoc：矢量蒙版与剪贴蒙版的归一', () => {
+describe('migrateDoc: normalizing vector and clipping masks', () => {
   const raw = (patch: Record<string, unknown>) => ({
     id: 'doc-1',
     name: 'n',
@@ -193,7 +193,7 @@ describe('migrateDoc：矢量蒙版与剪贴蒙版的归一', () => {
     ],
   });
 
-  it('羽化被钳制到上限，clipped 透传', () => {
+  it('feather clamps to the maximum and clipped passes through', () => {
     const parsed = parseDoc(
       raw({
         clipped: true,
@@ -210,21 +210,21 @@ describe('migrateDoc：矢量蒙版与剪贴蒙版的归一', () => {
     expect(parsed.layers[0].clipped).toBe(true);
   });
 
-  it('轮廓全无效时整份矢量蒙版丢弃', () => {
+  it('the whole vector mask is dropped when every contour is invalid', () => {
     const parsed = parseDoc(
       raw({ vectorMask: { enabled: true, contours: [{ path: [0, 0, 1, 1] }, 'nope'] } }),
     );
     expect(parsed.layers[0].vectorMask).toBeNull();
   });
 
-  it('奇数长度的顶点序列被裁齐（不足三点则丢弃）', () => {
+  it('odd-length vertex lists are trimmed (dropped under three points)', () => {
     const parsed = parseDoc(
       raw({ vectorMask: { enabled: true, contours: [{ path: [0, 0, 10, 0, 10] }] } }),
     );
     expect(parsed.layers[0].vectorMask).toBeNull();
   });
 
-  it('旧工程没有这些字段时补默认值', () => {
+  it('old projects without these fields get defaults', () => {
     const parsed = parseDoc(raw({}));
     expect(parsed.layers[0].vectorMask).toBeNull();
     expect(parsed.layers[0].clipped).toBe(false);

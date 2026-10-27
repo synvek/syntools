@@ -1,9 +1,10 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 电子表格编辑器纯逻辑层（技术设计 §8.2）：
- * 本文件不引入 Univer / exceljs（全部在 xlsx-io.ts 与 univer.ts 中动态导入），
- * 且所有函数遵循 ToolResult 契约——预期错误返回结果而非抛异常。
+ * Spreadsheet editor pure-logic layer (technical design §8.2):
+ * This file imports neither Univer nor exceljs (both are dynamically imported in xlsx-io.ts and
+ * univer.ts), and every function follows the ToolResult contract — expected errors are returned,
+ * never thrown.
  */
 
 export type SheetErrorCode =
@@ -16,16 +17,16 @@ export type SheetErrorCode =
   | 'SNAPSHOT_FAILED'
   | 'RUNTIME_FAILED';
 
-/** 导入文件大小上限（10MB），与 FileDropZone 保持一致 */
+/** Import file size cap (10MB), matching FileDropZone */
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
-/** 导入后至少保留的网格规模，避免工作表过小 */
+/** Minimum grid size kept after import so the sheet never looks too small */
 export const MIN_ROW_COUNT = 200;
 export const MIN_COLUMN_COUNT = 26;
 
-/** Univer 的 0/1 布尔 */
+/** Univer's 0/1 boolean */
 export type BooleanNumber = 0 | 1;
 
-/** Univer 单元格样式（IStyleData 的精简子集，字段语义与 @univerjs/core 一致） */
+/** Univer cell style (a trimmed subset of IStyleData; field semantics match @univerjs/core) */
 export interface UniverStyleLite {
   ff?: string;
   fs?: number;
@@ -35,9 +36,9 @@ export interface UniverStyleLite {
   st?: { s: BooleanNumber };
   cl?: { rgb?: string };
   bg?: { rgb?: string };
-  /** HorizontalAlign: 1 左 / 2 中 / 3 右 / 4 两端 */
+  /** HorizontalAlign: 1 left / 2 center / 3 right / 4 justify */
   ht?: 1 | 2 | 3 | 4;
-  /** VerticalAlign: 1 上 / 2 中 / 3 下 */
+  /** VerticalAlign: 1 top / 2 middle / 3 bottom */
   vt?: 1 | 2 | 3;
   /** WrapStrategy: 1 overflow / 2 clip / 3 wrap */
   tb?: 1 | 2 | 3;
@@ -50,7 +51,7 @@ export interface UniverStyleLite {
   };
 }
 
-/** ExcelJS 单元格样式（仅取本工具关心的字段） */
+/** ExcelJS cell style (only the fields this tool cares about) */
 export interface ExcelStyleLite {
   font?: {
     name?: string;
@@ -72,7 +73,7 @@ export interface ExcelStyleLite {
   };
 }
 
-/** 富文本片段（与 ExcelJS RichText 对齐的字体子集） */
+/** Rich text piece (font subset aligned with ExcelJS RichText) */
 export interface RichTextPiece {
   text: string;
   font?: {
@@ -87,8 +88,9 @@ export interface RichTextPiece {
 }
 
 /**
- * Univer 单元格富文本文档数据（ICellData.p 的最小形态）。
- * Univer 会原样保留 p（见实现前的探针验证），因此可安全承载 Excel 单元格内的局部格式。
+ * Univer cell rich-text document data (the minimal shape of ICellData.p).
+ * Univer keeps p verbatim (verified by a probe run before implementation), so it can safely carry
+ * partial formatting from an Excel cell.
  */
 export interface CellDocumentData {
   id: string;
@@ -102,15 +104,15 @@ export interface CellDocumentData {
 }
 
 /**
- * 单元格附加载荷，写入 Univer 的 ICellData.custom（Univer 原样保留该字段）。
- * 当前承载超链接 / 批注 / 错误值语义，供 UI（P1）与导出还原使用。
+ * Extra per-cell payload, stored in Univer's ICellData.custom (Univer keeps the field verbatim).
+ * It currently carries hyperlink / note / error-value semantics for the UI (P1) and for export.
  */
 export interface CellCustomPayload {
-  /** 超链接目标与可选显示文本 */
+  /** Hyperlink target and optional display text */
   hyperlink?: { url: string; text?: string };
-  /** 批注 / 备注文本 */
+  /** Comment / note text */
   note?: string;
-  /** 错误值文本（如 #VALUE!）：导出时还原为 Excel 错误单元格 */
+  /** Error value text (e.g. #VALUE!): restored as an Excel error cell on export */
   error?: string;
 }
 
@@ -121,7 +123,7 @@ export interface MergeRange {
   endColumn: number;
 }
 
-/** 0 基列序号 → Excel 列名：0 → A，25 → Z，26 → AA */
+/** 0-based column index → Excel column name: 0 → A, 25 → Z, 26 → AA */
 export function columnIndexToName(index: number): string {
   if (!Number.isInteger(index) || index < 0) return 'A';
   let n = index;
@@ -133,7 +135,7 @@ export function columnIndexToName(index: number): string {
   return name;
 }
 
-/** Excel 列名 → 0 基列序号：A → 0，AA → 26；非法返回 null */
+/** Excel column name → 0-based index: A → 0, AA → 26; returns null when invalid */
 export function columnNameToIndex(name: string): number | null {
   const text = name.trim().toUpperCase();
   if (!/^[A-Z]+$/.test(text)) return null;
@@ -144,7 +146,7 @@ export function columnNameToIndex(name: string): number | null {
   return index - 1;
 }
 
-/** 解析 A1 风格坐标："B3" → { row: 2, column: 1 }（均为 0 基） */
+/** Parse an A1-style reference: "B3" → { row: 2, column: 1 } (both 0-based) */
 export function parseCellRef(ref: string): { row: number; column: number } | null {
   const match = /^([A-Za-z]+)(\d+)$/.exec(ref.trim());
   if (!match) return null;
@@ -154,7 +156,7 @@ export function parseCellRef(ref: string): { row: number; column: number } | nul
   return { row, column };
 }
 
-/** 合并区字符串（"A1:C3"）→ 0 基闭区间 */
+/** Merge range string ("A1:C3") → 0-based inclusive bounds */
 export function parseMergeRange(range: string): ToolResult<MergeRange> {
   const [startRef, endRef] = range.split(':');
   const start = parseCellRef(startRef ?? '');
@@ -171,7 +173,7 @@ export function parseMergeRange(range: string): ToolResult<MergeRange> {
   };
 }
 
-/** ARGB（FFFF0000）→ Univer 用的 #RRGGBB；alpha 忽略 */
+/** ARGB (FFFF0000) → #RRGGBB for Univer; alpha is dropped */
 export function argbToHex(argb: string | undefined): string | undefined {
   if (!argb) return undefined;
   const hex = argb.replace(/^#/, '').toUpperCase();
@@ -180,7 +182,7 @@ export function argbToHex(argb: string | undefined): string | undefined {
   return undefined;
 }
 
-/** #RRGGBB → ExcelJS 用的 ARGB（不透明） */
+/** #RRGGBB → ARGB for ExcelJS (fully opaque) */
 export function hexToArgb(hex: string | undefined): string | undefined {
   if (!hex) return undefined;
   const value = hex.replace(/^#/, '').toUpperCase();
@@ -191,7 +193,7 @@ export function hexToArgb(hex: string | undefined): string | undefined {
 
 export type ImportKind = 'xlsx' | 'csv' | 'legacy-xls' | 'unsupported';
 
-/** 依据扩展名判定可导入类型；旧版 .xls（BIFF 二进制）浏览器端不解析 */
+/** Decide the importable type from the extension; legacy .xls (BIFF binary) is not parsed in the browser */
 export function resolveImportKind(filename: string): ImportKind {
   const lower = filename.trim().toLowerCase();
   if (lower.endsWith('.xlsx') || lower.endsWith('.xlsm')) return 'xlsx';
@@ -200,7 +202,7 @@ export function resolveImportKind(filename: string): ImportKind {
   return 'unsupported';
 }
 
-/** 导入前统一校验：格式 + 体积 */
+/** Single pre-import check: format and size */
 export function checkImportFile(file: { name: string; size: number }): ToolResult<'xlsx' | 'csv'> {
   const kind = resolveImportKind(file.name);
   if (kind === 'legacy-xls') return { ok: false, error: 'UNSUPPORTED_LEGACY_XLS' };
@@ -215,21 +217,22 @@ export function checkImportFile(file: { name: string; size: number }): ToolResul
   return { ok: true, value: kind };
 }
 
-/* ------------------------------ 工作表结构保真 ------------------------------ */
+/* ------------------------------ Sheet structure fidelity ------------------------------ */
 
-/** Excel 工作表可见状态 → Univer hidden 标记（hidden / veryHidden 均归一为隐藏） */
+/** Excel sheet visibility → Univer hidden flag (both hidden and veryHidden normalise to hidden) */
 export function worksheetStateToHidden(state: string | undefined): BooleanNumber {
   return state === 'hidden' || state === 'veryHidden' ? 1 : 0;
 }
 
-/** Univer hidden 标记 → Excel 工作表可见状态 */
+/** Univer hidden flag → Excel sheet visibility */
 export function hiddenToWorksheetState(hidden: BooleanNumber | undefined): 'visible' | 'hidden' {
   return hidden ? 'hidden' : 'visible';
 }
 
 /**
- * Excel 视图布尔（showGridLines / rightToLeft 等）→ Univer 0/1。
- * 字段缺失时回落到 fallback，避免把「未设置」误判为 false 而改变默认外观。
+ * Excel view boolean (showGridLines / rightToLeft, …) → Univer 0/1.
+ * Falls back when the field is absent, so "unset" is not mistaken for false and the default look
+ * stays intact.
  */
 export function viewFlagToBooleanNumber(
   value: boolean | undefined,
@@ -239,7 +242,7 @@ export function viewFlagToBooleanNumber(
   return value ? 1 : 0;
 }
 
-/** Univer 0/1 → Excel 视图布尔 */
+/** Univer 0/1 → Excel view boolean */
 export function booleanNumberToViewFlag(value: BooleanNumber | undefined): boolean {
   return value === 1;
 }
@@ -259,7 +262,7 @@ const HORIZONTAL_TO_EXCEL: Record<number, string> = {
 };
 const VERTICAL_TO_EXCEL: Record<number, string> = { 1: 'top', 2: 'middle', 3: 'bottom' };
 
-/** ExcelJS 边框线型 → Univer BorderStyleTypes */
+/** ExcelJS border style → Univer BorderStyleTypes */
 const BORDER_TO_UNIVER: Record<string, number> = {
   hair: 2,
   dotted: 3,
@@ -305,7 +308,8 @@ function toExcelBorder(side: { s: number; cl: { rgb?: string } } | undefined) {
   };
 }
 
-/** ExcelJS 样式 → Univer 样式（仅覆盖字体/字号/粗斜体/下划线/删除线/字色/背景/对齐/换行/数字格式/边框） */
+/** ExcelJS style → Univer style (only font / size / bold-italic / underline / strike / colour /
+ * background / alignment / wrap / number format / borders) */
 export function excelStyleToUniver(style: ExcelStyleLite): UniverStyleLite {
   const out: UniverStyleLite = {};
   const font = style.font;
@@ -349,7 +353,7 @@ export function excelStyleToUniver(style: ExcelStyleLite): UniverStyleLite {
   return out;
 }
 
-/** Univer 样式 → ExcelJS 样式 */
+/** Univer style → ExcelJS style */
 export function univerStyleToExcel(style: UniverStyleLite): ExcelStyleLite {
   const out: ExcelStyleLite = {};
   const font: NonNullable<ExcelStyleLite['font']> = {};
@@ -397,9 +401,9 @@ export function univerStyleToExcel(style: UniverStyleLite): ExcelStyleLite {
   return out;
 }
 
-/* ------------------------------ 单元格富文本 / 日期 / 自定义载荷 ------------------------------ */
+/* ------------------------------ Cell rich text / dates / custom payload ------------------------------ */
 
-/** 富文本字体子集 → Univer 文本样式（字段与单元格样式一致，便于复用渲染） */
+/** Rich-text font subset → Univer text style (same fields as cell styles, so rendering can be reused) */
 export function richTextFontToStyle(font: RichTextPiece['font'] | undefined): UniverStyleLite {
   const out: UniverStyleLite = {};
   if (!font) return out;
@@ -414,7 +418,7 @@ export function richTextFontToStyle(font: RichTextPiece['font'] | undefined): Un
   return out;
 }
 
-/** Univer 文本样式 → 富文本字体子集（导出用；无样式返回 undefined） */
+/** Univer text style → rich-text font subset (for export; undefined when there is no style) */
 export function styleToRichTextFont(style: UniverStyleLite | undefined): RichTextPiece['font'] {
   if (!style) return undefined;
   const font: NonNullable<RichTextPiece['font']> = {};
@@ -430,8 +434,8 @@ export function styleToRichTextFont(style: UniverStyleLite | undefined): RichTex
 }
 
 /**
- * ExcelJS richText 片段 → Univer 单元格富文本（ICellData.p）。
- * 无任何可保留的样式时返回 null，调用方直接用纯文本即可。
+ * ExcelJS richText pieces → Univer cell rich text (ICellData.p).
+ * Returns null when no style is worth keeping, in which case callers should just use plain text.
  */
 export function richTextToCellDocument(
   pieces: readonly RichTextPiece[],
@@ -462,7 +466,7 @@ export function richTextToCellDocument(
   };
 }
 
-/** Univer 单元格富文本 → ExcelJS richText 片段（导出用；按文本 run 边界切分） */
+/** Univer cell rich text → ExcelJS richText pieces (for export; split at text-run boundaries) */
 export function cellDocumentToRichText(doc: CellDocumentData): RichTextPiece[] {
   const text = (doc.body?.dataStream ?? '').replace(/\r\n$/, '');
   const runs = doc.body?.textRuns ?? [];
@@ -488,20 +492,20 @@ export function cellDocumentToRichText(doc: CellDocumentData): RichTextPiece[] {
   return pieces;
 }
 
-/** Excel 1900 日期系统：Date → 序列号（与 ExcelJS 的 excelToDate 精确互逆） */
+/** Excel 1900 date system: Date → serial (the exact inverse of ExcelJS's excelToDate) */
 export function dateToExcelSerial(date: Date): number {
   return 25569 + date.getTime() / 86_400_000;
 }
 
-/** Excel 序列号 → Date（1900 日期系统；与 dateToExcelSerial 互逆） */
+/** Excel serial → Date (1900 date system; inverse of dateToExcelSerial) */
 export function excelSerialToDate(serial: number): Date {
   return new Date(Math.round((serial - 25569) * 86_400_000));
 }
 
-/** Unicode BOM：CSV 导出时前置，便于 Excel 正确识别 UTF-8 中文 */
+/** Unicode BOM, prepended on CSV export so Excel detects UTF-8 Chinese text correctly */
 export const CSV_BOM = '\ufeff';
 
-/** 工作簿快照（供统计使用的精简视图，字段与 Univer IWorkbookData 对齐） */
+/** Workbook snapshot (a trimmed view for statistics; fields aligned with Univer IWorkbookData) */
 export interface WorkbookSnapshotLite {
   sheetOrder?: string[];
   sheets?: Record<
@@ -518,7 +522,7 @@ export interface WorkbookSummary {
   formulas: number;
 }
 
-/** 统计工作簿规模：工作表数 / 最大行 / 最大列 / 非空单元格数 / 公式数 */
+/** Summarise workbook size: sheets / max rows / max columns / non-empty cells / formulas */
 export function summarizeWorkbook(snapshot: WorkbookSnapshotLite): WorkbookSummary {
   const sheetIds = snapshot.sheetOrder?.length
     ? snapshot.sheetOrder
@@ -545,13 +549,13 @@ export function summarizeWorkbook(snapshot: WorkbookSnapshotLite): WorkbookSumma
   return { sheets: sheetIds.length, rows, columns, cells, formulas };
 }
 
-/* ------------------------------ 放映（只读表格） ------------------------------ */
+/* ------------------------------ Present mode (read-only grid) ------------------------------ */
 
-/** 放映最多展示的行 / 列：超出只提示截断，避免把 DOM 撑爆 */
+/** Max rows / columns rendered in present mode; beyond that we only flag truncation so the DOM stays small */
 export const PRESENT_MAX_ROWS = 120;
 export const PRESENT_MAX_COLS = 30;
 
-/** 空工作簿放映时的空白网格规模（看起来像一张空表，而不是孤零零一个单元格） */
+/** Blank grid size when presenting an empty workbook (looks like an empty table, not one lonely cell) */
 export const PRESENT_BLANK_ROWS = 16;
 export const PRESENT_BLANK_COLS = 8;
 
@@ -581,7 +585,7 @@ export interface PresentGrid {
   cols: number;
   cells: PresentCell[];
   merges: PresentMerge[];
-  /** 内容超出展示上限（行列被截断） */
+  /** Content exceeds the display cap (rows/columns truncated) */
   truncated: boolean;
 }
 
@@ -593,8 +597,8 @@ function alignOf(style: UniverStyleLite | undefined): PresentCell['align'] {
 }
 
 /**
- * 快照 → 只读表格数据（纯函数，便于单测）。
- * 用于「放映」模式：不依赖 Univer 实例，直接渲染成 HTML 表格。
+ * Snapshot → read-only grid data (a pure function, easy to unit test).
+ * Used by present mode: renders straight to an HTML table without a Univer instance.
  */
 export function buildPresentGrid(
   snapshot: WorkbookSnapshotLite,
@@ -622,7 +626,7 @@ export function buildPresentGrid(
   const order = snapshot.sheetOrder?.length
     ? snapshot.sheetOrder
     : Object.keys(snapshot.sheets ?? {});
-  // 指定的工作表为空时，回退到第一张有内容的表
+  // Fall back to the first non-empty sheet when the requested one is empty
   const target =
     sheetId && snapshot.sheets?.[sheetId]
       ? sheetId
@@ -632,7 +636,7 @@ export function buildPresentGrid(
   if (!sheet) return null;
 
   const used = withData(target);
-  // 有内容就按内容范围展示；完全空的工作簿给一张空白网格，避免只剩一个单元格
+  // Render the used range when there is content; a fully empty workbook gets a blank grid rather than a single cell
   const hasData = used.rows > 0 || used.cols > 0;
   const rows = hasData ? Math.max(1, Math.min(used.rows, maxRows)) : PRESENT_BLANK_ROWS;
   const cols = hasData ? Math.max(1, Math.min(used.cols, maxCols)) : PRESENT_BLANK_COLS;
@@ -647,7 +651,7 @@ export function buildPresentGrid(
       const value = cell?.v ?? cell?.f;
       if (value === undefined || value === null || value === '') continue;
       const formula = typeof cell?.f === 'string' ? cell.f : '';
-      // 快照里的公式已按 Univer 约定带前导 "="，避免重复前缀
+      // Per Univer, formulas in the snapshot already carry a leading "=", so do not add another
       const text =
         formula && (cell.v === undefined || cell.v === null)
           ? formula.startsWith('=')
@@ -683,14 +687,14 @@ export function buildPresentGrid(
     sheetName: sheet.name ?? '',
     rows,
     cols,
-    // 按行列排序，便于渲染时按顺序填充
+    // Sort by row then column so rendering can fill cells in order
     cells: cells.sort((a, b) => a.row - b.row || a.col - b.col),
     merges,
     truncated: used.rows > rows || used.cols > cols,
   };
 }
 
-/** 清洗非法文件名字符并限制长度 */
+/** Strip illegal filename characters and cap the length */
 export function sanitizeFilename(name: string): string {
   const cleaned = name
     .replace(/[\\/:*?"<>|]/g, '')
@@ -699,12 +703,12 @@ export function sanitizeFilename(name: string): string {
   return cleaned.slice(0, 60) || 'workbook';
 }
 
-/** 生成导出文件名 */
+/** Build the export filename */
 export function buildExportFilename(title: string, ext: 'xlsx' | 'csv'): string {
   return `${sanitizeFilename(title)}.${ext}`;
 }
 
-/** 列宽单位换算：Univer 用像素，ExcelJS 用字符宽度（1 字符 ≈ 7px） */
+/** Column width conversion: Univer uses pixels, ExcelJS uses character widths (1 char ≈ 7px) */
 export function pxToColumnWidth(px: number | undefined): number | undefined {
   if (!px || px <= 0) return undefined;
   return Math.max(1, Math.round((px / 7) * 100) / 100);
@@ -715,7 +719,7 @@ export function columnWidthToPx(width: number | undefined): number | undefined {
   return Math.round(width * 7);
 }
 
-/** 行高单位换算：Univer 用像素，ExcelJS 用磅（1pt ≈ 1.333px） */
+/** Row height conversion: Univer uses pixels, ExcelJS uses points (1pt ≈ 1.333px) */
 export function pxToRowHeight(px: number | undefined): number | undefined {
   if (!px || px <= 0) return undefined;
   return Math.max(1, Math.round((px / 1.3333) * 100) / 100);

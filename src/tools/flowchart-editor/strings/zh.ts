@@ -1,6 +1,6 @@
 /**
- * zh 文案：UI 文案 + 图形名（84 个图形）。
- * 由 `strings/index.ts` 按需 import() 合并注册，键路径 `tools.flowchart.*`。
+ * zh copy: UI copy + shape names (84 shapes).
+ * Merged and registered via on-demand import() in `strings/index.ts`, with keys under `tools.flowchart.*`.
  */
 
 import type { LangBundle, ResourceTree } from './types';

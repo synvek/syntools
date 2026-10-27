@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 教学与培训类提示词，详见 ../README.md */
+/** Teaching and training prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'education-lesson-plan',

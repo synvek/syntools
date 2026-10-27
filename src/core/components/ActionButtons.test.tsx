@@ -21,7 +21,7 @@ describe('DownloadButton', () => {
   });
 
   it('点击触发下载并释放对象 URL', async () => {
-    // jsdom 未实现 URL.createObjectURL，直接定义 stub
+    // jsdom has no URL.createObjectURL, so define a stub
     const createObjectURL = vi.fn().mockReturnValue('blob:test');
     const revokeObjectURL = vi.fn();
     Object.assign(URL, { createObjectURL, revokeObjectURL });

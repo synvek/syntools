@@ -2,7 +2,7 @@ import type { ShapeDef } from './index';
 import { axisAdjust, pxMx } from './adjust';
 import { activeClassPath, templateClassPath } from './uml-paths';
 
-/** UML 类图：类、接口、枚举、数据类型、抽象类、活动类、模板类、关联类 */
+/** UML class diagram: class, interface, enumeration, data type, abstract class, active class, template class, association class */
 export const UML_CLASS_SHAPES: ShapeDef[] = [
   {
     kind: 'umlClass',

@@ -1,18 +1,18 @@
 /**
- * Mermaid flowchart 文本的双向转换。
+ * Bidirectional conversion between the editor and Mermaid flowchart text.
  *
- * 导出：结构与可表达的样式（classDef / class / linkStyle）一并写出，便于粘贴到 Markdown 与往返。
- * 导入：自研轻量解析器（不引入 mermaid 运行时，避免 ~500KB gzip 依赖），
- *      覆盖 `flowchart` / `graph` 的常用子集：
- *        - 方向：TD / TB / BT / LR / RL
- *        - 节点：`id`、`id[矩形]`、`id(圆角)`、`id([终止])`、`id((圆形))`、`id(((双圆)))`、`id{判断}`、
- *                `id{{六边形}}`、`id[(数据库)]`、`id[[预定义]]`、`id>非对称]`、
- *                `id[/平行四边形/]`、`id[\平行四边形\]`、`id[/梯形\]`、`id[\梯形/]`
- *        - 连线：`-->` `---` `-.->` `-.-` `==>` `===` `--x` `--o`，标签 `|文本|` 或 `-- 文本 -->`
- *        - 样式：`classDef` 定义 + `class` 指派 + `style` 内联 + `linkStyle`（按连线序号）
- *        - 容器：`subgraph 名称 ... end`（映射为编组容器）
- *      其余指令（click / direction / accTitle / accDescr 等）安全忽略。
- *      由于 Mermaid 不携带坐标，导入后必然经过一次 dagre 自动布局。
+ * Export: structure and the expressible styles (classDef / class / linkStyle) are written out for pasting into Markdown and round-tripping.
+ * Import: a purpose-built lightweight parser (no mermaid runtime, avoiding a ~500KB gzip dependency)
+ * covering a common subset of `flowchart` / `graph`:
+ * - direction: TD / TB / BT / LR / RL
+ * - nodes: `id`, `id[rect]`, `id(rounded)`, `id([terminator])`, `id((circle))`, `id(((double circle)))`, `id{decision}`,
+ * `id{{hexagon}}`, `id[(database)]`, `id[[predefined]]`, `id>asymmetric]`,
+ * `id[/parallelogram/]`, `id[\parallelogram\]`, `id[/trapezoid\]`, `id[\trapezoid/]`
+ * - edges: `-->` `---` `-.->` `-.-` `==>` `===` `--x` `--o`, labels as `|text|` or `-- text -->`
+ * - styles: `classDef` definitions + `class` assignments + inline `style` + `linkStyle` (by edge index)
+ * - containers: `subgraph name ... end` (mapped to group containers)
+ * Other directives (click / direction / accTitle / accDescr, etc.) are ignored safely.
+ * Since Mermaid carries no coordinates, an import always runs one dagre auto-layout pass.
  */
 
 import { createId, defaultData } from '../core';
@@ -34,9 +34,9 @@ import {
   type ShapeKind,
 } from '../model/types';
 
-/* ------------------------------ 导出 ------------------------------ */
+/* ------------------------------ Export ------------------------------ */
 
-/** 去掉 Mermaid 语法敏感字符，避免生成非法脚本 */
+/** Strip characters that are sensitive in Mermaid syntax so the output stays a valid script */
 function safe(text: string): string {
   return (
     text
@@ -46,7 +46,7 @@ function safe(text: string): string {
   );
 }
 
-/** 形状 → Mermaid 文本包裹方式 */
+/** Shape → how it is wrapped in Mermaid text */
 function bodyOf(kind: ShapeKind, label: string): string {
   const text = safe(label);
   switch (kind) {
@@ -80,7 +80,7 @@ function bodyOf(kind: ShapeKind, label: string): string {
   }
 }
 
-/** 节点样式 → classDef 声明体；只输出与形状默认值不同的属性，保持导出精简 */
+/** Node style → classDef body; only properties differing from the shape defaults are emitted, keeping export lean */
 function classBodyOf(kind: ShapeKind, style: FlowNodeStyle): string {
   const base = defaultData(kind).style;
   const parts: string[] = [];
@@ -98,7 +98,7 @@ function classBodyOf(kind: ShapeKind, style: FlowNodeStyle): string {
   return parts.join(',');
 }
 
-/** 连线样式 → linkStyle 声明体；全默认时返回空串（不产生 linkStyle 行） */
+/** Edge style → linkStyle body; returns an empty string when everything is default (no linkStyle line emitted) */
 function linkBodyOf(style: FlowEdgeStyle | undefined): string {
   if (!style) return '';
   const parts: string[] = [];
@@ -118,12 +118,12 @@ function linkBodyOf(style: FlowEdgeStyle | undefined): string {
   return parts.join(',');
 }
 
-/** 单页 → Mermaid flowchart 文本（结构 + 可在 Mermaid 中还原的样式） */
+/** Single page → Mermaid flowchart text (structure + styles restorable in Mermaid) */
 function pageMermaidOf(page: FlowPage): string {
   if (page.nodes.length === 0) return '';
   const lines: string[] = ['flowchart TD'];
 
-  // 节点样式去重为 classDef：body 相同即复用同一 class
+  // Deduplicate node styles into classDefs: identical bodies reuse the same class
   const classNameByBody = new Map<string, string>();
   const classBodies: string[] = [];
   const membersOfClass = new Map<string, string[]>();
@@ -142,7 +142,7 @@ function pageMermaidOf(page: FlowPage): string {
     membersOfClass.set(name, members);
   }
 
-  // 连线 + linkStyle（索引即连线声明顺序）
+  // Edges + linkStyle (the index is the edge declaration order)
   const linkLines: string[] = [];
   page.edges.forEach((edge, index) => {
     const label = edge.label ? safe(edge.label) : '';
@@ -163,7 +163,7 @@ function pageMermaidOf(page: FlowPage): string {
 }
 
 export interface MermaidExportOptions {
-  /** 'current' 仅活动页（默认）；'all' 全部页（多段 flowchart，段前以 `%% page:` 注释标注页名） */
+  /** `current` is the active page only (default); `all` covers every page (one flowchart block per page, each preceded by a `%% page:` comment with the page name) */
   pages?: 'current' | 'all';
 }
 
@@ -180,13 +180,13 @@ export function toMermaid(doc: FlowDoc, options: MermaidExportOptions = {}): str
   return chunks.join('\n');
 }
 
-/* ------------------------------ 导入 ------------------------------ */
+/* ------------------------------ Import ------------------------------ */
 
 export type MermaidParseResult =
   | { ok: true; doc: FlowDoc }
   | { ok: false; error: 'MISSING_HEADER' | 'EMPTY' | 'INVALID_STATEMENT'; line?: number };
 
-/** 形状包裹语法 → 图形目录（顺序即优先级，先长后短、先复合后简单） */
+/** Shape wrapping syntax → shape catalog (order is priority: longer before shorter, compound before simple) */
 const WRAPPERS: Array<[RegExp, ShapeKind]> = [
   [/^\(\(\(([\s\S]*)\)\)\)$/, 'ellipse'],
   [/^\(\(([\s\S]*)\)\)$/, 'ellipse'],
@@ -198,9 +198,9 @@ const WRAPPERS: Array<[RegExp, ShapeKind]> = [
 ];
 
 /**
- * `[...]` 系列按首尾分隔符判定形状：
- * `[[x]]` 预定义、`[(x)]` 数据库、`[/x/]` 与 `[\x\]` 平行四边形、
- * `[/x\]` 与 `[\x/]` 梯形、`[x]` 矩形。
+ * `[...]` forms are resolved by their leading/trailing delimiters:
+ * `[[x]]` predefined, `[(x)]` database, `[/x/]` and `[\x\]` parallelogram,
+ * `[/x\]` and `[\x/]` trapezoid, `[x]` rectangle.
  */
 function squareBracketShape(rest: string): { kind: ShapeKind; label: string } | null {
   if (!rest.startsWith('[') || !rest.endsWith(']')) return null;
@@ -225,10 +225,10 @@ function squareBracketShape(rest: string): { kind: ShapeKind; label: string } | 
   return { kind: 'rect', label: unquote(inner) };
 }
 
-/** 语句中可出现的连线标记（含可选 |标签|） */
+/** Edge markers that may appear in a statement (with optional |label|) */
 const LINK_SPLIT = /\s*((?:-->|---|-\.->|-\.-|==>|===|--x|--o)\s*(?:\|[^|]*\|)?)\s*/;
 
-/** 行内 `-- 文本 -->` / `-. 文本 .->` / `== 文本 ==>` 归一为 `-->|文本|` */
+/** Normalize inline `-- text -->` / `-. text .->` / `== text ==>` to `-->|text|` */
 function normalizeTextLinks(line: string): string {
   return line
     .replace(/--\s+(.+?)\s+-->/g, '-->|$1|')
@@ -270,11 +270,11 @@ function parseNodeExpr(expr: string): ParsedNodeExpr | null {
     const hit = re.exec(rest);
     if (hit) return { id, kind, label: unquote(hit[1]) };
   }
-  // 有残留但无法识别包裹语法：按纯 id 处理，避免整行失败
+  // Leftover text that matches no wrapping syntax: treat it as a bare id instead of failing the whole line
   return { id };
 }
 
-/** 连线标记 → 线样式 */
+/** Edge marker → line style */
 function linkStyleOf(token: string): Partial<FlowEdgeStyle> {
   const raw = token.replace(/\|[^|]*\|/g, '').trim();
   const dashed = raw.includes('.');
@@ -295,10 +295,10 @@ function linkLabelOf(token: string): string | undefined {
   return m ? m[1].trim() || undefined : undefined;
 }
 
-/** 需要忽略的 Mermaid 指令行（样式指令 classDef / class / style / linkStyle 另行解析） */
+/** Mermaid directive lines to ignore (style directives classDef / class / style / linkStyle are parsed separately) */
 const IGNORED_DIRECTIVE = /^(?:click|direction|accTitle|accDescr)\b/;
 
-/** `fill:#f00,stroke:#333` → Map（键统一小写） */
+/** `fill:#f00,stroke:#333` → Map (keys lowercased) */
 function parseMermaidStyle(body: string): Map<string, string> {
   const map = new Map<string, string>();
   for (const token of body.split(',')) {
@@ -309,14 +309,14 @@ function parseMermaidStyle(body: string): Map<string, string> {
   return map;
 }
 
-/** 去掉 `px` 等单位的数值 */
+/** Numeric value with units such as `px` stripped */
 function cssNum(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const n = Number.parseFloat(value);
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Mermaid 样式属性 → 节点样式（只取可表达的字段） */
+/** Mermaid style properties → node style (only expressible fields are taken) */
 function nodeStyleFromMermaid(map: Map<string, string> | undefined): Partial<FlowNodeStyle> {
   if (!map || map.size === 0) return {};
   const out: Partial<FlowNodeStyle> = {};
@@ -335,7 +335,7 @@ function nodeStyleFromMermaid(map: Map<string, string> | undefined): Partial<Flo
   return out;
 }
 
-/** Mermaid 样式属性 → 连线样式（只取可表达的字段） */
+/** Mermaid style properties → edge style (only expressible fields are taken) */
 function edgeStyleFromMermaid(map: Map<string, string> | undefined): Partial<FlowEdgeStyle> {
   if (!map || map.size === 0) return {};
   const out: Partial<FlowEdgeStyle> = {};
@@ -349,8 +349,8 @@ function edgeStyleFromMermaid(map: Map<string, string> | undefined): Partial<Flo
 }
 
 /**
- * 解析单个 `flowchart` 段落（一个 header + 其后的语句）。
- * 失败时返回 `{ ok:false, error, line }`，由 UI 提示具体行号。
+ * Parse a single `flowchart` block (one header plus the statements that follow).
+ * On failure returns `{ ok:false, error, line }` so the UI can point at the offending line.
  */
 function parseMermaidPage(text: string): MermaidParseResult {
   const lines = text.split(/\r?\n/);
@@ -364,7 +364,7 @@ function parseMermaidPage(text: string): MermaidParseResult {
   }> = [];
   const subgraphs = new Map<string, { id: string; label: string; members: string[] }>();
   const subStack: string[] = [];
-  // 样式指令：classDef 定义 / class 指派 / style 内联 / linkStyle 按连线序号
+  // Style directives: classDef definitions / class assignments / inline style / linkStyle by edge index
   const classDefs = new Map<string, Map<string, string>>();
   const classOf = new Map<string, string>();
   const styleOfNode = new Map<string, Map<string, string>>();
@@ -379,7 +379,7 @@ function parseMermaidPage(text: string): MermaidParseResult {
     if (!existing) {
       nodeDefs.set(expr.id, expr);
     } else if (expr.kind || expr.label) {
-      // 后声明的形状/文案覆盖裸 id 声明
+      // A later shape/copy declaration overrides a bare id declaration
       nodeDefs.set(expr.id, { ...existing, ...expr });
     }
     const current = subStack[subStack.length - 1];
@@ -416,7 +416,7 @@ function parseMermaidPage(text: string): MermaidParseResult {
       subStack.pop();
       continue;
     }
-    // 样式指令：解析并暂存，稍后并入节点 / 连线样式（行尾分号可有可无）
+    // Style directives: parse and buffer them, then merge into node / edge styles (the trailing semicolon is optional)
     if (/^classDef\b/.test(line)) {
       const m = /^classDef\s+([^\s;]+)\s+([\s\S]+?);?\s*$/.exec(line);
       if (m) classDefs.set(m[1], parseMermaidStyle(m[2]));
@@ -454,7 +454,7 @@ function parseMermaidPage(text: string): MermaidParseResult {
     for (let c = 0; c < chunks.length; c += 1) {
       const chunk = chunks[c].trim();
       if (!chunk) continue;
-      if (c % 2 === 1) continue; // 连线标记
+      if (c % 2 === 1) continue; // edge marker
       const parsed = parseNodeExpr(chunk);
       if (!parsed) return { ok: false, error: 'INVALID_STATEMENT', line: lineNo };
       exprs.push(parsed);
@@ -483,7 +483,7 @@ function parseMermaidPage(text: string): MermaidParseResult {
   if (!sawHeader) return { ok: false, error: 'MISSING_HEADER', line: 1 };
   if (nodeDefs.size === 0) return { ok: false, error: 'EMPTY' };
 
-  /* 1) 建扁平节点 → dagre 布局（Mermaid 无坐标，必须自动排版） */
+  /* 1) build flat nodes → dagre layout (Mermaid has no coordinates, so auto-layout is mandatory) */
   const flat: Array<{
     id: string;
     type: 'shape';
@@ -492,7 +492,7 @@ function parseMermaidPage(text: string): MermaidParseResult {
     height: number;
     data: FlowNodeData;
   }> = [];
-  /** 节点样式覆盖：class 指派 + style 内联（内联优先） */
+  /** Node style overrides: class assignments + inline style (inline wins) */
   const nodeStyleOverride = (id: string): Partial<FlowNodeStyle> => {
     const cls = classOf.get(id);
     const fromClass = cls ? classDefs.get(cls) : undefined;
@@ -522,7 +522,7 @@ function parseMermaidPage(text: string): MermaidParseResult {
   );
   const posById = new Map(laidOut.map((n) => [n.id, n.position] as const));
 
-  /* 2) subgraph → 编组容器（按成员包围盒生成，并把子节点坐标转为相对） */
+  /* 2) subgraph → group container (built from the members' bounding box, with child coordinates made relative) */
   const recs: FlowNodeRec[] = [];
   const childIds = new Set<string>();
   for (const sub of subgraphs.values()) {
@@ -591,15 +591,15 @@ function parseMermaidPage(text: string): MermaidParseResult {
   return { ok: true, doc: toDocV3(recs, edgeRecs) };
 }
 
-/* ------------------------------ 多页入口 ------------------------------ */
+/* ------------------------------ Multi-page entry ------------------------------ */
 
 interface MermaidSegment {
-  /** `%% page: <name>` 注释声明的页名（可选） */
+  /** Page name declared by a `%% page: <name>` comment (optional) */
   name?: string;
   body: string;
 }
 
-/** 按 `flowchart` / `graph` header 切分多页文本；header 之前的注释行忽略 */
+/** Split multi-page text by `flowchart` / `graph` headers; comment lines before the first header are ignored */
 function splitMermaidSegments(text: string): MermaidSegment[] {
   const lines = text.split(/\r?\n/);
   const collected: Array<{ name?: string; lines: string[] }> = [];
@@ -624,11 +624,11 @@ function splitMermaidSegments(text: string): MermaidSegment[] {
 }
 
 /**
- * 解析 Mermaid 文本为文档。
+ * Parse Mermaid text into a document.
  *
- * 单页时与历史行为一致；出现多个 `flowchart` / `graph` header 时
- * （例如 `toMermaid(doc, { pages: 'all' })` 的导出结果）合并为多页文档。
- * 错误行号为所在段落的相对行号，足以定位问题。
+ * A single page behaves as before; multiple `flowchart` / `graph` headers
+ * (e.g. output of `toMermaid(doc, { pages: 'all' })`) are merged into a multi-page document.
+ * Error line numbers are relative to their block, which is enough to locate the problem.
  */
 export function parseMermaidFlowchart(text: string): MermaidParseResult {
   const segments = splitMermaidSegments(text);

@@ -30,7 +30,7 @@ const read = (data: Uint8ClampedArray, index = 0) => [
   data[index * 4 + 2],
   data[index * 4 + 3],
 ];
-/** 断言像素值（`Uint8ClampedArray` 会取整，因此用显式容差） */
+/** Assert a pixel value (`Uint8ClampedArray` rounds, so use an explicit tolerance) */
 const expectRgb = (data: Uint8ClampedArray, expected: number[], delta = 1) => {
   const actual = read(data);
   expected.forEach((value, i) => {
@@ -38,8 +38,8 @@ const expectRgb = (data: Uint8ClampedArray, expected: number[], delta = 1) => {
   });
 };
 
-describe('HSL / CMYK 转换', () => {
-  it('RGB → HSL → RGB 往返一致', () => {
+describe('HSL / CMYK conversion', () => {
+  it('RGB → HSL → RGB round-trips', () => {
     for (const [r, g, b] of [
       [255, 0, 0],
       [0, 255, 0],
@@ -53,13 +53,13 @@ describe('HSL / CMYK 转换', () => {
     }
   });
 
-  it('灰色没有色相与饱和度', () => {
+  it('gray has no hue or saturation', () => {
     const [h, s] = rgbToHsl(128, 128, 128);
     expect(h).toBe(0);
     expect(s).toBe(0);
   });
 
-  it('CMYK 往返一致（黑色单独处理）', () => {
+  it('CMYK round-trips (black handled separately)', () => {
     const [c, m, y, k] = rgbToCmyk(12, 200, 90);
     const [r, g, b] = cmykToRgb(c, m, y, k);
     expect(r).toBeCloseTo(12, -1);
@@ -69,26 +69,26 @@ describe('HSL / CMYK 转换', () => {
   });
 });
 
-describe('selectiveWeight：色域归属', () => {
-  it('纯红只落在红色域', () => {
+describe('selectiveWeight: color-range membership', () => {
+  it('pure red only lands in the red range', () => {
     const [h, s, l] = rgbToHsl(255, 0, 0);
     expect(selectiveWeight('reds', h, s, l)).toBeCloseTo(1, 2);
     expect(selectiveWeight('greens', h, s, l)).toBe(0);
     expect(selectiveWeight('blues', h, s, l)).toBe(0);
   });
 
-  it('相邻色域有交叠（±60° 三角窗）', () => {
-    const [h, s, l] = rgbToHsl(255, 128, 0); // 橙色，介于红与黄之间
+  it('neighbouring ranges overlap (±60° triangular window)', () => {
+    const [h, s, l] = rgbToHsl(255, 128, 0); // orange, between red and yellow
     expect(selectiveWeight('reds', h, s, l)).toBeGreaterThan(0);
     expect(selectiveWeight('yellows', h, s, l)).toBeGreaterThan(0);
   });
 
-  it('灰色只落在白 / 中性 / 黑，且三段互补', () => {
+  it('gray only lands in white / neutral / black, and the three weights sum to 1', () => {
     const mid = rgbToHsl(128, 128, 128);
     expect(selectiveWeight('neutrals', mid[0], mid[1], mid[2])).toBeCloseTo(1, 2);
     expect(selectiveWeight('reds', mid[0], mid[1], mid[2])).toBe(0);
 
-    // 白 / 中性 / 黑按明度线性过渡，三段权重之和恒为 1
+    // White / neutral / black blend linearly on lightness; the three weights always sum to 1
     for (const level of [10, 64, 128, 200, 240]) {
       const [h, s, l] = rgbToHsl(level, level, level);
       const total =
@@ -105,14 +105,14 @@ describe('selectiveWeight：色域归属', () => {
   });
 });
 
-describe('照片滤镜', () => {
-  it('浓度为 0 时画面不变', () => {
+describe('Photo filter', () => {
+  it('zero density leaves the image unchanged', () => {
     const data = px(120, 80, 40);
     applyPhotoFilter(data, { ...defaultPhotoFilter(), density: 0 });
     expectRgb(data, [120, 80, 40], 0.5);
   });
 
-  it('偏暖滤镜把中灰推向暖色', () => {
+  it('a warming filter pushes mid gray toward warm tones', () => {
     const data = px(128, 128, 128);
     applyPhotoFilter(data, {
       color: '#EC8A00',
@@ -123,7 +123,7 @@ describe('照片滤镜', () => {
     expect(data[2]).toBeLessThan(128);
   });
 
-  it('保持明度时亮度基本不变', () => {
+  it('preserving luminosity keeps brightness roughly unchanged', () => {
     const data = px(128, 128, 128);
     applyPhotoFilter(data, { color: '#EC8A00', density: 60, preserveLuminosity: true });
     const luma = data[0] * 0.299 + data[1] * 0.587 + data[2] * 0.114;
@@ -131,14 +131,14 @@ describe('照片滤镜', () => {
   });
 });
 
-describe('通道混合器', () => {
-  it('恒等参数不改变画面', () => {
+describe('Channel mixer', () => {
+  it('identity parameters leave the image unchanged', () => {
     const data = px(10, 90, 200);
     applyChannelMixer(data, defaultChannelMixer());
     expectRgb(data, [10, 90, 200], 0.5);
   });
 
-  it('互换红蓝输出通道', () => {
+  it('swapping the red and blue output channels', () => {
     const data = px(10, 90, 200);
     applyChannelMixer(data, {
       red: [0, 0, 100, 0],
@@ -148,7 +148,7 @@ describe('通道混合器', () => {
     expectRgb(data, [200, 90, 10], 0.5);
   });
 
-  it('常数按百分点加到通道上（25% ≈ +63.75）', () => {
+  it('constants add to a channel in percentage points (25% ≈ +63.75)', () => {
     const data = px(0, 0, 0);
     applyChannelMixer(data, { red: [0, 0, 0, 25], green: [0, 0, 0, 0], blue: [0, 0, 0, -100] });
     expect(data[0]).toBeCloseTo(64, -1);
@@ -156,8 +156,8 @@ describe('通道混合器', () => {
   });
 });
 
-describe('阴影 / 高光', () => {
-  it('提亮暗部，对亮部影响很小', () => {
+describe('Shadows / highlights', () => {
+  it('lifts the shadows with little effect on highlights', () => {
     const dark = px(20, 20, 20);
     const bright = px(235, 235, 235);
     const params = { ...defaultShadowsHighlights(), shadows: 80, highlights: 0 };
@@ -167,7 +167,7 @@ describe('阴影 / 高光', () => {
     expect(bright[0] - 235).toBeLessThan(3);
   });
 
-  it('压暗亮部，对暗部影响很小', () => {
+  it('darkens the highlights with little effect on shadows', () => {
     const dark = px(20, 20, 20);
     const bright = px(235, 235, 235);
     const params = { shadows: 0, highlights: 80 };
@@ -177,45 +177,45 @@ describe('阴影 / 高光', () => {
     expect(Math.abs(dark[0] - 20)).toBeLessThan(2);
   });
 
-  it('两个参数都为 0 时不做任何改动', () => {
+  it('both parameters at 0 change nothing', () => {
     const data = px(30, 150, 240);
     applyShadowsHighlights(data, { shadows: 0, highlights: 0 });
     expectRgb(data, [30, 150, 240], 0.5);
   });
 });
 
-describe('可选颜色', () => {
+describe('Selective color', () => {
   const withRange = (range: SelectiveRange, values: number[]) => {
     const params = defaultSelectiveColor();
     params.ranges[range] = values;
     return params;
   };
 
-  it('全部为 0 时画面不变', () => {
+  it('all zeros leave the image unchanged', () => {
     const data = px(200, 30, 30);
     applySelectiveColor(data, defaultSelectiveColor());
     expectRgb(data, [200, 30, 30], 0.5);
   });
 
-  it('加青色会吸走红像素的红分量，灰像素不受影响', () => {
+  it('adding cyan pulls red out of red pixels; gray pixels are unaffected', () => {
     const red = px(200, 30, 30);
     const gray = px(128, 128, 128);
     applySelectiveColor(red, withRange('reds', [50, 0, 0, 0]));
     applySelectiveColor(gray, withRange('reds', [50, 0, 0, 0]));
-    // 青墨吸红：只有红通道下降，绿 / 蓝保持
+    // Cyan ink absorbs red: only the red channel drops, green / blue stay put
     expect(red[0]).toBeLessThan(150);
     expect(red[1]).toBeCloseTo(30, -1);
     expectRgb(gray, [128, 128, 128], 1);
   });
 
-  it('加洋红只会拉低绿通道', () => {
+  it('adding magenta only lowers the green channel', () => {
     const red = px(200, 30, 30);
     applySelectiveColor(red, withRange('reds', [0, 50, 0, 0]));
     expect(red[1]).toBeLessThan(30);
     expect(red[0]).toBeCloseTo(200, -2);
   });
 
-  it('白色域只作用于高亮低饱和像素', () => {
+  it('the white range only affects bright, low-saturation pixels', () => {
     const white = px(250, 250, 250);
     const mid = px(128, 128, 128);
     applySelectiveColor(white, withRange('whites', [0, 0, 0, 40]));
@@ -225,21 +225,21 @@ describe('可选颜色', () => {
   });
 });
 
-describe('替换颜色', () => {
-  it('偏移量全为 0 时画面不变', () => {
+describe('Replace color', () => {
+  it('zero offsets leave the image unchanged', () => {
     const data = px(255, 0, 0);
     applyReplaceColor(data, { ...defaultReplaceColor(), hue: 0, saturation: 0, lightness: 0 });
     expectRgb(data, [255, 0, 0], 0.5);
   });
 
-  it('色相 +120° 把红色替换为绿色（容差内）', () => {
+  it('hue +120° turns red into green (within tolerance)', () => {
     const data = px(255, 0, 0);
     applyReplaceColor(data, { ...defaultReplaceColor(), hue: 120, fuzziness: 200 });
     expect(data[1]).toBeGreaterThan(200);
     expect(data[0]).toBeLessThan(60);
   });
 
-  it('容差外的像素不受影响', () => {
+  it('pixels outside the tolerance are unaffected', () => {
     const data = px(0, 0, 255);
     applyReplaceColor(data, {
       color: '#FF0000',
@@ -251,19 +251,19 @@ describe('替换颜色', () => {
     expectRgb(data, [0, 0, 255], 0.5);
   });
 
-  it('容差边缘是平滑过渡（强度随距离衰减）', () => {
+  it('the tolerance edge falls off smoothly (strength decays with distance)', () => {
     const near = px(250, 0, 0);
     const far = px(200, 0, 0);
     const params = { color: '#FF0000', hue: 120, saturation: 0, lightness: 0, fuzziness: 100 };
     applyReplaceColor(near, params);
     applyReplaceColor(far, params);
-    // 越接近目标色，绿色分量越高
+    // The closer to the target color, the higher the green component
     expect(near[1]).toBeGreaterThan(far[1]);
   });
 });
 
-describe('更多调整接入像素通道判定', () => {
-  it('启用任一扩展调整都需要像素通道', () => {
+describe('extra adjustments feed the pixel-pass check', () => {
+  it('enabling any extended adjustment needs the pixel pass', () => {
     const base = { ...NO_ADJUSTMENTS };
     expect(hasExtendedAdjustments(base)).toBe(false);
     expect(needsPixelPass(base, [])).toBe(false);

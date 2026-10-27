@@ -202,7 +202,7 @@ describe('Draw.io XML', () => {
 
   it('样式到形状的映射', () => {
     expect(kindOfStyle('rhombus;whiteSpace=wrap;')).toBe('decision');
-    // draw.io 的 ellipse 字面映射为椭圆（开始/结束是胶囊，走 shape=syntools.* 精确 token）
+    // draw.io's literal ellipse maps to the ellipse shape (start/end are capsules using the shape=syntools.* exact token)
     expect(kindOfStyle('ellipse;')).toBe('ellipse');
     expect(kindOfStyle('shape=syntools.startEnd;')).toBe('startEnd');
     expect(kindOfStyle('shape=invParallelogram;')).toBe('display');
@@ -307,7 +307,7 @@ describe('Draw.io XML', () => {
       },
     };
     const xml = toDrawioXml(toDocV3([node], []));
-    // 旋转是几何属性，镜像与垂直对齐是样式 token
+    // Rotation is a geometry attribute; mirroring and vertical alignment are style tokens
     expect(xml).toContain('rotation="45"');
     expect(xml).toContain('flipH=1');
     expect(xml).toContain('verticalAlign=top');
@@ -316,7 +316,7 @@ describe('Draw.io XML', () => {
     expect(back.rotation).toBe(45);
     expect(back.flipH).toBe(true);
     expect(back.verticalAlign).toBe('top');
-    // 未显式设置的镜像 / 对齐不写入字段
+    // Mirroring / alignment that were never set explicitly are not written
     expect(back.flipV).toBeUndefined();
   });
 
@@ -365,10 +365,10 @@ describe('Draw.io XML', () => {
     const byId = new Map(page.nodes.map((n) => [n.id, n] as const));
     expect(byId.get('n1')!.data.style.shapeParams?.foldSize).toBe(24);
     expect(byId.get('n2')!.data.style.shapeParams?.barWidth).toBe(22);
-    // 已语义化的 size token 不再进入 mxStyle 兜底
+    // Size tokens that now have semantics no longer go into the mxStyle fallback
     expect(byId.get('n1')!.mxStyle ?? []).not.toContain('size=24');
     expect(byId.get('n2')!.mxStyle ?? []).not.toContain('size=22');
-    // 生命线现已与 shape=syntools.umlLifeline 互认，size 被语义化为 lifelineHeader 参数
+    // Lifelines now recognize each other via shape=syntools.umlLifeline, and size is interpreted as the lifelineHeader parameter
     expect(byId.get('n3')!.data.kind).toBe('umlLifeline');
     expect(byId.get('n3')!.data.style.shapeParams?.lifelineHeader).toBe(56);
     expect(byId.get('n3')!.mxStyle ?? []).not.toContain('size=56');
@@ -428,7 +428,7 @@ describe('Draw.io XML', () => {
       source: 'a',
       target: 'b',
       label: '中',
-      sourceLabel: '起;点', // 含分隔符，验证 URL 编码
+      sourceLabel: '起;点', // contains a separator, verifying URL encoding
       targetLabel: '终点',
       labelPosition: 'nearTarget',
       style: { ...DEFAULT_EDGE_STYLE },
@@ -442,7 +442,7 @@ describe('Draw.io XML', () => {
     expect(back.sourceLabel).toBe('起;点');
     expect(back.targetLabel).toBe('终点');
     expect(back.labelPosition).toBe('nearTarget');
-    // 已语义化的自定义 token 不再进 mxStyle 兜底
+    // Custom tokens that now have semantics no longer go into the mxStyle fallback
     expect(back.mxStyle ?? []).not.toContain('synLabelPos=nearTarget');
   });
 
@@ -459,11 +459,11 @@ describe('Draw.io XML', () => {
   });
 
   it('htmlToPlain：行内换行、块级边界与实体还原为纯文本', () => {
-    // 输入是 XML 解析器已解码的 HTML 片段
+    // The input is an HTML fragment already decoded by the XML parser
     expect(htmlToPlain('a<br>b')).toBe('a\nb');
     expect(htmlToPlain('<div>第一行</div><div>第二行</div>')).toBe('第一行\n第二行');
     expect(htmlToPlain('A &amp; B &lt;C&gt;')).toBe('A & B <C>');
-    // 非标签形态的孤立尖括号原样保留
+    // Stray angle brackets that do not form tags are preserved
     expect(htmlToPlain('普通文本 < 10')).toBe('普通文本 < 10');
   });
 
@@ -475,14 +475,14 @@ describe('Draw.io XML', () => {
       data: defaultData('rect', '第一行\n第二行'),
     };
     const xml = toDrawioXml(toDocV3([node], []));
-    // 导出为 html=1 值：换行转 <br>，XMLBuilder 再把尖括号转义
+    // Export as an html=1 value: newlines become <br>, then XMLBuilder escapes the angle brackets
     expect(xml).toContain('第一行&lt;br&gt;第二行');
     const back = activePageOf(parseDrawioXml(xml)!)!;
     expect(back.nodes[0].data.label).toBe('第一行\n第二行');
   });
 
   it('解析压缩形式（base64 + deflateRaw + URI 编码）的 .drawio', async () => {
-    // jsdom 可能带 Node 的 DecompressionStream：显式移除以走 pako 兜底分支
+    // jsdom may ship Node's DecompressionStream: remove it explicitly to exercise the pako fallback
     Reflect.deleteProperty(globalThis, 'DecompressionStream');
 
     const inner =
@@ -496,7 +496,7 @@ describe('Draw.io XML', () => {
     for (const byte of bytes) binary += String.fromCharCode(byte);
     const xml = `<mxfile host="x"><diagram name="页 1" id="p1">${btoa(binary)}</diagram></mxfile>`;
 
-    // 同步解析器不认压缩格式，异步解析器负责解码
+    // The synchronous parser does not understand the compressed format; the async parser handles decoding
     expect(parseDrawioXml(xml)).toBeNull();
     const doc = await parseDrawioXmlAsync(xml);
     expect(doc).not.toBeNull();
@@ -526,7 +526,7 @@ describe('Mermaid 导入', () => {
     expect(page.nodes.find((n) => n.id === 'A')!.data.label).toBe('开始');
     expect(page.edges).toHaveLength(3);
     expect(page.edges.some((e) => e.label === '是')).toBe(true);
-    // Mermaid 不携带坐标：导入后必然完成一次自动布局
+    // Mermaid carries no coordinates: an import always runs one auto-layout pass
     expect(page.nodes.every((n) => Number.isFinite(n.position.x))).toBe(true);
     expect(new Set(page.nodes.map((n) => n.position.y)).size).toBeGreaterThan(1);
   });
@@ -565,7 +565,7 @@ describe('Mermaid 导入', () => {
     expect(group!.data.label).toBe('流程');
     const children = page.nodes.filter((n) => n.parentId === group!.id);
     expect(children.map((c) => c.id).sort()).toEqual(['A', 'B', 'C']);
-    // 顶层游离节点：编组容器自身也挂在顶层，需排除
+    // Top-level free nodes: group containers themselves also sit at the top level, so they must be excluded
     expect(
       page.nodes.filter((n) => !n.parentId && n.data.kind !== 'group').map((n) => n.id),
     ).toEqual(['D']);

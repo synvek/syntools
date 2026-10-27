@@ -9,20 +9,20 @@ export interface ExtractedFrame {
 }
 
 export interface ExtractFramesOptions {
-  /** 起始时间（秒） */
+  /** Start time (seconds) */
   start?: number;
-  /** 截取时长（秒） */
+  /** Capture duration (seconds) */
   duration?: number;
   fps: number;
-  /** 输出宽度（像素），高度按比例 */
+  /** Output width (px); height follows the aspect ratio */
   width?: number;
   maxFrames?: number;
   onProgress?: (ratio: number) => void;
 }
 
 /**
- * 使用 WebCodecs + Mediabunny 按时间点精确抽帧。
- * 相比 `<video>` + seek 的方式，帧更准、速度更快；不支持时返回错误码，由调用方回退。
+ * Extract frames at exact timestamps with WebCodecs + Mediabunny.
+ * More accurate and faster than `<video>` + seek; returns an error code for the caller to fall back on.
  */
 export async function extractFramesWebCodecs(
   file: Blob,

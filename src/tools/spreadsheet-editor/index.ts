@@ -1,8 +1,8 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 电子表格编辑器（「文档与创作」分类）：基于 Univer 的表格编辑
- * + 浏览器本地 .xlsx 导入导出，数据不离开浏览器。
+ * Spreadsheet editor (in the "Documents & creation" category): Univer-based sheet editing
+ * plus browser-local .xlsx import/export — data never leaves the browser.
  */
 export const spreadsheetEditorTool: ToolMeta = {
   id: 'spreadsheet-editor',

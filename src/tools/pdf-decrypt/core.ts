@@ -7,7 +7,7 @@ export interface DecryptResult {
   originalEncrypted: boolean;
 }
 
-/** 校验输入并返回文件字节（封装体积与类型检查，便于单测） */
+/** Validate the input and return the file bytes (wraps size and type checks for unit testing) */
 export async function readPdfBytes(file: File): Promise<ToolResult<Uint8Array>> {
   if (!isPdfFile(file)) return { ok: false, error: 'NOT_PDF' };
   if (file.size > PDF_MAX_BYTES) return { ok: false, error: 'TOO_LARGE' };
@@ -15,8 +15,8 @@ export async function readPdfBytes(file: File): Promise<ToolResult<Uint8Array>> 
 }
 
 /**
- * 移除 PDF 密码：用密码加载后原样保存（不重新加密）即得到无保护文件。
- * 等价于 qpdf --decrypt。
+ * Remove a PDF password: load with the password and save as-is (without re-encrypting) to get an unprotected file.
+ * Equivalent to qpdf --decrypt.
  */
 export async function decryptPdf(file: File, password: string): Promise<ToolResult<DecryptResult>> {
   const bytesResult = await readPdfBytes(file);

@@ -5,10 +5,10 @@ import { ClearButton } from '@/core/components/ActionButtons';
 import { countText } from './core';
 
 /**
- * 工具 UI 模板 —— 遵循技术设计 §8 交互规范：
- * - 输入区带「清空」（无输入时 disabled）；
- * - 输出区带「复制」（无输出时 disabled）；
- * - 错误就近展示于输出区下方（role="alert"）。
+ * Tool UI template - follows the interaction spec in Technical Design §8:
+ * - the input area has a Clear action (disabled while empty);
+ * - the output area has a Copy action (disabled while empty);
+ * - errors render right below the output area (role="alert").
  */
 export default function TemplateTool() {
   const [input, setInput] = useState('');
@@ -20,7 +20,7 @@ export default function TemplateTool() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 如有工具选项（模式下拉、开关等），用 <OptionBar> 包裹放在这里 */}
+      {/* Tool options (mode select, toggles, ...) go here, wrapped in <OptionBar> */}
 
       <div className="flex flex-col gap-4 lg:flex-row">
         <IOTextArea

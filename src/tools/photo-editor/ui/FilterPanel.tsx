@@ -29,7 +29,7 @@ const HINT_KEYS: Record<FilterId, string> = {
   reduceNoise: 'hintReduceNoise',
 };
 
-/** 分组标题的 i18n 键 */
+/** i18n key for the group heading */
 const GROUP_KEYS: Record<string, string> = {
   basic: 'filterGroupBasic',
   blur: 'filterGroupBlur',
@@ -42,12 +42,12 @@ const GROUP_KEYS: Record<string, string> = {
 const cap = (id: string) => `${id.charAt(0).toUpperCase()}${id.slice(1)}`;
 
 /**
- * 滤镜面板：可多选叠加，顺序即应用顺序（与 `render/filters.ts` 的管线一致）。
+ * Filter panel: multi-select stacking, where the order is the application order (matching the pipeline in `render/filters.ts`).
  *
- * 「智能滤镜」栈：
- * - 每个滤镜可**单独停用**（`enabled: false`，保留参数）与**上移 / 下移**、删除；
- * - 智能对象（`kind: 'smart'`）同样携带这套滤镜栈，并且滤镜作用在**呈现尺寸**上，
- *   所以缩放智能对象不会让模糊半径等参数跟着缩放。
+ * The "smart filter" stack:
+ * - each filter can be **disabled on its own** (`enabled: false`, parameters kept), moved **up / down**, or deleted;
+ * - smart objects (`kind: 'smart'`) carry the same stack, and filters apply at the **presentation size**,
+ *   so scaling a smart object does not scale the blur radius and friends.
  */
 export function FilterPanel() {
   const { t } = useTranslation();
@@ -55,7 +55,7 @@ export function FilterPanel() {
   const patchActive = usePhotoStore((s) => s.patchActive);
   const layer = doc.layers.find((item) => item.id === doc.activeLayerId);
 
-  // 位图 / 调整图层复用同一套滤镜栈；智能对象则是「智能滤镜」
+  // Bitmap / adjustment layers reuse this filter stack; smart objects get "smart filters"
   const target =
     layer && (layer.kind === 'raster' || layer.kind === 'adjustment' || layer.kind === 'smart')
       ? layer

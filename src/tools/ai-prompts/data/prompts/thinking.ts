@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 思维与决策类提示词，详见 ../README.md */
+/** Thinking and decision-making prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'thinking-brainstorm',

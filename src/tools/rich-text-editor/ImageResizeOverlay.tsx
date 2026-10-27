@@ -3,14 +3,14 @@ import type { Editor } from '@tiptap/react';
 import { findSelectedImage, keepImageSelected, readZoom } from './imageLayer';
 
 /**
- * 图片缩放手柄：选中图片后，四角 + 四边中点共 8 个手柄，拖动等比调整尺寸。
+ * Image resize handles: selecting an image shows 8 handles (4 corners + 4 edge midpoints) for proportional dragging.
  *
- * 采用「React 覆盖层」而非 ProseMirror NodeView：
- * - 不需要重写图片的 DOM 渲染（导出、层级样式、分页测量都依赖原生 <img> 结构）；
- * - 覆盖层是滚动容器的子元素，坐标按「内容坐标系」计算，滚动时自动跟随，无需监听滚动。
+ * Uses a React overlay instead of a ProseMirror NodeView:
+ * - No need to reimplement image DOM rendering (export, layering styles, and pagination all rely on the native <img>);
+ * - The overlay is a child of the scroll container, positioned in content coordinates, so it follows scrolling for free.
  */
 
-/** 手柄方位：四角 + 四边中点 */
+/** Handle position: 4 corners + 4 edge midpoints */
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const;
 type HandleDirection = (typeof HANDLES)[number];
 
@@ -18,9 +18,9 @@ const MIN_WIDTH = 24;
 const MAX_WIDTH = 4000;
 
 interface ImageBox {
-  /** 图片节点在文档中的位置 */
+  /** Document position of the image node */
   pos: number;
-  /** 覆盖层坐标（滚动容器内容坐标系） */
+  /** Overlay box (in the scroll container's content coordinate space) */
   top: number;
   left: number;
   width: number;
@@ -29,11 +29,11 @@ interface ImageBox {
 
 interface ImageResizeOverlayProps {
   editor: Editor | null;
-  /** 编辑工作区（滚动容器），覆盖层挂在它下面 */
+  /** Editing workspace (the scroll container) the overlay is mounted into */
   viewportRef: RefObject<HTMLDivElement | null>;
 }
 
-/** 计算选中图片的覆盖层坐标；未选中图片时返回 null */
+/** Compute the overlay box of the selected image; null when no image is selected */
 function measure(editor: Editor, viewport: HTMLElement): ImageBox | null {
   const found = findSelectedImage(editor.state);
   if (!found) return null;
@@ -42,7 +42,7 @@ function measure(editor: Editor, viewport: HTMLElement): ImageBox | null {
   const rect = dom.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return null;
   const viewportRect = viewport.getBoundingClientRect();
-  // 覆盖层在缩放层之外，坐标与尺寸都要从「屏幕像素」还原为「布局像素」
+  // The overlay sits outside the zoom layer, so position and size must be mapped from screen px back to layout px
   const zoom = readZoom(dom);
   return {
     pos: found.pos,
@@ -53,7 +53,7 @@ function measure(editor: Editor, viewport: HTMLElement): ImageBox | null {
   };
 }
 
-/** 拖动方向 → 宽高增量（等比缩放，以宽度为基准） */
+/** Drag direction → width/height delta (proportional, driven by width) */
 function nextWidth(
   direction: HandleDirection,
   dx: number,
@@ -71,7 +71,7 @@ function nextWidth(
     case 'sw':
       return start - dx;
     case 's':
-      // 上下边中点：竖向位移按宽高比换算成宽度增量
+      // Top/bottom midpoints: convert vertical movement to a width delta via the aspect ratio
       return start + dy / ratio;
     case 'n':
       return start - dy / ratio;
@@ -95,7 +95,7 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
   useEffect(() => {
     if (!editor) return;
     refresh();
-    // 选区/文档变化、图片加载完成、窗口尺寸变化都要重算
+    // Recompute on selection/doc changes, image load, and window resize
     editor.on('transaction', refresh);
     editor.on('selectionUpdate', refresh);
     window.addEventListener('resize', refresh);
@@ -121,7 +121,7 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
     const startY = event.clientY;
     const startWidth = box.width;
     const ratio = box.height > 0 ? box.height / box.width : 1;
-    // 屏幕位移 → 布局像素；上限取正文内容宽度（与工具栏 100% 预设一致）
+    // Screen delta → layout px; capped at the body content width (matching the toolbar's 100% preset)
     const zoom = readZoom(editor.view.dom);
     const maxWidth = Math.min(MAX_WIDTH, Math.max(editor.view.dom.clientWidth || 1, MIN_WIDTH * 2));
     const pos = box.pos;
@@ -135,7 +135,7 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
         width: Math.round(width),
       });
       if (!history) tr.setMeta('addToHistory', false);
-      // 行内图片的节点选中在映射后会退化成光标：不选回来，手柄会跳到同段落的第一张图片上
+      // An inline image's node selection degrades to a cursor after mapping: restore it or the handles jump to the first image in the paragraph
       keepImageSelected(tr, pos);
       editor.view.dispatch(tr);
     };
@@ -156,7 +156,7 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       if (Math.round(current) === Math.round(startWidth)) return;
-      // 拖动过程不进历史，松手时合并为一步可撤销操作
+      // Dragging does not enter history; on release it becomes a single undoable step
       apply(startWidth, false);
       apply(current, true);
     };

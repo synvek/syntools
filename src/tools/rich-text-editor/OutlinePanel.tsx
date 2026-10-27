@@ -12,7 +12,7 @@ interface OutlinePanelProps {
   editor: Editor;
 }
 
-/** 从文档派生 H1-H6 大纲树，点击跳转定位 */
+/** Derive an H1-H6 outline tree from the document; clicking jumps to the heading */
 export function OutlinePanel({ editor }: OutlinePanelProps) {
   const { t } = useTranslation();
   const [items, setItems] = useState<HeadingItem[]>([]);

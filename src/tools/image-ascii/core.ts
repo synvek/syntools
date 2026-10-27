@@ -17,11 +17,11 @@ export interface AsciiOptions {
   cols: number;
   charset: string;
   invert: boolean;
-  /** 字符宽高比补偿，默认 0.5（等宽字体下字符高约为宽 2 倍） */
+  /** Character aspect-ratio compensation, default 0.5 (in a monospace font a glyph is about twice as tall as it is wide) */
   aspect?: number;
 }
 
-/** 将 RGBA 像素数据转换为 ASCII 艺术。 */
+/** Convert RGBA pixel data into ASCII art. */
 export function imageDataToAscii(
   pixels: Uint8ClampedArray,
   width: number,

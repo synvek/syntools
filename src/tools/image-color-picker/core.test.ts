@@ -3,7 +3,7 @@ import { samplePixel } from './core';
 
 describe('image-color-picker', () => {
   it('取样像素', () => {
-    // 1x1 红像素
+    // 1x1 red pixel
     const data = new Uint8ClampedArray([255, 0, 0, 255]);
     const r = samplePixel(data, 1, 1, 0, 0);
     expect(r.ok).toBe(true);

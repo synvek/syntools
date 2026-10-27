@@ -39,12 +39,12 @@ describe('文本行原语', () => {
     const text = 'a\nb';
     expect(offsetToLineCol(text, 0)).toEqual({ line: 1, col: 0 });
     expect(offsetToLineCol(text, 1)).toEqual({ line: 1, col: 1 });
-    // 偏移落在换行符上 → 归到该行行尾
+    // Offset on a newline → belongs to the end of that line
     expect(offsetToLineCol('a\r\nb', 2)).toEqual({ line: 1, col: 1 });
-    // 偏移等于下一行行首 → 归到下一行
+    // Offset equal to the next line's start → belongs to the next line
     expect(offsetToLineCol(text, 2)).toEqual({ line: 2, col: 0 });
     expect(offsetToLineCol(text, 3)).toEqual({ line: 2, col: 1 });
-    // 末尾空行
+    // Trailing empty line
     expect(offsetToLineCol('a\n', 2)).toEqual({ line: 2, col: 0 });
   });
 

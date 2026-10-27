@@ -1,27 +1,31 @@
 #!/usr/bin/env node
 /**
- * Open Graph 分享图生成器（1200×630 PNG）。
+ * Open Graph share image generator (1200×630 PNG).
  *
- * 这张图只出现在**链接被分享出去时**的预览卡片里（微信、飞书、X、Telegram、
- * Slack、Discord、LinkedIn…），站内任何页面都不会显示它。因此它的唯一任务是
- * 「三秒内让人知道这是什么 + 记住品牌」，正文信息由平台自己渲染的
- * og:title / og:description 承担，不需要在图里重复一遍。
+ * This image only shows up in preview cards when a **link is shared** (WeChat, Feishu,
+ * X, Telegram, Slack, Discord, LinkedIn…); no page on the site displays it. Its only
+ * job is "make clear in three seconds what this is + keep the brand memorable" — the
+ * body copy comes from the platform's own og:title / og:description, so it does not
+ * need to be repeated in the image.
  *
- * 为什么用本机 Chrome 而不是新依赖：OG 图只是静态图，用无头浏览器截一张
- * HTML 卡片即可，不必为一次性产物引入 canvas / resvg 之类的原生依赖。
+ * Why the local Chrome instead of a new dependency: the OG image is just a static
+ * picture, so screenshotting an HTML card with a headless browser is enough; no need
+ * to pull native deps such as canvas / resvg into a one-off artifact.
  *
- * 用法：
- *   node scripts/gen-og.mjs                 # 中文默认图 public/og/default.png
- *   node scripts/gen-og.mjs --lang=en       # 英文版 public/og/default.en.png
- *   node scripts/gen-og.mjs --all           # 顺带为每个工具生成 public/og/<id>.png
+ * Usage:
+ *   node scripts/gen-og.mjs                 # Chinese default card public/og/default.png
+ *   node scripts/gen-og.mjs --lang=en       # English version public/og/default.en.png
+ *   node scripts/gen-og.mjs --all           # also generate public/og/<id>.png per tool
  *   CHROME_PATH=/path/to/chrome node scripts/gen-og.mjs
  *
- * 说明：
- * - 预渲染脚本（scripts/prerender.ts）会优先使用 /og/<toolId>.png，
- *   缺失时回退 /og/default.png，所以只跑默认图也能让全站分享卡片生效。
- * - 生成的图需要提交进仓库，构建时不再重复执行（CI 上通常没有 Chrome）。
- * - 全站所有语种共用一个 URL，因此 og:image 只能是一张图、一种语言；
- *   选语言的依据是「主要投放渠道」，不是「站点默认语言」。
+ * Notes:
+ * - The prerender script (scripts/prerender.ts) prefers /og/<toolId>.png and falls
+ *   back to /og/default.png, so running just the default card already makes share
+ *   cards work site-wide.
+ * - The generated images are committed to the repo and not rebuilt during the build
+ *   (CI usually has no Chrome).
+ * - Every language shares one URL, so og:image can only be one image in one language;
+ *   the language is chosen by "where we mainly promote it", not by "site default".
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -47,7 +51,7 @@ function findChrome() {
   const hit = CHROME_CANDIDATES.find((p) => existsSync(p));
   if (!hit) {
     throw new Error(
-      '未找到 Chromium 内核浏览器。请用 CHROME_PATH=/path/to/chrome 指定，或改用 pnpm exec playwright install chromium 后设置该路径。',
+      'No Chromium-based browser found. Set CHROME_PATH=/path/to/chrome, or run pnpm exec playwright install chromium and point CHROME_PATH at it.',
     );
   }
   return hit;
@@ -61,11 +65,11 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
-/** 文案表：新增语种只需在这里加一项 */
+/** Copy table: adding a language only needs one more entry here */
 const COPY = {
   zh: {
     title: '在线工具集',
-    // 数量交给右上角胶囊，这里不要再重复，否则一眼看到两个「153」
+    // The count lives in the top-right pill; do not repeat it here or you would see two "153"s
     subtitle: () => '打开即用，文件不出浏览器',
     badge: (n) => `${n} 个工具`,
     foot: '纯前端本地计算',
@@ -74,7 +78,7 @@ const COPY = {
   },
   en: {
     title: '153 tools in one place',
-    // 控制在 60 字符内，否则 28px 字号会被折成两行
+    // Keep it under 60 characters, otherwise 28px text wraps to two lines
     subtitle: () => `Documents, PDF, images, encoding — all running in your browser.`,
     badge: (n) => `${n} tools`,
     foot: '100% client-side · your files never leave the device',
@@ -92,7 +96,7 @@ const LOGO_TILE = `<svg width="38" height="38" viewBox="0 0 64 64" fill="none" x
 const glyph = (inner) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 
-/** 语言无关的工具类目图标：一眼看出「这里有一堆工具」 */
+/** Language-neutral tool category glyphs: signalling "there are lots of tools here" at a glance */
 const GLYPHS = [
   glyph(
     '<path d="M9 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2"/><path d="M15 3h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2"/>',
@@ -115,13 +119,13 @@ const GLYPHS = [
 ];
 
 /**
- * 卡片 HTML：尺寸固定 1200×630，不依赖任何外部资源。
- * 注意：背景网格用覆盖式渐变收边，不要用 mask-image ——
- * 无头 Chrome 截图上会留下合成层残影（实测出现过硬边色块）。
+ * Card HTML: fixed 1200×630, no external resources.
+ * Note: the background grid is faded out with an overlay gradient rather than mask-image —
+ * mask-image leaves compositing artifacts in headless Chrome screenshots (hard-edged blocks).
  */
 function cardHtml({ title, subtitle, badge, foot, lang, iconStrip = true }) {
   const safeTitle = escapeHtml(title);
-  // 标题过长时缩小字号，避免溢出到卡片外
+  // Shrink the font as the title grows so it never overflows the card
   const cjk = /[\u4e00-\u9fa5]/.test(safeTitle);
   const size = cjk
     ? safeTitle.length > 8
@@ -217,7 +221,7 @@ function cardHtml({ title, subtitle, badge, foot, lang, iconStrip = true }) {
 
 function shoot(chrome, html, outFile) {
   const tmp = path.join(tmpdir(), `syntools-og-${process.pid}.html`);
-  // 独立 profile：避免与本机已开的 Chrome 争抢默认 profile 锁
+  // Separate profile: avoid fighting a running Chrome over the default profile lock
   const profile = path.join(tmpdir(), `syntools-og-profile-${process.pid}`);
   writeFileSync(tmp, html, 'utf-8');
   try {
@@ -231,7 +235,7 @@ function shoot(chrome, html, outFile) {
         `--user-data-dir=${profile}`,
         '--force-device-scale-factor=1',
         '--window-size=1200,630',
-        // 太短会让渐变层来不及合成，留下色块
+        // Too short and the gradient layers are not composited in time, leaving colour blocks
         '--virtual-time-budget=3000',
         `--screenshot=${outFile}`,
         `file://${tmp}`,
@@ -244,7 +248,7 @@ function shoot(chrome, html, outFile) {
   }
 }
 
-/** 经 Vite SSR 管线读取注册表（与 prerender 同一套做法，无需手抄工具清单） */
+/** Read the registry through Vite's SSR pipeline (same approach as prerender; no hand-copied tool list) */
 async function loadTools() {
   const { createServer } = await import('vite');
   const server = await createServer({
@@ -304,7 +308,7 @@ async function main() {
         path.join(OUT_DIR, `${tool.id}.png`),
       );
     }
-    console.log(`✓ 已生成 ${tools.length} 张工具分享图（语言：${lang}）`);
+    console.log(`✓ Generated ${tools.length} tool share images (language: ${lang})`);
   }
 }
 

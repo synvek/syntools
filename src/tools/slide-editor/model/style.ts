@@ -1,32 +1,32 @@
 import type { Fill, RunStyle, ShadowStyle, SlideElement, Stroke, TextBody } from './types';
 
 /**
- * 格式刷：把「源元素的视觉样式」抽成快照，再套用到目标元素。
+ * Format painter: captures the visual style of a source element as a snapshot and applies it to targets.
  *
- * 只搬运**样式**，不搬运几何（位置/尺寸/旋转属于版式而非格式），
- * 与 PowerPoint 格式刷的行为一致：形状 ↔ 形状带填充描边，文本 ↔ 文本带字体格式。
+ * Only **styles** travel, never geometry (position/size/rotation is layout, not formatting), matching
+ * PowerPoint's format painter: shape ↔ shape carries fill and outline, text ↔ text carries font formatting.
  */
 
 export interface StyleSnapshot {
-  /** 源元素类型，用于决定目标元素能吃下哪些字段 */
+  /** Source element type, deciding which fields a target can accept */
   source: SlideElement['type'];
   fill?: Fill;
   stroke?: Stroke;
   shadow?: ShadowStyle;
   cornerRadius?: number;
-  /** 文本格式（来自第一个 run / 第一段） */
+  /** Text formatting (from the first run / first paragraph) */
   run?: RunStyle;
   paragraph?: Pick<
     TextBody['paragraphs'][number],
     'align' | 'lineSpacing' | 'bullet' | 'numbering'
   >;
-  /** 图表视觉开关 */
+  /** Chart visual toggles */
   chartOptions?: Record<string, unknown>;
-  /** 公式/图标的着色 */
+  /** Tint for formulas/icons */
   color?: string;
 }
 
-/** 取出元素的可复制样式（几何与内容一律不动） */
+/** Extract the copyable style of an element (geometry and content stay untouched) */
 export function extractStyleSnapshot(element: SlideElement): StyleSnapshot {
   const snapshot: StyleSnapshot = { source: element.type };
   if (element.type === 'shape' || element.type === 'text') {
@@ -60,7 +60,7 @@ export function extractStyleSnapshot(element: SlideElement): StyleSnapshot {
   return snapshot;
 }
 
-/** 快照是否为空（没有任何可搬运的样式） */
+/** Whether the snapshot is empty (no style to carry) */
 export function isEmptySnapshot(snapshot: StyleSnapshot): boolean {
   return (
     !snapshot.fill &&
@@ -74,14 +74,14 @@ export function isEmptySnapshot(snapshot: StyleSnapshot): boolean {
   );
 }
 
-/** 把快照套用到元素，返回**仅含样式字段**的补丁（供 patchElements 使用） */
+/** Apply a snapshot to an element, returning a **style-only** patch (for patchElements) */
 export function applyStyleSnapshot(
   element: SlideElement,
   snapshot: StyleSnapshot,
 ): Partial<SlideElement> {
   const patch: Record<string, unknown> = {};
 
-  // 填充/描边：形状与文本框互相可刷；图片只吃描边
+  // Fill/outline: shapes and text boxes paint each other; images only take an outline
   if (element.type === 'shape' || element.type === 'text') {
     if (snapshot.fill !== undefined) patch.fill = snapshot.fill;
     if (snapshot.stroke !== undefined) patch.stroke = snapshot.stroke;
@@ -106,7 +106,7 @@ export function applyStyleSnapshot(
   }
   if (snapshot.shadow !== undefined) patch.shadow = snapshot.shadow;
 
-  // 文本：run 级样式刷到每个 run，段落级刷到每段
+  // Text: run-level styles go to every run, paragraph-level to every paragraph
   const body =
     element.type === 'text' ? element.body : element.type === 'shape' ? element.body : undefined;
   if (body && (snapshot.run || snapshot.paragraph)) {

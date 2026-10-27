@@ -4,13 +4,13 @@ import { useFlowStore } from '../store';
 import { absoluteRectOf } from '../core';
 import { isContainerKind, type GroupScaleItem } from '../model/types';
 
-/** 包围盒最小边长（px，flow 坐标）：防止整体缩放到不可用 */
+/** Minimum bounding-box edge length (px, flow coordinates): prevents an unusable overall scale */
 const MIN_BOX = 24;
 const HANDLE_SIZE = 10;
 
 type Dir = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
-/** 八个缩放把手：相对包围盒的归一化位置 */
+/** The eight resize handles: normalized positions relative to the bounding box */
 const HANDLES: Array<{ dir: Dir; nx: number; ny: number; cursor: string }> = [
   { dir: 'nw', nx: 0, ny: 0, cursor: 'nwse-resize' },
   { dir: 'n', nx: 0.5, ny: 0, cursor: 'ns-resize' },
@@ -24,20 +24,20 @@ const HANDLES: Array<{ dir: Dir; nx: number; ny: number; cursor: string }> = [
 
 interface DragState {
   dir: Dir;
-  /** 起始包围盒（flow 坐标） */
+  /** Bounding box at gesture start (flow coordinates) */
   box: { x: number; y: number; width: number; height: number };
-  /** 起始指针（屏幕坐标） */
+  /** Pointer position at gesture start (screen coordinates) */
   pointer: { x: number; y: number };
   originals: GroupScaleItem[];
   zoom: number;
 }
 
 /**
- * 多选整体缩放：在选中集合的包围盒上渲染 8 个把手，拖拽时按比例换算全部选中节点。
+ * Multi-select group resize: renders 8 handles on the selection's bounding box and scales every selected node proportionally while dragging.
  *
- * - 覆盖层定位在屏幕坐标系（`useViewport` 换算），因此随平移/缩放实时跟随；
- * - 含容器（泳道 / 编组）时不提供（容器缩放已由 `onNodesChange` 联动子节点处理）；
- * - 拖拽起点提交一次历史，过程写 `history=false`，松手收口。
+ * - The overlay is positioned in screen space (`useViewport` conversion), so it follows pan/zoom in real time;
+ * - Not offered when containers (swimlane / group) are involved (container resizing already propagates to children via `onNodesChange`);
+ * - History is committed once at drag start, the process writes with `history=false`, and it is finalized on release.
  */
 export function SelectionResizer() {
   const selectedNodes = useFlowStore((s) => s.selectedNodes);
@@ -89,7 +89,7 @@ export function SelectionResizer() {
       const hasN = d.dir.includes('n');
       const hasS = d.dir.includes('s');
 
-      // 各行 / 列分别以「对边」为锚点：缩放时对边固定不动
+      // Each row / column is anchored to the opposite edge, which stays put during the resize
       const anchorX = hasW ? d.box.x + d.box.width : d.box.x;
       const anchorY = hasN ? d.box.y + d.box.height : d.box.y;
 
@@ -103,7 +103,7 @@ export function SelectionResizer() {
         const nextHeight = hasS ? d.box.height + dy : d.box.height - dy;
         sy = Math.max(MIN_BOX, nextHeight) / d.box.height;
       }
-      // Shift：等比（按位移较大的轴决定比例）
+      // Shift: proportional (the ratio comes from the axis with the larger displacement)
       if (ev.shiftKey) {
         const uniform = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
         sx = uniform;

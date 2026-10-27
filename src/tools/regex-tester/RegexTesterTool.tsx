@@ -7,25 +7,16 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { translateToolError } from '@/core/i18n/helpers';
 import { readSharedState } from '@/core/lib/share';
 import { useDebouncedValue } from '@/core/hooks/useDebouncedValue';
-import {
-  CHEAT_SHEET,
-  PRESET_PATTERNS,
-  compileRegex,
-  findMatches,
-  replaceRegex,
-} from './core';
+import { CHEAT_SHEET, PRESET_PATTERNS, compileRegex, findMatches, replaceRegex } from './core';
 
 const FLAG_OPTIONS = ['g', 'i', 'm', 's', 'u'] as const;
 const MAX_PREVIEW_MATCHES = 200;
 const MAX_TABLE_ROWS = 50;
 
-/** 正则表达式工具：匹配高亮 + 替换 + 速查 */
+/** Regex tool: match highlighting + replace + cheat sheet */
 export default function RegexTesterTool() {
   const { t } = useTranslation();
-  const init = useMemo(
-    () => readSharedState({ p: '', f: 'g', t: '', r: '', m: 'match' }),
-    [],
-  );
+  const init = useMemo(() => readSharedState({ p: '', f: 'g', t: '', r: '', m: 'match' }), []);
   const [pattern, setPattern] = useState(init.p);
   const [flags, setFlags] = useState(init.f);
   const [text, setText] = useState(init.t);

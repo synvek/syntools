@@ -17,17 +17,17 @@ import {
   type Radix,
 } from './core';
 
-// 分享状态白名单校验：进制为数字型，直接解析归一化
+// Share-state whitelist validation: the radix is numeric, so parse and normalize it directly
 const parseRadixState = (v: string): 'auto' | Radix =>
   RADIXES.includes(Number(v) as Radix) ? (Number(v) as Radix) : 'auto';
 const isOperator = (v: string): v is BitOperator => BIT_OPERATORS.includes(v as BitOperator);
 
 const RADIX_LABELS: Record<Radix, string> = { 2: 'BIN', 8: 'OCT', 10: 'DEC', 16: 'HEX' };
 
-/** 进制转换 / 位运算可视化（Tasks T40）：文案全部走 i18n（T29 约定） */
+/** Radix conversion / bitwise visualization (Tasks T40): all copy goes through i18n (T29 convention) */
 export default function RadixConverterTool() {
   const { t } = useTranslation();
-  // 从分享链接 ?s= 还原初始状态（T28）
+  // Restore initial state from the share link ?s= (T28)
   const init = useMemo(() => readSharedState({ i: '', r: 'auto', o: 'and', b: '' }), []);
   const [input, setInput] = useState(init.i);
   const [radix, setRadix] = useState<'auto' | Radix>(parseRadixState(init.r));
@@ -41,7 +41,7 @@ export default function RadixConverterTool() {
   );
   const value = parsed?.ok ? parsed.value : null;
 
-  // 位运算：操作数 A 复用主输入，操作数 B 按十进制/前缀解析
+  // Bitwise ops: operand A reuses the main input, operand B is parsed as decimal or by prefix
   const bRadix: Radix = detectRadix(operandB);
   const parsedB = useMemo(
     () => (operandB.trim() ? parseInteger(operandB, bRadix) : null),
@@ -117,7 +117,7 @@ export default function RadixConverterTool() {
             </div>
           ))}
 
-          {/* 64 位补码位模式可视化 */}
+          {/* 64-bit two's complement bit-pattern visualization */}
           <div className="rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
             <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
               {t('tools.radix.bitPattern')}（i64 {t('tools.radix.twosComplement')}）
@@ -129,7 +129,7 @@ export default function RadixConverterTool() {
         </div>
       )}
 
-      {/* 位运算区 */}
+      {/* Bitwise operations section */}
       <div className="flex flex-col gap-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
         <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
           {t('tools.radix.bitOps')}

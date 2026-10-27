@@ -1,6 +1,6 @@
 /**
- * 幻灯片编辑器样式：画布容器与面板细节。
- * 配色沿用项目既有语义色，深色模式下画布舞台保持中性，避免干扰内容判读。
+ * Slide editor styles: canvas container and panel details.
+ * Colors follow the project's existing semantic tokens; in dark mode the canvas stage stays neutral so it doesn't fight the content.
  */
 
 .slide-stage {
@@ -70,7 +70,7 @@
   }
 }
 
-/* 行内文本编辑层：由 render/textEditor.ts 动态插入 */
+/* Inline text editing layer: inserted dynamically by render/textEditor.ts */
 .slide-stage textarea {
   font-family: inherit;
 }

@@ -7,17 +7,17 @@ import { encodePdf } from './pdf';
 import { encodeTiff, hasTransparency } from './tiff';
 import type { PhotoDoc, Rect, Selection } from '../model/types';
 
-/** 导出：把文档合成到离屏画布再编码，不改动用户视口与缩放。 */
+/** Export: composite the document to an offscreen canvas and encode it, leaving the viewport untouched. */
 
 export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'tiff' | 'gif' | 'pdf';
 
 export interface ExportOptions {
   format: ExportFormat;
-  /** 0~1，仅 jpeg / webp 生效 */
+  /** 0~1, only applies to jpeg / webp */
   quality: number;
-  /** 只导出该区域（选区裁剪导出），缺省导出整张画布 */
+  /** Export only this region (cropped to a selection); defaults to the whole canvas */
   clip?: Rect | null;
-  /** 仅 pdf 生效：页面尺寸的换算基准（缺省 72 dpi = 像素与点 1:1） */
+  /** pdf only: basis for the page size (72 dpi by default, i.e. 1:1 pixels to points) */
   dpi?: number;
 }
 
@@ -35,21 +35,21 @@ export function exportMime(format: ExportFormat): string {
 }
 
 /**
- * 是否由浏览器原生编码。
+ * Whether the browser can encode it natively.
  *
- * PNG / JPEG / WebP 直接交给 `canvas.toBlob`（走浏览器内建编码器，质量与性能都最好），
- * TIFF / GIF / PDF 则没有原生编码器，需要我们自己写字节（见 `tiff.ts` / `gif.ts` / `pdf.ts`）。
+ * PNG / JPEG / WebP go through `canvas.toBlob` (the built-in encoder: best quality and performance),
+ * while TIFF / GIF / PDF have none, so the bytes are written here (see `tiff.ts` / `gif.ts` / `pdf.ts`).
  */
 export function isNativeExportFormat(format: ExportFormat): boolean {
   return format === 'png' || format === 'jpeg' || format === 'webp';
 }
 
-/** 导出扩展名（文件名拼装用）：jpeg → jpg，其余与格式名一致 */
+/** Export extension (for file names): jpeg → jpg, others match the format name */
 export function exportExtension(format: ExportFormat): string {
   return format === 'jpeg' ? 'jpg' : format;
 }
 
-/** 合成文档：可选裁剪区域与缩放（缩略图用 0.x 缩放） */
+/** Composite the document: optional crop region and scale (thumbnails use a 0.x scale) */
 export function compositeDoc(doc: PhotoDoc, clip?: Rect | null, scale = 1): HTMLCanvasElement {
   const region = clip ?? { x: 0, y: 0, width: doc.width, height: doc.height };
   const canvas = createCanvasElement(region.width * scale, region.height * scale);
@@ -78,7 +78,7 @@ export function exportDoc(doc: PhotoDoc, options: ExportOptions): HTMLCanvasElem
   return compositeDoc(doc, options.clip ?? null, 1);
 }
 
-/** 直接触发浏览器下载（文件名由调用方拼好） */
+/** Trigger a browser download directly (the caller assembles the file name) */
 export function downloadCanvas(
   canvas: HTMLCanvasElement,
   filename: string,
@@ -88,9 +88,9 @@ export function downloadCanvas(
 }
 
 /**
- * 导出字节：原生格式走 canvas 编码，TIFF / GIF / PDF 走自研编码器。
+ * Export bytes: native formats encode through canvas, TIFF / GIF / PDF through the in-house encoders.
  *
- * 统一返回 `Uint8Array`，调用方不必再关心「这个格式能不能用 toBlob」。
+ * Everything returns `Uint8Array`, so callers never worry about whether a format supports toBlob.
  */
 export async function encodeExport(
   canvas: HTMLCanvasElement,
@@ -99,7 +99,7 @@ export async function encodeExport(
   if (isNativeExportFormat(options.format)) {
     const blob = await canvasToBlob(canvas, options);
     if (blob) return new Uint8Array(await blob.arrayBuffer());
-    // 极端情况（内存不足等）：退回 data URL 解析，至少不把导出整个打断
+    // Extreme cases (out of memory, etc.): fall back to parsing the data URL so the export still succeeds
     const dataUrl = canvasToDataUrl(canvas, options);
     const comma = dataUrl.indexOf(',');
     return decodeBase64(dataUrl.slice(comma + 1));
@@ -119,10 +119,10 @@ export async function encodeExport(
 }
 
 /**
- * 导出并触发下载。
+ * Export and trigger the download.
  *
- * 原生格式仍走 data URL（少一次 Blob 复制），自研编码器走 Blob 下载 ——
- * 一条路径处理六种格式，避免调用方各写一遍分支。
+ * Native formats still use a data URL (one less Blob copy); the in-house encoders download a Blob —
+ * one path for six formats, so callers don't repeat the branching.
  */
 export async function downloadExport(
   canvas: HTMLCanvasElement,
@@ -138,7 +138,7 @@ export async function downloadExport(
   downloadBytes(bytes, filename, exportMime(options.format));
 }
 
-/** 读画布像素；拿不到上下文时返回 null（调用方按「导出失败」处理） */
+/** Read canvas pixels; null when no context is available (callers treat it as an export failure) */
 function readPixels(canvas: HTMLCanvasElement): {
   data: ImageData['data'];
   width: number;
@@ -150,7 +150,7 @@ function readPixels(canvas: HTMLCanvasElement): {
   return { data: frame.data, width: frame.width, height: frame.height };
 }
 
-/** base64 → 字节（仅在 `toBlob` 失败时的兜底路径上用） */
+/** base64 → bytes (only on the fallback path when `toBlob` fails) */
 function decodeBase64(input: string): Uint8Array {
   const binary = atob(input);
   const out = new Uint8Array(binary.length);
@@ -159,8 +159,8 @@ function decodeBase64(input: string): Uint8Array {
 }
 
 /**
- * 把选区内容烘焙成一张画布（按选区形状遮罩，反选的洞也会挖空）。
- * 供「通过拷贝新建图层」与「导出选区」共用。
+ * Bake the selection content into a canvas (masked by its shape; inverted holes are punched out too).
+ * Shared by "new layer via copy" and "export selection".
  */
 export function rasterizeSelection(doc: PhotoDoc, selection: Selection): HTMLCanvasElement | null {
   const region: Rect = {
@@ -182,7 +182,7 @@ export function rasterizeSelection(doc: PhotoDoc, selection: Selection): HTMLCan
   return canvas;
 }
 
-/** 图层缩略图：单边最长 48px，按内容比例自适应 */
+/** Layer thumbnail: at most 48px on the long side, keeping the content's aspect ratio */
 export function layerThumbnail(doc: PhotoDoc, clip: Rect, max = 48): string {
   const scale = Math.min(1, max / Math.max(clip.width, clip.height));
   const canvas = compositeDoc(doc, clip, scale);

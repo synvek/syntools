@@ -1,23 +1,14 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 长度单位转换：全部换算到米后再输出目标单位。
+ * Length unit conversion: convert everything to meters, then to the target unit.
  */
 
-export type LengthUnit =
-  | 'mm'
-  | 'cm'
-  | 'm'
-  | 'km'
-  | 'in'
-  | 'ft'
-  | 'yd'
-  | 'mi'
-  | 'nmi';
+export type LengthUnit = 'mm' | 'cm' | 'm' | 'km' | 'in' | 'ft' | 'yd' | 'mi' | 'nmi';
 
 export type LengthError = 'EMPTY' | 'INVALID';
 
-/** 1 单位 = 多少米 */
+/** How many meters one unit equals */
 export const LENGTH_TO_METERS: Record<LengthUnit, number> = {
   mm: 0.001,
   cm: 0.01,
@@ -30,23 +21,9 @@ export const LENGTH_TO_METERS: Record<LengthUnit, number> = {
   nmi: 1852,
 };
 
-export const LENGTH_UNITS: LengthUnit[] = [
-  'mm',
-  'cm',
-  'm',
-  'km',
-  'in',
-  'ft',
-  'yd',
-  'mi',
-  'nmi',
-];
+export const LENGTH_UNITS: LengthUnit[] = ['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi', 'nmi'];
 
-export function convertLength(
-  value: string,
-  from: LengthUnit,
-  to: LengthUnit,
-): ToolResult<number> {
+export function convertLength(value: string, from: LengthUnit, to: LengthUnit): ToolResult<number> {
   const text = value.trim();
   if (!text) return { ok: false, error: 'EMPTY' };
   const n = Number(text);
@@ -55,7 +32,7 @@ export function convertLength(
   return { ok: true, value: meters / LENGTH_TO_METERS[to] };
 }
 
-/** 将数值格式化为可读小数（去掉多余尾零） */
+/** Format a number as a readable decimal (dropping trailing zeros) */
 export function formatLength(n: number): string {
   if (!Number.isFinite(n)) return '';
   if (Math.abs(n) >= 1e6 || (Math.abs(n) > 0 && Math.abs(n) < 1e-6)) {

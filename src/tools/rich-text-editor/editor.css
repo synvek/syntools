@@ -1,8 +1,8 @@
 /**
- * 富文本编辑器样式（替代 @tailwindcss/typography，避免为单个工具改动框架层）：
- * 1. 编辑器正文排版（标题 / 列表 / 表格 / 引用 / 代码块）；
- * 2. 打印分页样式（@page A4）——打印式 PDF 与截图式 PDF 共用同一套版式；
- * 3. 深色模式适配。
+ * Rich text editor styles (replacing @tailwindcss/typography so the framework layer isn't touched for one tool):
+ * 1. Editor body typography (headings / lists / tables / quotes / code blocks);
+ * 2. Print pagination styles (@page A4) — text-based and snapshot PDFs share the same layout;
+ * 3. Dark mode support.
  */
 
 .rte-surface .tiptap {
@@ -17,9 +17,9 @@
   margin-top: 0.75em;
 }
 
-/* ---- 标尺（水平 + 垂直）：毫米刻度 + 页边距灰区 + 光标位置（对标 Word 的标尺） ---- */
+/* ---- Ruler (horizontal + vertical): millimeter ticks + margin shading + caret position (like Word's ruler) ---- */
 .rte-ruler {
-  /* 只作指示：不拦截编辑区的点选与拖拽 */
+  /* Indicator only: don't intercept clicks or drags in the editor */
   position: sticky;
   top: 0;
   z-index: 25;
@@ -39,7 +39,7 @@
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
 }
 
-/* 页边距区域（页面视图） */
+/* Margin area (page view) */
 .rte-ruler-pad {
   flex: none;
   background: var(--rte-ruler-pad);
@@ -51,7 +51,7 @@
   height: 100%;
 }
 
-/* 刻度用重复渐变绘制：1mm 小刻度 / 5mm 中刻度 / 10mm 主刻度 */
+/* Ticks drawn with repeating gradients: 1mm minor / 5mm medium / 10mm major */
 .rte-ruler-ticks {
   position: absolute;
   left: 0;
@@ -94,11 +94,12 @@
   background: var(--rte-ruler-caret);
 }
 
-/* ---- 垂直标尺（左侧） ---- */
+/* ---- Vertical ruler (left side) ---- */
 
-/* absolute 的包含块是滚动容器的 padding box：纵向滚动时标尺本体不动，
-   由内部刻度层按实测的内容顶部位置上下平移，数字才会跟着正文滚动；
-   若把标尺放进滚动内容流里，滚动会把整条标尺带走。 */
+/* An absolute element's containing block is the scroll container's padding box, so the ruler body
+   stays put while scrolling vertically and only the inner tick layer is translated by the measured
+   content top; that's how the numbers follow the text. Putting the ruler in the scroll flow would
+   make scrolling carry the whole ruler away. */
 .rte-ruler-v {
   position: absolute;
   left: 0;
@@ -121,7 +122,7 @@
   width: 100%;
 }
 
-/* 垂直刻度从右边缘向左延伸（与 Word 一致） */
+/* Vertical ticks extend from the right edge leftwards (matching Word) */
 .rte-ruler-ticks--v {
   top: 0;
   bottom: auto;
@@ -147,7 +148,7 @@
   background-image: linear-gradient(180deg, var(--rte-ruler-major) 0 1px, transparent 1px);
 }
 
-/* 数字放在刻度左侧（8px 字体刚好放下两位数），并与刻度线垂直居中对齐 */
+/* Numbers sit left of the ticks (an 8px font just fits two digits) and are vertically centered on the tick line */
 .rte-ruler-label--v {
   left: 1px;
   right: auto;
@@ -158,7 +159,7 @@
   transform: translateY(-50%);
 }
 
-/* 垂直标尺的光标指示：一条横线 */
+/* Caret indicator on the vertical ruler: a horizontal line */
 .rte-ruler-caret--v {
   top: auto;
   bottom: auto;
@@ -168,7 +169,7 @@
   height: 1px;
 }
 
-/* 左上角交点：把两条标尺在角落收口 */
+/* Top-left corner: closes the gap between the two rulers */
 .rte-ruler-corner {
   position: absolute;
   left: 0;
@@ -213,9 +214,9 @@
   color: #374151;
 }
 
-/* 段间距由上面的 `> * + *`（0.75em）统一给出，与打印流完全一致。
-   这里若写 margin: 0 会因选择器权重更高而吃掉段间距，
-   导致编辑器比打印流更"紧凑"，同一份文档在两处的分页结果不同。 */
+/* Paragraph spacing comes from the `> * + *` rule above (0.75em) and must match the print flow exactly.
+   Writing margin: 0 here would win on specificity and eat that spacing, making the editor "tighter"
+   than the print flow, so the same document paginates differently in the two places. */
 .rte-surface .tiptap p {
   margin-bottom: 0;
 }
@@ -262,7 +263,7 @@
   overflow-x: auto;
   font-size: 0.85rem;
   line-height: 1.6;
-  /* 与打印流保持一致：代码块同样折行，否则打印时高度不同而分页错位 */
+  /* Match the print flow: code blocks wrap as well, otherwise heights differ and pagination drifts */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -290,11 +291,11 @@
 }
 
 .rte-surface .tiptap img {
-  /* Tailwind preflight 把 img 定为 display: block + vertical-align: middle：
-     块级化会让「嵌入型」图片照样独占一行、把后续文字挤到下一行，这里显式恢复为行内。
-     垂直对齐用 baseline（Word 嵌入型的行为：图片坐在基线上，文字在图片底部一侧），
-     middle 会把文字排到图片高度正中，与常见的「图片+文字同行」观感不符。
-     需要独占一行的居中/右对齐在下方按 data-align 覆盖。 */
+  /* Tailwind preflight sets img to display: block + vertical-align: middle; block display would make
+     "inline" images take a whole line and push following text to the next line, so restore inline here.
+     Align to baseline (Word's inline behavior: the image sits on the baseline with text beside its bottom);
+     middle would center the text on the image height, unlike the usual "image + text on one line" look.
+     Center/right alignment that needs its own line is overridden below via data-align. */
   display: inline-block;
   vertical-align: baseline;
   max-width: 100%;
@@ -306,8 +307,9 @@
   outline: 2px solid #2563eb;
 }
 
-/* 行内图片是 atom 节点：光标记位置需要时 ProseMirror 会在其后插入占位分隔符 img。
-   必须让它零尺寸且不吃图片样式，否则正文里会多出一个小圆点（项目未引入 prosemirror 默认样式）。 */
+/* Inline images are atom nodes: ProseMirror inserts a placeholder separator img after them when a
+   cursor position requires it. It must be zero-sized and skip image styling, otherwise a small dot
+   shows up in the body (the project doesn't import Prosemirror's default styles). */
 .rte-surface .tiptap img.ProseMirror-separator {
   display: inline !important;
   width: 0 !important;
@@ -336,7 +338,7 @@
   font-weight: 600;
 }
 
-/* 表格列宽拖拽（Table resizable） */
+/* Table column resizing (Table resizable) */
 .rte-surface .tiptap .selectedCell:after {
   content: '';
   position: absolute;
@@ -346,7 +348,7 @@
   z-index: 1;
 }
 
-/* 批注高亮与修订标记（Mark 渲染，本地数据） */
+/* Comment highlight and tracked-change marks (rendered Marks from local data) */
 .rte-surface .tiptap .rte-comment {
   background: rgba(250, 204, 21, 0.35);
   border-bottom: 2px solid #f59e0b;
@@ -375,7 +377,7 @@
   color: #f87171;
 }
 
-/* 表格样式：边框开关与斑马纹（data 属性由 TableStyle 扩展写入） */
+/* Table styles: border toggle and zebra stripes (data attributes written by the TableStyle extension) */
 .rte-surface .tiptap table[data-bordered='false'] th,
 .rte-surface .tiptap table[data-bordered='false'] td {
   border-color: transparent;
@@ -389,22 +391,22 @@
   background: rgba(55, 65, 81, 0.4);
 }
 
-/* 图片层级：浮动层绝对定位在内容区（不影响文字排版与分页），可拖动调整位置 */
+/* Image layers: floating layers are absolutely positioned in the content area (no effect on text layout or pagination) and can be dragged */
 .rte-surface .tiptap img[data-layer='front'],
 .rte-surface .tiptap img[data-layer='behind'] {
   position: absolute;
   margin: 0;
   cursor: move;
-  /* 浮动定位以内容区左上角为原点（ProseMirror 的内容元素本身是定位元素） */
+  /* Floating position is relative to the content area's top-left corner (ProseMirror's content element is itself positioned) */
   z-index: 2;
 }
 
 .rte-surface .tiptap img[data-layer='behind'] {
-  /* 衬于文字下方：绘制在正文之下，但仍在纸面之上 */
+  /* Behind text: painted below the body text but still above the sheet */
   z-index: -1;
 }
 
-/* 环绕方式：四周型 —— 图片浮动到一侧，文字在另一侧与下方环绕（对应 Word 的「四周型环绕」） */
+/* Wrap mode: square — the image floats to one side and text wraps on the other side and below (Word's "square" wrapping) */
 .rte-surface .tiptap img[data-layer='wrap-left'] {
   float: left;
   margin: 4px 12px 8px 0;
@@ -415,14 +417,14 @@
   margin: 4px 0 8px 12px;
 }
 
-/* 环绕方式：上下型 —— 图片独占一行，文字只出现在其上下（对应 Word 的「上下型环绕」） */
+/* Wrap mode: top-and-bottom — the image takes a full line and text appears only above and below it (Word's "top and bottom" wrapping) */
 .rte-surface .tiptap img[data-layer='top-bottom'] {
   display: block;
   float: none;
   margin: 8px auto;
 }
 
-/* 打印流同样支持浮动图片（与屏幕同一套定位规则） */
+/* The print flow supports floating images too (same positioning rules as on screen) */
 .rte-print-flow {
   position: relative;
 }
@@ -438,7 +440,7 @@
   z-index: -1;
 }
 
-/* 打印流与编辑器保持同一套环绕排版 */
+/* The print flow keeps the same wrap layout as the editor */
 .rte-print-flow img[data-layer='wrap-left'] {
   float: left;
   margin: 4px 12px 8px 0;
@@ -455,7 +457,7 @@
   margin: 8px auto;
 }
 
-/* 图片对齐 */
+/* Image alignment */
 .rte-surface .tiptap img[data-align='center'] {
   display: block;
   margin-left: auto;
@@ -490,11 +492,12 @@
   pointer-events: none;
 }
 
-/* ---- 分页符节点 ---- */
+/* ---- Page break node ---- */
 
-/* 分页符节点用「高度」而不是上下外边距占位：
-   外边距会参与相邻块的合并，而页面视图里分页符后插入的页间空白会打断合并，
-   使得编辑器量到的自然位置与打印流不一致（每处差 ~11px），最终分页点错位。 */
+/* The page break node reserves space with `height` rather than vertical margins:
+   margins collapse with adjacent blocks, and in page view the inter-page gap inserted after a break
+   interrupts that collapsing, so the editor measures natural positions ~11px off the print flow
+   at each break and pagination drifts. */
 .rte-surface .tiptap .rte-page-break-node {
   position: relative;
   border-top: 2px dashed #93c5fd;
@@ -514,27 +517,27 @@
   border-radius: 3px;
 }
 
-/* 打印与页面视图中真正分页 */
+/* Real page break in print and page view */
 @media print {
   .rte-page-break-node {
     break-after: page;
   }
 }
 
-/* ---- 编辑工作区：固定高度内部滚动，长文档不再把页面无限撑高 ---- */
+/* ---- Editing workspace: fixed height with internal scrolling, so long documents don't grow the page forever ---- */
 
-/* 高度由 JS 按「首屏剩余空间」精确设置（见 RichTextEditorTool 的 viewportMax），
-   这里的高度只是脚本执行前的兜底。工作区是固定高度的滚动容器。 */
+/* JS sets the exact height from the remaining first-screen space (viewportMax in RichTextEditorTool);
+   the height here is just a fallback before the script runs. The workspace is a fixed-height scroll container. */
 .rte-editor-viewport {
   height: calc(100vh - 400px);
   min-height: 320px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* 给滚动条留出视觉空间 */
+  /* Leave visual room for the scrollbar */
   padding-right: 2px;
-  /* 图片缩放手柄覆盖层的定位基准（覆盖层按内容坐标系定位，滚动自动跟随） */
+  /* Positioning base for the image resize overlay (positioned in content coordinates, following scrolling) */
   position: relative;
-  /* 标尺配色：水平 / 垂直 / 左上角交点共用 */
+  /* Ruler colors: shared by horizontal / vertical rulers and the top-left corner */
   --rte-ruler-minor: #d8dde5;
   --rte-ruler-half: #9aa4b2;
   --rte-ruler-major: #4b5563;
@@ -556,12 +559,12 @@
   --rte-ruler-caret: #60a5fa;
 }
 
-/* 标尺开启时给左侧垂直标尺留出位置，避免刻度压在正文上 */
+/* Reserve space for the left vertical ruler when enabled, so ticks don't overlap the text */
 .rte-editor-viewport.rte-viewport-ruler {
   padding-left: 24px;
 }
 
-/* ---- 图片缩放手柄（四角 + 四边中点） ---- */
+/* ---- Image resize handles (4 corners + 4 edge midpoints) ---- */
 
 .rte-image-frame {
   position: absolute;
@@ -648,8 +651,9 @@
   }
 }
 
-/* 页面视图：灰色工作台由「滚动容器」承担，因此始终铺满整个可滚动区域——
-   内容不足一屏时底部也不会露出页面背景（与 Word / WPS / 石墨的页面视图一致）。 */
+/* Page view: the gray workbench is the scroll container itself, so it always fills the whole
+   scrollable area — no page background leaks at the bottom when content is shorter than one screen
+   (matching the page view of Word / WPS / Shimo). */
 .rte-editor-viewport.rte-viewport-paged {
   background: #e5e7eb;
   border-radius: 8px;
@@ -659,14 +663,15 @@
   background: #1f2937;
 }
 
-/* ---- 页面视图：Word 式多页 A4 纸面 ---- */
+/* ---- Page view: Word-style multi-page A4 sheets ---- */
 
 .rte-page-area {
   background: #e5e7eb;
   border-radius: 8px;
   padding: 16px;
-  /* 纸面宽度固定为 210mm：窗口/侧栏变窄时横向滚动，而不是把纸压缩变形。
-     一旦内容宽被压缩，块的换行与高度就和打印流不同，分页点必然分叉。 */
+  /* Sheet width is fixed at 210mm: scroll horizontally when the window/sidebar narrows rather than
+     squeezing the sheet. Once the content width shrinks, line breaks and block heights differ from
+     the print flow, so pagination inevitably diverges. */
   overflow-x: auto;
 }
 
@@ -674,45 +679,46 @@
   background: #1f2937;
 }
 
-/* 内容区自建层叠上下文：让「衬于文字下方」的浮动图片（z-index: -1）
-   只垫在正文与纸面背景之下，而不会被 .rte-surface 自身背景盖住。
-   （流式与页面视图都要生效，因此放在基础选择器上。） */
+/* The content area creates its own stacking context so "behind text" floating images (z-index: -1)
+   sit only under the body text and sheet background instead of being covered by .rte-surface's own
+   background. (Must apply in both flow and page view, hence the base selector.) */
 .rte-surface {
   isolation: isolate;
 }
 
 .rte-surface.rte-paged {
-  /* 纸张尺寸与页边距由页面设置（CSS 变量）驱动，默认 A4 + 20mm */
+  /* Sheet size and margins are driven by page setup (CSS variables), defaulting to A4 + 20mm */
   width: var(--rte-page-width, 210mm);
-  /* 不做 max-width 收缩：内容区必须与打印流同宽。
-     窗口不够宽时由 .rte-page-area 横向滚动。 */
+  /* No max-width shrink: the content area must match the print flow width.
+     When the window is too narrow, .rte-page-area scrolls horizontally. */
   max-width: none;
-  /* 居中：工作台比纸面宽时，左右留白必须对称 */
+  /* Centered: when the workbench is wider than the sheet, the left/right padding must be symmetric */
   margin: 0 auto;
   padding: var(--rte-page-margin-top, 20mm) var(--rte-page-margin-right, 20mm)
     var(--rte-page-margin-bottom, 20mm) var(--rte-page-margin-left, 20mm);
   border-color: transparent;
-  /* 去掉 1px 边框：内容区必须正好 170mm，与打印流同宽，否则换行不同→分页不同 */
+  /* Drop the 1px border: the content area must be exactly 170mm wide like the print flow, otherwise line breaks differ -> pagination differs */
   border-width: 0;
   box-shadow: none;
   background: transparent;
-  /* 建立独立层叠上下文：负 z-index 的纸面只垫在本文档内容之下，
-     不会被外部祖先（灰色工作台）的背景盖住 */
+  /* Create an independent stacking context so negative z-index sheets sit only under this document's
+     content and aren't covered by an outer ancestor's background (the gray workbench) */
   isolation: isolate;
 }
 
-/* 页间空白 widget（ProseMirror Decoration 渲染，高度由内联样式给出） */
+/* Inter-page gap widget (rendered by a ProseMirror Decoration, height comes from the inline style) */
 .rte-surface .tiptap .rte-page-gap {
   display: block;
   pointer-events: none;
-  /* 必须清掉外边距：上面 `> * + *` 的块间距会误加到它身上，
-     使测量出的「自然位置」比打印流多出 0.75em，分页点随之错位。 */
+  /* Margins must be cleared: the `> * + *` block spacing above would otherwise apply to it too,
+     making the measured natural position 0.75em larger than the print flow and shifting the page breaks. */
   margin: 0;
 }
 
-/* 一张纸（默认 A4 210mm × 297mm，随页面设置变化），落在内容之后。
-   注意：纸面必须用负 z-index 而非给 .tiptap 加定位——
-   一旦 .tiptap 成为定位元素，子块 offsetTop 坐标系改变，分页测量即失效。 */
+/* One sheet (A4 210mm x 297mm by default, following page setup), placed behind the content.
+   Note: sheets must use a negative z-index rather than positioning .tiptap —
+   once .tiptap becomes a positioned element, child blocks' offsetTop coordinate system changes
+   and pagination measurement breaks. */
 .rte-page-sheet {
   position: absolute;
   left: 0;
@@ -743,7 +749,7 @@
   color: #9ca3af;
 }
 
-/* 页眉 / 页脚（屏幕纸面层，与 Word 导出、快照 PDF 共用同一份设置） */
+/* Header / footer (on-screen sheet layer, sharing the same settings as Word export and snapshot PDF) */
 .rte-page-header,
 .rte-page-footer {
   position: absolute;
@@ -780,7 +786,7 @@
   }
 }
 
-/* ---- 查找替换高亮（find-replace.ts 的 decoration） ---- */
+/* ---- Find & replace highlight (decoration from find-replace.ts) ---- */
 
 .rte-surface .tiptap .rte-find-match {
   background-color: rgba(250, 204, 21, 0.55);
@@ -824,7 +830,7 @@
   border-color: #374151;
 }
 
-/* ---- 打印 / 导出容器：屏幕外渲染，仅打印时可见 ---- */
+/* ---- Print / export container: rendered off-screen, visible only when printing ---- */
 
 .rte-print-root {
   position: fixed;
@@ -835,10 +841,11 @@
   z-index: -1;
 }
 
-/* 打印/放映层排版与编辑器 .rte-surface .tiptap 严格一致（WYSIWYG）：
-   字号、行高、块间距、标题层级必须逐项相同，否则打印分页位置与页面视图不符。 */
+/* Print/present layer typography must match the editor's .rte-surface .tiptap exactly (WYSIWYG):
+   font size, line height, block spacing and heading levels must all be identical, otherwise printed
+   page breaks won't match the page view. */
 .rte-print-flow {
-  /* 必须与编辑器内容区同宽（随页面设置变化），否则换行不同→分页分叉 */
+  /* Must match the editor content width (following page setup), otherwise line breaks differ -> pagination diverges */
   width: var(--rte-content-width, 170mm);
   margin: 0 auto;
   padding: 0;
@@ -846,8 +853,8 @@
   color: #111827;
   font-size: 15px;
   line-height: 1.8;
-  /* WYSIWYG 关键：字体必须继承正文（与编辑器 .tiptap 完全一致）。
-     写死字体栈会让打印/导出时的换行与屏幕不同，进而导致分页位置不一致。 */
+  /* WYSIWYG critical: font must be inherited from the body (identical to the editor's .tiptap).
+     Hard-coding a font stack changes line breaks when printing/exporting and thus shifts page breaks. */
   font-family: inherit;
 }
 
@@ -926,10 +933,10 @@
   color: inherit;
 }
 
-/* 空块必须保留一行高度。
-   editor.getHTML() 序列化时会丢掉 ProseMirror 的尾随 <br>，空段落在 HTML 里是
-   <p></p>，浏览器渲染高度为 0——打印/放映里空行会凭空消失，而且因为高度和编辑器
-   不一致，分页点与页数也会与页面视图对不上。 */
+/* Empty blocks must keep one line of height.
+   editor.getHTML() drops ProseMirror's trailing <br>, so an empty paragraph becomes <p></p> in the
+   HTML and renders 0px tall — blank lines vanish in print/present, and because heights diverge from
+   the editor, page breaks and page counts no longer match the page view. */
 .rte-print-flow
   :where(p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, pre, code):empty::before {
   content: '\200B';
@@ -939,8 +946,8 @@
   border-top: 1px solid #e5e7eb;
 }
 
-/* 分页符节点在打印流中必须与编辑器占用完全相同的纵向空间（3rem），
-   否则两条路径量到的块位置不同，分页结果就会分叉 */
+/* The page break node must occupy exactly the same vertical space (3rem) in the print flow as in the
+   editor, otherwise the two paths measure different block positions and pagination diverges */
 .rte-print-flow .rte-page-break-node {
   margin: 0;
   height: 3rem;
@@ -952,7 +959,7 @@
 }
 
 .rte-print-flow img {
-  /* 与编辑器一致：行内图片不能被 preflight 块级化，否则打印 / PDF 里图片会独占一行 */
+  /* Match the editor: inline images must not be blockified by preflight, otherwise they take a whole line in print / PDF */
   display: inline-block;
   vertical-align: baseline;
   max-width: 100%;
@@ -960,7 +967,7 @@
   border-radius: 0.375rem;
 }
 
-/* 打印流补齐对齐规则，避免「编辑器里居中、导出后靠左」 */
+/* Complete the alignment rules for the print flow so centered images don't end up left-aligned after export */
 .rte-print-flow img[data-align='center'] {
   display: block;
   margin-left: auto;
@@ -976,7 +983,7 @@
 .rte-print-flow table {
   width: 100%;
   border-collapse: collapse;
-  /* 与编辑器表格同字号，避免行高差异造成分页错位 */
+  /* Same font size as the editor tables, avoiding row-height differences that shift pagination */
   font-size: 0.9rem;
 }
 
@@ -999,9 +1006,10 @@
     margin: 20mm;
   }
 
-  /* 页面视图的所见即所得：与屏幕同一套块级分页分配，页起始块强制换页。
-     必须同时清掉页起始块的上外边距：实测 Chrome 在强制断页处**不会**截断 margin，
-     多出来的 0.75em（约 11px）会让该页内容高出可打印高度，从而多印出一张空白页 */
+  /* WYSIWYG for the page view: same block pagination as on screen, page-start blocks force a break.
+     The page-start block's top margin must be cleared as well: Chrome does NOT truncate margins at a
+     forced break, and the extra 0.75em (~11px) pushes page content past the printable height,
+     printing one extra blank page */
   .rte-print-flow [data-page-start] {
     break-before: page;
     margin-top: 0;
@@ -1029,9 +1037,9 @@
 }
 
 /* ================================================================== *
- * 动态目录（对标 Word 目录域）
- * 类名与 data 属性由 toc.ts 统一产出，屏幕 / 打印 / 快照 PDF 共用同一套样式。
- * 这些规则不加 `.rte-surface` 前缀：打印层挂在 body 上，需要同样生效。
+ * Dynamic table of contents (equivalent to Word's TOC field)
+ * Class names and data attributes are produced by toc.ts; screen / print / snapshot PDF share these styles.
+ * These rules carry no `.rte-surface` prefix: the print layer hangs off body and needs them too.
  * ================================================================== */
 
 .rte-toc {
@@ -1092,7 +1100,7 @@ button.rte-toc-text:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* 编辑态：选中/悬停时给出可见边界，明确这是可整体删除的块 */
+/* Editable state: show a visible boundary on select/hover, signaling this is a block that can be deleted as a whole */
 .rte-toc-node {
   position: relative;
   border-radius: 0.375rem;
@@ -1130,9 +1138,10 @@ button.rte-toc-text:hover {
 }
 
 /* ================================================================== *
- * 脚注（对标 Word 脚注）
- * 引用是行内 atom，汇总区是文档末尾的 widget —— 两者都用 toc.ts 同款
- * 「类名 + data 属性」契约，屏幕 / 打印 / 快照 PDF / Word 五端一致。
+ * Footnotes (equivalent to Word footnotes)
+ * The reference is an inline atom and the summary is a widget at the end of the document — both use
+ * the same "class name + data attribute" contract as toc.ts, consistent across screen / print /
+ * snapshot PDF / Word.
  * ================================================================== */
 
 .rte-footnote-ref {
@@ -1196,8 +1205,8 @@ button.rte-toc-text:hover {
 }
 
 /* ================================================================== *
- * 公式（KaTeX）：节点只存 LaTeX 源码，预览由 NodeView 渲染。
- * 打印 / 快照 PDF 走 injectMath 输出的 MathML，不依赖这些样式。
+ * Formulas (KaTeX): the node stores only the LaTeX source; the preview is rendered by a NodeView.
+ * Print / snapshot PDF use the MathML emitted by injectMath and don't depend on these styles.
  * ================================================================== */
 
 .rte-math {
@@ -1247,8 +1256,8 @@ button.rte-toc-text:hover {
 }
 
 /* ================================================================== *
- * 版式：分栏 / 文字水印 / 页面背景
- * 屏幕页面视图、打印层与快照 PDF 共用同一套变量（--rte-* 由 pageSetup 注入）。
+ * Layout: columns / text watermark / page background
+ * The on-screen page view, print layer and snapshot PDF share the same variables (--rte-* injected by pageSetup).
  * ================================================================== */
 
 .rte-surface.rte-columns {
@@ -1281,7 +1290,7 @@ button.rte-toc-text:hover {
   user-select: none;
 }
 
-/* 屏幕：流式视图下挂在编辑区上的一次性水印 */
+/* Screen: single watermark covering the editor in flow view */
 .rte-watermark-flow {
   position: sticky;
   top: 0;
@@ -1289,7 +1298,7 @@ button.rte-toc-text:hover {
   z-index: 0;
 }
 
-/* 打印水印：fixed 定位让 Chrome 在每一页重复绘制 */
+/* Print watermark: fixed positioning makes Chrome repeat it on every page */
 .rte-print-watermark {
   position: fixed;
   inset: 0;
@@ -1313,8 +1322,8 @@ button.rte-toc-text:hover {
 }
 
 /* ================================================================== *
- * 拼写检查：疑似拼错的单词加波浪下划线（与 Word 一致的观感）
- * 判定完全本地，不调用浏览器原生拼写检查（避免文本被上送云端）。
+ * Spellcheck: wavy underline under likely misspellings (looking like Word)
+ * Detection is fully local; the browser's native spellchecker is never used (keeping text off the cloud).
  * ================================================================== */
 
 .rte-spell-error {

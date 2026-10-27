@@ -8,7 +8,7 @@ import { translateToolError } from '@/core/i18n/helpers';
 import { readSharedState } from '@/core/lib/share';
 import { processCss, type CssAction, type IndentSize } from './core';
 
-/** CSS 压缩 / 格式化 */
+/** CSS minifier / formatter */
 export default function CssFormatTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', a: 'format', n: 2 }), []);

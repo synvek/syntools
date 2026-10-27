@@ -1,24 +1,24 @@
 import type { PageSetupConfig } from './pageSetup';
 
 /**
- * 文档模板：一组「页面设置 + 正文骨架」的预设，用于一键开篇。
+ * Document templates: presets of "page setup + body skeleton" for starting a document in one click.
  *
- * 模板正文里的可见文字由调用方传入的翻译函数提供（`body` 为 `t => html`），
- * 因此模板数据本身与语言无关，切换语言后套用即为当前语言。
+ * Visible text in the body comes from a translation function passed by the caller (`body` is `t => html`),
+ * so the template data is language-neutral and applying it yields the current language.
  */
 
 export interface DocumentTemplate {
   id: string;
-  /** 名称 / 描述 / 正文字符串的 i18n key 前缀（`tools.richText.<key>`） */
+  /** i18n key prefix for name / description / body strings (`tools.richText.<key>`) */
   nameKey: string;
   descriptionKey: string;
-  /** 模板自身的页面设置覆盖（应用时会与当前设置合并） */
+  /** Page setup overrides of this template (merged with the current setup on apply) */
   pageSetup: Partial<PageSetupConfig>;
-  /** 正文骨架；`t` 为当前语言的翻译函数 */
+  /** Body skeleton; `t` is the translation function for the current language */
   body: (t: (key: string) => string) => string;
 }
 
-/** 模板列表（顺序即面板展示顺序） */
+/** Template list (order matches the panel) */
 export const DOCUMENT_TEMPLATES: readonly DocumentTemplate[] = [
   {
     id: 'blank',
@@ -85,7 +85,7 @@ export const DOCUMENT_TEMPLATES: readonly DocumentTemplate[] = [
   },
 ];
 
-/** 按 id 取模板 */
+/** Look up a template by id */
 export function findTemplate(id: string): DocumentTemplate | null {
   return DOCUMENT_TEMPLATES.find((template) => template.id === id) ?? null;
 }
@@ -98,8 +98,8 @@ export interface TemplateApplication {
 }
 
 /**
- * 生成套用结果：页面设置以「当前设置 + 模板覆盖」合并，
- * 模板未声明的字段（如分栏）沿用用户当前选择，避免套用模板时静默改掉用户的版式偏好。
+ * Build the apply result: page setup is the current setup merged with the template overrides,
+ * and fields the template omits (such as columns) keep the user's choice, so applying never silently changes their layout.
  */
 export function buildTemplateApplication(
   template: DocumentTemplate,

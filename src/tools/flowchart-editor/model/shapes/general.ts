@@ -1,6 +1,6 @@
 import type { ShapeDef } from './index';
 
-/** 通用图形：各类型图表都会用到的基础外形，置于分类首位 */
+/** Generic shapes: base outlines used by every diagram type, listed first in the category */
 export const GENERAL_SHAPES: ShapeDef[] = [
   { kind: 'rect', category: 'general', draw: 'rect', size: { width: 150, height: 64 } },
   { kind: 'roundRect', category: 'general', draw: 'roundRect', size: { width: 150, height: 64 } },

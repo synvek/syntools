@@ -14,9 +14,9 @@ import {
 import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
 
 /**
- * docStore / draft 降级逻辑测试。
- * IndexedDB 在 jsdom 中不可用：验证所有 API 静默降级不抛异常；
- * 草稿路径走 localStorage 真实实现。
+ * Tests for the docStore / draft degradation logic.
+ * IndexedDB is unavailable under jsdom: verify every API degrades silently without throwing, while
+ * the draft path runs against the real localStorage implementation.
  */
 
 const snapshot = (): WorkbookSnapshot => createEmptySnapshot('book');

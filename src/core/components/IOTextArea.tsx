@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const WARN_BYTES = 500 * 1024; // 500KB：提示性能风险
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB：拒绝并引导文件模式
+const WARN_BYTES = 500 * 1024; // 500KB: warn about performance
+const MAX_BYTES = 5 * 1024 * 1024; // 5MB: reject and point users to file mode
 
 interface IOTextAreaProps {
   label: string;
@@ -11,11 +11,11 @@ interface IOTextAreaProps {
   readOnly?: boolean;
   placeholder?: string;
   rows?: number;
-  /** 头部右侧操作区（如复制按钮） */
+  /** Header actions on the right (e.g. copy button) */
   actions?: ReactNode;
 }
 
-/** 工具通用输入输出面板（技术设计 §7.2） */
+/** Shared tool input/output panel (tech design §7.2) */
 export function IOTextArea({
   label,
   value,
@@ -42,7 +42,9 @@ export function IOTextArea({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex min-h-8 items-center justify-between gap-2">
-        <label className="shrink-0 text-sm font-medium text-gray-600 dark:text-gray-300">{label}</label>
+        <label className="shrink-0 text-sm font-medium text-gray-600 dark:text-gray-300">
+          {label}
+        </label>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           <span className="whitespace-nowrap text-xs text-gray-400 dark:text-gray-500">
             {t('io.stats', { chars: value.length, bytes })}

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
 /**
- * 内置轻量图标集：不引入图标库依赖，控制包体积（技术设计 §3.1）。
- * 工具通过 ToolMeta.icon 引用此处名称。
+ * Built-in lightweight icon set: no icon library dependency, keeps the bundle small (tech design §3.1).
+ * Tools reference these names through ToolMeta.icon.
  */
 const icons: Record<string, ReactNode> = {
   wrench: (
@@ -320,7 +320,7 @@ const icons: Record<string, ReactNode> = {
       <path d="m7 10 1 1M9 8l1 1M11 6l1 1M13 12l1 1M11 14l1 1" />
     </>
   ),
-  /** 横向标尺（刻度条）：用于切换文字处理器的标尺显示 */
+  /** Horizontal ruler (tick bar): toggles the word processor ruler */
   rulerTicks: (
     <>
       <path d="M2.5 9.5h19v5h-19z" />
@@ -798,7 +798,7 @@ const icons: Record<string, ReactNode> = {
       <circle cx="13.6" cy="18.4" r="1.1" />
     </>
   ),
-  // 多边形套索：折线 + 折点
+  // Polygonal lasso: polyline plus vertices
   lassoPolygon: (
     <>
       <path d="M4 18 8 6l8 3 4 7Z" />
@@ -807,14 +807,14 @@ const icons: Record<string, ReactNode> = {
       <circle cx="16" cy="9" r="1.4" />
     </>
   ),
-  // 磁性套索：沿边缘吸附（虚线环 + 磁铁小块）
+  // Magnetic lasso: snaps along edges (dashed ring + magnet)
   lassoMagnetic: (
     <>
       <path d="M12 4c4.4 0 8 2.2 8 5s-3.6 5-8 5-8-2.2-8-5 3.6-5 8-5Z" strokeDasharray="2.4 2.4" />
       <path d="M9.5 17.5v2.2m5-2.2v2.2M9.5 19.7h5" />
     </>
   ),
-  // 魔棒：棒身 + 星芒
+  // Magic wand: wand body plus sparkles
   magicWand: (
     <>
       <path d="M5 19 15 9" />
@@ -822,7 +822,7 @@ const icons: Record<string, ReactNode> = {
       <path d="m19.4 12 .6 1.3 1.3.6-1.3.6-.6 1.3-.6-1.3-1.3-.6 1.3-.6.6-1.3Z" />
     </>
   ),
-  // 快速选择：带加号的软边刷
+  // Quick select: soft brush with a plus
   quickSelect: (
     <>
       <path d="M5 19 12 12" />
@@ -881,7 +881,7 @@ const icons: Record<string, ReactNode> = {
       <circle cx="16" cy="8" r="4" />
     </>
   ),
-  // 形状家族：矩形 / 圆角矩形 / 椭圆 / 直线 / 箭头 / 星形，供照片编辑器的形状组按钮与图层徽标使用
+  // Shape family: rect / rounded rect / ellipse / line / arrow / star, used by shape buttons and layer badges
   shapeRect: <rect x="3" y="6" width="18" height="12" rx="1" />,
   shapeRoundRect: <rect x="3" y="6" width="18" height="12" rx="4.5" />,
   shapeEllipse: <ellipse cx="12" cy="12" rx="9" ry="6" />,

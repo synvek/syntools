@@ -40,7 +40,7 @@ const ICON_BUTTON =
   'inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100';
 const ACTIVE_ICON_BUTTON = 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300';
 
-/** 分组分隔线：竖起的一条细线，让主栏的「工具 / 颜色 / 历史 / 视图」一目了然 */
+/** Group divider: a thin vertical line that separates tools / colours / history / view */
 function Divider() {
   return <span className="mx-0.5 h-5 w-px shrink-0 self-center bg-gray-200 dark:bg-gray-700" />;
 }
@@ -69,7 +69,7 @@ function IconButton({ icon, label, onClick, disabled, active }: IconButtonProps)
   );
 }
 
-/** 缩放组：缩小 / 百分比（点击回到 100%）/ 放大 / 适应窗口 */
+/** Zoom group: zoom out / percentage (click to reset to 100%) / zoom in / fit to window */
 function ZoomControls() {
   const { t } = useTranslation();
   const viewScale = useBoardStore((s) => s.viewScale);
@@ -100,7 +100,7 @@ function ZoomControls() {
   );
 }
 
-/** 收起态：只保留一条细条（当前工具 + 撤销重做 + 缩放），把高度让给画布 */
+/** Collapsed state: a thin strip (current tool + undo/redo + zoom) that frees height for the canvas */
 function CollapsedToolbar() {
   const { t } = useTranslation();
   const tool = useBoardStore((s) => s.tool);
@@ -137,7 +137,7 @@ function CollapsedToolbar() {
   );
 }
 
-/** 工具栏：主栏（高频操作常驻）+「更多设置」（低频设置可折叠）+ 收起细条 */
+/** Toolbar: main bar (frequently used actions) + "more settings" (collapsible) + collapsed strip */
 export default function BoardToolbar() {
   const { t } = useTranslation();
   const tool = useBoardStore((s) => s.tool);

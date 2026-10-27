@@ -1,8 +1,8 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 幻灯片编辑器（「文档与创作」分类重工具）：
- * 自研 Canvas（Konva）编辑画布 + 浏览器本地 .pptx 导入导出，数据不离开浏览器。
+ * Slide editor (a heavy tool in the "Documents & Creation" category):
+ * a hand-built Canvas (Konva) editing surface + browser-local .pptx import/export; data never leaves the browser.
  */
 export const slideEditorTool: ToolMeta = {
   id: 'slide-editor',

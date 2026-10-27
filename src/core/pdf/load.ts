@@ -8,7 +8,7 @@ export async function fileToBytes(file: File): Promise<Uint8Array> {
 }
 
 export type LoadPdfOptions = {
-  /** 打开加密 PDF 时的用户密码 */
+  /** User password supplied when opening an encrypted PDF */
   password?: string;
 };
 
@@ -22,8 +22,8 @@ function mapLoadError(err: unknown): PdfError {
 }
 
 /**
- * 加载 PDF。加密文档需提供 password；不再默认 ignoreEncryption，
- * 避免「能打开但改坏/报错」的半加密状态。
+ * Load a PDF. Encrypted files require a password; ignoreEncryption is no
+ * longer the default, avoiding a half-encrypted state that opens then corrupts.
  */
 export async function loadPdfFromBytes(
   bytes: Uint8Array,
@@ -50,7 +50,7 @@ export async function loadPdfFromFile(
   return loadPdfFromBytes(await fileToBytes(file), opts);
 }
 
-/** 探测是否加密（未提供密码时返回 NEED_PASSWORD） */
+/** Detect encryption (returns NEED_PASSWORD when no password is given) */
 export async function probePdfBytes(bytes: Uint8Array): Promise<ToolResult<true>> {
   const loaded = await loadPdfFromBytes(bytes);
   if (loaded.ok) return { ok: true, value: true };
@@ -63,7 +63,7 @@ export async function probePdfFile(file: File): Promise<ToolResult<true>> {
   return probePdfBytes(await fileToBytes(file));
 }
 
-/** 解析 "1,3-5,8" 为 0-based 页索引（去重排序） */
+/** Parse "1,3-5,8" into 0-based page indexes (deduped and sorted) */
 export function parsePageSelection(input: string, pageCount: number): ToolResult<number[]> {
   const raw = input.trim();
   if (!raw) return { ok: false, error: 'EMPTY' };
@@ -72,12 +72,20 @@ export function parsePageSelection(input: string, pageCount: number): ToolResult
     const range = part.split(/[-–—]/);
     if (range.length === 1) {
       const n = Number(range[0]);
-      if (!Number.isInteger(n) || n < 1 || n > pageCount) return { ok: false, error: 'INVALID_RANGE' };
+      if (!Number.isInteger(n) || n < 1 || n > pageCount)
+        return { ok: false, error: 'INVALID_RANGE' };
       set.add(n - 1);
     } else if (range.length === 2) {
       const a = Number(range[0]);
       const b = Number(range[1]);
-      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 1 || b < 1 || a > pageCount || b > pageCount) {
+      if (
+        !Number.isInteger(a) ||
+        !Number.isInteger(b) ||
+        a < 1 ||
+        b < 1 ||
+        a > pageCount ||
+        b > pageCount
+      ) {
         return { ok: false, error: 'INVALID_RANGE' };
       }
       const lo = Math.min(a, b);

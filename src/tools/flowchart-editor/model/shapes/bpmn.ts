@@ -1,13 +1,13 @@
 import type { ShapeDef } from './index';
 import { axisAdjust, foldAdjust, pxMx, type ParamGetter } from './adjust';
 
-/** 数据对象：右上角折角矩形（折角可调） */
+/** Data object: rectangle with a folded top-right corner (fold adjustable) */
 const dataObjectPath = (w: number, h: number, p: ParamGetter): string => {
   const c = p('foldSize');
   return `M0,0 H${w - c} L${w},${c} V${h} H0 Z`;
 };
 
-/** 文本注释：左侧开放括号形（括号宽可调） */
+/** Text annotation: open bracket shape on the left (bracket width adjustable) */
 const textAnnotationPath = (_w: number, h: number, p: ParamGetter): string => {
   const bw = p('annotationBracket');
   return `M${bw},0 H0 V${h} H${bw}`;

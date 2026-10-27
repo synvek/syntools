@@ -4,11 +4,11 @@ import { CHART_TYPES } from './chart';
 import { SHAPE_PRESETS } from './shapes';
 
 /**
- * 插入面板的标签门禁。
+ * Insert-panel label gate.
  *
- * 图表类型与形状库曾经把中文写死在模型里，英文界面会显示中文。
- * 现在统一走 `tools.slide.*` 的 i18n 键，这条测试保证新增类型/形状时
- * 不会忘记补文案（缺键时 i18next 只会静默回落成原始 key）。
+ * Chart types and the shape library used to hardcode Chinese in the model, so English UIs showed Chinese.
+ * They now go through `tools.slide.*` i18n keys, and this test makes sure new types/shapes come with copy
+ * (a missing key silently falls back to the raw key in i18next).
  */
 
 function flatKeys(tree: unknown, prefix = ''): string[] {

@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 写作创作类提示词，详见 ../README.md */
+/** Writing and creation prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'writing-blog-outline',

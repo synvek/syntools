@@ -12,9 +12,9 @@ import {
 } from './persist';
 
 /**
- * persist 降级逻辑测试。
- * IndexedDB 在 jsdom 中不可用：验证所有 API 静默降级、不抛异常，
- * 且空文档写入语义为「清除草稿」（返回 false）。
+ * Tests for the persist fallback logic.
+ * IndexedDB is unavailable in jsdom: verifies that every API degrades silently without throwing,
+ * and that writing an empty document means "clear the draft" (returns false).
  */
 describe('persist（jsdom 无 IndexedDB：静默降级）', () => {
   beforeEach(() => {

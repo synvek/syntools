@@ -4,11 +4,11 @@ import { useFlowStore } from '../store';
 import { computeEdgeJumps } from '../model/jumps';
 
 /**
- * 连线跳线覆盖层（弧线跨越）。
+ * Edge jump overlay (arc hops).
  *
- * 绘制在两遍：先用画布背景色画一条较粗的弧线「擦掉」底下的直线，
- * 再用连线自身颜色画细弧，从而呈现「跨线」效果。
- * 与 Viewport 同步变换，保证与 React Flow 的连线严格对齐。
+ * Drawn in two passes: first a thicker arc in the canvas background color "erases" the straight line beneath,
+ * then a thin arc in the edge's own color, producing the crossing effect.
+ * Transformed in sync with the viewport so it stays exactly aligned with React Flow's edges.
  */
 export function EdgeJumpOverlay() {
   const nodes = useFlowStore((s) => s.nodes);

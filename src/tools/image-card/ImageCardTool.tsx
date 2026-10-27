@@ -22,7 +22,7 @@ import {
   type ImageCardTextPosition,
 } from './core';
 
-/** 图片转卡片制作 */
+/** Image to card generator */
 export default function ImageCardTool() {
   const { t } = useTranslation();
   const init = useMemo(

@@ -1,5 +1,5 @@
 /**
- * 代码生成图片：主题与语言配置（高亮在 UI 用 Prism，导出用 html-to-image）。
+ * Code to image: theme and language catalog (Prism highlights in the UI, html-to-image exports).
  */
 
 export const CODE_LANGUAGES = [

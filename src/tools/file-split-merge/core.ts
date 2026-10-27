@@ -4,15 +4,15 @@ export type SplitMode = 'size' | 'count';
 
 export interface SplitOptions {
   mode: SplitMode;
-  /** 每个分片的字节数（mode = 'size'） */
+  /** Bytes per chunk (mode = 'size') */
   size?: number;
-  /** 分片数量（mode = 'count'） */
+  /** Number of chunks (mode = 'count') */
   count?: number;
 }
 
 export const MIN_PART_SIZE = 1024;
 
-/** 按字节大小或分片数量切分数据。 */
+/** Split data by chunk size or by chunk count. */
 export function splitBytes(data: Uint8Array, options: SplitOptions): ToolResult<Uint8Array[]> {
   if (data.length === 0) return { ok: false, error: 'EMPTY' };
 
@@ -40,7 +40,7 @@ export function splitBytes(data: Uint8Array, options: SplitOptions): ToolResult<
   return { ok: true, value: parts };
 }
 
-/** 按顺序合并分片。 */
+/** Merge chunks in order. */
 export function mergeBytes(parts: Uint8Array[]): ToolResult<Uint8Array> {
   const nonEmpty = parts.filter((p) => p.length > 0 || parts.length === 1);
   if (parts.length === 0) return { ok: false, error: 'EMPTY' };

@@ -64,7 +64,7 @@ describe('模板文案多语种', () => {
       for (const key of Object.keys(TEMPLATE_LABELS_I18N.en)) {
         expect(table[key]?.trim(), `${lang}.${key} 缺失或为空`).toBeTruthy();
       }
-      // 至少核心 token 与英文不同（避免误用英文表）
+      // At least the core tokens must differ from English (guarding against accidentally using the en table)
       expect(table.start).not.toBe(TEMPLATE_LABELS_I18N.en.start);
     }
   });

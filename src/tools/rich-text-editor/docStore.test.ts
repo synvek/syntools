@@ -11,31 +11,31 @@ import {
   saveManualVersion,
 } from './docStore';
 
-/** docStore / draft 降级逻辑测试。
- * IndexedDB 在 jsdom 中不可用：验证所有 API 静默降级不抛异常；
- * 纯逻辑（草稿降级写入、schema 迁移）走 localStorage 真实路径。
+/** docStore / draft degradation tests.
+ * IndexedDB is unavailable in jsdom: verify every API degrades silently without throwing;
+ * pure logic (degraded draft writes, schema migration) runs against the real localStorage path.
  */
 
 const DRAFT_KEY_V2 = 'syntools:rich-text-editor.draft.v2';
 
-describe('docStore（jsdom 无 IndexedDB：静默降级）', () => {
-  it('listDocuments / loadDocument 失败时返回空值', async () => {
+describe('docStore (no IndexedDB in jsdom: silent degradation)', () => {
+  it('returns empty values when listDocuments / loadDocument fail', async () => {
     await expect(listDocuments()).resolves.toEqual([]);
     await expect(loadDocument('nope')).resolves.toBeNull();
     await expect(listVersions('nope')).resolves.toEqual([]);
   });
 
-  it('saveDocument / deleteDocument / duplicateDocument 不抛异常', async () => {
+  it('saveDocument / deleteDocument / duplicateDocument never throw', async () => {
     await expect(saveDocument('a', { title: 't', html: '<p>x</p>' })).resolves.toBeUndefined();
     await expect(deleteDocument('a')).resolves.toBeUndefined();
     await expect(duplicateDocument('a')).resolves.toBeNull();
   });
 
-  it('saveManualVersion 在文档不存在时返回 null', async () => {
+  it('saveManualVersion returns null when the document is missing', async () => {
     await expect(saveManualVersion('nope', '定稿')).resolves.toBeNull();
   });
 
-  describe('initDocStore 迁移', () => {
+  describe('initDocStore migration', () => {
     beforeEach(() => {
       localStorage.clear();
     });
@@ -44,15 +44,15 @@ describe('docStore（jsdom 无 IndexedDB：静默降级）', () => {
       localStorage.clear();
     });
 
-    it('IndexedDB 不可用时把 v1 草稿迁移为文档库首篇并升级为 v2', async () => {
+    it('migrates a v1 draft into the first library document and upgrades it to v2 when IndexedDB is unavailable', async () => {
       localStorage.setItem(
         LEGACY_DRAFT_KEY,
         JSON.stringify({ title: '旧文档', html: '<p>legacy</p>' }),
       );
       const init = await initDocStore();
-      // loadDocument 因 IndexedDB 不可用返回 null，但迁移路径应返回 docId
+      // loadDocument returns null without IndexedDB, but the migration path should still return a docId
       expect(init?.docId).toBe('legacy');
-      // v1 键已清理，v2 键承载迁移结果
+      // The v1 key is cleared and the v2 key holds the migrated result
       expect(localStorage.getItem(LEGACY_DRAFT_KEY)).toBeNull();
       const upgraded = JSON.parse(localStorage.getItem(DRAFT_KEY_V2) ?? '{}') as {
         schemaVersion?: number;
@@ -62,7 +62,7 @@ describe('docStore（jsdom 无 IndexedDB：静默降级）', () => {
       expect(upgraded.title).toBe('旧文档');
     });
 
-    it('v1 草稿中已有的批注标记在升级后带出元数据', async () => {
+    it('recovers metadata for existing comment marks when upgrading a v1 draft', async () => {
       localStorage.setItem(
         LEGACY_DRAFT_KEY,
         JSON.stringify({
@@ -76,7 +76,7 @@ describe('docStore（jsdom 无 IndexedDB：静默降级）', () => {
   });
 });
 
-describe('writeDraftSafe（超限降级）', () => {
+describe('writeDraftSafe (degradation over the limit)', () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -86,13 +86,13 @@ describe('writeDraftSafe（超限降级）', () => {
     vi.restoreAllMocks();
   });
 
-  it('正常内容直接写入', () => {
+  it('writes normal content directly', () => {
     const result = writeDraftSafe({ title: 't', html: '<p>hello</p>' });
     expect(result).toEqual({ ok: true, degraded: false });
     expect(localStorage.getItem(DRAFT_KEY_V2)).toContain('hello');
   });
 
-  it('写入时补齐 schema 版本与扩展字段', () => {
+  it('fills in the schema version and extras on write', () => {
     writeDraftSafe({ title: 't', html: '<p>x</p>', comments: [], changes: [] });
     const stored = JSON.parse(localStorage.getItem(DRAFT_KEY_V2) ?? '{}') as {
       schemaVersion?: number;
@@ -106,8 +106,8 @@ describe('writeDraftSafe（超限降级）', () => {
     expect(stored.userWords).toEqual([]);
   });
 
-  it('超过 10MB 时剥离图片后重试成功', () => {
-    // 构造 >10MB 的 html：大图片 + 正文
+  it('retries successfully after stripping images beyond 10MB', () => {
+    // Build >10MB of html: a large image plus body text
     const bigImage = `<img src="data:image/png;base64,${'A'.repeat(11 * 1024 * 1024)}">`;
     const result = writeDraftSafe({ title: 't', html: `<p>正文</p>${bigImage}` });
     expect(result.ok).toBe(true);
@@ -117,7 +117,7 @@ describe('writeDraftSafe（超限降级）', () => {
     expect(stored).toContain('正文');
   });
 
-  it('纯文本超限（无法降级）返回失败', () => {
+  it('fails when plain text is over the limit and cannot be degraded', () => {
     const result = writeDraftSafe({ title: 't', html: `<p>${'x'.repeat(11 * 1024 * 1024)}</p>` });
     expect(result.ok).toBe(false);
     expect(result.degraded).toBe(false);

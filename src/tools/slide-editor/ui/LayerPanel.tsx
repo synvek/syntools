@@ -4,16 +4,16 @@ import { containerElements, useSlideStore } from '../store';
 import { Section } from './controls';
 
 /**
- * 图层面板（等价于 PowerPoint 的「选择窗格」）。
+ * Layer panel (equivalent to PowerPoint's "Selection Pane").
  *
- * 与 photo-editor 的 LayerPanel 不同，幻灯片的元素是**每页一个扁平数组**，
- * 因此这里刻意保持轻量：不做拖拽排序与编组树，只提供
- * 选中 / 显隐 / 锁定 / 上移下移，够覆盖日常「找不到被压住的元素」的场景。
+ * Unlike photo-editor's LayerPanel, a slide's elements are **one flat array per slide**, so this stays
+ * deliberately light: no drag-to-reorder and no group tree, only select / show-hide / lock / move up
+ * and down, enough for the everyday "I can't find the element underneath" case.
  */
 
 /**
- * 图层行标题：优先展示元素自带的内容（文字、图表标题、公式源码），
- * 其次退回该元素类型在工具栏里的名称。
+ * Layer row title: prefer the element's own content (text, chart title, formula source),
+ * and fall back to the element type's name used in the toolbar.
  */
 function elementLabel(element: SlideElement, t: (key: string) => string): string {
   if (element.type === 'text' || element.type === 'shape') {
@@ -28,7 +28,7 @@ function elementLabel(element: SlideElement, t: (key: string) => string): string
   if (element.type === 'group') return t('tools.slide.group');
   if (element.type === 'line') return t('tools.slide.insertLine');
   if (element.type === 'placeholder') return element.label;
-  // 图表/公式/图标此前会落到「文本框」这个兜底分支，与工具栏的命名口径不一致
+  // Charts/formulas/icons used to fall into the "text box" fallback, inconsistent with the toolbar naming
   if (element.type === 'chart') {
     const title = element.title?.trim();
     return title || t('tools.slide.insertChart');
@@ -47,7 +47,7 @@ export function LayerPanel() {
   const { t } = useTranslation();
   const doc = useSlideStore((s) => s.doc);
   const slideIndex = useSlideStore((s) => s.slideIndex);
-  // 母版视图下图层列表展示的是母版/版式元素，因此统一走容器读取
+  // In master view the layer list shows master/layout elements, so always read through the container
   const viewMode = useSlideStore((s) => s.viewMode);
   const masterKind = useSlideStore((s) => s.masterKind);
   const masterIndex = useSlideStore((s) => s.masterIndex);
@@ -76,7 +76,7 @@ export function LayerPanel() {
   return (
     <Section title={t('tools.slide.panelLayers')}>
       <ul className="flex flex-col gap-1">
-        {/* 顶层在上：与画布的视觉层序一致 */}
+        {/* Top layer first: matches the canvas's visual stacking */}
         {[...elements].reverse().map((element) => {
           const active = selection.includes(element.id);
           const hidden = element.visible === false;

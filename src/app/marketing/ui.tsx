@@ -3,11 +3,11 @@ import { Link } from '@/core/components/LocaleLink';
 import { Icon } from '@/core/components/Icon';
 
 /**
- * 营销与信任页共用的展示件。
+ * Presentation pieces shared by the marketing and trust pages.
  *
- * 这四页（定价 / 安全 / 隐私 / 关于）是给人「读」的，不是给工具用的，
- * 所以排版比工具页更松：正文 15px、行高 1.7、单栏最大 720px，
- * 与预渲染的 `.seo-shell` 骨架保持同一套视觉，避免 JS 加载完成瞬间跳版。
+ * These four pages (pricing / security / privacy / about) are for reading, not for tooling,
+ * so the typography is looser than tool pages: 15px body, 1.7 line height, 720px max column,
+ * matching the prerendered `.seo-shell` so nothing jumps when JS finishes loading.
  */
 
 export function PageShell({
@@ -20,7 +20,7 @@ export function PageShell({
   title: string;
   lead: string;
   aside?: ReactNode;
-  /** 定价页有五档对比表，需要比正文阅读宽度更宽；其余页保持 720px */
+  /** Pricing has a five-tier comparison table needing more than reading width; other pages stay at 720px */
   wide?: boolean;
   children: ReactNode;
 }) {
@@ -53,7 +53,7 @@ export function Section({
   );
 }
 
-/** 勾选列表：用于「这一档包含什么」 */
+/** Check list: what a tier includes */
 export function CheckList({ items }: { items: string[] }) {
   return (
     <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
@@ -70,7 +70,7 @@ export function CheckList({ items }: { items: string[] }) {
   );
 }
 
-/** 段落型说明（安全页大量使用） */
+/** Paragraph-style note (used heavily on security) */
 export function Paragraphs({ items }: { items: string[] }) {
   return (
     <div className="space-y-2 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
@@ -81,7 +81,7 @@ export function Paragraphs({ items }: { items: string[] }) {
   );
 }
 
-/** 定义列表：左窄右宽，适合「策略项 → 它到底限制了谁」 */
+/** Definition list: narrow left, wide right, for "control → who it actually restricts" */
 export function DefinitionList({ items }: { items: { term: string; desc: string }[] }) {
   return (
     <dl className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white text-sm dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900">
@@ -160,10 +160,10 @@ export function PriceCard({ tier }: { tier: PriceTier }) {
 }
 
 /**
- * 档位对比表。
+ * Tier comparison table.
  *
- * 定价页暂时不渲染它 —— 付费档的功能范围仍在规划中，先摆一张「谁有谁没有」的表
- * 等于把没定的差异提前写死。组件留在这里，等差异定稿后重新挂回去即可。
+ * Pricing does not render it yet: paid tiers are still being scoped, and a "who has what" table
+ * would lock in undecided differences. The component stays here, ready to remount once they are final.
  */
 export function CompareTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
   return (
@@ -228,7 +228,7 @@ export function FaqList({ items }: { items: { q: string; a: string }[] }) {
   );
 }
 
-/** 页脚式提示条（与 /download 页的隐私条同款） */
+/** Footer-style notice bar (same as the privacy bar on /download) */
 export function NoteBar({ icon = 'shield', children }: { icon?: string; children: ReactNode }) {
   return (
     <p className="mt-6 flex items-start gap-2 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">

@@ -4,10 +4,10 @@ import { rulerTicks, screenToDoc } from '../core';
 import type { ViewOverlay } from '../model/types';
 
 /**
- * 画布辅助视图：标尺 / 网格 / 参考线（纯 DOM 叠加，不改动 Konva 管线）。
+ * Canvas helper views: rulers / grid / guides (pure DOM overlay, does not touch the Konva pipeline).
  *
- * 关键点：本组件绝对定位在画布宿主之上（inset:0），坐标与 `viewport` 完全一致，
- * 因此不会改变画布的命中与坐标换算；默认全部关闭，避免影响既有交互与测试。
+ * Key point: this component is absolutely positioned over the canvas host (inset:0) and shares `viewport`'s
+ * coordinates exactly, so hit-testing and coordinate mapping are unchanged; all off by default to avoid breaking existing interactions and tests.
  */
 
 const RULER = 20;
@@ -31,7 +31,7 @@ export function CanvasOverlay({
   width: number;
   height: number;
   transform: CanvasTransform;
-  /** 旋转视图角度：网格与参考线随之整体旋转（否则会与画布内容错位） */
+  /** View rotation angle: the grid and guides rotate with it (otherwise they would misalign with the canvas content) */
   viewRotation?: number;
   overlay: ViewOverlay;
   patchOverlay: (patch: Partial<ViewOverlay>) => void;
@@ -46,7 +46,7 @@ export function CanvasOverlay({
     return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
-  /** 屏幕分量 → 文档坐标分量（旋转视图下走完整逆变换，不再按轴线性换算） */
+  /** Screen component → document component (a full inverse transform under rotation, no longer per-axis linear math) */
   const toDocAxis = (axis: 'h' | 'v', screen: number) =>
     Math.round(
       screenToDoc(
@@ -57,7 +57,7 @@ export function CanvasOverlay({
       )[axis === 'v' ? 'x' : 'y'],
     );
 
-  /** 从标尺拖出参考线 */
+  /** Drag a guide out of the ruler */
   const startCreate = (axis: 'h' | 'v') => (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const guides = overlay.guides;
@@ -80,7 +80,7 @@ export function CanvasOverlay({
     window.addEventListener('pointerup', onUp);
   };
 
-  /** 拖动已有参考线；拖回标尺条即删除 */
+  /** Drag an existing guide; dropping it back on the ruler strip deletes it */
   const startMove = (index: number) => (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const guide = overlay.guides[index];
@@ -105,8 +105,8 @@ export function CanvasOverlay({
   return (
     <div ref={rootRef} className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
       {/*
-        网格与参考线是纯 DOM 绘制，无法跟随 Konva 的图层旋转，
-        因此整体套一层「绕视口中心旋转」的容器 —— 旋转锚点与 `stagePosition` 完全一致。
+        The grid and guides are plain DOM drawing and cannot follow Konva's layer rotation,
+        so they are wrapped in a "rotate about the viewport center" container — the anchor matches `stagePosition` exactly.
       */}
       <div
         aria-hidden
@@ -175,7 +175,7 @@ export function CanvasOverlay({
         />
       ) : null}
 
-      {/* 标尺是与屏幕坐标对齐的刻度，旋转后会指向错误方向，故旋转时隐藏 */}
+      {/* Ruler ticks align with screen coordinates and would point the wrong way once rotated, so the ruler hides while rotating */}
       {overlay.rulers && !viewRotation ? (
         <>
           <div

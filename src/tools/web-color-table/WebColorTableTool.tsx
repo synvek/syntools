@@ -14,7 +14,7 @@ import {
 
 const ALL_ROWS = toWebColorRows();
 
-/** Web / CSS 命名颜色对照表 */
+/** Web / CSS named color reference table */
 export default function WebColorTableTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ q: '', g: 'all' }), []);

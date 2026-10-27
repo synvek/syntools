@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 邮件与沟通类提示词，详见 ../README.md */
+/** Email and communication prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'email-business-request',

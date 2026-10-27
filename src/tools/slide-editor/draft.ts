@@ -2,9 +2,9 @@ import { migrateDoc } from './model/migrate';
 import type { MediaAsset, SlideDoc } from './model/types';
 
 /**
- * 本地草稿（不离开浏览器）：
- * 图片以 base64 内联，但总量超过 DRAFT_MEDIA_LIMIT 时丢弃字节，
- * 保证 localStorage 不被撑爆（恢复时这类图片显示为空白占位）。
+ * Local draft (never leaves the browser):
+ * images are inlined as base64, but once the total exceeds DRAFT_MEDIA_LIMIT their bytes are dropped so
+ * localStorage doesn't blow up (such images show as blank placeholders when restored).
  */
 
 const DRAFT_KEY = 'syntools:slide-editor.draft.v1';
@@ -69,7 +69,7 @@ function restore(raw: string): SlideDraft | null {
       bytes: entry.data ? base64ToBytes(entry.data) : undefined,
     };
   }
-  // 旧草稿（写入时还是 v1 schema）在此升到当前 schema
+  // Old drafts (written under the v1 schema) are upgraded to the current schema here
   return { doc: migrateDoc({ ...doc, media }), savedAt: parsed.savedAt ?? Date.now() };
 }
 
@@ -96,6 +96,6 @@ export function clearDraft(): void {
   try {
     localStorage.removeItem(DRAFT_KEY);
   } catch {
-    // localStorage 不可用时忽略
+    // Ignore when localStorage isn't available
   }
 }

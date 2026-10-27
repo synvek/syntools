@@ -29,7 +29,7 @@ export default function AudioConvertTool() {
   const [bitDepth, setBitDepth] = useState<BitDepth>(16);
   const [quality, setQuality] = useState<MediaQuality>('medium');
 
-  /** 当前浏览器能产出的目标格式；null 表示尚未探测完 */
+  /** Target formats the current browser can produce; null means detection has not finished */
   const [supported, setSupported] = useState<MediaTarget[] | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [result, setResult] = useState<{ blob: Blob; name: string } | null>(null);
@@ -75,7 +75,7 @@ export default function AudioConvertTool() {
     }
   };
 
-  /** WAV 精修：走浏览器原生 Web Audio 解码 + 自研 PCM 编码，可精确控制位深 */
+  /** WAV fine-tuning: decode with the browser's native Web Audio and run our own PCM encoder for exact bit-depth control */
   const convertToWav = async (source: File) => {
     const arrayBuffer = await source.arrayBuffer();
     const AudioCtx =

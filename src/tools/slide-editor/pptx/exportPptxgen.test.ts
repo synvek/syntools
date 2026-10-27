@@ -13,10 +13,10 @@ import { exportPptxPptxGen } from './exportPptxgen';
 import { importPptxFile } from './import';
 
 /**
- * pptxgenjs 通道的结构性断言。
+ * Structural assertions for the pptxgenjs channel.
  *
- * 这里不比较 XML 细节（那是 legacy 通道的事），只保证：
- * 包体合法、部件齐全、图表/母版/备注/背景等关键能力真的写进去了。
+ * XML details aren't compared here (that's the legacy channel's job); this only guarantees:
+ * a valid package, all parts present, and that charts/masters/notes/background really are written.
  */
 
 function sampleDoc(): SlideDoc {
@@ -86,7 +86,7 @@ describe('pptxgenjs 导出通道', () => {
     doc.masters[0].elements = [createTextElement(doc, '母版页脚')];
     doc.masters[0].background = '#123456';
     const { zip } = await zipped(doc);
-    // pptxgenjs 的 defineSlideMaster 把 objects 写进它新建的 slideLayout 部件
+    // pptxgenjs's defineSlideMaster writes objects into the slideLayout part it creates
     const layouts = Object.keys(zip.files).filter((name) =>
       /^ppt\/slideLayouts\/slideLayout\d+\.xml$/.test(name),
     );
@@ -126,7 +126,7 @@ describe('pptxgenjs 导出通道', () => {
     );
     expect(charts.length).toBeGreaterThan(0);
     const chart = (await zip.file(charts[0])?.async('string')) ?? '';
-    // 原生图表必须带类别与数值缓存，否则 PowerPoint 里无法编辑数据
+    // Native charts must carry category and value caches, or PowerPoint can't edit the data
     expect(chart).toContain('c:cat');
     expect(chart).toContain('c:val');
     expect(chart).toContain('Series 1');

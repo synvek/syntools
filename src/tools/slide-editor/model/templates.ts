@@ -2,26 +2,26 @@ import { createId } from './factory';
 import type { SlideElement, SlideLayout, SlideMaster, SlideTheme, TextBody } from './types';
 
 /**
- * 本地模板库：纯数据、无联网、无外部资源。
+ * Local template library: pure data, no network, no external assets.
  *
- * 每套模板 = 一套主题（12 色 + 中西文主副字体）+ 一个母版 + 若干版式。
- * 实例化时复用 `SlideMaster` / `SlideLayout` 既有结构，与手工创建的文档完全一致，
- * 因此能走同一条导出链路（母版/版式现在会被写回 pptx）。
+ * Each template = one theme (12 colors + Latin/CJK major and minor fonts) + one master + several layouts.
+ * Instantiation reuses the existing `SlideMaster` / `SlideLayout` structures, so the result is identical to a
+ * hand-built document and takes the same export path (masters/layouts are now written back to pptx).
  */
 
 export interface SlideTemplate {
   id: string;
-  /** i18n 键后缀：tools.slide.tpl<Name> */
+  /** i18n key suffix: tools.slide.tpl<Name> */
   nameKey: string;
-  /** 画廊分组：商务 / 科技 / 学术 / 教育 / 简约 / 创意 */
+  /** Gallery group: business / tech / academic / education / minimal / creative */
   category: string;
   theme: SlideTheme;
-  /** 母版公共元素（Logo / 页码等） */
+  /** Master shared elements (logo / slide number, etc.) */
   masterElements: SlideElement[];
   layouts: { name: string; key: string; elements: SlideElement[] }[];
 }
 
-/** 页面基准尺寸（与 createDoc 默认一致） */
+/** Base page size (same as the createDoc default) */
 const W = 1280;
 const H = 720;
 
@@ -55,7 +55,7 @@ function textBox(
   return { id: createId('el'), type: 'text', x, y, width, height, body: content };
 }
 
-/** 通用六版式：标题页 / 标题+内容 / 两栏 / 章节 / 引用 / 空白 */
+/** Standard six layouts: title / title+content / two-column / section / quote / blank */
 function standardLayouts(tx: string, txSoft: string): SlideTemplate['layouts'] {
   return [
     {
@@ -285,7 +285,7 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
     layouts: standardLayouts('#2B0E14', '#5C2A34'),
   },
 
-  /* ── 第二批：中文商务 / 学术 / 科技 / 教育 / 极简 / 创意 ── */
+  /* ── Second batch: Chinese business / academic / tech / education / minimal / creative ── */
   {
     id: 'teal-trust',
     nameKey: 'TealTrust',
@@ -477,12 +477,12 @@ export const SLIDE_TEMPLATES: SlideTemplate[] = [
   },
 ];
 
-/** 画廊分组（顺序即展示顺序，取模板中实际出现过的分类去重） */
+/** Gallery groups (order = display order; de-duplicated from categories actually present in templates) */
 export const TEMPLATE_CATEGORIES: string[] = Array.from(
   new Set(SLIDE_TEMPLATES.map((template) => template.category)),
 );
 
-/** 画廊卡片的配色预览（取主题里最能代表风格的四色） */
+/** Color preview for a gallery card (the four colors that best represent the theme) */
 export function templateSwatch(template: SlideTemplate): string[] {
   const { colors } = template.theme;
   return ['accent1', 'accent2', 'accent3', 'accent4']
@@ -494,7 +494,7 @@ export function findTemplate(id: string): SlideTemplate | undefined {
   return SLIDE_TEMPLATES.find((template) => template.id === id);
 }
 
-/** 模板 → 可写入 doc 的母版/版式（id 全部新建，避免与既有文档冲突） */
+/** Template → master/layouts writable into a doc (all ids are new, to avoid clashing with the current document) */
 export function instantiateTemplate(template: SlideTemplate): {
   theme: SlideTheme;
   masters: SlideMaster[];

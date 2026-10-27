@@ -27,7 +27,7 @@ describe('useDebouncedValue', () => {
     act(() => vi.advanceTimersByTime(60));
     rerender({ v: '123' });
     act(() => vi.advanceTimersByTime(60));
-    // 第二次输入重置了计时器，此时仍未更新
+    // The second input reset the timer, so nothing has updated yet
     expect(result.current).toBe('1');
     act(() => vi.advanceTimersByTime(40));
     expect(result.current).toBe('123');

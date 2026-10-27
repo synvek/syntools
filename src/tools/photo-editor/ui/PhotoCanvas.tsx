@@ -27,52 +27,52 @@ import { CanvasOverlay } from './CanvasOverlay';
 import { CanvasScrollbars } from './CanvasScrollbars';
 
 /**
- * 画布宿主：命令式托管 Konva Stage。
+ * Canvas host: imperatively owns the Konva Stage.
  *
- * 三条约定（与 slide-editor 的 SlideCanvas 一致）：
- * 1. Stage 延后一拍创建，规避 React 18 StrictMode 双挂载；
- * 2. 容器原生事件负责交互（Konva 节点 listening: false），统一做「屏幕 → 文档」坐标换算；
- * 3. 双击文字图层 → 叠一个 DOM textarea 做就地编辑。
+ * Three conventions (same as the slide editor's SlideCanvas):
+ * 1. The Stage is created one tick late, dodging React 18 StrictMode's double mount;
+ * 2. Native container events drive interaction (Konva nodes listening: false), with one screen → document map;
+ * 3. Double-clicking a text layer overlays a DOM textarea for in-place editing.
  */
-/** 视口变换落到 DOM 属性上：便于 e2e 断言缩放 / 平移 */
+/** Mirror the viewport transform onto DOM attributes, so e2e can assert zoom / pan */
 function markTransform(
   host: HTMLElement,
   transform: { scale: number; x: number; y: number; rotation?: number },
 ) {
   host.dataset.transform = `${transform.scale.toFixed(4)},${Math.round(transform.x)},${Math.round(transform.y)}`;
-  // 旋转单独放一个属性：`data-transform` 的格式被既有 e2e 断言依赖，不能改
+  // Rotation gets its own attribute: existing e2e assertions depend on the `data-transform` format
   if (transform.rotation) host.dataset.viewRotation = String(transform.rotation);
   else delete host.dataset.viewRotation;
 }
 
-/** 适配时四周留白 */
+/** Padding left around the canvas when fitting */
 const FIT_PADDING = 28;
-/** 滚轮滚动的位移系数（与 React Flow 的 panOnScrollSpeed 对齐） */
+/** Wheel scroll displacement factor (aligned with React Flow's panOnScrollSpeed) */
 const SCROLL_SPEED = 0.9;
 
-/** 容器尺寸（未布局完成时回退为 0，交由守卫处理） */
+/** Container size (0 before layout completes; the guards handle that) */
 function hostSize(host: HTMLElement | null): { width: number; height: number } {
   return { width: host?.clientWidth ?? 0, height: host?.clientHeight ?? 0 };
 }
 
-/** 判定类 Mac 平台：用于 Shift+滚轮 / ⌘+滚轮 的差异化处理 */
+/** Mac detection, used to branch Shift+wheel / ⌘+wheel handling */
 function isMacLike(): boolean {
   if (typeof navigator === 'undefined') return false;
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
 }
-/** 容器小于此尺寸视为「尚未完成布局」，不参与适配计算 */
+/** A container smaller than this counts as "not laid out yet" and is skipped by fit calculations */
 const MIN_HOST_SIZE = 64;
 
 /**
- * 组装一次覆盖层绘制所需的全部状态。
+ * Assemble all the state one overlay draw needs.
  *
- * 抽成模块级函数的原因：React 副作用与「像素变化后的合帧刷新」（画笔改写快速蒙版）两条路径
- * 都要重画覆盖层，两处若各写一份，很容易出现「加了新覆盖物只更新了一边」的漏改。
+ * It is module-level because both the React effect and the "coalesced redraw after pixel changes" path
+ * (the brush rewriting the quick mask) must redraw the overlay; two copies would inevitably drift apart.
  */
 function buildOverlayState(scale: number): OverlayState {
   const state = usePhotoStore.getState();
   const active = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
-  // 变换框与网格控制点由「图层 + 变换模式」决定，交互层用同一函数算，两边不会出现不一致
+  // The transform box and mesh points derive from "layer + transform mode"; interaction uses the same helper
   const overlay =
     state.tool === 'transform' && active
       ? transformOverlayFor(active, state.transformMode)
@@ -86,10 +86,10 @@ function buildOverlayState(scale: number): OverlayState {
     quickMask: state.quickMask ? (getCanvas(state.quickMask.assetId) ?? null) : null,
     transformBox: overlay.transformBox,
     meshGrid: overlay.meshGrid,
-    // 取样源标记只在与「取样点」相关的工具下显示，避免长期占据画面
+    // The sample-source marker only shows for sample-related tools, so it doesn't hog the canvas
     cloneSource: needsCloneSource(state.tool) ? state.cloneSource : null,
     snapGuides: state.snapGuides,
-    // 渐变示意由交互层按需覆盖（本组件只负责「清干净」）
+    // The gradient preview is overridden on demand by interaction (this component only clears it)
     gradient: null,
   };
 }
@@ -105,7 +105,7 @@ export function PhotoCanvas({
   onCursorMove: (point: { x: number; y: number } | null) => void;
   onContextMenu: (position: { x: number; y: number }) => void;
   onPickColor: (picked: PickedColor | null) => void;
-  /** 新建文字图层的默认内容（当前语言） */
+  /** Default content for a new text layer (active locale) */
   defaultText: string;
 }) {
   const { t } = useTranslation();
@@ -114,7 +114,7 @@ export function PhotoCanvas({
   const handleRef = useRef<StageHandle | null>(null);
   const editorRef = useRef<TextEditorHandle | null>(null);
   const transformRef = useRef({ scale: 1, x: 0, y: 0 });
-  /** 视口像素尺寸：滚动条几何依赖它，由 ResizeObserver 同步 */
+  /** Viewport pixel size: scrollbar geometry depends on it; kept in sync by the ResizeObserver */
   const [hostRect, setHostRect] = useState({ width: 0, height: 0 });
 
   const doc = usePhotoStore((s) => s.doc);
@@ -131,7 +131,7 @@ export function PhotoCanvas({
   const snapGuides = usePhotoStore((s) => s.snapGuides);
   const viewRotation = usePhotoStore((s) => s.viewRotation);
 
-  // 父组件每次渲染都会传入新函数：用 ref 承接，避免它进入副作用依赖导致 Stage 反复重建
+  // The parent passes a new function each render: hold it in a ref so effects don't rebuild the Stage
   const onRuntimeFailureRef = useRef(onRuntimeFailure);
   onRuntimeFailureRef.current = onRuntimeFailure;
   const onCursorMoveRef = useRef(onCursorMove);
@@ -143,7 +143,7 @@ export function PhotoCanvas({
   const defaultTextRef = useRef(defaultText);
   defaultTextRef.current = defaultText;
 
-  /** 把「未旋转的视口」写到画布上：图层位置经旋转换算，`transformRef` 始终保留未旋转值 */
+  /** Apply the unrotated viewport: the layer position is rotated while `transformRef` keeps the unrotated values */
   const pushTransform = useCallback((rotation: number) => {
     const handle = handleRef.current;
     const host = canvasRef.current;
@@ -155,10 +155,10 @@ export function PhotoCanvas({
   }, []);
 
   /**
-   * 应用视口变换（挂载、容器尺寸变化、用户缩放共用同一份逻辑）。
-   * - `scale === 0` 是「待适配」哨兵值：按容器算一次 fit **并写回 store**，工具栏才显示真实比例；
-   * - 容器尚未完成布局（宽或高过小）时直接放弃，等 ResizeObserver 下一次回调再算，
-   *   避免把「0 尺寸下算出的极小比例」当成用户缩放固定下来。
+   * Apply the viewport transform (one code path for mount, container resize and user zoom).
+   * - `scale === 0` is the "needs fit" sentinel: fit to the container **and write back to the store**, so the
+   *   toolbar shows the real ratio; when the container isn't laid out yet (width or height too small), bail
+   *   out and wait for the next ResizeObserver callback instead of freezing a tiny ratio computed at size 0.
    */
   const applyTransform = useCallback(() => {
     const handle = handleRef.current;
@@ -176,16 +176,16 @@ export function PhotoCanvas({
     let y = state.viewport.y;
 
     if (nextScale <= 0) {
-      // 待适配：算出比例并居中，一次写回 store（此后 x / y 就是权威值，不再用「0 即未设置」的隐式约定）
+      // Needs fit: compute the ratio and center, writing back once (x / y become authoritative from then on)
       nextScale = computeFitScale(state.doc, { width, height }, FIT_PADDING, rotation);
-      // 居中要按「旋转后的外接框」算，否则旋转视图下画布会偏出视口
+      // Centering uses the rotated bounds, or a rotated view pushes the canvas off the viewport
       const bounds = rotatedDocBounds(state.doc, rotation);
       x = Math.max(0, (width - bounds.width * nextScale) / 2);
       y = Math.max(0, (height - bounds.height * nextScale) / 2);
       state.setScale(nextScale);
       state.setViewport({ x, y });
     } else if (prev.scale > 0 && Math.abs(prev.scale - nextScale) > 0.0005) {
-      // 用户缩放：保持视口中心对应的文档坐标不变（否则每次缩放都会往左上角跑）
+      // User zoom: keep the document point at the viewport center fixed (or it drifts to the top-left)
       const centerX = (width / 2 - prev.x) / prev.scale;
       const centerY = (height / 2 - prev.y) / prev.scale;
       x = width / 2 - centerX * nextScale;
@@ -193,7 +193,7 @@ export function PhotoCanvas({
       state.setViewport({ x, y });
     }
 
-    // 统一钳制进可滚动世界：滚动条滑块位置与画布内容才始终对得上
+    // Clamp into the scrollable world so the scrollbar thumb always matches the canvas content
     const bounded = clampViewport(
       { x, y, scale: nextScale },
       state.doc,
@@ -205,7 +205,7 @@ export function PhotoCanvas({
     pushTransform(rotation);
   }, [pushTransform]);
 
-  /** 抓手平移：直接把变换写进画布，不等 React 渲染（平移是高频连续操作） */
+  /** Hand pan: write the transform to the canvas directly, without waiting for React (panning is continuous) */
   const applyPan = useCallback(
     (x: number, y: number) => {
       transformRef.current = { ...transformRef.current, x, y };
@@ -214,7 +214,7 @@ export function PhotoCanvas({
     [pushTransform],
   );
 
-  /** 应用视口（平移 + 缩放）：立即落画布并写回 store，滚动条随之更新 */
+  /** Apply the viewport (pan + zoom): update the canvas now and write back to the store so scrollbars follow */
   const applyViewport = useCallback(
     (next: { scale: number; x: number; y: number }) => {
       const host = canvasRef.current;
@@ -235,7 +235,7 @@ export function PhotoCanvas({
     [pushTransform],
   );
 
-  /** 滚动条拖动 / 点轨道：世界坐标 → 视口平移 */
+  /** Scrollbar drag / track click: world coordinates → viewport pan */
   const scrollTo = useCallback(
     (left: number, top: number) => {
       const state = usePhotoStore.getState();
@@ -246,9 +246,9 @@ export function PhotoCanvas({
   );
 
   /**
-   * 滚轮（对齐流程图编辑器的行为）：
-   * - 普通滚轮 = 上下/左右滚动（Shift + 滚轮在非 Mac 上转成横向）；
-   * - Ctrl / ⌘ + 滚轮 = 以光标为锚点缩放。
+   * Wheel (matching the flowchart editor's behavior):
+   * - plain wheel = vertical / horizontal scroll (Shift + wheel turns horizontal off Mac);
+   * - Ctrl / ⌘ + wheel = zoom anchored at the cursor.
    */
   const handleWheel = useCallback(
     (event: WheelEvent) => {
@@ -261,7 +261,7 @@ export function PhotoCanvas({
 
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
-        // 指数步进：一格滚轮（约 100px）≈ 15%，单次最多 2 倍，避免一档就顶到上限
+        // Exponential step: one notch (about 100px) ≈ 15%, capped at 2× per event so one notch can't max out
         const exponent = Math.max(
           -1,
           Math.min(1, -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002)),
@@ -353,9 +353,9 @@ export function PhotoCanvas({
     const cleanupRefs: (() => void)[] = [];
 
     /**
-     * 像素变化后的重绘：用 rAF 合帧。
-     * 落笔时 pointermove 可能一帧来好几次，逐次重烘焙（含卷积滤镜）会掉帧；
-     * 合到每帧一次既保证「边画边显示」，又把成本压在 1 次烘焙 / 帧。
+     * Redraw after pixel changes: coalesce into one rAF frame.
+     * While painting, pointermove can fire several times per frame, and rebaking each time (convolution
+     * filters included) would drop frames; once per frame keeps live feedback at one bake per frame.
      */
     let surfaceFrame: number | null = null;
     const flushSurface = () => {
@@ -366,7 +366,7 @@ export function PhotoCanvas({
       const layer = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
       if (layer) refreshLayerNode(current.contentLayer, layer, true);
       else current.contentLayer.batchDraw();
-      // 画笔也可能改写「快速蒙版」这类非图层内容，这里顺带把覆盖层合到同一帧（节点数很少）
+      // The brush can also rewrite non-layer content (the quick mask), so fold the overlay into the same frame
       current.renderOverlay(buildOverlayState(transformRef.current.scale));
     };
     const onSurfaceChange = () => {
@@ -431,7 +431,7 @@ export function PhotoCanvas({
     const onPointerLeave = () => onCursorMoveRef.current(null);
     canvas.addEventListener('pointermove', onPointerMoveForCursor);
     canvas.addEventListener('pointerleave', onPointerLeave);
-    // passive: false —— 需要 preventDefault 阻止浏览器整页滚动 / 缩放
+    // passive: false — preventDefault is needed to stop the browser from scrolling / zooming the page
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     cleanupRefs.push(() => canvas.removeEventListener('wheel', handleWheel));
 
@@ -461,13 +461,13 @@ export function PhotoCanvas({
     };
   }, [applyTransform, applyPan, handleWheel]);
 
-  // 光标随工具变化（CSS 里按 data-tool 匹配），让「当前工具」在画布上也有反馈
+  // The cursor follows the tool (CSS matches on data-tool), giving the active tool feedback on the canvas
   useEffect(() => {
     const host = canvasRef.current;
     if (host) host.dataset.tool = tool;
   }, [tool]);
 
-  // 画布尺寸 / 背景 / 缩放变化：只重设变换与背景，不重建节点
+  // Canvas size / background / zoom changed: reset transform and background only, never rebuild nodes
   useEffect(() => {
     const handle = handleRef.current;
     if (!handle) return;
@@ -475,7 +475,7 @@ export function PhotoCanvas({
     handle.renderBackground(usePhotoStore.getState().doc);
   }, [doc.width, doc.height, doc.background, scale, viewRotation, applyTransform]);
 
-  // 文档变化（增删改图层 / 调整参数）：增量同步节点
+  // Document changed (layers added / removed / edited, parameters adjusted): sync nodes incrementally
   useEffect(() => {
     const handle = handleRef.current;
     if (!handle) return;
@@ -484,11 +484,11 @@ export function PhotoCanvas({
   }, [doc]);
 
   /**
-   * 异步全分辨率烘焙完成：把结果写回烘焙缓存并重绘。
+   * An async full-resolution bake finished: write the result into the bake cache and redraw.
    *
-   * 只在「当前文档确实还需要这个签名」时才接受 —— 预热任务是防抖后触发的，
-   * 期间用户可能已经撤销 / 改参数 / 落笔改像素，旧签名的结果写进缓存会让
-   * 之后（例如撤销回同一 rev）取到与签名不符的像素。
+   * Accept it only if the current document still wants that signature: prewarm tasks are debounced, and
+   * meanwhile the user may have undone / changed parameters / painted, so caching a stale signature would
+   * later (e.g. after undoing back to the same rev) hand out pixels that don't match the signature.
    */
   useEffect(() => {
     return onBakeReady((signature, bitmap) => {
@@ -514,8 +514,8 @@ export function PhotoCanvas({
   }, []);
 
   /**
-   * 通道隔离视图（显示态）：合成分离通道图覆盖到画布，并隐藏图层栈；
-   * 回到 `rgb` 时恢复。只改显示、不动文档，因此不进历史。
+   * Channel isolation view (display state): composite the isolated channel over the canvas and hide the stack;
+   * switching back to `rgb` restores it. Display only, never the document, so it stays out of history.
    */
   useEffect(() => {
     const handle = handleRef.current;
@@ -527,7 +527,7 @@ export function PhotoCanvas({
     handle.setChannelView(channelViewCanvas(doc, channelView));
   }, [channelView, doc]);
 
-  // 覆盖层（选区 / 裁剪框 / 自由变换框）：三者在同一次绘制里重画，避免互相清空
+  // Overlay (selection / crop box / transform box): all three redraw in one pass so they don't wipe each other
   useEffect(() => {
     const handle = handleRef.current;
     if (!handle) return;

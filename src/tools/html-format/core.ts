@@ -2,15 +2,15 @@ import beautify from 'js-beautify';
 import type { ToolResult } from '@/core/types';
 
 /**
- * HTML 压缩 / 格式化：格式化走 js-beautify，压缩为轻量本地实现（避免引入 html-minifier-terser/terser）。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译。
+ * HTML minify / format: formatting uses js-beautify, minification is a lightweight local implementation (avoiding html-minifier-terser/terser).
+ * Error codes are decoupled from copy: core returns language-neutral codes that the UI translates via i18n.
  */
 
 export type HtmlErrorCode = 'EMPTY' | 'INVALID';
 export type IndentSize = 2 | 4;
 export type HtmlAction = 'format' | 'compress';
 
-/** 压缩：去掉注释、折叠标签间空白；保留 pre/textarea/script/style 内容 */
+/** Minify: drop comments and collapse whitespace between tags, leaving pre/textarea/script/style content intact */
 export function minifyHtml(input: string): string {
   const blocks: string[] = [];
   const preserved = input.replace(
@@ -26,7 +26,7 @@ export function minifyHtml(input: string): string {
     .replace(/>\s+</g, '><')
     .replace(/^\s+|\s+$/g, '')
     .replace(/\s{2,}/g, ' ');
-  // 再次折叠因占位符两侧残留的空白
+  // Collapse the whitespace left on either side of the placeholders
   result = result.replace(/>\s+/g, '>').replace(/\s+</g, '<');
   // eslint-disable-next-line no-control-regex -- sentinel placeholders use NUL delimiters
   result = result.replace(/\u0000BLOCK(\d+)\u0000/g, (_, i) => blocks[Number(i)]);

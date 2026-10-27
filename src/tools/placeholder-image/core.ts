@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 占位图参数校验（实际绘制在 UI canvas）。
+ * Placeholder parameter validation (actual drawing happens on a UI canvas).
  */
 
 export type PlaceholderError = 'INVALID_SIZE' | 'INVALID_COLOR';

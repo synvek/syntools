@@ -4,30 +4,30 @@ import { compositeDoc } from './export';
 import type { PhotoDoc, Selection, SelectionPart } from '../model/types';
 
 /**
- * 选区增强：布尔运算、形态学修改、魔棒与快速选择。
+ * Selection extras: boolean ops, morphological edits, magic wand and quick select.
  *
- * 设计取舍（重要）：
- * - **并集 / 差集走矢量路径**（`unionSelection` / `subtractSelection`）：直接追加轮廓并翻转方向，
- *   由 nonzero 填充得到精确结果，无精度损失。
- * - **交集 / 形态学 / 魔棒走栅格路径**：把区域栅格化到受限分辨率（`MAX_WORK`）后做像素运算，
- *   再用「逐行左右边界」提取多边形。该提取得到的是**列单调外轮廓**——对矩形 / 椭圆 / 常规套索
- *   是精确的，对带凹口或空洞的区域会把它填实（近似）。这是为回避通用多边形裁剪与轮廓跟踪
- *   而做的工程折中，已在路线图中登记为后续可优化项。
+ * Design trade-off (important):
+ * - **union / difference go through vectors** (`unionSelection` / `subtractSelection`): append outlines and
+ *   flip their direction, so nonzero fill gives an exact result with no loss of precision.
+ * - **intersection / morphology / magic wand go through rasters**: quantize to a capped size (`MAX_WORK`),
+ *   do pixel math, then extract polygons from per-row left / right bounds. That gives a **column-monotone
+ *   outline**: exact for rects / ovals / normal lassos, but notches and holes get filled in (approximate).
+ *   This avoids general polygon clipping and contour tracing; it is logged as a future optimization.
  */
 
-/** 布尔运算种类 */
+/** Boolean op kind */
 export type SelectionOp = 'replace' | 'add' | 'subtract' | 'intersect';
 
-/** 形态学修改种类 */
+/** Morphological edit kind */
 export type SelectionModify = 'expand' | 'contract' | 'smooth';
 
-/** 栅格运算的最大边长：限制 4096² 画布的开销 */
+/** Max raster side: bounds the cost on a 4096² canvas */
 const MAX_WORK = 1024;
 
 interface Grid {
   width: number;
   height: number;
-  /** 文档坐标 → 栅格坐标的比例 */
+  /** Scale from document coordinates to raster coordinates */
   scale: number;
 }
 
@@ -40,7 +40,7 @@ function makeGrid(doc: { width: number; height: number }): Grid {
   };
 }
 
-/** 选区（可空）→ 二值掩码 */
+/** Selection (may be null) → binary mask */
 export function selectionToMask(selection: Selection | null, grid: Grid): Uint8Array {
   const canvas = createCanvasElement(grid.width, grid.height);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -58,8 +58,8 @@ export function selectionToMask(selection: Selection | null, grid: Grid): Uint8A
 }
 
 /**
- * 掩码 → 多边形（文档坐标）。
- * 取「每行的最左 / 最右前景像素」作为左右边界，沿左边下行、再沿右边上行闭合成一条简单多边形。
+ * Mask → polygon (document coordinates).
+ * Leftmost / rightmost foreground pixels bound each row: walk down the left, up the right, and close.
  */
 export function maskToPolygon(mask: Uint8Array, grid: Grid, minDistance = 1.5): number[] | null {
   const left = new Int32Array(grid.height).fill(-1);
@@ -95,7 +95,7 @@ export function maskToPolygon(mask: Uint8Array, grid: Grid, minDistance = 1.5): 
   return simplified.length >= 6 ? simplified : null;
 }
 
-/** 多边形 → 选区（lasso） */
+/** Polygon → selection (lasso) */
 export function selectionFromPolygon(polygon: number[], feather = 0): Selection {
   const simplified = simplifyPath(polygon, 1.5);
   const bounds = polygonBounds(simplified);
@@ -110,7 +110,7 @@ export function selectionFromPolygon(polygon: number[], feather = 0): Selection 
   };
 }
 
-/** 按运算类型合并选区（`replace` 直接替换，其余与当前选区做布尔运算） */
+/** Combine by op kind (`replace` swaps outright; the others run a boolean against the current selection) */
 export function applySelectionOp(
   base: Selection | null,
   next: Selection,
@@ -129,21 +129,21 @@ export function applySelectionOp(
   }
 }
 
-/** 并集：直接追加轮廓（nonzero 填充下精确取并） */
+/** Union: append outlines directly (exact under nonzero fill) */
 export function unionSelection(base: Selection | null, next: Selection): Selection {
   if (!base) return next;
   const parts: SelectionPart[] = [...(base.parts ?? []), ...selectionContours(next)];
   return { ...base, parts };
 }
 
-/** 差集：把新选区的轮廓反向追加（nonzero 下即从原选区中挖掉） */
+/** Difference: append the new outlines reversed (under nonzero that carves them out) */
 export function subtractSelection(base: Selection | null, next: Selection): Selection | null {
   if (!base) return null;
   const parts: SelectionPart[] = [
     ...(base.parts ?? []),
     ...selectionContours(next).map((contour) => ({ path: contour.path, add: !contour.add })),
   ];
-  // 用包围盒判断是否已完全减空（避免留下空选区）
+  // Check the bounds to see if it subtracted everything (avoids leaving an empty selection)
   const probe = { ...base, parts };
   const grid = makeGrid({
     width: Math.max(1, base.x + base.width),
@@ -153,7 +153,7 @@ export function subtractSelection(base: Selection | null, next: Selection): Sele
   return mask.some((value) => value === 1) ? { ...base, parts } : null;
 }
 
-/** 交集：栅格化后按像素取与，再提取轮廓（近似） */
+/** Intersection: rasterize, AND the pixels, then extract outlines (approximate) */
 export function intersectSelection(
   base: Selection | null,
   next: Selection,
@@ -170,9 +170,9 @@ export function intersectSelection(
 }
 
 /**
- * 形态学修改（栅格）：
- * - expand / contract：按半径做「正方形结构元」的膨胀 / 腐蚀（分离轴两趟，近似圆盘）
- * - smooth：先膨胀再腐蚀（闭运算先填小凹，再腐蚀去毛刺）
+ * Morphological edits (raster):
+ * - expand / contract: dilate / erode with a square structuring element by radius (two separable passes)
+ * - smooth: dilate then erode (a closing fills small notches, then eroding removes the fringe)
  */
 export function modifySelection(
   selection: Selection,
@@ -198,7 +198,7 @@ export function modifySelection(
   return polygon ? selectionFromPolygon(polygon, fallbackFeather || selection.feather) : null;
 }
 
-/** 水平方向膨胀 */
+/** Horizontal dilation */
 function dilate(mask: Uint8Array, grid: Grid, radius: number): Uint8Array {
   const out = new Uint8Array(mask.length);
   const sums = new Int32Array(grid.width);
@@ -218,7 +218,7 @@ function dilate(mask: Uint8Array, grid: Grid, radius: number): Uint8Array {
       if (total > 0) out[row + x] = 1;
     }
   }
-  // 垂直方向
+  // Vertical pass
   const result = new Uint8Array(mask.length);
   for (let x = 0; x < grid.width; x += 1) {
     let running = 0;
@@ -239,7 +239,7 @@ function dilate(mask: Uint8Array, grid: Grid, radius: number): Uint8Array {
   return result;
 }
 
-/** 水平方向腐蚀（= 背景膨胀后取反） */
+/** Horizontal erosion (= invert, dilate the background, invert back) */
 function erode(mask: Uint8Array, grid: Grid, radius: number): Uint8Array {
   const inverted = new Uint8Array(mask.length);
   for (let i = 0; i < mask.length; i += 1) inverted[i] = mask[i] ? 0 : 1;
@@ -251,13 +251,13 @@ function erode(mask: Uint8Array, grid: Grid, radius: number): Uint8Array {
 
 export interface WandOptions {
   tolerance: number;
-  /** true = 只取连通区域；false = 全图同色区域 */
+  /** true = connected region only; false = same-colored areas across the whole image */
   contiguous: boolean;
 }
 
 /**
- * 魔棒：以 (x, y) 处像素为基准，按容差选出同色区域。
- * 在受限分辨率的合成图上取样（所见即所得），返回近似外轮廓选区。
+ * Magic wand: sample the pixel at (x, y) and select same-colored areas within the tolerance.
+ * Sampling happens on the capped-resolution composite (what you see), returning an approximate outline.
  */
 export function magicWandSelection(
   doc: PhotoDoc,

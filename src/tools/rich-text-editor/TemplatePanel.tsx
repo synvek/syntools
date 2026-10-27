@@ -3,13 +3,13 @@ import { Icon } from '@/core/components/Icon';
 import { DOCUMENT_TEMPLATES, type DocumentTemplate } from './templates';
 
 interface TemplatePanelProps {
-  /** 当前已套用的模板 id */
+  /** Id of the currently applied template */
   activeId?: string;
   onApply: (template: DocumentTemplate) => void;
   onClose: () => void;
 }
 
-/** 页面设置摘要：纸张 / 方向 / 边距 / 分栏，让用户在套用前就能判断版式 */
+/** Page setup summary: paper / orientation / margins / columns, so users can judge the layout before applying */
 function summarize(
   template: DocumentTemplate,
   labels: {
@@ -34,8 +34,8 @@ function summarize(
 }
 
 /**
- * 模板面板：卡片式列表，左侧为版式摘要，右侧为名称与描述，主按钮「套用」。
- * 套用前面板会先确认（避免覆盖正在编辑的内容），确认逻辑由工具层负责。
+ * Template panel: a card list with the layout summary on the left, name and description on the right, and an "Apply" primary button.
+ * The panel confirms before applying (to protect work in progress); the tool layer owns that logic.
  */
 export function TemplatePanel({ activeId, onApply, onClose }: TemplatePanelProps) {
   const { t } = useTranslation();

@@ -1,10 +1,10 @@
 /**
- * 基于 dagre 的层次化自动布局。
+ * Hierarchical auto-layout powered by dagre.
  *
- * 两段式（默认开启 `preserveContainers`）：
- * 1. 先在每个容器（泳道 / 编组）内部独立排版，并让容器按内容自适应尺寸；
- * 2. 再把「容器 + 游离节点」当作一个整体排版。
- * 这样自动布局不再需要解除泳道归属，容器层级与内部相对坐标都会被保留。
+ * Two-pass (with `preserveContainers` enabled by default):
+ * 1. Lay out each container (swimlane / group) independently and let the container resize to fit its content;
+ * 2. Then lay out "containers + free nodes" as one unit.
+ * Auto-layout therefore no longer needs to dissolve swimlane ownership; container hierarchy and inner relative coordinates are kept.
  */
 
 import dagre from '@dagrejs/dagre';
@@ -21,20 +21,20 @@ import { shapeSize } from './model/shapes';
 export type LayoutDirection = 'TB' | 'BT' | 'LR' | 'RL';
 
 export interface LayoutOptions {
-  /** 布局方向：TB 自上而下 / BT 自下而上 / LR 自左向右 / RL 自右向左 */
+  /** Layout direction: TB top-to-bottom / BT bottom-to-top / LR left-to-right / RL right-to-left */
   direction?: LayoutDirection;
-  /** 同层节点间距 */
+  /** Spacing between nodes on the same layer */
   nodesep?: number;
-  /** 层间距 */
+  /** Spacing between layers */
   ranksep?: number;
-  /** 保留泳道 / 编组层级（默认 true） */
+  /** Keep the swimlane / group hierarchy (true by default) */
   preserveContainers?: boolean;
 }
 
-/** 布局方向下拉可选值 */
+/** Selectable layout directions */
 export const LAYOUT_DIRECTIONS: LayoutDirection[] = ['TB', 'BT', 'LR', 'RL'];
 
-/** 间距预设：紧凑 / 标准 / 宽松 */
+/** Spacing presets: compact / standard / roomy */
 export const LAYOUT_DENSITY = {
   compact: { nodesep: 32, ranksep: 44 },
   normal: { nodesep: 48, ranksep: 64 },
@@ -59,7 +59,7 @@ function sizeOf(node: Node<FlowNodeData>): { width: number; height: number } {
   return shapeSize(node.data.kind);
 }
 
-/** 容器内部内容区的左上角（避开标题栏与内边距） */
+/** Top-left corner of a container's content area (clear of the title bar and padding) */
 function containerInnerOrigin(kind: ShapeKind): { x: number; y: number } {
   const padding = 14;
   if (kind === 'group') return { x: padding, y: 26 + padding };
@@ -67,7 +67,7 @@ function containerInnerOrigin(kind: ShapeKind): { x: number; y: number } {
   return { x: SWIMLANE_HEADER_WIDTH + padding, y: padding };
 }
 
-/** 跑一次 dagre，返回每个节点的左上角坐标 */
+/** Run dagre once, returning each node's top-left corner */
 function dagreLayout(
   items: ReadonlyArray<Node<FlowNodeData>>,
   edges: ReadonlyArray<Pick<Edge, 'source' | 'target'>>,
@@ -105,8 +105,8 @@ function dagreLayout(
 }
 
 /**
- * 返回位置被重排后的新节点数组（不修改入参）。
- * 容器（泳道 / 编组）的子节点坐标保持「相对父节点」语义。
+ * Returns a new node array with rearranged positions (the input is not modified).
+ * Child coordinates inside containers (swimlane / group) keep their "relative to parent" semantics.
  */
 export function layoutGraph(
   nodes: Node<FlowNodeData>[],
@@ -119,7 +119,7 @@ export function layoutGraph(
     ...options,
   };
 
-  // 关闭层级保留：整体扁平重排（调用方需先把子节点坐标绝对化）
+  // Hierarchy preservation off: flatten and relayout everything (callers must absolute-ize child coordinates first)
   if (!preserveContainers) {
     const positions = dagreLayout(nodes, edges, direction, nodesep, ranksep);
     return nodes.map((node) => ({ ...node, position: positions.get(node.id) ?? node.position }));
@@ -128,12 +128,12 @@ export function layoutGraph(
   const containers = nodes.filter((n) => !n.parentId && isContainerKind(n.data.kind));
   const childIds = new Set(nodes.filter((n) => n.parentId).map((n) => n.id));
 
-  /** 容器 id → 自适应后的尺寸 */
+  /** Container id → fitted size */
   const containerSize = new Map<string, { width: number; height: number }>();
-  /** 节点 id → 新的相对/绝对坐标 */
+  /** Node id → new relative/absolute coordinates */
   const innerPositions = new Map<string, { x: number; y: number }>();
 
-  // 1) 容器内部排版 + 容器尺寸自适应
+  // 1) lay out inside each container + fit the container size
   for (const container of containers) {
     const kids = nodes.filter((n) => n.parentId === container.id);
     const def = sizeOf(container);
@@ -170,7 +170,7 @@ export function layoutGraph(
     });
   }
 
-  // 2) 顶层（容器 + 游离节点）排版
+  // 2) lay out the top level (containers + free nodes)
   const topLevel = nodes
     .filter((n) => !n.parentId)
     .map((n) => {
@@ -197,7 +197,7 @@ export function layoutGraph(
 
   const topPositions = dagreLayout(topLevel, topEdges, direction, nodesep, ranksep);
 
-  // 3) 合并结果：容器尺寸/位置更新，子节点用容器内部坐标，游离节点用顶层坐标
+  // 3) merge results: containers get their new size/position, children use container-inner coordinates, free nodes use top-level coordinates
   const updatedById = new Map<string, Node<FlowNodeData>>();
   for (const node of topLevel) {
     const pos = topPositions.get(node.id) ?? node.position;

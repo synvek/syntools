@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { exportDocxBlob, importDocx } from './docx';
 import { DEFAULT_PAGE_SETUP } from './pageSetup';
 
-// jsdom 未实现 Blob/File.prototype.arrayBuffer，用 FileReader 兜底（仅测试环境需要）
+// jsdom lacks Blob/File.prototype.arrayBuffer, so fall back to FileReader (test-only)
 if (typeof Blob !== 'undefined' && typeof Blob.prototype.arrayBuffer !== 'function') {
   Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
@@ -16,10 +16,10 @@ if (typeof Blob !== 'undefined' && typeof Blob.prototype.arrayBuffer !== 'functi
 }
 
 /**
- * 导入/导出兼容回归：
- * 1) 页面设置与页眉页脚确实写入 OOXML（sectPr / header / footer）；
- * 2) 导出的 .docx 再经 mammoth 导入后，标题层级 / 列表 / 表格结构不丢失
- *    （覆盖石墨、腾讯文档、语雀、WPS 导出 docx 的通用结构路径）。
+ * Import/export compatibility regression:
+ * 1) Page setup, header, and footer really land in the OOXML (sectPr / header / footer);
+ * 2) Re-importing the exported .docx through mammoth preserves heading levels / lists / tables
+ *    (covering the common structure paths of docx files exported by Shimo, Tencent Docs, Yuque, and WPS).
  */
 
 async function readDocumentXml(
@@ -32,8 +32,8 @@ async function readDocumentXml(
   return { document, header, footer };
 }
 
-describe('exportDocxBlob 页面设置写入', () => {
-  it('A4 纵向 + 20mm 边距 + 页眉页脚页码写入 OOXML', async () => {
+describe('exportDocxBlob page setup output', () => {
+  it('writes A4 portrait + 20mm margins + header, footer, and page number to OOXML', async () => {
     const result = await exportDocxBlob('<p>hello</p>', 't', {
       ...DEFAULT_PAGE_SETUP,
       header: '页眉文本',
@@ -43,17 +43,17 @@ describe('exportDocxBlob 页面设置写入', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const { document, header, footer } = await readDocumentXml(result.value);
-    // 页面尺寸与边距（twip）：A4 宽 210mm ≈ 11907，边距 20mm ≈ 1134
+    // Page size and margins in twips: A4 width 210mm ≈ 11907, margin 20mm ≈ 1134
     expect(document).toContain('<w:pgSz');
     expect(document).toMatch(/w:w="11906"/);
     expect(document).toMatch(/w:h="16838"/);
     expect(document).toContain('<w:pgMar');
     expect(header).toContain('页眉文本');
     expect(footer).toContain('页脚文本');
-    expect(footer).toContain('PAGE'); // 页码域
+    expect(footer).toContain('PAGE'); // page number field
   });
 
-  it('Letter 横向会交换宽高', async () => {
+  it('swaps width and height for Letter landscape', async () => {
     const result = await exportDocxBlob('<p>x</p>', 't', {
       ...DEFAULT_PAGE_SETUP,
       size: 'Letter',
@@ -65,14 +65,14 @@ describe('exportDocxBlob 页面设置写入', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const { document } = await readDocumentXml(result.value);
-    // Letter 横向：宽 279.4mm ≈ 15840，高 215.9mm ≈ 12240，landscape
+    // Letter landscape: width 279.4mm ≈ 15840, height 215.9mm ≈ 12240, landscape
     expect(document).toMatch(/w:w="15840"/);
     expect(document).toMatch(/w:orient="landscape"/);
   });
 });
 
-describe('docx 导出 → mammoth 导入 往返', () => {
-  it('标题 / 列表 / 表格结构在往返后保留', async () => {
+describe('docx export → mammoth import round trip', () => {
+  it('keeps headings / lists / tables across the round trip', async () => {
     const html = [
       '<h1>文档标题</h1>',
       '<h2>小节</h2>',

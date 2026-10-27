@@ -2,25 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { countUnsupportedLatex, isOmmlSupported, latexToAst, type LatexNode } from './latex';
 
 /**
- * LaTeX 子集解析测试：
- * 解析结果直接决定 Word 导出走「原生公式」还是「图片降级」，
- * 因此这里既验证能解析的结构，也验证必须拒绝的语法。
+ * LaTeX subset parser tests:
+ * The parse result decides whether Word export uses a native equation or the image fallback,
+ * so these tests cover both the structures that parse and the syntax that must be rejected.
  */
 
-/** 取第一个节点，便于断言 */
+/** Take the first node for easier assertions */
 function first(latex: string): LatexNode {
   const ast = latexToAst(latex);
   expect(ast).not.toBeNull();
   return (ast as LatexNode[])[0];
 }
 
-describe('latexToAst：支持的语法', () => {
-  it('普通文本与数字拆成独立节点', () => {
+describe('latexToAst: supported syntax', () => {
+  it('splits plain text and digits into separate nodes', () => {
     const ast = latexToAst('a1');
     expect(ast?.map((node) => (node.kind === 'text' ? node.value : node.kind))).toEqual(['a', '1']);
   });
 
-  it('分数解析为 frac', () => {
+  it('parses fractions as frac', () => {
     const node = first('\\frac{a}{b}');
     expect(node.kind).toBe('frac');
     if (node.kind !== 'frac') return;
@@ -28,7 +28,7 @@ describe('latexToAst：支持的语法', () => {
     expect(node.denominator[0]).toEqual({ kind: 'text', value: 'b' });
   });
 
-  it('根号与根指数', () => {
+  it('parses radicals and root indices', () => {
     const plain = first('\\sqrt{x}');
     expect(plain.kind).toBe('sqrt');
     if (plain.kind === 'sqrt') expect(plain.degree).toBeNull();
@@ -40,7 +40,7 @@ describe('latexToAst：支持的语法', () => {
     }
   });
 
-  it('上下标挂在基座上，且可同时存在', () => {
+  it('attaches sub/superscripts to the base, and both can coexist', () => {
     const sub = first('x_i');
     expect(sub.kind).toBe('scripts');
     if (sub.kind === 'scripts') {
@@ -56,7 +56,7 @@ describe('latexToAst：支持的语法', () => {
     }
   });
 
-  it('大运算符的上下限挂在 nary 上', () => {
+  it('attaches limits of large operators to nary', () => {
     const node = first('\\sum_{i=1}^{n} a_i');
     expect(node.kind).toBe('nary');
     if (node.kind !== 'nary') return;
@@ -65,7 +65,7 @@ describe('latexToAst：支持的语法', () => {
     expect(node.sup).not.toBeNull();
   });
 
-  it('\\left..\\right 解析为定界对', () => {
+  it('parses \\left..\\right as delimiter pairs', () => {
     const node = first('\\left( a + b \\right)');
     expect(node.kind).toBe('brackets');
     if (node.kind === 'brackets') {
@@ -74,66 +74,66 @@ describe('latexToAst：支持的语法', () => {
     }
   });
 
-  it('希腊字母与数学符号映射为 Unicode', () => {
+  it('maps Greek letters and math symbols to Unicode', () => {
     expect(first('\\alpha')).toEqual({ kind: 'text', value: 'α' });
     expect(first('\\infty')).toEqual({ kind: 'text', value: '∞' });
     expect(first('\\times')).toEqual({ kind: 'text', value: '×' });
   });
 
-  it('\\text 保留字面文本，函数名按原样输出', () => {
+  it('keeps \\text literal and emits function names as-is', () => {
     expect(first('\\text{当 x > 0}')).toEqual({ kind: 'text', value: '当 x > 0' });
     expect(first('\\sin')).toEqual({ kind: 'text', value: 'sin' });
   });
 
-  it('空白命令产生间距', () => {
+  it('turns spacing commands into spacing', () => {
     expect(first('\\,')).toEqual({ kind: 'text', value: ' ' });
     expect(first('\\quad')).toEqual({ kind: 'text', value: '\u2003' });
   });
 
-  it('示例公式整体可解析', () => {
+  it('parses a full sample formula', () => {
     expect(isOmmlSupported('\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1')).toBe(true);
     expect(isOmmlSupported('\\int_a^b f(x)\\,dx')).toBe(true);
     expect(isOmmlSupported('\\left( a + b \\right)^2')).toBe(true);
   });
 });
 
-describe('latexToAst：不支持的语法（应走图片降级）', () => {
-  it('未收录的命令', () => {
+describe('latexToAst: unsupported syntax (image fallback)', () => {
+  it('rejects unknown commands', () => {
     expect(isOmmlSupported('\\begin{matrix} a \\end{matrix}')).toBe(false);
     expect(isOmmlSupported('\\overbrace{x}')).toBe(false);
     expect(isOmmlSupported('\\color{red}{x}')).toBe(false);
   });
 
-  it('空公式与特殊字符', () => {
+  it('rejects empty formulas and special characters', () => {
     expect(latexToAst('')).toBeNull();
     expect(latexToAst('   ')).toBeNull();
     expect(isOmmlSupported('a % b')).toBe(false);
     expect(isOmmlSupported('a & b')).toBe(false);
   });
 
-  it('缺少脚本基座或括号不匹配', () => {
+  it('rejects scripts without a base and unbalanced braces', () => {
     expect(isOmmlSupported('^2')).toBe(false);
     expect(isOmmlSupported('\\frac{a}{b')).toBe(false);
     expect(isOmmlSupported('\\frac{a}')).toBe(false);
     expect(isOmmlSupported('{a')).toBe(false);
   });
 
-  it('\\text 内出现命令时降级（无法保证正体语义）', () => {
+  it('falls back when \\text contains commands (upright semantics cannot be guaranteed)', () => {
     expect(isOmmlSupported('\\text{a \\alpha}')).toBe(false);
   });
 
-  it('不支持的定界符降级', () => {
+  it('falls back for unsupported delimiters', () => {
     expect(isOmmlSupported('\\left\\{ \\frac{a}{b} \\right\\}')).toBe(true);
     expect(isOmmlSupported('\\left( a \\right]')).toBe(false);
   });
 });
 
 describe('countUnsupportedLatex', () => {
-  it('只统计无法用 OMML 表达的公式（空串同样视为不可表达）', () => {
+  it('counts only formulas OMML cannot express (an empty string counts as inexpressible)', () => {
     expect(
       countUnsupportedLatex(['\\frac{a}{b}', '\\begin{matrix} a \\end{matrix}', '', 'x^2']),
     ).toBe(2);
-    // 调用方通常先过滤空白公式，再统计降级数量
+    // Callers usually filter blank formulas before counting fallbacks
     expect(
       countUnsupportedLatex(
         ['\\frac{a}{b}', '\\begin{matrix} a \\end{matrix}', '   ', 'x^2'].filter((latex) =>
@@ -143,7 +143,7 @@ describe('countUnsupportedLatex', () => {
     ).toBe(1);
   });
 
-  it('空列表返回 0', () => {
+  it('returns 0 for an empty list', () => {
     expect(countUnsupportedLatex([])).toBe(0);
   });
 });

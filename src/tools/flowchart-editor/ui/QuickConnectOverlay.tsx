@@ -8,11 +8,11 @@ import { shapeDefOf, shapesOfCategory, shapeSize } from '../model/shapes';
 import type { FlowEdgeStyle, ShapeKind } from '../model/types';
 import { ShapeGlyph } from './ShapeGlyph';
 
-/** 弹窗尺寸估算，用于边界收敛 */
+/** Estimated popup size, used to keep it inside the bounds */
 const PICKER_W = 228;
 const PICKER_H = 268;
 
-/** 拖拽预览路径：跟随当前默认线型（直线 / 折线 / 圆角折线 / 曲线） */
+/** Drag preview path: follows the current default line type (straight / step / smoothstep / bezier) */
 function previewPath(
   type: FlowEdgeStyle['type'],
   x1: number,
@@ -49,8 +49,8 @@ function previewPath(
 }
 
 /**
- * 悬停快速连线：按住箭头拖出预览线（线型跟随工具栏），松手立即生成相连节点与连线，
- * 同时弹出图形选择弹窗（源图形所在分类）——选择后替换该新节点类型。
+ * Hover quick-connect: hold and drag an arrow to draw a preview line (line type follows the toolbar); on release a connected node
+ * and edge are created immediately and the shape picker opens (filtered to the source shape's category) — picking replaces the new node's type.
  */
 export function QuickConnectOverlay() {
   const { t } = useTranslation();
@@ -68,7 +68,7 @@ export function QuickConnectOverlay() {
   const category = pickerSource ? shapeDefOf(pickerSource.data.kind)?.category : undefined;
   const shapes = category ? shapesOfCategory(category) : [];
 
-  // 拖拽期间：监听全局指针，松手时立即建节点+连线并打开选择弹窗
+  // While dragging: track the global pointer; on release create the node + edge immediately and open the picker
   useEffect(() => {
     if (!active) return;
     const onMove = (ev: PointerEvent) => useQuickConnect.getState().move(ev.clientX, ev.clientY);
@@ -95,7 +95,7 @@ export function QuickConnectOverlay() {
         centerX = fp.x;
         centerY = fp.y;
       } else {
-        // 未拖动（点击箭头）：按方向放在源图形外侧
+        // Not dragged (a click on the arrow): place it outside the source shape in that direction
         const byId = new Map(all.map((n) => [n.id, n] as const));
         const abs = absolutePositionOf(src, byId);
         const gap = 48;
@@ -108,7 +108,7 @@ export function QuickConnectOverlay() {
         centerX = abs.x + off.x + size.width / 2;
         centerY = abs.y + off.y + size.height / 2;
       }
-      // 立即生成相连节点与连线（默认同类型，稍后由弹窗替换类型）
+      // Create the connected node and edge immediately (same type by default; the picker replaces the type afterwards)
       const nodeId = useFlowStore.getState().spawnConnectedNode(d.sourceId, {
         x: Math.round((centerX - size.width / 2) / 10) * 10,
         y: Math.round((centerY - size.height / 2) / 10) * 10,

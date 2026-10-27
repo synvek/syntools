@@ -21,13 +21,13 @@ describe('resolveRelatedTools', () => {
     const tool = toolMap.get('spreadsheet-editor')!;
     const related = resolveRelatedTools(tool, 4);
     expect(related).toHaveLength(4);
-    // 前 3 个来自显式声明（可跨分类）
+    // The first three come from explicit declarations (may cross categories)
     expect(related.slice(0, 3).map((t) => t.id)).toEqual([
       'rich-text-editor',
       'slide-editor',
       'csv-tool',
     ]);
-    // 第 4 个由同分类补齐
+    // The fourth is filled in from the same category
     expect(related[3].category).toBe('advanced');
   });
 

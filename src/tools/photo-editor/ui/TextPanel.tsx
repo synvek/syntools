@@ -14,10 +14,10 @@ import { usePhotoStore } from '../store';
 import type { TextAlign, TextWarpKind } from '../model/types';
 
 /**
- * 文字面板：字符 + 段落 + 变形三段式（对齐 Photoshop 的「字符 / 段落 / 变形文字」）。
+ * Text panel: character + paragraph + warp in three sections (mirroring Photoshop's "Character / Paragraph / Warp Text").
  *
- * 属性面板只保留「内容」这一项快速编辑；一切排版细节都收敛到这里，避免同一批参数散落两处后互相漂移。
- * 变形样式名是专有名词，按 `textWarp_<kind>` 走 i18n。
+ * The Properties panel keeps only the "content" quick edit; every layout detail is gathered here so the same parameters cannot drift apart.
+ * Warp style names are proper nouns and go through i18n as `textWarp_<kind>`.
  */
 export function TextPanel() {
   const { t } = useTranslation();

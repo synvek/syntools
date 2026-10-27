@@ -17,7 +17,7 @@ import {
   type PaperSize,
 } from './core';
 
-/** 图片转纸张并导出 PDF */
+/** Fit an image to a paper size and export a PDF */
 export default function ImageToPaperTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -110,7 +110,7 @@ export default function ImageToPaperTool() {
     ctx.drawImage(img, dx, dy, dw, dh);
     ctx.restore();
 
-    // 边距示意线
+    // Margin guide lines
     ctx.strokeStyle = '#e5e7eb';
     ctx.setLineDash([4, 4]);
     ctx.strokeRect(cx, cy, cw, ch);
@@ -175,7 +175,7 @@ export default function ImageToPaperTool() {
         format: [L.paperWidthMm, L.paperHeightMm],
       });
 
-      // 用临时 canvas 按纸张比例光栅化（cover 需裁剪）
+      // Rasterize on a scratch canvas at the paper aspect ratio (cover needs cropping)
       const scale = 2;
       const cw = Math.round(mmToPx(L.contentWidthMm, PREVIEW_DPI) * scale);
       const ch = Math.round(mmToPx(L.contentHeightMm, PREVIEW_DPI) * scale);
@@ -301,7 +301,9 @@ export default function ImageToPaperTool() {
                 disabled={exporting}
                 className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                {exporting ? t('tools.imageToPaper.exporting') : t('tools.imageToPaper.downloadPdf')}
+                {exporting
+                  ? t('tools.imageToPaper.exporting')
+                  : t('tools.imageToPaper.downloadPdf')}
               </button>
             </div>
           </div>

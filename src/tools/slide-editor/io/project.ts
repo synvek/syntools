@@ -5,19 +5,19 @@ import { migrateDoc } from '../model/migrate';
 import type { MediaAsset, SlideDoc } from '../model/types';
 
 /**
- * 工程文件（.sld）：JSON + 原始图片字节打包成 zip。
+ * Project file (.sld): JSON + raw image bytes packed into a zip.
  *
- * 为什么需要它：此前唯一可靠的持久化只有「导出 pptx」与 localStorage 草稿，
- * 而草稿超过 3MB 会**丢弃图片字节**，恢复后图片变空白。
- * 工程文件把图片原样带上，且不经过 OOXML 的保真损耗，是真正无损的中间态。
+ * Why it's needed: until now the only reliable persistence was "export pptx" and localStorage drafts,
+ * and drafts over 3MB **drop the image bytes**, so images come back blank.
+ * A project file carries images verbatim and avoids OOXML's fidelity loss, a truly lossless intermediate form.
  */
 
 /**
- * 工程文件格式版本。
+ * Project file format version.
  *
- * v2 = 引入 Fill 背景 + chart/formula/icon 元素 + run 级扩展属性。
- * 旧 v1 文件仍可读（`payload.version <= PROJECT_VERSION` 放行），
- * 读取后统一经 `migrateDoc()` 升到当前 schema，保证背景等字段不丢失。
+ * v2 = Fill backgrounds + chart/formula/icon elements + run-level extras.
+ * Old v1 files are still readable (`payload.version <= PROJECT_VERSION` passes),
+ * and are upgraded to the current schema via `migrateDoc()` so fields like background aren't lost.
  */
 export const PROJECT_VERSION = 2;
 export const PROJECT_FORMAT = 'syntools-slide';
@@ -30,11 +30,11 @@ interface ProjectPayload {
   format: string;
   version: number;
   doc: SlideDoc;
-  /** mediaId → zip 内路径（没有字节的媒体不出现） */
+  /** mediaId → path inside the zip (media without bytes is omitted) */
   mediaFiles: Record<string, string>;
 }
 
-/** 剥离运行态与大字段：bytes 单独存二进制条目，url 不入库 */
+/** Strip runtime state and large fields: bytes become their own binary entries, url is never stored */
 function stripDoc(doc: SlideDoc): {
   clean: SlideDoc;
   files: Record<string, string>;
@@ -87,7 +87,7 @@ export async function openProject(file: File): Promise<ToolResult<SlideDoc>> {
       const bytes = name ? await zip.file(`media/${name}`)?.async('uint8array') : undefined;
       media[id] = { ...asset, bytes: bytes ?? undefined };
     }
-    // 旧版本工程（v1）在此升到当前 schema：背景 string→Fill、补齐新增可选字段
+    // Old project versions (v1) are upgraded to the current schema here: background string→Fill, new optional fields filled in
     const doc: SlideDoc = migrateDoc({ ...payload.doc, media });
     if (!doc.slides || doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
     return { ok: true, value: doc };

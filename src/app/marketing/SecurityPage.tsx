@@ -19,14 +19,14 @@ import {
 } from '@/app/marketing/ui';
 
 /**
- * /security —— 安全与合规说明。
+ * /security — security and compliance notes.
  *
- * 这是「企业内网私有部署」这条主赛道能不能过技术评审的决定性材料，
- * 也是唯一别人难复制的差异点：纯静态、无外联、CSP 极严、代码可审计。
+ * This is the decisive material for whether private on-prem deployment passes technical review,
+ * and the one differentiator others cannot copy: fully static, no outbound calls, strict CSP, auditable code.
  *
- * 写作原则：**只写能当场验证的事**，每条都给出验证方式（开发者工具、仓库文件路径、
- * 依赖清单）。同时把站上真实的例外（内联样式、检查更新、可选埋点）主动写出来 ——
- * 一份只讲优点不讲例外的安全说明，在评审会上第一轮就会被问穿。
+ * Writing rule: **state only what can be verified on the spot**, giving a way to check each claim (dev tools, repo paths,
+ * dependency lists). Also volunteer the real exceptions (inline styles, update checks, optional analytics) —
+ * a write-up that lists only strengths gets dismantled in the first review round.
  */
 
 interface SecurityCopy {

@@ -27,7 +27,7 @@ interface ToolButtonProps {
   children: ReactNode;
 }
 
-/** 工具栏按钮：激活态蓝底，尺寸紧凑，带 aria-pressed 与 tooltip */
+/** Toolbar button: blue background when active, compact, with aria-pressed and a tooltip */
 function ToolButton({
   label,
   active = false,
@@ -55,8 +55,8 @@ function ToolButton({
 }
 
 /**
- * 撤销/重做图标：标准「弯箭头 + 圆弧」造型（与 Excalidraw / tldraw 等画板应用一致），
- * 描边参数与内置 Icon 集统一（24 视窗、当前色描边）。
+ * Undo/redo icon: the standard "bent arrow + arc" shape (as in Excalidraw / tldraw and friends),
+ * with stroke settings matching the built-in Icon set (24 viewBox, currentColor stroke).
  */
 function UndoIcon({ className }: { className?: string }) {
   return (
@@ -94,7 +94,7 @@ function RedoIcon({ className }: { className?: string }) {
   );
 }
 
-/** 刷新图标：顺时针箭头 + 缺口圆环（与撤销/重做图标同一套描边参数） */
+/** Refresh icon: clockwise arrow + open ring (same stroke settings as the undo/redo icons) */
 function RefreshIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -113,7 +113,7 @@ function RefreshIcon({ className }: { className?: string }) {
   );
 }
 
-/** 脚注图标：基线 + 上标数字，与 Word「插入脚注」的视觉语义一致 */
+/** Footnote icon: baseline + superscript digit, carrying the same visual meaning as Word's "Insert Footnote" */
 function FootnoteIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -126,16 +126,16 @@ function FootnoteIcon({ className }: { className?: string }) {
       className={className}
       aria-hidden="true"
     >
-      {/* 上标数字 1 */}
+      {/* Superscript digit 1 */}
       <path d="M14 4.6 16 3.2v5.9" />
-      {/* 分隔线 + 正文基线，表达「脚注落在页面底部」 */}
+      {/* Separator + body baseline, conveying "the footnote sits at the bottom of the page" */}
       <path d="M5.5 12.5h6" />
       <path d="M4 19.5h16" />
     </svg>
   );
 }
 
-/** 图片对齐图标：方框 + 三条对齐线（左/中/右各不相同，避免三个按钮长得一样） */
+/** Image alignment icon: box + three alignment lines (left/center/right differ, so the buttons don't look identical) */
 function ImageAlignIcon({ position }: { position: 'left' | 'center' | 'right' }) {
   const bars =
     position === 'left'
@@ -161,7 +161,7 @@ function ImageAlignIcon({ position }: { position: 'left' | 'center' | 'right' })
   );
 }
 
-/** 对齐按钮里的装饰条（左/中/右/两端对齐） */
+/** Decorative bars inside the alignment buttons (left/center/right/justify) */
 function AlignBars({ widths }: { widths: string[] }) {
   return (
     <span className="flex w-4 flex-col items-center gap-[2px]" aria-hidden="true">
@@ -177,11 +177,11 @@ interface ToolbarSelectProps {
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
-  /** 宽版：字体名较长（如 Franklin Gothic Medium）时避免被截断 */
+  /** Wide variant: keeps long font names (e.g. Franklin Gothic Medium) from being truncated */
   wide?: boolean;
 }
 
-/** 工具栏内联下拉：与 pdfMode 选择器同风格，紧凑高度 */
+/** Inline toolbar dropdown: same style as the pdfMode selector, compact height */
 function ToolbarSelect({ label, value, onChange, options, wide }: ToolbarSelectProps) {
   return (
     <select
@@ -202,7 +202,7 @@ function ToolbarSelect({ label, value, onChange, options, wide }: ToolbarSelectP
   );
 }
 
-/** 缩放档位（100% = 1） */
+/** Zoom levels (100% = 1) */
 export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
 interface EditorToolbarProps {
@@ -213,46 +213,46 @@ interface EditorToolbarProps {
   outlineOpen: boolean;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
-  /** 页面设置 */
+  /** Page setup */
   pageSetupOpen: boolean;
   onTogglePageSetup: () => void;
-  /** 水平标尺显示开关 */
+  /** Horizontal ruler visibility */
   rulerOpen: boolean;
   onToggleRuler: () => void;
-  /** 插入目录 */
+  /** Insert table of contents */
   onInsertToc: () => void;
-  /** 刷新目录（重算分页与页码） */
+  /** Refresh TOC (recompute pagination and page numbers) */
   onRefreshToc: () => void;
   tocDisabled: boolean;
-  /** 脚注：选中已有脚注时为编辑，否则为新建 */
+  /** Footnote: edit the selected footnote, otherwise insert a new one */
   onFootnote: () => void;
-  /** 公式：选中已有公式时为编辑，否则为新建 */
+  /** Formula: edit the selected formula, otherwise insert a new one */
   onMath: () => void;
-  /** 样式面板 */
+  /** Style panel */
   stylesOpen: boolean;
   onToggleStyles: () => void;
-  /** 模板面板 */
+  /** Template panel */
   templatesOpen: boolean;
   onToggleTemplates: () => void;
-  /** 拼写检查面板 */
+  /** Spellcheck panel */
   spellcheckOpen: boolean;
   onToggleSpellcheck: () => void;
-  /** 批注与修订 */
+  /** Comments and tracked changes */
   reviewOpen: boolean;
   onToggleReview: () => void;
-  /** 历史版本 */
+  /** Version history */
   onOpenVersions: () => void;
   versionsDisabled: boolean;
-  /** 视图缩放 */
+  /** View zoom */
   zoom: number;
   onZoomChange: (zoom: number) => void;
 }
 
 /**
- * 富文本工具栏（两层结构）：
- * - 第一层「内容格式」：历史 / 段落样式 / 字符格式 / 列表 / 插入 / 对齐 / 缩进 / 条件组（图片、表格）/ 查找
- * - 第二层「文档与视图」：大纲 / 页面设置 / 目录 / 样式 / 批注修订 / 历史版本 …… 右侧缩放与视图模式
- * 通过 useEditorState 精确订阅激活态，避免整棵树随输入频繁重渲染。
+ * Rich text toolbar (two rows):
+ * - Row 1 "content formatting": history / paragraph styles / character formatting / lists / insert / align / indent / conditional groups (image, table) / find
+ * - Row 2 "document & view": outline / page setup / TOC / styles / comments & changes / version history ... with zoom and view mode on the right
+ * useEditorState subscribes to active states precisely, keeping the whole tree from re-rendering on every keystroke.
  */
 export function EditorToolbar({
   editor,
@@ -287,7 +287,7 @@ export function EditorToolbar({
   const { t } = useTranslation();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // 系统字体探测只在挂载时做一次：字体菜单只列出当前系统真实安装的字体
+  // Probe system fonts once on mount: the font menu lists only fonts actually installed on this system
   const installedFonts = useMemo(() => detectInstalledFonts(createSystemFontProbe()), []);
   const defaultFontName = useMemo(
     () => detectDefaultFontName(navigator.userAgent, navigator.platform ?? ''),
@@ -297,7 +297,7 @@ export function EditorToolbar({
     const installed = installedFonts.some(
       (font) => font.name.toLowerCase() === defaultFontName.toLowerCase(),
     );
-    // 首项显示具体字体名（正文实际生效的字体）；探测不到时退回通用文案
+    // The first entry shows the concrete font name (the one actually applied to body text); falls back to a generic label when undetected
     const label = installed ? defaultFontName : t('tools.richText.fontDefault');
     return [
       ...buildFontOptions(installedFonts, label, defaultFontName),
@@ -307,7 +307,7 @@ export function EditorToolbar({
     ];
   }, [installedFonts, defaultFontName, t]);
 
-  // 字号/行距同样显示具体数值：未显式设置时即文档默认值
+  // Font size / line spacing also show concrete values: the document default when unset
   const fontSizeOptions = useMemo(
     () => [
       { value: '', label: String(DEFAULT_FONT_SIZE_PX) },
@@ -403,10 +403,10 @@ export function EditorToolbar({
   };
 
   const chain = () => editor.chain().focus();
-  // 色板与原生取色器都只认 #rrggbb：非标准值（如导入文档里的命名色）回退到默认正文色
+  // Palette and native color picker only handle #rrggbb: non-standard values (e.g. named colors from imported docs) fall back to the default text color
   const currentColor = /^#[0-9a-f]{6}$/i.test(state.color) ? state.color : '#111827';
 
-  // 图片宽度内部统一存像素，工具栏用百分比预设表达（换算基准 = 当前正文内容宽度）
+  // Image widths are stored in pixels; the toolbar exposes percentage presets (converted against the current content width)
   const contentWidth = Math.max(1, Math.round(editor.view.dom.clientWidth || CONTENT_WIDTH_PX));
   const presetWidths = [25, 50, 75, 100].map((pct) => ({
     pct,
@@ -421,19 +421,19 @@ export function EditorToolbar({
   const imageWidthOptions = [
     { value: '', label: t('tools.richText.imageWidthAuto') },
     ...presetWidths.map((preset) => ({ value: preset.value, label: `${preset.pct}%` })),
-    // 拖动缩放手柄后宽度是任意像素值：显示为「自定义 (Npx)」，避免看起来像回到了自动
+    // After dragging the resize handle the width is an arbitrary pixel value: show "Custom (Npx)" so it doesn't look auto again
     ...(imageWidthValue === 'custom' && imageWidth !== null
       ? [{ value: 'custom', label: t('tools.richText.imageWidthCustom', { px: imageWidth }) }]
       : []),
   ];
 
-  // 根容器不能加 overflow-hidden：文字颜色等弹层是 absolute 定位，会被工具栏下边缘裁掉
+  // The root container must not use overflow-hidden: popovers (text color, etc.) are absolutely positioned and would be clipped by the toolbar's bottom edge
   return (
     <div
       data-testid="rich-text-toolbar"
       className="sticky top-0 z-10 -mx-1 rounded-lg border border-gray-200 bg-white/95 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95"
     >
-      {/* 第一层：内容格式 */}
+      {/* Row 1: content formatting */}
       <div className="flex flex-wrap items-center gap-1 p-1">
         <div className="flex items-center gap-1">
           <ToolButton
@@ -545,13 +545,13 @@ export function EditorToolbar({
           >
             <span className="font-mono">&lt;/&gt;</span>
           </ToolButton>
-          {/* 文字颜色：预设色板弹层，选色后自动收起（原生系统色板不会自己关） */}
+          {/* Text color: preset palette popover that closes after picking (the native system picker doesn't close itself) */}
           <TextColorPicker
             value={currentColor}
             onPick={(color) => chain().setColor(color).run()}
             onReset={() => chain().unsetColor().run()}
           />
-          {/* 荧光笔：固定黄色高亮，按钮蓝底即表示 ON/OFF 状态 */}
+          {/* Highlighter: fixed yellow highlight; the blue button background reflects ON/OFF */}
           <ToolButton
             label={t('tools.richText.highlight')}
             active={state.highlight}
@@ -629,7 +629,7 @@ export function EditorToolbar({
             label={t('tools.richText.pageBreak')}
             onClick={() => chain().setPageBreak().run()}
           >
-            {/* 与分隔线/对齐按钮同风格的单色线条图标（虚线断页） */}
+            {/* Monochrome line icon in the same style as the divider/align buttons (dashed page break) */}
             <svg
               viewBox="0 0 16 16"
               fill="none"
@@ -763,7 +763,7 @@ export function EditorToolbar({
           </ToolButton>
         </div>
 
-        {/* 段落排版：首行缩进与段前段后 */}
+        {/* Paragraph layout: first-line indent and space before/after */}
         <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
 
         <div className="flex items-center gap-1">
@@ -797,7 +797,7 @@ export function EditorToolbar({
           />
         </div>
 
-        {/* 图片：宽度 / 对齐 / 层级（嵌入、浮于文字上方、衬于文字下方） */}
+        {/* Image: width / alignment / layer (inline, in front of text, behind text) */}
         {state.inImage ? (
           <>
             <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
@@ -811,7 +811,7 @@ export function EditorToolbar({
                     return;
                   }
                   if (value === 'custom') return;
-                  // 百分比预设按正文内容宽度换算为像素（图片宽度统一存像素）
+                  // Convert the percentage preset to pixels using the content width (image widths are stored in pixels)
                   chain()
                     .setImageWidth(Math.round((Number(value) / 100) * contentWidth))
                     .run();
@@ -849,7 +849,7 @@ export function EditorToolbar({
           </>
         ) : null}
 
-        {/* 表格样式：边框 / 斑马纹 */}
+        {/* Table styles: borders / zebra stripes */}
         {state.inTable ? (
           <>
             <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
@@ -873,7 +873,7 @@ export function EditorToolbar({
         ) : null}
       </div>
 
-      {/* 第二层：文档与视图（自带底色，需自行圆角，否则会盖住工具栏底部的圆角） */}
+      {/* Row 2: document & view (has its own background, so it needs its own radius or it covers the toolbar's bottom corners) */}
       <div className="flex flex-wrap items-center gap-1 rounded-b-lg border-t border-gray-200 bg-gray-50/70 px-1 py-1 dark:border-gray-700 dark:bg-gray-800/40">
         <span className="ml-1 mr-0.5 select-none text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
           {t('tools.richText.docSection')}
@@ -948,7 +948,7 @@ export function EditorToolbar({
           <Icon name="clock" className="h-4 w-4" />
         </ToolButton>
 
-        {/* 视图控制靠右：缩放 + 视图模式 */}
+        {/* View controls right-aligned: zoom + view mode */}
         <div className="ml-auto flex items-center gap-1">
           <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
             {t('tools.richText.zoom')}

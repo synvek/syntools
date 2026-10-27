@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ProgressBar } from '@/core/components/ProgressBar';
 
-/** 共享：PDF 工具主操作按钮 */
+/** Shared: primary action button for PDF tools */
 export function PdfRunButton({
   label,
   disabled,

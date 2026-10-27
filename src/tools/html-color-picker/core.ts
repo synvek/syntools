@@ -2,7 +2,7 @@ import type { ToolResult } from '@/core/types';
 import { formatColor, parseColor, type RgbColor } from '@/tools/color-converter/core';
 
 /**
- * HTML 取色器：从色值 / 系统取色器得到 HEX/RGB/HSL 与常用 HTML/CSS 片段。
+ * HTML color picker: derive HEX/RGB/HSL plus common HTML/CSS snippets from a color value or the system picker.
  */
 
 export type ColorPickerError = 'EMPTY' | 'INVALID';
@@ -38,7 +38,7 @@ export function buildColorPicker(input: string): ToolResult<ColorPickerResult> {
   };
 }
 
-/** 将 #rrggbb 规范为可被 <input type="color"> 使用的 7 位 hex */
+/** Normalize a color to the 7-digit hex form that <input type="color"> requires */
 export function toColorInputValue(hex: string): string {
   const m = /^#([0-9a-fA-F]{6})$/.exec(hex.trim());
   return m ? `#${m[1].toLowerCase()}` : '#000000';

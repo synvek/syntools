@@ -1,22 +1,22 @@
 /**
- * 连线跳线（crossing jump）的纯几何计算。
+ * Pure geometry for edge crossing jumps.
  *
- * 设计取舍：
- * - 只为「可精确复现几何」的连线绘制跳线：**折点正交路由**与**直线**。
- *   贝塞尔 / 无折点的圆角折线由 React Flow 内部生成路径，外部无法精确复现，
- *   强行近似会出现跳线错位，因此跳过（见 `polylineOf`）。
- * - 跳线只作用于「声明了 arc」的连线，且跳过数组中更靠前（更底层）的连线，
- *   与 draw.io 中「上层线跳过下层线」的观感一致。
- * - 性能：线段相交检测走空间网格哈希，把 O(E²·S²) 降为近似 O(E·S)；
- *   连线数超过 `JUMP_EDGE_LIMIT` 时按比例分级降级（而非整体丢弃），
- *   保证大图仍保留可读的跳线表现且开销可控。
+ * Design trade-offs:
+ * - Jumps are drawn only for edges whose geometry can be reproduced exactly: **orthogonal polylines with waypoints** and **straight lines**.
+ * Bezier and waypoint-free rounded polylines get their path from inside React Flow, which cannot be reproduced externally,
+ * so approximating them would misplace the jumps and they are skipped (see `polylineOf`).
+ * - Jumps apply only to edges that declare arc, and only to edges earlier in the array (lower in the stack),
+ * matching draw.io's "upper lines hop over lower lines" look.
+ * - Performance: segment intersection tests use a spatial grid hash, cutting O(E²·S²) to roughly O(E·S);
+ * above `JUMP_EDGE_LIMIT` edges the result degrades stepwise (rather than dropping jumps entirely),
+ * keeping large diagrams legible while keeping the cost bounded.
  */
 
 import { anchorOf } from '../core';
 import { normalizeEdgeStyle } from '../ops';
 import type { EdgeJumpStyle, FlowEdgeStyle, ShapeKind, Waypoint } from './types';
 
-/** 计算跳线所需的最小节点结构（与 store 的 FlowNode 结构兼容） */
+/** Minimal node structure needed for jump computation (compatible with the store's FlowNode) */
 export interface JumpNode {
   id: string;
   parentId?: string | null;
@@ -27,7 +27,7 @@ export interface JumpNode {
   data: { kind: ShapeKind };
 }
 
-/** 计算跳线所需的最小连线结构（与 store 的 FlowEdge 结构兼容） */
+/** Minimal edge structure needed for jump computation (compatible with the store's FlowEdge) */
 export interface JumpEdge {
   id: string;
   source: string;
@@ -43,32 +43,32 @@ export interface Point2 {
   y: number;
 }
 
-/** 一处跳线标记（画布坐标） */
+/** One jump marker (canvas coordinates) */
 export interface JumpMark {
   x: number;
   y: number;
-  /** 被穿越连线的方向角（弧度），用于让弧线朝对侧鼓起 */
+  /** Direction angle (radians) of the crossed edge, used to bulge the arc to the opposite side */
   angle: number;
-  /** SVG 弧线 sweep 方向 */
+  /** SVG arc sweep direction */
   sweep: 0 | 1;
   radius: number;
   stroke: string;
 }
 
-/** 可绘制跳线的连线数上限（超过则按比例降级） */
+/** Max number of edges for which jumps are drawn (beyond it the result degrades stepwise) */
 export const JUMP_EDGE_LIMIT = 150;
-/** 跳线弧半径（画布单位） */
+/** Jump arc radius (canvas units) */
 const ARC_RADIUS = 5;
-/** 端点附近不画跳线（避免与节点/箭头重叠） */
+/** No jumps near endpoints (avoid overlapping nodes / arrows) */
 const ENDPOINT_MARGIN = 8;
-/** 同一位置去重阈值 */
+/** Deduplication threshold for identical positions */
 const DEDUPE_DISTANCE = 3;
-/** 空间网格边长（画布单位）：越大候选越少但格子越大，取 64 折中 */
+/** Spatial grid cell size (canvas units): larger means fewer candidates but bigger cells; 64 is a compromise */
 const GRID_CELL = 64;
-/** 标记去重网格边长 */
+/** Deduplication grid cell size */
 const MARK_CELL = DEDUPE_DISTANCE * 2;
 
-/** 两条线段的真交点；共线 / 平行 / 仅端点相接时返回 null */
+/** True intersection of two segments; null when collinear / parallel / touching at endpoints only */
 export function segmentIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point2 | null {
   const r = { x: a2.x - a1.x, y: a2.y - a1.y };
   const s = { x: b2.x - b1.x, y: b2.y - b1.y };
@@ -77,13 +77,13 @@ export function segmentIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Poin
   const qp = { x: b1.x - a1.x, y: b1.y - a1.y };
   const t = (qp.x * s.y - qp.y * s.x) / denom;
   const u = (qp.x * r.y - qp.y * r.x) / denom;
-  // 排除端点相接（严格内部相交）
+  // Exclude endpoint touches (strict interior intersection)
   const EPS = 1e-6;
   if (t <= EPS || t >= 1 - EPS || u <= EPS || u >= 1 - EPS) return null;
   return { x: a1.x + t * r.x, y: a1.y + t * r.y };
 }
 
-/** 折线总长 */
+/** Total polyline length */
 function polylineLength(points: Point2[]): number {
   let total = 0;
   for (let i = 1; i < points.length; i += 1) {
@@ -92,7 +92,7 @@ function polylineLength(points: Point2[]): number {
   return total;
 }
 
-/** 取一条连线的折线顶点；无法精确复现时返回 null */
+/** Polyline vertices of an edge; null when the geometry cannot be reproduced exactly */
 function polylineOf(
   edge: JumpEdge,
   byId: Map<string, JumpNode>,
@@ -102,7 +102,7 @@ function polylineOf(
   if (!source || !target) return null;
   const style = normalizeEdgeStyle(edge.data?.style);
   const waypoints = edge.data?.waypoints ?? [];
-  // 只有折点正交路由与直线可以精确复现（见文件头说明）
+  // Only orthogonal polylines with waypoints and straight lines can be reproduced exactly (see the file header)
   if (waypoints.length === 0 && style.type !== 'straight') return null;
   const points: Point2[] = [
     anchorOf(source, byId, edge.sourceHandle, target).point,
@@ -122,7 +122,7 @@ function cellKey(cx: number, cy: number): string {
   return `${cx},${cy}`;
 }
 
-/** 把一条线段按其 AABB 覆盖的网格单元登记（供查询） */
+/** Register a segment in every grid cell its AABB covers (for lookup) */
 function insertSegment(grid: Map<string, SegEntry[]>, entry: SegEntry): void {
   const minX = Math.min(entry.a.x, entry.b.x);
   const maxX = Math.max(entry.a.x, entry.b.x);
@@ -142,7 +142,7 @@ function insertSegment(grid: Map<string, SegEntry[]>, entry: SegEntry): void {
   }
 }
 
-/** 收集查询线段 AABB 覆盖单元内的候选段（自动去重） */
+/** Collect candidate segments in the cells covered by the query segment's AABB (deduplicated automatically) */
 function querySegments(
   grid: Map<string, SegEntry[]>,
   a: Point2,
@@ -167,9 +167,9 @@ function querySegments(
 }
 
 /**
- * 计算全部跳线标记。
- * 只在「声明 arc 的连线」与「数组中更靠前的连线」的交叉处生成标记；
- * 连线数超过 `limit` 时按比例降级（保留前 limit/2 条连线参与绘制）。
+ * Compute all jump markers.
+ * Markers are produced only where an arc-declaring edge crosses an edge earlier in the array;
+ * above `limit` edges the result degrades stepwise (only the first limit/2 edges take part).
  */
 export function computeEdgeJumps(
   nodes: readonly JumpNode[],
@@ -184,7 +184,7 @@ export function computeEdgeJumps(
   const byId = new Map(nodes.map((n) => [n.id, n] as const));
   const lines = visible.map((e) => polylineOf(e, byId));
 
-  // 1) 空间网格：装入「更底层」（索引 < drawCount）的所有线段
+  // 1) spatial grid: load every segment of the lower layers (index < drawCount)
   const grid = new Map<string, SegEntry[]>();
   for (let i = 0; i < drawCount; i += 1) {
     const line = lines[i];
@@ -235,7 +235,7 @@ export function computeEdgeJumps(
         if (entry.owner >= i) continue;
         const hit = segmentIntersection(a1, a2, entry.a, entry.b);
         if (!hit) continue;
-        // 太靠近自身线段端点：跳过（避免与节点/箭头视觉冲突）
+        // Too close to its own segment endpoint: skip (avoid visual clashes with nodes / arrows)
         if (
           Math.hypot(hit.x - a1.x, hit.y - a1.y) < ENDPOINT_MARGIN ||
           Math.hypot(hit.x - a2.x, hit.y - a2.y) < ENDPOINT_MARGIN
@@ -244,14 +244,14 @@ export function computeEdgeJumps(
         }
         const ownAngle = Math.atan2(a2.y - a1.y, a2.x - a1.x);
         const otherAngle = Math.atan2(entry.b.y - entry.a.y, entry.b.x - entry.a.x);
-        // 用叉积判断被穿越连线相对本线的方位，决定弧线鼓起方向
+        // Use the cross product to see which side of this line the crossed edge lies on, deciding the arc bulge direction
         const cross = Math.sin(otherAngle - ownAngle);
         if (Math.abs(cross) < 1e-6) continue;
         if (hasNearbyMark(hit.x, hit.y)) continue;
         addMark({
           x: hit.x,
           y: hit.y,
-          // 弧线沿「本线方向」张弦，避免斜向交叉时弧线方向错乱
+          // The arc spans a chord along this line's direction, so diagonal crossings do not flip the arc orientation
           angle: ownAngle,
           sweep: cross > 0 ? 1 : 0,
           radius: ARC_RADIUS,

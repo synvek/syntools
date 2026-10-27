@@ -1,9 +1,9 @@
 import type { WorkbookSnapshot } from './xlsx-io';
 
-/** 本地草稿存储：键遵循 syntools:* 规范，内容不离开浏览器 */
+/** Local draft storage: keys follow the syntools:* convention; contents never leave the browser */
 
 const DRAFT_KEY = 'syntools:spreadsheet-editor.draft.v1';
-/** 单篇草稿体积上限（10MB），防止 localStorage 被撑爆 */
+/** Per-draft size cap (10MB) so localStorage does not get blown up */
 const MAX_DRAFT_BYTES = 10 * 1024 * 1024;
 
 export function readDraft(): WorkbookSnapshot | null {
@@ -19,16 +19,16 @@ export function readDraft(): WorkbookSnapshot | null {
 }
 
 /**
- * 写入草稿的结果：
- * - `ok:false, degraded:false` → 内容超出体积上限（本次未保存）
- * - `ok:false, degraded:true`  → localStorage 不可用 / 配额不足
+ * Draft write outcome:
+ * - `ok:false, degraded:false` → content exceeds the size cap (not saved this time)
+ * - `ok:false, degraded:true`  → localStorage unavailable / out of quota
  */
 export interface DraftWriteResult {
   ok: boolean;
   degraded: boolean;
 }
 
-/** 写入草稿并返回可区分的原因（供 UI 明确提示，而不是永远停在「保存中」） */
+/** Write the draft and report a distinguishable reason (so the UI can say why instead of sitting on "saving" forever) */
 export function writeDraftSafe(snapshot: WorkbookSnapshot): DraftWriteResult {
   let raw: string;
   try {
@@ -45,7 +45,7 @@ export function writeDraftSafe(snapshot: WorkbookSnapshot): DraftWriteResult {
   }
 }
 
-/** 便捷布尔版（失败原因不关心时使用） */
+/** Boolean convenience wrapper for callers that do not care about the failure reason */
 export function writeDraft(snapshot: WorkbookSnapshot): boolean {
   return writeDraftSafe(snapshot).ok;
 }
@@ -54,7 +54,7 @@ export function clearDraft(): void {
   try {
     localStorage.removeItem(DRAFT_KEY);
   } catch {
-    // localStorage 不可用时忽略
+    // Ignore when localStorage is unavailable
   }
 }
 

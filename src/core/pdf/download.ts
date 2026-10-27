@@ -1,4 +1,4 @@
-/** 浏览器下载工具 */
+/** Browser download helpers */
 
 export function downloadBytes(bytes: Uint8Array, filename: string, mime = 'application/pdf') {
   const blob = new Blob([bytes], { type: mime });
@@ -17,7 +17,7 @@ export function downloadDataUrl(dataUrl: string, filename: string) {
   a.click();
 }
 
-/** 将多份 PDF 字节打包为 ZIP 并下载（懒加载 jszip） */
+/** Zip several PDFs and download them (jszip is lazy-loaded) */
 export async function downloadPdfZip(
   entries: { name: string; bytes: Uint8Array }[],
   zipName: string,

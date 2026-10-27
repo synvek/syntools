@@ -9,7 +9,7 @@ interface FramePreview {
   url: string;
 }
 
-/** 将 GIF 帧合成并导出预览 URL */
+/** Composite GIF frames and export preview URLs */
 function compositeFrames(parsed: GifParsed): FramePreview[] {
   const { width, height, frames } = parsed;
   const canvas = document.createElement('canvas');
@@ -31,7 +31,7 @@ function compositeFrames(parsed: GifParsed): FramePreview[] {
       if (prevDisposal === 2) {
         ctx.clearRect(prevDims.left, prevDims.top, prevDims.width, prevDims.height);
       } else if (prevDisposal === 3) {
-        // restore-to-previous：简化为清屏（多数 GIF 不依赖）
+        // restore-to-previous: simplified to a clear (most GIFs do not rely on it)
       }
     } else {
       ctx.clearRect(0, 0, width, height);
@@ -55,7 +55,7 @@ function compositeFrames(parsed: GifParsed): FramePreview[] {
   return out;
 }
 
-/** GIF 拆帧 */
+/** GIF frame extraction */
 export default function GifFramesTool() {
   const { t } = useTranslation();
   const [frames, setFrames] = useState<FramePreview[]>([]);
@@ -154,11 +154,7 @@ export default function GifFramesTool() {
               key={frame.index}
               className="rounded-md border border-gray-200 p-2 dark:border-gray-700"
             >
-              <img
-                src={frame.url}
-                alt=""
-                className="mx-auto max-h-40 object-contain"
-              />
+              <img src={frame.url} alt="" className="mx-auto max-h-40 object-contain" />
               <div className="mt-2 flex items-center justify-between gap-1 text-xs text-gray-500">
                 <span>
                   #{frame.index + 1} · {frame.delay}ms

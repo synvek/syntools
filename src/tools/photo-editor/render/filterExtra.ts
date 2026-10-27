@@ -1,16 +1,16 @@
 import type { FilterId } from '../model/types';
 
 /**
- * 扩展滤镜像素实现：扭曲 / 风格化 / 渲染 / 降噪。
+ * Extra filter pixel implementations: distort / stylize / render / noise reduction.
  *
- * 与 `render/adjust.ts` 里既有的滤镜一样，全部是**就地修改 RGBA 数据**的纯函数，
- * 因此可以在没有 Canvas2D 的环境（单测）里直接断言结果。
+ * Like the filters already in `render/adjust.ts`, these are pure functions that **mutate RGBA data in place**,
+ * so unit tests can run without Canvas2D and assert on the result directly.
  *
- * 两类实现风格：
- * - **几何类**（扭曲）走「反向映射 + 双线性采样」：目标像素反查源坐标，
- *   天然没有空洞，也不会出现正向映射的锯齿堆积；
- * - **随机类**（云彩）用**按坐标哈希**的确定性噪声，而不是 `Math.random` ——
- *   否则每次重新烘焙缓存都会得到不同的云，撤销 / 重做前后画面会跳变。
+ * Two implementation styles:
+ * - **geometric** (distort) uses "inverse mapping + bilinear sampling": each target pixel looks up its source,
+ *   which has no holes by construction and avoids the jagged pile-up of forward mapping;
+ * - **random** (clouds) uses coordinate-hashed deterministic noise instead of `Math.random` —
+ *   otherwise every rebake would yield different clouds and undo / redo would visibly jump.
  */
 
 function clampByte(value: number): number {
@@ -18,10 +18,10 @@ function clampByte(value: number): number {
 }
 
 /**
- * 双线性采样（**坐标越界时钳制到边缘像素**）。
+ * Bilinear sampling (**out-of-range coordinates clamp to the edge pixels**).
  *
- * 钳制而不是返回透明：扭曲会把画布角落旋出界外，若返回透明，成品会出现透明缺口、
- * 纯色图还会出现条纹 —— 边缘复制才是图像滤镜应有的行为（Photoshop 亦然）。
+ * Clamping rather than returning transparent: distortion rotates corners out of bounds, and transparency
+ * would leave see-through gaps and stripes on solid colors; edge replication is the right filter behavior.
  */
 export function sampleBilinear(
   data: Uint8ClampedArray,
@@ -49,7 +49,7 @@ export function sampleBilinear(
   return out;
 }
 
-/** 按「目标 → 源」的坐标映射重采样（扭曲类滤镜共用） */
+/** Resample through a "target → source" coordinate map (shared by the distort filters) */
 function remap(
   width: number,
   height: number,
@@ -74,7 +74,7 @@ function remap(
   return out;
 }
 
-/** 旋转扭曲：绕画布中心按半径递增地旋转，中心不动、边缘扭得最厉害 */
+/** Twirl: rotate about the center with an angle that grows by radius — center still, edges twisted most */
 export function applyTwirl(
   width: number,
   height: number,
@@ -88,7 +88,7 @@ export function applyTwirl(
     const dx = x - cx;
     const dy = y - cy;
     const radius = Math.hypot(dx, dy);
-    // 二次衰减：半径越大角度越大，到画布角落时达到设定角度
+    // Quadratic falloff: the angle grows with radius and reaches the set value at the corners
     const theta = radians * (radius / maxRadius) ** 2;
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
@@ -97,7 +97,7 @@ export function applyTwirl(
   data.set(result);
 }
 
-/** 球面化：正值向外鼓（放大中心），负值向内凹 */
+/** Spherize: positive bulges outward (enlarges the center), negative dents inward */
 export function applySpherize(
   width: number,
   height: number,
@@ -113,7 +113,7 @@ export function applySpherize(
     const radius = Math.hypot(dx, dy);
     if (radius < 1e-6) return { x, y };
     const normalized = radius / maxRadius;
-    // 球面投影：r' = r^(1 - k) 的线性化形式，中心放大倍数最大
+    // Spherical projection: a linearized form of r' = r^(1 - k), with maximum magnification at the center
     const factor = 1 + strength * (1 - normalized);
     if (factor <= 0.01) return { x, y };
     return { x: cx + dx / factor, y: cy + dy / factor };
@@ -121,7 +121,7 @@ export function applySpherize(
   data.set(result);
 }
 
-/** 挤压：向中心收缩（沿半径方向拉伸取样点） */
+/** Pinch: contract toward the center (stretch the sample point along the radius) */
 export function applyPinch(
   width: number,
   height: number,
@@ -143,7 +143,7 @@ export function applyPinch(
   data.set(result);
 }
 
-/** Sobel 梯度幅值（0~510）；风格化类滤镜共用 */
+/** Sobel gradient magnitude (0~510), shared by the stylize filters */
 export function sobelMagnitude(
   data: Uint8ClampedArray,
   width: number,
@@ -174,7 +174,7 @@ export function sobelMagnitude(
   return Math.hypot(gx, gy);
 }
 
-/** 查找边缘：白底暗线（与 Photoshop 的呈现一致） */
+/** Find edges: dark lines on white (matching Photoshop's look) */
 export function applyFindEdges(width: number, height: number, data: Uint8ClampedArray): void {
   const source = new Uint8ClampedArray(data);
   for (let y = 0; y < height; y += 1) {
@@ -189,7 +189,7 @@ export function applyFindEdges(width: number, height: number, data: Uint8Clamped
   }
 }
 
-/** 等高线：梯度超过阈值的像素压黑，其余压白 */
+/** Trace contour: pixels whose gradient exceeds the threshold go black, the rest go white */
 export function applyTraceContour(
   width: number,
   height: number,
@@ -210,13 +210,13 @@ export function applyTraceContour(
   }
 }
 
-/** 坐标哈希 → 0~1 的确定性伪随机（云彩 / 渲染类用） */
+/** Coordinate hash → deterministic pseudo-random in 0~1 (used by clouds / render filters) */
 function hashNoise(x: number, y: number, seed: number): number {
   const value = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453;
   return value - Math.floor(value);
 }
 
-/** 值噪声：对网格取哈希后做平滑插值（云彩的基础） */
+/** Value noise: hash the lattice, then interpolate smoothly (the basis of clouds) */
 function valueNoise(x: number, y: number, seed: number): number {
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
@@ -231,9 +231,9 @@ function valueNoise(x: number, y: number, seed: number): number {
 }
 
 /**
- * 云彩：多层值噪声叠加（分形），再按强度与画面混合。
+ * Clouds: several octaves of value noise summed (fractal), then blended in by strength.
  *
- * 噪声完全由坐标决定，因此同一份参数重复烘焙得到完全相同的云。
+ * Noise depends only on coordinates, so rebaking the same parameters yields identical clouds.
  */
 export function applyClouds(
   width: number,
@@ -264,7 +264,7 @@ export function applyClouds(
   }
 }
 
-/** 镜头光晕：中心光斑 + 光环 + 两个对称鬼影（叠加到原图上） */
+/** Lens flare: center spot + halo + two symmetric ghosts (added over the image) */
 export function applyLensFlare(
   width: number,
   height: number,
@@ -279,7 +279,7 @@ export function applyLensFlare(
   const cx = (Math.max(0, Math.min(100, xPercent)) / 100) * width;
   const cy = (Math.max(0, Math.min(100, yPercent)) / 100) * height;
   const radius = (Math.max(10, size) / 100) * Math.max(width, height);
-  // 鬼影沿「光斑 → 中心对称点」这条经典轨迹分布（比例 0 / 0.5 / 1）
+  // Ghosts follow the classic "spot → mirrored center point" line (at ratios 0 / 0.5 / 1)
   const mirrorX = width - cx;
   const mirrorY = height - cy;
   const ghosts = [
@@ -297,9 +297,9 @@ export function applyLensFlare(
       let add = 0;
       for (const ghost of ghosts) {
         const distance = Math.hypot(x - ghost.x, y - ghost.y) / (radius * ghost.scale);
-        // 光斑（平顶衰减）+ 外圈光环
+        // Spot (flat-top falloff) plus the outer halo
         add += Math.exp(-distance * distance * 3) * ghost.gain;
-        // 光环要窄：太宽会让整个画面发灰（实测 8 的宽度会让角落亮 20 级）
+        // The halo must stay narrow: too wide grays out the frame (width 8 brightens corners by 20 levels)
         add += Math.exp(-((distance - 1.3) ** 2) * 20) * ghost.gain * 0.5;
       }
       if (add <= 0.001) continue;
@@ -313,10 +313,10 @@ export function applyLensFlare(
 }
 
 /**
- * 降噪：中值滤波（对椒盐噪声最有效），再按强度与原图混合。
+ * Noise reduction: median filter (best on salt-and-pepper noise), then blended in by strength.
  *
- * 没有做双边滤波是刻意的：中值只依赖排序、无浮点累积误差，
- * 且「保边」特性足以应付照片噪点；强度滑杆让用户自己权衡细节。
+ * Skipping the bilateral filter is deliberate: median depends only on sorting, with no float accumulation,
+ * and its edge preservation handles photo grain; the strength slider lets users trade off detail themselves.
  */
 export function applyReduceNoise(
   width: number,
@@ -351,7 +351,7 @@ export function applyReduceNoise(
   }
 }
 
-/** 需要走像素管线的扩展滤镜（CSS filter 无法表达） */
+/** Extra filters that need the pixel pipeline (CSS filter can't express them) */
 const EXTRA_IDS: FilterId[] = [
   'twirl',
   'spherize',

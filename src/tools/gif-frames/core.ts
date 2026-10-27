@@ -2,7 +2,7 @@ import { decompressFrames, parseGIF } from 'gifuct-js';
 import type { ToolResult } from '@/core/types';
 
 /**
- * GIF 拆帧：解析帧数据（合成在 UI canvas）。
+ * GIF frame extraction: parse frame data (compositing happens on a UI canvas).
  */
 
 export type GifError = 'NOT_GIF' | 'EMPTY' | 'PARSE';

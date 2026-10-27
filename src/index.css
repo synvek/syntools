@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Markdown 预览排版（T41）：外部 CSS 以符合严格 CSP（禁内联 style 标签） */
+/* Markdown preview typography (T41): external CSS to satisfy the strict CSP (no inline style tags) */
 .markdown-body {
   @apply text-sm leading-6 text-gray-800 dark:text-gray-100;
   word-wrap: break-word;
@@ -78,7 +78,7 @@
   @apply text-gray-400 dark:text-gray-500;
 }
 
-/* Markdown → 图片导出卡片：不受 dark 主题影响，颜色由内联 style 控制 */
+/* Markdown → image export card: unaffected by the dark theme, colors come from inline style */
 .md-to-image-card {
   word-wrap: break-word;
   text-align: left;
@@ -187,7 +187,7 @@
   text-decoration: line-through;
 }
 
-/* Markdown 语法高亮编辑器（CodeJar + Prism） */
+/* Markdown syntax-highlighted editor (CodeJar + Prism) */
 .md-editor .md-editor-surface {
   @apply min-h-[320px] whitespace-pre-wrap break-words bg-transparent;
   tab-size: 2;
@@ -235,7 +235,7 @@
   @apply text-gray-400;
 }
 
-/* 代码生成图片卡片内 Prism 高亮 */
+/* Prism highlighting inside the code-to-image card */
 .code-image-card .token.comment,
 .code-image-card .token.prolog,
 .code-image-card .token.doctype {

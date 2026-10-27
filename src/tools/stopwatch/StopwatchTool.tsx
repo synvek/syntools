@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buildLap,
-  computeElapsed,
-  formatStopwatch,
-  type LapRecord,
-} from './core';
+import { buildLap, computeElapsed, formatStopwatch, type LapRecord } from './core';
 
-/** 在线秒表 */
+/** Online stopwatch */
 export default function StopwatchTool() {
   const { t } = useTranslation();
   const [baseElapsed, setBaseElapsed] = useState(0);

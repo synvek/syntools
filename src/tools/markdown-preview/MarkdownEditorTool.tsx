@@ -28,9 +28,9 @@ import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor';
 import { Outline } from './Outline';
 
 const MODES: MarkdownViewMode[] = ['edit', 'split', 'preview'];
-/** 草稿写入节流：输入停顿后再落盘，避免每次按键都写 localStorage */
+/** Draft write throttle: persist after typing pauses instead of on every keystroke */
 const DRAFT_DEBOUNCE_MS = 800;
-/** 提示条的展示时长 */
+/** How long the notice stays visible */
 const NOTICE_MS = 2400;
 const ACCEPT = '.md,.markdown,.txt,text/markdown,text/plain';
 
@@ -38,10 +38,11 @@ const GHOST_BUTTON =
   'inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-600 transition-colors duration-150 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800';
 
 /**
- * Markdown 编辑器：CodeJar 语法高亮 + 实时预览 + 大纲 + 统计 + 文件读写。
+ * Markdown editor: CodeJar syntax highlighting + live preview + outline + stats + file I/O.
  *
- * 三种视图：编辑 / 分屏 / 预览；分屏时编辑器滚动按比例带动预览。
- * 内容与偏好自动存入 localStorage 草稿，刷新或误关后自动恢复。
+ * Three views: edit / split / preview; in split view the preview follows the editor's scroll ratio.
+ * Content and preferences are saved to a localStorage draft and restored after a reload or a
+ * mistaken close.
  */
 export default function MarkdownEditorTool() {
   const { t } = useTranslation();
@@ -79,7 +80,7 @@ export default function MarkdownEditorTool() {
     [],
   );
 
-  // 首次进入：分享链接优先；否则恢复本地草稿
+  // First visit: prefer the share link, otherwise restore the local draft
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
@@ -96,7 +97,7 @@ export default function MarkdownEditorTool() {
     if (draft.text) notify('tools.markdown.draftRestored');
   }, [init.i, notify]);
 
-  // 草稿写入（节流）；首次渲染跳过，避免用初始值覆盖刚读出的草稿
+  // Draft write (throttled); skipped on first render so the initial value cannot clobber the restored draft
   useEffect(() => {
     if (skipSaveRef.current) {
       skipSaveRef.current = false;
@@ -123,7 +124,7 @@ export default function MarkdownEditorTool() {
     downloadText(text, withExtension(name || DEFAULT_DOCUMENT_NAME, '.md'));
   }, [text, name]);
 
-  // Ctrl/⌘+S 保存（编辑器与预览区通用）
+  // Ctrl/⌘+S saves (works in both the editor and the preview)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
@@ -186,7 +187,7 @@ export default function MarkdownEditorTool() {
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    // 清空以便重复选择同一个文件
+    // Clear so selecting the same file again still fires
     e.target.value = '';
     if (file) void loadFile(file);
   };

@@ -14,7 +14,7 @@ import {
 } from './core';
 import { PROMPT_CATEGORIES, PROMPTS } from './data';
 
-/** AI 提示词库：数据驱动的多分类多语言提示词检索与一键复制 */
+/** AI prompt library: data-driven, multi-category, multilingual prompt search with one-click copy */
 export default function AiPromptsTool() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language || 'en';
@@ -33,7 +33,7 @@ export default function AiPromptsTool() {
       : ALL_CATEGORY;
   });
 
-  // 条目较多时保证输入框跟手：列表渲染降为低优先级更新
+  // Keep typing responsive with many entries: render the list as a low-priority update
   const deferredQuery = useDeferredValue(query);
   const list = useMemo(() => filterPrompts(deferredQuery, category), [deferredQuery, category]);
 

@@ -45,7 +45,7 @@ export function filterWebColors(
   });
 }
 
-/** 浅色背景用深色字，深色背景用浅色字 */
+/** Dark text on light backgrounds, light text on dark backgrounds */
 export function contrastText(hex: string): '#111827' | '#f9fafb' {
   const rgb = hexToRgb(hex);
   if (!rgb) return '#111827';

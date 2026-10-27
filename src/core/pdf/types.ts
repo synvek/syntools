@@ -1,4 +1,4 @@
-/** PDF 工具公共类型与限制 */
+/** Shared PDF tool types and limits */
 
 export type PdfError =
   | 'EMPTY'
@@ -12,10 +12,10 @@ export type PdfError =
   | 'NEED_PASSWORD'
   | 'WRONG_PASSWORD';
 
-/** 单文件建议上限 50MB */
+/** Recommended 50MB limit per file */
 export const PDF_MAX_BYTES = 50 * 1024 * 1024;
 
-/** 缩略图渲染缩放 */
+/** Scale used when rendering thumbnails */
 export const PDF_THUMB_SCALE = 0.25;
 
 export function isPdfFile(file: File): boolean {

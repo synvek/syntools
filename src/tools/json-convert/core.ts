@@ -3,8 +3,8 @@ import { XMLBuilder } from 'fast-xml-parser';
 import type { ToolResult } from '@/core/types';
 
 /**
- * JSON 解析并转换为 YAML / XML / CSV。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译。
+ * Parse JSON and convert it to YAML / XML / CSV.
+ * Error codes are decoupled from copy: core returns language-neutral codes that the UI translates via i18n.
  */
 
 export type JsonTarget = 'yaml' | 'xml' | 'csv';
@@ -18,7 +18,7 @@ function escapeCsvCell(value: unknown): string {
   return text;
 }
 
-/** 对象数组 → CSV；非数组或元素非对象时返回 null */
+/** Array of objects → CSV; null when the value is not an array or holds non-object items */
 export function jsonToCsv(value: unknown): string | null {
   if (!Array.isArray(value) || value.length === 0) return null;
   if (!value.every((row) => row !== null && typeof row === 'object' && !Array.isArray(row))) {
@@ -43,7 +43,7 @@ export function jsonToCsv(value: unknown): string | null {
   return lines.join('\n');
 }
 
-/** JS 值 → 简单 XML（根节点 root） */
+/** JS value → simple XML (root element named root) */
 export function jsonToXml(value: unknown): string {
   const builder = new XMLBuilder({
     ignoreAttributes: false,
@@ -52,7 +52,7 @@ export function jsonToXml(value: unknown): string {
     indentBy: '  ',
     suppressEmptyNode: true,
   });
-  // 标量 / 数组需要包一层 root
+  // Scalars and arrays need a root element wrapper
   const wrapped =
     value !== null && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)

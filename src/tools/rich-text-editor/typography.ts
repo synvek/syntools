@@ -1,21 +1,22 @@
 /**
- * 字体与排版默认值（纯逻辑 + 可注入的浏览器能力探测，便于单测）。
+ * Font and typography defaults (pure logic + injectable browser capability probing, easy to unit test).
  *
- * 设计前提：本工具完全本地渲染、字体不随文档分发，因此字体菜单只列出
- * 「当前系统实际安装」的字体，而不是一份写死的清单——否则用户选了却看不到效果。
+ * Design premise: this tool renders fully locally and fonts aren't distributed with the document, so the
+ * font menu lists only fonts actually installed on the current system rather than a hard-coded list —
+ * otherwise users pick a font and see no effect.
  */
 
-/** 正文默认字号（px），必须与 editor.css 中 .rte-surface .tiptap 的 font-size 一致 */
+/** Default body font size (px); must match font-size of .rte-surface .tiptap in editor.css */
 export const DEFAULT_FONT_SIZE_PX = 15;
-/** 正文默认行高，必须与 editor.css 中 .rte-surface .tiptap 的 line-height 一致 */
+/** Default body line height; must match line-height of .rte-surface .tiptap in editor.css */
 export const DEFAULT_LINE_HEIGHT = 1.8;
 
-/** 可选字号（px）：不含默认值本身，默认值单独作为首项展示 */
+/** Available font sizes (px): excluding the default, which is shown separately as the first entry */
 export const FONT_SIZE_OPTIONS = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 48, 72] as const;
-/** 可选行高：不含默认值本身 */
+/** Available line heights: excluding the default */
 export const LINE_HEIGHT_OPTIONS = [1, 1.15, 1.5, 1.75, 2, 2.5, 3] as const;
 
-/** CSS 通用字体族与关键字：不构成「具体字体名」 */
+/** CSS generic families and keywords: they don't count as a concrete font name */
 const GENERIC_FAMILIES = new Set([
   'serif',
   'sans-serif',
@@ -39,15 +40,15 @@ const GENERIC_FAMILIES = new Set([
   'revert-layer',
 ]);
 
-/** 候选字体：name 为具体字体名，fallback 为该字体缺失时退回的通用族 */
+/** Font candidate: name is the concrete font, fallback is the generic family used when it's missing */
 export interface FontCandidate {
   name: string;
   fallback: 'sans-serif' | 'serif' | 'monospace' | 'cursive';
 }
 
-/** 候选字体清单（按「中文正文 → 西文无衬线 → 衬线 → 等宽 → 手写/装饰」排序） */
+/** Candidate font list (ordered: CJK body text -> Latin sans-serif -> serif -> monospace -> script/decorative) */
 export const FONT_CANDIDATES: readonly FontCandidate[] = [
-  // 中文字体（macOS / Windows / Linux 常见内置）
+  // CJK fonts (commonly bundled on macOS / Windows / Linux)
   { name: 'PingFang SC', fallback: 'sans-serif' },
   { name: 'PingFang TC', fallback: 'sans-serif' },
   { name: 'Hiragino Sans GB', fallback: 'sans-serif' },
@@ -72,7 +73,7 @@ export const FONT_CANDIDATES: readonly FontCandidate[] = [
   { name: 'FangSong', fallback: 'serif' },
   { name: 'Yuanti SC', fallback: 'sans-serif' },
   { name: 'Lantinghei SC', fallback: 'sans-serif' },
-  // 西文无衬线
+  // Latin sans-serif
   { name: 'Arial', fallback: 'sans-serif' },
   { name: 'Helvetica', fallback: 'sans-serif' },
   { name: 'Helvetica Neue', fallback: 'sans-serif' },
@@ -93,7 +94,7 @@ export const FONT_CANDIDATES: readonly FontCandidate[] = [
   { name: 'DejaVu Sans', fallback: 'sans-serif' },
   { name: 'Liberation Sans', fallback: 'sans-serif' },
   { name: 'Noto Sans', fallback: 'sans-serif' },
-  // 衬线
+  // Serif
   { name: 'Times New Roman', fallback: 'serif' },
   { name: 'Georgia', fallback: 'serif' },
   { name: 'Cambria', fallback: 'serif' },
@@ -110,7 +111,7 @@ export const FONT_CANDIDATES: readonly FontCandidate[] = [
   { name: 'DejaVu Serif', fallback: 'serif' },
   { name: 'Liberation Serif', fallback: 'serif' },
   { name: 'Noto Serif', fallback: 'serif' },
-  // 等宽
+  // Monospace
   { name: 'Menlo', fallback: 'monospace' },
   { name: 'Monaco', fallback: 'monospace' },
   { name: 'SF Mono', fallback: 'monospace' },
@@ -124,7 +125,7 @@ export const FONT_CANDIDATES: readonly FontCandidate[] = [
   { name: 'DejaVu Sans Mono', fallback: 'monospace' },
   { name: 'Liberation Mono', fallback: 'monospace' },
   { name: 'Noto Sans Mono', fallback: 'monospace' },
-  // 手写 / 装饰
+  // Script / decorative
   { name: 'Chalkboard SE', fallback: 'cursive' },
   { name: 'Marker Felt', fallback: 'cursive' },
   { name: 'Comic Sans MS', fallback: 'cursive' },
@@ -133,7 +134,7 @@ export const FONT_CANDIDATES: readonly FontCandidate[] = [
   { name: 'Impact', fallback: 'sans-serif' },
 ];
 
-/** 从 CSS 字体栈中取第一个「具体字体名」（跳过 system-ui / sans-serif 等关键字） */
+/** Take the first concrete font name from a CSS font stack (skipping keywords like system-ui / sans-serif) */
 export function firstFontFamily(stack: string | null | undefined): string | null {
   if (!stack) return null;
   for (const raw of stack.split(',')) {
@@ -148,18 +149,18 @@ export function firstFontFamily(stack: string | null | undefined): string | null
   return null;
 }
 
-/** 具体字体名 + 兜底族 → CSS font-family 值（名称一律加引号，含空格/中文都安全） */
+/** Concrete font name + fallback family -> CSS font-family value (always quoted, safe with spaces or CJK) */
 export function fontStackFor(candidate: FontCandidate): string {
   return `"${candidate.name}", ${candidate.fallback}`;
 }
 
-/** px → Word 半磅值（1px = 0.75pt，半磅 = pt × 2） */
+/** px -> Word half-points (1px = 0.75pt, half-point = pt × 2) */
 export function pxToHalfPoints(px: number): number | null {
   if (!Number.isFinite(px) || px <= 0) return null;
   return Math.round(px * 1.5);
 }
 
-/** 平台默认正文字体名（未显式设置 fontFamily 时实际生效的字体） */
+/** Platform default body font name (the font actually applied when fontFamily isn't set) */
 export function detectDefaultFontName(userAgent: string, platform = ''): string {
   const hint = `${platform} ${userAgent}`;
   if (/mac|iphone|ipad/i.test(hint)) return 'PingFang SC';
@@ -167,13 +168,13 @@ export function detectDefaultFontName(userAgent: string, platform = ''): string 
   return 'Noto Sans CJK SC';
 }
 
-/** 字体探测函数：给定 CSS font 简写返回测量宽度，不可用时返回 null */
+/** Font probe: returns the measured width for a CSS font shorthand, or null when unavailable */
 export type FontProbe = (font: string) => number | null;
 
 const PROBE_SAMPLE = 'mmmmmmmmmmlliWW漢字';
 const PROBE_FALLBACKS = ['monospace', 'serif', 'sans-serif'] as const;
 
-/** 浏览器 canvas 字体测量探针（同一字号下比较宽度差异） */
+/** Browser canvas font-measurement probe (compares width differences at the same size) */
 export function createSystemFontProbe(): FontProbe {
   if (typeof document === 'undefined') return () => null;
   const canvas = document.createElement('canvas');
@@ -186,8 +187,9 @@ export function createSystemFontProbe(): FontProbe {
 }
 
 /**
- * 判断字体是否真实安装：与三个通用族逐一比对，只要有一个宽度不同即视为已安装。
- * 若字体缺失，浏览器会完全回退到通用族，宽度与基准一致。
+ * Check whether a font is really installed: compare against three generic families; any width difference
+ * means installed. When the font is missing the browser falls back to the generic family entirely and
+ * widths match the baseline.
  */
 export function isFontInstalled(name: string, probe: FontProbe): boolean {
   return PROBE_FALLBACKS.some((fallback) => {
@@ -198,7 +200,7 @@ export function isFontInstalled(name: string, probe: FontProbe): boolean {
   });
 }
 
-/** 探测系统已安装的候选字体（保持候选清单顺序）；探测不可用时返回空数组 */
+/** Detect installed candidate fonts (keeping list order); returns an empty array when probing is unavailable */
 export function detectInstalledFonts(
   probe: FontProbe,
   candidates: readonly FontCandidate[] = FONT_CANDIDATES,
@@ -208,9 +210,9 @@ export function detectInstalledFonts(
 }
 
 /**
- * 构建字体下拉选项：
- * 首项为「文档默认字体」（显示具体字体名，未安装时由调用方传入通用文案），
- * 其后为系统已安装的具体字体（与首项重名时去重）。
+ * Build the font dropdown options:
+ * the first entry is "document default font" (showing the concrete name; callers pass a generic label
+ * when it isn't installed), followed by the installed concrete fonts (deduped against the first entry).
  */
 export function buildFontOptions(
   available: readonly FontCandidate[],
@@ -228,7 +230,7 @@ export function buildFontOptions(
   return options;
 }
 
-/** 已设置的字体系列（可能是旧版字体栈）→ 下拉可匹配的选项值 */
+/** An applied font family (possibly a legacy stack) -> the matching option value for the dropdown */
 export function matchFontOption(
   stack: string | null | undefined,
   options: readonly { value: string; label: string }[],

@@ -1,10 +1,10 @@
 /*
- * 代码编辑器样式：配色由 themes.ts 注入的 `--ce-*` 自定义属性驱动，
- * 编辑区 / 导出预览卡片 / 导出的独立 HTML 共用同一套变量，保证所见即所得。
+ * Code editor styles: colours come from the `--ce-*` custom properties injected by themes.ts,
+ * shared by the editor, the export preview card and the standalone HTML, keeping WYSIWYG exact.
  *
- * 行高由 `lineHeight.ts` 的 LINE_HEIGHT_PX 以内联 `--ce-line-h` 注入：
- * 覆盖层（当前行、查找命中、缩进引导线）按行号换算像素位置，
- * 因此这里不能再写 `line-height: 1.6`（20.8px 会产生亚像素漂移）。
+ * Line height is injected by `lineHeight.ts` (LINE_HEIGHT_PX) as the inline `--ce-line-h`:
+ * overlays (current line, find matches, indent guides) convert line numbers to pixels, so
+ * `line-height: 1.6` must not be used here (20.8px would drift into subpixels).
  */
 
 .ce-code {
@@ -23,7 +23,7 @@
   overflow: auto;
 }
 
-/* 编辑区与覆盖层的共同定位基准：宽度跟随内容（横向可滚），覆盖层随之滚动 */
+/* Shared positioning context for the editor and overlay: width follows content (h-scrollable) */
 .ce-stage {
   position: relative;
   display: flex;
@@ -34,7 +34,7 @@
 .ce-gutter {
   position: sticky;
   left: 0;
-  /* 高于 .ce-surface（z-index: 1）：横向滚动时行号槽始终压在代码之上 */
+  /* Above .ce-surface (z-index: 1) so the gutter stays over the code while scrolling horizontally */
   z-index: 2;
   flex: 0 0 auto;
   padding: 12px 10px 12px 14px;
@@ -51,7 +51,7 @@
 
 .ce-surface {
   position: relative;
-  /* 高于覆盖层：当前行底色透在文字下方而不遮挡文字 */
+  /* Above the overlay so the current-line tint sits under the text without hiding it */
   z-index: 1;
   flex: 1 0 auto;
   min-width: 0;
@@ -70,17 +70,17 @@
   overflow-wrap: anywhere;
 }
 
-/* 覆盖层：与 .ce-surface 同级、位于滚动内容内 —— CodeJar 每次重绘都会重写
-   编辑区的 innerHTML，装饰节点只能放在 contenteditable 之外。
-   不设 z-index 与 overflow：装饰节点留在文字下方（.ce-surface 为 z-index: 1），
-   而折叠标记 / 徽标自带更高 z-index 且允许伸进行号槽。 */
+/* Overlay: a sibling of .ce-surface inside the scroll content — CodeJar rewrites the editor's
+   innerHTML on every repaint, so decorative nodes must live outside the contenteditable.
+   No z-index or overflow here: decorations stay below the text (.ce-surface is z-index: 1),
+   while fold markers / badges carry their own higher z-index and may extend into the gutter. */
 .ce-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
 
-/* 当前行高亮：整行低透明度底色（深浅主题下由 --ce-fg 自动适配） */
+/* Current-line highlight: a very faint full-width tint (adapts to light / dark via --ce-fg) */
 .ce-line-active {
   position: absolute;
   left: 0;
@@ -90,8 +90,9 @@
   opacity: 0.08;
 }
 
-/* 查找命中：行级淡底（编辑区是 contenteditable，无法安全地插入行内高亮节点，
-   命中范围由原生选区承担，行级底色用于指示「还有哪些行有命中」） */
+/* Find matches: a faint line-level tint (the editor is a contenteditable, so inline highlight
+   nodes cannot be inserted safely; the native selection marks the match itself and this tint
+   indicates which lines contain matches) */
 .ce-match {
   position: absolute;
   left: 0;
@@ -101,13 +102,13 @@
   opacity: 0.05;
 }
 
-/* 当前命中：加深底色 + 左侧主题色强调条 */
+/* Current match: deeper tint plus a left accent bar in the theme colour */
 .ce-match-current {
   opacity: 0.14;
   border-left: 3px solid var(--ce-keyword);
 }
 
-/* 批量替换目标（同词多处）：比普通命中更强，且用另一主题色区分 */
+/* Batch replacement targets (same word, several places): stronger than a plain match, in another theme colour */
 .ce-multi {
   position: absolute;
   left: 0;
@@ -118,7 +119,7 @@
   border-left: 3px solid var(--ce-function);
 }
 
-/* 缩进引导线：按列定位的浅色竖线（列宽用 ch，等宽字体下与前导空格严格对齐） */
+/* Indent guides: faint vertical lines positioned by column (`ch` aligns exactly in a monospace font) */
 .ce-guide {
   position: absolute;
   width: 1px;
@@ -127,7 +128,7 @@
   opacity: 0.12;
 }
 
-/* 括号配对：按 DOM 实测像素描边（含 CJK 的行也能对齐） */
+/* Bracket pairs: outlined at DOM-measured pixels (aligns even on lines containing CJK) */
 .ce-bracket {
   position: absolute;
   box-sizing: border-box;
@@ -136,7 +137,7 @@
   opacity: 0.55;
 }
 
-/* 折叠范围：整段淡底 + 左侧强调条（CodeJar 无法隐藏行，故以范围标记呈现） */
+/* Fold range: faint tint over the block plus a left accent bar (CodeJar cannot hide lines, so a range marker) */
 .ce-fold-band {
   position: absolute;
   left: 0;
@@ -146,7 +147,7 @@
   border-left: 3px solid var(--ce-keyword);
 }
 
-/* 折叠标记：位于行号槽内，点击切换范围高亮 */
+/* Fold marker: sits in the gutter; clicking toggles the range highlight */
 .ce-fold-marker {
   position: absolute;
   left: -18px;
@@ -173,7 +174,7 @@
   opacity: 1;
 }
 
-/* 折叠徽标：行数 + 一键复制该段 */
+/* Fold badge: line count plus one-click copy of the block */
 .ce-fold-badge {
   position: absolute;
   right: 8px;
@@ -217,8 +218,8 @@
   pointer-events: none;
 }
 
-/* 导出预览卡片：版式由 cardOptions.ts 的 --ce-card-* 变量驱动，
-   正文结构与独立 HTML 共用（见 cardOptions.buildCardBodyHtml），保证所见即所得 */
+/* Export preview card: layout driven by the --ce-card-* variables from cardOptions.ts, with the
+   same body structure as the standalone HTML (see cardOptions.buildCardBodyHtml) for WYSIWYG */
 .ce-card {
   position: relative;
   border: 1px solid var(--ce-border);
@@ -296,7 +297,7 @@
   color: var(--ce-gutter);
 }
 
-/* Prism token 着色 */
+/* Prism token colours */
 .ce-code .token.comment,
 .ce-card .token.comment {
   color: var(--ce-comment);

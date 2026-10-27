@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-  type UIEvent,
-} from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode, type UIEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClearButton, OptionBar, SwapButton } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
@@ -50,7 +43,7 @@ interface DiffEditorPaneProps {
   annotations: AnnotatedLine[];
 }
 
-/** 带行号与行内差异高亮的可编辑面板（高亮层 + 透明 textarea 叠层） */
+/** Editable panel with line numbers and inline diff highlighting (highlight layer + transparent textarea overlay) */
 function DiffEditorPane({
   label,
   value,
@@ -111,7 +104,8 @@ function DiffEditorPane({
           >
             {annotations.map((line, i) => (
               <span key={i} className="block w-full">
-                {line.segments.length === 0 || (line.segments.length === 1 && !line.segments[0].text) ? (
+                {line.segments.length === 0 ||
+                (line.segments.length === 1 && !line.segments[0].text) ? (
                   <span className={SEG_BG[line.type] || undefined}>{'\u00a0'}</span>
                 ) : (
                   line.segments.map((seg, j) => (
@@ -140,7 +134,7 @@ function DiffEditorPane({
   );
 }
 
-/** 在线文本比较：左右编辑器内行动态高亮 + 行号 */
+/** Online text diff: live inline highlighting in both editors + line numbers */
 export default function TextDiffTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ o: '', n: '', w: 0 }), []);
@@ -163,21 +157,11 @@ export default function TextDiffTool() {
   const rightLines = useMemo(() => splitEditorLines(newText), [newText]);
 
   const leftAnnotated = useMemo(
-    () =>
-      alignAnnotations(
-        leftLines,
-        result.ok ? result.value.left : undefined,
-        'same',
-      ),
+    () => alignAnnotations(leftLines, result.ok ? result.value.left : undefined, 'same'),
     [leftLines, result],
   );
   const rightAnnotated = useMemo(
-    () =>
-      alignAnnotations(
-        rightLines,
-        result.ok ? result.value.right : undefined,
-        'same',
-      ),
+    () => alignAnnotations(rightLines, result.ok ? result.value.right : undefined, 'same'),
     [rightLines, result],
   );
 
@@ -203,9 +187,7 @@ export default function TextDiffTool() {
           {t('tools.textDiff.ignoreWhitespace')}
         </label>
         <SwapButton onSwap={swap} label={t('tools.textDiff.swapSides')} disabled={!hasInput} />
-        <ShareButton
-          getState={() => ({ o: oldText, n: newText, w: ignoreWhitespace ? 1 : 0 })}
-        />
+        <ShareButton getState={() => ({ o: oldText, n: newText, w: ignoreWhitespace ? 1 : 0 })} />
         {result.ok && hasInput && (
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {identical

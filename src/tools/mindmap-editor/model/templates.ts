@@ -1,7 +1,7 @@
 /**
- * 脑图预设模板：模板内的节点文案统一为英文（与默认新建文案保持一致），
- * 模板在侧边栏 / 弹窗中的展示名仍走 i18n（键 `tools.mindmap.template*`）。
- * 载入模板会替换当前脑图内容。
+ * Mind map presets: node text inside a template is always English (matching the default new-node
+ * text), while template display names in the sidebar / dialog still go through i18n
+ * (keys `tools.mindmap.template*`). Loading a template replaces the current map content.
  */
 
 import { createId } from './tree';
@@ -177,7 +177,7 @@ function flatten(spec: Spec, parentId: string | null, out: MindNodeRec[]): void 
   for (const child of spec.children ?? []) flatten(child, id, out);
 }
 
-/** 生成模板脑图（每次调用都是全新 id） */
+/** Build a template map (fresh ids on every call) */
 export function buildMindTemplate(kind: MindTemplateKind): MindDoc {
   const entry = SPECS[kind] ?? SPECS.project;
   const nodes: MindNodeRec[] = [];

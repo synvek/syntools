@@ -5,21 +5,21 @@ import { angleFromCenter, normalizeRotation, snapRotation } from '../core';
 import { ROTATION_FINE_STEP, ROTATION_SNAP_STEP, type FlowNodeStyle } from '../model/types';
 
 /**
- * 手柄相对节点顶边的距离（px）。
- * 需同时避开顶边中点的缩放把手与「向上」快连箭头（18×18、中心在顶边上方 18px）：
- * 取 40 让手柄底边（-31）位于快连箭头顶边（-27）之上，否则手柄会抢走箭头的指针事件。
+ * Distance from the handle to the node's top edge (px).
+ * It must clear both the top-center resize handle and the "up" quick-connect arrow (18×18, centered 18px above the top edge):
+ * 40 puts the handle's bottom edge (-31) above the arrow's top edge (-27), otherwise the handle steals the arrow's pointer events.
  */
 const HANDLE_OFFSET = 40;
 
 /**
- * 节点旋转手柄（类 Figma / draw.io 的旋转顶点）。
+ * Node rotate handle (Figma / draw.io style rotation vertex).
  *
- * - 拖拽时按「指针相对节点中心的方位角」旋转，拖动过程合并为一次撤销；
- * - 默认 15° 吸附，按住 Shift 以 45° 步进，按住 Alt 自由角度；
- * - 拖动过程显示角度读数，双击复位到 0°。
+ * - Dragging rotates by the pointer's bearing relative to the node center, coalesced into one undo step;
+ * - snaps to 15° by default, 45° steps while holding Shift, free angle while holding Alt;
+ * - an angle readout shows while dragging, and a double-click resets to 0°.
  *
- * 手柄渲染在**未旋转**的外层容器上（与缩放把手、连线锚点一致），
- * 因此旋转后手柄位置依然可预期、可命中。
+ * The handle renders on the **unrotated** outer container (like the resize handles and edge anchors),
+ * so its position stays predictable and hittable after rotation.
  */
 export function ShapeRotateHandle({
   nodeId,
@@ -28,16 +28,16 @@ export function ShapeRotateHandle({
 }: {
   nodeId: string;
   style: FlowNodeStyle;
-  /** 节点根节点引用：用于把指针屏幕坐标换算回节点本地坐标（自动适配缩放与父偏移） */
+  /** Node root ref: converts pointer screen coordinates back to node-local coordinates (handling zoom and parent offsets) */
   containerRef: RefObject<HTMLDivElement | null>;
 }) {
   const { t } = useTranslation();
   const [reading, setReading] = useState<number | null>(null);
   const dragging = useRef<{
     rect: DOMRect;
-    /** 按下时的指针方位角（度） */
+    /** Pointer bearing at pointer-down (degrees) */
     startAngle: number;
-    /** 按下时的节点角度（度） */
+    /** Node angle at pointer-down (degrees) */
     startRotation: number;
   } | null>(null);
 
@@ -49,7 +49,7 @@ export function ShapeRotateHandle({
     if (!el) return;
     e.stopPropagation();
     e.preventDefault();
-    // 会话起点提交历史，pointermove 期间不再入栈（与形状调整手柄一致）
+    // Commit history once at the start of the gesture; pointermove does not push again (matching the shape adjust handles)
     useFlowStore.getState().commit();
     const rect = el.getBoundingClientRect();
     dragging.current = {
@@ -78,7 +78,7 @@ export function ShapeRotateHandle({
       e.clientX,
       e.clientY,
     );
-    // 用「相对位移」而非绝对方位角，避免按下瞬间图形跳到指针方向
+    // Use the relative displacement rather than the absolute bearing, so the shape does not jump to the pointer direction on press
     const raw = d.startRotation + (angle - d.startAngle);
     const next = e.altKey
       ? normalizeRotation(raw)

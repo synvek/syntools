@@ -42,42 +42,42 @@ import './editor.css';
 export interface CodeSurfaceProps {
   value: string;
   onChange: (value: string) => void;
-  /** Prism 语法名，'none' 表示不高亮 */
+  /** Prism grammar name; 'none' disables highlighting */
   prismKey: string;
-  /** 主题变量（--ce-*） */
+  /** Theme variables (`--ce-*`) */
   themeVars: Record<string, string>;
-  /** Tab 键插入的缩进单元 */
+  /** Indent unit inserted by the Tab key */
   indentUnit: string;
   showLineNumbers: boolean;
   wordWrap: boolean;
-  /** 当前语言：提供注释符（行操作）与折叠模式（括号 / 缩进） */
+  /** Current language: supplies comment markers (line ops) and fold mode (brackets / indent) */
   spec: LangSpec;
-  /** 需要 UI 参与的动作（格式化 / 跳转行 / 查找）交给工具层，返回是否已处理 */
+  /** Actions needing UI involvement (format / go-to-line / find) go to the tool layer; returns whether handled */
   onAction?: (action: EditorAction) => boolean;
-  /** 查找命中（由工具层计算，覆盖层只渲染可视区域内的高亮） */
+  /** Find matches (computed by the tool layer; the overlay renders visible ones only) */
   matches?: FindMatch[];
-  /** 当前命中（高亮强度更高） */
+  /** Current match (highlighted more strongly) */
   currentMatch?: FindMatch | null;
-  /** 批量替换的目标位置（同词多处） */
+  /** Targets for batch replacement (all occurrences of a word) */
   multiRanges?: TextRange[];
   placeholder?: string;
   ariaLabel: string;
 }
 
-/** 编辑器动作入口：工具栏按钮与快捷键走同一套逻辑 */
+/** Editor action entry point: toolbar buttons and shortcuts share this logic */
 export interface CodeSurfaceHandle {
   runAction: (action: EditorAction) => boolean;
-  /** 选中并滚动到指定行（跳转行使用） */
+  /** Select the given line and scroll it into view (for go-to-line) */
   focusLine: (line: number) => void;
-  /** 取光标所在词在全文中出现的位置（批量替换使用） */
+  /** Positions of the word under the caret across the document (for batch replacement) */
   wordSelectionAtCaret: () => WordSelection | null;
-  /** 把命中滚动进可视区域（查找定位使用；不改动内容、历史与焦点） */
+  /** Scroll a match into view (for find navigation; leaves content, history and focus untouched) */
   revealRange: (start: number) => void;
-  /** 用新文本替换内容（保留光标大致位置），并补记历史以便撤销 */
+  /** Replace the content with new text (approximate caret kept) and record history so undo works */
   applyText: (text: string) => void;
 }
 
-/** 光标在编辑区内的字符偏移；选区不在编辑区时返回 null */
+/** Character offset of the caret inside the editor; null when the selection is outside */
 function caretOffset(el: HTMLElement): number | null {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return null;
@@ -90,9 +90,10 @@ function caretOffset(el: HTMLElement): number | null {
 }
 
 /**
- * 实测编辑区内某个字符的位置。
- * 覆盖层的括号高亮按像素绘制：编辑区里可能混有 CJK（双列宽）字符，
- * 按「列数 × 字符宽」换算会错位，因此这里用 DOM Range 直接量取。
+ * Measure the actual position of a character inside the editor.
+ * Bracket highlights are drawn by pixel in the overlay, and the editor may contain CJK
+ * (double-width) characters, so a "column × char width" conversion would drift; a DOM Range
+ * measurement avoids that.
  */
 function measureChar(root: HTMLElement, offset: number): DOMRect | null {
   let remaining = offset;
@@ -113,7 +114,7 @@ function measureChar(root: HTMLElement, offset: number): DOMRect | null {
   return null;
 }
 
-/** 可编辑的语法高亮编辑器（CodeJar + Prism），含行号槽、行级覆盖层与快捷键总线 */
+/** Editable syntax-highlighted editor (CodeJar + Prism) with gutter, line overlays and shortcut bus */
 export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(function CodeSurface(
   {
     value,
@@ -157,14 +158,15 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
   const [bracketBoxes, setBracketBoxes] = useState<
     Array<{ left: number; top: number; width: number; height: number }>
   >([]);
-  /** 程序化聚焦期间抑制「焦点归还」（见 highlight 回调） */
+  /** Suppress focus restore during programmatic focus (see the highlight callback) */
   const suppressFocusRestoreRef = useRef(false);
 
   /**
-   * 重绘回调（CodeJar 会在输入后 30ms 防抖调用，并在其后 `restore()` 选区）。
-   * 注意：给 contenteditable 设置选区会把焦点抢回编辑区，因此当重绘发生时焦点在别处
-   * （例如查找栏输入框），这里在重绘结束后把焦点还回去 —— 否则紧接着的 Enter
-   * 会落进编辑区插入换行。`suppressFocusRestoreRef` 用于放过我们自己的程序化聚焦。
+   * Repaint callback (CodeJar debounces it 30ms after input, then calls `restore()` on the selection).
+   * Note: setting a selection on a contenteditable steals focus back to the editor, so when a repaint
+   * happens while focus is elsewhere (e.g. the find input) this restores focus afterwards —
+   * otherwise the next Enter would land in the editor and insert a newline.
+   * `suppressFocusRestoreRef` exempts our own programmatic focus.
    */
   const highlight = useCallback((editor: HTMLElement) => {
     const code = editor.textContent ?? '';
@@ -174,36 +176,36 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     if (suppressed || !previous || previous === editor || !(previous instanceof HTMLElement))
       return;
     queueMicrotask(() => {
-      // 仅在确实被抢走（编辑区拿到了焦点）且原元素仍在文档中时归还
+      // Restore only when focus really was stolen (the editor has it) and the element is still connected
       if (document.activeElement === editor && previous.isConnected) previous.focus();
     });
   }, []);
 
-  /** 用新文本替换编辑区内容并恢复选区（同时补记历史，保证一次撤销可回退） */
+  /** Replace the editor content with new text and restore the selection (also records history for undo) */
   const applySelection = useCallback((next: EditorSelection) => {
     const jar = jarRef.current;
     const el = hostRef.current;
     if (!jar || !el) return;
-    // 程序化编辑会主动把焦点交给编辑区，跳过重绘回调里的「焦点归还」
+    // A programmatic edit intentionally focuses the editor, so skip the focus restore in the repaint callback
     suppressFocusRestoreRef.current = true;
     jar.updateCode(next.text, true);
     suppressFocusRestoreRef.current = false;
-    // 取回焦点：工具栏按钮会抢走焦点，而 CodeJar 只在编辑器聚焦时记录历史
+    // Take focus back: the toolbar button stole it, and CodeJar only records history while focused
     el.focus();
     try {
       jar.restore({ start: next.selectionStart, end: next.selectionEnd, dir: '->' });
     } catch {
-      /* 光标恢复失败不影响内容 */
+      /* A failed caret restore does not affect the content */
     }
-    // 补记编辑后的状态，使一次撤销回到编辑前（对齐 CodeJar 自身在粘贴 / 剪切时的做法）
+    // Record the post-edit state so one undo returns to the pre-edit text (as CodeJar does for paste / cut)
     jar.recordHistory();
   }, []);
 
   /**
-   * 把指定偏移滚动进可视区域（查找定位与括号跳转使用）。
+   * Scroll the given offset into view (used by find navigation and bracket jumps).
    *
-   * 刻意**不**抢焦点、也不改写原生选区：查找栏输入框持有焦点时，
-   * 一旦把焦点移回编辑区，用户后续的 Enter 就会落进编辑区插入换行。
+   * Deliberately **does not** steal focus or rewrite the native selection: while the find input
+   * holds focus, moving focus back to the editor would make the user's next Enter insert a newline.
    */
   const revealRange = useCallback((start: number) => {
     const el = hostRef.current;
@@ -216,7 +218,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     }
   }, []);
 
-  /** 执行编辑器动作；返回 false 表示该动作需要工具层处理 */
+  /** Run an editor action; false means the action must be handled by the tool layer */
   const runAction = useCallback(
     (action: EditorAction): boolean => {
       const el = hostRef.current;
@@ -228,7 +230,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
       try {
         pos = jar.save();
       } catch {
-        pos = null; // 无选区时 save 会抛错
+        pos = null; // save() throws when there is no selection
       }
       const selectionStart = pos ? Math.min(pos.start, pos.end) : 0;
       const selectionEnd = pos ? Math.max(pos.start, pos.end) : 0;
@@ -260,13 +262,13 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
         case 'jumpToBracket': {
           const pair = findBracketPair(text, selectionEnd, langSpec);
           if (!pair) return false;
-          // 跳到光标所在括号的另一端（快捷键由编辑区派发，焦点本就在编辑区内）
+          // Jump to the other end of the bracket at the caret (focus is already in the editor here)
           const target = selectionEnd <= pair.open ? pair.close : pair.open;
           el.focus();
           try {
             jar.restore({ start: target, end: target, dir: '->' });
           } catch {
-            /* 光标恢复失败不影响内容 */
+            /* A failed caret restore does not affect the content */
           }
           revealRange(target);
           setCaret(target);
@@ -303,7 +305,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     [applySelection, revealRange],
   );
 
-  /** 选中并滚动到指定行（跳转行使用） */
+  /** Select the given line and scroll it into view (for go-to-line) */
   const focusLine = useCallback(
     (line: number) => {
       const el = hostRef.current;
@@ -313,14 +315,14 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     [applySelection],
   );
 
-  /** 取光标所在词在全文中出现的位置（批量替换使用） */
+  /** Positions of the word under the caret across the document (for batch replacement) */
   const wordSelectionAtCaret = useCallback((): WordSelection | null => {
     const el = hostRef.current;
     if (!el) return null;
     return wordRanges(el.textContent ?? '', caretRef.current);
   }, []);
 
-  /** 用新文本替换内容（尽量保留原光标位置），并补记历史以便一次撤销 */
+  /** Replace the content with new text (caret kept where possible) and record history for a single undo */
   const applyText = useCallback(
     (text: string) => {
       const jar = jarRef.current;
@@ -344,7 +346,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     [applyText, focusLine, revealRange, runAction, wordSelectionAtCaret],
   );
 
-  // 挂载 / 缩进单元变化时重建实例（CodeJar 的 tab 选项在创建时固定）
+  // Rebuild on mount / indent-unit change (CodeJar fixes its tab option at creation time)
   useEffect(() => {
     const el = hostRef.current;
     if (!el) return;
@@ -364,7 +366,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     };
   }, [highlight, indentUnit]);
 
-  // 快捷键：必须在捕获阶段解析 —— CodeJar 会抢占 Tab / 粘贴 / 撤销，且对 defaultPrevented 直接返回
+  // Shortcuts must be parsed in the capture phase: CodeJar claims Tab / paste / undo and bails on defaultPrevented
   useEffect(() => {
     const el = hostRef.current;
     if (!el) return;
@@ -377,7 +379,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
         altKey: event.altKey,
         shiftKey: event.shiftKey,
       };
-      // 撤销 / 重做交给 CodeJar，但在事件派发结束后同步受控状态（否则预览与统计滞后）
+      // Leave undo / redo to CodeJar but sync controlled state after dispatch (else preview and stats lag)
       if (isUndoRedo(keyEvent)) {
         queueMicrotask(() => onChangeRef.current(el.textContent ?? ''));
         return;
@@ -392,8 +394,8 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     return () => el.removeEventListener('keydown', handleKeyDown, true);
   }, [runAction]);
 
-  // 光标行跟踪（当前行高亮与后续的查找 / 折叠定位共用）：
-  // 直接读 DOM 文本而非受控 value，避免输入当帧的滞后
+  // Caret-line tracking (shared by the current-line highlight and later find / fold positioning):
+  // Read the DOM text instead of the controlled value to avoid a one-frame lag while typing
   useEffect(() => {
     const el = hostRef.current;
     if (!el) return;
@@ -418,8 +420,8 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     };
   }, []);
 
-  // 外部清空 / 导入 / 格式化 / 自动格式化 / 分享还原等受控更新
-  // 聚焦时保存并恢复光标：避免自动格式化把光标弹回开头而打断输入
+  // Controlled updates from outside: clear / import / format / auto-format / share restore
+  // Save and restore the caret while focused so auto-formatting does not jump it to the start mid-typing
   useEffect(() => {
     const jar = jarRef.current;
     const el = hostRef.current;
@@ -430,7 +432,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
       try {
         pos = jar.save();
       } catch {
-        pos = null; // 无选区时 save 会抛错，忽略即可
+        pos = null; // save() throws without a selection; safe to ignore
       }
     }
     jar.updateCode(value, false);
@@ -438,19 +440,19 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
       try {
         jar.restore(pos);
       } catch {
-        /* 光标恢复失败不影响内容 */
+        /* A failed caret restore does not affect the content */
       }
     }
   }, [value]);
 
-  // 语言切换后重新着色
+  // Re-highlight after a language switch
   useEffect(() => {
     const jar = jarRef.current;
     if (!jar) return;
     jar.updateCode(jar.toString(), false);
   }, [prismKey]);
 
-  // 可视区域跟踪：命中高亮只渲染可视行，避免长文本下堆出上千个覆盖层节点
+  // Viewport tracking: match highlights render only for visible lines, avoiding thousands of overlay nodes
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -465,7 +467,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     };
   }, []);
 
-  // 括号配对高亮：位置用 DOM Range 实测（按 `ch` 换算在含 CJK 的行上会错位）
+  // Bracket pair highlight: positions measured with DOM Range (a `ch` conversion drifts on CJK lines)
   useEffect(() => {
     const el = hostRef.current;
     if (!el) {
@@ -492,13 +494,13 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
   }, [caret, spec, value]);
 
   const lines = countLines(value);
-  // 自动换行会让行号与视觉行错位，此时隐藏行号槽与行级覆盖层
+  // Word wrap desyncs line numbers from visual lines, so hide the gutter and line overlays then
   const showGutter = showLineNumbers && !wordWrap;
   const showLineOverlays = !wordWrap && value.length > 0;
   const gutterWidth = String(lines).length * 8 + 24;
 
   const visibleRange = useMemo(() => {
-    // 尚未测到尺寸（首次渲染）时先给一小批，避免整篇渲染
+    // Before the first size measurement, render a small batch instead of the whole document
     if (viewport.height <= 0) return { first: 1, last: Math.min(lines, 50) };
     return {
       first: lineAtOffsetY(viewport.top, lines),
@@ -513,7 +515,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     );
   }, [matches, visibleRange]);
 
-  // 缩进引导线：按行前导空白的列数生成（列宽用 `ch`，等宽字体下与前导空格严格对齐）
+  // Indent guides from the leading-whitespace column count (`ch` units align exactly in a monospace font)
   const guides = useMemo(() => {
     if (wordWrap) return [];
     const unit = indentUnit === '\t' ? TAB_SIZE : Math.max(indentUnit.length, 1);
@@ -528,7 +530,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
     return out;
   }, [indentUnit, value, visibleRange, wordWrap]);
 
-  // 按行号排序：标记的 DOM 顺序即 Tab 焦点顺序，应与视觉顺序一致
+  // Sort by line number: DOM order is Tab order, so it must match the visual order
   const folds = useMemo(
     () =>
       foldRanges(value, spec, defaultFoldMode(spec)).sort(
@@ -591,7 +593,7 @@ export const CodeSurface = forwardRef<CodeSurfaceHandle, CodeSurfaceProps>(funct
             spellCheck={false}
             className="ce-surface"
           />
-          {/* 覆盖层：装饰节点一律 aria-hidden，只有折叠标记是可交互控件，故容器本身不加 aria-hidden */}
+          {/* Overlay: decorative nodes are all aria-hidden, but fold markers are interactive, so the container is not */}
           <div className="ce-overlay">
             {showLineOverlays && (
               <>

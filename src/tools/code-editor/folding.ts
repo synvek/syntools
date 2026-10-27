@@ -2,26 +2,27 @@ import type { LangSpec } from './core';
 import { lineSpans, type LineSpan } from './lines';
 
 /**
- * 可折叠范围计算（阶段 4）。
+ * Foldable range computation (phase 4).
  *
- * 重要前提：编辑区由 CodeJar 托管，内容就是一段纯文本（`textContent`），
- * 隐藏部分行只能靠**改写文本**实现，会破坏草稿 / 导出 / 撤销的一致性。
- * 因此这里只产出「可折叠范围」，由编辑区以**折叠标记 + 范围高亮 + 行数徽标**呈现，
- * 不做隐藏式折叠（真正的隐藏折叠需要更换编辑器内核，见方案文档 4.3 / 六）。
+ * Important caveat: the editing surface is owned by CodeJar and its content is plain text
+ * (`textContent`), so hiding lines would require **rewriting the text**, which breaks draft /
+ * export / undo consistency. This module therefore only produces "foldable ranges", which the
+ * surface renders as **fold markers + range highlight + line-count badge**; it does not hide
+ * anything (real folding needs a different editor kernel, see design doc 4.3 / section 6).
  */
 
 export interface FoldRange {
-  /** 折叠头所在行（1 起始） */
+  /** Line of the fold header (1-based) */
   headerLine: number;
-  /** 折叠体末行（1 起始，含） */
+  /** Last line of the fold body (1-based, inclusive) */
   endLine: number;
-  /** 嵌套深度（0 起） */
+  /** Nesting depth (0-based) */
   depth: number;
 }
 
 export type FoldMode = 'brackets' | 'indent';
 
-/** 单文件参与计算的可折叠范围上限（超长文件下只保留前若干层） */
+/** Max foldable ranges computed per file (huge files keep only the outermost layers) */
 export const MAX_FOLD_RANGES = 2000;
 
 const OPEN_BRACKETS = new Set(['{', '[', '(']);
@@ -37,7 +38,7 @@ function ctxOf(spec: LangSpec): ScanContext {
   return { lineComment: spec.lineComment, blockComment: spec.blockComment };
 }
 
-/** 跳过字符串（含转义），返回结束下标 */
+/** Skip a string (escapes included) and return the end index */
 function skipString(text: string, start: number): number {
   const quote = text[start]!;
   let i = start + 1;
@@ -54,7 +55,7 @@ function skipString(text: string, start: number): number {
   return text.length;
 }
 
-/** 按括号深度求可折叠范围：同一行打开的括号在更后面的行闭合即形成范围 */
+/** Fold ranges by bracket depth: a bracket opened on a line and closed on a later line forms a range */
 function foldByBrackets(text: string, spans: LineSpan[], ctx: ScanContext): FoldRange[] {
   const ranges: FoldRange[] = [];
   const stack: Array<{ line: number; depth: number }> = [];
@@ -98,7 +99,7 @@ function foldByBrackets(text: string, spans: LineSpan[], ctx: ScanContext): Fold
   return ranges;
 }
 
-/** 按缩进求可折叠范围：后一行缩进更深的连续行构成块（Python / YAML / Shell 等） */
+/** Fold ranges by indentation: consecutive lines indented deeper than the header form a block (Python / YAML / Shell) */
 function foldByIndent(spans: LineSpan[]): FoldRange[] {
   const ranges: FoldRange[] = [];
   const indentOf = (span: LineSpan) => {
@@ -115,7 +116,7 @@ function foldByIndent(spans: LineSpan[]): FoldRange[] {
     let endIndex = index;
     for (let next = index + 1; next < spans.length; next += 1) {
       const candidate = spans[next]!;
-      if (candidate.text.trim().length === 0) continue; // 空行不打断块
+      if (candidate.text.trim().length === 0) continue; // blank lines do not break the block
       if (indentOf(candidate) <= base) break;
       endIndex = next;
     }
@@ -127,8 +128,8 @@ function foldByIndent(spans: LineSpan[]): FoldRange[] {
 }
 
 /**
- * 计算可折叠范围。
- * @param mode `brackets`（默认）按括号深度；`indent` 按缩进语义
+ * Compute foldable ranges.
+ * @param mode `brackets` (default) folds by bracket depth; `indent` folds by indentation
  */
 export function foldRanges(text: string, spec: LangSpec, mode: FoldMode = 'brackets'): FoldRange[] {
   const spans = lineSpans(text);
@@ -136,12 +137,12 @@ export function foldRanges(text: string, spec: LangSpec, mode: FoldMode = 'brack
   return mode === 'indent' ? foldByIndent(spans) : foldByBrackets(text, spans, ctxOf(spec));
 }
 
-/** 该语言默认的折叠模式：缩进即语义的语言走 indent */
+/** Default fold mode for a language: indent-based languages use `indent` */
 export function defaultFoldMode(spec: LangSpec): FoldMode {
   return spec.fallbackMode === 'indent' ? 'indent' : 'brackets';
 }
 
-/** 行号 → 以该行为折叠头的范围（存在嵌套时取最外层，便于一次收起整段） */
+/** Line number → range headed by that line (outermost when nested, so the whole chunk collapses at once) */
 export function foldRangeAtLine(ranges: FoldRange[], line: number): FoldRange | null {
   const matched = ranges.filter((range) => range.headerLine === line);
   if (matched.length === 0) return null;

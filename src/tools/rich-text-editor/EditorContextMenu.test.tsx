@@ -10,7 +10,7 @@ vi.mock('react-i18next', () => ({
 
 import { EditorContextMenu, type EditorContextTarget } from './EditorContextMenu';
 
-/** 记录链式命令调用顺序的编辑器替身（只覆盖菜单会用到的命令） */
+/** Editor stub that records chained command calls (covering only the commands the menu uses) */
 function stubEditor(selection = { from: 0, to: 0 }) {
   const calls: string[] = [];
   const chain: Record<string, unknown> = {};
@@ -45,7 +45,7 @@ function stubEditor(selection = { from: 0, to: 0 }) {
     isActive: () => false,
     state: {
       selection,
-      // 位置 5 处放一个图片节点，用于验证「删除图片」的目标校验
+      // Put an image node at position 5 to test the target check of "delete image"
       doc: { nodeAt: (pos: number) => (pos === 5 ? { type: { name: 'image' } } : null) },
     },
   } as unknown as Editor;
@@ -66,8 +66,8 @@ const linkTarget: EditorContextTarget = {
   href: 'https://example.com/a',
 };
 
-describe('编辑区右键菜单', () => {
-  it('在链接上给出查看 / 编辑 / 移除入口', () => {
+describe('editor context menu', () => {
+  it('offers open / edit / remove actions on a link', () => {
     setup(linkTarget, { from: 3, to: 12 });
     expect(screen.getByRole('menu')).toBeTruthy();
     for (const key of ['openLink', 'copyLink', 'editLink', 'removeLink']) {
@@ -75,7 +75,7 @@ describe('编辑区右键菜单', () => {
     }
   });
 
-  it('移除链接：解除整段链接并关闭菜单', () => {
+  it('removes a link: unwraps the whole run and closes the menu', () => {
     const { calls, onClose } = setup(linkTarget, { from: 3, to: 12 });
     fireEvent.click(screen.getByRole('menuitem', { name: 'tools.richText.removeLink' }));
 
@@ -84,17 +84,17 @@ describe('编辑区右键菜单', () => {
     expect(calls).toContain('unsetLink()');
   });
 
-  it('编辑链接：输入新地址后应用到链接 mark，且输入过程中不再全选', () => {
+  it('edits a link: applies the new address to the link mark without re-selecting while typing', () => {
     const selectSpy = vi.spyOn(HTMLInputElement.prototype, 'select');
     const { calls, onClose } = setup(linkTarget, { from: 3, to: 12 });
     fireEvent.click(screen.getByRole('menuitem', { name: 'tools.richText.editLink' }));
 
     const input = screen.getByRole('textbox');
     expect(input).toHaveValue('https://example.com/a');
-    // 进入输入态时全选一次，便于直接覆盖旧地址
+    // Select everything once when entering the input state, so the old address can be overwritten
     expect(selectSpy).toHaveBeenCalledTimes(1);
 
-    // 回归：逐字输入期间不能再触发全选，否则下一个字母会把已输入内容整段替换
+    // Regression: no re-selecting while typing, or the next keystroke would replace everything typed
     fireEvent.change(input, { target: { value: 'https://example.org' } });
     fireEvent.change(input, { target: { value: 'https://example.org/b' } });
     expect(selectSpy).toHaveBeenCalledTimes(1);
@@ -106,7 +106,7 @@ describe('编辑区右键菜单', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('插入链接：为空时清除选中文本上的链接', () => {
+  it('inserts a link: an empty value removes the link from the selected text', () => {
     const { calls } = setup({ x: 10, y: 10, kind: 'text' }, { from: 2, to: 6 });
     fireEvent.click(screen.getByRole('menuitem', { name: 'tools.richText.insertLink' }));
     fireEvent.click(screen.getByRole('button', { name: 'tools.richText.apply' }));
@@ -115,7 +115,7 @@ describe('编辑区右键菜单', () => {
     expect(calls).toContain('unsetLink()');
   });
 
-  it('选中文本时给出编辑动作，未选中时只给粘贴 / 全选', () => {
+  it('offers editing actions with a selection and only paste / select-all without one', () => {
     setup({ x: 10, y: 10, kind: 'text' }, { from: 2, to: 6 });
     expect(screen.getByRole('menuitem', { name: 'tools.richText.cut' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'common.copy' })).toBeTruthy();
@@ -123,7 +123,7 @@ describe('编辑区右键菜单', () => {
     expect(screen.getByRole('menuitem', { name: 'tools.richText.insertLink' })).toBeTruthy();
   });
 
-  it('未选中文本时剪切 / 复制不可用，且不提供插入链接', () => {
+  it('disables cut / copy and omits insert-link without a selection', () => {
     setup({ x: 10, y: 10, kind: 'empty' });
     expect(screen.getByRole('menuitem', { name: 'tools.richText.cut' })).toBeDisabled();
     expect(screen.getByRole('menuitem', { name: 'common.copy' })).toBeDisabled();
@@ -131,7 +131,7 @@ describe('编辑区右键菜单', () => {
     expect(screen.getByRole('menuitem', { name: 'tools.richText.selectAll' })).toBeTruthy();
   });
 
-  it('图片上提供删除，且只删除仍指向图片的节点', () => {
+  it('offers delete on images and only deletes nodes that still point at an image', () => {
     const { calls } = setup({ x: 10, y: 10, kind: 'image', imagePos: 5 });
     fireEvent.click(screen.getByRole('menuitem', { name: 'tools.richText.deleteImage' }));
     expect(calls).toContain('setNodeSelection(5)');

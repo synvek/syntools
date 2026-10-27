@@ -118,7 +118,7 @@ describe('统一尺寸', () => {
     const a = useFlowStore.getState().selectedNodes[0];
     useFlowStore.getState().addNode('diamond', { x: 500, y: 0 });
     const b = useFlowStore.getState().selectedNodes[0];
-    // 先把 a 调成自定义尺寸作为参考
+    // First resize a to a custom size as a reference
     useFlowStore.getState().setNodeGeometry([a], { width: 260, height: 90 });
     selectNodes([a, b]);
 

@@ -60,7 +60,7 @@ export default function PdfReorderTool() {
     }
     setThumbs(next);
     setProgress(null);
-    // pdf.js destroy 在部分类型定义中缺失
+    // pdf.js destroy is missing from some type definitions
     void (doc as { destroy?: () => Promise<void> }).destroy?.();
   };
 
@@ -145,11 +145,20 @@ export default function PdfReorderTool() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-gray-500 dark:text-gray-400">{t('tools.pdf-reorder.hint')}</p>
-      <FileDropZone accept=".pdf,application/pdf" maxBytes={PDF_MAX_BYTES} onFile={(f) => void onFile(f)} />
+      <FileDropZone
+        accept=".pdf,application/pdf"
+        maxBytes={PDF_MAX_BYTES}
+        onFile={(f) => void onFile(f)}
+      />
       <FilePreviewList files={file ? [file] : []} onRemove={clear} />
       {shouldShowPdfPassword(errorCode, pdfPwd.needsPassword) && (
         <div className="flex flex-col gap-2">
-          <PdfPasswordField value={pdfPwd.password} onChange={pdfPwd.setPassword} error={errorCode} autoFocus />
+          <PdfPasswordField
+            value={pdfPwd.password}
+            onChange={pdfPwd.setPassword}
+            error={errorCode}
+            autoFocus
+          />
           {needsUnlock && (
             <PdfRunButton
               label={busy ? t('common.loading') : t('pdf.unlock')}
@@ -182,8 +191,14 @@ export default function PdfReorderTool() {
                 </div>
               )}
               <div className="flex items-center gap-1 text-xs">
-                <span className="flex-1 truncate">{t('tools.pdf-reorder.pageLabel', { n: pageIndex + 1 })}</span>
-                <button type="button" disabled={i === 0} onClick={() => setOrder((o) => moveIndex(o, i, i - 1))}>
+                <span className="flex-1 truncate">
+                  {t('tools.pdf-reorder.pageLabel', { n: pageIndex + 1 })}
+                </span>
+                <button
+                  type="button"
+                  disabled={i === 0}
+                  onClick={() => setOrder((o) => moveIndex(o, i, i - 1))}
+                >
                   ↑
                 </button>
                 <button

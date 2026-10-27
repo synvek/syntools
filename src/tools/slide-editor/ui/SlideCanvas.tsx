@@ -11,13 +11,13 @@ import { Rulers } from './Rulers';
 import { SlideContextMenu, type SlideContextTarget } from './SlideContextMenu';
 
 /**
- * 画布宿主：命令式托管 Konva Stage。
+ * Canvas host: imperatively manages the Konva Stage.
  *
- * 三条约定：
- * 1. Stage 延后一拍创建，规避 React 18 StrictMode 双挂载（与 Univer 宿主一致）；
- * 2. 拖拽 / 缩放过程中禁止回写 store → 避免整页重建把正在拖的节点销毁；
- * 3. 双击文本元素 → 挂载 DOM textarea 叠加层做行内编辑；
- *    叠加层必须透明（否则会遮住压在该元素上层的其它元素），文字由 textarea 独占渲染。
+ * Three rules:
+ * 1. The Stage is created one tick late to dodge React 18 StrictMode double mounting (same as the Univer host);
+ * 2. No store writes during drag/resize → a full-page rebuild would destroy the node being dragged;
+ * 3. Double-clicking a text element mounts a DOM textarea overlay for inline editing;
+ *    the overlay must be transparent (or it would cover elements above), and the textarea renders the text alone.
  */
 export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void }) {
   const { t } = useTranslation();
@@ -25,15 +25,15 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   const canvasRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<StageHandle | null>(null);
   const editorRef = useRef<TextEditorHandle | null>(null);
-  /** 正在被行内编辑的元素 id：其静态文字在编辑期间需要隐藏 */
+  /** Id of the element being edited inline: its static text is hidden while editing */
   const editingIdRef = useRef<string | null>(null);
   const draggingRef = useRef(false);
   const transformRef = useRef({ scale: 1, x: 0, y: 0 });
-  /** 右键菜单：命中元素为 element 级，命中空白为 canvas 级 */
+  /** Context menu: hitting an element gives the element menu, hitting blank space the canvas menu */
   const [menu, setMenu] = useState<SlideContextTarget | null>(null);
 
-  // onRuntimeFailure 由父组件每次渲染传入新函数，用 ref 承接，避免它进入副作用依赖，
-  // 否则每次渲染都会销毁并重建整个 Konva Stage（正在拖拽的元素会被一并销毁）。
+  // onRuntimeFailure is a new function on every parent render, so it's held in a ref to keep it out of
+  // effect dependencies; otherwise every render would destroy and rebuild the whole Konva Stage (killing dragged elements).
   const onRuntimeFailureRef = useRef(onRuntimeFailure);
   onRuntimeFailureRef.current = onRuntimeFailure;
 
@@ -47,7 +47,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   const viewMode = useSlideStore((s) => s.viewMode);
   const masterKind = useSlideStore((s) => s.masterKind);
   const masterIndex = useSlideStore((s) => s.masterIndex);
-  // 参考线/标尺是 store 状态，需要订阅才能触发重绘
+  // Guides/rulers are store state, so a subscription is needed to trigger a redraw
   const showRulers = useSlideStore((s) => s.showRulers);
   const guides = useSlideStore((s) => s.guides);
 
@@ -56,7 +56,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     const handle = handleRef.current;
     if (!canvas || !handle) return;
     const state = useSlideStore.getState();
-    // scale === 0 表示「尚未适配」：按容器尺寸算一次 fit 并写回 store，工具栏即可显示真实比例
+    // scale === 0 means "not fitted yet": compute the fit once from the container size and write it back so the toolbar shows a real ratio
     const fitted = fitScale(
       state.doc,
       { width: canvas.clientWidth, height: canvas.clientHeight },
@@ -64,7 +64,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     );
     const nextScale = state.viewport.scale > 0 ? state.viewport.scale : fitted;
     if (state.viewport.scale <= 0) state.setScale(nextScale);
-    // 页面默认居中，再叠加用户平移偏移
+    // The page is centered by default, then the user's pan offset is added
     const x =
       Math.max(0, (canvas.clientWidth - state.doc.width * nextScale) / 2) +
       (state.viewport.panX ?? 0);
@@ -80,7 +80,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     if (!handle) return;
     const state = useSlideStore.getState();
     if (state.viewMode === 'master') {
-      // 母版视图：直接编辑母版/版式元素，不再叠加继承层（否则会和自己重影）
+      // Master view: edit master/layout elements directly without the inherited layer (or it would double up)
       handle.renderBackground(state.doc, []);
       handle.sync(containerElements(state), state.doc);
       handle.renderCustomGuides(state.showRulers ? state.guides : [], {
@@ -96,26 +96,26 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     const master = layout
       ? state.doc.masters.find((item) => item.id === layout.masterId)
       : undefined;
-    // 母版/版式只作几何参考：PowerPoint 普通视图不会显示占位符的提示文案，这里同样去掉文字
+    // Master/layout only serve as geometry reference: PowerPoint's normal view shows no placeholder captions, so drop the text too
     const inherited = state.showPlaceholders
       ? [...(master?.elements ?? []), ...(layout?.elements ?? [])].map(stripPlaceholderText)
       : [];
     handle.renderBackground(state.doc, inherited);
     handle.sync(slide.elements, state.doc);
-    // 手动参考线画在内容层之上，始终跟随文档尺寸
+    // Manual guides are drawn above the content layer and always follow the document size
     handle.renderCustomGuides(state.showRulers ? state.guides : [], {
       width: state.doc.width,
       height: state.doc.height,
     });
-    // 同步会按 id 重建文本/形状/表格节点（这些类型不走属性快路径），
-    // Transformer 仍指向被销毁的旧节点，需按当前选中集合重新挂载，否则拖拽后
-    // 旋转手柄错位、放缩手柄消失。
+    // The sync rebuilds text/shape/table nodes by id (these types bypass the fast property path), and the
+    // Transformer still points at the destroyed old nodes, so it must be reattached to the current selection;
+    // otherwise rotation handles end up misplaced and resize handles disappear after dragging.
     handle.setSelection(state.selection);
   }, []);
 
   /**
-   * 滚轮：⌘/Ctrl + 滚轮 = 以指针为锚点缩放，普通滚轮 = 平移画布。
-   * 缩放时保持「指针下那个页面点」不动，与 PowerPoint / WPS 的手感一致。
+   * Wheel: ⌘/Ctrl + wheel = zoom anchored at the pointer, plain wheel = pan the canvas.
+   * Zooming keeps "the page point under the pointer" fixed, matching the feel of PowerPoint / WPS.
    */
   const handleWheel = useCallback((event: WheelEvent) => {
     const canvas = canvasRef.current;
@@ -152,11 +152,11 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   }, []);
 
   /**
-   * 行内编辑期间隐藏 / 恢复元素的静态文字。
+   * Hide / restore an element's static text during inline editing.
    *
-   * 编辑覆盖层是透明 DOM，文字由 textarea 独占渲染；画布若继续画一份就会重影。
-   * 命令式直接改节点（不走 store）是刻意的：开编辑不该产生一次文档变更，
-   * 否则整页 sync 会把刚挂上的 textarea 位置算错。
+   * The editing overlay is transparent DOM and the textarea renders the text alone; if the canvas kept drawing it, it would double.
+   * Mutating nodes imperatively (bypassing the store) is deliberate: opening the editor shouldn't count as a document change,
+   * otherwise a full sync would misplace the textarea that was just mounted.
    */
   const setStaticTextVisible = useCallback((id: string, visible: boolean) => {
     const layer = handleRef.current?.contentLayer;
@@ -167,9 +167,9 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   }, []);
 
   /**
-   * 收尾：恢复静态文字并销毁覆盖层。
-   * 幂等且可重入 —— 编辑器自身销毁时（Esc / 失焦）会回调进来，
-   * 因此先清 ref 再 destroy，重复进入时直接短路。
+   * Wrap up: restore the static text and destroy the overlay.
+   * Idempotent and reentrant — the editor itself calls back in on destroy (Esc / blur),
+   * so the ref is cleared before destroy and repeated calls short-circuit.
    */
   const closeEditor = useCallback(() => {
     const editingId = editingIdRef.current;
@@ -194,7 +194,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
             : undefined;
       if (!element || !body) return;
       closeEditor();
-      // 静止文字让位给 textarea（否则透明背景下会与画布上的同一段文字重影）
+      // Static text steps aside for the textarea (otherwise it doubles the same text on the canvas)
       editingIdRef.current = element.id;
       setStaticTextVisible(element.id, false);
       editorRef.current = openTextEditor(
@@ -220,7 +220,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
             closeEditor();
             syncNow();
           },
-          // Esc 取消 / 无改动失焦都不会走 onCommit，仍要恢复静态文字
+          // Esc cancel / blur without changes never reach onCommit, but the static text still has to be restored
           onClose: closeEditor,
         },
       );
@@ -250,7 +250,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
         const state = useSlideStore.getState();
         draggingRef.current = false;
         if (changes.length === 0) return;
-        // 变换期间不写 store，这里统一压一次历史快照，多选变换只占一步撤销
+        // No store writes during the transform: push one history snapshot here instead, so a multi-select transform is one undo step
         state.commit();
         for (const change of changes) {
           const { id, ...patch } = change;
@@ -275,7 +275,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       },
       getSnapContext: () => {
         const state = useSlideStore.getState();
-        // 吸附对象取自「当前编辑容器」：母版视图下吸附到母版元素而不是页面元素
+        // Snap targets come from the "current editing container": in master view, snap to master elements rather than slide elements
         const others = containerElements(state)
           .filter((element) => !state.selection.includes(element.id))
           .map((element) => ({
@@ -295,7 +295,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       getSelection: () => useSlideStore.getState().selection,
     };
 
-    // 延后一拍实例化：StrictMode 下 effect 会挂载→卸载→再挂载
+    // Instantiate one tick later: under StrictMode the effect mounts → unmounts → remounts
     const timer = window.setTimeout(() => {
       if (cancelled) return;
       try {
@@ -309,7 +309,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       }
     }, 0);
 
-    // 必须 passive:false，否则 preventDefault 无效、页面会跟着滚
+    // passive:false is required, otherwise preventDefault has no effect and the page scrolls along
     canvas.addEventListener('wheel', handleWheel, { passive: false });
 
     if (typeof ResizeObserver !== 'undefined') {
@@ -360,8 +360,8 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     handleRef.current?.setSelection(selection);
   }, [selection]);
 
-  // 文档被键盘编辑 / 撤销 / 菜单动作改动后收起菜单，避免它停在已失效的目标元素上。
-  // 刻意不监听 slideIndex：右键页缩略图时会先切页再开菜单，否则会被立刻关掉。
+  // Close the menu after the document changes via keyboard edits / undo / menu actions, so it doesn't linger on a stale target.
+  // slideIndex is deliberately not watched: right-clicking a thumbnail switches slides before the menu opens, which would close it at once.
   useEffect(() => {
     setMenu(null);
   }, [doc, viewMode, masterKind, masterIndex]);
@@ -375,7 +375,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   );
 }
 
-/** 去掉占位符元素上的提示文字，仅保留几何与填充（避免母版提示语干扰画布） */
+/** Strip the hint text from placeholder elements, keeping only geometry and fill (so master captions don't clutter the canvas) */
 function stripPlaceholderText(element: SlideElement): SlideElement {
   if (element.type === 'text') {
     return { ...element, body: { ...element.body, paragraphs: [] } };

@@ -1,6 +1,6 @@
 /**
- * 复合编辑操作（对齐、分布、层级、编组、剪贴板、边样式）。
- * 通过 store 的 setState/getState 操作，避免在单个 store 文件里堆叠过多逻辑。
+ * Composite editing operations (align, distribute, layering, grouping, clipboard, edge styles).
+ * Driven through the store's setState/getState, keeping a single store file from piling up too much logic.
  */
 
 import { selectOnly, useFlowStore } from './store';
@@ -32,7 +32,7 @@ import {
 
 type MoveMap = Record<string, { x: number; y: number }>;
 
-/** 选中且非容器的节点，返回其画布绝对包围盒（容器不参与排版） */
+/** Selected non-container nodes, returning their absolute canvas bounding boxes (containers do not take part in layout) */
 function selectedBoxes(): LayoutBox[] {
   const { nodes, selectedNodes } = useFlowStore.getState();
   const byId = new Map(nodes.map((n) => [n.id, n] as const));
@@ -45,7 +45,7 @@ function selectedBoxes(): LayoutBox[] {
   return boxes;
 }
 
-/** 把绝对坐标的位移结果写回节点（有父节点时转回相对坐标） */
+/** Write displacement results in absolute coordinates back to nodes (converted to relative coordinates when a parent exists) */
 function applyAbsoluteMoves(moves: MoveMap): void {
   if (Object.keys(moves).length === 0) return;
   const nodes = useFlowStore.getState().nodes;
@@ -75,13 +75,13 @@ export function distributeSelected(axis: 'h' | 'v'): void {
   applyAbsoluteMoves(computeDistribute(boxes, axis));
 }
 
-/** 对齐参照范围：选中集合 / 画布整体 / 页面纸张 */
+/** Alignment reference frame: selection / whole canvas / page paper */
 export type ArrangeScope = 'selection' | 'canvas' | 'page';
 
-/** 分布方式：保持两端不动等间距 / 首尾贴住参照矩形两端 */
+/** Distribution mode: equal spacing with both ends fixed / first and last flush with the reference rect edges */
 export type DistributeMode = 'spacing' | 'edges';
 
-/** 画布参照矩形：所有可见节点的整体包围盒 */
+/** Canvas reference rect: the overall bounding box of all visible nodes */
 function canvasRect(): AlignRect | null {
   const { nodes } = useFlowStore.getState();
   const byId = new Map(nodes.map((n) => [n.id, n] as const));
@@ -91,13 +91,13 @@ function canvasRect(): AlignRect | null {
   return groupBounds(boxes);
 }
 
-/** 页面参照矩形：纸张尺寸（未设置页面尺寸时返回 null） */
+/** Page reference rect: the paper size (returns null when no page size is set) */
 function pageRect(): AlignRect | null {
   const size = useFlowStore.getState().pageSize;
   return size ? { x: 0, y: 0, width: size.width, height: size.height } : null;
 }
 
-/** 按参照范围对齐选中节点 */
+/** Align selected nodes within the reference frame */
 export function alignSelectedToScope(mode: AlignMode, scope: ArrangeScope = 'selection'): void {
   if (scope === 'selection') {
     alignSelected(mode);
@@ -111,7 +111,7 @@ export function alignSelectedToScope(mode: AlignMode, scope: ArrangeScope = 'sel
   applyAbsoluteMoves(computeAlignToRect(boxes, mode, rect));
 }
 
-/** 按参照范围分布选中节点（等间距或贴合两端） */
+/** Distribute selected nodes within the reference frame (equal spacing or flush to both ends) */
 export function distributeSelectedInScope(
   axis: 'h' | 'v',
   scope: ArrangeScope = 'selection',
@@ -131,9 +131,9 @@ export function distributeSelectedInScope(
 }
 
 /**
- * 对齐增强：把选中节点的位置吸附到画布网格。
- * 位置按网格取整后写回（容器内的子节点自动换算回相对坐标）；
- * 未开启网格吸附、或已对齐时不产生历史记录。
+ * Alignment add-on: snap the selected nodes' positions to the canvas grid.
+ * Positions are rounded to the grid and written back (children inside containers convert back to relative coordinates);
+ * no history entry is produced when grid snapping is off or everything is already aligned.
  */
 export function snapSelectedToGrid(): void {
   const { nodes, selectedNodes, gridEnabled, gridSize } = useFlowStore.getState();
@@ -159,8 +159,8 @@ export function snapSelectedToGrid(): void {
 }
 
 /**
- * 统一尺寸：把选中的普通节点宽高统一为「第一个选中节点」的尺寸。
- * 容器不参与（容器尺寸由内容决定），至少需要两个可缩放节点；已一致时不写历史。
+ * Uniform size: make the selected plain nodes take the width/height of "the first selected node".
+ * Containers are excluded (their size follows content); at least two resizable nodes are needed; no history when already uniform.
  */
 export function applyUniformSize(): void {
   const { nodes, selectedNodes } = useFlowStore.getState();
@@ -184,7 +184,7 @@ export function applyUniformSize(): void {
   );
 }
 
-/** 层级调整后重新归一顺序，确保容器仍在子节点之前 */
+/** Renormalize the order after a layer change so containers still precede their children */
 export function layerOp(op: LayerOp): void {
   const { nodes, selectedNodes } = useFlowStore.getState();
   if (selectedNodes.length === 0) return;
@@ -195,8 +195,8 @@ export function layerOp(op: LayerOp): void {
 }
 
 /**
- * 旋转选中节点（度，叠加到各自当前角度上，容器一并参与）。
- * 归一后为 0 时清除字段，避免文档里出现冗余的 `rotation: 0`。
+ * Rotate the selected nodes (degrees, added to each node's current angle; containers take part too).
+ * Clears the field when it normalizes to 0, avoiding a redundant `rotation: 0` in the document.
  */
 export function rotateSelected(delta: number): void {
   const { selectedNodes } = useFlowStore.getState();
@@ -213,8 +213,8 @@ export function rotateSelected(delta: number): void {
 }
 
 /**
- * 水平 / 垂直镜像。
- * 切换语义与「锁定 / 隐藏」一致：只要有一个选中节点未镜像就整体镜像，否则整体取消。
+ * Horizontal / vertical mirror.
+ * Toggle semantics match "lock / hide": if any selected node is not mirrored, mirror them all; otherwise unmirror them all.
  */
 export function flipSelected(axis: 'h' | 'v'): void {
   const { nodes, selectedNodes } = useFlowStore.getState();
@@ -234,7 +234,7 @@ export function flipSelected(axis: 'h' | 'v'): void {
   }));
 }
 
-/** 把选中的普通节点装进一个新的编组容器 */
+/** Wrap the selected plain nodes into a new group container */
 export function groupSelected(): void {
   const { nodes, selectedNodes } = useFlowStore.getState();
   if (selectedNodes.length === 0) return;
@@ -253,7 +253,7 @@ export function groupSelected(): void {
   if (!bounds) return;
 
   const padX = 24;
-  const padTop = 46; // 编组标题栏 + 间距
+  const padTop = 46; // group title bar + spacing
   const padBottom = 20;
   const groupPos = { x: bounds.x - padX, y: bounds.y - padTop };
   const groupId = createId('g');
@@ -284,7 +284,7 @@ export function groupSelected(): void {
   });
 }
 
-/** 解散选中的编组：子节点转回绝对坐标并保留 */
+/** Ungroup the selected group: children return to absolute coordinates and are kept */
 export function ungroupSelected(): void {
   const { nodes, selectedNodes } = useFlowStore.getState();
   const groupIds = new Set(
@@ -315,8 +315,8 @@ export function copySelection(): void {
 }
 
 /**
- * 剪切：先把选中节点复制进剪贴板，再删除。
- * 仅选中连线（无节点）时退化为删除连线（连线无法脱离节点单独粘贴）。
+ * Cut: copy the selected nodes to the clipboard, then delete them.
+ * With only edges selected (no nodes) it degrades to deleting the edges (edges cannot be pasted without nodes).
  */
 export function cutSelection(): void {
   const { selectedNodes, selectedEdges } = useFlowStore.getState();
@@ -358,7 +358,7 @@ export function pasteClipboard(): void {
   });
 }
 
-/** 修改选中连线的样式（缺失字段用默认值补齐） */
+/** Change the style of the selected edges (missing fields are filled from the defaults) */
 export function patchSelectedEdgeStyle(patch: Partial<FlowEdgeStyle>): void {
   const { edges, selectedEdges } = useFlowStore.getState();
   if (selectedEdges.length === 0) return;
@@ -375,14 +375,14 @@ export function patchSelectedEdgeStyle(patch: Partial<FlowEdgeStyle>): void {
   });
 }
 
-/** 当前选中连线的样式（供属性面板回显） */
+/** Style of the currently selected edges (for the property panel to display) */
 export function selectedEdgeStyle(): FlowEdgeStyle {
   const { edges, selectedEdges } = useFlowStore.getState();
   const first = edges.find((e) => e.id === selectedEdges[0]);
   return normalizeEdgeStyle((first?.data as { style?: Partial<FlowEdgeStyle> } | undefined)?.style);
 }
 
-/** 切换可见性：只要有一个可见就整体隐藏，否则全部显示 */
+/** Toggle visibility: hidden if any is visible, otherwise all shown */
 export function toggleHidden(ids: string[]): void {
   if (ids.length === 0) return;
   const nodes = useFlowStore.getState().nodes;
@@ -394,7 +394,7 @@ export function toggleHidden(ids: string[]): void {
   });
 }
 
-/** 切换锁定：锁定后不可拖动 / 不可选中 */
+/** Toggle lock: locked nodes cannot be dragged or selected */
 export function toggleLocked(ids: string[]): void {
   if (ids.length === 0) return;
   const nodes = useFlowStore.getState().nodes;
@@ -408,7 +408,7 @@ export function toggleLocked(ids: string[]): void {
   });
 }
 
-/** 重命名节点（双击图层名称触发） */
+/** Rename a node (triggered by double-clicking the layer name) */
 export function renameNode(id: string, name: string): void {
   const nodes = useFlowStore.getState().nodes;
   const node = nodes.find((n) => n.id === id);
@@ -419,12 +419,12 @@ export function renameNode(id: string, name: string): void {
   });
 }
 
-/** 主题 / 样式预设的应用范围 */
+/** Scope to which a theme / style preset is applied */
 export type ThemeScope = 'all' | 'selection';
 
 /**
- * 应用主题（样式预设）到整图或选中元素。
- * 只覆盖预设声明的字段，其余样式保持原样；整个操作合并为一次撤销。
+ * Apply a theme (style preset) to the whole diagram or the selection.
+ * Only the fields the preset declares are overridden, other styles stay as they are; the whole operation is one undo step.
  */
 export function applyTheme(themeId: ThemeId, scope: ThemeScope): void {
   const theme = themeOf(themeId);
@@ -452,7 +452,7 @@ export function applyTheme(themeId: ThemeId, scope: ThemeScope): void {
   });
 }
 
-/** 格式刷：复制第一个选中节点的样式 */
+/** Format painter: copy the first selected node's style */
 export function copyNodeStyle(): boolean {
   const { nodes, selectedNodes } = useFlowStore.getState();
   const source = nodes.find((n) => n.id === selectedNodes[0]);
@@ -461,7 +461,7 @@ export function copyNodeStyle(): boolean {
   return true;
 }
 
-/** 格式刷：把已复制的样式套用到选中节点（一次撤销） */
+/** Format painter: apply the copied style to the selected nodes (one undo step) */
 export function pasteNodeStyle(): void {
   const brush = useFlowStore.getState().styleBrush;
   if (!brush) return;
@@ -470,7 +470,7 @@ export function pasteNodeStyle(): void {
   useFlowStore.getState().patchSelected({ style: { ...brush } }, true);
 }
 
-/** 单个节点的层级调整（图层面板的上下箭头） */
+/** Layer change for a single node (the up/down arrows in the layer panel) */
 export function moveNodeLayer(id: string, op: LayerOp): void {
   const { nodes } = useFlowStore.getState();
   if (!nodes.some((n) => n.id === id)) return;

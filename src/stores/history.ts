@@ -19,7 +19,7 @@ function writeIds(key: string, ids: string[]) {
 }
 
 interface HistoryState {
-  /** 最近使用的工具 id，最新在前，上限 8 */
+  /** Recently used tool ids, newest first, capped at 8 */
   recent: string[];
   favorites: string[];
   recordUse: (id: string) => void;

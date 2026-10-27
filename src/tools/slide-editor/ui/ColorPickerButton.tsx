@@ -3,16 +3,16 @@ import { useTranslation } from 'react-i18next';
 import { MenuButton } from './MenuButton';
 
 /**
- * 工具栏色板（对标 PowerPoint 的「字体颜色 / 形状填充 / 形状轮廓」下拉）。
+ * Toolbar color palette (counterpart of PowerPoint's "font color / shape fill / shape outline" dropdowns).
  *
- * 为什么需要它：属性面板里的 `input[type=color]` 只有系统取色器，改色要点 3 次
- * 才能落到一个常用色；而「主题色 + 标准色」宫格是高频操作里最省事的入口。
+ * Why it's needed: `input[type=color]` in the property panel only opens the system picker, so landing on a
+ * common color takes three clicks; the "theme + standard colors" grid is the handiest entry point for frequent use.
  *
- * 面板内容是固定结构（主题色行 / 标准色行 / 可选的无操作 / 自定义取色器），
- * 因此直接复用 `MenuButton` 的 `panel` 模式，定位与关闭行为保持一致。
+ * The panel content is a fixed structure (theme row / standard row / optional clear action / custom picker),
+ * so it reuses MenuButton's `panel` mode directly, keeping positioning and closing behavior consistent.
  */
 
-/** 标准色（Office 常用的 10 × 2 紧凑色板） */
+/** Standard colors (Office's compact 10 × 2 palette) */
 const STANDARD_COLORS = [
   '#000000',
   '#404040',
@@ -70,33 +70,33 @@ export function ColorPickerButton({
   onChange,
   onClear,
   clearLabel,
-  /** 主题色板（通常取文档主题的 12 色） */
+  /** Theme palette (usually the document theme's 12 colors) */
   themeColors,
   disabled,
-  /** 触发器里的前置图标（字体颜色 / 填充 / 轮廓各用各的图形） */
+  /** Leading icon in the trigger (font color / fill / outline each use their own glyph) */
   glyph,
   extra,
 }: {
   label: string;
   value?: string;
   onChange: (color: string) => void;
-  /** 提供时在面板底部加一个「无填充/无颜色」按钮 */
+  /** When provided, adds a "no fill / no color" button at the bottom of the panel */
   onClear?: () => void;
   clearLabel?: string;
   themeColors?: string[];
   disabled?: boolean;
   glyph?: ReactNode;
-  /** 面板底部的附加参数行（轮廓的「粗细」这类，对标 PowerPoint 的形状轮廓下拉） */
+  /** Extra parameter row at the bottom of the panel (e.g. outline "weight", like PowerPoint's shape outline dropdown) */
   extra?: ReactNode;
 }) {
   const { t } = useTranslation();
   const customInputId = useId();
   const current = value ?? '#000000';
   /**
-   * 触发器沿用 PowerPoint 的紧凑写法：图标 + 下方一条颜色条，
-   * 而不是「图标 + 独立色块 + 箭头」——后者每个控件多占约 12px，
-   * 四个颜色控件叠起来正好把「格式」行挤到换行。
-   * 当前没有该颜色时（如未设高亮）色条画成斜纹示意「无」。
+   * The trigger follows PowerPoint's compact form: icon plus a color bar underneath, rather than
+   * "icon + separate swatch + arrow" — the latter costs ~12px more per control, and four color controls
+   * would push the "format" row onto a second line. When there is no color (e.g. no highlight set),
+   * the bar is drawn as a hatch to signal "none".
    */
   const triggerContent = (
     <span className="flex flex-col items-center leading-none">
@@ -118,7 +118,7 @@ export function ColorPickerButton({
           <span className="text-[10px] uppercase tracking-wide text-gray-400">
             {t('tools.slide.themeColors')}
           </span>
-          {/* 选完即收，与 PowerPoint 的字体颜色/形状填充一致 */}
+          {/* Close right after picking, matching PowerPoint's font color / shape fill */}
           <SwatchGrid
             colors={themeColors}
             value={value}

@@ -4,18 +4,18 @@ import { getCanvas } from '../model/assets';
 import type { RasterLayer, Selection } from '../model/types';
 
 /**
- * 渐变工具：在图层位图上从 A 拖到 B 生成线性 / 径向渐变。
+ * Gradient tool: drag from A to B on a layer bitmap to create a linear / radial gradient.
  *
- * 落点是「一次拖拽 = 一次历史」，因此这里只负责把结果画上去；
- * 提交历史 / 失效烘焙缓存由调用方（`interaction/pointer.ts`）处理。
+ * The rule is "one drag = one history entry", so this module only paints the result;
+ * committing history / invalidating the bake cache is the caller's job (`interaction/pointer.ts`).
  */
 
 export interface GradientOptions {
   kind: GradientKind;
   mode: GradientMode;
-  /** 起点（文档坐标） */
+  /** Start point (document coordinates) */
   from: { x: number; y: number };
-  /** 终点（文档坐标）；径向渐变中它到起点的距离即半径 */
+  /** End point (document coordinates); for a radial gradient its distance to the start is the radius */
   to: { x: number; y: number };
   foreground: string;
   background: string;
@@ -23,7 +23,7 @@ export interface GradientOptions {
   lockAlpha?: boolean;
 }
 
-/** 端点颜色：前景→透明 / 前景→背景 */
+/** Endpoint colors: foreground → transparent / foreground → background */
 export function gradientColors(
   mode: GradientMode,
   foreground: string,
@@ -43,7 +43,7 @@ export function applyGradient(layer: RasterLayer, options: GradientOptions): boo
 
   const [start, end] = gradientColors(options.mode, options.foreground, options.background);
   const distance = Math.hypot(options.to.x - options.from.x, options.to.y - options.from.y);
-  // 起终点重合时退化成一个点：用 1px 兜底，避免 createLinearGradient 抛错
+  // Coincident start and end degenerate to a point: pad to 1px so createLinearGradient does not throw
   const span = Math.max(1, distance);
 
   ctx.save();

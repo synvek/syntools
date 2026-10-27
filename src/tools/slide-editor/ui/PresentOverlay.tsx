@@ -7,13 +7,13 @@ import { createElementNode } from '../render/nodes';
 import { useSlideStore } from '../store';
 
 /**
- * 放映模式。
+ * Presentation mode.
  *
- * 渲染方式：直接在容器尺寸上绘制 Konva 矢量舞台（按 devicePixelRatio 出图），
- * 不再走「离屏渲染成 1600px 位图再 img 展示」——后者放大后文字边缘会糊。
+ * Rendering: the Konva vector stage is drawn directly at container size (per devicePixelRatio), instead of
+ * "render offscreen to a 1600px bitmap and show an img" — the latter blurs text edges when scaled up.
  *
- * 演示增强：计时器、黑屏/白屏、按页跳转、激光笔、演讲者备注面板（含下一页提示）。
- * 批注只在放映期存在，不写回文档，退出即丢弃。
+ * Presentation extras: timer, black/white screen, jump to slide, laser pointer, speaker notes panel (with next-slide hint).
+ * Annotations exist only during the presentation, are never written back to the document, and are dropped on exit.
  */
 export function PresentOverlay({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
@@ -35,13 +35,13 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
     setCursor(slideIndex);
   }, [slideIndex]);
 
-  // 计时器：进入放映即开始，退出即销毁
+  // Timer: starts on entering the presentation and is torn down on exit
   useEffect(() => {
     const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
-  /* ----------------------------- 矢量舞台 ----------------------------- */
+  /* ----------------------------- Vector stage ----------------------------- */
 
   const draw = useCallback(() => {
     const stage = stageRef.current;
@@ -105,7 +105,7 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
     stageRef.current = stage;
     layerRef.current = layer;
 
-    // 激光笔跟随指针（stage 坐标）
+    // Laser pointer follows the cursor (stage coordinates)
     stage.on('mousemove', () => {
       const dot = laserRef.current;
       if (!dot) return;
@@ -140,7 +140,7 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
     selectSlide(cursor);
   }, [cursor, selectSlide]);
 
-  /* ------------------------------- 交互 ------------------------------- */
+  /* ------------------------------- Interactions ------------------------------- */
 
   const next = useCallback(
     () => setCursor((current) => Math.min(doc.slides.length - 1, current + 1)),
@@ -251,7 +251,7 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
           />
         )}
 
-        {/* 演讲者视图：备注 + 下一页提示（不弹副窗，单屏也能用） */}
+        {/* Speaker view: notes + next-slide hint (no second window, so it works on a single screen) */}
         {showNotes && blank === 'none' ? (
           <aside className="flex w-72 shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border border-gray-700 bg-gray-900/70 p-3 text-[12px] text-gray-300">
             <div className="font-semibold text-gray-200">{t('tools.slide.notes')}</div>
@@ -260,7 +260,7 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
             ) : (
               <p className="text-gray-500">{t('tools.slide.notesHint')}</p>
             )}
-            {/* 用「n/m」紧凑写法：避免与顶部页码的「n / m」文本撞车（子串匹配会歧义） */}
+            {/* Compact "n/m" so it can't collide with the "n / m" page number above (substring matching would be ambiguous) */}
             <div className="mt-auto border-t border-gray-700 pt-2 text-gray-400">
               {t('tools.slide.nextSlide')}: {Math.min(cursor + 2, doc.slides.length)}/
               {doc.slides.length}

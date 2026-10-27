@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 倒计时：时长解析与剩余时间格式化。
+ * Countdown: duration parsing and remaining-time formatting.
  */
 
 export type CountdownError = 'INVALID' | 'ZERO';
@@ -30,7 +30,7 @@ export function parseCountdownDuration(
   return { ok: true, value: total };
 }
 
-/** 剩余毫秒 → HH:MM:SS（向下取整到秒） */
+/** Remaining milliseconds → HH:MM:SS (floored to the second) */
 export function formatCountdown(ms: number): string {
   const clamped = Math.max(0, Math.floor(ms));
   const totalSec = Math.ceil(clamped / 1000);

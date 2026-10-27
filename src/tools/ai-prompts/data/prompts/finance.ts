@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 财务与金融类提示词，详见 ../README.md */
+/** Finance and accounting prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'finance-budget-plan',

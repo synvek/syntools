@@ -41,7 +41,7 @@ function parseSharedFields(raw: string): Record<CronFieldKey, CronFieldState> {
   return base;
 }
 
-/** Crontab 生成器 */
+/** Crontab generator */
 export default function CronGeneratorTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ f: '' }), []);

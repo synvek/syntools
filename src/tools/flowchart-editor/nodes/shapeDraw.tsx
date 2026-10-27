@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { paramGetterFor, type ShapeDef } from '../model/shapes';
 import type { FlowNodeStyle } from '../model/types';
 
-/** 正 n 边形顶点（默认顶点朝上） */
+/** Regular n-gon vertices (pointing up by default) */
 function regularPolygon(sides: number, w: number, h: number, rotDeg = -90): string {
   const cx = w / 2;
   const cy = h / 2;
@@ -17,7 +17,7 @@ function regularPolygon(sides: number, w: number, h: number, rotDeg = -90): stri
   return pts.join(' ');
 }
 
-/** 星形顶点（外/内交替） */
+/** Star vertices (alternating outer/inner) */
 function starPoints(points: number, w: number, h: number, inner = 0.44, rotDeg = -90): string {
   const cx = w / 2;
   const cy = h / 2;
@@ -33,7 +33,7 @@ function starPoints(points: number, w: number, h: number, inner = 0.44, rotDeg =
   return arr.join(' ');
 }
 
-/** 加号/十字形多边形（厚度按尺寸比例，可由 plusArm 参数调整） */
+/** Plus/cross polygon (thickness proportional to the size, adjustable via the plusArm parameter) */
 function plusPoints(w: number, h: number, ratio = 0.34): string {
   const wx = w * ratio;
   const hy = h * ratio;
@@ -54,9 +54,9 @@ function plusPoints(w: number, h: number, ratio = 0.34): string {
 }
 
 /**
- * 生成形状的基础外形（SVG 子元素），由图形目录的 draw 字段驱动。
- * `style` 可选：其中的 `shapeParams` / `cornerRadius` / `foldSize` 经 `paramValue` 解析
- * （缺省时取图形目录声明的默认值），绘制结果与改造前完全一致。
+ * Generate a shape's base outline (SVG children), driven by the catalog's draw field.
+ * `style` is optional: its `shapeParams` / `cornerRadius` / `foldSize` are resolved through `paramValue`
+ * (falling back to the defaults declared in the shape catalog), and the drawing is identical to before the refactor.
  */
 export function drawShape(
   def: ShapeDef,
@@ -137,12 +137,12 @@ export function drawShape(
     case 'octagon':
       return <polygon points={regularPolygon(8, w, h)} />;
     case 'chevron': {
-      // 右向雪佛龙箭头；depth 为箭头尖深（左右凹口一致）
+      // Right-facing chevron arrow; depth is the point depth (the left notch matches)
       const d2 = p('chevronDepth');
       return <path d={`M0,0 H${w - d2} L${w},${h / 2} L${w - d2},${h} H0 L${d2},${h / 2} Z`} />;
     }
     case 'card': {
-      // 圆角矩形 + 右上折角（名片/卡片）
+      // Rounded rectangle + folded top-right corner (business card / card)
       const r = Math.min(12, w / 2, h / 2);
       const c = p('foldSize');
       return (
@@ -152,7 +152,7 @@ export function drawShape(
       );
     }
     case 'callout': {
-      // 圆角气泡 + 左下尾巴（标注）；calloutTail 为尾巴高度
+      // Rounded bubble + tail at the bottom-left (callout); calloutTail is the tail height
       const r = Math.min(12, w / 2, h / 2);
       const bh = h - p('calloutTail');
       return (
@@ -162,7 +162,7 @@ export function drawShape(
       );
     }
     case 'cloud': {
-      // 云朵（贝塞尔近似）
+      // Cloud (bezier approximation)
       const cy = h * 0.6;
       return (
         <path
@@ -173,14 +173,14 @@ export function drawShape(
     case 'plus':
       return <polygon points={plusPoints(w, h, p('plusArm'))} />;
     case 'cross':
-      // 十字旋转 45° 即为 X 形
+      // A cross rotated 45° is an X
       return (
         <g transform={`rotate(45 ${w / 2} ${h / 2})`}>
           <polygon points={plusPoints(w, h, p('plusArm'))} />
         </g>
       );
     case 'flag': {
-      // 旗杆 + 三角旗
+      // Flagpole + triangular flag
       const poleX = w * 0.2;
       const poleW = Math.max(3, w * 0.05);
       return (
@@ -196,7 +196,7 @@ export function drawShape(
         />
       );
     case 'arrow': {
-      // 右向块状箭头；arrowHead 为箭头头部长度
+      // Right-facing block arrow; arrowHead is the head length
       const hs = w - p('arrowHead');
       return (
         <polygon
@@ -205,7 +205,7 @@ export function drawShape(
       );
     }
     case 'bracket': {
-      // 左方括号 [ 形；armThickness 为上下臂厚度
+      // Left square bracket [ shape; armThickness is the thickness of the top and bottom arms
       const t = p('bracketArm');
       return (
         <polygon
@@ -216,7 +216,7 @@ export function drawShape(
     case 'bar':
       return <rect x={0} y={0} width={w} height={h} rx={2} ry={2} />;
     case 'laneH': {
-      // 横向泳道：外框 + 左侧竖条标题栏
+      // Horizontal swimlane: outer frame + vertical title bar on the left
       const hw = p('laneHeader');
       return (
         <g>
@@ -229,7 +229,7 @@ export function drawShape(
       );
     }
     case 'laneV': {
-      // 纵向泳道：外框 + 顶部横条标题栏
+      // Vertical swimlane: outer frame + horizontal title bar on top
       const hh = p('laneHeader');
       return (
         <g>
@@ -242,7 +242,7 @@ export function drawShape(
       );
     }
     case 'group':
-      // 编组：虚线框 + 淡背景（fill 由外层 g 继承）
+      // Group: dashed frame + faint background (fill inherited from the outer g)
       return <rect x={0} y={0} width={w} height={h} rx={8} ry={8} strokeDasharray="7 5" />;
     case 'path':
     default:
@@ -250,7 +250,7 @@ export function drawShape(
   }
 }
 
-/** 生成外形内部的装饰符号（网关 X/+、事件内圈、机架线、类图分栏等） */
+/** Generate the decorative symbols inside the outline (gateway X/+, event inner circles, rack lines, class diagram compartments, etc.) */
 export function drawDecor(
   def: ShapeDef,
   w: number,
@@ -262,7 +262,7 @@ export function drawDecor(
   const cy = h / 2;
   const m = Math.min(w, h);
   const common = { fill: 'none' } as const;
-  // 历史伪状态的 H / H* 文字以描边路径绘制，避免依赖字体与颜色继承。
+  // The H / H* text of the history pseudo-states is drawn as stroked paths, avoiding any dependency on fonts and color inheritance.
   const histE = m * 0.22;
   const histF = m * 0.26;
   const histH =
@@ -335,7 +335,7 @@ export function drawDecor(
     case 'disk':
       return <path {...common} d={`M0,${h * 0.4} H${w} M0,${h * 0.62} H${w}`} />;
     case 'compartments': {
-      // 分栏线：上/下两处高度可调（dividerTop / dividerBottom），并保证互不重叠
+      // Compartment lines: two adjustable heights (dividerTop / dividerBottom), guaranteed not to overlap
       const d1 = p('dividerTop');
       const d2 = Math.max(d1 + 6, p('dividerBottom'));
       return <path {...common} d={`M0,${d1} H${w} M0,${d2} H${w}`} />;
@@ -346,7 +346,7 @@ export function drawDecor(
       return <path {...common} d={`M${cx - d},${y} H${cx + d} M${cx},${y - d} V${y + d}`} />;
     }
     case 'bullseye':
-      // 活动结束：实心内圆（填充色由外层 g 提供）
+      // Activity final: solid inner circle (the fill comes from the outer g)
       return <circle cx={cx} cy={cy} r={Math.min(w, h) * 0.28} />;
     case 'history':
       return <path {...common} d={histH} />;

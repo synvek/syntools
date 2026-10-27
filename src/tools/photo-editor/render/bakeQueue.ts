@@ -3,22 +3,22 @@ import { cssFilterOf } from './filters';
 import type { Adjustments, FilterSpec } from '../model/types';
 
 /**
- * 异步烘焙调度（机会式加速）。
+ * Async bake scheduling (opportunistic acceleration).
  *
- * 设计前提：**主渲染管线保持同步**。落笔 / 拖滑杆的每一帧都必须立刻拿到结果，
- * 把管线改成异步会牵动 nodes / sync / 导出三条路径，风险远大于收益。
- * 因此 Worker 只承担「不必当帧要结果」的那部分：实时预览先按**降采样**给出同步结果，
- * 停手后再由 Worker 算一遍**全分辨率**，写回烘焙缓存并通知重绘。
+ * Design premise: **the main render pipeline stays synchronous**. Every frame while painting / dragging
+ * must return at once; async would touch nodes / sync / export, and the risk far outweighs the gain. The
+ * Worker therefore only handles work not needed this frame: live preview gives a **downsampled** synchronous
+ * result, and when the user stops the Worker recomputes **full resolution**, updates the bake cache and repaints.
  *
- * 传参只走 `ImageBitmap`：把源画布转成位图交给 Worker（可转移，不复制像素），
- * 主线程全程不碰全分辨率的 `getImageData` —— 否则「省下的时间」又会在取像素时花掉。
+ * Arguments cross only as `ImageBitmap`: the source canvas becomes a bitmap handed to the Worker (transferable,
+ * not copied); the main thread never calls `getImageData` at full resolution — else the saved time is spent there.
  *
- * 失败策略：Worker 不可用（SSR / 老浏览器）或出错时静默降级为纯同步，且出错后不再重试。
+ * Failure policy: if the Worker is unavailable (SSR / old browsers) or throws, fall back silently to pure sync; no retry.
  */
 
 export interface FullResBakeJob {
   signature: string;
-  /** 源画布（主线程侧转成 ImageBitmap 后转移给 Worker） */
+  /** Source canvas (turned into an ImageBitmap on the main thread, then transferred to the Worker) */
   source: HTMLCanvasElement;
   adjustments: Adjustments;
   filters: FilterSpec[];
@@ -53,7 +53,7 @@ function ensureWorker(): Worker | null {
       for (const listener of listeners) listener(job.signature, event.data.bitmap);
     };
     worker.onerror = () => {
-      // 出错即判死：继续重试只会在坏环境里反复起线程
+      // One error is fatal: retrying would only keep spawning threads in a broken environment
       workerBroken = true;
       worker?.terminate();
       worker = null;
@@ -66,7 +66,7 @@ function ensureWorker(): Worker | null {
   return worker;
 }
 
-/** 登记一次「停手后算全分辨率」的任务；同签名在防抖窗口内只保留最后一次 */
+/** Register a "recompute at full resolution after the user stops" job; within the debounce window only the last one per signature is kept */
 export function scheduleFullResBake(job: FullResBakeJob): void {
   if (!shouldOffloadPixels(job.source.width, job.source.height, job.filters)) return;
   if (typeof createImageBitmap !== 'function') return;
@@ -108,12 +108,12 @@ function flush(): void {
       );
     })
     .catch(() => {
-      // 位图创建失败（画布为 0 尺寸 / 被回收）时放弃本次预热，不影响同步结果
+      // If bitmap creation fails (zero-size canvas / already reclaimed), skip this warm-up; the sync result is unaffected
       void signature;
     });
 }
 
-/** 订阅「全分辨率烘焙完成」；返回取消订阅函数 */
+/** Subscribe to "full-resolution bake finished"; returns an unsubscribe function */
 export function onBakeReady(
   listener: (signature: string, bitmap: ImageBitmap) => void,
 ): () => void {
@@ -123,7 +123,7 @@ export function onBakeReady(
   };
 }
 
-/** 仅供测试：重置内部状态 */
+/** Test-only: reset internal state */
 export function resetBakeQueue(): void {
   if (timer) clearTimeout(timer);
   timer = null;
@@ -136,7 +136,7 @@ export function resetBakeQueue(): void {
   nextId = 1;
 }
 
-/** 仅供测试 / 诊断：Worker 是否已被判定为不可用 */
+/** Test / diagnostic only: whether the Worker has been marked unavailable */
 export function isWorkerUnavailable(): boolean {
   return workerBroken;
 }

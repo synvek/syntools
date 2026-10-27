@@ -13,7 +13,7 @@ import {
   type CropRect,
 } from './core';
 
-/** 在线图片裁剪 */
+/** In-browser image cropping */
 export default function ImageCropTool() {
   const { t } = useTranslation();
   const [aspect, setAspect] = useState<CropAspect>('free');
@@ -232,7 +232,12 @@ export default function ImageCropTool() {
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
             >
-              <img src={sourceUrl} alt="" className="max-h-96 max-w-full select-none" draggable={false} />
+              <img
+                src={sourceUrl}
+                alt=""
+                className="max-h-96 max-w-full select-none"
+                draggable={false}
+              />
               {overlayStyle && (
                 <div
                   className="pointer-events-none absolute border-2 border-blue-500 bg-blue-500/20"

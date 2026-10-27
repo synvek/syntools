@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 
 /**
- * 「格式」行专用图标。
+ * Icons dedicated to the "format" row.
  *
- * 与 `toolIcons.tsx` 同样的理由：字体颜色、高亮、轮廓、行距、文字对齐这些图标
- * 在共享 Icon 集里没有合适图形（`palette` 更像调色板工具、`listCheck` 更像清单），
- * 集中内联定义以保证这一行内的视觉语言统一。画法沿用既有约定：
- * 24 视窗、1.7 描边、currentColor。
+ * Same reasoning as `toolIcons.tsx`: font color, highlight, outline, line spacing and text alignment have
+ * no suitable glyph in the shared icon set (`palette` reads more like a palette tool, `listCheck` like a checklist),
+ * so they are defined inline here to keep this row's visual language consistent. Drawing follows the existing
+ * convention: 24 viewBox, 1.7 stroke, currentColor.
  */
 
 const svg = (children: ReactNode) => (
@@ -30,14 +30,14 @@ const glyph = (text: string, className: string) => (
   </span>
 );
 
-/* --------------------------- 字形（B/I/U/S） --------------------------- */
+/* --------------------------- Glyphs (B/I/U/S) --------------------------- */
 
 export const BoldGlyph = () => glyph('B', 'font-bold');
 export const ItalicGlyph = () => glyph('I', 'font-serif italic');
 export const UnderlineGlyph = () => glyph('U', 'underline');
 export const StrikeGlyph = () => glyph('S', 'line-through');
 
-/* ------------------------------ 字号阶梯 ------------------------------ */
+/* ------------------------------ Font size ladder ------------------------------ */
 
 export function FontSizeUpIcon() {
   return svg(
@@ -59,9 +59,9 @@ export function FontSizeDownIcon() {
   );
 }
 
-/* ------------------------------- 颜色类 ------------------------------- */
+/* ------------------------------- Color group ------------------------------- */
 
-/** 字体颜色：字母 A + 下方色条（色条用 currentColor 加深表示「这是颜色按钮」） */
+/** Text color: letter A with a bar underneath (the bar uses a darker currentColor to signal "this is a color button") */
 export function TextColorIcon() {
   return svg(
     <>
@@ -72,7 +72,7 @@ export function TextColorIcon() {
   );
 }
 
-/** 高亮：荧光笔造型 */
+/** Highlight: a highlighter pen */
 export function HighlightIcon() {
   return svg(
     <>
@@ -83,7 +83,7 @@ export function HighlightIcon() {
   );
 }
 
-/** 轮廓：空心方块 + 粗细刻度 */
+/** Outline: hollow square + weight ticks */
 export function OutlineIcon() {
   return svg(
     <>
@@ -95,7 +95,7 @@ export function OutlineIcon() {
   );
 }
 
-/* ------------------------------ 文字对齐 ------------------------------ */
+/* ------------------------------ Text alignment ------------------------------ */
 
 export function AlignLeftIcon() {
   return svg(
@@ -129,7 +129,7 @@ export function AlignJustifyIcon() {
   );
 }
 
-/** 行距：两行文字 + 右侧上下箭头 */
+/** Line spacing: two lines of text with up/down arrows on the right */
 export function LineSpacingIcon() {
   return svg(
     <>
@@ -161,9 +161,9 @@ export function NumberListIcon() {
   );
 }
 
-/* ------------------------------ 效果类 ------------------------------ */
+/* ------------------------------ Effects ------------------------------ */
 
-/** 阴影：实心方块 + 偏移虚影 */
+/** Shadow: solid square + offset ghost */
 export function ShadowIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
@@ -182,7 +182,7 @@ export function ShadowIcon() {
   );
 }
 
-/** 圆角：直角框 + 圆角对比 */
+/** Corner radius: square corner vs rounded corner */
 export function CornerRadiusIcon() {
   return svg(
     <>
@@ -192,7 +192,7 @@ export function CornerRadiusIcon() {
   );
 }
 
-/** 不透明度：左实右虚的方块 */
+/** Opacity: half solid, half dashed square */
 export function OpacityIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">

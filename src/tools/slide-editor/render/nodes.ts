@@ -17,11 +17,11 @@ import { acquireImage } from './imageCache';
 import { layoutTextBody } from './textLayout';
 
 /**
- * SlideElement → Konva.Node 工厂与更新器。
+ * SlideElement → Konva.Node factory and updater.
  *
- * 约定：每个元素映射为一个 Konva.Group（承载 id / 位置 / 旋转 / 翻转 / 透明度），
- * 组内的子图形由 `konvaChildKind` 区分，diff 同步时只要 kind 不变就只更新属性，
- * 避免每次都重建节点导致的闪烁与 GC 压力。
+ * Convention: each element maps to one Konva.Group (carrying id / position / rotation / flip / opacity);
+ * the child shape inside is identified by `konvaChildKind`, so diff sync only updates properties while the kind
+ * is unchanged, avoiding the flicker and GC pressure of rebuilding nodes every time.
  */
 
 export interface RenderContext {
@@ -47,7 +47,7 @@ export function fillToAlpha(fill: Fill | undefined): number | undefined {
   return undefined;
 }
 
-/** 线性渐变 → Konva 起止点（画布坐标，盒子左上角为原点） */
+/** Linear gradient → Konva start/end points (canvas coordinates, box top-left as origin) */
 function gradientPoints(
   fill: GradientFill,
   width: number,
@@ -96,14 +96,14 @@ function applyStroke(node: Konva.Shape, stroke: Stroke | undefined): void {
   node.dash(stroke.dash ?? []);
 }
 
-/** 文本 body → Konva.Group（内部按 run 片段分段，保留混排样式） */
+/** Text body → Konva.Group (split into fragments per run, preserving mixed styles) */
 export function createTextNodes(body: TextBody, width: number, height: number): Konva.Group {
-  // 具名是为了「行内编辑期间」整组隐藏：那时文字由 DOM textarea 独占渲染，
-  // 画布若继续画一份就会重影（见 SlideCanvas 的 startEditing / closeEditor）。
+  // Named so the whole group can be hidden during inline editing: the text is then rendered exclusively by
+  // the DOM textarea, and drawing another copy on the canvas would double it (see startEditing / closeEditor in SlideCanvas).
   const group = new Konva.Group({ name: 'text', listening: false });
 
-  // normAutofit：超框时先等比缩小字号重新排版（最多迭代 3 次），
-  // 这与 PowerPoint「自动调整文字大小」的行为一致；直接压缩 Y 轴会把文字压扁。
+  // normAutofit: when it overflows, shrink the font proportionally and re-layout (at most 3 iterations),
+  // matching PowerPoint's "shrink text on overflow"; squashing the Y axis would distort the text.
   let effective = body;
   let layout = layoutTextBody(effective, { width, height });
   for (let attempt = 0; attempt < 3 && height > 0 && layout.height > height; attempt += 1) {
@@ -111,7 +111,7 @@ export function createTextNodes(body: TextBody, width: number, height: number): 
     effective = scaleBodyFonts(effective, factor);
     layout = layoutTextBody(effective, { width, height });
   }
-  // 缩到下限仍溢出时退回纵向压缩兜底，至少保证内容都在框内
+  // Still overflowing at the lower bound: fall back to vertical compression so content stays inside the box
   if (layout.height > height && height > 0) {
     group.scaleY(height / layout.height);
   }
@@ -180,11 +180,11 @@ function createShapeNode(element: ShapeElement): Konva.Shape {
 }
 
 /**
- * 表格渲染。
+ * Table rendering.
  *
- * 必须消费 cell.colSpan / rowSpan：早期实现只按行列下标取 colWidths[rowHeights]，
- * 合并单元格会被画成错位/空洞（而导出反而是正确的），导致「看到的和导出的不一致」。
- * 这里用占用矩阵跳过被合并覆盖的格子，并把跨列/跨行的宽高累加起来。
+ * cell.colSpan / rowSpan must be honored: the early implementation indexed colWidths[rowHeights] by row/column
+ * only, so merged cells were drawn offset or hollow (while export was correct), making the screen and the file disagree.
+ * An occupancy matrix skips covered cells and accumulates width/height across colspans and rowspans.
  */
 function createTableNode(element: TableElement): Konva.Group {
   const group = new Konva.Group({ listening: true });
@@ -194,7 +194,7 @@ function createTableNode(element: TableElement): Konva.Group {
   const fallbackWidth = element.width / colCount;
   const fallbackHeight = element.height / Math.max(1, rows.length);
 
-  /** 累加前 n 列的宽度（网格列号，而不是数组下标） */
+  /** Accumulated width of the first n columns (grid column number, not array index) */
   const widthBefore = (gridCol: number): number => {
     let total = 0;
     for (let c = 0; c < gridCol; c += 1) total += colWidths[c] ?? fallbackWidth;
@@ -202,8 +202,8 @@ function createTableNode(element: TableElement): Konva.Group {
   };
 
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-    // 关键：列位置用「网格列号」推进，而不是数组下标 ——
-    // 否则一行里出现 gridSpan 后，后面所有单元格都会左移错位。
+    // Key: advance the column position by "grid column number", not array index —
+    // otherwise once a row contains gridSpan, every later cell shifts left.
     let gridCol = 0;
     let y = 0;
     for (let r = 0; r < rowIndex; r += 1) y += rowHeights[r] ?? fallbackHeight;
@@ -221,11 +221,11 @@ function createTableNode(element: TableElement): Konva.Group {
       for (let r = rowIndex; r < rowIndex + rowSpan; r += 1) {
         height += rowHeights[r] ?? fallbackHeight;
       }
-      // 命中标记用「数组下标」：store 的 patchTableCell / activeCell 都按数组槽位操作
+      // The hit marker uses the "array index": the store's patchTableCell / activeCell operate on array slots
       const colIndex = arrayIndex;
       gridCol += colSpan;
 
-      // 被合并覆盖的格子不绘制（但仍占据网格位置）
+      // Covered cells are not drawn (but still occupy grid positions)
       if (cell.covered) continue;
 
       const isHeader = element.headerRow && rowIndex === 0;
@@ -239,7 +239,7 @@ function createTableNode(element: TableElement): Konva.Group {
         fill,
         stroke: border,
         strokeWidth: 1,
-        // 单元格可点击：属性面板需要知道当前活动单元格以便编辑文字
+        // Cells are clickable: the property panel needs the active cell to edit its text
         name: 'cell',
         listening: true,
       });
@@ -257,7 +257,7 @@ function createTableNode(element: TableElement): Konva.Group {
           text: cell.text,
           fontSize: cell.size ?? 14,
           fontFamily: DEFAULT_FONT,
-          // 表头默认加粗（与 PowerPoint 的表头行样式一致）
+          // Header cells are bold by default (matching PowerPoint's header row style)
           fontStyle: cell.bold || isHeader ? 'bold' : 'normal',
           fill: cell.color ?? '#000000',
           align: cell.align ?? 'left',
@@ -273,15 +273,15 @@ function createTableNode(element: TableElement): Konva.Group {
   return group;
 }
 
-/** 元素 → Konva.Group（含全部子图形） */
+/** Element → Konva.Group (with all child shapes) */
 export function createElementNode(element: SlideElement, ctx: RenderContext): Konva.Group {
   const group = new Konva.Group({
     id: element.id,
     name: 'element',
     x: element.x,
     y: element.y,
-    // 记录元素盒子尺寸：Transformer 与 transformend 读取 node.width()/height()
-    // 计算落点尺寸，未设置时 Group 默认返回 0，会导致旋转后元素尺寸被清零消失。
+    // Record the element box size: Transformer and transformend read node.width()/height()
+    // to compute the landing size; unset, a Group reports 0 and a rotated element collapses to nothing.
     width: element.width,
     height: element.height,
     rotation: element.rotation ?? 0,
@@ -293,13 +293,13 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
     dragDistance: 3,
   });
   group.setAttr('elType', element.type);
-  // 锁定标记写在节点上：命中与框选在 pointer.ts 里读它来决定是否跳过
+  // The lock flag lives on the node: hit testing and rubber-band selection in pointer.ts read it to skip elements
   group.setAttr('elLocked', Boolean(element.locked));
 
   switch (element.type) {
     case 'text': {
-      // 无填充的文本框需要一块透明的命中区域，否则只有文字字形可点（文字又是 listening:false），
-      // 整框无法被选中 / 拖拽。透明填充仍会被 Konva 计入命中画布。
+      // A text box with no fill needs a transparent hit area, otherwise only the glyphs are clickable (and text is
+      // listening:false), so the whole box can't be selected or dragged. A transparent fill still counts in the hit canvas.
       const hit = new Konva.Rect({
         width: element.width,
         height: element.height,
@@ -370,14 +370,14 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       break;
     }
     case 'group': {
-      // 子坐标是相对 group 原点的（见 GroupElement 注释），直接挂进已定位的 Group 即可。
-      // 子元素关闭命中：MVP 采用 PowerPoint 的「整组选中」语义，避免点到组内单个子元素。
+      // Child coordinates are relative to the group origin (see the GroupElement comment), so they attach
+      // directly to the already-positioned Group. Children don't listen: the MVP uses PowerPoint's "select whole group" semantics.
       for (const child of element.children) {
         const node = createElementNode(child, ctx);
         node.listening(false);
         group.add(node);
       }
-      // 子元素已不参与命中，靠这块透明矩形保证整组可被点击 / 拖拽 / 框选
+      // Children no longer take part in hit testing; this transparent rect keeps the group clickable/draggable/selectable
       group.add(
         new Konva.Rect({
           width: element.width,
@@ -389,7 +389,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       break;
     }
     case 'chart': {
-      // 透明命中区：图表节点 listening:false，整框仍需可选中/可拖拽
+      // Transparent hit area: chart nodes are listening:false but the box must still be selectable/draggable
       const hit = new Konva.Rect({
         width: element.width,
         height: element.height,
@@ -451,12 +451,12 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
   return group;
 }
 
-/** 元素类型是否发生变化（变化时必须重建节点） */
+/** Whether the element type changed (a change requires rebuilding the node) */
 export function sameKind(node: Konva.Node, element: SlideElement): boolean {
   return node.getAttr('elType') === element.type;
 }
 
-/** 仅更新几何/视觉属性（元素类型未变时的快路径） */
+/** Update geometry/visual properties only (fast path when the element type is unchanged) */
 export function patchElementNode(
   node: Konva.Group,
   element: SlideElement,
@@ -481,7 +481,7 @@ export function patchElementNode(
       if (image && imageNode.image() !== image) imageNode.image(image);
       imageNode.width(element.width);
       imageNode.height(element.height);
-      // 图片走属性快路径，圆角与裁剪必须在这里同步，否则改了不刷新
+      // Images take the property fast path; corner radius and crop must be synced here or they won't refresh
       imageNode.cornerRadius(element.cornerRadius ?? 0);
       const crop = element.crop;
       if (crop) {

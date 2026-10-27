@@ -1,26 +1,26 @@
 import type { PromptCategoryMeta, PromptItem } from '../types';
 
 /**
- * 提示词数据一致性校验（纯函数，无副作用）。
+ * Prompt data consistency checks (pure functions, no side effects).
  *
- * 同时服务于两处：
- * - 开发环境：`./index.ts` 在模块加载时断言，脏数据直接快速失败；
- * - 测试：`../data.test.ts` 断言返回空数组。
+ * Serves two call sites:
+ * - Development: `./index.ts` asserts at module load so bad data fails fast;
+ * - Tests: `../data.test.ts` asserts an empty array is returned.
  */
 
 export interface ValidateOptions {
   /**
-   * 每个分类要求的最少条数。
-   * 默认 0 —— 允许新增分类先建空文件，逐步补齐内容；
-   * 测试中传入 10 以守住内容底线。
+   * Minimum number of prompts required per category.
+   * Defaults to 0 so a new category can start with an empty file and fill in gradually;
+   * Tests pass 10 to enforce the content baseline.
    */
   minPerCategory?: number;
 }
 
-/** kebab-case：小写字母/数字，单词间单连字符 */
+/** kebab-case: lowercase letters/digits, single hyphen between words */
 const KEBAB_CASE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** 编译期必填的语种 */
+/** Languages required at compile time */
 const REQUIRED_LANGS: readonly string[] = ['zh', 'en'];
 
 export function validatePromptData(

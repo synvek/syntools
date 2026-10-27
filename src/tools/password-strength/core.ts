@@ -66,7 +66,7 @@ function hasRepeated(pw: string): boolean {
   return /(.)\1\1/.test(pw);
 }
 
-/** 估算密码强度：基于字符集熵，并对常见弱模式进行惩罚（零依赖）。 */
+/** Estimate password strength: character-set entropy with penalties for common weak patterns (zero dependencies). */
 export function estimateStrength(password: string): StrengthReport {
   const length = password.length;
   const hasLower = /[a-z]/.test(password);

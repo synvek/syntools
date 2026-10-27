@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 社交媒体类提示词，详见 ../README.md */
+/** Social media prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'social-lifestyle-post',

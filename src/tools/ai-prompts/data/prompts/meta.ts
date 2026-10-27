@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 提示词工程类提示词，详见 ../README.md */
+/** Prompt engineering prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'meta-improve-prompt',

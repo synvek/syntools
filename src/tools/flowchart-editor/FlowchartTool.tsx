@@ -38,7 +38,7 @@ import {
 } from './store/persist';
 import { hasFlowchartStrings, registerFlowchartStrings } from './strings';
 
-/** 元素是否处于文本输入态（输入框 / 文本域 / 可编辑区域） */
+/** Whether the element is in a text-input state (input / textarea / contenteditable) */
 function isTypingElement(el: unknown): boolean {
   if (!el || !(el instanceof HTMLElement)) return false;
   const tag = el.tagName.toUpperCase();
@@ -46,11 +46,11 @@ function isTypingElement(el: unknown): boolean {
 }
 
 /**
- * 当前是否处于文本编辑：同时看「事件目标」与「焦点元素」。
+ * Whether text editing is currently active: checks both the event target and the focused element.
  *
- * 内联编辑器（图形文字 / 表格单元格 / 连线标签 / 图层重命名）在 Enter 提交时会同步卸载，
- * 此时 `document.activeElement` 已回落到 body，只看焦点元素会把「提交」误判为画布操作
- * （典型表现：在节点里按 Enter 提交后，又触发了「Enter 生成下方节点」）。
+ * Inline editors (shape text / table cells / edge labels / layer rename) unmount synchronously on Enter submit,
+ * by which point `document.activeElement` has fallen back to body; looking only at the focused element would
+ * mistake the submit for a canvas action (classic symptom: Enter inside a node also triggers "Enter creates node below").
  */
 function isTypingContext(e: KeyboardEvent): boolean {
   return isTypingElement(e.target) || isTypingElement(document.activeElement);
@@ -99,11 +99,11 @@ import '@xyflow/react/dist/style.css';
 
 const DRAFT_DEBOUNCE_MS = 1200;
 
-/** 右侧面板：属性 / 排列 / 图层 / 历史快照 / 全图搜索 */
+/** Right panel: properties / arrange / layers / history snapshots / full-graph search */
 const PANELS = ['prop', 'arrange', 'layer', 'history', 'search'] as const;
 type PanelKey = (typeof PANELS)[number];
 
-/** 面板 → i18n 键后缀 */
+/** Panel → i18n key suffix */
 const PANEL_LABEL_KEY: Record<PanelKey, string> = {
   prop: 'panelTitle',
   arrange: 'arrangePanel',
@@ -116,13 +116,13 @@ function FlowchartInner() {
   const { t, i18n: i18nInstance } = useTranslation();
   const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
-  /** 当前语言的文案是否已按需加载完成 */
+  /** Whether the current language's copy has finished loading on demand */
   const [stringsReady, setStringsReady] = useState(() =>
     hasFlowchartStrings(i18nInstance.language),
   );
-  /** 工作区（图形库 + 画布 + 属性面板）高度 = 首屏剩余空间 */
+  /** Workspace height (shape library + canvas + property panel) = remaining first-screen space */
   const workRowRef = useRef<HTMLDivElement | null>(null);
-  // 文案未就绪时整个工具返回 null（工作区尚未挂载），把就绪状态作为重算信号
+  // Return null for the whole tool until the copy is ready (the workspace is not mounted yet); the ready flag is the recompute signal
   const workHeight = useViewportFill(workRowRef, {
     min: 360,
     signature: stringsReady ? 'ready' : 'loading',
@@ -138,7 +138,7 @@ function FlowchartInner() {
   const pageOrder = useFlowStore((s) => s.pageOrder);
   const activePageId = useFlowStore((s) => s.activePageId);
   const pageData = useFlowStore((s) => s.pageData);
-  // 需持久化的会话设置（网格 / 布局 / 对齐阈值）与命名快照
+  // Session settings that need persisting (grid / layout / alignment threshold) plus named snapshots
   const gridEnabled = useFlowStore((s) => s.gridEnabled);
   const gridSize = useFlowStore((s) => s.gridSize);
   const layoutDirection = useFlowStore((s) => s.layoutDirection);
@@ -153,8 +153,8 @@ function FlowchartInner() {
   const snapshots = useFlowStore((s) => s.snapshots);
 
   /**
-   * 各页的即时快照（活动页现场序列化），仅供总览缩略图使用。
-   * 依赖 nodes/edges/pageData，编辑过程中缩略图也会跟着更新。
+   * Live snapshot of each page (the active page is serialized in place), used only for overview thumbnails.
+   * Depends on nodes/edges/pageData, so thumbnails follow along during editing.
    */
   const pages = useMemo(
     () => useFlowStore.getState().getDoc().pages,
@@ -167,10 +167,10 @@ function FlowchartInner() {
   const [exportOpen, setExportOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelKey>('prop');
-  /** 窄屏（<lg）下把左右两栏改为抽屉；宽屏保持三栏 */
+  /** On narrow screens (<lg) the two side columns become drawers; wide screens keep three columns */
   const isNarrow = useMediaQuery(NARROW_QUERY);
   const [drawer, setDrawer] = useState<null | 'palette' | 'panel'>(null);
-  /** 首启引导：仅首次进入自动弹出，可由空状态或快捷键帮助再次打开 */
+  /** First-run onboarding: shown automatically only on first visit, reopenable from the empty state or shortcut help */
   const [guideOpen, setGuideOpen] = useState(false);
   useEffect(() => {
     if (!hasSeenOnboarding()) setGuideOpen(true);
@@ -180,10 +180,10 @@ function FlowchartInner() {
   const [presenting, setPresenting] = useState(false);
   const [presentSrc, setPresentSrc] = useState<string | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
-  /** 会话设置 / 快照是否已从 IndexedDB 恢复完成（避免用默认值覆盖已存设置） */
+  /** Whether session settings / snapshots have been restored from IndexedDB (avoids overwriting stored settings with defaults) */
   const [hydrated, setHydrated] = useState(false);
 
-  /** 放映：先渲染放映层（显示「生成中」），下一帧再截图，避免大图卡住首次绘制 */
+  /** Present mode: render the overlay (showing "generating") first and capture on the next frame, so large images do not stall the first paint */
   const openPresent = () => {
     setPresentSrc(null);
     setPresentFailed(false);
@@ -204,15 +204,15 @@ function FlowchartInner() {
   const saveTimer = useRef<number | null>(null);
   const firstSave = useRef(true);
 
-  // 只在「载入整张图」（草稿 / 模板）时适配视图。
-  // 不能用 fitView prop：它会在首个节点测量完成后自动适配，
-  // 导致新图的第一个元素无论拖到哪里都被居中显示。
-  // 默认以 100%（实际大小）呈现：文字与元件尺寸贴近设计时的大小，避免一进来被无限缩小看不清。
+  // Only fit the view when a whole diagram is loaded (draft / template).
+  // The fitView prop cannot be used: it fits once the first node is measured,
+  // so the first element of a new diagram would always be centered no matter where it is dragged.
+  // Default to 100% (actual size) so text and components look close to their designed size instead of being shrunk out of sight.
   const fitViewSoon = useCallback(() => {
     requestAnimationFrame(() => fitView({ padding: 0.3, minZoom: 1, maxZoom: 1 }));
   }, [fitView]);
 
-  // 文案按语种按需加载：就绪后再渲染，避免闪现键名
+  // Copy is loaded per language on demand: render only once ready, avoiding a flash of key names
   useEffect(() => {
     let alive = true;
     void registerFlowchartStrings(i18n, i18nInstance.language).then(() => {
@@ -223,7 +223,7 @@ function FlowchartInner() {
     };
   }, [i18nInstance.language]);
 
-  // 文案就绪后载入：优先恢复 IndexedDB 完整草稿（含图片），回退 localStorage 草稿；都无则重置为空文档
+  // Load once the copy is ready: prefer the full IndexedDB draft (images included), fall back to the localStorage draft, otherwise reset to an empty document
   useEffect(() => {
     if (!stringsReady) return;
     let alive = true;
@@ -236,7 +236,7 @@ function FlowchartInner() {
         fitViewSoon();
         return;
       }
-      // 回退：旧版 localStorage 草稿（可能已丢弃图片）
+      // Fallback: a legacy localStorage draft (images may already have been dropped)
       const draft = readDraft();
       const page = activePageOf(draft);
       if (draft && page && page.nodes.length > 0) {
@@ -252,7 +252,7 @@ function FlowchartInner() {
     };
   }, [fitViewSoon, stringsReady]);
 
-  // 恢复会话设置与命名快照（IndexedDB 不可用时静默降级为默认值）
+  // Restore session settings and named snapshots (silently falls back to defaults when IndexedDB is unavailable)
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -273,7 +273,7 @@ function FlowchartInner() {
     };
   }, []);
 
-  // 会话设置变更后持久化（hydrated 之前不写，避免默认值覆盖已存设置）
+  // Persist session settings after they change (not before hydration, to avoid defaults overwriting stored settings)
   useEffect(() => {
     if (!hydrated) return;
     void savePersistedSession({
@@ -304,16 +304,16 @@ function FlowchartInner() {
     rulersVisible,
   ]);
 
-  // 命名快照变更后持久化
+  // Persist named snapshots after they change
   useEffect(() => {
     if (!hydrated) return;
     void savePersistedSnapshots(snapshots);
   }, [hydrated, snapshots]);
 
   /**
-   * 落盘：先写 localStorage（同步、可即时恢复，体积受限可能丢图），
-   * 再写 IndexedDB（异步、完整含图片）。任一成功即视为「已保存」；
-   * 仅当 IndexedDB 也失败且 localStorage 丢图时才提示改用项目文件。
+   * Saving: write localStorage first (synchronous and instantly restorable, size-limited so images may be lost),
+   * then IndexedDB (asynchronous, images included). Either one succeeding counts as "saved";
+   * only when IndexedDB also fails and localStorage dropped images is the user advised to switch to project files.
    */
   const persistNow = useCallback(async () => {
     const doc = useFlowStore.getState().getDoc();
@@ -323,9 +323,9 @@ function FlowchartInner() {
     if (local.droppedImages && !persisted) setFailure(t('tools.flowchart.draftTooLarge'));
   }, [t]);
 
-  // 变更后防抖写入本地草稿（编辑 → 未保存 → 1.2s 后落盘为已保存）
+  // Debounced local draft write after changes (edit → unsaved → flushed as saved after 1.2s)
   useEffect(() => {
-    // 首次挂载的数据本身就来自草稿，不必再写一次
+    // The data on first mount already comes from the draft, so no need to write it again
     if (firstSave.current) {
       firstSave.current = false;
       return;
@@ -338,7 +338,7 @@ function FlowchartInner() {
     return () => {
       if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     };
-    // docName 参与依赖：只改标题时也要落盘
+    // docName is part of the dependencies: changing only the title must also persist
   }, [nodes, edges, docName, persistNow]);
 
   const addNodeAtCenter = useCallback(
@@ -359,7 +359,7 @@ function FlowchartInner() {
     [screenToFlowPosition],
   );
 
-  /** 在画布中心插入非图形节点（图片 / 图标 / 公式） */
+  /** Insert a non-shape node (image / icon / formula) at the canvas center */
   const addMediaAtCenter = useCallback(
     (type: FlowNodeType, data: FlowNodeData, size: { width: number; height: number }) => {
       const el = canvasRef.current;
@@ -428,7 +428,7 @@ function FlowchartInner() {
     setDraftSaved(false);
   }, []);
 
-  /** 模板内文案走 i18n（token 见 model/templateLabels.ts），缺键回退英文 */
+  /** Template copy goes through i18n (tokens in model/templateLabels.ts); missing keys fall back to English */
   const translateTemplate = useCallback<TemplateTranslator>(
     (key) => String(i18n.t(`tools.flowchart.tpl_${key}`)),
     [],
@@ -445,7 +445,7 @@ function FlowchartInner() {
   const handleDelete = useCallback(() => useFlowStore.getState().removeSelected(), []);
   const handleDuplicate = useCallback(() => useFlowStore.getState().duplicateSelected(), []);
 
-  /** 方向键微移的合并计时器：一次连续按键只产生一条撤销记录 */
+  /** Coalescing timer for arrow-key nudges: one continuous key press produces a single undo entry */
   const nudgeTimer = useRef<number | null>(null);
   const nudge = useCallback((dx: number, dy: number) => {
     const st = useFlowStore.getState();
@@ -458,7 +458,7 @@ function FlowchartInner() {
     st.nudgeSelected(dx, dy);
   }, []);
 
-  /** Tab / Enter：以选中的单个节点为源，在右侧 / 下方生成相连节点 */
+  /** Tab / Enter: with a single selected node as the source, create a connected node to its right / below */
   const spawnFromSelection = useCallback((dir: 'right' | 'bottom'): boolean => {
     const st = useFlowStore.getState();
     if (st.selectedNodes.length !== 1) return false;
@@ -475,8 +475,8 @@ function FlowchartInner() {
   }, []);
 
   /**
-   * Ctrl/⌘+S：跳过防抖，立即把当前文档写入本地存储。
-   * 本工具无服务端，「保存」即把草稿落盘（localStorage + IndexedDB）。
+   * Ctrl/⌘+S: skip the debounce and write the current document to local storage immediately.
+   * This tool has no server, so "save" means persisting the draft (localStorage + IndexedDB).
    */
   const handleSave = useCallback(() => {
     if (saveTimer.current !== null) {
@@ -486,7 +486,7 @@ function FlowchartInner() {
     void persistNow();
   }, [persistNow]);
 
-  /** 全图搜索定位：把视口居中到该节点（含父容器偏移的绝对坐标） */
+  /** Full-graph search focus: center the viewport on that node (absolute coordinates including parent container offsets) */
   const locateNode = useCallback(
     (nodeId: string) => {
       const st = useFlowStore.getState();
@@ -503,15 +503,15 @@ function FlowchartInner() {
     [setCenter],
   );
 
-  // 键盘快捷键：撤销/重做/剪切复制粘贴/保存/导出/删除/微移/全选/重命名/建节点（文本编辑态不拦截）
+  // Keyboard shortcuts: undo/redo/cut copy paste/save/export/delete/nudge/select all/rename/create node (not intercepted while editing text)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingContext(e)) return;
-      // 任意模态弹层（放映 / 模板 / 页面总览）打开时让位：
-      // 编辑器快捷键不应作用于被遮挡的画布，也不应抢走弹层的 Esc。
+      // Step aside while any modal overlay (present / templates / page overview) is open:
+      // editor shortcuts should neither act on the covered canvas nor steal the overlay's Esc.
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       const mod = e.metaKey || e.ctrlKey;
-      // Ctrl/⌘ + PageUp/PageDown：上一页 / 下一页（与表格软件切换工作表的手感一致）
+      // Ctrl/⌘ + PageUp/PageDown: previous / next page (matching the feel of switching sheets in a spreadsheet)
       if (mod && (e.key === 'PageUp' || e.key === 'PageDown')) {
         e.preventDefault();
         const st = useFlowStore.getState();
@@ -521,15 +521,15 @@ function FlowchartInner() {
         return;
       }
       if (!mod && e.key === 'Escape') {
-        // Esc 取消选择。延迟到本次事件派发结束再更新 store：
-        // 同步的 store 更新会让其它弹层（如页面总览）在派发中途重挂监听而收不到 Esc。
+        // Esc clears the selection. Defer the store update until this event finishes dispatching:
+        // a synchronous store update would make other overlays (e.g. page overview) re-bind listeners mid-dispatch and miss the Esc.
         queueMicrotask(() => useFlowStore.getState().clearSelection());
       } else if (!mod && e.key === 'F1') {
-        // F1 打开快捷键帮助（`?`/`/` 已被全局工具搜索占用，避免抢占）
+        // F1 opens shortcut help (`?`/`/` are taken by the global tool search, so they are not claimed)
         e.preventDefault();
         setHelpOpen(true);
       } else if (!mod && e.key === 'F2') {
-        // F2 重命名选中节点：聚焦属性面板的文本输入框
+        // F2 renames the selected node: focus the text input in the property panel
         const labelInput = document.querySelector<HTMLInputElement>(
           '[data-testid="flowchart-label-input"]',
         );
@@ -539,19 +539,19 @@ function FlowchartInner() {
           labelInput.select();
         }
       } else if (mod && e.key.toLowerCase() === 'y') {
-        // Ctrl/⌘+Y 重做（与 Ctrl/⌘+Shift+Z 等效）
+        // Ctrl/⌘+Y redo (equivalent to Ctrl/⌘+Shift+Z)
         e.preventDefault();
         useFlowStore.getState().redo();
       } else if (mod && e.key.toLowerCase() === 's') {
-        // Ctrl/⌘+S 立即保存草稿
+        // Ctrl/⌘+S saves the draft immediately
         e.preventDefault();
         handleSave();
       } else if (mod && (e.key.toLowerCase() === 'p' || e.key.toLowerCase() === 'e')) {
-        // Ctrl/⌘+P / Ctrl/⌘+E 打开导出面板
+        // Ctrl/⌘+P / Ctrl/⌘+E open the export panel
         e.preventDefault();
         setExportOpen(true);
       } else if (mod && e.key.toLowerCase() === 'x') {
-        // Ctrl/⌘+X 剪切选中元素
+        // Ctrl/⌘+X cuts the selected elements
         e.preventDefault();
         cutSelection();
       } else if (mod && e.key.toLowerCase() === 'z') {
@@ -572,26 +572,26 @@ function FlowchartInner() {
         if (e.shiftKey) ungroupSelected();
         else groupSelected();
       } else if (mod && e.key.toLowerCase() === 'a') {
-        // 全选当前页节点与连线
+        // Select all nodes and edges on the current page
         e.preventDefault();
         useFlowStore.getState().selectAll();
       } else if (mod && e.key.toLowerCase() === 'r') {
-        // Ctrl/⌘+R 顺时针 90°，加 Shift 逆时针 90°（与 draw.io 的旋转快捷键一致）
+        // Ctrl/⌘+R rotates 90° clockwise, with Shift 90° counter-clockwise (matching draw.io's rotate shortcut)
         e.preventDefault();
         rotateSelected(e.shiftKey ? -90 : 90);
       } else if (mod && e.shiftKey && e.key.toLowerCase() === 'h') {
-        // Ctrl/⌘+Shift+H 水平镜像
+        // Ctrl/⌘+Shift+H mirrors horizontally
         e.preventDefault();
         flipSelected('h');
       } else if (mod && e.shiftKey && e.key.toLowerCase() === 'j') {
-        // Ctrl/⌘+Shift+J 垂直镜像
+        // Ctrl/⌘+Shift+J mirrors vertically
         e.preventDefault();
         flipSelected('v');
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         useFlowStore.getState().removeSelected();
       } else if (!mod && !e.altKey && e.key.startsWith('Arrow')) {
-        // 方向键微移选中节点（默认 1px，按住 ⇧ 加速为 10px）
+        // Arrow keys nudge the selected nodes (1px by default, ⇧ accelerates to 10px)
         const st = useFlowStore.getState();
         if (st.selectedNodes.length === 0) return;
         const step = e.shiftKey ? 10 : 1;
@@ -610,11 +610,11 @@ function FlowchartInner() {
   }, [nudge, spawnFromSelection, handleSave]);
 
   /**
-   * 从 draw.io 直接粘贴：识别系统剪贴板中的 mxGraph 内容并插入当前页。
+   * Paste straight from draw.io: detect mxGraph content on the system clipboard and insert it into the current page.
    *
-   * - 只在画布空闲（非输入框 / 无模态弹层）时接管，普通文本粘贴不受影响；
-   * - 复用既有 `parseDrawioXmlAsync`（支持未压缩、base64+deflate、URI 编码）；
-   * - 解析纯属 XML 数据解析，不执行任何脚本；节点数量有上限保护。
+   * - Only takes over when the canvas is idle (not in an input, no modal overlay), so plain text paste is unaffected;
+   * - Reuses the existing `parseDrawioXmlAsync` (supports uncompressed, base64+deflate and URI-encoded content);
+   * - Parsing is pure XML data parsing with no script execution; node count is capped.
    */
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
@@ -642,10 +642,10 @@ function FlowchartInner() {
     return () => window.removeEventListener('paste', onPaste);
   }, [screenToFlowPosition, t]);
 
-  // 文档体积估算：只在节点/连线变化时重新序列化，避免拖动时反复计算
+  // Document size estimate: re-serialize only when nodes/edges change, avoiding work on every drag
   const memory = useMemo(() => formatBytes(estimateJsonBytes({ nodes, edges })), [nodes, edges]);
 
-  // 文案未就绪时先不渲染（只有当前语言的小 chunk 需要等待）
+  // Render nothing until the copy is ready (only the current language's small chunk needs to load)
   if (!stringsReady) return null;
 
   const menus: EditorMenu[] = [
@@ -780,7 +780,7 @@ function FlowchartInner() {
         onShortcutHelp={() => setHelpOpen(true)}
         onAutoLayout={() => {
           const st = useFlowStore.getState();
-          // 两段式布局：保留泳道 / 编组层级，方向与间距取工具栏设置
+          // Two-pass layout: keeps the swimlane / group hierarchy, with direction and spacing taken from the toolbar settings
           st.applyAutoLayout({
             direction: st.layoutDirection,
             ...LAYOUT_DENSITY[st.layoutDensity],
@@ -794,7 +794,7 @@ function FlowchartInner() {
         canRedo={canRedo}
       />
 
-      {/* 窄屏：左右两栏改为抽屉，底部提供开关 */}
+      {/* Narrow screens: the two side columns become drawers toggled from the bottom */}
       {isNarrow ? (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           <button
@@ -920,7 +920,7 @@ function FlowchartInner() {
             }}
             thumbnail={(id) => {
               const page = pages.find((item) => item.id === id);
-              // 空页返回 null，总览卡片才会显示「空白页」提示
+              // An empty page returns null so the overview card shows the "blank page" hint
               const hasContent = page?.nodes.some((node) => !node.hidden) ?? false;
               return page && hasContent ? <PageThumbnail page={page} /> : null;
             }}

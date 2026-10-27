@@ -5,7 +5,7 @@ export type HashEncoding = 'hex' | 'base64';
 
 export interface Pbkdf2Options {
   password: string;
-  /** 16 进制盐；省略则随机生成 16 字节 */
+  /** Hex salt; a random 16-byte salt is generated when omitted */
   salt?: string;
   iterations: number;
   hash: Pbkdf2Hash;
@@ -16,7 +16,7 @@ export interface Pbkdf2Result {
   hash: string;
   salt: string;
   iterations: number;
-  /** 通用格式：pbkdf2$<hash>$<iters>$<saltHex>$<hashHex> */
+  /** Common format: pbkdf2$<hash>$<iters>$<saltHex>$<hashHex> */
   format: string;
 }
 
@@ -45,7 +45,7 @@ function hexToBytes(hex: string): Uint8Array | null {
   return bytes;
 }
 
-/** 基于 WebCrypto 的 PBKDF2 派生（零额外依赖）。 */
+/** PBKDF2 derivation on top of WebCrypto (no extra dependencies). */
 export async function pbkdf2(options: Pbkdf2Options): Promise<ToolResult<Pbkdf2Result>> {
   if (!options.password) return { ok: false, error: 'EMPTY' };
 

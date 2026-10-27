@@ -5,12 +5,12 @@ import { CompactSlider } from './controls';
 import type { Layer, MaskRef, VectorMaskRef } from '../model/types';
 
 /**
- * 蒙版小节：挂在「属性」面板顶部，只作用于当前选中图层。
+ * Mask section: sits at the top of the Properties panel and only affects the selected layer.
  *
- * 两类蒙版并列：
- * - **像素蒙版**：灰度画布，画笔涂白 = 显示、涂黑 = 隐藏（`maskEditing` 切换笔迹落点）；
- * - **矢量蒙版**：按轮廓裁切，与分辨率无关（缩放图层不会糊），P1 由「当前选区」创建。
- * 两者的参数（启用 / 反相 / 羽化等）都是非破坏的——随时改、随时删。
+ * Two kinds of masks side by side:
+ * - **pixel mask**: a grayscale canvas — painting white shows, painting black hides (`maskEditing` switches where strokes land);
+ * - **vector mask**: clips by contour and is resolution-independent (scaling stays sharp); P1 creates it from the current selection.
+ * All their parameters (enable / invert / feather, etc.) are non-destructive: change or delete them at any time.
  */
 export function MaskPanel({ layer }: { layer: Layer }) {
   return (

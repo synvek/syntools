@@ -1,7 +1,7 @@
 /**
- * UML 图形目录（聚合层）：按 UML 2.5 图种拆分为 9 个分类文件，
- * 这里只做拼接导出，`shapes/index.ts` 的 import 保持不变。
- * 共享 path 生成函数见 `./uml-paths`。
+ * UML shape catalog (aggregation layer): split into 9 category files by UML 2.5 diagram type,
+ * and this file only re-exports them so the imports in `shapes/index.ts` stay unchanged.
+ * Shared path generators live in `./uml-paths`.
  */
 
 import type { ShapeDef } from './index';

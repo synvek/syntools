@@ -2,7 +2,7 @@ import { PDFDocument } from '@cantoo/pdf-lib';
 import type { ToolResult } from '@/core/types';
 import { openPdfjsDoc, renderPageToCanvas, canvasToGrayscale } from './render';
 
-/** 视觉灰度：渲图后重打 PDF（非矢量文字可编辑灰度） */
+/** Visual grayscale: re-emit the PDF from rendered pages (text is no longer editable) */
 export async function pdfToGrayscaleVisual(
   bytes: Uint8Array,
   scale = 1.5,
@@ -29,7 +29,7 @@ export async function pdfToGrayscaleVisual(
   }
 }
 
-/** 多图合成 PDF（每图一页，按图片像素尺寸） */
+/** Build a PDF from images (one page per image, sized to its pixels) */
 export async function imagesToPdf(
   images: Array<{ bytes: Uint8Array; mime: string }>,
 ): Promise<ToolResult<Uint8Array>> {

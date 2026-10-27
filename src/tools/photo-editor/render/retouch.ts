@@ -4,27 +4,27 @@ import { createStampSession, type StampFrame, type StampSession } from './stamp'
 import type { StampHost } from './stamp';
 
 /**
- * 润饰工具族：减淡（Dodge）/ 加深（Burn）/ 海绵（Sponge）。
+ * Retouch tool family: dodge / burn / sponge.
  *
- * 印章步进、坐标换算、压感归一都交给 `render/stamp.ts` 的通用会话，
- * 本模块只负责「一枚印章里每个像素怎么变」。
- * 一次笔画 = 一次历史；落笔前必须由调用方 `commitPixels` 保存原始像素。
+ * Stamp stepping, coordinate mapping and pressure normalization all come from the generic session in
+ * `render/stamp.ts`; this module only decides how each pixel inside one stamp changes.
+ * One stroke = one history entry; the caller must call `commitPixels` before painting to save the original pixels.
  */
 
 export interface RetouchOptions {
   mode: RetouchMode;
-  /** 文档坐标下的笔头直径 */
+  /** Brush tip diameter in document coordinates */
   size: number;
-  /** 0~100：每枚印章的最大调制幅度（%） */
+  /** 0~100: maximum modulation per stamp (%) */
   strength: number;
   selection: Selection | null;
 }
 
 export type RetouchSession = StampSession;
 
-/** 印章间距（相对直径）：过密会重复累加导致瞬间过曝 */
+/** Stamp spacing (relative to the diameter): too dense and the repeated accumulation blows out instantly */
 const SPACING = 0.25;
-/** 单枚印章的基础幅度系数：把 0~100 的强度映射到每次可感知但不过头的量 */
+/** Base amount per stamp: maps a 0~100 strength to something visible each stamp without overshooting */
 const STAMP_GAIN = 0.06;
 
 export function createRetouchSession(
@@ -53,7 +53,7 @@ export function createRetouchSession(
   });
 }
 
-/** 单像素调制：减淡提亮 / 加深压暗 / 海绵降饱和 */
+/** Per-pixel modulation: dodge brightens / burn darkens / sponge desaturates */
 function modulate(frame: StampFrame, offset: number, mode: RetouchMode, weight: number): void {
   const data = frame.data;
   const r = data[offset];
@@ -66,12 +66,12 @@ function modulate(frame: StampFrame, offset: number, mode: RetouchMode, weight: 
     data[offset + 2] = mixChannel(b, gray, weight);
     return;
   }
-  // 减淡：向白靠拢；加深：向黑靠拢。按通道独立计算，保持色彩关系
+  // Dodge moves toward white, burn toward black. Computed per channel so the color relationship is preserved
   const target = mode === 'dodge' ? 255 : 0;
   data[offset] = mixChannel(r, target, weight);
   data[offset + 1] = mixChannel(g, target, weight);
   data[offset + 2] = mixChannel(b, target, weight);
 }
 
-/** 供修复类工具复用：判断该像素是否在选区内（与印章权重同源） */
+/** Reused by the repair tools: whether this pixel lies inside the selection (same source as the stamp weight) */
 export { pointInSelection };

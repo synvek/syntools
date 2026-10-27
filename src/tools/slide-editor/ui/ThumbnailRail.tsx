@@ -5,7 +5,7 @@ import { renderThumbnail } from '../render/thumbnail';
 import { useSlideStore } from '../store';
 import { SlideContextMenu, type SlideContextTarget } from './SlideContextMenu';
 
-/** 左侧页导航：离屏缩略图 + 增删复制排序（拖拽排序用原生 HTML5 DnD） */
+/** Left slide navigator: offscreen thumbnails + add/delete/duplicate/reorder (reordering uses native HTML5 DnD) */
 export function ThumbnailRail() {
   const { t } = useTranslation();
   const doc = useSlideStore((s) => s.doc);
@@ -16,7 +16,7 @@ export function ThumbnailRail() {
   const removeSlide = useSlideStore((s) => s.removeSlide);
   const moveSlide = useSlideStore((s) => s.moveSlide);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  /** 右键某页弹出的菜单（悬停按钮之外的第二条入口） */
+  /** Menu opened by right-clicking a slide (a second entry point besides the hover buttons) */
   const [menu, setMenu] = useState<SlideContextTarget | null>(null);
 
   const thumbs = useMemo(() => doc.slides.map((slide) => renderThumbnail(doc, slide, 200)), [doc]);
@@ -41,7 +41,7 @@ export function ThumbnailRail() {
             }`}
             onClick={() => selectSlide(index)}
             onContextMenu={(event) => {
-              // 接管原生菜单；先切到该页，菜单里的动作才有个明确的「当前页」
+              // Take over the native menu; switch to that slide first so menu actions have an explicit "current slide"
               event.preventDefault();
               selectSlide(index);
               setMenu({ kind: 'slide', x: event.clientX, y: event.clientY, slideIndex: index });

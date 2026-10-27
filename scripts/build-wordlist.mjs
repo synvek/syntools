@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /**
- * 生成拼写检查用的英文词表（public/dict/en-words.txt.gz）。
+ * Builds the English word list used by the spell checker (public/dict/en-words.txt.gz).
  *
- * 词表以「运行时按需 fetch 的静态资源」形式提供，不进打包产物、不进首屏：
- * 只有用户第一次开启拼写检查时才会下载并解压（gzip + DecompressionStream）。
+ * The list ships as a static asset fetched on demand: it is not part of the bundle
+ * or the first paint. It is only downloaded and inflated (gzip + DecompressionStream)
+ * the first time a user enables spell checking.
  *
- * 用法：
- *   node scripts/build-wordlist.mjs                     # 默认读 /usr/share/dict/web2
+ * Usage:
+ *   node scripts/build-wordlist.mjs                     # reads /usr/share/dict/web2 by default
  *   WORDLIST_SOURCE=./my-words.txt node scripts/build-wordlist.mjs
  *
- * 默认词源为 Webster's Second International（1934 年版权已失效，属公有领域），
- * 过滤规则：仅保留纯小写字母、长度 2–20 的单词，去重后按字典序输出。
+ * The default source is Webster's Second International (copyright expired in 1934,
+ * public domain). Filtering: keep lowercase-only words of length 2–20, deduplicate,
+ * then emit in dictionary order.
  */
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { gzipSync, constants } from 'node:zlib';
@@ -27,8 +29,8 @@ function main() {
   try {
     raw = readFileSync(SOURCE, 'utf8');
   } catch (error) {
-    console.error(`读取词源失败：${SOURCE}`);
-    console.error('可通过 WORDLIST_SOURCE 指定自己的词表文件（每行一个单词）。');
+    console.error(`Failed to read the word source: ${SOURCE}`);
+    console.error('Use WORDLIST_SOURCE to point at your own word list (one word per line).');
     console.error(String(error));
     process.exitCode = 1;
     return;
@@ -50,9 +52,9 @@ function main() {
   writeFileSync(OUTPUT, gz);
 
   const kb = (value) => `${(value / 1024).toFixed(1)} KB`;
-  console.log(`词源：${SOURCE}`);
-  console.log(`词表：${sorted.length} 个单词`);
-  console.log(`产物：${OUTPUT}（原始 ${kb(Buffer.byteLength(text))} → gzip ${kb(gz.length)}）`);
+  console.log(`Source: ${SOURCE}`);
+  console.log(`Word list: ${sorted.length} words`);
+  console.log(`Output: ${OUTPUT} (raw ${kb(Buffer.byteLength(text))} → gzip ${kb(gz.length)})`);
 }
 
 main();

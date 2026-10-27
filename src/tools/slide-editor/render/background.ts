@@ -3,15 +3,15 @@ import { normalizeBackground } from '../core';
 import type { SlideBackground } from '../model/types';
 
 /**
- * 页面背景 → Konva 填充属性。
+ * Slide background → Konva fill props.
  *
- * v2 起背景支持线性渐变，画布 / 缩略图 / 放映 / 光栅导出四处都要渲染背景，
- * 抽成同一个纯函数避免四处各写一遍角度换算。
+ * Since v2 backgrounds support linear gradients, and canvas / thumbnail / presentation / raster export all
+ * render it, this lives in one pure function instead of repeating the angle math in four places.
  *
- * 角度约定与 PowerPoint 一致：0° 左→右，90° 上→下，180° 右→左，270° 下→上。
+ * Angular convention matches PowerPoint: 0° left→right, 90° top→bottom, 180° right→left, 270° bottom→top.
  */
 
-/** 渐变方向向量 → 包围盒上的起点/终点 */
+/** Gradient direction vector → start/end points on the bounding box */
 function gradientEnds(
   angle: number,
   width: number,
@@ -20,7 +20,7 @@ function gradientEnds(
   const rad = (angle * Math.PI) / 180;
   const dx = Math.cos(rad);
   const dy = Math.sin(rad);
-  // 方向线在包围盒上的投影长度
+  // Projected length of the direction line onto the bounding box
   const length = Math.abs(width * dx) + Math.abs(height * dy);
   const cx = width / 2;
   const cy = height / 2;
@@ -31,11 +31,11 @@ function gradientEnds(
 }
 
 /**
- * 生成 Konva.Rect 的填充配置。
+ * Build the fill config for a Konva.Rect.
  *
- * - 纯色 / 缺省 → `{ fill }`
- * - 渐变 → `fillLinearGradient*` 三件套
- * - 无填充 → `{ fill: 'transparent' }`（仍需要节点来兜住页面范围）
+ * - solid / default → `{ fill }`
+ * - gradient → the `fillLinearGradient*` trio
+ * - no fill → `{ fill: 'transparent' }` (the node is still needed to cover the page area)
  */
 export function backgroundFillProps(
   bg: SlideBackground | undefined,

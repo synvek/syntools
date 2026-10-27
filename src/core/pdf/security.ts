@@ -12,7 +12,7 @@ export type PdfPermissionFlags = {
 };
 
 /**
- * 使用 @cantoo/pdf-lib 加密。兼容性取决于阅读器对标准 PDF 加密的支持。
+ * Encrypts via @cantoo/pdf-lib. Compatibility depends on the reader's standard PDF encryption support.
  */
 export async function encryptPdf(
   bytes: Uint8Array,

@@ -52,7 +52,7 @@ function MixedBadge({ show }: { show: boolean }) {
   );
 }
 
-/** 连线上已有折点数量（用于回显与按钮禁用） */
+/** Number of existing waypoints on the edge (for display and button disabling) */
 function edgeWaypointCount(edge: { data?: unknown }): number {
   const data = edge.data as FlowEdgeData | undefined;
   return data?.waypoints?.length ?? 0;
@@ -72,8 +72,8 @@ export function PropertyPanel() {
   const edges = useFlowStore((s) => s.edges);
 
   /**
-   * 连续编辑（拖动滑块 / 输入文字）合并为一次撤销：
-   * 会话内第一次改动前 commit，焦点离开后结束会话。
+   * Continuous edits (dragging a slider / typing) coalesce into one undo step:
+   * commit before the first change in a session, end the session when focus leaves.
    */
   const session = useRef(false);
   const begin = () => {
@@ -90,7 +90,7 @@ export function PropertyPanel() {
     useFlowStore.getState().patchSelected(p, false);
   };
 
-  /** 选中节点集合（保持画布上的顺序） */
+  /** Selected node set (keeping canvas order) */
   const selNodes = nodes.filter((n) => selectedNodes.includes(n.id));
   const edge =
     selectedNodes.length === 0 && selectedEdges.length === 1
@@ -103,7 +103,7 @@ export function PropertyPanel() {
     const connectableNodes = nodes.filter((n) => !isContainerKind(n.data.kind));
     const nodeOptions = connectableNodes.map((n) => (
       <option key={n.id} value={n.id}>
-        {/* 图形默认无文案，故无标签时回退为形状名，避免下拉出现空选项 */}
+        {/* Shapes have no copy by default, so a missing label falls back to the shape name, avoiding empty dropdown options */}
         {n.data.label || t(`tools.flowchart.shape_${n.data.kind}`)} · {n.id.slice(-4)}
       </option>
     ));
@@ -127,7 +127,7 @@ export function PropertyPanel() {
           />
         </Field>
 
-        {/* 起止标签与主标签位置：UML 时序/流程语义表达 */}
+        {/* Source/target labels and main label position: express UML sequence / flow semantics */}
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('tools.flowchart.edgeSourceLabel')}>
             <input
@@ -183,7 +183,7 @@ export function PropertyPanel() {
           </select>
         </Field>
 
-        {/* 重连：直接选择起点/终点节点（与画布上拖拽端点等效） */}
+        {/* Reconnect: pick the source/target node directly (equivalent to dragging an endpoint on the canvas) */}
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('tools.flowchart.edgeSourceNode')}>
             <select
@@ -262,7 +262,7 @@ export function PropertyPanel() {
           </select>
         </Field>
 
-        {/* 折点：正交自动布线 / 清除 */}
+        {/* Waypoints: orthogonal auto-routing / clear */}
         <div className="flex flex-col gap-2 rounded-md border border-gray-100 p-2 dark:border-gray-800">
           <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
             {t('tools.flowchart.waypoints')}
@@ -328,7 +328,7 @@ export function PropertyPanel() {
           </Field>
         </div>
 
-        {/* 关系预设：一键切到常见 UML 关系（线型 + 线样式 + 起止箭头） */}
+        {/* Relation presets: switch to a common UML relation in one click (line type + line style + end arrows) */}
         <Field label={t('tools.flowchart.relationPreset')}>
           <div className="flex flex-wrap gap-1">
             {EDGE_RELATION_PRESETS.map((preset) => (
@@ -375,7 +375,7 @@ export function PropertyPanel() {
   const first = selNodes[0];
   const base = first.data.style;
 
-  /** 批次内的公共值：不一致返回 undefined（混合态） */
+  /** Common value across the batch: undefined when inconsistent (mixed state) */
   const pick = <K extends keyof FlowNodeStyle>(key: K): FlowNodeStyle[K] | undefined =>
     commonValue(selNodes.map((n) => n.data.style[key]));
 
@@ -404,11 +404,11 @@ export function PropertyPanel() {
     link: pick('link'),
   };
   const label = commonValue(selNodes.map((n) => n.data.label));
-  // 单选时提供该图形专属的可调参数分组（圆角 / 折角 / 斜切 / 分栏高 ……）
+  // For a single selection, offer the shape-specific adjustable-parameter group (corner radius / fold / shear / compartment height …)
   const soleDef = selNodes.length === 1 ? shapeDefOf(first.data.kind) : undefined;
   const aligns: Align[] = ['left', 'center', 'right'];
 
-  /** 各选中节点的几何（画布绝对坐标 + 实际尺寸），用于 X / Y / W / H 输入与混合态判定 */
+  /** Geometry of each selected node (absolute canvas coordinates + actual size), used for the X / Y / W / H inputs and mixed-state detection */
   const byId = new Map(nodes.map((n) => [n.id, n] as const));
   const geos = selNodes.map((n) => {
     const abs = absolutePositionOf(n, byId);
@@ -420,7 +420,7 @@ export function PropertyPanel() {
     };
   });
 
-  /** 几何字段：多选时取公共值，取值不一致则留空并提示「混合」 */
+  /** Geometry fields: take the common value on multi-select; leave empty and show "mixed" when values differ */
   const geoField = (key: keyof NodeGeometryPatch, label: string) => {
     const value = commonValue(geos.map((g) => g[key]));
     return (
@@ -450,7 +450,7 @@ export function PropertyPanel() {
       </Field>
     );
   };
-  // 只有「必然存在」的字段取值不一致才算混合态（可选字段缺省属正常）
+  // Only fields that always exist count as mixed when their values differ (optional fields being absent is normal)
   const hasMixed =
     isBatch &&
     (label === undefined ||
@@ -478,7 +478,7 @@ export function PropertyPanel() {
         />
       </Field>
 
-      {/* 公式节点：编辑 LaTeX 源码（仅单选时提供） */}
+      {/* Formula node: edit the LaTeX source (single selection only) */}
       {selNodes.length === 1 && first.data.formula !== undefined ? (
         <Field label={t('tools.flowchart.formula')}>
           <textarea
@@ -495,7 +495,7 @@ export function PropertyPanel() {
         </Field>
       ) : null}
 
-      {/* 几何：画布绝对坐标与尺寸（多选取公共值，混合态留空） */}
+      {/* Geometry: absolute canvas coordinates and size (common value on multi-select, empty when mixed) */}
       <div className="flex flex-col gap-2 rounded-md border border-gray-100 p-2 dark:border-gray-800">
         <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
           {t('tools.flowchart.geometry')}
@@ -602,7 +602,7 @@ export function PropertyPanel() {
         </button>
       </div>
 
-      {/* 形状专属可调参数（类 draw.io 调整顶点）：单选时按图形目录声明列出 */}
+      {/* Shape-specific adjustable parameters (draw.io-style adjustment vertices): listed per the catalog declarations on single selection */}
       {soleDef && hasAdjusts(soleDef) ? (
         <NodeShapeParamsSection
           def={soleDef}
@@ -621,7 +621,7 @@ export function PropertyPanel() {
         isContainer={selNodes.some((n) => isContainerKind(n.data.kind))}
       />
 
-      {/* 表格节点专属：行列数量调整 */}
+      {/* Table node specific: row and column count adjustment */}
       {selNodes.length === 1 && selNodes[0].type === 'table' ? (
         <NodeTableSection node={selNodes[0]} />
       ) : null}

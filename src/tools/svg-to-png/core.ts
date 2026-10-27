@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * SVG → PNG：校验与尺寸解析（绘制在 UI canvas）。
+ * SVG → PNG: validation and size parsing (drawing happens on a UI canvas).
  */
 
 export type SvgError = 'EMPTY' | 'INVALID_SVG' | 'INVALID_SIZE';
@@ -25,7 +25,7 @@ function parseLength(raw: string | undefined, fallback: number): number | null {
   return n;
 }
 
-/** 从 SVG 源提取宽高；优先 width/height，其次 viewBox */
+/** Extract width/height from the SVG source; prefers width/height, falls back to viewBox */
 export function extractSvgSize(svg: string): { width: number; height: number } | null {
   const docMatch = svg.match(/<svg\b[^>]*>/i);
   if (!docMatch) return null;
@@ -39,7 +39,10 @@ export function extractSvgSize(svg: string): { width: number; height: number } |
   let height = parseLength(heightAttr, 0) ?? 0;
 
   if ((!width || !height) && viewBox) {
-    const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+    const parts = viewBox
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
     if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
       const vbW = parts[2];
       const vbH = parts[3];

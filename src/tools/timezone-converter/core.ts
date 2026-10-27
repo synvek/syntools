@@ -15,7 +15,7 @@ export const COMMON_ZONES = [
   'Australia/Sydney',
 ];
 
-/** 校验 IANA 时区名是否可用。 */
+/** Check whether an IANA time zone name is usable. */
 export function isValidZone(zone: string): boolean {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: zone });
@@ -59,14 +59,14 @@ function partsInZone(date: Date, timeZone: string): Parts {
   };
 }
 
-/** 返回该时刻在指定时区相对 UTC 的偏移（毫秒）。 */
+/** Return the offset from UTC (in milliseconds) of the given instant in the specified time zone. */
 export function getZoneOffsetMs(date: Date, timeZone: string): number {
   const p = partsInZone(date, timeZone);
   const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
   return asUtc - date.getTime();
 }
 
-/** 返回形如 `GMT+08:00` 的偏移文本。 */
+/** Return the offset as text such as `GMT+08:00`. */
 export function zoneOffsetLabel(date: Date, timeZone: string): string {
   const ms = getZoneOffsetMs(date, timeZone);
   const sign = ms < 0 ? '-' : '+';
@@ -76,7 +76,7 @@ export function zoneOffsetLabel(date: Date, timeZone: string): string {
   return `GMT${sign}${hh}:${mm}`;
 }
 
-/** 把某时区的「墙上时间」转换为对应的 UTC 时刻。 */
+/** Convert a wall-clock time in a time zone to the corresponding UTC instant. */
 export function wallTimeToUtc(
   year: number,
   month: number,
@@ -105,7 +105,7 @@ function formatLocal(date: Date, timeZone: string): string {
   return `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)}:${pad(p.second)}`;
 }
 
-/** 将同一 UTC 时刻转换到多个时区。 */
+/** Convert the same UTC instant to multiple time zones. */
 export function convertZones(date: Date, zones: string[]): ToolResult<ZoneConversion[]> {
   if (!Number.isFinite(date.getTime())) return { ok: false, error: 'INVALID_DATE' };
   const out: ZoneConversion[] = [];

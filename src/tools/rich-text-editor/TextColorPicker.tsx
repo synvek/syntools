@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * 文字颜色选择弹层。
+ * Text color picker popover.
  *
- * 为什么不用裸的 `<input type="color">`：在 Tauri（WKWebView / WebView2）里原生取色器打开的是
- * 系统色板，选完颜色后**不会自动关闭**，用户每点一次按钮都要手动关一次窗口。
- * 因此这里改成「预设色板 + 选完即收」：点色块立即应用并收起弹层，面板外点击 / Esc 同样收起。
- * 需要精确取色时仍保留原生取色器作为兜底入口（此时不自动收起，避免拖滑块过程中面板消失）。
+ * Why not a bare `<input type="color">`: in Tauri (WKWebView / WebView2) the native picker opens the
+ * system palette and **does not close** after picking, forcing users to close the window every time.
+ * So this uses "preset swatches + close on pick": clicking a swatch applies and closes, as do outside clicks / Esc.
+ * For exact colors the native picker stays as a fallback (it does not auto-close, so the panel survives slider dragging).
  */
 
-/** 常用文字色：灰阶一行为「正文/次要文字」，彩色一行覆盖强调、警示与链接色 */
+/** Common text colors: one grayscale row for body/secondary text, one color row for emphasis, warning, and links */
 const TEXT_COLORS = [
   '#000000',
   '#404040',
@@ -34,10 +34,10 @@ const SWATCH =
   'h-5 w-5 rounded border border-black/10 transition-transform hover:scale-110 dark:border-white/20';
 
 interface TextColorPickerProps {
-  /** 当前文字颜色（已是可选中的 #rrggbb） */
+  /** Current text color (already a selectable #rrggbb) */
   value: string;
   onPick: (color: string) => void;
-  /** 「默认颜色」：清除显式文字色，回到正文默认色 */
+  /** "Default color": clears the explicit text color and returns to the body default */
   onReset: () => void;
 }
 
@@ -47,7 +47,7 @@ export function TextColorPicker({ value, onPick, onReset }: TextColorPickerProps
   const rootRef = useRef<HTMLSpanElement>(null);
   const selected = value.toLowerCase();
 
-  // 打开期间才挂监听：面板外按下或 Esc 收起，与画板 / 幻灯片工具的取色弹层保持一致
+  // Listen only while open: outside press or Esc closes it, consistent with the canvas / slides color popovers
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: MouseEvent) => {

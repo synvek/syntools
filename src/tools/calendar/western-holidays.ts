@@ -1,6 +1,6 @@
 /**
- * 英文区域常见假日（公历）。
- * en / en-US → 美国联邦假日为主；en-GB → 英国公共假日为主。
+ * Common holidays in English-speaking regions (Gregorian calendar).
+ * en / en-US → mostly US federal holidays; en-GB → mostly UK public holidays.
  */
 
 export interface WesternHoliday {
@@ -8,12 +8,7 @@ export interface WesternHoliday {
   nameZh?: string;
 }
 
-function nthWeekdayOfMonth(
-  year: number,
-  month: number,
-  weekday: number,
-  n: number,
-): number {
+function nthWeekdayOfMonth(year: number, month: number, weekday: number, n: number): number {
   // n: 1..5；weekday: 0=Sun..6=Sat
   const first = new Date(year, month - 1, 1);
   const firstWd = first.getDay();
@@ -28,7 +23,7 @@ function lastWeekdayOfMonth(year: number, month: number, weekday: number): numbe
   return last - delta;
 }
 
-/** 匿名格里高利历复活节（西方教会） */
+/** Gregorian Easter for the Western churches (anonymous algorithm) */
 export function easterSunday(year: number): { month: number; day: number } {
   const a = year % 19;
   const b = Math.floor(year / 100);

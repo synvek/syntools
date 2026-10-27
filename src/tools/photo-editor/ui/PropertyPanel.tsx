@@ -13,7 +13,7 @@ import { MaskPanel } from './MaskPanel';
 import { usePhotoStore } from '../store';
 import type { CanvasBackground } from '../model/types';
 
-/** 属性面板：几何 + 文字 / 形状各自的样式属性。 */
+/** Properties panel: geometry + the style properties specific to text / shapes. */
 export function PropertyPanel() {
   const { t } = useTranslation();
   const doc = usePhotoStore((s) => s.doc);
@@ -22,7 +22,7 @@ export function PropertyPanel() {
   const applyCanvas = usePhotoStore((s) => s.applyCanvas);
   const layer = doc.layers.find((item) => item.id === doc.activeLayerId);
 
-  // 未选中图层时展示「文档属性」：画布尺寸与背景（这一入口以前只在新建画布时出现过）
+  // With no layer selected show "document properties": canvas size and background (an entry that used to appear only when creating a canvas)
   if (!layer) {
     return (
       <div className="flex flex-col gap-3">
@@ -157,7 +157,7 @@ export function PropertyPanel() {
             value={layer.text}
             onChange={(text) => patchActive({ text } as never, false)}
           />
-          {/* 字符 / 段落 / 变形等完整参数在「文字」面板，这里只留最常用的内容编辑 */}
+          {/* Full character / paragraph / warp settings live in the Text panel; only the most common content editing stays here */}
           <p className="text-[10px] leading-4 text-gray-400 dark:text-gray-500">
             {t('tools.photo.textPanelTip')}
           </p>

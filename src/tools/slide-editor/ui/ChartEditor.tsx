@@ -11,10 +11,10 @@ import { useSlideStore } from '../store';
 import { ActionRow, Field, NumberInput, Section, SelectInput, TextInput } from './controls';
 
 /**
- * 图表数据编辑器（属性面板内嵌）。
+ * Chart data editor (embedded in the property panel).
  *
- * 直接改模型里的 categories / series，导出 PPTX 时写成原生图表，
- * 因此在 PowerPoint 里拿到的是**可编辑数据**的图表而不是图片。
+ * Edits categories / series in the model directly; .pptx export writes a native chart, so PowerPoint
+ * receives a chart with **editable data** rather than an image.
  */
 
 const BTN =

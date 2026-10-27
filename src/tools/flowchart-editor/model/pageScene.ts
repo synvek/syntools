@@ -3,12 +3,12 @@ import { shapeDefOf, shapeSize } from './shapes';
 import type { FlowPage, ShapeKind } from './types';
 
 /**
- * 页面缩略图：多页浏览用。
+ * Page thumbnails: for multi-page browsing.
  *
- * 分两层，便于单测与复用：
- * 1. `pageSceneOf(page)` 纯函数：把一页的节点 / 连线归一成「包围盒 + 图元」，不碰 DOM；
- * 2. `PageThumbnail` 只是把图元画成 SVG —— 不走 DOM 截图（非活动页并未渲染），
- *    因此切换/预览任意页都很快。
+ * Two layers, for easy unit-testing and reuse:
+ * 1. `pageSceneOf(page)` is pure: normalizes a page's nodes / edges into "bounds + primitives" without touching the DOM;
+ * 2. `PageThumbnail` merely draws those primitives as SVG — no DOM capture (inactive pages are not rendered),
+ *    so switching and previewing any page stays fast.
  */
 
 export interface SceneNode {
@@ -19,7 +19,7 @@ export interface SceneNode {
   height: number;
   fill: string;
   stroke: string;
-  /** 缩略图足够小，只区分「矩形 / 椭圆 / 菱形」三类轮廓 */
+  /** Thumbnails are small enough to only distinguish three outlines: rectangle / ellipse / diamond */
   shape: 'rect' | 'ellipse' | 'diamond';
   label: string;
 }
@@ -41,7 +41,7 @@ export interface PageScene {
 }
 
 function outlineOf(kind: ShapeKind): SceneNode['shape'] {
-  // 由图形目录的 draw 驱动，自动覆盖圆形/椭圆/菱形类（含 UML 的用例、伪状态、判断等）
+  // Driven by the catalog's draw, covering circle/ellipse/diamond kinds automatically (including UML use cases, pseudo-states, decisions, etc.)
   switch (shapeDefOf(kind)?.draw) {
     case 'ellipse':
     case 'circle':
@@ -51,12 +51,12 @@ function outlineOf(kind: ShapeKind): SceneNode['shape'] {
     default:
       break;
   }
-  // 兜底：胶囊体与斜四边形在缩略图里按椭圆近似（保持历史观感）
+  // Fallback: capsules and sheared quadrilaterals are approximated as ellipses in thumbnails (preserving the legacy look)
   if (kind === 'startEnd' || kind === 'terminator' || kind === 'display') return 'ellipse';
   return 'rect';
 }
 
-/** 一页 → 缩略图场景；空页返回 null（由调用方显示「空白页」提示） */
+/** One page → thumbnail scene; returns null for an empty page (callers show the "blank page" hint) */
 export function pageSceneOf(page: FlowPage): PageScene | null {
   const visible = page.nodes.filter((node) => !node.hidden);
   if (visible.length === 0) return null;
@@ -82,7 +82,7 @@ export function pageSceneOf(page: FlowPage): PageScene | null {
     });
   }
 
-  // 连线画成「节点中心 → 节点中心」的直线：缩略图上足够表达走向
+  // Edges are drawn as straight "node center → node center" lines: enough to convey direction at thumbnail size
   const centerOf = (id: string) => {
     const node = nodes.find((item) => item.id === id);
     if (!node) return null;
@@ -110,7 +110,7 @@ export function pageSceneOf(page: FlowPage): PageScene | null {
   return {
     width: Math.max(1, maxX - minX),
     height: Math.max(1, maxY - minY),
-    // 平移到原点，缩略图里再统一缩放
+    // Translate to the origin, then scale uniformly in the thumbnail
     nodes: nodes.map((node) => ({ ...node, x: node.x - minX, y: node.y - minY })),
     edges: edges.map((edge) => ({
       ...edge,
@@ -123,12 +123,12 @@ export function pageSceneOf(page: FlowPage): PageScene | null {
 }
 
 /**
- * `pageSceneOf` 的记忆化版本（性能优化）。
+ * Memoized version of `pageSceneOf` (performance optimization).
  *
- * 缩略图会在编辑过程中反复重算；非活动页的 nodes/edges 数组引用在多次取文档间保持稳定，
- * 因此以「nodes 数组 → { edges 数组, 场景 }」缓存：引用未变直接复用，
- * 数组引用变化（活动页每次编辑都会新建）则自动失效。
- * WeakMap 使缓存随数组回收，无需手动清理。
+ * Thumbnails are recomputed repeatedly during editing; the nodes/edges array references of inactive pages stay stable
+ * across document reads, so the cache maps "nodes array → { edges array, scene }": reused while the references hold,
+ * invalidated automatically when the references change (the active page rebuilds them on every edit).
+ * A WeakMap lets the cache be collected with the arrays, requiring no manual cleanup.
  */
 const sceneCache = new WeakMap<object, { edges: object; scene: PageScene | null }>();
 

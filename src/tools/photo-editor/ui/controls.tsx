@@ -2,7 +2,7 @@ import type { MouseEvent, ReactNode } from 'react';
 import { Icon } from '@/core/components/Icon';
 import type { ToolId } from '../model/types';
 
-/** 面板通用控件：统一控件高度（32px）与深色模式样式，避免各面板各写一套。 */
+/** Shared panel controls: unified control height (32px) and dark-mode styling, so panels do not each roll their own. */
 
 const LABEL_CLASS = 'text-xs font-medium text-gray-500 dark:text-gray-400';
 const FOCUS_RING =
@@ -84,7 +84,7 @@ export function Slider({
   );
 }
 
-/** 单行滑杆：用于顶部工具条这类横向空间紧张的位置（标签只作无障碍名，不占宽度） */
+/** Single-row slider: for tight horizontal spots like the top toolbar (the label is only an accessible name and takes no width) */
 export function CompactSlider({
   label,
   value,
@@ -249,7 +249,7 @@ export function IconTextButton({
   disabled?: boolean;
   title?: string;
   active?: boolean;
-  /** 是否还有同族选项：有则显示右下角小三角（纯装饰，点击行为仍由按钮本身承担） */
+  /** Whether more options of the same family exist: draws a small triangle in the bottom-right corner (decoration only; the button still handles clicks) */
   grouped?: boolean;
   testId?: string;
 }) {
@@ -303,11 +303,11 @@ export function ToggleChip({
 }
 
 /**
- * 工具箱按钮：竖排图标，当前工具高亮。
+ * Toolbox button: vertical icon, with the active tool highlighted.
  *
- * 角标语义（与 Photoshop / Photopea 一致）：
- * - 右上角：快捷键字母，仅在当前工具高亮时出现，避免 15 行都挂着一串字母；
- * - 右下角小三角：该行还有同族工具（**纯装饰**，不能点，点击行为统一由按钮本身承担）。
+ * Badge semantics (matching Photoshop / Photopea):
+ * - top-right: the shortcut letter, shown only while the tool is active, so 15 rows are not all trailing letters;
+ * - bottom-right triangle: this row has more tools of the same family (**decoration only**, not clickable; clicks always go to the button).
  */
 export function ToolButton({
   tool,
@@ -323,7 +323,7 @@ export function ToolButton({
   label: string;
   shortcut: string;
   active: boolean;
-  /** 是否还有同组工具：有则显示右下角小三角 */
+  /** Whether more tools of the same group exist: draws a small triangle in the bottom-right corner */
   grouped?: boolean;
   onSelect: (tool: ToolId, event: MouseEvent<HTMLButtonElement>) => void;
 }) {

@@ -8,7 +8,7 @@ export interface PortOptions {
   excludeSystem: boolean;
 }
 
-/** 常见服务占用端口（生成时可选排除） */
+/** Ports commonly used by services (optionally excluded on generation) */
 export const COMMON_PORTS = new Set([
   20, 21, 22, 23, 25, 53, 67, 68, 69, 80, 110, 119, 123, 143, 161, 194, 389, 443, 465, 514, 587,
   636, 873, 993, 995, 1433, 1521, 2049, 3306, 3389, 5432, 5672, 5900, 6379, 8080, 8443, 8888, 9000,
@@ -47,7 +47,7 @@ export function randomPorts(
   return { ok: true, value: out };
 }
 
-/** 私有网段随机 IPv4 */
+/** Random IPv4 address in a private range */
 export function randomPrivateIpv4(rand: () => number = Math.random): string {
   const blocks: Array<() => string> = [
     () => `10.${Math.floor(rand() * 256)}.${Math.floor(rand() * 256)}.${Math.floor(rand() * 256)}`,
@@ -58,14 +58,14 @@ export function randomPrivateIpv4(rand: () => number = Math.random): string {
   return blocks[Math.floor(rand() * blocks.length)]();
 }
 
-/** 随机 MAC（本地管理位为 1，避免与真实设备冲突） */
+/** Random MAC (locally administered bit set, so it never collides with a real device) */
 export function randomMac(rand: () => number = Math.random): string {
   const bytes = Array.from({ length: 6 }, () => Math.floor(rand() * 256));
   bytes[0] = (bytes[0] | 0x02) & ~0x01;
   return bytes.map((b) => b.toString(16).padStart(2, '0').toUpperCase()).join(':');
 }
 
-/** 随机 IPv6（fd00::/8 唯一本地地址） */
+/** Random IPv6 address (unique local address in fd00::/8) */
 export function randomIpv6(rand: () => number = Math.random): string {
   const groups: string[] = ['fd00'];
   for (let i = 0; i < 7; i += 1) {

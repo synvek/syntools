@@ -26,7 +26,7 @@ import SheetsUIZhCN from '@univerjs/sheets-ui/locale/zh-CN';
 import { UniverUIPlugin } from '@univerjs/ui';
 import UIEnUS from '@univerjs/ui/locale/en-US';
 import UIZhCN from '@univerjs/ui/locale/zh-CN';
-// P1 功能插件：条件格式 / 数据验证 / 筛选 / 排序 / 超链接 / 查找替换
+// P1 feature plugins: conditional formatting / data validation / filter / sort / hyperlink / find-replace
 import { UniverSheetsConditionalFormattingPlugin } from '@univerjs/sheets-conditional-formatting';
 import { UniverSheetsConditionalFormattingUIPlugin } from '@univerjs/sheets-conditional-formatting-ui';
 import ConditionalFormattingUIEnUS from '@univerjs/sheets-conditional-formatting-ui/locale/en-US';
@@ -57,7 +57,7 @@ import { UniverFindReplacePlugin } from '@univerjs/find-replace';
 import FindReplaceEnUS from '@univerjs/find-replace/locale/en-US';
 import FindReplaceZhCN from '@univerjs/find-replace/locale/zh-CN';
 import { UniverSheetsFindReplacePlugin } from '@univerjs/sheets-find-replace';
-// 副作用导入：给 FUniver 追加 createWorkbook / getActiveWorkbook 等工作簿方法
+// Side-effect imports: add workbook methods such as createWorkbook / getActiveWorkbook to FUniver
 import '@univerjs/sheets/facade';
 import '@univerjs/sheets-ui/facade';
 import '@univerjs/sheets-conditional-formatting/facade';
@@ -66,7 +66,7 @@ import '@univerjs/sheets-filter/facade';
 import '@univerjs/sheets-sort/facade';
 import '@univerjs/sheets-hyper-link/facade';
 import '@univerjs/sheets-find-replace/facade';
-// 样式必须按 design → ui → docs-ui → sheets-ui → formula-ui → numfmt-ui → 功能插件 的顺序引入
+// Styles must be imported in the order design → ui → docs-ui → sheets-ui → formula-ui → numfmt-ui → feature plugins
 import '@univerjs/design/lib/index.css';
 import '@univerjs/ui/lib/index.css';
 import '@univerjs/docs-ui/lib/index.css';
@@ -82,8 +82,9 @@ import '@univerjs/find-replace/lib/index.css';
 import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
 
 /**
- * Univer 适配层：插件注册、语言包、主题与生命周期收敛在单一出口。
- * 本模块只会被懒加载的 SpreadsheetTool 引用，因此 Univer 不会进入首屏包。
+ * Univer adapter layer: plugin registration, locales, theme and lifecycle funnel through one entry
+ * point. Only the lazy-loaded SpreadsheetTool imports this module, so Univer stays out of the
+ * initial bundle.
  */
 
 export interface SheetInfo {
@@ -97,31 +98,32 @@ export interface UniverHandle {
   loadSnapshot(snapshot: WorkbookSnapshot): void;
   getSnapshot(): WorkbookSnapshot;
   dispose(): void;
-  /** 列出当前工作簿的全部工作表（按展示顺序） */
+  /** List every sheet of the current workbook (in display order) */
   getSheets(): SheetInfo[];
-  /** 当前激活工作表 id */
+  /** Id of the active sheet */
   getActiveSheetId(): string | null;
-  /** 切换激活的工作表 */
+  /** Switch the active sheet */
   setActiveSheet(id: string): void;
   /**
-   * 订阅「会写入快照的修改」（Univer MUTATION）。
-   * 用于按编辑事件做脏跟踪，替代定时全量 save() 轮询；返回取消订阅函数。
+   * Subscribe to "changes that land in the snapshot" (Univer MUTATION).
+   * Lets dirty tracking follow edit events instead of a periodic full save() poll; returns an
+   * unsubscribe function.
    */
   onMutation(listener: () => void): () => void;
-  /** 当前选区（0 基闭区间）；没有选区时返回 null */
+  /** Current selection (0-based inclusive); null when nothing is selected */
   getActiveRange(): {
     startRow: number;
     startColumn: number;
     endRow: number;
     endColumn: number;
   } | null;
-  /** 在末尾新增一张工作表，缺省名称交给 Univer 自动生成 */
+  /** Append a new sheet at the end; leave the name out to let Univer generate one */
   addSheet(name?: string): void;
-  /** 删除指定工作表（至少保留一张，最后一张会被忽略） */
+  /** Delete a sheet (at least one is kept; deleting the last one is a no-op) */
   deleteSheet(id: string): void;
-  /** 重命名工作表 */
+  /** Rename a sheet */
   renameSheet(id: string, name: string): void;
-  /** 复制工作表（在源表之后插入副本） */
+  /** Duplicate a sheet (the copy is inserted after the source) */
   duplicateSheet(id: string): void;
 }
 
@@ -163,8 +165,9 @@ const EN_LOCALE = mergeLocales(
 );
 
 /**
- * 创建 Univer 实例并挂载到 container。
- * 语言/主题变化需要重建实例，调用方应先取快照再重建（见 SpreadsheetTool 的 pendingRef）。
+ * Create a Univer instance and mount it into `container`.
+ * A locale / theme change requires rebuilding the instance, so callers should take a snapshot first
+ * (see pendingRef in SpreadsheetTool).
  */
 export function createUniverInstance(
   container: HTMLElement,
@@ -188,7 +191,7 @@ export function createUniverInstance(
   univer.registerPlugin(UniverSheetsFormulaUIPlugin);
   univer.registerPlugin(UniverSheetsNumfmtPlugin);
   univer.registerPlugin(UniverSheetsNumfmtUIPlugin);
-  // P1 功能插件：条件格式 / 数据验证 / 超链接 / 筛选 / 排序 / 查找替换
+  // P1 feature plugins: conditional formatting / data validation / hyperlink / filter / sort / find-replace
   univer.registerPlugin(UniverSheetsConditionalFormattingPlugin);
   univer.registerPlugin(UniverSheetsConditionalFormattingUIPlugin);
   univer.registerPlugin(UniverSheetsDataValidationPlugin);
@@ -203,10 +206,10 @@ export function createUniverInstance(
   univer.registerPlugin(UniverSheetsFindReplacePlugin);
 
   const univerAPI = FUniver.newAPI(univer);
-  // 必须存在工作簿实例，否则 Univer 只渲染外壳而不出网格画布
+  // A workbook instance must exist, otherwise Univer renders the chrome without the grid canvas
   univerAPI.createWorkbook(createEmptySnapshot() as unknown as Partial<IWorkbookData>);
 
-  // 脏跟踪：MUTATION 才会写入快照；加载新工作簿后需重新订阅（旧实例已销毁）
+  // Dirty tracking: only MUTATIONs reach the snapshot; resubscribe after loading a new workbook (the old instance is gone)
   let mutationListener: (() => void) | null = null;
   let mutationDisposable: { dispose: () => void } | null = null;
   const resubscribe = (): void => {

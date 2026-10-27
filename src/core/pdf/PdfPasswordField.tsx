@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { PdfField, pdfInputClass } from '@/core/pdf/ui';
 
-/** 加密 PDF 密码输入；在 NEED_PASSWORD / WRONG_PASSWORD 时展示。 */
+/** Password input for encrypted PDFs; shown on NEED_PASSWORD / WRONG_PASSWORD. */
 export function PdfPasswordField({
   value,
   onChange,
@@ -10,7 +10,7 @@ export function PdfPasswordField({
 }: {
   value: string;
   onChange: (value: string) => void;
-  /** 当前错误码，用于切换文案 */
+  /** Current error code, used to pick the message */
   error?: string | null;
   autoFocus?: boolean;
 }) {

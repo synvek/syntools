@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 效率与办公类提示词，详见 ../README.md */
+/** Productivity and office-work prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'productivity-task-breakdown',

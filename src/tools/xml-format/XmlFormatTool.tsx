@@ -8,7 +8,7 @@ import { translateToolError } from '@/core/i18n/helpers';
 import { readSharedState } from '@/core/lib/share';
 import { processXml, type IndentSize, type XmlAction } from './core';
 
-/** XML 格式化 / 压缩 */
+/** XML formatting / minification */
 export default function XmlFormatTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', a: 'format', n: 2 }), []);

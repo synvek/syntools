@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildSideBySide, buildVersionDiff } from './versionDiff';
 
-/** 版本差异纯逻辑测试：统计、行号、左右对照配对与空状态。 */
+/** Pure-logic version diff tests: stats, line numbers, side-by-side pairing, and empty state. */
 
 describe('buildVersionDiff', () => {
-  it('内容一致时标记 identical 且相似度为 1', () => {
+  it('marks identical content and a similarity of 1', () => {
     const result = buildVersionDiff('<p>甲</p><p>乙</p>', '<p>甲</p><p>乙</p>');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -15,7 +15,7 @@ describe('buildVersionDiff', () => {
     expect(result.value.rows.every((row) => row.kind === 'equal')).toBe(true);
   });
 
-  it('新增一行统计正确且不占用基准行号', () => {
+  it('counts an added line correctly without consuming a base line number', () => {
     const result = buildVersionDiff('<p>甲</p>', '<p>甲</p><p>乙</p>');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -27,7 +27,7 @@ describe('buildVersionDiff', () => {
     expect(result.value.identical).toBe(false);
   });
 
-  it('删除一行统计正确且不占用当前行号', () => {
+  it('counts a deleted line correctly without consuming a current line number', () => {
     const result = buildVersionDiff('<p>甲</p><p>乙</p>', '<p>乙</p>');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -38,7 +38,7 @@ describe('buildVersionDiff', () => {
     expect(result.value.removedChars).toBe(1);
   });
 
-  it('修改一行的相似度为 0.5（一删一增 / 总行数 4）', () => {
+  it('reports 0.5 similarity for a modified line (one delete plus one insert over 4 lines)', () => {
     const result = buildVersionDiff('<p>甲</p><p>乙</p>', '<p>甲</p><p>丙</p>');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -47,7 +47,7 @@ describe('buildVersionDiff', () => {
     expect(result.value.similarity).toBeCloseTo(0.5, 5);
   });
 
-  it('行号在混合变更下保持连续', () => {
+  it('keeps line numbers contiguous under mixed changes', () => {
     const result = buildVersionDiff('<p>a</p><p>b</p><p>c</p>', '<p>a</p><p>x</p><p>c</p>');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -61,7 +61,7 @@ describe('buildVersionDiff', () => {
     ]);
   });
 
-  it('一侧为空时全部记为新增', () => {
+  it('treats everything as added when one side is empty', () => {
     const result = buildVersionDiff('', '<p>甲</p><p>乙</p>');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -70,14 +70,14 @@ describe('buildVersionDiff', () => {
     expect(result.value.afterLines).toBe(2);
   });
 
-  it('两侧都无可对比文本时返回 EMPTY', () => {
+  it('returns EMPTY when neither side has comparable text', () => {
     expect(buildVersionDiff('', '')).toEqual({ ok: false, error: 'EMPTY' });
     expect(buildVersionDiff('<p></p>', '<p> </p>')).toEqual({ ok: false, error: 'EMPTY' });
   });
 });
 
 describe('buildSideBySide', () => {
-  it('连续的删除与插入按序号配对为修改行', () => {
+  it('pairs consecutive deletes and inserts by index as modified rows', () => {
     const diff = buildVersionDiff('<p>a</p><p>b</p>', '<p>x</p><p>y</p>');
     expect(diff.ok).toBe(true);
     if (!diff.ok) return;
@@ -87,7 +87,7 @@ describe('buildSideBySide', () => {
     expect(sides[0].right?.text).toBe('x');
   });
 
-  it('一侧多余的行单独成行', () => {
+  it('keeps leftover rows on one side as standalone rows', () => {
     const diff = buildVersionDiff('<p>a</p>', '<p>x</p><p>y</p>');
     expect(diff.ok).toBe(true);
     if (!diff.ok) return;
@@ -97,7 +97,7 @@ describe('buildSideBySide', () => {
     expect(sides[1].right?.text).toBe('y');
   });
 
-  it('相同行左右复用同一行对象', () => {
+  it('reuses the same row object for unchanged lines on both sides', () => {
     const diff = buildVersionDiff('<p>a</p>', '<p>a</p>');
     expect(diff.ok).toBe(true);
     if (!diff.ok) return;
@@ -106,7 +106,7 @@ describe('buildSideBySide', () => {
     expect(sides[0].left).toBe(sides[0].right);
   });
 
-  it('空输入返回空数组', () => {
+  it('returns an empty array for empty input', () => {
     expect(buildSideBySide([])).toEqual([]);
   });
 });

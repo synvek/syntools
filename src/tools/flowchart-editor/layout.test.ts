@@ -39,17 +39,17 @@ describe('自动布局（两段式）', () => {
     const a = out.find((n) => n.id === 'a')!;
     const b = out.find((n) => n.id === 'b')!;
 
-    // 层级被保留（旧实现会解除泳道归属）
+    // Hierarchy is preserved (the old implementation dissolved swimlane ownership)
     expect(a.parentId).toBe('lane');
     expect(b.parentId).toBe('lane');
-    // 子节点坐标是相对泳道的，必须落在容器内部
+    // Child coordinates are relative to the swimlane and must fall inside the container
     for (const child of [a, b]) {
       expect(child.position.x).toBeGreaterThanOrEqual(0);
       expect(child.position.y).toBeGreaterThanOrEqual(0);
       expect(child.position.x + (child.width ?? 0)).toBeLessThanOrEqual(lane.width ?? Infinity);
       expect(child.position.y + (child.height ?? 0)).toBeLessThanOrEqual(lane.height ?? Infinity);
     }
-    // TB 方向：b 在 a 下方
+    // TB direction: b sits below a
     expect(b.position.y).toBeGreaterThan(a.position.y);
   });
 
@@ -98,7 +98,7 @@ describe('自动布局（两段式）', () => {
       direction: 'TB',
       preserveContainers: false,
     });
-    // 扁平布局下座标为绝对坐标，容器与子节点一起参与排版
+    // Under flat layout the coordinates are absolute, with containers and children laid out together
     const a = out.find((n) => n.id === 'a')!;
     const lane = out.find((n) => n.id === 'lane')!;
     expect(a.position.x).not.toBe(10);

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { countByCategory } from './core';
 import { PROMPT_CATEGORIES, PROMPTS, validatePromptData } from './data';
 
-/** 内容底线：每个分类至少 10 条 */
+/** Content baseline: at least 10 prompts per category */
 const MIN_PER_CATEGORY = 10;
 
-/** 需要携带免责声明的领域 */
+/** Domains that must carry a disclaimer */
 const DISCLAIMER_CATEGORIES = ['finance', 'legal', 'health'];
 
 describe('提示词数据完整性', () => {

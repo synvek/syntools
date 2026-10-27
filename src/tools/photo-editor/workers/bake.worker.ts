@@ -2,13 +2,13 @@ import { applyPixelPassToData } from '../render/pixelPass';
 import type { Adjustments, FilterSpec } from '../model/types';
 
 /**
- * 全分辨率烘焙 Worker。
+ * Full-resolution bake Worker.
  *
- * 主线程把源画布转成 `ImageBitmap` 转移进来，这里用 `OffscreenCanvas` 重放同一条管线
- * （CSS 滤镜 + 逐像素通道，与 `render/filters.ts` 的实现同源），再以位图形式转移回去。
+ * The main thread turns the source canvas into an `ImageBitmap` and transfers it in; here `OffscreenCanvas` replays the
+ * same pipeline (CSS filters + the per-pixel pass, the very implementation in `render/filters.ts`) and transfers a bitmap back.
  *
- * 与主线程分工：主线程只跑**降采样**的实时预览，全分辨率的像素运算全部落在 Worker 里，
- * 因此拖滑杆 / 落笔期间主线程不会因为一次全量 `getImageData` + 逐像素循环而卡住。
+ * Division of labor: the main thread only runs the **downsampled** live preview and all full-resolution pixel work lands
+ * here, so painting / dragging sliders never stalls the main thread on a full `getImageData` plus a per-pixel loop.
  */
 
 export interface BakeWorkerRequest {
@@ -16,7 +16,7 @@ export interface BakeWorkerRequest {
   width: number;
   height: number;
   bitmap: ImageBitmap;
-  /** CSS 能表达的滤镜部分（`ctx.filter` 的字符串） */
+  /** The part of the filter CSS can express (a `ctx.filter` string) */
   cssFilter: string;
   adjustments: Adjustments;
   filters: FilterSpec[];
@@ -32,7 +32,7 @@ interface WorkerScope {
   postMessage: (message: unknown, transfer?: Transferable[]) => void;
 }
 
-/** 单次烘焙：可被单测以「注入伪造 OffscreenCanvas」的方式覆盖（真实环境走 worker 全局） */
+/** One bake: unit tests can override it by injecting a fake OffscreenCanvas (the real environment uses the worker global) */
 export async function bakeToBitmap(
   request: BakeWorkerRequest,
   createCanvas: (width: number, height: number) => OffscreenCanvas,
@@ -68,7 +68,7 @@ export function attachBakeWorker(scope: WorkerScope): void {
   };
 }
 
-// 只有在真正的 Worker 环境里才挂载（单测 / SSR 下 import 本模块不应报错）
+// Only mount in a real Worker environment (importing this module must not throw under tests / SSR)
 if (typeof self !== 'undefined' && typeof (self as unknown as Worker).postMessage === 'function') {
   attachBakeWorker(self as unknown as WorkerScope);
 }

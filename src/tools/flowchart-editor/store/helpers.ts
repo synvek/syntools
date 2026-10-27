@@ -1,6 +1,6 @@
 /**
- * store 内部共享工具：节点/边构造、页面记录 ↔ React Flow 节点互转、选择归一化。
- * 从 `store.ts` 下沉，保持纯函数、便于单测与复用。
+ * Shared helpers inside the store: node/edge builders, page records ↔ React Flow nodes, selection normalization.
+ * Moved down out of `store.ts`, kept as pure functions for easy unit-testing and reuse.
  */
 
 import type { Connection, Edge, Node } from '@xyflow/react';
@@ -20,21 +20,21 @@ import { edgePropsOf, normalizeEdgeStyle } from '../ops';
 export type FlowNode = Node<FlowNodeData>;
 export type FlowEdge = Edge;
 
-/** 撤销栈上限（结构 diff 后单条记录远小于整图快照） */
+/** Undo stack limit (after structural diffing, one entry is far smaller than a whole-graph snapshot) */
 export const HISTORY_LIMIT = 50;
 
-/** 页面元数据（名称与顺序，数据另存） */
+/** Page metadata (name and order; data is stored separately) */
 export interface PageMeta {
   id: string;
   name: string;
 }
 
-/** 默认首页 id（新建文档与清空后使用） */
+/** Default first-page id (used for new documents and after clearing) */
 export const DEFAULT_PAGE_ID = 'page-1';
 
 /**
- * 本地化的默认页名（`tools.flowchart.defaultPageName`）。
- * i18n 尚未注册该键时回退为语言中立的 `Page N`，避免出现硬编码中文。
+ * Localized default page name (`tools.flowchart.defaultPageName`).
+ * Falls back to the language-neutral `Page N` while i18n has not registered that key, avoiding hard-coded Chinese.
  */
 export function defaultPageName(index: number): string {
   const key = 'tools.flowchart.defaultPageName';
@@ -43,8 +43,8 @@ export function defaultPageName(index: number): string {
 }
 
 /**
- * 复制页面的名称：`<原名> 副本`（i18n 缺失时回退语言中立的 `Copy`）。
- * 与 `defaultPageName` 同理，避免在 store 里硬编码文案。
+ * Name of a duplicated page: `<original name> copy` (falls back to the language-neutral `Copy` when i18n is missing).
+ * Same reasoning as `defaultPageName`: no copy is hard-coded in the store.
  */
 export function copyPageName(name: string): string {
   const key = 'tools.flowchart.pageCopySuffix';
@@ -63,7 +63,7 @@ export function makeNode(
     id: opts?.id ?? createId('n'),
     type: 'shape',
     position,
-    // 显式尺寸：让 React Flow 在测量前就有正确包围盒（fitView / 导出 / 自动布局均依赖）
+    // Explicit size so React Flow has correct bounds before measuring (fitView / export / auto-layout all depend on it)
     width: size.width,
     height: size.height,
     parentId: opts?.parentId,
@@ -85,10 +85,10 @@ export function makeEdge(
 }
 
 /**
- * 只把给定 id 标记为选中（同时清掉其它节点的 selected 标记）。
- * React Flow 以节点自身的 `selected` 为准，若只改 store 的 selectedNodes，
- * 它下一次派发 onSelectionChange 时会把选中态清空。
- * 未受影响的节点保持原引用，避免整图重渲染。
+ * Mark only the given ids as selected (also clearing the selected flag on other nodes).
+ * React Flow trusts the node's own `selected` flag; changing only the store's selectedNodes
+ * would be cleared the next time it dispatches onSelectionChange.
+ * Unaffected nodes keep their references, avoiding a full re-render.
  */
 export function selectOnly(nodes: readonly FlowNode[], ids: readonly string[]): FlowNode[] {
   const set = new Set(ids);
@@ -99,7 +99,7 @@ export function selectOnly(nodes: readonly FlowNode[], ids: readonly string[]): 
   });
 }
 
-/** 把持久化的页面记录转换为 React Flow 节点 */
+/** Convert persisted page records into React Flow nodes */
 export function nodesFromPage(page: FlowPage): FlowNode[] {
   return orderNodesByHierarchy(
     page.nodes.map((n) => {
@@ -112,7 +112,7 @@ export function nodesFromPage(page: FlowPage): FlowNode[] {
         height: n.height ?? size.height,
         parentId: n.parentId ?? undefined,
         hidden: n.hidden === true,
-        // React Flow 无 locked 字段，用 draggable/selectable 表达
+        // React Flow has no locked field, so draggable/selectable express it
         draggable: n.locked === true ? false : undefined,
         selectable: n.locked === true ? false : undefined,
         data: {
@@ -131,7 +131,7 @@ export function nodesFromPage(page: FlowPage): FlowNode[] {
   );
 }
 
-/** 把持久化的连线记录转换为 React Flow 边（含样式） */
+/** Convert persisted edge records into React Flow edges (styles included) */
 export function edgesFromPage(page: FlowPage): FlowEdge[] {
   return page.edges.map((e) => {
     const style = normalizeEdgeStyle(e.style);

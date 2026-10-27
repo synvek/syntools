@@ -6,9 +6,9 @@ import type { DocComment, TrackedChange } from './docs';
 interface ReviewPanelProps {
   comments: DocComment[];
   changes: TrackedChange[];
-  /** 正在撰写的新批注引文（null 表示未在撰写） */
+  /** Quote for the comment being written (null when not composing) */
   pendingQuote: string | null;
-  /** 批注/修订署名（本地偏好，随草稿一起保存） */
+  /** Comment/change author name (a local preference saved with the draft) */
   author: string;
   onAuthorChange: (author: string) => void;
   onSubmitComment: (text: string) => void;
@@ -25,10 +25,10 @@ const buttonBase =
   'h-7 rounded-md border border-gray-300 px-2 text-xs text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800';
 
 /**
- * 批注与修订侧栏：
- * - 批注新增改为面板内联编辑（不再弹出浏览器原生对话框），支持回车提交 / Esc 取消
- * - 批注条目支持「标记已解决」与删除
- * - 修订条目按插入/删除分色，保留全部接受 / 全部拒绝
+ * Comments and tracked-changes sidebar:
+ * - New comments are edited inline in the panel (no native browser dialog), Enter submits / Esc cancels
+ * - Comment entries support "mark resolved" and delete
+ * - Change entries are color-coded by insert/delete, with accept-all / reject-all
  */
 export function ReviewPanel({
   comments,

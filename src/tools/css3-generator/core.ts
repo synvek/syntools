@@ -1,14 +1,9 @@
 /**
- * CSS3 代码生成器：border-radius / box-shadow / text-shadow / transform / transition / filter。
+ * CSS3 snippet generator: border-radius / box-shadow / text-shadow / transform / transition / filter.
  */
 
 export type Css3Module =
-  | 'borderRadius'
-  | 'boxShadow'
-  | 'textShadow'
-  | 'transform'
-  | 'transition'
-  | 'filter';
+  'borderRadius' | 'boxShadow' | 'textShadow' | 'transform' | 'transition' | 'filter';
 
 export const CSS3_MODULES: Css3Module[] = [
   'borderRadius',
@@ -188,7 +183,7 @@ export function buildCss3ForModule(
   }
 }
 
-/** 将 CSS 声明解析为内联 style 对象（仅当前模块预览用） */
+/** Parse CSS declarations into an inline style object (used only for previews inside this module) */
 export function cssDeclToStyle(css: string): Record<string, string> {
   const style: Record<string, string> = {};
   const m = /^([a-z-]+)\s*:\s*(.+);?\s*$/i.exec(css.trim());

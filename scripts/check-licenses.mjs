@@ -1,25 +1,27 @@
 #!/usr/bin/env node
 /**
- * 依赖许可门禁：出现 GPL / AGPL / SSPL 等强 copyleft 许可时直接失败。
+ * Dependency license gate: fails as soon as a strong copyleft license (GPL / AGPL / SSPL) appears.
  *
- * 为什么需要它：本项目计划以「AGPL-3.0（社区） + 商业许可（付费）」双轨发布，而随包分发的
- * GPL/AGPL 组件会让商业许可版本背上源码开放义务。这类问题在安装一个包时悄无声息地发生，
- * 只有在发布前被门禁挡住才可控（历史上就是这么混进 `@ffmpeg/core-mt` 与 `ua-parser-js@2` 的）。
+ * Why it exists: the project ships on two tracks, "AGPL-3.0 (community) + commercial license (paid)",
+ * and bundling GPL/AGPL components would saddle the commercial build with source-disclosure duties.
+ * Such problems sneak in silently when installing a package; only a gate before release keeps them
+ * manageable (that is how `@ffmpeg/core-mt` and `ua-parser-js@2` slipped in historically).
  *
- * 判定基于 SPDX 表达式：
- * - `A OR B`：任一侧可接受即通过（并提示在 NOTICES 里声明选择了哪一侧）；
- * - `A AND B`：两侧都必须可接受；
- * - 单许可：必须在白名单内。
- * LGPL 不直接失败，标记为「需人工复核」—— 静态链接进 wasm/JS 产物时义务会变重。
+ * Verdicts follow SPDX expressions:
+ * - `A OR B`: passes if either side is acceptable (and asks you to state the choice in NOTICES);
+ * - `A AND B`: both sides must be acceptable;
+ * - single license: must be on the allowlist.
+ * LGPL does not fail outright but is marked "needs manual review" — linking it statically into a
+ * wasm/JS artifact increases the obligations.
  *
- * 用法：
- *   pnpm license:check           # 含 devDependencies（更严格，能提早发现）
- *   pnpm license:check --prod    # 仅运行时依赖（即真正随产物发布的包）
+ * Usage:
+ *   pnpm license:check           # includes devDependencies (stricter, catches issues earlier)
+ *   pnpm license:check --prod    # runtime dependencies only (what actually ships)
  */
 import { execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-/** 允许的许可（均为宽松许可、文件级 copyleft、字体/数据许可或公共领域声明） */
+/** Allowed licenses (all permissive, file-level copyleft, font/data licenses, or public-domain statements) */
 export const ALLOWED = new Set([
   '0BSD',
   'Apache-2.0',
@@ -48,36 +50,44 @@ export const ALLOWED = new Set([
   'Zlib',
 ]);
 
-/** 强 copyleft / 非自由许可：命中即失败 */
+/** Strong copyleft / non-free licenses: a match fails the gate */
 const FORBIDDEN = [
-  { re: /^AGPL/i, why: 'AGPL 会传染到网络服务，商业许可版本无法承受' },
-  { re: /^GPL/i, why: 'GPL 要求随分发提供源码，商业许可版本无法承受' },
-  { re: /^SSPL/i, why: 'SSPL 比 AGPL 更严格，不属于开源许可' },
-  { re: /Commons-Clause/i, why: '禁止商业使用' },
-  { re: /BUSL/i, why: '商业使用受限的时间锁许可' },
-  { re: /Elastic-2\.0/i, why: '禁止作为托管服务提供' },
-  { re: /CC-BY-NC/i, why: '禁止商业使用' },
-  { re: /NonCommercial/i, why: '禁止商业使用' },
-  { re: /^(?:OSL|RPL|QPL|Sleepycat|JSON)-?/i, why: '与 AGPL 不兼容或含字段使用限制' },
+  { re: /^AGPL/i, why: 'AGPL spreads to network services; the commercial build cannot take it' },
+  {
+    re: /^GPL/i,
+    why: 'GPL requires shipping sources with distribution; the commercial build cannot take it',
+  },
+  { re: /^SSPL/i, why: 'SSPL is stricter than AGPL and is not an open-source license' },
+  { re: /Commons-Clause/i, why: 'prohibits commercial use' },
+  { re: /BUSL/i, why: 'time-locked license that restricts commercial use' },
+  { re: /Elastic-2\.0/i, why: 'cannot be offered as a hosted service' },
+  { re: /CC-BY-NC/i, why: 'prohibits commercial use' },
+  { re: /NonCommercial/i, why: 'prohibits commercial use' },
+  {
+    re: /^(?:OSL|RPL|QPL|Sleepycat|JSON)-?/i,
+    why: 'incompatible with AGPL or restricts fields of use',
+  },
 ];
 
-/** LGPL 单列：不失败，但要求人工确认链接方式 */
-const REVIEW = [{ re: /^LGPL/i, why: 'LGPL：确认是否动态链接；静态链接进产物需提供重链接手段' }];
+/** LGPL is separate: no failure, but the linking mode needs manual confirmation */
+const REVIEW = [
+  { re: /^LGPL/i, why: 'LGPL: confirm dynamic linking; static linking needs a relinking option' },
+];
 
 /**
- * package.json 未声明许可、但已人工核实的包。
- * 新增条目必须写清依据，不允许「先放行再说」。
+ * Packages that declare no license in package.json but were verified by hand.
+ * Every new entry must state the evidence; "let it through for now" is not allowed.
  */
 export const KNOWN_UNKNOWN = new Map([
-  ['buffers', '包内 LICENSE 为 MIT，仅 package.json 缺字段'],
-  ['khroma', '包内 LICENSE 为 MIT，仅 package.json 缺字段'],
-  ['@univerjs/telemetry', '只存在于 lockfile 的 peer 条目，未安装、不进产物'],
+  ['buffers', 'the bundled LICENSE is MIT; only the package.json field is missing'],
+  ['khroma', 'the bundled LICENSE is MIT; only the package.json field is missing'],
+  ['@univerjs/telemetry', 'a lockfile-only peer entry; not installed and not bundled'],
 ]);
 
 /**
- * 把 SPDX 表达式切成 token：`(MIT OR GPL-3.0-or-later)` → `( MIT OR GPL-3.0-or-later )`。
- * `WITH` 例外条款并入前一个标识符（如 `Apache-2.0 WITH LLVM-exception`）。
- * `A/B` 这种非 SPDX 写法（多见于 Rust crate）等价于 `A OR B`。
+ * Splits an SPDX expression into tokens: `(MIT OR GPL-3.0-or-later)` → `( MIT OR GPL-3.0-or-later )`.
+ * A `WITH` exception is folded into the preceding identifier (e.g. `Apache-2.0 WITH LLVM-exception`).
+ * The non-SPDX `A/B` form (common in Rust crates) is equivalent to `A OR B`.
  */
 function tokenize(expression) {
   const spaced = expression.replace(/([()])/g, ' $1 ').trim();
@@ -115,7 +125,7 @@ function tokenize(expression) {
   return tokens;
 }
 
-/** 递归下降：AND 优先级高于 OR，返回语法树 */
+/** Recursive descent: AND binds tighter than OR; returns a syntax tree */
 function parse(tokens) {
   let index = 0;
   const peek = () => tokens[index];
@@ -154,22 +164,22 @@ function parse(tokens) {
 }
 
 /**
- * 评估一个 SPDX 表达式，返回 'ok' | 'review' | 'unknown' | 'forbidden'。
- * AND 取最差结果（全部义务都要满足），OR 取最好结果（任选其一即可）。
+ * Evaluates an SPDX expression, returning 'ok' | 'review' | 'unknown' | 'forbidden'.
+ * AND keeps the worst result (all obligations apply), OR keeps the best (any one suffices).
  */
 export function evaluate(license) {
-  if (!license || !license.trim()) return { verdict: 'unknown', reason: '未声明许可' };
+  if (!license || !license.trim()) return { verdict: 'unknown', reason: 'no license declared' };
   let tree;
   try {
     tree = parse(tokenize(license));
   } catch {
-    return { verdict: 'unknown', reason: '无法解析的许可表达式' };
+    return { verdict: 'unknown', reason: 'unparseable license expression' };
   }
   return evaluateNode(tree);
 }
 
 function evaluateNode(node) {
-  if (!node) return { verdict: 'unknown', reason: '空表达式' };
+  if (!node) return { verdict: 'unknown', reason: 'empty expression' };
   if (node.type === 'leaf') return evaluateSingle(node.id);
 
   const results = node.children.map(evaluateNode);
@@ -195,7 +205,7 @@ function evaluateSingle(token) {
   for (const rule of REVIEW) {
     if (rule.re.test(id)) return { verdict: 'review', reason: rule.why };
   }
-  return { verdict: 'unknown', reason: `不在允许清单内：${id}` };
+  return { verdict: 'unknown', reason: `not on the allowlist: ${id}` };
 }
 
 function collect(prodOnly) {
@@ -237,37 +247,43 @@ export function main(argv = process.argv) {
     } else if (verdict === 'review') review.push({ ...row, reason });
   }
 
-  const scope = prodOnly ? '运行时依赖' : '全部依赖（含 dev）';
-  console.log(`许可门禁：检查 ${rows.length} 个包（${scope}）`);
+  const scope = prodOnly ? 'runtime dependencies' : 'all dependencies (incl. dev)';
+  console.log(`License gate: checking ${rows.length} packages (${scope})`);
 
   if (review.length) {
-    console.log('\n需人工复核（不阻断构建）：');
+    console.log('\nNeeds manual review (does not block the build):');
     for (const row of review)
-      console.log(`  · ${row.name}@${row.versions} — ${row.license}：${row.reason}`);
+      console.log(`  · ${row.name}@${row.versions} — ${row.license}: ${row.reason}`);
   }
 
   if (unknown.length) {
-    console.log('\n无法判定的许可：');
+    console.log('\nUndeterminable licenses:');
     for (const row of unknown)
       console.log(`  · ${row.name}@${row.versions} — ${row.license}：${row.reason}`);
-    console.log('  核实后把包名与依据加入 scripts/check-licenses.mjs 的 KNOWN_UNKNOWN。');
+    console.log(
+      '  Once verified, add the package and its evidence to KNOWN_UNKNOWN in scripts/check-licenses.mjs.',
+    );
   }
 
   if (forbidden.length) {
-    console.log('\n禁止的许可：');
+    console.log('\nForbidden licenses:');
     for (const row of forbidden)
       console.log(`  · ${row.name}@${row.versions} — ${row.license}：${row.reason}`);
-    console.log('\n许可门禁失败：存在强 copyleft / 非自由许可组件，商业许可版本无法合规发布。');
-    console.log('处理方式见 plan/license-audit.md（替换、降级或移除，而不是放宽门禁）。');
+    console.log(
+      '\nLicense gate failed: strong copyleft / non-free components cannot ship in the commercial build.',
+    );
+    console.log('See plan/license-audit.md (replace, downgrade or remove — not loosen the gate).');
     process.exit(1);
   }
 
   if (unknown.length) {
-    console.log('\n许可门禁失败：存在无法判定的许可。');
+    console.log('\nLicense gate failed: some licenses cannot be determined.');
     process.exit(1);
   }
 
-  console.log(`\n许可门禁通过：${rows.length} 个包均无 GPL / AGPL / SSPL 类许可。`);
+  console.log(
+    `\nLicense gate passed: no GPL / AGPL / SSPL licenses among ${rows.length} packages.`,
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

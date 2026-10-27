@@ -1,6 +1,7 @@
 /**
- * 脑图树操作（纯函数）：只操作 MindNodeRec[]，不涉及 React Flow 与布局。
- * 所有函数返回新数组（不修改入参），失败时原样返回，供 store 组合使用。
+ * Mind map tree operations (pure functions) over `MindNodeRec[]`, with no React Flow or layout
+ * concerns. Every function returns a new array (never mutating its input) and returns the input
+ * unchanged on failure, so the store can compose them freely.
  */
 
 import { DEFAULT_THEME_ID } from './themes';
@@ -8,21 +9,22 @@ import type { MindDoc, MindNodeRec, MindSide } from './types';
 
 let seq = 0;
 
-/** 本地唯一 id：时间戳 + 自增序号，避免并发下重号 */
+/** Local unique id: timestamp + sequence counter, avoiding collisions under concurrency */
 export function createId(prefix = 'm'): string {
   seq += 1;
   return `${prefix}-${Date.now().toString(36)}-${seq.toString(36)}`;
 }
 
 /**
- * 默认英文文案：新建即带可读文本，进入编辑态后直接输入即可覆盖。
- * 放在模型层（纯数据）而非 i18n，保证草稿 / 导出内容与界面语言无关。
+ * Default English copy: a new node starts with readable text that typing replaces in edit mode.
+ * Kept in the model layer (pure data) rather than i18n, so drafts / exports are independent of
+ * the UI language.
  */
 export const DEFAULT_ROOT_TEXT = 'Central Topic';
 export const DEFAULT_CHILD_TEXT = 'Subtopic';
 export const DEFAULT_SIBLING_TEXT = 'Topic';
 
-/** 仅含中心主题的空白脑图 */
+/** Blank mind map containing only the central topic */
 export function emptyDoc(themeId: string = DEFAULT_THEME_ID): MindDoc {
   const rootId = createId('root');
   return {
@@ -46,19 +48,19 @@ export function findNode(
   return nodes.find((n) => n.id === id);
 }
 
-/** 子节点（按数组顺序，即同级展示顺序） */
+/** Child nodes (in array order, which is the display order among siblings) */
 export function childrenOf(nodes: readonly MindNodeRec[], id: string): MindNodeRec[] {
   return nodes.filter((n) => n.parentId === id);
 }
 
-/** 参与布局的子节点：折叠的节点不返回子树 */
+/** Children that take part in layout: collapsed nodes expose no subtree */
 export function visibleChildrenOf(nodes: readonly MindNodeRec[], id: string): MindNodeRec[] {
   const self = findNode(nodes, id);
   if (self?.collapsed) return [];
   return childrenOf(nodes, id);
 }
 
-/** id 是否为 ancestorId 的后代（含自身，用于环检测） */
+/** Whether `id` is a descendant of `ancestorId` (itself included; used for cycle detection) */
 export function isDescendantOf(
   nodes: readonly MindNodeRec[],
   id: string,
@@ -74,7 +76,7 @@ export function isDescendantOf(
   return false;
 }
 
-/** 子树全部节点 id（含自身），按树的先序排列 */
+/** All node ids of a subtree (itself included) in pre-order */
 export function subtreeIdsOf(nodes: readonly MindNodeRec[], id: string): string[] {
   const out: string[] = [];
   const walk = (nodeId: string) => {
@@ -85,7 +87,7 @@ export function subtreeIdsOf(nodes: readonly MindNodeRec[], id: string): string[
   return out;
 }
 
-/** 子树在数组中的结束下标（用于插入时保持子树连续） */
+/** Index where the subtree ends in the array (keeps subtrees contiguous when inserting) */
 function subtreeEndIndex(nodes: readonly MindNodeRec[], id: string): number {
   const ids = new Set(subtreeIdsOf(nodes, id));
   let last = nodes.findIndex((n) => n.id === id);
@@ -95,7 +97,7 @@ function subtreeEndIndex(nodes: readonly MindNodeRec[], id: string): number {
   return last;
 }
 
-/** 在 anchor 子树之后插入节点，保持 DFS 顺序连续 */
+/** Insert a node after the anchor's subtree, keeping DFS order contiguous */
 function insertAfter(
   nodes: readonly MindNodeRec[],
   anchorId: string,
@@ -118,14 +120,14 @@ export function depthOf(nodes: readonly MindNodeRec[], id: string): number {
   return depth;
 }
 
-/** 在同级中的序号（0 起）；根节点返回 0 */
+/** Index among siblings (0-based); the root returns 0 */
 export function siblingIndexOf(nodes: readonly MindNodeRec[], id: string): number {
   const self = findNode(nodes, id);
   if (!self?.parentId) return 0;
   return childrenOf(nodes, self.parentId).findIndex((n) => n.id === id);
 }
 
-/** 前序兄弟（同级中紧邻的上一个），无则 undefined */
+/** Previous sibling (the one right before it at the same level), or undefined */
 export function prevSiblingOf(nodes: readonly MindNodeRec[], id: string): MindNodeRec | undefined {
   const self = findNode(nodes, id);
   if (!self?.parentId) return undefined;
@@ -134,7 +136,7 @@ export function prevSiblingOf(nodes: readonly MindNodeRec[], id: string): MindNo
   return idx > 0 ? siblings[idx - 1] : undefined;
 }
 
-/** 新增子节点：返回新数组与新节点 id */
+/** Add a child node: returns the new array and the new node id */
 export function addChild(
   nodes: readonly MindNodeRec[],
   parentId: string,
@@ -152,7 +154,7 @@ export function addChild(
     collapsed: false,
     side: parent.parentId === null ? (parent.side ?? 'right') : parent.side,
   };
-  // 折叠的父节点先展开，否则新节点不可见
+  // Expand a collapsed parent first, otherwise the new node would be invisible
   const opened = parent.collapsed
     ? nodes.map((n) => (n.id === parentId ? { ...n, collapsed: false } : n))
     : [...nodes];
@@ -160,7 +162,7 @@ export function addChild(
   return { nodes: next, id };
 }
 
-/** 新增同级节点：根节点退化为新增子节点 */
+/** Add a sibling node; for the root this degrades to adding a child */
 export function addSibling(
   nodes: readonly MindNodeRec[],
   id: string,
@@ -168,7 +170,7 @@ export function addSibling(
 ): { nodes: MindNodeRec[]; id: string } {
   const self = findNode(nodes, id);
   if (!self) return { nodes: [...nodes], id: '' };
-  // 中心主题没有同级：退化为新增子主题（沿用调用方传入的文案）
+  // The central topic has no siblings: add a child instead, reusing the caller's text
   if (!self.parentId) return addChild(nodes, id, text);
   const newId = createId();
   const rec: MindNodeRec = {
@@ -181,7 +183,7 @@ export function addSibling(
   return { nodes: insertAfter(nodes, id, rec), id: newId };
 }
 
-/** 删除节点及其子树：根节点不可删 */
+/** Delete a node and its subtree; the root cannot be deleted */
 export function removeNode(nodes: readonly MindNodeRec[], id: string): MindNodeRec[] {
   const self = findNode(nodes, id);
   if (!self || self.parentId === null) return nodes as MindNodeRec[];
@@ -189,7 +191,7 @@ export function removeNode(nodes: readonly MindNodeRec[], id: string): MindNodeR
   return nodes.filter((n) => !doomed.has(n.id));
 }
 
-/** 降级为子级：成为前序兄弟的最后一个子节点 */
+/** Indent: become the last child of the previous sibling */
 export function indentNode(nodes: readonly MindNodeRec[], id: string): MindNodeRec[] {
   const self = findNode(nodes, id);
   if (!self?.parentId) return nodes as MindNodeRec[];
@@ -205,7 +207,7 @@ export function indentNode(nodes: readonly MindNodeRec[], id: string): MindNodeR
   return last ? insertAfter(opened, last.id, moved) : [...opened, moved];
 }
 
-/** 升级为同级：成为父节点的下一个兄弟；根节点无操作 */
+/** Outdent: become the next sibling of the parent; a no-op for the root */
 export function outdentNode(nodes: readonly MindNodeRec[], id: string): MindNodeRec[] {
   const self = findNode(nodes, id);
   if (!self?.parentId) return nodes as MindNodeRec[];
@@ -216,7 +218,7 @@ export function outdentNode(nodes: readonly MindNodeRec[], id: string): MindNode
   return insertAfter(rest, parent.id, moved);
 }
 
-/** 同级上移 / 下移（dir: -1 上移，1 下移） */
+/** Move among siblings (dir: -1 up, 1 down) */
 export function moveNode(nodes: readonly MindNodeRec[], id: string, dir: -1 | 1): MindNodeRec[] {
   const self = findNode(nodes, id);
   if (!self?.parentId) return nodes as MindNodeRec[];
@@ -226,7 +228,7 @@ export function moveNode(nodes: readonly MindNodeRec[], id: string, dir: -1 | 1)
   if (target < 0 || target >= siblings.length) return nodes as MindNodeRec[];
   const other = siblings[target];
   const rest = nodes.filter((n) => n.id !== id);
-  // 上移：插到目标兄弟之前；下移：插到目标兄弟子树之后
+  // Move up: insert before the target sibling; move down: insert after its subtree
   if (dir < 0) {
     const at = rest.findIndex((n) => n.id === other.id);
     return [...rest.slice(0, at), self, ...rest.slice(at)];
@@ -234,7 +236,7 @@ export function moveNode(nodes: readonly MindNodeRec[], id: string, dir: -1 | 1)
   return insertAfter(rest, other.id, self);
 }
 
-/** 改挂父节点（拖拽）：禁止挂到自身或自身后代 */
+/** Reparent (drag and drop): never onto itself or one of its descendants */
 export function reparent(
   nodes: readonly MindNodeRec[],
   id: string,
@@ -242,7 +244,7 @@ export function reparent(
 ): MindNodeRec[] {
   const self = findNode(nodes, id);
   if (!self || self.parentId === newParentId) return nodes as MindNodeRec[];
-  if (self.parentId === null) return nodes as MindNodeRec[]; // 根节点不可移动
+  if (self.parentId === null) return nodes as MindNodeRec[]; // the root cannot be moved
   if (isDescendantOf(nodes, newParentId, id)) return nodes as MindNodeRec[];
   const parent = findNode(nodes, newParentId);
   if (!parent) return nodes as MindNodeRec[];
@@ -260,7 +262,7 @@ export function reparent(
   return last ? insertAfter(opened, last.id, moved) : [...opened, moved];
 }
 
-/** 复制子树：新子树挂在同一父级下，返回新根 id */
+/** Duplicate a subtree under the same parent and return the new root id */
 export function duplicateSubtree(
   nodes: readonly MindNodeRec[],
   id: string,
@@ -269,7 +271,7 @@ export function duplicateSubtree(
   if (!self || self.parentId === null) return { nodes: [...nodes], id: '' };
   let next = [...nodes];
   const newIds = new Map<string, string>();
-  // 先序复制，保证父节点先落位
+  // Copy in pre-order so parents are placed first
   for (const oldId of subtreeIdsOf(nodes, id)) {
     const src = findNode(nodes, oldId);
     if (!src) continue;
@@ -287,17 +289,17 @@ export function duplicateSubtree(
   return { nodes: next, id: newIds.get(id) ?? '' };
 }
 
-/** 折叠 / 展开 */
+/** Collapse / expand */
 export function toggleCollapse(nodes: readonly MindNodeRec[], id: string): MindNodeRec[] {
   return nodes.map((n) => (n.id === id ? { ...n, collapsed: !n.collapsed } : n));
 }
 
-/** 设置全部节点的折叠状态 */
+/** Set the collapsed state of every node */
 export function setAllCollapsed(nodes: readonly MindNodeRec[], collapsed: boolean): MindNodeRec[] {
   return nodes.map((n) => (n.parentId === null ? n : { ...n, collapsed }));
 }
 
-/** 局部更新节点字段（style 为浅合并） */
+/** Patch node fields (style is shallow-merged) */
 export function patchNode(
   nodes: readonly MindNodeRec[],
   id: string,
@@ -317,7 +319,7 @@ export function patchNode(
   });
 }
 
-/** 一级分支所在侧（左右分布布局用） */
+/** Side of the top-level branch (used by the both-sides layout) */
 export function sideOfNode(
   nodes: readonly MindNodeRec[],
   id: string,
@@ -328,7 +330,7 @@ export function sideOfNode(
   return self.side ?? fallback;
 }
 
-/** 全图节点数（含根）与分支数（连线数） */
+/** Node count (root included) and branch count (edge count) of the whole map */
 export function countOf(nodes: readonly MindNodeRec[]): { nodes: number; edges: number } {
   const edges = nodes.filter((n) => n.parentId !== null).length;
   return { nodes: nodes.length, edges };

@@ -75,7 +75,7 @@ function keyClass(kind: KeyKind, span?: 2): string {
   return `${base}${spanCls} border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900`;
 }
 
-/** 在线计算器 */
+/** Online calculator */
 export default function CalculatorTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ e: '' }), []);

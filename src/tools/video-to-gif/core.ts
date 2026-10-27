@@ -2,7 +2,7 @@ import type { ToolResult } from '@/core/types';
 
 const LEVELS = [0, 51, 102, 153, 204, 255];
 
-/** 216 色 web-safe 调色板（256 项，尾部补零）。 */
+/** 216-color web-safe palette (256 entries, zero-padded at the end). */
 export function buildWebPalette(): Uint8Array {
   const palette = new Uint8Array(768);
   let i = 0;
@@ -23,7 +23,7 @@ function level(v: number): number {
   return Math.min(5, Math.max(0, Math.round(v / 51)));
 }
 
-/** 将 RGBA 像素量化为调色板索引（index = r·36 + g·6 + b）。 */
+/** Quantize RGBA pixels to palette indices (index = r·36 + g·6 + b). */
 export function quantizeFrame(rgba: Uint8ClampedArray, pixelCount: number): Uint8Array {
   const out = new Uint8Array(pixelCount);
   for (let i = 0; i < pixelCount; i += 1) {
@@ -32,7 +32,7 @@ export function quantizeFrame(rgba: Uint8ClampedArray, pixelCount: number): Uint
   return out;
 }
 
-/** GIF LZW 压缩（LSB-first 位打包，子块由调用方切分）。 */
+/** GIF LZW compression (LSB-first bit packing; the caller splits the sub-blocks). */
 export function lzwEncode(pixels: Uint8Array, minCodeSize: number): number[] {
   const clearCode = 1 << minCodeSize;
   const endCode = clearCode + 1;
@@ -97,7 +97,7 @@ function ascii(str: string): number[] {
   return Array.from(str, (c) => c.charCodeAt(0));
 }
 
-/** 组装 GIF89a（全局调色板 + 循环）。 */
+/** Assemble a GIF89a (global color table + looping). */
 export function encodeGif(
   frames: GifFrame[],
   width: number,
@@ -112,12 +112,12 @@ export function encodeGif(
   out.push(...ascii('GIF89a'));
   pushShort(width);
   pushShort(height);
-  out.push(0xf7); // GCT 存在 + 256 色
-  out.push(0); // 背景色索引
-  out.push(0); // 像素宽高比
+  out.push(0xf7); // GCT present + 256 colors
+  out.push(0); // Background color index
+  out.push(0); // Pixel aspect ratio
   for (let i = 0; i < 768; i += 1) out.push(palette[i] ?? 0);
 
-  // Netscape 循环扩展
+  // Netscape looping extension
   out.push(0x21, 0xff, 0x0b, ...ascii('NETSCAPE2.0'), 0x03, 0x01);
   pushShort(0);
   out.push(0x00);
@@ -151,7 +151,7 @@ export interface VideoGifOptions {
   width: number;
 }
 
-/** 由若干 RGBA 帧生成 GIF。 */
+/** Build a GIF from a set of RGBA frames. */
 export function framesToGif(
   frames: { rgba: Uint8ClampedArray; width: number; height: number }[],
   fps: number,

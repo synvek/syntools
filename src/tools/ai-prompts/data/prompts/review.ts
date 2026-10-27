@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 评审与反馈类提示词，详见 ../README.md */
+/** Review and feedback prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'review-plan',

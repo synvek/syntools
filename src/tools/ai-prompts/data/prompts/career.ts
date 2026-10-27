@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 职场求职类提示词，详见 ../README.md */
+/** Job hunting and career prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'career-resume-bullets',

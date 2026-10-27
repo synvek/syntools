@@ -49,7 +49,7 @@ describe('urlDecode', () => {
   });
 
   it('full 模式不解码组件保留字符', () => {
-    // decodeURI 不会解码 %26（&），与 decodeURIComponent 行为不同
+    // decodeURI does not decode %26 (&), unlike decodeURIComponent
     expect(urlDecode('%26', 'full')).toEqual({ ok: true, value: '%26' });
     expect(urlDecode('%26', 'component')).toEqual({ ok: true, value: '&' });
   });

@@ -1,7 +1,7 @@
 import { getBezierPath, type EdgeProps } from '@xyflow/react';
 
 /**
- * 脑图分支连线：平滑贝塞尔曲线，颜色继承所属分支，层级越深越细。
+ * Mind map branch edge: smooth bezier curve, inherits the branch colour and thins out with depth.
  */
 export function MindEdge({
   id,

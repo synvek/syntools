@@ -8,13 +8,13 @@ import {
   signJwtHs256,
 } from './core';
 
-/** jwt.io 官方示例 token（HS256） */
+/** Official jwt.io sample token (HS256) */
 const VALID_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
   '.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ' +
   '.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
 
-/** 测试辅助：任意对象 → base64url 段（UTF-8 字节，支持非 ASCII） */
+/** Test helper: any object → base64url segment (UTF-8 bytes, non-ASCII safe) */
 const enc = (obj: unknown) => {
   const bytes = new TextEncoder().encode(JSON.stringify(obj));
   let bin = '';

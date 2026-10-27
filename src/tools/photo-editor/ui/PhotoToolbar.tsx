@@ -25,11 +25,11 @@ const SWATCHES = [
 ];
 
 /**
- * 顶部工具参数条：**最左固定「撤销 / 重做」**，中间随当前工具切换控件，右侧固定缩放控件。
+ * Top tool options bar: **undo / redo pinned at the far left**, controls that follow the current tool in the middle, zoom pinned on the right.
  *
- * 撤销 / 重做放在这里而不是单独一行：它们与当前工具无关、任何时候都要可用，
- * 合并进本行后正好省下一整行高度（省下来的空间全部给画布）。
- * 滑杆拖动即时生效（历史在松手时由调用方补一次 commit，见各 onChange）。
+ * Undo / redo live here instead of on their own row: they are independent of the current tool and must always be
+ * available, and folding them into this row saves a full row of height (all of it goes to the canvas).
+ * Dragging a slider applies immediately (the caller commits once on release, see the onChange handlers).
  */
 export function PhotoToolbar({
   onFit,
@@ -109,7 +109,7 @@ export function PhotoToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      {/* 固定段：撤销 / 重做（与工具无关，始终可见可点） */}
+      {/* Fixed section: undo / redo (tool-independent, always visible and clickable) */}
       <div className="flex shrink-0 items-center gap-1">
         <IconTextButton
           icon="undo"
@@ -330,7 +330,7 @@ export function PhotoToolbar({
       ) : null}
 
       {tool === 'shape' ? (
-        // 形状「种类」放在左侧工具箱（组按钮 + 角标角），参数条只放落笔用到的属性
+        // Shape "variants" live in the left toolbox (group button + corner badge); the options bar only holds paint-time properties
         <div className="flex flex-wrap items-center gap-3" data-testid="shape-bar">
           <label className="flex shrink-0 items-center gap-1.5" title={t('tools.photo.fill')}>
             <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -511,7 +511,7 @@ export function PhotoToolbar({
         </span>
       ) : null}
 
-      {/* 缩放控件：全部走图标按钮，文字说明放 tooltip / aria-label */}
+      {/* Zoom controls: icon buttons only; descriptions go in tooltip / aria-label */}
       <div className="ml-auto flex items-center gap-1">
         <IconTextButton
           icon="zoomOut"

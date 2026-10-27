@@ -1,4 +1,4 @@
-/** 涂鸦画板渲染：把 Scene 绘制到任意 2D 上下文（屏幕画布与导出离屏共用）。 */
+/** Doodle board rendering: paint a Scene into any 2D context (shared by the screen canvas and offscreen export). */
 
 import {
   GRID_SIZE,
@@ -14,11 +14,11 @@ import {
   type TextOp,
 } from './core';
 
-/** 字体栈与站内其他工具保持一致，中文用系统黑体 */
+/** Font stack matches the other tools on the site; CJK text uses the system sans-serif */
 export const TEXT_FONT_FAMILY =
   '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, sans-serif';
 
-/** 清空画布（只看 backing size，因此无需场景尺寸） */
+/** Clear the canvas (uses the backing size only, so no scene dimensions are needed) */
 export function clearStage(ctx: CanvasRenderingContext2D): void {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -26,7 +26,7 @@ export function clearStage(ctx: CanvasRenderingContext2D): void {
   ctx.restore();
 }
 
-/** 网格背景导出用：屏幕上的网格由 CSS 绘制，这里只服务导出 */
+/** Grid background for export only: the on-screen grid is drawn with CSS */
 export function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number): void {
   ctx.save();
   ctx.strokeStyle = 'rgba(100, 116, 139, 0.35)';
@@ -44,7 +44,7 @@ export function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: n
   ctx.restore();
 }
 
-/** 绘制场景全部内容（不含背景：屏幕上的背景由 CSS 层呈现，导出时单独合成） */
+/** Draw everything in the scene (no background: CSS renders it on screen and export composites it separately) */
 export function drawOps(ctx: CanvasRenderingContext2D, scene: Scene): void {
   for (const op of scene.ops) drawOp(ctx, op);
 }
@@ -73,18 +73,19 @@ export function drawOp(ctx: CanvasRenderingContext2D, op: Op): void {
   }
 }
 
-/* ----------------------------- 笔画 ----------------------------- */
+/* ----------------------------- Strokes ----------------------------- */
 
 function widthAt(base: number, point: Point): number {
   return Math.max(0.5, base * (point.p > 0 ? point.p : 1));
 }
 
 /**
- * 笔画绘制（同时也是绘制过程中的增量绘制）：
+ * Stroke rendering (also used for incremental drawing while dragging):
  *
- * 每相邻三点做一次「中点二次贝塞尔」，即以相邻点的中点为端点、采样点为控制点，
- * 逐段 stroke —— 这样任意时刻重画整条笔画的结果与落笔结束时完全一致
- * （若用整条 path 一次画完，中途插入新点会让尾部曲线变化，出现重影）。
+ * For every three consecutive points it draws a "midpoint quadratic Bezier" — endpoints at the
+ * midpoints of neighbouring samples with the sample as the control point — segment by segment.
+ * Redrawing the whole stroke at any moment therefore matches the finished stroke exactly (drawing
+ * one long path instead would shift the tail when a point is appended, leaving ghosting).
  */
 export function drawStroke(ctx: CanvasRenderingContext2D, op: StrokeOp): void {
   const points = op.points;
@@ -95,7 +96,7 @@ export function drawStroke(ctx: CanvasRenderingContext2D, op: StrokeOp): void {
   const paint = withAlpha(op.color, op.opacity);
   ctx.strokeStyle = paint;
   ctx.fillStyle = paint;
-  // 荧光笔用 multiply 叠在内容上；橡皮用 destination-out 做真擦除（不再涂白色）
+  // Marker blends over content with multiply; the eraser really erases via destination-out (no white paint)
   ctx.globalCompositeOperation =
     op.mode === 'eraser' ? 'destination-out' : op.mode === 'marker' ? 'multiply' : 'source-over';
 
@@ -122,7 +123,7 @@ export function drawStroke(ctx: CanvasRenderingContext2D, op: StrokeOp): void {
   ctx.restore();
 }
 
-/* --------------------------- 形状与文字 --------------------------- */
+/* --------------------------- Shapes and text --------------------------- */
 
 function applyStroke(ctx: CanvasRenderingContext2D, color: string, width: number, opacity: number) {
   ctx.lineWidth = Math.max(0.5, width);
@@ -131,7 +132,7 @@ function applyStroke(ctx: CanvasRenderingContext2D, color: string, width: number
   ctx.lineJoin = 'round';
 }
 
-/** 按「背景色」填充闭合图形（与描边同一不透明度，肉眼可直接看出填充色） */
+/** Fill a closed shape with the "background colour" (same opacity as the stroke so the fill reads clearly) */
 function fillIfNeeded(ctx: CanvasRenderingContext2D, op: ShapeOp | PolygonOp): void {
   if (!op.fill) return;
   ctx.fillStyle = withAlpha(op.fillColor ?? op.color, clampUnit(op.opacity));
@@ -205,8 +206,8 @@ function drawPolygon(ctx: CanvasRenderingContext2D, op: PolygonOp): void {
 }
 
 /**
- * 多边形落点预览：已确定的边用实线，末点→光标与光标→起点的收边用虚线，
- * 并给每个顶点画一个小圆点，便于判断是否点回起点闭合。
+ * Polygon placement preview: committed edges are solid, while last-point → cursor and
+ * cursor → start are dashed; each vertex gets a dot so closing on the start point is obvious.
  */
 export function drawPolygonPreview(
   ctx: CanvasRenderingContext2D,
@@ -241,7 +242,7 @@ export function drawPolygonPreview(
     ctx.restore();
   }
 
-  // 顶点圆点：起点画大一圈并高亮，提示「点回这里闭合」
+  // Vertex dots: the start point is drawn larger and highlighted to hint "click here to close"
   points.forEach((point, index) => {
     ctx.beginPath();
     ctx.arc(point.x, point.y, index === 0 ? width * 1.6 : width * 0.9, 0, Math.PI * 2);
@@ -264,7 +265,7 @@ function drawText(ctx: CanvasRenderingContext2D, op: TextOp): void {
   ctx.restore();
 }
 
-/** 文本编辑器覆盖层用：完整 font 简写（与 canvas 渲染保持一致） */
+/** For the text editor overlay: the full `font` shorthand (matches canvas rendering) */
 export function textFont(size: number): string {
   return `${size}px ${TEXT_FONT_FAMILY}`;
 }

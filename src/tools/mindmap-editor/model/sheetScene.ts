@@ -3,11 +3,11 @@ import { visibleChildrenOf } from './tree';
 import type { MindDoc } from './types';
 
 /**
- * 画布（sheet）缩略图：多画布浏览用。
+ * Sheet thumbnails, used when browsing multiple sheets.
  *
- * `sheetSceneOf(doc)` 复用与画布完全一致的 `layoutMindmap` 布局结果，
- * 因此缩略图的形状与主画布一致；`SheetThumbnail` 只负责把它画成 SVG
- * （非活动画布并未挂到 DOM 上，无法用截图方案）。
+ * `sheetSceneOf(doc)` reuses the exact `layoutMindmap` output the canvas uses, so a thumbnail has
+ * the same shape as the real canvas; `SheetThumbnail` merely draws it as SVG (inactive sheets are
+ * not mounted in the DOM, so screenshots are not an option).
  */
 
 export interface SheetSceneNode {
@@ -37,9 +37,9 @@ export interface SheetScene {
 }
 
 /**
- * 一张画布 → 缩略图场景。
- * 只布局「可见节点」（折叠分支不参与，与画布上的呈现一致），
- * 因此缩略图既忠实又便宜；返回 null 由调用方显示「空白画布」。
+ * One sheet → thumbnail scene.
+ * Only visible nodes are laid out (collapsed branches are excluded, matching the canvas), which
+ * keeps the thumbnail both faithful and cheap; returning null lets the caller show an empty state.
  */
 export function sheetSceneOf(doc: MindDoc): SheetScene | null {
   const visible = new Set<string>();
@@ -70,7 +70,7 @@ export function sheetSceneOf(doc: MindDoc): SheetScene | null {
     const from = byId.get(edge.source);
     const to = byId.get(edge.target);
     if (!from || !to) continue;
-    // 与画布一致：从父节点右侧/左侧连到子节点对应侧
+    // Matches the canvas: connect from the parent's right / left edge to the child's matching side
     const fromRight = to.x >= from.x;
     edges.push({
       id: edge.id,

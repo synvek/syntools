@@ -34,8 +34,8 @@ interface FallbackOptions {
 }
 
 /**
- * 兜底抽帧：`<video>` + seek + canvas。
- * 精度与速度都不如 WebCodecs，但几乎全浏览器可用（含不支持 WebCodecs 的环境）。
+ * Fallback frame extraction: `<video>` + seek + canvas.
+ * Less accurate and slower than WebCodecs, but works in almost every browser (including ones without WebCodecs).
  */
 async function extractViaVideoElement(
   file: File,
@@ -104,7 +104,7 @@ export default function VideoToGifTool() {
     setEngine(null);
 
     try {
-      // 优先 WebCodecs：帧更准、速度更快；不支持时回退 <video> + seek
+      // Prefer WebCodecs: more accurate frames and faster; fall back to <video> + seek when unsupported
       let frames: Frame[];
       const viaWebCodecs = await extractFramesWebCodecs(file, {
         start,

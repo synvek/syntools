@@ -21,7 +21,7 @@ import type {
   TextRun,
 } from './types';
 
-/** 元素 / 文档工厂：所有新建对象都从这里产出，保证字段默认值一致 */
+/** Element / document factories: every new object comes from here so defaults stay consistent */
 
 let seq = 0;
 export function createId(prefix: string): string {
@@ -32,10 +32,10 @@ export function createId(prefix: string): string {
 export const DEFAULT_WIDTH = 1280;
 export const DEFAULT_HEIGHT = 720;
 
-/** 文档结构版本号：与 `model/migrate.ts` 的 `CURRENT_SCHEMA_VERSION` 保持一致 */
+/** Document schema version: kept in sync with `CURRENT_SCHEMA_VERSION` in `model/migrate.ts` */
 export const SCHEMA_VERSION = 2;
 
-/** 页面尺寸预设标识 */
+/** Page size preset id */
 export type PageSizeId = '16:9' | '16:10' | '4:3' | 'a4' | 'custom';
 
 export interface PageSizePreset {
@@ -44,7 +44,7 @@ export interface PageSizePreset {
   height: number;
 }
 
-/** 页面尺寸预设表（px @96dpi） */
+/** Page size preset table (px @96dpi) */
 export const PAGE_SIZES: Record<PageSizeId, PageSizePreset> = {
   '16:9': { id: '16:9', width: 1280, height: 720 },
   '16:10': { id: '16:10', width: 1280, height: 800 },
@@ -53,7 +53,7 @@ export const PAGE_SIZES: Record<PageSizeId, PageSizePreset> = {
   custom: { id: 'custom', width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
 };
 
-/** 依据宽高反查预设 id，非标准尺寸返回 custom */
+/** Look up the preset id from width/height; non-standard sizes return custom */
 export function resolvePageSizeId(width: number, height: number): PageSizeId {
   for (const preset of Object.values(PAGE_SIZES)) {
     if (preset.id === 'custom') continue;
@@ -62,7 +62,7 @@ export function resolvePageSizeId(width: number, height: number): PageSizeId {
   return 'custom';
 }
 
-/** 默认主题（Office 主题色板的近似默认：蓝/灰） */
+/** Default theme (approximation of the Office palette: blue/gray) */
 export function createDefaultTheme(): SlideTheme {
   return {
     name: 'Office',
@@ -153,7 +153,7 @@ export function createDoc(name = 'presentation', sizeId: PageSizeId = '16:9'): S
   };
 }
 
-/** 新建元素默认占位尺寸（位于页面中部） */
+/** Default placeholder size for a new element (centered on the page) */
 function centerRect(doc: SlideDoc, width: number, height: number) {
   return {
     x: Math.round((doc.width - width) / 2),
@@ -229,7 +229,7 @@ export function createTableElement(doc: SlideDoc, rows = 3, cols = 3): TableElem
   };
 }
 
-/** 新建图表元素：默认 3 类别 × 2 系列柱状图 */
+/** New chart element: a 3-category × 2-series bar chart by default */
 export function createChartElement(
   doc: SlideDoc,
   chartType: ChartType = 'bar',
@@ -251,7 +251,7 @@ export function createChartElement(
   };
 }
 
-/** 新建公式元素：默认渲染一个示例公式，便于用户直接改写 */
+/** New formula element: renders a sample formula by default so users can edit it right away */
 export function createFormulaElement(doc: SlideDoc, latex = 'E = mc^2'): FormulaElement {
   const height = 80;
   const width = Math.round(doc.width * 0.35);
@@ -265,7 +265,7 @@ export function createFormulaElement(doc: SlideDoc, latex = 'E = mc^2'): Formula
   };
 }
 
-/** 新建图标元素：内置素材库图标 */
+/** New icon element: an icon from the built-in library */
 export function createIconElement(doc: SlideDoc, iconId: string): IconElement {
   const size = Math.round(Math.min(doc.width, doc.height) * 0.12);
   return {
@@ -276,15 +276,15 @@ export function createIconElement(doc: SlideDoc, iconId: string): IconElement {
   };
 }
 
-/** 页面尺寸（px）→ DrawingML sldSz EMU */
+/** Page size (px) → DrawingML sldSz EMU */
 export function slideSizeToEmu(doc: SlideDoc): { cx: number; cy: number } {
   return { cx: pxToEmu(doc.width), cy: pxToEmu(doc.height) };
 }
 
 /**
- * 深拷贝：用于 history 快照。
- * 元素均为纯 JSON 数据，走 JSON 复制最为稳妥（jsdom 下 structuredClone 未必可用）；
- * media 的 bytes 是引用共享，避免历史栈把内存翻倍。
+ * Deep clone, used for history snapshots.
+ * Elements are plain JSON data, so a JSON copy is the safest route (structuredClone isn't guaranteed in jsdom);
+ * media bytes are shared by reference so the history stack doesn't double memory use.
  */
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -304,10 +304,10 @@ export function cloneDoc(doc: SlideDoc): SlideDoc {
 }
 
 /**
- * 深拷贝单个元素（复制/粘贴与历史回放使用）。
+ * Deep-clone a single element (used by copy/paste and history replay).
  *
- * `newId` 为真时**递归**为组合元素的所有后代换新 id —— 否则复制一个 group 后，
- * 副本与原件（以及取消组合后的两个副本）会出现重复 id，导致选中与命中错乱。
+ * When `newId` is true, **recursively** give every descendant of a group a new id — otherwise copying a
+ * group, or ungrouping the two copies, would produce duplicate ids and break selection and hit testing.
  */
 export function cloneElement<T extends SlideElement>(element: T, newId = false): T {
   const copy = deepClone(element);

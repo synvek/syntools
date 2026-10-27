@@ -9,34 +9,34 @@ import { PANEL_GROUPS } from '../panels';
 import type { PanelGroupId, PanelId } from '../panels';
 import { usePhotoStore } from '../store';
 
-/** 拖动分割线时每块面板至少保留的高度（标题条 + 一行内容） */
+/** Minimum height each panel keeps while dragging a splitter (title bar + one row of content) */
 const MIN_PANEL_PX = 84;
-/** 键盘 ← → 微调步长 */
+/** Nudge step for the ← → keys */
 const KEYBOARD_STEP_PX = 24;
 
 /**
- * 需要「顶部固定 + 列表自己滚动」的面板。
+ * Panels that need a fixed header with a self-scrolling list.
  *
- * 其它面板整体滚动即可，但图层面板顶部那行（混合模式下拉 + 不透明度滑杆）是图层列表的
- * 操作入口，图多到需要滚动时必须始终可见；由面板内部自己划分固定区 / 滚动区。
+ * Other panels can scroll as a whole, but the top row of the layers panel (blend-mode dropdown + opacity
+ * slider) is the layer list's control strip and must stay visible when scrolling; the panel splits fixed / scrolling areas.
  */
 const SELF_SCROLL_PANELS: ReadonlySet<PanelId> = new Set<PanelId>(['layers']);
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 /**
- * 面板停靠区：自上而下三个固定面板（颜色 / 图层 / 信息），每个面板内部是一组子 tab。
+ * Panel dock: three fixed panels stacked top to bottom (color / layers / info), each with its own set of sub-tabs.
  *
- * 三个面板铺满侧栏高度（默认各 1/3），之间的分割线可拖动调整高度；
- * 面板本身不再整体滚动，内容超出时只在各自的内容区滚动，避免侧栏出现拥挤的整体滚动条。
- * 每个面板只记录自己当前选中的子 tab（切走再切回来保持原样）。
+ * The three panels fill the sidebar height (1/3 each by default) and the splitters between them can be dragged;
+ * panels no longer scroll as a whole — only their content area scrolls — so the sidebar never gets one crowded scrollbar.
+ * Each panel remembers only its own selected sub-tab (switching away and back restores it).
  */
 export function PanelDock({ content }: { content: Record<PanelId, ReactNode> }) {
   const { t } = useTranslation();
   const panels = usePhotoStore((s) => s.panels);
   const setPanelTab = usePhotoStore((s) => s.setPanelTab);
 
-  // 高度权重（flex-grow）：默认 1/1/1，拖动分割线时只改变相邻两块的比例
+  // Height weights (flex-grow): 1/1/1 by default; dragging a splitter only changes the ratio of the two neighbours
   const [sizes, setSizes] = useState<number[]>(() => PANEL_GROUPS.map(() => 1));
   const [dragging, setDragging] = useState(false);
   const sectionRefs = useRef<(HTMLElement | null)[]>([]);
@@ -49,7 +49,7 @@ export function PanelDock({ content }: { content: Record<PanelId, ReactNode> }) 
     layers: t('tools.photo.tabGroupLayers'),
     info: t('tools.photo.tabGroupInfo'),
   };
-  // 标题取既有 Tab 文案，保持与「窗口」菜单、e2e 选择器一致
+  // Titles reuse the existing tab labels so they match the Window menu and the e2e selectors
   const titles: Record<PanelId, string> = {
     color: t('tools.photo.tabColor'),
     layers: t('tools.photo.tabLayers'),
@@ -62,7 +62,7 @@ export function PanelDock({ content }: { content: Record<PanelId, ReactNode> }) 
     history: t('tools.photo.tabHistory'),
   };
 
-  /** 把相邻两块的高度换算成权重：两者权重和保持不变，只改比例 */
+  /** Turn the heights of two neighbouring panels into weights: their sum is preserved, only the ratio changes */
   const resizePair = useCallback((index: number, aPx: number, pairPx: number) => {
     setSizes((prev) => {
       const total = prev[index] + prev[index + 1];

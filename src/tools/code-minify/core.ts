@@ -10,21 +10,21 @@ export const MINIFY_LANGS: { value: MinifyLang; label: string }[] = [
 ];
 
 /**
- * 移除 JS 注释：正确跳过字符串 / 模板字符串 / 正则字面量 / 注释。
- * 保守策略——保留换行，避免 ASI（自动分号插入）语义变化。
+ * Strip JS comments while correctly skipping strings, template literals, regex literals, and comments.
+ * Conservative by design: newlines are preserved so automatic semicolon insertion (ASI) semantics never change.
  */
 export function stripJsComments(code: string): string {
   let out = '';
   let i = 0;
   const n = code.length;
-  // 上一处有效字符，用于判断 '/' 是除号还是正则字面量起始
+  // Last significant character, used to tell a division sign from the start of a regex literal
   let prev = '';
   const regexAllowed = () => prev === '' || /[([{,;:=!&|?+\-*%^~<>]/.test(prev);
 
   while (i < n) {
     const c = code[i];
 
-    // 字符串 / 模板字符串
+    // Strings and template literals
     if (c === '"' || c === "'" || c === '`') {
       const quote = c;
       out += c;
@@ -44,20 +44,20 @@ export function stripJsComments(code: string): string {
       continue;
     }
 
-    // 行注释
+    // Line comment
     if (c === '/' && code[i + 1] === '/') {
       i += 2;
       while (i < n && code[i] !== '\n') i += 1;
       continue;
     }
-    // 块注释
+    // Block comment
     if (c === '/' && code[i + 1] === '*') {
       i += 2;
       while (i < n && !(code[i] === '*' && code[i + 1] === '/')) i += 1;
       i += 2;
       continue;
     }
-    // 正则字面量
+    // Regex literal
     if (c === '/' && regexAllowed()) {
       out += c;
       i += 1;
@@ -87,11 +87,11 @@ export function stripJsComments(code: string): string {
     if (!/\s/.test(c)) prev = c;
     i += 1;
   }
-  // 收尾：删除注释后可能残留的行尾空白
+  // Cleanup: removing a comment can leave trailing whitespace behind
   return out.replace(/[ \t]+$/gm, '');
 }
 
-/** 压缩水平空白（保留换行），并合并多余空行。 */
+/** Collapse horizontal whitespace (keeping newlines) and merge redundant blank lines. */
 function collapseSpaces(code: string): string {
   return code
     .replace(/[ \t]+/g, ' ')
@@ -100,7 +100,7 @@ function collapseSpaces(code: string): string {
     .trim();
 }
 
-/** 保守的 HTML 压缩：移除注释、标签间空白与多余空格（不处理 <pre>/<textarea> 内容）。 */
+/** Conservative HTML minification: drop comments, whitespace between tags, and redundant spaces (leaves <pre>/<textarea> content alone). */
 export function minifyHtml(code: string): string {
   return collapseSpaces(
     code
@@ -110,12 +110,12 @@ export function minifyHtml(code: string): string {
   );
 }
 
-/** JS 压缩：移除注释 + 压缩空白（保留换行，安全优先）。 */
+/** JS minification: strip comments and collapse whitespace (newlines kept; safety first). */
 export function minifyJs(code: string): string {
   return collapseSpaces(stripJsComments(code));
 }
 
-/** 按语言压缩代码。CSS 走 csso，JSON 走 JSON.stringify，HTML/JS 为保守实现。 */
+/** Minify code by language. CSS uses csso, JSON uses JSON.stringify, HTML/JS use conservative implementations. */
 export async function minifyCode(lang: MinifyLang, code: string): Promise<ToolResult<string>> {
   if (!code.trim()) return { ok: false, error: 'EMPTY' };
 

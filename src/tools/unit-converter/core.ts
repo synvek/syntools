@@ -3,7 +3,7 @@ import type { ToolResult } from '@/core/types';
 export type UnitCategory =
   'length' | 'mass' | 'area' | 'volume' | 'temperature' | 'speed' | 'data' | 'time';
 
-/** 每个分类下的单位 → 基准单位的换算系数（温度单独处理） */
+/** Conversion factor from each unit → its category's base unit (temperature is handled separately) */
 export const UNIT_FACTORS: Record<Exclude<UnitCategory, 'temperature'>, Record<string, number>> = {
   length: {
     mm: 0.001,
@@ -110,7 +110,7 @@ export function convertUnit(
   return { ok: true, value: (n * table[from]) / table[to] };
 }
 
-/** 将数值格式化为可读小数（去除多余尾零）。 */
+/** Format a number as a readable decimal (trailing zeros trimmed). */
 export function formatNumber(n: number): string {
   if (!Number.isFinite(n)) return '';
   const abs = Math.abs(n);

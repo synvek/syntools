@@ -8,11 +8,11 @@ import {
   type WorkbookSnapshot,
 } from './xlsx-io';
 
-/** Uint8Array → 独立 ArrayBuffer（exceljs 的 load 需要完整缓冲区） */
+/** Uint8Array → standalone ArrayBuffer (exceljs load needs a complete buffer) */
 const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer =>
   bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-/** 构造一个满足 checkImportFile / arrayBuffer() 契约的 File 替身（jsdom 下无需真实 File） */
+/** Build a File stand-in satisfying the checkImportFile / arrayBuffer() contract (no real File needed under jsdom) */
 const fakeFile = (buffer: ArrayBuffer, name: string): File =>
   ({ name, size: buffer.byteLength, arrayBuffer: async () => buffer }) as unknown as File;
 
@@ -85,7 +85,7 @@ describe('xlsx 结构保真：导出', () => {
     if (!result.ok) return;
 
     const workbook = await loadExcel(result.value);
-    // 未写入 views 时 exceljs 读回 undefined
+    // exceljs reads undefined back when views were never written
     expect(workbook.worksheets[0].views ?? []).toHaveLength(0);
     expect(workbook.worksheets[0].state).toBe('visible');
   });
@@ -136,7 +136,7 @@ describe('xlsx 结构保真：导入', () => {
 });
 
 describe('xlsx 单元格内容保真：往返', () => {
-  /** 用 exceljs 构造含指定单元格的源文件 */
+  /** Build a source file with the given cells using exceljs */
   const buildCellWorkbook = async (fill: (worksheet: Worksheet) => void): Promise<ArrayBuffer> => {
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
@@ -144,7 +144,7 @@ describe('xlsx 单元格内容保真：往返', () => {
     return (await workbook.xlsx.writeBuffer()) as ArrayBuffer;
   };
 
-  /** 导入 → 导出 → 再导入，返回两次导入的 A1 单元格（验证往返不丢内容） */
+  /** Import → export → import again, returning the A1 cell from both imports (verifies the round-trip keeps content) */
   const roundTripCell = async (buffer: ArrayBuffer) => {
     const cellOf = (snapshot: WorkbookSnapshot) =>
       snapshot.sheets[snapshot.sheetOrder[0]].cellData['0']?.['0'];

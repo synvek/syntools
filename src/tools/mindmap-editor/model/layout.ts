@@ -1,25 +1,25 @@
 /**
- * 脑图布局：tidy-tree 后序计算子树跨度 → 先序落位。
- * 三种方向：right（向右逻辑图）/ both（左右两侧分布）/ down（向下组织图）。
- * 纯函数、O(n)，输出 React Flow 可直接使用的坐标与分支连线。
+ * Mind map layout: a tidy-tree pass computes subtree spans post-order, then places nodes pre-order.
+ * Three directions: right (rightward logic chart) / both (split left and right) / down (downward org chart).
+ * Pure and O(n); outputs coordinates and branch edges that React Flow can consume directly.
  */
 
 import { branchColorOf, themeOf } from './themes';
 import { childrenOf, findNode, visibleChildrenOf } from './tree';
 import type { MindDoc, MindNodeRec, MindSide } from './types';
 
-/** 水平布局：层间距 / 同层间距 */
+/** Horizontal layout: level gap / sibling gap */
 const H_GAP = 54;
 const V_GAP = 14;
-/** 向下布局：层间距 / 同层间距 */
+/** Downward layout: level gap / sibling gap */
 const DOWN_V_GAP = 34;
 const DOWN_H_GAP = 18;
 
-/** 节点左右留白（形状内边距）：紧凑风格，仅够不贴边 */
+/** Node horizontal padding (shape padding): compact, just enough to keep text off the edge */
 const PAD_X = 20;
-/** 文本容器内边距（对应 MindNode 里 span 的 px-2） */
+/** Text container padding (the span's px-2 in MindNode) */
 const TEXT_PAD = 16;
-/** 估算误差补偿：宁可略宽也不要把文本截成省略号 */
+/** Estimate compensation: prefer slightly wide over truncating text with an ellipsis */
 const SAFETY = 6;
 const MAX_WIDTH = 420;
 const MIN_WIDTH = 76;
@@ -32,7 +32,7 @@ export interface MindLayoutNode {
   height: number;
   depth: number;
   side: MindSide;
-  /** 所属分支主色 */
+  /** Main colour of the owning branch */
   color: string;
 }
 
@@ -56,7 +56,7 @@ export interface MindLayoutResult {
   bounds: MindBounds;
 }
 
-/** 文本宽度估算：中文按全角计，其余按 0.6 字宽计（避免依赖 DOM 测量） */
+/** Estimate text width: CJK counts full-width, the rest 0.6 em (avoids DOM measurement) */
 export function measureTextWidth(text: string, fontSize: number): number {
   let width = 0;
   for (const ch of text) {
@@ -65,7 +65,7 @@ export function measureTextWidth(text: string, fontSize: number): number {
   return width;
 }
 
-/** 节点尺寸：层级越深越小；宽度随文本自适应并做上下限约束 */
+/** Node size: smaller deeper in the tree; width fits the text within min / max bounds */
 export function nodeSizeOf(rec: MindNodeRec, depth: number): { width: number; height: number } {
   const fontSize = rec.style?.fontSize ?? (depth === 0 ? 16 : depth === 1 ? 14 : 13);
   const text = rec.text?.length ? rec.text : ' ';
@@ -85,7 +85,7 @@ interface Ctx {
   span: Map<string, number>;
 }
 
-/** 子树在「交叉轴」上需要的跨度（水平布局 = 高度方向，向下布局 = 宽度方向） */
+/** Span a subtree needs on the cross axis (height for horizontal layout, width for downward) */
 function crossSizeOf(ctx: Ctx, id: string): number {
   const s = ctx.size.get(id);
   if (!s) return 0;
@@ -116,7 +116,7 @@ function computeSpans(ctx: Ctx, id: string): void {
   computeSpan(ctx, id);
 }
 
-/** 先序落位：mainStart 为该节点在主轴上的起点（right/down 为左/上边，left 为右边） */
+/** Place in pre-order: `mainStart` is the node's start on the main axis (left/top for right/down, right edge for left) */
 function place(
   ctx: Ctx,
   id: string,
@@ -162,7 +162,7 @@ function place(
   const kids = visibleChildrenOf(ctx.nodes, id);
   if (kids.length === 0) return;
   const gap = ctx.dir === 'down' ? DOWN_H_GAP : V_GAP;
-  // 子树整体在父节点跨度内居中，保证父节点正对子节点群中心
+  // Centre the whole subtree within the parent's span so the parent faces the child cluster
   let cursor = crossStart + (span - childrenTotalOf(ctx, id)) / 2;
   for (const child of kids) {
     const childSpan = ctx.span.get(child.id) ?? crossSizeOf(ctx, child.id);
@@ -171,7 +171,7 @@ function place(
   }
 }
 
-/** 计算整棵树的坐标（右上角为 0 基准，随后归一化为 0,0 起点） */
+/** Compute coordinates for the whole tree (top-right origin, then normalised to start at 0,0) */
 export function layoutMindmap(doc: MindDoc): MindLayoutResult {
   const root = findNode(doc.nodes, doc.rootId);
   if (!root) return { nodes: [], edges: [], bounds: { x: 0, y: 0, width: 0, height: 0 } };
@@ -187,7 +187,7 @@ export function layoutMindmap(doc: MindDoc): MindLayoutResult {
     span: new Map(),
   };
 
-  // 深度 / 分支色 / 侧别：先序遍历一次
+  // Depth / branch colour / side: one pre-order pass
   const assign = (id: string, depth: number, color: string, side: MindSide, index: number) => {
     const rec = findNode(doc.nodes, id);
     if (!rec) return;
@@ -214,7 +214,7 @@ export function layoutMindmap(doc: MindDoc): MindLayoutResult {
   const rootKids = visibleChildrenOf(doc.nodes, root.id);
 
   if (doc.direction === 'both' && rootKids.length > 0) {
-    // 左右分组：两组各自居中于根节点中心，水平方向互不干扰
+    // Left / right groups: each is centred on the root, so they never overlap horizontally
     const left = rootKids.filter((k) => ctx.side.get(k.id) === 'left');
     const right = rootKids.filter((k) => ctx.side.get(k.id) === 'right');
     const spanOf = (list: MindNodeRec[]) =>
@@ -260,7 +260,7 @@ export function layoutMindmap(doc: MindDoc): MindLayoutResult {
     });
   }
 
-  // 归一化：整体平移到 (0,0)，便于 fitView 与导出
+  // Normalise: shift everything to (0,0) for fitView and export
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;

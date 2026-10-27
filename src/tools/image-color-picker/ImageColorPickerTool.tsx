@@ -7,7 +7,7 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
 import { isImageFile, samplePixel, type PickedColor } from './core';
 
-/** 图片取色器：点击图片像素取色 */
+/** Image color picker: sample colors by clicking pixels */
 export default function ImageColorPickerTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({}), []);
@@ -25,47 +25,44 @@ export default function ImageColorPickerTool() {
     [previewUrl],
   );
 
-  const handleFile = useCallback(
-    (file: File) => {
-      if (!isImageFile(file.type)) {
-        setError('NOT_IMAGE');
+  const handleFile = useCallback((file: File) => {
+    if (!isImageFile(file.type)) {
+      setError('NOT_IMAGE');
+      return;
+    }
+    setError(null);
+    setPicked(null);
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const maxW = 720;
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) {
+        setError('LOAD');
+        URL.revokeObjectURL(url);
         return;
       }
-      setError(null);
-      setPicked(null);
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const maxW = 720;
-        const scale = Math.min(1, maxW / img.width);
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) {
-          setError('LOAD');
-          URL.revokeObjectURL(url);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, w, h);
-        const imageData = ctx.getImageData(0, 0, w, h);
-        dataRef.current = { data: imageData.data, w, h };
-        setPreviewUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return url;
-        });
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        setError('LOAD');
-      };
-      img.src = url;
-    },
-    [],
-  );
+      ctx.drawImage(img, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+      dataRef.current = { data: imageData.data, w, h };
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setError('LOAD');
+    };
+    img.src = url;
+  }, []);
 
   const onClick = (e: MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -84,11 +81,7 @@ export default function ImageColorPickerTool() {
         <ShareButton getState={() => ({})} />
       </OptionBar>
 
-      <FileDropZone
-        accept="image/*"
-        onFile={handleFile}
-        hint={t('tools.imageColor.dropHint')}
-      />
+      <FileDropZone accept="image/*" onFile={handleFile} hint={t('tools.imageColor.dropHint')} />
 
       {error && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

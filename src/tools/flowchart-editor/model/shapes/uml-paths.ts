@@ -1,14 +1,14 @@
 /**
- * UML 形状共享的 SVG path 生成函数。
+ * Shared SVG path generators for UML shapes.
  *
- * 约定：入参 `w` / `h` 为节点像素尺寸，`p` 为可调参数读取器（默认值由 `ShapeDef.adjust` 声明）；
- * 所有函数对尺寸做防御处理（不产生 NaN），输出可直接用于 `ShapeDef.path`，
- * 由 `nodes/shapeDraw.tsx` 的 `path` 分支渲染。
+ * Convention: `w` / `h` are the node's pixel size and `p` is the adjustable-parameter reader (defaults declared in `ShapeDef.adjust`);
+ * every function guards against bad sizes (never produces NaN) and the output drops straight into `ShapeDef.path`,
+ * rendered by the `path` branch of `nodes/shapeDraw.tsx`.
  */
 
 import type { ParamGetter } from './adjust';
 
-/** 角色（火柴人）：头 + 躯干 + 手臂 + 腿 */
+/** Actor (stick figure): head + torso + arms + legs */
 export const actorPath = (w: number, h: number): string => {
   const cx = w / 2;
   const r = w * 0.13;
@@ -20,26 +20,26 @@ export const actorPath = (w: number, h: number): string => {
   );
 };
 
-/** 包：左上角标签 + 主体矩形（tabHeight 可调） */
+/** Package: top-left tab + body rectangle (tabHeight adjustable) */
 export const packagePath = (w: number, h: number, p: ParamGetter): string => {
   const th = p('tabHeight');
   return `M0,${th} V${h} H${w} V${th} H${w * 0.45} V0 H0 Z`;
 };
 
 /**
- * 生命线：顶部对象框 + 向下竖虚线。
- * 标题框高度 `lifelineHeader` 为固定像素（默认 40px），不再随生命线高度等比缩放。
+ * Lifeline: object box on top + a vertical dashed line downward.
+ * The header box height `lifelineHeader` is fixed in pixels (40px by default) and no longer scales with the lifeline height.
  */
 export const lifelinePath = (w: number, h: number, p: ParamGetter): string => {
   const hh = p('lifelineHeader');
   return `M${w * 0.2},0 H${w * 0.8} V${hh} H${w * 0.2} Z M${w * 0.5},${hh} V${h}`;
 };
 
-/** 正圆（两条半圆弧），供无需填充的圆形图标复用 */
+/** Full circle (two semicircular arcs), reused by circular icons that need no fill */
 const circlePath = (cx: number, cy: number, r: number): string =>
   `M${cx - r},${cy} a${r},${r} 0 1,1 ${r * 2},0 a${r},${r} 0 1,1 -${r * 2},0`;
 
-/** 边界（boundary，分析类）：圆 + 左侧竖线 + 连接短线 */
+/** Boundary (analysis kind): circle + vertical line on the left + connecting stub */
 export const boundaryPath = (w: number, h: number): string => {
   const r = Math.min(w, h) * 0.26;
   const cx = w * 0.62;
@@ -51,7 +51,7 @@ export const boundaryPath = (w: number, h: number): string => {
   );
 };
 
-/** 控制（control，分析类）：圆 + 顶部小箭头 */
+/** Control (analysis kind): circle + small arrow on top */
 export const controlPath = (w: number, h: number): string => {
   const r = Math.min(w, h) * 0.26;
   const cx = w / 2;
@@ -64,7 +64,7 @@ export const controlPath = (w: number, h: number): string => {
   );
 };
 
-/** 实体（entity，分析类）：圆 + 底部横线 + 连接竖线 */
+/** Entity (analysis kind): circle + horizontal line at the bottom + connecting vertical line */
 export const entityPath = (w: number, h: number): string => {
   const r = Math.min(w, h) * 0.24;
   const cx = w / 2;
@@ -75,7 +75,7 @@ export const entityPath = (w: number, h: number): string => {
   );
 };
 
-/** 图框（frame）：外框矩形 + 左上角五边形名称标签（tabHeight 可调） */
+/** Frame: outer rectangle + pentagon name tab at the top-left (tabHeight adjustable) */
 export const framePath = (w: number, h: number, p: ParamGetter): string => {
   const tabW = Math.min(w * 0.42, 160);
   const tabH = p('tabHeight');
@@ -83,14 +83,14 @@ export const framePath = (w: number, h: number, p: ParamGetter): string => {
   return `M0,0 H${w} V${h} H0 Z M0,0 H${tabW} L${tabW - clip},${tabH} H0 Z`;
 };
 
-/** 系统边界 / 主体（subject）：带左上角名称栏的矩形（tabHeight 可调） */
+/** System boundary / subject: rectangle with a name bar at the top-left (tabHeight adjustable) */
 export const subjectPath = (w: number, h: number, p: ParamGetter): string => {
   const tabW = Math.min(w * 0.46, 180);
   const tabH = p('tabHeight');
   return `M0,0 H${tabW} V${tabH} H${w} V${h} H0 Z`;
 };
 
-/** 圆角矩形（含箭头指向时为内部关系记号） */
+/** Rounded rectangle (with an internal relation marker when it points with an arrow) */
 const roundedRect = (w: number, h: number): string => {
   const r = Math.max(0, Math.min(12, w / 2, h / 2));
   return (
@@ -99,7 +99,7 @@ const roundedRect = (w: number, h: number): string => {
   );
 };
 
-/** 包含关系：圆角矩形 + 内部向右箭头（点线由样式 lineDash 控制） */
+/** Include relation: rounded rectangle + internal right arrow (dotted line controlled by the style's lineDash) */
 export const includePath = (w: number, h: number): string => {
   const y = h / 2;
   return (
@@ -109,7 +109,7 @@ export const includePath = (w: number, h: number): string => {
   );
 };
 
-/** 扩展关系：圆角矩形 + 内部向左箭头 */
+/** Extend relation: rounded rectangle + internal left arrow */
 export const extendPath = (w: number, h: number): string => {
   const y = h / 2;
   return (
@@ -119,20 +119,20 @@ export const extendPath = (w: number, h: number): string => {
   );
 };
 
-/** 活动类：矩形 + 左右两侧的双竖线（inset 可调） */
+/** Active class: rectangle + double vertical lines on both sides (inset adjustable) */
 export const activeClassPath = (w: number, h: number, p: ParamGetter): string => {
   const inset = p('activeClassInset');
   return `M0,0 H${w} V${h} H0 Z M${inset},0 V${h} M${w - inset},0 V${h}`;
 };
 
-/** 模板类：矩形 + 右上角虚线小框（tabHeight 可调） */
+/** Template class: rectangle + small dashed box at the top-right (tabHeight adjustable) */
 export const templateClassPath = (w: number, h: number, p: ParamGetter): string => {
   const tw = Math.min(w * 0.34, 70);
   const th = p('tabHeight');
   return `M0,0 H${w} V${h} H0 Z ` + `M${w - tw - 4},4 H${w - 4} V${4 + th} H${w - tw - 4} Z`;
 };
 
-/** 组件：主体矩形 + 左侧两个小凸块（tabWidth 可调） */
+/** Component: body rectangle + two small nubs on the left (tabWidth adjustable) */
 export const componentPath = (w: number, h: number, p: ParamGetter): string => {
   const tw = p('componentTab');
   const ty = h * 0.16;
@@ -146,7 +146,7 @@ export const componentPath = (w: number, h: number, p: ParamGetter): string => {
   );
 };
 
-/** 提供接口（球）：圆 + 下垂线 + 底部横线 */
+/** Provided interface (ball): circle + dropline + horizontal line at the bottom */
 export const providedInterfacePath = (w: number, h: number): string => {
   const r = Math.min(w, h) * 0.2;
   const cx = w / 2;
@@ -156,7 +156,7 @@ export const providedInterfacePath = (w: number, h: number): string => {
   );
 };
 
-/** 需求接口（插座）：向右开口的半圆 + 下垂线 + 底部横线 */
+/** Required interface (socket): semicircle opening to the right + dropline + horizontal line at the bottom */
 export const requiredInterfacePath = (w: number, h: number): string => {
   const r = Math.min(w, h) * 0.2;
   const cx = w / 2;
@@ -167,7 +167,7 @@ export const requiredInterfacePath = (w: number, h: number): string => {
   );
 };
 
-/** 销毁标记：粗叉（X 形多边形，靠样式填充） */
+/** Destroy marker: a thick cross (X polygon filled by the style) */
 export const destroyPath = (w: number, h: number): string => {
   const t = Math.min(w, h) * 0.14;
   const cx = w / 2;
@@ -180,7 +180,7 @@ export const destroyPath = (w: number, h: number): string => {
   );
 };
 
-/** 组合片段 / 图框：外框 + 左上角被切角的五边形标签（tabHeight 可调） */
+/** Combined fragment / frame: outer box + pentagon tab with a cut corner at the top-left (tabHeight adjustable) */
 export const combinedFragmentPath = (w: number, h: number, p: ParamGetter): string => {
   const tabW = Math.min(w * 0.4, 150);
   const tabH = p('tabHeight');
@@ -188,28 +188,28 @@ export const combinedFragmentPath = (w: number, h: number, p: ParamGetter): stri
   return `M0,0 H${w} V${h} H0 Z M0,0 H${tabW} L${tabW - clip},${tabH} H0 Z`;
 };
 
-/** 交互引用（ref）：外框 + 左上角矩形标签（tabHeight 可调） */
+/** Interaction use (ref): outer box + rectangular tab at the top-left (tabHeight adjustable) */
 export const interactionUsePath = (w: number, h: number, p: ParamGetter): string => {
   const tabW = Math.min(w * 0.4, 150);
   const tabH = p('tabHeight');
   return `M0,0 H${w} V${h} H0 Z M0,0 H${tabW} V${tabH} H0 Z`;
 };
 
-/** 发送信号：右侧尖角的凸五边形 */
+/** Send signal: convex pentagon with a point on the right */
 export const sendSignalPath = (w: number, h: number): string =>
   `M0,0 H${w * 0.7} L${w},${h / 2} L${w * 0.7},${h} H0 Z`;
 
-/** 接收信号：左侧凹口的五边形 */
+/** Receive signal: pentagon with a concave notch on the left */
 export const receiveSignalPath = (w: number, h: number): string =>
   `M${w * 0.3},0 H${w} V${h} H${w * 0.3} L0,${h / 2} Z`;
 
-/** 活动分区：外框 + 左侧竖向分隔线（左栏宽可调） */
+/** Activity partition: outer box + vertical divider on the left (left column width adjustable) */
 export const activityPartitionPath = (w: number, h: number, p: ParamGetter): string => {
   const hw = p('partitionHeader');
   return `M0,0 H${w} V${h} H0 Z M${hw},0 V${h}`;
 };
 
-/** 部署节点：3D 立方体（前/上/右三面；深度可调） */
+/** Deployment node: 3D cube (front/top/right faces; depth adjustable) */
 export const nodePath = (w: number, h: number, p: ParamGetter): string => {
   const d = p('cubeDepth');
   return (
@@ -218,19 +218,19 @@ export const nodePath = (w: number, h: number, p: ParamGetter): string => {
   );
 };
 
-/** 设备：3D 立方体 + 前表面上方的一条横线（与普通节点区分） */
+/** Device: 3D cube + a horizontal line above the front face (distinguishing it from a plain node) */
 export const devicePath = (w: number, h: number, p: ParamGetter): string => {
   const d = p('cubeDepth');
   return `${nodePath(w, h, p)} M0,${d + h * 0.18} H${w - d}`;
 };
 
-/** 运行环境：3D 立方体 + 前表面下方的双横线 */
+/** Execution environment: 3D cube + double horizontal lines below the front face */
 export const executionEnvironmentPath = (w: number, h: number, p: ParamGetter): string => {
   const d = p('cubeDepth');
   return `${nodePath(w, h, p)} M0,${h * 0.66} H${w - d} M0,${h * 0.76} H${w - d}`;
 };
 
-/** 制品：右上角折角的矩形（折角可调） */
+/** Artifact: rectangle with a folded top-right corner (fold adjustable) */
 export const artifactPath = (w: number, h: number, p: ParamGetter): string => {
   const c = p('foldSize');
   return `M0,0 H${w - c} L${w},${c} V${h} H0 Z M${w - c},0 V${c} H${w}`;

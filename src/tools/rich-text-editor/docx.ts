@@ -23,17 +23,17 @@ import { renderLatexImages, type MathImage, type MathImageRequest } from './math
 import type { DocComment, TrackedChange } from './docs';
 
 /**
- * Word 双向适配层（重度依赖 mammoth / docx 均走动态 import，
- * 保证不进入首屏包，且不影响 core 层纯度）。
+ * Word bidirectional adapter layer (mammoth / docx are both dynamically imported
+ * to keep them out of the initial bundle and preserve core-layer purity).
  */
 
-/** docx 模块命名空间类型：用于在不静态引入依赖的前提下描述结构 */
+/** docx module namespace type: describes the structure without statically importing the dependency */
 type DocxNs = typeof import('docx');
 type ParagraphOptions = import('docx').IParagraphOptions;
 
 const DATA_URL_RE = /^data:(image\/(png|jpe?g|gif|webp|bmp));base64,(.+)$/i;
 
-/** 读取 PNG / JPEG / GIF / BMP 的像素尺寸（docx 的 ImageRun 需要显式给出 transformation） */
+/** Read pixel dimensions of PNG / JPEG / GIF / BMP (docx ImageRun requires an explicit transformation) */
 function readImageSize(bytes: Uint8Array): { width: number; height: number } | null {
   const u32 = (offset: number) =>
     ((bytes[offset] << 24) |
@@ -43,11 +43,11 @@ function readImageSize(bytes: Uint8Array): { width: number; height: number } | n
     0;
   const u16be = (offset: number) => (bytes[offset] << 8) | bytes[offset + 1];
   const u16le = (offset: number) => (bytes[offset + 1] << 8) | bytes[offset];
-  // PNG: IHDR 宽高位于 offset 16/20
+  // PNG: width/height live in IHDR at offsets 16/20
   if (bytes.length > 24 && bytes[0] === 0x89 && bytes[1] === 0x50) {
     return { width: u32(16), height: u32(20) };
   }
-  // JPEG: 扫描段的 SOF 标记
+  // JPEG: scan segments for the SOF marker
   if (bytes.length > 8 && bytes[0] === 0xff && bytes[1] === 0xd8) {
     let offset = 2;
     while (offset < bytes.length - 9) {
@@ -66,11 +66,11 @@ function readImageSize(bytes: Uint8Array): { width: number; height: number } | n
       offset += 2 + length;
     }
   }
-  // GIF: 逻辑屏幕描述符宽高（小端，offset 6/8）
+  // GIF: logical screen descriptor width/height (little-endian, offsets 6/8)
   if (bytes.length > 10 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) {
     return { width: u16le(6), height: u16le(8) };
   }
-  // BMP: BITMAPINFOHEADER 宽高（小端，offset 18/22）
+  // BMP: BITMAPINFOHEADER width/height (little-endian, offsets 18/22)
   if (bytes.length > 26 && bytes[0] === 0x42 && bytes[1] === 0x4d) {
     return { width: u32(18), height: Math.abs(u32(22) | 0) };
   }
@@ -79,16 +79,16 @@ function readImageSize(bytes: Uint8Array): { width: number; height: number } | n
 
 const MAX_IMAGE_WIDTH = 480;
 
-/** docx ImageRun 支持的位图类型（webp 不支持，由丢失清单提示） */
+/** Bitmap types supported by docx ImageRun (webp is unsupported and surfaces in the loss report) */
 type DecodedImage = { bytes: Uint8Array; type: 'png' | 'jpg' | 'gif' | 'bmp' };
 
-/** data URL → 二进制字节（仅处理 base64 图片） */
+/** data URL -> binary bytes (base64 images only) */
 function decodeDataUrl(src: string): DecodedImage | null {
   const match = DATA_URL_RE.exec(src);
   if (!match) return null;
   const [, mime, , payload] = match;
   const lower = mime.toLowerCase();
-  if (lower.includes('webp')) return null; // docx 不支持 webp
+  if (lower.includes('webp')) return null; // docx doesn't support webp
   const raw = atob(payload);
   const bytes = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
@@ -102,7 +102,7 @@ function decodeDataUrl(src: string): DecodedImage | null {
   return { bytes, type };
 }
 
-/** docx 高亮仅支持有限的颜色名，需由十六进制色取近似值 */
+/** docx highlights only support a fixed set of color names, so pick the nearest one from a hex color */
 type DocxHighlight = NonNullable<import('docx').IRunStylePropertiesOptions['highlight']>;
 
 const HIGHLIGHT_PALETTE: Record<string, DocxHighlight> = {
@@ -132,11 +132,11 @@ interface Mark {
   color?: string;
   highlight?: DocxHighlight;
   font?: string;
-  /** 字号（半磅值，Word 的 w:sz） */
+  /** Font size (half-points, Word's w:sz) */
   size?: number;
 }
 
-/** 十六进制 → 最近的 docx 高亮色名 */
+/** Hex color -> nearest docx highlight color name */
 function nearestHighlight(hex: string): DocxHighlight {
   const target = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
   let best: DocxHighlight = 'yellow';
@@ -178,7 +178,7 @@ function normalizeColor(value: string | undefined): string | undefined {
   return undefined;
 }
 
-/** 行样式 → 行属性：合并字色/高亮/加粗等 */
+/** Inline style -> run properties: merge font color / highlight / bold etc. */
 function mergeMark(parent: Mark, el: Element): Mark {
   const next: Mark = { ...parent };
   const style = (el as HTMLElement).style;
@@ -189,7 +189,7 @@ function mergeMark(parent: Mark, el: Element): Mark {
   if (tag === 'S' || tag === 'DEL' || tag === 'STRIKE') next.strike = true;
   if (tag === 'CODE') next.font = 'Consolas';
   if (tag === 'MARK') next.highlight = 'yellow';
-  // 显式设置的字体/字号需写入 Word 行属性，否则导出后选择失效
+  // Explicitly set font/size must be written into Word run properties, otherwise the choice is lost after export
   const family = firstFontFamily(style?.fontFamily);
   if (family) next.font = family;
   const sizePx = Number.parseFloat(style?.fontSize ?? '');
@@ -203,20 +203,20 @@ function mergeMark(parent: Mark, el: Element): Mark {
 }
 
 /**
- * 单个 <img> → docx ImageRun（图片节点自身，不依赖子节点）。
- * 层级（浮于文字上方 / 衬于文字下方）→ Word 浮动图片，嵌入型保持随文排版。
+ * Single <img> -> docx ImageRun (the image node itself, no child nodes involved).
+ * Layer (in front of / behind text) -> Word floating image; inline stays in the text flow.
  */
 function imageRun(D: DocxNs, el: Element): InstanceType<DocxNs['ImageRun']> | null {
   const decoded = decodeDataUrl(el.getAttribute('src') ?? '');
   if (!decoded) return null;
   const size = readImageSize(decoded.bytes);
   const ratio = size ? size.height / Math.max(1, size.width) : 0.62;
-  // 优先使用编辑器中显式指定的宽度（style width / width 属性，px）
+  // Prefer the width explicitly set in the editor (style width / width attribute, px)
   const styleWidth = (el as HTMLElement).style.width;
   const rawWidth = styleWidth || el.getAttribute('width') || '';
   const parsedWidth = Number.parseFloat(rawWidth);
   const specified = Number.isFinite(parsedWidth)
-    ? // 兼容旧数据：百分比宽度换算成像素（Word 里需要绝对尺寸）
+    ? // Legacy data: percentage widths are converted to pixels (Word needs absolute sizes)
       styleWidth.includes('%')
       ? (parsedWidth / 100) * CONTENT_WIDTH_PX
       : parsedWidth
@@ -227,11 +227,11 @@ function imageRun(D: DocxNs, el: Element): InstanceType<DocxNs['ImageRun']> | nu
       ? Math.min(MAX_IMAGE_WIDTH, size.width)
       : MAX_IMAGE_WIDTH;
   /*
-   * 环绕方式 → Word 浮动图片参数（与编辑器的 CSS 实现一一对应）：
-   * - 浮于文字上方 / 衬于文字下方：绝对偏移 + 不环绕，允许重叠
-   * - 四周型：靠左 / 靠右 + 方框环绕
-   * - 上下型：居中 + 仅上下环绕
-   * 嵌入型不加 floating，保持随文排版。
+   * Wrap mode -> Word floating image options (one-to-one with the editor's CSS implementation):
+   * - in front of / behind text: absolute offset + no wrap, overlap allowed
+   * - wrap-left / wrap-right: aligned left / right + square wrapping
+   * - top-bottom: centered + top-and-bottom wrapping only
+   * Inline images get no floating option and stay in the text flow.
    */
   const layer = normalizeImageLayer(el.getAttribute('data-layer'));
   const offsetX = Number.parseFloat((el as HTMLElement).style.left ?? '');
@@ -259,7 +259,7 @@ function imageRun(D: DocxNs, el: Element): InstanceType<DocxNs['ImageRun']> | nu
                 ? D.HorizontalPositionAlign.LEFT
                 : D.HorizontalPositionAlign.RIGHT,
           },
-          // docx 要求水平 / 垂直位置都必须给出 align 或 offset，否则导出直接抛错
+          // docx requires either align or offset for both horizontal and vertical position, otherwise export throws
           verticalPosition: { relative: D.VerticalPositionRelativeFrom.PARAGRAPH, offset: 0 },
           wrap: { type: D.TextWrappingType.SQUARE, side: D.TextWrappingSide.BOTH_SIDES },
         }
@@ -281,7 +281,7 @@ function imageRun(D: DocxNs, el: Element): InstanceType<DocxNs['ImageRun']> | nu
   });
 }
 
-/** 行内内容节点：在文本/图片之外补充超链接、修订与批注标记 */
+/** Inline content nodes: text/images plus hyperlinks, tracked changes and comment marks */
 type RunChild = InstanceType<
   | DocxNs['TextRun']
   | DocxNs['ImageRun']
@@ -292,41 +292,42 @@ type RunChild = InstanceType<
 type ParagraphChild = import('docx').ParagraphChild;
 
 /**
- * 行内内容 + 其覆盖的批注集合。
- * 批注范围需要「合并连续同批注的 run」，因此在收集阶段先记录、渲染阶段再成对包裹。
+ * Inline content plus the set of comments covering it.
+ * Comment ranges must "merge consecutive runs sharing a comment", so ids are recorded while collecting
+ * and wrapped in pairs at render time.
  */
 interface InlineRun {
   node: RunChild;
-  /** 该 run 覆盖的批注 id（文档顺序） */
+  /** Comment ids covering this run (document order) */
   commentIds: string[];
 }
 
-/** 修订追踪状态：进入 <ins>/<del> 后其内部文本节点直接生成 Word 修订运行 */
+/** Tracked-change state: text nodes inside <ins>/<del> produce Word revision runs directly */
 type TrackedKind = 'insert' | 'delete' | null;
 
-/** 导出上下文：把 docx 命名空间与批注 / 修订 / 脚注所需的全局状态一并传递 */
+/** Export context: carries the docx namespace plus the global state needed for comments / revisions / footnotes */
 interface ExportContext {
   D: DocxNs;
-  /** 编辑器批注 id → Word 批注数字 id（仅包含有元数据的批注） */
+  /** Editor comment id -> Word numeric comment id (only comments that have metadata) */
   commentIds: Map<string, number>;
-  /** 修订与批注署名 */
+  /** Author for revisions and comments */
   author: string;
-  /** 修订时间（统一取导出时刻，避免逐处新建 Date） */
+  /** Revision timestamp (single export-time value, avoiding a new Date per item) */
   date: string;
-  /** 修订 id 计数器：Word 要求文档内唯一 */
+  /** Revision id counter: Word requires document-wide uniqueness */
   revisionId: { value: number };
-  /** 按正文顺序收集的脚注正文（编号 = 下标 + 1） */
+  /** Footnote bodies collected in body order (number = index + 1) */
   footnoteNotes: string[];
-  /** OMML 表达不了的公式 → 预渲染图片（按 mathKey 索引） */
+  /** Formulas OMML can't express -> pre-rendered images (indexed by mathKey) */
   mathImages: Map<string, MathImage>;
 }
 
-/** 超链接默认样式：docx 未内置 Hyperlink 字符样式，显式补蓝色下划线 */
+/** Default hyperlink styling: docx has no built-in Hyperlink character style, so add blue underline explicitly */
 function hyperlinkMark(mark: Mark): Mark {
   return { ...mark, color: mark.color ?? '0563C1', underline: mark.underline ?? true };
 }
 
-/** 生成一个文本运行（自动套用修订包装） */
+/** Create one text run (automatically wrapped as a revision when tracking) */
 function createTextRun(
   ctx: ExportContext,
   mark: Mark,
@@ -356,9 +357,9 @@ function createTextRun(
 }
 
 /**
- * 行内节点 → docx 行。
- * 覆盖：文本 / 换行 / 图片 / 超链接（ExternalHyperlink）/
- * 修订（ins → InsertedTextRun、del → DeletedTextRun）/ 批注范围（commentId 向后传递）。
+ * Inline node -> docx run.
+ * Covers: text / line break / image / hyperlink (ExternalHyperlink) /
+ * revisions (ins -> InsertedTextRun, del -> DeletedTextRun) / comment ranges (commentId propagated down).
  */
 function collectInlineRuns(
   ctx: ExportContext,
@@ -379,7 +380,7 @@ function collectInlineRuns(
     if (node.nodeType !== 1) return;
     const el = node as Element;
 
-    // 修订追踪：内部文本直接产出 Word 原生修订运行
+    // Tracked revisions: inner text produces native Word revision runs
     if (el.tagName === 'INS' && el.getAttribute('data-track') === 'insert') {
       runs.push(...collectInlineRuns(ctx, el, mergeMark(mark, el), commentIds, 'insert'));
       return;
@@ -392,7 +393,7 @@ function collectInlineRuns(
     if (el.tagName === 'A') {
       const href = (el.getAttribute('href') ?? '').trim();
       const inner = collectInlineRuns(ctx, el, hyperlinkMark(mark), commentIds, tracked);
-      // 无 href 的锚点退化为普通文本，避免生成空链接
+      // Anchors without an href degrade to plain text, avoiding empty links
       if (!href || inner.length === 0) {
         runs.push(...inner);
         return;
@@ -417,13 +418,13 @@ function collectInlineRuns(
       return;
     }
 
-    // 行内公式 → 原生公式（OMML）或降级图片
+    // Inline formula -> native equation (OMML) or a fallback image
     if (el.hasAttribute('data-math') && el.getAttribute('data-display') !== 'true') {
       runs.push({ node: buildMathRun(ctx, el), commentIds });
       return;
     }
 
-    // 脚注引用 → Word 脚注：编号取正文顺序（权威来源是遍历顺序，不信任 HTML 里的编号）
+    // Footnote reference -> Word footnote: number follows body order (traversal order is authoritative, not the HTML number)
     if (el.tagName === 'SUP' && el.hasAttribute(FOOTNOTE_ATTR)) {
       ctx.footnoteNotes.push((el.getAttribute('data-note') ?? '').trim());
       runs.push({
@@ -439,7 +440,7 @@ function collectInlineRuns(
       return;
     }
 
-    // 批注标记：把 id 叠加到后续内容，渲染阶段再成对包裹
+    // Comment mark: stack the id onto subsequent content, wrapped in pairs at render time
     const commentId = el.getAttribute('data-comment-id');
     const nested =
       commentId && ctx.commentIds.has(commentId) ? [...commentIds, commentId] : commentIds;
@@ -449,9 +450,11 @@ function collectInlineRuns(
 }
 
 /**
- * 把行内内容渲染为段落子节点，并为连续的批注内容成对插入
- * CommentRangeStart / CommentRangeEnd / CommentReference（Word 批注必需的三段标记）。
- * 批注集合发生变化时整体收合再重开，保证范围严格嵌套（Word 不接受交叉范围）。
+ * Render inline content as paragraph children, inserting paired
+ * CommentRangeStart / CommentRangeEnd / CommentReference for consecutive commented content
+ * (the three markers Word comments require).
+ * When the comment set changes, close everything and reopen, so ranges stay strictly nested
+ * (Word rejects crossing ranges).
  */
 function runsToChildren(ctx: ExportContext, runs: readonly InlineRun[]): ParagraphChild[] {
   const { D } = ctx;
@@ -485,15 +488,15 @@ function runsToChildren(ctx: ExportContext, runs: readonly InlineRun[]): Paragra
   return children;
 }
 
-/** 单元格/段落级别的一站式转换 */
+/** One-stop conversion at cell/paragraph level */
 function blockChildren(ctx: ExportContext, parent: Element): ParagraphChild[] {
   return runsToChildren(ctx, collectInlineRuns(ctx, parent, {}, [], null));
 }
 
-/** A4 内容宽度（170mm）换算为 twip（1mm ≈ 56.7 twip），用于按百分比列宽换算 */
+/** A4 content width (170mm) in twips (1mm ≈ 56.7 twip), used to convert percentage column widths */
 const CONTENT_WIDTH_DXA = 9640;
 
-/** 读取 TipTap 表格 colgroup 的百分比/像素列宽（dxa） */
+/** Read percentage/pixel column widths from TipTap's table colgroup (dxa) */
 function readColumnWidthsDxa(table: Element, columnCount: number): number[] {
   const cols = Array.from(table.querySelectorAll('colgroup > col'));
   if (cols.length === 0) {
@@ -511,7 +514,7 @@ function readColumnWidthsDxa(table: Element, columnCount: number): number[] {
   return pcts.map((pct) => Math.round((pct / total) * CONTENT_WIDTH_DXA));
 }
 
-/** 表格 → docx Table（保留列宽 / 合并单元格 / 单元格底色） */
+/** Table -> docx Table (preserving column widths / merged cells / cell shading) */
 function buildTable(ctx: ExportContext, table: Element): InstanceType<DocxNs['Table']> {
   const D = ctx.D;
   const colCount =
@@ -525,7 +528,7 @@ function buildTable(ctx: ExportContext, table: Element): InstanceType<DocxNs['Ta
         ),
       ),
     );
-  // 表格样式：边框开关与斑马纹（data 属性由 TableStyle 扩展写入）
+  // Table style: border toggle and zebra stripes (data attributes written by the TableStyle extension)
   const bordered = table.getAttribute('data-bordered') !== 'false';
   const zebra = table.getAttribute('data-zebra') === 'true';
   const rows: InstanceType<DocxNs['TableRow']>[] = [];
@@ -575,10 +578,10 @@ function buildTable(ctx: ExportContext, table: Element): InstanceType<DocxNs['Ta
   });
 }
 
-/** docx 编号最多 9 级（0-8），超出部分拍平到最深层 */
+/** docx numbering supports at most 9 levels (0-8); deeper levels are flattened onto the last one */
 const MAX_LIST_LEVEL = 8;
 
-/** 生成 0-8 级编号定义：无序用圆点循环，有序用多级十进制（%1.%2.…） */
+/** Build level definitions 0-8: bullets cycle through dot glyphs, numbered lists use multi-level decimals (%1.%2.…) */
 function buildNumberingLevels(D: DocxNs, bullet: boolean) {
   const bulletGlyphs = ['\u2022', '\u25E6', '\u25AA'];
   return Array.from({ length: MAX_LIST_LEVEL + 1 }, (_, level) => {
@@ -595,7 +598,7 @@ function buildNumberingLevels(D: DocxNs, bullet: boolean) {
   });
 }
 
-/** 列表（有序/无序/任务清单）→ docx 段落集合，保留嵌套层级 */
+/** List (ordered/unordered/task list) -> docx paragraphs, preserving nesting depth */
 function buildList(
   ctx: ExportContext,
   list: Element,
@@ -615,7 +618,7 @@ function buildList(
       );
       const host = inline.length > 0 ? inline : [li];
       const children = host.flatMap((piece) => blockChildren(ctx, piece));
-      // 任务清单：复选框状态转为前缀符号
+      // Task list: convert checkbox state into a leading symbol
       if (isTaskList) {
         const checked = li.getAttribute('data-checked') === 'true';
         children.unshift(new D.TextRun({ text: checked ? '\u2611 ' : '\u2610 ' }));
@@ -627,7 +630,7 @@ function buildList(
           numbering: ordered ? { reference, level } : undefined,
         }),
       );
-      // 递归导出嵌套子列表
+      // Recursively export nested sub-lists
       Array.from(li.children)
         .filter((c) => c.tagName === 'UL' || c.tagName === 'OL')
         .forEach((nested) => {
@@ -637,7 +640,7 @@ function buildList(
   return out;
 }
 
-/** 标题层级 → docx HeadingLevel（避免索引访问导致的类型不精确） */
+/** Heading level -> docx HeadingLevel (avoids imprecise types from indexed access) */
 function headingLevel(D: DocxNs, level: number) {
   switch (level) {
     case 1:
@@ -655,7 +658,7 @@ function headingLevel(D: DocxNs, level: number) {
   }
 }
 
-/** text-align → docx AlignmentType */
+/** text-align -> docx AlignmentType */
 function alignmentType(D: DocxNs, align: string | undefined) {
   if (align === 'center') return D.AlignmentType.CENTER;
   if (align === 'right') return D.AlignmentType.RIGHT;
@@ -667,14 +670,14 @@ function blockAlignment(el: Element): string | undefined {
   return (el.getAttribute('style') ?? '').match(/text-align:\s*(\w+)/)?.[1];
 }
 
-/** 区块级子节点：段落 / 表格 / 目录域 */
+/** Block-level children: paragraphs / tables / TOC field */
 type BlockChild = InstanceType<DocxNs['Paragraph'] | DocxNs['Table'] | DocxNs['TableOfContents']>;
 
 /**
- * 目录节点 → Word 目录域（TOC field）。
- * 条目文本取自导出 HTML 中已渲染的 `li[data-level]`，
- * 作为 cachedEntries 让文档打开即显示目录；页码由 Word 更新域时重算，
- * 因此编辑器侧算出的页码只是「打开前的预览值」。
+ * TOC node -> Word TOC field.
+ * Entry text comes from the already rendered `li[data-level]` in the export HTML and is fed as
+ * cachedEntries so the document shows a TOC as soon as it opens; page numbers are recomputed when
+ * Word updates the field, so the editor-side numbers are only a "preview before opening".
  */
 function buildTocField(D: DocxNs, el: Element): InstanceType<DocxNs['TableOfContents']> {
   const caption = el.querySelector('.rte-toc-title')?.textContent?.trim() ?? '';
@@ -695,7 +698,7 @@ function buildTocField(D: DocxNs, el: Element): InstanceType<DocxNs['TableOfCont
   });
 }
 
-/** 正文 HTML → docx 文档内容数组 */
+/** Body HTML -> docx document content array */
 function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
   const D = ctx.D;
   const out: BlockChild[] = [];
@@ -705,18 +708,19 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       out.push(buildTocField(D, el));
       return;
     }
-    // 块级公式：独占一行，Word 中作为独立公式段落
+    // Block formula: takes a whole line, becoming a standalone formula paragraph in Word
     if (el.hasAttribute('data-math')) {
       out.push(new D.Paragraph({ children: [buildMathRun(ctx, el) as ParagraphChild] }));
       return;
     }
     if (el.hasAttribute('data-page-break')) {
-      // 分页符：空段落 + pageBreakBefore
+      // Page break: empty paragraph + pageBreakBefore
       out.push(new D.Paragraph({ children: [], pageBreakBefore: true }));
       return;
     }
-    // 图片在编辑器里是块级节点（独占一行）：必须包一层段落输出，否则导出时整张图被丢弃。
-    // 注意要处理 <img> 元素本身（它没有子节点），不能沿用遍历子节点的 collectInlineRuns。
+    // Images are block nodes in the editor (a whole line): they must be wrapped in a paragraph,
+    // otherwise the entire image is dropped on export. Note we handle the <img> element itself
+    // (it has no child nodes), so collectInlineRuns' child traversal can't be reused here.
     if (el.tagName === 'IMG') {
       const run = imageRun(D, el);
       out.push(
@@ -754,13 +758,13 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       );
       return;
     }
-    // 段落排版：首行缩进与段前段后（内联样式为 px，需换算成 twip：1px = 15 twip）
+    // Paragraph layout: first-line indent and space before/after (inline styles are px, convert to twip: 1px = 15 twip)
     const PX_TO_TWIP = 15;
     const style = (el as HTMLElement).style;
     const textIndent = style?.textIndent
       ? Math.round(Number.parseFloat(style.textIndent) * PX_TO_TWIP)
       : 0;
-    // 未设置内联样式时沿用原有默认间距（120 twip）
+    // Keep the existing default spacing (120 twip) when no inline style is set
     const spaceBefore = style?.marginTop
       ? Math.round(Number.parseFloat(style.marginTop) * PX_TO_TWIP)
       : 120;
@@ -792,7 +796,7 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
   return out;
 }
 
-/** mammoth 样式映射：把 Word 内置/中文样式映射为语义 HTML（标题 1-6 默认已映射） */
+/** mammoth style map: translate Word built-in and Chinese style names into semantic HTML (headings 1-6 are mapped by default) */
 const MAMMOTH_STYLE_MAP = [
   "p[style-name='Title'] => h1:fresh",
   "p[style-name='Subtitle'] => h2:fresh",
@@ -805,15 +809,16 @@ const MAMMOTH_STYLE_MAP = [
   "p[style-name='代码'] => pre:fresh",
 ];
 
-/** 导入 .docx：mammoth 解析（含样式映射）→ 消毒 HTML */
+/** Import .docx: parse with mammoth (including style map) -> sanitize HTML */
 export async function importDocx(file: File): Promise<ToolResult<string>> {
   const check = checkImportFile(file);
   if (!check.ok) return check;
   try {
     const buffer = await file.arrayBuffer();
     const mammoth = (await import('mammoth')).default;
-    // mammoth 的浏览器构建认 `arrayBuffer`，Node 构建只认 `buffer`（且 buffer 优先），
-    // 一次传入两种形态即可在两种环境都命中，无需失败重试（重试会产生未处理拒绝）
+    // mammoth's browser build expects `arrayBuffer` while the Node build only reads `buffer`
+    // (and prefers it); passing both forms hits either environment in one call — no retry needed
+    // (a retry would produce unhandled rejections)
     const nodeBuffer =
       typeof Buffer === 'undefined' ? undefined : Buffer.from(new Uint8Array(buffer));
     const parsed = await mammoth.convertToHtml(
@@ -829,24 +834,24 @@ export async function importDocx(file: File): Promise<ToolResult<string>> {
   }
 }
 
-/** 审阅元数据：批注清单、修订条目与署名 */
+/** Review metadata: comment list, tracked-change entries and author */
 export interface DocxReviewOptions {
   comments?: DocComment[];
   changes?: TrackedChange[];
-  /** 批注与修订的署名 */
+  /** Author for comments and revisions */
   author?: string;
 }
 
-/** 公式去重键：同一条公式（含展示模式）只渲染一次 */
+/** Formula dedup key: the same formula (including display mode) is rendered only once */
 function mathKey(latex: string, display: boolean): string {
   return `${display ? 'block' : 'inline'}|${latex}`;
 }
 
 /**
- * 公式节点 → Word 内容。
- * 优先输出原生公式（OMML，Word 中可继续编辑）；
- * 语法不支持时用预渲染的图片降级，保证视觉一致；
- * 图片也拿不到时退回 LaTeX 源码文本，绝不静默丢内容。
+ * Formula node -> Word content.
+ * Prefer a native equation (OMML, still editable in Word);
+ * fall back to a pre-rendered image when the syntax isn't supported, keeping visuals consistent;
+ * if even the image is unavailable, emit the LaTeX source as text — never drop content silently.
  */
 function buildMathRun(
   ctx: ExportContext,
@@ -874,18 +879,18 @@ function buildMathRun(
       });
     }
   }
-  // 兜底：原样输出源码，至少内容不丢
+  // Last resort: output the source as-is so nothing is lost
   return new D.TextRun({ text: display ? `$$${latex}$$` : `$${latex}$` });
 }
 
 type CommentsOptions = NonNullable<import('docx').ICommentsOptions>;
 
 /**
- * 生成 Word 原生批注：正文标记由 runsToChildren 写入，此处只提供批注内容。
+ * Build native Word comments: body markers are written by runsToChildren, this only supplies the content.
  *
- * 注意：当前 docx 版本只序列化 `comments.xml`（批注正文 / 作者 / 时间），
- * `resolved` 标志不会落盘；已解决的批注在编辑器侧已移除正文标记，
- * 因此不会出现在导出文档中，行为与 Word「已解决批注默认隐藏」一致。
+ * Note: the current docx version only serializes `comments.xml` (comment body / author / date);
+ * the `resolved` flag is not persisted. Resolved comments already had their body marks removed in the
+ * editor, so they never reach the exported document — matching Word's "hide resolved comments by default".
  */
 function buildComments(
   D: DocxNs,
@@ -894,7 +899,7 @@ function buildComments(
 ): CommentsOptions | undefined {
   if (comments.length === 0) return undefined;
   return {
-    // ICommentsOptions 接收的是普通选项对象（docx 内部再构造 Comment 组件）
+    // ICommentsOptions takes plain option objects (docx constructs the Comment components internally)
     children: comments.map((comment, index) => {
       const byline = comment.author.trim() || author;
       return {
@@ -918,7 +923,7 @@ function buildComments(
   };
 }
 
-/** 导出 .docx：编辑器 HTML → Word 文档 Blob（含页面设置、页眉页脚、批注与修订） */
+/** Export .docx: editor HTML -> Word document Blob (with page setup, header/footer, comments and revisions) */
 export async function exportDocxBlob(
   html: string,
   title: string,
@@ -934,7 +939,7 @@ export async function exportDocxBlob(
     const comments = review?.comments ?? [];
     const ctx: ExportContext = {
       D,
-      // 仅正文中确实引用了的批注才需要数字 id；顺序即 Word 批注窗格顺序
+      // Only comments actually referenced in the body need numeric ids; the order defines the Word comment pane order
       commentIds: new Map(comments.map((comment, index) => [comment.id, index])),
       author: review?.author?.trim() || 'SynTools',
       date: new Date().toISOString(),
@@ -944,7 +949,7 @@ export async function exportDocxBlob(
     };
     const doc = new DOMParser().parseFromString(html, 'text/html');
 
-    // 先把「OMML 表达不了」的公式离屏渲染为图片（异步），再进入同步的遍历阶段
+    // First render off-screen the formulas "OMML can't express" as images (async), then enter the synchronous traversal
     const mathRequests: MathImageRequest[] = [];
     const seenMath = new Set<string>();
     Array.from(doc.querySelectorAll('[data-math]')).forEach((el) => {
@@ -963,7 +968,7 @@ export async function exportDocxBlob(
     if (children.length === 0) {
       children.push(new D.Paragraph({ children: [] }));
     }
-    // 水印：Word 行属性不支持文字旋转，改为页眉中的浮动透明图片（衬于文字下方）
+    // Watermark: Word run properties can't rotate text, so use a floating transparent image in the header (behind text)
     const watermarkImage = await renderWatermarkImage(
       setup.watermark,
       metrics.contentWidthMm * MM_TO_PX,
@@ -974,15 +979,15 @@ export async function exportDocxBlob(
       : undefined;
 
     const commentOptions = buildComments(D, comments, ctx.author);
-    // 脚注正文由遍历正文时收集，编号即数组下标 + 1（与 FootnoteReferenceRun 一致）
+    // Footnote bodies are collected while traversing the body; the number is the array index + 1 (matching FootnoteReferenceRun)
     const footnoteOptions =
       ctx.footnoteNotes.length > 0
         ? Object.fromEntries(
             ctx.footnoteNotes.map((note, index) => [
               String(index + 1),
               {
-                // docx 会自动在脚注段落前插入 w:footnoteRef（引用序号），
-                // 这里只写正文，避免出现两个序号
+                // docx inserts w:footnoteRef (the reference number) before footnote paragraphs automatically,
+                // so only the body is written here to avoid two numbers
                 children: [
                   new D.Paragraph({
                     children: [new D.TextRun({ text: note || ' ', size: 18 })],
@@ -1001,21 +1006,21 @@ export async function exportDocxBlob(
           { reference: 'rte-number', levels: buildNumberingLevels(D, false) },
         ],
       },
-      // 修订追踪：正文中的 ins/del 已映射为 Word 修订运行，
-      // 打开开关让 Word 以「修订」模式呈现并允许接受/拒绝
+      // Tracked changes: body ins/del already map to Word revision runs;
+      // turn on the switch so Word presents them in "track changes" mode and allows accept/reject
       features: {
         trackRevisions: (review?.changes?.length ?? 0) > 0,
         updateFields: true,
       },
       ...(commentOptions ? { comments: commentOptions } : {}),
       ...(footnoteOptions ? { footnotes: footnoteOptions } : {}),
-      // 页面背景色（Word 打开时铺满纸张）
+      // Page background color (fills the sheet when opened in Word)
       ...(setup.background ? { background: { color: setup.background } } : {}),
       sections: [
         {
           properties: {
             page: {
-              // Word 约定：pgSz 始终写纵向尺寸，靠 orient 标志表达横向
+              // Word convention: pgSz always stores portrait dimensions; landscape is expressed via the orient flag
               size: {
                 width: mmToTwip(
                   setup.orientation === 'landscape' ? metrics.heightMm : metrics.widthMm,
@@ -1035,7 +1040,7 @@ export async function exportDocxBlob(
                 left: mmToTwip(setup.margin.left),
               },
             },
-            // 分栏：Word 自行按栏流排（与屏幕流式视图 / 打印一致）
+            // Columns: Word flows the content by column itself (matching the on-screen flow view / print)
             ...(setup.columns > 1
               ? {
                   column: {
@@ -1046,7 +1051,7 @@ export async function exportDocxBlob(
                   },
                 }
               : {}),
-            // 首页不同：为 true 时首页不再显示页眉页脚（与 Word「首页不同」一致）
+            // Different first page: when true the first page hides header/footer (matching Word's "different first page")
             ...(setup.differentFirstPage ? { titlePage: true } : {}),
           },
           headers: buildHeaderFooter(D, setup, 'header', watermarkChild),
@@ -1063,8 +1068,8 @@ export async function exportDocxBlob(
 }
 
 /**
- * 水印 → 页眉中锚定到页面的浮动图片（衬于文字下方）。
- * Word 的水印本质上就是页眉里的 behindDoc 图形，因此这一做法与 Word 行为一致。
+ * Watermark -> a floating image in the header anchored to the page (behind text).
+ * A Word watermark is essentially a behindDoc shape in the header, so this matches Word's behavior.
  */
 function buildWatermarkRun(
   D: DocxNs,
@@ -1086,7 +1091,7 @@ function buildWatermarkRun(
   });
 }
 
-/** 生成 docx 页眉/页脚（无内容时返回 undefined，避免出现空页眉） */
+/** Build the docx header/footer (returns undefined when empty, avoiding blank headers) */
 function buildHeaderFooter(
   D: DocxNs,
   setup: PageSetupConfig,

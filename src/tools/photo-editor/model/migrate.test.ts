@@ -52,8 +52,8 @@ function group(id: string, patch: Record<string, unknown> = {}): Record<string, 
   };
 }
 
-describe('文档迁移 / 归一（工程 v1 → v2）', () => {
-  it('v1 文档（只有三类旧图层）迁移后新字段补齐、内容不变', () => {
+describe('Document migration / normalization (project v1 → v2)', () => {
+  it('a v1 document (three legacy layer kinds) gains new fields without changing content', () => {
     const result = migrateDoc(doc([raster('a'), { ...raster('b'), kind: 'text', text: 'hi' }]));
     expect(result).not.toBeNull();
     expect(result!.layers).toHaveLength(2);
@@ -65,12 +65,12 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     expect(result!.activeLayerId).toBeNull();
   });
 
-  it('未知类型的图层被丢弃而不是让整档打不开', () => {
+  it('layers of unknown type are dropped rather than breaking the whole file', () => {
     const result = migrateDoc(doc([raster('a'), { id: 'x', kind: 'ufo' }, raster('b')]));
     expect(result!.layers.map((layer) => layer.id)).toEqual(['a', 'b']);
   });
 
-  it('parentId 指向不存在或非编组时降级为顶层', () => {
+  it('a parentId pointing at nothing or a non-group demotes the layer to top level', () => {
     const result = migrateDoc(
       doc([
         group('g'),
@@ -84,16 +84,16 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     expect(result.layers.find((l) => l.id === 'orphan')!.parentId).toBeNull();
   });
 
-  it('编组自指与父子环被打断', () => {
+  it('self-referencing groups and parent/child cycles are broken', () => {
     const self = migrateDoc(doc([group('g', { parentId: 'g' })]))!;
     expect(self.layers[0].parentId).toBeNull();
 
     const loop = migrateDoc(doc([group('a', { parentId: 'b' }), group('b', { parentId: 'a' })]))!;
-    // 两个编组各自都不能留在环里
+    // Neither group may remain in the cycle
     expect(loop.layers.filter((l) => l.parentId === null).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('缺失字段按类型补默认值', () => {
+  it('missing fields get defaults per layer type', () => {
     const result = migrateDoc(doc([{ id: 'a', kind: 'raster' }]))!;
     const layer = result.layers[0];
     expect(layer.visible).toBe(true);
@@ -104,7 +104,7 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     expect(layer.kind === 'raster' && layer.adjustments.brightness).toBe(0);
   });
 
-  it('非法混合模式与滤镜被过滤', () => {
+  it('illegal blend modes and filters are filtered out', () => {
     const result = migrateDoc(
       doc([
         raster('a', { blend: 'luminosity' }),
@@ -113,12 +113,12 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     )!;
     expect(result.layers[0].blend).toBe('luminosity');
     expect(result.layers[1].blend).toBe('normal');
-    // 旧格式 FilterId[] 会被升级为「规格 + 默认参数」
+    // The old `FilterId[]` format is upgraded to "spec + default params"
     const filters = result.layers[1].kind === 'raster' ? result.layers[1].filters : [];
     expect(filters).toEqual([{ id: 'blur', params: { radius: 4 } }]);
   });
 
-  it('新格式滤镜保留参数，越界参数被钳制', () => {
+  it('new-format filters keep their parameters, out-of-range ones clamp', () => {
     const result = migrateDoc(
       doc([
         raster('a', {
@@ -132,11 +132,11 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     const filters = result.layers[0].kind === 'raster' ? result.layers[0].filters : [];
     expect(filters).toHaveLength(1);
     expect(filters[0].id).toBe('posterize');
-    // FILTER_PARAMS 的 max 为 16
+    // FILTER_PARAMS has max = 16
     expect(filters[0].params?.levels).toBe(16);
   });
 
-  it('扩展调整字段被归一化，空值回落为未启用', () => {
+  it('extended adjustment fields are normalized and nulls fall back to disabled', () => {
     const result = migrateDoc(
       doc([
         raster('a', {
@@ -163,20 +163,20 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     expect(second?.threshold).toBe(128);
   });
 
-  it('画布尺寸被钳到合法区间', () => {
+  it('canvas dimensions clamp to the valid range', () => {
     const small = migrateDoc(doc([], { width: 1, height: 99999 }))!;
     expect(small.width).toBe(MIN_CANVAS_SIZE);
     expect(small.height).toBe(MAX_CANVAS_SIZE);
   });
 
-  it('activeLayerId 指向不存在时归零', () => {
+  it('activeLayerId resets when it points at nothing', () => {
     const result = migrateDoc(doc([raster('a')], { activeLayerId: 'gone' }))!;
     expect(result.activeLayerId).toBeNull();
     const ok = migrateDoc(doc([raster('a')], { activeLayerId: 'a' }))!;
     expect(ok.activeLayerId).toBe('a');
   });
 
-  it('蒙版参数被归一（浓度 0~1、rev ≥ 1、无 assetId 视为无蒙版）', () => {
+  it('mask parameters are normalized (density 0~1, rev ≥ 1, no assetId means no mask)', () => {
     const result = migrateDoc(
       doc([
         raster('a', { mask: { assetId: 'm1', density: 9, rev: 0, feather: -2 } }),
@@ -191,13 +191,13 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     expect(result.layers[1].mask).toBeNull();
   });
 
-  it('结构不可用（无 layers / 非对象）返回 null', () => {
+  it('an unusable structure (no layers / not an object) returns null', () => {
     expect(migrateDoc(null)).toBeNull();
     expect(migrateDoc({ width: 100, height: 100 })).toBeNull();
     expect(migrateDoc(doc([]))).not.toBeNull();
   });
 
-  it('智能对象保留源像素尺寸', () => {
+  it('smart objects keep their source pixel size', () => {
     const result = migrateDoc(
       doc([{ id: 's', kind: 'smart', sourceAssetId: 'src', sourceWidth: 40, sourceHeight: 30 }]),
     )!;
@@ -206,7 +206,7 @@ describe('文档迁移 / 归一（工程 v1 → v2）', () => {
     expect(layer.kind === 'smart' && layer.sourceHeight).toBe(30);
   });
 
-  it('图层顺序即 z 序（尾部为最上层）', () => {
+  it('layer order is z order (the tail is the top layer)', () => {
     const result = migrateDoc(doc([raster('a'), raster('b'), raster('c')]))!;
     expect((result.layers as Layer[]).map((l) => l.id)).toEqual(['a', 'b', 'c']);
     expect((result as PhotoDoc).layers.at(-1)!.id).toBe('c');

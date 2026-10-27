@@ -1,16 +1,11 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 图片水印：在 canvas 上绘制文字/图片水印的参数与布局计算。
+ * Image watermarking: parameters and layout math for drawing text/image watermarks on a canvas.
  */
 
 export type WatermarkPosition =
-  | 'top-left'
-  | 'top-right'
-  | 'center'
-  | 'bottom-left'
-  | 'bottom-right'
-  | 'tile';
+  'top-left' | 'top-right' | 'center' | 'bottom-left' | 'bottom-right' | 'tile';
 
 export type WatermarkError = 'NOT_IMAGE' | 'ENCODE';
 
@@ -43,7 +38,7 @@ export function isImageFile(type: string): boolean {
   return type.startsWith('image/');
 }
 
-/** 计算水印锚点（非 tile） */
+/** Compute the watermark anchor (non-tiled) */
 export function resolveAnchor(
   width: number,
   height: number,

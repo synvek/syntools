@@ -7,9 +7,9 @@ export type CompressLevel = 'objects' | 'raster';
 
 export interface CompressOptions {
   level: CompressLevel;
-  /** raster 模式下的 JPEG 质量 0–1 */
+  /** JPEG quality in raster mode, 0–1 */
   quality: number;
-  /** raster 模式渲染缩放（越大越清晰、体积越大） */
+  /** Render scale in raster mode (larger is sharper and bigger) */
   scale: number;
 }
 
@@ -17,7 +17,7 @@ export interface CompressResult {
   bytes: Uint8Array;
   originalSize: number;
   pages: number;
-  /** 压缩率（0–1），负数表示变大 */
+  /** Compression ratio (0–1); a negative value means the file grew */
   ratio: number;
   lossy: boolean;
 }
@@ -63,7 +63,7 @@ export async function compressPdf(
     }
   }
 
-  // raster：逐页重渲染为 JPEG 后重新组装（有损压缩）
+  // raster: re-render each page as JPEG and reassemble (lossy compression)
   const doc = await openPdfjsDoc(bytes, { password });
   if (!doc.ok) return doc;
   ensureWorker();

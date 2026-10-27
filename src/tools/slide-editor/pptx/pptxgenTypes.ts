@@ -1,15 +1,15 @@
 /**
- * pptxgenjs 的最小类型契约。
+ * Minimal type contract for pptxgenjs.
  *
- * pptxgenjs@3.12 的 `types/index.d.ts` 把所有接口放在一个**未导出**的
- * `declare namespace` 里（`export as namespace` 只暴露了 default），
- * 因此外部拿不到 `TextPropsOptions` / `ShapeProps` 等具名类型。
+ * pptxgenjs@3.12's `types/index.d.ts` puts every interface inside a **non-exported**
+ * `declare namespace` (`export as namespace` only exposes the default export),
+ * so named types such as `TextPropsOptions` / `ShapeProps` can't be imported.
  *
- * 这里只声明我们真正用到的字段，作为一层窄接口：
- * - 保持 TS strict 下的类型检查；
- * - 不依赖上游打包细节，升级 pptxgenjs 时只需按编译错误补齐字段。
+ * Only the fields we actually use are declared here, as a narrow interface that:
+ * - keeps type checking under TS strict;
+ * - doesn't depend on upstream packaging details — upgrading pptxgenjs only needs the missing fields filled in from compile errors.
  *
- * 单位约定：位置用 inch，字号/线宽/间距用 pt，颜色是不带 `#` 的 6 位十六进制。
+ * Units: positions in inches, font size/stroke width/spacing in pt, colors as 6-digit hex without `#`.
  */
 
 export type PptxHexColor = string;
@@ -19,7 +19,7 @@ export type PptxVAlign = 'top' | 'middle' | 'bottom';
 export interface PptxFill {
   type?: 'none' | 'solid';
   color?: PptxHexColor;
-  /** 透明度百分比 0-100 */
+  /** Opacity percentage 0-100 */
   transparency?: number;
 }
 
@@ -121,7 +121,7 @@ export interface PptxImageOptions {
   hyperlink?: PptxHyperlink;
 }
 
-/** 单元格：pptxgenjs 从 `options` 上读取 colspan / rowspan 与样式 */
+/** Cell: pptxgenjs reads colspan / rowspan and styles from `options` */
 export interface PptxTableCell {
   text?: string;
   options?: PptxTextOptions & {

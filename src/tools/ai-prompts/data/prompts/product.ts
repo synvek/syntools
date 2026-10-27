@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 产品管理类提示词，详见 ../README.md */
+/** Product management prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'product-requirement-breakdown',

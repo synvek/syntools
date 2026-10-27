@@ -21,18 +21,18 @@ import {
 
 const BOX = 10;
 
-/** 连线标签槽位：主标签 + 起点 / 终点标签 */
+/** Edge label slots: main label + source / target labels */
 type LabelSlot = 'main' | 'source' | 'target';
 
-/** 路径取点缓存（键为 path 字符串）：避免同一路径反复建 DOM 测量 */
+/** Path sampling cache (keyed by the path string): avoids rebuilding a DOM measurement for the same path */
 const pathPointCache = new Map<string, { el: SVGPathElement; length: number }>();
 
 /**
- * 取路径上指定比例处的点（0=起点，1=终点）。
+ * Point at the given ratio along a path (0 = start, 1 = end).
  *
- * 用离屏 `<path>` 的 `getPointAtLength` 求解，因此对直线 / 折线 / 折点正交路由 / 贝塞尔
- * 都成立，不需要为每种线型分别推导参数方程。路径字符串作为缓存键，
- * 结果在连续缩放/平移（path 不变）时直接复用；缓存过大时整体清空，避免无界增长。
+ * Solved with an off-screen `<path>`'s `getPointAtLength`, which works for straight / polyline / waypoint
+ * orthogonal / bezier paths alike, with no per-type parametric equation to derive. The path string is the cache key,
+ * so results are reused across pan/zoom (the path is unchanged); the cache is cleared wholesale when it grows too large.
  */
 function pointOnPath(d: string, fraction: number): { x: number; y: number } | null {
   if (!d || typeof document === 'undefined') return null;
@@ -59,10 +59,10 @@ function pointOnPath(d: string, fraction: number): { x: number; y: number } | nu
   }
 }
 
-/** 折线拐角倒角半径（仅 smoothstep 使用；step 保持直角） */
+/** Polyline corner chamfer radius (used by smoothstep only; step keeps right angles) */
 const POLYLINE_RADIUS = 10;
 
-/** 箭头形状（在 0..10 的 viewBox 内绘制，颜色取连线描边色） */
+/** Arrow shapes (drawn in a 0..10 viewBox, colored with the edge stroke) */
 function arrowShape(kind: EdgeArrow, color: string): ReactElement | null {
   switch (kind) {
     case 'arrowclosed':
@@ -83,7 +83,7 @@ function arrowShape(kind: EdgeArrow, color: string): ReactElement | null {
     case 'diamond':
       return <path d="M0,5 L5,0 L10,5 L5,10 Z" fill={color} />;
     case 'diamondHollow':
-      // 聚合：空心菱形（UML 聚合关系）
+      // Aggregation: hollow diamond (UML aggregation)
       return (
         <path
           d="M0,5 L5,0 L10,5 L5,10 Z"
@@ -94,7 +94,7 @@ function arrowShape(kind: EdgeArrow, color: string): ReactElement | null {
         />
       );
     case 'triangle':
-      // 泛化 / 实现：空心三角（尖端朝外）
+      // Generalization / realization: hollow triangle (tip pointing outward)
       return (
         <path
           d="M9.4,5 L0.6,0.6 L0.6,9.4 Z"
@@ -113,7 +113,7 @@ function arrowShape(kind: EdgeArrow, color: string): ReactElement | null {
   }
 }
 
-/** 箭头尖端对齐路径端点：三角类对齐尖端，其它几何形居中对齐 */
+/** Align the arrow tip with the path endpoint: triangle-like shapes align by the tip, other geometries are centered */
 function refXOf(kind: EdgeArrow): number {
   return kind === 'arrowclosed' || kind === 'arrow' || kind === 'triangle' ? BOX : BOX / 2;
 }
@@ -136,22 +136,22 @@ function EdgeMarker({ id, kind, color }: { id: string; kind: EdgeArrow; color: s
 }
 
 /**
- * 自定义连线：按 style.type 生成路径，并按 startArrow / endArrow 自绘箭头，
- * 因此箭头风格不受 React Flow 内置 marker 限制（实心/空心/圆点/菱形/方块/竖线）。
+ * Custom edge: builds the path from style.type and draws arrows from startArrow / endArrow,
+ * so arrow styles are free of React Flow's built-in marker limits (solid/hollow/circle/diamond/square/bar).
  *
- * 存在 `data.waypoints` 时改为折线路径（正交路由结果），标签也改为
- * 可双击就地编辑的 HTML 元素（通过 EdgeLabelRenderer 渲染）。
+ * With `data.waypoints` present it switches to a polyline path (the orthogonal routing result), and labels become
+ * HTML elements that can be double-clicked for in-place editing (rendered through EdgeLabelRenderer).
  */
 export function FlowEdgeLine(props: EdgeProps) {
   const { t } = useTranslation();
   const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label } = props;
   const data = props.data as FlowEdgeData | undefined;
   const style: FlowEdgeStyle = { ...DEFAULT_EDGE_STYLE, ...data?.style };
-  // 选中态：加粗并高亮描边（自定义边用内联样式，故在此显式处理选中反馈）
+  // Selected state: thicker and highlighted stroke (custom edges use inline styles, so selection feedback is explicit here)
   const selected = props.selected === true;
   const strokeColor = selected ? '#2563EB' : style.stroke;
   const strokeWidth = selected ? style.strokeWidth + 1.5 : style.strokeWidth;
-  /** 正在就地编辑的标签槽位（null 表示无） */
+  /** Label slot currently being edited in place (null means none) */
   const [editingSlot, setEditingSlot] = useState<LabelSlot | null>(null);
   const [draft, setDraft] = useState('');
 
@@ -175,7 +175,7 @@ export function FlowEdgeLine(props: EdgeProps) {
     if (style.type === 'straight') {
       [path, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
     } else if (style.type === 'step') {
-      // 直角折线 = 圆角折线（圆角半径 0）
+      // Right-angle polyline = rounded polyline with a radius of 0
       [path, labelX, labelY] = getSmoothStepPath({ ...params, borderRadius: 0 });
     } else if (style.type === 'smoothstep') {
       [path, labelX, labelY] = getSmoothStepPath(params);
@@ -191,7 +191,7 @@ export function FlowEdgeLine(props: EdgeProps) {
   const targetText = data?.targetLabel ?? '';
   const labelPosition: EdgeLabelPosition = data?.labelPosition ?? 'center';
 
-  /** 三处标签的文本与落点：无文本的槽位不计算路径取点（零开销） */
+  /** Text and anchor point of the three labels: slots without text skip path sampling (zero cost) */
   const slots: Array<{
     slot: LabelSlot;
     text: string;
@@ -258,7 +258,7 @@ export function FlowEdgeLine(props: EdgeProps) {
         interactionWidth={20}
       />
 
-      {/* 连线标签：主标签 + 起点 / 终点标签，双击就地编辑（不走 BaseEdge 的 SVG 文本，便于富交互） */}
+      {/* Edge labels: main label + source / target labels, double-click to edit in place (bypassing BaseEdge's SVG text for richer interaction) */}
       <EdgeLabelRenderer>
         {slots.map((s) => (
           <div
@@ -274,7 +274,7 @@ export function FlowEdgeLine(props: EdgeProps) {
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={() => commitLabel(s.slot)}
                 onKeyDown={(e) => {
-                  // 阻止冒泡：提交后输入框卸载，避免全局快捷键误判为画布操作
+                  // Stop propagation: the input unmounts after submit, so global shortcuts do not mistake it for a canvas action
                   e.stopPropagation();
                   if (e.key === 'Enter') {
                     e.preventDefault();

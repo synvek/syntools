@@ -4,8 +4,8 @@ import { backgroundFillProps } from './background';
 import { createElementNode } from './nodes';
 
 /**
- * 离屏缩略图：用一个隐藏 Konva.Stage 逐页渲染并导出 dataURL。
- * 按 `slideId + version + width` 缓存，只有文档变更时才重绘。
+ * Offscreen thumbnails: a hidden Konva.Stage renders each slide and exports a dataURL.
+ * Cached by `slideId + version + width`, redrawn only when the document changes.
  */
 
 interface Offscreen {
@@ -14,13 +14,13 @@ interface Offscreen {
   layer: Konva.Layer;
 }
 
-/** 缓存条目上限（LRU）：长文档下避免 dataURL 无限堆积 */
+/** Cache entry cap (LRU), so dataURLs don't pile up on long documents */
 const CACHE_LIMIT = 240;
 
 let offscreen: Offscreen | null = null;
 const cache = new Map<string, string>();
 
-/** 命中后移到队尾，保持 Map 的插入顺序即 LRU 顺序 */
+/** On a hit, move the entry to the tail so Map insertion order stays LRU order */
 function touch(key: string, value: string): void {
   cache.delete(key);
   cache.set(key, value);
@@ -32,10 +32,10 @@ function touch(key: string, value: string): void {
 }
 
 /**
- * 单页内容指纹：只依赖「会影响这一页渲染结果」的字段。
+ * Per-slide content fingerprint: depends only on the fields that affect that slide's rendering.
  *
- * 不能用 doc.version —— 它是全局自增的，改任意一页都会让全部页的缓存失效。
- * 也不能带上 media 的 bytes/url 等运行态字段，否则必然 miss。
+ * doc.version can't be used — it's a global counter, so changing any slide invalidates every slide's cache.
+ * Runtime fields such as media bytes/url must stay out too, or the cache would always miss.
  */
 function slideFingerprint(slide: Slide): string {
   const payload = JSON.stringify({
@@ -96,7 +96,7 @@ export function renderThumbnail(doc: SlideDoc, slide: Slide, width = 240): strin
   target.layer.add(background);
 
   for (const element of slide.elements) {
-    // 隐藏元素不渲染，与画布 / 导出保持一致
+    // Hidden elements aren't rendered, matching the canvas / export
     if (element.visible === false) continue;
     const node = createElementNode(element, { media: doc.media, onImageReady: () => undefined });
     node.listening(false);

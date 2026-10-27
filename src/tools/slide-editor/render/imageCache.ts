@@ -2,8 +2,8 @@ import { getMediaUrl } from '../model/media';
 import type { MediaAsset } from '../model/types';
 
 /**
- * 图片解码缓存：同一 mediaId 只解码一次，解码完成后回调通知重绘。
- * element → node 渲染时若图片尚未就绪，先用空占位，待 onload 后 patchImage 替换。
+ * Image decode cache: each mediaId is decoded once, and callbacks trigger a redraw when decoding finishes.
+ * When rendering element → node, an undecoded image shows an empty placeholder and is swapped via patchImage on load.
  */
 
 const images = new Map<string, HTMLImageElement>();
@@ -30,7 +30,7 @@ export function getCachedImage(asset: MediaAsset): HTMLImageElement | undefined 
   return undefined;
 }
 
-/** 供 Konva.Image 使用：返回已解码图片，并注册解码完成回调 */
+/** For Konva.Image: return the decoded image and register a decode-complete callback */
 export function acquireImage(asset: MediaAsset, onReady: () => void): HTMLImageElement | undefined {
   const cached = getCachedImage(asset);
   if (cached) return cached;

@@ -2,13 +2,13 @@ import { format } from 'sql-formatter';
 import type { ToolResult } from '@/core/types';
 
 /**
- * SQL 格式化（Tasks T35）：基于 sql-formatter，纯前端无数据外发。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译（T29 约定）。
+ * SQL formatting (Tasks T35): built on sql-formatter, fully client-side with no data sent out.
+ * Error codes are decoupled from copy: core returns language-agnostic error codes and the UI translates them via i18n (T29 convention).
  */
 
 export type SqlErrorCode = 'EMPTY' | 'INVALID';
 
-/** 支持的方言子集（完整列表见 sql-formatter 文档） */
+/** Supported dialect subset (see the sql-formatter docs for the full list) */
 export const SQL_LANGUAGES = [
   'sql',
   'mysql',
@@ -34,7 +34,7 @@ export const DEFAULT_SQL_OPTIONS: SqlFormatOptions = {
   keywordCase: 'upper',
 };
 
-/** 格式化 SQL；语法无法识别时返回 INVALID */
+/** Format SQL; returns INVALID when the syntax cannot be recognized */
 export function formatSqlText(input: string, options: SqlFormatOptions): ToolResult<string> {
   if (!input.trim()) return { ok: false, error: 'EMPTY' };
   try {

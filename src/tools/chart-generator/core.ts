@@ -1,28 +1,15 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 在线图表生成器：CSV → SVG（多类型、图例、Y 轴、配色预设）。
+ * Online chart generator: CSV → SVG (multiple chart types, legend, Y axis, color presets).
  */
 
-export type ChartType =
-  | 'bar'
-  | 'hbar'
-  | 'line'
-  | 'area'
-  | 'pie'
-  | 'doughnut'
-  | 'scatter';
+export type ChartType = 'bar' | 'hbar' | 'line' | 'area' | 'pie' | 'doughnut' | 'scatter';
 
 export type LegendPosition = 'top' | 'bottom' | 'left' | 'right' | 'none';
 
 export type ColorSchemeId =
-  | 'vibrant'
-  | 'pastel'
-  | 'ocean'
-  | 'sunset'
-  | 'forest'
-  | 'mono'
-  | 'rainbow';
+  'vibrant' | 'pastel' | 'ocean' | 'sunset' | 'forest' | 'mono' | 'rainbow';
 
 export type ChartError = 'EMPTY' | 'INVALID' | 'NO_NUMERIC';
 
@@ -36,7 +23,7 @@ export interface ChartOptions {
   width: number;
   height: number;
   title: string;
-  /** 数据集 / 系列名称（出现在图例） */
+  /** Dataset / series name (shown in the legend) */
   seriesLabel: string;
   xLabel: string;
   yLabel: string;
@@ -54,13 +41,7 @@ export const CHART_TYPES: ChartType[] = [
   'scatter',
 ];
 
-export const LEGEND_POSITIONS: LegendPosition[] = [
-  'top',
-  'bottom',
-  'left',
-  'right',
-  'none',
-];
+export const LEGEND_POSITIONS: LegendPosition[] = ['top', 'bottom', 'left', 'right', 'none'];
 
 export const COLOR_SCHEMES: Record<ColorSchemeId, string[]> = {
   vibrant: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'],
@@ -124,7 +105,7 @@ export function colorAt(scheme: ColorSchemeId | string, index: number): string {
   return colors[index % colors.length];
 }
 
-/** 解析 CSV（首行可含表头） */
+/** Parse CSV (the first row may hold headers) */
 export function parseChartData(input: string): ToolResult<ChartPoint[]> {
   const raw = input.trim();
   if (!raw) return { ok: false, error: 'EMPTY' };
@@ -300,10 +281,7 @@ function legendEl(
   const series = opts.seriesLabel.trim();
 
   if (opts.legend === 'top' || opts.legend === 'bottom') {
-    const y =
-      opts.legend === 'top'
-        ? (opts.title.trim() ? 46 : 18)
-        : opts.height - 14;
+    const y = opts.legend === 'top' ? (opts.title.trim() ? 46 : 18) : opts.height - 14;
     let x = layout.plotX;
     const parts: string[] = [];
     if (series) {
@@ -339,12 +317,7 @@ function legendEl(
   return parts.join('\n');
 }
 
-function yAxisEl(
-  layout: Layout,
-  min: number,
-  max: number,
-  yLabel: string,
-): string {
+function yAxisEl(layout: Layout, min: number, max: number, yLabel: string): string {
   const ticks = 5;
   const range = max - min || 1;
   const parts: string[] = [
@@ -503,7 +476,8 @@ function buildHBarSvg(points: ChartPoint[], opts: ChartOptions): string {
 function buildPieSvg(points: ChartPoint[], opts: ChartOptions, doughnut: boolean): string {
   const layout = computeLayout(opts, points, 'pie');
   const total = points.reduce((s, p) => s + Math.abs(p.value), 0) || 1;
-  const cx = layout.plotX + layout.plotW * (opts.legend === 'right' || opts.legend === 'none' ? 0.45 : 0.5);
+  const cx =
+    layout.plotX + layout.plotW * (opts.legend === 'right' || opts.legend === 'none' ? 0.45 : 0.5);
   const cy = layout.plotY + layout.plotH / 2;
   const r = Math.min(layout.plotW, layout.plotH) * 0.38;
   const inner = doughnut ? r * 0.55 : 0;

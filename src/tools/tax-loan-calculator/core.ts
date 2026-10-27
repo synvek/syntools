@@ -18,7 +18,7 @@ export interface LoanResult {
   schedule: ScheduleRow[];
 }
 
-/** 房贷/贷款还款计划：等额本息或等额本金。annualRatePct 为年利率（%）。 */
+/** Mortgage/loan repayment schedule: equal installments or equal principal. annualRatePct is the annual rate (%). */
 export function calcLoan(
   principal: number,
   annualRatePct: number,
@@ -80,7 +80,7 @@ export function calcLoan(
   };
 }
 
-/** 数值格式化：去除多余尾零，极大/极小值用科学计数法。 */
+/** Number formatting: trims trailing zeros and uses scientific notation for very large / very small values. */
 export function formatNumber(n: number): string {
   if (!Number.isFinite(n)) return '';
   const abs = Math.abs(n);
@@ -97,7 +97,7 @@ export interface TaxBracket {
   deduction: number;
 }
 
-/** 个人所得税月度税率表（综合所得，速算扣除数法） */
+/** Monthly individual income tax rate table (comprehensive income, quick-deduction method) */
 export const TAX_BRACKETS: TaxBracket[] = [
   { limit: 3000, rate: 0.03, deduction: 0 },
   { limit: 12000, rate: 0.1, deduction: 210 },
@@ -115,7 +115,7 @@ export interface TaxResult {
   effectiveRate: number;
 }
 
-/** 工资薪金个税估算（按月度速算扣除数，非累计预扣）。threshold 默认 5000。 */
+/** Estimate salary income tax (monthly quick deduction, not cumulative withholding). threshold defaults to 5000. */
 export function calcIncomeTax(
   gross: number,
   socialInsurance = 0,

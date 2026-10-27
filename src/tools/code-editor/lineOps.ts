@@ -2,12 +2,15 @@ import type { ToolResult } from '@/core/types';
 import { lineSpans, offsetToLineCol } from './lines';
 
 /**
- * 行操作纯逻辑（阶段 2）：注释切换、行移动 / 复制 / 删除 / 转置、缩进调整、跳转行。
+ * Line-operation pure logic (phase 2): comment toggling, moving / duplicating / deleting /
+ * transposing lines, indentation and go-to-line.
  *
- * 设计约定（与 `markdown-preview/editor.ts` 的 `EditorSelection` 一致）：
- * - 输入输出都是「文本 + 选区」，不触碰 DOM，便于单测；
- * - 可由语言能力决定的失败（如 CSS 没有行注释）返回 `ToolResult`，几何类操作恒成功；
- * - 缩进 / 注释一律改写**行首空白之后**的位置，保留原有缩进层级。
+ * Design rules (consistent with `EditorSelection` in `markdown-preview/editor.ts`):
+ * - Input and output are plain "text + selection"; the DOM is never touched, so it unit-tests well;
+ * - Failures caused by language capabilities (e.g. CSS has no line comments) return `ToolResult`,
+ *   while geometry-only operations always succeed;
+ * - Indentation and comments are always applied **after the leading whitespace**, so the
+ *   existing indent level is preserved.
  */
 
 export interface EditorSelection {
@@ -16,7 +19,7 @@ export interface EditorSelection {
   selectionEnd: number;
 }
 
-/** 一次文本编辑：在 `at` 处删除 `remove` 个字符并插入 `insert` */
+/** One text edit: remove `remove` characters at `at` and insert `insert` instead */
 export interface TextEdit {
   at: number;
   remove: number;
@@ -24,31 +27,31 @@ export interface TextEdit {
 }
 
 export interface LineRange {
-  /** 选区覆盖的首行（1 起始） */
+  /** First line covered by the selection (1-based) */
   firstLine: number;
-  /** 选区覆盖的末行（1 起始，含） */
+  /** Last line covered by the selection (1-based, inclusive) */
   lastLine: number;
-  /** 首行行首偏移 */
+  /** Offset of the first line's start */
   start: number;
-  /** 末行行尾偏移（不含换行符） */
+  /** Offset of the last line's end (newline excluded) */
   end: number;
 }
 
 const LEADING_WS_RE = /^[ \t]*/;
 
-/** 行首空白长度 */
+/** Length of the leading whitespace */
 function indentWidth(line: string): number {
   return LEADING_WS_RE.exec(line)?.[0].length ?? 0;
 }
 
-/** 取 `offset` 处的换行符（CRLF / CR / LF）；末尾无换行时返回 '' */
+/** Newline sequence at `offset` (CRLF / CR / LF); returns '' when the text ends without one */
 function separatorAt(text: string, offset: number): string {
   if (text[offset] === '\r') return text[offset + 1] === '\n' ? '\r\n' : '\r';
   if (text[offset] === '\n') return '\n';
   return '';
 }
 
-/** 行块应使用的换行符：优先块后紧跟的，其次块前的，最后回退 `\n`（CRLF 文档复制出的行仍为 CRLF） */
+/** Newline for a line block: the one after the block, else the one before, else `\n` (CRLF docs stay CRLF) */
 function lineEndingFor(text: string, range: LineRange): string {
   const trailing = separatorAt(text, range.end);
   if (trailing) return trailing;
@@ -60,9 +63,10 @@ function lineEndingFor(text: string, range: LineRange): string {
 }
 
 /**
- * 把选区两端跟随一组编辑位移：
- * - 完全落在编辑之前 → 整体平移；落在被删除区间内 → 贴到插入内容之后；
- * - 编辑按起点升序、互不重叠（调用方保证）。
+ * Shift both selection edges along with a batch of edits:
+ * - Entirely before an edit → translated by its delta; inside a deleted range → snapped to the
+ *   end of the inserted text;
+ * - Edits are sorted by start offset and never overlap (guaranteed by the caller).
  */
 function mapPosition(sorted: TextEdit[], pos: number): number {
   let delta = 0;
@@ -78,7 +82,7 @@ function mapPosition(sorted: TextEdit[], pos: number): number {
   return pos + delta;
 }
 
-/** 应用一组文本编辑并同步选区 */
+/** Apply a batch of text edits and remap the selection */
 export function applyEdits(
   text: string,
   edits: TextEdit[],
@@ -100,7 +104,7 @@ export function applyEdits(
   };
 }
 
-/** 选区覆盖的整行范围；选区结束落在行首时不把该行计入（与主流编辑器一致） */
+/** Full-line range covered by the selection; a trailing caret at column 0 does not count (as in mainstream editors) */
 export function selectionLineRange(
   text: string,
   selectionStart: number,
@@ -119,7 +123,7 @@ export function selectionLineRange(
   return { firstLine, lastLine, start: firstSpan.start, end: lastSpan.end };
 }
 
-/** 选中整行（跳转行用）：返回新选区 */
+/** Select an entire line (used by go-to-line); returns the new selection */
 export function selectLine(text: string, line: number): EditorSelection {
   const spans = lineSpans(text);
   const index = Math.min(Math.max(Math.trunc(line) - 1, 0), spans.length - 1);
@@ -127,14 +131,15 @@ export function selectLine(text: string, line: number): EditorSelection {
   return { text, selectionStart: span.start, selectionEnd: span.end };
 }
 
-/** 该行是否已被行注释符注释（按行首空白之后判断） */
+/** Whether the line is already commented (checked after the leading whitespace) */
 function isLineCommented(line: string, marker: string): boolean {
   return line.slice(indentWidth(line)).startsWith(marker);
 }
 
 /**
- * 切换行注释：全部已注释 → 取消注释；否则统一加注释（空行跳过）。
- * 与 VS Code 一致，注释符插在行首空白之后，取消时连同一个尾随空格一并移除。
+ * Toggle line comments: if every line is commented, uncomment them; otherwise comment them all
+ * (blank lines are skipped). As in VS Code the marker goes after the leading whitespace, and
+ * uncommenting also removes one trailing space.
  */
 export function toggleLineComment(
   text: string,
@@ -163,8 +168,9 @@ export function toggleLineComment(
 }
 
 /**
- * 切换块注释：选区**两侧**已有块注释符 → 拆掉；否则用块注释符包裹。
- * 折叠光标时插入成对的 `开 关` 并把光标置于中间（再次触发即拆掉，可往返切换）。
+ * Toggle block comments: if the markers already sit on **both** sides of the selection, remove
+ * them; otherwise wrap the selection. With a collapsed caret a matching `open close` pair is
+ * inserted and the caret placed between them (triggering again removes it, so it round-trips).
  */
 export function toggleBlockComment(
   text: string,
@@ -221,7 +227,7 @@ export function toggleBlockComment(
   };
 }
 
-/** 上移 / 下移整行块；已在首行 / 末行时原样返回 */
+/** Move a line block up / down; returns the input unchanged at the first / last line */
 export function moveLines(
   text: string,
   selectionStart: number,
@@ -256,8 +262,9 @@ export function moveLines(
 }
 
 /**
- * 转置行（单行语义）：与上一行互换；已在首行则与下一行互换。
- * 与 `moveLines` 的区别：转置始终只针对**一行**，不随选区扩张成块。
+ * Transpose lines (single-line semantics): swap with the previous line, or with the next line
+ * when already on the first. Unlike `moveLines`, this always acts on **one** line and never
+ * expands to the whole selected block.
  */
 export function transposeLine(
   text: string,
@@ -270,8 +277,9 @@ export function transposeLine(
 }
 
 /**
- * 复制当前行（或所选行块）：向下复制时把块插到下方，向上复制时插到上方。
- * 选区始终停留在**原行块**上，可连续触发；换行符沿用原文（保留 CRLF）。
+ * Duplicate the current line (or selected block): inserting below when duplicating down, above
+ * when duplicating up. The selection stays on the **original block** so it can be repeated; the
+ * newline sequence is taken from the source (CRLF is preserved).
  */
 export function duplicateLines(
   text: string,
@@ -281,7 +289,7 @@ export function duplicateLines(
 ): EditorSelection {
   const range = selectionLineRange(text, selectionStart, selectionEnd);
   const block = text.slice(range.start, range.end);
-  // 块后紧跟的换行符（保留 CRLF）；块是最后一行时回退到文档既有换行符
+  // Newline right after the block (keeps CRLF); falls back to the document's own when it is last
   const separator = lineEndingFor(text, range);
   if (direction === 'up') {
     const shift = block.length + separator.length;
@@ -298,7 +306,7 @@ export function duplicateLines(
   };
 }
 
-/** 删除当前行（或所选行块）；末行会连同上一行的换行一起删除 */
+/** Delete the current line (or selected block); for the last line the preceding newline goes too */
 export function deleteLines(
   text: string,
   selectionStart: number,
@@ -323,7 +331,7 @@ export function deleteLines(
   return { text: next, selectionStart: caret, selectionEnd: caret };
 }
 
-/** 增加 / 减少所选行块的缩进（空行跳过；减少时最多移除一个缩进单元） */
+/** Indent / outdent the selected block (blank lines skipped; outdent removes at most one unit) */
 export function indentLines(
   text: string,
   selectionStart: number,

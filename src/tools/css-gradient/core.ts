@@ -1,5 +1,5 @@
 /**
- * CSS 渐变生成器：linear / radial + color stops。
+ * CSS gradient generator: linear / radial with color stops.
  */
 
 export type GradientType = 'linear' | 'radial';

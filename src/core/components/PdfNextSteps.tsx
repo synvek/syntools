@@ -4,7 +4,7 @@ import { toolMap } from '@/core/registry';
 import { Icon } from '@/core/components/Icon';
 import { getToolMeta } from '@/core/i18n/helpers';
 
-/** 结果完成后的「下一步」chips（U5） */
+/** "Next steps" chips shown after a result (U5) */
 export function PdfNextSteps({ toolIds }: { toolIds: string[] }) {
   const { t } = useTranslation();
   const items = toolIds

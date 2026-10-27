@@ -13,10 +13,10 @@ import {
 import { CheckList, NoteBar, PageShell, Paragraphs, Section } from '@/app/marketing/ui';
 
 /**
- * /about —— 项目说明。
+ * /about — about the project.
  *
- * 企业评审与技术用户在看定价之前，通常先确认三件事：这东西是谁做的、
- * 会不会明天就跑路、许可允不允许我们用。这一页就回答这三件事，不写愿景。
+ * Before pricing, enterprise reviewers and technical users usually confirm three things: who built this,
+ * whether it will vanish tomorrow, and whether the license lets them use it. This page answers those three, no vision talk.
  */
 
 interface AboutCopy {

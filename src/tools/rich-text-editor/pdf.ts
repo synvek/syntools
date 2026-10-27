@@ -9,15 +9,17 @@ import {
 } from './pageSetup';
 
 /**
- * PDF 导出适配层：
- * - 模式一（text）：交给浏览器打印视图，生成可选可检索的文字 PDF（中文不乱码）；
- * - 模式二（snapshot）：按内容宽度排版后光栅化，再按块级边界切片拼成多页 PDF。
+ * PDF export adapter layer:
+ * - Mode 1 (text): handed to the browser print view, producing a selectable, searchable text PDF
+ *   (CJK text renders correctly);
+ * - Mode 2 (snapshot): lay out at the content width, rasterize, then slice on block boundaries into a
+ *   multi-page PDF.
  *
- * 两种模式共用同一份页面设置（纸张/边距/方向），确保版式一致。
+ * Both modes share one page setup (paper/margins/orientation), keeping the layout identical.
  */
 
 const MAX_PAGES = 200;
-/** 大文档分片渲染阈值（px）：超过时按页区段分片 toPng，避免单张超大 canvas */
+/** Chunked-render threshold for large documents (px): above it, toPng runs per page segment to avoid one huge canvas */
 const CHUNK_HEIGHT_PX = 6000;
 
 function loadImage(dataUrl: string): Promise<HTMLImageElement> {
@@ -30,29 +32,29 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
 }
 
 /**
- * 当前环境是否支持打印对话框。
- * Tauri 等桌面 WebView（WKWebView / WebView2）中 window.print() 静默无效，
- * 此时导出 PDF 应回退到快照模式。
+ * Whether the current environment supports a print dialog.
+ * In desktop WebViews like Tauri (WKWebView / WebView2), window.print() silently does nothing, so PDF
+ * export must fall back to snapshot mode there.
  */
 export function printSupported(): boolean {
   return !('__TAURI_INTERNALS__' in window) && !('__TAURI__' in window);
 }
 
 /**
- * 打印整篇文档（依赖用户在打印对话框中选择「另存为 PDF」）。
- * @param flow 页面视图下传入打印流容器：套用与屏幕页面视图同一套块级分页，
- *             配合 CSS `break-before: page` 使打印分页与所见一致。
+ * Print the whole document (relies on the user choosing "Save as PDF" in the print dialog).
+ * @param flow The print flow container in page view: applies the same block pagination as the on-screen
+ *             page view, so with CSS `break-before: page` the printed pagination matches what you see.
  */
 export function printToPdf(flow?: HTMLElement | null, setup?: PageSetupConfig | null): void {
   const metrics = resolvePageMetrics(setup ?? DEFAULT_PAGE_SETUP);
-  // 多栏时交给浏览器/打印引擎按列自然流排，块级强制换页会把列布局切错
+  // With multiple columns, let the browser/print engine flow by column; forced block breaks would cut the columns wrongly
   if (flow && metrics.columns === 1) applyPagedBreaks(flow, metrics);
   window.print();
 }
 
 /**
- * 高保真 PDF：把按 A4 内容宽度排版的容器整体光栅化，
- * 再按块级元素的边界切片为多页 A4 图片 PDF。
+ * High-fidelity PDF: rasterize the whole container laid out at the A4 content width,
+ * then slice it on block boundaries into a multi-page A4 image PDF.
  */
 export async function snapshotToPdf(
   container: HTMLElement,
@@ -73,8 +75,8 @@ export async function snapshotToPdf(
       const rect = child.getBoundingClientRect();
       return { top: rect.top - baseTop, height: rect.height };
     });
-    // 分栏排版由浏览器/Word 自行流排，块级切页算法在列布局下会错位，
-    // 因此多栏时按固定页高切片，与打印/Word 的列流保持一致
+    // Multi-column layout is flowed by the browser/Word itself, and block-based page cutting drifts
+    // under columns, so slice at a fixed page height to stay consistent with print/Word column flow
     const cuts =
       metrics.columns > 1
         ? Array.from(
@@ -90,7 +92,7 @@ export async function snapshotToPdf(
       .slice(0, MAX_PAGES);
     if (pages.length === 0) return { ok: false, error: 'RENDER_FAILED' };
 
-    // 大文档按高度分片光栅化，避免单张超大 canvas（浏览器尺寸上限/内存）
+    // Rasterize large documents in height chunks, avoiding one oversized canvas (browser size limits / memory)
     const pixelRatio = height > CHUNK_HEIGHT_PX ? 1.5 : 2;
     const background = setup.background ?? '#ffffff';
     const source = await rasterize(container, width, height, pixelRatio, onProgress, background);
@@ -103,7 +105,7 @@ export async function snapshotToPdf(
       orientation: 'portrait',
       compress: true,
     });
-    // 页面背景：快照已按背景色填充，这里只需补内容区之外的纸张边距
+    // Page background: the snapshot is already filled, so only the sheet margins outside the content area need it
     if (setup.background) {
       doc.setFillColor(setup.background);
       doc.rect(0, 0, metrics.widthMm, metrics.heightMm, 'F');
@@ -137,9 +139,9 @@ export async function snapshotToPdf(
         metrics.contentWidthMm,
         pageHeightMm,
       );
-      // 水印：文本层叠在快照之上，保证透明度与旋转可控
+      // Watermark: drawn as text over the snapshot so opacity and rotation stay controllable
       drawWatermark(doc, setup, metrics);
-      // 页眉 / 页脚 / 页码（文本层叠在快照之上）
+      // Header / footer / page number (drawn as text over the snapshot)
       drawHeaderFooter(doc, setup, metrics, i + 1);
       onProgress?.((i + 1) / pages.length);
     }
@@ -152,8 +154,8 @@ export async function snapshotToPdf(
 }
 
 /**
- * 光栅化容器为 canvas：超过分片阈值时按高度分段渲染再拼接，
- * 避免单张超大 canvas 触发浏览器尺寸上限或内存峰值。
+ * Rasterize the container into a canvas: above the chunk threshold, render in height segments and
+ * stitch them, avoiding one oversized canvas hitting browser size limits or memory spikes.
  */
 async function rasterize(
   container: HTMLElement,
@@ -211,7 +213,7 @@ async function rasterize(
   return canvas;
 }
 
-/** 十六进制颜色 → RGB 三元组（jsPDF 需要分通道设置颜色） */
+/** Hex color -> RGB triple (jsPDF sets colors per channel) */
 function hexToRgb(hex: string): [number, number, number] {
   const value = hex.replace('#', '');
   return [
@@ -222,8 +224,9 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 /**
- * 在快照页上绘制文字水印。
- * 与屏幕/打印一致：位于内容区中心、按 rotation 反向倾斜、透明度由 GState 控制。
+ * Draw the text watermark on a snapshot page.
+ * Consistent with screen/print: centered in the content area, tilted by the inverse of rotation, with
+ * opacity controlled via GState.
  */
 function drawWatermark(
   doc: import('jspdf').jsPDF,
@@ -234,7 +237,7 @@ function drawWatermark(
   if (!watermark || !watermark.text.trim()) return;
   const [r, g, b] = hexToRgb(watermark.color);
   doc.saveGraphicsState();
-  // 字号随内容宽度缩放：与屏幕用 vw 级字号保持同样的视觉比例
+  // Font size scales with content width, keeping the same visual ratio as the vw-sized text on screen
   doc.setFontSize(Math.max(24, Math.round(metrics.contentWidthMm * 0.9)));
   doc.setTextColor(r, g, b);
   const gState = (doc as unknown as { GState?: new (options: { opacity: number }) => unknown })
@@ -249,7 +252,7 @@ function drawWatermark(
   doc.restoreGraphicsState();
 }
 
-/** 在快照页上绘制页眉 / 页脚 / 页码（页眉位于上边距中部，页脚位于下边距中部） */
+/** Draw header / footer / page number on a snapshot page (header mid top margin, footer mid bottom margin) */
 function drawHeaderFooter(
   doc: import('jspdf').jsPDF,
   setup: PageSetupConfig,

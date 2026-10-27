@@ -35,7 +35,7 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
     setOpen(false);
     onError(null);
     const state = useMindStore.getState();
-    // 导出文件名取自工具栏的文档标题
+    // The export filename comes from the document title in the toolbar
     const filename = state.docName.trim() || 'mindmap';
 
     if (TEXT_KINDS.includes(kind)) {
@@ -46,7 +46,7 @@ export function IoMenu({ busy, setBusy, onError }: IoMenuProps) {
 
     setBusy(true);
     const nodes = getNodes() as Node<MindNodeData>[];
-    // 导出底色跟随当前主题
+    // The export background follows the current theme
     const background = themeOf(state.doc.themeId).background;
     const result = await exportRaster(
       nodes,

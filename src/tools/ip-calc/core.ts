@@ -40,7 +40,7 @@ function formatIpv4(n: bigint): string {
   return [24n, 16n, 8n, 0n].map((shift) => String((n >> shift) & 0xffn)).join('.');
 }
 
-/** 展开 IPv6（支持 :: 压缩与内嵌 IPv4），返回 128 位整数 */
+/** Expand an IPv6 address (handles :: compression and embedded IPv4) into a 128-bit integer */
 function parseIpv6(input: string): bigint | null {
   let ip = input.trim();
   if (!ip) return null;
@@ -77,7 +77,7 @@ function parseIpv6(input: string): bigint | null {
     if (groups.length !== 8) return null;
   } else {
     const fill = 8 - groups.length - right.length;
-    // "::" 至少要压缩掉一个 0 组
+    // "::" must compress at least one all-zero group
     if (fill < 1) return null;
     groups.push(...Array.from({ length: fill }, () => '0'), ...right);
   }
@@ -88,7 +88,7 @@ function parseIpv6(input: string): bigint | null {
   return n;
 }
 
-/** 按 RFC 5952 输出压缩形式 */
+/** Emit the compressed form per RFC 5952 */
 function formatIpv6(n: bigint): string {
   const groups: string[] = [];
   for (let i = 7; i >= 0; i -= 1) groups.push(((n >> BigInt(i * 16)) & 0xffffn).toString(16));
@@ -129,8 +129,8 @@ function maskOf(prefix: number, version: IpVersion): bigint {
 }
 
 /**
- * 解析 IPv4 / IPv6（可带 /prefix）。
- * 不带前缀时按单主机处理（v4 = /32，v6 = /128）。
+ * Parse IPv4 / IPv6 with an optional /prefix.
+ * Without a prefix the address is a single host (v4 = /32, v6 = /128).
  */
 export function parseIpQuery(input: string): ToolResult<IpInfo> {
   const trimmed = input.trim();
@@ -189,7 +189,7 @@ export function parseIpQuery(input: string): ToolResult<IpInfo> {
 
 const MAX_SUBNETS = 4096;
 
-/** 子网划分：把输入网段按 newPrefix 切成等长子网 */
+/** Subnetting: split the input network into equal subnets at newPrefix */
 export function splitSubnets(input: string, newPrefix: number): ToolResult<string[]> {
   const base = parseIpQuery(input);
   if (!base.ok) return base;

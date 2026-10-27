@@ -8,7 +8,7 @@ const SETTINGS_KEY = 'syntools:settings.v1';
 type SettingsBlob = {
   theme?: ThemeMode;
   lang?: Lang;
-  /** 用户是否在 UI 中显式选择过语言（未设置则每次按系统/浏览器检测） */
+  /** Whether the user picked a language in the UI (otherwise detect from system/browser each time) */
   langExplicit?: boolean;
 };
 
@@ -33,7 +33,7 @@ function readStoredTheme(): ThemeMode {
   return theme === 'light' || theme === 'dark' || theme === 'system' ? theme : 'system';
 }
 
-/** 与 index.html 内联脚本保持一致的主题应用逻辑（技术设计 §6.3） */
+/** Theme application kept in sync with the inline script in index.html (tech design §6.3) */
 export function applyTheme(mode: ThemeMode) {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const dark = mode === 'dark' || (mode === 'system' && prefersDark);
@@ -43,7 +43,7 @@ export function applyTheme(mode: ThemeMode) {
 interface SettingsState {
   theme: ThemeMode;
   setTheme: (mode: ThemeMode) => void;
-  /** 按当前实际明暗状态取反 */
+  /** Flip the actual current light/dark state */
   toggleTheme: () => void;
   lang: Lang;
   setLang: (lang: Lang) => Promise<void>;
@@ -52,7 +52,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   theme: readStoredTheme(),
   setTheme: (theme) => {
-    // 只写 theme，不把当前检测语言误标为「用户选择」
+    // Write theme only; never mark the detected language as a user choice
     writeSettingsBlob({ theme });
     applyTheme(theme);
     set({ theme });
@@ -63,15 +63,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   lang: resolveBootLang(),
   setLang: async (lang) => {
-    // 只写 langExplicit：路径前缀不以「用户选择」的形式落盘，
-    // 否则从 /zh/ 进来的人会被永久钉在中文，之后访问 / 也不生效了
+    // Write langExplicit only: a path prefix must not be persisted as a user choice,
+    // or visitors entering from /zh/ stay pinned to Chinese and later visits to / do nothing
     writeSettingsBlob({ theme: get().theme, lang, langExplicit: true });
     await changeAppLanguage(lang);
     set({ lang });
   },
 }));
 
-// system 模式下跟随系统主题变化
+// In system mode, follow OS theme changes
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (useSettingsStore.getState().theme === 'system') applyTheme('system');
 });

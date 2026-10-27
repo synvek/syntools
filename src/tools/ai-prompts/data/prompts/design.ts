@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 设计与创意类提示词，详见 ../README.md */
+/** Design and creativity prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'design-brief',

@@ -1,15 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CopyButton } from '@/core/components/CopyButton';
-import {
-  MBTI_QUESTIONS,
-  answeredCount,
-  scoreMbti,
-  type MbtiResult,
-} from './core';
+import { MBTI_QUESTIONS, answeredCount, scoreMbti, type MbtiResult } from './core';
 import { getMbtiQuestion, getMbtiTypeCopy } from './copy';
 
-/** MBTI 在线性格测试 */
+/** MBTI personality test */
 export default function MbtiTestTool() {
   const { t, i18n } = useTranslation();
   const [answers, setAnswers] = useState<Record<string, 'a' | 'b'>>({});
@@ -100,16 +95,17 @@ export default function MbtiTestTool() {
         <span className="font-mono text-xs">{progress}%</span>
       </div>
       <div className="h-2 overflow-hidden rounded bg-gray-100 dark:bg-gray-800">
-        <div className="h-full rounded bg-blue-500 transition-all" style={{ width: `${progress}%` }} />
+        <div
+          className="h-full rounded bg-blue-500 transition-all"
+          style={{ width: `${progress}%` }}
+        />
       </div>
 
       <div className="rounded-md border border-gray-200 p-4 dark:border-gray-700">
         <p className="text-xs text-gray-400">
           {t('tools.mbti.questionIndex', { n: step + 1, total })}
         </p>
-        <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-50">
-          {qCopy?.text}
-        </p>
+        <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-50">{qCopy?.text}</p>
         <div className="mt-4 flex flex-col gap-2">
           {current.options.map((opt) => {
             const selected = answers[current.id] === opt.id;

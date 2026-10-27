@@ -1,8 +1,8 @@
 /**
- * 在线日历：月视图网格与日期格式化（纯函数）。
+ * Online calendar: month-view grid and date formatting (pure functions).
  */
 
-export type WeekStart = 0 | 1; // 0=周日, 1=周一
+export type WeekStart = 0 | 1; // 0 = Sunday, 1 = Monday
 
 export interface CalendarCell {
   year: number;
@@ -18,7 +18,7 @@ export interface DateFormats {
   weekDay: number; // 0-6 Sun-Sat
 }
 
-/** 构造某月日历网格（含上下月填充，固定 6 行 × 7 列） */
+/** Build the month grid (with adjacent-month padding, always 6 rows × 7 columns) */
 export function buildMonthGrid(
   year: number,
   month: number,
@@ -41,7 +41,11 @@ export function buildMonthGrid(
   return cells;
 }
 
-export function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
+export function shiftMonth(
+  year: number,
+  month: number,
+  delta: number,
+): { year: number; month: number } {
   const d = new Date(year, month - 1 + delta, 1);
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
@@ -78,7 +82,7 @@ export function formatDateParts(
   };
 }
 
-/** 周标题顺序：按 weekStartsOn 旋转 [日..六] 的索引 */
+/** Weekday header order: indexes of [Sun..Sat] rotated by weekStartsOn */
 export function weekdayOrder(weekStartsOn: WeekStart): number[] {
   return Array.from({ length: 7 }, (_, i) => (weekStartsOn + i) % 7);
 }
@@ -93,8 +97,4 @@ export {
   type RestMark,
 } from './culture';
 
-export {
-  easterSunday,
-  getWesternHoliday,
-  resolveWesternRegion,
-} from './western-holidays';
+export { easterSunday, getWesternHoliday, resolveWesternRegion } from './western-holidays';

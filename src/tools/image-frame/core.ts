@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 图片边框 / 圆角 / 阴影：参数校验与画布尺寸（绘制在 UI）。
+ * Image border / rounded corners / shadow: option validation and canvas geometry (drawing happens in the UI).
  */
 
 export type FrameError = 'NOT_IMAGE' | 'INVALID';
@@ -53,19 +53,19 @@ export function clampFrameOptions(raw: Partial<FrameOptions>): FrameOptions {
 export interface FrameLayout {
   canvasWidth: number;
   canvasHeight: number;
-  /** 内容区（含边框）左上角 */
+  /** Top-left of the content area (border included) */
   contentX: number;
   contentY: number;
   contentWidth: number;
   contentHeight: number;
-  /** 图片绘制区（边框内侧） */
+  /** Image drawing area (inside the border) */
   imageX: number;
   imageY: number;
   imageWidth: number;
   imageHeight: number;
 }
 
-/** 为阴影留出 padding，计算最终画布布局 */
+/** Compute the final canvas layout, padded to leave room for the shadow */
 export function computeFrameLayout(
   imgW: number,
   imgH: number,
@@ -102,7 +102,11 @@ export function hexToRgba(hex: string, alpha: number): string {
   const m = hex.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
   if (!m) return `rgba(0,0,0,${alpha})`;
   let h = m[1];
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);
   const b = parseInt(h.slice(4, 6), 16);

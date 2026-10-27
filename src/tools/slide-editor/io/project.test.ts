@@ -4,8 +4,8 @@ import type { SlideDoc } from '../model/types';
 import { openProject, PROJECT_FORMAT, saveProject } from './project';
 
 /**
- * jsdom 的 Blob 没有 arrayBuffer()（同 rich-text-editor 的既有处理），
- * 这里补一个 FileReader 兜底，避免测试环境差异掩盖真实问题。
+ * jsdom's Blob has no arrayBuffer() (same handling as rich-text-editor),
+ * so a FileReader fallback is added here to keep environment differences from masking real problems.
  */
 function ensureArrayBuffer(): void {
   const proto = Blob.prototype as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> };
@@ -25,7 +25,7 @@ function sampleDoc(): SlideDoc {
   doc.slides[0].elements = [createTextElement(doc, '内容')];
   doc.slides.push({ id: 'slide-2', layoutId: doc.layouts[0]?.id, elements: [] });
   doc.slides[1].notes = '第二页备注';
-  // 一个 1x1 PNG 的原始字节，验证图片不丢
+  // Raw bytes of a 1x1 PNG, to verify images aren't lost
   doc.media.asset1 = {
     id: 'asset1',
     mime: 'image/png',

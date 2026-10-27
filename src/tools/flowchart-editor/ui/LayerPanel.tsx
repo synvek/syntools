@@ -9,12 +9,12 @@ const iconBtn =
 
 interface TreeRow {
   node: FlowNode;
-  /** 0 = 顶层；1 = 容器内子节点 */
+  /** 0 = top level; 1 = child node inside a container */
   depth: number;
   hasChildren: boolean;
 }
 
-/** 顶层在前（数组越靠后层级越高），容器行之后紧跟其子节点 */
+/** Top level first (later in the array means higher in the stack), with each container's children right after its row */
 function buildRows(nodes: FlowNode[], collapsed: ReadonlySet<string>): TreeRow[] {
   const tops = nodes.filter((n) => !n.parentId).reverse();
   const rows: TreeRow[] = [];
@@ -52,10 +52,10 @@ export function LayerPanel() {
           t(`tools.flowchart.shape_${n.data.kind}`).toLowerCase().includes(q),
       )
       .map((n) => ({ node: n, depth: n.parentId ? 1 : 0, hasChildren: false }));
-    // t 变化时重新计算（语言切换）
+    // Recompute when t changes (language switch)
   }, [q, rows, nodes, t]);
 
-  /** 选中：普通点击单选，Ctrl/⌘ 点击多选，Shift 点击按显示顺序范围选择 */
+  /** Selection: a plain click selects one, Ctrl/⌘ click multi-selects, Shift click selects a range in display order */
   const selectRow = (node: FlowNode, e: React.MouseEvent) => {
     const ids = visibleRows.map((r) => r.node.id);
     const state = useFlowStore.getState();
@@ -83,7 +83,7 @@ export function LayerPanel() {
     });
   };
 
-  /** 拖放：拖到容器行 → 归入该容器；拖到普通行 → 排序（或跟随该行的容器） */
+  /** Drag and drop: onto a container row → join that container; onto a plain row → reorder (or follow that row's container) */
   const dropOnRow = (target: FlowNode) => {
     const id = dragId.current;
     dragId.current = null;
@@ -212,7 +212,7 @@ export function LayerPanel() {
                     setEditingId(null);
                   }}
                   onKeyDown={(e) => {
-                    // 阻止冒泡：提交后输入框卸载，避免全局快捷键误判为画布操作
+                    // Stop propagation: the input unmounts after submit, so global shortcuts do not mistake it for a canvas action
                     e.stopPropagation();
                     if (e.key === 'Enter') {
                       e.preventDefault();

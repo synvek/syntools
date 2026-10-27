@@ -8,7 +8,7 @@ import { WEIGHT_UNITS, convertWeightAll, type WeightUnit } from './core';
 
 const UNIT_SET = new Set<string>(WEIGHT_UNITS);
 
-/** 重量单位转换 */
+/** Weight unit converter */
 export default function WeightConverterTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ v: '1', f: 'kg' }), []);

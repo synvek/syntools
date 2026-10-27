@@ -1,19 +1,19 @@
 import type { ChartElement, ChartType } from './types';
 
 /**
- * 图表数据规范化。
+ * Chart data normalization.
  *
- * 纯函数（不依赖 Konva / echarts），供三处共用：
- * - 导入：把 `c:chart` 解析出的原始类别/系列补齐成模型要求的形状；
- * - 属性面板：编辑行列时保持 categories 与 series 长度对齐；
- * - 导出：ChartType → pptxgenjs 图表名。
+ * Pure functions (no Konva / echarts dependency), shared by three call sites:
+ * - import: pads the raw categories/series parsed from `c:chart` into the shape the model expects;
+ * - property panel: keeps categories and series the same length while editing rows/columns;
+ * - export: ChartType → pptxgenjs chart name.
  */
 
 /**
- * 所有受支持的图表类型（顺序即插入面板展示顺序）。
+ * All supported chart types (order = display order in the insert panel).
  *
- * `labelKey` 是 `tools.slide.*` 下的 i18n 键后缀，9 种语言都有对应文案；
- * 这里不写死展示文案，否则英文界面里会出现中文标签。
+ * `labelKey` is the suffix of an i18n key under `tools.slide.*`, with copy for all 9 languages;
+ * display text is not hardcoded here, otherwise English UIs would show Chinese labels.
  */
 export const CHART_TYPES: { id: ChartType; labelKey: string }[] = [
   { id: 'bar', labelKey: 'chartBar' },
@@ -27,7 +27,7 @@ export const CHART_TYPES: { id: ChartType; labelKey: string }[] = [
   { id: 'radar', labelKey: 'chartRadar' },
 ];
 
-/** ChartType → pptxgenjs 的 CHART_NAME（导出侧查表，避免散落字符串） */
+/** ChartType → pptxgenjs CHART_NAME (looked up on export to avoid scattered strings) */
 export function chartNameOf(type: ChartType): string {
   switch (type) {
     case 'bar':
@@ -51,7 +51,7 @@ export function chartNameOf(type: ChartType): string {
   }
 }
 
-/** 柱形图分组方式（pptxgenjs 的 barGrouping） */
+/** Bar grouping (pptxgenjs `barGrouping`) */
 export function barGroupingOf(type: ChartType): string | undefined {
   if (type === 'barStacked') return 'stacked';
   if (type === 'barPercent') return 'percent';
@@ -59,7 +59,7 @@ export function barGroupingOf(type: ChartType): string | undefined {
   return undefined;
 }
 
-/** 饼图/环形图只取第一个系列 */
+/** Pie/doughnut charts only use the first series */
 export function isSingleSeriesChart(type: ChartType): boolean {
   return type === 'pie' || type === 'doughnut';
 }
@@ -70,10 +70,10 @@ function toNumber(value: unknown): number {
 }
 
 /**
- * 规范化图表数据：
- * - 保证至少 1 个类别与 1 个系列（空数据也能安全渲染）；
- * - 每个系列的数值长度补齐到类别数（缺的补 0，多的截断）；
- * - 饼图系列超过 1 个时截断（OOXML 饼图也只表达单系列）。
+ * Normalize chart data:
+ * - guarantee at least 1 category and 1 series (empty data still renders safely);
+ * - pad each series to the category count (missing values become 0, extras are truncated);
+ * - truncate pie charts to one series (OOXML pie charts express only a single series too).
  */
 export function normalizeChartData(
   categories: string[],
@@ -93,7 +93,7 @@ export function normalizeChartData(
   };
 }
 
-/** 调整类别数量：同步裁剪/补齐每个系列的数值长度 */
+/** Resize the category count: trims or pads each series' values accordingly */
 export function resizeChartCategories(element: ChartElement, count: number): ChartElement {
   const size = Math.max(1, Math.round(count));
   const categories = Array.from(
@@ -111,7 +111,7 @@ export function resizeChartCategories(element: ChartElement, count: number): Cha
   };
 }
 
-/** 调整系列数量：裁剪或补齐（新系列填 0） */
+/** Resize the series count: trim or pad (new series filled with 0) */
 export function resizeChartSeries(element: ChartElement, count: number): ChartElement {
   const size = Math.max(1, Math.round(count));
   const width = Math.max(1, element.categories.length);
@@ -123,7 +123,7 @@ export function resizeChartSeries(element: ChartElement, count: number): ChartEl
   return { ...element, series, revision: (element.revision ?? 0) + 1 };
 }
 
-/** 修改单个数值 */
+/** Update a single value */
 export function setChartValue(
   element: ChartElement,
   seriesIndex: number,
@@ -144,7 +144,7 @@ export function setChartValue(
   };
 }
 
-/** 修改类别名 / 系列名 */
+/** Rename a category / series */
 export function setChartLabel(
   element: ChartElement,
   kind: 'category' | 'series',
@@ -165,7 +165,7 @@ export function setChartLabel(
   };
 }
 
-/** 主题 accent 色作为图表默认配色（与 Office 主题色板一致） */
+/** Theme accent colors as the chart's default palette (matching the Office theme colors) */
 export function themePalette(colors: Record<string, string> | undefined): string[] {
   const keys = ['accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'];
   const picked = keys

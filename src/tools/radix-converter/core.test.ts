@@ -117,7 +117,7 @@ describe('applyBitOperator', () => {
     expect(applyBitOperator('shl', 1n, 3n)).toEqual({ ok: true, value: 8n });
     expect(applyBitOperator('shl', 1n, 63n)).toEqual({ ok: true, value: MIN_I64 });
     expect(applyBitOperator('shl', -1n, 1n)).toEqual({ ok: true, value: -2n });
-    // 移位量对 64 取模
+    // Shift amount is taken modulo 64
     expect(applyBitOperator('shl', 5n, 64n)).toEqual({ ok: true, value: 5n });
   });
 

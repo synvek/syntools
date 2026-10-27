@@ -1,8 +1,8 @@
 <!doctype html>
 <!--
-  默认树是英文（无前缀路径 = en），中文树在 /zh/ 下。
-  `lang` / `title` / `description` 在这里只是兜底：构建结束时
-  scripts/prerender.ts 会按语言重写它们，并在两棵树里注入 hreflang。
+  The default tree is English (no path prefix = en); the Chinese tree lives under /zh/.
+  `lang` / `title` / `description` here are only fallbacks: at the end of the build
+  scripts/prerender.ts rewrites them per language and injects hreflang into both trees.
 -->
 <html lang="en">
   <head>
@@ -15,7 +15,7 @@
       name="description"
       content="SynTools is a free online toolkit that runs entirely in your browser: JSON, Base64, regex, hashing, PDF, images and Office documents, with no uploads."
     />
-    <!-- 百度搜索资源平台站点验证：验证通过后不可删除，百度会定期复查 -->
+    <!-- Baidu Search Resource Platform site verification: must not be removed once verified; Baidu re-checks it periodically -->
     <meta name="baidu-site-verification" content="codeva-tIYOjt3A6N" />
     <script src="/theme-init.js"></script>
   </head>

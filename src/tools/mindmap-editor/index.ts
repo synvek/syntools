@@ -1,11 +1,12 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 脑图编辑器（「文档与创作」分类重工具）：
- * 自研 Canvas 同样采用 React Flow（@xyflow/react）渲染引擎，配合自研 tidy-tree 布局，
- * 提供类 XMind / MindMaster 的思维导图编辑能力——键盘快速建节点、分支折叠、
- * 多种布局与配色主题、拖拽改挂父节点、撤销重做，并支持 PNG / SVG / PDF / JSON /
- * Markdown 导出与本地草稿（数据不离开浏览器）。
+ * Mind map editor (a heavyweight tool in the "Documents & creation" category):
+ * The home-grown canvas also uses React Flow (`@xyflow/react`) as its rendering engine, paired with
+ * our own tidy-tree layout, to deliver XMind / MindMaster-style mind mapping — rapid keyboard node
+ * creation, branch collapsing, multiple layouts and colour themes, drag-and-drop reparenting,
+ * undo / redo, plus PNG / SVG / PDF / JSON / Markdown export and local drafts (data never leaves
+ * the browser).
  */
 export const mindmapEditorTool: ToolMeta = {
   id: 'mindmap-editor',

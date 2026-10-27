@@ -62,7 +62,7 @@ import { NARROW_QUERY, useMediaQuery } from './ui/useMediaQuery';
 import type { CanvasBackground, PhotoDoc } from './model/types';
 import './photo.css';
 
-// 工具文案随本 chunk 懒加载注册，不占用首屏语言包体积
+// Tool labels register with this lazily loaded chunk, keeping them out of the first-paint bundle
 registerPhotoStrings(i18n);
 
 type Failure = { error: string; params?: Record<string, string | number> };
@@ -71,19 +71,19 @@ type DialogKind = 'new' | 'canvas' | 'export' | 'shortcuts' | null;
 const DRAFT_DEBOUNCE_MS = 1200;
 
 /**
- * 工作区高度下限。
+ * Minimum workspace height.
  *
- * 460 = 工具箱 11 行的自然高度（约 454px，32px 按钮 + 分隔线）再留一点余量：
- * 比它更矮时左侧栏会出现内部滚动条，而它比改前的 520px 更小 —— 画布反而更高了。
+ * 460 = the natural height of 11 tool rows (about 454px: 32px buttons plus dividers) plus a little slack:
+ * below it the left rail scrolls internally, and since it beats the old 520px the canvas ends up taller.
  */
 const MIN_WORK_HEIGHT = 460;
 
 /**
- * 照片编辑器：Konva 画布 + 浏览器本地的多图层图像编辑。
- * 所有 Konva / DOM 副作用都收在懒加载模块内（PhotoCanvas），避免被 prerender 的 SSR 载入触发。
+ * Photo editor: a Konva canvas plus browser-local, multi-layer image editing.
+ * All Konva / DOM side effects live inside the lazy module (PhotoCanvas), so prerender's SSR never runs them.
  *
- * 工作区结构（自上而下）：菜单栏（含画布名 / 新建 / 放映 / 状态 / 清空）→ 工具参数条
- * → 左工具箱 / 画布 / 右面板停靠列 → 状态栏（含画布信息与内存占用）。
+ * Workspace layout (top to bottom): menu bar (canvas name / new / present / status / clear) → tool options bar
+ * → left toolbox / canvas / right panel dock → status bar (canvas info and memory usage).
  */
 export default function PhotoTool() {
   const { t } = useTranslation();
@@ -119,34 +119,34 @@ export default function PhotoTool() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
-  /** PSD 导出进行中（只有这个分支会异步载入 ag-psd） */
+  /** PSD export in progress (only this branch loads ag-psd asynchronously) */
   const [psdBusy, setPsdBusy] = useState(false);
   const [presentSrc, setPresentSrc] = useState<string | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
-  /** 窄屏改为纵向堆叠：固定工作区高度会把画布挤没，改由内容自然撑开 */
+  /** Narrow screens stack vertically: a fixed workspace height would squeeze the canvas away, so content decides */
   const isNarrow = useMediaQuery(NARROW_QUERY);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
-  /** 图片选择器有两种用途：置入当前画布（默认）/ 作为新文档打开 */
+  /** The image picker serves two purposes: place into the current canvas (default) / open as a new document */
   const imageIntentRef = useRef<'import' | 'open'>('import');
   const projectInputRef = useRef<HTMLInputElement | null>(null);
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
   const workRowRef = useRef<HTMLDivElement | null>(null);
   /**
-   * 工作区（工具箱 + 画布 + 右侧面板）高度 = 首屏剩余空间。
+   * Workspace height (toolbox + canvas + right panel) = the space left below the first screen.
    *
-   * 必须测，不能写死 `calc(100vh - Npx)`：工作区上方的行数会变（提示条、降级提示、画布为空时的说明），
-   * 写死常量会在这些情况下把状态栏挤出视口；宽度/高度的变化由 hook 内部的重测兜住。
+   * It must be measured, not hard-coded as `calc(100vh - Npx)`: the rows above vary (hints, degraded notices,
+   * empty-canvas help), and a constant would push the status bar out of view; the hook re-measures on resize.
    *
-   * 另一重意义：**切断「左侧工具栏高度 → 工作区高度」的传导**。
-   * 之前工具栏平铺 26 个工具约 1100px，它是 flex 行里最高的元素，于是整行被撑到 1100px，
-   * 画布也一起被拉长，页面只能滚动 —— 工作区高度改由视口决定后，工具栏再高也只会自己内部滚动。
+   * It also **cuts the "left toolbar height → workspace height" chain**.
+   * Before, 26 flat tools made the rail about 1100px, the tallest item in the flex row, so the whole row
+   * stretched and the page scrolled. With the height driven by the viewport, a tall rail only scrolls itself.
    */
   const workHeight = useViewportFill(workRowRef, { min: MIN_WORK_HEIGHT });
 
   const fail = useCallback((result: Failure) => setFailure(result), []);
 
-  /* --------------------------- 面板布局持久化 --------------------------- */
+  /* --------------------------- Panel layout persistence --------------------------- */
 
   const [panelsRestored, setPanelsRestored] = useState(false);
 
@@ -155,13 +155,13 @@ export default function PhotoTool() {
     setPanelsRestored(true);
   }, [setPanels]);
 
-  // 读取完成前不回写：StrictMode 会二次挂载，先写一次默认值就会把已存的布局覆盖掉
+  // Don't write back before loading finishes: StrictMode mounts twice and a default write would clobber it
   useEffect(() => {
     if (!panelsRestored) return;
     savePanelLayout(panels);
   }, [panels, panelsRestored]);
 
-  /** 放映：先渲染放映层（显示「生成中」），下一帧再合成整幅位图，避免大图卡住首次绘制 */
+  /** Present: show the layer first ("generating"), composite the bitmap next frame, so big images stay fluid */
   const openPresent = useCallback(() => {
     setPresentSrc(null);
     setPresentFailed(false);
@@ -177,9 +177,9 @@ export default function PhotoTool() {
   }, []);
 
   /**
-   * 吸管结果：写入前景色并给出瞬时反馈。
-   * 单独做一层反馈是因为「只改笔刷颜色」在界面上看不出任何变化，
-   * 用户会以为吸管没反应（尤其吸到透明像素时）。
+   * Eyedropper result: write the foreground color and give instant feedback.
+   * The extra feedback exists because "just change the brush color" is invisible in the UI,
+   * so users would think the eyedropper did nothing (especially when sampling a transparent pixel).
    */
   const handlePickColor = useCallback(
     (picked: PickedColor | null) => {
@@ -194,14 +194,14 @@ export default function PhotoTool() {
     [t],
   );
 
-  // 提示 2 秒后自动消失
+  // The toast disappears after 2 seconds
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), 2000);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  /* ------------------------------ 草稿 ------------------------------ */
+  /* ------------------------------ Draft ------------------------------ */
 
   useEffect(() => {
     let cancelled = false;
@@ -211,8 +211,8 @@ export default function PhotoTool() {
         loadDoc(draft.doc);
         setDegraded(draft.degraded);
       }
-      // 首次进入（无草稿）或草稿本身就是空文档：预置一张可编辑的底色图层，
-      // 与 PS / Photopea 新建即有「背景」层一致，不再另设空态提示。
+      // First visit (no draft) or a draft that is itself an empty document: seed one editable background layer,
+      // matching PS / Photopea where a new document starts with a "Background" layer, so no empty-state hint.
       const state = usePhotoStore.getState();
       if (state.doc.layers.length === 0) state.ensurePaintLayer();
       setRestored(true);
@@ -230,7 +230,7 @@ export default function PhotoTool() {
     return () => window.clearTimeout(timer);
   }, [doc, restored]);
 
-  /* ------------------------------ 导入 / 导出 ------------------------------ */
+  /* ------------------------------ Import / export ------------------------------ */
 
   const handleImage = useCallback(
     async (file: File) => {
@@ -240,7 +240,7 @@ export default function PhotoTool() {
         fail(check as Failure);
         return;
       }
-      // SVG 是矢量：先解析固有尺寸，再按倍数栅格化（默认 2 倍，导入后缩放不易糊）
+      // SVG is vector: read its intrinsic size, then rasterize at a multiple (2× by default, so zoom stays crisp)
       const result =
         resolveImageKind(file.name) === 'svg' ? await loadSvgFile(file) : await loadImageFile(file);
       if (!result.ok) {
@@ -262,10 +262,10 @@ export default function PhotoTool() {
   );
 
   /**
-   * 打开图片：以图片尺寸新建画布并载入图片（替换当前文档）。
+   * Open image: create a canvas at the image size and load the image (replacing the current document).
    *
-   * 与 `handleImage` 的区别：那个是「把图片置入当前画布」，画布尺寸不变、只多一个图层；
-   * 这里才是真正的「打开」—— 画布跟着图片走，图片铺满画布，可直接对原图做调整。
+   * Unlike `handleImage`, which places the image into the current canvas (same size, one more layer),
+   * this is a real "open": the canvas follows the image, the image fills it, and edits hit the original.
    */
   const handleOpenImage = useCallback(
     async (file: File) => {
@@ -282,7 +282,7 @@ export default function PhotoTool() {
         return;
       }
       const { assetId, width, height } = result.value;
-      // 画布尺寸上限 4096：超大图按比例缩小画布，图片图层同步缩放，避免文档尺寸越界
+      // Canvas cap 4096: oversized images shrink the canvas proportionally and scale the layer, staying in range
       const ratio = Math.min(1, MAX_CANVAS_SIZE / width, MAX_CANVAS_SIZE / height);
       const canvasWidth = Math.max(1, Math.round(width * ratio));
       const canvasHeight = Math.max(1, Math.round(height * ratio));
@@ -295,15 +295,15 @@ export default function PhotoTool() {
         x: 0,
         y: 0,
       });
-      // 文档与图层一次性交给 loadDoc：它会回收未被引用的资产，
-      // 先建立好引用关系，刚读进来的图片才不会被当作旧文档资产清掉。
+      // Hand the document and layers to loadDoc in one go: it reclaims unreferenced assets, so the
+      // references must exist first, or the freshly read image would be collected as an old asset.
       loadDoc({
         ...createDoc(),
         name,
         width: canvasWidth,
         height: canvasHeight,
-        // 白底与「新建画布」一致：橡皮擦掉像素后露出的是白色，而不是舞台的深色棋盘格。
-        // 需要透明背景（例如抠好的 PNG）可用菜单「图像 → 透明」切换。
+        // A white base matches "new canvas": erasing reveals white, not the stage's dark checkerboard.
+        // For a transparent background (e.g. a cut-out PNG) use the menu "Image → Transparent".
         background: 'white',
         layers: [layer],
         activeLayerId: layer.id,
@@ -337,8 +337,8 @@ export default function PhotoTool() {
   );
 
   /**
-   * 导入 PSD：还原为可继续编辑的图层（组 / 蒙版 / 混合模式 / 文字 / 图层效果）。
-   * 无法还原的部分（调整图层等）由读取器统计并提示，避免用户以为「导进来少了东西」。
+   * Import PSD: restore layers that stay editable (groups / masks / blend modes / text / layer effects).
+   * Whatever can't be restored (adjustment layers etc.) is counted by the reader and reported to the user.
    */
   const handlePsd = useCallback(
     async (file: File) => {
@@ -378,7 +378,7 @@ export default function PhotoTool() {
           dpi,
         };
         const canvas = exportDoc(current, options);
-        // TIFF / GIF / PDF 需要现场编码字节（浏览器只能原生编码 png / jpeg / webp）
+        // TIFF / GIF / PDF need bytes encoded here (browsers only encode png / jpeg / webp natively)
         await downloadExport(
           canvas,
           buildExportFilename(docDisplayName(current.name, t), exportExtension(format)),
@@ -392,7 +392,7 @@ export default function PhotoTool() {
     [fail, selection, t],
   );
 
-  /** PSD 导出：动态载入 writer（ag-psd 只在这一次使用时才下载） */
+  /** PSD export: load the writer dynamically (ag-psd is downloaded only for this one use) */
   const handleExportPsd = useCallback(async () => {
     setFailure(null);
     setPsdBusy(true);
@@ -422,8 +422,8 @@ export default function PhotoTool() {
 
   const handleNewCanvas = useCallback(
     (width: number, height: number, background: CanvasBackground) => {
-      // 新文档从空白开始：名称一并重置为空（UI 显示「未命名画布」占位名），
-      // 不沿用旧画布的名字，否则导出文件名会一直带着上一张图的名字。
+      // A new document starts blank: reset the name too (the UI shows the "Untitled canvas" placeholder),
+      // or the exported file name would keep carrying the previous image's name.
       const next: PhotoDoc = {
         ...createDoc(),
         name: '',
@@ -432,7 +432,7 @@ export default function PhotoTool() {
         background,
       };
       loadDoc(next);
-      // 新建画布即预置一张底色图层（与初始化 / 清空一致）
+      // A new canvas seeds one background layer (consistent with init / clear)
       usePhotoStore.getState().ensurePaintLayer();
       setScale(0);
       setViewport({ x: 0, y: 0 });
@@ -443,7 +443,7 @@ export default function PhotoTool() {
     [loadDoc, setScale, setViewport],
   );
 
-  /** 应用画布尺寸 / 背景（单次历史提交） */
+  /** Apply canvas size / background (a single history entry) */
   const handleCanvasSize = useCallback(
     (width: number, height: number, background: CanvasBackground) => {
       usePhotoStore.getState().applyCanvas(width, height, background);
@@ -453,7 +453,7 @@ export default function PhotoTool() {
 
   const handleClear = useCallback(() => {
     loadDoc(createDoc());
-    // 清空后回到「有一张底色图层」的初始态，与首次进入一致
+    // Clearing returns to the initial state with one background layer, same as the first visit
     usePhotoStore.getState().ensurePaintLayer();
     clearDraft();
     setDraftSaved(false);
@@ -461,28 +461,28 @@ export default function PhotoTool() {
     setFailure(null);
   }, [loadDoc]);
 
-  /* ------------------------------ 缩放 ------------------------------ */
+  /* ------------------------------ Zoom ------------------------------ */
 
   const zoomBy = useCallback(
     (delta: number) => setScale((scale > 0 ? scale : 1) + delta),
     [scale, setScale],
   );
 
-  /** 适应窗口：置回「待适配」哨兵值，画布宿主按容器算出真实比例后写回 */
+  /** Fit to window: restore the "needs fit" sentinel; the canvas host writes the real ratio back */
   const fitToWindow = useCallback(() => {
     setScale(0);
     setViewport({ x: 0, y: 0 });
   }, [setScale, setViewport]);
 
-  /** 100%：回到原始像素，并重新居中 */
+  /** 100%: back to native pixels, re-centered */
   const zoomActual = useCallback(() => {
     setScale(1);
     setViewport({ x: 0, y: 0 });
   }, [setScale, setViewport]);
 
-  /* --------------------------- 系统剪贴板 / 拖放 --------------------------- */
+  /* --------------------------- System clipboard / drag and drop --------------------------- */
 
-  /** 拷贝到系统剪贴板：优先选区内容，其次当前图层，最后整幅合并 */
+  /** Copy to the system clipboard: selection first, then the current layer, finally the whole composite */
   const handleCopySystem = useCallback(() => {
     const state = usePhotoStore.getState();
     const canvas = clipboardCanvas(state.doc, state.selection, state.doc.activeLayerId);
@@ -498,13 +498,13 @@ export default function PhotoTool() {
         setNotice(i18n.t('tools.photo.copiedToClipboard'));
         return;
       }
-      // 无权限 / 不支持时降级为下载，避免用户以为「什么都没发生」
+      // Without permission / support, fall back to a download so it doesn't look like nothing happened
       downloadCanvas(canvas, filename, { format: 'png', quality: 1 });
       setNotice(i18n.t('tools.photo.copyFailed'));
     })();
   }, []);
 
-  /** 从系统剪贴板粘贴为新图层；返回 true 表示已处理 */
+  /** Paste from the system clipboard as a new layer; true means it was handled */
   const handlePasteSystem = useCallback(async (): Promise<boolean> => {
     const blob = await readClipboardImage();
     if (!blob) return false;
@@ -512,7 +512,7 @@ export default function PhotoTool() {
     return true;
   }, [handleImage]);
 
-  /** 拖入文件：`.photo.json` 视为工程，其余交给图片导入流程校验 */
+  /** Dropped file: `.photo.json` is a project, everything else goes through the image import validation */
   const handleDropFile = useCallback(
     (file: File) => {
       if (checkProjectFile(file).ok) {
@@ -528,9 +528,9 @@ export default function PhotoTool() {
     [handleImage, handleProject, handlePsd],
   );
 
-  /* ------------------------------ 快捷键 ------------------------------ */
+  /* ------------------------------ Shortcuts ------------------------------ */
 
-  /** 快捷键一览打开时暂停全局绑定：否则 Esc（关面板）会连带清掉选区 */
+  /** Pause global bindings while the shortcut sheet is open, or Esc (close) would also clear the selection */
   const shortcutsOpen = dialog === 'shortcuts';
 
   useEffect(() => {
@@ -546,8 +546,8 @@ export default function PhotoTool() {
   }, [shortcutsOpen, fitToWindow, zoomActual, handleCopySystem, handlePasteSystem]);
 
   /**
-   * 浏览器原生 paste：覆盖「用系统菜单 / 触控板粘贴」这类不走我们 keydown 的路径。
-   * 只在事件确实带图片时接管，避免抢走输入框内的文本粘贴。
+   * Native browser paste: covers paths that bypass our keydown, like the system menu / trackpad paste.
+   * It only takes over when the event really carries an image, so text pasting inside inputs still works.
    */
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
@@ -563,7 +563,7 @@ export default function PhotoTool() {
     return () => document.removeEventListener('paste', onPaste);
   }, [handleImage]);
 
-  /* ------------------------------ 菜单 ------------------------------ */
+  /* ------------------------------ Menu ------------------------------ */
 
   const activeLayerId = doc.activeLayerId;
   const hasActive = Boolean(activeLayerId);
@@ -808,7 +808,7 @@ export default function PhotoTool() {
       id: 'window',
       label: t('tools.photo.menuWindow'),
       entries: [
-        // 按三个面板分组列出子 tab：点击即切到对应面板的该 tab（✓ 表示当前选中）
+        // List sub tabs grouped by the three panels: clicking switches to that tab (✓ marks the current one)
         ...PANEL_GROUPS.flatMap((group, index) => [
           ...(index > 0 ? ([{ type: 'separator' }] as const) : []),
           ...group.panels.map((id) =>
@@ -846,7 +846,7 @@ export default function PhotoTool() {
     history: <HistoryPanel />,
   };
 
-  /** 草稿状态：图标 + tooltip（不再占用一行文字） */
+  /** Draft status: icon + tooltip (no longer takes a whole text row) */
   const statusText = degraded
     ? t('tools.photo.degraded')
     : draftSaved
@@ -862,7 +862,7 @@ export default function PhotoTool() {
   return (
     <DropZone onFile={handleDropFile} testId="photo-drop">
       <div className="flex flex-col gap-3" data-tool-root>
-        {/* 隐藏的文件选择器：菜单中的「打开图片 / 导入图片到画布 / 导入工程」仍复用它们 */}
+        {/* Hidden file inputs: the menu's "open image / import into canvas / import project" still reuse them */}
         <input
           ref={imageInputRef}
           type="file"
@@ -870,8 +870,8 @@ export default function PhotoTool() {
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.[0];
-            // PSD 与普通图片共用同一个选择器，按扩展名分流；
-            // 普通图片再按意图分流：置入当前画布 / 以图片尺寸新建文档
+            // PSD and plain images share one picker and are routed by extension;
+            // plain images are then routed by intent: place into the canvas / new document at image size
             if (file) {
               if (checkPsdFile(file).ok) void handlePsd(file);
               else
@@ -895,7 +895,7 @@ export default function PhotoTool() {
           }}
         />
 
-        {/* 菜单栏：左侧菜单 + 紧邻的帮助侧图标操作；中部画布名；右侧新建 / 放映 */}
+        {/* Menu bar: menus on the left plus the help icon; canvas name in the middle; new / present on the right */}
         <MenuBar
           menus={menus}
           ariaLabel={t('tools.photo.menuBar')}
@@ -957,10 +957,10 @@ export default function PhotoTool() {
         />
 
         {/*
-          工具参数条按内容自然撑高（不锁死高度）：各工具显示的控件行数不同——吸管只有一行、
-          画笔有三行。锁成固定高度时，控件少的工具下方会留出一条空白带，控件多的工具则把
-          缩放控件裁进内部滚动区。高度变化由上方 ResizeObserver 传导给工作区，
-          指针映射每次事件现取 `getBoundingClientRect()`，因此画布位移不会造成取点错位。
+          The options bar grows with its content (no fixed height): tools show different numbers of rows —
+          the eyedropper has one, the brush three. With a fixed height, lean tools leave an empty band and
+          rich ones push the zoom controls into an inner scroll area. The ResizeObserver above feeds height
+          changes to the workspace, and pointer mapping re-reads `getBoundingClientRect()` per event.
         */}
         <div className="shrink-0">
           <PhotoToolbar

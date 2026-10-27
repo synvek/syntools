@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 图片 ↔ Base64 互转（纯逻辑；编解码在 UI / FileReader）。
+ * Image ↔ Base64 conversion (pure logic; encoding happens in the UI via FileReader).
  */
 
 export type ImageBase64Error = 'EMPTY' | 'INVALID_BASE64' | 'NOT_IMAGE';
@@ -10,7 +10,7 @@ export function isImageFile(type: string): boolean {
   return type.startsWith('image/');
 }
 
-/** 从 data URL 或纯 Base64 提取纯净 Base64 与 mime */
+/** Extract the bare Base64 payload and MIME type from a data URL or raw Base64 */
 export function parseBase64Input(
   input: string,
 ): ToolResult<{ mime: string; base64: string; dataUrl: string }> {
@@ -36,7 +36,7 @@ export function parseBase64Input(
   };
 }
 
-/** 根据 Base64 头嗅探常见图片类型 */
+/** Sniff common image types from the Base64 header */
 export function sniffMime(base64: string): string | null {
   if (base64.startsWith('/9j/')) return 'image/jpeg';
   if (base64.startsWith('iVBOR')) return 'image/png';

@@ -3,7 +3,7 @@ import { tools } from '@/core/registry';
 import type { ToolMeta } from '@/core/types';
 import { getToolMeta } from '@/core/i18n/helpers';
 
-/** 加权评分：名称精确 > 名称前缀 > 名称包含 > 关键词前缀 > 关键词包含 > 描述包含（技术设计 §7.3） */
+/** Weighted score: exact name > name prefix > name contains > keyword prefix > keyword contains > description (tech design §7.3) */
 function score(tool: ToolMeta, q: string): number {
   const { name, description } = getToolMeta(tool);
   const nameLower = name.toLowerCase();
@@ -17,7 +17,7 @@ function score(tool: ToolMeta, q: string): number {
   return 0;
 }
 
-/** 注册表内存索引搜索；空查询返回全部工具 */
+/** In-memory index search over the registry; an empty query returns every tool */
 export function searchTools(query: string): ToolMeta[] {
   const q = query.trim().toLowerCase();
   if (!q) return [...tools];

@@ -1,25 +1,27 @@
-# cargo-deny 配置（Rust 侧依赖门禁）
+# cargo-deny configuration (dependency gate for the Rust side)
 #
-# 只启用 licenses 检查：许可白名单之外的许可一律失败，因此 GPL / AGPL / SSPL 这类
-# 强 copyleft 组件进不来。这与 `pnpm license:check` 对 npm 侧的口径一致，
-# 目的是让「AGPL 社区版 + 商业许可版」双轨发布成立（见 plan/license-audit.md）。
+# Only the licenses check is enabled: any license outside the allowlist fails, so
+# strong copyleft components such as GPL / AGPL / SSPL cannot get in. This matches
+# what `pnpm license:check` enforces for npm, keeping the dual release
+# (AGPL community edition + commercial license) viable (see plan/license-audit.md).
 #
-# 本地执行：pnpm license:check:rust（需先 cargo install cargo-deny）
-# CI 执行：.github/workflows/ci.yml 的 licenses job
+# Local: pnpm license:check:rust (requires cargo install cargo-deny first)
+# CI: the licenses job in .github/workflows/ci.yml
 #
-# 规则：CI 报出未列入 allow 的许可时，处理顺序是「替换/移除依赖 → 复核许可 → 才考虑加入
-# 白名单」。不要为了过门禁而放宽白名单。
+# Rule: when CI reports a license missing from allow, the order of work is
+# "replace/remove the dependency → review the license → only then consider adding
+# it to the allowlist". Never widen the allowlist just to pass the gate.
 
 [licenses]
-# cargo-deny 0.14+ 的配置版本
+# Configuration version for cargo-deny 0.14+
 version = 2
 
-# 声明式许可判定需要的最低置信度：低于该值视为「无法判定」并失败，
-# 而不是默认猜一个宽松许可。
+# Minimum confidence required for declarative license matching: below this the
+# license counts as undeterminable and fails, instead of guessing a permissive one.
 confidence-threshold = 0.85
 
-# 白名单：全部为宽松许可、文件级 copyleft 或公共领域声明。
-# 出现的组合写法（如 `MIT OR Apache-2.0`）由 cargo-deny 按 SPDX 解析，任一侧命中即通过。
+# Allowlist: all permissive licenses, file-level copyleft, or public-domain statements.
+# Compound expressions (e.g. `MIT OR Apache-2.0`) are parsed as SPDX by cargo-deny; matching either side passes.
 allow = [
   "0BSD",
   "Apache-2.0",
@@ -44,12 +46,12 @@ allow = [
   "Zlib",
 ]
 
-# 白名单里长期用不到的条目给出警告，便于定期收敛
+# Warn about allowlist entries that stay unused, so the list can be trimmed periodically
 unused-allowed-license = "warn"
 
 [sources]
-# 只允许 crates.io：出现 git 依赖或私有 registry 时需要显式加白，
-# 避免供应链被悄悄改道。
+# crates.io only: git dependencies or private registries need an explicit entry,
+# so the supply chain cannot be quietly rerouted.
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]

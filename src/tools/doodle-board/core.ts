@@ -1,9 +1,9 @@
 /**
- * 涂鸦画板核心模型与纯函数（不依赖 DOM，便于复用与验证）。
+ * Doodle board core model and pure functions (DOM-free, so they are easy to reuse and test).
  *
- * 场景采用**矢量操作列表**而非像素快照：每次落笔是一条 Op，
- * 画布只是 ops 的重放结果。这样撤销只是替换 ops 列表（O(1)），
- * 改变画布尺寸 / DPR 不清空笔迹，草稿也能被序列化成很小的 JSON。
+ * The scene is a **list of vector operations** rather than a pixel snapshot: every stroke is one
+ * Op and the canvas is just a replay of the ops. Undo therefore only swaps the ops list (O(1)),
+ * resizing or a DPR change keeps the strokes, and a draft serialises to a very small JSON.
  */
 
 export type ToolId =
@@ -19,12 +19,12 @@ export type ToolId =
   | 'picker'
   | 'move';
 
-/** 背景类型：`solid` 纯色 / `grid` 网格（屏幕上由 CSS 呈现，导出时才合成） */
+/** Background kind: `solid` flat colour / `grid` grid (rendered by CSS on screen, composited on export) */
 export type BackgroundKind = 'transparent' | 'solid' | 'grid';
 
 export type SizePreset = 'fit' | '800x600' | '1280x720' | '1920x1080' | 'custom';
 
-/** 采样点：`p` 为该点的压感系数（0~1，鼠标恒为 1） */
+/** Sample point: `p` is the pressure factor (0-1, always 1 for a mouse) */
 export interface Point {
   x: number;
   y: number;
@@ -58,13 +58,13 @@ export interface ShapeOp {
   color: string;
   width: number;
   opacity: number;
-  /** 是否填充（填充色取 `fillColor`，缺省回退描边色；透明度取 opacity 的三成） */
+  /** Whether to fill (fill uses `fillColor`, falling back to the stroke colour; alpha is 30% of opacity) */
   fill: boolean;
-  /** 填充色（工具栏的「背景色」），缺省时与描边同色 */
+  /** Fill colour (the toolbar "background colour"); same as the stroke colour when omitted */
   fillColor?: string;
 }
 
-/** 自由多边形：依次点击的顶点，闭合成面 */
+/** Free-form polygon: vertices added by clicking, closed into a face */
 export interface PolygonOp {
   kind: 'polygon';
   points: Point[];
@@ -72,7 +72,7 @@ export interface PolygonOp {
   width: number;
   opacity: number;
   fill: boolean;
-  /** 填充色（工具栏的「背景色」），缺省时与描边同色 */
+  /** Fill colour (the toolbar "background colour"); same as the stroke colour when omitted */
   fillColor?: string;
 }
 
@@ -90,7 +90,7 @@ export type Op = StrokeOp | LineOp | ShapeOp | PolygonOp | TextOp;
 
 export interface Background {
   kind: BackgroundKind;
-  /** `solid` / `grid` 使用的底色 */
+  /** Base colour used by `solid` / `grid` */
   color: string;
 }
 
@@ -101,45 +101,45 @@ export interface Scene {
   ops: Op[];
 }
 
-/* ------------------------------- 常量 ------------------------------- */
+/* ------------------------------- Constants ------------------------------- */
 
 export const BRUSH_MIN = 1;
 export const BRUSH_MAX = 32;
 export const TEXT_MIN = 12;
 export const TEXT_MAX = 96;
 export const HISTORY_LIMIT = 32;
-/** 采样阈值：移动距离小于该值不记点，避免长笔画堆积无效点 */
+/** Sampling threshold: points closer than this are not recorded, so long strokes stay lean */
 export const SAMPLE_MIN_DISTANCE = 1.2;
-/** 网格间距（同时决定屏幕上 CSS 网格的视觉密度） */
+/** Grid spacing (also sets the visual density of the CSS grid on screen) */
 export const GRID_SIZE = 24;
-/** 自适应预设的宽高比与取值区间 */
+/** Aspect ratio and width range of the fit preset */
 export const FIT_ASPECT = 0.6;
 export const FIT_MIN_WIDTH = 360;
 export const FIT_MAX_WIDTH = 1600;
 export const DEFAULT_COLOR = '#0f172a';
 export const DEFAULT_WIDTH = 4;
 export const DEFAULT_OPACITY = 1;
-/** 不透明度下限：低于 10% 的笔迹几乎看不见 */
+/** Minimum opacity step: strokes below 10% are practically invisible */
 export const OPACITY_STEP = 0.1;
 export const DEFAULT_TEXT_SIZE = 24;
-/** 荧光笔默认透明度：半透明叠加才是“划重点”的观感 */
+/** Marker default opacity: translucent overlap is what makes the highlighter look right */
 export const MARKER_OPACITY = 0.4;
 export const MARKER_MIN_WIDTH = 10;
-/** 默认「背景色」（经典画板语义：形状填充色 / 右键落笔色） */
+/** Default "background colour" (classic drawing-app meaning: shape fill / right-click ink) */
 export const DEFAULT_SECONDARY = '#ffffff';
 
-/** 缩放区间与档位（`fit` 由容器宽度实时计算，不在此列） */
+/** Zoom range and steps (`fit` is computed from the container width live and is not listed here) */
 export const ZOOM_MIN = 0.1;
 export const ZOOM_MAX = 8;
 export const ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
-/** 整体移动的最小位移（画布坐标），小于该值视为误触 */
+/** Minimum pan distance (canvas units); anything smaller counts as an accidental nudge */
 export const MOVE_MIN_DELTA = 1;
-/** 多边形闭合判定：指针与起点的屏幕距离小于该值即闭合 */
+/** Polygon closing rule: closing when the pointer is within this screen distance of the start point */
 export const POLYGON_CLOSE_PX = 12;
-/** 最近使用颜色的保留数量 */
+/** Number of recent colours to keep */
 export const RECENT_LIMIT = 10;
 
-/** 调色板：按行排列的 40 色，第一行沿用旧版预设，保持肌肉记忆 */
+/** Palette: 40 colours laid out in rows; the first row keeps the legacy presets for muscle memory */
 export const PALETTE = [
   '#0f172a',
   '#ef4444',
@@ -187,14 +187,14 @@ export const PALETTE = [
   '#f472b6',
 ];
 
-/** 颜色是否可作为前景/背景色（仅接受 `#rgb` / `#rrggbb`） */
+/** Whether a value can be used as a foreground / background colour (only `#rgb` / `#rrggbb`) */
 export function isHexColor(value: unknown): value is string {
   return typeof value === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim());
 }
 
 export const BACKGROUND_COLORS = ['#ffffff', '#f8fafc', '#111827', '#fff7ed', '#eef2ff'];
 
-/** 尺寸预设表（`fit` 与 `custom` 不在此列） */
+/** Size presets (`fit` and `custom` are not listed here) */
 export const SIZE_PRESETS: Record<
   Exclude<SizePreset, 'fit' | 'custom'>,
   { width: number; height: number }
@@ -204,27 +204,27 @@ export const SIZE_PRESETS: Record<
   '1920x1080': { width: 1920, height: 1080 },
 };
 
-/* ----------------------------- 数值工具 ----------------------------- */
+/* ----------------------------- Number helpers ----------------------------- */
 
-/** 画笔尺寸钳制（保留原导出：默认区间 1~32） */
+/** Clamp the brush size (keeps the original export: default range 1-32) */
 export function clampBrushSize(n: number, min = BRUSH_MIN, max = BRUSH_MAX): number {
   if (!Number.isFinite(n)) return min;
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
-/** 任意区间取整钳制 */
+/** Clamp to an arbitrary range and round */
 export function clampInt(n: number, min: number, max: number, fallback = min): number {
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
-/** 0~1 钳制（不透明度） */
+/** Clamp to 0-1 (opacity) */
 export function clampUnit(n: number): number {
   if (!Number.isFinite(n)) return 1;
   return Math.min(1, Math.max(0, n));
 }
 
-/** 给颜色加上不透明度，输出 canvas 可直接使用的 rgba / #rrggbbaa */
+/** Apply opacity to a colour, yielding rgba / #rrggbbaa that canvas accepts directly */
 export function withAlpha(color: string, opacity: number): string {
   const alpha = clampUnit(opacity);
   const hex = color.trim();
@@ -234,7 +234,7 @@ export function withAlpha(color: string, opacity: number): string {
   }
   const full = /^#([0-9a-f]{6})$/i.exec(hex);
   if (full) return `${full[0]}${alphaHex(alpha)}`;
-  // rgb() / 颜色名等：交给浏览器解析，失败时退回原色
+  // rgb() / colour names etc.: let the browser parse them and fall back to the original colour on failure
   return parseToRgba(hex, alpha);
 }
 
@@ -243,7 +243,7 @@ function alphaHex(alpha: number): string {
   return value.toString(16).padStart(2, '0');
 }
 
-/** rgb() / 英文色名 → rgba()；无法解析时原样返回 */
+/** rgb() / named colour → rgba(); returned unchanged when it cannot be parsed */
 function parseToRgba(color: string, alpha: number): string {
   if (typeof document === 'undefined') return color;
   const probe = document.createElement('canvas').getContext('2d');
@@ -259,13 +259,13 @@ function parseToRgba(color: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/* ----------------------------- 几何工具 ----------------------------- */
+/* ----------------------------- Geometry helpers ----------------------------- */
 
 export function distance(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-/** 距离足够才采样 */
+/** Sample only when far enough apart */
 export function shouldSample(prev: Point, next: Point, min = SAMPLE_MIN_DISTANCE): boolean {
   return distance(prev, next) >= min;
 }
@@ -274,7 +274,7 @@ export function midpoint(a: Point, b: Point): Point {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, p: (a.p + b.p) / 2 };
 }
 
-/** 拖拽矩形归一：支持任意方向拖拽；`square` 时取长边 */
+/** Normalise a dragged rectangle (any direction); with `square`, the longer edge is used */
 export function normalizeRect(
   x0: number,
   y0: number,
@@ -293,8 +293,8 @@ export function normalizeRect(
 }
 
 /**
- * 压感系数：触控笔按 `pressure` 缩放（轻触也有 0.35 底线），
- * 鼠标 / 触屏统一返回 1（否则浏览器给的 0 或 0.5 会让笔画忽粗忽细）。
+ * Pressure factor: a stylus scales by `pressure` (with a 0.35 floor for light touches), while
+ * mouse / touch always return 1 (otherwise the browser's 0 or 0.5 makes strokes wobble in width).
  */
 export function pressureFactor(pointer: { pressure?: number; pointerType?: string }): number {
   if (pointer.pointerType !== 'pen') return 1;
@@ -303,7 +303,7 @@ export function pressureFactor(pointer: { pressure?: number; pointerType?: strin
   return clampUnit(0.35 + 0.65 * pressure);
 }
 
-/* ----------------------------- 颜色工具 ----------------------------- */
+/* ----------------------------- Colour helpers ----------------------------- */
 
 export interface Rgb {
   r: number;
@@ -311,7 +311,7 @@ export interface Rgb {
   b: number;
 }
 
-/** `#rgb` / `#rrggbb` → RGB；其他格式返回 null */
+/** `#rgb` / `#rrggbb` → RGB; returns null for other formats */
 export function hexToRgb(color: string): Rgb | null {
   const hex = color.trim();
   const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(hex);
@@ -335,8 +335,8 @@ export function rgbToHex({ r, g, b }: Rgb): string {
 }
 
 /**
- * 吸管取色：把画布上带 alpha 的像素合成到背景色之上，
- * 得到「肉眼看到的颜色」（画布本身透明，不合成的话取到的是黑色）。
+ * Eyedropper sampling: composite the canvas pixel (with its alpha) over the background colour to
+ * get the colour the eye actually sees (the canvas itself is transparent, so raw pixels read black).
  */
 export function compositeOver(pixel: Rgb & { a: number }, backdrop: string): string {
   const bg = hexToRgb(backdrop) ?? { r: 255, g: 255, b: 255 };
@@ -349,19 +349,19 @@ export function compositeOver(pixel: Rgb & { a: number }, backdrop: string): str
   });
 }
 
-/** 取色时的合成底：透明背景在屏幕上显示为白色棋盘格 */
+/** Backdrop for sampling: a transparent background shows as a white checkerboard on screen */
 export function backdropOf(kind: BackgroundKind, color: string): string {
   return kind === 'transparent' ? '#ffffff' : color;
 }
 
-/* ----------------------------- 缩放工具 ----------------------------- */
+/* ----------------------------- Zoom helpers ----------------------------- */
 
 export function clampZoom(zoom: number): number {
   if (!Number.isFinite(zoom)) return 1;
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 }
 
-/** 在档位表上按方向步进；`current` 落在两档之间时取相邻档 */
+/** Step through the zoom table in the given direction; values between steps snap to the nearest */
 export function nextZoom(current: number, direction: 1 | -1): number {
   const value = clampZoom(current);
   const epsilon = 0.001;
@@ -373,13 +373,13 @@ export function nextZoom(current: number, direction: 1 | -1): number {
   return prev ?? ZOOM_MIN;
 }
 
-/* ----------------------------- 平移工具 ----------------------------- */
+/* ----------------------------- Pan helpers ----------------------------- */
 
 export function translatePoint(point: Point, dx: number, dy: number): Point {
   return { x: point.x + dx, y: point.y + dy, p: point.p };
 }
 
-/** 平移单个操作（整体移动时把位移烘焙进坐标，画布坐标系保持唯一真相） */
+/** Translate one operation (panning bakes the delta into coordinates so canvas space stays the truth) */
 export function translateOp(op: Op, dx: number, dy: number): Op {
   switch (op.kind) {
     case 'stroke':
@@ -401,7 +401,7 @@ export function translateOps(ops: Op[], dx: number, dy: number): Op[] {
   return ops.map((op) => translateOp(op, dx, dy));
 }
 
-/* ----------------------------- 场景工具 ----------------------------- */
+/* ----------------------------- Scene helpers ----------------------------- */
 
 export function createScene(
   width: number,
@@ -416,7 +416,7 @@ export function createScene(
   };
 }
 
-/** 坐标保留 1 位小数后再序列化，草稿体积可压掉近一半 */
+/** Round coordinates to 1 decimal before serialising, which nearly halves the draft size */
 function roundScene(scene: Scene): Scene {
   const roundOp = (op: Op): Op => {
     const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -454,7 +454,7 @@ function roundScene(scene: Scene): Scene {
   return { ...scene, ops: scene.ops.map(roundOp) };
 }
 
-/** 场景 → JSON；超出预算返回 null（草稿 / URL 内容都不可信且不可膨胀） */
+/** Scene → JSON; returns null when over budget (draft / URL content is untrusted and must not inflate) */
 export function serializeScene(scene: Scene, budget = 1_500_000): string | null {
   try {
     const raw = JSON.stringify(roundScene(scene));
@@ -545,7 +545,7 @@ function parseOp(value: unknown): Op | null {
   return null;
 }
 
-/** JSON → 场景：逐字段校验，任何异常都返回 null（草稿内容不可信） */
+/** JSON → scene: field-by-field validation; any anomaly returns null (draft content is untrusted) */
 export function parseScene(raw: string): Scene | null {
   let parsed: unknown;
   try {

@@ -58,7 +58,7 @@ describe('矢量 SVG 导出', () => {
 
   it('表格节点渲染为矢量单元格', async () => {
     const svg = await pageToVectorSvg(page, { padding: 0 });
-    // 2×2 表格：4 个单元格矩形 + 节点矩形等，至少 4 个 rect
+    // 2×2 table: 4 cell rects plus the node rect, so at least 4 rects
     const rectCount = (svg.match(/<rect/g) ?? []).length;
     expect(rectCount).toBeGreaterThanOrEqual(4);
   });

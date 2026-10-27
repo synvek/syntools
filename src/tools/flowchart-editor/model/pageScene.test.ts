@@ -36,10 +36,10 @@ describe('页面缩略图场景（多页浏览）', () => {
       ]),
     );
     expect(scene).not.toBeNull();
-    // 包围盒：x 200→500，y 120→340
+    // Bounding box: x 200→500, y 120→340
     expect(scene!.width).toBe(300);
     expect(scene!.height).toBe(220);
-    // 第一个节点被平移到 (0,0)
+    // The first node is translated to (0,0)
     expect(scene!.nodes[0]).toMatchObject({ x: 0, y: 0 });
     expect(scene!.nodes[1]).toMatchObject({ x: 220, y: 180 });
   });
@@ -51,7 +51,7 @@ describe('页面缩略图场景（多页浏览）', () => {
         node({ id: 'child', parentId: 'lane', position: { x: 30, y: 60 }, width: 100, height: 50 }),
       ]),
     )!;
-    // 子节点绝对坐标 = (80, 100)；平移后相对 lane(50,40) 为 (30,60)
+    // Child absolute coordinates = (80, 100); after translation relative to lane(50,40) that is (30,60)
     expect(scene.nodes.find((item) => item.id === 'child')).toMatchObject({ x: 30, y: 60 });
     expect(scene.nodes.find((item) => item.id === 'lane')).toMatchObject({ x: 0, y: 0 });
   });
@@ -97,7 +97,7 @@ describe('缩略图场景记忆化', () => {
     const p = page([node({ id: 'a' })]);
     const first = cachedPageSceneOf(p);
     expect(first).not.toBeNull();
-    // 用同一 nodes/edges 引用重组 FlowPage（模拟 getDoc 每页组装）
+    // Rebuild a FlowPage from the same nodes/edges references (simulating getDoc page assembly)
     const again = cachedPageSceneOf({ id: 'p1', name: '页面 1', nodes: p.nodes, edges: p.edges });
     expect(again).toBe(first);
   });

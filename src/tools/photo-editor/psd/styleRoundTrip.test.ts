@@ -12,21 +12,21 @@ import { toPsdEffects } from './styleMap';
 import type { LayerStyle } from '../model/types';
 
 /**
- * 图层效果的**真实往返**测试：我们的样式 → `toPsdEffects` → ag-psd 序列化成 PSD 字节 → ag-psd 读回 → `mapPsdEffects`。
+ * **Real round-trip** tests for layer effects: our style → `toPsdEffects` → ag-psd writes PSD bytes → ag-psd reads back → `mapPsdEffects`.
  *
- * 为什么不只测映射函数：写出的单位约定（尤其 ag-psd 的 `opacity` 是 0~1 的 FixedPoint8）只有经过一次
- * 真实序列化才能验证。本次就是靠这组用例发现读入侧把 opacity 当成了百分比 ——
- * 那种错误在界面上表现为「PSD 里的投影淡到看不见」，很难归因。
+ * Why not test the mapping functions alone: the unit conventions on the write side (especially ag-psd's
+ * `opacity` being 0~1 FixedPoint8) only hold up after a real serialization. This suite is what caught the read side
+ * treating opacity as a percentage — a bug that surfaces as "the drop shadow in the PSD is invisible" and is hard to attribute.
  *
- * 用 `imageData` + `useImageData` 传递像素，因此整条链路不依赖 Canvas（jsdom 可跑）。
+ * Pixels travel as `imageData` + `useImageData`, so the whole chain needs no Canvas (runs under jsdom).
  */
 
 const PIXELS = new Uint8ClampedArray(2 * 2 * 4).fill(200);
 
 /**
- * jsdom 没有 2D 上下文，而 ag-psd 在读路径上会走 `createImageData`（默认实现要一张临时画布）。
- * `initializeCanvas` 正是为此提供的注入点：这里给它一个「只造 ImageData、不真画像素」的替身。
- * 因为 `useImageData: true` 时 ag-psd 直接读原始像素数据，不需要真正的绘图能力。
+ * jsdom has no 2D context, while ag-psd's read path calls `createImageData` (whose default needs a scratch canvas).
+ * `initializeCanvas` is the injection point for exactly this: it gets a stand-in that only allocates ImageData and paints nothing.
+ * With `useImageData: true` ag-psd reads the raw pixel buffer, so real drawing capability is never needed.
  */
 initializeCanvas(
   (width = 1, height = 1) =>
@@ -69,27 +69,27 @@ function roundTrip(style: LayerStyle | null): LayerStyle | null {
   return mapPsdEffects((psd.children?.[0] as { effects?: never } | undefined)?.effects);
 }
 
-describe('图层效果写出的边界', () => {
-  it('没有样式 / 空样式时返回 undefined（ag-psd 会完全跳过 lfx2 段）', () => {
+describe('Edge cases when writing layer effects', () => {
+  it('no style / empty style returns undefined (ag-psd skips the lfx2 block entirely)', () => {
     expect(toPsdEffects(null)).toBeUndefined();
     expect(toPsdEffects({})).toBeUndefined();
   });
 
-  it('未启用的效果照样写出（参数要保留，只是标记为 disabled）', () => {
+  it('disabled effects are still written (parameters kept, just marked disabled)', () => {
     const shadow = { ...createDropShadow(), enabled: false };
     const effects = toPsdEffects({ dropShadow: shadow });
     expect(effects?.dropShadow?.[0]).toMatchObject({ present: true, enabled: false });
   });
 
-  it('尺寸一律写成 { units: Pixels, value }（直接写数字会被序列化成 0）', () => {
+  it('sizes are always written as { units: Pixels, value } (a bare number serializes as 0)', () => {
     const effects = toPsdEffects({ dropShadow: { ...createDropShadow(), distance: 7, spread: 3 } });
     expect(effects?.dropShadow?.[0].distance).toEqual({ units: 'Pixels', value: 7 });
     expect(effects?.dropShadow?.[0].choke).toEqual({ units: 'Pixels', value: 3 });
   });
 });
 
-describe('投影往返', () => {
-  it('颜色 / 不透明度 / 角度 / 距离 / 扩展 / 模糊全部保留', () => {
+describe('Drop shadow round-trip', () => {
+  it('color / opacity / angle / distance / spread / blur are all preserved', () => {
     const style: LayerStyle = {
       dropShadow: {
         ...createDropShadow(),
@@ -111,11 +111,11 @@ describe('投影往返', () => {
       spread: 4,
       size: 12,
     });
-    // 不透明度是 0~1 的 FixedPoint8：容忍 1/255 的量化误差
+    // Opacity is 0~1 FixedPoint8: allow a 1/255 quantization error
     expect(back?.dropShadow?.opacity).toBeCloseTo(0.6, 2);
   });
 
-  it('内阴影往返（无扩展参数）', () => {
+  it('inner shadow round-trip (no spread parameter)', () => {
     const back = roundTrip({
       innerShadow: {
         ...createInnerShadow(),
@@ -132,8 +132,8 @@ describe('投影往返', () => {
   });
 });
 
-describe('外发光 / 颜色叠加 / 描边往返', () => {
-  it('外发光：颜色与半径保留', () => {
+describe('Outer glow / color overlay / stroke round-trip', () => {
+  it('outer glow: color and radius are preserved', () => {
     const back = roundTrip({
       outerGlow: { ...createOuterGlow(), enabled: true, color: '#22C55E', opacity: 0.75, size: 14 },
     });
@@ -141,7 +141,7 @@ describe('外发光 / 颜色叠加 / 描边往返', () => {
     expect(back?.outerGlow?.opacity).toBeCloseTo(0.75, 2);
   });
 
-  it('颜色叠加：走 PSD 的 solidFill', () => {
+  it('color overlay: uses the PSD solidFill', () => {
     const back = roundTrip({
       colorOverlay: { ...createColorOverlay(), enabled: true, color: '#123456', opacity: 0.5 },
     });
@@ -149,7 +149,7 @@ describe('外发光 / 颜色叠加 / 描边往返', () => {
     expect(back?.colorOverlay?.opacity).toBeCloseTo(0.5, 2);
   });
 
-  it('描边：位置与粗细保留（outside / inside / center）', () => {
+  it('stroke: position and size are preserved (outside / inside / center)', () => {
     for (const position of ['outside', 'inside', 'center'] as const) {
       const back = roundTrip({
         stroke: {
@@ -166,8 +166,8 @@ describe('外发光 / 颜色叠加 / 描边往返', () => {
   });
 });
 
-describe('多效果共存', () => {
-  it('五种效果一次写出并全部读回', () => {
+describe('Multiple effects together', () => {
+  it('five effects written at once all read back', () => {
     const back = roundTrip({
       dropShadow: { ...createDropShadow(), enabled: true, size: 6 },
       innerShadow: { ...createInnerShadow(), enabled: true, size: 4 },
@@ -185,7 +185,7 @@ describe('多效果共存', () => {
     ]);
   });
 
-  it('无样式时读回也是 null（不会凭空造出效果）', () => {
+  it('no style reads back as null (no effects are invented)', () => {
     expect(roundTrip(null)).toBeNull();
   });
 });

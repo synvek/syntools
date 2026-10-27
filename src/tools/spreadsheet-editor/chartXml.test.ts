@@ -37,7 +37,7 @@ const CHART: ChartConfig = {
 const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer =>
   bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-/** 含 2 行数据 + 表头的工作簿，可选带站内图表 */
+/** A workbook with a header row + 2 data rows, optionally carrying in-app charts */
 function makeSnapshot(overrides: Partial<WorkbookSnapshot> = {}): WorkbookSnapshot {
   return {
     id: 'wb',
@@ -87,12 +87,12 @@ describe('buildChartXml', () => {
     expect(xml).toContain('<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>');
     expect(xml).toContain('<c:catAx>');
     expect(xml).toContain('<c:valAx>');
-    // 系列名指向表头单元格
+    // The series name points at the header cell
     expect(xml).toContain("'Sales Data'!$B$1");
-    // 分类 / 数值引用
+    // Category / value references
     expect(xml).toContain("'Sales Data'!$A$2:$A$3");
     expect(xml).toContain("'Sales Data'!$B$2:$B$3");
-    // 缓存：不重算的查看器也能画出来
+    // Caches: viewers that never recalculate can still draw the chart
     expect(xml).toContain('<c:ptCount val="2"/>');
     expect(xml).toContain('<c:v>Jan</c:v>');
     expect(xml).toContain('<c:v>20</c:v>');
@@ -116,10 +116,10 @@ describe('锚点换算', () => {
       { x: 200, y: 120, width: 400, height: 300 },
       DEFAULT_SHEET_METRICS,
     );
-    // 200 - 46 = 154 → 列 1（93），偏移 61px
+    // 200 - 46 = 154 → column 1 (93), offset 61px
     expect(anchor.col).toBe(1);
     expect(anchor.colOff).toBe(61 * EMU_PER_PX);
-    // 120 - 20 = 100 → 行 3（27），偏移 19px
+    // 120 - 20 = 100 → row 3 (27), offset 19px
     expect(anchor.row).toBe(3);
     expect(anchor.rowOff).toBe(19 * EMU_PER_PX);
     expect(anchor.cx).toBe(400 * EMU_PER_PX);
@@ -287,7 +287,7 @@ describe('原生图表往返保留', () => {
     expect(parts.sheetDrawings[SHEET_NAME]).toBe('xl/drawings/drawing1.xml');
     expect(Object.keys(parts.parts)).toContain('xl/charts/chart1.xml');
 
-    // 再导出：没有站内图表，只有保留的原生部件
+    // Export again: no in-app charts, only the preserved native parts
     const second = await exportSnapshotToBytes(makeSnapshot({ syntoolsRawParts: parts }));
     expect(second.ok).toBe(true);
     if (!second.ok) return;
@@ -316,7 +316,7 @@ describe('原生图表往返保留', () => {
     if (!second.ok) return;
     const zip = await JSZip.loadAsync(toArrayBuffer(second.value));
     const names = Object.keys(zip.files);
-    // 原图表保留、新图表编号避让
+    // The original chart is preserved and the new one steps around its number
     expect(names).toContain('xl/charts/chart1.xml');
     expect(names).toContain('xl/charts/chart2.xml');
 
@@ -326,7 +326,7 @@ describe('原生图表往返保留', () => {
       (await zip.file('xl/drawings/_rels/drawing1.xml.rels')?.async('string')) ?? '';
     expect(drawingRels).toContain('Target="../charts/chart1.xml"');
     expect(drawingRels).toContain('Target="../charts/chart2.xml"');
-    // 工作表仍只引用一个 drawing，且关系指向保留的 drawing
+    // The sheet still references a single drawing, and the relationship points at the preserved one
     const sheet = (await zip.file('xl/worksheets/sheet1.xml')?.async('string')) ?? '';
     expect(sheet.match(/<drawing /g)).toHaveLength(1);
   });

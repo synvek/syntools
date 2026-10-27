@@ -1,6 +1,7 @@
 /**
- * 脑图工程文件（.json）序列化与解析。
- * 解析走「宽容 + 修复」策略：缺字段补默认、孤儿挂到根、多根合并，坏数据返回 null。
+ * Mind map project file (.json) serialisation and parsing.
+ * Parsing is lenient and repairing: missing fields get defaults, orphans are attached to the root
+ * and extra roots are merged; anything unusable returns null.
  */
 
 import { DEFAULT_THEME_ID, MIND_THEME_IDS } from '../model/themes';
@@ -54,7 +55,7 @@ function asStyle(v: unknown): Partial<MindNodeStyle> | undefined {
   return Object.keys(style).length > 0 ? style : undefined;
 }
 
-/** 规范化：补齐缺省字段、修复孤儿与多根，保证一定是「单根树」 */
+/** Normalise: fill in defaults, repair orphans and multiple roots, guaranteeing a single-root tree */
 export function migrateDoc(input: unknown): MindDoc | null {
   if (!input || typeof input !== 'object') return null;
   const raw = input as Record<string, unknown>;
@@ -87,7 +88,7 @@ export function migrateDoc(input: unknown): MindDoc | null {
   }
   if (nodes.length === 0) return null;
 
-  // 单根：优先使用声明的 rootId，否则取第一个 parentId 为空的节点
+  // Single root: use the declared rootId when valid, else the first node without a parentId
   const declared = asString(raw.rootId);
   let root = nodes.find((n) => n.id === declared && n.parentId === null);
   if (!root) root = nodes.find((n) => n.parentId === null);
@@ -97,13 +98,13 @@ export function migrateDoc(input: unknown): MindDoc | null {
   }
   root.parentId = null;
 
-  // 其余「无父」节点并入根，避免出现第二个根
+  // Attach any remaining parentless nodes to the root so no second root appears
   const idSet = new Set(nodes.map((n) => n.id));
   for (const n of nodes) {
     if (n !== root && (n.parentId === null || !idSet.has(n.parentId))) n.parentId = root.id;
   }
 
-  // 断环：沿父链上溯，超过节点总数仍未到根的节点直接挂到根
+  // Break cycles: walk up the parent chain and attach anything that never reaches the root
   for (const n of nodes) {
     if (n === root) continue;
     let cur = n.parentId;
@@ -129,7 +130,7 @@ export function migrateDoc(input: unknown): MindDoc | null {
   };
 }
 
-/** 深拷贝一份干净文档用于保存（丢弃内部字段） */
+/** Deep-copy a clean document for saving (internal fields dropped) */
 export function serializeDoc(doc: MindDoc): MindDoc {
   return {
     version: 1,
@@ -151,7 +152,7 @@ export function serializeDoc(doc: MindDoc): MindDoc {
   };
 }
 
-/** 导出为工程文件文本（缩进 JSON） */
+/** Export as project-file text (indented JSON) */
 export function toProjectJson(doc: MindDoc): string {
   return JSON.stringify(serializeDoc(doc), null, 2);
 }
@@ -164,7 +165,7 @@ export function parseProjectJson(text: string): MindDoc | null {
   }
 }
 
-/** 重新分配 id（导入模板式内容时使用，避免与现有节点撞号） */
+/** Reassign ids (used when importing template-like content to avoid clashing with existing nodes) */
 export function reassignIds(doc: MindDoc): MindDoc {
   const map = new Map<string, string>();
   for (const n of doc.nodes) map.set(n.id, createId());
@@ -180,25 +181,25 @@ export function reassignIds(doc: MindDoc): MindDoc {
   };
 }
 
-/** 取工程的活动画布内容（无活动标记时取第一张） */
+/** Active sheet content of a project (the first when no marker is set) */
 export function activeSheetOf(project: MindProject): MindSheet {
   const id = project.activeSheetId;
   return (id ? project.sheets.find((s) => s.id === id) : project.sheets[0]) ?? project.sheets[0];
 }
 
-/** 规范化工程：兼容 v1 扁平文档与 v2 多画布，坏数据返回 null */
+/** Normalise a project: accepts v1 flat documents and v2 multi-sheet, null for unusable data */
 export function migrateProject(input: unknown): MindProject | null {
   if (!input || typeof input !== 'object') return null;
   const raw = input as Record<string, unknown>;
   const name = typeof raw.name === 'string' ? raw.name : undefined;
 
-  // v2 多画布
+  // v2 multi-sheet
   if (Array.isArray(raw.sheets)) {
     const sheets: MindSheet[] = [];
     raw.sheets.forEach((item, index) => {
       if (!item || typeof item !== 'object') return;
       const rec = item as Record<string, unknown>;
-      const doc = migrateDoc(rec.doc ?? rec); // 兼容 sheet.doc 嵌套或整段即 doc
+      const doc = migrateDoc(rec.doc ?? rec); // supports nested sheet.doc or a bare doc
       if (!doc) return;
       const id = asString(rec.id) || doc.rootId;
       const sheetName = asString(rec.name) || `画布 ${index + 1}`;
@@ -210,7 +211,7 @@ export function migrateProject(input: unknown): MindProject | null {
     return { version: 2, ...(name === undefined ? {} : { name }), sheets, activeSheetId };
   }
 
-  // v1 扁平文档 → 单画布
+  // v1 flat document → a single sheet
   const doc = migrateDoc(raw);
   if (!doc) return null;
   return {
@@ -221,7 +222,7 @@ export function migrateProject(input: unknown): MindProject | null {
   };
 }
 
-/** 深拷贝一份干净工程用于保存（每张画布丢弃内部字段） */
+/** Deep-copy a clean project for saving (internal fields dropped from every sheet) */
 export function serializeProject(project: MindProject): MindProject {
   return {
     version: 2,
@@ -231,7 +232,7 @@ export function serializeProject(project: MindProject): MindProject {
   };
 }
 
-/** 导出为多画布工程文件文本（缩进 JSON） */
+/** Export as multi-sheet project-file text (indented JSON) */
 export function toProjectJsonV2(project: MindProject): string {
   return JSON.stringify(serializeProject(project), null, 2);
 }
@@ -244,7 +245,7 @@ export function parseProjectJsonV2(text: string): MindProject | null {
   }
 }
 
-/** 把单张扁平文档包装为单画布工程 */
+/** Wrap a single flat document as a one-sheet project */
 export function singleSheetProject(doc: MindDoc): MindProject {
   return {
     version: 2,

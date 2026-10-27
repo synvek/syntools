@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolvePageSeo } from '@/core/seo/meta';
 import { SITE_DESCRIPTION, SITE_TITLE, STATIC_PAGE_SEO } from '@/core/seo/copy';
 
-/** 用固定表代替 i18next：这里只验证「路径 → 标题/描述」的取值逻辑 */
+/** A fixed table stands in for i18next: this only checks the path → title/description lookup */
 function fakeT(dict: Record<string, string>) {
   return (key: string) => dict[key] ?? '';
 }

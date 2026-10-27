@@ -13,8 +13,8 @@ const PANEL_CLASS =
   'w-full max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-800 dark:bg-gray-900';
 
 /**
- * 对话框壳：Esc / 点遮罩关闭，与 ShortcutHelp 行为一致。
- * 面板自身 stopPropagation，避免点表单控件时误关。
+ * Dialog shell: Esc / clicking the backdrop closes it, matching ShortcutHelp's behavior.
+ * The panel itself stops propagation so clicking form controls does not close it by accident.
  */
 function DialogShell({
   label,
@@ -50,7 +50,7 @@ function DialogShell({
   );
 }
 
-/** 新建画布：预设 / 自定义尺寸 / 背景色 */
+/** New canvas: presets / custom size / background color */
 export function NewCanvasDialog({
   onClose,
   onCreate,
@@ -145,8 +145,8 @@ export function NewCanvasDialog({
 }
 
 /**
- * 画布大小 / 背景：修改现有画布的尺寸与背景色。
- * 只改变画布范围（图层内容不平移也不缩放），与「新建画布」是两条不同的路径。
+ * Canvas size / background: change the size and background color of the existing canvas.
+ * Only the canvas extent changes (layer content neither moves nor scales); this is a different path from "new canvas".
  */
 export function CanvasSizeDialog({
   width,
@@ -231,8 +231,8 @@ export function CanvasSizeDialog({
   );
 }
 
-/** 导出图片：格式 / 质量 / 是否仅导出选区 */
-/** 导出对话框回传的参数（含仅 PDF 使用的 dpi） */
+/** Export image: format / quality / selection only */
+/** Parameters returned by the export dialog (including the dpi used only by PDF) */
 export interface ExportSubmit {
   format: ExportFormat;
   /** 0~1 */
@@ -241,7 +241,7 @@ export interface ExportSubmit {
   dpi: number;
 }
 
-/** 格式名是专有名词，直接按原名展示；顺序按「常用 → 专用」排列 */
+/** Format names are proper nouns and shown as-is; ordered from common to specialized */
 const EXPORT_FORMATS: { id: ExportFormat; label: string }[] = [
   { id: 'png', label: 'PNG' },
   { id: 'jpeg', label: 'JPEG' },
@@ -251,7 +251,7 @@ const EXPORT_FORMATS: { id: ExportFormat; label: string }[] = [
   { id: 'pdf', label: 'PDF' },
 ];
 
-/** PDF 页面尺寸换算基准（像素 → 点） */
+/** PDF page size conversion base (pixels → points) */
 const PDF_DPI_OPTIONS = [
   { id: '72', label: '72' },
   { id: '150', label: '150' },

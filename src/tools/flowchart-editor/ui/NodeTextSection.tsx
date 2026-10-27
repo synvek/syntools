@@ -18,8 +18,8 @@ const VERTICAL_ALIGN_KEY: Record<VerticalAlign, string> = {
 };
 
 /**
- * 节点「文本排版」分组：垂直对齐 / 行高 / 文字自动缩放 / 标签背景色 / 超链接。
- * 自动缩放的度量与渲染在 `ShapeNode`（ResizeObserver + 二分），此处只写入开关。
+ * Node "Text layout" group: vertical alignment / line height / text auto-shrink / label background / hyperlink.
+ * Auto-shrink measurement and rendering live in `ShapeNode` (ResizeObserver + binary search); this only writes the toggle.
  */
 export function NodeTextSection({
   style,
@@ -32,7 +32,7 @@ export function NodeTextSection({
   patch: (p: FlowNodePatch) => void;
   onEnd: () => void;
   fallback: FlowNodeStyleView;
-  /** 容器（泳道/编组）文本由标题栏承载，垂直对齐与行高无意义 */
+  /** Container (swimlane/group) text lives in the title bar, so vertical alignment and line height are meaningless */
   isContainer: boolean;
 }) {
   const { t } = useTranslation();
@@ -105,7 +105,7 @@ export function NodeTextSection({
             {t('tools.flowchart.autoShrink')}
           </button>
 
-          {/* 文本格式：纯文本 / Markdown（行内语法在 ShapeNode 中渲染） */}
+          {/* Text format: plain text / Markdown (inline syntax is rendered in ShapeNode) */}
           <button
             type="button"
             data-testid="flowchart-text-format"

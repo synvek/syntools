@@ -3,14 +3,14 @@ import type { MediaAsset } from './types';
 import { createId } from './factory';
 
 /**
- * 媒体资源运行时管理：
- * - Asset 本体只存字节与元信息（可序列化到草稿）；
- * - objectURL 由本模块按需创建并缓存，撤销/重做不会重复申请。
+ * Runtime media management:
+ * - Asset itself only stores bytes and metadata (serializable into drafts);
+ * - objectURLs are created and cached here on demand, so undo/redo doesn't request them again.
  */
 
 const urlCache = new Map<string, string>();
 
-/** 受支持的图片类型（SVG 走 elm.type 'image/svg+xml' 亦允许） */
+/** Supported image types (SVG is allowed via type 'image/svg+xml') */
 const ALLOWED_IMAGE_TYPES = [
   'image/png',
   'image/jpeg',
@@ -20,7 +20,7 @@ const ALLOWED_IMAGE_TYPES = [
   'image/svg+xml',
 ];
 
-/** pptx media 扩展名 → MIME */
+/** pptx media extension → MIME */
 const MIME_BY_EXT: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -35,7 +35,7 @@ const MIME_BY_EXT: Record<string, string> = {
   svg: 'image/svg+xml',
 };
 
-/** MIME → pptx 内使用的扩展名（Content_Types 依赖正确的扩展名） */
+/** MIME → extension used inside pptx (Content_Types relies on correct extensions) */
 export const EXT_BY_MIME: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpeg',
@@ -51,7 +51,7 @@ export function mimeFromFilename(filename: string): string | undefined {
   return MIME_BY_EXT[ext];
 }
 
-/** 依据字节前缀判定图片真实类型（防止扩展名撒谎） */
+/** Detect the real image type from the byte prefix (so a lying extension can't fool us) */
 export function detectImageMime(bytes: Uint8Array): string | undefined {
   const startsWith = (...sig: number[]) => sig.every((b, i) => bytes[i] === b);
   if (startsWith(0x89, 0x50, 0x4e, 0x47)) return 'image/png';
@@ -71,7 +71,7 @@ export function extensionForMime(mime: string): string {
   return EXT_BY_MIME[mime] ?? 'png';
 }
 
-/** 读取图片文件 → MediaAsset（含真实宽高） */
+/** Read an image file → MediaAsset (with real width/height) */
 export async function createMediaFromFile(file: File): Promise<ToolResult<MediaAsset>> {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return { ok: false, error: 'UNSUPPORTED_MEDIA' };
   const buffer = await file.arrayBuffer();
@@ -91,7 +91,7 @@ export async function createMediaFromFile(file: File): Promise<ToolResult<MediaA
   return { ok: true, value: asset };
 }
 
-/** 从已解出的 pptx media 字节创建 Asset */
+/** Create an Asset from extracted pptx media bytes */
 export async function createMediaFromBytes(
   bytes: Uint8Array,
   mime: string,
@@ -104,7 +104,7 @@ export async function createMediaFromBytes(
   return { ok: true, value: asset };
 }
 
-/** 读取图片原始宽高；失败返回 null（如 WMF/EMF 浏览器无法解码） */
+/** Read an image's intrinsic size; returns null on failure (e.g. WMF/EMF the browser can't decode) */
 export async function measureImageSize(
   asset: MediaAsset,
 ): Promise<{ width: number; height: number } | null> {
@@ -119,7 +119,7 @@ export async function measureImageSize(
   });
 }
 
-/** 取得（并缓存）媒体的 objectURL */
+/** Get (and cache) a media objectURL */
 export function getMediaUrl(asset: MediaAsset): string | undefined {
   if (!asset.bytes) return asset.url;
   const cached = urlCache.get(asset.id);
@@ -130,7 +130,7 @@ export function getMediaUrl(asset: MediaAsset): string | undefined {
   return url;
 }
 
-/** 释放全部已创建的 objectURL（工具卸载时调用） */
+/** Revoke every objectURL created so far (called when the tool unmounts) */
 export function revokeAllMediaUrls(): void {
   for (const url of urlCache.values()) URL.revokeObjectURL(url);
   urlCache.clear();

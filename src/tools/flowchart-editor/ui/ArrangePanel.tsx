@@ -43,8 +43,8 @@ const sectionTitle =
   'text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400';
 
 /**
- * 排列工具箱：对齐（含对齐到画布 / 页面）、分布（等间距 / 贴边）、统一尺寸、
- * 吸附网格、层级与编组。所有操作复用 `flowOps`，单选即可对齐，分布需要多选。
+ * Arrange toolbox: align (including align to canvas / page), distribute (equal spacing / flush to edges), uniform size,
+ * snap to grid, layering and grouping. Every operation reuses `flowOps`; alignment works on a single selection, distribution needs multi-select.
  */
 export function ArrangePanel() {
   const { t } = useTranslation();

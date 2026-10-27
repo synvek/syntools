@@ -3,10 +3,10 @@ import { cachedPageSceneOf } from './pageScene';
 import type { FlowPage } from './types';
 
 /**
- * 页面缩略图：直接由「记忆化的」页面场景渲染。
- * 非活动页没有 DOM，因此不走截图——任意页都能即时预览；
- * 场景按 nodes/edges 数组引用缓存，编辑过程中未变动的页不会重复计算。
- * `box` 可覆盖尺寸（模板卡片用更扁的框）。
+ * Page thumbnail: rendered directly from the (memoized) page scene.
+ * Inactive pages have no DOM, so no screenshot is involved — any page can be previewed instantly;
+ * scenes are cached by the nodes/edges array references, so pages untouched during editing are not recomputed.
+ * `box` can override the size (template cards use a flatter frame).
  */
 export function PageThumbnail({
   page,

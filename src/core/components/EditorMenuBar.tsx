@@ -3,16 +3,16 @@ import type { ReactNode } from 'react';
 import type { EditorMenu, EditorMenuEntry } from './editorChrome';
 
 /**
- * 文档类编辑器统一的「菜单工具栏」。
+ * Shared "menu toolbar" for document editors.
  *
- * 布局（左 → 右）：菜单区 → actions（紧邻菜单，如保存状态 / 清空）→ center（文档标题）
- * → right（新建 / 放映等图标按钮）。center 用 flex-1 居中，使标题与左右两组的间距相等。
+ * Layout, left to right: menus → actions (next to the menus: save state, clear) → center (title)
+ * → right (icon buttons: new, present). center uses flex-1 so its gaps to both sides match.
  *
- * 交互约定：
- * - 顶层入口用 `role="menuitem"`（而非 button），避免与画布/面板里的同名按钮抢
- *   Playwright 的 `getByRole('button', ...)` 选择器；下拉面板用 `role="menu"`，仅在展开时渲染。
- * - 展开后鼠标划过其它顶层入口即切换菜单（贴近桌面端）。
- * - 点击外部 / 按 Esc 关闭。
+ * Interaction conventions:
+ * - Top-level entries use `role="menuitem"` (not button) so they never collide with same-named
+ *   buttons on the canvas or panels in Playwright's `getByRole('button', ...)`; panels use `role="menu"` and mount only when open.
+ * - Once open, hovering another top-level entry switches menus (desktop-style).
+ * - Closes on outside click / Esc.
  */
 export function EditorMenuBar({
   menus,
@@ -23,11 +23,11 @@ export function EditorMenuBar({
 }: {
   menus: EditorMenu[];
   ariaLabel: string;
-  /** 菜单区右侧、紧邻末尾菜单的操作 */
+  /** Actions right of the menus, next to the last one */
   actions?: ReactNode;
-  /** 中部插槽：文档标题输入框 */
+  /** Center slot: document title input */
   center?: ReactNode;
-  /** 右侧操作：新建 / 放映等图标按钮 */
+  /** Right slot: icon buttons for new / present, etc. */
   right?: ReactNode;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);

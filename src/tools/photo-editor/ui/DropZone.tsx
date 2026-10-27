@@ -4,11 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 
 /**
- * 画布级拖放导入：拖入图片即新建图层、拖入 `.photo.json` 即载入工程。
+ * Canvas-level drag-and-drop import: dropping an image creates a layer, dropping a `.photo.json` loads a project.
  *
- * 只负责「事件收集 + 视觉反馈 + 取第一个文件」，文件校验与载入仍走既有导入流程
- * （`checkImageFile` / `checkProjectFile`），避免出现第二套校验规则。
- * 用 drag 计数抵消子元素间的 enter/leave 抖动（拖过画布内部元素时不会闪烁）。
+ * Only handles event collection + visual feedback + picking the first file; validation and loading still go through
+ * the existing import flow (`checkImageFile` / `checkProjectFile`), so there is never a second set of validation rules.
+ * A drag counter cancels enter/leave jitter between children (no flicker when passing over inner canvas elements).
  */
 export function DropZone({
   onFile,
@@ -38,7 +38,7 @@ export function DropZone({
       }}
       onDragOver={(event) => {
         if (!hasFiles(event)) return;
-        // 必须阻止默认行为，否则浏览器不会派发 drop
+        // The default must be prevented, otherwise the browser never fires drop
         event.preventDefault();
         event.dataTransfer.dropEffect = 'copy';
       }}

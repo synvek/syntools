@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PropertyPanel } from './PropertyPanel';
 import { ThemePanel } from './ThemePanel';
 
-/** 右侧检查器：属性 / 主题 两个标签页（与流程图编辑器的右侧面板同一布局） */
+/** Right-hand inspector: Properties / Theme tabs (same layout as the flowchart editor's right panel) */
 const PANELS = ['prop', 'theme'] as const;
 type PanelKey = (typeof PANELS)[number];
 

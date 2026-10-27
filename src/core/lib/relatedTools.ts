@@ -3,7 +3,7 @@ import { tools, toolMap } from '@/core/registry';
 
 const DEFAULT_LIMIT = 6;
 
-/** 解析相关工具列表：优先 relatedIds，不足时用同分类补齐 */
+/** Resolve related tools: prefer relatedIds, top up from the same category */
 export function resolveRelatedTools(tool: ToolMeta, limit = DEFAULT_LIMIT): ToolMeta[] {
   const seen = new Set<string>([tool.id]);
   const out: ToolMeta[] = [];

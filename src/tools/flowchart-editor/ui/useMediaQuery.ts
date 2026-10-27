@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 /**
- * 订阅媒体查询（SSR / 无 matchMedia 环境下降级为 false）。
- * 用于窄屏抽屉布局与触控相关的响应式分支。
+ * Subscribe to a media query (degrades to false under SSR / without matchMedia).
+ * Used for the narrow-screen drawer layout and the touch-related responsive branches.
  */
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
@@ -22,8 +22,8 @@ export function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/** 触控 / 手写笔等粗指针设备：放大命中区域、启用触控手势 */
+/** Coarse-pointer devices such as touch / stylus: enlarge hit areas and enable touch gestures */
 export const COARSE_POINTER_QUERY = '(pointer: coarse)';
 
-/** 窄屏断点（与 Tailwind 的 lg 对齐）：三栏改为抽屉 */
+/** Narrow-screen breakpoint (aligned with Tailwind's lg): three columns become drawers */
 export const NARROW_QUERY = '(max-width: 1023px)';

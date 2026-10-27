@@ -6,7 +6,7 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
 import { buildAsciiTable, filterAsciiTable } from './core';
 
-/** ASCII 对照表 */
+/** ASCII reference table */
 export default function AsciiTableTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ q: '' }), []);
@@ -50,9 +50,7 @@ export default function AsciiTableTool() {
                 >
                   <td className="px-3 py-1.5 font-mono">{row.dec}</td>
                   <td className="px-3 py-1.5 font-mono">0x{row.hex}</td>
-                  <td className="px-3 py-1.5 font-mono text-base">
-                    {row.char || '·'}
-                  </td>
+                  <td className="px-3 py-1.5 font-mono text-base">{row.char || '·'}</td>
                   <td className="px-3 py-1.5 text-gray-600 dark:text-gray-300">{row.name}</td>
                   <td className="px-3 py-1.5">
                     <CopyButton text={copyText} />

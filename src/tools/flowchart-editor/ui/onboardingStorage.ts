@@ -1,11 +1,11 @@
 /**
- * 引导已读标记（本机 localStorage）。
- * 与组件分离，避免把非组件导出混进 `Onboarding.tsx`（保持 Fast Refresh 可用）。
+ * Onboarding seen flag (local localStorage).
+ * Separated from the component so non-component exports do not pollute `Onboarding.tsx` (keeping Fast Refresh working).
  */
 
 const SEEN_KEY = 'syntools:flowchart-editor.onboarding.v1';
 
-/** 是否已看过首启引导；localStorage 不可用时视作已读，避免反复弹出 */
+/** Whether the first-run onboarding has been seen; treated as seen when localStorage is unavailable, so it does not pop up repeatedly */
 export function hasSeenOnboarding(): boolean {
   try {
     return localStorage.getItem(SEEN_KEY) === '1';
@@ -14,11 +14,11 @@ export function hasSeenOnboarding(): boolean {
   }
 }
 
-/** 标记为已读 */
+/** Mark as seen */
 export function markOnboardingSeen(): void {
   try {
     localStorage.setItem(SEEN_KEY, '1');
   } catch {
-    // localStorage 不可用时忽略
+    // Ignore when localStorage is unavailable
   }
 }

@@ -1,15 +1,15 @@
 import type { Lang } from '@/core/i18n';
 
 /**
- * /download 页文案。
+ * Copy for the /download page.
  *
- * 说明：这些字符串暂不放进 `core/i18n/locales/*`。外壳语言包以 zh 的键结构作为
- * `ShellResources` 的类型源（见 `core/i18n/types.ts`），新增一个 section 会强制
- * 9 个语种文件同时补齐，否则 typecheck 失败。为避免再引入一批机翻文案，
- * 这里只提供人工撰写的 zh / en / ja 三语，其余语种回落英文。
+ * Note: these strings stay out of `core/i18n/locales/*` for now. The shell packs use zh's keys as
+ * the type source for `ShellResources` (see `core/i18n/types.ts`), so a new section forces
+ * all 9 locale files to be filled in at once or typecheck fails. To avoid another batch of machine translation,
+ * only hand-written zh / en / ja are provided here, with other languages falling back to English.
  *
- * 后续若要把本页纳入正式语言包：先在 9 个 locale 文件里补齐 `download.*`，
- * 再把这里的调用换成 `t('download.xxx')`。
+ * To fold this page into the official packs later: first add `download.*` to all 9 locale files,
+ * then swap the calls here for `t('download.xxx')`.
  */
 export interface DownloadStrings {
   title: string;
@@ -130,7 +130,7 @@ const ja: DownloadStrings = {
 
 export const downloadStrings: Partial<Record<Lang, DownloadStrings>> = { zh, en, ja };
 
-/** 取文案：未覆盖的语种回落英文 */
+/** Pick copy: uncovered languages fall back to English */
 export function getDownloadStrings(lang: Lang): DownloadStrings {
   return downloadStrings[lang] ?? en;
 }

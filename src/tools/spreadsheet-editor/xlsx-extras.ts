@@ -1,40 +1,41 @@
 import type { ConditionalFormattingOptions, DataValidation } from 'exceljs';
 
 /**
- * .xlsx 往返保留层：条件格式与数据验证。
+ * .xlsx round-trip preservation layer: conditional formatting and data validation.
  *
- * 这两类内容 Univer 与 exceljs 的数据模型差异较大，暂不做双向语义映射，
- * 而是把 exceljs 读出的原始定义随工作簿快照一起保存，导出时再写回，
- * 这样「导入 → 编辑 → 导出」不会静默丢失原有条件格式 / 数据验证。
+ * Univer and exceljs model these two features quite differently, so there is no two-way semantic
+ * mapping yet. Instead the raw definitions read by exceljs are stored alongside the workbook snapshot
+ * and written back on export, so "import → edit → export" never silently drops existing conditional
+ * formatting / data validation.
  *
- * 存放位置是快照上的**自有字段**（`syntoolsExtras`），而不是 Univer 的
- * `resources`：Univer 只会加载「已注册插件的 resource 名」
- * （core 的 `ResourceManagerService.loadResources` 按 pluginName 过滤），
- * 本工具未安装条件格式插件，写进 resources 的内容会在 loadSnapshot 后丢失。
+ * They live in a **tool-owned field** on the snapshot (`syntoolsExtras`) rather than Univer's
+ * `resources`: Univer only loads resource names of registered plugins (core's
+ * `ResourceManagerService.loadResources` filters by pluginName), and this tool installs no
+ * conditional-formatting plugin, so anything written to resources is lost after loadSnapshot.
  *
- * 注意：在本工具内新建的条件格式 / 数据验证仍在 Univer 侧，
- * 尚未映射回 .xlsx，导出损耗说明见 strings 的 unsupportedTip。
+ * Note: conditional formatting / data validation created inside this tool still lives on the Univer
+ * side and is not mapped back to .xlsx yet; see unsupportedTip in strings for the export caveat.
  */
 
-/** 单个工作表中需往返保留的内容 */
+/** Content to preserve across the round-trip for one sheet */
 export interface SheetExtras {
   conditionalFormattings?: ConditionalFormattingOptions[];
-  /** 单元格地址 → 数据验证定义 */
+  /** Cell address → data validation definition */
   dataValidations?: Record<string, DataValidation>;
 }
 
 export interface WorkbookExtras {
   version: 1;
-  /** 工作表名 → 附加内容（用名称而非 id：Univer 快照与 exceljs 的 id 体系不同） */
+  /** Sheet name → extra content (by name, not id: Univer snapshots and exceljs use different id schemes) */
   sheets: Record<string, SheetExtras>;
 }
 
-/** 承载附加内容的快照形态 */
+/** Snapshot shape that carries the extra content */
 export interface SnapshotWithExtras {
   syntoolsExtras?: WorkbookExtras;
 }
 
-/** exceljs 工作表形态：只声明本模块用到的成员 */
+/** exceljs worksheet shape: only the members this module uses */
 export interface WorksheetExtrasLike {
   name: string;
   conditionalFormattings?: ConditionalFormattingOptions[];
@@ -43,7 +44,7 @@ export interface WorksheetExtrasLike {
   getCell?: (address: string) => { dataValidation: DataValidation } | undefined;
 }
 
-/** 读取工作表中需往返保留的附加内容；没有则返回 null */
+/** Read the round-trip extras of a worksheet; null when there are none */
 export function collectSheetExtras(worksheet: WorksheetExtrasLike): SheetExtras | null {
   const extras: SheetExtras = {};
   if (Array.isArray(worksheet.conditionalFormattings) && worksheet.conditionalFormattings.length) {
@@ -56,7 +57,7 @@ export function collectSheetExtras(worksheet: WorksheetExtrasLike): SheetExtras 
   return Object.keys(extras).length > 0 ? extras : null;
 }
 
-/** 把附加内容写回 exceljs 工作表 */
+/** Write the extras back into an exceljs worksheet */
 export function applySheetExtras(worksheet: WorksheetExtrasLike, extras: SheetExtras): void {
   for (const formatting of extras.conditionalFormattings ?? []) {
     worksheet.addConditionalFormatting?.(formatting);
@@ -67,7 +68,7 @@ export function applySheetExtras(worksheet: WorksheetExtrasLike, extras: SheetEx
   }
 }
 
-/** 从快照读回附加内容；缺失或损坏时返回 null */
+/** Read the extras back from a snapshot; null when missing or malformed */
 export function readWorkbookExtras(snapshot: object | null | undefined): WorkbookExtras | null {
   const value = (snapshot as SnapshotWithExtras | null | undefined)?.syntoolsExtras;
   if (!value || value.version !== 1 || typeof value.sheets !== 'object' || !value.sheets) {
@@ -76,7 +77,7 @@ export function readWorkbookExtras(snapshot: object | null | undefined): Workboo
   return value;
 }
 
-/** 把附加内容并入快照；无内容时移除该字段 */
+/** Merge the extras into a snapshot; drop the field when there is nothing to keep */
 export function withWorkbookExtras<T extends object>(
   snapshot: T,
   extras: WorkbookExtras | null,
@@ -91,7 +92,7 @@ export function withWorkbookExtras<T extends object>(
   return { ...snapshot, syntoolsExtras: extras } as T;
 }
 
-/** 统计附加内容规模（用于提示「有多少内容靠往返保留、未做语义映射」） */
+/** Count the extras (to tell the user how much content only survives via round-trip, without semantic mapping) */
 export function countExtras(extras: WorkbookExtras | null): {
   conditionalFormattings: number;
   dataValidations: number;

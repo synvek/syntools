@@ -17,7 +17,7 @@ export async function mergePdfs(docs: PDFDocument[]): Promise<ToolResult<Uint8Ar
   }
 }
 
-/** 每页拆成独立 PDF */
+/** Split each page into its own PDF */
 export async function splitPdfToPages(doc: PDFDocument): Promise<ToolResult<Uint8Array[]>> {
   const count = doc.getPageCount();
   if (count === 0) return { ok: false, error: 'NO_PAGES' };
@@ -72,7 +72,7 @@ export async function extractPages(
   }
 }
 
-/** order: 新顺序的 0-based 页索引（必须覆盖全部页且不重复） */
+/** order: 0-based page indexes in the new order (must cover every page once) */
 export async function reorderPages(
   doc: PDFDocument,
   order: number[],

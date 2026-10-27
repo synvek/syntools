@@ -17,7 +17,7 @@ function clampNum(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
-/** CSS 按钮生成器 */
+/** CSS button generator */
 export default function CssButtonTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -142,7 +142,10 @@ export default function CssButtonTool() {
               ['fontWeight', 'fontWeight', 400, 800],
             ] as const
           ).map(([key, field, min, max]) => (
-            <label key={key} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <label
+              key={key}
+              className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+            >
               <span className="w-24 shrink-0">{t(`tools.cssButton.${key}`)}</span>
               <input
                 type="range"

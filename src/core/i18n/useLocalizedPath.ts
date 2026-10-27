@@ -3,16 +3,16 @@ import { useLocation } from 'react-router-dom';
 import { routedLangFromPath, withLangPrefix } from '@/core/i18n/routing';
 
 /**
- * 站内跳转的路径构造函数：按**当前所在的路径树**补语言前缀。
+ * Path builder for internal links: prefixes with the **tree the user is currently in**.
  *
- * 为什么用「路径树」而不是「界面语言」：
- * 只有 en 与 zh 有独立 URL，其余 7 种语言是在无前缀树里切换的。若按界面语言算，
- * 一个把界面切成日语的用户点「全部工具」会掉回 `/zh/`（因为他上一站在中文树），
- * 而他应该继续待在自己所在的那棵树里。
+ * Why the tree and not the UI language:
+ * only en and zh have their own URLs and the other 7 switch inside the unprefixed tree. Keying on UI language,
+ * a user who switched the UI to Japanese would drop back to `/zh/` (their previous stop was the Chinese tree)
+ * when they should stay in the tree they are already in.
  *
- * 用法：
+ * Usage:
  *   const lp = useLocalizedPath();
- *   <Link to={lp('/pricing')}>…           // 英文树 → /pricing，中文树 → /zh/pricing
+ *   <Link to={lp('/pricing')}>…           // English tree → /pricing, Chinese tree → /zh/pricing
  *   navigate(lp(`/tools/${id}`))
  */
 export function useLocalizedPath(): (path: string) => string {

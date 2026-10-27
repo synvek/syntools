@@ -14,11 +14,11 @@ import {
 } from './render/filterExtra';
 
 /**
- * 扩展滤镜（扭曲 / 风格化 / 渲染 / 降噪）的像素级测试。
+ * Pixel-level tests for the extra filters (distort / stylize / render / noise reduction).
  *
- * 这些实现全是「就地修改 RGBA 数据」的纯函数，因此可以在 jsdom 下直接断言；
- * 其中**纯色不变性**（uniform image 经过几何变换后仍应均匀）是几何类滤镜最有效的回归防线：
- * 反向映射一旦搞错采样坐标，纯色图会立刻出现条纹或空洞。
+ * All of them are pure functions that rewrite the RGBA buffer in place, so they can be asserted directly under jsdom;
+ * **uniform-color invariance** (a uniform image stays uniform after a geometric transform) is the most effective regression
+ * guard for geometry filters: get the inverse mapping wrong and stripes or holes appear at once.
  */
 
 const rgba = (pixels: number[][]): Uint8ClampedArray => Uint8ClampedArray.from(pixels.flat());
@@ -34,7 +34,7 @@ const flat = (width: number, height: number, color: number[]): Uint8ClampedArray
   return data;
 };
 
-/** 断言整个缓冲的颜色都一样（允许 1 个字节的插值误差） */
+/** Assert that the whole buffer has a single color (allowing 1 byte of interpolation error) */
 const expectUniform = (data: Uint8ClampedArray, expected: number[]) => {
   for (let index = 0; index < data.length; index += 4) {
     for (let channel = 0; channel < 3; channel += 1) {
@@ -48,18 +48,18 @@ const pixel = (data: Uint8ClampedArray, width: number, x: number, y: number) => 
   return [data[offset], data[offset + 1], data[offset + 2]];
 };
 
-describe('滤镜清单与分组一致性', () => {
-  it('分组完整覆盖 FILTERS，且没有重复项', () => {
+describe('Filter list and grouping consistency', () => {
+  it('groups cover FILTERS completely with no duplicates', () => {
     const grouped = FILTER_GROUPS.flatMap((group) => group.items);
     expect(new Set(grouped).size).toBe(grouped.length);
     expect([...grouped].sort()).toEqual([...FILTERS].sort());
   });
 
-  it('每个滤镜都有参数描述（可为空数组）', () => {
+  it('every filter has a parameter spec (possibly empty)', () => {
     for (const id of FILTERS) expect(Array.isArray(FILTER_PARAMS[id])).toBe(true);
   });
 
-  it('扩展滤镜共 8 个，且都必须走像素管线（CSS 表达不了）', () => {
+  it('there are 8 extra filters and all need the pixel pipeline (CSS cannot express them)', () => {
     const extra = FILTERS.filter((id) => isExtraFilter(id));
     expect(extra).toEqual([
       'twirl',
@@ -75,7 +75,7 @@ describe('滤镜清单与分组一致性', () => {
 });
 
 describe('sampleBilinear', () => {
-  it('整数坐标取原像素', () => {
+  it('integer coordinates sample the original pixel', () => {
     const data = rgba([
       [10, 20, 30, 255],
       [40, 50, 60, 255],
@@ -84,7 +84,7 @@ describe('sampleBilinear', () => {
     expect(sampleBilinear(data, 2, 1, 1, 0)).toEqual([40, 50, 60, 255]);
   });
 
-  it('中点取两像素均值', () => {
+  it('a midpoint averages the two neighbouring pixels', () => {
     const data = rgba([
       [0, 0, 0, 255],
       [100, 100, 100, 255],
@@ -92,17 +92,17 @@ describe('sampleBilinear', () => {
     expect(sampleBilinear(data, 2, 1, 0.5, 0)).toEqual([50, 50, 50, 255]);
   });
 
-  it('越界钳制到边缘像素（否则扭曲后会出现透明缺口）', () => {
+  it('out-of-range samples clamp to the edge pixel (otherwise warping leaves transparent gaps)', () => {
     const data = flat(2, 2, [200, 200, 200]);
     expect(sampleBilinear(data, 2, 2, -5, 0)).toEqual([200, 200, 200, 255]);
     expect(sampleBilinear(data, 2, 2, 0, 9)).toEqual([200, 200, 200, 255]);
   });
 });
 
-describe('扭曲类：纯色不变性是几何正确性的基线', () => {
+describe('Distort family: uniform-color invariance is the baseline for correct geometry', () => {
   const color = [120, 80, 40];
 
-  it('旋转扭曲：角度 0 不改画面；纯色图不管扭多少都仍均匀', () => {
+  it('twirl: angle 0 changes nothing; a uniform image stays uniform however much it twists', () => {
     const data = flat(9, 9, color);
     const before = [...data];
     applyTwirl(9, 9, data, 0);
@@ -112,15 +112,15 @@ describe('扭曲类：纯色不变性是几何正确性的基线', () => {
     expectUniform(data, color);
   });
 
-  it('旋转扭曲：中心保持不动', () => {
+  it('twirl: the center stays put', () => {
     const data = flat(9, 9, [10, 10, 10]);
-    // 中心 + 一个偏心的亮点：中心像素不应被搬走
+    // Center + one off-center bright dot: the center pixel must not be displaced
     data[(4 * 9 + 4) * 4] = 250;
     applyTwirl(9, 9, data, 90);
     expect(data[(4 * 9 + 4) * 4]).toBeGreaterThan(200);
   });
 
-  it('球面化：0 不改；纯色保持均匀；中心不动', () => {
+  it('spherize: 0 changes nothing, uniform stays uniform, the center stays put', () => {
     const data = flat(9, 9, [60, 60, 60]);
     const before = [...data];
     applySpherize(9, 9, data, 0);
@@ -131,7 +131,7 @@ describe('扭曲类：纯色不变性是几何正确性的基线', () => {
     expect(pixel(data, 9, 4, 4)).toEqual([60, 60, 60]);
   });
 
-  it('挤压：0 不改；纯色保持均匀', () => {
+  it('pinch: 0 changes nothing, uniform stays uniform', () => {
     const data = flat(9, 9, [30, 90, 150]);
     const before = [...data];
     applyPinch(9, 9, data, 0);
@@ -142,8 +142,8 @@ describe('扭曲类：纯色不变性是几何正确性的基线', () => {
   });
 });
 
-describe('风格化：边缘检测', () => {
-  /** 左黑右白的竖直台阶 */
+describe('Stylize: edge detection', () => {
+  /** Vertical step, black on the left and white on the right */
   const stepImage = (width = 6, height = 4) => {
     const data = new Uint8ClampedArray(width * height * 4);
     for (let y = 0; y < height; y += 1) {
@@ -159,7 +159,7 @@ describe('风格化：边缘检测', () => {
     return data;
   };
 
-  it('查找边缘：平坦区域为白，边界处变暗', () => {
+  it('find edges: flat areas go white and boundaries darken', () => {
     const flatData = flat(5, 5, [128, 128, 128]);
     applyFindEdges(5, 5, flatData);
     expectUniform(flatData, [255, 255, 255]);
@@ -170,7 +170,7 @@ describe('风格化：边缘检测', () => {
     expect(pixel(data, 6, 0, 1)[0]).toBe(255);
   });
 
-  it('等高线：低于阈值处为白，边界处按阈值压黑', () => {
+  it('trace contour: areas below the threshold go white and boundaries darken by the threshold', () => {
     const flatData = flat(5, 5, [128, 128, 128]);
     applyTraceContour(5, 5, flatData, 128);
     expectUniform(flatData, [255, 255, 255]);
@@ -181,7 +181,7 @@ describe('风格化：边缘检测', () => {
     expect(boundary).toContain(0);
   });
 
-  it('阈值越高越容易画出等高线', () => {
+  it('a higher threshold draws contours more readily', () => {
     const low = stepImage();
     const high = stepImage();
     applyTraceContour(6, 4, low, 40);
@@ -192,8 +192,8 @@ describe('风格化：边缘检测', () => {
   });
 });
 
-describe('渲染类', () => {
-  it('云彩：确定性（同参数重复烘焙结果一致）', () => {
+describe('Render family', () => {
+  it('clouds: deterministic (baking twice with the same parameters gives the same result)', () => {
     const a = flat(16, 16, [0, 0, 0]);
     const b = flat(16, 16, [0, 0, 0]);
     applyClouds(16, 16, a, 80, 16);
@@ -201,7 +201,7 @@ describe('渲染类', () => {
     expect([...a]).toEqual([...b]);
   });
 
-  it('云彩：强度 0 不改；强度 100 后被完全替换为噪声（出现明暗起伏）', () => {
+  it('clouds: strength 0 changes nothing, strength 100 replaces the image with noise (light and dark appear)', () => {
     const untouched = flat(16, 16, [10, 20, 30]);
     const before = [...untouched];
     applyClouds(16, 16, untouched, 0, 16);
@@ -214,7 +214,7 @@ describe('渲染类', () => {
     expect(Math.min(...values)).toBeLessThan(240);
   });
 
-  it('镜头光晕：0 不改；光斑处变亮、远处几乎不受影响', () => {
+  it('lens flare: 0 changes nothing; the flare spot brightens while far areas barely change', () => {
     const data = flat(40, 40, [0, 0, 0]);
     const before = [...data];
     applyLensFlare(40, 40, data, 0, 40, 50, 50);
@@ -223,27 +223,27 @@ describe('渲染类', () => {
     applyLensFlare(40, 40, data, 100, 40, 50, 50);
     const center = pixel(data, 40, 20, 20)[0];
     const corner = pixel(data, 40, 0, 0)[0];
-    // 中心显著变亮；角落即使正好落在某道鬼影光环上，也必须远弱于中心
+    // The center brightens noticeably; a corner must stay far dimmer even if it happens to land on a ghost halo
     expect(center).toBeGreaterThan(150);
     expect(corner).toBeLessThan(center * 0.25);
   });
 });
 
-describe('降噪：中值滤波', () => {
-  it('强度 0 不改画面', () => {
+describe('Noise reduction: median filter', () => {
+  it('strength 0 leaves the image unchanged', () => {
     const data = flat(5, 5, [100, 100, 100]);
     const before = [...data];
     applyReduceNoise(5, 5, data, 0, 1);
     expect([...data]).toEqual(before);
   });
 
-  it('纯色图像保持均匀', () => {
+  it('a uniform image stays uniform', () => {
     const data = flat(7, 7, [77, 88, 99]);
     applyReduceNoise(7, 7, data, 100, 1);
     expectUniform(data, [77, 88, 99]);
   });
 
-  it('孤立亮点被抹平（椒盐噪声）', () => {
+  it('isolated bright dots are flattened (salt and pepper noise)', () => {
     const data = flat(5, 5, [0, 0, 0]);
     const center = (2 * 5 + 2) * 4;
     data[center] = 255;
@@ -253,7 +253,7 @@ describe('降噪：中值滤波', () => {
     expect(pixel(data, 5, 2, 2)).toEqual([0, 0, 0]);
   });
 
-  it('强度 50 时只削弱一半', () => {
+  it('strength 50 only halves the effect', () => {
     const data = flat(5, 5, [0, 0, 0]);
     const center = (2 * 5 + 2) * 4;
     data[center] = 200;
@@ -263,7 +263,7 @@ describe('降噪：中值滤波', () => {
     expect(pixel(data, 5, 2, 2)[0]).toBe(100);
   });
 
-  it('半径为 3 时更大的斑块也会被抹掉', () => {
+  it('radius 3 also erases larger blobs', () => {
     const data = flat(9, 9, [0, 0, 0]);
     for (const [x, y] of [
       [4, 4],

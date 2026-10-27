@@ -1,17 +1,17 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * HTML 实体 / Unicode 编解码（Tasks T36）：
- * 编码支持命名实体 / 十进制 / 十六进制 / \u 转义；
- * 解码兼容上述全部形式，未识别的实体原样保留并列出（不抛异常）。
+ * HTML entity / Unicode codec (Tasks T36):
+ * Encoding supports named entities, decimal, hexadecimal, and \u escapes;
+ * Decoding accepts all of the above; unrecognized entities are kept verbatim and reported (nothing throws).
  */
 
 export type Direction = 'encode' | 'decode';
 export type EncodeMode = 'named' | 'decimal' | 'hex' | 'unicode';
-/** special = 仅 &<>"'；nonascii = 另含全部非 ASCII 字符 */
+/** special = only &<>"'; nonascii = additionally covers every non-ASCII character */
 export type EncodeScope = 'special' | 'nonascii';
 
-/** 常用命名实体表（完整 HTML5 实体表约 2000 项，此处覆盖高频子集；其余走数字实体） */
+/** Common named-entity table (the full HTML5 set has ~2000 entries; this covers the high-frequency subset, the rest go through numeric entities) */
 const NAMED_ENTITIES: Record<string, string> = {
   amp: '&',
   lt: '<',
@@ -52,7 +52,7 @@ const NAMED_ENTITIES: Record<string, string> = {
   harr: '\u2194',
 };
 
-/** 字符 → 实体名（命名编码用） */
+/** Character → entity name (for named encoding) */
 const CHAR_TO_NAME = new Map(Object.entries(NAMED_ENTITIES).map(([name, char]) => [char, name]));
 
 const SPECIAL = new Set(['&', '<', '>', '"', "'"]);
@@ -61,7 +61,7 @@ function inScope(char: string, code: number, scope: EncodeScope): boolean {
   return SPECIAL.has(char) || (scope === 'nonascii' && (code < 0x20 || code > 0x7e));
 }
 
-/** 编码：按模式与范围转换 */
+/** Encode: convert according to mode and range */
 export function encodeEntities(
   text: string,
   mode: EncodeMode,
@@ -77,7 +77,7 @@ export function encodeEntities(
     switch (mode) {
       case 'named': {
         const name = CHAR_TO_NAME.get(char);
-        // 无命名实体的字符回退为十进制数字实体
+        // Characters without a named entity fall back to decimal numeric entities
         out += name ? `&${name};` : `&#${code};`;
         break;
       }
@@ -88,7 +88,7 @@ export function encodeEntities(
         out += `&#x${code.toString(16).toUpperCase()};`;
         break;
       case 'unicode': {
-        // 增补平面字符按 UTF-16 码元输出 \uHHHH 对（与 Java/JSON 习惯一致）
+        // Supplementary-plane characters emit a \uHHHH surrogate pair (the Java/JSON convention)
         for (let i = 0; i < char.length; i += 1) {
           out += `\\u${char.charCodeAt(i).toString(16).padStart(4, '0').toUpperCase()}`;
         }
@@ -101,11 +101,11 @@ export function encodeEntities(
 
 export interface DecodeResult {
   output: string;
-  /** 未识别的命名实体（原样保留在输出中） */
+  /** Unrecognized named entities (kept verbatim in the output) */
   unknown: string[];
 }
 
-/** 解码：数字实体（十进制/十六进制）+ 命名实体 + \uXXXX；未识别的原样保留 */
+/** Decode: numeric entities (decimal/hex), named entities, and \uXXXX; unrecognized ones are kept verbatim */
 export function decodeEntities(text: string): ToolResult<DecodeResult> {
   const unknown: string[] = [];
 
@@ -129,7 +129,7 @@ export function decodeEntities(text: string): ToolResult<DecodeResult> {
     return match;
   });
 
-  // \uXXXX（含代理对自动拼接由 String.fromCharCode 逐段还原）
+  // \uXXXX (surrogate pairs are reassembled piecewise by String.fromCharCode)
   out = out.replace(/\\u([0-9a-fA-F]{4})/g, (_match, hex: string) =>
     String.fromCharCode(Number.parseInt(hex, 16)),
   );

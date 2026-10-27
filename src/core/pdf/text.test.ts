@@ -3,7 +3,7 @@ import { PDFDocument, rgb } from '@cantoo/pdf-lib';
 import { addHeaderFooter } from './draw';
 import { embedRasterizedText, needsUnicodeFont } from './text';
 
-/** jsdom 无 2d 上下文：为中文栅格路径提供最小 mock（真实浏览器走系统字体）。 */
+/** jsdom has no 2d context: minimal mock for the CJK raster path (browsers use system fonts). */
 beforeAll(() => {
   const proto = HTMLCanvasElement.prototype;
   proto.getContext = ((type: string) => {

@@ -1,13 +1,13 @@
 /**
- * 自绘矢量导出：把文档渲染为纯 SVG（形状为 path、文字为 <text>，可缩放、文字可选）。
+ * Self-drawn vector export: renders the document as pure SVG (shapes as paths, text as <text>, scalable and selectable).
  *
- * 相对 DOM 截图（html-to-image）的优点：
- * - 输出是真矢量，外部工具（Illustrator / Inkscape）打开正常，文字可编辑可选；
- * - 无需切到对应页再截图，多页导出不必打乱用户当前页；
- * - 形状与画布共用 `drawShape`，视觉一致。
+ * Advantages over DOM capture (html-to-image):
+ * - The output is true vector, opens correctly in external tools (Illustrator / Inkscape), and text stays editable and selectable;
+ * - No need to switch to the target page before capturing, so multi-page export does not disturb the user's current page;
+ * - Shapes share `drawShape` with the canvas, keeping the visuals identical.
  *
- * 局限：公式节点依赖 KaTeX 的 HTML 输出，无法矢量化为 SVG 文本，
- * 由调用方检测到公式节点时回退到 DOM 截图路径（见 `pageHasFormula`）。
+ * Limitation: formula nodes rely on KaTeX's HTML output and cannot be vectorized into SVG text,
+ * so callers fall back to the DOM capture path when a formula node is present (see `pageHasFormula`).
  */
 
 import { downloadDataUrl } from '@/core/pdf/download';
@@ -16,17 +16,17 @@ import type { FlowDoc, FlowPage } from '../model/types';
 import { VectorScene } from './VectorScene';
 
 export interface VectorExportOptions {
-  /** 导出范围：仅选中 / 当前页 / 全部页（默认当前页） */
+  /** Export range: selection only / current page / all pages (defaults to the current page) */
   range?: 'selection' | 'current' | 'all';
-  /** 内容外留白（像素） */
+  /** Padding around the content (pixels) */
   padding?: number;
-  /** 透明背景 */
+  /** Transparent background */
   transparent?: boolean;
-  /** `range=selection` 时要导出的节点 id */
+  /** Node ids to export when `range=selection` */
   selection?: readonly string[];
 }
 
-/** 只保留选中节点（及它们的容器父节点）与相关连线 */
+/** Keep only the selected nodes (plus their container ancestors) and the related edges */
 function filterPage(page: FlowPage, ids?: readonly string[]): FlowPage {
   if (!ids || ids.length === 0) return page;
   const keep = new Set(ids);
@@ -41,12 +41,12 @@ function filterPage(page: FlowPage, ids?: readonly string[]): FlowPage {
   };
 }
 
-/** 该页是否包含矢量管线无法忠实呈现的公式节点 */
+/** Whether the page contains formula nodes the vector pipeline cannot render faithfully */
 export function pageHasFormula(page: FlowPage): boolean {
   return page.nodes.some((n) => n.type === 'formula');
 }
 
-/** 渲染单页为矢量 SVG 字符串 */
+/** Render a single page as a vector SVG string */
 export async function pageToVectorSvg(
   page: FlowPage,
   options: VectorExportOptions = {},
@@ -59,7 +59,7 @@ export async function pageToVectorSvg(
   return `<?xml version="1.0" encoding="UTF-8"?>\n${markup}`;
 }
 
-/** 矢量 SVG → PNG dataURL（用于 PDF / 位图回退） */
+/** Vector SVG → PNG dataURL (for PDF / bitmap fallback) */
 export async function vectorSvgToPngDataUrl(svg: string, scale = 2): Promise<string | null> {
   try {
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
@@ -98,7 +98,7 @@ function pagesOf(doc: FlowDoc, options: VectorExportOptions): FlowPage[] {
   return active ? [active] : [];
 }
 
-/** 导出矢量 SVG：单页直接下载，多页打包为 ZIP */
+/** Export vector SVG: a single page downloads directly, multiple pages are packed into a ZIP */
 export async function exportVectorSvg(
   doc: FlowDoc,
   filename: string,

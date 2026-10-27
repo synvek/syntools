@@ -15,10 +15,10 @@ import {
 
 const MODES: EncodeMode[] = ['named', 'decimal', 'hex', 'unicode'];
 
-/** HTML 实体 / Unicode 编解码（Tasks T36）：文案全部走 i18n（T29 约定） */
+/** HTML entity / Unicode codec (Tasks T36): all copy goes through i18n (T29 convention) */
 export default function EntityCodecTool() {
   const { t } = useTranslation();
-  // 从分享链接 ?s= 还原初始状态（T28）
+  // Restore the initial state from the ?s= share link (T28)
   const init = useMemo(() => readSharedState({ i: '', d: 'encode', m: 'named', s: 'special' }), []);
   const [input, setInput] = useState(init.i);
   const [direction, setDirection] = useState<Direction>(init.d === 'decode' ? 'decode' : 'encode');

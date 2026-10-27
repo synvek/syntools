@@ -1,27 +1,27 @@
 /**
- * 面板布局（视图态）：右侧三个固定面板，每个面板记录当前选中的子 tab。
+ * Panel layout (view state): three fixed panels on the right, each remembering its selected sub tab.
  *
- * 与 `viewport` 同级：属于会话 / 视图状态，不进文档历史，也随工具在 localStorage 单独持久化
- * （不占用 `draft.ts` 的文档草稿预算，避免超大草稿降级时把面板布局一起丢掉）。
+ * Same tier as `viewport`: session / view state, not in document history, persisted separately in
+ * localStorage (so it never eats `draft.ts`'s document budget or gets dropped with oversized drafts).
  */
 
 export type PanelId =
   'color' | 'layers' | 'style' | 'text' | 'channels' | 'property' | 'adjust' | 'filter' | 'history';
 
-/** 三个固定面板（自上而下）：每个面板内部是一组子 tab，同一时刻只显示一个子面板 */
+/** The three fixed panels (top to bottom): each holds a set of sub tabs, one visible at a time */
 export type PanelGroupId = 'color' | 'layers' | 'info';
 
 export interface PanelGroup {
   id: PanelGroupId;
-  /** 面板内的子 tab（数组顺序即 tab 顺序） */
+  /** Sub tabs inside the panel (array order is tab order) */
   panels: readonly PanelId[];
 }
 
 /**
- * 三个面板按修图任务划分（参考 Photoshop / Photopea 的停靠区）：
- * - 颜色：颜色、调整、滤镜 —— 调色与效果，作用于整幅画面；
- * - 图层：图层、图层样式、通道 —— 结构类，处理「这份内容由什么组成」；
- * - 信息：文字、属性、历史 —— 单对象的参数与操作轨迹。
+ * The three panels split by editing task (mirroring Photoshop / Photopea docks):
+ * - Color: color, adjustments, filters — grading and effects on the whole picture;
+ * - Layers: layers, layer styles, channels — structure, i.e. "what makes up this content";
+ * - Info: text, properties, history — one object's parameters and the trail of operations.
  */
 export const PANEL_GROUPS: readonly PanelGroup[] = [
   { id: 'color', panels: ['color', 'adjust', 'filter'] },
@@ -29,7 +29,7 @@ export const PANEL_GROUPS: readonly PanelGroup[] = [
   { id: 'info', panels: ['text', 'property', 'history'] },
 ];
 
-/** 面板全集（按面板 / tab 顺序排列） */
+/** All panels (in panel / tab order) */
 export const ALL_PANELS: readonly PanelId[] = PANEL_GROUPS.flatMap((group) => [...group.panels]);
 
 export const PANEL_GROUP_OF: Record<PanelId, PanelGroupId> = PANEL_GROUPS.reduce(
@@ -44,19 +44,19 @@ export function panelGroupOf(id: PanelId): PanelGroupId {
   return PANEL_GROUP_OF[id];
 }
 
-/** 每个面板当前选中的子 tab */
+/** The sub tab currently selected in each panel */
 export type PanelTabs = Record<PanelGroupId, PanelId>;
 
 export interface PanelLayout {
   tabs: PanelTabs;
 }
 
-/** 默认选中各面板的主力 tab：颜色 / 图层 / 属性 */
+/** Default sub tab per panel: color / layers / properties */
 export function defaultPanelLayout(): PanelLayout {
   return { tabs: { color: 'color', layers: 'layers', info: 'property' } };
 }
 
-// 结构变化（旧的 order / collapsed / hidden 已不再适用），换键让旧数据自然回落默认值
+// The structure changed (old order / collapsed / hidden no longer apply); a new key resets old data
 const STORAGE_KEY = 'syntools:photo-editor.panels.v2';
 
 function isPanelOfGroup(groupId: PanelGroupId, value: unknown): value is PanelId {
@@ -66,8 +66,8 @@ function isPanelOfGroup(groupId: PanelGroupId, value: unknown): value is PanelId
 }
 
 /**
- * 归一化外部数据（localStorage / 旧版本）：逐面板校验，非法值回退到该面板的默认 tab。
- * 与 `model/migrate.ts` 同一思路——只补默认值、不猜测（例如不会把「颜色」面板的旧状态映射到别处）。
+ * Normalize external data (localStorage / older versions): validate per panel; invalid values fall back.
+ * Same approach as `model/migrate.ts`: fill defaults, never guess (old "color" state isn't remapped elsewhere).
  */
 export function normalizePanelLayout(raw: unknown): PanelLayout {
   const fallback = defaultPanelLayout();
@@ -88,7 +88,7 @@ export function loadPanelLayout(): PanelLayout {
     const raw = localStorage.getItem(STORAGE_KEY);
     return normalizePanelLayout(raw ? JSON.parse(raw) : null);
   } catch {
-    // 隐私模式 / 配额异常 / 脏数据：回落到默认布局
+    // Private mode / quota errors / dirty data: fall back to the default layout
     return defaultPanelLayout();
   }
 }
@@ -97,6 +97,6 @@ export function savePanelLayout(layout: PanelLayout): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
   } catch {
-    // 存储不可写时忽略：面板布局不是关键数据
+    // Ignore write failures: panel layout isn't critical data
   }
 }

@@ -4,11 +4,11 @@ import { ALL_TOOLS } from '../toolset';
 import { Button } from './controls';
 
 /**
- * 快捷键一览（F1 / `?` / 帮助菜单）。
+ * Shortcut overview (F1 / `?` / Help menu).
  *
- * 工具部分直接读 `toolset.ts`，与工具箱角标共用同一份数据；
- * 编辑 / 视图部分列举的是 `interaction/keyboard.ts` 中真实存在的绑定，
- * 新增绑定时应同步此表（`toolset.test.ts` 守住工具侧的一致性）。
+ * The tools section reads `toolset.ts` directly, sharing one source with the toolbox badges;
+ * the edit / view sections list bindings that actually exist in `interaction/keyboard.ts`,
+ * so new bindings must update this table too (`toolset.test.ts` guards the tool side).
  */
 
 interface Binding {

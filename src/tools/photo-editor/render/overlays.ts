@@ -5,15 +5,15 @@ import type { LayerBox, MeshGridState, SnapGuide } from '../core';
 import type { PhotoDoc, Rect, Selection } from '../model/types';
 
 /**
- * 覆盖层绘制：选区（蚂蚁线）、裁剪框（外部压暗 + 三分构图线）、自由变换框。
- * 全部 `listening: false`，只负责视觉，命中检测在 `interaction/pointer.ts` 里按几何算。
+ * Overlay drawing: selection (marching ants), crop box (dimmed outside + rule of thirds), transform box.
+ * All `listening: false` and purely visual; hit testing happens geometrically in `interaction/pointer.ts`.
  */
 
 export function clearOverlay(layer: Konva.Layer): void {
   layer.destroyChildren();
 }
 
-/** 1 / scale：让线宽与虚线间隔在任意缩放下看起来一致 */
+/** 1 / scale: keeps stroke width and dash gaps visually constant at any zoom */
 function hairline(scale: number): number {
   return 1 / Math.max(0.05, scale);
 }
@@ -21,8 +21,8 @@ function hairline(scale: number): number {
 export function drawSelection(layer: Konva.Layer, selection: Selection, scale: number): void {
   const strokeWidth = hairline(scale);
   const dash = [6 * strokeWidth, 4 * strokeWidth];
-  // 自绘：矩形 / 椭圆 / 套索 / 布尔运算结果统一按「多个闭合子路径」描边，
-  // 用 Konva.Line 会把各轮廓首尾连成斜线。
+  // Hand-drawn: rect / oval / lasso / boolean results all stroke as multiple closed subpaths, since
+  // Konva.Line would connect the end of one outline to the start of the next.
   const shape = new Konva.Shape({
     stroke: '#2563EB',
     strokeWidth,
@@ -41,14 +41,14 @@ export function drawSelection(layer: Konva.Layer, selection: Selection, scale: n
     },
   });
   layer.add(shape);
-  // 反色描边：在深色 / 浅色画面上都能看清蚂蚁线
+  // Inverted stroke so the ants stay visible on both dark and light images
   const ghost = shape.clone({ stroke: '#FFFFFF', dash: dash.slice().reverse(), opacity: 0.7 });
   layer.add(ghost);
 }
 
 /**
- * 自由变换框：旋转后的外框 + 8 个方形缩放手柄 + 顶边外侧的旋转柄。
- * 线宽与手柄边长按 1/scale 折算，保证任意缩放下视觉尺寸恒定。
+ * Free-transform box: the rotated frame + 8 square scale handles + a rotate handle above the top edge.
+ * Stroke width and handle size divide by scale so they stay visually constant at any zoom.
  */
 export function drawTransformBox(
   layer: Konva.Layer,
@@ -116,7 +116,7 @@ export function drawTransformBox(
   }
 }
 
-/** 渐变工具的拖拽示意：起点 → 终点虚线 + 两端圆点 */
+/** Gradient drag preview: a dashed line from start to end with a dot at each end */
 export interface GradientGuide {
   from: { x: number; y: number };
   to: { x: number; y: number };
@@ -157,7 +157,7 @@ export function drawCrop(layer: Konva.Layer, rect: Rect, doc: PhotoDoc, scale: n
   });
   layer.add(mask);
 
-  // 挖出裁剪区：destination-out 把中间掏空，露出未压暗的画面
+  // Punch out the crop area: destination-out clears the middle, revealing the undimmed image
   const hole = new Konva.Rect({
     x: rect.x,
     y: rect.y,
@@ -178,7 +178,7 @@ export function drawCrop(layer: Konva.Layer, rect: Rect, doc: PhotoDoc, scale: n
   });
   layer.add(frame);
 
-  // 三分构图参考线
+  // Rule-of-thirds guides
   for (let i = 1; i <= 2; i += 1) {
     layer.add(
       new Konva.Line({
@@ -210,11 +210,11 @@ export function drawCrop(layer: Konva.Layer, rect: Rect, doc: PhotoDoc, scale: n
 }
 
 /**
- * 快速蒙版：未选中区域压红（选中区域被「挖空」）。
+ * Quick mask: unselected areas are tinted red (the selected area is punched out).
  *
- * 实现取巧但等价：先铺一层半透明红，再用蒙版画布以 `destination-out` 把白色（选中）部分擦掉。
- * 好处是**直接复用蒙版画布本身**，不需要为叠加效果再生成一张同尺寸临时画布（涂抹时才不掉帧）。
- * 顺序要求：必须在选区蚂蚁线之前绘制 —— `destination-out` 会擦掉同一图层里先前画的内容。
+ * Cheap but equivalent: lay down translucent red, then `destination-out` the mask's white (selected) parts.
+ * That **reuses the mask canvas itself**, with no same-size temp canvas, so painting stays smooth.
+ * Order matters: draw it before the ants, since `destination-out` erases earlier content on the layer.
  */
 export function drawQuickMask(
   layer: Konva.Layer,
@@ -258,10 +258,10 @@ export function drawQuickMask(
 }
 
 /**
- * 网格变形覆盖层：变形前轮廓（细虚线）+ 变形后网格 + 控制点方块。
+ * Mesh warp overlay: pre-warp outline (thin dashes) + warped grid + control-point squares.
  *
- * 同时画「原位置」与「现位置」是刻意的：变形到一个近似网格后，肉眼几乎无法判断哪些点被拖动过，
- * 参照线是唯一的视觉锚点。
+ * Drawing both "original" and "current" positions is deliberate: once warped, the eye can't tell which
+ * points moved, so the reference lines are the only visual anchor.
  */
 export function drawMeshGrid(layer: Konva.Layer, grid: MeshGridState, scale: number): void {
   const strokeWidth = hairline(scale);
@@ -281,7 +281,7 @@ export function drawMeshGrid(layer: Konva.Layer, grid: MeshGridState, scale: num
       sceneFunc: (ctx, shape) => {
         const raw = ctx as unknown as CanvasRenderingContext2D;
         raw.beginPath();
-        // 先逐行连横线，再逐列连纵线：网格线既不属于闭合轮廓，也不能首尾相连
+        // Connect horizontals row by row, then verticals column by column: grid lines neither close nor join
         for (let row = 0; row < grid.rows; row += 1) {
           for (let col = 0; col < grid.cols; col += 1) {
             const point = pointAt(points, col, row);
@@ -319,8 +319,8 @@ export function drawMeshGrid(layer: Konva.Layer, grid: MeshGridState, scale: num
 }
 
 /**
- * 吸附参考线：横贯画布的洋红细线（与 Photoshop 的智能参考线同色）。
- * 只画「真正吸住」的那几条，松手即消失 —— 常驻会变成噪声。
+ * Snap guides: thin magenta lines across the canvas (Photoshop's smart-guide color).
+ * Only the guides that actually snap are drawn, and they vanish on release — permanent ones would be noise.
  */
 export function drawSnapGuides(
   layer: Konva.Layer,
@@ -345,7 +345,7 @@ export function drawSnapGuides(
   }
 }
 
-/** 图章 / 修复的取样源标记（十字准星 + 小圆） */
+/** Sample-source marker for stamp / healing (crosshair + small circle) */
 export function drawCloneSource(
   layer: Konva.Layer,
   point: { x: number; y: number },
@@ -381,7 +381,7 @@ export function drawCloneSource(
   );
 }
 
-/** 颜色取样点：编号圆点 + 十字准星（取样器的可视标记） */
+/** Color sampler point: numbered dot + crosshair (the sampler's visual marker) */
 export function drawSamples(layer: Konva.Layer, samples: SamplePoint[], scale: number): void {
   const strokeWidth = hairline(scale);
   const radius = 7 * strokeWidth;

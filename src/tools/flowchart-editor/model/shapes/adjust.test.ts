@@ -5,7 +5,7 @@ import type { FlowNodeStyle } from '../types';
 
 const ALL_KINDS = Object.keys(SHAPE_DEFS) as ShapeKind[];
 
-/** 定位某形状的某个可调参数 */
+/** Locate a given adjustable parameter of a shape */
 function adjustOf(kind: ShapeKind, key: string): ShapeAdjustDef {
   const adj = adjustsFor(SHAPE_DEFS[kind]).find((a) => a.key === key);
   if (!adj) throw new Error(`missing adjust ${kind}.${key}`);
@@ -24,7 +24,7 @@ describe('形状可调参数 - 解析器', () => {
     const note = SHAPE_DEFS.note;
     const style: Partial<FlowNodeStyle> = { shapeParams: { foldSize: 40 } };
     expect(paramValue(note, style, 'foldSize', 300, 300)).toBe(40);
-    // 超过 max（min(w,h)*0.9）时夹取
+    // Clamped when above max (min(w,h)*0.9)
     const big: Partial<FlowNodeStyle> = { shapeParams: { foldSize: 999 } };
     expect(paramValue(note, big, 'foldSize', 100, 100)).toBeCloseTo(90);
   });
@@ -59,7 +59,7 @@ describe('形状可调参数 - 手柄与投影', () => {
 
   it('projectAdjust 会把越界指针夹取到 [min, max]', () => {
     const adj = adjustOf('note', 'foldSize');
-    // 指针拖到节点左外侧：fold 应被夹到 max（min(w,h)*0.9）
+    // Pointer dragged outside the node's left edge: fold should clamp to max (min(w,h)*0.9)
     const v = projectAdjust(adj, -1000, 0, 100, 100);
     expect(v).toBeCloseTo(90);
   });
@@ -94,7 +94,7 @@ describe('形状可调参数 - draw.io 双向映射', () => {
       const token = adj.mx!.to(value, w, h);
       const back = adj.mx!.from(token, w, h);
       expect(back).not.toBeNull();
-      // 像素参数导出时取整，允许 ≤0.5px 的往返误差；比例参数应精确还原
+      // Pixel parameters are rounded on export, allowing a round-trip error of ≤0.5px; ratio parameters must restore exactly
       const tolerance = adj.unit === 'ratio' ? 1e-6 : 0.5;
       expect(Math.abs(back! - value)).toBeLessThanOrEqual(tolerance);
     }
@@ -104,7 +104,7 @@ describe('形状可调参数 - draw.io 双向映射', () => {
     const adj = adjustOf('umlLifeline', 'lifelineHeader');
     expect(adj.default(120, 300)).toBe(40);
     expect(adj.default(120, 600)).toBe(40);
-    // 面板/手柄仍可在 [16, h*0.9] 内调整
+    // The panel / handles can still adjust within [16, h*0.9]
     expect(adj.min(120, 300)).toBe(16);
     expect(adj.max(120, 300)).toBeCloseTo(270);
   });

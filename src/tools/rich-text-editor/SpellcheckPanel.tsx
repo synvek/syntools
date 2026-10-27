@@ -3,18 +3,18 @@ import { Icon } from '@/core/components/Icon';
 import type { DocSpellIssue } from './spellcheck';
 
 interface SpellcheckPanelProps {
-  /** 当前是否启用拼写检查 */
+  /** Whether spellcheck is currently enabled */
   enabled: boolean;
   onToggle: () => void;
-  /** 词表是否已加载（未加载时只依据自定义词典判断，误报会偏多） */
+  /** Whether the word list is loaded (without it only the custom dictionary is used, so expect more false positives) */
   dictionaryLoaded: boolean;
   loading: boolean;
-  /** 词表加载失败 */
+  /** The word list failed to load */
   loadFailed: boolean;
   onLoadDictionary: () => void;
-  /** 问题列表（已按文档位置排序，数量由工具层限制） */
+  /** Issue list (sorted by document position; the count is capped by the tool layer) */
   issues: DocSpellIssue[];
-  /** 取某条问题的建议候选（懒计算，索引会缓存） */
+  /** Suggestions for one issue (computed lazily, the index is cached) */
   suggestionsFor: (word: string) => string[];
   onReplace: (issue: DocSpellIssue, replacement: string) => void;
   onAddToDictionary: (word: string) => void;
@@ -24,15 +24,15 @@ interface SpellcheckPanelProps {
   onClose: () => void;
 }
 
-/** 每条问题最多展示的建议数：太多会淹没「加入词典 / 忽略」这两个主要动作 */
+/** Max suggestions per issue: too many would drown out the primary "add to dictionary / ignore" actions */
 const MAX_SUGGESTIONS = 3;
-/** 建议计算较贵，只对前 N 条问题展示 */
+/** Suggestions are expensive, so only the first N issues show them */
 const SUGGESTION_LIMIT = 20;
 
 /**
- * 拼写检查面板：
- * 词表完全本地（首次启用时按需下载），自定义词典随草稿保存。
- * 建议只对前若干条问题计算——词表有二十多万词，全量求建议会明显卡顿。
+ * Spellcheck panel:
+ * The word list is fully local (downloaded on first use) and the custom dictionary is saved with the draft.
+ * Suggestions are computed only for the first few issues: with 200k+ words, computing them all would stutter.
  */
 export function SpellcheckPanel({
   enabled,

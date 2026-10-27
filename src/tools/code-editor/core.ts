@@ -2,45 +2,46 @@ import type { ToolResult } from '@/core/types';
 import { DEFAULT_THEME_ID } from './themes';
 
 /**
- * 代码编辑器纯逻辑层（技术设计 §8.2）：
- * 不引入 Prism / prettier / html-to-image 等重依赖（全部由组件层动态导入），
- * 且所有函数遵循 ToolResult 契约——预期错误返回结果而非抛异常。
+ * Code editor pure-logic layer (technical design §8.2):
+ * No heavy deps (Prism / prettier / html-to-image) are imported here — the component
+ * layer loads them dynamically — and every function follows the ToolResult contract:
+ * expected errors are returned as results instead of being thrown.
  */
 
 export type CodeErrorCode =
   'EMPTY' | 'TOO_LARGE' | 'UNSUPPORTED' | 'READ_FAILED' | 'FORMAT_FAILED' | 'EXPORT_FAILED';
 
-/** 导入文件大小上限（10MB），与 FileDropZone 默认保持一致 */
+/** Max import file size (10MB), kept in sync with the FileDropZone default */
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 
-/** prettier 插件分组：按语言按需动态 import，避免单个 chunk 超出 500KB 预算 */
+/** Prettier plugin groups: imported on demand per language so no chunk exceeds the 500KB budget */
 export type PrettierGroup = 'js' | 'ts' | 'doc' | 'java';
 export type FormatStrategy = 'prettier' | 'sql' | 'fallback' | 'none';
-/** 下拉框中的语言分组 */
+/** Language groups shown in the dropdown */
 export type LangGroup = 'web' | 'system' | 'data' | 'markup';
 
 export interface LangSpec {
   id: string;
-  /** 展示名（专有名词，各语言一致） */
+  /** Display name (a proper noun, identical in every language) */
   label: string;
-  /** Prism 语法名；'none' 表示不做高亮 */
+  /** Prism grammar name; 'none' means no highlighting */
   prism: string;
-  /** 导出源码时使用的扩展名（含点） */
+  /** Extension used when exporting source (leading dot included) */
   ext: string;
   group: LangGroup;
   format: FormatStrategy;
   prettierGroup?: PrettierGroup;
-  /** prettier parser 名 */
+  /** Prettier parser name */
   parser?: string;
-  /** 内置格式化器模式：缩进本身即语义的语言（Python / Ruby / Shell）用 indent */
+  /** Built-in formatter mode: 'indent' for languages where indentation carries meaning */
   fallbackMode?: 'indent';
-  /** 行注释符（`//` / `#` / `--`）；未定义表示该语言不支持行注释 */
+  /** Line comment marker (`//` / `#` / `--`); undefined when line comments are unsupported */
   lineComment?: string;
-  /** 块注释包裹符 `[开始, 结束]`；未定义表示不支持块注释 */
+  /** Block comment delimiters `[open, close]`; undefined when block comments are unsupported */
   blockComment?: [string, string];
 }
 
-/** 语言基础配置：注释符由 `COMMENT_SPECS` 合并进来，见文件末尾的 `LANG_SPECS` */
+/** Base language config: comment markers are merged in from `COMMENT_SPECS`, see `LANG_SPECS` */
 const LANG_BASE: LangSpec[] = [
   // Web
   {
@@ -104,7 +105,7 @@ const LANG_BASE: LangSpec[] = [
     parser: 'scss',
   },
   { id: 'php', label: 'PHP', prism: 'php', ext: '.php', group: 'web', format: 'fallback' },
-  // 系统 / 编译型
+  // Systems / compiled
   {
     id: 'java',
     label: 'Java',
@@ -180,7 +181,7 @@ const LANG_BASE: LangSpec[] = [
     format: 'fallback',
     fallbackMode: 'indent',
   },
-  // 数据
+  // Data
   {
     id: 'json',
     label: 'JSON',
@@ -202,7 +203,7 @@ const LANG_BASE: LangSpec[] = [
     parser: 'yaml',
   },
   { id: 'sql', label: 'SQL', prism: 'sql', ext: '.sql', group: 'data', format: 'sql' },
-  // 标记语言
+  // Markup
   {
     id: 'html',
     label: 'HTML',
@@ -234,11 +235,11 @@ const LANG_BASE: LangSpec[] = [
   },
 ];
 
-/** 语言的注释符：集中维护，既供行注释切换（阶段 2）使用，也供内置格式化器跳过注释 */
+/** Comment markers per language: shared by comment toggling (phase 2) and by the built-in formatter */
 interface CommentSpec {
-  /** 行注释符 */
+  /** Line comment marker */
   line?: string;
-  /** 块注释包裹符 */
+  /** Block comment delimiters */
   block?: [string, string];
 }
 
@@ -269,10 +270,10 @@ const COMMENT_SPECS: Partial<Record<string, CommentSpec>> = {
   html: { block: ['<!--', '-->'] },
   xml: { block: ['<!--', '-->'] },
   markdown: { block: ['<!--', '-->'] },
-  // json / plaintext 无注释语法
+  // json / plaintext have no comment syntax
 };
 
-/** 语言表：核心字段 + 注释符合并（注释符见 `COMMENT_SPECS`） */
+/** Language table: base fields merged with comment markers (markers live in `COMMENT_SPECS`) */
 export const LANG_SPECS: LangSpec[] = LANG_BASE.map((spec) => {
   const comment = COMMENT_SPECS[spec.id];
   return comment ? { ...spec, lineComment: comment.line, blockComment: comment.block } : spec;
@@ -283,7 +284,7 @@ export const DEFAULT_FILENAME = 'snippet';
 export const DEFAULT_THEME = DEFAULT_THEME_ID;
 
 const SPEC_BY_ID = new Map(LANG_SPECS.map((s) => [s.id, s]));
-/** 扩展名 → 语言（.h/.hpp 等别名一并收录） */
+/** Extension → language (aliases such as .h/.hpp are registered too) */
 const EXT_TO_ID = new Map<string, string>();
 
 for (const spec of LANG_SPECS) {
@@ -316,7 +317,7 @@ export function getLangSpec(id: string): LangSpec {
   return SPEC_BY_ID.get(id) ?? SPEC_BY_ID.get(DEFAULT_LANG_ID)!;
 }
 
-/** 扩展名（或文件名）→ 语言 id；无法识别时返回 null */
+/** Extension (or filename) → language id; returns null when unrecognised */
 export function detectLanguageByExt(filename: string): string | null {
   const lower = filename.trim().toLowerCase();
   const dot = lower.lastIndexOf('.');
@@ -324,10 +325,10 @@ export function detectLanguageByExt(filename: string): string | null {
   return EXT_TO_ID.get(lower.slice(dot)) ?? null;
 }
 
-/** 可导入的扩展名清单，用于 FileDropZone 的 accept */
+/** Importable extension list, used for the FileDropZone accept attribute */
 export const IMPORT_ACCEPT = Array.from(EXT_TO_ID.keys()).join(',');
 
-/** 导入前的统一校验：体积 + 是否像文本文件 */
+/** Shared pre-import validation: file size and whether it looks like a text file */
 export function checkImportFile(file: { name: string; size: number }): ToolResult<string> {
   if (file.size > MAX_IMPORT_BYTES) {
     return {
@@ -339,28 +340,28 @@ export function checkImportFile(file: { name: string; size: number }): ToolResul
   return { ok: true, value: file.name };
 }
 
-/** 清洗文件名：去掉路径分隔符与控制字符，保留安全字符；空则回落默认值 */
+/** Sanitise a filename: drop path separators and control chars, keep the rest; fall back when empty */
 export function sanitizeFilename(name: string): string {
   const cleaned = name
-    // eslint-disable-next-line no-control-regex -- 过滤控制字符与路径分隔符
+    // eslint-disable-next-line no-control-regex -- strip control characters and path separators
     .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, '')
     .replace(/^\.+/, '')
     .trim();
   return cleaned.slice(0, 64) || DEFAULT_FILENAME;
 }
 
-/** 拼装导出文件名：basename + 语言扩展名（如 snippet.java） */
+/** Build the export filename: basename + language extension (e.g. snippet.java) */
 export function buildExportFilename(name: string, spec: LangSpec): string {
   const base = sanitizeFilename(name);
   const ext = spec.ext;
   return base.toLowerCase().endsWith(ext) ? base : `${base}${ext}`;
 }
 
-/** 统计：字符数（码点）、行数、UTF-8 字节数 */
+/** Stats: character count (code points), line count and UTF-8 byte count */
 export function countStats(code: string): { chars: number; lines: number; bytes: number } {
   const chars = Array.from(code).length;
   const lines = code ? code.split(/\r\n|\r|\n/).length : 0;
-  // TextEncoder 在 jsdom / 浏览器均可用
+  // TextEncoder is available in both jsdom and browsers
   const bytes = new TextEncoder().encode(code).length;
   return { chars, lines, bytes };
 }
@@ -370,11 +371,11 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * 生成可独立打开的 HTML 文档：内嵌主题样式 + Prism 高亮片段。
- * 高亮片段由 Prism 生成（`<` 已被转义），此处不再二次转义。
+ * Build a standalone HTML document: inlined theme styles + the Prism highlight markup.
+ * The highlight markup comes from Prism with `<` already escaped, so it is not escaped again.
  *
- * `bodyHtml` 用于样式化导出卡片（逐行渲染 / 水印等），
- * 由 `cardOptions.buildCardBodyHtml` 产出；不传则沿用默认的整段 `<pre>`。
+ * `bodyHtml` renders a styled export card (line-by-line, watermark, etc.) and is produced by
+ * `cardOptions.buildCardBodyHtml`; when omitted, the default single `<pre>` block is used.
  */
 export function buildStandaloneHtml(
   highlightedHtml: string,
@@ -407,7 +408,7 @@ ${cssBlock}
 `;
 }
 
-/** 生成可复制的高亮 HTML 片段（嵌入博客 / 文档） */
+/** Build a copyable highlighted HTML snippet (for embedding in blogs / docs) */
 export function buildSnippet(highlightedHtml: string, spec: LangSpec): string {
   const langClass = spec.prism === 'none' ? 'text' : spec.prism;
   return `<pre class="language-${langClass}"><code class="language-${langClass}">${highlightedHtml}</code></pre>`;

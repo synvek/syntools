@@ -1,6 +1,6 @@
 /**
- * 悬停快速连线的会话态：拖拽草稿（画预览线）与图形选择弹窗。
- * 独立于 useFlowStore，避免指针高频移动时触发节点/连线重渲染。
+ * Session state for hover quick-connect: the drag draft (drawing a preview line) and the shape picker popup.
+ * Kept outside useFlowStore so high-frequency pointer moves do not re-render nodes/edges.
  */
 
 import { create } from 'zustand';
@@ -10,22 +10,22 @@ export type QuickDir = 'up' | 'down' | 'left' | 'right';
 export interface QuickDraft {
   sourceId: string;
   dir: QuickDir;
-  /** 起点（client 坐标） */
+  /** Start point (client coordinates) */
   startX: number;
   startY: number;
-  /** 当前指针（client 坐标） */
+  /** Current pointer position (client coordinates) */
   curX: number;
   curY: number;
-  /** 是否已产生有效拖动 */
+  /** Whether a valid drag has started */
   moved: boolean;
 }
 
 export interface QuickPicker {
-  /** 源图形（决定弹窗列出哪个分类） */
+  /** Source shape (decides which category the popup lists) */
   sourceId: string;
-  /** 松手时已立即生成的相连节点 id（选择图形后改变其类型） */
+  /** Id of the connected node already created on release (its type changes after picking a shape) */
   nodeId: string;
-  /** 弹窗位置（相对画布容器） */
+  /** Popup position (relative to the canvas container) */
   x: number;
   y: number;
 }

@@ -9,7 +9,7 @@ export const BARCODE_TYPES: { value: BarcodeType; label: string }[] = [
 ];
 
 export interface Bar {
-  /** 模块宽度（1–4） */
+  /** Module width (1–4) */
   w: number;
   black: boolean;
 }
@@ -76,7 +76,7 @@ function encodeCode39(text: string): ToolResult<Bar[]> {
   };
   pushChar('*');
   for (const c of chars) {
-    bars.push({ w: 1, black: false }); // 字间窄间隙
+    bars.push({ w: 1, black: false }); // narrow inter-character gap
     pushChar(c);
   }
   bars.push({ w: 1, black: false });
@@ -273,7 +273,7 @@ const EAN_PARITY = [
   'LGGLGL',
 ];
 
-/** 计算 EAN-13 校验位（输入前 12 位数字）。 */
+/** Compute the EAN-13 check digit (input: the first 12 digits). */
 export function ean13CheckDigit(digits12: string): number | null {
   if (!/^\d{12}$/.test(digits12)) return null;
   let sum = 0;
@@ -306,14 +306,14 @@ function encodeEan13(input: string): ToolResult<{ bars: Bar[]; text: string }> {
 
   const first = Number(digits[0]);
   const parity = EAN_PARITY[first];
-  let modules = '101'; // 起始符
+  let modules = '101'; // start guard
   for (let i = 0; i < 6; i += 1) {
     const d = Number(digits[i + 1]);
     modules += parity[i] === 'L' ? EAN_L[d] : EAN_G[d];
   }
-  modules += '01010'; // 中间符
+  modules += '01010'; // center guard
   for (let i = 0; i < 6; i += 1) modules += EAN_R[Number(digits[i + 7])];
-  modules += '101'; // 结束符
+  modules += '101'; // end guard
   return { ok: true, value: { bars: modulesToBars(modules), text: digits } };
 }
 
@@ -349,7 +349,7 @@ function renderSvg(bars: Bar[], text: string, options: BarcodeOptions): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + textHeight}" viewBox="0 0 ${width} ${height + textHeight}"><rect width="100%" height="100%" fill="#fff" />${rects.join('')}${label}</svg>`;
 }
 
-/** 生成条码 SVG。 */
+/** Generate the barcode SVG. */
 export function generateBarcode(
   type: BarcodeType,
   text: string,

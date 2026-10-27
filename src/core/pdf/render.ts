@@ -10,7 +10,7 @@ let workerReady = false;
 
 export function ensurePdfjsWorker() {
   if (workerReady) return;
-  // Vite: 将 worker 作为独立资源
+  // Vite: ship the worker as a standalone asset
   GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/build/pdf.worker.min.mjs',
     import.meta.url,
@@ -91,7 +91,7 @@ export async function renderPageDataUrl(
   }
 }
 
-/** 将 canvas 转为灰度 */
+/** Convert the canvas to grayscale */
 export function canvasToGrayscale(source: HTMLCanvasElement): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = source.width;

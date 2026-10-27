@@ -5,7 +5,7 @@ import { writeHandoff } from '@/core/lib/handoff';
 import { toolMap } from '@/core/registry';
 import { getToolMeta } from '@/core/i18n/helpers';
 
-/** 将当前输出带到另一工具（轻量串联） */
+/** Hand the current output to another tool (lightweight chaining) */
 export function OpenInToolButton({
   targetId,
   text,

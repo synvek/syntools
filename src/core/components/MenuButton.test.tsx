@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { MenuButton } from './MenuButton';
 
 /**
- * 通用下拉菜单按钮的交互契约：文档头「导入 / 导出」与工具栏下拉共用同一套行为，
- * 这里锁住展开、选择后收起、外部关闭与禁用态。
+ * Interaction contract for the generic dropdown button, shared by header import / export and toolbar menus:
+ * this pins opening, closing on select, outside dismissal and the disabled state.
  */
 describe('通用下拉菜单按钮', () => {
   const setup = (props: Partial<Parameters<typeof MenuButton>[0]> = {}) => {

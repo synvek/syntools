@@ -58,7 +58,12 @@ export default function PdfAnnotateTool() {
   const penPts = useRef<Point[]>([]);
   const previewRef = useRef<AnnotateDraft | null>(null);
 
-  useEffect(() => () => { void docRef.current?.cleanup(); }, []);
+  useEffect(
+    () => () => {
+      void docRef.current?.cleanup();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!doc) return;
@@ -153,7 +158,7 @@ export default function PdfAnnotateTool() {
 
   const pageDrafts = drafts.filter((d) => d.pageIndex === page - 1);
 
-  /** 指针 → 归一化坐标 */
+  /** Pointer → normalized coordinates */
   const localNorm = (e: ReactPointerEvent): Point | null => {
     const el = overlayRef.current;
     if (!el || displaySize.width < 1) return null;
@@ -381,7 +386,12 @@ export default function PdfAnnotateTool() {
                 onChange={(e) => setScale(Number(e.target.value) || 1)}
               />
             </PdfField>
-            <button type="button" className="rounded border px-2 py-1 text-sm" onClick={undo} disabled={drafts.length === 0}>
+            <button
+              type="button"
+              className="rounded border px-2 py-1 text-sm"
+              onClick={undo}
+              disabled={drafts.length === 0}
+            >
               {t('tools.pdf-annotate.undo')}
             </button>
             <button type="button" className="rounded border px-2 py-1 text-sm" onClick={clearPage}>
@@ -523,17 +533,42 @@ function DraftShape({ draft, display }: { draft: AnnotateDraft; display: Size })
         return `${i === 0 ? 'M' : 'L'}${s.x} ${s.y}`;
       })
       .join(' ');
-    return <path d={d} fill="none" stroke={draft.color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />;
+    return (
+      <path
+        d={d}
+        fill="none"
+        stroke={draft.color}
+        strokeWidth={sw}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    );
   }
   if (draft.kind === 'line') {
     const a = fromNorm(draft.x1, draft.y1, display);
     const b = fromNorm(draft.x2, draft.y2, display);
-    return <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={draft.color} strokeWidth={sw} strokeLinecap="round" />;
+    return (
+      <line
+        x1={a.x}
+        y1={a.y}
+        x2={b.x}
+        y2={b.y}
+        stroke={draft.color}
+        strokeWidth={sw}
+        strokeLinecap="round"
+      />
+    );
   }
   if (draft.kind === 'text') {
     const p = fromNorm(draft.x, draft.y, display);
     return (
-      <text x={p.x} y={p.y + draft.fontSize} fill={draft.color} fontSize={draft.fontSize} fontFamily="sans-serif">
+      <text
+        x={p.x}
+        y={p.y + draft.fontSize}
+        fill={draft.color}
+        fontSize={draft.fontSize}
+        fontFamily="sans-serif"
+      >
         {draft.text}
       </text>
     );
@@ -542,7 +577,17 @@ function DraftShape({ draft, display }: { draft: AnnotateDraft; display: Size })
     const cx = fromNorm(draft.x + draft.width / 2, draft.y + draft.height / 2, display);
     const rx = Math.abs(draft.width / 2) * display.width;
     const ry = draft.kind === 'circle' ? rx : Math.abs(draft.height / 2) * display.height;
-    return <ellipse cx={cx.x} cy={cx.y} rx={rx} ry={ry} fill="none" stroke={draft.color} strokeWidth={sw} />;
+    return (
+      <ellipse
+        cx={cx.x}
+        cy={cx.y}
+        rx={rx}
+        ry={ry}
+        fill="none"
+        stroke={draft.color}
+        strokeWidth={sw}
+      />
+    );
   }
   const x0 = Math.min(draft.x, draft.x + draft.width);
   const y0 = Math.min(draft.y, draft.y + draft.height);
@@ -552,5 +597,15 @@ function DraftShape({ draft, display }: { draft: AnnotateDraft; display: Size })
   if (draft.kind === 'highlight') {
     return <rect x={tl.x} y={tl.y} width={w} height={h} fill={draft.color} opacity={0.35} />;
   }
-  return <rect x={tl.x} y={tl.y} width={w} height={h} fill="none" stroke={draft.color} strokeWidth={sw} />;
+  return (
+    <rect
+      x={tl.x}
+      y={tl.y}
+      width={w}
+      height={h}
+      fill="none"
+      stroke={draft.color}
+      strokeWidth={sw}
+    />
+  );
 }

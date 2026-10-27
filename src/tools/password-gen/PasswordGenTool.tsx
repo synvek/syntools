@@ -24,10 +24,10 @@ const STRENGTH_CLASS: Record<Strength, string> = {
   strong: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
 };
 
-/** 随机密码生成器（Tasks T38）：文案全部走 i18n（T29 约定） */
+/** Random password generator (Tasks T38): all copy goes through i18n (T29 convention) */
 export default function PasswordGenTool() {
   const { t } = useTranslation();
-  // 从分享链接 ?s= 还原初始状态（T28）
+  // Restore initial state from the share link ?s= (T28)
   const init = useMemo(
     () => readSharedState({ l: 16, a: true, b: true, c: true, d: true, e: false, f: true }),
     [],
@@ -55,7 +55,7 @@ export default function PasswordGenTool() {
     }
   };
 
-  // 强度按当前选项的字符池实时估算
+  // Strength is estimated in real time from the character pool of the current options
   const strength = useMemo(() => {
     if (!password) return null;
     const poolSize = poolFor(options).join('').length;

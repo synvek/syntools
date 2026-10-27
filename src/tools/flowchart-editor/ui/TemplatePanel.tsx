@@ -10,7 +10,7 @@ import {
 import { PageThumbnail } from '../model/PageThumbnail';
 import type { FlowPage } from '../model/types';
 
-/** 模板卡片缩略图：与「页面总览」同一套真实场景渲染（节点形状 + 连线） */
+/** Template card thumbnail: the same real-scene rendering as the page overview (node shapes + edges) */
 const PREVIEW_BOX = { width: 168, height: 56 };
 
 interface TemplatePanelProps {
@@ -23,7 +23,7 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
   const { t } = useTranslation();
   const [category, setCategory] = useState<TemplateCategory>('flow');
 
-  // 每个模板构建一次真实场景（仅几何，与语言无关）
+  // Build the real scene once per template (geometry only, language-independent)
   const previews = useMemo(() => {
     const map = new Map<TemplateKind, FlowPage>();
     for (const item of TEMPLATES) {
@@ -41,8 +41,8 @@ export function TemplatePanel({ open, onClose, onSelect }: TemplatePanelProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   /**
-   * 无鼠标场景的可用性：打开时把焦点移入弹窗，Tab 在弹窗内循环，
-   * Esc 关闭。用捕获阶段监听，避免画布上的全局快捷键抢走按键。
+   * Usability without a mouse: focus moves into the dialog when it opens, Tab cycles inside it,
+   * and Esc closes it. Listeners use the capture phase so global canvas shortcuts cannot steal the keys.
    */
   useEffect(() => {
     if (!open) return;

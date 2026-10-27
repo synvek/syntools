@@ -36,7 +36,7 @@ export default function VideoConvertTool() {
   const [trimStart, setTrimStart] = useState<number | null>(null);
   const [trimEnd, setTrimEnd] = useState<number | null>(null);
 
-  /** 当前浏览器能产出的目标格式；null 表示尚未探测完（先按全部可用渲染，避免闪烁） */
+  /** Target formats this browser can produce; null means probing is not done yet (render all as available to avoid flicker) */
   const [supported, setSupported] = useState<MediaTarget[] | null>(null);
 
   const [busy, setBusy] = useState(false);
@@ -55,7 +55,7 @@ export default function VideoConvertTool() {
     };
   }, []);
 
-  // 探测结果可能把当前选中项排除（例如不支持 MP3 的浏览器），自动退到第一个可用项
+  // Probing may rule out the current selection (e.g. a browser without MP3 support); fall back to the first available option
   useEffect(() => {
     if (supported && supported.length > 0 && !supported.includes(target)) {
       setTarget(supported[0]);

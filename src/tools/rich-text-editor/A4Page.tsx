@@ -3,25 +3,25 @@ import type { CSSProperties, Ref } from 'react';
 import { watermarkCssVars, type WatermarkConfig } from './pageSetup';
 
 interface PrintLayerProps {
-  /** 已消毒的文档 HTML */
+  /** Sanitized document HTML */
   html: string;
   flowRef: Ref<HTMLDivElement>;
-  /** 文字水印（null 表示无水印）：打印时以 fixed 定位重复出现在每一页 */
+  /** Text watermark (null for none): fixed-positioned so it repeats on every printed page */
   watermark?: WatermarkConfig | null;
 }
 
 /**
- * A4 打印/导出层（技术设计 §7.3）：
- * - 屏幕：渲染到 body 的屏幕外容器（仍需参与布局以便量测高度）；
- * - 打印：@media print 仅保留该容器，交给浏览器自动分页；
- * - 快照：按同一容器量测块级边界后分页截图。
- * 打印与截图因此共用完全一致的版式。
+ * A4 print/export layer (technical design §7.3):
+ * - Screen: rendered into an off-screen container on body (still laid out so heights can be measured);
+ * - Print: @media print keeps only this container and lets the browser paginate;
+ * - Snapshot: measures block boundaries in the same container, then slices it into pages.
+ * Print and snapshot therefore share an identical layout.
  */
 export function PrintLayer({ html, flowRef, watermark }: PrintLayerProps) {
   if (typeof document === 'undefined') return null;
   return createPortal(
     <div className="rte-print-root" aria-hidden="true">
-      {/* 水印放在打印流之外：fixed 定位在打印时会在每一页重复出现 */}
+      {/* Watermark lives outside the print flow: a fixed element repeats on every printed page */}
       {watermark && watermark.text.trim() ? (
         <div className="rte-print-watermark" style={watermarkCssVars(watermark) as CSSProperties}>
           <span>{watermark.text}</span>

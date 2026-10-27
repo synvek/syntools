@@ -2,7 +2,7 @@ import { UAParser } from 'ua-parser-js';
 import type { ToolResult } from '@/core/types';
 
 /**
- * User-Agent 解析：浏览器 / 引擎 / 系统 / 设备 / CPU。
+ * User-Agent parsing: browser / engine / OS / device / CPU.
  */
 
 export type UaError = 'EMPTY';
@@ -10,7 +10,7 @@ export type UaError = 'EMPTY';
 export interface UaField {
   name: string;
   version: string;
-  /** 浏览器 major / 设备 type 等补充字段 */
+  /** Extra fields such as browser major / device type */
   extra?: string;
 }
 
@@ -32,12 +32,12 @@ function field(name?: string, version?: string, extra?: string): UaField {
 }
 
 /**
- * 操作系统名的显示别名。
+ * Display aliases for OS names.
  *
- * 这里刻意停留在 `ua-parser-js@1.0.41`（MIT）。v2 起该包改为 AGPL-3.0-or-later，
- * 与「AGPL 社区版 + 商业许可版」的双轨发布冲突，而本工具只用到 v1 就有的
- * `new UAParser(ua).getResult()`，因此降级代价仅是几个显示名不同（v2 起把
- * `Mac OS` 改叫 `macOS`）。这些差异在这里补齐，UI 不必知道用的是哪个大版本。
+ * We deliberately stay on `ua-parser-js@1.0.41` (MIT). From v2 on the package is
+ * AGPL-3.0-or-later, which conflicts with the dual "AGPL community edition +"
+ * "commercial license" release, while this tool only uses `new UAParser(ua).getResult()`
+ * from v1, so the downgrade only costs a few display names (v2 renames `Mac OS` to `macOS`). We patch those here.
  */
 const OS_NAME_ALIASES: Record<string, string> = {
   'Mac OS': 'macOS',

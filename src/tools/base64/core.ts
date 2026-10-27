@@ -3,7 +3,7 @@ import type { ToolResult } from '@/core/types';
 const BASE64_ALPHABET = /^[A-Za-z0-9+/]$/;
 const CHUNK_SIZE = 0x8000;
 
-/** 字节 → Base64 字符串（分块处理，文件模式可直接复用） */
+/** Bytes → Base64 string (chunked, so file mode can reuse it directly) */
 export function bytesToBase64(bytes: Uint8Array, urlSafe = false): string {
   let binary = '';
   for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
@@ -16,7 +16,7 @@ export function bytesToBase64(bytes: Uint8Array, urlSafe = false): string {
   return result;
 }
 
-/** Base64 字符串 → 字节；校验字符集与长度，非法输入返回错误码 */
+/** Base64 string → bytes; validates the charset and length, returning an error code on invalid input */
 export function base64ToBytes(input: string, urlSafe = false): ToolResult<Uint8Array> {
   let normalized = input.replace(/\s+/g, '');
   if (urlSafe) {
@@ -51,12 +51,12 @@ export function base64ToBytes(input: string, urlSafe = false): ToolResult<Uint8A
   }
 }
 
-/** 文本 → Base64（TextEncoder 保证 Unicode 安全） */
+/** Text → Base64 (TextEncoder keeps it Unicode-safe) */
 export function encodeBase64(input: string, urlSafe = false): ToolResult<string> {
   return { ok: true, value: bytesToBase64(new TextEncoder().encode(input), urlSafe) };
 }
 
-/** Base64 → 文本（UTF-8 解码） */
+/** Base64 → text (UTF-8 decoding) */
 export function decodeBase64(input: string, urlSafe = false): ToolResult<string> {
   const bytes = base64ToBytes(input, urlSafe);
   if (!bytes.ok) return bytes;

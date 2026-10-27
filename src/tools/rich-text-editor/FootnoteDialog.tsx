@@ -2,18 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface FootnoteDialogProps {
-  /** null 表示未打开；insert 为新建，edit 为编辑已有脚注 */
+  /** null when closed; insert creates a footnote, edit modifies an existing one */
   mode: 'insert' | 'edit' | null;
   initialNote: string;
   onCancel: () => void;
   onConfirm: (note: string) => void;
-  /** 编辑模式下的删除回调（新建模式不显示删除） */
+  /** Delete callback in edit mode (hidden in insert mode) */
   onRemove?: () => void;
 }
 
 /**
- * 脚注内容编辑弹窗：与 PDF 模式弹窗同一套视觉语言。
- * Enter（不带 Shift）提交，Esc 取消。
+ * Footnote content dialog: same visual language as the PDF mode dialog.
+ * Enter (without Shift) submits, Esc cancels.
  */
 export function FootnoteDialog({
   mode,

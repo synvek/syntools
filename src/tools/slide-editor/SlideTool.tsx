@@ -42,7 +42,7 @@ import { ThemePanel } from './ui/ThemePanel';
 import { ThumbnailRail } from './ui/ThumbnailRail';
 import './slide.css';
 
-// 工具文案随本 chunk 懒加载注册，不占用首屏语言包体积
+// Tool copy is registered lazily with this chunk, keeping it out of the first-screen language bundle
 registerSlideStrings(i18n);
 
 type BusyKind = 'import' | 'export' | null;
@@ -52,8 +52,8 @@ const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.
 const DRAFT_DEBOUNCE_MS = 1200;
 
 /**
- * 幻灯片编辑器：Konva 画布 + 浏览器本地 pptx 导入导出。
- * 所有 Konva / DOM 副作用都收在懒加载模块内，避免被 prerender 的 SSR 载入触发。
+ * Slide editor: Konva canvas + browser-local pptx import/export.
+ * All Konva / DOM side effects stay inside lazily loaded modules, so prerender SSR never triggers them.
  */
 export default function SlideTool() {
   const { t } = useTranslation();
@@ -89,7 +89,7 @@ export default function SlideTool() {
   const saveTimer = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
-  /** 工作区（缩略图栏 + 画布 + 右侧面板）高度 = 首屏剩余空间 */
+  /** Workspace height (thumbnail rail + canvas + right panel) = the space left below the first screen */
   const workRowRef = useRef<HTMLDivElement | null>(null);
   const workHeight = useViewportFill(workRowRef, { min: 360, signature: viewMode });
 
@@ -133,7 +133,7 @@ export default function SlideTool() {
     );
   }, []);
 
-  /** 导出 PDF：逐页光栅后合成，复用 core/pdf 的 imagesToPdf */
+  /** Export PDF: rasterize each slide then combine, reusing core/pdf's imagesToPdf */
   const handleExportPdf = useCallback(async () => {
     setFailure(null);
     setBusy('export');
@@ -151,7 +151,7 @@ export default function SlideTool() {
     );
   }, []);
 
-  /** 导出当前页 PNG（2 倍以上分辨率） */
+  /** Export the current slide as PNG (2× resolution or more) */
   const handleExportPng = useCallback(() => {
     setFailure(null);
     const state = useSlideStore.getState();
@@ -168,7 +168,7 @@ export default function SlideTool() {
     );
   }, []);
 
-  /** 打开 .sld 工程文件：无损还原（含图片原始字节） */
+  /** Open a .sld project file: lossless restore (raw image bytes included) */
   const handleOpenProject = useCallback(
     async (file: File) => {
       setFailure(null);
@@ -184,7 +184,7 @@ export default function SlideTool() {
     [loadDoc],
   );
 
-  /** 另存为 .sld 工程文件（图片字节一并打包，不经过 OOXML 损耗） */
+  /** Save as a .sld project file (image bytes packed in, bypassing OOXML fidelity loss) */
   const handleSaveProject = useCallback(async () => {
     setFailure(null);
     setBusy('export');
@@ -202,7 +202,7 @@ export default function SlideTool() {
     );
   }, []);
 
-  /** 大纲 → 幻灯片：解析后整体替换当前页集合 */
+  /** Outline → slides: parse, then replace the current slide set wholesale */
   const handleOutlineGenerate = useCallback(() => {
     const state = useSlideStore.getState();
     const slides = buildDeck(state.doc, parseOutline(outlineText), state.doc.layouts[0]?.id);
@@ -234,7 +234,7 @@ export default function SlideTool() {
     setDraftSaved(false);
   }, [loadDoc]);
 
-  // 首次挂载时恢复本地草稿
+  // Restore the local draft on first mount
   useEffect(() => {
     const draft = readDraft();
     if (draft && draft.doc.slides.length > 0) loadDoc(draft.doc, null);
@@ -245,7 +245,7 @@ export default function SlideTool() {
     };
   }, [loadDoc]);
 
-  // 文档变更后防抖写入草稿
+  // Debounced draft write after document changes
   useEffect(() => {
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
@@ -579,7 +579,7 @@ export default function SlideTool() {
   );
 }
 
-/** 方向键微调：整体平移当前选中的所有元素（走 store 的容器感知 action，母版视图下同样生效） */
+/** Arrow-key nudge: move every selected element (through the store's container-aware action, so master view works too) */
 function moveBy(dx: number, dy: number): void {
   const state = useSlideStore.getState();
   if (state.selection.length === 0) return;

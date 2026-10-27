@@ -1,8 +1,8 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 颜色转换（Tasks T39）：HEX / RGB / HSL 互转，纯函数无依赖。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译（T29 约定）。
+ * Color conversion (Tasks T39): HEX / RGB / HSL interconversion, pure and dependency-free.
+ * Error codes are decoupled from copy: core returns language-neutral codes that the UI translates via i18n (T29 convention).
  */
 
 export type ColorErrorCode = 'EMPTY' | 'INVALID';
@@ -46,7 +46,7 @@ const toPercent = (raw: string): number | null => {
 function parseHex(input: string): RgbColor | null {
   const hex = input.slice(1);
   if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
-  // #RGB / #RRGGBB；带 alpha 的 #RGBA / #RRGGBBAA 解析 RGB 部分、忽略 alpha
+  // #RGB / #RRGGBB; for #RGBA / #RRGGBBAA only the RGB part is parsed, alpha is ignored
   if (hex.length === 3 || hex.length === 4) {
     return {
       r: parseInt(hex[0] + hex[0], 16),
@@ -68,7 +68,7 @@ function parseFunctional(input: string): RgbColor | null {
   const match = /^(rgba?|hsla?)\s*\(([^)]*)\)$/i.exec(input);
   if (!match) return null;
   const fn = match[1].toLowerCase();
-  // 同时支持逗号与空格分隔（CSS Color 4），alpha 分量忽略
+  // Accepts both comma- and space-separated syntax (CSS Color 4); the alpha component is ignored
   const parts = match[2]
     .split(/[\s,/]+/)
     .map((p) => p.trim())
@@ -87,7 +87,7 @@ function parseFunctional(input: string): RgbColor | null {
   return hslToRgb({ h: ((h % 360) + 360) % 360, s, l });
 }
 
-/** 解析颜色输入：#RGB / #RRGGBB（含 alpha 变体）/ rgb() / rgba() / hsl() / hsla() */
+/** Parse a color input: #RGB / #RRGGBB (including alpha variants) / rgb() / rgba() / hsl() / hsla() */
 export function parseColor(input: string): ToolResult<RgbColor> {
   const text = input.trim();
   if (!text) return { ok: false, error: 'EMPTY' };
@@ -96,13 +96,13 @@ export function parseColor(input: string): ToolResult<RgbColor> {
   return { ok: true, value: color };
 }
 
-/** RGB → HEX（小写 #rrggbb） */
+/** RGB → HEX (lowercase #rrggbb) */
 export function rgbToHex({ r, g, b }: RgbColor): string {
   const hex = (n: number) => clamp(Math.round(n), 0, 255).toString(16).padStart(2, '0');
   return `#${hex(r)}${hex(g)}${hex(b)}`;
 }
 
-/** RGB → HSL（h 0-360，s/l 0-100，四舍五入到整数） */
+/** RGB → HSL (h 0-360, s/l 0-100, rounded to integers) */
 export function rgbToHsl({ r, g, b }: RgbColor): HslColor {
   const rn = clamp(r, 0, 255) / 255;
   const gn = clamp(g, 0, 255) / 255;
@@ -122,7 +122,7 @@ export function rgbToHsl({ r, g, b }: RgbColor): HslColor {
   return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
 
-/** HSL → RGB（标准算法，结果四舍五入到 0-255） */
+/** HSL → RGB (standard algorithm, result rounded to 0-255) */
 export function hslToRgb({ h, s, l }: HslColor): RgbColor {
   const hn = (((h % 360) + 360) % 360) / 360;
   const sn = clamp(s, 0, 100) / 100;
@@ -149,7 +149,7 @@ export function hslToRgb({ h, s, l }: HslColor): RgbColor {
   };
 }
 
-/** RGB → 指定格式的字符串 */
+/** RGB → string in the requested format */
 export function formatColor(color: RgbColor, format: ColorFormat): string {
   const { r, g, b } = color;
   if (format === 'hex') return rgbToHex(color);

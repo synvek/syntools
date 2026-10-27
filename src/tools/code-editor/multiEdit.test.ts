@@ -35,7 +35,7 @@ describe('wordRanges', () => {
     const text = 'total totalTotal total_1 total';
     const found = wordRanges(text, 3);
     expect(found?.word).toBe('total');
-    // 「totalTotal」与「total_1」都不算独立词
+    // Neither "totalTotal" nor "total_1" counts as a standalone word
     expect(found?.ranges.map((range) => range.start)).toEqual([0, 25]);
     expect(wordRanges(text, 3, false)?.ranges.length).toBe(2);
   });

@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * Crontab 生成：由字段选项拼装标准 5 段 Cron（分 时 日 月 周）。
+ * Crontab generation: assemble a standard five-field cron expression (minute hour day month weekday) from field options.
  */
 
 export type CronFieldMode = 'every' | 'value' | 'range' | 'step' | 'list';
@@ -95,7 +95,7 @@ export function buildCronExpression(
   return { ok: true, value: parts.join(' ') };
 }
 
-/** 常用预设 */
+/** Common presets */
 export const CRON_PRESETS: { id: string; fields: Partial<Record<CronFieldKey, CronFieldState>> }[] =
   [
     {

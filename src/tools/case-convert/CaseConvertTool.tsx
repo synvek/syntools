@@ -7,7 +7,7 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
 import { CASE_MODES, convertCase, type CaseMode } from './core';
 
-/** 字母大小写 / 命名风格转换 */
+/** Letter-case and naming-convention conversion */
 export default function CaseConvertTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', m: 'upper' }), []);

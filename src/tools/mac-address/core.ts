@@ -19,7 +19,7 @@ export interface MacInfo {
   oui: string;
 }
 
-/** 常见 OUI 厂商前缀（内置精简表，未收录时返回 null） */
+/** Common OUI vendor prefixes (a small built-in table; null when not listed) */
 const OUI_VENDOR: Record<string, string> = {
   '000c29': 'VMware',
   '005056': 'VMware',
@@ -71,7 +71,7 @@ const OUI_VENDOR: Record<string, string> = {
   f0bf97: 'Lenovo',
 };
 
-/** 解析常见 MAC 写法：00:1A:2B:3C:4D:5E / 00-1A-... / 001A.2B3C.4D5E / 001A2B3C4D5E */
+/** Parse common MAC notations: 00:1A:2B:3C:4D:5E / 00-1A-... / 001A.2B3C.4D5E / 001A2B3C4D5E */
 export function parseMac(input: string): ToolResult<number[]> {
   const raw = input.trim();
   if (!raw) return { ok: false, error: 'EMPTY' };
@@ -109,14 +109,14 @@ function formatMac(bytes: number[], separator: MacSeparator, upper: boolean): st
   }
 }
 
-/** EUI-64：在第 3/4 字节之间插入 fffe 并翻转 U/L 位 */
+/** EUI-64: insert fffe between the 3rd and 4th bytes and flip the U/L bit */
 function toEui64(bytes: number[]): string {
   const modified = bytes.slice(0, 3).concat([0xff, 0xfe], bytes.slice(3));
   modified[0] ^= 0x02;
   return formatMac(modified, ':', false);
 }
 
-/** IPv6 链路本地地址（fe80::/64 + EUI-64） */
+/** IPv6 link-local address (fe80::/64 + EUI-64) */
 function toLinkLocal(bytes: number[]): string {
   const eui = toEui64(bytes)
     .split(':')

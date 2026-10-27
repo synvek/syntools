@@ -1,6 +1,7 @@
 /**
- * 脑图编辑器状态：唯一真相源是树（doc.nodes），坐标由 model/layout.ts 派生。
- * 结构性变更前先写历史快照，保证 undo / redo 可回放（沿用 flowchart-editor 模式）。
+ * Mind map editor state: the tree (`doc.nodes`) is the single source of truth and coordinates are
+ * derived by model/layout.ts. A history snapshot is written before every structural change so
+ * undo / redo can replay it (following the flowchart-editor pattern).
  */
 
 import { create } from 'zustand';
@@ -36,12 +37,12 @@ import type {
 
 const HISTORY_LIMIT = 50;
 
-/** 默认首页 id（新建文档与清空后使用） */
+/** Default first-sheet id (used for new documents and after clearing) */
 export const DEFAULT_SHEET_ID = 'sheet-1';
-/** 默认首页名称 */
+/** Default first-sheet name */
 export const DEFAULT_SHEET_NAME = '画布 1';
 
-/** 归一化输入为工程：null → 单张空白画布；v1 扁平文档 → 单画布；v2 多画布原样补默认 */
+/** Normalise input to a project: null → one blank sheet; v1 flat doc → one sheet; v2 kept with defaults filled */
 function normalizeProject(input: MindProject | MindDoc | null): MindProject {
   if (!input) {
     const doc = emptyDoc();
@@ -68,7 +69,7 @@ function normalizeProject(input: MindProject | MindDoc | null): MindProject {
       activeSheetId: id,
     };
   }
-  // 扁平 v1 文档 → 单画布
+  // Flat v1 document → a single sheet
   const doc = input as MindDoc;
   return {
     version: 2,
@@ -78,13 +79,13 @@ function normalizeProject(input: MindProject | MindDoc | null): MindProject {
   };
 }
 
-/** 取活动画布（无活动标记时取第一张） */
+/** Active sheet (the first one when no marker is set) */
 function activeSheetOf(project: MindProject): MindSheet {
   const id = project.activeSheetId;
   return (id ? project.sheets.find((s) => s.id === id) : project.sheets[0]) ?? project.sheets[0];
 }
 
-/** 快照深拷贝：撤销栈只存纯数据，不含派生坐标 */
+/** Deep-copy snapshot: the undo stack stores pure data with no derived coordinates */
 function snapshotOf(doc: MindDoc): MindDoc {
   return {
     ...doc,
@@ -93,11 +94,11 @@ function snapshotOf(doc: MindDoc): MindDoc {
 }
 
 interface UpdateOptions {
-  /** 变更后的选中项；undefined 表示不变，null 表示取消选中 */
+  /** Selection after the change; undefined keeps it, null clears it */
   select?: string | null;
-  /** 变更后的文本编辑项 */
+  /** Node being edited after the change */
   edit?: string | null;
-  /** false 时不写历史（连续输入类操作） */
+  /** false skips history (continuous typing operations) */
   history?: boolean;
 }
 
@@ -109,7 +110,7 @@ interface MindState {
   past: MindDoc[];
   future: MindDoc[];
 
-  /** 多画布：文档标题 + 页面顺序与名称；活动页内容在 doc，其余页缓存在 sheetData */
+  /** Sheets: a document title plus sheet order and names; the active sheet lives in `doc`, others in `sheetData` */
   docName: string;
   sheetOrder: { id: string; name: string }[];
   activeSheetId: string;
@@ -122,7 +123,7 @@ interface MindState {
 
   load: (doc: MindProject | MindDoc | null) => void;
   getDoc: () => MindProject;
-  /** 文档标题（导出文件名来源，不计入撤销历史） */
+  /** Document title (source of the export filename, not part of undo history) */
   setDocName: (name: string) => void;
 
   commit: () => void;
@@ -130,7 +131,7 @@ interface MindState {
   redo: () => void;
 
   select: (id: string | null) => void;
-  /** 可见节点的先序序列（折叠子树不含在内） */
+  /** Pre-order list of visible node ids (collapsed subtrees excluded) */
   visibleIds: () => string[];
   moveSelection: (dir: 'up' | 'down' | 'left' | 'right') => void;
 
@@ -159,7 +160,7 @@ interface MindState {
 
 const initialDoc = emptyDoc();
 
-/** 操作目标：未指定（undefined / null）时用当前选中项，仍无则回落到根节点 */
+/** Operation target: falls back to the current selection, then to the root node */
 function targetOf(state: MindState, id?: string | null): string | null {
   const wanted = id ?? state.selectedId;
   const hit = wanted ? findNode(state.doc.nodes, wanted) : undefined;
@@ -168,7 +169,7 @@ function targetOf(state: MindState, id?: string | null): string | null {
 }
 
 export const useMindStore = create<MindState>((set, get) => {
-  /** 结构 / 内容变更的统一入口：写历史 → 更新 doc → 重算布局 */
+  /** Single entry point for structural / content changes: history → doc → relayout */
   const update = (nodes: MindNodeRec[], opts?: UpdateOptions) => {
     const state = get();
     const doc: MindDoc = { ...state.doc, nodes };
@@ -183,7 +184,7 @@ export const useMindStore = create<MindState>((set, get) => {
     });
   };
 
-  /** 仅替换文档级字段（方向 / 主题等），同样重算布局 */
+  /** Replace document-level fields only (direction / theme etc.) and relayout */
   const updateDoc = (patch: Partial<MindDoc>, history = true) => {
     const state = get();
     const doc: MindDoc = { ...state.doc, ...patch };
@@ -195,7 +196,7 @@ export const useMindStore = create<MindState>((set, get) => {
     });
   };
 
-  /** 撤销 / redo 落位：目标节点可能已被删除，需回落 */
+  /** Undo / redo landing: the selected node may be gone, so fall back */
   const restore = (doc: MindDoc) => {
     const state = get();
     const exists = state.selectedId ? findNode(doc.nodes, state.selectedId) : undefined;
@@ -399,7 +400,7 @@ export const useMindStore = create<MindState>((set, get) => {
       const horizontal = state.doc.direction !== 'down';
       const order = state.visibleIds();
       const idx = order.indexOf(current);
-      // 主轴方向：横向布局为左右，向下布局为上下
+      // Main axis: left / right for horizontal layouts, up / down for the downward layout
       const deeper = horizontal ? dir === 'right' : dir === 'down';
       const shallower = horizontal ? dir === 'left' : dir === 'up';
       if (deeper) {
@@ -425,7 +426,7 @@ export const useMindStore = create<MindState>((set, get) => {
       const state = get();
       const parent = targetOf(state, id);
       if (!parent) return;
-      // 不显式传文案：使用模型层的默认英文文案（Subtopic）
+      // No text passed explicitly: the model layer's default English copy (Subtopic) is used
       const res = addChild(state.doc.nodes, parent);
       if (!res.id) return;
       update(res.nodes, { select: res.id, edit: res.id });
@@ -435,7 +436,7 @@ export const useMindStore = create<MindState>((set, get) => {
       const state = get();
       const anchor = targetOf(state, id);
       if (!anchor) return;
-      // 同上：默认英文文案（Topic）
+      // Same as above: the default English copy (Topic)
       const res = addSibling(state.doc.nodes, anchor);
       if (!res.id) return;
       update(res.nodes, { select: res.id, edit: res.id });
@@ -446,7 +447,7 @@ export const useMindStore = create<MindState>((set, get) => {
       const target = targetOf(state, id);
       if (!target) return;
       const self = findNode(state.doc.nodes, target);
-      if (!self || self.parentId === null) return; // 中心主题不可删
+      if (!self || self.parentId === null) return; // the central topic cannot be deleted
       update(removeNode(state.doc.nodes, target), { select: self.parentId, edit: null });
     },
 
@@ -502,7 +503,7 @@ export const useMindStore = create<MindState>((set, get) => {
     beginEdit: (id) => {
       const state = get();
       if (!findNode(state.doc.nodes, id)) return;
-      // 重复进入（如双击事件被多处监听）不重复压历史
+      // Repeated entry (e.g. a double-click handled in several places) does not push history twice
       if (state.editingId === id) return;
       set({
         past: [...state.past, snapshotOf(state.doc)].slice(-HISTORY_LIMIT),
@@ -537,7 +538,7 @@ export const useMindStore = create<MindState>((set, get) => {
   };
 });
 
-/** 选中节点的子节点数量（折叠徽标用） */
+/** Number of children of a node (for the collapse badge) */
 export function childCountOf(doc: MindDoc, id: string): number {
   return childrenOf(doc.nodes, id).length;
 }

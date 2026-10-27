@@ -20,7 +20,7 @@ const fieldClass =
   'rounded-md border border-gray-300 bg-white px-2 py-1 dark:border-gray-600 dark:bg-gray-800';
 const labelClass = 'text-xs text-gray-500 dark:text-gray-400';
 
-/** 页面设置面板：纸张 / 方向 / 边距 / 页眉页脚 / 页码 / 分栏 / 水印 / 背景色 */
+/** Page setup panel: paper / orientation / margins / header & footer / page numbers / columns / watermark / background */
 export function PageSetupPanel({ setup, onChange, onClose }: PageSetupPanelProps) {
   const { t } = useTranslation();
 
@@ -151,7 +151,7 @@ export function PageSetupPanel({ setup, onChange, onClose }: PageSetupPanelProps
         </label>
       </div>
 
-      {/* 分栏 / 水印 / 背景色：三项都属于「版面观感」，放在同一分组里 */}
+      {/* Columns / watermark / background: all three are about visual layout, so they share one group */}
       <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1">

@@ -13,7 +13,7 @@ interface DocLibraryPanelProps {
   onClose: () => void;
 }
 
-/** 本地文档库面板：多文档列表 + 打开/复制/删除/新建（IndexedDB） */
+/** Local document library panel: document list + open/duplicate/delete/create (IndexedDB) */
 export function DocLibraryPanel({
   currentDocId,
   docs,
@@ -107,7 +107,7 @@ export function DocLibraryPanel({
 
 interface VersionHistoryPanelProps {
   versions: StoredVersion[];
-  /** 是否已有可打快照的文档（新建但未保存的文档没有 id） */
+  /** Whether a document can be snapshotted (a new unsaved document has no id) */
   canSnapshot: boolean;
   onRestore: (version: StoredVersion) => void;
   onCompare: (version: StoredVersion) => void;
@@ -115,7 +115,7 @@ interface VersionHistoryPanelProps {
   onClose: () => void;
 }
 
-/** 版本历史面板：快照列表 + 手动打快照 + 差异对比 + 恢复 */
+/** Version history panel: snapshot list + manual snapshot + diff + restore */
 export function VersionHistoryPanel({
   versions,
   canSnapshot,

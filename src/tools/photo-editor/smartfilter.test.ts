@@ -29,34 +29,34 @@ const smart = (filters: FilterSpec[]): SmartLayer => ({
   filters,
 });
 
-describe('activeFilters：启停语义', () => {
-  it('缺省（没有 enabled 字段）视为启用', () => {
+describe('activeFilters: enable / disable semantics', () => {
+  it('missing means enabled (no enabled field)', () => {
     expect(activeFilters([{ id: 'blur', params: { radius: 4 } }])).toHaveLength(1);
   });
 
-  it('enabled: false 的滤镜被排除，但参数仍留在原列表里', () => {
+  it('filters with enabled: false are excluded but keep their entry in the list', () => {
     const filters: FilterSpec[] = [blur(), { id: 'noise', params: { amount: 10 }, enabled: false }];
     expect(activeFilters(filters)).toHaveLength(1);
     expect(activeFilters(filters)[0].id).toBe('gaussianBlur');
-    // 面板还要继续显示被停用的那一项，所以原数组不能被就地改写
+    // The panel must keep showing the disabled entry, so the original array must not be mutated in place
     expect(filters).toHaveLength(2);
   });
 
-  it('空列表 / null / undefined 都安全', () => {
+  it('empty lists / null / undefined are all safe', () => {
     expect(activeFilters([])).toEqual([]);
     expect(activeFilters(null)).toEqual([]);
     expect(activeFilters(undefined)).toEqual([]);
   });
 
-  it('hasActiveFilters 反映是否还有启用中的滤镜', () => {
+  it('hasActiveFilters reflects whether any filter is still enabled', () => {
     expect(hasActiveFilters([blur()])).toBe(true);
     expect(hasActiveFilters([blur({ enabled: false })])).toBe(false);
     expect(hasActiveFilters([])).toBe(false);
   });
 });
 
-describe('停用滤镜后不再参与烘焙', () => {
-  it('全部停用时不需要像素通道', () => {
+describe('Disabled filters drop out of baking', () => {
+  it('all disabled needs no pixel pass', () => {
     const filters: FilterSpec[] = [
       blur({ enabled: false }),
       { id: 'unsharp', params: { radius: 4, amount: 100 }, enabled: false },
@@ -64,21 +64,21 @@ describe('停用滤镜后不再参与烘焙', () => {
     expect(needsPixelPass(NO_ADJUSTMENTS, filters)).toBe(false);
   });
 
-  it('启用像素级滤镜（USM）时走像素通道', () => {
+  it('an enabled pixel-level filter (USM) uses the pixel pass', () => {
     expect(
       needsPixelPass(NO_ADJUSTMENTS, [{ id: 'unsharp', params: { radius: 4, amount: 100 } }]),
     ).toBe(true);
   });
 });
 
-describe('缓存签名对启停敏感', () => {
-  it('同一份滤镜，启用与停用产生不同签名（否则画面不会刷新）', () => {
+describe('The cache signature reacts to enable / disable', () => {
+  it('the same filter yields different signatures enabled vs disabled (otherwise nothing repaints)', () => {
     const on = bakeSignature('a1', 1, NO_ADJUSTMENTS, [blur()]);
     const off = bakeSignature('a1', 1, NO_ADJUSTMENTS, [blur({ enabled: false })]);
     expect(on).not.toBe(off);
   });
 
-  it('参数键序不同但内容相同的滤镜签名一致', () => {
+  it('filters with the same parameters in a different key order share a signature', () => {
     const a = bakeSignature('a1', 1, NO_ADJUSTMENTS, [
       { id: 'noise', params: { amount: 10, mono: 1 } },
     ]);
@@ -88,23 +88,23 @@ describe('缓存签名对启停敏感', () => {
     expect(a).toBe(b);
   });
 
-  it('NO_ADJUSTMENTS 等价于「不调整」', () => {
+  it('NO_ADJUSTMENTS equals no adjustments', () => {
     expect(needsPixelPass(NO_ADJUSTMENTS, [])).toBe(false);
   });
 });
 
-describe('智能滤镜决定预览是否走离屏合成', () => {
-  it('有启用中的滤镜时要合成（否则 Konva 直接画源图，滤镜不可见）', () => {
+describe('Smart filters decide whether the preview composites offscreen', () => {
+  it('with enabled filters it must composite (otherwise Konva draws the source and the filter is invisible)', () => {
     expect(layerNeedsComposite(smart([blur()]))).toBe(true);
   });
 
-  it('没有滤镜或全部停用时保持轻量路径', () => {
+  it('no filters or all disabled keeps the lightweight path', () => {
     expect(layerNeedsComposite(smart([]))).toBe(false);
     expect(layerNeedsComposite(smart([blur({ enabled: false })]))).toBe(false);
   });
 });
 
-describe('migrateDoc：智能滤镜栈归一', () => {
+describe('migrateDoc: normalizing the smart filter stack', () => {
   const raw = (filters: unknown) => ({
     id: 'doc-1',
     name: 'n',
@@ -141,25 +141,25 @@ describe('migrateDoc：智能滤镜栈归一', () => {
     return parsed;
   }
 
-  it('旧工程没有 filters 字段时补成空栈', () => {
+  it('old projects without a filters field get an empty stack', () => {
     const parsed = parse(raw(undefined));
     const layer = parsed.layers[0] as SmartLayer;
     expect(layer.filters).toEqual([]);
     expect(layerNeedsComposite(layer)).toBe(false);
   });
 
-  it('保留 enabled: false 并补齐缺省参数', () => {
+  it('keeps enabled: false and fills in default parameters', () => {
     const parsed = parse(raw([{ id: 'gaussianBlur', params: { radius: 12 }, enabled: false }]));
     const layer = parsed.layers[0] as SmartLayer;
     expect(layer.filters).toHaveLength(1);
     expect(layer.filters[0].enabled).toBe(false);
     expect(layer.filters[0].params?.radius).toBe(12);
-    // 启用中的滤镜缺省写入时不带 enabled 字段
+    // Enabled filters are written without an enabled field by default
     const enabled = parse(raw([{ id: 'gaussianBlur', params: { radius: 12 } }]));
     expect((enabled.layers[0] as SmartLayer).filters[0].enabled).toBeUndefined();
   });
 
-  it('未知滤镜 id 与非法参数被丢弃 / 钳制', () => {
+  it('unknown filter ids and illegal parameters are dropped / clamped', () => {
     const parsed = parse(
       raw([{ id: 'notAFilter' }, { id: 'gaussianBlur', params: { radius: 99999 } }]),
     );

@@ -1,35 +1,36 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 内置轻量格式化器（兜底）。
+ * Built-in lightweight formatter (fallback).
  *
- * 背景：prettier v3 生态没有维护中的 Rust / Go / C / C++ / C# / Python / Kotlin / Swift
- * 等语言插件（唯一 Rust 插件 `prettier-plugin-rust` 停留在 prettier@2 且已停更），
- * 因此这些语言走本文件的本地实现：
- *   - `brackets` 模式：按括号深度重排缩进（C / Rust / Go / Java / Kotlin / Swift …）
- *   - `indent` 模式：以原始缩进层级为骨架重排（Python / Ruby / Shell — 缩进本身即语义）
- * 两种模式都会跳过字符串与注释，避免把 `}` 之类的内容误判为结构符号。
+ * Background: the prettier v3 ecosystem has no maintained plugins for Rust / Go / C / C++ / C# /
+ * Python / Kotlin / Swift (the only Rust plugin, `prettier-plugin-rust`, is stuck on prettier@2
+ * and unmaintained), so these languages use the local implementation in this file:
+ *   - `brackets` mode: re-indent by bracket depth (C / Rust / Go / Java / Kotlin / Swift …)
+ *   - `indent` mode: re-indent using the original indent levels as a skeleton (Python / Ruby /
+ *     Shell — where indentation is semantic)
+ * Both modes skip strings and comments so content like `}` is never mistaken for structure.
  */
 
 export type FallbackMode = 'brackets' | 'indent';
 
 export interface FallbackOptions {
-  /** 缩进单元，如 '  ' / '    ' / '\t' */
+  /** Indent unit, e.g. '  ' / '    ' / '\t' */
   indentUnit: string;
   mode?: FallbackMode;
-  /** `#` 视为行注释（Shell / Ruby / Python） */
+  /** Treat `#` as a line comment (Shell / Ruby / Python) */
   hashComment?: boolean;
-  /** `--` 视为行注释（Lua / SQL / Haskell） */
+  /** Treat `--` as a line comment (Lua / SQL / Haskell) */
   dashComment?: boolean;
 }
 
 interface ScanState {
   blockComment: boolean;
-  /** 三引号字符串的结束标记，如 '"""' / "'''" */
+  /** Closing delimiter of a triple-quoted string, e.g. '"""' / "'''" */
   triple: string | null;
 }
 
-/** 行内片段：code 可被格式化，其余原样保留 */
+/** Inline fragment: `code` spans may be reformatted, everything else is kept verbatim */
 interface Span {
   text: string;
   code: boolean;
@@ -37,11 +38,11 @@ interface Span {
 
 interface LineScan {
   spans: Span[];
-  /** 该行代码部分是否以 `:` 结尾（Python 块起始） */
+  /** Whether the code part of the line ends with `:` (start of a Python block) */
   endsWithColon: boolean;
-  /** 行尾括号深度变化量 */
+  /** Net change in bracket depth over the line */
   delta: number;
-  /** 行首闭合括号数量（用于本行前置去缩进） */
+  /** Number of leading closing brackets (used to dedent this line up front) */
   leadingClosers: number;
   hasCode: boolean;
 }
@@ -53,7 +54,7 @@ function isCloser(ch: string): boolean {
   return CLOSERS.includes(ch);
 }
 
-/** 扫描一行：识别字符串 / 注释跨度并统计括号，跨行状态写入 state */
+/** Scan one line: find string / comment spans and count brackets, writing multi-line state back */
 function scanLine(line: string, state: ScanState, opts: FallbackOptions): LineScan {
   const spans: Span[] = [];
   let plain = '';
@@ -74,7 +75,7 @@ function scanLine(line: string, state: ScanState, opts: FallbackOptions): LineSc
   const n = line.length;
 
   while (i < n) {
-    // 三引号字符串（Python 文档串）
+    // Triple-quoted string (Python docstrings)
     if (state.triple) {
       const end = line.indexOf(state.triple, i);
       if (end < 0) {
@@ -87,7 +88,7 @@ function scanLine(line: string, state: ScanState, opts: FallbackOptions): LineSc
       }
       continue;
     }
-    // 块注释
+    // Block comment
     if (state.blockComment) {
       const end = line.indexOf('*/', i);
       if (end < 0) {
@@ -138,7 +139,7 @@ function scanLine(line: string, state: ScanState, opts: FallbackOptions): LineSc
         i += 3;
         continue;
       }
-      // 同一行内查找闭合引号；找不到则视为字符字面量 / 生命周期标记（Rust `'a`）
+      // Look for the closing quote on the same line; if absent, treat it as a char literal / lifetime (Rust `'a`)
       let j = i + 1;
       let closed = false;
       while (j < n) {
@@ -157,7 +158,7 @@ function scanLine(line: string, state: ScanState, opts: FallbackOptions): LineSc
         spans.push({ text: line.slice(i, j + 1), code: false });
         i = j + 1;
       } else {
-        // 单字符字面量或生命周期：吞掉 1~2 个字符，不参与结构判断
+        // Char literal or lifetime: consume 1-2 chars and keep it out of the structure scan
         const width = next === '\\' ? 3 : 2;
         spans.push({ text: line.slice(i, i + width), code: false });
         i += width;
@@ -200,7 +201,7 @@ function scanLine(line: string, state: ScanState, opts: FallbackOptions): LineSc
   };
 }
 
-/** 保守的空格整理：仅作用于代码片段（字符串 / 注释已排除） */
+/** Conservative whitespace cleanup, applied to code spans only (strings / comments excluded) */
 function tidyCode(text: string): string {
   let out = text;
   out = out.replace(/\s+([,;)\]}])/g, '$1');
@@ -222,8 +223,8 @@ function lineIndentWidth(line: string, tabWidth: number): number {
 }
 
 /**
- * 轻量格式化：重排缩进 + 清理空白。
- * 输入为空返回 EMPTY；任何异常都被捕获为 FORMAT_FAILED（core 层不抛异常）。
+ * Lightweight formatting: re-indent and tidy whitespace.
+ * Empty input returns EMPTY; any exception is caught and reported as FORMAT_FAILED (core never throws).
  */
 export function formatFallback(code: string, options: FallbackOptions): ToolResult<string> {
   if (!code.trim()) return { ok: false, error: 'EMPTY' };
@@ -238,7 +239,7 @@ export function formatFallback(code: string, options: FallbackOptions): ToolResu
     const out: string[] = [];
     let depth = 0;
     let blankRun = 0;
-    /** indent 模式的缩进层级栈（原始缩进宽度） */
+    /** Indent-level stack for `indent` mode (original indent widths) */
     const levels: number[] = [0];
     let prevEndsWithColon = false;
 
@@ -255,7 +256,7 @@ export function formatFallback(code: string, options: FallbackOptions): ToolResu
       const content = scan.spans
         .map((span) => (span.code ? tidyCode(span.text) : span.text))
         .join('');
-      // 注释 / 字符串开头的行保留原有对齐（块注释内的缩进等），代码行去掉前导空白
+      // Lines starting with a comment / string keep their alignment (e.g. inside block comments); code lines lose leading space
       const keepLeading = scan.spans.length > 0 && !scan.spans[0].code;
       const body = keepLeading ? content : content.replace(/^\s+/, '');
 
@@ -266,7 +267,7 @@ export function formatFallback(code: string, options: FallbackOptions): ToolResu
         if (width > levels[levels.length - 1] && (prevEndsWithColon || levels.length === 1)) {
           levels.push(width);
         }
-        // 括号未闭合 → 续行挂靠缩进
+        // Unclosed brackets → continuation lines get one extra level
         level = levels.length - 1 + (depth > 0 ? 1 : 0);
       } else {
         level = Math.max(0, depth - scan.leadingClosers);

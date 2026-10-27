@@ -20,7 +20,7 @@ describe('formatSqlText', () => {
 
   it('keywordCase：lower 与 preserve', () => {
     expect(ok(SQL, { ...DEFAULT_SQL_OPTIONS, keywordCase: 'lower' })).toContain('select');
-    // preserve：保留原文小写关键字，不被提升为大写（关键字后默认换行，逐词断言）
+    // preserve: lowercase keywords stay as written instead of being upper-cased (a newline follows each keyword by default; assertions are per word)
     const preserved = ok(SQL, { ...DEFAULT_SQL_OPTIONS, keywordCase: 'preserve' });
     expect(preserved).toContain('select');
     expect(preserved).toContain('from');

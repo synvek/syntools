@@ -15,8 +15,8 @@ export type { AnnotateKind, PdfAnnotation };
 export type Point = { x: number; y: number };
 
 /**
- * 草稿使用页面归一化坐标（0–1，原点左上），与缩放无关。
- * 导出时再换算为 PDF 视觉坐标（原点左下，单位 pt）。
+ * Drafts use page-normalized coordinates (0–1, origin at top-left) and are independent of zoom.
+ * They are converted to PDF visual coordinates (origin at bottom-left, in pt) on export.
  */
 export type AnnotateDraft =
   | {
@@ -28,7 +28,7 @@ export type AnnotateDraft =
       width: number;
       height: number;
       color: string;
-      strokeWidth: number; // 屏幕像素线宽（按绘制时的视觉粗细）
+      strokeWidth: number; // Line width in screen pixels (visual thickness at draw time)
     }
   | {
       id: string;
@@ -68,7 +68,7 @@ export type AnnotateDraft =
       x: number;
       y: number;
       text: string;
-      fontSize: number; // 屏幕像素字号
+      fontSize: number; // Font size in screen pixels
       color: string;
     };
 
@@ -90,11 +90,15 @@ export function toNorm(px: number, py: number, display: { width: number; height:
   return { x: px / display.width, y: py / display.height };
 }
 
-export function fromNorm(nx: number, ny: number, display: { width: number; height: number }): Point {
+export function fromNorm(
+  nx: number,
+  ny: number,
+  display: { width: number; height: number },
+): Point {
   return { x: nx * display.width, y: ny * display.height };
 }
 
-/** 归一化（左上）→ PDF 视觉坐标（左下，pt） */
+/** Normalized (top-left) → PDF visual coordinates (bottom-left, pt) */
 export function normToPdfPoint(
   nx: number,
   ny: number,
@@ -109,7 +113,7 @@ export function draftToPdfAnnotation(
   pageSize: { width: number; height: number },
 ): PdfAnnotation {
   const map = (nx: number, ny: number) => normToPdfPoint(nx, ny, pageSize);
-  // 线宽/字号按「相对当前页宽」换算到 pt（display 为导出时该页渲染尺寸）
+  // Line width and font size are converted to pt relative to the current page width (display is the page's render size at export time)
   const pxToPt = pageSize.width / display.width;
 
   if (draft.kind === 'pen') {

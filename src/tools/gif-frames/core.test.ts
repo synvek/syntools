@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { isGifFile, parseGifBuffer } from './core';
 
-/** 1×1 红色 GIF87a */
+/** 1×1 red GIF87a */
 const TINY_GIF = Uint8Array.from(
-  atob(
-    'R0lGODlhAQABAIABAP8AAP///yH5BAEAAAEALAAAAAABAAEAAAICRAEAOw==',
-  ),
+  atob('R0lGODlhAQABAIABAP8AAP///yH5BAEAAAEALAAAAAABAAEAAAICRAEAOw=='),
   (c) => c.charCodeAt(0),
 );
 

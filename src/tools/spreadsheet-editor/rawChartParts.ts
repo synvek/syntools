@@ -2,23 +2,23 @@ import type JSZipType from 'jszip';
 import { resolvePartPath } from './xlsx-normalize';
 
 /**
- * 原生图表部件保留层（导入侧）。
+ * Native chart part preservation layer (import side).
  *
- * - 站内自己插入的图表由 chartXml.ts 生成标准 DrawingML；
- * - **导入文件里原有的 Excel 原生图表**不做解析，按原始部件原样保留，
- *   导出时回填，避免「带图表的 .xlsx 导入再导出、图表静默消失」。
+ * - Charts inserted in the app are generated as standard DrawingML by chartXml.ts;
+ * - **native Excel charts already in an imported file** are not parsed: their parts are kept verbatim
+ *   and written back on export, so an .xlsx with charts never loses them on an import/export round.
  *
- * 保留范围：工作表 → drawing → chart →（图表内嵌）media，以及各自的 .rels。
- * 纯图片的 drawing 不在本轮范围（不保留）。
+ * Preserved scope: worksheet → drawing → chart → (chart-embedded) media, plus each .rels.
+ * Drawings that only contain pictures are out of scope here (not preserved).
  */
 
 export interface RawChartParts {
   version: 1;
-  /** 路径 → base64 内容 */
+  /** Path → base64 content */
   parts: Record<string, string>;
-  /** 工作表名 → 该表的 drawing 部件路径（如 xl/drawings/drawing1.xml） */
+  /** Sheet name → that sheet's drawing part path (e.g. xl/drawings/drawing1.xml) */
   sheetDrawings: Record<string, string>;
-  /** 原始 [Content_Types].xml：导出时用于合并与保留部件相关的条目 */
+  /** Original [Content_Types].xml: used on export to merge the entries for the preserved parts */
   contentTypes?: string;
 }
 
@@ -29,24 +29,24 @@ export interface Relationship {
 }
 
 const RELATIONSHIP_TAG = /<Relationship\b[^>]*?\/?>/g;
-// 注意：这些正则匹配的是关系的 Type **属性值**（不含引号），因此以 $ 结尾
+// Note: these patterns match the relationship Type **attribute value** (without quotes), hence the trailing $
 const DRAWING_REL = /relationships\/drawing$/;
 const CHART_REL = /relationships\/chart$/;
 const IMAGE_REL = /relationships\/image$/;
 
-/** 部件所在目录（含末尾斜杠）：xl/worksheets/sheet1.xml → xl/worksheets/ */
+/** Directory of a part (with trailing slash): xl/worksheets/sheet1.xml → xl/worksheets/ */
 export function dirOf(partPath: string): string {
   const index = partPath.lastIndexOf('/');
   return index < 0 ? '' : partPath.slice(0, index + 1);
 }
 
-/** 部件的 .rels 路径：xl/worksheets/sheet1.xml → xl/worksheets/_rels/sheet1.xml.rels */
+/** A part's .rels path: xl/worksheets/sheet1.xml → xl/worksheets/_rels/sheet1.xml.rels */
 export function relsPathFor(partPath: string): string {
   const dir = dirOf(partPath);
   return `${dir}_rels/${partPath.slice(dir.length)}.rels`;
 }
 
-/** XML 属性值里的实体解码（工作表名可能含 &amp; 等） */
+/** Decode entities in XML attribute values (a sheet name may contain &amp; and friends) */
 export function decodeXmlEntities(text: string): string {
   return text
     .replace(/&lt;/g, '<')
@@ -57,7 +57,7 @@ export function decodeXmlEntities(text: string): string {
     .replace(/&amp;/g, '&');
 }
 
-/** 解析 .rels 中的关系列表（只看 Id / Type / Target） */
+/** Parse the relationship list in a .rels (only Id / Type / Target) */
 export function parseRelationships(xml: string | null | undefined): Relationship[] {
   if (!xml) return [];
   const out: Relationship[] = [];
@@ -80,7 +80,7 @@ async function readBase64(zip: JSZipType, path: string): Promise<string | null> 
   return file ? file.async('base64') : null;
 }
 
-/** 工作表名 → 工作表部件路径（经 workbook.xml + 其 rels 解析，不靠命名猜测） */
+/** Sheet name → sheet part path (resolved through workbook.xml and its rels, never guessed from names) */
 export async function resolveSheetParts(zip: JSZipType): Promise<Record<string, string>> {
   const workbook = await readText(zip, 'xl/workbook.xml');
   const rels = await readText(zip, 'xl/_rels/workbook.xml.rels');
@@ -100,8 +100,8 @@ export async function resolveSheetParts(zip: JSZipType): Promise<Record<string, 
 }
 
 /**
- * 收集归档内与「原生图表」相关的部件；没有图表时返回 null。
- * 只做路径遍历与原文读取，不解析图表语义。
+ * Collect the parts related to "native charts" in the archive; returns null when there are none.
+ * Only walks paths and reads raw content — chart semantics are never parsed.
  */
 export async function collectRawChartParts(zip: JSZipType): Promise<RawChartParts | null> {
   const sheetParts = await resolveSheetParts(zip);
@@ -118,7 +118,7 @@ export async function collectRawChartParts(zip: JSZipType): Promise<RawChartPart
     const drawingRelsPath = relsPathFor(drawingPath);
     const drawingRels = parseRelationships(await readText(zip, drawingRelsPath));
     const chartRels = drawingRels.filter((item) => CHART_REL.test(item.type));
-    // 仅保留确实含图表的 drawing（纯图片 drawing 暂不处理）
+    // Keep only drawings that really contain charts (picture-only drawings are out of scope)
     if (chartRels.length === 0) continue;
 
     sheetDrawings[sheetName] = drawingPath;
@@ -132,7 +132,7 @@ export async function collectRawChartParts(zip: JSZipType): Promise<RawChartPart
       const chartContent = await readBase64(zip, chartPath);
       if (chartContent !== null) parts[chartPath] = chartContent;
 
-      // 图表可能内嵌图片（如数据点图片），一并保留
+      // A chart may embed pictures (e.g. data-point images); keep them too
       const chartRelsPath = relsPathFor(chartPath);
       const chartRelsXml = await readText(zip, chartRelsPath);
       if (chartRelsXml === null) continue;
@@ -159,7 +159,7 @@ export async function collectRawChartParts(zip: JSZipType): Promise<RawChartPart
   };
 }
 
-/** 从原始 [Content_Types].xml 中挑出与给定部件相关的条目（用于导出时合并） */
+/** Pick the entries of the original [Content_Types].xml that concern the given parts (merged on export) */
 export function relevantContentTypeEntries(
   originalXml: string | undefined,
   partPaths: readonly string[],
@@ -179,7 +179,7 @@ export function relevantContentTypeEntries(
     const extension = /\bExtension="([^"]*)"/.exec(tag)?.[1];
     if (!extension) continue;
     const normalized = extension.toLowerCase();
-    // xml / rels 的 Default 由 exceljs 负责写，这里只补它不会写的（如图片扩展名）
+    // exceljs writes the Defaults for xml / rels itself; only add the ones it would miss (e.g. image extensions)
     if (normalized === 'xml' || normalized === 'rels') continue;
     if (extensions.has(normalized)) out.push(tag);
   }

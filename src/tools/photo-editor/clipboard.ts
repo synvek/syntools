@@ -2,19 +2,19 @@ import type { PhotoDoc, Selection } from './model/types';
 import { compositeDoc, rasterizeSelection } from './render/export';
 
 /**
- * 系统剪贴板桥：与 Photoshop / Photopea 双向交换位图。
+ * System clipboard bridge: exchange bitmaps both ways with Photoshop / Photopea.
  *
- * 约定与站内其它工具一致（见 `tools/code-editor/clipboard.ts`）：
- * - `ClipboardItem` 不可用、无权限、或被浏览器拒绝时**一律返回失败**，不抛出；
- *   由调用方决定是提示还是降级（下载 / 内部剪贴板）。
- * - 读取带超时：某些环境下 `clipboard.read()` 会挂在权限提示上，
- *   若不设上限会把「粘贴」这类高频操作卡住。
+ * Same conventions as the other tools (see `tools/code-editor/clipboard.ts`):
+ * - when `ClipboardItem` is missing, permission is denied or the browser refuses, **return failure**, never throw;
+ *   the caller decides whether to notify or degrade (download / internal clipboard).
+ * - reads time out: in some environments `clipboard.read()` hangs on the permission prompt,
+ *   and without a cap a high-frequency action like paste would stall.
  */
 
-/** 默认读取超时：超过即视为「系统剪贴板不可用」，让调用方回退 */
+/** Default read timeout: past it the system clipboard counts as unavailable, so callers fall back */
 export const CLIPBOARD_READ_TIMEOUT = 500;
 
-/** 画布 → PNG Blob；`toBlob` 失败或返回空时回落到 dataURL 解码 */
+/** Canvas → PNG Blob; when `toBlob` fails or returns nothing, fall back to decoding a dataURL */
 export function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((resolve) => {
     try {
@@ -45,7 +45,7 @@ function dataUrlToBlob(dataUrl: string): Blob | null {
   }
 }
 
-/** 写入 PNG 到系统剪贴板；成功与否由返回值表达 */
+/** Write a PNG to the system clipboard; success is reported through the return value */
 export async function writeClipboardImage(blob: Blob): Promise<boolean> {
   if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return false;
   try {
@@ -70,7 +70,7 @@ async function readClipboardImageOnce(): Promise<Blob | null> {
   return null;
 }
 
-/** 读取系统剪贴板中的图片；超时或不可用时返回 null */
+/** Read an image from the system clipboard; null on timeout or when unavailable */
 export async function readClipboardImage(timeoutMs = CLIPBOARD_READ_TIMEOUT): Promise<Blob | null> {
   return Promise.race([
     readClipboardImageOnce(),
@@ -80,19 +80,19 @@ export async function readClipboardImage(timeoutMs = CLIPBOARD_READ_TIMEOUT): Pr
   ]);
 }
 
-/** Blob → 可交给既有导入流程的 File（扩展名按 MIME 推导） */
+/** Blob → File for the existing import flow (extension derived from the MIME type) */
 export function blobToImageFile(blob: Blob, name = 'clipboard'): File {
   const extension = (blob.type.split('/')[1] ?? 'png').replace('jpeg', 'jpg');
   return new File([blob], `${name}.${extension}`, { type: blob.type || 'image/png' });
 }
 
 /**
- * 挑出「复制」应该送往系统剪贴板的那块像素，语义与 Photoshop 对齐：
- * 1. 有选区 → 选区内的合成内容；
- * 2. 否则有活动图层 → 只渲染该图层（及其子树，例如组 / 智能对象的子级）并裁到它的包围盒；
- * 3. 都没有 → 整幅合并图像。
+ * Pick the pixels "copy" should send to the system clipboard, matching Photoshop:
+ * 1. with a selection: the composited content inside it;
+ * 2. otherwise with an active layer: render only it (and its subtree, e.g. a group's children), cropped to bbox;
+ * 3. neither: the whole composite.
  *
- * 注意第 2 步用浅拷贝替换 `layers` 来隔离图层，避免 `cloneDoc` 深拷贝整份像素数据。
+ * Note step 2 swaps in a shallow copy of `layers` to isolate the layer, avoiding `cloneDoc`'s deep copies.
  */
 export function clipboardCanvas(
   doc: PhotoDoc,

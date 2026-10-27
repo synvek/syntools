@@ -3,17 +3,18 @@ import jsQR from 'jsqr';
 import type { ToolResult } from '@/core/types';
 
 /**
- * 二维码生成与解析（Tasks T37）：基于 qrcode + jsqr，纯前端无数据外发。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译（T29 约定）。
+ * QR code generation and decoding (Tasks T37): built on qrcode + jsqr, fully client-side with no data sent out.
+ * Error codes are decoupled from copy: core returns language-agnostic error codes and the UI translates them via i18n (T29 convention).
  */
 
-export type QrErrorCode = 'EMPTY' | 'TOO_LONG' | 'NOT_FOUND' | 'DECODE' | 'INVALID_COLOR' | 'INVALID_MARGIN';
+export type QrErrorCode =
+  'EMPTY' | 'TOO_LONG' | 'NOT_FOUND' | 'DECODE' | 'INVALID_COLOR' | 'INVALID_MARGIN';
 
-/** 纠错等级：L≈7% / M≈15% / Q≈25% / H≈30% */
+/** Error correction level: L≈7% / M≈15% / Q≈25% / H≈30% */
 export const QR_LEVELS = ['L', 'M', 'Q', 'H'] as const;
 export type QrLevel = (typeof QR_LEVELS)[number];
 
-/** 输出边长（px） */
+/** Output side length (px) */
 export const QR_SIZES = [128, 256, 512, 1024] as const;
 export type QrSize = (typeof QR_SIZES)[number];
 
@@ -25,11 +26,11 @@ export const DEFAULT_BG = '#ffffff';
 export interface QrOptions {
   level: QrLevel;
   size: QrSize;
-  /** 前景色（深色模块） */
+  /** Foreground color (dark modules) */
   foreground: string;
-  /** 背景色（浅色模块 / quiet zone） */
+  /** Background color (light modules / quiet zone) */
   background: string;
-  /** 边距（模块数，quiet zone） */
+  /** Margin in modules (quiet zone) */
   margin: number;
 }
 
@@ -41,7 +42,7 @@ export const DEFAULT_QR_OPTIONS: QrOptions = {
   margin: 2,
 };
 
-/** 归一化为 #RRGGBB；非法返回 null */
+/** Normalize to #RRGGBB; returns null when invalid */
 export function normalizeQrColor(input: string): string | null {
   const raw = input.trim();
   const short = /^#([0-9a-fA-F]{3})$/.exec(raw);
@@ -61,10 +62,8 @@ export function clampMargin(n: number): number | null {
   return m;
 }
 
-/** 校验并归一化生成选项 */
-export function resolveQrOptions(
-  partial: Partial<QrOptions> = {},
-): ToolResult<QrOptions> {
+/** Validate and normalize the generation options */
+export function resolveQrOptions(partial: Partial<QrOptions> = {}): ToolResult<QrOptions> {
   const level = partial.level ?? DEFAULT_QR_OPTIONS.level;
   const size = partial.size ?? DEFAULT_QR_OPTIONS.size;
   if (!QR_LEVELS.includes(level) || !QR_SIZES.includes(size)) {
@@ -86,7 +85,7 @@ export function resolveQrOptions(
   };
 }
 
-/** 生成二维码（PNG dataURL）；内容超出容量时返回 TOO_LONG */
+/** Generate a QR code (PNG dataURL); returns TOO_LONG when the content exceeds capacity */
 export async function generateQr(
   text: string,
   options: Partial<QrOptions> = {},
@@ -111,7 +110,7 @@ export async function generateQr(
   }
 }
 
-/** 从 RGBA 像素数据解码二维码；未识别时返回 NOT_FOUND */
+/** Decode a QR code from RGBA pixel data; returns NOT_FOUND when unrecognized */
 export function decodeQrFromImage(
   data: Uint8ClampedArray,
   width: number,

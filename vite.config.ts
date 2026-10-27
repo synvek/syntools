@@ -4,7 +4,7 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { prerenderPlugin } from './scripts/prerender';
 
-/** 应用版本号（来自 package.json，供 /download 等页面展示，避免手工同步） */
+/** App version (from package.json, shown on /download and friends, so it is never synced by hand) */
 function resolveAppVersion(): string {
   try {
     const pkg = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')) as {
@@ -17,8 +17,8 @@ function resolveAppVersion(): string {
 }
 
 /**
- * 部署子路径（GitHub Pages 项目站为 /<repo>/）。
- * 默认 `/`（Vercel / Cloudflare / 本地 / Tauri）；Pages 构建时设置 BASE_PATH=/syntools/
+ * Deployment sub-path (GitHub Pages project sites use /<repo>/).
+ * Defaults to `/` (Vercel / Cloudflare / local / Tauri); the Pages build sets BASE_PATH=/syntools/
  */
 function resolveBase(): string {
   const raw = process.env.BASE_PATH?.trim() || '/';
@@ -29,7 +29,7 @@ function resolveBase(): string {
 // https://vitejs.dev/config/
 export default defineConfig({
   base: resolveBase(),
-  // Tauri 期望固定端口，且避免清屏打乱 Rust 编译日志
+  // Tauri expects a fixed port; clearing the screen would also scramble Rust build logs
   clearScreen: false,
   define: {
     __APP_VERSION__: JSON.stringify(resolveAppVersion()),
@@ -41,7 +41,7 @@ export default defineConfig({
     },
   },
   server: {
-    // 9999：避开 5173（Vite 默认，易与其它本地项目冲突）
+    // 9999: avoids 5173 (the Vite default, which often collides with other local projects)
     port: 9999,
     strictPort: true,
     host: process.env.TAURI_DEV_HOST || false,
@@ -52,12 +52,12 @@ export default defineConfig({
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
     rollupOptions: {
-      // 限制 transform 并行度，降低大数据量依赖（univer/mermaid）时的内存峰值
+      // Limit transform parallelism to lower peak memory with large deps (univer/mermaid)
       maxParallelFileOps: 2,
       output: {
-        // 拆分首屏与重依赖；单 chunk 预算见 scripts/check-bundle-size.mjs
-        // onlyExplicitManualChunks：避免把 mermaid 的传递依赖（cytoscape 等）并进同一 chunk，
-        // 并配合下面把 vite preload-helper 钉在 vendor-react，防止首屏静态依赖 mermaid。
+        // Split the entry screen from heavy deps; chunk budgets live in scripts/check-bundle-size.mjs
+        // onlyExplicitManualChunks: keeps mermaid's transitive deps (cytoscape etc.) out of the same chunk,
+        // and together with pinning vite's preload-helper to vendor-react keeps mermaid out of the entry graph.
         onlyExplicitManualChunks: true,
         manualChunks(id) {
           if (
@@ -77,8 +77,8 @@ export default defineConfig({
           }
           if (/[/\\]node_modules[/\\](i18next|react-i18next)[/\\]/.test(id)) return 'vendor-i18n';
           if (/[/\\]node_modules[/\\]js-beautify[/\\]/.test(id)) return 'vendor-beautify';
-          // 代码编辑器：prettier 核心与 Java 插件（tree-sitter wasm）单独成 chunk，
-          // 各语言插件随分组动态 import 自动成 chunk，避免任一 chunk 超过 500KB 预算
+          // Code editor: prettier core and the Java plugin (tree-sitter wasm) get their own chunks,
+          // while language plugins form chunks via grouped dynamic imports, keeping each under 500KB
           if (/[/\\]node_modules[/\\]prettier[/\\](?!plugins[/\\])/.test(id))
             return 'vendor-prettier';
           if (/[/\\]node_modules[/\\]prettier-plugin-java[/\\]/.test(id)) {
@@ -98,21 +98,21 @@ export default defineConfig({
           if (/[/\\]node_modules[/\\]lunar-javascript[/\\]/.test(id)) return 'vendor-lunar';
           if (/[/\\]node_modules[/\\]@cantoo[/\\]pdf-lib[/\\]/.test(id)) return 'vendor-pdf-lib';
           if (/[/\\]node_modules[/\\]pdfjs-dist[/\\]/.test(id)) return 'vendor-pdfjs';
-          // 富文本编辑器：tiptap + prosemirror 传递依赖必须独立于 mermaid / jspdf
+          // Rich text editor: tiptap + prosemirror transitive deps must stay separate from mermaid / jspdf
           if (/[/\\]node_modules[/\\](@tiptap|prosemirror-[^/\\]+)[/\\]/.test(id)) {
             return 'vendor-tiptap';
           }
           if (/[/\\]node_modules[/\\]docx[/\\]/.test(id)) return 'vendor-docx';
           if (/[/\\]node_modules[/\\]mammoth[/\\]/.test(id)) return 'vendor-mammoth';
-          // 电子表格（Univer）**不要**指定 manualChunks：@univerjs/* 之间存在循环依赖，
-          // 任何人为切分都会破坏初始化顺序，生产构建下表现为工具整体无法加载：
-          //   - 拆成多个 @univerjs-* chunk → “Cannot access 'k0' before initialization”（TDZ）；
-          //   - 合并成一个 vendor-univer → 插件注册时读取 undefined 的类型（registerSubtype）。
-          // 交给 Rollup 按动态入口自然分块（随 SpreadsheetTool 一起）才能保证 live binding 顺序；
-          // dev 态走浏览器原生 ESM，不受影响。体积预算见 scripts/check-bundle-size.mjs。
+          // Spreadsheet (Univer): do **not** assign manualChunks — @univerjs/* have circular deps,
+          // and any manual split breaks initialization order; in production the tool then fails to load:
+          //   - several @univerjs-* chunks → "Cannot access 'k0' before initialization" (TDZ);
+          //   - one merged vendor-univer → plugin registration reads an undefined type (registerSubtype).
+          // Let Rollup chunk it naturally around the dynamic entry (with SpreadsheetTool) to keep live bindings ordered;
+          // dev uses native browser ESM and is unaffected. Size budgets: scripts/check-bundle-size.mjs.
           if (/[/\\]node_modules[/\\]konva[/\\]/.test(id)) return 'vendor-konva';
           if (/[/\\]node_modules[/\\]exceljs[/\\]/.test(id)) return 'vendor-exceljs';
-          // 图表：ECharts 按需引入，独立 chunk（只在打开图表面板时加载）
+          // Charts: ECharts is imported on demand into its own chunk (loaded only when the chart panel opens)
           if (/[/\\]node_modules[/\\](echarts|zrender)[/\\]/.test(id)) return 'vendor-echarts';
         },
       },
@@ -120,10 +120,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    // 启用 globals 以便 Testing Library 自动清理（afterEach cleanup）
+    // Enable globals so Testing Library auto-cleans (afterEach cleanup)
     globals: true,
     setupFiles: ['src/test/setup.ts'],
-    // e2e/ 下为 Playwright 冒烟用例，不属于单测
+    // e2e/ holds Playwright smoke cases, not unit tests
     exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       include: ['src/**'],

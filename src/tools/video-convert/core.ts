@@ -7,15 +7,15 @@ export const QUALITY_LEVELS: MediaQuality[] = ['low', 'medium', 'high'];
 export interface VideoConvertForm {
   target: MediaTarget;
   quality: MediaQuality;
-  /** 目标宽度（px）；留空表示保持原尺寸 */
+  /** Target width (px); empty keeps the original size */
   width: number | null;
-  /** 秒；留空表示从头 */
+  /** Seconds; empty means from the start */
   trimStart: number | null;
-  /** 秒；留空表示到结尾 */
+  /** Seconds; empty means until the end */
   trimEnd: number | null;
 }
 
-/** 把表单状态整理为转换参数（纯函数，便于单测）。 */
+/** Turn form state into conversion parameters (pure function for easy unit testing). */
 export function buildConvertOptions(form: VideoConvertForm): ToolResult<ConvertMediaOptions> {
   if (!VIDEO_TARGETS.includes(form.target)) return { ok: false, error: 'INVALID_TARGET' };
   if (!QUALITY_LEVELS.includes(form.quality)) return { ok: false, error: 'INVALID_QUALITY' };
@@ -46,7 +46,7 @@ export function formatDuration(seconds: number): string {
   return `${minutes}:${rest}`;
 }
 
-/** 依据目标容器生成下载文件名（替换原扩展名）。 */
+/** Build the download file name from the target container (replaces the original extension). */
 export function outputFileName(baseName: string, target: MediaTarget): string {
   const stem = baseName.replace(/\.[^./\\]+$/, '') || 'output';
   return `${stem}.${target}`;

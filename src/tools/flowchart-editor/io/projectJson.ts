@@ -1,6 +1,6 @@
 /**
- * 项目文件（.flow.json）的保存与打开。
- * 读取时统一经 migrateDoc 归一，保证旧版文件与草稿都能打开。
+ * Saving and opening project files (.flow.json).
+ * Reads always go through migrateDoc normalization, so legacy files and drafts both open.
  */
 
 import { migrateDoc } from '../model/migrate';
@@ -12,7 +12,7 @@ export function toProjectJson(doc: FlowDoc): string {
   return JSON.stringify(doc, null, 2);
 }
 
-/** 解析项目文件；非法内容返回 null */
+/** Parse a project file; returns null for invalid content */
 export function parseProjectJson(text: string): FlowDoc | null {
   try {
     const raw: unknown = JSON.parse(text);

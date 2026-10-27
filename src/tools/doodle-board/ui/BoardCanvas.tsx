@@ -5,12 +5,13 @@ import { TEXT_FONT_FAMILY, clearStage, drawOps } from '../render';
 import { useBoardStore } from '../store';
 
 /**
- * 画布舞台：CSS 背景层 + 内容 canvas + 文字输入覆盖层。
+ * Canvas stage: CSS background layer + content canvas + text input overlay.
  *
- * 背景（纯色 / 网格 / 透明棋盘格）完全交给 CSS：既省一层画布，
- * 又让画布自身保持透明 —— 橡皮因此可以用 `destination-out` 做真正的擦除。
- * 内容缩放只改变 stage 的 CSS 尺寸，canvas 的像素分辨率保持不变，
- * 指针坐标通过 `getBoundingClientRect` 换算，因此任意缩放下落笔都精准。
+ * The background (solid / grid / transparent checkerboard) is entirely CSS: it saves a canvas
+ * layer and keeps the canvas itself transparent, which lets the eraser do real erasure with
+ * `destination-out`. Zooming only changes the stage's CSS size while the canvas pixel resolution
+ * stays fixed, and pointer coordinates are mapped via `getBoundingClientRect`, so strokes land
+ * precisely at any zoom.
  */
 export default function BoardCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,19 +31,19 @@ export default function BoardCanvas() {
   const [available, setAvailable] = useState(0);
   const [editor, setEditor] = useState<{ x: number; y: number; value: string } | null>(null);
 
-  // `fit` 跟随容器宽度（不放大，避免小画布被拉伸）；数值缩放则固定倍率
+  // `fit` follows the container width (never upscales, so small canvases are not stretched); numbers are fixed scales
   const scale = available > 0 ? (zoom === 'fit' ? Math.min(1, available / scene.width) : zoom) : 0;
   const overflowing = available > 0 && scene.width * scale > available + 1;
 
-  // 工具栏越精简，画布允许越高：收起细条 / 关闭更多设置时把空间还给画布
+  // The leaner the toolbar, the taller the canvas: collapsing it or closing settings gives space back
   const stageHeightClass = collapsed ? 'max-h-[88vh]' : details ? 'max-h-[64vh]' : 'max-h-[78vh]';
 
-  // 缩放控件在工具栏里，倍率由此处测算后回填
+  // The zoom control lives in the toolbar; the scale is measured here and written back
   useEffect(() => {
     if (scale > 0) setViewScale(scale);
   }, [scale, setViewScale]);
 
-  /** 整幅重绘：尺寸 / DPR / 历史变化时调用 */
+  /** Full repaint: called when size / DPR / history change */
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -68,13 +69,13 @@ export default function BoardCanvas() {
     return () => observer.disconnect();
   }, []);
 
-  // 自适应预设：按可用宽度同步画布尺寸（不写历史）
+  // Fit preset: sync the canvas size to the available width (no history entry)
   useEffect(() => {
     if (available > 0) applyFitSize(available);
   }, [available, applyFitSize]);
 
-  // scene 身份变化 = 落笔 / 撤销 / 重做 / 清空 / 改尺寸 / 整体移动：整幅重绘，
-  // 保证「屏幕上看到的」与「导出的」严格一致（落笔过程中只在快照上增量预览）。
+  // A new scene identity means commit / undo / redo / clear / resize / pan: repaint everything so
+  // what is on screen matches the export exactly (during a stroke only the snapshot is previewed).
   useEffect(() => {
     if (scale > 0) render();
   }, [scene, scale, render]);
@@ -108,7 +109,7 @@ export default function BoardCanvas() {
     if (!editor) return;
     const { x, y, value } = editor;
     setEditor(null);
-    // Esc 取消：置位标记后关闭输入框，避免随后的 blur 又把内容提交上去
+    // Esc cancels: set the flag before closing the input, so the following blur does not commit
     if (cancelledRef.current) {
       cancelledRef.current = false;
       return;
@@ -125,7 +126,7 @@ export default function BoardCanvas() {
       color: state.brush.color,
       opacity: state.brush.opacity,
     });
-    // addOp 不触发舞台重绘（一笔一画的中间状态不重绘），这里主动补一次
+    // addOp does not repaint the stage (intermediate stroke states never do), so repaint here
     render();
   };
 
@@ -160,7 +161,7 @@ export default function BoardCanvas() {
           ref={measureRef}
           className={`flex w-full items-center p-2 ${overflowing ? 'justify-start' : 'justify-center'}`}
         >
-          {/* 尺寸不做过渡：绘制过程中尺寸动画会让指针坐标与画布错位 */}
+          {/* No size transition: animating the size would desync pointer coordinates from the canvas */}
           <div
             className="relative ring-1 ring-black/5 dark:ring-white/10"
             style={{ ...backgroundStyle, width: scene.width * scale, height: scene.height * scale }}

@@ -55,7 +55,7 @@ describe('容器缩放联动（scaleChildren）', () => {
     const out = scaleChildren([child], { width: 200, height: 200 }, { width: 400, height: 100 });
     expect(out[0].position).toEqual({ x: 40, y: 20 });
     expect(out[0].width).toBe(200);
-    // 50 * 0.5 = 25，低于 rect 的最小高度 32 → 夹取
+    // 50 * 0.5 = 25, below rect's minimum height of 32 → clamped
     expect(out[0].height).toBe(32);
   });
 
@@ -373,7 +373,7 @@ describe('cachedAbsoluteRectOf', () => {
     const moved = cachedAbsoluteRectOf(child, nextById);
     expect(moved.x).toBe(60);
     expect(moved).not.toBe(before);
-    // 同一父引用再次调用命中缓存
+    // Calling again with the same parent reference hits the cache
     expect(cachedAbsoluteRectOf(child, nextById)).toBe(moved);
   });
 });

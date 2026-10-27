@@ -1,28 +1,28 @@
 /**
- * 本地内置图标素材包。
+ * Built-in local icon set.
  *
- * 隐私约束：SynTools 承诺「用户内容不离开浏览器」，因此**不接第三方图标 CDN**，
- * 图标以 24×24 viewBox 的 SVG path 数据内联在包里（纯字符串，不增加网络请求）。
+ * Privacy constraint: SynTools promises "user content never leaves the browser", so no third-party icon CDN is
+ * used; icons are inlined as 24×24 viewBox SVG path data (plain strings, no extra network requests).
  *
- * 存 path 而不是整段 `<svg>` 的好处：Konva.Path 可以直接同步绘制成矢量节点，
- * 缩略图与 PNG / PDF 光栅导出（同步渲染路径）也能正常出图。
+ * Storing paths instead of full `<svg>` markup lets Konva.Path draw them directly as vector nodes, and
+ * thumbnails plus PNG / PDF raster export (the synchronous render path) work too.
  */
 
 export interface SlideIcon {
   id: string;
   label: string;
   category: string;
-  /** 24×24 viewBox 下的 SVG path 数据 */
+  /** SVG path data in a 24×24 viewBox */
   path: string;
-  /** 线性图标（只描边不填充） */
+  /** Line icon (stroked, not filled) */
   stroke?: boolean;
 }
 
-/** 图标分类（顺序即面板展示顺序） */
+/** Icon categories (order = display order in the panel) */
 export const ICON_CATEGORIES = ['通用', '箭头', '商务', '状态', '形状'] as const;
 
 export const SLIDE_ICONS: SlideIcon[] = [
-  // 通用
+  // General
   {
     id: 'check',
     label: '对勾',
@@ -53,7 +53,7 @@ export const SLIDE_ICONS: SlideIcon[] = [
     path: 'M10 4a6 6 0 1 0 3.7 10.7l4.8 4.8 1.4-1.4-4.8-4.8A6 6 0 0 0 10 4zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8z',
   },
 
-  // 箭头
+  // Arrows
   {
     id: 'arrow-right',
     label: '右箭头',
@@ -109,7 +109,7 @@ export const SLIDE_ICONS: SlideIcon[] = [
     path: 'M12 4a8 8 0 0 1 7.5 5.2l-1.9.7A6 6 0 0 0 12 6a6 6 0 0 0-5.7 4.1l2 2H4V6h2.1l-1.4 1.4A8 8 0 0 1 12 4zm0 16a8 8 0 0 1-7.5-5.2l1.9-.7A6 6 0 0 0 12 18a6 6 0 0 0 5.7-4.1l-2-2H20v6h-2.1l1.4-1.4A8 8 0 0 1 12 20z',
   },
 
-  // 商务
+  // Business
   {
     id: 'briefcase',
     label: '公文包',
@@ -159,7 +159,7 @@ export const SLIDE_ICONS: SlideIcon[] = [
     path: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm6.9 6h-2.6a15 15 0 0 0-1.2-4.2A7 7 0 0 1 18.9 9zM12 5.1c.7 1 1.3 2.3 1.7 3.9h-3.4c.4-1.6 1-2.9 1.7-3.9zM5.1 9a7 7 0 0 1 3.8-4.2A15 15 0 0 0 7.7 9zm0 2a15 15 0 0 0 1.2 4.2A7 7 0 0 1 5.1 11zm3.9 6.9c-.9 0-1.7-.1-2.5-.3.4-.9.9-1.8 1.4-2.6.4.1.7.1 1.1.1zm4 0c-.4 0-.7 0-1.1-.1.5.8 1 1.7 1.4 2.6-.8.2-1.6.3-2.5.3zm2.9-.6a15 15 0 0 0 1.2-4.2h2.6a7 7 0 0 1-3.8 4.2z',
   },
 
-  // 状态
+  // Status
   {
     id: 'warning',
     label: '警告',
@@ -198,7 +198,7 @@ export const SLIDE_ICONS: SlideIcon[] = [
     path: 'M12 3a6 6 0 0 0-3.6 10.8c.6.5.9 1.1 1 1.7l.1.5h5l.1-.5c.1-.6.4-1.2 1-1.7A6 6 0 0 0 12 3zM9.5 18h5c0 .8-.7 1.5-1.5 1.5h-2c-.8 0-1.5-.7-1.5-1.5z',
   },
 
-  // 形状
+  // Shapes
   {
     id: 'shape-circle',
     label: '圆形',
@@ -232,7 +232,7 @@ export function findIcon(id: string): SlideIcon | undefined {
   return SLIDE_ICONS.find((icon) => icon.id === id);
 }
 
-/** 图标 → 完整 SVG 文本（导出时栅格化用） */
+/** Icon → full SVG text (used for rasterization on export) */
 export function iconSvg(icon: SlideIcon, color = '#2563EB'): string {
   const paint = icon.stroke
     ? `<path d="${icon.path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`

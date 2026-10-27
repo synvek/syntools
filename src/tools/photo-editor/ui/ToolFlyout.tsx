@@ -7,19 +7,19 @@ export interface FlyoutItem<T extends string> {
   id: T;
   icon: string;
   label: string;
-  /** 展示用快捷键；形状种类这类没有独立快捷键的组可以省略 */
+  /** Display-only shortcut; groups without one (shape kinds) may omit it */
   shortcut?: string;
 }
 
 /**
- * 组选择浮层（Photoshop / Photopea 的组选择器）：工具箱的「再次点击已选中工具」、
- * 顶部工具条的形状组按钮都用它，保证两处的展开方式 / 键盘行为完全一致。
+ * Group flyout (Photoshop / Photopea's group picker), used by both "click the active tool again"
+ * and the shape group button in the options bar, so expansion and keyboard behavior match exactly.
  *
- * 与「角标按钮」的区别：按钮右下角的小三角只是「还有同族选项」的图标，
- * 不是可点的第二颗按钮；打开浮层的入口是按钮本身。
+ * Not the same as a "badge button": the little triangle at a button's corner is merely an icon saying
+ * "more options exist", not a second clickable button; the button itself opens the flyout.
  *
- * 浮层走 portal + fixed 定位：工具箱自己会滚动（`overflow-y-auto`），
- * 就地 absolute 会被裁剪；打开期间滚动 / 缩放 / 点外部 / Esc 都会关闭。
+ * The flyout renders in a portal with fixed positioning: the toolbox scrolls (`overflow-y-auto`),
+ * so an in-place absolute box would be clipped; scrolling / zooming / outside clicks / Esc all close it.
  */
 export function ToolFlyout<T extends string>({
   anchor,
@@ -30,13 +30,13 @@ export function ToolFlyout<T extends string>({
   onPick,
   onClose,
 }: {
-  /** 浮层的定位锚点（当前选项按钮） */
+  /** Anchor for the flyout (the current option button) */
   anchor: HTMLElement;
   label: string;
   items: FlyoutItem<T>[];
-  /** 当前选项：在列表里高亮，并在打开时获得焦点 */
+  /** Current option: highlighted in the list and focused when opened */
   activeId: T;
-  /** 竖排工具箱放右侧，窄屏横向工具箱放下方 */
+  /** Right of the vertical toolbox; below the horizontal one on narrow screens */
   prefer?: 'right' | 'bottom';
   onPick: (id: T) => void;
   onClose: () => void;
@@ -57,11 +57,11 @@ export function ToolFlyout<T extends string>({
       let left: number;
       let top: number;
       if (prefer === 'bottom') {
-        // 横向工具箱：贴在按钮下方并水平钳制，避免盖住同一行其它按钮
+        // Horizontal toolbox: below the button and clamped horizontally, so siblings stay visible
         left = Math.min(Math.max(8, rect.left), maxLeft);
         top = rect.bottom + 8;
       } else {
-        // 竖排工具箱：贴在按钮右侧；右侧放不下就翻到左侧
+        // Vertical toolbox: right of the button, flipping to the left when there's no room
         left = rect.right + 8;
         if (left > maxLeft) left = Math.max(8, rect.left - width - 8);
         top = rect.top;
@@ -72,13 +72,13 @@ export function ToolFlyout<T extends string>({
       );
     };
     place();
-    // 首帧量不到尺寸：下一帧校正，位置算好前面板不可见
+    // Size is unknown on the first frame: correct it next frame, hidden until the position is ready
     const raf = requestAnimationFrame(place);
 
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (panelRef.current?.contains(target)) return;
-      // 锚点按钮自己负责「再点关闭」，这里不能抢先关掉再让按钮重新打开
+      // The anchor button owns "click again to close"; closing here would let it reopen immediately
       if (anchor.contains(target)) return;
       onClose();
     };
@@ -88,7 +88,7 @@ export function ToolFlyout<T extends string>({
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
     window.addEventListener('resize', place);
-    // 滚动会让 fixed 坐标失效，直接关闭比留着错位菜单更好
+    // Scrolling invalidates fixed coordinates, so closing beats leaving a misplaced menu
     window.addEventListener('scroll', onClose, true);
     return () => {
       cancelAnimationFrame(raf);
@@ -99,13 +99,13 @@ export function ToolFlyout<T extends string>({
     };
   }, [anchor, onClose, prefer]);
 
-  // 首帧面板还是 hidden（位置未算出），此时 focus() 不会生效；等位置就绪再聚焦当前工具
+  // The panel is hidden on the first frame (no position yet) and focus() does nothing; wait for layout
   useEffect(() => {
     if (!position) return;
     activeRef.current?.focus({ preventScroll: true });
   }, [position]);
 
-  /** ↑↓ / Home / End 在选项间移动焦点（菜单的标准键盘行为） */
+  /** ↑↓ / Home / End move focus between options (standard menu keyboard behavior) */
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
     if (!keys.includes(event.key)) return;
@@ -137,7 +137,7 @@ export function ToolFlyout<T extends string>({
         position: 'fixed',
         top: position?.top ?? 0,
         left: position?.left ?? 0,
-        // 位置算好前先隐藏（layout effect 会在绘制前补上，看不到中间态）
+        // Stay hidden until the position is known (the layout effect applies it before paint)
         visibility: position ? 'visible' : 'hidden',
         maxHeight: 'calc(100vh - 1rem)',
       }}

@@ -1,5 +1,5 @@
 /**
- * ASCII 可打印字符表（32–126）及常用控制字符说明。
+ * ASCII printable character table (32–126) plus notes on common control characters.
  */
 
 export interface AsciiEntry {

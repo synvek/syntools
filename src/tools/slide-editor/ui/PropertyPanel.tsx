@@ -15,7 +15,7 @@ import {
   ToggleGroup,
 } from './controls';
 
-/** 右侧属性面板：无选中时编辑页面，选中时编辑元素（位置/填充/文字/层序） */
+/** Right-side property panel: edits the slide when nothing is selected, the element (position/fill/text/z-order) when something is */
 export function PropertyPanel() {
   const { t } = useTranslation();
   const doc = useSlideStore((s) => s.doc);
@@ -29,7 +29,7 @@ export function PropertyPanel() {
   const removeSelected = useSlideStore((s) => s.removeSelected);
   const duplicateSelected = useSlideStore((s) => s.duplicateSelected);
 
-  // 统一按「当前编辑容器」取元素：母版视图下编辑的是母版/版式元素
+  // Always read elements from the "current editing container": master view edits master/layout elements
   const element = containerElements({ doc, viewMode, slideIndex, masterKind, masterIndex }).find(
     (item) => item.id === selection[selection.length - 1],
   );
@@ -39,7 +39,7 @@ export function PropertyPanel() {
   const mergeCellRight = useSlideStore((s) => s.mergeCellRight);
   const splitCell = useSlideStore((s) => s.splitCell);
 
-  // 页级背景/备注始终取「当前页」，与正在编辑的容器无关（母版视图下这两项不展示）
+  // Slide-level background/notes always come from the "current slide", whatever the container (neither shows in master view)
   const currentSlide = doc.slides[slideIndex];
   const pageBackground =
     currentSlide?.background ??
@@ -61,7 +61,7 @@ export function PropertyPanel() {
             {t('tools.slide.noSelection')}
           </p>
         </Section>
-        {/* 备注是页级属性，放在「未选中元素」分支下语义最自然 */}
+        {/* Notes are a slide-level property, so the "no element selected" branch is the most natural home */}
         <Section title={t('tools.slide.notes')}>
           <TextArea
             ariaLabel={t('tools.slide.notes')}
@@ -114,7 +114,7 @@ export function PropertyPanel() {
     };
     apply({ body: next } as Partial<SlideElement>);
   };
-  /** 段落级属性（行距/缩进/段前后）写回全部段落：这类字段在 Paragraph 上而非 RunStyle 上 */
+  /** Paragraph-level props (line spacing/indent/space before and after) write to every paragraph: they live on Paragraph, not RunStyle */
   const patchParagraph = (patch: {
     lineSpacing?: number;
     indent?: number;
@@ -171,9 +171,9 @@ export function PropertyPanel() {
             />
           </Field>
         </div>
-        {/* 层级 / 对齐 / 分布 / 组合 / 翻转 / 锁定 / 隐藏 都是「选中态操作」，
-            已统一收进顶部工具栏的「排列」行；不透明度/圆角在「格式」行；
-            这里只保留需要精确数值的几何属性，语义更干净。 */}
+        {/* Z-order / align / distribute / group / flip / lock / hide are all selection-only actions,
+            now collected in the toolbar's "arrange" row; opacity/radius are in the "format" row;
+            only geometry that needs exact numbers is left here, which keeps the semantics clean. */}
       </Section>
 
       {element.type === 'table' ? (
@@ -258,7 +258,7 @@ export function PropertyPanel() {
         </Section>
       ) : null}
 
-      {/* 线条：颜色与粗细在工具栏的「轮廓」下拉里，这里只留线型（虚/实线） */}
+      {/* Line: color and weight live in the toolbar's "outline" dropdown; only the dash style stays here */}
       {element.type === 'line' ? (
         <Section title={t('tools.slide.panelLine')}>
           <Field label={t('tools.slide.strokeStyle')}>
@@ -315,7 +315,7 @@ export function PropertyPanel() {
             />
           </Field>
 
-          {/* run 级扩展属性：字距 / 上下标（DrawingML a:spc / baseline），工具栏未覆盖的低频项 */}
+          {/* Run-level extras: letter spacing / baseline (DrawingML a:spc / baseline), low-frequency items the toolbar skips */}
           <Field label={t('tools.slide.charSpacing')}>
             <NumberInput
               ariaLabel={t('tools.slide.charSpacing')}
@@ -398,7 +398,7 @@ export function PropertyPanel() {
         </Section>
       ) : null}
 
-      {/* 元素级超链接（DrawingML a:hlinkClick）：导出时由 pptxgen 通道写出 */}
+      {/* Element-level hyperlink (DrawingML a:hlinkClick): written by the pptxgen channel on export */}
       <Section title={t('tools.slide.panelLink')}>
         <Field label={t('tools.slide.hyperlink')}>
           <TextInput
@@ -483,7 +483,7 @@ export function PropertyPanel() {
         </div>
       </Section>
 
-      {/* 页面级设置只在普通视图出现：母版视图下母版背景由 MasterView 提供入口 */}
+      {/* Page-level settings only appear in normal view: in master view MasterView provides the master background entry */}
       {viewMode === 'normal' ? (
         <Section title={t('tools.slide.panelPage')}>
           <Field label={t('tools.slide.background')}>
@@ -517,7 +517,7 @@ export function PropertyPanel() {
   );
 }
 
-/** 文字型动作按钮（对齐/组合/锁定等），禁用态统一置灰 */
+/** Text action button (align/group/lock etc.), grayed out when disabled */
 function ActionButton({
   label,
   onClick,
@@ -580,7 +580,7 @@ function ToggleGlyph({
   );
 }
 
-/** 裁剪四边的方向标记（语言无关，避免为四个方向各加 9 语文案） */
+/** Direction markers for the four crop edges (language-neutral, so no 9-language copy per direction) */
 function sideLabel(side: 'left' | 'top' | 'right' | 'bottom'): string {
   return side === 'left' ? '←' : side === 'top' ? '↑' : side === 'right' ? '→' : '↓';
 }

@@ -1,17 +1,17 @@
 /**
- * 脑图主题（XMind 风格）：一套主题同时定义「中心主题 / 一级分支 / 二级及以下」
- * 的形状、填充、描边与文字样式，以及分支配色循环与连线粗细。
- * 展示名走 i18n 键 `tools.mindmap.theme_<id>`，此处只存样式数据。
+ * Mind map themes (XMind style): one theme defines the shape, fill, stroke and typography of the
+ * central topic / top-level branches / deeper nodes, plus the branch colour cycle and line width.
+ * Display names come from the i18n key `tools.mindmap.theme_<id>`; only style data lives here.
  */
 
 import type { MindNodeShape, MindNodeStyle } from './types';
 
-/** 取色占位：'branch' 表示使用所属分支的颜色 */
+/** Colour placeholder: 'branch' means use the colour of the owning branch */
 export const BRANCH = 'branch';
 
 export interface MindLevelStyle {
   shape: MindNodeShape;
-  /** 'transparent' 表示不填充 */
+  /** 'transparent' means no fill */
   fill: string;
   stroke: string;
   textColor: string;
@@ -21,17 +21,17 @@ export interface MindLevelStyle {
 
 export interface MindTheme {
   id: string;
-  /** 中心主题 */
+  /** Central topic */
   root: MindLevelStyle;
-  /** 一级分支 */
+  /** Top-level branch */
   main: MindLevelStyle;
-  /** 二级及以下 */
+  /** Second level and deeper */
   sub: MindLevelStyle;
-  /** 一级分支按顺序循环取色（同时作为该分支连线的颜色） */
+  /** Top-level branches cycle through these colours (also the colour of their edges) */
   branches: string[];
-  /** 主干连线粗细 */
+  /** Trunk line width */
   lineWidth: number;
-  /** 画布底色（导出时的背景） */
+  /** Canvas base colour (export background) */
   background: string;
 }
 
@@ -39,7 +39,7 @@ export const DEFAULT_THEME_ID = 'classic';
 
 export const MIND_THEMES: MindTheme[] = [
   {
-    // 经典蓝：中心实心胶囊 + 白底彩边一级分支 + 下划线叶子
+    // Classic blue: solid pill root, white top-level branches with coloured borders, underlined leaves
     id: 'classic',
     root: {
       shape: 'pill',
@@ -70,7 +70,7 @@ export const MIND_THEMES: MindTheme[] = [
     background: '#FFFFFF',
   },
   {
-    // 森林绿：中心圆角实心，一级分支浅绿填充
+    // Forest green: solid rounded root, pale green top-level branches
     id: 'forest',
     root: {
       shape: 'rounded',
@@ -101,7 +101,7 @@ export const MIND_THEMES: MindTheme[] = [
     background: '#FFFFFF',
   },
   {
-    // 暖阳橙：一级分支用分支色实心 + 白字
+    // Sunset orange: solid top-level branches in the branch colour with white text
     id: 'sunset',
     root: {
       shape: 'pill',
@@ -132,7 +132,7 @@ export const MIND_THEMES: MindTheme[] = [
     background: '#FFFFFF',
   },
   {
-    // 葡萄紫：中心椭圆，一级分支圆角描边
+    // Grape purple: elliptical root, rounded outlined top-level branches
     id: 'grape',
     root: {
       shape: 'ellipse',
@@ -163,7 +163,7 @@ export const MIND_THEMES: MindTheme[] = [
     background: '#FFFFFF',
   },
   {
-    // 石墨灰：中性商务风，一级分支矩形浅灰填充
+    // Graphite grey: neutral business look, rectangular pale grey top-level branches
     id: 'slate',
     root: {
       shape: 'rect',
@@ -194,7 +194,7 @@ export const MIND_THEMES: MindTheme[] = [
     background: '#FFFFFF',
   },
   {
-    // 糖果粉：圆润轻盈
+    // Candy pink: soft and light
     id: 'candy',
     root: {
       shape: 'pill',
@@ -225,7 +225,7 @@ export const MIND_THEMES: MindTheme[] = [
     background: '#FFFFFF',
   },
   {
-    // 极简黑白：仅靠形状与层级区分，无彩色
+    // Minimal black and white: hierarchy told by shape alone, no colour
     id: 'mono',
     root: {
       shape: 'rect',
@@ -256,7 +256,7 @@ export const MIND_THEMES: MindTheme[] = [
     background: '#FFFFFF',
   },
   {
-    // 霓虹：深色中心 + 高饱和分支，一级分支实心彩色
+    // Neon: dark root with saturated branches; top-level branches are solid colour
     id: 'neon',
     root: {
       shape: 'rounded',
@@ -294,7 +294,7 @@ export function themeOf(id: string): MindTheme {
   return MIND_THEMES.find((t) => t.id === id) ?? MIND_THEMES[0];
 }
 
-/** 一级分支取色：同一父级下按序号循环，保证相邻分支不同色 */
+/** Branch colour: cycles by index under one parent so neighbouring branches differ */
 export function branchColorOf(theme: MindTheme, index: number): string {
   return theme.branches[index % theme.branches.length];
 }
@@ -303,7 +303,7 @@ function levelOf(theme: MindTheme, depth: number): MindLevelStyle {
   return depth === 0 ? theme.root : depth === 1 ? theme.main : theme.sub;
 }
 
-/** 未显式指定样式时的默认外观：按主题与层级推导 */
+/** Default appearance when no style is set, derived from the theme and depth */
 export function defaultStyleOf(
   theme: MindTheme,
   depth: number,
@@ -322,7 +322,7 @@ export function defaultStyleOf(
   };
 }
 
-/** 节点未显式指定形状时的默认形状（随主题与层级变化） */
+/** Default shape when none is set (varies with theme and depth) */
 export function defaultShapeOf(theme: MindTheme, depth: number): MindNodeShape {
   return levelOf(theme, depth).shape;
 }

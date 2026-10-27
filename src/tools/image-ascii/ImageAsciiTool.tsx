@@ -19,7 +19,7 @@ export default function ImageAsciiTool() {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      // 先缩放到目标列数附近，降低采样成本
+      // Downscale close to the target column count first to cut sampling cost
       const targetW = Math.max(1, Math.min(cols * 4, img.naturalWidth));
       const targetH = Math.max(1, Math.round((img.naturalHeight / img.naturalWidth) * targetW));
       const canvas = document.createElement('canvas');

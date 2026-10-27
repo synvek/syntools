@@ -30,7 +30,7 @@ describe('脑图 store', () => {
     const state = useMindStore.getState();
     expect(state.doc.nodes).toHaveLength(2);
     expect(state.doc.nodes[1].parentId).toBe(state.doc.rootId);
-    // 中心主题没有同级，退化为新增子主题（文案用同级的默认 Topic）
+    // The central topic has no siblings, so this degrades to adding a child (using the sibling default text, Topic)
     expect(state.doc.nodes[1].text).toBe('Topic');
 
     useMindStore.getState().endEdit();
@@ -72,7 +72,7 @@ describe('脑图 store', () => {
     const second = useMindStore.getState().selectedId!;
     expect(second).not.toBe(first);
 
-    // 当前选中第二个子节点：上移应把它换到第一个之前
+    // The second child is selected: moving up should swap it in front of the first
     useMindStore.getState().moveAt(null, -1);
     const kids = useMindStore
       .getState()

@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * Markdown → 思维导图树（标题 / 列表），再布局为带主题的 SVG。
+ * Markdown → mind-map tree (headings / lists), then laid out as a themed SVG.
  */
 
 export type MindmapError = 'EMPTY';
@@ -53,7 +53,8 @@ export const MINDMAP_THEMES: MindmapTheme[] = [
     background: '#f8fafc',
     link: '#94a3b8',
     linkSoft: '#cbd5e1',
-    fontFamily: 'ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Noto Sans SC", sans-serif',
+    fontFamily:
+      'ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Noto Sans SC", sans-serif',
     depths: [
       { fill: '#1d4ed8', stroke: '#1e3a8a', text: '#ffffff' },
       { fill: '#dbeafe', stroke: '#3b82f6', text: '#1e3a8a' },
@@ -171,7 +172,7 @@ function parseHeading(line: string): { level: number; text: string } | null {
   return { level: m[1].length, text: m[2].trim() };
 }
 
-/** 将 Markdown 标题/列表解析为树；无标题时用「Root」作根 */
+/** Parse Markdown headings/lists into a tree; uses "Root" when there are no headings */
 export function parseMarkdownTree(md: string): ToolResult<MindNode> {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   if (!lines.some((l) => l.trim())) return { ok: false, error: 'EMPTY' };

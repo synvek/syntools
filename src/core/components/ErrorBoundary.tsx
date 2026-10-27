@@ -11,7 +11,7 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-/** 工具级错误边界（技术设计 §7.1）：工具内部异常不扩散到应用外壳 */
+/** Tool-level error boundary (tech design §7.1): tool errors stay out of the app shell */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
 
@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ToolPage] 工具运行出错', error, info.componentStack);
-    // 只上报错误摘要与当前工具 id，不上报用户输入
+    // Report only the error summary and current tool id, never user input
     trackToolError(error.message);
   }
 

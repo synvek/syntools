@@ -34,7 +34,7 @@ const IOS_VERSIONS = ['16_6', '17_0', '17_5', '18_0', '18_1'];
 const ANDROID_VERSIONS = ['11', '12', '13', '14'];
 const ANDROID_DEVICES = ['Pixel 7', 'SM-S918B', 'Redmi Note 12', 'moto g84', 'V2312DA'];
 
-/** 生成指定平台组合的 User-Agent（rand 可注入以便测试） */
+/** Generate a User-Agent for the given platform combination (rand is injectable for tests) */
 export function generateUa(kind: UaKind, rand: () => number = Math.random): string {
   const chromeMajor = between(118, 131, rand);
   const chromeBuild = between(0, 5900, rand);
@@ -61,7 +61,7 @@ export function generateUa(kind: UaKind, rand: () => number = Math.random): stri
   }
 }
 
-/** 一次性生成所有预设组合 */
+/** Generate all preset combinations at once */
 export function generateAll(rand: () => number = Math.random): Array<{ id: UaKind; ua: string }> {
   return UA_PRESETS.map((preset) => ({ id: preset.id, ua: generateUa(preset.id, rand) }));
 }

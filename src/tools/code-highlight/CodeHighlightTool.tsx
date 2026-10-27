@@ -38,7 +38,7 @@ function highlight(code: string, language: HighlightLanguage): string {
   return Prism.highlight(code || ' ', grammar, language);
 }
 
-/** 代码在线高亮 */
+/** In-browser code highlighting */
 export default function CodeHighlightTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -61,10 +61,7 @@ export default function CodeHighlightTool() {
   const colors = THEME_COLORS[theme];
   const html = useMemo(() => highlight(code, language), [code, language]);
   const lines = lineCount(code || ' ');
-  const snippet = useMemo(
-    () => buildHighlightSnippet(html, language),
-    [html, language],
-  );
+  const snippet = useMemo(() => buildHighlightSnippet(html, language), [html, language]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -128,7 +125,11 @@ export default function CodeHighlightTool() {
               {t('tools.codeHighlight.preview')}
             </span>
             <div className="flex flex-wrap gap-2">
-              <CopyButton text={code} disabled={!code.trim()} label={t('tools.codeHighlight.copyCode')} />
+              <CopyButton
+                text={code}
+                disabled={!code.trim()}
+                label={t('tools.codeHighlight.copyCode')}
+              />
               <CopyButton
                 text={snippet}
                 disabled={!code.trim()}
@@ -150,10 +151,7 @@ export default function CodeHighlightTool() {
               <div className="mb-2 text-xs opacity-60">{languageLabel(language)}</div>
               <div className="flex gap-3 font-mono text-sm leading-6">
                 {showLineNumbers && (
-                  <pre
-                    className="select-none text-right"
-                    style={{ color: colors.gutter }}
-                  >
+                  <pre className="select-none text-right" style={{ color: colors.gutter }}>
                     {Array.from({ length: lines }, (_, i) => i + 1).join('\n')}
                   </pre>
                 )}

@@ -1,19 +1,19 @@
 import { i18n } from '@/core/i18n';
 
 /**
- * 第一方、隐私优先的埋点。
+ * First-party, privacy-first analytics.
  *
- * 设计约束（与「数据不离开浏览器」的承诺不冲突）：
- * - **默认完全关闭**：只有构建时设置 `VITE_ANALYTICS_ENDPOINT` 才会发出任何请求，
- *   未设置时所有调用都是空操作，页面零网络请求。
- * - **同源上报**：端点必须与站点同源，否则还需放宽 CSP 的 `connect-src`
- *   （见 `public/_headers` 与 `vercel.json`）。
- * - **不采集内容**：只上报事件名、工具 id、耗时、界面语言；不碰输入框/文件内容，
- *   不使用 cookie，不做跨站标识。session id 为随机值，存于 sessionStorage，关标签页即失效。
- * - **尊重用户意愿**：`DNT: 1` 或 Global Privacy Control 生效时直接不采集。
+ * Design constraints (compatible with the "data never leaves the browser" promise):
+ * - **Off by default**: no request is made unless `VITE_ANALYTICS_ENDPOINT` is set at build time;
+ *   without it every call is a no-op and the page makes zero requests.
+ * - **Same-origin reporting**: the endpoint must share the site's origin, otherwise the CSP `connect-src`
+ *   has to be relaxed (see `public/_headers` and `vercel.json`).
+ * - **No content collection**: only event name, tool id, duration and UI language; never input or file content,
+ *   no cookies, no cross-site identifiers. The session id is random, lives in sessionStorage and dies with the tab.
+ * - **Respects user intent**: nothing is collected when `DNT: 1` or Global Privacy Control is active.
  *
- * 接后端的最小落地方式：一个同源 Cloudflare Worker / Vercel Function，
- * 把 JSON body 追加写入 Workers Analytics Engine 或 KV，再导出周报。
+ * Minimal way to wire a backend: a same-origin Cloudflare Worker / Vercel Function that
+ * appends the JSON body to Workers Analytics Engine or KV, then export weekly reports.
  */
 
 type EventName =
@@ -22,19 +22,19 @@ type EventName =
   | 'tool_error'
   | 'download_click'
   | 'search_use'
-  /** 页面浏览（仅营销/信任页，用于判断定价页是否被真实打开） */
+  /** Page view (marketing / trust pages only, to see whether pricing is really opened) */
   | 'page_view'
-  /** 定价页浏览：与 page_view 分开，转化率只看这一个分母 */
+  /** Pricing page view: separate from page_view, the only denominator for conversion */
   | 'pricing_view'
-  /** 商务询价点击：从定价页或安全页发起的联系动作 */
+  /** Sales inquiry click: contact action started from pricing or security */
   | 'inquiry_click';
 
 interface QueuedEvent {
-  /** 事件名 */
+  /** Event name */
   n: EventName;
-  /** 附加属性（只允许非内容型字段） */
+  /** Extra properties (non-content fields only) */
   p?: Record<string, string | number | boolean>;
-  /** 相对页面加载的毫秒时间戳 */
+  /** Milliseconds since page load */
   t: number;
 }
 
@@ -46,7 +46,7 @@ const MAX_BATCH = 8;
 let queue: QueuedEvent[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let listening = false;
-/** 当前工具 id：供 ErrorBoundary 在拿不到 props 时归因 */
+/** Current tool id, so ErrorBoundary can attribute errors without props */
 let currentToolId: string | null = null;
 
 function isOptedOut(): boolean {
@@ -77,7 +77,7 @@ function send(events: QueuedEvent[]): void {
     events,
   });
   try {
-    // sendBeacon 在页面卸载时仍能送达，且不阻塞导航
+    // sendBeacon survives page unload and never blocks navigation
     if (typeof navigator.sendBeacon === 'function') {
       const blob = new Blob([payload], { type: 'application/json' });
       if (navigator.sendBeacon(ENDPOINT, blob)) return;
@@ -89,7 +89,7 @@ function send(events: QueuedEvent[]): void {
       keepalive: true,
       credentials: 'omit',
     }).catch(() => {
-      /* 埋点失败不影响产品功能，静默丢弃 */
+      /* Analytics failures never affect the product; drop them silently */
     });
   } catch {
     /* ignore */
@@ -114,14 +114,14 @@ function schedule(): void {
 function attachLifecycle(): void {
   if (listening || typeof window === 'undefined') return;
   listening = true;
-  // 页面隐藏/卸载时把剩余事件发出去（bundle 最小化：只在启用埋点后才挂监听）
+  // Flush remaining events on hide/unload (minimal bundle: listeners attach only when analytics is on)
   window.addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flush();
   });
 }
 
-/** 记录一个事件（未配置端点时为空操作） */
+/** Record an event (a no-op when no endpoint is configured) */
 export function track(name: EventName, props?: QueuedEvent['p']): void {
   if (!ENDPOINT || isOptedOut()) return;
   attachLifecycle();
@@ -134,31 +134,31 @@ export function track(name: EventName, props?: QueuedEvent['p']): void {
   else schedule();
 }
 
-/** 进入工具页：记录打开事件，并把它设为错误归因的当前工具 */
+/** Enter a tool page: log the open event and make it the current tool for error attribution */
 export function trackToolOpen(toolId: string): void {
   currentToolId = toolId;
   track('tool_open', { id: toolId });
 }
 
-/** 离开工具页：记录停留时长（用于判断哪些工具真被用起来） */
+/** Leave a tool page: log dwell time (shows which tools are actually used) */
 export function trackToolDuration(toolId: string, durationMs: number): void {
-  if (durationMs < 1000) return; // 秒开秒走多半是误点，不参与统计
+  if (durationMs < 1000) return; // Instant bounce is usually a misclick; keep it out of the stats
   track('tool_duration', { id: toolId, ms: Math.min(durationMs, 30 * 60 * 1000) });
 }
 
-/** 工具运行出错：只上报错误类型与工具 id，不上报输入内容 */
+/** Tool error: report only the error type and tool id, never the input */
 export function trackToolError(message: string): void {
   track('tool_error', {
     ...(currentToolId ? { id: currentToolId } : {}),
-    // 截断并去掉换行，避免把用户数据或超长堆栈带出去
+    // Truncate and strip newlines so user data or huge stacks never leave
     msg: message.replace(/\s+/g, ' ').slice(0, 120),
   });
 }
 
-/** 桌面版下载点击：记录平台，用于判断下载页转化 */
+/** Desktop download click: log the platform to gauge download page conversion */
 export function trackDownloadClick(platform: string): void {
   track('download_click', { os: platform });
 }
 
-/** 埋点是否启用（供调试/设置页展示） */
+/** Whether analytics is enabled (for debugging / the settings page) */
 export const analyticsEnabled = Boolean(ENDPOINT);

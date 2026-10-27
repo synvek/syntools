@@ -6,18 +6,18 @@ import { compositeDoc } from './export';
 import type { PhotoDoc } from '../model/types';
 
 /**
- * 通道相关渲染：单通道隔离显示、通道缩略图与「从图像提取调色板」。
+ * Channel rendering: single-channel isolation, channel thumbnails, and "extract a palette from the image".
  *
- * 三者都建立在「先合成整份文档」之上（`compositeDoc`），因此结果与画布、导出完全一致。
- * 通道视图是**显示态**：只影响画布呈现，不改动任何图层数据。
+ * All three build on compositing the whole document first (`compositeDoc`), so results match the canvas and export exactly.
+ * The channel view is a **display state**: it only affects what the canvas shows, never layer data.
  */
 
-/** 单通道缩略图最长边 */
+/** Longest side of a single-channel thumbnail */
 const THUMB_MAX = 40;
-/** 提取调色板时的采样边长上限：大图先降采样，避免为取几个主色扫过千万像素 */
+/** Max sampling side for palette extraction: large images are downscaled first so a few dominant colors do not cost tens of millions of pixels */
 const PALETTE_SAMPLE_MAX = 256;
 
-/** 合成后取出单通道（灰度） */
+/** Pull a single channel (grayscale) out of the composite */
 export function channelCanvas(
   doc: PhotoDoc,
   channel: Exclude<ChannelView, 'rgb'>,
@@ -32,7 +32,7 @@ export function channelCanvas(
   return canvas;
 }
 
-/** 隔离显示用画布（整幅尺寸，供 Konva 通道层直接用） */
+/** Canvas for isolated display (full size, consumed directly by the Konva channel layer) */
 export function channelViewCanvas(
   doc: PhotoDoc,
   channel: Exclude<ChannelView, 'rgb'>,
@@ -43,7 +43,7 @@ export function channelViewCanvas(
 const thumbCache = new Map<string, string>();
 const THUMB_CACHE_LIMIT = 12;
 
-/** 通道缩略图（面板用，dataURL）：按文档签名缓存，避免面板每次渲染都重合成 */
+/** Channel thumbnail (for the panel, dataURL): cached by document signature so the panel does not recomposite on every render */
 export function channelThumbnail(doc: PhotoDoc, channel: ChannelView): string {
   const key = `${docSignature(doc)}#${channel}`;
   const cached = thumbCache.get(key);
@@ -62,13 +62,13 @@ export function channelThumbnail(doc: PhotoDoc, channel: ChannelView): string {
   return url;
 }
 
-/** 通道全集（复合 + R/G/B），面板按此顺序展示 */
+/** All channels (composite + R/G/B), shown by the panel in this order */
 export const CHANNEL_LIST: ChannelView[] = ['rgb', ...COLOR_CHANNELS];
 
 /**
- * 从当前合成结果提取主色（文档色板用）。
+ * Extract the dominant colors of the current composite (for the document palette).
  *
- * 先按 `PALETTE_SAMPLE_MAX` 降采样再统计，因此成本与画布尺寸无关（大图也不卡）。
+ * Downsampled to `PALETTE_SAMPLE_MAX` before counting, so the cost is independent of canvas size (large images stay smooth).
  */
 export function extractDocPalette(doc: PhotoDoc, count = PALETTE_SIZE): string[] {
   const scale = Math.min(1, PALETTE_SAMPLE_MAX / Math.max(doc.width, doc.height));

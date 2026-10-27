@@ -4,17 +4,17 @@ import katex from 'katex';
 import { isOmmlSupported } from './latex';
 
 interface MathDialogProps {
-  /** null 表示未打开 */
+  /** null means closed */
   mode: 'insert' | 'edit' | null;
   initialLatex: string;
   initialDisplay: boolean;
   onCancel: () => void;
   onConfirm: (latex: string, display: boolean) => void;
-  /** 编辑模式下的删除回调 */
+  /** Delete callback in edit mode */
   onRemove?: () => void;
 }
 
-/** 常用公式简称：一键填入，降低输入门槛 */
+/** Common formula presets: one-click fill-in to lower the input barrier */
 const PRESETS: { label: string; latex: string; display: boolean }[] = [
   { label: '分数', latex: '\\frac{a}{b}', display: false },
   { label: '根号', latex: '\\sqrt{x}', display: false },
@@ -26,8 +26,8 @@ const PRESETS: { label: string; latex: string; display: boolean }[] = [
 ];
 
 /**
- * 公式编辑弹窗：上为 LaTeX 输入（等宽字体 + 行内/块级切换），下为 KaTeX 实时预览。
- * 解析失败时输入框描红并在预览位展示错误文案。
+ * Formula dialog: LaTeX input on top (monospace font, inline/block toggle), live KaTeX preview below.
+ * On a parse error the input gets a red outline and the preview slot shows the error message.
  */
 export function MathDialog({
   mode,

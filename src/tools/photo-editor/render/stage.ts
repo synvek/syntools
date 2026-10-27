@@ -18,49 +18,49 @@ import type { GradientGuide } from './overlays';
 import { syncLayers } from './sync';
 
 /**
- * Konva Stage 生命周期宿主（命令式托管，不使用 react-konva）。
+ * Konva Stage lifecycle host (imperative, no react-konva).
  *
- * 与 slide-editor 一致的三条约束：
- * 1. 模块顶层不触碰 DOM（避免 prerender SSR 崩溃），副作用只在 `createStage()` 被调用时展开；
- * 2. 由 `PhotoCanvas` 在 useEffect 内延后一拍创建，StrictMode 双挂载靠 cancel 守卫规避；
- * 3. 指针交互走容器原生事件（见 `interaction/pointer.ts`），Konva 节点一律 `listening: false`，
- *    避免命中检测与自绘选区互相抢事件。
+ * The same three constraints as slide-editor:
+ * 1. no DOM at module top level (prerender SSR would crash); side effects only run inside `createStage()`;
+ * 2. `PhotoCanvas` creates it a tick later inside useEffect, with a cancel guard for StrictMode;
+ * 3. pointer interaction uses native container events (see `interaction/pointer.ts`) and Konva nodes stay
+ *    `listening: false`, so hit tests and custom-drawn selections never fight over events.
  */
 
 export interface PageTransform {
   scale: number;
   x: number;
   y: number;
-  /** 旋转视图角度（度）：绕视口中心旋转；`x / y` 仍表示未旋转时的平移量 */
+  /** View rotation (degrees) about the viewport center; `x / y` is still the unrotated pan */
   rotation?: number;
 }
 
-/** 覆盖层一次要画的全部内容（选区 / 裁剪框 / 变换框） */
+/** Everything the overlay draws in one pass (selection / crop box / transform box) */
 export interface OverlayState {
   doc: PhotoDoc;
   scale: number;
   selection: Selection | null;
   cropRect: Rect | null;
-  /** 自由变换框；null 表示不显示 */
+  /** Free-transform box; null hides it */
   transformBox: LayerBox | null;
-  /** 渐变拖拽示意；null 表示不显示 */
+  /** Gradient drag preview; null hides it */
   gradient: GradientGuide | null;
-  /** 网格变形控制点（透视 / 扭曲 / 斜切 / 变形）；null 表示不显示 */
+  /** Mesh warp control points (perspective / distort / skew / warp); null hides them */
   meshGrid: MeshGridState | null;
-  /** 图章 / 修复的取样源标记；null 表示不显示 */
+  /** Sample-source marker for stamp / healing; null hides it */
   cloneSource: { x: number; y: number } | null;
-  /** 吸附参考线（拖拽过程中才会出现） */
+  /** Snap guides (only present during a drag) */
   snapGuides: SnapGuide[];
-  /** 颜色取样点（取样器工具） */
+  /** Color sampler points (sampler tool) */
   samples: SamplePoint[];
-  /** 快速蒙版画布（白 = 选中）；null 表示未进入快速蒙版 */
+  /** Quick mask canvas (white = selected); null means quick mask is off */
   quickMask: HTMLCanvasElement | null;
 }
 
 export interface StageHandle {
   stage: Konva.Stage;
   bgLayer: Konva.Layer;
-  /** 通道隔离视图层（显示态）：非空时隐藏 contentLayer，只显示这张单通道图 */
+  /** Channel isolation layer (display state): when set, contentLayer hides and only this channel shows */
   channelLayer: Konva.Layer;
   contentLayer: Konva.Layer;
   overlayLayer: Konva.Layer;
@@ -68,9 +68,9 @@ export interface StageHandle {
   setSize: (width: number, height: number) => void;
   renderBackground: (doc: PhotoDoc) => void;
   sync: (doc: PhotoDoc) => void;
-  /** 重绘覆盖层（清空后按传入状态重画选区 / 裁剪框 / 变换框 / 取样点） */
+  /** Redraw the overlay (clears, then repaints selection / crop box / transform box / sampler points) */
   renderOverlay: (state: OverlayState) => void;
-  /** 切换通道隔离视图；传 null 回到正常显示 */
+  /** Switch the channel isolation view; pass null to return to normal display */
   setChannelView: (canvas: HTMLCanvasElement | null) => void;
   destroy: () => void;
 }
@@ -85,8 +85,8 @@ export function createStage(container: HTMLDivElement): StageHandle {
   const contentLayer = new Konva.Layer({ listening: false });
   const overlayLayer = new Konva.Layer({ listening: false });
   stage.add(bgLayer, channelLayer, contentLayer, overlayLayer);
-  // E2E 稳定读取：给内容层画布加 data-testid（图层顺序变化会改变 canvas 索引，
-  // 测试里原本用 document.querySelectorAll('canvas')[1] 会误读到空白的通道层）。
+  // Stable e2e hook: tag the content canvas with data-testid (layer order changes canvas indices, so
+  // document.querySelectorAll('canvas')[1] used to read the empty channel layer instead).
   (contentLayer.getCanvas() as unknown as { _canvas: HTMLCanvasElement })._canvas.setAttribute(
     'data-testid',
     'photo-content-canvas',
@@ -148,7 +148,7 @@ export function createStage(container: HTMLDivElement): StageHandle {
       quickMask,
     }) => {
       clearOverlay(overlayLayer);
-      // 快速蒙版必须最先画：它用 destination-out 挖空，会擦掉同图层先前的内容
+      // The quick mask must draw first: it punches out with destination-out, erasing earlier content
       if (quickMask) drawQuickMask(overlayLayer, quickMask, doc, scale);
       if (selection) drawSelection(overlayLayer, selection, scale);
       if (cropRect) drawCrop(overlayLayer, cropRect, doc, scale);
@@ -184,7 +184,7 @@ export function createStage(container: HTMLDivElement): StageHandle {
       });
       channelLayer.add(channelNode);
       channelLayer.visible(true);
-      // 隔离显示时隐藏图层栈：避免与单通道图叠加出错误画面
+      // Hide the layer stack in isolation view, or stacking with the channel image shows a wrong picture
       contentLayer.visible(false);
       channelLayer.batchDraw();
       contentLayer.batchDraw();
@@ -198,5 +198,5 @@ export function createStage(container: HTMLDivElement): StageHandle {
   return handle;
 }
 
-/** 工厂转发：供 overlays / 缩略图复用节点创建逻辑 */
+/** Factory re-export so overlays / thumbnails can reuse the node creation logic */
 export { createLayerNode, updateLayerNode };

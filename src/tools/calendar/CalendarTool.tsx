@@ -34,7 +34,7 @@ function cellTone(info: DayCultureInfo | undefined, inMonth: boolean): string {
   return 'text-gray-800 dark:text-gray-100';
 }
 
-/** 在线日历 */
+/** Online calendar */
 export default function CalendarTool() {
   const { t, i18n } = useTranslation();
   const today = useMemo(() => todayParts(), []);
@@ -72,9 +72,7 @@ export default function CalendarTool() {
     () => formatDateParts(selected.year, selected.month, selected.day, i18n.language),
     [selected, i18n.language],
   );
-  const selectedInfo = cultureMap.get(
-    dayCultureKey(selected.year, selected.month, selected.day),
-  );
+  const selectedInfo = cultureMap.get(dayCultureKey(selected.year, selected.month, selected.day));
 
   const go = (delta: number) => {
     const next = shiftMonth(year, month, delta);

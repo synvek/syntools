@@ -1,20 +1,20 @@
 import { XMLParser } from 'fast-xml-parser';
 
 /**
- * DrawingML / OPC XML 读取辅助。
+ * DrawingML / OPC XML reading helpers.
  *
- * 关键点：必须开启 `preserveOrder` —— spTree 下 `<p:sp>` / `<p:pic>` 等兄弟节点
- * 需要严格保持文档顺序（同一层级的对象在 JS 里会被同名标签合并，导致 z-order 丢失）。
+ * Key point: `preserveOrder` must be on — sibling nodes such as `<p:sp>` / `<p:pic>` under spTree must keep
+ * strict document order (same-level objects get merged under identical tag names in JS, losing z-order).
  */
 
-/** preserveOrder 解析结果：{ 'tagName': children | [{'#text': string}], ':@': { '@_attr': string } } */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- OPC XML 结构动态多变，此处按动态节点处理
+/** preserveOrder parse result: { 'tagName': children | [{'#text': string}], ':@': { '@_attr': string } } */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- OPC XML shapes vary, so nodes are handled dynamically
 export type XmlNode = Record<string, any>;
 
 /**
- * 注意：必须保留命名空间前缀（removeNSPrefix: false）。
- * `<p:sldId id="256" r:id="rId2"/>` 这类节点上 `id` 与 `r:id` 会重名，
- * 去前缀后后者会把前者覆盖掉，导致关系引用丢失。
+ * Note: namespace prefixes must be kept (removeNSPrefix: false).
+ * On nodes like `<p:sldId id="256" r:id="rId2"/>` the attributes `id` and `r:id` collide, and stripping
+ * the prefix makes the latter overwrite the former, losing the relationship reference.
  */
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -31,7 +31,7 @@ export function parseXml(text: string): XmlNode[] {
   return parser.parse(text) as XmlNode[];
 }
 
-/** 完整标签名（含前缀） */
+/** Full tag name (with prefix) */
 export function tagOf(node: XmlNode | undefined): string {
   if (!node) return '';
   for (const key of Object.keys(node)) {
@@ -40,14 +40,14 @@ export function tagOf(node: XmlNode | undefined): string {
   return '';
 }
 
-/** 去掉命名空间前缀后的本地名 */
+/** Local name without the namespace prefix */
 export function localNameOf(node: XmlNode | undefined): string {
   const tag = tagOf(node);
   const colon = tag.indexOf(':');
   return colon >= 0 ? tag.slice(colon + 1) : tag;
 }
 
-/** 直接子节点（按文档顺序） */
+/** Direct children (in document order) */
 export function childrenOf(node: XmlNode | undefined): XmlNode[] {
   if (!node) return [];
   const out: XmlNode[] = [];
@@ -58,17 +58,17 @@ export function childrenOf(node: XmlNode | undefined): XmlNode[] {
   return out;
 }
 
-/** 直接子节点中第一个匹配标签的节点（比较时忽略命名空间前缀） */
+/** First direct child matching the tag (prefix ignored in the comparison) */
 export function childOf(node: XmlNode | undefined, tag: string): XmlNode | undefined {
   return childrenOf(node).find((childItem) => localNameOf(childItem) === tag);
 }
 
-/** 直接子节点中所有匹配标签的节点 */
+/** All direct children matching the tag */
 export function childrenNamed(node: XmlNode | undefined, tag: string): XmlNode[] {
   return childrenOf(node).filter((childItem) => localNameOf(childItem) === tag);
 }
 
-/** 递归查找首个匹配标签的节点（深度优先） */
+/** Recursively find the first node matching the tag (depth first) */
 export function findFirst(node: XmlNode | undefined, tag: string): XmlNode | undefined {
   if (!node) return undefined;
   for (const childItem of childrenOf(node)) {
@@ -79,7 +79,7 @@ export function findFirst(node: XmlNode | undefined, tag: string): XmlNode | und
   return undefined;
 }
 
-/** 递归收集（含自身）匹配标签的所有节点 */
+/** Recursively collect all nodes matching the tag (including the node itself) */
 export function collect(node: XmlNode | undefined, tag: string, out: XmlNode[] = []): XmlNode[] {
   if (!node) return out;
   if (localNameOf(node) === tag) out.push(node);
@@ -105,7 +105,7 @@ export function boolAttr(node: XmlNode | undefined, name: string): boolean {
   return raw === '1' || raw === 'true';
 }
 
-/** 连接节点内的全部文本内容 */
+/** Concatenate all text content inside a node */
 export function textOf(node: XmlNode | undefined): string {
   if (!node) return '';
   let text = '';

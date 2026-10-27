@@ -21,7 +21,7 @@ describe('id-photo', () => {
 
   it('横图按覆盖式居中裁剪', () => {
     const r = coverCrop(1000, 500, 295, 413);
-    // 目标更窄更高，则裁剪宽度
+    // Target is narrower and taller, so trim the width
     expect(r.sw).toBe(Math.round(500 * (295 / 413)));
     expect(r.sx).toBe(Math.round((1000 - r.sw) / 2));
     expect(r.sh).toBe(500);

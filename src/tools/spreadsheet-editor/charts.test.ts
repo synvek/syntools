@@ -189,7 +189,7 @@ describe('数据区域标签', () => {
     expect(buildRangeLabel({ startRow: 0, startColumn: 0, endRow: 9, endColumn: 2 })).toBe(
       'A1:C10',
     );
-    // 反转区域先归一
+    // A reversed range is normalised first
     expect(buildRangeLabel({ startRow: 2, startColumn: 1, endRow: 0, endColumn: 0 })).toBe('A1:B3');
   });
 

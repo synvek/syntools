@@ -5,22 +5,14 @@ import { CopyButton } from '@/core/components/CopyButton';
 import { OptionBar } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
-import {
-  MAX_COUNT,
-  MAX_LENGTH,
-  generateRandomStrings,
-  type RandomStringPreset,
-} from './core';
+import { MAX_COUNT, MAX_LENGTH, generateRandomStrings, type RandomStringPreset } from './core';
 
 const PRESETS: RandomStringPreset[] = ['alnum', 'alpha', 'hex', 'base64', 'custom'];
 
-/** 随机字符串生成器 */
+/** Random string generator */
 export default function RandomStringTool() {
   const { t } = useTranslation();
-  const init = useMemo(
-    () => readSharedState({ l: 16, c: 5, p: 'alnum', x: '' }),
-    [],
-  );
+  const init = useMemo(() => readSharedState({ l: 16, c: 5, p: 'alnum', x: '' }), []);
   const [length, setLength] = useState(Number(init.l) || 16);
   const [count, setCount] = useState(Number(init.c) || 5);
   const [preset, setPreset] = useState<RandomStringPreset>(

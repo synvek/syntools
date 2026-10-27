@@ -12,7 +12,7 @@ describe('findBracketPair', () => {
     const text = 'foo(bar[1])';
     expect(findBracketPair(text, 4, java)).toEqual({ open: 3, close: 10 });
     expect(findBracketPair(text, 3, java)).toEqual({ open: 3, close: 10 });
-    // 偏移 8 是 '1'，回看偏移 7 的 '['
+    // Offset 8 is '1', so look back at the '[' at offset 7
     expect(findBracketPair(text, 8, java)).toEqual({ open: 7, close: 9 });
     expect(findBracketPair(text, 9, java)).toEqual({ open: 7, close: 9 });
   });
@@ -24,16 +24,16 @@ describe('findBracketPair', () => {
   });
 
   it('跳过字符串与注释里的括号', () => {
-    // 字符串里的右括号不参与配对：f(/* ) */ 1) 的 '(' 应配到末位
+    // A closing bracket inside a string is ignored: the '(' in f(/* ) */ 1) matches the last char
     const block = 'f(/* ) */ 1)';
     expect(findBracketPair(block, 1, java)).toEqual({ open: 1, close: 11 });
-    // 光标停在字符串内部的括号上时不配对
+    // No pairing when the caret sits on a bracket inside a string
     expect(findBracketPair('x = "{"; }', 5, java)).toBeNull();
     expect(findBracketPair('x = "}";', 6, java)).toBeNull();
   });
 
   it('缩进语言用 `#` 注释时同样跳过注释里的括号', () => {
-    // call(  # )↵  1↵) —— 注释里的 ')' 不参与配对
+    // call(  # )↵  1↵) — the ')' inside the comment is ignored
     const text = 'call(  # )\n  1\n)';
     expect(findBracketPair(text, 4, python)).toEqual({ open: 4, close: 15 });
   });

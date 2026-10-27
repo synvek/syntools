@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 视频与音频脚本类提示词，详见 ../README.md */
+/** Video and audio script prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'video-short-form-script',

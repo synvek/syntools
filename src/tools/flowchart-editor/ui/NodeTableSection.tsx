@@ -6,7 +6,7 @@ import { insertCol, insertRow, normalizeTable, removeCol, removeRow } from '../m
 const inputCls =
   'h-8 w-full rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 
-/** 增删行列到目标数量（保持已有内容） */
+/** Add or remove rows/columns down to the target count (keeping existing content) */
 function resize(
   table: TableData,
   axis: 'rows' | 'cols',
@@ -28,7 +28,7 @@ function resize(
 }
 
 /**
- * 表格节点属性分组：行列数量调整（复用 model/table 的纯逻辑，保持已有单元格内容）。
+ * Table node property group: row and column count adjustment (reusing the pure logic in model/table, keeping existing cell content).
  */
 export function NodeTableSection({ node }: { node: FlowNode }) {
   const { t } = useTranslation();

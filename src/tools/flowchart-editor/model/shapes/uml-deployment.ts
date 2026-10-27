@@ -2,7 +2,7 @@ import type { ShapeDef } from './index';
 import { axisAdjust, foldAdjust, pxMx } from './adjust';
 import { artifactPath, devicePath, executionEnvironmentPath, nodePath } from './uml-paths';
 
-/** 3D 立方体深度可调（节点 / 设备 / 运行环境） */
+/** 3D cube depth is adjustable (node / device / execution environment) */
 const CUBE_ADJUST = [
   axisAdjust({
     key: 'cubeDepth',
@@ -16,7 +16,7 @@ const CUBE_ADJUST = [
   }),
 ];
 
-/** UML 部署图：节点、设备、运行环境、制品、部署规范 */
+/** UML deployment diagram: node, device, execution environment, artifact, deployment spec */
 export const UML_DEPLOYMENT_SHAPES: ShapeDef[] = [
   {
     kind: 'umlNode',

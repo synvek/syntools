@@ -2,7 +2,7 @@ import type { ToolResult } from '@/core/types';
 
 export type PayloadMode = 'text' | 'hex' | 'base64';
 
-/** 校验 WebSocket 地址（仅允许 ws / wss） */
+/** Validate a WebSocket address (only ws / wss are allowed) */
 export function validateWsUrl(input: string): ToolResult<{ url: string; secure: boolean }> {
   const trimmed = input.trim();
   if (!trimmed) return { ok: false, error: 'EMPTY' };
@@ -26,7 +26,7 @@ function fromBytes(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
 }
 
-/** 按模式编码待发送消息 */
+/** Encode the outgoing message according to the mode */
 export function encodePayload(text: string, mode: PayloadMode): ToolResult<string | Uint8Array> {
   if (mode === 'text') {
     if (!text) return { ok: false, error: 'EMPTY_MESSAGE' };
@@ -54,7 +54,7 @@ export function encodePayload(text: string, mode: PayloadMode): ToolResult<strin
   }
 }
 
-/** 将收到的数据按模式展示为文本（兼容跨 realm 的 ArrayBuffer / TypedArray） */
+/** Render received data as text according to the mode (tolerates cross-realm ArrayBuffer / TypedArray) */
 export function decodePayload(data: unknown, mode: PayloadMode): string {
   if (typeof data === 'string') {
     return mode === 'hex' ? bytesToHex(toBytes(data)) : data;
@@ -96,7 +96,7 @@ export function nextLogId(): number {
   return seq;
 }
 
-/** WebSocket 关闭码释义（RFC 6455 + 常见扩展） */
+/** WebSocket close code descriptions (RFC 6455 + common extensions) */
 export function closeCodeText(code: number): string {
   const map: Record<number, string> = {
     1000: 'CLOSE_NORMAL',

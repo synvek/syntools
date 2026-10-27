@@ -9,7 +9,7 @@ import { layerDisplayName } from './layerName';
 import { usePhotoStore } from '../store';
 import type { AlignMode, BlendMode, Layer, PhotoDoc } from '../model/types';
 
-/** 对齐到画布的菜单项（作用域：当前选中图层） */
+/** Canvas-alignment menu items (scope: the selected layer) */
 const ALIGN_ITEMS: { mode: AlignMode; label: string }[] = [
   { mode: 'left', label: 'alignLeft' },
   { mode: 'hcenter', label: 'alignHCenter' },
@@ -20,17 +20,17 @@ const ALIGN_ITEMS: { mode: AlignMode; label: string }[] = [
 ];
 
 /**
- * 图层面板。
+ * Layers panel.
  *
- * 布局刻意保持「一行一图层」的紧凑密度：
- * 1. 顶部一行是「仅作用于当前选中图层」的混合模式 + 不透明度（不再塞进每条图层里展开）；
- * 2. 每条图层右侧的 ⋯ 弹窗菜单承载重命名、新建各类图层与复制 / 合并 / 删除等操作。
- * 列表顺序与文档一致（数组尾部为最上层），展示时倒序呈现。
+ * The layout deliberately keeps a compact "one row per layer" density:
+ * 1. the top row holds blend mode + opacity for the selected layer (no longer expanded inside each row);
+ * 2. each row's ⋯ menu carries rename, new layer kinds, duplicate / merge / delete and friends.
+ * Order matches the document (array tail = topmost), rendered reversed.
  */
 
 const MENU_WIDTH = 208;
 
-/** 面板行：图层 + 缩进深度 + 在 doc.layers 中的下标 */
+/** Panel row: layer + indent depth + index in doc.layers */
 interface LayerRow {
   layer: Layer;
   depth: number;
@@ -38,8 +38,8 @@ interface LayerRow {
 }
 
 /**
- * 扁平层栈 → 面板行（最上层在前）。
- * 编组折叠时其子树整段隐藏——这正是「编组」在面板上的意义。
+ * Flat layer stack → panel rows (topmost first).
+ * A collapsed group hides its whole subtree — which is what grouping means in a panel.
  */
 function buildRows(doc: PhotoDoc): LayerRow[] {
   const childrenOf = new Map<string, Layer[]>();
@@ -106,9 +106,9 @@ export function LayerPanel() {
   const active = doc.layers.find((item) => item.id === activeId) ?? null;
   const menuLayer = menu?.id ? (doc.layers.find((item) => item.id === menu.id) ?? null) : null;
 
-  // 菜单：点外部 / 按 Esc / 视口变化时关闭。
-  // 用 DOM 包含关系判断内外——靠 stopPropagation 会在 pointerdown 阶段就把菜单卸载，
-  // 紧随其后的 click 落不到菜单项上（触发按钮单独用 ref 放行，以便切换开关）。
+  // Menu: closes on an outside click, on Esc, or when the viewport changes.
+  // Inside / outside is decided by DOM containment — stopPropagation unmounts the menu on pointerdown,
+  // and the following click never lands on an item (the trigger uses its own ref so toggling still works).
   useEffect(() => {
     if (!menu) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -150,7 +150,7 @@ export function LayerPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      {/* 顶部一行：混合模式 + 不透明度，只作用于当前选中图层 */}
+      {/* Top row: blend mode + opacity, applying only to the selected layer */}
       <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 dark:border-gray-800">
         <div className="min-w-0 flex-1">
           <Select
@@ -209,7 +209,7 @@ export function LayerPanel() {
                     if (from === null || from === index) return;
                     const dragged = doc.layers[from];
                     if (!dragged) return;
-                    // 落在编组上 = 移入组内；否则按层栈顺序重排
+                    // Dropping on a group moves it inside; otherwise it reorders within the stack
                     if (isGroup) moveIntoGroup(dragged.id, layer.id);
                     else reorderLayer(dragged.id, index);
                   }}
@@ -324,7 +324,7 @@ export function LayerPanel() {
             left: menu.left,
             top: menu.top,
             width: MENU_WIDTH,
-            // 菜单项会随功能增加：限制高度并可滚动，避免溢出视口后点不到下面的项
+            // Items keep growing with features: cap the height and scroll, or the tail becomes unreachable
             maxHeight: Math.max(120, window.innerHeight - menu.top - 12),
           }}
           className="fixed z-40 flex flex-col gap-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
@@ -576,7 +576,7 @@ export function LayerPanel() {
   );
 }
 
-/** 行内图标按钮（可见性 / 锁定）：尺寸与间距保持一致 */
+/** Inline icon button (visibility / lock): consistent size and spacing */
 function RowIconButton({
   label,
   icon,
@@ -599,7 +599,7 @@ function RowIconButton({
   );
 }
 
-/** 菜单触发按钮：固定在锁定按钮右侧 */
+/** Menu trigger button: fixed to the right of the lock button */
 function MenuTrigger({
   label,
   onClick,
@@ -642,7 +642,7 @@ function MenuItem({
   label: string;
   onClick: () => void;
   danger?: boolean;
-  /** 开关型菜单项：为真时右侧显示勾选 */
+  /** Toggle menu item: shows a check on the right when true */
   checked?: boolean;
   disabled?: boolean;
 }) {
@@ -666,7 +666,7 @@ function MenuItem({
   );
 }
 
-/** 图层缩略图：只合成该图层，随 rev / 尺寸变化重算 */
+/** Layer thumbnail: composites just this layer, recomputed when rev / size changes */
 function LayerThumb({ doc, layer }: { doc: PhotoDoc; layer: Layer }) {
   const [url, setUrl] = useState<string | null>(null);
   const signature = `${layer.id}:${layer.kind === 'raster' ? layer.rev : 0}:${Math.round(layer.width)}:${Math.round(layer.height)}`;
@@ -689,7 +689,7 @@ function LayerThumb({ doc, layer }: { doc: PhotoDoc; layer: Layer }) {
     } catch {
       setUrl(null);
     }
-    // 只在图层内容 / 尺寸变化时重算，避免每次拖动滑杆都重新合成
+    // Recompute only when content / size changes, so dragging a slider doesn't recomposite
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 

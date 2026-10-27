@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { slideStrings } from './strings';
 
 /**
- * 语言包一致性门禁。
+ * Locale consistency gate.
  *
- * 本项目对工具文案采用的是「懒加载 chunk 内注册、9 语言同步补齐」的约定，
- * 但此前**没有任何强制机制**（无校验脚本、无 lint、无 CI 步骤），
- * 缺 key 只会被 i18next 的 fallbackLng 静默兜住，界面出现中英混杂也很难被发现。
- * 这条单测用最低成本把该约定变成门禁。
+ * This project registers tool copy inside a lazy-loaded chunk with all 9 languages kept in sync,
+ * but until now there was **no enforcement** (no validation script, no lint, no CI step): a missing
+ * key was silently absorbed by i18next's fallbackLng, and mixed Chinese/English UI was hard to spot.
+ * This unit test turns the convention into a gate at minimal cost.
  */
 
 function flattenKeys(tree: unknown, prefix = ''): string[] {
@@ -26,7 +26,7 @@ describe('幻灯片工具语言包一致性', () => {
   const languages = Object.keys(slideStrings);
 
   it('覆盖全部 9 种语言', () => {
-    // 注意：繁体中文的 i18n 语言码是 'zh-TW'（与 core/i18n/locales/zh-TW.ts 一致）
+    // Note: Traditional Chinese's i18n code is 'zh-TW' (matching core/i18n/locales/zh-TW.ts)
     expect([...languages].sort()).toEqual([
       'de',
       'en',

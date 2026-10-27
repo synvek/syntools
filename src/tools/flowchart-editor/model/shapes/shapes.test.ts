@@ -59,7 +59,7 @@ describe('图形目录', () => {
 
   it('shapeSize 与目录一致，未知 kind 有兜底', () => {
     expect(shapeSize('rect')).toEqual({ width: 150, height: 64 });
-    // 横向泳道宽大于高、纵向泳道高大于宽
+    // Horizontal swimlanes are wider than tall, vertical swimlanes taller than wide
     expect(shapeSize('swimlane').width).toBeGreaterThan(shapeSize('swimlane').height);
     expect(shapeSize('swimlaneV').height).toBeGreaterThan(shapeSize('swimlaneV').width);
     expect(shapeSize('unknown-kind' as ShapeKind)).toEqual({ width: 150, height: 64 });

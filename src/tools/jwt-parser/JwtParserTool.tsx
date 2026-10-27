@@ -11,7 +11,7 @@ import { isExpired, parseJwt, readTimeClaim, signJwtHs256, TIME_CLAIMS } from '.
 
 type Mode = 'parse' | 'sign';
 
-/** JWT 解析 / HS256 签发 */
+/** JWT parsing / HS256 signing */
 export default function JwtParserTool() {
   const { t } = useTranslation();
   const init = useMemo(() => {
@@ -71,9 +71,7 @@ export default function JwtParserTool() {
             <option value="sign">{t('tools.jwt.modes.sign')}</option>
           </select>
         </label>
-        <ShareButton
-          getState={() => ({ i: input, m: mode, p: payloadJson, s: secret })}
-        />
+        <ShareButton getState={() => ({ i: input, m: mode, p: payloadJson, s: secret })} />
       </OptionBar>
 
       {mode === 'parse' ? (

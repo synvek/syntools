@@ -3,13 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { OptionBar } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
-import {
-  formatCountdown,
-  parseCountdownDuration,
-  remainingMs,
-} from './core';
+import { formatCountdown, parseCountdownDuration, remainingMs } from './core';
 
-/** 在线倒计时器 */
+/** Online countdown timer */
 export default function CountdownTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ h: 0, m: 5, s: 0 }), []);
@@ -55,12 +51,7 @@ export default function CountdownTool() {
   }, [running, endAt]);
 
   const start = () => {
-    const base =
-      pausedLeft != null
-        ? pausedLeft
-        : duration.ok
-          ? duration.value
-          : 0;
+    const base = pausedLeft != null ? pausedLeft : duration.ok ? duration.value : 0;
     if (base <= 0) return;
     setFinished(false);
     setEndAt(Date.now() + base);
@@ -85,7 +76,7 @@ export default function CountdownTool() {
     setDisplayMs(duration.ok ? duration.value : 0);
   };
 
-  // 未运行时跟随时长输入预览
+  // While idle, the preview follows the duration input
   useEffect(() => {
     if (running || pausedLeft != null) return;
     setDisplayMs(duration.ok ? duration.value : 0);

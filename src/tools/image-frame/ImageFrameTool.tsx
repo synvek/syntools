@@ -31,7 +31,7 @@ function roundRect(
   ctx.closePath();
 }
 
-/** 图片边框 / 圆角 / 阴影 */
+/** Image border / rounded corners / shadow */
 export default function ImageFrameTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -90,7 +90,7 @@ export default function ImageFrameTool() {
 
     const r = Math.min(options.radius, L.contentWidth / 2, L.contentHeight / 2);
 
-    // 阴影底板
+    // Shadow backdrop
     ctx.save();
     ctx.shadowColor = hexToRgba(options.shadowColor, options.shadowOpacity);
     ctx.shadowBlur = options.shadowBlur;
@@ -101,7 +101,7 @@ export default function ImageFrameTool() {
     ctx.fill();
     ctx.restore();
 
-    // 边框填充已由底板完成；再裁切绘制图片
+    // The backdrop already painted the border; clip and draw the image
     ctx.save();
     const ir = Math.max(0, r - options.borderWidth);
     roundRect(ctx, L.imageX, L.imageY, L.imageWidth, L.imageHeight, ir);

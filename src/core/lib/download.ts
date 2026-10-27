@@ -1,4 +1,4 @@
-/** 触发浏览器下载二进制/文本内容。 */
+/** Trigger a browser download of binary or text content. */
 export function downloadBlob(
   content: BlobPart,
   filename: string,
@@ -15,7 +15,7 @@ export function downloadBlob(
   URL.revokeObjectURL(url);
 }
 
-/** 下载纯文本（UTF-8）。 */
+/** Download plain text (UTF-8). */
 export function downloadText(text: string, filename: string): void {
   downloadBlob(text, filename, 'text/plain;charset=utf-8');
 }

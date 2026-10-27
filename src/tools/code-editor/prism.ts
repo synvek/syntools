@@ -1,5 +1,5 @@
 import Prism from 'prismjs';
-// 依赖顺序：markup → css → clike → javascript → jsx → typescript → tsx → 其余
+// Dependency order: markup → css → clike → javascript → jsx → typescript → tsx → the rest
 import 'prismjs/components/prism-markup';
 import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-clike';
@@ -29,8 +29,8 @@ import 'prismjs/components/prism-lua';
 import 'prismjs/components/prism-dart';
 
 /**
- * 代码编辑器使用的 Prism 语言包集中在此导入（工具 chunk 内，不进首屏）。
- * 组件与导出逻辑共用，避免多处重复 import 造成语言包被重复打包。
+ * Prism grammars used by the code editor are imported here in one place (inside the tool chunk,
+ * never the initial bundle). Shared by the component and the export logic so no grammar is bundled twice.
  */
 
 export function escapeHtml(text: string): string {
@@ -38,12 +38,13 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * 高亮为 HTML 字符串；`none` 或缺失语法时仅转义。
+ * Highlight to an HTML string; `none` or a missing grammar only escapes.
  *
- * 注意：空文本必须返回空串。历史上这里用 `code || ' '` 为空编辑区「撑」出行高，
- * 但编辑区内容是 CodeJar 的 `textContent`，注入的空格会被当成真实内容——
- * 清空后输入的第一个字符会变成 ` a`，并一路带进预览、统计与导出文件。
- * 行高由 `.ce-surface` 的 padding 与 line-height 保证，无需填充字符。
+ * Note: empty text must return an empty string. This used to return `code || ' '` to "prop up"
+ * the line height of an empty editor, but since the content is CodeJar's `textContent` the
+ * injected space counted as real content: the first character typed after clearing became ` a`
+ * and leaked into the preview, the stats and the exported file. Line height comes from
+ * `.ce-surface` padding plus line-height, so no filler character is needed.
  */
 export function highlightCode(code: string, prismKey: string): string {
   const grammar = prismKey === 'none' ? undefined : Prism.languages[prismKey];

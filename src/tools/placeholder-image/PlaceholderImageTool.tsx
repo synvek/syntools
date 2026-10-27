@@ -5,7 +5,7 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
 import { MAX_SIZE, MIN_SIZE, validatePlaceholder } from './core';
 
-/** 在线占位图生成 */
+/** Online placeholder image generator */
 export default function PlaceholderImageTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -98,9 +98,7 @@ export default function PlaceholderImageTool() {
             className="w-24 rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-sm dark:border-gray-700 dark:bg-gray-900"
           />
         </label>
-        <ShareButton
-          getState={() => ({ w: width, h: height, bg, fg, txt: text })}
-        />
+        <ShareButton getState={() => ({ w: width, h: height, bg, fg, txt: text })} />
       </OptionBar>
 
       <div className="grid gap-3 sm:grid-cols-3">

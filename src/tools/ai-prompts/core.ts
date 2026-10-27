@@ -3,21 +3,21 @@ import { PROMPT_CATEGORIES, PROMPTS } from './data';
 import type { LocalizedText, PromptCategoryMeta, PromptItem } from './types';
 
 /**
- * AI 提示词库核心纯函数：多语言回退、跨语言检索、分类聚合。
+ * Core pure functions for the AI prompt library: locale fallback, cross-language search, category aggregation.
  *
- * 本模块不依赖 React / i18next 实例（i18n 仅通过 `TranslateFn` 注入），便于测试与复用。
- * 所有函数不抛异常：输入异常时返回空结果而非报错。
+ * This module depends on neither React nor an i18next instance (i18n is injected via `TranslateFn`), which keeps it testable and reusable.
+ * No function throws: invalid input yields an empty result instead of an error.
  */
 
-/** i18n 翻译函数的最小签名（`t` 的兼容子集） */
+/** Minimal signature of an i18n translate function (a compatible subset of `t`) */
 export type TranslateFn = (key: string) => string;
 
-/** 「全部分类」哨兵值，与分享链接参数 `c` 保持一致 */
+/** Sentinel value for "all categories", kept in sync with the `c` share-link param */
 export const ALL_CATEGORY = 'all';
 
 const REGION_SEPARATOR = '-';
 
-/** 每个提示词的小写检索串缓存：数据为静态常量，缓存键即对象本身 */
+/** Per-prompt lowercase haystack cache: data is static, so the object itself is the key */
 const ITEM_HAYSTACK = new WeakMap<PromptItem, string>();
 
 function firstFilled(text: LocalizedText, langs: readonly string[]): string | undefined {
@@ -28,7 +28,7 @@ function firstFilled(text: LocalizedText, langs: readonly string[]): string | un
   return undefined;
 }
 
-/** 任意非空的可用值（兜底，避免数据异常时返回空串） */
+/** Any non-empty usable value (fallback so malformed data never yields an empty string) */
 function anyFilled(text: LocalizedText): string | undefined {
   return Object.values(text).find(
     (value): value is string => typeof value === 'string' && value.trim().length > 0,
@@ -36,7 +36,7 @@ function anyFilled(text: LocalizedText): string | undefined {
 }
 
 /**
- * 取多语言文本：精确匹配 → 基础语言（`zh-TW` → `zh`）→ `en` → 第一个非空值。
+ * Resolve localized text: exact match → base language (`zh-TW` → `zh`) → `en` → first non-empty value.
  */
 export function pickText(text: LocalizedText, lang: string): string {
   const normalized = normalizeLang(lang);
@@ -55,11 +55,11 @@ export function pickText(text: LocalizedText, lang: string): string {
 }
 
 /**
- * 取分类显示名，四段回退：
- * 数据中该语种 → i18n 既有译文 → 数据中基础语言 → 数据中 `en`。
+ * Resolve a category display name with a four-step fallback:
+ * that locale in the data → existing i18n translation → base language in the data → `en` in the data.
  *
- * i18n 兜底可复用 9 个 locale 中历史分类的既有译名；
- * `t()` 在缺少键时会原样返回键名，此类结果视为未命中。
+ * The i18n fallback reuses translations of legacy categories already present in all 9 locales;
+ * `t()` returns the key verbatim when a key is missing, so such results count as a miss.
  */
 export function pickCategoryName(
   meta: PromptCategoryMeta,
@@ -86,12 +86,12 @@ export function pickCategoryName(
   return meta.name.en;
 }
 
-/** 按 `order` 升序排列分类（不修改入参） */
+/** Sort categories by ascending `order` (does not mutate the input) */
 export function sortCategories(categories: readonly PromptCategoryMeta[]): PromptCategoryMeta[] {
   return [...categories].sort((a, b) => a.order - b.order);
 }
 
-/** 统计各分类的提示词条数 */
+/** Count prompts per category */
 export function countByCategory(items: readonly PromptItem[] = PROMPTS): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const item of items) {
@@ -117,7 +117,7 @@ function itemHaystack(item: PromptItem): string {
   return haystack;
 }
 
-/** 分类维度的检索串（分类 id、i18n 键与各语言名称），分类数量固定且很小，按次构建即可 */
+/** Category haystack (id, i18n key, and names in every language); the category list is small and fixed, so rebuilding it per call is fine */
 function categoryHaystack(categories: readonly PromptCategoryMeta[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const meta of categories) {
@@ -130,11 +130,11 @@ function categoryHaystack(categories: readonly PromptCategoryMeta[]): Map<string
 }
 
 /**
- * 按分类与关键词筛选提示词。
+ * Filter prompts by category and keyword.
  *
- * - `category` 为 `ALL_CATEGORY` 时不过滤分类；
- * - 关键词匹配与语言无关，可命中任意语种的标题、正文、分类名与 id；
- * - 复杂度 O(N)，N 为提示词总数（数百条量级，微秒级）。
+ * - `category === ALL_CATEGORY` disables category filtering;
+ * - Keyword matching is language-agnostic: it hits titles, bodies, category names, and ids in any language;
+ * - Complexity is O(N), where N is the total prompt count (a few hundred, i.e. microseconds).
  */
 export function filterPrompts(
   query: string,

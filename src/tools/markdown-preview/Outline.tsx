@@ -6,7 +6,7 @@ interface OutlineProps {
   onSelect: (item: MarkdownOutlineItem) => void;
 }
 
-/** 文档大纲：标题层级缩进排列，点击在编辑器 / 预览之间跳转 */
+/** Document outline: headings indented by level; clicking jumps between editor and preview */
 export function Outline({ items, onSelect }: OutlineProps) {
   const { t } = useTranslation();
 

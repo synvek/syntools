@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/** PDF 导出模式：文字（可检索）/ 快照（高保真图片） */
+/** PDF export modes: text (searchable) / snapshot (high-fidelity image) */
 export type PdfMode = 'text' | 'snapshot';
 
 interface PdfModeDialogProps {
@@ -13,8 +13,8 @@ interface PdfModeDialogProps {
 }
 
 /**
- * 导出 PDF 前的模式选择对话框：
- * 点「导出 PDF」时弹出，选择导出方式（文字可检索 / 高保真快照）后再执行导出。
+ * Mode picker shown before exporting a PDF:
+ * Opens on "Export PDF" and runs the export after a mode (searchable text / high-fidelity snapshot) is chosen.
  */
 export function PdfModeDialog({
   open,
@@ -27,7 +27,7 @@ export function PdfModeDialog({
   const [mode, setMode] = useState<PdfMode>(initialMode);
   const firstRef = useRef<HTMLButtonElement | null>(null);
 
-  // 每次打开时同步最近一次选择，并把焦点移到第一个选项
+  // On each open, restore the last choice and move focus to the first option
   useEffect(() => {
     if (!open) return;
     setMode(initialMode);

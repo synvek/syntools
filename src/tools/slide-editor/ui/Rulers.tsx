@@ -3,16 +3,16 @@ import { useTranslation } from 'react-i18next';
 import { useSlideStore } from '../store';
 
 /**
- * 标尺与手动参考线。
+ * Rulers and manual guides.
  *
- * 标尺是 DOM 覆盖层（画布是 Konva，不适合画刻度文字）：
- * - 顶部标尺拖动 → 新建纵向参考线；左侧标尺拖动 → 新建横向参考线；
- * - 参考线以刻度三角形留在标尺上，双击即可删除；
- * - 参考线本身由 Konva 画在内容层（见 render/overlays.ts drawCustomGuides）。
+ * The rulers are a DOM overlay (the canvas is Konva, unsuited to drawing tick labels):
+ * - drag the top ruler → create a vertical guide; drag the left ruler → create a horizontal guide;
+ * - a guide stays on the ruler as a tick triangle and is removed by double-clicking it;
+ * - the guide line itself is drawn by Konva in the content layer (see render/overlays.ts drawCustomGuides).
  */
 
 const RULER_SIZE = 20;
-/** 标尺主刻度间隔（页面 px） */
+/** Major tick interval of the ruler (page px) */
 const MAJOR_STEP = 120;
 
 interface Draft {
@@ -47,7 +47,7 @@ export function Rulers({ containerRef }: { containerRef: React.RefObject<HTMLDiv
     [containerRef, originX, originY, scale],
   );
 
-  // 拖动期间监听 window，指针移出标尺也能继续调整
+  // Listen on window while dragging so the pointer can leave the ruler and keep adjusting
   useEffect(() => {
     if (!dragAxis.current) return;
     const axis = dragAxis.current;
@@ -124,7 +124,7 @@ export function Rulers({ containerRef }: { containerRef: React.RefObject<HTMLDiv
           );
         })}
 
-        {/* 已有参考线在标尺上的落点：双击删除 */}
+        {/* Where existing guides sit on the ruler: double-click to delete */}
         {guides
           .filter((guide) => guide.axis === axis)
           .map((guide) => (
@@ -179,7 +179,7 @@ export function Rulers({ containerRef }: { containerRef: React.RefObject<HTMLDiv
     <>
       {strip('x')}
       {strip('y')}
-      {/* 左上角方块，遮住两条标尺的交叠 */}
+      {/* Top-left square covering the overlap of the two rulers */}
       <div
         className="absolute left-0 top-0 z-20 bg-white dark:bg-gray-900"
         style={{ width: RULER_SIZE, height: RULER_SIZE }}

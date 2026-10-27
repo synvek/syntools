@@ -5,7 +5,7 @@ import { ICON_NODE_SIZE, type FlowNodeData } from '../model/types';
 import { iconDefOf } from '../model/icons';
 import { nodeDashArrayOf } from '../ops';
 
-/** 内置图标节点：描边色即图标颜色，导出 SVG/PNG 与画布一致 */
+/** Built-in icon node: the stroke color is the icon color, and SVG/PNG export matches the canvas */
 function IconNodeComponent({ data, selected, width, height }: NodeProps) {
   const d = data as FlowNodeData;
   const w = width ?? ICON_NODE_SIZE.width;

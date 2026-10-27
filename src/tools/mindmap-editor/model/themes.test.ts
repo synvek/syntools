@@ -43,7 +43,7 @@ describe('脑图主题', () => {
     expect(main.stroke).toBe('#123456');
     expect(main.textColor).toBe('#123456');
 
-    // 二级及以下：描边取分支色，文字色用主题定义的固定色
+    // Level 2 and below: the stroke uses the branch colour, the text uses the theme's fixed colour
     const sub = defaultStyleOf(theme, 2, '#123456');
     expect(sub.stroke).toBe('#123456');
     expect(sub.textColor).toBe(theme.sub.textColor);

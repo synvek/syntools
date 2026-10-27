@@ -10,7 +10,7 @@ const ITEMS: { format: ExportFormat; key: string }[] = [
   { format: 'jpg', key: 'exportJpg' },
 ];
 
-/** 导出下拉：把 3 个格式收进一个菜单，避免常驻占用主栏宽度 */
+/** Export dropdown: three formats in one menu, so they do not eat the main bar's width */
 export default function ExportMenu({ scene }: { scene: Scene }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);

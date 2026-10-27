@@ -2,15 +2,15 @@ import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * 挂载冒烟测试（渲染期顺序回归防护）。
+ * Mount smoke test (guarding render-order regressions).
  *
- * 背景：`useEditor` 会在**渲染期同步构造**编辑器，随即执行各扩展插件的
- * `state.init`。因此任何被插件 init 调用的 getter，其内部读取的 ref/state
- * 都必须在 `useEditor` 之前完成声明，否则会抛
+ * Background: `useEditor` **constructs the editor synchronously during render** and immediately runs each
+ * plugin's `state.init`. So any getter called from plugin init reads refs/state that
+ * must be declared before `useEditor`, otherwise it throws
  * `ReferenceError: Cannot access 'xxx' before initialization`。
  *
- * 这类错误 tsc 与 eslint 都抓不到（闭包内引用后声明变量属合法语法），
- * 只有真实挂载才会暴露，故用本测试兜住。
+ * Neither tsc nor eslint catches this (referencing a later-declared variable inside a closure is legal syntax);
+ * only a real mount surfaces it, so this test covers it.
  */
 
 vi.mock('react-i18next', () => ({
@@ -25,9 +25,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('文字处理器挂载', () => {
-  it('渲染出编辑区，且渲染期不抛 TDZ 之类的顺序错误', async () => {
-    // jsdom 未实现这两个 API，而工具在挂载后立刻使用它们
+describe('word processor mount', () => {
+  it('renders the editor area without TDZ-style ordering errors during render', async () => {
+    // jsdom does not implement these two APIs but the tool uses them right after mounting
     vi.stubGlobal(
       'ResizeObserver',
       class ResizeObserverStub {

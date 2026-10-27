@@ -1,16 +1,17 @@
 /**
- * xlsx 兼容层：把不同写入器（openpyxl / WPS / LibreOffice 等）的批注关系
- * 归一为 exceljs 能识别的形式。
+ * xlsx compatibility layer: normalises comment relationships written by other producers
+ * (openpyxl / WPS / LibreOffice, …) into the form exceljs understands.
  *
- * 背景：exceljs 只按条目名正则 `/xl\/(comments\d+)[.]xml/` 与
- * `/xl\/drawings\/(vmlDrawing\d+)[.]vml/` 收集批注，并在 reconcile 阶段
- * 以关系 Target 的字面量去查表（`options.comments[rel.Target]`）。
- * 而 openpyxl 写的是 `xl/comments/comment1.xml` 加绝对路径 Target
- * （`/xl/comments/comment1.xml`），两者都对不上，于是抛 TypeError，
- * 导致**含批注的合法文件整个导入失败**。
+ * Background: exceljs collects comments only via the entry-name patterns
+ * `/xl\/(comments\d+)[.]xml/` and `/xl\/drawings\/(vmlDrawing\d+)[.]vml/`, and during the
+ * reconcile phase looks them up by the literal relationship Target
+ * (`options.comments[rel.Target]`). openpyxl instead writes `xl/comments/comment1.xml` with an
+ * absolute Target (`/xl/comments/comment1.xml`), so neither side matches, exceljs throws a
+ * TypeError, and **a perfectly valid file with comments fails to import entirely**.
  *
- * 这里在交给 exceljs 之前重写这类关系（并把部件重命名到它期望的位置），
- * 内容不变，仅路径归一；不改动的文件原样返回，避免无谓的重压缩开销。
+ * So these relationships are rewritten before exceljs sees them (renaming the parts to where it
+ * expects them). Content is untouched — only paths are normalised; files that need no change are
+ * returned as-is to avoid a needless re-compression.
  */
 import type JSZipType from 'jszip';
 
@@ -18,14 +19,14 @@ const RELS_PATH = /^xl\/worksheets\/_rels\/[^/]+\.rels$/;
 const RELATIONSHIP_TAG = /<Relationship\b[^>]*?\/?>/g;
 const TARGET_ATTR = /\bTarget="([^"]*)"/;
 
-/** 关系类型判定：只看本地名，兼容不同命名空间前缀写法 */
+/** Relationship kind: match on the local name only, tolerating any namespace prefix */
 function relationshipKind(tag: string): 'comments' | 'vmlDrawing' | null {
   if (/relationships\/comments"/.test(tag)) return 'comments';
   if (/relationships\/vmlDrawing"/.test(tag)) return 'vmlDrawing';
   return null;
 }
 
-/** 把关系 Target 解析为归档内路径（支持绝对路径与相对路径） */
+/** Resolve a relationship Target to an in-archive path (absolute or relative) */
 export function resolvePartPath(target: string, baseDir: string): string | null {
   const raw = target.trim();
   if (!raw) return null;
@@ -45,7 +46,7 @@ async function loadZip(buffer: ArrayBuffer): Promise<JSZipType | null> {
     const JSZip = (await import('jszip')).default;
     return await JSZip.loadAsync(buffer);
   } catch {
-    // 不是合法 zip：交给 exceljs 去报错，这里保持原样
+    // Not a valid zip: let exceljs raise the error and return the input untouched here
     return null;
   }
 }
@@ -53,20 +54,20 @@ async function loadZip(buffer: ArrayBuffer): Promise<JSZipType | null> {
 const TEXT_ELEMENT = /<text>([\s\S]*?)<\/text>/g;
 
 /**
- * 批注正文归一：把直接写在 `<text>` 下的 `<t>` 包一层 `<r>`。
- * exceljs 的批注解析只处理 run 形式，否则读出的 texts 为空、批注文本丢失。
+ * Normalise comment bodies: wrap a `<t>` sitting directly under `<text>` in an `<r>`.
+ * exceljs only parses the run form; otherwise texts comes back empty and the comment body is lost.
  */
 export function wrapCommentTextRuns(xml: string): string {
   return xml.replace(TEXT_ELEMENT, (whole, inner: string) => {
-    if (/<r[\s>]/.test(inner)) return whole; // 已是 run 形式
-    if (!/<t[\s>]/.test(inner)) return whole; // 没有文本节点
+    if (/<r[\s>]/.test(inner)) return whole; // already in run form
+    if (!/<t[\s>]/.test(inner)) return whole; // no text node
     return `<text><r>${inner}</r></text>`;
   });
 }
 
 /**
- * 归一化归档；无需改动或任何异常时返回原始 buffer。
- * 仅影响批注（comments）与其 VML 绘制部件的关系路径与正文结构。
+ * Normalise the archive; returns the original buffer when nothing needs changing or anything fails.
+ * Only affects the relationship paths and body structure of comments and their VML drawing parts.
  */
 export async function normalizeXlsxArchive(buffer: ArrayBuffer): Promise<ArrayBuffer> {
   const zip = await loadZip(buffer);
@@ -93,7 +94,7 @@ export async function normalizeXlsxArchive(buffer: ArrayBuffer): Promise<ArrayBu
       const part = resolvePartPath(targetMatch[1], baseDir);
       if (!part) return tag;
 
-      // 已在 exceljs 期望位置则只校正 Target；否则改名到期望位置（避让已占用的编号）
+      // If already where exceljs expects it, only fix the Target; otherwise rename it into place (stepping around numbers already taken)
       const expectedPart =
         kind === 'comments' ? /^xl\/comments\d+\.xml$/ : /^xl\/drawings\/vmlDrawing\d+\.vml$/;
       let nextPart = part;
@@ -127,8 +128,8 @@ export async function normalizeXlsxArchive(buffer: ArrayBuffer): Promise<ArrayBu
     }
   }
 
-  // 批注正文：openpyxl 等写的是 <text><t>…</t></text>，
-  // 而 exceljs 的批注解析只认 <text><r><t>…</t></r></text>（run 形式），否则文本为空
+  // Comment bodies: openpyxl and friends write <text><t>…</t></text>, while exceljs only parses the
+  // run form <text><r><t>…</t></r></text> — anything else yields empty text
   for (const name of Object.keys(zip.files)) {
     if (!/^xl\/comments\d+\.xml$/.test(name)) continue;
     const file = zip.file(name);

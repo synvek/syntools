@@ -1,6 +1,6 @@
 import { isPdfPasswordError } from './types';
 
-/** 是否应显示密码框 */
+/** Whether the password field should be shown */
 export function shouldShowPdfPassword(
   error: string | null | undefined,
   needsPassword: boolean,
@@ -8,7 +8,7 @@ export function shouldShowPdfPassword(
   return needsPassword || (!!error && isPdfPasswordError(error));
 }
 
-/** 统一解析 PDF 工具错误文案（密码类走公共 pdf.errors） */
+/** Map PDF tool errors to a message (password errors use the shared pdf.errors) */
 export function pdfToolErrorMessage(
   t: (key: string) => string,
   toolId: string,

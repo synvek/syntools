@@ -18,7 +18,7 @@ import {
   splitCell,
 } from '../model/table';
 
-/** 表格节点锚点：上下左右各一个边中点，便于连线吸附 */
+/** Table node anchors: one midpoint per side, for easy edge snapping */
 const HANDLES: Array<{ id: string; position: Position }> = [
   { id: 't', position: Position.Top },
   { id: 'b', position: Position.Bottom },
@@ -43,7 +43,7 @@ function spanSum(sizes: number[], from: number, count: number): number {
   return total;
 }
 
-/** 向右再合并一列（已到边界则保持不变） */
+/** Merge one more column to the right (unchanged when already at the boundary) */
 function mergeRight(table: TableData, cell: CellRef): TableData {
   const t = normalizeTable(table);
   const current = t.cells?.[cell.row]?.[cell.col];
@@ -83,9 +83,9 @@ function TableTool({
 }
 
 /**
- * 表格节点：SVG 绘制单元格，双击就地编辑文本。
- * 结构操作（行列增删 / 合并拆分）通过选中节点后在节点内的工具条完成，
- * 纯逻辑位于 `model/table.ts`，可独立单测。
+ * Table node: cells drawn as SVG, double-click to edit text in place.
+ * Structural operations (row/column add & remove, merge/split) run from the toolbar shown inside a selected node;
+ * the pure logic lives in `model/table.ts` and is independently unit-tested.
  */
 function TableNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const { t } = useTranslation();
@@ -195,7 +195,7 @@ function TableNodeComponent({ id, data, selected, width, height }: NodeProps) {
             }}
             onPointerDown={(e) => {
               if (editing) return;
-              // 必须阻止冒泡：否则 React Flow 会在节点上启动拖拽，双击进入编辑会被吞掉
+              // Must stop propagation: otherwise React Flow starts dragging the node and the double-click edit is swallowed
               e.stopPropagation();
               setActive({ row: b.row, col: b.col });
             }}
@@ -207,13 +207,13 @@ function TableNodeComponent({ id, data, selected, width, height }: NodeProps) {
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={commit}
                 onKeyDown={(e) => {
-                  // 阻止冒泡：提交后 textarea 卸载，避免全局快捷键误判为画布操作
+                  // Stop propagation: the textarea unmounts after submit, so global shortcuts do not mistake it for a canvas action
                   e.stopPropagation();
                   if (e.key === 'Escape') {
                     setEditing(null);
                     return;
                   }
-                  // Enter 换行（单元格支持多行），⌘/Ctrl+Enter 提交
+                  // Enter inserts a newline (cells support multiple lines), ⌘/Ctrl+Enter submits
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
                     commit();

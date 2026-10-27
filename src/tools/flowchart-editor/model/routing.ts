@@ -1,11 +1,11 @@
 /**
- * 连线正交避障布线（纯函数，无 React / DOM 依赖，便于单测与复用）。
+ * Orthogonal obstacle-avoiding edge routing (pure functions, no React / DOM dependency, easy to unit-test and reuse).
  *
- * 策略分三级：
- * 1. 起终点同行 / 同列且无遮挡 → 直连（无折点）；
- * 2. 两条 L 形候选（先横后竖 / 先竖后横）任一无遮挡 → 采用该 L 形（最整洁）；
- * 3. 否则在栅格上用 A* 搜索只走水平 / 竖直段的绕障路径，转向带惩罚。
- * 搜索失败（栅格过大、被完全封死等）时退化为 L 形折线，保证连线始终可用。
+ * Three-tier strategy:
+ * 1. Endpoints share a row / column with no obstruction → connect straight (no waypoints);
+ * 2. Either of the two L-shaped candidates (horizontal-then-vertical / vertical-then-horizontal) is unobstructed → use that L (cleanest);
+ * 3. Otherwise run an A* search on a grid using only horizontal / vertical segments, with a penalty on turns.
+ * When the search fails (grid too large, fully enclosed, etc.) it degrades to an L-shaped polyline so the edge is always usable.
  */
 
 import { dropCollinear } from '../ops';
@@ -19,7 +19,7 @@ export interface Rect {
   height: number;
 }
 
-/** 带 id 的障碍包围盒（id 用于按边排除自身起终点节点） */
+/** Obstacle bounding box with an id (the id excludes an edge's own source/target nodes) */
 export interface ObstacleRect extends Rect {
   id?: string;
 }
@@ -29,44 +29,44 @@ export interface RoutePoint {
   y: number;
 }
 
-/** 单条边待布线的起终点（绝对坐标，通常为锚点外推后的短桩端点） */
+/** Start and end of a single edge to route (absolute coordinates, usually the stub end points pushed out from the anchors) */
 export interface RouteEdge {
   id: string;
   from: RoutePoint;
   to: RoutePoint;
-  /** 起点所在边（端点法线方向）：用于生成沿法线进出、观感与 draw.io 一致的 Z 形路由 */
+  /** Side the start point sits on (its normal): used to build Z-shaped routes that enter and leave along the normal, matching draw.io */
   fromSide?: AnchorSide;
-  /** 终点所在边 */
+  /** Side the end point sits on */
   toSide?: AnchorSide;
-  /** 该边起终点所属节点 id：对应障碍会被忽略，避免绕开自身节点 */
+  /** Node ids owning this edge's start and end: their obstacles are ignored so the route does not avoid itself */
   exclude?: ReadonlyArray<string>;
 }
 
 export interface RouteRequest {
   edges: ReadonlyArray<RouteEdge>;
-  /** 障碍包围盒 */
+  /** Obstacle bounding boxes */
   obstacles: ReadonlyArray<ObstacleRect>;
-  /** 栅格步长（像素，缺省 16）：越小越贴合，越大越快 */
+  /** Grid step (pixels, default 16): smaller hugs the obstacles more closely, larger is faster */
   grid?: number;
-  /** 障碍外扩间隙（像素，缺省等于栅格，保证绕行不贴边） */
+  /** Obstacle inflation gap (pixels, defaults to the grid so routes never hug edges) */
   margin?: number;
-  /** 搜索范围外扩（像素，缺省 240） */
+  /** Search-bounds inflation (pixels, default 240) */
   padding?: number;
 }
 
 export interface RouteResult {
   edgeId: string;
-  /** 中间折点（不含起终点），可直接写入 `FlowEdgeRec.waypoints` */
+  /** Intermediate waypoints (excluding endpoints), writable straight into `FlowEdgeRec.waypoints` */
   waypoints: Waypoint[];
-  /** 是否找到可绕障的路径；false 表示退化为强制 L 形 */
+  /** Whether a path around the obstacles was found; false means it degraded to a forced L shape */
   routed: boolean;
 }
 
 const DEFAULT_GRID = 16;
 const DEFAULT_PADDING = 240;
-/** 单条边的栅格规模上限：超过则逐级放大步长，保证 A* 可控 */
+/** Per-edge grid size cap: beyond it the step is enlarged stepwise so A* stays bounded */
 const MAX_CELLS = 40_000;
-/** 转向惩罚（步长的倍数）：越大越倾向少转弯 */
+/** Turn penalty (multiple of the grid step): higher values favor fewer turns */
 const TURN_PENALTY_FACTOR = 4;
 
 const DIRS: ReadonlyArray<{ dx: number; dy: number }> = [
@@ -76,7 +76,7 @@ const DIRS: ReadonlyArray<{ dx: number; dy: number }> = [
   { dx: 1, dy: 0 },
 ];
 
-/** 极简二叉最小堆（A* 开放集），避免引入依赖 */
+/** Minimal binary min-heap (the A* open set), avoiding an extra dependency */
 class MinHeap {
   private readonly items: Array<{ f: number; s: number }> = [];
 
@@ -123,7 +123,7 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
 
-/** 轴对齐线段是否与矩形相交（正交折线的每段都是水平 / 竖直段） */
+/** Whether an axis-aligned segment intersects a rectangle (every segment of an orthogonal polyline is horizontal or vertical) */
 function segmentHitsRect(a: RoutePoint, b: RoutePoint, r: Rect): boolean {
   const minX = Math.min(a.x, b.x);
   const maxX = Math.max(a.x, b.x);
@@ -132,7 +132,7 @@ function segmentHitsRect(a: RoutePoint, b: RoutePoint, r: Rect): boolean {
   return minX < r.x + r.width && maxX > r.x && minY < r.y + r.height && maxY > r.y;
 }
 
-/** 折线是否完全避开所有障碍 */
+/** Whether a polyline avoids all obstacles entirely */
 function pathClear(points: ReadonlyArray<RoutePoint>, obstacles: ReadonlyArray<Rect>): boolean {
   for (let i = 1; i < points.length; i += 1) {
     for (const r of obstacles) {
@@ -142,7 +142,7 @@ function pathClear(points: ReadonlyArray<RoutePoint>, obstacles: ReadonlyArray<R
   return true;
 }
 
-/** 把相邻的斜线段补成两段正交线段（插入拐角），保证输出严格水平 / 竖直 */
+/** Split diagonal segments into two orthogonal segments by inserting a corner, guaranteeing strictly horizontal / vertical output */
 function orthogonalize(points: ReadonlyArray<RoutePoint>): RoutePoint[] {
   const out: RoutePoint[] = [];
   for (const p of points) {
@@ -157,15 +157,15 @@ function orthogonalize(points: ReadonlyArray<RoutePoint>): RoutePoint[] {
   return out;
 }
 
-/** 端点所在边是否为水平法线（左 / 右） */
+/** Whether the endpoint's side has a horizontal normal (left / right) */
 function isHorizontalSide(side: AnchorSide): boolean {
   return side === 'l' || side === 'r';
 }
 
 /**
- * 沿端点法线进出的「Z 形」正交路由（draw.io 的默认观感）：
- * 两端法线同为水平 / 竖直时走中位线折返，一横一竖时退化为 L 形。
- * 返回 null 表示缺少端点法线信息，交由通用候选处理。
+ * Z-shaped orthogonal route entering and leaving along the endpoint normals (draw.io's default look):
+ * with both normals horizontal or both vertical it folds through the midline; with one of each it degrades to an L shape.
+ * Returns null when the endpoint normals are unknown, leaving it to the generic candidates.
  */
 function preferredRoute(
   from: RoutePoint,
@@ -184,11 +184,11 @@ function preferredRoute(
     const midY = Math.round((from.y + to.y) / 2);
     return [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to];
   }
-  // 一横一竖：L 形（先沿起点法线走，再拐向终点）
+  // One horizontal one vertical: L shape (follow the start normal, then turn toward the end)
   return fh ? [from, { x: to.x, y: from.y }, to] : [from, { x: from.x, y: to.y }, to];
 }
 
-/** 强制 L 形兜底折线（先横后竖） */
+/** Forced-L fallback polyline (horizontal first, then vertical) */
 function fallbackWaypoints(from: RoutePoint, to: RoutePoint): Waypoint[] {
   if (Math.round(from.x) === Math.round(to.x) || Math.round(from.y) === Math.round(to.y)) return [];
   return dropCollinear(orthogonalize([from, to])).slice(1, -1);
@@ -211,12 +211,12 @@ function routeOne(
   const sameY = Math.round(from.y) === Math.round(to.y);
   if (sameX && sameY) return { edgeId: edge.id, waypoints: [], routed: true };
 
-  // 1) 直连
+  // 1) straight connection
   if ((sameX || sameY) && pathClear([from, to], obs)) {
     return { edgeId: edge.id, waypoints: [], routed: true };
   }
 
-  // 2) 沿端点法线的 Z 形（最贴近 draw.io 的默认路由）
+  // 2) Z shape along the endpoint normals (closest to draw.io's default routing)
   if (!sameX && !sameY) {
     const preferred = preferredRoute(from, to, edge.fromSide, edge.toSide);
     if (preferred && pathClear(preferred, obs)) {
@@ -224,7 +224,7 @@ function routeOne(
     }
   }
 
-  // 3) L 形候选（优先整洁结果）
+  // 3) L-shaped candidates (prefer the tidy result)
   if (!sameX && !sameY) {
     const hv: RoutePoint[] = [from, { x: to.x, y: from.y }, to];
     const vh: RoutePoint[] = [from, { x: from.x, y: to.y }, to];
@@ -236,7 +236,7 @@ function routeOne(
     }
   }
 
-  // 4) 栅格 A*
+  // 4) grid A*
   const ox = Math.round((Math.min(from.x, to.x) - padding) / grid) * grid;
   const oy = Math.round((Math.min(from.y, to.y) - padding) / grid) * grid;
   const maxX = Math.max(from.x, to.x) + padding;
@@ -345,7 +345,7 @@ function routeOne(
   return { edgeId: edge.id, waypoints, routed: true };
 }
 
-/** 批量正交避障布线：逐条边独立寻路，返回可写入 waypoints 的结果 */
+/** Batch orthogonal obstacle-avoiding routing: routes each edge independently, returning results ready to be written to waypoints */
 export function routeEdges(req: RouteRequest): RouteResult[] {
   const grid = req.grid ?? DEFAULT_GRID;
   const margin = req.margin ?? grid;

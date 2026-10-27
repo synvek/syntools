@@ -4,25 +4,25 @@ import { Icon } from '@/core/components/Icon';
 import { containerElements, useSlideStore } from '../store';
 
 /**
- * 幻灯片右键菜单。
+ * Slide context menu.
  *
- * 画布、左侧页缩略图、属性面板上的右键共用同一个面板：
- * 定位（按实测尺寸收敛在视口内）与关闭时机（点击外部 / Esc / 滚动 / 缩放）只有一份实现，
- * 内容按命中对象切换，避免每种命中各写一套菜单。
+ * The canvas, the thumbnail rail and the property panel share one panel: positioning (clamped to the
+ * viewport after measuring) and closing (outside click / Esc / scroll / zoom) exist once, and only the
+ * content switches by hit target, so each hit type doesn't need its own menu.
  *
- * - `element`：右键元素 —— 剪贴板、编辑文字、层级、组合、锁定隐藏、提升母版、删除；
- * - `canvas`：右键画布空白 —— 粘贴、全选、页操作、吸附与标尺开关、适应窗口；
- * - `slide`：右键页缩略图 —— 新建 / 复制 / 删除该页与上下移动。
+ * - `element`: right-click an element — clipboard, edit text, z-order, group, lock/hide, promote to master, delete;
+ * - `canvas`: right-click blank canvas — paste, select all, slide actions, snap and ruler toggles, fit to window;
+ * - `slide`: right-click a thumbnail — new / duplicate / delete this slide and move it up or down.
  */
 
 export interface SlideContextTarget {
   kind: 'element' | 'canvas' | 'slide';
-  /** 视口坐标（clientX / clientY） */
+  /** Viewport coordinates (clientX / clientY) */
   x: number;
   y: number;
-  /** `kind === 'element'` 时命中的元素 id */
+  /** Id of the hit element when `kind === 'element'` */
   elementId?: string | null;
-  /** `kind === 'slide'` 时的目标页下标 */
+  /** Target slide index when `kind === 'slide'` */
   slideIndex?: number;
 }
 
@@ -33,12 +33,12 @@ export function SlideContextMenu({
 }: {
   target: SlideContextTarget | null;
   onClose: () => void;
-  /** 进入行内文字编辑；缩略图菜单不需要，故为可选 */
+  /** Enter inline text editing; not needed by the thumbnail menu, hence optional */
   onEditText?: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
-  /** 实测尺寸前的兜底定位（先摆在视口外，避免首帧闪现在错误位置） */
+  /** Fallback position before measuring (off-screen, so it doesn't flash in the wrong place on the first frame) */
   const [pos, setPos] = useState({ left: -9999, top: -9999 });
 
   const doc = useSlideStore((s) => s.doc);
@@ -51,8 +51,8 @@ export function SlideContextMenu({
   const gridSnap = useSlideStore((s) => s.gridSnap);
   const showRulers = useSlideStore((s) => s.showRulers);
 
-  // 只订阅上面这些稳定值，派生数组在 useMemo 里算：选择器里返回新数组会让
-  // useSyncExternalStore 认为快照每次都变，React 会直接报错
+  // Subscribe only to these stable values and derive arrays inside useMemo: returning a new array from
+  // a selector makes useSyncExternalStore think the snapshot changed every time, and React errors out
   const elements = useMemo(
     () => containerElements({ doc, viewMode, slideIndex, masterKind, masterIndex }),
     [doc, viewMode, slideIndex, masterKind, masterIndex],
@@ -78,11 +78,11 @@ export function SlideContextMenu({
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      // 捕获阶段拦下：菜单关闭后不再触发编辑器的全局 Esc（取消选择）
+      // Intercept in the capture phase: once the menu is closed, the editor's global Esc (clear selection) doesn't fire
       event.stopPropagation();
       onClose();
     };
-    // 菜单已用 fixed 坐标锚定，滚动 / 滚轮 / 缩放后位置会失效，直接收起更稳
+    // The menu is anchored with fixed coordinates, so scrolling / wheel / zoom invalidate it; closing is more reliable
     const onScrollLike = (event: Event) => {
       if (outside(event.target)) onClose();
     };
@@ -118,7 +118,7 @@ export function SlideContextMenu({
   const allLocked = hasSelection && picked.every((element) => element.locked);
   const allHidden = hasSelection && picked.every((element) => element.visible === false);
 
-  /** 先关菜单再执行动作：动作会改 store，菜单不该停在已失效的选中态上 */
+  /** Close the menu before running the action: actions change the store and the menu shouldn't linger on a stale selection */
   const run = (action: () => void) => () => {
     onClose();
     action();
@@ -216,7 +216,7 @@ export function SlideContextMenu({
             onClick={run(() => store().toggleVisibleSelected())}
           />
 
-          {/* 提升为母版元素只在普通视图有意义（母版视图里元素本来就在母版上） */}
+          {/* Promoting to a master element only makes sense in normal view (in master view they're already on the master) */}
           {viewMode === 'normal' ? (
             <>
               <Separator />
@@ -292,7 +292,7 @@ export function SlideContextMenu({
           <Row
             label={t('tools.slide.addSlide')}
             onClick={run(() => {
-              // addSlide 插入到当前页之后，先把目标页设为当前页，语义才符合「在这一页后面新建」
+              // addSlide inserts after the current slide, so make the target current first to match "new slide after this one"
               store().selectSlide(targetIndex);
               store().addSlide();
             })}
@@ -335,7 +335,7 @@ function Row({
 }: {
   label: string;
   hint?: string;
-  /** 开关型条目：左侧留出勾选位，选中时显示对勾 */
+  /** Toggle item: leaves a check slot on the left, showing a checkmark when on */
   checked?: boolean;
   disabled?: boolean;
   danger?: boolean;
@@ -358,7 +358,7 @@ function Row({
       </span>
       <span className="flex-1 truncate">{label}</span>
       {hint ? (
-        // 快捷键只是视觉提示：不进可访问名（否则读屏会把「复制 Ctrl+C」整串念出来）
+        // The shortcut is only a visual hint: keep it out of the accessible name (or a screen reader reads "Copy Ctrl+C")
         <span aria-hidden="true" className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
           {hint}
         </span>

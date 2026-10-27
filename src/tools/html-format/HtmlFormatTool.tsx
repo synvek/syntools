@@ -8,7 +8,7 @@ import { translateToolError } from '@/core/i18n/helpers';
 import { readSharedState } from '@/core/lib/share';
 import { processHtml, type HtmlAction, type IndentSize } from './core';
 
-/** HTML 压缩 / 格式化 */
+/** HTML minifier / formatter */
 export default function HtmlFormatTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', a: 'format', n: 2 }), []);

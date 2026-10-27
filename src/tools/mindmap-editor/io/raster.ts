@@ -1,7 +1,7 @@
 /**
- * 位图 / 矢量 / PDF 导出。
- * 沿用 flowchart-editor 的「DOM 截图」方案（html-to-image）：
- * React Flow 渲染结果就是 DOM + SVG，截图即可还原样式。
+ * Bitmap / vector / PDF export.
+ * Reuses flowchart-editor's "DOM snapshot" approach (html-to-image): React Flow renders to DOM + SVG,
+ * so a snapshot reproduces the styling as-is.
  */
 
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
@@ -14,13 +14,13 @@ export type RasterFormat = 'png' | 'jpeg' | 'svg' | 'pdf';
 
 export interface RasterExportOptions {
   format: RasterFormat;
-  /** 导出倍率，越大越清晰（也越占内存） */
+  /** Export scale factor: higher is sharper (and uses more memory) */
   scale: number;
-  /** 透明背景（jpeg 不支持透明） */
+  /** Transparent background (jpeg does not support transparency) */
   transparent: boolean;
-  /** 导出底色，缺省为当前主题的背景色 */
+  /** Export background; defaults to the current theme's background colour */
   background?: string;
-  /** 内容外留白 */
+  /** Padding around the content */
   padding: number;
 }
 
@@ -66,8 +66,8 @@ function viewportEl(): HTMLElement | null {
 }
 
 /**
- * 把当前画布截成 dataURL（不落盘）。
- * 放映模式复用同一条 DOM 截图管线，保证与导出结果一致。
+ * Snapshot the current canvas into a data URL (nothing is written to disk).
+ * Present mode reuses the same DOM capture pipeline so the result matches an export.
  */
 export async function captureViewportDataUrl(
   nodes: Node<MindNodeData>[],
@@ -83,7 +83,7 @@ export async function captureViewportDataUrl(
   }
 }
 
-/** 导出当前脑图为 PNG / JPEG / SVG / PDF */
+/** Export the current mind map as PNG / JPEG / SVG / PDF */
 export async function exportRaster(
   nodes: Node<MindNodeData>[],
   options: RasterExportOptions,

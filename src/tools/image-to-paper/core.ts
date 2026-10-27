@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 图片转纸张：纸张尺寸（mm）与 fit/cover 布局计算。
+ * Image to paper: paper sizes (mm) and fit / cover layout math.
  */
 
 export type PaperSize = 'A3' | 'A4' | 'A5' | 'Letter';
@@ -9,7 +9,7 @@ export type Orientation = 'portrait' | 'landscape';
 export type FitMode = 'contain' | 'cover';
 export type ImageToPaperError = 'INVALID_MARGIN' | 'INVALID_IMAGE';
 
-/** 纸张尺寸（毫米，portrait 宽×高） */
+/** Paper size (millimeters, portrait width × height) */
 export const PAPER_SIZES_MM: Record<PaperSize, { width: number; height: number }> = {
   A3: { width: 297, height: 420 },
   A4: { width: 210, height: 297 },
@@ -22,7 +22,7 @@ export const PAPER_SIZE_IDS: PaperSize[] = ['A3', 'A4', 'A5', 'Letter'];
 export const MIN_MARGIN_MM = 0;
 export const MAX_MARGIN_MM = 50;
 
-/** 预览用：1 英寸 = 25.4mm，按 96 DPI 换算像素 */
+/** For previews: 1 inch = 25.4mm, converted to pixels at 96 DPI */
 export const PREVIEW_DPI = 96;
 
 export interface LayoutOptions {
@@ -35,15 +35,15 @@ export interface LayoutOptions {
 }
 
 export interface PaperLayout {
-  /** 纸张宽高（mm） */
+  /** Paper width and height (mm) */
   paperWidthMm: number;
   paperHeightMm: number;
-  /** 内容区（扣除边距） */
+  /** Content area (after margins) */
   contentXMm: number;
   contentYMm: number;
   contentWidthMm: number;
   contentHeightMm: number;
-  /** 图片绘制位置与尺寸（mm） */
+  /** Image position and size (mm) */
   drawXMm: number;
   drawYMm: number;
   drawWidthMm: number;
@@ -66,14 +66,10 @@ export function mmToPx(mm: number, dpi = PREVIEW_DPI): number {
   return (mm / 25.4) * dpi;
 }
 
-/** 计算图片在纸张上的布局（contain / cover） */
+/** Lay the image out on the paper (contain / cover) */
 export function computeLayout(options: LayoutOptions): ToolResult<PaperLayout> {
   const { paper, orientation, marginMm, fit, imageWidth, imageHeight } = options;
-  if (
-    !Number.isFinite(marginMm) ||
-    marginMm < MIN_MARGIN_MM ||
-    marginMm > MAX_MARGIN_MM
-  ) {
+  if (!Number.isFinite(marginMm) || marginMm < MIN_MARGIN_MM || marginMm > MAX_MARGIN_MM) {
     return { ok: false, error: 'INVALID_MARGIN' };
   }
   if (
@@ -94,7 +90,7 @@ export function computeLayout(options: LayoutOptions): ToolResult<PaperLayout> {
     return { ok: false, error: 'INVALID_MARGIN' };
   }
 
-  // 将像素视为与 mm 同比例的抽象单位，用宽高比计算缩放
+  // Treat pixels as abstract units proportional to mm and derive the scale from the aspect ratio
   const scaleX = contentWidthMm / imageWidth;
   const scaleY = contentHeightMm / imageHeight;
   const scale = fit === 'cover' ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY);

@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { SHORTCUT_GROUPS } from '../model/shortcuts';
 
 /**
- * 快捷键帮助浮层。
+ * Shortcut help overlay.
  *
- * 内容来自 `model/shortcuts.ts`（与实现同源）；带 `aria-modal`，
- * 因此编辑器的全局快捷键会自动让位（见 FlowchartTool 的 keydown 守卫）。
+ * Content comes from `model/shortcuts.ts` (same source as the implementation) and it sets `aria-modal`,
+ * so the editor's global shortcuts step aside automatically (see the keydown guard in FlowchartTool).
  */
 export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();

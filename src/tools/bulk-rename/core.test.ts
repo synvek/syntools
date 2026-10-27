@@ -111,7 +111,7 @@ describe('bulk-rename 批量', () => {
         numbering: { ...DEFAULT_RENAME_RULES.numbering, enabled: false },
       }),
     );
-    // 前缀相同不会重名；构造重名场景
+    // Identical prefixes do not collide; build an actual collision case
     expect(r.ok).toBe(true);
     const dup = findDuplicates([
       { from: 'a.txt', to: 'x.txt' },

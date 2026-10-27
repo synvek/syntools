@@ -37,13 +37,10 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/** LaTeX 数学公式编辑器 */
+/** LaTeX math formula editor */
 export default function LatexEditorTool() {
   const { t, i18n } = useTranslation();
-  const init = useMemo(
-    () => readSharedState({ i: DEFAULT_TEX, d: 1, c: DEFAULT_CATEGORY }),
-    [],
-  );
+  const init = useMemo(() => readSharedState({ i: DEFAULT_TEX, d: 1, c: DEFAULT_CATEGORY }), []);
   const [input, setInput] = useState(String(init.i || DEFAULT_TEX));
   const [displayMode, setDisplayMode] = useState(Number(init.d) !== 0);
   const [categoryId, setCategoryId] = useState<LatexCategory['id']>(() =>
@@ -54,10 +51,7 @@ export default function LatexEditorTool() {
   const previewRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef({ start: 0, end: 0 });
 
-  const result = useMemo(
-    () => renderLatex(input, { displayMode }),
-    [input, displayMode],
-  );
+  const result = useMemo(() => renderLatex(input, { displayMode }), [input, displayMode]);
 
   const htmlSnippet = result.ok ? wrapLatexHtml(result.value, displayMode) : '';
   const category = LATEX_CATEGORIES.find((c) => c.id === categoryId) ?? LATEX_CATEGORIES[0];
@@ -109,7 +103,7 @@ export default function LatexEditorTool() {
         downloadDataUrl(await toJpeg(node, { ...opts, quality: 0.95 }), 'latex.jpg');
       } else {
         const dataUrl = await toSvg(node, { cacheBust: true, backgroundColor: '#ffffff' });
-        // data:image/svg+xml;charset=utf-8,... → 下载为文件
+        // data:image/svg+xml;charset=utf-8,... → download as a file
         const comma = dataUrl.indexOf(',');
         const encoded = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
         const svgText = decodeURIComponent(encoded);
@@ -254,14 +248,18 @@ export default function LatexEditorTool() {
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
               {t('tools.latex.preview')}
             </span>
-            <CopyButton text={htmlSnippet} disabled={!htmlSnippet} label={t('tools.latex.copyHtml')} />
+            <CopyButton
+              text={htmlSnippet}
+              disabled={!htmlSnippet}
+              label={t('tools.latex.copyHtml')}
+            />
           </div>
           <div className="flex flex-1 items-center justify-center overflow-auto rounded-md border border-gray-200 bg-white p-6 dark:border-gray-700">
             {result.ok ? (
               <div
                 ref={previewRef}
                 className="inline-block max-w-full overflow-x-auto bg-white p-4 text-gray-900"
-                // KaTeX 输出为受信库生成的静态 HTML
+                // KaTeX emits static HTML produced by a trusted library
                 dangerouslySetInnerHTML={{ __html: result.value }}
               />
             ) : input.trim() ? (

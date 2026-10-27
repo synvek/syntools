@@ -20,8 +20,8 @@ function ToolSkeleton() {
 }
 
 /**
- * 所有工具的统一外壳（技术设计 §6.1）：
- * 标题渲染、本地徽章、收藏、Suspense、ErrorBoundary、相关推荐。
+ * Shared shell for every tool (tech design §6.1):
+ * title, local badge, favorite, Suspense, ErrorBoundary, related tools.
  */
 export function ToolPage({ tool }: { tool: ToolMeta }) {
   const LazyTool = useMemo(() => lazy(tool.component), [tool]);
@@ -35,14 +35,14 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
   const lang: Lang = normalizeLang(i18n.resolvedLanguage ?? 'en') ?? 'en';
 
   /**
-   * 工具 UI 文案（`tools.*`）不在首屏包里，它占语言包约 82%，只有工具页需要。
+   * Tool UI copy (`tools.*`) is not in the first-load bundle: it is ~82% of a locale and only tool pages need it.
    *
-   * 这里与工具 chunk **并行**预取：`tool.component()` 提前触发动态 import
-   * （后续 React.lazy 复用同一模块缓存，不会重复下载），文案与工具代码同时在路上，
-   * 因此相比改造前只是多了一个可缓存的小 chunk，而不是多一次串行往返。
+   * Prefetch it **in parallel** with the tool chunk: `tool.component()` kicks off the dynamic import
+   * (React.lazy then reuses the same module cache, so nothing downloads twice), so copy and code travel together,
+   * costing one extra cacheable chunk rather than an extra serial round trip.
    *
-   * 一旦就绪就永久为 true：语言切换时不再回落到骨架屏，
-   * 否则会把工具组件的 state（例如正在编辑的幻灯片）连带卸载掉。
+   * Once ready it stays true forever: switching language never falls back to the skeleton,
+   * which would unmount the tool's state (an in-progress slide deck, for example).
    */
   const [stringsReady, setStringsReady] = useState(() => hasToolStrings(lang));
 
@@ -53,7 +53,7 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
       try {
         await Promise.all([loadToolStrings(lang), tool.component()]);
       } catch (error) {
-        // 文案失败可退回已加载语言；工具 chunk 失败留给 ErrorBoundary 呈现
+        // A copy failure falls back to a loaded language; tool chunk failures go to ErrorBoundary
         console.error('[ToolPage] 预取工具资源失败', error);
       } finally {
         if (alive) setStringsReady(true);
@@ -68,7 +68,7 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
     recordUse(tool.id);
   }, [tool, recordUse]);
 
-  // 埋点：打开与停留时长（未配置端点时为空操作，零网络请求）
+  // Analytics: open and dwell time (a no-op with zero requests when no endpoint is set)
   useEffect(() => {
     trackToolOpen(tool.id);
     const startedAt = performance.now();
@@ -112,7 +112,7 @@ export function ToolPage({ tool }: { tool: ToolMeta }) {
       </header>
       <ErrorBoundary key={tool.id}>
         <Suspense fallback={<ToolSkeleton />}>
-          {/* 文案就绪前先占位：否则会先闪一屏未翻译的 key */}
+          {/* Placeholder until copy is ready; otherwise untranslated keys flash on screen */}
           {stringsReady ? <LazyTool /> : <ToolSkeleton />}
         </Suspense>
       </ErrorBoundary>

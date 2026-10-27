@@ -18,12 +18,12 @@ import type {
 } from '../model/types';
 
 /**
- * 逐像素调整 / 滤镜运算（在 `render/filters.ts` 的像素通道里调用）。
+ * Per-pixel adjustment / filter math (called from the pixel pass in `render/filters.ts`).
  *
- * 分工：
- * - **可分离**的调整（色阶 / 曲线）合成每通道 LUT，一次查表完成；
- * - **跨通道 / 依赖亮度**的调整（色彩平衡、黑白、阈值、渐变映射、去色）逐像素处理；
- * - 滤镜（锐化 / USM / 动感模糊 / 浮雕 / 边缘 / 噪点 / 像素化 / 色调分离）按需卷积或扫描。
+ * Division of labor:
+ * - **separable** adjustments (levels / curves) become one LUT per channel, a single lookup;
+ * - **cross-channel / luminance-based** ones (color balance, B&W, threshold, gradient map, desaturate) go per pixel;
+ * - filters (sharpen / USM / motion blur / emboss / edges / noise / pixelate / posterize) convolve or scan.
  */
 
 function clampByte(value: number): number {
@@ -34,7 +34,7 @@ function luminance(r: number, g: number, b: number): number {
   return r * 0.299 + g * 0.587 + b * 0.114;
 }
 
-/** 色阶 + 曲线：每通道 LUT 一次查表 */
+/** Levels + curves: one LUT lookup per channel */
 export function applyAdjustLuts(data: Uint8ClampedArray, adjustments: Adjustments): void {
   const luts = buildAdjustLuts(adjustments);
   if (!luts) return;
@@ -46,7 +46,7 @@ export function applyAdjustLuts(data: Uint8ClampedArray, adjustments: Adjustment
   }
 }
 
-/** 色彩平衡：按亮度落在阴影 / 中间调 / 高光的权重，对三条颜色轴做偏移 */
+/** Color balance: weight by shadows / midtones / highlights and shift the three color axes */
 export function applyColorBalance(data: Uint8ClampedArray, params: ColorBalanceParams): void {
   const shadows = params.shadows ?? [0, 0, 0];
   const midtones = params.midtones ?? [0, 0, 0];
@@ -55,7 +55,7 @@ export function applyColorBalance(data: Uint8ClampedArray, params: ColorBalanceP
 
   for (let i = 0; i < data.length; i += 4) {
     const lum = luminance(data[i], data[i + 1], data[i + 2]) / 255;
-    // 三个区间的高斯权重（峰值分别在 0 / 0.5 / 1）
+    // Gaussian weights for the three ranges (peaks at 0 / 0.5 / 1)
     const wShadow = Math.max(0, 1 - lum * 2);
     const wHighlight = Math.max(0, lum * 2 - 1);
     const wMid = 1 - wShadow - wHighlight;
@@ -66,7 +66,7 @@ export function applyColorBalance(data: Uint8ClampedArray, params: ColorBalanceP
         (midtones[axis] ?? 0) * wMid +
         (highlights[axis] ?? 0) * wHighlight;
     }
-    // 轴 0：青-红；轴 1：洋红-绿；轴 2：黄-蓝
+    // Axis 0: cyan-red; axis 1: magenta-green; axis 2: yellow-blue
     const factor = 1.2;
     data[i] = clampByte(data[i] + shift[0] * factor);
     data[i + 1] = clampByte(data[i + 1] - shift[1] * factor);
@@ -74,7 +74,7 @@ export function applyColorBalance(data: Uint8ClampedArray, params: ColorBalanceP
   }
 }
 
-/** 黑白：按六色权重混合成灰度 */
+/** Black & white: mix to gray with six color weights */
 export function applyBlackWhite(data: Uint8ClampedArray, params: BlackWhiteParams): void {
   const weights: Record<string, number> = {
     red: params.red ?? 0,
@@ -88,7 +88,7 @@ export function applyBlackWhite(data: Uint8ClampedArray, params: BlackWhiteParam
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
-    // 六色近似分解：基色通道直接取，间色取两通道最小值
+    // Six-color decomposition: primary channels directly, secondary ones as the min of two channels
     const red = r - Math.min(g, b);
     const yellow = Math.min(r, g) - b;
     const green = g - Math.min(r, b);
@@ -113,7 +113,7 @@ export function applyBlackWhite(data: Uint8ClampedArray, params: BlackWhiteParam
   }
 }
 
-/** 阈值：亮度高于阈值为白，否则为黑 */
+/** Threshold: white above the cutoff luminance, black below */
 export function applyThreshold(data: Uint8ClampedArray, level: number): void {
   const threshold = Math.min(255, Math.max(0, level));
   for (let i = 0; i < data.length; i += 4) {
@@ -124,7 +124,7 @@ export function applyThreshold(data: Uint8ClampedArray, level: number): void {
   }
 }
 
-/** 解析 #RRGGBB → [r,g,b] */
+/** Parse #RRGGBB → [r,g,b] */
 function parseHex(hex: string): [number, number, number] {
   const value = hex.trim().replace('#', '');
   const full =
@@ -142,7 +142,7 @@ function parseHex(hex: string): [number, number, number] {
   ];
 }
 
-/** 渐变映射：按亮度在色标上取色 */
+/** Gradient map: pick a color from the stops by luminance */
 export function applyGradientMap(data: Uint8ClampedArray, stops: GradientStop[]): void {
   if (stops.length === 0) return;
   const sorted = [...stops].sort((a, b) => a.pos - b.pos);
@@ -174,7 +174,7 @@ export function applyGradientMap(data: Uint8ClampedArray, stops: GradientStop[])
   }
 }
 
-/** 去色：降到灰度（等价于饱和度 -100，但更直接） */
+/** Desaturate: drop to gray (equivalent to saturation -100, but more direct) */
 export function applyDesaturate(data: Uint8ClampedArray): void {
   for (let i = 0; i < data.length; i += 4) {
     const value = clampByte(luminance(data[i], data[i + 1], data[i + 2]));
@@ -184,7 +184,7 @@ export function applyDesaturate(data: Uint8ClampedArray): void {
   }
 }
 
-/** 3×3 卷积：`mix` 用于与原图混合 */
+/** 3×3 convolution; `mix` blends with the original */
 export function applyConvolution(
   width: number,
   height: number,
@@ -224,7 +224,7 @@ export const SHARPEN_KERNEL = [0, -1, 0, -1, 5, -1, 0, -1, 0];
 export const EMBOSS_KERNEL = [-2, -1, 0, -1, 1, 1, 0, 1, 2];
 export const EDGE_KERNEL = [0, 1, 0, 1, -4, 1, 0, 1, 0];
 
-/** USM 锐化：先模糊再按差值增强边缘 */
+/** USM sharpening: blur first, then boost edges by the difference */
 export function applyUnsharp(
   width: number,
   height: number,
@@ -242,7 +242,7 @@ export function applyUnsharp(
   }
 }
 
-/** 可分离盒式模糊（近似高斯），原地写回 */
+/** Separable box blur (approximates gaussian), written back in place */
 export function boxBlur(
   width: number,
   height: number,
@@ -250,7 +250,7 @@ export function boxBlur(
   radius: number,
 ): void {
   const temp = new Uint8ClampedArray(data);
-  // 横向
+  // Horizontal
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       let r = 0;
@@ -274,7 +274,7 @@ export function boxBlur(
       data[index + 3] = a / count;
     }
   }
-  // 纵向
+  // Vertical
   const horizontal = new Uint8ClampedArray(data);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -301,7 +301,7 @@ export function boxBlur(
   }
 }
 
-/** 动感模糊：沿给定角度做等距平均 */
+/** Motion blur: average along the given angle at even steps */
 export function applyMotionBlur(
   width: number,
   height: number,
@@ -405,7 +405,7 @@ function applyPosterize(data: Uint8ClampedArray, levels: number): void {
   }
 }
 
-/** 应用全部像素级滤镜（顺序即数组顺序；已停用的滤镜自动跳过） */
+/** Apply every pixel-level filter (array order; disabled filters are skipped) */
 export function applyFilterSpecs(
   width: number,
   height: number,
@@ -460,7 +460,7 @@ export function applyFilterSpecs(
       case 'posterize':
         applyPosterize(data, filterParam(spec, 'levels'));
         break;
-      // 扩展滤镜（扭曲 / 风格化 / 渲染 / 降噪）：实现见 `render/filterExtra.ts`
+      // Extra filters (distort / stylize / render / noise reduction): see `render/filterExtra.ts`
       case 'twirl':
         applyTwirl(width, height, data, filterParam(spec, 'angle'));
         break;

@@ -5,7 +5,7 @@ import { encodeGif } from './gif';
 import { encodePdf } from './pdf';
 import { encodeTiff, hasTransparency, type PixelSource } from './tiff';
 
-/** 由 RGB 三元组数组构造 RGBA 像素源 */
+/** Build an RGBA pixel source from an array of RGB triples */
 function pixels(rows: number[][]): PixelSource {
   const data = new Uint8ClampedArray(rows.length * 4);
   rows.forEach((rgba, index) => data.set(rgba, index * 4));
@@ -25,10 +25,10 @@ function image(
 }
 
 /**
- * 独立的 TIFF 读取器（测试自备）。
+ * Standalone TIFF reader (shipped by the tests).
  *
- * 故意不复用被测代码的任何部分：只按 TIFF 规范解释字节——
- * 若写出侧的 IFD 顺序 / 值偏移 / strip 布局有错，这里会解析失败或读出不同的像素，而不是「自证正确」。
+ * Deliberately shares no code with the codec under test: it interprets the bytes purely by the TIFF spec —
+ * a wrong IFD order / value offset / strip layout on the write side surfaces as a parse failure or different pixels, not as "it must be right".
  */
 function readTiff(bytes: Uint8Array) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -74,8 +74,8 @@ function readGif(bytes: Uint8Array) {
   return decompressFrames(parseGIF(buffer), true);
 }
 
-describe('TIFF 编码', () => {
-  it('写出 baseline 头与必需标签（小端 / 无压缩 / RGB）', () => {
+describe('TIFF encoding', () => {
+  it('writes a baseline header and the required tags (little-endian / uncompressed / RGB)', () => {
     const source = image(2, 1, () => [10, 20, 30, 255]);
     const tiff = readTiff(encodeTiff(source, { alpha: false }));
     expect(tiff.magic).toBe(42);
@@ -92,7 +92,7 @@ describe('TIFF 编码', () => {
     expect(tiff.tags.get(338)).toBeUndefined();
   });
 
-  it('IFD 条目按 tag 升序（部分读取器会因此拒绝解析）', () => {
+  it('IFD entries are sorted by tag (some readers reject the file otherwise)', () => {
     const bytes = encodeTiff(image(1, 1, () => [1, 2, 3, 255]));
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const count = view.getUint16(8, true);
@@ -101,13 +101,13 @@ describe('TIFF 编码', () => {
     expect(tags).toEqual([...tags].sort((a, b) => a - b));
   });
 
-  it('strip 里的像素与输入逐字节一致（RGB）', () => {
+  it('strip pixels match the input byte for byte (RGB)', () => {
     const source = image(2, 1, (x) => [x === 0 ? 255 : 0, 128, 64, 255]);
     const tiff = readTiff(encodeTiff(source, { alpha: false }));
     expect([...tiff.strip]).toEqual([255, 128, 64, 0, 128, 64]);
   });
 
-  it('带 alpha 时写 4 通道并标注未关联 alpha', () => {
+  it('with alpha it writes 4 channels and marks unassociated alpha', () => {
     const source = image(1, 1, () => [9, 8, 7, 128]);
     const tiff = readTiff(encodeTiff(source, { alpha: true }));
     expect(tiff.tags.get(258)?.values).toEqual([8, 8, 8, 8]);
@@ -116,16 +116,16 @@ describe('TIFF 编码', () => {
     expect([...tiff.strip]).toEqual([9, 8, 7, 128]);
   });
 
-  it('不保留 alpha 时透明区域按白底合成（而不是变黑）', () => {
+  it('without alpha, transparent areas composite onto white (instead of turning black)', () => {
     const source = image(1, 1, () => [0, 0, 0, 0]);
     const tiff = readTiff(encodeTiff(source, { alpha: false }));
     expect([...tiff.strip]).toEqual([255, 255, 255]);
   });
 
-  it('多值字段（BitsPerSample）走值区且偏移正确', () => {
+  it('multi-value fields (BitsPerSample) go to the value area with a correct offset', () => {
     const bytes = encodeTiff(image(1, 1, () => [1, 1, 1, 1]));
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    // 找到 BitsPerSample(258) 条目，其值区不应落在 IFD 自身区间内
+    // Find the BitsPerSample(258) entry; its value must not land inside the IFD's own range
     const count = view.getUint16(8, true);
     const ifdEnd = 8 + 2 + count * 12 + 4;
     for (let i = 0; i < count; i += 1) {
@@ -136,13 +136,13 @@ describe('TIFF 编码', () => {
     }
   });
 
-  it('hasTransparency 只对真正含透明的图返回 true', () => {
+  it('hasTransparency only returns true for images with real transparency', () => {
     expect(hasTransparency(image(2, 2, () => [0, 0, 0, 255]))).toBe(false);
     expect(hasTransparency(image(2, 2, (x) => [0, 0, 0, x === 0 ? 254 : 255]))).toBe(true);
   });
 });
 
-describe('GIF 编码（用 gifuct-js 解码回读）', () => {
+describe('GIF encoding (read back with gifuct-js)', () => {
   const COLORS = [
     [255, 0, 0, 255],
     [0, 255, 0, 255],
@@ -150,7 +150,7 @@ describe('GIF 编码（用 gifuct-js 解码回读）', () => {
     [255, 255, 255, 255],
   ] as const;
 
-  it('四种纯色可无损往返（调色板精确覆盖）', () => {
+  it('four solid colors round-trip losslessly (the palette covers them exactly)', () => {
     const source = image(2, 2, (x, y) => [...COLORS[(y * 2 + x) % 4]]);
     const frames = readGif(encodeGif(source, { alpha: false }));
     expect(frames).toHaveLength(1);
@@ -158,7 +158,7 @@ describe('GIF 编码（用 gifuct-js 解码回读）', () => {
     expect([...frames[0].patch]).toEqual([...source.data]);
   });
 
-  it('透明像素写出透明色索引，其余不受影响', () => {
+  it('transparent pixels get the transparent color index, the rest are untouched', () => {
     const source = image(2, 1, (x) => (x === 0 ? [0, 0, 0, 0] : [12, 34, 56, 255]));
     const frames = readGif(encodeGif(source, { alpha: true }));
     expect(frames[0].transparentIndex).toBeGreaterThanOrEqual(0);
@@ -166,15 +166,15 @@ describe('GIF 编码（用 gifuct-js 解码回读）', () => {
     expect([...frames[0].patch.slice(4)]).toEqual([12, 34, 56, 255]);
   });
 
-  it('超过 256 色时量化到调色板，尺寸与像素数不变', () => {
+  it('over 256 colors it quantizes to the palette, keeping size and pixel count', () => {
     const source = image(32, 32, (x, y) => [(x * 8) % 256, (y * 8) % 256, (x + y) % 256, 255]);
     const frames = readGif(encodeGif(source, { alpha: false }));
     expect(frames[0].dims).toMatchObject({ width: 32, height: 32 });
     expect(frames[0].patch).toHaveLength(32 * 32 * 4);
   });
 
-  it('大图触发 LZW 码长增长与字典重置，仍能被解码器接受', () => {
-    // 伪随机噪声：颜色几乎不重复，LZW 字典会被灌满，必然走到 12 位 + Clear 重开字典的分支
+  it('a large image triggers LZW code growth and dictionary resets and still decodes', () => {
+    // Pseudo-random noise: colors almost never repeat, so the LZW table fills up and the 12-bit + clear-to-reset path is guaranteed
     let seed = 7;
     const random = () => {
       seed = (seed * 1103515245 + 12345) % 2147483648;
@@ -184,13 +184,13 @@ describe('GIF 编码（用 gifuct-js 解码回读）', () => {
     const frames = readGif(encodeGif(source, { alpha: false }));
     expect(frames[0].dims).toMatchObject({ width: 96, height: 96 });
     expect(frames[0].patch).toHaveLength(96 * 96 * 4);
-    // 量化后每个像素都应是调色板中的颜色，不应出现解码错位导致的越界
+    // After quantizing, every pixel should be a palette color; misaligned decoding would produce out-of-range values
     for (let i = 0; i < frames[0].patch.length; i += 4) {
       expect(frames[0].patch[i + 3]).toBe(255);
     }
   });
 
-  it('全透明图不崩（调色板为空时补一个占位色）', () => {
+  it('a fully transparent image does not crash (an empty palette gets a placeholder color)', () => {
     const source = image(2, 2, () => [0, 0, 0, 0]);
     const frames = readGif(encodeGif(source, { alpha: true }));
     expect(
@@ -198,18 +198,18 @@ describe('GIF 编码（用 gifuct-js 解码回读）', () => {
     ).toBe(true);
   });
 
-  it('文件头是 GIF89a 且以结束符收尾', () => {
+  it('the header is GIF89a and the file ends with the terminator', () => {
     const bytes = encodeGif(image(1, 1, () => [1, 2, 3, 255]));
     expect(String.fromCharCode(...bytes.subarray(0, 6))).toBe('GIF89a');
     expect(bytes[bytes.length - 1]).toBe(0x3b);
   });
 
-  it('未使用 alpha 时不写图形控制扩展（无透明索引）', () => {
+  it('without alpha it writes no graphic control extension (no transparent index)', () => {
     const bytes = encodeGif(
       image(1, 1, () => [1, 2, 3, 255]),
       { alpha: false },
     );
-    // 0x21 0xf9 是 GCE 引导符
+    // 0x21 0xf9 is the GCE introducer
     let found = false;
     for (let i = 0; i < bytes.length - 1; i += 1) {
       if (bytes[i] === 0x21 && bytes[i + 1] === 0xf9) found = true;
@@ -218,8 +218,8 @@ describe('GIF 编码（用 gifuct-js 解码回读）', () => {
   });
 });
 
-describe('PDF 编码', () => {
-  /** 从 PDF 文本里取出交叉引用表声明的对象偏移 */
+describe('PDF encoding', () => {
+  /** Pull the object offsets declared by the cross-reference table out of the PDF text */
   function xrefOffsets(text: string): number[] {
     const table = /xref\n0 (\d+)\n([\s\S]*?)trailer/.exec(text);
     expect(table).not.toBeNull();
@@ -242,13 +242,13 @@ describe('PDF 编码', () => {
 
   const SOURCE = image(2, 2, (x, y) => [x * 10, y * 20, 30, 255]);
 
-  it('头部 / 交叉引用表 / startxref 自洽（偏移指向真正的对象起始处）', () => {
+  it('header / xref table / startxref agree (offsets point at the real object start)', () => {
     const bytes = encodePdf(SOURCE, { dpi: 72 });
     const text = new TextDecoder('latin1').decode(bytes);
     expect(text.startsWith('%PDF-1.4')).toBe(true);
 
     const offsets = xrefOffsets(text);
-    expect(offsets).toHaveLength(5); // 1..5 号对象（无 SMask）
+    expect(offsets).toHaveLength(5); // objects 1..5 (no SMask)
     offsets.forEach((offset, index) => {
       expect(text.slice(offset, offset + `${index + 1} 0 obj`.length)).toBe(`${index + 1} 0 obj`);
     });
@@ -258,15 +258,15 @@ describe('PDF 编码', () => {
     expect(text.trimEnd().endsWith('%%EOF')).toBe(true);
   });
 
-  it('图像流解压后与输入 RGB 逐字节一致', () => {
+  it('the decompressed image stream matches the input RGB byte for byte', () => {
     const bytes = encodePdf(SOURCE, { dpi: 72 });
     const text = new TextDecoder('latin1').decode(bytes);
     const stream = inflate(streamOf(text, bytes, 4));
-    // 逐行：(0,0) (1,0) (0,1) (1,1)
+    // Row by row: (0,0) (1,0) (0,1) (1,1)
     expect([...stream]).toEqual([0, 0, 30, 10, 0, 30, 0, 20, 30, 10, 20, 30]);
   });
 
-  it('页面尺寸按 dpi 换算（72dpi 时 1 像素 = 1 点）', () => {
+  it('page size converts by dpi (at 72 dpi, 1 pixel = 1 point)', () => {
     const text = new TextDecoder('latin1').decode(
       encodePdf(
         image(200, 100, () => [0, 0, 0, 255]),
@@ -283,7 +283,7 @@ describe('PDF 编码', () => {
     expect(at144).toContain('/MediaBox [0 0 100 50]');
   });
 
-  it('含透明像素时写入 SMask，且 alpha 与输入一致', () => {
+  it('transparent pixels produce an SMask whose alpha matches the input', () => {
     const source = image(2, 1, (x) => [255, 255, 255, x === 0 ? 0 : 255]);
     const bytes = encodePdf(source, { dpi: 72 });
     const text = new TextDecoder('latin1').decode(bytes);
@@ -292,13 +292,13 @@ describe('PDF 编码', () => {
     expect([...inflate(streamOf(text, bytes, 6))]).toEqual([0, 255]);
   });
 
-  it('全不透明时不写 SMask（少一个对象、文件更小）', () => {
+  it('fully opaque images skip the SMask (one object less, smaller file)', () => {
     const text = new TextDecoder('latin1').decode(encodePdf(SOURCE, { dpi: 72 }));
     expect(text).not.toContain('SMask');
     expect(xrefOffsets(text)).toHaveLength(5);
   });
 
-  it('内容流按页面尺寸铺满整页', () => {
+  it('the content stream fills the whole page', () => {
     const text = new TextDecoder('latin1').decode(
       encodePdf(
         image(50, 20, () => [0, 0, 0, 255]),
@@ -309,8 +309,8 @@ describe('PDF 编码', () => {
   });
 });
 
-describe('导出像素源', () => {
-  it('pixels 辅助函数构造的宽度与数据长度一致', () => {
+describe('Export pixel sources', () => {
+  it('the pixels helper builds a width matching the data length', () => {
     const source = pixels([
       [1, 2, 3, 255],
       [4, 5, 6, 255],

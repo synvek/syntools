@@ -1,9 +1,9 @@
 /**
- * 模板库：按图种分类提供起始图。
- * 模板内容是「一页」的节点与连线；需要完整文档时用 buildTemplateDoc。
+ * Template library: starting diagrams grouped by diagram type.
+ * A template's content is the nodes and edges of "one page"; use buildTemplateDoc when a full document is needed.
  *
- * 模板内文案通过 `TemplateTranslator` 注入（token 见 `./templateLabels`），
- * 缺省回退中文，保证纯函数可单测、不依赖 i18next 实例。
+ * Template copy is injected through `TemplateTranslator` (tokens in `./templateLabels`),
+ * falling back to Chinese by default so pure functions stay unit-testable without an i18next instance.
  */
 
 import { createId, defaultData } from '../core';
@@ -12,7 +12,7 @@ import { TEMPLATE_LABELS_I18N, type TemplateLabelKey } from './templateLabels';
 import type { FlowDoc, FlowEdgeRec, FlowNodeRec, ShapeKind } from './types';
 
 export type TemplateKind =
-  // 流程图
+  // Flowchart
   | 'basic'
   | 'decision'
   | 'swimlane'
@@ -31,7 +31,7 @@ export type TemplateKind =
   | 'bpmn'
   | 'bpmnProcess'
   | 'bpmnCollab'
-  // 其它图种
+  // Other diagram types
   | 'netTopology'
   | 'netSubnet'
   | 'orgChart'
@@ -43,7 +43,7 @@ export type TemplateCategory = 'flow' | 'uml' | 'bpmn' | 'network' | 'org' | 'mi
 export interface TemplateDef {
   kind: TemplateKind;
   category: TemplateCategory;
-  /** 模板标题的 i18n 键后缀（`tools.flowchart.template<Key>`） */
+  /** i18n key suffix of the template title (`tools.flowchart.template<Key>`) */
   labelKey: string;
 }
 
@@ -81,16 +81,16 @@ export const TEMPLATES: TemplateDef[] = [
   { kind: 'erDiagram', category: 'er', labelKey: 'ErDiagram' },
 ];
 
-/** 模板内容是「一页」的节点与连线 */
+/** A template's content is the nodes and edges of "one page" */
 export interface TemplateContent {
   nodes: FlowNodeRec[];
   edges: FlowEdgeRec[];
 }
 
-/** 模板文案翻译器：token → 展示文案 */
+/** Template copy translator: token → display copy */
 export type TemplateTranslator = (key: TemplateLabelKey) => string;
 
-/** 缺省翻译器：回退中文（单测与无 i18n 环境使用） */
+/** Default translator: falls back to Chinese (for unit tests and environments without i18n) */
 export const fallbackTemplateTranslator: TemplateTranslator = (key) =>
   TEMPLATE_LABELS_I18N.zh[key] ?? TEMPLATE_LABELS_I18N.en[key] ?? key;
 
@@ -380,7 +380,7 @@ export function buildTemplate(
   return { nodes, edges };
 }
 
-/** 模板内容包成完整 v3 文档（供 store.load 使用） */
+/** Wrap template content into a complete v3 document (for store.load) */
 export function buildTemplateDoc(
   kind: TemplateKind,
   tr: TemplateTranslator = fallbackTemplateTranslator,

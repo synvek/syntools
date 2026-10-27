@@ -11,7 +11,7 @@ interface SearchPaletteProps {
   onClose: () => void;
 }
 
-/** 全局搜索面板（⌘K / /，技术设计 §7.3），ARIA combobox 模式 */
+/** Global search palette (⌘K / /, tech design §7.3) using the ARIA combobox pattern */
 export function SearchPalette({ open, onClose }: SearchPaletteProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
     if (open) {
       setQuery('');
       setActive(0);
-      // 等待面板渲染后聚焦
+      // Focus once the panel has rendered
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);

@@ -1,22 +1,22 @@
 /**
- * TIFF 编码（baseline，无压缩）。
+ * TIFF encoding (baseline, uncompressed).
  *
- * 为什么自己写而不是引库：我们只需要「一张 RGBA 位图存成 TIFF」这一种情况，
- * 而 baseline 无压缩 TIFF 的结构非常简单（头 + 一个 IFD + 一条 strip 的原始字节），
- * 几十行就能写完、还能被单元测试逐字段校验；引一个几百 KB 的编码器（多半还带解码器）不划算。
+ * Why hand-roll instead of pulling a library: we only need "save one RGBA bitmap as TIFF",
+ * and baseline uncompressed TIFF is simple (header + one IFD + one strip of raw bytes):
+ * dozens of lines, field-checkable by unit tests, beats a hundreds-of-KB encoder with a decoder attached.
  *
- * 采用**小端 + 单条 strip + 未关联 alpha** 的组合：这是 Photoshop / GIMP / 预览程序都认的最朴素形态。
- * 分辨率按 72 dpi 写入（像素与点 1:1），避免某些程序按 1 dpi 猜出离谱的物理尺寸。
+ * It combines **little-endian + a single strip + unassociated alpha**, the plainest form PS / GIMP / Preview read.
+ * Resolution is written as 72 dpi (1:1 pixels to points), so viewers don't infer absurd physical sizes.
  */
 
-/** 编码输入：与 `ImageData` 结构一致（便于单测直接构造） */
+/** Encoder input: same shape as `ImageData` (easy to build directly in tests) */
 export interface PixelSource {
   data: Uint8ClampedArray | Uint8Array;
   width: number;
   height: number;
 }
 
-/** TIFF 标签常量（只列用到的） */
+/** TIFF tag constants (only the ones used) */
 const TAG = {
   ImageWidth: 256,
   ImageLength: 257,
@@ -34,7 +34,7 @@ const TAG = {
   ExtraSamples: 338,
 } as const;
 
-/** 字段类型 */
+/** Field types */
 const TYPE = {
   BYTE: 1,
   ASCII: 2,
@@ -54,24 +54,24 @@ const TYPE_SIZE: Record<number, number> = {
 interface Entry {
   tag: number;
   type: number;
-  /** 元素个数 */
+  /** Element count */
   count: number;
-  /** 单值直接内联；多值走值区 */
+  /** A single value is inlined; multiple values go to the value area */
   values: number[];
 }
 
 export interface TiffOptions {
-  /** 保留透明通道（未关联 alpha）。文档全不透明时建议关掉，文件更小、兼容性更好 */
+  /** Keep alpha (unassociated). Turn off for fully opaque images: smaller files, better compatibility */
   alpha?: boolean;
-  /** 每英寸像素数，仅作元数据 */
+  /** Pixels per inch, metadata only */
   dpi?: number;
 }
 
 /**
- * RGBA 像素 → TIFF 字节。
+ * RGBA pixels → TIFF bytes.
  *
- * `alpha: false` 时按「白底 + alpha 合成」丢弃透明通道 —— 直接丢掉 alpha 会让透明区域变黑，
- * 而 TIFF 没有「背景色」概念，白底是用户预期中的默认结果。
+ * With `alpha: false` the channel is dropped by compositing onto white — dropping alpha outright would
+ * turn transparent areas black; TIFF has no background color, and white is the expected default.
  */
 export function encodeTiff(image: PixelSource, options: TiffOptions = {}): Uint8Array {
   const { width, height } = image;
@@ -115,10 +115,10 @@ export function encodeTiff(image: PixelSource, options: TiffOptions = {}): Uint8
     { tag: TAG.ResolutionUnit, type: TYPE.SHORT, count: 1, values: [2] },
   ];
   if (alpha) {
-    // 2 = unassociated（直通 alpha），与 canvas 的语义一致
+    // 2 = unassociated (straight alpha), matching canvas semantics
     entries.push({ tag: TAG.ExtraSamples, type: TYPE.SHORT, count: 1, values: [2] });
   }
-  // TIFF 要求 IFD 条目按 tag 升序排列（部分读取器会因此直接放弃解析）
+  // TIFF requires IFD entries sorted by tag ascending (some readers give up otherwise)
   entries.sort((a, b) => a.tag - b.tag);
 
   const headerSize = 8;
@@ -137,7 +137,7 @@ export function encodeTiff(image: PixelSource, options: TiffOptions = {}): Uint8
   });
 
   const stripOffset = valueCursor;
-  // StripOffsets 是单值，一定内联；直接改它的值即可
+  // StripOffsets is a single value, always inlined; just overwrite its value
   for (const item of entryValues) {
     if (item.entry.tag === TAG.StripOffsets) item.entry.values = [stripOffset];
   }
@@ -145,7 +145,7 @@ export function encodeTiff(image: PixelSource, options: TiffOptions = {}): Uint8
   const total = stripOffset + strip.length;
   const out = new Uint8Array(total);
   const view = new DataView(out.buffer);
-  // 头：小端 + 版本 42 + 首个 IFD 偏移
+  // Header: little-endian + version 42 + offset of the first IFD
   out[0] = 0x49; // 'I'
   out[1] = 0x49;
   view.setUint16(2, 42, true);
@@ -160,7 +160,7 @@ export function encodeTiff(image: PixelSource, options: TiffOptions = {}): Uint8
     if (item.inline) {
       writeValues(out.subarray(base + 8, base + 12), item.entry.type, item.entry.values);
     } else {
-      // 值区偏移；同时把值写进值区
+      // Offset into the value area; also write the value there
       view.setUint32(base + 8, item.offset, true);
     }
   });
@@ -175,7 +175,7 @@ export function encodeTiff(image: PixelSource, options: TiffOptions = {}): Uint8
   return out;
 }
 
-/** 按字段类型把值写入缓冲区（小端） */
+/** Write a value into the buffer by field type (little-endian) */
 function writeValues(target: Uint8Array, type: number, values: number[]): void {
   const view = new DataView(target.buffer, target.byteOffset, target.byteLength);
   switch (type) {
@@ -196,10 +196,10 @@ function writeValues(target: Uint8Array, type: number, values: number[]): void {
 }
 
 /**
- * 是否值得保留 alpha 通道。
+ * Whether the alpha channel is worth keeping.
  *
- * 全不透明的图带上 alpha 只会让文件变大、并让部分老程序把图当成「未关联 alpha」显示异常；
- * 因此导出前扫一遍 alpha，全 255 就走 RGB。
+ * Keeping alpha on a fully opaque image only inflates the file and confuses viewers expecting it;
+ * so scan alpha before exporting and use RGB when everything is 255.
  */
 export function hasTransparency(image: PixelSource): boolean {
   for (let i = 3; i < image.data.length; i += 4) {

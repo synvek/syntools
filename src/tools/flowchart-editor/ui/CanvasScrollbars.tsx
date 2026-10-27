@@ -3,16 +3,16 @@ import { useReactFlow, useStore, useViewport } from '@xyflow/react';
 import { useFlowStore } from '../store';
 import { absoluteRectOf } from '../core';
 
-/** 内容四周外扩（画布坐标），允许滚到内容之外一些 */
+/** Content padding (canvas coordinates): allows scrolling a little beyond the content */
 const PAD = 140;
-/** 滚动条厚度（细窄样式） */
+/** Scrollbar thickness (slim style) */
 const THICKNESS = 6;
-/** 滑块最小像素长度 */
+/** Minimum thumb length in pixels */
 const MIN_THUMB = 28;
-/** 右下角缩略图占位（避免滚动条与其重叠） */
+/** Space reserved for the bottom-right thumbnail (so scrollbars do not overlap it) */
 const MINIMAP_RESERVE_X = 156;
 const MINIMAP_RESERVE_Y = 108;
-/** 左下角缩放控件占位 */
+/** Space reserved for the bottom-left zoom control */
 const CONTROLS_RESERVE_X = 48;
 
 function clamp(v: number, min: number, max: number): number {
@@ -32,9 +32,9 @@ interface DragState {
 }
 
 /**
- * 画布滚动条：以「内容包围盒 + 外扩」作为文档范围，
- * 用可视区域在其中的位置渲染滑块，拖动滑块即平移视口。
- * 内容未超出视口时自动隐藏。
+ * Canvas scrollbars: the document range is "content bounding box + padding",
+ * and the thumbs are rendered from the viewport's position within it; dragging a thumb pans the viewport.
+ * Hidden automatically when the content fits inside the viewport.
  */
 export function CanvasScrollbars() {
   const { x, y, zoom } = useViewport();
@@ -44,7 +44,7 @@ export function CanvasScrollbars() {
   const nodes = useFlowStore((s) => s.nodes);
   const dragRef = useRef<DragState | null>(null);
 
-  // 内容包围盒（仅随节点变化重算）
+  // Content bounding box (recomputed only when nodes change)
   const bounds = useMemo(() => {
     let left = Infinity;
     let top = Infinity;
@@ -91,7 +91,7 @@ export function CanvasScrollbars() {
     }
   }
 
-  // 拖动滑块平移视口
+  // Drag the thumb to pan the viewport
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       const d = dragRef.current;

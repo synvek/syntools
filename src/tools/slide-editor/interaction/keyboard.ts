@@ -1,6 +1,6 @@
 /**
- * 编辑器快捷键：仅在外层容器获得焦点或无输入元素聚焦时生效，
- * 避免与浏览器/系统快捷键以及行内文本编辑冲突。
+ * Editor shortcuts: active only when the outer container has focus or no input element is focused,
+ * avoiding clashes with browser/system shortcuts and inline text editing.
  */
 
 export interface KeyboardCallbacks {
@@ -19,13 +19,13 @@ export interface KeyboardCallbacks {
   onPrevSlide: () => void;
   onNextSlide: () => void;
   onPresent: () => void;
-  /** ⌘/Ctrl + F：打开查找替换浮层 */
+  /** ⌘/Ctrl + F: open the find & replace popover */
   onFind: () => void;
-  /** ⌘/Ctrl + Shift + C：复制格式（格式刷第一步） */
+  /** ⌘/Ctrl + Shift + C: copy formatting (format painter step 1) */
   onCopyFormat: () => void;
-  /** ⌘/Ctrl + Shift + V：套用格式（格式刷第二步） */
+  /** ⌘/Ctrl + Shift + V: apply formatting (format painter step 2) */
   onPasteFormat: () => void;
-  /** ⌘/Ctrl + M：在普通视图与母版视图之间切换 */
+  /** ⌘/Ctrl + M: toggle between normal and master view */
   onToggleMaster: () => void;
 }
 
@@ -62,7 +62,7 @@ export function handleShortcut(event: KeyboardEvent, callbacks: KeyboardCallback
     callbacks.onSelectAll();
     return true;
   }
-  // 注意顺序：带 Shift 的组合（格式刷）必须排在普通复制/粘贴之前判断
+  // Order matters: Shift combos (format painter) must be checked before plain copy/paste
   if (meta && event.shiftKey && event.key.toLowerCase() === 'c') {
     event.preventDefault();
     callbacks.onCopyFormat();

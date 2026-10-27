@@ -1,24 +1,24 @@
 import { latexToAst, type LatexNode } from './latex';
 
 /**
- * LaTeX → Word 原生公式（OMML）。
+ * LaTeX → native Word equations (OMML).
  *
- * 只覆盖 AST 能表达的语法（见 math.ts 的 latexToAst）；
- * 任一子节点无法表达即整体返回 null，由调用方降级为图片，
- * 绝不输出「部分正确」的公式——错误公式比图片更难发现。
+ * Only covers syntax the AST can express (see latexToAst in math.ts);
+ * One inexpressible child returns null for the whole formula, and the caller falls back to an image.
+ * Never emit a partially correct formula: a wrong formula is harder to spot than an image.
  */
 
 type DocxNs = typeof import('docx');
 type MathComponent = import('docx').MathComponent;
 
-/** AST → OMML 组件；null 表示无法表达 */
+/** AST → OMML component; null means it cannot be expressed */
 function nodesToOmml(D: DocxNs, nodes: readonly LatexNode[]): MathComponent[] | null {
   const out: MathComponent[] = [];
   for (let index = 0; index < nodes.length; index += 1) {
     const node = nodes[index];
 
-    // \sum / \int 等大运算符：LaTeX 语义是「作用于其后的表达式」，
-    // 因此把剩余兄弟节点整体作为被运算对象。
+    // Large operators such as \sum / \int apply to the expression that follows,
+    // so the remaining siblings become the operand as a whole.
     if (node.kind === 'nary' && node.body === null) {
       const rest = nodesToOmml(D, nodes.slice(index + 1));
       if (!rest) return null;
@@ -111,7 +111,7 @@ function nodeToOmml(D: DocxNs, node: LatexNode): MathComponent[] | null {
       if (pair === '[]') return [new D.MathSquareBrackets({ children })];
       if (pair === '{}') return [new D.MathCurlyBrackets({ children })];
       if (pair === '⟨⟩') return [new D.MathAngledBrackets({ children })];
-      // 其余定界符（| |、单边等）用普通字符 + 内容表达，语义仍正确
+      // Other delimiters (| |, one-sided, ...) use plain characters plus content, which stays correct
       return [
         ...(node.open ? [new D.MathRun(node.open)] : []),
         ...children,
@@ -131,7 +131,7 @@ function nodeToOmml(D: DocxNs, node: LatexNode): MathComponent[] | null {
   }
 }
 
-/** LaTeX → OMML 公式对象；null 表示需要用图片降级 */
+/** LaTeX → OMML equation object; null means the image fallback is required */
 export function latexToOmml(D: DocxNs, latex: string): InstanceType<DocxNs['Math']> | null {
   const ast = latexToAst(latex);
   if (!ast) return null;

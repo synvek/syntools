@@ -7,13 +7,10 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
 import { generateRandomNumbers, MAX_COUNT, MAX_DECIMALS } from './core';
 
-/** 随机数生成器 */
+/** Random number generator */
 export default function RandomNumberTool() {
   const { t } = useTranslation();
-  const init = useMemo(
-    () => readSharedState({ min: '1', max: '100', c: 5, d: 0, u: 0 }),
-    [],
-  );
+  const init = useMemo(() => readSharedState({ min: '1', max: '100', c: 5, d: 0, u: 0 }), []);
   const [min, setMin] = useState(String(init.min));
   const [max, setMax] = useState(String(init.max));
   const [count, setCount] = useState(Number(init.c) || 5);

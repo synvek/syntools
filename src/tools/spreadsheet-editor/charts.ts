@@ -2,8 +2,8 @@ import type { ToolResult } from '@/core/types';
 import { columnIndexToName, parseCellRef, type WorkbookSnapshotLite } from './core';
 
 /**
- * 图表纯逻辑层：把工作表的单元格区域转成「分类 + 系列」，
- * 再生成 ECharts 配置。不依赖 echarts 运行时，可单独单测。
+ * Chart pure-logic layer: turns a sheet cell range into "categories + series", then into an ECharts
+ * option. No dependency on the echarts runtime, so it can be unit tested in isolation.
  */
 
 export interface ChartRange {
@@ -15,29 +15,30 @@ export interface ChartRange {
 
 export interface ChartSeries {
   name: string;
-  /** 与 categories 一一对应；空值 / 非数值为 null（折线断开，不误画为 0） */
+  /** One entry per category; blank / non-numeric values are null (the line breaks instead of dropping to 0) */
   data: (number | null)[];
 }
 
 export interface ChartData {
   categories: string[];
   series: ChartSeries[];
-  /** 数据区域标签（如 A1:C10），用于面板标题 */
+  /** Data range label (e.g. A1:C10), used as the panel title */
   rangeLabel: string;
 }
 
 export type ChartType = 'bar' | 'line' | 'pie';
 
 /**
- * 工作表内图表的持久化配置。
- * 几何量为「相对工作表区域」的像素值，随快照保存（见 xlsx-io 的 syntoolsCharts）。
+ * Persisted config for an in-sheet chart.
+ * Geometry is in pixels relative to the sheet area and is saved with the snapshot (see syntoolsCharts
+ * in xlsx-io).
  */
 export interface ChartConfig {
   id: string;
   type: ChartType;
-  /** 数据区域（0 基闭区间） */
+  /** Data range (0-based inclusive) */
   range: ChartRange;
-  /** 图表所属工作表：切换工作表后仍读取原表数据，并只在原表上显示 */
+  /** Sheet the chart belongs to: it keeps reading that sheet and only shows on it after a sheet switch */
   sheetId?: string;
   x: number;
   y: number;
@@ -45,7 +46,7 @@ export interface ChartConfig {
   height: number;
 }
 
-/** 区域 → A1 记法（"A1:C10"） */
+/** Range → A1 notation ("A1:C10") */
 export function buildRangeLabel(range: ChartRange): string {
   const startRow = Math.min(range.startRow, range.endRow);
   const endRow = Math.max(range.startRow, range.endRow);
@@ -56,7 +57,7 @@ export function buildRangeLabel(range: ChartRange): string {
   }`;
 }
 
-/** A1 记法 → 区域；非法返回 null（单格 "A1" 视为 1×1） */
+/** A1 notation → range; null when invalid (a single cell "A1" is treated as 1×1) */
 export function parseRangeLabel(label: string): ChartRange | null {
   const text = label.trim();
   if (!text) return null;
@@ -74,7 +75,7 @@ export function parseRangeLabel(label: string): ChartRange | null {
 
 type LiteCell = { v?: unknown; f?: unknown } | undefined;
 
-/** 单元格值 → 数值；文本数字也接受，非数值返回 null */
+/** Cell value → number; numeric strings are accepted, anything else returns null */
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'boolean') return value ? 1 : 0;
@@ -93,12 +94,12 @@ function toText(value: unknown): string {
   return String(value);
 }
 
-/** 系列的「引用」信息（导出 .xlsx 原生图表时用；行列为 0 基绝对坐标） */
+/** A series' "reference" info (used when exporting a native .xlsx chart; rows/columns are 0-based absolute) */
 export interface ChartSeriesRef {
   name: string;
-  /** 系列名所在单元格；无表头时为 null（导出时改用 name 字面量） */
+  /** Cell holding the series name; null without a header row (the export then uses the literal name) */
   nameCell: { row: number; column: number } | null;
-  /** 值列（0 基绝对列号） */
+  /** Value column (0-based absolute index) */
   column: number;
   startRow: number;
   endRow: number;
@@ -106,13 +107,13 @@ export interface ChartSeriesRef {
 }
 
 /**
- * 图表结构化解码：既含「值」（站内 ECharts 渲染 / 导出时的缓存），
- * 也含「引用」（导出为 Excel 原生图表的数据来源）。
- * 两者共用同一套判定，避免出现「站内画的和导出到 Excel 的不是一回事」。
+ * Resolved chart structure: carries both the values (for in-app ECharts rendering and export caches)
+ * and the references (the data source for native Excel charts). Both come from the same resolution,
+ * so what the app draws and what Excel receives can never diverge.
  */
 export interface ChartSpec {
   categories: string[];
-  /** 分类列（0 基绝对列号）；null 表示无分类列（Excel 默认按 1..N） */
+  /** Category column (0-based absolute index); null means no category column (Excel uses 1..N) */
   categoryColumn: number | null;
   categoryStartRow: number;
   categoryEndRow: number;
@@ -121,11 +122,12 @@ export interface ChartSpec {
 }
 
 /**
- * 单元格区域 → 图表结构（值 + 引用）。
+ * Cell range → chart structure (values + references).
  *
- * 约定（与常见表格软件一致）：
- * - 首列若为文本，用作分类轴；否则分类为 1..N；
- * - 首行在「值列」上若为文本，用作系列名，数据从第二行开始。
+ * Conventions (same as common spreadsheet apps):
+ * - if the first column is text, it becomes the category axis; otherwise categories are 1..N;
+ * - if the first row of the value columns is text, it becomes the series names and data starts on
+ *   the second row.
  */
 export function resolveChart(
   snapshot: WorkbookSnapshotLite,
@@ -155,14 +157,14 @@ export function resolveChart(
   if (rows.length < 2) return { ok: false, error: 'EMPTY' };
 
   const columnCount = rows[0].length;
-  // 首列是否为分类轴（首行之后存在非数值文本）
+  // Whether the first column is the category axis (non-numeric text exists below the first row)
   const firstColumnIsText = rows
     .slice(1)
     .some((line) => line[0].num === null && line[0].text !== '');
   const valueStart = firstColumnIsText ? 1 : 0;
   if (valueStart >= columnCount) return { ok: false, error: 'EMPTY' };
 
-  // 首行在值列上是否为表头
+  // Whether the first row of the value columns is a header
   const hasHeaderRow = rows[0]
     .slice(valueStart)
     .some((cell) => cell.num === null && cell.text !== '');
@@ -188,7 +190,7 @@ export function resolveChart(
       data: dataRows.map((line) => line[column].num),
     });
   }
-  // 整列都是空值的系列不展示
+  // Series whose column is entirely empty are dropped
   const usable = series.filter((item) => item.data.some((value) => value !== null));
   if (usable.length === 0) return { ok: false, error: 'EMPTY' };
 
@@ -205,7 +207,7 @@ export function resolveChart(
   };
 }
 
-/** 区域 → 图表数据（站内渲染用；与 resolveChart 共用同一套判定） */
+/** Range → chart data (for in-app rendering; shares the resolution logic with resolveChart) */
 export function buildChartData(
   snapshot: WorkbookSnapshotLite,
   sheetId: string | null,
@@ -224,7 +226,7 @@ export function buildChartData(
   };
 }
 
-/** 生成 ECharts 配置（饼图取第一个系列按分类切片；其余按分类轴多系列） */
+/** Build an ECharts option (a pie slices the first series by category; the rest use a category axis with multiple series) */
 export function buildChartOption(data: ChartData, type: ChartType): Record<string, unknown> {
   if (type === 'pie') {
     const first = data.series[0];

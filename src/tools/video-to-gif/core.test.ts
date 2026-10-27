@@ -17,7 +17,7 @@ describe('video-to-gif 调色板', () => {
     const pal = buildWebPalette();
     expect(pal.length).toBe(768);
     expect(pal.slice(0, 3)).toEqual(new Uint8Array([0, 0, 0]));
-    // 第 216 项（最后一个 web-safe）应为 (255,255,255)
+    // Entry 216 (the last web-safe color) should be (255,255,255)
     const last = 215 * 3;
     expect([pal[last], pal[last + 1], pal[last + 2]]).toEqual([255, 255, 255]);
   });
@@ -46,7 +46,7 @@ describe('video-to-gif GIF', () => {
     const header = String.fromCharCode(...gif.slice(0, 6));
     expect(header).toBe('GIF89a');
     expect(gif[gif.length - 1]).toBe(0x3b);
-    // 包含 Netscape 循环块
+    // Contains the Netscape looping block
     const body = String.fromCharCode(...gif);
     expect(body).toContain('NETSCAPE2.0');
   });

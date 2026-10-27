@@ -39,8 +39,8 @@ import type {
 } from './model/types';
 
 /**
- * 纯函数层：不引用 Konva、不触碰 DOM（便于单测，且可被 prerender 安全载入）。
- * 需要落盘 / 报错的校验统一返回 `ToolResult<T>`，错误码文案见 `strings.ts` 的 `err.*`。
+ * Pure-function layer: no Konva, no DOM (unit-testable and safe to load during prerender).
+ * Validations that persist or report errors return `ToolResult<T>`; see `err.*` in `strings.ts` for messages.
  */
 
 export const MIN_CANVAS_SIZE = 16;
@@ -49,7 +49,7 @@ export const MIN_BRUSH = 1;
 export const MAX_BRUSH = 400;
 export const MAX_IMAGE_BYTES = 30 * 1024 * 1024; // 30MB
 export const MAX_PROJECT_BYTES = 60 * 1024 * 1024; // 60MB
-/** PSD 导入上限：多图层工程文件常远超普通图片 */
+/** PSD import cap: multi-layer project files are usually far larger than plain images */
 export const MAX_PSD_BYTES = 128 * 1024 * 1024; // 128MB
 
 export interface CanvasPreset {
@@ -60,9 +60,9 @@ export interface CanvasPreset {
 }
 
 /**
- * 常用画布预设：正方形 / 横版 / 竖版 / 纸张。
- * 标签只用「数字 + 比例 + 纸张代号」，不含自然语言，因此无需翻译
- * （文案见 `CanvasPreset.label`，其余枚举的名字统一由 UI 走 i18n，见 `blend.*` / `shape.*`）。
+ * Common canvas presets: square / landscape / portrait / paper.
+ * Labels only use numbers + aspect ratio + paper name, with no natural language, so they need no translation
+ * (text lives in `CanvasPreset.label`; all other enum names are localized by the UI, see `blend.*` / `shape.*`).
  */
 export const CANVAS_PRESETS: CanvasPreset[] = [
   { id: 'hd', label: '1280 × 720 · 16:9', width: 1280, height: 720 },
@@ -72,7 +72,7 @@ export const CANVAS_PRESETS: CanvasPreset[] = [
   { id: 'a4', label: 'A4 · 2480 × 3508', width: 2480, height: 3508 },
 ];
 
-/** 混合模式：只声明 id，名称由 UI 通过 `tools.photo.blend.<id>` 取当前语言 */
+/** Blend modes: ids only; the UI resolves names via `tools.photo.blend.<id>` for the active locale */
 export const BLEND_MODES: BlendMode[] = [
   'normal',
   'multiply',
@@ -92,7 +92,7 @@ export const BLEND_MODES: BlendMode[] = [
   'luminosity',
 ];
 
-/** 滤镜：只声明 id，名称与说明由 UI 通过 `tools.photo.filter*` / `hint*` 取当前语言 */
+/** Filters: ids only; the UI resolves names and hints via `tools.photo.filter*` / `hint*` for the active locale */
 export const FILTERS: FilterId[] = [
   'grayscale',
   'sepia',
@@ -107,24 +107,24 @@ export const FILTERS: FilterId[] = [
   'noise',
   'pixelate',
   'posterize',
-  // 扭曲
+  // Distort
   'twirl',
   'spherize',
   'pinch',
-  // 风格化
+  // Stylize
   'findEdges',
   'traceContour',
-  // 渲染
+  // Render
   'clouds',
   'lensFlare',
-  // 降噪
+  // Noise reduction
   'reduceNoise',
 ];
 
 /**
- * 滤镜分组（面板按组展示）。
+ * Filter groups (the panel renders one section per group).
  *
- * 滤镜从 13 个扩到 21 个后，平铺的两列卡片已经难以扫视；分组顺序对齐 Photoshop 的菜单层级。
+ * Growing from 13 to 21 filters made a flat two-column grid hard to scan; the order follows Photoshop's menus.
  */
 export const FILTER_GROUPS: { id: string; items: FilterId[] }[] = [
   {
@@ -138,7 +138,7 @@ export const FILTER_GROUPS: { id: string; items: FilterId[] }[] = [
   { id: 'render', items: ['clouds', 'lensFlare'] },
 ];
 
-/** 滤镜参数描述：UI 据此生成滑杆（标签走 `tools.photo.<label>`） */
+/** Filter parameter spec: the UI builds sliders from it (labels go through `tools.photo.<label>`) */
 export interface FilterParamSpec {
   key: string;
   label: string;
@@ -192,46 +192,46 @@ export const FILTER_PARAMS: Record<FilterId, FilterParamSpec[]> = {
   ],
 };
 
-/** 滤镜默认参数（新建滤镜实例时写入） */
+/** Default filter parameters (written when a filter instance is created) */
 export function defaultFilterParams(id: FilterId): Record<string, number> {
   const out: Record<string, number> = {};
   for (const spec of FILTER_PARAMS[id]) out[spec.key] = spec.default;
   return out;
 }
 
-/** 读取滤镜参数：缺失 / 非法值回落到该参数的默认值 */
+/** Read a filter parameter: missing / invalid values fall back to that parameter's default */
 export function filterParam(spec: FilterSpec, key: string): number {
   const value = spec.params?.[key];
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   return FILTER_PARAMS[spec.id].find((item) => item.key === key)?.default ?? 0;
 }
 
-/** CSS `filter` 能直接表达的滤镜（其余走像素通道） */
+/** Filters expressible through CSS `filter` (the rest go through the pixel pipeline) */
 const CSS_FILTERS: FilterId[] = ['grayscale', 'sepia', 'invert', 'blur', 'gaussianBlur'];
 
 export function isCssFilter(id: FilterId): boolean {
   return CSS_FILTERS.includes(id);
 }
 
-/** 形状：只声明 id，名称由 UI 通过 `tools.photo.shape.<id>` 取当前语言 */
+/** Shapes: ids only; the UI resolves names via `tools.photo.shape.<id>` for the active locale */
 export const SHAPE_KINDS: ShapeKind[] = ['rect', 'roundRect', 'ellipse', 'line', 'arrow', 'star'];
 
-/* ------------------------------ 标尺刻度 ------------------------------ */
+/* ------------------------------ Ruler ticks ------------------------------ */
 
-/** 标尺候选步长（像素）：取「乘以缩放后 ≥ 最小间距」的第一个，保证刻度不挤在一起 */
+/** Candidate ruler steps (px): the first that stays ≥ the minimum gap once scaled, so ticks never crowd */
 const RULER_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
 
 export interface RulerTick {
-  /** 屏幕坐标（相对画布宿主左上角） */
+  /** Screen coordinates (relative to the top-left corner of the canvas host) */
   screen: number;
-  /** 文档坐标 */
+  /** Document coordinates */
   doc: number;
   label: string;
 }
 
 /**
- * 计算标尺刻度：`offset` 为视口平移（屏幕像素），`scale` 为缩放比。
- * 纯函数（可单测）：只做「文档坐标 → 屏幕坐标」的映射与步长选择。
+ * Compute ruler ticks: `offset` is the viewport pan (screen px) and `scale` is the zoom factor.
+ * Pure function (unit-testable): it only maps document → screen coordinates and picks the step.
  */
 export function rulerTicks(
   scale: number,
@@ -252,7 +252,7 @@ export function rulerTicks(
   return ticks;
 }
 
-/** 数值钳制：非法值回落到 min（与 doodle-board 的 clampBrushSize 一致） */
+/** Clamp a number: invalid values fall back to min (same as doodle-board's clampBrushSize) */
 export function clampNumber(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
@@ -262,9 +262,9 @@ export function clampBrushSize(value: number): number {
   return Math.round(clampNumber(value, MIN_BRUSH, MAX_BRUSH));
 }
 
-/* ------------------------------ 笔刷 / 绘制 ------------------------------ */
+/* ------------------------------ Brushes / painting ------------------------------ */
 
-/** 笔刷间距（相对直径的比例）：0.02 近似连续，>1 出现明显间隔 */
+/** Brush spacing (fraction of the diameter): 0.02 looks continuous, above 1 leaves visible gaps */
 export const MIN_SPACING = 0.02;
 export const MAX_SPACING = 2;
 
@@ -274,15 +274,15 @@ export function clampSpacing(value: number): number {
 }
 
 /**
- * 间距足够小（≤ 5%）时用「连续线段」描边，否则按间距逐个盖章。
- * 阈值存在的意义：连续线段更快且边缘更平滑，而大间距必须盖章才能体现「点」的质感。
+ * When spacing is small enough (≤ 5%) stroke one continuous path; otherwise stamp once per spacing step.
+ * The threshold exists because a continuous path is faster and smoother, while wide spacing needs real stamps.
  */
 export const SPACING_LINE_THRESHOLD = 0.05;
 
-/** 笔刷预设：一组可复用的画笔参数 */
+/** Brush preset: a reusable set of brush parameters */
 export interface BrushPreset {
   id: string;
-  /** 内置预设有 i18n 名（`tools.photo.preset<Id>`）；自定义预设自带名字 */
+  /** Built-in presets have i18n names (`tools.photo.preset<Id>`); custom presets carry their own name */
   name?: string;
   size: number;
   hardness: number;
@@ -298,7 +298,7 @@ export const DEFAULT_BRUSH_PRESETS: BrushPreset[] = [
   { id: 'spray', size: 60, hardness: 0, opacity: 0.25, spacing: 0.4 },
 ];
 
-/** 预设归一：丢弃非法项，参数钳制到合法区间 */
+/** Normalize presets: drop invalid entries and clamp parameters into their valid ranges */
 export function normalizeBrushPresets(value: unknown): BrushPreset[] {
   if (!Array.isArray(value)) return [];
   const out: BrushPreset[] = [];
@@ -319,37 +319,37 @@ export function normalizeBrushPresets(value: unknown): BrushPreset[] {
   return out;
 }
 
-/* ------------------------------ 通道 / 取样 / 色板 ------------------------------ */
+/* ------------------------------ Channels / sampling / palette ------------------------------ */
 
-/** 通道视图：`rgb` = 正常显示，其余为单通道灰度隔离显示（仅影响显示，不改文档） */
+/** Channel view: `rgb` = normal, others isolate one channel as grayscale (display only, not the document) */
 export type ChannelView = 'rgb' | 'red' | 'green' | 'blue';
 export const CHANNEL_VIEWS: ChannelView[] = ['rgb', 'red', 'green', 'blue'];
-/** 可独立隔离的三个颜色通道 */
+/** The three color channels that can be isolated on their own */
 export const COLOR_CHANNELS: Exclude<ChannelView, 'rgb'>[] = ['red', 'green', 'blue'];
 
-/** 颜色取样器最多保留的取样点数（与 Photoshop 一致） */
+/** Maximum number of color-sampler points kept (same as Photoshop) */
 export const MAX_SAMPLES = 4;
 
 export interface SamplePoint {
-  /** 文档坐标（取整后的像素中心） */
+  /** Document coordinates (pixel center, rounded) */
   x: number;
   y: number;
   /** `#RRGGBB` */
   hex: string;
-  /** 0~255：透明像素提示用 */
+  /** 0~255: used to flag transparent pixels */
   alpha: number;
 }
 
-/** 调色板默认容量 */
+/** Default palette capacity */
 export const PALETTE_SIZE = 8;
-/** 提取调色板时的量化精度（每通道右移的位数）：4 bit → 4096 个颜色桶 */
+/** Quantization when extracting the palette (bits shifted per channel): 4 bit → 4096 color buckets */
 const PALETTE_QUANTIZE_SHIFT = 4;
 
 /**
- * 单通道隔离：把 RGBA 数据就地替换为该通道的灰度。
+ * Single-channel isolation: replace the RGBA data in place with that channel's grayscale.
  *
- * 与 Photoshop 的「单通道视图」一致——只看该通道的明暗，因此三个通道都按灰度呈现，
- * 而不是把 R 通道显示成红色。
+ * Matches Photoshop's single-channel view: only that channel's luminance counts, so all three render as grayscale
+ * instead of tinting the R channel red.
  */
 export function extractChannelData(
   data: Uint8ClampedArray,
@@ -365,15 +365,15 @@ export function extractChannelData(
 }
 
 /**
- * 二值蒙版 → 选区轮廓（扫描线法）。
+ * Binary mask → selection outlines (scanline method).
  *
- * 逐行找出「值 ≥ threshold」的连续区段，每段输出一个矩形轮廓作为**并集**加入选区。
- * 得到的是阶梯状（块状）选区——这正是扫描线法的固有精度，换来的是零依赖与线性复杂度；
- * 用它把「快速蒙版 / 通道」转成可继续运算的选区，比引入轮廓追踪（marching squares）划算。
+ * Row by row, find runs where "value ≥ threshold" and emit one rectangular outline per run as a **union**.
+ * The result is stair-stepped (blocky): that is the inherent precision of scanlines, traded for zero deps and O(n);
+ * good enough to turn quick mask / channels into an editable selection without pulling in marching squares.
  *
- * `source` 决定取哪个量作为判据：
- * - `luma`（默认）：亮度 —— 通道图、灰度蒙版（白=选中、黑=未选中）用；
- * - `alpha`：不透明度 —— alpha 蒙版（透明=未选中）用。
+ * `source` picks which quantity to test:
+ * - `luma` (default): luminance, for channel views and grayscale masks (white = selected, black = not selected);
+ * - `alpha`: opacity, for alpha masks (transparent = not selected).
  */
 export function maskRunsToParts(
   data: Uint8ClampedArray,
@@ -409,13 +409,13 @@ export function maskRunsToParts(
       }
     }
     if (start >= 0) parts.push({ path: rect(start, y, width, y + 1), add: true });
-    // 轮廓数量保护：极端噪点蒙版会产出海量矩形，截断并交由调用方提示
+    // Outline guard: a very noisy mask yields swarms of rects, so truncate and let the caller warn
     if (parts.length >= MAX_VECTOR_CONTOURS * 8) return parts;
   }
   return parts;
 }
 
-/** 由扫描线矩形并集反推选区外接框（矩形并集的包围盒） */
+/** Derive the selection bounds from the scanline rect union (its bounding box) */
 export function partsBounds(parts: SelectionPart[]): Rect {
   let minX = Infinity;
   let minY = Infinity;
@@ -434,13 +434,13 @@ export function partsBounds(parts: SelectionPart[]): Rect {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-/** 快速蒙版 / 通道载入选区时的亮度阈值：白（≥128）视为选中 */
+/** Luminance threshold when loading quick mask / channels as a selection: white (≥128) counts as selected */
 export const MASK_SELECTION_THRESHOLD = 128;
 
 /**
- * 灰度蒙版 → 选区（白 = 选中、黑 = 未选中）。
+ * Grayscale mask → selection (white = selected, black = not selected).
  *
- * 快速蒙版退出与「载入通道为选区」共用：两者都是「一张灰度图 → 可继续运算的选区」。
+ * Shared by exiting quick mask and "load channel as selection": both turn one grayscale image into a selection.
  */
 export function selectionFromMask(
   data: Uint8ClampedArray,
@@ -451,7 +451,7 @@ export function selectionFromMask(
   return selectionFromParts(maskRunsToParts(data, width, height, threshold, 'luma'));
 }
 
-/** 由扫描线轮廓组装选区（快速蒙版 / 通道 → 选区统一走这里） */
+/** Assemble a selection from scanline outlines (the single path from quick mask / channels to a selection) */
 export function selectionFromParts(parts: SelectionPart[]): Selection | null {
   const usable = parts.filter((part) => part.path.length >= 6);
   if (usable.length === 0) return null;
@@ -464,17 +464,17 @@ export function selectionFromParts(parts: SelectionPart[]): Selection | null {
     height: Math.max(1, bounds.height),
     path: [],
     feather: 0,
-    // 第一段作为主轮廓，其余作为并集追加（nonzero 填充下等价于矩形并集）
+    // First run becomes the main outline, the rest append as unions (a rect union under nonzero fill)
     parts: usable.map((part, index) => ({ path: part.path, add: index === 0 ? true : part.add })),
   };
 }
 
 /**
- * 从像素数据提取调色板（主色）。
+ * Extract the palette (dominant colors) from pixel data.
  *
- * 做法：按 `PALETTE_QUANTIZE_SHIFT` 位量化分桶 → 统计各桶的像素数与颜色和 → 取像素数最多的若干桶的平均色，
- * 再按「与已选颜色的最小距离」做一次去重，避免同色系重复占位。
- * 半透明以下的像素直接跳过（透明区域的 RGB 多为 0，会把黑色顶进色板）。
+ * Method: bucket by `PALETTE_QUANTIZE_SHIFT` bits → count pixels and sum colors per bucket → average the most
+ * populated buckets, then de-duplicate by "minimum distance to an already picked color" so similar hues don't
+ * take several slots. Nearly transparent pixels are skipped (their RGB is mostly 0, which would push in black).
  */
 export function extractPalette(data: Uint8ClampedArray, count = PALETTE_SIZE): string[] {
   const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
@@ -511,19 +511,19 @@ export function extractPalette(data: Uint8ClampedArray, count = PALETTE_SIZE): s
   return picked;
 }
 
-/** 两个颜色的欧氏距离（0~441），用于调色板去重（`hexToRgb` 在文件后部的颜色工具区） */
+/** Euclidean distance between two colors (0~441), used to de-duplicate the palette (`hexToRgb` lives further down) */
 function colorDistance(hex: string, rgb: { r: number; g: number; b: number }): number {
   const parsed = hexToRgb(hex);
   if (!parsed) return 0;
   return Math.hypot(parsed.r - rgb.r, parsed.g - rgb.g, parsed.b - rgb.b);
 }
 
-/* ------------------------------ 旋转视图 ------------------------------ */
+/* ------------------------------ View rotation ------------------------------ */
 
-/** 旋转视图的步进（度）：菜单按 15° 递进，与 Photoshop 的预设一致 */
+/** View rotation step (degrees): the menu advances by 15°, matching Photoshop's presets */
 export const VIEW_ROTATION_STEP = 15;
 
-/** 视角归一化到 (-180, 180]：避免反复旋转后累出 ±1000° 这类无意义数值 */
+/** Normalize the angle into (-180, 180] so repeated rotations don't pile up values like ±1000° */
 export function normalizeViewRotation(degrees: number): number {
   if (!Number.isFinite(degrees)) return 0;
   let value = degrees % 360;
@@ -532,7 +532,7 @@ export function normalizeViewRotation(degrees: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** 视口中心：旋转与缩放的共同锚点 */
+/** Viewport center: the shared anchor for rotation and zoom */
 export function viewCenter(size: { width: number; height: number }): { x: number; y: number } {
   return { x: size.width / 2, y: size.height / 2 };
 }
@@ -544,11 +544,11 @@ function rotate(px: number, py: number, radians: number): { x: number; y: number
 }
 
 /**
- * 视口平移量（未旋转）→ Konva 图层位置。
+ * Viewport pan (unrotated) → Konva layer position.
  *
- * 语义：`viewport.x / y` 始终表示**未旋转**时的文档左上角屏幕位置（滚动条、滚动、适配都按它计算），
- * 旋转则围绕视口中心施加。Konva 的节点变换是「先缩放旋转再平移」，因此位置必须是旋转后的结果：
- * `P = C + R(θ)·(t − C)`。
+ * Semantics: `viewport.x / y` always holds the **unrotated** screen position of the document's top-left
+ * corner (scrollbars, scrolling and fit rely on it); rotation is about the viewport center, so the position is
+ * `P = C + R(θ)·(t − C)`.
  */
 export function stagePosition(
   viewport: { x: number; y: number },
@@ -565,7 +565,7 @@ export function stagePosition(
   return { x: center.x + offset.x, y: center.y + offset.y };
 }
 
-/** 文档坐标 → 屏幕坐标（含旋转视图） */
+/** Document coordinates → screen coordinates (including view rotation) */
 export function docToScreen(
   point: { x: number; y: number },
   viewport: { x: number; y: number; scale: number },
@@ -582,7 +582,7 @@ export function docToScreen(
   return { x: center.x + local.x, y: center.y + local.y };
 }
 
-/** 屏幕坐标 → 文档坐标（含旋转视图）；与 `docToScreen` 互为逆运算 */
+/** Screen coordinates → document coordinates (including view rotation); inverse of `docToScreen` */
 export function screenToDoc(
   point: { x: number; y: number },
   viewport: { x: number; y: number; scale: number },
@@ -592,14 +592,14 @@ export function screenToDoc(
   const scale = viewport.scale > 0 ? viewport.scale : 1;
   const center = viewCenter(size);
   const local = rotate(point.x - center.x, point.y - center.y, (-rotationDegrees * Math.PI) / 180);
-  // 反解：R(−θ)(screen − C) = v + p·s − C  →  p = (C + R(−θ)(screen − C) − v) / s
+  // Inverse: R(−θ)(screen − C) = v + p·s − C  →  p = (C + R(−θ)(screen − C) − v) / s
   return {
     x: (center.x + local.x - viewport.x) / scale,
     y: (center.y + local.y - viewport.y) / scale,
   };
 }
 
-/** 旋转后的文档外接框尺寸（适配与钳制都按它计算，否则旋转会把画布裁掉） */
+/** Bounds of the document after rotation (fit and clamping use it, or rotation would crop the canvas) */
 export function rotatedDocBounds(
   doc: { width: number; height: number },
   rotationDegrees: number,
@@ -614,24 +614,24 @@ export function rotatedDocBounds(
   };
 }
 
-/* ------------------------------ 对齐吸附（智能参考线） ------------------------------ */
+/* ------------------------------ Snapping (smart guides) ------------------------------ */
 
-/** 吸附判定阈值（屏幕像素）：换算到文档单位时要除以当前缩放 */
+/** Snap threshold (screen px): divide by the current zoom to convert into document units */
 export const SNAP_THRESHOLD_PX = 6;
 
-/** 吸附候选线（文档坐标） */
+/** Snap candidate lines (document coordinates) */
 export interface SnapTargets {
-  /** 竖直候选线：吸附 x */
+  /** Vertical candidate lines: snap x */
   vertical: number[];
-  /** 水平候选线：吸附 y */
+  /** Horizontal candidate lines: snap y */
   horizontal: number[];
 }
 
-/** 正在生效的吸附参考线（画在覆盖层上） */
+/** Snap guides currently in effect (drawn on the overlay) */
 export interface SnapGuide {
-  /** `x` = 竖直参考线（由 x 吸附产生），`y` = 水平参考线 */
+  /** `x` = vertical guide (produced by an x snap), `y` = horizontal guide */
   axis: 'x' | 'y';
-  /** 文档坐标 */
+  /** Document coordinates */
   position: number;
 }
 
@@ -642,10 +642,10 @@ export interface SnapOutcome {
 }
 
 /**
- * 收集吸附候选线。
+ * Collect snap candidate lines.
  *
- * 来源与 Photoshop 的「对齐」一致：画布边界与中心、其它可见图层的边界与中心、已有参考线；
- * 网格线不预先展开（数量随尺寸爆炸），而是在判定时按当前值就近取整。
+ * Sources match Photoshop's "align": canvas edges and center, edges and centers of other visible layers, guides;
+ * grid lines are not expanded up front (their count explodes with size) but rounded on the fly while testing.
  */
 export function collectSnapTargets(
   doc: PhotoDoc,
@@ -666,10 +666,10 @@ export function collectSnapTargets(
 }
 
 /**
- * 拖拽中的吸附：把盒子位置吸到最近的候选线上。
+ * Snapping while dragging: pull the box position onto the nearest candidate line.
  *
- * 判定用的是「盒子自己的三条线」（左 / 中 / 右，上 / 中 / 下）与候选线的最近距离，
- * 因此拖到与另一个图层左对齐、居中对齐、右对齐都能吸住 —— 这正是参考线要解决的问题。
+ * The test measures the nearest distance between the box's own three lines (left / center / right,
+ * top / middle / bottom) and the candidates, so left-, center- and right-aligned drags all stick.
  */
 export function snapBoxPosition(
   box: { x: number; y: number; width: number; height: number },
@@ -691,8 +691,8 @@ export function snapBoxPosition(
     for (const value of values) {
       for (const candidate of candidates) consider(candidate, value);
     }
-    // 网格只吸「左上角」：三条线都参与的话，小图层的中心线会赢过左上角，
-    // 结果图层停在离网格半格的位置上，看起来像没对齐
+    // Grid snaps only the top-left corner: with all three lines in play, a small layer's center line wins,
+    // leaving the layer half a cell off the grid, which looks misaligned
     if (gridSize > 0 && values.length > 0) {
       consider(Math.round(values[0] / gridSize) * gridSize, values[0]);
     }
@@ -711,9 +711,9 @@ export function snapBoxPosition(
   };
 }
 
-/* ------------------------------ 印章步进 / 润饰族 ------------------------------ */
+/* ------------------------------ Stamp stepping / retouch family ------------------------------ */
 
-/** 润饰工具族（沿笔迹逐印章作用的一类工具） */
+/** Retouch family (tools that act stamp by stamp along a stroke) */
 export type RepairTool =
   'cloneStamp' | 'healing' | 'spotHeal' | 'smudge' | 'blurBrush' | 'sharpenBrush';
 
@@ -726,28 +726,28 @@ export const REPAIR_TOOLS: RepairTool[] = [
   'sharpenBrush',
 ];
 
-/** 需要「Alt + 点击取样」的修复类工具 */
+/** Healing tools that require "Alt + click to sample" */
 export function needsCloneSource(tool: ToolId): boolean {
   return tool === 'cloneStamp' || tool === 'healing';
 }
 
-/** 印章间距（相对直径）：涂抹 / 模糊这类要连续，间距比减淡加深更小 */
+/** Stamp spacing (fraction of the diameter): smudge / blur need continuity, so tighter than dodge and burn */
 export const REPAIR_SPACING = 0.15;
-/** 单次 pointermove 的印章上限：防止异常跳点造成海量绘制 */
+/** Stamp cap per pointermove: keeps a stray jump from painting thousands of stamps */
 export const MAX_STAMPS_PER_MOVE = 4096;
 
 export interface StampStep {
-  /** 本次该盖章的位置（含起点之间的插值） */
+  /** Positions to stamp this time (including interpolation from the start point) */
   positions: { x: number; y: number }[];
-  /** 供下一次调用使用的「距下一枚印章还需前进的距离」 */
+  /** "Distance left before the next stamp", handed to the next call */
   next: number;
 }
 
 /**
- * 沿「上一点 → 当前点」插值出所有该盖章的位置（纯函数）。
+ * Interpolate every stamp position along "previous point → current point" (pure function).
  *
- * 抽出来的原因：图章 / 修复 / 涂抹 / 模糊锐化 / 减淡加深五类工具共用同一套步进逻辑，
- * 各写一遍时只要有人写错累积量，就会表现为「走得快时印章变稀」这种极难复现的差异。
+ * Extracted because stamp / healing / smudge / blur-sharpen / dodge-burn share one stepping rule, and a
+ * per-tool copy with a wrong accumulator shows up as "stamps thin out when moving fast", near impossible to debug.
  */
 export function walkStamps(
   fromX: number,
@@ -772,7 +772,7 @@ export function walkStamps(
   return { positions, next: Math.max(0, walked - distance) };
 }
 
-/** 印章的边缘衰减：中心 1 → 边缘 0（平方衰减，视觉上比线性更接近柔边笔刷） */
+/** Stamp edge falloff: 1 at the center → 0 at the edge (squared, closer to a soft brush than linear) */
 export function stampFalloff(distance: number): number {
   if (distance >= 1) return 0;
   const value = 1 - distance;
@@ -780,9 +780,9 @@ export function stampFalloff(distance: number): number {
 }
 
 /**
- * 修复取色：把「源区均值」平移到「目标区均值」所需的分量增量。
+ * Healing color pick: the per-channel offset that moves the source mean onto the target mean.
  *
- * 修复画笔要的是「保留源的纹理、匹配目标的颜色」，因此复制像素时加上这个增量。
+ * The healing brush wants source texture with target color, so this offset is added while copying pixels.
  */
 export function healOffset(
   sourceMean: readonly number[],
@@ -795,21 +795,21 @@ export function healOffset(
   ];
 }
 
-/** 单通道混合：`value` 向 `target` 靠拢 `weight` 比例 */
+/** Blend one channel: move `value` toward `target` by `weight` */
 export function mixChannel(value: number, target: number, weight: number): number {
   const amount = Number.isFinite(weight) ? Math.min(1, Math.max(0, weight)) : 0;
   return value + (target - value) * amount;
 }
 
-/* ------------------------------ 网格变形（透视 / 扭曲 / 斜切 / 变形） ------------------------------ */
+/* ------------------------------ Mesh warp (perspective / distort / skew / warp) ------------------------------ */
 
-/** 自由变换家族的四种模式（`free` = 常规自由变换） */
+/** The four modes of the free-transform family (`free` = plain free transform) */
 export type TransformMode = 'free' | 'perspective' | 'distort' | 'skew' | 'warp';
 export const TRANSFORM_MODES: TransformMode[] = ['free', 'perspective', 'distort', 'skew', 'warp'];
 
-/** 控制点位移上限（相对图层宽 / 高）：限制在 ±50%，避免把图层拖到无法收拾 */
+/** Control-point shift cap (relative to layer width / height): ±50%, so a layer can never be dragged too far */
 export const MAX_MESH_OFFSET = 0.5;
-/** 变形（Warp）的网格规模：4×4 = 16 个控制点，与 Photoshop 一致 */
+/** Warp mesh size: 4×4 = 16 control points, same as Photoshop */
 export const WARP_COLS = 4;
 export const WARP_ROWS = 4;
 
@@ -818,12 +818,12 @@ export function clampMeshOffset(value: number): number {
   return Math.min(MAX_MESH_OFFSET, Math.max(-MAX_MESH_OFFSET, value));
 }
 
-/** 全零网格（未变形） */
+/** All-zero mesh (no warp) */
 export function createMesh(cols: number, rows: number): MeshWarp {
   return { cols, rows, points: new Array(cols * rows * 2).fill(0) };
 }
 
-/** 四角网格：透视 / 扭曲 / 斜切共用同一存储，差异只在交互约束 */
+/** Four-corner mesh: perspective / distort / skew share one storage, differing only in interaction constraints */
 export function createQuadMesh(): MeshWarp {
   return createMesh(2, 2);
 }
@@ -836,9 +836,9 @@ export function meshIsIdentity(mesh?: MeshWarp | null): boolean {
 }
 
 /**
- * 校验 / 归一化外部网格（迁移与导入入口共用）。
- * 只接受 2×2（四角）与 4×4（变形）两种规模 —— 其它规模没有对应的交互实现，宁可丢弃也不留半成品数据。
- * 全零网格直接返回 undefined：数据里不该存在「等价于没有变形」的网格。
+ * Validate / normalize an external mesh (shared by the migration and import entry points).
+ * Only 2×2 (four corners) and 4×4 (warp) are accepted: other sizes have no interaction behind them, so drop
+ * them rather than keep half-baked data. An all-zero mesh returns undefined: "equivalent to no warp" shouldn't exist.
  */
 export function normalizeMesh(value: unknown): MeshWarp | undefined {
   if (!value || typeof value !== 'object') return undefined;
@@ -857,9 +857,9 @@ export function normalizeMesh(value: unknown): MeshWarp | undefined {
 }
 
 /**
- * 网格变形需要的额外留白（像素）：按位移场的最大绝对值估算。
+ * Extra padding the mesh warp needs (px), estimated from the largest absolute offset in the displacement field.
  *
- * 用途：合成缓冲（蒙版 / 图层样式）与变形位图都要按此扩张，否则被甩出盒子的内容会被裁掉。
+ * Purpose: composite buffers (mask / layer styles) and the warped bitmap grow by it, else content gets clipped.
  */
 export function meshPadding(
   mesh: MeshWarp | null | undefined,
@@ -877,14 +877,14 @@ export function meshPadding(
   return Math.ceil(Math.max(maxDx * width, maxDy * height));
 }
 
-/** 缓存签名（渲染据此决定是否重建位图） */
+/** Cache signature (rendering uses it to decide whether to rebuild the bitmap) */
 export function meshSignature(mesh?: MeshWarp | null): string {
   if (meshIsIdentity(mesh)) return '';
   const value = mesh as MeshWarp;
   return `${value.cols}x${value.rows}:${value.points.map((item) => item.toFixed(4)).join(',')}`;
 }
 
-/** 控制点在「未变形盒子」中的归一化位置（行优先） */
+/** Normalized position of each control point inside the undeformed box (row-major) */
 function meshBaseParam(mesh: MeshWarp, index: number): { u: number; v: number } {
   const col = index % mesh.cols;
   const row = Math.floor(index / mesh.cols);
@@ -894,19 +894,19 @@ function meshBaseParam(mesh: MeshWarp, index: number): { u: number; v: number } 
 export interface MeshControlPoint {
   col: number;
   row: number;
-  /** 当前控制点（含变形位移） */
+  /** Current control point (including warp offset) */
   x: number;
   y: number;
-  /** 未变形时的位置（画网格参照线要用） */
+  /** Position when undeformed (needed for the grid reference lines) */
   baseX: number;
   baseY: number;
 }
 
 /**
- * 控制点的文档坐标。
+ * Document coordinates of a control point.
  *
- * `rotated` 决定是否叠加图层旋转：**覆盖层（Konva 覆盖层不带旋转）必须传 true**，
- * 而 Canvas2D 绘制路径外层已经施加过旋转，必须传 false，否则会转两次。
+ * `rotated` decides whether layer rotation is applied: **overlays (the Konva overlay is unrotated) must pass true**,
+ * while Canvas2D paint paths already applied it outside and must pass false, or the rotation doubles.
  */
 export function meshControlPoints(
   mesh: MeshWarp,
@@ -946,8 +946,8 @@ export function meshControlPoints(
 }
 
 /**
- * 文档点 → 盒内归一化坐标（u, v ∈ [0,1]，未变形参照系）。
- * 与 `meshControlPoints(rotated = true)` 配套：把指针位置换算成控制点参数。
+ * Document point → normalized box coordinates (u, v ∈ [0,1] in the undeformed frame).
+ * Pairs with `meshControlPoints(rotated = true)`: turns a pointer position into control-point parameters.
  */
 export function meshParamAt(
   box: LayerBox,
@@ -975,13 +975,13 @@ export function meshParamAt(
 }
 
 /**
- * 拖动控制点后的新网格。
+ * New mesh after dragging a control point.
  *
- * 四种模式的差异全部收敛在这个纯函数里（便于单测）：
- * - `distort`：拖哪个点动哪个点；
- * - `perspective`：拖角点时，另两个相邻角点沿各自所在边同步平移 → 得到标准梯形；
- * - `skew`：拖边中点时整条边的两个端点同向平移 → 剪切；
- * - `warp`：任意控制点自由移动。
+ * All differences between the four modes are folded into this pure function (easy to unit test):
+ * - `distort`: the dragged point moves alone;
+ * - `perspective`: dragging a corner moves the two adjacent corners along their own edges → a proper trapezoid;
+ * - `skew`: dragging an edge midpoint moves both endpoints of that edge together → a shear;
+ * - `warp`: any control point moves freely.
  */
 export function dragMeshPoint(
   mesh: MeshWarp,
@@ -1005,7 +1005,7 @@ export function dragMeshPoint(
   set(col, row, du, dv);
 
   if (mode === 'perspective') {
-    // 相邻点只继承「沿各自边」的那一维位移：横边借 dx、纵边借 dy
+    // Neighbors inherit only the component along their own edge: horizontal edges take dx, vertical ones dy
     set(mesh.cols - 1 - col, row, du, 0);
     set(col, mesh.rows - 1 - row, 0, dv);
   }
@@ -1015,10 +1015,10 @@ export function dragMeshPoint(
 export type MeshEdge = 'top' | 'bottom' | 'left' | 'right';
 
 /**
- * 拖动边线后的新网格（斜切）：整条边的端点同向平移。
+ * New mesh after dragging an edge (skew): both endpoints of that edge move together.
  *
- * 与「拖角点」互补 —— 斜切要的是剪切（整条边平移），而 2×2 网格里没有边中点可拖，
- * 因此把边本身作为可拖对象。
+ * Complementary to corner dragging: skew means a shear (whole edge shifts), and a 2×2 mesh has no edge
+ * midpoints to drag, so the edge itself becomes the handle.
  */
 export function dragMeshEdge(mesh: MeshWarp, edge: MeshEdge, du: number, dv: number): MeshWarp {
   const points = mesh.points.slice();
@@ -1039,7 +1039,7 @@ export function dragMeshEdge(mesh: MeshWarp, edge: MeshEdge, du: number, dv: num
   return { ...mesh, points };
 }
 
-/** 命中哪条边（容差按盒内归一化坐标给出）；都不命中返回 null */
+/** Which edge was hit (tolerance in normalized box coordinates); null when none */
 export function meshEdgeAt(
   u: number,
   v: number,
@@ -1053,17 +1053,17 @@ export function meshEdgeAt(
   return null;
 }
 
-/** 网格覆盖层状态（纯数据，`render/overlays.ts` 只负责画） */
+/** Mesh overlay state (pure data; `render/overlays.ts` only draws it) */
 export interface MeshGridState {
   cols: number;
   rows: number;
-  /** 行优先的控制点（含变形位移） */
+  /** Row-major control points (including warp offset) */
   points: { x: number; y: number }[];
-  /** 未变形时的控制点位置（参照线用） */
+  /** Control-point positions when undeformed (for reference lines) */
   basePoints: { x: number; y: number }[];
 }
 
-/** 由网格与图层盒算出覆盖层状态 */
+/** Derive the overlay state from the mesh and the layer box */
 export function meshGridState(mesh: MeshWarp, box: LayerBox, rotated = true): MeshGridState {
   const controls = meshControlPoints(mesh, box, rotated);
   return {
@@ -1075,16 +1075,16 @@ export function meshGridState(mesh: MeshWarp, box: LayerBox, rotated = true): Me
 }
 
 export interface TransformOverlay {
-  /** 常规变换框（自由变换模式） */
+  /** Regular transform box (free transform mode) */
   transformBox: LayerBox | null;
-  /** 网格控制点（透视 / 扭曲 / 斜切 / 变形模式） */
+  /** Mesh control points (perspective / distort / skew / warp modes) */
   meshGrid: MeshGridState | null;
 }
 
 /**
- * 覆盖层该显示什么，由「图层 + 变换模式」唯一决定。
+ * What the overlay shows is decided solely by "layer + transform mode".
  *
- * 抽到 core 的原因：画布组件与交互层都要算这一份（两条路径各写一次必然出现「拖拽时显示的框和静态时不一样」）。
+ * Lives in core because canvas and interaction both need it; two copies drift (drag box ≠ idle box).
  */
 export function transformOverlayFor(
   layer: {
@@ -1110,15 +1110,15 @@ export function transformOverlayFor(
   return { transformBox: null, meshGrid: meshGridState(layer.mesh as MeshWarp, box, true) };
 }
 
-/* ------------------------------ 再次变换 ------------------------------ */
+/* ------------------------------ Transform again ------------------------------ */
 
-/** 一次变换的增量：⌘⇧T「再次变换」就是把它再作用一次 */
+/** One transform's delta: ⌘⇧T "transform again" simply applies it once more */
 export interface TransformDelta {
   dx: number;
   dy: number;
   scaleX: number;
   scaleY: number;
-  /** 角度增量 */
+  /** Angle delta */
   rotation: number;
 }
 
@@ -1133,9 +1133,9 @@ export function isIdentityDelta(delta: TransformDelta): boolean {
 }
 
 /**
- * 把增量作用到图层盒：缩放以盒子中心为锚点，再叠加平移与旋转。
+ * Apply the delta to the layer box: scale about the box center, then add translation and rotation.
  *
- * 网格变形无需额外处理 —— 位移是归一化的，会随盒子一起缩放 / 旋转 / 平移。
+ * The mesh warp needs no extra work: offsets are normalized and scale / rotate / translate with the box.
  */
 export function applyTransformDelta(box: LayerBox, delta: TransformDelta): LayerBox {
   const width = Math.max(MIN_TRANSFORM_SIZE, box.width * delta.scaleX);
@@ -1151,12 +1151,12 @@ export function applyTransformDelta(box: LayerBox, delta: TransformDelta): Layer
   };
 }
 
-/* ------------------------------ 文字排版 / 变形 ------------------------------ */
+/* ------------------------------ Text layout / warp ------------------------------ */
 
 /**
- * 可选字体（专有名词，按原名展示，不做翻译）。
+ * Optional fonts (proper nouns, shown as-is, never translated).
  *
- * 放在 core 而不是某个面板里：字符面板与属性面板都要用它，两处各写一份必然出现「一边加了字体另一边没有」。
+ * Lives in core, not a panel: the character and properties panels both need it; two copies always drift apart.
  */
 export const FONT_FAMILIES = [
   'PingFang SC',
@@ -1168,7 +1168,7 @@ export const FONT_FAMILIES = [
   'Courier New',
 ].map((name) => ({ id: name, label: name }));
 
-/** 变形样式全集（含 none） */
+/** All warp styles (including none) */
 export const TEXT_WARP_KINDS: TextWarpKind[] = [
   'none',
   'arc',
@@ -1183,7 +1183,7 @@ export const TEXT_WARP_KINDS: TextWarpKind[] = [
   'fisheye',
 ];
 
-/** 变形强度上限（百分比） */
+/** Warp strength cap (percent) */
 export const MAX_WARP_AMOUNT = 100;
 
 export function clampWarpAmount(value: number): number {
@@ -1191,25 +1191,25 @@ export function clampWarpAmount(value: number): number {
   return Math.round(Math.min(MAX_WARP_AMOUNT, Math.max(-MAX_WARP_AMOUNT, value)));
 }
 
-/** 弯曲强度 → 最大垂直位移占文字块高度的比例（25%：肉眼明显但不会甩出画布太远） */
+/** Bend strength → max vertical shift as a fraction of the text block height (25%: clear but stays on canvas) */
 const WARP_BEND_RATIO = 0.25;
-/** 水平强度 → 最大水平位移占文字块宽度的比例 */
+/** Horizontal strength → max horizontal shift as a fraction of the text block width */
 const WARP_HORIZONTAL_RATIO = 0.18;
 
 export interface WarpOffset {
-  /** 水平位移，单位 = 文字块宽度的比例 */
+  /** Horizontal offset, as a fraction of the text block width */
   dx: number;
-  /** 垂直位移，单位 = 文字块高度的比例（负值向上） */
+  /** Vertical offset, as a fraction of the text block height (negative = up) */
   dy: number;
 }
 
 /**
- * 变形位移场（纯函数，供渲染与测试共用）。
+ * Warp displacement field (pure function, shared by rendering and tests).
  *
- * `u` ∈ [0,1] 为横向归一坐标（左→右），`v` ∈ [0,1] 为纵向（上→下），
- * 返回值为**归一化位移**（乘上宽 / 高即得像素）。参考 Photoshop 的变形样式：
- * 弧度族沿基线弯曲，`lower/upper` 只弯下半 / 上半，`arch` 中间最鼓，
- * `wave` 为 S 形，`flag` 为旗面摆动（振幅随高度递增），`rise` 为整体的斜向抬升，`fisheye` 为径向鼓形。
+ * `u` ∈ [0,1] is the horizontal normalized coordinate (left→right) and `v` ∈ [0,1] the vertical (top→bottom);
+ * the return value is a **normalized offset** (multiply by width / height for pixels). Photoshop's styles:
+ * arc variants bend along the baseline, `lower/upper` bend only the bottom / top half, `arch` bulges in the middle,
+ * `wave` is S-shaped, `flag` flutters (amplitude grows with height), `rise` lifts diagonally, `fisheye` bulges radially.
  */
 export function warpOffset(
   kind: TextWarpKind,
@@ -1222,7 +1222,7 @@ export function warpOffset(
   const bendAmount = clampWarpAmount(bend) / MAX_WARP_AMOUNT;
   const horizontalAmount = clampWarpAmount(horizontal) / MAX_WARP_AMOUNT;
   const mid = Math.sin(Math.PI * u);
-  /** 到水平中线的距离：0 = 中线，1 = 上下边缘 */
+  /** Distance from the horizontal center line: 0 = center, 1 = top / bottom edge */
   const center = Math.abs(v * 2 - 1);
   let dx = 0;
   let dy = 0;
@@ -1252,11 +1252,11 @@ export function warpOffset(
       dy = Math.sin(Math.PI * 2 * u) * (0.5 + 0.5 * v);
       break;
     case 'rise':
-      // 右侧整体抬高（bend > 0 时向上）
+      // Lift the right side as a whole (upward when bend > 0)
       dy = -u;
       break;
     case 'fisheye': {
-      // 径向鼓形：中心不动，越靠边缘位移越大（bend 控制纵向、horizontal 控制横向）
+      // Radial bulge: center stays put, offset grows toward the edges (bend = vertical, horizontal = lateral)
       const radial = Math.min(1, Math.hypot(u - 0.5, v - 0.5) / 0.7071);
       dx = (u - 0.5) * 2 * radial;
       dy = (v - 0.5) * 2 * radial;
@@ -1270,10 +1270,10 @@ export function warpOffset(
 }
 
 /**
- * 是否需要走「位图路径」渲染文字。
+ * Whether text must go through the bitmap rendering path.
  *
- * 两种情况 Konva.Text 无法表达：变形（需要网格重采样）与段间距（需要逐段定位）。
- * 走位图路径时由 `render/text.ts` 统一绘制，与导出用的 Canvas2D 路径**同源**，避免预览与导出漂移。
+ * Two cases Konva.Text cannot express: warp (needs mesh resampling) and paragraph spacing (needs per-line layout).
+ * `render/text.ts` draws that path from the **same code** as the Canvas2D export, so preview and export agree.
  */
 export function needsTextBitmap(layer: {
   paragraphSpacing: number;
@@ -1284,14 +1284,14 @@ export function needsTextBitmap(layer: {
   return layer.warp.bend !== 0 || layer.warp.horizontal !== 0;
 }
 
-/* ------------------------------ 矢量蒙版 / 剪贴蒙版 ------------------------------ */
+/* ------------------------------ Vector mask / clipping mask ------------------------------ */
 
-/** 羽化上限：与像素蒙版一致（`render/mask.ts` 的模糊上限 64px） */
+/** Feather cap: same as the pixel mask (`render/mask.ts` caps blur at 64px) */
 export const MAX_VECTOR_FEATHER = 64;
-/** 轮廓数量上限：布尔运算叠加出的选区轮廓过多时截断，避免蒙版与工程文件失控 */
+/** Outline cap: boolean ops can pile up outlines, so truncate to keep masks and project files sane */
 export const MAX_VECTOR_CONTOURS = 32;
 
-/** 矢量蒙版签名：轮廓顶点 + 羽化 / 反相都参与缓存键 */
+/** Vector mask signature: outline points plus feather / invert all feed the cache key */
 export function vectorMaskSignature(mask: VectorMaskRef | null | undefined): string {
   if (!mask?.enabled || mask.contours.length === 0) return '';
   const parts = mask.contours.map(
@@ -1300,15 +1300,15 @@ export function vectorMaskSignature(mask: VectorMaskRef | null | undefined): str
   return `${mask.inverted ? 'i' : ''}${mask.feather.toFixed(1)}|${parts.join(';')}`;
 }
 
-/** 该蒙版是否会产生裁切（已启用且至少一条轮廓） */
+/** Whether this mask actually clips (enabled and at least one outline) */
 export function hasVectorMask(mask: VectorMaskRef | null | undefined): boolean {
   return Boolean(mask?.enabled) && (mask?.contours.length ?? 0) > 0;
 }
 
 /**
- * 选区 → 矢量蒙版轮廓（图层局部坐标）。
- * 直接把选区的「并集 / 差集」轮廓平移 `-(originX, originY)`，语义完全沿用选区，
- * 因此布尔运算产生的加选 / 减选 / 洞都能原样成为矢量蒙版的多轮廓。
+ * Selection → vector mask outlines (layer-local coordinates).
+ * Just shift the selection's union / difference outlines by `-(originX, originY)`; the semantics carry over,
+ * so adds / subtracts / holes from boolean ops all become multiple mask outlines unchanged.
  */
 export function selectionToVectorContours(
   selection: Selection,
@@ -1329,19 +1329,19 @@ export function selectionToVectorContours(
 }
 
 /**
- * 剪贴蒙版的基准图层下标：同层内、下方最近的「可绘制」图层。
+ * Base layer index for a clipping mask: the nearest drawable layer below it at the same level.
  *
- * 不可当基准的情形：
- * - 调整图层（不产生像素，PS 亦不允许）；
- * - 穿透编组（自身不合成成一张图，没有可用的 alpha）；
- * - 不可见图层（PS 中基准不可见时整组剪贴失效）。
- * 找不到时返回 -1，调用方据此忽略 `clipped`。
+ * Cases that cannot be a base:
+ * - adjustment layers (produce no pixels, and PS forbids it too);
+ * - pass-through groups (never composited into one image, so no usable alpha);
+ * - hidden layers (in PS the whole clip dies when the base is hidden).
+ * Returns -1 when none is found, and the caller then ignores `clipped`.
  */
 export function clipBaseIndex(layers: Layer[], index: number): number {
   for (let i = index - 1; i >= 0; i -= 1) {
     const candidate = layers[i];
     if (!candidate) continue;
-    // 跨出当前编组就不再往上找：剪贴蒙版只能作用于同组内的下方图层
+    // Stop at the group boundary: a clipping mask only affects layers below it in the same group
     if ((candidate.parentId ?? null) !== (layers[index]?.parentId ?? null)) return -1;
     if (!candidate.visible) continue;
     if (candidate.kind === 'adjustment') continue;
@@ -1352,9 +1352,9 @@ export function clipBaseIndex(layers: Layer[], index: number): number {
   return -1;
 }
 
-/* ------------------------------ 图层样式 ------------------------------ */
+/* ------------------------------ Layer styles ------------------------------ */
 
-/** 效果 id（与 `LayerStyle` 的字段同名） */
+/** Effect ids (same names as the `LayerStyle` fields) */
 export const STYLE_EFFECTS = [
   'dropShadow',
   'innerShadow',
@@ -1396,7 +1396,7 @@ export function createColorOverlay(): ColorOverlayStyle {
   return { enabled: true, color: '#2563EB', opacity: 0.65 };
 }
 
-/** 默认样式（五种效果全部关闭）：面板「添加效果」时的起点 */
+/** Default style (all five effects off): the starting point for "add effect" in the panel */
 export function createLayerStyle(): LayerStyle {
   return {
     dropShadow: { ...createDropShadow(), enabled: false },
@@ -1407,22 +1407,22 @@ export function createLayerStyle(): LayerStyle {
   };
 }
 
-/** 该效果是否会产生可见绘制 */
+/** Whether this effect draws anything visible */
 export function isEffectActive(effect: { enabled: boolean } | null | undefined): boolean {
   return Boolean(effect?.enabled);
 }
 
-/** 图层样式是否有任一启用中的效果 */
+/** Whether any effect in the layer style is enabled */
 export function hasLayerStyle(style: LayerStyle | null | undefined): boolean {
   if (!style) return false;
   return STYLE_EFFECTS.some((id) => isEffectActive(style[id]));
 }
 
 /**
- * 样式在自身轮廓之外需要多少留白（像素）。
+ * How much padding a style needs outside its own outline (px).
  *
- * 依据：Canvas2D 的 `filter: blur(r)` 影响范围约为 2r，`spread` 与 `distance` 直接平移外扩；
- * 内阴影与内侧描边都在剪影内部，不占用留白。
+ * Basis: Canvas2D's `filter: blur(r)` reaches about 2r, and `spread` / `distance` shift and grow it directly;
+ * inner shadow and inner stroke stay inside the silhouette and take no padding.
  */
 export function stylePadding(style: LayerStyle | null | undefined): number {
   if (!style) return 0;
@@ -1440,7 +1440,7 @@ export function stylePadding(style: LayerStyle | null | undefined): number {
   return Math.ceil(pad);
 }
 
-/** 样式签名：参与烘焙 / 合成缓存键，任一参数变化都会换键 */
+/** Style signature: feeds the bake / composite cache keys, so any changed parameter changes the key */
 export function styleSignature(style: LayerStyle | null | undefined): string {
   if (!hasLayerStyle(style)) return '';
   const parts: string[] = [];
@@ -1456,10 +1456,10 @@ export function styleSignature(style: LayerStyle | null | undefined): string {
   return parts.join('|');
 }
 
-/* ------------------------------ 渐变 / 润饰 ------------------------------ */
+/* ------------------------------ Gradients / retouch ------------------------------ */
 
 export type GradientKind = 'linear' | 'radial';
-/** 渐变端点组合：前景→透明 / 前景→背景 */
+/** Gradient endpoint pairs: foreground→transparent / foreground→background */
 export type GradientMode = 'fg-transparent' | 'fg-bg';
 
 export const GRADIENT_KINDS: GradientKind[] = ['linear', 'radial'];
@@ -1468,19 +1468,19 @@ export const GRADIENT_MODES: GradientMode[] = ['fg-transparent', 'fg-bg'];
 export type RetouchMode = 'dodge' | 'burn' | 'sponge';
 export const RETOUCH_MODES: RetouchMode[] = ['dodge', 'burn', 'sponge'];
 
-/** 润饰工具强度上限（百分比） */
+/** Retouch tool strength cap (percent) */
 export const MAX_RETOUCH_STRENGTH = 100;
 
 export interface HsvColor {
-  /** 色相 0~360 */
+  /** Hue 0~360 */
   h: number;
-  /** 饱和度 0~100 */
+  /** Saturation 0~100 */
   s: number;
-  /** 明度 0~100 */
+  /** Lightness 0~100 */
   v: number;
 }
 
-/** `#RRGGBB` → HSV；解析失败回落到黑色 */
+/** `#RRGGBB` → HSV; falls back to black when parsing fails */
 export function hexToHsv(hex: string): HsvColor {
   const value = String(hex).trim().replace('#', '');
   const full =
@@ -1508,7 +1508,7 @@ export function hexToHsv(hex: string): HsvColor {
   return { h, s: max <= 0 ? 0 : (delta / max) * 100, v: max * 100 };
 }
 
-/** HSV → `#RRGGBB`（大写，便于与既有颜色字符串比较） */
+/** HSV → `#RRGGBB` (uppercase, so it compares against existing color strings) */
 export function hsvToHex(hsv: HsvColor): string {
   const h = ((hsv.h % 360) + 360) % 360;
   const s = Math.min(100, Math.max(0, hsv.s)) / 100;
@@ -1536,7 +1536,7 @@ export function hsvToHex(hsv: HsvColor): string {
   return `#${toHex(rgb[0])}${toHex(rgb[1])}${toHex(rgb[2])}`.toUpperCase();
 }
 
-/** `#RRGGBB` + alpha → `rgba(...)`；解析失败回落到黑色 */
+/** `#RRGGBB` + alpha → `rgba(...)`; falls back to black when parsing fails */
 export function withAlpha(hex: string, alpha: number): string {
   const value = String(hex).trim().replace('#', '');
   const full =
@@ -1554,19 +1554,19 @@ export function withAlpha(hex: string, alpha: number): string {
   )},${a})`;
 }
 
-/** 面板滑杆统一为整数百分比 / 角度 */
+/** Panel sliders are integers: percent / degrees */
 export function clampPercent(value: number, min = -100, max = 100): number {
   return Math.round(clampNumber(value, min, max));
 }
 
-/** 0~1 的不透明度，滑杆用 0~100 展示 */
+/** 0~1 opacity, shown on sliders as 0~100 */
 export function clampUnit(value: number): number {
   return Math.round(clampNumber(value, 0, 1) * 100) / 100;
 }
 
 /**
- * 调整参数 → CSS filter 字符串（只覆盖 CSS 能表达的部分）。
- * 温度、锐化等无法用 CSS 表达的项由 `render/filters.ts` 走像素运算。
+ * Adjustment parameters → CSS filter string (only the parts CSS can express).
+ * Temperature, sharpen and the like cannot be expressed in CSS and go through `render/filters.ts` pixels.
  */
 export function buildFilterString(adjustments: Adjustments): string {
   const parts: string[] = [];
@@ -1582,7 +1582,7 @@ export function buildFilterString(adjustments: Adjustments): string {
   return parts.join(' ');
 }
 
-/** 是否启用了任一扩展调整（色阶 / 曲线 / 色彩平衡 / 黑白 / 阈值 / 渐变映射 / 去色） */
+/** Whether any extended adjustment is on (levels, curves, color balance, B&W, threshold, gradient map, desaturate) */
 export function hasExtendedAdjustments(adjustments: Adjustments): boolean {
   return Boolean(
     adjustments.levels ||
@@ -1600,7 +1600,7 @@ export function hasExtendedAdjustments(adjustments: Adjustments): boolean {
   );
 }
 
-/** 是否存在需要像素运算的调整项（决定是否需要 getImageData 通道） */
+/** Whether any adjustment needs pixel math (decides whether the getImageData channel is required) */
 export function needsPixelPass(adjustments: Adjustments, filters: FilterSpec[]): boolean {
   if (adjustments.temperature !== 0) return true;
   if (adjustments.sharpen > 0) return true;
@@ -1609,24 +1609,24 @@ export function needsPixelPass(adjustments: Adjustments, filters: FilterSpec[]):
 }
 
 /**
- * 启用中的滤镜（`enabled === false` 表示「保留参数但暂时关闭」）。
+ * Enabled filters (`enabled === false` means "keep the parameters but switch it off for now").
  *
- * 所有**渲染**路径都必须经过它；而缓存签名（`filterSpecKey`）仍然序列化整份列表，
- * 这样「停用某个滤镜」既能改变画面，又能让缓存跟着失效。
+ * Every **render** path must go through it, while the cache signature (`filterSpecKey`) still serializes the
+ * full list, so disabling a filter both changes the image and invalidates the cache.
  */
 export function activeFilters(filters: FilterSpec[] | null | undefined): FilterSpec[] {
   if (!filters || filters.length === 0) return [];
   return filters.filter((spec) => spec.enabled !== false);
 }
 
-/** 智能滤镜是否会产生画面变化（决定智能对象能否走轻量预览路径） */
+/** Whether the smart filter changes the image (decides whether a smart object can use the light preview path) */
 export function hasActiveFilters(filters: FilterSpec[] | null | undefined): boolean {
   return activeFilters(filters).length > 0;
 }
 
 /**
- * 「没有调整」的调整参数。
- * 供只关心滤镜栈的场景（智能滤镜烘焙、签名）使用，避免为了取默认值而依赖 `model/factory`。
+ * The "no adjustments" adjustment parameters.
+ * For callers that only care about the filter stack (smart filter baking, signatures), without relying on `model/factory`.
  */
 export const NO_ADJUSTMENTS: Adjustments = {
   brightness: 0,
@@ -1638,7 +1638,7 @@ export const NO_ADJUSTMENTS: Adjustments = {
   sharpen: 0,
 };
 
-/** 滤镜实例的稳定序列化（参数按键名排序，避免键序不同导致签名漂移） */
+/** Stable serialization of a filter instance (parameters sorted by key, so key order can't shift the signature) */
 function filterSpecKey(filters: FilterSpec[]): string {
   return filters
     .map((spec) => {
@@ -1648,13 +1648,13 @@ function filterSpecKey(filters: FilterSpec[]): string {
             .map((key) => `${key}=${spec.params?.[key]}`)
             .join(',')
         : '';
-      // `enabled` 参与签名：停用 / 启用必须让缓存失效
+      // `enabled` is part of the signature: toggling it must invalidate the cache
       return `${spec.id}(${params})${spec.enabled === false ? ':off' : ''}`;
     })
     .join('|');
 }
 
-/** 烘焙缓存签名：参数不变则复用上一次的画布 */
+/** Bake cache signature: reuse the last canvas while the parameters are unchanged */
 export function bakeSignature(
   assetId: string,
   rev: number,
@@ -1664,9 +1664,9 @@ export function bakeSignature(
   return [assetId, rev, JSON.stringify(adjustments ?? {}), filterSpecKey(filters ?? [])].join('|');
 }
 
-/* ------------------------------ 调整 LUT ------------------------------ */
+/* ------------------------------ Adjustment LUTs ------------------------------ */
 
-/** 0~255 钳制 */
+/** Clamp to 0~255 */
 function clampByte(value: number): number {
   return value < 0 ? 0 : value > 255 ? 255 : Math.round(value);
 }
@@ -1677,7 +1677,7 @@ function identityLut(): Uint8ClampedArray {
   return lut;
 }
 
-/** 色阶 LUT */
+/** Levels LUT */
 export function buildLevelsLut(params: LevelsParams): Uint8ClampedArray {
   const lut = new Uint8ClampedArray(256);
   const inBlack = clampByte(params.inBlack);
@@ -1696,8 +1696,8 @@ export function buildLevelsLut(params: LevelsParams): Uint8ClampedArray {
 }
 
 /**
- * 曲线 LUT：控制点按 x 排序后做**单调三次插值（PCHIP）**，
- * 相比普通三次样条不会在控制点之间产生过冲，调色结果更可控。
+ * Curve LUT: control points are sorted by x, then **monotone cubic interpolation (PCHIP)** is applied, which
+ * unlike a plain cubic spline does not overshoot between points, keeping color grading predictable.
  */
 export function buildCurveLut(points: CurvePoint[]): Uint8ClampedArray {
   const sorted = [...points]
@@ -1756,7 +1756,7 @@ export function buildCurveLut(points: CurvePoint[]): Uint8ClampedArray {
   return lut;
 }
 
-/** 串联两条 LUT：先 a 后 b */
+/** Concatenate two LUTs: a first, then b */
 export function composeLut(a: Uint8ClampedArray, b: Uint8ClampedArray): Uint8ClampedArray {
   const lut = new Uint8ClampedArray(256);
   for (let i = 0; i < 256; i += 1) lut[i] = b[a[i]];
@@ -1764,9 +1764,9 @@ export function composeLut(a: Uint8ClampedArray, b: Uint8ClampedArray): Uint8Cla
 }
 
 /**
- * 把「色阶 + 曲线」合成为每通道一条 LUT（可分离的部分）。
- * 色彩平衡 / 黑白 / 阈值 / 渐变映射依赖亮度或跨通道，无法用 LUT 表达，由 `render/adjust.ts` 逐像素处理。
- * 返回 null 表示没有可分离的调整。
+ * Fold levels + curves into one LUT per channel (the separable part).
+ * Color balance / B&W / threshold / gradient map rely on luminance or cross-channel data, so they stay out of
+ * LUTs; `render/adjust.ts` handles them per pixel. A null return means there is nothing separable.
  */
 export function buildAdjustLuts(
   adjustments: Adjustments,
@@ -1789,15 +1789,15 @@ export function buildAdjustLuts(
   return { r: chain(redLut), g: chain(greenLut), b: chain(blueLut) };
 }
 
-/** 默认色阶参数 */
+/** Default levels parameters */
 export function defaultLevels(): LevelsParams {
   return { inBlack: 0, inWhite: 255, gamma: 1, outBlack: 0, outWhite: 255 };
 }
 
-/** 曲线编辑器使用的固定 x 控制点（0 / 64 / 128 / 192 / 255） */
+/** Fixed x positions used by the curve editor (0 / 64 / 128 / 192 / 255) */
 export const CURVE_X = [0, 64, 128, 192, 255];
 
-/** 把任意曲线点集对齐到固定 x 控制点：缺失的点补成对角（不变） */
+/** Align any curve point set to those fixed x positions: missing points fill the diagonal (no change) */
 export function curvePointsFrom(points: CurvePoint[] | null | undefined): CurvePoint[] {
   const source = points && points.length >= 2 ? points : null;
   return CURVE_X.map((x) => {
@@ -1806,7 +1806,7 @@ export function curvePointsFrom(points: CurvePoint[] | null | undefined): CurveP
   });
 }
 
-/** 默认曲线（两点直线 = 不变） */
+/** Default curve (two-point line = identity) */
 export function defaultCurves(): CurvesParams {
   return {
     rgb: [
@@ -1827,14 +1827,14 @@ export function defaultBlackWhite(): BlackWhiteParams {
   return { red: 40, yellow: 60, green: 40, cyan: 60, blue: 20, magenta: 80 };
 }
 
-/* --------------------------- 更多调整（P1-C2） --------------------------- */
+/* --------------------------- More adjustments (P1-C2) --------------------------- */
 
-/** 照片滤镜默认：暖色调（PS 的「加温滤镜 85」近似） */
+/** Photo filter default: warm (an approximation of PS's "warming filter 85") */
 export function defaultPhotoFilter(): PhotoFilterParams {
   return { color: '#EC8A00', density: 25, preserveLuminosity: true };
 }
 
-/** 通道混合器默认：恒等（每个输出通道只取自己的源通道） */
+/** Channel mixer default: identity (each output channel takes only its own source) */
 export function defaultChannelMixer(): ChannelMixerParams {
   return {
     red: [100, 0, 0, 0],
@@ -1851,7 +1851,7 @@ export function defaultReplaceColor(): ReplaceColorParams {
   return { color: '#FF0000', hue: 0, saturation: 0, lightness: 0, fuzziness: 60 };
 }
 
-/** 可选颜色的 9 个色域（顺序即面板展示顺序） */
+/** The 9 selective-color ranges (in panel display order) */
 export const SELECTIVE_RANGES: readonly SelectiveRange[] = [
   'reds',
   'yellows',
@@ -1864,7 +1864,7 @@ export const SELECTIVE_RANGES: readonly SelectiveRange[] = [
   'blacks',
 ];
 
-/** 全零的可选颜色参数（面板启用时的起点） */
+/** All-zero selective color parameters (the starting point when enabled in the panel) */
 export function defaultSelectiveColor(): SelectiveColorParams {
   const ranges = {} as Record<SelectiveRange, number[]>;
   for (const range of SELECTIVE_RANGES) ranges[range] = [0, 0, 0, 0];
@@ -1875,9 +1875,9 @@ function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
-/* ------------------------------ 视口滚动 / 缩放 ------------------------------ */
+/* ------------------------------ Viewport scrolling / zoom ------------------------------ */
 
-/** 缩放上下限：滚轮缩放与 store 共用同一套钳制，避免两处各写一份 */
+/** Zoom limits: wheel zoom and the store share one clamp instead of each writing its own */
 export const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 8;
 
@@ -1886,30 +1886,30 @@ export function clampScale(scale: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(scale * 1000) / 1000));
 }
 
-/** 越界余量（屏幕像素）：画布四周留出可滚动余白，而不是贴死在视口边缘 */
+/** Overscroll margin (screen px): leaves scrollable slack around the canvas instead of pinning it to the edge */
 export const OVERSCROLL_SCREEN = 160;
 
 export interface ScrollMetrics {
-  /** 视口尺寸（文档坐标单位 = 屏幕像素 / scale） */
+  /** Viewport size (document units = screen px / scale) */
   viewW: number;
   viewH: number;
-  /** 可滚动世界（文档矩形 + 越界余量，且不小于视口）在文档坐标中的位置与大小 */
+  /** Scrollable world (document rect + overscroll, at least viewport-sized) in document coordinates */
   worldLeft: number;
   worldTop: number;
   worldW: number;
   worldH: number;
-  /** 当前视口左上角在世界中的位置（已钳制） */
+  /** Top-left of the current viewport in world space (already clamped) */
   left: number;
   top: number;
-  /** 可滚动范围（世界尺寸 − 视口尺寸，≥ 0） */
+  /** Scroll range (world size − viewport size, ≥ 0) */
   rangeX: number;
   rangeY: number;
 }
 
 /**
- * 滚动几何：把「文档 + 视口」换算成滚动条需要的一组量。
- * 世界 = 文档矩形四周各留 `overscroll`（屏幕像素）余量，并与视口尺寸取最大值——
- * 这样文档小于视口时范围为 0（不显示滚动条），且「居中」正好落在合法区间内。
+ * Scroll geometry: turn "document + viewport" into the numbers a scrollbar needs.
+ * The world is the document rect plus `overscroll` (screen px) on each side, at least as large as the viewport,
+ * so the range is 0 when the document is smaller (no scrollbars) and "center" lands inside the valid range.
  */
 export function scrollMetrics(
   doc: { width: number; height: number },
@@ -1921,7 +1921,7 @@ export function scrollMetrics(
   const viewW = Math.max(1, viewport.width) / scale;
   const viewH = Math.max(1, viewport.height) / scale;
   const pad = overscroll / scale;
-  // 旋转视图下可滚动世界要按外接框扩张，否则画布会被钳制在视口里滚动不动
+  // With a rotated view the scrollable world must grow by the bounds, or the canvas stays clamped and won't scroll
   const bounds = rotatedDocBounds(doc, rotation);
   const worldW = Math.max(bounds.width + pad * 2, viewW);
   const worldH = Math.max(bounds.height + pad * 2, viewH);
@@ -1943,7 +1943,7 @@ export function scrollMetrics(
   };
 }
 
-/** 世界坐标（视口左上角）→ 屏幕平移量 */
+/** World coordinates (viewport top-left) → screen translation */
 export function viewportFromScroll(
   left: number,
   top: number,
@@ -1953,7 +1953,7 @@ export function viewportFromScroll(
   return { x: Math.round(-left * safe), y: Math.round(-top * safe) };
 }
 
-/** 把候选视口钳制进可滚动世界（滚轮滚动 / 抓手平移共用） */
+/** Clamp a candidate viewport into the scrollable world (shared by wheel scrolling and hand panning) */
 export function clampViewport(
   viewport: { x: number; y: number; scale: number },
   doc: { width: number; height: number },
@@ -1965,7 +1965,7 @@ export function clampViewport(
   return viewportFromScroll(metrics.left, metrics.top, viewport.scale);
 }
 
-/** 以某点为锚点缩放：让该点下的文档坐标保持不动（滚轮缩放共用） */
+/** Zoom about a point: keep the document coordinate under it fixed (shared by wheel zoom) */
 export function zoomAtPoint(
   viewport: { x: number; y: number; scale: number },
   nextScale: number,
@@ -1975,7 +1975,7 @@ export function zoomAtPoint(
 ): { x: number; y: number; scale: number } {
   const scale = viewport.scale > 0 ? viewport.scale : 1;
   const target = clampScale(nextScale);
-  // 旋转视图：锚点下的文档坐标要按逆变换求，再用正变换反解新的平移量
+  // Rotated view: invert the anchor's document position first, then solve the new pan with the forward transform
   if (size && rotation) {
     const p = screenToDoc(anchor, viewport, size, rotation);
     const center = viewCenter(size);
@@ -1995,7 +1995,7 @@ export function zoomAtPoint(
   };
 }
 
-/** 画布适配缩放：留 padding 且不超过 1（小图不放大，避免糊） */
+/** Fit zoom: leave padding and never exceed 1 (small images are not upscaled, avoiding blur) */
 export function computeFitScale(
   doc: Pick<PhotoDoc, 'width' | 'height'>,
   viewport: { width: number; height: number },
@@ -2007,7 +2007,7 @@ export function computeFitScale(
     height: Math.max(1, viewport.height - padding * 2),
   };
   if (doc.width <= 0 || doc.height <= 0) return 1;
-  // 旋转后按外接框适配：按原始宽高算会让旋转后的画布超出视口
+  // After rotation, fit by bounds: raw width/height would push the rotated canvas past the viewport
   const bounds = rotatedDocBounds(doc, rotation);
   const scale = Math.min(available.width / bounds.width, available.height / bounds.height);
   return Math.max(0.02, Math.min(1, Math.round(scale * 1000) / 1000));
@@ -2033,12 +2033,12 @@ export function clampRect(rect: Rect, bounds: { width: number; height: number })
   };
 }
 
-/* ------------------------------ 自由变换几何 ------------------------------ */
+/* ------------------------------ Free-transform geometry ------------------------------ */
 
-/** 变换把手：8 个缩放手柄 + 1 个旋转柄 */
+/** Transform handles: 8 scale handles + 1 rotate handle */
 export type TransformHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rotate';
 
-/** 变换盒：位置 / 尺寸 + 旋转（角度制，绕中心） */
+/** Transform box: position / size + rotation (degrees, about the center) */
 export interface LayerBox {
   x: number;
   y: number;
@@ -2047,7 +2047,7 @@ export interface LayerBox {
   rotation: number;
 }
 
-/** 缩放下限（文档像素）：避免拖成 0 尺寸后无法再拖回 */
+/** Minimum scale (document px): keeps a box from collapsing to 0 and becoming undraggable */
 export const MIN_TRANSFORM_SIZE = 8;
 
 const HANDLE_LOCAL: { id: Exclude<TransformHandle, 'rotate'>; lx: number; ly: number }[] = [
@@ -2065,7 +2065,7 @@ function boxCenter(box: LayerBox): { x: number; y: number } {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
-/** 图层盒的控制点（文档坐标）。`rotateOffset` 为旋转柄相对顶边的屏幕距离换算到文档单位后的值 */
+/** Layer box control points (document coords). `rotateOffset`: the rotate handle's screen gap above the top edge, in doc units */
 export function transformHandles(
   box: LayerBox,
   rotateOffset = 0,
@@ -2088,7 +2088,7 @@ export function transformHandles(
   return out;
 }
 
-/** 文档坐标 → 图层局部坐标（以图层中心为原点、未旋转的坐标系） */
+/** Document coordinates → layer-local coordinates (origin at the layer center, unrotated) */
 export function toLocalPoint(box: LayerBox, px: number, py: number): { x: number; y: number } {
   const center = boxCenter(box);
   const rad = (-box.rotation * Math.PI) / 180;
@@ -2100,9 +2100,9 @@ export function toLocalPoint(box: LayerBox, px: number, py: number): { x: number
 }
 
 /**
- * 拖拽手柄后的新盒子。
- * - `local` 为指针在「初始盒子」局部坐标系中的位置；
- * - `keepRatio`（Shift）保持宽高比，`fromCenter`（Alt）以中心为锚点对称缩放。
+ * New box after dragging a handle.
+ * - `local` is the pointer position in the local frame of the "initial box";
+ * - `keepRatio` (Shift) keeps the aspect ratio, `fromCenter` (Alt) scales symmetrically about the center.
  */
 export function resizeLayerBox(
   start: LayerBox,
@@ -2125,7 +2125,7 @@ export function resizeLayerBox(
   const hasS = handle.includes('s');
 
   if (options.fromCenter) {
-    // 中心锚点：拖一侧时对侧镜像
+    // Center anchor: dragging one side mirrors the opposite side
     const dx = Math.abs(local.x);
     const dy = Math.abs(local.y);
     if (hasW || hasE) {
@@ -2150,7 +2150,7 @@ export function resizeLayerBox(
 
   if (options.keepRatio && start.width > 0 && start.height > 0) {
     const ratio = start.width / start.height;
-    // 角手柄按最大边等比；边手柄只按对应轴等比
+    // Corner handles scale by the largest side; edge handles scale only along their own axis
     const isCorner = (hasW || hasE) && (hasN || hasS);
     if (isCorner) {
       const scale = Math.max(width / start.width, height / start.height);
@@ -2161,7 +2161,7 @@ export function resizeLayerBox(
     } else {
       width = height * ratio;
     }
-    // 等比缩放后按锚点重新贴边
+    // After proportional scaling, snap the edges back around the anchor
     if (options.fromCenter) {
       left = -width / 2;
       right = width / 2;
@@ -2195,7 +2195,7 @@ export function resizeLayerBox(
   };
 }
 
-/** 拖拽旋转柄：`deltaDeg` 为指针相对起始角的变化量；`snap` 时吸附到 15° */
+/** Drag the rotate handle: `deltaDeg` is the pointer's change from the start angle; `snap` sticks to 15° */
 export function rotateLayerBox(start: LayerBox, deltaDeg: number, snap = false): LayerBox {
   let rotation = start.rotation + deltaDeg;
   if (snap) rotation = Math.round(rotation / 15) * 15;
@@ -2203,13 +2203,13 @@ export function rotateLayerBox(start: LayerBox, deltaDeg: number, snap = false):
   return { ...start, rotation: Math.round(rotation * 10) / 10 };
 }
 
-/** 指针位置相对图层中心的角度（度，屏幕/文档同向） */
+/** Angle of the pointer relative to the layer center (degrees, same direction on screen and document) */
 export function angleFromCenter(box: LayerBox, px: number, py: number): number {
   const center = boxCenter(box);
   return (Math.atan2(py - center.y, px - center.x) * 180) / Math.PI;
 }
 
-/** 命中判定：把手（`radius` 为文档单位下的命中半径）或盒内部 */
+/** Hit test: a handle (`radius` is the hit radius in document units) or the inside of the box */
 export function hitTransformHandle(
   box: LayerBox,
   px: number,
@@ -2240,8 +2240,8 @@ export function intersectRect(a: Rect, b: Rect): Rect | null {
   return { x, y, width: right - x, height: bottom - y };
 }
 
-/** 把选区轮廓写入当前路径（文档坐标）：矩形 / 椭圆 / 套索统一入口 */
-/** 多边形有向面积（鞋带公式）：y 轴向下时，顺时针为正 */
+/** Write selection outlines into the current path (document coords): shared entry for rect / oval / lasso */
+/** Signed polygon area (shoelace): with y pointing down, clockwise is positive */
 export function signedArea(path: number[]): number {
   let area = 0;
   for (let i = 0, j = path.length - 2; i < path.length; j = i, i += 2) {
@@ -2250,7 +2250,7 @@ export function signedArea(path: number[]): number {
   return area / 2;
 }
 
-/** 把轮廓方向规范化为「正/负面积」，nonzero 填充下并集与差集才能正确叠加 */
+/** Normalize outline direction to "positive/negative area" so unions and differences stack under nonzero fill */
 export function orientPolygon(path: number[], positive: boolean): number[] {
   if (path.length < 6) return path;
   const area = signedArea(path);
@@ -2261,7 +2261,7 @@ export function orientPolygon(path: number[], positive: boolean): number[] {
   return reversed;
 }
 
-/** 矩形 / 椭圆 → 多边形顶点（统一表示，便于方向规范化与布尔运算） */
+/** Rect / oval → polygon vertices (one representation, for direction normalization and boolean ops) */
 export function shapePolygon(selection: {
   kind: SelectionKind;
   x: number;
@@ -2288,8 +2288,8 @@ export function shapePolygon(selection: {
 }
 
 /**
- * 选区的全部轮廓（含并/差语义）。
- * 主轮廓恒为并集；`hole` 与 `parts` 中 `add: false` 的轮廓为差集。
+ * All outlines of a selection (including union / difference semantics).
+ * The main outline is always a union; `hole` and `parts` entries with `add: false` are differences.
  */
 export function selectionContours(selection: Selection): SelectionPart[] {
   const contours: SelectionPart[] = [{ path: shapePolygon(selection), add: true }];
@@ -2302,7 +2302,7 @@ export function selectionContours(selection: Selection): SelectionPart[] {
   return contours;
 }
 
-/** 选区外接矩形（全部轮廓的并集包围盒） */
+/** Selection bounds (bounding box of the union of all outlines) */
 export function selectionBounds(selection: Selection): Rect {
   const contours = selectionContours(selection);
   let minX = Infinity;
@@ -2321,9 +2321,9 @@ export function selectionBounds(selection: Selection): Rect {
 }
 
 /**
- * 把选区写入当前路径：矩形 / 椭圆 / 套索 / 布尔运算结果统一为多边形子路径，
- * 并按并集（正向）/ 差集（反向）规范化方向，调用方需使用 `nonzero` 填充规则
- * （`ctx.fill('nonzero')` / `ctx.clip('nonzero')`）。
+ * Write the selection into the current path: rect / oval / lasso / boolean results all become polygon subpaths,
+ * with directions normalized by union (forward) / difference (reverse); callers must use the `nonzero` rule
+ * (`ctx.fill('nonzero')` / `ctx.clip('nonzero')`).
  */
 export function traceSelection(ctx: CanvasRenderingContext2D, selection: Selection): void {
   ctx.beginPath();
@@ -2336,14 +2336,14 @@ export function traceSelection(ctx: CanvasRenderingContext2D, selection: Selecti
   }
 }
 
-/** 选区 → 等效多边形顶点（用于反选等需要拼接路径的场合） */
+/** Selection → equivalent polygon points (for invert and other cases that join paths) */
 export function selectionPolygon(selection: Selection): number[] {
   return shapePolygon(selection);
 }
 
 /**
- * 反选：画布外框作为并集，原选区的全部轮廓翻转并/差标记后追加。
- * 用 nonzero 填充验证：内部区域 winding 相加为 0（不选中），原选区未覆盖处为 1（选中）。
+ * Invert: the canvas frame becomes the union, and every original outline follows with its add/subtract flag flipped.
+ * Verified under nonzero fill: the interior winds to 0 (unselected) and the area outside the original is 1 (selected).
  */
 export function invertSelection(
   selection: Selection,
@@ -2362,7 +2362,7 @@ export function invertSelection(
   };
 }
 
-/** 整块画布作为矩形选区 */
+/** The whole canvas as a rectangular selection */
 export function fullSelection(canvas: { width: number; height: number }): Selection {
   return {
     kind: 'rect',
@@ -2376,8 +2376,8 @@ export function fullSelection(canvas: { width: number; height: number }): Select
 }
 
 /**
- * 选区是否命中某点：按 nonzero 缠绕数判定（并集 +1、差集 -1，正值即在选区内）。
- * 与 `traceSelection` 的填充结果严格一致，因此笔刷裁剪、填充与命中判定不会互相矛盾。
+ * Whether a selection contains a point: by nonzero winding number (union +1, difference -1, positive = inside).
+ * It matches what `traceSelection` fills exactly, so brush clipping, fill and hit testing never contradict each other.
  */
 export function pointInSelection(selection: Selection, px: number, py: number): boolean {
   let winding = 0;
@@ -2400,7 +2400,7 @@ export function pointInPolygon(path: number[], px: number, py: number): boolean 
   return inside;
 }
 
-/** 套索顶点 → 外接矩形 */
+/** Lasso vertices → bounding box */
 export function polygonBounds(path: number[]): Rect {
   if (path.length < 2) return { x: 0, y: 0, width: 0, height: 0 };
   let minX = Infinity;
@@ -2416,7 +2416,7 @@ export function polygonBounds(path: number[]): Rect {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-/** 按步长抽稀套索顶点，避免长笔画产生上万个点 */
+/** Thin out lasso vertices by step, so a long stroke doesn't produce tens of thousands of points */
 export function simplifyPath(path: number[], minDistance = 3): number[] {
   if (path.length < 4) return path;
   const out: number[] = [path[0], path[1]];
@@ -2480,16 +2480,16 @@ export function formatBytes(bytes: number): string {
   return `${bytes}B`;
 }
 
-/* ------------------------------ 文件校验 ------------------------------ */
+/* ------------------------------ File validation ------------------------------ */
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'];
 const SVG_EXTENSIONS = ['.svg'];
 
 /**
- * 图片文件类型判定。
+ * Image file type detection.
  *
- * SVG 单列一类：它**不是**位图，导入时要先栅格化（`render/svg.ts`），
- * 因此调用方需要区分「直接解码」与「先解析尺寸再按倍数渲染」两条路径。
+ * SVG is a class of its own: it is **not** a bitmap and must be rasterized on import (`render/svg.ts`),
+ * so callers must distinguish "decode directly" from "read the size, then render at a multiple".
  */
 export function resolveImageKind(filename: string): 'image' | 'svg' | 'unsupported' {
   const lower = filename.trim().toLowerCase();
@@ -2500,7 +2500,7 @@ export function resolveImageKind(filename: string): 'image' | 'svg' | 'unsupport
 export function checkImageFile(file: { name: string; size: number }): ToolResult<void> {
   if (resolveImageKind(file.name) === 'unsupported') return { ok: false, error: 'NOT_IMAGE' };
   if (file.size === 0) return { ok: false, error: 'EMPTY' };
-  // SVG 是文本，体积与像素量无关，但仍要防超大文件（多数编辑器会把它当炸弹）
+  // SVG is text, so size is unrelated to pixel count, but still guard against huge files (editors treat them as bombs)
   if (file.size > MAX_IMAGE_BYTES) {
     return {
       ok: false,
@@ -2512,10 +2512,10 @@ export function checkImageFile(file: { name: string; size: number }): ToolResult
 }
 
 /**
- * PSD 导入校验。
+ * PSD import validation.
  *
- * 与图片共用体积上限的检查方式，但上限单独放宽（PSD 承载多图层，常远大于普通图片）；
- * 真正的格式校验交给 `psd/reader.ts` 的解析结果（坏文件返回 INVALID_PSD）。
+ * It shares the size-limit check with images, but the cap is looser (PSD holds many layers and is often far
+ * larger); the real format check is the parse result from `psd/reader.ts` (bad files return INVALID_PSD).
  */
 export function checkPsdFile(file: { name: string; size: number }): ToolResult<void> {
   if (!/\.psd$/i.test(file.name.trim())) return { ok: false, error: 'NOT_PSD' };
@@ -2547,15 +2547,15 @@ export function checkProjectFile(file: { name: string; size: number }): ToolResu
 }
 
 /**
- * 工程文件版本号：导入时据此拒绝未来格式，旧版本走 `model/migrate.ts` 归一。
- * v2 → v3：滤镜由 `FilterId[]` 升级为「规格 + 参数」（`FilterSpec[]`），
- * 调整新增色阶 / 曲线 / 色彩平衡 / 黑白 / 阈值 / 渐变映射 / 去色等可选参数。
- * 旧文件仍可读取（`normalizeFilters` 兼容字符串数组），但新文件不应被旧版本打开。
+ * Project file version: imports reject future formats with it, and older versions are normalized by `model/migrate.ts`.
+ * v2 → v3: filters went from `FilterId[]` to spec + parameters (`FilterSpec[]`), and adjustments gained
+ * optional levels / curves / color balance / B&W / threshold / gradient map / desaturate parameters.
+ * Old files still load (`normalizeFilters` accepts string arrays), but new files should not open in old builds.
  */
 export const PROJECT_VERSION = 3;
 
 /* ------------------------------------------------------------------ *
- * 层栈：扁平数组 + parentId → 合成指令序列
+ * Layer stack: flat array + parentId → compositing instruction sequence
  * ------------------------------------------------------------------ */
 
 export type StackStep =
@@ -2564,11 +2564,11 @@ export type StackStep =
   | { kind: 'layer'; layer: Layer };
 
 /**
- * 把 `doc.layers`（扁平、尾部为最上层）展开成可顺序合成的指令序列。
+ * Expand `doc.layers` (flat, tail = topmost) into an ordered list of compositing instructions.
  *
- * 表示法约定：编组的子图层紧随编组之后，并用 `parentId` 指回编组；
- * 因此这里按 parentId 建索引后递归即可。`parentId` 指向不存在 / 非编组时降级为顶层
- * （旧工程或迁移异常时不至于丢图层）。
+ * Convention: a group's children follow the group and point back to it via `parentId`, so indexing by
+ * `parentId` and recursing is enough. A `parentId` that is missing / not a group degrades to the top level
+ * (so old projects or odd migrations don't lose layers).
  */
 export function flattenStack(doc: PhotoDoc): StackStep[] {
   const knownIds = new Set(doc.layers.map((layer) => layer.id));
@@ -2602,7 +2602,7 @@ export function flattenStack(doc: PhotoDoc): StackStep[] {
   return steps;
 }
 
-/** 子树 id（自身 + 全部后代），按 `doc.layers` 顺序 */
+/** Subtree ids (itself + all descendants), in `doc.layers` order */
 export function subtreeIdsOf(doc: PhotoDoc, id: string): string[] {
   const childrenOf = new Map<string, string[]>();
   for (const layer of doc.layers) {
@@ -2621,25 +2621,25 @@ export function subtreeIdsOf(doc: PhotoDoc, id: string): string[] {
   return out;
 }
 
-/** 编组的直接子图层（按层栈顺序） */
+/** Direct children of a group (in layer-stack order) */
 export function childrenOfLayer(doc: PhotoDoc, id: string): Layer[] {
   return doc.layers.filter((layer) => (layer.parentId ?? null) === id);
 }
 
 /**
- * 把某图层（连同其子树）移动到目标父级下，返回新的层数组。
+ * Move a layer (with its subtree) under a target parent and return the new layer array.
  *
- * 纯函数：不动原数组。落位规则——
- * - 目标父级为 null → 移到最顶层（数组末尾）；
- * - 目标为编组 → 紧跟在该编组子树之后（即成为组内最上层）；
- * - 目标是自己的后代时拒绝（会形成环），原样返回。
+ * Pure: the input array is not mutated. Placement rules —
+ * - target parent null → move to the top level (end of the array);
+ * - target is a group → right after that group's subtree (i.e. the topmost child);
+ * - target is one of its own descendants → refuse (would create a cycle) and return the input unchanged.
  */
 export function moveSubtree(layers: Layer[], id: string, targetParentId: string | null): Layer[] {
   const byId = new Map(layers.map((layer) => [layer.id, layer] as const));
   const moving = layers.find((layer) => layer.id === id);
   if (!moving) return layers;
 
-  // 环检测：目标父级不能是自己的后代
+  // Cycle check: the target parent must not be a descendant of itself
   if (targetParentId) {
     const descendants = new Set<string>();
     const walk = (current: string) => {
@@ -2671,7 +2671,7 @@ export function moveSubtree(layers: Layer[], id: string, targetParentId: string 
 
   if (!targetParentId) return [...rest, ...moved];
 
-  // 落点：目标编组子树之后
+  // Insert point: after the target group's subtree
   const targetIds = new Set<string>();
   {
     const walk = (current: string) => {
@@ -2691,7 +2691,7 @@ export function moveSubtree(layers: Layer[], id: string, targetParentId: string 
   return [...rest.slice(0, insertAt), ...moved, ...rest.slice(insertAt)];
 }
 
-/** 祖先链（由外到内） */
+/** Ancestor chain (outermost first) */
 export function ancestorChainOf(doc: PhotoDoc, layer: Layer): Layer[] {
   const byId = new Map(doc.layers.map((item) => [item.id, item] as const));
   const chain: Layer[] = [];
@@ -2707,26 +2707,26 @@ export function ancestorChainOf(doc: PhotoDoc, layer: Layer): Layer[] {
   return chain;
 }
 
-/** 编组会向下继承可见性：任一祖先不可见 → 子图层不可见 */
+/** Groups pass visibility down: any hidden ancestor makes the child hidden */
 export function effectiveVisible(doc: PhotoDoc, layer: Layer): boolean {
   if (!layer.visible) return false;
   return ancestorChainOf(doc, layer).every((parent) => parent.visible);
 }
 
-/** 锁定同样向下继承（Photoshop 行为：锁住的组内子图层也不可编辑） */
+/** Locking inherits too (Photoshop behavior: children of a locked group cannot be edited either) */
 export function effectiveLocked(doc: PhotoDoc, layer: Layer): boolean {
   if (layer.locked) return true;
   return ancestorChainOf(doc, layer).some((parent) => parent.locked);
 }
 
-/** 蒙版烘焙缓存键：蒙版像素或参数一变就换键；无蒙版返回 null */
+/** Mask bake cache key: changes when mask pixels or parameters change; null when there is no mask */
 export function maskSignature(layer: Layer): string | null {
   const mask = layer.mask;
   if (!mask || !mask.assetId || !mask.enabled) return null;
   return `${mask.assetId}:${mask.rev}:${mask.inverted ? 1 : 0}:${mask.density.toFixed(3)}:${mask.feather}`;
 }
 
-/** 历史面板的一行（纯展示数据：操作名键 + 时间 + 是否当前状态） */
+/** One row in the history panel (display only: label key + time + whether it is the current state) */
 export interface HistoryRow {
   label: HistoryLabel;
   at: number;
@@ -2734,9 +2734,9 @@ export interface HistoryRow {
 }
 
 /**
- * 由 past / future 推导面板行序列。
- * 行序列即「时间轴」：0 = 最初状态，past.length = 当前，末尾 = 可重做的最远状态。
- * 面板点击第 i 行 → `jumpTo(i)`。
+ * Derive the panel's row list from past / future.
+ * The row list is the timeline: 0 = initial state, past.length = current, the end = furthest redoable state.
+ * Clicking row i calls `jumpTo(i)`.
  */
 export function historyTimeline(past: HistoryEntry[], future: HistoryEntry[]): HistoryRow[] {
   const rows: HistoryRow[] = past.map((entry, index) => ({
@@ -2753,7 +2753,7 @@ export function historyTimeline(past: HistoryEntry[], future: HistoryEntry[]): H
   return rows;
 }
 
-/** 图层引用的全部资产 id（位图 / 智能对象源 / 蒙版），供资产回收与序列化使用 */
+/** Every asset id a layer references (bitmap / smart object source / mask), for asset GC and serialization */
 export function layerAssetIds(layer: Layer): string[] {
   const ids: string[] = [];
   if (layer.kind === 'raster' && layer.assetId) ids.push(layer.assetId);

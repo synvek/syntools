@@ -10,10 +10,10 @@ import {
 } from './footnotes';
 
 /**
- * 脚注测试：
- * - 引用是行内 atom（注释正文存在节点属性里），单节点自包含；
- * - 屏幕汇总区是文档末尾的 widget，导出前由 injectFootnotes 统一编号并注入汇总区；
- * - 编号的权威来源是遍历顺序，不信任 HTML 里的旧编号。
+ * Footnote tests:
+ * - A reference is an inline atom (the note body lives in node attributes), self-contained in one node;
+ * - The on-screen summary is a widget at the end of the document; injectFootnotes numbers and injects it before export;
+ * - Numbering follows traversal order; stale numbers in the HTML are never trusted.
  */
 
 const LABELS: FootnoteLabels = { name: '脚注', empty: '（空脚注）' };
@@ -33,22 +33,22 @@ afterEach(() => {
 });
 
 describe('collectFootnoteNotes', () => {
-  it('按文档顺序收集并裁剪空白', () => {
+  it('collects notes in document order and trims whitespace', () => {
     const editor = createEditor('<p>甲<sup data-footnote data-note="  第一条  "></sup>乙</p>');
-    // 光标移到段落末尾再插入，验证顺序按文档位置而非插入先后
+    // Move the cursor to the end before inserting, proving order follows position, not insertion time
     editor.commands.setTextSelection(editor.state.doc.content.size - 1);
     editor.commands.insertFootnote('第二条');
     expect(collectFootnoteNotes(editor.state.doc)).toEqual(['第一条', '第二条']);
   });
 
-  it('没有脚注时返回空数组', () => {
+  it('returns an empty array when there are no footnotes', () => {
     const editor = createEditor('<p>正文</p>');
     expect(collectFootnoteNotes(editor.state.doc)).toEqual([]);
   });
 });
 
 describe('renderFootnoteList', () => {
-  it('输出带编号的汇总区，空注释显示占位文案', () => {
+  it('renders a numbered summary and shows placeholder copy for empty notes', () => {
     const element = renderFootnoteList(['第一条', ''], LABELS);
     expect(element.tagName).toBe('SECTION');
     expect(element.getAttribute('data-footnote-list')).toBe('true');
@@ -61,7 +61,7 @@ describe('renderFootnoteList', () => {
 });
 
 describe('injectFootnotes', () => {
-  it('按 DOM 顺序编号并追加汇总区', () => {
+  it('numbers by DOM order and appends the summary', () => {
     const html = injectFootnotes(
       '<p>甲<sup data-footnote data-note="注释一"></sup>乙<sup data-footnote data-note="注释二"></sup></p>',
       LABELS,
@@ -75,7 +75,7 @@ describe('injectFootnotes', () => {
     expect(html).toContain('注释二');
   });
 
-  it('重复调用不会累积多个汇总区，并会重新编号', () => {
+  it('does not accumulate summaries on repeated calls and renumbers them', () => {
     const once = injectFootnotes('<p>甲<sup data-footnote data-note="A"></sup></p>', LABELS);
     const twice = injectFootnotes(
       `${once}<p>乙<sup data-footnote data-note="B"></sup></p>`,
@@ -85,19 +85,19 @@ describe('injectFootnotes', () => {
     expect(twice).toContain('data-number="2"');
   });
 
-  it('没有脚注引用时原样返回', () => {
+  it('returns the input unchanged when there are no footnote references', () => {
     const html = '<p>只有正文</p>';
     expect(injectFootnotes(html, LABELS)).toBe(html);
   });
 
-  it('引用上的 data-note 会保留，供 Word 导出读取', () => {
+  it('keeps data-note on references so Word export can read it', () => {
     const html = injectFootnotes('<p>甲<sup data-footnote data-note="保留我"></sup></p>', LABELS);
     expect(html).toContain('data-note="保留我"');
   });
 });
 
-describe('脚注节点命令', () => {
-  it('插入后在序列化 HTML 中带 data-footnote 与 data-note', () => {
+describe('footnote node commands', () => {
+  it('writes data-footnote and data-note into the serialized HTML', () => {
     const editor = createEditor('<p>正文</p>');
     editor.commands.insertFootnote('引用来源');
     const html = editor.getHTML();
@@ -105,25 +105,25 @@ describe('脚注节点命令', () => {
     expect(html).toContain('data-note="引用来源"');
   });
 
-  it('再解析该 HTML 仍识别为脚注节点并保留注释正文', () => {
+  it('re-parses that HTML as footnote nodes and keeps the note body', () => {
     const editor = createEditor('<p>正文<sup data-footnote="true" data-note="来源"></sup></p>');
     const notes = collectFootnoteNotes(editor.state.doc);
     expect(notes).toEqual(['来源']);
   });
 
-  it('findSelectedFootnote 能定位光标紧邻的引用', () => {
+  it('findSelectedFootnote locates the reference next to the cursor', () => {
     const editor = createEditor('<p>正文</p>');
     editor.commands.insertFootnote('一条注释');
-    // 插入后光标停在引用之后，正是「继续编辑该脚注」的常见形态
+    // After insertion the cursor sits right after the reference, the usual shape of "continue editing this note"
     const found = findSelectedFootnote(editor.state);
     expect(found?.note).toBe('一条注释');
-    // 引用本身被选中时同样能定位
+    // Also works when the reference itself is selected
     const pos = found?.pos ?? 0;
     editor.commands.setNodeSelection(pos);
     expect(findSelectedFootnote(editor.state)?.pos).toBe(pos);
   });
 
-  it('updateFootnote / removeFootnote 修改指定位置的引用', () => {
+  it('updateFootnote / removeFootnote edit the reference at a position', () => {
     const editor = createEditor('<p>正文</p>');
     editor.commands.insertFootnote('旧内容');
     const pos = findSelectedFootnote(editor.state)?.pos ?? -1;
@@ -134,13 +134,13 @@ describe('脚注节点命令', () => {
     expect(collectFootnoteNotes(editor.state.doc)).toEqual([]);
   });
 
-  it('对非脚注位置执行命令返回 false', () => {
+  it('returns false when the command targets a non-footnote position', () => {
     const editor = createEditor('<p>正文</p>');
     expect(editor.commands.updateFootnote(0, 'x')).toBe(false);
     expect(editor.commands.removeFootnote(0)).toBe(false);
   });
 
-  it('屏幕端在文档末尾渲染汇总区 widget', () => {
+  it('renders the summary widget at the end of the document on screen', () => {
     const editor = createEditor('<p>正文</p>');
     expect(editor.view.dom.querySelector('.rte-footnote-list')).toBeNull();
     editor.commands.insertFootnote('屏幕可见');

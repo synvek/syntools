@@ -8,42 +8,42 @@ import { isFloatingImageElement } from './imageLayer';
 import { MM_TO_PX, SHEET_GAP_MM, pageMetricsToPx, type PageMetrics } from './pageSetup';
 
 /**
- * Word 式分页编辑视图（ProseMirror 正统实现）：
+ * Word-style paged editing view (the canonical ProseMirror approach):
  *
- * 文档仍是单一 PM 文档；页间空白通过 Decoration.widget 由 PM 自己渲染——
- * 外部直接改 PM 管理的块元素（inline style / data 属性）会被 PM 的
- * DOMObserver 检测并强制重绘抹掉，widget 则由 PM 管理，稳定可靠。
+ * The document remains a single PM document; inter-page gaps are rendered by PM itself via
+ * Decoration.widget — editing PM-managed block elements (inline style / data attributes) from the
+ * outside gets wiped out by PM's DOMObserver, whereas widgets are owned by PM and stay reliable.
  *
- * 布局算法：
- * 1. 测量块级几何（剔除页间空白 widget，并扣除其高度，还原「自然排版」位置）；
- * 2. planPageBlocks 规划分页起始块（与导出 PDF/Word 同一套算法）；
- * 3. 在起始块前插入 52mm（40mm 页边距补偿 + 12mm 纸间留白）的块级空白 widget；
- * 4. 把每页对齐到一张真实 A4 纸面（210mm × 297mm）。
+ * Layout algorithm:
+ * 1. Measure block geometry (skip gap widgets and subtract their heights to recover "natural" positions);
+ * 2. planPageBlocks picks the page-start blocks (same algorithm as PDF/Word export);
+ * 3. Insert a 52mm block-level gap widget before each page start (40mm margin compensation + 12mm inter-sheet gap);
+ * 4. Align each page to a real A4 sheet (210mm x 297mm).
  */
 
-/** 默认页高（A4 纵向），供未接入页面设置时的兜底 */
+/** Default page height (A4 portrait), fallback when page setup isn't wired in */
 export const PAGE_HEIGHT_PX = 297 * MM_TO_PX;
 
 const pageLayoutKey = new PluginKey<PageLayoutState>('richTextPageLayout');
 
-/** 当前页面几何（mm）→ 像素，随页面设置变化 */
+/** Current page geometry (mm) -> pixels, following page setup changes */
 export type PageMetricsGetter = () => PageMetrics;
 
 /**
- * 页码查询契约：目录等需要「文档位置 → 页码」的消费者统一走它。
- * 数据源是分页插件的 state（各页起始块的文档位置），因此查询是
- * 「当前 state 的快照」——调用方在 state 变化后重新取一次即可。
+ * Page-number query contract: consumers that need "document position -> page number" (e.g. the TOC)
+ * all go through it. The source is the pagination plugin's state (page-start doc positions), so a
+ * query is a snapshot of the current state — callers just re-query after the state changes.
  */
 export interface PageLayoutQuery {
-  /** 文档位置 → 页码（1 起；未分页时恒为 1） */
+  /** Document position -> page number (1-based; always 1 when not paginated) */
   pageIndexOfPos(pos: number): number;
-  /** 总页数 */
+  /** Total page count */
   pageCount(): number;
-  /** 是否已有分页信息（流式视图下没有页码） */
+  /** Whether pagination info exists (the flow view has no page numbers) */
   paginated: boolean;
 }
 
-/** 从当前编辑器状态创建页码查询（二分查找，可安全用于每次渲染） */
+/** Create a page-number query from the current editor state (binary search, safe to call on every render) */
 export function createPageLayoutQuery(state: EditorState): PageLayoutQuery {
   const positions = pageLayoutKey.getState(state)?.positions ?? [];
   return {
@@ -53,7 +53,7 @@ export function createPageLayoutQuery(state: EditorState): PageLayoutQuery {
   };
 }
 
-/** 读取视图缩放系数（CSS zoom）：rect 会按缩放放大，测量时必须还原成 CSS px */
+/** Read the view zoom factor (CSS zoom): rects scale with zoom, so measurements must be converted back to CSS px */
 function readZoomScale(view: EditorView): number {
   const host = view.dom.closest('[data-rte-zoom]');
   const raw = Number.parseFloat(host?.getAttribute('data-rte-zoom') ?? '1');
@@ -61,28 +61,28 @@ function readZoomScale(view: EditorView): number {
 }
 
 interface PageLayoutState {
-  /** 分页起始块的文档位置 */
+  /** Document positions of the page-start blocks */
   positions: number[];
-  /** 对应页间空白 widget 的高度（px） */
+  /** Heights of the corresponding gap widgets (px) */
   heights: number[];
   deco: DecorationSet;
 }
 
-/** 相邻两页纸的固定间距 = 纸间留白 12mm（px） */
+/** Fixed spacing between adjacent sheets = 12mm sheet gap (px) */
 const SHEET_GAP_PX = SHEET_GAP_MM * MM_TO_PX;
 
 function isGapElement(el: Element): boolean {
   return el.hasAttribute('data-page-gap');
 }
 
-/** 显式分页符节点：其后的第一个可见块必须另起一页（与打印时 break-after: page 对齐） */
+/** Explicit page break node: the first visible block after it must start a new page (matching break-after: page when printing) */
 function isPageBreakElement(el: Element): boolean {
   return el.hasAttribute('data-page-break') || el.classList.contains('rte-page-break-node');
 }
 
 /**
- * 规划分页：先按页高分配块，再补上显式分页符强制的换页点。
- * 屏幕与打印两条路径必须共用它，否则同一份文档会出现两种分页。
+ * Plan pagination: first distribute blocks by page height, then add the breaks forced by explicit
+ * page break nodes. The screen and print paths must share this, otherwise one document paginates two ways.
  */
 function planPageStarts(
   elements: Element[],
@@ -92,7 +92,7 @@ function planPageStarts(
   const starts = new Set(planPageBlocks(items, pageHeight));
   elements.forEach((el, index) => {
     if (!isPageBreakElement(el)) return;
-    // 分页符之后的第一个非空块另起一页
+    // The first non-empty block after a page break starts a new page
     for (let next = index + 1; next < elements.length; next += 1) {
       if (items[next].height > 0) {
         starts.add(next);
@@ -126,9 +126,10 @@ function buildDecorations(
 }
 
 /**
- * 测量并规划分页。返回 null 表示已收敛（无需 dispatch）。
- * widget 高度按需计算：让每页首块恰好落在 k × (纸高 + 留白) 的自然位置上——
- * 短页（显式分页符等）自动加高空白，保证纸面间距恒定、永不重叠。
+ * Measure and plan pagination. Returns null when already converged (no dispatch needed).
+ * Widget heights are computed as needed so each page's first block lands exactly at the natural
+ * position k × (page height + gap) — short pages (explicit breaks, etc.) get taller gaps
+ * automatically, keeping the sheet spacing constant and sheets from ever overlapping.
  */
 function planLayout(
   view: EditorView,
@@ -145,8 +146,8 @@ function planLayout(
   }
   const px = pageMetricsToPx(metrics);
   const scale = readZoomScale(view);
-  // 读取块几何（用 rect 取亚像素值，避免 offsetTop 取整逐块累积误差）：
-  // 1) 除以缩放系数还原为 CSS px；2) 扣除页间空白高度，还原「自然排版」位置
+  // Read block geometry (use rects for sub-pixel values, avoiding per-block rounding drift from offsetTop):
+  // 1) divide by the zoom factor to recover CSS px; 2) subtract gap heights to recover natural positions
   const domTop = view.dom.getBoundingClientRect().top;
   let gapPx = 0;
   const elements: HTMLElement[] = [];
@@ -160,8 +161,8 @@ function planLayout(
       return;
     }
     elements.push(el);
-    // 浮动图片（浮于文字上方 / 衬于文字下方）脱离文字流：按零高度参与，
-    // 否则图片的绝对位置会被误判成「块跨页」而插入多余页间空白。
+    // Floating images (in front of / behind text) are out of the text flow: count them as zero height,
+    // otherwise their absolute position is mistaken for a block spilling across pages and extra gaps appear.
     if (isFloatingImageElement(el)) {
       items.push({ top: 0, height: 0 });
       return;
@@ -170,7 +171,7 @@ function planLayout(
   });
   const starts = planPageStarts(elements, items, px.contentHeightPx);
 
-  // 块索引 → 文档位置 + 每个页间空白的高度
+  // Block index -> document position + height of each gap widget
   const positions: number[] = [];
   const heights: number[] = [];
   let prevNaturalTop = 0;
@@ -183,8 +184,8 @@ function planLayout(
     }
     index += 1;
   });
-  // 收敛判断必须校验装饰本身仍在（整篇 setContent 等事务会把 decoration 映射成空集，
-  // 若只比较位置会误判「已收敛」而死锁）
+  // The convergence check must verify the decorations still exist (a whole-document setContent maps
+  // decorations to an empty set; comparing positions alone would falsely report convergence and deadlock)
   const decoCount = state.deco.find().length;
   if (
     positions.length === state.positions.length &&
@@ -192,32 +193,32 @@ function planLayout(
     heights.every((h, i) => Math.abs(h - (state.heights[i] ?? 0)) < 1) &&
     decoCount === positions.length
   ) {
-    return null; // 已收敛，避免 dispatch 风暴
+    return null; // Converged: avoid a dispatch storm
   }
   return { positions, heights };
 }
 
-/** 每页纸面的 top（wrapper 坐标）：解析式，恒定间距 */
+/** Top of each sheet (wrapper coordinates): closed-form, constant spacing */
 function sheetTopsFor(count: number, metrics: PageMetrics): number[] {
   const px = pageMetricsToPx(metrics);
   return Array.from({ length: count }, (_, i) => i * px.advancePx);
 }
 
 /**
- * 分页结果快照：把「纸面位置」与「每页起始块的文档位置」一并交给 React。
- * 后者是目录计算真实页码的依据（页码只存在于分页插件 state 中）。
+ * Pagination snapshot: hands both the sheet positions and each page's start position to React.
+ * The latter is what the TOC uses to compute real page numbers (page numbers exist only in the plugin state).
  */
 export interface PageLayoutSnapshot {
-  /** 每页纸面的 top（px，wrapper 坐标，恒定间距） */
+  /** Top of each sheet (px, wrapper coordinates, constant spacing) */
   sheetTops: number[];
-  /** 每页起始块在文档中的位置（升序，至少含第 1 页的隐含起点） */
+  /** Document position of each page's start block (ascending, including the implicit start of page 1) */
   pageStarts: number[];
 }
 
 /**
- * 页面布局插件：仅在 .rte-paged 容器内生效。
- * onLayout 把分页快照回调给 React（渲染纸面层 + 目录页码）。
- * getMetrics 提供当前页面设置（纸张/边距/方向），随设置变化自动重排。
+ * Page layout plugin: only active inside a .rte-paged container.
+ * onLayout hands the pagination snapshot to React (to render sheets + TOC page numbers).
+ * getMetrics supplies the current page setup (size/margins/orientation); changes trigger a re-layout.
  */
 export function createPageLayoutPlugin(
   onLayout: (snapshot: PageLayoutSnapshot) => void,
@@ -231,13 +232,14 @@ export function createPageLayoutPlugin(
     const plan = planLayout(view, metrics);
     if (plan) {
       const { positions, heights } = plan;
-      // 延迟到宏任务后 dispatch，避免在 PM update 流程内同步 dispatch
+      // Dispatch on a later macrotask, avoiding a synchronous dispatch inside PM's update cycle
       setTimeout(() => {
         const current =
           pageLayoutKey.getState(view.state) ??
           ({ positions: [], heights: [], deco: DecorationSet.empty } satisfies PageLayoutState);
-        // 装饰可能因文档事务（setContent 等）被映射丢失，此时即使分页点没变也必须重建，
-        // 否则页面视图会退化成"没有页间空白"的连续排版
+        // Decorations can be lost through document transactions (setContent, etc.); then they must be
+        // rebuilt even if the page breaks didn't change, otherwise the page view degrades into
+        // continuous layout without inter-page gaps
         const decoLost = current.deco.find().length !== positions.length;
         const changed =
           decoLost ||
@@ -288,7 +290,7 @@ export function createPageLayoutPlugin(
     view: (view) => {
       const onResize = () => schedule(view);
       schedule(view);
-      // 字体/图片异步加载完成后再校准
+      // Re-calibrate after fonts/images finish loading asynchronously
       fontTimer = window.setTimeout(onResize, 400);
       window.addEventListener('resize', onResize);
       return {
@@ -304,12 +306,12 @@ export function createPageLayoutPlugin(
 }
 
 /**
- * 打印路径专用（非 PM 管理 DOM）：给打印流打上与屏幕页面视图完全相同的块级分页标记，
- * 配合 CSS `break-before: page` 实现所见即所得。
+ * Print path only (DOM not managed by PM): tag the print flow with the same block pagination markers
+ * as the on-screen page view, using CSS `break-before: page` for WYSIWYG.
  *
- * 只做标记、不改 margin：Chrome 在强制断页处**不会**截断 margin-top，
- * 一旦用 margin 把块"顶"到目标位置，打印预览就会多出空白页或整段下移，
- * 与屏幕分页明显不一致。
+ * Mark only, never touch margins: Chrome does NOT truncate margin-top at a forced break, so pushing
+ * blocks into position with margins makes the print preview add blank pages or shift everything down,
+ * visibly diverging from on-screen pagination.
  */
 export function applyPagedBreaks(dom: HTMLElement, metrics: PageMetrics): void {
   const children = Array.from(dom.children) as HTMLElement[];
@@ -318,12 +320,12 @@ export function applyPagedBreaks(dom: HTMLElement, metrics: PageMetrics): void {
     el.removeAttribute('data-page-start');
   });
   if (children.length === 0) return;
-  // 归一化到内容原点（打印流的 offsetParent 未必是容器本身）。
-  // 原点取第一个「参与文字流」的块：浮动图片是绝对定位，不能作为基准。
+  // Normalize to the content origin (the print flow's offsetParent isn't necessarily the container).
+  // Take the first block "in the text flow" as the origin: floating images are absolutely positioned.
   const flowChild = children.find((el) => !isFloatingImageElement(el)) ?? children[0];
   const base = flowChild.getBoundingClientRect().top;
   const items = children.map((el) => {
-    // 浮动图片脱离文字流：按零高度参与，不参与打印分页
+    // Floating images are out of the text flow: count them as zero height and exclude them from print pagination
     if (isFloatingImageElement(el)) return { top: 0, height: 0 };
     const rect = el.getBoundingClientRect();
     return { top: rect.top - base, height: rect.height };

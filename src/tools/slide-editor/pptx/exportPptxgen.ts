@@ -32,29 +32,29 @@ import type {
 } from './pptxgenTypes';
 
 /**
- * SlideDoc → pptxgenjs 导出通道。
+ * SlideDoc → pptxgenjs export channel.
  *
- * 为什么引入它：自研 DrawingML 写出（pptx/write.ts）对子元素顺序零容忍，
- * 每补一种能力都要手写一遍 XML 且难以覆盖全；pptxgenjs 已经封装了
- * **原生可编辑图表**、母版、表格合并、run 级字距/上下标/高亮/超链接等能力。
+ * Why it exists: the hand-written DrawingML writer (pptx/write.ts) is zero-tolerance about element
+ * order — every new capability means hand-writing XML again and still can't cover everything; pptxgenjs
+ * already wraps **natively editable charts**, masters, table merges and run-level spacing/baseline/highlight/hyperlinks.
  *
- * 体积约束：pptxgenjs 约 350KB+ gzip，因此这里**只在真正导出时**动态 import，
- * 由 Vite 切成独立 chunk，绝不进入首屏。
+ * Size budget: pptxgenjs is ~350KB+ gzipped, so it is imported dynamically **only when actually exporting**,
+ * letting Vite split it into its own chunk that never reaches the first screen.
  *
- * 已知降级（pptxgenjs 表达不了的部分）：
- * - 渐变填充（ShapeFillProps.type 仅 'none' | 'solid'）→ 取首个色标作为纯色；
- * - 组合 group（无原生分组）→ 导出时展平为绝对坐标的独立元素；
- * - 元素级透明度 opacity（无对应选项）→ 忽略；
- * - 竖排文本 vert → 忽略，按横排导出；
- * - 自定义路径 custGeom → 退化为最接近的 prstGeom；
- * - 公式 formula → 暂以「LaTeX 源码文本框」落盘（见 addFormula）。
+ * Known degradations (what pptxgenjs cannot express):
+ * - gradient fills (ShapeFillProps.type is only 'none' | 'solid') → use the first stop as a solid color;
+ * - groups (no native grouping) → flattened into independent elements with absolute coordinates on export;
+ * - element-level opacity (no matching option) → ignored;
+ * - vertical text vert → ignored, exported horizontally;
+ * - custom paths custGeom → degrade to the closest prstGeom;
+ * - formulas → persisted for now as a "LaTeX source" text box (see addFormula).
  */
 
 export type PptxGenExportErrorCode = 'EMPTY' | 'EXPORT_FAILED' | 'UNSUPPORTED';
 
 /**
- * pptxgenjs 3.12 未导出其命名空间类型，因此这里用本地最小契约
- * （`pptxgenTypes.ts`）承接，实例由 `new PptxGenJS()` 构造后断言为该契约。
+ * pptxgenjs 3.12 doesn't export its namespace types, so a local minimal contract
+ * (`pptxgenTypes.ts`) stands in; the instance is built by `new PptxGenJS()` and asserted to it.
  */
 type PptxPres = PptxPresentation;
 type PresSlide = PptxSlide;
@@ -68,9 +68,9 @@ type IChartOpts = PptxChartOptions;
 type SHAPE_NAME = string;
 type CHART_NAME = string;
 
-/** 96dpi：模型用 px，pptxgenjs 用 inch */
+/** 96dpi: the model uses px, pptxgenjs uses inches */
 const PX_PER_INCH = 96;
-/** px → pt（描边宽度、缩进等以磅为单位） */
+/** px → pt (stroke widths, indents and similar are measured in points) */
 const PX_PER_PT = 96 / 72;
 
 function toIn(px: number): number {
@@ -81,7 +81,7 @@ function toPt(px: number): number {
   return px / PX_PER_PT;
 }
 
-/** '#RRGGBB' → 'RRGGBB'（pptxgenjs 的 HexColor 不带 #） */
+/** '#RRGGBB' → 'RRGGBB' (pptxgenjs HexColor has no leading #) */
 function hex(color: string | undefined): string | undefined {
   if (!color) return undefined;
   const text = color.trim().replace(/^#/, '');
@@ -100,7 +100,7 @@ function fillToShapeFill(fill: Fill | undefined): ShapeFillProps | undefined {
       transparency: fill.alpha === undefined ? undefined : Math.round((1 - fill.alpha) * 100),
     };
   }
-  // 渐变降级为首个色标（pptxgenjs 不支持 gradient fill）
+  // Degrade gradients to the first stop (pptxgenjs has no gradient fill)
   const first = hex(fill.stops[0]?.color);
   return first ? { type: 'solid', color: first } : undefined;
 }
@@ -112,7 +112,7 @@ function lineToShapeLine(stroke: Stroke | undefined): ShapeProps['line'] {
   return { color, width: Math.max(0.75, toPt(stroke.width)) };
 }
 
-/** 我们的 prstGeom 名 → pptxgenjs SHAPE_NAME；未收录的退化为 rect */
+/** Our prstGeom names → pptxgenjs SHAPE_NAME; unknown ones degrade to rect */
 const SHAPE_MAP: Record<string, SHAPE_NAME> = {
   rect: 'rect',
   roundRect: 'roundRect',
@@ -150,7 +150,7 @@ function shapeNameOf(prst: string): SHAPE_NAME {
   return SHAPE_MAP[prst] ?? 'rect';
 }
 
-/** 图表类型 → pptxgenjs CHART_NAME + 分组方式 */
+/** Chart type → pptxgenjs CHART_NAME + grouping */
 function chartNameOf(element: ChartElement): {
   name: CHART_NAME;
   barGrouping?: string;
@@ -188,12 +188,12 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/** 媒体字节 → pptxgenjs 可接受的 data URI */
+/** Media bytes → a data URI pptxgenjs accepts */
 function mediaDataUri(bytes: Uint8Array, mime: string): string {
   return `data:${mime || 'image/png'};base64,${bytesToBase64(bytes)}`;
 }
 
-/* ------------------------------- 文本 ------------------------------- */
+/* ------------------------------- Text ------------------------------- */
 
 const ALIGN_MAP = { left: 'left', center: 'center', right: 'right', justify: 'justify' } as const;
 const VALIGN_MAP = { top: 'top', middle: 'middle', bottom: 'bottom' } as const;
@@ -221,7 +221,7 @@ function runOptions(style: RunStyle | undefined): TextPropsOptions {
   return options;
 }
 
-/** 一个段落 → 若干 TextProps（最后一段不加换行） */
+/** One paragraph → a few TextProps (the last paragraph adds no line break) */
 function paragraphToTextProps(paragraph: Paragraph, isLast: boolean): TextProps[] {
   const shared: TextPropsOptions = {};
   if (paragraph.align) shared.align = ALIGN_MAP[paragraph.align];
@@ -238,7 +238,7 @@ function paragraphToTextProps(paragraph: Paragraph, isLast: boolean): TextProps[
     options: {
       ...shared,
       ...runOptions(run.style),
-      // 段内换行由段落边界控制：每个段落的最后一段不加 breakLine
+      // Line breaks inside a paragraph follow paragraph boundaries: the last chunk adds no breakLine
       breakLine: isLast && index === runs.length - 1 ? false : index === runs.length - 1,
     },
   }));
@@ -251,7 +251,7 @@ function bodyToTextProps(body: TextBody): TextProps[] {
   );
 }
 
-/** 富文本 → 纯文本（段落以换行分隔）：给只接受单字符串的 master text 对象用 */
+/** Rich text → plain text (paragraphs separated by newlines), for master text objects that take a single string only */
 function plainTextOf(body: TextBody): string {
   return body.paragraphs.map((p) => p.runs.map((run) => run.text).join('')).join('\n');
 }
@@ -274,11 +274,11 @@ function textBaseOptions(
   };
 }
 
-/* ------------------------------- 元素 ------------------------------- */
+/* ------------------------------- Elements ------------------------------- */
 
 interface ExportCtx {
   doc: SlideDoc;
-  /** 元素级超链接兜底（run 级优先） */
+  /** Element-level hyperlink fallback (run level wins) */
   hyperlinkOf: (element: SlideElement) => { url: string } | undefined;
 }
 
@@ -325,7 +325,7 @@ function addShapeElement(slide: PresSlide, element: ShapeElement, ctx: ExportCtx
   if (element.hyperlink) options.hyperlink = ctx.hyperlinkOf(element);
   slide.addShape(options.shape as SHAPE_NAME, options);
 
-  // 形状内文字单独叠一层文本框（pptxgenjs 的 shape 不支持富文本段落）
+  // Draw text inside a shape as a separate overlay text box (pptxgenjs shapes don't support rich paragraphs)
   if (element.body && element.body.paragraphs.length > 0) {
     slide.addText(bodyToTextProps(element.body), {
       ...textBaseOptions(element, element.body),
@@ -355,7 +355,7 @@ function addImageElement(slide: PresSlide, element: ImageElement, ctx: ExportCtx
 }
 
 function addLineElement(slide: PresSlide, element: LineElement): void {
-  // 连线用 line 形状近似：坐标取包围盒，方向由起止点决定
+  // Approximate connectors with a line shape: coordinates come from the bounding box, direction from the end points
   const points = element.points ?? [0, 0, element.width, 0];
   const flipH = (points[2] ?? 0) < 0;
   const flipV = (points[3] ?? 0) < 0;
@@ -373,8 +373,8 @@ function addLineElement(slide: PresSlide, element: LineElement): void {
 }
 
 function addTableElement(slide: PresSlide, element: TableElement): void {
-  // pptxgenjs 从 cell.options 上读 colspan/rowspan（不是 cell 顶层字段），
-  // 因此所有单元格属性都要放进 options。
+  // pptxgenjs reads colspan/rowspan from cell.options (not top-level cell fields),
+  // so every cell property has to go into options.
   const rows: TableCellProps[][] = element.rows.map((row) =>
     row
       .filter((cell) => !cell.covered)
@@ -388,7 +388,7 @@ function addTableElement(slide: PresSlide, element: TableElement): void {
         if (color) options.color = color;
         const fill = hex(cell.fill);
         if (fill) options.fill = { type: 'solid', color: fill };
-        // 被合并覆盖的格子已过滤掉，pptxgenjs 会按 span 自动补占位格
+        // Covered cells are filtered out; pptxgenjs fills the placeholder cells from the span automatically
         const span: { colspan?: number; rowspan?: number } = {};
         if (cell.colSpan && cell.colSpan > 1) span.colspan = cell.colSpan;
         if (cell.rowSpan && cell.rowSpan > 1) span.rowspan = cell.rowSpan;
@@ -438,7 +438,7 @@ function addChartElement(slide: PresSlide, element: ChartElement): void {
   slide.addChart(name, data, options);
 }
 
-/** 公式：pptxgenjs 无公式对象，降级为展示 LaTeX 源码的文本框 */
+/** Formula: pptxgenjs has no formula object, so degrade to a text box showing the LaTeX source */
 function addFormulaElement(
   slide: PresSlide,
   element: {
@@ -470,11 +470,11 @@ function addFormulaElement(
 }
 
 /**
- * 内置 SVG → PNG dataURL（浏览器端栅格化）。
+ * Built-in SVG → PNG dataURL (rasterized in the browser).
  *
- * 图标在画布上是矢量（Konva.Path），但 pptxgenjs 不接受 SVG 路径，
- * 因此在导出时把 24×24 的图标栅格化成本地图再作为图片插入。
- * 导出本身已是异步链路，这里等待一次图片解码是可接受的。
+ * Icons are vectors on the canvas (Konva.Path), but pptxgenjs doesn't accept SVG paths, so on export a
+ * 24×24 icon is rasterized to a bitmap and inserted as an image. Export is already async, so awaiting one
+ * image decode here is acceptable.
  */
 async function rasterizeSvg(svg: string, size: number): Promise<string | null> {
   try {
@@ -501,7 +501,7 @@ async function rasterizeSvg(svg: string, size: number): Promise<string | null> {
   }
 }
 
-/** 占位框（导入时无法解析的图表/SmartArt/OLE）：灰底虚线框 + 说明文字 */
+/** Placeholder box (charts/SmartArt/OLE that failed to parse on import): gray dashed box + caption */
 function addPlaceholderElement(
   slide: PresSlide,
   element: { x: number; y: number; width: number; height: number; label: string },
@@ -519,7 +519,7 @@ function addPlaceholderElement(
   });
 }
 
-/** 图标导出：栅格化为 PNG 后以图片插入；栅格化失败时退回占位说明 */
+/** Icon export: rasterize to PNG and insert as an image; fall back to a placeholder caption when that fails */
 async function addIconElement(
   slide: PresSlide,
   element: { x: number; y: number; width: number; height: number; iconId: string; color?: string },
@@ -561,8 +561,8 @@ async function addElement(slide: PresSlide, element: SlideElement, ctx: ExportCt
     case 'placeholder':
       return addPlaceholderElement(slide, element);
     case 'group': {
-      // 组合展平：子元素坐标是相对 group 原点且缩放比为 1，直接叠加；
-      // 组的旋转角累加到子元素上（无原生分组可写）。
+      // Flatten groups: children use coordinates relative to the group origin at scale 1, so just add them up;
+      // the group's rotation accumulates onto the children (there is no native grouping to write).
       const rotation = element.rotation ?? 0;
       for (const child of element.children) {
         await addElement(
@@ -583,14 +583,14 @@ async function addElement(slide: PresSlide, element: SlideElement, ctx: ExportCt
   }
 }
 
-/* ------------------------------- 母版 ------------------------------- */
+/* ------------------------------- Masters ------------------------------- */
 
 const MASTER_NAME = 'SYNTOOLS_MASTER';
 
 /**
- * 把母版元素写进 pptxgenjs 的 slide master。
- * master.objects 只接受 rect / text / image / line，其它类型跳过（母版上的
- * 表格、图表等本就罕见，跳过比写坏包体更安全）。
+ * Write master elements into the pptxgenjs slide master.
+ * master.objects only accepts rect / text / image / line; other types are skipped (tables, charts and the like
+ * are rare on masters, and skipping is safer than writing a corrupt package).
  */
 function defineMaster(pres: PptxPres, doc: SlideDoc): void {
   const master = doc.masters[0];
@@ -600,7 +600,7 @@ function defineMaster(pres: PptxPres, doc: SlideDoc): void {
   for (const element of master?.elements ?? []) {
     if (element.visible === false) continue;
     if (element.type === 'text') {
-      // master 的 text 对象只接受单条 TextProps，段落用换行拼成一段文本
+      // The master's text object accepts a single TextProps, so paragraphs are joined with newlines
       objects.push({
         text: {
           text: plainTextOf(element.body),
@@ -659,18 +659,18 @@ function defineMaster(pres: PptxPres, doc: SlideDoc): void {
   });
 }
 
-/* ------------------------------- 后处理 ------------------------------- */
+/* ------------------------------- Post-processing ------------------------------- */
 
-/** 需要重排形状 id 的部件（同一部件内 id 必须唯一） */
+/** Parts whose shape ids must be renumbered (ids must be unique within a part) */
 const SHAPE_ID_PARTS = /^ppt\/(slides|slideLayouts|slideMasters|notesSlides)\/[^/]+\.xml$/;
 
 /**
- * 重排 `p:cNvPr/@id`。
+ * Renumber `p:cNvPr/@id`.
  *
- * pptxgenjs 3.12 对 `p:sp` 与 `p:graphicFrame` 用了两套自增计数器，
- * 同一页里混排形状与表格/图表时会出现重复 id（实测 Text=2 与 Table=2）。
- * PowerPoint 对重复 id 会弹出「需要修复」对话框，因此导出后统一按文档顺序重排：
- * 组内第一个（spTree 的 nvGrpSpPr）天然是 1，其余顺延，不影响任何交叉引用。
+ * pptxgenjs 3.12 uses two independent auto-increment counters for `p:sp` and `p:graphicFrame`, so mixing
+ * shapes with tables/charts on one slide yields duplicate ids (Text=2 and Table=2 in testing).
+ * PowerPoint shows a "repair" dialog for duplicate ids, so after export everything is renumbered in
+ * document order: the first in a group (spTree's nvGrpSpPr) is naturally 1 and the rest follow, breaking no cross-references.
  */
 async function renumberShapeIds(bytes: Uint8Array): Promise<Uint8Array> {
   const { default: JSZip } = await import('jszip');
@@ -700,19 +700,19 @@ async function renumberShapeIds(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
-/* ------------------------------- 入口 ------------------------------- */
+/* ------------------------------- Entry ------------------------------- */
 
 /**
- * 用 pptxgenjs 导出 .pptx。
+ * Export .pptx with pptxgenjs.
  *
- * 与自研通道保持相同的 `ToolResult<Uint8Array>` 契约与错误码，
- * 便于 pptx/export.ts 做双通道调度。
+ * Keeps the same `ToolResult<Uint8Array>` contract and error codes as the hand-written channel, so
+ * pptx/export.ts can dispatch between the two.
  */
 export async function exportPptxPptxGen(doc: SlideDoc): Promise<ToolResult<Uint8Array>> {
   if (!doc.slides || doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
 
   try {
-    // 动态 import：pptxgenjs 单独分包，只在导出时下载
+    // Dynamic import: pptxgenjs is its own chunk, downloaded only when exporting
     const { default: PptxGenJS } = await import('pptxgenjs');
     const pres = new PptxGenJS() as unknown as PptxPresentation;
 
@@ -751,7 +751,7 @@ export async function exportPptxPptxGen(doc: SlideDoc): Promise<ToolResult<Uint8
 async function addSlide(pres: PptxPres, slide: Slide, ctx: ExportCtx): Promise<void> {
   const pptSlide = pres.addSlide({ masterName: MASTER_NAME });
 
-  // 页面自身背景覆盖母版；渐变降级为首色（pptxgenjs 仅支持纯色背景）
+  // The slide's own background overrides the master; gradients degrade to the first color (pptxgenjs supports solid only)
   const ownBackground = normalizeBackground(slide.background);
   if (ownBackground) {
     pptSlide.background = {
@@ -762,8 +762,8 @@ async function addSlide(pres: PptxPres, slide: Slide, ctx: ExportCtx): Promise<v
     };
   }
 
-  // pptxgenjs 的 defineSlideMaster 只生成一个版式，无法表达「每页引用不同版式」，
-  // 因此把该页所属版式的元素直接写到页上，保证视觉与画布一致。
+  // pptxgenjs's defineSlideMaster produces a single layout and can't express "each slide references a different layout",
+  // so the slide's layout elements are written straight onto the slide to keep it visually identical to the canvas.
   const layout = ctx.doc.layouts.find((item) => item.id === slide.layoutId);
   for (const element of layout?.elements ?? []) {
     if (element.visible === false) continue;

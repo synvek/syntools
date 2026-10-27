@@ -54,7 +54,7 @@ function fnv1a64(data: Uint8Array): bigint {
   return hash;
 }
 
-/** 计算校验和（十六进制，永不失败）。data 为空时返回 0（合法值）。 */
+/** Compute a checksum (hex, never fails). Empty data returns 0, which is a valid value. */
 export function computeChecksum(algo: ChecksumAlgo, data: Uint8Array): string {
   let value: number | bigint;
   switch (algo) {
@@ -78,12 +78,12 @@ export function computeChecksum(algo: ChecksumAlgo, data: Uint8Array): string {
   return hex.toUpperCase();
 }
 
-/** 计算校验和，返回统一的 ToolResult。 */
+/** Compute a checksum and return a uniform ToolResult. */
 export function checksum(algo: ChecksumAlgo, data: Uint8Array): ToolResult<string> {
   return { ok: true, value: computeChecksum(algo, data) };
 }
 
-/** 一次性计算所有算法的校验和，便于对照。 */
+/** Compute every algorithm's checksum at once for comparison. */
 export function allChecksums(data: Uint8Array): Record<ChecksumAlgo, string> {
   return {
     crc32: computeChecksum('crc32', data),

@@ -1,25 +1,25 @@
 /**
- * SVG 导入。
+ * SVG import.
  *
- * 定位很明确：**栅格化导入**（不是「把 SVG 解析成矢量图层」）。
- * 我们的文档模型是位图优先的，真正需要的是「把这张矢量图按我想要的清晰度变成像素」；
- * 而 SVG 恰恰是可缩放的，所以关键在两点：
+ * The scope is narrow: **rasterize on import**, not "parse SVG into vector layers".
+ * Our document model is bitmap-first; what we need is "turn this vector art into pixels at my sharpness";
+ * and SVG is scalable, so two things matter:
  *
- * 1. **算出它的固有尺寸** —— 读 `width` / `height`（含 px / pt / cm 等单位换算），缺失时退回 `viewBox`；
- * 2. **按倍数超采样** —— 默认 2 倍，这样导入后再缩放图层不会立刻糊掉（上限 `MAX_CANVAS_SIZE`）。
+ * 1. **work out its intrinsic size** — read `width` / `height` (converting px / pt / cm), else `viewBox`;
+ * 2. **supersample** — 2× by default, so scaling the layer after import stays sharp (capped by `MAX_CANVAS_SIZE`).
  *
- * 安全上只经 `<img>` 渲染：浏览器在这种模式下**不执行** SVG 内的脚本、也不加载外部资源
- * （因此不存在外链请求与脚本注入面），失败就回落到「无法导入」。
+ * For safety it renders through `<img>` only: in that mode browsers **do not run** SVG scripts or load
+ * external resources (so no outbound requests or script injection); failure means "cannot import".
  */
 
 import type { ToolResult } from '@/core/types';
 import { MAX_CANVAS_SIZE } from '../core';
 import { createCanvasElement, registerCanvas, type LoadedImage } from '../model/assets';
 
-/** 导入时的默认超采样倍数 */
+/** Default supersampling factor on import */
 export const SVG_DEFAULT_SCALE = 2;
 
-/** CSS 的绝对单位 → 像素换算（1in = 96px） */
+/** CSS absolute units → pixels (1in = 96px) */
 const UNIT_TO_PX: Record<string, number> = {
   '': 1,
   px: 1,
@@ -37,8 +37,8 @@ export interface SvgSize {
 }
 
 /**
- * 从一个 CSS 长度值解析出像素数；`%` / `auto` / `em` 这类依赖上下文的长度返回 null。
- * 允许负数？不允许 —— 负尺寸的 SVG 没有意义，直接当解析失败。
+ * Parse a CSS length into pixels; context-dependent lengths (`%` / `auto` / `em`) return null.
+ * Negative values? No — a negative SVG size is meaningless and counts as a parse failure.
  */
 export function parseSvgLength(value: string | undefined): number | null {
   if (!value) return null;
@@ -52,7 +52,7 @@ export function parseSvgLength(value: string | undefined): number | null {
   return amount * factor;
 }
 
-/** `viewBox="minX minY width height"`（逗号或空白分隔）→ 宽高 */
+/** `viewBox="minX minY width height"` (comma or space separated) → width and height */
 export function parseViewBox(value: string | undefined): SvgSize | null {
   if (!value) return null;
   const parts = value
@@ -66,11 +66,11 @@ export function parseViewBox(value: string | undefined): SvgSize | null {
 }
 
 /**
- * SVG 源码 → 固有尺寸。
+ * SVG source → intrinsic size.
  *
- * 用正则在 `<svg ...>` 开标签上取属性，而不是上 `DOMParser`：这段逻辑要能在纯函数层跑（含 prerender 环境），
- * 而 `width` / `height` / `viewBox` 这三个属性是纯文本形态，正则足够且失败模式可控（解析不出就返回 null）。
- * 优先级与浏览器一致：`width`+`height` 都有效时优先，否则用 `viewBox`。
+ * Attributes come from the `<svg ...>` tag via regex rather than `DOMParser`, so this stays pure-function
+ * (prerender included); the three attributes are plain text, and failure simply returns null.
+ * Priority matches browsers: valid `width` and `height` win, otherwise `viewBox`.
  */
 export function parseSvgIntrinsicSize(source: string): SvgSize | null {
   const tag = /<svg\b([^>]*)>/i.exec(source);
@@ -82,7 +82,7 @@ export function parseSvgIntrinsicSize(source: string): SvgSize | null {
     attributes.set(match[1], match[2] ?? match[3] ?? '');
     match = attrPattern.exec(tag[1]);
   }
-  // 属性名按原样保留再忽略大小写查找：`viewBox` 是驼峰，直接小写化会把它找丢
+  // Names are kept as written and matched case-insensitively: lowercasing would lose camelCase `viewBox`
   const read = (name: string) => {
     const target = name.toLowerCase();
     for (const [key, value] of attributes) {
@@ -97,7 +97,7 @@ export function parseSvgIntrinsicSize(source: string): SvgSize | null {
   return parseViewBox(read('viewBox'));
 }
 
-/** 按倍数算出栅格化尺寸；未知固有尺寸时给一个保守的默认框，并整体钳制到画布上限 */
+/** Raster size at the given factor; unknown sizes get a conservative default box, all clamped to the cap */
 export function svgRasterSize(size: SvgSize | null, scale = SVG_DEFAULT_SCALE): SvgSize {
   const base = size ?? { width: 512, height: 512 };
   const factor = Math.max(1, scale);
@@ -113,10 +113,10 @@ export function svgRasterSize(size: SvgSize | null, scale = SVG_DEFAULT_SCALE): 
 }
 
 /**
- * SVG 文本 → 画布。
+ * SVG text → canvas.
  *
- * 用 Blob 重新包一次（而不是直接用原 File 的 object URL）：
- * 这样即使文件缺少 MIME（有些系统导出为空）也能强制按 `image/svg+xml` 解码。
+ * Rewrap in a Blob instead of using the File's object URL directly:
+ * that way a missing MIME type (some systems export empty ones) still decodes as `image/svg+xml`.
  */
 export function rasterizeSvg(
   source: string,
@@ -146,7 +146,7 @@ export function rasterizeSvg(
   });
 }
 
-/** 读取本地 SVG 文件 → 资产 */
+/** Read a local SVG file → asset */
 export async function loadSvgFile(
   file: File,
   scale = SVG_DEFAULT_SCALE,

@@ -5,16 +5,11 @@ import { CopyButton } from '@/core/components/CopyButton';
 import { ClearButton, OptionBar, SwapButton } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
-import {
-  UNICODE_FORMATS,
-  processUnicode,
-  type UnicodeDirection,
-  type UnicodeFormat,
-} from './core';
+import { UNICODE_FORMATS, processUnicode, type UnicodeDirection, type UnicodeFormat } from './core';
 
 const FORMAT_SET = new Set<string>(UNICODE_FORMATS);
 
-/** Unicode 在线编码 / 解码 */
+/** Online Unicode encoding / decoding */
 export default function UnicodeCodecTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', d: 'encode', f: 'js' }), []);

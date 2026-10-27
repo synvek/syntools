@@ -1,6 +1,6 @@
 /**
- * 缩略图几何：把「内容包围盒」等比放进缩略图框，返回平移与缩放。
- * 单独放在 .ts 里（不含组件），便于各工具复用与单测。
+ * Thumbnail geometry: fit the content bounding box into the frame; returns translation and scale.
+ * Kept in a plain .ts file (no components) so tools can reuse and unit-test it.
  */
 
 export const PAGE_THUMB_SIZE = { width: 168, height: 104 };

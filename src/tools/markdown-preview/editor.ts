@@ -1,5 +1,5 @@
 /**
- * Markdown 编辑辅助：围绕选区包裹 / 行前缀插入，供工具栏与快捷键复用。
+ * Markdown editing helpers: wrap the selection or prefix lines, shared by the toolbar and shortcuts.
  */
 
 export interface EditorSelection {
@@ -77,7 +77,7 @@ function setHeading(text: string, start: number, end: number, level: number): Ed
   });
 }
 
-/** 对选区应用 Markdown 语法动作，返回新文本与建议选区 */
+/** Apply a Markdown syntax action to the selection, returning the new text and suggested selection */
 export function applyMarkdownAction(
   text: string,
   selectionStart: number,
@@ -138,7 +138,7 @@ export function applyMarkdownAction(
       });
     case 'task':
       return prefixLines(text, start, end, (_, line) => {
-        // 已是任务项则切换勾选状态，否则把普通行变成待办
+        // Toggle the checkbox when already a task item, otherwise turn a plain line into a todo
         const done = /^(\s*)[-*+]\s+\[([ xX])\]\s+(.*)$/.exec(line);
         if (done) return `${done[1]}${done[2] === ' ' ? '- [x]' : '- [ ]'} ${done[3]}`;
         const stripped = line.replace(/^(\s*)([-*+]|\d+\.)\s+/, '$1');
@@ -165,7 +165,7 @@ export function applyMarkdownAction(
   }
 }
 
-/** CodeJar 实例上需要的最小接口（避免把编辑器实现泄漏到工具栏） */
+/** Minimal CodeJar surface needed here (keeps the editor implementation out of the toolbar) */
 export interface MarkdownJarLike {
   toString: () => string;
   save: () => { start: number; end: number; dir?: '->' | '<-' };
@@ -174,7 +174,7 @@ export interface MarkdownJarLike {
   recordHistory: () => void;
 }
 
-/** 在 CodeJar 上应用 Markdown 动作并精确恢复选区 */
+/** Apply a Markdown action to a CodeJar instance and restore the selection precisely */
 export function runMarkdownAction(jar: MarkdownJarLike, action: MarkdownAction): boolean {
   const pos = jar.save();
   const result = applyMarkdownAction(jar.toString(), pos.start, pos.end, action);

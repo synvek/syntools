@@ -5,8 +5,8 @@ import { usePhotoStore } from '../store';
 import { layerDisplayName } from './layerName';
 
 /**
- * 底部状态栏：分区呈现「色彩模式 / 缩放 / 光标 / 选区 / 当前图层 / 画布信息 / 内存」。
- * 与桌面端修图软件一致，把文档级信息固定在底部，避免占用画布与面板空间。
+ * Bottom status bar: sections for color mode / zoom / cursor / selection / current layer / canvas info / memory.
+ * Like desktop retouching apps, document-level info is pinned to the bottom so it does not eat canvas or panel space.
  */
 export function StatusBar({ cursor }: { cursor: { x: number; y: number } | null }) {
   const { t } = useTranslation();

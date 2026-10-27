@@ -35,7 +35,7 @@ export { PROMPT_CATEGORIES };
 export type { PromptCategoryId } from './categories';
 export { validatePromptData } from './validate';
 
-/** 全量提示词，按分类清单顺序拼接 */
+/** All prompts, concatenated in category-list order */
 export const PROMPTS: PromptItem[] = [
   ...WRITING_PROMPTS,
   ...CODING_PROMPTS,
@@ -68,8 +68,8 @@ export const PROMPTS: PromptItem[] = [
 ];
 
 if (import.meta.env.DEV) {
-  // 开发期快速失败：数据文件写错时立即给出可读错误，避免脏数据进入界面。
-  // 生产构建下该分支会被摇树移除，不产生运行时开销。
+  // Fail fast in development: a malformed data file raises a readable error right away, keeping bad data out of the UI.
+  // Production builds tree-shake this branch away, so it costs nothing at runtime.
   const issues = validatePromptData(PROMPTS, PROMPT_CATEGORIES);
   if (issues.length > 0) {
     throw new Error(`[ai-prompts] 提示词数据校验失败：\n- ${issues.join('\n- ')}`);

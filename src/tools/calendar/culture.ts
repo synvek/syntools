@@ -6,22 +6,22 @@ import {
 } from './western-holidays';
 
 /**
- * 日历文化增强：中文阴历/节气/法定休班/宜忌；英文等本地假日与周末标识。
+ * Calendar cultural enrichment: for Chinese, lunar dates, solar terms, statutory rest/work days, and auspicious notes; for English and others, local holidays and weekend markers.
  */
 
 export type RestMark = 'off' | 'work' | 'weekend' | null;
 
 export interface DayCultureInfo {
-  /** 月格副文案（阴历日 / 节日 / 节气 择一） */
+  /** Month-cell subline (one of lunar day / festival / solar term) */
   subline: string;
-  /** 阴历简写，如 初一→正月、廿九 */
+  /** Short lunar label, e.g. the first day or the 29th day of a lunar month */
   lunarText: string | null;
-  /** 阴历完整描述 */
+  /** Full lunar description */
   lunarFull: string | null;
   festivals: string[];
   solarTerm: string | null;
   rest: RestMark;
-  /** 法定假日名（休/班关联） */
+  /** Statutory holiday name (tied to a rest/work day) */
   holidayName: string | null;
   yi: string[];
   ji: string[];
@@ -43,7 +43,7 @@ function dateKey(year: number, month: number, day: number): string {
 }
 
 function applyLunarLanguage(profile: CalendarCultureProfile): void {
-  // lunar-javascript：chs / en（以及 cht 等）
+  // lunar-javascript locale ids: chs / en (plus cht and others)
   I18n.setLanguage(profile === 'zh' ? 'chs' : 'en');
 }
 
@@ -117,24 +117,18 @@ function buildEnDay(
   region: WesternHolidayRegion,
 ): DayCultureInfo {
   const solar = Solar.fromYmd(year, month, day);
-  const libFestivals = uniqueStrings([
-    ...solar.getFestivals(),
-    ...solar.getOtherFestivals(),
-  ]);
+  const libFestivals = uniqueStrings([...solar.getFestivals(), ...solar.getOtherFestivals()]);
   const western = getWesternHoliday(year, month, day, region);
-  const festivals = uniqueStrings([
-    ...libFestivals,
-    ...(western ? [western.name] : []),
-  ]);
+  const festivals = uniqueStrings([...libFestivals, ...(western ? [western.name] : [])]);
 
   let rest: RestMark = null;
   if (festivals.length > 0 && !weekendRest(year, month, day)) {
-    // 公共假日：工作日遇上则标 off
+    // Public holiday falling on a weekday: mark it off
     rest = 'off';
   } else if (weekendRest(year, month, day)) {
     rest = 'weekend';
   }
-  // 若假日落在周末，仍标 weekend，但保留节日名
+  // A holiday on a weekend stays "weekend" but keeps its festival name
 
   const subSource = festivals[0] || null;
   return {
@@ -183,7 +177,7 @@ export function getDayCultureInfo(
   return buildGenericDay(year, month, day);
 }
 
-/** 批量查询（同语言一次设 i18n，减少重复切换） */
+/** Batch lookup (sets i18n once per language to avoid repeated switching) */
 export function getDaysCultureInfo(
   days: Array<{ year: number; month: number; day: number }>,
   lang: string,

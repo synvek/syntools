@@ -25,7 +25,7 @@ import {
   type MdFontId,
 } from './core';
 
-/** Markdown 转图片：编辑 → 预览 → 导出 PNG */
+/** Markdown to image: edit → preview → export PNG */
 export default function MdToImageTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -63,10 +63,7 @@ export default function MdToImageTool() {
   const [exporting, setExporting] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const result = useMemo(
-    () => prepareMarkdownHtml(input, { gfm, breaks }),
-    [input, gfm, breaks],
-  );
+  const result = useMemo(() => prepareMarkdownHtml(input, { gfm, breaks }), [input, gfm, breaks]);
   const html = result.ok ? result.value : '';
 
   const styleResult = useMemo(

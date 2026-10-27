@@ -16,7 +16,7 @@ import {
   type TextCardOptions,
 } from './core';
 
-/** 文字转卡片制作 */
+/** Text to card maker */
 export default function TextCardTool() {
   const { t } = useTranslation();
   const init = useMemo(

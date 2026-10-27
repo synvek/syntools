@@ -1,5 +1,5 @@
 /**
- * 代码在线高亮：语言 / 主题配置（Prism 高亮在 UI）。
+ * In-browser code highlighting: language / theme catalog (Prism does the highlighting in the UI).
  */
 
 export const HIGHLIGHT_LANGUAGES = [
@@ -61,7 +61,7 @@ export function languageLabel(language: HighlightLanguage): string {
   return language === 'markup' ? 'html' : language;
 }
 
-/** 生成可复制的高亮 HTML 片段 */
+/** Build a copyable highlighted HTML snippet */
 export function buildHighlightSnippet(
   highlightedInnerHtml: string,
   language: HighlightLanguage,

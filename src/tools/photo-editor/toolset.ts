@@ -3,52 +3,52 @@ import type { ShapeKind, ToolId } from './model/types';
 import { SHAPE_ICONS } from './shapeIcons';
 
 /**
- * 工具箱的**单一真相源**：分组、图标、文案键与展示用快捷键。
+ * **Single source of truth** for the toolbox: groups, icons, label keys and display-only shortcuts.
  *
- * 抽成纯数据模块的原因：工具箱（`ui/ToolPalette.tsx`）与快捷键一览（`ui/ShortcutHelp.tsx`）
- * 必须显示同一份映射，否则「角标写着 O 但按键没反应」这类不一致会悄悄回归
- * （历史问题：椭圆选区角标为 O，但 `interaction/keyboard.ts` 未绑定）。
- * 真正的按键绑定仍在 `interaction/keyboard.ts`，`toolset.test.ts` 会守住两边一致。
+ * It is a pure data module because the toolbox (`ui/ToolPalette.tsx`) and the shortcut sheet
+ * (`ui/ShortcutHelp.tsx`) must show the same mapping, or mismatches like "the badge says O but O does
+ * nothing" creep back (a real bug once: the oval selection badge said O with no binding behind it).
+ * The real bindings still live in `interaction/keyboard.ts`, and `toolset.test.ts` keeps both in sync.
  *
- * **分组即工具箱的一行**：26 个工具平铺会让左侧栏超过 1000px 高（把整个工作区顶高、页面只能滚动），
- * 因此按「工具家族」压缩成 15 行、4 个大区 —— 每行只显示**当前工具**
- * （该组没选中过任何工具时显示 `primary`），同组其它工具收进角标浮层（与 Photoshop 的工具组一致）。
- * 高频工具（画笔 / 橡皮 / 仿制图章 / 文字 / 形状）各自独立成行，不再藏在角标里；
- * 行数超过工作区高度时由工具箱自己滚动（`ui/ToolPalette.tsx` 的 `max-h-full overflow-y-auto`）。
+ * **A group is one toolbox row**: 26 flat tools would push the rail past 1000px (tall workspace, scrolling page),
+ * so tool families compress into 15 rows across 4 sections, each row showing only the **current tool**
+ * (`primary` when nothing in the group has been picked), with the rest in the badge flyout, as in Photoshop.
+ * High-frequency tools (brush / eraser / clone stamp / text / shape) get their own row, out of the flyout;
+ * when rows exceed the workspace height the rail scrolls itself (`max-h-full overflow-y-auto` in ToolPalette).
  */
 
 export interface ToolDef {
   id: ToolId;
   icon: string;
-  /** 完整 i18n 键名，可直接交给 `t()` */
+  /** Full i18n key, ready to pass to `t()` */
   labelKey: string;
-  /** 工具箱角标 / 快捷键一览中展示的按键（展示用，可能是 ⇧ 组合） */
+  /** Key shown on the toolbox badge / shortcut sheet (display only, possibly a ⇧ combination) */
   shortcut: string;
   /**
-   * 同一工具的**子种类**（目前只有形状）。
+   * **Sub-kinds** of the same tool (only shapes so far).
    *
-   * 六种形状共用 `shape` 这一个 ToolId（落笔时由 `shapeKind` 决定画什么），
-   * 但工具箱里要按组按钮呈现、每项各有图标与名字，因此额外带上种类。
+   * Six shapes share the single `shape` ToolId (`shapeKind` decides what gets drawn),
+   * but the toolbox shows them as grouped buttons with their own icons and names, hence the kinds.
    */
   variant?: ShapeKind;
 }
 
 /**
- * 工具箱的**大区**：只有跨区时才画分隔线。
+ * Toolbox **sections**: a divider is drawn only when the section changes.
  *
- * 11 行若每行都画分隔线，左侧栏会多出约 50px（工作区下限就得跟着变高）；
- * 而按「选择 / 编辑 / 绘制 / 取样与形状」四区划分，既保留视觉分区又省下这段高度。
- * 同一区必须连续（否则会出现重复分隔线），由 `toolset.test.ts` 守住。
+ * A divider between all 11 rows would add ~50px to the rail (raising the workspace minimum);
+ * splitting into select / edit / paint / sample-and-shape keeps the visual grouping without that height.
+ * A section must stay contiguous (or dividers repeat), and `toolset.test.ts` enforces that.
  */
 export type ToolSection = 'select' | 'edit' | 'paint' | 'sample';
 
 export interface ToolGroupDef {
   id: string;
-  /** 所属大区：跨区时工具箱画一条分隔线 */
+  /** Owning section: the toolbox draws a divider when it changes */
   section: ToolSection;
-  /** 组内默认工具：该组尚无「当前工具」时按钮展示它 */
+  /** Default tool of the group: shown while the group has no current tool */
   primary: ToolId;
-  /** 组级文案（有子种类的组用它做整体名称，如「形状」）；缺省用 primary 的文案 */
+  /** Group-level label (the overall name for groups with sub-kinds, e.g. "Shape"); else primary's */
   labelKey?: string;
   items: ToolDef[];
 }
@@ -87,7 +87,7 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       },
     ],
   },
-  // 套索家族：手绘 / 多边形 / 磁性（⇧L 循环），与 PS 的 L 组一致
+  // Lasso family: freehand / polygonal / magnetic (⇧L cycles), matching PS's L group
   {
     id: 'lasso',
     section: 'select',
@@ -108,7 +108,7 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       },
     ],
   },
-  // 魔棒与快速选择都是「按颜色 / 相似度扩张选区」，单独成组（W）
+  // Magic wand and quick selection both "expand by color / similarity", so they share a group (W)
   {
     id: 'wand',
     section: 'select',
@@ -129,7 +129,7 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
     primary: 'crop',
     items: [{ id: 'crop', icon: 'imageCrop', labelKey: 'tools.photo.toolCrop', shortcut: 'C' }],
   },
-  // 画笔与橡皮互为替代工具，但使用频率都很高：各自独立成行，少一次角标展开
+  // Brush and eraser replace each other but are both very common: separate rows save a flyout click
   {
     id: 'brush',
     section: 'paint',
@@ -161,7 +161,7 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       { id: 'sponge', icon: 'sponge', labelKey: 'tools.photo.toolSponge', shortcut: '⇧O' },
     ],
   },
-  // 仿制图章取样逻辑与修复类工具差异较大，单独成行
+  // The clone stamp samples quite differently from the healing tools, so it gets its own row
   {
     id: 'clone',
     section: 'paint',
@@ -170,7 +170,7 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       { id: 'cloneStamp', icon: 'clone', labelKey: 'tools.photo.toolCloneStamp', shortcut: 'S' },
     ],
   },
-  // 修复画笔 / 污点修复共用「取周边像素修补」的交互，合成一组（⇧J 循环）
+  // Healing brush / spot healing share "patch with nearby pixels", so they form one group (⇧J cycles)
   {
     id: 'heal',
     section: 'paint',
@@ -209,7 +209,7 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
       { id: 'sampler', icon: 'sampler', labelKey: 'tools.photo.toolSampler', shortcut: '⇧I' },
     ],
   },
-  // 文字与形状是两类对象（文本层 / 形状层），各自独立成行
+  // Text and shapes are different objects (text layer / shape layer), each with its own row
   {
     id: 'text',
     section: 'sample',
@@ -221,8 +221,8 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
     section: 'sample',
     primary: 'shape',
     labelKey: 'tools.photo.toolShape',
-    // 形状按「一个工具 + 六个种类」呈现：工具行跟着当前种类换图标，
-    // 点开浮层选具体形状（角标在侧边栏，参数条只放宽度 / 颜色这类属性）。
+    // Shapes present as one tool with six kinds: the row's icon follows the current kind,
+    // and the flyout picks a specific shape (the badge sits on the rail; options hold width / color).
     items: SHAPE_KINDS.map((kind) => ({
       id: 'shape' as ToolId,
       variant: kind,
@@ -240,10 +240,10 @@ export const TOOL_GROUPS: ToolGroupDef[] = [
 ];
 
 /**
- * 展平的工具列表（工具箱顺序），供快捷键一览等场景使用。
+ * Flattened tool list (toolbox order), for the shortcut sheet and similar consumers.
  *
- * 有子种类的组（形状）只保留**一条**：快捷键一览里「U = 形状」一行就够，
- * 铺成六行「矩形 U / 椭圆 U…」只会把面板撑长。
+ * Groups with sub-kinds (shapes) keep **one entry**: "U = shape" is enough in the shortcut sheet,
+ * and six rows of "rect U / oval U…" would only stretch the panel.
  */
 export const ALL_TOOLS: ToolDef[] = TOOL_GROUPS.flatMap((group) => {
   const base = group.items.find((item) => item.id === group.primary) ?? group.items[0];
@@ -251,19 +251,19 @@ export const ALL_TOOLS: ToolDef[] = TOOL_GROUPS.flatMap((group) => {
   return [{ ...base, variant: undefined, labelKey: group.labelKey ?? base.labelKey }];
 });
 
-/** 工具 → 所属组（工具箱按组高亮 / 定位用） */
+/** Tool → its group (used by the toolbox for highlighting / lookup) */
 export function groupOfTool(tool: ToolId): ToolGroupDef | undefined {
   return TOOL_GROUPS.find((group) => group.items.some((item) => item.id === tool));
 }
 
 /**
- * 组内当前应展示的工具。
+ * The tool a group should show right now.
  *
- * 规则与 Photoshop 一致：**该组已有当前工具就用它**（用户切换过就记住），否则退回 `primary`。
- * 这样「先用画笔、再切到橡皮」之后，这一行始终停在用户最近用过的那个上，而不是弹回默认。
+ * Photoshop's rule: **use the group's current tool if there is one** (remembered once the user switches),
+ * otherwise fall back to `primary`, so the row sticks to the user's last pick instead of snapping back.
  *
- * `variant` 用于同一工具下的子种类（形状）：同一 ToolId 有多项时，优先取种类匹配的那一项，
- * 于是形状工具行的图标 / 名称会跟着「当前画哪种形状」变化。
+ * `variant` handles sub-kinds (shapes): with several entries for one ToolId, the matching kind wins,
+ * so the shape row's icon and name follow the kind currently being drawn.
  */
 export function displayToolOf(group: ToolGroupDef, current: ToolId, variant?: ShapeKind): ToolDef {
   const candidates = group.items.filter((item) => item.id === current);

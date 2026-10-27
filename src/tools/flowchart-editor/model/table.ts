@@ -1,9 +1,9 @@
 /**
- * 表格节点的纯逻辑：结构归一、单元格读写、行列增删、合并 / 拆分与渲染布局计算。
- * 不引用 React / DOM，便于单测与在 store / 节点渲染中复用。
+ * Pure logic for table nodes: structure normalization, cell read/write, row/column add & remove, merge / split and render layout.
+ * No React / DOM references, so it is easy to unit-test and reuse in the store / node renderer.
  *
- * 数据约定：`cells[row][col]` 为单元格；被合并覆盖的从属单元格记为 `null`，
- * 仅合并区域左上角保留内容与 span。
+ * Data convention: `cells[row][col]` is a cell; cells covered by a merge are null,
+ * and only the top-left cell of a merged region keeps content and spans.
  */
 
 import type { TableCellData, TableData } from './types';
@@ -25,7 +25,7 @@ function spanOf(v: unknown, max: number): number {
   return Math.min(max, n);
 }
 
-/** 新建空表格 */
+/** Create an empty table */
 export function emptyTable(rows = DEFAULT_TABLE_ROWS, cols = DEFAULT_TABLE_COLS): TableData {
   const r = clampDim(rows);
   const c = clampDim(cols);
@@ -37,8 +37,8 @@ export function emptyTable(rows = DEFAULT_TABLE_ROWS, cols = DEFAULT_TABLE_COLS)
 }
 
 /**
- * 结构归一：行列数合法，`cells` 补齐为 rows×cols。
- * 源中显式 `null`（被合并覆盖）保留，缺失的格补空单元格。
+ * Structure normalization: row/column counts are made valid and `cells` is padded to rows×cols.
+ * Explicit `null` entries (covered by a merge) are kept; missing entries are filled with empty cells.
  */
 export function normalizeTable(table: TableData | undefined): TableData {
   const rows = clampDim(table?.rows ?? DEFAULT_TABLE_ROWS);
@@ -61,8 +61,8 @@ export function normalizeTable(table: TableData | undefined): TableData {
 }
 
 /**
- * 让 span 与结构自洽：把越界 span 夹到边界内，并据此重算从属格（被覆盖为 null）。
- * 行列增删后调用，避免出现悬空合并。
+ * Make spans consistent with the structure: clamp out-of-range spans to the bounds and recompute covered cells (set to null).
+ * Called after row/column add & remove to avoid dangling merges.
  */
 export function sanitizeSpans(table: TableData): TableData {
   const t = normalizeTable(table);
@@ -75,7 +75,7 @@ export function sanitizeSpans(table: TableData): TableData {
   );
   for (let r = 0; r < t.rows; r += 1) {
     for (let c = 0; c < t.cols; c += 1) {
-      // 已被上方 / 左侧合并区域覆盖的格子跳过（先到先得）
+      // Skip cells already covered by a merge from above / to the left (first come, first served)
       if (occupied[r][c]) continue;
       const cell = src[r][c];
       if (cell === null) continue;
@@ -99,14 +99,14 @@ export function sanitizeSpans(table: TableData): TableData {
   return { ...t, cells };
 }
 
-/** 读取单元格（越界或从属格返回空对象） */
+/** Read a cell (out-of-range or covered cells return an empty object) */
 export function cellAt(table: TableData, row: number, col: number): TableCellData {
   const t = normalizeTable(table);
   const cell = t.cells?.[row]?.[col];
   return cell ?? {};
 }
 
-/** 局部更新单元格（从属格与越界位置不生效） */
+/** Partially update a cell (covered cells and out-of-range positions are ignored) */
 export function patchCell(
   table: TableData,
   row: number,
@@ -122,12 +122,12 @@ export function patchCell(
   return sanitizeSpans({ ...t, cells });
 }
 
-/** 写入单元格文本 */
+/** Write cell text */
 export function setCellText(table: TableData, row: number, col: number, text: string): TableData {
   return patchCell(table, row, col, { text });
 }
 
-/** 在 `at` 行前 / 后插入空行 */
+/** Insert an empty row before / after row `at` */
 export function insertRow(
   table: TableData,
   at: number,
@@ -144,7 +144,7 @@ export function insertRow(
   return sanitizeSpans({ ...t, rows: t.rows + 1, cells });
 }
 
-/** 在 `at` 列前 / 后插入空列 */
+/** Insert an empty column before / after column `at` */
 export function insertCol(
   table: TableData,
   at: number,
@@ -160,7 +160,7 @@ export function insertCol(
   return sanitizeSpans({ ...t, cols: t.cols + 1, cells });
 }
 
-/** 删除 `at` 行（至少保留 1 行） */
+/** Delete row `at` (keeps at least 1 row) */
 export function removeRow(table: TableData, at: number): TableData {
   const t = normalizeTable(table);
   if (t.rows <= MIN_DIM || at < 0 || at >= t.rows) return t;
@@ -169,7 +169,7 @@ export function removeRow(table: TableData, at: number): TableData {
   return sanitizeSpans({ ...t, rows: t.rows - 1, cells });
 }
 
-/** 删除 `at` 列（至少保留 1 列） */
+/** Delete column `at` (keeps at least 1 column) */
 export function removeCol(table: TableData, at: number): TableData {
   const t = normalizeTable(table);
   if (t.cols <= MIN_DIM || at < 0 || at >= t.cols) return t;
@@ -181,7 +181,7 @@ export function removeCol(table: TableData, at: number): TableData {
   return sanitizeSpans({ ...t, cols: t.cols - 1, cells });
 }
 
-/** 合并：以 (row, col) 为左上角覆盖 rowSpan×colSpan，从属格置空 */
+/** Merge: cover rowSpan×colSpan from (row, col) as the top-left corner, clearing covered cells */
 export function mergeCells(
   table: TableData,
   row: number,
@@ -199,7 +199,7 @@ export function mergeCells(
   });
 }
 
-/** 拆分：清除该单元格的 rowspan / colspan（从属格恢复为空单元格） */
+/** Split: clear the cell's rowspan / colspan (covered cells become empty cells again) */
 export function splitCell(table: TableData, row: number, col: number): TableData {
   const t = normalizeTable(table);
   const cell = t.cells?.[row]?.[col];
@@ -220,7 +220,7 @@ export function splitCell(table: TableData, row: number, col: number): TableData
   return sanitizeSpans({ ...t, cells });
 }
 
-/** 渲染布局：仅返回非从属单元格及其几何跨度 */
+/** Render layout: returns only non-covered cells and their geometric spans */
 export interface TableCellBox {
   row: number;
   col: number;
@@ -248,7 +248,7 @@ export function computeTableLayout(table: TableData): TableCellBox[] {
   return boxes;
 }
 
-/** 按权重把总长分配到 count 段（缺省等分） */
+/** Distribute a total length across `count` slots by weight (equal by default) */
 function distribute(total: number, weights: number[] | undefined, count: number): number[] {
   const w = Array.from({ length: count }, (_, i) => {
     const v = weights?.[i];
@@ -258,13 +258,13 @@ function distribute(total: number, weights: number[] | undefined, count: number)
   return w.map((v) => (v / sum) * total);
 }
 
-/** 各列宽度（像素） */
+/** Width of each column (pixels) */
 export function columnWidths(table: TableData, total: number): number[] {
   const t = normalizeTable(table);
   return distribute(total, t.colWeights, t.cols);
 }
 
-/** 各行高度（像素） */
+/** Height of each row (pixels) */
 export function rowHeights(table: TableData, total: number): number[] {
   const t = normalizeTable(table);
   return distribute(total, t.rowWeights, t.rows);

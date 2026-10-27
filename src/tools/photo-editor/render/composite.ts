@@ -12,19 +12,19 @@ import { clipBaseOf, layerNeedsComposite, paintLayer } from './paint';
 import type { AdjustmentLayer, GroupLayer, Layer, PhotoDoc, Rect } from '../model/types';
 
 /**
- * 离屏合成管线：编组（整体合成模式）、蒙版、调整图层都在这里合成，
- * 画布预览、图片导出与 PSD 导出共用同一份结果，保证「所见即所得」。
+ * Offscreen compositing pipeline: groups (composited mode), masks and adjustment layers all compose here,
+ * and canvas preview, image export and PSD export share the result, so what you see is what you get.
  *
- * 未被这些特性用到的图层仍走 `render/nodes.ts` 的 Konva 节点（文本清晰、增量更新快），
- * 只有真正需要「先把若干图层压成一张图」时才付出离屏合成的代价。
+ * Layers that need none of this still use Konva nodes from `render/nodes.ts` (crisp text, fast updates),
+ * paying the offscreen cost only when layers genuinely have to be flattened into one image.
  */
 
 export interface CompositeOptions {
-  /** 只合成该区域（文档坐标）；缺省为整块画布 */
+  /** Composite only this region (document coordinates); defaults to the whole canvas */
   clip?: Rect | null;
-  /** 输出缩放：1 = 原尺寸，<1 用于预览降采样 */
+  /** Output scale: 1 = full size, <1 for downsampled previews */
   scale?: number;
-  /** 背景填充；'none' 表示透明（组内合成用） */
+  /** Background fill; 'none' means transparent (used for in-group compositing) */
   background?: PhotoDoc['background'] | 'none';
   signaturePrefix?: string;
 }
@@ -55,10 +55,10 @@ export function compositeLayers(
 
   for (const layer of layers) {
     if (layer.kind === 'group') {
-      // 穿透模式下子图层各自混合，由调用方（层栈展开）逐个绘制
+      // In pass-through mode children blend on their own and the caller (layer-stack walk) draws each
       if (layer.passThrough || !layer.visible) continue;
       if (!layerNeedsComposite(layer)) {
-        // 无蒙版 / 无样式的快路径：整组先合成成一张图，再按本组的透明度与混合模式整体绘制
+        // Fast path without mask / style: composite the whole group, then draw it with the group's settings
         ctx.save();
         ctx.globalAlpha = layer.opacity;
         ctx.globalCompositeOperation = layer.blend === 'normal' ? 'source-over' : layer.blend;
@@ -66,7 +66,7 @@ export function compositeLayers(
         ctx.restore();
         continue;
       }
-      // 有蒙版 / 图层样式 / 剪贴蒙版：统一走 `paintLayer` 的合成路径，保证与预览一致
+      // With mask / layer style / clipping mask: use `paintLayer`'s composite path, matching the preview
       paintLayer(ctx, layer, {
         doc,
         signaturePrefix: options.signaturePrefix ?? 'composite',
@@ -75,7 +75,7 @@ export function compositeLayers(
       continue;
     }
     if (layer.kind === 'adjustment') {
-      // 调整图层：作用于「已合成的下方内容」——把画布整体烘焙一遍（CSS filter + 像素通道）
+      // Adjustment layer: acts on the composited content below — bake the whole canvas (CSS + pixel pass)
       if (!layer.visible) continue;
       applyAdjustment(canvas, ctx, layer, region, scale, options.signaturePrefix);
       continue;
@@ -90,8 +90,8 @@ export function compositeLayers(
 }
 
 /**
- * 编组整体合成：把组内子树压成一张画布（透明背景），
- * 结果按签名缓存——子图层没变时复用，避免每帧重画。
+ * Composite a group: flatten its subtree into one canvas (transparent background),
+ * cached by signature so an unchanged subtree is reused instead of repainted every frame.
  */
 export function groupComposite(doc: PhotoDoc, group: GroupLayer): HTMLCanvasElement {
   const key = groupCompositeKey(doc, group);
@@ -107,7 +107,7 @@ export function groupComposite(doc: PhotoDoc, group: GroupLayer): HTMLCanvasElem
   return canvas;
 }
 
-/** 编组合成签名：组内任何影响像素的字段变化都要换键 */
+/** Group composite signature: any pixel-affecting change inside the group must change the key */
 export function groupCompositeKey(doc: PhotoDoc, group: GroupLayer): string {
   const ids = new Set(subtreeIdsOf(doc, group.id));
   const parts: string[] = [`${doc.width}x${doc.height}`];
@@ -149,8 +149,8 @@ const groupCache = new Map<string, HTMLCanvasElement>();
 const GROUP_CACHE_LIMIT = 12;
 
 /**
- * 调整图层作用于其下方内容：把当前画布整体再烘焙一次。
- * 复用 `filters.bakeRaster`（同一套 CSS filter + 像素通道），保证与位图图层的调整完全一致。
+ * An adjustment layer acts on what is below: bake the current canvas one more time.
+ * It reuses `filters.bakeRaster` (the same CSS filter + pixel pass), so bitmap adjustments match exactly.
  */
 function applyAdjustment(
   canvas: HTMLCanvasElement,
@@ -161,17 +161,17 @@ function applyAdjustment(
   signaturePrefix = 'composite',
 ): void {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  // 签名复用 bakeSignature：扩展调整与滤镜参数一并参与，缓存不会串味
+  // Reuses bakeSignature, so extended adjustments and filter params are included and caches can't mix
   const signature = `${signaturePrefix}:adj:${layer.id}:${bakeSignature('', 0, layer.adjustments, layer.filters)}`;
   const baked = bakeRaster(canvas, signature, layer.adjustments, layer.filters);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(baked, 0, 0);
-  // 还原「裁剪 + 缩放」变换，后续图层才能继续按文档坐标绘制
+  // Restore the crop + scale transform so later layers can keep drawing in document coordinates
   if (scale !== 1) ctx.scale(scale, scale);
   ctx.translate(-region.x, -region.y);
 }
 
-/** 最上方一个「可见的调整图层」在 doc.layers 中的下标；没有则返回 -1 */
+/** Index in doc.layers of the topmost visible adjustment layer; -1 when there is none */
 export function adjustmentBaseIndex(doc: PhotoDoc): number {
   for (let index = doc.layers.length - 1; index >= 0; index -= 1) {
     const layer = doc.layers[index];
@@ -180,7 +180,7 @@ export function adjustmentBaseIndex(doc: PhotoDoc): number {
   return -1;
 }
 
-/** 合成「最上方调整图层及其以下」的全部内容（含背景），作为画布的底层节点 */
+/** Composite everything up to and including the topmost adjustment layer (with background), as the base */
 export function compositeBelowAdjustments(
   doc: PhotoDoc,
   options: CompositeOptions = {},
@@ -203,7 +203,7 @@ export function compositeBelowAdjustments(
   return canvas;
 }
 
-/** 文档渲染签名：参与画面的字段一变就换键（用于调整图层合成缓存） */
+/** Document render signature: any field affecting the picture changes the key (for adjustment-layer caches) */
 export function docSignature(doc: PhotoDoc): string {
   const parts = [`${doc.width}x${doc.height}:${doc.background}`];
   for (const layer of doc.layers) {

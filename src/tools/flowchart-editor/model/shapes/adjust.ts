@@ -1,55 +1,55 @@
 /**
- * 形状「可调参数」核心机制（类 draw.io 的调整顶点）。
+ * Core mechanism for shape "adjustable parameters" (draw.io-style adjustment vertices).
  *
- * 单一数据源：每个参数只声明一次（形状专属项在 `ShapeDef.adjust`，
- * 通用项按 `draw` / `decor` 自动派生，如圆角、折角、斜切、分栏高……），
- * 绘制层、画布手柄、属性面板、draw.io 导入导出四端共用同一份声明与解析器，
- * 避免 20+ 处参数各写一套交互与映射逻辑。
+ * Single source of truth: each parameter is declared once (shape-specific ones in `ShapeDef.adjust`,
+ * generic ones derived from `draw` / `decor`, such as corner radius, fold, shear, compartment height…),
+ * and the renderer, canvas handles, property panel and draw.io import/export all share the same declarations and resolver,
+ * so 20+ parameters do not each reimplement their own interaction and mapping logic.
  *
- * 约定：入参 `w` / `h` 为节点像素尺寸；所有函数对尺寸做防御处理（不产生 NaN）。
+ * Convention: `w` / `h` are the node's pixel size; every function guards against bad sizes (never produces NaN).
  */
 
 import { type FlowNodeStyle, SWIMLANE_HEADER_HEIGHT, SWIMLANE_HEADER_WIDTH } from '../types';
 import type { ShapeDef } from './index';
 
-/** 参数取值读取器：键 → 数值（已按 min/max 夹取）；供绘制层复用 */
+/** Parameter reader: key → value (already clamped to min/max); reusable by the renderer */
 export type ParamGetter = (key: string) => number;
 
-/** 节点本地坐标系中的点 */
+/** Point in the node's local coordinate system */
 export interface AdjustPoint {
   x: number;
   y: number;
 }
 
-/** mxGraph（draw.io）双向映射：把可调参数写入 / 读出 `size` 等 token */
+/** mxGraph (draw.io) two-way mapping: write / read an adjustable parameter to and from tokens such as `size` */
 export interface AdjustMx {
-  /** mxGraph token 名，如 'size' | 'arcSize' */
+  /** mxGraph token name, e.g. 'size' | 'arcSize' */
   key: string;
-  /** 取值 → token 值字符串 */
+  /** Value → token value string */
   to: (value: number, w: number, h: number) => string;
-  /** token 值 → 取值；解析失败返回 null（此时该 token 会原样保留在 mxStyle 中） */
+  /** Token value → value; returns null when parsing fails (the token is then kept verbatim in mxStyle) */
   from: (raw: string, w: number, h: number) => number | null;
 }
 
-/** 单个可调参数的声明式元数据；四端共用 */
+/** Declarative metadata for a single adjustable parameter; shared by all four consumers */
 export interface ShapeAdjustDef {
   key: string;
-  /** i18n 后缀：`tools.flowchart.shapeParam.*` */
+  /** i18n suffix: `tools.flowchart.shapeParam.*` */
   labelKey: string;
   unit: 'px' | 'ratio';
   default: (w: number, h: number) => number;
   min: (w: number, h: number) => number;
   max: (w: number, h: number) => number;
-  /** 取值 → 手柄在节点本地坐标 */
+  /** Value → handle position in node-local coordinates */
   anchor: (w: number, h: number, value: number) => AdjustPoint;
-  /** 指针本地坐标 → 新取值 */
+  /** Pointer position in local coordinates → new value */
   project: (x: number, y: number, w: number, h: number) => number;
   mx?: AdjustMx;
 }
 
-/* ------------------------------ mx 映射助手 ------------------------------ */
+/* ------------------------------ mx mapping helpers ------------------------------ */
 
-/** 绝对像素参数 → `size=<px>`；导入时把 ≤1 的值视作 draw.io 比例（× 参考尺寸）还原 */
+/** Absolute pixel parameter → `size=<px>`; on import a value ≤1 is treated as a draw.io ratio (× the reference size) */
 export function pxMx(ref: (w: number, h: number) => number): AdjustMx {
   return {
     key: 'size',
@@ -62,7 +62,7 @@ export function pxMx(ref: (w: number, h: number) => number): AdjustMx {
   };
 }
 
-/** 比例参数 → `size=<ratio>`（draw.io 的比例语义） */
+/** Ratio parameter → `size=<ratio>` (draw.io ratio semantics) */
 export function ratioMx(): AdjustMx {
   return {
     key: 'size',
@@ -74,7 +74,7 @@ export function ratioMx(): AdjustMx {
   };
 }
 
-/** 圆角 → `arcSize`（沿用既有导出约定：arcSize = cornerRadius / 2） */
+/** Corner radius → `arcSize` (keeping the existing export convention: arcSize = cornerRadius / 2) */
 function arcSizeMx(): AdjustMx {
   return {
     key: 'arcSize',
@@ -86,18 +86,18 @@ function arcSizeMx(): AdjustMx {
   };
 }
 
-/* ------------------------------ 线性轴工厂 ------------------------------ */
+/* ------------------------------ Linear-axis factory ------------------------------ */
 
 export interface LinearAdjustOptions {
   key: string;
   labelKey: string;
   unit?: 'px' | 'ratio';
-  /** 拖动主轴 */
+  /** Drag axis */
   axis: 'x' | 'y';
-  /** 取值 = 主轴坐标 × scale(w,h) + bias(w,h)，默认 scale=1 / bias=0 */
+  /** Value = axis coordinate × scale(w,h) + bias(w,h); scale=1 / bias=0 by default */
   scale?: (w: number, h: number) => number;
   bias?: (w: number, h: number) => number;
-  /** 另一轴上手柄的坐标（可随取值变化） */
+  /** Coordinate of the handle on the other axis (may vary with the value) */
   cross: number | ((w: number, h: number, value: number) => number);
   default: (w: number, h: number) => number;
   min?: (w: number, h: number) => number;
@@ -105,7 +105,7 @@ export interface LinearAdjustOptions {
   mx?: AdjustMx;
 }
 
-/** 沿单一轴拖动的可调参数：手柄位置与指针投影互为逆变换 */
+/** Adjustable parameter dragged along a single axis: handle position and pointer projection are inverse transforms */
 export function axisAdjust(o: LinearAdjustOptions): ShapeAdjustDef {
   const scale = o.scale ?? (() => 1);
   const bias = o.bias ?? (() => 0);
@@ -130,7 +130,7 @@ export function axisAdjust(o: LinearAdjustOptions): ShapeAdjustDef {
   };
 }
 
-/** 右上角折角（便签 / 卡片 / 制品 / 数据对象）：值 = 折角边长 px */
+/** Fold at the top-right corner (note / card / artifact / data object): value = fold edge length in px */
 export function foldAdjust(
   labelKey: string,
   dflt: (w: number, h: number) => number,
@@ -148,12 +148,12 @@ export function foldAdjust(
   });
 }
 
-/* ------------------------------ 派生规则 ------------------------------ */
+/* ------------------------------ Derivation rules ------------------------------ */
 
-/** 只读缓存：同一 ShapeDef 的派生结果复用，避免渲染热路径重复分配 */
+/** Read-only cache: derived results for the same ShapeDef are reused, avoiding allocation on the render hot path */
 const adjustCache = new WeakMap<ShapeDef, ShapeAdjustDef[]>();
 
-/** 由 `draw` / `decor` 自动派生的通用参数（顺序即面板显示顺序，置于形状专属项之前） */
+/** Generic parameters derived from `draw` / `decor` (order is the panel order, placed before shape-specific items) */
 function derivedAdjusts(def: ShapeDef): ShapeAdjustDef[] {
   const out: ShapeAdjustDef[] = [];
   switch (def.draw) {
@@ -369,7 +369,7 @@ function derivedAdjusts(def: ShapeDef): ShapeAdjustDef[] {
   return out;
 }
 
-/** 内部分栏（decor === 'compartments'）：两处分隔线高度 */
+/** Internal compartments (decor === 'compartments'): heights of the two separator lines */
 const COMPARTMENT_ADJUSTS: ShapeAdjustDef[] = [
   axisAdjust({
     key: 'dividerTop',
@@ -393,8 +393,8 @@ const COMPARTMENT_ADJUSTS: ShapeAdjustDef[] = [
 ];
 
 /**
- * 某形状的全部可调参数（派生项 + `ShapeDef.adjust` 声明项）。
- * 结果按 ShapeDef 缓存，渲染热路径零额外分配。
+ * All adjustable parameters of a shape (derived items + those declared in `ShapeDef.adjust`).
+ * Cached per ShapeDef, so the render hot path allocates nothing extra.
  */
 export function adjustsFor(def: ShapeDef): ShapeAdjustDef[] {
   const cached = adjustCache.get(def);
@@ -405,16 +405,16 @@ export function adjustsFor(def: ShapeDef): ShapeAdjustDef[] {
   return list;
 }
 
-/** 是否具备可调参数（决定是否渲染手柄 / 面板分组） */
+/** Whether the shape has adjustable parameters (decides whether handles / the panel group are rendered) */
 export function hasAdjusts(def: ShapeDef | undefined): boolean {
   return !!def && adjustsFor(def).length > 0;
 }
 
-/* ------------------------------ 解析器 ------------------------------ */
+/* ------------------------------ Resolver ------------------------------ */
 
 /**
- * 读取参数值：优先 `style.shapeParams[key]`，为兼容旧草稿回退 `foldSize` / `cornerRadius`，
- * 否则取该形状声明的默认值，最后按 min/max 夹取（含 NaN 防御）。
+ * Read a parameter value: prefer `style.shapeParams[key]`, fall back to `foldSize` / `cornerRadius` for legacy drafts,
+ * otherwise take the default declared by the shape, and clamp to min/max at the end (with NaN guards).
  */
 export function paramValue(
   def: ShapeDef,
@@ -438,7 +438,7 @@ export function paramValue(
   return Math.max(min, Math.min(max, raw));
 }
 
-/** 构造某形状的参数读取器，供绘制层与手柄复用 */
+/** Build the parameter reader for a shape, shared by the renderer and handles */
 export function paramGetterFor(
   def: ShapeDef,
   style: Partial<FlowNodeStyle> | undefined,
@@ -448,7 +448,7 @@ export function paramGetterFor(
   return (key) => paramValue(def, style, key, w, h);
 }
 
-/** 指针本地坐标 → 夹取后的参数值（画布拖拽用） */
+/** Pointer position in local coordinates → clamped parameter value (used by canvas dragging) */
 export function projectAdjust(
   adj: ShapeAdjustDef,
   x: number,

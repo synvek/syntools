@@ -15,21 +15,21 @@ import { FaqList, PageShell, PriceCard, Section, NoteBar } from '@/app/marketing
 import type { PriceTier } from '@/app/marketing/ui';
 
 /**
- * /pricing —— 定价页。
+ * /pricing — the pricing page.
  *
- * 产品结构是「形态 × 许可」，两条线共五个入口：
- *   - 网页版（免费）
- *   - 桌面端：社区版（免费，AGPL-3.0） / 专业版（规划中）
- *   - 服务器端：社区服务器版（免费，AGPL-3.0） / 企业服务器版（规划中）
+ * The product is "form × license", five entries across two lines:
+ *   - web version (free)
+ *   - desktop: community (free, AGPL-3.0) / professional (planned)
+ *   - server: community server (free, AGPL-3.0) / enterprise server (planned)
  *
- * 四条刻意的取舍：
- * 1. **免费档不设功能墙**。社区版与网页版给的是一整套工具，不加水印、不降精度、
- *    不拿「升级解锁」当增长手段 —— 工具站用户对阉割极度敏感。
- * 2. **付费档不报价、不编差异**。两个付费档的功能范围、授权方式与价格都还在规划中，
- *    此时写任何数字或差异表都是在透支信任；页面只留「规划中 + 登记」。
- * 3. **不拿签名、公证当卖点**。所有构建都会签名，它属于发布流程的必备项而不是产品差异，
- *    因此不出现在任何一档的描述里。
- * 4. **不假装能立刻付款**。付费档未开放，CTA 是登记与咨询，不是点了没反应的购买按钮。
+ * Four deliberate trade-offs:
+ * 1. **No feature wall on the free tiers**. Community and web get the full tool set: no watermarks, no reduced precision,
+ *    no "upgrade to unlock" growth tactics — tool-site users are highly sensitive to crippling.
+ * 2. **No prices, no invented differences** for paid tiers. Their scope, licensing and pricing are all still planned,
+ *    so any number or comparison table would spend trust; the page only says "planned + register".
+ * 3. **Signing and notarization are not selling points**. Every build is signed; that is release hygiene, not differentiation,
+ *    so it appears in no tier description.
+ * 4. **No pretending you can pay now**. Paid tiers are closed; the CTA registers or asks, it is not a dead buy button.
  */
 
 type TierKey = 'web' | 'desktopCommunity' | 'desktopPro' | 'serverCommunity' | 'serverEnterprise';

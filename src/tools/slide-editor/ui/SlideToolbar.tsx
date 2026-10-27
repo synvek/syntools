@@ -26,16 +26,16 @@ import {
 } from './toolIcons';
 
 /**
- * 工具栏：与文字处理器 / 电子表格处理器保持同一套按钮语言 ——
+ * Toolbar: shares the same button language as the word processor / spreadsheet tools —
  *
- * - **绝大部分按钮只有图标**，文字只作为 tooltip（title / aria-label），
- *   空闲态无边框、激活态蓝底填充（沿用 EditorToolbar 的约定）；
- * - **少数「分类入口」下拉**保留图标 + 文字（形状 / 对齐 / 分布 / 翻转），
- *   因为纯图标很难区分这四者；下拉菜单项仍显示文字。
+ * - **most buttons are icon-only**, with text only as tooltip (title / aria-label): no border when idle,
+ *   blue fill when active (following the EditorToolbar convention);
+ * - **a few "category entry" dropdowns** keep icon + text (shape / align / distribute / flip), because pure
+ *   icons can't tell those four apart; the dropdown items still show text.
  *
- * 两行分组：格式 / 插入·排列·视图。
- * 后三者各自成簇（CLUSTER），窄屏时整簇换行、不被拆散；
- * 其中「排列」全部是**选中态操作**，未选中时降级为禁用。
+ * Two rows: format / insert·arrange·view.
+ * The last three form their own clusters (CLUSTER) so narrow screens wrap them as a whole;
+ * "arrange" is entirely a **selection-dependent** group and degrades to disabled when nothing is selected.
  */
 
 const SHAPES: { key: string; geom: ShapeGeometry }[] = [
@@ -60,9 +60,9 @@ const SHAPES: { key: string; geom: ShapeGeometry }[] = [
 const ROW =
   'slide-glass flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 p-1.5 shadow-sm dark:border-gray-700';
 const GROUP = 'flex flex-wrap items-center gap-0.5';
-/** 逻辑簇：把若干 GROUP 绑成一个整体参与换行，避免窄屏时被拆到不同行 */
+/** Logical cluster: binds several GROUPs into one wrapping unit so narrow screens don't split them across rows */
 const CLUSTER = 'flex shrink-0 items-center gap-1';
-/** 分组竖线，与文字处理器工具栏一致 */
+/** Group divider, matching the word-processor toolbar */
 const SEP = <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />;
 
 const BTN_BASE =
@@ -176,7 +176,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
     { key: 'flipV', label: t('tools.slide.flipV'), onClick: () => toggleFlip('flipY') },
   ];
 
-  /** 翻转是「取反」语义，必须读当前值：patchSelected 同时适用于多选 */
+  /** Flip is a "negate" operation, so it must read the current value: patchSelected works for multi-select too */
   function toggleFlip(axis: 'flipX' | 'flipY') {
     const state = useSlideStore.getState();
     const slide = state.doc.slides[state.slideIndex];
@@ -187,7 +187,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
     patchSelected({ [axis]: !target[axis] } as never);
   }
 
-  /** 锁定/隐藏按钮的激活态：选中元素全部处于该状态才算「已开启」 */
+  /** Active state of the lock/hide buttons: "on" only when every selected element is in that state */
   const allLocked = (): boolean => {
     const state = useSlideStore.getState();
     const slide = state.doc.slides[state.slideIndex];
@@ -204,18 +204,18 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
 
   return (
     <div className="flex flex-col gap-2">
-      {/* ── 格式：字体/字号/字形/颜色/填充/轮廓/段落/效果，未选中元素时整行禁用 ── */}
+      {/* ── Format: font/size/style/color/fill/outline/paragraph/effects; disabled when nothing is selected ── */}
       <FormatBar />
 
-      {/* ── 插入 + 排列 + 视图：三簇各自整体换行；「排列」为选中态操作，未选中时降级为禁用 ── */}
+      {/* ── Insert + arrange + view: three clusters wrapping as units; "arrange" needs a selection ── */}
       <div className={ROW}>
-        {/* 插入（含撤销/重做）：与「排列」合并到同一行，窄屏时整块换行不被拆散 */}
+        {/* Insert (undo/redo included): shares the row with "arrange" so narrow screens don't split the block */}
         <div className={CLUSTER}>
           <div className={GROUP}>
             <IconButton label={t('tools.slide.insertText')} onClick={insertText}>
               <Icon name="text" className="h-4 w-4" />
             </IconButton>
-            {/* 下拉是「分类入口」，保留文字更易懂 */}
+            {/* A dropdown is a "category entry", so keeping the text is clearer */}
             <MenuButton
               label={t('tools.slide.insertShape')}
               icon="shapes"
@@ -245,7 +245,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
             <IconButton label={t('tools.slide.insertIcon')} onClick={() => setPanel('icon')}>
               <IconSparkIcon />
             </IconButton>
-            {/* 形状库：与「形状 ▾」区分开用专用图形；同为纯图标按钮，本组风格才统一 */}
+            {/* Shape library: its own glyph sets it apart from "Shape ▾"; icon-only keeps this group consistent */}
             <IconButton label={t('tools.slide.insertShapeLib')} onClick={() => setPanel('shape')}>
               <ShapeLibraryIcon />
             </IconButton>
@@ -263,7 +263,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
           </div>
         </div>
 
-        {/* 视图：缩放 / 网格 / 标尺 / 页面。排在插入之后，正好与插入簇共处一行 */}
+        {/* View: zoom / grid / rulers / page. After insert, so it shares that row */}
         <div className={CLUSTER}>
           <div className={GROUP}>
             <IconButton
@@ -272,7 +272,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
             >
               <Icon name="zoomOut" className="h-4 w-4" />
             </IconButton>
-            {/* 百分比是数值显示而非按钮，保留文字 */}
+            {/* The percentage is a value display, not a button, so it keeps text */}
             <span className="w-10 text-center text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
               {Math.round(scale * 100)}%
             </span>
@@ -284,7 +284,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
             </IconButton>
             <IconButton
               label={t('tools.slide.zoomFit')}
-              // 适应窗口同时复位平移，否则会被误认为「点了没反应」
+              // Fit to window also resets panning, otherwise it looks like the click did nothing
               onClick={() => setViewport({ scale: 0, panX: 0, panY: 0 })}
             >
               <Icon name="fitScreen" className="h-4 w-4" />
@@ -422,7 +422,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
 
           {SEP}
 
-          {/* 格式刷：先「复制格式」再「套用格式」，两步之间按钮保持激活态 */}
+          {/* Format painter: "copy format" then "apply format"; the button stays active in between */}
           <div className={GROUP}>
             <IconButton
               label={t('tools.slide.copyFormat')}
@@ -468,7 +468,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
   );
 }
 
-/** 格式刷图标：激活态在刷头右侧加一个小「+」，提示已复制样式 */
+/** Format painter icon: a small "+" on the brush head when active, hinting that a style was copied */
 function FormatPainterIcon({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
@@ -480,7 +480,7 @@ function FormatPainterIcon({ active }: { active: boolean }) {
   );
 }
 
-/** 图表图标（内联 SVG，沿用 toolIcons 的 16×16 约定） */
+/** Chart icon (inline SVG, following toolIcons' 16×16 convention) */
 function ChartIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
@@ -491,7 +491,7 @@ function ChartIcon() {
   );
 }
 
-/** 公式图标 */
+/** Formula icon */
 function FormulaIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
@@ -503,8 +503,8 @@ function FormulaIcon() {
 }
 
 /**
- * 形状库图标：2×2 的「方形 / 圆形 / 三角 / 菱形」组合，
- * 与「形状 ▾」下拉共用的 `shapes` 图标区分开（两者相邻，同图标会撞脸）。
+ * Shape library icon: a 2×2 "square / circle / triangle / diamond" combo,
+ * distinct from the `shapes` icon used by "Shape ▾" (they're adjacent, so the same icon would be confusing).
  */
 function ShapeLibraryIcon() {
   return (
@@ -517,7 +517,7 @@ function ShapeLibraryIcon() {
   );
 }
 
-/** 图标素材库图标 */
+/** Icon library icon */
 function IconSparkIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
@@ -528,7 +528,7 @@ function IconSparkIcon() {
   );
 }
 
-/** 工具栏图标按钮：仅图标，文字走 tooltip；激活态蓝底填充 */
+/** Toolbar icon button: icon only, text via tooltip; blue fill when active */
 function IconButton({
   label,
   onClick,
@@ -557,7 +557,7 @@ function IconButton({
   );
 }
 
-/** 形状缩略图（内联 SVG，避免额外依赖） */
+/** Shape thumbnail (inline SVG to avoid extra dependencies) */
 function ShapeGlyph({ geom }: { geom: ShapeGeometry }) {
   const common = { width: 16, height: 16, viewBox: '0 0 16 16' } as const;
   if (geom.kind === 'ellipse') {

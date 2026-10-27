@@ -44,13 +44,13 @@ import type {
 } from './types';
 
 /**
- * 文档归一 / 迁移：把任意来源（工程文件、草稿、旧版本）的原始对象整理成合法的 `PhotoDoc`。
+ * Document normalization / migration: turn raw objects from projects, drafts or old versions into `PhotoDoc`.
  *
- * 设计要点：
- * - **只做补全，不做猜测**：字段缺失按类型补默认值，类型不对就丢弃该图层（而不是抛错），
- *   这样单个图层损坏不会让整个文档打不开；
- * - **引用完整性**：`parentId` 指向不存在或非编组的图层时降级为顶层，避免「孤儿子图层永不渲染」；
- * - v1（无编组 / 蒙版 / 调整图层）可直接迁移为 v2：新字段全部补默认值，行为零变化。
+ * Design notes:
+ * - **fill in, never guess**: missing fields get type defaults; a wrong type drops that layer (no throw), so
+ *   one corrupt layer can't make the whole document unopenable;
+ * - **referential integrity**: a `parentId` pointing at a missing / non-group layer degrades to top level;
+ * - v1 (no groups / masks / adjustment layers) migrates straight to v2: new fields default, behavior unchanged.
  */
 
 const KINDS: LayerKind[] = ['raster', 'text', 'shape', 'group', 'adjustment', 'smart'];
@@ -194,7 +194,7 @@ function normalizeAdjustments(value: unknown): Adjustments {
   return base;
 }
 
-/* --------------------------- 更多调整（P1-C2） --------------------------- */
+/* --------------------------- More adjustments (P1-C2) --------------------------- */
 
 function normalizeRow(value: unknown, size: number, min: number, max: number): number[] {
   const source = Array.isArray(value) ? value : [];
@@ -227,7 +227,7 @@ function normalizeShadowsHighlights(value: unknown): ShadowsHighlightsParams | n
   };
 }
 
-/** 可选颜色：9 个色域各补齐 4 个 -100~100 的值；全零也保留（用户可能只想先加进来） */
+/** Selective color: 9 ranges × 4 values in -100~100; all-zero is kept (users may add it first, tune later) */
 function normalizeSelectiveColor(value: unknown): SelectiveColorParams | null {
   if (!isObject(value)) return null;
   const source = isObject(value.ranges) ? value.ranges : {};
@@ -251,8 +251,8 @@ function normalizeReplaceColor(value: unknown): ReplaceColorParams | null {
 }
 
 /**
- * 滤镜归一：兼容旧格式 `FilterId[]`（升级为带默认参数的规格）与新格式 `FilterSpec[]`。
- * 未知 id 丢弃；参数缺失按 `FILTER_PARAMS` 的默认值补齐。
+ * Filter normalization: accepts the old `FilterId[]` (upgraded to specs with defaults) and `FilterSpec[]`.
+ * Unknown ids are dropped and missing parameters default from `FILTER_PARAMS`.
  */
 function normalizeFilters(value: unknown): FilterSpec[] {
   if (!Array.isArray(value)) return [];
@@ -272,7 +272,7 @@ function normalizeFilters(value: unknown): FilterSpec[] {
     for (const param of FILTER_PARAMS[id]) {
       params[param.key] = clamp(num(rawParams[param.key], param.default), param.min, param.max);
     }
-    // 只在「显式停用」时写入 enabled，保持工程文件紧凑（缺省 = 启用）
+    // Only write enabled when explicitly disabled, keeping project files compact (absent = enabled)
     out.push({ id, params, ...(item.enabled === false ? { enabled: false } : {}) });
   }
   return out;
@@ -293,8 +293,8 @@ function normalizeMask(value: unknown): MaskRef | null {
 }
 
 /**
- * 矢量蒙版归一：轮廓必须是「偶数个有限数字」的顶点序列，少于 3 个点的轮廓丢弃。
- * 全部轮廓无效时整份蒙版视为不存在（返回 null），避免留下一个永远不生效的开关。
+ * Vector mask normalization: an outline must be an even count of finite numbers; under 3 points is dropped.
+ * If every outline is invalid the whole mask becomes null, avoiding a switch that never does anything.
  */
 function normalizeVectorMask(value: unknown): VectorMaskRef | null {
   if (!isObject(value)) return null;
@@ -322,7 +322,7 @@ function normalizeVectorMask(value: unknown): VectorMaskRef | null {
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
-/** 文字变形归一：非法 kind 回落 none，强度钳制到 -100~100 */
+/** Text warp normalization: invalid kinds fall back to none, strengths clamp to -100~100 */
 function normalizeTextWarp(value: unknown): TextWarp {
   const raw = (value && typeof value === 'object' ? value : {}) as Partial<TextWarp>;
   const kind = TEXT_WARP_KINDS.includes(raw.kind as never) ? (raw.kind as TextWarpKind) : 'none';
@@ -333,7 +333,7 @@ function normalizeTextWarp(value: unknown): TextWarp {
   };
 }
 
-/** 文档色板归一：只保留合法 `#RRGGBB`，去重并限长（色板属于轻量附加数据，损坏时静默丢弃） */
+/** Palette normalization: keep valid `#RRGGBB`, de-duplicate, cap length (lightweight extras, dropped silently) */
 function normalizeSwatches(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const out: string[] = [];
@@ -352,8 +352,8 @@ function color(value: unknown, fallback: string): string {
 }
 
 /**
- * 图层样式归一：逐效果校验类型与范围。
- * 未知效果直接丢弃（不做猜测），任一效果存在即保留该样式对象；全部无效时返回 null。
+ * Layer style normalization: validate each effect's type and range.
+ * Unknown effects are dropped (no guessing); the style object survives if any effect does, else null.
  */
 export function normalizeLayerStyle(value: unknown): LayerStyle | null {
   if (!isObject(value)) return null;
@@ -465,7 +465,7 @@ function normalizeLayer(raw: unknown): Layer | null {
         sourceAssetId: str(raw.sourceAssetId),
         sourceWidth: Math.max(1, Math.round(num(raw.sourceWidth, 1))),
         sourceHeight: Math.max(1, Math.round(num(raw.sourceHeight, 1))),
-        // 智能对象也带一整套非破坏参数：旧工程没有这些字段 → 空栈 / 全零调整（行为不变）
+        // Smart objects also carry the non-destructive set; old projects lack it → empty stack, no adjustments
         adjustments: normalizeAdjustments(raw.adjustments),
         filters: normalizeFilters(raw.filters),
       };
@@ -515,10 +515,10 @@ function normalizeLayer(raw: unknown): Layer | null {
 }
 
 /**
- * 归一（含 v1 → v2）：返回 null 表示结构不可用（调用方按空文档处理）。
+ * Normalize (including v1 → v2): null means the structure is unusable (callers treat it as an empty document).
  *
- * 引用完整性处理放在最后：先把全部图层解析出来，再清掉「指向不存在 / 非编组」的 parentId，
- * 并打断环（父链自指会让后续遍历死循环）。
+ * Referential integrity comes last: parse every layer first, then clear parentIds that point nowhere
+ * or at non-groups, and break cycles (a self-referencing parent chain would loop forever).
  */
 export function migrateDoc(raw: unknown): PhotoDoc | null {
   if (!isObject(raw)) return null;
@@ -536,10 +536,10 @@ export function migrateDoc(raw: unknown): PhotoDoc | null {
   );
   for (const layer of layers) {
     if (!layer.parentId) continue;
-    // 父级不存在、不是编组、或指向自己 → 降级为顶层
+    // Parent missing, not a group, or pointing at itself → degrade to the top level
     if (!groupIds.has(layer.parentId) || layer.parentId === layer.id) layer.parentId = null;
   }
-  // 打断环：若某编组的祖先链能绕回自己，把它降级为顶层
+  // Break cycles: if a group's ancestor chain loops back to itself, degrade it to the top level
   const byId = new Map(layers.map((layer) => [layer.id, layer] as const));
   for (const layer of layers) {
     const seen = new Set<string>([layer.id]);

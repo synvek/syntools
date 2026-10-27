@@ -2,15 +2,15 @@ import { useTranslation } from 'react-i18next';
 import { normalizeLang } from '@/core/i18n';
 
 /**
- * 营销与信任页（定价 / 安全 / 隐私 / 关于）的语言解析与文案取值。
+ * Locale resolution and copy lookup for the marketing and trust pages (pricing / security / privacy / about).
  *
- * 为什么不接 `core/i18n/locales/*`：
- * 外壳语言包以 `zh` 的键结构作为类型源，新增 section 会强制 9 个语种同步补齐，
- * 否则 typecheck 失败 —— 而这 4 页是销售材料，一旦补齐就意味着一批 MyMemory 机翻。
- * `plan/Monetization.md` 的结论是「宁可 3 语精，不要 9 语糙」，所以这里与
- * `/download` 页保持一致：人工撰写 zh / en / ja，其余语种回落英文。
+ * Why these pages bypass `core/i18n/locales/*`:
+ * the shell packs use `zh`'s keys as the type source, so a new section forces all 9 locales to be filled in,
+ * or typecheck fails — and these 4 pages are sales material, so filling them in means a batch of MyMemory output.
+ * `plan/Monetization.md` concluded "3 languages done well beats 9 done badly", so this matches
+ * `/download`: hand-written zh / en / ja with other languages falling back to English.
  *
- * 繁体按「能读简体胜过读英文」处理，回落 zh 而不是 en。
+ * Traditional Chinese falls back to zh, not en: readable Simplified beats English.
  */
 
 export type PageLang = 'zh' | 'en' | 'ja';
@@ -23,32 +23,32 @@ export function usePageLang(): PageLang {
   return 'en';
 }
 
-/** 取某一语言的文案；未覆盖的语种回落英文（en 为必填） */
+/** Copy for one language; uncovered languages fall back to English (en is required) */
 export function pickCopy<T>(dict: Partial<Record<PageLang, T>> & { en: T }, lang: PageLang): T {
   return dict[lang] ?? dict.en;
 }
 
 /**
- * 联系方式。
+ * Contact details.
  *
- * 采购方要的是「发一封信就能对上人」，而 GitHub Issue 是公开的，不能用于报价；
- * 因此优先用 `VITE_CONTACT_EMAIL` 配置的真实邮箱，未配置时降级到
- * GitHub 的私有渠道（Security advisory / Discussions），避免页面上出现一个
- * 收不到信的假地址。
+ * Buyers want "one email reaches a person", and GitHub issues are public, so they cannot carry quotes;
+ * hence the real address from `VITE_CONTACT_EMAIL` takes priority, falling back to
+ * GitHub's private channels (security advisories / Discussions) so the page never shows a
+ * fake address that nobody reads.
  */
 const CONTACT_EMAIL = (import.meta.env.VITE_CONTACT_EMAIL as string | undefined)?.trim() ?? '';
 export const HAS_CONTACT_EMAIL = CONTACT_EMAIL.length > 0;
 
 const REPO_URL = 'https://github.com/synvek/syntools';
 
-/** 询价 / 索取采购材料的入口 */
+/** Entry point for quotes / procurement material */
 export function inquiryHref(topic: string, body?: string): string {
   if (HAS_CONTACT_EMAIL) {
     const subject = encodeURIComponent(`[${topic}] SynTools 商务咨询`);
     const content = encodeURIComponent(body ?? '');
     return `mailto:${CONTACT_EMAIL}?subject=${subject}${content ? `&body=${content}` : ''}`;
   }
-  // 无邮箱时退到 GitHub 讨论区：仍然能收到消息，但不会把联系方式暴露在公开 issue 里
+  // Without an email, fall back to GitHub Discussions: messages still arrive, contacts stay out of public issues
   return `${REPO_URL}/discussions/new?category=general`;
 }
 
@@ -57,8 +57,8 @@ export const GITHUB_RELEASES_URL = `${REPO_URL}/releases/latest`;
 export const GITHUB_ISSUES_URL = `${REPO_URL}/issues`;
 
 /**
- * 文案里的 `{n}` 占位替换（工具数量会随注册表变化，不写死在文案里）。
- * 只替换对象里出现的占位符，其余原样保留。
+ * Replace `{n}` placeholders in copy (the tool count changes with the registry, so it is never hard-coded).
+ * Only placeholders present in the object are replaced; everything else stays as-is.
  */
 export function fill(text: string, vars: Record<string, string | number>): string {
   return text.replace(/\{(\w+)\}/g, (match, key: string) =>

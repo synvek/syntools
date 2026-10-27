@@ -4,33 +4,33 @@ import { createCanvasElement } from '../model/assets';
 import type { MeshWarp } from '../model/types';
 
 /**
- * 网格变形渲染：把一张位图按「目标网格」重画。
+ * Mesh warp rendering: redraw a bitmap according to a target grid.
  *
- * 核心是**逐单元仿射**：每个细单元用自己的仿射矩阵绘制，单元足够密时肉眼无法分辨，
- * 却能表达透视 / 扭曲 / 变形这类**非仿射**映射（Canvas2D 一次 `drawImage` 只能做仿射）。
- * 文字变形与图层网格变形共用这一份实现，避免两处各写一套插值而出现视觉差异。
+ * The core is **per-cell affine**: each fine cell draws with its own affine matrix, and once cells are dense
+ * enough they're invisible, yet perspective / distort / warp (**non-affine**) come through (`drawImage` is affine).
+ * Text warp and layer mesh warp share this implementation, avoiding two interpolators with different looks.
  */
 
 export type Point = { x: number; y: number };
 
 export interface MeshNodes {
-  /** 横向单元数（节点数为 cols + 1） */
+  /** Cells across (the node count is cols + 1) */
   cols: number;
   rows: number;
-  /** 行优先的目标位置，长度 = (cols + 1) * (rows + 1) */
+  /** Row-major target positions, length = (cols + 1) * (rows + 1) */
   nodes: Point[];
 }
 
-/** 单元外扩像素：遮住相邻单元间的细缝（浮点取整会留下 1px 缝） */
+/** Extra pixels per cell: hides hairline seams between neighbors (float rounding leaves 1px gaps) */
 const CELL_BLEED = 1;
-/** 变形位图四周留白比例（相对图层尺寸） */
+/** Padding around the warped bitmap, as a fraction of the layer size */
 const MESH_PAD_RATIO = 0.3;
 
 /**
- * 按目标网格逐单元绘制 `source`。
+ * Draw `source` cell by cell onto the target grid.
  *
- * `sourceRect` 是 `source` 中要参与映射的矩形，`nodes` 是该矩形细分后的目标位置：
- * 节点 (r, c) 对应源矩形中的 `(c/cols, r/rows)`。
+ * `sourceRect` is the region of `source` being mapped, and `nodes` are the target positions after
+ * subdivision: node (r, c) corresponds to `(c/cols, r/rows)` inside the source rect.
  */
 export function drawMeshCells(
   ctx: CanvasRenderingContext2D,
@@ -50,7 +50,7 @@ export function drawMeshCells(
       if (!p00 || !p10 || !p01) continue;
       const sx = sourceRect.x + col * cellW;
       const sy = sourceRect.y + row * cellH;
-      // 仿射：把源单元映射到由 p00 / p10 / p01 决定的平行四边形
+      // Affine: map the source cell onto the parallelogram defined by p00 / p10 / p01
       const a = (p10.x - p00.x) / cellW;
       const b = (p10.y - p00.y) / cellW;
       const c = (p01.x - p00.x) / cellH;
@@ -73,7 +73,7 @@ export function drawMeshCells(
   }
 }
 
-/** 双线性插值取值（u, v 为整个网格上的归一化坐标） */
+/** Bilinear lookup (u, v normalized across the whole grid) */
 function sampleGrid(values: Point[], cols: number, rows: number, u: number, v: number): Point {
   const gx = u * (cols - 1);
   const gy = v * (rows - 1);
@@ -94,10 +94,10 @@ function sampleGrid(values: Point[], cols: number, rows: number, u: number, v: n
 }
 
 /**
- * 由控制点网格算出细网格目标位置（双线性插值）。
+ * Compute the fine grid's target positions from the control grid (bilinear interpolation).
  *
- * `subdivisions` 是每个控制单元再细分的份数：2×2（透视 / 扭曲 / 斜切）用大一点的值，
- * 因为一层双线性单元对透视的近似误差最明显；4×4（变形）本身已经足够密，用小值即可。
+ * `subdivisions` is how finely each control cell is split: 2×2 (perspective / distort / skew) needs more,
+ * since a single bilinear cell approximates perspective worst; 4×4 (warp) is dense enough with fewer.
  */
 export function meshFineNodes(
   mesh: MeshWarp,
@@ -118,7 +118,7 @@ export function meshFineNodes(
   return { cols: fineCols, rows: fineRows, nodes };
 }
 
-/** 不同网格规模对应的细分份数：以「细单元边长别超过约 20px」为目标 */
+/** Subdivision counts per mesh size, aiming to keep fine cells under about 20px per side */
 function subdivisionsFor(mesh: MeshWarp, box: LayerBox): number {
   const target = 20;
   const spanCols = Math.max(1, mesh.cols - 1);
@@ -130,7 +130,7 @@ function subdivisionsFor(mesh: MeshWarp, box: LayerBox): number {
 const cache = new Map<string, { canvas: HTMLCanvasElement; offsetX: number; offsetY: number }>();
 const CACHE_LIMIT = 16;
 
-/** 变形位图在文档坐标中的落位（= 图层原点 - 留白）；`meshLayerBitmap` 与节点更新共用 */
+/** Placement of the warped bitmap in document coords (layer origin - padding), shared by node updates */
 export function meshBitmapOrigin(layer: { x: number; y: number; width: number; height: number }): {
   x: number;
   y: number;
@@ -142,17 +142,17 @@ export function meshBitmapOrigin(layer: { x: number; y: number; width: number; h
 
 export interface MeshBitmap {
   canvas: HTMLCanvasElement;
-  /** 画布相对图层原点的落位偏移（负值 = 向左上扩） */
+  /** Offset of the canvas from the layer origin (negative = extends up-left) */
   offsetX: number;
   offsetY: number;
 }
 
 /**
- * 网格变形后的图层位图（签名缓存）。
+ * The layer bitmap after mesh warping (cached by signature).
  *
- * 与文字变形同一取舍：把非仿射映射烘焙成位图，之后每次绘制只花一次 `drawImage`，
- * 代价是变形期间不再享受矢量清晰度。`render` 回调负责把**未变形**的图层内容画到给定上下文，
- * 调用方需保证回调里不再走网格分支（否则递归）。
+ * Same trade-off as text warp: bake the non-affine mapping into a bitmap so each draw is one `drawImage`,
+ * at the cost of vector crispness while warped. The `render` callback draws the **undeformed** layer
+ * into the given context, and callers must keep that callback out of the mesh branch (or it recurses).
  */
 export function meshLayerBitmap(
   layer: { mesh?: MeshWarp | null; x: number; y: number; width: number; height: number },
@@ -172,12 +172,12 @@ export function meshLayerBitmap(
     height: layer.height,
     rotation: 0,
   };
-  // 变形可能把内容甩出盒子：四周留 30% 余量，避免被裁
+  // Warping can throw content outside the box: leave 30% padding on each side so it isn't clipped
   const padX = Math.ceil(Math.max(1, layer.width) * MESH_PAD_RATIO);
   const padY = Math.ceil(Math.max(1, layer.height) * MESH_PAD_RATIO);
   const width = Math.max(1, Math.round(layer.width + padX * 2));
   const height = Math.max(1, Math.round(layer.height + padY * 2));
-  // 画布内把「文档坐标」平移成以盒子左上角为 (padX, padY)
+  // Inside the canvas, translate document space so the box's top-left sits at (padX, padY)
   const shiftX = padX - layer.x;
   const shiftY = padY - layer.y;
 
@@ -216,7 +216,7 @@ export function meshLayerBitmap(
   return bitmap;
 }
 
-/** 清空网格位图缓存（文档切换 / 内存吃紧时调用） */
+/** Clear the mesh bitmap cache (on document switch / memory pressure) */
 export function clearMeshCache(): void {
   cache.clear();
 }

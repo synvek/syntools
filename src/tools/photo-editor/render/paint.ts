@@ -23,28 +23,28 @@ import { paintLayerStyle } from './style';
 import type { Layer, LayerStyle, PhotoDoc, ShapeKind } from '../model/types';
 
 /**
- * 2D 上下文绘制层：把任意图层（位图 / 文字 / 形状）画到 Canvas2D 上。
+ * Canvas2D paint layer: draw any layer (bitmap / text / shape) onto a 2D context.
  *
- * 导出、拼合、缩略图共用本模块，保证预览与产物一致；Konva 只负责交互与实时预览。
+ * Export, flatten and thumbnails share it so output matches the preview; Konva only handles interaction.
  *
- * 关键约定：**蒙版与图层样式都必须作用在「图层自己的像素」上**，
- * 因此这两类图层要先离屏合成（`composedLayerCanvas`）再整体绘制。
- * 该分支对预览（Konva 用同一张合成结果做 Image）与导出（`compositeLayers` → `paintLayer`）是同一条代码路径，
- * 从根上避免「预览有蒙版、导出没有」这类双管线漂移。
+ * Key rule: **masks and layer styles must act on the layer's own pixels**,
+ * so such layers are composited offscreen first (`composedLayerCanvas`) and then drawn as a whole.
+ * Preview (Konva uses that composite as its Image) and export (`compositeLayers` → `paintLayer`) share the path,
+ * ruling out double-pipeline drift like "masks in the preview but not in the export".
  */
 
 export interface PaintOptions {
-  /** 位图烘焙结果缓存键前缀（默认按文档烘焙；缩略图可传自己的前缀避免互相覆盖） */
+  /** Bake cache key prefix (per-document by default; thumbnails pass their own to avoid collisions) */
   signaturePrefix?: string;
-  /** 文档：编组整体合成 / 蒙版与样式合成需要它来取组内子树与文档尺寸 */
+  /** Document: group compositing / mask and style passes need it for the subtree and document size */
   doc?: PhotoDoc;
-  /** 剪贴蒙版的基准图层（由 `compositeLayers` / Konva 节点传入） */
+  /** Base layer of the clipping mask (passed in by `compositeLayers` / the Konva node) */
   clipBase?: Layer | null;
 }
 
 /**
- * 图层是否需要「先离屏合成再整体绘制」：
- * 像素蒙版 / 矢量蒙版 / 图层样式 / 剪贴蒙版都要求先拿到「图层自己的像素」。
+ * Whether a layer needs "composite offscreen, then draw as a whole":
+ * pixel masks / vector masks / layer styles / clipping masks all need the layer's own pixels first.
  */
 export function layerNeedsComposite(layer: Layer): boolean {
   return (
@@ -52,26 +52,26 @@ export function layerNeedsComposite(layer: Layer): boolean {
     hasVectorMask(layer.vectorMask) ||
     hasLayerStyle(layer.style) ||
     Boolean(layer.clipped) ||
-    // 智能滤镜：烘焙结果不等于「源像素缩放」，必须走离屏合成
+    // Smart filters: the bake is not just "scaled source pixels", so they need offscreen compositing
     (layer.kind === 'smart' && hasActiveFilters(layer.filters))
   );
 }
 
-/** 合成缓冲相对图层包围盒的留白（图层样式向外扩散的范围） */
+/** Padding of the composite buffer around the layer box (where layer styles spread outward) */
 export function composedLayerPadding(layer: Layer): number {
-  // 网格变形会把内容甩出盒子，留白必须一并算上，否则合成缓冲会把变形结果裁掉
+  // Mesh warp throws content outside the box, so include it or the buffer clips the warped result
   return stylePadding(layer.style) + meshPadding(layer.mesh, layer.width, layer.height);
 }
 
-/** 合成缓冲左上角对应的文档坐标 */
+/** Document coordinates of the composite buffer's top-left corner */
 export function composedLayerOrigin(layer: Layer): { x: number; y: number } {
   const pad = composedLayerPadding(layer);
   return { x: layer.x - pad, y: layer.y - pad };
 }
 
 /**
- * 合成签名：蒙版 / 矢量蒙版 / 样式 / 剪贴蒙版任一变化都应让 Konva 重建这张图。
- * `clipKey` 由调用方给出（含基准图层的 id 与内容版本），保证基准变了剪贴结果也会刷新。
+ * Composite signature: any change to mask / vector mask / style / clipping mask must make Konva rebuild it.
+ * `clipKey` comes from the caller (base layer id plus content revision), so a changed base refreshes the clip.
  */
 export function compositeSignature(layer: Layer, clipKey = ''): string {
   return [
@@ -86,8 +86,8 @@ export function compositeSignature(layer: Layer, clipKey = ''): string {
 }
 
 /**
- * 基准图层的内容签名：只有它的**轮廓**变化才会改变剪贴结果，
- * 因此只纳入像素版本 / 蒙版 / 文本内容，不含透明度与混合模式。
+ * Content signature of the base layer: only changes to its **silhouette** alter the clip result,
+ * so it covers pixel revision / mask / text content only, never opacity or blend mode.
  */
 export function clipKeyOf(base: Layer | null | undefined): string {
   if (!base) return '';
@@ -101,7 +101,7 @@ export function clipKeyOf(base: Layer | null | undefined): string {
   ].join(',');
 }
 
-/** 查出某个图层的剪贴基准（同层内下方最近的可绘制图层） */
+/** Find a layer's clip base (the nearest drawable layer below it at the same level) */
 export function clipBaseOf(doc: PhotoDoc, layer: Layer): Layer | null {
   const index = doc.layers.findIndex((item) => item.id === layer.id);
   if (index < 0) return null;
@@ -109,7 +109,7 @@ export function clipBaseOf(doc: PhotoDoc, layer: Layer): Layer | null {
   return baseIndex >= 0 ? doc.layers[baseIndex] : null;
 }
 
-/** 图层内容 + 自身蒙版（像素 / 矢量），不含样式与透明度 —— 单独抽出以复用为剪贴基准的形状 */
+/** Layer content plus its own masks (pixel / vector), no style or opacity: reused as a clip-base shape */
 function layerShapeCanvas(
   doc: PhotoDoc,
   layer: Layer,
@@ -128,7 +128,7 @@ function layerShapeCanvas(
   return canvas;
 }
 
-/** 把图层自己的两种蒙版作用到画布上（像素蒙版 → 矢量蒙版） */
+/** Apply a layer's two kinds of mask to the canvas (pixel mask → vector mask) */
 function applyLayerMasks(
   canvas: HTMLCanvasElement,
   layer: Layer,
@@ -159,11 +159,11 @@ function applyLayerMasks(
 }
 
 /**
- * 把「图层内容 + 两种蒙版 + 剪贴蒙版 + 图层样式」压成一张画布
- * （比图层包围盒四周多 `stylePadding` 的留白）。
+ * Flatten "layer content + both masks + clipping mask + layer style" into a single canvas
+ * (larger than the layer box by `stylePadding` on every side).
  *
- * 绘制顺序：内容 → 像素蒙版 → 矢量蒙版 → 图层样式 → 剪贴蒙版。
- * 剪贴放在最后，与 Photoshop 一致：整层（含效果）都被基准图层的 alpha 裁切。
+ * Draw order: content → pixel mask → vector mask → layer style → clipping mask.
+ * The clip comes last, as in Photoshop: the whole layer (effects included) is clipped by the base's alpha.
  */
 export function composedLayerCanvas(
   doc: PhotoDoc,
@@ -193,7 +193,7 @@ export function composedLayerCanvas(
     const base = layerShapeCanvas(doc, options.clipBase, width, height, origin, options);
     const ctx = base?.getContext('2d');
     if (base && ctx) {
-      // 只保留基准图层的 alpha（形状），再用它裁切本层
+      // Keep only the base layer's alpha (its shape) and use it to clip this layer
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalCompositeOperation = 'source-in';
       ctx.fillStyle = '#ffffff';
@@ -237,14 +237,14 @@ export function paintLayer(
 }
 
 /**
- * 图层内容本身（不含图层透明度 / 混合模式 / 旋转翻转 —— 这些由 `paintLayer` 施加）。
- * 单独暴露是为了让样式合成能拿到「未加样式的原始剪影」。
+ * The layer content itself (no opacity / blend mode / rotation or flip — `paintLayer` applies those).
+ * Exposed separately so the style pass can get the un-styled silhouette.
  */
 /**
- * 网格变形的缓存键：必须覆盖一切会改变「未变形像素」的因素。
+ * Cache key for the mesh warp: it must cover everything that changes the "undeformed pixels".
  *
- * 位图缓存发生在**未变形**的局部空间，因此位置 / 旋转 / 翻转 / 不透明度这些不影响像素的字段要排除掉，
- * 否则拖动图层时每帧都会重建一张位图。
+ * Bitmaps cache in **undeformed** local space, so position / rotation / flip / opacity are excluded,
+ * otherwise dragging a layer would rebuild a bitmap every frame.
  */
 export function meshContentKey(layer: Layer, prefix = 'doc'): string {
   const pixelKey =
@@ -272,13 +272,13 @@ export function paintLayerContent(
   layer: Layer,
   options: PaintOptions = {},
 ): void {
-  // 网格变形（透视 / 扭曲 / 斜切 / 变形）：先按常规方式画到离屏画布，再按网格重采样。
-  // 与文字变形同一策略：预览与导出共用同一张位图，两条管线不会漂移。
+  // Mesh warp (perspective / distort / skew / warp): draw normally to an offscreen canvas, then resample.
+  // Same strategy as text warp: preview and export share one bitmap, so the pipelines can't drift.
   const meshBitmap = meshLayerBitmap(
     layer,
     meshContentKey(layer, options.signaturePrefix),
     (inner, box) => {
-      // 回调内以「网格已置空」的图层绘制，避免再次进入本分支造成递归
+      // Draw inside the callback with the mesh cleared, so it can't re-enter this branch and recurse
       paintLayerContent(inner, { ...layer, mesh: null, x: box.x, y: box.y } as Layer, options);
     },
   );
@@ -302,7 +302,7 @@ export function paintLayerContent(
   } else if (layer.kind === 'shape') {
     paintShape(ctx, layer);
   } else if (layer.kind === 'group') {
-    // 穿透模式下子图层由调用方逐个绘制；否则整体合成后再绘制
+    // In pass-through mode the caller draws children one by one; otherwise the group is composited first
     if (!layer.passThrough && options.doc) {
       ctx.drawImage(
         groupComposite(options.doc, layer),
@@ -321,8 +321,8 @@ export function paintLayerContent(
       if (filters.length === 0) {
         ctx.drawImage(source, layer.x, layer.y, layer.width, layer.height);
       } else {
-        // 智能滤镜作用在「呈现尺寸」上：先缩放到当前尺寸再烘焙，
-        // 这样放大 / 缩小智能对象时模糊半径等参数不会跟着一起缩放。
+        // Smart filters act at the presentation size: scale to the current size first, then bake,
+        // so scaling a smart object doesn't scale the blur radius and friends along with it.
         const scaled = createCanvasElement(width, height);
         const scaledCtx = scaled.getContext('2d');
         if (!scaledCtx) return;
@@ -339,14 +339,14 @@ export function paintLayerContent(
       }
     }
   }
-  // adjustment 由 render/composite.ts 在「作用于下方合成结果」时处理
+  // adjustment layers are handled by render/composite.ts when applied to the composite below
 }
 
 /**
- * 按文档顺序绘制全部图层（导出 / 拼合的主体）。
+ * Draw all layers in document order (the core of export / flatten).
  *
- * 走与画布预览同一条 `compositeLayers` 管线，编组整体合成、蒙版、调整图层才不会被漏掉——
- * 否则「预览正确、导出少一层调整」这类不一致很难排查。
+ * It runs the same `compositeLayers` pipeline as the canvas preview, so groups, masks and adjustment layers
+ * can't be missed — inconsistencies like "preview right, export missing an adjustment" are hard to debug.
  */
 export function paintDoc(
   ctx: CanvasRenderingContext2D,
@@ -375,11 +375,11 @@ export function applyTransform(ctx: CanvasRenderingContext2D, layer: Layer): voi
 }
 
 /**
- * 文字绘制。
+ * Text drawing.
  *
- * 常规文字直接落到 Canvas2D（`render/text.ts`，与预览共用同一份排版逻辑）；
- * 变形 / 带段间距的文字先由 `render/warp.ts` 生成位图再整体贴入 —— 与预览走的是同一张位图，
- * 因此「画布上看到什么，导出就是什么」。
+ * Plain text goes straight to Canvas2D (`render/text.ts`, sharing layout with the preview);
+ * warped / paragraph-spaced text is rendered to a bitmap by `render/warp.ts` and pasted in — the same
+ * bitmap the preview uses, so what you see on the canvas is exactly what gets exported.
  */
 function paintText(ctx: CanvasRenderingContext2D, layer: Extract<Layer, { kind: 'text' }>): void {
   const bitmap = textBitmap(layer);
@@ -390,7 +390,7 @@ function paintText(ctx: CanvasRenderingContext2D, layer: Extract<Layer, { kind: 
   drawText(ctx, layer);
 }
 
-/** 文字换行：CJK 逐字断行、拉丁按空格断词（实现见 `render/text.ts`，此处再导出保持既有引用可用） */
+/** Text wrapping: CJK breaks per character, Latin at spaces (see `render/text.ts`; re-exported for callers) */
 export { wrapText } from './text';
 
 function paintShape(ctx: CanvasRenderingContext2D, layer: Extract<Layer, { kind: 'shape' }>): void {
@@ -411,8 +411,8 @@ function paintShape(ctx: CanvasRenderingContext2D, layer: Extract<Layer, { kind:
       );
       break;
     case 'line':
-      // 直线走「拖拽框的对角线」：拖出一个框就得到框内的一条斜线，
-      // 与矩形 / 箭头 / 星形一样，笔迹不会超脱框外（原先固定画在竖向中线上）
+      // A line runs along the drag box's diagonal: drag a box and get a diagonal inside it,
+      // so like rect / arrow / star the stroke stays inside the box (it used to sit on the vertical mid-line)
       ctx.moveTo(x, y);
       ctx.lineTo(x + width, y + height);
       break;

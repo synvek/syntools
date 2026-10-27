@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { MarkdownToolbar } from './MarkdownToolbar';
 import { runMarkdownAction, type MarkdownAction, type MarkdownJarLike } from './editor';
 
-/** 暴露给外层的编辑能力（供大纲跳转等使用），避免把实现细节泄漏出去 */
+/** Editing capabilities exposed to callers (e.g. for outline jumps) without leaking internals */
 export interface MarkdownEditorHandle {
   jar: MarkdownJarLike;
   focus: () => void;
@@ -17,9 +17,9 @@ interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  /** 滚动比例（0~1），用于分屏时同步预览 */
+  /** Scroll ratio (0-1), used to sync the preview in split view */
   onScrollRatio?: (ratio: number) => void;
-  /** 编辑器就绪回调（挂载一次） */
+  /** Editor-ready callback (fires once on mount) */
   onReady?: (handle: MarkdownEditorHandle) => void;
 }
 
@@ -28,7 +28,7 @@ function highlightMarkdown(editor: HTMLElement) {
   editor.innerHTML = Prism.highlight(code, Prism.languages.markdown, 'markdown');
 }
 
-/** 带语法高亮与快捷工具栏的 Markdown 编辑器（CodeJar + Prism） */
+/** Markdown editor with syntax highlighting and a shortcut toolbar (CodeJar + Prism) */
 export function MarkdownEditor({
   value,
   onChange,
@@ -64,11 +64,11 @@ export function MarkdownEditor({
       jar.destroy();
       jarRef.current = null;
     };
-    // 仅挂载一次；外部 value 通过下方 effect 同步
+    // Mount-only; external `value` is synced by the effect below
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only init
   }, []);
 
-  // 外部清空 / 分享还原等受控更新
+  // Controlled updates from outside: clear / share restore
   useEffect(() => {
     const jar = jarRef.current;
     if (!jar) return;

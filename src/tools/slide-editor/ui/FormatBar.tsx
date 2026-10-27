@@ -62,22 +62,22 @@ import {
 import { MenuButton, type MenuItem } from './MenuButton';
 
 /**
- * 工具栏「格式」行 —— 对标 PowerPoint / WPS 的上下文格式选项卡。
+ * The toolbar's "format" row — counterpart of PowerPoint / WPS's contextual format tab.
  *
- * 为什么搬到工具栏：字体、字号、颜色、填充、对齐这几项是**最高频且最需要即时视觉反馈**
- * 的操作，每次都要「选中元素 → 目光移到右侧面板 → 找到对应字段 → 改」；
- * 放在紧邻画布的工具栏里，视线几乎不用离开正在编辑的对象。
+ * Why it moved into the toolbar: font, size, color, fill and alignment are the **most frequent operations and
+ * the ones that most need instant visual feedback**, yet each used to require "select element → look right to
+ * the panel → find the field → change it"; next to the canvas, your eyes barely leave the object being edited.
  *
- * 与「排列」行同一套取舍：**未选中元素时整行禁用而不是整行消失**。
- * 上下文选项卡在竞品里是「选中才出现」，但那会让工具栏高度跳动、画布上下抖动；
- * 这里用禁用态表达同一件事，代价是常驻一行。
+ * Same trade-off as the "arrange" row: **the row is disabled, not hidden, when nothing is selected**.
+ * Competing products only show the contextual tab when something is selected, but that makes the toolbar height
+ * jump and the canvas bounce; a disabled row says the same thing at the cost of one always-present row.
  *
- * 职责边界（避免与右侧面板重复）：
- * - 工具栏 = 高频、点击型、单一取值（字体/字号/字形/颜色/填充/轮廓/对齐/列表/透明度/圆角/阴影开关）
- * - 右侧面板 = 低频、需要精确数值或长文本（坐标尺寸、裁剪四边、缩进段距、字距、上下标、竖排、超链接、表格、图表数据、公式源码、阴影细参数、页面与备注）
+ * Responsibility split (to avoid duplicating the right panel):
+ * - toolbar = frequent, click-type, single-value (font/size/style/color/fill/outline/align/list/opacity/radius/shadow)
+ * - right panel = rare, needs exact values or long text (position/size, crop, indent/spacing, tracking, baseline, vertical text, link, table, chart data, formula, shadow, page/notes)
  */
 
-/** 中西文混排常用字体（无联网字体加载，只列系统常见族） */
+/** Common fonts for mixed CJK/Latin text (no web font loading, only widely available system families) */
 const FONT_FAMILIES = [
   'Arial',
   'Helvetica',
@@ -109,11 +109,11 @@ const ALIGNS: { value: TextAlign; icon: ReactNode; labelKey: string }[] = [
 const ROW =
   'slide-glass flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 p-1.5 shadow-sm dark:border-gray-700';
 /**
- * 组内**不允许**换行（`flex` 而非 `flex-wrap`）：窄窗口下整行会折成两行，
- * 若组内也参与换行，「字体」和「字号」这种强关联的控件会被拆到不同行，读起来像两组。
+ * Wrapping is **not allowed** inside a group (`flex`, not `flex-wrap`): in a narrow window the whole row wraps,
+ * and if groups could wrap too, tightly coupled controls like "font" and "size" would split across lines.
  */
 const GROUP = 'flex shrink-0 items-center gap-0.5';
-/** 分组竖线，与工具栏其它行一致 */
+/** Group divider, consistent with the toolbar's other rows */
 const SEP = <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />;
 
 const BTN_BASE =
@@ -122,7 +122,7 @@ const BTN_IDLE =
   'border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800';
 const BTN_ACTIVE = 'border-blue-600 bg-blue-600 text-white';
 
-/** 紧凑数字字段：图标 + 输入框，省掉面板里的文字标签 */
+/** Compact number field: icon + input, skipping the panel's text label */
 function MiniNumber({
   label,
   icon,
@@ -173,12 +173,12 @@ export function FormatBar() {
   const patchSelectedWith = useSlideStore((s) => s.patchSelectedWith);
 
   const elements = containerElements({ doc, viewMode, slideIndex, masterKind, masterIndex });
-  // 活动元素 = 最后点选的那个，与右侧面板口径一致（PowerPoint 的格式选项卡同理）
+  // The active element is the last one clicked, consistent with the right panel (same as PowerPoint's format tab)
   const active: SlideElement | undefined = elements.find(
     (element) => element.id === selection[selection.length - 1],
   );
 
-  /** 逐元素计算补丁后批量应用，多选时保留各自内容 */
+  /** Compute a patch per element and apply in bulk, preserving each one's content on multi-select */
   const apply = (updater: (element: SlideElement) => Partial<SlideElement> | null) =>
     patchSelectedWith(updater);
 
@@ -193,7 +193,7 @@ export function FormatBar() {
   const align: TextAlign = active ? alignOf(active) : 'left';
   const listKind = active ? listKindOf(active) : 'none';
 
-  /** 主题色板：取文档主题的 10 个常用槽位（与 PowerPoint 的主题色行一致） */
+  /** Theme palette: the document theme's 10 common slots (matching PowerPoint's theme color row) */
   const themeColors = [
     'dk1',
     'lt1',
@@ -209,7 +209,7 @@ export function FormatBar() {
     .map((key) => doc.theme.colors[key])
     .filter((color): color is string => /^#[0-9a-fA-F]{6}$/.test(color ?? ''));
 
-  // 当前行距在菜单里打勾（MenuButton 的菜单项没有勾选态，用前置标记表达）
+  // Check the current line spacing in the menu (MenuButton items have no checked state, so use a leading marker)
   const currentLineSpacing = active ? lineSpacingOf(active) : 1.2;
   const lineSpacingItems: MenuItem[] = LINE_SPACINGS.map((value) => ({
     key: String(value),
@@ -219,7 +219,7 @@ export function FormatBar() {
 
   return (
     <div className={ROW}>
-      {/* ── 字体 / 字号 ── */}
+      {/* ── Font / size ── */}
       <div className={GROUP}>
         <SelectInput
           ariaLabel={t('tools.slide.fontFamily')}
@@ -262,7 +262,7 @@ export function FormatBar() {
 
       {SEP}
 
-      {/* ── 字形 ── */}
+      {/* ── Style ── */}
       <div className={GROUP}>
         {(
           [
@@ -281,7 +281,7 @@ export function FormatBar() {
               aria-label={item.label}
               aria-pressed={on}
               disabled={!canText}
-              // 取绝对值而非逐元素取反：与 PowerPoint 一致 —— 混合状态点击后统一为开启
+              // Take an absolute value rather than toggling per element: like PowerPoint, a mixed state becomes "on"
               onClick={() =>
                 apply((element) => runStylePatch(element, { [item.key]: !on } as Partial<RunStyle>))
               }
@@ -295,7 +295,7 @@ export function FormatBar() {
 
       {SEP}
 
-      {/* ── 颜色：字体颜色 / 高亮 / 填充 / 轮廓 ── */}
+      {/* ── Color: text color / highlight / fill / outline ── */}
       <div className={GROUP}>
         <ColorPickerButton
           label={t('tools.slide.color')}
@@ -332,7 +332,7 @@ export function FormatBar() {
           onChange={(color) => apply((element) => strokeColorPatch(element, color))}
           clearLabel={t('tools.slide.noStroke')}
           onClear={() => apply((element) => strokeWidthPatch(element, 0))}
-          // 粗细放进「轮廓」下拉，对标 PowerPoint 的形状轮廓；线宽为 0 即无轮廓
+          // Weight lives in the "outline" dropdown, like PowerPoint's shape outline; a width of 0 means no outline
           extra={
             <label className="flex items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-gray-400">
               <span>{t('tools.slide.strokeWidth')}</span>
@@ -355,7 +355,7 @@ export function FormatBar() {
 
       {SEP}
 
-      {/* ── 段落：对齐 / 行距 / 列表 ── */}
+      {/* ── Paragraph: align / line spacing / list ── */}
       <div className={GROUP}>
         {ALIGNS.map((item) => (
           <button
@@ -407,7 +407,7 @@ export function FormatBar() {
 
       {SEP}
 
-      {/* ── 效果：不透明度 / 圆角 / 阴影 ── */}
+      {/* ── Effects: opacity / corner radius / shadow ── */}
       <div className={GROUP}>
         <MiniNumber
           label={t('tools.slide.opacity')}
@@ -440,14 +440,14 @@ export function FormatBar() {
         </button>
       </div>
 
-      {/* 未选中元素：整行禁用，这里给出原因，避免被当成「格式功能坏了」 */}
+      {/* No selection: the row is disabled and the reason shown, so it isn't mistaken for "formatting is broken" */}
       {!active ? (
         <span className="ml-1 text-[11px] text-gray-400 dark:text-gray-500">
           {t('tools.slide.noSelection')}
         </span>
       ) : null}
 
-      {/* 形状尚未带文字时提示：字体/字号可以直接设，双击即可输入 */}
+      {/* Hint when a shape has no text yet: font/size can be set directly, double-click to type */}
       {active && canText && !body ? (
         <span className="ml-1 text-[11px] text-gray-400 dark:text-gray-500">
           {t('tools.slide.emptyTextHint')}

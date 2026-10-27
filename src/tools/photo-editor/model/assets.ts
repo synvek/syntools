@@ -2,12 +2,12 @@ import type { ToolResult } from '@/core/types';
 import { createId } from './factory';
 
 /**
- * 位图资产运行时注册表。
+ * Runtime registry for bitmap assets.
  *
- * 像素不进文档（文档只存 `assetId`），因此：
- * - 撤销 / 重做只复制引用，不做像素深拷贝；
- * - 资产可被多个图层共享（复制图层）；
- * - `releaseExcept` 在历史被裁剪 / 文档被替换时回收无引用画布，避免内存泄漏。
+ * Pixels never enter the document (it only stores an `assetId`), so:
+ * - undo / redo copies references only, never deep-copies pixels;
+ * - an asset can be shared by several layers (duplicated layers);
+ * - `releaseExcept` reclaims unreferenced canvases when history is trimmed / the document is replaced, avoiding leaks.
  */
 
 const registry = new Map<string, HTMLCanvasElement>();
@@ -38,7 +38,7 @@ export function createBlankAsset(width: number, height: number): string {
   return registerCanvas(createCanvasElement(width, height));
 }
 
-/** 复制资产（复制图层用）：返回新 assetId */
+/** Copy an asset (for layer duplication): returns the new assetId */
 export function cloneAsset(id: string): string | null {
   const source = registry.get(id);
   if (!source) return null;
@@ -49,13 +49,13 @@ export function cloneAsset(id: string): string | null {
   return registerCanvas(copy);
 }
 
-/** 释放未被任何图层引用的资产 */
+/** Release assets no layer references */
 export function releaseExcept(usedIds: Set<string>): void {
   for (const id of [...registry.keys()]) {
     if (usedIds.has(id)) continue;
     const canvas = registry.get(id);
     if (!canvas) continue;
-    // 显式清零尺寸，提示浏览器尽早回收 backing store
+    // Zero the dimensions explicitly so the browser reclaims the backing store early
     canvas.width = 0;
     canvas.height = 0;
     registry.delete(id);
@@ -74,7 +74,7 @@ export function assetCount(): number {
   return registry.size;
 }
 
-/** 估算全部资产占用内存（状态栏展示用） */
+/** Estimate the memory held by all assets (shown in the status bar) */
 export function estimateMemoryBytes(): number {
   let total = 0;
   for (const canvas of registry.values()) total += canvas.width * canvas.height * 4;
@@ -111,7 +111,7 @@ export interface LoadedImage {
   height: number;
 }
 
-/** 读取本地图片文件 → 资产（不上传，全程在浏览器内） */
+/** Read a local image file → asset (no upload, all in the browser) */
 export async function loadImageFile(file: File): Promise<ToolResult<LoadedImage>> {
   try {
     const buffer = await file.arrayBuffer();
@@ -137,10 +137,10 @@ export async function loadImageFile(file: File): Promise<ToolResult<LoadedImage>
 }
 
 /**
- * 收集文档当前引用到的全部资产 id（供 releaseExcept 使用）。
+ * Collect every asset id the document currently references (for releaseExcept).
  *
- * 除了位图本体，还必须包含**蒙版画布**与**智能对象源像素**——
- * 否则一次 `releaseExcept`（撤销 / 重做 / 删除图层都会触发）就会把蒙版回收成空白。
+ * Besides the bitmaps themselves this must include **mask canvases** and **smart-object source pixels**,
+ * otherwise a single `releaseExcept` (fired by undo / redo / layer deletion) would reclaim masks to blank.
  */
 export function collectUsedAssets(
   layers: {

@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { allChecksums, checksum, type ChecksumAlgo } from './core';
 
 describe('checksum 已知测试向量', () => {
-  // CRC-32 标准校验序列
+  // Standard CRC-32 check vector
   it('crc32("123456789") = CBF43926', () => {
     expect(checksum('crc32', new TextEncoder().encode('123456789'))).toEqual({
       ok: true,
       value: 'CBF43926',
     });
   });
-  // Adler-32 标准校验序列
+  // Standard Adler-32 check vector
   it('adler32("123456789") = 091E01DE', () => {
     expect(checksum('adler32', new TextEncoder().encode('123456789'))).toEqual({
       ok: true,

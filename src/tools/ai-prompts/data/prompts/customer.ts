@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 客户服务类提示词，详见 ../README.md */
+/** Customer service prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'customer-ticket-reply',

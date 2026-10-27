@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  collectBrowserLocales,
-  detectBrowserLang,
-  mapBrowserLocale,
-  normalizeLang,
-} from './types';
+import { collectBrowserLocales, detectBrowserLang, mapBrowserLocale, normalizeLang } from './types';
 
 describe('mapBrowserLocale', () => {
   it('maps exact and primary tags', () => {
@@ -49,7 +44,7 @@ describe('detectBrowserLang', () => {
   });
 
   it('prefers system locale over browser UI language list', () => {
-    // 中文系统 + Chrome UI 英文：navigator 常为 en-US 在前
+    // Chinese system, English Chrome UI: navigator usually lists en-US first
     expect(detectBrowserLang(['en-US', 'en', 'zh-CN', 'zh'], 'zh-CN')).toBe('zh');
     expect(detectBrowserLang(['en-US', 'zh-TW'], 'zh-Hant-TW')).toBe('zh-TW');
   });
@@ -60,9 +55,6 @@ describe('detectBrowserLang', () => {
   });
 
   it('collectBrowserLocales puts system locale first', () => {
-    expect(collectBrowserLocales(['en-US', 'zh-CN'], 'zh-CN')).toEqual([
-      'zh-CN',
-      'en-US',
-    ]);
+    expect(collectBrowserLocales(['en-US', 'zh-CN'], 'zh-CN')).toEqual(['zh-CN', 'en-US']);
   });
 });

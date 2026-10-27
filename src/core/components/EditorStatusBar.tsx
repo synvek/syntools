@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
 /**
- * 文档类编辑器统一的底部状态栏（footbar）。
- * 左侧放文档统计信息，右侧放内存等次要信息；与桌面编辑器的状态栏一致。
+ * Shared bottom status bar (footbar) for document editors.
+ * Stats on the left, secondary info such as memory on the right, matching desktop editors.
  */
 export function EditorStatusBar({ left, right }: { left?: ReactNode; right?: ReactNode }) {
   return (

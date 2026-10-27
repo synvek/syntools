@@ -4,9 +4,9 @@ import type { StageHandle } from '../render/stage';
 import { updateMarquee, type TransformChange } from '../render/overlays';
 
 /**
- * 画布交互：选择 / 拖拽（含吸附）/ 框选 / 双击进入文本编辑。
- * 本模块只负责「把 Konva 事件翻译成回调」，具体状态变更交给 store 与页面组件，
- * 便于后续把吸附、多选拖拽等逻辑抽成纯函数单独测试。
+ * Canvas interaction: selection / dragging (with snapping) / marquee / double-click to edit text.
+ * This module only translates Konva events into callbacks; state changes belong to the store and the page component,
+ * which keeps snapping, multi-select dragging and friends easy to extract into pure functions and test on their own.
  */
 
 export type { TransformChange };
@@ -14,10 +14,10 @@ export type { TransformChange };
 export interface SnapContext {
   page: { width: number; height: number };
   others: SnapCandidate[];
-  /** 手动参考线的吸附位置 */
+  /** Snap positions from manual guides */
   extraX: number[];
   extraY: number[];
-  /** 网格吸附步长（0 = 关闭） */
+  /** Grid snap step (0 = off) */
   grid: number;
 }
 
@@ -30,13 +30,13 @@ export interface StageCallbacks {
   onBackgroundClick: () => void;
   onTextEdit: (id: string) => void;
   /**
-   * 右键：`x` / `y` 为视口坐标（clientX / clientY），`elementId` 为命中的元素；
-   * 未命中元素（空白 / 页面矩形 / 锁定元素）时为 null，调用方据此给出画布级菜单。
+   * Right click: `x` / `y` are viewport coordinates (clientX / clientY), `elementId` is the hit element;
+   * null when nothing was hit (blank area / page rect / locked element), so the caller can show a canvas-level menu.
    */
   onContextMenu: (payload: { x: number; y: number; elementId: string | null }) => void;
-  /** 点到表格单元格时回传坐标（null 表示点到的不是单元格） */
+  /** Report cell coordinates when a table cell is clicked (null when the click wasn't on a cell) */
   onCellSelect: (cell: { row: number; col: number } | null) => void;
-  /** 平移画布（中键拖动） */
+  /** Pan the canvas (middle-button drag) */
   onPan: (dx: number, dy: number) => void;
   getSnapContext: () => SnapContext;
   getSelection: () => string[];
@@ -51,9 +51,9 @@ function ancestorElement(node: Konva.Node): Konva.Node | undefined {
 export function attachInteraction(handle: StageHandle): void {
   const { stage, contentLayer, marquee, callbacks } = handle;
   let marqueeStart: { x: number; y: number } | null = null;
-  /** 中键拖动平移：与框选互斥，按下时优先 */
+  /** Middle-button drag panning: mutually exclusive with the marquee, and takes priority on press */
   let panStart: { x: number; y: number } | null = null;
-  /** 本帧是否由框选落点触发，用于抑制随后误发的背景 click 清选 */
+  /** Whether this frame ended with a marquee; suppresses the stray background click that clears the selection */
   let marqueeJustEnded = false;
   let dragOrigin = new Map<string, { x: number; y: number }>();
 
@@ -64,19 +64,19 @@ export function attachInteraction(handle: StageHandle): void {
 
   stage.on('mousedown touchstart', (event) => {
     const target = event.target;
-    // 中键按下即进入平移（即使落在元素上），浏览器默认中键是自动滚动，这里拦掉
+    // Middle button starts panning even over an element; the browser's default middle-click autoscroll is blocked here
     if (event.evt instanceof MouseEvent && event.evt.button === 1) {
       event.evt.preventDefault();
       panStart = pointerPosition();
       return;
     }
-    // 右键交给 contextmenu 处理（出菜单），不参与框选
+    // The right button is handled by contextmenu (menu), not by the marquee
     if (event.evt instanceof MouseEvent && event.evt.button === 2) return;
     const element = ancestorElement(target);
-    // 任何按下动作都会让上一轮「框选落点」标记失效，避免误吞后续正常点击
+    // Any press invalidates the previous "marquee ended" flag so it can't swallow later normal clicks
     marqueeJustEnded = false;
     if (element) return;
-    // 在页面矩形或空白处按下 → 开始框选
+    // Press on the page rect or blank space → start a marquee
     marqueeStart = pointerPosition();
     updateMarquee(marquee, { x: marqueeStart.x, y: marqueeStart.y, width: 0, height: 0 });
   });
@@ -116,36 +116,36 @@ export function attachInteraction(handle: StageHandle): void {
     };
     const ids = contentLayer
       .getChildren()
-      // 锁定元素不参与框选
+      // Locked elements don't take part in the marquee
       .filter(
         (child) =>
           child.name() === 'element' && !child.getAttr('elLocked') && intersects(child, rect),
       )
       .map((child) => child.id());
-    // 标记为本轮框选落点，抑制紧随其后的背景 click 把刚选中的对象清空
+    // Mark this as a marquee landing so the following background click doesn't clear what was just selected
     marqueeJustEnded = true;
     callbacks.onSelect(ids, false);
   });
 
   stage.on('click tap', (event) => {
-    // 框选落点后 Konva 仍会补发一次背景 click，这里直接吞掉，保留框选结果
+    // Konva still emits a background click after a marquee lands; swallow it to keep the selection
     if (marqueeJustEnded) {
       marqueeJustEnded = false;
       return;
     }
-    // 点击落在 contentLayer（元素 / Transformer 控件）内才关心，否则视为背景
+    // Only clicks inside contentLayer (elements / Transformer handles) matter; everything else is background
     if (event.target.getLayer() !== contentLayer) {
       callbacks.onBackgroundClick();
       return;
     }
     const element = ancestorElement(event.target);
-    if (!element) return; // Transformer 手柄等：不处理、不清选
-    if (element.getAttr('elLocked')) return; // 锁定元素不可选中
+    if (!element) return; // Transformer handles etc.: do nothing and don't clear the selection
+    if (element.getAttr('elLocked')) return; // Locked elements can't be selected
     const additive = Boolean(
       event.evt instanceof MouseEvent && (event.evt.shiftKey || event.evt.metaKey),
     );
     callbacks.onSelect([element.id()], additive);
-    // 点到表格单元格时记下坐标，属性面板据此编辑该单元格文字
+    // Record the coordinates when a table cell is clicked, so the property panel can edit that cell's text
     const row = event.target.getAttr('cellRow');
     const col = event.target.getAttr('cellCol');
     callbacks.onCellSelect(
@@ -156,22 +156,22 @@ export function attachInteraction(handle: StageHandle): void {
   stage.on('contextmenu', (event) => {
     const evt = event.evt;
     if (!(evt instanceof MouseEvent)) return;
-    // 接管浏览器原生菜单：画布上的右键一律走自己的菜单
+    // Take over the browser menu: right clicks on the canvas always use our own menu
     evt.preventDefault();
     const element = ancestorElement(event.target);
-    // 元素之外的 contentLayer 命中（Transformer 手柄、参考线）：沿用当前选中，
-    // 否则用户右键自己刚选中的对象却看到「画布菜单」，动作目标会让人意外
+    // Hits on contentLayer outside an element (Transformer handles, guides) keep the current selection;
+    // otherwise right-clicking the object you just selected would show a "canvas menu", which is surprising
     const id =
       element?.id() ??
       (element === undefined && event.target.getLayer() === contentLayer
         ? callbacks.getSelection()[0]
         : undefined);
-    // 与左键一致：锁定元素不可选中，右键也只给画布级菜单
+    // Same as the left button: locked elements can't be selected, so only the canvas-level menu applies
     if (!id || element?.getAttr('elLocked')) {
       callbacks.onContextMenu({ x: evt.clientX, y: evt.clientY, elementId: null });
       return;
     }
-    // 右键未选中对象时先选中它（与 PowerPoint 一致），避免菜单动作落到别的元素上
+    // Right-clicking an unselected object selects it first (like PowerPoint) so menu actions target the right element
     if (!callbacks.getSelection().includes(id)) callbacks.onSelect([id], false);
     callbacks.onContextMenu({ x: evt.clientX, y: evt.clientY, elementId: id });
   });
@@ -185,8 +185,8 @@ export function attachInteraction(handle: StageHandle): void {
     const node = event.target;
     if (!node.id()) return;
     dragOrigin = new Map();
-    // 拖拽一个「未被选中」的对象：先把它设为唯一选中项，再拖拽它自己，
-    // 而不是沿用旧选择把多个对象一起带走（旧选择不会被误删但仍保持选中见下方说明）。
+    // Dragging an object that isn't selected: make it the sole selection first, then drag it alone,
+    // instead of reusing the old selection and moving several objects together (the old selection stays selected, see below).
     let selection = callbacks.getSelection();
     if (!selection.includes(node.id())) {
       callbacks.onSelect([node.id()], false);
@@ -228,7 +228,7 @@ export function attachInteraction(handle: StageHandle): void {
   });
 }
 
-/** 拖拽中的吸附：直接改写节点位置，让画面即时「咬合」 */
+/** Snapping during a drag: rewrite the node position directly so the screen locks on instantly */
 function snapNode(
   node: Konva.Node,
   context: SnapContext,

@@ -1,10 +1,10 @@
 /**
- * 轻量 Markdown 标签渲染：仅支持行内语法（加粗 / 斜体 / 行内代码 / 链接 / 换行）。
- * 输出已转义的 HTML，供节点标签以 dangerouslySetInnerHTML 呈现；
- * 不做块级解析，避免引入重型依赖。
+ * Lightweight Markdown label rendering: inline syntax only (bold / italic / inline code / links / line breaks).
+ * Emits escaped HTML, rendered in node labels via dangerouslySetInnerHTML;
+ * no block-level parsing, to avoid heavy dependencies.
  */
 
-/** 允许的链接协议（其余一律忽略，避免 javascript: 等注入） */
+/** Allowed link protocols (everything else is ignored, preventing injections such as javascript:) */
 const SAFE_URL = /^(?:https?:\/\/|mailto:)[^\s"'<>]+$/i;
 
 export function escapeHtml(text: string): string {
@@ -15,17 +15,17 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** 校验链接安全性；不合法返回 null（调用方原样保留文本） */
+/** Validate link safety; returns null when invalid (callers keep the text as-is) */
 export function safeMarkdownHref(url: string): string | null {
   const trimmed = url.trim();
   return SAFE_URL.test(trimmed) ? trimmed : null;
 }
 
-/** 行内 Markdown → 安全 HTML */
+/** Inline Markdown → safe HTML */
 export function renderInlineMarkdown(text: string): string {
   let out = escapeHtml(text);
 
-  // 行内代码：先用私有区占位符替换，避免其内部被其它规则改写
+  // Inline code: substitute a private-use-area placeholder first so other rules cannot rewrite its contents
   const codes: string[] = [];
   out = out.replace(/`([^`\n]+)`/g, (_m, code: string) => {
     codes.push(code);

@@ -3,16 +3,18 @@ import { MIN_COLUMN_COUNT, MIN_ROW_COUNT, excelSerialToDate } from './core';
 import { createEmptySnapshot, type CellSnapshot, type WorkbookSnapshot } from './xlsx-io';
 
 /**
- * CSV 纯逻辑层：解析 / 序列化 / 与工作簿快照互转。
- * 不依赖 exceljs 或 Univer，可单独单测；数据不离开浏览器。
+ * CSV pure-logic layer: parsing / serialising / converting to and from workbook snapshots.
+ * Depends on neither exceljs nor Univer, so it can be unit tested alone; data never leaves the
+ * browser.
  */
 
-/** 默认分隔符（逗号） */
+/** Default delimiter (comma) */
 export const CSV_DELIMITER = ',';
 
 /**
- * 解析 CSV（RFC 4180）：支持引号包裹、字段内分隔符与换行、"" 转义、CRLF / CR / LF，并剥离 BOM。
- * 空字段保留为空字符串；末尾换行不产生多余空行。
+ * Parse CSV (RFC 4180): quoted fields, delimiters and newlines inside fields, "" escapes,
+ * CRLF / CR / LF, and a stripped BOM. Empty fields stay empty strings; a trailing newline does not
+ * create a spurious blank row.
  */
 export function parseCsv(text: string, delimiter = CSV_DELIMITER): string[][] {
   const rows: string[][] = [];
@@ -52,7 +54,7 @@ export function parseCsv(text: string, delimiter = CSV_DELIMITER): string[][] {
     }
   }
 
-  // 收尾：仅当还有未落行的内容时才补一行，避免末尾换行造出空行
+  // Flush: only push a row when something is still pending, so a trailing newline adds no blank line
   if (field.length > 0 || row.length > 0) {
     row.push(field);
     rows.push(row);
@@ -65,7 +67,7 @@ function escapeCsvField(value: string, delimiter: string): string {
   return needsQuote ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-/** 序列化 CSV：含分隔符 / 引号 / 换行 / 首尾空白时加引号转义 */
+/** Serialise CSV: quote fields containing the delimiter / quotes / newlines / surrounding whitespace */
 export function serializeCsv(
   rows: readonly (readonly string[])[],
   delimiter = CSV_DELIMITER,
@@ -76,8 +78,8 @@ export function serializeCsv(
 }
 
 /**
- * 文本 → 单元格：纯数字转为数值（便于公式与合计）。
- * 保留前导 0 的编号（如 007）、超长数字与其它内容按文本原样保留。
+ * Text → cell: pure numbers become numeric values (so formulas and sums work).
+ * Identifiers with leading zeros (e.g. 007), over-long digit strings and anything else stay textual.
  */
 export function inferCellValue(text: string): CellSnapshot {
   const trimmed = text.trim();
@@ -92,7 +94,7 @@ export function inferCellValue(text: string): CellSnapshot {
   return { v: text };
 }
 
-/** CSV 文本 → 单表工作簿快照 */
+/** CSV text → single-sheet workbook snapshot */
 export function csvToSnapshot(
   text: string,
   name: string,
@@ -122,7 +124,7 @@ export function csvToSnapshot(
   return { ok: true, value: snapshot };
 }
 
-/** 单元格 → CSV 文本：日期（序列号 + 年月格式）还原为可读日期，而非 Excel 序列号 */
+/** Cell → CSV text: dates (serial + year/month format) become readable dates instead of Excel serials */
 export function formatCsvValue(cell: CellSnapshot | undefined): string {
   if (!cell) return '';
   const pattern = cell.s?.n?.pattern ?? '';
@@ -140,7 +142,7 @@ export function formatCsvValue(cell: CellSnapshot | undefined): string {
   return '';
 }
 
-/** 工作簿快照 → CSV 文本（单表；默认取第一张有内容的表） */
+/** Workbook snapshot → CSV text (single sheet; defaults to the first non-empty sheet) */
 export function snapshotToCsv(
   snapshot: WorkbookSnapshot,
   sheetId?: string | null,

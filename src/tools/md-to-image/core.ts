@@ -3,15 +3,10 @@ import DOMPurify from 'dompurify';
 import type { ToolResult } from '@/core/types';
 
 /**
- * Markdown 转图片：解析 + 消毒，以及导出卡片样式选项。
+ * Markdown to image: parsing, sanitizing, and the export card style options.
  */
 
-export type MdToImageError =
-  | 'EMPTY'
-  | 'PARSE'
-  | 'INVALID_COLOR'
-  | 'INVALID_SIZE'
-  | 'INVALID_FONT';
+export type MdToImageError = 'EMPTY' | 'PARSE' | 'INVALID_COLOR' | 'INVALID_SIZE' | 'INVALID_FONT';
 
 export interface MdToImageOptions {
   gfm: boolean;
@@ -33,7 +28,8 @@ export interface MdCardStyle {
 export const MD_FONTS: { id: MdFontId; stack: string }[] = [
   {
     id: 'sans',
-    stack: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif',
+    stack:
+      'ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif',
   },
   {
     id: 'serif',
@@ -41,7 +37,8 @@ export const MD_FONTS: { id: MdFontId; stack: string }[] = [
   },
   {
     id: 'mono',
-    stack: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Noto Sans Mono CJK SC", monospace',
+    stack:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Noto Sans Mono CJK SC", monospace',
   },
   {
     id: 'song',
@@ -89,7 +86,7 @@ Write **Markdown** and export as PNG.
 > Quote block
 `;
 
-/** 归一化为 #RRGGBB */
+/** Normalize to #RRGGBB */
 export function normalizeHexColor(input: string): string | null {
   const raw = input.trim();
   const short = /^#([0-9a-fA-F]{3})$/.exec(raw);
@@ -150,7 +147,7 @@ export function resolveCardStyle(partial: Partial<MdCardStyle> = {}): ToolResult
   };
 }
 
-/** 导出卡片内联样式（不受全局 dark 主题影响） */
+/** Inline styles for the export card (immune to the global dark theme) */
 export type CardCssProperties = {
   background: string;
   color: string;
@@ -172,7 +169,7 @@ export function toCardCss(style: MdCardStyle): CardCssProperties {
     fontFamily: FONT_MAP[style.font],
     fontSize: `${style.fontSize}px`,
     lineHeight: String(style.lineHeight),
-    // 固定宽度，避免被预览栏 max-width:100% / 网格压缩导致「宽度无效」
+    // Pin the width so the preview pane's max-width:100% or grid shrinking cannot override it
     width: w,
     minWidth: w,
     maxWidth: w,
@@ -181,7 +178,7 @@ export function toCardCss(style: MdCardStyle): CardCssProperties {
   };
 }
 
-/** Markdown → 消毒后的 HTML */
+/** Markdown → sanitized HTML */
 export function prepareMarkdownHtml(
   text: string,
   options: MdToImageOptions = DEFAULT_MD_OPTIONS,

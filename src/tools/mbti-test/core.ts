@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * MBTI 简易性格测试：四维计分（E/I、S/N、T/F、J/P）。
+ * Simplified MBTI personality test: scores on four dimensions (E/I, S/N, T/F, J/P).
  */
 
 export type MbtiDimension = 'EI' | 'SN' | 'TF' | 'JP';
@@ -52,45 +52,211 @@ export interface MbtiScores {
 export interface MbtiResult {
   type: MbtiType;
   scores: MbtiScores;
-  /** 各维倾向强度 0–100（偏向字母一侧的百分比） */
+  /** Strength of each preference, 0–100 (percentage leaning toward one letter) */
   strengths: { EI: number; SN: number; TF: number; JP: number };
 }
 
-/** 24 题：每维 6 题，选项 letter 决定加分方向 */
+/** 24 questions, 6 per dimension; each option's letter decides which side gains */
 export const MBTI_QUESTIONS: MbtiQuestion[] = [
-  { id: 'q1', dimension: 'EI', options: [{ id: 'a', letter: 'E' }, { id: 'b', letter: 'I' }] },
-  { id: 'q2', dimension: 'EI', options: [{ id: 'a', letter: 'E' }, { id: 'b', letter: 'I' }] },
-  { id: 'q3', dimension: 'EI', options: [{ id: 'a', letter: 'I' }, { id: 'b', letter: 'E' }] },
-  { id: 'q4', dimension: 'EI', options: [{ id: 'a', letter: 'E' }, { id: 'b', letter: 'I' }] },
-  { id: 'q5', dimension: 'EI', options: [{ id: 'a', letter: 'I' }, { id: 'b', letter: 'E' }] },
-  { id: 'q6', dimension: 'EI', options: [{ id: 'a', letter: 'E' }, { id: 'b', letter: 'I' }] },
-  { id: 'q7', dimension: 'SN', options: [{ id: 'a', letter: 'S' }, { id: 'b', letter: 'N' }] },
-  { id: 'q8', dimension: 'SN', options: [{ id: 'a', letter: 'N' }, { id: 'b', letter: 'S' }] },
-  { id: 'q9', dimension: 'SN', options: [{ id: 'a', letter: 'S' }, { id: 'b', letter: 'N' }] },
-  { id: 'q10', dimension: 'SN', options: [{ id: 'a', letter: 'S' }, { id: 'b', letter: 'N' }] },
-  { id: 'q11', dimension: 'SN', options: [{ id: 'a', letter: 'N' }, { id: 'b', letter: 'S' }] },
-  { id: 'q12', dimension: 'SN', options: [{ id: 'a', letter: 'S' }, { id: 'b', letter: 'N' }] },
-  { id: 'q13', dimension: 'TF', options: [{ id: 'a', letter: 'T' }, { id: 'b', letter: 'F' }] },
-  { id: 'q14', dimension: 'TF', options: [{ id: 'a', letter: 'F' }, { id: 'b', letter: 'T' }] },
-  { id: 'q15', dimension: 'TF', options: [{ id: 'a', letter: 'T' }, { id: 'b', letter: 'F' }] },
-  { id: 'q16', dimension: 'TF', options: [{ id: 'a', letter: 'T' }, { id: 'b', letter: 'F' }] },
-  { id: 'q17', dimension: 'TF', options: [{ id: 'a', letter: 'F' }, { id: 'b', letter: 'T' }] },
-  { id: 'q18', dimension: 'TF', options: [{ id: 'a', letter: 'T' }, { id: 'b', letter: 'F' }] },
-  { id: 'q19', dimension: 'JP', options: [{ id: 'a', letter: 'J' }, { id: 'b', letter: 'P' }] },
-  { id: 'q20', dimension: 'JP', options: [{ id: 'a', letter: 'P' }, { id: 'b', letter: 'J' }] },
-  { id: 'q21', dimension: 'JP', options: [{ id: 'a', letter: 'J' }, { id: 'b', letter: 'P' }] },
-  { id: 'q22', dimension: 'JP', options: [{ id: 'a', letter: 'J' }, { id: 'b', letter: 'P' }] },
-  { id: 'q23', dimension: 'JP', options: [{ id: 'a', letter: 'P' }, { id: 'b', letter: 'J' }] },
-  { id: 'q24', dimension: 'JP', options: [{ id: 'a', letter: 'J' }, { id: 'b', letter: 'P' }] },
+  {
+    id: 'q1',
+    dimension: 'EI',
+    options: [
+      { id: 'a', letter: 'E' },
+      { id: 'b', letter: 'I' },
+    ],
+  },
+  {
+    id: 'q2',
+    dimension: 'EI',
+    options: [
+      { id: 'a', letter: 'E' },
+      { id: 'b', letter: 'I' },
+    ],
+  },
+  {
+    id: 'q3',
+    dimension: 'EI',
+    options: [
+      { id: 'a', letter: 'I' },
+      { id: 'b', letter: 'E' },
+    ],
+  },
+  {
+    id: 'q4',
+    dimension: 'EI',
+    options: [
+      { id: 'a', letter: 'E' },
+      { id: 'b', letter: 'I' },
+    ],
+  },
+  {
+    id: 'q5',
+    dimension: 'EI',
+    options: [
+      { id: 'a', letter: 'I' },
+      { id: 'b', letter: 'E' },
+    ],
+  },
+  {
+    id: 'q6',
+    dimension: 'EI',
+    options: [
+      { id: 'a', letter: 'E' },
+      { id: 'b', letter: 'I' },
+    ],
+  },
+  {
+    id: 'q7',
+    dimension: 'SN',
+    options: [
+      { id: 'a', letter: 'S' },
+      { id: 'b', letter: 'N' },
+    ],
+  },
+  {
+    id: 'q8',
+    dimension: 'SN',
+    options: [
+      { id: 'a', letter: 'N' },
+      { id: 'b', letter: 'S' },
+    ],
+  },
+  {
+    id: 'q9',
+    dimension: 'SN',
+    options: [
+      { id: 'a', letter: 'S' },
+      { id: 'b', letter: 'N' },
+    ],
+  },
+  {
+    id: 'q10',
+    dimension: 'SN',
+    options: [
+      { id: 'a', letter: 'S' },
+      { id: 'b', letter: 'N' },
+    ],
+  },
+  {
+    id: 'q11',
+    dimension: 'SN',
+    options: [
+      { id: 'a', letter: 'N' },
+      { id: 'b', letter: 'S' },
+    ],
+  },
+  {
+    id: 'q12',
+    dimension: 'SN',
+    options: [
+      { id: 'a', letter: 'S' },
+      { id: 'b', letter: 'N' },
+    ],
+  },
+  {
+    id: 'q13',
+    dimension: 'TF',
+    options: [
+      { id: 'a', letter: 'T' },
+      { id: 'b', letter: 'F' },
+    ],
+  },
+  {
+    id: 'q14',
+    dimension: 'TF',
+    options: [
+      { id: 'a', letter: 'F' },
+      { id: 'b', letter: 'T' },
+    ],
+  },
+  {
+    id: 'q15',
+    dimension: 'TF',
+    options: [
+      { id: 'a', letter: 'T' },
+      { id: 'b', letter: 'F' },
+    ],
+  },
+  {
+    id: 'q16',
+    dimension: 'TF',
+    options: [
+      { id: 'a', letter: 'T' },
+      { id: 'b', letter: 'F' },
+    ],
+  },
+  {
+    id: 'q17',
+    dimension: 'TF',
+    options: [
+      { id: 'a', letter: 'F' },
+      { id: 'b', letter: 'T' },
+    ],
+  },
+  {
+    id: 'q18',
+    dimension: 'TF',
+    options: [
+      { id: 'a', letter: 'T' },
+      { id: 'b', letter: 'F' },
+    ],
+  },
+  {
+    id: 'q19',
+    dimension: 'JP',
+    options: [
+      { id: 'a', letter: 'J' },
+      { id: 'b', letter: 'P' },
+    ],
+  },
+  {
+    id: 'q20',
+    dimension: 'JP',
+    options: [
+      { id: 'a', letter: 'P' },
+      { id: 'b', letter: 'J' },
+    ],
+  },
+  {
+    id: 'q21',
+    dimension: 'JP',
+    options: [
+      { id: 'a', letter: 'J' },
+      { id: 'b', letter: 'P' },
+    ],
+  },
+  {
+    id: 'q22',
+    dimension: 'JP',
+    options: [
+      { id: 'a', letter: 'J' },
+      { id: 'b', letter: 'P' },
+    ],
+  },
+  {
+    id: 'q23',
+    dimension: 'JP',
+    options: [
+      { id: 'a', letter: 'P' },
+      { id: 'b', letter: 'J' },
+    ],
+  },
+  {
+    id: 'q24',
+    dimension: 'JP',
+    options: [
+      { id: 'a', letter: 'J' },
+      { id: 'b', letter: 'P' },
+    ],
+  },
 ];
 
 function emptyScores(): MbtiScores {
   return { E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 };
 }
 
-export function scoreMbti(
-  answers: Record<string, 'a' | 'b'>,
-): ToolResult<MbtiResult> {
+export function scoreMbti(answers: Record<string, 'a' | 'b'>): ToolResult<MbtiResult> {
   const scores = emptyScores();
   for (const q of MBTI_QUESTIONS) {
     const choice = answers[q.id];

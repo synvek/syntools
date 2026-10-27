@@ -14,11 +14,11 @@ import { SHAPE_PRESETS } from '../model/shapes';
 import { useSlideStore } from '../store';
 
 /**
- * 插入面板：形状库 / 图表 / 图标 / 公式。
+ * Insert panel: shape library / charts / icons / formulas.
  *
- * 工具栏只放得下几个按钮，形状库（30+ prstGeom）与素材库需要一个宫格面板承载。
- * 面板本身不持有文档状态，插入动作一律走 store 的 addElement，撤销/重做与
- * 工具栏插入完全等价。
+ * The toolbar only fits a few buttons, so the shape library (30+ prstGeom) and the asset library need a grid panel.
+ * The panel holds no document state; inserts always go through the store's addElement, making undo/redo
+ * identical to inserting from the toolbar.
  */
 
 export type InsertPanelTab = 'shape' | 'chart' | 'icon' | 'formula';
@@ -249,7 +249,7 @@ export function InsertPanel({
   );
 }
 
-/** 形状缩略图：用内联 SVG 画一个 24×24 的简化轮廓 */
+/** Shape thumbnail: a simplified 24×24 outline drawn with inline SVG */
 function ShapeThumb({ prst }: { prst: string }) {
   const geometry = resolvePresetGeometry(prst);
   const common = { fill: 'currentColor', stroke: 'none' } as const;
@@ -290,7 +290,7 @@ function ShapeThumb({ prst }: { prst: string }) {
   );
 }
 
-/** 图表类型缩略图 */
+/** Chart type thumbnail */
 function ChartThumb({ type }: { type: string }) {
   const bars = (
     <>

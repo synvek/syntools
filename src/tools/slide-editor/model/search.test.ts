@@ -20,7 +20,7 @@ describe('查找', () => {
   it('跨页统计命中次数（含表格与备注）', () => {
     const doc = docWithText();
     expect(countMatches(doc, '营收', { includeNotes: true })).toBe(4);
-    // 不含备注时少一处
+    // One fewer hit without notes
     expect(countMatches(doc, '营收')).toBe(3);
   });
 
@@ -71,7 +71,7 @@ describe('替换', () => {
     const nextTable = next.slides[1].elements[0] as TableElement;
     expect(nextTable.rows[0][0].text).toBe('收入');
     expect(next.slides[0].notes).toBe('收入口径见附录');
-    // 未命中的部分保持原引用
+    // Unmatched parts keep their original reference
     expect(next.slides[1].elements[0]).not.toBe(doc.slides[1].elements[0]);
     expect(doc.slides[0].notes).toBe('营收口径见附录');
   });

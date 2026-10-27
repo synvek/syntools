@@ -4,17 +4,17 @@ import { GITHUB_ISSUES_URL, GITHUB_REPO_URL, pickCopy, usePageLang } from '@/app
 import type { PageLang } from '@/app/marketing/copy';
 
 /**
- * 全局页脚。
+ * Global footer.
  *
- * 存在的理由很直接：`plan/Monetization.md` 记录的现状是「官网没有下载页、
- * 没有定价、没有信任页，用户路径到首页就断了」。页脚是这些页面唯一的常驻入口 ——
- * 首页有 153 个工具卡片、工具页是编辑器界面，两处都没有理由塞销售链接。
+ * Why it exists: `plan/Monetization.md` recorded that the site had no download page,
+ * no pricing and no trust pages, so the user path died at the home page. The footer is their only permanent entry —
+ * the home page has 153 tool cards and tool pages are editors; neither should host sales links.
  *
- * 两条约束：
- * 1. **不在工具页渲染**：工具页（尤其是照片编辑器、幻灯片）按首屏剩余高度布局，
- *    底部多出一行会把画布挤矮，属于纯粹的体验损失。由 AppLayout 判断路由后决定。
- * 2. **文案不进取舍 9 语种语言包**：与 /pricing 等页同一套 zh / en / ja 字典，
- *    其余语种回落英文，避免再产生一批机翻文案。
+ * Two constraints:
+ * 1. **Never rendered on tool pages**: they (especially the photo editor and slides) lay out to the leftover first-screen height,
+ *    and an extra bottom row squeezes the canvas for no benefit. AppLayout decides after checking the route.
+ * 2. **Copy bypasses the 9-language packs**: it uses the same zh / en / ja dictionary as /pricing,
+ *    with other languages falling back to English, avoiding another batch of machine translation.
  */
 
 interface FooterCopy {

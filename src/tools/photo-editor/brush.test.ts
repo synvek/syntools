@@ -25,7 +25,7 @@ describe('clampSpacing', () => {
   });
 
   it('agrees with the line-vs-stamp threshold semantics', () => {
-    // 阈值以下走连续描边、以上走盖章，边界值本身应落在「盖章」一侧
+    // Below the threshold it strokes continuously, above it stamps; the boundary value itself belongs to the "stamp" side
     expect(clampSpacing(SPACING_LINE_THRESHOLD)).toBe(SPACING_LINE_THRESHOLD);
     expect(SPACING_LINE_THRESHOLD).toBeGreaterThan(0);
   });

@@ -47,12 +47,12 @@ export function isAudioTarget(target: MediaTarget): boolean {
 }
 
 /**
- * 每个目标容器实际需要的编码器（数组内为「任选其一」，全部满足才算可转）。
+ * Encoders each target container actually needs (within an array any one suffices; all arrays must pass).
  *
- * 这不是照抄规格书，而是跟 mediabunny 的自动选码保持一致的实测口径：
- * Chrome 只提供 AAC 与 Opus 音频编码器，MP3 / Vorbis / FLAC 根本没有，
- * 所以「MP3」这类目标在部分浏览器上不可达 —— 与其让用户点完才发现失败，
- * 不如在渲染选项时就把不可用的条目标出来。
+ * This follows what mediabunny's automatic codec pick really does, rather than the spec sheet:
+ * Chrome ships only AAC and Opus audio encoders — no MP3 / Vorbis / FLAC at all,
+ * so targets like "MP3" are unreachable in some browsers. Better to mark unavailable entries
+ * while rendering the options than to fail once the user commits.
  */
 const TARGET_CAPABILITY: Record<MediaTarget, { video?: VideoCodec[]; audio?: AudioCodec[] }> = {
   mp4: { video: ['avc'], audio: ['aac'] },
@@ -60,7 +60,7 @@ const TARGET_CAPABILITY: Record<MediaTarget, { video?: VideoCodec[]; audio?: Aud
   mkv: { video: ['avc', 'vp9'], audio: ['aac', 'opus'] },
   mp3: { audio: ['mp3'] },
   m4a: { audio: ['aac'] },
-  wav: {}, // 自研 PCM 编码，不依赖 WebCodecs
+  wav: {}, // in-house PCM encoder, no WebCodecs needed
   ogg: { audio: ['opus', 'vorbis'] },
   flac: { audio: ['flac'] },
 };
@@ -74,13 +74,13 @@ async function anyAudioEncodable(codecs: AudioCodec[]): Promise<boolean> {
 
 async function anyVideoEncodable(codecs: VideoCodec[]): Promise<boolean> {
   for (const codec of codecs) {
-    // 用 720p 探测：过低的分辨率可能命中软件编码器而高估能力
+    // Probe at 720p: a low resolution may land on a software encoder and overstate support
     if (await canEncodeVideo(codec, { width: 1280, height: 720 })) return true;
   }
   return false;
 }
 
-/** 当前浏览器能否产出该目标格式。 */
+/** Whether this browser can produce the target format. */
 export async function isTargetSupported(target: MediaTarget): Promise<boolean> {
   const need = TARGET_CAPABILITY[target];
   if (!need.video && !need.audio) return true;
@@ -89,7 +89,7 @@ export async function isTargetSupported(target: MediaTarget): Promise<boolean> {
   return true;
 }
 
-/** 一次性探测全部目标格式，返回可用的那部分（供下拉框过滤）。 */
+/** Probe every target format once and return the usable ones (for filtering the dropdown). */
 export async function getSupportedTargets(): Promise<MediaTarget[]> {
   const results = await Promise.all(
     MEDIA_TARGETS.map(async (item) => ((await isTargetSupported(item.value)) ? item.value : null)),
@@ -142,7 +142,7 @@ function disposeInput(input: Input): void {
   (input as { dispose?: () => void }).dispose?.();
 }
 
-/** 读取媒体基本信息（时长、轨道、编码），失败时返回错误码。 */
+/** Read basic media info (duration, tracks, codecs); returns an error code on failure. */
 export async function probeMedia(file: Blob): Promise<ToolResult<MediaProbe>> {
   const input = openInput(file);
   try {
@@ -175,7 +175,7 @@ export interface ConvertMediaOptions {
   quality?: MediaQuality;
   video?: { width?: number; height?: number; fit?: 'contain' | 'cover' | 'fill' };
   audio?: { numberOfChannels?: number; sampleRate?: number };
-  /** 秒；end 省略表示到结尾 */
+  /** Seconds; omitting end means until the end */
   trim?: { start?: number; end?: number };
   onProgress?: (ratio: number) => void;
   signal?: AbortSignal;
@@ -185,7 +185,7 @@ export interface ConvertMediaResult {
   blob: Blob;
 }
 
-/** 音频专用输出格式 */
+/** Audio-only output formats */
 function audioFormatOf(target: MediaTarget): OutputFormat | null {
   if (target === 'mp3') return new Mp3OutputFormat();
   if (target === 'wav') return new WavOutputFormat();
@@ -263,8 +263,8 @@ function defaultVideoFormat(target: MediaTarget): OutputFormat {
 }
 
 /**
- * 转换媒体：WebCodecs 解码 + 编码，mediabunny 负责容器。
- * 浏览器缺少对应能力时返回明确的错误码，由 UI 提示，而不是静默降级到别的引擎。
+ * Convert media: WebCodecs decodes and encodes, mediabunny handles containers.
+ * Missing browser capabilities return an explicit error code for the UI instead of silently swapping engines.
  */
 export async function convertMedia(
   file: Blob,

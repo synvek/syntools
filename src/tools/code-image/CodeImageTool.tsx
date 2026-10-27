@@ -32,7 +32,7 @@ function highlight(code: string, language: CodeLanguage): string {
   return Prism.highlight(code, grammar, language);
 }
 
-/** 代码生成图片：高亮预览并导出 PNG */
+/** Code to image: highlighted preview with PNG export */
 export default function CodeImageTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -180,10 +180,7 @@ export default function CodeImageTool() {
               </div>
               <div className="flex gap-3 font-mono text-sm leading-6">
                 {showLineNumbers && (
-                  <pre
-                    className="select-none text-right"
-                    style={{ color: colors.gutter }}
-                  >
+                  <pre className="select-none text-right" style={{ color: colors.gutter }}>
                     {Array.from({ length: lines }, (_, i) => i + 1).join('\n')}
                   </pre>
                 )}

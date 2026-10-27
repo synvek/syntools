@@ -27,9 +27,9 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
   const toggleTheme = useSettingsStore((s) => s.toggleTheme);
   const setLang = useSettingsStore((s) => s.setLang);
   /**
-   * 当前语言以 i18next 为准，而不是 store 里那份。
-   * `/zh/` 这棵树会强制中文，此时 store 里可能还存着「上次选的英文」——
-   * 下拉框必须以真正在生效的语言显示，否则会显示成英文而界面是中文。
+   * The language comes from i18next, not the copy in the store.
+   * The `/zh/` tree forces Chinese while the store may still hold "English, picked last time" —
+   * so the dropdown must show the language actually in effect, not English over a Chinese UI.
    */
   const lang = normalizeLang(i18n.resolvedLanguage ?? 'en') ?? 'en';
   const isDark =
@@ -37,22 +37,22 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
     (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   /**
-   * 不做「按浏览器语言自动跳转」。
+   * No "redirect by browser language".
    *
-   * `/` 是英文树（爬虫看到的那一版），而 `resolveBootLang()` 仍然允许中文浏览器在
-   * 无前缀路径上看到中文界面——所以中文访客并不会被英文界面卡住，没有必要用
-   * `navigator.language` 做一次客户端 redirect。那种 redirect 对爬虫接近「隐藏内容」，
-   * 是 Google 明确警告过的 cloaking 模式，收益远小于风险。
+   * `/` is the English tree (what crawlers see), yet `resolveBootLang()` still lets Chinese browsers
+   * see a Chinese UI on unprefixed paths — so Chinese visitors are never stuck with English and there is no need for
+   * a client-side `navigator.language` redirect. For crawlers that is close to "hidden content",
+   * a cloaking pattern Google explicitly warns about, with far more risk than reward.
    *
-   * 中文树的可达性由三处保证：下拉框切到中文时跳到 `/zh/…`、搜索结果经 `hreflang`
-   * 直接落到 `/zh/…`、页面里的语言切换会保留当前路径。
+   * The Chinese tree stays reachable three ways: the dropdown jumps to `/zh/…`, search results arrive via `hreflang`
+   * straight at `/zh/…`, and in-page language switches keep the current path.
    */
 
   /**
-   * 切换语言时同步地址：
-   * - en / zh 有独立 URL，跳到对应那棵树；
-   * - 其余 7 种语言没有 URL，若当前在 `/zh/` 下要退回无前缀树，
-   *   否则刷新时路径会把语言按回中文。
+   * Keep the address in sync when switching:
+   * - en / zh have their own URLs, so jump to the matching tree;
+   * - the other 7 have no URL, so leave `/zh/` for the unprefixed tree,
+   *   otherwise a refresh forces the language back to Chinese.
    */
   const onLangChange = (next: Lang) => {
     void setLang(next);

@@ -12,7 +12,7 @@ import {
   type AdjustOptions,
 } from './core';
 
-/** 在线图片调色 */
+/** In-browser image color adjustment */
 export default function ImageAdjustTool() {
   const { t } = useTranslation();
   const init = useMemo(

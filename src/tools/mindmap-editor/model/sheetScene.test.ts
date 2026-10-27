@@ -32,7 +32,7 @@ describe('画布缩略图场景（多画布浏览）', () => {
     const root = scene.nodes.find((node) => node.id === 'root')!;
     const child = scene.nodes.find((node) => node.id === 'child')!;
     const edge = scene.edges[0];
-    // 起点贴在父节点右边缘、终点贴在子节点左边缘
+    // The start sits on the parent's right edge and the end on the child's left edge
     expect(edge.x1).toBeCloseTo(root.x + root.width, 5);
     expect(edge.x2).toBeCloseTo(child.x, 5);
     expect(edge.y1).toBeCloseTo(root.y + root.height / 2, 5);
@@ -49,7 +49,7 @@ describe('画布缩略图场景（多画布浏览）', () => {
     expect(minY).toBe(0);
     expect(scene.width).toBeGreaterThan(0);
     expect(scene.height).toBeGreaterThan(0);
-    // 包围盒不小于任一节点
+    // The bounding box is at least as large as any node
     for (const node of scene.nodes) {
       expect(node.x + node.width).toBeLessThanOrEqual(scene.width + 1e-6);
       expect(node.y + node.height).toBeLessThanOrEqual(scene.height + 1e-6);

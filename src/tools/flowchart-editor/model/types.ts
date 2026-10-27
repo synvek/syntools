@@ -1,12 +1,12 @@
 /**
- * 流程图编辑器数据模型契约。
- * 这里只放纯数据结构（不依赖 React Flow），方便 core.ts 单测与草稿序列化。
- * React Flow 的 Node/Edge 类型在 store.ts 中按需引入。
- * 尺寸查询请走 `./shapes`（图形目录），避免 types → shapes 的循环依赖。
+ * Data model contract for the flowchart editor.
+ * Pure data structures only (no React Flow dependency) so core.ts can be unit-tested and drafts serialized.
+ * React Flow Node/Edge types are imported on demand in store.ts.
+ * For size lookups go through `./shapes` (the shape catalog) to avoid a types → shapes circular dependency.
  */
 
 export type ShapeKind =
-  // 通用图形
+  // Generic shapes
   | 'rect'
   | 'roundRect'
   | 'ellipse'
@@ -30,7 +30,7 @@ export type ShapeKind =
   | 'lightning'
   | 'arrow'
   | 'bracket'
-  // 流程图
+  // Flowchart
   | 'startEnd'
   | 'decision'
   | 'data'
@@ -46,20 +46,20 @@ export type ShapeKind =
   | 'terminator'
   | 'parallelMode'
   | 'loopLimit'
-  // UML 通用
+  // UML common
   | 'umlActor'
   | 'umlNote'
   | 'umlBoundary'
   | 'umlControl'
   | 'umlEntity'
   | 'umlFrame'
-  // UML 用例图
+  // UML use case diagram
   | 'umlUseCase'
   | 'umlSubject'
   | 'umlInclude'
   | 'umlExtend'
   | 'umlExtensionPoint'
-  // UML 类图
+  // UML class diagram
   | 'umlClass'
   | 'umlInterface'
   | 'umlEnumeration'
@@ -68,13 +68,13 @@ export type ShapeKind =
   | 'umlActiveClass'
   | 'umlTemplateClass'
   | 'umlAssociationClass'
-  // UML 对象/包图
+  // UML object / package diagram
   | 'umlPackage'
   | 'umlObject'
   | 'umlObjectSlot'
   | 'umlModel'
   | 'umlProfile'
-  // UML 时序图
+  // UML sequence diagram
   | 'umlLifeline'
   | 'umlActivation'
   | 'umlDestroy'
@@ -82,7 +82,7 @@ export type ShapeKind =
   | 'umlInteractionUse'
   | 'umlStateInvariant'
   | 'umlGate'
-  // UML 活动图
+  // UML activity diagram
   | 'umlForkJoin'
   | 'umlAction'
   | 'umlActivity'
@@ -94,7 +94,7 @@ export type ShapeKind =
   | 'umlSendSignal'
   | 'umlReceiveSignal'
   | 'umlActivityPartition'
-  // UML 状态图
+  // UML state diagram
   | 'umlState'
   | 'umlStateInitial'
   | 'umlStateFinal'
@@ -106,13 +106,13 @@ export type ShapeKind =
   | 'umlHistory'
   | 'umlHistoryDeep'
   | 'umlCompositeState'
-  // UML 组件图
+  // UML component diagram
   | 'umlComponent'
   | 'umlProvidedInterface'
   | 'umlRequiredInterface'
   | 'umlPort'
   | 'umlSubsystem'
-  // UML 部署图
+  // UML deployment diagram
   | 'umlNode'
   | 'umlDevice'
   | 'umlExecutionEnvironment'
@@ -131,7 +131,7 @@ export type ShapeKind =
   | 'bpmnDataObject'
   | 'bpmnDataStore'
   | 'bpmnTextAnnotation'
-  // 网络与云架构
+  // Network and cloud architecture
   | 'netServer'
   | 'netClient'
   | 'netRouter'
@@ -142,11 +142,11 @@ export type ShapeKind =
   | 'netCdn'
   | 'netDatabase'
   | 'netStorage'
-  // 组织结构
+  // Org chart
   | 'orgUnit'
   | 'orgAssistant'
   | 'orgTeam'
-  // 思维导图
+  // Mind map
   | 'mindCenter'
   | 'mindTopic'
   | 'mindSub'
@@ -155,7 +155,7 @@ export type ShapeKind =
   | 'erAttribute'
   | 'erRelationship'
   | 'erWeakEntity'
-  // 容器
+  // Containers
   | 'swimlane'
   | 'swimlaneV'
   | 'group';
@@ -170,123 +170,123 @@ export interface FlowNodeStyle {
   bold: boolean;
   italic: boolean;
   align: Align;
-  /** 整体不透明度 0~1（驱动 fill-opacity，文字同步） */
+  /** Overall opacity 0–1 (drives fill-opacity, text follows) */
   opacity?: number;
-  /** 是否显示投影 */
+  /** Whether to draw a drop shadow */
   shadow?: boolean;
-  /** 描边线型（节点轮廓虚线） */
+  /** Stroke line style (node outline dash pattern) */
   lineDash?: 'solid' | 'dashed' | 'dotted';
-  /** 字体族 */
+  /** Font family */
   fontFamily?: string;
-  /** 文字颜色（与 stroke 区分） */
+  /** Text color (distinct from stroke) */
   textColor?: string;
-  /** 圆角半径（roundRect / rect 可选圆角） */
+  /** Corner radius (optional rounded corners for roundRect / rect) */
   cornerRadius?: number;
-  /** 便签（note）右上折角三角块大小 */
+  /** Size of the folded corner triangle at the top-right of a note */
   foldSize?: number;
   /**
-   * 形状可调参数（类 draw.io 调整顶点）：键 → 数值，仅记录被用户改动过的键。
-   * 键与取值范围由图形目录的 `ShapeDef.adjust` 声明，见 `model/shapes/adjust.ts`。
+   * Adjustable shape parameters (draw.io-style vertices): key → value; only keys the user changed are recorded.
+   * Keys and value ranges are declared by `ShapeDef.adjust` in the shape catalog, see `model/shapes/adjust.ts`.
    */
   shapeParams?: Record<string, number>;
-  /* ------------------------------ 节点变换 ------------------------------ */
+  /* ------------------------------ Node transform ------------------------------ */
   /**
-   * 旋转角度（度，0~360 顺时针）。
-   * 以节点包围盒中心为原点做纯 CSS transform，**不改动几何与连线锚点**：
-   * 连线仍吸附未旋转的轴对齐包围盒，与 draw.io 的 bbox 行为一致。
+   * Rotation in degrees (0–360, clockwise).
+   * Applied as a pure CSS transform around the bounding-box center, **without touching geometry or edge anchors**:
+   * edges still attach to the unrotated axis-aligned box, matching draw.io's bbox behavior.
    */
   rotation?: number;
-  /** 水平镜像（左右翻转） */
+  /** Horizontal mirror (flip left/right) */
   flipH?: boolean;
-  /** 垂直镜像（上下翻转） */
+  /** Vertical mirror (flip up/down) */
   flipV?: boolean;
-  /* ------------------------------ 文本排版 ------------------------------ */
-  /** 文本垂直对齐（缺省 middle，与历史行为一致） */
+  /* ------------------------------ Text layout ------------------------------ */
+  /** Vertical text alignment (defaults to middle, matching legacy behavior) */
   verticalAlign?: VerticalAlign;
-  /** 行高（倍数，缺省 1.25） */
+  /** Line height (multiplier, defaults to 1.25) */
   lineHeight?: number;
-  /** 文字自动缩放以适应框体（缺省关闭） */
+  /** Auto-shrink text to fit the box (off by default) */
   autoShrink?: boolean;
-  /** 标签背景色（缺省透明） */
+  /** Label background color (transparent by default) */
   labelBackground?: string;
-  /** 超链接（仅允许 http/https/mailto 协议，渲染时校验） */
+  /** Hyperlink (http/https/mailto only, validated at render time) */
   link?: string;
-  /** 标签文本格式：纯文本（缺省）/ Markdown 轻量渲染 */
+  /** Label text format: plain text (default) / lightweight Markdown rendering */
   textFormat?: TextFormat;
 }
 
-/** 标签文本格式 */
+/** Label text format */
 export type TextFormat = 'plain' | 'markdown';
 
-/** 标签文本格式下拉选项 */
+/** Label text format options */
 export const TEXT_FORMAT_OPTIONS: TextFormat[] = ['plain', 'markdown'];
 
-/** 文本垂直对齐 */
+/** Vertical text alignment */
 export type VerticalAlign = 'top' | 'middle' | 'bottom';
 
-/** 垂直对齐下拉选项 */
+/** Vertical alignment options */
 export const VERTICAL_ALIGN_OPTIONS: VerticalAlign[] = ['top', 'middle', 'bottom'];
 
-/** 垂直对齐 → 弹性主轴映射（面板与渲染共用，避免散落魔术字符串） */
+/** Vertical alignment → flex main-axis mapping (shared by panel and renderer to avoid stray magic strings) */
 export const VERTICAL_ALIGN_FLEX: Record<VerticalAlign, string> = {
   top: 'flex-start',
   middle: 'center',
   bottom: 'flex-end',
 };
 
-/** 旋转默认吸附步长（度）；按住 Shift 使用精细步长 */
+/** Default rotation snap step (degrees); hold Shift for the fine step */
 export const ROTATION_SNAP_STEP = 15;
-/** 旋转精细步长（按住 Shift，度） */
+/** Fine rotation step (hold Shift, degrees) */
 export const ROTATION_FINE_STEP = 45;
-/** 默认行高倍数（与历史 CSS 行为一致） */
+/** Default line-height multiplier (matches legacy CSS behavior) */
 export const DEFAULT_LINE_HEIGHT = 1.25;
 
-/** 节点类型：图形 / 图片 / 内置图标 / 公式 / 表格 */
+/** Node type: shape / image / built-in icon / formula / table */
 export type FlowNodeType = 'shape' | 'image' | 'icon' | 'formula' | 'table';
 
-/** 非图形节点的默认尺寸 */
+/** Default sizes for non-shape nodes */
 export const IMAGE_NODE_SIZE: ShapeSize = { width: 240, height: 160 };
 export const ICON_NODE_SIZE: ShapeSize = { width: 64, height: 64 };
 export const FORMULA_NODE_SIZE: ShapeSize = { width: 200, height: 64 };
 export const TABLE_NODE_SIZE: ShapeSize = { width: 320, height: 168 };
 
-/** 单张图片的最大边长（超过则等比压缩，控制草稿体积） */
+/** Max edge length of a single image (larger images are downscaled proportionally to bound draft size) */
 export const IMAGE_MAX_EDGE = 1600;
-/** 草稿体积上限（字符数，约 4MB）；超限时降级为「不含图片」的草稿 */
+/** Draft size limit (characters, ~4MB); past it the draft degrades to one without images */
 export const DRAFT_SIZE_LIMIT = 4_000_000;
 
-/** 单次粘贴/导入可插入的最大节点数（防止异常内容拖垮画布） */
+/** Max nodes a single paste/import may insert (keeps pathological content from bogging down the canvas) */
 export const MAX_PASTE_NODES = 500;
 
-/** 表格单元格（合并时仅左上角保留内容，被覆盖的从属格为 null） */
+/** Table cell (on merge only the top-left cell keeps content; covered subordinate cells are null) */
 export interface TableCellData {
   text?: string;
-  /** 跨列数（≥1，缺省 1） */
+  /** Column span (≥1, defaults to 1) */
   colspan?: number;
-  /** 跨行数（≥1，缺省 1） */
+  /** Row span (≥1, defaults to 1) */
   rowspan?: number;
-  /** 单元格内文本水平对齐（缺省继承节点样式 align） */
+  /** Horizontal text alignment inside the cell (defaults to the node style's align) */
   align?: Align;
-  /** 单元格填充色（缺省继承节点样式 fill） */
+  /** Cell fill color (defaults to the node style's fill) */
   fill?: string;
-  /** 单元格文本加粗（缺省继承节点样式 bold） */
+  /** Cell text bold (defaults to the node style's bold) */
   bold?: boolean;
 }
 
-/** 表格节点数据（type === 'table'） */
+/** Table node data (type === 'table') */
 export interface TableData {
-  /** 行数（≥1） */
+  /** Row count (≥1) */
   rows: number;
-  /** 列数（≥1） */
+  /** Column count (≥1) */
   cols: number;
   /**
-   * 单元格内容，按 [行][列] 索引；行/列长度与 rows/cols 一致，
-   * 被合并覆盖的从属单元格为 null；缺省时渲染为空表格。
+   * Cell content indexed as [row][column]; row/column lengths match rows/cols,
+   * covered subordinate cells are null; when absent an empty table is rendered.
    */
   cells?: (TableCellData | null)[][];
-  /** 各行高度权重（缺省等分） */
+  /** Row height weights (equal by default) */
   rowWeights?: number[];
-  /** 各列宽度权重（缺省等分） */
+  /** Column width weights (equal by default) */
   colWeights?: number[];
 }
 
@@ -294,53 +294,53 @@ export interface FlowNodeData extends Record<string, unknown> {
   kind: ShapeKind;
   label: string;
   style: FlowNodeStyle;
-  /** 图片节点的 dataURL（type === 'image'） */
+  /** Image node dataURL (type === 'image') */
   src?: string;
-  /** 图标节点的图标 id（type === 'icon'） */
+  /** Icon id of an icon node (type === 'icon') */
   iconId?: string;
-  /** 公式节点的 LaTeX 源码（type === 'formula'） */
+  /** LaTeX source of a formula node (type === 'formula') */
   formula?: string;
-  /** 表格节点的表格数据（type === 'table'） */
+  /** Table data of a table node (type === 'table') */
   table?: TableData;
   /**
-   * 容器（泳道 / 编组）折叠：仅保留标题栏并隐藏子节点。
-   * 放在 data 上以便随 React Flow 节点自动流转；缺省即展开，子节点数据完整保留。
+   * Container (swimlane / group) collapsed: keeps only the title bar and hides child nodes.
+   * Stored on data so it travels with React Flow nodes; defaults to expanded with child data intact.
    */
   collapsed?: boolean;
-  /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写，减少样式丢失） */
+  /** Unrecognized mxGraph style tokens from import (written back on Draw.io round-trip to limit style loss) */
   mxStyle?: string[];
 }
 
-/** 连线折点（画布绝对坐标） */
+/** Edge waypoint (absolute canvas coordinates) */
 export interface Waypoint {
   x: number;
   y: number;
 }
 
-/** 连线路由来源：默认（由线型决定）/ 手动折点 / 正交自动布线（避障） */
+/** Edge routing source: default (decided by the edge type) / manual waypoints / orthogonal auto-routing (obstacle avoidance) */
 export type EdgeRoutingMode = 'default' | 'manual' | 'orthogonal';
 
 export interface FlowEdgeData extends Record<string, unknown> {
   label?: string;
-  /** 起点侧标签（缺省不显示）；与主标签、终点标签互相独立 */
+  /** Source-side label (hidden by default); independent of the main and target labels */
   sourceLabel?: string;
-  /** 终点侧标签（缺省不显示） */
+  /** Target-side label (hidden by default) */
   targetLabel?: string;
-  /** 主标签在路径上的位置：居中（缺省）/ 靠近起点 / 靠近终点 */
+  /** Main label position along the path: center (default) / near source / near target */
   labelPosition?: EdgeLabelPosition;
-  /** 连线样式（渲染层读取，展示于属性面板） */
+  /** Edge style (read by the renderer, shown in the property panel) */
   style?: FlowEdgeStyle;
-  /** 手动/导入的折点；缺省表示无折点 */
+  /** Manual or imported waypoints; absent means none */
   waypoints?: Waypoint[];
-  /** 路由来源（缺省 default）；orthogonal 表示由避障正交布线生成 */
+  /** Routing source (defaults to default); orthogonal means generated by obstacle-avoiding orthogonal routing */
   routing?: EdgeRoutingMode;
-  /** 该连线是否参与避障正交布线（缺省不参与） */
+  /** Whether this edge takes part in obstacle-avoiding orthogonal routing (no by default) */
   avoidObstacles?: boolean;
-  /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
+  /** Unrecognized mxGraph style tokens from import (written back on Draw.io round-trip) */
   mxStyle?: string[];
 }
 
-/** 主标签在连线路径上的位置 */
+/** Main label position along the edge path */
 export type EdgeLabelPosition = 'center' | 'nearSource' | 'nearTarget';
 
 export const EDGE_LABEL_POSITION_OPTIONS: EdgeLabelPosition[] = [
@@ -349,20 +349,20 @@ export const EDGE_LABEL_POSITION_OPTIONS: EdgeLabelPosition[] = [
   'nearTarget',
 ];
 
-/** 标签位置 → 路径长度比例（用于按路径取点渲染） */
+/** Label position → path-length ratio (used to sample a point along the path for rendering) */
 export const EDGE_LABEL_POSITION_RATIO: Record<EdgeLabelPosition, number> = {
   center: 0.5,
   nearSource: 0.2,
   nearTarget: 0.8,
 };
 
-/** 连线线型 */
+/** Edge line type */
 export type EdgeType = 'straight' | 'smoothstep' | 'step' | 'bezier';
 
-/** 连线线样式：实线 / 虚线 / 点线 / 点划线 / 实线手绘 / 虚线手绘 */
+/** Edge line style: solid / dashed / dotted / dash-dot / hand-drawn solid / hand-drawn dashed */
 export type EdgeDash = 'solid' | 'dashed' | 'dotted' | 'dashdot' | 'sketch' | 'sketchDashed';
 
-/** 连线箭头风格 */
+/** Edge arrow style */
 export type EdgeArrow =
   | 'none'
   | 'arrowclosed'
@@ -374,22 +374,22 @@ export type EdgeArrow =
   | 'square'
   | 'bar';
 
-/** 连线跳线样式：不跳 / 弧线跨越 */
+/** Edge jump style: none / arc hop */
 export type EdgeJumpStyle = 'none' | 'arc';
 
-/** 跳线下拉选项 */
+/** Jump style options */
 export const EDGE_JUMP_OPTIONS: EdgeJumpStyle[] = ['none', 'arc'];
 
-/** 连线样式（工具栏 / 属性面板可编辑） */
+/** Edge style (editable from the toolbar / property panel) */
 export interface FlowEdgeStyle {
-  /** straight 直线 / smoothstep 圆角折线 / step 直角折线 / bezier 曲线 */
+  /** straight line / smoothstep rounded elbow / step right-angle elbow / bezier curve */
   type: EdgeType;
   stroke: string;
   strokeWidth: number;
   dash: EdgeDash;
   startArrow: EdgeArrow;
   endArrow: EdgeArrow;
-  /** 跳线样式（缺省 none，与历史行为一致） */
+  /** Jump style (defaults to none, matching legacy behavior) */
   jumpStyle?: EdgeJumpStyle;
 }
 
@@ -403,21 +403,21 @@ export const DEFAULT_EDGE_STYLE: FlowEdgeStyle = {
   jumpStyle: 'none',
 };
 
-/** 连线类型下拉选项 */
+/** Edge type options */
 export const EDGE_TYPE_OPTIONS: EdgeType[] = ['smoothstep', 'straight', 'step', 'bezier'];
 
-/** UML 关系预设：一键把连线切到该关系的线型 / 线样式 / 箭头组合 */
+/** UML relation presets: switch an edge to a relation's line type / line style / arrows in one click */
 export interface EdgeRelationPreset {
   id: string;
-  /** i18n 键后缀（tools.flowchart.relation*） */
+  /** i18n key suffix (tools.flowchart.relation*) */
   labelKey: string;
   patch: Partial<FlowEdgeStyle>;
 }
 
 /**
- * 关系预设一览（纯数据，零渲染成本）。
- * 箭头方向按 UML 约定：泛化 / 实现 / 依赖的空心三角与开放箭头指向「被指向方」（终点），
- * 聚合 / 组合的菱形位于「整体」一端（起点）。
+ * Relation preset list (pure data, zero rendering cost).
+ * Arrow direction follows UML convention: the hollow triangle and open arrow of generalization / realization /
+ * dependency point at the referenced side (the target); aggregation / composition diamonds sit at the whole end (start).
  */
 export const EDGE_RELATION_PRESETS: EdgeRelationPreset[] = [
   {
@@ -451,7 +451,7 @@ export const EDGE_RELATION_PRESETS: EdgeRelationPreset[] = [
     patch: { type: 'straight', dash: 'solid', startArrow: 'diamond', endArrow: 'arrow' },
   },
 ];
-/** 线样式下拉选项 */
+/** Line style options */
 export const EDGE_DASH_OPTIONS: EdgeDash[] = [
   'solid',
   'dashed',
@@ -460,7 +460,7 @@ export const EDGE_DASH_OPTIONS: EdgeDash[] = [
   'sketch',
   'sketchDashed',
 ];
-/** 箭头下拉选项 */
+/** Arrow options */
 export const EDGE_ARROW_OPTIONS: EdgeArrow[] = [
   'none',
   'arrowclosed',
@@ -473,7 +473,7 @@ export const EDGE_ARROW_OPTIONS: EdgeArrow[] = [
   'bar',
 ];
 
-/** 箭头 → i18n 键后缀（tools.flowchart.arrow*） */
+/** Arrow → i18n key suffix (tools.flowchart.arrow*) */
 export const EDGE_ARROW_LABEL_KEY: Record<EdgeArrow, string> = {
   none: 'arrowNone',
   arrowclosed: 'arrowSolid',
@@ -486,23 +486,23 @@ export const EDGE_ARROW_LABEL_KEY: Record<EdgeArrow, string> = {
   bar: 'arrowBar',
 };
 
-/** 部分更新节点数据：style 允许只传需要改动的字段 */
+/** Partial node data update: style may carry only the fields that change */
 export type FlowNodePatch = Partial<Omit<FlowNodeData, 'style'>> & {
   style?: Partial<FlowNodeStyle>;
 };
 
-/** 节点样式视图：字段缺省表示多选批次内取值不一致（混合态） */
+/** Node style view: a missing field means values differ within a multi-select batch (mixed state) */
 export type FlowNodeStyleView = Partial<FlowNodeStyle>;
 
-/** 画布网格吸附尺寸可选值 */
+/** Selectable canvas grid snap sizes */
 export const GRID_SIZE_OPTIONS = [5, 10, 20, 25] as const;
 
-/** 画布网格样式（背景绘制方式） */
+/** Canvas grid style (how the background is drawn) */
 export type GridStyle = 'dots' | 'lines' | 'cross' | 'none';
 
 export const GRID_STYLE_OPTIONS: GridStyle[] = ['dots', 'lines', 'cross', 'none'];
 
-/** 画布背景预设色（含透明） */
+/** Canvas background preset colors (including transparent) */
 export const CANVAS_BACKGROUND_OPTIONS = [
   'transparent',
   '#FFFFFF',
@@ -511,22 +511,22 @@ export const CANVAS_BACKGROUND_OPTIONS = [
   '#0F172A',
 ] as const;
 
-/** 鼠标滚轮行为：平移（历史默认）/ 缩放（draw.io 习惯） */
+/** Mouse wheel behavior: pan (legacy default) / zoom (draw.io habit) */
 export type WheelMode = 'pan' | 'zoom';
 
-/** 标尺与参考线的轴向 */
+/** Axis of rulers and guides */
 export type GuideAxis = 'x' | 'y';
 
 /**
- * 持久参考线（画布坐标系）。
- * `x` 轴参考线为竖直直线（记住 x 坐标），`y` 轴为水平直线。
+ * Persistent guide (canvas coordinate space).
+ * An `x` guide is a vertical line (its x coordinate is stored); a `y` guide is horizontal.
  */
 export interface CanvasGuide {
   axis: GuideAxis;
   pos: number;
 }
 
-/** 纸张预设（px @96dpi 的常见规格，页面边界用） */
+/** Paper presets (common px @96dpi sizes, used for page bounds) */
 export interface PaperPreset {
   id: string;
   width: number;
@@ -541,29 +541,29 @@ export const PAPER_PRESETS: PaperPreset[] = [
   { id: 'letterp', width: 816, height: 1056 },
 ];
 
-/** 页面尺寸下限（避免纸张被压成不可用尺寸） */
+/** Minimum page size (keeps a paper from being squeezed to an unusable size) */
 export const MIN_PAGE_SIZE = 200;
 
-/** 画布上一个节点的持久化记录 */
+/** Persisted record of a node on the canvas */
 export interface FlowNodeRec {
   id: string;
   type: FlowNodeType;
-  /** 有 parentId 时，坐标是相对父节点（泳道/编组）的左上角 */
+  /** With parentId, coordinates are relative to the parent (swimlane/group) top-left corner */
   position: { x: number; y: number };
   parentId?: string | null;
   data: FlowNodeData;
-  /** 用户手动调整过的尺寸（未设置时取图形目录默认值） */
+  /** Size manually set by the user (falls back to the shape catalog default when unset) */
   width?: number;
   height?: number;
-  /** 图层：隐藏 */
+  /** Layer: hidden */
   hidden?: boolean;
-  /** 图层：锁定（不可拖动/编辑） */
+  /** Layer: locked (not draggable/editable) */
   locked?: boolean;
-  /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
+  /** Unrecognized mxGraph style tokens from import (written back on Draw.io round-trip) */
   mxStyle?: string[];
 }
 
-/** 画布上一条连线的持久化记录 */
+/** Persisted record of an edge on the canvas */
 export interface FlowEdgeRec {
   id: string;
   source: string;
@@ -571,71 +571,71 @@ export interface FlowEdgeRec {
   sourceHandle?: string | null;
   targetHandle?: string | null;
   label?: string;
-  /** 起点侧标签（旧文档缺省即不显示） */
+  /** Source-side label (absent in legacy documents means hidden) */
   sourceLabel?: string;
-  /** 终点侧标签（旧文档缺省即不显示） */
+  /** Target-side label (absent in legacy documents means hidden) */
   targetLabel?: string;
-  /** 主标签位置（缺省 center） */
+  /** Main label position (defaults to center) */
   labelPosition?: EdgeLabelPosition;
   style?: FlowEdgeStyle;
-  /** 折点（画布绝对坐标）；旧文档缺省即无折点 */
+  /** Waypoints (absolute canvas coordinates); absent in legacy documents means none */
   waypoints?: Waypoint[];
-  /** 路由来源（缺省 default）；orthogonal 表示由避障正交布线生成 */
+  /** Routing source (defaults to default); orthogonal means generated by obstacle-avoiding orthogonal routing */
   routing?: EdgeRoutingMode;
-  /** 该连线是否参与避障正交布线（缺省不参与） */
+  /** Whether this edge takes part in obstacle-avoiding orthogonal routing (no by default) */
   avoidObstacles?: boolean;
-  /** 导入时未识别的 mxGraph 样式 token（Draw.io 往返时回写） */
+  /** Unrecognized mxGraph style tokens from import (written back on Draw.io round-trip) */
   mxStyle?: string[];
 }
 
-/** v1：单页文档（历史草稿与旧项目文件） */
+/** v1: single-page document (legacy drafts and old project files) */
 export interface FlowDocV1 {
   version: 1;
   nodes: FlowNodeRec[];
   edges: FlowEdgeRec[];
 }
 
-/** 一页画布 */
+/** One canvas page */
 export interface FlowPage {
   id: string;
   name: string;
   nodes: FlowNodeRec[];
   edges: FlowEdgeRec[];
-  /** 纸张/画布尺寸（缺省即无页边界，与历史行为一致） */
+  /** Paper/canvas size (absent means no page bounds, matching legacy behavior) */
   size?: ShapeSize;
 }
 
-/** v2：多页文档（历史规范，读取时归一为 v3） */
+/** v2: multi-page document (legacy schema, normalized to v3 on read) */
 export interface FlowDocV2 {
   version: 2;
-  /** 文档标题：导出文件名来源（与工具栏标题输入框一致） */
+  /** Document title: source of the export file name (matches the toolbar title input) */
   name?: string;
   pages: FlowPage[];
   activePageId?: string;
 }
 
 /**
- * v3：多页文档（当前规范形态）。
- * 相对 v2 新增表格节点、富文本/Markdown 标签与连线路由字段，均为可选，读写向后兼容。
+ * v3: multi-page document (current schema).
+ * Over v2 it adds table nodes, rich-text/Markdown labels and edge routing fields; all optional and backward compatible.
  */
 export interface FlowDocV3 {
   version: 3;
-  /** 文档标题：导出文件名来源（与工具栏标题输入框一致） */
+  /** Document title: source of the export file name (matches the toolbar title input) */
   name?: string;
   pages: FlowPage[];
   activePageId?: string;
 }
 
-/** 内部统一使用 v3；v1 / v2 读取时经 `model/migrate.ts` 归一 */
+/** v3 is used internally throughout; v1 / v2 are normalized on read via `model/migrate.ts` */
 export type FlowDoc = FlowDocV3;
 
-/** 各形状的默认尺寸（像素） */
+/** Default size per shape (pixels) */
 export interface ShapeSize {
   width: number;
   height: number;
 }
 
-/** 图形中文名（i18n 缺失时的回退，完整 9 语翻译见 strings.ts） */
+/** Chinese shape names (fallback when i18n is missing; full 9-language translations live in strings.ts) */
 export const SHAPE_LABELS: Record<ShapeKind, string> = {
   rect: '过程',
   roundRect: '圆角矩形',
@@ -775,25 +775,25 @@ export const SHAPE_LABELS: Record<ShapeKind, string> = {
   group: '编组',
 };
 
-/** 横向泳道：标准横向长条 */
+/** Horizontal swimlane: standard horizontal bar */
 export const SWIMLANE_SIZE: ShapeSize = { width: 760, height: 220 };
-/** 纵向泳道：标准纵向长条 */
+/** Vertical swimlane: standard vertical bar */
 export const SWIMLANE_V_SIZE: ShapeSize = { width: 240, height: 640 };
-/** 泳道标题栏厚度（横向为高度，纵向为宽度） */
+/** Swimlane title bar thickness (height when horizontal, width when vertical) */
 export const SWIMLANE_HEADER_HEIGHT = 40;
 export const SWIMLANE_HEADER_WIDTH = 40;
 
-/** 容器类形状可以容纳其它节点（泳道 / 编组） */
+/** Container shapes can hold other nodes (swimlane / group) */
 export function isContainerKind(kind: ShapeKind): boolean {
   return kind === 'swimlane' || kind === 'swimlaneV' || kind === 'group';
 }
 
-/** 是否为纵向容器（长边垂直，标题栏在顶部横排） */
+/** Whether this is a vertical container (long side vertical, title bar across the top) */
 export function isVerticalLane(kind: ShapeKind): boolean {
   return kind === 'swimlaneV';
 }
 
-/** 几何编辑补丁（属性面板 X / Y / W / H）：X / Y 为画布绝对坐标；仅修改传入字段 */
+/** Geometry edit patch (property panel X / Y / W / H): X / Y are absolute canvas coordinates; only the given fields change */
 export interface NodeGeometryPatch {
   x?: number;
   y?: number;
@@ -801,7 +801,7 @@ export interface NodeGeometryPatch {
   height?: number;
 }
 
-/** 多选整体缩放时单个节点的几何快照（画布绝对坐标 + 实际尺寸） */
+/** Geometry snapshot of one node during a multi-select group resize (absolute canvas coordinates + actual size) */
 export interface GroupScaleItem {
   id: string;
   absX: number;
@@ -811,8 +811,8 @@ export interface GroupScaleItem {
 }
 
 /**
- * 节点变换补丁（旋转 / 镜像）。
- * 值为 `undefined` 表示「清除该字段」；为具体值表示写入。
+ * Node transform patch (rotation / mirror).
+ * A value of `undefined` clears the field; a concrete value writes it.
  */
 export interface NodeTransformPatch {
   rotation?: number | undefined;
@@ -820,7 +820,7 @@ export interface NodeTransformPatch {
   flipV?: boolean | undefined;
 }
 
-/** 几何编辑的尺寸下限（与 NodeResizer 的最小尺寸保持一致：容器更大） */
+/** Minimum size for geometry edits (matches NodeResizer's minimum; larger for containers) */
 export function minNodeSize(kind: ShapeKind): ShapeSize {
   return isContainerKind(kind) ? { width: 200, height: 140 } : { width: 48, height: 32 };
 }

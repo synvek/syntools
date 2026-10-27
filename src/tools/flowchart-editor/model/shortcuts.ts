@@ -1,19 +1,19 @@
 /**
- * 快捷键清单（单一数据源）。
+ * Shortcut list (single source of truth).
  *
- * 帮助浮层与 `FlowchartTool` 的 keydown 逻辑共用本清单描述，
- * 避免「文档与实现漂移」。`keys` 为展示用文本（Mac 优先，标注 ⌘/Ctrl）。
+ * The help overlay and the keydown logic in `FlowchartTool` both describe this list,
+ * preventing "documentation drifting from implementation". `keys` is display text (Mac first, labeled ⌘/Ctrl).
  */
 
 export interface ShortcutDef {
-  /** 展示用键位（如 `⌘/Ctrl + Z`） */
+  /** Key labels for display (e.g. `⌘/Ctrl + Z`) */
   keys: string;
-  /** i18n 键后缀（tools.flowchart.sc*） */
+  /** i18n key suffix (tools.flowchart.sc*) */
   labelKey: string;
 }
 
 export interface ShortcutGroup {
-  /** i18n 键后缀（tools.flowchart.scGroup*） */
+  /** i18n key suffix (tools.flowchart.scGroup*) */
   titleKey: string;
   items: ShortcutDef[];
 }

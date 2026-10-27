@@ -1,16 +1,17 @@
 /**
- * 指针交互：把 PointerEvent 翻译成 Scene 里的 Op。
+ * Pointer interaction: translate PointerEvents into Ops on the Scene.
  *
- * 绘制期间**不改 React 状态**、也不整幅重绘：落笔时把当前画布像素
- * 拍一张快照，之后每次移动都「恢复快照 + 重画当前这一笔」，
- * 因此每帧成本只与当前操作相关，且与最终落笔结果逐像素一致。
+ * Drawing **never touches React state** and never repaints the whole board: the canvas pixels are
+ * snapshotted on pointer-down, then each move restores the snapshot and redraws only the current
+ * op. Per-frame cost therefore depends only on the active operation, and the result matches the
+ * committed stroke pixel for pixel.
  *
- * 覆盖三类交互：
- * - 拖拽型：画笔 / 荧光笔 / 橡皮 / 直线 / 箭头 / 矩形 / 椭圆 / 整体移动
- * - 取色型：吸管（点击即取色，并自动切回上一个工具）
- * - 点击序列型：自由多边形（点击加顶点，点回起点 / 回车 / 右键闭合）
+ * Three interaction families:
+ * - Drag: pen / marker / eraser / line / arrow / rectangle / ellipse / pan
+ * - Pick: eyedropper (a click samples a colour and switches back to the previous tool)
+ * - Click sequence: free-form polygon (clicks add vertices; close by clicking the start, Enter or right-click)
  *
- * 鼠标右键统一使用工具栏的「背景色」落笔（经典画板语义）。
+ * Right-click always inks with the toolbar's "background colour" (classic drawing-app semantics).
  */
 
 import {
@@ -58,7 +59,7 @@ export interface BoardPointer {
 }
 
 const DPR_MAX = 2;
-/** 判定「右键」：仅鼠标有意义，触控 / 触控笔一律按左键处理 */
+/** Right-click detection: only meaningful for a mouse; touch / stylus always count as primary */
 function isSecondaryButton(e: { pointerType?: string; button?: number }): boolean {
   return e.pointerType === 'mouse' && e.button === 2;
 }
@@ -68,7 +69,7 @@ function currentDpr(): number {
   return Math.min(DPR_MAX, Math.max(1, window.devicePixelRatio || 1));
 }
 
-/** 直线按 Shift 吸附到 45° 步进 */
+/** With Shift, snap lines to 45° steps */
 function snapAngle(from: Point, to: Point): Point {
   const angle = Math.atan2(to.y - from.y, to.x - from.x);
   const step = Math.PI / 4;
@@ -99,7 +100,7 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
     [canvasRef],
   );
 
-  /** 一个屏幕像素对应多少画布单位（多边形闭合判定用） */
+  /** Canvas units per screen pixel (used for the polygon closing threshold) */
   const sceneUnitsPerPx = useCallback((): number => {
     const canvas = canvasRef.current;
     const { scene } = useBoardStore.getState();
@@ -108,7 +109,7 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
     return scene.width / rect.width;
   }, [canvasRef]);
 
-  /** 落笔瞬间备份像素：之后的每次移动都基于它重画 */
+  /** Snapshot pixels on pointer-down: every later move redraws on top of it */
   const captureSnapshot = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -125,8 +126,8 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
   }, [canvasRef]);
 
   /**
-   * 依据「快照 + 当前进行中的操作」重绘舞台：
-   * 移动整体时平移快照，绘制时叠加当前一笔，多边形则叠加折线预览。
+   * Redraw the stage from "snapshot + operation in progress": panning offsets the snapshot,
+   * drawing overlays the current op, and polygons overlay a polyline preview.
    */
   const repaint = useCallback(() => {
     const canvas = canvasRef.current;
@@ -157,7 +158,7 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
     }
   }, [canvasRef]);
 
-  /** 多边形落点：首点建草稿，点回起点（或点数达标）则闭合 */
+  /** Polygon click: the first point starts a draft; clicking the start point closes it */
   const addPolygonPoint = useCallback(
     (point: Point) => {
       const draft = polygonRef.current;
@@ -184,7 +185,7 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
         state.addOp(op);
         return;
       }
-      // 与上一点过近：忽略，避免抖动产生重复顶点
+      // Too close to the previous point: ignore it so jitter cannot create duplicate vertices
       const last = draft.points[draft.points.length - 1];
       if (distance(point, last) <= threshold * 0.5) return;
       polygonRef.current = { points: [...draft.points, point], hover: point };
@@ -212,7 +213,7 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
     repaint();
   }, [repaint]);
 
-  /** 吸管：把画布像素合成到背景色之上，得到肉眼所见颜色，然后切回上一个工具 */
+  /** Eyedropper: composite the pixel over the background to get the perceived colour, then restore the previous tool */
   const pickAt = useCallback(
     (point: Point) => {
       const canvas = canvasRef.current;
@@ -246,19 +247,19 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
     if (pending.kind === 'move') {
       const { dx, dy } = pending;
       useBoardStore.getState().translateScene(dx, dy);
-      // 位移过小会被 store 忽略（scene 不变 → 不会重绘），这里手动恢复快照
+      // A tiny pan is ignored by the store (scene unchanged → no repaint), so restore the snapshot here
       if (Math.abs(dx) < MOVE_MIN_DELTA && Math.abs(dy) < MOVE_MIN_DELTA) repaint();
       return;
     }
     if (isTrivial(pending.op)) {
-      // 误触产生的空操作不入历史：回到落笔前的像素
+      // Accidental no-op actions never enter history: revert to the pre-stroke pixels
       repaint();
       return;
     }
     useBoardStore.getState().addOp(pending.op);
   }, [repaint]);
 
-  // 多边形的键盘操作：回车闭合 / Esc 取消 / Backspace 退点
+  // Polygon keyboard controls: Enter closes / Esc cancels / Backspace removes the last vertex
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!polygonRef.current) return;
@@ -301,11 +302,11 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
         const state = useBoardStore.getState();
         const secondary = isSecondaryButton(e);
         if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
-        // 文字不走 pointer 绘制：由 BoardCanvas 的覆盖层输入框接管
+        // Text is not drawn via pointer events: the overlay input in BoardCanvas handles it
         if (state.tool === 'text') return;
 
         if (state.tool === 'polygon') {
-          // 右键用于闭合，交给 onContextMenu 处理，避免误加顶点
+          // Right-click closes the polygon via onContextMenu, so it must not add a vertex
           if (secondary) return;
           canvasRef.current?.setPointerCapture(e.pointerId);
           addPolygonPoint(pointAt(e));
@@ -406,7 +407,7 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
         e.preventDefault();
         const polygon = polygonRef.current;
         if (polygon) {
-          // 右键闭合多边形（点数不足则丢弃）
+          // Right-click closes the polygon (discarded when there are too few vertices)
           if (polygon.points.length >= 3) {
             const state = useBoardStore.getState();
             state.addOp({
@@ -427,7 +428,7 @@ export function useBoardPointer(canvasRef: RefObject<HTMLCanvasElement | null>):
   );
 }
 
-/** 判定“没有实际内容”的操作：尺寸过小的图形 / 直线会丢弃，笔画连一个点也算数 */
+/** Detect "empty" operations: tiny shapes / lines are dropped, while a stroke counts even with one point */
 function isTrivial(op: Op): boolean {
   if (op.kind === 'stroke') return false;
   if (op.kind === 'polygon') return op.points.length < 3;

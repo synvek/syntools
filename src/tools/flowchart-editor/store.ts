@@ -1,10 +1,10 @@
 /**
- * 流程图编辑器状态：单一真相源是 nodes / edges，其余（选中 / 历史）是会话态。
+ * Flowchart editor state: nodes / edges are the single source of truth; everything else (selection / history) is session state.
  *
- * 结构：
- * - `store/helpers.ts`  共享纯工具（节点/边构造、页面互转、选择归一化）
- * - `store/history.ts`  撤销/重做（结构 diff，见该文件说明）
- * - 本文件：文档编辑（doc/UI）与多页、快照的组合根；对外 API 与调用点保持不变。
+ * Layout:
+ * - `store/helpers.ts`  shared pure utilities (node/edge builders, page conversion, selection normalization)
+ * - `store/history.ts`  undo/redo (structural diff, see the notes in that file)
+ * - this file: composition root for document editing (doc/UI) plus multi-page and snapshots; the public API and call sites stay unchanged.
  */
 
 import { create } from 'zustand';
@@ -85,7 +85,7 @@ import {
 } from './store/helpers';
 import { createHistorySlice, type HistoryDiff } from './store/history';
 
-/** 版本快照：与内存态撤销栈相互独立，可命名、预览与回滚 */
+/** Version snapshot: independent of the in-memory undo stack; can be named, previewed and restored */
 export interface SnapshotRec {
   id: string;
   name: string;
@@ -94,161 +94,161 @@ export interface SnapshotRec {
 }
 
 interface FlowState {
-  /** 文档标题：导出文件名来源 */
+  /** Document title: source of the export file name */
   docName: string;
   setDocName: (name: string) => void;
   nodes: FlowNode[];
   edges: FlowEdge[];
   selectedNodes: string[];
   selectedEdges: string[];
-  /** 撤销栈：每条记录只包含本次变更涉及的节点/边（结构 diff） */
+  /** Undo stack: each entry holds only the nodes/edges touched by that change (structural diff) */
   past: HistoryDiff[];
   future: HistoryDiff[];
   helperLines: HelperLines | null;
-  /** 复制粘贴的剪贴板（会话态，不持久化） */
+  /** Copy/paste clipboard (session state, not persisted) */
   clipboard: { nodes: FlowNode[]; edges: FlowEdge[] } | null;
   setClipboard: (clip: { nodes: FlowNode[]; edges: FlowEdge[] } | null) => void;
-  /** 版本快照列表（最新的在前） */
+  /** Version snapshot list (newest first) */
   snapshots: SnapshotRec[];
   saveSnapshot: (name: string) => void;
   restoreSnapshot: (id: string) => void;
   deleteSnapshot: (id: string) => void;
 
-  /** 画布网格吸附：开关与网格尺寸（会话态，不落文档） */
+  /** Canvas grid snapping: toggle and grid size (session state, not part of the document) */
   gridEnabled: boolean;
   gridSize: number;
   setGridEnabled: (v: boolean) => void;
   setGridSize: (v: number) => void;
-  /** 自动布局参数：方向与间距预设 */
+  /** Auto-layout parameters: direction and spacing presets */
   layoutDirection: LayoutDirection;
   layoutDensity: LayoutDensity;
   setLayoutDirection: (v: LayoutDirection) => void;
   setLayoutDensity: (v: LayoutDensity) => void;
-  /** 对齐辅助线吸附阈值（px） */
+  /** Snap threshold for alignment guides (px) */
   alignTolerance: number;
   setAlignTolerance: (v: number) => void;
-  /** 格式刷：已复制的节点样式（会话态，不持久化） */
+  /** Format painter: copied node style (session state, not persisted) */
   styleBrush: FlowNodeStyle | null;
   setStyleBrush: (style: FlowNodeStyle | null) => void;
-  /** 全选当前页的节点与连线（锁定节点除外） */
+  /** Select all nodes and edges on the current page (excluding locked nodes) */
   selectAll: () => void;
-  /** 清空所有选中（Esc）：同时复位节点/连线的 selected 标记 */
+  /** Clear the whole selection (Esc): also resets the selected flags on nodes/edges */
   clearSelection: () => void;
-  /** 按方向键微移选中节点（不写历史，由调用方合并为一次撤销） */
+  /** Nudge selected nodes by direction key (writes no history; the caller merges them into one undo step) */
   nudgeSelected: (dx: number, dy: number) => void;
 
-  /** 多页：页面顺序与名称；活动页数据在 nodes/edges，其余页缓存在 pageData */
+  /** Multi-page: page order and names; the active page lives in nodes/edges, other pages are cached in pageData */
   pageOrder: PageMeta[];
   activePageId: string;
   pageData: Record<string, FlowPage>;
   addPage: (name?: string) => void;
-  /** 复制页面（含全部节点/连线，id 重映射）并切换到副本 */
+  /** Duplicate a page (all nodes/edges, ids remapped) and switch to the copy */
   duplicatePage: (id: string) => void;
   switchPage: (id: string) => void;
   renamePage: (id: string, name: string) => void;
   removePage: (id: string) => void;
   movePage: (id: string, dir: -1 | 1) => void;
-  /** 当前页的纸张尺寸（缺省即无页边界） */
+  /** Paper size of the current page (absent means no page bounds) */
   pageSize: ShapeSize | undefined;
-  /** 写入当前页的纸张尺寸（传 undefined 清除页边界） */
+  /** Write the current page's paper size (pass undefined to clear the page bounds) */
   setPageSize: (size: ShapeSize | undefined) => void;
 
-  /** 鼠标滚轮行为（会话态，持久化） */
+  /** Mouse wheel behavior (session state, persisted) */
   wheelMode: WheelMode;
   setWheelMode: (v: WheelMode) => void;
-  /** 画布背景色（会话态，持久化；`transparent` 表示透明） */
+  /** Canvas background color (session state, persisted; `transparent` means transparent) */
   canvasBackground: string;
   setCanvasBackground: (v: string) => void;
-  /** 画布网格样式（会话态，持久化） */
+  /** Canvas grid style (session state, persisted) */
   gridStyle: GridStyle;
   setGridStyle: (v: GridStyle) => void;
-  /** 持久参考线（会话态，持久化） */
+  /** Persistent guides (session state, persisted) */
   guides: CanvasGuide[];
   setGuides: (guides: CanvasGuide[]) => void;
-  /** 是否显示标尺 */
+  /** Whether to show the rulers */
   rulersVisible: boolean;
   setRulersVisible: (v: boolean) => void;
 
-  /** keepHistory 为 true 时保留撤销栈（用于快照回滚） */
+  /** When keepHistory is true the undo stack is preserved (used for snapshot rollback) */
   load: (doc: FlowDoc | null, keepHistory?: boolean) => void;
   getDoc: () => FlowDoc;
   /**
-   * 把外部文档（如从 draw.io 粘贴的 mxGraph）插入当前页。
-   * 会重映射全部节点/连线 id（含父子关系），把内容平移到 `at` 并选中新元素。
-   * 返回插入的节点数（0 表示内容为空或超出上限）。
+   * Insert an external document (e.g. mxGraph pasted from draw.io) into the current page.
+   * Remaps every node/edge id (including parent-child links), shifts the content to `at` and selects the new elements.
+   * Returns the number of inserted nodes (0 means empty content or over the limit).
    */
   insertDoc: (doc: FlowDoc, at: { x: number; y: number }) => number;
 
   commit: () => void;
   undo: () => void;
   redo: () => void;
-  /** 载入文档后重建历史基线（keep 为真时保留撤销栈） */
+  /** Rebuild the history baseline after loading a document (keeps the undo stack when keep is true) */
   resetHistory: (keep?: boolean) => void;
 
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
-  /** 重连：把已有连线的一端拖到新的节点/锚点 */
+  /** Reconnect: drag one end of an existing edge onto a new node/anchor */
   reconnectEdge: (edgeId: string, connection: Connection) => void;
-  /** 修改连线起点/终点连接的节点（属性面板下拉） */
+  /** Change the node an edge's source/target connects to (property panel dropdown) */
   setEdgeEndpoint: (edgeId: string, end: 'source' | 'target', nodeId: string) => void;
-  /** 写入/清除连线折点（传入空数组等于清除） */
+  /** Write or clear edge waypoints (an empty array clears them) */
   setEdgeWaypoints: (edgeId: string, waypoints: Waypoint[] | undefined, history?: boolean) => void;
-  /** 对选中连线执行正交自动布线（避开其它节点包围盒） */
+  /** Run orthogonal auto-routing on the selected edges (avoiding other nodes' bounding boxes) */
   autoRouteSelectedEdges: () => void;
-  /** 正交避障布线：对选中连线或整页连线批量布线，并标记 routing=orthogonal */
+  /** Orthogonal obstacle-avoiding routing: route the selected edges or all edges on the page and mark routing=orthogonal */
   autoRouteEdges: (scope: 'selected' | 'all') => void;
   onSelectionChange: (selection: { nodes: FlowNode[]; edges: FlowEdge[] }) => void;
-  /** 仅取消连线选中（保留节点选中）：用于「开始新建连线」时让出连线选择态 */
+  /** Deselect edges only (keeping node selection): yields the edge selection state when starting a new connection */
   deselectEdges: () => void;
 
-  /** 新建连线的默认样式（工具栏可调：线型 / 线宽 / 线样式 / 起止箭头） */
+  /** Default style for new edges (adjustable from the toolbar: line type / width / style / end arrows) */
   defaultEdge: FlowEdgeStyle;
   setDefaultEdge: (patch: Partial<FlowEdgeStyle>) => void;
-  /** 在指定绝对坐标生成新节点（默认同类型，可指定 kind）并与源节点连线；返回新节点 id */
+  /** Create a new node at the given absolute coordinates (same kind by default, kind can be overridden) and connect it to the source node; returns the new node id */
   spawnConnectedNode: (
     sourceId: string,
     position: { x: number; y: number },
     kind?: ShapeKind,
   ) => string | undefined;
-  /** 改变节点图形类型（保留位置与连线，尺寸/默认样式随类型更新） */
+  /** Change a node's shape kind (position and edges are kept; size/default style follow the new kind) */
   changeNodeKind: (id: string, kind: ShapeKind) => void;
 
   addNode: (kind: ShapeKind, position: { x: number; y: number }) => void;
-  /** 插入非图形节点（图片 / 图标 / 公式），返回新节点 id */
+  /** Insert a non-shape node (image / icon / formula) and return the new node id */
   addTypedNode: (
     type: FlowNodeType,
     data: FlowNodeData,
     size: { width: number; height: number },
     position: { x: number; y: number },
   ) => string;
-  /** 改写公式节点的 LaTeX 源码 */
+  /** Rewrite the LaTeX source of a formula node */
   setNodeFormula: (id: string, formula: string, history?: boolean) => void;
-  /** 容器（泳道 / 编组）折叠 / 展开：折叠时画布隐藏其子节点 */
+  /** Collapse / expand a container (swimlane / group): collapsing hides its child nodes on the canvas */
   toggleContainerCollapsed: (id: string, collapsed?: boolean) => void;
   reparentNode: (id: string) => void;
-  /** 拖拽结束后的归属判定（图层面板：拖入容器 / 拖回画布顶层） */
+  /** Ownership check after a drag ends (layer panel: dropped into a container / back to the canvas top level) */
   reparentNodeTo: (id: string, parentId?: string) => void;
-  /** 图层排序：把节点移动到目标节点之前（保持父在子前的层级不变量） */
+  /** Layer ordering: move a node before the target node (keeping the parent-before-child invariant) */
   reorderNode: (id: string, targetId: string) => void;
   setNodeLabel: (id: string, label: string, history?: boolean) => void;
-  /** 写入表格节点的表格数据（行列增删 / 合并拆分 / 样式） */
+  /** Write table data of a table node (row/column add & remove / merge & split / styles) */
   setNodeTable: (id: string, table: TableData, history?: boolean) => void;
-  /** 写入表格单元格文本 */
+  /** Write the text of a table cell */
   setTableCellText: (id: string, row: number, col: number, text: string, history?: boolean) => void;
   patchSelected: (patch: FlowNodePatch, history?: boolean) => void;
-  /** 几何编辑（属性面板 X / Y / W / H）：X / Y 为画布绝对坐标，仅修改传入字段 */
+  /** Geometry edit (property panel X / Y / W / H): X / Y are absolute canvas coordinates; only the given fields change */
   setNodeGeometry: (ids: string[], patch: NodeGeometryPatch, history?: boolean) => void;
-  /** 写入形状可调参数（合并到 style.shapeParams，键为图形目录声明的参数 key） */
+  /** Write adjustable shape parameters (merged into style.shapeParams; keys are the parameter keys declared by the shape catalog) */
   setNodeParams: (ids: string[], params: Record<string, number>, history?: boolean) => void;
   /**
-   * 写入节点变换（旋转 / 镜像）。
-   * 传 `undefined` 表示清除该字段（回到默认：0° / 不镜像）。
+   * Write node transform (rotation / mirror).
+   * Passing `undefined` clears the field (back to the default: 0° / no mirror).
    */
   setNodeTransform: (ids: string[], patch: NodeTransformPatch, history?: boolean) => void;
   /**
-   * 多选整体缩放：按包围盒比例换算各节点的绝对坐标与尺寸。
-   * `originals` 为拖拽开始时的快照（绝对坐标 + 尺寸），避免累积误差。
+   * Multi-select group resize: scale each node's absolute coordinates and size by the bounding-box ratio.
+   * `originals` is the snapshot taken when the drag started (absolute coordinates + size), preventing error accumulation.
    */
   scaleSelection: (
     originals: GroupScaleItem[],
@@ -256,12 +256,12 @@ interface FlowState {
     sx: number,
     sy: number,
   ) => void;
-  /** 清除某个形状可调参数（回到图形目录默认值） */
+  /** Clear an adjustable shape parameter (back to the shape catalog default) */
   clearNodeParam: (ids: string[], key: string, history?: boolean) => void;
   patchEdgeLabel: (id: string, label: string, history?: boolean) => void;
   /**
-   * 写入连线标签字段：主标签（label）/ 起点标签 / 终点标签。
-   * 空串视为清除，避免文档里留下无意义的空字符串。
+   * Write edge label fields: main label (label) / source label / target label.
+   * An empty string counts as clearing, so no meaningless empty strings are left in the document.
    */
   setEdgeLabelField: (
     id: string,
@@ -269,7 +269,7 @@ interface FlowState {
     value: string,
     history?: boolean,
   ) => void;
-  /** 写入主标签在路径上的位置（center / nearSource / nearTarget） */
+  /** Write the main label's position along the path (center / nearSource / nearTarget) */
   setEdgeLabelPosition: (id: string, position: EdgeLabelPosition, history?: boolean) => void;
   removeSelected: () => void;
   duplicateSelected: () => void;
@@ -279,12 +279,12 @@ interface FlowState {
 }
 
 /**
- * `getDoc` 的活动页序列化缓存（性能优化）。
+ * `getDoc` serialization cache for the active page (performance optimization).
  *
- * 缩略图派生（FlowchartTool 的 `pages` useMemo）会在每次 nodes/edges 变动时调用 getDoc，
- * 而活动页序列化需要遍历全部节点、拷贝样式并处理图片 base64。
- * 以 nodes/edges 的数组引用为键记忆化：未发生编辑（例如仅改标题、切换侧栏面板）时直接复用，
- * 编辑后数组引用变化即自动失效。
+ * Thumbnail derivation (FlowchartTool's `pages` useMemo) calls getDoc on every nodes/edges change,
+ * and serializing the active page means walking every node, copying styles and handling image base64.
+ * Memoized on the nodes/edges array references: reused when no edit happened (e.g. only the title changed
+ * or a side panel was switched) and invalidated automatically once the references change after an edit.
  */
 let activePageMemo: {
   nodes: FlowNode[];
@@ -294,7 +294,7 @@ let activePageMemo: {
 } | null = null;
 
 export const useFlowStore = create<FlowState>((set, get) => ({
-  // 撤销/重做：结构 diff 历史（见 store/history.ts）
+  // Undo/redo: structural diff history (see store/history.ts)
   ...createHistorySlice<FlowState>(set, get),
   docName: '',
   setDocName: (name) => set({ docName: name }),
@@ -378,7 +378,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   restoreSnapshot: (id) => {
     const snap = get().snapshots.find((s) => s.id === id);
     if (!snap) return;
-    // 先压入当前状态，回滚后仍可撤销；保留历史栈不清空
+    // Push the current state first so a rollback can still be undone; the history stack is kept, not cleared
     get().commit();
     get().load(snap.doc, true);
   },
@@ -403,7 +403,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       get().resetHistory(keepHistory);
       return;
     }
-    // 迁移到 v2 后按页恢复：旧版 v1 草稿也能正常读取，多页结构一并保留
+    // Restore page by page after migrating to v2: legacy v1 drafts still load, and the multi-page structure is preserved
     const normalized = migrateDoc(doc);
     const page = activePageOf(normalized);
     if (!normalized || !page) {
@@ -426,13 +426,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       selectedNodes: [],
       selectedEdges: [],
     });
-    // 载入即新的历史基线：未显式保留时清空撤销栈
+    // Loading sets a new history baseline: the undo stack is cleared unless explicitly kept
     get().resetHistory(keepHistory);
   },
 
   getDoc: () => {
     const { nodes, edges, pageOrder, activePageId, pageData, docName } = get();
-    // 活动页即时序列化；nodes/edges 引用未变时复用上次结果（见 activePageMemo 说明）
+    // Serialize the active page on demand; reuse the previous result while nodes/edges references are unchanged (see activePageMemo)
     let recNodes: FlowNodeRec[];
     let recEdges: FlowEdgeRec[];
     if (activePageMemo && activePageMemo.nodes === nodes && activePageMemo.edges === edges) {
@@ -504,7 +504,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   insertDoc: (doc, at) => {
     const page = activePageOf(doc);
     if (!page || page.nodes.length === 0) return 0;
-    // 上限保护：避免把异常大的剪贴板内容一次性塞进当前页
+    // Upper bound: keep an abnormally large clipboard payload from being dumped into the current page at once
     const source = page.nodes.slice(0, MAX_PASTE_NODES);
     const idMap = new Map<string, string>();
     for (const n of source) idMap.set(n.id, createId('n'));
@@ -513,7 +513,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const nextNodes: FlowNodeRec[] = source.map((n) => ({
       ...n,
       id: idMap.get(n.id)!,
-      // 平移到目标点：以内容左上角对齐 `at`
+      // Shift so the content's top-left corner aligns with `at`
       position: {
         x: Math.round(n.position.x - minX + at.x),
         y: Math.round(n.position.y - minY + at.y),
@@ -544,8 +544,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   onNodesChange: (changes) => {
     /**
-     * 容器缩放联动：NodeResizer 拖拽期间（resizing + setAttributes）按比例换算子节点。
-     * 只处理「尺寸真的变化」的容器，O(子节点数)，不影响普通拖拽/选择流程。
+     * Container resize linkage: while NodeResizer drags (resizing + setAttributes), convert child nodes proportionally.
+     * Only containers whose size really changed are processed, O(child count), leaving normal drag/select flows untouched.
      */
     const before = get().nodes;
     const childPatches = new Map<string, ScaledChild>();
@@ -608,7 +608,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const nextTarget = connection.target ?? edge.target;
     const nextSourceHandle = connection.sourceHandle ?? null;
     const nextTargetHandle = connection.targetHandle ?? null;
-    // 无变化则不写入历史
+    // No change, so nothing is written to history
     if (
       edge.source === nextSource &&
       edge.target === nextTarget &&
@@ -638,7 +638,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const edge = state.edges.find((e) => e.id === edgeId);
     if (!edge) return;
     const otherId = end === 'source' ? edge.target : edge.source;
-    if (nodeId === otherId) return; // 不允许自连
+    if (nodeId === otherId) return; // self-connections are not allowed
     if ((end === 'source' ? edge.source : edge.target) === nodeId) return;
     const nodes = state.nodes;
     const node = nodes.find((n) => n.id === nodeId);
@@ -649,7 +649,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const b = absoluteRectOf(other, byId);
     const dx = b.x + b.width / 2 - (a.x + a.width / 2);
     const dy = b.y + b.height / 2 - (a.y + a.height / 2);
-    // 新节点朝向对端的一侧锚点
+    // Anchor on the new node's side facing the opposite end
     const handle = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : dy >= 0 ? 'b' : 't';
     get().commit();
     set((s) => ({
@@ -663,7 +663,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   setEdgeWaypoints: (edgeId, waypoints, history = true) => {
-    // 折点跟随网格吸附设置：开启时对齐到网格，否则仅取整
+    // Waypoints follow the grid snap setting: align to the grid when enabled, otherwise just round
     const { gridEnabled, gridSize } = get();
     const snap = (v: number) =>
       gridEnabled && gridSize > 1 ? Math.round(v / gridSize) * gridSize : Math.round(v);
@@ -757,7 +757,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       parentId: placement.parentId,
       data: defaultData(kind),
     };
-    // 依据源节点与新节点中心的相对方位选择最合适的锚点
+    // Pick the most suitable anchor from the relative bearing of the source node and the new node's center
     const srcAbs = absolutePositionOf(src, byId);
     const dx = position.x - srcAbs.x;
     const dy = position.y - srcAbs.y;
@@ -795,7 +795,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               ...n,
               width: size.width,
               height: size.height,
-              // 换形状只替换图形种类与尺寸：文本、用户配色与其它样式原样保留
+              // Changing the shape replaces only the kind and size: text, user colors and other styles are kept as-is
               data: { ...n.data, kind, style: { ...n.data.style } },
             }
           : n,
@@ -901,7 +901,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const { nodes } = get();
     const node = nodes.find((n) => n.id === id);
     if (!node) return;
-    // 容器之间不支持嵌套（与画布拖拽保持一致）
+    // Nesting containers is not supported (consistent with canvas dragging)
     if (parentId && isContainerKind(node.data.kind)) return;
     const byId = new Map(nodes.map((n) => [n.id, n] as const));
     const abs = absolutePositionOf(node, byId);
@@ -914,7 +914,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         width: parent.width ?? shapeSize(parent.data.kind).width,
         height: parent.height ?? shapeSize(parent.data.kind).height,
       };
-      // 相对坐标保持视觉位置，并夹进容器内部（避免子节点落在容器之外）
+      // Keep the visual position in relative coordinates and clamp it inside the container (so children never sit outside)
       const rel = { x: Math.round(abs.x - parentAbs.x), y: Math.round(abs.y - parentAbs.y) };
       next = {
         parentId,
@@ -1010,7 +1010,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: s.edges.map((e) => {
         if (e.id !== id) return e;
         const data: FlowEdgeData = { ...(e.data as FlowEdgeData | undefined) };
-        // center 为默认值，不写入字段
+        // center is the default, so the field is not written
         if (position === 'center') delete data.labelPosition;
         else data.labelPosition = position;
         return { ...e, data };
@@ -1041,7 +1041,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
         }
         if (hasMove) {
-          // 输入框给的是画布绝对坐标：有父容器时换算回相对坐标
+          // The input field gives absolute canvas coordinates: convert back to relative coordinates when there is a parent container
           const parent = n.parentId ? byId.get(n.parentId) : undefined;
           const base = parent ? absolutePositionOf(parent, byId) : { x: 0, y: 0 };
           const absX = patch.x ?? base.x + n.position.x;
@@ -1086,7 +1086,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         if (!prev || prev[key] === undefined) return n;
         const next = { ...prev };
         delete next[key];
-        // 兼容旧字段：清除折角/圆角时同时移除旧字段，避免回落到旧值
+        // Legacy field compatibility: remove the old fields when clearing the fold/corner radius to avoid falling back to old values
         const style = { ...n.data.style, shapeParams: next };
         if (key === 'foldSize') delete style.foldSize;
         if (key === 'cornerRadius') delete style.cornerRadius;
@@ -1160,7 +1160,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const value = patch[key];
           if (key === 'rotation') {
             if (value === undefined) delete style.rotation;
-            // 归一后为 0 时清除字段，避免文档里出现冗余的 rotation: 0
+            // Clear the field when it normalizes to 0, avoiding a redundant rotation: 0 in the document
             else style.rotation = normalizeRotation(value as number) || undefined;
           } else if (key === 'flipH') {
             if (value) style.flipH = true;
@@ -1180,7 +1180,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
     get().commit();
     const nodeSet = new Set(selectedNodes);
-    // 删除泳道时，其内部子节点一并删除，避免出现孤儿
+    // Deleting a swimlane also deletes its child nodes, so none are left orphaned
     for (const n of get().nodes) {
       if (n.parentId && nodeSet.has(n.parentId)) nodeSet.add(n.id);
     }
@@ -1219,7 +1219,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   applyAutoLayout: (options = {}) => {
     get().commit();
-    // 两段式布局默认保留泳道/编组层级，容器位置与内部相对坐标一起重排
+    // Two-pass layout keeps the swimlane/group hierarchy by default: container positions and inner relative coordinates are reflowed together
     set((s) => ({ nodes: layoutGraph(s.nodes, s.edges, options) }));
   },
 
@@ -1239,13 +1239,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         { id, name: name?.trim() || defaultPageName(state.pageOrder.length + 1) },
       ],
       activePageId: id,
-      // 先把当前页内容缓存起来，再切换到空白新页
+      // Cache the current page's content first, then switch to a blank new page
       pageData: { ...state.pageData, ...(cur ? { [state.activePageId]: cur } : {}) },
       nodes: [],
       edges: [],
       selectedNodes: [],
       selectedEdges: [],
-      // 新页继承当前页的纸张设置，便于连续排版
+      // The new page inherits the current page's paper settings for continuous paging
       pageSize: state.pageSize,
     });
   },
@@ -1256,7 +1256,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const source = doc.pages.find((p) => p.id === id);
     if (!source) return;
     const newId = createId('page');
-    // 深拷贝并重映射 id，避免与源页共用标识
+    // Deep-copy and remap ids so the copy shares no identifiers with the source page
     const idMap = new Map<string, string>();
     for (const n of source.nodes) idMap.set(n.id, createId('n'));
     const nodes = source.nodes.map((n) => ({
@@ -1347,7 +1347,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       set({ pageOrder, pageData });
       return;
     }
-    // 删除当前页：切到相邻页并载入其内容
+    // Deleting the current page: switch to an adjacent page and load its content
     const next = pageOrder[Math.min(idx, pageOrder.length - 1)];
     const doc = state.getDoc();
     const target =
@@ -1378,9 +1378,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setHelperLines: (lines) => set({ helperLines: lines }),
 }));
 
-/* ------------------------------ 兼容导出 ------------------------------ */
-// 实现已下沉到 store/helpers.ts 与 store/history.ts；对外 API 保持不变，
-// 调用点（UI / flowOps / 单测）无需改动。
+/* ------------------------------ Compatibility exports ------------------------------ */
+// The implementation now lives in store/helpers.ts and store/history.ts; the public API is unchanged,
+// so call sites (UI / flowOps / unit tests) need no changes.
 
 export {
   DEFAULT_PAGE_ID,

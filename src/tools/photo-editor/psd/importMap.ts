@@ -8,19 +8,19 @@ import {
 import type { BlendMode, LayerStyle } from '../model/types';
 
 /**
- * PSD → 我们的模型的映射（纯函数，可单测）。
+ * PSD → our model mapping (pure, unit-testable).
  *
- * ag-psd 的结构体字段多且互相可选，直接散在读取流程里会变成「改一处漏一处」。
- * 这里只声明**我们真正读取的字段**（结构化子集），既避免绑定它的完整类型，
- * 也让映射规则能脱离真实 PSD 文件被测试覆盖。
+ * ag-psd's structures have many mutually optional fields; scattering them through the read flow would
+ * become "change one, miss another". Only the **fields we actually read** are declared here, which avoids
+ * binding to its full types and lets the mapping be tested without real PSD files.
  */
 
 export type PsdBlendName = string;
 
-/** 我们的混合模式 ↔ PSD 名称：写出用的是「带空格的写法」，读入按同表反向映射 */
+/** Our blend modes ↔ PSD names: writing uses the spaced spelling, reading maps back through the table */
 const PSD_TO_BLEND: Record<string, BlendMode> = {
   normal: 'normal',
-  // PSD 的「穿透」不是混合模式，读入时按正常处理（组内穿透由组自身的 passThrough 表达）
+  // PSD's "pass through" isn't a blend mode: reads treat it as normal (the group's own flag carries it)
   'pass through': 'normal',
   multiply: 'multiply',
   screen: 'screen',
@@ -49,7 +49,7 @@ export interface PsdColor {
   b: number;
 }
 
-/** PSD 颜色（0~255 分量）→ `#RRGGBB`；缺省回落黑色 */
+/** PSD color (0~255 components) → `#RRGGBB`; falls back to black */
 export function mapPsdColor(color: PsdColor | undefined): string {
   const to = (value: number | undefined) =>
     Math.max(0, Math.min(255, Math.round(value ?? 0)))
@@ -65,8 +65,8 @@ export interface PsdDropShadow {
   angle?: number;
   distance?: { units?: string; value?: number } | number;
   /**
-   * 「扩展」在 PSD 描述符里叫 `choke`（ag-psd 读出来的就是它），
-   * `spread` 是其它实现（以及部分工具的导出）使用的别名，两个都认。
+   * "Spread" is called `choke` in PSD descriptors (that's what ag-psd returns),
+   * and `spread` is the alias other implementations use; both are accepted.
    */
   choke?: { units?: string; value?: number } | number;
   spread?: { units?: string; value?: number } | number;
@@ -114,7 +114,7 @@ export interface PsdEffects {
   stroke?: PsdStroke | PsdStroke[];
 }
 
-/** PSD 的尺寸值是 `{ units, value }`（有些字段直接给数字） */
+/** PSD size values are `{ units, value }` (some fields give a plain number instead) */
 function sizeOf(value: PsdDropShadow['distance']): number {
   if (typeof value === 'number') return value;
   const raw = value?.value ?? 0;
@@ -135,17 +135,17 @@ function hexWithAlpha(
 } {
   return {
     color: mapPsdColor(color),
-    // ag-psd 的 opacity 走 FixedPoint8，取值 0~1（不是 PS 界面上的百分比）；缺省按完全不透明
+    // ag-psd's opacity is FixedPoint8 in 0~1 (not the percentage PS shows); absent means fully opaque
     opacity: Math.max(0, Math.min(1, opacity ?? 1)),
   };
 }
 
 /**
- * 图层效果 → 图层样式。
+ * Layer effects → layer style.
  *
- * 只映射我们**确实能渲染**的五种效果；PSD 里其它效果（图案叠加 / 渐变叠加 / 斜面和浮雕…）
- * 会被静默忽略 —— 宁可少读，也不要读成一个渲染不出来的半成品。
- * 返回 null 表示「这份 PSD 没有我们支持的图层效果」。
+ * Only the five effects we can **actually render** are mapped; others (pattern overlay / gradient
+ * overlay / bevel and emboss…) are silently ignored — reading less beats a half-baked result.
+ * Returning null means "this PSD has no layer effects we support".
  */
 export function mapPsdEffects(effects: PsdEffects | undefined): LayerStyle | null {
   if (!effects) return null;
@@ -219,7 +219,7 @@ export function mapPsdEffects(effects: PsdEffects | undefined): LayerStyle | nul
   return Object.keys(style).length > 0 ? style : null;
 }
 
-/** 图层的矩形（PSD 用 left/top/right/bottom 表达） */
+/** The layer's rectangle (PSD expresses it as left/top/right/bottom) */
 export interface PsdBounds {
   left?: number;
   top?: number;

@@ -1,4 +1,4 @@
-/** CSS Level 4 命名颜色（含 rebeccapurple），hex 为大写 #RRGGBB */
+/** CSS Level 4 named colors (including rebeccapurple); hex is uppercase #RRGGBB */
 
 export type WebColorGroup =
   | 'red'

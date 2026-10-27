@@ -18,7 +18,7 @@ function parseTimestamp(raw: string): number | null {
   return Number(hh) * 3600000 + Number(mm) * 60000 + Number(ss) * 1000 + Number(ms.padEnd(3, '0'));
 }
 
-/** 将毫秒格式化为时间戳。srt 用逗号分隔毫秒，vtt 用点。 */
+/** Format milliseconds as a timestamp. srt separates milliseconds with a comma, vtt with a dot. */
 export function formatTimestamp(ms: number, format: SubFormat = 'srt'): string {
   const clamped = Math.max(0, Math.round(ms));
   const hh = Math.floor(clamped / 3600000);
@@ -37,7 +37,7 @@ function parseBlocks(text: string): { start: number; end: number; text: string }
   for (const block of blocks) {
     const lines = block.split('\n').filter((l) => l.trim() !== '');
     if (lines.length === 0) continue;
-    // 找到包含 --> 的时间行
+    // Find the time line containing -->
     const timeIdx = lines.findIndex((l) => l.includes('-->'));
     if (timeIdx < 0) continue;
     const [startRaw, endRaw] = lines[timeIdx].split('-->');
@@ -65,7 +65,7 @@ export function parseVtt(text: string): ToolResult<Cue[]> {
   return { ok: true, value: raw.map((c, i) => ({ index: i + 1, ...c })) };
 }
 
-/** 自动识别格式并解析。 */
+/** Detect the format automatically and parse it. */
 export function parseSubtitle(text: string): ToolResult<{ format: SubFormat; cues: Cue[] }> {
   if (!text.trim()) return { ok: false, error: 'EMPTY' };
   const isVtt = /^\uFEFF?WEBVTT/.test(text.trimStart());
@@ -92,7 +92,7 @@ export function toVtt(cues: Cue[]): string {
   return `WEBVTT\n\n${body}\n`;
 }
 
-/** 整体平移时间轴（offsetMs 可为负）。 */
+/** Shift the whole timeline (offsetMs may be negative). */
 export function shiftCues(cues: Cue[], offsetMs: number): Cue[] {
   return cues.map((c) => ({
     ...c,

@@ -1,10 +1,10 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 页面设置纯逻辑层（不依赖 DOM，便于单测）：
- * 纸张 / 方向 / 页边距 → 内容区尺寸与 CSS 变量。
- * 屏幕页面视图、Word 导出、打印流、快照 PDF 四端共用同一份设置，
- * 保证「所见即所得」。
+ * Page setup pure logic layer (DOM-free, easy to unit test):
+ * paper / orientation / margins -> content area size and CSS variables.
+ * The on-screen page view, Word export, print flow and snapshot PDF all share one configuration,
+ * guaranteeing WYSIWYG.
  */
 
 export type PageSize = 'A4' | 'Letter';
@@ -17,63 +17,63 @@ export interface PageMargins {
   left: number;
 }
 
-/** 分栏数：与 Word「分栏」一致，最多三栏（更多会让正文列宽低到不可读） */
+/** Column count: like Word's columns, at most three (more would make columns unreadably narrow) */
 export type ColumnCount = 1 | 2 | 3;
 
-/** 文字水印配置 */
+/** Text watermark configuration */
 export interface WatermarkConfig {
   text: string;
-  /** 0–1 之间的透明度 */
+  /** Opacity between 0 and 1 */
   opacity: number;
-  /** 旋转角度（度），正值为逆时针倾斜 */
+  /** Rotation angle in degrees; positive values tilt counter-clockwise */
   rotation: number;
-  /** 十六进制颜色 */
+  /** Hex color */
   color: string;
 }
 
 export interface PageSetupConfig {
   size: PageSize;
   orientation: Orientation;
-  /** 页边距（mm） */
+  /** Page margins (mm) */
   margin: PageMargins;
-  /** 页眉文本（空字符串表示不显示） */
+  /** Header text (empty string means hidden) */
   header: string;
-  /** 页脚文本 */
+  /** Footer text */
   footer: string;
-  /** 是否在页脚显示页码 */
+  /** Whether to show page numbers in the footer */
   showPageNumber: boolean;
-  /** 分栏数 */
+  /** Column count */
   columns: ColumnCount;
-  /** 文字水印（null 表示无水印） */
+  /** Text watermark (null = none) */
   watermark: WatermarkConfig | null;
-  /** 页面背景色（#rrggbb；null 表示白色） */
+  /** Page background color (#rrggbb; null = white) */
   background: string | null;
-  /** 首页是否使用不同的页眉页脚（Word「首页不同」） */
+  /** Whether the first page uses a different header/footer (Word's "different first page") */
   differentFirstPage: boolean;
 }
 
 export interface PageMetrics {
-  /** 纸张尺寸（mm，已按方向交换） */
+  /** Paper size (mm, already swapped for orientation) */
   widthMm: number;
   heightMm: number;
-  /** 内容区尺寸（mm） */
+  /** Content area size (mm) */
   contentWidthMm: number;
   contentHeightMm: number;
-  /** 分栏数（已按内容宽度裁剪到可读范围） */
+  /** Column count (clamped by content width to stay readable) */
   columns: ColumnCount;
-  /** 列间距（mm） */
+  /** Column gap (mm) */
   columnGapMm: number;
-  /** 供视图层与打印层共用的 CSS 变量 */
+  /** CSS variables shared by the view and print layers */
   cssVars: Record<string, string>;
 }
 
-/** 纸张原始尺寸（mm，纵向） */
+/** Native paper sizes (mm, portrait) */
 const PAPER_SIZES: Record<PageSize, { width: number; height: number }> = {
   A4: { width: 210, height: 297 },
   Letter: { width: 215.9, height: 279.4 },
 };
 
-/** 页边距预设（mm） */
+/** Margin presets (mm) */
 export const MARGIN_PRESETS: Record<'normal' | 'narrow' | 'wide', PageMargins> = {
   normal: { top: 20, right: 20, bottom: 20, left: 20 },
   narrow: { top: 12.7, right: 12.7, bottom: 12.7, left: 12.7 },
@@ -93,7 +93,7 @@ export const DEFAULT_PAGE_SETUP: PageSetupConfig = {
   differentFirstPage: false,
 };
 
-/** 水印默认样式（面板首次启用时使用） */
+/** Default watermark style (used when the panel first enables it) */
 export const DEFAULT_WATERMARK: WatermarkConfig = {
   text: '',
   opacity: 0.12,
@@ -102,8 +102,8 @@ export const DEFAULT_WATERMARK: WatermarkConfig = {
 };
 
 /**
- * 水印 → CSS 变量：屏幕页面视图、流式视图、打印层共用同一段样式规则，
- * 颜色 / 角度 / 透明度只在这里换算一次。
+ * Watermark -> CSS variables: the on-screen page view, flow view and print layer share one style rule,
+ * so color / angle / opacity are converted only here.
  */
 export function watermarkCssVars(watermark: WatermarkConfig): Record<string, string> {
   return {
@@ -113,14 +113,14 @@ export function watermarkCssVars(watermark: WatermarkConfig): Record<string, str
   };
 }
 
-/** 列间距（mm）：与 Word 默认相近，避免两栏贴在一起 */
+/** Column gap (mm): close to Word's default, keeping two columns from touching */
 export const COLUMN_GAP_MM = 8;
 
 const MIN_MARGIN_MM = 5;
-/** 内容区最小宽度（mm），避免边距设置把版面压到不可用 */
+/** Minimum content width (mm), so margins can't squeeze the layout into unusability */
 const MIN_CONTENT_WIDTH_MM = 40;
 const MIN_CONTENT_HEIGHT_MM = 40;
-/** 分栏后单列最小宽度（mm）：低于此值正文会难读，据此限制最大栏数 */
+/** Minimum single-column width after splitting (mm): narrower text is hard to read, which caps the column count */
 const MIN_COLUMN_WIDTH_MM = 35;
 const MIN_WATERMARK_OPACITY = 0.02;
 const MAX_WATERMARK_OPACITY = 0.6;
@@ -129,7 +129,7 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-/** 十六进制颜色（#rgb / #rrggbb）→ 统一为 #rrggbb；非法值返回 null */
+/** Hex color (#rgb / #rrggbb) -> normalized to #rrggbb; invalid values return null */
 function normalizeHexColor(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const raw = value.trim();
@@ -143,7 +143,7 @@ function normalizeHexColor(value: unknown): string | null {
 function normalizeColumns(value: unknown, contentWidthMm: number): ColumnCount {
   const parsed = isFiniteNumber(value) ? Math.round(value) : 1;
   const wanted: ColumnCount = parsed >= 3 ? 3 : parsed >= 2 ? 2 : 1;
-  // 栏宽不足时逐级回退，避免把正文挤到不可读
+  // Fall back level by level when columns would be too narrow, keeping the text readable
   for (let count = wanted; count > 1; count -= 1) {
     if (contentWidthMm / count >= MIN_COLUMN_WIDTH_MM) return count as ColumnCount;
   }
@@ -167,7 +167,7 @@ function normalizeWatermark(value: unknown): WatermarkConfig | null {
   };
 }
 
-/** 规范化配置：补齐缺失字段、裁剪非法值 */
+/** Normalize the config: fill in missing fields and clamp invalid values */
 export function normalizePageSetup(input: Partial<PageSetupConfig> | null): PageSetupConfig {
   const raw = input ?? {};
   const margin: Partial<PageMargins> = raw.margin ?? {};
@@ -209,7 +209,7 @@ export function normalizePageSetup(input: Partial<PageSetupConfig> | null): Page
 }
 
 /**
- * 计算页面几何。边距过大导致内容区不可用时返回错误码（不抛异常）。
+ * Compute page geometry. Returns an error code (never throws) when oversized margins leave no usable content area.
  */
 export function computePageMetrics(config: PageSetupConfig): ToolResult<PageMetrics> {
   const paper = PAPER_SIZES[config.size] ?? PAPER_SIZES.A4;
@@ -248,11 +248,11 @@ export function computePageMetrics(config: PageSetupConfig): ToolResult<PageMetr
   };
 }
 
-/** 便捷：直接用默认设置兜底计算（视图层用，失败时退回 A4 纵向） */
+/** Convenience wrapper: falls back to defaults (view layer; A4 portrait on failure) */
 export function resolvePageMetrics(config: Partial<PageSetupConfig> | null): PageMetrics {
   const metrics = computePageMetrics(normalizePageSetup(config));
   if (metrics.ok) return metrics.value;
-  // normalizePageSetup 已把边距裁剪到下限，默认设置必定合法，这里只做静态兜底
+  // normalizePageSetup already clamps margins to the lower bound, so defaults are always valid; this is a static fallback
   return {
     widthMm: 210,
     heightMm: 297,
@@ -264,14 +264,14 @@ export function resolvePageMetrics(config: Partial<PageSetupConfig> | null): Pag
   };
 }
 
-/** mm → twip（1mm ≈ 56.7 twip），docx 页面尺寸与边距单位 */
+/** mm -> twip (1mm ≈ 56.7 twip), the unit for docx page size and margins */
 export function mmToTwip(mm: number): number {
   return Math.round(mm * 56.6929);
 }
 
-/** CSS 规范：1in = 96px，1mm = 96/25.4px */
+/** CSS spec: 1in = 96px, 1mm = 96/25.4px */
 export const MM_TO_PX = 96 / 25.4;
-/** 相邻两页纸之间的可见留白（mm） */
+/** Visible gap between adjacent sheets (mm) */
 export const SHEET_GAP_MM = 12;
 
 export interface PageMetricsPx {
@@ -279,16 +279,16 @@ export interface PageMetricsPx {
   heightPx: number;
   contentWidthPx: number;
   contentHeightPx: number;
-  /** 上/下页边距（px） */
+  /** Top/bottom page margin (px) */
   padTopPx: number;
   padBottomPx: number;
-  /** 页间空白 widget 的兜底高度（px）= 上下页边距 + 纸间留白 */
+  /** Fallback gap widget height (px) = top and bottom margins + sheet gap */
   gapPx: number;
-  /** 相邻两页纸步进（px）= 纸高 + 纸间留白 */
+  /** Step between adjacent sheets (px) = sheet height + sheet gap */
   advancePx: number;
 }
 
-/** 页面几何 → 像素（屏幕分页、纸面定位、快照切页共用） */
+/** Page geometry -> pixels (shared by on-screen pagination, sheet positioning and snapshot page splitting) */
 export function pageMetricsToPx(metrics: PageMetrics): PageMetricsPx {
   const widthPx = metrics.widthMm * MM_TO_PX;
   const heightPx = metrics.heightMm * MM_TO_PX;
@@ -307,9 +307,9 @@ export function pageMetricsToPx(metrics: PageMetrics): PageMetricsPx {
 }
 
 /**
- * 生成打印用的样式：
- * - @page 声明纸张尺寸 + 边距（CSS 变量在 @page 中不可靠，必须用字面量）；
- * - 分栏与页面背景作用在打印流容器上（@page 无法表达分栏）。
+ * Build print styles:
+ * - @page declares paper size + margins (CSS variables aren't reliable inside @page, so use literals);
+ * - columns and page background apply to the print flow container (@page can't express columns).
  */
 export function buildPrintPageCss(metrics: PageMetrics, margin: PageMargins): string {
   const page = `@page { size: ${metrics.widthMm}mm ${metrics.heightMm}mm; margin: ${margin.top}mm ${margin.right}mm ${margin.bottom}mm ${margin.left}mm; }`;

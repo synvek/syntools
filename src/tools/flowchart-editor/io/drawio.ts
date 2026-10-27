@@ -1,14 +1,14 @@
 /**
- * Draw.io（.drawio / mxGraphModel XML）导入导出。
- * 复用已安装的 fast-xml-parser，零新增依赖即可与 Draw.io 互通。
+ * Draw.io (.drawio / mxGraphModel XML) import and export.
+ * Reuses the already-installed fast-xml-parser, so Draw.io interop needs no new dependency.
  *
- * 往返能力：
- * - **多页**：`<mxfile>` 下的每个 `<diagram>` 都是一个页面，导入/导出都完整保留。
- * - **样式映射**：填充色 / 描边色 / 描边宽度 / 字号 / 文字色 / 对齐 / 圆角 / 虚线 / 透明度 / 阴影，
- *   连线线型 / 线性 / 起止箭头 / 折点。
- * - **无损兜底**：未识别的 mxGraph 样式 token 存入 `mxStyle`，导出时原样回写，减少往返丢失。
- * - **HTML 标签**：`html=1` 的 `<br>` / `<div>` 换行与实体在导入时还原为纯文本，导出时再转回。
- * - **压缩文件**：`<diagram>` 文本为 base64+deflate 的压缩形式由 `parseDrawioXmlAsync` 解码。
+ * Round-trip support:
+ * - **Multi-page**: every `<diagram>` under `<mxfile>` is a page; import and export both preserve them all.
+ * - **Style mapping**: fill / stroke / stroke width / font size / text color / alignment / corner radius / dash / opacity / shadow,
+ * plus edge type / line style / start and end arrows / waypoints.
+ * - **Lossless fallback**: unrecognized mxGraph style tokens are kept in `mxStyle` and written back verbatim, limiting round-trip loss.
+ * - **HTML labels**: `<br>` / `<div>` line breaks and entities of `html=1` are decoded back to plain text on import and re-encoded on export.
+ * - **Compressed files**: `<diagram>` text stored as base64+deflate is decoded by `parseDrawioXmlAsync`.
  */
 
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
@@ -44,10 +44,10 @@ const BUILDER = new XMLBuilder({
   suppressEmptyNode: true,
 });
 
-/** XML 解析后的宽松结构 */
+/** Loose structure after XML parsing */
 type XmlNode = Record<string, unknown>;
 
-/** 已知的 mxGraph 样式键（其余 token 作为 `mxStyle` 原样保留） */
+/** Known mxGraph style keys (any other token is preserved verbatim in `mxStyle`) */
 const KNOWN_STYLE_KEYS = new Set([
   'rounded',
   'whiteSpace',
@@ -75,15 +75,15 @@ const KNOWN_STYLE_KEYS = new Set([
   'endSize',
   'jettySize',
   'orthogonalLoop',
-  // 跳线：draw.io 使用 jumpStyle / jumpSize
+  // Jump lines: draw.io uses jumpStyle / jumpSize
   'jumpStyle',
   'jumpSize',
   'horizontal',
   'shape',
-  // 节点镜像：由 FlowNodeStyle.flipH/flipV 承载，纳入已知键避免与 mxStyle 重复回写
+  // Node mirroring: carried by FlowNodeStyle.flipH/flipV; listed as a known key so it is not written back twice via mxStyle
   'flipH',
   'flipV',
-  // 起止标签 / 标签位置：mxGraph 无对应概念，用自定义 token 承载
+  // Source/target labels and label position: no mxGraph equivalent, so custom tokens carry them
   'synSourceLabel',
   'synTargetLabel',
   'synLabelPos',
@@ -101,7 +101,7 @@ function geoNum(cell: XmlNode, key: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** 取整到 2 位小数：旋转角度导出用，避免浮点尾数污染 XML */
+/** Round to 2 decimals: used for exported rotation angles, keeping float tails out of the XML */
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -112,9 +112,9 @@ function asArray<T>(v: T | T[] | undefined): T[] {
 }
 
 /**
- * Draw.io 的 `html=1` 标签（HTML 片段）→ 纯文本。
- * 行内换行与块级边界转 \n，其余成对标签剥离，常见实体解码；
- * 仅匹配「像标签」的片段（`<` 后跟字母或 `/`），孤立的 `<` `>` 原样保留。
+ * Draw.io `html=1` label (HTML fragment) → plain text.
+ * Inline line breaks and block boundaries become \n, other paired tags are stripped, common entities decoded;
+ * only tag-like fragments are matched (`<` followed by a letter or `/`), stray `<` and `>` are kept as-is.
  */
 export function htmlToPlain(html: string): string {
   return html
@@ -132,19 +132,19 @@ export function htmlToPlain(html: string): string {
     .replace(/^\n+|\n+$/g, '');
 }
 
-/** 纯文本标签 → Draw.io `html=1` 值（换行转 `<br>`；XML 实体转义交给 XMLBuilder） */
+/** Plain text label → Draw.io `html=1` value (newlines become `<br>`; XML entity escaping is left to XMLBuilder) */
 export function toMxHtmlLabel(label: string): string {
   return label.replace(/\r\n?/g, '\n').replace(/\n/g, '<br>');
 }
 
-/** 读取 cell 的显示文本：`html=1` 时按 HTML 解析回纯文本 */
+/** Read a cell's display text: parse back to plain text as HTML when `html=1` */
 function labelOf(cell: XmlNode, rawStyle: string | undefined): string {
   const raw = attr(cell, '@_value') ?? '';
   if (!raw) return '';
   return parseStyleMap(rawStyle).map.get('html') === '1' ? htmlToPlain(raw) : raw;
 }
 
-/** `k=v;k2=v2;bare;` → Map；键统一小写以便比较 */
+/** `k=v;k2=v2;bare;` → Map; keys are lowercased for comparison */
 function parseStyleMap(style: string | undefined): {
   map: Map<string, string>;
   bare: string[];
@@ -169,7 +169,7 @@ function parseStyleMap(style: string | undefined): {
   return { map, bare, unknown };
 }
 
-/** 大小写不敏感地取 style 值（不同工具写出的键名大小写可能不一致） */
+/** Look up a style value case-insensitively (different tools write key names with different casing) */
 function mapGetCI(map: Map<string, string>, key: string): string | undefined {
   const direct = map.get(key);
   if (direct !== undefined) return direct;
@@ -180,20 +180,20 @@ function mapGetCI(map: Map<string, string>, key: string): string | undefined {
   return undefined;
 }
 
-/** 起止标签 / 标签位置的自定义 token 键 */
+/** Custom token keys for source/target labels and label position */
 const SYN_SOURCE_LABEL = 'synSourceLabel';
 const SYN_TARGET_LABEL = 'synTargetLabel';
 const SYN_LABEL_POS = 'synLabelPos';
 
-/** 表格节点的自定义 token 键：值做 URL 编码后可安全放在样式串中 */
+/** Custom token key for table nodes: URL-encoded values are safe inside a style string */
 const SYN_TABLE = 'synTable';
 
-/** 表格节点 → mxGraph 样式 token（整表数据 URL 编码，drawio 打开时忽略即可） */
+/** Table node → mxGraph style token (whole table data URL-encoded so draw.io can ignore it) */
 function tableTokenOf(table: TableData | undefined): string {
   return `${SYN_TABLE}=${encodeURIComponent(JSON.stringify(normalizeTable(table)))}`;
 }
 
-/** 从 mxGraph 样式串中还原表格数据（无该 token 时返回 undefined） */
+/** Restore table data from an mxGraph style string (returns undefined when the token is absent) */
 function tableFromStyle(rawStyle: string | undefined): TableData | undefined {
   if (!rawStyle) return undefined;
   const eq = rawStyle.search(new RegExp(`${SYN_TABLE}=`, 'i'));
@@ -208,7 +208,7 @@ function tableFromStyle(rawStyle: string | undefined): TableData | undefined {
   }
 }
 
-/** 连线记录 → 自定义标签 token（值做 URL 编码，避免 `;` / `=` 破坏样式串） */
+/** Edge record → custom label tokens (values URL-encoded so `;` / `=` cannot break the style string) */
 function edgeLabelTokens(e: FlowEdgeRec): string[] {
   const parts: string[] = [];
   if (e.sourceLabel) parts.push(`${SYN_SOURCE_LABEL}=${encodeURIComponent(e.sourceLabel)}`);
@@ -219,7 +219,7 @@ function edgeLabelTokens(e: FlowEdgeRec): string[] {
   return parts;
 }
 
-/** 从 mxGraph style 还原起止标签与标签位置，并给出应从 mxStyle 兜底中剔除的键 */
+/** Restore source/target labels and label position from an mxGraph style; also returns the keys to drop from the mxStyle fallback */
 function edgeLabelsFromMx(style: string | undefined): {
   sourceLabel?: string;
   targetLabel?: string;
@@ -262,7 +262,7 @@ function edgeLabelsFromMx(style: string | undefined): {
   return out;
 }
 
-/** 从 mxStyle 兜底列表中剔除已语义化的 token */
+/** Drop tokens that now have semantics from the mxStyle fallback list */
 function dropConsumedTokens(tokens: string[], consumed: Set<string>): string[] {
   if (consumed.size === 0) return tokens;
   const lower = new Set([...consumed].map((k) => k.toLowerCase()));
@@ -273,14 +273,14 @@ function dropConsumedTokens(tokens: string[], consumed: Set<string>): string[] {
   });
 }
 
-/* ------------------------------ 形状映射 ------------------------------ */
+/* ------------------------------ Shape mapping ------------------------------ */
 
 /**
- * draw.io 原生 token → 图形：仅登记「往返无歧义」的映射。
+ * draw.io native token → shape: only mappings that round-trip unambiguously are registered.
  *
- * 未登记（含 draw.io 无对应、或被其它 token 遮蔽）的图形统一走 `shape=syntools.<kind>`，
- * 由 `kindOfStyle` 反向精确还原。这样既最大化 draw.io 可读性，又保证本工具往返不丢形状
- * （不变量由 `io.test.ts` 的全量往返测试守护）。
+ * Unregistered shapes (no draw.io counterpart, or shadowed by another token) go through `shape=syntools.<kind>`
+ * and are restored exactly by `kindOfStyle`. That maximizes draw.io legibility while guaranteeing this tool
+ * loses no shapes on round-trip (the invariant is guarded by the full round-trip tests in `io.test.ts`).
  */
 const DRAWIO_TOKEN: Partial<Record<ShapeKind, string>> = {
   roundRect: 'rounded=1',
@@ -313,37 +313,37 @@ const DRAWIO_TOKEN: Partial<Record<ShapeKind, string>> = {
   netLoadBalancer: 'shape=mxgraph.networks.load_balancer',
 };
 
-/** 形状 → mxGraph 基础样式 token（不含颜色等通用样式） */
+/** Shape → base mxGraph style token (excluding generic styles such as color) */
 function shapeTokenOf(kind: ShapeKind): string {
   return DRAWIO_TOKEN[kind] ?? exactTokenOf(kind);
 }
 
 /**
- * 精确形状 token 前缀。
+ * Exact shape token prefix.
  *
- * draw.io 没有覆盖本工具全部 84 个图形（尤其 UML 2.5 细分图形），
- * 且部分 draw.io 原生 token 之间互相歧义（如 `ellipse` 同时被椭圆与开始/结束使用）。
- * 因此对「无对应 / 有歧义」的图形，统一写出 `shape=syntools.<kind>`：
- * - 本工具往返 100% 精确（见 io.test 的往返不变量测试）；
- * - draw.io 打开时会退化为矩形（与其原有的未知形状行为一致），不会破坏文件。
+ * draw.io has no counterpart for all 84 shapes of this tool (especially the UML 2.5 sub-shapes),
+ * and some draw.io native tokens are ambiguous (e.g. `ellipse` is used for both ellipse and start/end).
+ * So for shapes with no counterpart or ambiguous ones, `shape=syntools.<kind>` is always written:
+ * - round-trip within this tool is 100% exact (see the round-trip invariant tests in io.test);
+ * - draw.io degrades them to a rectangle (same as its own unknown-shape behavior) instead of breaking the file.
  */
 const SYNTOOLS_SHAPE_PREFIX = 'shape=syntools.';
 
-/** 小写形状名 → 规范 kind（用于反解 `shape=syntools.<kind>`） */
+/** Lowercase shape name → canonical kind (used to reverse `shape=syntools.<kind>`) */
 const KINDS_BY_LOWER = new Map<string, ShapeKind>(
   (Object.keys(SHAPE_DEFS) as ShapeKind[]).map((k) => [k.toLowerCase(), k]),
 );
 
-/** 无 draw.io 对应（或有歧义）时的精确 token */
+/** Exact token used when draw.io has no counterpart (or it would be ambiguous) */
 function exactTokenOf(kind: ShapeKind): string {
   return `${SYNTOOLS_SHAPE_PREFIX}${kind}`;
 }
 
-/** mxGraph style → 形状（无法识别时按矩形处理） */
+/** mxGraph style → shape (falls back to a rectangle when unrecognized) */
 export function kindOfStyle(style: string | undefined): ShapeKind {
   if (!style) return 'rect';
   const s = style.toLowerCase();
-  // 本工具写出的精确 token 优先（避免与 draw.io 原生 token 的歧义）
+  // Precise tokens written by this tool take precedence (avoiding ambiguity with draw.io native tokens)
   const at = s.indexOf(SYNTOOLS_SHAPE_PREFIX);
   if (at >= 0) {
     const name = s.slice(at + SYNTOOLS_SHAPE_PREFIX.length).split(/[;,\s]/)[0];
@@ -365,11 +365,11 @@ export function kindOfStyle(style: string | undefined): ShapeKind {
   if (s.includes('shape=component')) return 'umlComponent';
   if (s.includes('shape=cube')) return 'umlNode';
   if (s.includes('rhombus')) return 'decision';
-  // 椭圆：draw.io 的 `ellipse` 字面映射为本工具的椭圆（开始/结束为胶囊，走精确 token）
+  // Ellipse: draw.io's literal `ellipse` maps to this tool's ellipse (start/end are capsules using the exact token)
   if (s.includes('ellipse')) return 'ellipse';
   if (s.includes('cylinder')) return 'database';
   if (s.includes('document')) return 'document';
-  // 反斜切平行四边形需先于「平行四边形」判断，否则会被误判为数据
+  // A backslash-sheared parallelogram must be checked before "parallelogram", otherwise it is taken for data
   if (s.includes('invparallelogram')) return 'display';
   if (s.includes('parallelogram')) return 'data';
   if (s.includes('triangle')) return 'triangle';
@@ -386,7 +386,7 @@ export function kindOfStyle(style: string | undefined): ShapeKind {
   return 'rect';
 }
 
-/* ------------------------------ 样式映射 ------------------------------ */
+/* ------------------------------ Style mapping ------------------------------ */
 
 const ALIGN_TO_MX: Record<Align, string> = { left: 'left', center: 'center', right: 'right' };
 const MX_TO_ALIGN: Record<string, Align> = { left: 'left', center: 'center', right: 'right' };
@@ -396,7 +396,7 @@ const MX_TO_VERTICAL: Record<VerticalAlign, string> = {
   middle: 'middle',
   bottom: 'bottom',
 };
-/** 解析：兼容 draw.io 与其它工具写出的 `center` 变体 */
+/** Parse: accept the `center` variants written by draw.io and other tools */
 const MX_VERTICAL_TO_STYLE: Record<string, VerticalAlign> = {
   top: 'top',
   middle: 'middle',
@@ -404,7 +404,7 @@ const MX_VERTICAL_TO_STYLE: Record<string, VerticalAlign> = {
   bottom: 'bottom',
 };
 
-/** 形状可调参数 → mxGraph token（含圆角 arcSize）；仅写用户显式设置过的项 */
+/** Adjustable shape parameters → mxGraph tokens (including corner arcSize); only values the user set explicitly are written */
 function shapeParamTokens(kind: ShapeKind, style?: Partial<FlowNodeStyle>): string[] {
   const def = SHAPE_DEFS[kind];
   if (!def) return [];
@@ -427,7 +427,7 @@ function shapeParamTokens(kind: ShapeKind, style?: Partial<FlowNodeStyle>): stri
   return parts;
 }
 
-/** 形状 + 样式 → mxGraph style（保留填充/描边/线型/字号/透明度/圆角/阴影/可调参数） */
+/** Shape + style → mxGraph style (keeps fill/stroke/line style/font size/opacity/corner radius/shadow/adjust params) */
 function styleOf(kind: ShapeKind, style?: Partial<FlowNodeStyle>, extra: string[] = []): string {
   const parts = [shapeTokenOf(kind), 'whiteSpace=wrap', 'html=1'];
   if (style?.fill) parts.push(`fillColor=${style.fill}`);
@@ -452,7 +452,7 @@ function styleOf(kind: ShapeKind, style?: Partial<FlowNodeStyle>, extra: string[
   return `${parts.filter(Boolean).join(';')};`;
 }
 
-/** mxGraph style → 节点样式（只写与默认不同的字段） */
+/** mxGraph style → node style (only fields that differ from the defaults are written) */
 function nodeStyleFromMx(
   style: string | undefined,
   kind?: ShapeKind,
@@ -491,12 +491,12 @@ function nodeStyleFromMx(
   const vertical = map.get('verticalAlign');
   if (vertical) {
     const mapped = MX_VERTICAL_TO_STYLE[vertical.toLowerCase()];
-    // middle 是历史默认值，不写入字段，保持文档精简
+    // middle is the legacy default, so it is not written, keeping the document lean
     if (mapped && mapped !== 'middle') out.verticalAlign = mapped;
   }
   if (map.get('flipH') === '1') out.flipH = true;
   if (map.get('flipV') === '1') out.flipV = true;
-  // 形状可调参数：把 size / arcSize 等 token 还原为 shapeParams（已消费的 token 不再进 mxStyle）
+  // Adjustable shape parameters: restore tokens such as size / arcSize into shapeParams (consumed tokens no longer go to mxStyle)
   const consumed = new Set<string>();
   const def = kind ? SHAPE_DEFS[kind] : undefined;
   if (def) {
@@ -545,12 +545,12 @@ const ARROW_TO_MX: Record<EdgeArrow, string | null> = {
   bar: 'line',
 };
 
-/** 空心箭头（泛化 / 实现 / 聚合）：mxGraph 端以 fill=0 表达 */
+/** Hollow arrow (generalization / realization / aggregation): expressed as fill=0 on the mxGraph side */
 function isHollowArrow(kind: EdgeArrow): boolean {
   return kind === 'arrow' || kind === 'triangle' || kind === 'diamondHollow';
 }
 
-/** 连线样式 → mxGraph style */
+/** Edge style → mxGraph style */
 function edgeStyleOf(style: FlowEdgeStyle | undefined, extra: string[] = []): string {
   const s = normalizeEdgeStyle(style);
   const parts = [EDGE_STYLE_TOKEN[s.type], 'html=1'];
@@ -565,13 +565,13 @@ function edgeStyleOf(style: FlowEdgeStyle | undefined, extra: string[] = []): st
   const endToken = ARROW_TO_MX[s.endArrow];
   parts.push(`endArrow=${endToken ?? 'none'}`);
   parts.push(`endFill=${isHollowArrow(s.endArrow) ? 0 : 1}`);
-  // 跳线：draw.io 的原生 token
+  // Jump lines: draw.io's native tokens
   if (s.jumpStyle === 'arc') parts.push('jumpStyle=arc');
   parts.push(...extra);
   return `${parts.join(';')};`;
 }
 
-/** mxGraph edge style → 连线样式（含未识别 token） */
+/** mxGraph edge style → edge style (including unrecognized tokens) */
 function edgeStyleFromMx(rawStyle: string | undefined): {
   style: FlowEdgeStyle;
   mxStyle: string[];
@@ -622,7 +622,7 @@ function edgeStyleFromMx(rawStyle: string | undefined): {
   return { style: normalizeEdgeStyle(style), mxStyle: unknown, rounded };
 }
 
-/* ------------------------------ 导出 ------------------------------ */
+/* ------------------------------ Export ------------------------------ */
 
 function pointsOf(mxGeometry: unknown): Waypoint[] {
   if (!mxGeometry || typeof mxGeometry !== 'object') return [];
@@ -657,7 +657,7 @@ function pageToCells(page: FlowPage): XmlNode[] {
         '@_y': Math.round(n.position.y),
         '@_width': Math.round(n.width ?? def.width),
         '@_height': Math.round(n.height ?? def.height),
-        // 旋转在 mxGraph 中是几何属性（绕包围盒中心），不是样式 token
+        // Rotation is a geometry attribute in mxGraph (around the bounding-box center), not a style token
         ...(n.data.style.rotation
           ? { '@_rotation': String(round2(normalizeRotation(n.data.style.rotation))) }
           : {}),
@@ -716,13 +716,13 @@ export function toDrawioXml(doc: FlowDoc): string {
   }) as string;
 }
 
-/* ------------------------------ 导入 ------------------------------ */
+/* ------------------------------ Import ------------------------------ */
 
 type ParsedCell = XmlNode;
 
 function cellsOfDiagram(diagram: XmlNode): ParsedCell[] {
-  // 未压缩形式：mxGraphModel 是 diagram 的子节点。
-  // 压缩形式（mxGraphModel 藏于文本、base64+deflate）走 `parseDrawioXmlAsync` 预处理后再进来。
+  // Uncompressed form: mxGraphModel is a child of diagram.
+  // Compressed form (mxGraphModel hidden in text, base64+deflate) goes through `parseDrawioXmlAsync` preprocessing first.
   const model = diagram.mxGraphModel as XmlNode | undefined;
   const root = model?.root as XmlNode | undefined;
   return asArray(root?.mxCell as XmlNode | XmlNode[] | undefined);
@@ -749,10 +749,10 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
         width,
         height,
       );
-      // 旋转存于 mxGeometry.rotation（绕包围盒中心），归一后写回 style
+      // Rotation lives in mxGeometry.rotation (around the bounding-box center); normalized and written back to style
       const rotation = normalizeRotation(geoNum(cell, '@_rotation', 0));
       if (rotation !== 0) nodeStyle.rotation = rotation;
-      // 表格节点：由自定义 token 还原整表数据（drawio 打开时退化为普通矩形）
+      // Table node: restore the whole table from the custom token (degrades to a plain rectangle when opened in draw.io)
       const table = tableFromStyle(rawStyle);
       const keptMxStyle = table
         ? dropConsumedTokens(nodeMxStyle, new Set([SYN_TABLE]))
@@ -801,11 +801,11 @@ function buildPage(diagram: XmlNode, index: number): FlowPage {
   return { ...page, nodes, edges };
 }
 
-/** 解析 .drawio XML → FlowDoc（多页）；失败或无法识别时返回 null */
+/** Parse a .drawio XML → FlowDoc (multi-page); returns null on failure or when unrecognized */
 /**
- * 取文档中的 diagram 列表。
- * draw.io 的剪贴板内容通常没有 `mxfile` 外壳，只有裸 `mxGraphModel`，
- * 这里统一包成单页，使粘贴与导入共用同一条解析路径。
+ * Collect the diagram list of a document.
+ * draw.io clipboard content usually has no `mxfile` wrapper, only a bare `mxGraphModel`,
+ * so it is wrapped as a single page here, letting paste and import share one parsing path.
  */
 function diagramsOf(parsed: XmlNode | undefined): XmlNode[] {
   const mxfile = parsed?.mxfile as XmlNode | undefined;
@@ -814,7 +814,7 @@ function diagramsOf(parsed: XmlNode | undefined): XmlNode[] {
   return asArray(mxfile?.diagram as XmlNode | XmlNode[] | undefined);
 }
 
-/** 解析 .drawio XML → FlowDoc（多页）；失败或无法识别时返回 null */
+/** Parse a .drawio XML → FlowDoc (multi-page); returns null on failure or when unrecognized */
 export function parseDrawioXml(xml: string): FlowDoc | null {
   try {
     const parsed = PARSER.parse(xml) as XmlNode | undefined;
@@ -833,9 +833,9 @@ export function parseDrawioXml(xml: string): FlowDoc | null {
   }
 }
 
-/* ------------------------------ 压缩形式导入 ------------------------------ */
+/* ------------------------------ Compressed import ------------------------------ */
 
-/** 解压原始 deflate 字节：优先原生 DecompressionStream，缺失/失败时回退 pako（动态加载） */
+/** Inflate raw deflate bytes: prefer the native DecompressionStream, fall back to pako (loaded dynamically) when missing or failing */
 async function inflateRawBytes(bytes: Uint8Array): Promise<string | null> {
   const DS = (globalThis as { DecompressionStream?: typeof DecompressionStream })
     .DecompressionStream;
@@ -844,13 +844,13 @@ async function inflateRawBytes(bytes: Uint8Array): Promise<string | null> {
       const stream = new Blob([bytes]).stream().pipeThrough(new DS('deflate-raw'));
       return await new Response(stream).text();
     } catch {
-      // 落到 pako
+      // Fall back to pako
     }
   }
   try {
     const { inflateRaw } = await import('pako');
     const out = inflateRaw(bytes);
-    // pako v3 的 to:'string' 已不再生效，统一用 TextDecoder 解码
+    // pako v3 no longer honors to:'string', so decoding always goes through TextDecoder
     return typeof out === 'string' ? out : new TextDecoder().decode(out);
   } catch {
     return null;
@@ -858,8 +858,8 @@ async function inflateRawBytes(bytes: Uint8Array): Promise<string | null> {
 }
 
 /**
- * 解压压缩形式的 `<diagram>` 文本。
- * Draw.io 的压缩格式为 `base64(deflateRaw(encodeURIComponent(xml)))`。
+ * Inflate the text of a compressed `<diagram>`.
+ * Draw.io's compressed format is `base64(deflateRaw(encodeURIComponent(xml)))`.
  */
 async function inflateDiagramText(encoded: string): Promise<string | null> {
   try {
@@ -873,12 +873,12 @@ async function inflateDiagramText(encoded: string): Promise<string | null> {
 }
 
 /**
- * 解析 .drawio XML（支持未压缩与压缩两种形式）。
+ * Parse a .drawio XML (supports both uncompressed and compressed forms).
  *
- * 优先直接解析；若失败则按压缩形式处理：逐个解压 `<diagram>` 文本、
- * 重新拼成未压缩 XML 后再复用同步解析器。
- * 解压依赖仅在需要时动态加载（原生 DecompressionStream 优先，pako 兜底），
- * 避免把解析依赖并入工具主 chunk。
+ * Try direct parsing first; on failure treat it as compressed: inflate each `<diagram>` text,
+ * reassemble uncompressed XML and reuse the synchronous parser.
+ * The inflate dependency is loaded dynamically only when needed (native DecompressionStream first, pako as fallback),
+ * keeping parsing dependencies out of the tool's main chunk.
  */
 export async function parseDrawioXmlAsync(xml: string): Promise<FlowDoc | null> {
   const direct = parseDrawioXml(xml);

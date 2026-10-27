@@ -1,18 +1,11 @@
 /**
- * 文字转卡片：主题与布局参数（渲染/导出在 UI）。
+ * Text to card: theme and layout parameters (rendering/export happens in the UI).
  */
 
 export type CardThemeId = 'slate' | 'ocean' | 'sunset' | 'forest' | 'mono' | 'paper';
 export type TextAlign = 'left' | 'center' | 'right';
 
-export const CARD_THEMES: CardThemeId[] = [
-  'slate',
-  'ocean',
-  'sunset',
-  'forest',
-  'mono',
-  'paper',
-];
+export const CARD_THEMES: CardThemeId[] = ['slate', 'ocean', 'sunset', 'forest', 'mono', 'paper'];
 
 export interface CardThemeStyle {
   background: string;
@@ -87,8 +80,7 @@ export function clampTextCard(raw: Partial<TextCardOptions>): TextCardOptions {
   const theme = CARD_THEMES.includes(raw.theme as CardThemeId)
     ? (raw.theme as CardThemeId)
     : DEFAULT_TEXT_CARD.theme;
-  const align: TextAlign =
-    raw.align === 'center' || raw.align === 'right' ? raw.align : 'left';
+  const align: TextAlign = raw.align === 'center' || raw.align === 'right' ? raw.align : 'left';
   return {
     theme,
     align,

@@ -4,12 +4,7 @@ import { FileDropZone } from '@/core/components/FileDropZone';
 import { OptionBar } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
-import {
-  MAX_IMAGES,
-  computeMergeLayout,
-  isImageFile,
-  type MergeDirection,
-} from './core';
+import { MAX_IMAGES, computeMergeLayout, isImageFile, type MergeDirection } from './core';
 
 interface LoadedImage {
   id: string;
@@ -19,14 +14,12 @@ interface LoadedImage {
 
 const DIRECTIONS: MergeDirection[] = ['horizontal', 'vertical', 'grid'];
 
-/** 在线图片合并 */
+/** In-browser image merge */
 export default function ImageMergeTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ d: 'horizontal', g: 0 }), []);
   const [direction, setDirection] = useState<MergeDirection>(
-    DIRECTIONS.includes(init.d as MergeDirection)
-      ? (init.d as MergeDirection)
-      : 'horizontal',
+    DIRECTIONS.includes(init.d as MergeDirection) ? (init.d as MergeDirection) : 'horizontal',
   );
   const [gap, setGap] = useState(Number(init.g) || 0);
   const [images, setImages] = useState<LoadedImage[]>([]);

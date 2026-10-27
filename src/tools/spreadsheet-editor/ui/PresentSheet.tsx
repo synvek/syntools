@@ -1,10 +1,10 @@
 import { columnIndexToName, type PresentCell, type PresentGrid } from '../core';
 
 /**
- * 放映用的只读表格。
+ * Read-only grid used by present mode.
  *
- * 表格数据来自 `buildPresentGrid`（快照 → 纯数据），因此不需要 Univer 实例，
- * 也不会影响正在编辑的工作簿；合并单元格按 rowSpan / colSpan 还原。
+ * Data comes from `buildPresentGrid` (snapshot → plain data), so no Univer instance is needed and the
+ * workbook being edited is untouched; merged cells are restored via rowSpan / colSpan.
  */
 
 const CELL_WIDTH = 108;
@@ -14,7 +14,7 @@ export function PresentSheet({ grid }: { grid: PresentGrid }) {
   const merges = new Map<string, PresentGrid['merges'][number]>();
   for (const merge of grid.merges) merges.set(`${merge.row}:${merge.col}`, merge);
 
-  // 被合并区域覆盖的格子不单独渲染
+  // Cells covered by a merged region are not rendered separately
   const covered = new Set<string>();
   for (const merge of grid.merges) {
     for (let row = merge.row; row < merge.row + merge.rowSpan; row += 1) {

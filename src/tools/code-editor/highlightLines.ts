@@ -1,22 +1,23 @@
 import { escapeHtml } from './prism';
 
 /**
- * 把 Prism 的高亮 HTML 切分为「逐行 HTML」（阶段 6）。
+ * Split Prism's highlighted HTML into per-line HTML (phase 6).
  *
- * 为什么需要：导出卡片要支持行号与指定行高亮，必须逐行渲染 DOM；
- * 而 Prism 的块注释 / 多行字符串会输出**跨行 token**，直接按 `\n` 切字符串会破坏标签。
- * 这里用临时容器解析后按行重组：换行处先闭合当前打开的所有 `<span>`，
- * 下一行再用同样的 class 重新打开（高亮效果因此保持连续）。
+ * Why: export cards need line numbers and per-line highlighting, which requires rendering one
+ * DOM row per line, yet Prism emits **multi-line tokens** for block comments / multi-line strings,
+ * so splitting the string on `\n` would break tags. This parses into a temporary container and
+ * rebuilds by line: at each newline every open `<span>` is closed, then reopened with the same
+ * class on the next line, so highlighting stays continuous.
  */
 
-/** 单行的最大长度保护：超长行直接返回转义文本，避免解析开销 */
+/** Max line length guard: over-long input is returned escaped to avoid the parse cost */
 const MAX_PARSE_LENGTH = 200_000;
 
 interface OpenTag {
   className: string;
 }
 
-/** 用临时容器解析高亮 HTML，并按行重组（无 DOM 环境时退化为按 \n 切分） */
+/** Parse highlighted HTML in a temporary container and rebuild per line (falls back to \n split without DOM) */
 export function splitHighlightedLines(html: string): string[] {
   if (!html) return [''];
   if (html.length > MAX_PARSE_LENGTH || typeof document === 'undefined') {
@@ -51,7 +52,7 @@ export function splitHighlightedLines(html: string): string[] {
     const element = node as HTMLElement;
     const className = element.getAttribute('class') ?? '';
     if (element.childNodes.length === 0) {
-      // 空元素（如 <br>）原样保留
+      // Keep void elements (e.g. <br>) as they are
       current += element.outerHTML;
       return;
     }

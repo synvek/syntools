@@ -2,15 +2,15 @@ import Konva from 'konva';
 import type { ChartElement } from '../model/types';
 
 /**
- * 图表元素 → Konva 矢量节点。
+ * Chart element → Konva vector nodes.
  *
- * 为什么不用 echarts 离屏渲染成位图：
- * 缩略图（`render/thumbnail.ts`）与 PNG / PDF 光栅导出（`io/raster.ts`）都是
- * **同步**渲染的，没有等待异步图片解码的机会，位图方案会让这些场景里的图表变空白。
- * 用 Konva 图元直接画，既保持矢量清晰，又让所有渲染路径行为一致。
+ * Why not render offscreen with echarts into a bitmap:
+ * thumbnails (`render/thumbnail.ts`) and PNG / PDF raster export (`io/raster.ts`) render **synchronously**
+ * with no chance to await async image decoding, so a bitmap would leave charts blank in those paths.
+ * Drawing directly with Konva shapes keeps them vector-crisp and makes every render path behave the same.
  *
- * 与导出的关系：画布上的矢量图只负责展示与导出位图；
- * 导出 .pptx 时走 pptxgenjs 的原生 `addChart`，在 PowerPoint 里仍是可编辑数据图表。
+ * Relation to export: the canvas vector only serves display and bitmap export;
+ * .pptx export goes through pptxgenjs's native `addChart`, so charts stay editable data charts in PowerPoint.
  */
 
 const DEFAULT_PALETTE = [
@@ -64,7 +64,7 @@ interface Plot {
   height: number;
 }
 
-/** 图表布局：标题在上、图例在下、左侧留值轴、下方留类别轴 */
+/** Chart layout: title on top, legend below, value axis on the left, category axis underneath */
 function layout(element: ChartElement): {
   plot: Plot;
   palette: string[];
@@ -89,7 +89,7 @@ function layout(element: ChartElement): {
   return { plot, palette: paletteOf(element), titleHeight, showLegend };
 }
 
-/** 值轴刻度（4 段）与网格线 */
+/** Value axis ticks (4 divisions) and grid lines */
 function addValueAxis(group: Konva.Group, plot: Plot, max: number, grid: boolean): void {
   const color = '#94A3B8';
   for (let i = 0; i <= 4; i += 1) {
@@ -113,7 +113,7 @@ function addValueAxis(group: Konva.Group, plot: Plot, max: number, grid: boolean
   }
 }
 
-/** 类别轴标签（均匀分布在绘图区下方） */
+/** Category axis labels (evenly spread under the plot area) */
 function addCategoryAxis(group: Konva.Group, plot: Plot, categories: string[]): void {
   const count = Math.max(1, categories.length);
   const step = plot.width / count;
@@ -172,7 +172,7 @@ function addLegend(
   }
 }
 
-/* ------------------------------ 各类图表 ------------------------------ */
+/* ------------------------------ Chart kinds ------------------------------ */
 
 function addBars(group: Konva.Group, element: ChartElement, plot: Plot, palette: string[]): void {
   const categories = element.categories.length > 0 ? element.categories : [''];
@@ -347,7 +347,7 @@ function addPie(
     angle += sweep;
   });
 
-  // 无类别轴，类别名以图例形式标在下方
+  // No category axis: category names are labeled in the legend below
   if (element.options?.legend !== false) {
     const names = element.categories.map((name, index) => `${name || `Item ${index + 1}`}`);
     names.forEach((name, index) => {
@@ -456,7 +456,7 @@ function addRadar(group: Konva.Group, element: ChartElement, plot: Plot, palette
   });
 }
 
-/** 图表元素 → Konva.Group（局部坐标 0,0 → width,height） */
+/** Chart element → Konva.Group (local coordinates 0,0 → width,height) */
 export function createChartNode(element: ChartElement): Konva.Group {
   const group = new Konva.Group({ listening: false });
   const { plot, palette, showLegend } = layout(element);

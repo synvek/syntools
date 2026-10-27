@@ -4,24 +4,25 @@ import type { Editor } from '@tiptap/react';
 import { Icon } from '@/core/components/Icon';
 
 /**
- * 编辑区右键菜单。
+ * Editor context menu.
  *
- * 为什么需要它：编辑区此前没有任何 contextmenu 处理，链接只能靠工具栏按钮 + `window.prompt`
- * 创建，创建后既看不到地址也无法修改 / 移除；桌面端（Tauri）连原生右键菜单都不可用，
- * 等于丢掉了复制 / 粘贴这类基本操作。
+ * Why it exists: the editor had no contextmenu handling at all, so links could only be created via a
+ * toolbar button + `window.prompt` and then couldn't be inspected, edited or removed; on desktop
+ * (Tauri) even the native context menu is unavailable, which drops basics like copy / paste.
  *
- * 菜单按命中的对象给出不同动作：链接（打开 / 复制地址 / 编辑 / 移除）、图片（删除）、
- * 文本（剪切 / 复制 / 粘贴 / 常用格式 / 插入链接 / 清除格式）、空白（粘贴 / 全选）。
+ * The menu offers different actions per hit target: link (open / copy address / edit / remove),
+ * image (delete), text (cut / copy / paste / common formats / insert link / clear formatting),
+ * empty space (paste / select all).
  */
 
-/** 右键命中的上下文与位置（视口坐标） */
+/** Context and position of the right-click hit (viewport coordinates) */
 export interface EditorContextTarget {
   x: number;
   y: number;
   kind: 'link' | 'image' | 'text' | 'empty';
-  /** kind === 'link'：链接地址 */
+  /** kind === 'link': link address */
   href?: string;
-  /** kind === 'image'：图片节点在文档中的位置 */
+  /** kind === 'image': document position of the image node */
   imagePos?: number;
 }
 
@@ -31,13 +32,13 @@ interface EditorContextMenuProps {
   onClose: () => void;
 }
 
-/** 复制到剪贴板：优先异步 API，失败退回临时 textarea（与 CopyButton 同策略） */
+/** Copy to clipboard: prefer the async API, fall back to a temporary textarea (same strategy as CopyButton) */
 async function copyText(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
     return;
   } catch {
-    // 继续走降级路径
+    // Continue to the fallback path
   }
   const area = document.createElement('textarea');
   area.value = text;
@@ -50,7 +51,7 @@ async function copyText(text: string): Promise<void> {
   area.remove();
 }
 
-/** 在新标签页 / 系统浏览器打开链接（与站内其它外链一致：原生锚点 + target=_blank） */
+/** Open a link in a new tab / system browser (like other external links here: native anchor + target=_blank) */
 function openInNewTab(href: string): void {
   const anchor = document.createElement('a');
   anchor.href = href;
@@ -75,8 +76,9 @@ function Row({ label, glyph, icon, active = false, disabled = false, onClick }: 
       role="menuitem"
       disabled={disabled}
       /*
-       * 保持编辑器的焦点与选区：菜单一旦抢走焦点，execCommand('copy' / 'cut') 就会落在空选区上。
-       * 菜单自身的定位与关闭由 pointerdown 监听负责，不受这里 preventDefault 影响。
+       * Preserve the editor's focus and selection: once the menu steals focus,
+       * execCommand('copy' / 'cut') operates on an empty selection. Positioning and closing of the
+       * menu are handled by the pointerdown listener, unaffected by preventDefault here.
        */
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
@@ -86,7 +88,7 @@ function Row({ label, glyph, icon, active = false, disabled = false, onClick }: 
           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'
       }`}
     >
-      {/* 字形只是装饰：可访问名称保持为纯动作文字，避免读出「B 加粗」 */}
+      {/* The glyph is decorative only: the accessible name stays plain action text, avoiding "B bold" */}
       <span
         aria-hidden="true"
         className="flex h-3.5 w-3.5 shrink-0 items-center justify-center opacity-70"
@@ -106,19 +108,19 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  /** 实测尺寸前的兜底定位（避免首帧出现在错误位置） */
+  /** Fallback position before measuring (keeps the first frame from appearing in the wrong place) */
   const [pos, setPos] = useState({ left: -9999, top: -9999 });
-  /** 链接地址输入态：编辑已有链接 / 为选中文本插入链接 */
+  /** Link address input state: edit an existing link / insert a link for the selected text */
   const [linkEdit, setLinkEdit] = useState<{
     mode: 'edit' | 'insert';
     value: string;
     from: number;
     to: number;
   } | null>(null);
-  /** 是否处于链接输入态：用布尔量驱动副作用，避免输入过程中被反复触发 */
+  /** Whether the link input is open: driven by a boolean so side effects don't re-fire while typing */
   const editing = linkEdit !== null;
 
-  // 按实测尺寸把菜单收敛在视口内（进入链接输入态后尺寸会变，需重新收敛）
+  // Keep the menu inside the viewport using measured size (entering the link input changes it, so re-clamp)
   useLayoutEffect(() => {
     const el = panelRef.current;
     if (!el) return;
@@ -132,9 +134,9 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
   }, [target, editing]);
 
   /*
-   * 只在「进入输入态」时聚焦并全选一次，方便直接覆盖旧地址。
-   * 依赖必须是布尔量：若依赖每次输入都会变化的对象状态，每敲一个字母都会重新全选，
-   * 下一个字母就会把已输入的内容整段替换掉。
+   * Focus and select-all only when entering the input state, so the old address can be overwritten directly.
+   * The dependency must be the boolean: depending on object state that changes per keystroke would
+   * re-select on every character, and the next character would replace everything typed so far.
    */
   useEffect(() => {
     if (!editing) return;
@@ -148,14 +150,14 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      // 捕获阶段拦下：菜单关闭后不再把 Esc 传给编辑器
+      // Intercept in the capture phase: once the menu closes, Esc no longer reaches the editor
       event.stopPropagation();
       onClose();
     };
     const onViewportChange = () => onClose();
     window.addEventListener('pointerdown', onPointerDown, true);
     window.addEventListener('keydown', onKeyDown, true);
-    // 滚动 / 缩放会让坐标失效，直接关闭比留着错位菜单更好
+    // Scrolling / zooming invalidates the coordinates; closing beats leaving a misplaced menu
     window.addEventListener('wheel', onViewportChange, { passive: true });
     window.addEventListener('resize', onViewportChange);
     return () => {
@@ -166,7 +168,7 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
     };
   }, [onClose]);
 
-  /** 先关菜单再执行动作，避免动作引起的重渲染作用在已失效的菜单上 */
+  /** Close the menu before running the action, so action-triggered re-renders don't hit a stale menu */
   const run = (action: () => void) => () => {
     onClose();
     action();
@@ -176,7 +178,7 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
   const { from, to } = editor.state.selection;
   const hasSelection = from !== to;
 
-  /** 提交链接输入：编辑已有链接时作用于整段链接，插入时作用于右键时选中的文本；留空即移除 */
+  /** Submit the link input: for edits it applies to the whole link, for inserts to the text selected at right-click; empty removes it */
   const submitLink = () => {
     if (!linkEdit) return;
     const href = linkEdit.value.trim();
@@ -291,7 +293,7 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
                   if (text) chain().insertContent(text).run();
                 })
                 .catch(() => {
-                  // 剪贴板不可读（权限 / 环境限制）：保持静默，用户仍可用快捷键粘贴
+                  // Clipboard unreadable (permissions / environment): stay silent, the user can still paste with a shortcut
                 });
             })}
           />

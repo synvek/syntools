@@ -2,8 +2,8 @@ import { docToScreen } from '../core';
 import type { TextLayer } from '../model/types';
 
 /**
- * 文字就地编辑：在画布容器上叠一个透明 textarea，位置 / 字号随视口缩放同步。
- * 与 slide-editor 的 `render/textEditor.ts` 同一思路，但只保留照片编辑器需要的精简能力。
+ * Inline text editing: a transparent textarea over the canvas host whose position / font size follows the viewport zoom.
+ * Same idea as slide-editor's `render/textEditor.ts`, trimmed to what the photo editor needs.
  */
 
 export interface TextEditorInit {
@@ -28,7 +28,7 @@ export interface TextEditorHandle {
 export interface TextEditorOptions {
   host: HTMLElement;
   transform: { scale: number; x: number; y: number };
-  /** 视口尺寸与旋转视图角度：就地图层编辑必须跟画布一起转，否则输入框会飘在错误位置 */
+  /** Viewport size and view rotation: in-place layer editing must rotate with the canvas, or the input box drifts out of place */
   viewSize: { width: number; height: number };
   viewRotation: number;
   onCommit: (id: string, text: string) => void;
@@ -49,7 +49,7 @@ export function openTextEditor(init: TextEditorInit, options: TextEditorOptions)
     position: 'absolute',
     left: `${origin.x}px`,
     top: `${origin.y}px`,
-    // 绕左上角旋转，与画布内容的旋转保持同一角度
+    // Rotate about the top-left corner, matching the canvas content's rotation angle
     transform: viewRotation ? `rotate(${viewRotation}deg)` : '',
     transformOrigin: '0 0',
     width: `${Math.max(40, init.width * scale)}px`,

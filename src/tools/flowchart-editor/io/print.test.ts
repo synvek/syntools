@@ -4,7 +4,7 @@ import { DEFAULT_PRINT_OPTIONS, PAPER_OPTIONS, exportPrintPdfSet, printGrid } fr
 describe('分页打印网格', () => {
   it('A4 纵向：按内容尺寸计算行列', () => {
     const grid = printGrid({ width: 1000, height: 2000 }, { ...DEFAULT_PRINT_OPTIONS, margin: 24 });
-    // 内容区 746 × 1075
+    // Content area 746 × 1075
     expect(grid.cols).toBe(2);
     expect(grid.rows).toBe(2);
     expect(grid.pageWidth).toBe(794);

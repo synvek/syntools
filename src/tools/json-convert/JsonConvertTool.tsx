@@ -9,7 +9,7 @@ import { convertJson, TARGETS, type JsonTarget } from './core';
 
 const isTarget = (v: string): v is JsonTarget => TARGETS.includes(v as JsonTarget);
 
-/** JSON 解析并转换为 YAML / XML / CSV */
+/** Parse JSON and convert it to YAML / XML / CSV */
 export default function JsonConvertTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', t: 'yaml' }), []);

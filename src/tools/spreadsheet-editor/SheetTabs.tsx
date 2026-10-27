@@ -19,9 +19,9 @@ interface SheetTabsProps {
 }
 
 /**
- * 工作表标签栏：切换 / 新增 / 重命名 / 复制 / 删除。
- * 与 Univer 内部状态保持单向同步——本组件是唯一的工作表操作入口
- * （Univer 的 footer 已被关闭，避免两套标签栏并存）。
+ * Sheet tab bar: switch / add / rename / duplicate / delete.
+ * One-way synced with Univer's internal state — this component is the only entry point for sheet
+ * operations (Univer's own footer is disabled so two tab bars never coexist).
  */
 export function SheetTabs({
   sheets,

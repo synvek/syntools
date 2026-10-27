@@ -3,28 +3,29 @@ import DOMPurify from 'dompurify';
 import type { ToolResult } from '@/core/types';
 
 /**
- * Markdown 编辑器核心：marked 解析 + DOMPurify 消毒 + 大纲/统计/导出辅助，
- * 纯前端无数据外发。安全：输出 HTML 一律经 sanitize（剥离 script/事件属性/
- * javascript: 链接），UI 层才可 dangerouslySetInnerHTML。错误码与文案解耦（T29 约定）。
+ * Markdown editor core: marked parsing + DOMPurify sanitising + outline / stats / export helpers,
+ * entirely client-side with no data leaving the browser. Security: all output HTML is sanitised
+ * (stripping script tags, event attributes and `javascript:` links) before the UI layer may use
+ * dangerouslySetInnerHTML. Error codes are decoupled from copy (T29 convention).
  */
 
 export type MarkdownErrorCode = 'EMPTY' | 'PARSE';
 
-/** 单个 .md 文件的读取上限（同时也是草稿上限） */
+/** Read limit for a single .md file (also the draft limit) */
 export const MAX_MARKDOWN_BYTES = 2 * 1024 * 1024;
 
 export const DEFAULT_DOCUMENT_NAME = 'untitled';
 
 export interface MarkdownOptions {
-  /** GitHub 风格 Markdown（表格 / 删除线等），默认开启 */
+  /** GitHub-flavoured Markdown (tables / strikethrough etc.), on by default */
   gfm: boolean;
-  /** 换行符转 <br>，默认关闭 */
+  /** Convert newlines to <br>, off by default */
   breaks: boolean;
 }
 
 export const DEFAULT_MARKDOWN_OPTIONS: MarkdownOptions = { gfm: true, breaks: false };
 
-/** Markdown → 消毒后的 HTML 字符串 */
+/** Markdown → sanitised HTML string */
 export function renderMarkdown(
   text: string,
   options: MarkdownOptions = DEFAULT_MARKDOWN_OPTIONS,
@@ -42,22 +43,22 @@ export function renderMarkdown(
   }
 }
 
-/* ----------------------------- 文档统计 ----------------------------- */
+/* ----------------------------- Document stats ----------------------------- */
 
 export interface MarkdownStats {
-  /** 字符数（码点，含空白与标点） */
+  /** Character count (code points, whitespace and punctuation included) */
   characters: number;
-  /** 字数：中文按字计，西文按词计 */
+  /** Word count: CJK counted per character, Latin per word */
   words: number;
   lines: number;
-  /** 预计阅读时长（分钟），按 300 字/分钟估算 */
+  /** Estimated reading time in minutes, at 300 words per minute */
   readingMinutes: number;
 }
 
 const CJK_RE = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/g;
 const LATIN_WORD_RE = /[A-Za-z0-9][A-Za-z0-9'’-]*/g;
 
-/** 文档统计：字数（中英混排）/ 字符 / 行数 / 预计阅读时长 */
+/** Document stats: words (mixed CJK and Latin) / characters / lines / reading time */
 export function countMarkdownStats(text: string): MarkdownStats {
   const characters = Array.from(text).length;
   const lines = text.length === 0 ? 0 : text.split(/\r\n|\r|\n/).length;
@@ -72,9 +73,9 @@ export function countMarkdownStats(text: string): MarkdownStats {
   };
 }
 
-/* ----------------------------- 大纲与锚点 ----------------------------- */
+/* ----------------------------- Outline and anchors ----------------------------- */
 
-/** 大纲条目：offset 供编辑器定位，id 与预览锚点一一对应 */
+/** Outline entry: `offset` locates it in the editor, `id` matches the preview anchor */
 export interface MarkdownOutlineItem {
   level: number;
   text: string;
@@ -84,16 +85,16 @@ export interface MarkdownOutlineItem {
 
 const HEADING_TAG_RE = /<h([1-6])(\s[^>]*)?>([\s\S]*?)<\/h\1>/gi;
 
-/** 预览锚点 id 规则：第 n 个标题（从 0 开始）对应 md-h-(n+1) */
+/** Preview anchor id rule: heading n (0-based) maps to md-h-(n+1) */
 export function headingAnchorId(index: number): string {
   return `md-h-${index + 1}`;
 }
 
 /**
- * 按出现顺序给已消毒预览 HTML 的标题注入锚点 id。
+ * Inject anchor ids into the headings of already-sanitised preview HTML, in document order.
  *
- * 在 sanitize **之后**执行：id 由自己生成才能保证与大纲顺序严格一致
- * （marked 的 id 会被 sanitize 影响，且不同版本行为不一致）。
+ * Runs **after** sanitising: generating the ids here keeps them strictly in sync with the outline
+ * (marked's own ids are affected by sanitising and behave differently across versions).
  */
 export function applyHeadingIds(html: string): string {
   let index = 0;
@@ -110,7 +111,7 @@ export function applyHeadingIds(html: string): string {
 const FENCE_RE = /^(?:```|~~~)/;
 const ATX_HEADING_RE = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
 
-/** 从 Markdown 源码提取 ATX 标题（跳过围栏代码块），得到可跳转的大纲 */
+/** Extract ATX headings from Markdown source (skipping fenced code blocks) into a jumpable outline */
 export function extractOutline(markdown: string): MarkdownOutlineItem[] {
   const outline: MarkdownOutlineItem[] = [];
   const lines = markdown.split('\n');
@@ -137,19 +138,19 @@ export function extractOutline(markdown: string): MarkdownOutlineItem[] {
   return outline;
 }
 
-/* ----------------------------- 文件名与导出 ----------------------------- */
+/* ----------------------------- Filename and export ----------------------------- */
 
-/** 清洗文件名：去掉路径分隔符与控制字符；空则回落默认名 */
+/** Sanitise a filename: drop path separators and control characters; fall back to the default when empty */
 export function sanitizeFilename(name: string): string {
   const cleaned = name
-    // eslint-disable-next-line no-control-regex -- 过滤控制字符与路径分隔符
+    // eslint-disable-next-line no-control-regex -- strip control characters and path separators
     .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, '')
     .replace(/^\.+/, '')
     .trim();
   return cleaned.slice(0, 64) || DEFAULT_DOCUMENT_NAME;
 }
 
-/** 补上扩展名（已存在则不重复追加） */
+/** Append the extension (never duplicated when already present) */
 export function withExtension(name: string, ext: string): string {
   const base = sanitizeFilename(name);
   return base.toLowerCase().endsWith(ext.toLowerCase()) ? base : `${base}${ext}`;
@@ -159,7 +160,7 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** 导出 HTML 的内嵌样式：单文件自包含，浅色/深色跟随系统 */
+/** Inlined styles for exported HTML: self-contained single file, light / dark follows the system */
 const EXPORT_STYLE = `:root { color-scheme: light dark; }
 body { margin: 0; padding: 2.5rem 1.25rem; background: #ffffff; }
 .markdown-body { max-width: 46rem; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; font-size: 16px; line-height: 1.75; color: #1f2937; word-wrap: break-word; }
@@ -193,7 +194,7 @@ body { margin: 0; padding: 2.5rem 1.25rem; background: #ffffff; }
   .markdown-body hr { border-top-color: #1f2937; }
 }`;
 
-/** 生成可独立打开的 HTML 文档（单文件自包含，无外部依赖） */
+/** Build a standalone HTML document (single self-contained file, no external dependencies) */
 export function buildHtmlDocument(title: string, bodyHtml: string): string {
   return `<!doctype html>
 <html lang="zh-CN">

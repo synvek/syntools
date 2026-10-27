@@ -16,7 +16,7 @@ export interface RenameRules {
     padding: number;
     position: NumberPosition;
   };
-  /** 留空则保留原扩展名；否则替换为指定扩展名（可带或不带点） */
+  /** Leave empty to keep the original extension; otherwise replace it with the given one (with or without a leading dot) */
   newExtension: string;
 }
 
@@ -36,7 +36,7 @@ export interface RenameItem {
   to: string;
 }
 
-/** 拆分基础名与扩展名（隐藏文件如 .gitignore 视为无扩展名）。 */
+/** Split base name and extension (dotfiles such as .gitignore count as having no extension). */
 export function splitName(name: string): { base: string; ext: string } {
   const idx = name.lastIndexOf('.');
   if (idx <= 0) return { base: name, ext: '' };
@@ -56,7 +56,7 @@ function applyCase(value: string, mode: CaseTransform): string {
   }
 }
 
-/** 对单个文件名应用重命名规则。 */
+/** Apply the rename rules to a single file name. */
 export function applyRename(name: string, index: number, rules: RenameRules): string {
   const { base, ext } = splitName(name);
   let next = base;
@@ -83,7 +83,7 @@ export function applyRename(name: string, index: number, rules: RenameRules): st
   return next + nextExt;
 }
 
-/** 批量重命名。 */
+/** Rename a batch of files. */
 export function bulkRename(names: string[], rules: RenameRules): ToolResult<RenameItem[]> {
   if (names.length === 0) return { ok: false, error: 'EMPTY' };
   if (rules.useRegex && rules.search) {
@@ -99,7 +99,7 @@ export function bulkRename(names: string[], rules: RenameRules): ToolResult<Rena
   };
 }
 
-/** 检测重命名结果中的重名。 */
+/** Detect duplicate names in the rename result. */
 export function findDuplicates(items: RenameItem[]): string[] {
   const seen = new Set<string>();
   const dup = new Set<string>();

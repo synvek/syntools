@@ -1,33 +1,32 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 在线字数统计：字符 / 单词 / 行 / 段落 / 字节等。
+ * Online text statistics: characters / words / lines / paragraphs / bytes, etc.
  */
 
 export interface TextCountStats {
-  /** Unicode 码点数（emoji 计 1） */
+  /** Unicode code points (an emoji counts as 1) */
   chars: number;
-  /** 不含空白的码点数 */
+  /** Code points excluding whitespace */
   charsNoSpace: number;
-  /** UTF-16 代码单元数（string.length） */
+  /** UTF-16 code units (string.length) */
   utf16Length: number;
-  /** UTF-8 字节数 */
+  /** UTF-8 byte count */
   bytes: number;
-  /** 英文按空白分词；连续 CJK 字各计 1 词 */
+  /** Latin text is split on whitespace; each CJK character counts as one word */
   words: number;
-  /** CJK 统一表意文字数量 */
+  /** Number of CJK unified ideographs */
   cjk: number;
   lines: number;
   paragraphs: number;
-  /** 空白字符数 */
+  /** Number of whitespace characters */
   spaces: number;
 }
 
 export type TextCountError = 'EMPTY';
 
 const CJK_RE = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
-const WORD_RE =
-  /[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?|[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu;
+const WORD_RE = /[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?|[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu;
 
 export function countTextStats(input: string): ToolResult<TextCountStats> {
   if (!input) return { ok: false, error: 'EMPTY' };

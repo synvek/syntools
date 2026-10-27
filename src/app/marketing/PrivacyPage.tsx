@@ -5,11 +5,11 @@ import { GITHUB_REPO_URL, pickCopy, usePageLang, type PageLang } from '@/app/mar
 import { PageShell, Paragraphs, Section } from '@/app/marketing/ui';
 
 /**
- * /privacy —— 隐私说明。
+ * /privacy — the privacy notice.
  *
- * 刻意写得很短。隐私页的可信度来自「具体」，不来自篇幅：与其罗列法律条款，
- * 不如把「我们到底会不会看到你的文件」这件事一次说清，并主动写明埋点范围。
- * 采购与技术评审会直接引用这一页的内容。
+ * Deliberately short. A privacy page earns trust through specifics, not length: rather than reciting legal clauses,
+ * it answers "do you ever see my files" once and clearly, and states the analytics scope up front.
+ * Procurement and technical reviewers quote this page directly.
  */
 
 interface PrivacyCopy {

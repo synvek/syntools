@@ -1,30 +1,30 @@
 import type { Paragraph, RunStyle, TextAlign, TextBody, TextRun } from './types';
 
 /**
- * 富文本纯逻辑层：把 TextBody 展平成「字符 + 样式 + 所属段落」的序列来操作。
+ * Rich-text pure-logic layer: flattens TextBody into a sequence of "char + style + owning paragraph".
  *
- * 之所以需要这一层：行内编辑用的是一个纯文本 textarea，编辑结束后必须把
- * 新文本映射回 run 级模型。早期实现直接「按行重建段落 + 每段套用首个 run 的样式」，
- * 导致两个真实缺陷：
- *   1. 段落内混排样式（如部分加粗）被抹平；
- *   2. spaceBefore / spaceAfter / indent 等段落属性被丢弃。
- * 这里改为「公共前缀 / 公共后缀 diff + 按字符继承样式」，只重算真正被改动的那一段。
+ * Why this layer exists: inline editing uses a plain-text textarea, so the new text must be mapped back onto
+ * the run-level model afterwards. The early implementation rebuilt paragraphs line by line and applied the
+ * first run's style to each, which caused two real defects:
+ *   1. mixed styles inside a paragraph (e.g. partial bold) were flattened;
+ *   2. paragraph props such as spaceBefore / spaceAfter / indent were dropped.
+ * It now diffs the common prefix/suffix and inherits styles per character, recomputing only the changed span.
  */
 
-/** 展平后的单个字符。`paragraph === -1` 表示段落分隔符（\n） */
+/** A single flattened character. `paragraph === -1` marks a paragraph separator (\n) */
 export interface FlatChar {
   paragraph: number;
   text: string;
   style?: RunStyle;
 }
 
-/** TextBody → 字符序列（段落间插入 -1 分隔项） */
+/** TextBody → character sequence (a -1 separator between paragraphs) */
 export function flattenBody(body: TextBody): FlatChar[] {
   const chars: FlatChar[] = [];
   body.paragraphs.forEach((paragraph, index) => {
     if (index > 0) chars.push({ paragraph: -1, text: '\n' });
     for (const run of paragraph.runs) {
-      // 按码点拆分，避免把 emoji / 代理对切坏
+      // Split by code point so emoji / surrogate pairs aren't cut in half
       for (const text of Array.from(run.text)) {
         chars.push({ paragraph: index, text, style: run.style });
       }
@@ -33,7 +33,7 @@ export function flattenBody(body: TextBody): FlatChar[] {
   return chars;
 }
 
-/** TextBody → 纯文本（与 textarea 内容一一对应） */
+/** TextBody → plain text (one-to-one with the textarea content) */
 export function bodyToText(body: TextBody): string {
   return flattenBody(body)
     .map((char) => char.text)
@@ -50,7 +50,7 @@ function styleEquals(a: RunStyle | undefined, b: RunStyle | undefined): boolean 
   return true;
 }
 
-/** 取某一段落的段落级属性（不含 runs） */
+/** Paragraph-level props of one paragraph (without runs) */
 function paragraphProps(source: TextBody, origin: number): Omit<Paragraph, 'runs'> {
   const picked = source.paragraphs[origin] ?? source.paragraphs[0];
   if (!picked) return {};
@@ -59,7 +59,7 @@ function paragraphProps(source: TextBody, origin: number): Omit<Paragraph, 'runs
   return rest;
 }
 
-/** 字符序列 → TextBody：相邻同样式字符合并为一个 run，段落属性按首字符来源段落继承 */
+/** Character sequence → TextBody: same-style neighbors merge into a run, paragraph props follow the first char */
 export function rebuildBody(chars: FlatChar[], source: TextBody): TextBody {
   const paragraphs: Paragraph[] = [];
   let origin = 0;
@@ -85,13 +85,13 @@ export function rebuildBody(chars: FlatChar[], source: TextBody): TextBody {
   }
   flush();
 
-  // 全空文档也要保留一个空段落，否则模型与渲染都会缺少落点
+  // Keep one empty paragraph even for an empty document, otherwise model and render have no anchor
   if (paragraphs.length === 0)
     paragraphs.push({ ...paragraphProps(source, 0), runs: [{ text: '' }] });
   return { ...source, paragraphs };
 }
 
-/** 查询选区内是否「全部」具备某样式，用于工具栏三态回显 */
+/** Whether "all" chars in [start, end) have a style, for the toolbar's tri-state display */
 export function queryStyleRange(body: TextBody, start: number, end: number): RunStyle {
   const chars = flattenBody(body);
   const slice = chars.slice(Math.max(0, start), Math.min(end, chars.length));
@@ -110,7 +110,7 @@ export function queryStyleRange(body: TextBody, start: number, end: number): Run
   return result;
 }
 
-/** 给选区 [start, end) 内的字符打样式补丁（会按需切分 run） */
+/** Apply a style patch to the chars in [start, end) (splitting runs as needed) */
 export function applyStyleRange(
   body: TextBody,
   start: number,
@@ -132,7 +132,7 @@ export function applyStyleRange(
   return rebuildBody(chars, body);
 }
 
-/** 段落级属性（去掉 runs），供重建段落时复用 */
+/** Paragraph-level props (without runs), reused when rebuilding paragraphs */
 function propsOf(paragraph: Paragraph | undefined): Omit<Paragraph, 'runs'> {
   if (!paragraph) return {};
   const { runs: _runs, ...rest } = paragraph;
@@ -141,9 +141,9 @@ function propsOf(paragraph: Paragraph | undefined): Omit<Paragraph, 'runs'> {
 }
 
 /**
- * 单行内的文本 diff：把旧 run 序列映射到新文本，返回合并后的 run 序列。
- * 只重算「公共前缀之后、公共后缀之前」的区间，新字符继承被替换处首字符的样式
- * —— 与 PowerPoint 的「紧邻样式继承」行为一致。
+ * Diff of the text within a single line: maps the old run sequence onto the new text and returns the merged runs.
+ * Only the span after the common prefix and before the common suffix is recomputed; new chars inherit the
+ * style of the first replaced char — matching PowerPoint's "inherit from adjacent text" behavior.
  */
 function diffLineToRuns(oldRuns: TextRun[], nextLine: string): TextRun[] {
   const oldChars: { text: string; style?: RunStyle }[] = [];
@@ -165,8 +165,8 @@ function diffLineToRuns(oldRuns: TextRun[], nextLine: string): TextRun[] {
     suffix += 1;
   }
 
-  // 继承「插入点前一个字符」的样式：与 PowerPoint 输入时的紧邻继承行为一致
-  // （在末尾追加时即最后一个字符；整行为空时无样式可继承）
+  // Inherit the style of the char before the insertion point: matches PowerPoint's adjacent inheritance
+  // (the last char when appending at the end; nothing to inherit when the whole line is empty)
   const inherit = oldChars[Math.max(0, Math.min(prefix - 1, oldChars.length - 1))]?.style;
   const head = oldChars.slice(0, prefix);
   const tail = oldChars.slice(oldChars.length - suffix);
@@ -184,16 +184,16 @@ function diffLineToRuns(oldRuns: TextRun[], nextLine: string): TextRun[] {
 }
 
 /**
- * 用编辑后的纯文本替换 TextBody 的文字内容，同时保留样式与段落属性。
+ * Replace a TextBody's text with the edited plain text, preserving styles and paragraph props.
  *
- * 段落属性按「行」映射：行数不变时逐行对应；行数变化时多出来的行继承末段属性。
- * 行内样式走 `diffLineToRuns` 的字符级 diff，只重算真正被改动的区间。
+ * Paragraph props map per line: same line count → line by line; extra lines inherit the last paragraph's props.
+ * Inline styles go through the char-level diff in `diffLineToRuns`, which recomputes only the changed spans.
  */
 export function replaceBodyText(body: TextBody, nextText: string): TextBody {
   const oldCount = body.paragraphs.length;
   const newLines = nextText.split('\n');
   const paragraphs: Paragraph[] = newLines.map((line, index) => {
-    // 行数一致时逐行对齐，最大程度保留各段自己的属性
+    // Align line by line when the counts match, preserving as much of each paragraph's own props as possible
     const sourceIndex =
       newLines.length === oldCount ? index : Math.min(index, Math.max(0, oldCount - 1));
     const source = body.paragraphs[sourceIndex];
@@ -203,8 +203,8 @@ export function replaceBodyText(body: TextBody, nextText: string): TextBody {
 }
 
 /**
- * 等比缩放全部 run 的字号，用于模拟 PowerPoint 的 normAutofit
- * （自动调整文字大小以适应形状：缩字后重新排版，而不是把文字压扁）。
+ * Scale every run's font size proportionally, simulating PowerPoint's normAutofit
+ * (shrink the text to fit the shape and re-layout, instead of squashing it).
  */
 export function scaleBodyFonts(body: TextBody, factor: number): TextBody {
   if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return body;
@@ -223,7 +223,7 @@ export function scaleBodyFonts(body: TextBody, factor: number): TextBody {
   };
 }
 
-/** 段落对齐：同时写回全部段落（与属性面板行为一致） */
+/** Paragraph alignment: written to every paragraph (matching the property panel) */
 export function setBodyAlign(body: TextBody, align: TextAlign): TextBody {
   return { ...body, paragraphs: body.paragraphs.map((paragraph) => ({ ...paragraph, align })) };
 }

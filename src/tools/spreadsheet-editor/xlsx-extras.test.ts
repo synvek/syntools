@@ -60,9 +60,9 @@ describe('xlsx-extras 纯逻辑', () => {
       sheets: { S: { dataValidations: { A1: { type: 'list', formulae: [] } } } },
     });
     expect(readWorkbookExtras(snapshot)?.sheets.S.dataValidations).toBeTruthy();
-    // 空内容：移除字段，恢复为原对象形态
+    // No content: the field is removed and the original shape restored
     expect(withWorkbookExtras(snapshot, { version: 1, sheets: {} })).toEqual(base);
-    // 损坏 / 缺失
+    // Malformed / missing
     expect(readWorkbookExtras(undefined)).toBeNull();
     expect(readWorkbookExtras({})).toBeNull();
     expect(readWorkbookExtras({ syntoolsExtras: { version: 2, sheets: {} } as never })).toBeNull();

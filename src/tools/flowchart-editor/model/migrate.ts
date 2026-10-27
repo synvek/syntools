@@ -1,7 +1,7 @@
 /**
- * 文档迁移与归一化：把任意历史 / 外部文档统一成 v3（多页）结构。
- * 纯函数，不向调用方抛异常；无法识别时返回 null，由调用方降级为空图。
- * 这样旧的 v1 草稿（{version:1, nodes, edges}）与 v2 文档仍然可读，不会被丢弃。
+ * Document migration and normalization: unify any historical / external document into the v3 (multi-page) structure.
+ * Pure functions that never throw to callers; returns null when unrecognized so callers can fall back to an empty graph.
+ * This keeps old v1 drafts ({version:1, nodes, edges}) and v2 documents readable instead of discarding them.
  */
 
 import type {
@@ -15,15 +15,15 @@ import type {
 } from './types';
 
 /**
- * 页面默认名占位符（语言中立）。
- * 新建页面时由 store 层按当前语言本地化（`tools.flowchart.defaultPageName`）；
- * 此常量仅用于兼容缺失页名的历史数据。
+ * Placeholder for the default page name (language-neutral).
+ * The store layer localizes new pages for the current language (`tools.flowchart.defaultPageName`);
+ * this constant only serves legacy data that lacks a page name.
  */
 export const DEFAULT_PAGE_NAME = 'Page 1';
 
 let seq = 0;
 
-/** 模块内自给 id，避免与 core 形成循环依赖 */
+/** Module-local id helper, avoiding a circular dependency with core */
 function newId(prefix: string): string {
   seq += 1;
   return `${prefix}_${Date.now().toString(36)}_${seq.toString(36)}`;
@@ -55,12 +55,12 @@ function num(v: unknown): number {
 
 const NODE_TYPES: FlowNodeType[] = ['shape', 'image', 'icon', 'formula', 'table'];
 
-/** 未知/缺失的节点类型回退为 shape（保证旧文档与脏数据都能打开） */
+/** Unknown/missing node types fall back to shape (so both legacy documents and dirty data open) */
 function normalizeNodeType(value: unknown): FlowNodeType {
   return NODE_TYPES.includes(value as FlowNodeType) ? (value as FlowNodeType) : 'shape';
 }
 
-/** 归一表格数据：行列数至少为 1，非法的从属单元格记为 null */
+/** Normalize table data: row/column counts are at least 1 and invalid covered cells become null */
 function normalizeTable(table: unknown): TableData | undefined {
   if (!isPlainObject(table)) return undefined;
   const rows = Math.max(1, Math.round(num(table.rows) || 1));
@@ -108,12 +108,12 @@ function normalizePage(v: Partial<FlowPage> & { id?: unknown; name?: unknown }):
   };
 }
 
-/** 新建一页 */
+/** Create a new page */
 export function createPage(name: string = DEFAULT_PAGE_NAME, id?: string): FlowPage {
   return { id: id ?? newId('page'), name, nodes: [], edges: [] };
 }
 
-/** 把单页 nodes/edges 包成 v3 文档 */
+/** Wrap single-page nodes/edges into a v3 document */
 export function toDocV3(
   nodes: FlowNodeRec[],
   edges: FlowEdgeRec[],
@@ -124,10 +124,10 @@ export function toDocV3(
 }
 
 /**
- * 归一为 v3 文档：
- * - v3 / v2（含 pages）：补齐缺失字段与 activePageId
- * - v1（含 nodes/edges）：包装成单页
- * - 其它：返回 null
+ * Normalize into a v3 document:
+ * - v3 / v2 (with pages): fill in missing fields and activePageId
+ * - v1 (with nodes/edges): wrap as a single page
+ * - anything else: return null
  */
 export function migrateDoc(raw: unknown): FlowDoc | null {
   if (!isPlainObject(raw)) return null;
@@ -158,7 +158,7 @@ export function migrateDoc(raw: unknown): FlowDoc | null {
   return null;
 }
 
-/** 取当前活动页（越界或缺失时回退第一页） */
+/** Get the active page (falls back to the first page when out of range or missing) */
 export function activePageOf(doc: FlowDoc | null | undefined): FlowPage | undefined {
   if (!doc || doc.pages.length === 0) return undefined;
   return doc.pages.find((p) => p.id === doc.activePageId) ?? doc.pages[0];

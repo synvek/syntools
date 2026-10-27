@@ -44,24 +44,24 @@ import { selectionFromPath as toSelection, usePhotoStore } from '../store';
 import type { RasterLayer, Layer, PhotoDoc, Rect, Selection } from '../model/types';
 
 /**
- * 指针交互：直接监听容器原生事件（Konva 节点一律 `listening: false`）。
+ * Pointer interaction: listen to native container events directly (all Konva nodes are `listening: false`).
  *
- * 好处是命中检测与自绘选区不会因为 Konva 的节点命中规则互相抢事件，
- * 也能统一把「屏幕坐标 → 文档坐标」的换算收在一处。
+ * That way hit testing and the custom-drawn selection never fight over events with Konva's node hit rules,
+ * and the "screen → document" conversion lives in a single place.
  */
 
 export interface PointerContext {
   getTransform: () => { scale: number; x: number; y: number };
   onRequestTextEdit: (id: string) => void;
-  /** 像素被改写（落笔 / 填充）：宿主以 rAF 合帧重绘该图层 */
+  /** Pixels rewritten (paint / fill): the host redraws that layer once per rAF frame */
   onSurfaceChange: () => void;
-  /** 抓手平移：宿主立即写入变换并落库 */
+  /** Hand pan: the host writes the transform immediately and persists it */
   onPan: (x: number, y: number) => void;
-  /** 右键菜单：坐标为视口坐标（clientX / clientY） */
+  /** Context menu: coordinates are viewport coordinates (clientX / clientY) */
   onContextMenu: (position: { x: number; y: number }) => void;
-  /** 吸管取色结果（null = 画布外），由宿主更新前景色并给出反馈 */
+  /** Eyedropper result (null = outside the canvas); the host updates the foreground color and gives feedback */
   onPickColor: (picked: PickedColor | null) => void;
-  /** 新建文字图层的默认内容（由宿主按当前语言提供） */
+  /** Default content for a new text layer (provided by the host in the active locale) */
   defaultText: string;
 }
 
@@ -104,18 +104,18 @@ export function attachPointer(
   let stroke: StrokeSession | null = null;
   let strokeLayerId: string | null = null;
   let strokeIsMask = false;
-  /** 润饰工具会话（减淡 / 加深 / 海绵） */
+  /** Retouch tool session (dodge / burn / sponge) */
   let retouch: RetouchSession | null = null;
   let retouchLayerId: string | null = null;
-  /** 本次笔画是否落在快速蒙版上（松手时要刷新蒙版而不是图层 rev） */
+  /** Whether this stroke lands on the quick mask (release refreshes the mask, not the layer rev) */
   let strokeIsQuickMask = false;
-  /** 修复类工具会话（图章 / 修复 / 涂抹 / 模糊锐化） */
+  /** Healing tool session (stamp / healing / smudge / blur-sharpen) */
   let repair: RepairSession | null = null;
   let repairLayerId: string | null = null;
-  /** 快速选择：上次生长的时间戳（节流，避免每个 pointermove 都重算魔棒） */
+  /** Quick select: timestamp of the last growth (throttles the magic wand off every pointermove) */
   let quickLastAt = 0;
 
-  /** 屏幕 → 文档：旋转视图下必须走完整逆变换，否则点击位置会随角度错开 */
+  /** Screen → document: a rotated view needs the full inverse, or clicks drift with the angle */
   const toDoc = (event: PointerEvent | MouseEvent): { x: number; y: number } => {
     const rect = container.getBoundingClientRect();
     return screenToDoc(
@@ -128,7 +128,7 @@ export function attachPointer(
 
   const scaleNow = () => context.getTransform().scale || 1;
 
-  /** 重绘覆盖层：默认取当前 store 状态，允许局部覆盖（拖拽预览用） */
+  /** Redraw the overlay: defaults to current store state, with optional overrides (for drag previews) */
   const drawOverlay = (over: Partial<OverlayState> = {}) => {
     const state = usePhotoStore.getState();
     const active = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
@@ -152,7 +152,7 @@ export function attachPointer(
     });
   };
 
-  /** 修饰键 → 选区布尔运算：Shift 加选、Alt 减选、Shift+Alt 交集，否则替换 */
+  /** Modifiers → selection boolean op: Shift adds, Alt subtracts, Shift+Alt intersects, otherwise replace */
   const selectionOpFrom = (event: { shiftKey: boolean; altKey: boolean }): SelectionOp => {
     if (event.shiftKey && event.altKey) return 'intersect';
     if (event.shiftKey) return 'add';
@@ -160,7 +160,7 @@ export function attachPointer(
     return 'replace';
   };
 
-  /** 快速选择：在落点做一次魔棒生长并并入当前选区（连续拖拽即逐步累积） */
+  /** Quick select: grow the magic wand at the point into the selection (dragging accumulates) */
   const growQuickSelection = (x: number, y: number) => {
     const state = usePhotoStore.getState();
     const next = magicWandSelection(state.doc, x, y, {
@@ -172,21 +172,21 @@ export function attachPointer(
     drawOverlay();
   };
 
-  /** 多边形套索：已落下的顶点（文档坐标）；null = 未开始 */
+  /** Polygon lasso: vertices placed so far (document coords); null = not started */
   let polygon: { points: number[] } | null = null;
-  /** 多边形套索：上一次点击的时间 / 位置（双击闭合用） */
+  /** Polygon lasso: time / position of the last click (used to detect a double-click close) */
   let lastPolyClick = { at: 0, x: 0, y: 0 };
-  /** 多边形套索：闭合时刻（双击的第二下不要再开一个新多边形） */
+  /** Polygon lasso: close timestamp (the second click of a double-click must not start a new polygon) */
   let lastPolyCloseAt = 0;
-  /** 磁性套索：手势开始时算好的边缘图（文档在手势内不变，不必每帧重算） */
+  /** Magnetic lasso: edge map computed at gesture start (the document can't change mid-gesture) */
   let edgeMap: EdgeMap | null = null;
 
-  /** 多边形套索：预览（最后一个顶点 → 光标 → 起点自动闭合） */
+  /** Polygon lasso: preview (last vertex → cursor → start, auto-closing) */
   const previewPolygon = (cursor?: { x: number; y: number }) => {
     if (!polygon) return;
     const path = cursor ? [...polygon.points, cursor.x, cursor.y] : [...polygon.points];
     if (path.length < 4) {
-      // 只有 1 个点时还画不出折线：保持现有选区，不要把它清掉
+      // With only one point there is no polyline yet: keep the existing selection, don't clear it
       drawOverlay();
       return;
     }
@@ -194,7 +194,7 @@ export function attachPointer(
     drawOverlay({ selection: preview });
   };
 
-  /** 多边形套索：闭合落子（顶点不足 3 个就当作误触丢弃） */
+  /** Polygon lasso: commit the close (fewer than 3 vertices counts as a stray click and is dropped) */
   const closePolygon = (op: SelectionOp) => {
     const points = polygon?.points ?? [];
     polygon = null;
@@ -213,9 +213,9 @@ export function attachPointer(
     drawOverlay();
   };
 
-  /** 屏幕 10px 换算到文档单位的命中半径 */
+  /** Hit radius: 10 screen px converted into document units */
   const handleRadius = () => 10 / scaleNow();
-  /** 旋转柄相对顶边的文档单位距离（屏幕 26px） */
+  /** Distance of the rotate handle above the top edge, in document units (26 screen px) */
   const rotateOffset = () => 26 / scaleNow();
 
   const onPointerDown = (event: PointerEvent) => {
@@ -246,15 +246,15 @@ export function attachPointer(
       tool === 'wand' ||
       tool === 'quickSelect';
 
-    // Alt + 左键：图章 / 修复类工具用于「取样源点」（Photoshop 同款手势）
+    // Alt + left click: stamp / healing tools use it to "sample the source point" (the Photoshop gesture)
     if (event.altKey && needsCloneSource(tool)) {
       state.setCloneSource({ x: point.x, y: point.y });
       drawOverlay();
       return;
     }
 
-    // Alt + 左键：其余（非选区、非取样器）工具临时吸取前景色；选区工具下 Alt 表示「减选」。
-    // 取样器自己要用 Alt 删除取样点，因此必须排除在外。
+    // Alt + left click: other tools (not selection, not sampler) temporarily pick the foreground color, while
+    // selection tools use Alt for "subtract". The sampler needs Alt to delete points, so it is excluded.
     if (event.altKey && !isSelectionTool && tool !== 'sampler') {
       context.onPickColor(pickColor(doc, point.x, point.y));
       return;
@@ -266,7 +266,7 @@ export function attachPointer(
     }
 
     if (tool === 'sampler') {
-      // Alt + 点击 = 删除最近的一个取样点（与 Photoshop 的取样器一致）
+      // Alt + click = delete the most recent sampler point (same as Photoshop's sampler)
       if (event.altKey) {
         const current = usePhotoStore.getState().samples;
         if (current.length > 0) {
@@ -284,7 +284,7 @@ export function attachPointer(
       const hit = hitTest(doc, point.x, point.y);
       if (hit) {
         state.selectLayer(hit.id);
-        // 锁定位置：仍可选中（便于在面板里改属性），但不进入拖拽
+        // Lock position: still selectable (to edit properties in the panel) but never dragged
         if (hit.lockPosition) return;
         state.commit('histMove');
         drag = {
@@ -315,7 +315,7 @@ export function attachPointer(
         height: active.height,
         rotation: active.rotation,
       };
-      // 网格模式（透视 / 扭曲 / 斜切 / 变形）：先命中控制点 / 边线，再回落到常规手柄判定
+      // Mesh modes (perspective / distort / skew / warp): hit control points / edges first, then handles
       if (state.transformMode !== 'free' && active.mesh) {
         const points = meshControlPoints(active.mesh, box, true);
         const radius = handleRadius();
@@ -352,7 +352,7 @@ export function attachPointer(
       }
       const target = hitTransformHandle(box, point.x, point.y, handleRadius(), rotateOffset());
       if (target === 'inside') {
-        // 框内拖动 = 平移（与移动工具一致）
+        // Dragging inside the box translates it (same as the move tool)
         state.selectLayer(active.id);
         state.commit('histMove');
         drag = {
@@ -370,7 +370,7 @@ export function attachPointer(
         if (under) state.selectLayer(under.id);
         return;
       }
-      // 一次变换 = 一次历史（拖拽过程沿用同一锚点，松手不再重复提交）
+      // One transform = one history entry (dragging reuses the anchor, release does not commit again)
       state.commit('histMove');
       drag = {
         kind: 'transform',
@@ -398,7 +398,7 @@ export function attachPointer(
     }
 
     if (tool === 'polyLasso') {
-      // 逐点单击建框：点回起点或双击闭合，Esc 取消
+      // Click point by point: click the start or double-click to close, Esc cancels
       const doubleClick =
         event.timeStamp - lastPolyClick.at < 320 &&
         Math.hypot(point.x - lastPolyClick.x, point.y - lastPolyClick.y) < 6;
@@ -411,7 +411,7 @@ export function attachPointer(
         lastPolyCloseAt = event.timeStamp;
         return;
       }
-      // 双击闭合的第二下不要再起一个新多边形
+      // The second click of a double-click close must not start a new polygon
       if (!polygon && event.timeStamp - lastPolyCloseAt < 350) return;
       if (polygon) polygon.points.push(point.x, point.y);
       else polygon = { points: [point.x, point.y] };
@@ -420,9 +420,9 @@ export function attachPointer(
     }
 
     if (tool === 'magneticLasso') {
-      // 边缘图只在本手势内有效：文档变化（撤销 / 切图层）时下次手势会重算
+      // The edge map is valid only for this gesture: on document changes (undo / layer switch) it recomputes
       edgeMap = buildEdgeMap(doc);
-      // 「宽度」按屏幕像素理解（Photoshop 的手感）：换算成文档像素后再去吸附
+      // "Width" is read as screen pixels (Photoshop's feel): convert to document px before snapping
       const snapped = snapToEdge(
         edgeMap,
         point,
@@ -494,7 +494,7 @@ export function attachPointer(
     }
 
     if (tool === 'brush' || tool === 'eraser') {
-      // 快速蒙版优先：笔迹写入蒙版画布（画笔涂白 = 加入选区，橡皮涂黑 = 移出选区）
+      // Quick mask wins: the stroke writes into the mask canvas (brush white = select, eraser black = deselect)
       if (state.quickMask) {
         stroke = createStrokeSession(
           {
@@ -522,7 +522,7 @@ export function attachPointer(
         return;
       }
 
-      // 蒙版编辑：笔迹写入蒙版画布（画笔涂白 = 显示，橡皮涂黑 = 隐藏）
+      // Mask editing: the stroke writes into the mask canvas (brush white = show, eraser black = hide)
       const active = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
       if (state.maskEditing && active?.mask) {
         state.commitMask(active.id);
@@ -574,11 +574,11 @@ export function attachPointer(
       const layer = usePhotoStore.getState().doc.layers.find((item) => item.id === layerId);
       if (!layer || layer.kind !== 'raster') return;
       const mode = tool as RepairTool;
-      // 图章 / 修复必须已有取样点；污点修复自动取样
+      // Stamp / healing need a sample point already; spot healing samples automatically
       if (needsCloneSource(mode) && !state.cloneSource) return;
       usePhotoStore.getState().commitPixels(layerId, 'histRetouch');
       const options = {
-        // 与减淡 / 加深 / 海绵共用笔头大小与强度：同族工具换用时期望「笔头不变」
+        // Shares tip size and strength with dodge / burn / sponge, so switching family members keeps the tip
         size: state.retouchSize,
         strength: state.retouchStrength,
         selection: state.selection,
@@ -630,7 +630,7 @@ export function attachPointer(
   };
 
   const onPointerMove = (event: PointerEvent) => {
-    // 多边形套索没有拖拽过程，但仍要跟着光标画「下一段」预览
+    // The polygon lasso has no drag phase, but still previews the "next segment" under the cursor
     const drawingPolygon =
       !drag && !stroke && polygon !== null && usePhotoStore.getState().tool === 'polyLasso';
     if (!drag && !stroke && !drawingPolygon) return;
@@ -666,7 +666,7 @@ export function attachPointer(
     }
 
     if (drag.kind === 'move') {
-      // 闭包内无法沿用外层收窄，先落到局部常量
+      // A closure can't inherit the outer narrowing, so bind a local constant first
       const dragging = drag;
       const layer = state.doc.layers.find((item) => item.id === dragging.id);
       const raw = { x: point.x - drag.offsetX, y: point.y - drag.offsetY };
@@ -676,7 +676,7 @@ export function attachPointer(
         width: layer?.width ?? 0,
         height: layer?.height ?? 0,
       };
-      // 吸附：⌘/Ctrl 临时关闭（与 Photoshop 的「临时停用对齐」同一手势）
+      // Snapping: ⌘/Ctrl disables it temporarily (the same gesture as Photoshop's "suspend align")
       const snapped = snapBoxPosition(
         box,
         collectSnapTargets(state.doc, {
@@ -736,7 +736,7 @@ export function attachPointer(
         path: [],
         feather: 0,
       };
-      // 预览只画新形状；布尔运算在松手时统一结算（避免拖拽中途反复叠加）
+      // The preview draws only the new shape; booleans settle on release (no repeated stacking mid-drag)
       drawOverlay({ selection });
       return;
     }
@@ -762,7 +762,7 @@ export function attachPointer(
 
     if (drag.kind === 'lasso') {
       if (drag.magnetic && edgeMap) {
-        // 磁性套索：吸附到附近最强边缘；间隔太小会让顶点爆炸（轮廓也变毛躁）
+        // Magnetic lasso: snap to the strongest nearby edge; too small a gap explodes the vertex count
         const snapped = snapToEdge(
           edgeMap,
           point,
@@ -906,8 +906,8 @@ export function attachPointer(
       }
     }
 
-    // 记录本次变换增量：⌘⇧T「再次变换」用。
-    // 只登记平移与自由变换 —— 透视 / 扭曲 / 变形不是「可重复的线性增量」，Photoshop 同样不支持重复。
+    // Record this transform's delta for ⌘⇧T "transform again".
+    // Only translate and free transform: perspective / distort / warp aren't repeatable linear deltas.
     const finished = drag;
     if (finished.kind === 'move') state.setSnapGuides([]);
     if (finished.kind === 'move' || finished.kind === 'transform') {
@@ -945,14 +945,14 @@ export function attachPointer(
     }
   };
 
-  /** 右键：屏蔽浏览器默认菜单，交给宿主的画布右键菜单 */
+  /** Right click: suppress the browser menu and hand over to the host's canvas context menu */
   const onContextMenu = (event: MouseEvent) => {
     event.preventDefault();
     context.onContextMenu({ x: event.clientX, y: event.clientY });
   };
 
-  // 多边形套索是「跨多次点击」的会话：Esc 取消、切走工具也要取消，
-  // 否则未闭合的折线会一直留在覆盖层上（换工具后看起来像卡住的选区）
+  // The polygon lasso spans multiple clicks: Esc cancels it, and so does switching tools,
+  // or the open polyline stays on the overlay and looks like a stuck selection after the switch
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') cancelPolygon();
   };
@@ -980,7 +980,7 @@ export function attachPointer(
   };
 }
 
-/** 命中检测：自顶层向下找第一个包含该点的可见图层 */
+/** Hit test: walk from the top down to the first visible layer containing the point */
 export function hitTest(doc: PhotoDoc, x: number, y: number): Layer | null {
   for (let i = doc.layers.length - 1; i >= 0; i -= 1) {
     const layer = doc.layers[i];
@@ -1009,11 +1009,11 @@ function boundsOf(path: number[]): Rect {
 
 export interface PickedColor {
   hex: string;
-  /** 0~255：透明像素不该覆盖前景色，UI 据此给出提示 */
+  /** 0~255: transparent pixels must not overwrite the foreground color, and the UI warns about it */
   alpha: number;
 }
 
-/** 吸管：合成整份文档后在落点取色（点击才触发，成本可接受） */
+/** Eyedropper: composite the whole document, then sample at the point (click-triggered, so the cost is fine) */
 export function pickColor(doc: PhotoDoc, x: number, y: number): PickedColor | null {
   const px = Math.floor(x);
   const py = Math.floor(y);

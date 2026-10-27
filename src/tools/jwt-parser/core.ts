@@ -1,9 +1,9 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * JWT 解析（Tasks T33）：header.payload.signature 三段拆分 + base64url 解码 + JSON 解析。
- * 只读解析、不做验签（验签需要密钥，与数据不出浏览器原则无关，属范围外）。
- * 错误码与文案解耦：core 返回语言无关的错误码，UI 层经 i18n 翻译（T29 约定）。
+ * JWT parsing (Tasks T33): split header.payload.signature, base64url-decode, then parse the JSON.
+ * Read-only parsing with no signature verification (verification needs a key and is out of scope).
+ * Error codes are decoupled from copy: core returns language-neutral codes that the UI translates via i18n (T29 convention).
  */
 
 export type JwtErrorCode = 'EMPTY' | 'INVALID_PARTS' | 'INVALID_HEADER' | 'INVALID_PAYLOAD';
@@ -11,13 +11,13 @@ export type JwtErrorCode = 'EMPTY' | 'INVALID_PARTS' | 'INVALID_HEADER' | 'INVAL
 export interface JwtInfo {
   header: Record<string, unknown>;
   payload: Record<string, unknown>;
-  /** base64url 原样的签名段 */
+  /** Signature segment, kept in raw base64url form */
   signature: string;
-  /** header 声明的算法（如 HS256/RS256），缺失时返回 null */
+  /** Algorithm declared in the header (e.g. HS256/RS256); null when absent */
   alg: string | null;
 }
 
-/** JWT 中常见的时间类声明（epoch 秒） */
+/** Common time-based JWT claims (epoch seconds) */
 export const TIME_CLAIMS = ['exp', 'nbf', 'iat'] as const;
 export type TimeClaim = (typeof TIME_CLAIMS)[number];
 
@@ -30,7 +30,7 @@ function base64UrlToUtf8(part: string): string {
   return new TextDecoder().decode(bytes);
 }
 
-/** 单段解码：任何失败（非法 base64/非法 JSON/非对象）返回 null，绝不抛异常 */
+/** Decode one segment: any failure (bad base64, bad JSON, non-object) returns null and never throws */
 function decodeJsonSegment(part: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(base64UrlToUtf8(part));
@@ -41,13 +41,13 @@ function decodeJsonSegment(part: string): Record<string, unknown> | null {
   }
 }
 
-/** 归一化：去首尾空白与可选 `Bearer ` 前缀 */
+/** Normalize: trim whitespace and drop an optional `Bearer ` prefix */
 export function normalizeToken(input: string): string {
   const trimmed = input.trim();
   return trimmed.startsWith('Bearer ') ? trimmed.slice('Bearer '.length).trim() : trimmed;
 }
 
-/** 解析 JWT；错误时 error 为 JwtErrorCode（UI 层翻译为当前语言文案） */
+/** Parse a JWT; on failure, error is a JwtErrorCode (translated to the current language by the UI) */
 export function parseJwt(input: string): ToolResult<JwtInfo> {
   const token = normalizeToken(input);
   if (!token) return { ok: false, error: 'EMPTY' };
@@ -68,13 +68,13 @@ export function parseJwt(input: string): ToolResult<JwtInfo> {
   };
 }
 
-/** 读取 exp/nbf/iat 声明（epoch 秒）；不存在或非有限数值时返回 null */
+/** Read the exp/nbf/iat claims (epoch seconds); null when missing or not a finite number */
 export function readTimeClaim(payload: Record<string, unknown>, claim: TimeClaim): number | null {
   const value = payload[claim];
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-/** 依据 exp 判断是否已过期；无 exp 声明时返回 null */
+/** Decide whether the token has expired from exp; null when there is no exp claim */
 export function isExpired(payload: Record<string, unknown>, nowMs = Date.now()): boolean | null {
   const exp = readTimeClaim(payload, 'exp');
   if (exp === null) return null;

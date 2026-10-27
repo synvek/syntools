@@ -6,13 +6,13 @@ import { backgroundFillProps } from '../render/background';
 import { createElementNode } from '../render/nodes';
 
 /**
- * 逐页光栅导出（PDF / PNG）。
+ * Per-slide raster export (PDF / PNG).
  *
- * 与缩略图分开用一个独立离屏舞台：导出分辨率远高于缩略图（1920px+），
- * 若共用缓存会把大图塞进缩略图 LRU，白白吃掉内存。
+ * A separate offscreen stage from thumbnails: export resolution is far higher (1920px+), and sharing the
+ * cache would push large images into the thumbnail LRU, wasting memory.
  */
 
-/** 导出用的目标宽度：至少 1920px，宽屏文档按 2 倍原始尺寸取更大值 */
+/** Target width for export: at least 1920px; widescreen documents take the larger of that and 2× the original size */
 const MIN_EXPORT_WIDTH = 1920;
 
 let host: HTMLDivElement | null = null;
@@ -41,7 +41,7 @@ function ensureStage(width: number, height: number): boolean {
   return true;
 }
 
-/** 单页 → PNG dataURL */
+/** One slide → PNG dataURL */
 export function renderSlideToDataUrl(
   doc: SlideDoc,
   slide: Slide,
@@ -66,8 +66,8 @@ export function renderSlideToDataUrl(
     if (element.visible === false) continue;
     const node = createElementNode(element, {
       media: doc.media,
-      // 离屏导出没有异步等待机会：图片未解码时先画占位，调用方可通过
-      // imageCache 预热（导出前先触发一次画布渲染）来规避
+      // Offscreen export has no chance to await async decoding: undecoded images draw a placeholder, and callers
+      // can prewarm through imageCache (trigger one canvas render before exporting) to avoid it
       onImageReady: () => undefined,
     });
     node.listening(false);
@@ -77,7 +77,7 @@ export function renderSlideToDataUrl(
   return stage.toDataURL({ pixelRatio: 1, mimeType: 'image/png' });
 }
 
-/** PNG dataURL → 字节 */
+/** PNG dataURL → bytes */
 export function dataUrlToBytes(dataUrl: string): Uint8Array {
   const base64 = dataUrl.split(',')[1] ?? '';
   const binary = atob(base64);
@@ -88,7 +88,7 @@ export function dataUrlToBytes(dataUrl: string): Uint8Array {
   return bytes;
 }
 
-/** 全部页面 → PDF（每页一张位图，按像素尺寸建页） */
+/** All slides → PDF (one bitmap per page, page size taken from the pixel size) */
 export async function exportSlidesToPdf(doc: SlideDoc): Promise<ToolResult<Uint8Array>> {
   const images: { bytes: Uint8Array; mime: string }[] = [];
   for (const slide of doc.slides) {

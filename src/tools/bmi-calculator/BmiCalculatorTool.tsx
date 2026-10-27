@@ -5,7 +5,7 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
 import { computeBmi, type BmiUnit } from './core';
 
-/** BMI 计算器 */
+/** BMI calculator */
 export default function BmiCalculatorTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ h: '170', w: '65', u: 'metric' }), []);
@@ -69,7 +69,9 @@ export default function BmiCalculatorTool() {
           </p>
           <p className="mt-2 text-sm text-gray-700 dark:text-gray-200">
             {t('tools.bmi.category')}:{' '}
-            <span className="font-medium">{t(`tools.bmi.categories.${result.value.category}`)}</span>
+            <span className="font-medium">
+              {t(`tools.bmi.categories.${result.value.category}`)}
+            </span>
           </p>
           <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
             {result.value.kg} kg · {result.value.meters} m

@@ -31,7 +31,7 @@ export interface JsonIssue {
   params?: Record<string, string | number>;
 }
 
-/** 字符位置 → 行/列（均从 1 开始） */
+/** Character offset → line/column (both 1-based) */
 export function positionToLineColumn(
   input: string,
   position: number,
@@ -59,8 +59,8 @@ function makeIssue(
 }
 
 /**
- * 轻量递归下降 JSON 扫描器：仅在 JSON.parse 失败后用于定位首个错误位置。
- * 返回 null 表示语法合法。
+ * Lightweight recursive-descent JSON scanner: used only after JSON.parse fails, to locate the first error.
+ * Returning null means the syntax is valid.
  */
 export function locateJsonError(input: string): JsonIssue | null {
   let pos = 0;

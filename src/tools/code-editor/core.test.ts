@@ -93,7 +93,7 @@ describe('主题', () => {
     expect(dark).toHaveLength(5);
     expect(CODE_THEMES.filter((t) => t.mode === 'light')).toHaveLength(5);
     expect(new Set(CODE_THEMES.map((t) => t.id)).size).toBe(10);
-    // 深色主题背景必须足够暗，浅色主题背景足够亮，避免误配
+    // Dark backgrounds must be dark enough and light ones light enough, guarding against mix-ups
     for (const t of CODE_THEMES) {
       const lum = parseInt(t.bg.slice(1, 3), 16);
       expect(t.mode === 'dark' ? lum < 0x60 : lum > 0xd0).toBe(true);
@@ -188,7 +188,7 @@ describe('语言注释符', () => {
     expect(getLangSpec('python').lineComment).toBe('#');
     expect(getLangSpec('lua').lineComment).toBe('--');
     expect(getLangSpec('html').blockComment).toEqual(['<!--', '-->']);
-    // CSS 只有块注释
+    // CSS only has block comments
     expect(getLangSpec('css').lineComment).toBeUndefined();
     expect(getLangSpec('css').blockComment).toEqual(['/*', '*/']);
   });

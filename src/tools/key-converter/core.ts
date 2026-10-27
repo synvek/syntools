@@ -199,7 +199,7 @@ async function parseToJwk(input: string): Promise<ToolResult<{ kind: KeyKind; jw
   return { ok: true, value: { kind: key.type === 'private' ? 'private' : 'public', jwk } };
 }
 
-/** 在 PEM / DER / JWK / OpenSSH 之间互转 RSA 密钥。 */
+/** Convert RSA keys between PEM / DER / JWK / OpenSSH. */
 export async function convertKey(input: string, target: KeyTarget): Promise<ToolResult<string>> {
   const parsed = await parseToJwk(input);
   if (!parsed.ok) return parsed;

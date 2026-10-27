@@ -8,7 +8,7 @@ import { buildColorPicker, toColorInputValue } from './core';
 
 type EyeDropperCtor = new () => { open: () => Promise<{ sRGBHex: string }> };
 
-/** HTML 取色器：系统色盘 + 可选 EyeDropper + CSS/HTML 片段 */
+/** HTML color picker: system color well, optional EyeDropper, and CSS/HTML snippets */
 export default function HtmlColorPickerTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '#3b82f6' }), []);
@@ -31,7 +31,7 @@ export default function HtmlColorPickerTool() {
       const { sRGBHex } = await eye.open();
       setInput(sRGBHex);
     } catch {
-      // 用户取消取色，忽略
+      // User cancelled the eyedropper, ignore
     }
   };
 

@@ -4,9 +4,9 @@ import { DEFAULT_PAGE_SETUP, normalizePageSetup, type PageSetupConfig } from './
 import { countUnsupportedLatex } from './latex';
 
 /**
- * 富文本编辑器纯逻辑层（技术设计 §8.2）：
- * 本文件不引入 TipTap / docx / mammoth 等重依赖（全部动态导入），
- * 且所有函数遵循 ToolResult 契约——预期错误返回结果而非抛异常。
+ * Rich text editor pure logic layer (technical design §8.2):
+ * This file imports no heavy dependencies (TipTap / docx / mammoth are all dynamic imports),
+ * and every function follows the ToolResult contract — expected errors are returned, never thrown.
  */
 
 export type EditorErrorCode =
@@ -18,15 +18,15 @@ export type EditorErrorCode =
   | 'EXPORT_FAILED'
   | 'RENDER_FAILED'
   | 'SNAPSHOT_FAILED'
-  /** 本地草稿/文档库 schema 迁移失败（数据保持不变，回退默认值） */
+  /** Local draft / document library schema migration failed (data untouched, defaults used) */
   | 'MIGRATION_FAILED';
 
-/** 导入文件大小上限（10MB），与 FileDropZone 保持一致 */
+/** Import file size limit (10MB), kept in sync with FileDropZone */
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
-/** 导出前 HTML 体积上限保护，避免超大文档长时间阻塞主线程 */
+/** Export HTML size guard, keeping huge documents from blocking the main thread for long */
 export const MAX_EXPORT_HTML_BYTES = 2 * 1024 * 1024;
 
-/** A4 页面几何（mm）：打印模式与快照模式共用，保证两种 PDF 版式一致 */
+/** A4 page geometry (mm): shared by print mode and snapshot mode so both PDFs match */
 export const PAGE_WIDTH_MM = 210;
 export const PAGE_HEIGHT_MM = 297;
 export const PAGE_MARGIN_MM = 20;
@@ -35,7 +35,7 @@ export const CONTENT_HEIGHT_MM = PAGE_HEIGHT_MM - PAGE_MARGIN_MM * 2;
 
 export type ImportKind = 'docx' | 'legacy-doc' | 'unsupported';
 
-/** 依据扩展名判定可导入类型；旧版 .doc 二进制格式浏览器端无法可靠解析 */
+/** Determine the importable kind from the extension; legacy binary .doc can't be parsed reliably in the browser */
 export function resolveImportKind(filename: string): ImportKind {
   const lower = filename.trim().toLowerCase();
   if (lower.endsWith('.docx')) return 'docx';
@@ -45,7 +45,7 @@ export function resolveImportKind(filename: string): ImportKind {
   return 'unsupported';
 }
 
-/** 导入前的统一前置校验：格式 + 体积 */
+/** Unified pre-import validation: format + size */
 export function checkImportFile(file: {
   name: string;
   size: number;
@@ -63,7 +63,7 @@ export function checkImportFile(file: {
   return { ok: true, value: 'docx' };
 }
 
-/** 导出前的 HTML 体积保护 */
+/** HTML size guard before export */
 export function checkExportSize(html: string): ToolResult<true> {
   if (!html.trim() || html === '<p></p>') return { ok: false, error: 'EMPTY' };
   if (html.length > MAX_EXPORT_HTML_BYTES) {
@@ -76,14 +76,14 @@ export function checkExportSize(html: string): ToolResult<true> {
   return { ok: true, value: true };
 }
 
-/** Word 转换出的 HTML 必须消毒后再写入编辑器，防止内嵌脚本/事件属性 */
+/** HTML produced from Word must be sanitized before entering the editor, blocking inline scripts/event attributes */
 export function sanitizeDocHtml(html: string): ToolResult<string> {
   if (!html.trim()) return { ok: false, error: 'EMPTY' };
   const clean = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
   return { ok: true, value: clean };
 }
 
-/** 新建文档时的初始内容（空段落） */
+/** Initial content for a new document (an empty paragraph) */
 export function createEmptyDocHtml(): string {
   return '<p></p>';
 }
@@ -107,7 +107,7 @@ const BLOCK_TAGS = new Set([
   'FIGCAPTION',
 ]);
 
-/** HTML → 纯文本（块级元素转为换行），用于字数统计与导出标题兜底 */
+/** HTML -> plain text (block elements become line breaks), used for stats and export-title fallback */
 export function htmlToPlain(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const chunks: string[] = [];
@@ -137,21 +137,21 @@ export function htmlToPlain(html: string): string {
 }
 
 export interface DocStats {
-  /** 字符数（不含换行） */
+  /** Character count (excluding line breaks) */
   chars: number;
-  /** 字符数（不含空白） */
+  /** Character count (excluding whitespace) */
   charsNoSpace: number;
-  /** 词数：中日韩按字计，拉丁语系按单词计 */
+  /** Word count: CJK counted per character, Latin scripts per word */
   words: number;
-  /** 段落数 */
+  /** Paragraph count */
   paragraphs: number;
 }
 
 const CJK_RE = /[㐀-䶿一-鿿぀-ヿ가-힯]/g;
 
-/** 统计文档的字数信息 */
+/** Compute word/character statistics for a document */
 export function countDocStats(plain: string): DocStats {
-  // 换行先归一为空格，避免相邻两行的单词被粘连算作一个词
+  // Normalize line breaks to spaces first, so words on adjacent lines aren't glued into one
   const normalized = plain.replace(/\s+/g, ' ').trim();
   const charsSource = plain.replace(/\n/g, '');
   const cjkCount = normalized.match(CJK_RE)?.length ?? 0;
@@ -168,7 +168,7 @@ export function countDocStats(plain: string): DocStats {
   };
 }
 
-/** 清洗非法文件名字符，并限制长度 */
+/** Strip illegal filename characters and cap the length */
 export function sanitizeFilename(name: string): string {
   const cleaned = name
     .replace(/[\\/:*?"<>|]/g, '')
@@ -177,7 +177,7 @@ export function sanitizeFilename(name: string): string {
   return cleaned.slice(0, 60) || 'document';
 }
 
-/** 生成导出文件名（保留用户原标题） */
+/** Build the export filename (keeping the user's original title) */
 export type ExportExt = 'docx' | 'pdf' | 'md' | 'html';
 
 export function buildExportFilename(title: string, ext: ExportExt): string {
@@ -185,8 +185,8 @@ export function buildExportFilename(title: string, ext: ExportExt): string {
 }
 
 /**
- * 按块级边界计算分页切割位置（返回内容高度的切点，单位同入参）。
- * 保证不要把一个段落从中间切开：超长块（高于一整页）允许溢出。
+ * Compute page break cut positions on block boundaries (returned in content-height units, same as the input).
+ * Never splits a paragraph in the middle: oversized blocks (taller than a page) are allowed to overflow.
  */
 export function computePageBreaks(
   items: { top: number; height: number }[],
@@ -200,7 +200,7 @@ export function computePageBreaks(
     if (item.top < pageStart) continue;
     const bottom = item.top + item.height;
     if (bottom - pageStart <= pageHeight) continue;
-    // 该块放不下当前页 → 它整体挪到下一页（自身超过一页则只能溢出）
+    // The block doesn't fit on the current page -> move it entirely to the next page (overflow if it alone exceeds a page)
     const cut = item.height >= pageHeight ? bottom : item.top;
     pageStart = cut;
     cuts.push(cut);
@@ -209,8 +209,9 @@ export function computePageBreaks(
 }
 
 /**
- * 规划编辑态分页：返回「从新一页开始」的块级元素索引（第 1 页不计入）。
- * 与 computePageBreaks 同策略：块不跨页切开，超长块允许溢出。
+ * Plan pagination for the editing view: returns the indices of block elements that start a new page
+ * (page 1 isn't included). Same policy as computePageBreaks: blocks never split across pages,
+ * oversized blocks overflow.
  */
 export function planPageBlocks(
   items: { top: number; height: number }[],
@@ -224,7 +225,7 @@ export function planPageBlocks(
     if (item.top < pageStart) return;
     const bottom = item.top + item.height;
     if (bottom - pageStart <= pageHeight) return;
-    // 页内首个块就超过一页：允许溢出，不因此新建页（否则会死循环/空页）
+    // The first block on a page already exceeds a page: let it overflow without starting a new page (otherwise: infinite loop / blank pages)
     if (item.top <= pageStart && item.height >= pageHeight) {
       pageStart = bottom;
       return;
@@ -235,16 +236,17 @@ export function planPageBlocks(
   return starts;
 }
 
-/** A4 正文内容宽度（170mm = 页宽 210mm − 左右各 20mm）对应的 CSS 像素。
- * 图片宽度统一以像素存储，工具栏的百分比预设、旧版百分比数据的换算都用它作基准。
+/** CSS pixels for the A4 content width (170mm = 210mm page width − 20mm on each side).
+ * Image widths are all stored in pixels; toolbar percentage presets and legacy percentage values
+ * are converted against this baseline.
  */
 export const CONTENT_WIDTH_PX = Math.round((170 * 96) / 25.4);
 
 /**
- * 文档位置 → 页码（1 起）。
- * `pageStarts` 为各页起始块在文档中的位置（升序，来自分页插件）；
- * 未分页时为空数组，所有位置都落在第 1 页。
- * 二分查找——目录渲染每次都要对每个标题求页码，不能全量遍历。
+ * Document position -> page number (1-based).
+ * `pageStarts` holds each page's start position (ascending, from the pagination plugin);
+ * it's an empty array when not paginated, so every position falls on page 1.
+ * Binary search — TOC rendering resolves a page number per heading on every pass, so a full scan is out.
  */
 export function pageIndexOfPosition(pageStarts: readonly number[], pos: number): number {
   let low = 0;
@@ -257,31 +259,31 @@ export function pageIndexOfPosition(pageStarts: readonly number[], pos: number):
   return low + 1;
 }
 
-/** 总页数：分页点数量 + 1（无分页信息时至少 1 页） */
+/** Total pages: number of break points + 1 (at least 1 page without pagination info) */
 export function countPages(pageStarts: readonly number[]): number {
   return pageStarts.length + 1;
 }
 
-/** Word 导出时的已知损耗清单 */
+/** Known losses when exporting to Word */
 export interface DocxExportLosses {
-  /** 外链图片（非 base64 内嵌）无法写入 .docx，将被跳过 */
+  /** External images (not base64-embedded) can't be written to .docx and are skipped */
   externalImages: number;
-  /** docx 不支持的 webp 图片将被跳过 */
+  /** webp images unsupported by docx are skipped */
   webpImages: number;
-  /** 嵌套超过 8 层的列表项会并入最深层级 */
+  /** List items nested deeper than 8 levels are merged into the deepest level */
   deepListItems: number;
-  /** 正文有批注标记但缺少元数据：无法生成 Word 批注（仅保留文本） */
+  /** Comment marks in the body without metadata: no Word comment can be created (text only) */
   unlinkedComments: number;
-  /** 语法超出 Word 原生公式能力、已降级为图片的公式数量 */
+  /** Formulas beyond Word's native equation support that were degraded to images */
   mathAsImages: number;
 }
 
 const DOCX_IMAGE_MIME_RE = /^data:image\/([a-z+]+);base64,/i;
 
 /**
- * 导出前差异扫描：列出本次导出会丢失或降级的内容（ToolResult 契约）。
- * 供 UI 在导出后提示，替代静默丢弃。
- * @param comments 批注元数据；缺省时无法判断批注是否可写，不报告 unlinkedComments
+ * Pre-export loss scan: list content that this export will drop or degrade (ToolResult contract).
+ * Lets the UI report it after export instead of discarding silently.
+ * @param comments Comment metadata; when omitted, comment writability can't be judged and unlinkedComments isn't reported
  */
 export function scanDocxExportLosses(
   html: string,
@@ -295,7 +297,7 @@ export function scanDocxExportLosses(
     unlinkedComments: 0,
     mathAsImages: 0,
   };
-  // 公式：语法超出 Word 原生公式能力时会降级为图片（视觉一致但不可再编辑）
+  // Formulas: syntax beyond Word's native equation support degrades to images (visually identical, no longer editable)
   const latexList = Array.from(doc.querySelectorAll('[data-latex]')).map(
     (el) => el.getAttribute('data-latex') ?? '',
   );
@@ -329,28 +331,28 @@ export function scanDocxExportLosses(
     });
   };
   doc.querySelectorAll('ul, ol').forEach((list) => {
-    // 只从顶层列表开始遍历（嵌套列表由 walkList 递归处理）；closest 含自身，故从父级查起
+    // Traverse only from top-level lists (nested ones are handled by walkList); closest includes self, so check the parent
     if (list.parentElement?.closest('ul, ol')) return;
     walkList(list, 0);
   });
   return { ok: true, value: losses };
 }
 
-/** Markdown 导出时的已知损耗清单（Markdown 语法边界之外的排版信息） */
+/** Known losses when exporting to Markdown (layout info beyond Markdown's syntax) */
 export interface MarkdownExportLosses {
-  /** 批注标记：Markdown 无批注概念，标记被丢弃（文本保留） */
+  /** Comment marks: Markdown has no comments, so marks are dropped (text is kept) */
   comments: number;
-  /** 修订追踪的接受/拒绝语义丢失（插入/删除样式仍以 HTML 标签保留） */
+  /** Accept/reject semantics of tracked changes are lost (insert/delete styling survives as HTML tags) */
   trackedChanges: number;
-  /** 段落首行缩进与段前段后间距：Markdown 无段落级排版 */
+  /** First-line indent and space before/after: Markdown has no paragraph-level layout */
   paragraphSpacing: number;
-  /** 浮动图片退化为普通行内图片（浮于文字上方 / 衬于文字下方失效） */
+  /** Floating images degrade to plain inline images (in front of / behind text is lost) */
   floatingImages: number;
-  /** 页面设置（页眉 / 页脚 / 页码 / 纸张 / 边距）不随 Markdown 导出 */
+  /** Page setup (header / footer / page numbers / paper size / margins) isn't carried into Markdown */
   pageSetupFields: number;
 }
 
-/** 页面设置中「非默认」字段计数：默认值不算损耗 */
+/** Count non-default page setup fields: defaults don't count as losses */
 function countNonDefaultPageSetup(setup: Partial<PageSetupConfig> | null | undefined): number {
   const normalized = normalizePageSetup(setup ?? null);
   const defaults = DEFAULT_PAGE_SETUP;
@@ -369,8 +371,9 @@ function countNonDefaultPageSetup(setup: Partial<PageSetupConfig> | null | undef
 }
 
 /**
- * Markdown 导出前的差异扫描：列出无法用 Markdown 语法表达、会被丢弃的信息。
- * 可表达的部分（下划线 / 高亮 / 颜色 / 字号 / 分页符）由 htmlToMarkdown 内联 HTML 保留。
+ * Pre-export Markdown loss scan: list the information that Markdown syntax can't express and will be dropped.
+ * What it can express (underline / highlight / color / font size / page breaks) is preserved by
+ * htmlToMarkdown as inline HTML.
  */
 export function scanMarkdownExportLosses(
   html: string,

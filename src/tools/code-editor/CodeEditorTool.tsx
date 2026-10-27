@@ -65,7 +65,7 @@ import {
   themeStyleBlock,
 } from './themes';
 
-// 工具文案随本 chunk 懒加载注册，不占用首屏语言包体积
+// Tool strings register lazily with this chunk so the initial language bundle stays small
 registerCodeEditorStrings(i18n);
 
 const SAMPLE_CODE = `public class HelloWorld {
@@ -79,16 +79,16 @@ type BusyKind = 'format' | 'png' | 'jpg' | 'svg' | null;
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 type ImageKind = 'png' | 'jpg' | 'svg';
 
-/** 稳定的空命中 / 空区间数组：关闭相关能力时避免每次渲染产生新引用 */
+/** Stable empty match / range arrays: avoids a new reference on every render when a feature is off */
 const EMPTY_MATCHES: FindMatch[] = [];
 const EMPTY_RANGES: TextRange[] = [];
 
-/** 卡片样式面板里的小控件统一外观 */
+/** Shared look for the small controls in the card style panel */
 const CARD_FIELD = 'flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300';
 const CARD_INPUT =
   'h-7 min-w-0 rounded-md border border-gray-300 bg-white px-1.5 text-xs text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100';
 
-/** 编辑操作栏按钮：与快捷键共用 CodeSurface 的动作入口 */
+/** Edit toolbar buttons: they share CodeSurface's action entry point with the shortcuts */
 const OP_ACTIONS: Array<{ action: EditorAction; labelKey: string }> = [
   { action: 'selectAllOccurrences', labelKey: 'selectOccurrences' },
   { action: 'toggleLineComment', labelKey: 'comment' },
@@ -109,7 +109,7 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
   anchor.click();
 }
 
-/** 语法高亮代码编辑器：多语言格式化 + 10 套风格 + 源码 / HTML / 图片导出 */
+/** Syntax-highlighted code editor: multi-language formatting + 10 themes + source / HTML / image export */
 export default function CodeEditorTool() {
   const { t } = useTranslation();
   const draft = useMemo(() => readDraft(), []);
@@ -129,7 +129,7 @@ export default function CodeEditorTool() {
     [],
   );
   const shared = hasShared ? init : null;
-  /** 分享链接里携带的卡片样式（压缩分享可承载更多版式状态） */
+  /** Card style carried by a share link (compressed links can carry more layout state) */
   const sharedCard = useMemo(() => {
     const raw = shared?.cs;
     if (!raw) return null;
@@ -223,7 +223,7 @@ export default function CodeEditorTool() {
   const themeVars = useMemo(() => themeCssVars(theme), [theme]);
   const highlighted = useMemo(() => highlightCode(code, spec.prism), [code, spec.prism]);
   const snippet = useMemo(() => buildSnippet(highlighted, spec), [highlighted, spec]);
-  // 导出卡片：逐行渲染（行号 / 指定行高亮 / 水印），预览与独立 HTML 共用同一份结构
+  // Export card: rendered per line (line numbers / line highlight / watermark); preview and HTML share it
   const cardVars = useMemo(() => cardCssVars(cardStyle), [cardStyle]);
   const cardBody = useMemo(
     () =>
@@ -244,12 +244,12 @@ export default function CodeEditorTool() {
   const indentUnit = indent === 'tab' ? '\t' : ' '.repeat(indent);
   const canAct = Boolean(code.trim());
 
-  // 查找结果：命中随内容 / 查询 / 选项变化重算（命中枚举在纯逻辑层做上限与边界保护）
+  // Find results: recomputed when content / query / options change (the pure layer caps and guards them)
   const findOutcome = useMemo(
     () => findMatches(code, findQuery, findOptions),
     [code, findOptions, findQuery],
   );
-  // 命中数组保持稳定引用：下游 useCallback / 覆盖层依赖它
+  // Keep a stable array reference: downstream useCallback / overlay depend on it
   const matches = useMemo(
     () => (findOutcome.ok ? findOutcome.value.matches : EMPTY_MATCHES),
     [findOutcome],
@@ -258,7 +258,7 @@ export default function CodeEditorTool() {
   const findTruncated = findOutcome.ok ? findOutcome.value.truncated : false;
   const currentMatch = findCurrent >= 0 ? (matches[findCurrent] ?? null) : null;
 
-  // 查询 / 选项变化后重新从「未定位」开始（首次 Enter 落到第一个命中）
+  // Reset to "not positioned" after a query / option change (the first Enter lands on the first match)
   useEffect(() => {
     setFindCurrent(-1);
   }, [findQuery, findOptions]);
@@ -300,7 +300,7 @@ export default function CodeEditorTool() {
     setNotice(t('tools.codeEditor.find.done'));
   }, [code, findOptions, findQuery, findReplacement, t]);
 
-  // 停止输入后写入本地草稿
+  // Write the local draft once typing stops
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setSaved(
@@ -380,7 +380,7 @@ export default function CodeEditorTool() {
       setFailure({ ok: false, error: 'EMPTY' });
       return;
     }
-    // 卡片样式块接在主题样式块之后：同名属性（padding / radius / 阴影）以卡片配置为准
+    // The card block follows the theme block, so same-named properties (padding / radius / shadow) use the card config
     const cssBlock = `${themeStyleBlock(theme)}\n${cardStyleBlock(cardStyle, cardBg)}`;
     const html = buildStandaloneHtml(highlighted, spec, cssBlock, baseName, cardBody);
     downloadBlob(html, `${baseName}.html`, 'text/html;charset=utf-8');
@@ -433,7 +433,7 @@ export default function CodeEditorTool() {
     setGotoOpen(false);
   }, []);
 
-  /** 快捷键 / 工具栏中需要 UI 参与的动作（CodeSurface 不处理的走这里） */
+  /** Actions needing UI involvement (shortcuts / toolbar) that CodeSurface does not handle */
   const handleAction = useCallback(
     (action: EditorAction): boolean => {
       switch (action) {
@@ -470,7 +470,7 @@ export default function CodeEditorTool() {
         }
         case 'toggleLineComment':
         case 'toggleBlockComment':
-          // CodeSurface 只在语言不支持注释语法时回调到这里
+          // CodeSurface only delegates here when the language has no comment syntax
           setNotice(t('tools.codeEditor.op.unsupported'));
           return false;
         default:
@@ -480,12 +480,12 @@ export default function CodeEditorTool() {
     [findOpen, openFind, runFormat, stepMatch, t],
   );
 
-  /** 更新卡片样式（统一走归一化，避免越界 / 非法值进入 DOM） */
+  /** Update the card style (always normalised so out-of-range / invalid values never reach the DOM) */
   const updateCard = useCallback((patch: Partial<CodeCardStyle>) => {
     setCardStyle((prev) => normalizeCardStyle({ ...prev, ...patch }));
   }, []);
 
-  /** 解析「高亮行」输入（如 `2-5` / `3`）；非法输入回落为未设置 */
+  /** Parse the "highlight lines" input (e.g. `2-5` / `3`); invalid input resets to unset */
   const updateHighlightLines = useCallback(
     (raw: string) => {
       const matched = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(raw);
@@ -500,20 +500,20 @@ export default function CodeEditorTool() {
     [updateCard],
   );
 
-  /** 统一替换当前选中的同词多处（批量编辑：多光标诉求的安全替代形态） */
+  /** Replace every occurrence of the current word (batch editing: a safe stand-in for multi-cursor) */
   const applyMultiReplace = useCallback(() => {
     if (!multiSelection) return;
     surfaceRef.current?.applyText(replaceRanges(code, multiSelection.ranges, multiReplacement));
     setMultiSelection(null);
   }, [code, multiReplacement, multiSelection]);
 
-  /** 复制 Markdown 代码块（```lang 围栏） */
+  /** Copy as a Markdown fenced code block (```lang) */
   const markdownSnippet = useMemo(() => {
     const fence = spec.id === 'markdown' ? 'text' : spec.id;
     return `\`\`\`${fence}\n${code}\n\`\`\``;
   }, [code, spec.id]);
 
-  /** 复制富文本：带主题配色的代码块（Word / 飞书 / 博客编辑器可直接粘贴） */
+  /** Copy rich text: a code block with theme colours (pastes into Word / Lark / blog editors) */
   const richHtml = useMemo(() => {
     const tokenCss = [
       '.token.comment{font-style:italic}',
@@ -538,14 +538,14 @@ export default function CodeEditorTool() {
         t(result === 'rich' ? 'tools.codeEditor.copy.richDone' : 'tools.codeEditor.copy.plainDone'),
       );
     } catch {
-      // 剪贴板完全不可用：降级为下载 HTML 片段，而非静默失败
+      // Clipboard fully unavailable: fall back to downloading the HTML snippet instead of failing silently
       downloadBlob(snippet, `${baseName}.html`, 'text/html;charset=utf-8');
       setFailure(null);
       setNotice(t('tools.codeEditor.copy.copyFallback'));
     }
   }, [baseName, canAct, code, richHtml, snippet, t]);
 
-  /** 复制卡片图片；剪贴板不可用时降级为下载 PNG */
+  /** Copy the card image; falls back to downloading a PNG when the clipboard is unavailable */
   const copyCardImage = useCallback(async () => {
     const node = cardRef.current;
     if (!node || !canAct) {
@@ -582,7 +582,7 @@ export default function CodeEditorTool() {
     setGotoOpen(false);
   }, [gotoValue]);
 
-  // 操作按钮与快捷键提示（同一份绑定表派生，避免文案与键位脱节）
+  // Action buttons and shortcut hints derive from one binding table, so labels and keys never drift
   const ops = useMemo(
     () =>
       OP_ACTIONS.map((op) => {
@@ -782,7 +782,7 @@ export default function CodeEditorTool() {
             placeholder={t('tools.codeEditor.placeholder')}
             ariaLabel={t('tools.codeEditor.editor')}
           />
-          {/* 行操作栏放在编辑器下方：两栏头部同为单行，编辑区与预览卡片顶部对齐 */}
+          {/* Line toolbar sits below the editor: both columns keep one-line headers, aligning editor and card tops */}
           <div className="flex flex-wrap items-center gap-1.5">
             {ops.map((op) => (
               <button
@@ -829,7 +829,7 @@ export default function CodeEditorTool() {
         </section>
 
         <section className="flex min-w-0 flex-col gap-2">
-          {/* 头部只放标题 + 卡片样式开关：与左栏同为单行，保证预览卡片与编辑区顶部对齐 */}
+          {/* Header holds only the title + card toggle: one line like the left column, aligning the card and editor tops */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
               {t('tools.codeEditor.preview')}
@@ -851,7 +851,7 @@ export default function CodeEditorTool() {
             aria-label={t('tools.codeEditor.preview')}
           >
             {canAct ? (
-              // 与独立 HTML 共用同一份正文结构（cardOptions.buildCardBodyHtml），保证所见即所得
+              // Shares the body structure with the standalone HTML (cardOptions.buildCardBodyHtml) for WYSIWYG
               <div dangerouslySetInnerHTML={{ __html: cardBody }} />
             ) : (
               <p style={{ color: theme.gutter }}>{t('tools.codeEditor.empty')}</p>
@@ -1022,7 +1022,7 @@ export default function CodeEditorTool() {
               </div>
             </div>
           )}
-          {/* 复制入口放在卡片下方：不占用头部行高，保证两栏顶部对齐 */}
+          {/* Copy actions sit below the card so they do not add header height and the column tops stay aligned */}
           <div className="flex flex-wrap gap-2">
             <CopyButton text={code} disabled={!canAct} label={t('tools.codeEditor.copyCode')} />
             <CopyButton text={snippet} disabled={!canAct} label={t('tools.codeEditor.copyHtml')} />

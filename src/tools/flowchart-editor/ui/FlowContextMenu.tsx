@@ -26,8 +26,8 @@ import { EDGE_RELATION_PRESETS, isContainerKind } from '../model/types';
 import { ShapeGlyph } from './ShapeGlyph';
 
 /**
- * 右键命中的对象与定位。
- * `x` / `y` 为相对画布容器左上角的坐标，`bounds` 为容器尺寸（用于把菜单收敛在可视区内）。
+ * The object hit by the right click and the menu position.
+ * `x` / `y` are relative to the canvas container's top-left corner and `bounds` is the container size (to keep the menu inside the viewport).
  */
 export interface FlowContextTarget {
   kind: 'node' | 'edge' | 'pane';
@@ -64,17 +64,17 @@ function Separator() {
 }
 
 /**
- * 画布右键菜单：在节点上提供「切换形状」与常用编辑动作，在连线上提供布线动作，
- * 在空白处提供粘贴 / 全选 / 适应画布。
+ * Canvas context menu: on nodes it offers "change shape" plus common edit actions, on edges the routing actions,
+ * and on empty space paste / select all / fit view.
  *
- * 关闭时机：点击菜单之外、Esc、滚轮 / 缩放平移。Esc 在捕获阶段拦截，
- * 避免同时触发编辑器的全局 Esc（取消选择）。
+ * Closing: a click outside the menu, Esc, wheel / pan / zoom. Esc is intercepted in the capture phase
+ * so it does not also trigger the editor's global Esc (clear selection).
  */
 export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
   const { t } = useTranslation();
   const { fitView } = useReactFlow();
   const panelRef = useRef<HTMLDivElement>(null);
-  /** 实测尺寸前的兜底定位（避免首帧出现在错误位置） */
+  /** Fallback positioning before the measured size is known (avoiding a first-frame jump) */
   const [pos, setPos] = useState({ left: -9999, top: -9999 });
   const [shapeOpen, setShapeOpen] = useState(true);
   const [category, setCategory] = useState<ShapeCategory>('flow');
@@ -87,7 +87,7 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
   const edge = target?.edgeId ? edges.find((e) => e.id === target.edgeId) : undefined;
   const nodeKind = node?.data.kind;
 
-  // 每次命中新的目标：重置形状面板，并默认展开命中节点所在的分类
+  // New target on every hit: reset the shape panel and expand the category containing the hit node by default
   useEffect(() => {
     if (!target) return;
     setShapeOpen(target.kind === 'node');
@@ -97,7 +97,7 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
     setCategory((kind ? shapeDefOf(kind)?.category : undefined) ?? 'flow');
   }, [target]);
 
-  // 按实测尺寸收敛在画布可视区内（形状面板展开/收起后重新收敛）
+  // Keep the menu inside the canvas viewport by its measured size (re-checked when the shape panel expands/collapses)
   useLayoutEffect(() => {
     if (!target) return;
     const el = panelRef.current;
@@ -118,15 +118,15 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      // 捕获阶段拦下：菜单关闭后不再触发编辑器的全局 Esc
+      // Intercept in the capture phase so the editor's global Esc does not fire once the menu has closed
       event.stopPropagation();
       onClose();
     };
     const onWheel = (event: WheelEvent) => {
-      // 形状面板内部可滚动，不据此关闭
+      // The shape panel scrolls internally, so scrolling inside it does not close the menu
       if (outside(event.target)) onClose();
     };
-    // 画布支持「右键拖拽平移」：一旦真的拖动就收起菜单，避免停在旧位置
+    // The canvas supports "right-button drag to pan": once an actual drag happens the menu closes, so it never lingers in place
     let origin: { x: number; y: number } | null = null;
     const onMove = (event: PointerEvent) => {
       if ((event.buttons & 2) === 0) {
@@ -153,7 +153,7 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
 
   if (!target) return null;
 
-  /** 先关菜单再执行动作，避免动作引起的重渲染作用在已失效的菜单上 */
+  /** Close the menu before running the action, so re-renders caused by the action do not hit a stale menu */
   const run = (action: () => void) => () => {
     onClose();
     action();
@@ -236,7 +236,7 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
             testId="context-edit-label"
             label={t('tools.flowchart.editText')}
             onClick={run(() => {
-              // 复用画布上的就地编辑：向节点派发一次 dblclick
+              // Reuse the canvas in-place editing: dispatch a dblclick to the node
               const el = document.querySelector(`.react-flow__node[data-id="${node.id}"]`);
               el?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
             })}
@@ -247,7 +247,7 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
             onClick={run(() => useFlowStore.getState().duplicateSelected())}
           />
 
-          {/* 对齐：与工具栏同一套动作，右键即可快速对齐 */}
+          {/* Align: the same actions as the toolbar, so right-click offers quick alignment */}
           <div className="mb-1 flex flex-wrap gap-1 border-y border-gray-100 px-1 py-1.5 dark:border-gray-800">
             {(
               [
@@ -274,7 +274,7 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
             ))}
           </div>
 
-          {/* 变换：旋转与镜像 */}
+          {/* Transform: rotate and mirror */}
           <div className="mb-1 flex flex-wrap gap-1 px-1">
             {(
               [
@@ -351,7 +351,7 @@ export function FlowContextMenu({ target, onClose }: FlowContextMenuProps) {
             onClick={run(() => useFlowStore.getState().setEdgeWaypoints(edge.id, undefined))}
           />
           <Separator />
-          {/* 关系预设：一键切换 UML 关系样式 */}
+          {/* Relation presets: switch UML relation styles in one click */}
           <div className="mb-1 flex flex-wrap gap-1 px-1">
             {EDGE_RELATION_PRESETS.map((preset) => (
               <button

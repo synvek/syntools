@@ -1,5 +1,5 @@
 /**
- * 图片转卡片：外层背景 + 内层图文一体区块。
+ * Image to card: outer background plus an inner combined text-and-image block.
  */
 
 export type ImageCardTextPosition = 'below' | 'above';
@@ -52,11 +52,7 @@ export const IMAGE_CARD_BACKDROP_CSS: Record<ImageCardBackdropPresetId, string> 
 
 export const IMAGE_CARD_ALIGNS: ImageCardAlign[] = ['left', 'center', 'right'];
 export const IMAGE_CARD_POSITIONS: ImageCardTextPosition[] = ['below', 'above'];
-export const IMAGE_CARD_BACKDROP_MODES: ImageCardBackdropMode[] = [
-  'preset',
-  'color',
-  'gradient',
-];
+export const IMAGE_CARD_BACKDROP_MODES: ImageCardBackdropMode[] = ['preset', 'color', 'gradient'];
 
 export interface ImageCardOptions {
   padding: number;

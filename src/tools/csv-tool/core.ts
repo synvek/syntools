@@ -14,7 +14,7 @@ export interface CsvParseOptions {
   hasHeader: boolean;
 }
 
-/** 解析 RFC 4180 风格的 CSV 文本。 */
+/** Parse RFC 4180-style CSV text. */
 export function parseCsv(text: string, delimiter: CsvDelimiter = ','): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -63,7 +63,7 @@ export function parseCsv(text: string, delimiter: CsvDelimiter = ','): string[][
       fieldStarted = true;
     }
   }
-  // 末尾仍有未提交的行（非空）
+  // A final non-empty row is still pending
   if (fieldStarted || field !== '' || row.length > 0) pushRow();
 
   return rows.filter((r) => !(r.length === 1 && r[0] === ''));
@@ -81,7 +81,7 @@ function escapeField(value: string, delimiter: CsvDelimiter): string {
   return value;
 }
 
-/** 序列化为 CSV 文本。 */
+/** Serialize to CSV text. */
 export function serializeCsv(
   rows: (string | number | boolean | null)[][],
   delimiter: CsvDelimiter = ',',
@@ -97,7 +97,7 @@ export function serializeCsv(
     .join('\n');
 }
 
-/** CSV → JSON（对象数组或二维数组）。 */
+/** CSV → JSON (array of objects or 2D array). */
 export function csvToJson(text: string, options: CsvParseOptions): ToolResult<string> {
   if (!text.trim()) return { ok: false, error: 'EMPTY' };
   const rows = parseCsv(text, options.delimiter);
@@ -117,7 +117,7 @@ export function csvToJson(text: string, options: CsvParseOptions): ToolResult<st
   return { ok: true, value: JSON.stringify(objects, null, 2) };
 }
 
-/** JSON → CSV。支持对象数组与二维数组。 */
+/** JSON → CSV. Handles both arrays of objects and 2D arrays. */
 export function jsonToCsv(text: string, delimiter: CsvDelimiter = ','): ToolResult<string> {
   if (!text.trim()) return { ok: false, error: 'EMPTY' };
   let data: unknown;

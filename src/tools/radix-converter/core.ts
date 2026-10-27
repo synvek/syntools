@@ -1,8 +1,8 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 进制转换与位运算（Tasks T40）：BigInt 实现，支持 64 位有符号整数。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译（T29 约定）。
+ * Radix conversion and bitwise operations (Tasks T40): BigInt implementation supporting signed 64-bit integers.
+ * Error codes are decoupled from copy: core returns language-agnostic error codes and the UI translates them via i18n (T29 convention).
  */
 
 export type RadixErrorCode = 'EMPTY' | 'INVALID' | 'RANGE';
@@ -10,7 +10,7 @@ export type RadixErrorCode = 'EMPTY' | 'INVALID' | 'RANGE';
 export const RADIXES = [2, 8, 10, 16] as const;
 export type Radix = (typeof RADIXES)[number];
 
-/** 有符号 64 位整数范围 */
+/** Signed 64-bit integer range */
 const MIN_I64 = -(2n ** 63n);
 const MAX_I64 = 2n ** 63n - 1n;
 
@@ -24,7 +24,7 @@ export interface RadixFormats {
   hex: string;
 }
 
-/** 前缀自动识别进制：0b→2 / 0o→8 / 0x→16 / 其余→10；带分隔符（_、空格、逗号）容忍 */
+/** Detect the radix from the prefix: 0b→2 / 0o→8 / 0x→16 / otherwise→10; separators (_, spaces, commas) are tolerated */
 export function detectRadix(input: string): Radix {
   const text = input.trim().toLowerCase();
   if (text.startsWith('0b')) return 2;
@@ -33,7 +33,7 @@ export function detectRadix(input: string): Radix {
   return 10;
 }
 
-/** 解析整数字符串为 BigInt；语法非法返回 INVALID，超出 i64 返回 RANGE */
+/** Parse an integer string into BigInt; INVALID on bad syntax, RANGE when outside i64 */
 export function parseInteger(input: string, radix: Radix): ToolResult<bigint> {
   let text = input.trim();
   if (!text) return { ok: false, error: 'EMPTY' };
@@ -49,7 +49,7 @@ export function parseInteger(input: string, radix: Radix): ToolResult<bigint> {
   if (radix !== 10 && lower.startsWith(prefixMap[radix])) {
     text = text.slice(2);
   } else if (/^0[box]/.test(lower)) {
-    // 前缀与所选进制不一致
+    // Prefix does not match the selected radix
     return { ok: false, error: 'INVALID' };
   }
   text = text.replace(/[_\s,]/g, '');
@@ -74,12 +74,12 @@ export function parseInteger(input: string, radix: Radix): ToolResult<bigint> {
   return { ok: true, value };
 }
 
-/** 64 位补码表示（用于二进制可视化，固定 64 位字符串） */
+/** 64-bit two's complement (fixed 64-character string for binary visualization) */
 function toTwosComplement64(value: bigint): bigint {
   return value < 0n ? value + 2n ** 64n : value;
 }
 
-/** BigInt → 四种进制字符串（负数带符号，hex/bin/oct 为大写无分隔） */
+/** BigInt → strings in four radices (negatives keep the sign; hex/bin/oct are uppercase and unseparated) */
 export function formatRadix(value: bigint): RadixFormats {
   const sign = value < 0n ? '-' : '';
   const abs = value < 0n ? -value : value;
@@ -91,12 +91,12 @@ export function formatRadix(value: bigint): RadixFormats {
   };
 }
 
-/** 64 位补码的二进制串（固定 64 字符，便于位模式展示） */
+/** Binary string of the 64-bit two's complement (always 64 chars, easy to read as a bit pattern) */
 export function toBitPattern(value: bigint): string {
   return toTwosComplement64(value).toString(2).padStart(64, '0');
 }
 
-/** 按 4 位分组展示二进制（可读性），如 1111 0000 … */
+/** Group the binary digits in fours for readability, e.g. 1111 0000 … */
 export function groupBits(bits: string, groupSize = 4): string {
   const groups: string[] = [];
   for (let i = bits.length; i > 0; i -= groupSize) {
@@ -105,9 +105,9 @@ export function groupBits(bits: string, groupSize = 4): string {
   return groups.join(' ');
 }
 
-const SHIFT_MASK = 63n; // 移位量对 64 取模（与常见语言 64 位行为一致）
+const SHIFT_MASK = 63n; // Shift amount modulo 64 (matches 64-bit behavior in common languages)
 
-/** 位运算：i64 范围内的与/或/异或/左移/右移/取反；结果超范围返回 RANGE */
+/** Bitwise and/or/xor/shl/shr/not within i64; RANGE when the result overflows */
 export function applyBitOperator(op: BitOperator, a: bigint, b?: bigint): ToolResult<bigint> {
   let result: bigint;
   switch (op) {
@@ -126,13 +126,13 @@ export function applyBitOperator(op: BitOperator, a: bigint, b?: bigint): ToolRe
     case 'shl': {
       if (b === undefined) return { ok: false, error: 'INVALID' };
       const n = b & SHIFT_MASK;
-      // 以补码移位再解释回有符号，模拟 64 位溢出回绕
+      // Shift in two's complement then reinterpret as signed to emulate 64-bit wraparound
       result = toTwosComplement64Signed((toTwosComplement64(a) << n) % 2n ** 64n);
       break;
     }
     case 'shr': {
       if (b === undefined) return { ok: false, error: 'INVALID' };
-      // 算术右移（保留符号）
+      // Arithmetic right shift (keeps the sign)
       result = a >> (b & SHIFT_MASK);
       break;
     }
@@ -144,7 +144,7 @@ export function applyBitOperator(op: BitOperator, a: bigint, b?: bigint): ToolRe
   return { ok: true, value: result };
 }
 
-/** 补码（0 ~ 2^64）→ 有符号 i64 解释 */
+/** Interpret two's complement (0 ~ 2^64) as signed i64 */
 function toTwosComplement64Signed(unsigned: bigint): bigint {
   return unsigned >= 2n ** 63n ? unsigned - 2n ** 64n : unsigned;
 }

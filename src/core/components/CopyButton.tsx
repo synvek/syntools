@@ -8,7 +8,7 @@ interface CopyButtonProps {
   disabled?: boolean;
 }
 
-/** 一键复制：Clipboard API + execCommand 降级，成功态反馈（技术设计 §7.2） */
+/** One-click copy: Clipboard API with execCommand fallback, success feedback (tech design §7.2) */
 export function CopyButton({ text, label, disabled = false }: CopyButtonProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);

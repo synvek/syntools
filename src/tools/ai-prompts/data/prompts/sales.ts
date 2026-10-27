@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 销售与商务拓展类提示词，详见 ../README.md */
+/** Sales and business development prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'sales-cold-email',

@@ -1,12 +1,12 @@
 /**
- * 流程图编辑器文案注册：**按语种拆分 + 按需加载**。
+ * Flowchart editor copy registration: **split per language + loaded on demand**.
  *
- * 与项目「两段式 locale」保持一致：工具被懒加载时只取当前语言的小 chunk
- * （约 1/9 体积），再按 `tools.flowchart.*` 合并进 i18next；
- * 切换语言时重新按需加载对应语种。
+ * Consistent with the project's "two-stage locale" approach: when the tool is lazy-loaded only the current language's small chunk
+ * is fetched (~1/9 of the size) and merged into i18next under `tools.flowchart.*`;
+ * switching languages loads the corresponding language again on demand.
  *
- * 模板文案（`tpl_*`）体量小且只有 zh/en，直接并入当前语种资源
- * （非 zh/en 时使用英文，避免出现未翻译的键名）。
+ * The template copy (`tpl_*`) is small and only exists in zh/en, so it is merged into the current language's resources
+ * (non-zh/en languages use English, avoiding untranslated key names).
  */
 
 import { TEMPLATE_LABELS_I18N, TEMPLATE_LABEL_PREFIX } from '../model/templateLabels';
@@ -28,10 +28,10 @@ const LOADERS: Record<string, Loader> = {
   pt: () => import('./pt'),
 };
 
-/** 支持的语言（与 `core/i18n` 的 Lang 保持一致） */
+/** Supported languages (kept in sync with Lang in `core/i18n`) */
 export const FLOWCHART_LANGS = Object.keys(LOADERS);
 
-/** 归一当前语言：精确匹配 → 主语言匹配 → 回退英文 */
+/** Normalize the current language: exact match → primary language match → fall back to English */
 export function resolveFlowchartLang(lng?: string): string {
   if (!lng) return 'en';
   if (LOADERS[lng]) return lng;
@@ -42,7 +42,7 @@ export function resolveFlowchartLang(lng?: string): string {
   return FLOWCHART_LANGS.find((item) => item.toLowerCase() === base) ?? 'en';
 }
 
-/** 把语种 bundle 摊平成 i18next 资源（图形名加 `shape_`、模板文案加 `tpl_` 前缀） */
+/** Flatten a language bundle into i18next resources (shape names prefixed with `shape_`, template copy with `tpl_`) */
 export function bundleToResource(lng: string, bundle: LangBundle): ResourceTree {
   const extra: StringTree = {};
   for (const [kind, name] of Object.entries(bundle.shapes ?? {})) {
@@ -55,9 +55,9 @@ export function bundleToResource(lng: string, bundle: LangBundle): ResourceTree 
   return { tools: { flowchart: { ...bundle.ui.tools.flowchart, ...extra } } };
 }
 
-/** 已注册的语种（模块级缓存，避免重复请求同一 chunk） */
+/** Registered languages (module-level cache, avoiding repeated fetches of the same chunk) */
 const registered = new Set<string>();
-/** 进行中的注册（并发调用共享同一 Promise） */
+/** Registrations in flight (concurrent calls share the same Promise) */
 const pending = new Map<string, Promise<string>>();
 
 interface I18nLike {
@@ -71,7 +71,7 @@ interface I18nLike {
   ) => void;
 }
 
-/** 注册单个语种（去重 + 并发共享 Promise） */
+/** Register a single language (deduplicated + concurrent calls share a Promise) */
 function ensureRegistered(instance: I18nLike, target: string): Promise<string> {
   if (registered.has(target)) return Promise.resolve(target);
   const running = pending.get(target);
@@ -97,12 +97,12 @@ function ensureRegistered(instance: I18nLike, target: string): Promise<string> {
 }
 
 /**
- * 注册指定语种（缺省取 i18next 当前语言）的文案。
- * 返回实际注册的语种码，便于调用方判断就绪状态。
+ * Register the copy for the given language (defaults to i18next's current language).
+ * Returns the language code actually registered so callers can check readiness.
  *
- * 非英文语种会**同时注册英文包作为兜底**：少数语种尚未覆盖全部键时，
- * i18next 的 `fallbackLng: ['en','zh']` 才能命中英文而不是回退到原始键名。
- * 两个包都就绪后才 resolve，避免首帧出现键名闪烁。
+ * Non-English languages also register the **English bundle as a fallback**: when a language does not cover every key yet,
+ * only then can i18next's `fallbackLng: ['en','zh']` resolve to English instead of the raw key name.
+ * Resolves only after both bundles are ready, so no key names flash on the first frame.
  */
 export function registerFlowchartStrings(instance: I18nLike, lng?: string): Promise<string> {
   const target = resolveFlowchartLang(lng ?? instance.language);
@@ -111,12 +111,12 @@ export function registerFlowchartStrings(instance: I18nLike, lng?: string): Prom
   return base.then(() => ensureRegistered(instance, target));
 }
 
-/** 当前语言文案是否已注册（UI 用它决定是否延迟渲染，避免闪现键名） */
+/** Whether the current language's copy is registered (the UI uses it to delay rendering and avoid flashing key names) */
 export function hasFlowchartStrings(lng?: string): boolean {
   return registered.has(resolveFlowchartLang(lng));
 }
 
-/** 仅测试使用：清空注册缓存 */
+/** For tests only: clear the registration caches */
 export function __resetFlowchartStrings(): void {
   registered.clear();
   pending.clear();

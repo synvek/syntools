@@ -22,7 +22,7 @@ const POSITIONS: WatermarkPosition[] = [
   'tile',
 ];
 
-/** 图片加水印 */
+/** Image watermarking */
 export default function ImageWatermarkTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -106,13 +106,7 @@ export default function ImageWatermarkTool() {
         }
       }
     } else {
-      const { x, y } = resolveAnchor(
-        canvas.width,
-        canvas.height,
-        markW,
-        markH,
-        options.position,
-      );
+      const { x, y } = resolveAnchor(canvas.width, canvas.height, markW, markH, options.position);
       paintAt(x, y);
     }
     ctx.restore();
@@ -131,7 +125,7 @@ export default function ImageWatermarkTool() {
     }, 'image/png');
   }, [options]);
 
-  // 选项变化时重绘；图片加载后由 handleFile 触发
+  // Redraw when options change; loading an image triggers this via handleFile
   useEffect(() => {
     if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) draw();
   }, [draw, sourceUrl]);
@@ -285,7 +279,11 @@ export default function ImageWatermarkTool() {
               <p className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t('tools.watermark.original')}
               </p>
-              <img src={sourceUrl} alt="" className="max-h-80 rounded-md border border-gray-200 dark:border-gray-700" />
+              <img
+                src={sourceUrl}
+                alt=""
+                className="max-h-80 rounded-md border border-gray-200 dark:border-gray-700"
+              />
             </div>
           )}
           {outputUrl && (
@@ -302,7 +300,11 @@ export default function ImageWatermarkTool() {
                   {t('tools.watermark.download')}
                 </button>
               </div>
-              <img src={outputUrl} alt="" className="max-h-80 rounded-md border border-gray-200 dark:border-gray-700" />
+              <img
+                src={outputUrl}
+                alt=""
+                className="max-h-80 rounded-md border border-gray-200 dark:border-gray-700"
+              />
             </div>
           )}
         </div>

@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 随机数生成：crypto.getRandomValues，支持整数 / 小数与批量。
+ * Random number generation with crypto.getRandomValues; supports integers / decimals and batches.
  */
 
 export type RandomNumberError = 'INVALID_RANGE' | 'INVALID_COUNT' | 'INVALID_DECIMALS';
@@ -10,7 +10,7 @@ export interface RandomNumberOptions {
   min: number;
   max: number;
   count: number;
-  /** 小数位数；0 表示整数 */
+  /** Decimal places; 0 means integers */
   decimals: number;
   unique: boolean;
 }
@@ -19,20 +19,20 @@ export const MIN_COUNT = 1;
 export const MAX_COUNT = 1000;
 export const MAX_DECIMALS = 10;
 
-/** [0, 1) 均匀随机 */
+/** Uniform random in [0, 1) */
 function randomUnit(): number {
   const buf = new Uint32Array(1);
   crypto.getRandomValues(buf);
   return buf[0] / 0x1_0000_0000;
 }
 
-/** [min, max] 闭区间整数（含端点） */
+/** Integer in the closed interval [min, max] (endpoints included) */
 export function randomIntInclusive(min: number, max: number): number {
   const lo = Math.ceil(min);
   const hi = Math.floor(max);
   const span = hi - lo + 1;
   if (span <= 0) return lo;
-  // 拒绝采样消除模偏差
+  // Rejection sampling removes modulo bias
   const limit = Math.floor(0x1_0000_0000 / span) * span;
   const buf = new Uint32Array(1);
   let x: number;
@@ -43,9 +43,7 @@ export function randomIntInclusive(min: number, max: number): number {
   return lo + (x % span);
 }
 
-export function generateRandomNumbers(
-  options: RandomNumberOptions,
-): ToolResult<number[]> {
+export function generateRandomNumbers(options: RandomNumberOptions): ToolResult<number[]> {
   const { min, max, count, decimals, unique } = options;
   if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
     return { ok: false, error: 'INVALID_RANGE' };

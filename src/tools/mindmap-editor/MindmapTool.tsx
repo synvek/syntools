@@ -32,7 +32,7 @@ function MindmapInner() {
   const { t } = useTranslation();
   const { fitView, getNodes } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
-  /** 工作区（大纲 + 画布 + 属性面板）高度 = 首屏剩余空间 */
+  /** Workspace height (outline + canvas + property panel) = whatever is left in the first viewport */
   const workRowRef = useRef<HTMLDivElement | null>(null);
   const workHeight = useViewportFill(workRowRef, { min: 360 });
 
@@ -44,7 +44,7 @@ function MindmapInner() {
   const activeSheetId = useMindStore((s) => s.activeSheetId);
   const sheetData = useMindStore((s) => s.sheetData);
 
-  /** 各画布的即时快照（活动画布现场序列化），仅供总览缩略图使用 */
+  /** Live snapshot of every sheet (the active one serialised on the spot), used only for overview thumbnails */
   const sheets = useMemo(
     () => useMindStore.getState().getDoc().sheets,
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,7 +59,7 @@ function MindmapInner() {
   const [presentSrc, setPresentSrc] = useState<string | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
 
-  /** 放映：先渲染放映层（显示「生成中」），下一帧再截图，避免大图卡住首次绘制 */
+  /** Present: render the overlay ("generating") first and capture on the next frame, so a large image cannot stall the first paint */
   const openPresent = () => {
     setPresentSrc(null);
     setPresentFailed(false);
@@ -84,8 +84,8 @@ function MindmapInner() {
     requestAnimationFrame(() => fitView({ padding: 0.25, maxZoom: 1 }));
   }, [fitView]);
 
-  // 首次挂载：恢复本地草稿，并把中心主题适配到画布中央
-  // （布局坐标以内容左上角为原点，不做适配的话默认会贴在画布左上角）
+  // First mount: restore the local draft and fit the central topic into the middle of the canvas
+  // (layout coordinates originate at the content's top-left corner, so without fitting it sticks to the canvas corner)
   useEffect(() => {
     const draft = readDraft();
     if (draft) {
@@ -95,7 +95,7 @@ function MindmapInner() {
     fitViewSoon();
   }, [fitViewSoon]);
 
-  // 变更后防抖写入本地草稿（编辑 → 未保存 → 1.2s 后落盘为已保存）
+  // Debounced draft write after changes (edit → unsaved → persisted as saved after 1.2s)
   useEffect(() => {
     if (firstSave.current) {
       firstSave.current = false;
@@ -139,14 +139,14 @@ function MindmapInner() {
     [fitViewSoon],
   );
 
-  // 键盘快捷键：脑图习惯（Enter 同级 / Tab 子级 / 方向键移动 / F2 改名）
+  // Keyboard shortcuts following mind map conventions (Enter = sibling, Tab = child, arrows = move, F2 = rename)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (document.activeElement?.tagName ?? '').toUpperCase();
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       const st = useMindStore.getState();
       const mod = e.metaKey || e.ctrlKey;
-      // Ctrl/⌘ + PageUp/PageDown：上一张 / 下一张画布
+      // Ctrl/⌘ + PageUp/PageDown: previous / next sheet
       if (mod && (e.key === 'PageUp' || e.key === 'PageDown')) {
         e.preventDefault();
         const st = useMindStore.getState();
@@ -271,7 +271,7 @@ function MindmapInner() {
         }}
         thumbnail={(id) => {
           const sheet = sheets.find((item) => item.id === id);
-          // 空画布返回 null，总览卡片才会显示「空白画布」提示
+          // Return null for a blank sheet so the overview card shows the "blank canvas" hint
           return sheet && sheet.doc.nodes.length > 0 ? <SheetThumbnail doc={sheet.doc} /> : null;
         }}
         onSelect={(id) => useMindStore.getState().switchSheet(id)}
@@ -292,7 +292,7 @@ function MindmapInner() {
           <div className="relative min-h-0 flex-1">
             <MindCanvas containerRef={canvasRef} />
             {onlyRoot ? (
-              // 提示条靠画布底部居中，避免盖住居中的中心主题
+              // Anchor the hint to the bottom centre so it never covers the centred root topic
               <div className="pointer-events-none absolute inset-x-0 bottom-14 flex justify-center px-4">
                 <p className="rounded-full bg-white/85 px-4 py-1.5 text-[12px] text-gray-500 shadow-sm dark:bg-gray-900/85 dark:text-gray-400">
                   {t('tools.mindmap.emptyHint')}

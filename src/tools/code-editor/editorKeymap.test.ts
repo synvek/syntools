@@ -9,7 +9,7 @@ import {
   type EditorKeyEvent,
 } from './editorKeymap';
 
-/** 构造最小键盘事件对象（默认 macOS 语义：primary = metaKey） */
+/** Build a minimal keyboard event (macOS semantics by default: primary = metaKey) */
 function keyEvent(init: Partial<EditorKeyEvent> & { key: string }): EditorKeyEvent {
   return {
     metaKey: false,
@@ -50,13 +50,13 @@ describe('matchShortcut（macOS：⌘ 为主修饰键）', () => {
   });
 
   it('Option 改变的标点字符用 KeyboardEvent.code 回退匹配', () => {
-    // macOS 上 ⌘⌥/ 实际产出 '÷'，仅靠 key 无法识别
+    // On macOS ⌘⌥/ actually produces '÷', so key alone cannot identify it
     expect(
       matchShortcut(keyEvent({ key: '÷', code: 'Slash', metaKey: true, altKey: true }), {
         mac: true,
       }),
     ).toBe('toggleBlockComment');
-    // Windows / Linux 对应 Ctrl+Alt+/（key 本身不变）
+    // Windows / Linux map to Ctrl+Alt+/ (the key itself is unchanged)
     expect(
       matchShortcut(keyEvent({ key: '/', code: 'Slash', ctrlKey: true, altKey: true }), {
         mac: false,
@@ -66,7 +66,7 @@ describe('matchShortcut（macOS：⌘ 为主修饰键）', () => {
 
   it('⇧Tab 减少缩进', () => {
     expect(matchShortcut(keyEvent({ key: 'Tab', shiftKey: true }), { mac: true })).toBe('outdent');
-    // 不带 Shift 的 Tab 交给 CodeJar 插入缩进
+    // A bare Tab is left to CodeJar, which inserts indentation
     expect(matchShortcut(keyEvent({ key: 'Tab' }), { mac: true })).toBeNull();
   });
 });
@@ -94,11 +94,11 @@ describe('matchShortcut 的边界', () => {
   });
 
   it('修饰键必须精确匹配，避免吞掉浏览器 / 系统快捷键', () => {
-    // ⌘⇧/ 不是任何绑定（保持浏览器原义）
+    // ⌘⇧/ is not bound to anything (the browser default is kept)
     expect(
       matchShortcut(keyEvent({ key: '/', metaKey: true, shiftKey: true }), { mac: true }),
     ).toBeNull();
-    // ⇧⌘K 之外：⌘K（无 shift）不匹配
+    // Anything but ⇧⌘K: ⌘K (no shift) does not match
     expect(matchShortcut(keyEvent({ key: 'k', metaKey: true }), { mac: true })).toBeNull();
   });
 

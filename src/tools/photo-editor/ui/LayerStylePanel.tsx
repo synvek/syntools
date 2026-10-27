@@ -13,11 +13,11 @@ import type {
 } from '../model/types';
 
 /**
- * 图层样式面板：投影 / 内阴影 / 外发光 / 描边 / 颜色叠加。
+ * Layer style panel: drop shadow / inner shadow / outer glow / stroke / color overlay.
  *
- * 交互约定：
- * - 勾选框 = 启停效果，`×` = 移除效果（两者都是独立的历史步骤）；
- * - 滑杆拖动中传 `history = false`（与 AdjustPanel 一致），避免每一帧都压一条历史。
+ * Interaction conventions:
+ * - the checkbox toggles an effect and `×` removes it (both are separate history steps);
+ * - while dragging a slider pass `history = false` (as in AdjustPanel) so no history entry is pushed per frame.
  */
 
 type Patch = Record<string, string | number | boolean>;

@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 图片裁剪：矩形约束与比例预设。
+ * Image cropping: rectangle constraints and aspect-ratio presets.
  */
 
 export type CropError = 'INVALID' | 'EMPTY';
@@ -38,7 +38,7 @@ export function aspectRatio(aspect: CropAspect): number | null {
   }
 }
 
-/** 将裁剪框限制在图片内，宽高至少 1px */
+/** Keep the crop box inside the image, at least 1px wide and tall */
 export function clampCrop(rect: CropRect, imgW: number, imgH: number): CropRect {
   let { x, y, width, height } = rect;
   width = Math.max(1, Math.min(Math.round(width), imgW));
@@ -48,11 +48,7 @@ export function clampCrop(rect: CropRect, imgW: number, imgH: number): CropRect 
   return { x, y, width, height };
 }
 
-export function validateCrop(
-  rect: CropRect,
-  imgW: number,
-  imgH: number,
-): ToolResult<CropRect> {
+export function validateCrop(rect: CropRect, imgW: number, imgH: number): ToolResult<CropRect> {
   if (!Number.isFinite(imgW) || !Number.isFinite(imgH) || imgW < 1 || imgH < 1) {
     return { ok: false, error: 'EMPTY' };
   }
@@ -61,8 +57,13 @@ export function validateCrop(
   return { ok: true, value: c };
 }
 
-/** 按比例调整现有框（尽量居中保持面积） */
-export function fitAspect(rect: CropRect, aspect: CropAspect, imgW: number, imgH: number): CropRect {
+/** Resize the current box to a ratio while staying centered and roughly preserving area */
+export function fitAspect(
+  rect: CropRect,
+  aspect: CropAspect,
+  imgW: number,
+  imgH: number,
+): CropRect {
   const ratio = aspectRatio(aspect);
   if (ratio == null) return clampCrop(rect, imgW, imgH);
 

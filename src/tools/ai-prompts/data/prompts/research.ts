@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 学术与研究类提示词，详见 ../README.md */
+/** Academic research prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'research-literature-review',

@@ -5,9 +5,9 @@ import { CONTENT_WIDTH_PX } from './core';
 import { createExtensions } from './extensions';
 
 /**
- * 图片节点序列化测试：
- * 1) 修复回归——ImageStyle 覆盖 addAttributes 时必须合并父类，否则 src 丢失、图片不可见；
- * 2) 层级（layer）与浮动偏移（offsetX/offsetY）要能写进 HTML 并再次解析回来。
+ * Image node serialization tests:
+ * 1) Regression guard: ImageStyle overriding addAttributes must merge the parent, or src is lost and the image disappears;
+ * 2) Layer and float offsets (offsetX/offsetY) must survive an HTML round trip.
  */
 
 const editors: Editor[] = [];
@@ -25,7 +25,7 @@ afterEach(() => {
   editors.splice(0).forEach((editor) => editor.destroy());
 });
 
-/** 文档中第一张图片的绝对位置：行内图片位于段落内部，不能再假设它出现在 pos 0 */
+/** Absolute position of the first image: inline images sit inside a paragraph, so pos 0 is no longer safe to assume */
 function imagePos(editor: Editor): number {
   let pos = -1;
   editor.state.doc.descendants((node, offset) => {
@@ -35,8 +35,8 @@ function imagePos(editor: Editor): number {
   return pos;
 }
 
-describe('ImageStyle 属性继承', () => {
-  it('保留父类 src/alt/title，不会渲染成没有 src 的空 img', () => {
+describe('ImageStyle attribute inheritance', () => {
+  it('keeps the parent src/alt/title instead of rendering an empty img without src', () => {
     const editor = createEditor('<p>文字</p>');
     editor.commands.setImage({ src: 'data:image/png;base64,iVBORw0KGgo=', alt: '样图' });
     const html = editor.getHTML();
@@ -45,7 +45,7 @@ describe('ImageStyle 属性继承', () => {
     expect(html).toContain('alt="样图"');
   });
 
-  it('插入的图片节点确实带有 src 属性', () => {
+  it('inserted image nodes really carry a src attribute', () => {
     const editor = createEditor('<p></p>');
     editor.commands.setImage({ src: 'data:image/png;base64,AAAA' });
     let src: unknown = null;
@@ -56,15 +56,15 @@ describe('ImageStyle 属性继承', () => {
   });
 });
 
-describe('图片宽度（像素语义）', () => {
-  it('选中行内图片（NodeSelection）后可以改宽度——曾经因为只看段落父节点而永远失败', () => {
+describe('image width (pixel semantics)', () => {
+  it('resizes a selected inline image (NodeSelection), which used to fail by only looking at the paragraph parent', () => {
     const editor = createEditor('<img src="data:image/png;base64,AAAA">');
     editor.commands.setNodeSelection(imagePos(editor));
     expect(editor.commands.setImageWidth(320)).toBe(true);
     expect(editor.getHTML()).toContain('width: 320px');
   });
 
-  it('setImageStyle 同时写入宽度与对齐', () => {
+  it('setImageStyle writes both width and alignment', () => {
     const editor = createEditor('<img src="data:image/png;base64,AAAA">');
     editor.commands.setNodeSelection(imagePos(editor));
     expect(editor.commands.setImageStyle(200, 'center')).toBe(true);
@@ -73,13 +73,13 @@ describe('图片宽度（像素语义）', () => {
     expect(html).toContain('data-align="center"');
   });
 
-  it('未选中图片时命令返回 false（不会误改其它内容）', () => {
+  it('returns false when no image is selected, so nothing else changes', () => {
     const editor = createEditor('<p>只有文字</p>');
     editor.commands.setTextSelection(1);
     expect(editor.commands.setImageWidth(200)).toBe(false);
   });
 
-  it('宽度为 null 表示自适应（不输出宽度样式）', () => {
+  it('treats a null width as auto-size and emits no width style', () => {
     const editor = createEditor('<img src="data:image/png;base64,AAAA" style="width: 320px">');
     editor.commands.setNodeSelection(imagePos(editor));
     editor.commands.setImageWidth(null);
@@ -87,7 +87,7 @@ describe('图片宽度（像素语义）', () => {
     expect(html).not.toContain('width: 320px');
   });
 
-  it('旧数据的百分比宽度按 A4 内容宽度换算为像素', () => {
+  it('converts legacy percentage widths to pixels using the A4 content width', () => {
     const editor = createEditor('<img src="data:image/png;base64,AAAA" style="width: 50%">');
     let width: unknown = null;
     editor.state.doc.descendants((node) => {
@@ -96,13 +96,13 @@ describe('图片宽度（像素语义）', () => {
     expect(width).toBe(Math.round(0.5 * CONTENT_WIDTH_PX));
   });
 
-  it('改宽度后仍选中图片，可以连续调整——行内节点的节点选中曾会退化成光标', () => {
+  it('keeps the image selected after a resize so it can be adjusted repeatedly; inline node selections used to collapse to a cursor', () => {
     const editor = createEditor('<p>前<img src="data:image/png;base64,AAAA">后</p>');
     editor.commands.setNodeSelection(imagePos(editor));
     editor.commands.setImageWidth(200);
     expect(editor.state.selection).toBeInstanceOf(NodeSelection);
 
-    // 紧接着设置对齐，说明选区仍在同一张图片上
+    // Setting alignment right after proves the selection is still on the same image
     expect(editor.commands.setImageStyle(120, 'center')).toBe(true);
     const html = editor.getHTML();
     expect(html).toContain('width: 120px');
@@ -110,8 +110,8 @@ describe('图片宽度（像素语义）', () => {
   });
 });
 
-describe('嵌入型图片（行内节点）', () => {
-  it('图片与文字落在同一段落，不再独占一行', () => {
+describe('inline images (inline nodes)', () => {
+  it('puts image and text in the same paragraph instead of its own line', () => {
     const editor = createEditor('<p>前<img src="data:image/png;base64,AAAA">后</p>');
     const html = editor.getHTML();
     expect(html).toContain('前<img');
@@ -119,7 +119,7 @@ describe('嵌入型图片（行内节点）', () => {
     expect(html.match(/<p/g)?.length).toBe(1);
   });
 
-  it('插入图片时落在光标处的文字中间', () => {
+  it('inserts the image between characters at the cursor', () => {
     const editor = createEditor('<p>前文后</p>');
     editor.commands.setTextSelection(3);
     editor.commands.setImage({ src: 'data:image/png;base64,AAAA' });
@@ -129,7 +129,7 @@ describe('嵌入型图片（行内节点）', () => {
     expect(html.match(/<p/g)?.length).toBe(1);
   });
 
-  it('旧文档里位于正文顶层的 <img> 解析后被包进段落，内容不丢', () => {
+  it('wraps a top-level <img> from an old document into a paragraph without losing content', () => {
     const editor = createEditor('<p>甲</p><img src="data:image/png;base64,AAAA"><p>乙</p>');
     const html = editor.getHTML();
     expect(html).toContain('src="data:image/png;base64,AAAA"');
@@ -137,15 +137,15 @@ describe('嵌入型图片（行内节点）', () => {
   });
 });
 
-describe('图片层级与浮动偏移', () => {
-  it('嵌入型不输出层级属性（默认样式，保持随文排版）', () => {
+describe('image layer and float offset', () => {
+  it('inline images emit no layer attributes (default style, flows with text)', () => {
     const editor = createEditor('<img src="data:image/png;base64,AAAA">');
     const html = editor.getHTML();
     expect(html).not.toContain('data-layer');
     expect(html).not.toContain('position: absolute');
   });
 
-  it('浮于文字上方 / 衬于文字下方输出 data-layer 与绝对定位偏移', () => {
+  it('in-front / behind-text images emit data-layer and absolute offsets', () => {
     const editor = createEditor('<img src="data:image/png;base64,AAAA">');
     editor.commands.setImageLayer('front');
     expect(editor.getHTML()).toContain('data-layer="front"');
@@ -157,7 +157,7 @@ describe('图片层级与浮动偏移', () => {
     expect(html).toContain('top:');
   });
 
-  it('层级与偏移可从 HTML 解析回来（草稿/导入往返一致）', () => {
+  it('round-trips layer and offset through HTML (draft/import parity)', () => {
     const editor = createEditor(
       '<img src="data:image/png;base64,AAAA" data-layer="behind" style="left: 12px; top: 34px">',
     );
@@ -168,7 +168,7 @@ describe('图片层级与浮动偏移', () => {
     expect(attrs).toMatchObject({ layer: 'behind', offsetX: 12, offsetY: 34 });
   });
 
-  it('四周型 / 上下型环绕写出 data-layer，但不带绝对定位偏移', () => {
+  it('square / top-and-bottom wrapping writes data-layer without absolute offsets', () => {
     const editor = createEditor('<p>文字<img src="data:image/png;base64,AAAA"></p>');
     editor.commands.setNodeSelection(imagePos(editor));
 
@@ -189,7 +189,7 @@ describe('图片层级与浮动偏移', () => {
     expect(attrs.offsetX).toBeNull();
   });
 
-  it('环绕方式可从 HTML 解析回来（草稿往返一致）', () => {
+  it('round-trips the wrap mode through HTML (draft parity)', () => {
     const editor = createEditor(
       '<p>文字<img src="data:image/png;base64,AAAA" data-layer="wrap-right"></p>',
     );
@@ -200,7 +200,7 @@ describe('图片层级与浮动偏移', () => {
     expect(layer).toBe('wrap-right');
   });
 
-  it('未知的 data-layer 取值回退为嵌入型', () => {
+  it('falls back to inline for an unknown data-layer value', () => {
     const editor = createEditor(
       '<p>文字<img src="data:image/png;base64,AAAA" data-layer="nonsense"></p>',
     );
@@ -211,7 +211,7 @@ describe('图片层级与浮动偏移', () => {
     expect(layer).toBe('inline');
   });
 
-  it('切换层级后仍选中图片，可继续切换', () => {
+  it('keeps the image selected after a layer switch so it can be switched again', () => {
     const editor = createEditor('<p>文字<img src="data:image/png;base64,AAAA"></p>');
     editor.commands.setNodeSelection(imagePos(editor));
     editor.commands.setImageLayer('front');
@@ -219,7 +219,7 @@ describe('图片层级与浮动偏移', () => {
     expect(editor.commands.setImageLayer('inline')).toBe(true);
   });
 
-  it('切回嵌入型会清掉浮动定位，避免残留绝对定位样式', () => {
+  it('clears float positioning when switching back to inline, leaving no absolute styles behind', () => {
     const editor = createEditor(
       '<img src="data:image/png;base64,AAAA" data-layer="front" style="left: 12px; top: 34px">',
     );

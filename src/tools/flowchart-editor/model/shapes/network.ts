@@ -1,6 +1,6 @@
 import type { ShapeDef } from './index';
 
-/** 云：多段圆弧组成的云形轮廓 */
+/** Cloud: outline made of several circular arcs */
 const cloudPath = (w: number, h: number): string =>
   `M${w * 0.2},${h * 0.78} H${w * 0.8} a${w * 0.11},${w * 0.11} 0 0,0 0,-${h * 0.2} ` +
   `a${w * 0.17},${w * 0.17} 0 0,0 -${w * 0.24},-${h * 0.17} ` +

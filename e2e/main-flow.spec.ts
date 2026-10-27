@@ -1,41 +1,41 @@
 import { expect, test } from '@playwright/test';
 
-// 断言使用简体中文文案，而界面语言跟随浏览器语言（默认 en-US）
+// Assertions rely on Simplified Chinese copy, while the UI language follows the browser (en-US by default)
 test.use({ locale: 'zh-CN' });
 
-/** 主链路：首页 → 搜索 → 打开工具 → 输入 → 复制（Tasks T24） */
-test('主链路：首页 → 搜索 → 打开工具 → 输入 → 复制', async ({ page }) => {
+/** Main flow: home → search → open tool → input → copy (Tasks T24) */
+test('main flow: home → search → open tool → input → copy', async ({ page }) => {
   await page.goto('/');
 
-  // 首页展示全部工具（侧边栏与卡片均含同名链接，取 first 避免 strict mode 歧义）
+  // Home lists every tool (sidebar and cards share link names, so take first to avoid strict-mode ambiguity)
   await expect(
     page.getByRole('link', { name: 'Base64 编解码', exact: true }).first(),
   ).toBeVisible();
   await expect(page.getByRole('link', { name: '哈希计算', exact: true }).first()).toBeVisible();
 
-  // 按 / 唤起搜索，输入关键词并回车跳转
+  // Press / to open search, type a keyword and hit Enter to navigate
   await page.keyboard.press('/');
-  // 语言切换下拉（#header-lang）同样是 combobox，须按名称区分
+  // The language dropdown (#header-lang) is also a combobox, so it must be distinguished by name
   const searchInput = page.getByRole('combobox', { name: '搜索工具' });
   await expect(searchInput).toBeVisible();
   await searchInput.fill('json');
   await searchInput.press('Enter');
   await expect(page).toHaveURL(/\/tools\/json-format/);
 
-  // 输入 → 实时格式化输出
+  // Input → live formatted output
   await page.getByRole('textbox', { name: 'JSON 输入' }).fill('{"a":1}');
   const output = page.getByRole('textbox', { name: '输出' });
   await expect(output).toHaveValue('{\n  "a": 1\n}');
 
-  // 复制结果并校验剪贴板内容
+  // Copy the result and verify the clipboard contents
   await page.getByRole('button', { name: '复制', exact: true }).click();
   await expect(page.getByRole('button', { name: '已复制' })).toBeVisible();
   const clipboard = await page.evaluate(() => navigator.clipboard.readText());
   expect(clipboard).toBe('{\n  "a": 1\n}');
 });
 
-/** SPA 深链可直接访问工具页（部署后由 fallback 路由保障） */
-test('深链直接访问工具页', async ({ page }) => {
+/** SPA deep links open tool pages directly (guaranteed by the fallback route after deploy) */
+test('deep link opens a tool page directly', async ({ page }) => {
   await page.goto('/tools/base64');
   await expect(page.getByRole('textbox', { name: '原始文本' })).toBeVisible();
 });

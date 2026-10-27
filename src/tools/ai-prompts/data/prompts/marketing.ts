@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 市场营销类提示词，详见 ../README.md */
+/** Marketing prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'marketing-slogan-ideas',

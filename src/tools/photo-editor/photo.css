@@ -1,6 +1,6 @@
 /**
- * 照片编辑器私有样式：画布容器（棋盘透明底）、就地文字编辑层。
- * 只在本工具 chunk 内引入，不污染全局。
+ * Styles private to the photo editor: canvas host (checkerboard transparency) and the inline text edit layer.
+ * Imported only inside this tool's chunk, so nothing leaks globally.
  */
 
 .photo-stage {
@@ -8,7 +8,7 @@
   inset: 0;
   overflow: hidden;
   border-radius: 0.75rem;
-  /* 透明通道的棋盘底：两层 45° 渐变错开形成 8px 方格 */
+  /* Checkerboard for transparency: two 45° gradients offset to form 8px squares */
   background-image:
     linear-gradient(
       45deg,
@@ -34,7 +34,7 @@
   min-height: 420px;
 }
 
-/* 就地文字编辑：透明 textarea 叠加在画布上，位置由 JS 按视口缩放计算 */
+/* Inline text editing: a transparent textarea over the canvas, positioned by JS from the viewport zoom */
 .photo-text-editor {
   z-index: 20;
   margin: 0;
@@ -53,7 +53,7 @@
   background: rgba(37, 99, 235, 0.3);
 }
 
-/* 光标随当前工具变化：在画布上直观反馈「现在能做什么」 */
+/* Cursor follows the current tool: an on-canvas hint of "what can I do now" */
 .photo-stage[data-tool='move'] {
   cursor: move;
 }

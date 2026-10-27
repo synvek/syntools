@@ -33,7 +33,7 @@ describe('多页', () => {
     const id = useFlowStore.getState().pageOrder[1].id;
     useFlowStore.getState().renamePage(id, 'B2');
     expect(useFlowStore.getState().pageOrder[1].name).toBe('B2');
-    // 空名称不生效
+    // An empty name has no effect
     useFlowStore.getState().renamePage(id, '  ');
     expect(useFlowStore.getState().pageOrder[1].name).toBe('B2');
   });
@@ -51,7 +51,7 @@ describe('多页', () => {
     useFlowStore.getState().addPage('X');
     useFlowStore.getState().removePage(useFlowStore.getState().activePageId);
     expect(useFlowStore.getState().pageOrder).toHaveLength(1);
-    // 只剩一页时不允许删除
+    // Deleting the last remaining page is not allowed
     useFlowStore.getState().removePage(useFlowStore.getState().activePageId);
     expect(useFlowStore.getState().pageOrder).toHaveLength(1);
   });
@@ -131,7 +131,7 @@ describe('批量编辑与微移', () => {
       );
     }
 
-    // 一次 undo 把两个节点一起还原（批量改动只产生一条历史记录）
+    // One undo restores both nodes (a batch change produces a single history entry)
     useFlowStore.getState().undo();
     ids.forEach((id, i) => {
       expect(useFlowStore.getState().nodes.find((n) => n.id === id)!.data.style.fill).toBe(
@@ -159,7 +159,7 @@ describe('批量编辑与微移', () => {
     useFlowStore.setState({ selectedNodes: [first] });
     st.patchSelected({ style: { fill: '#123456' } }, true);
 
-    // 第二次改动触发上一条变更的结算
+    // The second change settles the previous one
     useFlowStore.setState({ selectedNodes: [st.nodes[1].id] });
     useFlowStore.getState().patchSelected({ style: { fill: '#654321' } }, true);
 
@@ -178,7 +178,7 @@ describe('批量编辑与微移', () => {
     useFlowStore.getState().setGridSize(20);
     expect(useFlowStore.getState().gridEnabled).toBe(false);
     expect(useFlowStore.getState().gridSize).toBe(20);
-    // 复原，避免影响其它用例
+    // Restore so other cases are unaffected
     useFlowStore.getState().setGridEnabled(true);
     useFlowStore.getState().setGridSize(10);
   });
@@ -218,7 +218,7 @@ describe('选择清空与形状切换', () => {
     expect(changed.data.style.fill).toBe('#abcdef');
     expect(changed.data.style.fontSize).toBe(20);
 
-    // 换形状可撤销回原图形
+    // Changing the shape can be undone back to the original
     useFlowStore.getState().undo();
     expect(useFlowStore.getState().nodes.find((n) => n.id === target.id)!.data.kind).toBe(
       target.data.kind,
@@ -338,7 +338,7 @@ describe('形状可调参数写入', () => {
     useFlowStore.getState().addNode('note', { x: 0, y: 0 });
     const id = useFlowStore.getState().selectedNodes[0];
     useFlowStore.getState().setNodeParams([id], { foldSize: 24 });
-    // 模拟旧草稿：同时存在历史字段
+    // Simulate a legacy draft: both history fields present
     useFlowStore.setState((s) => ({
       nodes: s.nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, style: { ...n.data.style, foldSize: 24 } } } : n,
@@ -381,17 +381,17 @@ describe('插入外部文档（粘贴 draw.io）', () => {
     const st = useFlowStore.getState();
     expect(st.nodes).toHaveLength(3);
     expect(st.edges).toHaveLength(1);
-    // 既有节点保持不变；插入的节点使用全新 id
+    // Existing nodes stay as they are; inserted nodes use fresh ids
     expect(st.nodes.filter((n) => existing.has(n.id))).toHaveLength(1);
     const insertedIds = st.nodes.filter((n) => !existing.has(n.id)).map((n) => n.id);
     expect(new Set(insertedIds).size).toBe(insertedIds.length);
     for (const id of insertedIds) expect(existing.has(id)).toBe(false);
-    // 内容左上角对齐到目标点
+    // Content's top-left corner aligns with the target point
     const inserted = st.nodes.filter((n) => st.selectedNodes.includes(n.id));
     expect(inserted).toHaveLength(2);
     expect(Math.min(...inserted.map((n) => n.position.x))).toBe(100);
     expect(Math.min(...inserted.map((n) => n.position.y))).toBe(200);
-    // 连线端点也指向新 id
+    // Edge endpoints point at the new ids too
     const edge = st.edges[0];
     expect(st.selectedNodes).toContain(edge.source);
     expect(st.selectedNodes).toContain(edge.target);
@@ -452,7 +452,7 @@ describe('图层面板拖放', () => {
 describe('版本快照', () => {
   beforeEach(() => {
     useFlowStore.getState().load(null);
-    // 快照是全局会话态，测试之间需显式清空以保证隔离
+    // Snapshots are global session state, so tests must clear them explicitly for isolation
     useFlowStore.setState({ snapshots: [] });
   });
 
@@ -461,7 +461,7 @@ describe('版本快照', () => {
     const before = useFlowStore.getState().nodes.length;
     useFlowStore.getState().saveSnapshot('v1');
 
-    // 改动画布后回滚
+    // Roll back after changing the canvas
     useFlowStore.getState().clear();
     expect(useFlowStore.getState().nodes).toHaveLength(0);
 

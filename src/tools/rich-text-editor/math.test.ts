@@ -4,10 +4,10 @@ import { createExtensions } from './extensions';
 import { collectLatex, injectMath } from './math';
 
 /**
- * 公式测试：
- * - 节点只存 LaTeX 源码（atom），预览由 NodeView 用 KaTeX 渲染；
- * - 导出前 injectMath 把源码渲染为 MathML，保证单文件 HTML 不依赖外部样式表；
- * - 序列化结果必须能被再次解析回公式节点。
+ * Formula tests:
+ * - The node stores only LaTeX source (atom); the NodeView renders the preview with KaTeX;
+ * - Before export injectMath renders the source into MathML so single-file HTML needs no external stylesheet;
+ * - Serialized output must parse back into formula nodes.
  */
 
 const editors: Editor[] = [];
@@ -25,8 +25,8 @@ afterEach(() => {
   editors.splice(0).forEach((editor) => editor.destroy());
 });
 
-describe('公式节点命令', () => {
-  it('插入行内公式后序列化带 data-latex 与 data-display', () => {
+describe('formula node commands', () => {
+  it('serializes an inserted inline formula with data-latex and data-display', () => {
     const editor = createEditor('<p>正文</p>');
     editor.commands.setTextSelection(editor.state.doc.content.size - 1);
     editor.commands.insertInlineMath('\\frac{a}{b}');
@@ -36,7 +36,7 @@ describe('公式节点命令', () => {
     expect(html).toContain('data-display="false"');
   });
 
-  it('插入块级公式为独立块节点', () => {
+  it('inserts a block formula as its own block node', () => {
     const editor = createEditor('<p>正文</p>');
     editor.commands.insertBlockMath('\\sum_{i=1}^{n} a_i');
     const html = editor.getHTML();
@@ -45,7 +45,7 @@ describe('公式节点命令', () => {
     expect(collectLatex(editor.state.doc)).toEqual(['\\sum_{i=1}^{n} a_i']);
   });
 
-  it('序列化结果可再次解析回公式节点', () => {
+  it('re-parses the serialized output as formula nodes', () => {
     const editor = createEditor(
       '<p>前<span data-math="inline" data-latex="x^2" data-display="false"></span>后</p>' +
         '<div data-math="block" data-latex="y_i" data-display="true"></div>',
@@ -53,7 +53,7 @@ describe('公式节点命令', () => {
     expect(collectLatex(editor.state.doc)).toEqual(['x^2', 'y_i']);
   });
 
-  it('updateMath / removeMath 作用于指定位置的公式', () => {
+  it('updateMath / removeMath act on the formula at a position', () => {
     const editor = createEditor('<p>正文</p>');
     editor.commands.setTextSelection(editor.state.doc.content.size - 1);
     editor.commands.insertInlineMath('a');
@@ -65,18 +65,18 @@ describe('公式节点命令', () => {
     expect(collectLatex(editor.state.doc)).toEqual([]);
   });
 
-  it('对非公式位置执行命令返回 false', () => {
+  it('returns false when the command targets a non-formula position', () => {
     const editor = createEditor('<p>正文</p>');
     expect(editor.commands.updateMath(0, 'x')).toBe(false);
     expect(editor.commands.removeMath(0)).toBe(false);
   });
 
-  it('NodeView 用 KaTeX 渲染预览，失败时回退为源码', () => {
+  it('the NodeView renders the preview with KaTeX and falls back to source on failure', () => {
     const editor = createEditor('<p>正文</p>');
     editor.commands.insertBlockMath('\\frac{a}{b}');
     expect(editor.view.dom.querySelector('.rte-math .katex')).not.toBeNull();
 
-    // 语法错误时回退为源码并标注错误，而不是渲染出红色报错样式
+    // A syntax error shows the source with an error flag instead of KaTeX's red error output
     editor.commands.insertBlockMath('\\undefinedcmd{x}');
     const failed = Array.from(editor.view.dom.querySelectorAll('.rte-math-error'));
     expect(failed.length).toBe(1);
@@ -85,7 +85,7 @@ describe('公式节点命令', () => {
 });
 
 describe('injectMath', () => {
-  it('把公式节点的 LaTeX 渲染为 MathML 并保留 data-latex', () => {
+  it('renders formula LaTeX into MathML and keeps data-latex', () => {
     const html = injectMath(
       '<p>前<span data-math="inline" data-latex="x^2" data-display="false"></span>后</p>',
     );
@@ -95,7 +95,7 @@ describe('injectMath', () => {
     expect(html).toContain('后');
   });
 
-  it('块级公式以 display 模式渲染', () => {
+  it('renders block formulas in display mode', () => {
     const html = injectMath(
       '<div data-math="block" data-display="true" data-latex="\\sum_{i=1}^{n} a_i"></div>',
     );
@@ -103,12 +103,12 @@ describe('injectMath', () => {
     expect(html).toContain('display="block"');
   });
 
-  it('没有公式时原样返回', () => {
+  it('returns the input unchanged when there are no formulas', () => {
     const html = '<p>只有正文</p>';
     expect(injectMath(html)).toBe(html);
   });
 
-  it('LaTeX 为空或渲染失败时保留节点与源码，不丢内容', () => {
+  it('keeps the node and source when LaTeX is empty or rendering fails, losing nothing', () => {
     const empty = injectMath('<span data-math="inline" data-latex=""></span>');
     expect(empty).toContain('data-latex=""');
 

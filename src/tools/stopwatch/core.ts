@@ -1,8 +1,8 @@
 /**
- * 秒表：经过时间格式化与分段。
+ * Stopwatch: elapsed-time formatting and laps.
  */
 
-/** 格式化为 HH:MM:SS.cs（百分之一秒） */
+/** Format as HH:MM:SS.cs (hundredths of a second) */
 export function formatStopwatch(ms: number): string {
   const clamped = Math.max(0, Math.floor(ms));
   const cs = Math.floor(clamped / 10) % 100;
@@ -16,7 +16,7 @@ export function formatStopwatch(ms: number): string {
 }
 
 /**
- * 计算当前经过毫秒。
+ * Compute the current elapsed milliseconds.
  * - running：baseElapsed + (now - segmentStartedAt)
  * - paused：baseElapsed
  */
@@ -31,17 +31,13 @@ export function computeElapsed(
 
 export interface LapRecord {
   index: number;
-  /** 本圈用时 */
+  /** Duration of this lap */
   lapMs: number;
-  /** 累计用时 */
+  /** Cumulative duration */
   totalMs: number;
 }
 
-export function buildLap(
-  prevTotalMs: number,
-  currentTotalMs: number,
-  index: number,
-): LapRecord {
+export function buildLap(prevTotalMs: number, currentTotalMs: number, index: number): LapRecord {
   return {
     index,
     lapMs: Math.max(0, currentTotalMs - prevTotalMs),

@@ -1,8 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
 /**
- * E2E 冒烟测试配置（技术设计 §7.5 三层测试策略）
- * 对生产构建产物（vite preview）运行，运行前需先 `pnpm build`。
+ * E2E smoke test config (technical design §7.5, three-layer test strategy)
+ * Runs against the production build (vite preview); run `pnpm build` first.
  */
 export default defineConfig({
   testDir: 'e2e',
@@ -10,9 +10,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: 'http://localhost:4173',
-    // 主链路复制断言需要剪贴板读写权限
+    // The main-flow copy assertion needs clipboard read/write permission
     permissions: ['clipboard-read', 'clipboard-write'],
-    // 本地优先使用系统 Chrome，避免下载 Playwright 托管浏览器；CI 使用托管 Chromium（见 ci.yml）
+    // Prefer the system Chrome locally to avoid downloading Playwright's browser; CI uses the bundled Chromium (see ci.yml)
     ...(process.env.CI ? {} : { channel: 'chrome' }),
   },
   webServer: {

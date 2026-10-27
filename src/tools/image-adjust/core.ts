@@ -1,13 +1,13 @@
 /**
- * 图片调色：亮度 / 对比度 / 饱和度 / 色相 → CSS filter 字符串。
+ * Image color adjustment: brightness / contrast / saturation / hue → CSS filter string.
  */
 
 export interface AdjustOptions {
-  /** 百分比，100 = 原图 */
+  /** Percentage, 100 = original image */
   brightness: number;
   contrast: number;
   saturate: number;
-  /** 色相旋转角度 */
+  /** Hue rotation angle */
   hue: number;
 }
 
@@ -49,7 +49,5 @@ export function buildCssFilter(options: AdjustOptions): string {
 
 export function isIdentityAdjust(options: AdjustOptions): boolean {
   const o = clampAdjust(options);
-  return (
-    o.brightness === 100 && o.contrast === 100 && o.saturate === 100 && o.hue === 0
-  );
+  return o.brightness === 100 && o.contrast === 100 && o.saturate === 100 && o.hue === 0;
 }

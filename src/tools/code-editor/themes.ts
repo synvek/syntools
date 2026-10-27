@@ -1,14 +1,14 @@
 /**
- * 代码编辑器配色主题：10 套风格（深色 / 浅色各半）。
+ * Code editor colour themes: 10 palettes (half dark, half light).
  *
- * 调色板以 CSS 自定义属性（`--ce-*`）注入容器，由 `editor.css` 消费，
- * 因此编辑区、导出预览卡片、导出的独立 HTML 三处可复用同一份配色，
- * 保证「所见即所得」。
+ * A palette is injected into the container as CSS custom properties (`--ce-*`) and consumed by
+ * `editor.css`, so the editor, the export preview card and the exported standalone HTML all
+ * reuse one palette, keeping WYSIWYG exact.
  */
 
 export interface CodeTheme {
   id: string;
-  /** 展示名（多为专有名词，各语言保持一致） */
+  /** Display name (mostly proper nouns, identical in every language) */
   name: string;
   mode: 'dark' | 'light';
   bg: string;
@@ -25,7 +25,7 @@ export interface CodeTheme {
   variable: string;
 }
 
-/** Prism token → 调色板字段，供 CSS 与导出 HTML 共用 */
+/** Prism token → palette field, shared by CSS and the exported HTML */
 export const TOKEN_FIELDS = [
   'keyword',
   'string',
@@ -222,7 +222,7 @@ export function getTheme(id: string): CodeTheme {
   return CODE_THEMES.find((t) => t.id === id) ?? CODE_THEMES[0];
 }
 
-/** 主题 → `--ce-*` 自定义属性，供 React 内联 style 使用 */
+/** Theme → `--ce-*` custom properties, for React inline styles */
 export function themeCssVars(theme: CodeTheme): Record<string, string> {
   const vars: Record<string, string> = {
     '--ce-bg': theme.bg,
@@ -236,7 +236,7 @@ export function themeCssVars(theme: CodeTheme): Record<string, string> {
   return vars;
 }
 
-/** 主题 → 独立 CSS 片段（导出 HTML 时内嵌，脱离本站仍可用） */
+/** Theme → standalone CSS block (inlined into exported HTML so it works off-site) */
 export function themeStyleBlock(theme: CodeTheme): string {
   const tokens = TOKEN_FIELDS.map((field) => `  .token.${field} { color: ${theme[field]}; }`).join(
     '\n',

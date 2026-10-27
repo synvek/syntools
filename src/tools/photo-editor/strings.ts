@@ -1,10 +1,10 @@
 /**
- * 照片编辑器 UI 文案：随工具 chunk 懒加载注入 i18next。
+ * Photo editor UI copy: injected into i18next lazily together with the tool chunk.
  *
- * 与 slide-editor / flowchart-editor 保持同一套约定（详见各自 strings.ts 头部说明）：
- * 单工具的近百条 UI 文案不进首屏语言包 `core/i18n/locales/*`，
- * 而是在工具被懒加载时由 `registerPhotoStrings` 合并进 i18next，键路径保持 `tools.photo.*`。
- * 工具元数据（名称/描述）仍写在 `core/i18n/locales/*` 的 `toolsMeta` 中。
+ * Same convention as slide-editor / flowchart-editor (see the header notes in their strings.ts):
+ * the ~100 UI strings of a single tool do not go into the first-screen bundles under `core/i18n/locales/*`;
+ * `registerPhotoStrings` merges them into i18next when the tool is lazy-loaded, keeping keys under `tools.photo.*`.
+ * Tool metadata (name / description) still lives in `toolsMeta` under `core/i18n/locales/*`.
  */
 
 type StringTree = { [key: string]: string | StringTree };
@@ -5081,7 +5081,7 @@ const pt: ResourceTree = {
   },
 };
 
-/** 语言代码 → 资源树，键与 `Lang` 保持一致 */
+/** Language code → resource tree, with keys matching `Lang` */
 export const photoStrings: Record<string, ResourceTree> = {
   zh,
   en,
@@ -5094,7 +5094,7 @@ export const photoStrings: Record<string, ResourceTree> = {
   pt,
 };
 
-/** 把本工具文案合并进 i18next（工具被懒加载时调用，键路径 tools.photo.*） */
+/** Merge this tool's copy into i18next (called on lazy load, keys under tools.photo.*) */
 export function registerPhotoStrings(instance: {
   addResourceBundle: (
     lng: string,

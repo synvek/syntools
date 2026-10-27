@@ -1,27 +1,27 @@
 name: CI
 
-# 版本管理（简化双通道，全部由 workflow_dispatch 触发）：
-#   release 模式：tag = v<version>.<run_number>，构建版本 = <version>-<run_number>（合法 semver）
-#                 run_number 单调递增、永不复用 → 每次都是新 tag，不会覆盖历史。
-#   dev     模式：tag = v<version>.dev，构建版本 = <version>-0（MSI/WiX 要求 pre-release 为纯数字）
-#                 一个 version 共用一个 dev tag，允许覆盖重发（删旧 Release + 强制移动 tag）。
+# Versioning (simplified two-channel scheme, everything triggered by workflow_dispatch):
+#   release mode: tag = v<version>.<run_number>, build version = <version>-<run_number> (valid semver)
+#                 run_number only ever increases and is never reused -> every tag is new, history is never overwritten.
+#   dev     mode: tag = v<version>.dev, build version = <version>-0 (MSI/WiX requires a numeric pre-release)
+#                 one dev tag per version; re-releasing over it is allowed (delete the old Release + force-move the tag).
 on:
   workflow_dispatch:
     inputs:
       channel:
-        description: 'release: 正式发布（tag v<version>.<run>）；dev: 开发构建（tag v<version>.dev.<run>）'
+        description: 'release: production release (tag v<version>.<run>); dev: development build (tag v<version>.dev.<run>)'
         type: choice
         options:
           - dev
           - release
         default: dev
 
-# 创建并推送 tag、发布 Release 需要写权限
+# Creating and pushing tags plus publishing Releases requires write access
 permissions:
   contents: write
 
 jobs:
-  # 解析本次构建的版本 / 通道 / tag
+  # Resolve the version / channel / tag for this build
   version:
     name: resolve build version
     runs-on: ubuntu-latest
@@ -37,27 +37,27 @@ jobs:
         run: |
           BASE="$(jq -r '.version' package.json)"
           if [ -z "$BASE" ] || [ "$BASE" = "null" ]; then
-            echo "::error::package.json 中缺少 version 字段"; exit 1
+            echo "::error::package.json has no version field"; exit 1
           fi
 
           RUN="${{ github.run_number }}"
           CHANNEL="${{ github.event.inputs.channel || 'dev' }}"
 
           if [ "$CHANNEL" = "release" ]; then
-            # tag 用四点式（任意字符串）；构建版本需合法 semver，用 pre-release 形式
+            # Tags use a four-part form (any string); the build version must be valid semver, so use a pre-release
             BUILD="${BASE}-${RUN}"
             TAG="v${BASE}.${RUN}"
           else
             CHANNEL="dev"
-            # dev 不携带 run_number：一个 version 共用一个 dev tag，允许覆盖重发。
-            # 注意：MSI(WiX) 要求 pre-release 标识必须为纯数字且 <=65535，
-            # 因此 dev 构建版本用数值型 pre-release（0.7.0-0），tag 仍保持 v0.7.0.dev。
+            # dev carries no run_number: one dev tag per version, re-releases may overwrite it.
+            # Note: MSI (WiX) requires the pre-release identifier to be purely numeric and <=65535,
+            # so dev builds use a numeric pre-release (0.7.0-0) while the tag stays v0.7.0.dev.
             BUILD="${BASE}-0"
             TAG="v${BASE}.dev"
           fi
 
           if ! echo "$BUILD" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
-            echo "::error::非法版本号：$BUILD"; exit 1
+            echo "::error::Invalid version: $BUILD"; exit 1
           fi
 
           echo "version=${BUILD}" >> "$GITHUB_OUTPUT"
@@ -66,8 +66,8 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Resolved -> build=${BUILD} tag=${TAG} channel=${CHANNEL}"
 
-  # 依赖许可门禁（npm + Rust）。独立成 job：不阻塞 6 个平台的桌面构建矩阵，
-  # 且失败信息一眼可见 —— 许可问题必须先于打包解决。
+  # Dependency license gate (npm + Rust). Its own job: it must not block the 6-platform desktop
+  # build matrix, and its failures stay obvious at a glance - license issues come before packaging.
   licenses:
     name: license gate (npm + cargo-deny)
     runs-on: ubuntu-latest
@@ -100,7 +100,7 @@ jobs:
         with:
           tool: cargo-deny
 
-      # cargo-deny 只解析依赖图，不编译；白名单见 src-tauri/deny.toml
+      # cargo-deny only resolves the dependency graph, no compilation; allowlist lives in src-tauri/deny.toml
       - name: License gate (Rust, cargo-deny)
         run: pnpm license:check:rust
 
@@ -121,8 +121,8 @@ jobs:
       - name: install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 许可门禁：出现 GPL / AGPL / SSPL 等强 copyleft 组件直接失败。
-      # 这条必须在构建前跑 —— 组件一旦进了产物，事后清理的成本远高于拦住它。
+      # License gate: any strong-copyleft component (GPL / AGPL / SSPL ...) fails the build immediately.
+      # It must run before the build - once a component ships, cleaning it up costs far more than blocking it.
       - name: License gate (npm)
         run: pnpm license:check
 
@@ -132,7 +132,7 @@ jobs:
       - name: Type checking
         run: pnpm typecheck
 
-      # 以 package.json 为来源把版本同步进 Cargo / tauri.conf（写模式，避免漂移导致构建失败）
+      # Sync the version from package.json into Cargo / tauri.conf (write mode, so drift can't break the build)
       - name: Sync version (package.json -> Cargo / tauri.conf)
         run: pnpm version:sync
 
@@ -188,9 +188,9 @@ jobs:
             os: macos-15
     runs-on: ${{ matrix.os }}
     env:
-      # vite build 在 macOS runner 上会顶到 Node 默认堆上限（heap OOM），统一提高子进程堆上限
+      # vite build hits Node's default heap ceiling on the macOS runner (heap OOM); raise the child heap limit
       NODE_OPTIONS: --max-old-space-size=8192
-      # 注入本次构建版本，让安装包携带唯一/正式版本号
+      # Inject this build's version so installers carry a unique/official version number
       SYNTOOLS_BUILD_VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
@@ -225,14 +225,14 @@ jobs:
       - name: Install npm dependencies
         run: pnpm install --frozen-lockfile
 
-      # 将本次构建版本（release: <v>-<run>；dev: <v>-dev.<run>）写入 Cargo / tauri.conf
+      # Write this build's version (release: <v>-<run>; dev: <v>-dev.<run>) into Cargo / tauri.conf
       - name: Sync build version (Cargo / tauri.conf)
         run: pnpm version:sync
 
       - name: Tauri build
         run: pnpm tauri:build
 
-      # 只保留安装包，排除 .app、辅助脚本等
+      # Keep installers only; drop .app bundles, helper scripts and the like
       - name: Stage installers
         shell: bash
         run: |
@@ -260,9 +260,9 @@ jobs:
   release:
     name: publish (${{ needs.version.outputs.channel }})
     runs-on: ubuntu-latest
-    # 临时放开：publish 不再依赖 ci（lint + typecheck + test + e2e），
-    # 仅依赖 tauri 桌面包、version 解析与 licenses（许可门禁）。
-    # 许可不合格的产物不允许发布，因此 licenses 必须留在依赖里。
+    # Temporarily relaxed: publish no longer depends on ci (lint + typecheck + test + e2e),
+    # only on the tauri desktop packages, version resolution and licenses (the license gate).
+    # Artifacts with an unacceptable license may never ship, so licenses must stay a dependency.
     needs: [tauri, version, licenses]
     steps:
       - name: Checkout (full history for tags)
@@ -270,7 +270,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 下载后结构：artifacts/tauri-<platform>/<installer>
+      # Layout after download: artifacts/tauri-<platform>/<installer>
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -296,7 +296,7 @@ jobs:
           fi
           echo "Release notes:" && cat release_notes.md
 
-      # release 通道：run_number 唯一 → 新建并推送 tag（不会覆盖历史）
+      # release channel: run_number is unique -> create and push a new tag (history is never overwritten)
       - name: Create and push tag (release channel)
         if: needs.version.outputs.channel == 'release'
         env:
@@ -308,7 +308,7 @@ jobs:
           git tag "$TAG"
           git push origin "$TAG"
 
-      # dev 通道：一个 version 共用一个 dev tag，删除旧 Release 并强制移动 tag 以覆盖重发
+      # dev channel: one dev tag per version - delete the old Release and force-move the tag to re-release
       - name: Reset dev tag (dev channel, overwrite)
         if: needs.version.outputs.channel == 'dev'
         env:
@@ -317,7 +317,7 @@ jobs:
           TAG="${{ needs.version.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # 删除旧 Release（若存在），tag 随后强制指向当前提交
+          # Delete the old Release (if any), then force the tag onto the current commit
           gh release delete "$TAG" --yes || true
           git tag -f "$TAG"
           git push -f origin "$TAG"

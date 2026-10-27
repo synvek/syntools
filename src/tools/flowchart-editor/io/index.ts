@@ -1,5 +1,5 @@
 /**
- * 导入导出统一入口：对外只暴露本模块，UI 与 store 不直接依赖具体格式实现。
+ * Single entry point for import/export: only this module is exposed, so the UI and store never depend on a specific format implementation.
  */
 
 import { downloadDataUrl } from '@/core/pdf/download';
@@ -46,7 +46,7 @@ export function metaOf(kind: ExportKind): ExportMeta {
   return EXPORT_KINDS.find((m) => m.kind === kind) ?? EXPORT_KINDS[0];
 }
 
-/** 把文本保存为文件 */
+/** Save text as a file */
 export function downloadText(text: string, filename: string, mime: string): void {
   const blob = new Blob([text], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
@@ -54,7 +54,7 @@ export function downloadText(text: string, filename: string, mime: string): void
   URL.revokeObjectURL(url);
 }
 
-/** 文本文件类导出（项目 JSON / Draw.io XML / Mermaid） */
+/** Text-based exports (project JSON / Draw.io XML / Mermaid) */
 export function exportText(
   doc: Parameters<typeof toProjectJson>[0],
   kind: ExportKind,
@@ -72,13 +72,13 @@ export function exportText(
   return true;
 }
 
-/** 导入支持的文件类型 */
+/** File types supported for import */
 export type ImportKind = 'project' | 'drawio' | 'mermaid';
 
-/** 导入文件选择框的 accept 值 */
+/** Accept value for the import file picker */
 export const IMPORT_ACCEPT = '.json,.drawio,.xml,.mmd,.mermaid,.txt';
 
-/** 按文件名后缀判断导入类型；未知后缀按 Draw.io 处理（历史上 .xml 走这条路） */
+/** Infer the import type from the file extension; unknown extensions are treated as Draw.io (historically .xml took this path) */
 export function importKindOf(filename: string): ImportKind {
   const lower = filename.toLowerCase();
   if (lower.endsWith('.json')) return 'project';
@@ -88,7 +88,7 @@ export function importKindOf(filename: string): ImportKind {
   return 'drawio';
 }
 
-/** 解析导入文件为文档；无法识别返回 null */
+/** Parse an imported file into a document; returns null when unrecognized */
 export function parseImportedFile(filename: string, text: string): FlowDoc | null {
   switch (importKindOf(filename)) {
     case 'project':
@@ -104,8 +104,8 @@ export function parseImportedFile(filename: string, text: string): FlowDoc | nul
 }
 
 /**
- * 异步版导入解析：在同步版基础上支持 Draw.io 压缩文件
- * （`<diagram>` 文本为 base64+deflate，需要异步解压）。
+ * Async import parsing: adds Draw.io compressed-file support on top of the synchronous version
+ * (`<diagram>` text is base64+deflate and needs async inflation).
  */
 export async function parseImportedFileAsync(
   filename: string,

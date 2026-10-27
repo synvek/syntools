@@ -14,8 +14,8 @@ import { SHELL_TEXT, STATIC_PAGE_SECTIONS } from '@/core/seo/sections';
 const PATHS = ['/download/', '/pricing/', '/security/', '/privacy/', '/about/'] as const;
 
 /**
- * 这张表同时喂给两处：构建期写进静态 HTML 的 head，运行期同步 head。
- * 缺一种语言、或出现一条空描述，都会让其中一侧悄悄退化（没报错，只是白写）。
+ * This table feeds two places: the head baked into static HTML at build time, and head sync at runtime.
+ * A missing language or an empty description silently degrades one side (no error, just wasted output).
  */
 describe('SEO 文案完整性', () => {
   it('每种 SEO 语言都配齐站点级字段', () => {

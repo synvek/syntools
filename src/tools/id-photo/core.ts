@@ -19,12 +19,12 @@ export const ID_PHOTO_SIZES: PhotoSizePreset[] = [
 
 export const DEFAULT_DPI = 300;
 
-/** 毫米 → 像素（按给定 DPI）。 */
+/** Millimeters → pixels at the given DPI. */
 export function mmToPx(mm: number, dpi = DEFAULT_DPI): number {
   return Math.round((mm / 25.4) * dpi);
 }
 
-/** 计算目标尺寸像素。 */
+/** Compute the target size in pixels. */
 export function targetPixels(
   presetId: string,
   dpi = DEFAULT_DPI,
@@ -42,7 +42,7 @@ export interface SourceRect {
   sh: number;
 }
 
-/** 计算「覆盖式居中裁剪」的源矩形，用于在目标比例下尽量填满。 */
+/** Compute the cover-and-center-crop source rectangle that fills the target aspect ratio as much as possible. */
 export function coverCrop(
   imgW: number,
   imgH: number,

@@ -1,11 +1,11 @@
 import type { Paragraph, RunStyle, TextBody, VAlign } from '../model/types';
 
 /**
- * 文本排版：把 TextBody（段落 + run 级混排）转换成可绘制的行/片段。
+ * Text layout: turns a TextBody (paragraphs + run-level mixing) into drawable lines and fragments.
  *
- * Konva.Text 只支持整块统一样式，无法表达 pptx 同一段落内的 `<a:r>` 混排，
- * 因此这里用一个离线 canvas 的 measureText 自行折行，
- * 每个 run 片段交给一个 Konva.Text 节点定位绘制，从而保留加粗/颜色/字号差异。
+ * Konva.Text only supports one uniform style for the whole block and can't express `<a:r>` mixing inside a pptx
+ * paragraph, so line breaking is done here with an offline canvas measureText, and each run fragment is drawn
+ * by its own positioned Konva.Text node, preserving bold/color/size differences.
  */
 
 export interface LayoutSegment {
@@ -25,14 +25,14 @@ export interface LayoutLine {
 
 export interface TextLayout {
   lines: LayoutLine[];
-  /** 排版总高（px，含段间距） */
+  /** Total layout height (px, including paragraph spacing) */
   height: number;
 }
 
 const DEFAULT_SIZE = 18;
 const DEFAULT_FONT = 'Arial, Helvetica, sans-serif';
 
-/** 默认内边距（px）：pptx 缺省 bodyPr 大约为 0.1 英寸 */
+/** Default padding (px): a missing bodyPr in pptx is roughly 0.1 inch */
 const DEFAULT_MARGIN = { left: 9, top: 5, right: 9, bottom: 5 };
 
 let measureCtx: CanvasRenderingContext2D | null = null;
@@ -57,7 +57,7 @@ function measure(ctx: CanvasRenderingContext2D, text: string, style: RunStyle): 
   return ctx.measureText(text).width;
 }
 
-/** CJK 字符需逐字断行，因此单独成挪ragm */
+/** CJK characters wrap per character, so they get their own range */
 const CJK = '\\u2E80-\\u9FFF\\u3000-\\u303F\\u3040-\\u30FF\\u3400-\\u4DBF\\uAC00-\\uD7AF';
 const TOKEN_RE = new RegExp(`(\\s+)|([${CJK}])|(?:[^\\s${CJK}]+)`, 'g');
 
@@ -70,18 +70,18 @@ interface Atom {
 }
 
 /**
- * 中文/日文避头尾：这些标点不能出现在行首（否则会「孤立」在下一行最前面）。
- * 命中时宁可让当前行略微溢出，也不在该标点前断行。
+ * CJK line-start prohibition (kinsoku): these punctuation marks can't start a line, or they'd be orphaned
+ * at the head of the next one. When matched, overflow the current line slightly rather than break before the mark.
  */
 const NO_LINE_START = /^[，。、；：！？）」』】》〉…、·,.!?;:)\]}]$/;
 
-/** 单段落拆行：返回行内片段（已合并相邻同 run 的原子） */
+/** Split one paragraph into lines (fragments per line, with adjacent same-run atoms merged) */
 function layoutParagraph(
   paragraph: Paragraph,
   available: number,
   ctx: CanvasRenderingContext2D,
   startY: number,
-  /** 段落序号（从 1 开始），仅编号列表使用 */
+  /** Paragraph ordinal (1-based), used only by numbered lists */
   ordinal = 1,
 ): { lines: LayoutLine[]; height: number } {
   const runs = paragraph.runs.length > 0 ? paragraph.runs : [{ text: '' }];
@@ -106,7 +106,7 @@ function layoutParagraph(
 
   for (const atom of atoms) atom.width = measure(ctx, atom.text, atom.style);
 
-  // 编号列表优先于项目符号：两者互斥（numbering 由 buAutoNum 解析而来）
+  // Numbered lists take precedence over bullets: the two are mutually exclusive (numbering comes from buAutoNum)
   const bullet = paragraph.numbering ? `${ordinal}. ` : paragraph.bullet ? '• ' : '';
   const bulletWidth = bullet ? measure(ctx, bullet, runs[0]?.style ?? {}) : 0;
 
@@ -125,13 +125,13 @@ function layoutParagraph(
     if (isFirst && atom.kind === 'space') continue;
     const projected = currentWidth + atom.width;
     if (current.length > 0 && projected > available) {
-      // 避头尾：标点不停留在行首，跟随上一行（行首只有一个原子时不强行吞并，避免死循环）
+      // Kinsoku: punctuation doesn't start a line but follows the previous one (don't force-merge a single atom, to avoid a loop)
       if (current.length > 1 && NO_LINE_START.test(atom.text)) {
         current.push(atom);
         currentWidth += atom.width;
         continue;
       }
-      // 行尾的空格不下沉到下一行
+      // Trailing spaces don't drop to the next line
       while (current.length > 0 && current[current.length - 1].kind === 'space') {
         const dropped = current.pop();
         currentWidth -= dropped?.width ?? 0;
@@ -209,7 +209,7 @@ function verticalStart(anchor: VAlign | undefined, free: number): number {
   return 0;
 }
 
-/** 计算整块文本在盒子内的排版结果 */
+/** Compute the layout of a whole text block inside its box */
 export function layoutTextBody(body: TextBody, box: { width: number; height: number }): TextLayout {
   const ctx = getMeasureContext();
   const margins = body.margins ?? DEFAULT_MARGIN;
@@ -217,7 +217,7 @@ export function layoutTextBody(body: TextBody, box: { width: number; height: num
   const paragraphs = body.paragraphs.length > 0 ? body.paragraphs : [{ runs: [{ text: '' }] }];
 
   if (!ctx) {
-    // 无 canvas 环境（如 SSR / 测试）退化为等距估算，保证不崩
+    // Without a canvas (SSR / tests) fall back to a monospace estimate so nothing crashes
     let y = margins.top;
     let ordinal = 0;
     const lines: LayoutLine[] = paragraphs.map((paragraph) => {
@@ -242,7 +242,7 @@ export function layoutTextBody(body: TextBody, box: { width: number; height: num
     return { lines, height: y + margins.bottom };
   }
 
-  // 编号在同一组连续编号段落内递增，遇到普通段落则重置（与 PowerPoint 一致）
+  // The ordinal increments across consecutive numbered paragraphs and resets on a plain one (matching PowerPoint)
   let ordinal = 0;
   const measured = paragraphs.map((paragraph) => {
     ordinal = paragraph.numbering ? ordinal + 1 : 0;
@@ -272,7 +272,7 @@ export function layoutTextBody(body: TextBody, box: { width: number; height: num
   return { lines, height: cursor + margins.bottom };
 }
 
-/** 估算文本自然高度（自动增高 / autofit 场景） */
+/** Estimate the natural text height (auto-grow / autofit cases) */
 export function measureTextBodyHeight(body: TextBody, width: number, minHeight: number): number {
   const lines = layoutTextBody(body, { width, height: 100000 });
   const natural = lines.lines.reduce((sum, line) => sum + line.height, 0);

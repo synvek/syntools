@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 字母大小写 / 命名风格转换。
+ * Letter-case and naming-convention conversion.
  */
 
 export type CaseMode =
@@ -31,17 +31,14 @@ export const CASE_MODES: CaseMode[] = [
   'constant',
 ];
 
-/** 拆成单词：空白 / 标点 / 驼峰边界 */
+/** Split into words on whitespace, punctuation, and camelCase boundaries */
 export function splitWords(input: string): string[] {
   const spaced = input
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
     .replace(/[_\-.]+/g, ' ')
     .replace(/[^\p{L}\p{N}]+/gu, ' ');
-  return spaced
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  return spaced.trim().split(/\s+/).filter(Boolean);
 }
 
 function capitalize(word: string): string {
@@ -87,7 +84,8 @@ export function convertCase(input: string, mode: CaseMode): ToolResult<string> {
       if (words.length === 0) return { ok: true, value: '' };
       if (mode === 'snake') return { ok: true, value: words.join('_') };
       if (mode === 'kebab') return { ok: true, value: words.join('-') };
-      if (mode === 'constant') return { ok: true, value: words.map((w) => w.toUpperCase()).join('_') };
+      if (mode === 'constant')
+        return { ok: true, value: words.map((w) => w.toUpperCase()).join('_') };
       const pascal = words.map(capitalize).join('');
       if (mode === 'pascal') return { ok: true, value: pascal };
       return {

@@ -5,8 +5,8 @@ import { PROJECT_VERSION } from './core';
 import type { PhotoDoc } from './model/types';
 
 /**
- * 自有工程文件（`.photo.json`）：完整保存图层结构 + 像素（dataURL 内联），可再次导入继续编辑。
- * 与草稿不同，工程文件不做降级——它是用户显式导出的产物，必须能原样还原。
+ * Native project file (`.photo.json`): stores the full layer structure + pixels (inlined as dataURLs) and can be re-imported for further editing.
+ * Unlike drafts, a project file never degrades — it is an explicit export by the user and must restore exactly.
  */
 
 export interface ProjectFile {
@@ -17,7 +17,7 @@ export interface ProjectFile {
 
 export function buildProjectJson(doc: PhotoDoc): string {
   const layers = doc.layers.map((layer) => {
-    // 位图像素内联；蒙版像素单独内联（二者都在资产注册表里，不能只存 id）
+    // Bitmap pixels are inlined; mask pixels are inlined separately (both live in the asset registry, so ids alone are not enough)
     const maskUrl = layer.mask?.assetId ? assetToDataUrl(layer.mask.assetId, 'image/png') : null;
     const withMask = maskUrl ? { ...layer, maskData: maskUrl } : layer;
     if (layer.kind !== 'raster' && layer.kind !== 'smart') return withMask;
@@ -63,7 +63,7 @@ export async function parseProject(text: string): Promise<ToolResult<PhotoDoc>> 
     const { data, maskData, ...rest } = layer;
     let next: Record<string, unknown> = rest;
 
-    // 位图 / 智能对象源像素
+    // Bitmap / smart-object source pixels
     if (typeof data === 'string') {
       const canvas = await dataUrlToCanvas(data).catch(() => null);
       if (!canvas) return { ok: false, error: 'IMAGE_DECODE_FAILED' };
@@ -72,10 +72,10 @@ export async function parseProject(text: string): Promise<ToolResult<PhotoDoc>> 
           ? { ...next, sourceAssetId: registerCanvas(canvas) }
           : { ...next, assetId: registerCanvas(canvas) };
     }
-    // 蒙版像素
+    // Mask pixels
     if (typeof maskData === 'string' && isObject(next.mask)) {
       const canvas = await dataUrlToCanvas(maskData).catch(() => null);
-      // 蒙版解码失败不致命：退化为「无蒙版」，整档仍可打开
+      // A failed mask decode is not fatal: fall back to "no mask" and the rest of the file still opens
       if (canvas) {
         next = { ...next, mask: { ...(next.mask as object), assetId: registerCanvas(canvas) } };
       }
@@ -83,7 +83,7 @@ export async function parseProject(text: string): Promise<ToolResult<PhotoDoc>> 
     layers.push(next);
   }
 
-  // v1 及更早的文档在此归一为当前模型（补编组 / 蒙版 / 调整图层字段、修引用完整性）
+  // Documents from v1 and earlier are normalized to the current model here (fill in group / mask / adjustment fields, fix referential integrity)
   const doc = migrateDoc({ ...(raw as object), layers });
   if (!doc) return { ok: false, error: 'PARSE_FAILED' };
   return { ok: true, value: doc };

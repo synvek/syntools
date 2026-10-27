@@ -16,24 +16,24 @@ import { findTemplate, instantiateTemplate } from './model/templates';
 import type { Fill, Slide, SlideDoc, SlideElement, TableCell } from './model/types';
 
 /**
- * 幻灯片编辑器状态：唯一真相源是 doc，其余（选中 / 视口 / 历史）是会话态。
- * 所有修改 doc 的 action 都先 commit() 把旧快照压入历史，保证 undo 可回放。
+ * Slide editor state: `doc` is the single source of truth; the rest (selection / viewport / history) is session state.
+ * Every action that mutates doc calls commit() first to push the old snapshot into history, so undo can replay it.
  */
 
 const HISTORY_LIMIT = 50;
 
 export interface Viewport {
-  /** 画布缩放比例；0 = 尚未计算，宿主会按容器大小自动适配 */
+  /** Canvas scale; 0 = not computed yet, the host fits it to the container */
   scale: number;
   width: number;
   height: number;
-  /** 相对「页面居中位置」的平移偏移（滚轮平移 / 抓手拖动产生） */
+  /** Pan offset relative to the "page centered" position (produced by wheel panning / hand drag) */
   panX: number;
   panY: number;
 }
 
 export interface ImportReport {
-  /** 被降级为占位框的元素数量 */
+  /** Number of elements downgraded to placeholder boxes */
   placeholders: number;
   skipped: string[];
 }
@@ -47,39 +47,39 @@ interface SlideState {
   past: SlideDoc[];
   future: SlideDoc[];
   report: ImportReport | null;
-  /** 会话内剪贴板：不入 doc、不进 undo，关闭页面即失效 */
+  /** Session clipboard: not part of doc, not in undo, lost when the page closes */
   clipboard: SlideElement[];
-  /** 表格当前活动单元格（点击画布单元格设置，供属性面板编辑文字） */
+  /** Active table cell (set by clicking a cell on the canvas, used by the property panel to edit text) */
   activeCell: { row: number; col: number } | null;
-  /** 网格吸附开关（开启后拖动会额外吸附到 GRID_SIZE 的整数倍） */
+  /** Grid snap toggle (dragging also snaps to multiples of GRID_SIZE when on) */
   gridSnap: boolean;
-  /** 标尺与参考线显示开关 */
+  /** Show rulers and guides */
   showRulers: boolean;
-  /** 手动参考线（会话态，不入 doc / 不进 undo） */
+  /** Manual guides (session state, not part of doc / undo) */
   guides: { id: string; axis: 'x' | 'y'; position: number }[];
 
-  /** 视图模式：普通编辑 / 母版编辑 */
+  /** View mode: normal editing / master editing */
   viewMode: ViewMode;
-  /** 母版视图下编辑的是母版还是某个版式 */
+  /** In master view, whether a master or one of its layouts is being edited */
   masterKind: 'master' | 'layout';
-  /** 母版视图下的目标下标 */
+  /** Target index in master view */
   masterIndex: number;
-  /** 格式刷：已复制的样式快照（会话态，不入 doc） */
+  /** Format painter: copied style snapshot (session state, not part of doc) */
   formatPainter: StyleSnapshot | null;
 
   setViewMode: (mode: ViewMode) => void;
   selectMasterTarget: (kind: 'master' | 'layout', index: number) => void;
-  /** 设置当前容器背景（普通视图 = 页面背景；母版视图 = 母版/版式背景） */
+  /** Set the current container background (normal view = slide background; master view = master/layout background) */
   setContainerBackground: (background: string | Fill | undefined) => void;
-  /** 取出当前选中元素的样式快照（格式刷第一步） */
+  /** Capture a style snapshot of the selection (format painter, step 1) */
   copyFormat: () => void;
-  /** 把样式快照套用到选中元素（格式刷第二步） */
+  /** Apply the style snapshot to the selection (format painter, step 2) */
   applyFormat: () => void;
   clearFormatPainter: () => void;
 
-  /** 跨页全部替换（带 undo 快照） */
+  /** Replace all across slides (with an undo snapshot) */
   replaceAll: (query: string, replacement: string, options?: FindOptions) => void;
-  /** 跳到某处命中：切页并选中对应元素 */
+  /** Jump to a hit: switch slide and select the matching element */
   goToHit: (hit: TextHit) => void;
 
   loadDoc: (doc: SlideDoc, report?: ImportReport | null) => void;
@@ -100,11 +100,11 @@ interface SlideState {
   patchElement: (id: string, patch: Partial<SlideElement>, history?: boolean) => void;
   patchSelected: (patch: Partial<SlideElement>, history?: boolean) => void;
   /**
-   * 按**各自当前值**计算补丁后批量应用（`updater` 返回 `null` 表示该元素不适用）。
+   * Computes a patch from each element's **own current value** and applies it in bulk (`updater` returning `null` skips it).
    *
-   * `patchSelected` 只能下发同一个补丁，适合「设成同一个值」；而「按各自当前值取反」
-   * （加粗开关）或「基于各自 body 派生新 body」（字体/对齐）必须逐元素计算，
-   * 否则多选时会把首个元素的 body 覆盖掉其它元素的文字。
+   * `patchSelected` can only send one identical patch, which suits "set everything to the same value"; but
+   * "toggle based on each current value" (bold switch) or "derive a new body from each body" (font/align) must
+   * be computed per element, otherwise a multi-select overwrites every element's text with the first element's body.
    */
   patchSelectedWith: (
     updater: (element: SlideElement) => Partial<SlideElement> | null,
@@ -137,18 +137,18 @@ interface SlideState {
   setActiveCell: (cell: { row: number; col: number } | null) => void;
   setTableSize: (rows: number, cols: number) => void;
   patchTableCell: (row: number, col: number, patch: Partial<TableCell>) => void;
-  /** 把活动单元格与其右侧相邻单元格横向合并 */
+  /** Merge the active cell horizontally with its right neighbor */
   mergeCellRight: () => void;
-  /** 拆分活动单元格（还原被覆盖的右侧格子） */
+  /** Split the active cell (restores the covered right-hand cell) */
   splitCell: () => void;
 
-  /** 把当前选中元素提升为母版元素（提升后所有页都会显示）。母版视图下为「移入版式」 */
+  /** Promote the selection to master elements (they then appear on every slide). In master view this "moves into the layout" */
   promoteSelectedToMaster: () => void;
-  /** 清空母版公共元素 */
+  /** Clear the master's shared elements */
   clearMasterElements: () => void;
   setMasterBackground: (color: string | undefined) => void;
 
-  /** 用一批新页整体替换（Markdown 大纲生成用） */
+  /** Replace all slides at once (used by Markdown outline generation) */
   replaceSlides: (slides: Slide[]) => void;
   applyTemplate: (templateId: string) => void;
   applyThemeColor: (key: string, color: string) => void;
@@ -162,12 +162,12 @@ interface SlideState {
 const emptyReport: ImportReport | null = null;
 
 /**
- * 视图模式：普通编辑 vs 母版编辑。
+ * View mode: normal editing vs master editing.
  *
- * 母版视图下所有元素操作应作用于母版/版式元素而不是当前页元素，
- * 因此把「当前编辑容器」抽成一对读写器（`containerElements` /
- * `writeContainerElements`），各 action 只改这两处的调用，
- * 避免逐个 action 重写页面定位逻辑。
+ * In master view every element operation must target master/layout elements instead of the current slide's,
+ * so the "current editing container" is abstracted into a reader/writer pair (`containerElements` /
+ * `writeContainerElements`); each action only changes those two call sites,
+ * avoiding a per-action rewrite of the slide lookup logic.
  */
 export type ViewMode = 'normal' | 'master';
 export type ContainerKind = 'slide' | 'master' | 'layout';
@@ -177,7 +177,7 @@ export interface ContainerRef {
   index: number;
 }
 
-/** 当前编辑容器定位：普通视图 = 当前页；母版视图 = 选中的母版/版式 */
+/** Locate the current editing container: normal view = current slide; master view = selected master/layout */
 export function containerRefOf(s: {
   viewMode: ViewMode;
   slideIndex: number;
@@ -189,14 +189,14 @@ export function containerRefOf(s: {
     : { kind: 'slide', index: s.slideIndex };
 }
 
-/** 读取容器元素（越界返回空数组，调用方无需再判空） */
+/** Read container elements (returns an empty array when out of range, callers need no null check) */
 function elementsOf(doc: SlideDoc, ref: ContainerRef): SlideElement[] {
   if (ref.kind === 'slide') return doc.slides[ref.index]?.elements ?? [];
   if (ref.kind === 'master') return doc.masters[ref.index]?.elements ?? [];
   return doc.layouts[ref.index]?.elements ?? [];
 }
 
-/** 容器背景（普通视图下为页面背景 + 所属版式/母版兜底） */
+/** Container background (slide background in normal view, plus the owning layout/master fallback) */
 export function containerBackgroundOf(doc: SlideDoc, ref: ContainerRef): string | Fill | undefined {
   if (ref.kind === 'slide') {
     const slide = doc.slides[ref.index];
@@ -213,12 +213,12 @@ type ContainerHost = Pick<
   'doc' | 'viewMode' | 'slideIndex' | 'masterKind' | 'masterIndex'
 >;
 
-/** 读取当前编辑容器的元素数组 */
+/** Read the element array of the current editing container */
 export function containerElements(s: ContainerHost): SlideElement[] {
   return elementsOf(s.doc, containerRefOf(s));
 }
 
-/** 写回当前编辑容器元素，返回新的 doc（触发 version 自增以失效缩略图缓存） */
+/** Write the current container elements back and return a new doc (bumps version to invalidate thumbnail caches) */
 function writeContainerElements(
   s: ContainerHost,
   next: SlideElement[] | ((current: SlideElement[]) => SlideElement[]),
@@ -244,7 +244,7 @@ function writeContainerElements(
   return { ...s.doc, layouts, version: s.doc.version + 1 };
 }
 
-/** 按 id 批量打补丁（只改命中的元素，其余保持引用不变） */
+/** Bulk patch by id (only matching elements change, the rest keep their references) */
 function patchElements(
   elements: SlideElement[],
   patches: Map<string, Partial<SlideElement>>,
@@ -349,7 +349,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       if (patches.size === 0) return s;
       return {
         doc: writeContainerElements(s, (current) => patchElements(current, patches)),
-        // 格式刷为「一次性」使用，套用后自动清除（与 PowerPoint 单击行为一致）
+        // The format painter is single-use: it clears itself after applying (matching PowerPoint's click behavior)
         formatPainter: null,
       };
     });
@@ -361,7 +361,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     if (!query.trim()) return;
     const state = get();
     const next = replaceInDoc(state.doc, query, replacement, options);
-    // 无命中时不动历史，避免制造一次「什么都没变」的撤销点
+    // No hit: leave history alone so we don't create a "nothing changed" undo step
     if (next === state.doc) return;
     get().commit();
     set({ doc: next, activeCell: null });
@@ -375,8 +375,8 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     }));
   },
 
-  // 任何来源（pptx 导入 / .sld 打开 / 草稿恢复 / 模板套用）都在此过一遍迁移，
-  // 保证 store 里流通的始终是当前 schema 的文档
+  // Every source (pptx import / .sld open / draft restore / template apply) goes through migration here,
+  // so the store always holds a document in the current schema
   loadDoc: (doc, report) =>
     set((s) => ({
       doc: migrateDoc(doc),
@@ -385,7 +385,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       past: [],
       future: [],
       report: report ?? null,
-      // 换了文档后重新自动适配缩放
+      // Re-fit the zoom after switching documents
       viewport: { ...s.viewport, scale: 0 },
     })),
 
@@ -400,7 +400,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
 
   togglePlaceholders: () => set((s) => ({ showPlaceholders: !s.showPlaceholders })),
 
-  /** 压入当前 doc 快照（历史环形上限 HISTORY_LIMIT） */
+  /** Push the current doc snapshot (history ring capped at HISTORY_LIMIT) */
   commit: () =>
     set((s) => {
       const past = [...s.past, cloneDoc(s.doc)].slice(-HISTORY_LIMIT);
@@ -513,7 +513,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   select: (ids, additive = false) =>
     set((s) => ({
       selection: additive ? Array.from(new Set([...s.selection, ...ids])) : ids,
-      // 换选中元素时清掉表格活动单元格，避免面板继续指向已经取消选中的表格
+      // Clear the active table cell when the selection changes, so the panel doesn't point at an unselected table
       activeCell: null,
     })),
 
@@ -549,7 +549,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     for (const element of containerElements(state)) {
       if (!state.selection.includes(element.id)) continue;
       const patch = updater(element);
-      // 空补丁（例如字号已达上下限）不计入，避免制造一次「什么都没变」的撤销点
+      // Skip empty patches (e.g. font size already at its limit) to avoid a "nothing changed" undo step
       if (patch && Object.keys(patch).length > 0) patches.set(element.id, patch);
     }
     if (patches.size === 0) return;
@@ -645,7 +645,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
         const picked = current.filter((el) => s.selection.includes(el.id));
         if (picked.length === 0) return current;
         const rest = current.filter((el) => !s.selection.includes(el.id));
-        // 选中项整体移到末尾，内部保持原有相对顺序
+        // Move the selection to the end as a block, keeping its internal relative order
         return [...rest, ...picked];
       }),
     }));
@@ -668,7 +668,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     const targets = containerElements(state).filter((el) => state.selection.includes(el.id));
     if (targets.length === 0) return;
     const boxes = targets.map(toBox);
-    // 多选：对齐到选中元素的并集包围盒（对齐所选对象）；单选：对齐到幻灯片
+    // Multi-select: align to the union bounds of the selection (align to selection); single: align to slide
     const bounds =
       targets.length > 1
         ? unionBounds(boxes)
@@ -711,7 +711,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     const picked = current.filter((el) => state.selection.includes(el.id));
     if (picked.length < 2) return;
     const bounds = unionBounds(picked.map(toBox));
-    // children 存相对 group 原点的坐标（见 GroupElement 注释）
+    // children store coordinates relative to the group origin (see the GroupElement comment)
     const children = picked.map(
       (element) =>
         ({
@@ -730,7 +730,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       children,
     };
     const rest = current.filter((el) => !state.selection.includes(el.id));
-    // 插入位置沿用被选中元素中最靠前的那个，保持原有 z-order 直觉
+    // Insert at the earliest index among the selected elements to keep z-order intuitive
     const firstIndex = current.findIndex((el) => state.selection.includes(el.id));
     const elements = [...rest];
     elements.splice(Math.min(Math.max(firstIndex, 0), rest.length), 0, group);
@@ -754,7 +754,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
         continue;
       }
       for (const child of element.children) {
-        // 相对坐标还原为页面绝对坐标
+        // Convert relative coordinates back to absolute page coordinates
         const abs = {
           ...cloneElement(child),
           x: element.x + child.x,
@@ -775,7 +775,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     const state = get();
     const targets = containerElements(state).filter((el) => state.selection.includes(el.id));
     if (targets.length === 0) return;
-    // 只要有一个未锁定就整体锁定，否则整体解锁
+    // Lock everything if any target is unlocked, otherwise unlock everything
     const next = targets.some((el) => !el.locked);
     const patches = new Map<string, Partial<SlideElement>>(
       targets.map((el) => [el.id, { locked: next }]),
@@ -783,7 +783,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     get().commit();
     set((s) => ({
       doc: writeContainerElements(s, (current) => patchElements(current, patches)),
-      // 锁定后不应继续处于选中态
+      // A locked element should not stay selected
       selection: next ? [] : s.selection,
     }));
   },
@@ -860,7 +860,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     if (nextRows === target.rows.length && nextCols === target.colWidths.length) return;
 
     const emptyCell = (): TableCell => ({ text: '', align: 'left', valign: 'middle' });
-    // 保留已有内容：多出来的行/列补空单元格，减少的行/列直接裁掉
+    // Keep existing content: pad missing rows/columns with empty cells, drop the removed ones
     const nextCells = target.rows.slice(0, nextRows).map((row) => {
       const copy = row.slice(0, nextCols);
       while (copy.length < nextCols) copy.push(emptyCell());
@@ -869,7 +869,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     while (nextCells.length < nextRows) {
       nextCells.push(Array.from({ length: nextCols }, emptyCell));
     }
-    // 行列尺寸按新数量均分（当前没有单独调整列宽的入口，均分最可预期）
+    // Divide row/column sizes evenly (there is no per-column resize entry point, even is most predictable)
     const colWidths = Array.from({ length: nextCols }, () => Math.round(target.width / nextCols));
     const rowHeights = Array.from({ length: nextRows }, () => Math.round(target.height / nextRows));
     const patches = new Map<string, Partial<SlideElement>>();
@@ -908,7 +908,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     const source = containerElements(state);
     const picked = source.filter((el) => state.selection.includes(el.id));
     if (picked.length === 0) return;
-    // 已经在母版视图里就没什么可提升的（避免把母版元素重复塞回母版）
+    // Already in master view: nothing to promote (avoids pushing master elements back into the master)
     if (state.viewMode === 'master') return;
     get().commit();
     set((s) => {
@@ -917,7 +917,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       return {
         doc: {
           ...doc,
-          // 母版元素坐标即页面坐标，无需换算
+          // Master element coordinates are page coordinates already, no conversion needed
           masters: doc.masters.map((item, index) =>
             index === 0 ? { ...item, elements: [...item.elements, ...picked] } : item,
           ),
@@ -979,7 +979,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     const row = target.rows[cell.row];
     const current = row?.[cell.col];
     const next = row?.[cell.col + 1];
-    // 只允许向右吞并「尚未被覆盖」的相邻格
+    // Only swallow right-hand neighbors that are not covered yet
     if (!current || !next || next.covered) return;
     const consume = Math.max(1, next.colSpan ?? 1);
     const rows = target.rows.map((cells, rowIndex) =>
@@ -1050,7 +1050,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
         theme,
         masters,
         layouts,
-        // 换模板后原有 layoutId 已不存在，统一指向新模板的首个版式，避免悬空引用
+        // The old layoutId is gone after a template change; point every slide at the new template's first layout to avoid dangling refs
         slides: s.doc.slides.map((slide) => ({ ...slide, layoutId: defaultLayoutId })),
         version: s.doc.version + 1,
       },
@@ -1085,7 +1085,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   },
 }));
 
-/** 当前活动页（越界时回落到最后一页） */
+/** Current active slide (falls back to the last slide when out of range) */
 export function activeSlide(state: SlideState): Slide | undefined {
   return state.doc.slides[state.slideIndex];
 }

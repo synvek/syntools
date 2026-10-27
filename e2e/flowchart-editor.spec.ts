@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * 流程图编辑器「下一阶段增强」的回归用例（P0）：
- * 多选批量编辑、快捷键（全选 / 微移 / 建节点）、网格吸附开关、
- * Mermaid 导入、导出范围与边距参数。
+ * Regression cases for the flowchart editor's "next-stage enhancements" (P0):
+ * multi-select batch editing, keyboard shortcuts (select all / nudge / create node),
+ * grid snapping toggle, Mermaid import, export range and margin options.
  */
 
 const NODE = '.react-flow__node';
@@ -11,13 +11,13 @@ const EDGE = '.react-flow__edge';
 
 async function dropProcess(page: Page, x: number, y: number) {
   const canvas = page.locator('.react-flow');
-  // 精确匹配：图形库中「预定义过程」也包含「过程」子串
+  // Exact match: the shape library also has "预定义过程", which contains "过程" as a substring
   await page.getByRole('button', { name: '过程', exact: true }).dragTo(canvas, {
     targetPosition: { x, y },
   });
 }
 
-/** 从第 from 个图形的右侧锚点拖到第 to 个图形，生成一条连线 */
+/** Drag from the right handle of node `from` to node `to` to create an edge */
 async function connectNodes(page: Page, from: number, to: number) {
   const source = page.locator(NODE).nth(from);
   await source.hover();
@@ -29,7 +29,7 @@ async function connectNodes(page: Page, from: number, to: number) {
   await page.mouse.up();
 }
 
-/** 点击连线路径中点选中该连线 */
+/** Select the edge by clicking the midpoint of its path */
 async function selectFirstEdge(page: Page) {
   const mid = await page
     .locator('.react-flow__edge-interaction')
@@ -45,26 +45,28 @@ async function selectFirstEdge(page: Page) {
   await page.mouse.click(mid!.x, mid!.y);
 }
 
-test.describe('流程图编辑器增强（zh-CN）', () => {
+test.describe('flowchart editor enhancements (zh-CN)', () => {
   test.use({ locale: 'zh-CN' });
-  // 更大的视口：画布两侧有图形库与属性面板，节点/手柄需要足够的可点击区域
+  // Larger viewport: the shape library and properties panel flank the canvas, so nodes/handles need room to be clicked
   test.use({ viewport: { width: 1600, height: 1000 } });
 
-  test('多选批量编辑：属性面板聚合展示并一次写入全部选中节点', async ({ page }) => {
+  test('multi-select batch edit: properties panel aggregates and writes all selected nodes at once', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 110, 90);
     await dropProcess(page, 380, 90);
     await expect(page.locator(NODE)).toHaveCount(2);
 
-    // Ctrl/⌘+A 全选
+    // Ctrl/⌘+A selects all
     await page.keyboard.press('Control+a');
     await expect(page.getByText(/已选中 2 个元素/)).toBeVisible();
 
-    // 属性面板标题变为「已选中 2 个节点」
+    // The panel title becomes "已选中 2 个节点"
     await expect(page.getByText('已选中 2 个节点')).toBeVisible();
 
-    // 修改填充色 → 两个节点同时生效
-    // 注意：受控 input 需用原生 setter 写值，React 的 value tracker 才会识别到变化
+    // Changing the fill color → both nodes update
+    // Note: controlled inputs need the native setter so React's value tracker sees the change
     const fill = page.getByLabel('填充色');
     await fill.evaluate((el: HTMLInputElement, value: string) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -72,13 +74,15 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }, '#ffcc00');
-    // 每个节点的 svg 内第一个 <g> 是图形本体（后面的 <g> 是装饰/箭头）
+    // The first <g> inside each node's svg is the shape itself (later <g>s are decorations/arrowheads)
     const shapeGroup = (index: number) => page.locator(NODE).nth(index).locator('svg g').first();
     await expect(shapeGroup(0)).toHaveAttribute('fill', '#ffcc00');
     await expect(shapeGroup(1)).toHaveAttribute('fill', '#ffcc00');
   });
 
-  test('快捷键：Ctrl+A 全选、方向键微移、Tab 生成相连节点', async ({ page }) => {
+  test('shortcuts: Ctrl+A select all, arrow keys nudge, Tab creates a connected node', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 140, 120);
     await expect(page.locator(NODE)).toHaveCount(1);
@@ -88,27 +92,27 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
     const before = (await node.boundingBox())!;
 
-    // 方向键微移（默认 1px，按住 ⇧ 加速 10px）
+    // Nudge with arrow keys (1px by default, 10px with ⇧ held)
     await page.keyboard.press('Shift+ArrowRight');
     await expect
       .poll(async () => (await node.boundingBox())?.x ?? before.x)
       .toBeGreaterThan(before.x + 5);
 
-    // Ctrl+A 全选：状态栏出现「已选中 1 个元素」
+    // Ctrl+A selects all: the status bar shows "已选中 1 个元素"
     await page.keyboard.press('Control+a');
     await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
 
-    // Tab：在右侧生成相连的新节点
+    // Tab: create a connected node to the right
     await page.keyboard.press('Tab');
     await expect(page.locator(NODE)).toHaveCount(2);
     await expect(page.locator(EDGE)).toHaveCount(1);
   });
 
-  test('网格吸附可开关且网格尺寸可选', async ({ page }) => {
+  test('grid snapping can be toggled and the grid size is selectable', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const toggle = page.getByTestId('flowchart-grid-toggle');
     await expect(toggle).toBeVisible();
-    // 默认开启（primary 样式 = 蓝底）
+    // On by default (primary style = blue background)
     await expect(toggle).toHaveClass(/bg-blue-600/);
     await toggle.click();
     await expect(toggle).not.toHaveClass(/bg-blue-600/);
@@ -118,7 +122,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(gridSize).toHaveValue('20');
   });
 
-  test('导入 Mermaid 文本生成图形与连线', async ({ page }) => {
+  test('importing Mermaid text creates shapes and edges', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const source = ['flowchart TD', '  A[开始] --> B{判断}', '  B -->|是| C([结束])'].join('\n');
     await page.setInputFiles('input[type=file]', {
@@ -133,7 +137,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.locator(NODE).filter({ hasText: '判断' })).toHaveCount(1);
   });
 
-  test('导出面板提供范围 / 倍率 / 边距参数', async ({ page }) => {
+  test('export panel offers range / scale / margin options', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 140, 120);
 
@@ -141,7 +145,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     const range = page.getByTestId('flowchart-export-range');
     await expect(range).toBeVisible();
     await expect(range).toHaveValue('current');
-    // 只有一页时「全部页」不可选
+    // With a single page, "全部页" cannot be selected
     const allDisabled = await range
       .locator('option[value="all"]')
       .evaluate((el) => (el as HTMLOptionElement).disabled);
@@ -150,7 +154,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByTestId('flowchart-export-png')).toBeVisible();
   });
 
-  test('多页时可选「全部页」并导出 ZIP', async ({ page }) => {
+  test('with multiple pages "全部页" is selectable and exports a ZIP', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 140, 120);
     await page.getByRole('button', { name: '新建页面' }).click();
@@ -167,7 +171,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     expect(file.suggestedFilename()).toMatch(/\.zip$/);
   });
 
-  test('连线折点：正交自动布线生成折点，双击可删除', async ({ page }) => {
+  test('edge waypoints: orthogonal auto-routing creates bends, double-click deletes one', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 110, 80);
     await dropProcess(page, 400, 240);
@@ -178,26 +184,26 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await selectFirstEdge(page);
     await expect(page.getByTestId('edge-endpoint')).toHaveCount(2);
 
-    // 自动布线：生成正交折点并出现可拖拽手柄
+    // Auto-routing: generates orthogonal waypoints and draggable handles
     await page.getByTestId('flowchart-auto-route').click();
     const waypoints = page.getByTestId('edge-waypoint');
     await expect(waypoints.first()).toBeVisible();
     const count = await waypoints.count();
     expect(count).toBeGreaterThan(0);
 
-    // 双击删除一个折点
+    // Double-click deletes one waypoint
     await waypoints.first().dblclick();
     await expect.poll(() => page.getByTestId('edge-waypoint').count()).toBeLessThan(count);
 
-    // 重新布线后「清除折点」可用，可一次清空全部折点
-    // （布线按端点法线走最少的拐点：两节点对角相邻时可能只有一个折点）
+    // After re-routing "清除折点" is enabled and clears all waypoints at once
+    // (routing follows the fewest bends along endpoint normals: diagonally adjacent nodes may only need one bend)
     await page.getByTestId('flowchart-auto-route').click();
     await expect(page.getByTestId('edge-waypoint').first()).toBeVisible();
     await page.getByTestId('flowchart-clear-waypoints').click();
     await expect(page.getByTestId('edge-waypoint')).toHaveCount(0);
   });
 
-  test('连线标签：双击就地编辑', async ({ page }) => {
+  test('edge labels: double-click to edit in place', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 110, 80);
     await dropProcess(page, 400, 240);
@@ -205,37 +211,41 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await selectFirstEdge(page);
     await expect(page.getByTestId('edge-endpoint')).toHaveCount(2);
 
-    // 选中态下显示「＋」占位标签，双击进入编辑
+    // When selected, a "＋" placeholder label appears; double-click to edit
     await page.getByTestId('edge-label').first().dblclick();
     await page.keyboard.type('同意');
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('edge-label').first()).toHaveText('同意');
   });
 
-  test('图层面板：容器树形、搜索过滤与拖拽改父级入口', async ({ page }) => {
+  test('layers panel: container tree, search filtering and drag-to-reparent entry', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
-    // 精确匹配：图形库里另有「模板类」图形按钮
+    // Exact match: the shape library also has a "模板类" shape button
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
 
     await page.getByRole('button', { name: '图层' }).click();
-    // 1 条泳道 + 4 个内部节点
+    // 1 swimlane + 4 inner nodes
     await expect(page.getByTestId('layer-row')).toHaveCount(5);
-    // 子节点提供「移出容器」按钮
+    // Child nodes provide a "移出容器" button
     await expect(page.getByTestId('layer-move-out').first()).toBeVisible();
 
-    // 搜索过滤
+    // Search filtering
     await page.getByTestId('layer-search').fill('步骤 1');
     await expect(page.getByTestId('layer-row')).toHaveCount(1);
     await page.getByTestId('layer-search').fill('');
 
-    // 点击行选中节点，与画布选中态联动
+    // Clicking a row selects the node, syncing with the canvas selection
     await page.getByTestId('layer-row').first().click();
     await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
   });
 
-  test('插入图标与公式节点，并可在属性面板编辑公式', async ({ page }) => {
+  test('insert icon and formula nodes, and edit the formula in the properties panel', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByTestId('insert-icon').click();
     await page.getByTestId('icon-star').click();
@@ -243,7 +253,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
 
     await page.getByTestId('insert-formula').click();
     await expect(page.locator(NODE)).toHaveCount(2);
-    // 新插入的公式节点处于选中态，KaTeX 渲染完成后属性面板出现源码编辑框
+    // The newly inserted formula node is selected; once KaTeX renders, the source editor appears in the panel
     await expect(page.getByTestId('formula-content')).toBeVisible();
     const input = page.getByTestId('flowchart-formula-input');
     await expect(input).toBeVisible();
@@ -251,9 +261,11 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(input).toHaveValue('a^2 + b^2 = c^2');
   });
 
-  test('自动布局：方向可选且保留泳道层级', async ({ page }) => {
+  test('auto layout: direction is selectable and swimlane hierarchy is preserved', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
-    // 精确匹配：图形库里另有「模板类」图形按钮
+    // Exact match: the shape library also has a "模板类" shape button
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
@@ -262,14 +274,14 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await page.getByTestId('flowchart-layout-density').selectOption('loose');
     await page.getByRole('button', { name: '自动布局' }).click();
 
-    // 泳道仍是容器（旧实现会在布局前解除泳道归属并把它当普通节点重排）
+    // The swimlane is still a container (the old implementation detached swimlanes before layout and re-laid them out as plain nodes)
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
     await expect(page.locator(NODE).filter({ hasText: '横向泳道' })).toHaveCount(1);
     await page.getByRole('button', { name: '图层' }).click();
     await expect(page.getByTestId('layer-move-out').first()).toBeVisible();
   });
 
-  test('几何编辑：属性面板 X 与宽高输入写入节点', async ({ page }) => {
+  test('geometry editing: X and width/height inputs write to the node', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 220, 150);
     await page.locator(NODE).first().click();
@@ -289,7 +301,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
       .toBe(260);
   });
 
-  test('统一尺寸：选中节点统一为第一个节点的尺寸', async ({ page }) => {
+  test("uniform size: selected nodes adopt the first node's size", async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 130, 110);
     await page.locator(NODE).first().click();
@@ -308,7 +320,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
       .toBe(300);
   });
 
-  test('对齐到网格：选中节点位置吸附到网格整数倍', async ({ page }) => {
+  test('align to grid: selected node positions snap to grid multiples', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 173, 137);
     await page.locator(NODE).first().click();
@@ -320,7 +332,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     expect(y % 10).toBe(0);
   });
 
-  test('Esc 取消选择；Ctrl+X 剪切后可 Ctrl+V 粘回', async ({ page }) => {
+  test('Esc deselects; Ctrl+X cuts and Ctrl+V pastes back', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 160, 130);
     await page.locator(NODE).first().click();
@@ -337,7 +349,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.locator(NODE)).toHaveCount(1);
   });
 
-  test('Esc 关闭页面总览（全局 Esc 不抢走弹层的按键）', async ({ page }) => {
+  test('Esc closes the page overview (the global Esc does not steal keys from overlays)', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 150, 120);
     await page.getByRole('button', { name: '新建页面' }).click();
@@ -351,16 +365,16 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(overview).toHaveCount(0);
   });
 
-  test('模板弹窗：焦点陷阱与 Esc 关闭', async ({ page }) => {
+  test('template dialog: focus trap and Esc to close', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    // 精确匹配：图形库里另有「模板类」图形按钮
+    // Exact match: the shape library also has a "模板类" shape button
     await page.getByRole('button', { name: '模板', exact: true }).click();
     const dialog = page.getByTestId('flowchart-template-dialog');
     await expect(dialog).toBeVisible();
-    // 打开后焦点进入弹窗
+    // Focus moves into the dialog on open
     await expect(dialog.locator(':focus')).toHaveCount(1);
 
-    // 连续 Tab 后焦点仍留在弹窗内（焦点陷阱）
+    // Focus stays inside the dialog after repeated Tab presses (focus trap)
     for (let i = 0; i < 8; i += 1) await page.keyboard.press('Tab');
     await expect(dialog.locator(':focus')).toHaveCount(1);
 
@@ -368,7 +382,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(dialog).toBeHidden();
   });
 
-  test('多页 Mermaid 导出为多段 flowchart', async ({ page }) => {
+  test('multi-page Mermaid export produces multiple flowchart sections', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 140, 120);
     await page.getByRole('button', { name: '新建页面' }).click();
@@ -390,7 +404,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     expect(text.match(/flowchart TD/g)?.length).toBe(2);
   });
 
-  test('右键节点：切换形状（默认展开所在分类）', async ({ page }) => {
+  test('right-click node: switch shape (expands the category it belongs to by default)', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 190, 140);
     const node = page.locator(NODE).first();
@@ -400,7 +416,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByTestId('flow-context-menu')).toBeVisible();
     await expect(page.getByTestId('context-shape-grid')).toBeVisible();
 
-    // 切到「圆角矩形」：菜单关闭，节点图形随之改变
+    // Switch to "圆角矩形": the menu closes and the node shape changes
     await page.getByTestId('context-shape-roundRect').click();
     await expect(page.getByTestId('flow-context-menu')).toHaveCount(0);
     await expect(page.locator(NODE).first().locator('[data-kind]')).toHaveAttribute(
@@ -409,12 +425,14 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     );
   });
 
-  test('右键节点：可切换分类后选形状，复制与删除生效', async ({ page }) => {
+  test('right-click node: switch category then pick a shape, duplicate and delete work', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 170, 130);
     await expect(page.locator(NODE)).toHaveCount(1);
 
-    // 切到「流程图」分类后选「判断」（图形库里也有同名分类按钮，需限定在菜单内）
+    // Switch to the "流程图" category and pick "判断" (the shape library has a button with the same name, so scope to the menu)
     await page.locator(NODE).first().click({ button: 'right' });
     const menu = page.getByTestId('flow-context-menu');
     await menu.getByRole('button', { name: '流程图', exact: true }).click();
@@ -428,20 +446,20 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await page.getByTestId('context-duplicate').click();
     await expect(page.locator(NODE)).toHaveCount(2);
 
-    // 副本只偏移 24px、盖在原节点之上，用页面坐标右键副本（层级更高）执行删除
+    // The copy is offset by only 24px and covers the original, so right-click it via page coordinates (higher z-order) to delete
     const copy = (await page.locator(NODE).nth(1).boundingBox())!;
     await page.mouse.click(copy.x + copy.width / 2, copy.y + copy.height / 2, { button: 'right' });
     await page.getByTestId('context-delete').click();
     await expect(page.locator(NODE)).toHaveCount(1);
   });
 
-  test('右键空白：粘贴剪贴板内容', async ({ page }) => {
+  test('right-click empty canvas: paste clipboard contents', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 140, 110);
     await page.locator(NODE).first().click();
     await page.keyboard.press('Control+c');
 
-    // 空白处右键（避开节点与右下角缩略图，用页面坐标直接派发）
+    // Right-click an empty spot (away from nodes and the bottom-right minimap, dispatch via page coordinates)
     const pane = (await page.locator('.react-flow__pane').boundingBox())!;
     await page.mouse.click(pane.x + 120, pane.y + pane.height - 60, { button: 'right' });
     await expect(page.getByTestId('flow-context-menu')).toBeVisible();
@@ -449,7 +467,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.locator(NODE)).toHaveCount(2);
   });
 
-  test('右键菜单：Esc 关闭且不清空画布选择', async ({ page }) => {
+  test('context menu: Esc closes it without clearing the canvas selection', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 170, 130);
     await page.locator(NODE).first().click();
@@ -460,11 +478,11 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
 
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('flow-context-menu')).toHaveCount(0);
-    // 菜单在捕获阶段拦下 Esc，不应波及编辑器「取消选择」
+    // The menu intercepts Esc during the capture phase, so it must not reach the editor's "deselect"
     await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
   });
 
-  test('右键连线：正交自动布线生成折点', async ({ page }) => {
+  test('right-click edge: orthogonal auto-routing creates waypoints', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 110, 80);
     await dropProcess(page, 400, 240);
@@ -490,7 +508,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByTestId('edge-waypoint').first()).toBeVisible();
   });
 
-  test('形状调整手柄：便签折角可拖拽并与属性面板同步', async ({ page }) => {
+  test('shape adjust handles: the sticky-note fold can be dragged and syncs with the panel', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await page
       .getByRole('button', { name: '便签', exact: true })
@@ -507,7 +527,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     const before = Number(await slider.inputValue());
     const pathBefore = await node.locator('svg path').first().getAttribute('d');
 
-    // 向左拖拽折角顶点：折角变大（value = w - x）
+    // Drag the fold vertex left: the fold grows (value = w - x)
     const box = (await handle.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
@@ -515,17 +535,17 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await page.mouse.up();
 
     await expect.poll(async () => Number(await slider.inputValue())).toBeGreaterThan(before);
-    // 图形本体（折角路径）随之改变
+    // The shape itself (fold path) changes accordingly
     await expect
       .poll(async () => node.locator('svg path').first().getAttribute('d'))
       .not.toBe(pathBefore);
 
-    // 双击顶点回到默认值
+    // Double-click the vertex to restore the default value
     await handle.dblclick();
     await expect.poll(async () => Number(await slider.inputValue())).toBe(before);
   });
 
-  test('形状调整手柄：预定义过程左右竖线宽度可拖拽', async ({ page }) => {
+  test('shape adjust handles: predefined-process side bars are draggable', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page
       .getByRole('button', { name: '预定义过程', exact: true })
@@ -547,7 +567,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect.poll(async () => Number(await slider.inputValue())).toBeGreaterThan(before);
   });
 
-  test('多选时不显示调整手柄（避免堆叠）', async ({ page }) => {
+  test('adjust handles are hidden for multi-selection (to avoid stacking)', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page
       .getByRole('button', { name: '便签', exact: true })
@@ -561,7 +581,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByTestId('flowchart-adjust-foldSize')).toHaveCount(0);
   });
 
-  test('导入压缩形式（base64 + deflate）的 .drawio', async ({ page }) => {
+  test('import a compressed (base64 + deflate) .drawio file', async ({ page }) => {
     const { deflateRaw } = await import('pako');
     const inner =
       '<mxGraphModel dx="0" dy="0" grid="1" page="1"><root>' +
@@ -583,7 +603,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.locator(NODE).filter({ hasText: '开始' })).toHaveCount(1);
   });
 
-  test('旋转手柄：拖拽旋转并与属性面板同步，双击复位', async ({ page }) => {
+  test('rotation handle: drag to rotate, synced with the panel, double-click resets', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 300, 220);
     await page.locator(NODE).first().click();
@@ -593,7 +615,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     const slider = page.getByTestId('flowchart-param-rotation');
     await expect(slider).toHaveValue('0');
 
-    // 从顶边手柄拖到右侧：角度应显著变化，并在拖动中显示读数
+    // Drag from the top handle to the right side: the angle should change noticeably and show a live readout while dragging
     const box = (await handle.boundingBox())!;
     const node = (await page.locator(NODE).first().boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -608,12 +630,14 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
       String(rotated),
     );
 
-    // 双击手柄复位
+    // Double-click the handle to reset
     await handle.dblclick();
     await expect(slider).toHaveValue('0');
   });
 
-  test('容器折叠：隐藏子节点并显示角标，可再次展开', async ({ page }) => {
+  test('container collapse: hides children and shows a badge, can be expanded again', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
@@ -622,7 +646,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     const toggle = page.getByTestId('flowchart-collapse-toggle');
     await expect(toggle).toHaveCount(1);
     await toggle.click();
-    // 折叠后仅剩泳道本身可见（子节点被隐藏）
+    // After collapsing only the swimlane itself remains visible (children are hidden)
     await expect(page.locator(NODE)).toHaveCount(1);
     await expect(page.getByTestId('flowchart-collapsed-count')).toHaveText('4');
 
@@ -630,7 +654,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.locator(NODE)).toHaveCount(5);
   });
 
-  test('连线双标签与标签位置：面板输入即时生效', async ({ page }) => {
+  test('edge dual labels and label position: panel input applies immediately', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 110, 80);
     await dropProcess(page, 400, 240);
@@ -652,7 +676,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByTestId('edge-label-position')).toHaveValue('nearTarget');
   });
 
-  test('UML 关系预设：一键把连线切到聚合关系', async ({ page }) => {
+  test('UML relation presets: switch an edge to an aggregation relation in one click', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 110, 80);
     await dropProcess(page, 400, 240);
@@ -660,13 +686,15 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await selectFirstEdge(page);
 
     await page.getByTestId('edge-relation-aggregation').click();
-    // 聚合：起端空心菱形 + 终点箭头
+    // Aggregation: hollow diamond at the source + arrow at the target
     await expect(page.getByTestId('edge-jump')).toBeVisible();
     const startArrow = page.getByLabel('起点箭头');
     await expect(startArrow).toHaveValue('diamondHollow');
   });
 
-  test('多选整体缩放：包围盒把手可见并改变尺寸', async ({ page }) => {
+  test('multi-select resize: the bounding box handle is visible and changes the size', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 180, 140);
     await dropProcess(page, 520, 140);
@@ -675,7 +703,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
 
     const resizer = page.getByTestId('flowchart-selection-resizer');
     await expect(resizer).toBeVisible();
-    // 用属性面板的宽度输入读取 store 真值（.react-flow__node 的外框由 React Flow 测量缓存决定）
+    // Read the real store value from the panel width input (.react-flow__node's box comes from React Flow's measurement cache)
     const widthInput = page.getByTestId('flowchart-geo-width');
     const before = Number(await widthInput.inputValue());
 
@@ -692,7 +720,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
       .toBeGreaterThan(before + 10);
   });
 
-  test('页面与画布：复制页面、纸张边界与网格样式', async ({ page }) => {
+  test('pages and canvas: duplicate page, paper boundary and grid style', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 140, 120);
 
@@ -709,7 +737,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByTestId('flowchart-wheel-mode')).toHaveValue('zoom');
   });
 
-  test('标尺与参考线：可从标尺拉出参考线并双击删除', async ({ page }) => {
+  test('rulers and guides: drag a guide out of the ruler and double-click to delete', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 200, 160);
     await page.getByTestId('flowchart-rulers-toggle').click();
@@ -727,7 +757,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByTestId('flowchart-guide-y')).toHaveCount(0);
   });
 
-  test('快捷键帮助浮层：F1 打开、Esc 关闭', async ({ page }) => {
+  test('shortcut help overlay: F1 opens, Esc closes', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByTestId('flowchart-canvas').click();
     await page.keyboard.press('F1');
@@ -738,14 +768,14 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
 
-    // 工具栏按钮同样可以打开
+    // The toolbar button opens it too
     await page.getByTestId('flowchart-shortcut-help').click();
     await expect(dialog).toBeVisible();
     await page.getByTestId('flowchart-shortcut-close').click();
     await expect(dialog).toHaveCount(0);
   });
 
-  test('全图搜索：按文字定位并选中节点', async ({ page }) => {
+  test('canvas-wide search: locate and select a node by text', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
@@ -758,7 +788,7 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
   });
 
-  test('从 draw.io 粘贴 mxGraph：解析后插入并选中', async ({ page }) => {
+  test('paste mxGraph from draw.io: parsed, inserted and selected', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const xml =
       '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>' +
@@ -778,15 +808,15 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByText(/已选中 1 个元素/)).toBeVisible();
   });
 
-  test('插入表格并就地编辑单元格', async ({ page }) => {
+  test('insert a table and edit a cell in place', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByTestId('insert-table').click();
 
     await expect(page.getByTestId('flowchart-table')).toHaveCount(1);
-    // 默认 3×3：末格存在
+    // 3×3 by default: the last cell exists
     await expect(page.getByTestId('table-cell-2-2')).toHaveCount(1);
 
-    // 双击首个单元格 → 输入文本 → ⌘/Ctrl+Enter 提交（Enter 为换行）
+    // Double-click the first cell → type text → ⌘/Ctrl+Enter commits (Enter inserts a newline)
     await page.getByTestId('table-cell-0-0').dblclick();
     const editor = page.locator('[data-testid="table-cell-0-0"] textarea');
     await expect(editor).toBeVisible();
@@ -795,7 +825,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.getByTestId('table-cell-0-0')).toHaveText('表头');
   });
 
-  test('节点文字：Enter 换行支持多行，且不会误生成相连节点', async ({ page }) => {
+  test('node text: Enter inserts a newline for multiple lines and does not create a connected node', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 140, 120);
     await expect(page.locator(NODE)).toHaveCount(1);
@@ -810,13 +842,15 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await page.keyboard.type('第二行');
     await page.keyboard.press('Control+Enter');
 
-    // 关键回归点：Enter 只换行，不应触发「生成下方节点」
+    // Key regression point: Enter only inserts a newline and must not trigger "create node below"
     await expect(page.locator(NODE)).toHaveCount(1);
     await expect(page.locator(NODE).first()).toContainText('第一行');
     await expect(page.locator(NODE).first()).toContainText('第二行');
   });
 
-  test('全页布线：右键空白触发 autoRouteEdges(all)', async ({ page }) => {
+  test('page-wide routing: right-click empty canvas triggers autoRouteEdges(all)', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await dropProcess(page, 110, 90);
     await dropProcess(page, 420, 90);
@@ -828,7 +862,9 @@ test.describe('流程图编辑器增强（zh-CN）', () => {
     await expect(page.locator(EDGE)).toHaveCount(1);
   });
 
-  test('首启引导：首次进入自动弹出，跳过后不再出现', async ({ page }) => {
+  test('onboarding: opens automatically on first visit and never again after skipping', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await page.evaluate(() =>
       window.localStorage.removeItem('syntools:flowchart-editor.onboarding.v1'),

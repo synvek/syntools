@@ -1,11 +1,12 @@
 import { findMatches } from './findReplace';
 
 /**
- * 批量编辑纯逻辑（阶段 5）。
+ * Batch editing pure logic (phase 5).
  *
- * 定位说明：编辑区由 CodeJar 托管，浏览器对 contenteditable 的多选区支持极差，
- * 因此这里**不做**任意点插入式多光标，而是提供等效价值更高的形态：
- * 「选中所有同词 → 统一替换」+ 已有的多行行操作（注释 / 缩进 / 移动）。
+ * Scope note: the editing surface is owned by CodeJar and browsers support multi-selection in
+ * contenteditable poorly, so this module deliberately **avoids** free-form multi-cursor insertion
+ * and instead offers the higher-value equivalents: "select all occurrences of a word → replace
+ * them together", plus the existing multi-line operations (comment / indent / move).
  */
 
 const WORD_RE = /[\p{L}\p{N}_]/u;
@@ -16,18 +17,18 @@ export interface TextRange {
 }
 
 export interface WordSelection {
-  /** 光标所在的词 */
+  /** Word under the caret */
   word: string;
-  /** 全文中该词的所有位置（含当前光标处） */
+  /** Every occurrence of that word in the document (including the caret position) */
   ranges: TextRange[];
 }
 
-/** 是否为词字符（Unicode 字母 / 数字 / 下划线，中英文均适用） */
+/** Whether the character is a word character (Unicode letter / digit / underscore, CJK included) */
 export function isWordChar(char: string | undefined): boolean {
   return Boolean(char) && WORD_RE.test(char!);
 }
 
-/** 取 `offset` 处（或紧邻其前）的词；不在词上返回 null */
+/** Word at `offset` (or immediately before it); returns null when not on a word */
 export function wordAtOffset(text: string, offset: number): string | null {
   let start = offset;
   let end = offset;
@@ -41,7 +42,7 @@ export function wordAtOffset(text: string, offset: number): string | null {
   return text.slice(start, end) || null;
 }
 
-/** 全文中所有同词位置（默认区分大小写，与「重命名」预期一致） */
+/** All occurrences of the same word (case-sensitive by default, matching rename expectations) */
 export function wordRanges(text: string, offset: number, matchCase = true): WordSelection | null {
   const word = wordAtOffset(text, offset);
   if (!word) return null;
@@ -53,7 +54,7 @@ export function wordRanges(text: string, offset: number, matchCase = true): Word
   };
 }
 
-/** 用同一文本改写多处区间（从后往前应用，避免偏移错乱；要求 ranges 升序且不重叠） */
+/** Overwrite several ranges with the same text (applied back to front so offsets stay valid; ranges must be sorted and non-overlapping) */
 export function replaceRanges(text: string, ranges: TextRange[], replacement: string): string {
   let next = text;
   for (let index = ranges.length - 1; index >= 0; index -= 1) {

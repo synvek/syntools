@@ -1,6 +1,6 @@
 import { PDFDocument } from '@cantoo/pdf-lib';
 
-/** 最小多页 PDF fixture（用于单测） */
+/** Minimal multi-page PDF fixture (for unit tests) */
 export async function makeFixturePdf(pageCount = 3): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   for (let i = 0; i < pageCount; i++) {

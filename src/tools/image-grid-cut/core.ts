@@ -9,7 +9,7 @@ export interface GridCell {
   col: number;
 }
 
-/** 计算网格切图的分块矩形。gap 为块之间的像素间隔。 */
+/** Compute the tile rectangles for a grid cut. gap is the spacing between tiles in pixels. */
 export function computeGrid(
   imgW: number,
   imgH: number,

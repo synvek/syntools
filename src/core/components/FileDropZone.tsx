@@ -6,15 +6,15 @@ const DEFAULT_MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
 interface FileDropZoneProps {
   onFile: (file: File) => void;
-  /** 多选时回调（启用 multiple 时优先） */
+  /** Multi-file callback (takes precedence when multiple is enabled) */
   onFiles?: (files: File[]) => void;
   multiple?: boolean;
-  /** 允许的最大字节数，超出则拒绝并提示（默认 10MB） */
+  /** Max allowed bytes; larger files are rejected with a message (default 10MB) */
   maxBytes?: number;
-  /** 透传给 input[type=file].accept，如 ".txt,.json" */
+  /** Passed through to input[type=file].accept, e.g. ".txt,.json" */
   accept?: string;
   hint?: string;
-  /** 支持格式说明（展示在提示与大小限制之间），帮助用户理解可拖入的文件类型 */
+  /** Supported-format note (shown between hint and size limit) so users know what they can drop */
   formats?: string;
 }
 
@@ -25,7 +25,7 @@ function formatBytes(bytes: number): string {
   return `${bytes}B`;
 }
 
-/** 文件拖放/选择区：大小校验 + 拖拽高亮（技术设计 §7.2） */
+/** File drop / pick zone: size validation plus drag highlight (tech design §7.2) */
 export function FileDropZone({
   onFile,
   onFiles,
@@ -101,7 +101,7 @@ export function FileDropZone({
         className="hidden"
         onChange={(e) => {
           if (e.target.files) acceptFiles(e.target.files);
-          // 允许重复选择同一文件
+          // Allow picking the same file again
           e.target.value = '';
         }}
       />

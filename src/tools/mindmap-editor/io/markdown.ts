@@ -1,7 +1,7 @@
 /**
- * Markdown 大纲 ⇄ 脑图。
- * 导出：`# / ## / ###` 标题层级（最深 6 级）。
- * 导入：同时支持标题层级与 `-` 列表缩进两种写法。
+ * Markdown outline ⇄ mind map.
+ * Export: `# / ## / ###` heading levels (up to 6 levels deep).
+ * Import: accepts both heading levels and `-` list indentation.
  */
 
 import { createId } from '../model/tree';
@@ -10,7 +10,7 @@ import type { MindDoc, MindNodeRec } from '../model/types';
 
 const MAX_LEVEL = 6;
 
-/** 导出为 Markdown 大纲 */
+/** Export as a Markdown outline */
 export function toMarkdown(doc: MindDoc): string {
   const lines: string[] = [];
   const walk = (id: string, depth: number) => {
@@ -29,7 +29,7 @@ interface ParsedLine {
   text: string;
 }
 
-/** 解析单行：返回层级与文本，非大纲行返回 null */
+/** Parse one line: returns its depth and text, or null when it is not an outline line */
 function parseLine(line: string): ParsedLine | null {
   const heading = /^(#{1,6})\s+(.*)$/.exec(line);
   if (heading) {
@@ -42,18 +42,18 @@ function parseLine(line: string): ParsedLine | null {
     const indent = item[1].replace(/\t/g, '  ').length;
     return text ? { depth: Math.floor(indent / 2) + 1, text } : null;
   }
-  // 纯文本行（无标记）视为一级分支，便于直接粘贴大纲文本
+  // Plain lines (no marker) become first-level branches, so raw outline text can be pasted as-is
   const plain = line.trim();
   return plain ? { depth: 1, text: plain } : null;
 }
 
-/** 从 Markdown 大纲构建脑图；无有效内容时返回 null */
+/** Build a mind map from a Markdown outline; returns null when there is no usable content */
 export function fromMarkdown(text: string): MindDoc | null {
   const parsed: ParsedLine[] = [];
   let inFence = false;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trimEnd();
-    // 代码块围栏内的内容整体跳过
+    // Skip everything inside fenced code blocks wholesale
     if (line.trimStart().startsWith('```')) {
       inFence = !inFence;
       continue;
@@ -66,15 +66,15 @@ export function fromMarkdown(text: string): MindDoc | null {
   if (parsed.length === 0) return null;
 
   const nodes: MindNodeRec[] = [];
-  // 栈中保存 (depth, id)，用于为新节点找父级
+  // Stack of (depth, id) pairs, used to find each new node's parent
   const stack: Array<{ depth: number; id: string }> = [];
   let rootId = '';
 
   for (const item of parsed) {
     const id = createId();
     while (stack.length > 0 && stack[stack.length - 1].depth >= item.depth) stack.pop();
-    // 首个节点即中心主题：层级不足时强制提升为根
-    // 第一个节点即中心主题；其后所有节点至少挂在中心主题下，保证单根
+    // The first node becomes the central topic: promote it to the root when its depth is too shallow
+    // The first node is the central topic; every later node hangs under it at minimum, guaranteeing one root
     let parentId = stack.length > 0 ? stack[stack.length - 1].id : null;
     if (!parentId && rootId) parentId = rootId;
     if (!parentId) rootId = id;

@@ -5,10 +5,10 @@ import { useSlideStore } from '../store';
 import { Section } from './controls';
 
 /**
- * 模板画廊：卡片式预览 + 按场景筛选 + 一键套用。
+ * Template gallery: card previews + scene filtering + one-click apply.
  *
- * 模板是纯本地数据（主题色板 + 母版 + 版式），套用后走 `applyTemplate`，
- * 与导入的文稿共用同一条母版/版式结构，因此能原样导出到 .pptx。
+ * Templates are pure local data (theme palette + master + layouts); applying goes through `applyTemplate`,
+ * sharing the same master/layout structure as imported decks, so they export to .pptx unchanged.
  */
 
 const ALL = '__all__';
@@ -77,7 +77,7 @@ export function TemplateGallery() {
                   : 'border-gray-200 hover:border-blue-300 dark:border-gray-700'
               }`}
             >
-              {/* 缩略图：用主题色拼一个抽象版式预览，避免加载任何外部图片 */}
+              {/* Thumbnail: an abstract layout preview built from theme colors, so no external image is loaded */}
               <div className="flex h-12 w-full flex-col justify-between overflow-hidden rounded border border-gray-100 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
                 <div className="flex items-center gap-1">
                   {swatch.slice(0, 3).map((color) => (

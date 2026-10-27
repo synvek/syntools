@@ -53,35 +53,35 @@ import { photoStrings } from './strings';
 import type { Selection } from './model/types';
 import type { GroupLayer, HistoryEntry, HistoryLabel, Layer, PhotoDoc } from './model/types';
 
-describe('钳制与格式化', () => {
-  it('笔刷尺寸落在合法区间，非法值回落最小值', () => {
+describe('Clamping and formatting', () => {
+  it('brush size lands in the valid range, invalid values fall back to the minimum', () => {
     expect(clampBrushSize(0)).toBe(1);
     expect(clampBrushSize(9999)).toBe(400);
     expect(clampBrushSize(Number.NaN)).toBe(1);
     expect(clampBrushSize(12.6)).toBe(13);
   });
 
-  it('百分比与不透明度按区间取整', () => {
+  it('percentages and opacity are rounded within their range', () => {
     expect(clampPercent(120)).toBe(100);
     expect(clampPercent(-120)).toBe(-100);
     expect(clampUnit(1.8)).toBe(1);
     expect(clampUnit(0.456)).toBe(0.46);
   });
 
-  it('文件名清洗掉路径分隔符', () => {
+  it('file names strip path separators', () => {
     expect(sanitizeFilename('a/b:c*d?')).toBe('a-b-c-d-');
     expect(sanitizeFilename('   ')).toBe('photo');
   });
 
-  it('字节格式化', () => {
+  it('byte formatting', () => {
     expect(formatBytes(512)).toBe('512B');
     expect(formatBytes(2048)).toBe('2KB');
     expect(formatBytes(5 * 1024 * 1024)).toBe('5.0MB');
   });
 });
 
-describe('颜色', () => {
-  it('hex 与 rgb 互转', () => {
+describe('Colors', () => {
+  it('converts between hex and rgb', () => {
     expect(hexToRgb('#2563EB')).toEqual({ r: 37, g: 99, b: 235 });
     expect(hexToRgb('#abc')).toEqual({ r: 170, g: 187, b: 204 });
     expect(hexToRgb('nope')).toBeNull();
@@ -89,12 +89,12 @@ describe('颜色', () => {
   });
 });
 
-describe('调整参数 → 滤镜管线', () => {
-  it('默认参数不产生任何 CSS filter', () => {
+describe('Adjustments → filter pipeline', () => {
+  it('default parameters produce no CSS filter', () => {
     expect(buildFilterString(createAdjustments())).toBe('');
   });
 
-  it('亮度与曝光叠加，色相单独成段', () => {
+  it('brightness and exposure stack, hue gets its own segment', () => {
     const result = buildFilterString({
       ...createAdjustments(),
       brightness: 20,
@@ -106,7 +106,7 @@ describe('调整参数 → 滤镜管线', () => {
     expect(result).toContain('saturate(0.5)');
   });
 
-  it('色温 / 锐化 / 非 CSS 滤镜需要像素通道', () => {
+  it('temperature / sharpen / non-CSS filters need the pixel pass', () => {
     expect(needsPixelPass(createAdjustments(), [{ id: 'grayscale' }])).toBe(false);
     expect(needsPixelPass(createAdjustments(), [{ id: 'gaussianBlur' }])).toBe(false);
     expect(needsPixelPass({ ...createAdjustments(), temperature: 10 }, [])).toBe(true);
@@ -115,7 +115,7 @@ describe('调整参数 → 滤镜管线', () => {
     expect(needsPixelPass(createAdjustments(), [{ id: 'motionBlur' }])).toBe(true);
   });
 
-  it('启用扩展调整时同样需要像素通道', () => {
+  it('enabling extended adjustments also needs the pixel pass', () => {
     expect(hasExtendedAdjustments(createAdjustments())).toBe(false);
     expect(hasExtendedAdjustments({ ...createAdjustments(), levels: defaultLevels() })).toBe(true);
     expect(hasExtendedAdjustments({ ...createAdjustments(), desaturate: true })).toBe(true);
@@ -126,7 +126,7 @@ describe('调整参数 → 滤镜管线', () => {
     ).toBe(true);
   });
 
-  it('烘焙签名随参数与版本号变化', () => {
+  it('the bake signature changes with parameters and the version number', () => {
     const base = bakeSignature('asset-1', 1, createAdjustments(), []);
     const revChanged = bakeSignature('asset-1', 2, createAdjustments(), []);
     const paramChanged = bakeSignature(
@@ -140,8 +140,8 @@ describe('调整参数 → 滤镜管线', () => {
   });
 });
 
-describe('几何', () => {
-  it('拖拽矩形归一化为正数宽高', () => {
+describe('Geometry', () => {
+  it('a dragged rectangle normalizes to positive width and height', () => {
     expect(normalizeRect({ x: 30, y: 40 }, { x: 10, y: 10 })).toEqual({
       x: 10,
       y: 10,
@@ -150,7 +150,7 @@ describe('几何', () => {
     });
   });
 
-  it('矩形被裁剪到画布内', () => {
+  it('the rectangle is clipped to the canvas', () => {
     const clamped = clampRect(
       { x: -10, y: 90, width: 100, height: 100 },
       { width: 100, height: 100 },
@@ -158,7 +158,7 @@ describe('几何', () => {
     expect(clamped).toEqual({ x: 0, y: 90, width: 100, height: 10 });
   });
 
-  it('相交与不相交', () => {
+  it('intersecting and non-intersecting', () => {
     expect(
       intersectRect({ x: 0, y: 0, width: 10, height: 10 }, { x: 5, y: 5, width: 10, height: 10 }),
     ).toEqual({
@@ -172,22 +172,22 @@ describe('几何', () => {
     ).toBeNull();
   });
 
-  it('适配缩放留出边距且不放大小图', () => {
-    // 可宽 460 / 可高 260 → 取较小的 0.46
+  it('fit-to-view leaves a margin and never upscales small images', () => {
+    // Fits 460 wide / 260 tall → take the smaller one, 0.46
     expect(
       computeFitScale({ width: 1000, height: 500 }, { width: 500, height: 300 }, 20),
     ).toBeCloseTo(0.46, 2);
     expect(computeFitScale({ width: 100, height: 100 }, { width: 1000, height: 1000 }, 20)).toBe(1);
   });
 
-  it('套索顶点抽稀并计算外接矩形', () => {
+  it('lasso vertices are thinned and the bounding box computed', () => {
     const path = [0, 0, 1, 0, 2, 0, 3, 0, 30, 20];
     expect(simplifyPath(path).length).toBeLessThan(path.length);
     expect(polygonBounds([0, 0, 10, 20])).toEqual({ x: 0, y: 0, width: 10, height: 20 });
   });
 });
 
-describe('选区命中', () => {
+describe('Selection hit-testing', () => {
   const rect: Selection = {
     kind: 'rect',
     x: 0,
@@ -204,48 +204,48 @@ describe('选区命中', () => {
     path: [0, 0, 100, 0, 100, 50, 0, 50],
   };
 
-  it('矩形选区按外接矩形判定', () => {
+  it('a rectangular selection is tested by its bounding box', () => {
     expect(pointInSelection(rect, 50, 25)).toBe(true);
     expect(pointInSelection(rect, 120, 25)).toBe(false);
   });
 
-  it('椭圆选区排除四角', () => {
+  it('an elliptical selection excludes the corners', () => {
     expect(pointInSelection(ellipse, 50, 25)).toBe(true);
     expect(pointInSelection(ellipse, 2, 2)).toBe(false);
   });
 
-  it('套索按多边形判定', () => {
+  it('a lasso is tested as a polygon', () => {
     expect(pointInSelection(lasso, 50, 25)).toBe(true);
     expect(pointInSelection(lasso, -5, 25)).toBe(false);
   });
 });
 
-describe('视口滚动与缩放', () => {
+describe('Viewport scrolling and zoom', () => {
   const doc = { width: 1280, height: 720 };
   const size = { width: 650, height: 518 };
 
-  it('缩放钳制在上下限内，非法值回落下限', () => {
+  it('zoom clamps to the limits, invalid values fall back to the minimum', () => {
     expect(clampScale(100)).toBe(MAX_ZOOM);
     expect(clampScale(0.0001)).toBe(MIN_ZOOM);
     expect(clampScale(Number.NaN)).toBe(MIN_ZOOM);
     expect(clampScale(0.5)).toBe(0.5);
   });
 
-  it('内容装不下时产生滚动范围，装得下时为 0', () => {
-    // 100%：1280×720 画布放进 650×518 视口 → 两轴都能滚
+  it('overflowing content produces a scroll range, fitting content gives 0', () => {
+    // 100%: a 1280×720 canvas in a 650×518 viewport → both axes scroll
     const big = scrollMetrics(doc, { ...size, scale: 1, x: 0, y: 0 });
     expect(big.rangeX).toBeGreaterThan(0);
     expect(big.rangeY).toBeGreaterThan(0);
     expect(big.worldW).toBe(1280 + 2 * OVERSCROLL_SCREEN);
     expect(big.worldW - big.rangeX).toBeCloseTo(big.viewW, 5);
 
-    // 5%：整幅画布都在视口里 → 范围为 0（滚动条不显示）
+    // 5%: the whole canvas fits the viewport → range is 0 (no scrollbar)
     const small = scrollMetrics(doc, { ...size, scale: 0.05, x: 0, y: 0 });
     expect(small.rangeX).toBe(0);
     expect(small.rangeY).toBe(0);
   });
 
-  it('视口位置被钳制在世界范围内', () => {
+  it('the viewport position is clamped to the world', () => {
     const metrics = scrollMetrics(doc, { ...size, scale: 1, x: 99999, y: -99999 });
     expect(metrics.left).toBe(metrics.worldLeft);
     expect(metrics.top).toBe(metrics.worldTop + metrics.rangeY);
@@ -255,18 +255,18 @@ describe('视口滚动与缩放', () => {
     expect(clamped.y).toBe(-metrics.worldTop);
   });
 
-  it('世界坐标 ↔ 屏幕平移互为逆运算（允许整数像素取整误差）', () => {
-    // 取范围内部的值：世界坐标 [-320, 300]（横向）/ [-320, 4]（纵向）
+  it('world coordinates ↔ screen pan are inverses (allowing integer-pixel rounding)', () => {
+    // Take values inside the range: world coordinates [-320, 300] (horizontal) / [-320, 4] (vertical)
     const { x, y } = viewportFromScroll(-100, -100, 0.5);
     expect({ x, y }).toEqual({ x: 50, y: 50 });
 
     const back = scrollMetrics(doc, { ...size, scale: 0.5, x, y });
-    // 屏幕像素取整 → 换算回文档单位最多差 1/scale
+    // Screen pixels are rounded → mapping back to document units is off by at most 1/scale
     expect(Math.abs(back.left + 100)).toBeLessThanOrEqual(1 / 0.5);
     expect(Math.abs(back.top + 100)).toBeLessThanOrEqual(1 / 0.5);
   });
 
-  it('以光标为锚点缩放：锚点下的文档坐标保持不动', () => {
+  it('zoom at the cursor: the document point under the anchor stays put', () => {
     const before = { x: 28, y: 92, scale: 0.5 };
     const anchor = { x: 300, y: 200 };
     const docX = (anchor.x - before.x) / before.scale;
@@ -278,13 +278,13 @@ describe('视口滚动与缩放', () => {
     expect((anchor.y - next.y) / next.scale).toBeCloseTo(docY, 3);
   });
 
-  it('锚点缩放同样受上下限约束', () => {
+  it('anchored zoom obeys the same limits', () => {
     const next = zoomAtPoint({ x: 0, y: 0, scale: 1 }, 100, { x: 0, y: 0 });
     expect(next.scale).toBe(MAX_ZOOM);
   });
 });
 
-describe('选区续操作辅助', () => {
+describe('Selection follow-up helpers', () => {
   const canvas = { width: 200, height: 100 };
   const rect: Selection = {
     kind: 'rect',
@@ -296,37 +296,37 @@ describe('选区续操作辅助', () => {
     feather: 0,
   };
 
-  it('全选覆盖整块画布', () => {
+  it('select all covers the whole canvas', () => {
     const all = fullSelection(canvas);
     expect(all.kind).toBe('rect');
     expect(all.width).toBe(200);
     expect(pointInSelection(all, 199, 99)).toBe(true);
   });
 
-  it('反选：原选区内变成「洞」，其余区域命中', () => {
+  it('invert: the original selection becomes a hole, everything else is hit', () => {
     const inverted = invertSelection(rect, canvas);
-    // 反选把原选区轮廓翻转成差集轮廓（多轮廓模型取代了早期的单一 hole 字段）
+    // Invert turns the original contour into a difference contour (the multi-contour model replaced the old single hole field)
     expect(inverted.parts?.length ?? 0).toBeGreaterThan(0);
     expect(inverted.parts?.some((part) => part.add === false)).toBe(true);
-    // 原选区中心落在洞里 → 不属于反选结果
+    // The original selection center falls in the hole → not part of the inverted result
     expect(pointInSelection(inverted, 100, 50)).toBe(false);
-    // 画布其它位置属于反选结果
+    // Other canvas positions are part of the inverted result
     expect(pointInSelection(inverted, 10, 10)).toBe(true);
     expect(pointInSelection(inverted, 190, 90)).toBe(true);
   });
 
-  it('椭圆选区转多边形顶点（48 边采样）', () => {
+  it('an elliptical selection converts to polygon vertices (48 samples)', () => {
     const points = selectionPolygon({ ...rect, kind: 'ellipse' });
     expect(points.length).toBe(96);
   });
 
-  it('矩形选区转多边形顶点', () => {
+  it('a rectangular selection converts to polygon vertices', () => {
     expect(selectionPolygon(rect)).toEqual([50, 25, 150, 25, 150, 75, 50, 75]);
   });
 });
 
-describe('文件校验', () => {
-  it('图片扩展名 / 空文件 / 超限', () => {
+describe('File validation', () => {
+  it('image extension / empty file / over the limit', () => {
     expect(checkImageFile({ name: 'a.png', size: 1024 }).ok).toBe(true);
     expect(checkImageFile({ name: 'a.txt', size: 1024 })).toEqual({
       ok: false,
@@ -338,7 +338,7 @@ describe('文件校验', () => {
     if (!tooLarge.ok) expect(tooLarge.params?.max).toBe(30);
   });
 
-  it('工程文件必须是 json', () => {
+  it('project files must be json', () => {
     expect(checkProjectFile({ name: 'a.photo.json', size: 100 }).ok).toBe(true);
     expect(checkProjectFile({ name: 'a.png', size: 100 })).toEqual({
       ok: false,
@@ -347,7 +347,7 @@ describe('文件校验', () => {
   });
 });
 
-describe('文案完整性', () => {
+describe('String completeness', () => {
   const flatten = (tree: Record<string, unknown>, prefix = ''): string[] =>
     Object.entries(tree).flatMap(([key, value]) =>
       typeof value === 'string'
@@ -355,7 +355,7 @@ describe('文案完整性', () => {
         : flatten(value as Record<string, unknown>, `${prefix}${key}.`),
     );
 
-  it('九种语言与简体中文的键集合完全一致（防止漏翻）', () => {
+  it('nine languages share exactly the same key set as Simplified Chinese (catches missing translations)', () => {
     const keys = Object.keys(photoStrings);
     expect(keys).toHaveLength(9);
 
@@ -366,7 +366,7 @@ describe('文案完整性', () => {
     }
   });
 
-  it('每种语言都没有空文案', () => {
+  it('no language has empty strings', () => {
     const values = (tree: Record<string, unknown>): string[] =>
       Object.values(tree).flatMap((value) =>
         typeof value === 'string' ? [value] : values(value as Record<string, unknown>),
@@ -381,22 +381,22 @@ describe('文案完整性', () => {
   });
 });
 
-describe('工具常量', () => {
-  it('预设尺寸都在合法范围内', () => {
+describe('Tool constants', () => {
+  it('preset sizes are all within the valid range', () => {
     for (const preset of CANVAS_PRESETS) {
       expect(preset.width).toBeGreaterThanOrEqual(MIN_CANVAS_SIZE);
       expect(preset.height).toBeLessThanOrEqual(MAX_CANVAS_SIZE);
     }
   });
 
-  it('混合模式与滤镜枚举可用于下拉', () => {
+  it('blend modes and filter enums can populate dropdowns', () => {
     expect(BLEND_MODES[0]).toBe('normal');
     expect(FILTERS.length).toBeGreaterThanOrEqual(10);
     expect(FILTERS).toContain('grayscale');
   });
 });
 
-describe('层栈展开与继承（编组 / 蒙版前置）', () => {
+describe('layer stack flattening and inheritance (groups / masks first)', () => {
   const base = {
     name: '',
     visible: true,
@@ -439,7 +439,7 @@ describe('层栈展开与继承（编组 / 蒙版前置）', () => {
   const group = (id: string, patch: Partial<Layer> = {}): Layer =>
     ({ ...base, id, kind: 'group', passThrough: true, ...patch }) as Layer;
 
-  it('扁平层栈按 parentId 展开成 begin/end 包裹的序列', () => {
+  it('the flat stack expands by parentId into a begin/end wrapped sequence', () => {
     const doc = makeDoc([
       raster('bottom'),
       group('g', { parentId: null }),
@@ -458,7 +458,7 @@ describe('层栈展开与继承（编组 / 蒙版前置）', () => {
     ]);
   });
 
-  it('组可以嵌套，空组也成对出现', () => {
+  it('groups nest, and empty groups still emit a pair', () => {
     const doc = makeDoc([
       group('outer'),
       group('inner', { parentId: 'outer' }),
@@ -476,12 +476,12 @@ describe('层栈展开与继承（编组 / 蒙版前置）', () => {
     ]);
   });
 
-  it('parentId 指向缺失图层时该图层降级为顶层，不会消失', () => {
+  it('a parentId pointing at a missing layer demotes it to top level instead of dropping it', () => {
     const doc = makeDoc([raster('orphan', { parentId: 'ghost' })]);
     expect(flattenStack(doc).map((step) => step.layer.id)).toEqual(['orphan']);
   });
 
-  it('可见性 / 锁定沿祖先继承', () => {
+  it('visibility / lock inherit from ancestors', () => {
     const doc = makeDoc([
       group('g', { visible: false }),
       raster('child', { parentId: 'g' }),
@@ -497,13 +497,13 @@ describe('层栈展开与继承（编组 / 蒙版前置）', () => {
     expect(effectiveLocked(doc, free)).toBe(false);
   });
 
-  it('自身不可见 / 锁定同样生效', () => {
+  it('its own hidden / locked flags apply too', () => {
     const doc = makeDoc([raster('a', { visible: false }), raster('b', { locked: true })]);
     expect(effectiveVisible(doc, doc.layers[0])).toBe(false);
     expect(effectiveLocked(doc, doc.layers[1])).toBe(true);
   });
 
-  it('蒙版签名：无蒙版 / 停用为 null，像素或参数变化就换键', () => {
+  it('mask signature: null when absent / disabled, key changes with pixels or parameters', () => {
     const plain = raster('a');
     expect(maskSignature(plain)).toBeNull();
 
@@ -517,7 +517,7 @@ describe('层栈展开与继承（编组 / 蒙版前置）', () => {
     expect(maskSignature(raster('b', { mask: { ...masked.mask!, inverted: true } }))).not.toBe(key);
   });
 
-  it('资产收集覆盖位图、智能对象源与蒙版', () => {
+  it('asset collection covers bitmaps, smart-object sources and masks', () => {
     expect(layerAssetIds(raster('a'))).toEqual(['a-a']);
     expect(
       layerAssetIds({
@@ -534,7 +534,7 @@ describe('层栈展开与继承（编组 / 蒙版前置）', () => {
   });
 });
 
-describe('历史时间轴（面板数据源）', () => {
+describe('History timeline (panel data source)', () => {
   const entry = (label: HistoryLabel, at: number): HistoryEntry => ({
     doc: {
       id: 'd',
@@ -550,33 +550,33 @@ describe('历史时间轴（面板数据源）', () => {
     at,
   });
 
-  it('只有当前状态时是一行「打开文档」', () => {
+  it('with only the current state it is a single open-document row', () => {
     const rows = historyTimeline([], []);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ label: 'histOpen', current: true });
   });
 
-  it('每行展示「产生该状态的操作名」，当前行取最后一次操作', () => {
+  it('each row shows the action that produced that state; the current row takes the last action', () => {
     const rows = historyTimeline([entry('histAddLayer', 100), entry('histBrush', 200)], []);
     expect(rows.map((row) => row.label)).toEqual(['histOpen', 'histAddLayer', 'histBrush']);
     expect(rows.map((row) => row.current)).toEqual([false, false, true]);
   });
 
-  it('可重做的行排在末尾且标记为非当前', () => {
+  it('redoable rows sit at the end and are not marked current', () => {
     const rows = historyTimeline([entry('histBrush', 100)], [entry('histBrush', 300)]);
     expect(rows).toHaveLength(3);
     expect(rows[1].current).toBe(true);
     expect(rows[2]).toMatchObject({ label: 'histBrush', current: false });
   });
 
-  it('行索引即 jumpTo 的目标：past.length 为当前', () => {
+  it('the row index is the jumpTo target: past.length is current', () => {
     const past = [entry('histAddLayer', 1), entry('histMerge', 2)];
     const rows = historyTimeline(past, []);
     expect(rows.findIndex((row) => row.current)).toBe(past.length);
   });
 });
 
-describe('编组层栈操作（纯函数）', () => {
+describe('Group stack operations (pure functions)', () => {
   const base = {
     name: '',
     visible: true,
@@ -616,44 +616,44 @@ describe('编组层栈操作（纯函数）', () => {
     swatches: [],
   });
 
-  it('子树包含自身与全部后代', () => {
+  it('the subtree contains itself and every descendant', () => {
     const doc = docOf([grp('g'), leaf('c1', 'g'), grp('g2', 'g'), leaf('c2', 'g2'), leaf('out')]);
     expect(subtreeIdsOf(doc, 'g')).toEqual(['g', 'c1', 'g2', 'c2']);
     expect(subtreeIdsOf(doc, 'out')).toEqual(['out']);
   });
 
-  it('移入编组：图层连同子树紧跟编组之后，且 parentId 更新', () => {
+  it('move into a group: the layer and its subtree follow the group, and parentId updates', () => {
     const doc = docOf([leaf('a'), grp('g'), leaf('b')]);
     const next = moveSubtree(doc.layers, 'a', 'g');
     expect(next.map((l) => l.id)).toEqual(['g', 'a', 'b']);
     expect(next.find((l) => l.id === 'a')!.parentId).toBe('g');
   });
 
-  it('移到顶层：落在数组末尾（最上层）', () => {
+  it('move to top level: lands at the end of the array (topmost)', () => {
     const doc = docOf([grp('g'), leaf('c', 'g'), leaf('b')]);
     const next = moveSubtree(doc.layers, 'c', null);
     expect(next.map((l) => l.id)).toEqual(['g', 'b', 'c']);
     expect(next.find((l) => l.id === 'c')!.parentId).toBeNull();
   });
 
-  it('移动编组会带着整棵子树', () => {
+  it('moving a group carries the whole subtree', () => {
     const doc = docOf([leaf('bottom'), grp('g'), leaf('c1', 'g'), leaf('c2', 'g'), leaf('top')]);
     const next = moveSubtree(doc.layers, 'g', null);
     expect(next.map((l) => l.id)).toEqual(['bottom', 'top', 'g', 'c1', 'c2']);
   });
 
-  it('拒绝把编组移入自己的后代（否则成环）', () => {
+  it('refuses to move a group into its own descendant (would create a cycle)', () => {
     const layers = [grp('g'), grp('inner', 'g'), leaf('c', 'inner')];
     expect(moveSubtree(layers, 'g', 'inner')).toBe(layers);
     expect(moveSubtree(layers, 'g', 'g')).toBe(layers);
   });
 
-  it('目标父级不存在时原样返回', () => {
+  it('returns the input unchanged when the target parent is missing', () => {
     const layers = [leaf('a')];
     expect(moveSubtree(layers, 'a', 'ghost')).toBe(layers);
   });
 
-  it('纯函数：不修改入参数组', () => {
+  it('pure: does not mutate the input arrays', () => {
     const layers = [grp('g'), leaf('a')];
     moveSubtree(layers, 'a', 'g');
     expect(layers.map((l) => l.id)).toEqual(['g', 'a']);

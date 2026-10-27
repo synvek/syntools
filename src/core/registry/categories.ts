@@ -3,7 +3,7 @@ import type { CategoryId } from '@/core/types';
 export interface Category {
   id: CategoryId;
   name: string;
-  /** 侧边栏展示顺序，升序 */
+  /** Sidebar display order, ascending */
   order: number;
 }
 

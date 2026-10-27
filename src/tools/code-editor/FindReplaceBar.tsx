@@ -2,14 +2,14 @@ import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 
-/** 查找选项开关 */
+/** Find option toggles */
 export interface FindOptionState {
   matchCase: boolean;
   wholeWord: boolean;
   regex: boolean;
 }
 
-/** 打开 / 唤起查找栏时的聚焦目标（`seq` 变化即重新聚焦，保证重复按 ⌘F 也生效） */
+/** Focus target when opening / re-invoking the bar (`seq` changes refocus, so repeated ⌘F works) */
 export interface FindFocusRequest {
   target: 'query' | 'replacement';
   seq: number;
@@ -19,13 +19,13 @@ interface FindReplaceBarProps {
   query: string;
   replacement: string;
   options: FindOptionState;
-  /** 命中总数 */
+  /** Total number of matches */
   total: number;
-  /** 当前命中下标（-1 表示尚未定位） */
+  /** Index of the current match (-1 means not positioned yet) */
   current: number;
-  /** 命中数达到上限被截断 */
+  /** The match count hit the cap and was truncated */
   truncated: boolean;
-  /** 正则语法错误 */
+  /** Invalid regular expression */
   invalid: boolean;
   focus: FindFocusRequest;
   onQueryChange: (value: string) => void;
@@ -46,8 +46,9 @@ const TOGGLE_ON_CLASS =
   'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300';
 
 /**
- * 查找替换栏（编辑区顶部）：命中计数 + 大小写 / 整词 / 正则开关 + 定位与替换。
- * 只负责输入与展示，匹配计算在 `findReplace.ts`，命中高亮由 `CodeSurface` 覆盖层渲染。
+ * Find and replace bar (above the editor): match counter, case / whole-word / regex toggles, and
+ * navigation plus replacement. It only handles input and display; matching lives in
+ * `findReplace.ts` and the highlights are drawn by the `CodeSurface` overlay.
  */
 export function FindReplaceBar({
   query,

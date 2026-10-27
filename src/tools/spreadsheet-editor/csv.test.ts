@@ -92,7 +92,7 @@ describe('csvToSnapshot', () => {
     expect(sheet.name).toBe('Sheet1');
     expect(sheet.cellData['0']['0']).toEqual({ v: '名称' });
     expect(sheet.cellData['1']['1']).toEqual({ v: 3 });
-    // 预留空白网格
+    // Reserve the blank grid
     expect(sheet.rowCount).toBeGreaterThanOrEqual(200);
   });
 

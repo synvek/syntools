@@ -13,9 +13,9 @@ import {
 import { syncElements } from './sync';
 
 /**
- * Konva Stage 生命周期宿主（命令式托管，不使用 react-konva）：
- * - 所有副作用只在本模块被调用时展开，模块顶层不触碰 DOM（避免 prerender SSR 崩溃）；
- * - 由 `SlideCanvas.tsx` 在 useEffect 内延后创建，StrictMode 双挂载通过 cancel 守卫规避。
+ * Konva Stage lifecycle host (imperative, not react-konva):
+ * - side effects only run when this module is called; nothing touches the DOM at module scope (avoids prerender/SSR crashes);
+ * - `SlideCanvas.tsx` creates it deferred inside useEffect, and a cancel guard covers StrictMode's double mount.
  */
 
 export interface PageTransform {
@@ -38,7 +38,7 @@ export interface StageHandle {
   sync: (elements: SlideElement[], doc: SlideDoc) => void;
   showGuides: (guides: Guide[], size: { width: number; height: number }) => void;
   hideGuides: () => void;
-  /** 绘制持久的手动参考线（与拖拽时的临时参考线分开，样式不同） */
+  /** Draw the persistent manual guides (styled differently from the temporary drag guides) */
   renderCustomGuides: (
     guides: { id: string; axis: 'x' | 'y'; position: number }[],
     size: { width: number; height: number },

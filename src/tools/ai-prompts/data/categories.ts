@@ -1,11 +1,11 @@
 import type { PromptCategoryMeta } from '../types';
 
 /**
- * 提示词分类清单（28 类）。
+ * Prompt category list (28 categories).
  *
- * - `id` 同时作为该类提示词 id 的前缀，新增分类后需同步在 `./prompts/<id>.ts` 建数据文件；
- * - `name` 缺失的语种会回退到 i18n 既有译文（`tools.aiPrompts.cat.<id>`），再回退到 `en`；
- * - 详见 `./README.md`。
+ * - `id` doubles as the prompt id prefix for the category; when adding a category, also create `./prompts/<id>.ts`;
+ * - Locales missing from `name` fall back to the existing i18n translation (`tools.aiPrompts.cat.<id>`), then to `en`;
+ * - See `./README.md` for details.
  */
 export const PROMPT_CATEGORIES = [
   {
@@ -178,5 +178,5 @@ export const PROMPT_CATEGORIES = [
   },
 ] as const satisfies readonly PromptCategoryMeta[];
 
-/** 分类 id 联合类型 */
+/** Union type of category ids */
 export type PromptCategoryId = (typeof PROMPT_CATEGORIES)[number]['id'];

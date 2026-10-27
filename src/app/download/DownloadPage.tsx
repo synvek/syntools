@@ -12,17 +12,17 @@ const REPO_URL = 'https://github.com/synvek/syntools';
 type Platform = 'mac' | 'win' | 'linux' | 'unknown';
 
 /**
- * 粗粒度平台识别：只用于「推荐」高亮，不参与下载地址拼接。
+ * Coarse platform detection: only drives the "recommended" highlight, never the download URL.
  *
- * 安装包文件名带构建号（如 SynTools-0.8.0-29-x64.dmg），无法从 package.json 推出，
- * 因此所有按钮统一指向 Releases 最新版页面，由用户在页面内按架构选择。
+ * Installer filenames carry a build number (e.g. SynTools-0.8.0-29-x64.dmg) that package.json cannot supply,
+ * so every button points at the latest Releases page and users pick their architecture there.
  */
 function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return 'unknown';
   const uaData = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData;
   const raw =
     `${uaData?.platform ?? ''} ${navigator.platform ?? ''} ${navigator.userAgent ?? ''}`.toLowerCase();
-  // 移动端不推荐桌面版，避免把 Android/iOS 误判成 Linux/macOS
+  // Do not recommend the desktop build on mobile; Android/iOS must not read as Linux/macOS
   if (/android|iphone|ipad|ipod/.test(raw)) return 'unknown';
   if (raw.includes('mac')) return 'mac';
   if (raw.includes('win')) return 'win';
@@ -31,7 +31,7 @@ function detectPlatform(): Platform {
 }
 
 interface ArchOption {
-  /** 稳定标识，用于埋点（不随界面语言变化） */
+  /** Stable id for analytics (never changes with the UI language) */
   key: string;
   label: string;
   hint: string;

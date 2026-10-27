@@ -3,8 +3,8 @@ import { minify as cssMinify } from 'csso';
 import type { ToolResult } from '@/core/types';
 
 /**
- * CSS 压缩 / 格式化：格式化走 js-beautify，压缩走 csso。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译。
+ * CSS minify / format: formatting uses js-beautify, minification uses csso.
+ * Error codes are decoupled from copy: core returns language-neutral codes that the UI translates via i18n.
  */
 
 export type CssErrorCode = 'EMPTY' | 'INVALID';

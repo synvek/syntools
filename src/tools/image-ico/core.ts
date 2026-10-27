@@ -1,13 +1,13 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 图片 ↔ ICO：编码/解析纯逻辑（位图缩放在 UI canvas）。
- * 使用 PNG-in-ICO（Vista+），兼容现代浏览器与操作系统。
+ * Image ↔ ICO: pure encode / parse logic (bitmap scaling happens on a UI canvas).
+ * Uses PNG-in-ICO (Vista+), which works with modern browsers and operating systems.
  */
 
 export type IcoError = 'EMPTY' | 'INVALID_ICO' | 'NO_SIZES' | 'NOT_IMAGE';
 
-/** 常用 favicon / 应用图标尺寸 */
+/** Common favicon / app-icon sizes */
 export const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256] as const;
 export type IcoSize = (typeof ICO_SIZES)[number];
 
@@ -22,10 +22,10 @@ export interface IcoPngFrame {
 export interface ParsedIcoEntry {
   width: number;
   height: number;
-  /** PNG 或可预览的 data URL（BMP 条目解码为 PNG data URL 由 UI 处理时再转） */
+  /** PNG bytes or a previewable data URL (BMP entries are decoded into a PNG data URL by the UI on demand) */
   offset: number;
   size: number;
-  /** 原始图像字节（PNG 或 BMP） */
+  /** Raw image bytes (PNG or BMP) */
   bytes: Uint8Array;
   format: 'png' | 'bmp' | 'unknown';
 }
@@ -65,7 +65,7 @@ export function isIcoFile(type: string, name = ''): boolean {
   return name.toLowerCase().endsWith('.ico');
 }
 
-/** 将若干 PNG 帧打包为 ICO（PNG-in-ICO） */
+/** Pack several PNG frames into an ICO (PNG-in-ICO) */
 export function encodeIco(frames: IcoPngFrame[]): ToolResult<Uint8Array> {
   if (frames.length === 0) return { ok: false, error: 'NO_SIZES' };
   for (const f of frames) {
@@ -109,7 +109,7 @@ export function encodeIco(frames: IcoPngFrame[]): ToolResult<Uint8Array> {
   return { ok: true, value: out };
 }
 
-/** 解析 ICO，提取各尺寸图像字节 */
+/** Parse an ICO and extract the image bytes for each size */
 export function parseIco(buffer: ArrayBuffer): ToolResult<ParsedIcoEntry[]> {
   if (!buffer || buffer.byteLength < 6) return { ok: false, error: 'EMPTY' };
   const bytes = new Uint8Array(buffer);

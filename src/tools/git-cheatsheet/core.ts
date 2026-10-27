@@ -122,7 +122,7 @@ export const GIT_COMMANDS: GitCommand[] = [
   { category: 'tag', command: 'git push origin --tags', description: 'Push all tags' },
 ];
 
-/** 按命令或描述过滤（忽略大小写）。 */
+/** Filter by command or description (case-insensitive). */
 export function filterGitCommands(query: string): GitCommand[] {
   const q = query.trim().toLowerCase();
   if (!q) return GIT_COMMANDS;

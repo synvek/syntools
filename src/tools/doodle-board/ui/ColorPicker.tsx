@@ -4,11 +4,11 @@ import { PALETTE } from '../core';
 import { BoardIcon } from './icons';
 
 interface ColorPickerProps {
-  /** 前景色：左键落笔 / 图标填充 */
+  /** Foreground: left-click ink / icon fill */
   foreground: string;
-  /** 背景色：右键落笔 / 形状填充 */
+  /** Background: right-click ink / shape fill */
   background: string;
-  /** 最近使用的颜色 */
+  /** Recently used colours */
   recent: string[];
   onForeground: (color: string) => void;
   onBackground: (color: string) => void;
@@ -21,10 +21,10 @@ const ICON_BUTTON =
   'inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-gray-600 transition-colors duration-150 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800';
 
 /**
- * 前景 / 背景双色选择器：经典画板语义。
- * - 左键点击色块 → 前景色
- * - 右键点击色块 → 背景色
- * - 弹层内可自定义取色、交换前景背景、复用最近颜色
+ * Foreground / background colour picker with classic drawing-app semantics.
+ * - Left-click a swatch → foreground colour
+ * - Right-click a swatch → background colour
+ * - The popover offers a custom colour field, swapping the two colours and recent colours
  */
 export default function ColorPicker({
   foreground,

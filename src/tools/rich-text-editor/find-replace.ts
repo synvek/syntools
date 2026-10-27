@@ -3,14 +3,14 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 /**
- * 查找替换：基于 ProseMirror decoration 的搜索高亮 + 命中跳转 + 替换。
- * 不引入第三方依赖；替换全部走 TipTap transactions，保证撤销链完整。
+ * Find and replace: ProseMirror decoration highlights, match navigation, and replacement.
+ * No third-party dependency; all replacements go through TipTap transactions so undo stays intact.
  */
 
 export interface SearchConfig {
   term: string;
   matchCase: boolean;
-  /** 当前命中下标（循环跳转） */
+  /** Index of the current match (wraps around) */
   index: number;
 }
 
@@ -21,7 +21,7 @@ export interface TextMatch {
 
 export const findReplaceKey = new PluginKey<SearchConfig | null>('findReplace');
 
-/** 在文档中查找全部命中（不支持跨文本节点命中，与主流编辑器行为一致） */
+/** Find all matches in the document (no cross-text-node matches, matching mainstream editors) */
 export function findMatches(
   doc: import('@tiptap/pm/model').Node,
   term: string,
@@ -42,7 +42,7 @@ export function findMatches(
   return matches;
 }
 
-/** 查找替换扩展：状态与高亮都由本插件持有，UI 通过 commands 驱动 */
+/** Find-and-replace extension: the plugin owns state and highlights, the UI drives it via commands */
 export const FindReplace = Extension.create({
   name: 'findReplace',
 
@@ -57,7 +57,7 @@ export const FindReplace = Extension.create({
             if (meta !== undefined) return meta;
             if (!value) return null;
             if (!tr.docChanged) return value;
-            // 文档变化后重算命中并收敛下标，避免悬空指向
+            // Recompute matches after doc changes and clamp the index to avoid stale references
             const matches = findMatches(tr.doc, value.term, value.matchCase);
             if (matches.length === 0) return { ...value, index: 0 };
             return { ...value, index: Math.min(value.index, matches.length - 1) };
@@ -123,7 +123,7 @@ export const FindReplace = Extension.create({
           if (!config || !config.term || dispatch === undefined) return false;
           const matches = findMatches(state.doc, config.term, config.matchCase);
           if (matches.length === 0) return false;
-          // 从后往前替换，前面的位置不受影响
+          // Replace back to front so earlier positions stay valid
           for (let i = matches.length - 1; i >= 0; i -= 1) {
             const match = matches[i];
             if (replacement) tr.insertText(replacement, match.from, match.to);
@@ -139,13 +139,13 @@ export const FindReplace = Extension.create({
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     findReplace: {
-      /** 设置搜索词（空串清除高亮） */
+      /** Set the search term (an empty string clears highlights) */
       setSearch: (term: string, matchCase: boolean) => ReturnType;
-      /** 在命中项间跳转（1 下一个 / -1 上一个） */
+      /** Move between matches (1 next / -1 previous) */
       gotoMatch: (delta: 1 | -1) => ReturnType;
-      /** 替换当前命中项 */
+      /** Replace the current match */
       replaceMatch: (replacement: string) => ReturnType;
-      /** 替换全部命中项 */
+      /** Replace all matches */
       replaceAllMatches: (replacement: string) => ReturnType;
     };
   }

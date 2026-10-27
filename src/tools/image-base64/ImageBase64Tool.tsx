@@ -8,7 +8,7 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
 import { formatBytes, isImageFile, parseBase64Input } from './core';
 
-/** 图片 ↔ Base64 互转 */
+/** Image ↔ Base64 conversion */
 export default function ImageBase64Tool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ b: '' }), []);
@@ -21,7 +21,7 @@ export default function ImageBase64Tool() {
 
   useEffect(
     () => () => {
-      /* FileReader data URLs 无需 revoke */
+      /* FileReader data URLs need no revoke */
     },
     [],
   );
@@ -111,9 +111,7 @@ export default function ImageBase64Tool() {
             onChange={setBase64Input}
             placeholder={t('tools.imageBase64.pastePlaceholder')}
             rows={10}
-            actions={
-              <ClearButton onClick={() => setBase64Input('')} disabled={!base64Input} />
-            }
+            actions={<ClearButton onClick={() => setBase64Input('')} disabled={!base64Input} />}
           />
           {base64Input.trim() && !parsed.ok && (
             <p role="alert" className="text-sm text-red-600 dark:text-red-400">
@@ -123,9 +121,7 @@ export default function ImageBase64Tool() {
           {parsed.ok && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {parsed.value.mime}
-                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{parsed.value.mime}</p>
                 <button
                   type="button"
                   onClick={downloadFromBase64}

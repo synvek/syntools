@@ -21,14 +21,14 @@ export function AppLayout() {
   );
 
   /**
-   * 工具页不渲染页脚：照片编辑器、幻灯片、表格等按「首屏剩余高度」布局，
-   * 底部多一行会把画布压矮。营销与说明页需要页脚作为常驻入口（定价 / 安全 / 隐私）。
+   * No footer on tool pages: the photo editor, slides and sheets lay out to the leftover first-screen height,
+   * and one extra row would shrink the canvas. Marketing and info pages need the footer as a permanent entry (pricing / security / privacy).
    *
-   * 判据用去掉语言前缀后的路径：`/zh/tools/x` 与 `/tools/x` 必须得到同一个答案。
+   * The check uses the path without the locale prefix: `/zh/tools/x` and `/tools/x` must agree.
    */
   const showFooter = !stripLangPrefix(pathname).startsWith('/tools/');
 
-  // head 里的 lang / description / og 跟随界面语言，见 core/seo/meta.ts
+  // lang / description / og in the head follow the UI language, see core/seo/meta.ts
   useDocumentMeta();
 
   const toggleSidebarCollapsed = () => {
@@ -39,7 +39,7 @@ export function AppLayout() {
     });
   };
 
-  // 全局快捷键：⌘/Ctrl+K 或 /（非输入态）唤起搜索（技术设计 §7.3）
+  // Global shortcut: ⌘/Ctrl+K or / (when not typing) opens search (tech design §7.3)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;

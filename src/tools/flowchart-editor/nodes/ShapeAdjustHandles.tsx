@@ -11,10 +11,10 @@ import {
 import type { FlowNodeStyle } from '../model/types';
 
 /**
- * 形状可调参数手柄（类 draw.io 的黄色调整顶点）。
+ * Adjustable shape parameter handles (draw.io-style yellow adjustment vertices).
  *
- * 仅单选图形时渲染；每个参数一个手柄，位置与拖拽投影由 `ShapeDef.adjust` 声明反推，
- * 因此新增形状无需在此改动。拖拽过程合并为一次撤销（pointerdown 时 commit）。
+ * Rendered only for a single selected shape; one handle per parameter, with position and drag projection derived from `ShapeDef.adjust`,
+ * so new shapes need no change here. A drag coalesces into one undo step (commit on pointerdown).
  */
 export function ShapeAdjustHandles({
   nodeId,
@@ -29,7 +29,7 @@ export function ShapeAdjustHandles({
   style: FlowNodeStyle;
   w: number;
   h: number;
-  /** 节点根节点引用：用于把指针屏幕坐标换算回节点本地坐标（自动适配缩放与父偏移） */
+  /** Node root ref: converts pointer screen coordinates back to node-local coordinates (handling zoom and parent offsets) */
   containerRef: RefObject<HTMLDivElement | null>;
 }) {
   const { t } = useTranslation();
@@ -50,7 +50,7 @@ export function ShapeAdjustHandles({
     if (!el) return;
     e.stopPropagation();
     e.preventDefault();
-    // 会话起点提交历史，pointermove 期间不再入栈（与 NodeResizer 一致）
+    // Commit history once at the start of the gesture; pointermove does not push again (matching NodeResizer)
     useFlowStore.getState().commit();
     dragging.current = { adj, rect: el.getBoundingClientRect(), w, h };
     e.currentTarget.setPointerCapture?.(e.pointerId);

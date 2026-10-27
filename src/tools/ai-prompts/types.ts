@@ -1,15 +1,15 @@
 import type { Lang } from '@/core/i18n/types';
 
 /**
- * AI 提示词库基础类型。
+ * Core types for the AI prompt library.
  *
- * 设计要点：
- * - `zh` / `en` 为必填（编译期强制），其余语言可选，缺失时按回退链取值；
- * - 语言键允许任意字符串，便于后续增量补充语种而不改类型定义；
- * - 详细数据规范与增补流程见 `./data/README.md`。
+ * Design notes:
+ * - `zh` / `en` are required (enforced at compile time); other locales are optional and resolved through the fallback chain;
+ * - Locale keys accept any string, so locales can be added incrementally without touching the types;
+ * - See `./data/README.md` for the data spec and contribution flow.
  */
 
-/** 多语言文本：zh / en 必填，其余语种按需补充 */
+/** Localized text: zh / en required, other locales added as needed */
 export type LocalizedText = {
   zh: string;
   en: string;
@@ -17,26 +17,26 @@ export type LocalizedText = {
     [lang: string]: string | undefined;
   };
 
-/** 单条提示词 */
+/** A single prompt */
 export interface PromptItem {
-  /** 全局唯一，约定为 `<category>-<slug>`（kebab-case） */
+  /** Globally unique; by convention `<category>-<slug>` (kebab-case) */
   id: string;
-  /** 所属分类 id，必须存在于 `PROMPT_CATEGORIES` */
+  /** Owning category id; must exist in `PROMPT_CATEGORIES` */
   category: string;
-  /** 多语言标题 */
+  /** Localized title */
   title: LocalizedText;
-  /** 多语言正文，可包含 `{{变量}}` 占位符 */
+  /** Localized body; may contain `{{variable}}` placeholders */
   prompt: LocalizedText;
 }
 
-/** 分类元信息 */
+/** Category metadata */
 export interface PromptCategoryMeta {
-  /** 分类 id，kebab-case，同时用作提示词 id 前缀 */
+  /** Category id, kebab-case; also used as the prompt id prefix */
   id: string;
-  /** 展示顺序，在全部分类中唯一（从 1 开始） */
+  /** Display order, unique across all categories (1-based) */
   order: number;
-  /** 多语言分类名 */
+  /** Localized category name */
   name: LocalizedText;
-  /** i18n 兜底键，固定为 `tools.aiPrompts.cat.<id>` */
+  /** i18n fallback key, always `tools.aiPrompts.cat.<id>` */
   i18nKey: string;
 }

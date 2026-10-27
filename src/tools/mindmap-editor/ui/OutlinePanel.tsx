@@ -43,7 +43,7 @@ export function OutlinePanel() {
   const rows = useMemo(() => buildRows(doc), [doc]);
   const boxOf = useMemo(() => new Map(layout.nodes.map((n) => [n.id, n])), [layout]);
 
-  /** 选中并把该节点居中显示 */
+  /** Select the node and centre it in the viewport */
   const focus = (id: string) => {
     select(id);
     const box = boxOf.get(id);

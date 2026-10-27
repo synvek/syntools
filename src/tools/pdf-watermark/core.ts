@@ -22,7 +22,7 @@ export interface WatermarkOptions {
 
 export type Rgba = { r: number; g: number; b: number };
 
-/** 解析 #RGB / #RRGGBB 为 0–1 的 rgb 分量 */
+/** Parse #RGB / #RRGGBB into 0–1 rgb components */
 export function parseHexColor(hex: string): Rgba | null {
   let h = hex.trim().replace(/^#/, '');
   if (h.length === 3)
@@ -38,7 +38,7 @@ export function parseHexColor(hex: string): Rgba | null {
   };
 }
 
-/** 平铺模式下的网格坐标（以页宽高为基准，返回归一化中心点的像素坐标列表） */
+/** Grid coordinates in tile mode (relative to page width/height; returns the pixel coordinates of each tile center) */
 export function buildTileCenters(
   width: number,
   height: number,

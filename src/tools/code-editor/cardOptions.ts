@@ -1,8 +1,9 @@
 import { escapeHtml } from './prism';
 
 /**
- * 导出卡片样式模型（阶段 6）：选项栏、导出预览、图片导出与独立 HTML 四方共用同一份配置，
- * 保证「所见即所得」。配色仍由 `themes.ts` 的 `--ce-*` 提供，这里只负责版式变量。
+ * Export card style model (phase 6): the options bar, export preview, image export and standalone
+ * HTML all share one config, which keeps WYSIWYG consistent. Colours still come from the
+ * `--ce-*` variables in `themes.ts`; this module only owns the layout variables.
  */
 
 export type CardWindowStyle = 'mac' | 'title' | 'plain' | 'none';
@@ -11,20 +12,20 @@ export type CardBackground = 'theme' | 'gradient' | 'grid' | 'transparent';
 
 export interface CodeCardStyle {
   windowStyle: CardWindowStyle;
-  /** 卡片内边距（px） */
+  /** Card padding (px) */
   padding: number;
-  /** 圆角（px） */
+  /** Corner radius (px) */
   radius: number;
   shadow: CardShadow;
   background: CardBackground;
-  /** 水印文本；空串表示不加水印 */
+  /** Watermark text; an empty string means no watermark */
   watermarkText: string;
-  /** 水印透明度（0–1） */
+  /** Watermark opacity (0–1) */
   watermarkOpacity: number;
-  /** 指定行高亮区间（1 起始，含两端）；from > to 时视为未设置 */
+  /** Highlighted line range (1-based, inclusive); treated as unset when from > to */
   highlightFrom: number;
   highlightTo: number;
-  /** 卡片字号（px） */
+  /** Card font size (px) */
   fontSize: number;
   showLineNumbers: boolean;
 }
@@ -43,7 +44,7 @@ export const CARD_BOUNDS: CardBounds = {
   opacity: [0, 1],
 };
 
-/** 导出倍率（与 Carbon 的 1x / 2x / 4x 对齐） */
+/** Export scale factors (matching Carbon's 1x / 2x / 4x) */
 export const CARD_SCALES = [1, 2, 4] as const;
 export type CardScale = (typeof CARD_SCALES)[number];
 
@@ -75,7 +76,7 @@ function clamp(value: number, [min, max]: readonly [number, number], fallback: n
   return Math.min(Math.max(Math.round(value), min), max);
 }
 
-/** 不取整的钳制（透明度是 0–1 的小数） */
+/** Clamp without rounding (opacity is a 0–1 fraction) */
 function clampFloat(
   value: number,
   [min, max]: readonly [number, number],
@@ -89,7 +90,7 @@ function pick<T extends string>(value: unknown, allowed: readonly T[], fallback:
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
-/** 归一化（含边界钳制）：草稿 / 分享链接里的值不可信，一律经此收敛 */
+/** Normalise with bounds clamping: draft and shared-link values are untrusted, so all go through here */
 export function normalizeCardStyle(
   input: Partial<CodeCardStyle> | null | undefined,
 ): CodeCardStyle {
@@ -113,7 +114,7 @@ export function normalizeCardStyle(
       CARD_BOUNDS.opacity,
       DEFAULT_CARD_STYLE.watermarkOpacity,
     ),
-    // from > to 视为未设置（避免反向区间）
+    // from > to counts as unset (avoids inverted ranges)
     highlightFrom: highlightTo > 0 && highlightFrom > highlightTo ? 0 : highlightFrom,
     highlightTo,
     fontSize: clamp(source.fontSize as number, CARD_BOUNDS.fontSize, DEFAULT_CARD_STYLE.fontSize),
@@ -121,7 +122,7 @@ export function normalizeCardStyle(
   };
 }
 
-/** 该行是否落在指定的高亮区间内 */
+/** Whether the line falls inside the configured highlight range */
 export function isHighlightedLine(style: CodeCardStyle, line: number): boolean {
   if (style.highlightFrom <= 0 || style.highlightTo < style.highlightFrom) return false;
   return line >= style.highlightFrom && line <= style.highlightTo;
@@ -138,14 +139,14 @@ export function shadowCssOf(shadow: CardShadow): string {
   return SHADOW_CSS[shadow];
 }
 
-/** 卡片 CSS 变量：预览卡片与独立 HTML 共用 */
+/** Card CSS variables, shared by the preview card and the standalone HTML */
 export function cardCssVars(style: CodeCardStyle): Record<string, string> {
   return {
     '--ce-card-padding': `${style.padding}px`,
     '--ce-card-radius': `${style.radius}px`,
     '--ce-card-shadow': shadowCssOf(style.shadow),
     '--ce-card-font-size': `${style.fontSize}px`,
-    // 卡片字号与行高保持 1.6 倍同步，行级高亮位置才不会错位
+    // Keep line height at 1.6× the font size so per-line highlights stay aligned
     '--ce-line-h': `${Math.round(style.fontSize * 1.6)}px`,
   };
 }
@@ -155,7 +156,7 @@ export interface CardBackgroundCss {
   backgroundColor: string;
 }
 
-/** 卡片背景（theme 跟随主题色；gradient / grid / transparent 由主题色派生） */
+/** Card background (`theme` follows the theme colours; gradient / grid / transparent derive from them) */
 export function cardBackground(
   style: CodeCardStyle,
   themeBg: string,
@@ -182,7 +183,7 @@ export function cardBackground(
   }
 }
 
-/** html-to-image 需要显式背景色（transparent 时给一个中性底，避免 JPG 变黑） */
+/** html-to-image needs an explicit background colour (a neutral base for transparent, so JPG stays light) */
 export function exportBackgroundCss(
   style: CodeCardStyle,
   themeBg: string,
@@ -194,16 +195,16 @@ export function exportBackgroundCss(
 }
 
 export interface CardBodyOptions {
-  /** 语言名称（标题栏展示） */
+  /** Language name (shown in the title bar) */
   label: string;
   style: CodeCardStyle;
-  /** 逐行高亮 HTML（见 highlightLines.splitHighlightedLines） */
+  /** Per-line highlighted HTML (see highlightLines.splitHighlightedLines) */
   lines: string[];
 }
 
 /**
- * 卡片正文 HTML：导出预览与独立 HTML 共用同一份结构，
- * 因此「预览长什么样，导出的 HTML 就长什么样」。
+ * Card body HTML: the export preview and the standalone HTML share this structure, so the
+ * exported file looks exactly like the preview.
  */
 export function buildCardBodyHtml({ label, style, lines }: CardBodyOptions): string {
   const parts: string[] = [];
@@ -233,7 +234,7 @@ export function buildCardBodyHtml({ label, style, lines }: CardBodyOptions): str
   return `\n${parts.join('\n')}\n`;
 }
 
-/** 导出 HTML 时内嵌的卡片样式（与 editor.css 的卡片规则保持一致） */
+/** Card styles inlined into the exported HTML (kept in sync with the card rules in editor.css) */
 export function cardStyleBlock(style: CodeCardStyle, background?: CardBackgroundCss): string {
   const vars = Object.entries(cardCssVars(style))
     .map(([key, value]) => `  ${key}: ${value};`)

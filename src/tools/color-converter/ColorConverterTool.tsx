@@ -7,10 +7,10 @@ import { Icon } from '@/core/components/Icon';
 import { readSharedState } from '@/core/lib/share';
 import { COLOR_FORMATS, formatColor, parseColor } from './core';
 
-/** 颜色转换（Tasks T39）：文案全部走 i18n（T29 约定） */
+/** Color conversion (Tasks T39): all copy goes through i18n (T29 convention) */
 export default function ColorConverterTool() {
   const { t } = useTranslation();
-  // 从分享链接 ?s= 还原初始状态（T28）
+  // Restore the initial state from the ?s= share link (T28)
   const init = useMemo(() => readSharedState({ i: '#3b82f6' }), []);
   const [input, setInput] = useState(init.i);
 

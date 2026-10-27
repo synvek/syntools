@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * BMI 计算：BMI = kg / m²，并按 WHO 成人标准分级。
+ * BMI calculation: BMI = kg / m², graded by the WHO adult standards.
  */
 
 export type BmiUnit = 'metric' | 'imperial';
@@ -11,7 +11,7 @@ export type BmiCategory = 'underweight' | 'normal' | 'overweight' | 'obese';
 export interface BmiResult {
   bmi: number;
   category: BmiCategory;
-  /** 换算后的千克 / 米，便于展示 */
+  /** Converted kilograms / meters, kept for display */
   kg: number;
   meters: number;
 }
@@ -23,11 +23,7 @@ export function classifyBmi(bmi: number): BmiCategory {
   return 'obese';
 }
 
-export function computeBmi(
-  height: string,
-  weight: string,
-  unit: BmiUnit,
-): ToolResult<BmiResult> {
+export function computeBmi(height: string, weight: string, unit: BmiUnit): ToolResult<BmiResult> {
   const h = Number(height);
   const w = Number(weight);
   if (!Number.isFinite(h) || !Number.isFinite(w) || h <= 0 || w <= 0) {
@@ -37,11 +33,11 @@ export function computeBmi(
   let meters: number;
   let kg: number;
   if (unit === 'metric') {
-    // 身高允许 cm（>3）或 m（≤3）
+    // Height accepts cm (>3) or m (≤3)
     meters = h > 3 ? h / 100 : h;
     kg = w;
   } else {
-    // imperial: 英寸 / 磅
+    // Imperial units: inches / pounds
     meters = h * 0.0254;
     kg = w * 0.45359237;
   }

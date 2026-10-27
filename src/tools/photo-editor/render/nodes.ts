@@ -19,32 +19,32 @@ import { textBitmap, type WarpedText } from './warp';
 import type { GroupLayer, Layer, PhotoDoc, ShapeLayer, TextLayer } from '../model/types';
 
 /**
- * 图层 → Konva 节点工厂。
+ * Layer → Konva node factory.
  *
- * 每个节点带 `layerId` / `layerKind` / `bakeKey` 三个自定义属性，
- * `sync.ts` 据此决定「就地更新」还是「销毁重建」。
+ * Each node carries three custom attributes (`layerId` / `layerKind` / `bakeKey`) that
+ * `sync.ts` uses to choose between updating in place and destroying / rebuilding.
  */
 
 export const LAYER_ID_ATTR = 'layerId';
 export const LAYER_KIND_ATTR = 'layerKind';
 export const BAKE_KEY_ATTR = 'bakeKey';
-/** 变形文字的位图（挂在节点上，避免 sceneFunc 闭包捕获过期图层） */
+/** Bitmap of warped text (stored on the node, so sceneFunc closures don't capture a stale layer) */
 const TEXT_BITMAP_ATTR = 'textBitmap';
 
-/** 位图烘焙键：资产 + 版本号 + 调整/滤镜参数 */
+/** Bitmap bake key: asset + revision + adjustment / filter parameters */
 export function bakeKeyOf(layer: Layer): string {
   if (layer.kind !== 'raster') return '';
   return bakeSignature(layer.assetId, layer.rev, layer.adjustments, layer.filters);
 }
 
 /**
- * 创建图层节点。
- * `group` / `adjustment` / `smart` 目前返回空 Group 占位（S3/S5/S6 接入离屏合成后的真实内容），
- * 这样在它们尚未可被创建时就已类型完备，后续只需替换分支实现。
+ * Create a layer node.
+ * `group` / `adjustment` / `smart` currently return an empty Group placeholder (S3/S5/S6 wire up the
+ * real composite), which keeps the types complete now and only needs the branch swapped later.
  */
 export function createLayerNode(layer: Layer, doc?: PhotoDoc): Konva.Shape | Konva.Group {
-  // 带蒙版 / 图层样式：整体先合成为一张图（两者都必须作用在「该图层自己的像素」上），
-  // 复用与导出完全相同的 `composedLayerCanvas`，预览与产物不会再漂移。
+  // With mask / layer style: composite into one image first (both must act on the layer's own pixels),
+  // reusing the exact `composedLayerCanvas` the export uses, so preview and output can't drift.
   if (doc && layerNeedsComposite(layer)) {
     const clipBase = layer.clipped ? clipBaseOf(doc, layer) : null;
     const canvas = composedLayerCanvas(doc, layer, { doc, clipBase });
@@ -63,7 +63,7 @@ export function createLayerNode(layer: Layer, doc?: PhotoDoc): Konva.Shape | Kon
       return node;
     }
   }
-  // 网格变形（无蒙版 / 样式时走这里；有蒙版 / 样式时上面的合成分支已把变形包含在内）
+  // Mesh warp (this path when there is no mask / style; the composite branch above already warps)
   if (!layerNeedsComposite(layer) && !meshIsIdentity(layer.mesh)) {
     const key = meshContentKey(layer, 'preview');
     const bitmap = meshLayerBitmap(layer, key, (inner, box) => {
@@ -80,7 +80,7 @@ export function createLayerNode(layer: Layer, doc?: PhotoDoc): Konva.Shape | Kon
       node.setAttr(LAYER_ID_ATTR, layer.id);
       node.setAttr(LAYER_KIND_ATTR, 'mesh');
       node.setAttr(BAKE_KEY_ATTR, key);
-      // 按「缓冲左上角」落位：与合成路径同一套变换（绕包围盒中心旋转 / 翻转）
+      // Position at the buffer's top-left, with the composite path's transforms (rotate / flip about center)
       applyCommon(node, layer, { x: bitmap.offsetX, y: bitmap.offsetY }, true);
       return node;
     }
@@ -99,7 +99,7 @@ export function createLayerNode(layer: Layer, doc?: PhotoDoc): Konva.Shape | Kon
               ? createGroupNode(layer, doc)
               : new Konva.Group({ listening: false });
   node.setAttr(LAYER_ID_ATTR, layer.id);
-  // 形状按具体图形区分：更换图形类型时必须重建节点
+  // Shapes are keyed by kind: switching the shape kind must rebuild the node
   node.setAttr(
     LAYER_KIND_ATTR,
     layer.kind === 'shape'
@@ -114,10 +114,10 @@ export function createLayerNode(layer: Layer, doc?: PhotoDoc): Konva.Shape | Kon
 }
 
 /**
- * 就地更新：类型未变时只改属性，避免整树重建导致闪烁。
+ * Update in place: when the type is unchanged only attributes change, avoiding whole-tree rebuild flicker.
  *
- * `live = true` 用于落笔过程中：签名（rev）没变但像素已经变了，
- * 必须绕过 bake 缓存重新取图，否则画面要到松手才刷新。
+ * `live = true` is for the middle of a stroke: the signature (rev) is unchanged but pixels already are,
+ * so the image must bypass the bake cache, or the canvas would refresh only on release.
  */
 export function updateLayerNode(
   node: Konva.Node,
@@ -158,7 +158,7 @@ export function updateLayerNode(
     if (asset && (live || node.getAttr(BAKE_KEY_ATTR) !== key)) {
       node.image(
         live
-          ? // live 传签名：预览走降采样，同时把「停手后算全分辨率」的任务交给 Worker
+          ? // live passes the signature: the preview downsamples while the Worker computes full resolution
             bakeRasterLive(asset, layer.adjustments, layer.filters, key)
           : bakeRaster(asset, key, layer.adjustments, layer.filters),
       );
@@ -183,7 +183,7 @@ export function updateLayerNode(
     node.fontStyle(fontStyleOf(layer));
     node.textDecoration(layer.underline ? 'underline' : '');
   } else if (layer.kind === 'text') {
-    // 变形 / 段间距：位图按签名缓存，同步时重新取一次只会命中缓存（除非参数真的变了）
+    // Warp / paragraph spacing: bitmaps cache by signature, so re-fetching on sync just hits the cache
     node.setAttr(TEXT_BITMAP_ATTR, textBitmap(layer));
   } else if (layer.kind === 'shape') {
     updateShapeNode(node, layer);
@@ -192,11 +192,11 @@ export function updateLayerNode(
 }
 
 /**
- * 同步节点的位置与变换。
+ * Sync a node's position and transform.
  *
- * `composed`（离屏合成结果 / 编组）必须用「以图层包围盒中心为轴」的写法（position = 中心 + offset = 中心到缓冲左上角），
- * 才能与 Canvas2D 的 `applyTransform`（绕包围盒中心旋转 / 翻转）逐像素对齐；
- * 普通节点仍按左上角落位，保持既有行为。
+ * `composed` nodes (offscreen composite / group) must pivot on the layer box's center (position = center,
+ * offset = center to buffer top-left) to align pixel-for-pixel with Canvas2D's `applyTransform`, which
+ * rotates / flips about that center; plain nodes still anchor at the top-left, as before.
  */
 function applyCommon(
   node: Konva.Node,
@@ -218,7 +218,7 @@ function applyCommon(
   node.rotation(layer.rotation);
   node.scale({ x: layer.flipX ? -1 : 1, y: layer.flipY ? -1 : 1 });
   node.visible(layer.visible);
-  // Konva 的 source-over 即「正常」；其余混合模式名与 Canvas2D 一致
+  // Konva's source-over is "normal"; every other blend mode name matches Canvas2D
   node.setAttr('globalCompositeOperation', layer.blend === 'normal' ? 'source-over' : layer.blend);
   if (!composed && layer.kind === 'raster') {
     node.size({ width: Math.max(1, layer.width), height: Math.max(1, layer.height) });
@@ -238,7 +238,7 @@ function createRasterNode(layer: Extract<Layer, { kind: 'raster' }>): Konva.Imag
   });
 }
 
-/** 编组（整体合成模式）：一张离屏合成结果的图片节点 */
+/** Group (composited mode): an image node holding one offscreen composite */
 function createGroupNode(layer: GroupLayer, doc: PhotoDoc): Konva.Image {
   return new Konva.Image({
     image: groupComposite(doc, layer),
@@ -261,12 +261,12 @@ function createSmartNode(layer: Extract<Layer, { kind: 'smart' }>): Konva.Image 
 }
 
 /**
- * 文字节点。
+ * Text node.
  *
- * 两条路径：
- * - 常规文字 → `Konva.Text`（可缩放清晰、随时改字体）；
- * - 变形 / 带段间距 → `Konva.Shape` + 位图（`render/warp.ts`），与导出所用的 Canvas2D 同源。
- * 位图挂在节点属性上而不是闭包里捕获图层对象 —— 闭包会让节点永远画旧数据。
+ * Two paths:
+ * - plain text → `Konva.Text` (crisp at any zoom, font editable on the fly);
+ * - warp / paragraph spacing → `Konva.Shape` + bitmap (`render/warp.ts`), the same code as the export.
+ * The bitmap lives on node attributes instead of a closure over the layer, which would draw stale data.
  */
 function createTextNode(layer: TextLayer): Konva.Text | Konva.Shape {
   if (needsTextBitmap(layer)) {
@@ -316,9 +316,9 @@ function createShapeNode(layer: ShapeLayer): Konva.Shape {
   };
   switch (layer.shape) {
     case 'ellipse':
-      // 不用 Konva.Ellipse：它的 x / y 表示**圆心**，而 applyCommon 会把节点 position 统一设成
-      // 图层左上角，结果椭圆被画到 (x−w/2, y−h/2) 去（笔迹整体往左上偏半个身位）。
-      // 统一用 sceneFunc 在节点局部坐标里落图，导出（Canvas2D）也是同一套坐标。
+      // No Konva.Ellipse: its x / y is the **center**, while applyCommon sets every node's position to
+      // the layer's top-left, so the oval lands at (x−w/2, y−h/2) and the whole stroke shifts up-left.
+      // Everything draws in node-local coordinates via sceneFunc, and the export uses the same space.
       return new Konva.Shape({
         ...common,
         width: layer.width,
@@ -362,7 +362,7 @@ function createShapeNode(layer: ShapeLayer): Konva.Shape {
         ...common,
         width: layer.width,
         height: layer.height,
-        // 按节点自身尺寸绘制（不是闭包里的 layer），缩放 / 变形后才会跟着刷新
+        // Draw using the node's own size (not the closure's layer) so scaling / transforming refreshes it
         sceneFunc: (ctx: Konva.Context, shape: Konva.Shape) => {
           const w = shape.width();
           const h = shape.height();
@@ -386,7 +386,7 @@ function updateShapeNode(node: Konva.Node, layer: ShapeLayer): void {
     }
     return;
   }
-  // Arrow 继承自 Line，必须先判箭头，否则会被当成普通直线重设 points
+  // Arrow extends Line, so test for arrows first or they get reset as plain lines
   if (node instanceof Konva.Arrow) {
     node.points([0, layer.height, layer.width / 2, 0, layer.width, layer.height]);
     node.stroke(layer.stroke || layer.fill);
@@ -399,7 +399,7 @@ function updateShapeNode(node: Konva.Node, layer: ShapeLayer): void {
     node.strokeWidth(Math.max(1, layer.strokeWidth));
     return;
   }
-  // 椭圆 / 星形：sceneFunc 按节点自身尺寸绘制，这里同步尺寸与配色
+  // Oval / star: sceneFunc draws from the node's own size; this syncs size and colors
   node.width(layer.width);
   node.height(layer.height);
   node.setAttr('fill', layer.fill || undefined);

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-/** 默认：无 localStorage 时跟随浏览器语言（本配置为 en-US → English） */
-test('无偏好时跟随浏览器语言（en）', async ({ page }) => {
+/** Default: without localStorage, follow the browser language (en-US here → English) */
+test('follows browser language when no preference is stored (en)', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.removeItem('syntools:settings.v1');
   });
@@ -10,8 +10,8 @@ test('无偏好时跟随浏览器语言（en）', async ({ page }) => {
   await expect(page.locator('#header-lang')).toHaveValue('en');
 });
 
-/** 浏览器为简体中文时默认简中 */
-test('浏览器 zh-CN 时默认简体中文', async ({ browser }) => {
+/** Defaults to Simplified Chinese when the browser is zh-CN */
+test('defaults to Simplified Chinese when the browser is zh-CN', async ({ browser }) => {
   const context = await browser.newContext({ locale: 'zh-CN' });
   const page = await context.newPage();
   await page.addInitScript(() => {
@@ -23,8 +23,8 @@ test('浏览器 zh-CN 时默认简体中文', async ({ browser }) => {
   await context.close();
 });
 
-/** 语言切换：下拉选择 + localStorage 持久化 */
-test('语言切换与刷新持久化', async ({ page }) => {
+/** Language switching: dropdown selection + localStorage persistence */
+test('language switching persists across reloads', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.removeItem('syntools:settings.v1');
   });
@@ -42,8 +42,8 @@ test('语言切换与刷新持久化', async ({ page }) => {
   await expect(langSelect).toHaveValue('en');
 });
 
-/** 旧数据只有 lang、无 langExplicit 时不锁死，按系统 locale 重检 */
-test('无 langExplicit 的旧设置会重新检测语言', async ({ browser }) => {
+/** Legacy settings with lang but no langExplicit are not pinned; language is re-detected from the system locale */
+test('legacy settings without langExplicit re-detect the language', async ({ browser }) => {
   const context = await browser.newContext({ locale: 'zh-CN' });
   const page = await context.newPage();
   await page.addInitScript(() => {
@@ -55,7 +55,7 @@ test('无 langExplicit 的旧设置会重新检测语言', async ({ browser }) =
   await context.close();
 });
 
-test('可切换到法语并显示本地化标题', async ({ page }) => {
+test('switches to French and shows the localized heading', async ({ page }) => {
   await page.goto('/');
   const langSelect = page.locator('#header-lang');
   await langSelect.selectOption('fr');

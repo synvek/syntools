@@ -10,8 +10,8 @@ import {
 } from './core';
 
 function pngStub(width: number, height: number): Uint8Array {
-  // 最小合法 PNG 头 + IHDR 尺寸占位不够完整；测试用假 PNG 魔数 + 填充
-  // encodeIco 只检查 PNG 魔数，不校验 CRC
+  // A minimal valid PNG header with an IHDR size placeholder is not complete enough; the test uses a fake PNG magic number plus padding
+  // encodeIco only checks the PNG magic number, not the CRC
   const data = new Uint8Array(24);
   data.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
   data[8] = width;
@@ -41,10 +41,12 @@ describe('image-ico', () => {
     expect(encoded.ok).toBe(true);
     if (!encoded.ok) return;
 
-    const parsed = parseIco(encoded.value.buffer.slice(
-      encoded.value.byteOffset,
-      encoded.value.byteOffset + encoded.value.byteLength,
-    ));
+    const parsed = parseIco(
+      encoded.value.buffer.slice(
+        encoded.value.byteOffset,
+        encoded.value.byteOffset + encoded.value.byteLength,
+      ),
+    );
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.value).toHaveLength(3);

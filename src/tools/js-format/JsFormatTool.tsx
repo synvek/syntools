@@ -8,7 +8,7 @@ import { translateToolError } from '@/core/i18n/helpers';
 import { readSharedState } from '@/core/lib/share';
 import { processJs, type IndentSize, type JsAction } from './core';
 
-/** JS 压缩 / 格式化 */
+/** JS minifier / formatter */
 export default function JsFormatTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', a: 'format', n: 2 }), []);

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon } from '@/core/components/Icon';
 
-/** 面板原子组件：统一表单控件观感，避免各面板重复样式 */
+/** Panel primitives: unify how form controls look so panels don't repeat styles */
 
 export function Section({
   title,
@@ -54,7 +54,7 @@ export function NumberInput({
   suffix?: string;
   ariaLabel: string;
   disabled?: boolean;
-  /** 覆盖默认宽度（工具栏比面板窄），如 'w-12' */
+  /** Override the default width (the toolbar is narrower than the panel), e.g. 'w-12' */
   widthClass?: string;
 }) {
   return (
@@ -101,7 +101,7 @@ export function TextInput({
   );
 }
 
-/** 下拉选择（字体等枚举项）。value 不在 options 内时追加，避免静默丢值 */
+/** Dropdown (enumerations such as fonts). Appends value when it isn't in options, so values aren't silently dropped */
 export function SelectInput({
   value,
   options,
@@ -115,9 +115,9 @@ export function SelectInput({
   options: string[];
   onChange: (value: string) => void;
   ariaLabel: string;
-  /** 与 options 一一对应的展示文案；缺省时直接显示取值 */
+  /** Display label for each option; falls back to the raw value when missing */
   labels?: string[];
-  /** 覆盖默认宽度（工具栏比面板窄），如 'max-w-[104px]' */
+  /** Override the default width (the toolbar is narrower than the panel), e.g. 'max-w-[104px]' */
   widthClass?: string;
   disabled?: boolean;
 }) {
@@ -139,7 +139,7 @@ export function SelectInput({
   );
 }
 
-/** 多行文本（演讲者备注等页级长文本） */
+/** Multi-line text (page-level long text such as speaker notes) */
 export function TextArea({
   value,
   onChange,

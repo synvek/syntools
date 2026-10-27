@@ -172,7 +172,10 @@ export function FilePreviewCard({
         )}
       </div>
       <div className="space-y-0.5 px-2 py-1.5">
-        <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-100" title={file.name}>
+        <p
+          className="truncate text-xs font-medium text-gray-800 dark:text-gray-100"
+          title={file.name}
+        >
           {file.name}
         </p>
         <p className="text-[10px] text-gray-500 dark:text-gray-400">{formatSize(file.size)}</p>
@@ -182,7 +185,7 @@ export function FilePreviewCard({
 }
 
 /**
- * 上传文件预览网格：图片显示内容缩略图，PDF 渲染首页缩略图，便于确认是否传错。
+ * Preview grid for uploaded files: images show a content thumbnail and PDFs render their first page, so mistakes are easy to spot.
  */
 export function FilePreviewList({
   files,
@@ -198,7 +201,10 @@ export function FilePreviewList({
   return (
     <ul className="flex flex-wrap gap-3">
       {files.map((file, index) => (
-        <li key={`${file.name}-${file.size}-${file.lastModified}-${index}`} className="w-36 sm:w-40">
+        <li
+          key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+          className="w-36 sm:w-40"
+        >
           <FilePreviewCard
             file={file}
             index={showIndex ? index + 1 : undefined}

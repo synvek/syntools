@@ -3,26 +3,26 @@ import { useViewport } from '@xyflow/react';
 import { useFlowStore } from '../store';
 import type { CanvasGuide, GuideAxis } from '../model/types';
 
-/** 标尺刻度候选步长（画布单位） */
+/** Candidate ruler tick steps (canvas units) */
 const STEPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
-/** 标尺厚度（px） */
+/** Ruler thickness (px) */
 export const RULER_SIZE = 20;
 
-/** 选一个让刻度间距不小于 minPx 屏幕像素的步长 */
+/** Pick a step that keeps tick spacing at least minPx screen pixels apart */
 function pickStep(zoom: number, minPx: number): number {
   const target = minPx / Math.max(0.05, zoom);
   return STEPS.find((s) => s >= target) ?? STEPS[STEPS.length - 1];
 }
 
 /**
- * 正在拖拽的参考线下标（模块级）。
- * 用下标而非对象引用：更新时只替换被拖动的那一项，下标在整个拖拽期间稳定。
+ * Index of the guide being dragged (module level).
+ * An index rather than an object reference: updates replace only the dragged entry, and the index is stable for the whole drag.
  */
 let draggingGuideIndex: number | null = null;
 
 /**
- * 顶部 / 左侧标尺。
- * 在标尺上按下并拖动即可拉出一条参考线（顶部 → 水平线，左侧 → 垂直线）。
+ * Top / left rulers.
+ * Press and drag on a ruler to pull out a guide (top → horizontal line, left → vertical line).
  */
 export function Ruler() {
   const { x: vx, y: vy, zoom } = useViewport();
@@ -36,7 +36,7 @@ export function Ruler() {
     const pos =
       axis === 'y' ? (e.clientY - host.top - vy) / zoom : (e.clientX - host.left - vx) / zoom;
     const guide: CanvasGuide = { axis, pos: Math.round(pos) };
-    // 新参考线追加在末尾，其下标在整个拖拽期间保持不变
+    // A new guide is appended at the end, so its index stays stable for the whole drag
     const initial = useFlowStore.getState().guides;
     const index = initial.length;
     draggingGuideIndex = index;
@@ -44,7 +44,7 @@ export function Ruler() {
 
     const onMove = (ev: PointerEvent) => {
       const rect = hostRef.current?.parentElement?.getBoundingClientRect();
-      // 注意：每次都取最新状态，避免用指针按下时的旧数组覆盖掉刚加入的参考线
+      // Note: always read the latest state, so the array captured at pointer-down does not overwrite a guide just added
       const st = useFlowStore.getState();
       if (!rect || draggingGuideIndex === null) return;
       const raw =
@@ -115,19 +115,19 @@ export function Ruler() {
   );
 }
 
-/** 持久参考线：细虚线，可拖动；双击删除 */
+/** Persistent guides: thin dashed lines, draggable; double-click to delete */
 export function GuideLines() {
   const guides = useFlowStore((s) => s.guides);
   const { x: vx, y: vy, zoom } = useViewport();
   if (guides.length === 0) return null;
 
-  /** 删除第 index 条参考线（按下标，避免对象引用比较失效） */
+  /** Delete the guide at index (by index, so object reference comparison cannot go stale) */
   const removeAt = (index: number) => {
     const st = useFlowStore.getState();
     st.setGuides(st.guides.filter((_, i) => i !== index));
   };
 
-  /** 拖动第 index 条参考线（每次读取最新状态） */
+  /** Drag the guide at index (reads the latest state every time) */
   const move = (index: number, e: ReactPointerEvent) => {
     e.stopPropagation();
     const container = (e.currentTarget as HTMLElement).parentElement;

@@ -4,19 +4,19 @@ import { useFlowStore } from '../store';
 import { anchorOf, type HierarchyNode } from '../core';
 import type { FlowEdgeData, Waypoint } from '../model/types';
 
-/** 折点手柄边长（屏幕像素） */
+/** Waypoint handle edge length (screen pixels) */
 const HANDLE = 9;
-/** 段中点「加折点」手柄边长 */
+/** Edge length of the segment-midpoint "add waypoint" handle */
 const ADD_HANDLE = 7;
 
 type EditorNode = HierarchyNode & { id: string; hidden?: boolean };
 
 /**
- * 折点编辑层：选中连线后，在每个折点上显示可拖拽手柄（双击删除），
- * 并在每段中点显示「＋」手柄（点击插入折点）。
+ * Waypoint editing layer: after an edge is selected, shows a draggable handle on each waypoint (double-click deletes),
+ * plus a "+" handle at each segment midpoint (click to insert a waypoint).
  *
- * 与 EdgeEndpointHandles 一致：用 viewport 变换把画布坐标换算成屏幕坐标，
- * 覆盖在 React Flow 之上；拖拽期间不写入历史，松手后由 commit 合并为一次撤销。
+ * Like EdgeEndpointHandles: viewport transforms convert canvas coordinates to screen coordinates,
+ * layered above React Flow; no history is written while dragging, and commit coalesces it into one undo step on release.
  */
 export function EdgeWaypointEditor() {
   const { t } = useTranslation();
@@ -31,7 +31,7 @@ export function EdgeWaypointEditor() {
   const byId = new Map(nodes.map((n) => [n.id, n as EditorNode] as const));
   const selected = new Set(selectedEdges);
 
-  /** 拖拽折点：跟手移动，松手结束 */
+  /** Drag a waypoint: follows the pointer, ends on release */
   const startDrag =
     (edgeId: string, index: number, waypoints: Waypoint[]) =>
     (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -93,7 +93,7 @@ export function EdgeWaypointEditor() {
         waypoints,
       });
     }
-    // 每段中点：点击插入折点（插入位置即段序号）
+    // Each segment's midpoint: click to insert a waypoint (the insertion position is the segment index)
     for (let i = 0; i < path.length - 1; i += 1) {
       items.push({
         key: `${edge.id}-a${i}`,
@@ -142,7 +142,7 @@ export function EdgeWaypointEditor() {
             onClick={(e) => {
               e.stopPropagation();
               const next = [...item.waypoints];
-              // 屏幕坐标 → 画布坐标后插入到该段序号处
+              // Convert screen coordinates to canvas coordinates, then insert at that segment index
               next.splice(item.index, 0, {
                 x: Math.round((item.x - vx) / zoom),
                 y: Math.round((item.y - vy) / zoom),

@@ -3,16 +3,16 @@ import type { ReactNode } from 'react';
 import type { MenuBarMenu, MenuEntry } from './menuModel';
 
 /**
- * 顶部菜单栏：把散落在各处的功能收拢成一份「功能地图」。
+ * Top menu bar: gathers features scattered around the app into a single "feature map".
  *
- * 布局（左 → 右）：菜单区 → actions（紧邻菜单，如保存状态 / 清空）→ center（画布标题）
- * → right（新建 / 放映等图标按钮）。center 用 flex-1 居中，使标题与左右两组的间距相等。
+ * Layout (left → right): menu area → actions (next to the menus, e.g. save status / clear) → center (canvas title)
+ * → right (icon buttons such as new / present). center uses flex-1 so the title sits equidistant from both sides.
  *
- * 交互约定：
- * - 顶层入口用 `role="menuitem"`（而非 button），避免与画布/面板里的同名按钮抢
- *   Playwright 的 `getByRole('button', ...)` 选择器；下拉面板用 `role="menu"`，仅在展开时渲染。
- * - 展开后鼠标划过其它顶层入口即切换菜单（贴近桌面端）。
- * - 点击外部 / 按 Esc 关闭。
+ * Interaction conventions:
+ * - Top-level entries use `role="menuitem"` (not button) so they do not collide with same-named buttons in the
+ *   canvas / panels in Playwright's `getByRole('button', ...)` selectors; dropdowns use `role="menu"` and render only when open.
+ * - Once open, hovering another top-level entry switches menus (desktop-like).
+ * - Clicking outside / pressing Esc closes it.
  */
 export function MenuBar({
   menus,
@@ -23,11 +23,11 @@ export function MenuBar({
 }: {
   menus: MenuBarMenu[];
   ariaLabel: string;
-  /** 菜单区右侧、紧邻末尾菜单的操作 */
+  /** Actions to the right of the menu area, right after the last menu */
   actions?: ReactNode;
-  /** 中部插槽：画布标题输入框 */
+  /** Center slot: the canvas title input */
   center?: ReactNode;
-  /** 右侧操作：新建 / 放映等图标按钮 */
+  /** Right-hand actions: icon buttons such as new / present */
   right?: ReactNode;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);

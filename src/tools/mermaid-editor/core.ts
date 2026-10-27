@@ -1,21 +1,15 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * Mermaid 文本校验与主题 / 缩放配置。
+ * Mermaid text validation plus theme / zoom settings.
  */
 
 export type MermaidError = 'EMPTY';
 
 export type MermaidThemeId =
-  | 'default'
-  | 'neutral'
-  | 'forest'
-  | 'dark'
-  | 'ocean'
-  | 'sunset'
-  | 'mono';
+  'default' | 'neutral' | 'forest' | 'dark' | 'ocean' | 'sunset' | 'mono';
 
-/** Mermaid initialize 可用的内置 theme；自定义主题用 base + themeVariables */
+/** Built-in themes accepted by Mermaid initialize; custom themes build on base + themeVariables */
 export type MermaidBuiltinTheme = 'default' | 'neutral' | 'forest' | 'dark' | 'base';
 
 export interface MermaidTheme {
@@ -156,7 +150,7 @@ export function parseSvgSize(svg: string): { width: number; height: number } {
   };
 }
 
-/** 在 SVG 根节点注入背景矩形，便于导出 PNG 不透明 */
+/** Inject a background rect into the SVG root so exported PNGs are opaque */
 export function injectSvgBackground(svg: string, background: string): string {
   if (!background || /<rect[^>]*width=["']100%["']/i.test(svg)) return svg;
   const rect = `<rect width="100%" height="100%" fill="${background}"/>`;

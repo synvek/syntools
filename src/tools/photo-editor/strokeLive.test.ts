@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
 /**
- * 落笔的**实时性**契约测试。
+ * Contract test for **live** painting feedback.
  *
- * 背景（真实回归）：画布刷新是「从图层位图重新取图」，因此**位图必须在落笔过程中就拿到新像素**。
- * 曾经为了「重叠印章不叠深」把整条笔迹先画进独立缓冲、只在松手时合成回位图 ——
- * 语义对了，但位图在落笔期间一直没变，用户看到的是「画完才刷新」。
- * 当时的测试全是纯函数（步进、间距、遮罩），**没有一条能发现这个问题**，所以在这里补上。
+ * Background (a real regression): the canvas refreshes by re-reading the layer bitmap, so **the bitmap must
+ * receive new pixels during the stroke**. Once, so overlapping stamps wouldn't compound, a whole stroke went
+ * into a buffer and was composited only on release: right semantics, but the bitmap never changed while
+ * painting, so users saw "refresh on finish". Pure-function tests never caught it, so these were added.
  *
- * 做法：把 `model/assets` 换成「记录调用」的画布替身，只断言「谁在什么时候被画」，
- * 不依赖真实 2D 上下文（jsdom 没有）。
+ * Approach: swap `model/assets` for a call-recording canvas stub and assert only "who drew when",
+ * with no real 2D context (jsdom has none).
  *
- * 术语：**落点** = 一次 `move()`；**间距模式** 用 `MIN_SPACING` 走连续描边（不建笔尖 sprite），
- * 大间距走盖章（会额外建一张 sprite 画布），两条分支都要覆盖。
+ * Terms: **move point** = one `move()`; **spacing mode** uses `MIN_SPACING` for a continuous stroke (no sprite),
+ * wide spacing stamps (creating an extra sprite canvas); both branches must be covered.
  */
 
 const harness = vi.hoisted(() => {
@@ -25,11 +25,11 @@ const harness = vi.hoisted(() => {
     const ctx = new Proxy(
       {},
       {
-        // 只关心「调了哪个方法」与「写了哪个属性」，参数与返回值都不需要
+        // Only "which method was called" and "which property was set" matter; arguments and returns don't
         get: (_target, prop) => () => {
           calls.push(String(prop));
         },
-        // 属性写入也要留痕：合成方式（copy / source-over / destination-out）只能这样断言
+        // Property writes are recorded too: that is the only way to assert copy / source-over / destination-out
         set: (_target, prop, value) => {
           calls.push(`set:${String(prop)}=${String(value)}`);
           return true;
@@ -41,9 +41,9 @@ const harness = vi.hoisted(() => {
   };
   return {
     make,
-    /** 图层位图（`getCanvas` 返回它） */
+    /** Layer bitmap (`getCanvas` returns it) */
     asset: null as Recorder | null,
-    /** 笔迹过程中新建的临时画布（笔尖 sprite / 缓冲 / 落笔前快照） */
+    /** Temp canvases created during the stroke (tip sprite / buffer / pre-stroke snapshot) */
     created: [] as Recorder[],
   };
 });
@@ -70,7 +70,7 @@ function options(overrides: Partial<Parameters<typeof createStrokeSession>[1]> =
     opacity: 1,
     mode: 'brush' as const,
     selection: null,
-    // 连续描边（不建 sprite），断言更干净；盖章分支单独覆盖
+    // Continuous stroke (no sprite) keeps assertions clean; the stamping branch is covered separately
     spacing: MIN_SPACING,
     ...overrides,
   };
@@ -82,12 +82,12 @@ function reset() {
   return { asset: harness.asset, created: harness.created };
 }
 
-/** 一次落点里位图是否真的被改写过 */
+/** Whether the bitmap was actually rewritten during one move point */
 const wroteToAsset = (calls: string[]) =>
   calls.some((call) => call === 'fill' || call === 'stroke' || call === 'drawImage');
 
-describe('落笔必须实时写进图层位图', () => {
-  it('不透明度 = 1：move 之后位图立即被写入（不需要 end）', () => {
+describe('A stroke must land in the layer bitmap in real time', () => {
+  it('opacity = 1: the bitmap is written right after move (no end needed)', () => {
     const { asset } = reset();
     const session = createStrokeSession(target, options());
     expect(session).not.toBeNull();
@@ -102,48 +102,48 @@ describe('落笔必须实时写进图层位图', () => {
     expect(asset!.calls).toContain('stroke');
   });
 
-  it('不透明度 = 1 时不额外分配画布（常见的满不透明笔刷零开销）', () => {
+  it('opacity = 1 allocates no extra canvas (the common fully opaque brush costs nothing)', () => {
     reset();
     createStrokeSession(target, options());
     expect(harness.created).toHaveLength(0);
   });
 
-  it('盖章模式（大间距）：位图同样实时拿到印章', () => {
+  it('stamp mode (large spacing): the bitmap still receives stamps in real time', () => {
     const { asset, created } = reset();
     const session = createStrokeSession(target, options({ spacing: 0.5 }));
-    expect(created).toHaveLength(1); // 笔尖 sprite
+    expect(created).toHaveLength(1); // Tip sprite
 
     asset!.calls.length = 0;
     session!.move(20, 20);
     expect(asset!.calls).toContain('drawImage');
   });
 
-  it('不透明度 < 1：move 之后位图立即拿到合成结果（缓冲模式也要实时）', () => {
+  it('opacity < 1: the bitmap gets the composite right after move (buffered mode is still live)', () => {
     const { asset, created } = reset();
     const session = createStrokeSession(target, options({ opacity: 0.5 }));
     expect(session).not.toBeNull();
-    // 落笔前快照 + 缓冲（源码里就是这个创建顺序）
+    // Pre-stroke snapshot + buffer (the source creates them in this order)
     expect(created).toHaveLength(2);
     const [snapshot, buffer] = created;
-    // 快照必须先把落笔前像素抄走（drawImage 位图 → 快照），否则重合成无从还原
+    // The snapshot must copy pre-stroke pixels first (drawImage bitmap → snapshot), or nothing to restore
     expect(snapshot.calls).toContain('drawImage');
     expect(snapshot.calls).not.toContain('fill');
 
     asset!.calls.length = 0;
     buffer.calls.length = 0;
     session!.move(20, 20);
-    // 笔迹画进缓冲…
+    // The stroke is drawn into the buffer…
     expect(wroteToAsset(buffer.calls)).toBe(true);
-    // …并且同一时刻就合成回位图（而不是等 end）
+    // …and composited back into the bitmap at that same moment (not waiting for end)
     expect(asset!.calls).toContain('drawImage');
-    // 合成前先把脏区还原成落笔前的像素：用 'copy' 才会连透明一起还原
+    // Restore the dirty region to pre-stroke pixels first: only 'copy' restores transparency too
     expect(asset!.calls).toContain('set:globalCompositeOperation=copy');
-    // 再按「不透明度」把缓冲盖上去
+    // Then overlay the buffer at that opacity
     expect(asset!.calls).toContain('set:globalAlpha=0.5');
     expect(asset!.calls).toContain('set:globalCompositeOperation=source-over');
   });
 
-  it('缓冲模式：位图在落笔期间的每次 move 都会被合成（不是只合一次）', () => {
+  it('buffered mode: every move during the stroke composites into the bitmap (not just once)', () => {
     const { asset } = reset();
     const session = createStrokeSession(target, options({ opacity: 0.4 }));
     session!.move(10, 10);
@@ -152,7 +152,7 @@ describe('落笔必须实时写进图层位图', () => {
     expect(asset!.calls).toContain('drawImage');
   });
 
-  it('橡皮（destination-out）同样实时写进位图', () => {
+  it('the eraser (destination-out) also writes through in real time', () => {
     const { asset } = reset();
     const session = createStrokeSession(target, options({ mode: 'eraser' }));
     asset!.calls.length = 0;
@@ -160,7 +160,7 @@ describe('落笔必须实时写进图层位图', () => {
     expect(wroteToAsset(asset!.calls)).toBe(true);
   });
 
-  it('锁定透明像素（source-atop）也走实时直写', () => {
+  it('locking transparency (source-atop) also writes directly in real time', () => {
     const { asset } = reset();
     const session = createStrokeSession(target, options({ lockAlpha: true }));
     asset!.calls.length = 0;
@@ -168,7 +168,7 @@ describe('落笔必须实时写进图层位图', () => {
     expect(wroteToAsset(asset!.calls)).toBe(true);
   });
 
-  it('end 之后释放缓冲模式的两张临时画布（大画布上这是几十兆的差别）', () => {
+  it('end releases the two scratch canvases of buffered mode (tens of megabytes on large canvases)', () => {
     const { created } = reset();
     const session = createStrokeSession(target, options({ opacity: 0.3 }));
     session!.move(10, 10);
@@ -177,7 +177,7 @@ describe('落笔必须实时写进图层位图', () => {
     expect(created.every((item) => item.canvas.width === 0 && item.canvas.height === 0)).toBe(true);
   });
 
-  it('选区裁剪：缓冲模式把裁剪放在合成阶段（缓冲只累积笔迹）', () => {
+  it('selection clipping: buffered mode clips at composite time (the buffer only accumulates paint)', () => {
     const { asset } = reset();
     const selection = {
       kind: 'rect' as const,

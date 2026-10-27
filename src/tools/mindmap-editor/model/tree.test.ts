@@ -22,7 +22,7 @@ import { layoutMindmap } from './layout';
 import { buildMindTemplate } from './templates';
 import type { MindDoc, MindNodeRec } from './types';
 
-/** 构造 a(根) → b → c，b 另有子节点 d */
+/** Build a(root) → b → c, where b also has a child d */
 function sample(): { nodes: MindNodeRec[]; ids: Record<string, string> } {
   const doc = emptyDoc();
   const rootId = doc.rootId;
@@ -85,7 +85,7 @@ describe('脑图树操作', () => {
     const { nodes, ids } = sample();
     const after = outdentNode(nodes, ids.c);
     expect(findNode(after, ids.c)?.parentId).toBe(ids.root);
-    // 一级节点的父级是根，再升级无处可去
+    // A first-level node's parent is the root, so outdenting has nowhere left to go
     expect(outdentNode(nodes, ids.b)).toEqual(nodes);
     expect(outdentNode(nodes, ids.root)).toEqual(nodes);
   });
@@ -96,7 +96,7 @@ describe('脑图树操作', () => {
     const two = addChild(one.nodes, doc.rootId, '二');
     const moved = moveNode(two.nodes, two.id, -1);
     expect(childrenOf(moved, doc.rootId).map((k) => k.text)).toEqual(['二', '一']);
-    // 已在首位时上移无效
+    // Moving up is a no-op when it is already first
     expect(moveNode(moved, two.id, -1)).toEqual(moved);
   });
 

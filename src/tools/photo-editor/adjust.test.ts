@@ -55,7 +55,7 @@ describe('buildCurveLut', () => {
       { x: 255, y: 255 },
     ]);
     expect(lut[128]).toBe(200);
-    // 单调性：PCHIP 不会在控制点间过冲
+    // Monotonicity: PCHIP does not overshoot between control points
     for (let i = 1; i < 256; i += 1) expect(lut[i]).toBeGreaterThanOrEqual(lut[i - 1]);
   });
 

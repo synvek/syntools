@@ -25,7 +25,7 @@ import {
 const isLevel = (v: string): v is QrLevel => QR_LEVELS.includes(v as QrLevel);
 const isSize = (v: number): v is QrSize => QR_SIZES.includes(v as QrSize);
 
-/** 二维码生成与解析（Tasks T37）：文案全部走 i18n（T29 约定） */
+/** QR code generation and decoding (Tasks T37): all copy goes through i18n (T29 convention) */
 export default function QrCodeTool() {
   const { t } = useTranslation();
   const init = useMemo(

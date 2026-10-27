@@ -9,7 +9,7 @@ import { parseUserAgent } from './core';
 
 const FIELDS = ['browser', 'engine', 'os', 'device', 'cpu'] as const;
 
-/** User-Agent 解析 */
+/** User-Agent parser */
 export default function UaParserTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -67,10 +67,7 @@ export default function UaParserTool() {
                 const row = result.value[key];
                 const line = [row.name, row.version, row.extra].filter(Boolean).join(' ');
                 return (
-                  <tr
-                    key={key}
-                    className="border-t border-gray-100 dark:border-gray-800"
-                  >
+                  <tr key={key} className="border-t border-gray-100 dark:border-gray-800">
                     <td className="px-3 py-2 font-medium text-gray-700 dark:text-gray-200">
                       {t(`tools.uaParser.fields.${key}`)}
                     </td>

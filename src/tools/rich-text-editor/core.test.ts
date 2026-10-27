@@ -18,42 +18,42 @@ import {
 } from './core';
 
 describe('resolveImportKind', () => {
-  it('识别 .docx（忽略大小写）', () => {
+  it('recognizes .docx case-insensitively', () => {
     expect(resolveImportKind('报告.DOCX')).toBe('docx');
     expect(resolveImportKind(' spec.docx ')).toBe('docx');
   });
 
-  it('旧版二进制格式归为 legacy-doc', () => {
+  it('classifies legacy binary files as legacy-doc', () => {
     expect(resolveImportKind('旧文档.doc')).toBe('legacy-doc');
     expect(resolveImportKind('notes.wps')).toBe('legacy-doc');
     expect(resolveImportKind('note.rtf')).toBe('legacy-doc');
   });
 
-  it('其它扩展名不支持', () => {
+  it('rejects other extensions', () => {
     expect(resolveImportKind('a.txt')).toBe('unsupported');
   });
 });
 
 describe('checkImportFile', () => {
-  it('合法的 .docx 通过校验', () => {
+  it('accepts a valid .docx', () => {
     expect(checkImportFile({ name: 'a.docx', size: 1024 })).toEqual({ ok: true, value: 'docx' });
   });
 
-  it('旧版 .doc 给出明确错误码', () => {
+  it('returns a specific error code for legacy .doc', () => {
     expect(checkImportFile({ name: 'a.doc', size: 1024 })).toEqual({
       ok: false,
       error: 'UNSUPPORTED_LEGACY_DOC',
     });
   });
 
-  it('非 docx 文件被拒绝', () => {
+  it('rejects non-docx files', () => {
     expect(checkImportFile({ name: 'a.pdf', size: 1024 })).toEqual({
       ok: false,
       error: 'NOT_DOCX',
     });
   });
 
-  it('超大文件返回 TOO_LARGE', () => {
+  it('returns TOO_LARGE for oversized files', () => {
     const result = checkImportFile({ name: 'a.docx', size: MAX_IMPORT_BYTES + 1 });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe('TOO_LARGE');
@@ -61,25 +61,25 @@ describe('checkImportFile', () => {
 });
 
 describe('checkExportSize', () => {
-  it('空文档不可导出', () => {
+  it('blocks exporting an empty document', () => {
     expect(checkExportSize('<p></p>')).toEqual({ ok: false, error: 'EMPTY' });
     expect(checkExportSize('   ')).toEqual({ ok: false, error: 'EMPTY' });
   });
 
-  it('超出上限不可导出', () => {
+  it('blocks exporting beyond the limit', () => {
     const oversized = `<p>${'a'.repeat(MAX_EXPORT_HTML_BYTES + 1)}</p>`;
     const result = checkExportSize(oversized);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe('TOO_LARGE');
   });
 
-  it('正常文档通过', () => {
+  it('passes for a normal document', () => {
     expect(checkExportSize('<p>hello</p>')).toEqual({ ok: true, value: true });
   });
 });
 
 describe('sanitizeDocHtml', () => {
-  it('剥离脚本与事件属性', () => {
+  it('strips scripts and event attributes', () => {
     const dirty = '<p onclick="alert(1)">你好</p><script>alert(2)</script>';
     const result = sanitizeDocHtml(dirty);
     expect(result.ok).toBe(true);
@@ -89,51 +89,51 @@ describe('sanitizeDocHtml', () => {
     expect(result.value).toContain('你好');
   });
 
-  it('空内容返回 EMPTY', () => {
+  it('returns EMPTY for empty content', () => {
     expect(sanitizeDocHtml('  ')).toEqual({ ok: false, error: 'EMPTY' });
   });
 });
 
-describe('htmlToPlain 与 countDocStats', () => {
-  it('块级元素转为换行并保留 CJK 文本', () => {
+describe('htmlToPlain and countDocStats', () => {
+  it('turns block elements into line breaks and keeps CJK text', () => {
     const plain = htmlToPlain('<h1>标题</h1><p>第一段</p><p>第二段</p>');
     expect(plain).toBe('标题\n第一段\n第二段');
   });
 
-  it('统计中英文混排字数与段落数', () => {
+  it('counts words and paragraphs in mixed Chinese/English text', () => {
     const stats = countDocStats('你好世界 hello world');
     expect(stats.chars).toBe(16);
     expect(stats.charsNoSpace).toBe(14);
     expect(stats.words).toBe(6);
   });
 
-  it('段落按非空行计数', () => {
+  it('counts paragraphs as non-empty lines', () => {
     const plain = htmlToPlain('<p>a</p><ul><li>b</li><li>c</li></ul>');
     const stats = countDocStats(plain);
     expect(stats.paragraphs).toBe(3);
     expect(stats.words).toBe(3);
   });
 
-  it('空文档统计为零', () => {
+  it('reports zero stats for an empty document', () => {
     expect(countDocStats('')).toEqual({ chars: 0, charsNoSpace: 0, words: 0, paragraphs: 0 });
   });
 });
 
-describe('文件名处理', () => {
-  it('过滤非法字符并限制长度', () => {
+describe('filename handling', () => {
+  it('filters illegal characters and caps the length', () => {
     expect(sanitizeFilename('report/2024:q1?')).toBe('report2024q1');
     expect(sanitizeFilename('')).toBe('document');
     expect(sanitizeFilename('a'.repeat(100)).length).toBe(60);
   });
 
-  it('生成带扩展名的导出文件名', () => {
+  it('builds an export filename with the extension', () => {
     expect(buildExportFilename('年度报告', 'docx')).toBe('年度报告.docx');
     expect(buildExportFilename('', 'pdf')).toBe('document.pdf');
   });
 });
 
 describe('computePageBreaks', () => {
-  it('全部内容容纳在一页时不产生切点', () => {
+  it('produces no break when everything fits on one page', () => {
     expect(
       computePageBreaks(
         [
@@ -145,7 +145,7 @@ describe('computePageBreaks', () => {
     ).toEqual([]);
   });
 
-  it('跨页的块整体移到下一页', () => {
+  it('moves a page-spanning block entirely to the next page', () => {
     const cuts = computePageBreaks(
       [
         { top: 0, height: 100 },
@@ -157,34 +157,34 @@ describe('computePageBreaks', () => {
     expect(cuts).toEqual([100, 200]);
   });
 
-  it('单块高于一整页时允许溢出，不会死循环', () => {
+  it('allows overflow when a block is taller than a page, without looping forever', () => {
     const cuts = computePageBreaks([{ top: 0, height: 500 }], 200);
     expect(cuts).toEqual([500]);
   });
 
-  it('页高非法时返回空数组', () => {
+  it('returns an empty array for an invalid page height', () => {
     expect(computePageBreaks([{ top: 0, height: 10 }], 0)).toEqual([]);
   });
 });
 
 describe('createEmptyDocHtml', () => {
-  it('返回空段落 HTML', () => {
+  it('returns empty paragraph HTML', () => {
     expect(createEmptyDocHtml()).toBe('<p></p>');
   });
 });
 
 describe('pageIndexOfPosition / countPages', () => {
-  it('未分页时全部落在第 1 页', () => {
+  it('puts everything on page 1 when unpaginated', () => {
     expect(pageIndexOfPosition([], 0)).toBe(1);
     expect(pageIndexOfPosition([], 5000)).toBe(1);
     expect(countPages([])).toBe(1);
   });
 
-  it('按页起始位置二分定位页码', () => {
+  it('finds the page number by binary search over page starts', () => {
     const starts = [100, 250, 900];
     expect(pageIndexOfPosition(starts, 0)).toBe(1);
     expect(pageIndexOfPosition(starts, 99)).toBe(1);
-    // 分页点本身属于新的一页
+    // A break point itself belongs to the new page
     expect(pageIndexOfPosition(starts, 100)).toBe(2);
     expect(pageIndexOfPosition(starts, 249)).toBe(2);
     expect(pageIndexOfPosition(starts, 250)).toBe(3);
@@ -192,8 +192,8 @@ describe('pageIndexOfPosition / countPages', () => {
     expect(countPages(starts)).toBe(4);
   });
 
-  it('对大量分页点保持对数复杂度结果正确', () => {
-    // 分页点从第 2 页起才有（第 1 页起点是文档开头，不入数组）
+  it('stays correct and logarithmic with many page breaks', () => {
+    // Page starts exist from page 2 on (page 1 starts at the document head and is not in the array)
     const starts = Array.from({ length: 500 }, (_, index) => (index + 1) * 100);
     expect(pageIndexOfPosition(starts, 0)).toBe(1);
     expect(pageIndexOfPosition(starts, 99)).toBe(1);
@@ -205,7 +205,7 @@ describe('pageIndexOfPosition / countPages', () => {
 });
 
 describe('scanMarkdownExportLosses', () => {
-  it('统计批注 / 修订 / 段落排版 / 浮动图片', () => {
+  it('counts comments / revisions / paragraph layout / floating images', () => {
     const html = [
       '<p style="text-indent: 24px"><span data-comment-id="c-1">批注</span></p>',
       '<p><ins data-track="insert">新增</ins><del data-track="delete">删除</del></p>',
@@ -221,12 +221,12 @@ describe('scanMarkdownExportLosses', () => {
     expect(result.value.floatingImages).toBe(1);
   });
 
-  it('嵌入型图片不算浮动损耗', () => {
+  it('does not treat inline images as floating overhead', () => {
     const result = scanMarkdownExportLosses('<img src="x.png" data-layer="inline">');
     expect(result.ok && result.value.floatingImages).toBe(0);
   });
 
-  it('默认页面设置不计入损耗，非默认项才计数', () => {
+  it('ignores default page setup and only counts non-default settings', () => {
     const defaults = scanMarkdownExportLosses('<p>x</p>');
     expect(defaults.ok && defaults.value.pageSetupFields).toBe(0);
     const custom = scanMarkdownExportLosses('<p>x</p>', {

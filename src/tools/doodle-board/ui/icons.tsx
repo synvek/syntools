@@ -1,4 +1,4 @@
-/** 画板专用图标：全局 Icon 集里缺少的工具形状，集中在此避免污染公共图标集。 */
+/** Board-only icons: shapes missing from the global Icon set, kept here to avoid polluting it. */
 
 import type { ReactNode } from 'react';
 
@@ -49,9 +49,9 @@ const paths: Record<BoardIconName, ReactNode> = {
     </>
   ),
   rect: <rect x="4" y="6" width="16" height="12" rx="2" />,
-  // 必须是 ellipse：<circle> 忽略 rx/ry，半径取默认值 0 会画不出任何东西
+  // Must be ellipse: <circle> ignores rx/ry, and its default radius of 0 renders nothing
   ellipse: <ellipse cx="12" cy="12" rx="8" ry="6.5" />,
-  // 五边形：多边形的「多点连线」语义比三角形更直观
+  // Pentagon: the "connect several points" meaning of a polygon reads better than a triangle
   polygon: (
     <path d="M10.83 2.38a2 2 0 0 1 2.34 0l8 5.74a2 2 0 0 1 .73 2.23l-3 9.24a2 2 0 0 1-1.9 1.41H7a2 2 0 0 1-1.9-1.41l-3-9.24a2 2 0 0 1 .73-2.23z" />
   ),
@@ -76,11 +76,11 @@ const paths: Record<BoardIconName, ReactNode> = {
       <path d="m21 21-4.3-4.3M8 11h6" />
     </>
   ),
-  // 适应窗口：四角框
+  // Fit to window: four corner brackets
   fit: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
   chevronUp: <path d="m6 15 6-6 6 6" />,
   chevronDown: <path d="m6 9 6 6 6-6" />,
-  // 更多设置：两条轨道 + 滑钮
+  // More settings: two tracks with a thumb
   sliders: (
     <>
       <path d="M4 8h16M4 16h16" />

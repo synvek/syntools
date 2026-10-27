@@ -3,15 +3,15 @@ import { scrollMetrics } from '../core';
 import { usePhotoStore } from '../store';
 
 /**
- * 画布滚动条（与流程图编辑器同一套交互与公式）：
- * - 轨道长度 = 视口尺寸，滑块长度 = 视口 / 世界（最小 28px）；
- * - 拖滑块 / 点轨道都会换算成「视口左上角在世界中的位置」，再写回 store；
- * - 内容未超出视口时整体隐藏（`range <= 0.5`）。
+ * Canvas scrollbars (same interaction and formulas as the flowchart editor):
+ * - track length = viewport size, thumb length = viewport / world (minimum 28 px);
+ * - dragging the thumb / clicking the track maps to "viewport top-left position in the world", then writes back to the store;
+ * - hidden entirely while the content fits the viewport (`range <= 0.5`).
  */
 
 const THICKNESS = 6;
 const MIN_THUMB = 28;
-/** 滑块可停留的额外留白，避免滑块端点贴住轨道端点 */
+/** Extra slack for the thumb travel so its ends do not touch the track ends */
 const EDGE_GAP = 4;
 
 interface DragState {
@@ -22,7 +22,7 @@ interface DragState {
   worldLeft: number;
   worldTop: number;
   range: number;
-  /** 另一轴的视口位置保持不变 */
+  /** Keep the viewport position on the other axis unchanged */
   fixedLeft: number;
   fixedTop: number;
 }
@@ -52,8 +52,8 @@ export function CanvasScrollbars({
     [doc, viewport, width, height],
   );
 
-  // 只有「内容装不下」时才显示滚动条：整幅画布都看得见时不打扰视觉，
-  // 但越界余量依然允许抓手/滚轮小幅平移。
+  // Show the scrollbar only when the content does not fit: a fully visible canvas stays visually quiet,
+  // while the overflow margin still allows small pans with the hand tool / wheel.
   const horizontal = metrics.rangeX > 0.5 && doc.width > metrics.viewW + 0.5;
   const vertical = metrics.rangeY > 0.5 && doc.height > metrics.viewH + 0.5;
 
@@ -113,7 +113,7 @@ export function CanvasScrollbars({
     window.addEventListener('pointercancel', onUp);
   };
 
-  /** 点击轨道：把滑块中心移到点击处 */
+  /** Click on the track: move the thumb center to the click point */
   const pageTo = (axis: 'x' | 'y', event: React.MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const thumbLen = axis === 'x' ? hThumb : vThumb;

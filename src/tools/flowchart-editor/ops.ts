@@ -1,12 +1,12 @@
 /**
- * 排版与层级操作的纯函数：对齐、等距分布、层级重排、编组包围盒、边样式归一化。
- * 不引用 React Flow 与 DOM，全部可单测。
+ * Pure functions for layout and layering: align, equal spacing, layer reordering, group bounding boxes, edge style normalization.
+ * No React Flow or DOM references, so everything is unit-testable.
  */
 
 import { DEFAULT_EDGE_STYLE, type FlowEdgeStyle, type ShapeKind } from './model/types';
 import { shapeSize } from './model/shapes';
 
-/** 节点的绝对包围盒（排版计算用，坐标需为画布绝对坐标） */
+/** Absolute bounding box of a node (for layout math; coordinates must be canvas-absolute) */
 export interface LayoutBox {
   id: string;
   x: number;
@@ -22,7 +22,7 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
 
-/** 节点尺寸：优先用户调整过的尺寸，其次图形目录默认值 */
+/** Node size: prefer the user-adjusted size, otherwise the shape catalog default */
 export function boxSizeOf(node: { width?: number; height?: number; data: { kind: ShapeKind } }): {
   width: number;
   height: number;
@@ -31,7 +31,7 @@ export function boxSizeOf(node: { width?: number; height?: number; data: { kind:
   return { width: node.width ?? def.width, height: node.height ?? def.height };
 }
 
-/** 一组节点的整体边界；空集合返回 null */
+/** Overall bounds of a set of nodes; null for an empty set */
 export function groupBounds(boxes: LayoutBox[]): Omit<LayoutBox, 'id'> | null {
   if (boxes.length === 0) return null;
   const left = Math.min(...boxes.map((b) => b.x));
@@ -41,7 +41,7 @@ export function groupBounds(boxes: LayoutBox[]): Omit<LayoutBox, 'id'> | null {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** 对齐参照矩形（画布 / 页面边界） */
+/** Alignment reference rect (canvas / page bounds) */
 export interface AlignRect {
   x: number;
   y: number;
@@ -49,7 +49,7 @@ export interface AlignRect {
   height: number;
 }
 
-/** 以给定参照矩形对齐：返回每个节点的新位置 */
+/** Align within the given reference rect: returns each node's new position */
 function alignBoxes(
   boxes: LayoutBox[],
   mode: AlignMode,
@@ -88,7 +88,7 @@ function alignBoxes(
   return out;
 }
 
-/** 对齐：以选中集合的整体边界为基准，返回每个节点的新位置 */
+/** Align: based on the overall bounds of the selection, returns each node's new position */
 export function computeAlign(
   boxes: LayoutBox[],
   mode: AlignMode,
@@ -98,7 +98,7 @@ export function computeAlign(
   return alignBoxes(boxes, mode, bounds);
 }
 
-/** 对齐到指定矩形（画布 / 页面边界） */
+/** Align to a given rect (canvas / page bounds) */
 export function computeAlignToRect(
   boxes: LayoutBox[],
   mode: AlignMode,
@@ -108,7 +108,7 @@ export function computeAlignToRect(
   return alignBoxes(boxes, mode, rect);
 }
 
-/** 等距分布：少于 3 个节点时无意义，返回空 */
+/** Equal spacing: meaningless with fewer than 3 nodes, returns empty */
 export function computeDistribute(
   boxes: LayoutBox[],
   axis: 'h' | 'v',
@@ -136,8 +136,8 @@ export function computeDistribute(
 }
 
 /**
- * 分布到指定矩形两端：首尾节点贴住矩形两侧边缘，其余节点在其间等间距。
- * 少于 2 个节点时无意义（返回空）。
+ * Distribute across the given rect's two ends: the first and last nodes touch the rect's edges and the rest are equally spaced.
+ * Meaningless with fewer than 2 nodes (returns empty).
  */
 export function computeDistributeInRect(
   boxes: LayoutBox[],
@@ -166,8 +166,8 @@ export function computeDistributeInRect(
 }
 
 /**
- * 层级重排：数组顺序即堆叠顺序（越靠后越上层）。
- * 只改顺序，调用方需再用 orderNodesByHierarchy 归一以保证父在子前。
+ * Layer reordering: array order is stacking order (later entries are on top).
+ * Only order changes; callers must normalize with orderNodesByHierarchy so parents precede children.
  */
 export function reorderLayers<T extends { id: string }>(
   items: readonly T[],
@@ -205,7 +205,7 @@ export function reorderLayers<T extends { id: string }>(
   }
 }
 
-/** 边样式归一化：补齐缺失字段并限制线宽范围 */
+/** Edge style normalization: fill in missing fields and clamp the stroke width */
 export function normalizeEdgeStyle(input?: Partial<FlowEdgeStyle> | null): FlowEdgeStyle {
   const d = DEFAULT_EDGE_STYLE;
   if (!input) return { ...d };
@@ -213,7 +213,7 @@ export function normalizeEdgeStyle(input?: Partial<FlowEdgeStyle> | null): FlowE
   return {
     type: input.type ?? d.type,
     stroke: input.stroke ?? d.stroke,
-    // 注意：0 是合法的显式输入，会被 clamp 到最小值 1，不能被当成 falsy 走默认值
+    // Note: 0 is a valid explicit input that clamps to the minimum of 1, so it must not be treated as falsy and replaced by the default
     strokeWidth: clamp(Number.isFinite(sw) ? sw : d.strokeWidth, 1, 8),
     dash: input.dash ?? d.dash,
     startArrow: input.startArrow ?? d.startArrow,
@@ -222,7 +222,7 @@ export function normalizeEdgeStyle(input?: Partial<FlowEdgeStyle> | null): FlowE
   };
 }
 
-/** 线样式 → SVG stroke-dasharray（手绘线型在此给出基础节奏，形变由滤镜负责） */
+/** Line style → SVG stroke-dasharray (hand-drawn styles give the base rhythm here; the distortion comes from the filter) */
 export function dashArrayOf(dash: FlowEdgeStyle['dash'], width: number): string | undefined {
   switch (dash) {
     case 'dashed':
@@ -239,12 +239,12 @@ export function dashArrayOf(dash: FlowEdgeStyle['dash'], width: number): string 
   }
 }
 
-/** 是否为手绘线型（需要叠加油漆抖动滤镜） */
+/** Whether this is a hand-drawn line type (needs the paint-jitter filter layered on) */
 export function isSketchDash(dash: FlowEdgeStyle['dash'] | undefined): boolean {
   return dash === 'sketch' || dash === 'sketchDashed';
 }
 
-/** 节点轮廓线型 → SVG stroke-dasharray */
+/** Node outline line style → SVG stroke-dasharray */
 export function nodeDashArrayOf(
   dash: 'solid' | 'dashed' | 'dotted' | undefined,
   width: number,
@@ -261,8 +261,8 @@ export function nodeDashArrayOf(
 }
 
 /**
- * 多选批量编辑：取集合内的公共值。
- * 全部相同 → 返回该值；存在差异 → 返回 undefined（UI 显示为「混合」）。
+ * Multi-select batch edit: take the common value across the set.
+ * All equal → return that value; any difference → return undefined (shown as "mixed" in the UI).
  */
 export function commonValue<T>(values: readonly T[]): T | undefined {
   if (values.length === 0) return undefined;
@@ -270,14 +270,14 @@ export function commonValue<T>(values: readonly T[]): T | undefined {
   return rest.every((v) => v === first) ? first : undefined;
 }
 
-/* --------------------------- 连线折点与正交路由 --------------------------- */
+/* --------------------------- Edge waypoints and orthogonal routing --------------------------- */
 
 export interface Point {
   x: number;
   y: number;
 }
 
-/** 轴对齐矩形（障碍物只需包围盒，不要求 id） */
+/** Axis-aligned rect (obstacles only need a bounding box, no id required) */
 export interface OrthogonalBox {
   x: number;
   y: number;
@@ -285,7 +285,7 @@ export interface OrthogonalBox {
   height: number;
 }
 
-/** 轴对齐线段是否与矩形相交（折线均为水平/竖直段，可直接用包围盒判定） */
+/** Whether an axis-aligned segment intersects a rect (polylines are all horizontal/vertical segments, so bounds suffice) */
 function segmentHitsRect(a: Point, b: Point, r: OrthogonalBox): boolean {
   const minX = Math.min(a.x, b.x);
   const maxX = Math.max(a.x, b.x);
@@ -304,7 +304,7 @@ function countHits(path: readonly Point[], obstacles: readonly OrthogonalBox[]):
   return hits;
 }
 
-/** 去掉重复点与共线的中间点 */
+/** Drop duplicate points and collinear intermediate points */
 export function dropCollinear(points: readonly Point[]): Point[] {
   const out: Point[] = [];
   for (const p of points) {
@@ -324,9 +324,9 @@ export function dropCollinear(points: readonly Point[]): Point[] {
 }
 
 /**
- * 正交（曼哈顿）路由：在起点与终点之间生成折点，尽量避开障碍包围盒。
- * 返回的是「中间折点」（不含起点与终点），可直接写入 `FlowEdgeRec.waypoints`。
- * 候选策略：H-V-H / V-H-V 中点折线，必要时从障碍并集的四侧绕行，取穿过障碍最少者。
+ * Orthogonal (Manhattan) routing: generate waypoints between the start and end points, avoiding obstacle boxes where possible.
+ * Returns the intermediate waypoints (excluding the endpoints), ready to write into `FlowEdgeRec.waypoints`.
+ * Candidate strategy: H-V-H / V-H-V midpoint polylines, detouring around the union of obstacles on all four sides when needed, taking the fewest crossings.
  */
 export function routeOrthogonal(
   from: Point,
@@ -390,7 +390,7 @@ function pointToward(from: Point, to: Point, length: number): Point {
   return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
 }
 
-/** 折线 → SVG path（radius > 0 时拐角用二次贝塞尔倒角） */
+/** Polyline → SVG path (corners get a quadratic bezier chamfer when radius > 0) */
 export function polylinePath(points: readonly Point[], radius = 0): string {
   if (points.length === 0) return '';
   if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
@@ -413,7 +413,7 @@ export function polylinePath(points: readonly Point[], radius = 0): string {
   return d;
 }
 
-/** 折线上按长度取中点（供连线标签定位） */
+/** Sample the midpoint by arc length along a polyline (for positioning edge labels) */
 export function polylineMidpoint(points: readonly Point[]): Point {
   if (points.length === 0) return { x: 0, y: 0 };
   if (points.length === 1) return { ...points[0] };
@@ -430,7 +430,7 @@ export function polylineMidpoint(points: readonly Point[]): Point {
   return { ...points[points.length - 1] };
 }
 
-/** 连线路径的描边样式（供自定义边组件 BaseEdge 使用） */
+/** Stroke style for an edge path (used by the custom edge component with BaseEdge) */
 export function edgeStyleOf(style: FlowEdgeStyle): {
   stroke: string;
   strokeWidth: number;
@@ -445,12 +445,12 @@ export function edgeStyleOf(style: FlowEdgeStyle): {
   };
 }
 
-/** 自定义连线渲染组件的注册类型（箭头由组件自绘，不受内置 marker 限制） */
+/** Registered type of the custom edge render component (arrows are drawn by the component, free of built-in marker limits) */
 export const EDGE_RENDER_TYPE = 'flow';
 
 /**
- * 把连线样式转换为 React Flow 边的渲染属性。
- * 统一使用自定义边组件（type=flow），路径与箭头在组件内按 style 渲染。
+ * Convert an edge style into React Flow edge render props.
+ * A custom edge component is always used (type=flow), with path and arrows rendered from the style inside it.
  */
 export function edgePropsOf(style: FlowEdgeStyle): {
   type: string;

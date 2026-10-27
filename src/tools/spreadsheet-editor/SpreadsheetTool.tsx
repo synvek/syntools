@@ -64,7 +64,7 @@ import type { RawChartParts } from './rawChartParts';
 import { SheetTabs } from './SheetTabs';
 import './sheet.css';
 
-// 工具文案随本 chunk 懒加载注册，不占用首屏语言包体积
+// Tool copy is registered lazily with this chunk so it does not weigh down the initial bundle
 registerSpreadsheetStrings(i18n);
 registerChartStrings(i18n);
 registerStoreStrings(i18n);
@@ -73,52 +73,53 @@ type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 type BusyKind = 'import' | 'export' | null;
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-/** 编辑后落盘防抖：避免连续输入时反复全量 save() */
+/** Debounce after edits: avoids a full save() on every keystroke */
 const SAVE_DEBOUNCE_MS = 600;
 
 /**
- * 电子表格编辑器：Univer 提供编辑界面，导入/导出全部在浏览器内完成。
- * 所有 Univer 相关副作用（CSS、实例化）都限制在本懒加载模块内，
- * 避免被 scripts/prerender.ts 的 SSR 载入触发。
+ * Spreadsheet editor: Univer provides the editing surface; import and export happen entirely in the
+ * browser. Every Univer side effect (CSS, instantiation) stays inside this lazy-loaded module so the
+ * SSR pass in scripts/prerender.ts cannot trigger it.
  */
 export default function SpreadsheetTool() {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
-  /** 表格区高度 = 首屏剩余空间（底部标签栏 / 状态栏可见，「相关工具」推到首屏之外） */
+  /** Sheet height = whatever remains in the first viewport (sheet tabs / status bar stay visible, "related tools" is pushed below the fold) */
   const sheetHeight = useViewportFill(containerRef, { min: 460 });
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const handleRef = useRef<UniverHandle | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  /** 重建实例（主题/语言切换）时用来接力当前数据 */
+  /** Carries the current data across instance rebuilds (theme / locale switch) */
   const pendingRef = useRef<WorkbookSnapshot | null>(null);
   const [title, setTitle] = useState('');
   const [presenting, setPresenting] = useState(false);
   const [presentGrid, setPresentGrid] = useState<PresentGrid | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
-  /** 工作表内浮动图表：配置（随快照持久化）+ 派生数据 + 选区提示 */
+  /** Floating charts on the sheet: configs (persisted with the snapshot) + derived data + a selection hint */
   const [charts, setCharts] = useState<ChartConfig[]>([]);
   const chartsRef = useRef<ChartConfig[]>([]);
   chartsRef.current = charts;
   const [chartDataMap, setChartDataMap] = useState<Record<string, ChartData | null>>({});
   const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
   const [chartNotice, setChartNotice] = useState(false);
-  /** 工作表区域尺寸：图表拖拽 / 缩放的边界 */
+  /** Sheet area size: the bounds for dragging / resizing charts */
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
   const chartSeqRef = useRef(0);
   /**
-   * 持久化触发器：图表的新增 / 移动 / 缩放 / 删除都不是 Univer MUTATION，
-   * 不会走脏跟踪，需要主动触发防抖落盘。（在 scheduleSave 创建后赋值）
+   * Persistence trigger: adding / moving / resizing / deleting a chart is not a Univer MUTATION, so
+   * dirty tracking never sees it — persistence has to be requested explicitly. (Assigned once
+   * scheduleSave exists.)
    */
   const scheduleSaveRef = useRef<() => void>(() => {});
-  /** 条件格式 / 数据验证等「随快照往返保留、未做语义映射」的内容 */
+  /** Content such as conditional formatting / data validation that survives the snapshot round-trip without semantic mapping */
   const extrasRef = useRef<WorkbookExtras | null>(null);
-  /** 导入文件里原有的 Excel 原生图表部件（原样回填，不解析） */
+  /** Excel native chart parts that came with the imported file (written back verbatim, never parsed) */
   const rawPartsRef = useRef<RawChartParts | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
 
   /**
-   * 放映：读取当前工作簿快照 → 转成只读表格。
-   * 不走 Univer 实例渲染，因此完全不影响正在编辑的工作簿状态。
+   * Present: read the current workbook snapshot → turn it into a read-only grid.
+   * It renders without the Univer instance, so the workbook being edited is left untouched.
    */
   const openPresent = () => {
     setPresentGrid(null);
@@ -142,7 +143,7 @@ export default function SpreadsheetTool() {
     setCharts(next);
   }, []);
 
-  /** 按当前工作簿内容重算所有图表的派生数据（单元格改动后调用） */
+  /** Recompute the derived data of every chart from the current workbook (called after cell edits) */
   const applyChartData = useCallback((snapshot: WorkbookSnapshotLite, sheetId: string | null) => {
     const configs = chartsRef.current;
     if (configs.length === 0) {
@@ -157,7 +158,7 @@ export default function SpreadsheetTool() {
     setChartDataMap(next);
   }, []);
 
-  /** 在表格区域内插入浮动图表：数据取当前选区，位置/尺寸给默认值 */
+  /** Insert a floating chart into the sheet area: data comes from the current selection, position/size get defaults */
   const openChart = useCallback(() => {
     const handle = handleRef.current;
     if (!handle) return;
@@ -191,7 +192,7 @@ export default function SpreadsheetTool() {
     scheduleSaveRef.current();
   }, [chartBounds.height, chartBounds.width, setChartList]);
 
-  /** 更新图表配置；数据区域变化时立即重算数据 */
+  /** Update a chart config; recompute its data immediately when the data range changes */
   const updateChart = useCallback(
     (id: string, patch: Partial<ChartConfig>) => {
       setChartList(
@@ -220,7 +221,7 @@ export default function SpreadsheetTool() {
     [setChartList],
   );
 
-  /** 用当前表格选区更新某个图表的数据区域 */
+  /** Point a chart at the current sheet selection */
   const pickRangeForChart = useCallback(
     (id: string) => {
       const handle = handleRef.current;
@@ -249,13 +250,13 @@ export default function SpreadsheetTool() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [runtimeError, setRuntimeError] = useState(false);
-  // 本地文档库（IndexedDB）：多工作簿 + 版本历史；不可用时静默降级
+  // Local document library (IndexedDB): multiple workbooks + version history; degrades silently when unavailable
   const [docs, setDocs] = useState<DocMeta[]>([]);
   const [versions, setVersions] = useState<StoredVersion[]>([]);
   const [docId, setDocId] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
-  /** 持久化失败提示：体积超限（failed）/ 本地存储不可用（degraded） */
+  /** Persistence failure notice: over the size cap (failed) / local storage unavailable (degraded) */
   const [draftNotice, setDraftNotice] = useState<'degraded' | 'failed' | null>(null);
   const docIdRef = useRef<string | null>(null);
   docIdRef.current = docId;
@@ -264,8 +265,8 @@ export default function SpreadsheetTool() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
-   * 把「本工具自有、Univer 不认识」的内容并入快照：
-   * 条件格式 / 数据验证（往返保留）+ 工作表内图表配置。
+   * Merge content this tool owns but Univer knows nothing about into the snapshot: conditional
+   * formatting / data validation (round-trip preserved) plus the in-sheet chart configs.
    */
   const withDocOwnedContent = useCallback((base: WorkbookSnapshot): WorkbookSnapshot => {
     let next: WorkbookSnapshot = base;
@@ -275,22 +276,23 @@ export default function SpreadsheetTool() {
   }, []);
 
   /**
-   * 统一持久化：localStorage 草稿（同步兜底）+ IndexedDB 文档库（多文档 / 版本历史）。
-   * 只在真正编辑过或显式操作后调用，替代原先「每 2 秒全量 save() + stringify」的轮询。
+   * Unified persistence: localStorage draft (a synchronous safety net) plus the IndexedDB document
+   * library (multiple documents / version history). Called only after real edits or explicit
+   * actions, replacing the old "full save() + stringify every 2 seconds" poll.
    */
   const persistNow = useCallback(
     (nextTitle?: string): void => {
       const handle = handleRef.current;
       if (!handle) return;
       const base = handle.getSnapshot();
-      // 图表数据跟随单元格内容变化
+      // Chart data follows the cell contents
       applyChartData(base, handle.getActiveSheetId());
       const snapshot = withDocOwnedContent(base);
       const result = writeDraftSafe(snapshot);
       setDraftSaved(result.ok);
       setDraftNotice(result.ok ? null : result.degraded ? 'degraded' : 'failed');
       setSummary(summarizeWorkbook(base));
-      // 惰性分配文档 id：首次保存时才入库
+      // Allocate the document id lazily: it only enters the library on the first save
       let id = docIdRef.current;
       if (!id) {
         id = createDocId();
@@ -305,7 +307,7 @@ export default function SpreadsheetTool() {
     [applyChartData, withDocOwnedContent],
   );
 
-  /** 编辑事件 → 防抖落盘 */
+  /** Edit events → debounced persistence */
   const scheduleSave = useCallback((): void => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
@@ -313,7 +315,7 @@ export default function SpreadsheetTool() {
       persistNow();
     }, SAVE_DEBOUNCE_MS);
   }, [persistNow]);
-  // 图表等「非 Univer 变更」通过该 ref 触发落盘（避免回调声明顺序依赖）
+  // Chart edits (non-Univer changes) trigger persistence through this ref, so callbacks need not be declared in order
   useEffect(() => {
     scheduleSaveRef.current = scheduleSave;
   }, [scheduleSave]);
@@ -328,9 +330,9 @@ export default function SpreadsheetTool() {
     const container = containerRef.current;
     if (!container) return;
     let cancelled = false;
-    // 延后一拍创建：StrictMode 下 effect 会同步挂载→卸载→再挂载，
-    // 若在 effect 内同步实例化，卸载阶段会在 React 渲染中同步 unmount Univer 的 React root，
-    // 导致第二次实例渲染不出来（开发环境表格空白）。
+    // Create one tick later: under StrictMode the effect mounts → unmounts → mounts synchronously,
+    // and instantiating inside the effect would unmount Univer's React root during React's own
+    // render, leaving the second instance blank (an empty sheet in development).
     const timer = window.setTimeout(() => {
       if (cancelled) return;
       let handle: UniverHandle;
@@ -343,9 +345,10 @@ export default function SpreadsheetTool() {
       const pending = pendingRef.current ?? readDraft();
       if (pending) {
         handle.loadSnapshot(pending);
-        // 自有内容（条件格式 / 数据验证 + 图表）：
-        // 仅在「首次从草稿恢复」时读取。实例重建（StrictMode 二次挂载、主题/语言切换）
-        // 时 pending 是 Univer 原始快照、并不含这些字段，覆盖会直接丢内容。
+        // Tool-owned content (conditional formatting / data validation + charts): read only on the
+        // first restore from the draft. On an instance rebuild (StrictMode's second mount, theme /
+        // locale switch) `pending` is a raw Univer snapshot without these fields, so overwriting
+        // would simply drop them.
         if (!extrasRef.current) extrasRef.current = readWorkbookExtras(pending);
         if (!rawPartsRef.current) rawPartsRef.current = pending.syntoolsRawParts ?? null;
         if (chartsRef.current.length === 0) {
@@ -358,7 +361,7 @@ export default function SpreadsheetTool() {
         }
       }
       handleRef.current = handle;
-      // 脏跟踪：仅「会写入快照的修改」触发防抖落盘
+      // Dirty tracking: only modifications that reach the snapshot trigger debounced persistence
       unsubscribeRef.current = handle.onMutation(scheduleSave);
       setSheets(handle.getSheets());
       setActiveSheetId(handle.getActiveSheetId());
@@ -381,7 +384,7 @@ export default function SpreadsheetTool() {
     };
   }, [univerLocale, dark, scheduleSave, applyChartData]);
 
-  // 工作表区域尺寸：图表拖拽 / 缩放需要边界
+  // Sheet area size: chart dragging / resizing needs bounds
   useEffect(() => {
     const el = surfaceRef.current;
     if (!el) return;
@@ -405,13 +408,13 @@ export default function SpreadsheetTool() {
     setActiveSheetId(handle.getActiveSheetId());
   }, []);
 
-  /** 当前工作表上可见的图表（图表绑定所属工作表） */
+  /** Charts visible on the active sheet (each chart is bound to one sheet) */
   const visibleCharts = useMemo(
     () => charts.filter((item) => !item.sheetId || item.sheetId === activeSheetId),
     [charts, activeSheetId],
   );
 
-  /** 装载一份快照并刷新派生状态（文档库 / 版本历史 / 导入共用） */
+  /** Load a snapshot and refresh derived state (shared by the document library / version history / import) */
   const applySnapshot = useCallback(
     (snapshot: WorkbookSnapshot, nextTitle: string) => {
       const handle = handleRef.current;
@@ -420,7 +423,7 @@ export default function SpreadsheetTool() {
       setTitle(nextTitle);
       setFailure(null);
       setChartNotice(false);
-      // 随快照保存的自有内容：条件格式 / 数据验证 + 图表 + 原生图表部件
+      // Tool-owned content carried by the snapshot: conditional formatting / data validation + charts + native chart parts
       extrasRef.current = readWorkbookExtras(snapshot);
       rawPartsRef.current = snapshot.syntoolsRawParts ?? null;
       const configs = snapshot.syntoolsCharts ?? [];
@@ -434,7 +437,7 @@ export default function SpreadsheetTool() {
     [applyChartData, refreshSummary, refreshSheets],
   );
 
-  // 启动：接管文档库指针（内容已由 localStorage 草稿恢复，避免与实例创建竞态）
+  // Startup: adopt the document-library pointer (content already came from the localStorage draft, avoiding a race with instance creation)
   useEffect(() => {
     void initDocStore().then((init) => {
       void listDocuments().then(setDocs);
@@ -444,7 +447,7 @@ export default function SpreadsheetTool() {
     });
   }, []);
 
-  // 标题变化同样落盘（首次渲染跳过，避免仅打开页面就建空文档）
+  // Title changes are persisted too (skipped on first render so merely opening the page does not create an empty document)
   const didMountRef = useRef(false);
   useEffect(() => {
     if (!didMountRef.current) {
@@ -455,7 +458,7 @@ export default function SpreadsheetTool() {
     return () => clearTimeout(timer);
   }, [title, persistNow]);
 
-  /** 按下拉所选格式限定文件对话框的默认过滤（仍可切到「所有文件」，类型校验在 handleImport 内） */
+  /** Limit the file dialog's default filter to the format picked in the dropdown (users can still switch to "all files"; the type check lives in handleImport) */
   const openImport = (accept: string) => {
     const input = importInputRef.current;
     if (!input) return;
@@ -466,7 +469,7 @@ export default function SpreadsheetTool() {
   const handleImport = async (file: File) => {
     setBusy('import');
     setFailure(null);
-    // 先按扩展名分流：.csv 走纯逻辑解析，.xlsx/.xlsm 交给 exceljs
+    // Route by extension first: .csv goes through the pure-logic parser, .xlsx/.xlsm to exceljs
     const check = checkImportFile(file);
     if (!check.ok) {
       setBusy(null);
@@ -527,7 +530,7 @@ export default function SpreadsheetTool() {
     downloadBytes(result.value, buildExportFilename(title || 'workbook', 'xlsx'), XLSX_MIME);
   };
 
-  /** 导出 CSV：取当前工作表；前置 BOM 便于 Excel 正确处理中文 */
+  /** Export CSV from the active sheet; a leading BOM lets Excel handle Chinese text correctly */
   const handleExportCsv = () => {
     const handle = handleRef.current;
     if (!handle) return;
@@ -555,7 +558,7 @@ export default function SpreadsheetTool() {
   const handleNew = () => {
     const hasContent = summary.cells > 0 || title.trim().length > 0;
     if (hasContent && !window.confirm(t('common.discardConfirm'))) return;
-    // 新建即建立新文档 id，旧工作簿仍保留在文档库中
+    // A new document gets a fresh id; the previous workbook stays in the library
     const id = createDocId();
     docIdRef.current = id;
     setDocId(id);

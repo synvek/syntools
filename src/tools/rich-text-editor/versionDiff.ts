@@ -3,22 +3,22 @@ import type { ToolResult } from '@/core/types';
 import { htmlToPlain } from './core';
 
 /**
- * 版本差异对比（纯逻辑，便于单测）：
- * HTML → 规范文本行（复用 htmlToPlain 的块级换行规则）→ diffLines → 结构化差异。
+ * Version diff (pure logic, kept testable):
+ * HTML → canonical text lines (reusing htmlToPlain's block line breaks) → diffLines → structured diff.
  *
- * 同时提供「统一视图行」与「左右对照行」两种形态：
- * 前者用于统计与无障碍朗读，后者用于面板渲染。
+ * Produces two shapes: unified rows and side-by-side rows.
+ * The former drives stats and screen-reader output, the latter drives the panel.
  */
 
 export type DiffRowKind = 'equal' | 'insert' | 'delete';
 
 export interface DiffRow {
   kind: DiffRowKind;
-  /** 行文本（不含换行符） */
+  /** Line text (without the trailing newline) */
   text: string;
-  /** 对比基准版本中的行号（1 起）；插入行为 null */
+  /** Line number in the base version (1-based); null for inserted lines */
   beforeLine: number | null;
-  /** 当前版本中的行号（1 起）；删除行为 null */
+  /** Line number in the current version (1-based); null for deleted lines */
   afterLine: number | null;
 }
 
@@ -33,16 +33,16 @@ export interface DiffStats {
 
 export interface VersionDiffResult extends DiffStats {
   rows: DiffRow[];
-  /** 两份内容完全一致 */
+  /** Both sides are identical */
   identical: boolean;
-  /** 行级相似度 0–1（1 表示完全相同） */
+  /** Line similarity from 0 to 1 (1 means identical) */
   similarity: number;
 }
 
-/** 统一的空状态错误码，UI 用 translateToolError 渲染 */
+/** Shared empty-state error code, rendered by translateToolError in the UI */
 const EMPTY_ERROR = 'EMPTY';
 
-/** 拆分行的同时丢弃末尾换行产生的空行，避免虚增行号 */
+/** Split into lines and drop the trailing empty line, so line numbers are not inflated */
 function toLines(text: string): string[] {
   if (!text) return [];
   const lines = text.split('\n');
@@ -51,8 +51,8 @@ function toLines(text: string): string[] {
 }
 
 /**
- * 行级 diff 的前置归一化：补上末尾换行。
- * 否则「末行无换行符」会被 jsdiff 视为与整块文本不同，导致首行被误判为新增。
+ * Pre-normalization for the line diff: ensure a trailing newline.
+ * Otherwise jsdiff treats a missing final newline as a different block, marking the first line as added.
  */
 function toDiffText(text: string): string {
   if (!text) return '';
@@ -60,8 +60,8 @@ function toDiffText(text: string): string {
 }
 
 /**
- * 生成版本差异。
- * 两侧都没有可对比文本时返回 EMPTY（UI 提示而不是渲染空面板）。
+ * Build the version diff.
+ * Returns EMPTY when neither side has comparable text, so the UI shows a hint instead of a blank panel.
  */
 export function buildVersionDiff(
   beforeHtml: string,
@@ -124,7 +124,7 @@ export function buildVersionDiff(
 
 export type SideRowKind = 'equal' | 'change' | 'insert' | 'delete';
 
-/** 左右对照行：一侧为 null 表示该侧此行不存在 */
+/** Side-by-side row: a null side means the row does not exist there */
 export interface DiffSideRow {
   kind: SideRowKind;
   left: DiffRow | null;
@@ -132,8 +132,8 @@ export interface DiffSideRow {
 }
 
 /**
- * 把统一视图行整理为左右对照行：
- * 连续的删除/插入块按序号两两配对（成对即为「修改」），多余的一侧单独成行。
+ * Convert unified rows into side-by-side rows:
+ * Consecutive delete/insert blocks are paired by index (a pair means a modification); leftovers stay alone.
  */
 export function buildSideBySide(rows: readonly DiffRow[]): DiffSideRow[] {
   const out: DiffSideRow[] = [];

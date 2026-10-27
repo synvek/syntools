@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 法律与合规类提示词，详见 ../README.md */
+/** Legal and compliance prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'legal-contract-key-points',

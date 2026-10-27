@@ -11,14 +11,14 @@ import {
 } from './imageLayer';
 
 /**
- * 排版细节扩展（Word 对标）：
- * - 段落：首行缩进、段前/段后间距（存为属性 → 渲染为内联 style，导出端可映射 OOXML）
- * - 图片：宽度百分比与对齐方式
- * - 表格：边框开关与斑马纹
- * 全部走「节点属性」而非外部改 DOM，符合 ProseMirror 约束。
+ * Typography details extension (modeled on Word):
+ * - Paragraphs: first-line indent, space before/after (stored as attributes -> inline style, mappable to OOXML on export)
+ * - Images: width percentage and alignment
+ * - Tables: border toggle and zebra stripes
+ * Everything goes through node attributes rather than mutating the DOM, staying within ProseMirror's rules.
  */
 
-/** 从内联样式读取数值（px） */
+/** Read a numeric value from an inline style (px) */
 function readPx(value: string | undefined): number | null {
   if (!value) return null;
   const parsed = Number.parseFloat(value);
@@ -38,9 +38,9 @@ interface StyleAttrs {
   spacingAfter?: number | null;
   width?: number | null;
   align?: string | null;
-  /** 图片层级：inline（嵌入）/ front（浮于文字上方）/ behind（衬于文字下方） */
+  /** Image layer: inline / front (in front of text) / behind (behind text) */
   layer?: string | null;
-  /** 浮动图片相对内容区左上角的偏移（px） */
+  /** Offset of a floating image from the content area's top-left corner (px) */
   offsetX?: number | null;
   offsetY?: number | null;
   bordered?: boolean;
@@ -48,8 +48,8 @@ interface StyleAttrs {
 }
 
 /**
- * 段落排版：textIndent / spacingBefore / spacingAfter（px）。
- * StarterKit 的 paragraph 节点不可单独引入包，这里用全局属性注入。
+ * Paragraph typography: textIndent / spacingBefore / spacingAfter (px).
+ * StarterKit's paragraph node can't be imported from its own package, so global attributes are injected here.
  */
 const ParagraphStyle = Extension.create({
   name: 'paragraphStyle',
@@ -83,28 +83,28 @@ const ParagraphStyle = Extension.create({
 });
 
 /**
- * 图片：宽度（px）、对齐、层级（嵌入 / 浮于文字上方 / 衬于文字下方）与浮动偏移。
+ * Image: width (px), alignment, layer (inline / in front of text / behind text) and floating offsets.
  *
- * 节点是行内还是块级由配置项 `inline` 决定（见 extensions.ts 的 configure）：
- * TipTap 的 `group()` / `inline()` 都读 `this.options.inline`，因此**只能**通过 configure 打开，
- * 直接在这里写 spec 字段 `inline: true` 会让节点同时落在 block group 与 inline 语义上，
- * schema 会以 `Mixing inline and block content` 直接构建失败。
+ * Whether the node is inline or block is decided by the `inline` option (see configure in extensions.ts):
+ * TipTap's `group()` / `inline()` both read `this.options.inline`, so it can **only** be enabled via
+ * configure. Writing the spec field `inline: true` here would put the node in the block group and carry
+ * inline semantics at once, and the schema build fails with `Mixing inline and block content`.
  */
 const ImageStyle = Image.extend({
   addAttributes() {
     return {
-      // 关键：必须合并父类属性，否则 src / alt / title 会被整体覆盖，
-      // 图片会渲染成没有 src 的空 <img>（看不到任何内容）。
+      // Important: the parent's attributes must be merged in, otherwise src / alt / title are replaced
+      // wholesale and the image renders as an empty <img> with no src (nothing visible).
       ...this.parent?.(),
-      // 图片宽度统一以「像素」存储：拖动调整/工具栏预设都写入像素，
-      // 渲染成 `width: Npx`（高度 auto 保持比例，与 Word 等比缩放一致）
+      // Image widths are always stored in pixels: drag-resize and toolbar presets both write pixels,
+      // rendered as `width: Npx` (height auto preserves the ratio, like Word's proportional scaling)
       width: {
         default: null,
         parseHTML: (el: HTMLElement) => {
           const raw = el.style.width || el.getAttribute('width') || '';
           const parsed = Number.parseFloat(raw);
           if (!Number.isFinite(parsed)) return null;
-          // 兼容旧数据：历史版本存的是百分比，按 A4 内容宽度换算为像素
+          // Legacy data: older versions stored percentages, converted to pixels via the A4 content width
           return raw.includes('%')
             ? Math.round((parsed / 100) * CONTENT_WIDTH_PX)
             : Math.round(parsed);
@@ -125,7 +125,7 @@ const ImageStyle = Image.extend({
       layer: {
         default: 'inline',
         parseHTML: (el: HTMLElement) => normalizeImageLayer(el.getAttribute('data-layer')),
-        // 嵌入型是默认样式：只有其它环绕方式才写 data-layer
+        // Inline is the default style: only other wrap modes write data-layer
         renderHTML: (attrs: StyleAttrs) =>
           hasImageLayerAttr(attrs.layer) ? { 'data-layer': attrs.layer } : {},
       },
@@ -149,7 +149,7 @@ const ImageStyle = Image.extend({
   },
 });
 
-/** 表格：边框与斑马纹（data 属性驱动 CSS，导出端再映射 OOXML） */
+/** Tables: borders and zebra stripes (data attributes drive CSS; export maps them to OOXML) */
 const TableStyle = Table.extend({
   addAttributes() {
     return {
@@ -170,26 +170,26 @@ const TableStyle = Table.extend({
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     paragraphStyle: {
-      /** 增加/减少首行缩进（步长 24px，约 2 字符） */
+      /** Increase/decrease the first-line indent (step 24px, roughly 2 characters) */
       indentParagraph: (delta: number) => ReturnType;
-      /** 设置段前/段后间距（px；0 表示恢复默认） */
+      /** Set space before/after (px; 0 restores the default) */
       setParagraphSpacing: (before: number, after: number) => ReturnType;
     };
     imageStyle: {
-      /** 设置图片宽度（像素，null 表示自适应原始尺寸）与对齐 */
+      /** Set image width (px; null = natural size) and alignment */
       setImageStyle: (width: number | null, align: string | null) => ReturnType;
-      /** 仅设置图片宽度（像素）：拖动手柄 / 工具栏预设使用 */
+      /** Set only the image width (px): used by the drag handle / toolbar presets */
       setImageWidth: (width: number | null) => ReturnType;
     };
     tableStyle: {
-      /** 切换表格边框 / 斑马纹 */
+      /** Toggle table borders / zebra stripes */
       toggleTableBorders: () => ReturnType;
       toggleTableZebra: () => ReturnType;
     };
   }
 }
 
-/** 命令扩展：段落缩进与间距、图片样式、表格样式 */
+/** Command extension: paragraph indent and spacing, image styles, table styles */
 export const BlockStyleCommands = Extension.create({
   name: 'blockStyleCommands',
   addCommands() {
@@ -224,7 +224,7 @@ export const BlockStyleCommands = Extension.create({
       setImageStyle:
         (width: number | null, align: string | null) =>
         ({ state, tr }) => {
-          // 复用统一的图片定位：图片被选中（NodeSelection）或光标落在图片所在段落时都可命中
+          // Reuse the shared image lookup: it hits when the image is selected (NodeSelection) or the cursor sits in its paragraph
           const found = findSelectedImage(state);
           if (!found) return false;
           tr.setNodeMarkup(found.pos, undefined, {

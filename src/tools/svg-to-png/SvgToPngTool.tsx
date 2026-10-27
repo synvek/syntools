@@ -5,13 +5,7 @@ import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
 import { FileDropZone } from '@/core/components/FileDropZone';
 import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
-import {
-  MAX_SCALE,
-  MIN_SCALE,
-  computeOutputSize,
-  svgToDataUrl,
-  validateSvg,
-} from './core';
+import { MAX_SCALE, MIN_SCALE, computeOutputSize, svgToDataUrl, validateSvg } from './core';
 
 const SAMPLE = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="120" viewBox="0 0 200 120">
   <rect width="200" height="120" fill="#e8f0fe"/>
@@ -19,7 +13,7 @@ const SAMPLE = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="120"
   <text x="100" y="66" text-anchor="middle" fill="white" font-size="18" font-family="sans-serif">SVG</text>
 </svg>`;
 
-/** 在线 SVG 转 PNG */
+/** Online SVG to PNG converter */
 export default function SvgToPngTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: SAMPLE, sc: 2, bg: 0 }), []);
@@ -138,20 +132,19 @@ export default function SvgToPngTool() {
     a.click();
   };
 
-  const sizeHint =
-    validated.ok
-      ? (() => {
-          const out = computeOutputSize(validated.value.width, validated.value.height, scale);
-          return out.ok
-            ? t('tools.svgPng.sizeHint', {
-                sw: validated.value.width,
-                sh: validated.value.height,
-                pw: out.value.width,
-                ph: out.value.height,
-              })
-            : '';
-        })()
-      : '';
+  const sizeHint = validated.ok
+    ? (() => {
+        const out = computeOutputSize(validated.value.width, validated.value.height, scale);
+        return out.ok
+          ? t('tools.svgPng.sizeHint', {
+              sw: validated.value.width,
+              sh: validated.value.height,
+              pw: out.value.width,
+              ph: out.value.height,
+            })
+          : '';
+      })()
+    : '';
 
   return (
     <div className="flex flex-col gap-4">
@@ -176,9 +169,7 @@ export default function SvgToPngTool() {
           />
           {t('tools.svgPng.transparent')}
         </label>
-        <ShareButton
-          getState={() => ({ i: input, sc: scale, bg: transparent ? 0 : 1 })}
-        />
+        <ShareButton getState={() => ({ i: input, sc: scale, bg: transparent ? 0 : 1 })} />
       </OptionBar>
 
       <FileDropZone
@@ -195,9 +186,7 @@ export default function SvgToPngTool() {
         actions={<ClearButton onClick={() => setInput('')} disabled={!input} />}
       />
 
-      {sizeHint && (
-        <p className="text-xs text-gray-400 dark:text-gray-500">{sizeHint}</p>
-      )}
+      {sizeHint && <p className="text-xs text-gray-400 dark:text-gray-500">{sizeHint}</p>}
 
       {error && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

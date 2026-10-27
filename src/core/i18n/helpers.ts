@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 type ErrorResult = Extract<ToolResult<unknown>, { ok: false }>;
 
-/** 将 core 层错误码翻译为当前语言文案 */
+/** Translate a core error code into the active language */
 export function translateToolError(prefix: string, result: ErrorResult): string {
   const key = `${prefix}.err.${result.error}`;
   if (i18n.exists(key)) {
@@ -13,7 +13,7 @@ export function translateToolError(prefix: string, result: ErrorResult): string 
   return result.error;
 }
 
-/** 获取工具元数据的当前语言展示名与描述 */
+/** Localized display name and description for a tool's metadata */
 export function getToolMeta(tool: ToolMeta) {
   return {
     name: i18n.t(`toolsMeta.${tool.id}.name`, { defaultValue: tool.name }),
@@ -21,7 +21,7 @@ export function getToolMeta(tool: ToolMeta) {
   };
 }
 
-/** React Hook：工具元数据的当前语言展示名与描述 */
+/** React hook: localized display name and description for a tool's metadata */
 export function useToolMeta(tool: ToolMeta) {
   const { t } = useTranslation();
   return {

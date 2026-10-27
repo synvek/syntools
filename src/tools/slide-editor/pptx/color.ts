@@ -2,10 +2,10 @@ import { applyColorTransform, normalizeHex } from '../core';
 import { attr, childOf, childrenOf, localNameOf, numAttr, type XmlNode } from './xml';
 
 /**
- * DrawingML 颜色解析（ECMA-376 §20.1.2.3）：
- * srgbClr / schemeClr / prstClr / sysClr / scrgbClr / hslClr 六类取值，
- * 再叠加 lumMod / lumOff / shade / tint / alpha 修正。
- * schemeClr 需要查主题色板；解析不到时向下降级，绝不抛异常。
+ * DrawingML color parsing (ECMA-376 §20.1.2.3):
+ * six value kinds — srgbClr / schemeClr / prstClr / sysClr / scrgbClr / hslClr —
+ * plus lumMod / lumOff / shade / tint / alpha corrections.
+ * schemeClr needs the theme palette; unresolved colors degrade gracefully and never throw.
  */
 
 export type Palette = Record<string, string>;
@@ -159,7 +159,7 @@ const PRESET_COLORS: Record<string, string> = {
 
 const ALPHA_SCALE = 100000;
 
-/** 读取 lumMod/lumOff/shade/tint/alpha 修正参数 */
+/** Read the lumMod/lumOff/shade/tint/alpha correction parameters */
 function readTransform(node: XmlNode) {
   return {
     lumMod: numAttr(childOf(node, 'lumMod'), 'val'),
@@ -181,7 +181,7 @@ function hexFromScrgb(node: XmlNode): string | null {
   return normalizeHex(`#${toHex(to255(r))}${toHex(to255(g))}${toHex(to255(b))}`);
 }
 
-/** HSL → RGB（DrawingML hslClr，单位 1/60000 度 / 千分比） */
+/** HSL → RGB (DrawingML hslClr, units of 1/60000 degree / permille) */
 function hexFromHsl(node: XmlNode): string | null {
   const hue = numAttr(node, 'hue') ?? 0;
   const sat = (numAttr(node, 'sat') ?? 0) / 100000;
@@ -205,7 +205,7 @@ function hexFromHsl(node: XmlNode): string | null {
   return normalizeHex(`#${rgb.map(toHex).join('')}`);
 }
 
-/** 解析任意「颜色容器」节点（srgbClr / schemeClr / …）为 RGB + alpha */
+/** Parse any "color container" node (srgbClr / schemeClr / …) into RGB + alpha */
 export function resolveColorNode(
   node: XmlNode | undefined,
   palette: Palette,
@@ -237,7 +237,7 @@ export function resolveColorNode(
   return undefined;
 }
 
-/** 解析填充节点（solidFill / gradFill / noFill / blipFill） */
+/** Parse a fill node (solidFill / gradFill / noFill / blipFill) */
 export interface ParsedFill {
   type: 'none' | 'solid' | 'gradient';
   color?: string;
@@ -276,7 +276,7 @@ export function parseShapeFill(node: XmlNode | undefined, palette: Palette): Par
   return { type: 'none' };
 }
 
-/** 解析描边节点（a:ln） */
+/** Parse a stroke node (a:ln) */
 export interface ParsedStroke {
   color: string;
   width: number;
@@ -285,7 +285,7 @@ export interface ParsedStroke {
 
 export function parseStroke(node: XmlNode | undefined, palette: Palette): ParsedStroke | undefined {
   if (!node) return undefined;
-  // DrawingML 线宽单位为 EMU（12700 EMU = 1pt），换算到画布 px（96dpi）
+  // DrawingML stroke widths are in EMU (12700 EMU = 1pt); convert them to canvas px (96dpi)
   const widthEmu = numAttr(node, 'w') ?? 12700;
   const widthPx = (widthEmu / 12700) * (96 / 72);
   const fill = childrenNamedFirst(node, ['solidFill', 'gradFill', 'noFill']);

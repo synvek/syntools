@@ -41,7 +41,7 @@ describe('segmentIntersection', () => {
 });
 
 describe('computeEdgeJumps', () => {
-  // 两条交叉的直线连线：e1 水平、e2 垂直，在 (200, 100) 附近相交
+  // Two crossing straight edges: e1 horizontal, e2 vertical, intersecting near (200, 100)
   const nodes: JumpNode[] = [
     node('a', 0, 80),
     node('b', 400, 80),
@@ -56,7 +56,7 @@ describe('computeEdgeJumps', () => {
     ];
     const marks = computeEdgeJumps(nodes, edges);
     expect(marks).toHaveLength(1);
-    // 弧线沿「跳线自身」的方向张弦：e2 为竖直连线，故角度为 π/2
+    // The arc spans a chord along the jumped line's own direction: e2 is vertical, so the angle is π/2
     expect(marks[0].angle).toBeCloseTo(Math.PI / 2, 3);
     expect(marks[0].stroke).toBeTruthy();
   });

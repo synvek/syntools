@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { isPdfPasswordError, probePdfFile } from '@/core/pdf';
 
-/** 加密 PDF 密码状态：选文件时探测，出错时提示输入。 */
+/** Encrypted-PDF password state: probed on file select, prompts on error. */
 export function usePdfPassword() {
   const [password, setPassword] = useState('');
   const [needsPassword, setNeedsPassword] = useState(false);

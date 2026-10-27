@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 图像与绘画提示词类提示词，详见 ../README.md */
+/** Image and drawing prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'image-photorealistic-portrait',

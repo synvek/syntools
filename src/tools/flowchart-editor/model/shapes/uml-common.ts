@@ -2,7 +2,7 @@ import type { ShapeDef } from './index';
 import { axisAdjust, pxMx } from './adjust';
 import { actorPath, boundaryPath, controlPath, entityPath, framePath } from './uml-paths';
 
-/** UML 通用：跨图种复用的基础元素（角色、注释、分析类、图框） */
+/** UML common: base elements shared across diagram types (actor, note, analysis kinds, frame) */
 export const UML_COMMON_SHAPES: ShapeDef[] = [
   {
     kind: 'umlActor',

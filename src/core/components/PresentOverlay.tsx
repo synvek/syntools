@@ -3,60 +3,60 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 
 /**
- * 文档类编辑器通用的「放映」全屏层（幻灯片工具是最早的实现，这里抽成公共组件）。
+ * Full-screen "present" layer shared by document editors (first built for slides, extracted here).
  *
- * 约定：
- * - 整屏深色背景 + 居中内容，内容自身决定底色（如白底 A4 / 白底表格）；
- * - `Esc` 退出，右上角同时提供退出按钮；
- * - 内容生成可能是异步的（截图 / 合成），用 `loading` 与 `failed` 呈现中间态；
- * - 底部 `footer` 放工具自定义操作（翻页、切换工作表等）；
- * - 缩放：右上角「缩小 / 百分比 / 放大 / 适应窗口」，并支持 `+` `-` `0` 快捷键
- *   与 Ctrl / ⌘ + 滚轮；`zoom = 1` 即「适应窗口」，内容默认铺满可视区。
- *   缩放以「锚点」为基准：滚轮取光标位置，按钮 / 快捷键取可视区中心
- *   （居顶内容则取可视区顶部）；缩放后补偿滚动偏移，锚点处的内容不会跑位。
- *   放大采用「布局盒撑出滚动区 + 内容整体 scale」两层结构，
- *   这样文字 / 表格这类固定尺寸内容也会真正变大，而不只是多出一块空白。
+ * Conventions:
+ * - Dark full-screen backdrop with centered content; content sets its own background (white A4, white sheet);
+ * - `Esc` exits, and a close button sits in the top-right corner;
+ * - Content may be produced asynchronously (screenshots / compositing); `loading` and `failed` cover those states;
+ * - The bottom `footer` holds tool-specific actions (paging, switching sheets);
+ * - Zoom: top-right "out / percentage / in / fit", plus `+` `-` `0` shortcuts
+ *   and Ctrl / ⌘ + wheel; `zoom = 1` means "fit", with content filling the viewport by default.
+ *   Zoom is anchored: the wheel uses the cursor, buttons / shortcuts use the viewport center
+ *   (the viewport top for top-aligned content); scroll offset is compensated so the anchor stays put.
+ *   Zoom-in uses two layers: a layout box that creates the scroll area, plus scaled content,
+ *   so fixed-size content such as text or tables really grows instead of exposing blank space.
  */
 
 export interface PresentOverlayProps {
-  /** 左上角标题（通常为文档名） */
+  /** Top-left title (usually the document name) */
   title: string;
   onClose: () => void;
-  /** 退出按钮文案（含 Esc 提示） */
+  /** Close button label (includes the Esc hint) */
   exitLabel: string;
-  /** 内容生成中的提示 */
+  /** Message shown while content is generated */
   loadingLabel?: string;
-  /** 内容生成失败的提示 */
+  /** Message shown when generation fails */
   failedLabel?: string;
-  /** 失败时的补充说明（如建议降低画布尺寸） */
+  /** Extra failure note (e.g. suggest a smaller canvas) */
   failedHint?: string;
   loading?: boolean;
   failed?: boolean;
-  /** 内容对齐：文档类居顶更像「一页纸」，图形类居中更像投影（默认居中） */
+  /** Content alignment: top reads like a page for documents, center like a projection for graphics; center by default */
   align?: 'center' | 'top';
-  /** 底部操作区 */
+  /** Bottom action area */
   footer?: ReactNode;
   children?: ReactNode;
 }
 
-/** 缩放范围（1 = 适应窗口） */
+/** Zoom range (1 = fit) */
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 6;
-/** 按钮 / 快捷键单步倍率 */
+/** Step ratio for buttons / shortcuts */
 const ZOOM_STEP = 1.25;
-/** Ctrl / ⌘ + 滚轮单步倍率：滚一格位移更细，避免一滚就跳过头 */
+/** Ctrl / ⌘ + wheel step: finer so one notch does not overshoot */
 const ZOOM_WHEEL_STEP = 1.02;
 
 function clampZoom(value: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
 }
 
-/** 缩放前记录的锚点：把同一内容点在缩放后钉回原来的屏幕位置 */
+/** Anchor recorded before zooming: pins the same content point to its old screen position */
 interface ZoomAnchor {
-  /** 锚点在舞台内的相对位置（可落在内容之外，故不做 0~1 截断） */
+  /** Anchor position inside the stage, fractional (may fall outside the content, so no 0–1 clamp) */
   fx: number;
   fy: number;
-  /** 锚点的屏幕坐标（viewport 视口系） */
+  /** Anchor screen coordinates (viewport space) */
   clientX: number;
   clientY: number;
 }
@@ -75,7 +75,7 @@ export function PresentOverlay({
   children,
 }: PresentOverlayProps) {
   const { t } = useTranslation();
-  /** 相对「适应窗口」的缩放比例，1 表示内容正好铺满可视区 */
+  /** Zoom relative to "fit"; 1 means the content exactly fills the viewport */
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -83,9 +83,9 @@ export function PresentOverlay({
   const pendingAnchorRef = useRef<ZoomAnchor | null>(null);
 
   /**
-   * 应用新缩放。默认锚点与内容对齐方式一致：居顶内容锚「可视区顶部」，
-   * 居中内容锚「可视区中心」；滚轮则直接传入光标坐标。
-   * 于是缩放后锚点下的内容原地不动，而不是整页跟着漂移。
+   * Apply a new zoom. The default anchor follows content alignment: top-aligned content anchors
+   * to the viewport top, centered content to the viewport center; the wheel passes cursor coordinates.
+   * The content under the anchor then stays in place instead of drifting with the page.
    */
   const applyZoom = useCallback(
     (next: number, anchor?: { clientX: number; clientY: number }) => {
@@ -125,8 +125,8 @@ export function PresentOverlay({
     setZoom(1);
   }, []);
 
-  // 缩放落地后（DOM 已更新、绘制前）补偿滚动偏移：把锚点拉回原屏幕位置。
-  // 用 useLayoutEffect 是为了赶在绘制前完成，避免出现「先跳一下再回正」的闪烁。
+  // After zoom lands (DOM updated, before paint) compensate scroll so the anchor returns to its position.
+  // useLayoutEffect runs before paint, avoiding a visible jump-then-settle flicker.
   useLayoutEffect(() => {
     const anchor = pendingAnchorRef.current;
     pendingAnchorRef.current = null;
@@ -141,8 +141,8 @@ export function PresentOverlay({
     host.scrollTop += dy;
   }, [zoom]);
 
-  // Ctrl / ⌘ + 滚轮缩放：浏览器默认会触发页面缩放，且 React 的 onWheel 是 passive 的
-  // （无法 preventDefault），因此这里手动绑定非 passive 的原生监听。
+  // Ctrl / ⌘ + wheel zoom: the browser zooms the page by default, and React's onWheel is passive
+  // (so preventDefault fails), hence a manually bound non-passive native listener.
   useEffect(() => {
     const host = scrollRef.current;
     if (!host) return;
@@ -163,7 +163,7 @@ export function PresentOverlay({
         onClose();
         return;
       }
-      // 缩放快捷键：`+` / `=` 放大，`-` / `_` 缩小，`0` 适应窗口
+      // Zoom shortcuts: `+` / `=` in, `-` / `_` out, `0` fit
       if (event.key === '+' || event.key === '=') {
         event.preventDefault();
         zoomIn();
@@ -260,7 +260,7 @@ export function PresentOverlay({
         data-testid="present-scroll"
         className="flex min-h-0 flex-1 overflow-auto px-6 pb-6"
         style={{
-          // `safe` 关键字：放大的内容超出可视区时靠起始边对齐，避免居中导致起始部分被裁掉
+          // `safe` keeps zoomed-in content aligned to the start edge so centering does not clip its beginning
           justifyContent: 'safe center',
           alignItems: align === 'top' ? 'flex-start' : 'safe center',
         }}
@@ -273,8 +273,8 @@ export function PresentOverlay({
           </div>
         ) : null}
         {ready ? (
-          // 缩放舞台：外层按倍率撑出「布局尺寸」以供滚动，内层保持原始尺寸再整体 scale，
-          // 这样文字 / 表格等固定尺寸内容也会真正放大，而不只是多出一块空白。
+          // Zoom stage: the outer box takes the scaled layout size for scrolling, the inner keeps its size and scales,
+          // so fixed-size content such as text or tables truly grows instead of leaving blank space.
           <div
             ref={stageRef}
             data-testid="present-stage"
@@ -284,7 +284,7 @@ export function PresentOverlay({
             <div
               className="flex justify-center"
               style={{
-                // 内层 = 舞台尺寸 / 倍率（即原始可视区大小），再从左上角放大回铺满舞台
+                // Inner = stage size / ratio (the original viewport size), scaled from the top-left to fill the stage
                 width: `${100 / zoom}%`,
                 height: `${100 / zoom}%`,
                 alignItems: align === 'top' ? 'flex-start' : 'center',

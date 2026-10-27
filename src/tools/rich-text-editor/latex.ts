@@ -1,12 +1,13 @@
 /**
- * LaTeX 子集解析（纯逻辑，不含 KaTeX / docx 等重依赖）：
+ * LaTeX subset parser (pure logic, no heavy KaTeX / docx dependencies):
  *
- * 编辑器只保存 LaTeX 源码，导出时需要知道「这条公式能否用 Word 原生公式表达」。
- * 因此把解析独立出来：`latexToAst` 返回抽象语法树，返回 null 表示含
- * OMML 表达不了的语法，导出层据此降级为图片。
+ * The editor stores only LaTeX source, and export needs to know whether a formula can be expressed as
+ * a native Word equation. Parsing is therefore kept separate: `latexToAst` returns an AST, and null
+ * means the syntax can't be expressed in OMML, so the export layer degrades to an image.
  *
- * 支持的语法：分组、\frac、\sqrt[..]{..}、^/_ 上下标、\sum/\int 等大运算符、
- * \left..\right 定界对、常用希腊字母与数学符号、\text{..}、常用函数名与空白命令。
+ * Supported syntax: groups, \frac, \sqrt[..]{..}, ^/_ scripts, n-ary operators like \sum/\int,
+ * \left..\right delimiter pairs, common Greek letters and math symbols, \text{..}, common function
+ * names and spacing commands.
  */
 
 export type LatexNode =
@@ -20,12 +21,12 @@ export type LatexNode =
       char: string;
       sub: LatexNode[] | null;
       sup: LatexNode[] | null;
-      /** \sum / \int 右侧的被运算对象 */
+      /** Operand to the right of \sum / \int */
       body: LatexNode[] | null;
     }
   | { kind: 'brackets'; open: string; close: string; body: LatexNode[] };
 
-/** LaTeX 命令 → Unicode 符号（覆盖常用数学符号，未收录的一律视为不支持） */
+/** LaTeX command -> Unicode symbol (common math symbols; anything unlisted counts as unsupported) */
 const SYMBOLS: Record<string, string> = {
   alpha: 'α',
   beta: 'β',
@@ -117,7 +118,7 @@ const SYMBOLS: Record<string, string> = {
   percent: '%',
 };
 
-/** 大运算符：上下限挂在求和 / 积分组件上 */
+/** N-ary operators: limits attach to the sum / integral component */
 const NARY: Record<string, string> = {
   sum: '∑',
   prod: '∏',
@@ -132,7 +133,7 @@ const NARY: Record<string, string> = {
   bigotimes: '⨂',
 };
 
-/** 函数名（Word 中以正体显示） */
+/** Function names (shown upright in Word) */
 const FUNCTIONS = new Set([
   'sin',
   'cos',
@@ -160,7 +161,7 @@ const FUNCTIONS = new Set([
   'lim',
 ]);
 
-/** 空白与间距命令 */
+/** Spacing commands */
 const SPACES: Record<string, string> = {
   ',': ' ',
   ';': ' ',
@@ -170,7 +171,7 @@ const SPACES: Record<string, string> = {
   qquad: '\u2003\u2003',
 };
 
-/** \left...\right 支持的定界符对（其余一律视为不支持，走图片降级） */
+/** Delimiter pairs supported by \left...\right (anything else counts as unsupported and degrades to an image) */
 const DELIMITERS: Record<string, string> = {
   '(': ')',
   '[': ']',
@@ -181,10 +182,10 @@ const DELIMITERS: Record<string, string> = {
   '.': '.',
 };
 
-/** 可作为 \right 后定界符的记号（闭合侧也要校验，避免 \left( … \right] 这类不匹配） */
+/** Tokens allowed after \right (the closing side is validated too, catching mismatches like \left( … \right]) */
 const CLOSING_DELIMS = new Set([')', ']', '\\}', '|', '\\rangle', '\\rvert', '.']);
 
-/** 定界符 → 实际字符（`.` 表示单边定界，输出空串） */
+/** Delimiter -> actual character (`.` means a one-sided delimiter and emits an empty string) */
 const DELIM_CHAR: Record<string, string> = {
   '(': '(',
   ')': ')',
@@ -200,7 +201,7 @@ const DELIM_CHAR: Record<string, string> = {
   '.': '',
 };
 
-/** 这些字符在公式中有特殊含义，无法直接表达 */
+/** These characters have special meaning in formulas and can't be expressed directly */
 const UNSUPPORTED_CHARS = new Set(['%', '&', '#', '$', '~']);
 
 interface Cursor {
@@ -212,7 +213,7 @@ function skipSpaces(cursor: Cursor): void {
   while (cursor.pos < cursor.src.length && /\s/.test(cursor.src[cursor.pos])) cursor.pos += 1;
 }
 
-/** 读取 `{...}` 分组；返回 null 表示括号不匹配 */
+/** Read a `{...}` group; null means the braces don't match */
 function parseBracedGroup(cursor: Cursor): LatexNode[] | null {
   skipSpaces(cursor);
   if (cursor.src[cursor.pos] !== '{') return null;
@@ -223,7 +224,7 @@ function parseBracedGroup(cursor: Cursor): LatexNode[] | null {
   return body;
 }
 
-/** 读取脚本参数：`{...}` / 单命令 / 单字符 */
+/** Read a script argument: `{...}` / single command / single character */
 function parseScriptArgument(cursor: Cursor): LatexNode[] | null {
   skipSpaces(cursor);
   if (cursor.pos >= cursor.src.length) return null;
@@ -232,7 +233,7 @@ function parseScriptArgument(cursor: Cursor): LatexNode[] | null {
   return atom ? [atom] : null;
 }
 
-/** 读取命令名；单字符命令（如 `\,`）返回该字符 */
+/** Read a command name; single-character commands (e.g. `\,`) return that character */
 function readCommandName(cursor: Cursor): string {
   cursor.pos += 1;
   const start = cursor.pos;
@@ -245,7 +246,7 @@ function readCommandName(cursor: Cursor): string {
   return cursor.src.slice(start, cursor.pos);
 }
 
-/** 解析 \left ... \right 定界对 */
+/** Parse a \left ... \right delimiter pair */
 function parseDelimited(cursor: Cursor): LatexNode | null {
   skipSpaces(cursor);
   const open = cursor.src.startsWith('\\{', cursor.pos) ? '\\{' : cursor.src[cursor.pos];
@@ -276,7 +277,7 @@ function parseDelimited(cursor: Cursor): LatexNode | null {
   return null;
 }
 
-/** 解析一个原子（分组 / 命令 / 单字符） */
+/** Parse one atom (group / command / single character) */
 function parseAtom(cursor: Cursor): LatexNode | null {
   if (cursor.pos >= cursor.src.length) return null;
   const char = cursor.src[cursor.pos];
@@ -325,7 +326,7 @@ function parseAtom(cursor: Cursor): LatexNode | null {
       if (!body) return null;
       const raw = cursor.src.slice(start, cursor.pos);
       const literal = raw.slice(raw.indexOf('{') + 1, raw.lastIndexOf('}'));
-      // \text{} 内出现命令或上下标时无法保证正体语义，交给图片降级
+      // Commands or scripts inside \text{} can't guarantee upright semantics, so fall back to an image
       if (/[\\^_$]/.test(literal)) return null;
       return { kind: 'text', value: literal };
     }
@@ -342,7 +343,7 @@ function parseAtom(cursor: Cursor): LatexNode | null {
   return { kind: 'text', value: char };
 }
 
-/** 解析序列；`stop` 为结束字符（`}`），null 表示解析到结尾 */
+/** Parse a sequence; `stop` is the terminator (`}`), null means parse to the end */
 function parseSequence(cursor: Cursor, stop: string | null): LatexNode[] | null {
   const nodes: LatexNode[] = [];
   while (cursor.pos < cursor.src.length) {
@@ -364,7 +365,7 @@ function parseSequence(cursor: Cursor, stop: string | null): LatexNode[] | null 
       const sub = char === '_' ? argument : (merged?.sub ?? null);
       const sup = char === '^' ? argument : (merged?.sup ?? null);
       if (merged) {
-        // \sum_{i=1}^{n}：上下限直接挂在求和组件上
+        // \sum_{i=1}^{n}: limits attach directly to the sum component
         nodes.push({ ...merged, sub, sup });
       } else if (base.kind === 'scripts') {
         nodes.push({ ...base, sub: base.sub ?? sub, sup: base.sup ?? sup });
@@ -387,7 +388,7 @@ function parseSequence(cursor: Cursor, stop: string | null): LatexNode[] | null 
   return nodes;
 }
 
-/** LaTeX → 抽象语法树；返回 null 表示含 OMML 表达不了的语法（应走图片降级） */
+/** LaTeX -> AST; null means the syntax can't be expressed in OMML (use an image fallback) */
 export function latexToAst(latex: string): LatexNode[] | null {
   const source = latex.trim();
   if (!source) return null;
@@ -395,12 +396,12 @@ export function latexToAst(latex: string): LatexNode[] | null {
   return nodes && nodes.length > 0 ? nodes : null;
 }
 
-/** 该公式能否用 Word 原生公式（OMML）表达 */
+/** Whether the formula can be expressed as a native Word equation (OMML) */
 export function isOmmlSupported(latex: string): boolean {
   return latexToAst(latex) !== null;
 }
 
-/** 统计无法用 OMML 表达、将降级为图片的公式数量 */
+/** Count formulas that can't be expressed in OMML and will degrade to images */
 export function countUnsupportedLatex(latexList: readonly string[]): number {
   return latexList.filter((latex) => !isOmmlSupported(latex)).length;
 }

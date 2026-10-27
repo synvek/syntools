@@ -3,15 +3,15 @@ import { createCanvasElement, getCanvas, registerCanvas } from '../model/assets'
 import type { MaskRef, Rect, Selection, VectorMaskRef } from '../model/types';
 
 /**
- * 图层蒙版：灰度画布（白 = 显示、黑 = 隐藏）。
+ * Layer mask: a grayscale canvas (white = shown, black = hidden).
  *
- * 蒙版像素同样放在资产注册表里（`MaskRef.assetId`），文档只存引用。
- * 这里负责三件事：
- * 1. 新建蒙版画布（全部显示 / 全部隐藏 / 按多边形裁剪）；
- * 2. 把蒙版按「羽化 → 浓度 → 反相」烘焙成可直接 `destination-in` 的 alpha 图；
- * 3. 把烘焙结果作用到目标画布上。
+ * Mask pixels also live in the asset registry (`MaskRef.assetId`); the document stores only a reference.
+ * Three responsibilities here:
+ * 1. create mask canvases (reveal all / hide all / clip by polygon);
+ * 2. bake the mask through "feather → density → invert" into an alpha image ready for `destination-in`;
+ * 3. apply the baked result to the target canvas.
  *
- * 烘焙结果按 `maskSignature` 缓存——蒙版没变时不重复模糊（模糊是大图最贵的一步）。
+ * Bakes cache by `maskSignature`, so an unchanged mask skips blurring (the priciest step on big images).
  */
 
 const cache = new Map<string, HTMLCanvasElement>();
@@ -30,7 +30,7 @@ export function createMaskCanvas(width: number, height: number, mode: 'show' | '
   return registerCanvas(canvas);
 }
 
-/** 按多边形（选区轮廓）生成蒙版：轮廓内为白，其余为黑 */
+/** Build a mask from a polygon (selection outline): white inside, black outside */
 export function createMaskCanvasFromPolygon(
   width: number,
   height: number,
@@ -56,7 +56,7 @@ export function createMaskCanvasFromPolygon(
   return registerCanvas(canvas);
 }
 
-/** 按选区（支持布尔运算产生的多轮廓）生成蒙版：轮廓内为白，其余为黑 */
+/** Build a mask from a selection (boolean multi-outlines supported): white inside, black outside */
 export function createMaskCanvasFromSelection(
   width: number,
   height: number,
@@ -78,12 +78,12 @@ export function createMaskCanvasFromSelection(
 }
 
 /**
- * 把蒙版烘焙成 alpha 图。
+ * Bake the mask into an alpha image.
  *
- * 关键点：`destination-in` 只看**源 alpha**，而蒙版画布是不透明的灰度图（黑也是 alpha=255），
- * 直接拿来当源等于「完全不裁」。所以这里把灰度转成 alpha：
- * `alpha = 亮度 × 浓度`，反相则在取亮度前先黑白互换。
- * 转换结果按 `maskSignature` 缓存——蒙版没变时不重复模糊与逐像素扫描。
+ * Key point: `destination-in` looks only at **source alpha**, but the mask canvas is opaque gray (even
+ * black has alpha=255), so using it as-is would clip nothing. Hence the grayscale → alpha conversion:
+ * `alpha = luminance × density`, and invert swaps black and white before reading luminance.
+ * The result caches by `maskSignature`, so an unchanged mask skips blurring and the per-pixel scan.
  */
 export function bakeMask(mask: MaskRef, signature: string): HTMLCanvasElement | null {
   const cached = cache.get(signature);
@@ -105,7 +105,7 @@ export function bakeMask(mask: MaskRef, signature: string): HTMLCanvasElement | 
   ctx.filter = 'none';
   ctx.globalCompositeOperation = 'source-over';
 
-  // 亮度 → alpha（0.299/0.587/0.114 为 Rec.601 亮度权重）
+  // Luminance → alpha (0.299/0.587/0.114 are the Rec.601 luminance weights)
   const image = ctx.getImageData(0, 0, out.width, out.height);
   const data = image.data;
   const density = Math.min(1, Math.max(0, mask.density));
@@ -124,8 +124,8 @@ export function bakeMask(mask: MaskRef, signature: string): HTMLCanvasElement | 
 }
 
 /**
- * 把蒙版作用到目标画布：只保留蒙版为白的部分（`destination-in`）。
- * `rect` 为蒙版在目标画布上的落位（目标画布坐标系）。
+ * Apply the mask to the target canvas: keep only what the mask paints white (`destination-in`).
+ * `rect` is where the mask lands on the target canvas (target coordinates).
  */
 export function applyMask(
   target: HTMLCanvasElement,
@@ -142,14 +142,14 @@ export function applyMask(
   ctx.restore();
 }
 
-/* ------------------------------ 矢量蒙版 ------------------------------ */
+/* ------------------------------ Vector mask ------------------------------ */
 
 /**
- * 矢量蒙版 → 当前路径（本地坐标 = 图层左上角为原点）。
+ * Vector mask → current path (local coordinates, origin at the layer's top-left).
  *
- * 与选区共用 nonzero 语义：并集轮廓正向、差集轮廓反向（`orientPolygon`）。
- * 反相时再加一圈「图层外框」（正向），使内部 winding 归零从而挖空 —— 与
- * `core.invertSelection` 完全同一套技巧，避免维护第二份几何实现。
+ * It shares the selection's nonzero semantics: union outlines forward, difference outlines reversed.
+ * Invert adds a forward layer frame so the interior winding cancels out and gets punched through, exactly
+ * like `core.invertSelection`, avoiding a second geometric implementation.
  */
 export function traceVectorMask(
   ctx: CanvasRenderingContext2D,
@@ -174,10 +174,10 @@ export function traceVectorMask(
 }
 
 /**
- * 把矢量蒙版作用到目标画布（`destination-in`，只保留轮廓内部）。
+ * Apply the vector mask to the target canvas (`destination-in`, keeping only the inside of the outlines).
  *
- * 羽化只在「蒙版」上做模糊（`filter: blur`），不能直接模糊目标画布——
- * 否则图层内容本身也会被糊掉。因此先烘焙一张同尺寸的蒙版图，再一次性裁切。
+ * Feathering blurs the mask itself (`filter: blur`), never the target canvas —
+ * that would blur the layer content too. So bake a same-size mask image, then clip in one pass.
  */
 export function applyVectorMask(
   target: HTMLCanvasElement,
@@ -196,7 +196,7 @@ export function applyVectorMask(
   bctx.translate(offset.x, offset.y);
   traceVectorMask(bctx, mask, size);
   bctx.fillStyle = '#ffffff';
-  // 反相轮廓的方向已被翻转，两种情形都用 nonzero
+  // Inverted outlines already have flipped directions; both cases use nonzero
   bctx.fill('nonzero');
   ctx.save();
   ctx.globalCompositeOperation = 'destination-in';
@@ -204,7 +204,7 @@ export function applyVectorMask(
   ctx.restore();
 }
 
-/** 蒙版缩略图（面板展示）：白底灰图 */
+/** Mask thumbnail (panel display): gray image on white */
 export function maskThumbnail(mask: MaskRef, max = 44): string | null {
   const source = getCanvas(mask.assetId);
   if (!source) return null;

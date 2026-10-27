@@ -8,14 +8,12 @@ import { LENGTH_UNITS, convertLengthAll, type LengthUnit } from './core';
 
 const UNIT_SET = new Set<string>(LENGTH_UNITS);
 
-/** 长度单位转换 */
+/** Length unit conversion */
 export default function LengthConverterTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ v: '1', f: 'm' }), []);
   const [value, setValue] = useState(init.v);
-  const [from, setFrom] = useState<LengthUnit>(
-    UNIT_SET.has(init.f) ? (init.f as LengthUnit) : 'm',
-  );
+  const [from, setFrom] = useState<LengthUnit>(UNIT_SET.has(init.f) ? (init.f as LengthUnit) : 'm');
 
   const result = useMemo(() => convertLengthAll(value, from), [value, from]);
   const rows = result.ok ? result.value : null;

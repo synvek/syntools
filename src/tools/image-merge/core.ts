@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 图片合并：布局尺寸计算（绘制在 UI canvas）。
+ * Image merge: layout geometry only (drawing happens on a UI canvas).
  */
 
 export type MergeDirection = 'horizontal' | 'vertical' | 'grid';
@@ -17,7 +17,7 @@ export interface ImageSize {
 export interface MergeLayout {
   canvasWidth: number;
   canvasHeight: number;
-  /** 每个槽位的绘制目标矩形 */
+  /** Destination rectangle for each slot */
   slots: { x: number; y: number; width: number; height: number }[];
 }
 
@@ -25,13 +25,8 @@ export function isImageFile(type: string): boolean {
   return type.startsWith('image/');
 }
 
-/** 等比缩放到放入 box，居中时用返回尺寸 */
-export function fitContain(
-  srcW: number,
-  srcH: number,
-  boxW: number,
-  boxH: number,
-): ImageSize {
+/** Scale proportionally to fit inside box; the returned size is used for centering */
+export function fitContain(srcW: number, srcH: number, boxW: number, boxH: number): ImageSize {
   const scale = Math.min(boxW / srcW, boxH / srcH);
   return {
     width: Math.max(1, Math.round(srcW * scale)),
@@ -83,7 +78,7 @@ export function computeMergeLayout(
     };
   }
 
-  // grid：尽量接近正方形列数
+  // grid: pick a column count that keeps the result close to square
   const cols = Math.ceil(Math.sqrt(sizes.length));
   const rows = Math.ceil(sizes.length / cols);
   const cellW = Math.max(...sizes.map((s) => s.width));

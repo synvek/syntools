@@ -1,6 +1,6 @@
 /**
- * 工具间轻量文本传递（F1）：经 sessionStorage，打开目标工具时自动灌入输入。
- * 仅用于短文本；大文件不走此路径。
+ * Lightweight text handoff between tools (F1): via sessionStorage, auto-filled when the target opens.
+ * Short text only; large files never take this path.
  */
 
 const HANDOFF_KEY = 'syntools:handoff.v1';
@@ -9,7 +9,7 @@ const HANDOFF_MAX = 200_000; // ~200KB
 export interface HandoffPayload {
   targetId: string;
   text: string;
-  /** 可选字段名提示（目标工具可读） */
+  /** Optional field-name hint (the target tool can read it) */
   field?: string;
 }
 
@@ -23,7 +23,7 @@ export function writeHandoff(payload: HandoffPayload): boolean {
   }
 }
 
-/** 读取并清除；仅当 targetId 匹配时返回文本 */
+/** Read and clear; returns the text only when targetId matches */
 export function consumeHandoff(toolId: string): string | null {
   try {
     const raw = sessionStorage.getItem(HANDOFF_KEY);

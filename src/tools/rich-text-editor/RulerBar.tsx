@@ -4,14 +4,17 @@ import type { ViewMode } from './draft';
 import { MM_TO_PX, type PageMargins, type PageMetrics } from './pageSetup';
 
 /**
- * 标尺（对标 Word）：顶部水平标尺 + 左侧垂直标尺，按当前纸张 / 页边距 / 缩放显示毫米刻度，
- * 页面视图下把页边距画成灰区，并用细线标出光标位置，便于排版时对齐。
+ * Ruler (modeled on Word): a horizontal ruler at the top and a vertical one on the left, showing
+ * millimeter ticks for the current paper size / margins / zoom. In page view the margins are drawn as
+ * gray bands and a thin line marks the caret, which helps align things while typesetting.
  *
- * 坐标系：两条标尺都渲染在滚动容器（`.rte-editor-viewport`）内。
- * - 水平标尺用 sticky 贴顶（纵向滚动不移动）；
- * - 垂直标尺用 absolute 钉在容器上（absolute 的包含块是容器的 padding box，不随滚动移动），
- *   刻度层再按实测的内容顶部位置上下平移，于是滚动时数字会跟着正文走。
- * 位置与尺寸全部取自实测屏幕矩形，因此 CSS `zoom`、横向 / 纵向滚动、分栏切换都会自动跟随。
+ * Coordinate system: both rulers are rendered inside the scroll container (`.rte-editor-viewport`).
+ * - The horizontal ruler is sticky at the top (vertical scrolling doesn't move it);
+ * - The vertical ruler is absolutely pinned to the container (its containing block is the container's
+ *   padding box, so scrolling doesn't move it), while the tick layer is translated by the measured
+ *   content top, so the numbers follow the text while scrolling.
+ * Positions and sizes all come from measured screen rects, so CSS `zoom`, horizontal / vertical
+ * scrolling and column switches are followed automatically.
  */
 
 interface RulerBarProps {
@@ -24,30 +27,30 @@ interface RulerBarProps {
 }
 
 interface RulerGeometry {
-  /** 纸面 / 正文列相对滚动容器的左边距与总宽（屏幕像素） */
+  /** Left offset and total width of the sheet / body column relative to the scroll container (screen px) */
   offsetLeft: number;
   width: number;
-  /** 左右页边距宽度（流式视图为 0） */
+  /** Left/right margin widths (0 in flow view) */
   padLeft: number;
   padRight: number;
-  /** 正文内容区左边缘的屏幕 x：用于把光标位置映射到刻度上 */
+  /** Screen x of the content area's left edge: maps the caret position onto the ticks */
   contentScreenLeft: number;
-  /** 正文内容区顶部相对滚动容器顶部的偏移（随滚动变化） */
+  /** Offset of the content area's top from the scroll container's top (changes with scrolling) */
   offsetTop: number;
-  /** 正文内容区高度（屏幕像素） */
+  /** Content area height (screen px) */
   contentHeight: number;
-  /** 上下页边距高度（流式视图为 0） */
+  /** Top/bottom margin heights (0 in flow view) */
   padTop: number;
   padBottom: number;
-  /** 正文内容区顶部的屏幕 y */
+  /** Screen y of the content area's top */
   contentScreenTop: number;
-  /** 当前纵向滚动偏移：滚动容器内的 absolute 元素会随内容一起移动，需要反向补偿 */
+  /** Current vertical scroll offset: absolute elements inside the container move with the content and need inverse compensation */
   scrollTop: number;
 }
 
-/** 流式视图下正文列的左右内边距（对应 `.rte-surface` 的 `px-8`）与上下内边距（`py-8`） */
+/** Horizontal padding (matching `.rte-surface`'s `px-8`) and vertical padding (`py-8`) in flow view */
 const FLOW_PADDING_PX = 32;
-/** 低于该尺寸就没必要画刻度（窗口极窄或内容区被压扁时） */
+/** Below these sizes, drawing ticks isn't worth it (very narrow window or squashed content area) */
 const MIN_RULER_WIDTH_PX = 140;
 const MIN_RULER_HEIGHT_PX = 120;
 
@@ -67,7 +70,7 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
     }
     const viewportRect = viewport.getBoundingClientRect();
     const surfaceRect = surface.getBoundingClientRect();
-    // 屏幕像素 = CSS 像素 × zoom；这里直接测量缩放后的矩形，故 scale 只用于页边距换算
+    // Screen px = CSS px × zoom; rects are measured after zooming, so scale is only used for margin conversion
     const scale = MM_TO_PX * zoom;
     const paged = viewMode === 'paged';
     const padLeft = paged ? margin.left * scale : FLOW_PADDING_PX * zoom;
@@ -101,9 +104,10 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
   }, [margin.bottom, margin.left, margin.right, margin.top, viewMode, viewportRef, zoom]);
 
   /**
-   * 水平标尺要等首次 measure 后（geo 非空）才会挂载，所以不能在 effect 里用
-   * `viewport.querySelector('.rte-ruler')` 观察它（那时还查不到，垂直标尺刻度会一直按
-   * 「标尺高度为 0」的旧几何定位，与正文错开约 20px）。改用回调 ref：节点一挂载就观察。
+   * The horizontal ruler only mounts after the first measure (once geo is set), so an effect can't
+   * observe it via `viewport.querySelector('.rte-ruler')` (it isn't there yet, and the vertical ruler
+   * ticks would keep using stale geometry assuming a ruler height of 0, misaligned by ~20px).
+   * A callback ref is used instead: observation starts as soon as the node mounts.
    */
   const measureRef = useRef(measure);
   measureRef.current = measure;
@@ -117,7 +121,7 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
     rulerObserverRef.current = observer;
   }, []);
 
-  /** 光标位置 → 两条标尺上的偏移（相对正文内容区左 / 上边缘） */
+  /** Caret position -> offsets on both rulers (relative to the content area's left / top edge) */
   const syncCaret = useCallback(() => {
     const geometry = geoRef.current;
     if (!editor || !geometry) {
@@ -134,8 +138,9 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
 
   useEffect(() => {
     measure();
-    // 布局（尤其水平标尺高度）常在首帧后才稳定，强制下一帧再算一次，
-    // 否则垂直标尺刻度会与正文错位（vOffset 偏差可达 ~20px）。
+    // Layout (especially the horizontal ruler's height) often settles only after the first frame,
+    // so measure again on the next frame; otherwise the vertical ticks misalign with the text
+    // (vOffset off by up to ~20px).
     requestAnimationFrame(() => measure());
     const viewport = viewportRef.current;
     if (!viewport) return;
@@ -144,9 +149,9 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
     observer?.observe(viewport);
     const surface = viewport.querySelector<HTMLElement>('.rte-surface');
     if (surface) observer?.observe(surface);
-    // 水平标尺高度变化会把正文区整体下移，但 surface 自身尺寸不变，
-    // 需要单独观察标尺；标尺由 attachRuler 在挂载时接管观察。
-    // 滚动事件不冒泡，用捕获阶段同时覆盖内层横向滚动（.rte-page-area）
+    // A height change in the horizontal ruler pushes the whole body area down while the surface size
+    // stays the same, so the ruler needs its own observation; attachRuler takes that over on mount.
+    // Scroll events don't bubble, so use the capture phase to also catch inner horizontal scrolling (.rte-page-area)
     const onScroll = () => measure();
     viewport.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onScroll);
@@ -186,7 +191,7 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
   const cmPx = mmPx * 10;
   const contentWidth = geo.width - geo.padLeft - geo.padRight;
   const contentHeight = geo.contentHeight;
-  // 每厘米一个数字标签（Word 标尺的数字即厘米值）
+  // One numeric label per centimeter (Word's ruler numbers are centimeters)
   const labels: number[] = [];
   for (let cm = 1; cm * cmPx <= contentWidth - 6; cm += 1) labels.push(cm);
   const vLabels: number[] = [];
@@ -200,9 +205,9 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
 
   return (
     <>
-      {/* 左上角交点 */}
+      {/* Top-left corner */}
       <span className="rte-ruler-corner" aria-hidden="true" />
-      {/* 水平标尺 */}
+      {/* Horizontal ruler */}
       <div ref={attachRuler} className="rte-ruler" data-testid="rich-text-ruler" aria-hidden="true">
         <div
           className="rte-ruler-track"
@@ -238,13 +243,14 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
           ) : null}
         </div>
       </div>
-      {/* 垂直标尺 */}
+      {/* Vertical ruler */}
       <div
         className="rte-ruler-v"
         data-testid="rich-text-ruler-v"
         aria-hidden="true"
-        // 滚动容器里的 absolute 元素会随内容一起上移，这里反向位移把标尺钉在原地；
-        // 刻度层再用 offsetTop 对齐正文内容顶部，于是滚动时数字跟着正文走。
+        // Absolute elements inside the scroll container move up with the content, so shift them back
+        // to pin the ruler in place; the tick layer then aligns to the content top via offsetTop,
+        // letting the numbers follow the text while scrolling.
         style={{ transform: `translateY(${geo.scrollTop}px)` }}
       >
         <div

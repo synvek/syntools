@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
- * 工具箱的分组按钮：点一次选中、再点一次才展开浮层，所以这里循环点到浮层出现为止
- * （首次点击只负责切换工具，直接点两次在有动画时容易把第二次点成「收起」）。
+ * Group buttons in the toolbox: the first click selects, a second click expands the flyout, so loop until it appears
+ * (the first click only switches tools; double-clicking quickly can register the second click as a collapse while animating).
  */
 async function pickFromGroup(page: Page, row: Locator, name: string) {
   const flyout = page.getByTestId('photo-tool-flyout');
@@ -16,24 +16,24 @@ async function pickFromGroup(page: Page, row: Locator, name: string) {
   await expect(flyout).toHaveCount(0);
 }
 
-// 界面文案跟随浏览器语言（Playwright 默认 en-US），下面这些用例断言简体中文
+// UI copy follows the browser language (Playwright defaults to en-US), so these cases assert Simplified Chinese
 test.use({ locale: 'zh-CN' });
 
-/** 每个工具 1 条冒烟用例：打开 → 输入 → 断言输出（Tasks T24） */
+/** One smoke case per tool: open → input → assert output (Tasks T24) */
 
-test('Base64：编码输出正确', async ({ page }) => {
+test('Base64: encoding output is correct', async ({ page }) => {
   await page.goto('/tools/base64');
   await page.getByRole('textbox', { name: '原始文本' }).fill('SynTools');
   await expect(page.getByRole('textbox', { name: 'Base64 结果' })).toHaveValue('U3luVG9vbHM=');
 });
 
-test('URL 编解码：component 模式编码正确', async ({ page }) => {
+test('URL codec: component mode encodes correctly', async ({ page }) => {
   await page.goto('/tools/url-codec');
   await page.getByRole('textbox', { name: '原始文本' }).fill('a b&c');
   await expect(page.getByRole('textbox', { name: '结果' })).toHaveValue('a%20b%26c');
 });
 
-test('正则验证：匹配计数与高亮', async ({ page }) => {
+test('regex tester: match count and highlighting', async ({ page }) => {
   await page.goto('/tools/regex-tester');
   await page.getByLabel('表达式').fill('\\d+');
   await page.getByRole('textbox', { name: '测试文本' }).fill('abc 123 def 45');
@@ -41,36 +41,36 @@ test('正则验证：匹配计数与高亮', async ({ page }) => {
   await expect(page.locator('mark', { hasText: '123' })).toBeVisible();
 });
 
-test('文本对比：差异统计正确', async ({ page }) => {
+test('text diff: difference stats are correct', async ({ page }) => {
   await page.goto('/tools/text-diff');
   await page.getByRole('textbox', { name: '原文本' }).fill('a\nb');
   await page.getByRole('textbox', { name: '新文本' }).fill('a\nc');
   await expect(page.getByText('+1 新增 / −1 删除 / 1 未变')).toBeVisible();
 });
 
-test('JSON 格式化：4 空格缩进', async ({ page }) => {
+test('JSON format: 4-space indent', async ({ page }) => {
   await page.goto('/tools/json-format');
   await page.getByLabel('缩进').selectOption('4');
   await page.getByRole('textbox', { name: 'JSON 输入' }).fill('{"a":1}');
   await expect(page.getByRole('textbox', { name: '输出' })).toHaveValue('{\n    "a": 1\n}');
 });
 
-test('时间戳：秒级时间戳解析', async ({ page }) => {
+test('timestamp: parses second-based timestamps', async ({ page }) => {
   await page.goto('/tools/timestamp');
   await page.getByLabel('时间戳输入').fill('1725000000');
   await expect(page.getByText('2024-08-30T06:40:00')).toBeVisible();
 });
 
-test('UUID：生成 v4 格式正确', async ({ page }) => {
+test('UUID: generates valid v4 values', async ({ page }) => {
   await page.goto('/tools/uuid');
-  // exact：避免子串匹配到侧边栏「生成器」分类按钮，并顺带等待懒加载的工具挂载
+  // exact: avoid substring-matching the sidebar "生成器" category, and wait for the lazy-loaded tool to mount
   await page.getByRole('button', { name: '生成', exact: true }).click();
   await expect(page.getByRole('textbox', { name: '生成结果（每行一个）' })).toHaveValue(
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
   );
 });
 
-test('哈希计算：SHA-256 与标准向量一致', async ({ page }) => {
+test('hash: SHA-256 matches the standard vector', async ({ page }) => {
   await page.goto('/tools/hash');
   await page.getByRole('textbox', { name: '文本输入' }).fill('abc');
   await expect(page.getByRole('textbox', { name: 'SHA-256 结果' })).toHaveValue(
@@ -78,21 +78,21 @@ test('哈希计算：SHA-256 与标准向量一致', async ({ page }) => {
   );
 });
 
-// 文档类编辑器的界面文案按浏览器语言切换，固定为简体中文以便断言
-test.describe('幻灯片编辑器（zh-CN）', () => {
+// Document editors follow the browser language for UI copy; pin to Simplified Chinese so assertions are stable
+test.describe('slide editor (zh-CN)', () => {
   test.use({ locale: 'zh-CN' });
 
-  test('画布挂载 → 插入文本框 → 导出 pptx → 放映', async ({ page }) => {
+  test('canvas mounts → insert text box → export pptx → present', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
-    // Konva 会注入 3 个 canvas（背景 / 内容 / 覆盖层）
+    // Konva injects 3 canvases (background / content / overlay)
     expect(await page.locator('canvas').count()).toBeGreaterThanOrEqual(3);
 
     await page.getByRole('button', { name: '文本框' }).click();
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
-    // 导出已收进「文件」菜单：先展开菜单再点具体格式
+    // Export moved into the "文件" menu: open the menu first, then pick the format
     await page.getByTestId('menubar-file').click();
     await page.getByRole('menuitem', { name: '导出 PPTX', exact: true }).click();
     const download = await downloadPromise;
@@ -104,13 +104,13 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByRole('button', { name: '放映', exact: true })).toBeVisible();
   });
 
-  /** 形状已收进工具栏「形状」下拉，插入前需先展开菜单 */
+  /** Shapes moved into the toolbar "形状" dropdown, so expand the menu before inserting */
   async function insertShape(page: Page, name: string) {
     await page.getByRole('button', { name: '形状', exact: true }).click();
     await page.getByRole('menuitem', { name, exact: true }).click();
   }
 
-  test('对齐：全选两个元素后左对齐，X 坐标收敛到最左侧元素', async ({ page }) => {
+  test('align left: both elements converge on the leftmost X', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
@@ -119,17 +119,17 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
 
-    // 面板展示最后选中的矩形（居中 240 宽 → x=520），文本框 x=400 更靠左
+    // The panel shows the last selected rectangle (240 wide, centered → x=520); the text box is further left at x=400
     const xInput = page.getByLabel('X 坐标').first();
     await expect(xInput).toHaveValue('520');
 
-    // 对齐属于选中态操作，已移到顶部工具栏「排列」行的下拉里
+    // Alignment acts on the selection and now lives in the toolbar "排列" row's dropdown
     await page.getByRole('button', { name: '对齐', exact: true }).click();
     await page.getByRole('menuitem', { name: '左对齐', exact: true }).click();
     await expect(xInput).toHaveValue('400');
   });
 
-  test('组合 → 取消组合：选中数 2 → 1 → 2', async ({ page }) => {
+  test('group → ungroup: selection count 2 → 1 → 2', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
@@ -145,7 +145,7 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
   });
 
-  test('剪贴板：复制粘贴后元素数增加', async ({ page }) => {
+  test('clipboard: copy/paste adds an element', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
@@ -156,12 +156,12 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await page.keyboard.press('ControlOrMeta+v');
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
-    // 全选应命中原件 + 副本
+    // Select all should hit both the original and the copy
     await page.keyboard.press('ControlOrMeta+a');
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
   });
 
-  test('演讲者备注：编辑后保留在面板中', async ({ page }) => {
+  test('speaker notes: edits are kept in the panel', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
@@ -171,20 +171,20 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(notes).toHaveValue('开场先讲背景');
   });
 
-  test('模板：套用后出现该模板的版式列表', async ({ page }) => {
+  test('templates: applying one shows its layout list', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    // 切到右侧「主题与母版」页签
+    // Switch to the right-hand "主题与母版" tab
     await page.getByRole('button', { name: '主题与母版' }).click();
     await page.getByRole('button', { name: '商务蓝' }).click();
 
-    // 模板自带 6 个版式，套用后版式区出现可点击按钮
+    // The template ships 6 layouts; once applied, clickable buttons appear in the layout area
     await expect(page.getByRole('button', { name: 'Title Slide' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Section Header' })).toBeVisible();
   });
 
-  test('表格：插入后可直接调整行数', async ({ page }) => {
+  test('table: row count can be adjusted right after inserting', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
@@ -195,11 +195,11 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(rows).toHaveValue('3');
     await rows.fill('4');
     await expect(rows).toHaveValue('4');
-    // 列数保持不变
+    // Column count stays unchanged
     await expect(page.getByLabel('列数')).toHaveValue('3');
   });
 
-  test('图层面板：列出本页元素并可切换显隐', async ({ page }) => {
+  test('layers panel: lists elements on this page and toggles visibility', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
@@ -209,16 +209,16 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     const row = page.getByRole('button', { name: '图层: 文本框' });
     await expect(row).toBeVisible();
 
-    // 切换显隐后行标题带删除线（aria-pressed 反映隐藏态）
+    // Hidden rows get a strikethrough title (aria-pressed reflects the hidden state)
     const hide = page.getByRole('button', { name: /文本框 隐藏/ });
     await hide.click();
     await expect(page.getByRole('button', { name: /文本框 显示/ })).toBeVisible();
   });
 
-  test('大纲生成：Markdown 生成多页', async ({ page }) => {
+  test('outline generation: Markdown produces multiple slides', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
-    // 初始 1 页
+    // 1 page initially
     await expect(page.locator('.slide-thumb')).toHaveCount(1);
 
     await page.getByTestId('menubar-file').click();
@@ -230,11 +230,11 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.locator('.slide-thumb')).toHaveCount(2);
   });
 
-  test('导出 PDF / 图片 / 工程文件：文件名后缀正确', async ({ page }) => {
+  test('export PDF / image / project file: file extensions are correct', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    // 导出已收进「导出」下拉：每轮先展开菜单再点具体格式
+    // Export moved into the "导出" dropdown: open the menu each round, then pick the format
     for (const [item, pattern] of [
       ['导出 PDF', /\.pdf$/],
       ['导出图片', /\.png$/],
@@ -248,7 +248,7 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     }
   });
 
-  test('网格吸附与标尺开关可切换', async ({ page }) => {
+  test('grid snapping and ruler toggles switch', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
@@ -263,14 +263,14 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(rulers).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('行内编辑：覆盖层透明，不遮挡压在上层的元素', async ({ page }) => {
+  test('inline editing: transparent overlay does not cover stacked elements', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
     await page.getByRole('button', { name: '文本框' }).click();
     await insertShape(page, '矩形');
 
-    // 读取两个元素的屏幕位置（文本框在前、矩形在后，矩形压住文本框中段）
+    // Read both elements' screen positions (text box first, rectangle second; the rectangle covers the middle of the text box)
     const [textBox, rect] = await page.evaluate(() => {
       const Konva = (window as unknown as { Konva: { stages: unknown[] } }).Konva;
       const stage = (Konva.stages as unknown as { container: () => HTMLElement | null }[]).find(
@@ -294,7 +294,7 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
         });
     });
 
-    /** 元素节点的静态文字是否可见（编辑期间应隐藏，结束后恢复） */
+    /** Whether the element node's static text is visible (hidden while editing, restored after) */
     const staticTextVisible = () =>
       page.evaluate((id) => {
         const Konva = (window as unknown as { Konva: { stages: unknown[] } }).Konva;
@@ -312,20 +312,20 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
         return node?.findOne('.text')?.visible();
       }, textBox.id);
 
-    // 采样点：两元素重叠区、且避开文本框里的文字与各方元素边框
+    // Sample point: the overlap area, avoiding the text box text and the element borders
     const clip = {
       x: Math.round(Math.max(textBox.left, rect.left) + 20),
       y: Math.round(Math.max(textBox.top, rect.top) + 8),
       width: 40,
       height: 12,
     };
-    // 覆盖层与矩形确有重叠（否则这条用例证明不了什么）
+    // The overlay really does overlap the rectangle (otherwise this case proves nothing)
     expect(clip.x).toBeGreaterThan(rect.left);
     expect(clip.x + clip.width).toBeLessThan(rect.left + rect.width);
     await page.waitForTimeout(200);
     const before = await page.screenshot({ clip });
 
-    // 双击文本框（左段未被矩形覆盖处）进入行内编辑
+    // Double-click the text box (left part, not covered by the rectangle) to enter inline editing
     const enterEdit = async () => {
       await page.mouse.dblclick(textBox.left + 10, textBox.top + textBox.height / 2);
       await expect(area).toBeAttached();
@@ -333,39 +333,39 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     const area = page.locator('textarea[aria-label="edit text"]');
     await enterEdit();
 
-    // 覆盖层必须透明：带底色就会盖住压在该元素上层的矩形
+    // The overlay must be transparent: a background would hide the rectangle stacked above it
     await expect(area).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(area).toHaveCSS('z-index', '20');
-    // 静态文字让位给 textarea，避免透明背景下的文字重影
+    // Static text yields to the textarea to avoid ghosting on a transparent background
     expect(await staticTextVisible()).toBe(false);
 
-    // 重叠区像素不应被编辑覆盖层改变（回归：此前白底会把矩形整块盖住）
+    // Overlap pixels must not change while editing (regression: a white background covered the rectangle)
     await page.waitForTimeout(200);
     const during = await page.screenshot({ clip });
     expect(during.equals(before)).toBe(true);
 
-    // Esc 退出：覆盖层移除、静态文字恢复
+    // Esc exits: overlay removed, static text restored
     await page.keyboard.press('Escape');
     await expect(area).toHaveCount(0);
     expect(await staticTextVisible()).toBe(true);
 
-    // 无改动的失焦退出（点其它元素）同样要恢复静态文字。
-    // 落点必须在文本框之外（矩形下缘），否则点到覆盖层本身不会失焦。
+    // Blurring without changes (clicking another element) must also restore the static text.
+    // The click must land outside the text box (bottom edge of the rectangle), else the overlay itself keeps focus.
     await enterEdit();
     await page.mouse.click(rect.left + rect.width / 2, rect.top + rect.height - 8);
     await expect(area).toHaveCount(0);
     expect(await staticTextVisible()).toBe(true);
   });
 
-  test('右键画布：弹出菜单，可全选与 Esc 关闭', async ({ page }) => {
+  test('right-click canvas: menu opens, select all and Esc to close', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
     await page.getByRole('button', { name: '文本框' }).click();
     await insertShape(page, '矩形');
 
-    // 先在空白处左键取消选择，右键时菜单应给出画布级动作。
-    // 坐标必须避开标尺覆盖层（左上两条 20px 标尺 + 左上角 20×20 方块）。
+    // Left-click empty space to clear the selection first; the right-click menu should offer canvas-level actions.
+    // Coordinates must avoid the ruler overlay (20px rulers on the top/left plus a 20×20 square in the corner).
     const blank = { x: 60, y: 60 };
     const canvas = page.getByLabel('slide canvas');
     await canvas.click({ position: blank });
@@ -376,7 +376,7 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await menu.getByRole('menuitem', { name: '全选' }).click();
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
 
-    // 再右键一次，Esc 只关菜单、不触发编辑器的「取消选择」
+    // Right-click again: Esc only closes the menu, without triggering the editor's "deselect"
     await canvas.click({ button: 'right', position: blank });
     await expect(menu).toBeVisible();
     await page.keyboard.press('Escape');
@@ -384,7 +384,7 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
   });
 
-  test('右键页缩略图：菜单可复制该页', async ({ page }) => {
+  test('right-click page thumbnail: menu can duplicate the page', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
     await expect(page.locator('.slide-thumb')).toHaveCount(1);
@@ -397,12 +397,12 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
     await expect(page.locator('.slide-thumb')).toHaveCount(2);
   });
 
-  test('放映：矢量舞台 + 跳页 + Esc 退出', async ({ page }) => {
+  test('present: vector stage + page jump + Esc to exit', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
     await page.getByRole('button', { name: '放映', exact: true }).click();
-    // 矢量舞台代替了原来的位图 <img>
+    // The vector stage replaces the previous bitmap <img>
     await expect(page.getByLabel('present stage')).toBeVisible();
     await expect(page.getByLabel('跳转到页')).toHaveValue('1');
     await expect(page.getByLabel('计时')).toBeVisible();
@@ -412,15 +412,17 @@ test.describe('幻灯片编辑器（zh-CN）', () => {
   });
 });
 
-// 流程图编辑器（zh-CN）
-test.describe('流程图编辑器（zh-CN）', () => {
+// Flowchart editor (zh-CN)
+test.describe('flowchart editor (zh-CN)', () => {
   test.use({ locale: 'zh-CN' });
 
-  test('画布挂载 → 拖放元素落在鼠标处（不被居中）→ 模板载入', async ({ page }) => {
+  test('canvas mounts → drop lands at the cursor (not centered) → template loads', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
-    // React Flow 会挂载画布（含 .react-flow 容器）
+    // React Flow mounts the canvas (including the .react-flow container)
     await expect(page.locator('.react-flow')).toBeVisible();
-    // 导出已整合为下拉菜单（PNG/JPEG/SVG/PDF/JSON/DrawIO/Mermaid）
+    // Export is now one dropdown (PNG/JPEG/SVG/PDF/JSON/DrawIO/Mermaid)
     await expect(page.getByRole('button', { name: '导出' })).toBeVisible();
     await expect(page.getByRole('button', { name: '导入' })).toBeVisible();
 
@@ -428,8 +430,8 @@ test.describe('流程图编辑器（zh-CN）', () => {
     const canvasBox = await canvas.boundingBox();
     expect(canvasBox).toBeTruthy();
 
-    // 拖放到画布左上区域：节点应落在鼠标处
-    // 精确匹配：图形库中「预定义过程」也包含「过程」子串
+    // Drop onto the top-left area of the canvas: the node should land at the cursor
+    // Exact match: the shape library's "预定义过程" also contains "过程" as a substring
     await page.getByRole('button', { name: '过程', exact: true }).dragTo(canvas, {
       targetPosition: { x: 90, y: 90 },
     });
@@ -437,30 +439,30 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(1);
     const node = page.locator('.react-flow__node').first();
     await expect(node).toBeVisible();
-    // 新建图形默认无文案：节点不应带「过程」等占位文字，但形状已渲染为矩形
+    // New shapes default to no text: the node carries no "过程" placeholder but renders as a rectangle
     await expect(node).not.toContainText(/\S/);
     await expect(node.locator('svg rect').first()).toBeVisible();
-    // 防止「节点被撑成 0 尺寸而不可见」回归：必须有实际的宽高
+    // Guard against "node collapsed to 0 size and became invisible": it needs a real width and height
     const nodeBox = await node.boundingBox();
     expect(nodeBox?.width).toBeGreaterThan(0);
     expect(nodeBox?.height).toBeGreaterThan(0);
-    // 防止「首个元素被 fitView 居中」回归：节点中心必须落在画布左上象限
+    // Guard against "first element centered by fitView": the node center must stay in the top-left quadrant
     const cx = nodeBox!.x + nodeBox!.width / 2 - canvasBox!.x;
     const cy = nodeBox!.y + nodeBox!.height / 2 - canvasBox!.y;
-    // 用 1/3 而非 1/2：被居中时坐标约等于画布正中，必须留足区分度
+    // Use 1/3 rather than 1/2: when centered the coordinate is near the canvas center, so keep separation
     expect(cx).toBeLessThan(canvasBox!.width / 3);
     expect(cy).toBeLessThan(canvasBox!.height / 3);
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
 
-    // 载入模板应替换画布内容且节点数增加
+    // Loading a template should replace the canvas contents and increase the node count
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '基础流程' }).click();
     await expect(page.getByText(/节点:\s*4/)).toBeVisible();
   });
 
-  test('泳道是容器：拖入的元素会放进泳道内', async ({ page }) => {
+  test('swimlanes are containers: dropped elements go inside the lane', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    // 泳道模板：1 条泳道 + 4 个内部节点
+    // Swimlane template: 1 lane + 4 inner nodes
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
@@ -469,15 +471,15 @@ test.describe('流程图编辑器（zh-CN）', () => {
     const canvasBox = await canvas.boundingBox();
     expect(canvasBox).toBeTruthy();
 
-    // 拖到画布中心（模板 fitView 后泳道覆盖画布中心区域）
-    // 精确匹配：图形库中「预定义过程」也包含「过程」子串
+    // Drop at the canvas center (after the template fitView the lane covers the center area)
+    // Exact match: the shape library's "预定义过程" also contains "过程" as a substring
     await page.getByRole('button', { name: '过程', exact: true }).dragTo(canvas, {
       targetPosition: { x: canvasBox!.width / 2, y: canvasBox!.height / 2 },
     });
     await expect(page.getByText(/节点:\s*6/)).toBeVisible();
 
-    // 新节点应被泳道包围（证明它确实被放进了泳道，而不是叠在外面）
-    // 新建图形默认无文本，故用「无文案的节点」定位它（模板里的节点都带标题）
+    // The new node should be enclosed by the lane (proving it went inside rather than on top)
+    // New shapes have no text, so locate the node without copy (every template node has a title)
     const newNode = page.locator('.react-flow__node').filter({ hasNotText: /\S/ });
     await expect(newNode).toHaveCount(1);
     const lane = page.locator('.react-flow__node').filter({ hasText: '泳道' }).first();
@@ -491,21 +493,23 @@ test.describe('流程图编辑器（zh-CN）', () => {
     expect(nb!.y + nb!.height).toBeLessThanOrEqual(lb!.y + lb!.height + 1);
   });
 
-  test('多页标签：新建页面后内容隔离，切回可恢复', async ({ page }) => {
+  test('page tabs: new pages are isolated and switching back restores content', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '过程', exact: true }).click();
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
 
-    // 新建页面：画布应变为空白
+    // New page: the canvas should become empty
     await page.getByRole('button', { name: '新建页面' }).click();
     await expect(page.getByText(/节点:\s*0/)).toBeVisible();
 
-    // 切回第一页：内容应恢复
+    // Switch back to the first page: content should be restored
     await page.getByRole('button', { name: '页面 1' }).click();
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
   });
 
-  test('纵向泳道同样是容器：拖入的元素会放进泳道内', async ({ page }) => {
+  test('vertical swimlanes are containers too: drops go inside the lane', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '纵向泳道流程' }).click();
@@ -515,7 +519,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     const canvasBox = await canvas.boundingBox();
     expect(canvasBox).toBeTruthy();
 
-    // 精确匹配：图形库中「预定义过程」也包含「过程」子串
+    // Exact match: the shape library's "预定义过程" also contains "过程" as a substring
     await page.getByRole('button', { name: '过程', exact: true }).dragTo(canvas, {
       targetPosition: { x: canvasBox!.width / 2, y: canvasBox!.height / 2 },
     });
@@ -534,10 +538,10 @@ test.describe('流程图编辑器（zh-CN）', () => {
     expect(nb!.y + nb!.height).toBeLessThanOrEqual(lb!.y + lb!.height + 1);
   });
 
-  test('自由连线锚点：从一个图形的锚点拖到另一个图形生成连线', async ({ page }) => {
+  test('free connection anchors: drag between shape anchors to connect', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const canvas = page.locator('.react-flow');
-    // 在画布两个不同位置各放一个图形
+    // Place one shape at each of two different canvas positions
     await page.getByRole('button', { name: '过程', exact: true }).dragTo(canvas, {
       targetPosition: { x: 120, y: 120 },
     });
@@ -548,30 +552,30 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(2);
 
     const node = page.locator('.react-flow__node').first();
-    // 每个图形渲染 8 个自由连线锚点（上/下各 3、左/右各 1）
+    // Each shape renders 8 free connection anchors (3 top/bottom each, 1 left/right each)
     await expect(node.locator('.react-flow__handle')).toHaveCount(8);
-    // 悬停时锚点可见，可从此处拉出连线（ConnectionMode.Loose）
+    // Anchors appear on hover and a connection can be dragged out (ConnectionMode.Loose)
     await node.hover();
     await expect(node.locator('.react-flow__handle').first()).toBeVisible();
   });
 
-  test('泳道缩放把手：选中泳道后出现 8 个缩放把手', async ({ page }) => {
+  test('lane resize handles: selecting a swimlane shows 8 resize handles', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '横向泳道流程' }).click();
     await expect(page.getByText(/节点:\s*5/)).toBeVisible();
 
-    // 横向泳道宽 760px，而编辑器默认「100% 呈现」：画布较窄时标题条会被裁到视口外，
-    // 直接点击会命中左侧图形面板。先「适应画布」把整张图缩进视口（用户看到全貌的常规路径）。
+    // The horizontal lane is 760px wide while the editor shows 100% by default: on a narrow canvas its title bar is clipped,
+    // so a direct click hits the left shape panel. Click "适应画布" first to fit the diagram into the viewport (the usual path).
     await page.getByRole('button', { name: '适应画布' }).click();
 
     const lane = page.locator('.react-flow__node').filter({ hasText: '泳道' }).first();
-    // 点击泳道标题栏选中泳道（避开内部子节点），随后出现 8 个缩放把手
+    // Click the lane title bar to select the lane (avoiding inner nodes), then 8 resize handles appear
     await lane.getByText('泳道').click();
     await expect(lane.locator('.react-flow__resize-control')).toHaveCount(8);
   });
 
-  test('普通图形也支持缩放把手：选中后出现 8 个圆形把手', async ({ page }) => {
+  test('plain shapes also support resize handles: 8 round handles on select', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '过程', exact: true }).click();
     const node = page.locator('.react-flow__node').first();
@@ -579,12 +583,12 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(node.locator('.react-flow__resize-control')).toHaveCount(8);
   });
 
-  test('图形分类：通用图形置顶且每个分类可独立折叠', async ({ page }) => {
+  test('shape categories: general shapes on top, each category collapses', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
-    // 通用图形为侧边栏第一个分类
+    // General shapes are the first sidebar category
     const palette = page.locator('aside').filter({ has: page.getByPlaceholder('搜索图形') });
-    // 侧边栏顶部新增了「插入图片/图标/公式」入口，分类按钮中第一个仍应是「通用图形」
-    // 等侧边栏渲染完成再统计（allInnerTexts 不会自动等待）
+    // The sidebar top gained insert image/icon/formula entries; the first category button should still be "通用图形"
+    // Wait for the sidebar to render before counting (allInnerTexts does not auto-wait)
     await expect(palette.getByPlaceholder('搜索图形')).toBeVisible();
     const categories = [
       '通用图形',
@@ -606,20 +610,20 @@ test.describe('流程图编辑器（zh-CN）', () => {
     ];
     const texts = await palette.getByRole('button').allInnerTexts();
     expect(texts.find((text) => categories.includes(text.trim()))).toBe('通用图形');
-    // 默认展开：可见通用图形下的「圆角矩形」
+    // Expanded by default: "圆角矩形" under general shapes is visible
     await expect(page.getByRole('button', { name: '圆角矩形', exact: true })).toBeVisible();
-    // 点击收起该分类，其下图形隐藏（其它分类不受影响）
+    // Collapse the category: its shapes hide (other categories are unaffected)
     await page.getByRole('button', { name: '通用图形', exact: true }).click();
     await expect(page.getByRole('button', { name: '圆角矩形', exact: true })).toHaveCount(0);
-    // 再次展开后恢复
+    // Expanding again restores them
     await page.getByRole('button', { name: '通用图形', exact: true }).click();
     await expect(page.getByRole('button', { name: '圆角矩形', exact: true })).toBeVisible();
   });
 
-  test('侧边栏默认每排 5 个元素且可拖拽分隔条调整宽度', async ({ page }) => {
+  test('sidebar shows 5 items per row by default and the splitter resizes it', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const palette = page.locator('aside').filter({ has: page.getByPlaceholder('搜索图形') });
-    // 默认宽度下每排约 5 个元素（按首行按钮数计，避免依赖精确列宽）
+    // About 5 items per row at the default width (count first-row buttons to avoid depending on exact column width)
     await expect
       .poll(
         async () => {
@@ -634,7 +638,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
         { timeout: 5000 },
       )
       .toBe(5);
-    // 拖拽右侧分隔条可加宽侧边栏
+    // Dragging the right splitter widens the sidebar
     const sep = palette.locator('[role="separator"]');
     const box = (await sep.boundingBox())!;
     const before = (await palette.boundingBox())?.width ?? 0;
@@ -646,7 +650,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     expect(after).toBeGreaterThan(before + 40);
   });
 
-  test('自由连线：拖到目标图形“身上”即生成连线（不再丢线）', async ({ page }) => {
+  test('free connection: dropping onto the target shape itself connects', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const canvas = page.locator('.react-flow');
     await page.getByRole('button', { name: '过程', exact: true }).dragTo(canvas, {
@@ -663,7 +667,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(handle).toBeVisible();
     const hb = (await handle.boundingBox())!;
     const tb = (await page.locator('.react-flow__node').nth(1).boundingBox())!;
-    // 从锚点拖出，松手在目标图形身体上（非精确 handle），应补建连线
+    // Drag out of an anchor and release on the target shape's body (not the exact handle): the edge should still be created
     await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
     await page.mouse.down();
     await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2, { steps: 10 });
@@ -671,7 +675,9 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   });
 
-  test('快速连线：点击箭头后在弹窗中选择图形生成相连图形', async ({ page }) => {
+  test('quick connect: click an arrow, pick a shape in the dialog to insert a node', async ({
+    page,
+  }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '过程', exact: true }).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(1);
@@ -679,17 +685,17 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await node.hover();
     const arrow = node.getByLabel('快速连线-right');
     await arrow.click();
-    // 松手立即生成相连节点与连线，并弹出图形选择弹窗
+    // Releasing creates the connected node and edge at once and opens the shape picker
     const picker = page.getByTestId('quick-picker');
     await expect(picker).toBeVisible();
     await expect(page.locator('.react-flow__node')).toHaveCount(2);
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-    // 在弹窗中选择图形后，新节点类型被替换为该图形（默认无文案，按渲染形状断言）
+    // Picking a shape in the dialog replaces the new node's kind (no text by default, so assert the rendered shape)
     await picker.getByRole('button', { name: '圆角矩形', exact: true }).click();
     await expect(page.locator('.react-flow__node svg rect[rx="10"]')).toHaveCount(1);
   });
 
-  test('自由连线：拖到空白画布只连已有图形，不新增图形', async ({ page }) => {
+  test('free connection: dropping on blank canvas creates no shape or edge', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '过程', exact: true }).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(1);
@@ -699,7 +705,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     const handle = node.locator('.react-flow__handle-left');
     await expect(handle).toBeVisible();
     const hb = (await handle.boundingBox())!;
-    // 从左侧锚点拖到画布空白处，松手不应生成任何图形/连线
+    // Drag from the left anchor to empty canvas: releasing should create no shape or edge
     await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
     await page.mouse.down();
     await page.mouse.move(canvasBox.x + 40, hb.y + hb.height / 2, { steps: 12 });
@@ -708,7 +714,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   });
 
-  test('快速连线：按住箭头拖出后松手弹出选择弹窗', async ({ page }) => {
+  test('quick connect: drag an arrow and release to open the picker', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '过程', exact: true }).click();
     const node = page.locator('.react-flow__node').first();
@@ -721,14 +727,14 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await page.mouse.up();
     const picker = page.getByTestId('quick-picker');
     await expect(picker).toBeVisible();
-    // 松手即已生成相连节点与连线
+    // Releasing has already created the connected node and edge
     await expect(page.locator('.react-flow__node')).toHaveCount(2);
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
     await picker.getByRole('button', { name: '椭圆', exact: true }).click();
     await expect(page.locator('.react-flow__node svg ellipse')).toHaveCount(1);
   });
 
-  test('工具栏连线样式：选中连线后调整下拉立即生效', async ({ page }) => {
+  test('toolbar edge style: dropdown changes apply to the selected edge', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const canvas = page.locator('.react-flow');
     await page.getByRole('button', { name: '过程', exact: true }).dragTo(canvas, {
@@ -739,7 +745,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     });
     await expect(page.locator('.react-flow__node')).toHaveCount(2);
 
-    // 从一个锚点拖到另一个图形身上生成连线
+    // Drag from one anchor onto another shape to create an edge
     const src = page.locator('.react-flow__node').first();
     await src.hover();
     const handle = src.locator('.react-flow__handle-right');
@@ -751,7 +757,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await page.mouse.up();
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 
-    // 在连线路径中点处点击以选中该连线（路径中点必落在描边上）
+    // Click the path midpoint to select the edge (the midpoint always lies on the stroke)
     const mid = await page
       .locator('.react-flow__edge-interaction')
       .first()
@@ -766,14 +772,14 @@ test.describe('流程图编辑器（zh-CN）', () => {
     expect(mid).toBeTruthy();
     await page.mouse.click(mid!.x, mid!.y);
 
-    // 选中后通过工具栏下拉调整样式，应立即应用到该连线（属性面板同步反映）
+    // Adjust the style from the toolbar dropdown: it should apply immediately (and the panel reflects it)
     await page.getByLabel('开始箭头').selectOption('arrowclosed');
     await page.getByLabel('连线样式').selectOption('dashed');
     await expect(page.getByLabel('起点箭头')).toHaveValue('arrowclosed');
     await expect(page.getByLabel('线条')).toHaveValue('dashed');
   });
 
-  test('画布滚动：滚轮平移视图并显示滚动条', async ({ page }) => {
+  test('canvas scrolling: wheel pans the view and scrollbars appear', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '基础流程' }).click();
@@ -785,24 +791,24 @@ test.describe('流程图编辑器（zh-CN）', () => {
     const before = (await node.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 
-    // 上下滚动 → 竖直平移（内容向上移动）
+    // Scroll vertically → pan vertically (content moves up)
     await page.mouse.wheel(0, 220);
     await expect
       .poll(async () => (await node.boundingBox())?.y ?? before.y)
       .toBeLessThan(before.y - 10);
 
-    // 左右滚动 → 水平平移（内容向左移动）
+    // Scroll horizontally → pan horizontally (content moves left)
     const beforeX = (await node.boundingBox())!.x;
     await page.mouse.wheel(220, 0);
     await expect
       .poll(async () => (await node.boundingBox())?.x ?? beforeX)
       .toBeLessThan(beforeX - 10);
 
-    // 内容超出视口时出现滚动条
+    // Scrollbars appear once content exceeds the viewport
     await expect(page.getByTestId('canvas-scrollbar-y')).toBeVisible();
   });
 
-  test('连线选中：高亮显示并可调整 source/target', async ({ page }) => {
+  test('edge selection: highlights and allows changing source/target', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const canvas = page.locator('.react-flow');
     const proc = page.getByRole('button', { name: '过程', exact: true });
@@ -811,7 +817,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await proc.dragTo(canvas, { targetPosition: { x: 250, y: 210 } });
     await expect(page.locator('.react-flow__node')).toHaveCount(3);
 
-    // 连 1 → 2
+    // Connect 1 → 2
     const n1 = page.locator('.react-flow__node').nth(0);
     await n1.hover();
     const hb = (await n1.locator('.react-flow__handle-right').boundingBox())!;
@@ -822,10 +828,10 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await page.mouse.up();
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 
-    // 未选中时：不应出现自绘的重连端点方块
+    // Not selected: no custom reconnect endpoint squares should render
     await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(0);
 
-    // 点击连线路径中点选中该连线
+    // Click the path midpoint to select the edge
     const mid = await page
       .locator('.react-flow__edge-interaction')
       .first()
@@ -839,7 +845,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
       });
     await page.mouse.click(mid!.x, mid!.y);
 
-    // 选中后：描边高亮为蓝色 + 两端出现「小方块」重连端点
+    // Selected: the stroke highlights blue and "small squares" appear at both ends
     const endpoints = page.locator('[data-testid="edge-endpoint"]');
     await expect(endpoints).toHaveCount(2);
     const stroke = await page
@@ -848,11 +854,11 @@ test.describe('流程图编辑器（zh-CN）', () => {
       .evaluate((el) => getComputedStyle(el).stroke);
     expect(stroke).toBe('rgb(37, 99, 235)');
     const box = (await endpoints.first().boundingBox())!;
-    // 正方形且尺寸更小
+    // Square, and smaller
     expect(Math.abs(box.width - box.height)).toBeLessThan(1);
     expect(box.width).toBeLessThanOrEqual(12);
 
-    // 通过属性面板把「终点节点」改为第 3 个图形，连线几何应改变
+    // Change "终点节点" to the 3rd shape in the properties panel; the edge geometry should change
     const dBefore = await page.locator('.react-flow__edge-path').first().getAttribute('d');
     await page.getByLabel('终点节点').selectOption({ index: 2 });
     await expect
@@ -860,9 +866,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
       .not.toBe(dBefore);
   });
 
-  test('连线重连：选中后直接拖拽端点改接另一图形（节点锚点与快连箭头不抢指针）', async ({
-    page,
-  }) => {
+  test('edge reconnect: drag an endpoint onto another shape', async ({ page }) => {
     await page.goto('/tools/flowchart-editor');
     const canvas = page.locator('.react-flow');
     const proc = page.getByRole('button', { name: '过程', exact: true });
@@ -871,7 +875,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await proc.dragTo(canvas, { targetPosition: { x: 250, y: 240 } });
     await expect(page.locator('.react-flow__node')).toHaveCount(3);
 
-    // 连 1 → 2
+    // Connect 1 → 2
     const n1 = page.locator('.react-flow__node').nth(0);
     await n1.hover();
     const hb = (await n1.locator('.react-flow__handle-right').boundingBox())!;
@@ -882,7 +886,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await page.mouse.up();
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 
-    // 点击连线路径中点选中该连线
+    // Click the path midpoint to select the edge
     const mid = await page
       .locator('.react-flow__edge-interaction')
       .first()
@@ -896,7 +900,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
       });
     await page.mouse.click(mid!.x, mid!.y);
 
-    // 两端的方块端点应出现，且方块自身可按下（命中自己）
+    // The squares at both ends should appear and accept a pointer down (hitting themselves)
     await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(2);
     const ub = (await page.locator('[data-testid="edge-endpoint"]').nth(1).boundingBox())!;
     const scx = ub.x + ub.width / 2;
@@ -907,7 +911,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     );
     expect(hitClass).toContain('edge-endpoint');
 
-    // 方块中心即连线终点：正好落在图形边缘上（不再偏外）
+    // The square center is the edge endpoint: it lies exactly on the shape border (no longer outside)
     expect(
       Math.min(
         Math.abs(scy - n2b.y),
@@ -917,7 +921,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
       ),
     ).toBeLessThanOrEqual(1);
 
-    // 连线终点也与该方块中心重合（即终点落在图形边缘，不再偏外约 6px）
+    // The edge endpoint coincides with the square center too (the endpoint sits on the border, not ~6px outside)
     const pathEnd = await page
       .locator('.react-flow__edge-path')
       .first()
@@ -931,7 +935,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
     expect(Math.abs(pathEnd.x - scx)).toBeLessThanOrEqual(1);
     expect(Math.abs(pathEnd.y - scy)).toBeLessThanOrEqual(1);
 
-    // 方块只盖住箭头根部：沿该边向外露出的长度不足箭头全长(16)的一半，箭头仍可见
+    // The square covers only the arrow root: the exposed length along that edge is under half the 16px arrow, so the arrow stays visible
     const outward =
       scy < n2b.y + n2b.height / 2
         ? n2b.y - ub.y
@@ -942,7 +946,7 @@ test.describe('流程图编辑器（zh-CN）', () => {
             : ub.x + ub.width - (n2b.x + n2b.width);
     expect(outward).toBeLessThan(8);
 
-    // 拖拽终点端点改接到第 3 个图形
+    // Drag the target endpoint onto the 3rd shape
     const id3 = await page.locator('.react-flow__node').nth(2).getAttribute('data-id');
     const n3b = (await page.locator('.react-flow__node').nth(2).boundingBox())!;
     await page.mouse.move(ub.x + ub.width / 2, ub.y + ub.height / 2);
@@ -950,13 +954,13 @@ test.describe('流程图编辑器（zh-CN）', () => {
     await page.mouse.move(n3b.x + n3b.width / 2, n3b.y + n3b.height / 2, { steps: 12 });
     await page.mouse.up();
 
-    // 未新增连线，且终点已改为第 3 个图形
+    // No edge was added and the target is now the 3rd shape
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
     await expect(page.getByLabel('终点节点')).toHaveValue(id3!);
 
-    // 选中连线不抑制节点侧连线 UI：锚点圆点悬停即显、锚点可接收指针
+    // Selecting an edge does not suppress node-side connection UI: anchor dots show on hover and accept pointers
     await n1.hover();
-    // 端点方块落在该连线自己的锚点上（右侧），故换用底边中点锚点拉新连线
+    // The endpoint square sits on this edge's own anchor (right side), so pull the new edge from the bottom-middle anchor
     const handleAgain = n1.locator('.react-flow__handle-bottom[data-handleid="b"]');
     const pointerEvents = await handleAgain.evaluate((el) => getComputedStyle(el).pointerEvents);
     expect(pointerEvents).not.toBe('none');
@@ -964,34 +968,34 @@ test.describe('流程图编辑器（zh-CN）', () => {
       .poll(() => handleAgain.locator('span').evaluate((el) => getComputedStyle(el).opacity))
       .toBe('1');
 
-    // 连线仍选中（两端端点方块在）时，从该锚点拉出新连线
+    // While the edge is still selected (both endpoint squares present), pull a new edge from that anchor
     await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(2);
     const hb2 = (await handleAgain.boundingBox())!;
     await page.mouse.move(hb2.x + hb2.width / 2, hb2.y + hb2.height / 2);
     await page.mouse.down();
     await page.mouse.move(n2b.x + n2b.width / 2, n2b.y + n2b.height / 2, { steps: 10 });
     await page.mouse.up();
-    // 新建了连线，且原连线选中态被取消（端点方块消失）
+    // A new edge was created and the original lost its selection (endpoint squares gone)
     await expect(page.locator('.react-flow__edge')).toHaveCount(2);
     await expect(page.locator('[data-testid="edge-endpoint"]')).toHaveCount(0);
   });
 });
 
-// 照片编辑器（zh-CN）
-test.describe('照片编辑器（zh-CN）', () => {
-  // 工作区有 460px 最小高度：窗口再矮就会整页滚动，画布落点会随滚动位置漂移。
-  // 用常见的笔记本尺寸跑，保证用例点的是画布里真实的位置。
+// Photo editor (zh-CN)
+test.describe('photo editor (zh-CN)', () => {
+  // The workspace has a 460px min height: any shorter window scrolls the page and the canvas drop point drifts with scroll.
+  // Run at a common laptop size so the cases click real positions inside the canvas.
   test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
 
-  test('画布挂载 → 画笔落笔自动建图层 → 导出 PNG', async ({ page }) => {
+  test('canvas mounts → brush stroke creates a layer → export PNG', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
-    // Konva 会注入 3 个 canvas（背景 / 内容 / 覆盖层）
+    // Konva injects 3 canvases (background / content / overlay)
     expect(await page.locator('canvas').count()).toBeGreaterThanOrEqual(3);
-    // 新建文档即预置一张底色图层（与 PS / Photopea 的「背景」层一致）
+    // A new document starts with a background layer (matching PS / Photopea's "背景" layer)
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 画笔工具：落笔写入当前（底色）图层
+    // Brush tool: strokes go into the current (background) layer
     await page.getByRole('button', { name: '画笔', exact: true }).click();
     const canvasBox = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(canvasBox.x + 120, canvasBox.y + 120);
@@ -1000,7 +1004,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.up();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 导出对话框 → 下载 PNG
+    // Export dialog → download PNG
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('menubar-file').click();
     await page.getByRole('menuitem', { name: '导出图片' }).click();
@@ -1009,7 +1013,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(download.suggestedFilename()).toMatch(/\.png$/);
   });
 
-  test('适应窗口：算出容器真实比例（不退化到最小缩放）→ 100% 复原', async ({ page }) => {
+  test('fit to window: real container ratio (not min zoom), 100% restores', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
@@ -1020,7 +1024,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(initial).toBeGreaterThan(10);
     expect(initial).toBeLessThanOrEqual(100);
 
-    // 1280×720 画布放进 ~650×518 的容器，适配结果应稳定复现（而非被下限钳成 2%）
+    // A 1280×720 canvas in a ~650×518 container should fit reproducibly (instead of being clamped to 2%)
     await page.getByRole('button', { name: '适应窗口' }).click();
     await expect(page.getByTestId('photo-zoom')).toContainText(`${initial}%`);
 
@@ -1028,11 +1032,11 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByTestId('photo-zoom')).toContainText('100%');
   });
 
-  test('画笔 / 橡皮：拖动过程中即时生效（不等松手）', async ({ page }) => {
+  test('brush / eraser: apply live while dragging (no need to release)', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    /** 统计内容层画布上「有颜色」的像素数（每次现取画布位置，避免页面滚动导致坐标失效） */
+    /** Count colored pixels on the content canvas (re-read its position each time so page scroll cannot invalidate coordinates) */
     const paintedPixels = () =>
       page.evaluate(() => {
         const canvas = document.querySelector(
@@ -1053,19 +1057,19 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.down();
     await page.mouse.move(box.x + 320, y, { steps: 12 });
     await page.waitForTimeout(150);
-    // 松手前就该看到笔迹：烘焙缓存不能把画面冻在笔画开始那一刻
+    // Strokes must be visible before release: the baked cache must not freeze the frame at the start of the stroke
     expect(await paintedPixels()).toBeGreaterThan(0);
     await page.mouse.up();
     await page.waitForTimeout(150);
     const painted = await paintedPixels();
     expect(painted).toBeGreaterThan(0);
 
-    // 橡皮沿同一条线擦回：松手前像素就应该减少
-    // 橡皮已从画笔组独立出来，工具箱里直接可点
+    // Erase back along the same line: pixels should shrink before release
+    // The eraser now has its own toolbox entry instead of living under the brush
     await page.getByTestId('photo-tool-palette').locator('[data-tool="eraser"]').click();
 
-    // 切到橡皮后工具参数条行数变化，工作区高度跟着重算，画布会整体位移，
-    // 之前记下的屏幕坐标已失效；改成从画布像素里现找笔迹所在的那一行再换算成屏幕坐标。
+    // Switching to the eraser changes the option bar's height and the workspace reflows, shifting the canvas,
+    // so earlier screen coordinates are stale; find the stroke's row in canvas pixels and convert it instead.
     const line = await page.evaluate(() => {
       const canvas = document.querySelector(
         '[data-testid="photo-content-canvas"]',
@@ -1097,12 +1101,12 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.move(line.left, line.y);
     await page.mouse.down();
     await page.mouse.move(line.right, line.y, { steps: 12 });
-    // 仍未松手：只要在拖动过程中（而不是松手后）像素减少即可，给重绘留出几帧
+    // Still not released: pixels only need to shrink during the drag (not after), leaving a few frames for repaint
     await expect.poll(paintedPixels, { timeout: 1000 }).toBeLessThan(painted);
     await page.mouse.up();
   });
 
-  test('抓手：拖动过程中即时平移视口', async ({ page }) => {
+  test('hand tool: pans the viewport live while dragging', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
@@ -1122,14 +1126,14 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.down();
     await page.mouse.move(cx + 100, cy, { steps: 10 });
     await page.waitForTimeout(150);
-    // 松手前视口就已经平移，且松手后保持
+    // The viewport has already panned before release and stays panned afterwards
     expect(await panX()).toBeGreaterThanOrEqual(before + 60);
     await page.mouse.up();
     await page.waitForTimeout(150);
     expect(await panX()).toBeGreaterThanOrEqual(before + 60);
   });
 
-  test('刷新后从草稿恢复仍能落笔（草稿不得把像素丢成空图层）', async ({ page }) => {
+  test('draft restore after reload still allows painting', async ({ page }) => {
     const paintedPixels = () =>
       page.evaluate(() => {
         const canvas = document.querySelector(
@@ -1158,7 +1162,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await stroke();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 等草稿落盘（草稿状态图标出现「已保存到本地草稿」提示）后刷新：恢复出来的图层必须还能继续画
+    // Wait for the draft to be persisted (the icon shows "已保存到本地草稿"), then reload: the layer must still accept strokes
     await expect(page.getByLabel('已保存到本地草稿')).toBeVisible({ timeout: 5000 });
     await page.reload();
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
@@ -1168,8 +1172,8 @@ test.describe('照片编辑器（zh-CN）', () => {
 
     await page.getByTestId('photo-tool-palette').locator('[data-tool="eraser"]').click();
 
-    // 恢复后的视口平移/缩放不必和刷新前一致，所以按画布里真实有笔迹的那一行换算屏幕坐标再擦，
-    // 否则固定屏幕坐标可能落在空白处（像素没丢也擦不到）。
+    // The restored pan/zoom need not match the pre-reload state, so convert the stroke row from canvas pixels to screen
+    // coordinates; fixed screen coordinates could land on blank space (pixels intact but nothing erased).
     const row = await page.evaluate(() => {
       const canvas = document.querySelector(
         '[data-testid="photo-content-canvas"]',
@@ -1206,31 +1210,31 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(await paintedPixels()).toBeLessThan(restored);
   });
 
-  test('图层面板：混合模式 / 不透明度置于顶部一行，⋯ 菜单承载重命名与新建图层', async ({
+  test('layers panel: blend mode / opacity on the top row, the ⋯ menu holds rename and new layer', async ({
     page,
   }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    // 空态下也能通过 ⋯ 菜单创建第一个图层
+    // The ⋯ menu also creates the first layer from the empty state
     await page.getByTestId('layer-menu-trigger').click();
     await expect(page.getByRole('menu')).toBeVisible();
     await page.getByRole('menuitem', { name: '空白图层' }).click();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 顶部一行只作用于当前选中图层
+    // The top row only affects the currently selected layer
     await page.getByLabel('混合模式').selectOption('multiply');
     await expect(page.getByLabel('混合模式')).toHaveValue('multiply');
     await page.getByRole('slider', { name: '不透明度' }).fill('60');
     await expect(page.getByRole('slider', { name: '不透明度' })).toHaveValue('60');
 
-    // ⋯ 菜单内的重命名文本框
+    // The rename text field inside the ⋯ menu
     await page.getByTestId('layer-menu-trigger').first().click();
     await page.getByRole('menu').getByLabel('重命名').fill('我的图层');
     await page.keyboard.press('Escape');
     await expect(page.getByText('我的图层').first()).toBeVisible();
 
-    // 图层多到需要滚动时，顶部「混合模式 / 不透明度」这一行必须固定不动
+    // When layers overflow and scroll, the "混合模式 / 不透明度" row must stay fixed
     for (let i = 0; i < 8; i += 1) {
       await page.getByTestId('layer-menu-trigger').first().click();
       await page.getByRole('menuitem', { name: '文字图层' }).click();
@@ -1251,7 +1255,9 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(Math.round((await opacity.boundingBox())!.y)).toBe(before.opacity);
   });
 
-  test('画布右键菜单：选区后续操作（填充 / 反选 / 通过拷贝新建图层）', async ({ page }) => {
+  test('canvas context menu: selection actions (fill / invert / new layer via copy)', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
@@ -1276,12 +1282,12 @@ test.describe('照片编辑器（zh-CN）', () => {
       await expect(menu).toBeVisible();
     };
 
-    // 无选区：菜单只有画布级操作
+    // No selection: the menu only has canvas-level actions
     await openMenu();
     await expect(menu.getByRole('menuitem', { name: '全选' })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: '填充选区（前景色）' })).toHaveCount(0);
 
-    // 全选 → 选区操作出现，填充整块画布
+    // Select all → selection actions appear and fill the whole canvas
     await menu.getByRole('menuitem', { name: '全选' }).click();
     await expect(menu).toHaveCount(0);
     await expect(page.getByText('选区 1280 × 720')).toBeVisible();
@@ -1292,7 +1298,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     const filled = await paintedPixels();
     expect(filled).toBeGreaterThan(0);
 
-    // 矩形选区 → 反选 → 清除：只有原选区内像素保留
+    // Rectangle select → invert → clear: only the original selection keeps its pixels
     await page.keyboard.press('Control+a');
     await page.getByRole('button', { name: '矩形选区', exact: true }).click();
     const box = (await page.getByTestId('photo-canvas').boundingBox())!;
@@ -1310,18 +1316,20 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(afterClear).toBeGreaterThan(0);
     expect(afterClear).toBeLessThan(filled);
 
-    // 通过拷贝新建图层
+    // New layer via copy
     await page.keyboard.press('Control+a');
     await openMenu();
     await menu.getByRole('menuitem', { name: '通过拷贝新建图层' }).click();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
   });
 
-  test('吸管：取色有反馈，透明像素不覆盖前景色，Alt+点击可临时取色', async ({ page }) => {
+  test('eyedropper: picks with feedback, transparent pixels keep the foreground, Alt+click samples temporarily', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    /** 文档坐标 → 屏幕坐标：data-transform = "scale,tx,ty" */
+    /** Document coordinates → screen coordinates: data-transform = "scale,tx,ty" */
     const stage = async () => {
       const box = (await page.getByTestId('photo-canvas').boundingBox())!;
       const raw = await page.evaluate(
@@ -1336,7 +1344,7 @@ test.describe('照片编辑器（zh-CN）', () => {
       };
     };
 
-    // 涂一段红色笔迹（文档坐标 (200,200) → (600,400)）
+    // Paint a red stroke (document coordinates (200,200) → (600,400))
     await page.getByRole('button', { name: '画笔', exact: true }).click();
     await page.getByTestId('photo-swatch-#DC2626').click();
     let s = await stage();
@@ -1348,7 +1356,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.up();
     await page.waitForTimeout(150);
 
-    // 吸管取色：参数条显示前景色，并给出「已吸取」反馈
+    // Eyedropper: the option bar shows the foreground color and a "已吸取" notice
     await page.getByRole('button', { name: '吸管', exact: true }).click();
     await expect(page.getByTestId('eyedropper-bar')).toBeVisible();
     s = await stage();
@@ -1357,12 +1365,12 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByTestId('photo-notice')).toContainText('已吸取 #DC2626');
     await expect(page.getByTestId('eyedropper-bar')).toContainText('#DC2626');
 
-    // 白底空白处 → 吸到白色
+    // Blank spot on a white canvas → picks white
     const onWhite = s.at(1100, 400);
     await page.mouse.click(onWhite.x, onWhite.y);
     await expect(page.getByTestId('photo-notice')).toContainText('已吸取 #FFFFFF');
 
-    // 透明画布：空白处提示透明，且不覆盖前景色
+    // Transparent canvas: blank spots report transparency and keep the foreground color
     await page.getByRole('button', { name: '新建画布' }).click();
     await page.getByLabel('画布背景').selectOption('transparent');
     await page.getByRole('dialog').getByRole('button', { name: '创建' }).click();
@@ -1374,7 +1382,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByTestId('photo-notice')).toContainText('透明像素');
     await expect(page.getByTestId('eyedropper-bar')).toContainText('#FFFFFF');
 
-    // Alt + 左键：在画笔工具下临时取色，且不切换工具
+    // Alt + left click: samples temporarily while the brush stays active
     await page.getByRole('button', { name: '画笔', exact: true }).click();
     await page.keyboard.down('Alt');
     await page.mouse.click(onEmpty.x, onEmpty.y);
@@ -1385,7 +1393,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     );
   });
 
-  test('滚动条与滚轮：上下 / 左右滚动、Ctrl+滚轮锚点缩放、拖动滑块、适应窗口后隐藏', async ({
+  test('scrollbars and wheel: vertical/horizontal scroll, Ctrl+wheel zoom, hide after fit', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -1402,12 +1410,12 @@ test.describe('照片编辑器（zh-CN）', () => {
     const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 
-    // 1) 100% 放大后内容必然超出视口 → 两条滚动条都出现
+    // 1) At 100% the content exceeds the viewport, so both scrollbars appear
     await page.getByRole('button', { name: '100%', exact: true }).click();
     await expect(page.getByTestId('canvas-scrollbar-x')).toBeVisible();
     await expect(page.getByTestId('canvas-scrollbar-y')).toBeVisible();
 
-    // 2) 普通滚轮 = 平移（内容向上/向左移动）
+    // 2) A plain wheel = panning (content moves up/left)
     const before = await transform();
     await page.mouse.move(center.x, center.y);
     await page.mouse.wheel(0, 200);
@@ -1420,7 +1428,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     const afterX = await transform();
     expect(afterX.x).toBeLessThan(before.x - 10);
 
-    // 3) Ctrl + 滚轮 = 以光标为锚点缩放：光标下的文档坐标保持不动
+    // 3) Ctrl + wheel = zoom anchored at the cursor: the document point under it stays put
     await page.getByRole('button', { name: '适应窗口' }).click();
     await page.waitForTimeout(150);
     const anchor = { x: box.x + box.width * 0.3, y: box.y + box.height * 0.35 };
@@ -1439,7 +1447,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(Math.abs(docAfter.x - docBefore.x)).toBeLessThan(6);
     expect(Math.abs(docAfter.y - docBefore.y)).toBeLessThan(6);
 
-    // 4) 拖动纵向滚动条滑块 → 视口平移
+    // 4) Drag the vertical scrollbar thumb → the viewport pans
     const vBefore = (await transform()).y;
     const thumb = page.getByTestId('canvas-scrollbar-y').locator('div').first();
     const tb = (await thumb.boundingBox())!;
@@ -1451,23 +1459,23 @@ test.describe('照片编辑器（zh-CN）', () => {
     const vAfter = (await transform()).y;
     expect(vAfter).toBeLessThan(vBefore - 20);
 
-    // 5) 适应窗口后内容小于视口 → 滚动条隐藏
+    // 5) After fit-to-window the content is smaller than the viewport → scrollbars hide
     await page.getByRole('button', { name: '适应窗口' }).click();
     await page.waitForTimeout(200);
     await expect(page.getByTestId('canvas-scrollbar-y')).toHaveCount(0);
   });
 
-  test('缩放控件：四个图标按钮图形各不相同，文字说明走 tooltip', async ({ page }) => {
+  test('zoom controls: four distinct icon buttons, labels live in tooltips', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-zoom')).toBeVisible();
 
     const markup = async (name: string) =>
       (await page.getByRole('button', { name }).innerHTML()).replace(/\s+/g, '');
 
-    // 放大 / 缩小必须是不同的图形（曾经两个按钮共用一个放大镜图标）
+    // Zoom in / out must use different icons (the two buttons once shared a magnifier icon)
     expect(await markup('放大')).not.toBe(await markup('缩小'));
 
-    // 适应窗口 / 100%：图标按钮 + tooltip，不再有可见文字
+    // Fit to window / 100%: icon buttons + tooltips, no visible text anymore
     for (const [testId, label] of [
       ['photo-fit', '适应窗口'],
       ['photo-actual', '100%'],
@@ -1479,7 +1487,9 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(await markup('适应窗口')).not.toBe(await markup('100%'));
   });
 
-  test('新建画布对话框：指定尺寸后画布统计更新，画布名称重置', async ({ page }) => {
+  test('new canvas dialog: creating at a custom size updates stats and resets the name', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     const title = page.getByLabel('画布名称');
     await title.fill('旧画布');
@@ -1490,16 +1500,16 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.getByRole('dialog').getByRole('button', { name: '创建' }).click();
     await expect(page.getByTestId('photo-stats')).toContainText('800 × 600');
 
-    // 新画布从空白开始：名称不沿用旧文档，回到「未命名画布」占位
+    // A new canvas starts blank: the name does not carry over and reverts to the "未命名画布" placeholder
     await expect(title).toHaveValue('');
     await expect(title).toHaveAttribute('placeholder', '未命名画布');
   });
 
-  test('打开图片：以图片尺寸新建画布；导入图片到画布：只追加图层', async ({ page }) => {
+  test('open image sizes the canvas; import image only appends a layer', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    // 16×16 的 PNG：与最小画布尺寸一致，便于校验「画布跟着图片走」
+    // A 16×16 PNG: identical to the minimum canvas size, so it is easy to check the canvas follows the image
     const png = {
       name: 'dot.png',
       mimeType: 'image/png',
@@ -1509,7 +1519,7 @@ test.describe('照片编辑器（zh-CN）', () => {
       ),
     };
 
-    // 导入图片到画布：画布尺寸保持不变，只多一个图层
+    // Import image: the canvas size is unchanged, just one more layer
     let chooser = page.waitForEvent('filechooser');
     await page.getByTestId('menubar-file').click();
     await page.getByRole('menuitem', { name: '导入图片到画布' }).click();
@@ -1517,15 +1527,15 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByTestId('photo-stats')).toContainText('1280 × 720');
     await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
 
-    // 打开图片：以图片尺寸新建画布，文档里只剩图片这一层
+    // Open image: a new canvas at the image size, leaving only the image layer in the document
     chooser = page.waitForEvent('filechooser');
     await page.getByTestId('menubar-file').click();
     await page.getByRole('menuitem', { name: '打开图片' }).click();
     await (await chooser).setFiles(png);
     await expect(page.getByTestId('photo-stats')).toContainText('16 × 16');
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
-    // 画布底色为白色：橡皮擦掉像素后露出白底，而不是舞台的深色棋盘格。
-    // 背景画在 bg 层（舞台上第一个 canvas），白底会铺满整个页面矩形。
+    // The canvas background is white: erasing pixels reveals white instead of the stage's dark checkerboard.
+    // The background is painted on the bg layer (the first canvas on the stage) and fills the whole page rect.
     const bgCanvas = await page.evaluate(() => {
       const canvas = document.querySelector('.photo-stage canvas') as HTMLCanvasElement;
       const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
@@ -1541,11 +1551,11 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(bgCanvas).toBeGreaterThan(0);
   });
 
-  test('导出 PSD：下载 .psd 且可在 Photoshop / Photopea 继续编辑', async ({ page }) => {
+  test('export PSD: downloads a .psd editable in Photoshop / Photopea', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    // 两层内容：位图 + 编组内再一层，验证层树映射不报错
+    // Two levels of content: a bitmap plus one layer inside a group, to verify the layer-tree mapping
     await page.getByTestId('layer-menu-trigger').first().click();
     await page.getByRole('menuitem', { name: '空白图层' }).click();
     await page.getByTestId('layer-menu-trigger').first().click();
@@ -1559,17 +1569,19 @@ test.describe('照片编辑器（zh-CN）', () => {
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.psd$/);
 
-    // 落盘后用文件头校验：PSD 以 8BPS 开头
+    // Validate the downloaded file by its header: PSD files start with 8BPS
     const path = await download.path();
     const header = (await import('node:fs')).readFileSync(path!).subarray(0, 4).toString('latin1');
     expect(header).toBe('8BPS');
   });
 
-  test('智能对象：位图转换后保留源像素尺寸，可再栅格化', async ({ page }) => {
+  test('smart object: conversion keeps source pixel size and can be rasterized', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    // 一张位图图层（落笔自动创建）
+    // One bitmap layer (created automatically by the first stroke)
     await page.getByRole('button', { name: '画笔', exact: true }).click();
     const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(box.x + 120, box.y + 120);
@@ -1578,32 +1590,34 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.up();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 转为智能对象
+    // Convert to a smart object
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '转换为智能对象' }).click();
 
     await page.getByRole('tab', { name: '属性', exact: true }).click();
     await expect(page.getByTestId('smart-section')).toBeVisible();
-    // 源像素尺寸来自原始资产（画布 1280×720 上的图层宽度）
+    // Source pixel size comes from the original asset (the layer width on a 1280×720 canvas)
     await expect(page.getByTestId('smart-section')).toContainText('1280 × 720');
 
-    // 缩小呈现尺寸：源尺寸不变（非破坏）
+    // Shrinking the displayed size leaves the source size untouched (non-destructive)
     const width = page.getByLabel('宽度');
     await width.fill('640');
     await width.dispatchEvent('change');
     await expect(page.getByTestId('smart-section')).toContainText('1280 × 720');
 
-    // 栅格化：回到普通位图，智能对象小节消失
+    // Rasterize: back to a plain bitmap and the smart object section disappears
     await page.getByTestId('smart-rasterize').click();
     await expect(page.getByTestId('smart-section')).toHaveCount(0);
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
   });
 
-  test('调整图层：作用于下方全部内容，改亮度即时生效且可撤销', async ({ page }) => {
+  test('adjustment layer: applies to everything below, brightness is live and undoable', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    // 底色：一张画满的位图（用油漆桶铺满画布，排除背景干扰）
+    // Base: a fully filled bitmap (bucket-fill the canvas to rule out background noise)
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '空白图层' }).click();
     await page.getByRole('button', { name: '油漆桶', exact: true }).click();
@@ -1611,7 +1625,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    /** 取内容层画布中心像素亮度 */
+    /** Brightness of the center pixel on the content canvas */
     const centerLuma = () =>
       page.evaluate(() => {
         const canvas = document.querySelector(
@@ -1627,7 +1641,7 @@ test.describe('照片编辑器（zh-CN）', () => {
         return Math.round(data[0] * 0.299 + data[1] * 0.587 + data[2] * 0.114);
       });
 
-    // 新建调整图层 → 选中它 → 调亮度
+    // New adjustment layer → select it → adjust brightness
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '新建调整图层' }).click();
     await page.getByRole('tab', { name: '调整', exact: true }).click();
@@ -1638,16 +1652,16 @@ test.describe('照片编辑器（zh-CN）', () => {
     await brightness.dispatchEvent('change');
     await expect.poll(centerLuma).toBeGreaterThan(before);
 
-    // 撤销（滑杆过程不进历史，用工具栏按钮触发）：亮度回到原值
+    // Undo (slider drags are not recorded in history, so use the toolbar button): brightness returns to the original
     await page.getByRole('button', { name: '撤销' }).click();
     await expect.poll(centerLuma).toBe(before);
   });
 
-  test('图层蒙版：隐藏全部 → 画笔涂白显示 → 反相 → 删除', async ({ page }) => {
+  test('layer mask: hide all → paint white to reveal → invert → delete', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    // 建一张有内容的位图图层
+    // Create a bitmap layer with content
     await page.getByRole('button', { name: '画笔', exact: true }).click();
     const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(box.x + 100, box.y + 100);
@@ -1656,7 +1670,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.up();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    /** 内容层画布上的可见像素数（蒙版会直接改变它） */
+    /** Number of visible pixels on the content canvas (the mask changes it directly) */
     const countInk = () =>
       page.evaluate(() => {
         const canvas = document.querySelector(
@@ -1671,74 +1685,76 @@ test.describe('照片编辑器（zh-CN）', () => {
     const before = await countInk();
     expect(before).toBeGreaterThan(0);
 
-    // 属性页 → 添加蒙版（隐藏全部）
+    // Properties tab → add mask (hide all)
     await page.getByRole('tab', { name: '属性', exact: true }).click();
     await page.getByRole('button', { name: '隐藏全部' }).click();
     await expect(page.getByTestId('mask-remove')).toBeVisible();
     await expect.poll(countInk).toBe(0);
 
-    // 进入蒙版编辑：画笔涂白 = 显示该区域
+    // Edit the mask: painting white shows that area
     await page.getByTestId('mask-edit-toggle').click();
     await page.mouse.move(box.x + 120, box.y + 120);
     await page.mouse.down();
     await page.mouse.move(box.x + 300, box.y + 240, { steps: 10 });
     await page.mouse.up();
-    // 蒙版合成是异步的（脏区重绘），直接读画布可能还没更新
+    // Mask compositing is async (dirty-region repaint), so reading the canvas right away may be stale
     await expect.poll(countInk).toBeGreaterThan(0);
     const revealed = await countInk();
 
-    // 反相：黑白互换 → 显示区域取反（与涂白区域互补，不再是同一批像素）
+    // Invert: black and white swap → the visible area becomes the complement of the painted area
     await page.getByTestId('mask-edit-toggle').click();
     await page.getByTestId('mask-invert').click();
     await expect.poll(countInk).not.toBe(revealed);
     const inverted = await countInk();
     expect(inverted).toBeGreaterThan(0);
-    // 互补：两部分之和不超过原始像素数（重叠部分按一次计）
+    // Complementary: the sum of both parts does not exceed the original pixel count (overlap counted once)
     expect(inverted + revealed).toBeLessThanOrEqual(before + revealed);
 
-    // 删除蒙版：回到完整可见
+    // Delete the mask: fully visible again
     await page.getByTestId('mask-remove').click();
     await expect.poll(countInk).toBe(before);
   });
 
-  test('图层编组：新建组 → 图层移入 → 折叠隐藏子图层 → 解散', async ({ page }) => {
+  test('layer groups: new group → move layer in → collapse hides children → ungroup', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    // 先有一张位图图层
+    // Start with one bitmap layer
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '空白图层' }).click();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 从图层新建编组
+    // New group from layer
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '从图层新建编组' }).click();
-    // 编组 + 组内图层共 2 行
+    // Two rows: the group plus its inner layer
     await expect(page.getByTestId('layer-panel').locator('li')).toHaveCount(2);
 
-    // 面板倒序呈现（最上层在前）：组内图层在第一行且缩进 12px，编组本身在第二行不缩进
+    // The panel is reversed (topmost first): the inner layer is row 1 indented 12px, the group is row 2 unindented
     const rows = page.getByTestId('layer-panel').locator('li');
     await expect(rows.nth(0)).toHaveCSS('margin-left', '12px');
     await expect(rows.nth(1)).toHaveCSS('margin-left', '0px');
 
-    // 折叠：子树整段隐藏
+    // Collapse: the whole subtree hides
     await page.locator('[data-testid^="group-toggle-"]').first().click();
     await expect(rows).toHaveCount(1);
     await page.locator('[data-testid^="group-toggle-"]').first().click();
     await expect(rows).toHaveCount(2);
 
-    // 解散编组：菜单在编组那一行（第二行）上
+    // Ungroup: the menu sits on the group's row (row 2)
     await rows.nth(1).getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: '解散编组' }).click();
     await expect(rows).toHaveCount(1);
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
   });
 
-  test('历史面板：按操作名列出步骤，点击可跳转并清空', async ({ page }) => {
+  test('history panel: lists steps by action name, click to jump and clear', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
-    // 画笔落笔 → 自动新建图层（一步历史）
+    // Brush stroke → a layer is created automatically (one history step)
     await page.getByRole('button', { name: '画笔', exact: true }).click();
     const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(box.x + 120, box.y + 120);
@@ -1750,27 +1766,29 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.getByRole('tab', { name: '历史', exact: true }).click();
     const list = page.getByTestId('history-list');
     await expect(list).toBeVisible();
-    // 打开文档 → 新建图层 → 画笔落笔（当前）
+    // Open document → new layer → brush stroke (current)
     await expect(list.locator('li')).toHaveCount(3);
     await expect(page.getByTestId('history-row-1')).toContainText('新建图层');
     await expect(page.getByTestId('history-row-2')).toContainText('画笔');
     await expect(page.getByTestId('history-row-2')).toHaveAttribute('data-current', 'true');
 
-    // 点第 0 行：跳回初始状态（图层被撤销）
+    // Click row 0: jump back to the initial state (the layer is undone)
     await page.getByTestId('history-row-0').click();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 0');
     await expect(page.getByTestId('history-row-0')).toHaveAttribute('data-current', 'true');
 
-    // 跳回最后一行：重做两步
+    // Jump to the last row: redo both steps
     await page.getByTestId('history-row-2').click();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 1');
 
-    // 清空历史：只剩当前状态一行
+    // Clear history: only the current state row remains
     await page.getByTestId('history-clear').click();
     await expect(list.locator('li')).toHaveCount(1);
   });
 
-  test('右侧面板：三块等分 → 拖动分割线改高度 → 各自滚动、侧栏不整体滚动', async ({ page }) => {
+  test('right panel: three equal panes, drag dividers, panes scroll independently', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-panels')).toBeVisible();
 
@@ -1784,19 +1802,19 @@ test.describe('照片编辑器（zh-CN）', () => {
         ),
       );
 
-    // 默认三等分
+    // Three equal panes by default
     const [first, second, third] = await heights();
     expect(Math.abs(first - second)).toBeLessThanOrEqual(2);
     expect(Math.abs(second - third)).toBeLessThanOrEqual(2);
 
-    // 侧栏本身不产生整体滚动条（内容溢出只发生在各面板内部）
+    // The sidebar as a whole never scrolls (overflow is confined to each pane)
     await expect
       .poll(() =>
         page.getByTestId('photo-panels').evaluate((el) => el.scrollHeight - el.clientHeight),
       )
       .toBeLessThanOrEqual(1);
 
-    // 拖动第一、二块之间的分割线：第一块变高、第二块变矮
+    // Drag the divider between panes 1 and 2: pane 1 grows, pane 2 shrinks
     const box = (await page.getByTestId('panel-divider-1').boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
@@ -1807,7 +1825,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(grownFirst).toBeGreaterThan(first);
     expect(shrunkSecond).toBeLessThan(second);
 
-    // 颜色面板内容高于可视区：在自己的内容区滚动
+    // The color pane is taller than its viewport: it scrolls inside its own content area
     const inner = await page.getByTestId('panel-group-color').evaluate((el) => {
       const area = el.lastElementChild as HTMLElement;
       return { scroll: area.scrollHeight, client: area.clientHeight };
@@ -1815,39 +1833,43 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(inner.scroll).toBeGreaterThan(inner.client);
   });
 
-  test('工具箱：首次点击选中，再次点击弹出同组工具，角标只是图标', async ({ page }) => {
+  test('toolbox: click selects, click again opens the group, the badge is only an icon', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     const palette = page.getByTestId('photo-tool-palette');
     const bucket = palette.locator('[data-tool="fill"]');
     await expect(bucket).toBeVisible();
 
-    // 一行只有一颗按钮：右下角小三角是图标，不再有第二颗「展开」按钮
+    // One button per row: the small corner triangle is an icon, there is no second "expand" button
     await expect(page.getByTestId('tool-group-fill').locator('button')).toHaveCount(1);
 
-    // 首次点击 = 选中，不弹层
+    // First click = select, no flyout
     await bucket.click();
     await expect(bucket).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('menu')).toHaveCount(0);
 
-    // 再次点击同一个已选中的按钮 = 弹出组内工具
+    // Clicking the already-selected button again = open the group's tools
     await bucket.click();
     const menu = page.getByRole('menu');
     await expect(menu).toBeVisible();
     await expect(menu.getByRole('menuitem')).toHaveText([/油漆桶/, /渐变/]);
 
-    // 选完自动收起，按钮切到新工具
+    // Closing is automatic after picking, and the button switches to the new tool
     await menu.getByRole('menuitem', { name: '渐变' }).click();
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(palette.locator('[data-tool="gradient"]')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('形状工具：种类在工具箱组按钮里，参数条只放形状属性', async ({ page }) => {
+  test('shape tools: kinds live in the toolbox group, the option bar holds shape props', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     const palette = page.getByTestId('photo-tool-palette');
     const row = palette.locator('[data-tool="shape"]');
     await expect(row).toHaveAttribute('aria-label', '矩形');
 
-    // 首次点击选中形状工具，再次点击展开六种形状（组按钮在侧边栏，不在参数条）
+    // First click selects the shape tool, a second click expands its six shapes (the group button is in the sidebar, not the bar)
     await row.click();
     await expect(row).toHaveAttribute('aria-pressed', 'true');
     await row.click();
@@ -1861,7 +1883,7 @@ test.describe('照片编辑器（zh-CN）', () => {
       /星形/,
     ]);
 
-    // 每个形状的图标必须各不相同（之前全是通用的 shapes 图标）
+    // Each shape icon must be distinct (they all used the generic shapes icon before)
     const icons = await menu
       .getByRole('menuitem')
       .evaluateAll((items) => items.map((item) => item.querySelector('svg')?.innerHTML ?? ''));
@@ -1871,7 +1893,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(row).toHaveAttribute('aria-label', '椭圆');
 
-    // 参数条：不再有「选形状」的按钮，改为落笔会用到的属性
+    // Option bar: no more "pick a shape" buttons, only properties used while drawing
     const bar = page.getByTestId('shape-bar');
     await expect(bar.getByRole('button')).toHaveCount(0);
     await expect(bar.getByLabel('填充色', { exact: true })).toBeVisible();
@@ -1879,13 +1901,13 @@ test.describe('照片编辑器（zh-CN）', () => {
     const width = bar.getByRole('slider', { name: '描边宽度' });
     await width.fill('8');
     await expect(width).toHaveValue('8');
-    // 圆角只有圆角矩形才有意义
+    // Rounded corners only make sense for rounded rectangles
     await expect(bar.getByRole('slider', { name: '圆角', exact: true })).toHaveCount(0);
     await row.click();
     await menu.getByRole('menuitem', { name: '圆角矩形' }).click();
     await expect(bar.getByRole('slider', { name: '圆角', exact: true })).toBeVisible();
 
-    // 属性确实用于新形状：落笔后能在「属性」面板读到描边宽度
+    // The properties are really used for new shapes: the stroke width is readable in the "属性" panel after drawing
     const box = (await page.getByTestId('photo-canvas').boundingBox())!;
     await page.mouse.move(box.x + 160, box.y + 160);
     await page.mouse.down();
@@ -1896,7 +1918,9 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(page.getByRole('slider', { name: '描边宽度' }).last()).toHaveValue('8');
   });
 
-  test('形状落点跟随鼠标：椭圆与直线都画在拖出的框里', async ({ page }) => {
+  test('shape placement follows the cursor: ellipse and line fill the dragged box', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     const row = page.getByTestId('photo-tool-palette').locator('[data-tool="shape"]');
     const flyout = page.getByTestId('photo-tool-flyout');
@@ -1908,7 +1932,7 @@ test.describe('照片编辑器（zh-CN）', () => {
       await flyout.getByRole('menuitem', { name }).click();
       await expect(flyout).toHaveCount(0);
     };
-    // 画布上笔迹的屏幕包围盒（背景是渲染出来的，不产生像素，只有形状本身有 alpha）
+    // On-screen bounding box of the marks (the background is rendered and yields no pixels, only shapes have alpha)
     const inkBox = () =>
       page.evaluate(() => {
         const canvas = document.querySelector(
@@ -1954,7 +1978,7 @@ test.describe('照片编辑器（zh-CN）', () => {
       await page.waitForTimeout(200);
 
       const ink = await inkBox();
-      // 椭圆曾按「圆心 = 图层左上角」绘制，整体往左上偏半个身位（约 110 × 90 px）
+      // The ellipse used to be drawn with "center = layer top-left", offset up-left by about half a body (≈110 × 90 px)
       expect(Math.abs(ink.x - from.x)).toBeLessThanOrEqual(6);
       expect(Math.abs(ink.y - from.y)).toBeLessThanOrEqual(6);
       expect(Math.abs(ink.w - (to.x - from.x))).toBeLessThanOrEqual(6);
@@ -1965,12 +1989,14 @@ test.describe('照片编辑器（zh-CN）', () => {
     }
   });
 
-  test('工具箱：魔棒与快速选择单独成组，套索组含多边形与磁性', async ({ page }) => {
+  test('toolbox: magic wand and quick select form a group, lasso adds polygon and magnetic', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     const palette = page.getByTestId('photo-tool-palette');
     const flyout = page.getByTestId('photo-tool-flyout');
 
-    // 魔棒组：默认魔棒，展开是魔棒 / 快速选择
+    // Wand group: magic wand by default, expands to wand / quick select
     const wandRow = palette.locator('[data-tool="wand"]');
     await expect(wandRow).toHaveAttribute('aria-label', '魔棒');
     for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -1980,13 +2006,13 @@ test.describe('照片编辑器（zh-CN）', () => {
     }
     await expect(flyout.getByRole('menuitem')).toHaveText([/魔棒/, /快速选择/]);
     await flyout.getByRole('menuitem', { name: '快速选择' }).click();
-    // 工具行显示「当前工具」，所以 data-tool 跟着变成 quickSelect
+    // The tool row shows the "current tool", so data-tool becomes quickSelect
     await expect(palette.locator('[data-tool="quickSelect"]')).toHaveAttribute(
       'aria-label',
       '快速选择',
     );
 
-    // 套索组：手绘 / 多边形 / 磁性（魔棒不再混在里面）
+    // Lasso group: freehand / polygon / magnetic (the wand is no longer mixed in)
     const lassoRow = palette.locator('[data-tool="lasso"]');
     for (let attempt = 0; attempt < 4; attempt += 1) {
       await lassoRow.click();
@@ -1994,14 +2020,16 @@ test.describe('照片编辑器（zh-CN）', () => {
       if ((await flyout.count()) > 0) break;
     }
     await expect(flyout.getByRole('menuitem')).toHaveText([/套索/, /多边形套索/, /磁性套索/]);
-    // 三个图标各不相同（之前魔棒 / 快速选择复用了套索图标）
+    // All three icons are distinct (wand / quick select used to reuse the lasso icon)
     const icons = await flyout
       .getByRole('menuitem')
       .evaluateAll((items) => items.map((item) => item.querySelector('svg')?.innerHTML ?? ''));
     expect(new Set(icons).size).toBe(icons.length);
   });
 
-  test('多边形套索：逐点单击建框，双击闭合，Esc 取消', async ({ page }) => {
+  test('polygon lasso: click point by point, double-click to close, Esc to cancel', async ({
+    page,
+  }) => {
     await page.goto('/tools/photo-editor');
     const row = page.getByTestId('photo-tool-palette').locator('[data-tool="lasso"]');
     await pickFromGroup(page, row, '多边形套索');
@@ -2017,10 +2045,10 @@ test.describe('照片编辑器（zh-CN）', () => {
       await page.mouse.click(p.x, p.y);
       await page.waitForTimeout(80);
     }
-    // 还没闭合：不应该有选区
+    // Not closed yet: there should be no selection
     await expect(page.getByText(/^选区 \d+ × \d+$/)).toHaveCount(0);
 
-    // 点回起点附近 → 闭合，生成三角选区
+    // Click near the start point → closes, creating a triangular selection
     await page.mouse.dblclick(a.x + 3, a.y + 3);
     const selection = page.getByText(/^选区 \d+ × \d+$/);
     await expect(selection).toBeVisible();
@@ -2028,7 +2056,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     expect(width).toBeGreaterThan(200);
     expect(height).toBeGreaterThan(150);
 
-    // Esc 取消未闭合的折线：不应产生新选区
+    // Esc cancels the open polyline: no new selection should appear
     await page.keyboard.press('Meta+d');
     await expect(selection).toHaveCount(0);
     await page.mouse.click(box.x + 300, box.y + 250);
@@ -2037,12 +2065,12 @@ test.describe('照片编辑器（zh-CN）', () => {
     await expect(selection).toHaveCount(0);
   });
 
-  test('磁性套索：拖动时吸附到图层边缘', async ({ page }) => {
+  test('magnetic lasso: snaps to layer edges while dragging', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     const palette = page.getByTestId('photo-tool-palette');
     const box = (await page.getByTestId('photo-canvas').boundingBox())!;
 
-    // 先画一个矩形当作「边缘」
+    // Draw a rectangle first to act as the "edge"
     await palette.locator('[data-tool="shape"]').click();
     await page.mouse.move(box.x + 300, box.y + 220);
     await page.mouse.down();
@@ -2050,7 +2078,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await page.mouse.up();
     await expect(page.getByTestId('photo-stats')).toContainText('图层 2');
 
-    // 形状在文档里的尺寸（用于对比吸附结果）
+    // The shape's size in the document (to compare the snap result)
     await page.getByRole('tab', { name: '属性', exact: true }).click();
     const shapeWidth = Number(await page.getByLabel('宽度', { exact: true }).first().inputValue());
     const shapeHeight = Number(await page.getByLabel('高度', { exact: true }).first().inputValue());
@@ -2058,7 +2086,7 @@ test.describe('照片编辑器（zh-CN）', () => {
     await pickFromGroup(page, palette.locator('[data-tool="lasso"]'), '磁性套索');
     await expect(page.getByTestId('selection-bar')).toContainText('对比度');
 
-    // 沿矩形外侧约 6px 绕一圈：吸附生效的话选区会收回到形状边缘
+    // Trace a loop about 6px outside the rectangle: with snapping the selection pulls back to the shape edge
     const ring = [
       [566, 214],
       [566, 426],
@@ -2076,23 +2104,23 @@ test.describe('照片编辑器（zh-CN）', () => {
     const selection = page.getByText(/^选区 \d+ × \d+$/);
     await expect(selection).toBeVisible();
     const [width, height] = (await selection.textContent())!.match(/\d+/g)!.map(Number);
-    // 没吸附的话会比形状大一圈（外侧 6px ≈ 10 文档像素，两边合计 20）
+    // Without snapping it would be one ring larger (6px outside ≈ 10 document pixels, 20 on both sides)
     expect(Math.abs(width - shapeWidth)).toBeLessThanOrEqual(8);
     expect(Math.abs(height - shapeHeight)).toBeLessThanOrEqual(8);
   });
 });
 
-// 照片编辑器国际化（en-US）：界面语言切换后不得残留中文
-test.describe('照片编辑器国际化（en-US）', () => {
+// Photo editor i18n (en-US): no Chinese may remain after switching the UI language
+test.describe('photo editor i18n (en-US)', () => {
   test.use({ locale: 'en-US' });
 
-  test('英文界面无残留中文（含各标签页 / 弹窗 / 右键菜单）', async ({ page }) => {
+  test('English UI leaves no Chinese (all tabs / dialogs / context menus)', async ({ page }) => {
     await page.goto('/tools/photo-editor');
     await expect(page.getByTestId('photo-canvas')).toBeVisible();
 
     await expect(page.getByLabel('Canvas name')).toHaveAttribute('placeholder', 'Untitled canvas');
 
-    // 空白图层 → 自动名应为英文
+    // Blank layer → the auto-generated name should be English
     await page.getByTestId('layer-menu-trigger').click();
     await page.getByRole('menuitem', { name: 'Blank layer' }).click();
     await page.getByTestId('layer-menu-trigger').first().click();
@@ -2103,11 +2131,11 @@ test.describe('照片编辑器国际化（en-US）', () => {
     await expect(page.getByText('Text 1').first()).toBeVisible();
     await expect(page.getByText('Shape 1').first()).toBeVisible();
 
-    // 混合模式下拉为英文
+    // The blend mode dropdown is English
     const mix = page.getByLabel('Blend mode');
     await expect(mix.locator('option')).toContainText(['Normal', 'Multiply']);
 
-    // 形状：种类在工具箱组按钮里（英文），参数条显示的是形状属性
+    // Shapes: kinds live in the toolbox group (English), the option bar shows shape properties
     const shapeRow = page.getByTestId('photo-tool-palette').locator('[data-tool="shape"]');
     await shapeRow.click();
     await expect(shapeRow).toHaveAttribute('aria-label', 'Rectangle');
@@ -2116,7 +2144,7 @@ test.describe('照片编辑器国际化（en-US）', () => {
     await expect(shapeRow).toHaveAttribute('aria-label', 'Rounded rectangle');
     await expect(page.getByTestId('shape-bar').getByLabel('Fill')).toBeVisible();
 
-    // 新建画布对话框：预设为中性文本，按钮为英文
+    // New canvas dialog: presets are neutral text, buttons are English
     await page.getByRole('button', { name: 'New canvas' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByLabel('Preset').locator('option').first()).toHaveText(
@@ -2124,7 +2152,7 @@ test.describe('照片编辑器国际化（en-US）', () => {
     );
     await page.getByRole('button', { name: 'Cancel' }).click();
 
-    // 逐个标签页 / 菜单 / 弹窗扫描：不应出现 CJK
+    // Scan each tab / menu / dialog: no CJK should appear
     const scan = () =>
       page.evaluate(() => {
         const main = document.querySelector('main') ?? document.body;
@@ -2137,7 +2165,7 @@ test.describe('照片编辑器国际化（en-US）', () => {
       await page.waitForTimeout(120);
       found.push(...(await scan()).map((line) => `${tab}: ${line}`));
     }
-    // 导出入口收在「文件」菜单里（菜单项 role=menuitem），先展开菜单再点
+    // The export entry lives in the "文件" menu (items are role=menuitem), so expand it first
     await page.getByTestId('menubar-file').click();
     await page.getByRole('menuitem', { name: 'Export image' }).click();
     found.push(...(await scan()).map((line) => `export: ${line}`));
@@ -2149,7 +2177,7 @@ test.describe('照片编辑器国际化（en-US）', () => {
     found.push(...(await scan()).map((line) => `ctx: ${line}`));
     await page.keyboard.press('Escape');
 
-    // 扫描工具区所有可见文本：不应出现 CJK
+    // Scan all visible text in the tool area: no CJK should appear
     const cjk = await page.evaluate(() => {
       const main = document.querySelector('main') ?? document.body;
       const text = (main as HTMLElement).innerText;
@@ -2160,27 +2188,29 @@ test.describe('照片编辑器国际化（en-US）', () => {
   });
 });
 
-// 代码编辑器（zh-CN）
-test.describe('代码编辑器（zh-CN）', () => {
+// Code editor (zh-CN)
+test.describe('code editor (zh-CN)', () => {
   test.use({ locale: 'zh-CN' });
 
-  test('挂载高亮编辑器 → 切换语言改扩展名 → 格式化 → 导出源码 / HTML', async ({ page }) => {
+  test('mounts editor → language switch changes extension → format → export source / HTML', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/code-editor');
 
     const editor = page.getByRole('textbox', { name: '编辑器' });
     await expect(editor).toBeVisible();
-    // 默认 Java 示例已着色（Prism token 落进可编辑区）+ 行号槽
+    // The default Java sample is highlighted (Prism tokens inside the editable area) plus the gutter
     await expect(page.locator('.ce-surface .token.keyword').first()).toBeVisible();
     await expect(page.locator('.ce-gutter')).toContainText('1');
 
-    // 导出文件名随语言变化
+    // The export filename follows the language
     await expect(page.getByText('将导出为 snippet.java')).toBeVisible();
     await page.getByLabel('语言', { exact: true }).selectOption('rust');
     await expect(page.getByText('将导出为 snippet.rs')).toBeVisible();
 
-    // 格式化：压缩成一行后重排
+    // Format: minify to one line, then re-indent
     await page.getByLabel('语言', { exact: true }).selectOption('java');
     await editor.click();
     await page.keyboard.press('Control+a');
@@ -2191,12 +2221,12 @@ test.describe('代码编辑器（zh-CN）', () => {
     await expect(page.locator('.ce-surface')).toContainText('class A {');
     await expect(page.locator('.ce-surface')).toContainText('  public static void main');
 
-    // 导出源码：扩展名跟随语言
+    // Export source: the extension follows the language
     const sourceDownload = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出 .java' }).click();
     expect((await sourceDownload).suggestedFilename()).toBe('snippet.java');
 
-    // 导出 HTML：独立高亮文档
+    // Export HTML: a standalone highlighted document
     const htmlDownload = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出 HTML' }).click();
     expect((await htmlDownload).suggestedFilename()).toBe('snippet.html');
@@ -2205,7 +2235,9 @@ test.describe('代码编辑器（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('当前行高亮与行号按整数行高对齐，自动换行时覆盖层关闭', async ({ page }) => {
+  test('current line highlight aligns with line numbers, overlay off when wrapped', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/code-editor');
@@ -2215,7 +2247,7 @@ test.describe('代码编辑器（zh-CN）', () => {
     const band = page.locator('.ce-line-active');
     await expect(surface).toBeVisible();
 
-    // 用工具自身的「清空」保证跨平台确定性，再键入 3 行（光标停在末行）
+    // Use the tool's own "清空" for cross-platform determinism, then type 3 lines (caret on the last line)
     await page.getByRole('button', { name: '清空' }).click();
     await editor.click();
     await page.keyboard.type('a\nb\nc');
@@ -2226,7 +2258,7 @@ test.describe('代码编辑器（zh-CN）', () => {
       )
       .toBe(3);
 
-    // 覆盖层与文字行严格对齐：首行 y = padding-top（12），第 3 行 y = 12 + 2 × 21
+    // The overlay aligns exactly with text lines: line 1 y = padding-top (12), line 3 y = 12 + 2 × 21
     const bandOffset = async () => {
       const bandBox = await band.boundingBox();
       const surfaceBox = await surface.boundingBox();
@@ -2236,12 +2268,12 @@ test.describe('代码编辑器（zh-CN）', () => {
     await expect.poll(bandOffset).toBeGreaterThan(53);
     await expect.poll(bandOffset).toBeLessThan(55);
 
-    // 光标上移一行 → 高亮跟随到第 2 行（12 + 21 = 33）
+    // Caret up one line → the highlight follows to line 2 (12 + 21 = 33)
     await page.keyboard.press('ArrowUp');
     await expect.poll(bandOffset).toBeGreaterThan(32);
     await expect.poll(bandOffset).toBeLessThan(34);
 
-    // 输入稳定性：连续输入 200 字符不丢内容、行数不变
+    // Typing stability: 200 consecutive characters lose nothing and keep the line count
     const filler = 'x'.repeat(200);
     await page.keyboard.type(filler);
     await expect
@@ -2253,13 +2285,13 @@ test.describe('代码编辑器（zh-CN）', () => {
       )
       .toBe(3);
 
-    // 切换语言与主题后内容不被重置（受控同步不产生抖动）
+    // Content is not reset after switching language or theme (controlled sync does not jitter)
     const before = await surface.evaluate((el) => el.textContent);
     await page.getByLabel('语言', { exact: true }).selectOption('javascript');
     await page.getByLabel('风格主题').selectOption('dracula');
     await expect.poll(() => surface.evaluate((el) => el.textContent)).toBe(before);
 
-    // 自动换行时行号与行级覆盖层一并隐藏（行↔视觉行不再一一对应）
+    // With soft wrap on, line numbers and the line overlay hide together (lines no longer map to visual lines)
     await page.getByLabel('自动换行').check();
     await expect(page.locator('.ce-line-active')).toHaveCount(0);
     await expect(page.locator('.ce-gutter')).toHaveCount(0);
@@ -2270,7 +2302,9 @@ test.describe('代码编辑器（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('行操作：注释切换快捷键 → 工具栏移动 / 复制 → 跳转行 → 撤销', async ({ page }) => {
+  test('line actions: comment toggle shortcut → toolbar move / copy → go to line → undo', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -2283,18 +2317,18 @@ test.describe('代码编辑器（zh-CN）', () => {
     await page.getByRole('button', { name: '清空' }).click();
     await editor.click();
     await page.keyboard.type('a\nb\nc');
-    // 空编辑区输入不应出现填充字符（历史实现会多出一个前导空格并带进导出内容）
+    // Typing in an empty editor must not insert padding characters (an earlier version added a leading space into the export)
     await expect.poll(text).toBe('a\nb\nc');
-    // 等 CodeJar 的历史记录落盘（keyup 后 300ms 防抖），保证撤销能回到键入后的状态
+    // Wait for CodeJar's history to settle (300ms debounce after keyup) so undo returns to the typed state
     await page.waitForTimeout(400);
 
-    // 快捷键切换行注释：光标停在末行 → 只注释该行，再按一次取消
+    // Toggle a line comment by shortcut: caret on the last line → only that line is commented, press again to undo
     await page.keyboard.press(`${mod}+/`);
     await expect.poll(text).toBe('a\nb\n// c');
     await page.keyboard.press(`${mod}+/`);
     await expect.poll(text).toBe('a\nb\nc');
 
-    // 工具栏「跳转行」把光标放到首行，再下移 / 复制
+    // The toolbar "跳转行" puts the caret on the first line, then move down / copy
     await page.getByRole('button', { name: '跳转行' }).click();
     const gotoInput = page.getByLabel('跳转行');
     await expect(gotoInput).toBeVisible();
@@ -2307,13 +2341,13 @@ test.describe('代码编辑器（zh-CN）', () => {
     await page.getByRole('button', { name: '复制行' }).click();
     await expect.poll(text).toBe('b\na\na\nc');
 
-    // 工具栏操作后编辑器仍是焦点目标（否则撤销无效），且撤销能回到复制前
+    // After toolbar actions the editor is still the focus target (otherwise undo fails), and undo returns to before the copy
     await page.keyboard.press(`${mod}+z`);
     await expect.poll(text).toBe('b\na\nc');
-    // 撤销后受控状态同步（统计随内容刷新，而非停留在复制后的长度）
+    // Undo also syncs controlled state (stats refresh instead of keeping the post-copy length)
     await expect(page.getByText(/5 字符/)).toBeVisible();
 
-    // 注释按钮：先跳转到首行再注释，验证跳转与工具栏动作可组合
+    // Comment button: jump to the first line, then comment, proving jump and toolbar actions compose
     await expect(page.getByRole('button', { name: '注释' })).toBeEnabled();
     await page.getByRole('button', { name: '跳转行' }).click();
     await page.getByLabel('跳转行').fill('1');
@@ -2325,7 +2359,9 @@ test.describe('代码编辑器（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('查找替换：⌘F 打开栏 → 计数与循环定位 → 正则校验 → 全部替换', async ({ page }) => {
+  test('find & replace: ⌘F opens the bar → count and wrap-around → regex → replace all', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -2341,14 +2377,14 @@ test.describe('代码编辑器（zh-CN）', () => {
     await page.keyboard.type('foo\nbar\nfoo');
     await expect.poll(text).toBe('foo\nbar\nfoo');
 
-    // ⌘F 打开查找栏并聚焦查询框
+    // ⌘F opens the find bar and focuses the query field
     await page.keyboard.press(`${mod}+f`);
     const query = page.getByLabel('查找', { exact: true });
     await expect(query).toBeFocused();
     await query.fill('foo');
     await expect(counter).toHaveText('–/2');
 
-    // Enter 循环定位，计数随之推进（末尾回绕）
+    // Enter moves through matches and the counter advances (wrapping at the end)
     await page.keyboard.press('Enter');
     await expect(counter).toHaveText('1/2');
     const matchTop = async () => {
@@ -2362,23 +2398,23 @@ test.describe('代码编辑器（zh-CN）', () => {
 
     await page.keyboard.press('Enter');
     await expect(counter).toHaveText('2/2');
-    // 当前命中跳到第 3 行：12 + 2 × 21 = 54
+    // The current hit jumps to line 3: 12 + 2 × 21 = 54
     await expect.poll(matchTop).toBeGreaterThan(53);
     await expect.poll(matchTop).toBeLessThan(55);
 
     await page.keyboard.press('Enter');
     await expect(counter).toHaveText('1/2');
-    // 连续定位期间焦点保留在查找框、内容不被改写（回归：定位不得把焦点交还编辑区）
+    // Focus stays in the find field across jumps and content is not rewritten (regression: jumps used to steal focus)
     await expect(query).toBeFocused();
     await expect.poll(text).toBe('foo\nbar\nfoo');
 
-    // 正则无效时给出可读提示
+    // An invalid regex shows a readable message
     await page.getByLabel('正则表达式', { exact: true }).click();
     await query.fill('[');
     await expect(counter).toHaveText('正则无效');
     await page.getByLabel('正则表达式', { exact: true }).click();
 
-    // 全部替换：内容、预览与统计同步
+    // Replace all: content, preview and stats stay in sync
     await query.fill('foo');
     await page.getByLabel('替换为', { exact: true }).fill('x');
     await page.getByRole('button', { name: '全部替换' }).click();
@@ -2386,7 +2422,7 @@ test.describe('代码编辑器（zh-CN）', () => {
     await expect(page.getByText('已全部替换')).toBeVisible();
     await expect(page.locator('.ce-card')).not.toContainText('foo');
 
-    // Esc 关闭查找栏
+    // Esc closes the find bar
     await query.press('Escape');
     await expect(query).toHaveCount(0);
 
@@ -2394,7 +2430,9 @@ test.describe('代码编辑器（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('视觉辅助：缩进引导线 / 括号配对与跳转 / 折叠范围标记', async ({ page }) => {
+  test('visual aids: indent guides / bracket matching and jump / fold markers', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -2402,7 +2440,7 @@ test.describe('代码编辑器（zh-CN）', () => {
 
     const editor = page.getByRole('textbox', { name: '编辑器' });
     const surface = page.locator('.ce-surface');
-    // prettier-plugin-java 会在嵌套块后补空行，这里按格式化后的实际形态断言（含结尾换行）
+    // prettier-plugin-java adds blank lines after nested blocks, so assert the formatted shape (trailing newline included)
     const code = ['class A {', '', '  void f() {', '    g();', '  }', '}', ''].join('\n');
     const caretTop = async () => {
       const box = await page.locator('.ce-line-active').boundingBox();
@@ -2413,26 +2451,26 @@ test.describe('代码编辑器（zh-CN）', () => {
 
     await page.getByRole('button', { name: '清空' }).click();
     await editor.click();
-    // 单行输入后用 Prettier 格式化，避免依赖 CodeJar 的自动缩进行为
+    // Feed a single line and let Prettier format it instead of relying on CodeJar's auto-indent
     await page.keyboard.type('class A{void f(){g();}}');
     await page.getByRole('button', { name: '格式化', exact: true }).click();
     await expect.poll(() => surface.evaluate((el) => el.textContent)).toBe(code);
 
-    // 缩进引导线：第 2/4 行各 1 条、第 3 行 2 条（列 0 与列 2），第 5 行无缩进
+    // Indent guides: one each on lines 2/4, two on line 3 (columns 0 and 2), none on line 5
     await expect(page.locator('.ce-guide')).toHaveCount(4);
 
-    // 折叠标记：第 1、2 行各一个可折叠范围
+    // Fold markers: one foldable range each on lines 1 and 2
     const markers = page.locator('.ce-fold-marker');
     await expect(markers).toHaveCount(2);
 
-    // 点击第 1 个标记 → 整段范围高亮 + 行数徽标（隐藏式折叠不在本内核支持范围内）
+    // Clicking the first marker highlights the whole range plus a line-count badge (hidden folding is out of scope for this core)
     await markers.first().click();
     await expect(page.locator('.ce-fold-band')).toHaveCount(1);
     await expect(page.getByText('6 行')).toBeVisible();
     const bandBox = await page.locator('.ce-fold-band').boundingBox();
     expect(Math.round(bandBox?.height ?? 0)).toBe(6 * 21);
 
-    // 括号配对 + 跳转：光标在文末 '}' 上按 ⌘⇧\ 跳到配对的 '{'（第 1 行）
+    // Bracket matching + jump: with the caret on the trailing '}', ⌘⇧\ jumps to its '{' (line 1)
     await editor.click();
     await page.keyboard.press(`${mod}+End`);
     await page.keyboard.press(`${mod}+Shift+\\`);
@@ -2440,7 +2478,7 @@ test.describe('代码编辑器（zh-CN）', () => {
     await expect.poll(caretTop).toBeGreaterThan(11);
     await expect.poll(caretTop).toBeLessThan(13);
 
-    // 再按一次跳回闭合括号（第 6 行：12 + 5 × 21 = 117）
+    // Pressing again jumps back to the closing bracket (line 6: 12 + 5 × 21 = 117)
     await page.keyboard.press(`${mod}+Shift+\\`);
     await expect.poll(caretTop).toBeGreaterThan(116);
     await expect.poll(caretTop).toBeLessThan(118);
@@ -2449,7 +2487,7 @@ test.describe('代码编辑器（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('批量编辑：选择同词 → 统一替换多处', async ({ page }) => {
+  test('batch edit: select same word → replace every occurrence', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/code-editor');
@@ -2463,23 +2501,23 @@ test.describe('代码编辑器（zh-CN）', () => {
     await page.keyboard.type('total = 1;');
     await page.keyboard.press('Enter');
     await page.keyboard.type('sum = total;');
-    // 光标移到末行词尾，落在 'total' 上
+    // Move the caret to the end of the last line, onto 'total'
     await page.keyboard.press('ArrowLeft');
     await expect.poll(text).toBe('total = 1;\nsum = total;');
 
-    // 选择同词：两处命中被标出
+    // Select same word: both hits are marked
     await page.getByRole('button', { name: '选择同词' }).click();
     await expect(page.getByText('2 处')).toBeVisible();
     await expect(page.locator('.ce-multi')).toHaveCount(2);
 
-    // 统一替换：两处同时改写
+    // Replace all: both occurrences are rewritten at once
     const input = page.getByLabel('统一替换');
     await input.fill('count');
     await page.getByRole('button', { name: '应用' }).click();
     await expect.poll(text).toBe('count = 1;\nsum = count;');
     await expect(page.locator('.ce-multi')).toHaveCount(0);
 
-    // 光标不在词上时给出说明而非静默失败（行尾补一个空格，光标两侧都不是词字符）
+    // When the caret is not on a word, explain instead of failing silently (append a space; neither side is a word char)
     await editor.click();
     await page.keyboard.press('End');
     await page.keyboard.type(' + ');
@@ -2490,7 +2528,9 @@ test.describe('代码编辑器（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('导出卡片样式化：窗口样式 / 行号 / 指定行高亮 / 水印 → 预览与导出一致', async ({ page }) => {
+  test('styled export card: window style / line numbers / highlighted lines / watermark → preview matches export', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/code-editor');
@@ -2502,7 +2542,7 @@ test.describe('代码编辑器（zh-CN）', () => {
     await page.keyboard.type('const a = 1;\nconst b = 2;\nconst c = 3;');
     await expect.poll(text).toBe('const a = 1;\nconst b = 2;\nconst c = 3;');
 
-    // 打开卡片样式面板并调整选项
+    // Open the card style panel and adjust the options
     await page.getByRole('button', { name: '卡片样式' }).click();
     const panel = page.getByTestId('card-panel');
     await panel.getByRole('checkbox').check();
@@ -2510,14 +2550,14 @@ test.describe('代码编辑器（zh-CN）', () => {
     await panel.getByLabel('水印', { exact: true }).fill('syntools');
     await panel.getByLabel('窗口').selectOption('title');
 
-    // 预览卡片即时反映选项
+    // The preview card reflects the options immediately
     await expect(page.locator('.ce-card .code-title')).toHaveCount(1);
     await expect(page.locator('.ce-card .code-dot')).toHaveCount(0);
     await expect(page.locator('.ce-card .code-line-no')).toHaveCount(3);
     await expect(page.locator('.ce-card .code-line-hit')).toHaveCount(2);
     await expect(page.locator('.ce-card .code-watermark')).toHaveText('syntools');
 
-    // 导出 HTML 与预览共用同一份正文结构
+    // The HTML export and the preview share the same body structure
     const htmlPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出 HTML' }).click();
     const htmlDownload = await htmlPromise;
@@ -2527,10 +2567,10 @@ test.describe('代码编辑器（zh-CN）', () => {
     expect(html).toContain('code-line-no');
     expect(html).toContain('code-line-hit');
     expect(html).toContain('code-watermark');
-    // title 样式不渲染三点（样式表里仍保留 .code-dot-* 规则）
+    // The title style renders no traffic lights (the .code-dot-* rules stay in the stylesheet)
     expect(html).not.toContain('class="code-dot code-dot-red"');
 
-    // 图片导出使用当前倍率
+    // Image export uses the current scale
     const pngPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出 PNG' }).click();
     expect((await pngPromise).suggestedFilename()).toBe('snippet.png');
@@ -2539,7 +2579,10 @@ test.describe('代码编辑器（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('分享扩容：压缩链接可还原长代码与卡片样式', async ({ page, context }) => {
+  test('share expansion: compressed links restore long code and card styles', async ({
+    page,
+    context,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -2549,7 +2592,7 @@ test.describe('代码编辑器（zh-CN）', () => {
     ).join('\n');
     const text = () => page.locator('.ce-surface').evaluate((el) => el.textContent);
 
-    // 用草稿预置长代码（未压缩分享会超过 2048 上限）
+    // Seed long code through the draft (an uncompressed share would exceed the 2048 limit)
     await page.goto('/tools/code-editor');
     await page.evaluate((code) => {
       localStorage.setItem(
@@ -2568,16 +2611,16 @@ test.describe('代码编辑器（zh-CN）', () => {
     await page.reload();
     await expect.poll(text).toBe(longCode);
 
-    // 调整一个可观察的卡片样式项（随链接一并分享）
+    // Tweak an observable card style option (shared along with the link)
     await page.getByRole('button', { name: '卡片样式' }).click();
     await page.getByTestId('card-panel').getByLabel('留白').fill('64');
 
     await page.getByRole('button', { name: /分享/ }).click();
     const sharedUrl = await page.evaluate(() => navigator.clipboard.readText());
-    // 压缩参数以 z 前缀标记
+    // Compression parameters are marked with a z prefix
     expect(sharedUrl).toContain('?s=z');
 
-    // 打开链接：长代码与卡片样式完整还原
+    // Open the link: long code and card styles are fully restored
     await page.goto(sharedUrl);
     await expect.poll(text).toBe(longCode);
     expect(await page.locator('.ce-card').evaluate((el) => getComputedStyle(el).paddingLeft)).toBe(
@@ -2589,17 +2632,19 @@ test.describe('代码编辑器（zh-CN）', () => {
   });
 });
 
-// 脑图编辑器（zh-CN）
-test.describe('脑图编辑器（zh-CN）', () => {
+// Mind map editor (zh-CN)
+test.describe('mind map editor (zh-CN)', () => {
   test.use({ locale: 'zh-CN' });
 
-  test('画布挂载 → Tab 建子主题 → 模板载入 → 折叠分支', async ({ page }) => {
+  test('canvas mounts → Tab adds a child topic → template loads → collapse a branch', async ({
+    page,
+  }) => {
     await page.goto('/tools/mindmap-editor');
-    // React Flow 画布与导出/导入入口
+    // The React Flow canvas plus export/import entries
     await expect(page.locator('.react-flow')).toBeVisible();
     await expect(page.getByRole('button', { name: '导出' })).toBeVisible();
     await expect(page.getByRole('button', { name: '导入' })).toBeVisible();
-    // 初始只有中心主题，且应被适配到画布中央（而非默认贴在左上角）
+    // Initially only the central topic, fitted to the canvas center (not stuck at the top-left)
     await expect(page.locator('.react-flow__node')).toHaveCount(1);
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
     const canvasBox = (await page.locator('.react-flow').boundingBox())!;
@@ -2610,7 +2655,7 @@ test.describe('脑图编辑器（zh-CN）', () => {
     expect(
       Math.abs(rootBox.y + rootBox.height / 2 - (canvasBox.y + canvasBox.height / 2)),
     ).toBeLessThan(canvasBox.height * 0.12);
-    // 默认文案不应被截成省略号（宽度需容纳 "Central Topic"）
+    // The default label must not be ellipsized (the width has to fit "Central Topic")
     await expect(page.locator('.react-flow__node').first()).toContainText('Central Topic');
     const clipped = await page
       .locator('.react-flow__node')
@@ -2620,32 +2665,32 @@ test.describe('脑图编辑器（zh-CN）', () => {
       .evaluate((el) => el.scrollWidth > el.clientWidth + 1);
     expect(clipped).toBe(false);
 
-    // 空态提示条不得盖住中心主题（应位于其下方）
+    // The empty-state hint must not cover the central topic (it sits below it)
     const hint = page.getByText(/按 Tab 添加子主题/);
     await expect(hint).toBeVisible();
     const hintBox = (await hint.boundingBox())!;
     expect(hintBox.y).toBeGreaterThan(rootBox.y + rootBox.height);
 
-    // Tab 新建子主题：节点 +1，且生成一条分支连线
+    // Tab creates a child topic: one more node and a branch edge
     await page.locator('.react-flow__pane').click({ position: { x: 40, y: 40 } });
     await page.keyboard.press('Tab');
     await expect(page.locator('.react-flow__node')).toHaveCount(2);
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 
-    // 新节点带默认英文文案
+    // New nodes carry the default English label
     await expect(page.getByText('Subtopic', { exact: true })).toBeVisible();
 
-    // Enter 新建同级主题（编辑态下 Enter 同样建同级）
+    // Enter creates a sibling topic (Enter in edit mode also creates a sibling)
     await page.keyboard.press('Enter');
     await expect(page.locator('.react-flow__node')).toHaveCount(3);
     await expect(page.getByText('Topic', { exact: true })).toBeVisible();
 
-    // 载入模板应替换整张脑图（项目规划：中心 + 4 分支 + 13 子节点）
+    // Loading a template replaces the whole map (Project Plan: center + 4 branches + 13 children)
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '项目规划' }).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(18);
 
-    // 二级及以下节点默认下划线形状：底边可见（2px），其余边为 0
+    // Second-level nodes and below use the underline shape by default: bottom edge visible (2px), others 0
     const borders = await page.locator('.react-flow__node').evaluateAll((els) =>
       els.map((el) => {
         const box = el.firstElementChild?.firstElementChild as HTMLElement | undefined;
@@ -2666,14 +2711,14 @@ test.describe('脑图编辑器（zh-CN）', () => {
       ),
     ).toBe(true);
 
-    // 全部折叠后只剩中心主题与一级分支
+    // Everything collapsed leaves only the central topic and first-level branches
     await page.getByRole('button', { name: '全部折叠' }).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(5);
     await page.getByRole('button', { name: '全部展开' }).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(18);
   });
 
-  test('切换布局方向后分支数不变且朝向正确', async ({ page }) => {
+  test('switching layout direction keeps the branch count and orientation', async ({ page }) => {
     await page.goto('/tools/mindmap-editor');
     await page.getByRole('button', { name: '模板', exact: true }).click();
     await page.getByRole('button', { name: '读书笔记' }).click();
@@ -2682,9 +2727,9 @@ test.describe('脑图编辑器（zh-CN）', () => {
 
     await page.getByRole('button', { name: '向下' }).click();
     await expect(page.locator('.react-flow__edge')).toHaveCount(12);
-    // 布局切换有 150ms 过渡动画，等落位后再比较坐标
+    // Layout switching animates for 150ms, so wait for it to settle before comparing coordinates
     await page.waitForTimeout(400);
-    // 向下布局：一级分支应位于中心主题下方
+    // Downward layout: first-level branches sit below the central topic
     const nodes = await page.locator('.react-flow__node').evaluateAll((els) =>
       els.map((el) => {
         const r = el.getBoundingClientRect();
@@ -2698,20 +2743,20 @@ test.describe('脑图编辑器（zh-CN）', () => {
     expect(below!.y).toBeGreaterThan(root!.y);
   });
 
-  test('双击节点编辑文本：可连续输入，Esc 取消回滚', async ({ page }) => {
+  test('double-click a node to edit text: continuous input, Esc cancels', async ({ page }) => {
     await page.goto('/tools/mindmap-editor');
     const root = page.locator('.react-flow__node').first();
     await expect(root).toContainText('Central Topic');
 
-    // 双击进入编辑态，连续输入完整文本后提交
-    // 断言限定在画布内：大纲面板里同样会出现该文本
+    // Double-click to enter edit mode, type the full text, then commit
+    // Scope the assertion to the canvas: the outline panel shows the same text
     const onCanvas = (text: string) => page.locator('.react-flow').getByText(text, { exact: true });
     await root.dblclick();
     await page.keyboard.type('Hello Map');
     await page.keyboard.press('Enter');
     await expect(onCanvas('Hello Map')).toBeVisible();
 
-    // F2 再次编辑：Esc 应回滚，不落库
+    // Edit again with F2: Esc should roll back without persisting
     await onCanvas('Hello Map').click();
     await page.keyboard.press('F2');
     await page.keyboard.type('Changed');
@@ -2719,7 +2764,7 @@ test.describe('脑图编辑器（zh-CN）', () => {
     await expect(onCanvas('Hello Map')).toBeVisible();
     await expect(onCanvas('Changed')).toHaveCount(0);
 
-    // 单击已选中的节点也能进入编辑（覆盖「两次单击间隔过长、不算双击」的场景）
+    // Clicking an already-selected node also enters edit mode (covers "two clicks too far apart to be a dblclick")
     const second = page.locator('.react-flow__node').nth(1);
     await second.click();
     await page.keyboard.press('Escape');
@@ -2728,13 +2773,13 @@ test.describe('脑图编辑器（zh-CN）', () => {
   });
 });
 
-// 文档类编辑器「放映」：与幻灯片工具同一套入口（DocumentHeader afterNew）
-test.describe('文档类编辑器放映（zh-CN）', () => {
+// Document editors' "present" mode: same entry as the slide tool (DocumentHeader afterNew)
+test.describe('document editor present mode (zh-CN)', () => {
   test.use({ locale: 'zh-CN' });
 
   const overlay = (page: Page) => page.getByTestId('present-overlay');
 
-  test('照片编辑器：放映合成位图并可 Esc 退出', async ({ page }) => {
+  test('photo editor: present composites the bitmap, Esc exits', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/photo-editor');
@@ -2746,7 +2791,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('文字处理器：放映只读文档', async ({ page }) => {
+  test('word processor: present a read-only document', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/rich-text-editor');
@@ -2762,7 +2807,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('文字处理器：放映放大后内容真正变大且不跑位', async ({ page }) => {
+  test('word processor: content really grows on zoom without drifting', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/rich-text-editor');
@@ -2771,7 +2816,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     await page.getByTestId('rich-text-present').click();
     await expect(overlay(page)).toBeVisible();
 
-    // 文档元素的「可视宽度」与「距可视区顶部的距离」
+    // The document element's "visible width" and "distance from the top of the viewport"
     const metrics = () =>
       page.evaluate(() => {
         const doc = document.querySelector('[data-testid="present-document"]') as HTMLElement;
@@ -2787,9 +2832,9 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     await expect(page.getByTestId('present-zoom-level')).toHaveText('156%');
 
     const after = await metrics();
-    // 文字 / 表格这类固定尺寸内容必须真正放大（而不是只撑出一块空白）
+    // Fixed-size content such as text / tables must really grow (not just leave a blank block)
     expect(after.width).toBeGreaterThan(before.width);
-    // 居顶文档：放大后仍贴着可视区顶部，不会被推到屏幕外
+    // Top-aligned document: still flush with the viewport top after zoom, never pushed off-screen
     expect(Math.abs(after.topGap - before.topGap)).toBeLessThan(4);
 
     await page.keyboard.press('Escape');
@@ -2797,25 +2842,27 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('文字处理器：链接可在右键菜单里查看 / 编辑 / 移除', async ({ page }) => {
+  test('word processor: links can be viewed / edited / removed from the context menu', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/rich-text-editor');
     await page.locator('.tiptap').click();
     await page.keyboard.type('示例链接文字');
 
-    // 先用工具栏按钮创建链接（该入口走原生 prompt）
+    // Create a link with the toolbar button first (that entry uses a native prompt)
     page.once('dialog', (dialog) => void dialog.accept('https://example.com/a'));
     await page.keyboard.press('ControlOrMeta+a');
     await page.getByRole('button', { name: '链接', exact: true }).click();
     await expect(page.locator('.tiptap a[href="https://example.com/a"]')).toHaveCount(1);
 
-    // 右键链接：菜单给出查看 / 编辑 / 移除入口
+    // Right-click the link: the menu offers view / edit / remove
     await page.locator('.tiptap a[href="https://example.com/a"]').click({ button: 'right' });
     await expect(page.getByTestId('rich-text-context-menu')).toBeVisible();
     await expect(page.getByRole('menuitem', { name: '复制链接地址' })).toBeVisible();
 
-    // 编辑链接地址
+    // Edit the link address
     await page.getByRole('menuitem', { name: '编辑链接' }).click();
     const input = page.getByRole('textbox', { name: '链接地址' });
     await expect(input).toHaveValue('https://example.com/a');
@@ -2823,21 +2870,23 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     await page.getByRole('button', { name: '确定' }).click();
     await expect(page.locator('.tiptap a[href="https://example.org/b"]')).toHaveCount(1);
 
-    // 移除链接
+    // Remove the link
     await page.locator('.tiptap a[href="https://example.org/b"]').click({ button: 'right' });
     await page.getByRole('menuitem', { name: '移除链接' }).click();
     await expect(page.locator('.tiptap a[href]')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
-  test('文字处理器：嵌入型图片留在文字中间，不再独占一行', async ({ page }) => {
+  test('word processor: inline images stay in the text flow instead of owning a line', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/rich-text-editor');
     await page.locator('.tiptap').click();
     await page.keyboard.type('前文');
 
-    // 与工具栏「插入图片」同一入口：直接向隐藏的 file input 投放图片
+    // Same entry as the toolbar "插入图片": drop an image straight into the hidden file input
     await page.setInputFiles('input[type="file"][accept="image/*"]', {
       name: 'dot.png',
       mimeType: 'image/png',
@@ -2846,11 +2895,11 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
         'base64',
       ),
     });
-    // 图片节点经 FileReader 异步插入，先等 <img> 落位再继续输入，避免文字排在图片之前
+    // The image node is inserted asynchronously via FileReader, so wait for the <img> before typing on
     await page.locator('.tiptap img').first().waitFor();
     await page.keyboard.type('后文');
 
-    // 图片与前后文字同处一个段落
+    // The image shares one paragraph with the text around it
     await expect(page.locator('.tiptap p')).toHaveCount(1);
     const html = await page.locator('.tiptap p').innerHTML();
     expect(html.startsWith('前文<img')).toBe(true);
@@ -2858,7 +2907,9 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('文字处理器：标尺显示毫米刻度，可随开关显隐', async ({ page }) => {
+  test('word processor: the ruler shows millimeter ticks and toggles visibility', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/rich-text-editor');
@@ -2866,7 +2917,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
 
     const ruler = page.getByTestId('rich-text-ruler');
     await expect(ruler).toBeVisible();
-    // 主刻度间隔 = 1cm（96/25.4 × 10 ≈ 37.8px），小刻度 = 1mm
+    // Major ticks every 1cm (96/25.4 × 10 ≈ 37.8px), minor ticks every 1mm
     const [major, minor] = await ruler.evaluate((el) => {
       const size = (selector: string) =>
         Number.parseFloat(getComputedStyle(el.querySelector(selector)!).backgroundSize);
@@ -2877,7 +2928,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(minor).toBeGreaterThan(3.5);
     expect(minor).toBeLessThan(4);
 
-    // 垂直标尺同样按 1cm / 1mm 绘制，并与正文内容顶部对齐
+    // The vertical ruler uses the same 1cm / 1mm scale and aligns with the top of the body
     const verticalRuler = page.getByTestId('rich-text-ruler-v');
     await expect(verticalRuler).toBeVisible();
     const [vMajor, vOffset] = await verticalRuler.evaluate((el) => {
@@ -2902,20 +2953,20 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('电子表格：放映只读表格', async ({ page }) => {
+  test('spreadsheet: present a read-only table', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/spreadsheet-editor');
     await page.getByTestId('sheet-present').click();
     await expect(overlay(page)).toBeVisible();
-    // 空工作簿也要呈现表头 + 空表
+    // Even an empty workbook shows the header plus an empty table
     await expect(page.getByRole('table')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(overlay(page)).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
-  test('电子表格：放映时支持放大 / 缩小 / 适应窗口', async ({ page }) => {
+  test('spreadsheet: zoom in / out / fit to window while presenting', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/spreadsheet-editor');
@@ -2929,7 +2980,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     const baseStage = await stage.evaluate((el) => el.getBoundingClientRect().width);
     const baseTable = await table.evaluate((el) => el.getBoundingClientRect().width);
 
-    // 放大：舞台与内容（表格）都要真正变大，而不是只多出一块空白
+    // Zoom in: the stage and the content (table) must really grow, not just leave a blank block
     await page.getByTestId('present-zoom-in').click();
     await expect(level).toHaveText('125%');
     expect(await stage.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(
@@ -2939,11 +2990,11 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
       baseTable,
     );
 
-    // 适应窗口：回到 100%
+    // Fit to window: back to 100%
     await page.getByTestId('present-zoom-fit').click();
     await expect(level).toHaveText('100%');
 
-    // 快捷键：`=` 放大、`-` 缩小
+    // Shortcuts: `=` zooms in, `-` zooms out
     await page.keyboard.press('=');
     await expect(level).toHaveText('125%');
     await page.keyboard.press('-');
@@ -2954,14 +3005,14 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('电子表格：缩放锚定可视区中心，不跑位', async ({ page }) => {
+  test('spreadsheet: zoom stays anchored to the viewport center', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/spreadsheet-editor');
     await page.getByTestId('sheet-present').click();
     await expect(overlay(page)).toBeVisible();
 
-    // 可视区中心落在缩放舞台内的相对位置：缩放前后应保持不变
+    // The viewport center's relative position inside the zoom stage should stay put before and after zooming
     const centerFraction = () =>
       page.evaluate(() => {
         const host = document.querySelector('[data-testid="present-scroll"]') as HTMLElement;
@@ -2979,7 +3030,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     await page.getByTestId('present-zoom-in').click();
     await expect(page.getByTestId('present-zoom-level')).toHaveText('156%');
 
-    // 放大后确实发生滚动补偿（否则「不跑位」只是没滚动造成的假象）
+    // Scroll compensation really happens after zooming (otherwise "no drift" is just an illusion of not scrolling)
     const scrolled = await page.getByTestId('present-scroll').evaluate((el) => ({
       left: el.scrollLeft,
       top: el.scrollTop,
@@ -2996,7 +3047,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('流程图：放映画布截图', async ({ page }) => {
+  test('flowchart: present a canvas screenshot', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/flowchart-editor');
@@ -3010,7 +3061,7 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
     expect(errors).toEqual([]);
   });
 
-  test('脑图：放映画布截图', async ({ page }) => {
+  test('mind map: present a canvas screenshot', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/mindmap-editor');
@@ -3024,16 +3075,16 @@ test.describe('文档类编辑器放映（zh-CN）', () => {
   });
 });
 
-// 多页浏览：页签条翻页 + 缩略图总览（流程图 / 脑图）
-test.describe('多页浏览（zh-CN）', () => {
+// Multi-page browsing: tab strip paging + thumbnail overview (flowchart / mind map)
+test.describe('multi-page browsing (zh-CN)', () => {
   test.use({ locale: 'zh-CN' });
 
-  test('流程图：总览 / 翻页 / 页码', async ({ page }) => {
+  test('flowchart: overview / paging / page number', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/flowchart-editor');
 
-    // 加一个节点，再加一页
+    // Add a node, then add a page
     await page.getByRole('button', { name: '过程', exact: true }).click();
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
     await page.getByTestId('page-counter').scrollIntoViewIfNeeded();
@@ -3041,33 +3092,33 @@ test.describe('多页浏览（zh-CN）', () => {
     await page.getByRole('button', { name: '新建页面' }).click();
     await expect(page.getByTestId('page-counter')).toContainText('2');
 
-    // 上一页 / 下一页
+    // Previous / next page
     await page.getByTestId('page-prev').click();
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
     await page.getByTestId('page-next').click();
     await expect(page.getByText(/节点:\s*0/)).toBeVisible();
 
-    // 总览：两页缩略图都在，第一页有内容
+    // Overview: both page thumbnails are there and page 1 has content
     await page.getByTestId('page-overview-open').click();
     const overview = page.getByTestId('page-overview');
     await expect(overview).toBeVisible();
     await expect(overview.getByTestId('page-thumb')).toHaveCount(1);
-    // 第二页还没有内容 → 卡片上给出「空白页」提示
+    // Page 2 is still empty → the card shows a "空白页" hint
     await expect(overview.getByText('空白页')).toBeVisible();
 
-    // 点第一页卡片跳转并关闭总览
+    // Click the first page card to jump there and close the overview
     await page.getByTestId('page-card-select-0').click();
     await expect(overview).toHaveCount(0);
     await expect(page.getByText(/节点:\s*1/)).toBeVisible();
 
-    // Ctrl+PageDown 翻页
+    // Ctrl+PageDown pages forward
     await page.keyboard.press('Control+PageDown');
     await expect(page.getByText(/节点:\s*0/)).toBeVisible();
 
     expect(errors).toEqual([]);
   });
 
-  test('脑图：总览 / 翻页 / 页码', async ({ page }) => {
+  test('mind map: overview / paging / page number', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/tools/mindmap-editor');
@@ -3089,12 +3140,12 @@ test.describe('多页浏览（zh-CN）', () => {
 });
 
 /**
- * 六个办公类编辑器统一的工作区高度规则：
- * 工作区撑满首屏剩余空间，底部状态栏留在首屏内，「相关工具」被推到首屏之外（滚动才可见）。
- * 这样各工具默认可见的工作区一致，也不会因为写死的 calc 常量把相关工具挤进首屏。
+ * Shared workspace-height rule for the six office editors:
+ * The workspace fills the rest of the first screen, the status bar stays visible and "相关工具" is pushed below the fold (needs scrolling).
+ * This keeps the default visible workspace consistent across tools and avoids hard-coded calc constants squeezing related tools in.
  */
-test.describe('办公工具工作区（zh-CN）', () => {
-  // 工作区最小高度（320 / 460）是按常见笔记本屏幕定的，窗口更矮时按设计允许页面滚动
+test.describe('office tool workspace (zh-CN)', () => {
+  // The minimum workspace heights (320 / 460) target common laptop screens; shorter windows are designed to scroll
   test.use({ viewport: { width: 1440, height: 900 } });
 
   const editors = [
@@ -3107,11 +3158,13 @@ test.describe('办公工具工作区（zh-CN）', () => {
   ];
 
   for (const id of editors) {
-    test(`${id}：工作区撑满首屏，相关工具默认在首屏之外`, async ({ page }) => {
+    test(`${id}: workspace fills the first screen, related tools stay below the fold`, async ({
+      page,
+    }) => {
       await page.goto(`/tools/${id}`);
       await expect(page.locator('[data-tool-root]')).toBeVisible();
 
-      // 返回 'ok' 或诊断串：失败时能看到具体几何，便于判断是哪个方向溢出
+      // Return 'ok' or a diagnostic string: on failure the geometry shows which direction overflowed
       const measure = () =>
         page.evaluate(() => {
           const vh = window.innerHeight;
@@ -3119,7 +3172,7 @@ test.describe('办公工具工作区（zh-CN）', () => {
           const relatedTop = related ? Math.round(related.getBoundingClientRect().top) : -1;
           const bar = document.querySelector('[data-editor-statusbar]');
           const barBottom = bar ? Math.round(bar.getBoundingClientRect().bottom) : null;
-          // 状态栏必须完整留在首屏内（±1px 舍入容差）
+          // The status bar must stay fully within the first screen (±1px rounding tolerance)
           const barOk = barBottom === null || barBottom <= vh + 1;
           const relatedOk = relatedTop >= vh;
           return barOk && relatedOk

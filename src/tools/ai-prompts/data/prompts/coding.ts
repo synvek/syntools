@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 编程开发类提示词，详见 ../README.md */
+/** Programming and development prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'coding-code-review',

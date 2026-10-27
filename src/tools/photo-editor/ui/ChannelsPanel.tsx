@@ -4,14 +4,14 @@ import { usePhotoStore } from '../store';
 import type { ChannelView } from '../core';
 
 /**
- * 通道面板：复合 / R / G / B 四个通道的缩略图与隔离显示，另附取样点与文档色板。
+ * Channels panel: thumbnails and isolated display for composite / R / G / B, plus sample points and the document palette.
  *
- * 隔离显示是**显示态**（只影响画布呈现、不改文档、不进历史）：用于检查单个通道的
- * 溢出 / 噪点 / 蒙版细节，这也是「通道」在实际修图里的主要用途。
- * 文档色板则属于文档数据（随工程保存），因此单独成块并标注来源。
+ * Isolated display is a **display state** (affects only the canvas, never the document or history): it is for inspecting a
+ * single channel's clipping / noise / mask detail, which is what channels are actually used for in retouching.
+ * The document palette, by contrast, is document data (saved with the project), so it has its own block with its source labelled.
  */
 
-/** 通道名的 i18n 键：`rgb` 复用「复合」 */
+/** i18n keys for channel names: `rgb` reuses the "composite" label */
 const CHANNEL_LABEL: Record<ChannelView, string> = {
   rgb: 'channelRgb',
   red: 'channelRed',

@@ -10,10 +10,10 @@ import { formatSqlText, SQL_LANGUAGES, type KeywordCase, type SqlLanguage } from
 const isLanguage = (v: string): v is SqlLanguage => SQL_LANGUAGES.includes(v as SqlLanguage);
 const KEYWORD_CASES: KeywordCase[] = ['upper', 'lower', 'preserve'];
 
-/** SQL 格式化（Tasks T35）：文案全部走 i18n（T29 约定） */
+/** SQL formatting (Tasks T35): all copy goes through i18n (T29 convention) */
 export default function SqlFormatTool() {
   const { t } = useTranslation();
-  // 从分享链接 ?s= 还原初始状态（T28）
+  // Restore initial state from the share link ?s= (T28)
   const init = useMemo(() => readSharedState({ i: '', l: 'sql', n: 2, k: 'upper' }), []);
   const [input, setInput] = useState(init.i);
   const [language, setLanguage] = useState<SqlLanguage>(isLanguage(init.l) ? init.l : 'sql');

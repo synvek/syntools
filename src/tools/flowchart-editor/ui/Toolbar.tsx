@@ -38,13 +38,13 @@ import {
   type WheelMode,
 } from '../model/types';
 
-/** 连线宽度可选值（与 normalizeEdgeStyle 的 1~8 限制一致） */
+/** Selectable edge widths (consistent with normalizeEdgeStyle's 1–8 limit) */
 const EDGE_WIDTH_OPTIONS = ['1', '2', '3', '4', '5', '6', '8'];
 
 const selectCls =
   'h-7 rounded-md border border-gray-200 bg-white px-1.5 text-[12px] text-gray-700 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200';
 
-/** 工具栏带标签的下拉选择器 */
+/** Toolbar dropdown select with a label */
 function EdgeSelect({
   label,
   value,
@@ -121,7 +121,7 @@ function ToolbarButton({
   );
 }
 
-/** 统一的线性图标容器（用于锁定/隐藏等图标按钮） */
+/** Shared linear icon container (for icon buttons such as lock/hide) */
 function SvgIcon({ children }: { children: ReactNode }) {
   return (
     <svg
@@ -213,28 +213,28 @@ export function Toolbar(props: ToolbarProps) {
   const gridStyle = useFlowStore((s) => s.gridStyle);
   const canvasBackground = useFlowStore((s) => s.canvasBackground);
   const rulersVisible = useFlowStore((s) => s.rulersVisible);
-  /** 命令式写会话设置（工具栏控件即时生效） */
+  /** Imperatively write session settings (toolbar controls take effect immediately) */
   const st = useFlowStore.getState();
-  /** 当前纸张：命中预设取其 id，否则为 custom / none */
+  /** Current paper: a preset's id when it matches one, otherwise custom / none */
   const pageSizeKey = !pageSize
     ? 'none'
     : (PAPER_PRESETS.find((p) => p.width === pageSize.width && p.height === pageSize.height)?.id ??
       'custom');
   const sep = <span className="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" />;
 
-  // 选中节点的锁定/隐藏状态（用于图标切换）
+  // Lock/hide state of the selected nodes (for icon toggling)
   const selNodes = nodes.filter((n) => selectedNodes.includes(n.id));
   const allLocked = selNodes.length > 0 && selNodes.every((n) => n.draggable === false);
   const allHidden = selNodes.length > 0 && selNodes.every((n) => n.hidden === true);
 
-  // 选中连线时回显该连线样式，否则回显默认样式
+  // Show the selected edge's style when an edge is selected, otherwise the default style
   const hasEdgeSel = selectedEdges.length > 0 && selectedNodes.length === 0;
   const selEdge = hasEdgeSel ? edges.find((e) => e.id === selectedEdges[0]) : undefined;
   const shown = selEdge
     ? normalizeEdgeStyle((selEdge.data as { style?: Partial<FlowEdgeStyle> } | undefined)?.style)
     : defaultEdge;
 
-  /** 修改连线样式：更新默认值，并在选中连线时立即应用到选中连线 */
+  /** Change edge style: update the default and apply it to the selected edges immediately */
   const applyEdge = (patch: Partial<FlowEdgeStyle>) => {
     const st = useFlowStore.getState();
     if (st.selectedEdges.length > 0 && st.selectedNodes.length === 0) {
@@ -270,7 +270,7 @@ export function Toolbar(props: ToolbarProps) {
 
         {sep}
 
-        {/* 网格吸附：可开关并可选网格尺寸 */}
+        {/* Grid snapping: toggle plus grid size */}
         <ToolbarButton
           testId="flowchart-grid-toggle"
           label={t('tools.flowchart.snapToGrid')}
@@ -304,7 +304,7 @@ export function Toolbar(props: ToolbarProps) {
           renderOption={(v) => `${v}px`}
         />
 
-        {/* 纸张尺寸：设置后画布显示页边界 */}
+        {/* Paper size: the canvas shows page bounds once set */}
         <EdgeSelect
           testId="flowchart-paper-size"
           label={t('tools.flowchart.paperSize')}
@@ -376,7 +376,7 @@ export function Toolbar(props: ToolbarProps) {
         />
       </div>
 
-      {/* 排列：对齐 / 分布 / 层级 / 编组 */}
+      {/* Arrange: align / distribute / layer / group */}
       <div className="flex flex-wrap items-center gap-1">
         {ALIGN_BUTTONS.map((item) => (
           <ToolbarButton

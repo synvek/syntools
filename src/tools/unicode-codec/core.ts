@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * Unicode 编码转换：文本 ⇄ JS 转义 / 码点 / HTML 实体 / UTF-8 字节。
+ * Unicode conversion: text ⇄ JS escapes / code points / HTML entities / UTF-8 bytes.
  */
 
 export type UnicodeFormat = 'js' | 'jsBrace' | 'codePoint' | 'htmlHex' | 'htmlDec' | 'utf8';
@@ -58,13 +58,16 @@ export function encodeUnicode(input: string, format: UnicodeFormat): string {
   return parts.join('');
 }
 
-/** 解码常见 Unicode 表示：\uXXXX、\u{…}、U+XXXX、&#x…;、&#…;、UTF-8 十六进制字节 */
+/** Decode common Unicode notations: \uXXXX, \u{…}, U+XXXX, &#x…;, &#…;, UTF-8 hex bytes */
 export function decodeUnicode(input: string): ToolResult<string> {
   const trimmed = input.trim();
   if (!trimmed) return { ok: false, error: 'EMPTY' };
 
-  // UTF-8 十六进制字节串：如 "E4 B8 AD" 或 "e4b8ad"
-  if (/^(?:[0-9a-fA-F]{2}(?:\s+[0-9a-fA-F]{2})+|[0-9a-fA-F]{4,})$/.test(trimmed) && !/[\\&U+]/.test(trimmed)) {
+  // UTF-8 hex byte string, e.g. "E4 B8 AD" or "e4b8ad"
+  if (
+    /^(?:[0-9a-fA-F]{2}(?:\s+[0-9a-fA-F]{2})+|[0-9a-fA-F]{4,})$/.test(trimmed) &&
+    !/[\\&U+]/.test(trimmed)
+  ) {
     const hex = trimmed.replace(/\s+/g, '');
     if (hex.length % 2 !== 0) return { ok: false, error: 'INVALID' };
     try {
@@ -117,12 +120,12 @@ export function decodeUnicode(input: string): ToolResult<string> {
         i += m[0].length;
         continue;
       }
-      // 跳过空白分隔
+      // Skip whitespace separators
       if (/\s/.test(s[i])) {
         i += 1;
         continue;
       }
-      // 普通字符原样保留（便于混排）
+      // Plain characters are kept as-is (so mixed input round-trips)
       out += s[i];
       i += 1;
     }

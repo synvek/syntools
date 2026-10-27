@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 翻译与本地化类提示词，详见 ../README.md */
+/** Translation and localization prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'translate-zh-to-en',

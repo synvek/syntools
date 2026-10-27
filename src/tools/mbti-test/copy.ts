@@ -1,4 +1,4 @@
-/** MBTI 题干与类型文案（随工具懒加载，避免撑大首屏 i18n） */
+/** MBTI question stems and type copy (lazy-loaded with the tool so the initial i18n bundle stays small) */
 
 export type MbtiLocale = 'zh' | 'en';
 
@@ -30,30 +30,114 @@ const questionsZh: Record<string, { text: string; a: string; b: string }> = {
 };
 
 const questionsEn: Record<string, { text: string; a: string; b: string }> = {
-  q1: { text: 'After a social gathering you usually feel…', a: 'Energized and ready for more', b: 'Drained and need alone time' },
-  q2: { text: 'On weekends you prefer to…', a: 'Go out with friends', b: 'Stay in and do your own thing' },
-  q3: { text: 'In unfamiliar settings you tend to…', a: 'Observe first, then join in', b: 'Start conversations quickly' },
-  q4: { text: 'When thinking something through you like to…', a: 'Talk it out with others', b: 'Figure it out alone first' },
-  q5: { text: 'When messages pile up you…', a: 'Feel interrupted and need quiet', b: 'Enjoy the buzz and reply readily' },
+  q1: {
+    text: 'After a social gathering you usually feel…',
+    a: 'Energized and ready for more',
+    b: 'Drained and need alone time',
+  },
+  q2: {
+    text: 'On weekends you prefer to…',
+    a: 'Go out with friends',
+    b: 'Stay in and do your own thing',
+  },
+  q3: {
+    text: 'In unfamiliar settings you tend to…',
+    a: 'Observe first, then join in',
+    b: 'Start conversations quickly',
+  },
+  q4: {
+    text: 'When thinking something through you like to…',
+    a: 'Talk it out with others',
+    b: 'Figure it out alone first',
+  },
+  q5: {
+    text: 'When messages pile up you…',
+    a: 'Feel interrupted and need quiet',
+    b: 'Enjoy the buzz and reply readily',
+  },
   q6: { text: 'Learning something new, you prefer…', a: 'Group discussion', b: 'Solo deep dives' },
-  q7: { text: 'When deciding you weigh more…', a: 'Proven experience and details', b: 'Future possibilities and big ideas' },
-  q8: { text: 'With instructions you…', a: 'Want the why before doing', b: 'Follow steps one by one' },
-  q9: { text: 'Describing things you lean…', a: 'Concrete, observable facts', b: 'Metaphors and meanings' },
-  q10: { text: 'Toward routines you feel…', a: 'They are reliable — keep them', b: 'They get stale — try new ways' },
-  q11: { text: 'In a story you notice more…', a: 'Themes and symbolism', b: 'Plot and concrete details' },
-  q12: { text: 'Planning a trip you…', a: 'List, review, lock an itinerary', b: 'Leave room to explore on the fly' },
-  q13: { text: 'In arguments you emphasize…', a: 'Logic and consistency', b: 'Feelings and relationships' },
-  q14: { text: 'A friend asks for help; you first…', a: 'Comfort and listen', b: 'Analyze and suggest fixes' },
-  q15: { text: 'Judging work you care more about…', a: 'Fairness and efficiency', b: 'People’s feelings' },
+  q7: {
+    text: 'When deciding you weigh more…',
+    a: 'Proven experience and details',
+    b: 'Future possibilities and big ideas',
+  },
+  q8: {
+    text: 'With instructions you…',
+    a: 'Want the why before doing',
+    b: 'Follow steps one by one',
+  },
+  q9: {
+    text: 'Describing things you lean…',
+    a: 'Concrete, observable facts',
+    b: 'Metaphors and meanings',
+  },
+  q10: {
+    text: 'Toward routines you feel…',
+    a: 'They are reliable — keep them',
+    b: 'They get stale — try new ways',
+  },
+  q11: {
+    text: 'In a story you notice more…',
+    a: 'Themes and symbolism',
+    b: 'Plot and concrete details',
+  },
+  q12: {
+    text: 'Planning a trip you…',
+    a: 'List, review, lock an itinerary',
+    b: 'Leave room to explore on the fly',
+  },
+  q13: {
+    text: 'In arguments you emphasize…',
+    a: 'Logic and consistency',
+    b: 'Feelings and relationships',
+  },
+  q14: {
+    text: 'A friend asks for help; you first…',
+    a: 'Comfort and listen',
+    b: 'Analyze and suggest fixes',
+  },
+  q15: {
+    text: 'Judging work you care more about…',
+    a: 'Fairness and efficiency',
+    b: 'People’s feelings',
+  },
   q16: { text: 'When conflict appears you…', a: 'Clarify facts first', b: 'Ease the mood first' },
-  q17: { text: 'Giving feedback you tend to…', a: 'Be gentle: praise then suggest', b: 'Be direct about the issue' },
-  q18: { text: '“Fair” means to you…', a: 'Same rules for everyone', b: 'Context and care for the vulnerable' },
-  q19: { text: 'Your desk / schedule is usually…', a: 'Organized with clear plans', b: 'Flexible and spontaneous' },
-  q20: { text: 'Near a deadline you…', a: 'Get a productive surge under pressure', b: 'Finish in stages ahead of time' },
-  q21: { text: 'Open-ended tasks make you…', a: 'Set a framework and milestones', b: 'Explore first, then converge' },
+  q17: {
+    text: 'Giving feedback you tend to…',
+    a: 'Be gentle: praise then suggest',
+    b: 'Be direct about the issue',
+  },
+  q18: {
+    text: '“Fair” means to you…',
+    a: 'Same rules for everyone',
+    b: 'Context and care for the vulnerable',
+  },
+  q19: {
+    text: 'Your desk / schedule is usually…',
+    a: 'Organized with clear plans',
+    b: 'Flexible and spontaneous',
+  },
+  q20: {
+    text: 'Near a deadline you…',
+    a: 'Get a productive surge under pressure',
+    b: 'Finish in stages ahead of time',
+  },
+  q21: {
+    text: 'Open-ended tasks make you…',
+    a: 'Set a framework and milestones',
+    b: 'Explore first, then converge',
+  },
   q22: { text: 'When shopping you…', a: 'Use a list', b: 'Browse and decide on the spot' },
-  q23: { text: 'On vacation you prefer…', a: 'Plenty of free, flexible time', b: 'Booked plans in advance' },
-  q24: { text: 'After finishing something you…', a: 'Close it out before starting more', b: 'Keep many things in parallel' },
+  q23: {
+    text: 'On vacation you prefer…',
+    a: 'Plenty of free, flexible time',
+    b: 'Booked plans in advance',
+  },
+  q24: {
+    text: 'After finishing something you…',
+    a: 'Close it out before starting more',
+    b: 'Keep many things in parallel',
+  },
 };
 
 const typesZh: Record<string, { name: string; desc: string }> = {
@@ -76,7 +160,10 @@ const typesZh: Record<string, { name: string; desc: string }> = {
 };
 
 const typesEn: Record<string, { name: string; desc: string }> = {
-  ISTJ: { name: 'Logistician', desc: 'Practical and reliable; values duty and getting things done.' },
+  ISTJ: {
+    name: 'Logistician',
+    desc: 'Practical and reliable; values duty and getting things done.',
+  },
   ISFJ: { name: 'Defender', desc: 'Warm and dutiful; quietly supports others and stability.' },
   INFJ: { name: 'Advocate', desc: 'Insightful idealist who seeks meaning and helps people grow.' },
   INTJ: { name: 'Architect', desc: 'Strategic and independent; builds long-range systems.' },

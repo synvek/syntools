@@ -154,8 +154,8 @@ import { videoConvertTool } from '@/tools/video-convert';
 import { subtitleTool } from '@/tools/subtitle-tool';
 
 /**
- * 全项目唯一的聚合注册入口：新增工具仅需在此追加一行。
- * 侧边栏、首页卡片、搜索索引、路由表均由本注册表派生（技术设计 §5）。
+ * The project's single registration entry point: adding a tool means adding one line here.
+ * Sidebar, home cards, search index and route table all derive from this registry (tech design §5).
  */
 export const tools: ToolMeta[] = [
   base64Tool,

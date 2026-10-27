@@ -1,16 +1,16 @@
 /**
- * 剪贴板扩展（阶段 7）：复制富文本与图片。
+ * Clipboard extensions (phase 7): copy rich text and images.
  *
- * 站内 `CopyButton` 只覆盖 `writeText`（纯文本），而 `ClipboardItem`（text/html、image/png）
- * 的支持度参差 —— 这里统一封装并显式降级：
- * - 富文本：`ClipboardItem` 不可用或写入失败时回落为纯文本；
- * - 图片：不可用或写入失败时返回 false，由调用方降级为「下载 PNG」。
- * 所有失败都不静默：调用方以 `role="status"` / 下载路径给出明确反馈。
+ * The in-app `CopyButton` only covers `writeText` (plain text), while `ClipboardItem` support
+ * (text/html, image/png) varies between browsers. This module wraps both and degrades explicitly:
+ * - Rich text: falls back to plain text when `ClipboardItem` is unavailable or the write fails;
+ * - Images: returns false when unavailable or the write fails, so the caller can offer "Download PNG".
+ * No failure is silent: callers surface it via `role="status"` or the download path.
  */
 
 export type RichTextCopyResult = 'rich' | 'plain';
 
-/** 复制富文本（HTML + 纯文本兜底）；剪贴板不可用时抛出，由调用方提示 */
+/** Copy rich text (HTML with a plain-text fallback); throws when the clipboard is unavailable */
 export async function copyRichText(html: string, text: string): Promise<RichTextCopyResult> {
   if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
     try {
@@ -22,14 +22,14 @@ export async function copyRichText(html: string, text: string): Promise<RichText
       ]);
       return 'rich';
     } catch {
-      // 部分浏览器对 text/html 有限制，回落纯文本
+      // Some browsers restrict text/html, so fall back to plain text
     }
   }
   await navigator.clipboard.writeText(text);
   return 'plain';
 }
 
-/** 复制 PNG 图片；返回是否成功（失败时调用方应降级为下载） */
+/** Copy a PNG image; returns whether it succeeded (callers should fall back to download) */
 export async function copyImage(blob: Blob): Promise<boolean> {
   if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return false;
   try {

@@ -1,35 +1,36 @@
 #!/usr/bin/env node
 /**
- * 产物体积预算检查（技术设计 §10.2）
- * - 首屏（index.html 引用的 js + css，gzip 后）≤ 185KB
- * - 单个 chunk（gzip 后）≤ 500KB（含 mermaid / jspdf 等重依赖）
- * 超限以退出码 1 失败；报告同时写入 dist/size-report.md。
- * 用法：pnpm build && pnpm size
+ * Bundle size budget check (technical design §10.2)
+ * - First screen (js + css referenced by index.html, gzipped) ≤ 185KB
+ * - Single chunk (gzipped) ≤ 500KB (including heavy deps such as mermaid / jspdf)
+ * Exceeding a budget fails with exit code 1; the report is also written to dist/size-report.md.
+ * Usage: pnpm build && pnpm size
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 const DIST = path.resolve(process.cwd(), 'dist');
-// 工具增多后适当放宽：首屏仍尽量紧凑，单 chunk 允许重依赖（mermaid / jspdf 等）。
-// 配额变迁：
-//   180KB → 185KB：工具数超过 100 个后，首屏同步语言包（zh + en）中的 toolsMeta（名称+描述）
-//     与 tools.*（工具 UI 文案）随之线性增长，2026-09 旧上限已被顶到。
-//   185KB → 210KB：工具数达到 152 个，同步打包的 zh+en 文案合计约 67KB（gzip），实测首屏 206.06KB。
-//   210KB → 175KB（收紧）：语言资源改为「外壳 / 工具文案」两段加载 ——
-//     src/core/i18n/locales/<lang>.ts      外壳（导航/首页/搜索 + toolsMeta），zh/en 同步进首屏；
-//     src/core/i18n/locales/<lang>.tools.ts 各工具 UI 文案 tools.*，进工具页时按需加载。
-//     tools.* 占语言包约 82%，剥离后首屏 209.03KB → 158.37KB（-50.66KB / -24%）。
-//     收紧到 175KB 是为了把这部分收益锁住：语言包/工具元数据再膨胀时先被这条门禁挡住，
-//     而不是继续抬上限。当前实测约 158KB，余量约 17KB。
-//   175KB → 195KB：2026-10 入口随工具/功能增长实测达 183KB（React 外壳 + 应用壳 + i18n 外壳 + CSS
-//     约占 180KB，难以继续压缩），放宽到 195KB 以吸收增长，余量约 12KB。
+// Loosened as tools were added: keep the first screen tight, but allow heavy deps (mermaid / jspdf) per chunk.
+// Budget history:
+//   180KB → 185KB: past 100 tools, the eagerly bundled locale bundles (zh + en) for toolsMeta (name+description)
+//     and tools.* (tool UI copy) grew linearly, and the 2026-09 limit was hit.
+//   185KB → 210KB: at 152 tools the eager zh+en copy reached ~67KB gzip and the entry measured 206.06KB.
+//   210KB → 175KB (tightened): locale resources now load in two parts — shell and tool copy:
+//     src/core/i18n/locales/<lang>.ts      shell (nav/home/search + toolsMeta), zh/en eager in the entry;
+//     src/core/i18n/locales/<lang>.tools.ts tool UI copy tools.*, loaded on demand on tool pages.
+//     tools.* is ~82% of the locale bundle; splitting it took the entry from 209.03KB to 158.37KB (-50.66KB / -24%).
+//     Tightening to 175KB locks in that gain: if locales or tool metadata grow again this gate trips first
+//     instead of the limit being raised again. Measured ~158KB, ~17KB of headroom.
+//   175KB → 195KB: in 2026-10 the entry measured 183KB as tools/features grew (React shell + app shell + i18n shell + CSS
+//     account for ~180KB and are hard to shrink further), so the limit was raised to 195KB, leaving ~12KB of headroom.
 const ENTRY_BUDGET = 195 * 1024;
 const CHUNK_BUDGET = 500 * 1024;
-// 电子表格工具依赖的 Univer / exceljs 天然是「重 chunk」：
-// 单个包体远超常规预算且无法再拆，单独放宽上限并记录在报告中，其余 chunk 仍受 500KB 约束。
-// 注意：Univer 不能人为切分（@univerjs/* 之间循环依赖，见 vite.config.ts），生产构建里它会
-// 自然并入动态入口 `SpreadsheetTool-*.js`（~6MB 原始 / ~1.7MB gzip），因此按该前缀放宽。
+// Univer / exceljs, used by the spreadsheet tool, are inherently heavy chunks:
+// a single bundle far exceeds the normal budget and cannot be split further, so they get their own
+// higher limit (still reported), while other chunks stay bound by 500KB.
+// Note: Univer cannot be split by hand (@univerjs/* are circularly dependent, see vite.config.ts); in
+// production builds it merges into the dynamic entry `SpreadsheetTool-*.js` (~6MB raw / ~1.7MB gzip), hence that prefix.
 const HEAVY_CHUNK_BUDGET = 12 * 1024 * 1024;
 const HEAVY_CHUNK_PATTERNS = [/^vendor-univer/, /^vendor-exceljs-/, /^SpreadsheetTool-/];
 const budgetFor = (file) =>
@@ -43,11 +44,11 @@ let html;
 try {
   html = readFileSync(path.join(DIST, 'index.html'), 'utf8');
 } catch {
-  console.error('未找到 dist/index.html，请先执行 pnpm build');
+  console.error('dist/index.html not found; run pnpm build first');
   process.exit(1);
 }
 
-// 首屏入口资源：index.html 中直接引用的 assets
+// First-screen entry assets: files referenced directly by index.html
 const entryFiles = new Set();
 for (const m of html.matchAll(/(?:src|href)="\/?assets\/([^"]+)"/g)) {
   entryFiles.add(m[1]);
@@ -59,13 +60,13 @@ const assets = readdirSync(assetsDir).filter((f) => f.endsWith('.js') || f.endsW
 let failed = false;
 let entryTotal = 0;
 const lines = [];
-lines.push('# 产物体积报告（gzip）');
+lines.push('# Bundle size report (gzip)');
 lines.push('');
 lines.push(
-  `预算：首屏 ≤ ${kb(ENTRY_BUDGET)}，单 chunk ≤ ${kb(CHUNK_BUDGET)}（Univer / exceljs 重 chunk ≤ ${kb(HEAVY_CHUNK_BUDGET)}）`,
+  `Budget: entry ≤ ${kb(ENTRY_BUDGET)}, single chunk ≤ ${kb(CHUNK_BUDGET)} (Univer / exceljs heavy chunks ≤ ${kb(HEAVY_CHUNK_BUDGET)})`,
 );
 lines.push('');
-lines.push('| 文件 | 类型 | gzip 体积 | 状态 |');
+lines.push('| File | Kind | gzip size | Status |');
 lines.push('| ---- | ---- | --------- | ---- |');
 
 for (const file of assets.sort()) {
@@ -75,16 +76,14 @@ for (const file of assets.sort()) {
   const budget = budgetFor(file);
   const over = bytes > budget;
   if (over) failed = true;
-  lines.push(
-    `| ${file} | ${isEntry ? '首屏入口' : '懒加载'} | ${kb(bytes)} | ${mark(bytes, budget)} |`,
-  );
+  lines.push(`| ${file} | ${isEntry ? 'entry' : 'lazy'} | ${kb(bytes)} | ${mark(bytes, budget)} |`);
 }
 
 lines.push('');
 const entryOver = entryTotal > ENTRY_BUDGET;
 if (entryOver) failed = true;
 lines.push(
-  `**首屏合计：${kb(entryTotal)} ${mark(entryTotal, ENTRY_BUDGET)}（预算 ${kb(ENTRY_BUDGET)}）**`,
+  `**Entry total: ${kb(entryTotal)} ${mark(entryTotal, ENTRY_BUDGET)} (budget ${kb(ENTRY_BUDGET)})**`,
 );
 
 const report = lines.join('\n');
@@ -92,7 +91,7 @@ writeFileSync(path.join(DIST, 'size-report.md'), `${report}\n`);
 console.log(report);
 
 if (failed) {
-  console.error('\n体积预算超限，请优化后再提交');
+  console.error('\nSize budget exceeded; optimize the bundle before committing');
   process.exit(1);
 }
-console.log('\n体积预算检查通过');
+console.log('\nSize budget check passed');

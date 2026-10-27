@@ -17,7 +17,7 @@ import {
   type GradientType,
 } from './core';
 
-/** CSS 渐变生成器 */
+/** CSS gradient generator */
 export default function CssGradientTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -48,10 +48,7 @@ export default function CssGradientTool() {
   });
 
   const [presetCategory, setPresetCategory] = useState<GradientPresetCategoryId>('warm');
-  const categoryPresets = useMemo(
-    () => getPresetsByCategory(presetCategory),
-    [presetCategory],
-  );
+  const categoryPresets = useMemo(() => getPresetsByCategory(presetCategory), [presetCategory]);
 
   const css = useMemo(() => buildGradientCss(options), [options]);
   const value = useMemo(() => buildGradientValue(options), [options]);

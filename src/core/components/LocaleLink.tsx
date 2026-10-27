@@ -8,19 +8,19 @@ import {
 import { useLocalizedPath } from '@/core/i18n/useLocalizedPath';
 
 /**
- * 会自己补语言前缀的 `Link` / `NavLink`。
+ * `Link` / `NavLink` that add the locale prefix themselves.
  *
- * 站点有两棵路由树（无前缀 = en，`/zh` = zh）。如果每个页面各写一遍
- * `to={lp('/pricing')}`，那么漏一处就是一条把中文用户甩回英文树的死链——
- * 而这种链接只有点下去才会发现，测试也未必覆盖。所以在导入层做一次替换：
+ * The site has two route trees (no prefix = en, `/zh` = zh). If every page wrote
+ * `to={lp('/pricing')}` itself, one miss becomes a link that drops Chinese users back into the English tree —
+ * a bug only visible after clicking and unlikely to be covered. So swap once at the import layer:
  *
- *   import { Link } from 'react-router-dom'        // 旧
- *   import { Link } from '@/app/layout/LocaleLink' // 新
+ *   import { Link } from 'react-router-dom'        // old
+ *   import { Link } from '@/app/layout/LocaleLink' // new
  *
- * 其余用法完全不变，`to` 为对象（`{ pathname, search }`）或外部地址时原样透传。
+ * Everything else is unchanged; object `to` (`{ pathname, search }`) and external URLs pass through as-is.
  */
 
-/** 只处理「站内绝对路径字符串」，其余形态交给调用方 */
+/** Handles internal absolute path strings only; other forms go back to the caller */
 function localize(to: LinkProps['to'], lp: (path: string) => string): LinkProps['to'] {
   return typeof to === 'string' ? lp(to) : to;
 }

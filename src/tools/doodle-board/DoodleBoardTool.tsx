@@ -16,7 +16,7 @@ import { useBoardStore } from './store';
 import BoardCanvas from './ui/BoardCanvas';
 import BoardToolbar from './ui/BoardToolbar';
 
-/** 数字键 1~9 对应的工具顺序（与工具栏一致） */
+/** Tool order for number keys 1-9 (matches the toolbar) */
 const TOOL_ORDER: ToolId[] = [
   'pen',
   'marker',
@@ -29,10 +29,10 @@ const TOOL_ORDER: ToolId[] = [
   'text',
 ];
 
-/** 字母快捷键：吸管 / 移动（对齐常见图像编辑器的 I / V） */
+/** Letter shortcuts: eyedropper / move (matching the I / V of common image editors) */
 const LETTER_TOOLS: Record<string, ToolId> = { i: 'picker', v: 'move' };
 
-/** 在线涂鸦画板 */
+/** Online doodle board */
 export default function DoodleBoardTool() {
   const { t } = useTranslation();
   const init = useMemo(
@@ -52,7 +52,7 @@ export default function DoodleBoardTool() {
   const secondary = useBoardStore((s) => s.secondary);
   const background = useBoardStore((s) => s.scene.background.kind);
 
-  // 多边形 / 移动 / 吸管这类「操作方式特殊」的工具给出针对性提示
+  // Tools with unusual interactions (polygon / move / eyedropper) get a tailored hint
   const contextualHint =
     tool === 'polygon'
       ? t('tools.doodle.polygonHint')
@@ -62,13 +62,13 @@ export default function DoodleBoardTool() {
           ? t('tools.doodle.pickerHint')
           : null;
 
-  // 本地草稿：进入时先恢复（分享链接的参数随后覆盖，保证链接所见即所得）
+  // Local draft: restore on entry (share-link parameters are applied afterwards and take precedence)
   useEffect(() => {
     const draft = readDraft();
     if (draft && draft.ops.length > 0) {
       const state = useBoardStore.getState();
       state.replaceScene(draft);
-      // 草稿自带尺寸：切到自定义，避免自适应的首帧把尺寸改掉
+      // The draft carries its own size: switch to custom so the first fit pass cannot resize it
       state.setPreset('custom');
       setRestored(true);
       window.setTimeout(() => setRestored(false), 2400);
@@ -88,7 +88,7 @@ export default function DoodleBoardTool() {
     };
   }, []);
 
-  // 分享链接里的画笔 / 背景参数：在草稿恢复之后应用，链接参数优先
+  // Brush / background parameters from the share link: applied after the draft, so the link wins
   useEffect(() => {
     const state = useBoardStore.getState();
     state.setPrimaryColor(init.c);

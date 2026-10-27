@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-/** localStorage 同步的 state，读写失败时降级为纯内存 */
+/** State synced to localStorage, degrading to memory when reads or writes fail */
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [value, setValue] = useState<T>(() => {
     try {
@@ -17,7 +17,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       try {
         localStorage.setItem(key, JSON.stringify(next));
       } catch {
-        /* 存储不可用时忽略 */
+        /* Ignore when storage is unavailable */
       }
     },
     [key],

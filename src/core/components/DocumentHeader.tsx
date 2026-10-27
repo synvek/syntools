@@ -3,22 +3,22 @@ import { Icon } from '@/core/components/Icon';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
 
 /**
- * 文档类编辑器（文字处理器 / 电子表格 / 幻灯片 / 流程图 / 脑图）的统一文档头部。
+ * Shared document header for document editors (word processor, spreadsheet, slides, flowchart, mind map).
  *
- * 行结构（自上而下）：
- * 1. 文档标题（输入框宽度固定 200px）+ 新建该类型文档按钮 + 导入 / 导出相关按钮（io 插槽，置于行尾）；
- * 2. 左侧文档统计信息（stats 插槽），右侧文档状态（status 插槽）+ 清空内容按钮；
- * 3. 之后由各工具自行渲染工具栏行（必要时可扩展到下一行）。
+ * Row layout, top to bottom:
+ * 1. Title (input fixed at 200px) + new-document button + import / export buttons (io slot, at the row end);
+ * 2. Document stats on the left (stats slot), status on the right (status slot) + clear button;
+ * 3. Each tool then renders its own toolbar row (wrapping to the next row when needed).
  *
- * 标题即导出文件名来源，由各工具传入的 onTitleChange 落到文档模型上。
- * 行内不放大段说明文字，改为 `HintTip` 气泡提示，避免挤占空间。
+ * The title is the export filename, persisted to the document model via onTitleChange.
+ * No long explanatory text inline; use a `HintTip` bubble to save space.
  */
 
-/** 标题输入框：宽度固定 200px，避免不同工具宽度不一致 */
+/** Title input: fixed 200px wide so tools stay consistent */
 export const DOC_TITLE_INPUT_CLASS =
   'w-[200px] shrink-0 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 
-/** 说明文字气泡：默认只显示一个 ⓘ 图标，悬停 / 聚焦时才展示完整文案 */
+/** Help bubble: shows only an ⓘ icon, expanding to the full text on hover / focus */
 export function HintTip({ text, label }: { text: string; label?: string }) {
   return (
     <span
@@ -38,20 +38,20 @@ interface DocumentHeaderProps {
   titlePlaceholder: string;
   title: string;
   onTitleChange: (value: string) => void;
-  /** 新建该类型文档按钮文案 */
+  /** Label for the new-document button */
   newLabel: string;
-  /** 新建按钮图标（Icon 名称） */
+  /** New-button icon (Icon name) */
   newIcon: string;
   onNew: () => void;
-  /** 新建按钮之后、io 之前插入的按钮（如放映） */
+  /** Buttons inserted after the new button and before io (e.g. present) */
   afterNew?: ReactNode;
-  /** 第一行尾部：导入 / 导出相关按钮 */
+  /** End of row one: import / export buttons */
   io?: ReactNode;
-  /** 第二行左侧：文档统计信息 */
+  /** Left of row two: document stats */
   stats?: ReactNode;
-  /** 第二行右侧：文档状态，如「已保存到本地草稿」 */
+  /** Right of row two: document status, e.g. "saved to local draft" */
   status?: ReactNode;
-  /** 清空内容 */
+  /** Clear content */
   onClear?: () => void;
   clearDisabled?: boolean;
 }

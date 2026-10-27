@@ -7,16 +7,16 @@ import { mapPsdBounds, mapPsdBlendMode, mapPsdEffects, type PsdEffects } from '.
 import type { BlendMode, GroupLayer, Layer, MaskRef, PhotoDoc, TextLayer } from '../model/types';
 
 /**
- * PSD 读入：把 Photoshop / Photopea 的文件还原成可继续编辑的文档。
+ * PSD reading: turn Photoshop / Photopea files back into an editable document.
  *
- * 与写出（`./writer.ts`）对称：同样**动态 import `ag-psd`**，只在真正导入时下载。
+ * Symmetric with writing (`./writer.ts`): also a **dynamic import of `ag-psd`**, fetched only on import.
  *
- * 保真边界（刻意不做半成品）：
- * - **像素图层 / 组 / 蒙版 / 混合模式 / 不透明度 / 隐藏**：完整读取；
- * - **图层效果**：只读我们渲染得出的五种（投影 / 内阴影 / 外发光 / 颜色叠加 / 描边），其余静默忽略；
- * - **文字**：按 PSD 的文字属性还原为**可再编辑的文字图层**（PSD 的变形 / 段落细节无法完全等价，见下）；
- * - **调整图层 / 智能对象**：还原为栅格像素（有像素就读，没像素就跳过），并计入降级统计；
- * - **图层顺序**：与写出同序（PSD 的 children 即自下而上的层栈顺序，与我们的 `layers` 数组一致）。
+ * Fidelity boundaries (no half-baked support on purpose):
+ * - **pixel layers / groups / masks / blend modes / opacity / visibility**: read in full;
+ * - **layer effects**: only the five we can render (shadow / inner shadow / outer glow / overlay / stroke);
+ * - **text**: restored as **re-editable text layers** from the PSD attributes (warp / paragraph details
+ *   don't map exactly, see below); **adjustment layers / smart objects** become raster pixels (read when
+ *   present, skipped when not) and count as degraded; **layer order** matches writing (bottom-up children).
  */
 
 interface PsdLikeLayer {
@@ -68,9 +68,9 @@ interface PsdLike {
 }
 
 export interface PsdImportReport {
-  /** 被降级成位图的图层名（调整图层 / 智能对象 / 形状） */
+  /** Names of layers degraded to bitmaps (adjustment layers / smart objects / shapes) */
   rasterized: string[];
-  /** 完全跳过的图层名（既无像素又无法还原） */
+  /** Names of layers skipped entirely (no pixels and not restorable) */
   skipped: string[];
 }
 
@@ -79,17 +79,17 @@ export interface PsdImportResult {
   report: PsdImportReport;
 }
 
-/** 从字体名里取族名（PSD 常带 "Family-Bold" / "Family,Bold" 这类后缀） */
+/** Extract the family from a font name (PSD often appends "Family-Bold" / "Family,Bold") */
 function fontFamilyOf(name: string | undefined): string {
   if (!name) return 'Helvetica';
   const cut = name.split(/[-,_]/)[0];
   return cut.trim() || 'Helvetica';
 }
 
-/** 从 PSD 文本的仿射矩阵近似还原旋转角（度） */
+/** Approximate the rotation angle (degrees) from the PSD text's affine matrix */
 function rotationOf(transform: number[] | undefined): number {
   if (!transform || transform.length < 4) return 0;
-  // 2×3/3×3 矩阵的 [a, b] 列即 x 轴方向
+  // In a 2×3 / 3×3 matrix the [a, b] column is the x axis
   const a = transform[0];
   const b = transform[1];
   if (!Number.isFinite(a) || !Number.isFinite(b) || (a === 0 && b === 0)) return 0;
@@ -130,7 +130,7 @@ function textOf(
     ...base,
     x,
     y,
-    // PSD 的文字块宽度由变换决定；取不到时给一个够用的默认宽，用户可再拖
+    // The PSD text box width comes from the transform; fall back to a usable default the user can drag
     width: Math.max(16, Math.round(width)),
     text,
     fontSize,
@@ -151,7 +151,7 @@ function textOf(
   };
 }
 
-/** 单个 PSD 图层 → 我们的图层（组只转换自身，子层由 `flattenPsdLayers` 紧随其后展开） */
+/** One PSD layer → our layer (groups convert themselves; children are expanded by `flattenPsdLayers`) */
 function convertLayer(
   layer: PsdLikeLayer,
   report: PsdImportReport,
@@ -189,7 +189,7 @@ function convertLayer(
       expanded: layer.opened ?? true,
       parentId,
     };
-    // 组自身不带像素，尺寸由子层在 sync 时推导
+    // A group has no pixels; its size is derived from the children during sync
     return group;
   }
 
@@ -208,7 +208,7 @@ function convertLayer(
       x: bounds.x,
       y: bounds.y,
     });
-    // 智能对象与调整图层在我们模型里没有对应表达，落成位图后计入降级统计
+    // Smart objects and adjustment layers have no equivalent here, so they become bitmaps, counted as degraded
     if (layer.placedLayer) report.rasterized.push(name);
     return { ...raster, ...base, mask: maskOf(layer) } as Layer;
   }
@@ -216,7 +216,7 @@ function convertLayer(
   return null;
 }
 
-/** 把一个 PSD 图层树按「自下而上」展开成扁平数组（与我们的 `layers` 数组一致） */
+/** Flatten a PSD layer tree bottom-up into a flat array (matching our `layers` array) */
 export function flattenPsdLayers(
   layers: PsdLikeLayer[] | undefined,
   report: PsdImportReport,
@@ -229,7 +229,7 @@ export function flattenPsdLayers(
       const converted = convertLayer(layer, report, parentId, context) as GroupLayer | null;
       if (!converted) continue;
       out.push(converted);
-      // 组内子层紧随其后（我们的扁平数组约定）
+      // The group's children follow right after it (our flat-array convention)
       out.push(...flattenPsdLayers(layer.children, report, context, converted.id));
       continue;
     }
@@ -240,10 +240,10 @@ export function flattenPsdLayers(
 }
 
 /**
- * 读取 PSD 文件为文档。
+ * Read a PSD file into a document.
  *
- * `ag-psd` 会就地解码图层像素（返回 canvas），因此这里不再做二次裁剪 ——
- * `layer.canvas` 已经是该图层自己的像素，`left/top` 是它在画布中的位置。
+ * `ag-psd` decodes layer pixels into canvases, so nothing is cropped a second time here —
+ * `layer.canvas` already holds the layer's own pixels, and `left/top` is its position on the canvas.
  */
 export async function loadPsdFile(file: File): Promise<ToolResult<PsdImportResult>> {
   const check = checkPsdFile(file);
@@ -252,7 +252,7 @@ export async function loadPsdFile(file: File): Promise<ToolResult<PsdImportResul
     const { readPsd } = await import('ag-psd');
     const buffer = await file.arrayBuffer();
     const psd = readPsd(buffer, {
-      // 只解码不压缩的原始像素：我们需要真实图层，而不是便于查看的缩略图
+      // Decode uncompressed raw pixels only: we need real layers, not view-friendly thumbnails
       skipLayerImageData: false,
       skipCompositeImageData: true,
       skipThumbnail: true,
@@ -272,7 +272,7 @@ export async function loadPsdFile(file: File): Promise<ToolResult<PsdImportResul
       name: file.name.replace(/\.[^.]+$/, ''),
       width,
       height,
-      // PSD 默认没有「画布底色」概念，保留透明底以免把导入图压成白底
+      // PSD has no "canvas background", so keep it transparent instead of flattening onto white
       background: 'transparent',
       layers,
       activeLayerId: layers[layers.length - 1]?.id ?? null,
@@ -284,7 +284,7 @@ export async function loadPsdFile(file: File): Promise<ToolResult<PsdImportResul
   }
 }
 
-/** PSD 文件名判定（读入口径与写出对称，只认 .psd） */
+/** PSD file-name test (symmetric with writing: only .psd) */
 export function isPsdFile(name: string): boolean {
   return /\.psd$/i.test(name.trim());
 }

@@ -1,6 +1,6 @@
 import type { ShapeDef } from './index';
 
-/** UML 状态图：状态、初始/终止、选择、汇合、终止、入口/出口点、浅/深历史、组合状态 */
+/** UML state diagram: state, initial/final, choice, junction, terminate, entry/exit point, shallow/deep history, composite state */
 export const UML_STATE_SHAPES: ShapeDef[] = [
   {
     kind: 'umlState',

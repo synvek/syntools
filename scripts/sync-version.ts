@@ -1,24 +1,26 @@
 /**
- * 版本号同步：以根目录 `package.json` 的 `version` 为唯一来源，
- * 把版本写进「无法派生」的副本。
+ * Version sync: the root `package.json` `version` is the single source of truth;
+ * the version is written into the copies that cannot be derived.
  *
- * 为什么同步面只剩 Cargo：
- * - `src-tauri/tauri.conf.json` 的 `version` 可以写成指向 package.json 的**路径**
- *   （Tauri v2 规范：semver 或 package.json 路径二选一），所以默认不再保留副本；
- *   若被改回字面量，本脚本会照常同步它，两种写法都支持。
- * - Cargo 无法从 package.json 派生版本：`Cargo.toml` 必须写字面量，
- *   `Cargo.lock` 中本包（syntools）的版本条目也要跟着变，否则 cargo 会重写锁文件。
+ * Why only Cargo remains to sync:
+ * - `src-tauri/tauri.conf.json` may point `version` at a **path** to package.json
+ *   (Tauri v2 spec: either semver or a package.json path), so no copy is kept by
+ *   default; if it is changed back to a literal, this script still syncs it — both
+ *   forms are supported.
+ * - Cargo cannot derive its version from package.json: `Cargo.toml` needs a literal,
+ *   and the version entry for this crate (syntools) in `Cargo.lock` must change too,
+ *   otherwise cargo rewrites the lock file.
  *
- * 用法：
- *   pnpm version:sync    写入并逐项报告
- *   pnpm version:check   只校验，发现漂移则退出码 1（CI / 提交前守卫）
+ * Usage:
+ *   pnpm version:sync    write and report each target
+ *   pnpm version:check   verify only; exit code 1 on drift (CI / pre-commit guard)
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = process.cwd();
 const PKG_FILE = path.join(ROOT, 'package.json');
-/** Cargo 包名（= Cargo.toml 的 [package] name），用于在 Cargo.lock 中定位本包条目 */
+/** Cargo crate name (= [package] name in Cargo.toml), used to locate our entry in Cargo.lock */
 const CRATE_NAME = 'syntools';
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -47,27 +49,32 @@ function readVersionFrom(file: string): string | null {
   }
 }
 
-/** tauri.conf.json：字面量则同步；路径写法则校验其指向的 package.json */
+/** tauri.conf.json: sync when it is a literal; when it is a path, verify the package.json it points to */
 function syncTauriConf(version: string): Report {
   const label = 'tauri.conf.json';
   if (!existsSync(FILES.tauriConf))
-    return { label, status: 'missing', detail: '文件不存在，已跳过' };
+    return { label, status: 'missing', detail: 'file not found, skipped' };
 
   const raw = readFileSync(FILES.tauriConf, 'utf8');
   const current = readVersionFrom(FILES.tauriConf);
-  if (current === null) return { label, status: 'unsupported', detail: '没有可读的 version 字段' };
+  if (current === null)
+    return { label, status: 'unsupported', detail: 'no readable version field' };
 
-  // 路径写法（例如 "../package.json"）：由 Tauri CLI 自行读取，这里只做校验
+  // Path form (e.g. "../package.json"): read by the Tauri CLI itself, so only verify here
   if (current.endsWith('.json')) {
     const resolved = path.resolve(path.dirname(FILES.tauriConf), current);
     const referenced = existsSync(resolved) ? readVersionFrom(resolved) : null;
     if (referenced === version) {
-      return { label, status: 'derived', detail: `指向 ${current}（${version}），无需同步` };
+      return {
+        label,
+        status: 'derived',
+        detail: `points at ${current} (${version}), nothing to sync`,
+      };
     }
     return {
       label,
       status: 'drifted',
-      detail: `指向 ${current}，其版本为 ${referenced ?? '不可读'}，期望 ${version}`,
+      detail: `points at ${current}, whose version is ${referenced ?? 'unreadable'}, expected ${version}`,
     };
   }
 
@@ -78,15 +85,15 @@ function syncTauriConf(version: string): Report {
   return { label, status: 'updated', detail: `${current} → ${version}` };
 }
 
-/** Cargo.toml：只改 [package] 段内的 version，不碰依赖里的 version */
+/** Cargo.toml: only change the version in the [package] section, never dependency versions */
 function syncCargoToml(version: string): Report {
   const label = 'Cargo.toml';
   if (!existsSync(FILES.cargoToml))
-    return { label, status: 'missing', detail: '文件不存在，已跳过' };
+    return { label, status: 'missing', detail: 'file not found, skipped' };
 
   const lines = readFileSync(FILES.cargoToml, 'utf8').split('\n');
   const start = lines.findIndex((line) => line.trim() === '[package]');
-  if (start < 0) return { label, status: 'unsupported', detail: '缺少 [package] 段' };
+  if (start < 0) return { label, status: 'unsupported', detail: 'no [package] section' };
   const after = lines.findIndex((line, i) => i > start && /^\s*\[/.test(line));
   const end = after < 0 ? lines.length : after;
 
@@ -97,7 +104,8 @@ function syncCargoToml(version: string): Report {
       break;
     }
   }
-  if (index < 0) return { label, status: 'unsupported', detail: '[package] 段内没有 version' };
+  if (index < 0)
+    return { label, status: 'unsupported', detail: 'no version in the [package] section' };
 
   const current = /^\s*version\s*=\s*"([^"]*)"/.exec(lines[index])?.[1] ?? '';
   if (current === version) return { label, status: 'in-sync', detail: current };
@@ -108,18 +116,18 @@ function syncCargoToml(version: string): Report {
   return { label, status: 'updated', detail: `${current} → ${version}` };
 }
 
-/** Cargo.lock：只改 [[package]] name = "syntools" 那一条的 version */
+/** Cargo.lock: only change the version of the [[package]] name = "syntools" entry */
 function syncCargoLock(version: string): Report {
   const label = 'Cargo.lock';
   if (!existsSync(FILES.cargoLock))
-    return { label, status: 'missing', detail: '文件不存在，已跳过' };
+    return { label, status: 'missing', detail: 'file not found, skipped' };
 
   const lines = readFileSync(FILES.cargoLock, 'utf8').split('\n');
   const nameIndex = lines.findIndex(
     (line, i) => line.trim() === `name = "${CRATE_NAME}"` && lines[i - 1]?.trim() === '[[package]]',
   );
   if (nameIndex < 0) {
-    return { label, status: 'missing', detail: `未找到 ${CRATE_NAME} 的包条目` };
+    return { label, status: 'missing', detail: `no package entry for ${CRATE_NAME}` };
   }
 
   let index = -1;
@@ -130,7 +138,7 @@ function syncCargoLock(version: string): Report {
       break;
     }
   }
-  if (index < 0) return { label, status: 'unsupported', detail: '包条目内没有 version' };
+  if (index < 0) return { label, status: 'unsupported', detail: 'no version in the package entry' };
 
   const current = /^\s*version\s*=\s*"([^"]*)"/.exec(lines[index])?.[1] ?? '';
   if (current === version) return { label, status: 'in-sync', detail: current };
@@ -151,35 +159,39 @@ const ICONS: Record<Status, string> = {
 };
 
 function main(): void {
-  // 允许 CI 通过环境变量注入构建版本（如 0.7.0-dev.123.abc1234），
-  // 用于开发/ nightly 构建让产物携带唯一可追踪的版本号；缺省回退到 package.json。
+  // CI may inject a build version through the environment (e.g. 0.7.0-dev.123.abc1234),
+  // so dev/nightly builds carry a unique traceable version; defaults to package.json.
   const envVersion = process.env.SYNTOOLS_BUILD_VERSION?.trim();
   const version = envVersion && envVersion.length > 0 ? envVersion : readVersionFrom(PKG_FILE);
   if (!version || !SEMVER_RE.test(version)) {
     console.error(
-      `✖ 版本来源无效（env=${JSON.stringify(envVersion)}）：${JSON.stringify(version)}`,
+      `✖ Invalid version source (env=${JSON.stringify(envVersion)}): ${JSON.stringify(version)}`,
     );
     process.exit(1);
   }
 
   const reports = [syncTauriConf(version), syncCargoToml(version), syncCargoLock(version)];
 
-  console.log(`SynTools 版本同步${isCheck ? '（校验模式）' : ''} — 来源 package.json: ${version}`);
+  console.log(
+    `SynTools version sync${isCheck ? ' (check mode)' : ''} — source package.json: ${version}`,
+  );
   for (const report of reports) {
     console.log(`  [${ICONS[report.status]}] ${report.label.padEnd(15)} ${report.detail}`);
   }
 
   const drifted = reports.filter((report) => report.status === 'drifted');
   if (drifted.length > 0) {
-    const hint = isCheck ? '请运行 pnpm version:sync' : '请检查上述文件是否被手动改动';
-    console.error(`\n✖ ${drifted.length} 处版本与 package.json 不一致，${hint}`);
+    const hint = isCheck
+      ? 'run pnpm version:sync'
+      : 'check whether the files above were edited by hand';
+    console.error(`\n✖ ${drifted.length} target(s) differ from package.json, ${hint}`);
     process.exit(1);
   }
 
   if (reports.some((report) => report.status === 'unsupported' || report.status === 'missing')) {
-    console.warn('\n⚠ 有目标未能处理，请查看上面的 [ ] 标记');
+    console.warn('\n⚠ Some targets could not be handled; see the [ ] markers above');
   }
-  console.log(isCheck ? '\n✔ 版本一致' : '\n✔ 同步完成');
+  console.log(isCheck ? '\n✔ Versions match' : '\n✔ Sync complete');
 }
 
 main();

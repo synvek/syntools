@@ -1,10 +1,10 @@
 import { MAX_IMPORT_BYTES } from './core';
 import type { CodeCardStyle } from './cardOptions';
 
-/** 本地草稿存储：键遵循 syntools:* 规范，代码内容不离开浏览器 */
+/** Local draft storage: keys follow the syntools:* convention; code never leaves the browser */
 
 const DRAFT_KEY = 'syntools:code-editor.draft.v1';
-/** 草稿体积上限（10MB），防止 localStorage 被撑爆 */
+/** Draft size cap (10MB) so localStorage is never blown up */
 const MAX_DRAFT_BYTES = MAX_IMPORT_BYTES;
 
 export interface CodeDraft {
@@ -15,9 +15,9 @@ export interface CodeDraft {
   filename: string;
   lineNumbers: boolean;
   wordWrap: boolean;
-  /** 导出卡片样式（阶段 6 新增；旧草稿缺该字段时由 normalizeCardStyle 兜底） */
+  /** Export card style (added in phase 6; legacy drafts without it fall back to normalizeCardStyle) */
   card?: Partial<CodeCardStyle>;
-  /** 导出倍率（1x / 2x / 4x） */
+  /** Export scale factor (1x / 2x / 4x) */
   cardScale?: number;
 }
 
@@ -43,7 +43,7 @@ export function readDraft(): CodeDraft | null {
   }
 }
 
-/** 写入草稿，返回是否成功（超限时放弃写入而非静默失败） */
+/** Write the draft and report success (over-limit writes are dropped explicitly, never silently) */
 export function writeDraft(draft: CodeDraft): boolean {
   try {
     if (draft.code.length > MAX_DRAFT_BYTES) return false;
@@ -58,6 +58,6 @@ export function clearDraft(): void {
   try {
     localStorage.removeItem(DRAFT_KEY);
   } catch {
-    // localStorage 不可用时忽略
+    // Ignore when localStorage is unavailable
   }
 }

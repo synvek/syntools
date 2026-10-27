@@ -96,19 +96,19 @@ import { defaultPanelLayout, normalizePanelLayout, panelGroupOf } from './panels
 import type { PanelGroupId, PanelId, PanelLayout } from './panels';
 
 /**
- * 照片编辑器状态：唯一真相源是 `doc`，其余（当前工具 / 选区 / 视口 / 历史）是会话态。
+ * Photo editor state: `doc` is the single source of truth; the rest (tool / selection / viewport / history) is session state.
  *
- * 与 slide-editor 一致：所有改 doc 的 action 先 `commit()` 压快照，保证 undo 可回放。
- * 额外约定：**像素级操作必须先 `commitPixels(layerId)`** —— 它会把该图层的位图复制一份，
- * 让历史快照指向「落笔前」的像素，否则撤销只能还原坐标而无法还原笔迹。
+ * Like slide-editor: every action that changes doc calls `commit()` first to push a snapshot, so undo can replay.
+ * Extra rule: **pixel-level operations must call `commitPixels(layerId)` first** — it copies that layer's bitmap
+ * so the history snapshot points at the pixels from before the stroke; otherwise undo restores coordinates only.
  */
 
 const HISTORY_LIMIT = 24;
 
-/** 文档色板容量上限 */
+/** Document palette capacity cap */
 const MAX_SWATCHES = 32;
 
-/** 图层样式各效果的默认参数（新增效果时使用，默认启用） */
+/** Default parameters per layer-style effect (used when adding one, enabled by default) */
 const STYLE_DEFAULTS: Record<StyleEffectId, () => NonNullable<LayerStyle[StyleEffectId]>> = {
   dropShadow: createDropShadow,
   innerShadow: createInnerShadow,
@@ -116,31 +116,31 @@ const STYLE_DEFAULTS: Record<StyleEffectId, () => NonNullable<LayerStyle[StyleEf
   stroke: createStroke,
   colorOverlay: createColorOverlay,
 };
-/** 缩放下限：允许缩到 2% 以观察超大画布全貌，但不会把「待适配」哨兵值也钳到这里 */
+/** Zoom floor: 2% shows a huge canvas whole, but the "needs fit" sentinel must never be clamped here */
 const MIN_ZOOM = 0.02;
 
 export interface BrushConfig {
-  /** 前景色 */
+  /** Foreground color */
   color: string;
-  /** 背景色（渐变工具的第二个端点 / 前景↔背景切换用） */
+  /** Background color (gradient's second stop / used by the fg↔bg swap) */
   background: string;
   size: number;
-  /** 0~1，1 为硬边 */
+  /** 0~1, where 1 gives a hard edge */
   hardness: number;
   opacity: number;
-  /** 落笔间距（相对直径）：越小越连续 */
+  /** Stamp spacing (relative to the diameter): smaller is more continuous */
   spacing: number;
-  /** 压感控制笔触大小 */
+  /** Pressure controls stroke size */
   pressureSize: boolean;
-  /** 压感控制不透明度 */
+  /** Pressure controls opacity */
   pressureOpacity: boolean;
 }
 
 /**
- * 快速蒙版：以「一张灰度画布」临时替代选区 —— 白 = 选中、黑 = 未选中。
+ * Quick mask: a grayscale canvas temporarily stands in for the selection — white = selected, black = not.
  *
- * 与选区的关系：进入时按当前选区初始化，退出时按亮度阈值转回选区。
- * `rev` 用于让视图层知道画布变了（画笔直接改写画布，不经过 React）。
+ * Relation to the selection: initialized from it on enter, converted back by luminance threshold on exit.
+ * `rev` tells the view layer the canvas changed (the brush rewrites it directly, bypassing React).
  */
 interface QuickMaskState {
   assetId: string;
@@ -153,33 +153,33 @@ interface PhotoState {
   brush: BrushConfig;
   eraserSize: number;
   shapeKind: ShapeKind;
-  /** 新建形状的默认填充 / 描边（参数条可调，不写进文档） */
+  /** Default fill / stroke for new shapes (set in the options bar, not part of the document) */
   shapeStyle: ShapeStyleDefaults;
-  /** 磁性套索：吸附宽度（文档像素）与边缘对比度阈值 */
+  /** Magnetic lasso: snap width (document px) and edge-contrast threshold */
   magnetic: { width: number; contrast: number };
   selection: Selection | null;
   cropRect: Rect | null;
   viewport: Viewport;
-  /** 辅助视图（标尺 / 网格 / 参考线），视图态，不进历史 */
+  /** Auxiliary views (rulers / grid / guides); view state, not in history */
   overlay: ViewOverlay;
   clipboard: Layer | null;
-  /** 历史：快照 + 操作名 + 时间（面板按此展示，可跳转） */
+  /** History: snapshots + labels + time (the panel renders these and can jump) */
   past: HistoryEntry[];
   future: HistoryEntry[];
-  /** 右侧面板布局（视图态，不进文档历史） */
+  /** Right-hand panel layout (view state, not part of document history) */
   panels: PanelLayout;
-  /** 油漆桶：容差 / 是否只填充连通区域 */
+  /** Paint bucket: tolerance / whether to fill only the connected region */
   fillTolerance: number;
   fillContiguous: boolean;
-  /** 渐变工具：形状与端点组合 */
+  /** Gradient tool: shape and endpoint combination */
   gradientKind: GradientKind;
   gradientMode: GradientMode;
-  /** 润饰 / 修复工具族（减淡加深海绵、图章、修复、涂抹、模糊锐化）：笔头大小与强度 */
+  /** Retouch / healing family (dodge-burn-sponge, stamp, healing, smudge, blur-sharpen): tip size and strength */
   retouchSize: number;
   retouchStrength: number;
-  /** 自定义画笔预设（持久化） */
+  /** Custom brush presets (persisted) */
   brushPresets: BrushPreset[];
-  /** 最近使用颜色（会话态） */
+  /** Recently used colors (session state) */
   recentColors: string[];
 
   loadDoc: (doc: PhotoDoc) => void;
@@ -187,12 +187,12 @@ interface PhotoState {
   setDocName: (name: string) => void;
   setBackground: (background: PhotoDoc['background']) => void;
   resizeCanvas: (width: number, height: number) => void;
-  /** 一次性应用画布尺寸与背景（单次历史提交，供「画布大小」/ 文档属性使用） */
+  /** Apply canvas size and background in one go (a single history entry, for "canvas size" / document properties) */
   applyCanvas: (width: number, height: number, background: PhotoDoc['background']) => void;
 
   /**
-   * 设置图层样式某一效果的参数（效果不存在时按默认值创建）；值会被钳制到合法区间。
-   * `history = false` 用于滑杆拖动中：与 AdjustPanel 同一约定，避免每一帧都压一条历史。
+   * Set one parameter of a layer-style effect (created with defaults when absent); values are clamped.
+   * `history = false` is for slider drags: same convention as AdjustPanel, so no entry is pushed per frame.
    */
   setLayerStyle: (
     id: string,
@@ -200,64 +200,64 @@ interface PhotoState {
     patch: Record<string, string | number | boolean>,
     history?: boolean,
   ) => void;
-  /** 添加 / 启停某一效果 */
+  /** Add / toggle one effect */
   toggleLayerStyle: (id: string, effect: StyleEffectId) => void;
-  /** 移除某一效果 */
+  /** Remove one effect */
   removeLayerStyle: (id: string, effect: StyleEffectId) => void;
-  /** 清空整份图层样式 */
+  /** Clear the whole layer style */
   clearLayerStyle: (id: string) => void;
 
   setTool: (tool: ToolId) => void;
   patchBrush: (patch: Partial<BrushConfig>) => void;
   setEraserSize: (size: number) => void;
   setShapeKind: (kind: ShapeKind) => void;
-  /** 修改新建形状的默认样式（填充 / 描边 / 描边宽度 / 圆角） */
+  /** Change the default style for new shapes (fill / stroke / stroke width / radius) */
   setShapeStyle: (patch: Partial<ShapeStyleDefaults>) => void;
-  /** 修改磁性套索的宽度 / 对比度 */
+  /** Change the magnetic lasso width / contrast */
   setMagnetic: (patch: Partial<{ width: number; contrast: number }>) => void;
-  /** 油漆桶设置 */
+  /** Paint bucket settings */
   setFill: (patch: { tolerance?: number; contiguous?: boolean }) => void;
-  /** 渐变工具设置 */
+  /** Gradient tool settings */
   setGradient: (patch: { kind?: GradientKind; mode?: GradientMode }) => void;
-  /** 润饰工具设置 */
+  /** Retouch tool settings */
   setRetouch: (patch: { size?: number; strength?: number }) => void;
-  /** 前景 / 背景色互换（快捷键 X） */
+  /** Swap foreground / background color (shortcut X) */
   swapColors: () => void;
-  /** 复位为黑前景 / 白背景（快捷键 D） */
+  /** Reset to black foreground / white background (shortcut D) */
   resetColors: () => void;
-  /** 记录最近使用的颜色（去重，最多 12 个） */
+  /** Record a recently used color (de-duplicated, at most 12) */
   pushRecentColor: (color: string) => void;
-  /** 保存当前画笔参数为自定义预设 */
+  /** Save the current brush parameters as a custom preset */
   saveBrushPreset: (name: string) => void;
   removeBrushPreset: (id: string) => void;
-  /** 应用预设到当前画笔 */
+  /** Apply a preset to the current brush */
   applyBrushPreset: (preset: BrushPreset) => void;
 
   setSelection: (selection: Selection | null) => void;
-  /** 按布尔运算合并选区（加选 / 减选 / 交集 / 替换） */
+  /** Combine selections with a boolean op (add / subtract / intersect / replace) */
   applySelection: (next: Selection, op: SelectionOp) => void;
-  /** 改当前选区的羽化半径 */
+  /** Change the feather radius of the current selection */
   setSelectionFeather: (feather: number) => void;
-  /** 选区形态学修改：扩展 / 收缩 / 平滑 */
+  /** Morphological selection edit: expand / contract / smooth */
   modifySelection: (mode: SelectionModify, amount: number) => void;
-  /** 魔棒设置 */
+  /** Magic wand settings */
   wandTolerance: number;
   wandContiguous: boolean;
   setWand: (patch: { tolerance?: number; contiguous?: boolean }) => void;
-  /** 全选（Ctrl+A） */
+  /** Select all (Ctrl+A) */
   selectAll: () => void;
-  /** 反选：画布外框 + 原选区内框（奇偶规则） */
+  /** Invert: canvas frame plus the original outlines reversed (even-odd rule) */
   invertSelection: () => void;
-  /** 填充 / 清除当前选区内容（作用于位图图层） */
+  /** Fill / clear the current selection content (applies to bitmap layers) */
   fillSelectionArea: (mode: 'fill' | 'clear') => void;
-  /** 通过拷贝新建图层：选区内容 → 新位图图层 */
+  /** New layer via copy: selection content becomes a new bitmap layer */
   copySelectionToLayer: () => void;
   setCropRect: (rect: Rect | null) => void;
   applyCrop: () => void;
 
   setViewport: (patch: Partial<Viewport>) => void;
   setScale: (scale: number) => void;
-  /** 辅助视图：合并式更新（标尺 / 网格 / 参考线） */
+  /** Auxiliary views: merged update (rulers / grid / guides) */
   patchOverlay: (patch: Partial<ViewOverlay>) => void;
 
   selectLayer: (id: string | null) => void;
@@ -265,134 +265,134 @@ interface PhotoState {
   patchLayer: (id: string, patch: Partial<Layer>, history?: boolean) => void;
   patchActive: (patch: Partial<Layer>, history?: boolean) => void;
   removeLayer: (id: string) => void;
-  /** copySuffix：复制出的图层名后缀（由 UI 传入当前语言，如「 副本」） */
+  /** copySuffix: suffix for copied layer names (passed in by the UI, e.g. " copy") */
   duplicateLayer: (id: string, copySuffix?: string) => void;
-  /** 新建空编组（置于最上层） */
+  /** Create an empty group (placed on top) */
   addGroup: () => string | null;
-  /** 用当前图层新建编组：图层被移入组内 */
+  /** Make a group from the current layer: the layer moves inside it */
   groupActive: () => string | null;
-  /** 解散编组：子图层上移一层，编组本身删除 */
+  /** Ungroup: children move up one level, the group itself is deleted */
   ungroup: (id: string) => void;
-  /** 把图层（连同子树）移入编组；groupId 为 null 表示移到顶层 */
+  /** Move a layer (with its subtree) into a group; a null groupId means the top level */
   moveIntoGroup: (layerId: string, groupId: string | null) => void;
   toggleGroupExpanded: (id: string) => void;
-  /** 用当前选区创建矢量蒙版（轮廓转为图层局部坐标，与分辨率无关） */
+  /** Create a vector mask from the current selection (outlines become layer-local, resolution-independent) */
   addVectorMask: (id: string) => void;
-  /** 矢量蒙版参数：启停 / 反相 / 羽化 */
+  /** Vector mask parameters: toggle / invert / feather */
   patchVectorMask: (id: string, patch: Partial<VectorMaskRef>, history?: boolean) => void;
   removeVectorMask: (id: string) => void;
-  /** 创建 / 释放剪贴蒙版（PS 的 ⌘⌥G）；下方没有可作基准的图层时不生效 */
+  /** Create / release a clipping mask (PS's ⌘⌥G); no-op when there is no base layer below */
   toggleClipping: (id: string) => boolean;
 
-  /** 给图层加蒙版：show = 全部显示，hide = 全部隐藏，selection = 按当前选区 */
-  /** 新建调整图层（置于最上层，作用于其下方全部内容） */
+  /** Add a mask to a layer: show = reveal all, hide = hide all, selection = from the current selection */
+  /** New adjustment layer (on top, affecting everything below it) */
   addAdjustment: () => string | null;
-  /** 位图 → 智能对象：保留源像素，画布上的尺寸只是呈现变换 */
+  /** Bitmap → smart object: source pixels are kept, the on-canvas size is only a presentation transform */
   convertToSmart: (id: string) => void;
-  /** 智能对象 → 普通位图（栅格化），像素按当前呈现尺寸重采样 */
+  /** Smart object → plain bitmap (rasterize), pixels resampled at the current presentation size */
   rasterizeSmart: (id: string) => void;
   addMask: (id: string, mode?: 'show' | 'hide' | 'selection') => void;
   removeMask: (id: string) => void;
-  /** 改蒙版参数（浓度 / 羽化 / 反相 / 启用） */
+  /** Change mask parameters (density / feather / invert / enabled) */
   patchMask: (id: string, patch: Partial<MaskRef>, history?: boolean) => void;
-  /** 蒙版像素级快照（绘制前调用） */
+  /** Pixel-level mask snapshot (call before painting) */
   commitMask: (id: string) => void;
-  /** 旋转视图（度，视图态，不进历史） */
+  /** View rotation (degrees, view state, not in history) */
   viewRotation: number;
-  /** 相对当前角度继续旋转（菜单按 15° 步进） */
+  /** Rotate further from the current angle (the menu steps by 15°) */
   rotateView: (delta: number) => void;
   setViewRotation: (degrees: number) => void;
   resetViewRotation: () => void;
 
-  /** 对齐吸附开关（视图态，默认开） */
+  /** Snap toggle (view state, on by default) */
   snapEnabled: boolean;
   setSnapEnabled: (value: boolean) => void;
-  /** 当前正在生效的吸附参考线（拖拽过程中显示，松手即清空） */
+  /** Snap guides currently in effect (shown while dragging, cleared on release) */
   snapGuides: SnapGuide[];
   setSnapGuides: (guides: SnapGuide[]) => void;
 
-  /** 图章 / 修复的取样点（文档坐标，会话态） */
+  /** Sample point for stamp / healing (document coordinates, session state) */
   cloneSource: { x: number; y: number } | null;
   setCloneSource: (point: { x: number; y: number } | null) => void;
-  /** 自由变换模式：自由 / 透视 / 扭曲 / 斜切 / 变形 */
+  /** Free-transform mode: free / perspective / distort / skew / warp */
   transformMode: TransformMode;
   setTransformMode: (mode: TransformMode) => void;
-  /** 清空当前图层的网格变形 */
+  /** Clear the current layer's mesh warp */
   resetMesh: (layerId?: string) => void;
-  /** 上一次变换的增量（⌘⇧T「再次变换」用） */
+  /** Delta of the last transform (used by ⌘⇧T "transform again") */
   lastTransform: TransformDelta | null;
-  /** 记录一次变换（由交互层在松手时提交） */
+  /** Record a transform (submitted by the interaction layer on release) */
   recordTransform: (delta: TransformDelta | null) => void;
-  /** 再次变换：把上次的增量再作用到当前图层 */
+  /** Transform again: apply the last delta to the current layer once more */
   repeatTransform: () => void;
 
-  /** 快速蒙版会话（null = 未进入） */
+  /** Quick mask session (null = not active) */
   quickMask: QuickMaskState | null;
-  /** 进入快速蒙版：以当前选区初始化（无选区则全为「未选中」） */
+  /** Enter quick mask: initialized from the current selection (all "unselected" when there is none) */
   enterQuickMask: () => void;
-  /** 退出快速蒙版：按亮度阈值把蒙版转回选区 */
+  /** Exit quick mask: convert the mask back into a selection by luminance threshold */
   exitQuickMask: () => void;
-  /** Q 键切换 */
+  /** Toggled by the Q key */
   toggleQuickMask: () => void;
-  /** 蒙版被涂抹后提交一次视觉刷新 */
+  /** Commit one visual refresh after the mask has been painted */
   bumpQuickMask: () => void;
 
-  /** 通道隔离显示（仅影响画布呈现，不改文档） */
+  /** Channel isolation view (affects canvas rendering only, not the document) */
   channelView: ChannelView;
   setChannelView: (view: ChannelView) => void;
-  /** 把当前隔离通道的亮部载入为选区（阈值 128）；处于复合视图时不生效 */
+  /** Load the bright parts of the isolated channel as a selection (threshold 128); no-op in composite view */
   loadChannelSelection: () => void;
-  /** 颜色取样点（会话态，最多 `MAX_SAMPLES` 个） */
+  /** Color samplers (session state, at most `MAX_SAMPLES`) */
   samples: SamplePoint[];
-  /** 在文档坐标处取样；超过上限时挤掉最早的一个 */
+  /** Sample at document coordinates; when full, evict the oldest */
   addSample: (x: number, y: number) => void;
   removeSample: (index: number) => void;
   clearSamples: () => void;
-  /** 文档色板（随工程保存） */
+  /** Document palette (saved with the project) */
   addSwatch: (color: string) => void;
   removeSwatch: (index: number) => void;
-  /** 从当前画面提取主色并并入色板 */
+  /** Extract dominant colors from the current image and merge them into the palette */
   extractSwatches: () => void;
 
-  /** 画笔是否写入蒙版（而非图层本体） */
+  /** Whether the brush writes into the mask (instead of the layer itself) */
   maskEditing: boolean;
   setMaskEditing: (value: boolean) => void;
-  /** 面板布局：整体替换 / 切换某个面板内的子 tab / 显示某个子面板 / 复位 */
+  /** Panel layout: replace wholesale / switch a panel's sub tab / show a sub panel / reset */
   setPanels: (layout: PanelLayout) => void;
   setPanelTab: (group: PanelGroupId, id: PanelId) => void;
   showPanel: (id: PanelId) => void;
   resetPanels: () => void;
   setGroupPassThrough: (id: string, passThrough: boolean) => void;
   reorderLayer: (id: string, toIndex: number) => void;
-  /** 在「同一父级」内上移 / 下移一层（不跨编组边界） */
+  /** Move up / down one level within the same parent (never across group boundaries) */
   moveLayer: (id: string, dir: -1 | 1) => void;
-  /** 把当前选中图层对齐到画布 */
+  /** Align the current layer to the canvas */
   alignLayer: (mode: AlignMode) => void;
   mergeDown: (id: string) => void;
   flattenVisible: () => void;
   copyLayer: () => void;
   pasteLayer: () => void;
-  /** 保证存在一个可落笔的位图图层（没有就新建整画布大小的空白图层） */
+  /** Ensure there is a paintable bitmap layer (create a blank full-canvas one if needed) */
   ensurePaintLayer: () => string | null;
-  /** text：新建文字图层的默认内容（由 UI 传入当前语言） */
+  /** text: default content for a new text layer (passed in by the UI in the active locale) */
   addTextLayer: (x: number, y: number, text?: string) => string | null;
   addShapeLayer: (rect: Rect) => string | null;
   addImageLayer: (assetId: string, width: number, height: number, name: string) => void;
-  /** 位图被就地改写后调用：自增 rev 使烘焙缓存失效 */
+  /** Called after a bitmap is rewritten in place: bump rev so the bake cache goes stale */
   bumpRev: (id: string) => void;
 
-  /** `label` 为该操作在历史面板中的名字（缺省 `histEdit`） */
+  /** `label` is the operation's name in the history panel (defaults to `histEdit`) */
   commit: (label?: HistoryLabel) => void;
   commitPixels: (id: string, label?: HistoryLabel) => void;
-  /** 跳到时间轴第 index 行（0 = 最初状态，past.length = 当前） */
+  /** Jump to timeline row index (0 = initial state, past.length = current) */
   jumpTo: (index: number) => void;
-  /** 清空历史（释放可回收资产） */
+  /** Clear history (releases recyclable assets) */
   clearHistory: () => void;
   undo: () => void;
   redo: () => void;
 }
 
-/** 给缺失位图的图层补一张空白画布 */
+/** Give a layer with a missing bitmap a blank canvas */
 function repairRasterAsset(get: () => PhotoState, id: string): string {
   const layer = get().doc.layers.find((item) => item.id === id);
   const width = Math.max(1, Math.round(layer?.width ?? get().doc.width));
@@ -403,8 +403,8 @@ function repairRasterAsset(get: () => PhotoState, id: string): string {
 }
 
 /**
- * 历史中被引用到的资产：回收时必须一并保留，否则撤销会拿到已释放的画布。
- * 快速蒙版画布也在这里登记 —— 它不属于任何文档，但撤销 / 重做期间仍然要能继续涂抹。
+ * Assets referenced by history: they must be kept alive during GC, or undo would get a freed canvas.
+ * The quick mask canvas is registered here too: it belongs to no document, but must stay paintable across undo.
  */
 function usedAssetsAcrossHistory(
   state: Pick<PhotoState, 'doc' | 'past' | 'future'> & {
@@ -476,7 +476,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       future: [],
     }));
     releaseExcept(usedAssetsAcrossHistory(get()));
-    // 换文档后旧文档的变形位图不会再被命中，主动清掉避免白白占内存
+    // After a document switch the old warped bitmaps can no longer be hit, so drop them to free memory
     clearMeshCache();
     clearWarpCache();
   },
@@ -576,7 +576,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   setTool: (tool) =>
     set((s) => ({
       tool,
-      // 切走裁剪工具时丢弃未应用的裁剪框；选区则保留（移动 / 画笔 / 填充都受其约束）
+      // Leaving the crop tool drops the unapplied crop box; the selection stays (move / brush / fill use it)
       cropRect: tool === 'crop' ? s.cropRect : null,
     })),
 
@@ -710,8 +710,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     })),
 
   /**
-   * 填充 / 清除选区：作用于当前位图图层。
-   * 先 commitPixels 复制落笔前的像素，保证一次撤销能还原。
+   * Fill / clear the selection: applies to the current bitmap layer.
+   * `commitPixels` runs first to copy the pre-stroke pixels, so a single undo restores everything.
    */
   fillSelectionArea: (mode) => {
     const state = get();
@@ -731,7 +731,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     if (changed) get().bumpRev(layerId);
   },
 
-  /** 通过拷贝新建图层：把选区内的合成结果拷成一个新位图图层 */
+  /** New layer via copy: copy the composited selection into a new bitmap layer */
   copySelectionToLayer: () => {
     const state = get();
     const selection = state.selection;
@@ -814,8 +814,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     set((s) => ({
       viewport: {
         ...s.viewport,
-        // scale === 0 是「尚未适配」哨兵值，不能被钳制——否则适应窗口会被锁在最小比例。
-        // 画布宿主按容器算出真实比例后会写回，此后始终是正数。
+        // scale === 0 is the "not yet fitted" sentinel and must not be clamped, or fit-to-window locks to the min.
+        // The canvas host writes the real ratio back once it knows its container, and it stays positive after.
         scale: scale <= 0 ? 0 : Math.min(8, Math.max(MIN_ZOOM, Math.round(scale * 1000) / 1000)),
       },
     })),
@@ -902,7 +902,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     if (!activeId) return null;
     state.commit('histGroup');
     const group = createGroupLayer({ doc: state.doc });
-    // 编组先入栈，再把图层（及其子树）移到组内
+    // Push the group first, then move the layer (and its subtree) inside it
     const withGroup = [...state.doc.layers, group];
     const layers = moveSubtree(withGroup, activeId, group.id);
     set({ doc: { ...state.doc, layers, activeLayerId: group.id } });
@@ -943,7 +943,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const state = get();
     const layer = state.doc.layers.find((item) => item.id === id);
     if (!layer || layer.kind !== 'group') return;
-    // 展开态属于视图状态，不进撤销历史
+    // Expanded state is view state and stays out of undo history
     set({
       doc: {
         ...state.doc,
@@ -984,10 +984,10 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       x: layer.x,
       y: layer.y,
     });
-    // 呈现尺寸沿用原图层的显示尺寸（不重采样）
+    // The presentation size reuses the layer's displayed size (no resampling)
     const smartLayer: Layer = {
       ...smart,
-      // 保留原 id：选中态、蒙版引用与层栈关系都不变
+      // Keep the id: selection, mask references and layer-stack relations all stay valid
       id: layer.id,
       width: layer.width,
       height: layer.height,
@@ -1000,7 +1000,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       locked: layer.locked,
       parentId: layer.parentId ?? null,
       mask: layer.mask ?? null,
-      // 位图上的非破坏参数原样升级为智能对象参数，转换不丢数据
+      // Non-destructive parameters on the bitmap upgrade as-is to smart object parameters, losing nothing
       adjustments: layer.adjustments,
       filters: layer.filters,
     };
@@ -1019,7 +1019,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const source = getCanvas(layer.sourceAssetId);
     if (!source) return;
     state.commit('histEdit');
-    // 按当前呈现尺寸重采样一份新像素，之后就是普通位图
+    // Resample fresh pixels at the current presentation size; from here it is a plain bitmap
     const canvas = createCanvasElement(
       Math.max(1, Math.round(layer.width)),
       Math.max(1, Math.round(layer.height)),
@@ -1044,7 +1044,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       locked: layer.locked,
       parentId: layer.parentId ?? null,
       mask: layer.mask ?? null,
-      // 智能滤镜作用在呈现尺寸上、新的位图也正好是呈现尺寸 → 参数原样带过去即可，画面不变
+      // Smart filters act on the presentation size and the new bitmap already is that size → carry them over as-is
       adjustments: layer.adjustments,
       filters: layer.filters,
     };
@@ -1160,7 +1160,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const index = state.doc.layers.findIndex((item) => item.id === id);
     const layer = state.doc.layers[index];
     if (!layer) return false;
-    // 释放剪贴随时可以；新建剪贴必须存在可作基准的下方图层（否则整组剪贴不生效）
+    // Releasing a clip is always fine; creating one needs a drawable layer below, or the clip does nothing
     if (!layer.clipped && clipBaseIndex(state.doc.layers, index) < 0) return false;
     state.commit('histClip');
     set({
@@ -1216,7 +1216,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     set({ transformMode: mode, tool: 'transform' });
     const active = state.doc.layers.find((item) => item.id === state.doc.activeLayerId);
     if (!active || active.locked) return;
-    // 进入网格模式时确保网格存在（四角模式用 2×2，变形用 4×4）
+    // Make sure a mesh exists when entering mesh mode (2×2 for four corners, 4×4 for warp)
     const want = mode === 'warp' ? Math.max(WARP_COLS, WARP_ROWS) : 2;
     const has = active.mesh?.cols === want && active.mesh?.rows === want;
     if (mode === 'free' || has) return;
@@ -1256,11 +1256,11 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   enterQuickMask: () => {
     const state = get();
     if (state.quickMask) return;
-    // 以当前选区为起点：选区外为黑（未选中）、选区内为白（选中）——与 PS 的进入行为一致
+    // Start from the current selection: outside is black (unselected), inside is white (selected), as in PS
     const assetId = state.selection
       ? createMaskCanvasFromSelection(state.doc.width, state.doc.height, state.selection)
       : createMaskCanvas(state.doc.width, state.doc.height, 'hide');
-    // 顺手切到画笔：进入快速蒙版就是为了涂抹选区
+    // Also switch to the brush: entering quick mask is all about painting the selection
     set({ quickMask: { assetId, rev: 0 }, tool: 'brush' });
   },
 
@@ -1274,7 +1274,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const frame = ctx.getImageData(0, 0, asset.width, asset.height);
       selection = selectionFromMask(frame.data, asset.width, asset.height);
     }
-    // 画布本身交给 releaseExcept 惰性回收（quickMask 置空后它自然脱离引用集合）
+    // The canvas is reclaimed lazily by releaseExcept (it leaves the reference set once quickMask is null)
     set({ quickMask: null, selection });
   },
 
@@ -1294,7 +1294,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const ctx = canvas?.getContext('2d', { willReadFrequently: true });
     if (!canvas || !ctx) return;
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    // 全黑通道（无亮部）视为「没有可载入的内容」：清空选区而不是留下一个不可见的空选区
+    // An all-black channel (no highlights) means "nothing to load": clear the selection instead of an empty one
     set({ selection: selectionFromMask(frame.data, canvas.width, canvas.height) });
   },
 
@@ -1302,7 +1302,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const state = get();
     const px = Math.max(0, Math.min(state.doc.width - 1, Math.floor(x)));
     const py = Math.max(0, Math.min(state.doc.height - 1, Math.floor(y)));
-    // 取样取自「合成结果」，与吸管一致：用户看到什么就取到什么
+    // Sampling reads the composited result, same as the eyedropper: you get what you see
     const canvas = compositeDoc(state.doc, { x: px, y: py, width: 1, height: 1 }, 1);
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
@@ -1358,7 +1358,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
         : { panels: { tabs: { ...s.panels.tabs, [group]: id } } },
     ),
 
-  // 「显示该面板」的语义：切到它所在面板，并把该面板的子 tab 指向它
+  // "Show this panel" means: switch to its group and point that group's sub tab at it
   showPanel: (id) =>
     set((s) => {
       const group = panelGroupOf(id);
@@ -1388,7 +1388,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const layers = state.doc.layers;
     const from = layers.findIndex((layer) => layer.id === id);
     if (from < 0) return;
-    // 只在同一父级内寻找相邻兄弟，避免把子图层移出编组（破坏「子紧随组」的层栈约定）
+    // Only look for siblings inside the same parent, so a child never leaves its group (breaking "child follows group")
     const parent = layers[from].parentId ?? null;
     let target = from + dir;
     while (target >= 0 && target < layers.length && (layers[target].parentId ?? null) !== parent) {
@@ -1433,7 +1433,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const state = get();
     const index = state.doc.layers.findIndex((layer) => layer.id === id);
     if (index <= 0) return;
-    // 仅支持「位图向下合并」：下方是文字 / 形状时不合并，避免出现内容丢失的假象
+    // Only "merge bitmap down" is supported: text / shape layers below are not merged, avoiding silent data loss
     if (
       state.doc.layers[index].kind !== 'raster' ||
       state.doc.layers[index - 1].kind !== 'raster'
@@ -1490,7 +1490,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       const clonedAsset = cloneAsset(source.assetId);
       if (clonedAsset) copy.assetId = clonedAsset;
     }
-    // 粘贴出的图层用自动命名，避免把来源名称带成重复项
+    // Pasted layers get automatic names, so a copied source name doesn't become a duplicate entry
     copy.name = '';
     get().addLayer(copy);
   },
@@ -1499,8 +1499,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const state = get();
     const active = state.doc.layers.find((layer) => layer.id === state.doc.activeLayerId);
     if (active && active.kind === 'raster' && !active.locked) {
-      // 位图缺失（例如超大草稿只恢复了结构）：就地补一张空白画布，
-      // 否则落笔会写进「空资产」，表现为「选了画笔却画不出东西」
+      // Bitmap missing (e.g. a huge draft restored structure only): fill in a blank canvas here,
+      // or painting writes into an "empty asset" and looks like "the brush draws nothing"
       if (!getCanvas(active.assetId)) return repairRasterAsset(get, active.id);
       return active.id;
     }
@@ -1550,7 +1550,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
 
   addImageLayer: (assetId, width, height, name) => {
     const doc = get().doc;
-    // 超出画布的大图按「适应画布」缩放，避免打开 4000px 照片后只能看到局部
+    // Oversized images are scaled to fit the canvas, so opening a 4000px photo doesn't show only a corner
     const scale = Math.min(1, doc.width / width, doc.height / height);
     const layer = createRasterLayer({
       assetId,
@@ -1580,8 +1580,8 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     })),
 
   /**
-   * 像素操作前的快照：把目标图层的位图复制一份，
-   * 使历史中的 doc 指向「改写前」的画布（资产不可变，撤销即可还原笔迹）。
+   * Snapshot before a pixel operation: copy the target layer's bitmap
+   * so the doc in history points at the pre-write canvas (assets are immutable, so undo restores strokes).
    */
   commitPixels: (id, label = 'histEdit') => {
     const state = get();
@@ -1590,7 +1590,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
       state.commit(label);
       return;
     }
-    // 蒙版绘制：只克隆蒙版画布，位图不动
+    // Painting in the mask: clone only the mask canvas, the bitmap stays
     if (layer.kind !== 'raster') {
       if (!layer.mask?.assetId) {
         state.commit(label);
@@ -1610,7 +1610,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const snapshot = cloneDoc(state.doc);
     const target = snapshot.layers.find((item) => item.id === id);
     if (target && target.kind === 'raster' && clonedAsset) target.assetId = clonedAsset;
-    // 位图图层也可能带蒙版，蒙版像素同样要独立快照
+    // Bitmap layers can have masks too, and mask pixels need their own snapshot
     if (target?.mask?.assetId) {
       const clonedMask = cloneAsset(target.mask.assetId);
       if (clonedMask) target.mask.assetId = clonedMask;
@@ -1627,7 +1627,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     if (!previous) return;
     set({
       past: state.past.slice(0, -1),
-      // 被撤销的状态进 future：它携带「产生它的操作名」
+      // The state being undone goes to future: it carries "the operation name that produced it"
       future: [
         { doc: cloneDoc(state.doc), label: previous.label, at: Date.now() },
         ...state.future,
@@ -1644,7 +1644,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const next = state.future[0];
     if (!next) return;
     set({
-      // 离开的状态进 past：它的 label 就是即将重做的操作
+      // The state being left goes to past: its label is the operation about to be redone
       past: [...state.past, { doc: cloneDoc(state.doc), label: next.label, at: Date.now() }].slice(
         -HISTORY_LIMIT,
       ),
@@ -1662,7 +1662,7 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
     const max = current + state.future.length;
     const target = Math.max(0, Math.min(max, Math.round(index)));
     if (target === current) return;
-    // 线性跳转：落到目标行之前逐步 undo / redo（步数受 HISTORY_LIMIT 约束，开销可忽略）
+    // Linear jump: undo / redo step by step to the target row (bounded by HISTORY_LIMIT, so the cost is negligible)
     if (target < current) {
       for (let step = 0; step < current - target; step += 1) get().undo();
     } else {
@@ -1676,12 +1676,12 @@ export const usePhotoStore = create<PhotoState>((set, get) => ({
   },
 }));
 
-/* --------------------------- 合并 / 拼合辅助 --------------------------- */
+/* --------------------------- Merge / flatten helpers --------------------------- */
 
-/** 把上方位图图层按几何、不透明度与混合模式烘焙进下方位图图层 */
+/** Bake the bitmap layer above into the one below, honoring geometry, opacity and blend mode */
 function mergeRasterPair(bottom: Layer, top: Layer): Layer | null {
   if (bottom.kind !== 'raster' || top.kind !== 'raster') return null;
-  // 以两图层并集为合并后画布，避免裁掉超出底图的部分
+  // Merge onto the union of both canvases, so parts sticking out of the base are not cropped
   const minX = Math.min(bottom.x, top.x);
   const minY = Math.min(bottom.y, top.y);
   const maxX = Math.max(bottom.x + bottom.width, top.x + top.width);
@@ -1705,7 +1705,7 @@ function mergeRasterPair(bottom: Layer, top: Layer): Layer | null {
   };
 }
 
-/** 拼合所有可见图层为一张位图（等价于 PS 的「合并可见图层」） */
+/** Flatten all visible layers into one bitmap (equivalent to PS's "merge visible") */
 export function flattenLayers(doc: PhotoDoc): Layer | null {
   const canvas = createCanvasElement(doc.width, doc.height);
   const ctx = canvas.getContext('2d');
@@ -1733,7 +1733,7 @@ export function flattenLayers(doc: PhotoDoc): Layer | null {
   };
 }
 
-/** 套索顶点 → 选区（顺带算外接矩形并抽稀） */
+/** Lasso vertices → selection (computes bounds and thins them out along the way) */
 export function selectionFromPath(path: number[], feather: number): Selection | null {
   const simplified = simplifyPath(path);
   if (simplified.length < 6) return null;

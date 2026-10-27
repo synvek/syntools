@@ -55,17 +55,17 @@ const DEFAULT_GRADIENT = {
   ],
 };
 
-/** 通道混合器的三行输出（顺序即面板顺序） */
+/** The channel mixer's three output rows (in panel order) */
 const CM_CHANNELS: { key: 'red' | 'green' | 'blue'; label: string }[] = [
   { key: 'red', label: 'chanRed' },
   { key: 'green', label: 'chanGreen' },
   { key: 'blue', label: 'chanBlue' },
 ];
 
-/** 每一行的三个来源通道（复用 R/G/B 通道名） */
+/** The three source channels per row (reusing the R/G/B channel labels) */
 const CM_SOURCES = ['chanRed', 'chanGreen', 'chanBlue'];
 
-/** 可选颜色面板里的 CMYK 四个通道（C/M/Y 复用黑白的通道文案） */
+/** The four CMYK channels in the selective color panel (C/M/Y reuse the black & white labels) */
 const SC_INKS: { index: number; label: string }[] = [
   { index: 0, label: 'bwCyan' },
   { index: 1, label: 'bwMagenta' },
@@ -74,8 +74,8 @@ const SC_INKS: { index: number; label: string }[] = [
 ];
 
 /**
- * 「更多调整」区块：五项均可独立启停，参数与 `render/adjustMore.ts` 一一对应。
- * 单独抽成组件是因为它自带较多局部状态（如可选颜色的当前色域）。
+ * The "more adjustments" block: five independently toggled items matching `render/adjustMore.ts`.
+ * It is its own component because it carries a fair amount of local state (e.g. the current range).
  */
 function MoreAdjustments({
   value,
@@ -94,7 +94,7 @@ function MoreAdjustments({
 
   return (
     <>
-      {/* 照片滤镜 */}
+      {/* Photo filter */}
       <ToggleChip
         label={t('tools.photo.adjPhotoFilter')}
         active={Boolean(photo)}
@@ -136,7 +136,7 @@ function MoreAdjustments({
         </PanelSection>
       ) : null}
 
-      {/* 通道混合器 */}
+      {/* Channel mixer */}
       <ToggleChip
         label={t('tools.photo.adjChannelMixer')}
         active={Boolean(mixer)}
@@ -190,7 +190,7 @@ function MoreAdjustments({
         </PanelSection>
       ) : null}
 
-      {/* 阴影 / 高光 */}
+      {/* Shadows / highlights */}
       <ToggleChip
         label={t('tools.photo.adjShadowsHighlights')}
         active={Boolean(tone)}
@@ -217,7 +217,7 @@ function MoreAdjustments({
         </PanelSection>
       ) : null}
 
-      {/* 可选颜色 */}
+      {/* Selective color */}
       <ToggleChip
         label={t('tools.photo.adjSelectiveColor')}
         active={Boolean(selective)}
@@ -261,7 +261,7 @@ function MoreAdjustments({
         </PanelSection>
       ) : null}
 
-      {/* 替换颜色 */}
+      {/* Replace color */}
       <ToggleChip
         label={t('tools.photo.adjReplaceColor')}
         active={Boolean(replace)}
@@ -321,12 +321,12 @@ function MoreAdjustments({
 }
 
 /**
- * 调整面板：非破坏性参数，写回图层后由 `render/filters.ts` 统一烘焙，
- * 预览与导出共用同一条管线（所见即所得）。
+ * Adjustments panel: non-destructive parameters baked by `render/filters.ts` once written to the layer,
+ * with preview and export sharing one pipeline (what you see is what you get).
  *
- * 分两层：
- * - 基础 7 项滑杆（与既有工程完全兼容）；
- * - 扩展调整（色阶 / 曲线 / 色彩平衡 / 黑白 / 阈值 / 渐变映射 / 去色），各自可独立启停。
+ * Two layers:
+ * - the 7 basic sliders (fully compatible with existing projects);
+ * - extended adjustments (levels / curves / color balance / B&W / threshold / gradient map / desaturate).
  */
 export function AdjustPanel() {
   const { t } = useTranslation();
@@ -335,7 +335,7 @@ export function AdjustPanel() {
   const commit = usePhotoStore((s) => s.commit);
   const layer = doc.layers.find((item) => item.id === doc.activeLayerId);
 
-  // 双模式：既可调「位图图层自带的调整」，也可调「调整图层」（后者作用于其下方全部内容）
+  // Dual mode: edit a bitmap layer's own adjustments or an adjustment layer (which affects everything below)
   const adjustable =
     layer && (layer.kind === 'raster' || layer.kind === 'adjustment') ? layer : null;
   if (!adjustable) {
@@ -382,7 +382,7 @@ export function AdjustPanel() {
         />
       ))}
 
-      {/* 色阶 */}
+      {/* Levels */}
       <ToggleChip
         label={t('tools.photo.adjLevels')}
         active={Boolean(levels)}
@@ -428,7 +428,7 @@ export function AdjustPanel() {
         </PanelSection>
       ) : null}
 
-      {/* 曲线 */}
+      {/* Curves */}
       <ToggleChip
         label={t('tools.photo.adjCurves')}
         active={Boolean(curves)}
@@ -445,7 +445,7 @@ export function AdjustPanel() {
         </PanelSection>
       ) : null}
 
-      {/* 色彩平衡 */}
+      {/* Color balance */}
       <ToggleChip
         label={t('tools.photo.adjColorBalance')}
         active={Boolean(balance)}
@@ -473,7 +473,7 @@ export function AdjustPanel() {
         </PanelSection>
       ) : null}
 
-      {/* 黑白 */}
+      {/* Black & white */}
       <ToggleChip
         label={t('tools.photo.adjBlackWhite')}
         active={Boolean(bw)}
@@ -494,7 +494,7 @@ export function AdjustPanel() {
         </PanelSection>
       ) : null}
 
-      {/* 阈值 */}
+      {/* Threshold */}
       <ToggleChip
         label={t('tools.photo.adjThreshold')}
         active={threshold !== null && threshold !== undefined}
@@ -514,7 +514,7 @@ export function AdjustPanel() {
         </PanelSection>
       ) : null}
 
-      {/* 渐变映射 */}
+      {/* Gradient map */}
       <ToggleChip
         label={t('tools.photo.adjGradientMap')}
         active={Boolean(gradient)}
@@ -563,14 +563,14 @@ export function AdjustPanel() {
         </PanelSection>
       ) : null}
 
-      {/* 去色 */}
+      {/* Desaturate */}
       <ToggleChip
         label={t('tools.photo.adjDesaturate')}
         active={Boolean(value.desaturate)}
         onClick={() => setAdj({ desaturate: value.desaturate ? undefined : true })}
       />
 
-      {/* 更多调整：照片滤镜 / 通道混合器 / 阴影高光 / 可选颜色 / 替换颜色 */}
+      {/* More adjustments: photo filter / channel mixer / shadows & highlights / selective color / replace color */}
       <MoreAdjustments value={value} setAdj={setAdj} />
 
       <PanelSection>

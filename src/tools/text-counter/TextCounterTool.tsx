@@ -19,7 +19,7 @@ const STAT_KEYS: (keyof TextCountStats)[] = [
   'utf16Length',
 ];
 
-/** 在线字数统计 */
+/** Online word and character counter */
 export default function TextCounterTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '' }), []);
@@ -65,7 +65,9 @@ export default function TextCounterTool() {
       )}
 
       {!result.ok && (
-        <p className="text-sm text-gray-400 dark:text-gray-500">{t('tools.textCounter.emptyHint')}</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">
+          {t('tools.textCounter.emptyHint')}
+        </p>
       )}
     </div>
   );

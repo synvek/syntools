@@ -273,7 +273,7 @@ describe('放映（只读表格）', () => {
     expect(header).toMatchObject({ text: '姓名', bold: true, background: '#ffee00' });
     expect(grid!.cells.find((cell) => cell.row === 0 && cell.col === 1)?.align).toBe('right');
     expect(grid!.cells.find((cell) => cell.row === 1 && cell.col === 1)?.text).toBe('128.5');
-    // 只有公式没有计算值时按 =公式 展示
+    // With a formula but no cached result, show =formula
     expect(grid!.cells.find((cell) => cell.row === 2)?.text).toBe('=SUM(B2:B2)');
   });
 
@@ -289,7 +289,7 @@ describe('放映（只读表格）', () => {
   });
 
   it('指定当前工作表优先；工作表 id 失效时回退到第一张有内容的表', () => {
-    // 当前就是空表：如实呈现空表，而不是跳到别的表
+    // The current sheet really is empty: present it as empty instead of jumping to another sheet
     const empty = buildPresentGrid(snapshot, 's2');
     expect(empty).toMatchObject({
       sheetName: '空表',
@@ -323,9 +323,9 @@ describe('工作表结构映射（可见状态 / 视图开关）', () => {
   it('Excel 可见状态 → Univer hidden 标记', () => {
     expect(worksheetStateToHidden('visible')).toBe(0);
     expect(worksheetStateToHidden('hidden')).toBe(1);
-    // veryHidden（VBA 隐藏）同样归一为隐藏
+    // veryHidden (hidden by VBA) also normalises to hidden
     expect(worksheetStateToHidden('veryHidden')).toBe(1);
-    // 缺失按可见处理，避免导入后整表消失
+    // A missing flag counts as visible, so no sheet vanishes after an import
     expect(worksheetStateToHidden(undefined)).toBe(0);
   });
 
@@ -336,11 +336,11 @@ describe('工作表结构映射（可见状态 / 视图开关）', () => {
   });
 
   it('视图布尔：缺省时保留 fallback，不把「未设置」误判为 false', () => {
-    // 网格线默认显示（1）
+    // Gridlines are on by default (1)
     expect(viewFlagToBooleanNumber(undefined, 1)).toBe(1);
     expect(viewFlagToBooleanNumber(false, 1)).toBe(0);
     expect(viewFlagToBooleanNumber(true, 1)).toBe(1);
-    // RTL 默认关闭（0）
+    // RTL is off by default (0)
     expect(viewFlagToBooleanNumber(undefined, 0)).toBe(0);
     expect(viewFlagToBooleanNumber(true, 0)).toBe(1);
   });

@@ -3,14 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useFlowStore } from '../store';
 import { isContainerKind } from '../model/types';
 
-/** 命中高亮持续时长（ms） */
+/** Duration of the hit highlight (ms) */
 const HIGHLIGHT_MS = 1400;
 
 /**
- * 全图搜索：按节点文字（含容器标题）过滤并定位。
+ * Full-graph search: filter and locate by node text (including container titles).
  *
- * 点击结果 → 选中该节点并请求父级把视口居中；
- * 通过一次性 CSS 类做短暂高亮，避免为此引入新的 store 状态。
+ * Clicking a result selects that node and asks the parent to center the viewport;
+ * a one-shot CSS class provides the brief highlight, avoiding a new store state just for it.
  */
 export function SearchPanel({ onLocate }: { onLocate: (nodeId: string) => void }) {
   const { t } = useTranslation();
@@ -25,7 +25,7 @@ export function SearchPanel({ onLocate }: { onLocate: (nodeId: string) => void }
   }, [nodes, q]);
 
   const locate = (id: string) => {
-    // 选中 + 短暂高亮（DOM 直接加类，父级负责视口居中）
+    // Select + briefly highlight (add the class directly on the DOM; the parent centers the viewport)
     useFlowStore.setState((s) => ({
       selectedNodes: [id],
       selectedEdges: [],

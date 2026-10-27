@@ -5,25 +5,25 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 
 /**
- * 公式（对标 Word 公式）：
+ * Formulas (modeled on Word equations):
  *
- * - 行内 `mathInline` 与块级 `mathBlock` 都是 atom，只存 LaTeX 源码，
- *   预览由 NodeView 用 KaTeX 渲染（渲染结果不进文档，避免序列化冗余）；
- * - 导出前统一走 injectMath：把 LaTeX 渲染成 KaTeX MathML，
- *   无需外部样式表即可在单文件 HTML 中正确显示；
- * - Word 导出走 mathOmml.ts（原生可编辑公式），不支持的语法降级为图片，
- *   降级数量进入导出损耗清单。
+ * - Inline `mathInline` and block `mathBlock` are both atoms storing only LaTeX source; the preview is
+ *   rendered by a NodeView with KaTeX (never written into the document, avoiding serialization bloat);
+ * - Export runs through injectMath: LaTeX is rendered to KaTeX MathML, which displays correctly in a
+ *   single-file HTML without any external stylesheet;
+ * - Word export goes through mathOmml.ts (native editable equations); unsupported syntax degrades to
+ *   images, and the count feeds the export loss report.
  */
 
-/** 该公式能否用 Word 原生公式表达（供导出损耗统计复用） */
+/** Whether the formula can be expressed as a native Word equation (reused by the export loss scan) */
 export { isOmmlSupported, latexToAst } from './latex';
 export type { LatexNode } from './latex';
 
 /* ------------------------------------------------------------------ *
- * 导出注入
+ * Export injection
  * ------------------------------------------------------------------ */
 
-/** 把序列化 HTML 中的公式节点渲染为 KaTeX MathML（单文件 HTML 无需外部样式即可正确显示） */
+/** Render formula nodes in serialized HTML to KaTeX MathML (single-file HTML displays them without external styles) */
 export function injectMath(html: string): string {
   if (!html.includes('data-math')) return html;
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -37,11 +37,11 @@ export function injectMath(html: string): string {
       target.innerHTML = katex.renderToString(latex, {
         displayMode,
         output: 'mathml',
-        // 抛错才能走到下面的源码兜底：导出结果里出现 KaTeX 的红色报错样式并不合适
+        // Throw so the source fallback below runs: KaTeX's red error styling looks wrong in an exported file
         throwOnError: true,
       });
     } catch {
-      // 渲染失败保留原始 LaTeX，至少不丢内容
+      // On render failure keep the raw LaTeX so nothing is lost
       target.textContent = displayMode ? `$$${latex}$$` : `$${latex}$`;
     }
   });
@@ -49,10 +49,10 @@ export function injectMath(html: string): string {
 }
 
 /* ------------------------------------------------------------------ *
- * 节点
+ * Nodes
  * ------------------------------------------------------------------ */
 
-/** 公式渲染失败的兜底显示：原样呈现 LaTeX 源码并标注错误 */
+/** Fallback when rendering fails: show the raw LaTeX source and mark it as an error */
 function renderLatexInto(container: HTMLElement, latex: string, displayMode: boolean): void {
   try {
     container.innerHTML = katex.renderToString(latex, {
@@ -108,7 +108,7 @@ class MathNodeView implements NodeView {
   }
 }
 
-/** 公式节点属性：LaTeX 源码 + 是否块级展示 */
+/** Formula node attributes: LaTeX source + whether it displays as a block */
 function mathAttributes() {
   return {
     latex: {
@@ -129,21 +129,21 @@ function mathAttributes() {
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     math: {
-      /** 在光标处插入行内公式 */
+      /** Insert an inline formula at the cursor */
       insertInlineMath: (latex: string) => ReturnType;
-      /** 插入块级公式（独占一行居中展示） */
+      /** Insert a block formula (a centered line of its own) */
       insertBlockMath: (latex: string) => ReturnType;
-      /** 修改指定位置的公式（行内/块级由节点自身决定，不在此切换） */
+      /** Update the formula at the given position (inline/block is decided by the node itself, not switched here) */
       updateMath: (pos: number, latex: string) => ReturnType;
-      /** 删除指定位置的公式 */
+      /** Remove the formula at the given position */
       removeMath: (pos: number) => ReturnType;
     };
   }
 }
 
-/** 公式节点选项：点击回调由工具层注入（打开编辑弹窗） */
+/** Formula node options: the click callback is injected by the tool layer (to open the edit dialog) */
 export interface MathNodeOptions {
-  /** 点击公式时回调（工具层打开编辑弹窗） */
+  /** Callback on formula click (the tool layer opens the edit dialog) */
   onSelect?: (pos: number, latex: string, display: boolean) => void;
 }
 
@@ -205,7 +205,7 @@ function createMathNode(name: string, inline: boolean) {
 export const MathInline = createMathNode('mathInline', true);
 export const MathBlock = createMathNode('mathBlock', false);
 
-/** 改写 / 删除公式的命令（与行内/块级无关，统一由扩展提供） */
+/** Commands to update / remove formulas (independent of inline/block, provided by one extension) */
 export const MathCommands = Extension.create({
   name: 'mathCommands',
   addCommands() {
@@ -231,7 +231,7 @@ export const MathCommands = Extension.create({
   },
 });
 
-/** 收集文档中的公式源码（按文档顺序），供导出损耗统计使用 */
+/** Collect formula sources in document order for the export loss scan */
 export function collectLatex(doc: import('@tiptap/pm/model').Node): string[] {
   const list: string[] = [];
   doc.descendants((node) => {

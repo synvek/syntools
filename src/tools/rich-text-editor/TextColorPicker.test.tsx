@@ -8,10 +8,10 @@ vi.mock('react-i18next', () => ({
 import { TextColorPicker } from './TextColorPicker';
 
 /**
- * 回归点：Tauri 里原生 `<input type="color">` 的系统色板选完不会自动关闭，
- * 因此文字颜色改为「预设色板 + 选完即收」，这里锁住收起行为。
+ * Regression guard: in Tauri the native `<input type="color">` palette does not close after picking,
+ * so text color uses "preset swatches + close on pick"; these tests lock that behavior down.
  */
-describe('文字颜色弹层', () => {
+describe('text color popover', () => {
   const trigger = () => screen.getByRole('button', { name: 'tools.richText.color' });
   const panel = () => screen.queryByTestId('rich-text-color-panel');
 
@@ -22,7 +22,7 @@ describe('文字颜色弹层', () => {
     return { onPick, onReset };
   };
 
-  it('默认收起，点击按钮后展开', () => {
+  it('starts collapsed and opens on button click', () => {
     setup();
     expect(panel()).toBeNull();
     fireEvent.click(trigger());
@@ -30,7 +30,7 @@ describe('文字颜色弹层', () => {
     expect(trigger().getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('选中预设色后立即应用并自动收起', () => {
+  it('applies a preset color immediately and closes', () => {
     const { onPick } = setup();
     fireEvent.click(trigger());
     fireEvent.click(screen.getByRole('button', { name: '#E11D48' }));
@@ -38,7 +38,7 @@ describe('文字颜色弹层', () => {
     expect(panel()).toBeNull();
   });
 
-  it('点击面板外部或按 Esc 收起', () => {
+  it('closes on an outside click or Esc', () => {
     setup();
     fireEvent.click(trigger());
     fireEvent.mouseDown(document.body);
@@ -49,7 +49,7 @@ describe('文字颜色弹层', () => {
     expect(panel()).toBeNull();
   });
 
-  it('「默认颜色」清除显式文字色并收起', () => {
+  it('"Default color" clears the explicit color and closes', () => {
     const { onReset } = setup();
     fireEvent.click(trigger());
     fireEvent.click(screen.getByRole('button', { name: 'tools.richText.colorDefault' }));

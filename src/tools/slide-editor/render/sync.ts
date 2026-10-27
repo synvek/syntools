@@ -3,9 +3,9 @@ import type { SlideElement } from '../model/types';
 import { createElementNode, patchElementNode, sameKind, type RenderContext } from './nodes';
 
 /**
- * keyed diff 同步：以 element.id 为键复用 Konva 节点。
- * 只有「元素类型变化」或「子节点结构变化」时才重建，其余走属性快路径，
- * 避免拖拽过程中整页重绘。
+ * Keyed diff sync: reuse Konva nodes keyed by element.id.
+ * Rebuild only when "the element type changed" or "the child structure changed"; everything else takes the fast
+ * property path, avoiding a full-page redraw while dragging.
  */
 export function syncElements(
   layer: Konva.Layer,
@@ -14,12 +14,12 @@ export function syncElements(
 ): void {
   const existing = new Map<string, Konva.Group>();
   for (const child of layer.getChildren()) {
-    if (child.name() !== 'element') continue; // Transformer 等非元素节点不参与 diff
+    if (child.name() !== 'element') continue; // Non-element nodes such as the Transformer don't take part in the diff
     const id = child.id();
     if (id && child instanceof Konva.Group) existing.set(id, child);
   }
 
-  // 隐藏元素不建节点：画布、缩略图、导出三端统一过滤，保证「隐藏」语义一致
+  // Hidden elements get no node: canvas, thumbnail and export all filter them, keeping "hidden" consistent
   const visible = elements.filter((element) => element.visible !== false);
 
   visible.forEach((element, index) => {
@@ -37,22 +37,22 @@ export function syncElements(
     existing.delete(element.id);
   });
 
-  // 未被命中的旧节点即已从文档中删除
+  // Old nodes that weren't matched have been removed from the document
   for (const stale of existing.values()) stale.destroy();
   layer.batchDraw();
 }
 
 /**
- * 元素是否可走属性快路径。
- * 文本/形状/表格的内部子节点由内容决定，属性更新可能漏掉结构差异，
- * 这类元素每次重建以保证与模型一致（元素数量可控，代价可接受）。
+ * Whether an element can take the fast property path.
+ * Text/shape/table child nodes are content-driven, so a property update could miss structural differences;
+ * these elements are rebuilt every time to stay in sync with the model (the element count is bounded, so the cost is fine).
  */
 function isUpdatable(element: SlideElement): boolean {
-  // group 的子元素走组合/取消组合后会变化，属性快路径更新不到 children，故一并重建
+  // A group's children change after group/ungroup and the fast path doesn't update children, so rebuild those too
   return element.type === 'image' || element.type === 'line';
 }
 
-/** 依据布局/母版占位符渲染「不可选中」的底层提示层 */
+/** Render the non-selectable backdrop hints from layout/master placeholders */
 export function renderInherited(
   layer: Konva.Layer,
   elements: SlideElement[],

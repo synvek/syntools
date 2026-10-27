@@ -9,16 +9,16 @@ import { isContainerKind } from '../model/types';
 import type { FlowEdgeRec, FlowNodeRec, FlowNodeStyle, FlowPage, ShapeKind } from '../model/types';
 
 /**
- * 自绘矢量导出的场景：把一页数据渲染为纯 SVG（形状为 path、文字为 <text>）。
- * 与画布共用 `drawShape` / `drawDecor` 与图形目录，因此导出结果与屏幕一致；
- * 由于不依赖 DOM 截图，导出结果可缩放、文字可选，也无需切换活动页。
+ * Scene for self-drawn vector export: renders one page's data as pure SVG (shapes as paths, text as <text>).
+ * It shares `drawShape` / `drawDecor` and the shape catalog with the canvas, so the export matches the screen;
+ * and because it does not rely on DOM capture, the result is scalable, has selectable text and needs no page switching.
  */
 
 export interface VectorSceneProps {
   page: FlowPage;
-  /** 内容外留白 */
+  /** Padding around the content */
   padding: number;
-  /** 透明背景（关闭时铺白底） */
+  /** Transparent background (a white backdrop is painted when off) */
   transparent: boolean;
 }
 
@@ -29,7 +29,7 @@ interface Bounds {
   height: number;
 }
 
-/** 计算某页内容包围盒（含容器子节点偏移） */
+/** Compute the content bounding box of a page (including container child offsets) */
 function vectorBoundsOf(page: FlowPage, padding: number): Bounds {
   const byId = new Map(page.nodes.map((n) => [n.id, n] as const));
   let minX = Number.POSITIVE_INFINITY;
@@ -53,7 +53,7 @@ function vectorBoundsOf(page: FlowPage, padding: number): Bounds {
   };
 }
 
-/** 文字换行渲染（多行按 <tspan> 排布） */
+/** Text wrapping (multiple lines laid out as <tspan>) */
 function TextLines({
   text,
   x,
@@ -226,7 +226,7 @@ const ARROW_MARKER: Record<string, string> = {
   bar: 'vecBar',
 };
 
-/** 端点锚点 → 单位外推方向（用于直线端点与箭头走向） */
+/** Endpoint anchor → unit outward direction (used for line endpoints and arrow orientation) */
 function edgePointsOf(
   edge: FlowEdgeRec,
   byId: Map<string, FlowNodeRec>,
@@ -314,7 +314,7 @@ function round(v: number): number {
   return Math.round(v * 100) / 100;
 }
 
-/** 纯 SVG 场景（供 renderToStaticMarkup 序列化） */
+/** Pure SVG scene (for serialization with renderToStaticMarkup) */
 export function VectorScene({ page, padding, transparent }: VectorSceneProps): ReactElement {
   const bounds = vectorBoundsOf(page, padding);
   const byId = new Map(page.nodes.map((n) => [n.id, n] as const));

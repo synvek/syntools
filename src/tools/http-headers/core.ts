@@ -32,7 +32,7 @@ export const DEFAULT_OPTIONS: HeaderOptions = {
   corsOrigin: '',
 };
 
-/** 根据选项生成响应头键值对（顺序稳定，便于测试与对比） */
+/** Build response header pairs from the options (stable order, easy to test and diff) */
 export function buildHeaders(options: HeaderOptions): Array<[string, string]> {
   const headers: Array<[string, string]> = [];
 
@@ -82,7 +82,7 @@ export function buildHeaders(options: HeaderOptions): Array<[string, string]> {
   return headers;
 }
 
-/** 按目标平台渲染配置片段 */
+/** Render the config snippet for the target platform */
 export function renderHeaders(options: HeaderOptions, target: HeaderTarget): string {
   const headers = buildHeaders(options);
   switch (target) {

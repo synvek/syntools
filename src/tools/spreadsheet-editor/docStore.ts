@@ -2,8 +2,9 @@ import { readDraft } from './draft';
 import type { WorkbookSnapshot } from './xlsx-io';
 
 /**
- * 本地工作簿文档库（IndexedDB）：多文档管理 + 版本历史。
- * 内容不出本机；IndexedDB 不可用时所有 API 静默降级（localStorage 草稿仍兜底）。
+ * Local workbook document library (IndexedDB): multi-document management + version history.
+ * Content never leaves the device; when IndexedDB is unavailable every API degrades silently (the
+ * localStorage draft still acts as a fallback).
  */
 
 export interface StoredWorkbook {
@@ -32,11 +33,11 @@ const DB_NAME = 'syntools-spreadsheet';
 const DB_VERSION = 1;
 const DOC_STORE = 'documents';
 const VER_STORE = 'versions';
-/** 每篇工作簿保留的版本快照上限 */
+/** Max version snapshots kept per workbook */
 const MAX_VERSIONS = 20;
-/** 两次版本快照的最小间隔（2 分钟），避免每次编辑都生成快照 */
+/** Minimum gap between version snapshots (2 minutes) so not every edit creates one */
 const VERSION_MIN_INTERVAL_MS = 120_000;
-/** 当前文档指针：刷新后恢复上次编辑的工作簿 */
+/** Current-document pointer: restores the last-edited workbook after a reload */
 const CURRENT_KEY = 'syntools:spreadsheet-editor.current.v1';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -87,7 +88,7 @@ function newId(): string {
     : `wb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** 列出全部工作簿（按更新时间倒序）；失败返回空列表 */
+/** List all workbooks (newest update first); returns an empty list on failure */
 export async function listDocuments(): Promise<DocMeta[]> {
   try {
     const all = await withStore<StoredWorkbook[]>(
@@ -103,7 +104,7 @@ export async function listDocuments(): Promise<DocMeta[]> {
   }
 }
 
-/** 读取单个工作簿；失败返回 null */
+/** Load a single workbook; null on failure */
 export async function loadDocument(id: string): Promise<StoredWorkbook | null> {
   try {
     const doc = await withStore<StoredWorkbook | undefined>(
@@ -117,7 +118,7 @@ export async function loadDocument(id: string): Promise<StoredWorkbook | null> {
   }
 }
 
-/** 保存工作簿（upsert），并按间隔生成版本快照 */
+/** Save a workbook (upsert) and push a version snapshot when the interval allows */
 export async function saveDocument(
   id: string,
   title: string,
@@ -136,7 +137,7 @@ export async function saveDocument(
     await withStore(DOC_STORE, 'readwrite', (store) => store.put(doc));
     await pushVersion(doc, now);
   } catch {
-    // IndexedDB 不可用：忽略（localStorage 草稿仍兜底）
+    // IndexedDB unavailable: ignore it (the localStorage draft still covers us)
   }
 }
 
@@ -162,7 +163,7 @@ async function pushVersion(doc: StoredWorkbook, now: number): Promise<void> {
   });
 }
 
-/** 列出某工作簿的版本快照（按时间倒序） */
+/** List a workbook's version snapshots (newest first) */
 export async function listVersions(docId: string): Promise<StoredVersion[]> {
   try {
     const db = await openDb();
@@ -183,11 +184,11 @@ export async function deleteDocument(id: string): Promise<void> {
     const tx = db.transaction(VER_STORE, 'readwrite');
     versions.forEach((version) => tx.objectStore(VER_STORE).delete(version.id));
   } catch {
-    // 忽略
+    // Ignore
   }
 }
 
-/** 复制工作簿，返回新文档 id（失败返回 null） */
+/** Duplicate a workbook and return the new document id (null on failure) */
 export async function duplicateDocument(id: string): Promise<string | null> {
   const source = await loadDocument(id);
   if (!source) return null;
@@ -200,7 +201,7 @@ export function setCurrentDocId(id: string): void {
   try {
     localStorage.setItem(CURRENT_KEY, id);
   } catch {
-    // 忽略
+    // Ignore
   }
 }
 
@@ -213,15 +214,15 @@ export function readCurrentDocId(): string | null {
 }
 
 export interface DocStoreInit {
-  /** 应恢复编辑的文档 id */
+  /** Document id that should be resumed */
   docId: string;
-  /** 应恢复的文档内容（null 表示仅记录 id） */
+  /** Document content to restore (null means only the id is recorded) */
   doc: StoredWorkbook | null;
 }
 
 /**
- * 初始化：优先恢复指针指向的文档；否则把 localStorage v1 单文档草稿
- * 迁移为文档库首篇（一次性）。
+ * Initialise: prefer the document the pointer refers to; otherwise migrate the localStorage v1
+ * single-document draft into the library as its first entry (one-off).
  */
 export async function initDocStore(): Promise<DocStoreInit | null> {
   const docs = await listDocuments();

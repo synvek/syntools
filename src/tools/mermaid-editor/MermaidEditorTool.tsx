@@ -46,7 +46,7 @@ async function svgStringToPngDataUrl(svg: string, scale = 2): Promise<string> {
   }
 }
 
-/** Mermaid 在线绘图（本地 import mermaid） */
+/** In-browser Mermaid diagrams (mermaid imported locally) */
 export default function MermaidEditorTool() {
   const { t } = useTranslation();
   const reactId = useId().replace(/:/g, '');
@@ -247,7 +247,7 @@ export default function MermaidEditorTool() {
                     transformOrigin: 'top left',
                   }}
                   className="[&_svg]:h-auto [&_svg]:max-w-none"
-                  // Mermaid 输出为受信库生成的静态 SVG
+                  // Mermaid emits static SVG produced by a trusted library
                   dangerouslySetInnerHTML={{ __html: svg }}
                 />
               </div>

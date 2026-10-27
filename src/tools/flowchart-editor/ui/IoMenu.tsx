@@ -34,7 +34,7 @@ const TEXT_KINDS: ExportKind[] = ['project', 'drawio', 'mermaid'];
 
 const RANGE_OPTIONS: ExportRange[] = ['selection', 'current', 'all'];
 
-/** 等待一次「画布已按新页面重绘」（两次 rAF + 微延时，覆盖 React 提交与节点测量） */
+/** Wait for one "canvas repainted for the new page" (two rAFs plus a short delay, covering React commit and node measurement) */
 function nextPaint(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
@@ -49,10 +49,10 @@ interface IoMenuProps {
   busy: boolean;
   setBusy: (v: boolean) => void;
   onError: (message: string | null) => void;
-  /** 受控展开态（快捷键 Ctrl+P / Ctrl+E 打开导出面板时使用）；缺省则组件内部自管 */
+  /** Controlled open state (used when Ctrl+P / Ctrl+E opens the export panel); managed internally when omitted */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  /** 紧凑模式：仅显示图标按钮（tooltip 提供文案），用于顶部菜单工具栏 */
+  /** Compact mode: icon buttons only (copy in the tooltip), for the top menu toolbar */
   compact?: boolean;
 }
 
@@ -81,8 +81,8 @@ export function IoMenu({
         : t('tools.flowchart.rangeCurrent');
 
   /**
-   * 逐页导出：切到每一页 → 等重绘 → 截图；结束后切回原页。
-   * 非活动页并未渲染在 DOM 中，只能逐页激活后截图（保证保真度与画布一致）。
+   * Page-by-page export: switch to each page → wait for repaint → capture; then switch back to the original page.
+   * Inactive pages are not in the DOM, so each must be activated before capturing (matching the canvas fidelity).
    */
   const captureAllPages = async (opts: RasterExportOptions): Promise<CapturedPage[]> => {
     const store = useFlowStore.getState();
@@ -116,11 +116,11 @@ export function IoMenu({
     setOpen(false);
     onError(null);
     const state = useFlowStore.getState();
-    // 导出文件名取自工具栏的文档标题
+    // The export file name comes from the toolbar's document title
     const filename = state.docName.trim() || 'flowchart';
 
     if (TEXT_KINDS.includes(kind)) {
-      // Mermaid 无栅格概念：导出范围中的「全部页」映射为多段 flowchart
+      // Mermaid has no grid concept: "all pages" in the export range maps to multiple flowchart blocks
       const ok = exportText(state.getDoc(), kind, filename, {
         mermaidPages: options.range === 'all' ? 'all' : 'current',
       });
@@ -130,8 +130,8 @@ export function IoMenu({
 
     const opts: RasterExportOptions = { ...options, format: kind as RasterFormat };
 
-    // SVG：优先自绘矢量（真矢量、文字可选、无需逐页切换）；
-    // 公式节点无法矢量化为 SVG 文本，含公式时回退到 DOM 截图路径。
+    // SVG: prefer the self-drawn vector path (true vector, selectable text, no page switching);
+    // formula nodes cannot be vectorized into SVG text, so pages with formulas fall back to DOM capture.
     if (kind === 'svg') {
       const doc = state.getDoc();
       const selection = opts.range === 'selection' ? [...state.selectedNodes] : undefined;
@@ -181,7 +181,7 @@ export function IoMenu({
     }
   };
 
-  /** 分页打印：整图按纸张切片导出多页 PDF；范围=全部页时逐页切片合并 */
+  /** Paged printing: slice the whole diagram by paper into a multi-page PDF; with range=all, slice and merge page by page */
   const runPrint = async () => {
     setOpen(false);
     onError(null);
@@ -190,7 +190,7 @@ export function IoMenu({
     setBusy(true);
     try {
       if (options.range === 'all' && state.pageOrder.length > 1) {
-        // 打印截图参数固定为 PNG（print.ts 内部按 PNG 贴图），倍率取打印清晰度
+        // Print capture always uses PNG (print.ts tiles PNG internally), and the scale comes from the print sharpness setting
         const captured = await captureAllPages({
           ...options,
           format: 'png',
@@ -360,7 +360,7 @@ export function IoMenu({
               {t('tools.flowchart.transparentBg')}
             </label>
 
-            {/* 分页打印：按纸张尺寸切分成多页 PDF */}
+            {/* Paged printing: split into a multi-page PDF by paper size */}
             <div className="flex items-center gap-1.5 border-t border-gray-100 px-1 pt-2 dark:border-gray-800">
               <select
                 data-testid="flowchart-print-paper"

@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 摘要与提炼类提示词，详见 ../README.md */
+/** Summarization and distillation prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'summarize-long-document',

@@ -2,7 +2,7 @@ import type { ShapeDef } from './index';
 import { axisAdjust, pxMx } from './adjust';
 import { packagePath } from './uml-paths';
 
-/** 包标签高度可调（左上角名称栏） */
+/** Package tab height is adjustable (the name bar at the top-left) */
 const PACKAGE_ADJUST = [
   axisAdjust({
     key: 'tabHeight',
@@ -16,7 +16,7 @@ const PACKAGE_ADJUST = [
   }),
 ];
 
-/** UML 对象/包图：包、对象、带槽对象、模型、剖面 */
+/** UML object / package diagram: package, object, object with slots, model, profile */
 export const UML_OBJECT_SHAPES: ShapeDef[] = [
   {
     kind: 'umlPackage',

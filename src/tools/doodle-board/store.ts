@@ -1,9 +1,10 @@
 /**
- * 涂鸦画板状态：唯一真相源是 `scene`（矢量 ops），工具参数是会话态。
+ * Doodle board state: the single source of truth is `scene` (vector ops); tool settings are session state.
  *
- * 历史采用**不可变场景快照**：`past` / `future` 里存的是整个 Scene 对象，
- * 因为 ops 数组不可变，快照只是多一个引用，成本远低于复制位图。
- * `addOp` 属于「正在画」，因此每次落笔前压一次快照，中途的笔迹不进历史。
+ * History uses **immutable scene snapshots**: `past` / `future` hold whole Scene objects. Because
+ * the ops arrays are immutable a snapshot is just one extra reference, far cheaper than copying
+ * bitmaps. `addOp` is "drawing in progress", so a snapshot is pushed before each stroke and
+ * intermediate strokes never enter history.
  */
 
 import { create } from 'zustand';
@@ -39,11 +40,11 @@ export interface BrushConfig {
   color: string;
   width: number;
   opacity: number;
-  /** 是否启用触控笔压感（鼠标无效） */
+  /** Enable stylus pressure (no effect for a mouse) */
   pressure: boolean;
 }
 
-/** 最近使用颜色：新色置顶并去重 */
+/** Recent colours: the newest goes first and duplicates are dropped */
 function pushRecent(list: string[], color: string): string[] {
   return [color, ...list.filter((item) => item !== color)].slice(0, RECENT_LIMIT);
 }
@@ -51,22 +52,22 @@ function pushRecent(list: string[], color: string): string[] {
 interface BoardState {
   scene: Scene;
   tool: ToolId;
-  /** 吸管前的工具：取色结束后自动切回，符合经典画板习惯 */
+  /** Tool used before the eyedropper: restored after sampling, matching classic drawing apps */
   lastTool: ToolId;
   brush: BrushConfig;
-  /** 前景色外的「背景色」：形状填充色，也是右键落笔的颜色 */
+  /** The "background colour" beside the foreground: shape fill and right-click ink colour */
   secondary: string;
   recent: string[];
-  /** 缩放：`fit` 跟随容器宽度自适应，数值为固定倍率 */
+  /** Zoom: `fit` follows the container width; a number is a fixed scale */
   zoom: number | 'fit';
-  /** 画布当前实际倍率，由 BoardCanvas 测算回填，供工具栏缩放控件使用 */
+  /** Current effective canvas scale, measured by BoardCanvas for the toolbar zoom control */
   viewScale: number;
-  /** 工具栏是否收起为一条细条（最大化工作区） */
+  /** Whether the toolbar is collapsed to a thin strip (maximises the canvas) */
   collapsed: boolean;
-  /** 「更多设置」面板是否展开 */
+  /** Whether the "more settings" panel is expanded */
   details: boolean;
   textSize: number;
-  /** 形状是否填充 */
+  /** Whether shapes are filled */
   fill: boolean;
   preset: SizePreset;
   past: Scene[];
@@ -80,7 +81,7 @@ interface BoardState {
   setViewScale: (scale: number) => void;
   toggleCollapsed: () => void;
   toggleDetails: () => void;
-  /** 整体平移：把位移烘焙进所有 op 的坐标（单条历史） */
+  /** Pan: bake the delta into every op's coordinates (one history entry) */
   translateScene: (dx: number, dy: number) => void;
   patchBrush: (patch: Partial<BrushConfig>) => void;
   setTextSize: (size: number) => void;
@@ -88,7 +89,7 @@ interface BoardState {
   setPreset: (preset: SizePreset) => void;
   setBackground: (patch: Partial<Background>) => void;
   setSize: (width: number, height: number, options?: { history?: boolean }) => void;
-  /** 自适应预设：按容器可用宽度重算画布尺寸（不进历史） */
+  /** Fit preset: recompute the canvas size from the available container width (no history entry) */
   applyFitSize: (availableWidth: number) => void;
   addOp: (op: Op) => void;
   replaceScene: (scene: Scene) => void;
@@ -111,7 +112,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   collapsed: false,
   details: true,
   textSize: DEFAULT_TEXT_SIZE,
-  // 默认填充：形状开箱即用「描边=前景色、填充=背景色」的经典画板语义
+  // Filled by default: shapes start with the classic "stroke = foreground, fill = background" semantics
   fill: true,
   preset: 'fit',
   past: [],
@@ -119,7 +120,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
   setTool: (tool) =>
     set((s) => {
-      // 荧光笔的观感依赖半透明与粗笔尖：切过去时补齐默认值，回到画笔再还原
+      // The marker look depends on translucency and a broad tip: fill in defaults when switching to it, restore on the way back
       const width = tool === 'marker' ? Math.max(MARKER_MIN_WIDTH, s.brush.width) : s.brush.width;
       const opacity =
         tool === 'marker'
@@ -129,7 +130,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
             : s.brush.opacity;
       return {
         tool,
-        // 记住「吸管之前」的工具，取色完成后回退；其余情况持续更新
+        // Remember the tool used before the eyedropper so it can be restored; otherwise keep updating
         lastTool: s.tool === 'picker' ? s.lastTool : s.tool,
         brush: { ...s.brush, width, opacity },
       };
@@ -237,7 +238,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     });
   },
 
-  // 载入草稿 / 场景：进入历史起点状态（preset 交给上层的自适应逻辑重新计算）
+  // Loading a draft / scene: enters a fresh history state (the caller recomputes the fit preset)
   replaceScene: (scene) => set({ scene, past: [], future: [] }),
 
   undo: () => {
@@ -271,5 +272,5 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   },
 }));
 
-/** 背景类型顺序（工具栏分段控件用） */
+/** Background kinds in display order (for the toolbar segmented control) */
 export const BACKGROUND_KINDS: BackgroundKind[] = ['transparent', 'solid', 'grid'];

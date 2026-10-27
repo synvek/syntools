@@ -2,9 +2,9 @@ import type { TFunction } from 'i18next';
 import type { Layer } from '../model/types';
 
 /**
- * 图层显示名：文档里的 `name` 为空表示「自动命名」，
- * 这里按类型 + 同类型序号用当前语言渲染（如「图层 2」/「Layer 2」），
- * 这样默认名称不会在创建时被写死成某一种语言。
+ * Layer display names: an empty `name` in the document means "auto-name",
+ * so it is rendered here from the type + index within that type in the current language (English shows "Layer 2"),
+ * which keeps default names from being frozen into one language at creation time.
  */
 export function layerDisplayName(layer: Layer, layers: Layer[], t: TFunction): string {
   const name = layer.name.trim();
@@ -26,7 +26,7 @@ export function layerDisplayName(layer: Layer, layers: Layer[], t: TFunction): s
   return t(`tools.photo.${key}`, { n: index });
 }
 
-/** 画布名的显示值：空名称用当前语言的「未命名画布」 */
+/** Display value for the canvas name: an empty name uses the current language's "untitled canvas" */
 export function docDisplayName(name: string, t: TFunction): string {
   return name.trim() || t('tools.photo.titlePlaceholder');
 }

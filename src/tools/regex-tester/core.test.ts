@@ -40,14 +40,14 @@ describe('findMatches', () => {
   });
 
   it('未带 g 标志时自动全局化', () => {
-    // 'foo foo' 中共有 4 个 'o'
+    // 'foo foo' contains 4 'o' characters in total
     const r = findMatches(/o/, 'foo foo');
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.matches).toHaveLength(4);
   });
 
   it('收集序号捕获组与命名捕获组', () => {
-    // 命名组同样占用序号：groups 按捕获组序号依次为 year、月份
+    // Named groups also take an index: groups follow capture order, i.e. year then month
     const r = findMatches(/(?<year>\d{4})-(\d{2})/g, 'date: 2026-09');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -59,7 +59,7 @@ describe('findMatches', () => {
   it('空匹配不会死循环', () => {
     const r = findMatches(/x?/g, 'ab');
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value.matches).toHaveLength(3); // 位置 0、1、2
+    if (r.ok) expect(r.value.matches).toHaveLength(3); // positions 0, 1, 2
   });
 
   it('多行模式下 ^ 匹配行首', () => {

@@ -97,7 +97,7 @@ describe('吸附对齐', () => {
       { width: 1280, height: 720 },
       6,
     );
-    // 各边/中线距页面中心线均超过容差 → 不吸附
+    // Every edge/center line is beyond tolerance from the page center line → no snap
     expect(result.x).toBe(620);
     expect(result.guides).toEqual([]);
   });
@@ -159,10 +159,10 @@ describe('工具函数', () => {
       6,
       { grid: 24 },
     );
-    // 103 → 96（24 的倍数），47 → 48
+    // 103 → 96 (multiple of 24), 47 → 48
     expect(result.x).toBe(96);
     expect(result.y).toBe(48);
-    // 网格吸附不产生参考线
+    // Grid snapping produces no guides
     expect(result.guides).toHaveLength(0);
   });
 
@@ -228,7 +228,7 @@ describe('对齐与分布', () => {
   });
 
   it('等间距分布：首末不动，中间间隙相等', () => {
-    // 三个等宽 100 的盒子，跨度 500 → 间隙 (500-300)/2 = 100
+    // Three 100-wide boxes spanning 500 → gap (500-300)/2 = 100
     const targets = [
       { x: 0, y: 0, width: 100, height: 50 },
       { x: 50, y: 0, width: 100, height: 50 },
@@ -258,7 +258,7 @@ describe('对齐与分布', () => {
       { x: 0, y: 300, width: 100, height: 40 },
     ];
     const deltas = computeDistribute('vertical', targets);
-    // 跨度 340、总高 120 → 间隙 110，中间元素落到 y=150（首末保持 0 与 300）
+    // Span 340, total height 120 → gap 110; the middle element lands at y=150 (first/last stay at 0 and 300)
     expect(deltas[0].dy).toBe(0);
     expect(deltas[2].dy).toBe(0);
     expect(targets[1].y + deltas[1].dy).toBe(150);

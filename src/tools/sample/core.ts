@@ -8,14 +8,14 @@ export const sampleOps: { value: SampleOp; label: string }[] = [
   { value: 'lower', label: '转小写' },
 ];
 
-/** 纯函数核心：统一返回 ToolResult，不向调用方抛异常（技术设计 §8.2） */
+/** Pure-function core: always returns ToolResult and never throws at callers (technical design §8.2) */
 export function sampleTransform(input: string, op: SampleOp): ToolResult<string> {
   if (input.length === 0) {
     return { ok: false, error: '请先输入文本' };
   }
   switch (op) {
     case 'reverse':
-      // 按码点反转，正确处理 emoji 等增补平面字符
+      // Reverse by code point so supplementary-plane characters such as emoji are handled correctly
       return { ok: true, value: [...input].reverse().join('') };
     case 'upper':
       return { ok: true, value: input.toUpperCase() };

@@ -1,5 +1,5 @@
 /**
- * CSS 按钮生成器：根据选项输出 CSS / HTML 片段。
+ * CSS button generator: emit CSS / HTML snippets from the options.
  */
 
 export interface ButtonStyleOptions {
@@ -82,7 +82,9 @@ export function buildButtonHtml(options: ButtonStyleOptions, className = 'btn'):
   return `<button type="button" class="${className}">${safe}</button>`;
 }
 
-export function buildButtonInlineStyle(options: ButtonStyleOptions): Record<string, string | number | undefined> {
+export function buildButtonInlineStyle(
+  options: ButtonStyleOptions,
+): Record<string, string | number | undefined> {
   return {
     display: 'inline-flex',
     alignItems: 'center',

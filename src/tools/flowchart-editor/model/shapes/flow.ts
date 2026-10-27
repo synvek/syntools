@@ -1,19 +1,19 @@
 import type { ShapeDef } from './index';
 import { axisAdjust, pxMx, type ParamGetter } from './adjust';
 
-/** 预定义过程：矩形 + 两侧竖线（竖线内缩量 barWidth 可调） */
+/** Predefined process: rectangle + vertical lines on both sides (inset adjustable via barWidth) */
 const predefinedPath = (w: number, h: number, p: ParamGetter): string => {
   const bw = p('barWidth');
   return `M0,0 H${w} V${h} H0 Z M${bw},0 V${h} M${w - bw},0 V${h}`;
 };
 
-/** 离页连接符：房屋形五边形（屋脊高度可调） */
+/** Off-page connector: house-shaped pentagon (roof height adjustable) */
 const offPagePath = (w: number, h: number, p: ParamGetter): string => {
   const roof = p('roofHeight');
   return `M0,${h} V${roof} L${w / 2},0 L${w},${roof} V${h} Z`;
 };
 
-/** 循环上限：左下角缺角矩形（缺角尺寸可调） */
+/** Loop limit: rectangle with a notch in the bottom-left corner (notch size adjustable) */
 const loopLimitPath = (w: number, h: number, p: ParamGetter): string => {
   const notch = p('loopNotch');
   return `M0,0 H${w} V${h} H${notch} L0,${h - notch} Z`;

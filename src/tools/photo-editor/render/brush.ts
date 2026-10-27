@@ -3,44 +3,44 @@ import { createCanvasElement, getCanvas } from '../model/assets';
 import type { RasterLayer, Rect, Selection } from '../model/types';
 
 /**
- * 落笔：直接改写图层位图的 2D 上下文。
+ * Painting: write straight into the layer bitmap's 2D context.
  *
- * 选择这条路径而不是「每笔一个 Konva 节点」，是为了避免长笔画把节点数撑爆；
- * 一次笔画只产生一次 `rev` 自增（触发烘焙缓存失效），撤销粒度 = 一次笔画。
+ * This path instead of "one Konva node per stroke" keeps long strokes from exploding the node count;
+ * one stroke bumps `rev` once (invalidating the bake cache), so the undo granularity is one stroke.
  *
- * 两种笔触形态：
- * - **连续描边**（间距 ≤ 5%）：`lineTo + stroke`，最快且边缘最平滑；
- * - **逐点盖章**（间距 > 5%）：把笔尖预渲染成一张精灵图，沿轨迹按 `间距 × 直径` 步进 `drawImage`，
- *   这样才能表达「间距」的颗粒感，也让每个印章可以独立受压感调制大小 / 不透明度。
+ * Two stroke shapes:
+ * - **continuous stroke** (spacing ≤ 5%): `lineTo + stroke`, fastest and smoothest at the edges;
+ * - **per-point stamping** (spacing > 5%): render the tip once into a sprite and `drawImage` it along the path,
+ *   stepping by `spacing × diameter`, which conveys the grain of the spacing and lets each stamp take pressure.
  */
 
 export interface StrokeOptions {
   color: string;
-  /** 文档坐标下的笔刷直径 */
+  /** Brush diameter in document units */
   size: number;
-  /** 0~1：1 为硬边，越小边缘越柔 */
+  /** 0~1: 1 gives a hard edge, smaller is softer */
   hardness: number;
   /** 0~1 */
   opacity: number;
   mode: 'brush' | 'eraser';
   selection: Selection | null;
-  /** 锁定透明像素：只画在已有像素上（source-atop），不新增内容 */
+  /** Lock transparent pixels: paint only on existing pixels (source-atop), never adding content */
   lockAlpha?: boolean;
-  /** 落笔间距（相对直径），缺省 0.1 */
+  /** Stamp spacing (relative to the diameter), 0.1 by default */
   spacing?: number;
-  /** 压感调制笔触大小（需要设备支持，鼠标回落为 1） */
+  /** Pressure modulates stroke size (needs device support; a mouse falls back to 1) */
   pressureSize?: boolean;
-  /** 压感调制不透明度 */
+  /** Pressure modulates opacity */
   pressureOpacity?: boolean;
 }
 
 export interface StrokeSession {
-  /** `pressure` 为 0~1 的压感；缺失时按 1 处理 */
+  /** `pressure` is 0~1; when missing it is treated as 1 */
   move: (x: number, y: number, pressure?: number) => void;
   end: () => void;
 }
 
-/** 压感下限：鼠标 / 无压感设备报送 0 时不至于画不出来 */
+/** Pressure floor: a mouse / device reporting 0 must still produce a visible stroke */
 const MIN_PRESSURE = 0.15;
 
 function normalizePressure(pressure: number | undefined): number {
@@ -49,8 +49,8 @@ function normalizePressure(pressure: number | undefined): number {
 }
 
 /**
- * 预渲染笔尖精灵：中心不透明、边缘按硬度衰减。
- * `hardness >= 1` 时直接画实心圆（依赖画布抗锯齿得到干净边缘）。
+ * Pre-render the tip sprite: opaque at the center, falling off toward the edge by hardness.
+ * When `hardness >= 1` it just fills a circle (canvas antialiasing gives the clean edge).
  */
 function transparentOf(color: string): string {
   const hex = color.trim();
@@ -74,12 +74,12 @@ function createStampSprite(color: string, hardness: number): HTMLCanvasElement {
     ctx.fill();
     return canvas;
   }
-  // 实心核心半径由硬度决定：hardness=1 → 核心≈半径；hardness=0 → 核心为 0（整体渐隐）
+  // Solid core radius follows hardness: hardness=1 → core ≈ radius; hardness=0 → core 0 (all falloff)
   const inner = Math.max(0, Math.min(0.98, hardness)) * radius;
   const gradient = ctx.createRadialGradient(radius, radius, inner, radius, radius, radius);
   gradient.addColorStop(0, color);
-  // 渐隐到「同色的透明版本」而非透明黑：后者在 premultiplied 插值下会经过暗红，
-  // 多枚笔尖边缘相互叠加后笔迹中部会被压暗（吸管取色取不到原本的颜色）。
+  // Fade to a transparent version of the same color, not transparent black: the latter passes through dark
+  // red under premultiplied interpolation, and stacked tips would darken the middle of the stroke.
   gradient.addColorStop(1, transparentOf(color));
   ctx.fillStyle = gradient;
   ctx.beginPath();
@@ -88,7 +88,7 @@ function createStampSprite(color: string, hardness: number): HTMLCanvasElement {
   return canvas;
 }
 
-/** 文档坐标 → 资产像素坐标的缩放比 */
+/** Scale from document coordinates to asset pixel coordinates */
 function assetScale(layer: StrokeTarget): { sx: number; sy: number } | null {
   const asset = getCanvas(layer.assetId);
   if (!asset) return null;
@@ -99,30 +99,30 @@ function assetScale(layer: StrokeTarget): { sx: number; sy: number } | null {
 }
 
 /**
- * 把当前上下文裁剪到选区（调用前上下文必须已经被平移到「文档坐标」）。
- * 统一使用 nonzero：`traceSelection` 已按并集 / 差集规范化轮廓方向，
- * 因此反选的「外框 + 内洞」与布尔运算产生的多轮廓都能正确裁剪。
+ * Clip the current context to the selection (the context must already be translated into document space).
+ * Everything uses nonzero: `traceSelection` already normalized outline directions for union / difference,
+ * so the inverted "frame + holes" and the multi-outline results of boolean ops all clip correctly.
  */
 function clipToSelection(ctx: CanvasRenderingContext2D, selection: Selection): void {
   traceSelection(ctx, selection);
   ctx.clip('nonzero');
 }
 
-/** 单次 pointermove 的盖章上限：防止极端跳点（如设备异常）产生海量绘制 */
+/** Stamp cap per pointermove: keeps an extreme jump (e.g. a glitchy device) from painting thousands of stamps */
 const MAX_STAMPS_PER_MOVE = 2048;
 
 /**
- * 笔迹落点：只需要「一张画布 + 它在文档中的位置尺寸」。
+ * Paint target: it only needs "a canvas plus where it sits and how big it is in the document".
  *
- * 抽成结构类型的原因：除了图层位图，笔迹还要能落到**图层蒙版**与**快速蒙版**上，
- * 后两者并非 `RasterLayer`；`RasterLayer` 天然满足本接口，因此原调用点无需改动。
+ * A structural type because strokes must also land on **layer masks** and the **quick mask**,
+ * which are not `RasterLayer`s; `RasterLayer` satisfies this interface as-is, so callers need no changes.
  */
 export interface StrokeTarget {
   assetId: string;
-  /** 文档坐标下的左上角 */
+  /** Top-left in document coordinates */
   x: number;
   y: number;
-  /** 文档坐标下的尺寸（与画布像素尺寸的比值即缩放） */
+  /** Size in document coordinates (its ratio to the canvas pixel size is the scale) */
   width: number;
   height: number;
 }
@@ -143,20 +143,20 @@ export function createStrokeSession(
   const step = Math.max(0.75, options.size * spacing);
 
   /**
-   * 两条落笔路径，取决定义在「是否必须走缓冲」：
+   * Two paint paths, decided by "does it have to go through a buffer":
    *
-   * - **直接落图**（不透明度 = 1，也就是绝大多数落笔）：笔迹直接画进图层位图。
-   *   像素立刻变 → 画布每帧重新取图就能看到笔迹（实时反馈），且不需要额外画布。
-   * - **缓冲合成**（不透明度 < 1）：笔迹先按 alpha 1 画进独立缓冲，再把
-   *   「落笔前快照 + 缓冲按 opacity 合成」写回位图。重叠印章因此不会互相叠深，
-   *   `不透明度` 的含义与用户预期一致；代价是多一张快照画布，且**每落点都要重合成**。
+   * - **direct** (opacity = 1, i.e. almost every stroke): the stroke is painted into the layer bitmap.
+   *   Pixels change immediately, so the per-frame canvas re-read shows the stroke, with no extra canvas.
+   * - **buffered** (opacity < 1): the stroke is painted at alpha 1 into a separate buffer, then
+   *   "pre-stroke snapshot + buffer composited at opacity" is written back. Overlapping stamps therefore
+   *   don't darken each other, so opacity behaves as expected; the cost is a snapshot canvas per stroke.
    *
-   * 两条路径的共同硬要求：**位图必须在落笔过程中就拿到新像素**。
-   * 画布刷新是「从位图重新取图」（`refreshLayerNode(..., live)`），
-   * 位图不变就等于没有反馈 —— 这正是「笔迹要等松手才出现」的成因。
+   * Hard requirement for both: **the bitmap must receive new pixels during the stroke itself**.
+   * Canvas refresh re-reads the bitmap (`refreshLayerNode(..., live)`),
+   * so an unchanged bitmap means no feedback — exactly what makes strokes appear only on release.
    */
   const direct = options.opacity >= 1;
-  /** 缓冲模式下每次重合成都要先把目标区域还原成它（因此必须整幅留一份） */
+  /** Buffered mode restores the target region from this each time (so it keeps the whole frame) */
   const base = direct ? null : createCanvasElement(asset.width, asset.height);
   const buffer = direct ? null : createCanvasElement(asset.width, asset.height);
   const baseCtx = base?.getContext('2d');
@@ -168,7 +168,7 @@ export function createStrokeSession(
   target.save();
   target.scale(scale.sx, scale.sy);
   target.translate(-layer.x, -layer.y);
-  // 选区裁剪：直接模式当场裁；缓冲模式在合成时裁（缓冲只负责累积笔迹）
+  // Selection clipping: direct mode clips inline; buffered mode clips at composite time (the buffer just accumulates)
   if (direct && options.selection) clipToSelection(target, options.selection);
   target.globalAlpha = direct ? options.opacity : 1;
   target.globalCompositeOperation = direct ? compositeOp(options) : 'source-over';
@@ -183,10 +183,10 @@ export function createStrokeSession(
     target.shadowBlur = blurRadius;
   }
 
-  /** 本次重合成需要覆盖的区域（文档坐标）；null = 还没有待合成的笔迹 */
+  /** Region to recomposite (document coords); null = no stroke waiting to be composited */
   let dirty: { x0: number; y0: number; x1: number; y1: number } | null = null;
   const markDirty = (x: number, y: number, radius: number) => {
-    // 阴影模糊会让笔迹超出几何范围，必须一起算进脏区
+    // Shadow blur pushes the stroke past its geometry, so it has to be part of the dirty region
     const pad = radius + blurRadius + 2;
     const box = { x0: x - pad, y0: y - pad, x1: x + pad, y1: y + pad };
     dirty = dirty
@@ -200,10 +200,10 @@ export function createStrokeSession(
   };
 
   /**
-   * 把「快照 + 缓冲」合成回位图。
+   * Composite "snapshot + buffer" back into the bitmap.
    *
-   * 只处理脏区（松手时整幅收尾）—— 每帧整幅重合成在 4096² 的画布上是几十兆像素的无效功。
-   * 合成是「区域的纯函数」（每次都从快照重新算），因此分区域重合成与整幅合成结果完全一致。
+   * Only the dirty region is processed (release closes out the full frame): a full recomposite per frame
+   * on a 4096² canvas wastes tens of megapixels; compositing is a pure function of the region, so results match.
    */
   const composite = (whole: boolean) => {
     if (direct || !base || !buffer) return;
@@ -218,7 +218,7 @@ export function createStrokeSession(
     ctx.beginPath();
     ctx.rect(region.x0, region.y0, region.x1 - region.x0, region.y1 - region.y0);
     ctx.clip();
-    // 'copy' 才会连透明一起精确还原（source-over 盖不回透明的像素）
+    // Only 'copy' restores transparency exactly (source-over cannot paint transparent pixels back)
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'copy';
     ctx.drawImage(base, 0, 0);
@@ -229,7 +229,7 @@ export function createStrokeSession(
     dirty = null;
   };
 
-  /** 按压感盖一个笔尖：压感调制直径与不透明度 */
+  /** Stamp one tip with pressure: pressure modulates diameter and opacity */
   const stamp = (x: number, y: number, pressure: number) => {
     if (!sprite) return;
     const sizeFactor = options.pressureSize ? 0.25 + 0.75 * pressure : 1;
@@ -241,7 +241,7 @@ export function createStrokeSession(
   };
 
   let last: { x: number; y: number } | null = null;
-  /** 距离下一次盖章还需前进的行程（跨 move 累积，保证步进与真实位移一致） */
+  /** Travel left before the next stamp (accumulates across moves, keeping steps in sync with real movement) */
   let next = step;
 
   return {
@@ -250,7 +250,7 @@ export function createStrokeSession(
 
       if (stamping) {
         if (!last) {
-          // 单击（未拖动）也要留下一个点
+          // A click (no drag) must still leave a dot
           stamp(x, y, value);
           last = { x, y };
           next = step;
@@ -298,10 +298,10 @@ export function createStrokeSession(
         ctx.restore();
         return;
       }
-      // 整幅收尾：脏区只求「够用」，最终一致性由这里保证
+      // Close out the full frame: the dirty region only has to be "good enough", this guarantees consistency
       composite(true);
       target.restore();
-      // 两张临时画布只服务本次笔迹，立即释放（大画布上这是几十兆的差别）
+      // Both temp canvases serve only this stroke, so free them now (tens of megabytes on a big canvas)
       base!.width = 0;
       base!.height = 0;
       buffer!.width = 0;
@@ -310,15 +310,15 @@ export function createStrokeSession(
   };
 }
 
-/** 落笔的合成方式：橡皮擦除 / 锁定 alpha 只在原像素上画 / 常规覆盖 */
+/** Paint compositing mode: erase / draw only on existing pixels (locked alpha) / normal over */
 function compositeOp(options: StrokeOptions): GlobalCompositeOperation {
   if (options.mode === 'eraser') return 'destination-out';
   return options.lockAlpha ? 'source-atop' : 'source-over';
 }
 
 /**
- * 选区内的整块填充 / 清除（右键菜单「填充选区」「清除选区内容」）。
- * fill：以前景色覆盖；clear：destination-out 擦成透明。
+ * Fill / clear the whole selection (context menu "fill selection" / "clear selection content").
+ * fill: cover with the foreground color; clear: destination-out to transparency.
  */
 export function paintSelection(
   layer: RasterLayer,
@@ -347,8 +347,8 @@ export function paintSelection(
 }
 
 /**
- * 选区遮罩：把非选区部分涂成透明（多轮廓按 nonzero 处理）。
- * 若选区带羽化半径，则对遮罩 alpha 做一次高斯模糊，得到柔和的边缘。
+ * Selection mask: paint everything outside the selection transparent (multiple outlines use nonzero).
+ * When the selection has a feather radius, the mask alpha gets one gaussian blur for a soft edge.
  */
 export function maskToSelection(
   canvas: HTMLCanvasElement,
@@ -366,7 +366,7 @@ export function maskToSelection(
   if (selection.feather > 0) featherCanvas(canvas, selection.feather);
 }
 
-/** 对画布 alpha 做高斯羽化（借临时画布做一次自绘，避免源与目标相同） */
+/** Gaussian-feather a canvas's alpha (draw through a temp canvas so source !== destination) */
 export function featherCanvas(canvas: HTMLCanvasElement, radius: number): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -381,8 +381,8 @@ export function featherCanvas(canvas: HTMLCanvasElement, radius: number): void {
 }
 
 /**
- * 油漆桶：容差内同色区域填充。
- * `contiguous = true` 走扫描线漫水（只填连通区域）；`false` 则全图扫描，把所有落在容差内的像素一起换色。
+ * Paint bucket: fill same-colored areas within the tolerance.
+ * `contiguous = true` runs a scanline flood fill (connected region only); `false` recolors the whole image.
  */
 export function floodFill(
   layer: RasterLayer,
@@ -422,7 +422,7 @@ export function floodFill(
   const tol = tolerance;
 
   if (!contiguous) {
-    // 全图替换：逐像素判定，不再做连通性检查
+    // Global replace: per-pixel test, no connectivity check
     for (let y = 0; y < asset.height; y += 1) {
       for (let x = 0; x < asset.width; x += 1) {
         if (!matches(data, x, y, asset.width, target, tol)) continue;
@@ -469,7 +469,7 @@ export function floodFill(
       visited[index] = 1;
       if (selection && !insideSelectionDoc(selection, layer, scale, i, y)) continue;
       const offset = index * 4;
-      // 锁定透明像素：不往全透明处新增内容
+      // Lock transparent pixels: never add content where the pixel is fully transparent
       if (lockAlpha && data[offset + 3] === 0) continue;
       data[offset] = fill[0];
       data[offset + 1] = fill[1];
@@ -521,7 +521,7 @@ function insideSelectionDoc(
   assetX: number,
   assetY: number,
 ): boolean {
-  // 复用 core 的命中判定：它已处理矩形 / 椭圆 / 套索以及反选产生的「洞」
+  // Reuse core's hit test: it already handles rect / oval / lasso and the "holes" invert produces
   return pointInSelection(selection, layer.x + assetX / scale.sx, layer.y + assetY / scale.sy);
 }
 

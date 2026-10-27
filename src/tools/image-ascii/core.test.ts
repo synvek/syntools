@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { imageDataToAscii } from './core';
 
-/** 生成单色 RGBA 像素 */
+/** Build a solid-color RGBA pixel buffer */
 function solid(width: number, height: number, value: number): Uint8ClampedArray {
   const data = new Uint8ClampedArray(width * height * 4);
   for (let i = 0; i < width * height; i += 1) {

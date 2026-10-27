@@ -21,7 +21,7 @@ const XML_REVERSE: Record<string, string> = Object.fromEntries(
   Object.entries(XML_ENTITIES).map(([k, v]) => [v, k]),
 );
 
-/** 转义：把字符串编码为对应表示 */
+/** Escape: encode a string into the matching representation */
 export function escapeText(text: string, kind: EscapeKind): string {
   switch (kind) {
     case 'json':
@@ -43,7 +43,7 @@ export function escapeText(text: string, kind: EscapeKind): string {
   }
 }
 
-/** 反转义 */
+/** Unescape */
 export function unescapeText(text: string, kind: EscapeKind): string {
   switch (kind) {
     case 'json':

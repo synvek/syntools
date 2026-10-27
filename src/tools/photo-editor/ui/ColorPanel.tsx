@@ -6,7 +6,7 @@ import type { HsvColor } from '../core';
 import { Button, PanelSection } from './controls';
 import { usePhotoStore } from '../store';
 
-/** 常用色板：与顶部工具条保持一致，另外给出常用中性色 */
+/** Common swatches: kept in sync with the top toolbar, plus a set of neutral colors */
 const PALETTE = [
   '#000000',
   '#404040',
@@ -29,10 +29,10 @@ const PALETTE = [
 type Target = 'foreground' | 'background';
 
 /**
- * 颜色面板：前景 / 背景双色 + HSV 拾色器 + 色板 + 最近使用 + 画笔预设。
+ * Color panel: foreground / background pair + HSV picker + swatches + recent + brush presets.
  *
- * 状态归属：颜色写在 `store.brush.color / background`（会话态），
- * 拾色器只维护一份 HSV，避免「灰阶颜色丢失色相」导致拖动时滑块跳位。
+ * State ownership: colors live in `store.brush.color / background` (session state),
+ * and the picker keeps its own HSV so a grayscale color does not lose its hue and make the sliders jump mid-drag.
  */
 export function ColorPanel() {
   const { t } = useTranslation();
@@ -49,7 +49,7 @@ export function ColorPanel() {
   const [target, setTarget] = useState<Target>('foreground');
   const active = target === 'foreground' ? brush.color : brush.background;
   const [hsv, setHsv] = useState<HsvColor>(() => hexToHsv(active));
-  /** 记录「由本组件产生」的颜色，避免 effect 把拖动中的色相重置掉 */
+  /** Record colors "produced by this component" so the effect does not reset the hue mid-drag */
   const emitted = useRef('');
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export function ColorPanel() {
   const svRef = useRef<HTMLDivElement | null>(null);
   const hueRef = useRef<HTMLDivElement | null>(null);
 
-  /** 统一的「按下 + 拖动 + 松手」取值逻辑：坐标归一化后交给回调 */
+  /** Shared pointer down + drag + release value logic: normalized coordinates are handed to the callback */
   const beginDrag =
     (ref: RefObject<HTMLDivElement | null>, onPick: (nx: number, ny: number) => void) =>
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -96,7 +96,7 @@ export function ColorPanel() {
   return (
     <div className="flex flex-col gap-3">
       <PanelSection>
-        {/* 前景 / 背景双色：点击选择编辑目标 */}
+        {/* Foreground / background pair: click to pick which one to edit */}
         <div className="flex items-center gap-3">
           <div className="relative h-10 w-12">
             <button
@@ -132,7 +132,7 @@ export function ColorPanel() {
           </div>
         </div>
 
-        {/* 色相条 */}
+        {/* Hue strip */}
         <div
           ref={hueRef}
           role="slider"
@@ -163,7 +163,7 @@ export function ColorPanel() {
           />
         </div>
 
-        {/* 饱和度 / 明度方块 */}
+        {/* Saturation / value square */}
         <div
           ref={svRef}
           role="slider"

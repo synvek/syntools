@@ -15,18 +15,18 @@ import {
 import { TOOL_DESCRIPTION_SUFFIX, pageTitle, seoLangOf, staticPageSeo } from '@/core/seo/copy';
 
 /**
- * 让 `<html lang>`、`<meta name="description">`、`og:*`、`canonical` 跟随当前语言。
+ * Keep `<html lang>`, `<meta name="description">`, `og:*` and `canonical` in sync with the active language.
  *
- * 为什么需要这个：
- * 站点的 head 是构建期预渲染出来的，写死成一种语言。用户在下拉框切到英文后，
- * 原先只有 `document.title` 被几个页面各自改了一下，`lang` 仍是 `zh-CN`、
- * 描述仍是中文——屏幕阅读器按中文朗读英文界面，CJK 字体 fallback 也跟着错，
- * 而搜索引擎若执行 JS，会读到一套自相矛盾的信号。
+ * Why this exists:
+ * the head is prerendered at build time in one hard-coded language. Once a user switches to English,
+ * previously only `document.title` changed per page while `lang` stayed `zh-CN`, the description
+ * stayed Chinese — screen readers read English UI in Chinese, CJK font fallback went wrong,
+ * and a JS-executing crawler saw contradictory signals.
  *
- * 取值顺序：
- * 1. 工具页 → `toolsMeta.<id>.description`（9 种语言都已有的人工文案）；
- * 2. 静态页 → `core/seo/copy.ts` 的同一张表（与预渲染完全同源）；
- * 3. 其余（404 等）→ 保持文档里已有的值，不做无谓改写。
+ * Lookup order:
+ * 1. tool pages → `toolsMeta.<id>.description` (hand-written for all 9 languages);
+ * 2. static pages → the same table in `core/seo/copy.ts` (identical to prerendering);
+ * 3. everything else (404s) → keep what the document already has, with no needless rewriting.
  */
 
 const TOOL_PATH = /^\/tools\/([^/]+)/;
@@ -51,7 +51,7 @@ function upsertLink(rel: string, href: string): void {
   if (el.getAttribute('href') !== href) el.setAttribute('href', href);
 }
 
-/** hreflang 链接按语言区分，不能用 `upsertLink`（它会命中第一条 alternate） */
+/** hreflang links differ per language, so `upsertLink` cannot be used (it hits the first alternate) */
 function upsertAlternate(hreflang: string, href: string): void {
   const selector = `link[rel="alternate"][hreflang="${hreflang}"]`;
   let el = document.head.querySelector<HTMLLinkElement>(selector);
@@ -64,13 +64,13 @@ function upsertAlternate(hreflang: string, href: string): void {
   if (el.getAttribute('href') !== href) el.setAttribute('href', href);
 }
 
-/** 站内绝对地址（含部署前缀），用于 canonical / og:url */
+/** Absolute in-site URL (including the deploy prefix) for canonical / og:url */
 function absoluteUrl(path: string): string {
   const base = import.meta.env.BASE_URL || '/';
   return new URL(path.replace(/^\//, ''), new URL(base, window.location.origin)).href;
 }
 
-/** 解析当前路径应使用的标题与描述；返回 null 表示不认识这条路径 */
+/** Resolve title and description for the current path; null means the path is unknown */
 export function resolvePageSeo(
   pathname: string,
   lang: Lang,
@@ -83,10 +83,10 @@ export function resolvePageSeo(
   if (toolId) {
     const name = t(`toolsMeta.${toolId}.name`);
     const desc = t(`toolsMeta.${toolId}.description`);
-    // 缺这条工具的该语种文案时 i18next 回落到 en/zh；两者都没有则保持原样
+    // Missing copy for this tool and language falls back to en/zh via i18next; otherwise keep as-is
     if (!name || !desc) return null;
-    // 后缀只有 en / zh 两份译文。其余语言（含繁体）不拼，否则会出现
-    // 「日本語の説明 + Processed entirely on the client」这种半句混语。
+    // The suffix exists in en / zh only. Other languages (including Traditional) skip it, otherwise you get
+    // half-language mashups like "日本語の説明 + Processed entirely on the client".
     const suffix = lang === 'en' || lang === 'zh' ? ` ${TOOL_DESCRIPTION_SUFFIX[lang]}` : '';
     return {
       title: pageTitle(name, seoLang),
@@ -105,10 +105,10 @@ export function useDocumentMeta(): void {
   const lang = normalizeLang(i18n.resolvedLanguage ?? 'en') ?? 'en';
 
   useEffect(() => {
-    // 1) 文档语言：无障碍与字体选择的正解，也是浏览器翻译提示的依据
+    // 1) Document language: drives a11y, font choice and the browser translate prompt
     document.documentElement.lang = LANG_TAG[lang];
 
-    // 2) 页面级标题与描述
+    // 2) Page-level title and description
     const seo = resolvePageSeo(pathname, lang, t);
     if (seo) {
       document.title = seo.title;
@@ -119,27 +119,27 @@ export function useDocumentMeta(): void {
       upsertMeta('name', 'twitter:title', seo.title);
     }
 
-    // 3) 语言声明：og:locale 必须与界面语言一致，否则分享卡片会标注错语言
+    // 3) Locale declaration: og:locale must match the UI language or share cards label the wrong one
     upsertMeta('property', 'og:locale', OG_LOCALE[lang]);
-    // 另一条语言树作为 alternate：分享卡片仍能给出「另一种语言版本」的提示
+    // The other tree as an alternate: share cards can still offer the other language version
     upsertMeta(
       'property',
       'og:locale:alternate',
       lang === 'zh' || lang === 'zh-TW' ? OG_LOCALE.en : OG_LOCALE.zh,
     );
 
-    // 4) canonical 指向**当前地址所属的那棵树**，与界面语言无关：
-    //    `/pricing` 就是英文页，即便访客把界面切成日语，这条 URL 在搜索引擎眼里仍是英文版。
-    //    用界面语言算会把整棵树都搬到 `/zh/` 去，等于自己制造重复内容。
+    // 4) canonical points at **the tree of the current address**, not the UI language:
+    //    `/pricing` is the English page; even with a Japanese UI, search engines still see English.
+    //    Deriving it from the UI language would move the whole tree to `/zh/`, creating duplicate content.
     const bare = stripLangPrefix(pathname);
     const canonicalPath = withLangPrefix(bare, routedLangFromPath(pathname));
     upsertLink('canonical', absoluteUrl(canonicalPath));
     upsertMeta('property', 'og:url', absoluteUrl(canonicalPath));
 
-    // 5) hreflang 跟着当前页面走。
-    //    预渲染时每条页面都写了自己的 alternates，但客户端路由跳转不会重写 head，
-    //    于是从 `/zh/` 点进工具页后，head 里指向的还是首页 —— 这正是我们要修的那类
-    //    「head 与地址不一致」，所以在这里补上。
+    // 5) hreflang follows the current page.
+    //    Prerendering writes alternates per page, but client-side navigation never rewrites the head,
+    //    so after clicking from `/zh/` into a tool page the head still points at the home page — exactly the
+    //    "head does not match the address" bug this fixes.
     for (const alt of ROUTED_LANGS) {
       upsertAlternate(LANG_TAG[alt], absoluteUrl(withLangPrefix(bare, alt)));
     }

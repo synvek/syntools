@@ -40,15 +40,15 @@ import { buildChartPlan, injectChartsIntoXlsx } from './chartXml';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
 
 /**
- * xlsx 适配层：exceljs 全部走动态 import，不进入首屏包
- * （对齐 src/core/pdf/download.ts 中懒加载 jszip 的写法）。
- * 数据只在浏览器内流转，不做任何外发。
+ * xlsx adapter layer: exceljs is always dynamically imported so it stays out of the initial bundle
+ * (matching the lazy jszip import in src/core/pdf/download.ts). Data only moves inside the browser
+ * and is never sent anywhere.
  */
 
-/** exceljs Worksheet 的结构化视图：只声明本工具用到的成员，避免与官方类型的字段冲突 */
+/** Structural view of an exceljs Worksheet: only the members this tool uses, avoiding clashes with the official types */
 interface WorksheetLike {
   name: string;
-  /** 可见状态：visible / hidden / veryHidden */
+  /** Visibility: visible / hidden / veryHidden */
   state?: string;
   properties?: { tabColor?: { argb?: string; theme?: number } };
   model?: { merges?: string[] };
@@ -67,13 +67,13 @@ export interface CellSnapshot {
   v?: string | number | boolean;
   f?: string;
   s?: UniverStyleLite;
-  /** 单元格富文本（Univer ICellData.p）：保留单元格内的局部字体格式 */
+  /** Cell rich text (Univer ICellData.p): preserves per-run font formatting inside a cell */
   p?: CellDocumentData;
-  /** 附加载荷（Univer ICellData.custom）：超链接 / 批注 / 错误值语义 */
+  /** Extra payload (Univer ICellData.custom): hyperlink / note / error-value semantics */
   custom?: CellCustomPayload;
 }
 
-/** 与 Univer IWorksheetData 对齐的最小工作表快照 */
+/** Minimal sheet snapshot aligned with Univer IWorksheetData */
 export interface SheetSnapshot {
   id: string;
   name: string;
@@ -94,7 +94,7 @@ export interface SheetSnapshot {
   rowData: Record<string, { h?: number }>;
 }
 
-/** 与 Univer IWorkbookData 对齐的最小工作簿快照 */
+/** Minimal workbook snapshot aligned with Univer IWorkbookData */
 export interface WorkbookSnapshot extends SnapshotWithExtras {
   id: string;
   name: string;
@@ -104,13 +104,14 @@ export interface WorkbookSnapshot extends SnapshotWithExtras {
   sheets: Record<string, SheetSnapshot>;
   styles: Record<string, unknown>;
   /**
-   * 条件格式 / 数据验证等「暂不做语义映射但需往返保留」的内容。
-   * 放在自有字段而非 Univer resources：未注册插件的 resource 会在加载时被丢弃。
+   * Content such as conditional formatting / data validation that is not mapped semantically yet but
+   * must survive a round-trip. Kept in our own field rather than Univer resources: a resource without
+   * a registered plugin is discarded on load.
    */
   syntoolsExtras?: WorkbookExtras;
-  /** 工作表内的图表：导出时写成 Excel 原生图表（DrawingML） */
+  /** In-sheet charts: written as native Excel charts (DrawingML) on export */
   syntoolsCharts?: ChartConfig[];
-  /** 导入文件里原有的原生图表部件（不解析，导出时原样回填） */
+  /** Native chart parts that came with the imported file (not parsed, written back verbatim on export) */
   syntoolsRawParts?: RawChartParts;
 }
 
@@ -136,7 +137,7 @@ export function createEmptySheet(id: string, name: string): SheetSnapshot {
   };
 }
 
-/** 新建空工作簿快照 */
+/** Create an empty workbook snapshot */
 export function createEmptySnapshot(
   title = 'workbook',
   locale: WorkbookSnapshot['locale'] = 'zhCN',
@@ -153,23 +154,23 @@ export function createEmptySnapshot(
   };
 }
 
-/** exceljs Cell 的结构化视图：只声明本工具用到的成员 */
+/** Structural view of an exceljs Cell: only the members this tool uses */
 interface ExcelCellLike {
   value: unknown;
   style?: unknown;
   numFmt?: string;
-  /** 超链接 URL（exceljs 把 URL 直接挂在该属性上） */
+  /** Hyperlink URL (exceljs hangs the URL directly on this property) */
   hyperlink?: string;
-  /** 批注：exceljs 读取时为字符串，也可能是含 texts 的 Comment 对象 */
+  /** Note: exceljs returns a string, or a Comment object carrying texts */
   note?: unknown;
 }
 
-/** 序列号保留 6 位小数，避免浮点噪声导致往返漂移 */
+/** Keep 6 decimal places on serials so float noise does not drift across a round-trip */
 function roundSerial(serial: number): number {
   return Math.round(serial * 1e6) / 1e6;
 }
 
-/** 读取批注文本（字符串或 Comment.texts 对象两种形态） */
+/** Read note text (either a plain string or a Comment.texts object) */
 function readNoteText(note: unknown): string | undefined {
   if (typeof note === 'string') return note.trim() ? note : undefined;
   if (note && typeof note === 'object') {
@@ -183,9 +184,9 @@ function readNoteText(note: unknown): string | undefined {
 }
 
 /**
- * exceljs 单元格 → Univer 单元格快照。
- * 保留日期（Excel 序列 + 数字格式）、错误值、超链接、批注与单元格富文本，
- * 避免导入时静默丢内容；无任何内容的单元格返回 null。
+ * exceljs cell → Univer cell snapshot.
+ * Preserves dates (Excel serial + number format), error values, hyperlinks, notes and cell rich text
+ * so an import never silently drops content; returns null for a cell with nothing in it.
  */
 function convertCell(cell: ExcelCellLike, row: number, col: number): CellSnapshot | null {
   const target: CellSnapshot = {};
@@ -194,7 +195,7 @@ function convertCell(cell: ExcelCellLike, row: number, col: number): CellSnapsho
   const value = cell.value;
 
   if (value instanceof Date) {
-    // Excel 日期本质是「序列号 + 日期格式」：降级为字符串会同时丢失类型与格式
+    // An Excel date is really "serial + date format": degrading it to a string loses both type and format
     target.v = roundSerial(dateToExcelSerial(value));
     target.s = { n: { pattern: numFmt || 'yyyy-mm-dd' } };
   } else if (value && typeof value === 'object') {
@@ -238,7 +239,7 @@ function convertCell(cell: ExcelCellLike, row: number, col: number): CellSnapsho
     target.v = value;
   }
 
-  // 超链接：exceljs 也可能把 URL 挂在 cell.hyperlink 上
+  // Hyperlink: exceljs may also hang the URL on cell.hyperlink
   if (!custom.hyperlink && typeof cell.hyperlink === 'string' && cell.hyperlink) {
     custom.hyperlink = {
       url: cell.hyperlink,
@@ -256,21 +257,21 @@ function convertCell(cell: ExcelCellLike, row: number, col: number): CellSnapsho
   return target;
 }
 
-/** 读取可见状态 / 标签色 / 视图显示 / 列宽 / 行高 / 冻结窗格等结构信息 */
+/** Read structural info: visibility / tab colour / view options / column widths / row heights / frozen panes */
 function collectStructure(
   worksheet: WorksheetLike,
   sheet: SheetSnapshot,
   maxRow: number,
   maxColumn: number,
 ): void {
-  // 隐藏工作表：hidden / veryHidden 都归一为隐藏，避免「消失的表」被当成可见
+  // Hidden sheets: both hidden and veryHidden normalise to hidden, so a "vanished" sheet is not treated as visible
   sheet.hidden = worksheetStateToHidden(worksheet.state);
 
-  // 标签页颜色（主题色需要主题表才能解析，缺少 argb 时保持默认）
+  // Tab colour (theme colours need the theme table to resolve; fall back to the default without argb)
   const tabColor = argbToHex(worksheet.properties?.tabColor?.argb);
   if (tabColor) sheet.tabColor = tabColor;
 
-  // 视图级显示选项：字段缺失时保留快照默认（显示网格线 / 非 RTL）
+  // View-level options: keep the snapshot defaults (gridlines on / LTR) when the fields are absent
   const firstView = worksheet.views?.[0];
   sheet.showGridlines = viewFlagToBooleanNumber(firstView?.showGridLines, sheet.showGridlines);
   sheet.rightToLeft = viewFlagToBooleanNumber(firstView?.rightToLeft, sheet.rightToLeft);
@@ -293,7 +294,7 @@ function collectStructure(
     if (px) sheet.rowData[String(row - 1)] = { h: px };
   }
 
-  // 冻结窗格
+  // Frozen panes
   const frozen = worksheet.views?.find((item) => item.state === 'frozen');
   if (frozen) {
     const xSplit = frozen.xSplit ?? 0;
@@ -303,8 +304,9 @@ function collectStructure(
 }
 
 /**
- * 从归档中收集「原生图表」部件（drawings / charts / media 及其 .rels）。
- * 失败或没有图表时返回 null —— 收集失败不影响正常导入。
+ * Collect the "native chart" parts from the archive (drawings / charts / media and their .rels).
+ * Returns null on failure or when there are no charts — a failed collection never blocks a normal
+ * import.
  */
 async function collectRawChartPartsFrom(buffer: ArrayBuffer): Promise<RawChartParts | null> {
   try {
@@ -315,15 +317,15 @@ async function collectRawChartPartsFrom(buffer: ArrayBuffer): Promise<RawChartPa
   }
 }
 
-/** 导入 .xlsx：exceljs 解析 → Univer 工作簿快照 */
+/** Import .xlsx: exceljs parse → Univer workbook snapshot */
 export async function importXlsxToSnapshot(file: File): Promise<ToolResult<WorkbookSnapshot>> {
   const check = checkImportFile(file);
   if (!check.ok) return check;
   try {
     const buffer = await file.arrayBuffer();
-    // 先收集原生图表部件（不解析，仅原样保留给导出回填）
+    // Collect native chart parts first (not parsed, just kept verbatim for the export to write back)
     const rawParts = await collectRawChartPartsFrom(buffer);
-    // 再归一化批注关系：openpyxl 等写入者的写法会让 exceljs 直接抛错、整份文件无法导入
+    // Then normalise comment relationships: the way openpyxl and friends write them makes exceljs throw, blocking the whole import
     const normalized = await normalizeXlsxArchive(buffer);
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
@@ -361,7 +363,7 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
       sheet.columnCount = Math.max(MIN_COLUMN_COUNT, maxColumn + 4);
       collectStructure(worksheet as unknown as WorksheetLike, sheet, maxRow, maxColumn);
 
-      // 条件格式 / 数据验证：暂不做语义映射，先随快照保留，导出时写回
+      // Conditional formatting / data validation: not mapped semantically yet, kept with the snapshot and written back on export
       const extras = collectSheetExtras(worksheet as unknown as WorksheetExtrasLike);
       if (extras) sheetExtras[name] = extras;
 
@@ -392,7 +394,7 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
   }
 }
 
-/** 导出 .xlsx：Univer 工作簿快照 → xlsx 字节 */
+/** Export .xlsx: Univer workbook snapshot → xlsx bytes */
 export async function exportSnapshotToBytes(
   snapshot: WorkbookSnapshot,
 ): Promise<ToolResult<Uint8Array>> {
@@ -401,7 +403,7 @@ export async function exportSnapshotToBytes(
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'SynTools';
     workbook.created = new Date();
-    // 条件格式 / 数据验证：导入时随快照保存，这里写回
+    // Conditional formatting / data validation: saved with the snapshot on import, written back here
     const extras = readWorkbookExtras(snapshot);
 
     let firstWorksheet: ReturnType<typeof workbook.addWorksheet> | null = null;
@@ -417,7 +419,7 @@ export async function exportSnapshotToBytes(
       worksheetCount += 1;
       if (sheet.hidden) hiddenCount += 1;
 
-      // 可见状态与标签色：往返保留用户 / Excel 中的设置
+      // Visibility and tab colour: preserve whatever the user or Excel had
       worksheet.state = hiddenToWorksheetState(sheet.hidden);
       const tabArgb = hexToArgb(sheet.tabColor);
       if (tabArgb) worksheet.properties.tabColor = { argb: tabArgb };
@@ -431,7 +433,7 @@ export async function exportSnapshotToBytes(
           const columnIndex = Number(colKey) + 1;
           const target = worksheet.getCell(rowIndex, columnIndex);
           const note = cell.custom?.note;
-          // 依次还原：公式 → 错误值 → 超链接 → 富文本 → 普通值
+          // Restore in order: formula → error value → hyperlink → rich text → plain value
           if (cell.f) {
             target.value = {
               formula: cell.f.replace(/^=/, ''),
@@ -454,13 +456,13 @@ export async function exportSnapshotToBytes(
           } else if (cell.v !== undefined) {
             target.value = cell.v;
           } else if (!note && !cell.s) {
-            // 真正空白的单元格跳过；仅批注 / 仅样式的单元格仍需写出
+            // Skip truly blank cells, but still write cells that only carry a note or a style
             continue;
           }
           if (cell.s) {
             target.style = univerStyleToExcel(cell.s) as never;
           }
-          // 批注：写回单元格备注
+          // Note: write it back as the cell comment
           if (note) target.note = note;
         }
       }
@@ -484,13 +486,13 @@ export async function exportSnapshotToBytes(
         if (height) worksheet.getRow(Number(rowKey) + 1).height = height;
       }
 
-      // 视图：冻结窗格 + 网格线显示 + 从右到左（仅在需要时才写入，避免无谓改动）
+      // View: frozen panes + gridline visibility + right-to-left (only written when needed, to avoid pointless changes)
       const freeze = sheet.freeze;
       const frozen = freeze && (freeze.xSplit > 0 || freeze.ySplit > 0) ? freeze : null;
       const wantGrid = sheet.showGridlines === 0;
       const wantRtl = sheet.rightToLeft === 1;
       if (frozen || wantGrid || wantRtl) {
-        // 用具体形状（而非 Partial<WorksheetView> 联合类型）拼接，避免展开后产生联合冲突
+        // Build a concrete shape (not the Partial<WorksheetView> union) so spreading cannot create a union conflict
         const common = {
           ...(wantGrid ? { showGridLines: false } : {}),
           ...(wantRtl ? { rightToLeft: true } : {}),
@@ -505,13 +507,13 @@ export async function exportSnapshotToBytes(
       }
     }
 
-    // Excel 要求至少保留一张可见工作表：全部隐藏时强制第一张可见
+    // Excel requires at least one visible sheet: force the first one visible when all are hidden
     if (worksheetCount > 0 && hiddenCount === worksheetCount && firstWorksheet) {
       firstWorksheet.state = 'visible';
     }
 
     const buffer = (await workbook.xlsx.writeBuffer()) as ArrayBuffer;
-    // 图表：站内图表写成 Excel 原生图表（DrawingML），导入时保留的原生图表原样回填
+    // Charts: in-app charts become native Excel charts (DrawingML); native charts kept from import are written back verbatim
     const plan = buildChartPlan(snapshot);
     const needsInjection = Object.keys(plan.chartsBySheet).length > 0 || plan.passthrough !== null;
     const bytes = needsInjection ? await injectChartsIntoXlsx(buffer, plan) : buffer;

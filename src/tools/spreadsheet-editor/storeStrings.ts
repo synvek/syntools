@@ -1,5 +1,6 @@
 /**
- * 文档库 / 版本历史 / 持久化提示文案：与 strings.ts 分离，避免为新增功能改动整份语言文件。
+ * Document library / version history / persistence notice copy: kept apart from strings.ts so adding
+ * a feature does not touch the whole locale file.
  */
 
 type ResourceTree = { tools: { sheet: Record<string, string> } };
@@ -215,7 +216,7 @@ export const storeStrings: Record<string, ResourceTree> = {
   pt,
 };
 
-/** 把文档库相关文案合并进 i18next（键路径 tools.sheet.*） */
+/** Merge the document-library copy into i18next (keys under tools.sheet.*) */
 export function registerStoreStrings(instance: Registrar): void {
   for (const [lng, resources] of Object.entries(storeStrings)) {
     instance.addResourceBundle(lng, 'translation', resources, true, true);

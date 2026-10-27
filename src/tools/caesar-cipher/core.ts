@@ -30,7 +30,7 @@ export function atbash(text: string): string {
   });
 }
 
-/** 栅栏密码（rail fence）：rails ≥ 2 */
+/** Rail fence cipher: rails ≥ 2 */
 export function railFence(text: string, rails: number): ToolResult<string> {
   if (rails < 2) return { ok: false, error: 'RAILS_TOO_SMALL' };
   const n = text.length;

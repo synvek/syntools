@@ -1,6 +1,6 @@
-/* 脑图编辑器自定义样式（依赖 @xyflow/react/dist/style.css，于 MindmapTool 引入） */
+/* Mind map editor styles (depends on @xyflow/react/dist/style.css, imported in MindmapTool) */
 
-/* 隐藏自定义节点的默认外观，让自绘容器填满节点盒 */
+/* Strip the default node chrome so the custom container fills the node box */
 .react-flow__node-mind {
   padding: 0;
   border: none;
@@ -13,24 +13,24 @@
   box-shadow: none;
 }
 
-/* 节点位置变化（新增/删除后重排）时平滑过渡 */
+/* Smooth transitions when nodes move (re-layout after add/remove) */
 .react-flow__node-mind {
   transition: transform 150ms ease;
 }
 
-/* 拖拽中的节点：禁用过渡，跟手 */
+/* Dragged node: disable transitions so it tracks the pointer */
 .react-flow__node.dragging .react-flow__node-mind {
   transition: none;
 }
 
-/* 分支连线 */
+/* Branch edges */
 .mind-edge {
   transition:
     stroke 150ms ease,
     stroke-width 150ms ease;
 }
 
-/* 折叠徽标 / 快速添加按钮 */
+/* Collapse badge / quick-add button */
 .mind-badge,
 .mind-add {
   cursor: pointer;
@@ -45,7 +45,7 @@
   transform: scale(1.18);
 }
 
-/* 画布上手型：节点可拖拽 */
+/* Grab cursor on the canvas: nodes are draggable */
 .react-flow__node-mind .mind-node {
   cursor: grab;
 }

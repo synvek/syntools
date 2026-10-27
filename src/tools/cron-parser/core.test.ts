@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeCron, MAX_COUNT, MIN_COUNT } from './core';
 
-/** 固定基准时间保证确定性（本地时区解析，断言均为相对量） */
+/** A fixed reference time keeps results deterministic (parsed in local time; assertions are relative) */
 const NOW = new Date('2024-01-01T10:03:00');
 
 const ok = (expression: string, count?: number) => {
@@ -25,7 +25,7 @@ describe('analyzeCron', () => {
     expect(value.fields[0].raw).toBe('0,30');
     expect(value.fields[1].raw).toBe('8-18');
     expect(value.fields[4].raw).toBe('1-5');
-    // 首次执行应在 8:00 之后（当前 10:03 落在窗口内）
+    // The first run must be after 8:00 (the current 10:03 falls inside the window)
     expect(value.next[0].getHours()).toBeGreaterThanOrEqual(8);
     expect(value.next[0].getHours()).toBeLessThanOrEqual(18);
   });
@@ -69,6 +69,6 @@ describe('analyzeCron', () => {
   it('count 钳制在 1-20', () => {
     expect(ok('* * * * *', 0)!.next).toHaveLength(MIN_COUNT);
     expect(ok('* * * * *', 999)!.next).toHaveLength(MAX_COUNT);
-    expect(ok('* * * * *')!.next).toHaveLength(5); // 默认 5
+    expect(ok('* * * * *')!.next).toHaveLength(5); // 5 by default
   });
 });

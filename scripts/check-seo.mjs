@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * 线上 SEO / 可达性自检（部署后跑一次）。
+ * Live SEO / reachability self-check (run once after deploying).
  *
  *   pnpm check:seo
  *   SITE_URL=https://staging.example.com pnpm check:seo
  *
- * 覆盖的是「部署后最容易被悄悄弄坏、而且坏了不会报错」的那几项：
- * robots.txt 是否被托管商改写、sitemap 主机是否一致、深链是否仍返回
- * 预渲染正文、canonical 是否唯一、og:image 是否真的取得到、
- * apex 是否 301 到主域且**保留了路径**。
+ * It covers the things that break silently after a deploy without raising errors:
+ * whether robots.txt was rewritten by the host, whether the sitemap host matches,
+ * whether deep links still return prerendered content, whether canonical is unique,
+ * whether og:image really resolves, and whether the apex 301s to the main domain
+ * **keeping the path**.
  *
- * 退出码：全部通过为 0，有失败为 1（可直接接进 CI）。
+ * Exit code: 0 when everything passes, 1 on failures (usable directly in CI).
  */
 import process from 'node:process';
 
@@ -29,7 +30,7 @@ async function get(url, { redirect = 'follow' } = {}) {
   const res = await fetch(url, {
     redirect,
     headers: {
-      // 部分 CDN 对无 UA 的请求会返回 403，伪装成普通浏览器
+      // Some CDNs return 403 for requests without a UA, so pretend to be a regular browser
       'user-agent':
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       'accept-language': 'zh-CN,zh;q=0.9',
@@ -40,73 +41,73 @@ async function get(url, { redirect = 'follow' } = {}) {
   return { status: res.status, headers: res.headers, body };
 }
 
-/** 包一层，把网络异常也变成一条可读的失败项，而不是让脚本崩掉 */
+/** Wraps a check so network errors become a readable failure instead of crashing the script */
 async function check(name, fn) {
   try {
     await fn();
   } catch (err) {
-    // fetch 的失败原因藏在 cause 里，直接打 err.message 只会看到 "fetch failed"
+    // fetch hides the real cause in `cause`; printing err.message only shows "fetch failed"
     const code = err.cause?.code || err.code;
     const hint =
       code === 'ENOTFOUND' || code === 'EAI_AGAIN'
-        ? 'DNS 解析失败（可能是本机 DNS 缓存，或该域名尚未配置解析）'
+        ? 'DNS resolution failed (local DNS cache, or the domain has no record yet)'
         : code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT'
-          ? '连接超时'
+          ? 'connection timed out'
           : err.message;
-    record(name, false, `请求失败：${hint}${code ? `［${code}］` : ''}`);
+    record(name, false, `request failed: ${hint}${code ? ` [${code}]` : ''}`);
   }
 }
 
 async function main() {
   const stamp = `?cb=${Date.now()}`;
 
-  // 1. robots.txt —— 托管商（Cloudflare 等）可能注入自己的内容
-  await check('robots.txt 可访问且未被托管商注入', async () => {
+  // 1. robots.txt — hosts (Cloudflare etc.) may inject their own content
+  await check('robots.txt reachable and not injected by the host', async () => {
     const { status, body } = await get(`${SITE}/robots.txt${stamp}`);
     const disallow = (body.match(/^\s*disallow\s*:/gim) || []).length;
     const injected = /BEGIN\s+Cloudflare\s+Managed/i.test(body);
     const ok = status === 200 && disallow === 0 && !injected;
     record(
-      'robots.txt 可访问且未被托管商注入',
+      'robots.txt reachable and not injected by the host',
       ok,
-      `HTTP ${status}｜Disallow ${disallow} 条｜注入块 ${injected ? '存在' : '无'}`,
+      `HTTP ${status} | Disallow rules ${disallow} | injected block ${injected ? 'present' : 'none'}`,
     );
   });
 
-  // 2. robots.txt 里必须声明 sitemap，否则只能靠手动提交
-  await check('robots.txt 声明 Sitemap', async () => {
+  // 2. robots.txt must declare the sitemap, otherwise only manual submission works
+  await check('robots.txt declares a Sitemap', async () => {
     const { body } = await get(`${SITE}/robots.txt${stamp}`);
     const m = body.match(/^\s*sitemap\s*:\s*(\S+)/im);
-    record('robots.txt 声明 Sitemap', Boolean(m), m ? m[1] : '缺少 Sitemap 行');
+    record('robots.txt declares a Sitemap', Boolean(m), m ? m[1] : 'Sitemap line missing');
   });
 
-  // 3. sitemap 主机一致性 —— 写错主机会让 GSC 报「属于其他主机」
-  await check('sitemap 可访问且主机一致', async () => {
+  // 3. Sitemap host consistency — a wrong host makes GSC report "belongs to another host"
+  await check('sitemap reachable and host matches', async () => {
     const { status, body } = await get(`${SITE}/sitemap.xml${stamp}`);
     const locs = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
     const foreign = locs.filter((u) => !u.startsWith(`${SITE}/`) && u !== SITE);
     const ok = status === 200 && locs.length > 0 && foreign.length === 0;
     record(
-      'sitemap 可访问且主机一致',
+      'sitemap reachable and host matches',
       ok,
-      `HTTP ${status}｜${locs.length} 条｜非本站主机 ${foreign.length} 条${foreign[0] ? `（如 ${foreign[0]}）` : ''}`,
+      `HTTP ${status} | ${locs.length} entries | foreign hosts ${foreign.length}${foreign[0] ? ` (e.g. ${foreign[0]})` : ''}`,
     );
   });
 
-  // 4. 首页有预渲染正文（不是空 #root）
-  await check('首页含静态正文与 canonical', async () => {
+  // 4. The home page has prerendered content (not an empty #root)
+  await check('home page has static content and canonical', async () => {
     const { status, body } = await get(`${SITE}/${stamp}`);
     const hasH1 = /<h1[\s>]/i.test(body);
     const hasCanonical = /rel="canonical"/i.test(body);
     record(
-      '首页含静态正文与 canonical',
+      'home page has static content and canonical',
       status === 200 && hasH1 && hasCanonical,
-      `HTTP ${status}｜h1 ${hasH1 ? '有' : '无'}｜canonical ${hasCanonical ? '有' : '无'}`,
+      `HTTP ${status} | h1 ${hasH1 ? 'yes' : 'no'} | canonical ${hasCanonical ? 'yes' : 'no'}`,
     );
   });
 
-  // 5. 工具深链：正文 + canonical + og:image + 无 noindex
-  await check('工具页深链完整', async () => {
+  // 5. Tool deep link: content + canonical + og:image + no noindex
+  await check('tool page deep link is complete', async () => {
     const { status, body } = await get(`${SITE}/${SAMPLE_TOOL}${stamp}`);
     const hasH1 = /<h1[\s>]/i.test(body);
     const canonical = body.match(/rel="canonical"\s+href="([^"]+)"/i)?.[1];
@@ -114,84 +115,84 @@ async function main() {
     const noindex = /content="[^"]*noindex/i.test(body);
     const canonicalOk = canonical === `${SITE}/${SAMPLE_TOOL}`;
     record(
-      `工具页深链完整（/${SAMPLE_TOOL}）`,
+      `tool page deep link is complete (/${SAMPLE_TOOL})`,
       status === 200 && hasH1 && canonicalOk && Boolean(ogImage) && !noindex,
-      `HTTP ${status}｜h1 ${hasH1 ? '有' : '无'}｜canonical ${canonicalOk ? '正确' : `异常(${canonical})`}｜og:image ${ogImage ? '有' : '无'}｜noindex ${noindex ? '有' : '无'}`,
+      `HTTP ${status} | h1 ${hasH1 ? 'yes' : 'no'} | canonical ${canonicalOk ? 'ok' : `bad (${canonical})`} | og:image ${ogImage ? 'yes' : 'no'} | noindex ${noindex ? 'yes' : 'no'}`,
     );
 
-    // 6. og:image 必须真的能取到，否则分享卡片是空白
+    // 6. og:image must really resolve, otherwise share cards render blank
     if (ogImage) {
       const img = await get(ogImage);
       const type = img.headers.get('content-type') || '';
       record(
-        'og:image 可访问',
+        'og:image reachable',
         img.status === 200 && type.startsWith('image/'),
-        `HTTP ${img.status}｜${type}`,
+        `HTTP ${img.status} | ${type}`,
       );
     } else {
-      record('og:image 可访问', false, '页面未声明 og:image');
+      record('og:image reachable', false, 'the page declares no og:image');
     }
   });
 
-  // 7. 下载页（桌面端收入入口）
-  await check('下载页可访问', async () => {
+  // 7. Download page (the entry point for desktop revenue)
+  await check('download page reachable', async () => {
     const { status, body } = await get(`${SITE}/download/${stamp}`);
     record(
-      '下载页可访问',
+      'download page reachable',
       status === 200 && /<h1[\s>]/i.test(body),
-      `HTTP ${status}｜h1 ${/<h1[\s>]/i.test(body) ? '有' : '无'}`,
+      `HTTP ${status} | h1 ${/<h1[\s>]/i.test(body) ? 'yes' : 'no'}`,
     );
   });
 
-  // 8. apex 首页 301 到主域
-  await check('apex 301 到主域', async () => {
+  // 8. Apex home 301s to the main domain
+  await check('apex 301s to the main domain', async () => {
     const { status, headers } = await get(`${APEX}/${stamp}`, { redirect: 'manual' });
     const loc = headers.get('location') || '';
     record(
-      'apex 301 到主域',
+      'apex 301s to the main domain',
       status === 301 && loc.replace(/\?.*$/, '') === `${SITE}/`,
-      `HTTP ${status}｜location ${loc}`,
+      `HTTP ${status} | location ${loc}`,
     );
   });
 
-  // 9. apex 深链必须保留路径与查询串 —— 丢了就等于把权重全堆到首页
-  await check('apex 深链保留路径与参数', async () => {
+  // 9. Apex deep links must keep path and query — losing them funnels all authority to the home page
+  await check('apex deep link keeps path and query', async () => {
     const path = '/tools/json-format/?a=1&b=2';
     const { status, headers } = await get(`${APEX}${path}`, { redirect: 'manual' });
     const loc = headers.get('location') || '';
     const expect = `${SITE}/tools/json-format/?a=1&b=2`;
     record(
-      'apex 深链保留路径与参数',
+      'apex deep link keeps path and query',
       status === 301 && loc === expect,
-      `HTTP ${status}｜期望 ${expect}｜实际 ${loc}`,
+      `HTTP ${status} | expected ${expect} | actual ${loc}`,
     );
   });
 
-  // 10. http 必须一跳直达 https 主域，不能中间再跳一次
-  await check('http 一跳直达 https 主域', async () => {
+  // 10. http must reach the https main domain in one hop, with no intermediate redirect
+  await check('http reaches the https main domain in one hop', async () => {
     const httpApex = APEX.replace(/^https:/, 'http:');
     const { status, headers } = await get(`${httpApex}/tools/base64/`, { redirect: 'manual' });
     const loc = headers.get('location') || '';
     const ok = status === 301 && loc === `${SITE}/tools/base64/`;
-    record('http 一跳直达 https 主域', ok, `HTTP ${status}｜location ${loc}`);
+    record('http reaches the https main domain in one hop', ok, `HTTP ${status} | location ${loc}`);
   });
 
-  // 11. 两棵语言树都在，且各自的 <html lang> 与目录一致
-  await check('双语树齐备且 lang 正确', async () => {
+  // 11. Both language trees exist and each <html lang> matches its directory
+  await check('both language trees exist with correct lang', async () => {
     const en = await get(`${SITE}/${stamp}`);
     const zh = await get(`${SITE}/zh/${stamp}`);
     const enLang = en.body.match(/<html[^>]*\blang="([^"]+)"/i)?.[1] || '';
     const zhLang = zh.body.match(/<html[^>]*\blang="([^"]+)"/i)?.[1] || '';
     const ok = en.status === 200 && zh.status === 200 && enLang === 'en' && zhLang === 'zh-CN';
     record(
-      '双语树齐备且 lang 正确',
+      'both language trees exist with correct lang',
       ok,
-      `/${en.status} lang=${enLang}｜/zh/ ${zh.status} lang=${zhLang}`,
+      `/${en.status} lang=${enLang} | /zh/ ${zh.status} lang=${zhLang}`,
     );
   });
 
-  // 12. hreflang 三向互指 —— 少一条 Google 就可能把两棵树当重复内容只留一棵
-  await check('hreflang 三向互指', async () => {
+  // 12. Three-way hreflang — with one missing, Google may treat the trees as duplicates and keep one
+  await check('hreflang links all three ways', async () => {
     const { body } = await get(`${SITE}/${stamp}`);
     const alts = [...body.matchAll(/<link[^>]+hreflang="([^"]+)"[^>]+href="([^"]+)"/gi)].map(
       (m) => [m[1], m[2]],
@@ -203,49 +204,49 @@ async function main() {
       norm(map['zh-CN']) === norm(`${SITE}/zh`) &&
       norm(map['x-default']) === norm(SITE);
     record(
-      'hreflang 三向互指',
+      'hreflang links all three ways',
       ok,
-      `en=${map.en || '缺'}｜zh-CN=${map['zh-CN'] || '缺'}｜x-default=${map['x-default'] || '缺'}`,
+      `en=${map.en || 'missing'} | zh-CN=${map['zh-CN'] || 'missing'} | x-default=${map['x-default'] || 'missing'}`,
     );
   });
 
-  // 13. 中文工具页有自己的标题，不是英文页的副本
-  await check('中文工具页标题独立', async () => {
+  // 13. The Chinese tool page has its own title, not a copy of the English page
+  await check('Chinese tool page has its own title', async () => {
     const zh = await get(`${SITE}/zh/${SAMPLE_TOOL}${stamp}`);
     const en = await get(`${SITE}/${SAMPLE_TOOL}${stamp}`);
     const zhTitle = zh.body.match(/<title>([^<]*)<\/title>/i)?.[1] || '';
     const enTitle = en.body.match(/<title>([^<]*)<\/title>/i)?.[1] || '';
     const hasCjk = /[\u4e00-\u9fa5]/.test(zhTitle);
     record(
-      '中文工具页标题独立',
+      'Chinese tool page has its own title',
       zh.status === 200 && hasCjk && zhTitle !== enTitle,
-      `/zh/ ${zh.status}｜zh「${zhTitle}」｜en「${enTitle}」`,
+      `/zh/ ${zh.status} | zh "${zhTitle}" | en "${enTitle}"`,
     );
   });
 
-  // 14. sitemap 带 hreflang alternates，且两条树都在里面
-  await check('sitemap 含语言 alternates', async () => {
+  // 14. The sitemap carries hreflang alternates and includes both trees
+  await check('sitemap has language alternates', async () => {
     const { body } = await get(`${SITE}/sitemap.xml${stamp}`);
     const hasNs = /xmlns:xhtml=/.test(body);
     const altCount = (body.match(/<xhtml:link[^>]+hreflang=/g) || []).length;
     const hasZh = /<loc>[^<]*\/zh\/<\/loc>/.test(body);
     const ok = hasNs && altCount > 0 && hasZh;
     record(
-      'sitemap 含语言 alternates',
+      'sitemap has language alternates',
       ok,
-      `xhtml 命名空间 ${hasNs ? '有' : '无'}｜alternate ${altCount} 条｜/zh/ 条目 ${hasZh ? '有' : '无'}`,
+      `xhtml namespace ${hasNs ? 'yes' : 'no'} | alternates ${altCount} | /zh/ entries ${hasZh ? 'yes' : 'no'}`,
     );
   });
 
-  // ---- 输出 ----
+  // ---- Output ----
   const pad = Math.max(...results.map((r) => r.name.length)) + 2;
   let failed = 0;
-  console.log(`\n站点：${SITE}    apex：${APEX}\n`);
+  console.log(`\nSite: ${SITE}    apex: ${APEX}\n`);
   for (const r of results) {
     if (!r.ok) failed += 1;
     console.log(`${r.ok ? '✓' : '✗'} ${r.name.padEnd(pad)}${r.detail}`);
   }
-  console.log(`\n${results.length - failed}/${results.length} 通过\n`);
+  console.log(`\n${results.length - failed}/${results.length} passed\n`);
   process.exit(failed ? 1 : 0);
 }
 

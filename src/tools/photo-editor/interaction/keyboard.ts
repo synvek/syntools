@@ -2,11 +2,11 @@ import type { ToolId } from '../model/types';
 import { usePhotoStore } from '../store';
 
 /**
- * 快捷键：与桌面端修图软件对齐。
- * 焦点在输入框 / textarea 内时全部让行，避免抢走文字编辑的按键。
+ * Shortcuts: aligned with desktop photo editors.
+ * Everything yields while focus is in an input / textarea, so typing keeps its keys.
  */
 
-/** 单键工具快捷键（Shift 组合见 `RETOUCH_CYCLE` 与 keydown 中的 fill 分支） */
+/** Single-key tool shortcuts (Shift combos live in `RETOUCH_CYCLE` and the fill branch of keydown) */
 export const TOOL_SHORTCUTS: Record<string, ToolId> = {
   v: 'move',
   m: 'rectSelect',
@@ -27,25 +27,25 @@ export const TOOL_SHORTCUTS: Record<string, ToolId> = {
   h: 'hand',
 };
 
-/** ⇧O 在同族工具间循环（与工具箱角标 ⇧O 一致） */
+/** ⇧O cycles within a tool family (matching the ⇧O badge in the toolbox) */
 export const RETOUCH_CYCLE: ToolId[] = ['dodge', 'burn', 'sponge'];
 
-/** ⇧L 在套索家族里循环：手绘 → 多边形 → 磁性 */
+/** ⇧L cycles the lasso family: freehand → polygon → magnetic */
 export const LASSO_CYCLE: ToolId[] = ['lasso', 'polyLasso', 'magneticLasso'];
 
 export interface KeyboardHooks {
   onExport: () => void;
-  /** 适应窗口（⌘0） */
+  /** Fit to window (⌘0) */
   onFit: () => void;
-  /** 100%（⌘1） */
+  /** 100% (⌘1) */
   onActual: () => void;
-  /** 打开快捷键一览（F1 / ?） */
+  /** Open the shortcut sheet (F1 / ?) */
   onShortcuts: () => void;
-  /** 拷贝到系统剪贴板（⇧⌘C） */
+  /** Copy to the system clipboard (⇧⌘C) */
   onCopySystem: () => void;
   /**
-   * 从系统剪贴板粘贴（⇧⌘V，以及 ⌘V 的首选路径）。
-   * 返回 true 表示系统剪贴板里确实有图像并已处理 —— 此时不再执行内部图层粘贴。
+   * Paste from the system clipboard (⇧⌘V, and the preferred path for ⌘V).
+   * Returning true means the system clipboard had an image and it was handled, so skip the internal paste.
    */
   onPasteSystem: () => Promise<boolean>;
 }
@@ -70,7 +70,7 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
       return;
     }
     if (meta && key === 'c' && event.shiftKey) {
-      // 拷贝到系统剪贴板：可与 Photoshop / Photopea 直接互贴
+      // Copy to the system clipboard: pastes straight into and out of Photoshop / Photopea
       event.preventDefault();
       hooks.onCopySystem();
       return;
@@ -82,12 +82,12 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
     if (meta && key === 'v') {
       event.preventDefault();
       if (event.shiftKey) {
-        // ⇧⌘V：只走系统剪贴板
+        // ⇧⌘V: system clipboard only
         void hooks.onPasteSystem();
         return;
       }
-      // ⌘V 优先系统剪贴板（外部复制来的图片直接落成新图层）；
-      // 读不到再回退到内部图层剪贴板，保证既有的图层复制粘贴手感不变。
+      // ⌘V prefers the system clipboard (an externally copied image becomes a new layer);
+      // if that fails it falls back to the internal layer clipboard, keeping the old copy/paste behavior.
       void hooks.onPasteSystem().then((handled) => {
         if (!handled) usePhotoStore.getState().pasteLayer();
       });
@@ -99,7 +99,7 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
       return;
     }
     if (meta && key === 'j') {
-      // 通过拷贝新建图层
+      // New layer via copy
       event.preventDefault();
       state.copySelectionToLayer();
       return;
@@ -131,27 +131,27 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
       return;
     }
     if (meta && key === 't' && event.shiftKey) {
-      // ⇧⌘T：再次变换（重复上一次的平移 / 缩放 / 旋转）
+      // ⇧⌘T: transform again (repeat the last translate / scale / rotate)
       event.preventDefault();
       state.repeatTransform();
       return;
     }
     if (meta && key === 't') {
-      // 自由变换（Ctrl/⌘ + T）：进入变换工具，选中图层后即可拖拽手柄
+      // Free transform (Ctrl/⌘ + T): switch to the transform tool and drag the selected layer's handles
       event.preventDefault();
       state.setTool('transform');
       return;
     }
     if ((key === 'enter' || key === 'escape') && state.tool === 'transform') {
       event.preventDefault();
-      // Enter = 确认并退出；Esc = 撤销本次变换并退出
+      // Enter = commit and exit; Esc = discard this transform and exit
       if (key === 'escape') state.undo();
       state.setTool('move');
       return;
     }
     if (key === 'delete' || key === 'backspace') {
       event.preventDefault();
-      // 有选区时「删除」清除选区内容（与右键菜单一致），否则删除当前图层
+      // With a selection, "delete" clears its content (as in the context menu); otherwise it deletes the layer
       if (state.selection) state.fillSelectionArea('clear');
       else if (state.doc.activeLayerId) state.removeLayer(state.doc.activeLayerId);
       return;
@@ -172,31 +172,31 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
       return;
     }
     if (!meta && key === 'x') {
-      // 前景 / 背景色互换
+      // Swap foreground / background color
       event.preventDefault();
       state.swapColors();
       return;
     }
     if (!meta && key === 'd') {
-      // 复位为黑前景 / 白背景
+      // Reset to black foreground / white background
       event.preventDefault();
       state.resetColors();
       return;
     }
     if (!meta && key === 'q') {
-      // 快速蒙版开关（与 PS 一致）
+      // Toggle quick mask (same as PS)
       event.preventDefault();
       state.toggleQuickMask();
       return;
     }
     if (event.key === 'Escape' && state.quickMask) {
-      // 蒙版模式下 Esc 先退出蒙版（把涂改结果转成选区），而不是走「取消选区」的默认行为
+      // In mask mode Esc exits the mask first (converting edits to a selection), not the default deselect
       event.preventDefault();
       state.exitQuickMask();
       return;
     }
 
-    // Shift + 字母：工具族内的次级工具（对齐 PS 的分组切换惯例）
+    // Shift + letter: secondary tools within a family (following PS's group-cycling convention)
     if (!meta && event.shiftKey) {
       if (key === 'g') {
         state.setTool('fill');
@@ -207,12 +207,12 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
         return;
       }
       if (key === 'r') {
-        // ⇧R：在模糊 / 锐化之间循环（与工具箱角标一致）
+        // ⇧R: cycle blur / sharpen (matching the toolbox badge)
         state.setTool(state.tool === 'blurBrush' ? 'sharpenBrush' : 'blurBrush');
         return;
       }
       if (key === 'i') {
-        // ⇧I：吸管 ↔ 颜色取样器（与工具箱角标一致）
+        // ⇧I: eyedropper ↔ color sampler (matching the toolbox badge)
         state.setTool(state.tool === 'sampler' ? 'eyedropper' : 'sampler');
         return;
       }
@@ -222,7 +222,7 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
         return;
       }
       if (key === 'l') {
-        // ⇧L：手绘 → 多边形 → 磁性
+        // ⇧L: freehand → polygon → magnetic
         const index = LASSO_CYCLE.indexOf(state.tool as ToolId);
         state.setTool(LASSO_CYCLE[(index + 1) % LASSO_CYCLE.length]);
         return;
@@ -235,7 +235,7 @@ export function attachKeyboard(hooks: KeyboardHooks): () => void {
   const onKeyUp = (event: KeyboardEvent) => {
     if (event.code !== 'Space') return;
     const state = usePhotoStore.getState();
-    // 空格临时抓手：松手回到移动工具
+    // Space temporarily pans; releasing returns to the move tool
     if (state.tool === 'hand') state.setTool('move');
   };
 

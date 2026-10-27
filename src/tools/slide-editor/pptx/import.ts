@@ -55,7 +55,7 @@ import {
   type XmlNode,
 } from './xml';
 
-/** PPTX 导入：OPC 解包 → DrawingML 解析 → SlideDoc（不支持的元素降级为占位框） */
+/** PPTX import: OPC unpacking → DrawingML parsing → SlideDoc (unsupported elements degrade to placeholder boxes) */
 
 export const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
 
@@ -86,7 +86,7 @@ export function checkImportFile(file: { name: string; size: number }): ToolResul
   return { ok: true, value: undefined };
 }
 
-/** 占位符几何（页面坐标 px） */
+/** Placeholder geometry (page coordinates, px) */
 type Rect = { x: number; y: number; width: number; height: number };
 
 interface ImportContext {
@@ -96,7 +96,7 @@ interface ImportContext {
   seq: number;
   placeholders: number;
   skipped: Set<string>;
-  /** 当前 layout（含 master 兜底）的占位符几何，供 slide 上缺失 xfrm 的占位元素继承 */
+  /** Placeholder geometry of the current layout (master included as fallback), inherited by slide placeholders without an xfrm */
   layoutPlaceholders: Map<string, Rect>;
 }
 
@@ -105,7 +105,7 @@ function nextId(ctx: ImportContext, prefix: string): string {
   return `${prefix}_${ctx.seq}`;
 }
 
-/** '+mj-lt' 之类的主题引用 → 真实字体名 */
+/** Theme reference such as '+mj-lt' → real font name */
 function resolveTypeface(raw: string | undefined, theme: SlideTheme): string | undefined {
   if (!raw) return undefined;
   const map: Record<string, string | undefined> = {
@@ -158,7 +158,7 @@ const ANCHOR_MAP: Record<string, VAlign> = {
   b: 'bottom',
 };
 
-/** p:txBody → TextBody；无可见文本时返回 undefined */
+/** p:txBody → TextBody; returns undefined when there is no visible text */
 function parseTextBody(
   node: XmlNode | undefined,
   palette: Palette,
@@ -175,8 +175,8 @@ function parseTextBody(
         const text = textOf(childOf(item, 't'));
         runs.push({ text, style: parseRunStyle(childOf(item, 'rPr'), palette, theme) });
       } else if (kind === 'fld') {
-        // 字段（页码 / 日期 / 幻灯片编号）：结构与 a:r 一致（rPr + t），
-        // 此前被整段忽略，导致「第 X 页」这类内容凭空消失
+        // Field (slide number / date / slide index): structured like a:r (rPr + t),
+        // previously skipped wholesale, so content like "slide X" silently disappeared
         const text = textOf(childOf(item, 't'));
         runs.push({ text, style: parseRunStyle(childOf(item, 'rPr'), palette, theme) });
       } else if (kind === 'br') {
@@ -190,7 +190,7 @@ function parseTextBody(
       runs: runs.length > 0 ? runs : [{ text: '' }],
       align: ALIGN_MAP[attr(pPr, 'algn') ?? ''] ?? 'left',
       bullet: Boolean(childOf(pPr, 'buChar')),
-      // buAutoNum 是「自动编号」，此前被误当作项目符号，导致 1./2. 变成 •
+      // buAutoNum is "auto numbering"; it used to be treated as a bullet, turning 1./2. into •
       numbering: Boolean(childOf(pPr, 'buAutoNum')),
       lineSpacing: lineSpacingPct ? lineSpacingPct / 1000 : undefined,
       spaceBefore: spaceBef === undefined ? undefined : (spaceBef / 100) * (96 / 72),
@@ -267,7 +267,7 @@ function parseShape(
   const ph = childOf(childOf(nvSpPr, 'nvPr'), 'ph');
   const placeholder = ph ? { kind: attr(ph, 'type') ?? 'body', index: attr(ph, 'idx') } : undefined;
 
-  // 无自建几何时沿用 baseRect 的 0 尺寸，稍后由 mergeInheritedGeometry 从 layout 继承
+  // Without its own geometry, keep baseRect's zero size; mergeInheritedGeometry fills it from the layout later
   const base = {
     id: nextId(ctx, 'el'),
     ...baseRect(xfrm),
@@ -378,7 +378,7 @@ function parseConnector(
   return element;
 }
 
-/** a:tbl → TableElement 的单元格部分 */
+/** a:tbl → the cell part of a TableElement */
 function parseTableCells(node: XmlNode, palette: Palette, theme: SlideTheme): TableCell[][] {
   const rows: TableCell[][] = [];
   for (const trNode of childrenNamed(node, 'tr')) {
@@ -399,7 +399,7 @@ function parseTableCells(node: XmlNode, palette: Palette, theme: SlideTheme): Ta
         valign: ANCHOR_MAP[attr(tcPr, 'anchor') ?? ''] ?? 'middle',
         colSpan: numAttr(tcNode, 'gridSpan'),
         rowSpan: numAttr(tcNode, 'rowSpan'),
-        // hMerge / vMerge 表示该格被左上方的合并单元格覆盖，不参与绘制
+        // hMerge / vMerge mark this cell as covered by the top-left merged cell, so it isn't painted
         ...(boolAttr(tcNode, 'hMerge') || boolAttr(tcNode, 'vMerge')
           ? {
               covered: true,
@@ -420,7 +420,7 @@ function parseTable(
   palette: Palette,
   theme: SlideTheme,
 ): SlideElement {
-  // 列宽定义在 a:tblGrid 下；少数第三方生成的文件会省略 tblGrid，故兼容直接子节点
+  // Column widths live under a:tblGrid; a few third-party generators omit tblGrid, so accept direct children too
   const gridNode = childOf(node, 'tblGrid') ?? node;
   const cols = childrenNamed(gridNode, 'gridCol');
   const tblPr = childOf(node, 'tblPr');
@@ -440,7 +440,7 @@ function parseTable(
     rows,
     colWidths: colWidths.length > 0 ? colWidths : (rows[0]?.map(() => 100) ?? []),
     rowHeights: rowHeights.length > 0 ? rowHeights : rows.map(() => 32),
-    // a:tblPr 的 firstRow / bandRow 决定表头与斑马纹，此前被丢弃导致导入后样式变化
+    // firstRow / bandRow on a:tblPr decide header and banding; they used to be dropped, changing the look after import
     headerRow: tblPr ? boolAttr(tblPr, 'firstRow') : true,
     bandRow: tblPr ? boolAttr(tblPr, 'bandRow') : false,
     borderColor: '#BFBFBF',
@@ -470,10 +470,10 @@ async function ensureMedia(
 }
 
 /**
- * 降级为占位框。
+ * degrade to a placeholder box.
  *
- * 必须带上原始几何：此前固定 240×160 @(0,0)，导致图表 / SmartArt / OLE 全部
- * 堆叠在页面左上角，用户完全看不出原文档的版面结构。
+ * Must carry the original geometry: it used to be fixed at 240×160 @(0,0), so charts / SmartArt / OLE all
+ * piled up in the top-left corner and users couldn't make out the original layout at all.
  */
 function noteUnsupported(
   ctx: ImportContext,
@@ -497,9 +497,9 @@ function noteUnsupported(
   };
 }
 
-/* ------------------------------- 图表 ------------------------------- */
+/* ------------------------------- Charts ------------------------------- */
 
-/** c:chart 的 plotArea 下第一个图表类型节点 → ChartType */
+/** First chart-type node under c:chart's plotArea → ChartType */
 function chartTypeOf(plotArea: XmlNode | undefined): ChartType {
   const kinds: { tag: string; type: ChartType }[] = [
     { tag: 'barChart', type: 'bar' },
@@ -523,18 +523,18 @@ function chartTypeOf(plotArea: XmlNode | undefined): ChartType {
   return 'bar';
 }
 
-/** c:pt 的值：c:pt 本身只有 idx 属性，真实内容在子节点的 c:v 里 */
+/** Value of c:pt: c:pt only has an idx attribute, the real content sits in the child c:v */
 function pointValueOf(pt: XmlNode | undefined): string | undefined {
   if (!pt) return undefined;
   return textOf(childOf(pt, 'v'));
 }
 
 /**
- * 收集缓存里的 c:pt 节点。
+ * Collect the c:pt nodes from a cache.
  *
- * 类别轴有两种写法：单级 `c:strCache/c:pt`，以及 pptxgenjs / PowerPoint 常用的
- * 多级 `c:multiLvlStrCache/c:lvl/c:pt`。这里向下找第一层有 pt 的位置，
- * 对两种写法都成立。
+ * Categories can be written two ways: single-level `c:strCache/c:pt`, and the multi-level
+ * `c:multiLvlStrCache/c:lvl/c:pt` used by pptxgenjs / PowerPoint. Searching downward for the first level
+ * that contains pt nodes handles both forms.
  */
 function collectPoints(node: XmlNode | undefined): XmlNode[] {
   if (!node) return [];
@@ -547,7 +547,7 @@ function collectPoints(node: XmlNode | undefined): XmlNode[] {
   return [];
 }
 
-/** c:cat → 类别文本数组（取缓存值，忽略 c:f 公式）；numRef 时也能取到数字标签 */
+/** c:cat → category labels (use cached values, ignore c:f formulas); numRef can yield numeric labels too */
 function categoryLabelsOf(seriesNode: XmlNode): string[] {
   const cat = childOf(seriesNode, 'cat');
   const points = collectPoints(cat);
@@ -558,7 +558,7 @@ function categoryLabelsOf(seriesNode: XmlNode): string[] {
   });
 }
 
-/** c:val → 数值数组 */
+/** c:val → numeric values */
 function seriesValuesOf(seriesNode: XmlNode): number[] {
   const val = childOf(seriesNode, 'val');
   return collectPoints(val).map((pt) => {
@@ -567,7 +567,7 @@ function seriesValuesOf(seriesNode: XmlNode): number[] {
   });
 }
 
-/** 系列名：优先 c:tx 的缓存文本，回落到 c:f 的引用串 */
+/** Series name: prefer the cached text in c:tx, fall back to the reference string in c:f */
 function seriesNameOf(seriesNode: XmlNode, index: number): string {
   const ref = childOf(childOf(seriesNode, 'tx'), 'strRef');
   const cache = childOf(ref, 'strCache');
@@ -578,7 +578,7 @@ function seriesNameOf(seriesNode: XmlNode, index: number): string {
   return formula && formula.trim() ? formula.trim() : `Series ${index + 1}`;
 }
 
-/** 读取 chart 部件 → ChartElement 的数据部分；解析不出数据时返回 null */
+/** Read a chart part → the data part of a ChartElement; returns null when no data can be parsed */
 async function readChartData(
   ctx: ImportContext,
   slidePart: string,
@@ -591,7 +591,7 @@ async function readChartData(
   const xml = await readTextPart(ctx.zip, partPath);
   if (!xml) return null;
   const root = parseXml(xml)[0] as XmlNode | undefined;
-  // 根节点可能是任意命名空间前缀的 chartSpace，统一剥掉前缀再取子节点
+  // The root may be a chartSpace under any namespace prefix; strip the prefix before reading children
   const chart = childOf(root, 'chart');
   const plotArea = childOf(chart, 'plotArea');
   const chartType = chartTypeOf(plotArea);
@@ -620,7 +620,7 @@ async function readChartData(
   return { chartType, categories, series };
 }
 
-/** graphicFrame：表格 → TableElement；图表 → ChartElement；SmartArt / OLE → 占位框 */
+/** graphicFrame: table → TableElement; chart → ChartElement; SmartArt / OLE → placeholder box */
 async function parseGraphicFrame(
   node: XmlNode,
   ctx: ImportContext,
@@ -643,8 +643,8 @@ async function parseGraphicFrame(
     return { ...table, ...base };
   }
 
-  // 图表：读取关联的 chart 部件，取出类别与系列数值，在画布上重绘成可编辑图表。
-  // 只有拿不到数据（关系缺失 / 部件损坏 / 无系列）时才降级为占位框。
+  // Chart: read the linked chart part, take categories and series values, and redraw it on the canvas as an editable chart.
+  // Only fall back to a placeholder when the data is unavailable (missing rel / corrupt part / no series).
   const chartNode = childOf(graphicData, 'chart');
   const chartRId = chartNode ? (attr(chartNode, 'id') ?? attr(chartNode, 'r:id')) : undefined;
   if (chartRId) {
@@ -665,7 +665,7 @@ async function parseGraphicFrame(
     }
   }
 
-  // 占位框沿用原对象的矩形，保住版面结构
+  // The placeholder reuses the original rect to preserve the layout structure
   if (uri.includes('chart')) return noteUnsupported(ctx, 'chart', '图表', base);
   if (uri.includes('diagram')) return noteUnsupported(ctx, 'diagram', 'SmartArt', base);
   if (uri.includes('ole')) return noteUnsupported(ctx, 'ole', '嵌入对象', base);
@@ -710,10 +710,10 @@ async function parseSpTreeNode(
 }
 
 /**
- * grpSp：先解析子节点，再按 chOff/chExt 把子坐标换算到**组内相对坐标**。
+ * grpSp: parse children first, then map sub-coordinates to **group-relative coordinates** using chOff/chExt.
  *
- * 模型约定 children 相对 group 原点存储（见 `GroupElement` 注释），
- * 因此这里不再叠加 groupX/groupY —— 否则渲染时会被二次偏移。
+ * The model stores children relative to the group origin (see the `GroupElement` comment),
+ * so groupX/groupY is not added here — otherwise rendering would offset them twice.
  */
 async function parseGroup(
   node: XmlNode,
@@ -768,8 +768,8 @@ async function parseGroup(
 }
 
 /**
- * 解析演讲者备注：从幻灯片的 rels 找到 notesSlide 部件，取 body 占位符的文本。
- * 找不到（或为空）时返回 undefined，不写空备注字段。
+ * Parse speaker notes: find the notesSlide part from the slide's rels and take the body placeholder text.
+ * Returns undefined when missing (or empty), so no empty notes field is written.
  */
 async function parseNotesText(
   ctx: ImportContext,
@@ -785,7 +785,7 @@ async function parseNotesText(
   for (const sp of childrenNamed(spTree, 'sp')) {
     const ph = childOf(childOf(childOf(sp, 'nvSpPr'), 'nvPr'), 'ph');
     if (!ph) continue;
-    // 备注正文的占位符是 type="body" idx="1"；其它（页码、幻灯片缩略图）跳过
+    // The notes body placeholder is type="body" idx="1"; skip the rest (slide index, slide thumbnail)
     if (attr(ph, 'type') !== 'body' && attr(ph, 'idx') !== '1') continue;
     const body = childOf(sp, 'txBody');
     const text = childrenNamed(body, 'p')
@@ -797,7 +797,7 @@ async function parseNotesText(
   return undefined;
 }
 
-/** 解析一层 spTree（保持文档顺序即 z-order） */
+/** Parse one spTree level (document order is z-order) */
 async function parseSpTree(
   spTree: XmlNode | undefined,
   ctx: ImportContext,
@@ -816,8 +816,8 @@ async function parseSpTree(
 }
 
 /**
- * 占位符几何继承：slide 上的占位元素若没有自己的 xfrm，
- * 从 layout 同名占位符（kind + idx）补齐位置与尺寸。
+ * Placeholder geometry inheritance: when a placeholder on the slide has no xfrm of its own,
+ * fill position and size from the same-named placeholder (kind + idx) on the layout.
  */
 function mergeInheritedGeometry(
   elements: SlideElement[],
@@ -846,7 +846,7 @@ async function readXmlPart(zip: JSZip, path: string): Promise<XmlNode | undefine
   return parsed[0];
 }
 
-/** 依据 layout / master part 解析出 theme 的色板与字体方案 */
+/** Resolve the theme palette and font scheme from the layout / master part */
 async function resolveThemeChain(
   ctx: ImportContext,
   slidePart: string,
@@ -883,7 +883,7 @@ async function resolveThemeChain(
   return { theme, palette: theme.colors, layoutId, masterId };
 }
 
-/** layout part → SlideLayout（含占位符元素，用于 Gallery 与几何继承） */
+/** layout part → SlideLayout (with placeholder elements, used by the gallery and geometry inheritance) */
 async function parseLayoutPart(
   ctx: ImportContext,
   layoutPart: string,
@@ -926,10 +926,10 @@ async function parseLayoutPart(
 }
 
 /**
- * slideMaster → SlideMaster（含占位符几何）。
+ * slideMaster → SlideMaster (with placeholder geometry).
  *
- * Office 生成的文件里，layout 上的占位符通常**不带** `<p:spPr>/<a:xfrm>`，
- * 真实位置写在 master 的对应占位符上，因此必须把 master 也解析出来做几何兜底。
+ * In Office-generated files, layout placeholders usually carry **no** `<p:spPr>/<a:xfrm>`; the real
+ * position lives on the matching master placeholder, so the master must be parsed as a geometry fallback.
  */
 async function parseMasterPart(
   ctx: ImportContext,
@@ -963,7 +963,7 @@ async function parseMasterPart(
   return { master, placeholders };
 }
 
-/** 占位符几何继承合并：master 兜底 → layout 覆盖（两者都要求尺寸有效） */
+/** Merge inherited placeholder geometry: master as fallback → layout overrides (both need a valid size) */
 function mergePlaceholderRects(
   base: Map<string, Rect> | undefined,
   override: Map<string, Rect> | undefined,
@@ -978,7 +978,7 @@ function mergePlaceholderRects(
   return merged;
 }
 
-/** 主入口：pptx File → SlideDoc */
+/** Main entry: pptx File → SlideDoc */
 export async function importPptxFile(file: File): Promise<ToolResult<ImportedDeck>> {
   const check = checkImportFile(file);
   if (!check.ok) return check;
@@ -1056,7 +1056,7 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
         masterRects.set(masterParsed.master.id, masterParsed.placeholders);
       }
     }
-    // 占位符几何：master 兜底（Office 的 layout 占位符往往不带 xfrm）
+    // Placeholder geometry: master as fallback (Office layouts often omit xfrm on placeholders)
     ctx.layoutPlaceholders = mergePlaceholderRects(
       layoutId ? masterRects.get(layoutCache.get(layoutId ?? '')?.masterId ?? '') : undefined,
       layoutId ? layoutRects.get(layoutId) : undefined,
@@ -1098,5 +1098,5 @@ function findBackgroundNode(slide: XmlNode): XmlNode | undefined {
   return childrenOf(cSld).find((node) => localNameOf(node) === 'bg');
 }
 
-/** 导出字形知识供外部使用（测试/导出） */
+/** Expose internals for external use (tests/export) */
 export const __internals = { pxToEmu };

@@ -69,7 +69,7 @@ export const MIME_TYPES: MimeEntry[] = [
   { ext: '.vcf', mime: 'text/vcard', description: 'vCard contact' },
 ];
 
-/** 按扩展名、MIME 或描述过滤。 */
+/** Filter by extension, MIME type, or description. */
 export function filterMimes(query: string): MimeEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return MIME_TYPES;
@@ -83,7 +83,7 @@ export function filterMimes(query: string): MimeEntry[] {
   );
 }
 
-/** 按扩展名（可带不带点）精确查询 MIME。 */
+/** Look up the MIME type by exact extension (with or without a leading dot). */
 export function mimeForExtension(ext: string): string | null {
   const q = ext.trim().toLowerCase();
   const withDot = q.startsWith('.') ? q : `.${q}`;

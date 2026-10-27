@@ -1,14 +1,14 @@
 /**
- * 图片节点素材处理：读取本地文件为 dataURL，并等比压缩到安全尺寸。
+ * Image node asset handling: read a local file as a dataURL and downscale it proportionally to a safe size.
  *
- * 全程在浏览器内完成（FileReader + canvas），图片不会离开设备；
- * 压缩的目的主要是控制草稿体积与导出/渲染开销。
+ * Everything happens in the browser (FileReader + canvas), so the image never leaves the device;
+ * the downscale is mainly to bound draft size and export/render cost.
  */
 
 import { IMAGE_MAX_EDGE } from './types';
 
 export interface LoadedImage {
-  /** dataURL（已按需压缩） */
+  /** dataURL (downscaled when needed) */
   src: string;
   width: number;
   height: number;
@@ -33,8 +33,8 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
 }
 
 /**
- * 读取图片文件；超过最大边长时用 canvas 等比压缩。
- * 返回 null 表示文件无法解码（调用方提示导入失败）。
+ * Read an image file; downscale proportionally with canvas when it exceeds the maximum edge length.
+ * Returns null when the file cannot be decoded (callers report the import failure).
  */
 export async function loadImageFile(
   file: File,
@@ -60,13 +60,13 @@ export async function loadImageFile(
   const ctx = canvas.getContext('2d');
   if (!ctx) return { src: dataUrl, width, height };
   ctx.drawImage(img, 0, 0, targetW, targetH);
-  // PNG/SVG 保持无损与透明；其它格式（照片）用 JPEG 控制体积
+  // PNG/SVG stay lossless with transparency; other formats (photos) use JPEG to bound size
   const keepAlpha = file.type === 'image/png' || file.type === 'image/svg+xml';
   const src = keepAlpha ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.85);
   return { src, width: targetW, height: targetH };
 }
 
-/** 在给定最大宽高内等比缩放（用于把图片放进节点默认尺寸） */
+/** Scale proportionally within the given maximum width/height (for fitting an image into a node's default size) */
 export function fitInto(
   size: { width: number; height: number },
   box: { width: number; height: number },

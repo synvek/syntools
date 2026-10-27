@@ -1,12 +1,12 @@
 /**
- * 位图 / 矢量 / PDF 导出。
- * 统一走「DOM 截图」方案（html-to-image），比自绘保真度高：
- * React Flow 渲染结果就是 DOM + SVG，截图即可还原样式。
+ * Bitmap / vector / PDF export.
+ * All paths go through DOM capture (html-to-image), which is more faithful than hand-drawing:
+ * React Flow's output is just DOM + SVG, so a screenshot reproduces the styles as they are.
  *
- * 导出范围（`range`）：
- * - `selection` 仅导出选中节点；
- * - `current`   导出当前页全部节点；
- * - `all`       逐页导出（由 UI 切换页面并调用 `capturePage`），多页结果打包为 ZIP 或合并 PDF。
+ * Export range (`range`):
+ * - `selection` exports only the selected nodes;
+ * - `current`   exports every node on the current page;
+ * - `all`       exports page by page (the UI switches pages and calls `capturePage`), packing multi-page results into a ZIP or a merged PDF.
  */
 
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
@@ -18,18 +18,18 @@ import type { FlowNodeData } from '../model/types';
 
 export type RasterFormat = 'png' | 'jpeg' | 'svg' | 'pdf';
 
-/** 导出范围 */
+/** Export range */
 export type ExportRange = 'selection' | 'current' | 'all';
 
 export interface RasterExportOptions {
   format: RasterFormat;
-  /** 导出倍率，越大越清晰（也越占内存） */
+  /** Export scale factor: larger is sharper (and uses more memory) */
   scale: number;
-  /** 透明背景（jpeg 不支持透明） */
+  /** Transparent background (jpeg does not support transparency) */
   transparent: boolean;
-  /** 内容外留白 */
+  /** Padding around the content */
   padding: number;
-  /** 导出范围 */
+  /** Export range */
   range: ExportRange;
 }
 
@@ -41,15 +41,15 @@ export const DEFAULT_RASTER_OPTIONS: RasterExportOptions = {
   range: 'current',
 };
 
-/** 倍率可选值（含 1x/2x/3x 常用预设） */
+/** Selectable scale factors (including the common 1x/2x/3x presets) */
 export const SCALE_OPTIONS = [0.5, 1, 1.5, 2, 3, 4];
-/** 边距可调范围 */
+/** Adjustable margin range */
 export const PADDING_MIN = 0;
 export const PADDING_MAX = 200;
 
 const EXT: Record<RasterFormat, string> = { png: 'png', jpeg: 'jpg', svg: 'svg', pdf: 'pdf' };
 
-/** 计算导出区域：子节点坐标先转绝对，避免泳道内元素被裁掉 */
+/** Compute the export area: child coordinates are converted to absolute first so elements inside swimlanes are not cropped */
 export function exportBoundsOf(
   nodes: ReadonlyArray<Node<FlowNodeData>>,
   padding: number,
@@ -66,7 +66,7 @@ export function exportBoundsOf(
   };
 }
 
-/** 生成截图参数（供 toPng / toJpeg / toSvg 复用） */
+/** Build the capture options (reused by toPng / toJpeg / toSvg) */
 function captureOptions(
   bounds: { x: number; y: number; width: number; height: number },
   opts: RasterExportOptions,
@@ -93,8 +93,8 @@ function viewportEl(): HTMLElement | null {
 }
 
 /**
- * 把当前画布截成 dataURL（不落盘）。
- * 放映模式复用同一条 DOM 截图管线，保证与导出结果一致。
+ * Capture the current canvas as a dataURL (without writing to disk).
+ * Present mode reuses the same DOM capture pipeline so it matches the export result.
  */
 export async function captureViewportDataUrl(
   nodes: Node<FlowNodeData>[],
@@ -104,7 +104,7 @@ export async function captureViewportDataUrl(
   return captured?.dataUrl ?? null;
 }
 
-/** 已捕获的一页（dataUrl 的格式由 options.format 决定，pdf 内部使用 png） */
+/** One captured page (the dataUrl format follows options.format; PDF uses png internally) */
 export interface CapturedPage {
   name: string;
   dataUrl: string;
@@ -113,8 +113,8 @@ export interface CapturedPage {
 }
 
 /**
- * 截取「当前画布上已渲染的那一页」。
- * 多页导出时由调用方逐页切换后调用；返回 null 表示画布不存在或该页不可导出。
+ * Capture the page currently rendered on the canvas.
+ * For multi-page export the caller switches pages and calls this; null means the canvas is missing or the page is not exportable.
  */
 export async function capturePage(
   name: string,
@@ -136,7 +136,7 @@ export async function capturePage(
   }
 }
 
-/** dataURL → 二进制（ZIP 打包用） */
+/** dataURL → binary (for ZIP packing) */
 function dataUrlToUint8(dataUrl: string): Uint8Array {
   const comma = dataUrl.indexOf(',');
   const payload = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
@@ -146,15 +146,15 @@ function dataUrlToUint8(dataUrl: string): Uint8Array {
   return bytes;
 }
 
-/** 文件名安全化（页名可能含空格或斜杠） */
+/** Make a file name safe (page names may contain spaces or slashes) */
 function safeName(name: string, fallback: string): string {
   const cleaned = name.replace(/[\\/:*?"<>|]+/g, '_').trim();
   return cleaned || fallback;
 }
 
 /**
- * 单页导出（PNG / JPEG / SVG / PDF）。
- * nodes 为要导出的节点集合（传入选中节点即可实现「仅导出选中」）。
+ * Single-page export (PNG / JPEG / SVG / PDF).
+ * `nodes` is the set to export (pass the selection to export only that).
  */
 export async function exportRaster(
   nodes: Node<FlowNodeData>[],
@@ -181,8 +181,8 @@ export async function exportRaster(
 }
 
 /**
- * 多页导出：ZIP 打包（png/jpeg/svg）或合并为多页 PDF。
- * 调用方需保证每个 `dataUrl` 是在对应页处于活动状态时截取的。
+ * Multi-page export: pack into a ZIP (png/jpeg/svg) or merge into a multi-page PDF.
+ * The caller must ensure each `dataUrl` was captured while its page was active.
  */
 export async function exportRasterSet(
   pages: CapturedPage[],

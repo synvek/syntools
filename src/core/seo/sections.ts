@@ -1,11 +1,11 @@
 import type { SeoLang } from '@/core/seo/copy';
 
 /**
- * 只给**预渲染**用的正文素材：静态页的小节，以及骨架里的固定句子。
+ * Body material for **prerendering** only: static page sections and the fixed sentences in the shell.
  *
- * 这个模块不会被浏览器加载——`core/seo/meta.ts` 只引 `copy.ts`。
- * 拆开的理由很直接：无 JS 环境下 crawler 读到的正文有 25 条条目，全部塞进
- * 首屏 bundle 是在为爬虫浪费每个访客的 195 KB 预算（`pnpm size` 有硬门禁）。
+ * Never loaded in the browser — `core/seo/meta.ts` imports `copy.ts` only.
+ * The split is simple: the no-JS body crawlers read has 25 items, and bundling all of it into the
+ * first-load bundle wastes every visitor's 195 KB on crawlers (`pnpm size` is a hard gate).
  */
 
 export interface SeoSection {
@@ -13,7 +13,7 @@ export interface SeoSection {
   items: string[];
 }
 
-/** 静态页正文小节，键为语言无关路径 */
+/** Static page body sections, keyed by language-agnostic path */
 export const STATIC_PAGE_SECTIONS: Record<SeoLang, Record<string, SeoSection[]>> = {
   en: {
     '/pricing/': [
@@ -189,10 +189,10 @@ export const STATIC_PAGE_SECTIONS: Record<SeoLang, Record<string, SeoSection[]>>
 };
 
 /**
- * 预渲染正文骨架里的固定句子。
+ * Fixed sentences in the prerendered body shell.
  *
- * 同样不进运行时：它们只出现在「JS 未执行」的那一版页面里，
- * 而那正是爬虫与极慢网络下的降级视图。
+ * Also kept out of runtime: they appear only in the "JS did not run" version,
+ * which is the degraded view for crawlers and very slow connections.
  */
 export interface ShellText {
   homeH1: string;

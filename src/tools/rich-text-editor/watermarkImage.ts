@@ -1,19 +1,19 @@
 import type { WatermarkConfig } from './pageSetup';
 
 /**
- * 文字水印的光栅化：Word 的行属性不支持文字旋转，
- * 因此导出 docx 时把水印渲染为透明 PNG，作为页眉中的浮动图片（衬于文字下方），
- * 与屏幕 / 打印 / PDF 三条路径的观感保持一致。
+ * Rasterizing the text watermark: Word paragraph properties cannot rotate text,
+ * so docx export renders it as a transparent PNG placed as a floating image in the header (behind text),
+ * matching how it looks on screen, in print, and in PDF.
  */
 
 export interface WatermarkImage {
   dataUrl: string;
-  /** 逻辑尺寸（CSS px），按 px → EMU 换算写入 docx */
+  /** Logical size in CSS px, converted px → EMU when written to docx */
   width: number;
   height: number;
 }
 
-/** 光栅化倍率：水印是大幅淡色文字，2 倍足够且体积可控 */
+/** Raster scale: the watermark is large pale text, so 2x is enough and keeps the file small */
 const PIXEL_RATIO = 2;
 
 const FONT_STACK = "'PingFang SC','Microsoft YaHei',Arial,sans-serif";
@@ -38,7 +38,7 @@ export async function renderWatermarkImage(
     node.style.cssText = `width:${widthPx}px;height:${heightPx}px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;`;
     const span = document.createElement('span');
     span.textContent = watermark.text;
-    // 字号与屏幕端 clamp(28px, 5vw, 64px) 对齐：水印观感不变
+    // Font size matches the screen clamp(28px, 5vw, 64px) so the watermark looks the same
     const fontSize = Math.max(28, Math.min(Math.round(widthPx * 0.16), 96));
     span.style.cssText = `color:${watermark.color};opacity:${watermark.opacity};transform:rotate(${watermark.rotation}deg);font-family:${FONT_STACK};font-weight:700;font-size:${fontSize}px;letter-spacing:0.08em;white-space:nowrap;`;
     node.appendChild(span);
@@ -47,7 +47,7 @@ export async function renderWatermarkImage(
     const dataUrl = await toPng(node, { pixelRatio: PIXEL_RATIO, cacheBust: true });
     return { dataUrl, width: widthPx, height: heightPx };
   } catch {
-    // 渲染失败不阻断导出：缺一个水印比导出失败好
+    // A render failure must not block export: a missing watermark beats a failed export
     return null;
   } finally {
     host.remove();

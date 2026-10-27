@@ -1,26 +1,26 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 文档级能力的纯逻辑层（不依赖 DOM）：
- * - 目录生成（基于标题树 + 页码）
- * - HTML → Markdown（导出用）
- * 便于单测，View 层只负责渲染与命令。
+ * Pure logic layer for document-level features (DOM-free):
+ * - TOC generation (from the heading tree + page numbers)
+ * - HTML -> Markdown (for export)
+ * Easy to unit test; the view layer only handles rendering and commands.
  */
 
 export interface TocEntry {
   level: number;
   text: string;
-  /** 页码（1 起）；未知时为 0 */
+  /** Page number (1-based); 0 when unknown */
   page: number;
 }
 
 export interface TocResult {
   entries: TocEntry[];
-  /** 目录文本（每行 "层级\t标题\t页码"） */
+  /** TOC text (one "level\ttitle\tpage" per line) */
   text: string;
 }
 
-/** 从标题树生成目录：pageOf(level, index) 由调用方按分页结果给出页码 */
+/** Build a TOC from the heading tree: pageOf(level, index) supplies page numbers from pagination */
 export function buildTableOfContents(
   headings: { level: number; text: string }[],
   pageOf: (index: number) => number,
@@ -38,9 +38,9 @@ export function buildTableOfContents(
 }
 
 /**
- * span 内联样式中可在 Markdown 里保留的属性白名单。
- * Markdown 本身无字符级样式，这里以 GFM 允许的内联 HTML 承载，
- * 保证「可表达的信息不丢」，纯排版信息（缩进/间距/页面设置）由损耗清单提示。
+ * Whitelist of span inline-style properties preserved in Markdown.
+ * Markdown has no character-level styling, so these ride on GFM inline HTML to keep "expressible
+ * information intact"; purely typographic data (indent/spacing/page setup) is reported in the loss list.
  */
 const MARKDOWN_INLINE_STYLE_PROPS = [
   'color',
@@ -61,13 +61,13 @@ function inlineStyleAttr(el: Element): string {
     .join('; ');
 }
 
-/** HTML → Markdown：覆盖标题/强调/删除线/下划线/高亮/行内样式/列表/引用/代码/表格/分割线/链接/图片/分页符 */
+/** HTML -> Markdown: covers headings/emphasis/strikethrough/underline/highlight/inline styles/lists/quotes/code/tables/rules/links/images/page breaks */
 export function htmlToMarkdown(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const out: string[] = [];
 
   const inline = (node: Node): string => {
-    // 递归入口可能是文本节点本身（map 直接传入子节点），必须先返回其内容
+    // The recursion may start on a text node itself (map passes children directly), so return its content first
     if (node.nodeType === 3) return node.textContent ?? '';
     let text = '';
     node.childNodes.forEach((child) => {
@@ -93,7 +93,7 @@ export function htmlToMarkdown(html: string): string {
         case 'strike':
           text += `~~${inner}~~`;
           break;
-        // 下划线 / 高亮 / 修订插入在 Markdown 中无原生语法，用 GFM 允许的内联 HTML 承载
+        // Underline / highlight / tracked insert have no Markdown syntax, so GFM inline HTML carries them
         case 'u':
           text += `<u>${inner}</u>`;
           break;
@@ -107,7 +107,7 @@ export function htmlToMarkdown(html: string): string {
           text += `<sub>${inner}</sub>`;
           break;
         case 'sup':
-          // 脚注引用：Markdown 无上标语法，直接输出编号（与文末汇总区一一对应）
+          // Footnote reference: Markdown has no superscript syntax, so emit the number (matching the end summary)
           text += el.hasAttribute('data-footnote') ? inner : `<sup>${inner}</sup>`;
           break;
         case 'code':
@@ -124,12 +124,12 @@ export function htmlToMarkdown(html: string): string {
           break;
         case 'span':
         case 'div': {
-          // 行内公式：保留 LaTeX 源码（Markdown 生态通用写法 $...$）
+          // Inline formula: keep the LaTeX source ($...$, the usual Markdown-ecosystem notation)
           if (el.hasAttribute('data-math')) {
             text += `$${el.getAttribute('data-latex') ?? ''}$`;
             break;
           }
-          // 批注标记（data-comment-id）无 Markdown 对应语法：保留文本，标记由损耗清单提示
+          // Comment marks (data-comment-id) have no Markdown equivalent: keep the text and report the marks in the loss list
           const style = inlineStyleAttr(el);
           text += style ? `<span style="${style}">${inner}</span>` : inner;
           break;
@@ -143,17 +143,17 @@ export function htmlToMarkdown(html: string): string {
 
   Array.from(doc.body.children).forEach((el) => {
     const tag = el.tagName.toLowerCase();
-    // 分页符：Markdown 无分页语义，留一个可直接还原的 HTML 注释
+    // Page break: Markdown has no pagination, so leave a restorable HTML comment
     if (el.hasAttribute('data-page-break')) {
       out.push('<!-- page-break -->');
       return;
     }
-    // 块级公式：独占一行，输出 $$...$$
+    // Block formula: a line of its own, emitted as $$...$$
     if (el.hasAttribute('data-math')) {
       out.push(`$$${el.getAttribute('data-latex') ?? ''}$$`);
       return;
     }
-    // 脚注汇总区：展开为有序列表（编号由注入阶段写入，与正文上标一致）
+    // Footnote summary: expanded into an ordered list (numbers written during injection, matching the body)
     if (el.hasAttribute('data-footnote-list')) {
       const items = Array.from(el.querySelectorAll('li'));
       if (items.length === 0) return;
@@ -164,7 +164,7 @@ export function htmlToMarkdown(html: string): string {
       });
       return;
     }
-    // 目录：展开为嵌套列表（页码附在条目末尾），保持层级可读
+    // TOC: expanded into a nested list (page numbers appended per entry), keeping levels readable
     if (el.hasAttribute('data-toc')) {
       const items = Array.from(el.querySelectorAll('li[data-level]'));
       if (items.length === 0) return;
@@ -249,10 +249,10 @@ export function htmlToMarkdown(html: string): string {
     .trim();
 }
 
-/** 批注与修订的本地存储结构（纯数据，UI 负责渲染） */
+/** Local storage shape for comments and tracked changes (plain data; the UI renders it) */
 export interface DocComment {
   id: string;
-  /** 批注覆盖的原文片段（用于重新定位） */
+  /** The quoted source text the comment covers (for re-anchoring) */
   quote: string;
   text: string;
   author: string;
@@ -263,7 +263,7 @@ export interface DocComment {
 export interface TrackedChange {
   id: string;
   kind: 'insert' | 'delete';
-  /** 变更文本 */
+  /** Changed text */
   text: string;
   author: string;
   createdAt: number;

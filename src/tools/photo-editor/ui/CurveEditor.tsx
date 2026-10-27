@@ -3,11 +3,11 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { CurvePoint } from '../model/types';
 
 /**
- * 曲线编辑器（RGB 主通道）。
+ * Curve editor (RGB master channel).
  *
- * 采用**固定 x 的 5 个控制点**（0 / 64 / 128 / 192 / 255），纵向拖拽调整输出值：
- * 相比「自由增删控制点」的实现更稳、无自交风险，同时保留了曲线最核心的
- * 「压暗阴影 / 提亮中间调 / 收高光」能力。LUT 由 `core.buildCurveLut`（PCHIP）生成。
+ * Uses **5 control points at fixed x** (0 / 64 / 128 / 192 / 255), dragged vertically to set the output:
+ * steadier than free add/remove of control points and free of self-intersection, while keeping the curve's
+ * core abilities: darken shadows / lift midtones / pull back highlights. The LUT comes from `core.buildCurveLut` (PCHIP).
  */
 
 const SIZE = 200;
@@ -83,7 +83,7 @@ export function CurveEditor({
       viewBox={`0 0 ${SIZE} ${SIZE}`}
       className="h-32 w-full touch-none rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
     >
-      {/* 网格 */}
+      {/* Grid */}
       {[0.25, 0.5, 0.75].map((ratio) => (
         <line
           key={`v-${ratio}`}
@@ -108,7 +108,7 @@ export function CurveEditor({
           strokeWidth={1}
         />
       ))}
-      {/* 参考对角线 */}
+      {/* Reference diagonal */}
       <line
         x1={PAD}
         y1={SIZE - PAD}

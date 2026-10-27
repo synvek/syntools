@@ -4,45 +4,45 @@ import { flattenPsdLayers, isPsdFile, type PsdImportReport } from './reader';
 import type { GroupLayer, Layer } from '../model/types';
 
 /**
- * PSD 导入映射的测试。
+ * Tests for the PSD import mapping.
  *
- * 用结构化子集（而不是真实 PSD 文件）来做断言：映射规则的价值在于「字段缺失 / 禁用 / 未知取值时怎么退化」，
- * 而这些分支在真实文件里很难凑齐，恰恰是线上最容易出问题的部分。
+ * Assertions use a structured subset rather than real PSD files: the value of the mapping rules is "how to degrade
+ * when a field is missing / disabled / unknown", branches real files rarely cover yet the most likely to break in production.
  */
 
 const report = (): PsdImportReport => ({ rasterized: [], skipped: [] });
 const fakeCanvas = () => ({ width: 10, height: 10 }) as unknown as HTMLCanvasElement;
 
 describe('mapPsdBlendMode', () => {
-  it('带空格的 PSD 写法映射回我们的短横线取值', () => {
+  it('PSD names with spaces map back to our kebab-case values', () => {
     expect(mapPsdBlendMode('soft light')).toBe('soft-light');
     expect(mapPsdBlendMode('color dodge')).toBe('color-dodge');
     expect(mapPsdBlendMode('Hard Light')).toBe('hard-light');
   });
 
-  it('穿透不是混合模式，按 normal 处理（组内穿透由组的 passThrough 表达）', () => {
+  it('pass-through is not a blend mode and maps to normal (group pass-through is expressed by passThrough)', () => {
     expect(mapPsdBlendMode('pass through')).toBe('normal');
   });
 
-  it('未知 / 缺失取值退化为 normal', () => {
+  it('unknown / missing values fall back to normal', () => {
     expect(mapPsdBlendMode(undefined)).toBe('normal');
     expect(mapPsdBlendMode('vivid light')).toBe('normal');
   });
 });
 
 describe('mapPsdColor', () => {
-  it('分量转成大写十六进制', () => {
+  it('components become uppercase hex', () => {
     expect(mapPsdColor({ r: 255, g: 128, b: 0 })).toBe('#FF8000');
   });
 
-  it('越界分量钳制，缺失回落黑色', () => {
+  it('out-of-range components clamp, missing ones fall back to black', () => {
     expect(mapPsdColor({ r: 300, g: -20, b: 10 })).toBe('#FF000A');
     expect(mapPsdColor(undefined)).toBe('#000000');
   });
 });
 
 describe('mapPsdBounds', () => {
-  it('left/top/right/bottom 转成矩形', () => {
+  it('left/top/right/bottom become a rectangle', () => {
     expect(mapPsdBounds({ left: 10, top: 20, right: 110, bottom: 70 })).toEqual({
       x: 10,
       y: 20,
@@ -51,25 +51,25 @@ describe('mapPsdBounds', () => {
     });
   });
 
-  it('空 / 退化矩形返回 null（空图层不该产出 0 尺寸对象）', () => {
+  it('an empty / degenerate rectangle returns null (empty layers must not yield zero-size objects)', () => {
     expect(mapPsdBounds(undefined)).toBeNull();
     expect(mapPsdBounds({ left: 5, top: 5, right: 5, bottom: 9 })).toBeNull();
   });
 });
 
 describe('mapPsdEffects', () => {
-  it('没有效果时返回 null', () => {
+  it('returns null when there are no effects', () => {
     expect(mapPsdEffects(undefined)).toBeNull();
     expect(mapPsdEffects({})).toBeNull();
   });
 
-  it('投影：颜色 / 不透明度 / 角度 / 距离 / 扩展 / 模糊都映射过来（opacity 为 0~1）', () => {
+  it('drop shadow: color / opacity / angle / distance / spread / blur all map over (opacity is 0~1)', () => {
     const style = mapPsdEffects({
       dropShadow: [
         {
           enabled: true,
           color: { r: 10, g: 20, b: 30 },
-          // ag-psd 的 opacity 是 0~1（FixedPoint8）
+          // ag-psd's opacity is 0~1 (FixedPoint8)
           opacity: 0.6,
           angle: 120,
           distance: { units: 'Pixels', value: 8 },
@@ -89,12 +89,12 @@ describe('mapPsdEffects', () => {
     });
   });
 
-  it('停用的效果被忽略', () => {
+  it('disabled effects are ignored', () => {
     const style = mapPsdEffects({ dropShadow: [{ enabled: false }] });
     expect(style).toBeNull();
   });
 
-  it('取第一个启用中的效果（PSD 的数组里可能有多条）', () => {
+  it('takes the first enabled effect (the PSD array may hold several)', () => {
     const style = mapPsdEffects({
       outerGlow: [
         { enabled: false, color: { r: 1, g: 1, b: 1 } },
@@ -104,7 +104,7 @@ describe('mapPsdEffects', () => {
     expect(style?.outerGlow).toMatchObject({ color: '#FF0000', size: 6, enabled: true });
   });
 
-  it('颜色叠加与描边：描边位置非法时回落 outside', () => {
+  it('color overlay and stroke: an illegal stroke position falls back to outside', () => {
     const style = mapPsdEffects({
       solidFill: { enabled: true, color: { r: 0, g: 0, b: 255 }, opacity: 0.5 },
       stroke: { enabled: true, color: { r: 0, g: 0, b: 0 }, size: { value: 4 }, position: 'weird' },
@@ -113,7 +113,7 @@ describe('mapPsdEffects', () => {
     expect(style?.stroke).toMatchObject({ size: 4, position: 'outside' });
   });
 
-  it('内阴影与描边 inside 位置正常映射', () => {
+  it('inner shadow and inside stroke map normally', () => {
     const style = mapPsdEffects({
       innerShadow: [{ enabled: true, angle: 90, distance: 4, blur: { value: 6 } }],
       stroke: { enabled: true, position: 'inside', size: { value: 2 } },
@@ -122,21 +122,21 @@ describe('mapPsdEffects', () => {
     expect(style?.stroke).toMatchObject({ position: 'inside', size: 2 });
   });
 
-  it('「扩展」兼容 choke（PSD 描述符名）与 spread（其它实现的别名）', () => {
+  it('spread accepts both choke (the PSD descriptor name) and spread (the alias other tools use)', () => {
     const viaChoke = mapPsdEffects({ dropShadow: [{ enabled: true, choke: 5 }] });
     expect(viaChoke?.dropShadow?.spread).toBe(5);
     const viaSpread = mapPsdEffects({ dropShadow: [{ enabled: true, spread: { value: 2 } }] });
     expect(viaSpread?.dropShadow?.spread).toBe(2);
   });
 
-  it('尺寸字段直接给数字也能读', () => {
+  it('size fields given as plain numbers are read too', () => {
     const style = mapPsdEffects({ dropShadow: [{ enabled: true, distance: 5, blur: 9 }] });
     expect(style?.dropShadow).toMatchObject({ distance: 5, size: 9 });
   });
 });
 
 describe('isPsdFile', () => {
-  it('只认 .psd 扩展名（大小写与首尾空白都容错）', () => {
+  it('only the .psd extension is accepted (case and surrounding whitespace tolerated)', () => {
     expect(isPsdFile('a.PSD')).toBe(true);
     expect(isPsdFile('  b.psd  ')).toBe(true);
     expect(isPsdFile('c.png')).toBe(false);
@@ -144,7 +144,7 @@ describe('isPsdFile', () => {
   });
 });
 
-describe('flattenPsdLayers：层栈展开', () => {
+describe('flattenPsdLayers: flattening the layer stack', () => {
   const raster = (name: string, extra: Record<string, unknown> = {}) => ({
     name,
     canvas: fakeCanvas(),
@@ -156,7 +156,7 @@ describe('flattenPsdLayers：层栈展开', () => {
     ...extra,
   });
 
-  it('扁平图层的顺序保持自下而上（与我们的 layers 数组一致）', () => {
+  it('flat layers keep bottom-up order (matching our layers array)', () => {
     const out = flattenPsdLayers([raster('bottom'), raster('top')], report(), {
       width: 100,
       height: 100,
@@ -164,7 +164,7 @@ describe('flattenPsdLayers：层栈展开', () => {
     expect(out.map((layer) => layer.name)).toEqual(['bottom', 'top']);
   });
 
-  it('组展开为「组 + 紧随其后的子层」，并写入 parentId', () => {
+  it('a group expands to the group followed by its children and sets parentId', () => {
     const out = flattenPsdLayers(
       [
         raster('below'),
@@ -186,7 +186,7 @@ describe('flattenPsdLayers：层栈展开', () => {
     expect(out[0].parentId).toBeNull();
   });
 
-  it('非穿透组按普通混合处理', () => {
+  it('non-pass-through groups blend normally', () => {
     const out = flattenPsdLayers(
       [{ name: 'G', blendMode: 'multiply', children: [raster('x')] }],
       report(),
@@ -196,7 +196,7 @@ describe('flattenPsdLayers：层栈展开', () => {
     expect(out[0].blend).toBe('multiply');
   });
 
-  it('拿不到像素的图层被计入 skipped 且不进文档', () => {
+  it('layers without pixels count as skipped and stay out of the document', () => {
     const stats = report();
     const out = flattenPsdLayers([{ name: 'no-pixels' }, raster('ok')], stats, {
       width: 10,
@@ -206,7 +206,7 @@ describe('flattenPsdLayers：层栈展开', () => {
     expect(stats.skipped).toEqual(['no-pixels']);
   });
 
-  it('智能对象（放置图层）计入 rasterized 统计', () => {
+  it('smart objects (placed layers) count toward the rasterized total', () => {
     const stats = report();
     const out = flattenPsdLayers([raster('smart', { placedLayer: { id: 'abc' } })], stats, {
       width: 10,
@@ -216,7 +216,7 @@ describe('flattenPsdLayers：层栈展开', () => {
     expect(stats.rasterized).toEqual(['smart']);
   });
 
-  it('文字图层还原为可再编辑的文字图层（而不是位图）', () => {
+  it('text layers come back as editable text layers (not bitmaps)', () => {
     const out: Layer[] = flattenPsdLayers(
       [
         raster('Title', {
@@ -239,15 +239,15 @@ describe('flattenPsdLayers：层栈展开', () => {
     if (layer.kind !== 'text') return;
     expect(layer.text).toBe('Hello');
     expect(layer.fontSize).toBe(36);
-    // 字体名里的族名与粗体标记分别还原
+    // Restore the family name and the bold marker from the font name separately
     expect(layer.fontFamily).toBe('Georgia');
     expect(layer.bold).toBe(true);
     expect(layer.fill).toBe('#FF0000');
-    // [0, 1, -1, 0] 表示旋转 90°
+    // [0, 1, -1, 0] means a 90° rotation
     expect(layer.rotation).toBe(90);
   });
 
-  it('组自身不产出像素尺寸（由子层推导）', () => {
+  it('a group reports no pixel size of its own (derived from its children)', () => {
     const out = flattenPsdLayers([{ name: 'G', children: [raster('x')] }], report(), {
       width: 10,
       height: 10,
@@ -256,7 +256,7 @@ describe('flattenPsdLayers：层栈展开', () => {
     expect(out[0].height).toBe(0);
   });
 
-  it('空输入返回空数组（调用方据此判定 INVALID_PSD）', () => {
+  it('empty input returns an empty array (the caller reports INVALID_PSD)', () => {
     expect(flattenPsdLayers(undefined, report(), { width: 1, height: 1 })).toEqual([]);
   });
 });

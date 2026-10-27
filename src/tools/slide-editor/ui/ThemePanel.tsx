@@ -5,7 +5,7 @@ import { SLIDE_TEMPLATES } from '../model/templates';
 import { useSlideStore } from '../store';
 import { ActionRow, ColorInput, Field, Section, SelectInput, ToggleGroup } from './controls';
 
-/** 主题面板里允许直接编辑的关键色（其余色板仍可点击套用为页面背景） */
+/** Key colors editable directly in the theme panel (other swatches can still be clicked to apply as the slide background) */
 const EDITABLE_KEYS = ['dk1', 'lt1', 'accent1', 'accent2', 'accent3', 'accent4'];
 const FONT_CHOICES = [
   'Arial',
@@ -34,7 +34,7 @@ const SWATCH_KEYS = [
   'folHlink',
 ];
 
-/** 主题与母版面板：主题色板、字体方案、背景应用范围、占位符显示开关 */
+/** Theme and master panel: theme palette, font scheme, background scope, placeholder visibility toggle */
 export function ThemePanel() {
   const { t } = useTranslation();
   const doc = useSlideStore((s) => s.doc);
@@ -68,7 +68,7 @@ export function ThemePanel() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* 本地模板库：纯数据、不联网，一键替换主题 + 母版 + 版式 */}
+      {/* Local template library: pure data, offline, swaps theme + master + layouts in one click */}
       <Section title={t('tools.slide.templateTitle')}>
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
           {t('tools.slide.templateHint')}
@@ -117,7 +117,7 @@ export function ThemePanel() {
             );
           })}
         </div>
-        {/* 直接编辑主题色本身（此前色板点击只能改页面背景，无法自定义主题） */}
+        {/* Edit the theme colors themselves (swatches used to only set the slide background, with no way to customize the theme) */}
         <Field label={t('tools.slide.themeColor')}>
           <div className="flex flex-wrap items-center gap-1">
             {EDITABLE_KEYS.map((key) => (
@@ -173,7 +173,7 @@ export function ThemePanel() {
         </ActionRow>
       </Section>
 
-      {/* 母版编辑：完整能力在「母版视图」（MasterView）里，这里只保留快捷入口与常用动作 */}
+      {/* Master editing: the full capability lives in "Master View" (MasterView); only the shortcut and common actions stay here */}
       <Section title={t('tools.slide.masterElements')}>
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
           {t('tools.slide.masterElements')}: {master?.elements.length ?? 0}

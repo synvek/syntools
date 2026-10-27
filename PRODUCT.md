@@ -8,66 +8,66 @@ web
 
 ## Users
 
-广义工具用户，不偏某一类：开发者、文档与办公/创作者、图像与设计处理者、以及日常文档与轻量工具使用者。使用场景是「打开浏览器（或可选桌面壳）即可完成一件事」，无需安装、注册或把敏感文件交给第三方网站。
+Broad utility users, not skewed toward one group: developers, document/office and creator users, image and design handlers, and people who just need a lightweight everyday tool. The usage scenario is "open a browser (or optionally the desktop shell) and get one thing done" — no install, no sign-up, and no handing sensitive files to a third-party website.
 
 ## Product Purpose
 
-SynTools 把日常常用工具收拢到同一入口：办公文档（Word / Excel / PowerPoint）、PDF、图片与照片、编解码、格式化、哈希、生成器、网络与文件处理等，默认在浏览器内本地运行。成功意味着用户能快速找到工具、完成处理并带走结果，同时默认情况下数据不离开本机。
+SynTools gathers everyday utilities behind a single entry point: office documents (Word / Excel / PowerPoint), PDF, images and photos, encoding, formatting, hashing, generators, network and file handling, and more — all running locally in the browser by default. Success means a user can find a tool fast, finish the task and take the result away, with their data never leaving the device by default.
 
 ## Positioning
 
-相对广告密集、需上传的在线工具站，以及需安装与授权的 Office/桌面软件，SynTools 必须同时守住两件事：
+Compared with ad-heavy online tool sites that require uploads, and with Office/desktop software that requires installation and licensing, SynTools has to hold two things at once:
 
-1. **隐私优先** — 除非某工具明确需要服务端，处理均在浏览器/本机完成，数据默认不上传。
-2. **统一入口 + 免费本地** — 单一搜索与一致 UI（收藏、最近使用、⌘K），替代散落站点与付费墙，且核心能力可免费使用。
+1. **Privacy first** — unless a tool explicitly needs a server, processing happens in the browser/on the machine, and data is not uploaded by default.
+2. **Single entry point + free local use** — one search and one consistent UI (favorites, recent, ⌘K) replacing scattered sites and paywalls, with core capabilities free to use.
 
-二者同等核心，不可为其中一条牺牲另一条。
+Both are equally central; neither may be sacrificed for the other.
 
 ## Operating Context
 
-- 主交付面：静态 Web 应用（如 www.syntools.net；亦支持 GitHub Pages、Vercel、Cloudflare Pages 等静态托管）。
-- 可选桌面壳：Tauri 打包（macOS / Windows / Linux），设计语言仍是同一套 Web UI，不是按系统换肤的原生应用。
-- 典型仪式：打开站点或应用 → ⌘/Ctrl+K 或 `/` 搜索 → 使用工具 → 复制/下载结果；收藏与最近使用存在本机 `localStorage`。
-- 文档级工作流：导入/编辑 `.docx` / `.xlsx` / `.pptx`、PDF 与图像，再导出可续编或交付格式；草稿默认可本地自动保存。
+- Primary delivery: a static web app (e.g. www.syntools.net; also works on static hosts such as GitHub Pages, Vercel and Cloudflare Pages).
+- Optional desktop shell: packaged with Tauri (macOS / Windows / Linux). The design language is still the same web UI — not a per-platform native app with its own skin.
+- Typical ritual: open the site or app → ⌘/Ctrl+K or `/` to search → use a tool → copy/download the result; favorites and recents live in local `localStorage`.
+- Document-level workflows: import/edit `.docx` / `.xlsx` / `.pptx`, PDF and images, then export in a format you can keep editing or hand off; drafts are auto-saved locally by default.
 
 ## Capabilities and Constraints
 
-**已确认能力（产品事实，非完整清单）：**
+**Confirmed capabilities (product facts, not an exhaustive list):**
 
-- 150+ 工具，注册表驱动；侧边栏、首页、搜索与路由由统一 registry 派生。
-- 全局搜索、最近使用、收藏；亮/暗主题（默认同系统）；9 语种 i18n。
-- 工具懒加载；静态部署；可选 Tauri 桌面。
-- 许可：AGPL-3.0-only；作者/主体标识 Synvek。
+- 150+ tools, registry-driven; the sidebar, home page, search and routing are all derived from one registry.
+- Global search, recents, favorites; light/dark theme (follows the system by default); i18n for 9 locales.
+- Lazy-loaded tools; static deployment; optional Tauri desktop.
+- License: AGPL-3.0-only; author/entity mark Synvek.
 
-**技术与产品约束：**
+**Technical and product constraints:**
 
-- 默认纯前端本地计算；个别工具若需服务端须显式标明，不得悄悄改写「隐私优先」承诺。
-- 工具路由保持稳定（含历史 id），以免破坏书签与外链。
-- 设计语言以 Web 为准；桌面为可选壳，不单独定义一套原生设计系统，除非日后明确改为 adaptive。
+- Client-side local computation by default; any tool that needs a server must say so explicitly and may not quietly weaken the "privacy first" promise.
+- Tool routes stay stable (including legacy ids) so bookmarks and external links keep working.
+- The design language is the web UI; desktop is an optional shell and does not get its own native design system unless it is explicitly changed to adaptive later.
 
-**未决（明确未定，不臆造）：**
+**Open questions (genuinely undecided, do not invent answers):**
 
-- 是否将某类用户升为首要受众，或是否调整付费/增值边界：未在本次 init 中决定。
+- Whether to elevate one user group to primary audience, or to adjust the paid/value-added boundary: not decided in this init.
 
 ## Brand Commitments
 
-- 产品名：**SynTools**；关联主体：**Synvek**。
-- 官方站点：www.syntools.net；仓库：https://github.com/synvek/syntools。
-- 现有标识资产：`public/logo.svg`；Tauri 应用名 SynTools（`com.synvek.syntools`）。
-- 许可与版权表述须尊重 AGPL-3.0-only；不得在文案中暗示「已上传到云端处理」或「必须注册才能用核心工具」，除非产品事实变更。
-- 声音倾向（来自现有产品文案）：直接、以能力与隐私承诺说话，不编造客户证言或未公布的指标。
+- Product name: **SynTools**; associated entity: **Synvek**.
+- Official site: www.syntools.net; repository: https://github.com/synvek/syntools.
+- Existing brand assets: `public/logo.svg`; Tauri app name SynTools (`com.synvek.syntools`).
+- License and copyright wording must respect AGPL-3.0-only; copy must never imply "already processed in the cloud" or "registration required to use core tools" unless the product facts change.
+- Voice (drawn from existing product copy): direct, speaking through capabilities and the privacy promise; never invent customer quotes or unpublished metrics.
 
 ## Evidence on Hand
 
-- 可运行的产品本体与文案：`README.md` / `README.zh-CN.md`、线上站点、本地 `pnpm dev`。
-- 工具注册与分类真相源：`src/core/registry/`。
-- Logo：`public/logo.svg`；桌面图标：`src-tauri/icons/`。
-- **没有**经确认的客户证言、案例研究、独立评测分数或增长指标；后续营销/落地页工作不得编造上述证据。
+- The runnable product and its copy: `README.md` / `README.zh-CN.md`, the live site, local `pnpm dev`.
+- Source of truth for tool registration and categories: `src/core/registry/`.
+- Logo: `public/logo.svg`; desktop icons: `src-tauri/icons/`.
+- There are **no** confirmed customer quotes, case studies, independent review scores or growth metrics; later marketing/landing-page work must not fabricate such evidence.
 
 ## Product Principles
 
-1. **本地默认** — 能在本机完成的绝不默认上传；需要网络时必须诚实标明。
-2. **一把入口** — 搜索、收藏、最近使用与一致的工具壳优先于单工具的孤岛体验。
-3. **广义有用** — 不为「只服务开发者」或「只服务办公」牺牲另一侧的可达性与完成路径。
-4. **可扩展但不碎** — 新工具走注册表与统一布局约定；能力增长不以破坏路由与壳层一致性为代价。
-5. **证据诚实** — 只陈述可验证的能力与约束；禁止虚构用户、指标与第三方背书。
+1. **Local by default** — if it can be done on the device, never upload by default; when the network is required, say so honestly.
+2. **One entry point** — search, favorites, recents and a consistent tool shell beat isolated single-tool experiences.
+3. **Broadly useful** — never sacrifice reachability on one side (developers / office users) to serve the other.
+4. **Extensible without fragmenting** — new tools follow the registry and layout conventions; growth never comes at the cost of broken routes or an inconsistent shell.
+5. **Honest evidence** — state only verifiable capabilities and constraints; no invented users, metrics or third-party endorsements.

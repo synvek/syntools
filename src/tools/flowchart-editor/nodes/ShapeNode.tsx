@@ -18,8 +18,8 @@ import { nodeDashArrayOf } from '../ops';
 import { useQuickConnect } from '../quickConnect';
 
 /**
- * 自由连线锚点：上下边各 3 个（含靠近两角的位置）、左右边各 1 个，共 8 个。
- * 配合 ConnectionMode.Loose，任意锚点都可作为起点或终点，接近 Draw.io 的自由连线体验。
+ * Free-edge anchors: 3 on each of the top and bottom sides (including near both corners), 1 on each side, 8 in total.
+ * With ConnectionMode.Loose, any anchor can start or end an edge, close to Draw.io's free-connection feel.
  */
 const HANDLES: Array<{ id: string; position: Position; offset: string }> = [
   { id: 't-l', position: Position.Top, offset: '25%' },
@@ -33,8 +33,8 @@ const HANDLES: Array<{ id: string; position: Position; offset: string }> = [
 ];
 
 /**
- * 悬停快速连线箭头（类 draw.io / ProcessOn）：点击即朝该方向生成同类型相连图形并自动连线。
- * 仅对普通图形显示；容器（泳道/编组）不提供。
+ * Hover quick-connect arrows (draw.io / ProcessOn style): one click creates a same-kind connected shape in that direction
+ * and links it automatically. Only shown for plain shapes, not containers (swimlane/group).
  */
 const QUICK_DIRS: Array<{
   dir: 'up' | 'down' | 'left' | 'right';
@@ -52,8 +52,8 @@ const QUICK_DIRS: Array<{
 ];
 
 /**
- * 按住 Shift 时等比缩放：NodeResizer 只有静态 `keepAspectRatio`，
- * 因此监听全局 Shift 状态并按需传入。仅在节点选中时才挂载监听。
+ * Hold Shift to resize proportionally: NodeResizer only has a static `keepAspectRatio`,
+ * so the global Shift state is tracked and passed in on demand. Listeners are mounted only while a node is selected.
  */
 function useShiftHeld(enabled: boolean): boolean {
   const [held, setHeld] = useState(false);
@@ -86,28 +86,28 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const { t } = useTranslation();
   const d = data as FlowNodeData;
   const def = shapeDefOf(d.kind);
-  // 必须给出确定尺寸：若依赖父容器的百分比高度，节点会被撑成 0 高度而不可见
+  // A definite size is required: relying on a percentage height from the parent container would collapse the node to 0 height and hide it
   const fallback = shapeSize(d.kind);
   const w = width ?? fallback.width;
   const h = height ?? fallback.height;
   const setNodeLabel = useFlowStore((s) => s.setNodeLabel);
   /**
-   * 本图形是否为「已选中连线的端点」。是则临时隐藏四向快连箭头：
-   * 箭头与连线重连端点圆在同一位置重叠（且节点层级更高），会抢走拖拽端点的指针。
-   * 只影响端点图形，其它图形的快连箭头、以及所有连线锚点始终可用。
+   * Whether this shape is an endpoint of a selected edge. If so the four quick-connect arrows are hidden:
+   * they overlap the edge-reconnect endpoint circles (and the node layer is above), stealing their pointer events.
+   * Only affects endpoint shapes; quick-connect arrows on other shapes and all edge anchors stay usable.
    */
   const endpointOfSelectedEdge = useFlowStore((s) => {
     if (s.selectedEdges.length === 0) return false;
     const sel = new Set(s.selectedEdges);
     return s.edges.some((e) => sel.has(e.id) && (e.source === id || e.target === id));
   });
-  /** 单选且为本节点时才渲染调整手柄，避免多选时手柄堆叠 */
+  /** Render adjust handles only when this node is the single selection, avoiding stacked handles on multi-select */
   const soleSelected = useFlowStore(
     (s) => s.selectedNodes.length === 1 && s.selectedNodes.includes(id),
   );
-  /** 按住 Shift 等比缩放（仅选中时监听键盘） */
+  /** Hold Shift to resize proportionally (keyboard listeners only while selected) */
   const shiftHeld = useShiftHeld(selected === true);
-  /** 容器内的直接子节点数量（折叠时在标题栏显示；非容器恒为 0） */
+  /** Number of direct children inside the container (shown in the title bar when collapsed; always 0 for non-containers) */
   const childCount = useFlowStore((s) =>
     isContainerKind(d.kind) ? s.nodes.filter((n) => n.parentId === id).length : 0,
   );
@@ -116,7 +116,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
-  /** 自动缩放后的实际字号（null 表示按原字号渲染即不溢出） */
+  /** Actual font size after auto-shrink (null means the original size fits without overflow) */
   const [fitFontSize, setFitFontSize] = useState<number | null>(null);
 
   useEffect(() => {
@@ -138,29 +138,29 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
   const textColor = style.textColor ?? strokeColor;
   const isContainer = isContainerKind(d.kind);
   const isGroup = d.kind === 'group';
-  // 纵向泳道与编组的标题栏在顶部；横向泳道在左侧
+  // Vertical swimlanes and groups have the title bar on top; horizontal swimlanes on the left
   const headerOnTop = def?.draw === 'laneV' || isGroup;
-  // 泳道标题条厚度（可调参数 laneHeader）
+  // Swimlane title bar thickness (adjustable parameter laneHeader)
   const laneHeader = def ? paramValue(def, style, 'laneHeader', w, h) : 40;
   /**
-   * 节点变换（旋转 / 镜像）：纯 CSS transform，仅作用在「图形 + 文本」内层容器上。
-   * 几何与连线锚点保持未旋转的轴对齐包围盒（与 draw.io 的 bbox 行为一致）；
-   * 缩放框 / 调整手柄 / 连线锚点留在外层，始终轴对齐可正常命中。
+   * Node transform (rotation / mirror): a pure CSS transform applied only to the inner shape + text container.
+   * Geometry and edge anchors keep the unrotated axis-aligned bounding box (matching draw.io's bbox behavior);
+   * the resize frame / adjust handles / edge anchors stay on the outer layer, always axis-aligned and hit-testable.
    */
   const transform = nodeTransformCss(style);
-  /** 容器折叠：仅保留标题栏，子节点由画布层隐藏（见 FlowCanvas 的派生节点） */
+  /** Container collapsed: keep only the title bar; child nodes are hidden by the canvas layer (see FlowCanvas's derived nodes) */
   const collapsed = isContainer && d.collapsed === true;
-  /** 文本垂直对齐（缺省 middle，与历史行为一致） */
+  /** Vertical text alignment (defaults to middle, matching legacy behavior) */
   const justify = VERTICAL_ALIGN_FLEX[style.verticalAlign ?? 'middle'];
   const textLineHeight = style.lineHeight ?? DEFAULT_LINE_HEIGHT;
   const href = safeLinkHref(style.link);
 
   /**
-   * 文字自动缩放：内容溢出时二分搜索能容纳的最大字号（下限 8px）。
+   * Text auto-shrink: when content overflows, binary-search the largest font size that fits (floor 8px).
    *
-   * 直接在 DOM 上试写字号测量（避免每轮候选都触发 React 重渲染），
-   * 仅在收敛后写入一次状态。节点尺寸变化会随 width/height 依赖重新计算，
-   * 因此无需额外的 ResizeObserver。
+   * Font sizes are tried directly on the DOM to measure (avoiding a React re-render per candidate),
+   * and the state is written once after convergence. Node size changes recompute via the width/height dependencies,
+   * so no extra ResizeObserver is needed.
    */
   useLayoutEffect(() => {
     const el = labelRef.current;
@@ -196,7 +196,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
     <div
       ref={rootRef}
       className={`group/node relative${collapsed ? ' flow-node-collapsed' : ''}`}
-      // 便于样式钩子与端到端断言「当前图形类型 / 折叠态」
+      // Convenient for style hooks and end-to-end assertions on "current shape kind / collapsed state"
       data-kind={d.kind}
       data-collapsed={collapsed ? 'true' : undefined}
       onDoubleClick={() => !isContainer && setEditing(true)}
@@ -228,8 +228,8 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             {def ? drawShape(def, w, h, style) : <rect x={0} y={0} width={w} height={h} rx={4} />}
           </g>
           {def ? (
-            // fill 取描边色：让「活动结束」的实心内圆等装饰符号随主题着色；
-            // 现有装饰均显式 fill:'none'，不受影响。
+            // fill takes the stroke color so decorations such as the solid inner circle of "activity final" follow the theme;
+            // existing decorations all set fill:'none' explicitly, so they are unaffected.
             <g
               stroke={strokeColor}
               fill={strokeColor}
@@ -266,15 +266,15 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             </div>
           )
         ) : editing ? (
-          // 多行文本：Enter / ⇧+Enter 换行，⌘/Ctrl+Enter 提交，Esc 取消，失焦自动提交
+          // Multi-line text: Enter / ⇧+Enter inserts a newline, ⌘/Ctrl+Enter submits, Esc cancels, blur submits automatically
           <textarea
             ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => {
-              // 必须阻止冒泡：提交会同步卸载 textarea，事件若继续冒泡到 window，
-              // 全局快捷键会误判为画布操作（Enter 会再生成一个相连节点）
+              // Must stop propagation: submitting unmounts the textarea synchronously, and an event bubbling on to window
+              // would make the global shortcuts mistake it for a canvas action (Enter would create another connected node)
               e.stopPropagation();
               if (e.key === 'Escape') {
                 setEditing(false);
@@ -342,7 +342,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         )}
       </div>
 
-      {/* 折叠角标：提示被隐藏的子节点数量，避免误以为内容丢失 */}
+      {/* Collapsed badge: shows how many child nodes are hidden, so content does not look lost */}
       {collapsed && childCount > 0 ? (
         <span
           className="nodrag absolute z-30 rounded bg-slate-200 px-1 text-[10px] leading-4 text-slate-600 dark:bg-slate-700 dark:text-slate-200"
@@ -353,7 +353,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         </span>
       ) : null}
 
-      {/* 容器折叠 / 展开开关：常驻显示，不依赖选中态 */}
+      {/* Container collapse / expand toggle: always visible, independent of selection */}
       {isContainer ? (
         <button
           type="button"
@@ -376,18 +376,18 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         </button>
       ) : null}
 
-      {/* 尺寸调整：容器（泳道 / 编组）同样可缩放，只是最小尺寸更大 */}
+      {/* Resize: containers (swimlane / group) can be resized too, only with a larger minimum size */}
       {selected ? (
         <NodeResizer
           minWidth={isContainer ? 200 : 48}
           minHeight={isContainer ? 140 : 32}
-          // 按住 Shift 等比缩放（见 useShiftHeld）
+          // Hold Shift to resize proportionally (see useShiftHeld)
           keepAspectRatio={shiftHeld}
           onResizeStart={() => useFlowStore.getState().commit()}
         />
       ) : null}
 
-      {/* 形状可调参数手柄（类 draw.io 黄色顶点）：单选时出现，拖拽即改 */}
+      {/* Shape adjustable-parameter handles (draw.io-style yellow vertices): appear on single selection and update on drag */}
       {soleSelected && def ? (
         <ShapeAdjustHandles
           nodeId={id}
@@ -399,12 +399,12 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
         />
       ) : null}
 
-      {/* 旋转手柄：仅单选图形时出现（容器由工具栏旋转，避免与标题栏重叠） */}
+      {/* Rotate handle: appears only for a single selected shape (containers are rotated from the toolbar, avoiding overlap with the title bar) */}
       {soleSelected && !isContainer ? (
         <ShapeRotateHandle nodeId={id} style={style} containerRef={rootRef} />
       ) : null}
 
-      {/* 容器不提供连线锚点 */}
+      {/* Containers provide no edge anchors */}
       {!isContainer &&
         HANDLES.map((handle) => (
           <Handle
@@ -413,10 +413,10 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             type="source"
             position={handle.position}
             /**
-             * 锚点盒收成 1px 且整体置于图形内侧：React Flow 以「锚点盒外沿」计算连线终点，
-             * 盒子越大终点越偏外（12px 盒会让终点跑到图形外约 6px）；
-             * 盒子外沿与图形边缘重合后，连线终点正好落在图形边缘上。
-             * 不能取 0 尺寸：React Flow 会因缺少锚点测量而无法从锚点起手连线。
+             * The anchor box is squeezed to 1px and placed inside the shape: React Flow computes edge endpoints from the anchor
+             * box's outer edge, so a larger box pushes the endpoint outward (a 12px box puts it ~6px outside the shape);
+             * once the box's outer edge coincides with the shape edge, the endpoint lands exactly on it.
+             * A 0-size box is not an option: React Flow then lacks anchor measurements and cannot start an edge from it.
              */
             style={
               handle.position === Position.Top || handle.position === Position.Bottom
@@ -425,12 +425,12 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             }
             className="!h-px !w-px !min-h-0 !min-w-0 !border-0 !bg-transparent"
           >
-            {/* 可见圆点（12px）：居中于锚点中心（即图形边缘），承担实际点击 */}
+            {/* Visible dot (12px): centered on the anchor center (i.e. the shape edge) and carries the actual click */}
             <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-blue-500 ring-2 ring-blue-300/70 opacity-0 transition-opacity group-hover/node:opacity-100" />
           </Handle>
         ))}
 
-      {/* 悬停快速连线箭头：按住拖出连线，松手弹出图形选择弹窗 */}
+      {/* Hover quick-connect arrows: drag out an edge and releasing it opens the shape picker */}
       {!isContainer &&
         QUICK_DIRS.map((q) => (
           <button
@@ -440,7 +440,7 @@ function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps) {
             onPointerDown={(e) => {
               e.stopPropagation();
               e.preventDefault();
-              // 从快连箭头拉线：让出已有连线的选中态
+              // Starting an edge from a quick-connect arrow: yield the selection of existing edges
               useFlowStore.getState().deselectEdges();
               useQuickConnect
                 .getState()

@@ -1,16 +1,16 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * URL 状态分享（Tasks T28）：
- * 将工具输入/参数序列化为 query 参数 ?s=（JSON → base64url），
- * 接收方打开链接即还原状态。长输入（> 2KB）降级：不生成分享链接。
+ * URL state sharing (Tasks T28):
+ * serialize tool input / options into the ?s= query param (JSON → base64url)
+ * so the recipient restores the state by opening the link. Long input (> 2KB) degrades to no link.
  */
 
-/** 可分享的状态字段：仅原始类型（文件等不可序列化内容不得入内） */
+/** Shareable state fields: primitives only (no files or anything unserializable) */
 export type ShareState = Record<string, string | number | boolean>;
 
 export const SHARE_PARAM = 's';
-/** 序列化结果长度上限（PRD：输入 > 2KB 不分享） */
+/** Max serialized length (PRD: no sharing above 2KB of input) */
 export const SHARE_LIMIT = 2048;
 
 function utf8ToBase64Url(str: string): string {
@@ -28,12 +28,12 @@ function base64UrlToUtf8(param: string): string {
   return new TextDecoder().decode(bytes);
 }
 
-/** 状态 → base64url 参数值 */
+/** State → base64url param value */
 export function encodeShareState(state: ShareState): string {
   return utf8ToBase64Url(JSON.stringify(state));
 }
 
-/** base64url 参数值 → 状态；任何解析失败返回 null，绝不抛异常 */
+/** base64url param value → state; returns null on any failure, never throws */
 export function decodeShareState(param: string): ShareState | null {
   try {
     const parsed: unknown = JSON.parse(base64UrlToUtf8(param));
@@ -50,15 +50,15 @@ export function decodeShareState(param: string): ShareState | null {
   }
 }
 
-/** 将默认值的字面量类型加宽为 string/number/boolean，便于还原后直接参与状态初始化 */
+/** Widen the defaults' literal types to string/number/boolean so restored values initialize state directly */
 type Widened<T> = {
   [K in keyof T]: T[K] extends string ? string : T[K] extends number ? number : boolean;
 };
 
 /**
- * 读取地址栏 ?s= 并与默认状态合并（T28 还原）：
- * 仅接受默认值中存在的键，且 typeof 与默认值一致（URL 内容不可信，
- * 工具侧对枚举/数值范围仍需自行校验）。无参数或解析失败时返回默认值。
+ * Read ?s= from the address bar and merge it over the defaults (T28 restore):
+ * only keys present in the defaults with a matching typeof (URL content is untrusted,
+ * so tools must still validate enums and ranges). Returns the defaults when absent or unparsable.
  */
 export function readSharedState<T extends Record<string, string | number | boolean>>(
   defaults: T,
@@ -77,20 +77,20 @@ export function readSharedState<T extends Record<string, string | number | boole
   return out as Widened<T>;
 }
 
-/** 生成完整分享链接；超长降级返回错误（交互规范：提示不分享） */
+/** Build a full share link; over-length degrades to an error (interaction spec: notice, no link) */
 export function buildShareUrl(pathname: string, state: ShareState): ToolResult<string> {
   const param = encodeShareState(state);
   if (param.length > SHARE_LIMIT) {
-    // 错误代码（不携带文案）：UI 层经 i18n 转为当前语言提示（T29）
+    // Error code without copy: the UI turns it into a localized message (T29)
     return { ok: false, error: 'TOO_LONG' };
   }
   return { ok: true, value: `${window.location.origin}${pathname}?${SHARE_PARAM}=${param}` };
 }
 
 /**
- * 用「已编码参数 + 自定义上限」生成分享链接（阶段 7 新增）。
- * 既有 `buildShareUrl` 与全部调用点保持原样：默认编码仍是 base64url、默认上限仍是
- * `SHARE_LIMIT`；需要压缩等自定义编码的工具（如 code-editor）使用本函数。
+ * Build a share link from pre-encoded params plus a custom limit (added in phase 7).
+ * `buildShareUrl` and its call sites stay as-is: the default encoding is still base64url and the default limit
+ * is still `SHARE_LIMIT`; tools needing compaction (e.g. code-editor) call this instead.
  */
 export function buildShareUrlWithLimit(
   pathname: string,

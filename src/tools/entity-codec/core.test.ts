@@ -16,7 +16,7 @@ describe('encodeEntities', () => {
     expect(okEncode('<div class="a">&\'', 'named')).toBe(
       '&lt;div class=&quot;a&quot;&gt;&amp;&apos;',
     );
-    expect(okEncode('中文', 'named')).toBe('中文'); // special 范围不动非 ASCII
+    expect(okEncode('中文', 'named')).toBe('中文'); // the special range leaves non-ASCII untouched
   });
 
   it('named + nonascii：无命名实体的字符回退十进制', () => {

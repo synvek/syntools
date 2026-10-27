@@ -1,13 +1,13 @@
 /**
- * 模板内节点/连线文案（占位内容，用户可自由改写）。
+ * Copy for the nodes/edges inside templates (placeholder content the user can freely rewrite).
  *
- * 模板内容是「起始素材」而非 UI 文案，因此不放进 strings.ts 的 9 语种大表：
- * - zh / en / zh-TW 在此完整维护（键集合必须与 en 保持一致，见 templates.test.ts）；
- * - 其余语种缺键时回退英文（`bundleToResource` 按 `TEMPLATE_LABELS_I18N[lng] ?? en` 注册），
- *   后续补齐只需在此追加同名 token 的整表（键名前缀统一为 `tpl_`）。
+ * Template content is "starting material" rather than UI copy, so it is not part of the 9-language table in strings.ts:
+ * - zh / en / zh-TW are maintained in full here (the key set must match en, see templates.test.ts);
+ * - other languages fall back to English when a key is missing (`bundleToResource` registers `TEMPLATE_LABELS_I18N[lng] ?? en`),
+ *   and completing them later only means appending a full table of the same tokens here (all keys prefixed with `tpl_`).
  */
 
-/** 模板文案 token → 文案；键与模板中的占位内容一一对应 */
+/** Template copy token → copy; keys map one-to-one to the placeholders used in templates */
 export const TEMPLATE_LABELS_I18N: Record<string, Record<string, string>> = {
   zh: {
     start: '开始',
@@ -226,8 +226,8 @@ export const TEMPLATE_LABELS_I18N: Record<string, Record<string, string>> = {
   },
 };
 
-/** 模板文案 token（以 en 表为基准，保证 zh/en 键集合一致） */
+/** Template copy tokens (based on the en table, keeping the zh/en key sets identical) */
 export type TemplateLabelKey = keyof (typeof TEMPLATE_LABELS_I18N)['en'];
 
-/** 与 i18next 注册时的键前缀保持一致 */
+/** Matches the key prefix used when registering with i18next */
 export const TEMPLATE_LABEL_PREFIX = 'tpl_';

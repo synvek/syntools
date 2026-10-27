@@ -6,36 +6,36 @@ import { buildTableOfContents, type TocEntry } from './docs';
 import { createPageLayoutQuery } from './PageView';
 
 /**
- * 动态目录（对标 Word 的目录域）：
+ * Dynamic table of contents (equivalent to Word's TOC field):
  *
- * - 目录是 atom 节点（不存内容，避免分页 ↔ 属性互相触发的事务循环）；
- * - 编辑态由 NodeView 从「当前文档 + 当前分页结果」实时派生，页码随排版自动更新；
- * - 序列化时 atom 只输出空外壳，导出/打印前用 injectTocHtml 补上渲染内容，
- *   Word 侧则映射为可更新的目录域（TableOfContents）。
+ * - The TOC is an atom node (storing no content, avoiding transaction loops between pagination and attributes);
+ * - In the editor a NodeView derives it live from "current document + current pagination", so page numbers follow the layout;
+ * - Serialization emits only an empty shell for atoms, so injectTocHtml fills in the rendered content
+ *   before export/print, while Word maps it to an updatable TOC field (TableOfContents).
  */
 
 export interface TocHeading {
   level: number;
-  /** 目录条目文本（已 trim） */
+  /** TOC entry text (trimmed) */
   text: string;
-  /** 标题节点在文档中的位置，用于点击跳转 */
+  /** Document position of the heading node, used for click-to-jump */
   pos: number;
 }
 
-/** 目录所需文案（由工具层按当前语言注入） */
+/** TOC labels (injected by the tool layer for the current language) */
 export interface TocLabels {
-  /** 目录标题 */
+  /** TOC heading */
   title: string;
-  /** 没有标题时的空状态提示 */
+  /** Empty-state hint when there are no headings */
   empty: string;
 }
 
 export const DEFAULT_TOC_LABELS: TocLabels = { title: '目录', empty: '文档暂无标题' };
 
-/** 每一级标题额外缩进（px） */
+/** Extra indent per heading level (px) */
 const TOC_INDENT_PX = 16;
 
-/** 收集文档中的标题；空标题被跳过，保证与目录条目一一对应 */
+/** Collect the document's headings; empty headings are skipped so they map one-to-one with TOC entries */
 export function collectHeadings(doc: PMNode): TocHeading[] {
   const headings: TocHeading[] = [];
   doc.descendants((node, pos) => {
@@ -48,9 +48,9 @@ export function collectHeadings(doc: PMNode): TocHeading[] {
 }
 
 /**
- * 由文档与页码查询生成目录数据。
- * 复用 docs.ts 的 buildTableOfContents（层级别裁剪到 1–6），
- * 页码经 pageOfPosition 回调按标题位置实时计算。
+ * Build TOC data from the document and the page-number query.
+ * Reuses buildTableOfContents from docs.ts (levels clamped to 1-6); page numbers are computed live
+ * from the heading position via the pageOfPosition callback.
  */
 export function buildTocEntries(
   doc: PMNode,
@@ -62,9 +62,9 @@ export function buildTocEntries(
 }
 
 /**
- * 渲染目录 DOM：编辑态（可点击跳转）与导出态（纯文本）共用同一结构。
- * 结构固定为 `div[data-toc] > p.rte-toc-title + ul > li[data-level]`，
- * 屏幕 / 打印 / 快照 PDF / Markdown / Word 五端都按这套类名与属性识别。
+ * Render the TOC DOM: the editable state (clickable) and the export state (plain text) share one structure.
+ * The structure is fixed as `div[data-toc] > p.rte-toc-title + ul > li[data-level]`, and screen / print /
+ * snapshot PDF / Markdown / Word all recognize it by these class names and attributes.
  */
 export function renderTocElement(
   entries: readonly TocEntry[],
@@ -95,7 +95,7 @@ export function renderTocElement(
     const item = document.createElement('li');
     item.className = 'rte-toc-item';
     item.setAttribute('data-level', String(entry.level));
-    // 内联缩进：打印与快照 PDF 不依赖外部样式表的加载时序
+    // Inline indent: print and snapshot PDF don't depend on external stylesheet load timing
     item.style.paddingLeft = `${(entry.level - 1) * TOC_INDENT_PX}px`;
 
     const text = document.createElement(onJump ? 'button' : 'span');
@@ -124,7 +124,7 @@ export function renderTocElement(
   return root;
 }
 
-/** 目录的 HTML 字符串（导出/打印/演示用） */
+/** TOC as an HTML string (for export/print/presentation) */
 export function renderTocHtml(
   entries: readonly TocEntry[],
   headings: readonly TocHeading[],
@@ -134,9 +134,9 @@ export function renderTocHtml(
 }
 
 /**
- * 把序列化 HTML 中的空目录节点替换为已渲染的目录内容。
- * `editor.getHTML()` 走 DOMSerializer，atom 节点只输出空外壳；
- * 不做这一步，打印 / 快照 PDF / 单文件 HTML 里的目录就是空的。
+ * Replace empty TOC nodes in serialized HTML with the rendered TOC content.
+ * `editor.getHTML()` goes through DOMSerializer, which emits only an empty shell for atom nodes;
+ * without this step the TOC is empty in print / snapshot PDF / single-file HTML.
  */
 export function injectTocHtml(html: string, renderedToc: string): string {
   if (!renderedToc || !html.includes('data-toc')) return html;
@@ -151,7 +151,7 @@ export function injectTocHtml(html: string, renderedToc: string): string {
   return doc.body.innerHTML;
 }
 
-/** 编辑态目录视图：每次 state 更新都用最新文档与分页结果重绘 */
+/** Editable TOC view: redraws with the latest document and pagination on every state update */
 class TocNodeView implements NodeView {
   readonly dom: HTMLElement;
 
@@ -177,7 +177,7 @@ class TocNodeView implements NodeView {
     return true;
   }
 
-  /** 目录内部只处理自己的按钮点击，不让事件进入编辑器选区逻辑 */
+  /** The TOC handles its own button clicks, keeping events out of the editor's selection logic */
   stopEvent(): boolean {
     return true;
   }
@@ -207,9 +207,9 @@ class TocNodeView implements NodeView {
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     tableOfContents: {
-      /** 在光标处插入目录 */
+      /** Insert a TOC at the cursor */
       insertTableOfContents: () => ReturnType;
-      /** 刷新目录：触发分页重算，页码与条目随之更新 */
+      /** Refresh the TOC: trigger a pagination recompute so page numbers and entries follow */
       refreshTableOfContents: () => ReturnType;
     };
   }
@@ -230,7 +230,7 @@ export const TableOfContents = Node.create<{ labels: TocLabels }>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    // atom 节点没有内容洞：导出前由 injectTocHtml 补内容
+    // Atom nodes have no content hole: injectTocHtml fills the content before export
     return ['div', mergeAttributes(HTMLAttributes, { 'data-toc': 'true', class: 'rte-toc' })];
   },
 
@@ -243,8 +243,8 @@ export const TableOfContents = Node.create<{ labels: TocLabels }>({
       refreshTableOfContents:
         () =>
         ({ tr, dispatch }) => {
-          // 空事务 + 元数据：分页插件会重新测量，目录 NodeView 随 state 更新重绘。
-          // 必须复用命令链的 tr（直接用 state.tr 会与链上其它步骤产生不匹配事务）
+          // Empty transaction + metadata: the pagination plugin re-measures and the TOC NodeView redraws
+          // on the state update. Reuse the chain's tr (state.tr would conflict with the other chained steps).
           if (dispatch) tr.setMeta('tocRefresh', Date.now());
           return true;
         },
@@ -252,7 +252,7 @@ export const TableOfContents = Node.create<{ labels: TocLabels }>({
   },
 
   addNodeView() {
-    // configure({ labels: undefined }) 会覆盖默认值，这里显式兜底
+    // configure({ labels: undefined }) overrides the defaults, so fall back explicitly here
     const labels = this.options.labels ?? DEFAULT_TOC_LABELS;
     return ({ node, view }) => new TocNodeView(node, view, labels);
   },

@@ -10,7 +10,7 @@ import {
   type ChartType,
 } from '../charts';
 
-/** ECharts 实例的最小接口（避免静态引入 echarts 类型） */
+/** Minimal ECharts instance interface (avoids a static echarts type import) */
 interface ChartInstance {
   setOption: (option: unknown, notMerge?: boolean) => void;
   resize: () => void;
@@ -31,11 +31,11 @@ export interface ChartOverlayProps {
   config: ChartConfig;
   data: ChartData | null;
   selected: boolean;
-  /** 工作表区域尺寸，用于拖拽 / 缩放的边界钳制 */
+  /** Sheet area size, used to clamp dragging / resizing */
   bounds: { width: number; height: number };
   onSelect: () => void;
   onChange: (patch: Partial<ChartConfig>) => void;
-  /** 用当前表格选区更新数据区域 */
+  /** Update the data range from the current sheet selection */
   onPickRange: () => void;
   onClose: () => void;
 }
@@ -45,10 +45,12 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * 工作表内的浮动图表：贴在工作表画布之上，可拖动、可缩放、可改数据区域与类型。
+ * Floating chart on the sheet: sits above the sheet canvas and can be dragged, resized, and have its
+ * data range and type changed.
  *
- * 拖动 / 缩放用 window 级指针监听（而不是 setPointerCapture + onPointerMove）：
- * 指针捕获在部分环境（自动化、部分浏览器）下会失败或丢事件，window 监听更可靠。
+ * Dragging / resizing listens for pointer events on window (rather than setPointerCapture +
+ * onPointerMove): pointer capture fails or drops events in some environments (automation, certain
+ * browsers), while window listeners are more reliable.
  */
 export function ChartOverlay({
   config,
@@ -67,11 +69,11 @@ export function ChartOverlay({
   const [failed, setFailed] = useState(false);
   const [rangeText, setRangeText] = useState(() => buildRangeLabel(config.range));
 
-  // 手势回调里读取最新值（避免闭包过期）
+  // Read the latest values inside gesture callbacks (avoids stale closures)
   const latest = useRef({ config, bounds, onChange });
   latest.current = { config, bounds, onChange };
 
-  // 外部（如「用当前选区」）改动数据区域时同步输入框
+  // Sync the input when the range changes from outside (e.g. "use selection")
   useEffect(() => {
     setRangeText(buildRangeLabel(config.range));
   }, [config.range]);
@@ -101,7 +103,7 @@ export function ChartOverlay({
         ]);
         const instance = core.init(host) as unknown as ChartInstance;
         instanceRef.current = instance;
-        // 尺寸变化（拖拽缩放 / 窗口变化）后让 ECharts 重算画布
+        // Let ECharts recompute the canvas after a size change (drag-resize / window resize)
         observer = new ResizeObserver(() => instance.resize());
         observer.observe(host);
         setReady(true);
@@ -123,8 +125,9 @@ export function ChartOverlay({
   }, [ready, data, config.type]);
 
   /**
-   * 手势期间把 pointermove / pointerup 挂到 window。
-   * 位移基于「手势开始时的几何 + 累计位移」计算，避免每帧读最新值导致位移叠加放大。
+   * Attach pointermove / pointerup to window for the duration of a gesture.
+   * Movement is computed from "geometry at gesture start + accumulated delta", so per-frame reads of
+   * the latest value cannot compound the offset.
    */
   const beginGesture = (
     event: React.PointerEvent<HTMLElement>,
@@ -150,12 +153,12 @@ export function ChartOverlay({
   };
 
   const startDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    // 头部内的按钮 / 输入框照常交互
+    // Buttons and inputs in the header keep working normally
     if ((event.target as HTMLElement).closest('button, input')) return;
     beginGesture(event, (total, start) => {
       const area = latest.current.bounds;
-      // 工作表区域是固定高度的滚动容器（overflow-hidden），
-      // 因此整块图表保持在区域内，避免被裁掉后缩放手柄不可达。
+      // The sheet area is a fixed-height overflow-hidden container, so keep the whole chart inside
+      // it — otherwise clipping would put the resize handle out of reach.
       return {
         x: Math.round(clamp(start.x + total.x, 0, Math.max(0, area.width - start.width))),
         y: Math.round(clamp(start.y + total.y, 0, Math.max(0, area.height - start.height))),
@@ -204,7 +207,7 @@ export function ChartOverlay({
         event.stopPropagation();
         onSelect();
       }}
-      // z-50：Univer 的渲染层自带 z-index，浮层必须显式高于它们才可交互
+      // z-50: Univer render layers bring their own z-index, so the overlay must sit above them to stay interactive
       className={`absolute z-50 flex flex-col overflow-hidden rounded-lg border bg-white shadow-lg dark:bg-gray-900 ${
         selected
           ? 'border-blue-500 ring-2 ring-blue-500/40'
@@ -291,7 +294,7 @@ export function ChartOverlay({
         ) : null}
       </div>
 
-      {/* 缩放手柄：右下角 */}
+      {/* Resize handle: bottom-right corner */}
       <div
         role="presentation"
         data-testid="sheet-chart-resize"

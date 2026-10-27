@@ -8,8 +8,8 @@ const numberCls =
   'h-8 rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 
 /**
- * 形状可调参数分组（属性面板）：按图形目录声明逐项渲染滑块 + 数值输入 + 重置。
- * 与画布上的黄色调整顶点共用同一份声明与解析器，取值天然一致。
+ * Shape adjustable-parameter group (property panel): renders a slider + number input + reset per catalog declaration.
+ * It shares the same declarations and resolver as the yellow adjustment vertices on the canvas, so values are always consistent.
  */
 export function NodeShapeParamsSection({
   def,
@@ -20,14 +20,14 @@ export function NodeShapeParamsSection({
 }: {
   def: ShapeDef;
   style: FlowNodeStyle;
-  /** 目标节点 id（通常为单个选中节点） */
+  /** Target node id (usually a single selected node) */
   ids: string[];
   w: number;
   h: number;
 }) {
   const { t } = useTranslation();
   const adjusts = adjustsFor(def);
-  /** 连续编辑（拖动滑块 / 输入）合并为一次撤销 */
+  /** Continuous edits (dragging the slider / typing) coalesce into one undo step */
   const session = useRef(false);
   const begin = () => {
     if (!session.current) {

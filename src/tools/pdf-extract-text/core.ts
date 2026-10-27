@@ -6,7 +6,7 @@ export interface ExtractedText {
   pages: number;
 }
 
-/** 将一页的 pdfjs 文本项拼接为纯文本（保留行间合并） */
+/** Join a page's pdfjs text items into plain text (line merging preserved) */
 export function joinTextItems(items: Array<{ str?: string }>): string {
   return items
     .map((it) => it.str ?? '')

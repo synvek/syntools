@@ -1,15 +1,15 @@
 /**
- * LaTeX 快捷符号与经典公式（插入片段）。
+ * LaTeX shortcut symbols and classic formulas (insertable snippets).
  */
 
 export interface LatexSnippet {
-  /** 按钮上显示的简短标签 */
+  /** Short label shown on the button */
   label: string;
-  /** 插入的 LaTeX */
+  /** LaTeX to insert */
   latex: string;
-  /** 中文说明（tooltip） */
+  /** Chinese description (tooltip) */
   hintZh: string;
-  /** 英文说明（tooltip） */
+  /** English description (tooltip) */
   hintEn: string;
 }
 
@@ -285,15 +285,30 @@ export const LATEX_CATEGORIES: LatexCategory[] = [
   {
     id: 'matrix',
     items: [
-      sn('2×2', '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', '2×2 圆括号矩阵', '2×2 parenthesis matrix'),
+      sn(
+        '2×2',
+        '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}',
+        '2×2 圆括号矩阵',
+        '2×2 parenthesis matrix',
+      ),
       sn(
         '3×3',
         '\\begin{pmatrix} a & b & c \\\\ d & e & f \\\\ g & h & i \\end{pmatrix}',
         '3×3 圆括号矩阵',
         '3×3 parenthesis matrix',
       ),
-      sn('bmatrix', '\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}', '方括号矩阵', 'Bracket matrix'),
-      sn('vmatrix', '\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}', '行列式竖线矩阵', 'Determinant matrix'),
+      sn(
+        'bmatrix',
+        '\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}',
+        '方括号矩阵',
+        'Bracket matrix',
+      ),
+      sn(
+        'vmatrix',
+        '\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}',
+        '行列式竖线矩阵',
+        'Determinant matrix',
+      ),
       sn('V', '\\begin{pmatrix} x \\\\ y \\\\ z \\end{pmatrix}', '列向量', 'Column vector'),
       sn('row', '\\begin{pmatrix} x & y & z \\end{pmatrix}', '行向量', 'Row vector'),
       sn('⋯', '\\cdots', '水平省略号（居中）', 'Centered horizontal dots'),
@@ -406,13 +421,13 @@ export function getClassicFormula(id: string): ClassicFormula | undefined {
   return CLASSIC_FORMULAS.find((f) => f.id === id);
 }
 
-/** 组合符号 tooltip：说明 + LaTeX */
+/** Accented-symbol tooltip: description plus LaTeX */
 export function formatSnippetTooltip(item: LatexSnippet, lang: string): string {
   const desc = lang.toLowerCase().startsWith('zh') ? item.hintZh : item.hintEn;
   return `${desc}\n${item.latex}`;
 }
 
-/** 插入片段后光标宜落在首个空 `{}` 内 */
+/** After insertion the caret should land inside the first empty `{}` */
 export function preferredCursorOffset(snippet: string): number {
   const idx = snippet.indexOf('{}');
   if (idx >= 0) return idx + 1;

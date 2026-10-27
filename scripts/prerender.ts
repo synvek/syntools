@@ -1,5 +1,5 @@
-// 类型从 vitest/config 导入（其 re-export 的 vite 类型与 defineConfig 同一副本，
-// 避免 vitest 内嵌 vite5 与顶层 vite6 的 Plugin 类型冲突）
+// Import the type from vitest/config: its re-exported vite types share a copy with defineConfig,
+// avoiding a Plugin type clash between vitest's bundled vite5 and the top-level vite6
 import type { Plugin } from 'vitest/config';
 import type { ToolMeta } from '../src/core/types';
 import { createServer } from 'vite';
@@ -7,40 +7,41 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve as resolvePath } from 'node:path';
 
 /**
- * SEO 预渲染插件（Tasks T31）：构建结束后为首页、工具页与静态页生成含
- * title / description / canonical / hreflang / Open Graph / JSON-LD 的静态 HTML，
- * 并在 `#root` 内注入可索引的正文骨架（H1 + 说明 + 站内内链），
- * 同时输出 robots.txt 与 sitemap.xml。
+ * SEO prerender plugin (Tasks T31): after the build it generates static HTML for the home page,
+ * tool pages and static pages with title / description / canonical / hreflang / Open Graph /
+ * JSON-LD, injects an indexable content shell into `#root` (H1 + copy + internal links), and
+ * also emits robots.txt and sitemap.xml.
  *
- * **输出两棵语言树**（这是 2026-10 的改动）：
+ * **Two language trees are written** (this changed in 2026-10):
  *
- * | 目录 | 语言 | `<html lang>` |
+ * | Directory | Language | `<html lang>` |
  * | ---- | ---- | ------------- |
- * | `dist/`、`dist/tools/<id>/`、`dist/pricing/` … | en | `en` |
- * | `dist/zh/`、`dist/zh/tools/<id>/` … | zh-CN | `zh-CN` |
+ * | `dist/`, `dist/tools/<id>/`, `dist/pricing/` … | en | `en` |
+ * | `dist/zh/`, `dist/zh/tools/<id>/` … | zh-CN | `zh-CN` |
  *
- * 在此之前整站只有一套写死中文的 head，于是 Bing / Google 抓到的唯一结论是
- * 「这是中文站」——9 种界面语言对搜索引擎等于不存在。现在每条页面都带自己的
- * 语言声明与 `hreflang` 三向互指（en / zh-CN / x-default）。
+ * Before this the whole site had one hard-coded Chinese head, so all Bing / Google concluded
+ * was "a Chinese site" — the 9 UI languages effectively did not exist for search engines.
+ * Now every page declares its language and the three-way `hreflang` set (en / zh-CN / x-default).
  *
- * 说明：
- * - 在 closeBundle 阶段（产物已落盘）读取 dist/index.html 作为模板；
- * - 工具元数据、SEO 文案、语言包都经编程式 createServer + ssrLoadModule 读取
- *   （走 Vite 模块管线，自动解析整条依赖链上的 `@/` 别名；build 环境的插件上下文
- *   不提供 ssrLoadModule，vite.config.ts 又被 esbuild 打包无法静态 import 别名模块）。
- *   这条链上只有 type-only 导入与不执行的懒加载工厂，SSR 加载安全；
- * - 文案与运行时共用 `src/core/seo/copy.ts`，保证 head 里的标题/描述与页面
- *   切换语言后同步出来的值一致；
- * - Cloudflare Pages / Vercel 均优先返回真实静态文件，SPA fallback 不受影响；
- * - 注入的正文位于 `#root` 内：`createRoot().render()` 首次提交时会清空容器
- *   已有子节点，因此不会与 React 渲染结果重复；若 JS 未加载，用户仍能看到
- *   可读的静态内容（渐进增强，而非降级）。
+ * Notes:
+ * - During closeBundle (artifacts already on disk) dist/index.html is read as the template;
+ * - Tool metadata, SEO copy and locale bundles are read via a programmatic createServer +
+ *   ssrLoadModule (through the Vite module pipeline, which resolves `@/` aliases along the whole
+ *   dependency chain; the build-time plugin context has no ssrLoadModule, and vite.config.ts is
+ *   bundled by esbuild so alias modules cannot be statically imported).
+ *   That chain only contains type-only imports and lazy factories that never run, so SSR is safe;
+ * - Copy is shared with the runtime through `src/core/seo/copy.ts`, so head titles/descriptions
+ *   match what the page produces after a language switch;
+ * - Cloudflare Pages / Vercel serve real static files first, so SPA fallback is unaffected;
+ * - The injected body lives inside `#root`: the first `createRoot().render()` commit clears
+ *   existing children, so it never duplicates the React output; if JS never loads, users still
+ *   get readable static content (progressive enhancement, not degradation).
  */
 
-/** 站点根地址；生产构建未显式传 SITE_URL 时用它兜底，避免 sitemap / canonical 丢失 */
+/** Site root URL; fallback when a production build passes no SITE_URL, so sitemap / canonical are never lost */
 const DEFAULT_SITE_URL = 'https://www.syntools.net';
 
-/** HTML 属性值转义（工具名/描述可能含 & " < > 等字符） */
+/** Escapes HTML attribute values (tool names/descriptions may contain & " < > and friends) */
 function escapeAttr(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -49,7 +50,7 @@ function escapeAttr(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** HTML 文本节点转义（比属性多处理单引号） */
+/** Escapes HTML text nodes (handles single quotes on top of attribute escaping) */
 function escapeText(value: string): string {
   return escapeAttr(value).replace(/'/g, '&#39;');
 }
@@ -57,9 +58,9 @@ function escapeText(value: string): string {
 const BRAND = 'SynTools';
 
 /**
- * 有独立 URL 的语言。顺序即 `hreflang` 的输出顺序，第一项同时是 `x-default`。
- * 与 `src/core/i18n/routing.ts` 的 `ROUTED_LANGS` 必须一致——两边都由
- * 「只有 en / zh 值得为 SEO 建路径」这个判断推导而来。
+ * Languages with their own URL. The order is the `hreflang` output order and the first entry
+ * is also `x-default`. Must match `ROUTED_LANGS` in `src/core/i18n/routing.ts` — both derive
+ * from the same call: only en / zh are worth separate paths for SEO.
  */
 const LOCALES = [
   { lang: 'en', prefix: '', htmlLang: 'en', ogLocale: 'en_US' },
@@ -69,9 +70,9 @@ const LOCALES = [
 type LocaleConf = (typeof LOCALES)[number];
 type LocaleCode = LocaleConf['lang'];
 
-/** 预渲染正文骨架的样式：内联注入，不依赖 JS，亮/暗色都保持可读 */
+/** Style for the prerendered content shell: inlined, JS-free, readable in light and dark */
 const SHELL_STYLE = `
-/* 与 theme-init.js 一致地按系统偏好铺底色，避免 React 挂载前出现反色闪光 */
+/* Paint the base colour from the system preference like theme-init.js, avoiding a colour flash before React mounts */
 html { background: #ffffff; }
 #root > .seo-shell {
   max-width: 56rem; margin: 0 auto; padding: 32px 24px 64px;
@@ -98,10 +99,10 @@ html { background: #ffffff; }
 }
 `.trim();
 
-/** 与语言无关的站点路径：静态页统一带尾斜杠，与静态托管目录结构一致 */
+/** Language-neutral site paths: static pages keep a trailing slash to match the hosting directory layout */
 const STATIC_PATHS = ['/download/', '/pricing/', '/security/', '/privacy/', '/about/'] as const;
 
-/** 给「语言无关路径」加前缀：`/pricing/` → `/zh/pricing/` */
+/** Prefixes a language-neutral path: `/pricing/` → `/zh/pricing/` */
 function localize(path: string, conf: LocaleConf): string {
   return path === '/' ? `${conf.prefix}/` : `${conf.prefix}${path}`;
 }
@@ -111,14 +112,14 @@ interface MetaOpts {
   description: string;
   siteUrl: string | null;
   path: string;
-  /** 语言无关路径，用于生成三向 hreflang */
+  /** Language-neutral path, used to build the three-way hreflang */
   barePath: string;
   locale: LocaleConf;
-  /** 相对站点的 OG 图路径；不存在则回退品牌默认图，都没有则省略 */
+  /** Site-relative OG image path; falls back to the brand default, omitted when neither exists */
   ogImage: string | null;
 }
 
-/** 站点通用 meta 标签（注入到 </head> 前） */
+/** Shared site meta tags (injected before </head>) */
 function buildMetaTags(opts: MetaOpts): string {
   const { title, description, siteUrl, path, barePath, locale, ogImage } = opts;
   const absolute = (p: string): string => (siteUrl ? siteUrl + p : p);
@@ -142,8 +143,8 @@ function buildMetaTags(opts: MetaOpts): string {
     tags.push(`<meta property="og:url" content="${escapeAttr(absolute(path))}" />`);
     tags.push(`<link rel="canonical" href="${escapeAttr(absolute(path))}" />`);
   }
-  // hreflang 三向互指：每条 URL 都声明自己是哪一语言、另一语言在哪、默认指向谁。
-  // 少任何一条，Google 都可能把两棵树当成重复内容只保留一棵。
+  // Three-way hreflang: every URL states its own language, where the other one lives, and the
+  // default. Miss any one and Google may treat the two trees as duplicates and keep just one.
   for (const alt of LOCALES) {
     const href = absolute(localize(barePath, alt));
     tags.push(`<link rel="alternate" hreflang="${alt.htmlLang}" href="${escapeAttr(href)}" />`);
@@ -161,7 +162,7 @@ function buildMetaTags(opts: MetaOpts): string {
   return tags.join('\n    ');
 }
 
-/** 工具页结构化数据：让搜索结果有机会出富摘要（免费在线工具 + 面包屑） */
+/** Tool page structured data, giving search results a chance at rich snippets (free online tool + breadcrumbs) */
 function buildToolJsonLd(opts: {
   siteUrl: string | null;
   path: string;
@@ -207,7 +208,7 @@ function buildToolJsonLd(opts: {
   return `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
 }
 
-/** 正文骨架：React 挂载后被替换，但爬虫与无 JS 环境可读 */
+/** Content shell: replaced once React mounts, but readable by crawlers and no-JS clients */
 function buildShell(bodyHtml: string): string {
   return `<div class="seo-shell">${bodyHtml}</div>`;
 }
@@ -234,13 +235,13 @@ type PrerenderTool = Pick<
   'id' | 'name' | 'description' | 'category' | 'weight' | 'relatedIds'
 >;
 
-/** 语言包中预渲染用到的部分 */
+/** The parts of the locale bundle used by prerendering */
 interface LocaleShell {
   categories?: Record<string, string>;
   toolsMeta?: Record<string, { name?: string; description?: string }>;
 }
 
-/** SEO 文案模块的形状（与 src/core/seo/copy.ts 对应） */
+/** Shape of the SEO copy module (matches src/core/seo/copy.ts) */
 interface SeoCopyModule {
   SITE_TITLE: Record<LocaleCode, string>;
   SITE_DESCRIPTION: Record<LocaleCode, string>;
@@ -249,7 +250,7 @@ interface SeoCopyModule {
   pageTitle: (title: string | null | undefined, lang: LocaleCode) => string;
 }
 
-/** 只给预渲染用的正文素材（与 src/core/seo/sections.ts 对应） */
+/** Body material used only for prerendering (matches src/core/seo/sections.ts) */
 interface SeoSectionsModule {
   SHELL_TEXT: Record<LocaleCode, SeoShellText>;
   STATIC_PAGE_SECTIONS: Record<LocaleCode, Record<string, SeoSection[]>>;
@@ -278,7 +279,7 @@ interface SsrBundle {
   shells: Record<LocaleCode, LocaleShell>;
 }
 
-/** 经编程式 dev server 的 SSR 管线加载注册表 / 文案 / 语言包（解析 @/ 别名） */
+/** Loads registry / copy / locale bundles through a programmatic dev server's SSR pipeline (resolves @/ aliases) */
 async function loadSsr(root: string): Promise<SsrBundle> {
   const server = await createServer({
     configFile: false,
@@ -300,7 +301,7 @@ async function loadSsr(root: string): Promise<SsrBundle> {
   }
 }
 
-/** 读取已生成的 OG 图清单（构建前放 public/og/<id>.png 即可按工具出图） */
+/** Reads the generated OG image list (drop public/og/<id>.png before building to get per-tool images) */
 async function readOgImages(distDir: string): Promise<Set<string>> {
   try {
     const files = await readdir(resolvePath(distDir, 'og'));
@@ -330,7 +331,7 @@ export function prerenderPlugin(): Plugin {
       try {
         template = await readFile(indexPath, 'utf-8');
       } catch {
-        console.warn('[prerender] 未找到 dist/index.html，跳过预渲染');
+        console.warn('[prerender] dist/index.html not found, skipping prerender');
         return;
       }
 
@@ -338,7 +339,7 @@ export function prerenderPlugin(): Plugin {
       try {
         bundle = await loadSsr(root);
       } catch (err) {
-        console.warn('[prerender] 加载注册表失败，跳过预渲染：', err);
+        console.warn('[prerender] failed to load the registry, skipping prerender:', err);
         return;
       }
       const { tools, seo, sections, shells } = bundle;
@@ -347,7 +348,7 @@ export function prerenderPlugin(): Plugin {
       const hasDefaultOg = ogFiles.has('default.png');
       const defaultOg = hasDefaultOg ? '/og/default.png' : null;
 
-      /** 某个语言下的工具名与说明；缺译文时退回注册表里的中文原文 */
+      /** Tool name and description for a language; falls back to the registry's Chinese original */
       const toolText = (
         tool: PrerenderTool,
         lang: LocaleCode,
@@ -359,7 +360,7 @@ export function prerenderPlugin(): Plugin {
         };
       };
 
-      /** 每个工具取同分类的其它工具作为内链（有 relatedIds 时优先），最多 8 个 */
+      /** Other tools in the same category as internal links (relatedIds first), at most 8 */
       const relatedOf = (tool: PrerenderTool): PrerenderTool[] => {
         const byId = new Map(tools.map((t) => [t.id, t]));
         if (tool.relatedIds?.length) {
@@ -400,7 +401,7 @@ export function prerenderPlugin(): Plugin {
           template
             .replace(/<html[^>]*>/, `<html lang="${opts.locale.htmlLang}">`)
             .replace(/<title>[^<]*<\/title>/, `<title>${escapeText(opts.title)}</title>`)
-            // 模板里的 title / description 是英文兜底，预渲染页面必须换成自己的
+            // The template's title / description are the English fallback; prerendered pages must replace them
             .replace(/<meta\s+name="description"[^>]*>\s*/i, '')
             .replace('</head>', `    ${head}\n  </head>`)
             .replace('<div id="root"></div>', `<div id="root">${buildShell(opts.bodyHtml)}</div>`)
@@ -426,7 +427,7 @@ export function prerenderPlugin(): Plugin {
           },
         };
 
-        // 首页：注入站点级 meta + 全量分类内链（给爬虫一张完整地图）
+        // Home: site-level meta plus a full category link map (a complete map for crawlers)
         const homePath = localize('/', locale);
         const homeFile = resolvePath(distDir, homePath.replace(/^\/+/, ''), 'index.html');
         await mkdir(dirname(homeFile), { recursive: true });
@@ -445,7 +446,7 @@ export function prerenderPlugin(): Plugin {
         );
         written.push(homePath);
 
-        // 工具页：/tools/<id>/index.html（静态托管优先于 SPA fallback 命中）
+        // Tool pages: /tools/<id>/index.html (static hosting wins over the SPA fallback)
         for (const tool of tools) {
           const bare = `/tools/${tool.id}/`;
           const path = ctx.href(bare);
@@ -477,11 +478,11 @@ export function prerenderPlugin(): Plugin {
           written.push(path);
         }
 
-        // 静态页：/download/ /pricing/ /security/ /privacy/ /about/
+        // Static pages: /download/ /pricing/ /security/ /privacy/ /about/
         for (const bare of STATIC_PATHS) {
           const page = ctx.staticPage(bare);
           if (!page) {
-            console.warn(`[prerender] 缺少 ${locale.lang} 的静态页文案：${bare}`);
+            console.warn(`[prerender] missing ${locale.lang} copy for static page: ${bare}`);
             continue;
           }
           const path = ctx.href(bare);
@@ -506,22 +507,23 @@ export function prerenderPlugin(): Plugin {
 
       // robots.txt
       //
-      // 立场：允许检索与「答案引擎」抓取，但保留对训练用途的权利（EU DSM 第 4 条）。
-      // 这是刻意的选择 —— 工具站的流量全部来自「被搜到 / 被 AI 引用」，
-      // 用 Disallow 把抓取挡掉等于自断入口；而 Content-Signal 只是权利声明，
-      // 不影响抓取，两者可以同时成立。
+      // Position: allow search and "answer engine" crawling, but reserve rights for training use
+      // (EU DSM Article 4). This is deliberate — a tool site's traffic comes entirely from "being
+      // found / being cited by AI", so blocking crawlers with Disallow cuts off its own entry
+      // point; Content-Signal is merely a rights statement and does not affect crawling, so both
+      // can hold at once.
       //
-      // 注意：Cloudflare 的 AI Crawl Control 若开启了「托管 robots.txt /
-      // Bot Preference Sync」，会在本文件**前面**注入一大段 Disallow，
-      // 并在边缘直接返回 403（实测 GPTBot / ClaudeBot 会 403）。
-      // 那种情况下改这个文件无效，必须去控制台关掉那个开关。
+      // Note: if Cloudflare's AI Crawl Control enables "managed robots.txt / Bot Preference
+      // Sync", it injects a large Disallow block **in front of** this file and returns 403 at the
+      // edge (GPTBot / ClaudeBot were observed getting 403). Editing this file cannot help then;
+      // turn that switch off in the dashboard.
       const robots = [
-        '# 欢迎检索与答案引擎抓取，包括 Baiduspider / Bingbot / GPTBot / ClaudeBot',
+        '# Search and answer-engine crawling is welcome, including Baiduspider / Bingbot / GPTBot / ClaudeBot',
         '',
-        '# Baiduspider 单独成组：本站无 ICP 备案（境外托管），百度后台的',
-        '# 「普通收录 → sitemap」提交配额固定为 0 条/日，按钮置灰不可用。',
-        '# 百度此时唯一可用的 sitemap 通道，是它读取 robots.txt 时发现的',
-        '# Sitemap 指令 —— 因此这条必须写在 Baiduspider 自己的分组里。',
+        '# Baiduspider gets its own group: the site has no ICP filing (hosted abroad), so the',
+        '# "regular indexing -> sitemap" quota in Baidu Webmaster is fixed at 0/day and the UI is greyed out.',
+        '# The only sitemap channel Baidu still honours is the Sitemap directive it finds while',
+        '# reading robots.txt — hence it must live inside the Baiduspider group itself.',
         'User-agent: Baiduspider',
         'Allow: /',
         `Sitemap: ${siteUrl}/sitemap.xml`,
@@ -529,7 +531,7 @@ export function prerenderPlugin(): Plugin {
         'User-agent: *',
         'Allow: /',
         '',
-        '# 权利保留：允许索引与引用，不授权用于模型训练',
+        '# Rights reserved: indexing and citation allowed, model training not licensed',
         'Content-Signal: search=yes, ai-train=no, use=reference',
         '',
         `Sitemap: ${siteUrl}/sitemap.xml`,
@@ -537,7 +539,7 @@ export function prerenderPlugin(): Plugin {
       ].join('\n');
       await writeFile(resolvePath(distDir, 'robots.txt'), robots, 'utf-8');
 
-      // sitemap.xml：每条「语言无关路径」展开成两条 URL，各自带三向 alternates
+      // sitemap.xml: each language-neutral path expands into two URLs, each with three-way alternates
       const barePaths = ['/', ...STATIC_PATHS, ...tools.map((tool) => `/tools/${tool.id}/`)];
       await writeFile(
         resolvePath(distDir, 'sitemap.xml'),
@@ -545,44 +547,44 @@ export function prerenderPlugin(): Plugin {
         'utf-8',
       );
 
-      // GitHub Pages：无服务端 SPA fallback，用 404.html 回退到应用壳
+      // GitHub Pages: no server-side SPA fallback, so 404.html falls back to the app shell
       await writeFile(
         resolvePath(distDir, '404.html'),
         await readFile(indexPath, 'utf-8'),
         'utf-8',
       );
-      // 禁止 Jekyll 处理，保留 _headers 等以下划线开头的文件
+      // Disable Jekyll so underscore-prefixed files such as _headers are kept
       await writeFile(resolvePath(distDir, '.nojekyll'), '', 'utf-8');
 
       console.log(
-        `预渲染完成：${LOCALES.length} 种语言 × ${tools.length} 个工具页 + ${STATIC_PATHS.length} 个静态页 = ${written.length} 个页面 + robots.txt + sitemap.xml（${barePaths.length * LOCALES.length} 个 URL）+ 404.html`,
+        `Prerender complete: ${LOCALES.length} languages × ${tools.length} tool pages + ${STATIC_PATHS.length} static pages = ${written.length} pages + robots.txt + sitemap.xml (${barePaths.length * LOCALES.length} URLs) + 404.html`,
       );
     },
   };
 }
 
 /**
- * 单个语言下生成正文骨架所需的上下文。
+ * Context needed to build the content shell for one language.
  *
- * 打包成一个对象而不是六个位置参数：三个骨架函数都要用其中大半，
- * 逐个传会让调用处变成一长串看不出含义的 `locale, seo, shell, href`。
+ * Bundled into an object instead of six positional arguments: all three shell builders use most
+ * of it, and passing them individually makes call sites unreadable `locale, seo, shell, href` runs.
  */
 interface LocaleCtx {
   locale: LocaleConf;
-  /** 该语言的外壳语言包（分类名、toolsMeta） */
+  /** The shell locale bundle for this language (category names, toolsMeta) */
   shell: LocaleShell;
-  /** 骨架里的固定句子 */
+  /** Fixed sentences used in the shell */
   text: SeoShellText;
   seo: SeoCopyModule;
-  /** 站内链接加上语言前缀 */
+  /** Adds the language prefix to an in-site link */
   href: (path: string) => string;
-  /** 取静态页文案 + 该语言的小节 */
+  /** Gets static page copy plus that language's sections */
   staticPage: (
     bare: string,
   ) => { title: string; description: string; sections: SeoSection[] } | null;
 }
 
-/** 首页正文骨架：按分类列出全部工具，形成可抓取的站内链接图 */
+/** Home shell: lists every tool by category, forming a crawlable internal link map */
 function buildHomeBody(tools: PrerenderTool[], ctx: LocaleCtx): string {
   const byCategory = new Map<string, PrerenderTool[]>();
   for (const tool of tools) {
@@ -611,7 +613,7 @@ function buildHomeBody(tools: PrerenderTool[], ctx: LocaleCtx): string {
   ].join('');
 }
 
-/** 静态页正文骨架：标题 + 一句话说明 + 小节 + 站内互链 */
+/** Static page shell: title + one-line lead + sections + cross links */
 function buildStaticBody(
   page: { title: string; description: string; sections: SeoSection[] },
   barePath: string,
@@ -626,7 +628,7 @@ function buildStaticBody(
           .join('')}</ul>`,
     )
     .join('');
-  // 互链只连「有文案」的页，避免静态骨架里出现空标题链接
+  // Only link pages that have copy, so the shell never shows a link with an empty title
   const siblings = STATIC_PATHS.filter((path) => path !== barePath && ctx.staticPage(path))
     .map((path) => `<a href="${ctx.href(path)}">${escapeText(ctx.staticPage(path)!.title)}</a>`)
     .join(' · ');
@@ -639,7 +641,7 @@ function buildStaticBody(
   ].join('');
 }
 
-/** 工具页正文骨架：说明 + 同分类内链 + 返回入口 */
+/** Tool page shell: description + same-category links + entry back to the site */
 function buildToolBody(tool: PrerenderTool, related: PrerenderTool[], ctx: LocaleCtx): string {
   const self = ctx.shell.toolsMeta?.[tool.id];
   const relatedHtml = related.length

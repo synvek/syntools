@@ -8,17 +8,17 @@ import { THEMES, type ThemeId } from '../model/themes';
 const btnCls =
   'flex-1 rounded-md border border-gray-200 px-2 py-1 text-[12px] text-gray-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-blue-500/10';
 
-/** 主题 / 样式预设 + 格式刷（工具栏弹层） */
+/** Themes / style presets + format painter (toolbar popover) */
 export function ThemePanel() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeId>('business');
-  /** 主题是否已从本地恢复（避免用默认值覆盖已存选择） */
+  /** Whether the theme has been restored locally (avoiding defaults overwriting a stored choice) */
   const [ready, setReady] = useState(false);
   const brush = useFlowStore((s) => s.styleBrush);
   const selectedCount = useFlowStore((s) => s.selectedNodes.length);
 
-  // 恢复上次选择的主题；IndexedDB 不可用则保持默认
+  // Restore the last selected theme; keep the default when IndexedDB is unavailable
   useEffect(() => {
     let alive = true;
     void loadPersistedSession().then((s) => {
@@ -31,7 +31,7 @@ export function ThemePanel() {
     };
   }, []);
 
-  // 主题变更后持久化
+  // Persist after the theme changes
   useEffect(() => {
     if (!ready) return;
     void savePersistedSession({ theme });
@@ -63,7 +63,7 @@ export function ThemePanel() {
 
       {open ? (
         <div className="absolute left-0 top-9 z-30 w-80 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-          {/* 20 套主题：三列铺开，超出上限时纵向滚动，避免弹层过高 */}
+          {/* 20 themes laid out in three columns, scrolling vertically past the cap so the popover does not grow too tall */}
           <div className="grid max-h-64 grid-cols-3 gap-1 overflow-y-auto pr-0.5">
             {THEMES.map((item) => {
               const label = t(`tools.flowchart.theme${item.labelKey}`);

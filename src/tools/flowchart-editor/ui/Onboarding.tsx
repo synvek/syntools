@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { markOnboardingSeen } from './onboardingStorage';
 
-/** 引导步骤（i18n 键后缀） */
+/** Onboarding steps (i18n key suffixes) */
 const STEPS = [
   'onboardingStepPalette',
   'onboardingStepConnect',
@@ -11,8 +11,8 @@ const STEPS = [
 ] as const;
 
 /**
- * 首启引导：轻量分步提示核心操作，可跳过；关闭后写入已读标记，不再自动弹出。
- * 也可从空状态或快捷键帮助中再次打开。
+ * First-run onboarding: lightweight step-by-step hints for the core operations, skippable; closing it stores a seen flag so it never
+ * opens automatically again. It can also be reopened from the empty state or shortcut help.
  */
 export function Onboarding({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();

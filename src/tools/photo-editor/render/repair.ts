@@ -4,32 +4,32 @@ import type { Selection } from '../model/types';
 import { createStampSession, type StampHost, type StampSession } from './stamp';
 
 /**
- * 修复类工具族：仿制图章 / 修复画笔 / 污点修复 / 涂抹 / 模糊 / 锐化。
+ * Healing tool family: clone stamp / healing brush / spot healing / smudge / blur / sharpen.
  *
- * 全部建立在 `render/stamp.ts` 的印章会话上，本模块只实现「一枚印章里像素怎么变」：
- * - **图章**：从落笔时拍下的图层快照按固定偏移复制（源点跟随笔头移动）；
- * - **修复**：复制源纹理，但按「源区均值 → 目标区均值」的增量做色彩匹配（去瑕疵同时保色）；
- * - **污点修复**：不做取样，直接用笔头外环的均值填充（简化实现，见文末说明）；
- * - **涂抹**：把上一次印章的结果当缓冲拖过来，形成晕开；
- * - **模糊 / 锐化**：对印章局部做盒式模糊，再按权重混合（锐化用 unsharp：原图减去模糊）。
+ * All build on the stamp session in `render/stamp.ts`; this module only defines what one stamp does:
+ * - **stamp**: copy from the snapshot taken at stroke start at a fixed offset (the source follows the tip);
+ * - **healing**: copy source texture, shifted by "source mean → target mean" to match color while keeping it;
+ * - **spot healing**: no sampling, just fill with the mean of the tip's outer ring (simplified, see below);
+ * - **smudge**: drag the previous stamp's result along as a buffer, smearing it;
+ * - **blur / sharpen**: box-blur the stamp locally, then blend by weight (sharpen uses unsharp masking).
  */
 
 export type RepairMode = 'clone' | 'heal' | 'spot' | 'smudge' | 'blur' | 'sharpen';
 
 export interface RepairOptions {
   mode: RepairMode;
-  /** 文档坐标下的笔头直径 */
+  /** Tip diameter in document units */
   size: number;
-  /** 0~100 的强度（不透明度） */
+  /** Strength 0~100 (opacity) */
   strength: number;
   selection: Selection | null;
-  /** 图章 / 修复的取样点（文档坐标） */
+  /** Sample point for stamp / healing (document coordinates) */
   source?: { x: number; y: number } | null;
 }
 
 export type RepairSession = StampSession;
 
-/** 一次笔画 = 一张快照：边涂边取样会让图案自我复制出「拖影」 */
+/** One stroke = one snapshot: sampling while painting would clone the pattern onto itself (smearing) */
 function snapshotOf(host: StampHost): HTMLCanvasElement | null {
   const asset = getCanvas(host.assetId);
   if (!asset) return null;
@@ -52,7 +52,7 @@ export function createCloneSession(host: StampHost, options: RepairOptions): Rep
   const mode = options.mode;
   const source = options.source ?? null;
 
-  /** 源点相对笔头的固定偏移：落笔第一枚印章时确定（等价于 Photoshop 的「对齐」关闭） */
+  /** Fixed offset of the source from the tip, set at the first stamp (like Photoshop with "aligned" off) */
   let offset: { x: number; y: number } | null = null;
 
   return createStampSession(host, {
@@ -69,7 +69,7 @@ export function createCloneSession(host: StampHost, options: RepairOptions): Rep
 
       const count = frame.width * frame.height;
 
-      // 污点修复：用笔头外环（1.0~1.5 倍半径）的均值直接覆盖，不需要取样点
+      // Spot healing: fill with the mean of the outer ring (1.0~1.5× radius); no sample point needed
       if (mode === 'spot') {
         const ring = ringMean(asset, ctx, cx, cy, options.size / 2, sx, sy);
         if (!ring) return false;
@@ -94,7 +94,7 @@ export function createCloneSession(host: StampHost, options: RepairOptions): Rep
 
       const shift = offset;
       if (!shift) return false;
-      // 源区块与印章同尺寸一次取出：逐像素 getImageData 会慢到不可用
+      // Read the source block at stamp size in one go: per-pixel getImageData would be unusably slow
       const sourceFrame = snapshotCtx.getImageData(
         Math.round(frame.left + shift.x),
         Math.round(frame.top + shift.y),
@@ -104,7 +104,7 @@ export function createCloneSession(host: StampHost, options: RepairOptions): Rep
       const weights = new Float32Array(count);
       for (let index = 0; index < count; index += 1) weights[index] = frame.weightAt(index);
 
-      // 修复：把源区均值平移到目标区均值，保留源纹理的同时匹配目标色彩
+      // Healing: shift the source mean onto the target mean, keeping texture while matching color
       let colorShift: [number, number, number] = [0, 0, 0];
       if (mode === 'heal') {
         const sourceMean = weightedMean(sourceFrame.data, weights);
@@ -138,7 +138,7 @@ export function createCloneSession(host: StampHost, options: RepairOptions): Rep
   });
 }
 
-/** 印章内（权重 > 0 且不透明）的加权均值 */
+/** Weighted mean inside the stamp (weight > 0 and opaque) */
 function weightedMean(
   data: Uint8ClampedArray,
   weights: Float32Array,
@@ -159,7 +159,7 @@ function weightedMean(
   return [acc[0] / sum, acc[1] / sum, acc[2] / sum];
 }
 
-/** 笔头外环的均值（污点修复的取样来源） */
+/** Mean of the tip's outer ring (the sample source for spot healing) */
 function ringMean(
   asset: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
@@ -198,10 +198,10 @@ function ringMean(
 }
 
 /**
- * 涂抹：把上一枚印章的结果当作缓冲，按强度拖到当前位置。
+ * Smudge: treat the previous stamp's result as a buffer and drag it here by strength.
  *
- * 缓冲随笔头移动而重新取样，因此连续落章会自然形成「晕开」——
- * 这正是涂抹的本质，而不是简单的高斯模糊。
+ * The buffer re-samples as the tip moves, so consecutive stamps naturally smear —
+ * which is what smudging is, rather than a plain gaussian blur.
  */
 export function createSmudgeSession(host: StampHost, options: RepairOptions): RepairSession | null {
   const amount = Math.max(0, Math.min(100, options.strength)) / 100;
@@ -214,7 +214,7 @@ export function createSmudgeSession(host: StampHost, options: RepairOptions): Re
       const count = frame.width * frame.height;
       const current = new Uint8ClampedArray(frame.data);
       if (!buffer || buffer.width !== frame.width || buffer.height !== frame.height) {
-        // 首章 / 包围盒尺寸变化（贴边）：本次仅初始化缓冲，不改画面
+        // First stamp, or the bbox changed size (hitting an edge): just initialize the buffer, draw nothing
         buffer = { width: frame.width, height: frame.height, data: current };
         return false;
       }
@@ -242,7 +242,7 @@ export function createSmudgeSession(host: StampHost, options: RepairOptions): Re
   });
 }
 
-/** 模糊 / 锐化笔：局部盒式模糊，再按权重混合（锐化用 unsharp 反推） */
+/** Blur / sharpen tip: local box blur, then blend by weight (sharpen inverts it as unsharp masking) */
 export function createFocusSession(host: StampHost, options: RepairOptions): RepairSession | null {
   const amount = Math.max(0, Math.min(100, options.strength)) / 100;
   const sharpen = options.mode === 'sharpen';
@@ -275,9 +275,9 @@ export function createFocusSession(host: StampHost, options: RepairOptions): Rep
 }
 
 /**
- * 盒式模糊（可分离：先横向再纵向，O(w·h·r) 的两遍扫描）。
+ * Box blur (separable: horizontal then vertical, two passes at O(w·h·r)).
  *
- * 导出为实现细节供测试使用：jsdom 没有 2D 上下文，像素运算只能靠这类纯函数覆盖。
+ * Exported for tests: jsdom has no 2D context, so pixel math can only be covered through pure functions.
  */
 export function boxBlurRgba(
   data: Uint8ClampedArray,
@@ -289,7 +289,7 @@ export function boxBlurRgba(
   const out = new Uint8ClampedArray(data.length);
   const temp = new Float32Array(data.length);
   const windowSize = r * 2 + 1;
-  // 横向
+  // Horizontal
   for (let y = 0; y < height; y += 1) {
     for (let channel = 0; channel < 4; channel += 1) {
       let acc = 0;
@@ -304,7 +304,7 @@ export function boxBlurRgba(
       }
     }
   }
-  // 纵向
+  // Vertical
   for (let x = 0; x < width; x += 1) {
     for (let channel = 0; channel < 4; channel += 1) {
       let acc = 0;

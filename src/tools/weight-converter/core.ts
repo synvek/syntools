@@ -1,13 +1,13 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 重量单位转换：全部换算到克后再输出目标单位。
+ * Weight unit conversion: convert everything to grams, then output the target unit.
  */
 
 export type WeightUnit = 'mg' | 'g' | 'kg' | 't' | 'oz' | 'lb' | 'st';
 export type WeightError = 'EMPTY' | 'INVALID';
 
-/** 1 单位 = 多少克 */
+/** How many grams one unit equals */
 export const WEIGHT_TO_GRAMS: Record<WeightUnit, number> = {
   mg: 0.001,
   g: 1,
@@ -22,7 +22,7 @@ export const WEIGHT_UNITS: WeightUnit[] = ['mg', 'g', 'kg', 't', 'oz', 'lb', 'st
 
 export function formatWeight(n: number): string {
   if (!Number.isFinite(n)) return '';
-  // 整数量级的整数直接展示，避免 1000000 → 1e+6
+  // Show whole numbers of order of magnitude directly so 1000000 does not become 1e+6
   if (Number.isInteger(n) && Math.abs(n) < 1e15) return String(n);
   if (Math.abs(n) >= 1e6 || (Math.abs(n) > 0 && Math.abs(n) < 1e-6)) {
     return n.toExponential(6).replace(/\.?0+e/, 'e');
@@ -31,11 +31,7 @@ export function formatWeight(n: number): string {
   return fixed === '-0' ? '0' : fixed;
 }
 
-export function convertWeight(
-  value: string,
-  from: WeightUnit,
-  to: WeightUnit,
-): ToolResult<number> {
+export function convertWeight(value: string, from: WeightUnit, to: WeightUnit): ToolResult<number> {
   const text = value.trim();
   if (!text) return { ok: false, error: 'EMPTY' };
   const n = Number(text);

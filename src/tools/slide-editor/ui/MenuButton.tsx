@@ -1,7 +1,7 @@
 /**
- * 兼容层：下拉菜单按钮已提升为共享实现 `@/core/components/MenuButton`
- * （幻灯片工具栏与文字处理器 / 电子表格 / 幻灯片的导入导出入口共用同一套定位与关闭行为）。
+ * Compatibility layer: the dropdown button now lives in the shared `@/core/components/MenuButton`
+ * (the slide toolbar shares positioning and closing behavior with the word / sheet / slide import-export entry points).
  *
- * 保留本文件与原有导出名，工具内各处的 `./MenuButton` 引用无需改动。
+ * This file and its export names are kept so existing `./MenuButton` imports inside the tool need no changes.
  */
 export { MenuButton, type MenuItem, type MenuButtonProps } from '@/core/components/MenuButton';

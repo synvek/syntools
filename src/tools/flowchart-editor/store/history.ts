@@ -1,28 +1,28 @@
 /**
- * 撤销/重做：**结构 diff 历史**（替代早期「整图快照」方案）。
+ * Undo/redo: **structural diff history** (replacing the earlier whole-graph snapshot approach).
  *
- * 背景：早期 commit 把整个 nodes/edges 数组压栈，大图 + 50 步历史会长期持有
- * 大量数组引用与对象。这里改为只记录「本次变更涉及的节点/边」的 before/after：
- * - 未受影响的节点引用完全不变 → diff 只保存引用，不做深拷贝（不可变更新保证安全）；
- * - 每条历史记录只含真正变动的条目，大图小改动时内存与拷贝成本都接近零。
+ * Background: the earlier commit pushed entire nodes/edges arrays onto the stack, so a large diagram with 50 history steps
+ * held many array references and objects for a long time. Now only the before/after of the nodes/edges touched by a change is recorded:
+ * - unaffected node references stay identical → the diff stores references only, no deep copies (immutable updates keep this safe);
+ * - each history entry holds only entries that really changed, so memory and copy cost stay near zero for small edits on large diagrams.
  *
- * 时序（commit 发生在变更「之前」，因此用 pending 基线做延迟结算）：
- *   commit() ── flush 上一条 pending 的 diff 入栈，再把当前状态记为新的 pending
- *   undo()   ── 先 flush 未入栈的改动，再弹出最后一条 diff 并反向应用
+ * Timing (commit happens *before* a change, so the pending baseline settles it later):
+ * commit() ── flush the previous pending diff onto the stack, then record the current state as the new pending
+ * undo()   ── flush unstacked changes first, then pop the last diff and apply it in reverse
  */
 
 import type { FlowEdge, FlowNode } from './helpers';
 import { HISTORY_LIMIT } from './helpers';
 
 /**
- * 单条 diff：id + 变更前后下标 + before/after（缺省表示「该侧不存在」）。
- * 记录下标是为了还原堆叠顺序（数组顺序即层级），-1 表示该侧不存在。
+ * One diff entry: id + index before and after + before/after (absent means "not present on that side").
+ * Indices are recorded to restore stacking order (array order is layering); -1 means absent on that side.
  */
 export interface ListEntry<T> {
   id: string;
-  /** 变更前下标；-1 表示新增 */
+  /** Index before the change; -1 means inserted */
   prevIndex: number;
-  /** 变更后下标；-1 表示删除 */
+  /** Index after the change; -1 means deleted */
   nextIndex: number;
   before?: T;
   after?: T;
@@ -44,11 +44,11 @@ export interface HistoryState {
   commit: () => void;
   undo: () => void;
   redo: () => void;
-  /** 载入文档后重建基线（keep 为真时保留历史栈，用于快照回滚） */
+  /** Rebuild the baseline after loading a document (keeps the history stack when keep is true, for snapshot rollback) */
   resetHistory: (keep?: boolean) => void;
 }
 
-/** 计算两个数组之间的最小 diff */
+/** Compute the minimal diff between two arrays */
 export function diffList<T extends { id: string }>(
   prev: readonly T[],
   next: readonly T[],
@@ -60,12 +60,12 @@ export function diffList<T extends { id: string }>(
   prev.forEach((item, at) => {
     const after = nextIndex.get(item.id);
     if (after === undefined) {
-      // 删除
+      // Deletion
       out.push({ id: item.id, prevIndex: at, nextIndex: -1, before: item });
       return;
     }
     const nextItem = next[after];
-    // 引用相等且位置未变 → 未变更（不可变更新的核心不变量，短路零成本）
+    // Same reference and same position → unchanged (the core invariant of immutable updates, a zero-cost shortcut)
     if (nextItem === item && after === at) return;
     out.push({ id: item.id, prevIndex: at, nextIndex: after, before: item, after: nextItem });
   });
@@ -77,7 +77,7 @@ export function diffList<T extends { id: string }>(
   return out;
 }
 
-/** 把 diff 应用到数组（dir='undo' 取 before/prevIndex，'redo' 取 after/nextIndex） */
+/** Apply a diff to an array (dir='undo' takes before/prevIndex, 'redo' takes after/nextIndex) */
 export function applyListDiff<T extends { id: string }>(
   list: readonly T[],
   entries: readonly ListEntry<T>[],
@@ -98,17 +98,17 @@ export function applyListDiff<T extends { id: string }>(
 }
 
 /**
- * 创建历史记录切片。
- * pending / 基线保存在闭包里，不进入响应式状态（避免无意义的订阅通知）。
+ * Create the history slice.
+ * pending / baseline live in the closure rather than reactive state (avoiding pointless subscriber notifications).
  */
 export function createHistorySlice<S extends HistoryState & DocSnapshot>(
   set: (partial: Partial<S> | ((state: S) => Partial<S>)) => void,
   get: () => S,
 ): HistoryState {
-  /** 上一次 commit 时的状态（尚未结算的变更基线） */
+  /** State at the previous commit (the baseline of changes not yet settled) */
   let pending: DocSnapshot | null = null;
 
-  /** 结算 pending：把「上一次 commit 之后发生的改动」压缩成一条 diff 入栈 */
+  /** Settle pending: compress "the changes since the previous commit" into one diff entry pushed onto the stack */
   const flush = (): void => {
     if (!pending) return;
     const { nodes, edges } = get();

@@ -3,12 +3,12 @@ import { Icon } from '@/core/components/Icon';
 import { PAGE_THUMB_SIZE } from '@/core/components/pageThumbnail';
 
 /**
- * 多页 / 多画布文档的通用「页面浏览器」（流程图、脑图共用）。
+ * Shared "page browser" for multi-page / multi-canvas documents (flowcharts, mind maps).
  *
- * - 页签条：上一页 / 下一页 / 页码 / 总览 / 新建，页签双击重命名，支持排序与删除；
- * - 总览浮层：以缩略图网格浏览全部页面（缩略图由各工具用自身数据模型绘制），
- *   点击任意页面即切换，`←/→` 可在总览里连续翻页，`Esc` 关闭；
- * - 组件本身不持有业务状态，只通过回调驱动宿主 store，便于在多个工具间复用。
+ * - Tab strip: prev / next / page number / overview / new; double-click renames, tabs reorder and delete;
+ * - Overview overlay: browse all pages as a thumbnail grid (each tool draws thumbnails from its model),
+ *   click a page to switch, `←/→` pages through the grid, `Esc` closes;
+ * - Holds no business state; callbacks drive the host store, keeping it reusable across tools.
  */
 
 export interface PageMeta {
@@ -17,7 +17,7 @@ export interface PageMeta {
 }
 
 export interface PageBrowserLabels {
-  /** 新建页面 / 新建画布 */
+  /** Create a page / canvas */
   add: string;
   renameHint: string;
   moveLeft: string;
@@ -25,13 +25,13 @@ export interface PageBrowserLabels {
   remove: string;
   prev: string;
   next: string;
-  /** 打开总览 */
+  /** Open the overview */
   openOverview: string;
   overviewTitle: string;
   close: string;
-  /** 空白页提示 */
+  /** Empty-page hint */
   empty: string;
-  /** 形如「第 2 / 5 页」，由调用方按当前语言生成 */
+  /** Like "page 2 / 5", formatted by the caller for the active language */
   counter: string;
 }
 
@@ -39,7 +39,7 @@ export interface PageBrowserProps {
   pages: PageMeta[];
   activeId: string;
   labels: PageBrowserLabels;
-  /** 页面缩略图：返回 null 表示该页还没有内容 */
+  /** Page thumbnail: null when the page has no content yet */
   thumbnail: (id: string) => ReactNode;
   onSelect: (id: string) => void;
   onAdd: () => void;
@@ -73,7 +73,7 @@ export function PageBrowser({
     if (next) onSelect(next.id);
   };
 
-  // 总览打开时：Esc 关闭，左右方向键连续翻页
+  // While open: Esc closes, arrow keys page through
   useEffect(() => {
     if (!overviewOpen) return;
     const onKey = (event: KeyboardEvent) => {

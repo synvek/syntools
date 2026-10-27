@@ -27,7 +27,7 @@ export function PropertyPanel() {
   const setSide = useMindStore((s) => s.setSide);
   const toggleCollapseAt = useMindStore((s) => s.toggleCollapseAt);
 
-  // 连续输入只压入一次历史（与 flowchart 属性面板同一约定）
+  // Push a single history entry for a burst of typing (same convention as the flowchart property panel)
   const session = useRef(false);
   const begin = () => {
     if (!session.current) {

@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * HSV / CMYK / RGB / HEX 互转（纯函数）。
+ * HSV / CMYK / RGB / HEX interconversion (pure functions).
  */
 
 export type ColorSpaceError = 'EMPTY' | 'INVALID';
@@ -145,11 +145,7 @@ export function cmykToRgb({ c, m, y, k }: Cmyk): Rgb {
   const mn = clamp(m, 0, 100) / 100;
   const yn = clamp(y, 0, 100) / 100;
   const kn = clamp(k, 0, 100) / 100;
-  return clampRgb(
-    255 * (1 - cn) * (1 - kn),
-    255 * (1 - mn) * (1 - kn),
-    255 * (1 - yn) * (1 - kn),
-  );
+  return clampRgb(255 * (1 - cn) * (1 - kn), 255 * (1 - mn) * (1 - kn), 255 * (1 - yn) * (1 - kn));
 }
 
 export function fromRgb(rgb: Rgb): ColorState {

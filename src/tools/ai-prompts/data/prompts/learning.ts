@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 学习成长类提示词，详见 ../README.md */
+/** Learning and growth prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'learning-study-plan',

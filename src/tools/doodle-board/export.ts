@@ -1,4 +1,4 @@
-/** 导出：离屏合成整幅场景，避免屏幕缩放影响导出分辨率。 */
+/** Export: composite the whole scene offscreen so screen zoom cannot affect export resolution. */
 
 import { downloadBlob } from '@/core/lib/download';
 import type { Scene } from './core';
@@ -6,7 +6,7 @@ import { drawGrid, drawOps } from './render';
 
 export type ExportFormat = 'png' | 'pngAlpha' | 'jpg';
 
-/** `png` 带背景、`pngAlpha` 透明背景、`jpg` 强制白底 */
+/** `png` keeps the background, `pngAlpha` is transparent, `jpg` forces a white background */
 export async function exportScene(scene: Scene, format: ExportFormat): Promise<void> {
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(scene.width));
@@ -18,7 +18,7 @@ export async function exportScene(scene: Scene, format: ExportFormat): Promise<v
   }
 
   if (format !== 'pngAlpha') {
-    // 透明背景导出为 JPG 会变黑，这里统一补一层白底；其余场景用自身底色
+    // Transparent exported as JPG turns black, so add a white base; other cases use their own colour
     ctx.fillStyle = scene.background.kind === 'transparent' ? '#ffffff' : scene.background.color;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (scene.background.kind === 'grid') drawGrid(ctx, canvas.width, canvas.height);

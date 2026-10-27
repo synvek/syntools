@@ -35,7 +35,7 @@ describe('useDeferredCompute', () => {
     rerender({ v: 'abcd' });
     act(() => vi.advanceTimersByTime(100));
     expect(result.current).toBe(4);
-    // 首次同步 1 次 + 延迟 1 次，中间的输入被合并
+    // One sync run plus one deferred run; intermediate inputs are merged
     expect(compute).toHaveBeenCalledTimes(2);
   });
 });

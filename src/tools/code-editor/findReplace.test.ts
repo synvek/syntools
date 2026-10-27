@@ -35,7 +35,7 @@ describe('findMatches', () => {
   it('全词匹配按词字符边界判定（中英文均适用）', () => {
     expect(matchesOf('foo foobar foo_bar', 'foo', { wholeWord: true }).matches).toHaveLength(1);
     expect(matchesOf('中文 中文测试', '中文', { wholeWord: true }).matches).toHaveLength(1);
-    // 非词字符开头的查找内容不做前边界限制
+    // A query starting with a non-word character is not checked for a leading boundary
     expect(matchesOf('a //b //c', '//', { wholeWord: true }).matches).toHaveLength(2);
   });
 

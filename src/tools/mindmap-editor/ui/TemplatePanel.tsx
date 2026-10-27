@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { buildMindTemplate, MIND_TEMPLATES, type MindTemplateKind } from '../model/templates';
 import { themeOf } from '../model/themes';
 
-/** 缩略图：与画布同款的「中心 + 三分支」结构 */
+/** Thumbnail: the same "centre + three branches" structure as the canvas */
 function Preview({ themeId }: { themeId: string }) {
   const theme = themeOf(themeId);
   const branches = [12, 32, 52];

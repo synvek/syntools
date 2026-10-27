@@ -26,7 +26,7 @@ import {
 
 const TIMINGS = ['ease', 'linear', 'ease-in', 'ease-out', 'ease-in-out'] as const;
 
-/** CSS3 代码生成器 */
+/** CSS3 snippet generator */
 export default function Css3GeneratorTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ m: 'borderRadius' }), []);

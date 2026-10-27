@@ -10,10 +10,10 @@ import { getToolMeta } from '@/core/i18n/helpers';
 import type { CategoryId } from '@/core/types';
 
 interface SidebarProps {
-  /** 移动端抽屉模式 */
+  /** Mobile drawer mode */
   mobile?: boolean;
   onClose?: () => void;
-  /** 桌面端折叠整个侧边栏（仅桌面生效，移动抽屉不显示折叠按钮） */
+  /** Collapse the whole sidebar on desktop (desktop only; the mobile drawer hides the toggle) */
   onCollapse?: () => void;
 }
 
@@ -34,19 +34,19 @@ function writeCollapsed(ids: Set<CategoryId>) {
   localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...ids]));
 }
 
-/** 从路径里取工具 id；先剥掉语言前缀，否则 `/zh/tools/x` 匹配不到 */
+/** Get the tool id from the path; strip the locale prefix or `/zh/tools/x` will not match */
 function toolIdFromPath(pathname: string): string | undefined {
   const m = stripLangPrefix(pathname).match(/^\/tools\/([^/]+)/);
   return m?.[1];
 }
 
-/** 侧边栏：注册表按分类分组 + weight 排序 + 本地筛选 + 分类折叠 */
+/** Sidebar: registry grouped by category, sorted by weight, local filter, collapsible groups */
 export function Sidebar({ mobile = false, onClose, onCollapse }: SidebarProps) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState<Set<CategoryId>>(readCollapsed);
-  /** 当前展开「分类操作」弹窗的分类 id（同时只允许一个） */
+  /** Category id whose "category actions" popover is open (only one at a time) */
   const [menuFor, setMenuFor] = useState<CategoryId | null>(null);
   const query = filter.trim().toLowerCase();
   const filtering = query.length > 0;
@@ -56,7 +56,7 @@ export function Sidebar({ mobile = false, onClose, onCollapse }: SidebarProps) {
     return toolId ? toolMap.get(toolId)?.category : undefined;
   })();
 
-  // 当前工具所在分类若被折叠，自动展开，避免高亮项不可见
+  // Auto-expand the active tool's category when collapsed so the highlight stays visible
   useEffect(() => {
     if (!activeCategory) return;
     setCollapsed((prev) => {
@@ -105,7 +105,7 @@ export function Sidebar({ mobile = false, onClose, onCollapse }: SidebarProps) {
 
   const collapseAll = () => applyCollapsed(new Set(categories.map((c) => c.id)));
 
-  // 点击弹窗外部或按 Esc 时关闭
+  // Close on outside click or Esc
   useEffect(() => {
     if (!menuFor) return;
     const onPointerDown = (e: MouseEvent | TouchEvent) => {

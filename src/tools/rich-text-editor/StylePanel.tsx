@@ -8,7 +8,7 @@ interface StylePanelProps {
 
 type StyleId = 'body' | 'title' | 'heading2' | 'heading3' | 'quote' | 'code';
 
-/** 样式面板：一键套用预设样式（组合命令，不改动文档结构） */
+/** Style panel: apply preset styles in one click (composed commands, no structural changes) */
 export function StylePanel({ editor, onClose }: StylePanelProps) {
   const { t } = useTranslation();
   if (!editor) return null;

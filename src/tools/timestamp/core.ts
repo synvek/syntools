@@ -61,7 +61,7 @@ export interface RelativeTime {
   direction: 'ago' | 'later';
 }
 
-/** 相对当前时间的结构化描述，由 UI 层翻译 */
+/** Structured description relative to the current time, translated by the UI layer */
 export function relativeParts(ms: number, now = Date.now()): RelativeTime {
   const diff = now - ms;
   const abs = Math.abs(diff);

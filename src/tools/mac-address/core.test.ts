@@ -43,7 +43,7 @@ describe('analyzeMac', () => {
     const result = analyzeMac('00:1a:2b:3c:4d:5e');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // U/L 位翻转后首字节为 02
+    // Flipping the U/L bit makes the first byte 02
     expect(result.value.eui64.startsWith('02:1a:2b:ff:fe:3c:4d:5e')).toBe(true);
     expect(result.value.linkLocal.startsWith('fe80:0:0:0:21a:2bff:fe3c:4d5e')).toBe(true);
   });
@@ -67,7 +67,7 @@ describe('generateMacs', () => {
     expect(result.value).toHaveLength(3);
     for (const mac of result.value) {
       expect(mac).toMatch(/^[0-9A-F]{2}(:[0-9A-F]{2}){5}$/);
-      // 本地管理位置 1、组播位清零
+      // Set the locally-administered bit and clear the multicast bit
       expect(parseInt(mac.slice(0, 2), 16) & 0x02).toBe(2);
       expect(parseInt(mac.slice(0, 2), 16) & 0x01).toBe(0);
     }

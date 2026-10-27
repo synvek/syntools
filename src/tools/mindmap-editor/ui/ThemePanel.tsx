@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useMindStore } from '../store';
 import { MIND_THEMES } from '../model/themes';
 
-/** 配色主题：一套主题同时决定中心主题 / 一级分支 / 叶子的形状与配色 */
+/** Colour theme: one theme drives the shape and palette of the central topic, first-level branches and leaves */
 export function ThemePanel() {
   const { t } = useTranslation();
   const themeId = useMindStore((s) => s.doc.themeId);

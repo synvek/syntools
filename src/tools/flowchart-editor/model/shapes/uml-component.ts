@@ -2,7 +2,7 @@ import type { ShapeDef } from './index';
 import { axisAdjust, pxMx } from './adjust';
 import { componentPath, providedInterfacePath, requiredInterfacePath } from './uml-paths';
 
-/** 组件左侧凸块宽度可调 */
+/** Component's left nub width is adjustable */
 const COMPONENT_ADJUST = [
   axisAdjust({
     key: 'componentTab',
@@ -16,7 +16,7 @@ const COMPONENT_ADJUST = [
   }),
 ];
 
-/** UML 组件图：组件、提供/需求接口、端口、子系统 */
+/** UML component diagram: component, provided/required interface, port, subsystem */
 export const UML_COMPONENT_SHAPES: ShapeDef[] = [
   {
     kind: 'umlComponent',

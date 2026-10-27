@@ -2,25 +2,25 @@ import type { PhotoDoc } from '../model/types';
 import { compositeDoc } from '../render/export';
 
 /**
- * 磁性套索的边缘吸附。
+ * Edge snapping for the magnetic lasso.
  *
- * 思路：手势开始时把当前文档拍成一张缩略合成图，按 Sobel 算子算出归一化的梯度强度，
- * 拖动过程中把光标**吸附到附近梯度最强**的位置。这样套索会「贴」着轮廓走，
- * 而不是像手绘套索那样只能靠手感。
+ * Approach: when the gesture starts, flatten the document into a small composite and compute a normalized
+ * gradient magnitude with the Sobel operator; while dragging, the cursor **snaps to the strongest nearby
+ * gradient**, so the lasso hugs the contour instead of relying purely on hand-eye coordination.
  *
- * 只算一次（而不是每帧重算）：文档在手势期间不会变，重算是纯浪费；
- * 缩略到 512px 也把每次查找的窗口控制在几千像素内。
+ * Computed once (not per frame): the document does not change during the gesture, so recomputing is pure
+ * waste; downscaling to 512 px also keeps each lookup window within a few thousand pixels.
  */
 
-/** 梯度图的边长上限：够用来找边缘，又不至于拖慢首帧 */
+/** Maximum side length of the gradient map: enough to find edges without slowing the first frame */
 const MAX_EDGE_SIZE = 512;
 
 export interface EdgeMap {
   width: number;
   height: number;
-  /** 文档坐标 → 梯度图坐标的比例 */
+  /** Ratio from document coordinates to gradient-map coordinates */
   scale: number;
-  /** 归一化梯度强度（0..1） */
+  /** Normalized gradient magnitude (0..1) */
   magnitude: Float32Array;
 }
 
@@ -36,7 +36,7 @@ export function buildEdgeMap(doc: PhotoDoc): EdgeMap {
   if (!ctx) return empty;
   const { data } = ctx.getImageData(0, 0, width, height);
 
-  // 亮度：透明处按 0 计，于是「图层与透明背景的边界」也是一条边
+  // Luminance: transparent pixels count as 0, so the "layer against transparent background" boundary is an edge too
   const luma = new Float32Array(width * height);
   for (let i = 0; i < luma.length; i += 1) {
     const offset = i * 4;
@@ -74,12 +74,12 @@ export function buildEdgeMap(doc: PhotoDoc): EdgeMap {
 }
 
 /**
- * 把文档坐标吸附到附近的强边缘。
+ * Snap document coordinates to a nearby strong edge.
  *
- * - `radius`：搜索半径（文档像素，来自工具选项条「宽度」）
- * - `contrast`：对比度阈值 0..100（越高越只认硬边，低对比度区域就不会乱吸）
+ * - `radius`: search radius in document pixels (the "width" field in the tool options bar)
+ * - `contrast`: contrast threshold 0..100 (higher accepts only hard edges, so low-contrast areas are not snapped)
  *
- * 找不到满足阈值的边缘时原样返回，保证快速划过平滑区域时路径仍连续。
+ * When no edge meets the threshold, the input is returned unchanged so the path stays continuous across smooth areas.
  */
 export function snapToEdge(
   map: EdgeMap,
@@ -106,7 +106,7 @@ export function snapToEdge(
       if (value <= threshold) continue;
       const distance = Math.hypot(dx, dy);
       if (distance > searchRadius) continue;
-      // 边缘越强越好，但同样强度下优先取更近的点，避免折线被扯到远处
+      // Stronger edges win, but at equal strength prefer the closer point so the polyline is not yanked far away
       const score = value - (distance / searchRadius) * 0.35;
       if (score > best) {
         best = score;

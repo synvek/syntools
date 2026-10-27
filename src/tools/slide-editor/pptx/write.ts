@@ -23,10 +23,10 @@ import type {
 import { escapeXml } from './templates';
 
 /**
- * SlideElement → DrawingML 字符串。
+ * SlideElement → DrawingML strings.
  *
- * 之所以手写字符串而不是用 XMLBuilder：PowerPoint 对子元素顺序零容忍，
- * 显式的模板顺序比「对象键顺序」更可控、更容易在单测里断言。
+ * Why hand-written strings instead of an XMLBuilder: PowerPoint is zero-tolerance about child element
+ * order, and explicit template order is more controllable and easier to assert in unit tests than "object key order".
  */
 
 let idSeq = 1;
@@ -105,7 +105,7 @@ function runXml(text: string, style: RunStyle | undefined): string {
     style?.italic ? 'i="1"' : '',
     style?.underline ? 'u="sng"' : '',
     style?.strike ? 'strike="sng"' : '',
-    // 字距（a:spc，单位 1/100 pt）与上下标（baseline，单位 0.1%）
+    // Letter spacing (a:spc, unit 1/100 pt) and baseline (unit 0.1%)
     style?.spacing ? `spc="${ptToHundredthsPt(style.spacing)}"` : '',
     typeof style?.baseline === 'number' && style.baseline !== 0
       ? `baseline="${Math.round(style.baseline * 10)}"`
@@ -120,14 +120,14 @@ function runXml(text: string, style: RunStyle | undefined): string {
     );
   }
   if (style?.font) parts.push(`<a:latin typeface="${escapeXml(style.font)}"/>`);
-  // 字符高亮（a:highlight）必须紧跟 latin，位于 uLn 之后
+  // Character highlight (a:highlight) must follow latin and come after uLn
   if (style?.highlight) {
     parts.push(
       `<a:highlight><a:srgbClr val="${style.highlight.replace(/^#/, '').toUpperCase()}"/></a:highlight>`,
     );
   }
-  // 注：run 级超链接需要 OPC 关系项（rId）支撑，legacy 通道不维护 hyperlink rels，
-  // 因此这里不写 a:hlinkClick —— 超链接由 pptxgen 通道完整导出。
+  // Note: run-level hyperlinks need an OPC relationship (rId), and the legacy channel doesn't maintain
+  // hyperlink rels, so a:hlinkClick is not written here — hyperlinks are fully exported by the pptxgen channel.
   const children =
     parts.length > 0 ? `<a:rPr ${attrs}>${parts.join('')}</a:rPr>` : `<a:rPr ${attrs}/>`;
   return `<a:r>${children}<a:t>${escapeXml(text)}</a:t></a:r>`;
@@ -137,7 +137,7 @@ function paragraphXml(paragraph: Paragraph): string {
   const pPrAttrs = [];
   if (paragraph.align) pPrAttrs.push(`algn="${ALIGN_ATTR[paragraph.align]}"`);
   if (paragraph.indent) pPrAttrs.push(`marL="${pxToEmu(paragraph.indent)}"`);
-  // 编号列表（buAutoNum 阿拉伯数字）与项目符号互斥
+  // Numbered lists (buAutoNum, Arabic numerals) and bullets are mutually exclusive
   const bullet = paragraph.numbering
     ? '<a:buClrTx/><a:buSzPct val="100000"/><a:buFontTx/><a:buAutoNum type="arabicPeriod"/>'
     : paragraph.bullet
@@ -175,7 +175,7 @@ function bodyXml(body: TextBody): string {
   return `<a:bodyPr ${attrs}${wrap}${anchor}${vert}>${autoFit}</a:bodyPr>`;
 }
 
-/** 投影 → a:outerShdw（放在 spPr 的 effectLst 内） */
+/** Shadow → a:outerShdw (inside spPr's effectLst) */
 function shadowXml(shadow: ShadowStyle | undefined): string {
   if (!shadow) return '';
   const alpha = Math.round((shadow.opacity ?? 1) * ALPHA_UNIT);
@@ -191,7 +191,7 @@ function shadowXml(shadow: ShadowStyle | undefined): string {
   ].join('');
 }
 
-/** 完整 txBody（命名限定：形状/表格/图片文本框分别用不同前缀） */
+/** Full txBody (namespace-qualified: shapes/tables/image text boxes use different prefixes) */
 export function textBodyXml(body: TextBody, prefix: 'p' | 'a'): string {
   const paragraphs = body.paragraphs.length > 0 ? body.paragraphs : [{ runs: [{ text: '' }] }];
   return `<${prefix}:txBody>${bodyXml(body)}<a:lstStyle/>${paragraphs.map(paragraphXml).join('')}</${prefix}:txBody>`;
@@ -273,10 +273,10 @@ function lineXml(element: {
 }
 
 function tableXml(element: TableElement): string {
-  // nvGraphicFramePr 的子元素顺序：p:cNvPr → p:cNvGraphicFramePr → p:nvPr（缺 cNvPr 会让解析器报错）
+  // Child order of nvGraphicFramePr: p:cNvPr → p:cNvGraphicFramePr → p:nvPr (a missing cNvPr makes parsers fail)
   const id = nextShapeId();
   const rows = element.rows;
-  // CT_Table 顺序：a:tblPr → a:tblGrid(a:gridCol*) → a:tr*
+  // CT_Table order: a:tblPr → a:tblGrid(a:gridCol*) → a:tr*
   const gridCols = `<a:tblGrid>${element.colWidths
     .map((width) => `<a:gridCol w="${pxToEmu(width)}"/>`)
     .join('')}</a:tblGrid>`;
@@ -285,7 +285,7 @@ function tableXml(element: TableElement): string {
       const height = element.rowHeights[rowIndex] ?? 32;
       const cells = row
         .map((cell) => {
-          // 被合并覆盖的格子：OOXML 要求保留占位，且必须带 hMerge/vMerge 标记
+          // Covered cell: OOXML requires the placeholder to remain, carrying hMerge/vMerge markers
           if (cell.covered) {
             const mergeAttr = cell.coveredBy === 'v' ? 'vMerge="1"' : 'hMerge="1"';
             return `<a:tc ${mergeAttr}><a:txBody><a:bodyPr/><a:lstStyle/><a:p/></a:txBody><a:tcPr/></a:tc>`;
@@ -311,8 +311,8 @@ function tableXml(element: TableElement): string {
             autoFit: 'none',
             margins: { left: 5, top: 3, right: 5, bottom: 3 },
           };
-          // gridSpan / rowSpan 是 a:tc 自身的属性（不是 tcPr 的）——
-          // 早先误写在 tcPr 上，导致合并信息在 PowerPoint 里被忽略、往返也丢失
+          // gridSpan / rowSpan are attributes of a:tc itself (not of tcPr) —
+          // they used to be written on tcPr, so PowerPoint ignored the merge and it was lost on round-trip
           const tcAttrs = [
             cell.colSpan && cell.colSpan > 1 ? `gridSpan="${cell.colSpan}"` : '',
             cell.rowSpan && cell.rowSpan > 1 ? `rowSpan="${cell.rowSpan}"` : '',
@@ -334,7 +334,7 @@ function tableXml(element: TableElement): string {
     `<p:nvGraphicFramePr><p:cNvPr id="${id}" name="Table ${id}"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>`,
     xfrmXml(element, 'p:xfrm'),
     '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">',
-    // 表头/斑马纹按元素自身设置写回，不再硬编码（否则导入的表格样式会被强行改写）
+    // Write header/banding from the element's own settings instead of hardcoding (otherwise imported table styles get overwritten)
     `<a:tbl><a:tblPr${element.headerRow ? ' firstRow="1"' : ''}${
       element.bandRow ? ' bandRow="1"' : ''
     }/>${gridCols}${rowsXml}</a:tbl>`,
@@ -344,7 +344,7 @@ function tableXml(element: TableElement): string {
   return graphicFrame;
 }
 
-/** 单个元素 → DrawingML（图片需要 relMap 提供 rId） */
+/** One element → DrawingML (images need relMap to supply rIds) */
 export function elementXml(element: SlideElement, relMap: Map<string, string>): string {
   switch (element.type) {
     case 'text':
@@ -368,15 +368,15 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
           const gid = nextShapeId();
           return `<p:nvGrpSpPr><p:cNvPr id="${gid}" name="Group ${gid}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>`;
         })(),
-        // 子元素以「相对 group 原点」存储，故子坐标系原点取 (0,0)、范围取组自身尺寸，
-        // 这样 chExt 与 ext 相同、缩放比为 1，子元素写回后落在正确的页面位置。
+        // Children are stored relative to the group origin, so the sub-coordinate system starts at (0,0) and spans the group's own size;
+        // chExt then equals ext and the scale is 1, so children land in the right page position when written back.
         `<p:grpSpPr><a:xfrm><a:off x="${pxToEmu(element.x)}" y="${pxToEmu(element.y)}"/><a:ext cx="${pxToEmu(element.width)}" cy="${pxToEmu(element.height)}"/><a:chOff x="0" y="0"/><a:chExt cx="${pxToEmu(element.width)}" cy="${pxToEmu(element.height)}"/></a:xfrm></p:grpSpPr>`,
         children,
         '</p:grpSp>',
       ].join('');
     }
     case 'placeholder': {
-      // 占位框导出为灰底矩形 + 说明文字，避免内容丢失
+      // Export placeholder boxes as a gray rect + caption so content isn't lost
       const pseudo: ShapeElement = {
         id: element.id,
         type: 'shape',
@@ -405,8 +405,8 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
     }
     case 'chart':
     case 'formula': {
-      // legacy 通道没有原生图表/公式对象：图表降级为占位框（数据不丢，标注类型），
-      // 公式降级为展示 LaTeX 源码的文本框。原生能力由 pptxgen 通道提供。
+      // The legacy channel has no native chart/formula object: charts degrade to a placeholder box (data kept, type labeled),
+      // formulas degrade to a text box showing the LaTeX source. Native support comes from the pptxgen channel.
       const pseudo: ShapeElement = {
         id: element.id,
         type: 'shape',
@@ -445,7 +445,7 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
       return shapeXml(pseudo, pseudo.body);
     }
     case 'icon':
-      // 内置 SVG 图标在 legacy 通道没有矢量化路径，导出为空占位框
+      // Built-in SVG icons have no vectorized path in the legacy channel, so they export as an empty placeholder box
       return '';
     default:
       return '';
@@ -455,14 +455,14 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
 const SLIDE_NS =
   'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
 
-/** 组装整页 slide XML */
+/** Assemble the full slide XML */
 export function slideXml(
   elements: SlideElement[],
   relMap: Map<string, string>,
   background?: SlideBackground,
 ): string {
   const body = elements.map((element) => elementXml(element, relMap)).join('');
-  // 背景支持纯色与渐变（v2）；旧数据的纯色字符串在此归一化
+  // Backgrounds support solid and gradient (v2); old solid-color strings are normalized here
   const fill = normalizeBackground(background);
   const bg =
     fill && fill.type !== 'none'
@@ -484,13 +484,13 @@ export function slideXml(
   ].join('');
 }
 
-/** slide rels：layout rId1 + 用到的媒体 */
+/** Slide rels: layout rId1 + the media used */
 /**
- * 幻灯片的 rels。
+ * Slide relationships.
  *
- * @param mediaRels  图片关系（rId 从 rId2 起，由 relMapFor 分配）
- * @param layoutIndex 该页引用的版式序号（多版式导出时不能一律指向 slideLayout1）
- * @param notes      备注关系；rId 由调用方保证不与图片冲突
+ * @param mediaRels   Image relationships (rIds start at rId2, allocated by relMapFor)
+ * @param layoutIndex Index of the layout this slide references (multi-layout exports can't all point at slideLayout1)
+ * @param notes      Notes relationship; the caller guarantees its rId doesn't clash with images
  */
 export function slideRelsXml(
   mediaRels: { rId: string; target: string }[],

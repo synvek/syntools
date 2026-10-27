@@ -1,8 +1,8 @@
 /**
- * 脑图编辑器 UI 文案：随工具 chunk 懒加载注入 i18next。
- * 与 flowchart-editor 保持同一套约定：UI 文案不进首屏语言包，工具被懒加载时由
- * `registerMindmapStrings` 合并进 i18next，键路径 `tools.mindmap.*`。
- * 工具元数据（名称/描述）仍写在 `core/i18n/locales/*` 的 `toolsMeta` 中。
+ * Mind map editor UI copy, lazily injected into i18next along with the tool chunk.
+ * Same convention as flowchart-editor: UI copy stays out of the initial bundle, and when the tool is
+ * lazy-loaded `registerMindmapStrings` merges it into i18next under `tools.mindmap.*`.
+ * Tool metadata (name/description) still lives in `toolsMeta` under `core/i18n/locales/*`.
  */
 
 type StringTree = { [key: string]: string | StringTree };
@@ -944,7 +944,7 @@ const pt: ResourceTree = {
   },
 };
 
-/** 语言代码 → 资源树，键与 `Lang` 保持一致 */
+/** Language code → resource tree; keys mirror `Lang` */
 export const mindmapStrings: Record<string, ResourceTree> = {
   zh,
   en,
@@ -957,7 +957,7 @@ export const mindmapStrings: Record<string, ResourceTree> = {
   pt,
 };
 
-/** 把本工具文案合并进 i18next（工具被懒加载时调用，键路径 tools.mindmap.*） */
+/** Merge this tool's copy into i18next (called when the tool is lazy-loaded; keys under tools.mindmap.*) */
 export function registerMindmapStrings(instance: {
   addResourceBundle: (
     lng: string,

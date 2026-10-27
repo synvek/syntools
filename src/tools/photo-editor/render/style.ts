@@ -3,19 +3,19 @@ import { createCanvasElement } from '../model/assets';
 import type { InnerShadowStyle, LayerStyle } from '../model/types';
 
 /**
- * 图层样式渲染：把「图层内容」整体当作 alpha 剪影，按 Photoshop 的效果顺序叠加。
+ * Layer style rendering: treat the layer content as an alpha silhouette and stack effects in PS order.
  *
- * 绘制顺序（与 PS 一致）：
- *   投影 → 外发光 → 描边（外侧/居中在外） → 图层内容 → 内阴影 → 颜色叠加 → 描边（内侧/居中在内）
+ * Draw order (same as PS):
+ *   shadow → outer glow → stroke (outside/center outside) → content → inner shadow → overlay → stroke inside
  *
- * 全部在「画布本地坐标」里工作（坐标原点 = 合成缓冲左上角，缓冲比图层包围盒四周多出
- * `core.stylePadding` 的留白），因此调用方只需准备一张大一圈的缓冲并把它按 origin 摆回文档。
+ * Everything works in canvas-local coordinates (origin = composite buffer top-left; the buffer is
+ * `core.stylePadding` larger than the layer box), so callers just prepare that buffer and place it by origin.
  */
 
-/** 光照角度 → 阴影偏移。Canvas 的 y 轴向下，故 sin 取正号表示「向下」；角度 90° = 光源在上。 */
+/** Light angle → shadow offset. Canvas y points down, so +sin means down; 90° puts the light on top. */
 export function effectOffset(angle: number, distance: number): { x: number; y: number } {
   const rad = (angle * Math.PI) / 180;
-  // 归一化 -0：`Math.cos(90°)` 会有极小负值，乘出 `-0` 会让「无偏移」的比较变得意外
+  // Normalize -0: `Math.cos(90°)` is slightly negative, and the resulting `-0` breaks "no offset" checks
   const x = -Math.cos(rad) * distance;
   const y = Math.sin(rad) * distance;
   return { x: x === 0 ? 0 : x, y: y === 0 ? 0 : y };
@@ -27,7 +27,7 @@ function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   return canvas;
 }
 
-/** 着色剪影：把内容按 `blur` 模糊后，用 source-in 覆盖成纯色（alpha 形状保留） */
+/** Tint the silhouette: blur by `blur`, then fill solid with source-in (the alpha shape survives) */
 function tintedSilhouette(
   content: HTMLCanvasElement,
   color: string,
@@ -49,15 +49,15 @@ function tintedSilhouette(
 }
 
 /**
- * 形态学膨胀（原地）：沿圆周平移叠加剪影。
- * 采样数随半径增加，24 个方向对 100px 以内的半径已足够平滑。
+ * Morphological dilation (in place): stamp the silhouette around a circle of offsets.
+ * The sample count grows with the radius; 24 directions is smooth enough up to about 100px.
  */
 function dilateInPlace(canvas: HTMLCanvasElement, radius: number): void {
   const r = Math.round(radius);
   if (r <= 0) return;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  // 快照后叠加，避免「边叠边涨」导致形状失真
+  // Snapshot before stamping, or accumulating while drawing would distort the shape
   const snapshot = cloneCanvas(canvas);
   const samples = Math.max(8, Math.min(24, Math.ceil(r * 1.5)));
   for (let i = 0; i < samples; i += 1) {
@@ -66,7 +66,7 @@ function dilateInPlace(canvas: HTMLCanvasElement, radius: number): void {
   }
 }
 
-/** 形态学腐蚀：由「补集膨胀」的对偶关系得到（补集膨胀后再从原图减掉） */
+/** Morphological erosion: the dual of dilation on the complement (dilate it, then subtract from the source) */
 function erode(source: HTMLCanvasElement, radius: number): HTMLCanvasElement {
   const out = cloneCanvas(source);
   const r = Math.round(radius);
@@ -85,7 +85,7 @@ function erode(source: HTMLCanvasElement, radius: number): HTMLCanvasElement {
   return out;
 }
 
-/** 内侧描边环：整块剪影着色后挖掉「向内腐蚀」的部分 */
+/** Inner stroke ring: tint the whole silhouette, then punch out the inward-eroded part */
 function innerRing(
   content: HTMLCanvasElement,
   color: string,
@@ -102,7 +102,7 @@ function innerRing(
   return ring;
 }
 
-/** 内阴影：整块着色 → 挖掉「偏移 + 模糊的剪影」→ 只保留剪影内部 */
+/** Inner shadow: tint everything → punch out the offset, blurred silhouette → keep only the inside */
 function innerShadowBuffer(
   content: HTMLCanvasElement,
   effect: InnerShadowStyle,
@@ -122,7 +122,7 @@ function innerShadowBuffer(
   return canvas;
 }
 
-/** 外侧 / 内侧各承担多少描边宽度（居中 = 一半在外、一半在内） */
+/** How much stroke width falls outside / inside (center = half out, half in) */
 export function strokeWidths(
   position: 'outside' | 'center' | 'inside',
   size: number,
@@ -135,8 +135,8 @@ export function strokeWidths(
 }
 
 /**
- * 把图层内容与样式合成到 `ctx`。`ctx` 不做坐标变换（原点 = 缓冲左上角），
- * `content` 与返回值尺寸一致；图层透明度 / 混合模式由调用方在此之外施加。
+ * Composite the layer content and its style into `ctx`. `ctx` carries no transform (origin = buffer top-left),
+ * and `content` matches the output size; layer opacity / blend mode are applied by the caller outside.
  */
 export function paintLayerStyle(
   ctx: CanvasRenderingContext2D,

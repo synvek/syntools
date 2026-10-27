@@ -8,7 +8,7 @@ import {
   templateSwatch,
 } from './templates';
 
-/** 把嵌套语言包摊平成 `tools.slide.*` 起始的键集合 */
+/** Flatten a nested locale pack into a key set starting at `tools.slide.*` */
 function flatKeys(tree: unknown, prefix = ''): string[] {
   if (!tree || typeof tree !== 'object') return prefix ? [prefix] : [];
   const keys: string[] = [];

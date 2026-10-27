@@ -1,15 +1,15 @@
 /**
- * 形状库：插入面板可见的 prstGeom 预设。
+ * Shape library: prstGeom presets exposed in the insert panel.
  *
- * 这里比 `core.ts` 的 `PRST_GEOMS` 小得多 —— 那个表要覆盖导入侧可能遇到的
- * 30+ 种预设几何，而插入面板只需覆盖日常高频形状；刻意收窄的好处是
- * 每个形状都能有 9 语言的正式名称，而不是在英文界面里显示中文或技术代号。
+ * Much smaller than `PRST_GEOMS` in `core.ts` — that table must cover the 30+ preset geometries the
+ * import side can encounter, while the insert panel only needs everyday shapes; the deliberate
+ * narrowing means every shape has a proper name in all 9 languages instead of showing Chinese or a raw code in English UIs.
  */
 
 export interface ShapePreset {
-  /** DrawingML 预设几何名，与导入/导出共用同一套取值 */
+  /** DrawingML preset geometry name, sharing values with import/export */
   prst: string;
-  /** `tools.slide.*` 下的 i18n 键后缀 */
+  /** i18n key suffix under `tools.slide.*` */
   labelKey: string;
 }
 

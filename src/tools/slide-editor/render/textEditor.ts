@@ -2,16 +2,16 @@ import type { RunStyle, TextBody } from '../model/types';
 import { applyStyleRange, bodyToText, queryStyleRange, replaceBodyText } from '../model/text';
 
 /**
- * 行内文本编辑：Konva 本身没有 DOM 输入能力，
- * 因此在画布上方叠加一层 textarea，按页面坐标与缩放精确对齐到文本框区域。
+ * Inline text editing: Konva has no DOM input, so a textarea is overlaid above the canvas and
+ * aligned precisely to the text box area using page coordinates and the view scale.
  *
- * 富文本保留策略：编辑期间维护一份 `draft` 文本体，
- * 每次输入都用「公共前缀 / 公共后缀 diff」把新文本映射回 run 级模型，
- * 只重算真正被改动的区间，其余 run 的样式与段落属性（含 spaceBefore/spaceAfter/indent）原样保留。
- * 工具栏的 B/I/U/S 作用于 textarea 当前选区，映射回 run 实现选区级样式。
+ * Rich-text preservation strategy: a `draft` text body is maintained while editing;
+ * every input maps the new text back onto the run-level model with a common-prefix/suffix diff,
+ * recomputing only the changed span and keeping other runs' styles and paragraph props (including spaceBefore/spaceAfter/indent).
+ * The toolbar's B/I/U/S act on the textarea's current selection and map back to runs for selection-level styling.
  */
 
-/** 可被就地编辑的文本框：文本框元素与「带文字的形状」都满足这个最小契约 */
+/** Text box editable in place: text elements and "shapes with text" both satisfy this minimal contract */
 export interface EditableTextBox {
   id: string;
   x: number;
@@ -26,7 +26,7 @@ export interface TextEditorHandle {
   focus: () => void;
 }
 
-/** 工具栏按钮文案（粗体/斜体/下划线/删除线），由调用方注入以便走 i18n */
+/** Toolbar button labels (bold/italic/underline/strike), injected by the caller for i18n */
 export interface TextEditorLabels {
   bold: string;
   italic: string;
@@ -35,14 +35,14 @@ export interface TextEditorLabels {
 }
 
 export interface TextEditorHost {
-  /** 相对定位的容器（与画布同尺寸同级） */
+  /** Relatively positioned container (same size and level as the canvas) */
   host: HTMLDivElement;
   transform: { scale: number; x: number; y: number };
   onCommit: (id: string, body: TextBody) => void;
   labels?: TextEditorLabels;
   /**
-   * 覆盖层被销毁时回调（Esc 取消、失焦后无改动等都不会走 onCommit）。
-   * 宿主借此把「编辑期间让位的静态文字」恢复回来，避免文字永久消失。
+   * Called when the overlay is destroyed (Esc cancel, blur without changes, etc. never reach onCommit).
+   * The host uses it to restore the static text it hid during editing, so the text doesn't vanish for good.
    */
   onClose?: () => void;
 }
@@ -72,7 +72,7 @@ export function openTextEditor(
   const size = (style?.size ?? DEFAULT_SIZE) * transform.scale;
   const align = element.body.paragraphs[0]?.align ?? 'left';
 
-  /** 编辑期间的文本体草稿：样式与段落属性的唯一来源 */
+  /** Text body draft during editing: the single source of truth for styles and paragraph props */
   let draft = cloneBody(element.body);
   let dirty = false;
 
@@ -94,9 +94,9 @@ export function openTextEditor(
     outline: 'none',
     resize: 'none',
     overflow: 'hidden',
-    // 背景必须透明：这是盖在画布之上的一层 DOM，若加底色就会把「压在该元素上层」的
-    // 其它元素一并遮住，视觉上像是被编辑的元素跳到了顶层（关掉编辑后又恢复）。
-    // 元素的底色/边框由画布自身绘制，文字改由本 textarea 独占渲染（见调用方隐藏静态文字）。
+    // Background must be transparent: this is a DOM layer above the canvas, and a fill would also cover
+    // the elements layered above it, making the edited element look like it jumped to the top (and back after editing).
+    // The element's fill/border is drawn by the canvas; the textarea renders the text alone (the caller hides the static text).
     background: 'transparent',
     color: style?.color ?? '#0F172A',
     fontFamily: style?.font || 'Arial, Helvetica, sans-serif',
@@ -108,7 +108,7 @@ export function openTextEditor(
     zIndex: '20',
   } satisfies Partial<CSSStyleDeclaration>);
 
-  /* ------------------------- 选区级样式工具栏 ------------------------- */
+  /* ------------------------- Selection-level style toolbar ------------------------- */
 
   const bar = document.createElement('div');
   bar.setAttribute('role', 'toolbar');
@@ -118,7 +118,7 @@ export function openTextEditor(
   Object.assign(bar.style, {
     position: 'absolute',
     left: `${left}px`,
-    // 上方空间不足时挂到文本框下方，避免被画布顶部裁掉
+    // When there is no room above, attach below the text box so the canvas top doesn't clip it
     top: `${topAbove >= 0 ? topAbove : transform.y + element.y * transform.scale + element.height * transform.scale + 4}px`,
     display: 'flex',
     gap: '2px',
@@ -159,7 +159,7 @@ export function openTextEditor(
       lineHeight: '1',
       ...item.css,
     } satisfies Partial<CSSStyleDeclaration>);
-    // 关键：阻止默认行为以保留 textarea 的焦点与选区，否则点击按钮会先触发 blur 提交
+    // Key: prevent default to keep the textarea's focus and selection, otherwise clicking a button blurs and commits first
     button.addEventListener('mousedown', (event) => event.preventDefault());
     button.addEventListener('click', () => toggleStyle(item.flag));
     buttons.set(item.flag, button);
@@ -182,7 +182,7 @@ export function openTextEditor(
   function toggleStyle(flag: StyleFlag): void {
     const start = area.selectionStart;
     const end = area.selectionEnd;
-    // 无选区时无从判断作用范围，保持不动（与 PowerPoint 一致）
+    // No selection means no scope to act on, so leave it unchanged (matching PowerPoint)
     if (end <= start) return;
     syncDraft();
     const current = queryStyleRange(draft, start, end);
@@ -193,7 +193,7 @@ export function openTextEditor(
     area.focus();
   }
 
-  /* ------------------------------ 生命周期 ------------------------------ */
+  /* ------------------------------ Lifecycle ------------------------------ */
 
   let cancelled = false;
   let disposed = false;
@@ -241,7 +241,7 @@ export function openTextEditor(
   host.appendChild(area);
   requestAnimationFrame(() => {
     area.focus();
-    // 默认全选，方便直接套用样式或整体替换
+    // Select all by default, so styles or a full replacement apply right away
     area.select();
     refreshStates();
   });

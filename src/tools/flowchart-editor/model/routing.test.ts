@@ -82,7 +82,7 @@ describe('正交避障布线', () => {
   it('两条 L 形被同时挡住时，A* 绕开障碍且路径保持正交', () => {
     const from = { x: 0, y: 0 };
     const to = { x: 320, y: 320 };
-    // A 挡住水平直行段，B 挡住竖直直行段
+    // A blocks the horizontal straight run, B blocks the vertical one
     const blockerA: Rect = { x: 100, y: -24, width: 24, height: 48 };
     const blockerB: Rect = { x: -24, y: 100, width: 48, height: 24 };
     const [result] = routeEdges({
@@ -92,7 +92,7 @@ describe('正交避障布线', () => {
     expect(result.routed).toBe(true);
     expect(result.waypoints.length).toBeGreaterThan(0);
     for (const [a, b] of segments(from, to, result.waypoints)) {
-      // 每段必须是水平或竖直段
+      // Every segment must be horizontal or vertical
       expect(a.x === b.x || a.y === b.y).toBe(true);
       expect(hits(a, b, blockerA)).toBe(false);
       expect(hits(a, b, blockerB)).toBe(false);

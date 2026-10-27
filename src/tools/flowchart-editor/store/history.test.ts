@@ -47,7 +47,7 @@ describe('结构 diff 历史', () => {
 
   it('仅位置变化也会被记录（可还原堆叠顺序）', () => {
     const entries = diffList([a, b, c], [c, a, b]);
-    // 三个条目都发生了位移
+    // All three entries were moved
     expect(entries).toHaveLength(3);
     expect(applyListDiff([c, a, b], entries, 'undo')).toEqual([a, b, c]);
   });

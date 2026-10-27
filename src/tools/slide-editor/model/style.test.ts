@@ -4,8 +4,8 @@ import { applyStyleSnapshot, extractStyleSnapshot, isEmptySnapshot } from './sty
 import type { ShapeElement, SlideElement, TextElement } from './types';
 
 /**
- * 补丁值是「按目标元素类型决定」的宽松记录，测试里统一按 Record 读取，
- * 避免为了取一个字段要先窄化整个 SlideElement 联合类型。
+ * Patch values are loose records decided by the target element type; tests read them as Records,
+ * so fetching one field doesn't require narrowing the whole SlideElement union first.
  */
 function patchOf(element: SlideElement, source: SlideElement): Record<string, unknown> {
   return applyStyleSnapshot(element, extractStyleSnapshot(source)) as Record<string, unknown>;

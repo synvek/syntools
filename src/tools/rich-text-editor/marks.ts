@@ -1,10 +1,10 @@
 import { Mark, mergeAttributes } from '@tiptap/core';
 
 /**
- * 文档级标记的 Mark 实现（本地，不依赖协作服务）：
- * - comment：批注高亮（属性 id 指向本地批注记录）
- * - trackedInsert / trackedDelete：修订追踪（插入为下划线、删除为删除线并保留原文）
- * 全部走 Mark（PM 一等公民），不会被 DOMObserver 抹掉。
+ * Mark implementations for document-level annotations (local, no collaboration service):
+ * - comment: comment highlight (the id attribute points to a local comment record)
+ * - trackedInsert / trackedDelete: tracked changes (inserts underlined, deletes struck through but kept)
+ * All go through Mark (a first-class ProseMirror citizen), so DOMObserver never strips them.
  */
 
 export interface CommentAttrs {
@@ -65,16 +65,16 @@ const TrackedDelete = Mark.create({
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     docMarks: {
-      /** 给选区加批注标记 */
+      /** Mark the selection with a comment */
       setComment: (id: string) => ReturnType;
-      /** 移除指定批注的正文标记（保留同节点上的其它批注） */
+      /** Remove the body marks of one comment (keeping other comments on the same node) */
       removeCommentMark: (id: string) => ReturnType;
-      /** 以修订方式标记选区为插入/删除 */
+      /** Track the selection as an insertion or deletion */
       markTrackedInsert: () => ReturnType;
       markTrackedDelete: () => ReturnType;
-      /** 接受全部修订（清除标记；删除标记同时移除文本） */
+      /** Accept all changes (clear marks; deletions also remove the text) */
       acceptAllTracked: () => ReturnType;
-      /** 拒绝全部修订（清除插入文本；删除标记恢复文本） */
+      /** Reject all changes (drop inserted text; restore deleted text) */
       rejectAllTracked: () => ReturnType;
     };
   }
@@ -103,7 +103,7 @@ export const DocMarkCommands = Mark.create({
             const from = pos;
             const to = pos + node.nodeSize;
             tr.removeMark(from, to, commentType);
-            // 同一段文本上可能叠加了其它批注：移除目标后按序补回
+            // Other comments may overlap the same text: re-apply them in order after removal
             node.marks
               .filter((mark) => mark.type.name === 'comment' && mark.attrs.commentId !== id)
               .forEach((mark) => tr.addMark(from, to, mark));
@@ -121,7 +121,7 @@ export const DocMarkCommands = Mark.create({
       acceptAllTracked:
         () =>
         ({ state, tr }) => {
-          // 删除标记：连同文本一起移除（接受删除）
+          // Deletion marks: remove the text as well (accept the deletion)
           const deletions: { from: number; to: number }[] = [];
           state.doc.descendants((node, pos) => {
             if (!node.isText) return;
@@ -129,7 +129,7 @@ export const DocMarkCommands = Mark.create({
               deletions.push({ from: pos, to: pos + node.nodeSize });
             }
           });
-          // 倒序删除，避免位置偏移
+          // Delete back to front so positions stay valid
           deletions.reverse().forEach(({ from, to }) => tr.delete(from, to));
           tr.removeMark(0, tr.doc.content.size, state.schema.marks.trackedInsert);
           return true;
@@ -137,7 +137,7 @@ export const DocMarkCommands = Mark.create({
       rejectAllTracked:
         () =>
         ({ state, tr }) => {
-          // 插入标记：移除被插入的文本（拒绝插入）
+          // Insertion marks: drop the inserted text (reject the insertion)
           const insertions: { from: number; to: number }[] = [];
           state.doc.descendants((node, pos) => {
             if (!node.isText) return;

@@ -25,7 +25,7 @@ function hex(bytes: Uint8Array): string {
   return s;
 }
 
-/** ULID：48 位毫秒时间戳 + 80 位随机数，Crockford Base32，共 26 字符。 */
+/** ULID: 48-bit millisecond timestamp + 80 random bits, Crockford Base32, 26 characters total. */
 export function generateUlid(time: number = Date.now()): string {
   let ts = Math.floor(time);
   let timePart = '';
@@ -39,7 +39,7 @@ export function generateUlid(time: number = Date.now()): string {
   return timePart + rand;
 }
 
-/** 解析 ULID 的时间戳（毫秒），非法返回 null。 */
+/** Extract the timestamp (ms) from a ULID; null when invalid. */
 export function parseUlidTime(ulid: string): number | null {
   if (!/^[0-9A-HJKMNP-TV-Z]{26}$/i.test(ulid)) return null;
   let ts = 0;
@@ -51,7 +51,7 @@ export function parseUlidTime(ulid: string): number | null {
   return ts;
 }
 
-/** NanoID：默认 21 字符，64 字符字母表。 */
+/** NanoID: 21 characters by default, 64-character alphabet. */
 export function generateNanoId(size = 21, alphabet = NANOID_ALPHABET): string {
   const bytes = randomBytes(size);
   const isPow2 = (alphabet.length & (alphabet.length - 1)) === 0;
@@ -69,7 +69,7 @@ export interface SnowflakeOptions {
   epoch?: number;
 }
 
-/** Snowflake：41 位时间 + 10 位机器号 + 12 位序列号。 */
+/** Snowflake: 41-bit time + 10-bit machine id + 12-bit sequence number. */
 export function generateSnowflake(options: SnowflakeOptions): string {
   const epoch = options.epoch ?? SNOWFLAKE_EPOCH;
   const ts = BigInt(Math.floor((options.timestamp ?? Date.now()) - epoch));
@@ -78,7 +78,7 @@ export function generateSnowflake(options: SnowflakeOptions): string {
   return ((ts << 22n) | (machine << 12n) | seq).toString();
 }
 
-/** ObjectId：4 字节时间 + 5 字节随机 + 3 字节计数器，24 位十六进制。 */
+/** ObjectId: 4-byte timestamp + 5 random bytes + 3-byte counter, 24 hex characters. */
 export function generateObjectId(timestamp: number = Date.now(), counter?: number): string {
   const time = Math.floor(timestamp / 1000);
   const timeHex = time.toString(16).padStart(8, '0').slice(-8);
@@ -88,7 +88,7 @@ export function generateObjectId(timestamp: number = Date.now(), counter?: numbe
   return timeHex + random + c.toString(16).padStart(6, '0');
 }
 
-/** 解析 ObjectId 中嵌入的时间戳（毫秒），非法返回 null。 */
+/** Extract the timestamp (ms) embedded in an ObjectId; null when invalid. */
 export function parseObjectIdTime(id: string): number | null {
   if (!/^[0-9a-fA-F]{24}$/.test(id)) return null;
   return parseInt(id.slice(0, 8), 16) * 1000;
@@ -101,7 +101,7 @@ export interface GenerateIdsOptions {
   machineId?: number;
 }
 
-/** 批量生成指定类型的 ID。 */
+/** Generate a batch of IDs of the given type. */
 export function generateIds(options: GenerateIdsOptions): ToolResult<string[]> {
   const count = Math.floor(options.count);
   if (!Number.isFinite(count) || count < 1 || count > MAX_ID_BATCH) {

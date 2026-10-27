@@ -1,17 +1,18 @@
 name: Deploy to Cloudflare Pages
 
-# 为什么不用网页拖拽上传：Direct Upload 的拖拽通道只上传静态产物，
-# 不会把仓库里的 functions/ 一起编译上传 —— 结果就是 /api/event 直接 404，
-# 前端埋点发了请求但被静态托管层以 405 挡回，且 sendBeacon 不报错、全程静默。
+# Why not drag-and-drop upload in the web UI: the Direct Upload drag channel only ships static
+# assets and never compiles the repo's functions/ directory — so /api/event 404s, the front end
+# fires the beacon but the static host rejects it with 405, and sendBeacon stays silent throughout.
 #
-# 这个 workflow 用 `wrangler pages deploy` 部署，它会自动带上 ./functions。
+# This workflow deploys with `wrangler pages deploy`, which picks up ./functions automatically.
 #
-# 默认只允许手动触发，避免一推提交就上线。确认稳定后可以放开 push 触发。
+# Manual trigger only by default, so a push never ships straight to production. Loosen it to push
+# once the pipeline has proven stable.
 on:
   workflow_dispatch:
     inputs:
       branch_commit:
-        description: '把本次部署标记为预览（不更新正式域名）'
+        description: 'Mark this deployment as a preview (does not update the production domain)'
         type: boolean
         default: false
 
@@ -36,7 +37,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # build:cf = FFMPEG_PAGES=1 VITE_ANALYTICS_ENDPOINT=/api/event pnpm build
-      # 必须用这个脚本而不是 pnpm build，否则前端拿不到埋点端点（整条链路静默失效）。
+      # Must use this script, not plain pnpm build: otherwise the front end gets no analytics
+      # endpoint and the whole telemetry chain fails silently.
       - name: Build
         run: pnpm build:cf
         env:
@@ -51,18 +53,18 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # 仓库 Settings → Variables 里设置，值为 Pages 项目名
+          # Set in repo Settings → Variables; the value is the Pages project name
           CF_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
-          # 传 main = 更新正式域名；传别的分支名 = 只生成预览部署
+          # main = update the production domain; any other branch name = preview deployment only
           DEPLOY_BRANCH: ${{ inputs.branch_commit && 'preview' || 'main' }}
 
-      # 上线后立刻自检：函数在跑的话 GET 应返回 405（带 allow: POST），
-      # 返回 404 说明 functions/ 又没被带上，构建等于白做。
+      # Self-check right after deploy: with Functions live, GET must return 405 (with allow: POST).
+      # A 404 means functions/ was left out again and the build was pointless.
       - name: Verify Functions deployed
         run: |
           CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://www.syntools.net/api/event")
           echo "GET /api/event -> $CODE"
           if [ "$CODE" != "405" ]; then
-            echo "::error::函数未上线（期望 405，实际 $CODE）。检查 functions/ 是否被包含进部署。"
+            echo "::error::Functions are not live (expected 405, got $CODE). Check whether functions/ is included in the deployment."
             exit 1
           fi

@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 角色扮演与人格设定类提示词，详见 ../README.md */
+/** Role-play and persona prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'roleplay-interviewer',

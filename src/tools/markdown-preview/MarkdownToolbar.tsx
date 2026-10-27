@@ -12,7 +12,7 @@ interface ToolbarItem {
   tipKey: string;
 }
 
-/** 按「强调 → 标题 → 块级 → 插入」分组，分组之间留分隔线，便于扫读 */
+/** Grouped as emphasis → headings → blocks → inserts, with dividers between groups for scannability */
 const GROUPS: ToolbarItem[][] = [
   [
     { id: 'bold', label: 'B', tipKey: 'tools.markdown.toolbar.bold' },
@@ -43,7 +43,7 @@ const GROUPS: ToolbarItem[][] = [
   ],
 ];
 
-/** Markdown 快捷工具栏：点击按钮对选区应用语法 */
+/** Markdown shortcut toolbar: clicking a button applies syntax to the selection */
 export function MarkdownToolbar({ getJar }: MarkdownToolbarProps) {
   const { t } = useTranslation();
 

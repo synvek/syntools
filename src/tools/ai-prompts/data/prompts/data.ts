@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 数据分析类提示词，详见 ../README.md */
+/** Data analysis prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'data-metric-definition',

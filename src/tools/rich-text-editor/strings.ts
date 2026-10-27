@@ -1,14 +1,14 @@
 /**
- * 富文本编辑器 UI 文案：随工具 chunk 懒加载注入 i18next。
+ * Rich text editor UI strings: injected into i18next with the lazily loaded tool chunk.
  *
- * 背景：项目的语言包 zh / en 是首屏同步资源（`SYNC_LANGS`），
- * 单个工具几十条 UI 文案若全部写进 `core/i18n/locales/*`，会直接推高首屏入口体积
- * （本项目预算：首屏 gzip ≤ 180KB，实测已接近上限）。
- * 因此本工具的界面文案放在这里，在工具被懒加载时由 `registerRichTextStrings` 合并进 i18next，
- * 键路径保持不变（`tools.richText.*`），且保留 10 种语言。
+ * Background: the project's zh / en bundles are first-paint synchronous resources (`SYNC_LANGS`),
+ * and putting the dozens of UI strings of a single tool into `core/i18n/locales/*` would bloat the entry chunk
+ * (project budget: first-paint gzip ≤ 180KB, already close to the limit in practice).
+ * So this tool's UI copy lives here and is merged into i18next by `registerRichTextStrings` on lazy load,
+ * keeping the same key paths (`tools.richText.*`) and all 10 languages.
  *
- * 注意：工具元数据（名称/描述）仍写在 `core/i18n/locales/*` 的 `toolsMeta` 中，
- * 因为首页卡片、侧边栏与 ⌘K 搜索在工具加载前就要用到。
+ * Note: tool metadata (name/description) still lives in `toolsMeta` under `core/i18n/locales/*`,
+ * because the home card, sidebar, and ⌘K search need it before the tool loads.
  */
 
 type StringTree = { [key: string]: string | StringTree };
@@ -2934,7 +2934,7 @@ const pt: ResourceTree = {
   },
 };
 
-/** 语言代码 → 资源树，键与 `Lang` 保持一致 */
+/** Language code → resource tree, keys aligned with `Lang` */
 export const richTextStrings: Record<string, ResourceTree> = {
   zh,
   en,
@@ -2947,7 +2947,7 @@ export const richTextStrings: Record<string, ResourceTree> = {
   pt,
 };
 
-/** 把本工具文案合并进 i18next（工具被懒加载时调用，键路径 tools.richText.*） */
+/** Merge this tool's strings into i18next (called on lazy load, key path tools.richText.*) */
 export function registerRichTextStrings(instance: {
   addResourceBundle: (
     lng: string,

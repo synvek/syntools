@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 商业与战略类提示词，详见 ../README.md */
+/** Business and strategy prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'business-model-canvas',

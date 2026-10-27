@@ -2,15 +2,15 @@ import { useTranslation } from 'react-i18next';
 import { ROTATION_SNAP_STEP, type FlowNodePatch, type FlowNodeStyleView } from '../model/types';
 import { normalizeRotation } from '../core';
 
-/** 快捷旋转角度：与 draw.io 的「旋转 90°」心智一致 */
+/** Quick rotation angles: matching draw.io's "rotate 90°" mental model */
 const QUICK_ANGLES = [0, 90, 180, 270];
 
 const inputCls =
   'h-8 rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 
 /**
- * 节点「变换」分组：旋转角度（滑块 + 数值 + 快捷角度）与水平/垂直镜像。
- * 与画布上的旋转手柄同源（都写 `style.rotation` / `flipH` / `flipV`），双向联动。
+ * Node "Transform" group: rotation angle (slider + number + quick angles) and horizontal/vertical mirror.
+ * Same source as the canvas rotate handle (both write `style.rotation` / `flipH` / `flipV`) and stay in sync both ways.
  */
 export function NodeTransformSection({
   style,

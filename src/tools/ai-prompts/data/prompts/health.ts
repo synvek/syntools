@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 健康与生活类提示词，详见 ../README.md */
+/** Health and lifestyle prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'health-training-plan',

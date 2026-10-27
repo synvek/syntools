@@ -263,7 +263,7 @@ export const HTTP_STATUSES: HttpStatus[] = [
   },
 ];
 
-/** 按状态码或名称/描述过滤。 */
+/** Filter by status code, name, or description. */
 export function filterStatuses(query: string): HttpStatus[] {
   const q = query.trim().toLowerCase();
   if (!q) return HTTP_STATUSES;

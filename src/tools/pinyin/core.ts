@@ -2,7 +2,7 @@ import { pinyin } from 'pinyin-pro';
 import type { ToolResult } from '@/core/types';
 
 /**
- * 汉字转拼音（pinyin-pro）：支持声调开关；多音字取常用读音。
+ * Chinese characters to pinyin (pinyin-pro): optional tone marks; polyphonic characters use the common reading.
  */
 
 export type PinyinCase = 'lower' | 'upper';
@@ -20,7 +20,7 @@ export function convertPinyin(
   options: {
     separator?: PinyinSeparator;
     letterCase?: PinyinCase;
-    /** 启用声调（符号标调，如 zhōng） */
+    /** Enable tone marks (diacritics, e.g. zhōng) */
     tone?: boolean;
   } = {},
 ): ToolResult<string> {
@@ -33,13 +33,13 @@ export function convertPinyin(
   const parts = pinyin(input, {
     type: 'array',
     toneType: tone ? 'symbol' : 'none',
-    // 非汉字原样保留
+    // Non-Chinese characters are kept as-is
     nonZh: 'consecutive',
   });
 
   let value = parts.join(separator);
   if (letterCase === 'upper') value = value.toUpperCase();
-  // toneType none 已是小写；symbol 声调字母保持小写音节 + 调号
+  // toneType none is already lowercase; symbol tones keep a lowercase syllable plus the tone mark
   else if (!tone) value = value.toLowerCase();
 
   return { ok: true, value };

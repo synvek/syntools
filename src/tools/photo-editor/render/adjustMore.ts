@@ -9,13 +9,13 @@ import type {
 } from '../model/types';
 
 /**
- * 「更多调整」的逐像素实现（P1-C2）：照片滤镜 / 通道混合器 / 阴影高光 / 可选颜色 / 替换颜色。
+ * Per-pixel "more adjustments" (P1-C2): photo filter / channel mixer / shadows & highlights / selective / replace.
  *
- * 与 `render/adjust.ts` 同一分工：这里只做纯像素运算，缓存与管线由 `render/filters.ts` 负责。
- * 全部函数对 `Uint8ClampedArray` 就地改写，可脱离画布单测。
+ * Same split as `render/adjust.ts`: pure pixel math here; caching and the pipeline belong to `render/filters.ts`.
+ * Every function rewrites a `Uint8ClampedArray` in place, so it can be unit-tested without a canvas.
  */
 
-/** 0~255 钳制（与 adjust.ts 同语义，单独一份避免跨模块私有依赖） */
+/** Clamp to 0~255 (same semantics as adjust.ts; duplicated to avoid a private cross-module dependency) */
 function clampByte(value: number): number {
   return value < 0 ? 0 : value > 255 ? 255 : Math.round(value);
 }
@@ -45,7 +45,7 @@ function parseHex(hex: string): [number, number, number] {
   ];
 }
 
-/** RGB（0~255）→ HSL（h 0~360，s/l 0~1） */
+/** RGB (0~255) → HSL (h 0~360, s/l 0~1) */
 export function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   const rn = r / 255;
   const gn = g / 255;
@@ -65,7 +65,7 @@ export function rgbToHsl(r: number, g: number, b: number): [number, number, numb
   return [h, s, l];
 }
 
-/** HSL → RGB（0~255）；h 支持任意角度（自动规范化） */
+/** HSL → RGB (0~255); h accepts any angle (normalized automatically) */
 export function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   const hue = (((h % 360) + 360) % 360) / 60;
   const sat = clamp01(s);
@@ -93,7 +93,7 @@ export function hslToRgb(h: number, s: number, l: number): [number, number, numb
   ];
 }
 
-/** RGB → CMYK（0~1） */
+/** RGB → CMYK (0~1) */
 export function rgbToCmyk(r: number, g: number, b: number): [number, number, number, number] {
   const rn = r / 255;
   const gn = g / 255;
@@ -103,7 +103,7 @@ export function rgbToCmyk(r: number, g: number, b: number): [number, number, num
   return [(1 - rn - k) / (1 - k), (1 - gn - k) / (1 - k), (1 - bn - k) / (1 - k), k];
 }
 
-/** CMYK（0~1）→ RGB（0~255） */
+/** CMYK (0~1) → RGB (0~255) */
 export function cmykToRgb(c: number, m: number, y: number, k: number): [number, number, number] {
   return [
     clampByte((1 - c) * (1 - k) * 255),
@@ -112,7 +112,7 @@ export function cmykToRgb(c: number, m: number, y: number, k: number): [number, 
   ];
 }
 
-/** 六个彩色色域的中心色相（度） */
+/** Center hues of the six chromatic ranges (degrees) */
 const RANGE_CENTERS: Partial<Record<SelectiveRange, number>> = {
   reds: 0,
   yellows: 60,
@@ -122,14 +122,14 @@ const RANGE_CENTERS: Partial<Record<SelectiveRange, number>> = {
   magentas: 300,
 };
 
-/** 彩色色域的色相半宽：±60° 的三角窗，相邻色域自然交叠 */
+/** Hue half-width of a chromatic range: a ±60° triangular window, so neighbors overlap naturally */
 const RANGE_HALF_WIDTH = 60;
 
 /**
- * 色域归属权重（0~1）。
+ * Range membership weight (0~1).
  *
- * - 六个彩色域：以中心色相 ±60° 的三角窗，再乘饱和度门限（近灰像素不该被彩色域影响）；
- * - 白 / 中性 / 黑：按饱和度与明度判定，三段互补。
+ * - the six chromatic ranges: a ±60° triangular window around the center hue, times a saturation gate
+ *   (near-gray pixels shouldn't be affected); white / neutral / black: judged by saturation and lightness.
  */
 export function selectiveWeight(range: SelectiveRange, h: number, s: number, l: number): number {
   if (range === 'whites') return clamp01(1 - s * 2) * clamp01((l - 0.5) * 2);
@@ -142,8 +142,8 @@ export function selectiveWeight(range: SelectiveRange, h: number, s: number, l: 
 }
 
 /**
- * 照片滤镜：整幅向滤镜色插值，可选保持明度。
- * `preserveLuminosity` 用「整体缩放回原亮度」实现（简单可预期；代价是高饱和色可能被钳制）。
+ * Photo filter: interpolate the whole image toward the filter color, optionally preserving luminosity.
+ * `preserveLuminosity` scales everything back to the original luminance (predictable, though it may clip).
  */
 export function applyPhotoFilter(data: Uint8ClampedArray, params: PhotoFilterParams): void {
   const [fr, fg, fb] = parseHex(params.color);
@@ -172,7 +172,7 @@ export function applyPhotoFilter(data: Uint8ClampedArray, params: PhotoFilterPar
   }
 }
 
-/** 通道混合器：系数为百分比，常数为百分点（×2.55） */
+/** Channel mixer: coefficients are percentages, constants are percentage points (×2.55) */
 export function applyChannelMixer(data: Uint8ClampedArray, params: ChannelMixerParams): void {
   const row = (values: number[]): [number, number, number, number] => [
     values[0] ?? 0,
@@ -194,8 +194,8 @@ export function applyChannelMixer(data: Uint8ClampedArray, params: ChannelMixerP
 }
 
 /**
- * 阴影 / 高光：暗部按 `(1-亮度)²` 加权提亮、亮部按 `亮度²` 加权压暗。
- * 简化版 —— 不涉及半径与局部对比（PS 的完整实现需要一遍模糊）。
+ * Shadows / highlights: lift darks weighted by `(1 - luminance)²`, pull down brights weighted by `luminance²`.
+ * Simplified: no radius or local contrast (the full PS version needs a blur pass).
  */
 export function applyShadowsHighlights(
   data: Uint8ClampedArray,
@@ -227,7 +227,7 @@ export function applyShadowsHighlights(
   }
 }
 
-/** 可选颜色：按色域权重把 CMYK 偏移叠加到像素上（绝对模式） */
+/** Selective color: add the CMYK offset to pixels by range weight (absolute mode) */
 export function applySelectiveColor(data: Uint8ClampedArray, params: SelectiveColorParams): void {
   const active: SelectiveRange[] = SELECTIVE_RANGES.filter((range) =>
     (params.ranges[range] ?? []).some((value) => value !== 0),
@@ -262,7 +262,7 @@ export function applySelectiveColor(data: Uint8ClampedArray, params: SelectiveCo
   }
 }
 
-/** 替换颜色：容差内的像素按强度做 HSL 偏移，容差边缘平滑过渡 */
+/** Replace color: shift HSL for pixels within the tolerance, with a smooth falloff at the edge */
 export function applyReplaceColor(data: Uint8ClampedArray, params: ReplaceColorParams): void {
   if (params.hue === 0 && params.saturation === 0 && params.lightness === 0) return;
   const [tr, tg, tb] = parseHex(params.color);

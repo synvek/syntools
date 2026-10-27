@@ -57,7 +57,7 @@ function ChannelInput({
   );
 }
 
-/** HSV / CMYK 颜色转换 */
+/** HSV / CMYK color conversion */
 export default function HsvCmykTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ h: DEFAULT_HEX }), []);
@@ -123,9 +123,7 @@ export default function HsvCmykTool() {
 
         <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-2 rounded-md border border-gray-200 p-3 dark:border-gray-700">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
-              RGB
-            </p>
+            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">RGB</p>
             <ChannelInput
               label="R"
               value={state.rgb.r}
@@ -150,9 +148,7 @@ export default function HsvCmykTool() {
           </div>
 
           <div className="flex flex-col gap-2 rounded-md border border-gray-200 p-3 dark:border-gray-700">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
-              HSV
-            </p>
+            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">HSV</p>
             <ChannelInput
               label="H"
               value={state.hsv.h}
@@ -180,9 +176,7 @@ export default function HsvCmykTool() {
           </div>
 
           <div className="flex flex-col gap-2 rounded-md border border-gray-200 p-3 dark:border-gray-700">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
-              CMYK
-            </p>
+            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">CMYK</p>
             <ChannelInput
               label="C"
               value={state.cmyk.c}

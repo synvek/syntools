@@ -3,12 +3,12 @@ import { usePhotoStore } from '../store';
 import { historyTimeline } from '../core';
 
 /**
- * 历史面板：按操作名列出时间轴，点击任意一行即可跳到那一步之后的状态。
+ * History panel: lists the timeline by action name; clicking any row jumps to the state after that step.
  *
- * 行语义见 `core.historyTimeline`：
- * - 第 0 行 = 打开 / 新建文档时的初始状态；
- * - 高亮行 = 当前状态；
- * - 高亮行之后 = 可重做的步骤（灰显）。
+ * Row semantics live in `core.historyTimeline`:
+ * - row 0 = the initial state when the document was opened / created;
+ * - the highlighted row = the current state;
+ * - rows after it = steps that can be redone (greyed out).
  */
 export function HistoryPanel() {
   const { t } = useTranslation();

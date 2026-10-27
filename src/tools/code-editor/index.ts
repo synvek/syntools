@@ -1,13 +1,14 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 代码编辑器（「文档与创作」分类）：可编辑的语法高亮编辑器。
- * 编辑体验：查找替换（大小写 / 整词 / 正则）、行操作与快捷键、缩进引导线、
- * 括号配对与跳转、折叠范围标记、批量替换（选择同词）、当前行高亮。
- * 输出：多语言格式化（Prettier + 内置）、10 套风格主题、样式化导出卡片
- * （窗口样式 / 留白 / 圆角 / 阴影 / 背景 / 水印 / 指定行高亮 / 行号），
- * 导出源码 / 独立 HTML / PNG / JPG / SVG，复制 Markdown / 富文本 / 图片，
- * 压缩分享链接与本地草稿，全部在本地完成。
+ * Code editor ("Documents & creation" category): an editable syntax-highlighted editor.
+ * Editing: find and replace (case / whole word / regex), line operations and shortcuts, indent
+ * guides, bracket matching and jumping, fold-range markers, batch replacement (select same word),
+ * current-line highlight.
+ * Output: multi-language formatting (Prettier + built-in), 10 themes, styled export cards
+ * (window style / padding / radius / shadow / background / watermark / line highlight / line
+ * numbers), source / standalone HTML / PNG / JPG / SVG export, copying Markdown / rich text /
+ * images, and compressed share links plus local drafts — all done locally.
  */
 export const codeEditorTool: ToolMeta = {
   id: 'code-editor',

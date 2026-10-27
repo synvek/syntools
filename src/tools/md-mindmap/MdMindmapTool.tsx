@@ -54,13 +54,10 @@ async function svgStringToPngDataUrl(svg: string, scale = 2): Promise<string> {
   }
 }
 
-/** Markdown 思维导图 */
+/** Markdown mind map */
 export default function MdMindmapTool() {
   const { t } = useTranslation();
-  const init = useMemo(
-    () => readSharedState({ i: DEFAULT_MD, th: DEFAULT_THEME_ID, z: 1 }),
-    [],
-  );
+  const init = useMemo(() => readSharedState({ i: DEFAULT_MD, th: DEFAULT_THEME_ID, z: 1 }), []);
   const [input, setInput] = useState(String(init.i || DEFAULT_MD));
   const [themeId, setThemeId] = useState<MindmapThemeId>(
     isMindmapThemeId(String(init.th)) ? (init.th as MindmapThemeId) : DEFAULT_THEME_ID,
@@ -207,7 +204,7 @@ export default function MdMindmapTool() {
                     transform: `scale(${zoom})`,
                     transformOrigin: 'top left',
                   }}
-                  // SVG 由本工具纯函数生成，无外部 HTML
+                  // The SVG comes from this tool's own pure functions, no external HTML
                   dangerouslySetInnerHTML={{ __html: svg }}
                 />
               </div>
@@ -219,7 +216,9 @@ export default function MdMindmapTool() {
               <p className="p-3 text-sm text-gray-400">{t('tools.mdMindmap.empty')}</p>
             )}
           </div>
-          <p className="text-xs text-gray-400 dark:text-gray-500">{t('tools.mdMindmap.zoomHint')}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            {t('tools.mdMindmap.zoomHint')}
+          </p>
         </div>
       </div>
     </div>

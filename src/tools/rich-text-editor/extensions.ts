@@ -28,12 +28,12 @@ import { MathBlock, MathCommands, MathInline } from './math';
 import { Spellcheck, SpellcheckCommands, type SpellDictionary } from './spellcheck';
 
 /**
- * 编辑器扩展组合（技术设计 §8.3）：
- * StarterKit 已内置 Link / Underline（Tiptap v3），此处只补充其未覆盖的能力。
- * 本文件被 RichTextEditorTool 懒加载引用，因此 TipTap 不会进入首屏包。
+ * Editor extension set (technical design §8.3):
+ * StarterKit already bundles Link / Underline (Tiptap v3), so only missing capabilities are added here.
+ * This file is imported lazily by RichTextEditorTool, keeping TipTap out of the initial bundle.
  */
 
-/** 分页符节点：导出 Word 时转 pageBreakBefore，打印/页面视图中自然分页 */
+/** Page break node: becomes pageBreakBefore on Word export, paginates naturally in print / page view */
 const PageBreak = Node.create({
   name: 'pageBreak',
   group: 'block',
@@ -58,18 +58,19 @@ const PageBreak = Node.create({
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     pageBreak: {
-      /** 在光标处插入分页符 */
+      /** Insert a page break at the cursor */
       setPageBreak: () => ReturnType;
     };
   }
 }
 
 /**
- * 拖动落点光标：拖动图片 / 文本块时在插入位置画一条竖线，用来判断会插到哪个文字前面。
+ * Drag drop cursor: draws a vertical line at the insertion point while dragging images / text blocks,
+ * showing where the content will land.
  *
- * StarterKit 虽然内置 dropcursor，但在本项目里始终没有生效（拖动过程中
- * `.ProseMirror-dropcursor` 元素从未出现），所以这里直接注册 ProseMirror 的插件，
- * 顺带把颜色 / 粗细调成可见（默认 1px 黑色在正文里几乎看不出来）。
+ * StarterKit's built-in dropcursor never worked in this project (the `.ProseMirror-dropcursor` element
+ * never appeared during a drag), so the ProseMirror plugin is registered directly here, with color and
+ * width tuned to be visible (the default 1px black is nearly invisible on body text).
  */
 const DropIndicator = Extension.create({
   name: 'dropIndicator',
@@ -78,7 +79,7 @@ const DropIndicator = Extension.create({
   },
 });
 
-/** 页面布局插件（Word 式分页）：仅页面视图启用，通过 Decoration.widget 渲染页间空白 */
+/** Page layout plugin (Word-style pagination): enabled in page view only, rendering inter-page gaps via Decoration.widget */
 const PageLayout = Extension.create<{
   onLayout?: (snapshot: PageLayoutSnapshot) => void;
   getPageMetrics?: () => PageMetrics;
@@ -94,21 +95,21 @@ const PageLayout = Extension.create<{
   },
 });
 
-/** 扩展集合的构造选项：文案与宿主回调都由工具层按当前语言/页面状态注入 */
+/** Extension options: labels and host callbacks are injected by the tool layer from the current language / page state */
 export interface RichTextExtensionOptions {
-  /** 空文档占位文案 */
+  /** Empty-document placeholder */
   placeholder: string;
-  /** 分页快照回调（纸面位置 + 每页起始块位置） */
+  /** Pagination snapshot callback (sheet positions + each page's start position) */
   onLayout?: (snapshot: PageLayoutSnapshot) => void;
-  /** 当前页面设置（纸张 / 边距 / 方向） */
+  /** Current page setup (paper / margins / orientation) */
   getPageMetrics?: () => PageMetrics;
-  /** 目录文案 */
+  /** TOC labels */
   tocLabels?: TocLabels;
-  /** 脚注文案 */
+  /** Footnote labels */
   footnoteLabels?: FootnoteLabels;
-  /** 点击公式时回调（工具层打开编辑弹窗） */
+  /** Callback on formula click (the tool layer opens the edit dialog) */
   onMathSelect?: (pos: number, latex: string, display: boolean) => void;
-  /** 拼写检查：词典与开关都以 getter 传入，词表加载完成后无需重建编辑器 */
+  /** Spellcheck: dictionary and toggle arrive as getters, so no editor rebuild is needed after the word list loads */
   spellcheck?: {
     getDictionary: () => SpellDictionary;
     isEnabled: () => boolean;
@@ -126,9 +127,9 @@ export function createExtensions({
 }: RichTextExtensionOptions) {
   return [
     StarterKit.configure({
-      // 链接点击不跳转，交由工具栏编辑
+      // Links don't navigate on click; the toolbar handles editing
       link: { openOnClick: false, autolink: true },
-      // 落点光标改由下面的 DropIndicator 提供（可配置颜色 / 粗细）
+      // The drop cursor comes from DropIndicator below (configurable color / width)
       dropcursor: false,
     }),
     TextStyle,
@@ -139,15 +140,15 @@ export function createExtensions({
     Highlight.configure({ multicolor: true }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    // TableStyle 是 Table 的扩展（含边框/斑马纹属性），不可与原 Table 同时注册，
-    // 否则会重复注册 tableColumnResizing 插件（PM 报 keyed plugin 实例冲突）
+    // TableStyle extends Table (adding border/zebra attributes) and must not be registered alongside
+    // the original Table, which would register tableColumnResizing twice (PM keyed plugin conflict)
     TableStyle.configure({ resizable: true, HTMLAttributes: { class: 'rte-table' } }),
     TableRow,
     TableCell,
     TableHeader,
-    // ImageStyle 同理替代原 Image
-    // inline: true → 「嵌入型」是真正的行内节点：插入后留在文字中间，不再独占一行。
-    // 浮于文字上方 / 衬于文字下方仍靠绝对定位（editor.css 的 [data-layer]），不受影响。
+    // ImageStyle likewise replaces the original Image
+    // inline: true -> "inline" is a true inline node: it stays within the text instead of taking a line.
+    // In front of / behind text still rely on absolute positioning (editor.css [data-layer]) and are unaffected.
     ImageStyle.configure({ inline: true, allowBase64: true }),
     ImageLayerCommands,
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
@@ -160,7 +161,7 @@ export function createExtensions({
     TrackedInsert,
     TrackedDelete,
     DocMarkCommands,
-    // 目录 / 脚注文案随语言注入：节点不含属性，切换语言后标题同步本地化
+    // TOC / footnote labels follow the language: the nodes carry no attributes, so titles localize on language switch
     TableOfContents.configure({ labels: tocLabels ?? DEFAULT_TOC_LABELS }),
     FootnoteRef.configure({ labels: footnoteLabels ?? DEFAULT_FOOTNOTE_LABELS }),
     FootnoteList.configure({ labels: footnoteLabels ?? DEFAULT_FOOTNOTE_LABELS }),

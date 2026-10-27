@@ -1,7 +1,7 @@
 /**
- * 电子表格工具样式：
- * 1. 给 Univer 显式高度（否则画布高度为 0）；
- * 2. 收口 Univer 与 Tailwind / 项目暗色模式的样式冲突。
+ * Spreadsheet tool styles:
+ * 1. Give Univer an explicit height (otherwise the canvas height collapses to 0).
+ * 2. Contain the style conflicts between Univer and Tailwind / the project's dark mode.
  */
 
 .sheet-canvas {
@@ -10,29 +10,29 @@
   width: 100%;
 }
 
-/* Univer 的工作台撑满容器，避免出现双重滚动条 */
+/* Stretch Univer's workspace to the container so no second scrollbar appears */
 .sheet-canvas > .univer-app-container,
 .sheet-canvas > div {
   height: 100%;
 }
 
-/* 暗色模式下让 Univer 自身的浅色面板与本工具容器背景对齐 */
+/* In dark mode, align Univer's own light panels with this tool's container background */
 .dark .sheet-canvas {
   background-color: #111827;
   color-scheme: dark;
 }
 
 /*
- * Univer Ribbon（classic 模式）把「开始 / 插入 / 公式 / 数据」标签栏与下方
- * 工具条按钮都硬编码成了 justify-content: center。这里统一改为靠左排列，
- * 与文档头的左对齐布局保持一致。
+ * Univer's classic ribbon hard-codes justify-content: center for both the
+ * "Home / Insert / Formula / Data" tab bar and the toolbar buttons below it. Left-align
+ * them here so they line up with the left-aligned layout of the document header.
  */
 .sheet-canvas [data-u-comp='ribbon-header-menu'] [role='tablist'],
 .sheet-canvas [data-u-comp='ribbon-toolbar'] {
   justify-content: flex-start;
 }
 
-/* 移动端给出更矮但可用的高度 */
+/* Shorter but still usable height on mobile */
 @media (max-width: 768px) {
   .sheet-canvas {
     height: 62vh;

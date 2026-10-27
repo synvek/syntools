@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 随机字符串生成：crypto 拒绝采样，支持预设字符集与自定义。
+ * Random string generation with crypto rejection sampling; supports presets and custom character sets.
  */
 
 export type RandomStringPreset = 'alpha' | 'alnum' | 'hex' | 'base64' | 'custom';

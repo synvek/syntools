@@ -7,10 +7,10 @@ import {
   toDraftV2,
 } from './migrate';
 
-/** 草稿 / 文档库 schema 迁移纯逻辑测试（不依赖 DOM 与 IndexedDB）。 */
+/** Pure-logic tests for draft / document library schema migration (no DOM or IndexedDB). */
 
 describe('migrateDraft（v1 → v2）', () => {
-  it('保留 v1 正文与标题并补齐版本号', () => {
+  it('keeps v1 body and title and adds the version number', () => {
     const result = migrateDraft({
       title: '季度报告',
       html: '<p>正文</p>',
@@ -32,7 +32,7 @@ describe('migrateDraft（v1 → v2）', () => {
     expect(result.value.changes).toEqual([]);
   });
 
-  it('v1 文档从 HTML 反推批注与修订，避免侧栏「有标记无条目」', () => {
+  it('derives comments and revisions from v1 HTML so the sidebar never has marks without entries', () => {
     const html =
       '<p><span data-comment-id="c-1" class="rte-comment">甲</span>' +
       '<ins data-track="insert" class="rte-track-insert">新增</ins>' +
@@ -49,7 +49,7 @@ describe('migrateDraft（v1 → v2）', () => {
     ]);
   });
 
-  it('已是 v2 时不复活用户已删除的批注', () => {
+  it('does not resurrect deleted comments when the data is already v2', () => {
     const html = '<p><span data-comment-id="c-1" class="rte-comment">甲</span></p>';
     const result = migrateDraft({ schemaVersion: CURRENT_SCHEMA_VERSION, html, comments: [] });
     expect(result.ok).toBe(true);
@@ -57,7 +57,7 @@ describe('migrateDraft（v1 → v2）', () => {
     expect(result.value.comments).toEqual([]);
   });
 
-  it('v2 数据保留完整批注元数据', () => {
+  it('keeps full comment metadata for v2 data', () => {
     const result = migrateDraft({
       schemaVersion: CURRENT_SCHEMA_VERSION,
       title: 't',
@@ -87,12 +87,12 @@ describe('migrateDraft（v1 → v2）', () => {
       resolved: true,
     });
     expect(result.value.changes).toHaveLength(1);
-    // 去重 + 去空白
+    // Dedupe and trim
     expect(result.value.userWords).toEqual(['syntools', '富文本']);
     expect(result.value.templateId).toBe('official');
   });
 
-  it('过滤非法批注 / 修订条目并补齐缺失 id', () => {
+  it('filters invalid comment / revision entries and fills in missing ids', () => {
     const result = migrateDraft({
       schemaVersion: CURRENT_SCHEMA_VERSION,
       html: '<p>x</p>',
@@ -105,7 +105,7 @@ describe('migrateDraft（v1 → v2）', () => {
     expect(result.value.changes.map((change) => change.id)).toEqual(['t-migrated-0', 't-1']);
   });
 
-  it('非法可选字段回退为 undefined 而不是写入脏值', () => {
+  it('falls back to undefined for invalid optional fields instead of writing junk', () => {
     const result = migrateDraft({
       title: 42,
       html: '<p>x</p>',
@@ -123,7 +123,7 @@ describe('migrateDraft（v1 → v2）', () => {
     expect(result.value.pageSetup).toBeUndefined();
   });
 
-  it('无法作为草稿使用时返回 MIGRATION_FAILED', () => {
+  it('returns MIGRATION_FAILED when the data cannot be used as a draft', () => {
     expect(migrateDraft(null)).toEqual({ ok: false, error: 'MIGRATION_FAILED' });
     expect(migrateDraft('text')).toEqual({ ok: false, error: 'MIGRATION_FAILED' });
     expect(migrateDraft([])).toEqual({ ok: false, error: 'MIGRATION_FAILED' });
@@ -131,8 +131,8 @@ describe('migrateDraft（v1 → v2）', () => {
   });
 });
 
-describe('deriveReviewFromHtml（尽力而为反推）', () => {
-  it('同一批注 id 只收录一次并还原 HTML 实体', () => {
+describe('deriveReviewFromHtml (best-effort derivation)', () => {
+  it('collects each comment id once and decodes HTML entities', () => {
     const html =
       '<p><span data-comment-id="c-1">甲</span><span data-comment-id="c-1">乙</span></p>' +
       '<p><ins data-track="insert">a&amp;b &lt;c&gt;</ins></p>';
@@ -141,14 +141,14 @@ describe('deriveReviewFromHtml（尽力而为反推）', () => {
     expect(derived.changes[0].text).toBe('a&b <c>');
   });
 
-  it('忽略没有文本的修订标记与未知 data-track 值', () => {
+  it('ignores revision marks without text and unknown data-track values', () => {
     const derived = deriveReviewFromHtml(
       '<p><ins data-track="insert"></ins><ins data-track="other">x</ins></p>',
     );
     expect(derived.changes).toEqual([]);
   });
 
-  it('反推条目数量受上限保护', () => {
+  it('caps the number of derived entries', () => {
     const many = Array.from(
       { length: 260 },
       (_, index) => `<span data-comment-id="c-${index}">x</span>`,
@@ -158,7 +158,7 @@ describe('deriveReviewFromHtml（尽力而为反推）', () => {
 });
 
 describe('normalizeDocExtras / toDraftV2', () => {
-  it('deriveReview=false 时不从 HTML 反推', () => {
+  it('skips deriving from HTML when deriveReview=false', () => {
     const extras = normalizeDocExtras(
       { html: '<p><span data-comment-id="c-1">x</span></p>' },
       false,
@@ -167,7 +167,7 @@ describe('normalizeDocExtras / toDraftV2', () => {
     expect(extras.changes).toEqual([]);
   });
 
-  it('toDraftV2 补齐版本号与默认扩展字段', () => {
+  it('fills in the version and default extras in toDraftV2', () => {
     const draft = toDraftV2({ title: 't', html: '<p>x</p>', view: 'flow' });
     expect(draft.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(draft.comments).toEqual([]);
@@ -176,7 +176,7 @@ describe('normalizeDocExtras / toDraftV2', () => {
     expect(draft.templateId).toBeUndefined();
   });
 
-  it('缺 html 的入参视为空正文写入', () => {
+  it('treats missing html as an empty body', () => {
     expect(toDraftV2({ title: 't', html: undefined as unknown as string }).html).toBe('');
   });
 });

@@ -2,10 +2,10 @@ import { DEFAULT_BRUSH_PRESETS, normalizeBrushPresets } from './core';
 import type { BrushPreset } from './core';
 
 /**
- * 自定义画笔预设的持久化（localStorage）。
+ * Persistence for custom brush presets (localStorage).
  *
- * 只存**用户自建**的预设；内置预设来自 `core.DEFAULT_BRUSH_PRESETS`（名字走 i18n），
- * 因此升级内置预设不会与用户数据冲突。读写全部容错，损坏数据一律回落到空列表。
+ * Only **user-created** presets are stored; built-ins come from `core.DEFAULT_BRUSH_PRESETS` (names via i18n),
+ * so upgrading the built-ins never clashes with user data. All reads / writes are fault-tolerant and corrupt data falls back to an empty list.
  */
 
 const STORAGE_KEY = 'syntools.photo.brushPresets';
@@ -25,11 +25,11 @@ export function saveBrushPresets(presets: BrushPreset[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(presets.slice(0, MAX_PRESETS)));
   } catch {
-    // 隐私模式 / 配额不足：静默降级（预设只是便利功能，不影响主流程）
+    // Private mode / quota exceeded: degrade silently (presets are a convenience, not the main flow)
   }
 }
 
-/** 界面展示用的完整预设列表：内置在前，自定义在后 */
+/** Full preset list shown in the UI: built-ins first, custom ones after */
 export function allBrushPresets(custom: BrushPreset[]): BrushPreset[] {
   return [...DEFAULT_BRUSH_PRESETS, ...custom];
 }

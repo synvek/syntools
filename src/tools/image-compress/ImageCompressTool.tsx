@@ -29,10 +29,10 @@ interface OutputState {
 const isFormat = (v: string): boolean => IMAGE_FORMATS.some((f) => f.id === v);
 const isMaxDim = (v: number): v is MaxDimension => MAX_DIMENSIONS.includes(v as MaxDimension);
 
-/** 图片压缩/格式转换（Tasks T42）：canvas 编码流程在 UI 层；文案走 i18n（T29 约定） */
+/** Image compression / format conversion (Tasks T42): the canvas encode pipeline lives in the UI; copy goes through i18n (T29 convention) */
 export default function ImageCompressTool() {
   const { t } = useTranslation();
-  // 从分享链接 ?s= 还原初始状态（T28）
+  // Restore the initial state from the ?s= share link (T28)
   const init = useMemo(() => readSharedState({ f: 'image/webp', q: 0.8, m: 0 }), []);
   const [format, setFormat] = useState(isFormat(init.f) ? init.f : 'image/webp');
   const [quality, setQuality] = useState(clampQuality(init.q));
@@ -46,7 +46,7 @@ export default function ImageCompressTool() {
 
   const lossy = formatById(format)?.lossy ?? false;
 
-  // 组件卸载时释放全部 objectURL
+  // Release every objectURL on unmount
   useEffect(
     () => () => {
       if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
@@ -75,7 +75,7 @@ export default function ImageCompressTool() {
     img.src = url;
   }, []);
 
-  // 源图或选项变化时重新编码（toBlob 异步，用 active 标记丢弃过期结果）
+  // Re-encode when the source image or options change (toBlob is async; an active flag drops stale results)
   useEffect(() => {
     const img = imgRef.current;
     if (!source || !img) return;
@@ -90,7 +90,7 @@ export default function ImageCompressTool() {
       return;
     }
     if (format === 'image/jpeg') {
-      // JPEG 无透明通道：先铺白底
+      // JPEG has no alpha channel: paint a white background first
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
     }

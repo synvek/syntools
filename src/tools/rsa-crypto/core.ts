@@ -86,7 +86,7 @@ async function importPrivate(pem: string, forSigning: boolean): Promise<CryptoKe
     .catch(() => null);
 }
 
-/** 生成 RSA 密钥对，导出 PEM（SPKI/PKCS#8）与 JWK。 */
+/** Generate an RSA key pair and export it as PEM (SPKI/PKCS#8) and JWK. */
 export async function generateRsaKeyPair(bits: RsaKeyBits = 2048): Promise<ToolResult<RsaKeyPair>> {
   try {
     const kp = await crypto.subtle.generateKey(

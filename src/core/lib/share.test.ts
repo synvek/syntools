@@ -21,9 +21,9 @@ describe('encodeShareState / decodeShareState', () => {
 
   it('非法输入返回 null 而非抛异常', () => {
     expect(decodeShareState('!!!not-base64!!!')).toBeNull();
-    // base64 合法但 JSON 非法
+    // Valid base64 but invalid JSON
     expect(decodeShareState(btoa('not json'))).toBeNull();
-    // JSON 合法但非对象
+    // Valid JSON but not an object
     expect(decodeShareState(btoa('[1,2]'))).toBeNull();
   });
 

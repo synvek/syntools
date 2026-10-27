@@ -5,25 +5,25 @@ import { drawMeshCells } from './mesh';
 import { applyTextStyle, layoutText, textBlockHeight } from './text';
 
 /**
- * 文字变形（变形文字）与「需要位图才能渲染」的情况。
+ * Text warp, and the cases that need a bitmap to render at all.
  *
- * 做法：先把文字按**正常排版**画到一张离屏画布，再做**网格重采样**得到变形结果。
- * 网格重采样用「每个单元格一个仿射变换」近似：单元足够密（64×64）时肉眼无法分辨，
- * 代价只有一次性的（结果按签名缓存），因此每次绘制仍然是一次 `drawImage`。
- * 与直接在 Konva.Text 上做逐列位移相比，网格法的好处是支持 `fisheye` 这类二维位移场。
+ * Approach: draw the text with **normal layout** to an offscreen canvas, then **resample the mesh**.
+ * Mesh resampling approximates with one affine transform per cell: at 64×64 the eye can't tell,
+ * and the cost is one-time (results cache by signature), so each draw is still a single `drawImage`.
+ * Unlike shifting columns on Konva.Text, a mesh supports 2D fields like `fisheye`.
  */
 
 export type TextLayerModel = Extract<Layer, { kind: 'text' }>;
 
-/** 网格密度：64×64 已足够平滑，再密只会线性增加构建成本 */
+/** Mesh density: 64×64 is smooth enough; denser only adds build cost linearly */
 const MESH = 64;
-/** 变形后内容的留白倍数（相对文字块），避免拱起部分被裁掉 */
+/** Padding factor around warped content (relative to the text block), so bulges aren't clipped */
 const MARGIN_X_RATIO = 0.2;
 const MARGIN_Y_RATIO = 0.3;
 
 export interface WarpedText {
   canvas: HTMLCanvasElement;
-  /** 画布左上角相对文字块左上角的偏移（负值 = 向左上扩） */
+  /** Canvas top-left relative to the text block's (negative = extends up-left) */
   offsetX: number;
   offsetY: number;
 }
@@ -31,7 +31,7 @@ export interface WarpedText {
 const cache = new Map<string, WarpedText>();
 const CACHE_LIMIT = 24;
 
-/** 缓存签名：任何影响像素的字段都必须进来，否则会出现「改了参数画面不变」 */
+/** Cache signature: every pixel-affecting field must be in it, or "changed a parameter, image unchanged" */
 function signatureOf(layer: TextLayerModel): string {
   return [
     layer.text,
@@ -55,14 +55,14 @@ function signatureOf(layer: TextLayerModel): string {
   ].join('|');
 }
 
-/** 清空变形位图缓存（文档切换 / 内存吃紧时可调用） */
+/** Clear the warp bitmap cache (on document switch / memory pressure) */
 export function clearWarpCache(): void {
   cache.clear();
 }
 
 /**
- * 生成文字位图：`warp.kind === 'none'` 时就是「正常排版的位图」，
- * 否则在其上做网格重采样。返回的画布带留白，调用方按 `offsetX / offsetY` 落位。
+ * Produce the text bitmap: with `warp.kind === 'none'` it is just the normally laid out text,
+ * otherwise mesh-resampled. The canvas includes padding; place it by `offsetX / offsetY`.
  */
 export function warpedText(layer: TextLayerModel): WarpedText | null {
   const key = signatureOf(layer);
@@ -85,8 +85,8 @@ export function warpedText(layer: TextLayerModel): WarpedText | null {
 }
 
 /**
- * 正常排版的位图：尺寸 = 文字块 + 留白，内容按文字块左上角定位。
- * `rotation` / 翻转由调用方（节点变换）负责，不进位图，避免重复应用。
+ * The normally laid out bitmap: size = text block + padding, content anchored at the block's top-left.
+ * `rotation` / flips belong to the caller (node transform) and stay out of the bitmap, avoiding doubling.
  */
 function renderSourceBitmap(
   layer: TextLayerModel,
@@ -106,13 +106,13 @@ function renderSourceBitmap(
   if (!ctx) return null;
   ctx.save();
   ctx.translate(marginX, marginY);
-  // 位图内原点即文字块左上角：align 的对齐基准仍是 layer.width
+  // The bitmap origin is the block's top-left, so align still measures against layer.width
   drawInto(ctx, layer);
   ctx.restore();
   return { canvas, marginX, marginY };
 }
 
-/** 位图内的排版绘制（origin 固定为文字块左上角在画布内的位置） */
+/** Layout drawing inside the bitmap (origin fixed at the block's top-left within the canvas) */
 function drawInto(ctx: CanvasRenderingContext2D, layer: TextLayerModel): void {
   applyTextStyle(ctx, layer);
   const lineHeight = layer.fontSize * layer.lineHeight;
@@ -134,10 +134,10 @@ function drawInto(ctx: CanvasRenderingContext2D, layer: TextLayerModel): void {
 }
 
 /**
- * 网格重采样：把 `source` 按变形位移场重画到新画布。
+ * Mesh resampling: redraw `source` onto a new canvas through the warp displacement field.
  *
- * 每个单元格按「源单元 → 目标平行四边形」求仿射矩阵；位移取单元格四角的位移场值，
- * 因此单元内是线性近似（这正是网格变形的标准做法）。
+ * Each cell gets an affine matrix from "source cell → target parallelogram", using the field at its corners,
+ * so the inside is a linear approximation (the standard way to do a mesh warp).
  */
 function warpBitmap(
   source: HTMLCanvasElement,
@@ -149,7 +149,7 @@ function warpBitmap(
   const ctx = out.getContext('2d');
   const { kind, bend, horizontal } = layer.warp;
   if (!ctx) return { canvas: source, offsetX: -marginX, offsetY: -marginY };
-  // 位移场以「文字块」为归一化基准（不含留白），故把画布坐标换算回块内坐标
+  // The field normalizes against the text block (not the padding), so convert canvas coords back inside
   const width = Math.max(1, layer.width);
   const height = Math.max(1, source.height - marginY * 2);
   const cellW = layer.width / MESH;
@@ -164,7 +164,7 @@ function warpBitmap(
     );
     return { x: x + dx * width, y: y + dy * height };
   };
-  // 细网格节点位置：源单元 (col, row) 的四角 + 各自位移
+  // Fine grid node positions: the corners of source cell (col, row) plus their displacements
   const nodes: { x: number; y: number }[] = [];
   for (let row = 0; row <= MESH; row += 1) {
     for (let col = 0; col <= MESH; col += 1) {
@@ -185,8 +185,8 @@ function warpBitmap(
 }
 
 /**
- * 文字位图（含留白）。`needsTextBitmap` 为 false 时返回 null —— 调用方应走原生文字路径，
- * 以保留可选中、可清晰缩放的优点。
+ * Text bitmap (with padding). Returns null when `needsTextBitmap` is false — the caller should use
+ * native text instead, keeping it selectable and crisp at any zoom.
  */
 export function textBitmap(layer: TextLayerModel): WarpedText | null {
   if (!needsTextBitmap(layer)) return null;

@@ -4,8 +4,8 @@ import { useFlowStore } from '../store';
 import { FORMULA_NODE_SIZE, type FlowNodeData } from '../model/types';
 
 /**
- * 公式节点：LaTeX 由 KaTeX 渲染成内联 HTML（矢量字形），
- * KaTeX 及其样式按需动态加载——只有真正使用公式节点时才进入该工具 chunk。
+ * Formula node: LaTeX is rendered by KaTeX into inline HTML (vector glyphs),
+ * and KaTeX plus its styles are loaded dynamically on demand — they only enter this tool's chunk when a formula node is actually used.
  */
 function useKatexHtml(tex: string): string {
   const [html, setHtml] = useState('');

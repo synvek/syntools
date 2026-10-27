@@ -1,20 +1,20 @@
 /**
- * 只做类型推导，不产生运行时 import。
+ * Types only: no runtime imports.
  *
- * 语言资源被刻意拆成两半：
- * - `locales/<lang>`：外壳（导航/首页/搜索/错误）+ `toolsMeta.*`，进首屏；
- * - `locales/<lang>.tools`：各工具 UI 文案 `tools.*`，随工具页按需加载。
- * 两者合计才是完整资源，所以这里取交叉类型。
+ * Locale resources are deliberately split in two:
+ * - `locales/<lang>`: shell (nav / home / search / errors) + `toolsMeta.*`, in the first-load bundle;
+ * - `locales/<lang>.tools`: per-tool UI copy `tools.*`, loaded on demand with tool pages.
+ * Together they form the full resource, hence the intersection type.
  */
 import type zh from '@/core/i18n/locales/zh';
 import type zhTools from '@/core/i18n/locales/zh.tools';
 
-/** 已支持的语言代码（扩展新语言时在此与 LANG_META / loaders 同步追加） */
+/** Supported language codes (add new ones here together with LANG_META / loaders) */
 export const LANGS = ['zh', 'zh-TW', 'en', 'ja', 'fr', 'de', 'it', 'es', 'pt'] as const;
 
 export type Lang = (typeof LANGS)[number];
 
-/** 可同步打进首屏的语言（其余按需懒加载） */
+/** Languages bundled into the first load (the rest are lazy-loaded) */
 export const SYNC_LANGS = ['zh', 'en'] as const satisfies readonly Lang[];
 
 export const LANG_META: Record<Lang, { nativeLabel: string }> = {
@@ -34,7 +34,7 @@ export function isLang(value: unknown): value is Lang {
   return (LANGS as readonly string[]).some((l) => l.toLowerCase() === value.toLowerCase());
 }
 
-/** 归一化为规范 Lang 码（如 zh-tw → zh-TW） */
+/** Normalize to a canonical Lang code (e.g. zh-tw → zh-TW) */
 export function normalizeLang(value: string): Lang | null {
   const lower = value.trim().toLowerCase();
   const found = LANGS.find((l) => l.toLowerCase() === lower);
@@ -46,8 +46,8 @@ export function isSyncLang(lang: Lang): boolean {
 }
 
 /**
- * 将 BCP 47 / navigator 语言标签映射到应用 Lang。
- * 繁体（Hant / TW / HK / MO）→ zh-TW；简体及其他 zh* → zh；无匹配返回 null。
+ * Map a BCP 47 / navigator language tag to an app Lang.
+ * Traditional (Hant / TW / HK / MO) → zh-TW; Simplified and other zh* → zh; no match → null.
  */
 export function mapBrowserLocale(tag: string): Lang | null {
   const raw = tag.trim().toLowerCase().replace(/_/g, '-');
@@ -74,7 +74,7 @@ export function mapBrowserLocale(tag: string): Lang | null {
   return normalizeLang(primary);
 }
 
-/** 收集检测用的 locale 列表：系统区域优先，再浏览器语言偏好 */
+/** Collect locales for detection: system locale first, then browser preferences */
 export function collectBrowserLocales(
   languages?: readonly string[],
   systemLocale?: string | null,
@@ -110,8 +110,8 @@ export function collectBrowserLocales(
 }
 
 /**
- * 按 locale 列表优先序检测；全无匹配时返回 English。
- * 系统区域（Intl）排在浏览器 UI 语言之前，避免「中文系统 + 英文 Chrome」误选 English。
+ * Detect in locale order; English when nothing matches.
+ * The system locale (Intl) precedes the browser UI language, so "Chinese system + English Chrome" is not read as English.
  */
 export function detectBrowserLang(
   languages?: readonly string[],
@@ -124,7 +124,7 @@ export function detectBrowserLang(
   return 'en';
 }
 
-/** 将翻译对象的所有字符串叶子节点宽化为 string，便于各语言文件独立维护 */
+/** Widen every string leaf to string so locale files can be maintained independently */
 type DeepStringRecord<T> = T extends string
   ? string
   : T extends readonly string[]
@@ -133,14 +133,14 @@ type DeepStringRecord<T> = T extends string
       ? { [K in keyof T]: DeepStringRecord<T[K]> }
       : T;
 
-/** 外壳资源结构（以 zh 的键结构为 schema 源）：导航 / 首页 / 搜索 / 工具元数据 */
+/** Shell resource shape (schema taken from zh's keys): nav / home / search / tool metadata */
 export type ShellResources = DeepStringRecord<typeof zh>;
 
-/** 工具 UI 文案结构（以 zh.tools 的键结构为 schema 源）：`tools.*` */
+/** Tool UI copy shape (schema taken from zh.tools' keys): `tools.*` */
 export type ToolStringsResources = DeepStringRecord<typeof zhTools>;
 
-/** 翻译资源结构 = 外壳 + 工具文案（i18next 运行时看到的完整结构） */
+/** Full resource = shell + tool copy (what i18next sees at runtime) */
 export type TranslationResources = ShellResources & ToolStringsResources;
 
-/** 新增语言文件时使用：const xx = { ... } satisfies ShellResources / ToolStringsResources */
+/** For new locale files: const xx = { ... } satisfies ShellResources / ToolStringsResources */
 export type LocaleResource = TranslationResources;

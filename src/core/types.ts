@@ -1,46 +1,46 @@
 import type { ComponentType } from 'react';
 
-/** 工具运行方：client = 纯前端；server = 依赖 Rust 后端（P2） */
+/** Tool runtime: client = pure frontend; server = needs the Rust backend (P2) */
 export type ToolMode = 'client' | 'server';
 
-/** 工具分类（技术设计 §5.1） */
+/** Tool categories (tech design §5.1) */
 export type CategoryId =
-  | 'advanced' // 文档与创作
-  | 'encoding' // 编码转换
-  | 'text' // 文本处理
-  | 'formatting' // 格式化
-  | 'crypto' // 加密哈希
-  | 'datetime' // 时间日期
-  | 'generator' // 生成器
-  | 'network' // 网络
-  | 'image' // 图片处理
-  | 'pdf' // PDF 工具
-  | 'other' // 其他
-  | 'file' // 文件工具
-  | 'media' // 音视频
-  | 'cheatsheet'; // 速查表
+  | 'advanced' // Documents and authoring
+  | 'encoding' // Encoding conversion
+  | 'text' // Text processing
+  | 'formatting' // Formatting
+  | 'crypto' // Hashing and crypto
+  | 'datetime' // Date and time
+  | 'generator' // Generators
+  | 'network' // Network
+  | 'image' // Image processing
+  | 'pdf' // PDF tools
+  | 'other' // Other
+  | 'file' // File tools
+  | 'media' // Audio and video
+  | 'cheatsheet'; // Cheat sheets
 
-/** 工具注册契约：所有工具必须声明此元数据 */
+/** Tool registration contract: every tool must declare this metadata */
 export interface ToolMeta {
-  /** 唯一标识，小写短横线，同时作为路由 /tools/:id */
+  /** Unique id, lowercase kebab-case, also used as the /tools/:id route */
   id: string;
   name: string;
   description: string;
   category: CategoryId;
-  /** 搜索关键词，含中英文别名 */
+  /** Search keywords, including Chinese and English aliases */
   keywords: string[];
-  /** 图标：内置 icon 名称（见 core/components/Icon） */
+  /** Icon: built-in icon name (see core/components/Icon) */
   icon: string;
-  /** 懒加载组件工厂 */
+  /** Lazy-loaded component factory */
   component: () => Promise<{ default: ComponentType }>;
-  /** 默认 client；P2 服务端工具为 server */
+  /** Defaults to client; P2 server-side tools use server */
   mode?: ToolMode;
-  /** 排序权重，同分类内升序 */
+  /** Sort weight, ascending within a category */
   weight?: number;
-  /** 相关工具 id（工具页推荐）；缺省时按同分类补齐 */
+  /** Related tool ids (recommended on the tool page); falls back to same-category tools */
   relatedIds?: string[];
 }
 
-/** 工具计算统一返回契约（技术设计 §8.2）：core.ts 永不向调用方抛异常 */
+/** Unified tool result contract (tech design §8.2): core.ts never throws to callers */
 export type ToolResult<T> =
   { ok: true; value: T } | { ok: false; error: string; params?: Record<string, string | number> };

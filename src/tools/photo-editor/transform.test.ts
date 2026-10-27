@@ -26,14 +26,14 @@ describe('transformHandles', () => {
     expect(at('se')).toMatchObject({ x: 300, y: 200 });
     expect(at('n')).toMatchObject({ x: 200, y: 100 });
     expect(at('w')).toMatchObject({ x: 100, y: 150 });
-    // 旋转柄在顶边外侧（26 个文档单位）
+    // The rotate handle sits outside the top edge (26 document units)
     expect(at('rotate')).toMatchObject({ x: 200, y: 74 });
   });
 
   it('rotates handles around the box center', () => {
     const handles = transformHandles(box({ rotation: 90 }));
     const at = (id: string) => handles.find((h) => h.id === id)!;
-    // 旋转 90° 后，「东」中点落到中心（200,150）正下方 100 处
+    // After a 90° rotation the "east" midpoint lands 100 units below the center (200,150)
     const east = at('e');
     expect(Math.round(east.x)).toBe(200);
     expect(Math.round(east.y)).toBe(250);
@@ -46,7 +46,7 @@ describe('toLocalPoint', () => {
   });
 
   it('inverts rotation', () => {
-    // 90° 时，中心正下方的点对应局部坐标的 +x 方向
+    // At 90°, the point directly below the center corresponds to local +x
     const local = toLocalPoint(box({ rotation: 90 }), 200, 200);
     expect(Math.round(local.x)).toBe(50);
     expect(Math.round(local.y)).toBe(0);
@@ -68,7 +68,7 @@ describe('resizeLayerBox', () => {
 
   it('Alt resizes symmetrically around the centre', () => {
     const next = resizeLayerBox(box(), 'e', { x: 150, y: 0 }, { fromCenter: true });
-    // 半宽 150 → 宽 300，中心不变
+    // Half width 150 → width 300, center unchanged
     expect(next.width).toBe(300);
     expect(next.x + next.width / 2).toBe(200);
   });

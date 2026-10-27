@@ -23,7 +23,7 @@ import {
   type LegendPosition,
 } from './core';
 
-/** 在线图表生成器（自研 SVG） */
+/** Online chart generator (hand-rolled SVG) */
 export default function ChartGeneratorTool() {
   const { t } = useTranslation();
   const init = useMemo(

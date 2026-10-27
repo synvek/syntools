@@ -2,19 +2,21 @@ import { deflate, inflate } from 'pako';
 import { SHARE_PARAM, decodeShareState, type ShareState } from '@/core/lib/share';
 
 /**
- * 分享状态压缩编解码（阶段 7）。
+ * Compressed share-state codec (phase 7).
  *
- * 现状约束：`?s=` 为「JSON → base64url」，`SHARE_LIMIT = 2048`，代码稍长即不可分享。
- * 这里在工具内新增「JSON → deflate → base64url」的压缩编码，参数以 `z` 前缀标记，
- * 读取时按前缀选择解码路径 —— 未压缩的历史链接与站内其他工具语义完全不受影响。
- * 压缩后的上限放宽到 8192（主流浏览器与 CDN 对 URL 长度仍然安全）。
- * pako 是既有依赖，随工具 chunk 懒加载（实测 deflate+inflate ≈ 12.5KB gzip）。
+ * Current constraint: `?s=` is "JSON → base64url" with `SHARE_LIMIT = 2048`, so anything but a
+ * short snippet cannot be shared. This adds a "JSON → deflate → base64url" encoding inside the
+ * tool, marking the parameter with a `z` prefix; reads pick the decode path by that prefix, so
+ * legacy uncompressed links and every other tool on the site are unaffected. The compressed
+ * limit is relaxed to 8192 (still safe for URL lengths in mainstream browsers and CDNs).
+ * pako is an existing dependency, lazily loaded with the tool chunk (≈ 12.5KB gzipped for
+ * deflate + inflate).
  */
 
-/** 压缩分享参数的长度上限（字节） */
+/** Length limit for a compressed share parameter (bytes) */
 export const SHARE_COMPRESSED_LIMIT = 8192;
 
-/** 压缩参数前缀：未压缩参数是纯 base64url，不会以 z 开头后紧跟合法 JSON */
+/** Compressed-parameter prefix: an uncompressed value is pure base64url and cannot start with z followed by valid JSON */
 const MARKER = 'z';
 
 function bytesToBase64Url(bytes: Uint8Array): string {
@@ -38,12 +40,12 @@ function isShareState(value: unknown): value is ShareState {
   );
 }
 
-/** 状态 → 压缩参数值 */
+/** State → compressed parameter value */
 export function encodeCompressedShare(state: ShareState): string {
   return MARKER + bytesToBase64Url(deflate(JSON.stringify(state)));
 }
 
-/** 压缩参数值 → 状态；任何解析失败返回 null，绝不抛异常 */
+/** Compressed parameter value → state; any parse failure returns null and never throws */
 export function decodeCompressedShare(param: string): ShareState | null {
   if (!param.startsWith(MARKER) || param.length <= MARKER.length) return null;
   try {
@@ -56,8 +58,9 @@ export function decodeCompressedShare(param: string): ShareState | null {
 }
 
 /**
- * 读取地址栏 `?s=`（兼容压缩与未压缩两种编码）并与默认状态合并。
- * 语义与 `readSharedState` 一致：仅接受默认值中存在的键，且 typeof 与默认值一致。
+ * Read `?s=` from the address bar (handling both compressed and uncompressed encodings) and merge
+ * it over the defaults. Semantics match `readSharedState`: only keys present in the defaults are
+ * accepted, and only when their typeof matches the default value.
  */
 export function readSharedCodeState<T extends Record<string, string | number | boolean>>(
   defaults: T,

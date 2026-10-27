@@ -1,5 +1,6 @@
 /**
- * 导入导出统一入口：对外只暴露本模块，UI 与 store 不直接依赖具体格式实现。
+ * Single entry point for import and export: only this module is public, so the UI and store never
+ * depend on a specific format implementation.
  */
 
 import { downloadDataUrl } from '@/core/pdf/download';
@@ -43,7 +44,7 @@ export function metaOf(kind: ExportKind): ExportMeta {
   return EXPORT_KINDS.find((m) => m.kind === kind) ?? EXPORT_KINDS[0];
 }
 
-/** 把文本保存为文件 */
+/** Save text as a file */
 export function downloadText(text: string, filename: string, mime: string): void {
   const blob = new Blob([text], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
@@ -51,7 +52,7 @@ export function downloadText(text: string, filename: string, mime: string): void
   URL.revokeObjectURL(url);
 }
 
-/** 文本文件类导出（工程 JSON / Markdown 大纲） */
+/** Text-based exports (project JSON / Markdown outline) */
 export function exportText(project: MindProject, kind: ExportKind, filename: string): boolean {
   let text = '';
   if (kind === 'project') text = toProjectJsonV2(project);
@@ -63,7 +64,7 @@ export function exportText(project: MindProject, kind: ExportKind, filename: str
   return true;
 }
 
-/** 按文件内容猜测并解析：JSON → 工程文件，否则按 Markdown 大纲 */
+/** Detect the format from the content and parse it: JSON → project file, otherwise a Markdown outline */
 export function parseImportedFile(name: string, text: string): MindProject | null {
   const lower = name.toLowerCase();
   if (lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.txt')) {

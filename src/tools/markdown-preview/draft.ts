@@ -1,6 +1,6 @@
 import { MAX_MARKDOWN_BYTES } from './core';
 
-/** 本地草稿存储：键遵循 syntools:* 规范，文档内容不离开浏览器 */
+/** Local draft storage: keys follow the syntools:* convention; documents never leave the browser */
 
 const DRAFT_KEY = 'syntools:markdown-preview.draft.v1';
 
@@ -13,7 +13,7 @@ export interface MarkdownDraft {
   breaks: boolean;
   syncScroll: boolean;
   outline: boolean;
-  /** 最近使用的文档名（保存文件时的默认名） */
+  /** Last used document name (the default when saving a file) */
   name: string;
 }
 
@@ -43,7 +43,7 @@ export function readDraft(): MarkdownDraft | null {
   }
 }
 
-/** 写入草稿，返回是否成功（超限时放弃写入而非静默失败） */
+/** Write the draft and report success (over-limit writes are dropped explicitly, never silently) */
 export function writeDraft(draft: MarkdownDraft): boolean {
   try {
     if (draft.text.length > MAX_MARKDOWN_BYTES) return false;
@@ -58,6 +58,6 @@ export function clearDraft(): void {
   try {
     localStorage.removeItem(DRAFT_KEY);
   } catch {
-    // localStorage 不可用时忽略
+    // Ignore when localStorage is unavailable
   }
 }

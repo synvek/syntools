@@ -9,16 +9,16 @@ import { convert, FORMATS, type DataFormat } from './core';
 
 const isFormat = (v: string): v is DataFormat => FORMATS.includes(v as DataFormat);
 
-/** YAML ⇄ JSON ⇄ TOML 互转（Tasks T32）：文案全部走 i18n（T29 约定） */
+/** YAML ⇄ JSON ⇄ TOML conversion (Tasks T32): all copy goes through i18n (T29 convention) */
 export default function ConvertDataTool() {
   const { t } = useTranslation();
-  // 从分享链接 ?s= 还原初始状态（T28）
+  // Restore the initial state from the ?s= share link (T28)
   const init = useMemo(() => readSharedState({ i: '', f: 'yaml', t: 'json' }), []);
   const [input, setInput] = useState(init.i);
   const [from, setFrom] = useState<DataFormat>(isFormat(init.f) ? init.f : 'yaml');
   const [to, setTo] = useState<DataFormat>(isFormat(init.t) ? init.t : 'json');
 
-  // 输入输出格式不允许相同：改一侧时自动调整另一侧
+  // Input and output formats must differ: changing one side adjusts the other
   const changeFrom = (next: DataFormat) => {
     setFrom(next);
     if (next === to) setTo(FORMATS.find((f) => f !== next)!);

@@ -2,40 +2,43 @@ import type { ToolResult } from '@/core/types';
 import { lineSpans } from './lines';
 
 /**
- * 查找与替换纯逻辑（阶段 3）：匹配枚举、整词 / 大小写 / 正则选项、单处与全部替换。
+ * Find and replace pure logic (phase 3): match enumeration, whole-word / case / regex options,
+ * and single / replace-all.
  *
- * 性能约定：
- * - 命中数量上限 `MAX_MATCHES`，超出即截断（`truncated` 标记），避免超长文本卡住主线程；
- * - 行列号在扫描过程中增量推算（O(文本 + 命中)），不做逐条 `offsetToLineCol` 的 O(n·m) 扫描。
+ * Performance rules:
+ * - Matches are capped at `MAX_MATCHES` and truncated beyond that (flagged by `truncated`), so a
+ *   huge document cannot stall the main thread;
+ * - Line / column numbers are derived incrementally during the scan (O(text + matches)) instead
+ *   of calling `offsetToLineCol` per match, which would be O(n·m).
  */
 
 export interface FindOptions {
-  /** 区分大小写 */
+  /** Match case */
   matchCase?: boolean;
-  /** 全词匹配（按 Unicode 字母 / 数字 / 下划线判定边界，中英文均适用） */
+  /** Whole word (boundaries judged by Unicode letters / digits / underscore, works for CJK too) */
   wholeWord?: boolean;
-  /** 按正则解释查找内容 */
+  /** Interpret the query as a regular expression */
   regex?: boolean;
 }
 
 export interface FindMatch {
   start: number;
   end: number;
-  /** 1 起始行号 */
+  /** 1-based line number */
   line: number;
-  /** 0 起始列号 */
+  /** 0-based column */
   col: number;
 }
 
 export interface FindResult {
   matches: FindMatch[];
-  /** 命中数达到上限被截断 */
+  /** The match count hit the cap and was truncated */
   truncated: boolean;
 }
 
 export type FindErrorCode = 'REGEX_INVALID';
 
-/** 单次查找的命中上限 */
+/** Match cap for a single search */
 export const MAX_MATCHES = 5000;
 
 const WORD_CHAR_RE = /[\p{L}\p{N}_]/u;
@@ -44,7 +47,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** 查找内容 → 全局正则；`regex` 关闭时对内容做转义 */
+/** Query → global regex; the query is escaped when `regex` is off */
 export function compileQuery(query: string, options: FindOptions = {}): ToolResult<RegExp> {
   const source = options.regex ? query : escapeRegExp(query);
   const flags = options.matchCase ? 'g' : 'gi';
@@ -55,12 +58,12 @@ export function compileQuery(query: string, options: FindOptions = {}): ToolResu
   }
 }
 
-/** 边界字符是否为词字符（`\b` 对 CJK 无效，这里自行判定） */
+/** Whether a boundary character is a word character (`\b` fails for CJK, so judge it here) */
 function isWordChar(char: string | undefined): boolean {
   return Boolean(char) && WORD_CHAR_RE.test(char!);
 }
 
-/** 全词匹配：命中首尾是词字符时，相邻字符不得同为词字符 */
+/** Whole-word check: when a match edge is a word character, the neighbour must not be one */
 function isWholeWord(text: string, start: number, end: number): boolean {
   const before = start > 0 ? text[start - 1] : undefined;
   const after = end < text.length ? text[end] : undefined;
@@ -69,7 +72,7 @@ function isWholeWord(text: string, start: number, end: number): boolean {
   return true;
 }
 
-/** 在文本中枚举命中（含行列号）；空查找内容返回空结果 */
+/** Enumerate matches in the text (with line / column); an empty query yields an empty result */
 export function findMatches(
   text: string,
   query: string,
@@ -102,7 +105,7 @@ export function findMatches(
       }
     }
 
-    // 零长度命中（如 `^` / `a*`）必须手动推进，否则 exec 会原地循环
+    // Zero-length matches (e.g. `^` / `a*`) must advance manually or exec loops in place
     if (found[0].length === 0) pattern.lastIndex += 1;
     found = pattern.exec(text);
   }
@@ -110,7 +113,7 @@ export function findMatches(
   return { ok: true, value: { matches, truncated } };
 }
 
-/** 单个命中的替换文本（正则模式下支持 `$1` 等替换语法） */
+/** Replacement text for one match (regex mode supports `$1` style syntax) */
 function replacementFor(
   text: string,
   match: FindMatch,
@@ -124,7 +127,7 @@ function replacementFor(
   return text.slice(match.start, match.end).replace(compiled.value, replacement);
 }
 
-/** 替换单处命中 */
+/** Replace a single match */
 export function replaceOne(
   text: string,
   match: FindMatch,
@@ -137,8 +140,8 @@ export function replaceOne(
 }
 
 /**
- * 全部替换：正则模式交给 `String.replace`（保留 `$1` 语义），
- * 普通模式按命中区间从后往前拼接，避免偏移错乱。
+ * Replace all: regex mode delegates to `String.replace` (keeping `$1` semantics); plain mode
+ * splices by match range from the end backwards so offsets stay valid.
  */
 export function replaceAll(
   text: string,
@@ -151,7 +154,7 @@ export function replaceAll(
   if (!found.ok) return { ok: false, error: found.error };
   const { matches, truncated } = found.value;
   if (matches.length === 0) return { ok: true, value: text };
-  // 命中被截断时不做「全部替换」，避免只替换一部分造成误以为已全量替换
+  // Skip replace-all when matches were truncated, so a partial result is never mistaken for a full one
   if (truncated) return { ok: false, error: 'TOO_MANY_MATCHES' };
 
   if (options.regex && !options.wholeWord) {
@@ -171,7 +174,7 @@ export function replaceAll(
   return { ok: true, value: next };
 }
 
-/** 命中游标推进（循环）：无命中维持 0，负方向从末尾回绕 */
+/** Advance the match cursor (wrapping): stays 0 with no matches; backwards wraps from the end */
 export function stepIndex(current: number, total: number, delta: 1 | -1): number {
   if (total <= 0) return 0;
   if (current < 0) return delta > 0 ? 0 : total - 1;

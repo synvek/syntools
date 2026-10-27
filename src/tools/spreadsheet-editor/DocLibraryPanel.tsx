@@ -15,7 +15,7 @@ interface DocLibraryPanelProps {
 const smallButton =
   'inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800';
 
-/** 本地文档库面板：多工作簿列表 + 打开 / 复制 / 删除 / 新建（IndexedDB） */
+/** Local document library panel: workbook list + open / duplicate / delete / new (IndexedDB) */
 export function DocLibraryPanel({
   currentDocId,
   docs,
@@ -105,7 +105,7 @@ interface VersionHistoryPanelProps {
   onClose: () => void;
 }
 
-/** 版本历史面板：快照列表 + 恢复 */
+/** Version history panel: snapshot list + restore */
 export function VersionHistoryPanel({ versions, onRestore, onClose }: VersionHistoryPanelProps) {
   const { t } = useTranslation();
   return (

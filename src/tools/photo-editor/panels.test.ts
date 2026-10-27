@@ -34,7 +34,7 @@ describe('photo panels layout', () => {
 
   it('normalize: falls back per panel and ignores tabs of another panel', () => {
     const layout = normalizePanelLayout({ tabs: { color: 'layers', layers: 'style' } });
-    // 'layers' 属于图层面板，不能当作颜色面板的选中项
+    // 'layers' belongs to the layers panel and cannot be the color panel's selection
     expect(layout.tabs).toEqual({ color: 'color', layers: 'style', info: 'property' });
   });
 
@@ -44,7 +44,7 @@ describe('photo panels layout', () => {
   });
 
   it('normalize: legacy layouts fall back to the default tabs', () => {
-    // v1 数据：扁平面板列表（order / collapsed / hidden / activeGroup），与新结构不兼容
+    // v1 data: a flat panel list (order / collapsed / hidden / activeGroup), incompatible with the new shape
     const layout = normalizePanelLayout({
       order: ['history', 'layers'],
       collapsed: ['filter'],

@@ -2,7 +2,7 @@ import type { ShapeDef } from './index';
 import { axisAdjust, pxMx } from './adjust';
 import { extendPath, includePath, subjectPath } from './uml-paths';
 
-/** UML 用例图：用例、系统边界、包含/扩展关系、扩展点 */
+/** UML use case diagram: use case, system boundary, include/extend relation, extension point */
 export const UML_USECASE_SHAPES: ShapeDef[] = [
   {
     kind: 'umlUseCase',

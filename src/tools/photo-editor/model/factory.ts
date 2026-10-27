@@ -16,7 +16,7 @@ import type {
   TextLayer,
 } from './types';
 
-/** 文档与图层工厂：只做纯数据构造，不触碰 DOM。 */
+/** Document and layer factory: pure data construction only, never touches the DOM. */
 
 let seq = 0;
 
@@ -37,15 +37,15 @@ export function createAdjustments(): Adjustments {
   };
 }
 
-/** 深拷贝：JSON 往返（jsdom 下 structuredClone 未必可用，与 slide-editor 一致） */
+/** Deep copy via a JSON round-trip (`structuredClone` isn't reliable under jsdom; same as slide-editor) */
 export function cloneDoc(doc: PhotoDoc): PhotoDoc {
   return JSON.parse(JSON.stringify(doc)) as PhotoDoc;
 }
 
 /**
- * 深拷贝图层（JSON 往返，与 cloneDoc 同一策略）。
- * 注意：**只复制 `assetId` / `mask.assetId` 引用，不复制像素**——
- * 调用方若需要独立像素（复制图层、像素级撤销快照），须额外 `cloneAsset()` 克隆画布。
+ * Deep-copy a layer (JSON round-trip, the same strategy as cloneDoc).
+ * Note: **only the `assetId` / `mask.assetId` references are copied, not pixels** —
+ * callers needing independent pixels (duplicated layers, pixel undo snapshots) must also `cloneAsset()`.
  */
 export function cloneLayer(layer: Layer, newId = false): Layer {
   const copy = JSON.parse(JSON.stringify(layer)) as Layer;
@@ -53,7 +53,7 @@ export function cloneLayer(layer: Layer, newId = false): Layer {
   return copy;
 }
 
-/** 新蒙版引用：白色满蒙版（全部显示）由调用方填充像素后传入 assetId */
+/** New mask reference: a fully white (reveal-all) mask; the caller fills pixels and passes the assetId */
 export function createMaskRef(assetId: string, patch: Partial<MaskRef> = {}): MaskRef {
   return {
     assetId,
@@ -73,7 +73,7 @@ export interface NewDocOptions {
   background?: PhotoDoc['background'];
 }
 
-/** 新建文档：校验尺寸后返回 ToolResult（core.ts 契约：永不抛异常） */
+/** New document: validates the size and returns a ToolResult (core.ts contract: never throws) */
 export function createNewDoc(options: NewDocOptions): ToolResult<PhotoDoc> {
   const width = Math.round(options.width);
   const height = Math.round(options.height);
@@ -95,7 +95,7 @@ export function createNewDoc(options: NewDocOptions): ToolResult<PhotoDoc> {
     ok: true,
     value: {
       id: createId('doc'),
-      // 空名称表示「未命名」：由 UI 用当前语言渲染占位名（见 PhotoTool 的 titlePlaceholder）
+      // An empty name means "untitled": the UI renders a localized placeholder (see titlePlaceholder)
       name: options.name?.trim() ?? '',
       width,
       height,
@@ -107,7 +107,7 @@ export function createNewDoc(options: NewDocOptions): ToolResult<PhotoDoc> {
   };
 }
 
-/** 默认画布：16:9 的 1280×720 */
+/** Default canvas: 1280×720 at 16:9 */
 export function createDoc(): PhotoDoc {
   const preset = CANVAS_PRESETS[0];
   const result = createNewDoc({ width: preset.width, height: preset.height });
@@ -131,7 +131,7 @@ export function createRasterLayer(input: {
   assetId: string;
   width: number;
   height: number;
-  /** 空字符串 = 自动命名（UI 按类型 + 序号展示当前语言的名字） */
+  /** Empty string = auto-name (the UI shows a localized name built from kind + index) */
   name?: string;
   x?: number;
   y?: number;
@@ -180,7 +180,7 @@ export function createTextLayer(input: {
     rotation: 0,
     flipX: false,
     flipY: false,
-    // 空文本交给调用方用当前语言填写默认内容（见 store.addTextLayer 的 text 参数）
+    // Empty text lets the caller supply localized default content (see addTextLayer's text parameter)
     text: input.text ?? '',
     fontSize,
     fontFamily: 'PingFang SC',
@@ -197,8 +197,8 @@ export function createTextLayer(input: {
 }
 
 /**
- * 编组：新建时为空组（随后由 UI 把选中图层移入）。
- * 默认「穿透」= true，与 Photoshop 新建组的默认行为一致。
+ * Group: created empty (the UI moves the selected layers in afterwards).
+ * Pass-through defaults to true, matching Photoshop's new-group behavior.
  */
 export function createGroupLayer(input: {
   doc: PhotoDoc;
@@ -227,7 +227,7 @@ export function createGroupLayer(input: {
   };
 }
 
-/** 调整图层：默认参数全 0（等于不影响），作用范围是其下方所有图层 */
+/** Adjustment layer: all-zero parameters (no effect), applying to every layer below it */
 export function createAdjustmentLayer(input: {
   doc: PhotoDoc;
   adjustments?: Partial<Adjustments>;
@@ -257,7 +257,7 @@ export function createAdjustmentLayer(input: {
   };
 }
 
-/** 智能对象：源像素尺寸与呈现尺寸分离，缩放不重采样 */
+/** Smart object: source pixel size is separate from presentation size, so scaling doesn't resample */
 export function createSmartLayer(input: {
   doc: PhotoDoc;
   sourceAssetId: string;
@@ -298,7 +298,7 @@ export function createShapeLayer(input: {
   shape: ShapeKind;
   x?: number;
   y?: number;
-  /** 新建形状的默认填充 / 描边（来自参数条；缺省沿用内置配色） */
+  /** Default fill / stroke for new shapes (from the options bar; falls back to built-in colors) */
   style?: ShapeStyleDefaults;
 }): ShapeLayer {
   const size = Math.round(Math.min(input.doc.width, input.doc.height) * 0.3);

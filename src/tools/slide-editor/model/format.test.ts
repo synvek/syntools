@@ -46,7 +46,7 @@ function makeDoc(): SlideDoc {
   return createDoc('format-test');
 }
 
-/** 补丁里的 body → 纯文本（校验多选时各自保留自己的文字） */
+/** body of a patch → plain text (verifies each element keeps its own text on multi-select) */
 function bodyTextOf(patch: Partial<SlideElement> | null): string {
   const body = (patch as { body?: TextBody } | null)?.body;
   return (
@@ -54,7 +54,7 @@ function bodyTextOf(patch: Partial<SlideElement> | null): string {
   );
 }
 
-/** 把补丁套到元素上（模拟 store 的 patchElements），返回新元素 */
+/** Apply a patch to an element (mimicking the store's patchElements) and return the new element */
 function withPatch<T extends SlideElement>(element: T, patch: Partial<SlideElement> | null): T {
   return { ...element, ...(patch ?? {}) } as T;
 }
@@ -188,7 +188,7 @@ describe('文字样式补丁', () => {
     const smaller = withPatch(small, fontSizeStepPatch(small, -2)) as TextElement;
     expect(fontSizeOf(smaller)).toBe(18);
 
-    // 已达上限时返回 null，调用方据此不产生撤销点
+    // Returns null at the limit, so the caller creates no undo step
     const huge = { ...small, body: { ...small.body } } as TextElement;
     huge.body.paragraphs = [{ runs: [{ text: 'a', style: { size: FONT_SIZE_MAX } }] }];
     expect(fontSizeStepPatch(huge, 2)).toBeNull();
@@ -309,7 +309,7 @@ describe('多选场景：逐元素计算补丁，不覆盖其它元素的内容'
     const patchFirst = makePatch(first);
     const patchSecond = makePatch(target);
 
-    // 两个补丁必须各自来自自己的 body —— 这正是 patchSelectedWith 存在的理由
+    // Each patch must come from its own body — exactly why patchSelectedWith exists
     const bodyOfFirst = bodyTextOf(patchFirst);
     const bodyOfSecond = bodyTextOf(patchSecond);
     expect(bodyOfFirst).toBe('第一页文字');

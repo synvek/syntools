@@ -1,6 +1,6 @@
 /**
- * 从简体 zh 生成繁体 zh-TW.ts（OpenCC 风格：chinese-conv tify）。
- * 用法：pnpm exec tsx scripts/gen-zh-TW.ts
+ * Generates Traditional Chinese zh-TW.ts from Simplified zh (OpenCC style: chinese-conv tify).
+ * Usage: pnpm exec tsx scripts/gen-zh-TW.ts
  */
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -31,12 +31,14 @@ const footer = ` satisfies TranslationResources;
 export default zhTW;
 `;
 
-const body = JSON.stringify(zhTW, null, 2)
-  // JSON uses double quotes; convert to TS-ish by keeping JSON (valid in TS as const object via JSON.parse pattern)
-  // Instead emit as TS object literal from JSON — valid: const x = { ... } 
-  ;
+const body = JSON.stringify(zhTW, null, 2);
 
+// JSON uses double quotes; convert to TS-ish by keeping JSON (valid in TS as const object via JSON.parse pattern)
+// Instead emit as TS object literal from JSON — valid: const x = { ... }
 const file = `${header}${body}${footer}`;
-const out = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/core/i18n/locales/zh-TW.ts');
+const out = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../src/core/i18n/locales/zh-TW.ts',
+);
 writeFileSync(out, file, 'utf8');
 console.log('Wrote', out);

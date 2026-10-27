@@ -30,7 +30,7 @@ function ShapeButton({ def, onAddNode }: { def: ShapeDef; onAddNode: (kind: Shap
   );
 }
 
-/** 图标按钮：点击即在画布中心插入图标节点 */
+/** Icon button: clicking inserts an icon node at the canvas center */
 function IconButton({ def, onAddIcon }: { def: IconDef; onAddIcon: (id: string) => void }) {
   return (
     <button
@@ -84,7 +84,7 @@ export function ShapePalette({
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
 
-  // 侧边栏宽度可拖拽调整（默认 248，约 5 列）
+  // Sidebar width is drag-adjustable (248 by default, about 5 columns)
   const [width, setWidth] = useState(248);
   const resizing = useRef(false);
   const onResizeStart = (e: ReactPointerEvent) => {
@@ -137,7 +137,7 @@ export function ShapePalette({
         className="h-8 w-full rounded-md border border-gray-200 bg-white px-2 text-[13px] text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
       />
 
-      {/* 插入：图片 / 图标 / 公式 / 表格 */}
+      {/* Insert: image / icon / formula / table */}
       <div className="flex gap-1.5">
         <button
           type="button"

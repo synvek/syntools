@@ -3,7 +3,7 @@ import { NodeResizer, type NodeProps } from '@xyflow/react';
 import { useFlowStore } from '../store';
 import { IMAGE_NODE_SIZE, type FlowNodeData } from '../model/types';
 
-/** 图片节点：dataURL 内联渲染，等比适配（object-fit: contain） */
+/** Image node: dataURL rendered inline, fitted proportionally (object-fit: contain) */
 function ImageNodeComponent({ data, selected, width, height }: NodeProps) {
   const d = data as FlowNodeData;
   const w = width ?? IMAGE_NODE_SIZE.width;

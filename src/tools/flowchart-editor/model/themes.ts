@@ -1,6 +1,6 @@
 /**
- * 主题 / 样式预设：一次性把「节点 + 连线」的成套样式应用到整图或选中元素。
- * 只覆盖预设中显式声明的字段，其余样式（字号、字体、透明度等）保持原样。
+ * Theme / style presets: apply a complete set of node + edge styles to the whole diagram or the selection in one go.
+ * Only the fields a preset declares explicitly are overridden; other styles (font size, family, opacity, etc.) stay as they are.
  */
 
 import type { FlowEdgeStyle, FlowNodeStyle } from './types';
@@ -10,7 +10,7 @@ export type ThemeId =
   | 'business'
   | 'minimal'
   | 'dark'
-  /* 以下为扩充的 16 套配色预设 */
+  /* The following are the 16 extended color presets */
   | 'ocean'
   | 'mint'
   | 'forest'
@@ -30,9 +30,9 @@ export type ThemeId =
 
 export interface ThemeDef {
   id: ThemeId;
-  /** 主题名的 i18n 键后缀（`tools.flowchart.theme<Key>`） */
+  /** i18n key suffix of the theme name (`tools.flowchart.theme<Key>`) */
   labelKey: string;
-  /** 预览色板（面板上展示） */
+  /** Preview palette (shown in the panel) */
   swatch: { fill: string; stroke: string; text: string };
   node: Partial<FlowNodeStyle>;
   edge: Partial<FlowEdgeStyle>;
@@ -103,7 +103,7 @@ export const THEMES: ThemeDef[] = [
     },
     edge: { stroke: '#CBD5E1', strokeWidth: 2, dash: 'solid', endArrow: 'arrowclosed' },
   },
-  /* ------------------------- 扩充配色（16 套） ------------------------- */
+  /* ------------------------- Extended color schemes (16) ------------------------- */
   {
     id: 'ocean',
     labelKey: 'Ocean',
@@ -294,7 +294,7 @@ export const THEMES: ThemeDef[] = [
       shadow: false,
       lineDash: 'dashed',
     },
-    // 连线用手绘抖动线型（sketch），与虚线轮廓一起呈现草图观感
+    // Edges use the hand-drawn sketch line type, giving a sketch-book look together with the dashed outlines
     edge: { stroke: '#334155', strokeWidth: 2, dash: 'sketch', endArrow: 'arrow' },
   },
   {

@@ -10,17 +10,18 @@ import type { Node as PMNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 
 /**
- * 图片环绕方式（对标 Word）：
- * - inline    ：嵌入型，图片在文字流里，占位并参与分页（默认）
- * - wrap-left ：四周型，图片靠左浮动，文字在右侧与下方环绕
- * - wrap-right：四周型，图片靠右浮动，文字在左侧与下方环绕
- * - top-bottom：上下型，图片独占一行，文字只出现在其上下
- * - front     ：浮于文字上方，脱离文字流，可拖动定位
- * - behind    ：衬于文字下方，脱离文字流，绘制在正文之下，可拖动定位
+ * Image wrapping modes (modeled on Word):
+ * - inline    : in line with text, flows with the text and affects pagination (default)
+ * - wrap-left : square, image floats left, text wraps on the right and below
+ * - wrap-right: square, image floats right, text wraps on the left and below
+ * - top-bottom: top and bottom, image takes a full line, text appears only above and below
+ * - front     : in front of text, out of the text flow, draggable
+ * - behind    : behind text, out of the text flow, painted under the body text, draggable
  *
- * front / behind 用绝对定位实现（偏移量相对内容区左上角，px），不影响文字排版与分页；
- * wrap-* / top-bottom 用 CSS 浮动与块级排版实现，仍参与文档流。所有取值都写进节点属性，
- * 导入导出、撤销重做走同一套数据。
+ * front / behind use absolute positioning (offsets relative to the content area's top-left corner, px)
+ * and don't affect text layout or pagination; wrap-* / top-bottom use CSS floats and block layout and
+ * stay in the document flow. All values live in node attributes, so import/export and undo/redo share
+ * the same data.
  */
 
 export const IMAGE_LAYERS = [
@@ -35,45 +36,45 @@ export type ImageLayer = (typeof IMAGE_LAYERS)[number];
 
 export const imageLayerKey = new PluginKey('imageLayer');
 
-/** 归一化层级取值（DOM 属性 / 历史数据都可能是任意字符串） */
+/** Normalize the layer value (DOM attributes / legacy data may hold arbitrary strings) */
 export function normalizeImageLayer(value: string | null | undefined): ImageLayer {
   return IMAGE_LAYERS.includes(value as ImageLayer) ? (value as ImageLayer) : 'inline';
 }
 
-/** 是否为绝对定位的浮动层（浮于文字上方 / 衬于文字下方） */
+/** Whether this is an absolutely positioned floating layer (in front of / behind text) */
 export function isFloatingImageLayer(
   layer: string | null | undefined,
 ): layer is 'front' | 'behind' {
   return layer === 'front' || layer === 'behind';
 }
 
-/** 四周型环绕：图片浮动到一侧，文字在另一侧环绕（仍参与文档流） */
+/** Square wrapping: the image floats to one side and text wraps on the other (still in the document flow) */
 export function isWrappedImageLayer(
   layer: string | null | undefined,
 ): layer is 'wrap-left' | 'wrap-right' {
   return layer === 'wrap-left' || layer === 'wrap-right';
 }
 
-/** 需要显式写出 data-layer 的环绕方式（嵌入型是默认样式，不输出属性） */
+/** Wrap modes that need an explicit data-layer attribute (inline is the default and writes none) */
 export function hasImageLayerAttr(layer: string | null | undefined): layer is ImageLayer {
   return Boolean(layer) && layer !== 'inline';
 }
 
-/** DOM 上的浮动图片判定（分页测量需跳过：浮动图片脱离文字流，不影响分页） */
+/** Floating-image check on the DOM (pagination measurement skips these: out of the text flow, no effect on pages) */
 export function isFloatingImageElement(el: Element | null | undefined): boolean {
   return Boolean(el && el.tagName === 'IMG' && isFloatingImageLayer(el.getAttribute('data-layer')));
 }
 
-/** px → EMU（OOXML 长度单位，1px = 9525EMU） */
+/** px -> EMU (OOXML length unit, 1px = 9525 EMU) */
 export function pxToEmu(px: number): number {
   return Math.round(px * 9525);
 }
 
 /**
- * 找到「当前操作目标」的图片节点：
- * 1) 图片被选中（NodeSelection，块级图片点击后的常态）；
- * 2) 光标所在段落内部的行内图片（含图片前/后）。
- * 注意不能只看 `$from.parent.descendants`——图片是块级节点时父节点是 doc，永远找不到。
+ * Find the image node the current action targets:
+ * 1) the image is selected (NodeSelection, the usual state after clicking a block image);
+ * 2) an inline image inside the paragraph holding the cursor (before or after the image).
+ * Don't rely on `$from.parent.descendants` alone — for block-level images the parent is doc, so it never matches.
  */
 export function findSelectedImage(state: EditorState): { pos: number; node: PMNode } | null {
   const { selection } = state;
@@ -94,11 +95,12 @@ export function findSelectedImage(state: EditorState): { pos: number; node: PMNo
 }
 
 /**
- * 修改图片属性后重新选中该图片。
+ * Re-select the image after changing its attributes.
  *
- * 行内图片（嵌入型）在事务映射时会从 NodeSelection 退化成光标——ProseMirror 只对块级 atom
- * 保持节点选中。若不重新选中，改完宽度 / 对齐后工具栏的图片控件会立刻消失，
- * 用户无法连续调整（比如先设宽度再挑环绕方式）。
+ * Inline images degrade from NodeSelection to a cursor when the transaction is mapped — ProseMirror
+ * only keeps node selection for block-level atoms. Without re-selecting, the toolbar's image controls
+ * vanish right after a width / alignment change and the user can't keep adjusting (e.g. set the width,
+ * then pick a wrap mode).
  */
 export function keepImageSelected(tr: Transaction, pos: number): void {
   const node = tr.doc.nodeAt(pos);
@@ -107,8 +109,9 @@ export function keepImageSelected(tr: Transaction, pos: number): void {
 }
 
 /**
- * 读取元素所在的缩放系数（编辑器支持 CSS zoom）。
- * getBoundingClientRect 返回的是缩放后的屏幕尺寸，换算布局像素（= 文档里存的尺寸）时必须还原。
+ * Read the zoom factor applying to the element (the editor supports CSS zoom).
+ * getBoundingClientRect returns zoomed screen sizes, which must be scaled back when converting to
+ * layout pixels (= the sizes stored in the document).
  */
 export function readZoom(el: HTMLElement | null): number {
   const zoomEl = el?.closest('[data-rte-zoom]');
@@ -116,7 +119,7 @@ export function readZoom(el: HTMLElement | null): number {
   return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
 }
 
-/** 图片相对内容区左上角的偏移（布局像素，已还原缩放） */
+/** Offset of the image from the content area's top-left corner (layout pixels, zoom undone) */
 function measureOffset(view: EditorView, dom: HTMLElement): { x: number; y: number } {
   const content = view.dom as HTMLElement;
   const rect = dom.getBoundingClientRect();
@@ -128,7 +131,7 @@ function measureOffset(view: EditorView, dom: HTMLElement): { x: number; y: numb
   };
 }
 
-/** 拖动浮动图片：拖动过程不写历史，松手后合成一步可撤销的改动 */
+/** Drag a floating image: no history during the drag, one undoable step once released */
 function startImageDrag(
   view: EditorView,
   event: MouseEvent,
@@ -148,7 +151,7 @@ function startImageDrag(
     if (!current) return;
     const tr = view.state.tr.setNodeMarkup(pos, undefined, {
       ...current.attrs,
-      // 不允许拖出内容区左上角（否则图片会跑到不可见位置）
+      // Don't allow dragging past the content area's top-left corner (the image would become invisible)
       offsetX: Math.max(0, Math.round(x)),
       offsetY: Math.max(0, Math.round(y)),
     });
@@ -172,7 +175,7 @@ function startImageDrag(
     const finalX = Number(current.attrs.offsetX ?? 0);
     const finalY = Number(current.attrs.offsetY ?? 0);
     if (finalX === baseX && finalY === baseY) return;
-    // 先静默回到拖动前，再以可撤销事务落到终值 → 整个拖动只占一步撤销
+    // First silently revert to the pre-drag state, then commit the final value in an undoable transaction -> one undo step per drag
     applyOffset(baseX, baseY, false);
     applyOffset(finalX, finalY, true);
   };
@@ -181,7 +184,7 @@ function startImageDrag(
   window.addEventListener('mouseup', onUp);
 }
 
-/** 选中图片节点（浮动图片点击即选中，便于继续用工具栏调整） */
+/** Select the image node (clicking a floating image selects it so the toolbar can keep adjusting it) */
 function selectImage(view: EditorView, pos: number): void {
   const { selection } = view.state;
   if (selection instanceof NodeSelection && selection.from === pos) return;
@@ -191,9 +194,9 @@ function selectImage(view: EditorView, pos: number): void {
 }
 
 /**
- * 按坐标命中浮动图片。
- * 「衬于文字下方」的图片绘制在正文之下，DOM 事件会被上层段落截获，
- * 因此这里按矩形做命中判定（与 Word 一致：点在被图片覆盖的区域内即选中图片）。
+ * Hit-test floating images by coordinates.
+ * "Behind text" images are painted below the body text, so DOM events are captured by the paragraphs
+ * above; hence the rectangle hit test (matching Word: clicking inside the area an image covers selects it).
  */
 function findFloatingImageAtPoint(
   view: EditorView,
@@ -214,11 +217,12 @@ function findFloatingImageAtPoint(
 }
 
 /**
- * 浮动图片 mousedown 处理：命中则选中并开始拖动。
+ * Floating image mousedown handling: on hit, select and start dragging.
  *
- * 除了编辑器的 handleDOMEvents，工作台容器（.rte-editor-viewport）也要兜底调用它：
- * 浮动图片是绝对定位元素，可以绘制到内容盒子之外（如纸张下沿的工作台区域），
- * 这类位置的 mousedown 不会进入编辑器 DOM，只靠编辑器插件会「点不到、拖不动」。
+ * Besides the editor's handleDOMEvents, the workbench container (.rte-editor-viewport) must also call
+ * this as a fallback: floating images are absolutely positioned and can be painted outside the content
+ * box (e.g. the workbench area below the sheet), where mousedown never reaches the editor DOM — with the
+ * editor plugin alone they can't be clicked or dragged.
  */
 export function handleFloatingImagePointerDown(view: EditorView, event: MouseEvent): boolean {
   if (event.button !== 0 || event.defaultPrevented) return false;
@@ -237,7 +241,7 @@ export function handleFloatingImagePointerDown(view: EditorView, event: MouseEve
   return true;
 }
 
-/** 浮动图片拖动插件（仅对浮动层生效，嵌入型保持 ProseMirror 默认拖拽行为） */
+/** Floating image drag plugin (floating layers only; inline images keep ProseMirror's default drag behavior) */
 export const ImageLayerDrag = new Plugin({
   key: imageLayerKey,
   props: {
@@ -252,7 +256,7 @@ export const ImageLayerDrag = new Plugin({
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     imageLayer: {
-      /** 切换图片层级（改成浮动层时按当前位置初始化偏移，避免图片跳动） */
+      /** Switch the image layer (initializing offsets from the current position when switching to floating, so the image doesn't jump) */
       setImageLayer: (layer: ImageLayer) => ReturnType;
     };
   }
@@ -264,7 +268,7 @@ export const ImageLayerCommands = Extension.create({
     return {
       setImageLayer:
         (layer: ImageLayer) =>
-        // 注意：必须写回 TipTap 传入的 tr，自行 view.dispatch 会让链式事务与最新状态错位
+        // Note: always write back to the tr TipTap passes in; dispatching via view.dispatch desyncs the chained transaction from the latest state
         ({ state, tr, view }) => {
           const found = findSelectedImage(state);
           if (!found) return false;
@@ -273,7 +277,7 @@ export const ImageLayerCommands = Extension.create({
           if (isFloatingImageLayer(layer)) {
             const dom = view.nodeDOM(pos) as HTMLElement | null;
             const offset = dom ? measureOffset(view, dom) : { x: 0, y: 0 };
-            // 仅在该轴尚未定位时初始化，重复切换不会重置用户拖好的位置
+            // Initialize only when that axis has no offset yet, so repeat switches don't reset the user's position
             attrs.offsetX = node.attrs.offsetX ?? offset.x;
             attrs.offsetY = node.attrs.offsetY ?? offset.y;
           } else {
@@ -281,7 +285,7 @@ export const ImageLayerCommands = Extension.create({
             attrs.offsetY = null;
           }
           tr.setNodeMarkup(pos, undefined, attrs);
-          // 切层后保持选中：否则行内图片的节点选中会退化为光标，无法继续调整
+          // Keep the selection after switching layers: otherwise inline images' node selection degrades to a cursor and adjustments stop
           keepImageSelected(tr, pos);
           return true;
         },

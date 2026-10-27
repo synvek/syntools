@@ -10,12 +10,12 @@ import { toPsdEffects } from './styleMap';
 import type { Layer, PhotoDoc, Rect } from '../model/types';
 
 /**
- * PSD 写出（只写不读）：让工程能在 Photoshop / Photopea 里继续编辑。
+ * PSD writing (write-only): keeps projects editable in Photoshop / Photopea.
  *
- * - `ag-psd` 通过**动态 import** 载入：它只在这个功能被用到时才下载，
- *   独立成一个异步 chunk，不影响首屏体积；
- * - 图层像素、蒙版、混合模式都复用画布渲染的同一条合成管线，保证「所见即所得」；
- * - 调整图层 / 智能对象 / 文字 / 形状的降级策略见 `./map.ts`。
+ * - `ag-psd` loads through a **dynamic import**: downloaded only when this feature is used,
+ *   as its own async chunk, leaving the first-paint bundle alone;
+ * - layer pixels, masks and blend modes reuse the canvas render pipeline, so WYSIWYG holds;
+ * - degradation rules for adjustment layers / smart objects / text / shapes live in `./map.ts`.
  */
 
 export function psdFilename(title: string): string {
@@ -26,7 +26,7 @@ export function psdFilename(title: string): string {
   return `${safe || 'photo'}.psd`;
 }
 
-/** 合成某节点需要的像素：裁剪到「源图层并集 ∩ 画布」，避免导出一堆整画布大小的图层 */
+/** Pixels a node needs: crop to "union of source layers ∩ canvas", avoiding full-canvas layers */
 function renderNode(
   doc: PhotoDoc,
   node: PsdPlanNode,
@@ -36,7 +36,7 @@ function renderNode(
 
   let box: Rect | null = null;
   for (const layer of layers) {
-    // 网格变形会把内容甩出图层盒：包围盒必须按最大位移扩张，否则导出结果被裁
+    // Mesh warp throws content outside the layer box: grow the bbox by the max offset, or the export clips
     const pad = meshPadding(layer.mesh, layer.width, layer.height);
     const rect = {
       x: layer.x - pad,
@@ -62,9 +62,9 @@ function renderNode(
   });
   if (!region || region.width < 1 || region.height < 1) return null;
 
-  // PSD 的「用户蒙版」是独立通道，像素里不能再带一份，否则会叠加两次。
-  // 因此合成像素时摘掉像素蒙版（蒙版本身由 `maskFields` 写成可编辑通道）；
-  // 而矢量蒙版 / 图层样式 / 剪贴蒙版在 PSD 里没有对应通道，保持烘焙进像素。
+  // A PSD "user mask" is a separate channel; pixels must not carry it too, or it would apply twice.
+  // So the pixel mask is stripped while compositing (it becomes an editable channel via `maskFields`),
+  // while vector masks / layer styles / clipping masks have no PSD channel and stay baked into pixels.
   const paintLayers = layers.map((layer) =>
     layer.mask?.enabled ? ({ ...layer, mask: null } as Layer) : layer,
   );
@@ -78,7 +78,7 @@ function renderNode(
 
 interface AgLayer {
   name?: string;
-  /** 图层效果（`lfx2`）：由 `./styleMap.ts` 从我们的 `LayerStyle` 映射而来 */
+  /** Layer effects (`lfx2`): mapped from our `LayerStyle` by `./styleMap.ts` */
   effects?: ReturnType<typeof toPsdEffects>;
   top?: number;
   left?: number;
@@ -103,7 +103,7 @@ function toAgLayers(doc: PhotoDoc, nodes: PsdPlanNode[]): AgLayer[] {
   for (const node of nodes) {
     if (node.kind === 'group') {
       const children = toAgLayers(doc, node.children ?? []);
-      // 空组在 PSD 里没有意义，丢弃
+      // An empty group means nothing in PSD, so drop it
       if (children.length === 0) continue;
       out.push({
         name: node.name || 'Group',
@@ -138,10 +138,10 @@ function toAgLayers(doc: PhotoDoc, nodes: PsdPlanNode[]): AgLayer[] {
 }
 
 /**
- * 图层效果：把我们的 `LayerStyle` 写成 PSD 的图层效果（`lfx2`），在 Photoshop 里仍可继续调参。
+ * Layer effects: write our `LayerStyle` as PSD layer effects (`lfx2`), still tunable in Photoshop.
  *
- * 只有「单一来源」的像素节点才写：合并节点（调整图层折进下方等）的效果已经烘焙进像素，
- * 再写一份会在 PS 里叠加两次。
+ * Only single-source pixel nodes get them: merged nodes (adjustments folded down etc.) already baked
+ * their effects into pixels, and writing them again would double them in PS.
  */
 function styleFields(doc: PhotoDoc, node: PsdPlanNode): Pick<AgLayer, 'effects'> {
   if (node.kind === 'pixel' && node.sources.length !== 1) return {};
@@ -150,7 +150,7 @@ function styleFields(doc: PhotoDoc, node: PsdPlanNode): Pick<AgLayer, 'effects'>
   return effects ? { effects } : {};
 }
 
-/** 蒙版：用 `bakeMask` 的输出——灰度已转成 alpha，正是 PSD 蒙版通道需要的形式 */
+/** Mask: use `bakeMask`'s output — grayscale already converted to alpha, exactly what PSD wants */
 function maskFields(doc: PhotoDoc, node: PsdPlanNode): Pick<AgLayer, 'mask'> {
   const mask = node.mask;
   if (!mask) return {};
@@ -168,7 +168,7 @@ function maskFields(doc: PhotoDoc, node: PsdPlanNode): Pick<AgLayer, 'mask'> {
     `psd-mask:${mask.assetId}:${mask.density}:${mask.feather}:${mask.inverted ? 1 : 0}`,
   );
   if (!baked) return {};
-  // 蒙版画布尺寸对齐图层包围盒（PSD 要求与图层矩形一致）
+  // The mask canvas matches the layer bbox (PSD requires it to match the layer rect)
   const layers = doc.layers.filter((layer) => node.sources.includes(layer.id));
   const first = layers[0];
   const target =
@@ -196,14 +196,14 @@ function scaleCanvas(source: HTMLCanvasElement, width: number, height: number): 
   return canvas;
 }
 
-/** 生成 PSD 字节流（不含下载） */
+/** Produce the PSD byte stream (no download) */
 export async function buildPsdBytes(doc: PhotoDoc): Promise<Uint8Array> {
   const { writePsdUint8Array } = await import('ag-psd');
   const plan = buildPsdPlan(doc);
   const psd = {
     width: doc.width,
     height: doc.height,
-    // 合并视图：多数看图软件与缩略图依赖它
+    // The composite view: most viewers and thumbnailers rely on it
     canvas: compositeDoc(doc),
     children: toAgLayers(doc, plan.nodes),
   };
@@ -211,7 +211,7 @@ export async function buildPsdBytes(doc: PhotoDoc): Promise<Uint8Array> {
   return new Uint8Array(bytes);
 }
 
-/** 导出并下载 .psd */
+/** Export and download a .psd */
 export async function exportPsdFile(doc: PhotoDoc, filename: string): Promise<void> {
   const bytes = await buildPsdBytes(doc);
   downloadBytes(bytes, filename, 'image/vnd.adobe.photoshop');

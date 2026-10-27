@@ -2,17 +2,17 @@ import { createCanvasElement } from '../model/assets';
 import type { Layer } from '../model/types';
 
 /**
- * 文字排版与绘制（Canvas2D 单一实现）。
+ * Text layout and drawing (the single Canvas2D implementation).
  *
- * 为什么要有这一层：文字在两个地方渲染 —— 预览走 Konva（`render/nodes.ts`），
- * 导出 / 拼合走 Canvas2D（`render/paint.ts`）。变形与段间距这两项 Konva.Text 表达不了，
- * 需要落到「先画成位图再重采样」，若各写一份必然漂移。
- * 因此把**排布 + 绘制**收敛到本模块，位图路径（`render/warp.ts`）与导出路径共用同一份代码。
+ * Why this layer exists: text renders in two places — the preview goes through Konva (`render/nodes.ts`)
+ * and export / flatten through Canvas2D (`render/paint.ts`). Warp and paragraph spacing are beyond Konva.Text,
+ * requiring "draw to a bitmap, then resample", and two copies would inevitably drift.
+ * So **layout + drawing** live here, shared by the bitmap path (`render/warp.ts`) and the export path.
  */
 
 export type TextLayerModel = Extract<Layer, { kind: 'text' }>;
 
-/** Canvas2D font 简写（含粗 / 斜） */
+/** Canvas2D font shorthand (including bold / italic) */
 export function textFont(layer: TextLayerModel): string {
   return [
     layer.italic ? 'italic' : 'normal',
@@ -22,17 +22,17 @@ export function textFont(layer: TextLayerModel): string {
   ].join(' ');
 }
 
-/** CJK 标点 / 假名 / 汉字 / 全角区间：这些字符逐字断行（用转义区间，避免源码出现全角空白） */
+/** CJK punctuation / kana / ideograph / full-width ranges: they break per character (escaped, no raw glyphs) */
 const CJK_PATTERN = new RegExp(
   '[\\u2E80-\\u9FFF\\uF900-\\uFAFF\\uFF00-\\uFFEF\\u3000-\\u303F\\u3040-\\u30FF]',
 );
 
 /**
- * 断行标记化：拉丁按词、CJK 逐字、空格单独成标记。
+ * Wrapping tokenizer: Latin by word, CJK per character, spaces as their own tokens.
  *
- * 之所以先标记化再贪心填行（而不是边扫边决定），是因为「空格处能否断行」必须看到**后面的词**才能判断：
- * 早期实现边扫边断，遇到
- * `aa bb cc` 这类文本会把断行点的那个单词整段丢掉（`bb` 直接消失）。
+ * Tokenize first, then fill lines greedily, because "can we break at this space" needs the **next word**:
+ * an early implementation decided while scanning and, on text like
+ * `aa bb cc`, dropped the whole word at the break (the `bb` simply vanished).
  */
 function tokenize(line: string): string[] {
   const tokens: string[] = [];
@@ -52,7 +52,7 @@ function tokenize(line: string): string[] {
   return tokens;
 }
 
-/** 文本换行：CJK 逐字断行，拉丁按空格断词；行尾空白裁掉（避免测量与下划线带出多余宽度） */
+/** Line breaking: CJK per character, Latin at spaces; trailing space is trimmed (it skews measurement) */
 export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = [];
   for (const paragraph of text.split('\n')) {
@@ -61,7 +61,7 @@ export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: 
       const candidate = current + token;
       if (current.length > 0 && ctx.measureText(candidate).width > maxWidth) {
         lines.push(current.replace(/\s+$/, ''));
-        // 断行处的空格不带到下一行行首
+        // A break at a space must not carry that space to the start of the next line
         current = token === ' ' ? '' : token;
       } else {
         current = candidate;
@@ -74,23 +74,23 @@ export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: 
 
 export interface PositionedLine {
   text: string;
-  /** 相对文字块顶部的纵向偏移 */
+  /** Vertical offset relative to the top of the text block */
   y: number;
 }
 
-/** 设置字体相关状态（字距在不支持的浏览器上静默忽略） */
+/** Set font-related state (letter spacing is silently ignored where unsupported) */
 export function applyTextStyle(ctx: CanvasRenderingContext2D, layer: TextLayerModel): void {
   ctx.font = textFont(layer);
   ctx.fillStyle = layer.fill;
   ctx.textBaseline = 'top';
   ctx.textAlign = layer.align === 'center' ? 'center' : layer.align === 'right' ? 'right' : 'left';
-  // `letterSpacing` 是较新的 Canvas2D 能力（Chrome 99+ / Safari 17+）：不支持时退化为 0 字距
+  // `letterSpacing` is a newer Canvas2D feature (Chrome 99+ / Safari 17+); without it, tracking falls to 0
   const spacingCtx = ctx as CanvasRenderingContext2D & { letterSpacing?: string };
   if ((layer.letterSpacing ?? 0) !== 0) spacingCtx.letterSpacing = `${layer.letterSpacing}px`;
   else if (spacingCtx.letterSpacing) spacingCtx.letterSpacing = '0px';
 }
 
-/** 排版：按段换行并累加纵向位置（段间距只加在段与段之间） */
+/** Layout: wrap per paragraph and accumulate y (paragraph spacing only goes between paragraphs) */
 export function layoutText(ctx: CanvasRenderingContext2D, layer: TextLayerModel): PositionedLine[] {
   const lineHeight = layer.fontSize * layer.lineHeight;
   const paragraphs = layer.text.split('\n');
@@ -106,7 +106,7 @@ export function layoutText(ctx: CanvasRenderingContext2D, layer: TextLayerModel)
   return out;
 }
 
-/** 文字块高度（含段间距；空文本按一行计） */
+/** Text block height (paragraph spacing included; empty text counts as one line) */
 export function textBlockHeight(ctx: CanvasRenderingContext2D, layer: TextLayerModel): number {
   const lines = layoutText(ctx, layer);
   const lineHeight = layer.fontSize * layer.lineHeight;
@@ -116,9 +116,9 @@ export function textBlockHeight(ctx: CanvasRenderingContext2D, layer: TextLayerM
 }
 
 /**
- * 把文字画到 `ctx` 上。
+ * Draw the text onto `ctx`.
  *
- * `origin` 默认取图层的文档坐标；位图路径传 `{ x: 0, y: 0 }`，把内容画到离屏画布的原点。
+ * `origin` defaults to the layer's document position; the bitmap path passes `{ x: 0, y: 0 }` (offscreen).
  */
 export function drawText(
   ctx: CanvasRenderingContext2D,
@@ -150,10 +150,10 @@ export function drawText(
 }
 
 /**
- * 借一张一次性画布取得「可测量」的 2D 上下文。
+ * Borrow a throwaway canvas to get a measurable 2D context.
  *
- * 换行与字宽必须依赖 `ctx.measureText`，因此排版类查询都需要一个上下文；
- * 画布仅用于测量，尺寸 1×1 即可（`measureText` 与画布尺寸无关）。
+ * Wrapping and widths need `ctx.measureText`, so layout queries require a context;
+ * the canvas is only for measuring, and 1×1 is enough (`measureText` doesn't care about size).
  */
 export function withMeasureContext<T>(fn: (ctx: CanvasRenderingContext2D) => T): T | null {
   const canvas = createCanvasElement(1, 1);
@@ -162,7 +162,7 @@ export function withMeasureContext<T>(fn: (ctx: CanvasRenderingContext2D) => T):
   return fn(ctx);
 }
 
-/** 文字块尺寸（文档坐标下的宽 × 排版高度）；测量不可用时返回 null */
+/** Text block size (width × layout height in document units); null when measurement isn't available */
 export function measureTextBlock(layer: TextLayerModel): { width: number; height: number } | null {
   return withMeasureContext((ctx) => {
     applyTextStyle(ctx, layer);

@@ -63,7 +63,7 @@ const nodeTypes = {
 };
 const edgeTypes = { flow: FlowEdgeLine };
 
-/** 默认线型 → React Flow 连接线型（自由锚点拖拽时跟随工具栏线型） */
+/** Default line type → React Flow connection line type (free-anchor dragging follows the toolbar line type) */
 const CONNECTION_LINE_TYPES: Record<FlowEdgeStyle['type'], ConnectionLineType> = {
   straight: ConnectionLineType.Straight,
   step: ConnectionLineType.Step,
@@ -73,9 +73,9 @@ const CONNECTION_LINE_TYPES: Record<FlowEdgeStyle['type'], ConnectionLineType> =
 
 const defaultEdgeOptions = { type: 'flow' };
 
-/* 自适应虚拟化阈值见 `model/perf.ts`（纯函数，便于单测）。 */
+/* Adaptive virtualization thresholds live in `model/perf.ts` (pure functions, easy to unit-test). */
 
-/** 手绘线型使用的油漆抖动滤镜（全局定义一次，供连线 url(#flow-sketch) 引用） */
+/** Paint-jitter filter for hand-drawn line types (defined once globally, referenced by edges as url(#flow-sketch)) */
 function SketchFilter() {
   return (
     <svg className="pointer-events-none absolute h-0 w-0" aria-hidden="true">
@@ -103,7 +103,7 @@ function SketchFilter() {
 
 const DROP_MIME = 'application/flowchart-kind';
 
-/** 右键命中未选中节点时：将其设为唯一选中项（同步 React Flow 内部的 selected 标记） */
+/** Right-click on an unselected node: make it the sole selection (syncing React Flow's internal selected flag) */
 function selectOnlyNode(id: string): void {
   useFlowStore.setState((s) => ({
     selectedNodes: [id],
@@ -117,7 +117,7 @@ function selectOnlyNode(id: string): void {
   }));
 }
 
-/** 右键命中未选中连线时：将其设为唯一选中项 */
+/** Right-click on an unselected edge: make it the sole selection */
 function selectOnlyEdge(id: string): void {
   useFlowStore.setState((s) => ({
     selectedEdges: [id],
@@ -161,7 +161,7 @@ function HelperLines() {
   );
 }
 
-/** 纸张页边界：按 viewport 换算的绝对定位矩形（置于画布最底层） */
+/** Paper page bounds: an absolutely positioned rect derived from the viewport (placed at the bottom of the canvas) */
 function PageBoundary() {
   const size = useFlowStore((s) => s.pageSize);
   const { x: vx, y: vy, zoom } = useViewport();
@@ -188,8 +188,8 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
   /**
-   * 视口面积（窗口尺寸）：用于自适应虚拟化阈值。
-   * 只在窗口尺寸变化时更新，避免拖拽节点时反复计算。
+   * Viewport area (window size): used for the adaptive virtualization threshold.
+   * Updated only when the window size changes, avoiding recomputation while dragging nodes.
    */
   const [viewportArea, setViewportArea] = useState(() =>
     typeof window === 'undefined' ? 1_200_000 : window.innerWidth * window.innerHeight,
@@ -200,10 +200,10 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   /**
-   * 渲染用节点：把「折叠容器」的子节点置为 hidden。
+   * Nodes to render: children of collapsed containers are marked hidden.
    *
-   * 仅派生视图、不改 store：折叠是视图态，子节点数据必须完整保留；
-   * 无折叠容器时直接复用原数组引用，避免无谓的重渲染。
+   * Derives the view only and never touches the store: collapsing is view state, child data must stay intact;
+   * with no collapsed container the original array reference is reused, avoiding needless re-renders.
    */
   const displayNodes = useMemo(() => {
     const collapsed = new Set<string>();
@@ -223,11 +223,11 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const onEdgesChange = useFlowStore((s) => s.onEdgesChange);
   const storeOnConnect = useFlowStore((s) => s.onConnect);
   const onSelectionChange = useFlowStore((s) => s.onSelectionChange);
-  /** onConnect 是否已为本次拖拽创建过连线（避免 onConnectEnd 重复补建） */
+  /** Whether onConnect already created an edge for this drag (so onConnectEnd does not build a duplicate) */
   const connectedRef = useRef(false);
-  /** 是否处于「重连端点」拖拽（此时不应用补建逻辑） */
+  /** Whether a "reconnect endpoint" drag is in progress (the fallback creation logic is skipped then) */
   const reconnectingRef = useRef(false);
-  /** 本容器的 DOM 引用：既转交给外部（画布中心插入定位），也用于右键菜单的坐标换算 */
+  /** DOM ref of this container: handed to the outside (for centering inserted nodes) and used for context-menu coordinate conversion */
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [contextMenu, setContextMenu] = useState<FlowContextTarget | null>(null);
 
@@ -235,13 +235,13 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     (el: HTMLDivElement | null) => {
       hostRef.current = el;
       if (typeof ref === 'function') ref(el);
-      // 对象 ref：React 类型把 current 标为只读，这里按可写引用转交
+      // Object ref: React types mark current as readonly, so it is handed over as a writable reference
       else if (ref) (ref as { current: HTMLDivElement | null }).current = el;
     },
     [ref],
   );
 
-  /** 打开右键菜单：把指针位置换算成相对画布容器的坐标 */
+  /** Open the context menu: convert the pointer position into coordinates relative to the canvas container */
   const openContextMenu = useCallback(
     (
       event: React.MouseEvent | MouseEvent,
@@ -280,7 +280,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const gridSize = useFlowStore((s) => s.gridSize);
   const connectionLineType = CONNECTION_LINE_TYPES[defaultEdge.type];
 
-  /** 离开编辑器时清理连线拖拽标记 */
+  /** Reset the edge-drag flag when leaving the editor */
   useEffect(
     () => () => {
       document.body.classList.remove('flow-connecting');
@@ -288,7 +288,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     [],
   );
 
-  /** 自由连线起点（onConnectEnd 据此判断落点：目标图形 / 空白处） */
+  /** Free-edge start point (onConnectEnd uses it to decide the drop target: a shape / empty space) */
   const connectingFrom = useRef<{
     nodeId?: string | null;
     handleId?: string | null;
@@ -299,7 +299,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   const onConnectStart = useCallback((e: unknown, params: unknown) => {
     document.body.classList.add('flow-connecting');
     connectedRef.current = false;
-    // 从锚点开始新建连线：让出已有连线的选中态（重连拖拽不在此列，由 onReconnectStart 先行标记）
+    // Start creating an edge from an anchor: yield the selection of existing edges (reconnect drags are excluded, flagged earlier by onReconnectStart)
     if (!reconnectingRef.current) useFlowStore.getState().deselectEdges();
     const p = params as { nodeId?: string | null; handleId?: string | null } | undefined;
     const ev = e as MouseEvent | TouchEvent | undefined;
@@ -316,10 +316,10 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
   }, []);
 
   /**
-   * 自由连线落点：
-   * - 落在其它图形「身上」→ 取最近边补建连线；
-   * - 落在 handle → onConnect 已处理，跳过；
-   * - 落在空白画布 / 自身 / 未拖动 → 不生成任何内容（仅连接到已有图形）。
+   * Free-edge drop target:
+   * - on another shape's body → create an edge from the nearest side;
+   * - on a handle → already handled by onConnect, skip;
+   * - on empty canvas / itself / no drag → create nothing (only connects to existing shapes).
    */
   const onConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent) => {
@@ -328,14 +328,14 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       connectingFrom.current = null;
       const alreadyConnected = connectedRef.current;
       connectedRef.current = false;
-      // 重连拖拽由其自身逻辑处理
+      // Reconnect drags are handled by their own logic
       if (reconnectingRef.current) return;
-      // onConnect 已创建连线（落点吸附到锚点）：不再补建
+      // onConnect already created the edge (drop snapped to an anchor): do not build another
       if (alreadyConnected) return;
       if (!from?.nodeId) return;
       const pt =
         'changedTouches' in event ? (event as TouchEvent).changedTouches[0] : (event as MouseEvent);
-      // 未拖动（基本是点击锚点）：不生成，避免误建
+      // Not dragged (basically a click on an anchor): create nothing, avoiding accidental edges
       if (
         from.x !== undefined &&
         from.y !== undefined &&
@@ -347,9 +347,9 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       const src = nodes.find((n) => n.id === from.nodeId);
       if (!src) return;
 
-      // 用画布坐标命中「节点包围盒」，替代 elementFromPoint / closest 的 DOM 命中测试：
-      // 后者会被节点内部元素、覆盖层（SelectionResizer / QuickConnectOverlay 等）、
-      // 8 个始终存在的锚点命中区，以及绘制时序干扰，导致偶发「落到图形身上却丢线」。
+      // Hit-test "node bounding boxes" in canvas coordinates instead of elementFromPoint / closest:
+      // the DOM hit test is disturbed by node internals, overlay layers (SelectionResizer / QuickConnectOverlay, etc.),
+      // the 8 always-present anchor hit areas, and paint timing, causing occasional "dropped on a shape but no edge" bugs.
       const flowPoint = screenToFlowPosition({ x: pt.clientX, y: pt.clientY });
       const byId = new Map(nodes.map((n) => [n.id, n] as const));
       const target = nodes.find((n) => {
@@ -362,7 +362,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
           flowPoint.y <= r.y + r.height
         );
       });
-      if (!target) return; // 落在空白 / 自身 / 容器 → 不生成
+      if (!target) return; // dropped on empty space / itself / a container → create nothing
 
       const sb = absoluteRectOf(src, byId);
       const tb = absoluteRectOf(target, byId);
@@ -387,15 +387,15 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     [screenToFlowPosition],
   );
 
-  /** 正在拖动的节点 id（rAF 收口时读取；null 表示未拖动） */
+  /** Id of the node being dragged (read when the rAF flush runs; null means no drag) */
   const draggingIdRef = useRef<string | null>(null);
-  /** 待执行的辅助线计算帧（rAF 句柄） */
+  /** Pending guide-computation frame (rAF handle) */
   const helperRafRef = useRef<number | null>(null);
 
   /**
-   * 计算对齐辅助线并把落点吸附到辅助线（读取最新 store 状态）。
-   * 抽成独立函数以便用 rAF 节流：一次拖拽在一帧内可能触发多次位置变更，
-   * 只保留最后一次计算，配合 cachedAbsoluteRectOf 复用未移动节点的包围盒。
+   * Compute alignment guides and snap the drop position to them (reads the latest store state).
+   * Extracted into a function so it can be throttled with rAF: one drag may fire several position changes per frame,
+   * so only the last computation is kept, and cachedAbsoluteRectOf reuses bounding boxes of unmoved nodes.
    */
   const applyHelperSnap = useCallback(() => {
     const state = useFlowStore.getState();
@@ -406,7 +406,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     if (!dragged) return;
     const byId = new Map(all.map((n) => [n.id, n] as const));
     const draggedRect = absoluteRectOf(dragged, byId);
-    // 跨容器对齐：与同页所有可见节点比较，但排除自身与自身后代（否则会自我吸附）
+    // Cross-container alignment: compare against all visible nodes on the page, excluding itself and its own descendants (otherwise it snaps to itself)
     const descendants = new Set<string>();
     const collectChildren = (id: string) => {
       for (const n of all) {
@@ -423,7 +423,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     const lines = computeHelperLines(draggedRect, others, state.alignTolerance);
     state.setHelperLines(lines);
     if (lines.x !== undefined || lines.y !== undefined) {
-      // helper lines 返回的是绝对吸附坐标，需转换回节点自身坐标系
+      // helper lines return absolute snap coordinates, which must be converted back to the node's own coordinate system
       const parent = dragged.parentId ? byId.get(dragged.parentId) : undefined;
       const parentAbs = parent ? absolutePositionOf(parent, byId) : { x: 0, y: 0 };
       const snapped = {
@@ -451,7 +451,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     });
   }, [applyHelperSnap]);
 
-  // 卸载时取消待执行帧，避免对已销毁画布写入
+  // Cancel the pending frame on unmount, avoiding writes to a destroyed canvas
   useEffect(() => () => cancelHelperSnap(), [cancelHelperSnap]);
 
   const onNodesChange = useCallback(
@@ -463,10 +463,10 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       );
       if (drag) {
         draggingIdRef.current = drag.id;
-        // rAF 节流：一帧内多次位置变更只计算一次（拖拽 O(n)/帧 → 每帧至多一次增量计算）
+        // rAF throttling: several position changes within one frame are computed once (O(n) per drag → at most one incremental pass per frame)
         scheduleHelperSnap();
       } else if (changes.some((c) => c.type === 'position')) {
-        // 拖拽结束：先同步收口一次吸附，避免松手瞬间被还原，再清理辅助线
+        // Drag end: flush the snap synchronously first so it is not reverted on release, then clear the guides
         if (draggingIdRef.current) {
           cancelHelperSnap();
           applyHelperSnap();
@@ -487,7 +487,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       const size = shapeSize(kind);
       let x = point.x - size.width / 2;
       const y = point.y - size.height / 2;
-      // 自动居中对齐：若落点中心与同层某节点中心 x 接近，则对齐到该中心（便于竖直堆叠成直线）
+      // Auto centering: when the drop center is close to the center x of a sibling node, align to that center (handy for stacking vertically in a line)
       const others = useFlowStore
         .getState()
         .nodes.filter((n) => !n.parentId && !isContainerKind(n.data.kind));
@@ -514,7 +514,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  /** 网格样式 → React Flow 背景变体 */
+  /** Grid style → React Flow background variant */
   const bgVariant =
     gridStyle === 'lines'
       ? BackgroundVariant.Lines
@@ -529,7 +529,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       data-testid="flowchart-canvas"
       style={
         {
-          // 画布背景色 + 供跳线遮罩使用的同名变量（保证「跨线留白」与背景一致）
+          // Canvas background color plus a same-name variable for the jump mask (keeping the gap across edges consistent with the background)
           background: canvasBackground === 'transparent' ? undefined : canvasBackground,
           '--flow-canvas-bg': canvasBackground === 'transparent' ? '#ffffff' : canvasBackground,
         } as CSSProperties
@@ -537,7 +537,7 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
-      {/* 纸张页边界：置于 React Flow 之下，仅在设置了页面尺寸时显示 */}
+      {/* Paper page bounds: placed below React Flow, shown only when a page size is set */}
       <PageBoundary />
       <ReactFlow
         nodes={displayNodes}
@@ -561,13 +561,13 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         onNodeDragStart={() => useFlowStore.getState().commit()}
         onNodeDragStop={(_, node) => useFlowStore.getState().reparentNode(node.id)}
         /**
-         * 关闭 React Flow 的「选中即置顶」默认行为（默认 true）。
-         * 本编辑器的层级由节点数组顺序决定（见 orderNodesByHierarchy / reorderLayers），
-         * 若保留该默认值，选中图形会被临时抬到 z-index 1000 之上，
-         * 出现「点一下就跑到最上层、切换选择才恢复」的错觉；关闭后所见层级即真实层级。
+         * Turn off React Flow's "bring selection to front" default (true by default).
+         * Layering in this editor is defined by node array order (see orderNodesByHierarchy / reorderLayers),
+         * and keeping that default would temporarily lift the selected shape above z-index 1000,
+         * giving the illusion of "click and it jumps to the top, restore by switching selection"; with it off, what you see is the real layering.
          */
         elevateNodesOnSelect={false}
-        // 右键菜单：节点（切换形状 / 编辑动作）、连线（布线动作）、空白（粘贴 / 全选等）
+        // Context menu: nodes (change shape / edit actions), edges (routing actions), empty canvas (paste / select all, etc.)
         onNodeContextMenu={(event, node) => {
           if (!useFlowStore.getState().selectedNodes.includes(node.id)) selectOnlyNode(node.id);
           openContextMenu(event, { kind: 'node', nodeId: node.id });
@@ -580,21 +580,21 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         connectionMode={ConnectionMode.Loose}
         connectionRadius={32}
         edgesReconnectable
-        // 端点圆始终不可见，只作为「重连拖拽」的承载元素：
-        // EdgeEndpointHandles 自绘方块按下时会向它派发 mousedown，之后由 React Flow 完成拖拽。
-        // 取较小半径以减少不可见的挡点击区域。
+        // The endpoint circle stays invisible and only carries "reconnect dragging":
+        // EdgeEndpointHandles dispatches mousedown to it when its custom square is pressed, and React Flow finishes the drag.
+        // A small radius is used to shrink the invisible click-blocking area.
         reconnectRadius={10}
         connectionLineType={connectionLineType}
         connectionLineStyle={{ stroke: '#2563EB', strokeWidth: 2, strokeDasharray: '5 4' }}
         snapToGrid={gridEnabled}
         snapGrid={[gridSize, gridSize]}
-        // 绘图工具习惯：左键拖出选框，中键/右键平移画布
+        // Drawing-tool habit: drag with the left button for a selection box, pan the canvas with the middle/right button
         selectionOnDrag
         panOnDrag={[1, 2]}
         /**
-         * 滚轮行为可切换（会话设置，默认保持历史行为）：
-         * - `pan`：滚轮平移、Ctrl/⌘+滚轮缩放（原行为）
-         * - `zoom`：滚轮缩放（draw.io 习惯），平移改用中键/右键拖拽
+         * Wheel behavior is switchable (a session setting, defaulting to legacy behavior):
+         * - `pan`: wheel pans, Ctrl/⌘+wheel zooms (the original behavior)
+         * - `zoom`: wheel zooms (draw.io habit), panning moves to middle/right-button drag
          */
         panOnScroll={wheelMode === 'pan'}
         panOnScrollMode={PanOnScrollMode.Free}
@@ -604,9 +604,9 @@ const FlowInner = forwardRef<HTMLDivElement>(function FlowInner(_props, ref) {
         minZoom={0.2}
         maxZoom={2.5}
         /**
-         * 大图虚拟化：只渲染可视区域内的节点/连线。
-         * 小图不开启，避免首帧测量造成的闪烁与额外开销；阈值以内的图全量渲染最稳。
-         * 阈值随视口面积自适应：大屏可容纳更多节点而全量渲染更快，小屏更早切换虚拟化。
+         * Large-graph virtualization: render only the nodes/edges inside the viewport.
+         * Disabled for small graphs to avoid first-frame measurement flicker and overhead; rendering fully is most stable below the threshold.
+         * The threshold adapts to the viewport area: large screens hold more nodes and render fully faster, small screens switch earlier.
          */
         onlyRenderVisibleElements={nodes.length > virtualizeThresholdOf(viewportArea)}
         proOptions={{ hideAttribution: true }}

@@ -1,26 +1,26 @@
 import type { SlideDoc, SlideElement, TextBody } from './types';
 
 /**
- * 跨页查找替换（纯函数）。
+ * Cross-slide find and replace (pure functions).
  *
- * 覆盖所有带文本的模型位置：文本框 / 形状内文字 / 表格单元格 / 备注。
- * 图表类别与系列名不参与替换（改动会破坏数据语义）。
+ * Covers every model location that holds text: text boxes / text inside shapes / table cells / notes.
+ * Chart categories and series names are excluded (changing them would break data semantics).
  */
 
 export interface TextHit {
   slideIndex: number;
   elementId: string;
-  /** 命中位置描述：text = 元素正文，table = 单元格，notes = 备注 */
+  /** Hit location kind: text = element body, table = cell, notes = speaker notes */
   scope: 'text' | 'table' | 'notes';
-  /** 表格命中的行列（scope === 'table'） */
+  /** Row/column of a table hit (scope === 'table') */
   cell?: { row: number; col: number };
-  /** 该处命中的次数 */
+  /** Number of matches in that spot */
   count: number;
 }
 
 export interface FindOptions {
   matchCase?: boolean;
-  /** 是否搜索演讲者备注 */
+  /** Whether to search speaker notes */
   includeNotes?: boolean;
 }
 
@@ -44,7 +44,7 @@ function bodyText(body: TextBody | undefined): string {
     .join('\n');
 }
 
-/** 元素里的可搜索文本（不含图表数据） */
+/** Searchable text inside an element (excluding chart data) */
 export function elementText(element: SlideElement): string {
   if (element.type === 'text') return bodyText(element.body);
   if (element.type === 'shape') return bodyText(element.body);
@@ -58,7 +58,7 @@ export function elementText(element: SlideElement): string {
   return '';
 }
 
-/** 全文档统计命中次数（供查找面板显示「N 处」） */
+/** Count matches across the document (used by the find panel's "N results") */
 export function countMatches(doc: SlideDoc, query: string, options: FindOptions = {}): number {
   if (!query.trim()) return 0;
   const matchCase = options.matchCase ?? false;
@@ -72,7 +72,7 @@ export function countMatches(doc: SlideDoc, query: string, options: FindOptions 
   return total;
 }
 
-/** 逐处列出命中（供导航到「下一个」） */
+/** List every hit (used to step to "next") */
 export function findInDoc(doc: SlideDoc, query: string, options: FindOptions = {}): TextHit[] {
   if (!query.trim()) return [];
   const matchCase = options.matchCase ?? false;
@@ -107,7 +107,7 @@ export function findInDoc(doc: SlideDoc, query: string, options: FindOptions = {
   return hits;
 }
 
-/** 替换一段文本中的全部匹配（按字面量替换，不做正则解释） */
+/** Replace all matches in a piece of text (literal replacement, no regex interpretation) */
 export function replaceAllInText(
   source: string,
   query: string,
@@ -116,12 +116,12 @@ export function replaceAllInText(
 ): string {
   if (!query) return source;
   if (matchCase) return source.split(query).join(replacement);
-  // 大小写不敏感：用正则匹配但转义元字符，避免用户输入被当成模式
+  // Case-insensitive: match with a regex but escape metacharacters so user input isn't treated as a pattern
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return source.replace(new RegExp(escaped, 'gi'), replacement);
 }
 
-/** 替换 body 内的文本；无命中时返回**原引用**，让调用方可以据此判断「有没有变」 */
+/** Replace text inside a body; returns the **original reference** when nothing matched so callers can detect "no change" */
 function replaceInBody(
   body: TextBody,
   query: string,
@@ -144,7 +144,7 @@ function replaceInBody(
   return touched ? { ...body, paragraphs } : body;
 }
 
-/** 替换整个文档中的全部匹配，返回**新文档**（不改原对象）；无命中时返回原引用 */
+/** Replace every match in the document, returning a **new document** (input untouched); returns the original ref on no match */
 export function replaceInDoc(
   doc: SlideDoc,
   query: string,

@@ -50,7 +50,7 @@ async function rasterToPng(
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-/** 将 ICO 内嵌 BMP（常见 32-bit BGRA + AND mask）转为 PNG data URL */
+/** Convert an ICO-embedded BMP (typically 32-bit BGRA plus an AND mask) into a PNG data URL */
 function bmpIcoEntryToDataUrl(entry: ParsedIcoEntry): string | null {
   const bytes = entry.bytes;
   if (bytes.length < 40) return null;
@@ -97,13 +97,10 @@ function entryPreviewUrl(entry: ParsedIcoEntry): string | null {
   return null;
 }
 
-/** 图片 ↔ ICO 转换（多尺寸 favicon） */
+/** Image ↔ ICO conversion (multi-size favicon) */
 export default function ImageIcoTool() {
   const { t } = useTranslation();
-  const init = useMemo(
-    () => readSharedState({ m: 'toIco', s: DEFAULT_ICO_SIZES.join(',') }),
-    [],
-  );
+  const init = useMemo(() => readSharedState({ m: 'toIco', s: DEFAULT_ICO_SIZES.join(',') }), []);
   const [mode, setMode] = useState<Mode>(init.m === 'fromIco' ? 'fromIco' : 'toIco');
   const [sizes, setSizes] = useState<IcoSize[]>(() => {
     const parsed = String(init.s || '')
@@ -130,7 +127,7 @@ export default function ImageIcoTool() {
         if (e.url.startsWith('blob:')) URL.revokeObjectURL(e.url);
       });
     },
-    // 仅卸载时清理；过程中由各 setter 自行 revoke
+    // Clean up on unmount only; URLs created in flight are revoked by each setter
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -206,15 +203,17 @@ export default function ImageIcoTool() {
         prev.forEach((e) => {
           if (e.url.startsWith('blob:')) URL.revokeObjectURL(e.url);
         });
-        return parsed.value.map((entry) => {
-          const url = entryPreviewUrl(entry);
-          return {
-            width: entry.width,
-            height: entry.height,
-            url: url || '',
-            format: entry.format,
-          };
-        }).filter((e) => e.url);
+        return parsed.value
+          .map((entry) => {
+            const url = entryPreviewUrl(entry);
+            return {
+              width: entry.width,
+              height: entry.height,
+              url: url || '',
+              format: entry.format,
+            };
+          })
+          .filter((e) => e.url);
       });
       if (parsed.value.length === 0) setError('INVALID_ICO');
     } catch {
@@ -291,7 +290,10 @@ export default function ImageIcoTool() {
             <option value="fromIco">{t('tools.imageIco.fromIco')}</option>
           </select>
         </label>
-        <ClearButton onClick={clearAll} disabled={!sourceUrl && !icoUrl && extracted.length === 0} />
+        <ClearButton
+          onClick={clearAll}
+          disabled={!sourceUrl && !icoUrl && extracted.length === 0}
+        />
         <ShareButton getState={() => ({ m: mode, s: sizes.join(',') })} />
       </OptionBar>
 
@@ -362,7 +364,9 @@ export default function ImageIcoTool() {
             hint={t('tools.imageIco.uploadIcoHint')}
           />
           {busy && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t('tools.imageIco.converting')}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('tools.imageIco.converting')}
+            </p>
           )}
           {extracted.length > 0 && (
             <div className="flex flex-col gap-2">

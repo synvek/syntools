@@ -1,22 +1,25 @@
 /**
- * 第一方埋点采集器（Cloudflare Pages Function）。
+ * First-party analytics collector (Cloudflare Pages Function).
  *
- * 为什么需要它：`src/core/analytics/index.ts` 早就在浏览器端准备好了队列、
- * 批量、DNT/GPC 尊重与 sendBeacon 投递，但**没有任何接收方** —— 未配置
- * `VITE_ANALYTICS_ENDPOINT` 时所有调用都是空操作。于是「周报看 DAU、Top10
- * 工具、工具失败率」这件事一直停在做不了的状态（见 plan/Monetization.md P0-1）。
+ * Why it exists: `src/core/analytics/index.ts` has long prepared the queue,
+ * batching, DNT/GPC respect and sendBeacon delivery in the browser, but there
+ * was **no receiver** — without `VITE_ANALYTICS_ENDPOINT` every call is a no-op.
+ * So "weekly DAU, Top 10 tools, tool failure rate" stayed impossible to answer
+ * (see plan/Monetization.md P0-1).
  *
- * 设计约束：
- * - **不落地原始 IP、不写 Cookie**：Analytics Engine 的 index 用随机 session id，
- *   只用于「同一次访问的事件聚在一起」，不含任何可识别个人的信息。
- * - **只接受白名单事件名与白名单属性**：即使前端被篡改，这个函数也不会变成
- *   一个任意写入的开放端点。
- * - **没有绑定就静默丢弃**：未配置 `ANALYTICS` 绑定时直接 204，不报错、不写日志，
- *   这样本地预览、GitHub Pages 等没有绑定的部署也照常工作。
- * - **同源**：站点 CSP 的 connect-src 为 'self'，本函数天然只能被本站调用。
+ * Design constraints:
+ * - **No raw IP, no cookies**: the Analytics Engine index uses a random session
+ *   id, only to group events from the same visit; it holds no personal data.
+ * - **Only whitelisted event names and properties**: even if the frontend is
+ *   tampered with, this function never becomes an open write endpoint.
+ * - **Drop silently without a binding**: when `ANALYTICS` is unbound it returns
+ *   204 without errors or logs, so local preview and GitHub Pages deployments
+ *   without a binding keep working.
+ * - **Same origin**: the site CSP sets connect-src to 'self', so this function
+ *   can only be called by the site itself.
  */
 
-/** Workers Analytics Engine 的最小结构（避免为几个字段引入 workers-types） */
+/** Minimal Workers Analytics Engine shape (avoids pulling in workers-types for a few fields) */
 interface AnalyticsEngineDataset {
   writeDataPoint(point: { blobs?: string[]; doubles?: number[]; indexes?: string[] }): void;
 }
@@ -30,7 +33,7 @@ interface PagesContext {
   env: Env;
 }
 
-/** 与前端 EventName 保持一致；新增事件必须同时改两处 */
+/** Must match the frontend EventName; adding an event means changing both places */
 const ALLOWED_EVENTS = new Set([
   'tool_open',
   'tool_duration',
@@ -42,7 +45,7 @@ const ALLOWED_EVENTS = new Set([
   'inquiry_click',
 ]);
 
-/** 单次请求上限：正常批量是 8 条，留足余量但不接受大包 */
+/** Per-request limits: normal batches are 8 events; leave headroom but reject large payloads */
 const MAX_BYTES = 4096;
 const MAX_EVENTS = 20;
 const MAX_PROPS = 8;
@@ -60,7 +63,7 @@ function empty(status: number): Response {
   return new Response(null, { status });
 }
 
-/** 把属性收敛成「按 key 排序的短字符串」，便于在 Analytics Engine 里按列过滤 */
+/** Flatten properties into a "key-sorted short string" so Analytics Engine can filter by column */
 function flattenProps(props: PropBag | undefined): string {
   if (!props) return '';
   const entries = Object.entries(props)
@@ -86,17 +89,18 @@ function sanitize(raw: RawEvent): { name: string; props: string; ms: number } | 
 }
 
 /**
- * 单一入口：按方法分派。
+ * Single entry point: dispatch by method.
  *
- * 之前同时导出 `onRequest` 与 `onRequestPost`，依赖 Pages 的路由优先级 ——
- * 一旦优先级不符合预期，POST 会落到 405 分支，表现为「前端在发、后端收不到」。
- * 合并成一个入口后行为是确定的，而且 GET 会稳定返回带 `Allow: POST` 的 405，
- * 可以当作「函数是否真的部署上线」的探针（见下方 onRequest 注释）。
+ * We used to export both `onRequest` and `onRequestPost`, relying on Pages route
+ * precedence — if that precedence was off, POST hit the 405 branch, looking like
+ * "the frontend sends but the backend never receives". One entry point makes the
+ * behaviour deterministic, and GET now always returns a 405 with `Allow: POST`,
+ * which doubles as a probe for "is the function actually deployed" (see below).
  */
 export async function onRequest(context: PagesContext): Promise<Response> {
   if (context.request.method !== 'POST') {
-    // 探针：线上 GET /api/event 返回 405 + allow: POST = 函数已部署；
-    // 返回 404 = 静态托管接管了该路径，说明 functions/ 没被构建（函数未上线）。
+    // Probe: a live GET /api/event returning 405 + allow: POST means the function is deployed;
+    // a 404 means static hosting took the path, i.e. functions/ was not built (not deployed).
     return new Response(null, { status: 405, headers: { allow: 'POST' } });
   }
 
@@ -124,7 +128,7 @@ export async function onRequest(context: PagesContext): Promise<Response> {
   const events = Array.isArray(payload.events) ? (payload.events as RawEvent[]) : [];
   if (events.length === 0 || events.length > MAX_EVENTS) return empty(400);
 
-  // 没有绑定就当成功：调用方不该为「没配分析」而看到失败
+  // Treat a missing binding as success: callers should not see failures for "no analytics configured"
   const dataset = env.ANALYTICS;
   if (!dataset) return empty(204);
 
@@ -134,7 +138,7 @@ export async function onRequest(context: PagesContext): Promise<Response> {
   for (const raw of events) {
     const event = sanitize(raw);
     if (!event) continue;
-    // 属性形如 "id=json-format&ms=812"，取 id 单独成列，方便按工具聚合
+    // Properties look like "id=json-format&ms=812"; keep id as its own column to aggregate per tool
     const idMatch = /(?:^|&)id=([^&]*)/.exec(event.props);
     dataset.writeDataPoint({
       indexes: [sid],

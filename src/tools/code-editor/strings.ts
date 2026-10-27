@@ -1,11 +1,12 @@
 /**
- * 代码编辑器 UI 文案：随工具 chunk 懒加载注入 i18next。
+ * Code editor UI strings, injected into i18next lazily with the tool chunk.
  *
- * 与 rich-text-editor / slide-editor / photo-editor 保持同一套约定：
- * 项目的 zh / en 语言包是首屏同步资源，本工具几十条文案若写进
- * `core/i18n/locales/*` 会直接推高首屏入口体积（预算 210KB，实测已接近上限）。
- * 因此文案放在这里，由 `registerCodeEditorStrings` 在工具被懒加载时合并进 i18next，
- * 键路径 `tools.codeEditor.*`。工具元数据（名称 / 描述）仍写在 locales 的 `toolsMeta` 中。
+ * Same convention as rich-text-editor / slide-editor / photo-editor:
+ * the project's zh / en bundles are synchronous first-paint resources, and putting the dozens of
+ * strings of this tool into `core/i18n/locales/*` would grow the entry bundle (budget 210KB, already
+ * close to the limit in practice). They therefore live here and `registerCodeEditorStrings` merges
+ * them into i18next when the tool is lazily loaded, under the key path `tools.codeEditor.*`.
+ * Tool metadata (name / description) still lives in the locales `toolsMeta`.
  */
 
 type StringTree = { [key: string]: string | StringTree };
@@ -1190,7 +1191,7 @@ const pt: ResourceTree = {
   },
 };
 
-/** 语言代码 → 资源树，键与 `Lang` 保持一致 */
+/** Language code → resource tree; keys match `Lang` */
 export const codeEditorStrings: Record<string, ResourceTree> = {
   zh,
   en,
@@ -1203,7 +1204,7 @@ export const codeEditorStrings: Record<string, ResourceTree> = {
   pt,
 };
 
-/** 把本工具文案合并进 i18next（工具懒加载时调用，键路径 tools.codeEditor.*） */
+/** Merge this tool's strings into i18next (called on lazy load, key path tools.codeEditor.*) */
 export function registerCodeEditorStrings(instance: {
   addResourceBundle: (
     lng: string,

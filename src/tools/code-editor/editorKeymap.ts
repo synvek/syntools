@@ -1,13 +1,13 @@
 /**
- * 编辑器快捷键总线：把键盘事件解析为「编辑器动作」，与具体实现解耦。
+ * Editor shortcut bus: turns keyboard events into "editor actions", decoupled from any implementation.
  *
- * 为什么单独成模块：
- * - CodeJar 自己会抢占 Tab / 粘贴 / 撤销等按键，且对 `event.defaultPrevented` 直接返回，
- *   因此快捷键必须在**捕获阶段**先解析（见 CodeSurface 的 keydown 监听）；
- * - `matchShortcut` 只依赖一个最小事件对象，可在 jsdom 下单测，不依赖真实键盘。
+ * Why a separate module:
+ * - CodeJar claims Tab / paste / undo itself and returns early on `event.defaultPrevented`, so
+ *   shortcuts must be parsed during the **capture phase** (see the keydown listener in CodeSurface);
+ * - `matchShortcut` only needs a minimal event object, so it unit-tests under jsdom with no real keyboard.
  *
- * 绑定参照 CodePen 的 Editor Commands（`⌘F` / `⌘/` / `⌘⇧F` / `⌘[` / `⌘]` 等），
- * `primary` 表示 macOS 的 ⌘、其它平台的 Ctrl。
+ * Bindings follow CodePen's Editor Commands (`⌘F` / `⌘/` / `⌘⇧F` / `⌘[` / `⌘]` etc.);
+ * `primary` means ⌘ on macOS and Ctrl elsewhere.
  */
 
 export type EditorAction =
@@ -31,9 +31,9 @@ export type EditorAction =
   | 'selectAllOccurrences';
 
 export interface KeyChord {
-  /** `KeyboardEvent.key`（小写比较） */
+  /** `KeyboardEvent.key` (compared lowercase) */
   key: string;
-  /** ⌘（macOS）/ Ctrl（其它平台） */
+  /** ⌘ (macOS) / Ctrl (other platforms) */
   primary?: boolean;
   shift?: boolean;
   alt?: boolean;
@@ -53,7 +53,7 @@ export interface EditorBinding {
   chord: KeyChord;
 }
 
-/** 标点键在按住 Option（macOS 会产出 ÷ 之类的字符）时回退用 `KeyboardEvent.code` 匹配 */
+/** For punctuation keys held with Option (macOS emits characters like ÷), fall back to `KeyboardEvent.code` */
 const KEY_TO_CODE: Record<string, string> = {
   '/': 'Slash',
   '[': 'BracketLeft',
@@ -83,7 +83,7 @@ export const EDITOR_BINDINGS: readonly EditorBinding[] = [
   { action: 'gotoLine', chord: { key: 'l', primary: true } },
 ];
 
-/** 是否为 macOS / iOS（决定主修饰键是 ⌘ 还是 Ctrl） */
+/** Whether this is macOS / iOS (decides whether the primary modifier is ⌘ or Ctrl) */
 export function detectMac(
   nav: { platform?: string; userAgent?: string } | undefined = typeof navigator === 'undefined'
     ? undefined
@@ -105,7 +105,7 @@ export interface MatchOptions {
   mac?: boolean;
 }
 
-/** 事件 → 动作；无匹配返回 null。修饰键必须精确匹配，避免误吞浏览器快捷键 */
+/** Event → action; null when nothing matches. Modifiers must match exactly so browser shortcuts are not swallowed */
 export function matchShortcut(
   event: EditorKeyEvent,
   options: MatchOptions = {},
@@ -113,7 +113,7 @@ export function matchShortcut(
   const mac = options.mac ?? detectMac();
   const primary = mac ? event.metaKey : event.ctrlKey;
   const secondary = mac ? event.ctrlKey : event.metaKey;
-  // 非主修饰键（macOS 上的 Ctrl、其它平台的 ⌘）不参与匹配
+  // The secondary modifier (Ctrl on macOS, ⌘ elsewhere) never participates in matching
   if (secondary) return null;
 
   for (const binding of options.bindings ?? EDITOR_BINDINGS) {
@@ -127,7 +127,7 @@ export function matchShortcut(
   return null;
 }
 
-/** 撤销 / 重做（交给 CodeJar 内部处理，但需要在派发结束后同步受控状态） */
+/** Undo / redo (handled inside CodeJar, but controlled state must be synced after dispatch) */
 export function isUndoRedo(event: EditorKeyEvent, mac = detectMac()): boolean {
   const primary = mac ? event.metaKey : event.ctrlKey;
   if (!primary || event.altKey) return false;
@@ -136,8 +136,8 @@ export function isUndoRedo(event: EditorKeyEvent, mac = detectMac()): boolean {
 }
 
 /**
- * 快捷键的可读提示（用于工具栏 `title` 与帮助文案）。
- * 只做展示，不参与匹配。
+ * Human-readable shortcut hint (for toolbar `title` attributes and help copy).
+ * Display only; never used for matching.
  */
 export function formatChord(chord: KeyChord, mac: boolean): string {
   const parts: string[] = [];
@@ -149,7 +149,7 @@ export function formatChord(chord: KeyChord, mac: boolean): string {
   return mac ? parts.join('') : parts.join('+');
 }
 
-/** 取某动作的首个绑定（用于展示提示） */
+/** First binding of an action (for displaying a hint) */
 export function chordOf(
   action: EditorAction,
   bindings: readonly EditorBinding[] = EDITOR_BINDINGS,

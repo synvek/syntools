@@ -2,8 +2,8 @@ import beautify from 'js-beautify';
 import type { ToolResult } from '@/core/types';
 
 /**
- * JS 压缩 / 格式化：格式化走 js-beautify，压缩为轻量本地实现（避免引入体积超标的 terser）。
- * 错误码与文案解耦：core 返回语言无关错误码，UI 层经 i18n 翻译。
+ * JS minify / format: formatting uses js-beautify, minification is a lightweight local implementation (avoiding an oversized terser dependency).
+ * Error codes are decoupled from copy: core returns language-neutral codes that the UI translates via i18n.
  */
 
 export type JsErrorCode = 'EMPTY' | 'INVALID';
@@ -11,8 +11,8 @@ export type IndentSize = 2 | 4;
 export type JsAction = 'format' | 'compress';
 
 /**
- * 轻量压缩：去掉注释与多余空白，保留字符串 / 模板字符串 / 正则字面量。
- * 不做变量混淆（体积预算内无法引入完整 JS 压缩器）。
+ * Lightweight minification: strip comments and redundant whitespace while preserving strings, template literals, and regex literals.
+ * No identifier mangling (the bundle budget leaves no room for a full JS minifier).
  */
 export function minifyJs(input: string): string {
   let out = '';
@@ -27,20 +27,20 @@ export function minifyJs(input: string): string {
     const ch = input[i];
     const next = peek(1);
 
-    // 行注释
+    // Line comment
     if (ch === '/' && next === '/') {
       i += 2;
       while (i < n && input[i] !== '\n') i++;
       continue;
     }
-    // 块注释
+    // Block comment
     if (ch === '/' && next === '*') {
       i += 2;
       while (i < n && !(input[i] === '*' && peek(1) === '/')) i++;
       i += 2;
       continue;
     }
-    // 字符串
+    // String
     if (ch === '"' || ch === "'" || ch === '`') {
       const quote = ch;
       out += ch;
@@ -55,7 +55,7 @@ export function minifyJs(input: string): string {
           continue;
         }
         if (quote === '`' && c === '$' && peek(1) === '{') {
-          // 模板插值：简单跳到匹配的 }（嵌套大括号计数）
+          // Template interpolation: jump to the matching } by counting nested braces
           out += '{';
           i += 2;
           let depth = 1;
@@ -93,7 +93,7 @@ export function minifyJs(input: string): string {
       lastWasSpace = false;
       continue;
     }
-    // 正则字面量（启发式：前一个非空白不是标识符 / 数字 / ) ] }）
+    // Regex literal (heuristic: the previous non-space character is not an identifier char, digit, or ) ] })
     if (ch === '/') {
       const prev = out.trimEnd().slice(-1);
       if (!prev || !/[A-Za-z0-9_$)\]}]/.test(prev)) {
@@ -125,7 +125,7 @@ export function minifyJs(input: string): string {
     }
 
     if (/\s/.test(ch)) {
-      // 仅在两个标识符相邻时保留一个空格
+      // Keep a single space only where two identifier characters would otherwise touch
       if (!lastWasSpace) {
         const left = out.slice(-1);
         let j = i + 1;

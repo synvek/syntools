@@ -51,7 +51,7 @@ export function findMatches(
   return { ok: true, value: { matches, truncated: false } };
 }
 
-/** 正则替换（支持 $1 / $& 等标准替换串） */
+/** Regex replace (supports standard replacement patterns such as $1 / $&) */
 export function replaceRegex(
   regex: RegExp,
   text: string,

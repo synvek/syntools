@@ -24,7 +24,7 @@ describe('applyEdits', () => {
       selectionStart: 2,
       selectionEnd: 3,
     });
-    // 多处编辑（注释放到两行行首）
+    // Several edits at once (comment markers added at two line starts)
     expect(
       applyEdits(
         'a\nb',
@@ -228,7 +228,7 @@ describe('indentLines', () => {
   it('减少缩进最多移除一个缩进单元', () => {
     expect(indentLines('    a', 0, 5, '  ', -1).text).toBe('  a');
     expect(indentLines('\ta', 0, 2, '\t', -1).text).toBe('a');
-    // 空格数不足一个单元时只移除已有空白
+    // Fewer spaces than one unit: remove only the whitespace that exists
     expect(indentLines(' a', 0, 2, '    ', -1).text).toBe('a');
     expect(indentLines('a', 0, 1, '  ', -1).text).toBe('a');
   });

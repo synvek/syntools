@@ -13,8 +13,8 @@ import {
 } from './xml';
 
 /**
- * theme1.xml 解析：色板（clrScheme）、字体方案（fontScheme）、格式方案（fmtScheme）。
- * 解析失败一律回落到内置默认主题，保证导入不中断。
+ * theme1.xml parsing: color scheme (clrScheme), font scheme (fontScheme), format scheme (fmtScheme).
+ * Any parse failure falls back to the built-in default theme so import never breaks.
  */
 
 const SCHEME_KEYS = [
@@ -66,7 +66,7 @@ export function parseTheme(text: string): SlideTheme {
   };
 }
 
-/** p:bg → 背景色（渐变取首色，图片背景暂不支持） */
+/** p:bg → background color (gradients take the first color; image backgrounds aren't supported yet) */
 export function parseBackgroundColor(
   node: XmlNode | undefined,
   palette: Palette,
@@ -79,19 +79,19 @@ export function parseBackgroundColor(
   return resolveColorNode(stop ?? clr, palette)?.color;
 }
 
-/** p:bg 内的图片回填 rel id（blipFill/blip r:embed） */
+/** Rel id of the image backfill inside p:bg (blipFill/blip r:embed) */
 export function parseBackgroundBlip(node: XmlNode | undefined): string | undefined {
   const blip = findFirst(node, 'blip');
   return blip ? (attr(blip, 'embed') ?? attr(blip, 'link')) : undefined;
 }
 
-/** 颜色组定义：<a:fills><a:blipFill><a:blip r:embed="rId2"/></a:blipFill>... */
+/** Color group definition: <a:fills><a:blipFill><a:blip r:embed="rId2"/></a:blipFill>... */
 export function parseFillOverrideRef(node: XmlNode | undefined): string | undefined {
   const blip = findFirst(node, 'blip');
   return blip ? attr(blip, 'embed') : undefined;
 }
 
-/** 从 clrMap 读取「占位符 → 方案色」映射 */
+/** Read the "placeholder → scheme color" mapping from clrMap */
 export function parseClrMap(node: XmlNode | undefined): Palette {
   if (!node) return {};
   const map: Palette = {};
@@ -103,7 +103,7 @@ export function parseClrMap(node: XmlNode | undefined): Palette {
   return map;
 }
 
-/** <a:latin> 之类附加属性里的字号倍数（常见于 txPr 的 sz） */
+/** Size multiplier in attributes like <a:latin> (common as sz in txPr) */
 export function readFontSize(node: XmlNode | undefined): number | undefined {
   const raw = numAttr(node, 'sz');
   return raw === undefined ? undefined : raw / 100;

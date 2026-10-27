@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COMMON_PORTS, randomIpv6, randomMac, randomPorts, randomPrivateIpv4 } from './core';
 
-/** 线性同余伪随机，保证测试可复现 */
+/** Linear congruential PRNG so tests stay reproducible */
 function seeded(seed: number): () => number {
   let state = seed;
   return () => {

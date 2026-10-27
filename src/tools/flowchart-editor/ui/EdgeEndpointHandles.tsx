@@ -4,7 +4,7 @@ import { useViewport } from '@xyflow/react';
 import { useFlowStore } from '../store';
 import { absoluteRectOf } from '../core';
 
-/** 八个锚点在图形内的相对位置与外法线方向（与 ShapeNode 的 HANDLES 一致） */
+/** Relative positions and outward normals of the eight anchors inside a shape (matching HANDLES in ShapeNode) */
 const HANDLE_SIDES: Record<string, { fx: number; fy: number }> = {
   't-l': { fx: 0.25, fy: 0 },
   t: { fx: 0.5, fy: 0 },
@@ -16,18 +16,18 @@ const HANDLE_SIDES: Record<string, { fx: number; fy: number }> = {
   r: { fx: 1, fy: 0.5 },
 };
 
-/** 方块边长（画布单位，随缩放同步）：小于箭头长度，覆盖箭头根部但能看到大部分箭头 */
+/** Square edge length (canvas units, scales with zoom): shorter than the arrow, covering its root while leaving most of it visible */
 const SQUARE = 9;
 const MIN_SQUARE_PX = 7;
 
 /**
- * 用自绘小方块替代 React Flow 默认的大圆重连端点。
- * 方块中心严格等于连线终点（即图形边缘上的锚点位置），因此只盖住箭头根部、
- * 仍能看到大部分箭头；同时比原来的圆形小得多。
+ * Replaces React Flow's default large circular reconnect endpoints with a small self-drawn square.
+ * The square center is exactly the edge endpoint (the anchor on the shape edge), so it covers only the arrow root
+ * and most of the arrow stays visible; it is also far smaller than the original circle.
  *
- * 交互：方块自身接收按下，并通过**原生 mousedown 监听**向 React Flow 隐藏的原生端点
- * 派发一次 mousedown，后续拖拽/吸附/投放全部由 React Flow 完成（其拖拽监听挂在 document 上）。
- * 这里必须用原生监听而非 React 的 onMouseDown：在 React 事件处理器内部派发的合成事件不会被处理。
+ * Interaction: the square receives the press and dispatches a mousedown to React Flow's hidden native endpoint
+ * through a **native mousedown listener**; dragging / snapping / dropping is then all handled by React Flow (it listens on document).
+ * A native listener is required rather than React's onMouseDown: a synthetic event dispatched from inside a React handler is not processed.
  */
 function EndpointSquare(props: {
   edgeId: string;
@@ -80,7 +80,7 @@ function EndpointSquare(props: {
   );
 }
 
-/** 选中连线两端的重连端点方块 */
+/** Reconnect endpoint squares at both ends of the selected edge */
 export function EdgeEndpointHandles() {
   const { x: vx, y: vy, zoom } = useViewport();
   const nodes = useFlowStore((s) => s.nodes);
@@ -114,7 +114,7 @@ export function EdgeEndpointHandles() {
         px = rect.x + rect.width * side.fx;
         py = rect.y + rect.height * side.fy;
       } else {
-        // 无锚点信息的连线（如导入数据）：按两端相对方位取朝向对方的边中点
+        // Edges without anchor info (e.g. imported data): take the midpoint of the side facing the opposite end from their relative positions
         const other = byId.get(end === 'source' ? edge.target : edge.source);
         const oRect = other ? absoluteRectOf(other, byId) : rect;
         const dx = oRect.x + oRect.width / 2 - (rect.x + rect.width / 2);
@@ -127,7 +127,7 @@ export function EdgeEndpointHandles() {
           py = rect.y + (dy >= 0 ? rect.height : 0);
         }
       }
-      // 方块中心 = 连线终点（图形边缘），不做任何外移
+      // Square center = edge endpoint (the shape edge), with no outward offset
       items.push({
         key: `${edge.id}-${end}`,
         edgeId: edge.id,

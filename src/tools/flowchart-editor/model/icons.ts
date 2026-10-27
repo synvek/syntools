@@ -1,8 +1,8 @@
 /**
- * 内置图标库（内联 SVG path，24×24 视图框，描边走 currentColor）。
+ * Built-in icon library (inline SVG paths, 24×24 viewBox, stroked with currentColor).
  *
- * 不引入任何图标依赖：图标随工具 chunk 一起加载，节点渲染只用 path，
- * 因此导出 SVG/PNG 与画布完全一致。
+ * No icon dependency: icons load with the tool chunk and nodes render paths only,
+ * so SVG/PNG export matches the canvas exactly.
  */
 
 export type IconGroup = 'general' | 'office' | 'tech' | 'people';
@@ -10,7 +10,7 @@ export type IconGroup = 'general' | 'office' | 'tech' | 'people';
 export interface IconDef {
   id: string;
   group: IconGroup;
-  /** 一组 path d 指令（统一 24×24 视图框、无填充、描边 currentColor） */
+  /** A list of path d commands (uniform 24×24 viewBox, no fill, currentColor stroke) */
   paths: string[];
 }
 
@@ -21,7 +21,7 @@ function circle(cx: number, cy: number, r: number): string {
 }
 
 export const ICONS: IconDef[] = [
-  // 通用
+  // General
   {
     id: 'star',
     group: 'general',
@@ -45,7 +45,7 @@ export const ICONS: IconDef[] = [
   { id: 'clock', group: 'general', paths: [circle(12, 12, 8), 'M12 8v5l3 2'] },
   { id: 'placeholder', group: 'general', paths: ['M4 5h16v14H4z', 'M4 15l4-4 4 4 3-3 5 5'] },
 
-  // 文档与办公
+  // Documents and office
   { id: 'file', group: 'office', paths: ['M7 3h7l5 5v13H7z', 'M14 3v5h5'] },
   { id: 'folder', group: 'office', paths: ['M3 6h6l2 2h10v11H3z'] },
   { id: 'document', group: 'office', paths: ['M6 3h8l4 4v14H6z', 'M9 12h6', 'M9 16h6'] },
@@ -60,7 +60,7 @@ export const ICONS: IconDef[] = [
     paths: ['M9 12h6', 'M8 8H6a4 4 0 0 0 0 8h2', 'M16 8h2a4 4 0 0 1 0 8h-2'],
   },
 
-  // 设备与技术
+  // Devices and technology
   {
     id: 'cloud',
     group: 'tech',
@@ -107,7 +107,7 @@ export const ICONS: IconDef[] = [
   },
   { id: 'code', group: 'tech', paths: ['M9 7l-5 5 5 5', 'M15 7l5 5-5 5'] },
 
-  // 人物与协作
+  // People and collaboration
   { id: 'user', group: 'people', paths: [circle(12, 8, 4), 'M4 21c0-4 3.6-6 8-6s8 2 8 6'] },
   {
     id: 'users',

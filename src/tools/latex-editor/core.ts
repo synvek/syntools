@@ -19,7 +19,7 @@ export {
 } from './snippets';
 
 /**
- * LaTeX 数学公式渲染（KaTeX）。
+ * LaTeX math rendering (KaTeX).
  */
 
 export type LatexError = 'EMPTY' | 'RENDER';
@@ -29,10 +29,7 @@ export interface LatexRenderOptions {
   throwOnError?: boolean;
 }
 
-export function renderLatex(
-  input: string,
-  options: LatexRenderOptions,
-): ToolResult<string> {
+export function renderLatex(input: string, options: LatexRenderOptions): ToolResult<string> {
   const src = input.trim();
   if (!src) return { ok: false, error: 'EMPTY' };
 
@@ -55,9 +52,8 @@ export function renderLatex(
   }
 }
 
-/** 包一层便于复制的 HTML 片段 */
+/** Wrap it in an HTML snippet that is easy to copy */
 export function wrapLatexHtml(inner: string, displayMode: boolean): string {
   const tag = displayMode ? 'div' : 'span';
   return `<${tag} class="katex-embed">${inner}</${tag}>`;
 }
-

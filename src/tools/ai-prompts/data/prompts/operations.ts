@@ -1,6 +1,6 @@
 import type { PromptItem } from '../../types';
 
-/** 运营与增长类提示词，详见 ../README.md */
+/** Operations and growth prompts; see ../README.md */
 export const PROMPTS: PromptItem[] = [
   {
     id: 'operations-growth-experiment',

@@ -2,7 +2,7 @@ import beautify from 'js-beautify';
 import type { ToolResult } from '@/core/types';
 
 /**
- * XML 格式化 / 压缩：美化复用 js-beautify.html，压缩为轻量本地实现。
+ * XML formatting / minification: beautify reuses js-beautify.html, minify is a lightweight local implementation.
  */
 
 export type XmlFormatError = 'EMPTY' | 'INVALID';
@@ -42,7 +42,7 @@ export function processXml(
           indent_inner_html: true,
           wrap_line_length: 0,
           end_with_newline: false,
-          // XML 自闭合标签更友好
+          // Self-closing tags read better in XML
           unformatted: [],
         }),
       };

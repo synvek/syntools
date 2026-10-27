@@ -14,7 +14,7 @@ export interface RequestDraft {
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
-/** 解析多行 `Name: value` 形式的请求头 */
+/** Parse multi-line `Name: value` request headers */
 export function parseHeaderLines(text: string): HeaderEntry[] {
   const entries: HeaderEntry[] = [];
   for (const line of text.split('\n')) {
@@ -30,7 +30,7 @@ export function parseHeaderLines(text: string): HeaderEntry[] {
   return entries;
 }
 
-/** 从 curl 命令还原请求草稿（支持 -X / -H / -d / --data-raw） */
+/** Rebuild a request draft from a curl command (supports -X / -H / -d / --data-raw) */
 export function parseCurlCommand(input: string): ToolResult<RequestDraft> {
   const trimmed = input.trim();
   if (!trimmed) return { ok: false, error: 'EMPTY' };
@@ -71,7 +71,7 @@ export function parseCurlCommand(input: string): ToolResult<RequestDraft> {
   return { ok: true, value: { method, url, headers, body: bodyParts.join('&') } };
 }
 
-/** 状态码归类，用于徽章配色 */
+/** Status-code class, used to color the badge */
 export function statusCategory(code: number): string {
   if (code >= 100 && code < 200) return 'info';
   if (code >= 200 && code < 300) return 'success';
@@ -92,7 +92,7 @@ export function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`;
 }
 
-/** 响应体格式化：JSON 会缩进，其他原样返回 */
+/** Format the response body: JSON gets indented, anything else is returned as-is */
 export function formatBody(text: string): ToolResult<string> {
   if (!text.trim()) return { ok: true, value: '' };
   try {
@@ -102,7 +102,7 @@ export function formatBody(text: string): ToolResult<string> {
   }
 }
 
-/** 生成可复制的 curl 命令 */
+/** Build a copyable curl command */
 export function toCurl(draft: RequestDraft): string {
   const parts = [`curl -X ${draft.method}`];
   for (const { name, value } of draft.headers) {

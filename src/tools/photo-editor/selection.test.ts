@@ -125,7 +125,7 @@ describe('pointInSelection', () => {
       ...base,
       parts: [{ path: shapePolygon(rect(40, 40, 60, 60)), add: true }],
     };
-    // 重叠区（40..60）必须命中
+    // The overlap (40..60) must be hit
     expect(pointInSelection(union, 50, 50)).toBe(true);
   });
 

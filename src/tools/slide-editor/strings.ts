@@ -1,10 +1,10 @@
 /**
- * 幻灯片编辑器 UI 文案：随工具 chunk 懒加载注入 i18next。
+ * Slide editor UI copy: injected into i18next lazily with the tool chunk.
  *
- * 与 rich-text-editor / spreadsheet-editor 保持同一套约定（详见各自 strings.ts 头部说明）：
- * 单工具的几十条 UI 文案不进首屏语言包 `core/i18n/locales/*`，
- * 而是在工具被懒加载时由 `registerSlideStrings` 合并进 i18next，键路径保持 `tools.slide.*`。
- * 工具元数据（名称/描述）仍写在 `core/i18n/locales/*` 的 `toolsMeta` 中。
+ * Follows the same convention as rich-text-editor / spreadsheet-editor (see the header of their strings.ts):
+ * a single tool's few dozen UI strings don't go into the first-screen language pack `core/i18n/locales/*`;
+ * instead `registerSlideStrings` merges them into i18next when the tool is lazily loaded, keeping `tools.slide.*` paths.
+ * Tool metadata (name/description) still lives in `toolsMeta` under `core/i18n/locales/*`.
  */
 
 type StringTree = { [key: string]: string | StringTree };
@@ -2616,7 +2616,7 @@ const pt: ResourceTree = {
   },
 };
 
-/** 语言代码 → 资源树，键与 `Lang` 保持一致 */
+/** Language code → resource tree, keys aligned with `Lang` */
 export const slideStrings: Record<string, ResourceTree> = {
   zh,
   en,
@@ -2629,7 +2629,7 @@ export const slideStrings: Record<string, ResourceTree> = {
   pt,
 };
 
-/** 把本工具文案合并进 i18next（工具被懒加载时调用，键路径 tools.slide.*） */
+/** Merge this tool's copy into i18next (called on lazy load, key path tools.slide.*) */
 export function registerSlideStrings(instance: {
   addResourceBundle: (
     lng: string,

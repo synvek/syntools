@@ -5,18 +5,18 @@ import type { LangSpec, PrettierGroup } from './core';
 import { formatFallback, type FallbackOptions } from './fallback';
 
 /**
- * 格式化调度：按语言选择引擎，全部按需动态 import。
+ * Format dispatch: pick an engine per language, everything imported lazily on demand.
  *
- * 分组而非一次性加载的原因：prettier standalone + 全部插件 gzip 合计约 1.07MB，
- * 直接打进一个 chunk 会突破 `pnpm size` 的单 chunk 500KB 预算；
- * 按 `js / ts / doc / java` 分组后每组仅加载所需插件，且结果用 Promise 缓存，
- * 重复格式化不再产生额外下载。
+ * Why grouping instead of one bundle: prettier standalone plus every plugin is ~1.07MB gzipped,
+ * which would blow the 500KB per-chunk budget enforced by `pnpm size`. Splitting into
+ * `js / ts / doc / java` groups loads only the needed plugins, and results are cached as
+ * Promises so repeated formatting triggers no extra download.
  *
- * 语言引擎对照：
- * - `prettier`：JavaScript / TypeScript / JSX / TSX / JSON / HTML / CSS / SCSS / Markdown / YAML / **Java**（prettier-plugin-java）
- * - `sql`：复用仓库已有的 sql-formatter
- * - `fallback`：Rust / Go / C / C++ / C# / Python / Kotlin / Swift … 走内置轻量格式化器
- *   （prettier v3 生态无维护中的对应插件；唯一的 Rust 插件仍停留在 prettier@2）
+ * Language → engine:
+ * - `prettier`: JavaScript / TypeScript / JSX / TSX / JSON / HTML / CSS / SCSS / Markdown / YAML / **Java** (prettier-plugin-java)
+ * - `sql`: reuses the repo's existing sql-formatter
+ * - `fallback`: Rust / Go / C / C++ / C# / Python / Kotlin / Swift … use the built-in formatter
+ *   (prettier v3 has no maintained plugins for them; the only Rust plugin is still on prettier@2)
  */
 
 export type IndentOption = 2 | 4 | 'tab';
@@ -79,7 +79,7 @@ async function loadDoc(): Promise<GroupBundle> {
   };
 }
 
-/** Java：官方 prettier 插件（内部用 web-tree-sitter 加载 447KB 的 java wasm 语法） */
+/** Java: the official prettier plugin (loads a 447KB Java wasm grammar via web-tree-sitter) */
 async function loadJava(): Promise<GroupBundle> {
   const [standalone, java] = await Promise.all([
     import('prettier/standalone'),
@@ -105,7 +105,7 @@ function loadGroup(group: PrettierGroup): Promise<GroupBundle> {
   if (cached) return cached;
   const pending = GROUP_LOADERS[group]();
   bundleCache.set(group, pending);
-  // 加载失败不缓存，便于网络恢复后重试
+  // Do not cache failures so a retry can succeed once the network recovers
   pending.catch(() => bundleCache.delete(group));
   return pending;
 }
@@ -118,16 +118,17 @@ function fallbackOptionsOf(spec: LangSpec, indent: IndentOption): FallbackOption
   return {
     indentUnit: indentUnitOf(indent),
     mode: spec.fallbackMode ?? 'brackets',
-    // 由统一的行注释符推导（见 core.ts 的 COMMENT_SPECS），避免注释语法两处维护
+    // Derived from the shared line comment marker (see COMMENT_SPECS in core.ts) to keep one source
     hashComment: spec.lineComment === '#',
     dashComment: spec.lineComment === '--',
   };
 }
 
 /**
- * 按语言格式化代码。
- * - 纯文本语言返回 UNSUPPORTED（无可格式化规则）
- * - prettier 引擎失败（含 Java wasm 加载失败）自动回退内置格式化器，仍失败才返回 FORMAT_FAILED
+ * Format code for a language.
+ * - Plain-text languages return UNSUPPORTED (there are no formatting rules)
+ * - A prettier failure (including the Java wasm load) falls back to the built-in formatter;
+ *   only if that also fails is FORMAT_FAILED returned
  */
 export async function formatCode(
   code: string,
@@ -147,7 +148,7 @@ export async function formatCode(
       });
       return { ok: true, value: { code: value, engine: 'sql' } };
     } catch {
-      // 语法不合法时回退内置整理
+      // Fall back to the built-in tidy-up when the syntax is invalid
     }
   }
 
@@ -163,7 +164,7 @@ export async function formatCode(
       });
       return { ok: true, value: { code: value, engine: 'prettier' } };
     } catch {
-      // 落到下方内置格式化器
+      // Fall through to the built-in formatter below
     }
   }
 
@@ -174,7 +175,7 @@ export async function formatCode(
   return { ok: true, value: { code: fallback.value, engine: 'fallback' } };
 }
 
-/** 该语言是否由 prettier 真格式化（UI 用于提示「已回退内置格式化」） */
+/** Whether the language is truly formatted by prettier (the UI uses this to say it fell back) */
 export function isPrettierLanguage(spec: LangSpec): boolean {
   return spec.format === 'prettier';
 }

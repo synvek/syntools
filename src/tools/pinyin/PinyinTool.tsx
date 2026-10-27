@@ -5,16 +5,12 @@ import { CopyButton } from '@/core/components/CopyButton';
 import { ClearButton, OptionBar } from '@/core/components/ActionButtons';
 import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
-import {
-  convertPinyin,
-  type PinyinCase,
-  type PinyinSeparator,
-} from './core';
+import { convertPinyin, type PinyinCase, type PinyinSeparator } from './core';
 
 const SEPS = new Set(['space', 'none', 'dash']);
 const CASES = new Set(['lower', 'upper']);
 
-/** 汉字转拼音 */
+/** Chinese characters to pinyin */
 export default function PinyinTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', s: 'space', c: 'lower', ton: 0 }), []);

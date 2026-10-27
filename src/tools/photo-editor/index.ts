@@ -1,8 +1,8 @@
 import type { ToolMeta } from '@/core/types';
 
 /**
- * 照片编辑器（「文档与创作」分类重工具）：
- * Konva 多图层画布 + 浏览器本地的调色 / 滤镜 / 绘制，支持导出 PNG / JPEG / WEBP 与工程文件续编。
+ * Photo editor (a heavyweight tool in the "Documents & Creation" category):
+ * Konva multi-layer canvas with browser-local color / filter / paint, exporting PNG / JPEG / WEBP and a project file for continued editing.
  */
 export const photoEditorTool: ToolMeta = {
   id: 'photo-editor',

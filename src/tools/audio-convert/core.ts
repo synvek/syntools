@@ -5,7 +5,7 @@ export interface WavOptions {
   bitDepth: BitDepth;
 }
 
-/** 线性插值重采样。 */
+/** Linear-interpolation resampling. */
 export function resample(input: Float32Array, fromRate: number, toRate: number): Float32Array {
   if (fromRate === toRate || input.length === 0) return input;
   const ratio = toRate / fromRate;
@@ -22,7 +22,7 @@ export function resample(input: Float32Array, fromRate: number, toRate: number):
   return out;
 }
 
-/** 多声道混合为单声道（平均值）。 */
+/** Downmix multiple channels to mono (average). */
 export function downmix(channels: Float32Array[]): Float32Array {
   if (channels.length === 0) return new Float32Array(0);
   if (channels.length === 1) return channels[0];
@@ -36,7 +36,7 @@ export function downmix(channels: Float32Array[]): Float32Array {
   return out;
 }
 
-/** 将浮点声道编码为 WAV（PCM）。 */
+/** Encode floating-point channels as WAV (PCM). */
 export function encodeWav(channels: Float32Array[], options: WavOptions): Uint8Array {
   const numChannels = Math.max(1, channels.length);
   const { sampleRate, bitDepth } = options;

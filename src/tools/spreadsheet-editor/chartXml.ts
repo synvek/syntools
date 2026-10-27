@@ -10,20 +10,20 @@ import {
 } from './rawChartParts';
 
 /**
- * 把站内图表写成 Excel **原生图表**（DrawingML），注入到 exceljs 产出的 .xlsx 里。
+ * Writes in-app charts as **native Excel charts** (DrawingML) and injects them into the .xlsx that
+ * exceljs produces.
  *
- * 为什么必须自己注入：exceljs 的 drawing 层只实现图片（`xdr:pic`），
- * 没有 `graphicFrame` / `c:chart`，公开 API 也没有 addChart；
- * SheetJS 社区版同样不写图表。而 .xlsx 就是 zip + OOXML，
- * 因此用已在依赖里的 jszip 做后处理注入。
+ * Why the manual injection: exceljs's drawing layer only implements pictures (`xdr:pic`) — no
+ * `graphicFrame` / `c:chart`, and no public addChart API; community SheetJS does not write charts
+ * either. But .xlsx is just zip + OOXML, so jszip (already a dependency) handles the post-processing.
  *
- * 注入点（必需，缺一 Excel 会报“需要修复”）：
- * 1. `xl/charts/chartN.xml`        —— 图表定义
- * 2. `xl/drawings/drawingM.xml`    —— 锚点 + graphicFrame 指向 chart
- * 3. `xl/drawings/_rels/drawingM.xml.rels` —— drawing → chart 关系
- * 4. `xl/worksheets/_rels/*.rels`  —— sheet → drawing 关系
- * 5. `xl/worksheets/sheetK.xml`    —— 末尾插入 `<drawing r:id="..."/>`
- * 6. `[Content_Types].xml`         —— 追加 drawing / chart 的 Override
+ * Injection points (all required — Excel otherwise complains it "needs repair"):
+ * 1. `xl/charts/chartN.xml`        — chart definition
+ * 2. `xl/drawings/drawingM.xml`    — anchor + graphicFrame pointing at the chart
+ * 3. `xl/drawings/_rels/drawingM.xml.rels` — drawing → chart relationships
+ * 4. `xl/worksheets/_rels/*.rels`  — sheet → drawing relationship
+ * 5. `xl/worksheets/sheetK.xml`    — `<drawing r:id="..."/>` appended at the end
+ * 6. `[Content_Types].xml`         — Override entries for the new drawing / chart parts
  */
 
 export const EMU_PER_PX = 9525;
@@ -39,11 +39,11 @@ const REL_CHART = `${R_NS}/chart`;
 const CT_DRAWING = 'application/vnd.openxmlformats-officedocument.drawing+xml';
 const CT_CHART = 'application/vnd.openxmlformats-officedocument.drawingml.chart+xml';
 
-/** 两轴 id：任一合法正整数即可，只要图组与坐标轴互相引用一致 */
+/** Axis ids: any valid positive integers, as long as the chart group and axes cross-reference consistently */
 const CAT_AX_ID = '111111111';
 const VAL_AX_ID = '222222222';
 
-/** 系列配色（与站内 ECharts 观感接近，同时便于区分多系列） */
+/** Series palette (close to the in-app ECharts look, and easy to tell series apart) */
 const SERIES_COLORS = [
   '5470C6',
   '91CC75',
@@ -69,9 +69,9 @@ export const DEFAULT_SHEET_METRICS: SheetMetrics = {
   columnHeaderHeight: 20,
 };
 
-/* -------------------------------- 基础工具 -------------------------------- */
+/* -------------------------------- Basic helpers -------------------------------- */
 
-/** XML 文本转义，并丢弃 XML 1.0 不允许的控制字符（\t \n \r 除外） */
+/** Escape XML text, dropping control characters XML 1.0 forbids (except \t \n \r) */
 export function xmlEscape(text: string): string {
   let cleaned = '';
   for (const char of text) {
@@ -79,8 +79,8 @@ export function xmlEscape(text: string): string {
     if (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) continue;
     cleaned += char;
   }
-  // 属性值都用双引号包裹，因此只需转义 & < > "；
-  // 单引号保持原样，避免把公式里的 'Sheet'! 写成 &apos;Sheet&apos;!
+  // Attribute values are always double-quoted, so only & < > " need escaping;
+  // single quotes stay as-is, so a formula's 'Sheet'! is not turned into &apos;Sheet&apos;!
   return cleaned
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -89,20 +89,21 @@ export function xmlEscape(text: string): string {
 }
 
 /**
- * 公式里的工作表名前缀。Excel 允许对任意表名加单引号，
- * 因此这里一律加引号（并翻倍内部单引号），避免「含空格/点号/数字开头」等一大类错误。
+ * Sheet-name prefix used in formulas. Excel allows single quotes around any sheet name, so always
+ * quote here (doubling any inner quotes) to avoid the whole class of "space / dot / leading digit"
+ * bugs.
  */
 export function sheetRefPrefix(sheetName: string): string {
   const name = sheetName || 'Sheet1';
   return `'${name.replace(/'/g, "''")}'`;
 }
 
-/** 绝对单元格引用：'Sheet'!$B$2 */
+/** Absolute cell reference: 'Sheet'!$B$2 */
 export function absoluteCellRef(sheetName: string, row: number, column: number): string {
   return `${sheetRefPrefix(sheetName)}!$${columnIndexToName(column)}$${row + 1}`;
 }
 
-/** 绝对单列区域引用：'Sheet'!$B$2:$B$4 */
+/** Absolute single-column range reference: 'Sheet'!$B$2:$B$4 */
 export function absoluteRangeRef(
   sheetName: string,
   startRow: number,
@@ -120,7 +121,7 @@ function strCache(values: readonly string[]): string {
   return `<c:strCache><c:ptCount val="${values.length}"/>${points}</c:strCache>`;
 }
 
-/** 数值缓存：空值写成缺失点（Excel 会视为空），ptCount 仍为完整长度 */
+/** Numeric cache: nulls become missing points (Excel treats them as blank) while ptCount stays the full length */
 function numCache(values: readonly (number | null)[]): string {
   const points = values
     .map((value, index) =>
@@ -130,7 +131,7 @@ function numCache(values: readonly (number | null)[]): string {
   return `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${values.length}"/>${points}</c:numCache>`;
 }
 
-/* ------------------------------ 图表 XML 生成 ------------------------------ */
+/* ------------------------------ Chart XML generation ------------------------------ */
 
 function seriesXml(spec: ChartSpec, index: number, sheetName: string, type: ChartType): string {
   const item = spec.series[index];
@@ -153,7 +154,7 @@ function seriesXml(spec: ChartSpec, index: number, sheetName: string, type: Char
   const values = `<c:val><c:numRef><c:f>${xmlEscape(
     absoluteRangeRef(sheetName, item.startRow, item.endRow, item.column),
   )}</c:f>${numCache(item.data)}</c:numRef></c:val>`;
-  // 饼图由 varyColors 着色，不写系列填充
+  // Pie slices are coloured via varyColors, so no series fill is written
   const shape =
     type === 'pie'
       ? ''
@@ -163,14 +164,14 @@ function seriesXml(spec: ChartSpec, index: number, sheetName: string, type: Char
   return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${shape}${category}${values}</c:ser>`;
 }
 
-/** 分类轴 + 数值轴（元素顺序按 CT_CatAx / CT_ValAx 规定） */
+/** Category axis + value axis (element order per CT_CatAx / CT_ValAx) */
 function axesXml(): string {
   const catAx = `<c:catAx><c:axId val="${CAT_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${VAL_AX_ID}"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx>`;
   const valAx = `<c:valAx><c:axId val="${VAL_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${CAT_AX_ID}"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`;
   return catAx + valAx;
 }
 
-/** 生成 chartN.xml（chartSpace → chart → plotArea → 图组 + 坐标轴） */
+/** Build chartN.xml (chartSpace → chart → plotArea → chart group + axes) */
 export function buildChartXml(spec: ChartSpec, type: ChartType, sheetName: string): string {
   const sers = spec.series.map((_, index) => seriesXml(spec, index, sheetName, type)).join('');
   let group: string;
@@ -185,7 +186,7 @@ export function buildChartXml(spec: ChartSpec, type: ChartType, sheetName: strin
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${A_NS}" xmlns:r="${R_NS}"><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/>${group}${axes}</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
 }
 
-/* -------------------------------- 锚点计算 -------------------------------- */
+/* -------------------------------- Anchor maths -------------------------------- */
 
 export interface ChartAnchorPx {
   x: number;
@@ -204,8 +205,8 @@ export interface DrawingAnchor {
 }
 
 /**
- * 像素（相对工作表区域，含行列头）→ 一单元格锚点。
- * 减去行列头尺寸后按默认列宽 / 行高换算。
+ * Pixels (relative to the sheet area, header rows/columns included) → a one-cell anchor.
+ * Subtract the header sizes first, then convert using the default column width / row height.
  */
 export function computeAnchor(anchor: ChartAnchorPx, metrics: SheetMetrics): DrawingAnchor {
   const left = Math.max(0, anchor.x - metrics.rowHeaderWidth);
@@ -222,7 +223,7 @@ export function computeAnchor(anchor: ChartAnchorPx, metrics: SheetMetrics): Dra
   };
 }
 
-/** oneCellAnchor + graphicFrame（引用 chart 部件的关系 id） */
+/** oneCellAnchor + graphicFrame (referencing the chart part's relationship id) */
 export function buildAnchorXml(
   anchor: ChartAnchorPx,
   metrics: SheetMetrics,
@@ -243,12 +244,12 @@ export function buildAnchorXml(
   );
 }
 
-/** 新建 drawing 部件（anchorsXml 可为空，后续追加） */
+/** Create a new drawing part (anchorsXml may be empty and appended later) */
 export function buildDrawingXml(anchorsXml: string): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="${XDR_NS}" xmlns:a="${A_NS}" xmlns:c="${CHART_NS}" xmlns:r="${R_NS}">${anchorsXml}</xdr:wsDr>`;
 }
 
-/** 往既有 drawing 追加锚点（导入保留的 drawing 上继续加图） */
+/** Append anchors to an existing drawing (add charts to a drawing kept from import) */
 export function appendAnchorsToDrawing(drawingXml: string, anchorsXml: string): string {
   if (!anchorsXml) return drawingXml;
   const close = drawingXml.lastIndexOf('</xdr:wsDr>');
@@ -256,9 +257,9 @@ export function appendAnchorsToDrawing(drawingXml: string, anchorsXml: string): 
   return `${drawingXml.slice(0, close)}${anchorsXml}${drawingXml.slice(close)}`;
 }
 
-/* ------------------------------ 关系与内容类型 ------------------------------ */
+/* ------------------------------ Relationships and content types ------------------------------ */
 
-/** 幂等地插入一条关系，返回最新 rels 与关系 id（rId 从已用的最大编号继续） */
+/** Idempotently insert a relationship, returning the updated rels and its id (rIds continue from the highest used) */
 export function upsertRelationship(
   xml: string | null,
   type: string,
@@ -284,9 +285,9 @@ export function upsertRelationship(
   };
 }
 
-/** 工作表根节点必须声明 r: 命名空间（exceljs 未必写全） */
+/** The worksheet root must declare the r: namespace (exceljs does not always write it) */
 export function ensureRelationshipNamespace(sheetXml: string): string {
-  // 跳过 <?xml ... ?> 声明，避免把属性加到声明上（否则直接破坏 XML）
+  // Skip the <?xml ... ?> declaration, or the attribute would land on it and break the XML
   const declarationEnd = sheetXml.startsWith('<?xml') ? sheetXml.indexOf('?>') : -1;
   const searchFrom = declarationEnd < 0 ? 0 : declarationEnd + 2;
   const rootStart = sheetXml.indexOf('<', searchFrom);
@@ -299,9 +300,9 @@ export function ensureRelationshipNamespace(sheetXml: string): string {
 }
 
 /**
- * 在 sheetN.xml 末尾插入 `<drawing/>`。
- * CT_Worksheet 里 drawing 排在 pageSetup/headerFooter 之后、tableParts/extLst 之前，
- * 因此优先插到 tableParts / extLst 前，否则插到 </worksheet> 前。
+ * Insert `<drawing/>` at the end of sheetN.xml.
+ * In CT_Worksheet, drawing comes after pageSetup/headerFooter and before tableParts/extLst, so insert
+ * before tableParts / extLst when present, otherwise before </worksheet>.
  */
 export function insertDrawingIntoSheet(sheetXml: string, relId: string): string {
   if (!sheetXml) return sheetXml;
@@ -322,7 +323,7 @@ export function contentTypeOverride(partName: string, contentType: string): stri
   return `<Override PartName="${partName}" ContentType="${contentType}"/>`;
 }
 
-/** 合并内容类型条目（按 PartName / Extension 去重后追加） */
+/** Merge content-type entries (deduplicated by PartName / Extension, then appended) */
 export function addContentTypeEntries(xml: string, entries: readonly string[]): string {
   if (entries.length === 0) return xml;
   const keyOf = (tag: string) => {
@@ -345,7 +346,7 @@ export function addContentTypeEntries(xml: string, entries: readonly string[]): 
   return close < 0 ? xml + block : `${xml.slice(0, close)}${block}${xml.slice(close)}`;
 }
 
-/* ------------------------------- 计划与注入 ------------------------------- */
+/* ------------------------------- Plan and injection ------------------------------- */
 
 export interface PlannedChart {
   chartXml: string;
@@ -353,11 +354,11 @@ export interface PlannedChart {
 }
 
 export interface XlsxChartPlan {
-  /** 工作表名 → 待注入的图表 */
+  /** Sheet name → charts to inject */
   chartsBySheet: Record<string, PlannedChart[]>;
-  /** 工作表名 → 像素换算度量 */
+  /** Sheet name → pixel conversion metrics */
   metricsBySheet: Record<string, SheetMetrics>;
-  /** 导入时保留的原生图表部件（原样回填） */
+  /** Native chart parts kept from import (written back unchanged) */
   passthrough: RawChartParts | null;
 }
 
@@ -376,7 +377,7 @@ export interface ChartPlanSource extends WorkbookSnapshotLite {
   syntoolsRawParts?: RawChartParts;
 }
 
-/** 快照 → 注入计划（哪些表要加哪些图 + 各自度量 + 需回填的原生部件） */
+/** Snapshot → injection plan (which charts go into which sheet, their metrics, and the native parts to write back) */
 export function buildChartPlan(source: ChartPlanSource): XlsxChartPlan {
   const metricsBySheet: Record<string, SheetMetrics> = {};
   for (const sheet of Object.values(source.sheets ?? {})) {
@@ -420,8 +421,9 @@ async function readText(
 }
 
 /**
- * 把图表注入到 exceljs 产出的 .xlsx。
- * 无新图表且无保留部件时由调用方直接跳过（这里也可安全处理空计划）。
+ * Inject the charts into the .xlsx produced by exceljs.
+ * Callers skip this when there are no new charts and no kept parts (an empty plan is handled safely
+ * here too).
  */
 export async function injectChartsIntoXlsx(
   buffer: ArrayBuffer,
@@ -436,7 +438,7 @@ export async function injectChartsIntoXlsx(
   let nextDrawingNumber = 1;
   const contentTypeEntries: string[] = [];
 
-  // 1) 回填导入时保留的原生图表部件（路径不变，编号避让）
+  // 1) Write back native chart parts kept from import (same paths, numbering skipped)
   if (passthrough) {
     for (const [path, base64] of Object.entries(passthrough.parts)) {
       zip.file(path, base64, { base64: true });
@@ -450,7 +452,7 @@ export async function injectChartsIntoXlsx(
     );
   }
 
-  // 2) 逐表处理（含「只在导入侧有原生图表」的表，需要补 sheet → drawing 关系）
+  // 2) Handle each sheet (including sheets that only have native charts from import, which still need a sheet → drawing link)
   const sheetNames = new Set([
     ...Object.keys(plan.chartsBySheet),
     ...Object.keys(passthrough?.sheetDrawings ?? {}),
@@ -468,7 +470,7 @@ export async function injectChartsIntoXlsx(
 
     const metrics = plan.metricsBySheet[sheetName] ?? DEFAULT_SHEET_METRICS;
 
-    // a) 分配 chart 部件
+    // a) Allocate chart parts
     const assignments = pending.map((item) => {
       const chartPath = `xl/charts/chart${nextChartNumber}.xml`;
       nextChartNumber += 1;
@@ -477,7 +479,7 @@ export async function injectChartsIntoXlsx(
       return { chartPath, anchor: item.anchor };
     });
 
-    // b) drawing 部件：沿用导入的（追加锚点），否则新建
+    // b) drawing part: reuse the imported one (appending anchors), otherwise create it
     let drawingPath = existingDrawing;
     if (!drawingPath) {
       drawingPath = `xl/drawings/drawing${nextDrawingNumber}.xml`;
@@ -487,7 +489,7 @@ export async function injectChartsIntoXlsx(
     }
     const drawingRelsPath = relsPathFor(drawingPath);
 
-    // c) 分配 chart → drawing 关系 id
+    // c) Allocate chart → drawing relationship ids
     let drawingRelsXml = await readText(zip, drawingRelsPath);
     const relIds: string[] = [];
     for (const item of assignments) {
@@ -501,7 +503,7 @@ export async function injectChartsIntoXlsx(
     }
     if (assignments.length > 0 && drawingRelsXml) zip.file(drawingRelsPath, drawingRelsXml);
 
-    // d) drawing 里追加锚点（cNvPr id 从 2 开始，避免与既有锚点冲突时也足够安全）
+    // d) Append anchors to the drawing (cNvPr ids start at 2, which also keeps them clear of existing anchors)
     if (assignments.length > 0) {
       const drawingXml = (await readText(zip, drawingPath)) ?? buildDrawingXml('');
       const anchorsXml = assignments
@@ -510,7 +512,7 @@ export async function injectChartsIntoXlsx(
       zip.file(drawingPath, appendAnchorsToDrawing(drawingXml, anchorsXml));
     }
 
-    // e) 工作表 → drawing 关系 + <drawing/>
+    // e) sheet → drawing relationship + <drawing/>
     const sheetRelsPath = relsPathFor(sheetPath);
     const sheetRelsXml = await readText(zip, sheetRelsPath);
     const drawingRel = upsertRelationship(
@@ -522,7 +524,7 @@ export async function injectChartsIntoXlsx(
     zip.file(sheetPath, insertDrawingIntoSheet(sheetXml, drawingRel.id));
   }
 
-  // 3) 合并内容类型
+  // 3) Merge content types
   const contentTypes = await readText(zip, '[Content_Types].xml');
   if (contentTypes) {
     zip.file('[Content_Types].xml', addContentTypeEntries(contentTypes, contentTypeEntries));

@@ -7,14 +7,12 @@ import { ShareButton } from '@/core/components/ShareButton';
 import { readSharedState } from '@/core/lib/share';
 import { convertZh, type ZhConvertDirection } from './core';
 
-/** 简繁体转换 */
+/** Traditional / Simplified Chinese conversion */
 export default function ZhConvertTool() {
   const { t } = useTranslation();
   const init = useMemo(() => readSharedState({ i: '', d: 's2t' }), []);
   const [input, setInput] = useState(init.i);
-  const [direction, setDirection] = useState<ZhConvertDirection>(
-    init.d === 't2s' ? 't2s' : 's2t',
-  );
+  const [direction, setDirection] = useState<ZhConvertDirection>(init.d === 't2s' ? 't2s' : 's2t');
 
   const result = useMemo(() => convertZh(input, direction), [input, direction]);
   const output = result.ok ? result.value : '';
@@ -45,7 +43,9 @@ export default function ZhConvertTool() {
 
       <div className="flex flex-col gap-4 lg:flex-row">
         <IOTextArea
-          label={direction === 's2t' ? t('tools.zhConvert.simplified') : t('tools.zhConvert.traditional')}
+          label={
+            direction === 's2t' ? t('tools.zhConvert.simplified') : t('tools.zhConvert.traditional')
+          }
           value={input}
           onChange={setInput}
           placeholder={

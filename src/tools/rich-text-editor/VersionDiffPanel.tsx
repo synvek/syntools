@@ -6,19 +6,19 @@ import { buildSideBySide, buildVersionDiff, type DiffSideRow } from './versionDi
 
 interface VersionDiffPanelProps {
   versions: StoredVersion[];
-  /** 默认选中的版本 id（从版本列表点「对比」进入时指定） */
+  /** Initially selected version id (passed when opening "Compare" from the version list) */
   initialVersionId?: string;
-  /** 当前编辑器内容（作为「与当前版本对比」的右侧基准） */
+  /** Current editor content (the right-hand side of "compare with current") */
   currentHtml: string;
   currentTitle: string;
   onRestore: (version: StoredVersion) => void;
   onClose: () => void;
 }
 
-/** 对比模式：与当前编辑内容对比 / 该快照相对其上一版的变化 */
+/** Compare mode: against the current content, or the snapshot against its previous version */
 type CompareMode = 'current' | 'previous';
 
-/** 渲染上限：超长文档只展示前 N 行，避免一次插入过多 DOM 节点 */
+/** Render cap: long docs show only the first N rows to avoid inserting too many DOM nodes at once */
 const MAX_RENDERED_ROWS = 1500;
 
 const NAME_CLASS: Record<DiffSideRow['kind'], string> = {
@@ -40,8 +40,8 @@ function lineNo(value: number | null): string {
 }
 
 /**
- * 版本差异面板：左侧版本列表（时间 / 字数 / 备注），右侧行级左右对照。
- * 差异计算走 versionDiff.ts 纯逻辑，面板只负责选择与渲染。
+ * Version diff panel: version list (time / word count / note) on the left, line-level side-by-side diff on the right.
+ * The diff comes from the pure logic in versionDiff.ts; the panel only selects and renders.
  */
 export function VersionDiffPanel({
   versions,

@@ -1,13 +1,13 @@
 /**
- * 流程图编辑器的本地持久化（IndexedDB）。
+ * Local persistence for the flowchart editor (IndexedDB).
  *
- * 为什么不用 localStorage：localStorage 约 5MB、同步阻塞，图片 dataURL 极易触发
- * `draft.ts` 的「丢弃图片」降级。IndexedDB 容量大、异步、结构化存储，
- * 可同时承载「完整草稿（含图片）」「命名快照」「会话设置」三类数据。
+ * Why not localStorage: it holds about 5MB, is synchronous and blocks, and image dataURLs would very easily trigger
+ * the "drop images" downgrade in `draft.ts`. IndexedDB has a large quota, is asynchronous and stores structured data,
+ * so it can hold all three kinds of data: the full draft (images included), named snapshots and session settings.
  *
- * 降级策略：IndexedDB 不可用（隐私模式 / 测试环境 / 旧浏览器）时所有 API 静默降级——
- * 读取返回空值、写入返回 false / no-op，绝不对编辑流程抛出异常；
- * 草稿仍由 `draft.ts` 的 localStorage 实现兜底。
+ * Fallback strategy: when IndexedDB is unavailable (private mode / test environment / old browsers) every API degrades silently—
+ * reads return empty values and writes return false / no-op, never throwing into the editing flow;
+ * the draft still falls back to the localStorage implementation in `draft.ts`.
  */
 
 import { activePageOf, migrateDoc } from '../model/migrate';
@@ -15,7 +15,7 @@ import type { LayoutDensity, LayoutDirection } from '../layout';
 import type { ThemeId } from '../model/themes';
 import type { CanvasGuide, FlowDoc, GridStyle, WheelMode } from '../model/types';
 
-/** 与 store.SnapshotRec 结构一致；此处独立声明以避免 store ↔ persist 的循环依赖 */
+/** Same shape as store.SnapshotRec; declared here separately to avoid a store ↔ persist circular dependency */
 export interface PersistedSnapshot {
   id: string;
   name: string;
@@ -23,10 +23,10 @@ export interface PersistedSnapshot {
   savedAt: number;
 }
 
-/** 侧栏面板 key（与 FlowchartTool 的 PanelKey 一致） */
+/** Side panel key (matching PanelKey in FlowchartTool) */
 export type PersistedPanelKey = 'prop' | 'arrange' | 'layer' | 'history' | 'search';
 
-/** 会话设置：网格 / 布局 / 对齐阈值 / 主题 / 侧栏面板 / 画布观感 */
+/** Session settings: grid / layout / alignment threshold / theme / side panel / canvas appearance */
 export interface PersistedSession {
   gridEnabled: boolean;
   gridSize: number;
@@ -35,15 +35,15 @@ export interface PersistedSession {
   alignTolerance: number;
   theme?: ThemeId;
   panel?: PersistedPanelKey;
-  /** 鼠标滚轮行为：平移（默认）/ 缩放 */
+  /** Mouse wheel behavior: pan (default) / zoom */
   wheelMode?: WheelMode;
-  /** 画布背景色（`transparent` 表示透明） */
+  /** Canvas background color (`transparent` means transparent) */
   canvasBackground?: string;
-  /** 网格样式 */
+  /** Grid style */
   gridStyle?: GridStyle;
-  /** 持久参考线（可手动拉出） */
+  /** Persistent guides (can be pulled out manually) */
   guides?: CanvasGuide[];
-  /** 是否显示标尺 */
+  /** Whether to show the rulers */
   rulersVisible?: boolean;
 }
 
@@ -69,7 +69,7 @@ function openDb(): Promise<IDBDatabase> {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
-        // 只补建缺失的 store，升级事务内不做批量重写，避免损坏既有数据
+        // Only missing stores are created; no bulk rewrite inside the upgrade transaction, avoiding damage to existing data
         if (!db.objectStoreNames.contains(DRAFT_STORE)) db.createObjectStore(DRAFT_STORE);
         if (!db.objectStoreNames.contains(SNAPSHOT_STORE)) db.createObjectStore(SNAPSHOT_STORE);
         if (!db.objectStoreNames.contains(SESSION_STORE)) db.createObjectStore(SESSION_STORE);
@@ -124,20 +124,20 @@ async function deleteKey(storeName: string, key: string): Promise<void> {
     const db = await openDb();
     await requestAs(db.transaction(storeName, 'readwrite').objectStore(storeName).delete(key));
   } catch {
-    // IndexedDB 不可用：忽略
+    // IndexedDB unavailable: ignore
   }
 }
 
-/* ------------------------------ 草稿 ------------------------------ */
+/* ------------------------------ Draft ------------------------------ */
 
-/** 读取完整草稿（含图片）；无草稿或不可用时返回 null */
+/** Read the full draft (images included); returns null when there is none or it is unavailable */
 export async function loadPersistedDoc(): Promise<FlowDoc | null> {
   const raw = await readKey<{ doc?: unknown }>(DRAFT_STORE, DRAFT_KEY);
   if (!raw || typeof raw !== 'object') return null;
   return migrateDoc(raw.doc);
 }
 
-/** 写入完整草稿（不丢弃图片）；返回是否成功落盘。空文档视为「清除草稿」 */
+/** Write the full draft (images kept); returns whether it was persisted. An empty document counts as "clear the draft" */
 export async function savePersistedDoc(doc: FlowDoc): Promise<boolean> {
   const page = activePageOf(doc);
   if (!page || page.nodes.length === 0) {
@@ -151,9 +151,9 @@ export async function clearPersistedDoc(): Promise<void> {
   await deleteKey(DRAFT_STORE, DRAFT_KEY);
 }
 
-/* ------------------------------ 快照 ------------------------------ */
+/* ------------------------------ Snapshots ------------------------------ */
 
-/** 读取命名快照列表（含图片，已归一化为 v2）；无记录或不可用时返回空数组 */
+/** Read the named snapshot list (images included, normalized to v2); returns an empty array when there are no records or it is unavailable */
 export async function loadPersistedSnapshots(): Promise<PersistedSnapshot[]> {
   const raw = await readKey<unknown>(SNAPSHOT_STORE, SNAPSHOT_KEY);
   if (!Array.isArray(raw)) return [];
@@ -178,7 +178,7 @@ export async function savePersistedSnapshots(list: PersistedSnapshot[]): Promise
   return writeKey(SNAPSHOT_STORE, SNAPSHOT_KEY, list);
 }
 
-/* ------------------------------ 会话设置 ------------------------------ */
+/* ------------------------------ Session settings ------------------------------ */
 
 export async function loadPersistedSession(): Promise<Partial<PersistedSession> | null> {
   const raw = await readKey<unknown>(SESSION_STORE, SESSION_KEY);
@@ -186,13 +186,13 @@ export async function loadPersistedSession(): Promise<Partial<PersistedSession> 
   return raw as Partial<PersistedSession>;
 }
 
-/** 合并写入会话设置（只覆盖传入字段，避免不同调用点互相清空） */
+/** Merge-write session settings (only the given fields are overwritten, so different call sites do not clear each other) */
 export async function savePersistedSession(patch: Partial<PersistedSession>): Promise<boolean> {
   const current = (await loadPersistedSession()) ?? {};
   return writeKey(SESSION_STORE, SESSION_KEY, { ...current, ...patch });
 }
 
-/** 仅测试用：重置缓存的数据库连接，便于隔离用例 */
+/** For tests only: reset the cached database connection to isolate cases */
 export function __resetPersistDb(): void {
   dbPromise = null;
 }

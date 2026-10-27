@@ -9,11 +9,11 @@ import {
 } from '@/core/i18n/routing';
 
 /**
- * 这组规则决定了「语言写在哪条 URL 上」，任何一条算错都会导致：
- * - 中文页面被 canonical 到英文树（重复内容）；
- * - 站内链接把用户甩回另一种语言；
- * - 预渲染落盘目录与运行时前缀不一致（404）。
- * 所以逐条钉死。
+ * These rules decide which URL carries the language; a single mistake causes:
+ * - Chinese pages canonicalized into the English tree (duplicate content);
+ * - internal links dropping users into the other language;
+ * - prerendered output directories disagreeing with runtime prefixes (404s).
+ * So every case is pinned here.
  */
 describe('routedLangFromPath', () => {
   it('无前缀路径属于默认语言', () => {
@@ -33,7 +33,7 @@ describe('routedLangFromPath', () => {
   it('不把 zh-TW 之类当成中文树', () => {
     expect(routedLangFromPath('/zh-TW/pricing/')).toBe('en');
     expect(routedLangFromPath('/zh-CN')).toBe('en');
-    // 前缀必须是完整的一段：/zhtools 不是语言
+    // The prefix must be a whole segment: /zhtools is not a language
     expect(routedLangFromPath('/zhtools/')).toBe('en');
   });
 

@@ -28,8 +28,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /**
- * 节点「外观」分组：透明度 / 文字色 / 线型 / 字体 / 阴影 / 圆角 / 折角。
- * 多选批量编辑时 `style` 中缺省的字段表示「取值不一致」，UI 回退到 fallback 并提示混合态。
+ * Node "Appearance" group: opacity / text color / line style / font / shadow / corner radius / fold.
+ * In multi-select batch editing a missing `style` field means "values differ"; the UI falls back to the fallback value and flags the mixed state.
  */
 export function NodeAppearanceSection({
   style,
@@ -41,7 +41,7 @@ export function NodeAppearanceSection({
   style: FlowNodeStyleView;
   patch: (p: FlowNodePatch) => void;
   onEnd: () => void;
-  /** 混合态下用于回显的基准样式（通常取首个选中节点） */
+  /** Base style used for display in a mixed state (usually the first selected node) */
   fallback: FlowNodeStyleView;
   mixed?: boolean;
 }) {

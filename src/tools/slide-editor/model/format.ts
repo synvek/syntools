@@ -11,24 +11,24 @@ import type {
 } from './types';
 
 /**
- * 工具栏「格式」行的纯逻辑。
+ * Pure logic behind the toolbar's "format" row.
  *
- * 设计约定（三条，缺一不可）：
+ * Three design rules (all required):
  *
- * 1. **补丁而不是新元素**：每个 `*Patch` 返回*仅含样式字段*的补丁，直接喂给 store 的
- *    `patchSelectedWith`。多选时逐元素按**各自当前值**计算，不会把首个元素的 body
- *    整体覆盖到其它元素上（否则多选改字体就会抹掉别的元素里的文字）。
- * 2. **`null` 表示不具备该能力**：调用方据此禁用按钮或跳过元素，而不是静默写入无效字段。
- * 3. **读取函数无副作用**：`*Of` / `supports*` 只读，供 UI 决定当前值与禁用态；
- *    形状没有文字 body 时，写入路径才按需补一个空 body（等价于竞品里「在形状里直接打字」）。
+ * 1. **Patches, not new elements**: every `*Patch` returns a patch with *style fields only*, fed straight into
+ *    the store's `patchSelectedWith`. With a multi-select each element is computed from its **own
+ *    current value**, otherwise changing the font would wipe the text in the other elements.
+ * 2. **`null` means "not supported"**: callers disable the button or skip the element, never write bogus fields.
+ * 3. **Readers are side-effect free**: `*Of` / `supports*` only read, so the UI can derive current values
+ *    and disabled states; only writes add an empty body on demand when a shape has none (typing into a shape).
  */
 
-/** 字号阶梯（pt）：与 PowerPoint 功能区「增大/减小字号」的步进一致 */
+/** Font size ladder (pt): matches the step of PowerPoint's ribbon "increase/decrease font size" */
 export const FONT_SIZE_STEP = 2;
 export const FONT_SIZE_MIN = 6;
 export const FONT_SIZE_MAX = 200;
 
-/** 开启阴影时使用的克制默认值（右下轻投影） */
+/** Restrained defaults used when enabling a shadow (a light drop shadow to the bottom right) */
 export const DEFAULT_SHADOW: ShadowStyle = {
   color: '#000000',
   blur: 8,
@@ -37,35 +37,35 @@ export const DEFAULT_SHADOW: ShadowStyle = {
   opacity: 0.35,
 };
 
-/** 默认字号（与 `createTextBody` 保持一致） */
+/** Default font size (kept in sync with `createTextBody`) */
 const DEFAULT_FONT_SIZE = 18;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/* ------------------------------ 能力判定 ------------------------------ */
+/* ------------------------------ Capability checks ------------------------------ */
 
-/** 可承载文字：文本框与形状（形状无 body 时按需补） */
+/** Text-capable: text boxes and shapes (a shape gets a body on demand) */
 type TextCapable = Extract<SlideElement, { type: 'text' | 'shape' }>;
 type FillCapable = Extract<SlideElement, { type: 'text' | 'shape' }>;
 type StrokeCapable = Extract<SlideElement, { type: 'text' | 'shape' | 'image' | 'line' }>;
 type CornerCapable = Extract<SlideElement, { type: 'text' | 'image' }>;
 
 /**
- * 这些判定同时是**类型守卫**：调用处 `if (!supportsX(element)) return null` 之后
- * TypeScript 就能把联合类型收窄到具体元素，读写 `fill` / `stroke` / `body` 才不用反复断言。
+ * These checks double as **type guards**: after `if (!supportsX(element)) return null` TypeScript
+ * narrows the union to the concrete element, so reading/writing `fill` / `stroke` / `body` needs no casts.
  */
 export function supportsText(element: SlideElement): element is TextCapable {
   return element.type === 'text' || element.type === 'shape';
 }
 
-/** 可设置填充：文本框与形状（图片/线条/表格/图表没有填充语义） */
+/** Fill-capable: text boxes and shapes (images/lines/tables/charts have no fill semantics) */
 export function supportsFill(element: SlideElement): element is FillCapable {
   return element.type === 'text' || element.type === 'shape';
 }
 
-/** 可设置轮廓：文本框/形状/图片有描边，线条就是描边本身 */
+/** Stroke-capable: text boxes/shapes/images have an outline, a line is the outline itself */
 export function supportsStroke(element: SlideElement): element is StrokeCapable {
   return (
     element.type === 'text' ||
@@ -75,31 +75,31 @@ export function supportsStroke(element: SlideElement): element is StrokeCapable 
   );
 }
 
-/** 可设置圆角：只有文本框与图片建模了 cornerRadius */
+/** Corner radius-capable: only text boxes and images model cornerRadius */
 export function supportsCorner(element: SlideElement): element is CornerCapable {
   return element.type === 'text' || element.type === 'image';
 }
 
-/** 可设置阴影：线条与表格没有意义，占位框是降级展示也不需要 */
+/** Shadow-capable: meaningless for lines and tables, and placeholder boxes are degraded display */
 export function supportsShadow(element: SlideElement): boolean {
   return element.type !== 'line' && element.type !== 'table' && element.type !== 'placeholder';
 }
 
-/* ------------------------------ 读取 ------------------------------ */
+/* ------------------------------ Reading ------------------------------ */
 
-/** 取文字 body（不补全） */
+/** Text body (without filling it in) */
 export function textBodyOf(element: SlideElement): TextBody | undefined {
   if (element.type === 'text') return element.body;
   if (element.type === 'shape') return element.body;
   return undefined;
 }
 
-/** 首个 run 的样式 */
+/** Style of the first run */
 export function runStyleOf(element: SlideElement): RunStyle | undefined {
   return textBodyOf(element)?.paragraphs[0]?.runs[0]?.style;
 }
 
-/** 首段（段落级属性：对齐/行距/项目符号） */
+/** First paragraph (paragraph-level props: align/line spacing/bullets) */
 export function paragraphOf(element: SlideElement): Paragraph | undefined {
   return textBodyOf(element)?.paragraphs[0];
 }
@@ -116,7 +116,7 @@ export function lineSpacingOf(element: SlideElement): number {
   return Number((paragraphOf(element)?.lineSpacing ?? 1.2).toFixed(2));
 }
 
-/** 列表形态：项目符号 / 编号 / 无（两者互斥，见 Paragraph 注释） */
+/** List kind: bullet / numbered / none (mutually exclusive, see the Paragraph comment) */
 export function listKindOf(element: SlideElement): 'none' | 'bullet' | 'numbering' {
   const paragraph = paragraphOf(element);
   if (paragraph?.bullet) return 'bullet';
@@ -129,7 +129,7 @@ export function fillColorOf(element: SlideElement): string | undefined {
   return element.fill?.type === 'solid' ? element.fill.color : undefined;
 }
 
-/** 是否显式设置了非 none 的填充（用于「无填充」的高亮态） */
+/** Whether a non-none fill is explicitly set (drives the "no fill" highlighted state) */
 export function hasFillOf(element: SlideElement): boolean {
   if (!supportsFill(element)) return false;
   return Boolean(element.fill && element.fill.type !== 'none');
@@ -159,9 +159,9 @@ export function cornerRadiusOf(element: SlideElement): number {
   return 0;
 }
 
-/* ------------------------------ 写入 ------------------------------ */
+/* ------------------------------ Writing ------------------------------ */
 
-/** 取（必要时补全）文字 body */
+/** Text body, created on demand */
 function ensureBody(element: SlideElement): TextBody | undefined {
   const body = textBodyOf(element);
   if (body) return body;
@@ -169,7 +169,7 @@ function ensureBody(element: SlideElement): TextBody | undefined {
   return undefined;
 }
 
-/** 逐段改写 body */
+/** Rewrite the body paragraph by paragraph */
 function bodyPatch(
   element: SlideElement,
   updater: (body: TextBody) => TextBody,
@@ -179,7 +179,7 @@ function bodyPatch(
   return { body: updater(body) } as Partial<SlideElement>;
 }
 
-/** run 级样式：写到整框的每个 run（与属性面板一致，避免只改第一个 run 造成的半截生效） */
+/** Run-level style: written to every run in the box (matching the property panel, so nothing is half-applied) */
 export function runStylePatch(
   element: SlideElement,
   style: Partial<RunStyle>,
@@ -196,7 +196,7 @@ export function runStylePatch(
   }));
 }
 
-/** 字号阶梯：基于各自当前字号增减，多选时不会把不同字号拉平 */
+/** Font size ladder: step from each element's own size, so a multi-select doesn't flatten different sizes */
 export function fontSizeStepPatch(
   element: SlideElement,
   delta: number,
@@ -211,7 +211,7 @@ export function alignPatch(element: SlideElement, align: TextAlign): Partial<Sli
   return bodyPatch(element, (body) => setBodyAlign(body, align));
 }
 
-/** 段落级属性（行距/缩进/段前后） */
+/** Paragraph-level props (line spacing/indent/space before and after) */
 export function paragraphPatch(
   element: SlideElement,
   patch: Partial<Pick<Paragraph, 'lineSpacing' | 'indent' | 'spaceBefore' | 'spaceAfter'>>,
@@ -222,7 +222,7 @@ export function paragraphPatch(
   }));
 }
 
-/** 项目符号 / 编号 / 无：三者互斥，一次只留一个 */
+/** Bullet / numbered / none: mutually exclusive, only one survives */
 export function listPatch(
   element: SlideElement,
   kind: 'none' | 'bullet' | 'numbering',
@@ -237,7 +237,7 @@ export function listPatch(
   }));
 }
 
-/** 填充：纯色或「无填充」 */
+/** Fill: solid color or "no fill" */
 export function fillPatch(
   element: SlideElement,
   fill: Fill | 'none',
@@ -246,7 +246,7 @@ export function fillPatch(
   return { fill: fill === 'none' ? { type: 'none' } : fill } as Partial<SlideElement>;
 }
 
-/** 描边颜色：原本没有描边时给一条默认线宽，避免「选了颜色却看不见」 */
+/** Stroke color: use a default width when there was no stroke, so a picked color isn't invisible */
 export function strokeColorPatch(
   element: SlideElement,
   color: string,
@@ -261,7 +261,7 @@ export function strokeWidthPatch(
   width: number,
 ): Partial<SlideElement> | null {
   if (!supportsStroke(element)) return null;
-  // 线宽归零等价于去掉描边，不留下「0 宽但有色」的隐式状态
+  // A zero width is equivalent to removing the stroke; avoid leaving an implicit "0 wide but colored" state
   if (width <= 0) return { stroke: undefined } as Partial<SlideElement>;
   const current = element.stroke ?? createStroke();
   return { stroke: { ...current, width } } as Partial<SlideElement>;
@@ -276,14 +276,14 @@ export function cornerRadiusPatch(
 }
 
 /**
- * 不透明度（0~1）。所有元素都支持，因此不需要元素参数 ——
- * 保留统一签名反而会引入未使用参数。
+ * Opacity (0~1). Every element supports it, so no element argument is needed —
+ * keeping a uniform signature would only introduce an unused parameter.
  */
 export function opacityPatch(opacity: number): Partial<SlideElement> {
   return { opacity: clamp(opacity, 0, 1) } as Partial<SlideElement>;
 }
 
-/** 阴影开关：开启用默认参数（已有参数则保留），关闭直接移除字段 */
+/** Shadow toggle: enabling uses the defaults (existing values are kept), disabling removes the field */
 export function shadowPatch(element: SlideElement, enabled: boolean): Partial<SlideElement> | null {
   if (!supportsShadow(element)) return null;
   return {

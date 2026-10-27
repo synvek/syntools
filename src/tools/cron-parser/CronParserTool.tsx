@@ -8,10 +8,10 @@ import { analyzeCron, MAX_COUNT, MIN_COUNT, type CronFieldKey } from './core';
 
 const clampCount = (n: number) => Math.min(Math.max(Math.floor(n) || 5, MIN_COUNT), MAX_COUNT);
 
-/** Cron 表达式解析（Tasks T34）：文案全部走 i18n（T29 约定） */
+/** Cron expression parsing (Tasks T34): all copy goes through i18n (T29 convention) */
 export default function CronParserTool() {
   const { t } = useTranslation();
-  // 从分享链接 ?s= 还原初始状态（T28）
+  // Restore the initial state from the ?s= share link (T28)
   const init = useMemo(() => readSharedState({ e: '', c: 5 }), []);
   const [expression, setExpression] = useState(init.e);
   const [count, setCount] = useState(clampCount(init.c));
@@ -19,7 +19,7 @@ export default function CronParserTool() {
   const result = useMemo(() => analyzeCron(expression, count), [expression, count]);
   const analysis = result.ok ? result.value : null;
 
-  /** 单值本地化：星期 → 星期名，月份 → 月份名，其余原样 */
+  /** Localize a single value: weekdays to weekday names, months to month names, everything else as-is */
   const valueName = (key: CronFieldKey, v: string): string => {
     if (key === 'week' && /^\d$/.test(v)) return t(`tools.cron.desc.days.${Number(v) % 7}`);
     if (key === 'month' && /^\d{1,2}$/.test(v)) {
@@ -29,7 +29,7 @@ export default function CronParserTool() {
     return v;
   };
 
-  /** 字段描述：* / *\/n / a-b / a-b/n / 列表，逗号分隔拼接 */
+  /** Field description: * / *\/n / a-b / a-b/n / lists, joined with commas */
   const describeField = (key: CronFieldKey, raw: string): string => {
     if (raw === '*') return t(`tools.cron.desc.every.${key}`);
     const noun = t(`tools.cron.desc.nouns.${key}`);

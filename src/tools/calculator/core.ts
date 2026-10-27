@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * 安全表达式计算器：仅支持数字与 + - * / % ^ () 及常用函数，不使用 eval。
+ * Safe expression evaluator: supports only numbers, + - * / % ^ (), and common functions; never uses eval.
  */
 
 export type CalcError = 'EMPTY' | 'SYNTAX' | 'DIV_ZERO';
@@ -88,7 +88,7 @@ class Parser {
     this.skip();
     if (this.peek() === '^') {
       this.i += 1;
-      const exp = this.power(); // 右结合
+      const exp = this.power(); // right-associative
       v = v ** exp;
     }
     return v;

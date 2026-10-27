@@ -1,10 +1,11 @@
 /**
- * 电子表格编辑器 UI 文案：随工具 chunk 懒加载注入 i18next。
+ * Spreadsheet editor UI copy, lazily injected into i18next along with the tool chunk.
  *
- * 与富文本编辑器同理：zh / en 是首屏同步语言包，单工具的界面文案若写入
- * `core/i18n/locales/*` 会直接推高首屏入口体积（预算 180KB，实测已接近上限）。
- * 因此放在这里，工具懒加载时由 `registerSpreadsheetStrings` 合并进 i18next，
- * 键路径保持 `tools.sheet.*`，并保留 10 种语言。
+ * Same reasoning as the rich text editor: zh / en are the synchronously loaded first-screen locales,
+ * and putting a single tool's UI copy into `core/i18n/locales/*` would push the entry bundle straight
+ * up (budget 180KB, already close in measurements). So it lives here and
+ * `registerSpreadsheetStrings` merges it into i18next when the tool is lazy-loaded, keeping the keys
+ * under `tools.sheet.*` and preserving all 10 languages.
  */
 
 type StringTree = { [key: string]: string | StringTree };
@@ -405,7 +406,7 @@ const pt: ResourceTree = {
   },
 };
 
-/** 语言代码 → 资源树，键与 i18next 的 Lang 保持一致 */
+/** Language code → resource tree; keys mirror i18next's Lang */
 export const spreadsheetStrings: Record<string, ResourceTree> = {
   zh,
   en,
@@ -418,7 +419,7 @@ export const spreadsheetStrings: Record<string, ResourceTree> = {
   pt,
 };
 
-/** 把本工具文案合并进 i18next（工具懒加载时调用，键路径 tools.sheet.*） */
+/** Merge this tool's copy into i18next (called when the tool is lazy-loaded; keys under tools.sheet.*) */
 export function registerSpreadsheetStrings(instance: {
   addResourceBundle: (
     lng: string,

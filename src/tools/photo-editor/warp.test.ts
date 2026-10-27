@@ -12,10 +12,10 @@ import { migrateDoc } from './model/migrate';
 import type { Layer, TextLayer, TextWarpKind } from './model/types';
 
 /**
- * 变形位移场与文字排版的纯逻辑测试。
+ * Pure-logic tests for the warp displacement field and text layout.
  *
- * `render/text.ts` 的排版只依赖 `ctx.measureText`，因此用一个「等宽字符」的假上下文就能测，
- * 不需要真实 Canvas（jsdom 没有 2D 上下文）。
+ * Layout in `render/text.ts` relies only on `ctx.measureText`, so a fake context with monospace characters is
+ * enough — no real Canvas needed (jsdom has no 2D context).
  */
 const stubCtx = (charWidth = 10) =>
   ({
@@ -58,14 +58,14 @@ const textLayer = (over: Partial<TextLayer> = {}): TextLayer =>
     ...over,
   }) as TextLayer;
 
-describe('变形常量与钳制', () => {
-  it('样式全集含 none 与 10 种变形，首项为 none', () => {
+describe('Warp constants and clamping', () => {
+  it('the style set holds none plus 10 warps, with none first', () => {
     expect(TEXT_WARP_KINDS[0]).toBe('none');
     expect(TEXT_WARP_KINDS).toHaveLength(11);
     expect(new Set(TEXT_WARP_KINDS).size).toBe(11);
   });
 
-  it('强度钳制到 ±100 并取整', () => {
+  it('strength clamps to ±100 and is rounded', () => {
     expect(MAX_WARP_AMOUNT).toBe(100);
     expect(clampWarpAmount(120)).toBe(100);
     expect(clampWarpAmount(-120)).toBe(-100);
@@ -73,20 +73,20 @@ describe('变形常量与钳制', () => {
     expect(clampWarpAmount(Number.NaN)).toBe(0);
   });
 
-  it('字体表非空且 id 与 label 一致（专有名词不翻译）', () => {
+  it('the font table is non-empty and id matches label (proper nouns stay untranslated)', () => {
     expect(FONT_FAMILIES.length).toBeGreaterThan(0);
     for (const font of FONT_FAMILIES) expect(font.id).toBe(font.label);
   });
 });
 
-describe('warpOffset：位移场', () => {
+describe('warpOffset: the displacement field', () => {
   const kinds = TEXT_WARP_KINDS.filter((kind) => kind !== 'none');
 
-  it('none 恒为零位移', () => {
+  it('none always gives zero displacement', () => {
     expect(warpOffset('none', 0.3, 0.7, 100, 100)).toEqual({ dx: 0, dy: 0 });
   });
 
-  it('强度为 0 时任何样式都不产生位移', () => {
+  it('at strength 0 no style displaces anything', () => {
     for (const kind of kinds) {
       const offset = warpOffset(kind, 0.42, 0.31, 0, 0);
       expect(Math.abs(offset.dx)).toBeLessThan(1e-9);
@@ -94,36 +94,36 @@ describe('warpOffset：位移场', () => {
     }
   });
 
-  it('除 fisheye 外只产生纵向位移（dx 恒为 0）', () => {
+  it('every style but fisheye displaces vertically only (dx is always 0)', () => {
     for (const kind of kinds.filter((item) => item !== 'fisheye')) {
       expect(warpOffset(kind, 0.3, 0.4, 80, 80).dx).toBe(0);
     }
   });
 
-  it('arc：两端不动、中间最大，且弯曲为正时向上（dy < 0）', () => {
+  it('arc: ends fixed, middle maximal, and a positive bend goes up (dy < 0)', () => {
     expect(warpOffset('arc', 0, 0.5, 100, 0).dy).toBeCloseTo(0, 6);
     expect(warpOffset('arc', 1, 0.5, 100, 0).dy).toBeCloseTo(0, 6);
     const mid = warpOffset('arc', 0.5, 0.5, 100, 0).dy;
     expect(mid).toBeLessThan(0);
     expect(mid).toBeCloseTo(-0.25, 6);
-    // 反向强度只是取反
+    // The inverse strength is just the negation
     expect(warpOffset('arc', 0.5, 0.5, -100, 0).dy).toBeCloseTo(0.25, 6);
   });
 
-  it('arcLower / arcUpper：分别只弯下半 / 上半', () => {
+  it('arcLower / arcUpper: bend only the lower / upper half', () => {
     expect(warpOffset('arcLower', 0.5, 0, 100, 0).dy).toBeCloseTo(0, 6);
     expect(warpOffset('arcLower', 0.5, 1, 100, 0).dy).toBeLessThan(0);
     expect(warpOffset('arcUpper', 0.5, 1, 100, 0).dy).toBeCloseTo(0, 6);
     expect(warpOffset('arcUpper', 0.5, 0, 100, 0).dy).toBeLessThan(0);
   });
 
-  it('arch：中间最鼓（上下边缘衰减为 0）', () => {
+  it('arch: bulges in the middle (zero at the top and bottom edges)', () => {
     expect(warpOffset('arch', 0.5, 0, 100, 0).dy).toBeCloseTo(0, 6);
     expect(warpOffset('arch', 0.5, 1, 100, 0).dy).toBeCloseTo(0, 6);
     expect(warpOffset('arch', 0.5, 0.5, 100, 0).dy).toBeLessThan(0);
   });
 
-  it('shellLower 在下边缘更强，shellUpper 在上边缘更强', () => {
+  it('shellLower is stronger at the bottom edge, shellUpper at the top', () => {
     const lowerBottom = warpOffset('shellLower', 0.5, 1, 100, 0).dy;
     const lowerTop = warpOffset('shellLower', 0.5, 0, 100, 0).dy;
     expect(Math.abs(lowerBottom)).toBeGreaterThan(Math.abs(lowerTop));
@@ -132,7 +132,7 @@ describe('warpOffset：位移场', () => {
     expect(Math.abs(upperTop)).toBeGreaterThan(Math.abs(upperBottom));
   });
 
-  it('wave：S 形（u=0.25 与 0.75 符号相反，中点归零）', () => {
+  it('wave: S-shaped (u=0.25 and 0.75 have opposite signs, the midpoint is zero)', () => {
     const a = warpOffset('wave', 0.25, 0.5, 100, 0).dy;
     const b = warpOffset('wave', 0.75, 0.5, 100, 0).dy;
     expect(a).toBeCloseTo(0.25, 6);
@@ -140,13 +140,13 @@ describe('warpOffset：位移场', () => {
     expect(warpOffset('wave', 0.5, 0.5, 100, 0).dy).toBeCloseTo(0, 6);
   });
 
-  it('flag：同为波浪，但振幅随高度递增', () => {
+  it('flag: also a wave, but the amplitude grows with height', () => {
     const top = Math.abs(warpOffset('flag', 0.25, 0, 100, 0).dy);
     const bottom = Math.abs(warpOffset('flag', 0.25, 1, 100, 0).dy);
     expect(bottom).toBeGreaterThan(top);
   });
 
-  it('rise：位移与横向位置成正比，且与纵向无关', () => {
+  it('rise: displacement is proportional to the horizontal position and independent of the vertical', () => {
     expect(warpOffset('rise', 0.5, 0, 100, 0).dy).toBeCloseTo(
       warpOffset('rise', 0.5, 1, 100, 0).dy,
       9,
@@ -155,35 +155,35 @@ describe('warpOffset：位移场', () => {
     expect(warpOffset('rise', 0, 0.5, 100, 0).dy).toBeCloseTo(0, 6);
   });
 
-  it('fisheye：中心零位移，且同时产生横向与纵向位移', () => {
+  it('fisheye: zero at the center and displaces both horizontally and vertically', () => {
     const center = warpOffset('fisheye', 0.5, 0.5, 100, 100);
     expect(center.dx).toBeCloseTo(0, 6);
     expect(center.dy).toBeCloseTo(0, 6);
-    // 左缘中线：横向被推向外侧
+    // Left edge, mid-height: pushed outward horizontally
     const left = warpOffset('fisheye', 0, 0.5, 0, 100);
     expect(left.dx).toBeLessThan(0);
-    // 顶缘中线：纵向鼓起
+    // Top edge, mid-width: bulges vertically
     const top = warpOffset('fisheye', 0.5, 0, 100, 0);
     expect(top.dy).toBeLessThan(0);
   });
 });
 
-describe('needsTextBitmap：是否需要走位图路径', () => {
-  it('无形变且无段间距 → 走原生文字（清晰、可缩放）', () => {
+describe('needsTextBitmap: whether the bitmap path is required', () => {
+  it('no warp and no paragraph spacing → native text (crisp, scalable)', () => {
     expect(needsTextBitmap(textLayer())).toBe(false);
   });
 
-  it('有段间距 → 必须走位图（Konva.Text 无法表达段间距）', () => {
+  it('paragraph spacing → bitmap path (Konva.Text cannot express it)', () => {
     expect(needsTextBitmap(textLayer({ paragraphSpacing: 12 }))).toBe(true);
   });
 
-  it('选择了变形样式但强度为 0 → 仍走原生文字', () => {
+  it('a warp style chosen at strength 0 still uses native text', () => {
     expect(needsTextBitmap(textLayer({ warp: { kind: 'arc', bend: 0, horizontal: 0 } }))).toBe(
       false,
     );
   });
 
-  it('变形强度非零 → 走位图', () => {
+  it('a non-zero warp strength uses the bitmap path', () => {
     expect(needsTextBitmap(textLayer({ warp: { kind: 'arc', bend: 40, horizontal: 0 } }))).toBe(
       true,
     );
@@ -193,8 +193,8 @@ describe('needsTextBitmap：是否需要走位图路径', () => {
   });
 });
 
-describe('render/text：排版（假上下文）', () => {
-  it('applyTextStyle 设置字体、颜色、对齐与字距', () => {
+describe('render/text: layout (fake context)', () => {
+  it('applyTextStyle sets font, color, alignment and letter spacing', () => {
     const ctx = stubCtx();
     applyTextStyle(
       ctx,
@@ -206,21 +206,21 @@ describe('render/text：排版（假上下文）', () => {
     expect((ctx as unknown as { letterSpacing?: string }).letterSpacing).toBe('3px');
   });
 
-  it('字距为 0 时显式写回 0px（避免沿用上一次的字距）', () => {
+  it('letter spacing 0 is written back as 0px (never inherits the previous value)', () => {
     const ctx = stubCtx();
     (ctx as unknown as { letterSpacing?: string }).letterSpacing = '5px';
     applyTextStyle(ctx, textLayer({ letterSpacing: 0 }));
     expect((ctx as unknown as { letterSpacing?: string }).letterSpacing).toBe('0px');
   });
 
-  it('wrapText 按可用宽度换行（拉丁按词，CJK 逐字）', () => {
+  it('wrapText wraps to the available width (Latin by word, CJK per character)', () => {
     const ctx = stubCtx(10);
     expect(wrapText(ctx, 'aa bb cc', 50)).toEqual(['aa bb', 'cc']);
-    // 中文逐字断行：每字 10px，宽 30 → 每行 3 字
+    // CJK wraps per character: 10 px each, width 30 → 3 characters per line
     expect(wrapText(ctx, '中文换行测试', 30)).toEqual(['中文换', '行测试']);
   });
 
-  it('layoutText 逐行累加行高，段间距只加在段与段之间', () => {
+  it('layoutText accumulates line heights and adds paragraph spacing only between paragraphs', () => {
     const layer = textLayer({ text: 'a\nb', fontSize: 10, lineHeight: 1.5, paragraphSpacing: 20 });
     const lines = layoutText(stubCtx(10), layer);
     expect(lines).toEqual([
@@ -229,7 +229,7 @@ describe('render/text：排版（假上下文）', () => {
     ]);
   });
 
-  it('textBlockHeight 含段间距，空文本按一行计', () => {
+  it('textBlockHeight includes paragraph spacing; empty text counts as one line', () => {
     expect(
       textBlockHeight(
         stubCtx(),
@@ -242,7 +242,7 @@ describe('render/text：排版（假上下文）', () => {
   });
 });
 
-describe('migrateDoc：文字新字段归一', () => {
+describe('migrateDoc: normalizing new text fields', () => {
   const rawTextLayer = (extra: Record<string, unknown>) => ({
     id: 'doc-1',
     name: 'n',
@@ -286,7 +286,7 @@ describe('migrateDoc：文字新字段归一', () => {
     return doc.layers[0];
   };
 
-  it('旧工程缺字段时补默认值（字距 0 / 段间距 0 / 不变形）', () => {
+  it('old projects get defaults (letter spacing 0 / paragraph spacing 0 / no warp)', () => {
     const layer = firstLayer({});
     expect(layer.kind).toBe('text');
     if (layer.kind !== 'text') return;
@@ -295,7 +295,7 @@ describe('migrateDoc：文字新字段归一', () => {
     expect(layer.warp).toEqual({ kind: 'none', bend: 0, horizontal: 0 });
   });
 
-  it('非法变形样式回落 none，强度钳制到 ±100', () => {
+  it('an illegal warp style falls back to none and strength clamps to ±100', () => {
     const layer = firstLayer({ warp: { kind: 'bogus', bend: 999, horizontal: -999 } });
     if (layer.kind !== 'text') throw new Error('不是文字图层');
     expect(layer.warp.kind).toBe<TextWarpKind>('none');
@@ -303,7 +303,7 @@ describe('migrateDoc：文字新字段归一', () => {
     expect(layer.warp.horizontal).toBe(-100);
   });
 
-  it('段间距不允许为负', () => {
+  it('paragraph spacing cannot go negative', () => {
     const layer = firstLayer({ paragraphSpacing: -20, letterSpacing: -3 });
     if (layer.kind !== 'text') throw new Error('不是文字图层');
     expect(layer.paragraphSpacing).toBe(0);

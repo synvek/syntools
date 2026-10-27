@@ -1,11 +1,11 @@
-/* 流程图编辑器自定义样式（依赖 @xyflow/react/dist/style.css，于 FlowchartTool 引入） */
+/* Custom styles for the flowchart editor (builds on @xyflow/react/dist/style.css, imported in FlowchartTool) */
 
-/* 泳道顶部标题条填充 */
+/* Swimlane top title bar fill */
 .swimlane-header {
   fill: rgba(71, 85, 105, 0.14);
 }
 
-/* 隐藏自定义节点的默认外边距，让 SVG 形状填满容器 */
+/* Hide the default margin of custom nodes so the SVG shape fills the container */
 .react-flow__node-shape {
   padding: 0;
   border: none;
@@ -17,7 +17,7 @@
   box-shadow: none;
 }
 
-/* 连线标签：浅底圆角，避免遮挡 */
+/* Edge labels: light rounded background so they do not obscure the line */
 .react-flow__edge-text {
   font-size: 12px;
   fill: #334155;
@@ -27,12 +27,12 @@
   fill: #ffffff;
 }
 
-/* 让拖拽中的节点保持抓取手型 */
+/* Keep the grabbing cursor on a node while it is dragged */
 .react-flow__node-shape:active {
   cursor: grabbing;
 }
 
-/* 缩放把手：仿 Draw.io 的小圆点，放大并圆形化，所有图形（含泳道/编组）通用 */
+/* Resize handles: draw.io-style small dots, enlarged and made circular, shared by all shapes (including swimlanes/groups) */
 .react-flow__resize-control.handle {
   width: 11px !important;
   height: 11px !important;
@@ -46,7 +46,7 @@
   background-color: #2563eb !important;
 }
 
-/* 四条边控制点同样收成居中的小圆，凑齐 8 个圆形把手（Draw.io 风格） */
+/* The four side control points also collapse into centered small circles, completing the 8 circular handles (Draw.io style) */
 .react-flow__resize-control.line {
   width: 11px !important;
   height: 11px !important;
@@ -71,14 +71,14 @@
   background-color: #2563eb !important;
 }
 
-/* 拖拽连线期间：所有连线锚点保持可见，便于「拖到图形身上」时吸附 */
+/* While dragging an edge: keep every edge anchor visible so dropping onto a shape can snap */
 body.flow-connecting .react-flow__handle {
   opacity: 1 !important;
 }
 
 /**
- * 连线重连端点：React Flow 原生端点只作为拖拽命中区，始终不可见；
- * 视觉由 EdgeEndpointHandles 自绘的小方块呈现（更小、方形、且避开箭头）。
+ * Edge reconnect endpoints: React Flow's native endpoints are only drag hit areas and always invisible;
+ * the visuals come from the small squares drawn by EdgeEndpointHandles (smaller, square, and clear of the arrows).
  */
 .react-flow__edgeupdater {
   fill: transparent !important;
@@ -90,7 +90,7 @@ body.flow-connecting .react-flow__handle {
   cursor: grabbing;
 }
 
-/* 形状可调参数手柄：仿 Draw.io 的琥珀色菱形调整顶点 */
+/* Shape adjustable-parameter handles: draw.io-style amber diamond adjustment vertices */
 .shape-adjust {
   position: absolute;
   z-index: 30;
@@ -130,7 +130,7 @@ body.flow-connecting .react-flow__handle {
   background: #b45309;
 }
 
-/* 节点旋转手柄：位于顶边上方，与缩放把手错开 */
+/* Node rotate handle: above the top edge, clear of the resize handles */
 .shape-rotate {
   position: absolute;
   left: 50%;
@@ -174,7 +174,7 @@ body.flow-connecting .react-flow__handle {
   background: #f59e0b;
 }
 
-/* 拖拽时的角度读数：浮在手柄右上方，不参与命中 */
+/* Angle readout while dragging: floats at the top-right of the handle and does not take hits */
 .shape-rotate__readout {
   position: absolute;
   left: 22px;
@@ -190,7 +190,7 @@ body.flow-connecting .react-flow__handle {
   color: #ffffff;
 }
 
-/* 多选整体缩放：包围盒虚线 + 8 个圆形把手（屏幕坐标覆盖层） */
+/* Multi-select group resize: dashed bounding box + 8 circular handles (screen-space overlay) */
 .selection-resizer {
   position: absolute;
   z-index: 25;
@@ -215,7 +215,7 @@ body.flow-connecting .react-flow__handle {
   background: #2563eb;
 }
 
-/* 全图搜索命中：短暂高亮目标节点（由 SearchPanel 添加/移除类） */
+/* Full-graph search hit: briefly highlights the target node (the class is added/removed by SearchPanel) */
 @keyframes flow-node-highlight {
   0%,
   100% {
@@ -231,7 +231,7 @@ body.flow-connecting .react-flow__handle {
   animation: flow-node-highlight 700ms ease-in-out 2;
 }
 
-/* 容器折叠态：虚线边框提示「子节点被隐藏」，不影响命中 */
+/* Collapsed container: a dashed border hints that child nodes are hidden, without affecting hit testing */
 .flow-node-collapsed::after {
   content: '';
   position: absolute;
@@ -241,7 +241,7 @@ body.flow-connecting .react-flow__handle {
   pointer-events: none;
 }
 
-/* 悬停快速连线箭头（四向） */
+/* Hover quick-connect arrows (four directions) */
 .quick-connect {
   width: 18px;
   height: 18px;
@@ -261,11 +261,11 @@ body.flow-connecting .react-flow__handle {
   transform: rotate(var(--qc-rot, 0deg)) scale(1.05);
 }
 
-/* ---------------------------- 触控与窄屏增强 ---------------------------- */
+/* ---------------------------- Touch and narrow-screen enhancements ---------------------------- */
 
 /*
- * 粗指针（触控 / 手写笔）设备：放大连线锚点与快连箭头的命中区域，
- * 避免手指点不中 12px 的圆点；同时收紧画布手势，防止拖动时误触发浏览器滚动/缩放。
+ * Coarse-pointer (touch / stylus) devices: enlarge the hit areas of edge anchors and quick-connect arrows
+ * so fingers can hit the 12px dots; canvas gestures are also tightened to avoid accidental browser scroll/zoom while dragging.
  */
 @media (pointer: coarse) {
   .react-flow__handle > span {
@@ -283,12 +283,12 @@ body.flow-connecting .react-flow__handle {
   }
 }
 
-/* 画布：单指拖动平移、双指缩放旋转交由 React Flow 处理 */
+/* Canvas: one-finger drag pans, two-finger pinch/rotate is left to React Flow */
 .react-flow__pane {
   touch-action: none;
 }
 
-/* 窄屏下画布铺满、面板以抽屉形式覆盖（见 FlowchartTool 的 isNarrow 分支） */
+/* On narrow screens the canvas fills the width and panels overlay it as drawers (see the isNarrow branch in FlowchartTool) */
 @media (max-width: 1023px) {
   .react-flow__minimap {
     display: none;

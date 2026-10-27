@@ -72,7 +72,7 @@ describe('折点与正交路由', () => {
     const points = routeOrthogonal(from, target, [obstacle]);
     const path = [from, ...points, target];
     expect(path.length).toBeGreaterThan(2);
-    // 折线不得穿过障碍物
+    // The polyline must not cross the obstacles
     for (let i = 1; i < path.length; i += 1) {
       const a = path[i - 1];
       const b = path[i];
@@ -130,7 +130,7 @@ describe('对齐', () => {
 
   it('右对齐按各自宽度靠右', () => {
     const out = computeAlign(BOXES, 'right');
-    // 最右边界 = 300
+    // Rightmost edge = 300
     expect(out.a.x).toBe(200);
     expect(out.b.x).toBe(200);
     expect(out.c.x).toBe(240);
@@ -157,7 +157,7 @@ describe('对齐', () => {
 describe('等距分布', () => {
   it('水平方向均匀分布', () => {
     const out = computeDistribute(BOXES, 'h');
-    // 按 x 排序：a(0) c(50) b(200)，间距 20
+    // Sorted by x: a(0) c(50) b(200), spacing 20
     expect(out.a.x).toBe(0);
     expect(out.c.x).toBe(120);
     expect(out.b.x).toBe(200);
@@ -165,7 +165,7 @@ describe('等距分布', () => {
 
   it('垂直方向均匀分布', () => {
     const out = computeDistribute(BOXES, 'v');
-    // 按 y 排序：a(0) b(100) c(300)
+    // Sorted by y: a(0) b(100) c(300)
     expect(out.a.y).toBe(0);
     expect(Object.keys(out)).toHaveLength(3);
   });

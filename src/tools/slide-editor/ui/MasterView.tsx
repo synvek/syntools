@@ -7,14 +7,14 @@ import { PropertyPanel } from './PropertyPanel';
 import { SlideCanvas } from './SlideCanvas';
 
 /**
- * 独立母版视图。
+ * Standalone master view.
  *
- * 与 PowerPoint 的「幻灯片母版」视图对应：左侧列出母版与全部版式，
- * 中间是可编辑画布，右侧是元素属性 / 图层面板。
+ * Corresponds to PowerPoint's "Slide Master" view: masters and all their layouts on the left, the editable
+ * canvas in the middle, element properties / layer panel on the right.
  *
- * 视图只用一套 store：母版视图下所有元素操作都被 store 的
- * `containerElements` / `writeContainerElements` 路由到母版/版式元素，
- * 因此插入、对齐、组合、撤销等能力无需另写一份。
+ * The view uses a single store: in master view every element operation is routed to master/layout elements
+ * by the store's `containerElements` / `writeContainerElements`, so insert, align, group, undo and the rest
+ * need no separate implementation.
  */
 
 const ROW_BASE =

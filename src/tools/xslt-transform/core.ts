@@ -1,7 +1,7 @@
 import type { ToolResult } from '@/core/types';
 
 /**
- * XSLT：XML → HTML（浏览器 XSLTProcessor；Node 测试侧重校验辅助）。
+ * XSLT: XML → HTML (browser XSLTProcessor; the Node tests focus on the validation helpers).
  */
 
 export type XsltError = 'EMPTY_XML' | 'EMPTY_XSLT' | 'INVALID_XML' | 'INVALID_XSLT' | 'TRANSFORM';
@@ -39,14 +39,14 @@ export const SAMPLE_XSLT = `<?xml version="1.0" encoding="UTF-8"?>
   </xsl:template>
 </xsl:stylesheet>`;
 
-/** 粗校验：是否像 XML（有根标签或自闭合） */
+/** Rough check: does it look like XML (has a root tag or a self-closing tag) */
 export function looksLikeXml(input: string): boolean {
   const t = input.trim();
   if (!t) return false;
   return /<\s*[\w:.-]+(?:\s[^>]*)?\/?\s*>/.test(t);
 }
 
-/** 用 DOMParser 校验 XML（浏览器 / jsdom） */
+/** Validate XML with DOMParser (browser / jsdom) */
 export function parseXmlDocument(input: string): ToolResult<Document> {
   if (!input.trim()) return { ok: false, error: 'EMPTY_XML' };
   if (typeof DOMParser === 'undefined') {
@@ -79,7 +79,7 @@ export function parseXsltDocument(input: string): ToolResult<Document> {
   }
 }
 
-/** 执行 XSLT 转换，返回序列化结果字符串 */
+/** Run the XSLT transform and return the serialized result string */
 export function transformXmlWithXslt(xml: string, xslt: string): ToolResult<string> {
   if (!xml.trim()) return { ok: false, error: 'EMPTY_XML' };
   if (!xslt.trim()) return { ok: false, error: 'EMPTY_XSLT' };
@@ -100,7 +100,7 @@ export function transformXmlWithXslt(xml: string, xslt: string): ToolResult<stri
     if (!result) return { ok: false, error: 'TRANSFORM' };
 
     const serializer = new XMLSerializer();
-    // 优先取 documentElement；空文档时序列化整个 document
+    // Prefer documentElement; serialize the whole document when it is empty
     const root = result.documentElement;
     const out = root ? serializer.serializeToString(root) : serializer.serializeToString(result);
     if (!out.trim()) return { ok: false, error: 'TRANSFORM' };

@@ -2,9 +2,9 @@ import Konva from 'konva';
 import type { Guide } from '../core';
 
 /**
- * 画布覆盖层：变换控件（Transformer）、对齐参考线、框选矩形。
- * Transformer 与参考线放在已缩放的内容层内，坐标即页面坐标；
- * 框选矩形放在未缩放的覆盖层内，坐标即 stage 坐标。
+ * Canvas overlays: transform handles (Transformer), alignment guides, marquee rect.
+ * The Transformer and guides live in the already-scaled content layer, so their coordinates are page coordinates;
+ * the marquee lives in the unscaled overlay layer, so its coordinates are stage coordinates.
  */
 
 export interface TransformChange {
@@ -17,11 +17,11 @@ export interface TransformChange {
 }
 
 export interface TransformerOptions {
-  /** 多选时返回全部受影响元素的落点，调用方需逐个写回（否则未写回的元素会在下次 sync 复位） */
+  /** With a multi-select, returns each affected element's landing box; the caller must write them all back (or they reset on the next sync) */
   onTransformEnd: (changes: TransformChange[]) => void;
 }
 
-/** Shift 键状态：按下时 Transformer 走等比缩放（与 PowerPoint / WPS 一致） */
+/** Shift state: while held, the Transformer scales proportionally (matching PowerPoint / WPS) */
 let shiftHeld = false;
 let shiftBound = false;
 function bindShiftTracker(): void {
@@ -56,7 +56,7 @@ export function createTransformer(
     anchorFill: '#FFFFFF',
   });
   transformer.on('transformend', () => {
-    // 多选时逐个节点取出落点：Konva 已把群组变换应用到每个成员节点上
+    // With a multi-select, take each node's landing box: Konva has already applied the group transform to every member
     const changes: TransformChange[] = [];
     for (const node of transformer.nodes()) {
       if (!node.id()) continue;
@@ -72,7 +72,7 @@ export function createTransformer(
     if (changes.length > 0) options.onTransformEnd(changes);
   });
   bindShiftTracker();
-  // 变换过程中持续跟随 Shift：按住等比、松开自由，无需重新进入变换
+  // Follow Shift continuously during the transform: hold to constrain, release for free, no need to restart
   transformer.on('transformstart transform', () => {
     transformer.keepRatio(shiftHeld);
   });
@@ -80,7 +80,7 @@ export function createTransformer(
   return transformer;
 }
 
-/** 参考线：以虚线绘制在页面坐标系内 */
+/** Guides: drawn as dashed lines in page coordinates */
 export function drawGuides(
   contentLayer: Konva.Layer,
   guides: Guide[],
@@ -111,7 +111,7 @@ export function clearGuides(contentLayer: Konva.Layer): void {
   if (group) group.destroy();
 }
 
-/** 手动参考线：蓝色实线 + 端点小方块，与拖拽时的红色虚线区分 */
+/** Manual guides: solid blue line with small square endpoints, distinct from the red dashed drag guides */
 export function drawCustomGuides(
   contentLayer: Konva.Layer,
   guides: { id: string; axis: 'x' | 'y'; position: number }[],
@@ -141,7 +141,7 @@ export function drawCustomGuides(
   contentLayer.add(next);
 }
 
-/** 框选矩形（stage 坐标系） */
+/** Marquee rect (stage coordinates) */
 export function createMarquee(overlayLayer: Konva.Layer): Konva.Rect {
   const rect = new Konva.Rect({
     fill: 'rgba(37, 99, 235, 0.12)',

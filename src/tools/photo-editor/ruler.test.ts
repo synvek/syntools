@@ -3,7 +3,7 @@ import { rulerTicks } from './core';
 
 describe('rulerTicks', () => {
   it('maps document coordinates to screen coordinates', () => {
-    // scale 1、无平移：文档 0 落在屏幕 0，文档 100 落在屏幕 100
+    // scale 1, no pan: document 0 lands on screen 0, document 100 on screen 100
     const ticks = rulerTicks(1, 0, 300, 50);
     expect(ticks[0].doc).toBe(0);
     expect(ticks[0].screen).toBe(0);
@@ -14,7 +14,7 @@ describe('rulerTicks', () => {
 
   it('honours pan offset', () => {
     const ticks = rulerTicks(1, -120, 300, 50);
-    // 屏幕 0 对应文档 120，因此第一个刻度从文档 150 开始
+    // Screen 0 maps to document 120, so the first tick starts at document 150
     expect(ticks[0].doc).toBe(150);
     expect(ticks[0].screen).toBe(30);
   });

@@ -1,5 +1,5 @@
-// 主题初始化：在首帧前读取本地设置，避免亮/暗主题闪烁（见技术设计 §6.3）
-// 独立为外部脚本以兼容严格 CSP（script-src 'self'，不允许内联脚本）
+// Theme init: read local settings before the first frame to avoid a light/dark flash (see Technical Design §6.3)
+// Kept as an external script to satisfy a strict CSP (script-src 'self'; no inline scripts)
 (function () {
   try {
     var raw = localStorage.getItem('syntools:settings.v1');
@@ -9,6 +9,6 @@
       document.documentElement.classList.add('dark');
     }
   } catch {
-    /* 忽略：降级为亮色 */
+    /* Ignore: fall back to the light theme */
   }
 })();

@@ -2,7 +2,7 @@ import type { ShapeDef } from './index';
 import { axisAdjust, pxMx } from './adjust';
 import { activityPartitionPath, receiveSignalPath, sendSignalPath } from './uml-paths';
 
-/** UML 活动图：动作、活动、判断/合并、初始/结束、流结束、对象节点、信号、分区、分叉/汇合 */
+/** UML activity diagram: action, activity, decision/merge, initial/final, flow final, object node, signal, partition, fork/join */
 export const UML_ACTIVITY_SHAPES: ShapeDef[] = [
   {
     kind: 'umlForkJoin',

@@ -8,16 +8,16 @@ export interface DiffCell {
   text: string;
 }
 
-/** 左右并排的一行：null 表示该侧无内容（占位对齐） */
+/** One side-by-side row: null means that side has no content (alignment placeholder) */
 export interface DiffRow {
   left: DiffCell | null;
   right: DiffCell | null;
 }
 
-/** 单侧源文本行注解（用于编辑器内高亮，行号与源文本一致） */
+/** Per-line annotation for one side's source text (used for in-editor highlighting; line numbers match the source text) */
 export type SideLineType = 'same' | 'added' | 'removed';
 
-/** 行内片段：仅差异片段带 added/removed，相同部分为 same */
+/** Inline segment: only differing segments carry added/removed, identical parts are same */
 export interface DiffSegment {
   text: string;
   type: SideLineType;
@@ -25,7 +25,7 @@ export interface DiffSegment {
 
 export interface AnnotatedLine {
   text: string;
-  /** 行级类型（行号着色）；有行内差异时仍为 added/removed */
+  /** Line-level type (drives line-number coloring); stays added/removed even when inline diffs exist */
   type: SideLineType;
   segments: DiffSegment[];
 }
@@ -41,10 +41,10 @@ export interface DiffStats {
   same: number;
 }
 
-/** 两侧文本合计上限，超过拒绝计算（防主线程长时间阻塞） */
+/** Combined size limit for both sides; larger inputs are rejected (avoids blocking the main thread) */
 export const MAX_DIFF_LENGTH = 200_000;
 
-/** 将 diff change 的 value 拆为行；去掉尾部换行产生的空尾行 */
+/** Split a diff change value into lines; drop the empty trailing line produced by a trailing newline */
 function toLines(value: string): string[] {
   const lines = value.split('\n');
   if (lines.length > 0 && lines[lines.length - 1] === '') {
@@ -53,12 +53,12 @@ function toLines(value: string): string[] {
   return lines;
 }
 
-/** 编辑器展示用：保留末尾空行，空字符串视为一行 */
+/** For editor display: keep the trailing empty line and treat an empty string as one line */
 export function splitEditorLines(text: string): string[] {
   return text.split('\n');
 }
 
-/** 补齐末尾换行：使行比较忽略「文末是否有换行」的差异（空行差异不受影响） */
+/** Pad a trailing newline so line comparison ignores whether the text ends with one (empty-line differences are unaffected) */
 function normalizeTrailingNewline(text: string): string {
   return text === '' || text.endsWith('\n') ? text : `${text}\n`;
 }
@@ -103,7 +103,7 @@ function lineTypeFromSegments(segments: DiffSegment[], side: 'left' | 'right'): 
 }
 
 /**
- * 对配对的修改行做字符级 diff，仅标记不同片段。
+ * Character-level diff for paired modified lines, marking only the differing segments.
  */
 export function inlineCharDiff(
   oldLine: string,
@@ -139,10 +139,10 @@ export function inlineCharDiff(
 }
 
 /**
- * 行级对比并做左右对齐：
- * - 连续的 removed+added 块配对为「修改」，逐行并排（多的一侧用 empty 占位）
- * - 纯 added / removed 另一侧为 null
- * - 空行差异（如多余空行）会作为 removed/added 行正确呈现
+ * Line-level diff with left/right alignment:
+ * - consecutive removed+added blocks are paired as modifications and placed side by side (the longer side uses empty placeholders)
+ * - pure added / removed lines have null on the other side
+ * - empty-line differences (e.g. extra blank lines) are still rendered correctly as removed/added rows
  */
 export function computeLineDiff(
   oldText: string,
@@ -191,8 +191,8 @@ export function computeLineDiff(
 }
 
 /**
- * 按源文本行注解左右两侧（无对齐占位），供编辑器内高亮与行号。
- * 修改行做字符级片段高亮；纯增删行整行标记。
+ * Annotate both sides by source-text line (no alignment placeholders) for in-editor highlighting and line numbers.
+ * Modified lines get character-level segment highlighting; pure insertions/deletions are marked on the whole line.
  */
 export function annotateDiffSides(
   oldText: string,
@@ -234,7 +234,7 @@ export function annotateDiffSides(
   return { ok: true, value: { left, right } };
 }
 
-/** 统计增/删/未变行数（empty 占位行不计） */
+/** Count added/deleted/unchanged lines (empty placeholder rows are not counted) */
 export function diffStats(rows: DiffRow[]): DiffStats {
   const stats: DiffStats = { added: 0, removed: 0, same: 0 };
   for (const row of rows) {
@@ -254,8 +254,8 @@ export function sideStats(sides: DiffSides): DiffStats {
 }
 
 /**
- * 将注解对齐到当前编辑器行：防抖计算滞后时按行数补齐/截断，避免高亮错位。
- * 若该行文本与注解一致则保留行内片段；否则退化为整行类型标记。
+ * Align annotations to the current editor lines: when the debounced computation lags, pad or truncate by line count to avoid misaligned highlighting.
+ * If a line's text matches its annotation the inline segments are kept; otherwise it falls back to a whole-line type marker.
  */
 export function alignAnnotations(
   editorLines: string[],

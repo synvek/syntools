@@ -1,33 +1,33 @@
 import katex from 'katex';
 
 /**
- * 公式光栅化（OMML 表达不了的语法走图片降级）：
- * 离屏用 KaTeX 渲染后交给 html-to-image 输出 PNG，
- * 保证 Word 中「看起来一致」，而不是退化成源码文本或丢失内容。
+ * Formula rasterization (the image fallback for syntax OMML cannot express):
+ * Renders off-screen with KaTeX, then uses html-to-image to produce a PNG,
+ * so Word shows the same formula instead of raw source text or missing content.
  */
 
 export interface MathImage {
-  /** PNG data URL（导出层负责解码为字节） */
+  /** PNG data URL (the export layer decodes it to bytes) */
   dataUrl: string;
-  /** 逻辑尺寸（CSS px）——写入 docx 时按 px → EMU 换算 */
+  /** Logical size in CSS px; converted px → EMU when written to docx */
   width: number;
   height: number;
 }
 
-/** 光栅化倍率：公式通常很小，3 倍保证打印清晰 */
+/** Raster scale: formulas are small, so 3x keeps them sharp in print */
 const PIXEL_RATIO = 3;
 
 export interface MathImageRequest {
-  /** 去重键（同一条公式只渲染一次） */
+  /** Dedupe key (each formula renders only once) */
   key: string;
   latex: string;
   display: boolean;
 }
 
 /**
- * 批量渲染公式图片。
- * 失败项直接跳过（调用方回退为源码文本），不抛异常——
- * 导出流程不允许因为一条公式而整体失败。
+ * Render formula images in bulk.
+ * Failures are skipped (the caller falls back to source text) and never thrown:
+ * the export must not fail as a whole because of one formula.
  */
 export async function renderLatexImages(
   items: readonly MathImageRequest[],
@@ -38,7 +38,7 @@ export async function renderLatexImages(
   const { toPng } = await import('html-to-image');
   const host = document.createElement('div');
   host.setAttribute('aria-hidden', 'true');
-  // 必须参与布局才能被光栅化：放到视口外而不是 display:none
+  // Must take part in layout to be rasterized: move it off-screen instead of display:none
   host.style.cssText =
     'position:fixed;left:-10000px;top:0;background:#ffffff;z-index:-1;pointer-events:none;';
   document.body.appendChild(host);
@@ -72,7 +72,7 @@ export async function renderLatexImages(
         });
         result.set(item.key, { dataUrl, width, height });
       } catch {
-        // 单条失败不影响其它公式
+        // One failure does not affect the other formulas
       }
       node.remove();
     }

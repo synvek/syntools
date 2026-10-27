@@ -25,7 +25,7 @@ export interface UrlParts {
 
 const IPV4 = /^(\d{1,3}\.){3}\d{1,3}$/;
 
-/** 解析 URL 为结构化字段（自动补全缺失协议） */
+/** Parse a URL into structured fields (fills in a missing scheme) */
 export function parseUrl(input: string): ToolResult<UrlParts> {
   const trimmed = input.trim();
   if (!trimmed) return { ok: false, error: 'EMPTY' };
