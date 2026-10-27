@@ -1518,7 +1518,7 @@ export default function RichTextEditorTool() {
               title={t('common.newDoc')}
               className={EDITOR_ICON_BUTTON_CLASS}
             >
-              <Icon name="text" className="h-4 w-4" />
+              <Icon name="newDoc" className="h-4 w-4" />
             </button>
             <button
               type="button"
