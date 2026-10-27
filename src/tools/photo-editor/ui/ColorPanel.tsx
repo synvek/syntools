@@ -96,16 +96,16 @@ export function ColorPanel() {
   return (
     <div className="flex flex-col gap-3">
       <PanelSection>
-        {/* Foreground / background pair: click to pick which one to edit */}
-        <div className="flex items-center gap-3">
-          <div className="relative h-10 w-12">
+        {/* Foreground / background pair + swap / reset actions, all on one row */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative h-10 w-12 shrink-0">
             <button
               type="button"
               title={t('tools.photo.bgColor')}
               aria-label={t('tools.photo.bgColor')}
               aria-pressed={target === 'background'}
               onClick={() => setTarget('background')}
-              className={`absolute bottom-0 right-0 h-6 w-6 rounded border-2 ${
+              className={`absolute bottom-0 right-0 h-7 w-7 rounded border-2 shadow-sm ${
                 target === 'background' ? 'border-blue-500' : 'border-gray-300 dark:border-gray-600'
               }`}
               style={{ backgroundColor: brush.background }}
@@ -116,13 +116,13 @@ export function ColorPanel() {
               aria-label={t('tools.photo.foreground')}
               aria-pressed={target === 'foreground'}
               onClick={() => setTarget('foreground')}
-              className={`absolute left-0 top-0 h-6 w-6 rounded border-2 ${
+              className={`absolute left-0 top-0 h-7 w-7 rounded border-2 shadow-sm ${
                 target === 'foreground' ? 'border-blue-500' : 'border-gray-300 dark:border-gray-600'
               }`}
               style={{ backgroundColor: brush.color }}
             />
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
             <Button onClick={swapColors} title={t('tools.photo.swapColors')}>
               {t('tools.photo.swapColors')}
             </Button>
