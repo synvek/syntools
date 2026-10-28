@@ -1,17 +1,12 @@
-import {
-  ALPHA_UNIT,
-  EMU_PER_PX,
-  normalizeBackground,
-  pxToEmu,
-  ptToHundredthsPt,
-  resolvePresetGeometry,
-} from '../core';
+import { ALPHA_UNIT, EMU_PER_PX, normalizeBackground, pxToEmu, ptToHundredthsPt } from '../core';
 import type {
   Fill,
+  LineElement,
   Paragraph,
   RunStyle,
   ShadowStyle,
   ShapeElement,
+  ShapeGeometry,
   SlideBackground,
   SlideElement,
   Stroke,
@@ -21,6 +16,7 @@ import type {
   TextElement,
 } from '../model/types';
 import { escapeXml } from './templates';
+import { custGeomXml } from './custGeom';
 
 /**
  * SlideElement → DrawingML strings.
@@ -30,13 +26,26 @@ import { escapeXml } from './templates';
  */
 
 let idSeq = 1;
+/** Stable internal element id → DrawingML cNvPr id, so connectors can reference shapes written later */
+const shapeIdByElement = new Map<string, number>();
+
 function nextShapeId(): number {
   idSeq += 1;
   return idSeq;
 }
 
+function shapeIdFor(elementId: string | undefined): number {
+  if (!elementId) return nextShapeId();
+  const existing = shapeIdByElement.get(elementId);
+  if (existing !== undefined) return existing;
+  const id = nextShapeId();
+  shapeIdByElement.set(elementId, id);
+  return id;
+}
+
 export function resetShapeIds(): void {
   idSeq = 1;
+  shapeIdByElement.clear();
 }
 
 const ALIGN_ATTR: Record<TextAlign, string> = {
@@ -88,11 +97,16 @@ function fillXml(fill: Fill | undefined): string {
   return `<a:gradFill rotWithShape="1"><a:gsLst>${stops}</a:gsLst><a:lin ang="${Math.round((fill.angle ?? 0) * 60000)}" scaled="0"/><a:tileRect/></a:gradFill>`;
 }
 
-function strokeXml(stroke: Stroke | undefined): string {
+function strokeXml(
+  stroke: Stroke | undefined,
+  ends?: { head?: LineElement['head']; tail?: LineElement['tail'] },
+): string {
   if (!stroke) return '<a:noFill/>';
   const width = Math.max(1, Math.round(stroke.width * 12700));
   const color = stroke.color.replace(/^#/, '').toUpperCase();
-  return `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="solid"/></a:ln>`;
+  const head = ends?.head ? `<a:headEnd type="${ends.head}"/>` : '';
+  const tail = ends?.tail ? `<a:tailEnd type="${ends.tail}"/>` : '';
+  return `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="solid"/>${head}${tail}</a:ln>`;
 }
 
 function runXml(text: string, style: RunStyle | undefined): string {
@@ -197,27 +211,42 @@ export function textBodyXml(body: TextBody, prefix: 'p' | 'a'): string {
   return `<${prefix}:txBody>${bodyXml(body)}<a:lstStyle/>${paragraphs.map(paragraphXml).join('')}</${prefix}:txBody>`;
 }
 
-function prstGeomXml(prst: string): string {
-  const geom = resolvePresetGeometry(prst);
-  return `<a:prstGeom prst="${escapeXml(geom.prst)}"><a:avLst/></a:prstGeom>`;
+function avLstXml(adj: Record<string, number> | undefined): string {
+  const entries = Object.entries(adj ?? {})
+    .filter(([, value]) => Number.isFinite(value))
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+  if (entries.length === 0) return '<a:avLst/>';
+  const gds = entries
+    .map(
+      ([name, value]) =>
+        `<a:gd name="${escapeXml(name)}" fmla="val ${Math.round(value * 100000)}"/>`,
+    )
+    .join('');
+  return `<a:avLst>${gds}</a:avLst>`;
+}
+
+function geomXml(geom: ShapeGeometry): string {
+  // An explicit path must survive a round-trip: writing prst would silently redraw the shape
+  if (geom.custGeom && geom.custGeom.length > 0) return custGeomXml(geom.custGeom);
+  return `<a:prstGeom prst="${escapeXml(geom.prst || 'rect')}">${avLstXml(geom.adj)}</a:prstGeom>`;
 }
 
 function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
-  const id = nextShapeId();
+  const id = shapeIdFor(element.id);
   const parts = [
     `<p:nvSpPr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Shape ${id}`)}"/><p:cNvSpPr/>`,
     element.placeholder
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${prstGeomXml(element.geom.prst)}${fillXml(element.fill)}${strokeXml(element.stroke)}${shadowXml(element.shadow)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${geomXml(element.geom)}${fillXml(element.fill)}${strokeXml(element.stroke)}${shadowXml(element.shadow)}</p:spPr>`,
   ];
   if (body) parts.push(textBodyXml(body, 'p'));
   return `<p:sp>${parts.join('')}</p:sp>`;
 }
 
 function textXml(element: TextElement): string {
-  const id = nextShapeId();
+  const id = shapeIdFor(element.id);
   return [
     '<p:sp>',
     `<p:nvSpPr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Text ${id}`)}"/><p:cNvSpPr txBox="1"/>`,
@@ -232,11 +261,18 @@ function textXml(element: TextElement): string {
 }
 
 function imageXml(
-  element: { x: number; y: number; width: number; height: number; rotation?: number },
+  element: {
+    id?: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation?: number;
+  },
   rId: string,
   crop: { left: number; top: number; right: number; bottom: number } | undefined,
 ): string {
-  const id = nextShapeId();
+  const id = shapeIdFor(element.id);
   const srcRect = crop
     ? `<a:srcRect l="${Math.round(crop.left * 100000)}" t="${Math.round(crop.top * 100000)}" r="${Math.round(crop.right * 100000)}" b="${Math.round(crop.bottom * 100000)}"/>`
     : '';
@@ -249,32 +285,30 @@ function imageXml(
   ].join('');
 }
 
-function lineXml(element: {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation?: number;
-  points: number[];
-  stroke?: Stroke;
-}): string {
-  const flipH = (element.points[2] ?? 0) < 0;
-  const flipV = (element.points[3] ?? 0) < 0;
+function lineXml(element: LineElement): string {
+  const first = element.points;
+  const flipH = (first[2] ?? 0) < 0;
+  const flipV = (first[3] ?? 0) < 0;
+  const id = shapeIdFor(element.id);
+  const startId = element.startCxn?.shapeId
+    ? shapeIdByElement.get(element.startCxn.shapeId)
+    : undefined;
+  const endId = element.endCxn?.shapeId ? shapeIdByElement.get(element.endCxn.shapeId) : undefined;
+  const cxnPr =
+    startId !== undefined || endId !== undefined
+      ? `<p:cNvCxnSpPr>${startId !== undefined ? `<a:stCxn id="${startId}" idx="${element.startCxn?.site ?? 0}"/>` : ''}${endId !== undefined ? `<a:endCxn id="${endId}" idx="${element.endCxn?.site ?? 0}"/>` : ''}</p:cNvCxnSpPr>`
+      : '<p:cNvCxnSpPr/>';
   return [
     '<p:cxnSp>',
-    (() => {
-      const lid = nextShapeId();
-      return `<p:nvCxnSpPr><p:cNvPr id="${lid}" name="Line ${lid}"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr>`;
-    })(),
-    `<p:spPr>${xfrmXml({ ...element, flipX: flipH, flipY: flipV })}<a:prstGeom prst="line"><a:avLst/></a:prstGeom>${strokeXml(element.stroke ?? { color: '#000000', width: 1 })}</p:spPr>`,
+    `<p:nvCxnSpPr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Line ${id}`)}"/>${cxnPr}<p:nvPr/></p:nvCxnSpPr>`,
+    `<p:spPr>${xfrmXml({ ...element, flipX: flipH, flipY: flipV })}<a:prstGeom prst="line"><a:avLst/></a:prstGeom>${strokeXml(element.stroke ?? { color: '#000000', width: 1 }, { head: element.head, tail: element.tail })}</p:spPr>`,
     '</p:cxnSp>',
   ].join('');
 }
 
 function tableXml(element: TableElement): string {
   // Child order of nvGraphicFramePr: p:cNvPr → p:cNvGraphicFramePr → p:nvPr (a missing cNvPr makes parsers fail)
-  const id = nextShapeId();
+  const id = shapeIdFor(element.id);
   const rows = element.rows;
   // CT_Table order: a:tblPr → a:tblGrid(a:gridCol*) → a:tr*
   const gridCols = `<a:tblGrid>${element.colWidths
@@ -365,7 +399,7 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
       return [
         '<p:grpSp>',
         (() => {
-          const gid = nextShapeId();
+          const gid = shapeIdFor(element.id);
           return `<p:nvGrpSpPr><p:cNvPr id="${gid}" name="Group ${gid}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>`;
         })(),
         // Children are stored relative to the group origin, so the sub-coordinate system starts at (0,0) and spans the group's own size;
@@ -455,12 +489,21 @@ export function elementXml(element: SlideElement, relMap: Map<string, string>): 
 const SLIDE_NS =
   'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
 
+/** Reserve cNvPr ids up-front so a connector can reference a shape that is written later. */
+function reserveShapeIds(elements: SlideElement[]): void {
+  for (const element of elements) {
+    shapeIdFor(element.id);
+    if (element.type === 'group') reserveShapeIds(element.children);
+  }
+}
+
 /** Assemble the full slide XML */
 export function slideXml(
   elements: SlideElement[],
   relMap: Map<string, string>,
   background?: SlideBackground,
 ): string {
+  reserveShapeIds(elements);
   const body = elements.map((element) => elementXml(element, relMap)).join('');
   // Backgrounds support solid and gradient (v2); old solid-color strings are normalized here
   const fill = normalizeBackground(background);

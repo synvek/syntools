@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import type { ToolResult } from '@/core/types';
 import { createLayout, createMaster } from '../model/factory';
 import { extensionForMime } from '../model/media';
-import type { SlideDoc } from '../model/types';
+import type { SlideDoc, SlideElement } from '../model/types';
 import {
   appXml,
   contentTypes,
@@ -88,6 +88,29 @@ function relMapFor(
 }
 
 /**
+ * pptxgenjs does not expose shape adjustment values (`a:avLst`) or connector bindings
+ * (`a:stCxn`/`a:endCxn`), so documents that use them must go through the hand-written channel.
+ */
+function requiresLegacy(doc: SlideDoc): boolean {
+  const walk = (elements: SlideElement[]): boolean =>
+    elements.some((element) => {
+      if (element.type === 'shape') {
+        // pptxgenjs has no path API, so custom geometry must go through the legacy writer
+        if (element.geom.custGeom && element.geom.custGeom.length > 0) return true;
+        return element.geom.adj !== undefined && Object.keys(element.geom.adj).length > 0;
+      }
+      if (element.type === 'line') {
+        return Boolean(element.startCxn?.shapeId || element.endCxn?.shapeId);
+      }
+      if (element.type === 'group') return walk(element.children);
+      return false;
+    });
+  return [...doc.slides, ...doc.masters, ...doc.layouts].some((container) =>
+    walk(container.elements),
+  );
+}
+
+/**
  * Export entry point.
  *
  * `channel` defaults to `pptxgen`; when that channel returns EXPORT_FAILED it falls back to legacy automatically.
@@ -99,7 +122,7 @@ export async function exportPptx(
 ): Promise<ToolResult<Uint8Array>> {
   if (!doc.slides || doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
 
-  if (options.channel !== 'legacy') {
+  if (options.channel !== 'legacy' && !requiresLegacy(doc)) {
     const { exportPptxPptxGen } = await import('./exportPptxgen');
     const result = await exportPptxPptxGen(doc);
     if (result.ok) return result;

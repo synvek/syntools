@@ -18,6 +18,12 @@ import {
   matchFontOption,
 } from './typography';
 import { CONTENT_WIDTH_PX } from './core';
+import {
+  LETTER_SPACING_PRESETS,
+  TEXT_TRANSFORM_SAMPLES,
+  TEXT_TRANSFORM_VALUES,
+  type TextTransformValue,
+} from './charFormat';
 
 interface ToolButtonProps {
   label: string;
@@ -322,6 +328,25 @@ export function EditorToolbar({
     ],
     [],
   );
+  // Letter spacing: "0" clears it; the rest are the CSS px presets (labels are values, no i18n needed)
+  const letterSpacingOptions = useMemo(
+    () => [
+      { value: '', label: '0' },
+      ...LETTER_SPACING_PRESETS.filter((value) => value > 0).map((value) => ({
+        value: String(value),
+        label: String(value),
+      })),
+    ],
+    [],
+  );
+  // Text transform: labels are visual samples (ABC / abc / Abc), so no translation is needed
+  const textTransformOptions = useMemo(
+    () => [
+      { value: '', label: '—' },
+      ...TEXT_TRANSFORM_VALUES.map((value) => ({ value, label: TEXT_TRANSFORM_SAMPLES[value] })),
+    ],
+    [],
+  );
   const state = useEditorState({
     editor,
     selector: (ctx) => {
@@ -345,6 +370,10 @@ export function EditorToolbar({
         underline: e.isActive('underline'),
         strike: e.isActive('strike'),
         code: e.isActive('code'),
+        superscript: e.isActive('superscript'),
+        subscript: e.isActive('subscript'),
+        letterSpacing: String(e.getAttributes('letterSpacing').px ?? ''),
+        textTransform: String(e.getAttributes('textTransform').transform ?? ''),
         bulletList: e.isActive('bulletList'),
         orderedList: e.isActive('orderedList'),
         taskList: e.isActive('taskList'),
@@ -539,12 +568,51 @@ export function EditorToolbar({
             <span className="line-through">S</span>
           </ToolButton>
           <ToolButton
+            label={t('tools.richText.superscript')}
+            active={state.superscript}
+            onClick={() => chain().toggleSuperscript().run()}
+          >
+            <span>
+              x<sup>2</sup>
+            </span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.subscript')}
+            active={state.subscript}
+            onClick={() => chain().toggleSubscript().run()}
+          >
+            <span>
+              x<sub>2</sub>
+            </span>
+          </ToolButton>
+          <ToolButton
             label={t('tools.richText.code')}
             active={state.code}
             onClick={() => chain().toggleCode().run()}
           >
             <span className="font-mono">&lt;/&gt;</span>
           </ToolButton>
+          {/* Character-level formatting: letter spacing (px) and text-transform */}
+          <ToolbarSelect
+            label={t('tools.richText.letterSpacing')}
+            value={state.letterSpacing}
+            onChange={(value) =>
+              chain()
+                .setLetterSpacing(value ? Number(value) : null)
+                .run()
+            }
+            options={letterSpacingOptions}
+          />
+          <ToolbarSelect
+            label={t('tools.richText.textTransform')}
+            value={state.textTransform}
+            onChange={(value) =>
+              chain()
+                .setTextTransform((value || null) as TextTransformValue | null)
+                .run()
+            }
+            options={textTransformOptions}
+          />
           {/* Text color: preset palette popover that closes after picking (the native system picker doesn't close itself) */}
           <TextColorPicker
             value={currentColor}

@@ -1,3 +1,4 @@
+import { resolveShapeGeometry } from './model/shapeDefs';
 import type { Fill, ShapeGeometry, SlideBackground, SlideDoc, SlideElement } from './model/types';
 
 /**
@@ -365,8 +366,14 @@ const PRST_GEOMS: Record<string, ShapeGeometry> = {
 };
 
 /** prstGeom → render geometry; unknown shapes degrade to a same-size rect (keeping the original prst name) */
-export function resolvePresetGeometry(prst: string): ShapeGeometry {
-  return PRST_GEOMS[prst] ?? { kind: 'rect', prst: prst || 'rect' };
+export function resolvePresetGeometry(prst: string, adj?: Record<string, number>): ShapeGeometry {
+  return (
+    resolveShapeGeometry(prst, adj) ?? {
+      ...(PRST_GEOMS[prst] ?? { kind: 'rect' as const }),
+      prst: prst || 'rect',
+      ...(adj ? { adj } : {}),
+    }
+  );
 }
 
 /** Number of star points (prst: star5 → 5) */

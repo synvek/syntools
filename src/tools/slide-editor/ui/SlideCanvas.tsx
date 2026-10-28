@@ -6,6 +6,8 @@ import type { StageCallbacks, TransformChange } from '../interaction/pointer';
 import { createStage, type StageHandle } from '../render/stage';
 import { openTextEditor, type TextEditorHandle } from '../render/textEditor';
 import { containerElements, useSlideStore } from '../store';
+import { elementsAtPath } from '../model/tree';
+import { threadsForSlide } from '../../../core/comments/model';
 import type { SlideElement } from '../model/types';
 import { Rulers } from './Rulers';
 import { SlideContextMenu, type SlideContextTarget } from './SlideContextMenu';
@@ -50,6 +52,12 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   // Guides/rulers are store state, so a subscription is needed to trigger a redraw
   const showRulers = useSlideStore((s) => s.showRulers);
   const guides = useSlideStore((s) => s.guides);
+  const penMode = useSlideStore((s) => s.penMode);
+  const penPoints = useSlideStore((s) => s.penPoints);
+  const pathEditId = useSlideStore((s) => s.pathEditId);
+  const activePathNode = useSlideStore((s) => s.activePathNode);
+  const groupPath = useSlideStore((s) => s.groupPath);
+  const activeThreadId = useSlideStore((s) => s.activeThreadId);
 
   const applyTransform = useCallback(() => {
     const canvas = canvasRef.current;
@@ -82,12 +90,17 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     if (state.viewMode === 'master') {
       // Master view: edit master/layout elements directly without the inherited layer (or it would double up)
       handle.renderBackground(state.doc, []);
-      handle.sync(containerElements(state), state.doc);
+      handle.sync(containerElements(state), state.doc, { enteredGroups: state.groupPath });
       handle.renderCustomGuides(state.showRulers ? state.guides : [], {
         width: state.doc.width,
         height: state.doc.height,
       });
-      handle.setSelection(state.selection);
+      handle.setSelection(state.selection, containerElements(state), {
+        pathEditId: state.pathEditId,
+        activePathNode: state.activePathNode,
+      });
+      // Comments belong to slides only, so master/layout views show no markers
+      handle.renderComments([], null);
       return;
     }
     const slide = state.doc.slides[state.slideIndex];
@@ -101,7 +114,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       ? [...(master?.elements ?? []), ...(layout?.elements ?? [])].map(stripPlaceholderText)
       : [];
     handle.renderBackground(state.doc, inherited);
-    handle.sync(slide.elements, state.doc);
+    handle.sync(slide.elements, state.doc, { enteredGroups: state.groupPath });
     // Manual guides are drawn above the content layer and always follow the document size
     handle.renderCustomGuides(state.showRulers ? state.guides : [], {
       width: state.doc.width,
@@ -110,7 +123,14 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     // The sync rebuilds text/shape/table nodes by id (these types bypass the fast property path), and the
     // Transformer still points at the destroyed old nodes, so it must be reattached to the current selection;
     // otherwise rotation handles end up misplaced and resize handles disappear after dragging.
-    handle.setSelection(state.selection);
+    handle.setSelection(state.selection, slide.elements, {
+      pathEditId: state.pathEditId,
+      activePathNode: state.activePathNode,
+    });
+    handle.renderComments(
+      threadsForSlide(state.doc.comments ?? [], slide.id),
+      state.activeThreadId,
+    );
   }, []);
 
   /**
@@ -150,6 +170,16 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       panY: (state.viewport.panY ?? 0) - event.deltaY,
     });
   }, []);
+
+  /** Pen preview: placed points are page coordinates, the overlay draws in viewport coordinates */
+  useEffect(() => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    const { scale: viewScale, x, y } = transformRef.current;
+    handle.renderPenPreview(
+      penPoints.map((point) => ({ x: point.x * viewScale + x, y: point.y * viewScale + y })),
+    );
+  }, [penPoints]);
 
   /**
    * Hide / restore an element's static text during inline editing.
@@ -258,6 +288,18 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
         }
         syncNow();
       },
+      onShapeAdjust: (id, adj) => {
+        useSlideStore.getState().setShapeAdjustment(id, adj);
+        syncNow();
+      },
+      onConnectorEnd: (id, which, end, geometry) => {
+        const patch: Partial<SlideElement> =
+          which === 'start'
+            ? { ...geometry, startCxn: end ?? undefined }
+            : { ...geometry, endCxn: end ?? undefined };
+        useSlideStore.getState().patchElement(id, patch);
+        syncNow();
+      },
       onBackgroundClick: () => {
         closeEditor();
         useSlideStore.getState().select([]);
@@ -275,8 +317,9 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       },
       getSnapContext: () => {
         const state = useSlideStore.getState();
-        // Snap targets come from the "current editing container": in master view, snap to master elements rather than slide elements
-        const others = containerElements(state)
+        // Snap targets come from the "current editing container": in master view, snap to master elements rather than slide elements;
+        // inside an entered group, snap to that group's siblings
+        const others = elementsAtPath(containerElements(state), state.groupPath)
           .filter((element) => !state.selection.includes(element.id))
           .map((element) => ({
             x: element.x,
@@ -293,6 +336,24 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
         };
       },
       getSelection: () => useSlideStore.getState().selection,
+      getEditableIds: () => {
+        const state = useSlideStore.getState();
+        return elementsAtPath(containerElements(state), state.groupPath).map((item) => item.id);
+      },
+      onEnterGroup: (id) => useSlideStore.getState().enterGroup(id),
+      onSelectComment: (id) => useSlideStore.getState().setActiveThread(id),
+      isPenMode: () => useSlideStore.getState().penMode,
+      onPenPoint: (x, y) => useSlideStore.getState().addPenPoint({ x, y }),
+      onPenFinish: () => useSlideStore.getState().finishPen(),
+      onPathCommands: (id, commands) => {
+        useSlideStore.getState().setPathCommands(id, commands);
+        syncNow();
+      },
+      onPathActive: (index) => useSlideStore.getState().setActivePathNode(index),
+      onPathToggleSmooth: (id, index) => {
+        useSlideStore.getState().togglePathNode(id, index);
+        syncNow();
+      },
     };
 
     // Instantiate one tick later: under StrictMode the effect mounts → unmounts → remounts
@@ -353,12 +414,32 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     viewMode,
     masterKind,
     masterIndex,
+    // Entering / leaving a group changes which children are hit-testable, so the nodes are rebuilt
+    groupPath,
     syncNow,
   ]);
 
+  // Focus moves between threads more often than the document changes: only recolour the markers
   useEffect(() => {
-    handleRef.current?.setSelection(selection);
-  }, [selection]);
+    const handle = handleRef.current;
+    if (!handle) return;
+    const state = useSlideStore.getState();
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    handle.renderComments(
+      threadsForSlide(state.doc.comments ?? [], state.viewMode === 'normal' ? slide.id : ''),
+      state.activeThreadId,
+    );
+  }, [activeThreadId]);
+
+  // Selection, node-edit target and the focused anchor all change which handles are drawn
+  useEffect(() => {
+    const state = useSlideStore.getState();
+    handleRef.current?.setSelection(state.selection, containerElements(state), {
+      pathEditId: state.pathEditId,
+      activePathNode: state.activePathNode,
+    });
+  }, [selection, pathEditId, activePathNode]);
 
   // Close the menu after the document changes via keyboard edits / undo / menu actions, so it doesn't linger on a stale target.
   // slideIndex is deliberately not watched: right-clicking a thumbnail switches slides before the menu opens, which would close it at once.
@@ -368,7 +449,12 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
 
   return (
     <div ref={wrapperRef} className="relative min-h-[360px] flex-1 overflow-hidden">
-      <div ref={canvasRef} className="slide-stage" aria-label="slide canvas" />
+      <div
+        ref={canvasRef}
+        className="slide-stage"
+        aria-label="slide canvas"
+        style={penMode ? { cursor: 'crosshair' } : undefined}
+      />
       <Rulers containerRef={canvasRef} />
       <SlideContextMenu target={menu} onClose={() => setMenu(null)} onEditText={startEditing} />
     </div>

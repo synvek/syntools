@@ -5,6 +5,10 @@
 # what `pnpm license:check` enforces for npm, keeping the dual release
 # (AGPL community edition + commercial license) viable (see plan/license-audit.md).
 #
+# Scope: third-party crates only. This crate itself is AGPL-3.0-only -- the project's
+# own license -- so it is excluded from the check through `private.ignore` below
+# instead of by adding AGPL to the allowlist.
+#
 # Local: pnpm license:check:rust (requires cargo install cargo-deny first)
 # CI: the licenses job in .github/workflows/ci.yml
 #
@@ -19,6 +23,12 @@ version = 2
 # Minimum confidence required for declarative license matching: below this the
 # license counts as undeterminable and fails, instead of guessing a permissive one.
 confidence-threshold = 0.85
+
+# This crate itself is AGPL-3.0-only (the project's own license), which the allowlist below
+# deliberately does not contain. `private.ignore` skips license checking for unpublished
+# workspace members, so the gate keeps looking only at third-party code -- the whole point of
+# the check. Requires `publish = false` in Cargo.toml; do not reuse it to smuggle a GPL crate in.
+private = { ignore = true }
 
 # Allowlist: all permissive licenses, file-level copyleft, or public-domain statements.
 # Compound expressions (e.g. `MIT OR Apache-2.0`) are parsed as SPDX by cargo-deny; matching either side passes.

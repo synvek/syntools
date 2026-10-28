@@ -2,6 +2,9 @@ import Konva from 'konva';
 import type { Guide } from '../core';
 import type { SlideDoc, SlideElement } from '../model/types';
 import { attachInteraction, type StageCallbacks } from '../interaction/pointer';
+import { renderAdjustHandles, type AdjustHandleOptions } from './adjustHandles';
+import { renderCommentAnchors } from './commentAnchors';
+import type { CommentThread } from '../../../core/comments/model';
 import { createElementNode } from './nodes';
 import {
   createMarquee,
@@ -35,7 +38,8 @@ export interface StageHandle {
   setTransform: (transform: PageTransform) => void;
   setSize: (width: number, height: number) => void;
   renderBackground: (doc: SlideDoc, invisibleElements: SlideElement[]) => void;
-  sync: (elements: SlideElement[], doc: SlideDoc) => void;
+  /** `enteredGroups` = group path currently open for child editing (P1-1.5) */
+  sync: (elements: SlideElement[], doc: SlideDoc, options?: { enteredGroups?: string[] }) => void;
   showGuides: (guides: Guide[], size: { width: number; height: number }) => void;
   hideGuides: () => void;
   /** Draw the persistent manual guides (styled differently from the temporary drag guides) */
@@ -43,7 +47,11 @@ export interface StageHandle {
     guides: { id: string; axis: 'x' | 'y'; position: number }[],
     size: { width: number; height: number },
   ) => void;
-  setSelection: (ids: string[]) => void;
+  setSelection: (ids: string[], elements?: SlideElement[], options?: AdjustHandleOptions) => void;
+  /** Numbered comment markers for the current slide (P1-2) */
+  renderComments: (threads: CommentThread[], activeId: string | null) => void;
+  /** Pen tool preview polyline (viewport coordinates); pass an empty array to hide it */
+  renderPenPreview: (points: { x: number; y: number }[]) => void;
   destroy: () => void;
 }
 
@@ -61,6 +69,16 @@ export function createStage(container: HTMLDivElement, callbacks: StageCallbacks
     onTransformEnd: (changes) => callbacks.onTransformEnd(changes),
   });
   const marquee = createMarquee(overlayLayer);
+  // Pen preview: a dashed polyline through the points placed so far
+  const penPreview = new Konva.Line({
+    points: [],
+    stroke: '#2563EB',
+    strokeWidth: 1.5,
+    dash: [5, 4],
+    listening: false,
+    visible: false,
+  });
+  overlayLayer.add(penPreview);
 
   const handle: StageHandle = {
     stage,
@@ -112,20 +130,56 @@ export function createStage(container: HTMLDivElement, callbacks: StageCallbacks
       }
       bgLayer.batchDraw();
     },
-    sync: (elements, doc) => {
+    sync: (elements, doc, options) => {
       syncElements(contentLayer, elements, {
         media: doc.media,
         onImageReady: () => contentLayer.batchDraw(),
+        enteredGroups: options?.enteredGroups,
       });
+    },
+
+    renderComments: (threads, activeId) => {
+      renderCommentAnchors(contentLayer, threads, activeId, callbacks.onSelectComment);
     },
     showGuides: (guides, size) => drawGuides(contentLayer, guides, size),
     hideGuides: () => clearGuides(contentLayer),
     renderCustomGuides: (guides, size) => drawCustomGuides(contentLayer, guides, size),
-    setSelection: (ids) => {
-      const nodes = ids
+    renderPenPreview: (points) => {
+      if (points.length === 0) {
+        penPreview.visible(false);
+        overlayLayer.batchDraw();
+        return;
+      }
+      const flat =
+        points.length === 1
+          ? [points[0].x, points[0].y, points[0].x, points[0].y]
+          : points.flatMap((point) => [point.x, point.y]);
+      penPreview.points(flat);
+      penPreview.visible(true);
+      overlayLayer.batchDraw();
+    },
+    setSelection: (ids, elements, options) => {
+      // The shape being node-edited must not keep resize/rotate handles: they would sit on top of the anchors
+      const framed = options?.pathEditId ? ids.filter((id) => id !== options.pathEditId) : ids;
+      const nodes = framed
         .map((id) => contentLayer.findOne<Konva.Node>(`#${id}`))
         .filter((node): node is Konva.Node => Boolean(node));
       transformer.nodes(nodes.length > 0 ? nodes : []);
+      if (elements) {
+        renderAdjustHandles(
+          contentLayer,
+          elements,
+          ids,
+          {
+            onShapeAdjust: callbacks.onShapeAdjust,
+            onConnectorEnd: callbacks.onConnectorEnd,
+            onPathCommands: callbacks.onPathCommands,
+            onPathActive: callbacks.onPathActive,
+            onPathToggleSmooth: callbacks.onPathToggleSmooth,
+          },
+          options,
+        );
+      }
       contentLayer.batchDraw();
     },
     destroy: () => {

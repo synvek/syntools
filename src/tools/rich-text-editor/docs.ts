@@ -1,4 +1,5 @@
 import type { ToolResult } from '@/core/types';
+import { textFingerprint, type CommentEntry, type CommentThread } from '../../core/comments/model';
 
 /**
  * Pure logic layer for document-level features (DOM-free):
@@ -258,6 +259,54 @@ export interface DocComment {
   author: string;
   createdAt: number;
   resolved: boolean;
+  /** Replies after the opener (P1-2); the opener itself stays in `text` for compatibility */
+  replies?: CommentEntry[];
+}
+
+/**
+ * Comments are stored flat (`DocComment`) because the Comment mark references `DocComment.id`,
+ * but they are displayed and edited through the shared thread model.
+ */
+export function toCommentThread(comment: DocComment): CommentThread {
+  return {
+    id: comment.id,
+    anchor: {
+      kind: 'text',
+      docPos: 0,
+      fingerprint: textFingerprint(comment.quote),
+      quote: comment.quote,
+    },
+    resolved: comment.resolved,
+    comments: [
+      {
+        id: `${comment.id}-opener`,
+        author: comment.author,
+        createdAt: comment.createdAt,
+        body: comment.text,
+      },
+      ...(comment.replies ?? []),
+    ],
+  };
+}
+
+/** Append a reply; returns the same array when the comment id is unknown or the body is empty */
+export function addCommentReply(
+  comments: DocComment[],
+  commentId: string,
+  reply: CommentEntry,
+): DocComment[] {
+  if (!reply.body.trim()) return comments;
+  const index = comments.findIndex((comment) => comment.id === commentId);
+  if (index < 0) return comments;
+  const target = comments[index];
+  const next = [...comments];
+  next[index] = { ...target, replies: [...(target.replies ?? []), reply] };
+  return next;
+}
+
+/** Map stored comments to threads for the shared panel (newest reply last) */
+export function toCommentThreads(comments: DocComment[]): CommentThread[] {
+  return comments.map(toCommentThread);
 }
 
 export interface TrackedChange {

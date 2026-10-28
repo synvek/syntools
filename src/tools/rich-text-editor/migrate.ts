@@ -1,4 +1,5 @@
 import type { ToolResult } from '@/core/types';
+import type { CommentEntry } from '../../core/comments/model';
 import type { ViewMode } from './draft';
 import type { DocComment, TrackedChange } from './docs';
 import type { PageSetupConfig } from './pageSetup';
@@ -88,7 +89,29 @@ function normalizeComment(raw: unknown): DocComment | null {
     author: readString(raw.author),
     createdAt: readPositiveNumber(raw.createdAt),
     resolved: raw.resolved === true,
+    replies: normalizeReplies(raw.replies),
   };
+}
+
+/** Replies were added in P1-2; older drafts simply have none */
+function normalizeReplies(raw: unknown): CommentEntry[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const replies = raw
+    .map((item) => {
+      if (!isPlainObject(item)) return null;
+      const id = readString(item.id);
+      const body = readString(item.body);
+      if (!id || !body) return null;
+      return {
+        id,
+        author: readString(item.author),
+        createdAt: readPositiveNumber(item.createdAt),
+        body,
+      } satisfies CommentEntry;
+    })
+    .filter((item): item is CommentEntry => item !== null)
+    .slice(0, MAX_DERIVED_ENTRIES);
+  return replies.length > 0 ? replies : undefined;
 }
 
 function normalizeChange(raw: unknown, index: number): TrackedChange | null {

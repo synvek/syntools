@@ -10,8 +10,9 @@ import {
   createTextElement,
 } from '../model/factory';
 import { createMediaFromFile } from '../model/media';
+import { hasCustomGeometry } from '../model/custGeom';
 import type { ShapeGeometry } from '../model/types';
-import { useSlideStore } from '../store';
+import { containerElements, useSlideStore } from '../store';
 import { FormatBar } from './FormatBar';
 import { InsertPanel } from './InsertPanel';
 import { MenuButton, type MenuItem } from './MenuButton';
@@ -75,6 +76,17 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
   const showRulers = useSlideStore((s) => s.showRulers);
   const toggleGridSnap = useSlideStore((s) => s.toggleGridSnap);
   const toggleRulers = useSlideStore((s) => s.toggleRulers);
+  const penMode = useSlideStore((s) => s.penMode);
+  const setPenMode = useSlideStore((s) => s.setPenMode);
+  const pathEditId = useSlideStore((s) => s.pathEditId);
+  const setPathEdit = useSlideStore((s) => s.setPathEdit);
+  // Only a hand-drawn / imported custom path has anchors to edit
+  const selectedElement =
+    selection.length === 1
+      ? containerElements(useSlideStore.getState()).find((el) => el.id === selection[0])
+      : undefined;
+  const canEditPoints =
+    selectedElement?.type === 'shape' && hasCustomGeometry(selectedElement.geom);
 
   const bringToFront = useSlideStore((s) => s.bringToFront);
   const sendToBack = useSlideStore((s) => s.sendToBack);
@@ -291,6 +303,21 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
               onClick={toggleRulers}
             >
               <Icon name="ruler" className="h-4 w-4" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.penTool')}
+              active={penMode}
+              onClick={() => setPenMode(!penMode)}
+            >
+              <Icon name="pen" className="h-4 w-4" />
+            </IconButton>
+            <IconButton
+              label={t('tools.slide.editPoints')}
+              active={Boolean(pathEditId)}
+              disabled={!pathEditId && !canEditPoints}
+              onClick={() => setPathEdit(pathEditId ? null : (selectedElement?.id ?? null))}
+            >
+              <Icon name="nodes" className="h-4 w-4" />
             </IconButton>
           </div>
 

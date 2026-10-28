@@ -135,14 +135,28 @@ const SHAPE_MAP: Record<string, SHAPE_NAME> = {
   downArrow: 'downArrow',
   chevron: 'chevron',
   star: 'star5',
-  star4: 'star5',
+  star4: 'star4',
   star5: 'star5',
   star6: 'star6',
-  star8: 'star5',
-  star12: 'star5',
-  star16: 'star5',
-  star24: 'star5',
-  star32: 'star5',
+  star8: 'star8',
+  star12: 'star12',
+  star16: 'star16',
+  star24: 'star24',
+  star32: 'star32',
+  parallelogram: 'parallelogram',
+  cross: 'plus',
+  leftRightArrow: 'leftRightArrow',
+  upDownArrow: 'upDownArrow',
+  quadArrow: 'quadArrow',
+  flowChartProcess: 'flowChartProcess',
+  flowChartDecision: 'flowChartDecision',
+  flowChartDocument: 'flowChartDocument',
+  flowChartTerminator: 'flowChartTerminator',
+  flowChartConnector: 'flowChartConnector',
+  wedgeRectCallout: 'wedgeRectCallout',
+  mathPlus: 'mathPlus',
+  mathMinus: 'mathMinus',
+  mathMultiply: 'mathMultiply',
   line: 'line',
 };
 
@@ -359,7 +373,12 @@ function addLineElement(slide: PresSlide, element: LineElement): void {
   const points = element.points ?? [0, 0, element.width, 0];
   const flipH = (points[2] ?? 0) < 0;
   const flipV = (points[3] ?? 0) < 0;
-  const line = lineToShapeLine(element.stroke) ?? { color: '000000', width: 1 };
+  const line: NonNullable<ShapeProps['line']> = lineToShapeLine(element.stroke) ?? {
+    color: '000000',
+    width: 1,
+  };
+  if (element.head) line.beginArrowType = element.head;
+  if (element.tail) line.endArrowType = element.tail;
   slide.addShape('line', {
     x: toIn(element.x),
     y: toIn(element.y),

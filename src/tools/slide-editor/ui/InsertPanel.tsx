@@ -10,7 +10,7 @@ import {
   createShapeElement,
 } from '../model/factory';
 import { ICON_CATEGORIES, SLIDE_ICONS, iconSvg, type SlideIcon } from '../model/icons';
-import { SHAPE_PRESETS } from '../model/shapes';
+import { SHAPE_GROUPS, SHAPE_PRESETS } from '../model/shapes';
 import { useSlideStore } from '../store';
 
 /**
@@ -39,6 +39,7 @@ export function InsertPanel({
   const doc = useSlideStore((s) => s.doc);
   const addElement = useSlideStore((s) => s.addElement);
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [shapeQuery, setShapeQuery] = useState('');
   const [chartType, setChartType] = useState<string>('bar');
   const [iconCategory, setIconCategory] = useState<string>(ICON_CATEGORIES[0]);
   const [iconQuery, setIconQuery] = useState('');
@@ -54,6 +55,20 @@ export function InsertPanel({
           icon.id.toLowerCase().includes(query)),
     );
   }, [iconCategory, iconQuery]);
+
+  const shapeGroups = useMemo(() => {
+    const query = shapeQuery.trim().toLowerCase();
+    return SHAPE_GROUPS.map((group) => ({
+      ...group,
+      items: SHAPE_PRESETS.filter(
+        (preset) =>
+          preset.group === group.id &&
+          (!query ||
+            t(`tools.slide.${preset.labelKey}`).toLowerCase().includes(query) ||
+            preset.prst.toLowerCase().includes(query)),
+      ),
+    })).filter((group) => group.items.length > 0);
+  }, [shapeQuery, t]);
 
   const insertShape = (prst: string) => {
     addElement({
@@ -129,19 +144,39 @@ export function InsertPanel({
 
         <div className="max-h-[46vh] overflow-y-auto">
           {tab === 'shape' ? (
-            <div className="grid grid-cols-6 gap-2">
-              {SHAPE_PRESETS.map((preset) => (
-                <button
-                  key={preset.prst}
-                  type="button"
-                  onClick={() => insertShape(preset.prst)}
-                  className={CARD}
-                  title={t(`tools.slide.${preset.labelKey}`)}
-                >
-                  <ShapeThumb prst={preset.prst} />
-                  <span className="truncate">{t(`tools.slide.${preset.labelKey}`)}</span>
-                </button>
+            <div className="flex flex-col gap-3">
+              <input
+                value={shapeQuery}
+                onChange={(event) => setShapeQuery(event.target.value)}
+                placeholder={t('tools.slide.shapeSearch')}
+                className="h-7 w-full rounded-md border border-gray-200 bg-white px-2 text-[12px] text-gray-700 outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              />
+              {shapeGroups.map((group) => (
+                <section key={group.id}>
+                  <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    {t(`tools.slide.${group.labelKey}`)}
+                  </div>
+                  <div className="grid grid-cols-6 gap-2">
+                    {group.items.map((preset) => (
+                      <button
+                        key={preset.prst}
+                        type="button"
+                        onClick={() => insertShape(preset.prst)}
+                        className={CARD}
+                        title={t(`tools.slide.${preset.labelKey}`)}
+                      >
+                        <ShapeThumb prst={preset.prst} />
+                        <span className="truncate">{t(`tools.slide.${preset.labelKey}`)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
               ))}
+              {shapeGroups.length === 0 ? (
+                <div className="py-6 text-center text-[12px] text-gray-400">
+                  {t('tools.slide.shapeSearchEmpty')}
+                </div>
+              ) : null}
             </div>
           ) : null}
 

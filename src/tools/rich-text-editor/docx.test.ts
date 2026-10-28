@@ -572,6 +572,41 @@ describe('docx export: equations', () => {
   });
 });
 
+describe('docx export: character-level formatting', () => {
+  it('maps <sup>/<sub> to Word vertAlign', async () => {
+    const result = await exportDocxBlob('<p>E=mc<sup>2</sup> H<sub>2</sub>O</p>', '上下标');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('<w:vertAlign w:val="superscript"/>');
+    expect(xml).toContain('<w:vertAlign w:val="subscript"/>');
+  });
+
+  it('maps letter-spacing to w:spacing and uppercase to w:caps', async () => {
+    const html =
+      '<p><span style="letter-spacing: 1px">宽</span><span style="text-transform: uppercase">abc</span></p>';
+    const result = await exportDocxBlob(html, '字间距');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    // 1px = 0.75pt = 15 twips
+    expect(xml).toContain('w:spacing w:val="15"');
+    expect(xml).toContain('<w:caps/>');
+  });
+
+  it('bakes lowercase / capitalize into the text (Word has no run property for them)', async () => {
+    const result = await exportDocxBlob(
+      '<p><span style="text-transform: lowercase">XYZ</span><span style="text-transform: capitalize">hello world</span></p>',
+      '大小写',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('xyz');
+    expect(xml).toContain('Hello World');
+  });
+});
+
 describe('docx export: comment ranges', () => {
   it('wraps a comment range spanning multiple text nodes only once (strictly nested)', async () => {
     const html = '<p><span data-comment-id="c-1">第一段<strong>加粗</strong>结尾</span></p>';

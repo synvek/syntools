@@ -36,7 +36,9 @@ import {
   type WorksheetExtrasLike,
 } from './xlsx-extras';
 import type { ChartConfig } from './charts';
+import type { SheetCommentMap } from './comments';
 import { buildChartPlan, injectChartsIntoXlsx } from './chartXml';
+import { collectEditorValidation } from './cfdv';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
 
 /**
@@ -113,6 +115,13 @@ export interface WorkbookSnapshot extends SnapshotWithExtras {
   syntoolsCharts?: ChartConfig[];
   /** Native chart parts that came with the imported file (not parsed, written back verbatim on export) */
   syntoolsRawParts?: RawChartParts;
+  /** Cell comment threads (P1-2); app-side only, reported as a fidelity warning on export */
+  syntoolsComments?: SheetCommentMap;
+  /**
+   * Univer plugin resources: `resources[pluginName][unitId][sheetId]` carries the rules created in
+   * the editor (conditional formatting, data validation). Converted to OOXML on export by `cfdv.ts`.
+   */
+  resources?: Record<string, unknown>;
 }
 
 export function createEmptySheet(id: string, name: string): SheetSnapshot {
@@ -426,6 +435,18 @@ export async function exportSnapshotToBytes(
 
       const sheetExtras = extras?.sheets?.[sheetName];
       if (sheetExtras) applySheetExtras(worksheet as unknown as WorksheetExtrasLike, sheetExtras);
+
+      // Rules created inside the editor live in snapshot resources (not in syntoolsExtras); convert + write them
+      const editorRules = collectEditorValidation(snapshot, sheetId);
+      if (
+        editorRules.conditionalFormattings.length > 0 ||
+        Object.keys(editorRules.dataValidations).length > 0
+      ) {
+        applySheetExtras(worksheet as unknown as WorksheetExtrasLike, {
+          conditionalFormattings: editorRules.conditionalFormattings,
+          dataValidations: editorRules.dataValidations,
+        });
+      }
 
       for (const [rowKey, rowCells] of Object.entries(sheet.cellData)) {
         const rowIndex = Number(rowKey) + 1;

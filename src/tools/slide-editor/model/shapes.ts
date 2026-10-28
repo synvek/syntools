@@ -1,31 +1,31 @@
 /**
- * Shape library: prstGeom presets exposed in the insert panel.
+ * Shape library exposed by the insert panel, derived from `shapeDefs.ts`.
  *
- * Much smaller than `PRST_GEOMS` in `core.ts` — that table must cover the 30+ preset geometries the
- * import side can encounter, while the insert panel only needs everyday shapes; the deliberate
- * narrowing means every shape has a proper name in all 9 languages instead of showing Chinese or a raw code in English UIs.
+ * The panel needs grouping and a label for every entry; `SHAPE_DEFS` is the single source so
+ * geometry, adjustment handles and the panel can never drift apart.
  */
+import { SHAPE_DEFS, type ShapeGroup } from './shapeDefs';
 
 export interface ShapePreset {
   /** DrawingML preset geometry name, sharing values with import/export */
   prst: string;
   /** i18n key suffix under `tools.slide.*` */
   labelKey: string;
+  /** Panel section */
+  group: ShapeGroup;
 }
 
-export const SHAPE_PRESETS: ShapePreset[] = [
-  { prst: 'rect', labelKey: 'shapePresetRect' },
-  { prst: 'roundRect', labelKey: 'shapePresetRoundRect' },
-  { prst: 'snipRoundRect', labelKey: 'shapePresetSnipRoundRect' },
-  { prst: 'ellipse', labelKey: 'shapePresetEllipse' },
-  { prst: 'triangle', labelKey: 'shapePresetTriangle' },
-  { prst: 'rtTriangle', labelKey: 'shapePresetRtTriangle' },
-  { prst: 'diamond', labelKey: 'shapePresetDiamond' },
-  { prst: 'trapezoid', labelKey: 'shapePresetTrapezoid' },
-  { prst: 'pentagon', labelKey: 'shapePresetPentagon' },
-  { prst: 'hexagon', labelKey: 'shapePresetHexagon' },
-  { prst: 'rightArrow', labelKey: 'shapePresetRightArrow' },
-  { prst: 'chevron', labelKey: 'shapePresetChevron' },
-  { prst: 'star', labelKey: 'shapePresetStar' },
-  { prst: 'star6', labelKey: 'shapePresetStar6' },
+export const SHAPE_PRESETS: ShapePreset[] = SHAPE_DEFS.map((def) => ({
+  prst: def.prst,
+  labelKey: def.labelKey,
+  group: def.group,
+}));
+
+export const SHAPE_GROUPS: { id: ShapeGroup; labelKey: string }[] = [
+  { id: 'basic', labelKey: 'shapeGroupBasic' },
+  { id: 'arrow', labelKey: 'shapeGroupArrow' },
+  { id: 'star', labelKey: 'shapeGroupStar' },
+  { id: 'flowchart', labelKey: 'shapeGroupFlowchart' },
+  { id: 'callout', labelKey: 'shapeGroupCallout' },
+  { id: 'math', labelKey: 'shapeGroupMath' },
 ];

@@ -25,6 +25,14 @@ import { EditorContextMenu, type EditorContextTarget } from './EditorContextMenu
 import { EditorToolbar } from './EditorToolbar';
 import { RulerBar } from './RulerBar';
 import { FindReplacePanel } from './FindReplacePanel';
+import {
+  createFidelityReport,
+  isFidelityMuted,
+  muteFidelity,
+  type FidelityReport,
+} from '@/core/fidelity';
+import { FidelityDialog } from '@/core/components/FidelityDialog';
+import { docxLossIssues, markdownLossIssues } from './fidelity';
 import { OutlinePanel } from './OutlinePanel';
 import {
   buildExportFilename,
@@ -70,7 +78,8 @@ import { createExtensions } from './extensions';
 import { PageSetupPanel } from './PageSetupPanel';
 import { ReviewPanel } from './ReviewPanel';
 import { StylePanel } from './StylePanel';
-import { htmlToMarkdown, type DocComment, type TrackedChange } from './docs';
+import { addCommentReply, htmlToMarkdown, type DocComment, type TrackedChange } from './docs';
+import { createCommentId } from '../../core/comments/model';
 import { pageIndexOfPosition } from './core';
 import { FootnoteDialog } from './FootnoteDialog';
 import {
@@ -170,6 +179,8 @@ export default function RichTextEditorTool() {
   const [failure, setFailure] = useState<Failure | null>(null);
   const [losses, setLosses] = useState<DocxExportLosses | null>(null);
   const [markdownLosses, setMarkdownLosses] = useState<MarkdownExportLosses | null>(null);
+  /** Unified cross-product fidelity report (shown once per export) */
+  const [fidelity, setFidelity] = useState<FidelityReport | null>(null);
   // Pagination snapshot: sheet positions + doc position of each page start (the TOC derives real page numbers from the latter)
   const [layout, setLayout] = useState<PageLayoutSnapshot>({ sheetTops: [], pageStarts: [] });
   const [printNotice, setPrintNotice] = useState(false);
@@ -600,6 +611,11 @@ export default function RichTextEditorTool() {
           ? scanned.value
           : null,
       );
+      setFidelity(
+        isFidelityMuted()
+          ? null
+          : createFidelityReport('rte', 'export', docxLossIssues(scanned.value)),
+      );
     }
   };
 
@@ -901,6 +917,18 @@ export default function RichTextEditorTool() {
     );
   };
 
+  /** Reply to a comment: metadata only, the anchor mark is untouched */
+  const handleReplyComment = (id: string, text: string) => {
+    setComments((prev) =>
+      addCommentReply(prev, id, {
+        id: createCommentId('r'),
+        author: resolveAuthor(),
+        createdAt: Date.now(),
+        body: text,
+      }),
+    );
+  };
+
   /** Tracked changes: mark the selection as insert/delete (local record + Mark) */
   const handleTrackChange = (kind: 'insert' | 'delete') => {
     if (!editor) return;
@@ -971,6 +999,11 @@ export default function RichTextEditorTool() {
         scanned.value;
       const total = comments + trackedChanges + paragraphSpacing + floatingImages + pageSetupFields;
       setMarkdownLosses(total > 0 ? scanned.value : null);
+      setFidelity(
+        isFidelityMuted()
+          ? null
+          : createFidelityReport('rte', 'export', markdownLossIssues(scanned.value)),
+      );
     }
   };
 
@@ -1647,6 +1680,7 @@ export default function RichTextEditorTool() {
               onAddComment={handleAddComment}
               onRemoveComment={handleRemoveComment}
               onToggleResolved={handleToggleResolved}
+              onReplyComment={handleReplyComment}
               onAcceptAll={() => {
                 editor?.chain().focus().acceptAllTracked().run();
                 setChanges([]);
@@ -1965,6 +1999,13 @@ export default function RichTextEditorTool() {
         onCancel={handleMathCancel}
         onConfirm={handleMathSubmit}
         onRemove={handleMathRemove}
+      />
+
+      <FidelityDialog
+        report={fidelity}
+        muted={isFidelityMuted()}
+        onClose={() => setFidelity(null)}
+        onMute={muteFidelity}
       />
 
       {contextMenu && editor ? (

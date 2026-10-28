@@ -16,6 +16,8 @@ interface ReviewPanelProps {
   onAddComment: () => void;
   onRemoveComment: (id: string) => void;
   onToggleResolved: (id: string, resolved: boolean) => void;
+  /** Reply to an existing thread (P1-2) */
+  onReplyComment: (id: string, text: string) => void;
   onAcceptAll: () => void;
   onRejectAll: () => void;
   onClose: () => void;
@@ -41,13 +43,22 @@ export function ReviewPanel({
   onAddComment,
   onRemoveComment,
   onToggleResolved,
+  onReplyComment,
   onAcceptAll,
   onRejectAll,
   onClose,
 }: ReviewPanelProps) {
   const { t } = useTranslation();
   const [draftText, setDraftText] = useState('');
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const submitReply = (id: string) => {
+    const text = (replyDrafts[id] ?? '').trim();
+    if (!text) return;
+    onReplyComment(id, text);
+    setReplyDrafts((current) => ({ ...current, [id]: '' }));
+  };
 
   useEffect(() => {
     if (pendingQuote === null) {
@@ -253,6 +264,47 @@ export function ReviewPanel({
                     <Icon name="close" className="h-3.5 w-3.5" />
                   </button>
                 </div>
+              </div>
+
+              {(comment.replies ?? []).map((reply) => (
+                <div
+                  key={reply.id}
+                  className="mt-1 border-l-2 border-gray-200 pl-2 dark:border-gray-700"
+                >
+                  <p className="break-words text-xs text-gray-700 dark:text-gray-200">
+                    {reply.body}
+                  </p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                    {reply.author}
+                    {reply.createdAt > 0 ? ` · ${new Date(reply.createdAt).toLocaleString()}` : ''}
+                  </p>
+                </div>
+              ))}
+
+              <div className="mt-1 flex items-center gap-1">
+                <input
+                  type="text"
+                  value={replyDrafts[comment.id] ?? ''}
+                  onChange={(event) =>
+                    setReplyDrafts((current) => ({ ...current, [comment.id]: event.target.value }))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    submitReply(comment.id);
+                  }}
+                  placeholder={t('tools.richText.commentReplyPlaceholder')}
+                  aria-label={t('tools.richText.commentReplyPlaceholder')}
+                  className="h-6 min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-1.5 text-xs text-gray-700 outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                />
+                <button
+                  type="button"
+                  disabled={!(replyDrafts[comment.id] ?? '').trim()}
+                  onClick={() => submitReply(comment.id)}
+                  className="h-6 shrink-0 rounded-md bg-blue-600 px-1.5 text-[10px] text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t('tools.richText.commentReply')}
+                </button>
               </div>
             </li>
           ))}

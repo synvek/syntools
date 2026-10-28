@@ -26,6 +26,7 @@ import {
   buildExportFilename,
   buildPresentGrid,
   checkImportFile,
+  sanitizeFilename,
   summarizeWorkbook,
   type PresentGrid,
   type WorkbookSnapshotLite,
@@ -59,6 +60,31 @@ import {
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
 import { PresentSheet } from './ui/PresentSheet';
 import { ChartOverlay } from './ui/ChartOverlay';
+import { PrintDialog } from './ui/PrintDialog';
+import { CommentDialog } from './ui/CommentDialog';
+import {
+  countSheetComments,
+  readSheetComments,
+  setSheetThreads,
+  threadsForSheet,
+  withSheetComments,
+  type SheetCommentMap,
+} from './comments';
+import {
+  addReply,
+  createThread,
+  setThreadResolved,
+  type CommentThread,
+} from '../../core/comments/model';
+import { printSheet, exportSheetPdf, type CellRange, type SheetPrintOptions } from './print';
+import {
+  createFidelityReport,
+  isFidelityMuted,
+  muteFidelity,
+  type FidelityReport,
+} from '@/core/fidelity';
+import { FidelityDialog } from '@/core/components/FidelityDialog';
+import { collectExportIssues } from './fidelity';
 import { readWorkbookExtras, withWorkbookExtras, type WorkbookExtras } from './xlsx-extras';
 import type { RawChartParts } from './rawChartParts';
 import { SheetTabs } from './SheetTabs';
@@ -93,6 +119,12 @@ export default function SpreadsheetTool() {
   const pendingRef = useRef<WorkbookSnapshot | null>(null);
   const [title, setTitle] = useState('');
   const [presenting, setPresenting] = useState(false);
+  const [printTarget, setPrintTarget] = useState<{
+    snapshot: WorkbookSnapshot;
+    sheetId: string | null;
+    selection: CellRange | null;
+  } | null>(null);
+  const [fidelity, setFidelity] = useState<FidelityReport | null>(null);
   const [presentGrid, setPresentGrid] = useState<PresentGrid | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
   /** Floating charts on the sheet: configs (persisted with the snapshot) + derived data + a selection hint */
@@ -105,6 +137,15 @@ export default function SpreadsheetTool() {
   /** Sheet area size: the bounds for dragging / resizing charts */
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
   const chartSeqRef = useRef(0);
+  /** Cell comment threads (P1-2): keyed by sheet id, carried by the snapshot like syntoolsCharts */
+  const [sheetComments, setSheetComments] = useState<SheetCommentMap>({});
+  const commentsRef = useRef<SheetCommentMap>({});
+  commentsRef.current = sheetComments;
+  /** Only adopt comments from the first restored snapshot; later rebuilds carry a raw Univer snapshot */
+  const commentsLoadedRef = useRef(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentCell, setCommentCell] = useState<{ row: number; col: number } | null>(null);
+  const [commentAuthor, setCommentAuthor] = useState('');
   /**
    * Persistence trigger: adding / moving / resizing / deleting a chart is not a Univer MUTATION, so
    * dirty tracking never sees it — persistence has to be requested explicitly. (Assigned once
@@ -272,8 +313,76 @@ export default function SpreadsheetTool() {
     let next: WorkbookSnapshot = base;
     if (chartsRef.current.length) next = { ...next, syntoolsCharts: chartsRef.current };
     if (rawPartsRef.current) next = { ...next, syntoolsRawParts: rawPartsRef.current };
+    // Comment threads ride along in their own field (xlsx has no counterpart yet)
+    next = withSheetComments(next, commentsRef.current);
     return withWorkbookExtras(next, extrasRef.current);
   }, []);
+
+  /** Comments are app-side data: write through the ref and request a save explicitly (like charts) */
+  const setCommentMap = useCallback((next: SheetCommentMap) => {
+    commentsRef.current = next;
+    setSheetComments(next);
+    scheduleSaveRef.current();
+  }, []);
+
+  const commentAnchor = (): { row: number; col: number } | null => {
+    const range = handleRef.current?.getActiveRange();
+    return range ? { row: range.startRow, col: range.startColumn } : null;
+  };
+
+  const openComments = () => {
+    setCommentCell(commentAnchor());
+    setCommentsOpen(true);
+  };
+
+  const resolveCommentAuthor = () => commentAuthor.trim() || t('tools.sheet.commentAnonymous');
+
+  const activeCommentSheetId = () => handleRef.current?.getActiveSheetId() ?? activeSheetId;
+
+  const updateCommentThread = (
+    threadId: string,
+    updater: (thread: CommentThread) => CommentThread,
+  ) => {
+    const sheetId = activeCommentSheetId();
+    if (!sheetId) return;
+    const threads = threadsForSheet(commentsRef.current, sheetId);
+    let changed = false;
+    const next = threads.map((thread) => {
+      if (thread.id !== threadId) return thread;
+      const updated = updater(thread);
+      if (updated !== thread) changed = true;
+      return updated;
+    });
+    if (changed) setCommentMap(setSheetThreads(commentsRef.current, sheetId, next));
+  };
+
+  const addSheetComment = (body: string) => {
+    const sheetId = activeCommentSheetId();
+    if (!sheetId || !commentCell) return;
+    const thread = createThread(
+      { kind: 'cell', sheetId, row: commentCell.row, col: commentCell.col },
+      { author: resolveCommentAuthor(), body },
+    );
+    const threads = [...threadsForSheet(commentsRef.current, sheetId), thread];
+    setCommentMap(setSheetThreads(commentsRef.current, sheetId, threads));
+  };
+
+  const replySheetComment = (threadId: string, body: string) =>
+    updateCommentThread(threadId, (thread) =>
+      addReply(thread, { author: resolveCommentAuthor(), body }),
+    );
+
+  const resolveSheetComment = (threadId: string, resolved: boolean) =>
+    updateCommentThread(threadId, (thread) => setThreadResolved(thread, resolved));
+
+  const deleteSheetComment = (threadId: string) => {
+    const sheetId = activeCommentSheetId();
+    if (!sheetId) return;
+    const threads = threadsForSheet(commentsRef.current, sheetId);
+    const next = threads.filter((thread) => thread.id !== threadId);
+    if (next.length === threads.length) return;
+    setCommentMap(setSheetThreads(commentsRef.current, sheetId, next));
+  };
 
   /**
    * Unified persistence: localStorage draft (a synchronous safety net) plus the IndexedDB document
@@ -359,6 +468,12 @@ export default function SpreadsheetTool() {
             setSelectedChartId(configs[0]?.id ?? null);
           }
         }
+        if (!commentsLoadedRef.current) {
+          const map = readSheetComments(pending);
+          commentsLoadedRef.current = true;
+          commentsRef.current = map;
+          setSheetComments(map);
+        }
       }
       handleRef.current = handle;
       // Dirty tracking: only modifications that reach the snapshot trigger debounced persistence
@@ -430,6 +545,10 @@ export default function SpreadsheetTool() {
       chartsRef.current = configs;
       setCharts(configs);
       setSelectedChartId(configs[0]?.id ?? null);
+      const commentMap = readSheetComments(snapshot);
+      commentsLoadedRef.current = true;
+      commentsRef.current = commentMap;
+      setSheetComments(commentMap);
       applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
       refreshSummary();
       refreshSheets();
@@ -521,13 +640,19 @@ export default function SpreadsheetTool() {
     if (!handle) return;
     setBusy('export');
     setFailure(null);
-    const result = await exportSnapshotToBytes(withDocOwnedContent(handle.getSnapshot()));
+    const snapshot = withDocOwnedContent(handle.getSnapshot());
+    const result = await exportSnapshotToBytes(snapshot);
     setBusy(null);
     if (!result.ok) {
       setFailure(result);
       return;
     }
     downloadBytes(result.value, buildExportFilename(title || 'workbook', 'xlsx'), XLSX_MIME);
+    setFidelity(
+      isFidelityMuted()
+        ? null
+        : createFidelityReport('sheet', 'export', collectExportIssues(snapshot)),
+    );
   };
 
   /** Export CSV from the active sheet; a leading BOM lets Excel handle Chinese text correctly */
@@ -542,6 +667,67 @@ export default function SpreadsheetTool() {
     }
     const bytes = new TextEncoder().encode(CSV_BOM + result.value);
     downloadBytes(bytes, buildExportFilename(title || 'workbook', 'csv'), 'text/csv;charset=utf-8');
+  };
+
+  /** Open the print dialog with a fresh snapshot + selection (printing never mutates the doc) */
+  const openPrint = () => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    const range = handle.getActiveRange();
+    const sheetId = handle.getActiveSheetId();
+    setPrintTarget({
+      snapshot: handle.getSnapshot(),
+      sheetId,
+      selection: range
+        ? {
+            startRow: range.startRow,
+            startColumn: range.startColumn,
+            endRow: range.endRow,
+            endColumn: range.endColumn,
+          }
+        : null,
+    });
+  };
+
+  /** Print; browsers that block the popup fall back to PDF export */
+  const handlePrint = async (options: SheetPrintOptions, range: CellRange | null) => {
+    if (!printTarget) return;
+    setFailure(null);
+    setBusy('export');
+    const result = await printSheet(printTarget.snapshot, printTarget.sheetId, options, range);
+    if (result.ok) {
+      setBusy(null);
+      setPrintTarget(null);
+      return;
+    }
+    if (result.error === 'PRINT_BLOCKED' || result.error === 'PRINT_UNSUPPORTED') {
+      const pdf = await exportSheetPdf(printTarget.snapshot, printTarget.sheetId, options, range);
+      setBusy(null);
+      if (!pdf.ok) {
+        setFailure(pdf);
+        return;
+      }
+      downloadBytes(pdf.value, `${sanitizeFilename(title || 'workbook')}.pdf`, 'application/pdf');
+      setPrintTarget(null);
+      return;
+    }
+    setBusy(null);
+    setFailure(result);
+  };
+
+  /** Export the print layout as PDF (paper / orientation / area) */
+  const handlePrintPdf = async (options: SheetPrintOptions, range: CellRange | null) => {
+    if (!printTarget) return;
+    setFailure(null);
+    setBusy('export');
+    const result = await exportSheetPdf(printTarget.snapshot, printTarget.sheetId, options, range);
+    setBusy(null);
+    if (!result.ok) {
+      setFailure(result);
+      return;
+    }
+    downloadBytes(result.value, `${sanitizeFilename(title || 'workbook')}.pdf`, 'application/pdf');
+    setPrintTarget(null);
   };
 
   const loadEmptyWorkbook = () => {
@@ -654,6 +840,9 @@ export default function SpreadsheetTool() {
         editorMenuItem('file-export-csv', t('tools.sheet.exportCsv'), handleExportCsv, {
           disabled: summary.cells === 0,
         }),
+        editorMenuItem('file-print', t('tools.sheet.print'), openPrint, {
+          disabled: summary.cells === 0,
+        }),
         { type: 'separator' },
         editorMenuItem('file-library', t('tools.sheet.library'), openLibrary),
         editorMenuItem('file-versions', t('tools.sheet.versions'), openVersions, {
@@ -720,6 +909,8 @@ export default function SpreadsheetTool() {
       id: 'view',
       label: t('common.menuView'),
       entries: [
+        editorMenuItem('view-comments', t('tools.sheet.comments'), openComments),
+        { type: 'separator' },
         editorMenuItem('view-present', t('tools.sheet.present'), () => setPresenting(true), {
           disabled: summary.cells === 0,
         }),
@@ -866,11 +1057,20 @@ export default function SpreadsheetTool() {
       />
 
       <EditorStatusBar
-        left={stats.map((item) => (
-          <span key={item.label}>
-            {item.label}: {item.value}
-          </span>
-        ))}
+        left={
+          <>
+            {stats.map((item) => (
+              <span key={item.label}>
+                {item.label}: {item.value}
+              </span>
+            ))}
+            {countSheetComments(sheetComments) > 0 ? (
+              <span className="text-amber-600 dark:text-amber-400">
+                {t('tools.sheet.commentCount', { count: countSheetComments(sheetComments) })}
+              </span>
+            ) : null}
+          </>
+        }
         right={<span>{t('common.memoryUsage', { size: memory })}</span>}
       />
 
@@ -907,6 +1107,40 @@ export default function SpreadsheetTool() {
           {translateToolError('tools.sheet', failure)}
         </p>
       )}
+
+      <FidelityDialog
+        report={fidelity}
+        muted={isFidelityMuted()}
+        onClose={() => setFidelity(null)}
+        onMute={muteFidelity}
+      />
+
+      {printTarget ? (
+        <PrintDialog
+          snapshot={printTarget.snapshot}
+          sheetId={printTarget.sheetId}
+          selection={printTarget.selection}
+          busy={busy !== null}
+          onCancel={() => setPrintTarget(null)}
+          onPrint={(options, range) => void handlePrint(options, range)}
+          onExportPdf={(options, range) => void handlePrintPdf(options, range)}
+        />
+      ) : null}
+
+      {commentsOpen ? (
+        <CommentDialog
+          cell={commentCell}
+          threads={threadsForSheet(sheetComments, activeSheetId)}
+          author={commentAuthor}
+          onAuthorChange={setCommentAuthor}
+          onAdd={addSheetComment}
+          onReply={replySheetComment}
+          onToggleResolved={resolveSheetComment}
+          onDeleteThread={deleteSheetComment}
+          onUseCurrentCell={() => setCommentCell(commentAnchor())}
+          onClose={() => setCommentsOpen(false)}
+        />
+      ) : null}
 
       {presenting ? (
         <PresentOverlay

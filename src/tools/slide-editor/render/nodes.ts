@@ -1,16 +1,19 @@
 import Konva from 'konva';
-import { toRad } from '../core';
+import { resolvePresetGeometry, toRad } from '../core';
 import type {
   Fill,
   GradientFill,
+  LineElement,
   MediaAsset,
   ShapeElement,
+  ShapeGeometry,
   SlideElement,
   Stroke,
   TableElement,
   TextBody,
 } from '../model/types';
 import { scaleBodyFonts } from '../model/text';
+import { commandsToSvg, hasCustomGeometry, scaleCommands } from '../model/custGeom';
 import { createChartNode } from './chartNode';
 import { createFormulaNode, createIconNode } from './shapeNodes';
 import { acquireImage } from './imageCache';
@@ -27,6 +30,12 @@ import { layoutTextBody } from './textLayout';
 export interface RenderContext {
   media: Record<string, MediaAsset>;
   onImageReady: () => void;
+  /**
+   * Groups entered for child editing (P1-1.5), top-down. Children of an entered group listen
+   * (and the group's transparent hit rect is dropped) so individual children can be clicked,
+   * dragged and transformed; otherwise a click selects the group as a whole.
+   */
+  enteredGroups?: string[];
 }
 
 const DEFAULT_FONT = 'Arial, Helvetica, sans-serif';
@@ -144,7 +153,16 @@ export function createTextNodes(body: TextBody, width: number, height: number): 
 }
 
 function createShapeNode(element: ShapeElement): Konva.Shape {
-  const { geom } = element;
+  // Explicit custom geometry wins over prst: re-deriving it would redraw a hand-drawn path
+  // as a rectangle. The commands are normalized, so they are scaled to the element box here.
+  if (hasCustomGeometry(element.geom) && element.geom.custGeom) {
+    return new Konva.Path({
+      data: commandsToSvg(scaleCommands(element.geom.custGeom, element.width, element.height)),
+    });
+  }
+  // `prst` + `adj` is authoritative: the stored points/radius are only a fallback for
+  // documents written before adjustment values existed.
+  const geom = resolvePresetGeometry(element.geom.prst, element.geom.adj);
   if (geom.kind === 'ellipse') {
     return new Konva.Ellipse({
       x: element.width / 2,
@@ -177,6 +195,121 @@ function createShapeNode(element: ShapeElement): Konva.Shape {
     height: element.height,
     cornerRadius: (geom.radius ?? 0) * Math.min(element.width, element.height),
   });
+}
+
+/**
+ * Draw an arrow head/tail for a polyline.
+ * `atEnd=false` uses the first segment, `atEnd=true` uses the last one.
+ */
+function addArrowHead(
+  group: Konva.Group,
+  kind: LineElement['head'],
+  points: number[],
+  color: string,
+  strokeWidth: number,
+  atEnd: boolean,
+): void {
+  if (!kind || kind === 'none' || points.length < 4) return;
+  const count = points.length;
+  const tipX = atEnd ? points[count - 2] : points[0];
+  const tipY = atEnd ? points[count - 1] : points[1];
+  const fromX = atEnd ? points[count - 4] : points[2];
+  const fromY = atEnd ? points[count - 3] : points[3];
+  const dx = tipX - fromX;
+  const dy = tipY - fromY;
+  const length = Math.hypot(dx, dy);
+  if (length < 1) return;
+
+  const size = Math.max(7, strokeWidth * 4.5);
+  const ux = dx / length;
+  const uy = dy / length;
+  const backX = tipX - ux * size;
+  const backY = tipY - uy * size;
+  const half = size * 0.45;
+  const leftX = backX - uy * half;
+  const leftY = backY + ux * half;
+  const rightX = backX + uy * half;
+  const rightY = backY - ux * half;
+
+  if (kind === 'oval') {
+    group.add(
+      new Konva.Circle({
+        x: tipX - ux * (size / 2),
+        y: tipY - uy * (size / 2),
+        radius: size / 2,
+        fill: color,
+        listening: false,
+      }),
+    );
+    return;
+  }
+
+  let arrowPoints: number[];
+  if (kind === 'diamond') {
+    arrowPoints = [
+      tipX,
+      tipY,
+      backX + uy * half,
+      backY - ux * half,
+      backX - ux * size * 0.6,
+      backY - uy * size * 0.6,
+      backX - uy * half,
+      backY + ux * half,
+    ];
+  } else if (kind === 'triangle') {
+    arrowPoints = [tipX, tipY, leftX, leftY, rightX, rightY];
+  } else {
+    // arrow / stealth: concave back notch
+    const notch = kind === 'stealth' ? 0.55 : 0.3;
+    arrowPoints = [
+      tipX,
+      tipY,
+      leftX,
+      leftY,
+      backX - ux * size * notch,
+      backY - uy * size * notch,
+      rightX,
+      rightY,
+    ];
+  }
+  group.add(
+    new Konva.Line({
+      points: arrowPoints,
+      closed: true,
+      fill: color,
+      stroke: color,
+      strokeWidth: 0.5,
+      listening: false,
+    }),
+  );
+}
+
+/**
+ * Live-update a shape node after an adjustment handle drag, without rebuilding the layer.
+ * The kind never changes during a handle drag, so mutating the existing node is safe.
+ */
+export function reshapeShapeNode(
+  node: Konva.Shape,
+  element: ShapeElement,
+  geom: ShapeGeometry,
+): void {
+  if (geom.kind === 'polygon' && geom.points && node instanceof Konva.Line) {
+    node.points(
+      geom.points.map((value, index) =>
+        index % 2 === 0 ? value * element.width : value * element.height,
+      ),
+    );
+    node.closed(true);
+    return;
+  }
+  if (geom.kind === 'star' && node instanceof Konva.Star) {
+    node.innerRadius((Math.min(element.width, element.height) / 2) * (geom.innerRatio ?? 0.4));
+    node.outerRadius(Math.min(element.width, element.height) / 2);
+    return;
+  }
+  if (geom.kind === 'rect' && node instanceof Konva.Rect) {
+    node.cornerRadius((geom.radius ?? 0) * Math.min(element.width, element.height));
+  }
 }
 
 /**
@@ -323,6 +456,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
     }
     case 'shape': {
       const shape = createShapeNode(element);
+      shape.name('shapeBody');
       applyFill(shape, element.fill, element.width, element.height);
       applyStroke(shape, element.stroke);
       group.add(shape);
@@ -362,7 +496,21 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
         lineCap: 'round',
         hitStrokeWidth: Math.max(8, element.stroke?.width ?? 1),
       });
+      line.name('lineBody');
       group.add(line);
+      // Keep the binding on the node so pointer.ts can make connectors follow a dragged shape
+      // without a store round-trip (the store path would rebuild the node mid-drag).
+      group.setAttrs({
+        cxnStartId: element.startCxn?.shapeId ?? '',
+        cxnEndId: element.endCxn?.shapeId ?? '',
+        cxnStartSite: element.startCxn?.site ?? 0,
+        cxnEndSite: element.endCxn?.site ?? 0,
+        cxnRoute: element.route ?? 'straight',
+      });
+      const color = element.stroke?.color ?? '#000000';
+      const width = element.stroke?.width ?? 1;
+      addArrowHead(group, element.head, element.points, color, width, false);
+      addArrowHead(group, element.tail, element.points, color, width, true);
       break;
     }
     case 'table': {
@@ -371,21 +519,26 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
     }
     case 'group': {
       // Child coordinates are relative to the group origin (see the GroupElement comment), so they attach
-      // directly to the already-positioned Group. Children don't listen: the MVP uses PowerPoint's "select whole group" semantics.
+      // directly to the already-positioned Group. Children listen only while the group is entered;
+      // otherwise the group is selected as a whole (PowerPoint semantics).
+      const entered = ctx.enteredGroups?.includes(element.id) ?? false;
       for (const child of element.children) {
         const node = createElementNode(child, ctx);
-        node.listening(false);
+        // A nested group stays clickable even when it isn't entered, so double-click can enter it
+        node.listening(entered || child.type === 'group');
         group.add(node);
       }
-      // Children no longer take part in hit testing; this transparent rect keeps the group clickable/draggable/selectable
-      group.add(
-        new Konva.Rect({
-          width: element.width,
-          height: element.height,
-          fill: 'rgba(0,0,0,0)',
-          listening: true,
-        }),
-      );
+      if (!entered) {
+        // Transparent rect keeps the group clickable/draggable/selectable as one object
+        group.add(
+          new Konva.Rect({
+            width: element.width,
+            height: element.height,
+            fill: 'rgba(0,0,0,0)',
+            listening: true,
+          }),
+        );
+      }
       break;
     }
     case 'chart': {

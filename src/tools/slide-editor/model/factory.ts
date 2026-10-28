@@ -33,7 +33,7 @@ export const DEFAULT_WIDTH = 1280;
 export const DEFAULT_HEIGHT = 720;
 
 /** Document schema version: kept in sync with `CURRENT_SCHEMA_VERSION` in `model/migrate.ts` */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Page size preset id */
 export type PageSizeId = '16:9' | '16:10' | '4:3' | 'a4' | 'custom';
@@ -168,6 +168,7 @@ export function createDoc(name = 'presentation', sizeId: PageSizeId = '16:9'): S
     layouts: [layout],
     slides: [createSlide(layout.id)],
     media: {},
+    comments: [],
     version: 1,
     schemaVersion: SCHEMA_VERSION,
   };

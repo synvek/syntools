@@ -27,6 +27,9 @@ export interface PptxLine {
   color?: PptxHexColor;
   width?: number;
   dash?: 'solid' | 'dash' | 'sysDash' | 'lgDash';
+  /** v3.3+ arrow heads, matching DrawingML `a:headEnd` / `a:tailEnd` types */
+  beginArrowType?: 'none' | 'arrow' | 'diamond' | 'oval' | 'stealth' | 'triangle';
+  endArrowType?: 'none' | 'arrow' | 'diamond' | 'oval' | 'stealth' | 'triangle';
 }
 
 export interface PptxBorder extends PptxLine {

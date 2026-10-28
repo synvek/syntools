@@ -8,13 +8,10 @@ import type { ConditionalFormattingOptions, DataValidation } from 'exceljs';
  * and written back on export, so "import → edit → export" never silently drops existing conditional
  * formatting / data validation.
  *
- * They live in a **tool-owned field** on the snapshot (`syntoolsExtras`) rather than Univer's
- * `resources`: Univer only loads resource names of registered plugins (core's
- * `ResourceManagerService.loadResources` filters by pluginName), and this tool installs no
- * conditional-formatting plugin, so anything written to resources is lost after loadSnapshot.
- *
- * Note: conditional formatting / data validation created inside this tool still lives on the Univer
- * side and is not mapped back to .xlsx yet; see unsupportedTip in strings for the export caveat.
+ * They live in a **tool-owned field** on the snapshot (`syntoolsExtras`) so the imported definitions
+ * survive loadSnapshot verbatim. Rules created inside the editor are a different source: they are
+ * stored by the registered CF/DV plugins in `snapshot.resources` and converted on export by
+ * `cfdv.ts`.
  */
 
 /** Content to preserve across the round-trip for one sheet */

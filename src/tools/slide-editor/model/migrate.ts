@@ -17,6 +17,9 @@ import type {
  * - chart / formula / icon elements were added (v1 data simply has none, no conversion needed);
  * - run-level extras (letter spacing/baseline/highlight/hyperlink) and element-level hyperlink/shadow, all optional.
  *
+ * What changed in v3 vs v2:
+ * - document-level `comments` threads (P1-2); older documents simply have none.
+ *
  * Migration is **idempotent**: re-running it on normalized data changes nothing.
  * `.sld` project files and localStorage drafts share this entry point, so the read paths stay consistent.
  */
@@ -86,6 +89,7 @@ export function migrateDoc(input: SlideDoc): SlideDoc {
     layouts: Array.isArray(input.layouts) ? input.layouts.map(migrateLayout) : [],
     slides: Array.isArray(input.slides) ? input.slides.map(migrateSlide) : [],
     media: input.media && typeof input.media === 'object' ? input.media : {},
+    comments: Array.isArray(input.comments) ? input.comments : [],
     version: input.version || 1,
     schemaVersion: CURRENT_SCHEMA_VERSION,
   };

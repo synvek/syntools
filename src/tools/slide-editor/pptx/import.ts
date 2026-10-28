@@ -2,6 +2,7 @@ import type { ToolResult } from '@/core/types';
 import JSZip from 'jszip';
 import { emuToPx, pxToEmu, resolvePresetGeometry } from '../core';
 import { createDoc, createId, SCHEMA_VERSION } from '../model/factory';
+import { withResolvedConnectors } from '../model/connectors';
 import { createMediaFromBytes, mimeFromFilename } from '../model/media';
 import { normalizeChartData } from '../model/chart';
 import type {
@@ -42,6 +43,7 @@ import {
   type Xfrm,
 } from './opc';
 import { parseBackgroundColor, parseTheme } from './theme';
+import { geometryFromCustGeom } from './custGeom';
 import {
   attr,
   boolAttr,
@@ -98,6 +100,14 @@ interface ImportContext {
   skipped: Set<string>;
   /** Placeholder geometry of the current layout (master included as fallback), inherited by slide placeholders without an xfrm */
   layoutPlaceholders: Map<string, Rect>;
+  /** DrawingML shape id (cNvPr@id) → imported element id, so connectors can resolve stCxn/endCxn */
+  shapeIdMap: Map<string, string>;
+  /** Connectors whose bindings are resolved once the whole spTree has been parsed */
+  connectorRefs: {
+    element: LineElement;
+    start?: { id: string; site?: number };
+    end?: { id: string; site?: number };
+  }[];
 }
 
 function nextId(ctx: ImportContext, prefix: string): string {
@@ -233,9 +243,18 @@ function fillFromParsed(parsed: ReturnType<typeof parseShapeFill>): Fill | undef
 }
 
 function parseGeom(spPrNode: XmlNode | undefined): ShapeGeometry {
+  // Custom geometry wins: a shape with an explicit path must not be re-derived from prst
+  const custom = geometryFromCustGeom(childOf(spPrNode, 'custGeom'));
+  if (custom) return custom;
   const geomNode = childOf(spPrNode, 'geom') ?? childOf(spPrNode, 'prstGeom');
   const prst = attr(geomNode, 'prst') ?? 'rect';
-  return resolvePresetGeometry(prst);
+  const adj: Record<string, number> = {};
+  for (const gd of childrenNamed(childOf(geomNode, 'avLst'), 'gd')) {
+    const name = attr(gd, 'name');
+    const match = /^val\s+(-?\d+(?:\.\d+)?)$/.exec(attr(gd, 'fmla') ?? '');
+    if (name && match) adj[name] = Number(match[1]) / 100000;
+  }
+  return resolvePresetGeometry(prst, Object.keys(adj).length > 0 ? adj : undefined);
 }
 
 function baseRect(xfrm: Xfrm | undefined) {
@@ -273,19 +292,23 @@ function parseShape(
     ...baseRect(xfrm),
     placeholder,
   };
+  let element: SlideElement;
   if (body && geometry.kind === 'rect' && !fill && !stroke) {
-    const element: TextElement = { type: 'text', ...base, body };
-    return element;
+    element = { type: 'text', ...base, body } satisfies TextElement;
+  } else if (body) {
+    const shape: ShapeElement = { type: 'shape', ...base, geom: geometry, body };
+    if (fill) shape.fill = fill;
+    if (stroke) shape.stroke = stroke;
+    element = shape;
+  } else {
+    const shape: ShapeElement = { type: 'shape', ...base, geom: geometry };
+    if (fill) shape.fill = fill;
+    if (stroke) shape.stroke = stroke;
+    element = shape;
   }
-  if (body) {
-    const element: ShapeElement = { type: 'shape', ...base, geom: geometry, body };
-    if (fill) element.fill = fill;
-    if (stroke) element.stroke = stroke;
-    return element;
-  }
-  const element: ShapeElement = { type: 'shape', ...base, geom: geometry };
-  if (fill) element.fill = fill;
-  if (stroke) element.stroke = stroke;
+  // Remember cNvPr@id so p:cxnSp's stCxn/endCxn can be resolved after the whole tree is parsed
+  const shapeRef = attr(childOf(nvSpPr, 'cNvPr'), 'id');
+  if (shapeRef) ctx.shapeIdMap.set(shapeRef, element.id);
   return element;
 }
 
@@ -346,6 +369,21 @@ function withPlaceholderFallback(element: SlideElement, label: string): SlideEle
   };
 }
 
+/** a:headEnd/a:tailEnd @type → ArrowKind */
+function parseArrowKind(value: string | undefined): LineElement['head'] {
+  if (!value || value === 'none') return undefined;
+  if (
+    value === 'arrow' ||
+    value === 'triangle' ||
+    value === 'diamond' ||
+    value === 'oval' ||
+    value === 'stealth'
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
 /** p:cxnSp → LineElement */
 function parseConnector(
   node: XmlNode,
@@ -355,7 +393,8 @@ function parseConnector(
   const spPr = childOf(node, 'spPr');
   const xfrm = readXfrm(childOf(spPr, 'xfrm'));
   if (!xfrm) return undefined;
-  const stroke = parseStroke(childOf(spPr, 'ln'), palette);
+  const ln = childOf(spPr, 'ln');
+  const stroke = parseStroke(ln, palette);
   const defaultStroke: Stroke = { color: '#000000', width: 1 };
   const element: LineElement = {
     id: nextId(ctx, 'el'),
@@ -375,6 +414,24 @@ function parseConnector(
     ],
     stroke: stroke ?? defaultStroke,
   };
+  const head = parseArrowKind(attr(childOf(ln, 'headEnd'), 'type'));
+  const tail = parseArrowKind(attr(childOf(ln, 'tailEnd'), 'type'));
+  if (head) element.head = head;
+  if (tail) element.tail = tail;
+
+  const cxnPr = childOf(childOf(node, 'nvCxnSpPr'), 'cNvCxnSpPr');
+  const readRef = (tag: string): { id: string; site?: number } | undefined => {
+    const ref = childOf(cxnPr, tag);
+    const id = attr(ref, 'id');
+    if (!id) return undefined;
+    const idx = numAttr(ref, 'idx');
+    return { id, site: idx === undefined ? undefined : Math.round(idx) };
+  };
+  const start = readRef('stCxn');
+  const end = readRef('endCxn');
+  if (start || end) {
+    ctx.connectorRefs.push({ element, start, end });
+  }
   return element;
 }
 
@@ -812,7 +869,22 @@ async function parseSpTree(
     const parsed = await parseSpTreeNode(childNode, ctx, slidePart, rels, palette, theme);
     if (parsed) elements.push(parsed);
   }
-  return mergeInheritedGeometry(elements, ctx.layoutPlaceholders);
+  const merged = mergeInheritedGeometry(elements, ctx.layoutPlaceholders);
+  // Resolve connector bindings only for elements at this tree level (group children keep their
+  // group-relative coordinates and would need a group-aware pass).
+  const present = new Set(merged);
+  for (const ref of ctx.connectorRefs) {
+    if (!present.has(ref.element)) continue;
+    if (ref.start) {
+      const shapeId = ctx.shapeIdMap.get(ref.start.id);
+      if (shapeId) ref.element.startCxn = { shapeId, site: ref.start.site };
+    }
+    if (ref.end) {
+      const shapeId = ctx.shapeIdMap.get(ref.end.id);
+      if (shapeId) ref.element.endCxn = { shapeId, site: ref.end.site };
+    }
+  }
+  return withResolvedConnectors(merged);
 }
 
 /**
@@ -1018,6 +1090,8 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
     placeholders: 0,
     skipped: new Set<string>(),
     layoutPlaceholders: new Map(),
+    shapeIdMap: new Map(),
+    connectorRefs: [],
   };
 
   const doc: SlideDoc = {

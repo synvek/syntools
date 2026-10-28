@@ -179,4 +179,33 @@ describe('normalizeDocExtras / toDraftV2', () => {
   it('treats missing html as an empty body', () => {
     expect(toDraftV2({ title: 't', html: undefined as unknown as string }).html).toBe('');
   });
+
+  it('keeps valid replies and drops malformed ones', () => {
+    const extras = normalizeDocExtras(
+      {
+        html: '<p>x</p>',
+        comments: [
+          {
+            id: 'c-1',
+            quote: '引用',
+            text: '正文',
+            author: '甲',
+            createdAt: 10,
+            resolved: false,
+            replies: [
+              { id: 'r-1', author: '乙', createdAt: 20, body: '收到' },
+              { id: 'r-2', createdAt: 30 },
+              'garbage',
+            ],
+          },
+        ],
+      },
+      false,
+    );
+    expect(extras.comments).toHaveLength(1);
+    // An empty body means "nothing to show", so only the complete reply survives
+    expect(extras.comments[0].replies).toEqual([
+      { id: 'r-1', author: '乙', createdAt: 20, body: '收到' },
+    ]);
+  });
 });

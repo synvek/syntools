@@ -134,6 +134,15 @@ interface Mark {
   font?: string;
   /** Font size (half-points, Word's w:sz) */
   size?: number;
+  /** Superscript / subscript (Word's w:vertAlign, mutually exclusive) */
+  superscript?: boolean;
+  subscript?: boolean;
+  /** Letter spacing in twips (Word's w:spacing; 1px = 15 twips) */
+  characterSpacing?: number;
+  /** uppercase -> w:caps */
+  allCaps?: boolean;
+  /** lowercase / capitalize have no Word run equivalent and are baked into the text */
+  textTransform?: 'lowercase' | 'capitalize';
 }
 
 /** Hex color -> nearest docx highlight color name */
@@ -189,6 +198,17 @@ function mergeMark(parent: Mark, el: Element): Mark {
   if (tag === 'S' || tag === 'DEL' || tag === 'STRIKE') next.strike = true;
   if (tag === 'CODE') next.font = 'Consolas';
   if (tag === 'MARK') next.highlight = 'yellow';
+  // Character-level formatting: <sup>/<sub> come from the super/subscript marks (and mammoth imports)
+  if (tag === 'SUP') next.superscript = true;
+  if (tag === 'SUB') next.subscript = true;
+  const spacingPx = Number.parseFloat(style?.letterSpacing ?? '');
+  if (Number.isFinite(spacingPx) && spacingPx !== 0) {
+    // Word measures letter spacing in twips (1/20 pt); 1px = 0.75pt = 15 twips
+    next.characterSpacing = Math.round(spacingPx * 15);
+  }
+  const transform = style?.textTransform;
+  if (transform === 'uppercase') next.allCaps = true;
+  else if (transform === 'lowercase' || transform === 'capitalize') next.textTransform = transform;
   // Explicitly set font/size must be written into Word run properties, otherwise the choice is lost after export
   const family = firstFontFamily(style?.fontFamily);
   if (family) next.font = family;
@@ -327,6 +347,20 @@ function hyperlinkMark(mark: Mark): Mark {
   return { ...mark, color: mark.color ?? '0563C1', underline: mark.underline ?? true };
 }
 
+/**
+ * Word has no run property for lowercase / capitalize, so the text itself is transformed.
+ * `capitalize` follows CSS semantics: the first letter of each whitespace-separated word.
+ */
+function applyTextTransform(text: string, transform: Mark['textTransform']): string {
+  if (transform === 'lowercase') return text.toLowerCase();
+  if (transform === 'capitalize')
+    return text.replace(
+      /(^|\s)(\p{L})/gu,
+      (_, lead: string, ch: string) => lead + ch.toUpperCase(),
+    );
+  return text;
+}
+
 /** Create one text run (automatically wrapped as a revision when tracking) */
 function createTextRun(
   ctx: ExportContext,
@@ -336,7 +370,7 @@ function createTextRun(
 ): RunChild {
   const { D } = ctx;
   const options = {
-    text,
+    text: applyTextTransform(text, mark.textTransform),
     bold: mark.bold,
     italics: mark.italics,
     strike: mark.strike,
@@ -345,6 +379,10 @@ function createTextRun(
     highlight: mark.highlight,
     font: mark.font,
     size: mark.size,
+    superScript: mark.superscript,
+    subScript: mark.subscript,
+    characterSpacing: mark.characterSpacing,
+    allCaps: mark.allCaps,
   };
   if (!tracked) return new D.TextRun(options);
   const revision = {

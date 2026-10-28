@@ -3,17 +3,59 @@ import {
   clampBounds,
   computeAlign,
   computeDistribute,
+  resolvePresetGeometry,
   unionBounds,
   type AlignMode,
   type AlignBox,
   type DistributeAxis,
 } from './core';
-import { cloneDoc, cloneElement, createDoc, createSlide, createId } from './model/factory';
+import { withResolvedConnectors } from './model/connectors';
+import {
+  cloneDoc,
+  cloneElement,
+  createDoc,
+  createId,
+  createShapeElement,
+  createSlide,
+} from './model/factory';
+import {
+  commandsFromGeometry,
+  commandsToSvg,
+  geometryFromPoints,
+  hasCustomGeometry,
+  movePathAnchor,
+  movePathControl,
+  removePathAnchor,
+  togglePathNodeSmooth,
+} from './model/custGeom';
 import { migrateDoc } from './model/migrate';
 import { replaceInDoc, type FindOptions, type TextHit } from './model/search';
 import { applyStyleSnapshot, extractStyleSnapshot, type StyleSnapshot } from './model/style';
 import { findTemplate, instantiateTemplate } from './model/templates';
-import type { Fill, Slide, SlideDoc, SlideElement, TableCell } from './model/types';
+import {
+  addReply,
+  createThread,
+  setThreadResolved,
+  type CommentAnchor,
+  type CommentThread,
+} from '../../core/comments/model';
+import {
+  elementsAtPath,
+  findElementDeep,
+  flattenElements,
+  offsetElementsDeep,
+  patchElementsDeep,
+  removeElementsDeep,
+} from './model/tree';
+import type {
+  ConnectorEnd,
+  Fill,
+  PathCommand,
+  Slide,
+  SlideDoc,
+  SlideElement,
+  TableCell,
+} from './model/types';
 
 /**
  * Slide editor state: `doc` is the single source of truth; the rest (selection / viewport / history) is session state.
@@ -59,6 +101,21 @@ interface SlideState {
   insertPanel: 'shape' | 'chart' | 'icon' | 'formula' | null;
   /** Manual guides (session state, not part of doc / undo) */
   guides: { id: string; axis: 'x' | 'y'; position: number }[];
+  /** Pen tool active (canvas clicks add path points instead of selecting) */
+  penMode: boolean;
+  /** Points placed so far by the pen tool, in page coordinates */
+  penPoints: { x: number; y: number }[];
+  /** Node editing (P1-1.4): id of the custom-geometry shape whose anchors are editable */
+  pathEditId: string | null;
+  /** Command index of the anchor focused during node editing */
+  activePathNode: number | null;
+  /** Entered group ids, top-down (P1-1.5). Empty = editing the slide level */
+  groupPath: string[];
+
+  /** Author name used for new comments (P1-2); empty falls back to the anonymous label */
+  commentAuthor: string;
+  /** Thread highlighted in the comment panel */
+  activeThreadId: string | null;
 
   /** View mode: normal editing / master editing */
   viewMode: ViewMode;
@@ -99,7 +156,45 @@ interface SlideState {
 
   select: (ids: string[], additive?: boolean) => void;
   addElement: (element: SlideElement) => void;
+  /** Enter / leave the pen tool (leaving clears the in-progress path) */
+  setPenMode: (on: boolean) => void;
+  /** Pen: add one point (page coordinates) */
+  addPenPoint: (point: { x: number; y: number }) => void;
+  /** Pen: close the path and insert it as a custom-geometry shape (needs ≥ 2 points) */
+  finishPen: () => void;
+  /** Pen: discard the in-progress path and leave the tool */
+  cancelPen: () => void;
+  /** Enter / leave node editing for a custom-geometry shape (null = off) */
+  setPathEdit: (id: string | null) => void;
+  /** Focus one anchor (or clear) while editing nodes */
+  setActivePathNode: (index: number | null) => void;
+  /** Replace the custom geometry of a shape (one undo step) */
+  setPathCommands: (id: string, commands: PathCommand[]) => void;
+  /** Move one anchor of the edited path (normalized coordinates) */
+  movePathNode: (id: string, index: number, x: number, y: number) => void;
+  /** Move one bezier control handle of the edited path */
+  movePathHandle: (id: string, index: number, which: 'in' | 'out', x: number, y: number) => void;
+  /** Delete one anchor (needs ≥ 2 remaining) */
+  removePathNode: (id: string, index: number) => void;
+  /** Toggle one anchor between smooth and corner */
+  togglePathNode: (id: string, index: number) => void;
+  /** Enter a group (double-click): its children become selectable */
+  enterGroup: (id: string) => void;
+  /** Leave the deepest entered group, selecting it as a whole */
+  exitGroup: () => void;
+
+  setCommentAuthor: (name: string) => void;
+  setActiveThread: (id: string | null) => void;
+  /** New thread anchored to the selected element, or to the page centre when nothing is selected */
+  addComment: (body: string, author: string) => void;
+  replyComment: (threadId: string, body: string, author: string) => void;
+  setCommentResolved: (threadId: string, resolved: boolean) => void;
+  deleteCommentThread: (threadId: string) => void;
   patchElement: (id: string, patch: Partial<SlideElement>, history?: boolean) => void;
+  /** Update `adj1`/`adj2`… on a shape (canvas adjustment handle or property panel) */
+  setShapeAdjustment: (id: string, adj: Record<string, number>) => void;
+  /** Bind/unbind one end of a connector to a shape connection site */
+  setConnectorEnd: (id: string, which: 'start' | 'end', end: ConnectorEnd | null) => void;
   patchSelected: (patch: Partial<SlideElement>, history?: boolean) => void;
   /**
    * Computes a patch from each element's **own current value** and applies it in bulk (`updater` returning `null` skips it).
@@ -228,7 +323,10 @@ function writeContainerElements(
 ): SlideDoc {
   const ref = containerRefOf(s);
   const current = elementsOf(s.doc, ref);
-  const resolved = typeof next === 'function' ? next(current) : next;
+  const raw = typeof next === 'function' ? next(current) : next;
+  // Bound connectors derive their box/points from the shapes they attach to, so every write
+  // re-resolves them; free lines pass through untouched.
+  const resolved = withResolvedConnectors(raw);
   if (ref.kind === 'slide') {
     const slides = s.doc.slides.map((slide, i) =>
       i === ref.index ? { ...slide, elements: resolved } : slide,
@@ -262,6 +360,25 @@ function toBox(element: SlideElement): AlignBox {
   return { x: element.x, y: element.y, width: element.width, height: element.height };
 }
 
+/** Comments don't change the rendered page, so they never bump the thumbnail version counter */
+function writeCommentThreads(doc: SlideDoc, threads: CommentThread[]): SlideDoc {
+  return { ...doc, comments: threads };
+}
+
+/**
+ * Keep the entered group only while the selection stays inside it.
+ * A blank click or a top-level pick ends group editing, matching PowerPoint's click-outside exit.
+ */
+function groupPathAfterSelect(
+  s: ContainerHost & { groupPath: string[] },
+  selection: string[],
+): string[] {
+  if (s.groupPath.length === 0) return s.groupPath;
+  if (selection.length === 0) return [];
+  const level = elementsAtPath(containerElements(s), s.groupPath);
+  return selection.every((id) => level.some((element) => element.id === id)) ? s.groupPath : [];
+}
+
 export const useSlideStore = create<SlideState>((set, get) => ({
   doc: createDoc(),
   slideIndex: 0,
@@ -275,6 +392,13 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   activeCell: null,
   gridSnap: false,
   showRulers: true,
+  penMode: false,
+  penPoints: [],
+  pathEditId: null,
+  activePathNode: null,
+  groupPath: [],
+  commentAuthor: '',
+  activeThreadId: null,
   insertPanel: null,
   guides: [],
   viewMode: 'normal',
@@ -282,7 +406,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   masterIndex: 0,
   formatPainter: null,
 
-  setViewMode: (mode) => set({ viewMode: mode, selection: [], activeCell: null }),
+  setViewMode: (mode) => set({ viewMode: mode, selection: [], activeCell: null, groupPath: [] }),
 
   selectMasterTarget: (kind, index) =>
     set((s) => {
@@ -291,6 +415,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
         masterKind: kind,
         masterIndex: Math.min(Math.max(index, 0), Math.max(0, max)),
         selection: [],
+        groupPath: [],
       };
     }),
 
@@ -334,7 +459,9 @@ export const useSlideStore = create<SlideState>((set, get) => ({
 
   copyFormat: () => {
     const state = get();
-    const target = containerElements(state).find((el) => state.selection.includes(el.id));
+    const target = flattenElements(containerElements(state)).find((el) =>
+      state.selection.includes(el.id),
+    );
     if (!target) return;
     set({ formatPainter: extractStyleSnapshot(target) });
   },
@@ -346,13 +473,13 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     get().commit();
     set((s) => {
       const patches = new Map<string, Partial<SlideElement>>();
-      for (const element of containerElements(s)) {
+      for (const element of flattenElements(containerElements(s))) {
         if (!s.selection.includes(element.id)) continue;
         patches.set(element.id, applyStyleSnapshot(element, snapshot));
       }
       if (patches.size === 0) return s;
       return {
-        doc: writeContainerElements(s, (current) => patchElements(current, patches)),
+        doc: writeContainerElements(s, (current) => patchElementsDeep(current, patches)),
         // The format painter is single-use: it clears itself after applying (matching PowerPoint's click behavior)
         formatPainter: null,
       };
@@ -391,6 +518,10 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       report: report ?? null,
       // Re-fit the zoom after switching documents
       viewport: { ...s.viewport, scale: 0 },
+      pathEditId: null,
+      activePathNode: null,
+      groupPath: [],
+      activeThreadId: null,
     })),
 
   setDocName: (name) => set((s) => ({ doc: { ...s.doc, name } })),
@@ -421,6 +552,9 @@ export const useSlideStore = create<SlideState>((set, get) => ({
         doc: previous,
         slideIndex: Math.min(s.slideIndex, previous.slides.length - 1),
         selection: [],
+        pathEditId: null,
+        activePathNode: null,
+        groupPath: [],
       };
     }),
 
@@ -434,6 +568,9 @@ export const useSlideStore = create<SlideState>((set, get) => ({
         doc: next,
         slideIndex: Math.min(s.slideIndex, next.slides.length - 1),
         selection: [],
+        pathEditId: null,
+        activePathNode: null,
+        groupPath: [],
       };
     }),
 
@@ -441,6 +578,8 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     set((s) => ({
       slideIndex: Math.min(Math.max(index, 0), s.doc.slides.length - 1),
       selection: [],
+      groupPath: [],
+      activeThreadId: null,
     })),
 
   addSlide: () => {
@@ -515,11 +654,20 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   },
 
   select: (ids, additive = false) =>
-    set((s) => ({
-      selection: additive ? Array.from(new Set([...s.selection, ...ids])) : ids,
-      // Clear the active table cell when the selection changes, so the panel doesn't point at an unselected table
-      activeCell: null,
-    })),
+    set((s) => {
+      const selection = additive ? Array.from(new Set([...s.selection, ...ids])) : ids;
+      // Node editing survives only while its shape stays selected
+      const keepPath = Boolean(s.pathEditId && selection.includes(s.pathEditId));
+      return {
+        selection,
+        // Clear the active table cell when the selection changes, so the panel doesn't point at an unselected table
+        activeCell: null,
+        pathEditId: keepPath ? s.pathEditId : null,
+        activePathNode: keepPath ? s.activePathNode : null,
+        // Picking something outside the entered group leaves it (PowerPoint behaviour)
+        groupPath: groupPathAfterSelect(s, selection),
+      };
+    }),
 
   addElement: (element) => {
     get().commit();
@@ -529,11 +677,241 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     }));
   },
 
+  setPenMode: (on) => set({ penMode: on, penPoints: [] }),
+
+  addPenPoint: (point) => set((s) => (s.penMode ? { penPoints: [...s.penPoints, point] } : {})),
+
+  finishPen: () => {
+    // A closing double-click arrives as two presses; drop the near-duplicate tail point
+    const raw = get().penPoints;
+    const points = raw.filter(
+      (point, index) =>
+        index === 0 || Math.hypot(point.x - raw[index - 1].x, point.y - raw[index - 1].y) > 2,
+    );
+    set({ penPoints: [], penMode: false });
+    const built = geometryFromPoints(points);
+    if (!built) return;
+    const element = createShapeElement(get().doc, built.geom);
+    element.x = built.x;
+    element.y = built.y;
+    element.width = built.width;
+    element.height = built.height;
+    get().addElement(element);
+  },
+
+  cancelPen: () => set({ penPoints: [], penMode: false }),
+
+  setPathEdit: (id) => {
+    if (!id) {
+      set({ pathEditId: null, activePathNode: null });
+      return;
+    }
+    const element = containerElements(get()).find((item) => item.id === id);
+    if (!element || element.type !== 'shape' || !hasCustomGeometry(element.geom)) {
+      set({ pathEditId: null, activePathNode: null });
+      return;
+    }
+    set({ pathEditId: id, activePathNode: null, selection: [id], penMode: false, penPoints: [] });
+  },
+
+  setActivePathNode: (index) => set({ activePathNode: index }),
+
+  setPathCommands: (id, commands) => {
+    // A path needs a move plus one more command; anything shorter would be a dangling element
+    if (commands.length < 2) return;
+    get().commit();
+    set((s) => ({
+      doc: writeContainerElements(s, (current) =>
+        current.map((el) =>
+          el.id === id && el.type === 'shape'
+            ? {
+                ...el,
+                geom: {
+                  ...el.geom,
+                  kind: 'path',
+                  custGeom: commands,
+                  path: commandsToSvg(commands),
+                },
+              }
+            : el,
+        ),
+      ),
+    }));
+  },
+
+  movePathNode: (id, index, x, y) => {
+    const element = containerElements(get()).find((item) => item.id === id);
+    if (!element || element.type !== 'shape') return;
+    const commands = commandsFromGeometry(element.geom);
+    const next = movePathAnchor(commands, index, x, y);
+    if (next === commands) return;
+    get().setPathCommands(id, next);
+  },
+
+  movePathHandle: (id, index, which, x, y) => {
+    const element = containerElements(get()).find((item) => item.id === id);
+    if (!element || element.type !== 'shape') return;
+    const commands = commandsFromGeometry(element.geom);
+    const next = movePathControl(commands, index, which, x, y);
+    if (next === commands) return;
+    get().setPathCommands(id, next);
+  },
+
+  removePathNode: (id, index) => {
+    const element = containerElements(get()).find((item) => item.id === id);
+    if (!element || element.type !== 'shape') return;
+    const commands = commandsFromGeometry(element.geom);
+    const next = removePathAnchor(commands, index);
+    if (next === commands) return;
+    get().setPathCommands(id, next);
+    get().setActivePathNode(null);
+  },
+
+  togglePathNode: (id, index) => {
+    const element = containerElements(get()).find((item) => item.id === id);
+    if (!element || element.type !== 'shape') return;
+    const commands = commandsFromGeometry(element.geom);
+    const next = togglePathNodeSmooth(commands, index);
+    if (next === commands) return;
+    get().setPathCommands(id, next);
+  },
+
+  enterGroup: (id) => {
+    const state = get();
+    // Only a group that sits on the current level can be entered
+    const level = elementsAtPath(containerElements(state), state.groupPath);
+    const target = level.find((element) => element.id === id);
+    if (!target || target.type !== 'group') return;
+    set({
+      groupPath: [...state.groupPath, id],
+      selection: [],
+      pathEditId: null,
+      activePathNode: null,
+      activeCell: null,
+    });
+  },
+
+  exitGroup: () => {
+    const state = get();
+    if (state.groupPath.length === 0) return;
+    const leaving = state.groupPath[state.groupPath.length - 1];
+    set({
+      groupPath: state.groupPath.slice(0, -1),
+      // Selecting the group as a whole is what the user expects after leaving it
+      selection: [leaving],
+      activeCell: null,
+      pathEditId: null,
+      activePathNode: null,
+    });
+  },
+
+  setCommentAuthor: (name) => set({ commentAuthor: name }),
+
+  setActiveThread: (id) => set({ activeThreadId: id }),
+
+  addComment: (body, author) => {
+    const state = get();
+    // Master/layout views have no slide to anchor to
+    if (state.viewMode !== 'normal' || !body.trim()) return;
+    const slide = state.doc.slides[state.slideIndex];
+    if (!slide) return;
+    const target =
+      state.selection.length === 1
+        ? findElementDeep(containerElements(state), state.selection[0])
+        : undefined;
+    const anchor: CommentAnchor = target
+      ? { kind: 'element', slideId: slide.id, elementId: target.id, dx: 0.5, dy: 0.5 }
+      : {
+          kind: 'page',
+          slideId: slide.id,
+          x: Math.round(state.doc.width / 2),
+          y: Math.round(state.doc.height / 2),
+        };
+    const thread = createThread(anchor, { author, body });
+    get().commit();
+    set((s) => ({
+      doc: writeCommentThreads(s.doc, [...(s.doc.comments ?? []), thread]),
+      activeThreadId: thread.id,
+    }));
+  },
+
+  replyComment: (threadId, body, author) => {
+    if (!body.trim()) return;
+    const state = get();
+    const thread = (state.doc.comments ?? []).find((item) => item.id === threadId);
+    if (!thread) return;
+    const next = addReply(thread, { author, body });
+    if (next === thread) return;
+    get().commit();
+    set((s) => ({
+      doc: writeCommentThreads(
+        s.doc,
+        (s.doc.comments ?? []).map((item) => (item.id === threadId ? next : item)),
+      ),
+    }));
+  },
+
+  setCommentResolved: (threadId, resolved) => {
+    const state = get();
+    const thread = (state.doc.comments ?? []).find((item) => item.id === threadId);
+    if (!thread) return;
+    const next = setThreadResolved(thread, resolved);
+    if (next === thread) return;
+    get().commit();
+    set((s) => ({
+      doc: writeCommentThreads(
+        s.doc,
+        (s.doc.comments ?? []).map((item) => (item.id === threadId ? next : item)),
+      ),
+    }));
+  },
+
+  deleteCommentThread: (threadId) => {
+    const state = get();
+    if (!(state.doc.comments ?? []).some((item) => item.id === threadId)) return;
+    get().commit();
+    set((s) => ({
+      doc: writeCommentThreads(
+        s.doc,
+        (s.doc.comments ?? []).filter((item) => item.id !== threadId),
+      ),
+      activeThreadId: s.activeThreadId === threadId ? null : s.activeThreadId,
+    }));
+  },
+
   patchElement: (id, patch, history = true) => {
     if (history) get().commit();
     set((s) => ({
+      // Depth-aware: a child inside an entered group is patched in place
       doc: writeContainerElements(s, (current) =>
-        current.map((el) => (el.id === id ? ({ ...el, ...patch } as SlideElement) : el)),
+        patchElementsDeep(current, new Map([[id, patch]])),
+      ),
+    }));
+  },
+
+  setShapeAdjustment: (id, adj) => {
+    get().commit();
+    set((s) => ({
+      doc: writeContainerElements(s, (current) =>
+        current.map((el) => {
+          if (el.id !== id || el.type !== 'shape') return el;
+          const merged = { ...(el.geom.adj ?? {}), ...adj };
+          return { ...el, geom: resolvePresetGeometry(el.geom.prst, merged) };
+        }),
+      ),
+    }));
+  },
+
+  setConnectorEnd: (id, which, end) => {
+    get().commit();
+    set((s) => ({
+      doc: writeContainerElements(s, (current) =>
+        current.map((el) => {
+          if (el.id !== id || el.type !== 'line') return el;
+          return which === 'start'
+            ? { ...el, startCxn: end ?? undefined }
+            : { ...el, endCxn: end ?? undefined };
+        }),
       ),
     }));
   },
@@ -543,14 +921,14 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     set((s) => {
       const patches = new Map<string, Partial<SlideElement>>();
       for (const id of s.selection) patches.set(id, patch);
-      return { doc: writeContainerElements(s, (current) => patchElements(current, patches)) };
+      return { doc: writeContainerElements(s, (current) => patchElementsDeep(current, patches)) };
     });
   },
 
   patchSelectedWith: (updater, history = true) => {
     const state = get();
     const patches = new Map<string, Partial<SlideElement>>();
-    for (const element of containerElements(state)) {
+    for (const element of flattenElements(containerElements(state))) {
       if (!state.selection.includes(element.id)) continue;
       const patch = updater(element);
       // Skip empty patches (e.g. font size already at its limit) to avoid a "nothing changed" undo step
@@ -564,25 +942,30 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   },
 
   moveSelected: (dx, dy) =>
-    set((s) => ({
-      doc: writeContainerElements(s, (current) =>
-        current.map((el) => {
-          if (!s.selection.includes(el.id)) return el;
-          const next = clampBounds({ ...el, x: el.x + dx, y: el.y + dy }, s.doc);
-          return { ...el, ...next } as SlideElement;
-        }),
-      ),
-    })),
+    set((s) => {
+      // Page clamping only applies at slide level; children live in group-local coordinates
+      const topLevel = new Set(containerElements(s).map((element) => element.id));
+      return {
+        doc: writeContainerElements(s, (current) =>
+          offsetElementsDeep(current, s.selection, (element) =>
+            topLevel.has(element.id)
+              ? clampBounds({ ...element, x: element.x + dx, y: element.y + dy }, s.doc)
+              : { x: element.x + dx, y: element.y + dy },
+          ),
+        ),
+      };
+    }),
 
   removeSelected: () => {
     get().commit();
     set((s) => {
       if (s.selection.length === 0) return s;
       return {
-        doc: writeContainerElements(s, (current) =>
-          current.filter((el) => !s.selection.includes(el.id)),
-        ),
+        // Deleting inside an entered group removes the child, not the group
+        doc: writeContainerElements(s, (current) => removeElementsDeep(current, s.selection)),
         selection: [],
+        pathEditId: null,
+        activePathNode: null,
       };
     });
   },
@@ -711,6 +1094,8 @@ export const useSlideStore = create<SlideState>((set, get) => ({
 
   groupSelected: () => {
     const state = get();
+    // Grouping inside an entered group would need a path-aware writer; keep it at slide level for now
+    if (state.groupPath.length > 0) return;
     const current = containerElements(state);
     const picked = current.filter((el) => state.selection.includes(el.id));
     if (picked.length < 2) return;
@@ -747,6 +1132,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
 
   ungroupSelected: () => {
     const state = get();
+    if (state.groupPath.length > 0) return;
     const current = containerElements(state);
     const hasGroup = current.some((el) => state.selection.includes(el.id) && el.type === 'group');
     if (!hasGroup) return;

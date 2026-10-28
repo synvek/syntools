@@ -25,11 +25,19 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
   const [blank, setBlank] = useState<'none' | 'black' | 'white'>('none');
   const [laser, setLaser] = useState(false);
   const [showNotes, setShowNotes] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const layerRef = useRef<Konva.Layer | null>(null);
   const laserRef = useRef<Konva.Circle | null>(null);
+
+  // Kept in a ref so the fullscreen listeners below never need to re-subscribe.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     setCursor(slideIndex);
@@ -39,6 +47,56 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  /* ------------------------------ Fullscreen ------------------------------ */
+
+  // Enter true fullscreen on mount; the overlay itself stays the fallback when the API is
+  // unavailable (Tauri WebView, denied gesture) — a failed request must not block presenting.
+  const enteredFullscreenRef = useRef(false);
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+
+    const onChange = () => {
+      const active = document.fullscreenElement === el;
+      if (active) enteredFullscreenRef.current = true;
+      setIsFullscreen(active);
+      // Leaving fullscreen (browser-handled Esc) ends the presentation, like PowerPoint.
+      // Only react once we actually entered, so a rejected request never closes the overlay.
+      if (!active && enteredFullscreenRef.current) onCloseRef.current();
+    };
+
+    document.addEventListener('fullscreenchange', onChange);
+    const request = el.requestFullscreen?.();
+    void request?.catch(() => {
+      /* keep the overlay; no error surfaced */
+    });
+
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      if (document.fullscreenElement === el) {
+        void document.exitFullscreen?.().catch(() => {
+          /* already exited */
+        });
+      }
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (document.fullscreenElement === el) {
+      void document.exitFullscreen?.().catch(() => {
+        /* already exited */
+      });
+      return;
+    }
+    const request = el.requestFullscreen?.();
+    void request?.catch(() => {
+      /* unsupported: staying in the overlay is fine */
+    });
   }, []);
 
   /* ----------------------------- Vector stage ----------------------------- */
@@ -178,7 +236,7 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
   const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0b1220]">
+    <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col bg-[#0b1220]">
       <header className="flex items-center justify-between gap-3 px-4 py-2 text-sm text-gray-300">
         <span className="tabular-nums">
           {cursor + 1} / {doc.slides.length}
@@ -187,6 +245,17 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
           <span className="tabular-nums text-gray-400" aria-label={t('tools.slide.elapsedTime')}>
             {clock}
           </span>
+          <button
+            type="button"
+            aria-label={t('tools.slide.fullscreen')}
+            aria-pressed={isFullscreen}
+            onClick={toggleFullscreen}
+            className={`rounded-md border px-2 py-1 text-[12px] transition-colors ${
+              isFullscreen ? 'border-blue-500 text-blue-300' : 'border-gray-600 hover:bg-gray-800'
+            }`}
+          >
+            ⛶
+          </button>
           <button
             type="button"
             aria-label={t('tools.slide.laserPointer')}

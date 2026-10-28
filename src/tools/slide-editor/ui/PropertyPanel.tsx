@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { backgroundToColor } from '../core';
+import { shapeAdjustValues, shapeAdjustments } from '../model/shapeDefs';
 import type { RunStyle, SlideElement, Stroke } from '../model/types';
 import { containerElements, useSlideStore } from '../store';
 import { ChartEditor } from './ChartEditor';
@@ -25,6 +26,7 @@ export function PropertyPanel() {
   const masterIndex = useSlideStore((s) => s.masterIndex);
   const selection = useSlideStore((s) => s.selection);
   const patchElement = useSlideStore((s) => s.patchElement);
+  const setShapeAdjustment = useSlideStore((s) => s.setShapeAdjustment);
   const updateSlide = useSlideStore((s) => s.updateSlide);
   const removeSelected = useSlideStore((s) => s.removeSelected);
   const duplicateSelected = useSlideStore((s) => s.duplicateSelected);
@@ -175,6 +177,27 @@ export function PropertyPanel() {
             now collected in the toolbar's "arrange" row; opacity/radius are in the "format" row;
             only geometry that needs exact numbers is left here, which keeps the semantics clean. */}
       </Section>
+
+      {element.type === 'shape' && shapeAdjustments(element.geom.prst).length > 0 ? (
+        <Section title={t('tools.slide.shapeAdjust')}>
+          <div className="grid grid-cols-2 gap-2">
+            {shapeAdjustments(element.geom.prst).map((spec, index) => {
+              const values = shapeAdjustValues(element.geom);
+              return (
+                <Field key={spec.id} label={`${t('tools.slide.shapeAdjust')} ${index + 1}`}>
+                  <NumberInput
+                    ariaLabel={`${t('tools.slide.shapeAdjust')} ${index + 1}`}
+                    value={Math.round(values[spec.id] * 100)}
+                    min={Math.round(spec.min * 100)}
+                    max={Math.round(spec.max * 100)}
+                    onChange={(value) => setShapeAdjustment(element.id, { [spec.id]: value / 100 })}
+                  />
+                </Field>
+              );
+            })}
+          </div>
+        </Section>
+      ) : null}
 
       {element.type === 'table' ? (
         <Section title={t('tools.slide.tableTitle')}>

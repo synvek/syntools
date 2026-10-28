@@ -12,6 +12,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import { FontFamily, FontSize, LineHeight, TextStyle } from '@tiptap/extension-text-style';
 import StarterKit from '@tiptap/starter-kit';
 import { FindReplace } from './find-replace';
+import { charFormatExtensions } from './charFormat';
 import { ImageLayerCommands } from './imageLayer';
 import { BlockStyleCommands, ImageStyle, ParagraphStyle, TableStyle } from './blockStyles';
 import { Comment, DocMarkCommands, TrackedDelete, TrackedInsert } from './marks';
@@ -161,6 +162,8 @@ export function createExtensions({
     TrackedInsert,
     TrackedDelete,
     DocMarkCommands,
+    // Character-level formatting (superscript / subscript / letter spacing / text transform)
+    ...charFormatExtensions,
     // TOC / footnote labels follow the language: the nodes carry no attributes, so titles localize on language switch
     TableOfContents.configure({ labels: tocLabels ?? DEFAULT_TOC_LABELS }),
     FootnoteRef.configure({ labels: footnoteLabels ?? DEFAULT_FOOTNOTE_LABELS }),

@@ -1,5 +1,7 @@
 import Konva from 'konva';
 import { computeSnap, type Guide, type SnapCandidate } from '../core';
+import { CONNECTOR_SITES, lineGeometryFromPoints } from '../model/connectors';
+import type { LineElement, PathCommand } from '../model/types';
 import type { StageHandle } from '../render/stage';
 import { updateMarquee, type TransformChange } from '../render/overlays';
 
@@ -38,8 +40,38 @@ export interface StageCallbacks {
   onCellSelect: (cell: { row: number; col: number } | null) => void;
   /** Pan the canvas (middle-button drag) */
   onPan: (dx: number, dy: number) => void;
+  /** Adjustment handle committed (one undo step per drag) */
+  onShapeAdjust: (id: string, adj: Record<string, number>) => void;
+  /** Connector endpoint committed: `end` non-null binds to a site, null detaches with free geometry */
+  onConnectorEnd: (
+    id: string,
+    which: 'start' | 'end',
+    end: { shapeId?: string; site?: number } | null,
+    geometry: Partial<LineElement>,
+  ) => void;
   getSnapContext: () => SnapContext;
   getSelection: () => string[];
+  /** Pen tool: clicks place path points instead of selecting / marquee-selecting */
+  isPenMode?: () => boolean;
+  /** Pen: a click placed one point (page coordinates) */
+  onPenPoint?: (x: number, y: number) => void;
+  /** Pen: double-click closed the path */
+  onPenFinish?: () => void;
+
+  /** Node editing: final normalized commands after an anchor / control drag */
+  onPathCommands: (id: string, commands: PathCommand[]) => void;
+  /** Node editing: an anchor was clicked (null clears the focus) */
+  onPathActive: (index: number | null) => void;
+  /** Node editing: double-click toggled smooth ↔ corner */
+  onPathToggleSmooth: (id: string, index: number) => void;
+
+  /** Group editing: double-click on a group opened it for child selection */
+  onEnterGroup: (id: string) => void;
+  /** Ids that may be selected at the current editing level (marquee filter) */
+  getEditableIds?: () => string[];
+
+  /** Comment marker clicked on the canvas (P1-2) */
+  onSelectComment: (threadId: string) => void;
 }
 
 const SNAP_TOLERANCE = 6;
@@ -72,6 +104,16 @@ export function attachInteraction(handle: StageHandle): void {
     }
     // The right button is handled by contextmenu (menu), not by the marquee
     if (event.evt instanceof MouseEvent && event.evt.button === 2) return;
+    // Pen mode takes over the left button: every press appends a path point, never a selection
+    if (callbacks.isPenMode?.()) {
+      const view = pointerPosition();
+      const scale = contentLayer.scaleX() || 1;
+      callbacks.onPenPoint?.(
+        (view.x - contentLayer.x()) / scale,
+        (view.y - contentLayer.y()) / scale,
+      );
+      return;
+    }
     const element = ancestorElement(target);
     // Any press invalidates the previous "marquee ended" flag so it can't swallow later normal clicks
     marqueeJustEnded = false;
@@ -114,12 +156,16 @@ export function attachInteraction(handle: StageHandle): void {
       width: Number(box.width),
       height: Number(box.height),
     };
+    // Deep: inside an entered group the marquee must catch its children, not only top-level elements
+    const editable = callbacks.getEditableIds?.();
     const ids = contentLayer
-      .getChildren()
+      .find('.element')
       // Locked elements don't take part in the marquee
       .filter(
         (child) =>
-          child.name() === 'element' && !child.getAttr('elLocked') && intersects(child, rect),
+          !child.getAttr('elLocked') &&
+          intersects(child, rect) &&
+          (!editable || editable.includes(child.id())),
       )
       .map((child) => child.id());
     // Mark this as a marquee landing so the following background click doesn't clear what was just selected
@@ -177,8 +223,21 @@ export function attachInteraction(handle: StageHandle): void {
   });
 
   contentLayer.on('dblclick dbltap', (event) => {
+    // In pen mode a double-click closes the path, it must not open the text editor
+    if (callbacks.isPenMode?.()) return;
     const element = ancestorElement(event.target);
-    if (element) callbacks.onTextEdit(element.id());
+    if (!element) return;
+    // Double-click on a group enters it (PowerPoint "edit group"); nested groups can be entered again
+    if (element.getAttr('elType') === 'group') {
+      callbacks.onEnterGroup(element.id());
+      return;
+    }
+    callbacks.onTextEdit(element.id());
+  });
+
+  // The final double-click may land on blank space: the stage sees it even when the layer doesn't
+  stage.on('dblclick dbltap', () => {
+    if (callbacks.isPenMode?.()) callbacks.onPenFinish?.();
   });
 
   contentLayer.on('dragstart', (event) => {
@@ -193,8 +252,10 @@ export function attachInteraction(handle: StageHandle): void {
       selection = [node.id()];
     }
     const selected = new Set(selection);
-    for (const child of contentLayer.getChildren()) {
-      if (child.name() !== 'element') continue;
+    const parent = node.getParent();
+    // Deep search: inside an entered group the members live under the group node, not the layer
+    for (const child of contentLayer.find('.element')) {
+      if (child.getParent() !== parent) continue;
       if (!selected.has(child.id())) continue;
       dragOrigin.set(child.id(), { x: child.x(), y: child.y() });
     }
@@ -205,7 +266,12 @@ export function attachInteraction(handle: StageHandle): void {
     const node = event.target;
     if (!node.id()) return;
     const context = callbacks.getSnapContext();
-    const moving = snapNode(node, context, handle);
+    // Group children live in group-local coordinates: page snapping would move them to the wrong place
+    const nested = node.getParent() !== contentLayer;
+    const moving = nested
+      ? { x: node.x(), y: node.y(), guides: [] as Guide[] }
+      : snapNode(node, context, handle);
+    if (nested) handle.hideGuides();
     const origin = dragOrigin.get(node.id());
     const dx = origin ? moving.x - origin.x : 0;
     const dy = origin ? moving.y - origin.y : 0;
@@ -214,6 +280,7 @@ export function attachInteraction(handle: StageHandle): void {
       const sibling = contentLayer.findOne<Konva.Node>(`#${id}`);
       if (sibling) sibling.position({ x: start.x + dx, y: start.y + dy });
     }
+    updateBoundConnectors(contentLayer, node.id());
     contentLayer.batchDraw();
     callbacks.onDragMove(node.id(), moving.x, moving.y, moving.guides);
   });
@@ -226,6 +293,55 @@ export function attachInteraction(handle: StageHandle): void {
     dragOrigin = new Map();
     contentLayer.batchDraw();
   });
+}
+
+/**
+ * Bound connectors follow a dragged shape without waiting for dragend (the store sync is
+ * suppressed while dragging so the dragged node isn't rebuilt). Only the line body moves;
+ * arrow heads are rebuilt from the store on dragend.
+ */
+function updateBoundConnectors(layer: Konva.Layer, skipId: string): void {
+  for (const node of layer.find('.element')) {
+    if (node.id() === skipId) continue;
+    // Nested connectors use group-local coordinates; the store rebuilds them on dragend anyway
+    if (node.getParent() !== layer) continue;
+    if (node.getAttr('elType') !== 'line') continue;
+    const startId = node.getAttr('cxnStartId') as string | undefined;
+    const endId = node.getAttr('cxnEndId') as string | undefined;
+    if (!startId && !endId) continue;
+    const lineNode = (node as Konva.Group).findOne<Konva.Line>('.lineBody');
+    if (!lineNode) continue;
+    const points = lineNode.points();
+    const freeStart = { x: node.x() + (points[0] ?? 0), y: node.y() + (points[1] ?? 0) };
+    const freeEnd = {
+      x: node.x() + (points[points.length - 2] ?? node.width()),
+      y: node.y() + (points[points.length - 1] ?? node.height()),
+    };
+    const startShape = startId ? layer.findOne<Konva.Node>(`#${startId}`) : undefined;
+    const endShape = endId ? layer.findOne<Konva.Node>(`#${endId}`) : undefined;
+    const start = startShape
+      ? shapeSitePoint(startShape, Number(node.getAttr('cxnStartSite') ?? 0))
+      : freeStart;
+    const end = endShape
+      ? shapeSitePoint(endShape, Number(node.getAttr('cxnEndSite') ?? 4))
+      : freeEnd;
+    const geometry = lineGeometryFromPoints(
+      start,
+      end,
+      (node.getAttr('cxnRoute') as LineElement['route']) ?? 'straight',
+    );
+    node.position({ x: geometry.x, y: geometry.y });
+    lineNode.points(geometry.points);
+  }
+}
+
+function shapeSitePoint(shape: Konva.Node, site: number): { x: number; y: number } {
+  const index = ((site % CONNECTOR_SITES.length) + CONNECTOR_SITES.length) % CONNECTOR_SITES.length;
+  const normalized = CONNECTOR_SITES[index];
+  return {
+    x: shape.x() + normalized.x * (shape.width() ?? 0),
+    y: shape.y() + normalized.y * (shape.height() ?? 0),
+  };
 }
 
 /** Snapping during a drag: rewrite the node position directly so the screen locks on instantly */

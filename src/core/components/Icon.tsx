@@ -388,6 +388,14 @@ const icons: Record<string, ReactNode> = {
       <path d="m16.5 3.5 4 4L8 20H4v-4L16.5 3.5Z" />
     </>
   ),
+  nodes: (
+    <>
+      <path d="M6 6 12 18 18 6" />
+      <circle cx="6" cy="6" r="2" />
+      <circle cx="12" cy="18" r="2" />
+      <circle cx="18" cy="6" r="2" />
+    </>
+  ),
   codeImage: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />

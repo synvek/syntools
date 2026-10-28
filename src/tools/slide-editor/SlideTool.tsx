@@ -16,10 +16,19 @@ import {
 import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
+import {
+  createFidelityReport,
+  isFidelityMuted,
+  muteFidelity,
+  type FidelityIssue,
+  type FidelityReport,
+} from '@/core/fidelity';
+import { FidelityDialog } from '@/core/components/FidelityDialog';
 import { downloadBytes, downloadDataUrl } from '@/core/pdf/download';
 import { buildExportFilename } from './core';
 import { clearDraft, readDraft, writeDraft } from './draft';
 import { disposeRaster, exportSlidesToPdf, renderSlideToDataUrl } from './io/raster';
+import { exportPrintPdf, printSlides, type PrintOptions } from './io/print';
 import { buildDeck, parseOutline } from './io/outline';
 import { openProject, saveProject } from './io/project';
 import { attachKeyboard } from './interaction/keyboard';
@@ -38,10 +47,13 @@ import { checkImportFile, importPptxFile } from './pptx/import';
 import { exportPptx } from './pptx/export';
 import { registerSlideStrings } from './strings';
 import { containerElements, useSlideStore } from './store';
+import { countUnresolved } from '../../core/comments/model';
 import { FindReplaceBar } from './ui/FindReplaceBar';
+import { CommentPanel } from './ui/CommentPanel';
 import { LayerPanel } from './ui/LayerPanel';
 import { MasterView } from './ui/MasterView';
 import { PresentOverlay } from './ui/PresentOverlay';
+import { PrintDialog } from './ui/PrintDialog';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { SlideCanvas } from './ui/SlideCanvas';
 import { SlideToolbar } from './ui/SlideToolbar';
@@ -66,6 +78,7 @@ const DRAFT_DEBOUNCE_MS = 1200;
 export default function SlideTool() {
   const { t } = useTranslation();
   const doc = useSlideStore((s) => s.doc);
+  const unresolvedComments = countUnresolved(doc.comments ?? []);
   const slideIndex = useSlideStore((s) => s.slideIndex);
   const selection = useSlideStore((s) => s.selection);
   const report = useSlideStore((s) => s.report);
@@ -107,8 +120,12 @@ export default function SlideTool() {
   const [runtimeError, setRuntimeError] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
-  const [rightTab, setRightTab] = useState<'element' | 'layers' | 'theme' | 'template'>('element');
+  const [rightTab, setRightTab] = useState<
+    'element' | 'layers' | 'theme' | 'template' | 'comments'
+  >('element');
   const [outlineOpen, setOutlineOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [fidelity, setFidelity] = useState<FidelityReport | null>(null);
   const [outlineText, setOutlineText] = useState('');
   const [findOpen, setFindOpen] = useState(false);
   const saveTimer = useRef<number | null>(null);
@@ -138,6 +155,18 @@ export default function SlideTool() {
         return;
       }
       loadDoc(result.value.doc, result.value.report);
+      const { placeholders, skipped } = result.value.report;
+      const issues: FidelityIssue[] = [];
+      if (placeholders > 0 || skipped.length > 0) {
+        issues.push({
+          code: 'slide.placeholders',
+          severity: 'loss',
+          count: placeholders > 0 ? placeholders : skipped.length,
+          messageKey: 'tools.slide.downgraded',
+          ...(skipped.length > 0 ? { detail: skipped.slice(0, 5).join(', ') } : {}),
+        });
+      }
+      setFidelity(isFidelityMuted() ? null : createFidelityReport('slide', 'import', issues));
     },
     [loadDoc],
   );
@@ -156,6 +185,22 @@ export default function SlideTool() {
       buildExportFilename(useSlideStore.getState().doc.name || 'presentation', 'pptx'),
       PPTX_MIME,
     );
+    // Comments stay in the .sld document only: OOXML comment round-trip is P2, so say so explicitly
+    const comments = useSlideStore.getState().doc.comments ?? [];
+    if (comments.length > 0) {
+      setFidelity(
+        isFidelityMuted()
+          ? null
+          : createFidelityReport('slide', 'export', [
+              {
+                code: 'slide.comments',
+                severity: 'warning',
+                count: comments.length,
+                messageKey: 'tools.slide.commentLoss',
+              },
+            ]),
+      );
+    }
   }, []);
 
   /** Export PDF: rasterize each slide then combine, reusing core/pdf's imagesToPdf */
@@ -174,6 +219,55 @@ export default function SlideTool() {
       buildExportFilename(state.doc.name || 'presentation', 'pdf'),
       'application/pdf',
     );
+  }, []);
+
+  /** Print using the chosen sheet layout; popup-blocked browsers fall back to the PDF path */
+  const handlePrint = useCallback(async (options: PrintOptions) => {
+    setFailure(null);
+    setBusy('export');
+    const state = useSlideStore.getState();
+    const result = await printSlides(state.doc, options);
+    if (result.ok) {
+      setBusy(null);
+      setPrintOpen(false);
+      return;
+    }
+    if (result.error === 'PRINT_BLOCKED' || result.error === 'PRINT_UNSUPPORTED') {
+      const pdf = await exportPrintPdf(state.doc, options);
+      setBusy(null);
+      if (!pdf.ok) {
+        setFailure(pdf as Failure);
+        return;
+      }
+      downloadBytes(
+        pdf.value,
+        buildExportFilename(state.doc.name || 'presentation', 'pdf'),
+        'application/pdf',
+      );
+      setPrintOpen(false);
+      return;
+    }
+    setBusy(null);
+    setFailure(result as Failure);
+  }, []);
+
+  /** Export the print layout as PDF (paper / orientation / slides per sheet) */
+  const handlePrintPdf = useCallback(async (options: PrintOptions) => {
+    setFailure(null);
+    setBusy('export');
+    const state = useSlideStore.getState();
+    const result = await exportPrintPdf(state.doc, options);
+    setBusy(null);
+    if (!result.ok) {
+      setFailure(result as Failure);
+      return;
+    }
+    downloadBytes(
+      result.value,
+      buildExportFilename(state.doc.name || 'presentation', 'pdf'),
+      'application/pdf',
+    );
+    setPrintOpen(false);
   }, []);
 
   /** Export the current slide as PNG (2× resolution or more) */
@@ -284,13 +378,37 @@ export default function SlideTool() {
   useEffect(
     () =>
       attachKeyboard({
-        onDelete: () => removeSelected(),
+        onDelete: () => {
+          const state = useSlideStore.getState();
+          // Node editing owns Delete: it removes the focused anchor, not the whole shape
+          if (state.pathEditId && state.activePathNode !== null) {
+            state.removePathNode(state.pathEditId, state.activePathNode);
+            return;
+          }
+          removeSelected();
+        },
         onUndo: () => undo(),
         onRedo: () => redo(),
         onDuplicate: () => duplicateSelected(),
         onNudge: (dx, dy) => moveBy(dx, dy),
         onSelectAll: () => select(containerElements(useSlideStore.getState()).map((el) => el.id)),
-        onEscape: () => select([]),
+        onEscape: () => {
+          const state = useSlideStore.getState();
+          if (state.pathEditId) {
+            state.setPathEdit(null);
+            return;
+          }
+          // Esc leaves the deepest entered group one level at a time
+          if (state.groupPath.length > 0) {
+            state.exitGroup();
+            return;
+          }
+          if (state.penMode) {
+            state.cancelPen();
+            return;
+          }
+          select([]);
+        },
         onCopy: () => copySelected(),
         onCut: () => cutSelected(),
         onPaste: () => pasteClipboard(),
@@ -369,6 +487,9 @@ export default function SlideTool() {
         { type: 'separator' },
         editorMenuItem('file-export-pptx', t('tools.slide.exportPptx'), () => void handleExport()),
         editorMenuItem('file-export-pdf', t('tools.slide.exportPdf'), () => void handleExportPdf()),
+        editorMenuItem('file-print', t('tools.slide.print'), () => setPrintOpen(true), {
+          disabled: doc.slides.length === 0,
+        }),
         editorMenuItem('file-export-image', t('tools.slide.exportImage'), () => handleExportPng()),
         editorMenuItem(
           'file-export-project',
@@ -726,7 +847,7 @@ export default function SlideTool() {
 
           <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/40">
             <div className="flex gap-1">
-              {(['element', 'layers', 'theme', 'template'] as const).map((tab) => (
+              {(['element', 'layers', 'theme', 'template', 'comments'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -743,7 +864,9 @@ export default function SlideTool() {
                       ? t('tools.slide.panelLayers')
                       : tab === 'theme'
                         ? t('tools.slide.panelTheme')
-                        : t('tools.slide.panelTemplate')}
+                        : tab === 'template'
+                          ? t('tools.slide.panelTemplate')
+                          : t('tools.slide.panelComments')}
                 </button>
               ))}
             </div>
@@ -753,8 +876,10 @@ export default function SlideTool() {
               <LayerPanel />
             ) : rightTab === 'theme' ? (
               <ThemePanel />
-            ) : (
+            ) : rightTab === 'template' ? (
               <TemplateGallery />
+            ) : (
+              <CommentPanel />
             )}
           </aside>
         </div>
@@ -772,6 +897,11 @@ export default function SlideTool() {
                 ? t('tools.slide.selected', { count: selection.length })
                 : t('tools.slide.noSelection')}
             </span>
+            {unresolvedComments > 0 ? (
+              <span className="text-amber-600 dark:text-amber-400">
+                {t('tools.slide.commentUnresolved', { count: unresolvedComments })}
+              </span>
+            ) : null}
             {report && report.placeholders > 0 ? (
               <span className="text-amber-600 dark:text-amber-400">
                 {t('tools.slide.downgraded', { count: report.placeholders })}
@@ -877,6 +1007,24 @@ export default function SlideTool() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      <FidelityDialog
+        report={fidelity}
+        muted={isFidelityMuted()}
+        onClose={() => setFidelity(null)}
+        onMute={muteFidelity}
+      />
+
+      {printOpen ? (
+        <PrintDialog
+          slideCount={doc.slides.length}
+          aspect={doc.width / doc.height}
+          busy={busy === 'export'}
+          onCancel={() => setPrintOpen(false)}
+          onPrint={(options) => void handlePrint(options)}
+          onExportPdf={(options) => void handlePrintPdf(options)}
+        />
       ) : null}
 
       {presenting ? <PresentOverlay onClose={() => setPresenting(false)} /> : null}

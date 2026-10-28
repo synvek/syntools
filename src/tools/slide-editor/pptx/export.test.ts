@@ -7,11 +7,11 @@ import {
   createTableElement,
   createTextElement,
 } from '../model/factory';
-import type { SlideDoc, SlideElement, TextElement } from '../model/types';
+import type { ShapeElement, SlideDoc, SlideElement, TextElement } from '../model/types';
 import { importPptxFile } from './import';
 // This file asserts the output structure of the **hand-written DrawingML channel**, so it uses legacy explicitly.
 // See exportPptxgen.test.ts for the pptxgen channel assertions.
-import { exportPptxLegacy } from './export';
+import { exportPptx, exportPptxLegacy } from './export';
 import { elementXml, slideXml } from './write';
 
 function sampleDoc(): SlideDoc {
@@ -103,6 +103,42 @@ describe('pptx 导出包结构', () => {
     expect(rels).toContain('Target="slides/slide1.xml"');
     expect(rels).toContain('Id="rId2"');
     expect(presentation).toContain('r:id="rId2"');
+  });
+});
+
+describe('自定义几何（a:custGeom）', () => {
+  function customDoc(): SlideDoc {
+    const doc = createDoc('custom');
+    const shape = createShapeElement(doc, { kind: 'path', prst: 'rect' }) as ShapeElement;
+    shape.geom.custGeom = [
+      { c: 'M', x: 0, y: 0 },
+      { c: 'L', x: 1, y: 0 },
+      { c: 'L', x: 0.5, y: 1 },
+      { c: 'Z' },
+    ];
+    doc.slides[0].elements = [shape];
+    return doc;
+  }
+
+  it('自动走 legacy 通道并写出 a:custGeom（pptxgenjs 无路径能力）', async () => {
+    const result = await exportPptx(customDoc());
+    expect(result.ok).toBe(true);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    const xml = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+    expect(xml).toContain('<a:custGeom>');
+    expect(xml).toContain('<a:moveTo>');
+    expect(xml).toContain('<a:lnTo>');
+    expect(xml).not.toContain('<a:prstGeom prst="rect"');
+  });
+
+  it('普通预设形状仍然写 prstGeom', async () => {
+    const doc = createDoc('preset');
+    doc.slides[0].elements = [createShapeElement(doc, { kind: 'rect', prst: 'roundRect' })];
+    const result = await exportPptxLegacy(doc);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    const xml = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+    expect(xml).toContain('<a:prstGeom prst="roundRect">');
+    expect(xml).not.toContain('<a:custGeom>');
   });
 });
 

@@ -7,6 +7,9 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/synvek/syntools"
 edition = "2021"
 rust-version = "1.77.2"
+# Desktop app crate, never published to crates.io. Also the signal cargo-deny uses to treat this
+# package as first-party code instead of a third-party dependency (see deny.toml).
+publish = false
 
 [lib]
 name = "syntools_lib"

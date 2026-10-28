@@ -5,6 +5,8 @@
  * pptx import/export boundary (1 inch = 914400 EMU = 96px → 1px = 9525 EMU, exact).
  */
 
+import type { CommentThread } from '../../../core/comments/model';
+
 /** Background/fill with no paint */
 export interface NoFill {
   type: 'none';
@@ -109,6 +111,18 @@ export interface TextBody {
 /** Text direction */
 export type TextVert = 'horz' | 'vert' | 'vert270' | 'wordArtVert';
 
+/**
+ * One command of a DrawingML `a:custGeom` path, in **normalized 0~1** coordinates.
+ * Normalized so the shape can be resized without rewriting the path; rendering scales it,
+ * export multiplies it back into the `a:path@w/h` space.
+ */
+export type PathCommand =
+  | { c: 'M'; x: number; y: number }
+  | { c: 'L'; x: number; y: number }
+  | { c: 'C'; x1: number; y1: number; x2: number; y2: number; x: number; y: number }
+  | { c: 'Q'; x1: number; y1: number; x: number; y: number }
+  | { c: 'Z' };
+
 /** DrawingML prstGeom → render-ready geometry description */
 export interface ShapeGeometry {
   /** Render form: rect (optionally rounded) / ellipse / star / closed polygon / SVG path */
@@ -119,8 +133,19 @@ export interface ShapeGeometry {
   points?: number[];
   /** Normalized SVG path, kind==='path' */
   path?: string;
+  /**
+   * Explicit custom geometry (normalized commands). When present it wins over `prst`,
+   * both when rendering and when exporting (`a:custGeom` is written instead of `a:prstGeom`).
+   */
+  custGeom?: PathCommand[];
   /** Star inner ratio (0~1), kind==='star' */
   innerRatio?: number;
+  /**
+   * DrawingML adjustment values, keyed `adj1`/`adj2`… and normalized to 0~1.
+   * The preset definition (`model/shapeDefs.ts`) turns them into the render geometry;
+   * export writes them to `a:avLst`, import reads them back.
+   */
+  adj?: Record<string, number>;
   /** Original prstGeom name, written back first on export */
   prst: string;
 }
@@ -191,11 +216,34 @@ export interface ImageElement extends ElementBase {
   stroke?: Stroke;
 }
 
+/** Arrow head/tail style (DrawingML `a:headEnd` / `a:tailEnd`). */
+export type ArrowKind = 'none' | 'arrow' | 'triangle' | 'diamond' | 'oval' | 'stealth';
+
+/**
+ * Connector endpoint binding. When `shapeId` is set, the endpoint follows the shape's
+ * connection site (`site`, 0–7 clockwise from top); otherwise the point stays free.
+ */
+export interface ConnectorEnd {
+  shapeId?: string;
+  /** Connection site index: 0 top, 2 right, 4 bottom, 6 left (odd values are corners). */
+  site?: number;
+}
+
 export interface LineElement extends ElementBase {
   type: 'line';
   /** Start/end points (offsets relative to x/y, in the pre-rotation coordinate system) */
   points: number[];
   stroke: Stroke;
+  /** Arrow at the start of the line */
+  head?: ArrowKind;
+  /** Arrow at the end of the line */
+  tail?: ArrowKind;
+  /** Start endpoint bound to a shape connection site */
+  startCxn?: ConnectorEnd;
+  /** End endpoint bound to a shape connection site */
+  endCxn?: ConnectorEnd;
+  /** Routing for bound connectors; free lines stay straight */
+  route?: 'straight' | 'elbow';
 }
 
 export interface TableCell {
@@ -367,6 +415,8 @@ export interface MediaAsset {
 export interface SlideDoc {
   id: string;
   name: string;
+  /** Comment threads (P1-2); anchored to elements or page points, persisted with the document */
+  comments?: CommentThread[];
   /** Slide size (px @96dpi) */
   width: number;
   height: number;
