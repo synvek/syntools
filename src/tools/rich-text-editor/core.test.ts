@@ -10,6 +10,7 @@ import {
   createEmptyDocHtml,
   countPages,
   htmlToPlain,
+  normalizeImportedDocHtml,
   pageIndexOfPosition,
   resolveImportKind,
   scanMarkdownExportLosses,
@@ -91,6 +92,24 @@ describe('sanitizeDocHtml', () => {
 
   it('returns EMPTY for empty content', () => {
     expect(sanitizeDocHtml('  ')).toEqual({ ok: false, error: 'EMPTY' });
+  });
+});
+
+describe('normalizeImportedDocHtml', () => {
+  it('wraps loose inline content inside blockquote in a paragraph', () => {
+    expect(normalizeImportedDocHtml('<blockquote>Quoted</blockquote>')).toContain(
+      '<blockquote><p>Quoted</p></blockquote>',
+    );
+  });
+
+  it('leaves a blockquote that already has block children untouched', () => {
+    const html = '<blockquote><p>Quoted</p></blockquote>';
+    expect(normalizeImportedDocHtml(html)).toBe(html);
+  });
+
+  it('does not add an empty paragraph to an empty blockquote', () => {
+    const html = '<blockquote></blockquote>';
+    expect(normalizeImportedDocHtml(html)).toBe(html);
   });
 });
 

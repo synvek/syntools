@@ -82,11 +82,11 @@ export interface PptxTextOptions {
   paraSpaceAfter?: number;
 
   margin?: number | [number, number, number, number];
+  shadow?: PptxShadow;
   wrap?: boolean;
   fit?: 'none' | 'shrink' | 'resize';
   fill?: PptxFill;
   line?: PptxLine;
-  shadow?: PptxShadow;
   isTextBox?: boolean;
 }
 

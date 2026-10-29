@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   CHART_TYPES,
+  isSingleSeriesChart,
   resizeChartCategories,
   resizeChartSeries,
   setChartLabel,
@@ -57,13 +58,21 @@ export function ChartEditor({ element }: { element: ChartElement }) {
           />
         </Field>
         <Field label={t('tools.slide.chartSeries')}>
-          <NumberInput
-            ariaLabel={t('tools.slide.chartSeries')}
-            value={element.series.length}
-            min={1}
-            max={12}
-            onChange={(count) => apply(resizeChartSeries(element, count))}
-          />
+          {/* Pie/doughnut only draw series[0] (and export it alone), so offering a series count
+              would let users fill in data that never appears. */}
+          {isSingleSeriesChart(element.chartType) ? (
+            <p className="text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+              {t('tools.slide.chartSingleSeriesHint')}
+            </p>
+          ) : (
+            <NumberInput
+              ariaLabel={t('tools.slide.chartSeries')}
+              value={element.series.length}
+              min={1}
+              max={12}
+              onChange={(count) => apply(resizeChartSeries(element, count))}
+            />
+          )}
         </Field>
       </div>
 

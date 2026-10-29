@@ -1,12 +1,14 @@
 import type { ToolResult } from '@/core/types';
-import { computePageBreaks } from './core';
-import { applyPagedBreaks } from './PageView';
+import { applyPagedBreaks, planPageStarts } from './PageView';
+import { isFloatingImageElement } from './imageLayer';
 import {
   DEFAULT_PAGE_SETUP,
   normalizePageSetup,
+  pageMetricsToPx,
   resolvePageMetrics,
   type PageSetupConfig,
 } from './pageSetup';
+import { parseSectionBreakElement, type SectionedBlock } from './sections';
 
 /**
  * PDF export adapter layer:
@@ -69,25 +71,60 @@ export async function snapshotToPdf(
     if (!width || !height) return { ok: false, error: 'RENDER_FAILED' };
 
     const pxPerMm = width / metrics.contentWidthMm;
-    const pageHeightPx = metrics.contentHeightMm * pxPerMm;
+    // Available content height in CSS px, taken from the page metrics (not derived from the container
+    // width) so the slice height is the exact number the on-screen page view paginated with.
+    const pageHeightPx = pageMetricsToPx(metrics).contentHeightPx;
     const baseTop = container.getBoundingClientRect().top;
-    const items = Array.from(container.children).map((child) => {
-      const rect = child.getBoundingClientRect();
-      return { top: rect.top - baseTop, height: rect.height };
-    });
+
+    // Section-aware slicing: the snapshot PDF must paginate exactly like the on-screen page view,
+    // otherwise a multi-section document exports a different page count than it displays.
+    const setups: PageSetupConfig[] = [setup];
+    const blocks: SectionedBlock[] = [];
+    for (const child of Array.from(container.children)) {
+      const el = child as HTMLElement;
+      if (el.hasAttribute('data-section-break')) {
+        const parsedSetup = parseSectionBreakElement(el, setup);
+        setups.push(parsedSetup.pageSetup);
+        // Zero-height block: the forced page start belongs to the next visible block
+        blocks.push({ top: 0, height: 0, section: setups.length - 1 });
+        continue;
+      }
+      // Floating images are out of the text flow (same rule as on-screen pagination)
+      if (isFloatingImageElement(el)) {
+        blocks.push({ top: 0, height: 0, section: setups.length - 1 });
+        continue;
+      }
+      const rect = el.getBoundingClientRect();
+      blocks.push({ top: rect.top - baseTop, height: rect.height, section: setups.length - 1 });
+    }
+
     // Multi-column layout is flowed by the browser/Word itself, and block-based page cutting drifts
     // under columns, so slice at a fixed page height to stay consistent with print/Word column flow
-    const cuts =
-      metrics.columns > 1
-        ? Array.from(
-            { length: Math.max(0, Math.ceil(height / pageHeightPx) - 1) },
-            (_, index) => (index + 1) * pageHeightPx,
-          )
-        : computePageBreaks(items, pageHeightPx);
+    let cuts: number[];
+    let pageSections: number[];
+    if (metrics.columns > 1) {
+      const fixed = Array.from(
+        { length: Math.max(0, Math.ceil(height / pageHeightPx) - 1) },
+        (_, index) => (index + 1) * pageHeightPx,
+      );
+      cuts = fixed;
+      pageSections = [0, ...fixed.map(() => 0)];
+    } else {
+      // Same planner as the page view and the print path: it also honors explicit page-break nodes
+      // (a block after a break must start a page), so the snapshot can't drift from the screen.
+      const starts = planPageStarts(Array.from(container.children), blocks, pageHeightPx);
+      cuts = starts.map((index) => blocks[index].top);
+      pageSections = [0, ...starts.map((index) => blocks[index].section)];
+    }
     const bounds = [0, ...cuts, height];
     const pages = bounds
       .slice(0, -1)
-      .map((start, index) => ({ start, height: bounds[index + 1] - start }))
+      .map((start, index) => ({
+        start,
+        height: bounds[index + 1] - start,
+        // Empty pages are filtered out below, so carry the section index on the page itself
+        section: pageSections[index] ?? 0,
+      }))
       .filter((page) => page.height > 1)
       .slice(0, MAX_PAGES);
     if (pages.length === 0) return { ok: false, error: 'RENDER_FAILED' };
@@ -99,21 +136,26 @@ export async function snapshotToPdf(
     const renderedRatio = source.height / height;
 
     const { jsPDF } = await import('jspdf');
+    // First page defines the PDF's initial format; later pages may differ (one paper size per section)
+    const firstSetup = setups[pages[0]?.section ?? 0] ?? setup;
+    const firstMetrics = resolvePageMetrics(firstSetup);
     const doc = new jsPDF({
       unit: 'mm',
-      format: [metrics.widthMm, metrics.heightMm],
+      format: [firstMetrics.widthMm, firstMetrics.heightMm],
       orientation: 'portrait',
       compress: true,
     });
     // Page background: the snapshot is already filled, so only the sheet margins outside the content area need it
-    if (setup.background) {
-      doc.setFillColor(setup.background);
-      doc.rect(0, 0, metrics.widthMm, metrics.heightMm, 'F');
+    if (firstSetup.background) {
+      doc.setFillColor(firstSetup.background);
+      doc.rect(0, 0, firstMetrics.widthMm, firstMetrics.heightMm, 'F');
     }
 
     for (let i = 0; i < pages.length; i += 1) {
       const page = pages[i];
-      if (i > 0) doc.addPage();
+      const pageSetup = setups[page.section] ?? setup;
+      const pageMetrics = resolvePageMetrics(pageSetup);
+      if (i > 0) doc.addPage([pageMetrics.widthMm, pageMetrics.heightMm], 'portrait');
       const sliceHeightPx = Math.max(
         1,
         Math.min(
@@ -130,19 +172,20 @@ export async function snapshotToPdf(
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(source, 0, -Math.round(page.start * renderedRatio));
       const pageUrl = canvas.toDataURL('image/jpeg', 0.92);
-      const pageHeightMm = Math.min(metrics.contentHeightMm, page.height / pxPerMm);
+      const pageHeightMm = Math.min(pageMetrics.contentHeightMm, page.height / pxPerMm);
       doc.addImage(
         pageUrl,
         'JPEG',
-        setup.margin.left,
-        setup.margin.top,
+        pageSetup.margin.left,
+        pageSetup.margin.top,
+        // Content width stays the document width: the snapshot is rendered once at that width
         metrics.contentWidthMm,
         pageHeightMm,
       );
       // Watermark: drawn as text over the snapshot so opacity and rotation stay controllable
-      drawWatermark(doc, setup, metrics);
+      drawWatermark(doc, pageSetup, pageMetrics);
       // Header / footer / page number (drawn as text over the snapshot)
-      drawHeaderFooter(doc, setup, metrics, i + 1);
+      drawHeaderFooter(doc, pageSetup, pageMetrics, i + 1);
       onProgress?.((i + 1) / pages.length);
     }
 

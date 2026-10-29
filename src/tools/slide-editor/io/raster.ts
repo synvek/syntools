@@ -1,6 +1,4 @@
 import Konva from 'konva';
-import { imagesToPdf } from '@/core/pdf/convert';
-import type { ToolResult } from '@/core/types';
 import type { Slide, SlideDoc } from '../model/types';
 import { backgroundFillProps } from '../render/background';
 import { createElementNode } from '../render/nodes';
@@ -86,18 +84,6 @@ export function dataUrlToBytes(dataUrl: string): Uint8Array {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
-}
-
-/** All slides → PDF (one bitmap per page, page size taken from the pixel size) */
-export async function exportSlidesToPdf(doc: SlideDoc): Promise<ToolResult<Uint8Array>> {
-  const images: { bytes: Uint8Array; mime: string }[] = [];
-  for (const slide of doc.slides) {
-    const dataUrl = renderSlideToDataUrl(doc, slide);
-    if (!dataUrl) return { ok: false, error: 'RENDER_FAILED' };
-    images.push({ bytes: dataUrlToBytes(dataUrl), mime: 'image/png' });
-  }
-  if (images.length === 0) return { ok: false, error: 'EMPTY' };
-  return imagesToPdf(images);
 }
 
 export function disposeRaster(): void {

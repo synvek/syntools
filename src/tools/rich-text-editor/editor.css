@@ -524,6 +524,30 @@
   }
 }
 
+/* ---- Section break node (P2-2 multi-section) ---- */
+
+/* The node reserves the same box in editor and print flow. Pagination treats it as zero-height
+   content (the forced page start belongs to the next block), but the space it occupies still shifts
+   the blocks after it — so both paths must render it identically or the two measurements drift. */
+.rte-surface .tiptap .rte-section-break-node {
+  position: relative;
+  border-top: 2px dashed #c4b5fd;
+  margin: 0;
+  height: 2.5rem;
+}
+
+.rte-surface .tiptap .rte-section-break-node::after {
+  content: '§';
+  position: absolute;
+  right: 0;
+  top: -9px;
+  font-size: 10px;
+  color: #7c3aed;
+  background: #f5f3ff;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
 /* ---- Editing workspace: fixed height with internal scrolling, so long documents don't grow the page forever ---- */
 
 /* JS sets the exact height from the remaining first-screen space (viewportMax in RichTextEditorTool);
@@ -836,7 +860,9 @@
   position: fixed;
   top: 0;
   left: -10000px;
-  width: 210mm;
+  /* Follows page setup (same variable as the page view's sheet): a fixed 210mm would clip landscape
+     and Letter sheets off the off-screen container. */
+  width: var(--rte-page-width, 210mm);
   background: #ffffff;
   z-index: -1;
 }
@@ -951,6 +977,11 @@
 .rte-print-flow .rte-page-break-node {
   margin: 0;
   height: 3rem;
+}
+
+.rte-print-flow .rte-section-break-node {
+  margin: 0;
+  height: 2.5rem;
 }
 
 .rte-print-flow a {

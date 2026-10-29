@@ -1,0 +1,193 @@
+[
+  {
+    "id": "slide/text-basic",
+    "tool": "slide",
+    "title": "三页纯文本",
+    "source": "generated"
+  },
+  {
+    "id": "slide/text-rich",
+    "tool": "slide",
+    "title": "多 run 富文本（粗斜下划删除线/高亮/上下标/链接）",
+    "source": "generated"
+  },
+  {
+    "id": "slide/shapes-presets",
+    "tool": "slide",
+    "title": "8 个预设形状 + 调整值",
+    "source": "generated"
+  },
+  {
+    "id": "slide/shapes-custgeom",
+    "tool": "slide",
+    "title": "自定义几何（贝塞尔 + 二次曲线 + 闭合）",
+    "source": "generated"
+  },
+  {
+    "id": "slide/connectors",
+    "tool": "slide",
+    "title": "连接线：自由线 + 绑定连接点 + 双箭头",
+    "source": "generated"
+  },
+  {
+    "id": "slide/group",
+    "tool": "slide",
+    "title": "组合内嵌套文本/形状/线",
+    "source": "generated",
+    "notes": "默认 pptxgen 通道把组合拍平（无原生分组），导入后 group=0；legacy 通道保留 p:grpSp"
+  },
+  {
+    "id": "slide/fill-gradient",
+    "tool": "slide",
+    "title": "渐变填充 + 渐变背景",
+    "source": "generated",
+    "notes": "默认 pptxgen 通道只支持纯色：导出侧把渐变降级为首色（gradientFills 1→0）"
+  },
+  {
+    "id": "slide/shadow-transform",
+    "tool": "slide",
+    "title": "阴影 + 旋转 + 翻转 + 透明度",
+    "source": "generated",
+    "notes": "导出写入 a:outerShdw，但导入侧不解析外阴影（shadows 1→0）"
+  },
+  {
+    "id": "slide/table-merge",
+    "tool": "slide",
+    "title": "表格：横纵合并 + 表头",
+    "source": "generated"
+  },
+  {
+    "id": "slide/table-style",
+    "tool": "slide",
+    "title": "表格：单元格底色/加粗/对齐/斑马纹",
+    "source": "generated"
+  },
+  {
+    "id": "slide/chart-bar",
+    "tool": "slide",
+    "title": "柱状图（原生图表 part）",
+    "source": "generated"
+  },
+  {
+    "id": "slide/chart-pie-line",
+    "tool": "slide",
+    "title": "饼图 + 折线图（两页）",
+    "source": "generated",
+    "notes": "饼图/环形图只用第一个系列（画布、导出、导入一致），指标按有效系列统计"
+  },
+  {
+    "id": "slide/image-1px",
+    "tool": "slide",
+    "title": "图片（1×1 PNG，验证媒体链路）",
+    "source": "generated",
+    "notes": "jsdom 不触发 Image.onload，媒体解码失败 → 导入为占位框；媒体往返需在 e2e/浏览器验证"
+  },
+  {
+    "id": "slide/master-layout",
+    "tool": "slide",
+    "title": "母版/版式继承元素",
+    "source": "generated",
+    "notes": "pptxgen 把母版对象写进版式：回读后 masterElements 1→0、layoutElements 0→1，属结构位移"
+  },
+  {
+    "id": "slide/4x3",
+    "tool": "slide",
+    "title": "4:3 页面尺寸下的几何",
+    "source": "generated"
+  },
+  {
+    "id": "sheet/cells-basic",
+    "tool": "sheet",
+    "title": "文本 / 数字 / 布尔",
+    "source": "generated"
+  },
+  {
+    "id": "sheet/formulas",
+    "tool": "sheet",
+    "title": "公式 + 缓存值",
+    "source": "generated"
+  },
+  {
+    "id": "sheet/formats",
+    "tool": "sheet",
+    "title": "日期 / 百分比 / 千分位格式",
+    "source": "generated"
+  },
+  {
+    "id": "sheet/merges-freeze-hidden",
+    "tool": "sheet",
+    "title": "合并 / 冻结 / 隐藏表",
+    "source": "generated"
+  },
+  {
+    "id": "sheet/cf",
+    "tool": "sheet",
+    "title": "条件格式：色阶 + 单元格规则",
+    "source": "generated",
+    "notes": "导出后规则以 extras 通道往返，cfRules 跨通道计数（before=2、after=2）"
+  },
+  {
+    "id": "sheet/dv",
+    "tool": "sheet",
+    "title": "数据验证：下拉列表 + 整数区间",
+    "source": "generated",
+    "notes": "导出后规则以 extras 通道往返，dvRules 跨通道计数"
+  },
+  {
+    "id": "sheet/chart",
+    "tool": "sheet",
+    "title": "原生图表（柱状图）",
+    "source": "generated",
+    "notes": "导出为原生图表 part；导入不解析为可编辑图表，改由 rawChartParts 记录保留数量"
+  },
+  {
+    "id": "sheet/hyperlink-note-error",
+    "tool": "sheet",
+    "title": "超链接 / 批注 / 错误值",
+    "source": "generated"
+  },
+  {
+    "id": "docx/basic",
+    "tool": "docx",
+    "title": "段落 + 行内样式",
+    "source": "generated",
+    "notes": "导出 XML 含 w:u / w:strike，导入侧 mammoth 只保留 strike、丢掉下划线"
+  },
+  {
+    "id": "docx/headings",
+    "tool": "docx",
+    "title": "三级标题结构",
+    "source": "generated"
+  },
+  {
+    "id": "docx/lists",
+    "tool": "docx",
+    "title": "无序/有序嵌套列表",
+    "source": "generated"
+  },
+  {
+    "id": "docx/table",
+    "tool": "docx",
+    "title": "表格：表头 + 合并单元格 + 底色",
+    "source": "generated"
+  },
+  {
+    "id": "docx/header-footer",
+    "tool": "docx",
+    "title": "页眉 / 页脚 / 页码 / 首页不同",
+    "source": "generated"
+  },
+  {
+    "id": "docx/quote-code-link",
+    "tool": "docx",
+    "title": "引用 / 代码块 / 链接",
+    "source": "generated",
+    "notes": "导出写 Quote / Code 命名样式，导入经 mammoth styleMap 还原 blockquote / pre"
+  },
+  {
+    "id": "docx/landscape-letter",
+    "tool": "docx",
+    "title": "Letter 横向 + 窄边距 + 分栏",
+    "source": "generated"
+  }
+]

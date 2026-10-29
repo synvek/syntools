@@ -101,4 +101,26 @@ describe('docx export → mammoth import round trip', () => {
     expect(result).toContain('姓名');
     expect(result).toContain('张三');
   });
+
+  it('keeps underline across the round trip (mammoth needs an explicit style map for it)', async () => {
+    const exported = await exportDocxBlob(
+      '<p><u>下划线</u> <strong>粗</strong> <s>删除</s></p>',
+      'underline',
+      DEFAULT_PAGE_SETUP,
+    );
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const imported = await importDocx(
+      new File([exported.value], 'underline.docx', {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      }),
+    );
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.value).toMatch(/<u[ >]/);
+    expect(imported.value).toContain('下划线');
+    expect(imported.value).toMatch(/<(strong|b)[ >]/);
+    expect(imported.value).toMatch(/<(s|strike|del)[ >]/);
+  });
 });

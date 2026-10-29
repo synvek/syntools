@@ -6,6 +6,7 @@ import {
   MARGIN_PRESETS,
   buildPrintPageCss,
   computePageMetrics,
+  mergePageSetup,
   mmToTwip,
   normalizePageSetup,
   resolvePageMetrics,
@@ -194,5 +195,39 @@ describe('layout field normalization', () => {
       '--rte-watermark-rotation': '-30deg',
       '--rte-watermark-opacity': '0.2',
     });
+  });
+});
+
+describe('mergePageSetup', () => {
+  it('composes two edits that arrive before a re-render', () => {
+    // Regression: the panel used to rebuild a whole config from the rendered props, so picking Letter and
+    // then landscape stored "A4 landscape" (the second edit read the size back before the first landed)
+    const afterSize = mergePageSetup(DEFAULT_PAGE_SETUP, { size: 'Letter' });
+    const afterOrientation = mergePageSetup(afterSize, { orientation: 'landscape' });
+    expect(afterOrientation.size).toBe('Letter');
+    expect(afterOrientation.orientation).toBe('landscape');
+  });
+
+  it('merges one margin side without touching the others', () => {
+    const merged = mergePageSetup(DEFAULT_PAGE_SETUP, { margin: { top: 30 } });
+    expect(merged.margin).toEqual({ ...DEFAULT_PAGE_SETUP.margin, top: 30 });
+  });
+
+  it('merges watermark fields and treats null as "remove"', () => {
+    const withWatermark = mergePageSetup(DEFAULT_PAGE_SETUP, {
+      watermark: { ...DEFAULT_WATERMARK, text: '内部资料' },
+    });
+    expect(withWatermark.watermark?.text).toBe('内部资料');
+    const recolored = mergePageSetup(withWatermark, { watermark: { color: '#ff0000' } });
+    expect(recolored.watermark).toMatchObject({ text: '内部资料', color: '#ff0000' });
+    expect(mergePageSetup(recolored, { watermark: null }).watermark).toBeNull();
+  });
+
+  it('keeps null for background but ignores untouched fields', () => {
+    const themed = mergePageSetup(DEFAULT_PAGE_SETUP, { background: '#fff8e1' });
+    expect(themed.background).toBe('#fff8e1');
+    expect(mergePageSetup(themed, { background: null }).background).toBeNull();
+    expect(mergePageSetup(themed, {}).background).toBe('#fff8e1');
+    expect(mergePageSetup(themed, {}).size).toBe(DEFAULT_PAGE_SETUP.size);
   });
 });

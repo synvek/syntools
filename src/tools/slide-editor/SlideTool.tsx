@@ -27,7 +27,8 @@ import { FidelityDialog } from '@/core/components/FidelityDialog';
 import { downloadBytes, downloadDataUrl } from '@/core/pdf/download';
 import { buildExportFilename } from './core';
 import { clearDraft, readDraft, writeDraft } from './draft';
-import { disposeRaster, exportSlidesToPdf, renderSlideToDataUrl } from './io/raster';
+import { disposeRaster, renderSlideToDataUrl } from './io/raster';
+import { exportSlidesToVectorPdf } from './io/pdfVector';
 import { exportPrintPdf, printSlides, type PrintOptions } from './io/print';
 import { buildDeck, parseOutline } from './io/outline';
 import { openProject, saveProject } from './io/project';
@@ -203,22 +204,39 @@ export default function SlideTool() {
     }
   }, []);
 
-  /** Export PDF: rasterize each slide then combine, reusing core/pdf's imagesToPdf */
+  /**
+   * Export PDF: text and solid shapes stay vector (searchable); a slide we cannot express
+   * faithfully falls back to its bitmap, and the report says how many pages did.
+   */
   const handleExportPdf = useCallback(async () => {
     setFailure(null);
     setBusy('export');
     const state = useSlideStore.getState();
-    const result = await exportSlidesToPdf(state.doc);
+    const result = await exportSlidesToVectorPdf(state.doc);
     setBusy(null);
     if (!result.ok) {
       setFailure(result as Failure);
       return;
     }
     downloadBytes(
-      result.value,
+      result.value.bytes,
       buildExportFilename(state.doc.name || 'presentation', 'pdf'),
       'application/pdf',
     );
+    if (result.value.rasterPages > 0) {
+      setFidelity(
+        isFidelityMuted()
+          ? null
+          : createFidelityReport('slide', 'export', [
+              {
+                code: 'slide.pdfRasterPages',
+                severity: 'info',
+                count: result.value.rasterPages,
+                messageKey: 'tools.slide.pdfRasterPages',
+              },
+            ]),
+      );
+    }
   }, []);
 
   /** Print using the chosen sheet layout; popup-blocked browsers fall back to the PDF path */

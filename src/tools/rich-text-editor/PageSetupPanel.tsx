@@ -1,18 +1,30 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import {
   DEFAULT_WATERMARK,
   MARGIN_PRESETS,
+  mergePageSetup,
   type ColumnCount,
   type Orientation,
-  type PageMargins,
   type PageSetupConfig,
+  type PageSetupPatch,
   type PageSize,
 } from './pageSetup';
 
 interface PageSetupPanelProps {
   setup: PageSetupConfig;
-  onChange: (next: PageSetupConfig) => void;
+  /** Which section these settings apply to, e.g. "Section 2" (multi-section documents) */
+  scopeLabel?: string;
+  /**
+   * Multi-section only: "link to previous" switches. Omit for the first section (nothing to link to).
+   */
+  linkState?: {
+    header: boolean;
+    footer: boolean;
+    onToggle: (part: 'header' | 'footer', linked: boolean) => void;
+  };
+  onChange: (patch: PageSetupPatch) => void;
   onClose: () => void;
 }
 
@@ -21,21 +33,31 @@ const fieldClass =
 const labelClass = 'text-xs text-gray-500 dark:text-gray-400';
 
 /** Page setup panel: paper / orientation / margins / header & footer / page numbers / columns / watermark / background */
-export function PageSetupPanel({ setup, onChange, onClose }: PageSetupPanelProps) {
+export function PageSetupPanel({
+  setup: setupProp,
+  scopeLabel,
+  linkState,
+  onChange,
+  onClose,
+}: PageSetupPanelProps) {
   const { t } = useTranslation();
 
-  const patch = (partial: Partial<PageSetupConfig>) => onChange({ ...setup, ...partial });
-  const patchMargin = (partial: Partial<PageMargins>) =>
-    onChange({ ...setup, margin: { ...setup.margin, ...partial } });
+  // Keep a local draft so the controls respond immediately and consecutive edits compose: the parent
+  // applies changes to the editor document, and until it re-renders the `setup` prop still holds the
+  // pre-edit value (two quick selects used to overwrite each other's field).
+  const [setup, setSetup] = useState(setupProp);
+  useEffect(() => setSetup(setupProp), [setupProp]);
+
+  const patch = (partial: PageSetupPatch) => {
+    setSetup((current) => mergePageSetup(current, partial));
+    onChange(partial);
+  };
   const applyPreset = (preset: keyof typeof MARGIN_PRESETS) =>
-    onChange({ ...setup, margin: { ...MARGIN_PRESETS[preset] } });
+    patch({ margin: { ...MARGIN_PRESETS[preset] } });
 
   const watermark = setup.watermark;
   const patchWatermark = (partial: Partial<NonNullable<PageSetupConfig['watermark']>>) =>
-    onChange({
-      ...setup,
-      watermark: { ...(watermark ?? { ...DEFAULT_WATERMARK, text: '' }), ...partial },
-    });
+    patch({ watermark: partial });
 
   return (
     <div
@@ -43,8 +65,13 @@ export function PageSetupPanel({ setup, onChange, onClose }: PageSetupPanelProps
       className="rounded-lg border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900"
     >
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-medium text-gray-700 dark:text-gray-200">
+        <span className="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-200">
           {t('tools.richText.pageSetup')}
+          {scopeLabel ? (
+            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-normal text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              {scopeLabel}
+            </span>
+          ) : null}
         </span>
         <button
           type="button"
@@ -55,6 +82,27 @@ export function PageSetupPanel({ setup, onChange, onClose }: PageSetupPanelProps
           <Icon name="close" className="h-4 w-4" />
         </button>
       </div>
+
+      {linkState ? (
+        <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-300">
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={linkState.header}
+              onChange={(event) => linkState.onToggle('header', event.target.checked)}
+            />
+            {t('tools.richText.linkHeader')}
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={linkState.footer}
+              onChange={(event) => linkState.onToggle('footer', event.target.checked)}
+            />
+            {t('tools.richText.linkFooter')}
+          </label>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
@@ -105,7 +153,7 @@ export function PageSetupPanel({ setup, onChange, onClose }: PageSetupPanelProps
               min={5}
               step={1}
               value={setup.margin[side]}
-              onChange={(e) => patchMargin({ [side]: Number(e.target.value) })}
+              onChange={(e) => patch({ margin: { [side]: Number(e.target.value) } })}
               className={`w-20 ${fieldClass}`}
             />
           </label>

@@ -209,6 +209,55 @@ export function normalizePageSetup(input: Partial<PageSetupConfig> | null): Page
 }
 
 /**
+ * A partial page-setup change coming from the panel.
+ *
+ * The panel sends patches instead of whole configs: two controls can fire before the editor has
+ * re-rendered, and a whole config rebuilt from a stale render silently drops the previous edit
+ * (choosing Letter and then landscape used to store "A4 landscape" — the size was read back before the
+ * first change reached the document).
+ */
+export interface PageSetupPatch {
+  size?: PageSize;
+  orientation?: Orientation;
+  /** Merged field-wise, so one margin input can update just its own side */
+  margin?: Partial<PageMargins>;
+  header?: string;
+  footer?: string;
+  showPageNumber?: boolean;
+  columns?: ColumnCount;
+  /** Merged field-wise; `null` removes the watermark */
+  watermark?: Partial<WatermarkConfig> | null;
+  background?: string | null;
+  differentFirstPage?: boolean;
+}
+
+/**
+ * Apply a patch on top of the **current** setup. `null` is a meaningful value for `watermark` and
+ * `background`, so only `undefined` counts as "not touched".
+ */
+export function mergePageSetup(base: PageSetupConfig, patch: PageSetupPatch): PageSetupConfig {
+  const merged: PageSetupConfig = {
+    ...base,
+    margin: patch.margin ? { ...base.margin, ...patch.margin } : base.margin,
+  };
+  if (patch.size !== undefined) merged.size = patch.size;
+  if (patch.orientation !== undefined) merged.orientation = patch.orientation;
+  if (patch.header !== undefined) merged.header = patch.header;
+  if (patch.footer !== undefined) merged.footer = patch.footer;
+  if (patch.showPageNumber !== undefined) merged.showPageNumber = patch.showPageNumber;
+  if (patch.columns !== undefined) merged.columns = patch.columns;
+  if (patch.background !== undefined) merged.background = patch.background;
+  if (patch.differentFirstPage !== undefined) merged.differentFirstPage = patch.differentFirstPage;
+  if ('watermark' in patch) {
+    merged.watermark =
+      patch.watermark === null || patch.watermark === undefined
+        ? null
+        : { ...(base.watermark ?? DEFAULT_WATERMARK), ...patch.watermark };
+  }
+  return normalizePageSetup(merged);
+}
+
+/**
  * Compute page geometry. Returns an error code (never throws) when oversized margins leave no usable content area.
  */
 export function computePageMetrics(config: PageSetupConfig): ToolResult<PageMetrics> {

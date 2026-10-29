@@ -1,8 +1,8 @@
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { CONTENT_WIDTH_PX, planPageBlocks, scanDocxExportLosses } from './core';
-import { exportDocxBlob } from './docx';
-import { DEFAULT_PAGE_SETUP } from './pageSetup';
+import { exportDocxBlob, importDocx } from './docx';
+import { DEFAULT_PAGE_SETUP, normalizePageSetup, type PageSetupConfig } from './pageSetup';
 import { renderTocHtml } from './toc';
 
 const TOC_LABELS = { title: '目录', empty: '文档暂无标题' };
@@ -130,6 +130,115 @@ describe('exportDocxBlob', () => {
       't',
     );
     expect(result.ok).toBe(true);
+  });
+
+  it('writes one w:sectPr per section, each with its own page geometry', async () => {
+    const html = [
+      '<p>第一节</p>',
+      '<div data-section-break="nextPage" data-section-setup=\'{"size":"Letter","orientation":"landscape","margin":{"top":12.7,"right":12.7,"bottom":12.7,"left":12.7}}\'></div>',
+      '<p>第二节</p>',
+    ].join('');
+    const result = await exportDocxBlob(html, 'sections', DEFAULT_PAGE_SETUP);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect((xml.match(/<w:sectPr/g) ?? []).length).toBe(2);
+    // Second section: Letter landscape. `docx` swaps the pair when writing w:pgSz for landscape,
+    // so the emitted size is the landscape one (15840 × 12240 twips) plus the orient flag.
+    expect(xml).toContain('w:orient="landscape"');
+    expect(xml).toContain('w:w="15840"');
+    expect(xml).toContain('w:h="12240"');
+    // 12.7mm margins -> 720 twips
+    expect(xml).toContain('w:top="720"');
+  });
+
+  it('keeps a single section when the document has no section break', async () => {
+    const result = await exportDocxBlob('<p>a</p><p>b</p>', 'single');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect((xml.match(/<w:sectPr/g) ?? []).length).toBe(1);
+  });
+
+  /** Header parts of an exported document (word/header1.xml, header2.xml, …) */
+  async function headerParts(blob: Blob): Promise<string[]> {
+    const zip = await JSZip.loadAsync(await blobToArrayBuffer(blob));
+    return Object.keys(zip.files).filter((name) => /^word\/header\d*\.xml$/.test(name));
+  }
+
+  it('a section linked to the previous one reuses its header instead of writing a new part', async () => {
+    const setup = normalizePageSetup({ header: '公司机密' });
+    const html = [
+      '<p>a</p>',
+      '<div data-section-break="nextPage" data-section-header-linked="true"></div>',
+      '<p>b</p>',
+    ].join('');
+    const linked = await exportDocxBlob(html, 'linked', setup);
+    expect(linked.ok).toBe(true);
+    if (!linked.ok) return;
+    expect(await headerParts(linked.value)).toHaveLength(1);
+
+    const unlinked = await exportDocxBlob(
+      html.replace(' data-section-header-linked="true"', ' data-section-header-linked="false"'),
+      'unlinked',
+      setup,
+    );
+    expect(unlinked.ok).toBe(true);
+    if (!unlinked.ok) return;
+    // Unlinked section owns its header → a second header part
+    expect(await headerParts(unlinked.value)).toHaveLength(2);
+  });
+});
+
+describe('importDocx layout read-back (P2-2.4)', () => {
+  /** jsdom's File has no arrayBuffer(); fall back to FileReader for the test only */
+  const toFile = (blob: Blob, name: string): File => {
+    const file = new File([blob], name, {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    if (typeof file.arrayBuffer !== 'function') {
+      Object.defineProperty(file, 'arrayBuffer', { value: () => blobToArrayBuffer(blob) });
+    }
+    return file;
+  };
+
+  it('recovers the first section page setup', async () => {
+    const setup = normalizePageSetup({
+      size: 'Letter',
+      orientation: 'landscape',
+      margin: { top: 12.7, right: 12.7, bottom: 12.7, left: 12.7 },
+    });
+    const exported = await exportDocxBlob('<p>a</p>', 'layout', setup);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    // A container keeps TypeScript from narrowing the value to null (the assignment happens in a callback)
+    const captured: { layout?: { pageSetup: Partial<PageSetupConfig>; sectionCount: number } } = {};
+    const result = await importDocx(toFile(exported.value, 'layout.docx'), {
+      onLayout: (info) => {
+        captured.layout = info;
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(captured.layout?.sectionCount).toBe(1);
+    expect(captured.layout?.pageSetup.size).toBe('Letter');
+    expect(captured.layout?.pageSetup.orientation).toBe('landscape');
+    expect(captured.layout?.pageSetup.margin?.top).toBe(12.7);
+  });
+
+  it('reports the section count of multi-section documents', async () => {
+    const html = ['<p>a</p>', '<div data-section-break="nextPage"></div>', '<p>b</p>'].join('');
+    const exported = await exportDocxBlob(html, 'layout', DEFAULT_PAGE_SETUP);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const captured: { layout?: { pageSetup: Partial<PageSetupConfig>; sectionCount: number } } = {};
+    await importDocx(toFile(exported.value, 'layout.docx'), {
+      onLayout: (info) => {
+        captured.layout = info;
+      },
+    });
+    expect(captured.layout?.sectionCount).toBe(2);
   });
 });
 

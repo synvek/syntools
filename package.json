@@ -41,6 +41,7 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "baseline:roundtrip": "node scripts/roundtrip-baseline.mjs",
     "size": "node scripts/check-bundle-size.mjs",
     "e2e": "playwright test",
     "prepare": "husky",

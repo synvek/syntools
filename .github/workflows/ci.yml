@@ -139,6 +139,22 @@ jobs:
       - name: Unit tests (with coverage)
         run: pnpm test -- --coverage
 
+      # Round-trip baseline (plan §5.2): generated OOXML samples → import → metrics → export.
+      # Non-blocking on purpose: the drift report is reviewed by a human, and a known degradation
+      # must not stop a release. Regenerate the golden locally with `pnpm baseline:roundtrip --update`.
+      - name: OOXML round-trip baseline (non-blocking)
+        continue-on-error: true
+        run: pnpm baseline:roundtrip
+
+      - name: Upload baseline report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ooxml-baseline-report
+          path: fixtures/ooxml-baseline/report.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Build
         run: pnpm build
 

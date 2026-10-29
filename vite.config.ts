@@ -49,6 +49,14 @@ export default defineConfig({
       ignored: ['**/src-tauri/**'],
     },
   },
+  optimizeDeps: {
+    // `prettier-plugin-java` locates its grammar with `new URL('./tree-sitter-java_orchard.wasm', import.meta.url)`.
+    // Pre-bundling rewrites that `import.meta.url` to `node_modules/.vite/deps/`, so dev served the SPA
+    // fallback (index.html) for the wasm request, the plugin threw "Incorrect response MIME type" and
+    // `formatCode` silently fell back to the built-in formatter (Java formatting looked broken in dev only).
+    // Serving the package as native ESM keeps the real file URL, so the asset resolves with application/wasm.
+    exclude: ['prettier-plugin-java'],
+  },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
     rollupOptions: {

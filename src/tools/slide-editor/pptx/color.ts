@@ -1,4 +1,4 @@
-import { applyColorTransform, normalizeHex } from '../core';
+import { applyColorTransform, EMU_PER_PX, emuToPx, normalizeHex } from '../core';
 import { attr, childOf, childrenOf, localNameOf, numAttr, type XmlNode } from './xml';
 
 /**
@@ -274,6 +274,33 @@ export function parseShapeFill(node: XmlNode | undefined, palette: Palette): Par
     }
   }
   return { type: 'none' };
+}
+
+/** Parse `a:effectLst/a:outerShdw` (the only effect the model carries) */
+export interface ParsedShadow {
+  color: string;
+  blur: number;
+  offsetX: number;
+  offsetY: number;
+  opacity?: number;
+}
+
+export function parseShadow(spPr: XmlNode | undefined, palette: Palette): ParsedShadow | undefined {
+  const effect = childOf(spPr, 'effectLst');
+  const shadow = effect ? childOf(effect, 'outerShdw') : undefined;
+  if (!shadow) return undefined;
+
+  const resolved = resolveColorNode(shadow, palette);
+  // `dist` + `dir` are polar; the model stores the cartesian offset the writer derives them from
+  const distPx = (numAttr(shadow, 'dist') ?? 0) / EMU_PER_PX;
+  const radians = ((numAttr(shadow, 'dir') ?? 0) / 60000) * (Math.PI / 180);
+  return {
+    color: resolved?.color ?? '#000000',
+    blur: emuToPx(numAttr(shadow, 'blurRad') ?? 0),
+    offsetX: Math.round(distPx * Math.sin(radians)),
+    offsetY: Math.round(-distPx * Math.cos(radians)),
+    opacity: resolved?.alpha,
+  };
 }
 
 /** Parse a stroke node (a:ln) */

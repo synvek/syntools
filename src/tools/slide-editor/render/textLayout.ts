@@ -36,12 +36,16 @@ const DEFAULT_FONT = 'Arial, Helvetica, sans-serif';
 const DEFAULT_MARGIN = { left: 9, top: 5, right: 9, bottom: 5 };
 
 let measureCtx: CanvasRenderingContext2D | null = null;
+/** jsdom / SSR have no 2d context: remember the failure instead of retrying on every line */
+let measureCtxUnavailable = false;
 
 function getMeasureContext(): CanvasRenderingContext2D | null {
   if (measureCtx) return measureCtx;
+  if (measureCtxUnavailable) return null;
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
   measureCtx = canvas.getContext('2d');
+  if (!measureCtx) measureCtxUnavailable = true;
   return measureCtx;
 }
 

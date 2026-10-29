@@ -1,5 +1,6 @@
 import type { ToolResult } from '@/core/types';
 import { backgroundToColor, normalizeBackground } from '../core';
+import { isSingleSeriesChart } from '../model/chart';
 import { findIcon, iconSvg } from '../model/icons';
 import { extensionForMime } from '../model/media';
 import type {
@@ -9,6 +10,7 @@ import type {
   LineElement,
   Paragraph,
   RunStyle,
+  ShadowStyle,
   ShapeElement,
   Slide,
   SlideDoc,
@@ -23,6 +25,7 @@ import type {
   PptxFill,
   PptxMasterObject,
   PptxPresentation,
+  PptxShadow,
   PptxShapeOptions,
   PptxSlide,
   PptxTableOptions,
@@ -304,7 +307,35 @@ function addTextElement(slide: PresSlide, element: TextElement, ctx: ExportCtx):
     isTextBox: true,
   };
   if (element.hyperlink) options.hyperlink = ctx.hyperlinkOf(element);
+  const shadow = shadowToProps(element.shadow);
+  if (shadow) options.shadow = shadow;
   slide.addText(bodyToTextProps(element.body), options);
+}
+
+/**
+ * Model shadow (px, cartesian offsets) → pptxgenjs ShadowProps.
+ *
+ * pptxgenjs takes points for blur/offset, while the model stores canvas px — passing px straight
+ * through made every imported shadow 4/3 too large (caught by the OOXML round-trip baseline).
+ *
+ * `angle` is written to `a:outerShdw/@dir` verbatim (degrees × 60000), and the reader resolves
+ * `dir` as 0 = up, growing clockwise (`offsetX = dist·sin(dir)`, `offsetY = −dist·cos(dir)`), so the
+ * angle must be derived the same way as the legacy writer in `write.ts`. Using `atan2(offsetY, offsetX)`
+ * instead rotated every shadow by −90°. pptxgenjs also resets out-of-range angles to 270, hence the
+ * normalisation into [0, 360).
+ */
+function shadowToProps(shadow: ShadowStyle | undefined): PptxShadow | undefined {
+  if (!shadow) return undefined;
+  const distPx = Math.sqrt(shadow.offsetX ** 2 + shadow.offsetY ** 2);
+  const angleDeg = Math.round((Math.atan2(shadow.offsetX, -shadow.offsetY) * 180) / Math.PI);
+  return {
+    type: 'outer',
+    color: hex(shadow.color) ?? '808080',
+    blur: Math.round((shadow.blur / PX_PER_PT) * 10) / 10,
+    offset: Math.round((distPx / PX_PER_PT) * 10) / 10,
+    angle: ((angleDeg % 360) + 360) % 360,
+    opacity: shadow.opacity ?? 1,
+  };
 }
 
 function addShapeElement(slide: PresSlide, element: ShapeElement, ctx: ExportCtx): void {
@@ -322,20 +353,8 @@ function addShapeElement(slide: PresSlide, element: ShapeElement, ctx: ExportCtx
   if (fill) options.fill = fill;
   const line = lineToShapeLine(element.stroke);
   if (line) options.line = line;
-  if (element.shadow) {
-    options.shadow = {
-      type: 'outer',
-      color: hex(element.shadow.color) ?? '808080',
-      blur: Math.round(element.shadow.blur),
-      offset: Math.round(
-        Math.sqrt(element.shadow.offsetX ** 2 + element.shadow.offsetY ** 2) / PX_PER_PT,
-      ),
-      angle: Math.round(
-        (Math.atan2(element.shadow.offsetY, element.shadow.offsetX) * 180) / Math.PI,
-      ),
-      opacity: element.shadow.opacity ?? 1,
-    };
-  }
+  const shadow = shadowToProps(element.shadow);
+  if (shadow) options.shadow = shadow;
   if (element.hyperlink) options.hyperlink = ctx.hyperlinkOf(element);
   slide.addShape(options.shape as SHAPE_NAME, options);
 
@@ -430,7 +449,13 @@ function addTableElement(slide: PresSlide, element: TableElement): void {
 
 function addChartElement(slide: PresSlide, element: ChartElement): void {
   const { name, barGrouping } = chartNameOf(element);
-  const data = element.series.map((series) => ({
+  // Pie/doughnut are single-series charts: the canvas draws only series[0], so writing the extra
+  // series into the pptx would make PowerPoint show data the canvas never renders (and the importer
+  // would truncate it anyway, showing up as data loss in the round-trip baseline).
+  const source = isSingleSeriesChart(element.chartType)
+    ? element.series.slice(0, 1)
+    : element.series;
+  const data = source.map((series) => ({
     name: series.name,
     labels: element.categories,
     values: series.values,

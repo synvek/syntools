@@ -105,9 +105,11 @@ const zh: ResourceTree = {
       image: '插入图片',
       divider: '分割线',
       pageBreak: '插入分页符',
+      sectionBreak: '插入分节符',
       lossExternalImages: '{{count}} 张外链图片未写入 Word（仅支持内嵌图片）。',
       lossWebpImages: '{{count}} 张 WebP 图片未写入 Word（请改用 PNG/JPEG）。',
       lossDeepLists: '{{count}} 处列表嵌套超过 8 层，已并入最深层级。',
+      lossSections: '{{count}} 个节的版面已合并为一节（仅保留首节设置）。',
       lossUnlinkedComments: '{{count}} 处批注缺少内容记录，未写入 Word 批注。',
       lossMdComments: '{{count}} 处批注在 Markdown 中不支持，已丢弃标记（文本保留）。',
       lossMdTracked: '{{count}} 处修订在 Markdown 中无法接受或拒绝，仅保留插入/删除样式。',
@@ -132,6 +134,9 @@ const zh: ResourceTree = {
       draftSaveFailed: '本地草稿保存失败，请导出文件以保留内容。',
       printFallback: '当前环境不支持打印对话框，已改用快照模式导出 PDF。',
       pageSetup: '页面设置',
+      pageSetupScope: '第 {{n}} 节',
+      linkHeader: '页眉链接到前一节',
+      linkFooter: '页脚链接到前一节',
       ruler: '标尺',
       pageSetupClose: '关闭页面设置',
       paperSize: '纸张',
@@ -426,9 +431,12 @@ const en: ResourceTree = {
       image: 'Insert image',
       divider: 'Divider',
       pageBreak: 'Insert page break',
+      sectionBreak: 'Insert section break',
       lossExternalImages: '{{count}} linked image(s) were not embedded in the Word file.',
       lossWebpImages: '{{count}} WebP image(s) were skipped (use PNG/JPEG instead).',
       lossDeepLists: '{{count}} list(s) nested deeper than 8 levels were flattened.',
+      lossSections:
+        '{{count}} sections were merged into one (only the first section layout is kept).',
       lossUnlinkedComments:
         '{{count}} comment(s) had no stored content and were not written as Word comments.',
       lossMdComments: '{{count}} comment(s) are unsupported in Markdown; markers were dropped.',
@@ -457,6 +465,9 @@ const en: ResourceTree = {
       draftSaveFailed: 'Failed to save the local draft. Export a file to keep your content.',
       printFallback: 'Print dialog is unavailable here; exported as snapshot PDF instead.',
       pageSetup: 'Page setup',
+      pageSetupScope: 'Section {{n}}',
+      linkHeader: 'Link header to previous section',
+      linkFooter: 'Link footer to previous section',
       ruler: 'Ruler',
       pageSetupClose: 'Close page setup',
       paperSize: 'Paper size',
@@ -755,9 +766,11 @@ const zhTW: ResourceTree = {
       image: '插入圖片',
       divider: '分隔線',
       pageBreak: '插入分頁符',
+      sectionBreak: '插入分節符',
       lossExternalImages: '{{count}} 張外鏈圖片未寫入 Word（僅支援內嵌圖片）。',
       lossWebpImages: '{{count}} 張 WebP 圖片未寫入 Word（請改用 PNG/JPEG）。',
       lossDeepLists: '{{count}} 處清單巢狀超過 8 層，已併入最深層級。',
+      lossSections: '{{count}} 個節的版面已合併為一節（僅保留首節設定）。',
       lossUnlinkedComments: '{{count}} 處批註缺少內容紀錄，未寫入 Word 批註。',
       lossMdComments: '{{count}} 處批註在 Markdown 中不支援，已捨棄標記（文字保留）。',
       lossMdTracked: '{{count}} 處修訂在 Markdown 中無法接受或拒絕，僅保留插入／刪除樣式。',
@@ -782,6 +795,9 @@ const zhTW: ResourceTree = {
       draftSaveFailed: '本機草稿儲存失敗，請匯出檔案以保留內容。',
       printFallback: '目前環境不支援列印對話框，已改用快照模式匯出 PDF。',
       pageSetup: '版面設定',
+      pageSetupScope: '第 {{n}} 節',
+      linkHeader: '頁首連結到前一節',
+      linkFooter: '頁尾連結到前一節',
       ruler: '尺規',
       pageSetupClose: '關閉版面設定',
       paperSize: '紙張',
@@ -1073,9 +1089,12 @@ const ja: ResourceTree = {
       image: '画像を挿入',
       divider: '区切り線',
       pageBreak: '改ページを挿入',
+      sectionBreak: 'セクション区切りを挿入',
       lossExternalImages: 'リンク画像 {{count}} 枚は Word に埋め込めませんでした。',
       lossWebpImages: 'WebP 画像 {{count}} 枚をスキップしました（PNG/JPEG をご利用ください）。',
       lossDeepLists: '8 階層を超えるリストの {{count}} か所を最深階層に統合しました。',
+      lossSections:
+        '{{count}} 個のセクションを 1 つに統合しました（先頭セクションの設定のみ保持）。',
       lossUnlinkedComments:
         '{{count}} 件のコメントに内容が保存されておらず、Word コメントとして書き出せませんでした。',
       lossMdComments:
@@ -1105,6 +1124,9 @@ const ja: ResourceTree = {
       printFallback:
         'この環境では印刷ダイアログを使用できないため、スナップショットで書き出しました。',
       pageSetup: 'ページ設定',
+      pageSetupScope: 'セクション {{n}}',
+      linkHeader: 'ヘッダーを前のセクションにリンク',
+      linkFooter: 'フッターを前のセクションにリンク',
       ruler: 'ルーラー',
       pageSetupClose: 'ページ設定を閉じる',
       paperSize: '用紙',
@@ -1406,9 +1428,12 @@ const fr: ResourceTree = {
       image: 'Insérer une image',
       divider: 'Séparateur',
       pageBreak: 'Insérer un saut de page',
+      sectionBreak: 'Insérer un saut de section',
       lossExternalImages: "{{count}} image(s) liée(s) n'ont pas été intégrées au fichier Word.",
       lossWebpImages: '{{count}} image(s) WebP ignorée(s) (utilisez PNG/JPEG).',
       lossDeepLists: '{{count}} liste(s) imbriquée(s) au-delà de 8 niveaux ont été aplanies.',
+      lossSections:
+        '{{count}} sections ont été fusionnées en une seule (seule la mise en page de la première est conservée).',
       lossUnlinkedComments:
         "{{count}} commentaire(s) sans contenu enregistré n'ont pas été écrits comme commentaires Word.",
       lossMdComments:
@@ -1440,6 +1465,9 @@ const fr: ResourceTree = {
       printFallback:
         "La boîte de dialogue d'impression est indisponible ; export en PDF snapshot effectué.",
       pageSetup: 'Mise en page',
+      pageSetupScope: 'Section {{n}}',
+      linkHeader: 'En-tête lié à la section précédente',
+      linkFooter: 'Pied de page lié à la section précédente',
       ruler: 'Règle',
       pageSetupClose: 'Fermer la mise en page',
       paperSize: 'Format',
@@ -1742,10 +1770,13 @@ const de: ResourceTree = {
       image: 'Bild einfügen',
       divider: 'Trennlinie',
       pageBreak: 'Seitenumbruch einfügen',
+      sectionBreak: 'Abschnittswechsel einfügen',
       lossExternalImages:
         '{{count}} verlinkte(s) Bild(er) wurden nicht in die Word-Datei eingebettet.',
       lossWebpImages: '{{count}} WebP-Bild(er) übersprungen (bitte PNG/JPEG verwenden).',
       lossDeepLists: '{{count}} Liste(n) tiefer als 8 Ebenen wurden vereinfacht.',
+      lossSections:
+        '{{count}} Abschnitte wurden zu einem zusammengefasst (nur das Layout des ersten bleibt erhalten).',
       lossUnlinkedComments:
         '{{count}} Kommentar(e) ohne gespeicherten Inhalt wurden nicht als Word-Kommentar geschrieben.',
       lossMdComments:
@@ -1776,6 +1807,9 @@ const de: ResourceTree = {
         'Lokaler Entwurf konnte nicht gespeichert werden. Exportieren Sie eine Datei.',
       printFallback: 'Druckdialog hier nicht verfügbar; PDF wurde als Snapshot exportiert.',
       pageSetup: 'Seite einrichten',
+      pageSetupScope: 'Abschnitt {{n}}',
+      linkHeader: 'Kopfzeile mit vorherigem Abschnitt verknüpfen',
+      linkFooter: 'Fußzeile mit vorherigem Abschnitt verknüpfen',
       ruler: 'Lineal',
       pageSetupClose: 'Seiteneinrichtung schließen',
       paperSize: 'Papierformat',
@@ -2080,9 +2114,12 @@ const it: ResourceTree = {
       image: 'Inserisci immagine',
       divider: 'Riga divisoria',
       pageBreak: 'Inserisci interruzione di pagina',
+      sectionBreak: 'Inserisci interruzione di sezione',
       lossExternalImages: '{{count}} immagine/i collegate non incorporate nel file Word.',
       lossWebpImages: '{{count}} immagine/i WebP ignorate (usa PNG/JPEG).',
       lossDeepLists: '{{count}} elenco/hi annidati oltre 8 livelli sono stati appiattiti.',
+      lossSections:
+        '{{count}} sezioni sono state unite in una sola (viene mantenuto solo il layout della prima).',
       lossUnlinkedComments:
         '{{count}} commento/i senza contenuto salvato non sono stati scritti come commenti Word.',
       lossMdComments:
@@ -2114,6 +2151,9 @@ const it: ResourceTree = {
         'Salvataggio locale non riuscito. Esporta un file per conservare il contenuto.',
       printFallback: 'Finestra di stampa non disponibile; esportato come PDF snapshot.',
       pageSetup: 'Impostazioni pagina',
+      pageSetupScope: 'Sezione {{n}}',
+      linkHeader: 'Collega intestazione alla sezione precedente',
+      linkFooter: 'Collega piè di pagina alla sezione precedente',
       ruler: 'Righello',
       pageSetupClose: 'Chiudi impostazioni pagina',
       paperSize: 'Formato',
@@ -2417,10 +2457,13 @@ const es: ResourceTree = {
       image: 'Insertar imagen',
       divider: 'Separador',
       pageBreak: 'Insertar salto de página',
+      sectionBreak: 'Insertar salto de sección',
       lossExternalImages:
         '{{count}} imagen/imagenes vinculadas no se incrustaron en el archivo Word.',
       lossWebpImages: '{{count}} imagen/imagenes WebP omitidas (usa PNG/JPEG).',
       lossDeepLists: '{{count}} lista/s con más de 8 niveles se aplanaron.',
+      lossSections:
+        '{{count}} secciones se fusionaron en una sola (solo se conserva el diseño de la primera).',
       lossUnlinkedComments:
         '{{count}} comentario(s) sin contenido guardado no se escribieron como comentarios de Word.',
       lossMdComments:
@@ -2452,6 +2495,9 @@ const es: ResourceTree = {
       printFallback:
         'El diálogo de impresión no está disponible; se exportó como PDF de instantánea.',
       pageSetup: 'Configuración de página',
+      pageSetupScope: 'Sección {{n}}',
+      linkHeader: 'Vincular encabezado a la sección anterior',
+      linkFooter: 'Vincular pie a la sección anterior',
       ruler: 'Regla',
       pageSetupClose: 'Cerrar configuración de página',
       paperSize: 'Tamaño',
@@ -2754,10 +2800,13 @@ const pt: ResourceTree = {
       image: 'Inserir imagem',
       divider: 'Separador',
       pageBreak: 'Inserir quebra de página',
+      sectionBreak: 'Inserir quebra de seção',
       lossExternalImages:
         '{{count}} imagem/imagens ligadas não foram incorporadas no ficheiro Word.',
       lossWebpImages: '{{count}} imagem/imagens WebP ignoradas (use PNG/JPEG).',
       lossDeepLists: '{{count}} lista(s) com mais de 8 níveis foram achatadas.',
+      lossSections:
+        '{{count}} seções foram mescladas em uma só (apenas o layout da primeira é mantido).',
       lossUnlinkedComments:
         '{{count}} comentário(s) sem conteúdo salvo não foram gravados como comentários do Word.',
       lossMdComments:
@@ -2788,6 +2837,9 @@ const pt: ResourceTree = {
         'Falha ao guardar o rascunho local. Exporte um ficheiro para manter o conteúdo.',
       printFallback: 'Diálogo de impressão indisponível; exportado como PDF de instantâneo.',
       pageSetup: 'Configuração da página',
+      pageSetupScope: 'Seção {{n}}',
+      linkHeader: 'Vincular cabeçalho à seção anterior',
+      linkFooter: 'Vincular rodapé à seção anterior',
       ruler: 'Régua',
       pageSetupClose: 'Fechar configuração da página',
       paperSize: 'Tamanho',

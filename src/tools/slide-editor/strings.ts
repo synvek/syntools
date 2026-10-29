@@ -100,6 +100,7 @@ const zh: ResourceTree = {
       chartTitle: '图表标题',
       chartCategories: '类别',
       chartSeries: '系列',
+      chartSingleSeriesHint: '饼图 / 环形图只使用第一个系列',
       chartLegend: '图例',
       chartDataLabels: '数据标签',
       chartGridLines: '网格线',
@@ -173,6 +174,7 @@ const zh: ResourceTree = {
       penTool: '钢笔（单击加点，双击闭合，Esc 取消）',
       editPoints: '编辑顶点（拖动顶点或控制柄，双击切换平滑，Delete 删除顶点）',
       exportPdf: '导出 PDF',
+      pdfRasterPages: '{{count}} 页含图片/渐变/效果，已转为位图（该页文字不可搜索）',
       exportImage: '导出图片',
       docTitle: '演示文稿标题',
       titlePlaceholder: '未命名演示文稿',
@@ -457,6 +459,7 @@ const en: ResourceTree = {
       chartTitle: 'Chart title',
       chartCategories: 'Categories',
       chartSeries: 'Series',
+      chartSingleSeriesHint: 'Pie and doughnut charts use the first series only',
       chartLegend: 'Legend',
       chartDataLabels: 'Data labels',
       chartGridLines: 'Grid lines',
@@ -531,6 +534,8 @@ const en: ResourceTree = {
       editPoints:
         'Edit points (drag anchors or handles, double-click to smooth, Delete to remove a point)',
       exportPdf: 'Export PDF',
+      pdfRasterPages:
+        '{{count}} page(s) with images, gradients or effects were exported as bitmaps (text there is not searchable)',
       exportImage: 'Export image',
       docTitle: 'Presentation title',
       titlePlaceholder: 'Untitled presentation',
@@ -816,6 +821,7 @@ const zhTW: ResourceTree = {
       chartTitle: '圖表標題',
       chartCategories: '類別',
       chartSeries: '數列',
+      chartSingleSeriesHint: '圓餅圖 / 環圈圖只使用第一個數列',
       chartLegend: '圖例',
       chartDataLabels: '資料標籤',
       chartGridLines: '格線',
@@ -889,6 +895,7 @@ const zhTW: ResourceTree = {
       penTool: '鋼筆（點擊加入節點，雙擊閉合，Esc 取消）',
       editPoints: '編輯頂點（拖曳頂點或控制點，雙擊切換平滑，Delete 刪除頂點）',
       exportPdf: '匯出 PDF',
+      pdfRasterPages: '{{count}} 頁含圖片/漸變/效果，已轉為點陣圖（該頁文字不可搜尋）',
       exportImage: '匯出圖片',
       docTitle: '簡報標題',
       titlePlaceholder: '未命名簡報',
@@ -1173,6 +1180,7 @@ const ja: ResourceTree = {
       chartTitle: 'グラフタイトル',
       chartCategories: '項目',
       chartSeries: '系列',
+      chartSingleSeriesHint: '円グラフ / ドーナツグラフは最初の系列のみ使用します',
       chartLegend: '凡例',
       chartDataLabels: 'データラベル',
       chartGridLines: '目盛線',
@@ -1248,6 +1256,8 @@ const ja: ResourceTree = {
       editPoints:
         '頂点を編集（頂点やハンドルをドラッグ、ダブルクリックでスムーズ切替、Delete で削除）',
       exportPdf: 'PDF に書き出す',
+      pdfRasterPages:
+        '{{count}} ページは画像・グラデーション・効果を含むためビットマップで出力されました（文字は検索できません）',
       exportImage: '画像に書き出す',
       docTitle: 'プレゼンタイトル',
       titlePlaceholder: '無題のプレゼン',
@@ -1535,6 +1545,8 @@ const fr: ResourceTree = {
       chartTitle: 'Titre du graphique',
       chartCategories: 'Catégories',
       chartSeries: 'Séries',
+      chartSingleSeriesHint:
+        'Les graphiques secteurs et anneaux utilisent uniquement la première série',
       chartLegend: 'Légende',
       chartDataLabels: 'Étiquettes de données',
       chartGridLines: 'Quadrillage',
@@ -1611,6 +1623,8 @@ const fr: ResourceTree = {
       editPoints:
         'Modifier les points (glisser les sommets ou poignées, double-clic pour lisser, Suppr pour supprimer)',
       exportPdf: 'Exporter en PDF',
+      pdfRasterPages:
+        '{{count}} page(s) avec images, dégradés ou effets ont été exportées en bitmap (texte non indexable)',
       exportImage: 'Exporter l’image',
       docTitle: 'Titre de la présentation',
       titlePlaceholder: 'Présentation sans titre',
@@ -1900,6 +1914,7 @@ const de: ResourceTree = {
       chartTitle: 'Diagrammtitel',
       chartCategories: 'Kategorien',
       chartSeries: 'Datenreihen',
+      chartSingleSeriesHint: 'Kreis- und Ringdiagramme verwenden nur die erste Datenreihe',
       chartLegend: 'Legende',
       chartDataLabels: 'Datenbeschriftungen',
       chartGridLines: 'Gitternetzlinien',
@@ -1976,6 +1991,8 @@ const de: ResourceTree = {
       editPoints:
         'Punkte bearbeiten (Anker oder Griffe ziehen, Doppelklick für glatt, Entf zum Löschen)',
       exportPdf: 'Als PDF exportieren',
+      pdfRasterPages:
+        '{{count}} Seite(n) mit Bildern, Verläufen oder Effekten wurden als Bitmap exportiert (Text nicht durchsuchbar)',
       exportImage: 'Als Bild exportieren',
       docTitle: 'Präsentationstitel',
       titlePlaceholder: 'Unbenannte Präsentation',
@@ -2264,6 +2281,7 @@ const it: ResourceTree = {
       chartTitle: 'Titolo del grafico',
       chartCategories: 'Categorie',
       chartSeries: 'Serie',
+      chartSingleSeriesHint: 'I grafici a torta e ad anello usano solo la prima serie',
       chartLegend: 'Legenda',
       chartDataLabels: 'Etichette dati',
       chartGridLines: 'Linee della griglia',
@@ -2340,6 +2358,8 @@ const it: ResourceTree = {
       editPoints:
         'Modifica punti (trascina ancore o maniglie, doppio clic per smussare, Canc per eliminare)',
       exportPdf: 'Esporta in PDF',
+      pdfRasterPages:
+        '{{count}} pagina/e con immagini, sfumature o effetti esportate come bitmap (testo non ricercabile)',
       exportImage: 'Esporta immagine',
       docTitle: 'Titolo presentazione',
       titlePlaceholder: 'Presentazione senza titolo',
@@ -2627,6 +2647,7 @@ const es: ResourceTree = {
       chartTitle: 'Título del gráfico',
       chartCategories: 'Categorías',
       chartSeries: 'Series',
+      chartSingleSeriesHint: 'Los gráficos circulares y de anillos usan solo la primera serie',
       chartLegend: 'Leyenda',
       chartDataLabels: 'Etiquetas de datos',
       chartGridLines: 'Líneas de división',
@@ -2703,6 +2724,8 @@ const es: ResourceTree = {
       editPoints:
         'Editar puntos (arrastra vértices o manejadores, doble clic para suavizar, Supr para eliminar)',
       exportPdf: 'Exportar a PDF',
+      pdfRasterPages:
+        '{{count}} página(s) con imágenes, degradados o efectos se exportaron como mapa de bits (texto no buscable)',
       exportImage: 'Exportar imagen',
       docTitle: 'Título de la presentación',
       titlePlaceholder: 'Presentación sin título',
@@ -2990,6 +3013,7 @@ const pt: ResourceTree = {
       chartTitle: 'Título do gráfico',
       chartCategories: 'Categorias',
       chartSeries: 'Séries',
+      chartSingleSeriesHint: 'Gráficos de pizza e de rosca usam apenas a primeira série',
       chartLegend: 'Legenda',
       chartDataLabels: 'Rótulos de dados',
       chartGridLines: 'Linhas de grade',
@@ -3065,6 +3089,8 @@ const pt: ResourceTree = {
       editPoints:
         'Editar pontos (arraste âncoras ou alças, duplo clique para suavizar, Del para remover)',
       exportPdf: 'Exportar para PDF',
+      pdfRasterPages:
+        '{{count}} página(s) com imagens, gradientes ou efeitos foram exportadas como bitmap (texto não pesquisável)',
       exportImage: 'Exportar imagem',
       docTitle: 'Título da apresentação',
       titlePlaceholder: 'Apresentação sem título',

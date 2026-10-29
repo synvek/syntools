@@ -83,6 +83,31 @@ export function sanitizeDocHtml(html: string): ToolResult<string> {
   return { ok: true, value: clean };
 }
 
+/**
+ * Repair the block structure of HTML produced by mammoth.
+ *
+ * Mammoth's `p[style-name='Quote'] => blockquote:fresh` keeps only the blockquote itself, so the
+ * quoted text ends up as a bare inline child. Our editor schema requires block content inside
+ * blockquote, so wrap loose inline content in a paragraph. (Without this, the text survives only
+ * because ProseMirror's parser auto-wraps it — an implicit behaviour we don't want to depend on.)
+ */
+export function normalizeImportedDocHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const BLOCK = /^(P|H[1-6]|UL|OL|PRE|TABLE|BLOCKQUOTE|DIV|HR)$/;
+  let changed = false;
+  for (const quote of Array.from(doc.body.querySelectorAll('blockquote'))) {
+    const hasBlockChild = Array.from(quote.children).some((child) => BLOCK.test(child.tagName));
+    if (hasBlockChild) continue;
+    // Empty quotes stay empty: an empty <p> would render a stray blank line
+    if (!(quote.textContent ?? '').trim()) continue;
+    const paragraph = doc.createElement('p');
+    while (quote.firstChild) paragraph.appendChild(quote.firstChild);
+    quote.appendChild(paragraph);
+    changed = true;
+  }
+  return changed ? doc.body.innerHTML : html;
+}
+
 /** Initial content for a new document (an empty paragraph) */
 export function createEmptyDocHtml(): string {
   return '<p></p>';

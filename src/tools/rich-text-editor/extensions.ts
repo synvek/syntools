@@ -1,5 +1,7 @@
 import { Extension, Node } from '@tiptap/core';
 import { dropCursor } from '@tiptap/pm/dropcursor';
+import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state';
+import type { Node as PmNode } from '@tiptap/pm/model';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -34,6 +36,29 @@ import { Spellcheck, SpellcheckCommands, type SpellDictionary } from './spellche
  * This file is imported lazily by RichTextEditorTool, keeping TipTap out of the initial bundle.
  */
 
+/**
+ * Insert a break atom (page/section break) *after the block that holds the caret*, never at the raw caret
+ * offset.
+ *
+ * Inserting at the offset splits the paragraph and leaves a stray fragment after the break: the text is
+ * chopped in two and — worse — the fragment gives the caret a home on the wrong side of the break, so the
+ * next keystroke or paste silently lands in the previous section and the break drifts to the document end.
+ * The projection also guarantees a block after the atom, because a document ending on an atom has no valid
+ * text position left (the caret would fall back to before the break).
+ */
+function insertBreakAfterBlock(state: EditorState, node: PmNode): Transaction {
+  const { $to } = state.selection;
+  const pos = $to.depth > 0 ? $to.after(1) : $to.pos;
+  const atomEnd = pos + node.nodeSize;
+  const tr = state.tr.insert(pos, node);
+  if (atomEnd >= tr.doc.content.size) {
+    tr.insert(atomEnd, state.schema.nodes.paragraph.create());
+  }
+  // `near` snaps to the closest valid text position, so this also survives a neighbouring atom
+  tr.setSelection(TextSelection.near(tr.doc.resolve(atomEnd + 1), 1));
+  return tr.scrollIntoView();
+}
+
 /** Page break node: becomes pageBreakBefore on Word export, paginates naturally in print / page view */
 const PageBreak = Node.create({
   name: 'pageBreak',
@@ -50,8 +75,10 @@ const PageBreak = Node.create({
     return {
       setPageBreak:
         () =>
-        ({ commands }) =>
-          commands.insertContent({ type: 'pageBreak' }),
+        ({ state, dispatch }) => {
+          dispatch?.(insertBreakAfterBlock(state, state.schema.nodes.pageBreak.create()));
+          return true;
+        },
     };
   },
 });
@@ -61,6 +88,113 @@ declare module '@tiptap/core' {
     pageBreak: {
       /** Insert a page break at the cursor */
       setPageBreak: () => ReturnType;
+    };
+  }
+}
+
+/**
+ * Section break node (P2-2): starts a new document section.
+ *
+ * The section's page setup travels with the node as a JSON snapshot instead of living in a
+ * document-level `sections[]`. That keeps one source of truth (the HTML), so drafts, version
+ * snapshots, imports and exports need no extra migration path.
+ */
+const SectionBreak = Node.create({
+  name: 'sectionBreak',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      /** How the new section starts: 'nextPage' | 'continuous' */
+      startType: {
+        default: 'nextPage',
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-section-break') ?? 'nextPage',
+        renderHTML: (attributes: Record<string, unknown>) => ({
+          'data-section-break': attributes.startType ?? 'nextPage',
+        }),
+      },
+      /** `true` = reuse the previous section's header (Word's "link to previous") */
+      headerLinked: {
+        default: false,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-section-header-linked') === 'true',
+        renderHTML: (attributes: Record<string, unknown>) => ({
+          'data-section-header-linked': attributes.headerLinked === true ? 'true' : 'false',
+        }),
+      },
+      /** `true` = reuse the previous section's footer */
+      footerLinked: {
+        default: false,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-section-footer-linked') === 'true',
+        renderHTML: (attributes: Record<string, unknown>) => ({
+          'data-section-footer-linked': attributes.footerLinked === true ? 'true' : 'false',
+        }),
+      },
+      /** Page setup snapshot of the section that starts here (null = inherit the document setup) */
+      pageSetup: {
+        default: null,
+        parseHTML: (element: HTMLElement) => {
+          const raw = element.getAttribute('data-section-setup');
+          if (!raw) return null;
+          try {
+            return JSON.parse(raw) as unknown;
+          } catch {
+            // A broken snapshot must not swallow the break itself
+            return null;
+          }
+        },
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.pageSetup
+            ? { 'data-section-setup': JSON.stringify(attributes.pageSetup) }
+            : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-section-break]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['div', { ...HTMLAttributes, class: 'rte-section-break-node' }];
+  },
+  addCommands() {
+    return {
+      setSectionBreak:
+        (options?: {
+          startType?: 'nextPage' | 'continuous';
+          pageSetup?: unknown;
+          headerLinked?: boolean;
+          footerLinked?: boolean;
+        }) =>
+        ({ state, dispatch }) => {
+          // Insert after the current block, never on top of the atom's NodeSelection (that would replace
+          // the previous break instead of adding another one) and never mid-paragraph (that splits the
+          // paragraph and leaves the caret on the wrong side of the break)
+          const node = state.schema.nodes[this.name].create({
+            startType: options?.startType ?? 'nextPage',
+            pageSetup: options?.pageSetup ?? null,
+            headerLinked: options?.headerLinked ?? false,
+            footerLinked: options?.footerLinked ?? false,
+          });
+          dispatch?.(insertBreakAfterBlock(state, node));
+          return true;
+        },
+    };
+  },
+});
+
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    sectionBreak: {
+      /** Insert a section break; `pageSetup` is a snapshot of the new section's page setup */
+      setSectionBreak: (options?: {
+        startType?: 'nextPage' | 'continuous';
+        pageSetup?: unknown;
+        headerLinked?: boolean;
+        footerLinked?: boolean;
+      }) => ReturnType;
     };
   }
 }
@@ -156,6 +290,7 @@ export function createExtensions({
     Placeholder.configure({ placeholder }),
     FindReplace,
     PageBreak,
+    SectionBreak,
     ParagraphStyle,
     BlockStyleCommands,
     Comment,

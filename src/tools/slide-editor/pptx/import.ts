@@ -31,7 +31,7 @@ import type {
   VAlign,
 } from '../model/types';
 import type { ImportReport } from '../store';
-import { parseShapeFill, parseStroke, resolveColorNode, type Palette } from './color';
+import { parseShadow, parseShapeFill, parseStroke, resolveColorNode, type Palette } from './color';
 import {
   loadZip,
   normalizePartPath,
@@ -281,6 +281,7 @@ function parseShape(
   const geometry = parseGeom(spPr);
   const fill = fillFromParsed(parseShapeFill(spPr, palette));
   const stroke = parseStroke(childOf(spPr, 'ln'), palette);
+  const shadow = parseShadow(spPr, palette);
   const body = parseTextBody(childOf(node, 'txBody'), palette, theme);
   const nvSpPr = childOf(node, 'nvSpPr');
   const ph = childOf(childOf(nvSpPr, 'nvPr'), 'ph');
@@ -291,6 +292,7 @@ function parseShape(
     id: nextId(ctx, 'el'),
     ...baseRect(xfrm),
     placeholder,
+    ...(shadow ? { shadow } : {}),
   };
   let element: SlideElement;
   if (body && geometry.kind === 'rect' && !fill && !stroke) {

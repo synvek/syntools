@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NodeSelection } from '@tiptap/pm/state';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
 import { EditorMenuBar } from '@/core/components/EditorMenuBar';
@@ -109,11 +109,13 @@ import { buildTocEntries, injectTocHtml, renderTocHtml, type TocLabels } from '.
 import {
   DEFAULT_PAGE_SETUP,
   buildPrintPageCss,
+  mergePageSetup,
   normalizePageSetup,
   pageMetricsToPx,
   watermarkCssVars,
   resolvePageMetrics,
   type PageSetupConfig,
+  type PageSetupPatch,
 } from './pageSetup';
 import { registerRichTextStrings } from './strings';
 import './editor.css';
@@ -167,6 +169,21 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** Positions of the section-break nodes, in document order */
+function sectionBreakPositions(editor: Editor): number[] {
+  const positions: number[] = [];
+  editor.state.doc.forEach((node, offset) => {
+    if (node.type.name === 'sectionBreak') positions.push(offset);
+  });
+  return positions;
+}
+
+/** 0-based index of the section that contains the caret (0 = the document-level setup) */
+function sectionIndexAtCaret(editor: Editor): number {
+  const { from } = editor.state.selection;
+  return sectionBreakPositions(editor).filter((pos) => pos < from).length;
+}
+
 /**
  * Rich text editor tool: local editing + Word (.docx) import/export + dual-mode PDF export.
  * All content processing happens in the browser; nothing is ever sent out.
@@ -178,6 +195,8 @@ export default function RichTextEditorTool() {
   const [snapshotHtml, setSnapshotHtml] = useState(initial?.html ?? createEmptyDocHtml());
   const [failure, setFailure] = useState<Failure | null>(null);
   const [losses, setLosses] = useState<DocxExportLosses | null>(null);
+  // Sections merged on import (>1 only): mammoth drops w:sectPr, so multi-section documents collapse
+  const [importSections, setImportSections] = useState(0);
   const [markdownLosses, setMarkdownLosses] = useState<MarkdownExportLosses | null>(null);
   /** Unified cross-product fidelity report (shown once per export) */
   const [fidelity, setFidelity] = useState<FidelityReport | null>(null);
@@ -470,16 +489,24 @@ export default function RichTextEditorTool() {
     return () => clearTimeout(timer);
   }, [comments, changes, persistNow, readHtml]);
 
+  // Latest callbacks for the update debounce. They change on almost every render, so keeping them in
+  // refs lets the effect subscribe once — otherwise every re-render clears the pending timer and the
+  // snapshot never updates (which silently disables the export menu entries).
+  const persistRef = useRef(persistNow);
+  persistRef.current = persistNow;
+  const readHtmlRef = useRef(readHtml);
+  readHtmlRef.current = readHtml;
+
   useEffect(() => {
     if (!editor) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const handleUpdate = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        const html = readHtml();
+        const html = readHtmlRef.current();
         if (html === null) return;
         setSnapshotHtml(html);
-        persistNow({ title: titleRef.current, html, view: viewRef.current });
+        persistRef.current({ title: titleRef.current, html, view: viewRef.current });
       }, SAVE_DEBOUNCE_MS);
     };
     editor.on('update', handleUpdate);
@@ -487,7 +514,7 @@ export default function RichTextEditorTool() {
       editor.off('update', handleUpdate);
       if (timer) clearTimeout(timer);
     };
-  }, [editor, persistNow, readHtml]);
+  }, [editor]);
 
   // Persist title changes too
   useEffect(() => {
@@ -564,7 +591,13 @@ export default function RichTextEditorTool() {
   const handleImport = async (file: File) => {
     setBusy('import');
     setFailure(null);
-    const result = await importDocx(file);
+    const result = await importDocx(file, {
+      onLayout: ({ pageSetup: importedSetup, sectionCount }) => {
+        // First section owns the document-level layout; partial data is merged over the current setup
+        setPageSetup((prev) => normalizePageSetup({ ...prev, ...importedSetup }));
+        setImportSections(sectionCount > 1 ? sectionCount : 0);
+      },
+    });
     setBusy(null);
     if (!result.ok) {
       setFailure(result);
@@ -1216,6 +1249,62 @@ export default function RichTextEditorTool() {
     setContextMenu({ x: event.clientX, y: event.clientY, kind: from !== to ? 'text' : 'empty' });
   };
 
+  // Multi-section (P2-2): the page setup panel edits the section under the cursor. Section 0 is the
+  // document-level setup; later sections carry their own snapshot on the section-break node.
+  const sectionState = (() => {
+    if (!editor) return { index: 0, setup: pageSetup, headerLinked: false, footerLinked: false };
+    const positions = sectionBreakPositions(editor);
+    const index = sectionIndexAtCaret(editor);
+    const pos = index > 0 ? positions[index - 1] : undefined;
+    const node = pos === undefined ? null : editor.state.doc.nodeAt(pos);
+    const raw = node?.attrs.pageSetup as Partial<PageSetupConfig> | null | undefined;
+    return {
+      index,
+      setup: raw ? normalizePageSetup(raw) : pageSetup,
+      headerLinked: node?.attrs.headerLinked === true,
+      footerLinked: node?.attrs.footerLinked === true,
+    };
+  })();
+
+  /** Toggle "link to previous" for the section under the cursor (mirrors what the docx writer emits) */
+  const applySectionLink = (part: 'header' | 'footer', linked: boolean) => {
+    if (!editor) return;
+    // Resolve the section at apply time: the render-time snapshot can predate the last caret move, and
+    // then the toggle (or the paper below) would silently land on the previous section
+    const pos = sectionBreakPositions(editor)[sectionIndexAtCaret(editor) - 1];
+    const node = pos === undefined ? null : editor.state.doc.nodeAt(pos);
+    if (pos === undefined || !node) return;
+    editor.view.dispatch(
+      editor.state.tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        [part === 'header' ? 'headerLinked' : 'footerLinked']: linked,
+      }),
+    );
+  };
+
+  const applySectionPageSetup = (patch: PageSetupPatch) => {
+    if (!editor) {
+      setPageSetup((current) => mergePageSetup(current, patch));
+      return;
+    }
+    const pos = sectionBreakPositions(editor)[sectionIndexAtCaret(editor) - 1];
+    const node = pos === undefined ? null : editor.state.doc.nodeAt(pos);
+    if (pos === undefined || !node) {
+      setPageSetup((current) => mergePageSetup(current, patch));
+      return;
+    }
+    // Merge onto the section's own snapshot, not onto the rendered one: consecutive edits must compose
+    const base = node.attrs.pageSetup
+      ? normalizePageSetup(node.attrs.pageSetup as Partial<PageSetupConfig>)
+      : pageSetup;
+    editor.view.dispatch(
+      editor.state.tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        pageSetup: mergePageSetup(base, patch),
+      }),
+    );
+  };
+
   const menus: EditorMenu[] = [
     {
       id: 'file',
@@ -1305,6 +1394,9 @@ export default function RichTextEditorTool() {
         ),
         editorMenuItem('insert-page-break', t('tools.richText.pageBreak'), () =>
           editor?.chain().focus().setPageBreak().run(),
+        ),
+        editorMenuItem('insert-section-break', t('tools.richText.sectionBreak'), () =>
+          editor?.chain().focus().setSectionBreak({ startType: 'nextPage', pageSetup }).run(),
         ),
         { type: 'separator' },
         editorMenuItem('insert-toc', t('tools.richText.insertToc'), handleInsertToc, {
@@ -1816,8 +1908,18 @@ export default function RichTextEditorTool() {
             ) : null}
             {pageSetupOpen ? (
               <PageSetupPanel
-                setup={pageSetup}
-                onChange={setPageSetup}
+                setup={sectionState.setup}
+                scopeLabel={t('tools.richText.pageSetupScope', { n: sectionState.index + 1 })}
+                linkState={
+                  sectionState.index > 0
+                    ? {
+                        header: sectionState.headerLinked,
+                        footer: sectionState.footerLinked,
+                        onToggle: applySectionLink,
+                      }
+                    : undefined
+                }
+                onChange={applySectionPageSetup}
                 onClose={() => setPageSetupOpen(false)}
               />
             ) : null}
@@ -1925,6 +2027,12 @@ export default function RichTextEditorTool() {
         </p>
       )}
 
+      {importSections > 1 && !failure && (
+        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
+          {t('tools.richText.lossSections', { count: importSections })}
+        </p>
+      )}
+
       {losses && !failure && (
         <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
           {[
@@ -2017,7 +2125,12 @@ export default function RichTextEditorTool() {
       ) : null}
 
       {printReady && (
-        <PrintLayer html={printHtml} flowRef={flowRef} watermark={pageSetup.watermark} />
+        <PrintLayer
+          html={printHtml}
+          flowRef={flowRef}
+          watermark={pageSetup.watermark}
+          cssVars={metrics.cssVars}
+        />
       )}
     </div>
   );

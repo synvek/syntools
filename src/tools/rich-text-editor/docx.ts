@@ -1,5 +1,11 @@
 import type { ToolResult } from '@/core/types';
-import { CONTENT_WIDTH_PX, checkExportSize, checkImportFile, sanitizeDocHtml } from './core';
+import {
+  CONTENT_WIDTH_PX,
+  checkExportSize,
+  checkImportFile,
+  normalizeImportedDocHtml,
+  sanitizeDocHtml,
+} from './core';
 import {
   COLUMN_GAP_MM,
   DEFAULT_PAGE_SETUP,
@@ -9,6 +15,7 @@ import {
   resolvePageMetrics,
   type PageSetupConfig,
 } from './pageSetup';
+import { parseDocxSections, splitSectionNodes, type ImportedSection } from './sections';
 import { renderWatermarkImage, type WatermarkImage } from './watermarkImage';
 import { firstFontFamily, pxToHalfPoints } from './typography';
 import {
@@ -790,6 +797,10 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       const text = el.textContent ?? '';
       out.push(
         new D.Paragraph({
+          // The named style is what makes the block survive a round trip: mammoth only emits <pre>
+          // when it sees a `p[style-name='Code']` entry in the style map (indent + shading alone is
+          // read back as a plain paragraph).
+          style: 'Code',
           children: [new D.TextRun({ text, font: 'Consolas' })],
           shading: { fill: 'F3F4F6' },
         }),
@@ -825,6 +836,7 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       el.tagName === 'BLOCKQUOTE'
         ? new D.Paragraph({
             ...paragraphOptions,
+            style: 'Quote',
             indent: { left: 720 },
             shading: { fill: 'F9FAFB' },
           })
@@ -836,6 +848,8 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
 
 /** mammoth style map: translate Word built-in and Chinese style names into semantic HTML (headings 1-6 are mapped by default) */
 const MAMMOTH_STYLE_MAP = [
+  // mammoth maps bold/italic/strike on its own but ignores underline unless told to keep it
+  'u => u',
   "p[style-name='Title'] => h1:fresh",
   "p[style-name='Subtitle'] => h2:fresh",
   "p[style-name='Quote'] => blockquote:fresh",
@@ -845,14 +859,50 @@ const MAMMOTH_STYLE_MAP = [
   "p[style-name='引用'] => blockquote:fresh",
   "p[style-name='明显引用'] => blockquote:fresh",
   "p[style-name='代码'] => pre:fresh",
+  // Our own exported styles (docx.ts writes style: 'Quote' / 'Code')
+  "p[style-name='Code'] => pre:fresh",
 ];
 
+export interface DocxImportOptions {
+  /**
+   * Called with the first section's page setup and the total section count.
+   * mammoth drops `w:sectPr` completely, so the layout has to be read from the zip directly.
+   */
+  onLayout?: (info: { pageSetup: Partial<PageSetupConfig>; sectionCount: number }) => void;
+}
+
+/**
+ * Read `word/document.xml` for section properties. This is a best-effort addition: an import must never
+ * fail because the archive was opened a second time, so any error degrades to "no section info".
+ */
+async function readDocxSections(buffer: ArrayBuffer): Promise<ImportedSection[]> {
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const entry = zip.file('word/document.xml');
+    if (!entry) return [];
+    return parseDocxSections(await entry.async('string'));
+  } catch (error) {
+    console.warn('[richText] docx section read failed:', error);
+    return [];
+  }
+}
+
 /** Import .docx: parse with mammoth (including style map) -> sanitize HTML */
-export async function importDocx(file: File): Promise<ToolResult<string>> {
+export async function importDocx(
+  file: File,
+  options?: DocxImportOptions,
+): Promise<ToolResult<string>> {
   const check = checkImportFile(file);
   if (!check.ok) return check;
   try {
     const buffer = await file.arrayBuffer();
+    const sections = await readDocxSections(buffer);
+    if (sections.length > 0) {
+      // The first section is what the document-level page setup corresponds to; later sections cannot be
+      // located in mammoth's HTML, so they are merged and reported to the caller instead of silently dropped
+      options?.onLayout?.({ pageSetup: sections[0].pageSetup, sectionCount: sections.length });
+    }
     const mammoth = (await import('mammoth')).default;
     // mammoth's browser build expects `arrayBuffer` while the Node build only reads `buffer`
     // (and prefers it); passing both forms hits either environment in one call — no retry needed
@@ -865,7 +915,9 @@ export async function importDocx(file: File): Promise<ToolResult<string>> {
       },
       { styleMap: MAMMOTH_STYLE_MAP },
     );
-    return sanitizeDocHtml(parsed.value);
+    const clean = sanitizeDocHtml(parsed.value);
+    if (!clean.ok) return clean;
+    return { ok: true, value: normalizeImportedDocHtml(clean.value) };
   } catch (error) {
     console.error('[richText] docx import failed:', error);
     return { ok: false, error: 'IMPORT_FAILED' };
@@ -1002,10 +1054,17 @@ export async function exportDocxBlob(
     });
     ctx.mathImages = await renderLatexImages(mathRequests);
 
-    const children = htmlToDocxChildren(ctx, doc.body);
-    if (children.length === 0) {
-      children.push(new D.Paragraph({ children: [] }));
-    }
+    // Sections (P2-2): every `sectionBreak` node starts a new section. A document without any break
+    // yields exactly one slice, so the single-section output is byte-for-byte the previous behaviour.
+    const slices = splitSectionNodes(Array.from(doc.body.children), setup);
+    const sectionBodies = slices.map((slice) => {
+      // Move the blocks into a fresh host so the existing traversal can run per section
+      const host = doc.createElement('div');
+      slice.elements.forEach((element) => host.appendChild(element));
+      const children = htmlToDocxChildren(ctx, host);
+      if (children.length === 0) children.push(new D.Paragraph({ children: [] }));
+      return { slice, children };
+    });
     // Watermark: Word run properties can't rotate text, so use a floating transparent image in the header (behind text)
     const watermarkImage = await renderWatermarkImage(
       setup.watermark,
@@ -1038,6 +1097,31 @@ export async function exportDocxBlob(
     const document = new D.Document({
       title: title || 'SynTools Document',
       creator: 'SynTools',
+      // Quote / Code are the only two semantic block styles we write. They exist mainly so the
+      // paragraph carries a style **name** into the document: mammoth can only rebuild
+      // <blockquote>/<pre> from a named style (see MAMMOTH_STYLE_MAP), not from indentation.
+      styles: {
+        paragraphStyles: [
+          {
+            id: 'Quote',
+            name: 'Quote',
+            basedOn: 'Normal',
+            next: 'Normal',
+            quickFormat: true,
+            run: { italics: true, color: '374151' },
+            paragraph: { indent: { left: 720 }, spacing: { before: 120, after: 120 } },
+          },
+          {
+            id: 'Code',
+            name: 'Code',
+            basedOn: 'Normal',
+            next: 'Normal',
+            quickFormat: true,
+            run: { font: 'Consolas' },
+            paragraph: { shading: { fill: 'F3F4F6' } },
+          },
+        ],
+      },
       numbering: {
         config: [
           { reference: 'rte-bullet', levels: buildNumberingLevels(D, true) },
@@ -1054,35 +1138,31 @@ export async function exportDocxBlob(
       ...(footnoteOptions ? { footnotes: footnoteOptions } : {}),
       // Page background color (fills the sheet when opened in Word)
       ...(setup.background ? { background: { color: setup.background } } : {}),
-      sections: [
-        {
+      sections: sectionBodies.map(({ slice, children }, index) => {
+        const sliceMetrics = resolvePageMetrics(slice.pageSetup);
+        const landscape = slice.pageSetup.orientation === 'landscape';
+        return {
           properties: {
             page: {
-              // Word convention: pgSz always stores portrait dimensions; landscape is expressed via the orient flag
+              // Landscape passes the swapped pair; `docx` swaps it back when writing w:pgSz, so the
+              // emitted size stays the landscape one and the orient flag carries the intent
               size: {
-                width: mmToTwip(
-                  setup.orientation === 'landscape' ? metrics.heightMm : metrics.widthMm,
-                ),
-                height: mmToTwip(
-                  setup.orientation === 'landscape' ? metrics.widthMm : metrics.heightMm,
-                ),
-                orientation:
-                  setup.orientation === 'landscape'
-                    ? D.PageOrientation.LANDSCAPE
-                    : D.PageOrientation.PORTRAIT,
+                width: mmToTwip(landscape ? sliceMetrics.heightMm : sliceMetrics.widthMm),
+                height: mmToTwip(landscape ? sliceMetrics.widthMm : sliceMetrics.heightMm),
+                orientation: landscape ? D.PageOrientation.LANDSCAPE : D.PageOrientation.PORTRAIT,
               },
               margin: {
-                top: mmToTwip(setup.margin.top),
-                right: mmToTwip(setup.margin.right),
-                bottom: mmToTwip(setup.margin.bottom),
-                left: mmToTwip(setup.margin.left),
+                top: mmToTwip(slice.pageSetup.margin.top),
+                right: mmToTwip(slice.pageSetup.margin.right),
+                bottom: mmToTwip(slice.pageSetup.margin.bottom),
+                left: mmToTwip(slice.pageSetup.margin.left),
               },
             },
             // Columns: Word flows the content by column itself (matching the on-screen flow view / print)
-            ...(setup.columns > 1
+            ...(slice.pageSetup.columns > 1
               ? {
                   column: {
-                    count: setup.columns,
+                    count: slice.pageSetup.columns,
                     space: mmToTwip(COLUMN_GAP_MM),
                     equalWidth: true,
                     separate: false,
@@ -1090,13 +1170,21 @@ export async function exportDocxBlob(
                 }
               : {}),
             // Different first page: when true the first page hides header/footer (matching Word's "different first page")
-            ...(setup.differentFirstPage ? { titlePage: true } : {}),
+            ...(slice.pageSetup.differentFirstPage ? { titlePage: true } : {}),
+            // The first section has nothing to start after, and Word ignores `w:type` there anyway
+            ...(index > 0 && slice.startType === 'continuous'
+              ? { type: D.SectionType.CONTINUOUS }
+              : {}),
           },
-          headers: buildHeaderFooter(D, setup, 'header', watermarkChild),
-          footers: buildHeaderFooter(D, setup, 'footer'),
+          // "Link to previous": a section without its own headerReference inherits the previous one in
+          // Word, so omitting the part is exactly the right encoding (no duplicate header parts)
+          headers: slice.headerLinked
+            ? undefined
+            : buildHeaderFooter(D, slice.pageSetup, 'header', watermarkChild),
+          footers: slice.footerLinked ? undefined : buildHeaderFooter(D, slice.pageSetup, 'footer'),
           children,
-        },
-      ],
+        };
+      }),
     });
     return { ok: true, value: await D.Packer.toBlob(document) };
   } catch (error) {

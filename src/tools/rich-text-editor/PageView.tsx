@@ -3,9 +3,10 @@ import type { Node as PMNode } from '@tiptap/pm/model';
 import type { EditorState, Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
-import { countPages, pageIndexOfPosition, planPageBlocks } from './core';
+import { countPages, pageIndexOfPosition } from './core';
 import { isFloatingImageElement } from './imageLayer';
 import { MM_TO_PX, SHEET_GAP_MM, pageMetricsToPx, type PageMetrics } from './pageSetup';
+import { planSectionedPageBlocks, sectionBoxFromElement, type SectionBox } from './sections';
 
 /**
  * Word-style paged editing view (the canonical ProseMirror approach):
@@ -80,16 +81,39 @@ function isPageBreakElement(el: Element): boolean {
   return el.hasAttribute('data-page-break') || el.classList.contains('rte-page-break-node');
 }
 
+/** Section break node: starts a new section; its page setup snapshot gives that section's usable height */
+function isSectionBreakElement(el: Element): boolean {
+  return el.hasAttribute('data-section-break');
+}
+
+function sectionBoxOf(el: Element, fallback: SectionBox): SectionBox {
+  return sectionBoxFromElement(el, fallback);
+}
+
 /**
- * Plan pagination: first distribute blocks by page height, then add the breaks forced by explicit
- * page break nodes. The screen and print paths must share this, otherwise one document paginates two ways.
+ * Plan pagination: distribute blocks by the height available **in their section**, then add the breaks
+ * forced by explicit page break nodes. The screen, print and snapshot paths must share this, otherwise
+ * one document paginates two ways (the snapshot PDF reuses it on the print flow's DOM).
  */
-function planPageStarts(
+export function planPageStarts(
   elements: Element[],
   items: { top: number; height: number }[],
   pageHeight: number,
 ): number[] {
-  const starts = new Set(planPageBlocks(items, pageHeight));
+  const boxes: SectionBox[] = [
+    { contentHeight: pageHeight, advancePx: pageHeight, startType: 'nextPage' },
+  ];
+  const sectionOf = new Array<number>(elements.length).fill(0);
+  let section = 0;
+  elements.forEach((el, index) => {
+    if (isSectionBreakElement(el)) {
+      boxes.push(sectionBoxOf(el, boxes[0]));
+      section = boxes.length - 1;
+    }
+    sectionOf[index] = section;
+  });
+  const blocks = items.map((item, index) => ({ ...item, section: sectionOf[index] ?? 0 }));
+  const starts = new Set(planSectionedPageBlocks(blocks, boxes));
   elements.forEach((el, index) => {
     if (!isPageBreakElement(el)) return;
     // The first non-empty block after a page break starts a new page
@@ -165,6 +189,11 @@ function planLayout(
     // otherwise their absolute position is mistaken for a block spilling across pages and extra gaps appear.
     if (isFloatingImageElement(el)) {
       items.push({ top: 0, height: 0 });
+      return;
+    }
+    // A section break is a marker, not content: the forced page start must land on the next visible block
+    if (isSectionBreakElement(el)) {
+      items.push({ top: (rect.top - domTop) / scale - gapPx, height: 0 });
       return;
     }
     items.push({ top: (rect.top - domTop) / scale - gapPx, height });
@@ -328,7 +357,9 @@ export function applyPagedBreaks(dom: HTMLElement, metrics: PageMetrics): void {
     // Floating images are out of the text flow: count them as zero height and exclude them from print pagination
     if (isFloatingImageElement(el)) return { top: 0, height: 0 };
     const rect = el.getBoundingClientRect();
-    return { top: rect.top - base, height: rect.height };
+    // A section break keeps its space but must not be the block that starts a page (same rule as the
+    // on-screen measurement, otherwise the print and screen paths paginate differently)
+    return { top: rect.top - base, height: isSectionBreakElement(el) ? 0 : rect.height };
   });
   const starts = planPageStarts(children, items, pageMetricsToPx(metrics).contentHeightPx);
   starts.forEach((index) => {
