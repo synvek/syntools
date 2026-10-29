@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import type { DocComment, TrackedChange } from './docs';
@@ -20,6 +20,11 @@ interface ReviewPanelProps {
   onReplyComment: (id: string, text: string) => void;
   onAcceptAll: () => void;
   onRejectAll: () => void;
+  /** Accept / reject one tracked change by id (P2-3: per-change review) */
+  onAcceptChange: (id: string) => void;
+  onRejectChange: (id: string) => void;
+  /** Jump the editor selection to a revision (prev/next navigation and row clicks) */
+  onFocusChange: (id: string) => void;
   onClose: () => void;
 }
 
@@ -46,12 +51,39 @@ export function ReviewPanel({
   onReplyComment,
   onAcceptAll,
   onRejectAll,
+  onAcceptChange,
+  onRejectChange,
+  onFocusChange,
   onClose,
 }: ReviewPanelProps) {
   const { t } = useTranslation();
   const [draftText, setDraftText] = useState('');
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  /** Author filter (`''` = all). Reviewers pile up revisions, and a long list is unusable without it */
+  const [authorFilter, setAuthorFilter] = useState('');
+  /** Cursor of prev/next navigation, as an index into `visibleChanges` */
+  const [cursor, setCursor] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const authors = useMemo(
+    () => Array.from(new Set(changes.map((change) => change.author).filter(Boolean))),
+    [changes],
+  );
+  const visibleChanges = useMemo(
+    () => (authorFilter ? changes.filter((change) => change.author === authorFilter) : changes),
+    [changes, authorFilter],
+  );
+
+  /** Only the first N rows are rendered: a comparison of two long documents can produce hundreds */
+  const shownChanges = visibleChanges.slice(0, 20);
+
+  /** Prev/next wraps around: the reviewer usually walks the list from wherever they stopped */
+  const step = (delta: number) => {
+    if (!visibleChanges.length) return;
+    const next = (cursor + delta + visibleChanges.length) % visibleChanges.length;
+    setCursor(next);
+    onFocusChange(visibleChanges[next].id);
+  };
 
   const submitReply = (id: string) => {
     const text = (replyDrafts[id] ?? '').trim();
@@ -120,36 +152,121 @@ export function ReviewPanel({
 
       {changes.length > 0 ? (
         <div className="mb-3">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {t('tools.richText.trackedChanges')} ({changes.length})
-          </span>
-          <div className="mt-1 flex gap-1">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {t('tools.richText.trackedChanges')} ({changes.length})
+            </span>
+            <span className="flex items-center gap-0.5">
+              <button
+                type="button"
+                title={t('tools.richText.prevChange')}
+                aria-label={t('tools.richText.prevChange')}
+                disabled={visibleChanges.length === 0}
+                onClick={() => step(-1)}
+                className="flex h-5 w-5 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                <Icon name="chevronLeft" className="h-3 w-3" />
+              </button>
+              <span
+                data-testid="rich-text-change-position"
+                className="min-w-8 text-center text-[10px] tabular-nums text-gray-400 dark:text-gray-500"
+              >
+                {visibleChanges.length
+                  ? `${Math.min(cursor + 1, visibleChanges.length)}/${visibleChanges.length}`
+                  : '0/0'}
+              </span>
+              <button
+                type="button"
+                title={t('tools.richText.nextChange')}
+                aria-label={t('tools.richText.nextChange')}
+                disabled={visibleChanges.length === 0}
+                onClick={() => step(1)}
+                className="flex h-5 w-5 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                <Icon name="chevronRight" className="h-3 w-3" />
+              </button>
+            </span>
+          </div>
+          <div className="mt-1 flex items-center gap-1">
             <button type="button" onClick={onAcceptAll} className={buttonBase}>
               {t('tools.richText.acceptAll')}
             </button>
             <button type="button" onClick={onRejectAll} className={buttonBase}>
               {t('tools.richText.rejectAll')}
             </button>
+            {authors.length > 1 ? (
+              <select
+                value={authorFilter}
+                aria-label={t('tools.richText.authorFilter')}
+                onChange={(event) => {
+                  setAuthorFilter(event.target.value);
+                  setCursor(0);
+                }}
+                className="ml-auto h-7 min-w-0 rounded-md border border-gray-300 bg-white px-1 text-xs text-gray-700 outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              >
+                <option value="">{t('tools.richText.authorFilterAll')}</option>
+                {authors.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
           </div>
           <ul className="mt-1 max-h-28 overflow-auto">
-            {changes.slice(0, 20).map((change) => (
+            {shownChanges.map((change, index) => (
               <li
                 key={change.id}
-                className="flex items-baseline gap-1 py-0.5 text-xs text-gray-600 dark:text-gray-300"
+                data-current={index === cursor ? 'true' : undefined}
+                className={`flex items-baseline gap-1 rounded px-0.5 py-0.5 text-xs text-gray-600 dark:text-gray-300 ${
+                  index === cursor ? 'bg-blue-50 dark:bg-blue-950/40' : ''
+                }`}
               >
-                <span
-                  className={`shrink-0 font-medium ${
-                    change.kind === 'insert' ? 'text-green-600' : 'text-red-600'
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCursor(index);
+                    onFocusChange(change.id);
+                  }}
+                  aria-label={`${t('tools.richText.focusChange')} ${change.text.slice(0, 20)}`}
+                  className="flex min-w-0 flex-1 items-baseline gap-1 text-left"
                 >
-                  {change.kind === 'insert' ? '+' : '−'}
-                </span>
-                <span className="truncate">{change.text.slice(0, 60)}</span>
-                {change.author ? (
-                  <span className="ml-auto shrink-0 text-gray-400 dark:text-gray-500">
-                    {change.author}
+                  <span
+                    className={`shrink-0 font-medium ${
+                      change.kind === 'insert'
+                        ? 'text-green-600'
+                        : change.kind === 'format'
+                          ? 'text-blue-600'
+                          : 'text-red-600'
+                    }`}
+                  >
+                    {change.kind === 'insert' ? '+' : change.kind === 'format' ? '±' : '−'}
                   </span>
-                ) : null}
+                  <span className="truncate">{change.text.slice(0, 60)}</span>
+                </button>
+                <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    title={t('tools.richText.acceptOne')}
+                    aria-label={`${t('tools.richText.acceptOne')} ${change.text.slice(0, 20)}`}
+                    onClick={() => onAcceptChange(change.id)}
+                    className="flex h-5 w-5 items-center justify-center rounded text-green-600 hover:bg-green-50 dark:hover:bg-green-950/40"
+                  >
+                    <Icon name="check" className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    title={t('tools.richText.rejectOne')}
+                    aria-label={`${t('tools.richText.rejectOne')} ${change.text.slice(0, 20)}`}
+                    onClick={() => onRejectChange(change.id)}
+                    className="flex h-5 w-5 items-center justify-center rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+                  >
+                    <Icon name="close" className="h-3 w-3" />
+                  </button>
+                  {change.author ? (
+                    <span className="text-gray-400 dark:text-gray-500">{change.author}</span>
+                  ) : null}
+                </span>
               </li>
             ))}
           </ul>
@@ -205,7 +322,9 @@ export function ReviewPanel({
           {comments.map((comment) => (
             <li
               key={comment.id}
-              className={`rounded-md px-2 py-1.5 ${comment.resolved ? 'opacity-60' : ''}`}
+              className={`rounded-md px-2 py-1.5 ${
+                comment.resolved || comment.orphaned ? 'opacity-60' : ''
+              }`}
             >
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
@@ -228,6 +347,14 @@ export function ReviewPanel({
                     ) : null}
                     {comment.resolved ? (
                       <span>{t('tools.richText.commentResolvedTag')}</span>
+                    ) : null}
+                    {comment.orphaned ? (
+                      <span
+                        data-testid="rich-text-comment-orphaned"
+                        className="text-amber-600 dark:text-amber-400"
+                      >
+                        {t('tools.richText.commentAnchorLost')}
+                      </span>
                     ) : null}
                   </p>
                 </div>

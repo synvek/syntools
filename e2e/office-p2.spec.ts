@@ -251,3 +251,111 @@ test('rich text: page break lands after the current block and keeps the caret af
   // The typed line sits after the last break (the caret did not fall back to the previous section)
   expect(afterTyping.lastBreakBefore).toEqual(['丙', 'BREAK', '丁']);
 });
+
+test('rich text: 50-page pagination stays within the 50ms budget per pass', async ({ page }) => {
+  test.setTimeout(180_000);
+  await openRichText(page);
+  const paragraphs = Array.from(
+    { length: 2100 },
+    (_, index) => `第 ${index + 1} 段：分页耗时的端到端采样内容，用于锁定 50 页文档的重排预算。`,
+  ).join('\n');
+  await pastePlainText(page, paragraphs);
+  const sheetCount = await page.locator('.rte-page-sheet').count();
+  expect(sheetCount).toBeGreaterThanOrEqual(50);
+
+  // §3.2.4 ②: budget for one pagination pass (block measurement + planning) on a ~50 page document.
+  // Every edit re-measures all blocks, so this is the number that decides whether typing feels laggy.
+  await page.evaluate(() => performance.clearMeasures('rte-page-layout'));
+  for (let round = 0; round < 5; round += 1) {
+    await page.locator('.tiptap p').first().click();
+    await page.keyboard.type('改');
+    await waitForStableLayout(page);
+  }
+  const stats = await page.evaluate(() => {
+    const durations = performance
+      .getEntriesByName('rte-page-layout')
+      .map((entry) => entry.duration)
+      .sort((a, b) => a - b);
+    if (durations.length === 0) return null;
+    const at = (fraction: number) =>
+      durations[Math.min(durations.length - 1, Math.floor(durations.length * fraction))];
+    return {
+      passes: durations.length,
+      median: Math.round(at(0.5) * 10) / 10,
+      p95: Math.round(at(0.95) * 10) / 10,
+      max: Math.round(durations[durations.length - 1] * 10) / 10,
+    };
+  });
+  expect(stats).not.toBeNull();
+  expect(stats?.passes).toBeGreaterThanOrEqual(5);
+  // Report the numbers in the run log: the budget alone doesn't show regressions until it is exceeded
+  console.info('page layout pass cost', stats);
+  expect(stats?.p95).toBeLessThan(50);
+});
+test('rich text: compare with a .docx file turns the differences into reviewable revisions', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await openRichText(page);
+  await pastePlainText(page, '第一段原文\n第二段原文\n第三段原文');
+
+  // 1) The exported .docx is the "other version": export first, edit afterwards
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    pickMenu(page, 'file', '导出 Word (.docx)'),
+  ]);
+  // Save under a real .docx name: the import validates the extension, and the download's temp path has none
+  const baseline = join(test.info().outputDir, 'baseline.docx');
+  await download.saveAs(baseline);
+
+  const edited = '第一段原文\n第二段改过的文字\n第三段原文\n第四段新增';
+  await page.locator('.tiptap').click();
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.press('Delete');
+  await pastePlainText(page, edited);
+
+  /** Run one comparison through the real UI (review panel button -> file picker) */
+  const compareWithBaseline = async () => {
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: '与文件比较…' }).click();
+    await (await chooser).setFiles(baseline);
+  };
+
+  await page.getByRole('button', { name: '批注与修订' }).click();
+  await expect(page.getByTestId('rich-text-review')).toBeVisible();
+  await compareWithBaseline();
+
+  // The comparison is applied in place: deleted text stays (struck through), insertions are underlined
+  await expect(page.locator('.tiptap del[data-track]').first()).toBeVisible();
+  await expect(page.locator('.tiptap ins[data-track]').first()).toBeVisible();
+  const perChangeReject = page.getByRole('button', { name: /^拒绝此条修订/ });
+  expect(await perChangeReject.count()).toBeGreaterThanOrEqual(2);
+
+  // Panel navigation: next/prev walk the revision list and move the editor selection with it
+  const position = page.getByTestId('rich-text-change-position');
+  await expect(position).toHaveText(/^1\/\d+$/);
+  await page.getByRole('button', { name: '下一处修订' }).click();
+  await expect(position).toHaveText(/^2\/\d+$/);
+  await page.getByRole('button', { name: '上一处修订' }).click();
+  await expect(position).toHaveText(/^1\/\d+$/);
+
+  // 2) One comparison = one history step (plan §3.3.4)
+  await page.locator('.tiptap p').first().click();
+  await page.keyboard.press('ControlOrMeta+Z');
+  await expect(page.locator('.tiptap del[data-track]')).toHaveCount(0);
+  await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
+  await expect(page.locator('.tiptap')).toContainText('第四段新增');
+
+  // 3) Compare again, reject exactly one revision, then accept the rest
+  await compareWithBaseline();
+  const beforeReject = await perChangeReject.count();
+  await perChangeReject.first().click();
+  await expect(perChangeReject).toHaveCount(beforeReject - 1);
+
+  await page.getByRole('button', { name: '全部接受', exact: true }).click();
+  await expect(page.locator('.tiptap del[data-track]')).toHaveCount(0);
+  await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
+  // Accepting everything leaves the compared file's content plus nothing else (the rejected block stayed in its base form)
+  await expect(page.locator('.tiptap')).toContainText('第一段原文');
+  await expect(page.locator('.tiptap')).toContainText('第三段原文');
+});

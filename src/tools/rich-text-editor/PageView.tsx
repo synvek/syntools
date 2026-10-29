@@ -245,6 +245,14 @@ export interface PageLayoutSnapshot {
 }
 
 /**
+ * `performance.measure` name of one pagination pass (measure + plan). The e2e perf case reads these
+ * entries to assert the §3.2.4 budget (a 50-page document must re-paginate in < 50ms per pass); keeping
+ * it as a real measure entry beats a hidden dev-only counter, and the overhead is negligible next to the
+ * block measurement itself.
+ */
+export const PAGE_LAYOUT_MEASURE = 'rte-page-layout';
+
+/**
  * Page layout plugin: only active inside a .rte-paged container.
  * onLayout hands the pagination snapshot to React (to render sheets + TOC page numbers).
  * getMetrics supplies the current page setup (size/margins/orientation); changes trigger a re-layout.
@@ -258,7 +266,13 @@ export function createPageLayoutPlugin(
 
   const measure = (view: EditorView) => {
     const metrics = getMetrics();
+    const startedAt = performance.now();
     const plan = planLayout(view, metrics);
+    try {
+      performance.measure(PAGE_LAYOUT_MEASURE, { start: startedAt, end: performance.now() });
+    } catch {
+      // Older engines / jsdom lack the options form: the timing is diagnostic only, never load-bearing
+    }
     if (plan) {
       const { positions, heights } = plan;
       // Dispatch on a later macrotask, avoiding a synchronous dispatch inside PM's update cycle

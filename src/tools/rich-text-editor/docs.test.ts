@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTableOfContents, htmlToMarkdown } from './docs';
+import { buildTableOfContents, htmlToMarkdown, syncCommentAnchors, type DocComment } from './docs';
 
 /** Pure-logic tests for TOC generation and HTML→Markdown */
 
@@ -133,5 +133,36 @@ describe('htmlToMarkdown', () => {
     expect(md).toContain('结论[1]');
     expect(md).toContain('**脚注**');
     expect(md).toContain('1. 来源');
+  });
+});
+
+/** 修订删除文本后，批注锚点可能消失：记录必须保留但标记 orphaned，绝不静默丢弃 */
+describe('syncCommentAnchors', () => {
+  const comment = (id: string, overrides: Partial<DocComment> = {}): DocComment => ({
+    id,
+    quote: '引用',
+    text: '正文',
+    author: '甲',
+    createdAt: 1,
+    resolved: false,
+    ...overrides,
+  });
+
+  it('flags comments whose anchor disappeared', () => {
+    const result = syncCommentAnchors([comment('c-1'), comment('c-2')], new Set(['c-1']));
+    expect(result.changed).toBe(true);
+    expect(result.comments.map((item) => Boolean(item.orphaned))).toEqual([false, true]);
+  });
+
+  it('keeps the same array when nothing changed (no needless re-render / draft write)', () => {
+    const comments = [comment('c-1')];
+    const result = syncCommentAnchors(comments, new Set(['c-1']));
+    expect(result.changed).toBe(false);
+    expect(result.comments).toBe(comments);
+  });
+
+  it('clears the flag when the anchor comes back', () => {
+    const result = syncCommentAnchors([comment('c-1', { orphaned: true })], new Set(['c-1']));
+    expect(result.comments[0].orphaned).toBe(false);
   });
 });

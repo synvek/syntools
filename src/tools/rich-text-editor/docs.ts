@@ -1,3 +1,4 @@
+import type { Node as PMNode } from '@tiptap/pm/model';
 import type { ToolResult } from '@/core/types';
 import { textFingerprint, type CommentEntry, type CommentThread } from '../../core/comments/model';
 
@@ -261,6 +262,45 @@ export interface DocComment {
   resolved: boolean;
   /** Replies after the opener (P1-2); the opener itself stays in `text` for compatibility */
   replies?: CommentEntry[];
+  /**
+   * The anchor disappeared (accepting a revision removed the commented text). The record is kept and
+   * listed separately — silently dropping a review comment is worse than showing it without a target
+   * (same policy as `CommentThread.orphaned` in `core/comments/model.ts`).
+   */
+  orphaned?: boolean;
+}
+
+/** Comment ids that still have a mark in the document */
+export function anchoredCommentIds(doc: PMNode): Set<string> {
+  const ids = new Set<string>();
+  doc.descendants((node) => {
+    if (!node.isText) return;
+    for (const mark of node.marks) {
+      if (mark.type.name !== 'comment') continue;
+      const id = mark.attrs.commentId;
+      if (typeof id === 'string' && id) ids.add(id);
+    }
+  });
+  return ids;
+}
+
+/**
+ * Re-anchor the comment list after a structural edit (accept/reject changes deletes text that may carry
+ * comment marks). `changed` lets the caller skip a state update — this runs after every review action,
+ * and an unchanged array would otherwise re-persist the draft each time.
+ */
+export function syncCommentAnchors(
+  comments: DocComment[],
+  alive: Set<string>,
+): { comments: DocComment[]; changed: boolean } {
+  let changed = false;
+  const next = comments.map((comment) => {
+    const orphaned = !alive.has(comment.id);
+    if (Boolean(comment.orphaned) === orphaned) return comment;
+    changed = true;
+    return { ...comment, orphaned };
+  });
+  return { comments: changed ? next : comments, changed };
 }
 
 /**
@@ -311,7 +351,8 @@ export function toCommentThreads(comments: DocComment[]): CommentThread[] {
 
 export interface TrackedChange {
   id: string;
-  kind: 'insert' | 'delete';
+  /** `format` = 文字未变、块类型变了（比较产生的格式修订） */
+  kind: 'insert' | 'delete' | 'format';
   /** Changed text */
   text: string;
   author: string;

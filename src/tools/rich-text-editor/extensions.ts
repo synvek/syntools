@@ -17,7 +17,7 @@ import { FindReplace } from './find-replace';
 import { charFormatExtensions } from './charFormat';
 import { ImageLayerCommands } from './imageLayer';
 import { BlockStyleCommands, ImageStyle, ParagraphStyle, TableStyle } from './blockStyles';
-import { Comment, DocMarkCommands, TrackedDelete, TrackedInsert } from './marks';
+import { Comment, DocMarkCommands, TrackedDelete, TrackedFormat, TrackedInsert } from './marks';
 import { createPageLayoutPlugin, type PageLayoutSnapshot } from './PageView';
 import { resolvePageMetrics, type PageMetrics } from './pageSetup';
 import { DEFAULT_TOC_LABELS, TableOfContents, type TocLabels } from './toc';
@@ -296,6 +296,7 @@ export function createExtensions({
     Comment,
     TrackedInsert,
     TrackedDelete,
+    TrackedFormat,
     DocMarkCommands,
     // Character-level formatting (superscript / subscript / letter spacing / text transform)
     ...charFormatExtensions,

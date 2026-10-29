@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NodeSelection } from '@tiptap/pm/state';
+import { DOMParser as PMDOMParser } from '@tiptap/pm/model';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
@@ -76,9 +77,18 @@ import { exportDocxBlob, importDocx } from './docx';
 import { printSupported, snapshotToPdf, printToPdf } from './pdf';
 import { createExtensions } from './extensions';
 import { PageSetupPanel } from './PageSetupPanel';
+import { planComparison } from './revisions';
 import { ReviewPanel } from './ReviewPanel';
 import { StylePanel } from './StylePanel';
-import { addCommentReply, htmlToMarkdown, type DocComment, type TrackedChange } from './docs';
+import {
+  addCommentReply,
+  anchoredCommentIds,
+  htmlToMarkdown,
+  syncCommentAnchors,
+  type DocComment,
+  type TrackedChange,
+} from './docs';
+import { findChangeRange } from './marks';
 import { createCommentId } from '../../core/comments/model';
 import { pageIndexOfPosition } from './core';
 import { FootnoteDialog } from './FootnoteDialog';
@@ -229,6 +239,8 @@ export default function RichTextEditorTool() {
   const [pendingQuote, setPendingQuote] = useState<string | null>(null);
   const [author, setAuthor] = useState(() => readReviewerName());
   const [diffVersion, setDiffVersion] = useState<StoredVersion | null>(null);
+  /** Outcome of the last "compare with file" run (shown inline; null = nothing to report) */
+  const [compareNote, setCompareNote] = useState<string | null>(null);
   // The pagination plugin starts calling back while the editor is created (during render), so wait until mounted before setState
   const mountedRef = useRef(false);
   const pendingLayoutRef = useRef<PageLayoutSnapshot | null>(null);
@@ -268,6 +280,8 @@ export default function RichTextEditorTool() {
   /** Editor height = remaining first-screen space (status bar stays in view, "related tools" is pushed below the fold) */
   const viewportMax = useViewportFill(viewportRef, { min: MIN_VIEWPORT_PX });
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  /** "Compare with file" picker (same .docx path as import, but the result becomes revisions) */
+  const compareInputRef = useRef<HTMLInputElement | null>(null);
   /** Image picker for the Insert menu (the toolbar owns its own hidden input) */
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const titleRef = useRef(title);
@@ -968,18 +982,114 @@ export default function RichTextEditorTool() {
     const { from, to } = editor.state.selection;
     const text = editor.state.doc.textBetween(from, to, ' ');
     if (!text.trim()) return;
-    if (kind === 'insert') editor.chain().focus().markTrackedInsert().run();
-    else editor.chain().focus().markTrackedDelete().run();
+    const id = `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    // The id has to live in the mark too: the mark is what per-change accept/reject looks up,
+    // the list entry alone would leave the command with nothing to find.
+    if (kind === 'insert') editor.chain().focus().markTrackedInsert(id).run();
+    else editor.chain().focus().markTrackedDelete(id).run();
     setChanges((prev) => [
       ...prev,
-      {
-        id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        kind,
-        text,
-        author: resolveAuthor(),
-        createdAt: Date.now(),
-      },
+      { id, kind, text, author: resolveAuthor(), createdAt: Date.now() },
     ]);
+  };
+
+  /**
+   * A revision action can delete text that carried a comment mark. The comment record survives and is
+   * flagged `orphaned` instead of being dropped: a reviewer losing a comment silently is worse than
+   * seeing "anchor lost" next to it (the policy `core/comments/model.ts` already uses for threads).
+   */
+  const refreshCommentAnchors = () => {
+    if (!editor) return;
+    const alive = anchoredCommentIds(editor.state.doc);
+    setComments((prev) => {
+      const result = syncCommentAnchors(prev, alive);
+      return result.changed ? result.comments : prev;
+    });
+  };
+
+  /** Accept one change: the mark carries the id, so only that range is touched */
+  const handleAcceptChange = (id: string) => {
+    if (!editor) return;
+    if (!editor.chain().focus().acceptTrackedChange(id).run()) return;
+    setChanges((prev) => prev.filter((change) => change.id !== id));
+    refreshCommentAnchors();
+  };
+
+  /** Reject one change (insertions disappear, deletions come back, format revisions revert the block kind) */
+  const handleRejectChange = (id: string) => {
+    if (!editor) return;
+    if (!editor.chain().focus().rejectTrackedChange(id).run()) return;
+    setChanges((prev) => prev.filter((change) => change.id !== id));
+    refreshCommentAnchors();
+  };
+
+  const handleAcceptAll = () => {
+    if (!editor) return;
+    editor.chain().focus().acceptAllTracked().run();
+    setChanges([]);
+    refreshCommentAnchors();
+  };
+
+  const handleRejectAll = () => {
+    if (!editor) return;
+    editor.chain().focus().rejectAllTracked().run();
+    setChanges([]);
+    refreshCommentAnchors();
+  };
+
+  /** Panel navigation: select the revision range so the editor scrolls it into view */
+  const handleFocusChange = (id: string) => {
+    if (!editor) return;
+    const range = findChangeRange(editor.state.doc, id);
+    if (!range) return;
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: range.from, to: range.to })
+      .scrollIntoView()
+      .run();
+  };
+
+  /**
+   * Compare with a .docx file: the import is parsed into a ProseMirror doc and handed to
+   * `planComparison`, which returns a single transaction — one comparison = one undo step.
+   * The result is *revisions in this document*, not a separate view, so the same review panel and the
+   * same accept/reject commands apply afterwards.
+   */
+  const handleCompareFile = async (file: File) => {
+    if (!editor) return;
+    setBusy('import');
+    setFailure(null);
+    setCompareNote(null);
+    const result = await importDocx(file);
+    setBusy(null);
+    if (!result.ok) {
+      setFailure(result);
+      return;
+    }
+    const dom = new DOMParser().parseFromString(result.value, 'text/html');
+    const target = PMDOMParser.fromSchema(editor.schema).parse(dom.body);
+    const plan = planComparison(editor.state, target);
+    if (!plan) {
+      setCompareNote(t('tools.richText.compareIdentical'));
+      return;
+    }
+    editor.view.dispatch(plan.tr);
+    const createdAt = Date.now();
+    const author = resolveAuthor();
+    // Comparison ids repeat across runs (`cmp-1`, `cmp-2`, …), so previously accepted entries are dropped
+    const fresh = new Set(plan.entries.map((entry) => entry.id));
+    setChanges((prev) => [
+      ...prev.filter((change) => !fresh.has(change.id)),
+      ...plan.entries.map((entry) => ({
+        id: entry.id,
+        kind: entry.kind,
+        text: entry.text,
+        author,
+        createdAt,
+      })),
+    ]);
+    setReviewOpen(true);
   };
 
   /** Manual snapshot: flush current content first, then archive it, optionally with a note */
@@ -1758,6 +1868,16 @@ export default function RichTextEditorTool() {
               <span className="text-xs text-gray-400 dark:text-gray-500">
                 {t('tools.richText.markHint')}
               </span>
+              <button
+                type="button"
+                onClick={() => compareInputRef.current?.click()}
+                className="h-7 rounded-md border border-gray-300 px-2 text-xs transition-colors hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                {t('tools.richText.compareWithFile')}
+              </button>
+              {compareNote ? (
+                <span className="text-xs text-amber-600 dark:text-amber-400">{compareNote}</span>
+              ) : null}
             </div>
           ) : null}
           {reviewOpen ? (
@@ -1773,14 +1893,11 @@ export default function RichTextEditorTool() {
               onRemoveComment={handleRemoveComment}
               onToggleResolved={handleToggleResolved}
               onReplyComment={handleReplyComment}
-              onAcceptAll={() => {
-                editor?.chain().focus().acceptAllTracked().run();
-                setChanges([]);
-              }}
-              onRejectAll={() => {
-                editor?.chain().focus().rejectAllTracked().run();
-                setChanges([]);
-              }}
+              onAcceptAll={handleAcceptAll}
+              onRejectAll={handleRejectAll}
+              onAcceptChange={handleAcceptChange}
+              onRejectChange={handleRejectChange}
+              onFocusChange={handleFocusChange}
               onClose={() => setReviewOpen(false)}
             />
           ) : null}
@@ -1992,6 +2109,20 @@ export default function RichTextEditorTool() {
           const file = e.target.files?.[0];
           e.target.value = '';
           if (file) void handleImport(file);
+        }}
+      />
+
+      {/* Same picker shape as import, but the file becomes revisions instead of replacing the document */}
+      <input
+        ref={compareInputRef}
+        type="file"
+        accept=".docx"
+        className="hidden"
+        data-testid="rich-text-compare-input"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void handleCompareFile(file);
         }}
       />
 
