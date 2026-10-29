@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { exportDocxBlob, importDocx } from './docx';
+import { exportDocxBlob, importDocx, type ImportedReview } from './docx';
 import { DEFAULT_PAGE_SETUP } from './pageSetup';
-import { applyRevisionMarks, hasRevisions, parseRevisionRuns } from './docxReview';
+import {
+  applyDocumentReview,
+  applyRevisionMarks,
+  hasRevisions,
+  parseDocumentReview,
+  parseRevisionRuns,
+} from './docxReview';
 
 // jsdom lacks Blob.prototype.arrayBuffer; the docx round trip needs it (same shim as docxCompat.test.ts)
 if (typeof Blob !== 'undefined' && typeof Blob.prototype.arrayBuffer !== 'function') {
@@ -136,5 +142,129 @@ describe('docx revision round trip', () => {
     expect(imported.value).toContain('data-track="insert"');
     expect(imported.value).toContain('data-track="delete"');
     expect(imported.value).toContain('丙');
+  });
+});
+
+/** 帮后续用例读 document.xml，避免每个用例重复开 zip */
+async function documentXmlOf(blob: Blob): Promise<string> {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  return (await zip.file('word/document.xml')?.async('string')) ?? '';
+}
+
+async function importWithReview(blob: Blob, name: string) {
+  // Boxed: the callback runs after this frame, so a plain `let` would be narrowed to `null` by TS
+  const box: { value: ImportedReview | null } = { value: null };
+  const imported = await importDocx(
+    new File([blob], name, {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    }),
+    {
+      onReview: (info) => {
+        box.value = info;
+      },
+    },
+  );
+  expect(imported.ok).toBe(true);
+  return { html: imported.ok ? imported.value : '', review: box.value as ImportedReview | null };
+}
+
+describe('format revision round trip (w:pPrChange)', () => {
+  it('writes the previous block kind as pPrChange and reads it back', async () => {
+    const exported = await exportDocxBlob(
+      '<h2><span data-track-format="paragraph" data-track-id="fmt-1">标题</span></h2>',
+      'format',
+      DEFAULT_PAGE_SETUP,
+      { author: '甲' },
+    );
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const xml = await documentXmlOf(exported.value);
+    // The library writes w:pPrChange natively (`ParagraphOptions.revision`), no zip surgery involved
+    expect(xml).toContain('<w:pPrChange');
+    expect(xml).toContain('w:author="甲"');
+
+    const { html, review } = await importWithReview(exported.value, 'format.docx');
+    expect(review?.changes.map((change) => change.kind)).toEqual(['format']);
+    // `paragraph` = 原来是普通段落；回填后 reject 才能把标题还原成段落
+    expect(html).toContain('data-track-format="paragraph"');
+    expect(html).toMatch(/<h2[^>]*>/);
+  });
+
+  it('keeps the heading level inside the target, so rejecting restores H2 (not H1)', async () => {
+    const exported = await exportDocxBlob(
+      '<p><span data-track-format="heading:2" data-track-id="fmt-2">正文</span></p>',
+      'level',
+      DEFAULT_PAGE_SETUP,
+    );
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    // Heading level can only travel through the style name: `Heading2` is what Word understands
+    expect(await documentXmlOf(exported.value)).toContain('Heading2');
+    const { html } = await importWithReview(exported.value, 'level.docx');
+    expect(html).toContain('data-track-format="heading:2"');
+  });
+});
+
+describe('comment round trip (comments.xml)', () => {
+  it('restores the anchor and the comment record', async () => {
+    const exported = await exportDocxBlob(
+      '<p>前文<span data-comment-id="c-1">待审</span>后文</p>',
+      'comment',
+      DEFAULT_PAGE_SETUP,
+      {
+        comments: [
+          {
+            id: 'c-1',
+            quote: '待审',
+            text: '这里需要补充来源',
+            author: '审阅人',
+            createdAt: 0,
+            resolved: false,
+          },
+        ],
+        author: '审阅人',
+      },
+    );
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const { html, review } = await importWithReview(exported.value, 'comment.docx');
+    expect(review?.degraded).toBe(false);
+    expect(review?.skippedComments).toBe(0);
+    expect(review?.comments).toHaveLength(1);
+    expect(review?.comments[0]).toMatchObject({
+      quote: '待审',
+      text: '这里需要补充来源',
+      author: '审阅人',
+    });
+    // The mark comes back, so the comment highlights the same text and can be resolved/removed again.
+    // Word numbers comments from 0, and the id is namespaced so a re-import cannot collide with editor ids.
+    expect(html).toContain('data-comment-id="docx-cmt-0"');
+    expect(html).toContain('待审');
+  });
+
+  it('imports a comment that crosses paragraphs as text and counts it', () => {
+    const xml = `<w:document xmlns:w="w"><w:body>
+      <w:p><w:commentRangeStart w:id="7"/><w:r><w:t>甲</w:t></w:r></w:p>
+      <w:p><w:r><w:t>乙</w:t></w:r><w:commentRangeEnd w:id="7"/></w:p>
+    </w:body></w:document>`;
+    const parsed = parseDocumentReview(xml);
+    expect(parsed.anchors).toEqual([{ docxId: '7', start: 0, end: 2 }]);
+
+    const applied = applyDocumentReview(
+      '<p>甲</p><p>乙</p>',
+      parsed,
+      [{ docxId: '7', author: 'A', date: null, quote: '', text: '跨段落批注' }],
+      1000,
+    );
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    // A mark cannot span two paragraphs in the editor: keep the text, report the loss
+    expect(applied.value.comments).toEqual([]);
+    expect(applied.value.skippedComments).toBe(1);
+    expect(applied.value.html).not.toContain('data-comment-id');
   });
 });

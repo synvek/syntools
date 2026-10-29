@@ -277,6 +277,7 @@ const zh: ResourceTree = {
       authorFilter: '按作者筛选修订',
       authorFilterAll: '全部作者',
       commentAnchorLost: '锚点已失效（正文已被修订删除）',
+      importCommentsLost: '有 {{count}} 条批注跨段落，无法定位到正文，已按纯文本导入',
       importRevisionsLost: '文档中的修订无法精确对应到正文，已按普通内容导入（修订标记未还原）',
       markInsert: '标记为插入',
       markDelete: '标记为删除',
@@ -621,6 +622,8 @@ const en: ResourceTree = {
       authorFilter: 'Filter changes by author',
       authorFilterAll: 'All authors',
       commentAnchorLost: 'Anchor lost (text removed by a revision)',
+      importCommentsLost:
+        '{{count}} comment(s) spanned paragraphs and could not be anchored, so they were imported as plain text',
       importRevisionsLost:
         'The revisions in the file could not be mapped onto the text, so they were imported as plain content',
       markInsert: 'Mark as insert',
@@ -958,6 +961,7 @@ const zhTW: ResourceTree = {
       authorFilter: '依作者篩選修訂',
       authorFilterAll: '全部作者',
       commentAnchorLost: '錨點已失效（內文已被修訂刪除）',
+      importCommentsLost: '有 {{count}} 條註解跨段落，無法定位到內文，已按純文字匯入',
       importRevisionsLost: '檔案中的修訂無法精確對應到內文，已按一般內容匯入（修訂標記未還原）',
       markInsert: '標記為插入',
       markDelete: '標記為刪除',
@@ -1305,6 +1309,8 @@ const ja: ResourceTree = {
       authorFilter: '変更を著者で絞り込む',
       authorFilterAll: 'すべての著者',
       commentAnchorLost: 'アンカーが失われました（変更で本文が削除されました）',
+      importCommentsLost:
+        '{{count}} 件のコメントが段落をまたいでいるため位置を特定できず、通常のテキストとして読み込みました',
       importRevisionsLost:
         'ファイル内の変更を本文に正確に対応付けできなかったため、通常の内容として読み込みました',
       markInsert: '挿入として記録',
@@ -1657,6 +1663,8 @@ const fr: ResourceTree = {
       authorFilter: 'Filtrer les modifications par auteur',
       authorFilterAll: 'Tous les auteurs',
       commentAnchorLost: 'Ancre perdue (texte supprimé par une révision)',
+      importCommentsLost:
+        '{{count}} commentaire(s) couvrent plusieurs paragraphes et n’ont pas pu être ancrés : importés en texte simple',
       importRevisionsLost:
         'Les révisions du fichier n’ont pas pu être associées au texte : importées comme contenu normal',
       markInsert: 'Marquer comme insertion',
@@ -2013,6 +2021,8 @@ const de: ResourceTree = {
       authorFilter: 'Änderungen nach Autor filtern',
       authorFilterAll: 'Alle Autoren',
       commentAnchorLost: 'Anker verloren (Text durch eine Änderung entfernt)',
+      importCommentsLost:
+        '{{count}} Kommentar(e) überspannen mehrere Absätze und konnten nicht verankert werden: als reiner Text importiert',
       importRevisionsLost:
         'Die Änderungen der Datei konnten dem Text nicht zugeordnet werden und wurden als normaler Inhalt importiert',
       markInsert: 'Als Einfügung markieren',
@@ -2369,6 +2379,8 @@ const it: ResourceTree = {
       authorFilter: 'Filtra le modifiche per autore',
       authorFilterAll: 'Tutti gli autori',
       commentAnchorLost: 'Ancora persa (testo rimosso da una revisione)',
+      importCommentsLost:
+        '{{count}} commento/i coprono più paragrafi e non sono stati ancorati: importati come testo semplice',
       importRevisionsLost:
         'Le revisioni del file non sono state associate al testo: sono state importate come contenuto normale',
       markInsert: 'Segna come inserimento',
@@ -2723,6 +2735,8 @@ const es: ResourceTree = {
       authorFilter: 'Filtrar cambios por autor',
       authorFilterAll: 'Todos los autores',
       commentAnchorLost: 'Ancla perdida (el texto se eliminó con una revisión)',
+      importCommentsLost:
+        '{{count}} comentario(s) abarcan varios párrafos y no se pudieron anclar: se importaron como texto simple',
       importRevisionsLost:
         'Las revisiones del archivo no se pudieron asociar al texto: se importaron como contenido normal',
       markInsert: 'Marcar como inserción',
@@ -3076,6 +3090,8 @@ const pt: ResourceTree = {
       authorFilter: 'Filtrar alterações por autor',
       authorFilterAll: 'Todos os autores',
       commentAnchorLost: 'Âncora perdida (texto removido por uma revisão)',
+      importCommentsLost:
+        '{{count}} comentário(s) abrangem vários parágrafos e não puderam ser ancorados: importados como texto simples',
       importRevisionsLost:
         'As revisões do arquivo não puderam ser associadas ao texto: foram importadas como conteúdo normal',
       markInsert: 'Marcar como inserção',

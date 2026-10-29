@@ -148,6 +148,27 @@ function formatRanges(
 }
 
 /**
+ * Block identity used by format revisions: `heading:2` keeps the level, plain kinds stay bare.
+ *
+ * The level has to travel with the target: restoring "it used to be a heading" without the level would
+ * silently turn an H2 into an H1 (or leave the new level in place).
+ */
+export function blockTargetKey(node: PMNode): string {
+  if (node.type.name === 'heading') {
+    const level = Number(node.attrs.level);
+    return Number.isFinite(level) && level > 0 ? `heading:${level}` : 'heading';
+  }
+  return node.type.name;
+}
+
+/** Inverse of `blockTargetKey`; `heading` without a level falls back to the current attrs */
+export function parseBlockTarget(key: string): { type: string; level?: number } {
+  const [type, rawLevel] = key.split(':');
+  const level = Number.parseInt(rawLevel ?? '', 10);
+  return Number.isFinite(level) && level > 0 ? { type, level } : { type };
+}
+
+/**
  * First text range carrying `changeId` (whatever the revision kind).
  *
  * The review panel uses it to jump to a revision: the panel only knows the id, and the id lives on the
@@ -239,12 +260,20 @@ function applyTrackedOps(tr: Transaction, schema: Schema, ops: TrackedOp[]): voi
       const $pos = tr.doc.resolve(op.from);
       const blockPos = $pos.depth > 0 ? $pos.before(1) : op.from;
       const block = tr.doc.nodeAt(blockPos);
-      const type = schema.nodes[op.target];
+      const target = parseBlockTarget(op.target);
+      const type = schema.nodes[target.type];
       if (!block || !type || type === block.type || restored.has(blockPos)) return;
       // A previous kind that cannot hold the current content (e.g. list item outside a list) is kept
       if (!type.validContent(block.content)) return;
       restored.add(blockPos);
-      tr.setNodeMarkup(blockPos, type);
+      // Heading level lives in the node attrs, so the type alone cannot describe "it used to be H2"
+      tr.setNodeMarkup(
+        blockPos,
+        type,
+        type === schema.nodes.heading && target.level
+          ? { ...block.attrs, level: target.level }
+          : block.attrs,
+      );
     });
 }
 

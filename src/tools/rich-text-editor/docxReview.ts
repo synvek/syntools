@@ -1,17 +1,22 @@
 import type { ToolResult } from '@/core/types';
-import type { TrackedChange } from './docs';
+import type { DocComment, TrackedChange } from './docs';
 
 /**
- * docx 修订回读（P2-3.5）：把 `word/document.xml` 里的 `w:ins` / `w:del` 还原成编辑器里的修订标记。
+ * docx 审阅层回读（P2-3.5）：把 `word/document.xml` 的修订/格式修订/批注区间，和 `word/comments.xml`
+ * 的批注正文，还原成编辑器里的 mark 与记录。
  *
- * 为什么必须自己读 XML：mammoth 对修订的处理恰好把两侧信息都丢掉——
+ * 为什么必须自己读 XML：mammoth 对审阅信息基本"两头都丢"——
  * - `w:ins` 走 `readChildElements`（透明穿透），**内容保留、修订语义消失**；
- * - `w:del` 直接列在 `ignoreElements` 里，**连 `w:delText` 一起丢弃**，HTML 里根本没有被删的文字。
- * 所以导入不是"解析 HTML"，而是"把 run 流回填到 mammoth 的 HTML 上"。
+ * - `w:del` 直接列在 `ignoreElements` 里，**连 `w:delText` 一起丢弃**，HTML 里根本没有被删的文字；
+ * - `w:commentRangeStart/End` 也在 `ignoreElements` 里，批注锚点直接消失。
+ * 所以导入不是"解析 HTML"，而是"把 XML 的 run 流回填到 mammoth 的 HTML 上"。
  *
  * 回填的正确性靠一条硬约束：mammoth 产出的可见文本必须与"非删除 run"拼出的文本**完全一致**。
- * 一致才回填；不一致（第三方 Word 文档里的域、脚注、图片替代文本、分栏重排…）一律**放弃回填并明确降级**，
- * 绝不错位——错误但沉默的还原比诚实的部分还原更糟（同 `sections.ts` 对 `sectPr` 的处理结论）。
+ * 一致才回填；不一致（第三方文档里的域、脚注、图片替代文本、分栏重排…）一律**放弃回填并明确降级**，
+ * 绝不错位——错误但沉默的还原比诚实的部分还原更糟（同 `sections.ts` 对 `sectPr` 的结论）。
+ *
+ * 三层的偏移基准是同一份"可见文本流"（删除的文字不占位），因此修订、格式修订、批注可以在**一次**
+ * DOM 操作里从后往前应用；分两次会因为前一次的 DOM 变更让后一次的偏移整体错位。
  *
  * 已知位置限制：整段被删除时 mammoth 会留下一个**空段落**，而回填是纯文本流定位，
  * 删除文字会贴在相邻段落的文本边界上（内容与修订标记正确，位置可能差一段）。
@@ -26,6 +31,39 @@ export interface RevisionRun {
   date: string | null;
   /** Paragraph ordinal: consecutive runs are only merged inside the same paragraph */
   block: number;
+}
+
+/** A `w:pPrChange`: the paragraph used to be another block kind (Word's format revision) */
+export interface FormatRevision {
+  /** Paragraph ordinal, same numbering as `RevisionRun.block` */
+  block: number;
+  /** Previous block kind in `marks.ts` notation (`heading:2` / `blockquote` / `codeBlock` / `paragraph`) */
+  target: string;
+  author: string;
+  date: string | null;
+}
+
+/** A `w:commentRangeStart` … `w:commentRangeEnd` pair, as offsets into the visible text stream */
+export interface CommentAnchor {
+  docxId: string;
+  start: number;
+  end: number;
+}
+
+/** One `w:comment` from `word/comments.xml` */
+export interface ImportedComment {
+  docxId: string;
+  author: string;
+  date: string | null;
+  /** Text our exporter (and Word users) put in italics: the quoted range */
+  quote: string;
+  text: string;
+}
+
+export interface ParsedDocumentReview {
+  runs: RevisionRun[];
+  formats: FormatRevision[];
+  anchors: CommentAnchor[];
 }
 
 /** Runs carry the same `w:author` on every run of one edit; merging keeps the panel readable */
@@ -60,13 +98,44 @@ function firstChild(element: Element, name: string): Element | null {
   return null;
 }
 
+/**
+ * `w:pPrChange` -> the previous block kind. Word records the *old* properties there, which is exactly
+ * what a reject needs; the reverse mapping mirrors the export side (`heading:N` / `Quote` / `Code`).
+ */
+function paragraphTargetOfChange(change: Element): string {
+  const props = firstChild(change, 'w:pPr');
+  const styleElement = props ? firstChild(props, 'w:pStyle') : null;
+  const style = styleElement ? attribute(styleElement, 'w:val') : '';
+  const heading = /^heading\s*(\d)$/i.exec(style);
+  if (heading) return `heading:${heading[1]}`;
+  if (style === 'Quote' || style === 'IntenseQuote' || style === 'Intense Quote')
+    return 'blockquote';
+  if (style === 'Code') return 'codeBlock';
+  return 'paragraph';
+}
+
 interface RunState {
   kind: RevisionRun['kind'];
   author: string;
   date: string | null;
 }
 
-function collectRuns(node: Node, block: number, state: RunState, out: RevisionRun[]): void {
+/** Mutable state shared by one document pass: text offset, open comment ranges, output arrays */
+interface CollectContext {
+  runs: RevisionRun[];
+  anchors: CommentAnchor[];
+  /** Offset into the *visible* text stream (deleted runs do not advance it) */
+  offset: number;
+  openComments: Map<string, number>;
+}
+
+function collectRuns(
+  node: Node,
+  block: number,
+  state: RunState,
+  ctx: CollectContext,
+  out: RevisionRun[],
+): void {
   for (const child of Array.from(node.childNodes)) {
     if (child.nodeType !== 1) continue;
     const element = child as Element;
@@ -81,8 +150,23 @@ function collectRuns(node: Node, block: number, state: RunState, out: RevisionRu
           author: attribute(element, 'w:author') || state.author,
           date: attribute(element, 'w:date') || state.date,
         },
+        ctx,
         out,
       );
+      continue;
+    }
+
+    if (tag === 'w:commentRangeStart') {
+      ctx.openComments.set(attribute(element, 'w:id'), ctx.offset);
+      continue;
+    }
+    if (tag === 'w:commentRangeEnd') {
+      const id = attribute(element, 'w:id');
+      const start = ctx.openComments.get(id);
+      if (start !== undefined) {
+        ctx.anchors.push({ docxId: id, start, end: ctx.offset });
+        ctx.openComments.delete(id);
+      }
       continue;
     }
 
@@ -102,6 +186,7 @@ function collectRuns(node: Node, block: number, state: RunState, out: RevisionRu
               date: attribute(mark, 'w:date') || state.date,
             }
           : state,
+        ctx,
         out,
       );
       continue;
@@ -109,41 +194,64 @@ function collectRuns(node: Node, block: number, state: RunState, out: RevisionRu
 
     if (tag === 'w:t' || tag === 'w:delText') {
       const text = element.textContent ?? '';
-      if (text) out.push({ text, kind: state.kind, author: state.author, date: state.date, block });
+      if (text) {
+        out.push({ text, kind: state.kind, author: state.author, date: state.date, block });
+        if (state.kind !== 'delete') ctx.offset += text.length;
+      }
       continue;
     }
 
     // Whitespace-ish runs mammoth renders as characters: they must count, otherwise the text stream drifts
-    if (tag === 'w:tab') {
-      out.push({ text: '\t', kind: state.kind, author: state.author, date: state.date, block });
-      continue;
-    }
-    if (tag === 'w:noBreakHyphen') {
-      out.push({ text: '\u2011', kind: state.kind, author: state.author, date: state.date, block });
-      continue;
-    }
-    if (tag === 'w:softHyphen') {
-      out.push({ text: '\u00AD', kind: state.kind, author: state.author, date: state.date, block });
+    if (tag === 'w:tab' || tag === 'w:noBreakHyphen' || tag === 'w:softHyphen') {
+      const text = tag === 'w:tab' ? '\t' : tag === 'w:noBreakHyphen' ? '\u2011' : '\u00AD';
+      out.push({ text, kind: state.kind, author: state.author, date: state.date, block });
+      if (state.kind !== 'delete') ctx.offset += text.length;
       continue;
     }
     // Field instructions are not rendered as text by mammoth: counting them would break the alignment
-    if (tag === 'w:instrText' || tag === 'w:pPr') continue;
+    if (tag === 'w:instrText') continue;
 
-    collectRuns(element, block, state, out);
+    collectRuns(element, block, state, ctx, out);
   }
 }
 
-/** Runs in document order (paragraph by paragraph, tables included) */
-export function parseRevisionRuns(xml: string): RevisionRun[] {
-  if (!xml.trim()) return [];
+/** Runs, format revisions and comment anchors, all from one pass over the same text stream */
+export function parseDocumentReview(xml: string): ParsedDocumentReview {
+  const empty: ParsedDocumentReview = { runs: [], formats: [], anchors: [] };
+  if (!xml.trim()) return empty;
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
-  if (doc.getElementsByTagName('parsererror').length > 0) return [];
-  const runs: RevisionRun[] = [];
+  if (doc.getElementsByTagName('parsererror').length > 0) return empty;
+
+  const ctx: CollectContext = {
+    runs: [],
+    anchors: [],
+    offset: 0,
+    openComments: new Map(),
+  };
+  const formats: FormatRevision[] = [];
   const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
   paragraphs.forEach((paragraph, block) => {
-    collectRuns(paragraph, block, { kind: 'normal', author: '', date: null }, runs);
+    const change = firstChild(firstChild(paragraph, 'w:pPr') ?? paragraph, 'w:pPrChange');
+    if (change) {
+      formats.push({
+        block,
+        target: paragraphTargetOfChange(change),
+        author: attribute(change, 'w:author'),
+        date: attribute(change, 'w:date') || null,
+      });
+    }
+    collectRuns(paragraph, block, { kind: 'normal', author: '', date: null }, ctx, ctx.runs);
   });
-  return mergeRuns(runs);
+
+  // An anchor left open at the end of the document is not a range: drop it rather than guessing an end
+  ctx.openComments.clear();
+
+  return { runs: mergeRuns(ctx.runs), formats, anchors: ctx.anchors };
+}
+
+/** Runs only (kept for callers/tests that do not care about the other two layers) */
+export function parseRevisionRuns(xml: string): RevisionRun[] {
+  return parseDocumentReview(xml).runs;
 }
 
 /** True when the package carries any revision at all (import can skip the whole path otherwise) */
@@ -151,10 +259,65 @@ export function hasRevisions(runs: RevisionRun[]): boolean {
   return runs.some((run) => run.kind !== 'normal' && run.text.trim().length > 0);
 }
 
-export interface AppliedRevisions {
+function paragraphIsItalic(paragraph: Element): boolean {
+  const runs = Array.from(paragraph.getElementsByTagName('w:r'));
+  if (runs.length === 0) return false;
+  return runs.every((run) => {
+    const italics = firstChild(firstChild(run, 'w:rPr') ?? run, 'w:i');
+    if (!italics) return false;
+    const value = attribute(italics, 'w:val');
+    return value !== '0' && value !== 'false';
+  });
+}
+
+function paragraphText(paragraph: Element): string {
+  return Array.from(paragraph.getElementsByTagName('w:t'))
+    .map((node) => node.textContent ?? '')
+    .join('');
+}
+
+/**
+ * `word/comments.xml` -> comment records.
+ *
+ * Our exporter writes the quoted range as an italic paragraph followed by the body, which is also what
+ * Word users do by hand; the first all-italic paragraph is therefore treated as the quote.
+ */
+export function parseImportedComments(xml: string): ImportedComment[] {
+  if (!xml.trim()) return [];
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length > 0) return [];
+
+  return Array.from(doc.getElementsByTagName('w:comment')).map((comment) => {
+    const paragraphs = Array.from(comment.getElementsByTagName('w:p'));
+    let quote = '';
+    const body: string[] = [];
+    paragraphs.forEach((paragraph) => {
+      const text = paragraphText(paragraph).trim();
+      if (!text) return;
+      if (!quote && paragraphIsItalic(paragraph)) {
+        quote = text;
+        return;
+      }
+      body.push(text);
+    });
+    return {
+      docxId: attribute(comment, 'w:id'),
+      author: attribute(comment, 'w:author'),
+      date: attribute(comment, 'w:date') || null,
+      quote,
+      text: body.join('\n'),
+    };
+  });
+}
+
+export interface AppliedReview {
   html: string;
   /** One entry per revision: the review panel and the per-change commands work off these ids */
   changes: TrackedChange[];
+  /** Comments that were restored as filled records (mark + metadata) */
+  comments: DocComment[];
+  /** Comments whose range crossed blocks (the editor cannot anchor across paragraphs): reported, not guessed */
+  skippedComments: number;
 }
 
 const BLOCK_TAGS = new Set([
@@ -203,23 +366,52 @@ function locate(slots: TextSlot[], offset: number): { node: Text; offset: number
   return null;
 }
 
-type RevisionOp =
-  | { kind: 'insert'; at: number; text: string; id: string; author: string; createdAt: number }
-  | { kind: 'delete'; at: number; text: string; id: string; author: string; createdAt: number };
+/** A block's span in the visible text stream (first/last non-deleted run), used by format revisions */
+function blockSpans(runs: RevisionRun[]): Map<number, { start: number; end: number }> {
+  const spans = new Map<number, { start: number; end: number }>();
+  let cursor = 0;
+  for (const run of runs) {
+    if (run.kind !== 'delete') {
+      const span = spans.get(run.block);
+      if (span) span.end += run.text.length;
+      else spans.set(run.block, { start: cursor, end: cursor + run.text.length });
+      cursor += run.text.length;
+    }
+  }
+  return spans;
+}
+
+interface MarkOp {
+  at: number;
+  /** Length of the covered text (`0` for a deletion, which only inserts the struck-through text) */
+  length: number;
+  changeId: string;
+  kind: 'insert' | 'delete' | 'format' | 'comment';
+  /** Revision text for the panel; unused for comments */
+  text: string;
+  author: string;
+  createdAt: number;
+  /** Comment id (`data-comment-id`) for `comment` ops */
+  commentId?: string;
+}
 
 /**
- * Apply the revision runs to mammoth's HTML.
+ * Apply the review layer to mammoth's HTML.
  *
  * Fails (instead of guessing) when the visible text does not line up: the caller then keeps the plain
  * import and reports the loss, so a wrong revision never lands in the document.
  */
-export function applyRevisionMarks(
+export function applyDocumentReview(
   html: string,
-  runs: RevisionRun[],
+  parsed: ParsedDocumentReview,
+  comments: ImportedComment[],
   importedAt: number,
-): ToolResult<AppliedRevisions> {
+): ToolResult<AppliedReview> {
+  const { runs, formats, anchors } = parsed;
   const marked = runs.filter((run) => run.kind !== 'normal' && run.text.length > 0);
-  if (marked.length === 0) return { ok: true, value: { html, changes: [] } };
+  if (marked.length === 0 && formats.length === 0 && anchors.length === 0) {
+    return { ok: true, value: { html, changes: [], comments: [], skippedComments: 0 } };
+  }
 
   const expected = runs
     .filter((run) => run.kind !== 'delete')
@@ -240,13 +432,14 @@ export function applyRevisionMarks(
 
   if (visible !== expected) return { ok: false, error: 'REVISION_MISMATCH' };
 
-  const parseDate = (value: string | null): number => {
-    if (!value) return importedAt;
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? importedAt : parsed;
+  const parseDate = (value: string | null, fallback: number): number => {
+    if (!value) return fallback;
+    const parsedDate = Date.parse(value);
+    return Number.isNaN(parsedDate) ? fallback : parsedDate;
   };
 
-  const ops: RevisionOp[] = [];
+  const ops: MarkOp[] = [];
+  const changes: TrackedChange[] = [];
   let cursor = 0;
   let insertedCount = 0;
   let deletedCount = 0;
@@ -257,38 +450,99 @@ export function applyRevisionMarks(
       cursor += run.text.length;
       continue;
     }
+    const createdAt = parseDate(run.date, importedAt);
     if (run.kind === 'insert') {
       insertedCount += 1;
+      const id = `docx-ins-${insertedCount}`;
       ops.push({
-        kind: 'insert',
         at: cursor,
+        length: run.text.length,
+        changeId: id,
+        kind: 'insert',
         text: run.text,
-        id: `docx-ins-${insertedCount}`,
         author: run.author,
-        createdAt: parseDate(run.date),
+        createdAt,
       });
+      changes.push({ id, kind: 'insert', text: run.text, author: run.author, createdAt });
       cursor += run.text.length;
       continue;
     }
     deletedCount += 1;
+    const id = `docx-del-${deletedCount}`;
     ops.push({
-      kind: 'delete',
       at: cursor,
+      length: 0,
+      changeId: id,
+      kind: 'delete',
       text: run.text,
-      id: `docx-del-${deletedCount}`,
       author: run.author,
-      createdAt: parseDate(run.date),
+      createdAt,
     });
+    changes.push({ id, kind: 'delete', text: run.text, author: run.author, createdAt });
   }
 
-  // Back to front: every operation keeps the offsets of the earlier ones valid
+  const spans = blockSpans(runs);
+  formats.forEach((format, index) => {
+    const span = spans.get(format.block);
+    if (!span || span.end <= span.start) return;
+    const id = `docx-fmt-${index + 1}`;
+    const text = runs
+      .filter((run) => run.block === format.block && run.kind !== 'delete')
+      .map((run) => run.text)
+      .join('');
+    const createdAt = parseDate(format.date, importedAt);
+    ops.push({
+      at: span.start,
+      length: span.end - span.start,
+      changeId: id,
+      kind: 'format',
+      text,
+      author: format.author,
+      createdAt,
+    });
+    changes.push({ id, kind: 'format', text, author: format.author, createdAt });
+  });
+
+  const metaById = new Map(comments.map((comment) => [comment.docxId, comment]));
+  const restored: DocComment[] = [];
+  let skippedComments = 0;
+  anchors.forEach((anchor) => {
+    const meta = metaById.get(anchor.docxId);
+    if (!meta || anchor.end <= anchor.start || anchor.end > visible.length) {
+      skippedComments += 1;
+      return;
+    }
+    const commentId = `docx-cmt-${anchor.docxId}`;
+    ops.push({
+      at: anchor.start,
+      length: anchor.end - anchor.start,
+      changeId: commentId,
+      kind: 'comment',
+      text: '',
+      author: meta.author,
+      createdAt: parseDate(meta.date, importedAt),
+      commentId,
+    });
+    restored.push({
+      id: commentId,
+      quote: meta.quote || visible.slice(anchor.start, anchor.end),
+      text: meta.text,
+      author: meta.author,
+      createdAt: parseDate(meta.date, importedAt),
+      resolved: false,
+    });
+  });
+
+  // Back to front: every operation keeps the offsets of the earlier ones valid. A block-wide format wrap
+  // starts before anything inside it, so it is applied last and nests around the inner marks.
   for (const op of [...ops].sort((a, b) => b.at - a.at)) {
+    const start = locate(slots, op.at);
+    if (!start) return { ok: false, error: 'REVISION_MISMATCH' };
+
     if (op.kind === 'delete') {
-      const start = locate(slots, op.at);
-      if (!start) return { ok: false, error: 'REVISION_MISMATCH' };
       const element = doc.createElement('del');
       element.setAttribute('data-track', 'delete');
-      element.setAttribute('data-track-id', op.id);
+      element.setAttribute('data-track-id', op.changeId);
       element.textContent = op.text;
       const range = doc.createRange();
       range.setStart(start.node, start.offset);
@@ -296,29 +550,60 @@ export function applyRevisionMarks(
       range.insertNode(element);
       continue;
     }
-    const start = locate(slots, op.at);
-    const end = locate(slots, op.at + op.text.length);
-    if (!start || !end) return { ok: false, error: 'REVISION_MISMATCH' };
+
+    const end = locate(slots, op.at + op.length);
+    if (!end) return { ok: false, error: 'REVISION_MISMATCH' };
     const range = doc.createRange();
     range.setStart(start.node, start.offset);
     range.setEnd(end.node, end.offset);
-    // An insertion never spans blocks in OOXML; if it does, the mapping is off and we stop rather than
-    // wrap a <p> in an <ins> (the editor schema would reject the node)
-    if (containsBlock(range.cloneContents())) return { ok: false, error: 'REVISION_MISMATCH' };
-    const wrapper = doc.createElement('ins');
-    wrapper.setAttribute('data-track', 'insert');
-    wrapper.setAttribute('data-track-id', op.id);
+    // Neither an insertion nor a comment spans blocks in OOXML (a comment may cross paragraphs, but the
+    // editor cannot anchor that); wrapping a <p> would produce a node the schema rejects
+    if (containsBlock(range.cloneContents())) {
+      if (op.kind === 'comment') {
+        skippedComments += 1;
+        restored.pop();
+        continue;
+      }
+      return { ok: false, error: 'REVISION_MISMATCH' };
+    }
+
+    let wrapper: HTMLElement;
+    if (op.kind === 'comment') {
+      wrapper = doc.createElement('span');
+      wrapper.setAttribute('data-comment-id', op.commentId ?? op.changeId);
+    } else if (op.kind === 'format') {
+      wrapper = doc.createElement('span');
+      wrapper.setAttribute('data-track', 'format');
+      wrapper.setAttribute('data-track-format', formatTargetOf(op.changeId, formats));
+      wrapper.setAttribute('data-track-id', op.changeId);
+    } else {
+      wrapper = doc.createElement('ins');
+      wrapper.setAttribute('data-track', 'insert');
+      wrapper.setAttribute('data-track-id', op.changeId);
+    }
     wrapper.appendChild(range.extractContents());
     range.insertNode(wrapper);
   }
 
-  const changes: TrackedChange[] = ops.map((op) => ({
-    id: op.id,
-    kind: op.kind,
-    text: op.text,
-    author: op.author,
-    createdAt: op.createdAt,
-  }));
+  return {
+    ok: true,
+    value: { html: doc.body.innerHTML, changes, comments: restored, skippedComments },
+  };
+}
 
-  return { ok: true, value: { html: doc.body.innerHTML, changes } };
+/** The `target` of one format op, looked up by its id (ids are assigned in `formats` order) */
+function formatTargetOf(changeId: string, formats: FormatRevision[]): string {
+  const index = Number.parseInt(changeId.replace('docx-fmt-', ''), 10) - 1;
+  return formats[index]?.target ?? 'paragraph';
+}
+
+/** Revisions only (kept for callers/tests that do not import comments or format changes) */
+export function applyRevisionMarks(
+  html: string,
+  runs: RevisionRun[],
+  importedAt: number,
+): ToolResult<{ html: string; changes: TrackedChange[] }> {
+  const applied = applyDocumentReview(html, { runs, formats: [], anchors: [] }, [], importedAt);
+  if (!applied.ok) return applied;
+  return { ok: true, value: { html: applied.value.html, changes: applied.value.changes } };
 }

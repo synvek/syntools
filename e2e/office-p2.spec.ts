@@ -399,3 +399,39 @@ test('rich text: tracked changes survive a .docx round trip through import', asy
   await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
   await expect(page.locator('.tiptap')).toContainText('甲乙丙');
 });
+
+test('rich text: comments survive a .docx round trip through import', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openRichText(page);
+  await pastePlainText(page, '甲乙丙');
+
+  // 1) Comment on a selection
+  await page.getByRole('button', { name: '批注与修订' }).click();
+  // Triple click selects the paragraph: a caret-only selection would silently create a document-level
+  // comment (no mark), which is exactly what this test must not accept
+  await page.locator('.tiptap p').first().click({ clickCount: 3 });
+  await page.getByRole('button', { name: '新建批注' }).click();
+  await expect(page.getByText('（未选中文本，将创建文档级批注）')).toHaveCount(0);
+  await page.getByPlaceholder('输入批注内容，回车提交，Shift+回车换行').fill('这里需要补充来源');
+  await page.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(page.getByTestId('rich-text-review')).toContainText('这里需要补充来源');
+  await expect(page.locator('.tiptap span[data-comment-id]').first()).toBeVisible();
+
+  // 2) Export, then import the same file back
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    pickMenu(page, 'file', '导出 Word (.docx)'),
+  ]);
+  const file = join(test.info().outputDir, 'commented.docx');
+  await download.saveAs(file);
+
+  const chooser = page.waitForEvent('filechooser');
+  await pickMenu(page, 'file', '导入 Word (.docx)');
+  await (await chooser).setFiles(file);
+
+  // 3) The comment (record + anchor) comes back, with a namespaced id that cannot collide with editor ids
+  await expect(page.getByTestId('rich-text-review')).toContainText('这里需要补充来源');
+  await expect(page.locator('.tiptap span[data-comment-id^="docx-cmt-"]').first()).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: '跨段落' })).toHaveCount(0);
+  await expect(page.locator('.tiptap')).toContainText('甲乙丙');
+});

@@ -1,6 +1,7 @@
 import type { EditorState, Transaction } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { compareBlocks, type DocBlock } from './compare';
+import { blockTargetKey } from './marks';
 
 /**
  * Comparison → tracked revisions (P2-3 第二批).
@@ -50,7 +51,7 @@ type EditOp =
   | { kind: 'insertText'; at: number; text: string; changeId: string }
   /** The block travels as JSON: the target document may come from a different editor (own schema) */
   | { kind: 'insertBlock'; at: number; json: unknown; changeId: string }
-  | { kind: 'setBlockType'; at: number; type: string; blockPos: number };
+  | { kind: 'setBlockType'; at: number; type: string; level?: number; blockPos: number };
 
 /** Normalized text of one block (list items / table rows joined with `\n`) */
 function blockText(node: PMNode): string {
@@ -65,8 +66,13 @@ function blockText(node: PMNode): string {
 function readBlocks(doc: PMNode): BlockRef[] {
   const refs: BlockRef[] = [];
   doc.forEach((node, offset) => {
+    const level = node.type.name === 'heading' ? Number(node.attrs.level) : NaN;
     refs.push({
-      block: { type: node.type.name, text: blockText(node) },
+      block: {
+        type: node.type.name,
+        text: blockText(node),
+        level: Number.isFinite(level) && level > 0 ? level : undefined,
+      },
       pos: offset,
       node,
       plain: node.childCount === 1 && node.firstChild?.isText === true,
@@ -143,6 +149,7 @@ export function planComparison(state: EditorState, target: PMNode): RevisionPlan
         kind: 'setBlockType',
         at: baseRef.pos,
         type: targetRef.block.type,
+        level: targetRef.block.level,
         blockPos: baseRef.pos,
       });
       ops.push({
@@ -151,7 +158,8 @@ export function planComparison(state: EditorState, target: PMNode): RevisionPlan
         from: baseRef.pos + 1,
         to: baseRef.pos + targetRef.node.nodeSize - 1,
         changeId,
-        target: baseRef.block.type,
+        // `heading:2` 而不是 `heading`：reject 要把级别也还回去，否则 H2 会变成 H1/默认级
+        target: blockTargetKey(baseRef.node),
       });
       entries.push({
         id: changeId,
@@ -266,7 +274,13 @@ export function planComparison(state: EditorState, target: PMNode): RevisionPlan
       const type = state.schema.nodes[op.type];
       const block = tr.doc.nodeAt(op.blockPos);
       if (type && block && type !== block.type && type.validContent(block.content)) {
-        tr.setNodeMarkup(op.blockPos, type);
+        tr.setNodeMarkup(
+          op.blockPos,
+          type,
+          op.level && type === state.schema.nodes.heading
+            ? { ...block.attrs, level: op.level }
+            : block.attrs,
+        );
       }
     });
 

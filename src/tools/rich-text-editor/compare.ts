@@ -21,6 +21,8 @@ export interface DocBlock {
   type: string;
   /** Plain text of the block (list items and table rows joined with `\n`) */
   text: string;
+  /** Heading level: `type` alone cannot tell H1 from H2, which a format revision has to restore */
+  level?: number;
 }
 
 export type CompareChangeKind = 'insert' | 'delete' | 'replace';

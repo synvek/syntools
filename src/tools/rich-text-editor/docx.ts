@@ -16,7 +16,7 @@ import {
   type PageSetupConfig,
 } from './pageSetup';
 import { parseDocxSections, splitSectionNodes } from './sections';
-import { applyRevisionMarks, hasRevisions, parseRevisionRuns } from './docxReview';
+import { applyDocumentReview, parseDocumentReview, parseImportedComments } from './docxReview';
 import { renderWatermarkImage, type WatermarkImage } from './watermarkImage';
 import { firstFontFamily, pxToHalfPoints } from './typography';
 import {
@@ -704,6 +704,26 @@ function headingLevel(D: DocxNs, level: number) {
   }
 }
 
+/**
+ * Format revision -> `w:pPrChange` payload.
+ *
+ * Word records the **previous** paragraph properties inside the change element, which is exactly what our
+ * `trackedFormat` mark keeps in `data-track-format`: `paragraph` / `heading:2` / `blockquote` / `codeBlock`.
+ * The document library writes the element natively (`ParagraphOptions.revision`), so no zip surgery is
+ * needed — but only the fields `IParagraphPropertiesOptionsBase` can express survive, which is why the
+ * target key has to carry the heading level.
+ */
+function paragraphChangeProperties(
+  D: DocxNs,
+  target: string,
+): { heading?: ReturnType<typeof headingLevel>; style?: string } {
+  const [type, rawLevel] = target.split(':');
+  if (type === 'heading') return { heading: headingLevel(D, Number.parseInt(rawLevel, 10) || 1) };
+  if (type === 'blockquote') return { style: 'Quote' };
+  if (type === 'codeBlock') return { style: 'Code' };
+  return {};
+}
+
 /** text-align -> docx AlignmentType */
 function alignmentType(D: DocxNs, align: string | undefined) {
   if (align === 'center') return D.AlignmentType.CENTER;
@@ -832,6 +852,17 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
         after: Math.max(0, spaceAfter),
         line: 300,
       },
+      // A format revision marks the whole block: the mark's own span tells us the previous kind
+      revision: (() => {
+        const target = el.querySelector('[data-track-format]')?.getAttribute('data-track-format');
+        if (!target) return undefined;
+        return {
+          id: (ctx.revisionId.value += 1),
+          author: ctx.author,
+          date: ctx.date,
+          ...paragraphChangeProperties(D, target),
+        };
+      })(),
     };
     out.push(
       el.tagName === 'BLOCKQUOTE'
@@ -874,31 +905,37 @@ export interface DocxImportOptions {
   onReview?: (info: ImportedReview) => void;
 }
 
-/** Result of reading the revision layer of an imported package */
+/** Result of reading the review layer (revisions + comments) of an imported package */
 export interface ImportedReview {
   changes: TrackedChange[];
+  comments: DocComment[];
   /**
    * The package had revisions but they could not be mapped onto mammoth's HTML (the text streams did not
    * line up). The import keeps the plain text and the caller reports the loss instead of guessing.
    */
   degraded: boolean;
+  /** Comments whose range crossed blocks: imported as text without a mark, and reported */
+  skippedComments: number;
 }
 
 /**
  * Read the raw `word/document.xml`. Best-effort: an import must never fail because the archive was opened
  * a second time, so any error degrades to "no layout / no revisions".
  */
-async function readDocumentXml(buffer: ArrayBuffer): Promise<string> {
+async function readPartXml(buffer: ArrayBuffer, path: string): Promise<string> {
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(buffer);
-    const entry = zip.file('word/document.xml');
+    const entry = zip.file(path);
     return entry ? await entry.async('string') : '';
   } catch (error) {
-    console.warn('[richText] docx document.xml read failed:', error);
+    console.warn(`[richText] docx ${path} read failed:`, error);
     return '';
   }
 }
+
+const readDocumentXml = (buffer: ArrayBuffer) => readPartXml(buffer, 'word/document.xml');
+const readCommentsXml = (buffer: ArrayBuffer) => readPartXml(buffer, 'word/comments.xml');
 
 /** Import .docx: parse with mammoth (including style map) -> sanitize HTML */
 export async function importDocx(
@@ -931,16 +968,23 @@ export async function importDocx(
     const clean = sanitizeDocHtml(parsed.value);
     if (!clean.ok) return clean;
     let html = normalizeImportedDocHtml(clean.value);
-    // Revisions last: mammoth keeps inserted text as plain text and drops deleted text outright, so the
-    // marks have to be re-applied onto the final HTML (see docxReview.ts for the alignment contract)
-    const runs = parseRevisionRuns(documentXml);
-    if (hasRevisions(runs)) {
-      const applied = applyRevisionMarks(html, runs, Date.now());
+    // Review layer last: mammoth keeps inserted text as plain text, drops deleted text and comment ranges
+    // outright, so revisions / format changes / comment marks are re-applied onto the final HTML
+    // (see docxReview.ts for the alignment contract)
+    const review = parseDocumentReview(documentXml);
+    const importedComments = parseImportedComments(await readCommentsXml(buffer));
+    if (review.runs.length > 0 || review.formats.length > 0 || review.anchors.length > 0) {
+      const applied = applyDocumentReview(html, review, importedComments, Date.now());
       if (applied.ok) {
         html = applied.value.html;
-        options?.onReview?.({ changes: applied.value.changes, degraded: false });
+        options?.onReview?.({
+          changes: applied.value.changes,
+          comments: applied.value.comments,
+          degraded: false,
+          skippedComments: applied.value.skippedComments,
+        });
       } else {
-        options?.onReview?.({ changes: [], degraded: true });
+        options?.onReview?.({ changes: [], comments: [], degraded: true, skippedComments: 0 });
       }
     }
     return { ok: true, value: html };

@@ -209,6 +209,8 @@ export default function RichTextEditorTool() {
   const [importSections, setImportSections] = useState(0);
   // Revisions present but not mappable onto mammoth's HTML: imported as plain text, reported (never guessed)
   const [importRevisionsLost, setImportRevisionsLost] = useState(false);
+  // Comments whose range crossed paragraphs: the editor cannot anchor those, so they are reported
+  const [importCommentsLost, setImportCommentsLost] = useState(0);
   const [markdownLosses, setMarkdownLosses] = useState<MarkdownExportLosses | null>(null);
   /** Unified cross-product fidelity report (shown once per export) */
   const [fidelity, setFidelity] = useState<FidelityReport | null>(null);
@@ -608,16 +610,20 @@ export default function RichTextEditorTool() {
     setBusy('import');
     setFailure(null);
     setImportRevisionsLost(false);
+    setImportCommentsLost(0);
     let importedChanges: TrackedChange[] = [];
+    let importedComments: DocComment[] = [];
     const result = await importDocx(file, {
       onLayout: ({ pageSetup: importedSetup, sectionCount }) => {
         // First section owns the document-level layout; partial data is merged over the current setup
         setPageSetup((prev) => normalizePageSetup({ ...prev, ...importedSetup }));
         setImportSections(sectionCount > 1 ? sectionCount : 0);
       },
-      onReview: ({ changes: readChanges, degraded }) => {
+      onReview: ({ changes: readChanges, comments: readComments, degraded, skippedComments }) => {
         importedChanges = readChanges;
+        importedComments = readComments;
         setImportRevisionsLost(degraded);
+        setImportCommentsLost(skippedComments);
       },
     });
     setBusy(null);
@@ -630,7 +636,7 @@ export default function RichTextEditorTool() {
     // Imported revisions replace the current review list: they describe *this* document, and keeping the
     // previous entries would leave ids that no longer exist in the new content
     applyReview({
-      comments: [],
+      comments: importedComments,
       changes: importedChanges,
       userWords: userWordsRef.current,
       templateId: templateIdRef.current,
@@ -2178,6 +2184,12 @@ export default function RichTextEditorTool() {
       {importRevisionsLost && !failure && (
         <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
           {t('tools.richText.importRevisionsLost')}
+        </p>
+      )}
+
+      {importCommentsLost > 0 && !failure && (
+        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
+          {t('tools.richText.importCommentsLost', { count: importCommentsLost })}
         </p>
       )}
 
