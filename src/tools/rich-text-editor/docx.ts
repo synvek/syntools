@@ -15,7 +15,8 @@ import {
   resolvePageMetrics,
   type PageSetupConfig,
 } from './pageSetup';
-import { parseDocxSections, splitSectionNodes, type ImportedSection } from './sections';
+import { parseDocxSections, splitSectionNodes } from './sections';
+import { applyRevisionMarks, hasRevisions, parseRevisionRuns } from './docxReview';
 import { renderWatermarkImage, type WatermarkImage } from './watermarkImage';
 import { firstFontFamily, pxToHalfPoints } from './typography';
 import {
@@ -869,22 +870,33 @@ export interface DocxImportOptions {
    * mammoth drops `w:sectPr` completely, so the layout has to be read from the zip directly.
    */
   onLayout?: (info: { pageSetup: Partial<PageSetupConfig>; sectionCount: number }) => void;
+  /** Tracked changes read back from `word/document.xml` (mammoth drops them entirely) */
+  onReview?: (info: ImportedReview) => void;
+}
+
+/** Result of reading the revision layer of an imported package */
+export interface ImportedReview {
+  changes: TrackedChange[];
+  /**
+   * The package had revisions but they could not be mapped onto mammoth's HTML (the text streams did not
+   * line up). The import keeps the plain text and the caller reports the loss instead of guessing.
+   */
+  degraded: boolean;
 }
 
 /**
- * Read `word/document.xml` for section properties. This is a best-effort addition: an import must never
- * fail because the archive was opened a second time, so any error degrades to "no section info".
+ * Read the raw `word/document.xml`. Best-effort: an import must never fail because the archive was opened
+ * a second time, so any error degrades to "no layout / no revisions".
  */
-async function readDocxSections(buffer: ArrayBuffer): Promise<ImportedSection[]> {
+async function readDocumentXml(buffer: ArrayBuffer): Promise<string> {
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(buffer);
     const entry = zip.file('word/document.xml');
-    if (!entry) return [];
-    return parseDocxSections(await entry.async('string'));
+    return entry ? await entry.async('string') : '';
   } catch (error) {
-    console.warn('[richText] docx section read failed:', error);
-    return [];
+    console.warn('[richText] docx document.xml read failed:', error);
+    return '';
   }
 }
 
@@ -897,7 +909,8 @@ export async function importDocx(
   if (!check.ok) return check;
   try {
     const buffer = await file.arrayBuffer();
-    const sections = await readDocxSections(buffer);
+    const documentXml = await readDocumentXml(buffer);
+    const sections = parseDocxSections(documentXml);
     if (sections.length > 0) {
       // The first section is what the document-level page setup corresponds to; later sections cannot be
       // located in mammoth's HTML, so they are merged and reported to the caller instead of silently dropped
@@ -917,7 +930,20 @@ export async function importDocx(
     );
     const clean = sanitizeDocHtml(parsed.value);
     if (!clean.ok) return clean;
-    return { ok: true, value: normalizeImportedDocHtml(clean.value) };
+    let html = normalizeImportedDocHtml(clean.value);
+    // Revisions last: mammoth keeps inserted text as plain text and drops deleted text outright, so the
+    // marks have to be re-applied onto the final HTML (see docxReview.ts for the alignment contract)
+    const runs = parseRevisionRuns(documentXml);
+    if (hasRevisions(runs)) {
+      const applied = applyRevisionMarks(html, runs, Date.now());
+      if (applied.ok) {
+        html = applied.value.html;
+        options?.onReview?.({ changes: applied.value.changes, degraded: false });
+      } else {
+        options?.onReview?.({ changes: [], degraded: true });
+      }
+    }
+    return { ok: true, value: html };
   } catch (error) {
     console.error('[richText] docx import failed:', error);
     return { ok: false, error: 'IMPORT_FAILED' };

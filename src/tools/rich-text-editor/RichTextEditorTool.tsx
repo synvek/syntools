@@ -207,6 +207,8 @@ export default function RichTextEditorTool() {
   const [losses, setLosses] = useState<DocxExportLosses | null>(null);
   // Sections merged on import (>1 only): mammoth drops w:sectPr, so multi-section documents collapse
   const [importSections, setImportSections] = useState(0);
+  // Revisions present but not mappable onto mammoth's HTML: imported as plain text, reported (never guessed)
+  const [importRevisionsLost, setImportRevisionsLost] = useState(false);
   const [markdownLosses, setMarkdownLosses] = useState<MarkdownExportLosses | null>(null);
   /** Unified cross-product fidelity report (shown once per export) */
   const [fidelity, setFidelity] = useState<FidelityReport | null>(null);
@@ -605,11 +607,17 @@ export default function RichTextEditorTool() {
   const handleImport = async (file: File) => {
     setBusy('import');
     setFailure(null);
+    setImportRevisionsLost(false);
+    let importedChanges: TrackedChange[] = [];
     const result = await importDocx(file, {
       onLayout: ({ pageSetup: importedSetup, sectionCount }) => {
         // First section owns the document-level layout; partial data is merged over the current setup
         setPageSetup((prev) => normalizePageSetup({ ...prev, ...importedSetup }));
         setImportSections(sectionCount > 1 ? sectionCount : 0);
+      },
+      onReview: ({ changes: readChanges, degraded }) => {
+        importedChanges = readChanges;
+        setImportRevisionsLost(degraded);
       },
     });
     setBusy(null);
@@ -619,6 +627,15 @@ export default function RichTextEditorTool() {
     }
     editor?.commands.setContent(result.value);
     setSnapshotHtml(result.value);
+    // Imported revisions replace the current review list: they describe *this* document, and keeping the
+    // previous entries would leave ids that no longer exist in the new content
+    applyReview({
+      comments: [],
+      changes: importedChanges,
+      userWords: userWordsRef.current,
+      templateId: templateIdRef.current,
+    });
+    if (importedChanges.length > 0) setReviewOpen(true);
     persistNow({ title: titleRef.current, html: result.value, view: viewRef.current });
     if (!titleRef.current.trim()) {
       setTitle(file.name.replace(/\.docx$/i, ''));
@@ -2155,6 +2172,12 @@ export default function RichTextEditorTool() {
           {draftNotice === 'degraded'
             ? t('tools.richText.draftDegraded')
             : t('tools.richText.draftSaveFailed')}
+        </p>
+      )}
+
+      {importRevisionsLost && !failure && (
+        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
+          {t('tools.richText.importRevisionsLost')}
         </p>
       )}
 

@@ -359,3 +359,43 @@ test('rich text: compare with a .docx file turns the differences into reviewable
   await expect(page.locator('.tiptap')).toContainText('第一段原文');
   await expect(page.locator('.tiptap')).toContainText('第三段原文');
 });
+
+test('rich text: tracked changes survive a .docx round trip through import', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openRichText(page);
+  await pastePlainText(page, '甲乙丙');
+
+  // 1) Mark the whole paragraph as an insertion
+  await page.getByRole('button', { name: '批注与修订' }).click();
+  await page.locator('.tiptap p').first().click();
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.getByRole('button', { name: '标记为插入' }).click();
+  await expect(page.getByTestId('rich-text-change-position')).toHaveText('1/1');
+  await expect(page.locator('.tiptap ins[data-track]').first()).toBeVisible();
+
+  // 2) Export (w:ins + trackRevisions), then import the same file back
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    pickMenu(page, 'file', '导出 Word (.docx)'),
+  ]);
+  const file = join(test.info().outputDir, 'tracked.docx');
+  await download.saveAs(file);
+
+  const chooser = page.waitForEvent('filechooser');
+  await pickMenu(page, 'file', '导入 Word (.docx)');
+  await (await chooser).setFiles(file);
+
+  // 3) The revision comes back as an editable revision, not as plain text
+  await expect(page.locator('.tiptap ins[data-track]').first()).toBeVisible();
+  await expect(page.getByTestId('rich-text-review')).toContainText('修订');
+  expect(await page.getByRole('button', { name: /^接受此条修订/ }).count()).toBeGreaterThanOrEqual(
+    1,
+  );
+  // No "revisions could not be mapped" notice: the round trip must stay exact
+  await expect(page.getByRole('status').filter({ hasText: '修订标记未还原' })).toHaveCount(0);
+
+  // Accepting clears the revision and keeps the text
+  await page.getByRole('button', { name: '全部接受', exact: true }).click();
+  await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
+  await expect(page.locator('.tiptap')).toContainText('甲乙丙');
+});
