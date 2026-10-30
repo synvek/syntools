@@ -84,6 +84,52 @@ describe('appendPivotSheets', () => {
     const empty = configOf({ range: { startRow: 0, startColumn: 0, endRow: 0, endColumn: 2 } });
     expect(appendPivotSheets(snapshot, [empty], '(空白)').sheetOrder).toEqual(snapshot.sheetOrder);
   });
+
+  it('never reuses an existing sheet id or name', () => {
+    const base = createEmptySnapshot('book');
+    const source = snapshotOf(SALES);
+    // 上一次导出的静态透视表还在文档里：id 与名字都被占用
+    const existing = buildPivotSheet(
+      'pivot1',
+      configOf(),
+      buildPivot(snapshotOf(SALES), configOf()),
+      '(空白)',
+    )!;
+    const snapshot = {
+      ...base,
+      ...source,
+      name: 'book',
+      locale: 'zhCN' as const,
+      sheets: { ...source.sheets, pivot1: existing },
+      sheetOrder: [...source.sheetOrder, 'pivot1'],
+    };
+
+    const next = appendPivotSheets(snapshot, [configOf()], '(空白)');
+    expect(next.sheetOrder.filter((id) => id.startsWith('pivot'))).toEqual(['pivot1', 'pivot2']);
+    expect(next.sheets.pivot2.name).toBe('透视表 2');
+    // 旧的工作表原样保留，没有被覆盖
+    expect(next.sheets.pivot1).toBe(existing);
+    const names = [existing.name, next.sheets.pivot2.name].map((name) => name.toLowerCase());
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('disambiguates names that collide case-insensitively with a user sheet', () => {
+    const base = createEmptySnapshot('book');
+    const source = snapshotOf(SALES);
+    const clash = { ...base.sheets[base.sheetOrder[0]], name: '透视表 1' };
+    const snapshot = {
+      ...base,
+      ...source,
+      name: 'book',
+      locale: 'zhCN' as const,
+      sheets: { ...source.sheets, user: clash },
+      sheetOrder: [...source.sheetOrder, 'user'],
+    };
+
+    const next = appendPivotSheets(snapshot, [configOf()], '(空白)');
+    expect(next.sheets.pivot1.name).toBe('透视表 1 (2)');
+    expect(next.sheets.user.name).toBe('透视表 1');
+  });
 });
 
 describe('pivot printing', () => {

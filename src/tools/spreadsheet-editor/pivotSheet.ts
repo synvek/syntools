@@ -31,10 +31,35 @@ export function buildPivotSheet(
   return sheet;
 }
 
+/** Excel 工作表名的上限（字符数），超出会被 Excel 截断并可能重名 */
+const MAX_SHEET_NAME_LENGTH = 31;
+
+/**
+ * 分配一个唯一工作表名。Excel 认为同名（不分大小写）就是损坏文件，
+ * 所以要么用原名，要么补 ` (2)`、` (3)`……
+ */
+function takeSheetName(taken: Set<string>, base: string, fallback: string): string {
+  const trimmed = (base.trim() || fallback).slice(0, MAX_SHEET_NAME_LENGTH);
+  if (!taken.has(trimmed.toLowerCase())) {
+    taken.add(trimmed.toLowerCase());
+    return trimmed;
+  }
+  for (let index = 2; ; index += 1) {
+    const suffix = ` (${index})`;
+    const candidate = `${trimmed.slice(0, MAX_SHEET_NAME_LENGTH - suffix.length)}${suffix}`;
+    if (!taken.has(candidate.toLowerCase())) {
+      taken.add(candidate.toLowerCase());
+      return candidate;
+    }
+  }
+}
+
 /**
  * 导出前把每个透视结果追加成工作表。
  *
  * 用传入的 `snapshot` 计算（不是"已经加好工作表的 next"），避免透视表把上一张透视表当成源数据。
+ * 工作表 id / 名字都避开文档里已有的内容：重新导出含透视表的文件时，
+ * 既不能覆盖旧的静态透视表，也不能产生重名（Excel 会报修复）。
  */
 export function appendPivotSheets(
   snapshot: WorkbookSnapshot,
@@ -47,10 +72,19 @@ export function appendPivotSheets(
     sheets: { ...snapshot.sheets },
     sheetOrder: [...snapshot.sheetOrder],
   };
-  configs.forEach((config, index) => {
-    const id = `pivot${index + 1}`;
+  const takenNames = new Set(
+    Object.values(snapshot.sheets ?? {}).map((sheet) => (sheet.name ?? '').trim().toLowerCase()),
+  );
+  let idSeq = 0;
+  configs.forEach((config) => {
+    let id: string;
+    do {
+      idSeq += 1;
+      id = `pivot${idSeq}`;
+    } while (next.sheets[id] || next.sheetOrder.includes(id));
     const sheet = buildPivotSheet(id, config, buildPivot(snapshot, config), blankLabel);
     if (!sheet) return;
+    sheet.name = takeSheetName(takenNames, sheet.name, config.name || 'Pivot');
     next.sheets[id] = sheet;
     next.sheetOrder.push(id);
   });
