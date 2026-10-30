@@ -71,3 +71,36 @@ describe('collectExportIssues', () => {
     ).toMatchObject({ severity: 'warning', count: 1, messageKey: 'tools.sheet.lossComments' });
   });
 });
+
+describe('collectExportIssues: pivot', () => {
+  it('warns that an exported pivot is a static value sheet (not refreshable)', () => {
+    const snapshot = {
+      ...createEmptySnapshot('book'),
+      syntoolsPivots: [
+        {
+          id: 'pivot-1',
+          name: '透视表',
+          sheetId: snapshotSheetId(),
+          range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 2 },
+          rows: [0],
+          cols: [1],
+          values: [{ column: 2, aggregation: 'sum' as const }],
+          filters: {},
+          hasHeader: true,
+        },
+      ],
+    };
+    expect(
+      collectExportIssues(snapshot).find((issue) => issue.code === 'sheet.pivotSnapshot'),
+    ).toMatchObject({
+      severity: 'warning',
+      count: 1,
+      messageKey: 'tools.sheet.pivotSnapshot',
+    });
+  });
+});
+
+/** 快照里第一张工作表的 id（透视表配置必须指向存在的表） */
+function snapshotSheetId(): string {
+  return createEmptySnapshot('book').sheetOrder[0];
+}

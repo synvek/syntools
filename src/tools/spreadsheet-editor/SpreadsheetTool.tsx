@@ -52,12 +52,23 @@ import {
 import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
 import { registerSpreadsheetStrings } from './strings';
 import {
+  createEmptySheet,
   createEmptySnapshot,
   exportSnapshotToBytes,
   importXlsxToSnapshot,
   type WorkbookSnapshot,
 } from './xlsx-io';
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
+import {
+  buildPivot,
+  collectFieldKeys,
+  computePivot,
+  pivotToMatrix,
+  readPivotSource,
+  type PivotConfig,
+} from './pivot';
+import { registerPivotStrings } from './pivotStrings';
+import { PivotPanel } from './ui/PivotPanel';
 import { PresentSheet } from './ui/PresentSheet';
 import { ChartOverlay } from './ui/ChartOverlay';
 import { PrintDialog } from './ui/PrintDialog';
@@ -86,6 +97,7 @@ import {
 import { FidelityDialog } from '@/core/components/FidelityDialog';
 import { collectExportIssues } from './fidelity';
 import { readWorkbookExtras, withWorkbookExtras, type WorkbookExtras } from './xlsx-extras';
+import { resolveUsedRange } from './print';
 import type { RawChartParts } from './rawChartParts';
 import { SheetTabs } from './SheetTabs';
 import './sheet.css';
@@ -94,8 +106,11 @@ import './sheet.css';
 registerSpreadsheetStrings(i18n);
 registerChartStrings(i18n);
 registerStoreStrings(i18n);
+registerPivotStrings(i18n);
 
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
+/** 首版一个工作簿只保留一个透视表：多表会让"导出到哪张工作表"的语义含混 */
+const PIVOT_ID = 'pivot-1';
 type BusyKind = 'import' | 'export' | null;
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -137,6 +152,16 @@ export default function SpreadsheetTool() {
   /** Sheet area size: the bounds for dragging / resizing charts */
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
   const chartSeqRef = useRef(0);
+  /** Pivot table (P2-4): analysis view over a source range, persisted in its own snapshot field */
+  const [pivotConfigs, setPivotConfigs] = useState<PivotConfig[]>([]);
+  const pivotConfigsRef = useRef<PivotConfig[]>([]);
+  pivotConfigsRef.current = pivotConfigs;
+  const [pivotOpen, setPivotOpen] = useState(false);
+  const pivotOpenRef = useRef(false);
+  pivotOpenRef.current = pivotOpen;
+  const [pivotConfig, setPivotConfig] = useState<PivotConfig | null>(null);
+  /** Snapshot the panel aggregates from: refreshed on every mutation so edits recompute immediately */
+  const [pivotSnapshot, setPivotSnapshot] = useState<WorkbookSnapshot | null>(null);
   /** Cell comment threads (P1-2): keyed by sheet id, carried by the snapshot like syntoolsCharts */
   const [sheetComments, setSheetComments] = useState<SheetCommentMap>({});
   const commentsRef = useRef<SheetCommentMap>({});
@@ -313,6 +338,7 @@ export default function SpreadsheetTool() {
     let next: WorkbookSnapshot = base;
     if (chartsRef.current.length) next = { ...next, syntoolsCharts: chartsRef.current };
     if (rawPartsRef.current) next = { ...next, syntoolsRawParts: rawPartsRef.current };
+    if (pivotConfigsRef.current.length) next = { ...next, syntoolsPivots: pivotConfigsRef.current };
     // Comment threads ride along in their own field (xlsx has no counterpart yet)
     next = withSheetComments(next, commentsRef.current);
     return withWorkbookExtras(next, extrasRef.current);
@@ -474,10 +500,21 @@ export default function SpreadsheetTool() {
           commentsRef.current = map;
           setSheetComments(map);
         }
+        if (pivotConfigsRef.current.length === 0) {
+          const pivots = pending.syntoolsPivots ?? [];
+          if (pivots.length > 0) {
+            pivotConfigsRef.current = pivots;
+            setPivotConfigs(pivots);
+          }
+        }
       }
       handleRef.current = handle;
       // Dirty tracking: only modifications that reach the snapshot trigger debounced persistence
-      unsubscribeRef.current = handle.onMutation(scheduleSave);
+      unsubscribeRef.current = handle.onMutation(() => {
+        scheduleSave();
+        // 透视表是"源数据的视图"：源表一改就重算，而不是等用户手动刷新
+        if (pivotOpenRef.current) setPivotSnapshot(handle.getSnapshot());
+      });
       setSheets(handle.getSheets());
       setActiveSheetId(handle.getActiveSheetId());
       const initial = handle.getSnapshot();
@@ -529,6 +566,26 @@ export default function SpreadsheetTool() {
     [charts, activeSheetId],
   );
 
+  /** 面板看到的一切都由这里算出来：源快照变了（编辑 / 刷新 / 换区域）就整体重算 */
+  const pivotView = useMemo(() => {
+    if (!pivotConfig || !pivotSnapshot) return null;
+    const source = readPivotSource(pivotSnapshot, pivotConfig);
+    return { source, result: computePivot(pivotConfig, source) };
+  }, [pivotConfig, pivotSnapshot]);
+
+  const pivotFieldKeys = useMemo(() => {
+    if (!pivotView) return {};
+    return Object.fromEntries(
+      pivotView.source.fields.map((field) => [
+        field.column,
+        collectFieldKeys(pivotView.source, field.column).map((key) => ({
+          key: key.key,
+          label: key.label,
+        })),
+      ]),
+    );
+  }, [pivotView]);
+
   /** Load a snapshot and refresh derived state (shared by the document library / version history / import) */
   const applySnapshot = useCallback(
     (snapshot: WorkbookSnapshot, nextTitle: string) => {
@@ -549,6 +606,9 @@ export default function SpreadsheetTool() {
       commentsLoadedRef.current = true;
       commentsRef.current = commentMap;
       setSheetComments(commentMap);
+      const pivots = snapshot.syntoolsPivots ?? [];
+      pivotConfigsRef.current = pivots;
+      setPivotConfigs(pivots);
       applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
       refreshSummary();
       refreshSheets();
@@ -635,12 +695,93 @@ export default function SpreadsheetTool() {
     refreshSheets();
   };
 
+  /**
+   * 从当前选区（单格时退回已用区域）生成初始配置。
+   * 布局给一个能立刻看到结果的最小默认：第一个字段做行、最后一个字段做值。
+   */
+  const buildPivotConfig = (snapshot: WorkbookSnapshot, sheetId: string): PivotConfig => {
+    const active = handleRef.current?.getActiveRange() ?? null;
+    const sheet = snapshot.sheets[sheetId];
+    const used = sheet ? resolveUsedRange(sheet) : null;
+    const single =
+      !!active && active.startRow === active.endRow && active.startColumn === active.endColumn;
+    const range =
+      active && !single
+        ? active
+        : (used ?? active ?? { startRow: 0, startColumn: 0, endRow: 0, endColumn: 0 });
+    const width = range.endColumn - range.startColumn + 1;
+    return {
+      id: PIVOT_ID,
+      name: t('tools.sheet.pivotTitle'),
+      sheetId,
+      range: { ...range },
+      // 默认给一个立刻能看懂的交叉表：第一列做行、第二列做列（够宽时）、最后一列求和
+      rows: width > 1 ? [0] : [],
+      cols: width > 2 ? [1] : [],
+      values: width > 1 ? [{ column: width - 1, aggregation: 'sum' }] : [],
+      filters: {},
+      hasHeader: true,
+    };
+  };
+
+  const openPivot = () => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    const snapshot = handle.getSnapshot();
+    // 没有活动工作表就没有源数据：与图表一致，直接不进面板
+    const sheetId = handle.getActiveSheetId() ?? snapshot.sheetOrder[0];
+    if (!sheetId) return;
+    // 已有配置就沿用（用户上次摆好的行列不因为重开面板丢失）
+    const saved = pivotConfigsRef.current.find((item) => item.sheetId === sheetId);
+    const config = saved ?? buildPivotConfig(snapshot, sheetId);
+    setPivotConfig(config);
+    // 第一次打开就把配置写进文档：否则"打开面板直接导出"会因为 ref 里没有配置而漏掉透视表工作表
+    pivotConfigsRef.current = [config];
+    setPivotConfigs([config]);
+    scheduleSaveRef.current();
+    setPivotSnapshot(snapshot);
+    setPivotOpen(true);
+  };
+
+  /** 配置是工具自有内容：写进 ref + 状态，并显式请求保存（与图表同一范式） */
+  const applyPivotConfig = (next: PivotConfig) => {
+    setPivotConfig(next);
+    const list = [next];
+    pivotConfigsRef.current = list;
+    setPivotConfigs(list);
+    scheduleSaveRef.current();
+  };
+
+  const handlePivotUseSelection = () => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    const snapshot = handle.getSnapshot();
+    const sheetId = handle.getActiveSheetId() ?? snapshot.sheetOrder[0];
+    if (!sheetId) return;
+    // 换源区域后旧的字段偏移不再有效：布局复位，避免把"第 3 列"当成"第 1 列"继续算
+    applyPivotConfig({
+      ...buildPivotConfig(snapshot, sheetId),
+      id: pivotConfig?.id ?? PIVOT_ID,
+    });
+    setPivotSnapshot(snapshot);
+  };
+
+  const handlePivotRemove = () => {
+    pivotConfigsRef.current = [];
+    setPivotConfigs([]);
+    setPivotConfig(null);
+    setPivotOpen(false);
+    scheduleSaveRef.current();
+  };
+
   const handleExport = async () => {
     const handle = handleRef.current;
     if (!handle) return;
     setBusy('export');
     setFailure(null);
-    const snapshot = withDocOwnedContent(handle.getSnapshot());
+    const base = withDocOwnedContent(handle.getSnapshot());
+    // 透视表以静态值写进额外工作表：Excel 里能看能算，但不可刷新（保真报告会写明）
+    const snapshot = appendPivotSheets(base, pivotConfigsRef.current, t('tools.sheet.pivotBlank'));
     const result = await exportSnapshotToBytes(snapshot);
     setBusy(null);
     if (!result.ok) {
@@ -872,6 +1013,9 @@ export default function SpreadsheetTool() {
       label: t('common.menuInsert'),
       entries: [
         editorMenuItem('insert-chart', t('tools.sheet.insertChart'), openChart, {
+          disabled: busy !== null,
+        }),
+        editorMenuItem('insert-pivot', t('tools.sheet.insertPivot'), openPivot, {
           disabled: busy !== null,
         }),
         { type: 'separator' },
@@ -1115,6 +1259,23 @@ export default function SpreadsheetTool() {
         onMute={muteFidelity}
       />
 
+      {pivotOpen && pivotConfig && pivotView ? (
+        <PivotPanel
+          config={pivotConfig}
+          fields={pivotView.source.fields}
+          result={pivotView.result}
+          empty={pivotView.source.records.length === 0}
+          recordCount={pivotView.source.records.length}
+          keysByColumn={pivotFieldKeys}
+          onConfigChange={applyPivotConfig}
+          onUseSelection={handlePivotUseSelection}
+          onRefresh={() => setPivotSnapshot(handleRef.current?.getSnapshot() ?? null)}
+          onRemove={handlePivotRemove}
+          onClose={() => setPivotOpen(false)}
+          onExport={() => void handleExport()}
+        />
+      ) : null}
+
       {printTarget ? (
         <PrintDialog
           snapshot={printTarget.snapshot}
@@ -1155,4 +1316,42 @@ export default function SpreadsheetTool() {
       ) : null}
     </div>
   );
+}
+
+/**
+ * 导出时把透视结果写成**静态值**工作表（P2-4.6 的兜底路线）。
+ *
+ * exceljs 4.4 写不出 `pivotTable` part，原生可刷新透视表需要自研 zip 注入（下一批）；
+ * 这里先把矩阵落到普通单元格，保证"Excel 打开无修复提示、数值正确"，并在保真报告里
+ * 标注不可刷新 —— 部分交付要说清楚，不能悄悄退化成一张看不出处的工作表。
+ */
+function appendPivotSheets(
+  snapshot: WorkbookSnapshot,
+  configs: PivotConfig[],
+  blankLabel: string,
+): WorkbookSnapshot {
+  if (configs.length === 0) return snapshot;
+  const next: WorkbookSnapshot = {
+    ...snapshot,
+    sheets: { ...snapshot.sheets },
+    sheetOrder: [...snapshot.sheetOrder],
+  };
+  configs.forEach((config, index) => {
+    const result = buildPivot(snapshot, config);
+    if (result.rowKeys.length === 0) return;
+    const matrix = pivotToMatrix(result, config, blankLabel);
+    const id = `pivot${index + 1}`;
+    // 工作表重名在 Excel 里会被当成损坏：名字后面补序号保证唯一
+    const sheet = createEmptySheet(id, `${config.name || 'Pivot'} ${index + 1}`);
+    matrix.forEach((line, row) => {
+      line.forEach((value, column) => {
+        if (value === '' || value === undefined) return;
+        sheet.cellData[String(row)] ??= {};
+        sheet.cellData[String(row)][String(column)] = { v: value };
+      });
+    });
+    next.sheets[id] = sheet;
+    next.sheetOrder.push(id);
+  });
+  return next;
 }

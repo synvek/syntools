@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import JSZip from 'jszip';
 import { expect, test, type Page } from '@playwright/test';
@@ -434,4 +434,59 @@ test('rich text: comments survive a .docx round trip through import', async ({ p
   await expect(page.locator('.tiptap span[data-comment-id^="docx-cmt-"]').first()).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: '跨段落' })).toHaveCount(0);
   await expect(page.locator('.tiptap')).toContainText('甲乙丙');
+});
+
+test('spreadsheet: pivot table aggregates a range and exports as static values', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+
+  await page.goto('/tools/spreadsheet-editor');
+  await expect(page.locator('.sheet-canvas')).toBeVisible();
+
+  // 1) Seed through the CSV importer: Univer is a canvas, so typing cells is not a stable test input
+  const csv = join(test.info().outputDir, 'sales.csv');
+  await mkdir(test.info().outputDir, { recursive: true });
+  await writeFile(csv, '区域,季度,金额\n华东,Q1,100\n华东,Q2,50\n华南,Q1,30\n华南,Q2,20', 'utf8');
+  const chooser = page.waitForEvent('filechooser');
+  await pickMenu(page, 'file', '导入 CSV (.csv)');
+  await (await chooser).setFiles(csv);
+  await expect(page.locator('.sheet-canvas')).toBeVisible();
+
+  // 2) Single-cell selection falls back to the used range, so the panel opens with a real cross table
+  await pickMenu(page, 'insert', '插入透视表');
+  const panel = page.getByTestId('sheet-pivot');
+  await expect(panel).toBeVisible();
+  const table = panel.getByRole('table');
+  await expect(table).toContainText('华东');
+  await expect(table).toContainText('华南');
+  // 行合计 150 / 50，列合计 130 / 70，总计 200（与手工计算一致）
+  await expect(table).toContainText('150');
+  await expect(table).toContainText('130');
+  await expect(table).toContainText('200');
+
+  // 3) Export: the pivot lands as a static value sheet and the file opens without repair prompts
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    panel.getByRole('button', { name: '连同透视表导出 xlsx' }).click(),
+  ]);
+  const xlsx = join(test.info().outputDir, 'pivot.xlsx');
+  await download.saveAs(xlsx);
+
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(xlsx);
+  const pivotSheet = workbook.getWorksheet('透视表 1');
+  expect(pivotSheet).toBeTruthy();
+  // 表头 + 第一行数据 + 合计行列
+  expect(pivotSheet!.getCell('A2').value).toBe('华东');
+  expect(pivotSheet!.getCell('D2').value).toBe(150);
+  // 合计行：列合计 130 / 70，总计 200
+  expect(pivotSheet!.getCell('B4').value).toBe(130);
+  expect(pivotSheet!.getCell('C4').value).toBe(70);
+  expect(pivotSheet!.getCell('D4').value).toBe(200);
+
+  expect(errors).toEqual([]);
 });

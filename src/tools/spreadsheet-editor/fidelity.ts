@@ -38,6 +38,17 @@ export function collectExportIssues(snapshot: WorkbookSnapshot): FidelityIssue[]
     }
   }
 
+  // 透视表以静态值导出：数值可用，但 Excel 里刷新不了，必须让用户知道
+  const pivots = snapshot.syntoolsPivots ?? [];
+  if (pivots.length > 0) {
+    issues.push({
+      code: 'sheet.pivotSnapshot',
+      severity: 'warning',
+      count: pivots.length,
+      messageKey: 'tools.sheet.pivotSnapshot',
+    });
+  }
+
   const counts = countExtras(readWorkbookExtras(snapshot));
   if (counts.conditionalFormattings > 0) {
     issues.push({

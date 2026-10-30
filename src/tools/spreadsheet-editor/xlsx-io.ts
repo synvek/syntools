@@ -36,6 +36,7 @@ import {
   type WorksheetExtrasLike,
 } from './xlsx-extras';
 import type { ChartConfig } from './charts';
+import type { PivotConfig } from './pivot';
 import type { SheetCommentMap } from './comments';
 import { buildChartPlan, injectChartsIntoXlsx } from './chartXml';
 import { collectEditorValidation } from './cfdv';
@@ -117,6 +118,11 @@ export interface WorkbookSnapshot extends SnapshotWithExtras {
   syntoolsRawParts?: RawChartParts;
   /** Cell comment threads (P1-2); app-side only, reported as a fidelity warning on export */
   syntoolsComments?: SheetCommentMap;
+  /**
+   * Pivot table configs (P2-4): an analysis view over a source range. App-side only —
+   * export writes the result as a value sheet and reports "not refreshable".
+   */
+  syntoolsPivots?: PivotConfig[];
   /**
    * Univer plugin resources: `resources[pluginName][unitId][sheetId]` carries the rules created in
    * the editor (conditional formatting, data validation). Converted to OOXML on export by `cfdv.ts`.
