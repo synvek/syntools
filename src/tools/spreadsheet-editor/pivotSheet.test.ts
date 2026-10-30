@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildPivot, type PivotConfig } from './pivot';
 import { appendPivotSheets, buildPivotSheet } from './pivotSheet';
 import { DEFAULT_SHEET_PRINT_OPTIONS, buildSheetPrintModel, paginateSheet } from './print';
-import { createEmptySnapshot } from './xlsx-io';
+import { createEmptySnapshot, type SheetSnapshot, type WorkbookSnapshot } from './xlsx-io';
 
 /** P2-4.6 / P2-4.7：透视结果落到工作表（导出 xlsx 与打印共用同一条路径） */
 
@@ -14,15 +14,17 @@ const SALES: unknown[][] = [
   ['华南', 'Q2', 20],
 ];
 
-function snapshotOf(rows: unknown[][]) {
-  const cellData: Record<string, Record<string, { v?: unknown }>> = {};
+function snapshotOf(rows: unknown[][]): WorkbookSnapshot {
+  const base = createEmptySnapshot('book');
+  const cellData: SheetSnapshot['cellData'] = {};
   rows.forEach((row, rowIndex) => {
     row.forEach((value, colIndex) => {
       cellData[String(rowIndex)] ??= {};
-      cellData[String(rowIndex)][String(colIndex)] = { v: value };
+      cellData[String(rowIndex)][String(colIndex)] = { v: value as string | number | boolean };
     });
   });
-  return { sheetOrder: ['s1'], sheets: { s1: { cellData } } };
+  const sheet: SheetSnapshot = { ...base.sheets[base.sheetOrder[0]], id: 's1', cellData };
+  return { ...base, sheetOrder: ['s1'], sheets: { s1: sheet } };
 }
 
 function configOf(overrides: Partial<PivotConfig> = {}): PivotConfig {
@@ -169,8 +171,8 @@ describe('pivot printing', () => {
     const base = createEmptySnapshot('透视表');
     const snapshot = { ...base, sheets: { [sheet.id]: sheet }, sheetOrder: [sheet.id] };
     const model = buildSheetPrintModel(snapshot, sheet.id, null)!;
-    // 按实际尺寸打印（fit 会把整表缩到一页宽，这里要验的是分列而不是缩放）
-    const pages = paginateSheet(model, { ...DEFAULT_SHEET_PRINT_OPTIONS, scale: 'actual' });
+    // 面板里的一键打印用的就是默认选项：fit 触到下限定为 50%，再宽就横向分页
+    const pages = paginateSheet(model, DEFAULT_SHEET_PRINT_OPTIONS);
     // 宽表被切成多页，而不是把右边几列裁掉
     expect(pages.length).toBeGreaterThan(1);
     const printedColumns = new Set(pages.flatMap((page) => page.columns));

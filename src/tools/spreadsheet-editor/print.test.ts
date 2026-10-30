@@ -6,6 +6,7 @@ import {
   formatSheetValue,
   paginateSheet,
   resolvePrintRange,
+  resolvePrintScale,
   resolveUsedRange,
   type SheetPrintOptions,
 } from './print';
@@ -152,6 +153,20 @@ describe('paginateSheet', () => {
     expect(pages[0].columns).toHaveLength(12);
   });
 
+  it('splits columns instead of shrinking past the 50% floor', () => {
+    const { snapshot, id } = makeWorkbook((sheet) => {
+      const row: Record<string, { v: string }> = {};
+      for (let col = 0; col < 40; col += 1) row[String(col)] = { v: `c${col}` };
+      sheet.cellData = { 0: row };
+    });
+    const model = buildSheetPrintModel(snapshot, id, null)!;
+    // 40 × 48pt 缩到一页要 27%，字会糊成灰条：这里只能缩到 50%，其余靠分列
+    expect(resolvePrintScale(model, options({ scale: 'fit' }))).toBeCloseTo(0.5, 5);
+    const pages = paginateSheet(model, options({ scale: 'fit' }));
+    expect(pages.length).toBeGreaterThan(1);
+    expect(new Set(pages.flatMap((page) => page.columns)).size).toBe(40);
+  });
+
   it('splits columns into bands at actual size', () => {
     const { snapshot, id } = makeWorkbook((sheet) => {
       const row: Record<string, { v: string }> = {};
@@ -206,6 +221,26 @@ describe('buildSheetPrintHtml', () => {
     expect(html.match(/<table/g)).toHaveLength(pages.length);
     expect(html).toContain('report');
     expect(html).toContain('@page');
+  });
+
+  it('sizes every page table from its own column band', () => {
+    const { snapshot, id } = makeWorkbook((sheet) => {
+      const row: Record<string, { v: string }> = {};
+      for (let col = 0; col < 40; col += 1) row[String(col)] = { v: `c${col}` };
+      sheet.cellData = { 0: row };
+    });
+    const model = buildSheetPrintModel(snapshot, id, null)!;
+    const opts = options({ scale: 'fit' });
+    const html = buildSheetPrintHtml(model, paginateSheet(model, opts), opts);
+    const widths = [...html.matchAll(/<table class="sheet-table" style="width:([\d.]+)pt/g)].map(
+      (match) => Number(match[1]),
+    );
+    // 每页一张自己的表：宽度按带算，且都不超过版心（否则右边的列会被 overflow 裁掉）
+    const contentWidth = 595.28 - opts.margin * 2;
+    expect(widths.length).toBeGreaterThan(1);
+    for (const width of widths) expect(width).toBeLessThanOrEqual(contentWidth + 0.01);
+    // 40 列全部出现在某一页里，没有列被丢掉
+    expect(html.match(/<col style/g)).toHaveLength(40);
   });
 
   it('escapes cell text', () => {

@@ -490,3 +490,43 @@ test('spreadsheet: pivot table aggregates a range and exports as static values',
 
   expect(errors).toEqual([]);
 });
+
+test('spreadsheet: pivot printing paginates wide headers instead of clipping them', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(120_000);
+  // Headless 里 window.print() 会卡住弹窗；这里验的是分页结构，不是系统打印对话框
+  await context.addInitScript(() => {
+    window.print = () => {};
+  });
+
+  await page.goto('/tools/spreadsheet-editor');
+  await expect(page.locator('.sheet-canvas')).toBeVisible();
+
+  // 30 个季度 → 行标签 + 30 列 + 总计 = 32 列，A4 纵向按 50% 也放不下，必须分列
+  const csv = join(test.info().outputDir, 'wide-sales.csv');
+  await mkdir(test.info().outputDir, { recursive: true });
+  const lines = ['区域,季度,金额'];
+  for (let index = 0; index < 30; index += 1) lines.push(`华东,Q${index},${index + 1}`);
+  await writeFile(csv, lines.join('\n'), 'utf8');
+
+  const chooser = page.waitForEvent('filechooser');
+  await pickMenu(page, 'file', '导入 CSV (.csv)');
+  await (await chooser).setFiles(csv);
+  await expect(page.locator('.sheet-canvas')).toBeVisible();
+
+  await pickMenu(page, 'insert', '插入透视表');
+  const panel = page.getByTestId('sheet-pivot');
+  await expect(panel).toBeVisible();
+
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup'),
+    panel.getByRole('button', { name: '打印透视表' }).click(),
+  ]);
+  const pages = popup.locator('section.print-page');
+  await expect(pages.first()).toBeVisible();
+  expect(await pages.count()).toBeGreaterThan(1);
+  // 最后一列仍然出现在某页里：宽表是拆页，不是裁掉右边
+  await expect(popup.locator('body')).toContainText('Q29');
+});

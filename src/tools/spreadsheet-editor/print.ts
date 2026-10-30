@@ -54,11 +54,25 @@ export const DEFAULT_SHEET_PRINT_OPTIONS: SheetPrintOptions = {
 /** Snapshot px → pt */
 const PX_TO_PT = 0.75;
 
+/**
+ * fit 模式最多缩到 50%。再小的字（9pt × 0.35 ≈ 3pt）打印出来只是灰条，
+ * 不如按列拆页——这也是 Excel 的行为：缩到装不下就分页，而不是无限缩。
+ */
+const MIN_FIT_SCALE = 0.5;
+
 export function resolvePageSize(options: SheetPrintOptions): { width: number; height: number } {
   const base = PAPER_SIZES[options.paper];
   return options.orientation === 'landscape'
     ? { width: base.height, height: base.width }
     : { width: base.width, height: base.height };
+}
+
+/** 实际打印缩放：fit 只在"缩得动"时生效，超出下限就交给分页 */
+export function resolvePrintScale(model: SheetPrintModel, options: SheetPrintOptions): number {
+  if (options.scale !== 'fit') return 1;
+  const contentWidth = resolvePageSize(options).width - options.margin * 2;
+  if (contentWidth <= 0 || model.width <= contentWidth) return 1;
+  return Math.max(contentWidth / model.width, MIN_FIT_SCALE);
 }
 
 /** Smallest range that contains data; null for an empty sheet */
@@ -302,27 +316,23 @@ export function paginateSheet(
   const contentHeight = size.height - options.margin * 2;
   if (contentWidth <= 0 || contentHeight <= 0) return [];
 
-  const scale =
-    options.scale === 'fit' && model.width > contentWidth ? contentWidth / model.width : 1;
-
+  // 统一走分列循环：缩得下时自然只有一列带，缩不下（含 fit 触到下限）就横向分页
+  const scale = resolvePrintScale(model, options);
   const columnBands: number[][] = [];
-  if (scale < 1) {
-    columnBands.push(model.columns.map((column) => column.index));
-  } else {
-    let band: number[] = [];
-    let used = 0;
-    for (const column of model.columns) {
-      const width = column.width * scale;
-      if (band.length > 0 && used + width > contentWidth) {
-        columnBands.push(band);
-        band = [];
-        used = 0;
-      }
-      band.push(column.index);
-      used += width;
+  let colBand: number[] = [];
+  let colUsed = 0;
+  for (const column of model.columns) {
+    const width = column.width * scale;
+    // 1e-6：fit 刚好整除时不要被浮点误差拆成两页
+    if (colBand.length > 0 && colUsed + width > contentWidth + 1e-6) {
+      columnBands.push(colBand);
+      colBand = [];
+      colUsed = 0;
     }
-    if (band.length > 0) columnBands.push(band);
+    colBand.push(column.index);
+    colUsed += width;
   }
+  if (colBand.length > 0) columnBands.push(colBand);
 
   const headerRow = options.repeatHeaderRow ? model.rows[0]?.index : undefined;
   const headerHeight = headerRow === undefined ? 0 : (model.rows[0]?.height ?? 0) * scale;
@@ -451,8 +461,7 @@ export function buildSheetPrintHtml(
 ): string {
   const size = resolvePageSize(options);
   const contentWidth = size.width - options.margin * 2;
-  const scale =
-    options.scale === 'fit' && model.width > contentWidth ? contentWidth / model.width : 1;
+  const scale = resolvePrintScale(model, options);
   const gridline = options.gridlines ? 'border:0.4pt solid #d4d4d8;' : '';
 
   const body = pages
@@ -463,6 +472,11 @@ export function buildSheetPrintHtml(
       const colgroup = cols
         .map((column) => `<col style="width:${(column.width * scale).toFixed(2)}pt">`)
         .join('');
+      // 分列打印时每页只放这一带的列：表格宽度必须按带算，否则第二页会把列挤成 1pt
+      const tableWidth = Math.min(
+        cols.reduce((sum, column) => sum + column.width, 0) * scale,
+        contentWidth,
+      );
       const rowsHtml = page.rows
         .map((rowIndex) => {
           const row = model.rows.find((item) => item.index === rowIndex);
@@ -478,7 +492,9 @@ export function buildSheetPrintHtml(
           return `<tr style="height:${height.toFixed(2)}pt">${tds}</tr>`;
         })
         .join('');
-      return `<section class="print-page"><table class="sheet-table" style="${gridline}">${colgroup}${rowsHtml}</table></section>`;
+      return `<section class="print-page"><table class="sheet-table" style="width:${tableWidth.toFixed(
+        2,
+      )}pt;${gridline}">${colgroup}${rowsHtml}</table></section>`;
     })
     .join('');
 
@@ -489,10 +505,7 @@ html, body { margin: 0; padding: 0; background: #fff }
   padding: ${options.margin}pt; box-sizing: border-box; overflow: hidden;
   page-break-after: always; break-after: page }
 .print-page:last-child { page-break-after: auto; break-after: auto }
-.sheet-table { border-collapse: collapse; table-layout: fixed; width: ${Math.min(
-    model.width,
-    contentWidth,
-  ).toFixed(2)}pt; font: 9pt/1.35 system-ui, -apple-system, sans-serif }
+.sheet-table { border-collapse: collapse; table-layout: fixed; font: 9pt/1.35 system-ui, -apple-system, sans-serif }
 .sheet-table td { ${gridline} padding: 2pt 3pt; vertical-align: middle;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 @media print { .sheet-table td { overflow: hidden } }
