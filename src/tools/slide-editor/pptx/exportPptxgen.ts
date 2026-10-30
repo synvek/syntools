@@ -47,7 +47,7 @@ import type {
  * Known degradations (what pptxgenjs cannot express):
  * - gradient fills (ShapeFillProps.type is only 'none' | 'solid') → use the first stop as a solid color;
  * - groups (no native grouping) → flattened into independent elements with absolute coordinates on export;
- * - element-level opacity (no matching option) → ignored;
+ * - element-level opacity → folded into fill / line / picture transparency (DrawingML has no element alpha);
  * - vertical text vert → ignored, exported horizontally;
  * - custom paths custGeom → degrade to the closest prstGeom;
  * - formulas → persisted for now as a "LaTeX source" text box (see addFormula).
@@ -91,80 +91,57 @@ function hex(color: string | undefined): string | undefined {
   return /^[0-9a-fA-F]{6}$/.test(text) ? text.toUpperCase() : undefined;
 }
 
-function fillToShapeFill(fill: Fill | undefined): ShapeFillProps | undefined {
+/** Transparency percentage (0-100) implied by the paint alpha and the element opacity */
+function transparencyOf(alpha: number | undefined, opacity = 1): number | undefined {
+  const value = (alpha ?? 1) * Math.min(1, Math.max(0, opacity));
+  return value < 1 ? Math.round((1 - value) * 100) : undefined;
+}
+
+function fillToShapeFill(fill: Fill | undefined, opacity = 1): ShapeFillProps | undefined {
   if (!fill) return undefined;
   if (fill.type === 'none') return { type: 'none' };
   if (fill.type === 'solid') {
     const color = hex(fill.color);
     if (!color) return undefined;
-    return {
-      type: 'solid',
-      color,
-      transparency: fill.alpha === undefined ? undefined : Math.round((1 - fill.alpha) * 100),
-    };
+    return { type: 'solid', color, transparency: transparencyOf(fill.alpha, opacity) };
   }
   // Degrade gradients to the first stop (pptxgenjs has no gradient fill)
   const first = hex(fill.stops[0]?.color);
-  return first ? { type: 'solid', color: first } : undefined;
+  return first
+    ? { type: 'solid', color: first, transparency: transparencyOf(1, opacity) }
+    : undefined;
 }
 
-function lineToShapeLine(stroke: Stroke | undefined): ShapeProps['line'] {
+function lineToShapeLine(stroke: Stroke | undefined, opacity = 1): ShapeProps['line'] {
   if (!stroke) return undefined;
   const color = hex(stroke.color);
   if (!color) return undefined;
-  return { color, width: Math.max(0.75, toPt(stroke.width)) };
+  return {
+    color,
+    width: Math.max(0.75, toPt(stroke.width)),
+    ...(stroke.dash && stroke.dash.length > 0 ? { dash: 'dash' as const } : {}),
+    ...(transparencyOf(stroke.alpha, opacity) !== undefined
+      ? { transparency: transparencyOf(stroke.alpha, opacity) }
+      : {}),
+  };
 }
 
-/** Our prstGeom names → pptxgenjs SHAPE_NAME; unknown ones degrade to rect */
-const SHAPE_MAP: Record<string, SHAPE_NAME> = {
-  rect: 'rect',
-  roundRect: 'roundRect',
-  snip1Rect: 'snip1Rect',
-  snipRoundRect: 'roundRect',
-  frame: 'frame',
-  ellipse: 'ellipse',
-  triangle: 'triangle',
-  rtTriangle: 'rtTriangle',
-  isoTriangle: 'triangle',
-  diamond: 'diamond',
-  trapezoid: 'trapezoid',
-  pentagon: 'pentagon',
-  homePlate: 'homePlate',
-  hexagon: 'hexagon',
-  octagon: 'octagon',
-  rightArrow: 'rightArrow',
-  leftArrow: 'leftArrow',
-  upArrow: 'upArrow',
-  downArrow: 'downArrow',
-  chevron: 'chevron',
+/**
+ * Internal preset aliases → the DrawingML name pptxgenjs writes verbatim into `a:prstGeom/@prst`.
+ *
+ * A whitelist used to sit here and every unlisted preset silently became a rectangle, so shapes such
+ * as `flowChartOffpageConnector` lost their outline. Presets are now passed through as-is: the model
+ * already stores DrawingML names, and an unknown prst simply renders as PowerPoint's own fallback.
+ */
+const SHAPE_ALIASES: Record<string, SHAPE_NAME> = {
   star: 'star5',
-  star4: 'star4',
-  star5: 'star5',
-  star6: 'star6',
-  star8: 'star8',
-  star12: 'star12',
-  star16: 'star16',
-  star24: 'star24',
-  star32: 'star32',
-  parallelogram: 'parallelogram',
+  isoTriangle: 'triangle',
   cross: 'plus',
-  leftRightArrow: 'leftRightArrow',
-  upDownArrow: 'upDownArrow',
-  quadArrow: 'quadArrow',
-  flowChartProcess: 'flowChartProcess',
-  flowChartDecision: 'flowChartDecision',
-  flowChartDocument: 'flowChartDocument',
-  flowChartTerminator: 'flowChartTerminator',
-  flowChartConnector: 'flowChartConnector',
-  wedgeRectCallout: 'wedgeRectCallout',
-  mathPlus: 'mathPlus',
-  mathMinus: 'mathMinus',
-  mathMultiply: 'mathMultiply',
-  line: 'line',
 };
 
 function shapeNameOf(prst: string): SHAPE_NAME {
-  return SHAPE_MAP[prst] ?? 'rect';
+  const name = SHAPE_ALIASES[prst] ?? prst;
+  return name && name.trim() ? name : 'rect';
 }
 
 /** Chart type → pptxgenjs CHART_NAME + grouping */
@@ -302,9 +279,14 @@ interface ExportCtx {
 function addTextElement(slide: PresSlide, element: TextElement, ctx: ExportCtx): void {
   const options: TextPropsOptions = {
     ...textBaseOptions(element, element.body),
-    ...(fillToShapeFill(element.fill) ? { fill: fillToShapeFill(element.fill) } : {}),
-    ...(lineToShapeLine(element.stroke) ? { line: lineToShapeLine(element.stroke) } : {}),
+    ...(fillToShapeFill(element.fill, element.opacity ?? 1)
+      ? { fill: fillToShapeFill(element.fill, element.opacity ?? 1) }
+      : {}),
+    ...(lineToShapeLine(element.stroke, element.opacity ?? 1)
+      ? { line: lineToShapeLine(element.stroke, element.opacity ?? 1) }
+      : {}),
     isTextBox: true,
+    ...(element.name ? { objectName: element.name } : {}),
   };
   if (element.hyperlink) options.hyperlink = ctx.hyperlinkOf(element);
   const shadow = shadowToProps(element.shadow);
@@ -348,10 +330,11 @@ function addShapeElement(slide: PresSlide, element: ShapeElement, ctx: ExportCtx
     flipH: element.flipX,
     flipV: element.flipY,
     shape: shapeNameOf(element.geom.prst),
+    ...(element.name ? { objectName: element.name } : {}),
   };
-  const fill = fillToShapeFill(element.fill);
+  const fill = fillToShapeFill(element.fill, element.opacity ?? 1);
   if (fill) options.fill = fill;
-  const line = lineToShapeLine(element.stroke);
+  const line = lineToShapeLine(element.stroke, element.opacity ?? 1);
   if (line) options.line = line;
   const shadow = shadowToProps(element.shadow);
   if (shadow) options.shadow = shadow;
@@ -383,6 +366,10 @@ function addImageElement(slide: PresSlide, element: ImageElement, ctx: ExportCtx
     rotate: element.rotation ?? 0,
     flipH: element.flipX,
     flipV: element.flipY,
+    ...(transparencyOf(1, element.opacity ?? 1) !== undefined
+      ? { transparency: transparencyOf(1, element.opacity ?? 1) }
+      : {}),
+    ...(element.name ? { objectName: element.name } : {}),
     ...(element.hyperlink ? { hyperlink: ctx.hyperlinkOf(element) } : {}),
   });
 }
@@ -392,13 +379,18 @@ function addLineElement(slide: PresSlide, element: LineElement): void {
   const points = element.points ?? [0, 0, element.width, 0];
   const flipH = (points[2] ?? 0) < 0;
   const flipV = (points[3] ?? 0) < 0;
-  const line: NonNullable<ShapeProps['line']> = lineToShapeLine(element.stroke) ?? {
+  const line: NonNullable<ShapeProps['line']> = lineToShapeLine(
+    element.stroke,
+    element.opacity ?? 1,
+  ) ?? {
     color: '000000',
     width: 1,
   };
   if (element.head) line.beginArrowType = element.head;
   if (element.tail) line.endArrowType = element.tail;
-  slide.addShape('line', {
+  // An elbow connector is written as bentConnector3 so the route survives (pptxgenjs writes the
+  // preset name verbatim); a plain 'line' preset always came back as a straight connector.
+  slide.addShape(element.route === 'elbow' ? 'bentConnector3' : 'line', {
     x: toIn(element.x),
     y: toIn(element.y),
     w: toIn(element.width || 1),
@@ -430,7 +422,19 @@ function addTableElement(slide: PresSlide, element: TableElement): void {
         const span: { colspan?: number; rowspan?: number } = {};
         if (cell.colSpan && cell.colSpan > 1) span.colspan = cell.colSpan;
         if (cell.rowSpan && cell.rowSpan > 1) span.rowspan = cell.rowSpan;
-        const item: TableCellProps = { text: cell.text, options: { ...options, ...span } };
+        // A line break inside a cell is stored as "\n" (the importer joins paragraphs that way), so
+        // multi-line cells go back out as several TextProps instead of one flattened run
+        const lines = cell.text.split('\n');
+        const item: TableCellProps =
+          lines.length > 1
+            ? {
+                text: lines.map((line, index) => ({
+                  text: line,
+                  options: { ...options, breakLine: index < lines.length - 1 },
+                })),
+                options: { ...options, ...span },
+              }
+            : { text: cell.text, options: { ...options, ...span } };
         return item;
       }),
   );
@@ -478,7 +482,11 @@ function addChartElement(slide: PresSlide, element: ChartElement): void {
       .map((color) => hex(color))
       .filter((value): value is string => Boolean(value));
   }
-  if (element.title) options.title = element.title;
+  // pptxgenjs drops `title` unless `showTitle` is set, so a chart title never reached the file
+  if (element.title) {
+    options.title = element.title;
+    options.showTitle = true;
+  }
   slide.addChart(name, data, options);
 }
 
@@ -716,9 +724,33 @@ const SHAPE_ID_PARTS = /^ppt\/(slides|slideLayouts|slideMasters|notesSlides)\/[^
  * PowerPoint shows a "repair" dialog for duplicate ids, so after export everything is renumbered in
  * document order: the first in a group (spTree's nvGrpSpPr) is naturally 1 and the rest follow, breaking no cross-references.
  */
-async function renumberShapeIds(bytes: Uint8Array): Promise<Uint8Array> {
+/**
+ * Per-slide table header/banding flags, in the order the tables are added to that slide
+ * (layout elements first, then slide elements — the same order `addSlide` uses).
+ */
+function tableFlagsBySlide(doc: SlideDoc): { header: boolean; band: boolean }[][] {
+  return doc.slides.map((slide) => {
+    const flags: { header: boolean; band: boolean }[] = [];
+    const walk = (elements: SlideElement[]): void => {
+      for (const element of elements) {
+        if (element.visible === false) continue;
+        if (element.type === 'table') {
+          flags.push({ header: Boolean(element.headerRow), band: Boolean(element.bandRow) });
+        } else if (element.type === 'group') {
+          walk(element.children);
+        }
+      }
+    };
+    walk(doc.layouts.find((layout) => layout.id === slide.layoutId)?.elements ?? []);
+    walk(slide.elements);
+    return flags;
+  });
+}
+
+async function postProcess(bytes: Uint8Array, doc: SlideDoc): Promise<Uint8Array> {
   const { default: JSZip } = await import('jszip');
   const zip = await JSZip.loadAsync(bytes);
+  const tableFlags = tableFlagsBySlide(doc);
   let changed = false;
   for (const name of Object.keys(zip.files)) {
     if (!SHAPE_ID_PARTS.test(name)) continue;
@@ -726,10 +758,27 @@ async function renumberShapeIds(bytes: Uint8Array): Promise<Uint8Array> {
     if (!entry) continue;
     const xml = await entry.async('string');
     let seq = 0;
-    const next = xml.replace(/<p:cNvPr id="\d+"/g, () => {
+    let next = xml.replace(/<p:cNvPr id="\d+"/g, () => {
       seq += 1;
       return `<p:cNvPr id="${seq}"`;
     });
+    // pptxgenjs always writes `<a:tblPr/>` (it has no table-style API), so header/banding flags are
+    // patched in afterwards in document order to keep the model's headerRow / bandRow on a round-trip
+    const slideIndex = /^ppt\/slides\/slide(\d+)\.xml$/.exec(name);
+    if (slideIndex) {
+      const list = tableFlags[Number(slideIndex[1]) - 1] ?? [];
+      let tableIndex = 0;
+      next = next.replace(/<a:tblPr(\s[^>]*)?\/>/g, (match) => {
+        const item = list[tableIndex];
+        tableIndex += 1;
+        if (!item) return match;
+        const cleaned = match.replace(/\s(firstRow|bandRow)="[^"]*"/g, '');
+        return cleaned.replace(
+          '<a:tblPr',
+          `<a:tblPr firstRow="${item.header ? 1 : 0}" bandRow="${item.band ? 1 : 0}"`,
+        );
+      });
+    }
     if (next !== xml) {
       zip.file(name, next);
       changed = true;
@@ -781,10 +830,10 @@ export async function exportPptxPptxGen(doc: SlideDoc): Promise<ToolResult<Uint8
 
     const output = await pres.write({ outputType: 'uint8array', compression: true });
     if (output instanceof Uint8Array) {
-      return { ok: true, value: await renumberShapeIds(output) };
+      return { ok: true, value: await postProcess(output, doc) };
     }
     if (output instanceof ArrayBuffer) {
-      return { ok: true, value: await renumberShapeIds(new Uint8Array(output)) };
+      return { ok: true, value: await postProcess(new Uint8Array(output), doc) };
     }
     return { ok: false, error: 'EXPORT_FAILED' };
   } catch {

@@ -27,6 +27,8 @@ export interface PptxLine {
   color?: PptxHexColor;
   width?: number;
   dash?: 'solid' | 'dash' | 'sysDash' | 'lgDash';
+  /** Opacity percentage 0-100 (writes a:alpha on the line colour) */
+  transparency?: number;
   /** v3.3+ arrow heads, matching DrawingML `a:headEnd` / `a:tailEnd` types */
   beginArrowType?: 'none' | 'arrow' | 'diamond' | 'oval' | 'stealth' | 'triangle';
   endArrowType?: 'none' | 'arrow' | 'diamond' | 'oval' | 'stealth' | 'triangle';
@@ -57,6 +59,8 @@ export interface PptxTextOptions {
   w?: number;
   h?: number;
   rotate?: number;
+  /** p:cNvPr/@name */
+  objectName?: string;
 
   fontSize?: number;
   bold?: boolean;
@@ -104,6 +108,8 @@ export interface PptxShapeOptions {
   flipH?: boolean;
   flipV?: boolean;
   shape?: string;
+  /** p:cNvPr/@name */
+  objectName?: string;
   fill?: PptxFill;
   line?: PptxLine;
   shadow?: PptxShadow;
@@ -121,12 +127,17 @@ export interface PptxImageOptions {
   rotate?: number;
   flipH?: boolean;
   flipV?: boolean;
+  /** Opacity percentage 0-100 (writes a:alphaModFix) */
+  transparency?: number;
+  /** p:cNvPr/@name */
+  objectName?: string;
   hyperlink?: PptxHyperlink;
 }
 
 /** Cell: pptxgenjs reads colspan / rowspan and styles from `options` */
 export interface PptxTableCell {
-  text?: string;
+  /** A single string, or several TextProps for multi-line cells */
+  text?: string | PptxTextProps[];
   options?: PptxTextOptions & {
     colspan?: number;
     rowspan?: number;
@@ -163,6 +174,8 @@ export interface PptxChartOptions {
   catGridLine?: PptxGridLine;
   valGridLine?: PptxGridLine;
   title?: string;
+  /** Without this pptxgenjs silently drops `title` */
+  showTitle?: boolean;
 }
 
 export interface PptxSlide {

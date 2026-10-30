@@ -236,18 +236,24 @@ function xfrmXml(
   ].join('');
 }
 
-function fillXml(fill: Fill | undefined): string {
+/**
+ * DrawingML has no element-level opacity, so the element's `opacity` is folded into the paint
+ * alpha here — otherwise a semi-transparent object would export fully opaque.
+ */
+function fillXml(fill: Fill | undefined, opacity = 1): string {
   if (!fill || fill.type === 'none') return '<a:noFill/>';
+  const factor = Math.min(1, Math.max(0, opacity));
   if (fill.type === 'solid') {
     const hex = fill.color.replace(/^#/, '').toUpperCase();
-    const alpha =
-      fill.alpha === undefined ? '' : `<a:alpha val="${Math.round(fill.alpha * 100000)}"/>`;
-    return `<a:solidFill><a:srgbClr val="${hex}">${alpha}</a:srgbClr></a:solidFill>`;
+    const alpha = (fill.alpha ?? 1) * factor;
+    const alphaXml = alpha < 1 ? `<a:alpha val="${Math.round(alpha * 100000)}"/>` : '';
+    return `<a:solidFill><a:srgbClr val="${hex}">${alphaXml}</a:srgbClr></a:solidFill>`;
   }
+  const stopAlpha = factor < 1 ? `<a:alpha val="${Math.round(factor * 100000)}"/>` : '';
   const stops = fill.stops
     .map(
       (stop) =>
-        `<a:gs pos="${Math.round(stop.offset * 100000)}"><a:srgbClr val="${stop.color.replace(/^#/, '').toUpperCase()}"/></a:gs>`,
+        `<a:gs pos="${Math.round(stop.offset * 100000)}"><a:srgbClr val="${stop.color.replace(/^#/, '').toUpperCase()}">${stopAlpha}</a:srgbClr></a:gs>`,
     )
     .join('');
   return `<a:gradFill rotWithShape="1"><a:gsLst>${stops}</a:gsLst><a:lin ang="${Math.round((fill.angle ?? 0) * 60000)}" scaled="0"/><a:tileRect/></a:gradFill>`;
@@ -256,6 +262,7 @@ function fillXml(fill: Fill | undefined): string {
 function strokeXml(
   stroke: Stroke | undefined,
   ends?: { head?: LineElement['head']; tail?: LineElement['tail'] },
+  opacity = 1,
 ): string {
   if (!stroke) return '<a:noFill/>';
   const width = Math.max(1, Math.round(stroke.width * 12700));
@@ -264,7 +271,9 @@ function strokeXml(
   const tail = ends?.tail ? `<a:tailEnd type="${ends.tail}"/>` : '';
   // A dash pattern used to be flattened to "solid" on export, losing dashes on every round-trip
   const dash = dashPresetName(stroke.dash) ?? 'solid';
-  return `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="${dash}"/>${head}${tail}</a:ln>`;
+  const alpha = (stroke.alpha ?? 1) * Math.min(1, Math.max(0, opacity));
+  const alphaXml = alpha < 1 ? `<a:alpha val="${Math.round(alpha * 100000)}"/>` : '';
+  return `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${color}">${alphaXml}</a:srgbClr></a:solidFill><a:prstDash val="${dash}"/>${head}${tail}</a:ln>`;
 }
 
 function runXml(text: string, style: RunStyle | undefined): string {
@@ -426,7 +435,7 @@ function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${geomXml(element.geom)}${fillXml(element.fill)}${strokeXml(element.stroke)}${effectLstXml(element)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${geomXml(element.geom)}${fillXml(element.fill, element.opacity ?? 1)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
   ];
   if (body) parts.push(textBodyXml(body, 'p'));
   return `<p:sp>${parts.join('')}</p:sp>`;
@@ -452,7 +461,7 @@ function textXml(element: TextElement): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${textGeomXml(element)}${fillXml(element.fill)}${strokeXml(element.stroke)}${effectLstXml(element)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${textGeomXml(element)}${fillXml(element.fill, element.opacity ?? 1)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
     textBodyXml(element.body, 'p'),
     '</p:sp>',
   ].join('');
@@ -461,11 +470,13 @@ function textXml(element: TextElement): string {
 function imageXml(
   element: {
     id?: string;
+    name?: string;
     x: number;
     y: number;
     width: number;
     height: number;
     rotation?: number;
+    opacity?: number;
   },
   rId: string,
   crop: { left: number; top: number; right: number; bottom: number } | undefined,
@@ -474,10 +485,13 @@ function imageXml(
   const srcRect = crop
     ? `<a:srcRect l="${Math.round(crop.left * 100000)}" t="${Math.round(crop.top * 100000)}" r="${Math.round(crop.right * 100000)}" b="${Math.round(crop.bottom * 100000)}"/>`
     : '';
+  // Picture transparency is a:alphaModFix on the blip; without it a faded image exported opaque
+  const opacity = Math.min(1, Math.max(0, element.opacity ?? 1));
+  const alphaXml = opacity < 1 ? `<a:alphaModFix amt="${Math.round(opacity * 100000)}"/>` : '';
   return [
     '<p:pic>',
-    `<p:nvPicPr><p:cNvPr id="${id}" name="Image ${id}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>`,
-    `<p:blipFill><a:blip r:embed="${rId}"/>${srcRect}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`,
+    `<p:nvPicPr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Image ${id}`)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>`,
+    `<p:blipFill><a:blip r:embed="${rId}">${alphaXml}</a:blip>${srcRect}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`,
     `<p:spPr>${xfrmXml(element)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>`,
     '</p:pic>',
   ].join('');
@@ -499,7 +513,9 @@ function lineXml(element: LineElement): string {
   return [
     '<p:cxnSp>',
     `<p:nvCxnSpPr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Line ${id}`)}"/>${cxnPr}<p:nvPr/></p:nvCxnSpPr>`,
-    `<p:spPr>${xfrmXml({ ...element, flipX: flipH, flipY: flipV })}<a:prstGeom prst="line"><a:avLst/></a:prstGeom>${strokeXml(element.stroke ?? { color: '#000000', width: 1 }, { head: element.head, tail: element.tail })}</p:spPr>`,
+    // Elbow routing is carried by the preset geometry: writing prst="line" always collapsed a
+    // bent connector into a straight one
+    `<p:spPr>${xfrmXml({ ...element, flipX: flipH, flipY: flipV })}<a:prstGeom prst="${element.route === 'elbow' ? 'bentConnector3' : 'line'}"><a:avLst/></a:prstGeom>${strokeXml(element.stroke ?? { color: '#000000', width: 1 }, { head: element.head, tail: element.tail }, element.opacity ?? 1)}</p:spPr>`,
     '</p:cxnSp>',
   ].join('');
 }
@@ -536,22 +552,18 @@ function tableXml(element: TableElement): string {
             const mergeAttr = cell.coveredBy === 'v' ? 'vMerge="1"' : 'hMerge="1"';
             return `<a:tc ${mergeAttr}><a:txBody><a:bodyPr/><a:lstStyle/><a:p/></a:txBody><a:tcPr/></a:tc>`;
           }
+          const style = {
+            size: cell.size,
+            bold: cell.bold,
+            color: cell.color,
+          } as RunStyle;
+          // Multi-line cell text: the importer joins the cell's paragraphs with "\n", so a line break
+          // has to go back out as its own paragraph (it used to be flattened into one run)
           const body: TextBody = {
-            paragraphs: [
-              {
-                runs: [
-                  {
-                    text: cell.text,
-                    style: {
-                      size: cell.size,
-                      bold: cell.bold,
-                      color: cell.color,
-                    } as RunStyle,
-                  },
-                ],
-                align: cell.align,
-              },
-            ],
+            paragraphs: cell.text.split('\n').map((line) => ({
+              runs: [{ text: line, style }],
+              align: cell.align,
+            })),
             anchor: cell.valign,
             wrap: true,
             autoFit: 'none',
@@ -580,7 +592,7 @@ function tableXml(element: TableElement): string {
     .join('');
   const graphicFrame = [
     '<p:graphicFrame>',
-    `<p:nvGraphicFramePr><p:cNvPr id="${id}" name="Table ${id}"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>`,
+    `<p:nvGraphicFramePr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Table ${id}`)}"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>`,
     xfrmXml(element, 'p:xfrm'),
     '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">',
     // Write header/banding from the element's own settings instead of hardcoding (otherwise imported table styles get overwritten)

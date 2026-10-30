@@ -60,6 +60,7 @@ import {
   childOf,
   childrenNamed,
   childrenOf,
+  collect,
   localNameOf,
   numAttr,
   parseXml,
@@ -118,6 +119,8 @@ interface ImportContext {
     start?: { id: string; site?: number };
     end?: { id: string; site?: number };
   }[];
+  /** Relationships of the part being parsed: hyperlinks live in a rel (`r:id`), not inline */
+  rels: Map<string, Relationship>;
 }
 
 function nextId(ctx: ImportContext, prefix: string): string {
@@ -143,11 +146,38 @@ function emuPx(value: number | undefined): number {
   return value === undefined ? 0 : emuToPx(value);
 }
 
+/** `nv…Pr/cNvPr` of an element (the node carrying its name, hyperlink and DrawingML id) */
+function cNvPrOf(node: XmlNode, nvTag: string): XmlNode | undefined {
+  return childOf(childOf(node, nvTag), 'cNvPr');
+}
+
+/** Element name from `cNvPr/@name`; PowerPoint fills this in for every object */
+function nameOf(node: XmlNode, nvTag: string): string | undefined {
+  const name = attr(cNvPrOf(node, nvTag), 'name');
+  return name && name.trim() ? name.trim() : undefined;
+}
+
+/**
+ * `a:hlinkClick/@r:id` → URL.
+ *
+ * Hyperlinks are OPC relationships (`TargetMode="External"`); internal jump links use
+ * `action="ppaction://..."` with no relationship and are skipped (no URL to open).
+ */
+function hyperlinkOf(node: XmlNode | undefined, ctx: ImportContext): string | undefined {
+  const rId = attr(childOf(node, 'hlinkClick'), 'r:id');
+  if (!rId) return undefined;
+  const rel = ctx.rels.get(rId);
+  if (!rel || !rel.external) return undefined;
+  const url = rel.target.trim();
+  return url.length > 0 ? url : undefined;
+}
+
 /** rPr → RunStyle */
 function parseRunStyle(
   node: XmlNode | undefined,
   palette: Palette,
   theme: SlideTheme,
+  ctx: ImportContext,
 ): RunStyle | undefined {
   if (!node) return undefined;
   const style: RunStyle = {};
@@ -171,6 +201,9 @@ function parseRunStyle(
   // `a:highlight` is a colour container, same shape as a:solidFill
   const highlight = resolveColorNode(childOf(node, 'highlight'), palette);
   if (highlight) style.highlight = highlight.color;
+  // Run hyperlinks used to be dropped, so every imported link became plain text
+  const link = hyperlinkOf(node, ctx);
+  if (link) style.hyperlink = link;
   return Object.keys(style).length > 0 ? style : undefined;
 }
 
@@ -195,6 +228,7 @@ function parseTextBody(
   node: XmlNode | undefined,
   palette: Palette,
   theme: SlideTheme,
+  ctx: ImportContext,
 ): TextBody | undefined {
   if (!node) return undefined;
   const paragraphs: Paragraph[] = [];
@@ -205,12 +239,12 @@ function parseTextBody(
       const kind = localNameOf(item);
       if (kind === 'r') {
         const text = textOf(childOf(item, 't'));
-        runs.push({ text, style: parseRunStyle(childOf(item, 'rPr'), palette, theme) });
+        runs.push({ text, style: parseRunStyle(childOf(item, 'rPr'), palette, theme, ctx) });
       } else if (kind === 'fld') {
         // Field (slide number / date / slide index): structured like a:r (rPr + t),
         // previously skipped wholesale, so content like "slide X" silently disappeared
         const text = textOf(childOf(item, 't'));
-        runs.push({ text, style: parseRunStyle(childOf(item, 'rPr'), palette, theme) });
+        runs.push({ text, style: parseRunStyle(childOf(item, 'rPr'), palette, theme, ctx) });
       } else if (kind === 'br') {
         runs.push({ text: '\n' });
       }
@@ -317,16 +351,20 @@ function parseShape(
   const stroke = parseStroke(childOf(spPr, 'ln'), palette);
   const shadow = parseShadow(spPr, palette);
   const glow = parseGlow(spPr, palette);
-  const body = parseTextBody(childOf(node, 'txBody'), palette, theme);
+  const body = parseTextBody(childOf(node, 'txBody'), palette, theme, ctx);
   const nvSpPr = childOf(node, 'nvSpPr');
   const ph = childOf(childOf(nvSpPr, 'nvPr'), 'ph');
   const placeholder = ph ? { kind: attr(ph, 'type') ?? 'body', index: attr(ph, 'idx') } : undefined;
+  const name = nameOf(node, 'nvSpPr');
+  const hyperlink = hyperlinkOf(childOf(nvSpPr, 'cNvPr'), ctx);
 
   // Without its own geometry, keep baseRect's zero size; mergeInheritedGeometry fills it from the layout later
   const base = {
     id: nextId(ctx, 'el'),
     ...baseRect(xfrm),
     placeholder,
+    ...(name ? { name } : {}),
+    ...(hyperlink ? { hyperlink } : {}),
     ...(shadow ? { shadow } : {}),
     ...(glow ? { glow } : {}),
   };
@@ -373,6 +411,11 @@ async function parsePicture(
   const blip = childOf(blipFill, 'blip');
   const embed = attr(blip, 'embed') ?? attr(blip, 'link');
   const mediaId = embed ? await ensureMedia(ctx, slidePart, embed, rels) : undefined;
+  // Picture transparency lives on the blip; without it a faded image came back fully opaque
+  const alphaAmt = numAttr(childOf(blip, 'alphaModFix'), 'amt');
+  const opacity = alphaAmt === undefined ? undefined : Math.min(1, Math.max(0, alphaAmt / 100000));
+  const name = nameOf(node, 'nvPicPr');
+  const hyperlink = hyperlinkOf(cNvPrOf(node, 'nvPicPr'), ctx);
 
   const srcRect = childOf(blipFill, 'srcRect');
   const crop =
@@ -395,6 +438,9 @@ async function parsePicture(
     ...baseRect(xfrm),
     mediaId: mediaId ?? '',
     ...(crop ? { crop } : {}),
+    ...(opacity !== undefined && opacity < 1 ? { opacity } : {}),
+    ...(name ? { name } : {}),
+    ...(hyperlink ? { hyperlink } : {}),
   } as ImageElement;
   if (!mediaId) {
     ctx.skipped.add('image');
@@ -462,6 +508,12 @@ function parseConnector(
     ],
     stroke: stroke ?? defaultStroke,
   };
+  // Elbow connectors carry a bentConnector / curvedConnector preset; without it the model would
+  // treat every connector as a straight line and re-export it as one
+  const prst = attr(childOf(spPr, 'prstGeom') ?? childOf(spPr, 'geom'), 'prst') ?? '';
+  if (/^(bentConnector|curvedConnector)/.test(prst)) element.route = 'elbow';
+  const name = nameOf(node, 'nvCxnSpPr');
+  if (name) element.name = name;
   const head = parseArrowKind(attr(childOf(ln, 'headEnd'), 'type'));
   const tail = parseArrowKind(attr(childOf(ln, 'tailEnd'), 'type'));
   if (head) element.head = head;
@@ -484,13 +536,18 @@ function parseConnector(
 }
 
 /** a:tbl → the cell part of a TableElement */
-function parseTableCells(node: XmlNode, palette: Palette, theme: SlideTheme): TableCell[][] {
+function parseTableCells(
+  node: XmlNode,
+  palette: Palette,
+  theme: SlideTheme,
+  ctx: ImportContext,
+): TableCell[][] {
   const rows: TableCell[][] = [];
   for (const trNode of childrenNamed(node, 'tr')) {
     const row: TableCell[] = [];
     for (const tcNode of childrenNamed(trNode, 'tc')) {
       const tcPr = childOf(tcNode, 'tcPr');
-      const body = parseTextBody(childOf(tcNode, 'txBody'), palette, theme);
+      const body = parseTextBody(childOf(tcNode, 'txBody'), palette, theme, ctx);
       const text = body?.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n') ?? '';
       const fill = fillFromParsed(parseShapeFill(tcPr, palette));
       const style = body?.paragraphs[0]?.runs[0]?.style;
@@ -541,7 +598,7 @@ function parseTable(
   const cols = childrenNamed(gridNode, 'gridCol');
   const tblPr = childOf(node, 'tblPr');
   const colWidths = cols.map((col) => emuPx(numAttr(col, 'w')) || 100);
-  const rows = parseTableCells(node, palette, theme);
+  const rows = parseTableCells(node, palette, theme, ctx);
   const rectWidth = emuPx(xfrm?.width) || colWidths.reduce((a, b) => a + b, 0);
   const rectHeight = emuPx(xfrm?.height) || rows.length * 32;
   const rowHeights = childrenNamed(node, 'tr').map(
@@ -695,13 +752,37 @@ function seriesNameOf(seriesNode: XmlNode, index: number): string {
   return formula && formula.trim() ? formula.trim() : `Series ${index + 1}`;
 }
 
+/**
+ * Chart title: rich text under `c:title/c:tx/c:rich`, or the cached string of a title reference.
+ * `c:autoTitleDeleted val="1"` means "no title", which must not become an empty title box.
+ */
+function chartTitleOf(chart: XmlNode | undefined): string {
+  if (!chart) return '';
+  if (boolAttr(childOf(chart, 'autoTitleDeleted'), 'val')) return '';
+  const tx = childOf(childOf(chart, 'title'), 'tx');
+  if (!tx) return '';
+  const rich = collect(childOf(tx, 'rich'), 't')
+    .map((node) => textOf(node))
+    .join('');
+  if (rich.trim()) return rich.trim();
+  return collectPoints(childOf(childOf(tx, 'strRef'), 'strCache'))
+    .map((node) => pointValueOf(node) ?? '')
+    .join('')
+    .trim();
+}
+
 /** Read a chart part → the data part of a ChartElement; returns null when no data can be parsed */
 async function readChartData(
   ctx: ImportContext,
   slidePart: string,
   rels: Map<string, Relationship>,
   chartRId: string,
-): Promise<{ chartType: ChartType; categories: string[]; series: ChartSeries[] } | null> {
+): Promise<{
+  chartType: ChartType;
+  categories: string[];
+  series: ChartSeries[];
+  title: string;
+} | null> {
   const rel = rels.get(chartRId);
   if (!rel) return null;
   const partPath = normalizePartPath(slidePart, rel.target);
@@ -734,7 +815,7 @@ async function readChartData(
     name: seriesNameOf(node, index),
     values: seriesValuesOf(node),
   }));
-  return { chartType, categories, series };
+  return { chartType, categories, series, title: chartTitleOf(chart) };
 }
 
 /** graphicFrame: table → TableElement; chart → ChartElement; SmartArt / OLE → placeholder box */
@@ -750,9 +831,11 @@ async function parseGraphicFrame(
   const graphic = childOf(node, 'graphic');
   const graphicData = childOf(graphic, 'graphicData');
   const uri = attr(graphicData, 'uri') ?? '';
+  const name = nameOf(node, 'nvGraphicFramePr');
   const base = {
     id: nextId(ctx, 'el'),
     ...baseRect(xfrm ?? { x: 0, y: 0, width: 0, height: 0 }),
+    ...(name ? { name } : {}),
   };
   const tableNode = childOf(graphicData, 'tbl');
   if (tableNode) {
@@ -775,7 +858,7 @@ async function parseGraphicFrame(
         categories: normalized.categories,
         series: normalized.series,
         options: { legend: true, dataLabels: false, gridLines: true },
-        title: '',
+        title: data.title,
         revision: 1,
       };
       return element;
@@ -863,14 +946,12 @@ async function parseGroup(
   const sx = extW > 0 ? groupW / extW : 1;
   const sy = extH > 0 ? groupH / extH : 1;
 
-  const mapped = children.map((child) => {
-    const next = { ...child } as SlideElement;
-    next.x = (child.x - offX) * sx;
-    next.y = (child.y - offY) * sy;
-    next.width = child.width * sx;
-    next.height = child.height * sy;
-    return next;
-  });
+  // Only the direct children are re-based on the subgroup origin (their own children are already
+  // relative to them), but the outer scale has to reach the whole subtree: nested groups keep a
+  // fixed chExt, so an unscaled grandchild would be off by the outer ratio.
+  const mapped = children.map((child) =>
+    scaleSubtree({ ...child, x: child.x - offX, y: child.y - offY } as SlideElement, sx, sy),
+  );
 
   return {
     id: nextId(ctx, 'el'),
@@ -881,7 +962,30 @@ async function parseGroup(
     height: groupH,
     rotation: xfrm?.rotation === undefined ? undefined : xfrm.rotation / 60000,
     children: mapped,
+    ...(nameOf(node, 'nvGrpSpPr') ? { name: nameOf(node, 'nvGrpSpPr') as string } : {}),
+    ...(xfrm?.flipX ? { flipX: true } : {}),
+    ...(xfrm?.flipY ? { flipY: true } : {}),
   };
+}
+
+/**
+ * Scale an element and everything below it by (sx, sy).
+ *
+ * Group children are stored relative to the group origin, so scaling the box and the descendants
+ * together keeps the layout consistent; line `points` are relative offsets and must scale too.
+ */
+function scaleSubtree(element: SlideElement, sx: number, sy: number): SlideElement {
+  const next = { ...element } as SlideElement;
+  next.x = element.x * sx;
+  next.y = element.y * sy;
+  next.width = element.width * sx;
+  next.height = element.height * sy;
+  if (next.type === 'line') {
+    next.points = next.points.map((value, index) => (index % 2 === 0 ? value * sx : value * sy));
+  } else if (next.type === 'group') {
+    next.children = next.children.map((child) => scaleSubtree(child, sx, sy));
+  }
+  return next;
 }
 
 /**
@@ -1029,6 +1133,8 @@ async function parseLayoutPart(
   const layout: SlideLayout = { id: layoutPart, masterId: '', elements: [] };
   const placeholders = new Map<string, { x: number; y: number; width: number; height: number }>();
   const rels = await readRels(ctx.zip, layoutPart);
+  // Hyperlinks inside layout elements resolve against the layout's own rels
+  ctx.rels = rels;
   if (!layoutXml) return { layout, placeholders };
   const masterRel = [...rels.values()].find((rel) => rel.type.endsWith('/slideMaster'));
   if (masterRel) layout.masterId = normalizePartPath(layoutPart, masterRel.target);
@@ -1075,6 +1181,8 @@ async function parseMasterPart(
   if (!masterXml) return { master, placeholders };
 
   const rels = await readRels(ctx.zip, masterPart);
+  // Hyperlinks inside master elements resolve against the master's own rels
+  ctx.rels = rels;
   const cSld = childOf(masterXml, 'cSld');
   const spTree = childOf(cSld, 'spTree');
   for (const node of childrenOf(spTree)) {
@@ -1152,6 +1260,7 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
     layoutPlaceholders: new Map(),
     shapeIdMap: new Map(),
     connectorRefs: [],
+    rels: new Map(),
   };
   /** 未能还原的切换/动画（`p:timing` 子集之外的效果），交给保真报告 */
   const unsupportedMotion: string[] = [];
@@ -1203,6 +1312,8 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
     // `cNvPr@id` restarts at 1 on every slide, so the spid map must be per-slide; a stale entry
     // from the previous slide would resolve `p:timing` to the wrong element.
     ctx.shapeIdMap.clear();
+    // Layout/master parsing sets ctx.rels to its own part; restore the slide's rels for hyperlinks
+    ctx.rels = rels;
     const elements = await parseSpTree(spTree as XmlNode, ctx, slidePart, rels, palette, theme);
     const bgNode = findBackgroundNode(slideXml);
     const background =
@@ -1247,4 +1358,4 @@ function findBackgroundNode(slide: XmlNode): XmlNode | undefined {
 }
 
 /** Expose internals for external use (tests/export) */
-export const __internals = { pxToEmu };
+export const __internals = { pxToEmu, scaleSubtree };
