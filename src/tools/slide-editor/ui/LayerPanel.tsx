@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import type { SlideElement } from '../model/types';
 import { containerElements, useSlideStore } from '../store';
 import { Section } from './controls';
+import { elementLabel } from './elementLabel';
 
 /**
  * Layer panel (equivalent to PowerPoint's "Selection Pane").
@@ -10,38 +10,6 @@ import { Section } from './controls';
  * deliberately light: no drag-to-reorder and no group tree, only select / show-hide / lock / move up
  * and down, enough for the everyday "I can't find the element underneath" case.
  */
-
-/**
- * Layer row title: prefer the element's own content (text, chart title, formula source),
- * and fall back to the element type's name used in the toolbar.
- */
-function elementLabel(element: SlideElement, t: (key: string) => string): string {
-  if (element.type === 'text' || element.type === 'shape') {
-    const text = element.body?.paragraphs
-      .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-      .join(' ')
-      .trim();
-    if (text) return text.length > 18 ? `${text.slice(0, 18)}…` : text;
-  }
-  if (element.type === 'image') return t('tools.slide.insertImage');
-  if (element.type === 'table') return t('tools.slide.insertTable');
-  if (element.type === 'group') return t('tools.slide.group');
-  if (element.type === 'line') return t('tools.slide.insertLine');
-  if (element.type === 'placeholder') return element.label;
-  // Charts/formulas/icons used to fall into the "text box" fallback, inconsistent with the toolbar naming
-  if (element.type === 'chart') {
-    const title = element.title?.trim();
-    return title || t('tools.slide.insertChart');
-  }
-  if (element.type === 'formula') {
-    const latex = element.latex.trim();
-    return latex
-      ? `${t('tools.slide.insertFormula')}: ${latex.length > 14 ? `${latex.slice(0, 14)}…` : latex}`
-      : t('tools.slide.insertFormula');
-  }
-  if (element.type === 'icon') return t('tools.slide.insertIcon');
-  return t('tools.slide.insertText');
-}
 
 export function LayerPanel() {
   const { t } = useTranslation();

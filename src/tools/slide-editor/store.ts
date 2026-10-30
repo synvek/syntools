@@ -47,6 +47,7 @@ import {
   patchElementsDeep,
   removeElementsDeep,
 } from './model/tree';
+import { pruneAnimations } from './model/animation';
 import type {
   ConnectorEnd,
   Fill,
@@ -152,7 +153,9 @@ interface SlideState {
   duplicateSlide: (index: number) => void;
   removeSlide: (index: number) => void;
   moveSlide: (from: number, to: number) => void;
-  updateSlide: (patch: Partial<Pick<Slide, 'background' | 'layoutId' | 'notes'>>) => void;
+  updateSlide: (
+    patch: Partial<Pick<Slide, 'background' | 'layoutId' | 'notes' | 'transition' | 'animations'>>,
+  ) => void;
 
   select: (ids: string[], additive?: boolean) => void;
   addElement: (element: SlideElement) => void;
@@ -960,9 +963,17 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     get().commit();
     set((s) => {
       if (s.selection.length === 0) return s;
+      // Deleting inside an entered group removes the child, not the group
+      const doc = writeContainerElements(s, (current) => removeElementsDeep(current, s.selection));
+      // 元素没了，它的动画也要走：留下悬空步骤会让放映时静默跳过一拍
+      const slides = doc.slides.map((slide) => {
+        if (!slide.animations?.length) return slide;
+        const ids = new Set(flattenElements(slide.elements).map((element) => element.id));
+        const animations = pruneAnimations(slide.animations, ids);
+        return animations.length === slide.animations.length ? slide : { ...slide, animations };
+      });
       return {
-        // Deleting inside an entered group removes the child, not the group
-        doc: writeContainerElements(s, (current) => removeElementsDeep(current, s.selection)),
+        doc: { ...doc, slides },
         selection: [],
         pathEditId: null,
         activePathNode: null,

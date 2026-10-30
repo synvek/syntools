@@ -52,6 +52,7 @@ import { countUnresolved } from '../../core/comments/model';
 import { FindReplaceBar } from './ui/FindReplaceBar';
 import { CommentPanel } from './ui/CommentPanel';
 import { LayerPanel } from './ui/LayerPanel';
+import { AnimationPanel } from './ui/AnimationPanel';
 import { MasterView } from './ui/MasterView';
 import { PresentOverlay } from './ui/PresentOverlay';
 import { PrintDialog } from './ui/PrintDialog';
@@ -122,7 +123,7 @@ export default function SlideTool() {
   const [presenting, setPresenting] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [rightTab, setRightTab] = useState<
-    'element' | 'layers' | 'theme' | 'template' | 'comments'
+    'element' | 'layers' | 'theme' | 'template' | 'comments' | 'animation'
   >('element');
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -865,28 +866,32 @@ export default function SlideTool() {
 
           <aside className="flex w-[248px] shrink-0 flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/40">
             <div className="flex gap-1">
-              {(['element', 'layers', 'theme', 'template', 'comments'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setRightTab(tab)}
-                  className={`h-7 flex-1 rounded-md text-[12px] transition-colors ${
-                    rightTab === tab
-                      ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-900 dark:text-blue-300'
-                      : 'text-gray-500 hover:bg-white/60 dark:text-gray-400 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {tab === 'element'
-                    ? t('tools.slide.panelElement')
-                    : tab === 'layers'
-                      ? t('tools.slide.panelLayers')
-                      : tab === 'theme'
-                        ? t('tools.slide.panelTheme')
-                        : tab === 'template'
-                          ? t('tools.slide.panelTemplate')
-                          : t('tools.slide.panelComments')}
-                </button>
-              ))}
+              {(['element', 'layers', 'theme', 'template', 'comments', 'animation'] as const).map(
+                (tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setRightTab(tab)}
+                    className={`h-7 flex-1 rounded-md text-[12px] transition-colors ${
+                      rightTab === tab
+                        ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-900 dark:text-blue-300'
+                        : 'text-gray-500 hover:bg-white/60 dark:text-gray-400 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {tab === 'element'
+                      ? t('tools.slide.panelElement')
+                      : tab === 'layers'
+                        ? t('tools.slide.panelLayers')
+                        : tab === 'theme'
+                          ? t('tools.slide.panelTheme')
+                          : tab === 'template'
+                            ? t('tools.slide.panelTemplate')
+                            : tab === 'comments'
+                              ? t('tools.slide.panelComments')
+                              : t('tools.slide.panelAnimation')}
+                  </button>
+                ),
+              )}
             </div>
             {rightTab === 'element' ? (
               <PropertyPanel />
@@ -896,8 +901,10 @@ export default function SlideTool() {
               <ThemePanel />
             ) : rightTab === 'template' ? (
               <TemplateGallery />
-            ) : (
+            ) : rightTab === 'comments' ? (
               <CommentPanel />
+            ) : (
+              <AnimationPanel />
             )}
           </aside>
         </div>

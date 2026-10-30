@@ -2,6 +2,7 @@ import Konva from 'konva';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
+import { advancePlayback, entranceByElement, FLY_OFFSET } from '../model/animation';
 import { backgroundFillProps } from '../render/background';
 import { createElementNode } from '../render/nodes';
 import { useSlideStore } from '../store';
@@ -32,6 +33,12 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const layerRef = useRef<Konva.Layer | null>(null);
   const laserRef = useRef<Konva.Circle | null>(null);
+  /** 本页已经播完的动画组数（每次换页归零） */
+  const playedRef = useRef(0);
+  /** 元素 id → 节点/原始位置：播放动画时要把节点 tween 回原位 */
+  const nodesRef = useRef(new Map<string, Konva.Node>());
+  const originsRef = useRef(new Map<string, { x: number; y: number }>());
+  const tweensRef = useRef<Konva.Tween[]>([]);
 
   // Kept in a ref so the fullscreen listeners below never need to re-subscribe.
   const onCloseRef = useRef(onClose);
@@ -112,6 +119,12 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
     const height = host.clientHeight;
     if (width <= 0 || height <= 0) return;
 
+    // 重画会换掉节点：旧 tween 必须先销毁，否则它会继续改一个已经没人引用的节点
+    for (const tween of tweensRef.current) tween.destroy();
+    tweensRef.current = [];
+    nodesRef.current.clear();
+    originsRef.current.clear();
+
     const scale = Math.min(width / doc.width, height / doc.height);
     layer.destroyChildren();
     layer.scale({ x: scale, y: scale });
@@ -124,6 +137,9 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
         ...backgroundFillProps(slide.background, doc.width, doc.height),
       }),
     );
+
+    // 还没轮到出场的元素先藏起来：透明；飞入的再挪到起点（单击后 tween 回原位）
+    const entrance = entranceByElement(slide.animations ?? []);
     for (const element of slide.elements) {
       if (element.visible === false) continue;
       const node = createElementNode(element, {
@@ -131,6 +147,14 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
         onImageReady: () => layer.batchDraw(),
       });
       node.listening(false);
+      const origin = { x: node.x(), y: node.y() };
+      originsRef.current.set(element.id, origin);
+      nodesRef.current.set(element.id, node);
+      const pending = entrance.get(element.id);
+      if (pending && pending.group >= playedRef.current) {
+        node.opacity(0);
+        if (pending.effect === 'flyIn') node.x(origin.x - FLY_OFFSET);
+      }
       layer.add(node);
     }
 
@@ -194,16 +218,73 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
     draw();
   }, [draw]);
 
+  // 换页后动画从"一个都没播"开始（声明在 draw 之前，保证先归零再画）
+  useEffect(() => {
+    playedRef.current = 0;
+  }, [cursor]);
+
+  /**
+   * 页面切换：draw 之后再把整层淡入/推入。
+   * 首次进入放映不播切换（PowerPoint 也不播第一页的"进入"效果）。
+   */
+  const firstCursorRef = useRef(true);
+  useEffect(() => {
+    if (firstCursorRef.current) {
+      firstCursorRef.current = false;
+      return;
+    }
+    const layer = layerRef.current;
+    const transition = doc.slides[cursor]?.transition;
+    if (!layer || !transition) return;
+    const offset = transition.type === 'push' ? FLY_OFFSET * 2 : 0;
+    if (offset > 0) layer.x(layer.x() + offset);
+    layer.opacity(0);
+    const tween = new Konva.Tween({
+      node: layer,
+      duration: Math.max(0.1, transition.duration / 1000),
+      opacity: 1,
+      x: layer.x() - offset,
+      easing: Konva.Easings.EaseOut,
+    });
+    tweensRef.current.push(tween);
+    tween.play();
+  }, [cursor, doc.slides]);
+
   useEffect(() => {
     selectSlide(cursor);
   }, [cursor, selectSlide]);
 
   /* ------------------------------- Interactions ------------------------------- */
 
-  const next = useCallback(
-    () => setCursor((current) => Math.min(doc.slides.length - 1, current + 1)),
-    [doc.slides.length],
-  );
+  /**
+   * 单击/→：先播完本页剩下的动画组，全部播完才翻页。
+   * 播放顺序与时长全部来自 `advancePlayback`（纯函数，单测覆盖），这里只负责 tween。
+   */
+  const next = useCallback(() => {
+    const action = advancePlayback(doc.slides[cursor]?.animations ?? [], playedRef.current);
+    if (action.kind === 'nextSlide') {
+      setCursor((current) => Math.min(doc.slides.length - 1, current + 1));
+      return;
+    }
+    playedRef.current = action.groupIndex + 1;
+    for (const { step, start } of action.steps) {
+      const node = nodesRef.current.get(step.elementId);
+      const origin = originsRef.current.get(step.elementId);
+      if (!node || !origin) continue;
+      const tween = new Konva.Tween({
+        node,
+        duration: Math.max(0.05, step.duration / 1000),
+        delay: Math.max(0, start / 1000),
+        opacity: 1,
+        x: origin.x,
+        y: origin.y,
+        easing: Konva.Easings.EaseOut,
+      });
+      tweensRef.current.push(tween);
+      tween.play();
+    }
+  }, [cursor, doc.slides]);
+
   const prev = useCallback(() => setCursor((current) => Math.max(0, current - 1)), []);
 
   useEffect(() => {

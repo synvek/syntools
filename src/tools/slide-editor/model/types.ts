@@ -362,6 +362,33 @@ export type SlideElement =
   | FormulaElement
   | IconElement;
 
+/** 页面切换效果（P2-5）：只做淡出/推入，其余在导入时降级为"无"并进保真提示 */
+export type SlideTransitionType = 'none' | 'fade' | 'push';
+
+export interface SlideTransition {
+  type: SlideTransitionType;
+  /** ms */
+  duration: number;
+  advanceOnClick: boolean;
+}
+
+/** 入场效果：只做淡入/飞入，避免"模型说有、播放不出来" */
+export type AnimationEffect = 'fadeIn' | 'flyIn';
+
+/** 触发方式：单击 / 与上一动画同时 / 上一动画之后 */
+export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious';
+
+export interface AnimationStep {
+  id: string;
+  elementId: string;
+  effect: AnimationEffect;
+  /** 动画本身时长（ms） */
+  duration: number;
+  /** 相对触发点的延迟（ms） */
+  delay: number;
+  trigger: AnimationTrigger;
+}
+
 export interface Slide {
   id: string;
   layoutId?: string;
@@ -369,6 +396,10 @@ export interface Slide {
   background?: SlideBackground;
   elements: SlideElement[];
   notes?: string;
+  /** 页面切换；缺省表示无切换 */
+  transition?: SlideTransition;
+  /** 入场动画，按顺序播放（顺序即动画窗格里的次序） */
+  animations?: AnimationStep[];
 }
 
 export interface SlideLayout {

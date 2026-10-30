@@ -1,4 +1,5 @@
 import { normalizeBackground } from '../core';
+import { normalizeAnimationSteps, normalizeTransition } from './animation';
 import { SCHEMA_VERSION } from './factory';
 import type {
   Slide,
@@ -48,10 +49,16 @@ function migrateElements(elements: SlideElement[] | undefined): SlideElement[] {
 }
 
 function migrateSlide(slide: Slide): Slide {
+  // v4：动画/切换是纯可选字段；这里把 null、非法效果、越界时长一并清掉，
+  // 免得播放层拿到 `duration: NaN` 后 tween 永远不结束。
+  const transition = normalizeTransition(slide.transition);
+  const animations = normalizeAnimationSteps(slide.animations);
   return {
     ...slide,
     background: migrateBackground(slide.background),
     elements: migrateElements(slide.elements),
+    ...(transition ? { transition } : { transition: undefined }),
+    ...(animations.length > 0 ? { animations } : { animations: undefined }),
   };
 }
 

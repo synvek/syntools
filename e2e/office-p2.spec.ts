@@ -549,3 +549,38 @@ test('spreadsheet: pivot printing paginates wide headers instead of clipping the
   // 最后一列仍然出现在某页里：宽表是拆页，不是裁掉右边
   await expect(popup.locator('body')).toContainText('Q29');
 });
+
+test('slide: entrance animation plays before the slide advances', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+
+  await page.goto('/tools/slide-editor');
+  await expect(page.getByLabel('slide canvas')).toBeVisible();
+
+  // 1) 插入一个文本框（自动选中），再给它加「飞入」
+  await page.getByRole('button', { name: '文本框' }).click();
+  await expect(page.getByText('已选中 1 个元素')).toBeVisible();
+  await page.getByRole('button', { name: '动画', exact: true }).click();
+  await page.getByRole('button', { name: '飞入' }).click();
+  await expect(page.getByRole('list', { name: '入场动画' }).getByRole('listitem')).toHaveCount(1);
+
+  // 2) 第二页：动画必须"先播完再翻页"，所以需要一页对照
+  await page.getByRole('button', { name: '新建幻灯片' }).click();
+  await expect(page.getByText(/页数: 2 · 2\/2/)).toBeVisible();
+  // 新建后停在第 2 页，点缩略图回到带动画的第 1 页
+  await page.locator('.slide-thumb').first().click();
+  await expect(page.getByText(/页数: 2 · 1\/2/)).toBeVisible();
+
+  // 3) 放映：第一次推进只播动画，第二次才换页
+  await page.getByRole('button', { name: '放映', exact: true }).click();
+  await expect(page.getByText('1 / 2')).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByText('1 / 2')).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByText('2 / 2')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '放映', exact: true })).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
