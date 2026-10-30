@@ -39,9 +39,13 @@ const zh: ResourceTree = {
       pivotSkipped: '{{count}} 个非数值单元格未参与{{aggregation}}',
       pivotRemove: '删除透视表',
       pivotClose: '关闭',
+      pivotInsertDoc: '插入到文档',
+      pivotUpdateDoc: '更新文档中的透视表',
       pivotExportXlsx: '连同透视表导出 xlsx',
       pivotPrint: '打印透视表',
       pivotSnapshot: '透视表以静态值导出，在 Excel 中不可刷新',
+      pivotNative:
+        '导出为原生透视表，可在 Excel 中继续拖字段、刷新；多级列头、筛选或超过 5 万单元格时退回静态值',
     },
   },
 };
@@ -71,9 +75,13 @@ const en: ResourceTree = {
       pivotSkipped: '{{count}} non-numeric cells were skipped for {{aggregation}}',
       pivotRemove: 'Remove pivot table',
       pivotClose: 'Close',
+      pivotInsertDoc: 'Insert into document',
+      pivotUpdateDoc: 'Update pivot in document',
       pivotExportXlsx: 'Export xlsx with this pivot',
       pivotPrint: 'Print pivot table',
       pivotSnapshot: 'The pivot is exported as static values and cannot be refreshed in Excel',
+      pivotNative:
+        'Exported as a native pivot table you can keep refreshing in Excel; multi-level columns, filters or sources over 50k cells fall back to static values',
     },
   },
 };
@@ -103,9 +111,13 @@ const zhTW: ResourceTree = {
       pivotSkipped: '{{count}} 個非數值儲存格未參與{{aggregation}}',
       pivotRemove: '刪除樞紐分析表',
       pivotClose: '關閉',
+      pivotInsertDoc: '插入到文件',
+      pivotUpdateDoc: '更新文件中的樞紐分析表',
       pivotExportXlsx: '連同樞紐分析表匯出 xlsx',
       pivotPrint: '列印樞紐分析表',
       pivotSnapshot: '樞紐分析表以靜態值匯出，在 Excel 中無法重新整理',
+      pivotNative:
+        '匯出為原生樞紐分析表，可在 Excel 中繼續拖曳欄位、重新整理；多層欄標題、篩選或超過 5 萬儲存格時改為靜態值',
     },
   },
 };
@@ -136,9 +148,13 @@ const ja: ResourceTree = {
       pivotSkipped: '{{count}} 個の非数値セルは{{aggregation}}に含まれていません',
       pivotRemove: 'ピボットテーブルを削除',
       pivotClose: '閉じる',
+      pivotInsertDoc: 'ドキュメントに挿入',
+      pivotUpdateDoc: 'ドキュメント内のピボットを更新',
       pivotExportXlsx: 'ピボット付きで xlsx を書き出す',
       pivotPrint: 'ピボットテーブルを印刷',
       pivotSnapshot: 'ピボットは静的な値として書き出されるため、Excel で更新できません',
+      pivotNative:
+        'Excel でそのまま更新できるネイティブなピボットとして書き出します。列が多階層・フィルターあり・5 万セル超の場合は静的値になります',
     },
   },
 };
@@ -171,10 +187,14 @@ const fr: ResourceTree = {
       pivotSkipped: '{{count}} cellules non numériques ignorées pour {{aggregation}}',
       pivotRemove: 'Supprimer le tableau croisé',
       pivotClose: 'Fermer',
+      pivotInsertDoc: 'Insérer dans le document',
+      pivotUpdateDoc: 'Mettre à jour le tableau dans le document',
       pivotExportXlsx: 'Exporter le xlsx avec ce tableau',
       pivotPrint: 'Imprimer le tableau croisé',
       pivotSnapshot:
         'Le tableau est exporté en valeurs statiques et ne peut pas être actualisé dans Excel',
+      pivotNative:
+        'Exporté comme tableau croisé natif, actualisable dans Excel ; les colonnes à plusieurs niveaux, les filtres ou plus de 50 000 cellules reviennent à des valeurs statiques',
     },
   },
 };
@@ -206,10 +226,14 @@ const de: ResourceTree = {
       pivotSkipped: '{{count}} nicht numerische Zellen wurden für {{aggregation}} übersprungen',
       pivotRemove: 'Pivot-Tabelle entfernen',
       pivotClose: 'Schließen',
+      pivotInsertDoc: 'Ins Dokument einfügen',
+      pivotUpdateDoc: 'Pivot-Tabelle im Dokument aktualisieren',
       pivotExportXlsx: 'xlsx mit dieser Pivot-Tabelle exportieren',
       pivotPrint: 'Pivot-Tabelle drucken',
       pivotSnapshot:
         'Die Pivot-Tabelle wird als statische Werte exportiert und lässt sich in Excel nicht aktualisieren',
+      pivotNative:
+        'Wird als native Pivot-Tabelle exportiert und bleibt in Excel aktualisierbar; bei mehrstufigen Spalten, Filtern oder über 50 000 Zellen statische Werte',
     },
   },
 };
@@ -242,9 +266,13 @@ const it: ResourceTree = {
       pivotSkipped: '{{count}} celle non numeriche escluse da {{aggregation}}',
       pivotRemove: 'Rimuovi tabella pivot',
       pivotClose: 'Chiudi',
+      pivotInsertDoc: 'Inserisci nel documento',
+      pivotUpdateDoc: 'Aggiorna la tabella nel documento',
       pivotExportXlsx: 'Esporta xlsx con la tabella pivot',
       pivotPrint: 'Stampa la tabella pivot',
       pivotSnapshot: 'La tabella viene esportata come valori statici e non è aggiornabile in Excel',
+      pivotNative:
+        'Esportata come tabella pivot nativa, aggiornabile in Excel; con colonne a più livelli, filtri o oltre 50.000 celle torna a valori statici',
     },
   },
 };
@@ -275,9 +303,13 @@ const es: ResourceTree = {
       pivotSkipped: '{{count}} celdas no numéricas se omitieron en {{aggregation}}',
       pivotRemove: 'Eliminar tabla dinámica',
       pivotClose: 'Cerrar',
+      pivotInsertDoc: 'Insertar en el documento',
+      pivotUpdateDoc: 'Actualizar la tabla en el documento',
       pivotExportXlsx: 'Exportar xlsx con esta tabla',
       pivotPrint: 'Imprimir la tabla dinámica',
       pivotSnapshot: 'La tabla se exporta como valores estáticos y no se puede actualizar en Excel',
+      pivotNative:
+        'Se exporta como tabla dinámica nativa y se puede actualizar en Excel; con columnas de varios niveles, filtros o más de 50.000 celdas vuelve a valores estáticos',
     },
   },
 };
@@ -310,10 +342,14 @@ const pt: ResourceTree = {
       pivotSkipped: '{{count}} células não numéricas foram ignoradas em {{aggregation}}',
       pivotRemove: 'Remover tabela dinâmica',
       pivotClose: 'Fechar',
+      pivotInsertDoc: 'Inserir no documento',
+      pivotUpdateDoc: 'Atualizar a tabela no documento',
       pivotExportXlsx: 'Exportar xlsx com esta tabela',
       pivotPrint: 'Imprimir a tabela dinâmica',
       pivotSnapshot:
         'A tabela é exportada como valores estáticos e não pode ser atualizada no Excel',
+      pivotNative:
+        'Exportada como tabela dinâmica nativa, atualizável no Excel; com colunas multinível, filtros ou mais de 50.000 células volta a valores estáticos',
     },
   },
 };

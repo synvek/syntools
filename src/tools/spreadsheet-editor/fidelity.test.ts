@@ -1,6 +1,8 @@
 import type { ConditionalFormattingOptions, DataValidation } from 'exceljs';
 import { describe, expect, it } from 'vitest';
 import { collectExportIssues } from './fidelity';
+import { appendPivotSheets } from './pivotSheet';
+import { buildPivotXlsxPlan } from './pivotXlsx';
 import { createEmptySnapshot } from './xlsx-io';
 
 /** Workbook export fidelity: charts and preserved native features */
@@ -73,7 +75,7 @@ describe('collectExportIssues', () => {
 });
 
 describe('collectExportIssues: pivot', () => {
-  it('warns that an exported pivot is a static value sheet (not refreshable)', () => {
+  it('warns when a pivot has to fall back to a static value sheet', () => {
     const snapshot = {
       ...createEmptySnapshot('book'),
       syntoolsPivots: [
@@ -97,6 +99,39 @@ describe('collectExportIssues: pivot', () => {
       count: 1,
       messageKey: 'tools.sheet.pivotSnapshot',
     });
+  });
+
+  it('stays quiet when the pivot goes out as a native, refreshable part', () => {
+    const base = createEmptySnapshot('book');
+    const sheetId = base.sheetOrder[0];
+    [
+      ['区域', '季度', '金额'],
+      ['华东', 'Q1', 100],
+      ['华南', 'Q1', 30],
+    ].forEach((row, rowIndex) => {
+      base.sheets[sheetId].cellData[String(rowIndex)] = {};
+      row.forEach((value, column) => {
+        base.sheets[sheetId].cellData[String(rowIndex)][String(column)] = {
+          v: value as string | number,
+        };
+      });
+    });
+    const config = {
+      id: 'pivot-1',
+      name: '透视表',
+      sheetId,
+      range: { startRow: 0, startColumn: 0, endRow: 2, endColumn: 2 },
+      rows: [0],
+      cols: [1],
+      values: [{ column: 2, aggregation: 'sum' as const }],
+      filters: {},
+      hasHeader: true,
+    };
+    const snapshot = appendPivotSheets({ ...base, syntoolsPivots: [config] }, [config], '(空白)');
+    expect(buildPivotXlsxPlan(snapshot).items).toHaveLength(1);
+    expect(
+      collectExportIssues(snapshot).some((issue) => issue.code === 'sheet.pivotSnapshot'),
+    ).toBe(false);
   });
 });
 

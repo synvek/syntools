@@ -1,5 +1,6 @@
 import type { FidelityIssue } from '@/core/fidelity';
 import { buildChartPlan } from './chartXml';
+import { buildPivotXlsxPlan } from './pivotXlsx';
 import { countUnsupportedValidation } from './cfdv';
 import { countSheetComments, readSheetComments } from './comments';
 import { countExtras, readWorkbookExtras } from './xlsx-extras';
@@ -38,15 +39,19 @@ export function collectExportIssues(snapshot: WorkbookSnapshot): FidelityIssue[]
     }
   }
 
-  // 透视表以静态值导出：数值可用，但 Excel 里刷新不了，必须让用户知道
+  // 透视表：能写成原生 part 的保持可刷新；只有退回静态值的那些需要告警（数值可用但刷新不了）
   const pivots = snapshot.syntoolsPivots ?? [];
   if (pivots.length > 0) {
-    issues.push({
-      code: 'sheet.pivotSnapshot',
-      severity: 'warning',
-      count: pivots.length,
-      messageKey: 'tools.sheet.pivotSnapshot',
-    });
+    const native = buildPivotXlsxPlan(snapshot).items.length;
+    const fallback = Math.max(0, pivots.length - native);
+    if (fallback > 0) {
+      issues.push({
+        code: 'sheet.pivotSnapshot',
+        severity: 'warning',
+        count: fallback,
+        messageKey: 'tools.sheet.pivotSnapshot',
+      });
+    }
   }
 
   const counts = countExtras(readWorkbookExtras(snapshot));

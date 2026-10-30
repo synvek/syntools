@@ -55,6 +55,13 @@ export interface PivotConfig {
   filters: Record<number, string[]>;
   /** 首行是否为字段名 */
   hasHeader: boolean;
+  /**
+   * 已经插入到文档里的透视结果工作表 id。
+   *
+   * 面板「插入到文档」写一次值并记下这张表；之后再点就是更新它（不新增副本），
+   * 导出也复用这张表（不重复追加工作表，原生 `pivotTable` part 直接挂在它上面）。
+   */
+  outputSheetId?: string;
 }
 
 export interface PivotKey {

@@ -39,6 +39,7 @@ import type { ChartConfig } from './charts';
 import type { PivotConfig } from './pivot';
 import type { SheetCommentMap } from './comments';
 import { buildChartPlan, injectChartsIntoXlsx } from './chartXml';
+import { buildPivotXlsxPlan, injectPivotTablesIntoXlsx } from './pivotXlsx';
 import { collectEditorValidation } from './cfdv';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
 
@@ -119,10 +120,16 @@ export interface WorkbookSnapshot extends SnapshotWithExtras {
   /** Cell comment threads (P1-2); app-side only, reported as a fidelity warning on export */
   syntoolsComments?: SheetCommentMap;
   /**
-   * Pivot table configs (P2-4): an analysis view over a source range. App-side only —
-   * export writes the result as a value sheet and reports "not refreshable".
+   * Pivot table configs (P2-4): an analysis view over a source range. App-side only.
+   * Export writes the result as a value sheet and, when the shape allows it, injects native
+   * `pivotTable` / `pivotCacheDefinition` parts so the table stays refreshable in Excel.
    */
   syntoolsPivots?: PivotConfig[];
+  /**
+   * 透视结果工作表 → 生成它的配置 id（导出时用来注入原生透视表 part）。
+   * 只在导出的临时快照上出现，不持久化。
+   */
+  syntoolsPivotSheets?: { sheetId: string; configId: string }[];
   /**
    * Univer plugin resources: `resources[pluginName][unitId][sheetId]` carries the rules created in
    * the editor (conditional formatting, data validation). Converted to OOXML on export by `cfdv.ts`.
@@ -543,7 +550,14 @@ export async function exportSnapshotToBytes(
     // Charts: in-app charts become native Excel charts (DrawingML); native charts kept from import are written back verbatim
     const plan = buildChartPlan(snapshot);
     const needsInjection = Object.keys(plan.chartsBySheet).length > 0 || plan.passthrough !== null;
-    const bytes = needsInjection ? await injectChartsIntoXlsx(buffer, plan) : buffer;
+    const withCharts = needsInjection ? await injectChartsIntoXlsx(buffer, plan) : buffer;
+
+    // Pivots: value sheets plus native pivotTable/pivotCache parts, so Excel can still refresh them
+    const pivotPlan = buildPivotXlsxPlan(snapshot);
+    const bytes =
+      pivotPlan.items.length > 0
+        ? await injectPivotTablesIntoXlsx(withCharts, pivotPlan)
+        : withCharts;
     return { ok: true, value: new Uint8Array(bytes) };
   } catch {
     return { ok: false, error: 'EXPORT_FAILED' };

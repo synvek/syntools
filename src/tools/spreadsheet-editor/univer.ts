@@ -5,6 +5,7 @@ import {
   UndoCommandId,
   Univer,
   mergeLocales,
+  type ICellData,
   type IWorkbookData,
 } from '@univerjs/core';
 import { FUniver } from '@univerjs/core/facade';
@@ -102,6 +103,9 @@ export interface SheetInfo {
   tabColor?: string;
 }
 
+/** 写进单元格的值：空串在 Univer 里应该写成 null，否则会留下"有内容的空单元格" */
+export type SheetCellValue = string | number | null;
+
 export interface UniverHandle {
   loadSnapshot(snapshot: WorkbookSnapshot): void;
   getSnapshot(): WorkbookSnapshot;
@@ -127,6 +131,20 @@ export interface UniverHandle {
   } | null;
   /** Append a new sheet at the end; leave the name out to let Univer generate one */
   addSheet(name?: string): void;
+  /**
+   * 追加一张带数据的工作表（值从 A1 开始铺），返回新表 id。
+   * 透视表「插入到文档」用它把结果矩阵落成真实工作表。
+   */
+  insertSheetWithValues(name: string, values: SheetCellValue[][]): string | null;
+  /**
+   * 用值矩阵覆盖某张表（从 A1 开始）。`clear` 先按旧范围清空——
+   * 重新计算后行列可能变少，不清就会留下上一版的尾巴。
+   */
+  writeSheetValues(
+    sheetId: string,
+    values: SheetCellValue[][],
+    clear?: { rows: number; columns: number },
+  ): boolean;
   /** Delete a sheet (at least one is kept; deleting the last one is a no-op) */
   deleteSheet(id: string): void;
   /** Rename a sheet */
@@ -303,6 +321,36 @@ export function createUniverInstance(
     univerAPI.getActiveWorkbook()?.insertSheet(name);
   };
 
+  /** 空串 → `{ v: null }`：Univer 里空串是"有值的空单元格"，会让已用范围判断变脏 */
+  const toCellMatrix = (values: SheetCellValue[][]): ICellData[][] =>
+    values.map((row) => row.map((value) => ({ v: value === '' ? null : value })));
+
+  const writeSheetValues = (
+    sheetId: string,
+    values: SheetCellValue[][],
+    clear?: { rows: number; columns: number },
+  ): boolean => {
+    const sheet = univerAPI.getActiveWorkbook()?.getSheetBySheetId(sheetId);
+    if (!sheet || values.length === 0 || !values[0]?.length) return false;
+    if (clear && clear.rows > 0 && clear.columns > 0) {
+      sheet.getRange(0, 0, clear.rows, clear.columns).clear();
+    }
+    sheet.getRange(0, 0, values.length, values[0].length).setValues(toCellMatrix(values));
+    return true;
+  };
+
+  const insertSheetWithValues = (name: string, values: SheetCellValue[][]): string | null => {
+    const workbook = univerAPI.getActiveWorkbook();
+    if (!workbook) return null;
+    const sheet = workbook.insertSheet(name);
+    const id = sheet?.getSheetId();
+    if (!id) return null;
+    if (values.length > 0 && values[0]?.length > 0) {
+      sheet.getRange(0, 0, values.length, values[0].length).setValues(toCellMatrix(values));
+    }
+    return id;
+  };
+
   const deleteSheet = (id: string): void => {
     const workbook = univerAPI.getActiveWorkbook();
     if (!workbook || workbook.getNumSheets() <= 1) return;
@@ -341,6 +389,8 @@ export function createUniverInstance(
     undo,
     redo,
     addSheet,
+    insertSheetWithValues,
+    writeSheetValues,
     deleteSheet,
     renameSheet,
     duplicateSheet,

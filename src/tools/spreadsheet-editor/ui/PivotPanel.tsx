@@ -28,6 +28,10 @@ interface PivotPanelProps {
   onRefresh: () => void;
   onRemove: () => void;
   onClose: () => void;
+  /** 把结果落成文档里的一张真实工作表（第一次插入，之后是更新） */
+  onInsert: () => void;
+  /** 文档里已经有这张透视结果表：按钮变成「更新」 */
+  inserted: boolean;
   onExport: () => void;
   onPrint: () => void;
 }
@@ -59,6 +63,8 @@ export function PivotPanel({
   onRefresh,
   onRemove,
   onClose,
+  onInsert,
+  inserted,
   onExport,
   onPrint,
 }: PivotPanelProps) {
@@ -451,14 +457,22 @@ export function PivotPanel({
         <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 px-4 py-2 dark:border-gray-700">
           <button
             type="button"
-            onClick={onExport}
+            onClick={onInsert}
             disabled={empty || !result || result.rowKeys.length === 0}
             className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {inserted ? t('tools.sheet.pivotUpdateDoc') : t('tools.sheet.pivotInsertDoc')}
+          </button>
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={empty || !result || result.rowKeys.length === 0}
+            className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
           >
             {t('tools.sheet.pivotExportXlsx')}
           </button>
           <span className="text-[11px] text-gray-500 dark:text-gray-400">
-            {t('tools.sheet.pivotSnapshot')}
+            {t('tools.sheet.pivotNative')}
           </span>
           <button
             type="button"

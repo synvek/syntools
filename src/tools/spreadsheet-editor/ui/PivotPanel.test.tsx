@@ -46,7 +46,11 @@ function configOf(overrides: Partial<PivotConfig> = {}): PivotConfig {
   };
 }
 
-function renderPanel(overrides: Partial<PivotConfig> = {}, rows: unknown[][] = SALES) {
+function renderPanel(
+  overrides: Partial<PivotConfig> = {},
+  rows: unknown[][] = SALES,
+  inserted = false,
+) {
   const config = configOf(overrides);
   const snapshot = snapshotOf(rows);
   const source = readPivotSource(snapshot, config);
@@ -57,6 +61,8 @@ function renderPanel(overrides: Partial<PivotConfig> = {}, rows: unknown[][] = S
     onRefresh: vi.fn(),
     onRemove: vi.fn(),
     onClose: vi.fn(),
+    onInsert: vi.fn(),
+    inserted,
     onExport: vi.fn(),
     onPrint: vi.fn(),
   };
@@ -124,6 +130,21 @@ describe('PivotPanel', () => {
     renderPanel({}, [['区域', '季度', '金额']]);
     expect(screen.getByText('tools.sheet.pivotEmpty')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'tools.sheet.pivotExportXlsx' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'tools.sheet.pivotInsertDoc' })).toBeDisabled();
+  });
+
+  it('inserts the pivot into the document', () => {
+    const { onInsert } = renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'tools.sheet.pivotInsertDoc' }));
+    expect(onInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers update instead of insert once the sheet exists', () => {
+    renderPanel({}, SALES, true);
+    expect(screen.getByRole('button', { name: 'tools.sheet.pivotUpdateDoc' })).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: 'tools.sheet.pivotInsertDoc' }),
+    ).not.toBeInTheDocument();
   });
 
   it('toggles a filter value without dropping the field', () => {

@@ -467,6 +467,11 @@ test('spreadsheet: pivot table aggregates a range and exports as static values',
   await expect(table).toContainText('130');
   await expect(table).toContainText('200');
 
+  // 2.5) 「插入到文档」：结果落成真实工作表，按钮随即变成「更新」
+  await panel.getByRole('button', { name: '插入到文档' }).click();
+  await expect(panel.getByRole('button', { name: '更新文档中的透视表' })).toBeVisible();
+  await expect(page.locator('.sheet-canvas')).toBeVisible();
+
   // 3) Export: the pivot lands as a static value sheet and the file opens without repair prompts
   const [download] = await Promise.all([
     page.waitForEvent('download'),
@@ -478,7 +483,7 @@ test('spreadsheet: pivot table aggregates a range and exports as static values',
   const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(xlsx);
-  const pivotSheet = workbook.getWorksheet('透视表 1');
+  const pivotSheet = workbook.getWorksheet('透视表');
   expect(pivotSheet).toBeTruthy();
   // 表头 + 第一行数据 + 合计行列
   expect(pivotSheet!.getCell('A2').value).toBe('华东');
@@ -487,6 +492,20 @@ test('spreadsheet: pivot table aggregates a range and exports as static values',
   expect(pivotSheet!.getCell('B4').value).toBe(130);
   expect(pivotSheet!.getCell('C4').value).toBe(70);
   expect(pivotSheet!.getCell('D4').value).toBe(200);
+
+  // Inserting already put a sheet in the document; export must reuse it instead of appending a copy
+  const pivotSheets = workbook.worksheets.filter((sheet) => sheet.name.startsWith('透视表'));
+  expect(pivotSheets).toHaveLength(1);
+  expect(pivotSheets[0].name).toBe('透视表');
+
+  // The export also carries native pivot parts, so the table stays refreshable in Excel
+  const zip = await JSZip.loadAsync(await readFile(xlsx));
+  expect(Object.keys(zip.files)).toContain('xl/pivotTables/pivotTable1.xml');
+  expect(Object.keys(zip.files)).toContain('xl/pivotCache/pivotCacheDefinition1.xml');
+  const tableXml = await zip.file('xl/pivotTables/pivotTable1.xml')!.async('string');
+  expect(tableXml).toContain('cacheId="1"');
+  const workbookXml = await zip.file('xl/workbook.xml')!.async('string');
+  expect(workbookXml).toMatch(/<pivotCaches count="1">/);
 
   expect(errors).toEqual([]);
 });

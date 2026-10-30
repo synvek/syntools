@@ -5,8 +5,9 @@ import { createEmptySheet, type SheetSnapshot, type WorkbookSnapshot } from './x
  * 透视结果 -> 工作表（P2-4.6 导出 / P2-4.7 打印共用）。
  *
  * 两者共用同一份矩阵，保证"面板里看到的数字"和"导出去/打出来的数字"不会各算一套。
- * 这里只做"静态值"：单元格里是数字与文本，没有公式、没有 pivotTable part ——
- * 因此 Excel 打开不会有修复提示，代价是不可刷新（保真报告会写明）。
+ * 单元格里写的是静态值（数字与文本，没有公式）；导出时 `pivotXlsx.ts` 会在这张表上再注入
+ * 原生 `pivotTable` / `pivotCacheDefinition` part，让 Excel 里可以继续拖字段、刷新。
+ * 无法注入的形态（多级列头 / 有筛选 / 源被截断）保留纯静态值，并由保真报告标注。
  */
 
 /** 一张只读工作表；`null` 表示没有可写的数据（空源区域） */
@@ -37,7 +38,18 @@ const MAX_SHEET_NAME_LENGTH = 31;
 /**
  * 分配一个唯一工作表名。Excel 认为同名（不分大小写）就是损坏文件，
  * 所以要么用原名，要么补 ` (2)`、` (3)`……
+ *
+ * 面板「插入到文档」也要用同一套规则：工具层拿现有表名数组进来，拿到能直接用的名字。
  */
+export function uniqueSheetName(
+  existing: readonly string[],
+  base: string,
+  fallback: string,
+): string {
+  const taken = new Set(existing.map((name) => (name ?? '').trim().toLowerCase()));
+  return takeSheetName(taken, base, fallback);
+}
+
 function takeSheetName(taken: Set<string>, base: string, fallback: string): string {
   const trimmed = (base.trim() || fallback).slice(0, MAX_SHEET_NAME_LENGTH);
   if (!taken.has(trimmed.toLowerCase())) {
@@ -60,6 +72,9 @@ function takeSheetName(taken: Set<string>, base: string, fallback: string): stri
  * 用传入的 `snapshot` 计算（不是"已经加好工作表的 next"），避免透视表把上一张透视表当成源数据。
  * 工作表 id / 名字都避开文档里已有的内容：重新导出含透视表的文件时，
  * 既不能覆盖旧的静态透视表，也不能产生重名（Excel 会报修复）。
+ *
+ * 同时登记 `syntoolsPivotSheets`：导出层靠它知道"哪张工作表来自哪个配置"，
+ * 才能把原生 `pivotTable` part 注入到正确的位置。
  */
 export function appendPivotSheets(
   snapshot: WorkbookSnapshot,
@@ -71,12 +86,22 @@ export function appendPivotSheets(
     ...snapshot,
     sheets: { ...snapshot.sheets },
     sheetOrder: [...snapshot.sheetOrder],
+    syntoolsPivotSheets: [...(snapshot.syntoolsPivotSheets ?? [])],
   };
   const takenNames = new Set(
     Object.values(snapshot.sheets ?? {}).map((sheet) => (sheet.name ?? '').trim().toLowerCase()),
   );
   let idSeq = 0;
   configs.forEach((config) => {
+    // 已经插入到文档里（面板「插入到文档」）：复用那张表，不再追加副本。
+    // 导出层只登记链接，原生 pivotTable part 会挂到这张表上。
+    const outputId = config.outputSheetId;
+    if (outputId && next.sheets[outputId]) {
+      const linked = next.syntoolsPivotSheets?.some((link) => link.sheetId === outputId);
+      if (!linked) next.syntoolsPivotSheets?.push({ sheetId: outputId, configId: config.id });
+      return;
+    }
+
     let id: string;
     do {
       idSeq += 1;
@@ -87,6 +112,7 @@ export function appendPivotSheets(
     sheet.name = takeSheetName(takenNames, sheet.name, config.name || 'Pivot');
     next.sheets[id] = sheet;
     next.sheetOrder.push(id);
+    next.syntoolsPivotSheets?.push({ sheetId: id, configId: config.id });
   });
   return next;
 }

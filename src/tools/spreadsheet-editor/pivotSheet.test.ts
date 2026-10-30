@@ -132,6 +132,29 @@ describe('appendPivotSheets', () => {
     expect(next.sheets.pivot1.name).toBe('透视表 1 (2)');
     expect(next.sheets.user.name).toBe('透视表 1');
   });
+
+  it('reuses the sheet the user already inserted into the document', () => {
+    const source = snapshotOf(SALES);
+    const config = configOf({ outputSheetId: 'doc-pivot' });
+    const docSheet = buildPivotSheet(
+      'doc-pivot',
+      config,
+      buildPivot(snapshotOf(SALES), config),
+      '(空白)',
+    )!;
+    const snapshot: WorkbookSnapshot = {
+      ...source,
+      syntoolsPivots: [config],
+      sheets: { ...source.sheets, 'doc-pivot': docSheet },
+      sheetOrder: [...source.sheetOrder, 'doc-pivot'],
+    };
+
+    const next = appendPivotSheets(snapshot, [config], '(空白)');
+    // 面板「插入到文档」已经落过一张表：导出不追加副本，只登记链接（原生 part 挂在它上面）
+    expect(next.sheetOrder).toEqual(snapshot.sheetOrder);
+    expect(next.syntoolsPivotSheets).toEqual([{ sheetId: 'doc-pivot', configId: config.id }]);
+    expect(next.sheets['doc-pivot']).toBe(docSheet);
+  });
 });
 
 describe('pivot printing', () => {

@@ -58,9 +58,15 @@ import {
   type WorkbookSnapshot,
 } from './xlsx-io';
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
-import { collectFieldKeys, computePivot, readPivotSource, type PivotConfig } from './pivot';
+import {
+  collectFieldKeys,
+  computePivot,
+  pivotToMatrix,
+  readPivotSource,
+  type PivotConfig,
+} from './pivot';
 import { registerPivotStrings } from './pivotStrings';
-import { appendPivotSheets, buildPivotSheet } from './pivotSheet';
+import { appendPivotSheets, buildPivotSheet, uniqueSheetName } from './pivotSheet';
 import { PivotPanel } from './ui/PivotPanel';
 import { PresentSheet } from './ui/PresentSheet';
 import { ChartOverlay } from './ui/ChartOverlay';
@@ -112,6 +118,25 @@ const PIVOT_ID = 'pivot-1';
 /** 打印用的合成快照里只有一个工作表，id 固定即可 */
 const PIVOT_SHEET_ID = 'pivot-print';
 type BusyKind = 'import' | 'export' | null;
+
+/**
+ * 一张表已经被写入的范围（行数/列数），用于「更新透视表」前清掉旧值：
+ * 换布局后行列可能变少，不清就会留下上一版的尾巴。
+ */
+function usedBlock(
+  sheet: WorkbookSnapshot['sheets'][string] | undefined,
+): { rows: number; columns: number } | undefined {
+  if (!sheet) return undefined;
+  let rows = 0;
+  let columns = 0;
+  for (const [row, cells] of Object.entries(sheet.cellData ?? {})) {
+    for (const column of Object.keys(cells ?? {})) {
+      rows = Math.max(rows, Number(row) + 1);
+      columns = Math.max(columns, Number(column) + 1);
+    }
+  }
+  return rows > 0 && columns > 0 ? { rows, columns } : undefined;
+}
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 /** Debounce after edits: avoids a full save() on every keystroke */
@@ -766,6 +791,52 @@ export default function SpreadsheetTool() {
     setPivotSnapshot(snapshot);
   };
 
+  /**
+   * 「插入到文档」：把透视结果落成一张真实工作表。
+   *
+   * 第一次插在末尾并记下 `outputSheetId`；之后再点就是**更新**同一张表
+   * （先按旧范围清空再写）。导出会复用这张表，不再追加副本——
+   * 否则用户点了插入再导出，文档里会出现两张透视表。
+   */
+  const handlePivotInsert = () => {
+    const handle = handleRef.current;
+    if (!handle || !pivotConfig) return;
+    // 从**当前**文档重算：面板可能停在旧快照上（源数据改过但没点刷新），
+    // 插进去的数字必须是用户此刻看到的这份数据。
+    const snapshot = handle.getSnapshot();
+    const source = readPivotSource(snapshot, pivotConfig);
+    if (source.records.length === 0 || source.fields.length === 0) return;
+    const result = computePivot(pivotConfig, source);
+    const matrix = pivotToMatrix(result, pivotConfig, t('tools.sheet.pivotBlank'));
+    if (matrix.length === 0 || result.rowKeys.length === 0) return;
+
+    const sheets = handle.getSheets();
+    const target = pivotConfig.outputSheetId
+      ? sheets.find((sheet) => sheet.id === pivotConfig.outputSheetId)
+      : undefined;
+
+    if (target) {
+      const used = usedBlock(snapshot.sheets[target.id]);
+      handle.writeSheetValues(target.id, matrix, used);
+      handle.setActiveSheet(target.id);
+      setPivotSnapshot(handle.getSnapshot());
+    } else {
+      const name = uniqueSheetName(
+        sheets.map((sheet) => sheet.name),
+        pivotConfig.name,
+        t('tools.sheet.pivotTitle'),
+      );
+      const id = handle.insertSheetWithValues(name, matrix);
+      if (!id) return;
+      // 记住这张表：下次点按钮是更新而不是再插一张
+      applyPivotConfig({ ...pivotConfig, outputSheetId: id });
+      handle.setActiveSheet(id);
+      setPivotSnapshot(handle.getSnapshot());
+    }
+    refreshSheets();
+    scheduleSaveRef.current();
+  };
+
   const handlePivotRemove = () => {
     pivotConfigsRef.current = [];
     setPivotConfigs([]);
@@ -803,7 +874,8 @@ export default function SpreadsheetTool() {
     setBusy('export');
     setFailure(null);
     const base = withDocOwnedContent(handle.getSnapshot());
-    // 透视表以静态值写进额外工作表：Excel 里能看能算，但不可刷新（保真报告会写明）
+    // 透视表写进额外工作表：导出层会再注入原生 pivotTable part，
+    // 支持不了的形态（多级列头/筛选/截断）保留静态值并由保真报告告警
     const snapshot = appendPivotSheets(base, pivotConfigsRef.current, t('tools.sheet.pivotBlank'));
     const result = await exportSnapshotToBytes(snapshot);
     setBusy(null);
@@ -1295,6 +1367,11 @@ export default function SpreadsheetTool() {
           onRefresh={() => setPivotSnapshot(handleRef.current?.getSnapshot() ?? null)}
           onRemove={handlePivotRemove}
           onClose={() => setPivotOpen(false)}
+          onInsert={handlePivotInsert}
+          inserted={
+            Boolean(pivotConfig.outputSheetId) &&
+            sheets.some((sheet) => sheet.id === pivotConfig.outputSheetId)
+          }
           onExport={() => void handleExport()}
           onPrint={handlePivotPrint}
         />
