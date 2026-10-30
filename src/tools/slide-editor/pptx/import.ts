@@ -1,6 +1,6 @@
 import type { ToolResult } from '@/core/types';
 import JSZip from 'jszip';
-import { emuToPx, pxToEmu } from '../../../core/drawing/geometry';
+import { emuToPx, ptToPx, pxToEmu } from '../../../core/drawing/geometry';
 import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import { createDoc, createId, SCHEMA_VERSION } from '../model/factory';
 import { withResolvedConnectors } from '../model/connectors';
@@ -29,6 +29,7 @@ import type {
   TextAlign,
   TextBody,
   TextElement,
+  TextVert,
   VAlign,
 } from '../model/types';
 import type { ImportReport } from '../store';
@@ -161,6 +162,15 @@ function parseRunStyle(
   if (attr(node, 'i') === '1') style.italic = true;
   if (attr(node, 'u') === 'sng') style.underline = true;
   if (attr(node, 'strike') === 'sng') style.strike = true;
+  // `a:spc` is letter spacing in 1/100 pt; the model stores points
+  const spacing = numAttr(node, 'spc');
+  if (spacing !== undefined) style.spacing = spacing / 100;
+  // `a:baseline` is an ST_Percentage (30000 = 30%); the model keeps the same units
+  const baseline = numAttr(node, 'baseline');
+  if (baseline !== undefined && baseline !== 0) style.baseline = baseline;
+  // `a:highlight` is a colour container, same shape as a:solidFill
+  const highlight = resolveColorNode(childOf(node, 'highlight'), palette);
+  if (highlight) style.highlight = highlight.color;
   return Object.keys(style).length > 0 ? style : undefined;
 }
 
@@ -176,6 +186,9 @@ const ANCHOR_MAP: Record<string, VAlign> = {
   ctr: 'middle',
   b: 'bottom',
 };
+
+/** a:bodyPr/@vert values the model can render (eaVert / mongolianVert have no renderer support) */
+const TEXT_VERT_VALUES = new Set(['horz', 'vert', 'vert270', 'wordArtVert']);
 
 /** p:txBody → TextBody; returns undefined when there is no visible text */
 function parseTextBody(
@@ -202,18 +215,23 @@ function parseTextBody(
         runs.push({ text: '\n' });
       }
     }
-    const lineSpacingPct = numAttr(childOf(pPr, 'spcPct'), 'val');
-    const spaceBef = numAttr(childOf(pPr, 'spcBef'), 'val');
-    const spaceAft = numAttr(childOf(pPr, 'spcAft'), 'val');
+    // a:lnSpc/a:spcPct and a:spcBef/a:spcPts sit one level deeper than pPr — reading the
+    // wrapper node directly always yielded undefined, so line spacing / paragraph spacing never
+    // survived an import
+    const lineSpacingPct = numAttr(childOf(childOf(pPr, 'lnSpc'), 'spcPct'), 'val');
+    const spaceBef = numAttr(childOf(childOf(pPr, 'spcBef'), 'spcPts'), 'val');
+    const spaceAft = numAttr(childOf(childOf(pPr, 'spcAft'), 'spcPts'), 'val');
     paragraphs.push({
       runs: runs.length > 0 ? runs : [{ text: '' }],
       align: ALIGN_MAP[attr(pPr, 'algn') ?? ''] ?? 'left',
       bullet: Boolean(childOf(pPr, 'buChar')),
       // buAutoNum is "auto numbering"; it used to be treated as a bullet, turning 1./2. into •
       numbering: Boolean(childOf(pPr, 'buAutoNum')),
-      lineSpacing: lineSpacingPct ? lineSpacingPct / 1000 : undefined,
-      spaceBefore: spaceBef === undefined ? undefined : (spaceBef / 100) * (96 / 72),
-      spaceAfter: spaceAft === undefined ? undefined : (spaceAft / 100) * (96 / 72),
+      // spcPct is in 1/1000 of a percent (100000 = 100%); the model stores a multiplier
+      lineSpacing: lineSpacingPct ? lineSpacingPct / 100000 : undefined,
+      // spcPts is in 1/100 pt while the model stores canvas px
+      spaceBefore: spaceBef === undefined ? undefined : ptToPx(spaceBef / 100),
+      spaceAfter: spaceAft === undefined ? undefined : ptToPx(spaceAft / 100),
       indent: numAttr(pPr, 'marL') === undefined ? undefined : emuPx(numAttr(pPr, 'marL')),
     });
   }
@@ -225,17 +243,24 @@ function parseTextBody(
 
   const bodyPr = childOf(node, 'bodyPr');
   const margin = (name: string, fallbackEmu: number) => emuPx(numAttr(bodyPr, name) ?? fallbackEmu);
+  // a:normAutofit / a:spAutoFit are child elements — there is no `autoFit` attribute on a:bodyPr,
+  // so the old attribute lookup always produced 'none'
+  const autoFit =
+    childOf(bodyPr, 'normAutofit') || childOf(bodyPr, 'spAutoFit') ? 'autofit' : 'none';
+  const vertRaw = attr(bodyPr, 'vert');
+  const vert = vertRaw && TEXT_VERT_VALUES.has(vertRaw) ? (vertRaw as TextVert) : undefined;
   return {
     paragraphs,
     anchor: ANCHOR_MAP[attr(bodyPr, 'anchor') ?? ''] ?? 'top',
     wrap: attr(bodyPr, 'wrap') !== 'none',
-    autoFit: attr(bodyPr, 'autoFit') === 'normAutofit' ? 'autofit' : 'none',
+    autoFit,
     margins: {
       left: margin('lIns', 91440),
       top: margin('tIns', 45720),
       right: margin('rIns', 91440),
       bottom: margin('bIns', 45720),
     },
+    ...(vert ? { vert } : {}),
   };
 }
 
@@ -307,7 +332,17 @@ function parseShape(
   };
   let element: SlideElement;
   if (body && geometry.kind === 'rect' && !fill && !stroke) {
-    element = { type: 'text', ...base, body } satisfies TextElement;
+    // A rounded text box is written as prstGeom roundRect + adj1, so the corner radius has to be
+    // reconstructed from the adjustment value (adj1 is a fraction of the shorter side)
+    const roundRadius = geometry.prst === 'roundRect' ? (geometry.adj?.adj1 ?? 0.167) : 0;
+    const cornerRadius =
+      roundRadius > 0 ? Math.round(roundRadius * Math.min(base.width, base.height)) : 0;
+    element = {
+      type: 'text',
+      ...base,
+      body,
+      ...(cornerRadius > 0 ? { cornerRadius } : {}),
+    } satisfies TextElement;
   } else if (body) {
     const shape: ShapeElement = { type: 'shape', ...base, geom: geometry, body };
     if (fill) shape.fill = fill;
@@ -483,6 +518,17 @@ function parseTableCells(node: XmlNode, palette: Palette, theme: SlideTheme): Ta
   return rows;
 }
 
+/**
+ * Table border colour. The model keeps a single colour for the whole table, so it is read from the
+ * first cell's left/top border (our own writer emits all four edges with the same colour).
+ */
+function tableBorderColorOf(node: XmlNode, palette: Palette): string | undefined {
+  const firstCell = childrenNamed(childrenNamed(node, 'tr')[0], 'tc')[0];
+  const tcPr = childOf(firstCell, 'tcPr');
+  const line = childOf(tcPr, 'lnL') ?? childOf(tcPr, 'lnR') ?? childOf(tcPr, 'lnT');
+  return resolveColorNode(childOf(line, 'solidFill'), palette)?.color;
+}
+
 function parseTable(
   node: XmlNode,
   ctx: ImportContext,
@@ -513,7 +559,8 @@ function parseTable(
     // firstRow / bandRow on a:tblPr decide header and banding; they used to be dropped, changing the look after import
     headerRow: tblPr ? boolAttr(tblPr, 'firstRow') : true,
     bandRow: tblPr ? boolAttr(tblPr, 'bandRow') : false,
-    borderColor: '#BFBFBF',
+    // Previously hardcoded: an imported table lost its border colour and re-exported gray
+    borderColor: tableBorderColorOf(node, palette) ?? '#BFBFBF',
   };
   return element;
 }

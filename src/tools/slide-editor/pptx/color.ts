@@ -374,3 +374,18 @@ const DASH_PATTERNS: Record<string, number[]> = {
   sysDashDot: [4, 3, 2, 3],
   sysDot: [2, 2],
 };
+
+/**
+ * Inverse of DASH_PATTERNS: a model dash array → `a:prstDash/@val`.
+ *
+ * The model only keeps the numeric pattern, so an exact match recovers the original preset name and
+ * anything else falls back to "dash" (still dashed, which is what the canvas shows).
+ */
+export function dashPresetName(dash: number[] | undefined): string | undefined {
+  if (!dash || dash.length === 0) return undefined;
+  const key = dash.join(',');
+  for (const [name, pattern] of Object.entries(DASH_PATTERNS)) {
+    if (pattern.join(',') === key) return name;
+  }
+  return 'dash';
+}

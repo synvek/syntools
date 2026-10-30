@@ -1,5 +1,11 @@
 import { normalizeBackground } from '../core';
-import { ALPHA_UNIT, EMU_PER_PX, pxToEmu, ptToHundredthsPt } from '../../../core/drawing/geometry';
+import {
+  ALPHA_UNIT,
+  EMU_PER_PX,
+  pxToEmu,
+  pxToPt,
+  ptToHundredthsPt,
+} from '../../../core/drawing/geometry';
 import { buildTimeline } from '../model/animation';
 import type {
   AnimationStep,
@@ -22,6 +28,7 @@ import type {
 } from '../model/types';
 import { escapeXml } from './templates';
 import { custGeomXml } from './custGeom';
+import { dashPresetName } from './color';
 
 /**
  * SlideElement → DrawingML strings.
@@ -255,7 +262,9 @@ function strokeXml(
   const color = stroke.color.replace(/^#/, '').toUpperCase();
   const head = ends?.head ? `<a:headEnd type="${ends.head}"/>` : '';
   const tail = ends?.tail ? `<a:tailEnd type="${ends.tail}"/>` : '';
-  return `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="solid"/>${head}${tail}</a:ln>`;
+  // A dash pattern used to be flattened to "solid" on export, losing dashes on every round-trip
+  const dash = dashPresetName(stroke.dash) ?? 'solid';
+  return `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="${dash}"/>${head}${tail}</a:ln>`;
 }
 
 function runXml(text: string, style: RunStyle | undefined): string {
@@ -270,8 +279,9 @@ function runXml(text: string, style: RunStyle | undefined): string {
     style?.strike ? 'strike="sng"' : '',
     // Letter spacing (a:spc, unit 1/100 pt) and baseline (unit 0.1%)
     style?.spacing ? `spc="${ptToHundredthsPt(style.spacing)}"` : '',
+    // The model stores the raw ST_Percentage value (30000 = 30%), so it is written verbatim
     typeof style?.baseline === 'number' && style.baseline !== 0
-      ? `baseline="${Math.round(style.baseline * 10)}"`
+      ? `baseline="${Math.round(style.baseline)}"`
       : '',
   ]
     .filter(Boolean)
@@ -306,18 +316,23 @@ function paragraphXml(paragraph: Paragraph): string {
     : paragraph.bullet
       ? '<a:buClrTx/><a:buSzPct val="100000"/><a:buFontTx/><a:buChar char="•"/>'
       : '';
+  // a:spcPct is in 1/1000 of a percent (100000 = 100%); the model stores a multiplier
   const lnSpc = paragraph.lineSpacing
-    ? `<a:lnSpc><a:spcPct val="${Math.round(paragraph.lineSpacing * 1000)}"/></a:lnSpc>`
+    ? `<a:lnSpc><a:spcPct val="${Math.round(paragraph.lineSpacing * 100000)}"/></a:lnSpc>`
     : '';
+  // a:spcPts is in 1/100 pt while the model stores canvas px
   const spcBef = paragraph.spaceBefore
-    ? `<a:spcBef><a:spcPts val="${Math.round(paragraph.spaceBefore * 100)}"/></a:spcBef>`
+    ? `<a:spcBef><a:spcPts val="${Math.round(pxToPt(paragraph.spaceBefore) * 100)}"/></a:spcBef>`
     : '';
   const spcAft = paragraph.spaceAfter
-    ? `<a:spcAft><a:spcPts val="${Math.round(paragraph.spaceAfter * 100)}"/></a:spcAft>`
+    ? `<a:spcAft><a:spcPts val="${Math.round(pxToPt(paragraph.spaceAfter) * 100)}"/></a:spcAft>`
     : '';
-  const pPrChild = bullet || lnSpc || spcBef || spcAft;
-  const pPr =
-    pPrAttrs.length > 0 || pPrChild ? `<a:pPr ${pPrAttrs.join(' ')}>${pPrChild}</a:pPr>` : '';
+  // Child order is fixed by CT_TextParagraphProperties (lnSpc → spcBef → spcAft → bullet …).
+  // This used to be a `||` chain, so only the first non-empty child was ever written: a paragraph
+  // with both line spacing and bullets lost the spacing, and a paragraph with spacing lost its list.
+  const pPrChild = `${lnSpc}${spcBef}${spcAft}${bullet}`;
+  const pPrAttrsText = pPrAttrs.length > 0 ? ` ${pPrAttrs.join(' ')}` : '';
+  const pPr = pPrAttrs.length > 0 || pPrChild ? `<a:pPr${pPrAttrsText}>${pPrChild}</a:pPr>` : '';
   const runs = paragraph.runs.map((run) => runXml(run.text, run.style)).join('');
   return `<a:p>${pPr}${runs}</a:p>`;
 }
@@ -334,7 +349,9 @@ function bodyXml(body: TextBody): string {
     `rIns="${pxToEmu(margins.right)}"`,
     `bIns="${pxToEmu(margins.bottom)}"`,
   ].join(' ');
-  const autoFit = body.autoFit === 'autofit' ? '<a:spAutoFit/>' : '<a:noAutofit/>';
+  // a:normAutofit ("shrink text on overflow") is what the pptxgen channel writes for fit:'shrink';
+  // using spAutoFit here made the same model mean "resize shape" on one channel and "shrink" on the other
+  const autoFit = body.autoFit === 'autofit' ? '<a:normAutofit/>' : '<a:noAutofit/>';
   return `<a:bodyPr ${attrs}${wrap}${anchor}${vert}>${autoFit}</a:bodyPr>`;
 }
 
@@ -415,6 +432,17 @@ function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
   return `<p:sp>${parts.join('')}</p:sp>`;
 }
 
+/**
+ * Text box geometry: a rounded text box is a `roundRect` whose `adj1` is the radius as a fraction of
+ * the shorter side (the same convention `resolvePresetGeometry` uses for shapes).
+ */
+function textGeomXml(element: { width: number; height: number; cornerRadius?: number }): string {
+  const min = Math.min(element.width, element.height);
+  const radius = min > 0 ? Math.min(0.5, Math.max(0, (element.cornerRadius ?? 0) / min)) : 0;
+  if (radius <= 0) return '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+  return `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj1" fmla="val ${Math.round(radius * 100000)}"/></a:avLst></a:prstGeom>`;
+}
+
 function textXml(element: TextElement): string {
   const id = shapeIdFor(element.id);
   return [
@@ -424,7 +452,7 @@ function textXml(element: TextElement): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fillXml(element.fill)}${strokeXml(element.stroke)}${effectLstXml(element)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${textGeomXml(element)}${fillXml(element.fill)}${strokeXml(element.stroke)}${effectLstXml(element)}</p:spPr>`,
     textBodyXml(element.body, 'p'),
     '</p:sp>',
   ].join('');
@@ -474,6 +502,20 @@ function lineXml(element: LineElement): string {
     `<p:spPr>${xfrmXml({ ...element, flipX: flipH, flipY: flipV })}<a:prstGeom prst="line"><a:avLst/></a:prstGeom>${strokeXml(element.stroke ?? { color: '#000000', width: 1 }, { head: element.head, tail: element.tail })}</p:spPr>`,
     '</p:cxnSp>',
   ].join('');
+}
+
+/** Cell borders: the model has a single border colour for the table, so all four edges use it */
+function cellBordersXml(color: string | undefined): string {
+  if (!color) return '';
+  const hex = hexOf(color);
+  const line = (tag: string) =>
+    `<${tag} w="12700" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill><a:prstDash val="solid"/></${tag}>`;
+  return `${line('a:lnL')}${line('a:lnR')}${line('a:lnT')}${line('a:lnB')}`;
+}
+
+/** Cell background: a:solidFill must follow the four border elements inside a:tcPr */
+function cellFillXml(fill: string | undefined): string {
+  return fill ? `<a:solidFill><a:srgbClr val="${hexOf(fill)}"/></a:solidFill>` : '';
 }
 
 function tableXml(element: TableElement): string {
@@ -527,7 +569,10 @@ function tableXml(element: TableElement): string {
             `anchor="${cell.valign === 'top' ? 't' : cell.valign === 'bottom' ? 'b' : 'ctr'}"`,
             'marL="68580" marR="68580" marT="34290" marB="34290"',
           ].join(' ');
-          return `<a:tc${tcAttrs ? ` ${tcAttrs}` : ''}>${textBodyXml(body, 'a')}<a:tcPr ${tcPrAttrs}/></a:tc>`;
+          // a:tcPr child order is fixed: lnL → lnR → lnT → lnB → fill properties. The cell fill used
+          // to be dropped entirely, so every shaded cell turned transparent when exporting
+          const tcPr = `<a:tcPr ${tcPrAttrs}>${cellBordersXml(element.borderColor)}${cellFillXml(cell.fill)}</a:tcPr>`;
+          return `<a:tc${tcAttrs ? ` ${tcAttrs}` : ''}>${textBodyXml(body, 'a')}${tcPr}</a:tc>`;
         })
         .join('');
       return `<a:tr h="${pxToEmu(height)}">${cells}</a:tr>`;
