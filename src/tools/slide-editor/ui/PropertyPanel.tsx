@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { backgroundToColor } from '../core';
-import { shapeAdjustValues, shapeAdjustments } from '../model/shapeDefs';
+import { shapeAdjustValues, shapeAdjustments } from '../../../core/drawing/shapeDefs';
 import type { RunStyle, SlideElement, Stroke } from '../model/types';
 import { containerElements, useSlideStore } from '../store';
 import { ChartEditor } from './ChartEditor';

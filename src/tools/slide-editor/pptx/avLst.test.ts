@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolvePresetGeometry } from '../core';
+import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import { createDoc, createLineElement, createShapeElement } from '../model/factory';
 import type { LineElement, ShapeElement, SlideDoc } from '../model/types';
 import { exportPptxLegacy } from './export';

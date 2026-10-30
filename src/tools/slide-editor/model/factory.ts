@@ -1,4 +1,4 @@
-import { pxToEmu } from '../core';
+import { pxToEmu } from '../../../core/drawing/geometry';
 import type {
   ChartElement,
   ChartType,

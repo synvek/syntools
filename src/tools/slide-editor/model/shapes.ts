@@ -4,7 +4,7 @@
  * The panel needs grouping and a label for every entry; `SHAPE_DEFS` is the single source so
  * geometry, adjustment handles and the panel can never drift apart.
  */
-import { SHAPE_DEFS, type ShapeGroup } from './shapeDefs';
+import { SHAPE_DEFS, type ShapeGroup } from '../../../core/drawing/shapeDefs';
 
 export interface ShapePreset {
   /** DrawingML preset geometry name, sharing values with import/export */

@@ -1,4 +1,4 @@
-import type { PathCommand, ShapeGeometry } from './types';
+import type { PathCommand, ShapeGeometry } from './geometry';
 
 /**
  * Custom geometry helpers.

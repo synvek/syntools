@@ -1,6 +1,7 @@
 import type { ToolResult } from '@/core/types';
 import JSZip from 'jszip';
-import { emuToPx, pxToEmu, resolvePresetGeometry } from '../core';
+import { emuToPx, pxToEmu } from '../../../core/drawing/geometry';
+import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import { createDoc, createId, SCHEMA_VERSION } from '../model/factory';
 import { withResolvedConnectors } from '../model/connectors';
 import { createMediaFromBytes, mimeFromFilename } from '../model/media';
@@ -31,6 +32,7 @@ import type {
   VAlign,
 } from '../model/types';
 import type { ImportReport } from '../store';
+import { parseSlideMotion } from './timingImport';
 import { parseShadow, parseShapeFill, parseStroke, resolveColorNode, type Palette } from './color';
 import {
   loadZip,
@@ -1095,6 +1097,8 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
     shapeIdMap: new Map(),
     connectorRefs: [],
   };
+  /** 未能还原的切换/动画（`p:timing` 子集之外的效果），交给保真报告 */
+  const unsupportedMotion: string[] = [];
 
   const doc: SlideDoc = {
     id: createId('doc'),
@@ -1140,10 +1144,16 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
 
     const cSld = childOf(slideXml, 'cSld');
     const spTree = childOf(cSld, 'spTree');
+    // `cNvPr@id` restarts at 1 on every slide, so the spid map must be per-slide; a stale entry
+    // from the previous slide would resolve `p:timing` to the wrong element.
+    ctx.shapeIdMap.clear();
     const elements = await parseSpTree(spTree as XmlNode, ctx, slidePart, rels, palette, theme);
     const bgNode = findBackgroundNode(slideXml);
     const background =
       parseBackgroundColor(bgNode, palette) ?? layoutCache.get(layoutId ?? '')?.background;
+
+    const motion = parseSlideMotion(slideXml, ctx.shapeIdMap);
+    unsupportedMotion.push(...motion.unsupported);
 
     doc.slides.push({
       id: slidePart,
@@ -1151,6 +1161,8 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
       elements,
       background,
       notes: await parseNotesText(ctx, slidePart, rels),
+      ...(motion.transition ? { transition: motion.transition } : {}),
+      ...(motion.animations.length > 0 ? { animations: motion.animations } : {}),
     });
   }
 
@@ -1162,7 +1174,11 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
     ok: true,
     value: {
       doc,
-      report: { placeholders: ctx.placeholders, skipped: [...ctx.skipped] },
+      report: {
+        placeholders: ctx.placeholders,
+        skipped: [...ctx.skipped],
+        unsupportedMotion: [...new Set(unsupportedMotion)],
+      },
     },
   };
 }

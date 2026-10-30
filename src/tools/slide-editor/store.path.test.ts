@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { geometryFromPoints } from './model/custGeom';
+import { geometryFromPoints } from '../../core/drawing/custGeom';
 import { createDoc, createShapeElement } from './model/factory';
 import type { ShapeElement } from './model/types';
 import { useSlideStore } from './store';

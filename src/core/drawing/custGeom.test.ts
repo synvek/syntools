@@ -12,7 +12,7 @@ import {
   svgToCommands,
   togglePathNodeSmooth,
 } from './custGeom';
-import type { PathCommand } from './types';
+import type { PathCommand } from './geometry';
 
 /** Normalized custom-geometry commands: SVG serialization, scaling and parsing back */
 

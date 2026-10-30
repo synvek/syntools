@@ -288,6 +288,8 @@ const zh: ResourceTree = {
       commentOnPage: '未选中对象时，批注锚定到页面中心。',
       commentUnresolved: '{{count}} 条未解决批注',
       commentLoss: '{{count}} 条批注未写入 PPTX，仅保存在本工具文档中',
+      motionLoss: '{{count}} 处切换/动画未能还原（仅支持淡出/推入切换与淡入/飞入入场）',
+      motionChannelLoss: '{{count}} 个原生图表/公式因动画改用兼容通道，已转为占位框',
       templateGallery: '模板画廊',
       templateAll: '全部',
       templateHint: '纯本地模板：一键替换主题配色、母版与版式，不联网、不上传内容',
@@ -663,6 +665,10 @@ const en: ResourceTree = {
       commentOnPage: 'With nothing selected, the comment anchors to the page centre.',
       commentUnresolved: '{{count}} unresolved comments',
       commentLoss: '{{count}} comments were not written to the PPTX and stay in this document only',
+      motionLoss:
+        '{{count}} transitions or animations could not be restored (only fade/push and fade-in/fly-in are supported)',
+      motionChannelLoss:
+        '{{count}} native charts or equations became placeholder frames because animations force the compatibility channel',
       templateGallery: 'Template gallery',
       templateAll: 'All',
       templateHint:
@@ -1037,6 +1043,8 @@ const zhTW: ResourceTree = {
       commentOnPage: '未選取物件時，註解錨定到頁面中央。',
       commentUnresolved: '{{count}} 則未解決註解',
       commentLoss: '{{count}} 則註解未寫入 PPTX，僅保存在本工具文件中',
+      motionLoss: '{{count}} 處切換/動畫未能還原（僅支援淡出/推入切換與淡入/飛入入場）',
+      motionChannelLoss: '{{count}} 個原生圖表/公式因動畫改用相容通道，已轉為預留位置',
       templateGallery: '範本庫',
       templateAll: '全部',
       templateHint: '純本機範本：一鍵替換主題配色、母片與版面配置，不連線、不上傳內容',
@@ -1414,6 +1422,10 @@ const ja: ResourceTree = {
       commentUnresolved: '未解決のコメント {{count}} 件',
       commentLoss:
         '{{count}} 件のコメントは PPTX に書き出されず、このドキュメントにのみ保存されます',
+      motionLoss:
+        '{{count}} 件の画面切り替え/アニメーションを再現できませんでした（フェード/プッシュ、フェードイン/フライインのみ対応）',
+      motionChannelLoss:
+        '{{count}} 件のネイティブグラフ/数式は、アニメーションのために互換チャネルへ切り替えたためプレースホルダーになりました',
       templateGallery: 'テンプレートギャラリー',
       templateAll: 'すべて',
       templateHint:
@@ -1797,6 +1809,10 @@ const fr: ResourceTree = {
       commentUnresolved: '{{count}} commentaires non résolus',
       commentLoss:
         '{{count}} commentaires ne sont pas écrits dans le PPTX et restent dans ce document',
+      motionLoss:
+        '{{count}} transitions ou animations n’ont pas pu être restaurées (seuls fondu/poussée et apparition/entrée animée sont pris en charge)',
+      motionChannelLoss:
+        '{{count}} graphiques ou équations natifs sont devenus des espaces réservés : les animations imposent le canal de compatibilité',
       templateGallery: 'Galerie de modèles',
       templateAll: 'Tous',
       templateHint:
@@ -2178,6 +2194,10 @@ const de: ResourceTree = {
       commentUnresolved: '{{count}} offene Kommentare',
       commentLoss:
         '{{count}} Kommentare wurden nicht in die PPTX geschrieben und bleiben nur in diesem Dokument',
+      motionLoss:
+        '{{count}} Übergänge oder Animationen konnten nicht wiederhergestellt werden (unterstützt werden nur Überblenden/Schieben sowie Einblenden/Fliegen)',
+      motionChannelLoss:
+        '{{count}} native Diagramme oder Formeln wurden zu Platzhaltern, weil Animationen den Kompatibilitätsweg erzwingen',
       templateGallery: 'Vorlagengalerie',
       templateAll: 'Alle',
       templateHint:
@@ -2558,6 +2578,10 @@ const it: ResourceTree = {
       commentUnresolved: '{{count}} commenti non risolti',
       commentLoss:
         '{{count}} commenti non sono stati scritti nel PPTX e restano solo in questo documento',
+      motionLoss:
+        '{{count}} transizioni o animazioni non sono state ripristinate (sono supportate solo dissolvenza/scorrimento ed entrata in dissolvenza/volo)',
+      motionChannelLoss:
+        '{{count}} grafici o formule nativi sono diventati segnaposto perché le animazioni impongono il canale di compatibilità',
       templateGallery: 'Galleria modelli',
       templateAll: 'Tutti',
       templateHint:
@@ -2938,6 +2962,10 @@ const es: ResourceTree = {
       commentUnresolved: '{{count}} comentarios sin resolver',
       commentLoss:
         '{{count}} comentarios no se escribieron en el PPTX y solo permanecen en este documento',
+      motionLoss:
+        '{{count}} transiciones o animaciones no se pudieron restaurar (solo se admiten fundido/empuje y aparición/entrada volando)',
+      motionChannelLoss:
+        '{{count}} gráficos o fórmulas nativos se convirtieron en marcos de posición porque las animaciones obligan a usar el canal de compatibilidad',
       templateGallery: 'Galería de plantillas',
       templateAll: 'Todas',
       templateHint:
@@ -3317,6 +3345,10 @@ const pt: ResourceTree = {
       commentUnresolved: '{{count}} comentários não resolvidos',
       commentLoss:
         '{{count}} comentários não foram gravados no PPTX e ficam apenas neste documento',
+      motionLoss:
+        '{{count}} transições ou animações não puderam ser restauradas (apenas fade/push e aparecer/voar são suportados)',
+      motionChannelLoss:
+        '{{count}} gráficos ou fórmulas nativos viraram marcadores de posição porque as animações exigem o canal de compatibilidade',
       templateGallery: 'Galeria de modelos',
       templateAll: 'Todos',
       templateHint:

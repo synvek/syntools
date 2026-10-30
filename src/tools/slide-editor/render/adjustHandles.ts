@@ -1,5 +1,5 @@
 import Konva from 'konva';
-import { resolvePresetGeometry } from '../core';
+import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import { lineGeometryFromPoints, lineEndpoint, nearestConnectorSite } from '../model/connectors';
 import {
   commandsFromGeometry,
@@ -10,8 +10,8 @@ import {
   scaleCommands,
   type PathNodeView,
   type PathPoint,
-} from '../model/custGeom';
-import { shapeAdjustValues, shapeAdjustments } from '../model/shapeDefs';
+} from '../../../core/drawing/custGeom';
+import { shapeAdjustValues, shapeAdjustments } from '../../../core/drawing/shapeDefs';
 import type {
   ConnectorEnd,
   LineElement,

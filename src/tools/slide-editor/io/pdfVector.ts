@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from '@cantoo/pdf-lib';
 import type { ToolResult } from '@/core/types';
-import { resolvePresetGeometry } from '../core';
-import { commandsToSvg, hasCustomGeometry, scaleCommands } from '../model/custGeom';
+import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
+import { commandsToSvg, hasCustomGeometry, scaleCommands } from '../../../core/drawing/custGeom';
 import type {
   Fill,
   LineElement,

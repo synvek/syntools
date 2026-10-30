@@ -45,7 +45,7 @@ import {
   createTextElement,
 } from './model/factory';
 import { checkImportFile, importPptxFile } from './pptx/import';
-import { exportPptx } from './pptx/export';
+import { exportPptx, motionExportDegradations } from './pptx/export';
 import { registerSlideStrings } from './strings';
 import { containerElements, useSlideStore } from './store';
 import { countUnresolved } from '../../core/comments/model';
@@ -157,7 +157,7 @@ export default function SlideTool() {
         return;
       }
       loadDoc(result.value.doc, result.value.report);
-      const { placeholders, skipped } = result.value.report;
+      const { placeholders, skipped, unsupportedMotion } = result.value.report;
       const issues: FidelityIssue[] = [];
       if (placeholders > 0 || skipped.length > 0) {
         issues.push({
@@ -166,6 +166,17 @@ export default function SlideTool() {
           count: placeholders > 0 ? placeholders : skipped.length,
           messageKey: 'tools.slide.downgraded',
           ...(skipped.length > 0 ? { detail: skipped.slice(0, 5).join(', ') } : {}),
+        });
+      }
+      // P2-5.5: 只还原 fade/push + fadeIn/flyIn；其余效果的标识进报告，不静默丢弃
+      const motionLoss = unsupportedMotion ?? [];
+      if (motionLoss.length > 0) {
+        issues.push({
+          code: 'slide.motion',
+          severity: 'warning',
+          count: motionLoss.length,
+          messageKey: 'tools.slide.motionLoss',
+          detail: motionLoss.slice(0, 5).join(', '),
         });
       }
       setFidelity(isFidelityMuted() ? null : createFidelityReport('slide', 'import', issues));
@@ -188,21 +199,32 @@ export default function SlideTool() {
       PPTX_MIME,
     );
     // Comments stay in the .sld document only: OOXML comment round-trip is P2, so say so explicitly
-    const comments = useSlideStore.getState().doc.comments ?? [];
+    const current = useSlideStore.getState().doc;
+    const exportIssues: FidelityIssue[] = [];
+    const comments = current.comments ?? [];
     if (comments.length > 0) {
-      setFidelity(
-        isFidelityMuted()
-          ? null
-          : createFidelityReport('slide', 'export', [
-              {
-                code: 'slide.comments',
-                severity: 'warning',
-                count: comments.length,
-                messageKey: 'tools.slide.commentLoss',
-              },
-            ]),
-      );
+      exportIssues.push({
+        code: 'slide.comments',
+        severity: 'warning',
+        count: comments.length,
+        messageKey: 'tools.slide.commentLoss',
+      });
     }
+    // 动画只能手写通道输出（pptxgenjs 不写 p:timing），而手写通道没有原生图表/公式
+    const degraded = motionExportDegradations(current);
+    if (degraded > 0) {
+      exportIssues.push({
+        code: 'slide.motionChannel',
+        severity: 'warning',
+        count: degraded,
+        messageKey: 'tools.slide.motionChannelLoss',
+      });
+    }
+    setFidelity(
+      exportIssues.length === 0 || isFidelityMuted()
+        ? null
+        : createFidelityReport('slide', 'export', exportIssues),
+    );
   }, []);
 
   /**

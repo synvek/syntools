@@ -6,6 +6,7 @@
  */
 
 import type { CommentThread } from '../../../core/comments/model';
+import type { ShapeGeometry } from '../../../core/drawing/geometry';
 
 /** Background/fill with no paint */
 export interface NoFill {
@@ -112,43 +113,10 @@ export interface TextBody {
 export type TextVert = 'horz' | 'vert' | 'vert270' | 'wordArtVert';
 
 /**
- * One command of a DrawingML `a:custGeom` path, in **normalized 0~1** coordinates.
- * Normalized so the shape can be resized without rewriting the path; rendering scales it,
- * export multiplies it back into the `a:path@w/h` space.
+ * `PathCommand` / `ShapeGeometry` are owned by the shared drawing kernel (P2-6) — the slide
+ * model only re-exports them so existing element types keep a single import site.
  */
-export type PathCommand =
-  | { c: 'M'; x: number; y: number }
-  | { c: 'L'; x: number; y: number }
-  | { c: 'C'; x1: number; y1: number; x2: number; y2: number; x: number; y: number }
-  | { c: 'Q'; x1: number; y1: number; x: number; y: number }
-  | { c: 'Z' };
-
-/** DrawingML prstGeom → render-ready geometry description */
-export interface ShapeGeometry {
-  /** Render form: rect (optionally rounded) / ellipse / star / closed polygon / SVG path */
-  kind: 'rect' | 'ellipse' | 'star' | 'polygon' | 'path';
-  /** Corner radius ratio when kind==='rect' (0~0.5, relative to the short side) */
-  radius?: number;
-  /** Normalized vertices (0~1), kind==='polygon' */
-  points?: number[];
-  /** Normalized SVG path, kind==='path' */
-  path?: string;
-  /**
-   * Explicit custom geometry (normalized commands). When present it wins over `prst`,
-   * both when rendering and when exporting (`a:custGeom` is written instead of `a:prstGeom`).
-   */
-  custGeom?: PathCommand[];
-  /** Star inner ratio (0~1), kind==='star' */
-  innerRatio?: number;
-  /**
-   * DrawingML adjustment values, keyed `adj1`/`adj2`… and normalized to 0~1.
-   * The preset definition (`model/shapeDefs.ts`) turns them into the render geometry;
-   * export writes them to `a:avLst`, import reads them back.
-   */
-  adj?: Record<string, number>;
-  /** Original prstGeom name, written back first on export */
-  prst: string;
-}
+export type { PathCommand, ShapeGeometry } from '../../../core/drawing/geometry';
 
 export interface PlaceholderRef {
   /** title / body / ctrTitle / subTitle / dt / sldNum / ftr / pic / tbl ... */

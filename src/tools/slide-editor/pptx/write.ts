@@ -1,5 +1,8 @@
-import { ALPHA_UNIT, EMU_PER_PX, normalizeBackground, pxToEmu, ptToHundredthsPt } from '../core';
+import { normalizeBackground } from '../core';
+import { ALPHA_UNIT, EMU_PER_PX, pxToEmu, ptToHundredthsPt } from '../../../core/drawing/geometry';
+import { buildTimeline } from '../model/animation';
 import type {
+  AnimationStep,
   Fill,
   LineElement,
   Paragraph,
@@ -9,6 +12,7 @@ import type {
   ShapeGeometry,
   SlideBackground,
   SlideElement,
+  SlideTransition,
   Stroke,
   TableElement,
   TextAlign,
@@ -46,6 +50,150 @@ function shapeIdFor(elementId: string | undefined): number {
 export function resetShapeIds(): void {
   idSeq = 1;
   shapeIdByElement.clear();
+}
+
+/** cNvPr id already assigned to an element, or undefined when it wasn't written (hidden/deleted) */
+export function shapeIdOf(elementId: string): number | undefined {
+  return shapeIdByElement.get(elementId);
+}
+
+/* --------------------------- 切换与动画（P2-5.4） --------------------------- */
+
+/**
+ * `p:transition` / `p:timing` 是 `pptxgenjs` 完全没有的部分（它不写动画），
+ * 因此这两块由手写通道产出：`slideXml` 在 `p:clrMapOvr` 之后按 ECMA-376 的顺序追加。
+ *
+ * 只写模型里真实存在的两种切换（fade / push）与两种入场（fadeIn / flyIn）。
+ * 元素用 `spid` 指向 `p:cNvPr id`，所以动画必须落在**同一次导出**里已经分配过 id 的元素上；
+ * 隐藏元素不参与导出，它们的动画在这里一并丢弃（不产生指向不存在形状的 timing 节点）。
+ */
+
+/**
+ * `spd` 只有 fast/med/slow 三档（精确时长在 p14 扩展里，不写就退回三档），
+ * 因此这里的阈值必须与导入侧的 `SPEED_TO_MS`（200/400/800）严格互逆 ——
+ * 否则「导出 800ms → 导入 400ms」这种量化误差会在往返测试里变成静默漂移。
+ */
+function transitionSpeed(duration: number): 'fast' | 'med' | 'slow' {
+  if (duration <= 200) return 'fast';
+  if (duration <= 400) return 'med';
+  return 'slow';
+}
+
+export function transitionXml(transition?: SlideTransition): string {
+  if (!transition || transition.type === 'none') return '';
+  const effect = transition.type === 'push' ? '<p:push dir="l"/>' : '<p:fade/>';
+  const advClick = transition.advanceOnClick ? '1' : '0';
+  return `<p:transition spd="${transitionSpeed(transition.duration)}" advClick="${advClick}">${effect}</p:transition>`;
+}
+
+/** 飞入的起始偏移（相对形状宽度的比例）；PowerPoint 自带 Fly In 的观感约 1/4 页宽 */
+const FLY_START_FORMULA = '#ppt_x-0.25';
+
+/**
+ * `p:timing`：把 `buildTimeline` 的「单击分组」翻译成 mainSeq 下的 par 树。
+ *
+ * 层级与 PowerPoint 自己写出来的一致：
+ * `par(等待单击) > par(delay=0) > par(单个效果，nodeType=clickEffect/withEffect/afterEffect)`。
+ * 同一组内各效果用 `p:cond delay`（相对本组起点，毫秒）表达先后，与播放层共用同一份时间线。
+ */
+export function timingXml(animations?: readonly AnimationStep[]): string {
+  if (!animations || animations.length === 0) return '';
+  // 先按已分配 spid 过滤，再做分组：隐藏元素的动画不能进时间线，否则组数是错的
+  const playable = animations.filter((step) => shapeIdOf(step.elementId) !== undefined);
+  if (playable.length === 0) return '';
+
+  const groups = buildTimeline(playable);
+  let idSeqTiming = 3; // 1 = tmRoot, 2 = mainSeq
+  const nextId = (): number => {
+    idSeqTiming += 1;
+    return idSeqTiming;
+  };
+
+  const leafXml = (step: AnimationStep, start: number, nodeType: string): string => {
+    const spid = shapeIdOf(step.elementId) as number;
+    const effect =
+      step.effect === 'flyIn'
+        ? { presetId: 2, presetSubtype: 4 }
+        : { presetId: 10, presetSubtype: 0 };
+    const set =
+      `<p:set><p:cBhvr><p:cTn id="${nextId()}" dur="1" fill="hold">` +
+      '<p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn>' +
+      `<p:tgtEl><p:spTgt spid="${spid}"/></p:tgtEl>` +
+      '<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>' +
+      '</p:cBhvr><p:to><p:strVal val="visible"/></p:to></p:set>';
+    // 飞入靠位移表达，再叠一层淡入会与 PowerPoint 的 Fly In 不一致；淡入才写 animEffect
+    const motion =
+      step.effect === 'flyIn'
+        ? '<p:anim calcmode="lin" valueType="num"><p:cBhvr additive="base">' +
+          `<p:cTn id="${nextId()}" dur="${step.duration}" fill="hold"/>` +
+          `<p:tgtEl><p:spTgt spid="${spid}"/></p:tgtEl>` +
+          '<p:attrNameLst><p:attrName>ppt_x</p:attrName></p:attrNameLst></p:cBhvr>' +
+          `<p:tavLst><p:tav tm="0"><p:val><p:strVal val="${FLY_START_FORMULA}"/></p:val></p:tav></p:tavLst>` +
+          '</p:anim>'
+        : '<p:animEffect transition="in" filter="fade"><p:cBhvr>' +
+          `<p:cTn id="${nextId()}" dur="${step.duration}"/>` +
+          `<p:tgtEl><p:spTgt spid="${spid}"/></p:tgtEl>` +
+          '</p:cBhvr></p:animEffect>';
+    return (
+      '<p:par>' +
+      `<p:cTn id="${nextId()}" presetID="${effect.presetId}" presetClass="entr" ` +
+      `presetSubtype="${effect.presetSubtype}" fill="hold" grpId="0" nodeType="${nodeType}">` +
+      `<p:stCondLst><p:cond delay="${start}"/></p:stCondLst>` +
+      `<p:childTnLst>${set}${motion}</p:childTnLst>` +
+      '</p:cTn></p:par>'
+    );
+  };
+
+  const groupXml = groups
+    .map((group) => {
+      const steps = group.steps
+        .map(({ step, start }, index) => {
+          const trigger = step.trigger;
+          const nodeType =
+            index === 0
+              ? 'clickEffect'
+              : trigger === 'withPrevious'
+                ? 'withEffect'
+                : trigger === 'afterPrevious'
+                  ? 'afterEffect'
+                  : 'clickEffect';
+          return leafXml(step, start, nodeType);
+        })
+        .join('');
+      return (
+        '<p:par>' +
+        `<p:cTn id="${nextId()}" fill="hold">` +
+        '<p:stCondLst><p:cond delay="indefinite"/></p:stCondLst>' +
+        '<p:childTnLst><p:par>' +
+        `<p:cTn id="${nextId()}" fill="hold">` +
+        '<p:stCondLst><p:cond delay="0"/></p:stCondLst>' +
+        `<p:childTnLst>${steps}</p:childTnLst>` +
+        '</p:cTn></p:par></p:childTnLst>' +
+        '</p:cTn></p:par>'
+      );
+    })
+    .join('');
+
+  // bldLst 声明每个参与构建的形状（grpId 与上面 cTn 的 grpId 对应）
+  const buildIds = [...new Set(playable.map((step) => shapeIdOf(step.elementId) as number))];
+  const bldLst =
+    '<p:bldLst>' +
+    buildIds.map((spid) => `<p:bldP spid="${spid}" grpId="0" build="allAtOnce"/>`).join('') +
+    '</p:bldLst>';
+
+  return [
+    '<p:timing><p:tnLst><p:par>' +
+      '<p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>',
+    '<p:seq concurrent="1" nextAc="seek">' +
+      '<p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>',
+    groupXml,
+    '</p:childTnLst></p:cTn>',
+    '<p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>',
+    '<p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>',
+    '</p:seq></p:childTnLst></p:cTn></p:par></p:tnLst>',
+    bldLst,
+    '</p:timing>',
+  ].join('');
 }
 
 const ALIGN_ATTR: Record<TextAlign, string> = {
@@ -497,11 +645,18 @@ function reserveShapeIds(elements: SlideElement[]): void {
   }
 }
 
+/** Per-slide motion: transition (≤1) + entrance animations (P2-5) */
+export interface SlideMotion {
+  transition?: SlideTransition;
+  animations?: readonly AnimationStep[];
+}
+
 /** Assemble the full slide XML */
 export function slideXml(
   elements: SlideElement[],
   relMap: Map<string, string>,
   background?: SlideBackground,
+  motion?: SlideMotion,
 ): string {
   reserveShapeIds(elements);
   const body = elements.map((element) => elementXml(element, relMap)).join('');
@@ -523,6 +678,9 @@ export function slideXml(
     '</p:spTree>',
     '</p:cSld>',
     '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>',
+    // CT_Slide 的子元素顺序固定：cSld → clrMapOvr → transition → timing → extLst
+    transitionXml(motion?.transition),
+    timingXml(motion?.animations),
     '</p:sld>',
   ].join('');
 }

@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-This file lists the third-party components shipped with **SynTools 0.8.3** and their licenses;
+This file lists the third-party components shipped with **SynTools 0.9.0** and their licenses;
 it applies to the web build, the desktop installer (Tauri) and the enterprise server deployment.
 
 This project itself is released under **AGPL-3.0-only** (see `LICENSE`). If you bought a commercial license,
@@ -13,8 +13,8 @@ these notices still apply: they govern third-party components and do not change 
 
 | Scope | Components | Notes |
 | --- | --- | --- |
-| Runtime npm dependencies | 535 | packages shipped in the build (deduplicated by name) |
-| Rust crates (desktop) | 389 + 50 not cached locally | crates inside the Tauri app binary |
+| Runtime npm dependencies | 537 | packages shipped in the build (deduplicated by name) |
+| Rust crates (desktop) | 438 + 1 not cached locally | crates inside the Tauri app binary |
 
 Every component is under a permissive license, file-level copyleft, or a font license; **none are GPL / AGPL / SSPL / non-commercial**.
 CI enforces this with `pnpm license:check` (npm) and `cargo deny check licenses` (Rust).
@@ -23,7 +23,7 @@ CI enforces this with `pnpm license:check` (npm) and `cargo deny check licenses`
 
 | License | Packages |
 | --- | --- |
-| MIT | 375 |
+| MIT | 377 |
 | ISC | 64 |
 | Apache-2.0 | 45 |
 | BSD-3-Clause | 25 |
@@ -90,7 +90,7 @@ The current dependency tree contains **no GPL / AGPL / SSPL / Commons Clause / n
 ## 4. Runtime npm dependency list
 
 <details>
-<summary>Expand all 535 packages</summary>
+<summary>Expand all 537 packages</summary>
 
 | Package | Version | License | Declared choice |
 | --- | --- | --- | --- |
@@ -515,6 +515,7 @@ The current dependency tree contains **no GPL / AGPL / SSPL / Commons Clause / n
 | pngjs | 5.0.0 | MIT |  |
 | points-on-curve | 0.2.0 | MIT |  |
 | points-on-path | 0.2.1 | MIT |  |
+| polygon-clipping | 0.15.7 | MIT |  |
 | pptxgenjs | 3.12.0 | MIT |  |
 | prettier | 3.9.6 | MIT |  |
 | prettier-plugin-java | 2.10.4 | Apache-2.0 |  |
@@ -580,6 +581,7 @@ The current dependency tree contains **no GPL / AGPL / SSPL / Commons Clause / n
 | smol-toml | 1.8.0 | BSD-3-Clause |  |
 | sonner | 2.0.8 | MIT |  |
 | source-map-js | 1.2.1 | BSD-3-Clause |  |
+| splaytree | 3.2.3 | MIT |  |
 | sprintf-js | 1.0.3 | BSD-3-Clause |  |
 | sql-formatter | 15.8.2 | MIT |  |
 | stackblur-canvas | 2.7.0 | MIT |  |
@@ -637,17 +639,17 @@ The current dependency tree contains **no GPL / AGPL / SSPL / Commons Clause / n
 Only the desktop (Tauri) binary contains these crates; the web and enterprise server builds do not.
 
 <details>
-<summary>Expand the license distribution of 389 crates</summary>
+<summary>Expand the license distribution of 438 crates</summary>
 
 | License | Crates |
 | --- | --- |
-| MIT OR Apache-2.0 | 186 |
-| MIT | 93 |
-| Apache-2.0 OR MIT | 20 |
+| MIT OR Apache-2.0 | 206 |
+| MIT | 100 |
+| Apache-2.0 OR MIT | 34 |
+| MIT/Apache-2.0 | 18 |
 | Unicode-3.0 | 18 |
-| Zlib OR Apache-2.0 OR MIT | 16 |
-| MIT/Apache-2.0 | 12 |
-| Unlicense OR MIT | 8 |
+| Zlib OR Apache-2.0 OR MIT | 17 |
+| Unlicense OR MIT | 9 |
 | MPL-2.0 | 5 |
 | Apache-2.0/MIT | 3 |
 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | 3 |
@@ -672,7 +674,7 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 </details>
 
 <details>
-<summary>Expand all 389 crates</summary>
+<summary>Expand all 438 crates</summary>
 
 | Crate | Version | License |
 | --- | --- | --- |
@@ -681,6 +683,7 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | alloc-no-stdlib | 2.0.4 | BSD-3-Clause |
 | alloc-stdlib | 0.2.4 | BSD-3-Clause |
 | android_log-sys | 0.3.2 | MIT OR Apache-2.0 |
+| android_logger | 0.15.1 | MIT OR Apache-2.0 |
 | android_system_properties | 0.1.6 | MIT OR Apache-2.0 |
 | anyhow | 1.0.104 | MIT OR Apache-2.0 |
 | atk | 0.18.2 | MIT |
@@ -705,9 +708,11 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | bytes | 1.12.1 | MIT |
 | cairo-rs | 0.18.5 | MIT |
 | cairo-sys-rs | 0.18.2 | MIT |
+| camino | 1.2.5 | MIT OR Apache-2.0 |
 | cargo_metadata | 0.19.2 | MIT |
 | cargo_toml | 0.22.3 | Apache-2.0 OR MIT |
 | cargo-platform | 0.1.9 | MIT OR Apache-2.0 |
+| cc | 1.4.5 | MIT OR Apache-2.0 |
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
 | cfb | 0.7.3 | MIT |
 | cfg-expr | 0.15.8 | MIT OR Apache-2.0 |
@@ -726,6 +731,8 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | crypto-common | 0.1.7 | MIT OR Apache-2.0 |
 | cssparser | 0.36.0 | MPL-2.0 |
 | cssparser-macros | 0.6.1 | MPL-2.0 |
+| ctor | 0.8.0 | Apache-2.0 OR MIT |
+| ctor-proc-macro | 0.0.7 | Apache-2.0 OR MIT |
 | darling | 0.24.1 | MIT |
 | darling_core | 0.24.1 | MIT |
 | darling_macro | 0.24.1 | MIT |
@@ -747,14 +754,20 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | dpi | 0.1.2 | Apache-2.0 AND MIT |
 | dtoa | 1.0.11 | MIT OR Apache-2.0 |
 | dtoa-short | 0.3.5 | MPL-2.0 |
+| dtor | 0.3.0 | Apache-2.0 OR MIT |
+| dtor-proc-macro | 0.0.6 | Apache-2.0 OR MIT |
 | dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 |
 | dyn-clone | 1.0.20 | MIT OR Apache-2.0 |
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 |
+| embed-resource | 3.0.11 | MIT |
+| env_filter | 0.1.4 | MIT OR Apache-2.0 |
 | equivalent | 1.0.2 | Apache-2.0 OR MIT |
 | erased-serde | 0.4.10 | MIT OR Apache-2.0 |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
+| fern | 0.7.1 | MIT |
 | field-offset | 0.3.6 | MIT OR Apache-2.0 |
+| find-msvc-tools | 0.1.12 | MIT OR Apache-2.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
 | fnv | 1.0.7 | Apache-2.0 / MIT |
 | foldhash | 0.2.0 | Zlib |
@@ -801,6 +814,7 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | http-body | 1.1.0 | MIT |
 | http-body-util | 0.1.5 | MIT |
 | httparse | 1.10.1 | MIT OR Apache-2.0 |
+| hyper | 1.11.1 | MIT |
 | hyper-util | 0.1.20 | MIT |
 | iana-time-zone | 0.1.65 | MIT OR Apache-2.0 |
 | iana-time-zone-haiku | 0.1.2 | MIT OR Apache-2.0 |
@@ -825,17 +839,22 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | jiff | 0.2.35 | Unlicense OR MIT |
 | jiff-core | 0.1.0 | Unlicense OR MIT |
 | jiff-static | 0.2.35 | Unlicense OR MIT |
+| jiff-tzdb | 0.1.8 | Unlicense OR MIT |
 | jiff-tzdb-platform | 0.1.3 | Unlicense OR MIT |
 | jni | 0.21.1 | MIT/Apache-2.0 |
 | jni-sys | 0.3.1 | MIT OR Apache-2.0 |
 | jni-sys | 0.4.1 | MIT OR Apache-2.0 |
 | jni-sys-macros | 0.4.1 | MIT OR Apache-2.0 |
+| js-sys | 0.3.105 | MIT OR Apache-2.0 |
+| json-patch | 3.0.1 | MIT/Apache-2.0 |
+| jsonptr | 0.6.3 | MIT OR Apache-2.0 |
 | keyboard-types | 0.7.0 | MIT OR Apache-2.0 |
 | libappindicator | 0.9.0 | Apache-2.0 OR MIT |
 | libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT |
 | libc | 0.2.189 | MIT OR Apache-2.0 |
 | libdbus-sys | 0.2.7 | Apache-2.0/MIT |
 | libloading | 0.7.4 | ISC |
+| libredox | 0.1.23 | MIT |
 | litemap | 0.8.3 | Unicode-3.0 |
 | lock_api | 0.4.14 | MIT OR Apache-2.0 |
 | log | 0.4.34 | MIT OR Apache-2.0 |
@@ -845,12 +864,14 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | mime | 0.3.17 | MIT OR Apache-2.0 |
 | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
 | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 |
+| mio | 1.2.3 | MIT |
 | muda | 0.19.3 | Apache-2.0 OR MIT |
 | ndk | 0.9.0 | MIT OR Apache-2.0 |
 | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
 | new_debug_unreachable | 1.0.6 | MIT |
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
+| num_threads | 0.1.7 | MIT OR Apache-2.0 |
 | num-conv | 0.2.2 | MIT OR Apache-2.0 |
 | num-traits | 0.2.19 | MIT OR Apache-2.0 |
 | objc2 | 0.6.4 | MIT |
@@ -930,6 +951,8 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | serde_repr | 0.1.21 | MIT OR Apache-2.0 |
 | serde_spanned | 0.6.9 | MIT OR Apache-2.0 |
 | serde_spanned | 1.1.1 | MIT OR Apache-2.0 |
+| serde_with | 3.23.0 | MIT OR Apache-2.0 |
+| serde_with_macros | 3.23.0 | MIT OR Apache-2.0 |
 | serde-untagged | 0.1.9 | MIT OR Apache-2.0 |
 | serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 |
 | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
@@ -939,6 +962,7 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | simd-adler32 | 0.3.10 | MIT |
 | siphasher | 1.0.3 | MIT/Apache-2.0 |
 | slab | 0.4.12 | MIT |
+| smallvec | 1.16.0 | MIT OR Apache-2.0 |
 | socket2 | 0.6.5 | MIT OR Apache-2.0 |
 | softbuffer | 0.4.8 | MIT OR Apache-2.0 |
 | soup3 | 0.5.0 | MIT |
@@ -947,14 +971,25 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | string_cache | 0.9.0 | MIT OR Apache-2.0 |
 | string_cache_codegen | 0.6.1 | MIT OR Apache-2.0 |
 | strsim | 0.11.1 | MIT |
+| swift-rs | 1.0.8 | MIT OR Apache-2.0 |
 | syn | 1.0.109 | MIT OR Apache-2.0 |
 | syn | 2.0.119 | MIT OR Apache-2.0 |
+| syn | 3.0.5 | MIT OR Apache-2.0 |
 | sync_wrapper | 1.0.2 | Apache-2.0 |
 | synstructure | 0.13.2 | MIT |
 | system-deps | 6.2.2 | MIT OR Apache-2.0 |
 | tao | 0.35.3 | Apache-2.0 |
 | tao-macros | 0.1.4 | MIT OR Apache-2.0 |
 | target-lexicon | 0.12.16 | Apache-2.0 WITH LLVM-exception |
+| tauri | 2.11.5 | Apache-2.0 OR MIT |
+| tauri-build | 2.6.3 | Apache-2.0 OR MIT |
+| tauri-codegen | 2.6.3 | Apache-2.0 OR MIT |
+| tauri-macros | 2.6.3 | Apache-2.0 OR MIT |
+| tauri-plugin | 2.6.3 | Apache-2.0 OR MIT |
+| tauri-plugin-log | 2.9.1 | Apache-2.0 OR MIT |
+| tauri-runtime | 2.11.3 | Apache-2.0 OR MIT |
+| tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT |
+| tauri-utils | 2.9.3 | Apache-2.0 OR MIT |
 | tauri-winres | 0.3.6 | MIT |
 | tendril | 0.5.1 | MIT OR Apache-2.0 |
 | thiserror | 1.0.69 | MIT OR Apache-2.0 |
@@ -965,11 +1000,13 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | time-core | 0.1.9 | MIT OR Apache-2.0 |
 | time-macros | 0.2.32 | MIT OR Apache-2.0 |
 | tinystr | 0.8.4 | Unicode-3.0 |
+| tinyvec | 1.13.2 | Zlib OR Apache-2.0 OR MIT |
 | tinyvec_macros | 0.1.1 | MIT OR Apache-2.0 OR Zlib |
 | tokio | 1.53.1 | MIT |
 | tokio-util | 0.7.19 | MIT |
 | toml | 0.8.2 | MIT OR Apache-2.0 |
 | toml | 0.9.12+spec-1.1.0 | MIT OR Apache-2.0 |
+| toml | 1.1.5+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_datetime | 0.6.3 | MIT OR Apache-2.0 |
 | toml_datetime | 0.7.5+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_datetime | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 |
@@ -988,9 +1025,15 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | try-lock | 0.2.5 | MIT |
 | typeid | 1.0.3 | MIT OR Apache-2.0 |
 | typenum | 1.20.1 | MIT OR Apache-2.0 |
+| unic-char-property | 0.9.0 | MIT/Apache-2.0 |
+| unic-char-range | 0.9.0 | MIT/Apache-2.0 |
+| unic-common | 0.9.0 | MIT/Apache-2.0 |
+| unic-ucd-ident | 0.9.0 | MIT/Apache-2.0 |
+| unic-ucd-version | 0.9.0 | MIT/Apache-2.0 |
 | unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
 | url | 2.5.8 | MIT OR Apache-2.0 |
+| urlpattern | 0.3.0 | MIT |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
 | uuid | 1.26.0 | Apache-2.0 OR MIT |
 | version_check | 0.9.5 | MIT/Apache-2.0 |
@@ -1001,8 +1044,14 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | want | 0.3.1 | MIT |
 | wasi | 0.11.1+wasi-snapshot-preview1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | wasip2 | 1.0.4+wasi-0.2.12 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
+| wasm-bindgen | 0.2.128 | MIT OR Apache-2.0 |
+| wasm-bindgen-futures | 0.4.78 | MIT OR Apache-2.0 |
+| wasm-bindgen-macro | 0.2.128 | MIT OR Apache-2.0 |
+| wasm-bindgen-macro-support | 0.2.128 | MIT OR Apache-2.0 |
+| wasm-bindgen-shared | 0.2.128 | MIT OR Apache-2.0 |
 | wasm-streams | 0.5.0 | MIT OR Apache-2.0 |
 | web_atoms | 0.2.6 | MIT OR Apache-2.0 |
+| web-sys | 0.3.105 | MIT OR Apache-2.0 |
 | webkit2gtk | 2.0.2 | MIT |
 | webkit2gtk-sys | 2.0.2 | MIT |
 | webview2-com | 0.38.2 | MIT |
@@ -1012,6 +1061,7 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | winapi-i686-pc-windows-gnu | 0.4.0 | MIT/Apache-2.0 |
 | winapi-util | 0.1.11 | Unlicense OR MIT |
 | winapi-x86_64-pc-windows-gnu | 0.4.0 | MIT/Apache-2.0 |
+| window-vibrancy | 0.6.0 | Apache-2.0 OR MIT |
 | windows | 0.61.3 | MIT OR Apache-2.0 |
 | windows_aarch64_gnullvm | 0.42.2 | MIT OR Apache-2.0 |
 | windows_aarch64_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
@@ -1051,6 +1101,7 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 | winnow | 0.5.40 | MIT |
 | winnow | 0.7.15 | MIT |
 | winnow | 1.0.4 | MIT |
+| winreg | 0.55.0 | MIT |
 | wit-bindgen | 0.57.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | writeable | 0.6.4 | Unicode-3.0 |
 | wry | 0.55.1 | Apache-2.0 OR MIT |
@@ -1068,7 +1119,7 @@ Only the desktop (Tauri) binary contains these crates; the web and enterprise se
 
 </details>
 
-> The licenses of 50 crates could not be read from the local registry cache (common for dependencies not yet unpacked).
+> The licenses of 1 crates could not be read from the local registry cache (common for dependencies not yet unpacked).
 > Running `pnpm license:check:rust` re-checks with `cargo-deny` over the full dependency graph; trust that result.
 
 ## 6. Full license texts

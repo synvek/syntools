@@ -1,4 +1,9 @@
-import { applyColorTransform, EMU_PER_PX, emuToPx, normalizeHex } from '../core';
+import {
+  applyColorTransform,
+  EMU_PER_PX,
+  emuToPx,
+  normalizeHex,
+} from '../../../core/drawing/geometry';
 import { attr, childOf, childrenOf, localNameOf, numAttr, type XmlNode } from './xml';
 
 /**

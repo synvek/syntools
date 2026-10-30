@@ -1,9 +1,9 @@
 import { create } from 'zustand';
+import { resolvePresetGeometry } from '../../core/drawing/shapeDefs';
 import {
   clampBounds,
   computeAlign,
   computeDistribute,
-  resolvePresetGeometry,
   unionBounds,
   type AlignMode,
   type AlignBox,
@@ -27,7 +27,7 @@ import {
   movePathControl,
   removePathAnchor,
   togglePathNodeSmooth,
-} from './model/custGeom';
+} from '../../core/drawing/custGeom';
 import { migrateDoc } from './model/migrate';
 import { replaceInDoc, type FindOptions, type TextHit } from './model/search';
 import { applyStyleSnapshot, extractStyleSnapshot, type StyleSnapshot } from './model/style';
@@ -79,6 +79,8 @@ export interface ImportReport {
   /** Number of elements downgraded to placeholder boxes */
   placeholders: number;
   skipped: string[];
+  /** 未能还原的切换/动画标识（P2-5.5），如 `anim:preset22`；空数组表示全部还原 */
+  unsupportedMotion?: string[];
 }
 
 interface SlideState {

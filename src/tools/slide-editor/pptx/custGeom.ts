@@ -1,4 +1,4 @@
-import { commandsToSvg } from '../model/custGeom';
+import { commandsToSvg } from '../../../core/drawing/custGeom';
 import type { PathCommand, ShapeGeometry } from '../model/types';
 import { attr, childOf, childrenNamed, childrenOf, localNameOf, type XmlNode } from './xml';
 

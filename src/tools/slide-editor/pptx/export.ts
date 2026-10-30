@@ -88,6 +88,36 @@ function relMapFor(
 }
 
 /**
+ * pptxgenjs writes no `p:transition` / `p:timing` at all, so any document with a transition or an
+ * entrance animation has to go through the hand-written channel (P2-5.4). This is a hard routing
+ * rule, not a fallback: the alternative would be losing the motion silently.
+ */
+export function hasSlideMotion(doc: SlideDoc): boolean {
+  return doc.slides.some(
+    (slide) =>
+      Boolean(slide.transition && slide.transition.type !== 'none') ||
+      (slide.animations?.length ?? 0) > 0,
+  );
+}
+
+/**
+ * 动画**单独**把文档推去手写通道时，会连带降级的元素数量（原生图表 / 公式在手写通道里只是占位框）。
+ * 只统计"本来会走 pptxgen"的文档 —— 已经因为 avLst/custGeom 走手写通道的文档不用重复提示。
+ */
+export function motionExportDegradations(doc: SlideDoc): number {
+  if (!hasSlideMotion(doc) || requiresLegacy(doc)) return 0;
+  let count = 0;
+  const walk = (elements: SlideElement[]): void => {
+    for (const element of elements) {
+      if (element.type === 'chart' || element.type === 'formula') count += 1;
+      else if (element.type === 'group') walk(element.children);
+    }
+  };
+  for (const slide of doc.slides) walk(slide.elements);
+  return count;
+}
+
+/**
  * pptxgenjs does not expose shape adjustment values (`a:avLst`) or connector bindings
  * (`a:stCxn`/`a:endCxn`), so documents that use them must go through the hand-written channel.
  */
@@ -122,7 +152,7 @@ export async function exportPptx(
 ): Promise<ToolResult<Uint8Array>> {
   if (!doc.slides || doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
 
-  if (options.channel !== 'legacy' && !requiresLegacy(doc)) {
+  if (options.channel !== 'legacy' && !hasSlideMotion(doc) && !requiresLegacy(doc)) {
     const { exportPptxPptxGen } = await import('./exportPptxgen');
     const result = await exportPptxPptxGen(doc);
     if (result.ok) return result;
@@ -212,7 +242,13 @@ export async function exportPptxLegacy(doc: SlideDoc): Promise<ToolResult<Uint8A
       ? // Image rels occupy rId2..rId(n+1); notes take the next free slot to avoid a clash
         { rId: `rId${rels.length + 2}`, target: `notesSlide${index + 1}.xml` }
       : null;
-    zip.file(`ppt/slides/slide${index + 1}.xml`, slideXml(elements, relMap, slide.background));
+    zip.file(
+      `ppt/slides/slide${index + 1}.xml`,
+      slideXml(elements, relMap, slide.background, {
+        transition: slide.transition,
+        animations: slide.animations,
+      }),
+    );
     zip.file(
       `ppt/slides/_rels/slide${index + 1}.xml.rels`,
       slideRelsXml(rels, layoutIndexById.get(slide.layoutId ?? '') ?? 0, notes),

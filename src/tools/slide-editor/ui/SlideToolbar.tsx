@@ -10,7 +10,7 @@ import {
   createTextElement,
 } from '../model/factory';
 import { createMediaFromFile } from '../model/media';
-import { hasCustomGeometry } from '../model/custGeom';
+import { hasCustomGeometry } from '../../../core/drawing/custGeom';
 import type { ShapeGeometry } from '../model/types';
 import { containerElements, useSlideStore } from '../store';
 import { FormatBar } from './FormatBar';

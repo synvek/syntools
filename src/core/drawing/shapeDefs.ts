@@ -1,4 +1,4 @@
-import type { ShapeGeometry } from './types';
+import type { ShapeGeometry } from './geometry';
 
 /**
  * Shape preset catalogue.
@@ -10,6 +10,11 @@ import type { ShapeGeometry } from './types';
  *
  * Documents only persist `geom.prst` + `geom.adj`; everything here is derived, so
  * adding a preset never changes the file schema.
+ *
+ * It also carries the **static** `prst → geometry` table used when importing a file that
+ * references a shape we have no adjustable definition for, plus `resolvePresetGeometry`
+ * (adjustable definitions win, the static table is the fallback). Living in the shared
+ * kernel (P2-6) means the rich-text / spreadsheet shape layers get the same 40+ outlines.
  */
 export type ShapeGroup = 'basic' | 'arrow' | 'star' | 'flowchart' | 'callout' | 'math';
 
@@ -729,4 +734,214 @@ export function resolveShapeGeometry(
   // exported), so an untouched shape does not force the legacy export channel.
   const values = { ...shapeAdjustValues({ prst, adj: stored }), ...(stored ?? {}) };
   return { ...def.outline(values), adj: stored };
+}
+/* ------------------------- DrawingML preset geometry mapping ------------------------- */
+
+/** Normalized polygon vertices (each point is [x,y], values 0~1) */
+function flatPoints(points: number[][]): number[] {
+  return points.flat();
+}
+
+const PRST_GEOMS: Record<string, ShapeGeometry> = {
+  // Rectangle family
+  rect: { kind: 'rect', prst: 'rect' },
+  roundRect: { kind: 'rect', radius: 0.167, prst: 'roundRect' },
+  snip1Rect: { kind: 'rect', prst: 'snip1Rect' },
+  snipRoundRect: { kind: 'rect', radius: 0.083, prst: 'snipRoundRect' },
+  frame: { kind: 'rect', prst: 'frame' },
+  // Ellipse family
+  ellipse: { kind: 'ellipse', prst: 'ellipse' },
+  // Triangle family
+  triangle: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.5, 0],
+      [1, 1],
+      [0, 1],
+    ]),
+    prst: 'triangle',
+  },
+  rtTriangle: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0, 0],
+      [1, 1],
+      [0, 1],
+    ]),
+    prst: 'rtTriangle',
+  },
+  // Isosceles triangle (apex up). prst used to be mislabeled rtTriangle, which changed the shape on export
+  isoTriangle: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.5, 0],
+      [1, 1],
+      [0, 1],
+    ]),
+    prst: 'isoTriangle',
+  },
+  // Diamond / trapezoid
+  diamond: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.5, 0],
+      [1, 0.5],
+      [0.5, 1],
+      [0, 0.5],
+    ]),
+    prst: 'diamond',
+  },
+  trapezoid: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.2, 0],
+      [0.8, 0],
+      [1, 1],
+      [0, 1],
+    ]),
+    prst: 'trapezoid',
+  },
+  // Regular pentagon (apex up, vertices on a circumcircle of radius 0.5)
+  pentagon: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.5, 0],
+      [0.976, 0.345],
+      [0.794, 0.905],
+      [0.206, 0.905],
+      [0.024, 0.345],
+    ]),
+    prst: 'pentagon',
+  },
+  // Home plate (DrawingML homePlate): previously mistaken for a pentagon geometry
+  homePlate: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.5, 0],
+      [1, 0.38],
+      [0.82, 1],
+      [0.18, 1],
+      [0, 0.38],
+    ]),
+    prst: 'homePlate',
+  },
+  hexagon: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.25, 0],
+      [0.75, 0],
+      [1, 0.5],
+      [0.75, 1],
+      [0.25, 1],
+      [0, 0.5],
+    ]),
+    prst: 'hexagon',
+  },
+  octagon: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.29, 0],
+      [0.71, 0],
+      [1, 0.29],
+      [1, 0.71],
+      [0.71, 1],
+      [0.29, 1],
+      [0, 0.71],
+      [0, 0.29],
+    ]),
+    prst: 'octagon',
+  },
+  // Arrow family
+  rightArrow: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0, 0.25],
+      [0.6, 0.25],
+      [0.6, 0],
+      [1, 0.5],
+      [0.6, 1],
+      [0.6, 0.75],
+      [0, 0.75],
+    ]),
+    prst: 'rightArrow',
+  },
+  leftArrow: {
+    kind: 'polygon',
+    points: flatPoints([
+      [1, 0.25],
+      [0.4, 0.25],
+      [0.4, 0],
+      [0, 0.5],
+      [0.4, 1],
+      [0.4, 0.75],
+      [1, 0.75],
+    ]),
+    prst: 'leftArrow',
+  },
+  upArrow: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.5, 0],
+      [1, 0.4],
+      [0.75, 0.4],
+      [0.75, 1],
+      [0.25, 1],
+      [0.25, 0.4],
+      [0, 0.4],
+    ]),
+    prst: 'upArrow',
+  },
+  downArrow: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0.5, 1],
+      [1, 0.6],
+      [0.75, 0.6],
+      [0.75, 0],
+      [0.25, 0],
+      [0.25, 0.6],
+      [0, 0.6],
+    ]),
+    prst: 'downArrow',
+  },
+  chevron: {
+    kind: 'polygon',
+    points: flatPoints([
+      [0, 0],
+      [0.6, 0],
+      [1, 0.5],
+      [0.6, 1],
+      [0, 1],
+      [0.4, 0.5],
+    ]),
+    prst: 'chevron',
+  },
+  // Star family
+  star5: { kind: 'star', innerRatio: 0.382, prst: 'star' },
+  star: { kind: 'star', innerRatio: 0.382, prst: 'star' },
+  star4: { kind: 'star', innerRatio: 0.4, prst: 'star4' },
+  star6: { kind: 'star', innerRatio: 0.4, prst: 'star6' },
+  star8: { kind: 'star', innerRatio: 0.45, prst: 'star8' },
+  star12: { kind: 'star', innerRatio: 0.5, prst: 'star12' },
+  star16: { kind: 'star', innerRatio: 0.5, prst: 'star16' },
+  star24: { kind: 'star', innerRatio: 0.55, prst: 'star24' },
+  star32: { kind: 'star', innerRatio: 0.6, prst: 'star32' },
+};
+
+/** prstGeom → render geometry; unknown shapes degrade to a same-size rect (keeping the original prst name) */
+export function resolvePresetGeometry(prst: string, adj?: Record<string, number>): ShapeGeometry {
+  return (
+    resolveShapeGeometry(prst, adj) ?? {
+      ...(PRST_GEOMS[prst] ?? { kind: 'rect' as const }),
+      prst: prst || 'rect',
+      ...(adj ? { adj } : {}),
+    }
+  );
+}
+
+/** Number of star points (prst: star5 → 5) */
+export function starPoints(prst: string): number {
+  const direct = /^star(\d+)$/.exec(prst);
+  if (direct) return Math.max(3, Number(direct[1]));
+  return 5;
 }

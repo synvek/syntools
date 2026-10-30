@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
-import { resolvePresetGeometry } from '../core';
+import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import { CHART_TYPES, themePalette } from '../model/chart';
 import {
   createChartElement,

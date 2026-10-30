@@ -1,5 +1,6 @@
 import Konva from 'konva';
-import { resolvePresetGeometry, toRad } from '../core';
+import { toRad } from '../core';
+import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import type {
   Fill,
   GradientFill,
@@ -13,7 +14,7 @@ import type {
   TextBody,
 } from '../model/types';
 import { scaleBodyFonts } from '../model/text';
-import { commandsToSvg, hasCustomGeometry, scaleCommands } from '../model/custGeom';
+import { commandsToSvg, hasCustomGeometry, scaleCommands } from '../../../core/drawing/custGeom';
 import { createChartNode } from './chartNode';
 import { createFormulaNode, createIconNode } from './shapeNodes';
 import { acquireImage } from './imageCache';
