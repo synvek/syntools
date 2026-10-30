@@ -54,6 +54,29 @@ async function slideXmlOf(bytes: Uint8Array, part = 'ppt/slides/slide1.xml'): Pr
   return (await zip.file(part)?.async('string')) ?? '';
 }
 
+/**
+ * Rewrite slide1.xml of an exported package, so tests can exercise markup our own writer never
+ * produces (hidden objects, underline variants, …) without hand-building a whole pptx.
+ */
+async function patchSlideXml(
+  bytes: Uint8Array,
+  patch: (xml: string) => string,
+): Promise<Uint8Array> {
+  const zip = await JSZip.loadAsync(bytes);
+  const xml = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+  zip.file('ppt/slides/slide1.xml', patch(xml));
+  return zip.generateAsync({ type: 'uint8array' });
+}
+
+async function importBytes(bytes: Uint8Array): Promise<SlideDoc> {
+  const imported = await importPptxFile(new File([bytes], 'patched.pptx'));
+  expect(imported.ok).toBe(true);
+  if (!imported.ok) throw new Error(imported.error);
+  return imported.value.doc;
+}
+
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+
 function textDoc(configure: (text: TextElement) => void): SlideDoc {
   const doc = createDoc('fidelity');
   const text = createTextElement(doc, 'Spacing sample') as TextElement;
@@ -455,5 +478,110 @@ describe('图表标题', () => {
     expect(element.options?.legend).toBe(false);
     expect(element.options?.dataLabels).toBe(true);
     expect(element.options?.gridLines).toBe(false);
+  });
+
+  it('系列颜色导入为 options.palette', async () => {
+    const doc = createDoc('chart-palette');
+    const chart = createChartElement(doc, 'bar') as ChartElement;
+    chart.options = {
+      legend: true,
+      dataLabels: false,
+      gridLines: true,
+      palette: ['#C00000', '#2E75B6'],
+    };
+    doc.slides[0].elements = [chart];
+
+    const back = await roundTripDefault(doc);
+    const element = back.slides[0].elements[0] as ChartElement;
+    expect(element.options?.palette?.slice(0, 2).map((color) => color.toUpperCase())).toEqual([
+      '#C00000',
+      '#2E75B6',
+    ]);
+  });
+});
+
+describe('隐藏对象', () => {
+  it('cNvPr@hidden="1" 导入为 visible=false', async () => {
+    const doc = createDoc('hidden');
+    const shape = createShapeElement(doc, { kind: 'rect', prst: 'rect' }) as ShapeElement;
+    shape.name = 'Hidden Shape';
+    doc.slides[0].elements = [shape];
+
+    const exported = await exportPptxLegacy(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    // Our writer never emits hidden objects (export policy), so flip the flag by hand
+    const patched = await patchSlideXml(exported.value, (xml) =>
+      xml.replace('name="Hidden Shape"', 'name="Hidden Shape" hidden="1"'),
+    );
+
+    const back = await importBytes(patched);
+    expect(back.slides[0].elements[0]?.visible).toBe(false);
+  });
+});
+
+describe('图片边框与圆角', () => {
+  it('写出 roundRect + 描边', async () => {
+    const doc = createDoc('image-frame');
+    doc.media['media-1'] = {
+      id: 'media-1',
+      mime: 'image/png',
+      width: 1,
+      height: 1,
+      bytes: PNG_BYTES,
+    };
+    const image: ImageElement = {
+      id: 'img-1',
+      type: 'image',
+      x: 40,
+      y: 40,
+      width: 320,
+      height: 240,
+      mediaId: 'media-1',
+      cornerRadius: 24,
+      stroke: { color: '#FF0000', width: 3 },
+    };
+    doc.slides[0].elements = [image];
+
+    const exported = await exportPptxLegacy(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    const xml = await slideXmlOf(exported.value);
+    expect(xml).toContain('<a:prstGeom prst="roundRect">');
+    // 24 / min(320, 240) = 0.1
+    expect(xml).toContain('fmla="val 10000"');
+    expect(xml).toContain('<a:srgbClr val="FF0000">');
+  });
+});
+
+describe('run 字体与下划线', () => {
+  it('字体写满 latin / ea / cs 三个槽位并能读回', async () => {
+    const doc = textDoc((text) => {
+      text.body.paragraphs[0].runs = [{ text: '中文', style: { font: '微软雅黑' } }];
+    });
+    const exported = await exportPptxLegacy(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    expect(await slideXmlOf(exported.value)).toContain(
+      '<a:latin typeface="微软雅黑"/><a:ea typeface="微软雅黑"/><a:cs typeface="微软雅黑"/>',
+    );
+
+    const back = await roundTrip(doc);
+    const element = back.slides[0].elements[0] as TextElement;
+    expect(element.body.paragraphs[0].runs[0]?.style?.font).toBe('微软雅黑');
+  });
+
+  it('a:u 的非 sng 款式也识别为下划线', async () => {
+    const doc = textDoc((text) => {
+      text.body.paragraphs[0].runs = [{ text: 'u', style: { underline: true } }];
+    });
+    const exported = await exportPptxLegacy(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    const patched = await patchSlideXml(exported.value, (xml) => xml.replace('u="sng"', 'u="dbl"'));
+
+    const back = await importBytes(patched);
+    const element = back.slides[0].elements[0] as TextElement;
+    expect(element.body.paragraphs[0].runs[0]?.style?.underline).toBe(true);
   });
 });

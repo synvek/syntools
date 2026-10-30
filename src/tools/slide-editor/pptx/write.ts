@@ -264,7 +264,9 @@ function strokeXml(
   ends?: { head?: LineElement['head']; tail?: LineElement['tail'] },
   opacity = 1,
 ): string {
-  if (!stroke) return '<a:noFill/>';
+  // "No stroke" means the a:ln element is absent: emitting <a:noFill/> here put a second fill
+  // property into a:spPr (right after the fill), which the schema does not allow
+  if (!stroke) return '';
   const width = Math.max(1, Math.round(stroke.width * 12700));
   const color = stroke.color.replace(/^#/, '').toUpperCase();
   const head = ends?.head ? `<a:headEnd type="${ends.head}"/>` : '';
@@ -301,12 +303,18 @@ function runXml(text: string, style: RunStyle | undefined): string {
       `<a:solidFill><a:srgbClr val="${style.color.replace(/^#/, '').toUpperCase()}"/></a:solidFill>`,
     );
   }
-  if (style?.font) parts.push(`<a:latin typeface="${escapeXml(style.font)}"/>`);
-  // Character highlight (a:highlight) must follow latin and come after uLn
+  // CT_TextCharacterProperties order: fill → highlight → latin/ea/cs. Highlight used to be written
+  // after a:latin, which is out of schema order.
   if (style?.highlight) {
     parts.push(
       `<a:highlight><a:srgbClr val="${style.highlight.replace(/^#/, '').toUpperCase()}"/></a:highlight>`,
     );
+  }
+  // The model has a single typeface per run, so it fills all three OOXML slots — otherwise a CJK
+  // font chosen by the user would only apply to Latin glyphs and silently fall back for East Asian
+  if (style?.font) {
+    const face = escapeXml(style.font);
+    parts.push(`<a:latin typeface="${face}"/><a:ea typeface="${face}"/><a:cs typeface="${face}"/>`);
   }
   // Note: run-level hyperlinks need an OPC relationship (rId), and the legacy channel doesn't maintain
   // hyperlink rels, so a:hlinkClick is not written here — hyperlinks are fully exported by the pptxgen channel.
@@ -442,10 +450,10 @@ function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
 }
 
 /**
- * Text box geometry: a rounded text box is a `roundRect` whose `adj1` is the radius as a fraction of
- * the shorter side (the same convention `resolvePresetGeometry` uses for shapes).
+ * Geometry for text boxes and pictures: a rounded frame is a `roundRect` whose `adj1` is the radius
+ * as a fraction of the shorter side (the same convention `resolvePresetGeometry` uses for shapes).
  */
-function textGeomXml(element: { width: number; height: number; cornerRadius?: number }): string {
+function roundedGeomXml(element: { width: number; height: number; cornerRadius?: number }): string {
   const min = Math.min(element.width, element.height);
   const radius = min > 0 ? Math.min(0.5, Math.max(0, (element.cornerRadius ?? 0) / min)) : 0;
   if (radius <= 0) return '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
@@ -461,7 +469,7 @@ function textXml(element: TextElement): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${textGeomXml(element)}${fillXml(element.fill, element.opacity ?? 1)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${roundedGeomXml(element)}${fillXml(element.fill, element.opacity ?? 1)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
     textBodyXml(element.body, 'p'),
     '</p:sp>',
   ].join('');
@@ -477,6 +485,8 @@ function imageXml(
     height: number;
     rotation?: number;
     opacity?: number;
+    stroke?: Stroke;
+    cornerRadius?: number;
   },
   rId: string,
   crop: { left: number; top: number; right: number; bottom: number } | undefined,
@@ -492,7 +502,8 @@ function imageXml(
     '<p:pic>',
     `<p:nvPicPr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Image ${id}`)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>`,
     `<p:blipFill><a:blip r:embed="${rId}">${alphaXml}</a:blip>${srcRect}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`,
-    `<p:spPr>${xfrmXml(element)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>`,
+    // A picture frame keeps its rounding and outline (previously forced to a plain rect with no line)
+    `<p:spPr>${xfrmXml(element)}${roundedGeomXml(element)}${strokeXml(element.stroke)}</p:spPr>`,
     '</p:pic>',
   ].join('');
 }

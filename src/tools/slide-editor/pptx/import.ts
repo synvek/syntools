@@ -8,6 +8,7 @@ import { createMediaFromBytes, mimeFromFilename } from '../model/media';
 import { normalizeChartData } from '../model/chart';
 import type {
   ChartElement,
+  ChartOptions,
   ChartSeries,
   ChartType,
   Fill,
@@ -158,6 +159,14 @@ function nameOf(node: XmlNode, nvTag: string): string | undefined {
 }
 
 /**
+ * `cNvPr/@hidden="1"`: the object still exists in the file but isn't painted.
+ * Importing it as visible flipped hidden helper objects into the deck on the first save.
+ */
+function hiddenOf(node: XmlNode, nvTag: string): boolean {
+  return boolAttr(cNvPrOf(node, nvTag), 'hidden');
+}
+
+/**
  * `a:hlinkClick/@r:id` → URL.
  *
  * Hyperlinks are OPC relationships (`TargetMode="External"`); internal jump links use
@@ -183,15 +192,23 @@ function parseRunStyle(
   const style: RunStyle = {};
   const size = numAttr(node, 'sz');
   if (size !== undefined) style.size = size / 100;
-  const typeface = attr(childOf(node, 'latin'), 'typeface');
+  // Latin text is written to a:latin, but CJK decks frequently set only a:ea (or a:cs); falling back
+  // keeps the run's typeface instead of silently resetting it to the theme font
+  const typeface =
+    attr(childOf(node, 'latin'), 'typeface') ??
+    attr(childOf(node, 'ea'), 'typeface') ??
+    attr(childOf(node, 'cs'), 'typeface');
   const font = resolveTypeface(typeface, theme);
   if (font) style.font = font;
   const resolved = resolveColorNode(childOf(node, 'solidFill'), palette);
   if (resolved) style.color = resolved.color;
   if (attr(node, 'b') === '1') style.bold = true;
   if (attr(node, 'i') === '1') style.italic = true;
-  if (attr(node, 'u') === 'sng') style.underline = true;
-  if (attr(node, 'strike') === 'sng') style.strike = true;
+  // Any underline style (sng / dbl / heavy / dotted …) collapses onto the model's boolean flag
+  const underline = attr(node, 'u');
+  if (underline && underline !== 'none') style.underline = true;
+  const strike = attr(node, 'strike');
+  if (strike && strike !== 'noStrike') style.strike = true;
   // `a:spc` is letter spacing in 1/100 pt; the model stores points
   const spacing = numAttr(node, 'spc');
   if (spacing !== undefined) style.spacing = spacing / 100;
@@ -365,6 +382,7 @@ function parseShape(
     placeholder,
     ...(name ? { name } : {}),
     ...(hyperlink ? { hyperlink } : {}),
+    ...(hiddenOf(node, 'nvSpPr') ? { visible: false } : {}),
     ...(shadow ? { shadow } : {}),
     ...(glow ? { glow } : {}),
   };
@@ -404,6 +422,7 @@ async function parsePicture(
   ctx: ImportContext,
   slidePart: string,
   rels: Map<string, Relationship>,
+  palette: Palette,
 ): Promise<SlideElement | undefined> {
   const spPr = childOf(node, 'spPr');
   const xfrm = readXfrm(childOf(spPr, 'xfrm'));
@@ -416,6 +435,12 @@ async function parsePicture(
   const opacity = alphaAmt === undefined ? undefined : Math.min(1, Math.max(0, alphaAmt / 100000));
   const name = nameOf(node, 'nvPicPr');
   const hyperlink = hyperlinkOf(cNvPrOf(node, 'nvPicPr'), ctx);
+  // Pictures can carry a frame line and a rounding radius too; both were dropped on import
+  const stroke = parseStroke(childOf(spPr, 'ln'), palette);
+  const pictureGeom = parseGeom(spPr);
+  const roundAdj = pictureGeom.prst === 'roundRect' ? (pictureGeom.adj?.adj1 ?? 0.167) : 0;
+  const cornerRadius =
+    roundAdj > 0 ? Math.round(roundAdj * Math.min(emuPx(xfrm?.width), emuPx(xfrm?.height))) : 0;
 
   const srcRect = childOf(blipFill, 'srcRect');
   const crop =
@@ -439,8 +464,11 @@ async function parsePicture(
     mediaId: mediaId ?? '',
     ...(crop ? { crop } : {}),
     ...(opacity !== undefined && opacity < 1 ? { opacity } : {}),
+    ...(cornerRadius > 0 ? { cornerRadius } : {}),
+    ...(stroke ? { stroke } : {}),
     ...(name ? { name } : {}),
     ...(hyperlink ? { hyperlink } : {}),
+    ...(hiddenOf(node, 'nvPicPr') ? { visible: false } : {}),
   } as ImageElement;
   if (!mediaId) {
     ctx.skipped.add('image');
@@ -514,6 +542,7 @@ function parseConnector(
   if (/^(bentConnector|curvedConnector)/.test(prst)) element.route = 'elbow';
   const name = nameOf(node, 'nvCxnSpPr');
   if (name) element.name = name;
+  if (hiddenOf(node, 'nvCxnSpPr')) element.visible = false;
   const head = parseArrowKind(attr(childOf(ln, 'headEnd'), 'type'));
   const tail = parseArrowKind(attr(childOf(ln, 'tailEnd'), 'type'));
   if (head) element.head = head;
@@ -777,11 +806,7 @@ function chartTitleOf(chart: XmlNode | undefined): string {
  * PowerPoint always emits a `c:dLbls` block, so the block alone does not mean "labels on" — the
  * `c:showVal` flag is what toggles it. Likewise `c:majorGridlines` only exists while they are on.
  */
-function chartOptionsOf(chart: XmlNode | undefined): {
-  legend: boolean;
-  dataLabels: boolean;
-  gridLines: boolean;
-} {
+function chartOptionsOf(chart: XmlNode | undefined, palette: Palette): ChartOptions {
   const plotArea = childOf(chart, 'plotArea');
   const legend = childOf(chart, 'legend') !== undefined;
   const plotNode = childrenOf(plotArea).find((node) => /Chart$/.test(localNameOf(node)));
@@ -790,7 +815,12 @@ function chartOptionsOf(chart: XmlNode | undefined): {
   const gridLines = childrenNamed(plotArea, 'valAx').some(
     (axis) => childOf(axis, 'majorGridlines') !== undefined,
   );
-  return { legend, dataLabels, gridLines };
+  // Series colours live on c:ser/c:spPr; keeping them makes an imported chart match the source
+  // instead of snapping back to the theme palette
+  const colors = childrenNamed(plotNode, 'ser')
+    .map((ser) => resolveColorNode(childOf(childOf(ser, 'spPr'), 'solidFill'), palette)?.color)
+    .filter((color): color is string => Boolean(color));
+  return { legend, dataLabels, gridLines, ...(colors.length > 0 ? { palette: colors } : {}) };
 }
 
 /** Read a chart part → the data part of a ChartElement; returns null when no data can be parsed */
@@ -799,12 +829,13 @@ async function readChartData(
   slidePart: string,
   rels: Map<string, Relationship>,
   chartRId: string,
+  palette: Palette,
 ): Promise<{
   chartType: ChartType;
   categories: string[];
   series: ChartSeries[];
   title: string;
-  options: { legend: boolean; dataLabels: boolean; gridLines: boolean };
+  options: ChartOptions;
 } | null> {
   const rel = rels.get(chartRId);
   if (!rel) return null;
@@ -843,7 +874,7 @@ async function readChartData(
     categories,
     series,
     title: chartTitleOf(chart),
-    options: chartOptionsOf(chart),
+    options: chartOptionsOf(chart, palette),
   };
 }
 
@@ -865,6 +896,7 @@ async function parseGraphicFrame(
     id: nextId(ctx, 'el'),
     ...baseRect(xfrm ?? { x: 0, y: 0, width: 0, height: 0 }),
     ...(name ? { name } : {}),
+    ...(hiddenOf(node, 'nvGraphicFramePr') ? { visible: false } : {}),
   };
   const tableNode = childOf(graphicData, 'tbl');
   if (tableNode) {
@@ -877,7 +909,7 @@ async function parseGraphicFrame(
   const chartNode = childOf(graphicData, 'chart');
   const chartRId = chartNode ? (attr(chartNode, 'id') ?? attr(chartNode, 'r:id')) : undefined;
   if (chartRId) {
-    const data = await readChartData(ctx, slidePart, rels, chartRId);
+    const data = await readChartData(ctx, slidePart, rels, chartRId, palette);
     if (data) {
       const normalized = normalizeChartData(data.categories, data.series, data.chartType);
       const element: ChartElement = {
@@ -914,7 +946,7 @@ async function parseSpTreeNode(
     case 'sp':
       return parseShape(node, ctx, palette, theme);
     case 'pic':
-      return parsePicture(node, ctx, slidePart, rels);
+      return parsePicture(node, ctx, slidePart, rels, palette);
     case 'cxnSp':
       return parseConnector(node, ctx, palette);
     case 'graphicFrame':
@@ -992,6 +1024,7 @@ async function parseGroup(
     rotation: xfrm?.rotation === undefined ? undefined : xfrm.rotation / 60000,
     children: mapped,
     ...(nameOf(node, 'nvGrpSpPr') ? { name: nameOf(node, 'nvGrpSpPr') as string } : {}),
+    ...(hiddenOf(node, 'nvGrpSpPr') ? { visible: false } : {}),
     ...(xfrm?.flipX ? { flipX: true } : {}),
     ...(xfrm?.flipY ? { flipY: true } : {}),
   };
