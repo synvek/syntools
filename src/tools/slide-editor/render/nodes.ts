@@ -6,6 +6,7 @@ import type {
   GradientFill,
   LineElement,
   MediaAsset,
+  ShadowStyle,
   ShapeElement,
   ShapeGeometry,
   SlideElement,
@@ -19,6 +20,7 @@ import { createChartNode } from './chartNode';
 import { createFormulaNode, createIconNode } from './shapeNodes';
 import { acquireImage } from './imageCache';
 import { layoutTextBody } from './textLayout';
+import { NO_SHADOW_PROPS, outerShadowProps } from './effects';
 
 /**
  * SlideElement → Konva.Node factory and updater.
@@ -104,6 +106,19 @@ function applyStroke(node: Konva.Shape, stroke: Stroke | undefined): void {
   node.stroke(stroke.color);
   node.strokeWidth(stroke.width);
   node.dash(stroke.dash ?? []);
+}
+
+/**
+ * P2-S3: draw the element's outer shadow on canvas.
+ *
+ * Until this landed the `shadow` field only existed in the exported pptx and the property panel —
+ * the editing canvas, thumbnails and PNG export never painted it, so "what you see" and "what you
+ * get" disagreed. Konva needs the props on the painted child shape (a Group has no shadow), hence
+ * the per-branch calls below.
+ */
+function applyShadow(node: Konva.Shape, shadow: ShadowStyle | undefined, fromStroke = false): void {
+  const props = outerShadowProps(shadow, { fromStroke });
+  node.setAttrs(props ?? NO_SHADOW_PROPS);
 }
 
 /** Text body → Konva.Group (split into fragments per run, preserving mixed styles) */
@@ -448,8 +463,10 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
           fill: fillToColor(element.fill),
           opacity: fillToAlpha(element.fill) ?? 1,
           cornerRadius: element.cornerRadius ?? 0,
+          name: 'textBg',
         });
         applyStroke(bg, element.stroke);
+        applyShadow(bg, element.shadow);
         group.add(bg);
       }
       group.add(createTextNodes(element.body, element.width, element.height));
@@ -460,6 +477,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       shape.name('shapeBody');
       applyFill(shape, element.fill, element.width, element.height);
       applyStroke(shape, element.stroke);
+      applyShadow(shape, element.shadow);
       group.add(shape);
       if (element.body) group.add(createTextNodes(element.body, element.width, element.height));
       break;
@@ -485,6 +503,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       }
       node.setAttr('mediaId', element.mediaId);
       applyStroke(node, element.stroke);
+      applyShadow(node, element.shadow);
       group.add(node);
       break;
     }
@@ -498,6 +517,8 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
         hitStrokeWidth: Math.max(8, element.stroke?.width ?? 1),
       });
       line.name('lineBody');
+      // 线条没有填充：Konva 只从描边取阴影，必须显式打开 fromStroke
+      applyShadow(line, element.shadow, true);
       group.add(line);
       // Keep the binding on the node so pointer.ts can make connectors follow a dragged shape
       // without a store round-trip (the store path would rebuild the node mid-drag).
@@ -637,6 +658,7 @@ export function patchElementNode(
       imageNode.height(element.height);
       // Images take the property fast path; corner radius and crop must be synced here or they won't refresh
       imageNode.cornerRadius(element.cornerRadius ?? 0);
+      applyShadow(imageNode, element.shadow);
       const crop = element.crop;
       if (crop) {
         imageNode.crop({
@@ -655,6 +677,7 @@ export function patchElementNode(
       lineNode.points(element.points);
       lineNode.stroke(element.stroke?.color ?? '#000000');
       lineNode.strokeWidth(element.stroke?.width ?? 1);
+      applyShadow(lineNode, element.shadow, true);
     }
   }
 }
