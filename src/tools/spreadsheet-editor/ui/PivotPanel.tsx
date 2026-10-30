@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PivotAggregation, PivotConfig, PivotField, PivotResult } from '../pivot';
+import type { PivotAggregation, PivotConfig, PivotField, PivotKey, PivotResult } from '../pivot';
 import { PIVOT_AGGREGATIONS } from '../pivot';
 
 /**
@@ -29,6 +29,7 @@ interface PivotPanelProps {
   onRemove: () => void;
   onClose: () => void;
   onExport: () => void;
+  onPrint: () => void;
 }
 
 const AGGREGATION_KEYS: Record<PivotAggregation, string> = {
@@ -59,6 +60,7 @@ export function PivotPanel({
   onRemove,
   onClose,
   onExport,
+  onPrint,
 }: PivotPanelProps) {
   const { t } = useTranslation();
   const [openFilter, setOpenFilter] = useState<number | null>(null);
@@ -81,8 +83,10 @@ export function PivotPanel({
     delete next.filters[column];
     if (zone === 'rows') next.rows = [...next.rows, column];
     if (zone === 'cols') next.cols = [...next.cols, column];
-    // 值区首版只支持一个字段：第二个字段会静默改变结果列的含义，不如明确替换
-    if (zone === 'values') next.values = [{ column, aggregation: 'sum' }];
+    // 值区支持多个字段（Excel 的"列 × 值"二维表头）；同一列不会重复加入
+    if (zone === 'values') {
+      next.values = [...next.values, { column, aggregation: 'sum' }];
+    }
     if (zone === 'filters') next.filters[column] = [];
     onConfigChange(next);
   };
@@ -123,6 +127,13 @@ export function PivotPanel({
   };
 
   const aggregationLabel = (aggregation: PivotAggregation) => t(AGGREGATION_KEYS[aggregation]);
+
+  const blocks = result?.blocks ?? [];
+  const multi = blocks.length > 1;
+  const hasCols = (result?.colFields.length ?? 0) > 0;
+  const colCount = hasCols ? (result?.colKeys.length ?? 0) : 1;
+  const labelOfKeys = (keys: PivotKey[]) =>
+    keys.map((key) => (key.blank ? t('tools.sheet.pivotBlank') : key.label)).join(' / ');
 
   return (
     <div
@@ -320,20 +331,54 @@ export function PivotPanel({
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-800">
-                    <th className="sticky left-0 z-10 bg-gray-50 px-2 py-1 text-left font-medium dark:bg-gray-800" />
-                    {result.colKeys.map((keys, index) => (
-                      <th key={index} className="px-2 py-1 text-right font-medium">
-                        {keys
-                          .map((key) => (key.blank ? t('tools.sheet.pivotBlank') : key.label))
-                          .join(' / ')}
+                    <th
+                      rowSpan={multi ? 2 : 1}
+                      className="sticky left-0 z-10 bg-gray-50 px-2 py-1 text-left font-medium dark:bg-gray-800"
+                    />
+                    {Array.from({ length: colCount }).map((_, colIndex) => (
+                      <th
+                        key={`col-${colIndex}`}
+                        colSpan={multi ? blocks.length : 1}
+                        className="px-2 py-1 text-right font-medium"
+                      >
+                        {hasCols && result.colKeys[colIndex]
+                          ? labelOfKeys(result.colKeys[colIndex])
+                          : ''}
                       </th>
                     ))}
-                    {result.colFields.length > 0 ? (
-                      <th className="px-2 py-1 text-right font-medium">
+                    {hasCols ? (
+                      <th
+                        colSpan={multi ? blocks.length : 1}
+                        className="px-2 py-1 text-right font-medium"
+                      >
                         {t('tools.sheet.pivotGrandTotal')}
                       </th>
                     ) : null}
                   </tr>
+                  {multi ? (
+                    <tr className="bg-gray-50 text-[11px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      {Array.from({ length: colCount }).flatMap((_, colIndex) =>
+                        blocks.map((block) => (
+                          <th
+                            key={`v-${colIndex}-${block.label}`}
+                            className="px-2 py-0.5 text-right font-normal"
+                          >
+                            {block.label}
+                          </th>
+                        )),
+                      )}
+                      {hasCols
+                        ? blocks.map((block) => (
+                            <th
+                              key={`vt-${block.label}`}
+                              className="px-2 py-0.5 text-right font-normal"
+                            >
+                              {block.label}
+                            </th>
+                          ))
+                        : null}
+                    </tr>
+                  ) : null}
                 </thead>
                 <tbody>
                   {result.rowKeys.map((keys, rowIndex) => (
@@ -342,37 +387,59 @@ export function PivotPanel({
                       className="border-t border-gray-100 odd:bg-white even:bg-gray-50/60 dark:border-gray-800 dark:odd:bg-transparent dark:even:bg-gray-800/40"
                     >
                       <th className="sticky left-0 z-10 bg-inherit px-2 py-1 text-left font-normal">
-                        {keys
-                          .map((key) => (key.blank ? t('tools.sheet.pivotBlank') : key.label))
-                          .join(' / ')}
+                        {labelOfKeys(keys)}
                       </th>
-                      {result.cells[rowIndex].map((value, colIndex) => (
-                        <td key={colIndex} className="px-2 py-1 text-right tabular-nums">
-                          {value === null ? '' : formatCell(value)}
-                        </td>
-                      ))}
-                      {result.colFields.length > 0 ? (
-                        <td className="px-2 py-1 text-right font-medium tabular-nums">
-                          {result.rowTotals[rowIndex] === null
-                            ? ''
-                            : formatCell(result.rowTotals[rowIndex] as number)}
-                        </td>
-                      ) : null}
+                      {Array.from({ length: colCount }).flatMap((_, colIndex) =>
+                        blocks.map((block) => {
+                          const value = block.cells[rowIndex][colIndex];
+                          return (
+                            <td
+                              key={`c-${colIndex}-${block.label}`}
+                              className="px-2 py-1 text-right tabular-nums"
+                            >
+                              {value === null ? '' : formatCell(value)}
+                            </td>
+                          );
+                        }),
+                      )}
+                      {hasCols
+                        ? blocks.map((block) => {
+                            const value = block.rowTotals[rowIndex];
+                            return (
+                              <td
+                                key={`t-${block.label}`}
+                                className="px-2 py-1 text-right font-medium tabular-nums"
+                              >
+                                {value === null ? '' : formatCell(value)}
+                              </td>
+                            );
+                          })
+                        : null}
                     </tr>
                   ))}
-                  {result.colFields.length > 0 ? (
+                  {hasCols ? (
                     <tr className="border-t-2 border-gray-300 bg-gray-100 font-medium dark:border-gray-600 dark:bg-gray-800">
                       <th className="sticky left-0 z-10 bg-gray-100 px-2 py-1 text-left dark:bg-gray-800">
                         {t('tools.sheet.pivotGrandTotal')}
                       </th>
-                      {result.colTotals.map((value, index) => (
-                        <td key={index} className="px-2 py-1 text-right tabular-nums">
-                          {value === null ? '' : formatCell(value)}
+                      {Array.from({ length: colCount }).flatMap((_, colIndex) =>
+                        blocks.map((block) => {
+                          const value = block.colTotals[colIndex];
+                          return (
+                            <td
+                              key={`ct-${colIndex}-${block.label}`}
+                              className="px-2 py-1 text-right tabular-nums"
+                            >
+                              {value === null ? '' : formatCell(value)}
+                            </td>
+                          );
+                        }),
+                      )}
+                      {blocks.map((block) => (
+                        <td key={`gt-${block.label}`} className="px-2 py-1 text-right tabular-nums">
+                          {block.grandTotal === null ? '' : formatCell(block.grandTotal)}
                         </td>
                       ))}
-                      <td className="px-2 py-1 text-right tabular-nums">
-                        {result.grandTotal === null ? '' : formatCell(result.grandTotal)}
-                      </td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -393,6 +460,14 @@ export function PivotPanel({
           <span className="text-[11px] text-gray-500 dark:text-gray-400">
             {t('tools.sheet.pivotSnapshot')}
           </span>
+          <button
+            type="button"
+            onClick={onPrint}
+            disabled={empty || !result || result.rowKeys.length === 0}
+            className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+          >
+            {t('tools.sheet.pivotPrint')}
+          </button>
           <button
             type="button"
             onClick={onRemove}

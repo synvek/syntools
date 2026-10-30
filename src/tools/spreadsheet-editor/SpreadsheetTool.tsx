@@ -52,22 +52,15 @@ import {
 import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
 import { registerSpreadsheetStrings } from './strings';
 import {
-  createEmptySheet,
   createEmptySnapshot,
   exportSnapshotToBytes,
   importXlsxToSnapshot,
   type WorkbookSnapshot,
 } from './xlsx-io';
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
-import {
-  buildPivot,
-  collectFieldKeys,
-  computePivot,
-  pivotToMatrix,
-  readPivotSource,
-  type PivotConfig,
-} from './pivot';
+import { collectFieldKeys, computePivot, readPivotSource, type PivotConfig } from './pivot';
 import { registerPivotStrings } from './pivotStrings';
+import { appendPivotSheets, buildPivotSheet } from './pivotSheet';
 import { PivotPanel } from './ui/PivotPanel';
 import { PresentSheet } from './ui/PresentSheet';
 import { ChartOverlay } from './ui/ChartOverlay';
@@ -87,7 +80,7 @@ import {
   setThreadResolved,
   type CommentThread,
 } from '../../core/comments/model';
-import { printSheet, exportSheetPdf, type CellRange, type SheetPrintOptions } from './print';
+import { exportSheetPdf, type CellRange } from './print';
 import {
   createFidelityReport,
   isFidelityMuted,
@@ -97,7 +90,12 @@ import {
 import { FidelityDialog } from '@/core/components/FidelityDialog';
 import { collectExportIssues } from './fidelity';
 import { readWorkbookExtras, withWorkbookExtras, type WorkbookExtras } from './xlsx-extras';
-import { resolveUsedRange } from './print';
+import {
+  DEFAULT_SHEET_PRINT_OPTIONS,
+  printSheet,
+  resolveUsedRange,
+  type SheetPrintOptions,
+} from './print';
 import type { RawChartParts } from './rawChartParts';
 import { SheetTabs } from './SheetTabs';
 import './sheet.css';
@@ -111,6 +109,8 @@ registerPivotStrings(i18n);
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 /** 首版一个工作簿只保留一个透视表：多表会让"导出到哪张工作表"的语义含混 */
 const PIVOT_ID = 'pivot-1';
+/** 打印用的合成快照里只有一个工作表，id 固定即可 */
+const PIVOT_SHEET_ID = 'pivot-print';
 type BusyKind = 'import' | 'export' | null;
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -774,6 +774,29 @@ export default function SpreadsheetTool() {
     scheduleSaveRef.current();
   };
 
+  /**
+   * 打印/PDF：透视表不是 Univer 的工作表，直接 `window.print()` 打印不到它。
+   * 做法是把矩阵合成一个**独立的只读快照**再交给 `print.ts` —— 分页、宽表横向切分、
+   * 打印样式全部复用既有管线，不需要为透视表再写一套。
+   */
+  const handlePivotPrint = () => {
+    if (!pivotConfig || !pivotView) return;
+    const sheet = buildPivotSheet(
+      PIVOT_SHEET_ID,
+      pivotConfig,
+      pivotView.result,
+      t('tools.sheet.pivotBlank'),
+    );
+    if (!sheet) return;
+    const base = createEmptySnapshot(t('tools.sheet.pivotTitle'), univerLocale);
+    const snapshot: WorkbookSnapshot = {
+      ...base,
+      sheets: { [sheet.id]: sheet },
+      sheetOrder: [sheet.id],
+    };
+    void printSheet(snapshot, sheet.id, DEFAULT_SHEET_PRINT_OPTIONS as SheetPrintOptions, null);
+  };
+
   const handleExport = async () => {
     const handle = handleRef.current;
     if (!handle) return;
@@ -1273,6 +1296,7 @@ export default function SpreadsheetTool() {
           onRemove={handlePivotRemove}
           onClose={() => setPivotOpen(false)}
           onExport={() => void handleExport()}
+          onPrint={handlePivotPrint}
         />
       ) : null}
 
@@ -1316,42 +1340,4 @@ export default function SpreadsheetTool() {
       ) : null}
     </div>
   );
-}
-
-/**
- * 导出时把透视结果写成**静态值**工作表（P2-4.6 的兜底路线）。
- *
- * exceljs 4.4 写不出 `pivotTable` part，原生可刷新透视表需要自研 zip 注入（下一批）；
- * 这里先把矩阵落到普通单元格，保证"Excel 打开无修复提示、数值正确"，并在保真报告里
- * 标注不可刷新 —— 部分交付要说清楚，不能悄悄退化成一张看不出处的工作表。
- */
-function appendPivotSheets(
-  snapshot: WorkbookSnapshot,
-  configs: PivotConfig[],
-  blankLabel: string,
-): WorkbookSnapshot {
-  if (configs.length === 0) return snapshot;
-  const next: WorkbookSnapshot = {
-    ...snapshot,
-    sheets: { ...snapshot.sheets },
-    sheetOrder: [...snapshot.sheetOrder],
-  };
-  configs.forEach((config, index) => {
-    const result = buildPivot(snapshot, config);
-    if (result.rowKeys.length === 0) return;
-    const matrix = pivotToMatrix(result, config, blankLabel);
-    const id = `pivot${index + 1}`;
-    // 工作表重名在 Excel 里会被当成损坏：名字后面补序号保证唯一
-    const sheet = createEmptySheet(id, `${config.name || 'Pivot'} ${index + 1}`);
-    matrix.forEach((line, row) => {
-      line.forEach((value, column) => {
-        if (value === '' || value === undefined) return;
-        sheet.cellData[String(row)] ??= {};
-        sheet.cellData[String(row)][String(column)] = { v: value };
-      });
-    });
-    next.sheets[id] = sheet;
-    next.sheetOrder.push(id);
-  });
-  return next;
 }

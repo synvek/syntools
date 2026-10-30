@@ -58,6 +58,7 @@ function renderPanel(overrides: Partial<PivotConfig> = {}, rows: unknown[][] = S
     onRemove: vi.fn(),
     onClose: vi.fn(),
     onExport: vi.fn(),
+    onPrint: vi.fn(),
   };
   render(
     <PivotPanel

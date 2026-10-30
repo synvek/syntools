@@ -89,13 +89,30 @@ export interface PivotSource {
   emptyRows: number;
 }
 
+/** 一个值字段的结果块：多值字段时并排展开（Excel 的"列 × 值"二维表头） */
+export interface PivotBlock {
+  valueField: PivotValueField;
+  /** 该值字段在源区域里的列标签（表头第二行显示） */
+  label: string;
+  /** cells[row][col]，null = 该组合没有可聚合的值 */
+  cells: (number | null)[][];
+  rowTotals: (number | null)[];
+  colTotals: (number | null)[];
+  grandTotal: number | null;
+}
+
 export interface PivotResult {
   fields: PivotField[];
   rowFields: number[];
   colFields: number[];
   rowKeys: PivotKey[][];
   colKeys: PivotKey[][];
-  /** cells[row][col]，null = 该组合没有可聚合的值 */
+  /** 每个值字段一块（顺序与 `config.values` 一致） */
+  blocks: PivotBlock[];
+  /**
+   * `blocks[0]` 的快捷方式：单值字段是最常见的情况，UI / 导出 / 打印都能少一层下标。
+   * 多值场景请用 `blocks`，这里的数字只代表第一个值字段。
+   */
   cells: (number | null)[][];
   rowTotals: (number | null)[];
   colTotals: (number | null)[];
@@ -418,14 +435,27 @@ export function computePivot(config: PivotConfig, source: PivotSource): PivotRes
     return a.index - b.index;
   });
 
-  // 值字段只有第一个参与展示（首版：多值字段按列展开留待下一批）
-  const primary = effectiveValues[0];
   const empty = emptyAcc();
-  const sortedCells = orderRows.map((row) =>
-    orderCols.map((col) =>
-      aggregateOf(cells[row.index][col.index]?.[0] ?? empty, primary.aggregation),
+  // 每个值字段一块：同一份分组结果，按各自的聚合方式折算
+  const blocks: PivotBlock[] = effectiveValues.map((valueField, index) => ({
+    valueField,
+    label:
+      source.fields[valueField.column]?.label ??
+      columnIndexToName(config.range.startColumn + valueField.column),
+    cells: orderRows.map((row) =>
+      orderCols.map((col) =>
+        aggregateOf(cells[row.index][col.index]?.[index] ?? empty, valueField.aggregation),
+      ),
     ),
-  );
+    rowTotals: orderRows.map((row) =>
+      aggregateOf(rowTotals[row.index][index], valueField.aggregation),
+    ),
+    colTotals: orderCols.map((col) =>
+      aggregateOf(colTotals[col.index][index], valueField.aggregation),
+    ),
+    grandTotal: aggregateOf(grand[index], valueField.aggregation),
+  }));
+  const first = blocks[0];
 
   return {
     fields: source.fields,
@@ -433,10 +463,11 @@ export function computePivot(config: PivotConfig, source: PivotSource): PivotRes
     colFields,
     rowKeys: orderRows.map((item) => item.keys),
     colKeys: orderCols.map((item) => item.keys),
-    cells: sortedCells,
-    rowTotals: orderRows.map((row) => aggregateOf(rowTotals[row.index][0], primary.aggregation)),
-    colTotals: orderCols.map((col) => aggregateOf(colTotals[col.index][0], primary.aggregation)),
-    grandTotal: aggregateOf(grand[0], primary.aggregation),
+    blocks,
+    cells: first.cells,
+    rowTotals: first.rowTotals,
+    colTotals: first.colTotals,
+    grandTotal: first.grandTotal,
     skippedValues,
     truncated: source.truncated,
   };
@@ -468,8 +499,23 @@ export function pivotToMatrix(
   config: PivotConfig,
   blankLabel: string,
 ): (string | number)[][] {
-  const aggregation = config.values[0]?.aggregation ?? 'count';
-  const round = (value: number | null): number | null => {
+  const blocks = result.blocks.length
+    ? result.blocks
+    : [
+        {
+          valueField: config.values[0] ?? { column: 0, aggregation: 'count' as const },
+          label: '',
+          cells: result.cells,
+          rowTotals: result.rowTotals,
+          colTotals: result.colTotals,
+          grandTotal: result.grandTotal,
+        },
+      ];
+  const multi = blocks.length > 1;
+  const round = (
+    value: number | null,
+    aggregation: PivotValueField['aggregation'],
+  ): number | null => {
     if (value === null) return null;
     return aggregation === 'avg' ? Math.round(value * 100) / 100 : value;
   };
@@ -482,36 +528,48 @@ export function pivotToMatrix(
   const hasCols = result.colFields.length > 0;
   const header: (string | number)[] = [''];
   if (hasCols) {
-    for (const keys of result.colKeys) header.push(labelOf(keys));
+    for (const keys of result.colKeys) {
+      for (const block of blocks) {
+        // 多值字段：列键 × 值字段名，表头一眼能看出这列是谁的
+        header.push(multi ? `${labelOf(keys)} / ${block.label}` : labelOf(keys));
+      }
+    }
+    for (const block of blocks) header.push(multi ? block.label : '');
   } else {
     // 单列结果：表头写值字段名，导出/打印时才知道这列是什么
     header.push(result.fields[config.values[0]?.column ?? 0]?.label ?? '');
   }
-  // 没有列字段时只有一列"总计"，此时不需要再追加一个合计列
-  if (hasCols) header.push('');
 
   const matrix: (string | number)[][] = [header];
   result.rowKeys.forEach((keys, rowIndex) => {
     const line: (string | number)[] = [labelOf(keys)];
-    for (const value of result.cells[rowIndex]) {
-      const rounded = round(value);
-      line.push(rounded === null ? '' : rounded);
+    for (let col = 0; col < (hasCols ? result.colKeys.length : 1); col += 1) {
+      for (const block of blocks) {
+        const rounded = round(block.cells[rowIndex][col], block.valueField.aggregation);
+        line.push(rounded === null ? '' : rounded);
+      }
     }
     if (hasCols) {
-      const total = round(result.rowTotals[rowIndex]);
-      line.push(total === null ? '' : total);
+      for (const block of blocks) {
+        const total = round(block.rowTotals[rowIndex], block.valueField.aggregation);
+        line.push(total === null ? '' : total);
+      }
     }
     matrix.push(line);
   });
 
   if (hasCols) {
     const totals: (string | number)[] = [''];
-    for (const value of result.colTotals) {
-      const rounded = round(value);
-      totals.push(rounded === null ? '' : rounded);
+    for (let col = 0; col < result.colKeys.length; col += 1) {
+      for (const block of blocks) {
+        const rounded = round(block.colTotals[col], block.valueField.aggregation);
+        totals.push(rounded === null ? '' : rounded);
+      }
     }
-    const grand = round(result.grandTotal);
-    totals.push(grand === null ? '' : grand);
+    for (const block of blocks) {
+      const grand = round(block.grandTotal, block.valueField.aggregation);
+      totals.push(grand === null ? '' : grand);
+    }
     matrix.push(totals);
   }
 

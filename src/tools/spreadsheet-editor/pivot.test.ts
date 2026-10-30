@@ -358,3 +358,49 @@ describe('performance', () => {
     expect(elapsed).toBeLessThan(100);
   });
 });
+
+describe('multiple value fields', () => {
+  const DATA: unknown[][] = [
+    ['区域', '季度', '金额', '数量'],
+    ['华东', 'Q1', 100, 2],
+    ['华东', 'Q1', 50, 3],
+    ['华南', 'Q1', 30, 1],
+  ];
+
+  const multiConfig = (): PivotConfig =>
+    configOf({
+      range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 3 },
+      rows: [0],
+      cols: [1],
+      values: [
+        { column: 2, aggregation: 'sum' },
+        { column: 3, aggregation: 'avg' },
+      ],
+    });
+
+  it('returns one block per value field, each with its own aggregation', () => {
+    const result = buildPivot(sheetOf(DATA), multiConfig());
+    expect(result.blocks).toHaveLength(2);
+    expect(result.blocks[0].cells).toEqual([[150], [30]]);
+    expect(result.blocks[1].cells).toEqual([[2.5], [1]]);
+    // 快捷字段仍指向第一个值字段，单值调用方不需要改
+    expect(result.cells).toEqual(result.blocks[0].cells);
+    expect(result.blocks.map((block) => block.label)).toEqual(['金额', '数量']);
+  });
+
+  it('lays blocks side by side in the export matrix, with per-block totals', () => {
+    const result = buildPivot(sheetOf(DATA), multiConfig());
+    expect(pivotToMatrix(result, multiConfig(), '(空白)')).toEqual([
+      ['', 'Q1 / 金额', 'Q1 / 数量', '金额', '数量'],
+      ['华东', 150, 2.5, 150, 2.5],
+      ['华南', 30, 1, 30, 1],
+      ['', 180, 2, 180, 2],
+    ]);
+  });
+
+  it('keeps the single-value matrix layout unchanged', () => {
+    const result = buildPivot(sheetOf(SALES), configOf());
+    // 单值时不加值字段名，导出结果与上一版一致（老断言不会因为新特性变化）
+    expect(pivotToMatrix(result, configOf(), '(空白)')[0]).toEqual(['', 'Q1', 'Q2', '']);
+  });
+});
