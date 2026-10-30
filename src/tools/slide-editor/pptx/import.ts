@@ -771,6 +771,28 @@ function chartTitleOf(chart: XmlNode | undefined): string {
     .trim();
 }
 
+/**
+ * Chart display options: `c:legend` presence, `c:dLbls/c:showVal` and the value axis gridlines.
+ *
+ * PowerPoint always emits a `c:dLbls` block, so the block alone does not mean "labels on" — the
+ * `c:showVal` flag is what toggles it. Likewise `c:majorGridlines` only exists while they are on.
+ */
+function chartOptionsOf(chart: XmlNode | undefined): {
+  legend: boolean;
+  dataLabels: boolean;
+  gridLines: boolean;
+} {
+  const plotArea = childOf(chart, 'plotArea');
+  const legend = childOf(chart, 'legend') !== undefined;
+  const plotNode = childrenOf(plotArea).find((node) => /Chart$/.test(localNameOf(node)));
+  const dLbls = childOf(plotNode, 'dLbls') ?? childOf(childrenNamed(plotNode, 'ser')[0], 'dLbls');
+  const dataLabels = attr(childOf(dLbls, 'showVal'), 'val') === '1';
+  const gridLines = childrenNamed(plotArea, 'valAx').some(
+    (axis) => childOf(axis, 'majorGridlines') !== undefined,
+  );
+  return { legend, dataLabels, gridLines };
+}
+
 /** Read a chart part → the data part of a ChartElement; returns null when no data can be parsed */
 async function readChartData(
   ctx: ImportContext,
@@ -782,6 +804,7 @@ async function readChartData(
   categories: string[];
   series: ChartSeries[];
   title: string;
+  options: { legend: boolean; dataLabels: boolean; gridLines: boolean };
 } | null> {
   const rel = rels.get(chartRId);
   if (!rel) return null;
@@ -815,7 +838,13 @@ async function readChartData(
     name: seriesNameOf(node, index),
     values: seriesValuesOf(node),
   }));
-  return { chartType, categories, series, title: chartTitleOf(chart) };
+  return {
+    chartType,
+    categories,
+    series,
+    title: chartTitleOf(chart),
+    options: chartOptionsOf(chart),
+  };
 }
 
 /** graphicFrame: table → TableElement; chart → ChartElement; SmartArt / OLE → placeholder box */
@@ -857,7 +886,7 @@ async function parseGraphicFrame(
         chartType: data.chartType,
         categories: normalized.categories,
         series: normalized.series,
-        options: { legend: true, dataLabels: false, gridLines: true },
+        options: data.options,
         title: data.title,
         revision: 1,
       };

@@ -442,4 +442,18 @@ describe('图表标题', () => {
     expect(element.type).toBe('chart');
     expect(element.title).toBe('销售趋势');
   });
+
+  it('图例 / 数据标签 / 网格线开关往返保持', async () => {
+    const doc = createDoc('chart-options');
+    const chart = createChartElement(doc, 'bar') as ChartElement;
+    // Deliberately the inverse of the defaults (true / false / true) so a stale hard-coded value fails
+    chart.options = { legend: false, dataLabels: true, gridLines: false };
+    doc.slides[0].elements = [chart];
+
+    const back = await roundTripDefault(doc);
+    const element = back.slides[0].elements[0] as ChartElement;
+    expect(element.options?.legend).toBe(false);
+    expect(element.options?.dataLabels).toBe(true);
+    expect(element.options?.gridLines).toBe(false);
+  });
 });
