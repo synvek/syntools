@@ -135,6 +135,15 @@ export interface ShadowStyle {
   opacity?: number;
 }
 
+/** Outer glow (subset of DrawingML `a:glow`): a colored halo around the silhouette */
+export interface GlowStyle {
+  color: string;
+  /** Halo radius in px (DrawingML `rad`) */
+  radius: number;
+  /** 0~1, defaults to 1 */
+  opacity?: number;
+}
+
 interface ElementBase {
   id: string;
   x: number;
@@ -156,6 +165,8 @@ interface ElementBase {
   hyperlink?: string;
   /** Shadow */
   shadow?: ShadowStyle;
+  /** Outer glow (P2-S3) */
+  glow?: GlowStyle;
 }
 
 export interface TextElement extends ElementBase {

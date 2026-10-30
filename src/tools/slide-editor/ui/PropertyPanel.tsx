@@ -506,6 +506,30 @@ export function PropertyPanel() {
         </div>
       </Section>
 
+      {/* P2-S3.1: glow. 半径 0 视为"没有光晕" —— 否则会导出一个 rad="0" 的 a:glow */}
+      <Section title={t('tools.slide.panelGlow')}>
+        <Field label={t('tools.slide.glowColor')}>
+          <ColorInput
+            ariaLabel={t('tools.slide.glowColor')}
+            value={element.glow?.color ?? '#38BDF8'}
+            onChange={(color) => apply({ glow: { color, radius: 8, ...element.glow } })}
+          />
+        </Field>
+        <Field label={t('tools.slide.glowRadius')}>
+          <NumberInput
+            ariaLabel={t('tools.slide.glowRadius')}
+            value={Math.round(element.glow?.radius ?? 0)}
+            min={0}
+            max={80}
+            onChange={(radius) =>
+              apply({
+                glow: radius > 0 ? { color: '#38BDF8', ...element.glow, radius } : undefined,
+              })
+            }
+          />
+        </Field>
+      </Section>
+
       {/* Page-level settings only appear in normal view: in master view MasterView provides the master background entry */}
       {viewMode === 'normal' ? (
         <Section title={t('tools.slide.panelPage')}>

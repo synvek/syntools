@@ -33,7 +33,14 @@ import type {
 } from '../model/types';
 import type { ImportReport } from '../store';
 import { parseSlideMotion } from './timingImport';
-import { parseShadow, parseShapeFill, parseStroke, resolveColorNode, type Palette } from './color';
+import {
+  parseGlow,
+  parseShadow,
+  parseShapeFill,
+  parseStroke,
+  resolveColorNode,
+  type Palette,
+} from './color';
 import {
   loadZip,
   normalizePartPath,
@@ -284,6 +291,7 @@ function parseShape(
   const fill = fillFromParsed(parseShapeFill(spPr, palette));
   const stroke = parseStroke(childOf(spPr, 'ln'), palette);
   const shadow = parseShadow(spPr, palette);
+  const glow = parseGlow(spPr, palette);
   const body = parseTextBody(childOf(node, 'txBody'), palette, theme);
   const nvSpPr = childOf(node, 'nvSpPr');
   const ph = childOf(childOf(nvSpPr, 'nvPr'), 'ph');
@@ -295,6 +303,7 @@ function parseShape(
     ...baseRect(xfrm),
     placeholder,
     ...(shadow ? { shadow } : {}),
+    ...(glow ? { glow } : {}),
   };
   let element: SlideElement;
   if (body && geometry.kind === 'rect' && !fill && !stroke) {

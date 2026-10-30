@@ -124,6 +124,8 @@ export function motionExportDegradations(doc: SlideDoc): number {
 function requiresLegacy(doc: SlideDoc): boolean {
   const walk = (elements: SlideElement[]): boolean =>
     elements.some((element) => {
+      // pptxgenjs has no glow/effect API beyond a single shadow; a glow would silently disappear
+      if (element.glow) return true;
       if (element.type === 'shape') {
         // pptxgenjs has no path API, so custom geometry must go through the legacy writer
         if (element.geom.custGeom && element.geom.custGeom.length > 0) return true;

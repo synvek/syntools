@@ -3,6 +3,7 @@ import { toRad } from '../core';
 import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import type {
   Fill,
+  GlowStyle,
   GradientFill,
   LineElement,
   MediaAsset,
@@ -20,7 +21,7 @@ import { createChartNode } from './chartNode';
 import { createFormulaNode, createIconNode } from './shapeNodes';
 import { acquireImage } from './imageCache';
 import { layoutTextBody } from './textLayout';
-import { NO_SHADOW_PROPS, outerShadowProps } from './effects';
+import { NO_SHADOW_PROPS, glowShadowProps, outerShadowProps } from './effects';
 
 /**
  * SlideElement → Konva.Node factory and updater.
@@ -119,6 +120,27 @@ function applyStroke(node: Konva.Shape, stroke: Stroke | undefined): void {
 function applyShadow(node: Konva.Shape, shadow: ShadowStyle | undefined, fromStroke = false): void {
   const props = outerShadowProps(shadow, { fromStroke });
   node.setAttrs(props ?? NO_SHADOW_PROPS);
+}
+
+/**
+ * P2-S3.1: glow is drawn as a **duplicate behind** the real shape.
+ *
+ * Konva has one shadow slot per node, so a glow and an outer shadow cannot live on the same shape.
+ * The clone carries the halo (zero-offset shadow) and stays non-listening: it is paint, not a
+ * click target, and must not double up hit testing or the transformer.
+ */
+function addGlow(
+  group: Konva.Group,
+  source: Konva.Shape,
+  glow: GlowStyle | undefined,
+  fromStroke = false,
+): void {
+  const props = glowShadowProps(glow, { fromStroke });
+  if (!props) return;
+  const halo = source.clone({ listening: false }) as Konva.Shape;
+  halo.setAttrs(props);
+  halo.listening(false);
+  group.add(halo);
 }
 
 /** Text body → Konva.Group (split into fragments per run, preserving mixed styles) */
@@ -466,6 +488,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
           name: 'textBg',
         });
         applyStroke(bg, element.stroke);
+        addGlow(group, bg, element.glow);
         applyShadow(bg, element.shadow);
         group.add(bg);
       }
@@ -477,6 +500,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       shape.name('shapeBody');
       applyFill(shape, element.fill, element.width, element.height);
       applyStroke(shape, element.stroke);
+      addGlow(group, shape, element.glow);
       applyShadow(shape, element.shadow);
       group.add(shape);
       if (element.body) group.add(createTextNodes(element.body, element.width, element.height));
@@ -503,6 +527,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       }
       node.setAttr('mediaId', element.mediaId);
       applyStroke(node, element.stroke);
+      addGlow(group, node, element.glow);
       applyShadow(node, element.shadow);
       group.add(node);
       break;
@@ -517,7 +542,8 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
         hitStrokeWidth: Math.max(8, element.stroke?.width ?? 1),
       });
       line.name('lineBody');
-      // 线条没有填充：Konva 只从描边取阴影，必须显式打开 fromStroke
+      // 线条没有填充：Konva 只从描边取阴影/光晕，必须显式打开 fromStroke
+      addGlow(group, line, element.glow, true);
       applyShadow(line, element.shadow, true);
       group.add(line);
       // Keep the binding on the node so pointer.ts can make connectors follow a dragged shape

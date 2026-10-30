@@ -290,6 +290,15 @@ export interface ParsedShadow {
   opacity?: number;
 }
 
+/** Outer glow parsed from `a:glow` */
+export interface ParsedGlow {
+  color: string;
+  /** Halo radius in canvas px */
+  radius: number;
+  /** 0~1 */
+  opacity?: number;
+}
+
 export function parseShadow(spPr: XmlNode | undefined, palette: Palette): ParsedShadow | undefined {
   const effect = childOf(spPr, 'effectLst');
   const shadow = effect ? childOf(effect, 'outerShdw') : undefined;
@@ -304,6 +313,24 @@ export function parseShadow(spPr: XmlNode | undefined, palette: Palette): Parsed
     blur: emuToPx(numAttr(shadow, 'blurRad') ?? 0),
     offsetX: Math.round(distPx * Math.sin(radians)),
     offsetY: Math.round(-distPx * Math.cos(radians)),
+    opacity: resolved?.alpha,
+  };
+}
+
+/**
+ * Parse `a:effectLst/a:glow` (P2-S3). `rad` is EMU; the model stores canvas px like the shadow does.
+ */
+export function parseGlow(spPr: XmlNode | undefined, palette: Palette): ParsedGlow | undefined {
+  const effect = childOf(spPr, 'effectLst');
+  const glow = effect ? childOf(effect, 'glow') : undefined;
+  if (!glow) return undefined;
+  const resolved = resolveColorNode(glow, palette);
+  const radius = emuToPx(numAttr(glow, 'rad') ?? 0);
+  // A zero-radius glow renders as nothing; keeping it would export a meaningless a:glow
+  if (radius <= 0) return undefined;
+  return {
+    color: resolved?.color ?? '#000000',
+    radius,
     opacity: resolved?.alpha,
   };
 }

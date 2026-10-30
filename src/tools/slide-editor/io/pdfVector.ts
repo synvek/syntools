@@ -102,6 +102,7 @@ function lineElementSafe(element: LineElement): boolean {
 export function elementIsVectorSafe(element: SlideElement): boolean {
   if (element.visible === false) return true;
   if (element.shadow) return false;
+  if (element.glow) return false;
   if (element.rotation) return false;
   if (element.flipX || element.flipY) return false;
   switch (element.type) {

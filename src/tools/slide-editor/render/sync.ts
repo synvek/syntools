@@ -48,6 +48,9 @@ export function syncElements(
  * these elements are rebuilt every time to stay in sync with the model (the element count is bounded, so the cost is fine).
  */
 function isUpdatable(element: SlideElement): boolean {
+  // Glow is a duplicate node behind the shape, which the fast path knows nothing about: adding or
+  // removing it would leave a stale halo (or none at all), so those elements always rebuild.
+  if (element.glow) return false;
   // A group's children change after group/ungroup and the fast path doesn't update children, so rebuild those too
   return element.type === 'image' || element.type === 'line';
 }

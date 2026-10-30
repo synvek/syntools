@@ -4,6 +4,7 @@ import { buildTimeline } from '../model/animation';
 import type {
   AnimationStep,
   Fill,
+  GlowStyle,
   LineElement,
   Paragraph,
   RunStyle,
@@ -338,19 +339,40 @@ function bodyXml(body: TextBody): string {
 }
 
 /** Shadow → a:outerShdw (inside spPr's effectLst) */
-function shadowXml(shadow: ShadowStyle | undefined): string {
-  if (!shadow) return '';
+function outerShdwXml(shadow: ShadowStyle): string {
   const alpha = Math.round((shadow.opacity ?? 1) * ALPHA_UNIT);
   const dist = Math.round(Math.sqrt(shadow.offsetX ** 2 + shadow.offsetY ** 2) * EMU_PER_PX);
   const dir = Math.round((Math.atan2(shadow.offsetX, -shadow.offsetY) * 60000 * 180) / Math.PI);
-  const color = shadow.color.replace(/^#/, '').toUpperCase();
   return [
-    '<a:effectLst>',
     `<a:outerShdw blurRad="${pxToEmu(shadow.blur)}" dist="${dist}" dir="${dir}" rotWithShape="0">`,
-    `<a:srgbClr val="${color}"><a:alpha val="${alpha}"/></a:srgbClr>`,
+    `<a:srgbClr val="${hexOf(shadow.color)}"><a:alpha val="${alpha}"/></a:srgbClr>`,
     '</a:outerShdw>',
-    '</a:effectLst>',
   ].join('');
+}
+
+function glowXml(glow: GlowStyle): string {
+  const alpha = Math.round((glow.opacity ?? 1) * ALPHA_UNIT);
+  return [
+    `<a:glow rad="${pxToEmu(Math.max(0, glow.radius))}">`,
+    `<a:srgbClr val="${hexOf(glow.color)}"><a:alpha val="${alpha}"/></a:srgbClr>`,
+    '</a:glow>',
+  ].join('');
+}
+
+function hexOf(color: string): string {
+  return color.replace(/^#/, '').toUpperCase();
+}
+
+/**
+ * `a:effectLst` for an element. Child order is fixed by the schema
+ * (blur → fillOverlay → glow → innerShdw → outerShdw → prstShdw → reflection → softEdge),
+ * so glow has to come before the shadow even though the panel lists shadow first.
+ */
+function effectLstXml(element: { shadow?: ShadowStyle; glow?: GlowStyle }): string {
+  const parts: string[] = [];
+  if (element.glow) parts.push(glowXml(element.glow));
+  if (element.shadow) parts.push(outerShdwXml(element.shadow));
+  return parts.length > 0 ? `<a:effectLst>${parts.join('')}</a:effectLst>` : '';
 }
 
 /** Full txBody (namespace-qualified: shapes/tables/image text boxes use different prefixes) */
@@ -387,7 +409,7 @@ function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${geomXml(element.geom)}${fillXml(element.fill)}${strokeXml(element.stroke)}${shadowXml(element.shadow)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${geomXml(element.geom)}${fillXml(element.fill)}${strokeXml(element.stroke)}${effectLstXml(element)}</p:spPr>`,
   ];
   if (body) parts.push(textBodyXml(body, 'p'));
   return `<p:sp>${parts.join('')}</p:sp>`;
@@ -402,7 +424,7 @@ function textXml(element: TextElement): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fillXml(element.fill)}${strokeXml(element.stroke)}${shadowXml(element.shadow)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fillXml(element.fill)}${strokeXml(element.stroke)}${effectLstXml(element)}</p:spPr>`,
     textBodyXml(element.body, 'p'),
     '</p:sp>',
   ].join('');

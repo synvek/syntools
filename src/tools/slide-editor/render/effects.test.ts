@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NO_SHADOW_PROPS, outerShadowProps } from './effects';
+import { NO_SHADOW_PROPS, glowShadowProps, outerShadowProps } from './effects';
 
 /**
  * P2-S3.0: outer shadow on the canvas path.
@@ -60,5 +60,35 @@ describe('outerShadowProps', () => {
 
   it('清除投影用的 props 只有 shadowEnabled', () => {
     expect(NO_SHADOW_PROPS).toEqual({ shadowEnabled: false });
+  });
+});
+
+describe('glowShadowProps', () => {
+  it('光晕是零偏移的阴影（画在克隆节点上）', () => {
+    expect(glowShadowProps({ color: '#38bdf8', radius: 10, opacity: 0.5 })).toEqual({
+      shadowColor: '#38bdf8',
+      shadowBlur: 10,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0,
+      shadowOpacity: 0.5,
+      shadowEnabled: true,
+      shadowForStrokeEnabled: false,
+    });
+  });
+
+  it('没有光晕 / 半径 0 / 透明度 0 都不画', () => {
+    expect(glowShadowProps(undefined)).toBeUndefined();
+    expect(glowShadowProps({ color: '#fff', radius: 0 })).toBeUndefined();
+    expect(glowShadowProps({ color: '#fff', radius: 8, opacity: 0 })).toBeUndefined();
+  });
+
+  it('线条的光晕要从描边取', () => {
+    expect(
+      glowShadowProps({ color: '#fff', radius: 8 }, { fromStroke: true })?.shadowForStrokeEnabled,
+    ).toBe(true);
+  });
+
+  it('负半径收敛为 0 → 不画（不是画一个反向光晕）', () => {
+    expect(glowShadowProps({ color: '#fff', radius: -4 })).toBeUndefined();
   });
 });

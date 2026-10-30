@@ -108,3 +108,27 @@ describe('格式刷快照', () => {
     expect(patchOf(table, textWithStyle())).toEqual({});
   });
 });
+
+describe('P2-S3：效果随格式刷传播', () => {
+  it('阴影与光晕都会被捕获并应用到目标元素', () => {
+    const source = makeShape();
+    source.shadow = { color: '#111111', blur: 6, offsetX: 2, offsetY: 3 };
+    source.glow = { color: '#38BDF8', radius: 12, opacity: 0.6 };
+
+    const snapshot = extractStyleSnapshot(source);
+    expect(snapshot.shadow).toEqual(source.shadow);
+    expect(snapshot.glow).toEqual(source.glow);
+    expect(isEmptySnapshot(snapshot)).toBe(false);
+
+    const target = makeShape();
+    const patch = patchOf(target, source);
+    expect(patch.shadow).toEqual(source.shadow);
+    expect(patch.glow).toEqual(source.glow);
+  });
+
+  it('只有效果、没有填充描边时快照依然非空（否则格式刷会当成空操作）', () => {
+    const source = makeShape();
+    source.glow = { color: '#FF0000', radius: 10 };
+    expect(isEmptySnapshot(extractStyleSnapshot(source))).toBe(false);
+  });
+});

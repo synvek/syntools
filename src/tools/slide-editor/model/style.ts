@@ -1,4 +1,12 @@
-import type { Fill, RunStyle, ShadowStyle, SlideElement, Stroke, TextBody } from './types';
+import type {
+  Fill,
+  GlowStyle,
+  RunStyle,
+  ShadowStyle,
+  SlideElement,
+  Stroke,
+  TextBody,
+} from './types';
 
 /**
  * Format painter: captures the visual style of a source element as a snapshot and applies it to targets.
@@ -13,6 +21,8 @@ export interface StyleSnapshot {
   fill?: Fill;
   stroke?: Stroke;
   shadow?: ShadowStyle;
+  /** Outer glow (P2-S3), carried by the same rules as the shadow */
+  glow?: GlowStyle;
   cornerRadius?: number;
   /** Text formatting (from the first run / first paragraph) */
   run?: RunStyle;
@@ -57,6 +67,9 @@ export function extractStyleSnapshot(element: SlideElement): StyleSnapshot {
   if (element.type === 'chart') {
     snapshot.chartOptions = { ...element.options };
   }
+  // Effects are element-level, so every type can carry them (before P2-S3 the painter dropped the shadow)
+  if (element.shadow) snapshot.shadow = element.shadow;
+  if (element.glow) snapshot.glow = element.glow;
   return snapshot;
 }
 
@@ -66,6 +79,7 @@ export function isEmptySnapshot(snapshot: StyleSnapshot): boolean {
     !snapshot.fill &&
     !snapshot.stroke &&
     !snapshot.shadow &&
+    !snapshot.glow &&
     snapshot.cornerRadius === undefined &&
     !snapshot.run &&
     !snapshot.paragraph &&
@@ -105,6 +119,7 @@ export function applyStyleSnapshot(
     patch.options = { ...element.options, ...snapshot.chartOptions };
   }
   if (snapshot.shadow !== undefined) patch.shadow = snapshot.shadow;
+  if (snapshot.glow !== undefined) patch.glow = snapshot.glow;
 
   // Text: run-level styles go to every run, paragraph-level to every paragraph
   const body =

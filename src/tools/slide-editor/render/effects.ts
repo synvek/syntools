@@ -1,4 +1,4 @@
-import type { ShadowStyle } from '../model/types';
+import type { GlowStyle, ShadowStyle } from '../model/types';
 
 /**
  * Element effects → canvas properties (P2-S3).
@@ -60,3 +60,31 @@ export function outerShadowProps(
 
 /** Props that remove a previously applied shadow from a reused Konva node */
 export const NO_SHADOW_PROPS = { shadowEnabled: false } as const;
+
+/**
+ * Glow → Konva props, meant for a **duplicate** node placed behind the real one.
+ *
+ * Konva has a single shadow slot per shape, so a glow cannot coexist with an outer shadow on the
+ * same node: the caller clones the shape, paints the clone with these zero-offset shadow props and
+ * keeps the clone non-listening (it is a halo, not a click target).
+ */
+export function glowShadowProps(
+  glow: GlowStyle | undefined,
+  options: { fromStroke?: boolean } = {},
+): ShadowNodeProps | undefined {
+  if (!glow) return undefined;
+  const opacity = glow.opacity ?? 1;
+  if (!(opacity > 0)) return undefined;
+  const radius = Math.max(0, glow.radius);
+  // A zero-radius halo is just the shape again — nothing to draw
+  if (radius === 0) return undefined;
+  return {
+    shadowColor: glow.color,
+    shadowBlur: radius,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    shadowOpacity: opacity,
+    shadowEnabled: true,
+    shadowForStrokeEnabled: options.fromStroke ?? false,
+  };
+}
