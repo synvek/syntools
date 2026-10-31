@@ -1,6 +1,7 @@
 import type { RectConfig } from 'konva/lib/shapes/Rect';
 import { normalizeBackground } from '../core';
 import type { SlideBackground } from '../model/types';
+import { patternTile } from './patternTile';
 
 /**
  * Slide background → Konva fill props.
@@ -46,6 +47,17 @@ export function backgroundFillProps(
   const fill = normalizeBackground(bg);
   if (!fill || fill.type === 'none') return { fill: 'transparent' };
   if (fill.type === 'solid') return { fill: fill.color };
+  if (fill.type === 'pattern') {
+    const tile = patternTile(fill);
+    if (!tile) return { fill: fill.bgColor };
+    return {
+      // Same tile as the shape fills; the page rect is just a much larger consumer of it
+      fillPatternImage: tile as unknown as HTMLImageElement,
+      fillPatternRepeat: 'repeat',
+      fillPatternScale: { x: 1, y: 1 },
+      fillPriority: 'pattern',
+    };
+  }
 
   const stops = fill.stops.length > 0 ? fill.stops : [{ offset: 0, color: fallback }];
   const [start, end] = gradientEnds(fill.angle ?? 0, width, height);

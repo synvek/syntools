@@ -5,6 +5,7 @@ import { createDoc, createId, SCHEMA_VERSION } from '../model/factory';
 import { withResolvedConnectors } from '../model/connectors';
 import { createMediaFromBytes, mimeFromFilename } from '../model/media';
 import { normalizeChartData } from '../model/chart';
+import { isPatternPreset } from '../model/patterns';
 import type {
   ChartElement,
   ChartOptions,
@@ -324,6 +325,18 @@ function fillFromParsed(parsed: ReturnType<typeof parseShapeFill>): Fill | undef
   }
   if (parsed.type === 'gradient' && parsed.stops) {
     return { type: 'gradient', stops: parsed.stops, angle: parsed.angle };
+  }
+  if (parsed.type === 'pattern' && parsed.pattern) {
+    // An unknown preset (PowerPoint has ~50 of them) degrades to the closest dot density rather
+    // than being written back verbatim: `a:pattFill@prst` only accepts the schema enum, and a value
+    // we cannot render would show as a blank fill in our own canvas.
+    const prst = isPatternPreset(parsed.pattern.prst) ? parsed.pattern.prst : 'pct20';
+    return {
+      type: 'pattern',
+      prst,
+      fgColor: parsed.pattern.fgColor,
+      bgColor: parsed.pattern.bgColor,
+    };
   }
   return undefined;
 }

@@ -89,7 +89,9 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     const state = useSlideStore.getState();
     if (state.viewMode === 'master') {
       // Master view: edit master/layout elements directly without the inherited layer (or it would double up)
-      handle.renderBackground(state.doc, []);
+      // Master view edits the master container itself, so its own background is what shows
+      const masterBg = state.doc.masters[state.masterIndex]?.background;
+      handle.renderBackground(state.doc, [], masterBg ?? state.doc.theme.colors.lt1 ?? '#FFFFFF');
       handle.sync(containerElements(state), state.doc, { enteredGroups: state.groupPath });
       handle.renderCustomGuides(state.showRulers ? state.guides : [], {
         width: state.doc.width,
@@ -113,7 +115,15 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     const inherited = state.showPlaceholders
       ? [...(master?.elements ?? []), ...(layout?.elements ?? [])].map(stripPlaceholderText)
       : [];
-    handle.renderBackground(state.doc, inherited);
+    handle.renderBackground(
+      state.doc,
+      inherited,
+      slide.background ??
+        layout?.background ??
+        master?.background ??
+        state.doc.theme.colors.lt1 ??
+        '#FFFFFF',
+    );
     handle.sync(slide.elements, state.doc, { enteredGroups: state.groupPath });
     // Manual guides are drawn above the content layer and always follow the document size
     handle.renderCustomGuides(state.showRulers ? state.guides : [], {

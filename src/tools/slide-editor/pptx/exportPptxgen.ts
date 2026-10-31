@@ -105,8 +105,10 @@ function fillToShapeFill(fill: Fill | undefined, opacity = 1): ShapeFillProps | 
     if (!color) return undefined;
     return { type: 'solid', color, transparency: transparencyOf(fill.alpha, opacity) };
   }
-  // Degrade gradients to the first stop (pptxgenjs has no gradient fill)
-  const first = hex(fill.stops[0]?.color);
+  // pptxgenjs has neither gradients nor pattern fills. Gradients degrade to the first stop and
+  // patterns to their foreground; documents that rely on the pattern are routed to the hand-written
+  // channel (`requiresLegacy`) before this runs, so the degradation is only a safety net.
+  const first = hex(fill.type === 'pattern' ? fill.fgColor : fill.stops[0]?.color);
   return first
     ? { type: 'solid', color: first, transparency: transparencyOf(1, opacity) }
     : undefined;

@@ -251,6 +251,15 @@ function fillXml(fill: Fill | undefined, opacity = 1): string {
     const alphaXml = alpha < 1 ? `<a:alpha val="${Math.round(alpha * 100000)}"/>` : '';
     return `<a:solidFill><a:srgbClr val="${hex}">${alphaXml}</a:srgbClr></a:solidFill>`;
   }
+  if (fill.type === 'pattern') {
+    // a:pattFill order is fgClr → bgClr; the element opacity scales both inks so a 50% shape stays
+    // visually consistent with its solid/gradient siblings
+    const ink = (color: string): string => {
+      const alphaXml = factor < 1 ? `<a:alpha val="${Math.round(factor * 100000)}"/>` : '';
+      return `<a:srgbClr val="${color.replace(/^#/, '').toUpperCase()}">${alphaXml}</a:srgbClr>`;
+    };
+    return `<a:pattFill prst="${fill.prst}"><a:fgClr>${ink(fill.fgColor)}</a:fgClr><a:bgClr>${ink(fill.bgColor)}</a:bgClr></a:pattFill>`;
+  }
   const stopAlpha = factor < 1 ? `<a:alpha val="${Math.round(factor * 100000)}"/>` : '';
   const stops = fill.stops
     .map(

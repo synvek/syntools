@@ -2,7 +2,10 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { backgroundToColor } from '../core';
 import { shapeAdjustValues, shapeAdjustments } from '../../../core/drawing/shapeDefs';
-import type { RunStyle, SlideElement, Stroke } from '../model/types';
+import type { Fill, RunStyle, SlideElement, Stroke } from '../model/types';
+import { fillColorOf, fillPatch, supportsFill } from '../model/format';
+import { PATTERN_PRESETS } from '../model/patterns';
+import { patternTileUrl } from '../render/patternTile';
 import { containerElements, useSlideStore } from '../store';
 import { ChartEditor } from './ChartEditor';
 import {
@@ -77,6 +80,15 @@ export function PropertyPanel() {
   }
 
   const apply = (patch: Partial<SlideElement>) => patchElement(element.id, patch);
+
+  /** Pattern fill currently on the element (P2-S4); `undefined` for solid / gradient / none */
+  const activePatternFill =
+    supportsFill(element) && element.fill?.type === 'pattern' ? element.fill : undefined;
+  /** `fillPatch` returns null for elements without a fill; the panel only renders this section for those that have one */
+  const applyFill = (fill: Fill) => {
+    const patch = fillPatch(element, fill);
+    if (patch) apply(patch);
+  };
 
   const stroke =
     element.type === 'shape' || element.type === 'text' || element.type === 'image'
@@ -432,6 +444,68 @@ export function PropertyPanel() {
           />
         </Field>
       </Section>
+
+      {/* P2-S4: 图案填充。纯色/无填充留在工具栏（高频），图案属于低频、需要预览的操作 */}
+      {supportsFill(element) ? (
+        <Section title={t('tools.slide.panelPattern')}>
+          <div className="grid grid-cols-5 gap-1.5">
+            {PATTERN_PRESETS.map((prst) => (
+              <button
+                key={prst}
+                type="button"
+                data-pattern-preset={prst}
+                aria-label={prst}
+                title={prst}
+                onClick={() =>
+                  // Switching preset keeps the user's inks instead of resetting them
+                  applyFill(
+                    activePatternFill
+                      ? { ...activePatternFill, prst }
+                      : {
+                          type: 'pattern',
+                          prst,
+                          fgColor: fillColorOf(element) ?? '#1F3864',
+                          bgColor: '#FFFFFF',
+                        },
+                  )
+                }
+                className={`h-8 rounded-md border transition-shadow ${
+                  activePatternFill?.prst === prst
+                    ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-900'
+                    : 'border-gray-300 hover:border-blue-400 dark:border-gray-600'
+                }`}
+                style={{
+                  backgroundImage: `url(${patternTileUrl(
+                    prst,
+                    activePatternFill?.fgColor ?? '#1F3864',
+                    activePatternFill?.bgColor ?? '#FFFFFF',
+                  )})`,
+                  backgroundRepeat: 'repeat',
+                  backgroundSize: '8px 8px',
+                }}
+              />
+            ))}
+          </div>
+          {activePatternFill ? (
+            <>
+              <Field label={t('tools.slide.patternForeground')}>
+                <ColorInput
+                  ariaLabel={t('tools.slide.patternForeground')}
+                  value={activePatternFill.fgColor}
+                  onChange={(fgColor) => applyFill({ ...activePatternFill, fgColor })}
+                />
+              </Field>
+              <Field label={t('tools.slide.patternBackground')}>
+                <ColorInput
+                  ariaLabel={t('tools.slide.patternBackground')}
+                  value={activePatternFill.bgColor}
+                  onChange={(bgColor) => applyFill({ ...activePatternFill, bgColor })}
+                />
+              </Field>
+            </>
+          ) : null}
+        </Section>
+      ) : null}
 
       <Section title={t('tools.slide.panelShadow')}>
         <Field label={t('tools.slide.shadowColor')}>

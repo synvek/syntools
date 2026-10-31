@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import type { ToolResult } from '@/core/types';
+import { normalizeBackground } from '../core';
 import { createLayout, createMaster } from '../model/factory';
 import { extensionForMime } from '../model/media';
 import type { SlideDoc, SlideElement } from '../model/types';
@@ -122,6 +123,12 @@ export function motionExportDegradations(doc: SlideDoc): number {
  * (`a:stCxn`/`a:endCxn`), so documents that use them must go through the hand-written channel.
  */
 function requiresLegacy(doc: SlideDoc): boolean {
+  /**
+   * P2-S4: pptxgenjs has no pattern fill — it would degrade to the foreground colour without a
+   * trace. Table cells only carry a solid colour string, so they cannot hit this path.
+   */
+  const hasPatternFill = (element: SlideElement): boolean =>
+    element.type === 'shape' || element.type === 'text' ? element.fill?.type === 'pattern' : false;
   const walk = (elements: SlideElement[]): boolean =>
     elements.some((element) => {
       // pptxgenjs has no glow/effect API beyond a single shadow; a glow would silently disappear
@@ -130,6 +137,7 @@ function requiresLegacy(doc: SlideDoc): boolean {
       if (element.softEdge) return true;
       // ...and it has no inner shadow concept at all (its single `shadow` is always an outer one)
       if (element.innerShadow) return true;
+      if (hasPatternFill(element)) return true;
       if (element.type === 'shape') {
         // pptxgenjs has no path API, so custom geometry must go through the legacy writer
         if (element.geom.custGeom && element.geom.custGeom.length > 0) return true;
@@ -141,8 +149,9 @@ function requiresLegacy(doc: SlideDoc): boolean {
       if (element.type === 'group') return walk(element.children);
       return false;
     });
-  return [...doc.slides, ...doc.masters, ...doc.layouts].some((container) =>
-    walk(container.elements),
+  return [...doc.slides, ...doc.masters, ...doc.layouts].some(
+    (container) =>
+      walk(container.elements) || normalizeBackground(container.background)?.type === 'pattern',
   );
 }
 

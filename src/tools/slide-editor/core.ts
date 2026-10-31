@@ -34,6 +34,8 @@ export function backgroundToColor(bg: SlideBackground | undefined, fallback = '#
   if (!fill) return fallback;
   if (fill.type === 'solid') return fill.color;
   if (fill.type === 'gradient' && fill.stops.length > 0) return fill.stops[0].color;
+  // A pattern's plate colour is the closest single colour match
+  if (fill.type === 'pattern') return fill.bgColor;
   return fallback;
 }
 

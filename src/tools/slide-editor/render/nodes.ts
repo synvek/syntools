@@ -22,6 +22,7 @@ import { commandsToSvg, hasCustomGeometry, scaleCommands } from '../../../core/d
 import { createChartNode } from './chartNode';
 import { createFormulaNode, createIconNode } from './shapeNodes';
 import { acquireImage } from './imageCache';
+import { patternTile } from './patternTile';
 import { layoutTextBody } from './textLayout';
 import {
   NO_SHADOW_PROPS,
@@ -60,6 +61,8 @@ export function fillToColor(fill: Fill | undefined): string | undefined {
     const first = fill.stops[0]?.color;
     return first;
   }
+  // Pattern: the plate colour stands in wherever one colour has to represent the fill
+  if (fill.type === 'pattern') return fill.bgColor;
   return undefined;
 }
 
@@ -85,7 +88,10 @@ function gradientPoints(
 }
 
 function applyFill(node: Konva.Shape, fill: Fill | undefined, width: number, height: number): void {
+  // Konva keeps every fill flavour on the node and picks one by priority, so switching away from a
+  // pattern has to reset the priority — otherwise the old tile keeps painting over the new colour.
   if (!fill || fill.type === 'none') {
+    node.fillPriority('color');
     node.fill(undefined);
     node.strokeScaleEnabled(true);
     return;
@@ -93,17 +99,31 @@ function applyFill(node: Konva.Shape, fill: Fill | undefined, width: number, hei
   const alpha = fillToAlpha(fill);
   if (alpha !== undefined) node.opacity(alpha);
   if (fill.type === 'solid') {
+    node.fillPriority('color');
     node.fill(fill.color);
     return;
   }
-  if (fill.type === 'gradient') {
-    const points = gradientPoints(fill, width, height);
-    node.fillLinearGradientStartPoint(points.start);
-    node.fillLinearGradientEndPoint(points.end);
-    node.fillLinearGradientColorStops(
-      fill.stops.flatMap((stop) => [Math.min(1, Math.max(0, stop.offset)), stop.color]),
-    );
+  if (fill.type === 'pattern') {
+    const tile = patternTile(fill);
+    if (!tile) {
+      // No DOM (node-side raster): fall back to the pattern's ink so the shape is not invisible
+      node.fillPriority('color');
+      node.fill(fill.fgColor);
+      return;
+    }
+    node.fillPriority('pattern');
+    node.fillPatternImage(tile);
+    node.fillPatternRepeat('repeat');
+    node.fillPatternScale({ x: 1, y: 1 });
+    return;
   }
+  node.fillPriority('color');
+  const points = gradientPoints(fill, width, height);
+  node.fillLinearGradientStartPoint(points.start);
+  node.fillLinearGradientEndPoint(points.end);
+  node.fillLinearGradientColorStops(
+    fill.stops.flatMap((stop) => [Math.min(1, Math.max(0, stop.offset)), stop.color]),
+  );
 }
 
 function applyStroke(node: Konva.Shape, stroke: Stroke | undefined): void {

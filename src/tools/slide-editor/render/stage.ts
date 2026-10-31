@@ -1,10 +1,11 @@
 import Konva from 'konva';
 import type { Guide } from '../core';
-import type { SlideDoc, SlideElement } from '../model/types';
+import type { SlideBackground, SlideDoc, SlideElement } from '../model/types';
 import { attachInteraction, type StageCallbacks } from '../interaction/pointer';
 import { renderAdjustHandles, type AdjustHandleOptions } from './adjustHandles';
 import { renderCommentAnchors } from './commentAnchors';
 import type { CommentThread } from '../../../core/comments/model';
+import { backgroundFillProps } from './background';
 import { createElementNode } from './nodes';
 import {
   createMarquee,
@@ -37,7 +38,16 @@ export interface StageHandle {
   callbacks: StageCallbacks;
   setTransform: (transform: PageTransform) => void;
   setSize: (width: number, height: number) => void;
-  renderBackground: (doc: SlideDoc, invisibleElements: SlideElement[]) => void;
+  /**
+   * `background` is the *resolved* page background (slide → layout → master). It used to be skipped
+   * entirely and the page rect was hard-coded white, so picking a background colour only showed up
+   * in the thumbnail / slideshow — the edit canvas silently disagreed with the export.
+   */
+  renderBackground: (
+    doc: SlideDoc,
+    invisibleElements: SlideElement[],
+    background?: SlideBackground,
+  ) => void;
   /** `enteredGroups` = group path currently open for child editing (P1-1.5) */
   sync: (elements: SlideElement[], doc: SlideDoc, options?: { enteredGroups?: string[] }) => void;
   showGuides: (guides: Guide[], size: { width: number; height: number }) => void;
@@ -100,14 +110,16 @@ export function createStage(container: HTMLDivElement, callbacks: StageCallbacks
       stage.size({ width: w, height: h });
       stage.batchDraw();
     },
-    renderBackground: (doc, invisibleElements) => {
+    renderBackground: (doc, invisibleElements, background) => {
       bgLayer.destroyChildren();
       const page = new Konva.Rect({
         x: 0,
         y: 0,
         width: doc.width,
         height: doc.height,
-        fill: '#FFFFFF',
+        // Solid / gradient / pattern all come from the same helper the thumbnail, slideshow and
+        // raster export use, so the page can no longer look different in four places
+        ...backgroundFillProps(background ?? '#FFFFFF', doc.width, doc.height),
         shadowColor: '#0F172A',
         shadowBlur: 24 / Math.max(0.2, bgLayer.scaleX()),
         shadowOpacity: 0.18,

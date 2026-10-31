@@ -245,11 +245,13 @@ export function resolveColorNode(
 
 /** Parse a fill node (solidFill / gradFill / noFill / blipFill) */
 export interface ParsedFill {
-  type: 'none' | 'solid' | 'gradient';
+  type: 'none' | 'solid' | 'gradient' | 'pattern';
   color?: string;
   alpha?: number;
   stops?: { offset: number; color: string }[];
   angle?: number;
+  /** Pattern fill (P2-S4): preset id plus the two inks */
+  pattern?: { prst: string; fgColor: string; bgColor: string };
 }
 
 export function parseShapeFill(node: XmlNode | undefined, palette: Palette): ParsedFill {
@@ -257,6 +259,20 @@ export function parseShapeFill(node: XmlNode | undefined, palette: Palette): Par
   for (const childItem of childrenOf(node)) {
     const kind = localNameOf(childItem);
     if (kind === 'noFill') return { type: 'none' };
+    if (kind === 'pattFill') {
+      const prst = attr(childItem, 'prst');
+      if (!prst) return { type: 'none' };
+      const fg = resolveColorNode(childOf(childItem, 'fgClr'), palette);
+      const bg = resolveColorNode(childOf(childItem, 'bgClr'), palette);
+      return {
+        type: 'pattern',
+        pattern: {
+          prst,
+          fgColor: fg?.color ?? '#000000',
+          bgColor: bg?.color ?? '#FFFFFF',
+        },
+      };
+    }
     if (kind === 'solidFill') {
       const resolved = resolveColorNode(childItem, palette);
       if (resolved) return { type: 'solid', color: resolved.color, alpha: resolved.alpha };

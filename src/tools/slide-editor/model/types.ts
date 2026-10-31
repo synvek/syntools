@@ -7,6 +7,7 @@
 
 import type { CommentThread } from '../../../core/comments/model';
 import type { ShapeGeometry } from '../../../core/drawing/geometry';
+import type { PatternPreset } from './patterns';
 
 /** Background/fill with no paint */
 export interface NoFill {
@@ -34,7 +35,22 @@ export interface GradientFill {
   stops: GradientStop[];
 }
 
-export type Fill = NoFill | SolidFill | GradientFill;
+/**
+ * Pattern fill (DrawingML `a:pattFill`, P2-S4).
+ *
+ * `prst` names the DrawingML preset verbatim (`pct20`, `ltDnDiag`, …) so the value can be written
+ * to `a:pattFill@prst` and read back without a lookup table; the renderer maps it to a tile.
+ */
+export interface PatternFill {
+  type: 'pattern';
+  prst: PatternPreset;
+  /** Foreground: the dots or lines */
+  fgColor: string;
+  /** Background plate behind the pattern */
+  bgColor: string;
+}
+
+export type Fill = NoFill | SolidFill | GradientFill | PatternFill;
 
 /**
  * Slide background form.
