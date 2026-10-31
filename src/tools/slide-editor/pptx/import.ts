@@ -36,6 +36,7 @@ import { parseSlideMotion } from './timingImport';
 import {
   parseGlow,
   parseShadow,
+  parseSoftEdge,
   parseShapeFill,
   parseStroke,
   resolveColorNode,
@@ -352,6 +353,7 @@ function parseShape(
   const stroke = parseStroke(childOf(spPr, 'ln'), palette);
   const shadow = parseShadow(spPr, palette);
   const glow = parseGlow(spPr, palette);
+  const softEdge = parseSoftEdge(spPr);
   const body = parseTextBody(childOf(node, 'txBody'), palette, theme, ctx);
   const nvSpPr = childOf(node, 'nvSpPr');
   const ph = childOf(childOf(nvSpPr, 'nvPr'), 'ph');
@@ -369,6 +371,7 @@ function parseShape(
     ...(hiddenOf(node, 'nvSpPr') ? { visible: false } : {}),
     ...(shadow ? { shadow } : {}),
     ...(glow ? { glow } : {}),
+    ...(softEdge ? { softEdge } : {}),
   };
   let element: SlideElement;
   if (body && geometry.kind === 'rect' && !fill && !stroke) {

@@ -1,4 +1,4 @@
-import type { GlowStyle, ShadowStyle } from '../model/types';
+import type { GlowStyle, ShadowStyle, SoftEdgeStyle } from '../model/types';
 
 /**
  * Element effects → canvas properties (P2-S3).
@@ -87,4 +87,18 @@ export function glowShadowProps(
     shadowEnabled: true,
     shadowForStrokeEnabled: options.fromStroke ?? false,
   };
+}
+
+/**
+ * Soft edge → blur radius for a cached, filtered node (P2-S3.2).
+ *
+ * Konva has no soft-edge primitive: the only way to fade a silhouette is to cache the node and
+ * paint it through `Konva.Filters.Blur`. Returns 0 when there is nothing to draw, so the caller can
+ * skip `cache()` entirely (caching costs a full rasterisation per element).
+ */
+export function softEdgeRadius(softEdge: SoftEdgeStyle | undefined): number {
+  if (!softEdge) return 0;
+  const radius = Math.max(0, softEdge.radius);
+  // A zero radius is the untouched shape; keeping it would export a meaningless a:softEdge
+  return radius > 0 ? radius : 0;
 }

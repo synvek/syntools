@@ -114,16 +114,19 @@ describe('P2-S3：效果随格式刷传播', () => {
     const source = makeShape();
     source.shadow = { color: '#111111', blur: 6, offsetX: 2, offsetY: 3 };
     source.glow = { color: '#38BDF8', radius: 12, opacity: 0.6 };
+    source.softEdge = { radius: 9 };
 
     const snapshot = extractStyleSnapshot(source);
     expect(snapshot.shadow).toEqual(source.shadow);
     expect(snapshot.glow).toEqual(source.glow);
+    expect(snapshot.softEdge).toEqual({ radius: 9 });
     expect(isEmptySnapshot(snapshot)).toBe(false);
 
     const target = makeShape();
     const patch = patchOf(target, source);
     expect(patch.shadow).toEqual(source.shadow);
     expect(patch.glow).toEqual(source.glow);
+    expect(patch.softEdge).toEqual({ radius: 9 });
   });
 
   it('只有效果、没有填充描边时快照依然非空（否则格式刷会当成空操作）', () => {

@@ -530,6 +530,19 @@ export function PropertyPanel() {
         </Field>
       </Section>
 
+      {/* P2-S3.2: soft edge. 半径 0 视为"没有柔化"，与 glow 同一规则 */}
+      <Section title={t('tools.slide.panelSoftEdge')}>
+        <Field label={t('tools.slide.softEdgeRadius')}>
+          <NumberInput
+            ariaLabel={t('tools.slide.softEdgeRadius')}
+            value={Math.round(element.softEdge?.radius ?? 0)}
+            min={0}
+            max={120}
+            onChange={(radius) => apply({ softEdge: radius > 0 ? { radius } : undefined })}
+          />
+        </Field>
+      </Section>
+
       {/* Page-level settings only appear in normal view: in master view MasterView provides the master background entry */}
       {viewMode === 'normal' ? (
         <Section title={t('tools.slide.panelPage')}>

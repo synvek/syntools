@@ -53,6 +53,20 @@ describe('effectLst 写出', () => {
     expect(xml.match(/<a:effectLst>/g)).toHaveLength(1);
   });
 
+  it('柔化写 a:softEdge，且排在所有阴影之后（schema 顺序）', () => {
+    const doc = createDoc('soft');
+    const shape = shapeWith(doc, {
+      softEdge: { radius: 7 },
+      shadow: { color: '#000000', blur: 4, offsetX: 2, offsetY: 2 },
+    });
+    const xml = slideXml([shape], new Map());
+    expect(xml).toContain(`<a:softEdge rad="${7 * EMU_PER_PX}"/>`);
+    const shadowAt = xml.indexOf('<a:outerShdw');
+    const softAt = xml.indexOf('<a:softEdge');
+    expect(shadowAt).toBeGreaterThan(-1);
+    expect(softAt).toBeGreaterThan(shadowAt);
+  });
+
   it('没有效果时不写 effectLst', () => {
     const doc = createDoc('plain');
     const shape = shapeWith(doc, {});
@@ -89,6 +103,33 @@ describe('往返与通道', () => {
     expect(element?.glow).toEqual({ color: '#38bdf8', radius: 12, opacity: 0.75 });
     // 形状的几何不能被效果影响
     expect(element?.type).toBe('shape');
+  });
+
+  it('柔化往返：rad 读回为 px，rad=0 被丢弃', async () => {
+    const doc = createDoc('soft-roundtrip');
+    shapeWith(doc, { softEdge: { radius: 15 } });
+    const exported = await exportPptx(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const zip = await JSZip.loadAsync(exported.value);
+    const xml = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+    expect(xml).toContain('<a:softEdge');
+
+    const imported = await importPptxFile(fileOf(exported.value, 'soft.pptx'));
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.value.doc.slides[0].elements[0]?.softEdge).toEqual({ radius: 15 });
+
+    const zero = createDoc('soft-zero');
+    shapeWith(zero, { softEdge: { radius: 0 } });
+    const zeroExported = await exportPptx(zero);
+    expect(zeroExported.ok).toBe(true);
+    if (!zeroExported.ok) return;
+    const zeroImported = await importPptxFile(fileOf(zeroExported.value, 'zero-soft.pptx'));
+    expect(zeroImported.ok).toBe(true);
+    if (!zeroImported.ok) return;
+    expect(zeroImported.value.doc.slides[0].elements[0]?.softEdge).toBeUndefined();
   });
 
   it('导入时 rad=0 的 a:glow 被丢弃（否则会一直导出一个空效果）', async () => {

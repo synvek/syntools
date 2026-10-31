@@ -3,6 +3,7 @@ import type {
   GlowStyle,
   RunStyle,
   ShadowStyle,
+  SoftEdgeStyle,
   SlideElement,
   Stroke,
   TextBody,
@@ -23,6 +24,8 @@ export interface StyleSnapshot {
   shadow?: ShadowStyle;
   /** Outer glow (P2-S3), carried by the same rules as the shadow */
   glow?: GlowStyle;
+  /** Soft edge (P2-S3.2), carried by the same rules as the shadow */
+  softEdge?: SoftEdgeStyle;
   cornerRadius?: number;
   /** Text formatting (from the first run / first paragraph) */
   run?: RunStyle;
@@ -70,6 +73,7 @@ export function extractStyleSnapshot(element: SlideElement): StyleSnapshot {
   // Effects are element-level, so every type can carry them (before P2-S3 the painter dropped the shadow)
   if (element.shadow) snapshot.shadow = element.shadow;
   if (element.glow) snapshot.glow = element.glow;
+  if (element.softEdge) snapshot.softEdge = element.softEdge;
   return snapshot;
 }
 
@@ -80,6 +84,7 @@ export function isEmptySnapshot(snapshot: StyleSnapshot): boolean {
     !snapshot.stroke &&
     !snapshot.shadow &&
     !snapshot.glow &&
+    !snapshot.softEdge &&
     snapshot.cornerRadius === undefined &&
     !snapshot.run &&
     !snapshot.paragraph &&
@@ -120,6 +125,7 @@ export function applyStyleSnapshot(
   }
   if (snapshot.shadow !== undefined) patch.shadow = snapshot.shadow;
   if (snapshot.glow !== undefined) patch.glow = snapshot.glow;
+  if (snapshot.softEdge !== undefined) patch.softEdge = snapshot.softEdge;
 
   // Text: run-level styles go to every run, paragraph-level to every paragraph
   const body =

@@ -8,6 +8,7 @@ import type {
   LineElement,
   MediaAsset,
   ShadowStyle,
+  SoftEdgeStyle,
   ShapeElement,
   ShapeGeometry,
   SlideElement,
@@ -21,7 +22,7 @@ import { createChartNode } from './chartNode';
 import { createFormulaNode, createIconNode } from './shapeNodes';
 import { acquireImage } from './imageCache';
 import { layoutTextBody } from './textLayout';
-import { NO_SHADOW_PROPS, glowShadowProps, outerShadowProps } from './effects';
+import { NO_SHADOW_PROPS, glowShadowProps, outerShadowProps, softEdgeRadius } from './effects';
 
 /**
  * SlideElement → Konva.Node factory and updater.
@@ -129,6 +130,24 @@ function applyShadow(node: Konva.Shape, shadow: ShadowStyle | undefined, fromStr
  * The clone carries the halo (zero-offset shadow) and stays non-listening: it is paint, not a
  * click target, and must not double up hit testing or the transformer.
  */
+/**
+ * P2-S3.2: soft edge = cache the node and blur it.
+ *
+ * Konva has nothing like `a:softEdge`, so the silhouette is rasterised (`cache()`) and pushed
+ * through the blur filter. Consequences the caller must respect:
+ * - the cache is baked at the current size, so any geometry change needs a re-cache → elements with
+ *   a soft edge never take the fast property path (`sync.ts`);
+ * - caching is expensive, so it only happens when the radius is > 0.
+ */
+function applySoftEdge(node: Konva.Shape, softEdge: SoftEdgeStyle | undefined): void {
+  const radius = softEdgeRadius(softEdge);
+  if (radius <= 0) return;
+  node.filters([Konva.Filters.Blur]);
+  node.blurRadius(radius);
+  // Padding covers the blurred tail, otherwise the fade is clipped at the element bounds
+  node.cache({ pixelRatio: 1, offset: Math.ceil(radius) });
+}
+
 function addGlow(
   group: Konva.Group,
   source: Konva.Shape,
@@ -488,6 +507,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
           name: 'textBg',
         });
         applyStroke(bg, element.stroke);
+        applySoftEdge(bg, element.softEdge);
         addGlow(group, bg, element.glow);
         applyShadow(bg, element.shadow);
         group.add(bg);
@@ -500,6 +520,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       shape.name('shapeBody');
       applyFill(shape, element.fill, element.width, element.height);
       applyStroke(shape, element.stroke);
+      applySoftEdge(shape, element.softEdge);
       addGlow(group, shape, element.glow);
       applyShadow(shape, element.shadow);
       group.add(shape);
@@ -508,15 +529,29 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
     }
     case 'image': {
       const asset = ctx.media[element.mediaId];
-      const image = asset ? acquireImage(asset, ctx.onImageReady) : undefined;
+      const softEdge = element.softEdge;
       const crop = element.crop;
+      // The node is built before the bitmap is requested so the ready-callback can re-cache it: a
+      // soft edge caches a raster, and a cache taken before decoding would stay a placeholder.
       const node = new Konva.Image({
         width: element.width,
         height: element.height,
-        image,
+        image: undefined,
         cornerRadius: element.cornerRadius ?? 0,
         listening: true,
       });
+      if (asset) {
+        node.image(
+          acquireImage(asset, () => {
+            // Re-cache first, then ask for the redraw — the reverse order waits for the next frame
+            if (softEdgeRadius(softEdge) > 0) {
+              node.clearCache();
+              applySoftEdge(node, softEdge);
+            }
+            ctx.onImageReady();
+          }),
+        );
+      }
       if (crop && asset) {
         node.crop({
           x: asset.width * crop.left,
@@ -527,6 +562,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       }
       node.setAttr('mediaId', element.mediaId);
       applyStroke(node, element.stroke);
+      applySoftEdge(node, softEdge);
       addGlow(group, node, element.glow);
       applyShadow(node, element.shadow);
       group.add(node);
@@ -542,6 +578,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
         hitStrokeWidth: Math.max(8, element.stroke?.width ?? 1),
       });
       line.name('lineBody');
+      applySoftEdge(line, element.softEdge);
       // 线条没有填充：Konva 只从描边取阴影/光晕，必须显式打开 fromStroke
       addGlow(group, line, element.glow, true);
       applyShadow(line, element.shadow, true);

@@ -126,6 +126,8 @@ function requiresLegacy(doc: SlideDoc): boolean {
     elements.some((element) => {
       // pptxgenjs has no glow/effect API beyond a single shadow; a glow would silently disappear
       if (element.glow) return true;
+      // pptxgenjs cannot express a soft edge either: same silent-loss trap as glow
+      if (element.softEdge) return true;
       if (element.type === 'shape') {
         // pptxgenjs has no path API, so custom geometry must go through the legacy writer
         if (element.geom.custGeom && element.geom.custGeom.length > 0) return true;

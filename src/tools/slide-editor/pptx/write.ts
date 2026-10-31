@@ -15,6 +15,7 @@ import type {
   Paragraph,
   RunStyle,
   ShadowStyle,
+  SoftEdgeStyle,
   ShapeElement,
   SlideBackground,
   SlideElement,
@@ -393,6 +394,11 @@ function glowXml(glow: GlowStyle): string {
   ].join('');
 }
 
+/** `a:softEdge`: the silhouette fades out over `rad` (EMU, like every other effect length) */
+function softEdgeXml(softEdge: SoftEdgeStyle): string {
+  return `<a:softEdge rad="${pxToEmu(Math.max(0, softEdge.radius))}"/>`;
+}
+
 function hexOf(color: string): string {
   return color.replace(/^#/, '').toUpperCase();
 }
@@ -402,10 +408,16 @@ function hexOf(color: string): string {
  * (blur → fillOverlay → glow → innerShdw → outerShdw → prstShdw → reflection → softEdge),
  * so glow has to come before the shadow even though the panel lists shadow first.
  */
-function effectLstXml(element: { shadow?: ShadowStyle; glow?: GlowStyle }): string {
+function effectLstXml(element: {
+  shadow?: ShadowStyle;
+  glow?: GlowStyle;
+  softEdge?: SoftEdgeStyle;
+}): string {
   const parts: string[] = [];
   if (element.glow) parts.push(glowXml(element.glow));
   if (element.shadow) parts.push(outerShdwXml(element.shadow));
+  // softEdge is the last child the schema allows, after every shadow variant
+  if (element.softEdge) parts.push(softEdgeXml(element.softEdge));
   return parts.length > 0 ? `<a:effectLst>${parts.join('')}</a:effectLst>` : '';
 }
 

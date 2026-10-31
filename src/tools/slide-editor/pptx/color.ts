@@ -5,6 +5,7 @@ import {
   normalizeHex,
 } from '../../../core/drawing/geometry';
 import { attr, childOf, childrenOf, localNameOf, numAttr, type XmlNode } from './xml';
+import type { SoftEdgeStyle } from '../model/types';
 
 /**
  * DrawingML color parsing (ECMA-376 §20.1.2.3):
@@ -333,6 +334,19 @@ export function parseGlow(spPr: XmlNode | undefined, palette: Palette): ParsedGl
     radius,
     opacity: resolved?.alpha,
   };
+}
+
+/**
+ * Parse `a:effectLst/a:softEdge` (P2-S3.2). The element carries only `rad`; a zero radius is the
+ * untouched silhouette, so it is dropped instead of being round-tripped forever.
+ */
+export function parseSoftEdge(spPr: XmlNode | undefined): SoftEdgeStyle | undefined {
+  const effect = childOf(spPr, 'effectLst');
+  const softEdge = effect ? childOf(effect, 'softEdge') : undefined;
+  if (!softEdge) return undefined;
+  const radius = emuToPx(numAttr(softEdge, 'rad') ?? 0);
+  if (radius <= 0) return undefined;
+  return { radius };
 }
 
 /** Parse a stroke node (a:ln) */

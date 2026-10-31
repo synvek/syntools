@@ -51,6 +51,9 @@ function isUpdatable(element: SlideElement): boolean {
   // Glow is a duplicate node behind the shape, which the fast path knows nothing about: adding or
   // removing it would leave a stale halo (or none at all), so those elements always rebuild.
   if (element.glow) return false;
+  // Soft edge caches the node (a blurred raster at the current size): the fast path would leave the
+  // stale cache behind after a resize, so these elements rebuild too
+  if (element.softEdge) return false;
   // A group's children change after group/ungroup and the fast path doesn't update children, so rebuild those too
   return element.type === 'image' || element.type === 'line';
 }

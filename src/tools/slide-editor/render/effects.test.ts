@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NO_SHADOW_PROPS, glowShadowProps, outerShadowProps } from './effects';
+import { NO_SHADOW_PROPS, glowShadowProps, outerShadowProps, softEdgeRadius } from './effects';
 
 /**
  * P2-S3.0: outer shadow on the canvas path.
@@ -90,5 +90,17 @@ describe('glowShadowProps', () => {
 
   it('负半径收敛为 0 → 不画（不是画一个反向光晕）', () => {
     expect(glowShadowProps({ color: '#fff', radius: -4 })).toBeUndefined();
+  });
+});
+
+describe('softEdgeRadius', () => {
+  it('有半径时原样返回（单位已是 px）', () => {
+    expect(softEdgeRadius({ radius: 18 })).toBe(18);
+  });
+
+  it('缺失/零/负半径都视为没有柔化（否则会导出空的 a:softEdge）', () => {
+    expect(softEdgeRadius(undefined)).toBe(0);
+    expect(softEdgeRadius({ radius: 0 })).toBe(0);
+    expect(softEdgeRadius({ radius: -5 })).toBe(0);
   });
 });

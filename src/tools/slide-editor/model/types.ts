@@ -144,6 +144,12 @@ export interface GlowStyle {
   opacity?: number;
 }
 
+/** Soft edge (subset of DrawingML `a:softEdge`): the silhouette fades out over `radius` px */
+export interface SoftEdgeStyle {
+  /** Fade radius in px (DrawingML `rad`) */
+  radius: number;
+}
+
 interface ElementBase {
   id: string;
   x: number;
@@ -167,6 +173,8 @@ interface ElementBase {
   shadow?: ShadowStyle;
   /** Outer glow (P2-S3) */
   glow?: GlowStyle;
+  /** Soft edge (P2-S3.2) */
+  softEdge?: SoftEdgeStyle;
 }
 
 export interface TextElement extends ElementBase {
