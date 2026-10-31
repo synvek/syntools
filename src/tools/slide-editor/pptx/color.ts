@@ -337,6 +337,34 @@ export function parseGlow(spPr: XmlNode | undefined, palette: Palette): ParsedGl
 }
 
 /**
+ * Parse `a:effectLst/a:innerShdw` (P2-S3.3). Same polar encoding as `a:outerShdw`; a shadow with
+ * neither blur nor offset paints nothing in our renderer, so it is dropped on import instead of
+ * being round-tripped forever (same rule as `a:glow rad=0` / `a:softEdge rad=0`).
+ */
+export function parseInnerShadow(
+  spPr: XmlNode | undefined,
+  palette: Palette,
+): ParsedShadow | undefined {
+  const effect = childOf(spPr, 'effectLst');
+  const inner = effect ? childOf(effect, 'innerShdw') : undefined;
+  if (!inner) return undefined;
+  const resolved = resolveColorNode(inner, palette);
+  const distPx = (numAttr(inner, 'dist') ?? 0) / EMU_PER_PX;
+  const radians = ((numAttr(inner, 'dir') ?? 0) / 60000) * (Math.PI / 180);
+  const blur = emuToPx(numAttr(inner, 'blurRad') ?? 0);
+  const offsetX = Math.round(distPx * Math.sin(radians));
+  const offsetY = Math.round(-distPx * Math.cos(radians));
+  if (blur <= 0 && offsetX === 0 && offsetY === 0) return undefined;
+  return {
+    color: resolved?.color ?? '#000000',
+    blur,
+    offsetX,
+    offsetY,
+    opacity: resolved?.alpha,
+  };
+}
+
+/**
  * Parse `a:effectLst/a:softEdge` (P2-S3.2). The element carries only `rad`; a zero radius is the
  * untouched silhouette, so it is dropped instead of being round-tripped forever.
  */

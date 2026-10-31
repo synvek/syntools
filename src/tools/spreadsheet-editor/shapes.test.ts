@@ -2,15 +2,20 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
+  DEFAULT_SHEET_VIEWPORT,
   SHEET_SHAPE_PRESETS,
   anchorToPx,
   buildSheetLayout,
   columnLeftPx,
+  contentVisibleBox,
   createSheetShape,
   pxToAnchor,
   rowTopPx,
+  screenDeltaToContent,
+  shapeLayerClip,
   shapePath,
   shapeRect,
+  shapeScreenRect,
 } from './shapes';
 
 /**
@@ -128,6 +133,94 @@ describe('shapeRect / shapePath', () => {
     const plain = shapePath({ prst: 'roundRect', width: 100, height: 60 });
     const rounded = shapePath({ prst: 'roundRect', adj: { adj1: 0.4 }, width: 100, height: 60 });
     expect(rounded).not.toBe(plain);
+  });
+});
+
+describe('视口投影（P4-SH6）', () => {
+  const layout = buildSheetLayout({ defaultColumnWidth: 100, defaultRowHeight: 25 });
+  const shape = createSheetShape({
+    prst: 'rect',
+    from: { col: 2, row: 4, colOff: 10, rowOff: 5 },
+    width: 120,
+    height: 80,
+  });
+  it('未滚动、无缩放时只平移网格原点', () => {
+    const box = shapeScreenRect(shape, layout, DEFAULT_SHEET_VIEWPORT);
+    // 第 2 列 200 + 偏移 10，第 4 行 100 + 偏移 5
+    expect({ left: box.left, top: box.top }).toEqual({ left: 210, top: 105 });
+    expect({ width: box.width, height: box.height }).toEqual({ width: 120, height: 80 });
+  });
+
+  it('滚动量按内容像素扣除（形状跟随单元格移动）', () => {
+    const box = shapeScreenRect(shape, layout, {
+      ...DEFAULT_SHEET_VIEWPORT,
+      originX: 46,
+      originY: 120,
+      scrollX: 100,
+      scrollY: 50,
+    });
+    expect({ left: box.left, top: box.top }).toEqual({ left: 156, top: 175 });
+  });
+
+  it('缩放同时作用于位置与尺寸', () => {
+    const box = shapeScreenRect(shape, layout, {
+      ...DEFAULT_SHEET_VIEWPORT,
+      originX: 46,
+      originY: 20,
+      scrollX: 100,
+      zoom: 1.5,
+    });
+    // originX + (210 - 100) * 1.5
+    expect(box.left).toBe(211);
+    expect(box.top).toBe(177.5);
+    expect(box.width).toBe(180);
+    expect(box.height).toBe(120);
+  });
+
+  it('指针位移换算回内容坐标（缩放后拖拽不放大位移）', () => {
+    const viewport = { ...DEFAULT_SHEET_VIEWPORT, zoom: 2 };
+    expect(screenDeltaToContent(40, -10, viewport)).toEqual({ x: 20, y: -5 });
+    // 坏缩放值退化为 1，避免形状被压到原点
+    expect(screenDeltaToContent(40, -10, { ...viewport, zoom: 0 })).toEqual({ x: 40, y: -10 });
+  });
+
+  it('形状层裁到网格区域，滚出网格的形状不会画到工具栏上', () => {
+    const viewport = {
+      originX: 46,
+      originY: 125,
+      scrollX: 0,
+      scrollY: 0,
+      zoom: 1,
+      width: 800,
+      height: 500,
+    };
+    expect(shapeLayerClip(viewport, { width: 900, height: 640 })).toBe(
+      'inset(125px 54px 15px 46px)',
+    );
+    // 网格尺寸未测到时不裁剪：空 clip 会把所有形状藏起来
+    expect(shapeLayerClip(DEFAULT_SHEET_VIEWPORT, { width: 900, height: 640 })).toBeNull();
+    // 滚动不改变裁剪区域（裁剪只跟着网格原点与尺寸）
+    expect(
+      shapeLayerClip({ ...viewport, scrollX: 300, scrollY: 200 }, { width: 900, height: 640 }),
+    ).toBe('inset(125px 54px 15px 46px)');
+  });
+
+  it('可见内容区四角正好投影到容器四角', () => {
+    const bounds = { width: 400, height: 300 };
+    const viewport = {
+      originX: 46,
+      originY: 120,
+      scrollX: 100,
+      scrollY: 50,
+      zoom: 1,
+      ...bounds,
+    };
+    const box = contentVisibleBox(viewport, bounds);
+    expect(box).toEqual({ minX: 54, minY: -70, maxX: 454, maxY: 230 });
+    expect(viewport.originX + (box.minX - viewport.scrollX) * viewport.zoom).toBe(0);
+    expect(viewport.originY + (box.minY - viewport.scrollY) * viewport.zoom).toBe(0);
+    expect(viewport.originX + (box.maxX - viewport.scrollX) * viewport.zoom).toBe(bounds.width);
+    expect(viewport.originY + (box.maxY - viewport.scrollY) * viewport.zoom).toBe(bounds.height);
   });
 });
 

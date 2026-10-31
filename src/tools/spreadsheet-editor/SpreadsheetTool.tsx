@@ -40,8 +40,10 @@ import {
   buildSheetLayout,
   createSheetShape,
   pxToAnchor,
+  DEFAULT_SHEET_VIEWPORT,
   type SheetLayout,
   type SheetShapeConfig,
+  type SheetViewport,
 } from './shapes';
 import { ShapeLayer, ShapePalette } from './ui/ShapeOverlay';
 import { registerStoreStrings } from './storeStrings';
@@ -196,6 +198,8 @@ export default function SpreadsheetTool() {
   /** Bumped on every mutation so the row/column layout is re-measured after a resize */
   const [shapeLayoutVersion, setShapeLayoutVersion] = useState(0);
   const shapeLayoutRef = useRef<SheetLayout>(buildSheetLayout(undefined));
+  /** Grid → container projection for the shape layer: scrolls / zooms with the sheet (P4-SH6) */
+  const [shapeViewport, setShapeViewport] = useState<SheetViewport>(DEFAULT_SHEET_VIEWPORT);
   /** Pivot table (P2-4): analysis view over a source range, persisted in its own snapshot field */
   const [pivotConfigs, setPivotConfigs] = useState<PivotConfig[]>([]);
   const pivotConfigsRef = useRef<PivotConfig[]>([]);
@@ -576,6 +580,7 @@ export default function SpreadsheetTool() {
     const container = containerRef.current;
     if (!container) return;
     let cancelled = false;
+    let stopViewport: (() => void) | null = null;
     // Create one tick later: under StrictMode the effect mounts → unmounts → mounts synchronously,
     // and instantiating inside the effect would unmount Univer's React root during React's own
     // render, leaving the second instance blank (an empty sheet in development).
@@ -640,10 +645,21 @@ export default function SpreadsheetTool() {
       const initial = handle.getSnapshot();
       setSummary(summarizeWorkbook(initial));
       applyChartData(initial, handle.getActiveSheetId());
+      // Shapes are projected through the grid's origin / scroll / zoom; the render unit is only
+      // measured once Univer has painted, hence the extra frame before the first read.
+      const syncViewport = (): void => {
+        if (cancelled) return;
+        setShapeViewport(handle.getViewport() ?? DEFAULT_SHEET_VIEWPORT);
+      };
+      stopViewport = handle.onViewportChange(syncViewport);
+      syncViewport();
+      window.requestAnimationFrame(syncViewport);
     }, 0);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      stopViewport?.();
+      stopViewport = null;
       unsubscribeRef.current?.();
       unsubscribeRef.current = null;
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
@@ -666,6 +682,13 @@ export default function SpreadsheetTool() {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // Every sheet keeps its own scroll position: re-read the projection on a sheet switch
+  useEffect(() => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    setShapeViewport(handle.getViewport() ?? DEFAULT_SHEET_VIEWPORT);
+  }, [activeSheetId]);
 
   const refreshSummary = useCallback(() => {
     const handle = handleRef.current;
@@ -1171,6 +1194,11 @@ export default function SpreadsheetTool() {
   );
 
   const activeSheet = sheets.find((sheet) => sheet.id === activeSheetId) ?? null;
+  /**
+   * A sheet holding only floating objects is still exportable: shapes and charts are written as
+   * native `xdr:*` parts. Gating on cell count alone made such a workbook impossible to save.
+   */
+  const canExportXlsx = summary.cells > 0 || shapes.length > 0 || charts.length > 0;
 
   const menus: EditorMenu[] = [
     {
@@ -1189,7 +1217,7 @@ export default function SpreadsheetTool() {
         }),
         { type: 'separator' },
         editorMenuItem('file-export-xlsx', t('tools.sheet.exportXlsx'), () => void handleExport(), {
-          disabled: summary.cells === 0,
+          disabled: !canExportXlsx,
         }),
         editorMenuItem('file-export-csv', t('tools.sheet.exportCsv'), handleExportCsv, {
           disabled: summary.cells === 0,
@@ -1405,7 +1433,7 @@ export default function SpreadsheetTool() {
           onBringFront={(id) => reorderShape(id, 'front')}
           onSendBack={(id) => reorderShape(id, 'back')}
           bounds={chartBounds}
-          scroll={{ x: 0, y: 0 }}
+          viewport={shapeViewport}
         />
         {shapePaletteOpen ? (
           <ShapePalette onPick={insertShape} onClose={() => setShapePaletteOpen(false)} />

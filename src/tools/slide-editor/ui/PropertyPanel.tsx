@@ -543,6 +543,80 @@ export function PropertyPanel() {
         </Field>
       </Section>
 
+      {/* P2-S3.3: 内阴影。几何与外部阴影一致，但画在剪影内侧；默认 6/4/4 让新加的效果立刻可见 */}
+      <Section title={t('tools.slide.panelInnerShadow')}>
+        <Field label={t('tools.slide.innerShadowColor')}>
+          <ColorInput
+            ariaLabel={t('tools.slide.innerShadowColor')}
+            value={element.innerShadow?.color ?? '#000000'}
+            onChange={(color) =>
+              apply({
+                innerShadow: { blur: 6, offsetX: 4, offsetY: 4, ...element.innerShadow, color },
+              })
+            }
+          />
+        </Field>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label={t('tools.slide.innerShadowBlur')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.innerShadowBlur')}
+              value={Math.round(element.innerShadow?.blur ?? 0)}
+              min={0}
+              max={80}
+              onChange={(blur) =>
+                apply({
+                  innerShadow: {
+                    color: '#000000',
+                    offsetX: 4,
+                    offsetY: 4,
+                    ...element.innerShadow,
+                    blur,
+                  },
+                })
+              }
+            />
+          </Field>
+          <Field label={t('tools.slide.innerShadowOffsetX')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.innerShadowOffsetX')}
+              value={Math.round(element.innerShadow?.offsetX ?? 0)}
+              min={-60}
+              max={60}
+              onChange={(offsetX) =>
+                apply({
+                  innerShadow: {
+                    color: '#000000',
+                    blur: 6,
+                    offsetY: 4,
+                    ...element.innerShadow,
+                    offsetX,
+                  },
+                })
+              }
+            />
+          </Field>
+          <Field label={t('tools.slide.innerShadowOffsetY')}>
+            <NumberInput
+              ariaLabel={t('tools.slide.innerShadowOffsetY')}
+              value={Math.round(element.innerShadow?.offsetY ?? 0)}
+              min={-60}
+              max={60}
+              onChange={(offsetY) =>
+                apply({
+                  innerShadow: {
+                    color: '#000000',
+                    blur: 6,
+                    offsetX: 4,
+                    ...element.innerShadow,
+                    offsetY,
+                  },
+                })
+              }
+            />
+          </Field>
+        </div>
+      </Section>
+
       {/* Page-level settings only appear in normal view: in master view MasterView provides the master background entry */}
       {viewMode === 'normal' ? (
         <Section title={t('tools.slide.panelPage')}>

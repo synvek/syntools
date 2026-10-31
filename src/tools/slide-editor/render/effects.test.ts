@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { NO_SHADOW_PROPS, glowShadowProps, outerShadowProps, softEdgeRadius } from './effects';
+import {
+  NO_SHADOW_PROPS,
+  glowShadowProps,
+  innerShadowPaint,
+  outerShadowProps,
+  softEdgeRadius,
+} from './effects';
 
 /**
  * P2-S3.0: outer shadow on the canvas path.
@@ -102,5 +108,38 @@ describe('softEdgeRadius', () => {
     expect(softEdgeRadius(undefined)).toBe(0);
     expect(softEdgeRadius({ radius: 0 })).toBe(0);
     expect(softEdgeRadius({ radius: -5 })).toBe(0);
+  });
+});
+
+describe('innerShadowPaint', () => {
+  it('正常内阴影原样返回，并给出缓存 padding', () => {
+    expect(
+      innerShadowPaint({ color: '#123456', blur: 6, offsetX: 4, offsetY: -3, opacity: 0.5 }),
+    ).toEqual({
+      color: '#123456',
+      blur: 6,
+      offsetX: 4,
+      offsetY: -3,
+      opacity: 0.5,
+      cacheOffset: 6,
+    });
+  });
+
+  it('模糊与偏移全为 0 时不画：PowerPoint 会整体压暗，我们不复现那个观感', () => {
+    expect(innerShadowPaint({ color: '#000000', blur: 0, offsetX: 0, offsetY: 0 })).toBeUndefined();
+  });
+
+  it('有偏移时零模糊仍然画（硬边内阴影）', () => {
+    expect(innerShadowPaint({ color: '#000000', blur: 0, offsetX: 0, offsetY: 5 })?.offsetY).toBe(
+      5,
+    );
+  });
+
+  it('缺失 / 透明度 0 / 负模糊都不画', () => {
+    expect(innerShadowPaint(undefined)).toBeUndefined();
+    expect(
+      innerShadowPaint({ color: '#000000', blur: 6, offsetX: 2, offsetY: 2, opacity: 0 }),
+    ).toBeUndefined();
+    expect(innerShadowPaint({ color: '#000000', blur: -4, offsetX: 2, offsetY: 2 })?.blur).toBe(0);
   });
 });

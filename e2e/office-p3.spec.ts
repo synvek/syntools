@@ -55,8 +55,10 @@ test('rich text: inserted shape renders as SVG and exports as a native wps:wsp',
   await expect(page.locator('[data-shape-handle="rotate"]')).toBeVisible();
 
   // 4) Panel edits flow into the node attributes (fill + text)
+  // Fill is canonicalised as lowercase `#rrggbb` across the app (`normalizeHex`, docx import); the
+  // exporter upper-cases it for `a:srgbClr@val`, so the node attribute stays lowercase.
   await panel.locator('input[type="color"]').first().fill('#ff8800');
-  await expect(shape).toHaveAttribute('data-shape-fill', '#FF8800');
+  await expect(shape).toHaveAttribute('data-shape-fill', '#ff8800');
   await panel.getByLabel('形状文字').fill('图内文字');
   await expect(shape).toHaveAttribute('data-shape-text', '图内文字');
 

@@ -67,6 +67,38 @@ describe('effectLst 写出', () => {
     expect(softAt).toBeGreaterThan(shadowAt);
   });
 
+  it('内阴影写 a:innerShdw，dist/dir 与外部阴影同一套极坐标', () => {
+    const doc = createDoc('inner');
+    const shape = shapeWith(doc, {
+      innerShadow: { color: '#c00000', blur: 6, offsetX: 0, offsetY: 4 },
+    });
+    const xml = slideXml([shape], new Map());
+    expect(xml).toContain('<a:innerShdw blurRad=');
+    // 偏移量写 dist（EMU），方向写 dir（60 000 单位/度）。本仓沿用 write.ts / exportPptxgen.ts
+    // 既有口径：0 = 向上、顺时针增长，所以"向下偏移 4px"是 180°（见 exportPptxgen 的 −90° 注释）
+    expect(xml).toContain(`dist="${4 * EMU_PER_PX}"`);
+    expect(xml).toContain('dir="10800000"');
+    expect(xml).toContain('<a:srgbClr val="C00000">');
+    expect(xml).not.toContain('<a:outerShdw');
+  });
+
+  it('四种效果共存时按 schema 顺序：glow → innerShdw → outerShdw → softEdge', () => {
+    const doc = createDoc('all-effects');
+    const shape = shapeWith(doc, {
+      glow: { color: '#38bdf8', radius: 8 },
+      innerShadow: { color: '#000000', blur: 5, offsetX: 3, offsetY: 3 },
+      shadow: { color: '#000000', blur: 4, offsetX: 2, offsetY: 2 },
+      softEdge: { radius: 7 },
+    });
+    const xml = slideXml([shape], new Map());
+    const order = ['<a:glow', '<a:innerShdw', '<a:outerShdw', '<a:softEdge'].map((token) =>
+      xml.indexOf(token),
+    );
+    expect(order.every((at) => at > -1)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(xml.match(/<a:effectLst>/g)).toHaveLength(1);
+  });
+
   it('没有效果时不写 effectLst', () => {
     const doc = createDoc('plain');
     const shape = shapeWith(doc, {});
@@ -130,6 +162,41 @@ describe('往返与通道', () => {
     expect(zeroImported.ok).toBe(true);
     if (!zeroImported.ok) return;
     expect(zeroImported.value.doc.slides[0].elements[0]?.softEdge).toBeUndefined();
+  });
+
+  it('内阴影往返：dist/dir 解回 px 偏移，走手写通道', async () => {
+    const doc = createDoc('inner-roundtrip');
+    shapeWith(doc, { innerShadow: { color: '#c00000', blur: 6, offsetX: 3, offsetY: 4 } });
+    const exported = await exportPptx(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    // pptxgenjs 只有一个 shadow 概念，出现 a:innerShdw 就证明分派到了手写通道
+    const zip = await JSZip.loadAsync(exported.value);
+    const xml = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+    expect(xml).toContain('<a:innerShdw');
+
+    const imported = await importPptxFile(fileOf(exported.value, 'inner.pptx'));
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    const inner = imported.value.doc.slides[0].elements[0]?.innerShadow;
+    expect(inner?.color).toBe('#c00000');
+    expect(inner?.blur).toBe(6);
+    // 极坐标取整会带来 ±1px 的误差，方向与量级必须对上
+    expect(Math.abs((inner?.offsetX ?? 0) - 3)).toBeLessThanOrEqual(1);
+    expect(Math.abs((inner?.offsetY ?? 0) - 4)).toBeLessThanOrEqual(1);
+  });
+
+  it('模糊与偏移都为 0 的内阴影导入时被丢弃（我们画不出"整体压暗"）', async () => {
+    const doc = createDoc('inner-zero');
+    shapeWith(doc, { innerShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 } });
+    const exported = await exportPptx(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    const imported = await importPptxFile(fileOf(exported.value, 'zero-inner.pptx'));
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.value.doc.slides[0].elements[0]?.innerShadow).toBeUndefined();
   });
 
   it('导入时 rad=0 的 a:glow 被丢弃（否则会一直导出一个空效果）', async () => {

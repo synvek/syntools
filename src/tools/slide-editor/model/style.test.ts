@@ -129,6 +129,18 @@ describe('P2-S3：效果随格式刷传播', () => {
     expect(patch.softEdge).toEqual({ radius: 9 });
   });
 
+  it('内阴影同样随格式刷传播（P2-S3.3）', () => {
+    const source = makeShape();
+    source.innerShadow = { color: '#c00000', blur: 6, offsetX: 3, offsetY: 4, opacity: 0.8 };
+
+    const snapshot = extractStyleSnapshot(source);
+    expect(snapshot.innerShadow).toEqual(source.innerShadow);
+    expect(isEmptySnapshot(snapshot)).toBe(false);
+
+    const patch = patchOf(makeShape(), source);
+    expect(patch.innerShadow).toEqual(source.innerShadow);
+  });
+
   it('只有效果、没有填充描边时快照依然非空（否则格式刷会当成空操作）', () => {
     const source = makeShape();
     source.glow = { color: '#FF0000', radius: 10 };

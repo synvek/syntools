@@ -128,6 +128,8 @@ function requiresLegacy(doc: SlideDoc): boolean {
       if (element.glow) return true;
       // pptxgenjs cannot express a soft edge either: same silent-loss trap as glow
       if (element.softEdge) return true;
+      // ...and it has no inner shadow concept at all (its single `shadow` is always an outer one)
+      if (element.innerShadow) return true;
       if (element.type === 'shape') {
         // pptxgenjs has no path API, so custom geometry must go through the legacy writer
         if (element.geom.custGeom && element.geom.custGeom.length > 0) return true;

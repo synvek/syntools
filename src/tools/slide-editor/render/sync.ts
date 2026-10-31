@@ -54,6 +54,9 @@ function isUpdatable(element: SlideElement): boolean {
   // Soft edge caches the node (a blurred raster at the current size): the fast path would leave the
   // stale cache behind after a resize, so these elements rebuild too
   if (element.softEdge) return false;
+  // Inner shadow is an extra cached overlay the fast path knows nothing about: a resize would keep
+  // the old mask at the old size (and adding/removing the effect would leave the overlay behind)
+  if (element.innerShadow) return false;
   // A group's children change after group/ungroup and the fast path doesn't update children, so rebuild those too
   return element.type === 'image' || element.type === 'line';
 }

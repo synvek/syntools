@@ -5,6 +5,7 @@ import type {
   Fill,
   GlowStyle,
   GradientFill,
+  InnerShadowStyle,
   LineElement,
   MediaAsset,
   ShadowStyle,
@@ -22,7 +23,13 @@ import { createChartNode } from './chartNode';
 import { createFormulaNode, createIconNode } from './shapeNodes';
 import { acquireImage } from './imageCache';
 import { layoutTextBody } from './textLayout';
-import { NO_SHADOW_PROPS, glowShadowProps, outerShadowProps, softEdgeRadius } from './effects';
+import {
+  NO_SHADOW_PROPS,
+  glowShadowProps,
+  innerShadowPaint,
+  outerShadowProps,
+  softEdgeRadius,
+} from './effects';
 
 /**
  * SlideElement → Konva.Node factory and updater.
@@ -160,6 +167,76 @@ function addGlow(
   halo.setAttrs(props);
   halo.listening(false);
   group.add(halo);
+}
+
+/**
+ * P2-S3.3: inner shadow painted as an overlay on top of the silhouette.
+ *
+ * Konva's shadow slot can only paint outside a shape, so the overlay is assembled from three layers
+ * inside a **cached** group (see `innerShadowPaint` for the layer-by-layer reasoning):
+ * plate → `destination-in` silhouette → `destination-out` blurred, offset silhouette.
+ *
+ * The **eroder** carries the blur, not the overlay: blurring the subtraction result loses the whole
+ * effect at zero offset (`A − A = ∅`), while PowerPoint paints a soft ring in that case — that is
+ * exactly what `A − blur(A)` produces.
+ *
+ * The cache is not optional: `destination-out` on an uncached node would punch a hole through every
+ * element painted underneath it. For the same reason the overlay never takes the fast property path
+ * (`sync.ts`), and the group must stay `listening:false` — it is paint, not a hit target.
+ */
+function addInnerShadow(
+  group: Konva.Group,
+  silhouette: Konva.Shape,
+  inner: InnerShadowStyle | undefined,
+  size: { width: number; height: number },
+): void {
+  const paint = innerShadowPaint(inner);
+  if (!paint) return;
+  const { width, height } = size;
+  if (!(width > 0 && height > 0)) return;
+
+  /** Crisp copy of the silhouette: same geometry, no stroke / shadow / filters / own effects */
+  const silhouetteCopy = (extra: Konva.ShapeConfig): Konva.Shape =>
+    silhouette.clone({
+      listening: false,
+      strokeEnabled: false,
+      shadowEnabled: false,
+      filters: [],
+      opacity: 1,
+      ...extra,
+    }) as Konva.Shape;
+
+  const overlay = new Konva.Group({ name: 'innerShadow', listening: false, width, height });
+  overlay.add(
+    new Konva.Rect({
+      x: 0,
+      y: 0,
+      width,
+      height,
+      fill: paint.color,
+      opacity: paint.opacity,
+      listening: false,
+    }),
+  );
+  // Keep only the part of the plate that lies inside the silhouette
+  overlay.add(silhouetteCopy({ globalCompositeOperation: 'destination-in' }));
+  // Then erase an offset copy: what survives is the band along the edge opposite the offset
+  const eroder = silhouetteCopy({
+    x: paint.offsetX,
+    y: paint.offsetY,
+    globalCompositeOperation: 'destination-out',
+  });
+  if (paint.blur > 0) {
+    eroder.filters([Konva.Filters.Blur]);
+    eroder.blurRadius(paint.blur);
+    // A cached shape clips the blurred tail at its own bounds, so the padding is mandatory here
+    eroder.cache({ pixelRatio: 1, offset: paint.cacheOffset });
+  }
+  overlay.add(eroder);
+
+  // Isolates the composite operations above from everything painted before it on the layer
+  overlay.cache({ pixelRatio: 1 });
+  group.add(overlay);
 }
 
 /** Text body → Konva.Group (split into fragments per run, preserving mixed styles) */
@@ -511,6 +588,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
         addGlow(group, bg, element.glow);
         applyShadow(bg, element.shadow);
         group.add(bg);
+        addInnerShadow(group, bg, element.innerShadow, element);
       }
       group.add(createTextNodes(element.body, element.width, element.height));
       break;
@@ -524,6 +602,8 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       addGlow(group, shape, element.glow);
       applyShadow(shape, element.shadow);
       group.add(shape);
+      // Clipped to the body, so it must sit above the fill but below the shape's own text
+      addInnerShadow(group, shape, element.innerShadow, element);
       if (element.body) group.add(createTextNodes(element.body, element.width, element.height));
       break;
     }
@@ -566,6 +646,19 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
       addGlow(group, node, element.glow);
       applyShadow(node, element.shadow);
       group.add(node);
+      // The bitmap may not be decoded yet, so an inner shadow uses the element box as its silhouette
+      // (instead of a clone of the Image node, which would be empty until `onImageReady`)
+      addInnerShadow(
+        group,
+        new Konva.Rect({
+          width: element.width,
+          height: element.height,
+          cornerRadius: element.cornerRadius ?? 0,
+          fill: '#000000',
+        }),
+        element.innerShadow,
+        element,
+      );
       break;
     }
     case 'line': {

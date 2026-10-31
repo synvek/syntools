@@ -11,6 +11,7 @@ import type {
   AnimationStep,
   Fill,
   GlowStyle,
+  InnerShadowStyle,
   LineElement,
   Paragraph,
   RunStyle,
@@ -385,6 +386,21 @@ function outerShdwXml(shadow: ShadowStyle): string {
   ].join('');
 }
 
+/**
+ * Inner shadow → a:innerShdw (P2-S3.3). Same polar `dist`/`dir` encoding as `a:outerShdw`, minus
+ * `algn` / `rotWithShape`: the effect is clipped to the silhouette, so it cannot be aligned outside.
+ */
+function innerShdwXml(inner: InnerShadowStyle): string {
+  const alpha = Math.round((inner.opacity ?? 1) * ALPHA_UNIT);
+  const dist = Math.round(Math.sqrt(inner.offsetX ** 2 + inner.offsetY ** 2) * EMU_PER_PX);
+  const dir = Math.round((Math.atan2(inner.offsetX, -inner.offsetY) * 60000 * 180) / Math.PI);
+  return [
+    `<a:innerShdw blurRad="${pxToEmu(inner.blur)}" dist="${dist}" dir="${dir}">`,
+    `<a:srgbClr val="${hexOf(inner.color)}"><a:alpha val="${alpha}"/></a:srgbClr>`,
+    '</a:innerShdw>',
+  ].join('');
+}
+
 function glowXml(glow: GlowStyle): string {
   const alpha = Math.round((glow.opacity ?? 1) * ALPHA_UNIT);
   return [
@@ -412,9 +428,13 @@ function effectLstXml(element: {
   shadow?: ShadowStyle;
   glow?: GlowStyle;
   softEdge?: SoftEdgeStyle;
+  innerShadow?: InnerShadowStyle;
 }): string {
   const parts: string[] = [];
   if (element.glow) parts.push(glowXml(element.glow));
+  // innerShdw sits between glow and outerShdw in the schema; swapping them makes PowerPoint drop
+  // the whole effect list (the file still opens, which is why this needs a test)
+  if (element.innerShadow) parts.push(innerShdwXml(element.innerShadow));
   if (element.shadow) parts.push(outerShdwXml(element.shadow));
   // softEdge is the last child the schema allows, after every shadow variant
   if (element.softEdge) parts.push(softEdgeXml(element.softEdge));

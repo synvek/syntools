@@ -1,4 +1,4 @@
-import type { GlowStyle, ShadowStyle, SoftEdgeStyle } from '../model/types';
+import type { GlowStyle, InnerShadowStyle, ShadowStyle, SoftEdgeStyle } from '../model/types';
 
 /**
  * Element effects → canvas properties (P2-S3).
@@ -101,4 +101,51 @@ export function softEdgeRadius(softEdge: SoftEdgeStyle | undefined): number {
   const radius = Math.max(0, softEdge.radius);
   // A zero radius is the untouched shape; keeping it would export a meaningless a:softEdge
   return radius > 0 ? radius : 0;
+}
+
+/**
+ * Inner shadow → the paint recipe for the overlay node (P2-S3.3).
+ *
+ * There is no Konva primitive for `a:innerShdw`: a shadow slot always paints **outside** the
+ * silhouette. The overlay is therefore built from three layers inside a cached group:
+ *
+ * 1. a solid plate in the shadow colour, sized to the element box;
+ * 2. the silhouette itself as `destination-in`, which trims the plate down to a solid silhouette;
+ * 3. the same silhouette offset by the shadow offset as `destination-out`, which punches the
+ *    interior away and leaves only the crescent along the far edge.
+ *
+ * Blur is then applied to the whole cached group (`Konva.Filters.Blur`), which is why the cache
+ * needs an `offset` (a blurred tail would be clipped at the group bounds).
+ *
+ * Returns `undefined` when nothing would be visible: no effect, zero opacity, or a shadow with
+ * neither blur nor offset. PowerPoint paints the last case as a flat dark fill over the whole
+ * shape, which looks like a bug in its own right — we treat it as "no effect" instead of
+ * reproducing it (the panel's defaults are 4 / 4 / 4, so it is not reachable by accident).
+ */
+export interface InnerShadowPaint {
+  color: string;
+  blur: number;
+  offsetX: number;
+  offsetY: number;
+  opacity: number;
+  /** Padding the cached raster needs so the blur is not clipped at the element bounds */
+  cacheOffset: number;
+}
+
+export function innerShadowPaint(
+  inner: InnerShadowStyle | undefined,
+): InnerShadowPaint | undefined {
+  if (!inner) return undefined;
+  const opacity = inner.opacity ?? 1;
+  if (!(opacity > 0)) return undefined;
+  const blur = Math.max(0, inner.blur);
+  if (blur === 0 && inner.offsetX === 0 && inner.offsetY === 0) return undefined;
+  return {
+    color: inner.color,
+    blur,
+    offsetX: inner.offsetX,
+    offsetY: inner.offsetY,
+    opacity,
+    cacheOffset: Math.ceil(blur),
+  };
 }

@@ -150,6 +150,21 @@ export interface SoftEdgeStyle {
   radius: number;
 }
 
+/**
+ * Inner shadow (subset of DrawingML `a:innerShdw`): darkens the inside of the silhouette along the
+ * side opposite to the offset. Same geometry as the outer shadow, but the effect is clipped to the
+ * shape, which is exactly why the canvas renderer cannot use Konva's shadow slot (P2-S3.3).
+ */
+export interface InnerShadowStyle {
+  color: string;
+  /** Blur radius (px, value after EMU conversion) */
+  blur: number;
+  offsetX: number;
+  offsetY: number;
+  /** 0~1, defaults to 1 */
+  opacity?: number;
+}
+
 interface ElementBase {
   id: string;
   x: number;
@@ -175,6 +190,8 @@ interface ElementBase {
   glow?: GlowStyle;
   /** Soft edge (P2-S3.2) */
   softEdge?: SoftEdgeStyle;
+  /** Inner shadow (P2-S3.3) */
+  innerShadow?: InnerShadowStyle;
 }
 
 export interface TextElement extends ElementBase {

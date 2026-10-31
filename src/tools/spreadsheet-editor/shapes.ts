@@ -165,6 +165,106 @@ export function shapeRect(
   };
 }
 
+/**
+ * Where the grid content sits inside the tool container (P4-SH6).
+ *
+ * The overlay is a sibling of Univer's canvas, but the grid's content origin is *not* the container's
+ * top-left: the ribbon, the formula bar, the row header and the column header all sit above/left of
+ * cell A1. `originX` / `originY` carry that offset (already multiplied by `zoom`), and
+ * `scrollX` / `scrollY` are the content pixels the viewport has scrolled away, so
+ *
+ * `screen = origin + (content - scroll) * zoom`
+ *
+ * A shape keeps its **content** position (the cell anchor); only this projection changes on scroll.
+ */
+export interface SheetViewport {
+  originX: number;
+  originY: number;
+  scrollX: number;
+  scrollY: number;
+  zoom: number;
+  /** Grid area size in container px; 0 when it cannot be measured (clipping is then skipped) */
+  width: number;
+  height: number;
+}
+
+/** Used until Univer reports its viewport (and as the fallback when the internals are unavailable) */
+export const DEFAULT_SHEET_VIEWPORT: SheetViewport = {
+  originX: 0,
+  originY: 0,
+  scrollX: 0,
+  scrollY: 0,
+  zoom: 1,
+  width: 0,
+  height: 0,
+};
+
+/** Bad zoom (0 / NaN) would collapse every shape onto the origin, so it degrades to 1 */
+export function viewportZoom(viewport: SheetViewport): number {
+  return Number.isFinite(viewport.zoom) && viewport.zoom > 0 ? viewport.zoom : 1;
+}
+
+/** Content-space box → overlay-space box (left/top/width/height in container CSS px) */
+export function shapeScreenRect(
+  shape: SheetShapeConfig,
+  layout: SheetLayout,
+  viewport: SheetViewport,
+): { left: number; top: number; width: number; height: number } {
+  const rect = shapeRect(shape, layout);
+  const zoom = viewportZoom(viewport);
+  return {
+    left: viewport.originX + (rect.x - viewport.scrollX) * zoom,
+    top: viewport.originY + (rect.y - viewport.scrollY) * zoom,
+    width: rect.width * zoom,
+    height: rect.height * zoom,
+  };
+}
+
+/** Screen (pointer) delta → content delta: zoom scales everything the user drags */
+export function screenDeltaToContent(
+  deltaX: number,
+  deltaY: number,
+  viewport: SheetViewport,
+): { x: number; y: number } {
+  const zoom = viewportZoom(viewport);
+  return { x: deltaX / zoom, y: deltaY / zoom };
+}
+
+/**
+ * Content-space area currently visible in the overlay.
+ *
+ * Clamping a drag against this keeps the shape reachable: the previous bounds ignored the scroll
+ * offset, so on a scrolled sheet the limit sat somewhere off-screen.
+ */
+export function contentVisibleBox(
+  viewport: SheetViewport,
+  bounds: { width: number; height: number },
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  const zoom = viewportZoom(viewport);
+  return {
+    minX: viewport.scrollX - viewport.originX / zoom,
+    minY: viewport.scrollY - viewport.originY / zoom,
+    maxX: viewport.scrollX + (bounds.width - viewport.originX) / zoom,
+    maxY: viewport.scrollY + (bounds.height - viewport.originY) / zoom,
+  };
+}
+
+/**
+ * CSS clip for the shape layer, so a scrolled shape cannot paint over the ribbon / formula bar.
+ *
+ * `null` when the grid area has not been measured yet — an empty clip would hide every shape, which
+ * is a much worse failure than a few frames of overdraw.
+ */
+export function shapeLayerClip(
+  viewport: SheetViewport,
+  bounds: { width: number; height: number },
+): string | null {
+  if (viewport.width <= 0 || viewport.height <= 0) return null;
+  const right = Math.max(0, bounds.width - (viewport.originX + viewport.width));
+  const bottom = Math.max(0, bounds.height - (viewport.originY + viewport.height));
+  return `inset(${Math.max(0, viewport.originY)}px ${right}px ${bottom}px ${Math.max(0, viewport.originX)}px)`;
+}
+
 /** SVG path for the shape at its own size (rotation is applied by the caller) */
 export function shapePath(
   shape: Pick<SheetShapeConfig, 'prst' | 'adj' | 'width' | 'height'>,

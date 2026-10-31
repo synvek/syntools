@@ -2,11 +2,17 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   anchorToPx,
+  contentVisibleBox,
   pxToAnchor,
+  screenDeltaToContent,
+  shapeLayerClip,
   shapePath,
+  shapeScreenRect,
+  viewportZoom,
   SHEET_SHAPE_PRESETS,
   type SheetLayout,
   type SheetShapeConfig,
+  type SheetViewport,
 } from '../shapes';
 
 /**
@@ -57,10 +63,10 @@ export interface ShapeLayerProps {
   onRemove: (id: string) => void;
   onBringFront: (id: string) => void;
   onSendBack: (id: string) => void;
-  /** Content-space size of the sheet area (scroll compensation clamps to this) */
+  /** Size of the container the overlay covers (CSS px); drags clamp inside it */
   bounds: { width: number; height: number };
-  /** Content-space scroll offset of the sheet viewport (0 when it cannot be read) */
-  scroll: { x: number; y: number };
+  /** Grid → container projection: origin / scroll / zoom of the active sheet */
+  viewport: SheetViewport;
 }
 
 /** All shapes of the active sheet, positioned in overlay coordinates */
@@ -74,7 +80,7 @@ export function ShapeLayer({
   onBringFront,
   onSendBack,
   bounds,
-  scroll,
+  viewport,
 }: ShapeLayerProps) {
   const { t } = useTranslation();
 
@@ -82,24 +88,29 @@ export function ShapeLayer({
 
   return (
     // pointer-events-none: the layer must not swallow clicks meant for the grid
-    <div data-testid="sheet-shape-layer" className="pointer-events-none absolute inset-0 z-40">
+    <div
+      data-testid="sheet-shape-layer"
+      className="pointer-events-none absolute inset-0 z-40"
+      // Scrolled shapes scroll *out* of the grid, not over the ribbon / formula bar
+      style={{ clipPath: shapeLayerClip(viewport, bounds) ?? undefined }}
+    >
       {shapes.map((shape) => {
-        const rect = anchorToPx(shape.from, layout);
-        const left = rect.x - scroll.x;
-        const top = rect.y - scroll.y;
+        const box = shapeScreenRect(shape, layout, viewport);
         // Outside the visible area: skip rendering instead of drawing at a clipped coordinate
-        if (left > bounds.width || top > bounds.height) return null;
-        if (left + shape.width < 0 || top + shape.height < 0) return null;
+        if (box.left > bounds.width || box.top > bounds.height) return null;
+        if (box.left + box.width < 0 || box.top + box.height < 0) return null;
         return (
           <ShapeNode
             key={shape.id}
             shape={shape}
             layout={layout}
-            left={left}
-            top={top}
+            left={box.left}
+            top={box.top}
+            width={box.width}
+            height={box.height}
             selected={shape.id === selectedId}
             bounds={bounds}
-            scroll={scroll}
+            viewport={viewport}
             onSelect={() => onSelect(shape.id)}
             onChange={(patch) => onChange(shape.id, patch)}
             onRemove={() => onRemove(shape.id)}
@@ -119,9 +130,11 @@ interface ShapeNodeProps {
   layout: SheetLayout;
   left: number;
   top: number;
+  width: number;
+  height: number;
   selected: boolean;
   bounds: { width: number; height: number };
-  scroll: { x: number; y: number };
+  viewport: SheetViewport;
   onSelect: () => void;
   onChange: (patch: Partial<SheetShapeConfig>) => void;
   onRemove: () => void;
@@ -136,9 +149,11 @@ function ShapeNode({
   layout,
   left,
   top,
+  width,
+  height,
   selected,
   bounds,
-  scroll,
+  viewport,
   onSelect,
   onChange,
   onRemove,
@@ -148,8 +163,9 @@ function ShapeNode({
   textLabel,
 }: ShapeNodeProps) {
   const { t } = useTranslation();
-  const latest = useRef({ shape, layout, scroll, bounds, onChange });
-  latest.current = { shape, layout, scroll, bounds, onChange };
+  const latest = useRef({ shape, layout, viewport, bounds, onChange });
+  latest.current = { shape, layout, viewport, bounds, onChange };
+  const zoom = viewportZoom(viewport);
 
   /** Window-level drag loop: geometry is fixed at gesture start, the delta is accumulated */
   const beginGesture = (
@@ -192,23 +208,24 @@ function ShapeNode({
     origin: DragOrigin,
   ): Partial<SheetShapeConfig> => {
     const current = latest.current;
-    // Clamp inside the visible sheet area so the shape can never be dragged out of reach
-    const maxLeft = Math.max(0, current.bounds.width - origin.shape.width);
-    const maxTop = Math.max(0, current.bounds.height - origin.shape.height);
-    const x = clamp(targetLeft, 0, maxLeft) + current.scroll.x;
-    const y = clamp(targetTop, 0, maxTop) + current.scroll.y;
+    // Clamp inside the *visible* content area so the shape can never be dragged out of reach
+    const visible = contentVisibleBox(current.viewport, current.bounds);
+    const minX = Math.max(0, visible.minX);
+    const minY = Math.max(0, visible.minY);
+    const maxX = Math.max(minX, visible.maxX - origin.shape.width);
+    const maxY = Math.max(minY, visible.maxY - origin.shape.height);
+    const x = clamp(targetLeft, minX, maxX);
+    const y = clamp(targetTop, minY, maxY);
     return { from: pxToAnchor(Math.round(x), Math.round(y), current.layout) };
   };
 
   const startDrag = (event: React.PointerEvent<HTMLDivElement>): void => {
     if ((event.target as HTMLElement).closest('button, input')) return;
-    beginGesture(event, (total, origin) =>
-      moveTo(
-        origin.left + total.x - latest.current.scroll.x,
-        origin.top + total.y - latest.current.scroll.y,
-        origin,
-      ),
-    );
+    // Pointer deltas are screen px; the anchor lives in content px, so both are divided by zoom
+    beginGesture(event, (total, origin) => {
+      const delta = screenDeltaToContent(total.x, total.y, latest.current.viewport);
+      return moveTo(origin.left + delta.x, origin.top + delta.y, origin);
+    });
   };
 
   const startResize =
@@ -216,23 +233,24 @@ function ShapeNode({
     (event: React.PointerEvent<HTMLDivElement>): void => {
       beginGesture(event, (total, origin) => {
         const start = origin.shape;
+        const delta = screenDeltaToContent(total.x, total.y, latest.current.viewport);
         const west = handle.includes('w');
         const east = handle.includes('e');
         const north = handle.includes('n');
         const south = handle.includes('s');
 
         const width = east
-          ? Math.max(MIN_SIZE, Math.round(start.width + total.x))
+          ? Math.max(MIN_SIZE, Math.round(start.width + delta.x))
           : west
-            ? Math.max(MIN_SIZE, Math.round(start.width - total.x))
+            ? Math.max(MIN_SIZE, Math.round(start.width - delta.x))
             : start.width;
         const height = south
-          ? Math.max(MIN_SIZE, Math.round(start.height + total.y))
+          ? Math.max(MIN_SIZE, Math.round(start.height + delta.y))
           : north
-            ? Math.max(MIN_SIZE, Math.round(start.height - total.y))
+            ? Math.max(MIN_SIZE, Math.round(start.height - delta.y))
             : start.height;
 
-        // Dragging a west/north handle moves the top-left corner: re-anchor from the new pixel origin
+        // Dragging a west/north handle moves the top-left corner: re-anchor from the new content origin
         const nextLeft = west ? origin.left + (start.width - width) : origin.left;
         const nextTop = north ? origin.top + (start.height - height) : origin.top;
         const from =
@@ -257,8 +275,13 @@ function ShapeNode({
       '[data-shape-id]',
     ) as HTMLElement | null;
     const rect = anchorToPx(current.shape.from, current.layout);
-    const centerX = rect.x + current.shape.width / 2 - current.scroll.x;
-    const centerY = rect.y + current.shape.height / 2 - current.scroll.y;
+    const zoomNow = viewportZoom(current.viewport);
+    const centerX =
+      current.viewport.originX +
+      (rect.x + current.shape.width / 2 - current.viewport.scrollX) * zoomNow;
+    const centerY =
+      current.viewport.originY +
+      (rect.y + current.shape.height / 2 - current.viewport.scrollY) * zoomNow;
     const onMove = (move: PointerEvent): void => {
       const box = host?.getBoundingClientRect();
       const cx = box ? box.left + box.width / 2 : centerX;
@@ -296,8 +319,8 @@ function ShapeNode({
       style={{
         left,
         top,
-        width: shape.width,
-        height: shape.height,
+        width,
+        height,
         transform: rotation ? `rotate(${rotation}deg)` : undefined,
       }}
     >
@@ -308,8 +331,8 @@ function ShapeNode({
         style={{ padding: 1 }}
       >
         <svg
-          width={shape.width}
-          height={shape.height}
+          width={width}
+          height={height}
           viewBox={`0 0 ${shape.width} ${shape.height}`}
           className="block h-full w-full"
           aria-hidden="true"
@@ -327,7 +350,7 @@ function ShapeNode({
       {shape.text ? (
         <div
           className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden px-2 text-center"
-          style={{ fontSize: 14, color: '#ffffff', lineHeight: 1.25 }}
+          style={{ fontSize: 14 * zoom, color: '#ffffff', lineHeight: 1.25 }}
         >
           <span className="line-clamp-3">{shape.text}</span>
         </div>

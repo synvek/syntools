@@ -1,6 +1,7 @@
 import type {
   Fill,
   GlowStyle,
+  InnerShadowStyle,
   RunStyle,
   ShadowStyle,
   SoftEdgeStyle,
@@ -26,6 +27,8 @@ export interface StyleSnapshot {
   glow?: GlowStyle;
   /** Soft edge (P2-S3.2), carried by the same rules as the shadow */
   softEdge?: SoftEdgeStyle;
+  /** Inner shadow (P2-S3.3), carried by the same rules as the shadow */
+  innerShadow?: InnerShadowStyle;
   cornerRadius?: number;
   /** Text formatting (from the first run / first paragraph) */
   run?: RunStyle;
@@ -74,6 +77,7 @@ export function extractStyleSnapshot(element: SlideElement): StyleSnapshot {
   if (element.shadow) snapshot.shadow = element.shadow;
   if (element.glow) snapshot.glow = element.glow;
   if (element.softEdge) snapshot.softEdge = element.softEdge;
+  if (element.innerShadow) snapshot.innerShadow = element.innerShadow;
   return snapshot;
 }
 
@@ -85,6 +89,7 @@ export function isEmptySnapshot(snapshot: StyleSnapshot): boolean {
     !snapshot.shadow &&
     !snapshot.glow &&
     !snapshot.softEdge &&
+    !snapshot.innerShadow &&
     snapshot.cornerRadius === undefined &&
     !snapshot.run &&
     !snapshot.paragraph &&
@@ -126,6 +131,7 @@ export function applyStyleSnapshot(
   if (snapshot.shadow !== undefined) patch.shadow = snapshot.shadow;
   if (snapshot.glow !== undefined) patch.glow = snapshot.glow;
   if (snapshot.softEdge !== undefined) patch.softEdge = snapshot.softEdge;
+  if (snapshot.innerShadow !== undefined) patch.innerShadow = snapshot.innerShadow;
 
   // Text: run-level styles go to every run, paragraph-level to every paragraph
   const body =

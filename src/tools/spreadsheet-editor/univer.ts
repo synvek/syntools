@@ -17,7 +17,11 @@ import DocsUIEnUS from '@univerjs/docs-ui/locale/en-US';
 import DocsUIZhCN from '@univerjs/docs-ui/locale/zh-CN';
 import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
 import '@univerjs/engine-formula/facade';
-import { UniverRenderEnginePlugin } from '@univerjs/engine-render';
+import {
+  IRenderManagerService,
+  SHEET_VIEWPORT_KEY,
+  UniverRenderEnginePlugin,
+} from '@univerjs/engine-render';
 import { UniverSheetsPlugin } from '@univerjs/sheets';
 import SheetsEnUS from '@univerjs/sheets/locale/en-US';
 import SheetsZhCN from '@univerjs/sheets/locale/zh-CN';
@@ -89,6 +93,7 @@ import '@univerjs/sheets-sort-ui/lib/index.css';
 import '@univerjs/sheets-hyper-link-ui/lib/index.css';
 import '@univerjs/find-replace/lib/index.css';
 import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
+import type { SheetViewport } from './shapes';
 
 /**
  * Univer adapter layer: plugin registration, locales, theme and lifecycle funnel through one entry
@@ -155,6 +160,13 @@ export interface UniverHandle {
   redo(): void;
   /** Duplicate a sheet (the copy is inserted after the source) */
   duplicateSheet(id: string): void;
+  /**
+   * Grid → container projection, for the floating overlay layers (shapes).
+   * Null when the render unit is not ready yet (first frames, or a disposed instance).
+   */
+  getViewport(): SheetViewport | null;
+  /** Subscribe to scroll / zoom / skeleton changes; returns an unsubscribe function */
+  onViewportChange(listener: () => void): () => void;
 }
 
 const ZH_LOCALE = mergeLocales(
@@ -377,6 +389,73 @@ export function createUniverInstance(
     container.replaceChildren();
   };
 
+  /**
+   * Grid → container projection for the floating overlays (P4-SH6).
+   *
+   * Three offsets have to be combined, and none of them is exposed as a single public "cell → screen"
+   * call:
+   *
+   * 1. the canvas element's position inside the tool container (ribbon + formula bar sit above it);
+   * 2. `viewMain`'s own left/top, which Univer sets to the row-header width / column-header height;
+   * 3. the viewport scroll, in content px, plus the scene scale (the sheet zoom).
+   *
+   * Everything is returned in CSS px of the *container*, which is exactly the overlay's coordinate
+   * space (both are children of the same `relative` box).
+   */
+  const getViewport = (): SheetViewport | null => {
+    const workbook = univerAPI.getActiveWorkbook();
+    const unitId = workbook?.getId();
+    if (!unitId) return null;
+    let render;
+    try {
+      render = univer.__getInjector().get(IRenderManagerService)?.getRenderById(unitId);
+    } catch {
+      // The injector is internal API: a version bump that renames it must degrade, not crash the tool
+      return null;
+    }
+    if (!render) return null;
+    const viewMain = render.scene.getViewport(SHEET_VIEWPORT_KEY.VIEW_MAIN);
+    if (!viewMain) return null;
+    const zoom = Math.abs(render.scene.scaleX) || 1;
+    const scroll = render.scene.getViewportScrollXY(viewMain);
+    const containerBox = container.getBoundingClientRect();
+    const canvasBox = render.engine.getCanvasElement().getBoundingClientRect();
+    const headerX = (viewMain.left ?? 0) * zoom;
+    const headerY = (viewMain.top ?? 0) * zoom;
+    return {
+      originX: canvasBox.left - containerBox.left + headerX,
+      originY: canvasBox.top - containerBox.top + headerY,
+      scrollX: scroll.x,
+      scrollY: scroll.y,
+      zoom,
+      // The canvas also covers the row / column headers; only the remainder shows cells
+      width: Math.max(0, canvasBox.width - headerX),
+      height: Math.max(0, canvasBox.height - headerY),
+    };
+  };
+
+  const onViewportChange = (listener: () => void): (() => void) => {
+    let frame = 0;
+    const schedule = (): void => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        listener();
+      });
+    };
+    // Scroll fires per wheel tick; zoom and column/row resizing move the grid origin as well
+    const disposables = [
+      univerAPI.addEvent(univerAPI.Event.Scroll, schedule),
+      univerAPI.addEvent(univerAPI.Event.SheetZoomChanged, schedule),
+      univerAPI.addEvent(univerAPI.Event.SheetSkeletonChanged, schedule),
+    ];
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = 0;
+      for (const disposable of disposables) disposable.dispose();
+    };
+  };
+
   return {
     loadSnapshot,
     getSnapshot,
@@ -394,5 +473,7 @@ export function createUniverInstance(
     deleteSheet,
     renameSheet,
     duplicateSheet,
+    getViewport,
+    onViewportChange,
   };
 }
