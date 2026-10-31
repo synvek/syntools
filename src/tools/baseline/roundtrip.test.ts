@@ -177,13 +177,13 @@ function writeReport(report: BaselineReport): string[] {
 }
 
 describe('OOXML round-trip baseline (generated samples)', () => {
-  it('builds the planned 15 / 8 / 8 samples with unique ids', () => {
+  it('builds the planned 15 / 9 / 8 samples with unique ids', () => {
     expect(slideSamples).toHaveLength(SAMPLE_COUNTS.slide);
     expect(sheetSamples).toHaveLength(SAMPLE_COUNTS.sheet);
     expect(docSamples).toHaveLength(SAMPLE_COUNTS.docx);
     const ids = sampleManifest.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(sampleManifest).toHaveLength(31);
+    expect(sampleManifest).toHaveLength(32);
   });
 
   it('exports and re-imports every sample without losing the document', async () => {

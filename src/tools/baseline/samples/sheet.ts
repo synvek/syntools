@@ -192,6 +192,48 @@ export const sheetSamples: SheetSample[] = [
     },
   },
   {
+    id: 'sheet/shapes',
+    title: '浮动形状（原生 xdr:sp）',
+    notes:
+      '形状按单元格锚定导出为 oneCellAnchor + xdr:sp；导入应原样读回（prst / 锚点 / 尺寸 / 文字）',
+    snapshot: () => {
+      const snapshot = sheetWith({
+        '0': { '0': { v: 'Note' }, '1': { v: 'Value' } },
+        '1': { '0': { v: 'Alpha' }, '1': { v: 12 } },
+        '2': { '0': { v: 'Beta' }, '1': { v: 34 } },
+      });
+      const sheetId = snapshot.sheetOrder[0];
+      snapshot.syntoolsShapes = [
+        {
+          id: 'shape-1',
+          prst: 'roundRect',
+          sheetId,
+          from: { col: 3, row: 1, colOff: 8, rowOff: 6 },
+          width: 180,
+          height: 90,
+          fill: '#4472c4',
+          stroke: '#2f5597',
+          strokeWidth: 1,
+          text: 'Callout',
+          z: 1,
+        },
+        {
+          id: 'shape-2',
+          prst: 'rightArrow',
+          sheetId,
+          from: { col: 3, row: 3, colOff: 8, rowOff: 6 },
+          width: 140,
+          height: 60,
+          fill: '#ff8800',
+          stroke: '#773300',
+          strokeWidth: 2,
+          z: 2,
+        },
+      ];
+      return snapshot;
+    },
+  },
+  {
     id: 'sheet/hyperlink-note-error',
     title: '超链接 / 批注 / 错误值',
     snapshot: () =>

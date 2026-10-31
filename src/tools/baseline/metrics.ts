@@ -130,6 +130,8 @@ export function sheetMetrics(snapshot: WorkbookSnapshot): Metrics {
     freezeSheets: 0,
     /** Charts the editor can still edit */
     charts: (snapshot.syntoolsCharts ?? []).length,
+    /** Floating shapes written as native `xdr:sp` (SHEET-02) */
+    shapes: (snapshot.syntoolsShapes ?? []).length,
     /** Charts that survive only as verbatim parts (edited file → import → export) */
     rawChartParts: Object.keys(snapshot.syntoolsRawParts?.parts ?? {}).length,
     /** CF/DV are measured across both channels: editor resources and preserved extras */

@@ -118,8 +118,12 @@ export async function collectRawChartParts(zip: JSZipType): Promise<RawChartPart
     const drawingRelsPath = relsPathFor(drawingPath);
     const drawingRels = parseRelationships(await readText(zip, drawingRelsPath));
     const chartRels = drawingRels.filter((item) => CHART_REL.test(item.type));
-    // Keep only drawings that really contain charts (picture-only drawings are out of scope)
-    if (chartRels.length === 0) continue;
+    // A drawing is worth keeping when it holds a chart **or** a shape (`xdr:sp`). Shapes used to be
+    // dropped here, which silently deleted every shape of an imported file on the next export.
+    const drawingXml = await readText(zip, drawingPath);
+    const hasShapes = Boolean(drawingXml && drawingXml.includes('<xdr:sp'));
+    // Picture-only drawings stay out of scope
+    if (chartRels.length === 0 && !hasShapes) continue;
 
     sheetDrawings[sheetName] = drawingPath;
     parts[drawingPath] = (await readBase64(zip, drawingPath)) as string;

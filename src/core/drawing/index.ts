@@ -12,3 +12,4 @@ export * from './custGeom';
 export * from './boolean';
 export * from './drawingml';
 export * from './xmlNode';
+export { shapePathD } from './svgPath';

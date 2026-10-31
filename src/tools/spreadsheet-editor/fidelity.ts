@@ -1,5 +1,6 @@
 import type { FidelityIssue } from '@/core/fidelity';
 import { buildChartPlan } from './chartXml';
+import { buildShapePlan } from './shapesXml';
 import { buildPivotXlsxPlan } from './pivotXlsx';
 import { countUnsupportedValidation } from './cfdv';
 import { countSheetComments, readSheetComments } from './comments';
@@ -11,7 +12,7 @@ import type { WorkbookSnapshot } from './xlsx-io';
  *
  * Editor-created conditional formatting / data validation is converted to OOXML by `cfdv.ts`;
  * only the rules without an exceljs/OOXML equivalent are reported as warnings here.
- * Pictures / shapes are still dropped on import and not counted anywhere yet.
+ * Floating shapes are written as native `xdr:sp` (SHEET-02); pictures are still dropped on import.
  */
 export function collectExportIssues(snapshot: WorkbookSnapshot): FidelityIssue[] {
   const issues: FidelityIssue[] = [];
@@ -35,6 +36,24 @@ export function collectExportIssues(snapshot: WorkbookSnapshot): FidelityIssue[]
         severity: 'loss',
         count: dropped,
         messageKey: 'tools.sheet.lossCharts',
+      });
+    }
+  }
+
+  // 形状：写成原生 xdr:sp，Excel / WPS / LibreOffice 里可直接编辑
+  const shapes = snapshot.syntoolsShapes ?? [];
+  if (shapes.length > 0) {
+    const shapePlan = buildShapePlan(snapshot);
+    const plannedShapes = Object.values(shapePlan.shapesBySheet).reduce(
+      (sum, list) => sum + list.length,
+      0,
+    );
+    if (plannedShapes > 0) {
+      issues.push({
+        code: 'sheet.shapesKept',
+        severity: 'info',
+        count: plannedShapes,
+        messageKey: 'tools.sheet.keptShapes',
       });
     }
   }

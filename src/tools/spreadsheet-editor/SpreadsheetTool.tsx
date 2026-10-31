@@ -35,6 +35,15 @@ import {
 import { csvToSnapshot, snapshotToCsv } from './csv';
 import { buildChartData, type ChartConfig, type ChartData } from './charts';
 import { registerChartStrings } from './chartStrings';
+import { registerShapeStrings } from './shapeStrings';
+import {
+  buildSheetLayout,
+  createSheetShape,
+  pxToAnchor,
+  type SheetLayout,
+  type SheetShapeConfig,
+} from './shapes';
+import { ShapeLayer, ShapePalette } from './ui/ShapeOverlay';
 import { registerStoreStrings } from './storeStrings';
 import {
   createDocId,
@@ -111,6 +120,7 @@ registerSpreadsheetStrings(i18n);
 registerChartStrings(i18n);
 registerStoreStrings(i18n);
 registerPivotStrings(i18n);
+registerShapeStrings(i18n);
 
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 /** 首版一个工作簿只保留一个透视表：多表会让"导出到哪张工作表"的语义含混 */
@@ -177,6 +187,15 @@ export default function SpreadsheetTool() {
   /** Sheet area size: the bounds for dragging / resizing charts */
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
   const chartSeqRef = useRef(0);
+  /** Floating shapes (SHEET-02): cell-anchored configs, persisted in their own snapshot field */
+  const [shapes, setShapes] = useState<SheetShapeConfig[]>([]);
+  const shapesRef = useRef<SheetShapeConfig[]>([]);
+  shapesRef.current = shapes;
+  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+  const [shapePaletteOpen, setShapePaletteOpen] = useState(false);
+  /** Bumped on every mutation so the row/column layout is re-measured after a resize */
+  const [shapeLayoutVersion, setShapeLayoutVersion] = useState(0);
+  const shapeLayoutRef = useRef<SheetLayout>(buildSheetLayout(undefined));
   /** Pivot table (P2-4): analysis view over a source range, persisted in its own snapshot field */
   const [pivotConfigs, setPivotConfigs] = useState<PivotConfig[]>([]);
   const pivotConfigsRef = useRef<PivotConfig[]>([]);
@@ -364,10 +383,77 @@ export default function SpreadsheetTool() {
     if (chartsRef.current.length) next = { ...next, syntoolsCharts: chartsRef.current };
     if (rawPartsRef.current) next = { ...next, syntoolsRawParts: rawPartsRef.current };
     if (pivotConfigsRef.current.length) next = { ...next, syntoolsPivots: pivotConfigsRef.current };
+    if (shapesRef.current.length) next = { ...next, syntoolsShapes: shapesRef.current };
     // Comment threads ride along in their own field (xlsx has no counterpart yet)
     next = withSheetComments(next, commentsRef.current);
     return withWorkbookExtras(next, extrasRef.current);
   }, []);
+
+  /**
+   * Shapes (SHEET-02) are app-side content exactly like charts: they are not Univer mutations, so
+   * every edit writes through the ref and asks for a save explicitly.
+   */
+  const setShapeList = useCallback((next: SheetShapeConfig[]) => {
+    shapesRef.current = next;
+    setShapes(next);
+  }, []);
+
+  /** Insert a preset shape next to the current selection, so it always lands in view */
+  const insertShape = useCallback(
+    (prst: string) => {
+      const handle = handleRef.current;
+      if (!handle) return;
+      const sheetId = handle.getActiveSheetId();
+      const layout = shapeLayoutRef.current;
+      const range = handle.getActiveRange();
+      const from = range
+        ? { col: range.startColumn, row: range.startRow, colOff: 8, rowOff: 8 }
+        : pxToAnchor(24, 24, layout);
+      const shape = createSheetShape({
+        prst,
+        from,
+        sheetId: sheetId ?? undefined,
+        z: shapesRef.current.reduce((max, item) => Math.max(max, item.z), 0) + 1,
+      });
+      setShapeList([...shapesRef.current, shape]);
+      setSelectedShapeId(shape.id);
+      setShapePaletteOpen(false);
+      scheduleSaveRef.current();
+    },
+    [setShapeList],
+  );
+
+  const updateShape = useCallback(
+    (id: string, patch: Partial<SheetShapeConfig>) => {
+      setShapeList(
+        shapesRef.current.map((shape) => (shape.id === id ? { ...shape, ...patch } : shape)),
+      );
+      scheduleSaveRef.current();
+    },
+    [setShapeList],
+  );
+
+  const removeShape = useCallback(
+    (id: string) => {
+      setShapeList(shapesRef.current.filter((shape) => shape.id !== id));
+      setSelectedShapeId((current) => (current === id ? null : current));
+      scheduleSaveRef.current();
+    },
+    [setShapeList],
+  );
+
+  /** z-order: one step above everything / below everything */
+  const reorderShape = useCallback(
+    (id: string, direction: 'front' | 'back') => {
+      const zs = shapesRef.current.map((shape) => shape.z);
+      const next = direction === 'front' ? Math.max(0, ...zs) + 1 : Math.min(0, ...zs) - 1;
+      setShapeList(
+        shapesRef.current.map((shape) => (shape.id === id ? { ...shape, z: next } : shape)),
+      );
+      scheduleSaveRef.current();
+    },
+    [setShapeList],
+  );
 
   /** Comments are app-side data: write through the ref and request a save explicitly (like charts) */
   const setCommentMap = useCallback((next: SheetCommentMap) => {
@@ -519,6 +605,13 @@ export default function SpreadsheetTool() {
             setSelectedChartId(configs[0]?.id ?? null);
           }
         }
+        if (shapesRef.current.length === 0) {
+          const shapeConfigs = pending.syntoolsShapes ?? [];
+          if (shapeConfigs.length > 0) {
+            shapesRef.current = shapeConfigs;
+            setShapes(shapeConfigs);
+          }
+        }
         if (!commentsLoadedRef.current) {
           const map = readSheetComments(pending);
           commentsLoadedRef.current = true;
@@ -539,6 +632,8 @@ export default function SpreadsheetTool() {
         scheduleSave();
         // 透视表是"源数据的视图"：源表一改就重算，而不是等用户手动刷新
         if (pivotOpenRef.current) setPivotSnapshot(handle.getSnapshot());
+        // Column widths / row heights may have changed: shapes are anchored through them
+        setShapeLayoutVersion((version) => version + 1);
       });
       setSheets(handle.getSheets());
       setActiveSheetId(handle.getActiveSheetId());
@@ -590,6 +685,29 @@ export default function SpreadsheetTool() {
     () => charts.filter((item) => !item.sheetId || item.sheetId === activeSheetId),
     [charts, activeSheetId],
   );
+
+  /** Shapes visible on the active sheet, painted in z order */
+  const visibleShapes = useMemo(
+    () =>
+      shapes
+        .filter((shape) => !shape.sheetId || shape.sheetId === activeSheetId)
+        .sort((a, b) => a.z - b.z),
+    [shapes, activeSheetId],
+  );
+
+  /**
+   * Row/column layout of the active sheet. Shapes are stored as cell anchors; both the overlay and
+   * the export go through this one conversion table so they cannot drift apart.
+   */
+  const shapeLayout = useMemo<SheetLayout>(() => {
+    // The snapshot is read through a ref, so the memo cannot depend on it: `shapeLayoutVersion` is
+    // the explicit invalidation token, bumped by the mutation subscription (column resize etc.)
+    void shapeLayoutVersion;
+    const snapshot = handleRef.current?.getSnapshot();
+    const sheet = activeSheetId ? snapshot?.sheets?.[activeSheetId] : undefined;
+    return buildSheetLayout(sheet);
+  }, [activeSheetId, shapeLayoutVersion]);
+  shapeLayoutRef.current = shapeLayout;
 
   /** 面板看到的一切都由这里算出来：源快照变了（编辑 / 刷新 / 换区域）就整体重算 */
   const pivotView = useMemo(() => {
@@ -1110,6 +1228,12 @@ export default function SpreadsheetTool() {
         editorMenuItem('insert-chart', t('tools.sheet.insertChart'), openChart, {
           disabled: busy !== null,
         }),
+        editorMenuItem(
+          'insert-shape',
+          t('tools.sheet.insertShape'),
+          () => setShapePaletteOpen(true),
+          { disabled: busy !== null },
+        ),
         editorMenuItem('insert-pivot', t('tools.sheet.insertPivot'), openPivot, {
           disabled: busy !== null,
         }),
@@ -1270,6 +1394,22 @@ export default function SpreadsheetTool() {
           className="sheet-canvas"
           style={sheetHeight ? { height: `${sheetHeight}px` } : undefined}
         />
+        {/* Shapes sit under the charts: charts are interactive panels, shapes are annotations */}
+        <ShapeLayer
+          shapes={visibleShapes}
+          layout={shapeLayout}
+          selectedId={selectedShapeId}
+          onSelect={setSelectedShapeId}
+          onChange={updateShape}
+          onRemove={removeShape}
+          onBringFront={(id) => reorderShape(id, 'front')}
+          onSendBack={(id) => reorderShape(id, 'back')}
+          bounds={chartBounds}
+          scroll={{ x: 0, y: 0 }}
+        />
+        {shapePaletteOpen ? (
+          <ShapePalette onPick={insertShape} onClose={() => setShapePaletteOpen(false)} />
+        ) : null}
         {visibleCharts.map((config) => (
           <ChartOverlay
             key={config.id}

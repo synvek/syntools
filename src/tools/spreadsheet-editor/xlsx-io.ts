@@ -42,6 +42,8 @@ import { buildChartPlan, injectChartsIntoXlsx } from './chartXml';
 import { buildPivotXlsxPlan, injectPivotTablesIntoXlsx } from './pivotXlsx';
 import { collectEditorValidation } from './cfdv';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
+import { buildShapePlan, collectSheetShapes, injectShapesIntoXlsx } from './shapesXml';
+import type { SheetShapeConfig } from './shapes';
 
 /**
  * xlsx adapter layer: exceljs is always dynamically imported so it stays out of the initial bundle
@@ -117,6 +119,8 @@ export interface WorkbookSnapshot extends SnapshotWithExtras {
   syntoolsCharts?: ChartConfig[];
   /** Native chart parts that came with the imported file (not parsed, written back verbatim on export) */
   syntoolsRawParts?: RawChartParts;
+  /** Floating shapes on sheets (SHEET-02): written as native `xdr:sp` on export */
+  syntoolsShapes?: SheetShapeConfig[];
   /** Cell comment threads (P1-2); app-side only, reported as a fidelity warning on export */
   syntoolsComments?: SheetCommentMap;
   /**
@@ -347,6 +351,8 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
     const buffer = await file.arrayBuffer();
     // Collect native chart parts first (not parsed, just kept verbatim for the export to write back)
     const rawParts = await collectRawChartPartsFrom(buffer);
+    // Floating shapes are read from the drawing parts (exceljs drops them like every other drawing)
+    const shapesByName = await collectSheetShapes(buffer);
     // Then normalise comment relationships: the way openpyxl and friends write them makes exceljs throw, blocking the whole import
     const normalized = await normalizeXlsxArchive(buffer);
     const ExcelJS = (await import('exceljs')).default;
@@ -395,6 +401,21 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
 
     if (sheetOrder.length === 0) return { ok: false, error: 'EMPTY' };
 
+    // Sheet names are the only stable link between a drawing and our snapshot ids
+    const importedShapes: SheetShapeConfig[] = [];
+    for (const [name, list] of Object.entries(shapesByName)) {
+      const sheetId = Object.entries(sheets).find(([, sheet]) => sheet.name === name)?.[0];
+      if (!sheetId) continue;
+      for (const shape of list) {
+        importedShapes.push({
+          ...shape,
+          id: `shape-import-${importedShapes.length + 1}`,
+          sheetId,
+          z: importedShapes.length,
+        });
+      }
+    }
+
     return {
       ok: true,
       value: {
@@ -409,6 +430,7 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
           ? { syntoolsExtras: { version: 1 as const, sheets: sheetExtras } }
           : {}),
         ...(rawParts ? { syntoolsRawParts: rawParts } : {}),
+        ...(importedShapes.length > 0 ? { syntoolsShapes: importedShapes } : {}),
       },
     };
   } catch {
@@ -552,12 +574,19 @@ export async function exportSnapshotToBytes(
     const needsInjection = Object.keys(plan.chartsBySheet).length > 0 || plan.passthrough !== null;
     const withCharts = needsInjection ? await injectChartsIntoXlsx(buffer, plan) : buffer;
 
+    // Shapes: appended to the same drawing part the charts created (Excel allows one per sheet)
+    const shapePlan = buildShapePlan(snapshot);
+    const withShapes =
+      Object.keys(shapePlan.shapesBySheet).length > 0
+        ? await injectShapesIntoXlsx(withCharts, shapePlan)
+        : withCharts;
+
     // Pivots: value sheets plus native pivotTable/pivotCache parts, so Excel can still refresh them
     const pivotPlan = buildPivotXlsxPlan(snapshot);
     const bytes =
       pivotPlan.items.length > 0
-        ? await injectPivotTablesIntoXlsx(withCharts, pivotPlan)
-        : withCharts;
+        ? await injectPivotTablesIntoXlsx(withShapes, pivotPlan)
+        : withShapes;
     return { ok: true, value: new Uint8Array(bytes) };
   } catch {
     return { ok: false, error: 'EXPORT_FAILED' };

@@ -141,6 +141,13 @@
     "notes": "导出为原生图表 part；导入不解析为可编辑图表，改由 rawChartParts 记录保留数量"
   },
   {
+    "id": "sheet/shapes",
+    "tool": "sheet",
+    "title": "浮动形状（原生 xdr:sp）",
+    "source": "generated",
+    "notes": "形状按单元格锚定导出为 oneCellAnchor + xdr:sp；导入应原样读回（prst / 锚点 / 尺寸 / 文字）"
+  },
+  {
     "id": "sheet/hyperlink-note-error",
     "tool": "sheet",
     "title": "超链接 / 批注 / 错误值",
