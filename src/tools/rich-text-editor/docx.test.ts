@@ -190,6 +190,37 @@ describe('exportDocxBlob', () => {
   });
 });
 
+describe('docx export: table cell alignment and row height', () => {
+  it('writes w:vAlign for aligned cells and w:trHeight for sized rows', async () => {
+    const html = [
+      '<table><colgroup><col style="width: 50%"><col style="width: 50%"></colgroup>',
+      '<tr style="height: 40px"><td data-valign="middle">a</td>',
+      // Pasted HTML carries the alignment as an inline style instead of the data attribute
+      '<td style="vertical-align: bottom">b</td></tr>',
+      '</table>',
+    ].join('');
+    const result = await exportDocxBlob(html, 'alignment');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('w:vAlign w:val="center"');
+    expect(xml).toContain('w:vAlign w:val="bottom"');
+    // 40px = 600 twips; "at least" is the Word equivalent of a browser row height
+    expect(xml).toContain('w:trHeight');
+    expect(xml).toContain('w:val="600"');
+    expect(xml).toContain('w:hRule="atLeast"');
+  });
+
+  it('leaves the row height and cell alignment out when the table has neither', async () => {
+    const result = await exportDocxBlob('<table><tr><td>a</td></tr></table>', 'plain');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).not.toContain('w:vAlign');
+    expect(xml).not.toContain('w:trHeight');
+  });
+});
+
 describe('importDocx layout read-back (P2-2.4)', () => {
   /** jsdom's File has no arrayBuffer(); fall back to FileReader for the test only */
   const toFile = (blob: Blob, name: string): File => {
@@ -224,6 +255,46 @@ describe('importDocx layout read-back (P2-2.4)', () => {
     expect(captured.layout?.pageSetup.size).toBe('Letter');
     expect(captured.layout?.pageSetup.orientation).toBe('landscape');
     expect(captured.layout?.pageSetup.margin?.top).toBe(12.7);
+  });
+
+  it('recovers header / footer text and the page-number flag', async () => {
+    const setup = normalizePageSetup({
+      header: '公司机密',
+      footer: '内部资料 第',
+      showPageNumber: true,
+    });
+    const exported = await exportDocxBlob('<p>a</p>', 'hf', setup);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const captured: { layout?: { pageSetup: Partial<PageSetupConfig>; sectionCount: number } } = {};
+    await importDocx(toFile(exported.value, 'hf.docx'), {
+      onLayout: (info) => {
+        captured.layout = info;
+      },
+    });
+    expect(captured.layout?.pageSetup.header).toBe('公司机密');
+    expect(captured.layout?.pageSetup.footer).toBe('内部资料 第');
+    expect(captured.layout?.pageSetup.showPageNumber).toBe(true);
+  });
+
+  it('imports a document without a footer as having no page numbers', async () => {
+    const exported = await exportDocxBlob('<p>a</p>', 'nofooter', {
+      ...DEFAULT_PAGE_SETUP,
+      header: '标题',
+      showPageNumber: false,
+    });
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const captured: { layout?: { pageSetup: Partial<PageSetupConfig>; sectionCount: number } } = {};
+    await importDocx(toFile(exported.value, 'nofooter.docx'), {
+      onLayout: (info) => {
+        captured.layout = info;
+      },
+    });
+    expect(captured.layout?.pageSetup.header).toBe('标题');
+    expect(captured.layout?.pageSetup.showPageNumber).toBe(false);
   });
 
   it('reports the section count of multi-section documents', async () => {

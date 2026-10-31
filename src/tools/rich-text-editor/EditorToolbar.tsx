@@ -18,6 +18,7 @@ import {
   matchFontOption,
 } from './typography';
 import { CONTENT_WIDTH_PX } from './core';
+import { MM_TO_PX } from './pageSetup';
 import {
   LETTER_SPACING_PRESETS,
   TEXT_TRANSFORM_SAMPLES,
@@ -211,6 +212,9 @@ function ToolbarSelect({ label, value, onChange, options, wide }: ToolbarSelectP
 /** Zoom levels (100% = 1) */
 export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
+/** Table row height presets (mm): rows are stored in px, the toolbar talks mm like Word does */
+const ROW_HEIGHT_MM_PRESETS = [8, 12, 16, 20] as const;
+
 interface EditorToolbarProps {
   editor: Editor | null;
   onToggleFind: () => void;
@@ -395,6 +399,15 @@ export function EditorToolbar({
         canSplitCell: e.can().splitCell(),
         tableBordered: Boolean(e.getAttributes('table').bordered),
         tableZebra: Boolean(e.getAttributes('table').zebra),
+        cellVAlign: String(
+          e.getAttributes('tableCell').verticalAlign ??
+            e.getAttributes('tableHeader').verticalAlign ??
+            '',
+        ),
+        rowHeight: ((): number | null => {
+          const raw = e.getAttributes('tableRow').height;
+          return typeof raw === 'number' ? raw : null;
+        })(),
         inImage: e.isActive('image') || Boolean(e.getAttributes('image').src),
         imageWidth: (e.getAttributes('image').width as number | undefined) ?? null,
         imageAlign: (e.getAttributes('image').align as string | undefined) ?? null,
@@ -459,6 +472,30 @@ export function EditorToolbar({
     // After dragging the resize handle the width is an arbitrary pixel value: show "Custom (Npx)" so it doesn't look auto again
     ...(imageWidthValue === 'custom' && imageWidth !== null
       ? [{ value: 'custom', label: t('tools.richText.imageWidthCustom', { px: imageWidth }) }]
+      : []),
+  ];
+
+  // Cell vertical alignment: `top` is the layout default, so it shares the empty ("default") option
+  const cellVAlignValue = state.cellVAlign === 'top' ? '' : state.cellVAlign;
+  const rowHeight = state.rowHeight === null ? null : Math.round(state.rowHeight);
+  const matchedRowHeightMm = ROW_HEIGHT_MM_PRESETS.find(
+    (mm) => rowHeight !== null && Math.abs(rowHeight - mm * MM_TO_PX) <= 2,
+  );
+  const rowHeightValue =
+    rowHeight === null
+      ? ''
+      : matchedRowHeightMm !== undefined
+        ? String(matchedRowHeightMm)
+        : 'custom';
+  const rowHeightOptions = [
+    { value: '', label: t('tools.richText.rowHeightAuto') },
+    ...ROW_HEIGHT_MM_PRESETS.map((mm) => ({
+      value: String(mm),
+      label: t('tools.richText.rowHeightMm', { mm }),
+    })),
+    // Rows imported from Word can carry an arbitrary height: show it instead of falling back to "auto"
+    ...(rowHeightValue === 'custom' && rowHeight !== null
+      ? [{ value: 'custom', label: t('tools.richText.rowHeightCustom', { px: rowHeight }) }]
       : []),
   ];
 
@@ -942,7 +979,7 @@ export function EditorToolbar({
           </>
         ) : null}
 
-        {/* Table styles: borders / zebra stripes */}
+        {/* Table styles: borders / zebra stripes / cell vertical alignment / row height */}
         {state.inTable ? (
           <>
             <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
@@ -961,6 +998,35 @@ export function EditorToolbar({
               >
                 <span className="text-xs leading-none">&#9776;</span>
               </ToolButton>
+              <ToolbarSelect
+                label={t('tools.richText.cellVAlign')}
+                value={cellVAlignValue}
+                onChange={(value) =>
+                  chain()
+                    .setCellVerticalAlign((value || null) as 'top' | 'middle' | 'bottom' | null)
+                    .run()
+                }
+                options={[
+                  { value: '', label: t('tools.richText.cellVAlignTop') },
+                  { value: 'middle', label: t('tools.richText.cellVAlignMiddle') },
+                  { value: 'bottom', label: t('tools.richText.cellVAlignBottom') },
+                ]}
+              />
+              <ToolbarSelect
+                label={t('tools.richText.rowHeight')}
+                value={rowHeightValue}
+                onChange={(value) => {
+                  if (!value) {
+                    chain().setRowHeight(null).run();
+                    return;
+                  }
+                  if (value === 'custom') return;
+                  chain()
+                    .setRowHeight(Math.round(Number(value) * MM_TO_PX))
+                    .run();
+                }}
+                options={rowHeightOptions}
+              />
             </div>
           </>
         ) : null}

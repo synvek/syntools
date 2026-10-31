@@ -1,10 +1,13 @@
 import type { ToolResult } from '@/core/types';
 import {
+  CELL_VALIGN_ATTR,
   CONTENT_WIDTH_PX,
   checkExportSize,
   checkImportFile,
+  normalizeCellVAlign,
   normalizeImportedDocHtml,
   sanitizeDocHtml,
+  type CellVerticalAlign,
 } from './core';
 import {
   COLUMN_GAP_MM,
@@ -569,7 +572,25 @@ function readColumnWidthsDxa(table: Element, columnCount: number): number[] {
   return pcts.map((pct) => Math.round((pct / total) * CONTENT_WIDTH_DXA));
 }
 
-/** Table -> docx Table (preserving column widths / merged cells / cell shading) */
+/** px -> twips (1px = 1/96in, 1twip = 1/1440in) */
+const PX_TO_TWIP = 15;
+
+/**
+ * Cell vertical alignment -> OOXML `w:vAlign`.
+ * Accepts both the data attribute written by the editor and an inline style from pasted HTML.
+ */
+function readCellVAlign(cell: Element): CellVerticalAlign | undefined {
+  return (
+    normalizeCellVAlign(
+      cell.getAttribute(CELL_VALIGN_ATTR) ?? (cell as HTMLElement).style?.verticalAlign,
+    ) ?? undefined
+  );
+}
+
+/** Our `middle` is OOXML's `center` */
+const CELL_VALIGN_KEYS = { top: 'TOP', middle: 'CENTER', bottom: 'BOTTOM' } as const;
+
+/** Table -> docx Table (preserving column widths / merged cells / cell shading / alignment / row height) */
 function buildTable(ctx: ExportContext, table: Element): InstanceType<DocxNs['Table']> {
   const D = ctx.D;
   const colCount =
@@ -597,6 +618,7 @@ function buildTable(ctx: ExportContext, table: Element): InstanceType<DocxNs['Ta
         (isHeader ? 'F3F4F6' : undefined);
       const colspan = Math.max(1, Number(child.getAttribute('colspan')) || 1);
       const rowspan = Math.max(1, Number(child.getAttribute('rowspan')) || 1);
+      const vAlign = readCellVAlign(child);
       const paragraph = new D.Paragraph({
         children: blockChildren(ctx, child),
       });
@@ -604,15 +626,23 @@ function buildTable(ctx: ExportContext, table: Element): InstanceType<DocxNs['Ta
         children: [paragraph],
         shading: background ? { fill: background } : undefined,
         margins: { top: 60, bottom: 60, left: 80, right: 80 },
+        verticalAlign: vAlign ? D.VerticalAlignTable[CELL_VALIGN_KEYS[vAlign]] : undefined,
         columnSpan: colspan > 1 ? colspan : undefined,
         rowSpan: rowspan > 1 ? rowspan : undefined,
       });
     });
     if (cells.length === 0) return;
+    // Browser row heights behave as a minimum, so "at least" is the faithful Word rule
+    const rawHeight = (tr as HTMLElement).style?.height || tr.getAttribute('height') || '';
+    const rowHeight = Number.parseFloat(rawHeight);
     rows.push(
       new D.TableRow({
         children: cells,
         tableHeader: tr.children[0]?.tagName === 'TH',
+        height:
+          Number.isFinite(rowHeight) && rowHeight > 0
+            ? { value: Math.round(rowHeight * PX_TO_TWIP), rule: D.HeightRule.ATLEAST }
+            : undefined,
       }),
     );
   });
@@ -856,8 +886,7 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       );
       return;
     }
-    // Paragraph layout: first-line indent and space before/after (inline styles are px, convert to twip: 1px = 15 twip)
-    const PX_TO_TWIP = 15;
+    // Paragraph layout: first-line indent and space before/after (inline styles are px, converted to twip)
     const style = (el as HTMLElement).style;
     const textIndent = style?.textIndent
       ? Math.round(Number.parseFloat(style.textIndent) * PX_TO_TWIP)
@@ -967,6 +996,105 @@ async function readPartXml(buffer: ArrayBuffer, path: string): Promise<string> {
 const readDocumentXml = (buffer: ArrayBuffer) => readPartXml(buffer, 'word/document.xml');
 const readCommentsXml = (buffer: ArrayBuffer) => readPartXml(buffer, 'word/comments.xml');
 
+/** Header / footer of the imported document, read straight from the package parts */
+export interface ImportedHeaderFooter {
+  header?: string;
+  footer?: string;
+  /** Whether the footer carries a PAGE field (Word's page number) */
+  showPageNumber: boolean;
+}
+
+/** `word/_rels/document.xml.rels`: rId -> part name, relative to `word/` */
+function relationshipTargets(relsXml: string): Map<string, string> {
+  const targets = new Map<string, string>();
+  if (!relsXml.trim()) return targets;
+  const doc = new DOMParser().parseFromString(relsXml, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length > 0) return targets;
+  Array.from(doc.getElementsByTagName('Relationship')).forEach((rel) => {
+    const id = rel.getAttribute('Id');
+    const target = rel.getAttribute('Target');
+    if (id && target) targets.set(id, target);
+  });
+  return targets;
+}
+
+/**
+ * `r:id` of a section's default header / footer reference. `first` and `even` are the title-page
+ * and even-page variants: they belong to `w:titlePg` / even-and-odd, which the model covers with
+ * `differentFirstPage` alone, so only the default part becomes the header / footer text.
+ */
+function defaultReferenceId(sectPr: Element, tag: string): string | null {
+  const refs = Array.from(sectPr.getElementsByTagName(tag));
+  const chosen = refs.find((ref) => (ref.getAttribute('w:type') ?? 'default') === 'default');
+  return chosen?.getAttribute('r:id') ?? null;
+}
+
+/**
+ * Visible text of a header / footer part. The page setup model keeps a single line per part,
+ * so multi-paragraph headers are joined with a space instead of silently dropping lines.
+ */
+function partText(xml: string): string {
+  if (!xml.trim()) return '';
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length > 0) return '';
+  return Array.from(doc.getElementsByTagName('w:p'))
+    .map((paragraph) =>
+      Array.from(paragraph.getElementsByTagName('w:t'))
+        .map((run) => run.textContent ?? '')
+        .join(''),
+    )
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** A PAGE field instruction (simple field or fldChar sequence); NUMPAGES must not count */
+function hasPageField(xml: string): boolean {
+  if (!xml.trim()) return false;
+  return /<w:instrText[^>]*>\s*PAGE\b/i.test(xml) || /\bw:instr\s*=\s*"\s*PAGE\b/i.test(xml);
+}
+
+/**
+ * Read the first section's default header / footer. mammoth returns body HTML only, so without this
+ * step Word's header and footer text would be dropped on import (the layout alone used to survive).
+ * Best-effort: a broken package degrades to "no header / footer" instead of failing the import.
+ */
+async function readHeaderFooter(
+  buffer: ArrayBuffer,
+  documentXml: string,
+): Promise<ImportedHeaderFooter | null> {
+  if (!documentXml.trim()) return null;
+  const doc = new DOMParser().parseFromString(documentXml, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length > 0) return null;
+  const sectPr = doc.getElementsByTagName('w:sectPr')[0];
+  if (!sectPr) return null;
+  const headerId = defaultReferenceId(sectPr, 'w:headerReference');
+  const footerId = defaultReferenceId(sectPr, 'w:footerReference');
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const targets = relationshipTargets(
+      (await zip.file('word/_rels/document.xml.rels')?.async('string')) ?? '',
+    );
+    const readPart = async (id: string | null): Promise<string> => {
+      const target = id ? targets.get(id) : undefined;
+      if (!target) return '';
+      // Targets are relative to `word/`, but some producers write them package-absolute
+      const path = target.startsWith('/') ? target.slice(1) : `word/${target}`;
+      return (await zip.file(path)?.async('string')) ?? '';
+    };
+    const headerXml = await readPart(headerId);
+    const footerXml = await readPart(footerId);
+    const info: ImportedHeaderFooter = { showPageNumber: hasPageField(footerXml) };
+    if (headerId) info.header = partText(headerXml);
+    if (footerId) info.footer = partText(footerXml);
+    return info;
+  } catch (error) {
+    console.warn('[richText] docx header/footer read failed:', error);
+    return null;
+  }
+}
+
 /** Import .docx: parse with mammoth (including style map) -> sanitize HTML */
 export async function importDocx(
   file: File,
@@ -980,8 +1108,13 @@ export async function importDocx(
     const sections = parseDocxSections(documentXml);
     if (sections.length > 0) {
       // The first section is what the document-level page setup corresponds to; later sections cannot be
-      // located in mammoth's HTML, so they are merged and reported to the caller instead of silently dropped
-      options?.onLayout?.({ pageSetup: sections[0].pageSetup, sectionCount: sections.length });
+      // located in mammoth's HTML, so they are merged and reported to the caller instead of silently dropped.
+      // Header / footer text lives in separate package parts that mammoth never reads.
+      const headerFooter = await readHeaderFooter(buffer, documentXml);
+      options?.onLayout?.({
+        pageSetup: { ...sections[0].pageSetup, ...(headerFooter ?? {}) },
+        sectionCount: sections.length,
+      });
     }
     const mammoth = (await import('mammoth')).default;
     // mammoth's browser build expects `arrayBuffer` while the Node build only reads `buffer`

@@ -33,6 +33,23 @@ export const PAGE_MARGIN_MM = 20;
 export const CONTENT_WIDTH_MM = PAGE_WIDTH_MM - PAGE_MARGIN_MM * 2;
 export const CONTENT_HEIGHT_MM = PAGE_HEIGHT_MM - PAGE_MARGIN_MM * 2;
 
+/** Attribute carrying a table cell's vertical alignment, shared by the editor extensions and the docx exporter */
+export const CELL_VALIGN_ATTR = 'data-valign';
+
+/** Vertical alignment of a table cell (`top` is the layout default) */
+export type CellVerticalAlign = 'top' | 'middle' | 'bottom';
+
+/**
+ * Normalize a vertical alignment read from a data attribute or an inline style.
+ * Browsers and Word write `center` for a vertically centered cell, so it maps onto `middle`.
+ */
+export function normalizeCellVAlign(value: string | null | undefined): CellVerticalAlign | null {
+  const lower = (value ?? '').trim().toLowerCase();
+  if (lower === 'middle' || lower === 'center') return 'middle';
+  if (lower === 'top' || lower === 'bottom') return lower;
+  return null;
+}
+
 export type ImportKind = 'docx' | 'legacy-doc' | 'unsupported';
 
 /** Determine the importable kind from the extension; legacy binary .doc can't be parsed reliably in the browser */

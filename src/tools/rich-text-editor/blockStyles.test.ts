@@ -229,3 +229,92 @@ describe('image layer and float offset', () => {
     expect(html).not.toContain('left:');
   });
 });
+
+/** Text position inside the first cell of the given kind (cell offset + 2 lands in its paragraph) */
+function firstCellTextPos(editor: Editor, type: 'tableCell' | 'tableHeader' = 'tableCell'): number {
+  let pos = -1;
+  editor.state.doc.descendants((node, offset) => {
+    if (pos < 0 && node.type.name === type) pos = offset;
+    return pos < 0;
+  });
+  return pos + 2;
+}
+
+const TABLE_HTML = [
+  '<table><tbody>',
+  '<tr><th>表头</th><th>表头2</th></tr>',
+  '<tr><td>甲</td><td>乙</td></tr>',
+  '</tbody></table>',
+].join('');
+
+describe('table cell vertical alignment', () => {
+  it('writes data-valign on the cell holding the caret and clears it again', () => {
+    const editor = createEditor(TABLE_HTML);
+    editor.commands.setTextSelection(firstCellTextPos(editor));
+    expect(editor.commands.setCellVerticalAlign('middle')).toBe(true);
+    const cells = editor.getHTML().match(/<td[^>]*>/g) ?? [];
+    expect(cells.filter((cell) => cell.includes('data-valign="middle"'))).toHaveLength(1);
+
+    expect(editor.commands.setCellVerticalAlign(null)).toBe(true);
+    expect(editor.getHTML()).not.toContain('data-valign');
+  });
+
+  it('also aligns header cells, which are a separate node type', () => {
+    const editor = createEditor(TABLE_HTML);
+    editor.commands.setTextSelection(firstCellTextPos(editor, 'tableHeader'));
+    expect(editor.commands.setCellVerticalAlign('bottom')).toBe(true);
+    const headers = editor.getHTML().match(/<th[^>]*>/g) ?? [];
+    expect(headers.filter((cell) => cell.includes('data-valign="bottom"'))).toHaveLength(1);
+  });
+
+  it('reads an inline vertical-align style and re-renders it as the data attribute', () => {
+    const editor = createEditor(
+      '<table><tr><td style="vertical-align: middle">x</td></tr></table>',
+    );
+    let align: unknown = null;
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell') align = node.attrs.verticalAlign;
+    });
+    expect(align).toBe('middle');
+    expect(editor.getHTML()).toContain('data-valign="middle"');
+  });
+
+  it('returns false outside a table so unrelated content is untouched', () => {
+    const editor = createEditor('<p>只有文字</p>');
+    editor.commands.setTextSelection(1);
+    expect(editor.commands.setCellVerticalAlign('middle')).toBe(false);
+  });
+});
+
+describe('table row height', () => {
+  it('sets the height of the row holding the caret only', () => {
+    const editor = createEditor(TABLE_HTML);
+    editor.commands.setTextSelection(firstCellTextPos(editor));
+    expect(editor.commands.setRowHeight(40)).toBe(true);
+    const rows = editor.getHTML().match(/<tr[^>]*>/g) ?? [];
+    expect(rows.filter((row) => row.includes('height: 40px'))).toHaveLength(1);
+  });
+
+  it('round-trips a height written by an import or a draft', () => {
+    const editor = createEditor('<table><tr style="height: 64px"><td>x</td></tr></table>');
+    let height: unknown = null;
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'tableRow') height = node.attrs.height;
+    });
+    expect(height).toBe(64);
+    expect(editor.getHTML()).toContain('height: 64px');
+  });
+
+  it('restores auto height with null and leaves no style behind', () => {
+    const editor = createEditor('<table><tr style="height: 64px"><td>x</td></tr></table>');
+    editor.commands.setTextSelection(firstCellTextPos(editor));
+    expect(editor.commands.setRowHeight(null)).toBe(true);
+    expect(editor.getHTML()).not.toContain('height:');
+  });
+
+  it('returns false outside a table', () => {
+    const editor = createEditor('<p>只有文字</p>');
+    editor.commands.setTextSelection(1);
+    expect(editor.commands.setRowHeight(40)).toBe(false);
+  });
+});

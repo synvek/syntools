@@ -1,7 +1,10 @@
 import Image from '@tiptap/extension-image';
 import { Table } from '@tiptap/extension-table';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
+import TableRow from '@tiptap/extension-table-row';
 import { Extension } from '@tiptap/core';
-import { CONTENT_WIDTH_PX } from './core';
+import { CELL_VALIGN_ATTR, CONTENT_WIDTH_PX, normalizeCellVAlign } from './core';
 import {
   findSelectedImage,
   hasImageLayerAttr,
@@ -14,7 +17,7 @@ import {
  * Typography details extension (modeled on Word):
  * - Paragraphs: first-line indent, space before/after (stored as attributes -> inline style, mappable to OOXML on export)
  * - Images: width percentage and alignment
- * - Tables: border toggle and zebra stripes
+ * - Tables: border toggle, zebra stripes, cell vertical alignment and row height
  * Everything goes through node attributes rather than mutating the DOM, staying within ProseMirror's rules.
  */
 
@@ -45,6 +48,10 @@ interface StyleAttrs {
   offsetY?: number | null;
   bordered?: boolean;
   zebra?: boolean;
+  /** Table cell vertical alignment (null = default, top) */
+  verticalAlign?: string | null;
+  /** Table row height in px (null = auto) */
+  height?: number | null;
 }
 
 /**
@@ -167,6 +174,50 @@ const TableStyle = Table.extend({
   },
 });
 
+/**
+ * Cell vertical alignment. Stored as a data attribute (not inline style) so it survives the HTML
+ * round trip of drafts / imports, drives editor.css, and is read back by the docx exporter.
+ * Pasted HTML often carries `style="vertical-align: middle"` instead: both forms are accepted.
+ */
+const cellVerticalAlignAttribute = {
+  default: null,
+  parseHTML: (el: HTMLElement) =>
+    normalizeCellVAlign(el.getAttribute(CELL_VALIGN_ATTR) ?? el.style.verticalAlign),
+  renderHTML: (attrs: StyleAttrs) =>
+    attrs.verticalAlign ? { [CELL_VALIGN_ATTR]: attrs.verticalAlign } : {},
+};
+
+const TableCellStyle = TableCell.extend({
+  addAttributes() {
+    return { ...this.parent?.(), verticalAlign: cellVerticalAlignAttribute };
+  },
+});
+
+const TableHeaderStyle = TableHeader.extend({
+  addAttributes() {
+    return { ...this.parent?.(), verticalAlign: cellVerticalAlignAttribute };
+  },
+});
+
+/**
+ * Row height as an inline `height` on the row: browsers treat it as a minimum height, which is
+ * exactly Word's "at least" row rule, and the docx exporter reads it back unchanged.
+ */
+const TableRowStyle = TableRow.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      height: {
+        default: null,
+        parseHTML: (el: HTMLElement) =>
+          readPx(el.style.height) ?? readPx(el.getAttribute('height') ?? undefined),
+        renderHTML: (attrs: StyleAttrs) =>
+          attrs.height ? { style: `height: ${Math.round(attrs.height)}px` } : {},
+      },
+    };
+  },
+});
+
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     paragraphStyle: {
@@ -185,6 +236,10 @@ declare module '@tiptap/core' {
       /** Toggle table borders / zebra stripes */
       toggleTableBorders: () => ReturnType;
       toggleTableZebra: () => ReturnType;
+      /** Set the vertical alignment of every selected cell (null restores the default, top) */
+      setCellVerticalAlign: (align: 'top' | 'middle' | 'bottom' | null) => ReturnType;
+      /** Set the height of the row holding the caret (px; null restores auto) */
+      setRowHeight: (height: number | null) => ReturnType;
     };
   }
 }
@@ -279,9 +334,39 @@ export const BlockStyleCommands = Extension.create({
           }
           return false;
         },
+      setCellVerticalAlign:
+        (align) =>
+        ({ state, tr }) => {
+          const { from, to } = state.selection;
+          // A collapsed selection still hits its own cell: nodesBetween only descends into nodes
+          // starting before `to`, so cells after the caret are left untouched.
+          let changed = false;
+          state.doc.nodesBetween(from, to, (node, pos) => {
+            if (node.type.name !== 'tableCell' && node.type.name !== 'tableHeader') return;
+            if ((node.attrs.verticalAlign ?? null) === align) return;
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, verticalAlign: align });
+            changed = true;
+          });
+          return changed;
+        },
+      setRowHeight:
+        (height) =>
+        ({ state, tr }) => {
+          const { $from } = state.selection;
+          for (let d = $from.depth; d > 0; d -= 1) {
+            const node = $from.node(d);
+            if (node.type.name !== 'tableRow') continue;
+            tr.setNodeMarkup($from.before(d), undefined, {
+              ...node.attrs,
+              height: height && height > 0 ? Math.round(height) : null,
+            });
+            return true;
+          }
+          return false;
+        },
     };
   },
 });
 
-export { ParagraphStyle, ImageStyle, TableStyle };
+export { ParagraphStyle, ImageStyle, TableStyle, TableCellStyle, TableHeaderStyle, TableRowStyle };
 export { styleObject };

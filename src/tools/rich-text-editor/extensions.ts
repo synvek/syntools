@@ -5,9 +5,6 @@ import type { Node as PmNode } from '@tiptap/pm/model';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
-import TableCell from '@tiptap/extension-table-cell';
-import TableHeader from '@tiptap/extension-table-header';
-import TableRow from '@tiptap/extension-table-row';
 import TaskItem from '@tiptap/extension-task-item';
 import TaskList from '@tiptap/extension-task-list';
 import TextAlign from '@tiptap/extension-text-align';
@@ -17,7 +14,15 @@ import { FindReplace } from './find-replace';
 import { charFormatExtensions } from './charFormat';
 import { ImageLayerCommands } from './imageLayer';
 import { DocShape } from './shapeNode';
-import { BlockStyleCommands, ImageStyle, ParagraphStyle, TableStyle } from './blockStyles';
+import {
+  BlockStyleCommands,
+  ImageStyle,
+  ParagraphStyle,
+  TableCellStyle,
+  TableHeaderStyle,
+  TableRowStyle,
+  TableStyle,
+} from './blockStyles';
 import { Comment, DocMarkCommands, TrackedDelete, TrackedFormat, TrackedInsert } from './marks';
 import { createPageLayoutPlugin, type PageLayoutSnapshot } from './PageView';
 import { resolvePageMetrics, type PageMetrics } from './pageSetup';
@@ -279,9 +284,11 @@ export function createExtensions({
     // TableStyle extends Table (adding border/zebra attributes) and must not be registered alongside
     // the original Table, which would register tableColumnResizing twice (PM keyed plugin conflict)
     TableStyle.configure({ resizable: true, HTMLAttributes: { class: 'rte-table' } }),
-    TableRow,
-    TableCell,
-    TableHeader,
+    // Table row / cell style extensions replace the plain nodes: they only add row height and
+    // cell vertical alignment attributes, everything else comes from the parent
+    TableRowStyle,
+    TableCellStyle,
+    TableHeaderStyle,
     // ImageStyle likewise replaces the original Image
     // inline: true -> "inline" is a true inline node: it stays within the text instead of taking a line.
     // In front of / behind text still rely on absolute positioning (editor.css [data-layer]) and are unaffected.

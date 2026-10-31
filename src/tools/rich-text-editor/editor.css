@@ -391,6 +391,17 @@
   background: rgba(55, 65, 81, 0.4);
 }
 
+/* Cell vertical alignment (data-valign written by the table cell extension); top is the layout default */
+.rte-surface .tiptap td[data-valign='middle'],
+.rte-surface .tiptap th[data-valign='middle'] {
+  vertical-align: middle;
+}
+
+.rte-surface .tiptap td[data-valign='bottom'],
+.rte-surface .tiptap th[data-valign='bottom'] {
+  vertical-align: bottom;
+}
+
 /* Image layers: floating layers are absolutely positioned in the content area (no effect on text layout or pagination) and can be dragged */
 .rte-surface .tiptap img[data-layer='front'],
 .rte-surface .tiptap img[data-layer='behind'] {
@@ -1151,6 +1162,17 @@
 .rte-print-flow th {
   background: #f9fafb;
   font-weight: 600;
+}
+
+/* Vertical alignment must be repeated for the print layer: `td` above forces `top` */
+.rte-print-flow td[data-valign='middle'],
+.rte-print-flow th[data-valign='middle'] {
+  vertical-align: middle;
+}
+
+.rte-print-flow td[data-valign='bottom'],
+.rte-print-flow th[data-valign='bottom'] {
+  vertical-align: bottom;
 }
 
 @media print {

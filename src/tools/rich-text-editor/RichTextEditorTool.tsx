@@ -157,6 +157,11 @@ const IMAGE_EXPORT_CSS =
   "img[data-layer='wrap-right']{float:right;margin:4px 0 8px 12px}" +
   "img[data-layer='top-bottom']{display:block;margin:8px auto}";
 
+/** Table cell vertical alignment for single-file HTML export (kept in sync with editor.css) */
+const TABLE_EXPORT_CSS =
+  "td[data-valign='middle'],th[data-valign='middle']{vertical-align:middle}" +
+  "td[data-valign='bottom'],th[data-valign='bottom']{vertical-align:bottom}";
+
 /** Single-file HTML export carries no editor stylesheet, so TOC styles are inlined (kept in sync with editor.css) */
 const TOC_EXPORT_CSS =
   '.rte-toc{margin:.75em 0 1.25em}.rte-toc-title{margin:0 0 .5em;font-weight:600}' +
@@ -1186,7 +1191,7 @@ export default function RichTextEditorTool() {
     if (!editor) return;
     // Single-file HTML uses KaTeX MathML so formulas render correctly without shipping the stylesheet
     const body = injectMath(prepareExportHtml(editor.getHTML()));
-    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}${IMAGE_EXPORT_CSS}${TOC_EXPORT_CSS}</style></head><body>${body}</body></html>`;
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem;vertical-align:top}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}${TABLE_EXPORT_CSS}${IMAGE_EXPORT_CSS}${TOC_EXPORT_CSS}</style></head><body>${body}</body></html>`;
     const bytes = new TextEncoder().encode(html);
     downloadBytes(bytes, buildExportFilename(title || 'document', 'html'), 'text/html');
   };
