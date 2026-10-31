@@ -28,6 +28,13 @@ import {
 import { FOOTNOTE_ATTR } from './footnotes';
 import { latexToOmml } from './mathOmml';
 import { renderLatexImages, type MathImage, type MathImageRequest } from './mathImage';
+import { readShapeSpec } from './shapeNode';
+import { extractDocxShapes, placeShapesInHtml } from './docxShapeImport';
+import {
+  injectShapeDrawings,
+  shapePlaceholderParagraphText,
+  type ShapeExportEntry,
+} from './docxShapeExport';
 import type { DocComment, TrackedChange } from './docs';
 
 /**
@@ -348,6 +355,8 @@ interface ExportContext {
   footnoteNotes: string[];
   /** Formulas OMML can't express -> pre-rendered images (indexed by mathKey) */
   mathImages: Map<string, MathImage>;
+  /** Shapes met during the traversal, in document order (injected into document.xml afterwards) */
+  shapes: ShapeExportEntry[];
 }
 
 /** Default hyperlink styling: docx has no built-in Hyperlink character style, so add blue underline explicitly */
@@ -774,6 +783,25 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       out.push(buildTocField(D, el));
       return;
     }
+    // Shape (P3-1.3): the docx library cannot emit `wps:wsp`, so write a token paragraph now and
+    // swap in the real drawing element after packing (see docxShapeExport.ts)
+    if (el.hasAttribute('data-doc-shape')) {
+      const spec = readShapeSpec(el);
+      if (!spec) return;
+      const index = ctx.shapes.length + 1;
+      const id = `s${index}`;
+      ctx.shapes.push({
+        id,
+        index,
+        attrs: spec,
+        offsetX: spec.offsetX ?? 0,
+        offsetY: spec.offsetY ?? 0,
+      });
+      out.push(
+        new D.Paragraph({ children: [new D.TextRun({ text: shapePlaceholderParagraphText(id) })] }),
+      );
+      return;
+    }
     // Block formula: takes a whole line, becoming a standalone formula paragraph in Word
     if (el.hasAttribute('data-math')) {
       out.push(new D.Paragraph({ children: [buildMathRun(ctx, el) as ParagraphChild] }));
@@ -903,6 +931,8 @@ export interface DocxImportOptions {
   onLayout?: (info: { pageSetup: Partial<PageSetupConfig>; sectionCount: number }) => void;
   /** Tracked changes read back from `word/document.xml` (mammoth drops them entirely) */
   onReview?: (info: ImportedReview) => void;
+  /** Shapes restored from `wps:wsp`, and how many were dropped because the text did not match */
+  onShapes?: (info: { shapes: number; skipped: number }) => void;
 }
 
 /** Result of reading the review layer (revisions + comments) of an imported package */
@@ -986,6 +1016,13 @@ export async function importDocx(
       } else {
         options?.onReview?.({ changes: [], comments: [], degraded: true, skippedComments: 0 });
       }
+    }
+    // Shapes last: they anchor on the final block texts, and only go in when those match exactly
+    const extracted = extractDocxShapes(documentXml);
+    if (extracted.shapes.length > 0 || extracted.unsupported > 0) {
+      const placed = placeShapesInHtml(html, extracted);
+      html = placed.html;
+      options?.onShapes?.({ shapes: placed.placed, skipped: placed.skipped });
     }
     return { ok: true, value: html };
   } catch (error) {
@@ -1106,6 +1143,7 @@ export async function exportDocxBlob(
       revisionId: { value: 1000 },
       footnoteNotes: [],
       mathImages: new Map(),
+      shapes: [],
     };
     const doc = new DOMParser().parseFromString(html, 'text/html');
 
@@ -1256,7 +1294,9 @@ export async function exportDocxBlob(
         };
       }),
     });
-    return { ok: true, value: await D.Packer.toBlob(document) };
+    const blob = await D.Packer.toBlob(document);
+    // Second pass: swap the shape tokens for real `wps:wsp` drawings (no-op without shapes)
+    return { ok: true, value: await injectShapeDrawings(blob, ctx.shapes) };
   } catch (error) {
     console.error('[richText] docx export failed:', error);
     return { ok: false, error: 'EXPORT_FAILED' };

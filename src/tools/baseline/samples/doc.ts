@@ -11,6 +11,22 @@ export interface DocSample {
 
 export const docSamples: DocSample[] = [
   {
+    id: 'docx/shapes',
+    title: '原生形状：圆角矩形 + 椭圆 + 浮动形状 + 形状文字',
+    notes:
+      '形状以 wps:wsp 导出，导入侧按段落文本严格匹配后回填；prst / adj / 尺寸 / 填充应完全一致',
+    html: () =>
+      [
+        '<p>Shapes below.</p>',
+        '<div data-doc-shape="roundRect" data-shape-prst="roundRect" data-shape-adj="{&quot;adj1&quot;:0.25}" data-shape-w="180" data-shape-h="90" data-shape-fill="#4472c4" data-shape-stroke="#2f5597" data-shape-stroke-width="1" data-shape-text="Rounded"></div>',
+        '<div data-doc-shape="ellipse" data-shape-prst="ellipse" data-shape-w="140" data-shape-h="140" data-shape-fill="#ff8800" data-shape-stroke="#773300" data-shape-stroke-width="2"></div>',
+        '<p>Middle text.</p>',
+        '<div data-doc-shape="rect" data-shape-prst="rect" data-shape-w="120" data-shape-h="60" data-shape-fill="#22aa55" data-layer="behind" data-shape-x="36" data-shape-y="24"></div>',
+        '<p>End text.</p>',
+      ].join(''),
+  },
+
+  {
     id: 'docx/basic',
     title: '段落 + 行内样式',
     notes: '导出 XML 含 w:u / w:strike，导入侧 mammoth 只保留 strike、丢掉下划线',

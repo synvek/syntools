@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-30T13:35:22.617Z",
+  "generatedAt": "2026-10-31T03:53:02.418Z",
   "generator": "src/tools/baseline/roundtrip.test.ts",
-  "total": 30,
+  "total": 31,
   "samples": [
     {
       "id": "slide/text-basic",
@@ -502,7 +502,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6793,
+        "bytes": 6807,
         "parts": 24,
         "slideParts": 1,
         "mediaParts": 0,
@@ -811,7 +811,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 46936,
+        "bytes": 47002,
         "parts": 41,
         "slideParts": 1,
         "mediaParts": 1,
@@ -913,7 +913,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 63681,
+        "bytes": 15839,
         "parts": 41,
         "slideParts": 1,
         "mediaParts": 1,
@@ -1015,7 +1015,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 58582,
+        "bytes": 15778,
         "parts": 41,
         "slideParts": 1,
         "mediaParts": 1,
@@ -1117,7 +1117,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 70529,
+        "bytes": 71255,
         "parts": 44,
         "slideParts": 1,
         "mediaParts": 1,
@@ -1953,6 +1953,78 @@
       }
     },
     {
+      "id": "docx/shapes",
+      "tool": "docx",
+      "title": "原生形状：圆角矩形 + 椭圆 + 浮动形状 + 形状文字",
+      "notes": "形状以 wps:wsp 导出，导入侧按段落文本严格匹配后回填；prst / adj / 尺寸 / 填充应完全一致",
+      "ok": true,
+      "before": {
+        "headings": 0,
+        "h1": 0,
+        "h2": 0,
+        "h3": 0,
+        "paragraphs": 3,
+        "listItems": 0,
+        "orderedLists": 0,
+        "unorderedLists": 0,
+        "tables": 0,
+        "tableRows": 0,
+        "tableCells": 0,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 0,
+        "italic": 0,
+        "underline": 0,
+        "strike": 0,
+        "links": 0,
+        "images": 0,
+        "shapes": 3,
+        "chars": 34
+      },
+      "after": {
+        "headings": 0,
+        "h1": 0,
+        "h2": 0,
+        "h3": 0,
+        "paragraphs": 3,
+        "listItems": 0,
+        "orderedLists": 0,
+        "unorderedLists": 0,
+        "tables": 0,
+        "tableRows": 0,
+        "tableCells": 0,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 0,
+        "italic": 0,
+        "underline": 0,
+        "strike": 0,
+        "links": 0,
+        "images": 0,
+        "shapes": 3,
+        "chars": 34
+      },
+      "issues": [
+        {
+          "code": "rte.shapes",
+          "count": 3
+        }
+      ],
+      "artifacts": {
+        "bytes": 10312,
+        "parts": 24,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      }
+    },
+    {
       "id": "docx/basic",
       "tool": "docx",
       "title": "段落 + 行内样式",
@@ -1979,6 +2051,7 @@
         "strike": 1,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 77
       },
       "after": {
@@ -2002,6 +2075,7 @@
         "strike": 1,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 77
       },
       "issues": [],
@@ -2043,6 +2117,7 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 77
       },
       "after": {
@@ -2066,6 +2141,7 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 77
       },
       "issues": [],
@@ -2107,6 +2183,7 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 45
       },
       "after": {
@@ -2130,6 +2207,7 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 65
       },
       "issues": [],
@@ -2171,6 +2249,7 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 37
       },
       "after": {
@@ -2194,11 +2273,12 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 37
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9932,
+        "bytes": 9933,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2235,6 +2315,7 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 38
       },
       "after": {
@@ -2258,6 +2339,7 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 38
       },
       "issues": [],
@@ -2300,6 +2382,7 @@
         "strike": 0,
         "links": 1,
         "images": 0,
+        "shapes": 0,
         "chars": 36
       },
       "after": {
@@ -2323,11 +2406,12 @@
         "strike": 0,
         "links": 1,
         "images": 0,
+        "shapes": 0,
         "chars": 36
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9919,
+        "bytes": 9920,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2364,6 +2448,7 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 47
       },
       "after": {
@@ -2387,11 +2472,12 @@
         "strike": 0,
         "links": 0,
         "images": 0,
+        "shapes": 0,
         "chars": 47
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9760,
+        "bytes": 9761,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,

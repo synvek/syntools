@@ -301,6 +301,8 @@ export interface DocxExportLosses {
   unlinkedComments: number;
   /** Formulas beyond Word's native equation support that were degraded to images */
   mathAsImages: number;
+  /** Shapes written as native `wps:wsp` objects (old readers show an empty frame) */
+  shapes?: number;
 }
 
 const DOCX_IMAGE_MIME_RE = /^data:image\/([a-z+]+);base64,/i;
@@ -321,12 +323,16 @@ export function scanDocxExportLosses(
     deepListItems: 0,
     unlinkedComments: 0,
     mathAsImages: 0,
+    shapes: 0,
   };
   // Formulas: syntax beyond Word's native equation support degrades to images (visually identical, no longer editable)
   const latexList = Array.from(doc.querySelectorAll('[data-latex]')).map(
     (el) => el.getAttribute('data-latex') ?? '',
   );
   losses.mathAsImages = countUnsupportedLatex(latexList.filter((latex) => latex.trim()));
+  // Shapes go out as native `wps:wsp`: editable in Word 2010+/WPS/LibreOffice 7+, an empty frame in
+  // older readers — a notice, not a loss
+  losses.shapes = doc.querySelectorAll('[data-doc-shape]').length;
   doc.querySelectorAll('img').forEach((img) => {
     const src = img.getAttribute('src') ?? '';
     const match = DOCX_IMAGE_MIME_RE.exec(src);

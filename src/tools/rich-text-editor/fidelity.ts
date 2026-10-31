@@ -35,6 +35,12 @@ export function docxLossIssues(losses: DocxExportLosses): FidelityIssue[] {
       messageKey: 'tools.richText.lossUnlinkedComments',
     },
     {
+      code: 'rte.shapes',
+      severity: 'warning',
+      count: losses.shapes ?? 0,
+      messageKey: 'tools.richText.lossShapes',
+    },
+    {
       code: 'rte.mathAsImages',
       severity: 'warning',
       count: losses.mathAsImages,

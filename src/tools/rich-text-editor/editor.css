@@ -470,6 +470,128 @@
   margin-right: 0;
 }
 
+/* ---- Shapes (P3-1.2): the atom carries an SVG body, layer CSS mirrors images ---- */
+
+.rte-surface .tiptap .rte-shape-node,
+.rte-print-flow .rte-shape-node {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  margin: 6px 0;
+  user-select: none;
+}
+
+.rte-surface .tiptap .rte-shape-node .rte-shape-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Shape text: one style per shape (P3-1.4 keeps it deliberately simpler than a full text box) */
+.rte-shape-node .rte-shape-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-word;
+  pointer-events: none;
+}
+
+/* Anchor modes re-use the image rules so the two object types behave identically */
+.rte-surface .tiptap .rte-shape-node[data-layer='front'],
+.rte-surface .tiptap .rte-shape-node[data-layer='behind'] {
+  position: absolute;
+  margin: 0;
+  cursor: move;
+  z-index: 2;
+}
+
+.rte-surface .tiptap .rte-shape-node[data-layer='behind'] {
+  z-index: -1;
+}
+
+.rte-surface .tiptap .rte-shape-node[data-layer='wrap-left'] {
+  float: left;
+  margin: 4px 12px 8px 0;
+}
+
+.rte-surface .tiptap .rte-shape-node[data-layer='wrap-right'] {
+  float: right;
+  margin: 4px 0 8px 12px;
+}
+
+.rte-surface .tiptap .rte-shape-node[data-layer='top-bottom'] {
+  display: block;
+  float: none;
+  margin: 8px auto;
+}
+
+/* Selection: ProseMirror's node selection outline */
+.rte-surface .tiptap .rte-shape-node.ProseMirror-selectednode {
+  outline: 1.5px solid #2563eb;
+  outline-offset: 1px;
+}
+
+/* Rotation handle above the frame; the dot on the blue line matches PowerPoint's affordance */
+.rte-shape-rotate {
+  position: absolute;
+  left: 50%;
+  top: -26px;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border: 1.5px solid #2563eb;
+  border-radius: 50%;
+  background: #fff;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.rte-shape-rotate::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 11px;
+  width: 1px;
+  height: 12px;
+  margin-left: -0.5px;
+  background: #2563eb;
+}
+
+/* Adjustment handles: the yellow vertices users expect from PowerPoint / draw.io */
+.rte-shape-adjust {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border: 1.5px solid #b45309;
+  border-radius: 50%;
+  background: #fbbf24;
+  cursor: crosshair;
+  pointer-events: auto;
+}
+
+.dark .rte-shape-rotate {
+  border-color: #60a5fa;
+  background: #111827;
+}
+
+@media print {
+  .rte-shape-rotate,
+  .rte-shape-adjust {
+    display: none;
+  }
+}
+
 .rte-surface .tiptap .column-resize-handle {
   position: absolute;
   top: 0;

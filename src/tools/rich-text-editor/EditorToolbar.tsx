@@ -237,6 +237,9 @@ interface EditorToolbarProps {
   /** Style panel */
   stylesOpen: boolean;
   onToggleStyles: () => void;
+  /** Shape panel (insert / edit a DrawingML preset shape) */
+  shapesOpen: boolean;
+  onToggleShapes: () => void;
   /** Template panel */
   templatesOpen: boolean;
   onToggleTemplates: () => void;
@@ -279,6 +282,8 @@ export function EditorToolbar({
   onMath,
   stylesOpen,
   onToggleStyles,
+  shapesOpen,
+  onToggleShapes,
   templatesOpen,
   onToggleTemplates,
   spellcheckOpen,
@@ -402,6 +407,7 @@ export function EditorToolbar({
         })(),
         footnoteSelected: findSelectedFootnote(e.state) !== null,
         mathSelected: e.isActive('mathInline') || e.isActive('mathBlock'),
+        shapeSelected: e.isActive('docShape'),
       };
     },
   });
@@ -683,6 +689,25 @@ export function EditorToolbar({
             onClick={onMath}
           >
             <span className="font-serif text-sm italic leading-none">fx</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.shapeInsert')}
+            active={shapesOpen || state.shapeSelected}
+            onClick={onToggleShapes}
+          >
+            {/* Square + circle: the classic "insert shape" glyph */}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="11" height="11" rx="1.5" />
+              <circle cx="16" cy="16" r="5" />
+            </svg>
           </ToolButton>
           <ToolButton label={t('tools.richText.image')} onClick={() => fileRef.current?.click()}>
             <Icon name="image" className="h-4 w-4" />

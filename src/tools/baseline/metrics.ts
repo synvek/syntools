@@ -206,6 +206,8 @@ export function docMetrics(html: string): Metrics {
     strike: count('s,strike,del'),
     links: count('a[href]'),
     images: count('img'),
+    // Shapes are native objects (wps:wsp), so a round-trip must keep them all
+    shapes: count('[data-doc-shape]'),
     chars: (body.textContent ?? '').replace(/\s+/g, ' ').trim().length,
   };
   return acc;

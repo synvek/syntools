@@ -10,3 +10,5 @@ export * from './geometry';
 export * from './shapeDefs';
 export * from './custGeom';
 export * from './boolean';
+export * from './drawingml';
+export * from './xmlNode';

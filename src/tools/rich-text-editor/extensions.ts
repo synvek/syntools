@@ -16,6 +16,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { FindReplace } from './find-replace';
 import { charFormatExtensions } from './charFormat';
 import { ImageLayerCommands } from './imageLayer';
+import { DocShape } from './shapeNode';
 import { BlockStyleCommands, ImageStyle, ParagraphStyle, TableStyle } from './blockStyles';
 import { Comment, DocMarkCommands, TrackedDelete, TrackedFormat, TrackedInsert } from './marks';
 import { createPageLayoutPlugin, type PageLayoutSnapshot } from './PageView';
@@ -291,6 +292,8 @@ export function createExtensions({
     FindReplace,
     PageBreak,
     SectionBreak,
+    // DrawingML preset shape atom (P3-1.1): geometry comes from the shared kernel
+    DocShape,
     ParagraphStyle,
     BlockStyleCommands,
     Comment,

@@ -147,6 +147,13 @@
     "source": "generated"
   },
   {
+    "id": "docx/shapes",
+    "tool": "docx",
+    "title": "原生形状：圆角矩形 + 椭圆 + 浮动形状 + 形状文字",
+    "source": "generated",
+    "notes": "形状以 wps:wsp 导出，导入侧按段落文本严格匹配后回填；prst / adj / 尺寸 / 填充应完全一致"
+  },
+  {
     "id": "docx/basic",
     "tool": "docx",
     "title": "段落 + 行内样式",

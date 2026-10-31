@@ -1,7 +1,6 @@
 import type { ToolResult } from '@/core/types';
 import JSZip from 'jszip';
 import { emuToPx, ptToPx, pxToEmu } from '../../../core/drawing/geometry';
-import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import { createDoc, createId, SCHEMA_VERSION } from '../model/factory';
 import { withResolvedConnectors } from '../model/connectors';
 import { createMediaFromBytes, mimeFromFilename } from '../model/media';
@@ -18,7 +17,6 @@ import type {
   Paragraph,
   RunStyle,
   ShapeElement,
-  ShapeGeometry,
   SlideDoc,
   SlideElement,
   SlideLayout,
@@ -54,7 +52,8 @@ import {
   type Xfrm,
 } from './opc';
 import { parseBackgroundColor, parseTheme } from './theme';
-import { geometryFromCustGeom } from './custGeom';
+// P3-1.0: geometry reading is shared with the docx/xlsx shape layers
+import { parseShapeGeometry } from '../../../core/drawing/drawingml';
 import {
   attr,
   boolAttr,
@@ -327,21 +326,6 @@ function fillFromParsed(parsed: ReturnType<typeof parseShapeFill>): Fill | undef
   return undefined;
 }
 
-function parseGeom(spPrNode: XmlNode | undefined): ShapeGeometry {
-  // Custom geometry wins: a shape with an explicit path must not be re-derived from prst
-  const custom = geometryFromCustGeom(childOf(spPrNode, 'custGeom'));
-  if (custom) return custom;
-  const geomNode = childOf(spPrNode, 'geom') ?? childOf(spPrNode, 'prstGeom');
-  const prst = attr(geomNode, 'prst') ?? 'rect';
-  const adj: Record<string, number> = {};
-  for (const gd of childrenNamed(childOf(geomNode, 'avLst'), 'gd')) {
-    const name = attr(gd, 'name');
-    const match = /^val\s+(-?\d+(?:\.\d+)?)$/.exec(attr(gd, 'fmla') ?? '');
-    if (name && match) adj[name] = Number(match[1]) / 100000;
-  }
-  return resolvePresetGeometry(prst, Object.keys(adj).length > 0 ? adj : undefined);
-}
-
 function baseRect(xfrm: Xfrm | undefined) {
   return {
     x: emuPx(xfrm?.x),
@@ -363,7 +347,7 @@ function parseShape(
 ): SlideElement | undefined {
   const spPr = childOf(node, 'spPr');
   const xfrm = readXfrm(childOf(spPr, 'xfrm'));
-  const geometry = parseGeom(spPr);
+  const geometry = parseShapeGeometry(spPr);
   const fill = fillFromParsed(parseShapeFill(spPr, palette));
   const stroke = parseStroke(childOf(spPr, 'ln'), palette);
   const shadow = parseShadow(spPr, palette);
@@ -437,7 +421,7 @@ async function parsePicture(
   const hyperlink = hyperlinkOf(cNvPrOf(node, 'nvPicPr'), ctx);
   // Pictures can carry a frame line and a rounding radius too; both were dropped on import
   const stroke = parseStroke(childOf(spPr, 'ln'), palette);
-  const pictureGeom = parseGeom(spPr);
+  const pictureGeom = parseShapeGeometry(spPr);
   const roundAdj = pictureGeom.prst === 'roundRect' ? (pictureGeom.adj?.adj1 ?? 0.167) : 0;
   const cornerRadius =
     roundAdj > 0 ? Math.round(roundAdj * Math.min(emuPx(xfrm?.width), emuPx(xfrm?.height))) : 0;

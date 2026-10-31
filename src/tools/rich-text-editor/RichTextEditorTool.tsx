@@ -72,6 +72,8 @@ import {
 import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
 import { VersionDiffPanel } from './VersionDiffPanel';
 import { ImageResizeOverlay } from './ImageResizeOverlay';
+import { ShapeOverlay } from './ShapeOverlay';
+import { ShapePanel } from './ShapePanel';
 import { handleFloatingImagePointerDown } from './imageLayer';
 import { exportDocxBlob, importDocx } from './docx';
 import { printSupported, snapshotToPdf, printToPdf } from './pdf';
@@ -209,6 +211,8 @@ export default function RichTextEditorTool() {
   const [importSections, setImportSections] = useState(0);
   // Revisions present but not mappable onto mammoth's HTML: imported as plain text, reported (never guessed)
   const [importRevisionsLost, setImportRevisionsLost] = useState(false);
+  /** Shapes dropped on import because their position could not be matched to the text */
+  const [importShapesLost, setImportShapesLost] = useState(0);
   // Comments whose range crossed paragraphs: the editor cannot anchor those, so they are reported
   const [importCommentsLost, setImportCommentsLost] = useState(0);
   const [markdownLosses, setMarkdownLosses] = useState<MarkdownExportLosses | null>(null);
@@ -223,6 +227,7 @@ export default function RichTextEditorTool() {
   const [pageSetupOpen, setPageSetupOpen] = useState(false);
   const [zoom, setZoom] = useState(initial?.zoom ?? 1);
   const [stylesOpen, setStylesOpen] = useState(false);
+  const [shapesOpen, setShapesOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [spellcheckOpen, setSpellcheckOpen] = useState(false);
   const [spellcheckEnabled, setSpellcheckEnabled] = useState(false);
@@ -611,6 +616,7 @@ export default function RichTextEditorTool() {
     setFailure(null);
     setImportRevisionsLost(false);
     setImportCommentsLost(0);
+    setImportShapesLost(0);
     let importedChanges: TrackedChange[] = [];
     let importedComments: DocComment[] = [];
     const result = await importDocx(file, {
@@ -625,6 +631,8 @@ export default function RichTextEditorTool() {
         setImportRevisionsLost(degraded);
         setImportCommentsLost(skippedComments);
       },
+      // Shapes are only restored when their block position provably matches the imported text
+      onShapes: ({ skipped }) => setImportShapesLost(skipped),
     });
     setBusy(null);
     if (!result.ok) {
@@ -1266,7 +1274,7 @@ export default function RichTextEditorTool() {
     setTemplatesOpen(false);
   };
 
-  type ToolPanel = 'pageSetup' | 'styles' | 'review' | 'templates' | 'spellcheck';
+  type ToolPanel = 'pageSetup' | 'styles' | 'shapes' | 'review' | 'templates' | 'spellcheck';
 
   /** Mutually exclusive toolbar panels: only one open at a time so the workspace isn't squeezed */
   const togglePanel = (panel: ToolPanel) => {
@@ -1275,6 +1283,7 @@ export default function RichTextEditorTool() {
     setDiffVersion(null);
     setPageSetupOpen(panel === 'pageSetup' ? !pageSetupOpen : false);
     setStylesOpen(panel === 'styles' ? !stylesOpen : false);
+    setShapesOpen(panel === 'shapes' ? !shapesOpen : false);
     setReviewOpen(panel === 'review' ? !reviewOpen : false);
     setTemplatesOpen(panel === 'templates' ? !templatesOpen : false);
     setSpellcheckOpen(panel === 'spellcheck' ? !spellcheckOpen : false);
@@ -1812,6 +1821,8 @@ export default function RichTextEditorTool() {
         onMath={handleMathAction}
         stylesOpen={stylesOpen}
         onToggleStyles={() => togglePanel('styles')}
+        shapesOpen={shapesOpen}
+        onToggleShapes={() => togglePanel('shapes')}
         templatesOpen={templatesOpen}
         onToggleTemplates={() => togglePanel('templates')}
         spellcheckOpen={spellcheckOpen}
@@ -1854,6 +1865,7 @@ export default function RichTextEditorTool() {
           ) : null}
 
           {stylesOpen ? <StylePanel editor={editor} onClose={() => setStylesOpen(false)} /> : null}
+          {shapesOpen ? <ShapePanel editor={editor} onClose={() => setShapesOpen(false)} /> : null}
           {spellcheckOpen ? (
             <SpellcheckPanel
               enabled={spellcheckEnabled}
@@ -1954,6 +1966,8 @@ export default function RichTextEditorTool() {
             ) : null}
             {/* Image resize handles: overlay layer (content coordinate space, follows scrolling) */}
             <ImageResizeOverlay editor={editor} viewportRef={viewportRef} />
+            {/* Shape handles: resize / rotate / preset adjustment dots for the selected shape */}
+            <ShapeOverlay editor={editor} viewportRef={viewportRef} />
             {/* Zoom layer: CSS zoom participates in layout (scroll height stays correct); data-rte-zoom lets pagination undo it */}
             <div data-rte-zoom={zoom} style={{ zoom, ...(metrics.cssVars as React.CSSProperties) }}>
               <div
@@ -2184,6 +2198,12 @@ export default function RichTextEditorTool() {
       {importRevisionsLost && !failure && (
         <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
           {t('tools.richText.importRevisionsLost')}
+        </p>
+      )}
+
+      {importShapesLost > 0 && !failure && (
+        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
+          {t('tools.richText.importShapesLost', { count: importShapesLost })}
         </p>
       )}
 

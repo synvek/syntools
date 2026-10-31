@@ -16,7 +16,6 @@ import type {
   RunStyle,
   ShadowStyle,
   ShapeElement,
-  ShapeGeometry,
   SlideBackground,
   SlideElement,
   SlideTransition,
@@ -27,7 +26,8 @@ import type {
   TextElement,
 } from '../model/types';
 import { escapeXml } from './templates';
-import { custGeomXml } from './custGeom';
+// P3-1.0: geometry strings come from the kernel so docx (wps:wsp) and xlsx (xdr:sp) share them
+import { frameGeomXml, geomXml } from '../../../core/drawing/drawingml';
 import { dashPresetName } from './color';
 
 /**
@@ -415,26 +415,6 @@ export function textBodyXml(body: TextBody, prefix: 'p' | 'a'): string {
   return `<${prefix}:txBody>${bodyXml(body)}<a:lstStyle/>${paragraphs.map(paragraphXml).join('')}</${prefix}:txBody>`;
 }
 
-function avLstXml(adj: Record<string, number> | undefined): string {
-  const entries = Object.entries(adj ?? {})
-    .filter(([, value]) => Number.isFinite(value))
-    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
-  if (entries.length === 0) return '<a:avLst/>';
-  const gds = entries
-    .map(
-      ([name, value]) =>
-        `<a:gd name="${escapeXml(name)}" fmla="val ${Math.round(value * 100000)}"/>`,
-    )
-    .join('');
-  return `<a:avLst>${gds}</a:avLst>`;
-}
-
-function geomXml(geom: ShapeGeometry): string {
-  // An explicit path must survive a round-trip: writing prst would silently redraw the shape
-  if (geom.custGeom && geom.custGeom.length > 0) return custGeomXml(geom.custGeom);
-  return `<a:prstGeom prst="${escapeXml(geom.prst || 'rect')}">${avLstXml(geom.adj)}</a:prstGeom>`;
-}
-
 function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
   const id = shapeIdFor(element.id);
   const parts = [
@@ -449,17 +429,6 @@ function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
   return `<p:sp>${parts.join('')}</p:sp>`;
 }
 
-/**
- * Geometry for text boxes and pictures: a rounded frame is a `roundRect` whose `adj1` is the radius
- * as a fraction of the shorter side (the same convention `resolvePresetGeometry` uses for shapes).
- */
-function roundedGeomXml(element: { width: number; height: number; cornerRadius?: number }): string {
-  const min = Math.min(element.width, element.height);
-  const radius = min > 0 ? Math.min(0.5, Math.max(0, (element.cornerRadius ?? 0) / min)) : 0;
-  if (radius <= 0) return '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
-  return `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj1" fmla="val ${Math.round(radius * 100000)}"/></a:avLst></a:prstGeom>`;
-}
-
 function textXml(element: TextElement): string {
   const id = shapeIdFor(element.id);
   return [
@@ -469,7 +438,7 @@ function textXml(element: TextElement): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${roundedGeomXml(element)}${fillXml(element.fill, element.opacity ?? 1)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${frameGeomXml(element.width, element.height, element.cornerRadius)}${fillXml(element.fill, element.opacity ?? 1)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
     textBodyXml(element.body, 'p'),
     '</p:sp>',
   ].join('');
@@ -503,7 +472,7 @@ function imageXml(
     `<p:nvPicPr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Image ${id}`)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>`,
     `<p:blipFill><a:blip r:embed="${rId}">${alphaXml}</a:blip>${srcRect}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`,
     // A picture frame keeps its rounding and outline (previously forced to a plain rect with no line)
-    `<p:spPr>${xfrmXml(element)}${roundedGeomXml(element)}${strokeXml(element.stroke)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${frameGeomXml(element.width, element.height, element.cornerRadius)}${strokeXml(element.stroke)}</p:spPr>`,
     '</p:pic>',
   ].join('');
 }
