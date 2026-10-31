@@ -49,14 +49,27 @@ interface MediaEntry {
   bytes: Uint8Array;
 }
 
+/**
+ * Media ids an element tree references: `p:pic` images *and* picture fills (P2-S4.2).
+ *
+ * Both end up as `<a:blip r:embed>` in the package, so a fill missing from this set would export a
+ * shape whose picture fill silently turns into noFill.
+ */
+function referencedMediaIds(elements: SlideElement[], into = new Set<string>()): Set<string> {
+  for (const element of elements) {
+    if (element.type === 'image') into.add(element.mediaId);
+    if (element.type === 'group') referencedMediaIds(element.children, into);
+    if ((element.type === 'shape' || element.type === 'text') && element.fill?.type === 'image') {
+      into.add(element.fill.mediaId);
+    }
+  }
+  return into;
+}
+
 /** Collect the media actually referenced by the document (de-duplicated by mediaId) */
 function collectMedia(doc: SlideDoc): MediaEntry[] {
   const used = new Set<string>();
-  for (const slide of doc.slides) {
-    for (const element of slide.elements) {
-      if (element.type === 'image') used.add(element.mediaId);
-    }
-  }
+  for (const slide of doc.slides) referencedMediaIds(slide.elements, used);
   const entries: MediaEntry[] = [];
   let index = 1;
   for (const [mediaId, asset] of Object.entries(doc.media)) {
@@ -76,11 +89,7 @@ function relMapFor(
 ): Map<string, string> {
   const map = new Map<string, string>();
   mediaEntries.forEach((entry, index) => map.set(entry.mediaId, `rId${index + 2}`));
-  const referenced = new Set(
-    slideElements
-      .filter((element) => element.type === 'image')
-      .map((element) => (element.type === 'image' ? element.mediaId : '')),
-  );
+  const referenced = referencedMediaIds(slideElements);
   const result = new Map<string, string>();
   for (const [mediaId, rId] of map) {
     if (referenced.has(mediaId)) result.set(mediaId, rId);
@@ -127,8 +136,12 @@ function requiresLegacy(doc: SlideDoc): boolean {
    * P2-S4: pptxgenjs has no pattern fill — it would degrade to the foreground colour without a
    * trace. Table cells only carry a solid colour string, so they cannot hit this path.
    */
-  const hasPatternFill = (element: SlideElement): boolean =>
-    element.type === 'shape' || element.type === 'text' ? element.fill?.type === 'pattern' : false;
+  const hasUnsupportedFill = (element: SlideElement): boolean => {
+    if (element.type !== 'shape' && element.type !== 'text') return false;
+    // Pattern degrades to the foreground colour; a picture fill has no API at all and needs a blip
+    // relationship only the hand-written writer allocates.
+    return element.fill?.type === 'pattern' || element.fill?.type === 'image';
+  };
   const walk = (elements: SlideElement[]): boolean =>
     elements.some((element) => {
       // pptxgenjs has no glow/effect API beyond a single shadow; a glow would silently disappear
@@ -137,7 +150,7 @@ function requiresLegacy(doc: SlideDoc): boolean {
       if (element.softEdge) return true;
       // ...and it has no inner shadow concept at all (its single `shadow` is always an outer one)
       if (element.innerShadow) return true;
-      if (hasPatternFill(element)) return true;
+      if (hasUnsupportedFill(element)) return true;
       if (element.type === 'shape') {
         // pptxgenjs has no path API, so custom geometry must go through the legacy writer
         if (element.geom.custGeom && element.geom.custGeom.length > 0) return true;

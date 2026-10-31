@@ -4,6 +4,7 @@ import { backgroundToColor } from '../core';
 import { shapeAdjustValues, shapeAdjustments } from '../../../core/drawing/shapeDefs';
 import type { Fill, RunStyle, SlideElement, Stroke } from '../model/types';
 import { fillColorOf, fillPatch, supportsFill } from '../model/format';
+import { createMediaFromFile } from '../model/media';
 import { PATTERN_PRESETS } from '../model/patterns';
 import { patternTileUrl } from '../render/patternTile';
 import { containerElements, useSlideStore } from '../store';
@@ -88,6 +89,26 @@ export function PropertyPanel() {
   const applyFill = (fill: Fill) => {
     const patch = fillPatch(element, fill);
     if (patch) apply(patch);
+  };
+  /** Picture fill currently on the element (P2-S4.2) */
+  const activeImageFill =
+    supportsFill(element) && element.fill?.type === 'image' ? element.fill : undefined;
+  /**
+   * Picture fill: the file becomes a normal media asset (so it is shared with any `p:pic` using the
+   * same bytes) and the element only stores the media id.
+   */
+  const chooseFillPicture = async (file: File) => {
+    const result = await createMediaFromFile(file);
+    if (!result.ok) return;
+    const asset = result.value;
+    useSlideStore.setState((state) => ({
+      doc: {
+        ...state.doc,
+        media: { ...state.doc.media, [asset.id]: asset },
+        version: state.doc.version + 1,
+      },
+    }));
+    applyFill({ type: 'image', mediaId: asset.id, mode: 'stretch' });
   };
 
   const stroke =
@@ -502,6 +523,63 @@ export function PropertyPanel() {
                   onChange={(bgColor) => applyFill({ ...activePatternFill, bgColor })}
                 />
               </Field>
+            </>
+          ) : null}
+        </Section>
+      ) : null}
+
+      {/* P2-S4.2: 图片填充。图片进 doc.media，元素只存 mediaId，因此与普通图片共用同一份资源 */}
+      {supportsFill(element) ? (
+        <Section title={t('tools.slide.panelPictureFill')}>
+          <ActionRow>
+            <label className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border border-gray-300 px-2 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+              {activeImageFill ? t('tools.slide.replacePicture') : t('tools.slide.choosePicture')}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml"
+                className="hidden"
+                data-testid="picture-fill-input"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) void chooseFillPicture(file);
+                }}
+              />
+            </label>
+            {activeImageFill ? (
+              <button
+                type="button"
+                onClick={() => applyFill({ type: 'none' })}
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-300 px-2 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                {t('tools.slide.clearPictureFill')}
+              </button>
+            ) : null}
+          </ActionRow>
+          {activeImageFill ? (
+            <>
+              <Field label={t('tools.slide.pictureFillMode')}>
+                <ToggleGroup
+                  ariaLabel={t('tools.slide.pictureFillMode')}
+                  value={activeImageFill.mode}
+                  options={[
+                    { value: 'stretch' as const, label: t('tools.slide.pictureFillStretch') },
+                    { value: 'tile' as const, label: t('tools.slide.pictureFillTile') },
+                  ]}
+                  onChange={(mode) => applyFill({ ...activeImageFill, mode })}
+                />
+              </Field>
+              {activeImageFill.mode === 'tile' ? (
+                <Field label={t('tools.slide.pictureFillScale')}>
+                  <NumberInput
+                    ariaLabel={t('tools.slide.pictureFillScale')}
+                    value={Math.round(activeImageFill.scale ?? 100)}
+                    min={5}
+                    max={400}
+                    onChange={(scale) => applyFill({ ...activeImageFill, scale })}
+                  />
+                </Field>
+              ) : null}
             </>
           ) : null}
         </Section>

@@ -50,7 +50,24 @@ export interface PatternFill {
   bgColor: string;
 }
 
-export type Fill = NoFill | SolidFill | GradientFill | PatternFill;
+/**
+ * Picture fill (DrawingML `a:blipFill`, P2-S4.2).
+ *
+ * The image lives in `doc.media` like every other picture; only the media id is stored, so a fill
+ * and a `p:pic` sharing one asset keep sharing it after a round-trip.
+ */
+export interface ImageFill {
+  type: 'image';
+  mediaId: string;
+  /** `stretch` scales the picture to the box (cropping overflow); `tile` repeats it at `scale` */
+  mode: 'stretch' | 'tile';
+  /** Tile scale in percent (100 = source pixel size). Ignored by `stretch` */
+  scale?: number;
+  /** 0~1, multiplies the picture (Export → `a:alphaModFix`) */
+  alpha?: number;
+}
+
+export type Fill = NoFill | SolidFill | GradientFill | PatternFill | ImageFill;
 
 /**
  * Slide background form.

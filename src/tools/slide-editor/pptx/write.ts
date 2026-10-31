@@ -242,7 +242,7 @@ function xfrmXml(
  * DrawingML has no element-level opacity, so the element's `opacity` is folded into the paint
  * alpha here — otherwise a semi-transparent object would export fully opaque.
  */
-function fillXml(fill: Fill | undefined, opacity = 1): string {
+function fillXml(fill: Fill | undefined, opacity = 1, relMap?: Map<string, string>): string {
   if (!fill || fill.type === 'none') return '<a:noFill/>';
   const factor = Math.min(1, Math.max(0, opacity));
   if (fill.type === 'solid') {
@@ -259,6 +259,19 @@ function fillXml(fill: Fill | undefined, opacity = 1): string {
       return `<a:srgbClr val="${color.replace(/^#/, '').toUpperCase()}">${alphaXml}</a:srgbClr>`;
     };
     return `<a:pattFill prst="${fill.prst}"><a:fgClr>${ink(fill.fgColor)}</a:fgClr><a:bgClr>${ink(fill.bgColor)}</a:bgClr></a:pattFill>`;
+  }
+  if (fill.type === 'image') {
+    // The picture itself is a relationship on the slide part, so a fill without a media rel cannot
+    // be written at all — degrade to noFill instead of emitting a dangling r:embed
+    const rId = relMap?.get(fill.mediaId);
+    if (!rId) return '<a:noFill/>';
+    const alpha = (fill.alpha ?? 1) * factor;
+    const alphaXml = alpha < 1 ? `<a:alphaModFix amt="${Math.round(alpha * 100000)}"/>` : '';
+    const body =
+      fill.mode === 'tile'
+        ? `<a:tile tx="0" ty="0" sx="${Math.round((fill.scale ?? 100) * 1000)}" sy="${Math.round((fill.scale ?? 100) * 1000)}" flip="none" algn="tl"/>`
+        : '<a:stretch><a:fillRect/></a:stretch>';
+    return `<a:blipFill rotWithShape="1"><a:blip r:embed="${rId}">${alphaXml}</a:blip>${body}</a:blipFill>`;
   }
   const stopAlpha = factor < 1 ? `<a:alpha val="${Math.round(factor * 100000)}"/>` : '';
   const stops = fill.stops
@@ -456,7 +469,11 @@ export function textBodyXml(body: TextBody, prefix: 'p' | 'a'): string {
   return `<${prefix}:txBody>${bodyXml(body)}<a:lstStyle/>${paragraphs.map(paragraphXml).join('')}</${prefix}:txBody>`;
 }
 
-function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
+function shapeXml(
+  element: ShapeElement,
+  body: TextBody | undefined,
+  relMap?: Map<string, string>,
+): string {
   const id = shapeIdFor(element.id);
   const parts = [
     `<p:nvSpPr><p:cNvPr id="${id}" name="${escapeXml(element.name ?? `Shape ${id}`)}"/><p:cNvSpPr/>`,
@@ -464,13 +481,13 @@ function shapeXml(element: ShapeElement, body: TextBody | undefined): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${geomXml(element.geom)}${fillXml(element.fill, element.opacity ?? 1)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${geomXml(element.geom)}${fillXml(element.fill, element.opacity ?? 1, relMap)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
   ];
   if (body) parts.push(textBodyXml(body, 'p'));
   return `<p:sp>${parts.join('')}</p:sp>`;
 }
 
-function textXml(element: TextElement): string {
+function textXml(element: TextElement, relMap?: Map<string, string>): string {
   const id = shapeIdFor(element.id);
   return [
     '<p:sp>',
@@ -479,7 +496,7 @@ function textXml(element: TextElement): string {
       ? `<p:nvPr><p:ph type="${escapeXml(element.placeholder.kind)}"${element.placeholder.index ? ` idx="${escapeXml(element.placeholder.index)}"` : ''}/></p:nvPr>`
       : '<p:nvPr/>',
     '</p:nvSpPr>',
-    `<p:spPr>${xfrmXml(element)}${frameGeomXml(element.width, element.height, element.cornerRadius)}${fillXml(element.fill, element.opacity ?? 1)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
+    `<p:spPr>${xfrmXml(element)}${frameGeomXml(element.width, element.height, element.cornerRadius)}${fillXml(element.fill, element.opacity ?? 1, relMap)}${strokeXml(element.stroke, undefined, element.opacity ?? 1)}${effectLstXml(element)}</p:spPr>`,
     textBodyXml(element.body, 'p'),
     '</p:sp>',
   ].join('');
@@ -630,9 +647,9 @@ function tableXml(element: TableElement): string {
 export function elementXml(element: SlideElement, relMap: Map<string, string>): string {
   switch (element.type) {
     case 'text':
-      return textXml(element);
+      return textXml(element, relMap);
     case 'shape':
-      return shapeXml(element, element.body);
+      return shapeXml(element, element.body, relMap);
     case 'image': {
       const rId = relMap.get(element.mediaId);
       if (!rId) return '';

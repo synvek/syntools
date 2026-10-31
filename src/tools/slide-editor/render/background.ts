@@ -59,6 +59,8 @@ export function backgroundFillProps(
     };
   }
 
+  // Page background pictures are not supported yet (no media plumbed into the background path)
+  if (fill.type === 'image') return { fill: fallback };
   const stops = fill.stops.length > 0 ? fill.stops : [{ offset: 0, color: fallback }];
   const [start, end] = gradientEnds(fill.angle ?? 0, width, height);
   const colorStops: (number | string)[] = [];

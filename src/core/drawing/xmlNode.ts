@@ -55,6 +55,17 @@ export function attr(node: XmlNode | undefined, name: string): string | undefine
   return typeof value === 'string' ? value : undefined;
 }
 
+/**
+ * Relationship attribute (`r:embed` / `r:id` / `r:link`).
+ *
+ * The XML parser keeps namespace prefixes (`removeNSPrefix: false`), so relationship ids are stored
+ * as `@_r:embed` while every other attribute is unprefixed. `attr(node, 'embed')` silently returns
+ * `undefined` — which is how imported pictures used to degrade into "图片" placeholder boxes.
+ */
+export function relAttr(node: XmlNode | undefined, name: string): string | undefined {
+  return attr(node, name) ?? attr(node, `r:${name}`);
+}
+
 export function numAttr(node: XmlNode | undefined, name: string): number | undefined {
   const raw = attr(node, name);
   if (raw === undefined) return undefined;

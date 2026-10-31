@@ -9,6 +9,7 @@ import {
   localNameOf,
   numAttr,
   parseXml,
+  relAttr,
   type XmlNode,
 } from './xml';
 
@@ -82,13 +83,13 @@ export function parseBackgroundColor(
 /** Rel id of the image backfill inside p:bg (blipFill/blip r:embed) */
 export function parseBackgroundBlip(node: XmlNode | undefined): string | undefined {
   const blip = findFirst(node, 'blip');
-  return blip ? (attr(blip, 'embed') ?? attr(blip, 'link')) : undefined;
+  return blip ? (relAttr(blip, 'embed') ?? relAttr(blip, 'link')) : undefined;
 }
 
 /** Color group definition: <a:fills><a:blipFill><a:blip r:embed="rId2"/></a:blipFill>... */
 export function parseFillOverrideRef(node: XmlNode | undefined): string | undefined {
   const blip = findFirst(node, 'blip');
-  return blip ? attr(blip, 'embed') : undefined;
+  return blip ? relAttr(blip, 'embed') : undefined;
 }
 
 /** Read the "placeholder → scheme color" mapping from clrMap */

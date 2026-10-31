@@ -4,7 +4,7 @@ import {
   emuToPx,
   normalizeHex,
 } from '../../../core/drawing/geometry';
-import { attr, childOf, childrenOf, localNameOf, numAttr, type XmlNode } from './xml';
+import { attr, childOf, childrenOf, localNameOf, numAttr, relAttr, type XmlNode } from './xml';
 import type { SoftEdgeStyle } from '../model/types';
 
 /**
@@ -245,13 +245,15 @@ export function resolveColorNode(
 
 /** Parse a fill node (solidFill / gradFill / noFill / blipFill) */
 export interface ParsedFill {
-  type: 'none' | 'solid' | 'gradient' | 'pattern';
+  type: 'none' | 'solid' | 'gradient' | 'pattern' | 'image';
   color?: string;
   alpha?: number;
   stops?: { offset: number; color: string }[];
   angle?: number;
   /** Pattern fill (P2-S4): preset id plus the two inks */
   pattern?: { prst: string; fgColor: string; bgColor: string };
+  /** Picture fill (S4.2): the blip relationship has to be resolved by the importer (async media read) */
+  blip?: { rId: string; mode: 'stretch' | 'tile'; scale?: number; alpha?: number };
 }
 
 export function parseShapeFill(node: XmlNode | undefined, palette: Palette): ParsedFill {
@@ -259,6 +261,24 @@ export function parseShapeFill(node: XmlNode | undefined, palette: Palette): Par
   for (const childItem of childrenOf(node)) {
     const kind = localNameOf(childItem);
     if (kind === 'noFill') return { type: 'none' };
+    if (kind === 'blipFill') {
+      const blip = childOf(childItem, 'blip');
+      const rId = relAttr(blip, 'embed') ?? relAttr(blip, 'link');
+      if (!rId) return { type: 'none' };
+      // a:tile sx/sy are thousandths of a percent: 100000 = 100%
+      const tile = childOf(childItem, 'tile');
+      const scale = numAttr(tile, 'sx');
+      const alphaAmt = numAttr(childOf(blip, 'alphaModFix'), 'amt');
+      return {
+        type: 'image',
+        blip: {
+          rId,
+          mode: tile ? 'tile' : 'stretch',
+          scale: tile ? Math.max(1, Math.round((scale ?? 100000) / 1000)) : undefined,
+          alpha: alphaAmt === undefined ? undefined : Math.min(1, Math.max(0, alphaAmt / 100000)),
+        },
+      };
+    }
     if (kind === 'pattFill') {
       const prst = attr(childItem, 'prst');
       if (!prst) return { type: 'none' };

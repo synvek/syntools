@@ -54,18 +54,6 @@ export interface RenderContext {
 const DEFAULT_FONT = 'Arial, Helvetica, sans-serif';
 const DEFAULT_SIZE = 18;
 
-export function fillToColor(fill: Fill | undefined): string | undefined {
-  if (!fill) return undefined;
-  if (fill.type === 'solid') return fill.color;
-  if (fill.type === 'gradient') {
-    const first = fill.stops[0]?.color;
-    return first;
-  }
-  // Pattern: the plate colour stands in wherever one colour has to represent the fill
-  if (fill.type === 'pattern') return fill.bgColor;
-  return undefined;
-}
-
 export function fillToAlpha(fill: Fill | undefined): number | undefined {
   if (fill?.type === 'solid') return fill.alpha;
   return undefined;
@@ -87,7 +75,14 @@ function gradientPoints(
   return { start: { x: cx - dx, y: cy - dy }, end: { x: cx + dx, y: cy + dy } };
 }
 
-function applyFill(node: Konva.Shape, fill: Fill | undefined, width: number, height: number): void {
+function applyFill(
+  node: Konva.Shape,
+  fill: Fill | undefined,
+  width: number,
+  height: number,
+  media?: Record<string, MediaAsset>,
+  onImageReady?: () => void,
+): void {
   // Konva keeps every fill flavour on the node and picks one by priority, so switching away from a
   // pattern has to reset the priority — otherwise the old tile keeps painting over the new colour.
   if (!fill || fill.type === 'none') {
@@ -115,6 +110,32 @@ function applyFill(node: Konva.Shape, fill: Fill | undefined, width: number, hei
     node.fillPatternImage(tile);
     node.fillPatternRepeat('repeat');
     node.fillPatternScale({ x: 1, y: 1 });
+    return;
+  }
+  if (fill.type === 'image') {
+    const asset = media?.[fill.mediaId];
+    // A picture fill whose asset is missing stays empty (noFill) instead of showing a red box
+    const image = asset && onImageReady ? acquireImage(asset, onImageReady) : undefined;
+    if (!image) {
+      node.fillPriority('color');
+      node.fill(undefined);
+      return;
+    }
+    node.fillPriority('pattern');
+    node.fillPatternImage(image);
+    if (fill.mode === 'tile') {
+      const scale = Math.max(1, fill.scale ?? 100) / 100;
+      node.fillPatternRepeat('repeat');
+      node.fillPatternScale({ x: scale, y: scale });
+    } else {
+      // Stretch = one tile scaled to the box, cropped at the edges (`fillPatternOffset` centres it,
+      // matching a:stretch/a:fillRect which always fills from the top-left of the shape)
+      const scaleX = width / Math.max(1, image.naturalWidth);
+      const scaleY = height / Math.max(1, image.naturalHeight);
+      node.fillPatternRepeat('repeat');
+      node.fillPatternScale({ x: scaleX, y: scaleY });
+    }
+    if (fill.alpha !== undefined) node.opacity(Math.min(1, Math.max(0, fill.alpha)));
     return;
   }
   node.fillPriority('color');
@@ -598,11 +619,11 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
         const bg = new Konva.Rect({
           width: element.width,
           height: element.height,
-          fill: fillToColor(element.fill),
-          opacity: fillToAlpha(element.fill) ?? 1,
           cornerRadius: element.cornerRadius ?? 0,
           name: 'textBg',
         });
+        // Same paint path as shapes: solid / gradient / pattern / picture all work on a text box
+        applyFill(bg, element.fill, element.width, element.height, ctx.media, ctx.onImageReady);
         applyStroke(bg, element.stroke);
         applySoftEdge(bg, element.softEdge);
         addGlow(group, bg, element.glow);
@@ -616,7 +637,7 @@ export function createElementNode(element: SlideElement, ctx: RenderContext): Ko
     case 'shape': {
       const shape = createShapeNode(element);
       shape.name('shapeBody');
-      applyFill(shape, element.fill, element.width, element.height);
+      applyFill(shape, element.fill, element.width, element.height, ctx.media, ctx.onImageReady);
       applyStroke(shape, element.stroke);
       applySoftEdge(shape, element.softEdge);
       addGlow(group, shape, element.glow);

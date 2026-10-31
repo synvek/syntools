@@ -21,6 +21,7 @@ export {
   childrenOf,
   localNameOf,
   numAttr,
+  relAttr,
   tagOf,
   textOf,
 } from '../../../core/drawing/xmlNode';

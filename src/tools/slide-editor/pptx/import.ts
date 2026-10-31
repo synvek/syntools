@@ -67,6 +67,7 @@ import {
   localNameOf,
   numAttr,
   parseXml,
+  relAttr,
   textOf,
   type XmlNode,
 } from './xml';
@@ -353,17 +354,33 @@ function baseRect(xfrm: Xfrm | undefined) {
   };
 }
 
-/** p:sp → TextElement / ShapeElement */
-function parseShape(
+/** p:sp → TextElement / ShapeElement (async: a picture fill has to load its blip from the package) */
+async function parseShape(
   node: XmlNode,
   ctx: ImportContext,
+  slidePart: string,
+  rels: Map<string, Relationship>,
   palette: Palette,
   theme: SlideTheme,
-): SlideElement | undefined {
+): Promise<SlideElement | undefined> {
   const spPr = childOf(node, 'spPr');
   const xfrm = readXfrm(childOf(spPr, 'xfrm'));
   const geometry = parseShapeGeometry(spPr);
-  const fill = fillFromParsed(parseShapeFill(spPr, palette));
+  const parsedFill = parseShapeFill(spPr, palette);
+  let fill = fillFromParsed(parsedFill);
+  if (parsedFill.type === 'image' && parsedFill.blip) {
+    // Picture fill: the image is a package part, exactly like a p:pic's blip
+    const mediaId = await ensureMedia(ctx, slidePart, parsedFill.blip.rId, rels);
+    fill = mediaId
+      ? {
+          type: 'image',
+          mediaId,
+          mode: parsedFill.blip.mode,
+          ...(parsedFill.blip.scale === undefined ? {} : { scale: parsedFill.blip.scale }),
+          ...(parsedFill.blip.alpha === undefined ? {} : { alpha: parsedFill.blip.alpha }),
+        }
+      : undefined;
+  }
   const stroke = parseStroke(childOf(spPr, 'ln'), palette);
   const shadow = parseShadow(spPr, palette);
   const glow = parseGlow(spPr, palette);
@@ -431,7 +448,7 @@ async function parsePicture(
   const xfrm = readXfrm(childOf(spPr, 'xfrm'));
   const blipFill = childOf(node, 'blipFill');
   const blip = childOf(blipFill, 'blip');
-  const embed = attr(blip, 'embed') ?? attr(blip, 'link');
+  const embed = relAttr(blip, 'embed') ?? relAttr(blip, 'link');
   const mediaId = embed ? await ensureMedia(ctx, slidePart, embed, rels) : undefined;
   // Picture transparency lives on the blip; without it a faded image came back fully opaque
   const alphaAmt = numAttr(childOf(blip, 'alphaModFix'), 'amt');
@@ -947,7 +964,7 @@ async function parseSpTreeNode(
   const kind = localNameOf(node);
   switch (kind) {
     case 'sp':
-      return parseShape(node, ctx, palette, theme);
+      return parseShape(node, ctx, slidePart, rels, palette, theme);
     case 'pic':
       return parsePicture(node, ctx, slidePart, rels, palette);
     case 'cxnSp':
