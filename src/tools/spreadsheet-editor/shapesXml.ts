@@ -319,6 +319,7 @@ function nodeText(node: XmlNode | undefined, tag: string): string {
  */
 export async function parseSheetShapes(
   zip: JSZipType,
+  onConverted?: (sheetName: string, anchorId: string) => void,
 ): Promise<Record<string, SheetShapeConfig[]>> {
   const out: Record<string, SheetShapeConfig[]> = {};
   const sheetParts = await resolveSheetParts(zip);
@@ -340,7 +341,11 @@ export async function parseSheetShapes(
       ...collect(parsed, 'absoluteAnchor'),
     ]) {
       const shape = parseAnchor(anchor, shapes.length);
-      if (shape) shapes.push(shape);
+      if (!shape) continue;
+      shapes.push(shape);
+      // 上报"已转成 config 的 anchor"，调用方据此从保留的 drawing 里摘掉它，避免导出写两份
+      const anchorId = attr(childOf(childOf(childOf(anchor, 'sp'), 'nvSpPr'), 'cNvPr'), 'id');
+      if (anchorId) onConverted?.(sheetName, anchorId);
     }
     if (shapes.length > 0) out[sheetName] = shapes;
   }
@@ -350,11 +355,12 @@ export async function parseSheetShapes(
 /** Buffer → sheet name → shapes (import entry point; a broken drawing never blocks the import) */
 export async function collectSheetShapes(
   buffer: ArrayBuffer,
+  onConverted?: (sheetName: string, anchorId: string) => void,
 ): Promise<Record<string, SheetShapeConfig[]>> {
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(buffer);
-    return await parseSheetShapes(zip);
+    return await parseSheetShapes(zip, onConverted);
   } catch {
     return {};
   }

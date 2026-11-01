@@ -38,6 +38,7 @@ import { CHART_TYPE_LABEL_KEY, buildChartData, type ChartConfig, type ChartData 
 import { registerChartStrings } from './chartStrings';
 import { chartTypeBreakdown, summarizeImport, type ChartImportReport } from './chartImport';
 import { registerShapeStrings } from './shapeStrings';
+import { registerImageStrings } from './imageStrings';
 import {
   buildSheetLayout,
   createSheetShape,
@@ -47,7 +48,16 @@ import {
   type SheetShapeConfig,
   type SheetViewport,
 } from './shapes';
+import {
+  IMAGE_ACCEPT,
+  MAX_IMAGE_BYTES,
+  createSheetImage,
+  fitImageSize,
+  parseImageDataUrl,
+  type SheetImageConfig,
+} from './sheetImages';
 import { ShapeLayer, ShapePalette } from './ui/ShapeOverlay';
+import { ImageLayer } from './ui/ImageLayer';
 import { registerStoreStrings } from './storeStrings';
 import {
   createDocId,
@@ -143,11 +153,36 @@ registerChartStrings(i18n);
 registerStoreStrings(i18n);
 registerPivotStrings(i18n);
 registerShapeStrings(i18n);
+registerImageStrings(i18n);
 registerMetaStrings(i18n);
 
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 /** 首版一个工作簿只保留一个透视表：多表会让"导出到哪张工作表"的语义含混 */
 const PIVOT_ID = 'pivot-1';
+/** File → dataURL：图片要存进快照，必须自包含（不能引用原文件路径） */
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** dataURL → 原始像素尺寸；量不出来（损坏 / 环境不支持）时返回 0，交给 fitImageSize 兜底 */
+function measureImage(src: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    if (typeof Image === 'undefined') {
+      resolve({ width: 0, height: 0 });
+      return;
+    }
+    const probe = new Image();
+    probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
+    probe.onerror = () => resolve({ width: 0, height: 0 });
+    probe.src = src;
+  });
+}
+
 /** 打印用的合成快照里只有一个工作表，id 固定即可 */
 const PIVOT_SHEET_ID = 'pivot-print';
 type BusyKind = 'import' | 'export' | null;
@@ -218,6 +253,13 @@ export default function SpreadsheetTool() {
   shapesRef.current = shapes;
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [shapePaletteOpen, setShapePaletteOpen] = useState(false);
+  const [images, setImages] = useState<SheetImageConfig[]>([]);
+  const imagesRef = useRef<SheetImageConfig[]>([]);
+  imagesRef.current = images;
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  /** 插入图片时的提示（超限 / 读取失败），贴在工具栏下方，不打断操作 */
+  const [imageNotice, setImageNotice] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   /** Bumped on every mutation so the row/column layout is re-measured after a resize */
   const [shapeLayoutVersion, setShapeLayoutVersion] = useState(0);
   const shapeLayoutRef = useRef<SheetLayout>(buildSheetLayout(undefined));
@@ -431,6 +473,7 @@ export default function SpreadsheetTool() {
     if (rawPartsRef.current) next = { ...next, syntoolsRawParts: rawPartsRef.current };
     if (pivotConfigsRef.current.length) next = { ...next, syntoolsPivots: pivotConfigsRef.current };
     if (shapesRef.current.length) next = { ...next, syntoolsShapes: shapesRef.current };
+    if (imagesRef.current.length) next = { ...next, syntoolsImages: imagesRef.current };
     // Names and protection are workbook/sheet metadata written into workbook.xml and sheetProtection
     const names = sanitizeNamedRanges(namedRangesRef.current);
     if (names.length) next = { ...next, namedRanges: names };
@@ -506,6 +549,90 @@ export default function SpreadsheetTool() {
       scheduleSaveRef.current();
     },
     [setShapeList],
+  );
+
+  /* ---------------------------- Pictures (SHEET-02 剩余) ---------------------------- */
+
+  const setImageList = useCallback((next: SheetImageConfig[]) => {
+    imagesRef.current = next;
+    setImages(next);
+  }, []);
+
+  /**
+   * 插入一张图。图片以 dataURL 存进快照 —— 快照必须自包含（草稿/历史版本/导出都不能依赖原文件路径），
+   * 导出时再拆回 `xl/media/imageN.<ext>`。超过上限直接拒绝，免得把 localStorage 撑爆。
+   */
+  const insertImageFile = useCallback(
+    async (file: File) => {
+      if (file.size > MAX_IMAGE_BYTES) {
+        setImageNotice(t('tools.sheet.imageTooLarge'));
+        return;
+      }
+      let src = '';
+      try {
+        src = await readFileAsDataUrl(file);
+      } catch {
+        setImageNotice(t('tools.sheet.imageReadFailed'));
+        return;
+      }
+      if (!parseImageDataUrl(src)) {
+        setImageNotice(t('tools.sheet.imageReadFailed'));
+        return;
+      }
+      const natural = await measureImage(src);
+      const handle = handleRef.current;
+      const layout = shapeLayoutRef.current;
+      const range = handle?.getActiveRange();
+      const from = range
+        ? { col: range.startColumn, row: range.startRow, colOff: 8, rowOff: 8 }
+        : pxToAnchor(24, 24, layout);
+      const fit = fitImageSize(natural.width, natural.height);
+      const image = createSheetImage({
+        src,
+        name: file.name,
+        from,
+        sheetId: handle?.getActiveSheetId() ?? undefined,
+        width: fit.width,
+        height: fit.height,
+        z: imagesRef.current.reduce((max, item) => Math.max(max, item.z), 0) + 1,
+      });
+      setImageNotice(null);
+      setImageList([...imagesRef.current, image]);
+      setSelectedImageId(image.id);
+      scheduleSaveRef.current();
+    },
+    [setImageList, t],
+  );
+
+  const updateImage = useCallback(
+    (id: string, patch: Partial<SheetImageConfig>) => {
+      setImageList(
+        imagesRef.current.map((image) => (image.id === id ? { ...image, ...patch } : image)),
+      );
+      scheduleSaveRef.current();
+    },
+    [setImageList],
+  );
+
+  const removeImage = useCallback(
+    (id: string) => {
+      setImageList(imagesRef.current.filter((image) => image.id !== id));
+      setSelectedImageId((current) => (current === id ? null : current));
+      scheduleSaveRef.current();
+    },
+    [setImageList],
+  );
+
+  const reorderImage = useCallback(
+    (id: string, direction: 'front' | 'back') => {
+      const zs = imagesRef.current.map((image) => image.z);
+      const next = direction === 'front' ? Math.max(0, ...zs) + 1 : Math.min(0, ...zs) - 1;
+      setImageList(
+        imagesRef.current.map((image) => (image.id === id ? { ...image, z: next } : image)),
+      );
+      scheduleSaveRef.current();
+    },
+    [setImageList],
   );
 
   /** Comments are app-side data: write through the ref and request a save explicitly (like charts) */
@@ -663,6 +790,13 @@ export default function SpreadsheetTool() {
         }
         // 图表导入提示：已转换成可编辑配置的 + 只能原样保留的（两者都为 0 时为 null，不显示）
         setChartImport(summarizeImport(chartsRef.current, rawPartsRef.current?.parts));
+        if (imagesRef.current.length === 0) {
+          const imageConfigs = pending.syntoolsImages ?? [];
+          if (imageConfigs.length > 0) {
+            imagesRef.current = imageConfigs;
+            setImages(imageConfigs);
+          }
+        }
         if (shapesRef.current.length === 0) {
           const shapeConfigs = pending.syntoolsShapes ?? [];
           if (shapeConfigs.length > 0) {
@@ -918,6 +1052,15 @@ export default function SpreadsheetTool() {
         .filter((shape) => !shape.sheetId || shape.sheetId === activeSheetId)
         .sort((a, b) => a.z - b.z),
     [shapes, activeSheetId],
+  );
+
+  /** Pictures visible on the active sheet, painted in z order (below the shapes) */
+  const visibleImages = useMemo(
+    () =>
+      images
+        .filter((image) => !image.sheetId || image.sheetId === activeSheetId)
+        .sort((a, b) => a.z - b.z),
+    [images, activeSheetId],
   );
 
   /**
@@ -1502,6 +1645,12 @@ export default function SpreadsheetTool() {
           () => setShapePaletteOpen(true),
           { disabled: busy !== null },
         ),
+        editorMenuItem(
+          'insert-image',
+          t('tools.sheet.insertImage'),
+          () => imageInputRef.current?.click(),
+          { disabled: busy !== null || activeProtection !== null },
+        ),
         editorMenuItem('insert-pivot', t('tools.sheet.insertPivot'), openPivot, {
           disabled: busy !== null,
         }),
@@ -1696,6 +1845,11 @@ export default function SpreadsheetTool() {
         </p>
       ) : null}
 
+      {imageNotice ? (
+        <p role="status" className="px-4 pb-1 text-[12px] text-amber-600 dark:text-amber-400">
+          {imageNotice}
+        </p>
+      ) : null}
       {chartImport ? (
         <p role="status" className="text-[11px] text-gray-500 dark:text-gray-400">
           {chartImport.editable.total > 0
@@ -1726,6 +1880,32 @@ export default function SpreadsheetTool() {
           ref={containerRef}
           className="sheet-canvas"
           style={sheetHeight ? { height: `${sheetHeight}px` } : undefined}
+        />
+        {/* Pictures sit under the shapes (the export writes pic before sp for the same reason) */}
+        <ImageLayer
+          images={visibleImages}
+          layout={shapeLayout}
+          selectedId={selectedImageId}
+          onSelect={setSelectedImageId}
+          onChange={updateImage}
+          onRemove={removeImage}
+          onBringFront={(id) => reorderImage(id, 'front')}
+          onSendBack={(id) => reorderImage(id, 'back')}
+          bounds={chartBounds}
+          viewport={shapeViewport}
+        />
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept={IMAGE_ACCEPT}
+          className="hidden"
+          data-testid="sheet-image-input"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // Reset first: picking the same file twice must still fire a change event
+            event.target.value = '';
+            if (file) void insertImageFile(file);
+          }}
         />
         {/* Shapes sit under the charts: charts are interactive panels, shapes are annotations */}
         <ShapeLayer

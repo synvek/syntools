@@ -152,8 +152,22 @@ export function pxToAnchor(
 }
 
 /** Shape → content-space box, ready for an absolutely positioned overlay */
+/**
+ * 浮动对象的最小几何：形状与图片都只需要"锚点 + 像素尺寸"就能定位。
+ * 手势计算因此可以共用一套纯函数，拖动/缩放两层不会各算一套而漂移。
+ */
+export interface FloatingBox {
+  from: SheetShapeConfig['from'];
+  width: number;
+  height: number;
+}
+
+export type BoxHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+export const BOX_HANDLES: readonly BoxHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
 export function shapeRect(
-  shape: SheetShapeConfig,
+  shape: FloatingBox,
   layout: SheetLayout,
 ): { x: number; y: number; width: number; height: number } {
   const { x, y } = anchorToPx(shape.from, layout);
@@ -206,7 +220,7 @@ export function viewportZoom(viewport: SheetViewport): number {
 
 /** Content-space box → overlay-space box (left/top/width/height in container CSS px) */
 export function shapeScreenRect(
-  shape: SheetShapeConfig,
+  shape: FloatingBox,
   layout: SheetLayout,
   viewport: SheetViewport,
 ): { left: number; top: number; width: number; height: number } {
@@ -247,6 +261,65 @@ export function contentVisibleBox(
     maxX: viewport.scrollX + (bounds.width - viewport.originX) / zoom,
     maxY: viewport.scrollY + (bounds.height - viewport.originY) / zoom,
   };
+}
+
+/* ------------------------- 浮动对象的手势计算（形状 / 图片共用） ------------------------- */
+
+/** 拖动：目标左上角（内容坐标）夹在可见区里，再换算回单元格锚点 */
+export function dragBoxAnchor(
+  box: FloatingBox,
+  targetLeft: number,
+  targetTop: number,
+  layout: SheetLayout,
+  viewport: SheetViewport,
+  bounds: { width: number; height: number },
+): SheetShapeConfig['from'] {
+  const visible = contentVisibleBox(viewport, bounds);
+  const minX = Math.max(0, visible.minX);
+  const minY = Math.max(0, visible.minY);
+  const maxX = Math.max(minX, visible.maxX - box.width);
+  const maxY = Math.max(minY, visible.maxY - box.height);
+  const x = Math.min(Math.max(targetLeft, minX), Math.max(minX, maxX));
+  const y = Math.min(Math.max(targetTop, minY), Math.max(minY, maxY));
+  return pxToAnchor(Math.round(x), Math.round(y), layout);
+}
+
+/**
+ * 缩放：只动被拖的方向；拖 w/n 手柄时左上角跟着移动，所以锚点也要重算。
+ * `originLeft/Top` 是手势开始时的内容坐标，`delta` 是累计内容位移。
+ */
+export function resizeBoxPatch(
+  box: FloatingBox,
+  handle: BoxHandle,
+  originLeft: number,
+  originTop: number,
+  delta: { x: number; y: number },
+  layout: SheetLayout,
+  minSize = 24,
+): { width: number; height: number; from: SheetShapeConfig['from'] } {
+  const west = handle.includes('w');
+  const east = handle.includes('e');
+  const north = handle.includes('n');
+  const south = handle.includes('s');
+
+  const width = east
+    ? Math.max(minSize, Math.round(box.width + delta.x))
+    : west
+      ? Math.max(minSize, Math.round(box.width - delta.x))
+      : box.width;
+  const height = south
+    ? Math.max(minSize, Math.round(box.height + delta.y))
+    : north
+      ? Math.max(minSize, Math.round(box.height - delta.y))
+      : box.height;
+
+  const nextLeft = west ? originLeft + (box.width - width) : originLeft;
+  const nextTop = north ? originTop + (box.height - height) : originTop;
+  const from =
+    west || north
+      ? pxToAnchor(Math.max(0, Math.round(nextLeft)), Math.max(0, Math.round(nextTop)), layout)
+      : box.from;
+  return { width, height, from };
 }
 
 /**

@@ -44,6 +44,9 @@ import { collectEditorValidation } from './cfdv';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
 import { adoptChartParts, metricsOfSheet } from './chartAdopt';
 import { buildShapePlan, collectSheetShapes, injectShapesIntoXlsx } from './shapesXml';
+import { buildImagePlan, collectSheetImages, injectImagesIntoXlsx } from './imagesXml';
+import { createConvertedAnchors, pruneConvertedAnchors } from './drawingAnchors';
+import type { SheetImageConfig } from './sheetImages';
 import type { SheetShapeConfig } from './shapes';
 import { injectNamedRanges, readNamedRangesFromXlsx, type NamedRange } from './namedRanges';
 import {
@@ -130,6 +133,8 @@ export interface WorkbookSnapshot extends SnapshotWithExtras {
   syntoolsRawParts?: RawChartParts;
   /** Floating shapes on sheets (SHEET-02): written as native `xdr:sp` on export */
   syntoolsShapes?: SheetShapeConfig[];
+  /** Floating pictures on sheets (SHEET-02 剩余): written as `xdr:pic` + `xl/media/imageN.<ext>` */
+  syntoolsImages?: SheetImageConfig[];
   /** Cell comment threads (P1-2); app-side only, reported as a fidelity warning on export */
   syntoolsComments?: SheetCommentMap;
   /**
@@ -374,9 +379,14 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
   try {
     const buffer = await file.arrayBuffer();
     // Collect native chart parts first (not parsed, just kept verbatim for the export to write back)
-    const rawParts = await collectRawChartPartsFrom(buffer);
-    // Floating shapes are read from the drawing parts (exceljs drops them like every other drawing)
-    const shapesByName = await collectSheetShapes(buffer);
+    const rawGathered = await collectRawChartPartsFrom(buffer);
+    // Floating shapes / pictures are read from the drawing parts (exceljs drops them like every other drawing).
+    // `converted` records which anchors became app-side configs, so the preserved drawing can drop exactly
+    // those — keeping them would export the same shape/picture twice (verbatim part + regenerated anchor).
+    const converted = createConvertedAnchors();
+    const shapesByName = await collectSheetShapes(buffer, converted.add);
+    const imagesByName = await collectSheetImages(buffer, converted.add);
+    const rawParts = pruneConvertedAnchors(rawGathered, converted);
     // Then normalise comment relationships: the way openpyxl and friends write them makes exceljs throw, blocking the whole import
     const normalized = await normalizeXlsxArchive(buffer);
     const ExcelJS = (await import('exceljs')).default;
@@ -450,6 +460,20 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
       }
     }
 
+    const importedImages: SheetImageConfig[] = [];
+    for (const [name, list] of Object.entries(imagesByName)) {
+      const sheetId = Object.entries(sheets).find(([, sheet]) => sheet.name === name)?.[0];
+      if (!sheetId) continue;
+      for (const image of list) {
+        importedImages.push({
+          ...image,
+          id: `image-import-${importedImages.length + 1}`,
+          sheetId,
+          z: importedImages.length,
+        });
+      }
+    }
+
     // Names live in workbook.xml (exceljs drops `localSheetId`, so they are read from the raw part)
     const namedRanges = await readNamedRangesFromXlsx(normalized, sheetOrder, sheets);
 
@@ -485,6 +509,7 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
         ...(charts.charts.length > 0 ? { syntoolsCharts: charts.charts } : {}),
         ...(charts.parts ? { syntoolsRawParts: charts.parts } : {}),
         ...(importedShapes.length > 0 ? { syntoolsShapes: importedShapes } : {}),
+        ...(importedImages.length > 0 ? { syntoolsImages: importedImages } : {}),
         ...(namedRanges.length > 0 ? { namedRanges } : {}),
         ...(protections.length > 0 ? { syntoolsProtection: protections } : {}),
         ...(collectedTables.length > 0 ? { syntoolsTables: collectedTables } : {}),
@@ -638,12 +663,20 @@ export async function exportSnapshotToBytes(
     const needsInjection = Object.keys(plan.chartsBySheet).length > 0 || plan.passthrough !== null;
     const withCharts = needsInjection ? await injectChartsIntoXlsx(buffer, plan) : buffer;
 
+    // Pictures: same drawing part as charts; written before shapes so shapes stay on top
+    // (the in-app overlay paints pictures under shapes for the same reason)
+    const imagePlan = buildImagePlan(snapshot);
+    const withImages =
+      Object.keys(imagePlan.imagesBySheet).length > 0
+        ? await injectImagesIntoXlsx(withCharts, imagePlan)
+        : withCharts;
+
     // Shapes: appended to the same drawing part the charts created (Excel allows one per sheet)
     const shapePlan = buildShapePlan(snapshot);
     const withShapes =
       Object.keys(shapePlan.shapesBySheet).length > 0
-        ? await injectShapesIntoXlsx(withCharts, shapePlan)
-        : withCharts;
+        ? await injectShapesIntoXlsx(withImages, shapePlan)
+        : withImages;
 
     // Pivots: value sheets plus native pivotTable/pivotCache parts, so Excel can still refresh them
     const pivotPlan = buildPivotXlsxPlan(snapshot);
