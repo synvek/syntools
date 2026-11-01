@@ -11,6 +11,8 @@
  * because the home card, sidebar, and ⌘K search need it before the tool loads.
  */
 
+import { charFormatStrings } from './charFormatStrings';
+
 type StringTree = { [key: string]: string | StringTree };
 type ResourceTree = { tools: { richText: StringTree } };
 
@@ -513,6 +515,9 @@ const en: ResourceTree = {
       indentDecrease: 'Decrease indent',
       paragraphSpacing: 'Paragraph spacing',
       spacingPresetDefault: 'Default',
+      spacingCompact: 'Compact',
+      spacingRelaxed: 'Relaxed',
+      spacingLoose: 'Loose',
       spacingPresetCompact: 'Compact',
       spacingPresetRelaxed: 'Relaxed',
       spacingPresetLoose: 'Loose',
@@ -865,6 +870,9 @@ const zhTW: ResourceTree = {
       indentDecrease: '減少縮排',
       paragraphSpacing: '段落間距',
       spacingPresetDefault: '預設',
+      spacingCompact: '緊湊',
+      spacingRelaxed: '寬鬆',
+      spacingLoose: '很寬鬆',
       spacingPresetCompact: '緊湊',
       spacingPresetRelaxed: '寬鬆',
       spacingPresetLoose: '很寬鬆',
@@ -1214,6 +1222,9 @@ const ja: ResourceTree = {
       indentDecrease: 'インデントを減らす',
       paragraphSpacing: '段落間隔',
       spacingPresetDefault: '既定',
+      spacingCompact: '詰める',
+      spacingRelaxed: '広め',
+      spacingLoose: 'さらに広く',
       spacingPresetCompact: '狭い',
       spacingPresetRelaxed: '広い',
       spacingPresetLoose: 'とても広い',
@@ -1577,6 +1588,9 @@ const fr: ResourceTree = {
       indentDecrease: 'Diminuer le retrait',
       paragraphSpacing: 'Interligne de paragraphe',
       spacingPresetDefault: 'Par défaut',
+      spacingCompact: 'Compact',
+      spacingRelaxed: 'Aéré',
+      spacingLoose: 'Très aéré',
       spacingPresetCompact: 'Compact',
       spacingPresetRelaxed: 'Large',
       spacingPresetLoose: 'Très large',
@@ -1941,6 +1955,9 @@ const de: ResourceTree = {
       indentDecrease: 'Einzug verkleinern',
       paragraphSpacing: 'Absatzabstand',
       spacingPresetDefault: 'Standard',
+      spacingCompact: 'Kompakt',
+      spacingRelaxed: 'Locker',
+      spacingLoose: 'Sehr locker',
       spacingPresetCompact: 'Kompakt',
       spacingPresetRelaxed: 'Weit',
       spacingPresetLoose: 'Sehr weit',
@@ -2307,6 +2324,9 @@ const it: ResourceTree = {
       indentDecrease: 'Riduci rientro',
       paragraphSpacing: 'Spaziatura paragrafo',
       spacingPresetDefault: 'Predefinita',
+      spacingCompact: 'Compatto',
+      spacingRelaxed: 'Ampio',
+      spacingLoose: 'Molto ampio',
       spacingPresetCompact: 'Compatta',
       spacingPresetRelaxed: 'Ampia',
       spacingPresetLoose: 'Molto ampia',
@@ -2673,6 +2693,9 @@ const es: ResourceTree = {
       indentDecrease: 'Reducir sangría',
       paragraphSpacing: 'Espaciado de párrafo',
       spacingPresetDefault: 'Predeterminado',
+      spacingCompact: 'Compacto',
+      spacingRelaxed: 'Amplio',
+      spacingLoose: 'Muy amplio',
       spacingPresetCompact: 'Compacto',
       spacingPresetRelaxed: 'Amplio',
       spacingPresetLoose: 'Muy amplio',
@@ -3037,6 +3060,9 @@ const pt: ResourceTree = {
       indentDecrease: 'Reduzir avanço',
       paragraphSpacing: 'Espaçamento do parágrafo',
       spacingPresetDefault: 'Predefinido',
+      spacingCompact: 'Compacto',
+      spacingRelaxed: 'Amplo',
+      spacingLoose: 'Muito amplo',
       spacingPresetCompact: 'Compacto',
       spacingPresetRelaxed: 'Amplo',
       spacingPresetLoose: 'Muito amplo',
@@ -3501,23 +3527,34 @@ const shapeStrings: Record<string, StringTree> = {
   },
 };
 
-/** Merge the shape block into one language tree (shallow: only `tools.richText` gains keys) */
-function withShapeStrings(tree: ResourceTree, extra: StringTree | undefined): ResourceTree {
-  if (!extra) return tree;
-  return { tools: { richText: { ...tree.tools.richText, ...extra } } };
+/** 增量文案块（语言 id → `tools.richText` 下的补充键）；新增小功能时往这里加一块即可 */
+const EXTRA_STRINGS: Record<string, StringTree>[] = [shapeStrings, charFormatStrings];
+
+/**
+ * Merge every incremental block into one language tree (shallow: only `tools.richText` gains keys).
+ * 主语言块保持原样，补充键按语言 id 依次覆盖合并 —— 新增几个键不必改 9 个正文块。
+ */
+function withExtras(tree: ResourceTree, lng: string, shape: StringTree | undefined): ResourceTree {
+  let merged: StringTree = { ...tree.tools.richText };
+  if (shape) merged = { ...merged, ...shape };
+  for (const block of EXTRA_STRINGS) {
+    const extra = block[lng];
+    if (extra) merged = { ...merged, ...extra };
+  }
+  return { tools: { richText: merged } };
 }
 
 /** Language code → resource tree, keys aligned with `Lang` */
 export const richTextStrings: Record<string, ResourceTree> = {
-  zh: withShapeStrings(zh, shapeStrings.zh),
-  en: withShapeStrings(en, shapeStrings.en),
-  'zh-TW': withShapeStrings(zhTW, shapeStrings['zh-TW']),
-  ja: withShapeStrings(ja, shapeStrings.ja),
-  fr: withShapeStrings(fr, shapeStrings.fr),
-  de: withShapeStrings(de, shapeStrings.de),
-  it: withShapeStrings(it, shapeStrings.it),
-  es: withShapeStrings(es, shapeStrings.es),
-  pt: withShapeStrings(pt, shapeStrings.pt),
+  zh: withExtras(zh, 'zh', shapeStrings.zh),
+  en: withExtras(en, 'en', shapeStrings.en),
+  'zh-TW': withExtras(zhTW, 'zh-TW', shapeStrings['zh-TW']),
+  ja: withExtras(ja, 'ja', shapeStrings.ja),
+  fr: withExtras(fr, 'fr', shapeStrings.fr),
+  de: withExtras(de, 'de', shapeStrings.de),
+  it: withExtras(it, 'it', shapeStrings.it),
+  es: withExtras(es, 'es', shapeStrings.es),
+  pt: withExtras(pt, 'pt', shapeStrings.pt),
 };
 
 /** Merge this tool's strings into i18next (called on lazy load, key path tools.richText.*) */

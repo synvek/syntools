@@ -39,6 +39,12 @@ interface StyleAttrs {
   textIndent?: number | null;
   spacingBefore?: number | null;
   spacingAfter?: number | null;
+  /** 左缩进（px）：Word 的 `w:ind/@w:left` */
+  indentLeft?: number | null;
+  /** 右缩进（px）：Word 的 `w:ind/@w:right` */
+  indentRight?: number | null;
+  /** 悬挂缩进（px）：显示为负 text-indent，配合左缩进即 Word 的 hanging */
+  hangingIndent?: number | null;
   width?: number | null;
   align?: string | null;
   /** Image layer: inline / front (in front of text) / behind (behind text) */
@@ -68,8 +74,32 @@ const ParagraphStyle = Extension.create({
           textIndent: {
             default: null,
             parseHTML: (el: HTMLElement) => readPx(el.style.textIndent),
+            // 悬挂缩进也用 text-indent 表达（负值），两者不能同时写，否则后者会覆盖前者
             renderHTML: (attrs: StyleAttrs) =>
-              attrs.textIndent ? { style: `text-indent: ${attrs.textIndent}px` } : {},
+              attrs.textIndent && !attrs.hangingIndent
+                ? { style: `text-indent: ${attrs.textIndent}px` }
+                : {},
+          },
+          indentLeft: {
+            default: null,
+            parseHTML: (el: HTMLElement) => readPx(el.style.marginLeft),
+            renderHTML: (attrs: StyleAttrs) =>
+              attrs.indentLeft ? { style: `margin-left: ${attrs.indentLeft}px` } : {},
+          },
+          indentRight: {
+            default: null,
+            parseHTML: (el: HTMLElement) => readPx(el.style.marginRight),
+            renderHTML: (attrs: StyleAttrs) =>
+              attrs.indentRight ? { style: `margin-right: ${attrs.indentRight}px` } : {},
+          },
+          hangingIndent: {
+            default: null,
+            parseHTML: (el: HTMLElement) => {
+              const parsed = readPx(el.style.textIndent);
+              return typeof parsed === 'number' && parsed < 0 ? Math.abs(parsed) : null;
+            },
+            renderHTML: (attrs: StyleAttrs) =>
+              attrs.hangingIndent ? { style: `text-indent: -${attrs.hangingIndent}px` } : {},
           },
           spacingBefore: {
             default: null,
@@ -225,6 +255,15 @@ declare module '@tiptap/core' {
       indentParagraph: (delta: number) => ReturnType;
       /** Set space before/after (px; 0 restores the default) */
       setParagraphSpacing: (before: number, after: number) => ReturnType;
+      /**
+       * 左/右/悬挂缩进（px，null 清除）。只更新传入的字段，
+       * 这样"加悬挂"不会把用户手调过的左缩进清掉。
+       */
+      setParagraphIndent: (patch: {
+        left?: number | null;
+        right?: number | null;
+        hanging?: number | null;
+      }) => ReturnType;
     };
     imageStyle: {
       /** Set image width (px; null = natural size) and alignment */
@@ -273,6 +312,26 @@ export const BlockStyleCommands = Extension.create({
             ...node.attrs,
             spacingBefore: before || null,
             spacingAfter: after || null,
+          });
+          return true;
+        },
+      setParagraphIndent:
+        (patch) =>
+        ({ state, tr }) => {
+          const { $from } = state.selection;
+          const node = $from.parent;
+          if (node.type.name !== 'paragraph') return false;
+          // 上限 480px：再大就把正文挤没了，Word 默认页边距也放不下
+          const normalize = (value: number | null | undefined): number | null => {
+            if (value === null || value === undefined) return null;
+            const rounded = Math.max(0, Math.min(480, Math.round(value)));
+            return rounded || null;
+          };
+          tr.setNodeMarkup($from.before(), undefined, {
+            ...node.attrs,
+            ...('left' in patch ? { indentLeft: normalize(patch.left) } : {}),
+            ...('right' in patch ? { indentRight: normalize(patch.right) } : {}),
+            ...('hanging' in patch ? { hangingIndent: normalize(patch.hanging) } : {}),
           });
           return true;
         },

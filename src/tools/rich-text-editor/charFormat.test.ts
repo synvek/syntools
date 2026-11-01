@@ -78,4 +78,24 @@ describe('charFormat commands', () => {
     editor.commands.setTextTransform(null);
     expect(editor.getHTML()).not.toContain('text-transform');
   });
+
+  it('toggles small caps (font-variant, not text-transform)', () => {
+    const editor = createEditor('<p>abc</p>');
+    editor.commands.selectAll();
+    editor.commands.toggleSmallCaps();
+    expect(editor.getHTML()).toContain('font-variant: small-caps');
+    expect(editor.isActive('smallCaps')).toBe(true);
+    editor.commands.toggleSmallCaps();
+    expect(editor.getHTML()).not.toContain('font-variant');
+  });
+
+  it('parses small caps back from html and keeps it independent from all caps', () => {
+    const editor = createEditor('<p><span style="font-variant: small-caps">abc</span></p>');
+    editor.commands.selectAll();
+    expect(editor.isActive('smallCaps')).toBe(true);
+    editor.commands.setTextTransform('uppercase');
+    // text-transform 与 font-variant 是两个独立开关，加上大写不应清掉小型大写
+    expect(editor.isActive('smallCaps')).toBe(true);
+    expect(editor.isActive('textTransform')).toBe(true);
+  });
 });

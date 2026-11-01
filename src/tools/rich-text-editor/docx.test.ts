@@ -804,3 +804,40 @@ describe('docx export: comment ranges', () => {
     expect(ends).toBe(1);
   });
 });
+
+describe('docx export: character layout (RTE-05)', () => {
+  it('writes small caps as w:smallCaps', async () => {
+    const result = await exportDocxBlob(
+      '<p><span style="font-variant: small-caps">abc</span></p>',
+      'small-caps',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('<w:smallCaps/>');
+  });
+
+  it('writes left indent and hanging indent into w:ind', async () => {
+    const result = await exportDocxBlob(
+      '<p style="margin-left: 48px; text-indent: -24px">段落</p>',
+      'indent',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    // px → twip 是 ×15：48px → 720，24px → 360
+    expect(xml).toContain('w:left="720"');
+    expect(xml).toContain('w:hanging="360"');
+    // 悬挂缩进不能同时写成 firstLine（OOXML 里二者互斥）
+    expect(xml).not.toContain('w:firstLine');
+  });
+
+  it('keeps a positive text-indent as firstLine', async () => {
+    const result = await exportDocxBlob('<p style="text-indent: 32px">缩进</p>', 'first-line');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('w:firstLine="480"');
+    expect(xml).not.toContain('w:hanging');
+  });
+});

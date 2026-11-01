@@ -383,6 +383,9 @@ export function EditorToolbar({
         subscript: e.isActive('subscript'),
         letterSpacing: String(e.getAttributes('letterSpacing').px ?? ''),
         textTransform: String(e.getAttributes('textTransform').transform ?? ''),
+        smallCaps: e.isActive('smallCaps'),
+        indentLeft: Number(e.getAttributes('paragraph').indentLeft ?? 0),
+        hangingIndent: Number(e.getAttributes('paragraph').hangingIndent ?? 0),
         bulletList: e.isActive('bulletList'),
         orderedList: e.isActive('orderedList'),
         taskList: e.isActive('taskList'),
@@ -626,6 +629,15 @@ export function EditorToolbar({
           >
             <span>
               x<sub>2</sub>
+            </span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.smallCaps')}
+            active={state.smallCaps}
+            onClick={() => chain().toggleSmallCaps().run()}
+          >
+            <span>
+              A<small>a</small>
             </span>
           </ToolButton>
           <ToolButton
@@ -908,6 +920,43 @@ export function EditorToolbar({
             onClick={() => chain().indentParagraph(24).run()}
           >
             <span className="text-xs font-semibold leading-none">&#8677;</span>
+          </ToolButton>
+          {/* 左缩进 / 悬挂缩进（Word 的 ind.left 与 ind.hanging），与首行缩进分开各占两个按钮 */}
+          <ToolButton
+            label={t('tools.richText.indentLeftDecrease')}
+            disabled={state.indentLeft <= 0}
+            onClick={() =>
+              chain()
+                .setParagraphIndent({ left: state.indentLeft - 24 })
+                .run()
+            }
+          >
+            <span className="text-[11px] font-semibold leading-none">⇤</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.indentLeftIncrease')}
+            onClick={() =>
+              chain()
+                .setParagraphIndent({ left: state.indentLeft + 24 })
+                .run()
+            }
+          >
+            <span className="text-[11px] font-semibold leading-none">⇥</span>
+          </ToolButton>
+          <ToolButton
+            label={t('tools.richText.hangingIndent')}
+            active={state.hangingIndent > 0}
+            onClick={() =>
+              chain()
+                .setParagraphIndent({
+                  hanging: state.hangingIndent > 0 ? null : 24,
+                  // 悬挂缩进必须有左缩进做参照，否则负的 text-indent 会把首行顶到页边距外
+                  left: state.hangingIndent > 0 ? state.indentLeft : Math.max(24, state.indentLeft),
+                })
+                .run()
+            }
+          >
+            <span className="text-[11px] font-semibold leading-none">↩︎</span>
           </ToolButton>
           <ToolbarSelect
             label={t('tools.richText.paragraphSpacing')}

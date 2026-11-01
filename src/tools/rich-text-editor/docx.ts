@@ -159,6 +159,8 @@ interface Mark {
   characterSpacing?: number;
   /** uppercase -> w:caps */
   allCaps?: boolean;
+  /** 小型大写 -> w:smallCaps */
+  smallCaps?: boolean;
   /** lowercase / capitalize have no Word run equivalent and are baked into the text */
   textTransform?: 'lowercase' | 'capitalize';
 }
@@ -224,6 +226,8 @@ function mergeMark(parent: Mark, el: Element): Mark {
     // Word measures letter spacing in twips (1/20 pt); 1px = 0.75pt = 15 twips
     next.characterSpacing = Math.round(spacingPx * 15);
   }
+  // 小型大写：CSS 走 font-variant，Word 走独立的 w:smallCaps，与 allCaps 互不覆盖
+  if (style?.fontVariant?.includes('small-caps')) next.smallCaps = true;
   const transform = style?.textTransform;
   if (transform === 'uppercase') next.allCaps = true;
   else if (transform === 'lowercase' || transform === 'capitalize') next.textTransform = transform;
@@ -368,6 +372,24 @@ function hyperlinkMark(mark: Mark): Mark {
 }
 
 /**
+ * `w:ind` 的子属性。首行缩进与悬挂缩进在 OOXML 里互斥（firstLine / hanging），
+ * 这里只写真正用到的项：全 0 时返回 undefined，避免每段都生成一串 0 值属性。
+ */
+function paragraphIndent(
+  firstLine: number,
+  left: number,
+  right: number,
+  hanging: number,
+): { firstLine?: number; left?: number; right?: number; hanging?: number } | undefined {
+  const indent: { firstLine?: number; left?: number; right?: number; hanging?: number } = {};
+  if (firstLine > 0) indent.firstLine = firstLine;
+  if (left > 0) indent.left = left;
+  if (right > 0) indent.right = right;
+  if (hanging > 0) indent.hanging = hanging;
+  return Object.keys(indent).length > 0 ? indent : undefined;
+}
+
+/**
  * Word has no run property for lowercase / capitalize, so the text itself is transformed.
  * `capitalize` follows CSS semantics: the first letter of each whitespace-separated word.
  */
@@ -403,6 +425,7 @@ function createTextRun(
     subScript: mark.subscript,
     characterSpacing: mark.characterSpacing,
     allCaps: mark.allCaps,
+    smallCaps: mark.smallCaps,
   };
   if (!tracked) return new D.TextRun(options);
   const revision = {
@@ -888,8 +911,17 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
     }
     // Paragraph layout: first-line indent and space before/after (inline styles are px, converted to twip)
     const style = (el as HTMLElement).style;
-    const textIndent = style?.textIndent
+    // 负的 text-indent 是悬挂缩进（浏览器与 Word 一致），要拆成 ind.hanging 而不是 firstLine
+    const rawTextIndent = style?.textIndent
       ? Math.round(Number.parseFloat(style.textIndent) * PX_TO_TWIP)
+      : 0;
+    const hangingIndent = rawTextIndent < 0 ? Math.abs(rawTextIndent) : 0;
+    const textIndent = rawTextIndent > 0 ? rawTextIndent : 0;
+    const indentLeft = style?.marginLeft
+      ? Math.max(0, Math.round(Number.parseFloat(style.marginLeft) * PX_TO_TWIP))
+      : 0;
+    const indentRight = style?.marginRight
+      ? Math.max(0, Math.round(Number.parseFloat(style.marginRight) * PX_TO_TWIP))
       : 0;
     // Keep the existing default spacing (120 twip) when no inline style is set
     const spaceBefore = style?.marginTop
@@ -903,7 +935,9 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       children: blockChildren(ctx, el),
       alignment: alignmentType(D, blockAlignment(el)),
       heading: heading ? headingLevel(D, heading) : undefined,
-      indent: textIndent > 0 ? { firstLine: textIndent } : undefined,
+      // 左右缩进与悬挂缩进都是 Word 的 `w:ind`；只写实际用到的子属性，
+      // 否则 docx 库会给每段都生成一堆 0 值属性
+      indent: paragraphIndent(textIndent, indentLeft, indentRight, hangingIndent),
       spacing: {
         before: Math.max(0, spaceBefore),
         after: Math.max(0, spaceAfter),

@@ -35,6 +35,8 @@ declare module '@tiptap/core' {
       setLetterSpacing: (px: number | null) => ReturnType;
       /** Set text-transform; null removes it */
       setTextTransform: (transform: TextTransformValue | null) => ReturnType;
+      /** Toggle small caps (docx `w:smallCaps`) */
+      toggleSmallCaps: () => ReturnType;
     };
   }
 }
@@ -167,5 +169,50 @@ export const TextTransform = Mark.create<{ transform: string | null }>({
   },
 });
 
+/**
+ * 小型大写（Word 的"小型大写字母"，docx `w:smallCaps`）。
+ *
+ * 与 TextTransform 分开而不是并进 `text-transform`：CSS 没有 small-caps 的 text-transform 值，
+ * 浏览器里靠 `font-variant` 才有等效效果，而两者在 Word 里也是彼此独立的两个开关。
+ */
+export const SmallCaps = Mark.create({
+  name: 'smallCaps',
+  parseHTML() {
+    return [
+      {
+        tag: 'span[style*="font-variant"]',
+        getAttrs: (el) => ((el as HTMLElement).style.fontVariant ? null : false),
+      },
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(
+        { class: 'rte-small-caps', style: 'font-variant: small-caps' },
+        HTMLAttributes,
+      ),
+      0,
+    ];
+  },
+  addKeyboardShortcuts() {
+    return { 'Mod-Shift-K': () => this.editor.commands.toggleSmallCaps() };
+  },
+  addCommands() {
+    return {
+      toggleSmallCaps:
+        () =>
+        ({ commands }) =>
+          commands.toggleMark(this.name),
+    };
+  },
+});
+
 /** Marks registered by the rich-text extension set (order matters only for serialization clarity) */
-export const charFormatExtensions = [Superscript, Subscript, LetterSpacing, TextTransform];
+export const charFormatExtensions = [
+  Superscript,
+  Subscript,
+  LetterSpacing,
+  TextTransform,
+  SmallCaps,
+];
