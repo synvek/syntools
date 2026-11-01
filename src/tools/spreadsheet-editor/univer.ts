@@ -154,6 +154,11 @@ export interface UniverHandle {
   deleteSheet(id: string): void;
   /** Rename a sheet */
   renameSheet(id: string, name: string): void;
+  /**
+   * 切换可编辑状态（P2-S7.2 工作表保护）。Univer 只提供工作簿级权限点，
+   * 所以保护是按"当前活动表"映射到整本工作簿的只读开关。
+   */
+  setEditable(editable: boolean): void;
   /** Undo the last document mutation (Univer's own undo stack) */
   undo(): void;
   /** Redo the last undone mutation */
@@ -329,6 +334,18 @@ export function createUniverInstance(
     void univerAPI.executeCommand(RedoCommandId);
   };
 
+  /**
+   * 工作表保护 → 工作簿只读。Univer 的权限点是工作簿级的（`WorkbookEditablePermission`），
+   * 没有"单表只读"，所以这里按调用方传入的布尔值整体切换；读取/渲染不受影响。
+   */
+  const setEditable = (editable: boolean): void => {
+    try {
+      univerAPI.getActiveWorkbook()?.setEditable(editable);
+    } catch {
+      // 实例还没挂载完成时忽略：挂载完成后调用方会再同步一次
+    }
+  };
+
   const addSheet = (name?: string): void => {
     univerAPI.getActiveWorkbook()?.insertSheet(name);
   };
@@ -467,6 +484,7 @@ export function createUniverInstance(
     onMutation,
     undo,
     redo,
+    setEditable,
     addSheet,
     insertSheetWithValues,
     writeSheetValues,

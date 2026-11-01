@@ -26,6 +26,7 @@ import {
   buildExportFilename,
   buildPresentGrid,
   checkImportFile,
+  columnIndexToName,
   sanitizeFilename,
   summarizeWorkbook,
   type PresentGrid,
@@ -115,6 +116,17 @@ import {
 } from './print';
 import type { RawChartParts } from './rawChartParts';
 import { SheetTabs } from './SheetTabs';
+import { NameManagerPanel } from './ui/NameManagerPanel';
+import { ProtectDialog } from './ui/ProtectDialog';
+import { registerMetaStrings } from './metaStrings';
+import { sanitizeNamedRanges, type NamedRange } from './namedRanges';
+import {
+  createPasswordHash,
+  protectionFor,
+  setProtection,
+  type SheetProtectionFlags,
+  type SheetProtectionState,
+} from './sheetProtection';
 import './sheet.css';
 
 // Tool copy is registered lazily with this chunk so it does not weigh down the initial bundle
@@ -123,6 +135,7 @@ registerChartStrings(i18n);
 registerStoreStrings(i18n);
 registerPivotStrings(i18n);
 registerShapeStrings(i18n);
+registerMetaStrings(i18n);
 
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 /** 首版一个工作簿只保留一个透视表：多表会让"导出到哪张工作表"的语义含混 */
@@ -219,6 +232,21 @@ export default function SpreadsheetTool() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCell, setCommentCell] = useState<{ row: number; col: number } | null>(null);
   const [commentAuthor, setCommentAuthor] = useState('');
+  /** Named ranges (P2-S7.1): workbook/sheet metadata that neither Univer nor its formula engine knows */
+  const [namedRanges, setNamedRanges] = useState<NamedRange[]>([]);
+  const namedRangesRef = useRef<NamedRange[]>([]);
+  namedRangesRef.current = namedRanges;
+  const [namesOpen, setNamesOpen] = useState(false);
+  /** 打开名称面板时的选区（`A1:B2`），供"用选区填入"使用 */
+  const [selectionLabel, setSelectionLabel] = useState<string | null>(null);
+  /** Sheet protection (P2-S7.2): carried by the snapshot, enforced by switching Univer to read-only */
+  const [protection, setProtectionList] = useState<SheetProtectionState[]>([]);
+  const protectionRef = useRef<SheetProtectionState[]>([]);
+  protectionRef.current = protection;
+  const [protectOpen, setProtectOpen] = useState(false);
+  const [protectBusy, setProtectBusy] = useState(false);
+  /** Only adopt names/protection from the first restored snapshot (same rule as comments) */
+  const metaLoadedRef = useRef(false);
   /**
    * Persistence trigger: adding / moving / resizing / deleting a chart is not a Univer MUTATION, so
    * dirty tracking never sees it — persistence has to be requested explicitly. (Assigned once
@@ -388,6 +416,10 @@ export default function SpreadsheetTool() {
     if (rawPartsRef.current) next = { ...next, syntoolsRawParts: rawPartsRef.current };
     if (pivotConfigsRef.current.length) next = { ...next, syntoolsPivots: pivotConfigsRef.current };
     if (shapesRef.current.length) next = { ...next, syntoolsShapes: shapesRef.current };
+    // Names and protection are workbook/sheet metadata written into workbook.xml and sheetProtection
+    const names = sanitizeNamedRanges(namedRangesRef.current);
+    if (names.length) next = { ...next, namedRanges: names };
+    if (protectionRef.current.length) next = { ...next, syntoolsProtection: protectionRef.current };
     // Comment threads ride along in their own field (xlsx has no counterpart yet)
     next = withSheetComments(next, commentsRef.current);
     return withWorkbookExtras(next, extrasRef.current);
@@ -623,6 +655,15 @@ export default function SpreadsheetTool() {
           commentsRef.current = map;
           setSheetComments(map);
         }
+        if (!metaLoadedRef.current) {
+          metaLoadedRef.current = true;
+          const names = pending.namedRanges ?? [];
+          namedRangesRef.current = names;
+          setNamedRanges(names);
+          const protections = pending.syntoolsProtection ?? [];
+          protectionRef.current = protections;
+          setProtectionList(protections);
+        }
         if (pivotConfigsRef.current.length === 0) {
           const pivots = pending.syntoolsPivots ?? [];
           if (pivots.length > 0) {
@@ -642,6 +683,8 @@ export default function SpreadsheetTool() {
       });
       setSheets(handle.getSheets());
       setActiveSheetId(handle.getActiveSheetId());
+      // Re-apply the read-only switch after every rebuild (locale / theme rebuilds the instance)
+      handle.setEditable(protectionFor(protectionRef.current, handle.getActiveSheetId()) === null);
       const initial = handle.getSnapshot();
       setSummary(summarizeWorkbook(initial));
       applyChartData(initial, handle.getActiveSheetId());
@@ -702,6 +745,85 @@ export default function SpreadsheetTool() {
     setSheets(handle.getSheets());
     setActiveSheetId(handle.getActiveSheetId());
   }, []);
+
+  /**
+   * 名称改动立刻进快照：名称不是 Univer 的 mutation，脏标记看不到它，
+   * 所以必须显式请求持久化（与图表/形状同一条路径）。
+   */
+  const updateNames = useCallback((next: NamedRange[]) => {
+    namedRangesRef.current = next;
+    setNamedRanges(next);
+    scheduleSaveRef.current();
+  }, []);
+
+  /** 关面板时把"半成品"名称清掉：空名或引用识别不了的行导出后就是坏文件 */
+  const closeNames = useCallback(() => {
+    const cleaned = sanitizeNamedRanges(namedRangesRef.current);
+    if (cleaned.length !== namedRangesRef.current.length) updateNames(cleaned);
+    setNamesOpen(false);
+  }, [updateNames]);
+
+  /**
+   * 打开名称管理器：顺手把当前选区记成 `A1:B2`，供"用选区填入"按钮使用。
+   * 只在打开那一刻取一次 —— 面板是模态的，背后的选区不会变。
+   */
+  const openNames = useCallback(() => {
+    const range = handleRef.current?.getActiveRange();
+    if (!range) {
+      setSelectionLabel(null);
+    } else {
+      const from = `${columnIndexToName(range.startColumn)}${range.startRow + 1}`;
+      const to = `${columnIndexToName(range.endColumn)}${range.endRow + 1}`;
+      setSelectionLabel(from === to ? from : `${from}:${to}`);
+    }
+    setNamesOpen(true);
+  }, []);
+
+  /**
+   * 保护开关：开启时把该表切为只读（Univer 的 editable 权限），关闭时恢复。
+   * 密码只在开启那一刻算一次哈希，之后从快照原样导出（导出结果才是可复现的）。
+   */
+  const applyProtection = useCallback(
+    async (input: { enabled: boolean; flags: SheetProtectionFlags; password: string }) => {
+      const handle = handleRef.current;
+      const sheetId = handle?.getActiveSheetId();
+      if (!sheetId) return;
+      setProtectBusy(true);
+      try {
+        if (!input.enabled) {
+          const next = setProtection(protectionRef.current, sheetId, null);
+          protectionRef.current = next;
+          setProtectionList(next);
+          scheduleSaveRef.current();
+          setProtectOpen(false);
+          return;
+        }
+        const hash = await createPasswordHash(input.password);
+        const previous = protectionFor(protectionRef.current, sheetId);
+        const next = setProtection(protectionRef.current, sheetId, {
+          sheetId,
+          enabled: true,
+          flags: input.flags,
+          // 保留已有密码：只是改"允许的操作"时不该把密码丢掉
+          ...(hash ?? (previous?.password ? { password: previous.password } : {})),
+        });
+        protectionRef.current = next;
+        setProtectionList(next);
+        scheduleSaveRef.current();
+        setProtectOpen(false);
+      } finally {
+        setProtectBusy(false);
+      }
+    },
+    [],
+  );
+
+  /** 活动表受保护 → 整个工作簿切只读（Univer 只有工作簿级 editable 权限） */
+  useEffect(() => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    handle.setEditable(protectionFor(protection, activeSheetId) === null);
+  }, [protection, activeSheetId]);
 
   /** Charts visible on the active sheet (each chart is bound to one sheet) */
   const visibleCharts = useMemo(
@@ -775,6 +897,14 @@ export default function SpreadsheetTool() {
       const pivots = snapshot.syntoolsPivots ?? [];
       pivotConfigsRef.current = pivots;
       setPivotConfigs(pivots);
+      // Names / protection travel in the same snapshot; adopting them here keeps "打开文件" honest
+      const names = snapshot.namedRanges ?? [];
+      namedRangesRef.current = names;
+      setNamedRanges(names);
+      const protections = snapshot.syntoolsProtection ?? [];
+      protectionRef.current = protections;
+      setProtectionList(protections);
+      metaLoadedRef.current = true;
       applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
       refreshSummary();
       refreshSheets();
@@ -854,6 +984,18 @@ export default function SpreadsheetTool() {
   const handleDeleteSheet = (id: string) => {
     handleRef.current?.deleteSheet(id);
     refreshSheets();
+    // 该表的保护与局部名称随表一起消失：留着会让导出的 localSheetId 指向不存在的表
+    if (protectionRef.current.some((item) => item.sheetId === id)) {
+      const nextProtection = protectionRef.current.filter((item) => item.sheetId !== id);
+      protectionRef.current = nextProtection;
+      setProtectionList(nextProtection);
+    }
+    if (namedRangesRef.current.some((item) => item.sheetId === id)) {
+      const nextNames = namedRangesRef.current.filter((item) => item.sheetId !== id);
+      namedRangesRef.current = nextNames;
+      setNamedRanges(nextNames);
+    }
+    scheduleSaveRef.current();
   };
 
   const handleDuplicateSheet = (id: string) => {
@@ -957,6 +1099,8 @@ export default function SpreadsheetTool() {
       : undefined;
 
     if (target) {
+      // 保护的意义就是拦住写入：目标表受保护时不要悄悄覆盖它
+      if (protectionFor(protectionRef.current, target.id)) return;
       const used = usedBlock(snapshot.sheets[target.id]);
       handle.writeSheetValues(target.id, matrix, used);
       handle.setActiveSheet(target.id);
@@ -1194,6 +1338,8 @@ export default function SpreadsheetTool() {
   );
 
   const activeSheet = sheets.find((sheet) => sheet.id === activeSheetId) ?? null;
+  /** Protection of the active sheet drives both the menu copy and the read-only switch */
+  const activeProtection = protectionFor(protection, activeSheetId);
   /**
    * A sheet holding only floating objects is still exportable: shapes and charts are written as
    * native `xdr:*` parts. Gating on cell count alone made such a workbook impossible to save.
@@ -1265,6 +1411,9 @@ export default function SpreadsheetTool() {
         editorMenuItem('insert-pivot', t('tools.sheet.insertPivot'), openPivot, {
           disabled: busy !== null,
         }),
+        editorMenuItem('insert-name', t('tools.sheet.namesTitle'), openNames, {
+          disabled: busy !== null,
+        }),
         { type: 'separator' },
         editorMenuItem('insert-sheet', t('tools.sheet.addSheet'), handleAddSheet, {
           disabled: busy !== null,
@@ -1301,6 +1450,12 @@ export default function SpreadsheetTool() {
       label: t('common.menuView'),
       entries: [
         editorMenuItem('view-comments', t('tools.sheet.comments'), openComments),
+        editorMenuItem(
+          'view-protect',
+          activeProtection ? t('tools.sheet.protectMenuOff') : t('tools.sheet.protectMenuOn'),
+          () => setProtectOpen(true),
+          { disabled: busy !== null || !activeSheetId },
+        ),
         { type: 'separator' },
         editorMenuItem('view-present', t('tools.sheet.present'), () => setPresenting(true), {
           disabled: summary.cells === 0,
@@ -1327,6 +1482,17 @@ export default function SpreadsheetTool() {
         ariaLabel={t('common.menuBar')}
         actions={
           <>
+            {activeProtection ? (
+              <span
+                role="status"
+                data-testid="sheet-protected-badge"
+                title={t('tools.sheet.protectLockedNotice')}
+                aria-label={t('tools.sheet.protectLockedNotice')}
+                className="inline-flex h-7 items-center justify-center rounded-md bg-amber-50 px-1.5 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+              >
+                <Icon name="lock" className="h-3.5 w-3.5" />
+              </span>
+            ) : null}
             <span
               role="status"
               title={statusText}
@@ -1569,6 +1735,27 @@ export default function SpreadsheetTool() {
           onDeleteThread={deleteSheetComment}
           onUseCurrentCell={() => setCommentCell(commentAnchor())}
           onClose={() => setCommentsOpen(false)}
+        />
+      ) : null}
+
+      {namesOpen ? (
+        <NameManagerPanel
+          names={namedRanges}
+          sheets={sheets.map((sheet) => ({ id: sheet.id, name: sheet.name }))}
+          activeSheetId={activeSheetId}
+          selectionRef={selectionLabel}
+          onChange={updateNames}
+          onClose={closeNames}
+        />
+      ) : null}
+
+      {protectOpen ? (
+        <ProtectDialog
+          sheetName={activeSheet?.name ?? ''}
+          state={activeProtection}
+          busy={protectBusy}
+          onApply={(input) => void applyProtection(input)}
+          onClose={() => setProtectOpen(false)}
         />
       ) : null}
 

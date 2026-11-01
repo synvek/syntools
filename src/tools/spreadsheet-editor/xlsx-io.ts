@@ -44,6 +44,13 @@ import { collectEditorValidation } from './cfdv';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
 import { buildShapePlan, collectSheetShapes, injectShapesIntoXlsx } from './shapesXml';
 import type { SheetShapeConfig } from './shapes';
+import { injectNamedRanges, readNamedRangesFromXlsx, type NamedRange } from './namedRanges';
+import {
+  applySheetProtection,
+  readSheetProtection,
+  type SheetProtectionState,
+  type WorksheetProtectionLike,
+} from './sheetProtection';
 
 /**
  * xlsx adapter layer: exceljs is always dynamically imported so it stays out of the initial bundle
@@ -139,6 +146,16 @@ export interface WorkbookSnapshot extends SnapshotWithExtras {
    * the editor (conditional formatting, data validation). Converted to OOXML on export by `cfdv.ts`.
    */
   resources?: Record<string, unknown>;
+  /**
+   * Workbook-scoped / sheet-scoped names (P2-S7.1). Written as `<definedNames>` in workbook.xml;
+   * kept outside Univer because neither the model nor the formula engine knows about names.
+   */
+  namedRanges?: NamedRange[];
+  /**
+   * Sheet protection (P2-S7.2). Written as `<sheetProtection>` on export and read back on import;
+   * the editor also uses it to switch the sheet to read-only.
+   */
+  syntoolsProtection?: SheetProtectionState[];
 }
 
 export function createEmptySheet(id: string, name: string): SheetSnapshot {
@@ -362,6 +379,8 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
     const sheets: Record<string, SheetSnapshot> = {};
     const sheetOrder: string[] = [];
     const sheetExtras: Record<string, SheetExtras> = {};
+    // Sheet protection (P2-S7.2): read per sheet below, restored on export and used for the read-only switch
+    const protections: SheetProtectionState[] = [];
 
     workbook.eachSheet((worksheet, sheetId) => {
       const id = String(sheetId);
@@ -395,6 +414,9 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
       const extras = collectSheetExtras(worksheet as unknown as WorksheetExtrasLike);
       if (extras) sheetExtras[name] = extras;
 
+      const protection = readSheetProtection(worksheet as unknown as WorksheetProtectionLike);
+      if (protection) protections.push({ ...protection, sheetId: id });
+
       sheets[id] = sheet;
       sheetOrder.push(id);
     });
@@ -416,6 +438,9 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
       }
     }
 
+    // Names live in workbook.xml (exceljs drops `localSheetId`, so they are read from the raw part)
+    const namedRanges = await readNamedRangesFromXlsx(normalized, sheetOrder, sheets);
+
     return {
       ok: true,
       value: {
@@ -431,6 +456,8 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
           : {}),
         ...(rawParts ? { syntoolsRawParts: rawParts } : {}),
         ...(importedShapes.length > 0 ? { syntoolsShapes: importedShapes } : {}),
+        ...(namedRanges.length > 0 ? { namedRanges } : {}),
+        ...(protections.length > 0 ? { syntoolsProtection: protections } : {}),
       },
     };
   } catch {
@@ -467,6 +494,13 @@ export async function exportSnapshotToBytes(
       worksheet.state = hiddenToWorksheetState(sheet.hidden);
       const tabArgb = hexToArgb(sheet.tabColor);
       if (tabArgb) worksheet.properties.tabColor = { argb: tabArgb };
+
+      // Protection (P2-S7.2): written straight into the exceljs sheet model, so the OOXML element
+      // lands in the required position (after sheetData, before autoFilter)
+      applySheetProtection(
+        worksheet as unknown as { sheetProtection?: unknown },
+        snapshot.syntoolsProtection?.find((item) => item.sheetId === sheetId) ?? null,
+      );
 
       const sheetExtras = extras?.sheets?.[sheetName];
       if (sheetExtras) applySheetExtras(worksheet as unknown as WorksheetExtrasLike, sheetExtras);
@@ -583,10 +617,17 @@ export async function exportSnapshotToBytes(
 
     // Pivots: value sheets plus native pivotTable/pivotCache parts, so Excel can still refresh them
     const pivotPlan = buildPivotXlsxPlan(snapshot);
-    const bytes =
+    const withPivots =
       pivotPlan.items.length > 0
         ? await injectPivotTablesIntoXlsx(withShapes, pivotPlan)
         : withShapes;
+
+    // Names (P2-S7.1): exceljs cannot express sheet-scoped names, so workbook.xml is patched here
+    const namedRanges = snapshot.namedRanges ?? [];
+    const bytes =
+      namedRanges.length > 0
+        ? await injectNamedRanges(withPivots, namedRanges, snapshot.sheetOrder, snapshot.sheets)
+        : withPivots;
     return { ok: true, value: new Uint8Array(bytes) };
   } catch {
     return { ok: false, error: 'EXPORT_FAILED' };
