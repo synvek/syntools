@@ -29,6 +29,12 @@ import {
   togglePathNodeSmooth,
 } from '../../core/drawing/custGeom';
 import { migrateDoc } from './model/migrate';
+import {
+  normalizeSections,
+  removeSection as removeSectionAt,
+  renameSection as renameSectionIn,
+  splitSectionAt,
+} from './model/sections';
 import { replaceInDoc, type FindOptions, type TextHit } from './model/search';
 import { applyStyleSnapshot, extractStyleSnapshot, type StyleSnapshot } from './model/style';
 import { findTemplate, instantiateTemplate } from './model/templates';
@@ -158,6 +164,11 @@ interface SlideState {
   updateSlide: (
     patch: Partial<Pick<Slide, 'background' | 'layoutId' | 'notes' | 'transition' | 'animations'>>,
   ) => void;
+  /** Sections (P2-S6): start a new section at this slide (no-op for the first slide or an existing boundary) */
+  splitSection: (index: number, name: string) => void;
+  renameSection: (id: string, name: string) => void;
+  /** Delete a section: its slides join the previous one; the last pair collapses back to a flat deck */
+  removeSection: (id: string) => void;
 
   select: (ids: string[], additive?: boolean) => void;
   addElement: (element: SlideElement) => void;
@@ -626,7 +637,13 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       if (s.doc.slides.length <= 1) return s;
       const slides = s.doc.slides.filter((_, i) => i !== index);
       return {
-        doc: { ...s.doc, slides, version: s.doc.version + 1 },
+        doc: {
+          ...s.doc,
+          slides,
+          // Deleting a section's first slide must not leave a boundary pointing at a missing slide
+          sections: normalizeSections(s.doc.sections, slides),
+          version: s.doc.version + 1,
+        },
         slideIndex: Math.min(index, slides.length - 1),
         selection: [],
       };
@@ -656,6 +673,39 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       );
       return { doc: { ...s.doc, slides, version: s.doc.version + 1 } };
     });
+  },
+
+  splitSection: (index, name) => {
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        sections: splitSectionAt(s.doc.sections, s.doc.slides, index, name),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  renameSection: (id, name) => {
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        sections: renameSectionIn(s.doc.sections, id, name),
+        version: s.doc.version + 1,
+      },
+    }));
+  },
+
+  removeSection: (id) => {
+    get().commit();
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        sections: removeSectionAt(s.doc.sections, s.doc.slides, id),
+        version: s.doc.version + 1,
+      },
+    }));
   },
 
   select: (ids, additive = false) =>

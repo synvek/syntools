@@ -213,6 +213,11 @@ const zh: ResourceTree = {
       addSlide: '新建幻灯片',
       duplicate: '复制此页',
       deleteSlide: '删除此页',
+      section: '节',
+      newSectionFromHere: '从此页新建节',
+      sectionDefaultName: '节 {{index}}',
+      renameSection: '重命名节',
+      deleteSection: '删除节',
       moveUp: '上移',
       moveDown: '下移',
       insertLabel: '插入',
@@ -310,7 +315,7 @@ const zh: ResourceTree = {
       commentUnresolved: '{{count}} 条未解决批注',
       commentLoss: '{{count}} 条批注未写入 PPTX，仅保存在本工具文档中',
       motionLoss: '{{count}} 处切换/动画未能还原（仅支持淡出/推入切换与淡入/飞入入场）',
-      motionChannelLoss: '{{count}} 个原生图表/公式因动画改用兼容通道，已转为占位框',
+      motionChannelLoss: '{{count}} 个原生图表/公式因动画或节改用兼容通道，已转为占位框',
       templateGallery: '模板画廊',
       templateAll: '全部',
       templateHint: '纯本地模板：一键替换主题配色、母版与版式，不联网、不上传内容',
@@ -611,6 +616,11 @@ const en: ResourceTree = {
       addSlide: 'New slide',
       duplicate: 'Duplicate slide',
       deleteSlide: 'Delete slide',
+      section: 'Section',
+      newSectionFromHere: 'New section from here',
+      sectionDefaultName: 'Section {{index}}',
+      renameSection: 'Rename section',
+      deleteSection: 'Delete section',
       moveUp: 'Move up',
       moveDown: 'Move down',
       insertLabel: 'Insert',
@@ -710,7 +720,7 @@ const en: ResourceTree = {
       motionLoss:
         '{{count}} transitions or animations could not be restored (only fade/push and fade-in/fly-in are supported)',
       motionChannelLoss:
-        '{{count}} native charts or equations became placeholder frames because animations force the compatibility channel',
+        '{{count}} native charts or equations became placeholder frames because animations or sections force the compatibility channel',
       templateGallery: 'Template gallery',
       templateAll: 'All',
       templateHint:
@@ -1010,6 +1020,11 @@ const zhTW: ResourceTree = {
       addSlide: '新增投影片',
       duplicate: '複製此頁',
       deleteSlide: '刪除此頁',
+      section: '節',
+      newSectionFromHere: '從此頁新增節',
+      sectionDefaultName: '節 {{index}}',
+      renameSection: '重新命名節',
+      deleteSection: '刪除節',
       moveUp: '上移',
       moveDown: '下移',
       insertLabel: '插入',
@@ -1107,7 +1122,7 @@ const zhTW: ResourceTree = {
       commentUnresolved: '{{count}} 則未解決註解',
       commentLoss: '{{count}} 則註解未寫入 PPTX，僅保存在本工具文件中',
       motionLoss: '{{count}} 處切換/動畫未能還原（僅支援淡出/推入切換與淡入/飛入入場）',
-      motionChannelLoss: '{{count}} 個原生圖表/公式因動畫改用相容通道，已轉為預留位置',
+      motionChannelLoss: '{{count}} 個原生圖表/公式因動畫或節改用相容通道，已轉為預留位置',
       templateGallery: '範本庫',
       templateAll: '全部',
       templateHint: '純本機範本：一鍵替換主題配色、母片與版面配置，不連線、不上傳內容',
@@ -1409,6 +1424,11 @@ const ja: ResourceTree = {
       addSlide: 'スライドを追加',
       duplicate: 'このスライドを複製',
       deleteSlide: 'このスライドを削除',
+      section: 'セクション',
+      newSectionFromHere: 'このスライドからセクションを作成',
+      sectionDefaultName: 'セクション {{index}}',
+      renameSection: 'セクション名を変更',
+      deleteSection: 'セクションを削除',
       moveUp: '上へ移動',
       moveDown: '下へ移動',
       insertLabel: '挿入',
@@ -1509,7 +1529,7 @@ const ja: ResourceTree = {
       motionLoss:
         '{{count}} 件の画面切り替え/アニメーションを再現できませんでした（フェード/プッシュ、フェードイン/フライインのみ対応）',
       motionChannelLoss:
-        '{{count}} 件のネイティブグラフ/数式は、アニメーションのために互換チャネルへ切り替えたためプレースホルダーになりました',
+        '{{count}} 件のネイティブグラフ/数式は、アニメーションまたはセクションのために互換チャネルへ切り替えたためプレースホルダーになりました',
       templateGallery: 'テンプレートギャラリー',
       templateAll: 'すべて',
       templateHint:
@@ -1816,6 +1836,11 @@ const fr: ResourceTree = {
       addSlide: 'Nouvelle diapositive',
       duplicate: 'Dupliquer la diapositive',
       deleteSlide: 'Supprimer la diapositive',
+      section: 'Section',
+      newSectionFromHere: "Nouvelle section à partir d'ici",
+      sectionDefaultName: 'Section {{index}}',
+      renameSection: 'Renommer la section',
+      deleteSection: 'Supprimer la section',
       moveUp: 'Monter',
       moveDown: 'Descendre',
       insertLabel: 'Insérer',
@@ -1917,7 +1942,7 @@ const fr: ResourceTree = {
       motionLoss:
         '{{count}} transitions ou animations n’ont pas pu être restaurées (seuls fondu/poussée et apparition/entrée animée sont pris en charge)',
       motionChannelLoss:
-        '{{count}} graphiques ou équations natifs sont devenus des espaces réservés : les animations imposent le canal de compatibilité',
+        '{{count}} graphiques ou équations natifs sont devenus des espaces réservés : les animations ou les sections imposent le canal de compatibilité',
       templateGallery: 'Galerie de modèles',
       templateAll: 'Tous',
       templateHint:
@@ -2222,6 +2247,11 @@ const de: ResourceTree = {
       addSlide: 'Neue Folie',
       duplicate: 'Folie duplizieren',
       deleteSlide: 'Folie löschen',
+      section: 'Abschnitt',
+      newSectionFromHere: 'Neuer Abschnitt ab hier',
+      sectionDefaultName: 'Abschnitt {{index}}',
+      renameSection: 'Abschnitt umbenennen',
+      deleteSection: 'Abschnitt löschen',
       moveUp: 'Nach oben',
       moveDown: 'Nach unten',
       insertLabel: 'Einfügen',
@@ -2323,7 +2353,7 @@ const de: ResourceTree = {
       motionLoss:
         '{{count}} Übergänge oder Animationen konnten nicht wiederhergestellt werden (unterstützt werden nur Überblenden/Schieben sowie Einblenden/Fliegen)',
       motionChannelLoss:
-        '{{count}} native Diagramme oder Formeln wurden zu Platzhaltern, weil Animationen den Kompatibilitätsweg erzwingen',
+        '{{count}} native Diagramme oder Formeln wurden zu Platzhaltern, weil Animationen oder Abschnitte den Kompatibilitätsweg erzwingen',
       templateGallery: 'Vorlagengalerie',
       templateAll: 'Alle',
       templateHint:
@@ -2628,6 +2658,11 @@ const it: ResourceTree = {
       addSlide: 'Nuova diapositiva',
       duplicate: 'Duplica diapositiva',
       deleteSlide: 'Elimina diapositiva',
+      section: 'Sezione',
+      newSectionFromHere: 'Nuova sezione da qui',
+      sectionDefaultName: 'Sezione {{index}}',
+      renameSection: 'Rinomina sezione',
+      deleteSection: 'Elimina sezione',
       moveUp: 'Sposta su',
       moveDown: 'Sposta giù',
       insertLabel: 'Inserisci',
@@ -2728,7 +2763,7 @@ const it: ResourceTree = {
       motionLoss:
         '{{count}} transizioni o animazioni non sono state ripristinate (sono supportate solo dissolvenza/scorrimento ed entrata in dissolvenza/volo)',
       motionChannelLoss:
-        '{{count}} grafici o formule nativi sono diventati segnaposto perché le animazioni impongono il canale di compatibilità',
+        '{{count}} grafici o formule nativi sono diventati segnaposto perché le animazioni o le sezioni impongono il canale di compatibilità',
       templateGallery: 'Galleria modelli',
       templateAll: 'Tutti',
       templateHint:
@@ -3033,6 +3068,11 @@ const es: ResourceTree = {
       addSlide: 'Nueva diapositiva',
       duplicate: 'Duplicar diapositiva',
       deleteSlide: 'Eliminar diapositiva',
+      section: 'Sección',
+      newSectionFromHere: 'Nueva sección desde aquí',
+      sectionDefaultName: 'Sección {{index}}',
+      renameSection: 'Cambiar nombre de sección',
+      deleteSection: 'Eliminar sección',
       moveUp: 'Subir',
       moveDown: 'Bajar',
       insertLabel: 'Insertar',
@@ -3133,7 +3173,7 @@ const es: ResourceTree = {
       motionLoss:
         '{{count}} transiciones o animaciones no se pudieron restaurar (solo se admiten fundido/empuje y aparición/entrada volando)',
       motionChannelLoss:
-        '{{count}} gráficos o fórmulas nativos se convirtieron en marcos de posición porque las animaciones obligan a usar el canal de compatibilidad',
+        '{{count}} gráficos o fórmulas nativos se convirtieron en marcos de posición porque las animaciones o las secciones obligan a usar el canal de compatibilidad',
       templateGallery: 'Galería de plantillas',
       templateAll: 'Todas',
       templateHint:
@@ -3437,6 +3477,11 @@ const pt: ResourceTree = {
       addSlide: 'Novo diapositivo',
       duplicate: 'Duplicar diapositivo',
       deleteSlide: 'Eliminar diapositivo',
+      section: 'Secção',
+      newSectionFromHere: 'Nova secção a partir daqui',
+      sectionDefaultName: 'Secção {{index}}',
+      renameSection: 'Renomear secção',
+      deleteSection: 'Eliminar secção',
       moveUp: 'Mover para cima',
       moveDown: 'Mover para baixo',
       insertLabel: 'Inserir',
@@ -3537,7 +3582,7 @@ const pt: ResourceTree = {
       motionLoss:
         '{{count}} transições ou animações não puderam ser restauradas (apenas fade/push e aparecer/voar são suportados)',
       motionChannelLoss:
-        '{{count}} gráficos ou fórmulas nativos viraram marcadores de posição porque as animações exigem o canal de compatibilidade',
+        '{{count}} gráficos ou fórmulas nativos viraram marcadores de posição porque as animações ou as secções exigem o canal de compatibilidade',
       templateGallery: 'Galeria de modelos',
       templateAll: 'Todos',
       templateHint:

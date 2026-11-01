@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDoc } from './factory';
+import { createDoc, createSlide } from './factory';
 import { CURRENT_SCHEMA_VERSION, migrateDoc } from './migrate';
 
 /** Schema upgrades: v3 adds document-level comment threads (P1-2) */
@@ -11,6 +11,23 @@ describe('migrateDoc', () => {
     const migrated = migrateDoc(legacy);
     expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.comments).toEqual([]);
+  });
+
+  it('adds an empty section list when reading a v4 document, dropping stale boundaries', () => {
+    const current = createDoc('sections');
+    expect(migrateDoc({ ...current, sections: undefined, schemaVersion: 4 }).sections).toEqual([]);
+
+    current.slides.push(createSlide(), createSlide());
+    const stale = {
+      ...current,
+      sections: [
+        { id: 'a', name: 'A', startSlideId: current.slides[0].id },
+        { id: 'b', name: 'B', startSlideId: 'deleted-slide' },
+        { id: 'c', name: 'C', startSlideId: current.slides[2].id },
+      ],
+      schemaVersion: 4,
+    };
+    expect(migrateDoc(stale).sections?.map((item) => item.name)).toEqual(['A', 'C']);
   });
 
   it('keeps existing threads and is idempotent', () => {

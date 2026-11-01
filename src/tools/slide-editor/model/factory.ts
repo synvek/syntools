@@ -33,7 +33,7 @@ export const DEFAULT_WIDTH = 1280;
 export const DEFAULT_HEIGHT = 720;
 
 /** Document schema version: kept in sync with `CURRENT_SCHEMA_VERSION` in `model/migrate.ts` */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** Page size preset id */
 export type PageSizeId = '16:9' | '16:10' | '4:3' | 'a4' | 'custom';
@@ -169,6 +169,8 @@ export function createDoc(name = 'presentation', sizeId: PageSizeId = '16:9'): S
     slides: [createSlide(layout.id)],
     media: {},
     comments: [],
+    // Empty = flat deck; the rail only groups once the user creates a second section (P2-S6)
+    sections: [],
     version: 1,
     schemaVersion: SCHEMA_VERSION,
   };

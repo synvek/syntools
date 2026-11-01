@@ -13,7 +13,7 @@ import type {
   SlideTransition,
   TextElement,
 } from '../model/types';
-import { exportPptx, hasSlideMotion, motionExportDegradations } from './export';
+import { exportPptx, hasSlideMotion, legacyChannelDegradations } from './export';
 import { importPptxFile } from './import';
 import { resetShapeIds, shapeIdOf, slideXml, timingXml, transitionXml } from './write';
 
@@ -281,9 +281,9 @@ describe('导出通道分派', () => {
     const chart = createChartElement(doc, 'bar');
     doc.slides[0].elements = [chart];
     // 没有动画时走 pptxgen，图表是原生对象 → 不报降级
-    expect(motionExportDegradations(doc)).toBe(0);
+    expect(legacyChannelDegradations(doc)).toBe(0);
     doc.slides[0].animations = [step(chart.id, 'fadeIn')];
-    expect(motionExportDegradations(doc)).toBe(1);
+    expect(legacyChannelDegradations(doc)).toBe(1);
   });
 
   it('携带动画的 pptx 仍能重新导入（timing 不影响读取）', async () => {

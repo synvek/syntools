@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
+import { sectionStartingAt } from '../model/sections';
 import { containerElements, useSlideStore } from '../store';
 
 /**
@@ -107,6 +108,8 @@ export function SlideContextMenu({
 
   const store = useSlideStore.getState;
   const targetIndex = target.slideIndex ?? slideIndex;
+  /** Section starting exactly at the target slide — the one "rename / delete section" acts on */
+  const sectionAtTarget = sectionStartingAt(doc.sections, doc.slides, targetIndex);
   const picked = elements.filter((element) => selection.includes(element.id));
   const hasSelection = picked.length > 0;
   const hit = target.elementId
@@ -319,6 +322,36 @@ export function SlideContextMenu({
             disabled={targetIndex >= doc.slides.length - 1}
             onClick={run(() => store().moveSlide(targetIndex, targetIndex + 1))}
           />
+
+          {/* Sections (P2-S6): a section is created by splitting at this slide, so the entry lives here */}
+          <Separator />
+          <Row
+            label={t('tools.slide.newSectionFromHere')}
+            disabled={targetIndex <= 0 || Boolean(sectionAtTarget)}
+            onClick={run(() =>
+              store().splitSection(
+                targetIndex,
+                t('tools.slide.sectionDefaultName', { index: (doc.sections?.length ?? 0) + 1 }),
+              ),
+            )}
+          />
+          {sectionAtTarget ? (
+            <>
+              <Row
+                label={t('tools.slide.renameSection')}
+                onClick={run(() => {
+                  const name = window.prompt(t('tools.slide.renameSection'), sectionAtTarget.name);
+                  if (name) store().renameSection(sectionAtTarget.id, name);
+                })}
+              />
+              <Row
+                label={t('tools.slide.deleteSection')}
+                danger
+                disabled={(doc.sections?.length ?? 0) <= 1}
+                onClick={run(() => store().removeSection(sectionAtTarget.id))}
+              />
+            </>
+          ) : null}
         </>
       ) : null}
     </div>

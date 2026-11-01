@@ -1,5 +1,6 @@
 import { pxToEmu } from '../../../core/drawing/geometry';
 import type { SlideDoc, SlideTheme } from '../model/types';
+import { sectionExtLstXml } from './sections';
 
 /**
  * Hand-written OOXML output (no new dependencies): the fixed skeleton of the pptx package lives here.
@@ -26,6 +27,9 @@ const XMLNS = {
   relationships: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
   packageRelationships: 'http://schemas.openxmlformats.org/package/2006/relationships',
   slideMaster: 'http://schemas.openxmlformats.org/drawingml/2006/main',
+  // Sections (P2-S6) need the 2010 extension namespace plus the compatibility marker
+  presentationml2010: 'http://schemas.microsoft.com/office/powerpoint/2010/main',
+  markupCompatibility: 'http://schemas.openxmlformats.org/markup-compatibility/2006',
 };
 
 export const SLIDE_MASTER_TYPE = `${APP}.slideMaster+xml`;
@@ -146,9 +150,16 @@ export function contentTypes(
 
 export function presentationXml(slideCount: number, doc: SlideDoc, masterCount = 1): string {
   const masters = Math.max(1, masterCount);
+  // One id per slide, shared by `p:sldIdLst` and the section list (they must reference the same ids)
+  const slideIds = Array.from({ length: slideCount }, (_, index) => 256 + index);
+  // Sections (P2-S6): `p:extLst` is the last child of `p:presentation`, so it goes after `p:notesSz`
+  const sectionExt = sectionExtLstXml(doc, slideIds);
+  const sectionNs = sectionExt
+    ? ` xmlns:mc="${XMLNS.markupCompatibility}" xmlns:p14="${XMLNS.presentationml2010}" mc:Ignorable="p14"`
+    : '';
   return [
     XML_DECLARATION,
-    `<p:presentation xmlns:a="${XMLNS.drawingml}" xmlns:r="${XMLNS.relationships}" xmlns:p="${XMLNS.presentationml}" saveSubsetFonts="true">`,
+    `<p:presentation xmlns:a="${XMLNS.drawingml}" xmlns:r="${XMLNS.relationships}" xmlns:p="${XMLNS.presentationml}"${sectionNs} saveSubsetFonts="true">`,
     '<p:sldMasterIdLst>',
     Array.from(
       { length: masters },
@@ -156,13 +167,11 @@ export function presentationXml(slideCount: number, doc: SlideDoc, masterCount =
     ).join(''),
     '</p:sldMasterIdLst>',
     '<p:sldIdLst>',
-    Array.from(
-      { length: slideCount },
-      (_, index) => `<p:sldId id="${256 + index}" r:id="rId${masters + 1 + index}"/>`,
-    ).join(''),
+    slideIds.map((id, index) => `<p:sldId id="${id}" r:id="rId${masters + 1 + index}"/>`).join(''),
     '</p:sldIdLst>',
     `<p:sldSz cx="${pxToEmu(doc.width)}" cy="${pxToEmu(doc.height)}"/>`,
     '<p:notesSz cx="6858000" cy="9144000"/>',
+    sectionExt,
     '</p:presentation>',
   ].join('');
 }

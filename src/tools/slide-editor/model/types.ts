@@ -480,11 +480,28 @@ export interface MediaAsset {
   url?: string;
 }
 
+/**
+ * Section (PowerPoint's `p14:sectionLst`): a named run of consecutive slides, identified by its
+ * first slide. The name is user-editable and exported as-is.
+ */
+export interface SlideSection {
+  id: string;
+  name: string;
+  /** First slide of the section; the section runs until the next section's start slide */
+  startSlideId: string;
+}
+
 export interface SlideDoc {
   id: string;
   name: string;
   /** Comment threads (P1-2); anchored to elements or page points, persisted with the document */
   comments?: CommentThread[];
+  /**
+   * Sections (P2-S6). Stored as **boundaries** — the section owns its `startSlideId` and everything
+   * up to the next section — because a boundary survives add / delete / reorder without bookkeeping,
+   * while an explicit id list would go stale on every structural edit.
+   */
+  sections?: SlideSection[];
   /** Slide size (px @96dpi) */
   width: number;
   height: number;

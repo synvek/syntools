@@ -45,7 +45,7 @@ import {
   createTextElement,
 } from './model/factory';
 import { checkImportFile, importPptxFile } from './pptx/import';
-import { exportPptx, motionExportDegradations } from './pptx/export';
+import { exportPptx, legacyChannelDegradations } from './pptx/export';
 import { registerSlideStrings } from './strings';
 import { containerElements, useSlideStore } from './store';
 import { countUnresolved } from '../../core/comments/model';
@@ -210,8 +210,8 @@ export default function SlideTool() {
         messageKey: 'tools.slide.commentLoss',
       });
     }
-    // 动画只能手写通道输出（pptxgenjs 不写 p:timing），而手写通道没有原生图表/公式
-    const degraded = motionExportDegradations(current);
+    // 动画（p:timing）与节（p14:sectionLst）只能手写通道输出，而手写通道没有原生图表/公式
+    const degraded = legacyChannelDegradations(current);
     if (degraded > 0) {
       exportIssues.push({
         code: 'slide.motionChannel',

@@ -33,6 +33,8 @@ import type {
   VAlign,
 } from '../model/types';
 import type { ImportReport } from '../store';
+import { DEFAULT_SECTION_NAME, hasSections } from '../model/sections';
+import { readSections, sectionsFromStarts } from './sections';
 import { parseSlideMotion } from './timingImport';
 import {
   parseGlow,
@@ -1318,10 +1320,17 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
   const presentationRels = await readRels(zip, 'ppt/presentation.xml');
   const sldIds = childrenNamed(childOf(presentationXml, 'sldIdLst'), 'sldId');
   const slideParts: string[] = [];
+  /** `p:sldId@id` → slide index, so the section list (`p14:sldId`) can be resolved to our slides */
+  const slideIndexById = new Map<number, number>();
   for (const sldId of sldIds) {
+    // `p:sldId` carries both a plain `id` (256+) and the relationship `r:id`: read the prefixed one explicitly
     const rId = attr(sldId, 'r:id');
     const rel = rId ? presentationRels.get(rId) : undefined;
-    if (rel) slideParts.push(normalizePartPath('ppt/presentation.xml', rel.target));
+    if (rel) {
+      const id = numAttr(sldId, 'id');
+      if (id !== undefined) slideIndexById.set(id, slideParts.length);
+      slideParts.push(normalizePartPath('ppt/presentation.xml', rel.target));
+    }
   }
   const slidePartNames = Object.keys(zip.files).filter((name) =>
     /^ppt\/slides\/slide\d+\.xml$/.test(name),
@@ -1418,6 +1427,15 @@ export async function importPptxFile(file: File): Promise<ToolResult<ImportedDec
   doc.layouts = [...layoutCache.values()];
   doc.masters = [...masterCache.values()];
   if (doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
+
+  // Sections (P2-S6): boundaries only, resolved against the slide ids we just assigned
+  const importedSections = sectionsFromStarts(
+    readSections(presentationXml, slideIndexById),
+    doc.slides,
+    createId,
+    DEFAULT_SECTION_NAME,
+  );
+  if (hasSections(importedSections)) doc.sections = importedSections;
 
   return {
     ok: true,

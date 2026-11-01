@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDoc, createShapeElement, createTextElement } from '../model/factory';
+import { createDoc, createShapeElement, createSlide, createTextElement } from '../model/factory';
 import type { ShapeElement, TextElement } from '../model/types';
 import { exportPptx } from './export';
 import { importPptxFile } from './import';
@@ -63,5 +63,42 @@ describe('导入：外阴影（基线 slide/shadow-transform 的回归）', () =
 
     const imported = await roundTrip(shape);
     expect(imported.shadow).toBeUndefined();
+  });
+});
+
+describe('导入：节（p14:sectionLst）', () => {
+  it('往返后节的名称与起始幻灯片保持不变', async () => {
+    const doc = createDoc('sections');
+    doc.slides.push(createSlide(), createSlide());
+    doc.sections = [
+      { id: 'sec-a', name: '引言', startSlideId: doc.slides[0].id },
+      { id: 'sec-b', name: '正文', startSlideId: doc.slides[2].id },
+    ];
+    const exported = await exportPptx(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const imported = await importPptxFile(fileOf(exported.value, 'sections.pptx'));
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    const sections = imported.value.doc.sections ?? [];
+    expect(sections.map((item) => item.name)).toEqual(['引言', '正文']);
+    expect(
+      sections.map((item) =>
+        imported.value.doc.slides.findIndex((slide) => slide.id === item.startSlideId),
+      ),
+    ).toEqual([0, 2]);
+  });
+
+  it('没有节的文档导入后仍是扁平结构', async () => {
+    const doc = createDoc('flat');
+    const exported = await exportPptx(doc);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const imported = await importPptxFile(fileOf(exported.value, 'flat.pptx'));
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.value.doc.sections ?? []).toEqual([]);
   });
 });

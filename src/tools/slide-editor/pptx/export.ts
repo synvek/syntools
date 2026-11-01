@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import type { ToolResult } from '@/core/types';
 import { normalizeBackground } from '../core';
 import { createLayout, createMaster } from '../model/factory';
+import { hasSections as documentHasSections } from '../model/sections';
 import { extensionForMime } from '../model/media';
 import type { SlideDoc, SlideElement } from '../model/types';
 import {
@@ -111,11 +112,19 @@ export function hasSlideMotion(doc: SlideDoc): boolean {
 }
 
 /**
- * 动画**单独**把文档推去手写通道时，会连带降级的元素数量（原生图表 / 公式在手写通道里只是占位框）。
+ * `true` when the deck has sections: `p14:sectionLst` only exists in the hand-written channel, because
+ * pptxgenjs cannot write extension lists. Same hard routing rule as motion — no silent loss.
+ */
+export function hasSections(doc: SlideDoc): boolean {
+  return documentHasSections(doc.sections);
+}
+
+/**
+ * 动画或节**单独**把文档推去手写通道时，会连带降级的元素数量（原生图表 / 公式在手写通道里只是占位框）。
  * 只统计"本来会走 pptxgen"的文档 —— 已经因为 avLst/custGeom 走手写通道的文档不用重复提示。
  */
-export function motionExportDegradations(doc: SlideDoc): number {
-  if (!hasSlideMotion(doc) || requiresLegacy(doc)) return 0;
+export function legacyChannelDegradations(doc: SlideDoc): number {
+  if ((!hasSlideMotion(doc) && !hasSections(doc)) || requiresLegacy(doc)) return 0;
   let count = 0;
   const walk = (elements: SlideElement[]): void => {
     for (const element of elements) {
@@ -180,7 +189,12 @@ export async function exportPptx(
 ): Promise<ToolResult<Uint8Array>> {
   if (!doc.slides || doc.slides.length === 0) return { ok: false, error: 'EMPTY' };
 
-  if (options.channel !== 'legacy' && !hasSlideMotion(doc) && !requiresLegacy(doc)) {
+  if (
+    options.channel !== 'legacy' &&
+    !hasSlideMotion(doc) &&
+    !hasSections(doc) &&
+    !requiresLegacy(doc)
+  ) {
     const { exportPptxPptxGen } = await import('./exportPptxgen');
     const result = await exportPptxPptxGen(doc);
     if (result.ok) return result;

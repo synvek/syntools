@@ -4,6 +4,7 @@ import {
   createDoc,
   createLineElement,
   createShapeElement,
+  createSlide,
   createTableElement,
   createTextElement,
 } from '../model/factory';
@@ -331,5 +332,51 @@ describe('表格样式写回', () => {
     const slide = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
     expect(slide).not.toContain('firstRow="1"');
     expect(slide).toContain('bandRow="1"');
+  });
+});
+
+describe('节（p14:sectionLst）', () => {
+  /** Three slides, two sections: the second starts on slide 2 */
+  function sectionedDoc(): SlideDoc {
+    const doc = createDoc('sections');
+    doc.slides.push(createSlide(), createSlide());
+    doc.sections = [
+      { id: 'sec-a', name: '引言', startSlideId: doc.slides[0].id },
+      { id: 'sec-b', name: '正文 & 结论', startSlideId: doc.slides[1].id },
+    ];
+    return doc;
+  }
+
+  it('把节写进 presentation.xml 的 extLst，并补齐 p14 / mc 命名空间', async () => {
+    const result = await exportPptxLegacy(sectionedDoc());
+    expect(result.ok).toBe(true);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    const xml = (await zip.file('ppt/presentation.xml')?.async('string')) ?? '';
+
+    expect(xml).toContain('xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"');
+    expect(xml).toContain('mc:Ignorable="p14"');
+    expect(xml).toContain('<p14:sectionLst>');
+    expect(xml).toContain('name="引言"');
+    expect(xml).toContain('name="正文 &amp; 结论"');
+    // Each section references the p:sldId of its first slide (256 / 257)
+    expect(xml).toContain('<p14:sldId id="256"/>');
+    expect(xml).toContain('<p14:sldId id="257"/>');
+    // p:extLst is the last child of p:presentation, so it must come after p:notesSz
+    expect(xml.indexOf('<p14:sectionLst>')).toBeGreaterThan(xml.indexOf('<p:notesSz'));
+  });
+
+  it('有节时默认通道也走手写实现（pptxgenjs 不写扩展列表）', async () => {
+    const result = await exportPptx(sectionedDoc());
+    expect(result.ok).toBe(true);
+    const zip = await JSZip.loadAsync((result as { ok: true; value: Uint8Array }).value);
+    const xml = (await zip.file('ppt/presentation.xml')?.async('string')) ?? '';
+    expect(xml).toContain('<p14:sectionLst>');
+  });
+
+  it('无节的文档不写 extLst，presentation.xml 与原来一致', async () => {
+    const { zip } = await exported();
+    const xml = (await zip.file('ppt/presentation.xml')?.async('string')) ?? '';
+    expect(xml).not.toContain('sectionLst');
+    expect(xml).not.toContain('xmlns:p14');
   });
 });

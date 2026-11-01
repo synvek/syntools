@@ -1,6 +1,7 @@
 import { normalizeBackground } from '../core';
 import { normalizeAnimationSteps, normalizeTransition } from './animation';
 import { SCHEMA_VERSION } from './factory';
+import { normalizeSections } from './sections';
 import type {
   Slide,
   SlideBackground,
@@ -20,6 +21,10 @@ import type {
  *
  * What changed in v3 vs v2:
  * - document-level `comments` threads (P1-2); older documents simply have none.
+ *
+ * What changed in v5 vs v4:
+ * - document-level `sections` (P2-S6). Boundaries are re-anchored on read, so a draft written before a
+ *   slide was deleted cannot point at a missing slide.
  *
  * Migration is **idempotent**: re-running it on normalized data changes nothing.
  * `.sld` project files and localStorage drafts share this entry point, so the read paths stay consistent.
@@ -88,15 +93,18 @@ export function migrateDoc(input: SlideDoc): SlideDoc {
   if (!input || typeof input !== 'object') return input;
   if (input.schemaVersion === CURRENT_SCHEMA_VERSION) return input;
 
+  const slides = Array.isArray(input.slides) ? input.slides.map(migrateSlide) : [];
   return {
     ...input,
     width: input.width || 1280,
     height: input.height || 720,
     masters: Array.isArray(input.masters) ? input.masters.map(migrateMaster) : [],
     layouts: Array.isArray(input.layouts) ? input.layouts.map(migrateLayout) : [],
-    slides: Array.isArray(input.slides) ? input.slides.map(migrateSlide) : [],
+    slides,
     media: input.media && typeof input.media === 'object' ? input.media : {},
     comments: Array.isArray(input.comments) ? input.comments : [],
+    // Boundaries are re-anchored against the migrated slide list (dropped when their slide is gone)
+    sections: normalizeSections(input.sections, slides),
     version: input.version || 1,
     schemaVersion: CURRENT_SCHEMA_VERSION,
   };
