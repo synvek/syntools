@@ -225,6 +225,36 @@ describe('buildChartPlan', () => {
   });
 });
 
+describe('导出 .xlsx：新图表类型（P2-S8）', () => {
+  const exportOne = async (type: ChartConfig['type']) => {
+    const result = await exportSnapshotToBytes(
+      makeSnapshot({ syntoolsCharts: [{ ...CHART, type }] }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return '';
+    const zip = await JSZip.loadAsync(toArrayBuffer(result.value));
+    return (await zip.file('xl/charts/chart1.xml')?.async('string')) ?? '';
+  };
+
+  it('散点图导出为 scatterChart + xVal/yVal', async () => {
+    const chart = await exportOne('scatter');
+    expect(chart).toContain('<c:scatterChart>');
+    expect(chart).toContain('<c:xVal>');
+    expect(chart).toContain('<c:yVal>');
+  });
+
+  it('雷达图导出为 radarChart', async () => {
+    const chart = await exportOne('radar');
+    expect(chart).toContain('<c:radarChart>');
+  });
+
+  it('组合图导出两个图表组（柱 + 折线）', async () => {
+    const chart = await exportOne('combo');
+    expect(chart).toContain('<c:barChart>');
+    expect(chart).toContain('<c:lineChart>');
+  });
+});
+
 describe('导出 .xlsx：注入原生图表', () => {
   it('6 处部件与引用链齐全', async () => {
     const result = await exportSnapshotToBytes(makeSnapshot({ syntoolsCharts: [CHART] }));

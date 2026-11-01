@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot } from './xlsx-io';
 import { exportSnapshotToBytes, importXlsxToSnapshot } from './xlsx-io';
 import type { NamedRange } from './namedRanges';
+import type { SheetTable } from './sheetTables';
 import type { SheetProtectionState } from './sheetProtection';
 
 /**
@@ -90,6 +91,42 @@ describe('名称与保护的 xlsx 往返', () => {
       selectLockedCells: false,
     });
     expect(back[0].password).toEqual(password);
+  });
+
+  it('表格对象随文件往返，且不改写区域内单元格', async () => {
+    const { snapshot, sheetId } = snapshotWithMeta();
+    const sheet = snapshot.sheets[sheetId];
+    sheet.cellData['0'] = { '0': { v: '商品' }, '1': { v: '金额' } };
+    sheet.cellData['1'] = { '0': { v: '苹果' }, '1': { v: 12 } };
+    const table: SheetTable = {
+      id: 'table-1',
+      name: 'Table1',
+      sheetId,
+      range: { startRow: 0, startColumn: 0, endRow: 1, endColumn: 1 },
+      columns: ['商品', '金额'],
+      headerRow: true,
+      totalsRow: false,
+      style: { name: 'TableStyleMedium2', showRowStripes: true },
+    };
+    snapshot.syntoolsTables = [table];
+
+    const exported = await exportSnapshotToBytes(snapshot);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const imported = await importXlsxToSnapshot(fakeFile(exported.value));
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+
+    const tables = imported.value.syntoolsTables ?? [];
+    expect(tables).toHaveLength(1);
+    expect(tables[0]).toMatchObject({ name: 'Table1', headerRow: true });
+    expect(tables[0].range).toEqual({ startRow: 0, startColumn: 0, endRow: 1, endColumn: 1 });
+    expect(tables[0].columns).toEqual(['商品', '金额']);
+    // 单元格内容保持原样（导出不通过 addTable 覆写）
+    const backSheet = imported.value.sheets[imported.value.sheetOrder[0]];
+    expect(backSheet.cellData['0']?.['0']?.v).toBe('商品');
+    expect(backSheet.cellData['1']?.['1']?.v).toBe(12);
   });
 
   it('没有名称/保护时不往文件里塞空块', async () => {

@@ -51,6 +51,7 @@ import {
   type SheetProtectionState,
   type WorksheetProtectionLike,
 } from './sheetProtection';
+import { injectTablesIntoXlsx, readSheetTables, type SheetTable } from './sheetTables';
 
 /**
  * xlsx adapter layer: exceljs is always dynamically imported so it stays out of the initial bundle
@@ -156,6 +157,11 @@ export interface WorkbookSnapshot extends SnapshotWithExtras {
    * the editor also uses it to switch the sheet to read-only.
    */
   syntoolsProtection?: SheetProtectionState[];
+  /**
+   * Table objects / ListObject (P2-S7.3). Written as native `xl/tables/tableN.xml` parts
+   * (exceljs's own `addTable` would overwrite the cells it covers), read back from `worksheet.tables`.
+   */
+  syntoolsTables?: SheetTable[];
 }
 
 export function createEmptySheet(id: string, name: string): SheetSnapshot {
@@ -381,6 +387,8 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
     const sheetExtras: Record<string, SheetExtras> = {};
     // Sheet protection (P2-S7.2): read per sheet below, restored on export and used for the read-only switch
     const protections: SheetProtectionState[] = [];
+    // Table objects (P2-S7.3): exceljs exposes them as `worksheet.tables` without touching cells
+    const collectedTables: SheetTable[] = [];
 
     workbook.eachSheet((worksheet, sheetId) => {
       const id = String(sheetId);
@@ -416,6 +424,9 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
 
       const protection = readSheetProtection(worksheet as unknown as WorksheetProtectionLike);
       if (protection) protections.push({ ...protection, sheetId: id });
+
+      const tables = readSheetTables(worksheet as unknown as { tables?: unknown }, id);
+      if (tables.length > 0) collectedTables.push(...tables);
 
       sheets[id] = sheet;
       sheetOrder.push(id);
@@ -458,6 +469,7 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
         ...(importedShapes.length > 0 ? { syntoolsShapes: importedShapes } : {}),
         ...(namedRanges.length > 0 ? { namedRanges } : {}),
         ...(protections.length > 0 ? { syntoolsProtection: protections } : {}),
+        ...(collectedTables.length > 0 ? { syntoolsTables: collectedTables } : {}),
       },
     };
   } catch {
@@ -624,10 +636,16 @@ export async function exportSnapshotToBytes(
 
     // Names (P2-S7.1): exceljs cannot express sheet-scoped names, so workbook.xml is patched here
     const namedRanges = snapshot.namedRanges ?? [];
-    const bytes =
+    const withNames =
       namedRanges.length > 0
         ? await injectNamedRanges(withPivots, namedRanges, snapshot.sheetOrder, snapshot.sheets)
         : withPivots;
+
+    // Tables (P2-S7.3): parts + sheet rels + content types; cells are left untouched
+    const bytes =
+      (snapshot.syntoolsTables ?? []).length > 0
+        ? await injectTablesIntoXlsx(withNames, snapshot)
+        : withNames;
     return { ok: true, value: new Uint8Array(bytes) };
   } catch {
     return { ok: false, error: 'EXPORT_FAILED' };

@@ -34,8 +34,9 @@ import {
   type WorkbookSummary,
 } from './core';
 import { csvToSnapshot, snapshotToCsv } from './csv';
-import { buildChartData, type ChartConfig, type ChartData } from './charts';
+import { CHART_TYPE_LABEL_KEY, buildChartData, type ChartConfig, type ChartData } from './charts';
 import { registerChartStrings } from './chartStrings';
+import { chartTypeBreakdown, summarizeChartParts, type ChartFileSummary } from './chartImport';
 import { registerShapeStrings } from './shapeStrings';
 import {
   buildSheetLayout,
@@ -121,6 +122,13 @@ import { ProtectDialog } from './ui/ProtectDialog';
 import { registerMetaStrings } from './metaStrings';
 import { sanitizeNamedRanges, type NamedRange } from './namedRanges';
 import {
+  createTableFromSelection,
+  sanitizeTables,
+  takenNames,
+  tablesInRange,
+  type SheetTable,
+} from './sheetTables';
+import {
   createPasswordHash,
   protectionFor,
   setProtection,
@@ -199,6 +207,8 @@ export default function SpreadsheetTool() {
   const [chartDataMap, setChartDataMap] = useState<Record<string, ChartData | null>>({});
   const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
   const [chartNotice, setChartNotice] = useState(false);
+  /** 导入文件里保留下来的原生图表统计（P2-S8 回读：只报数量与类型，不做语义重建） */
+  const [chartImport, setChartImport] = useState<ChartFileSummary | null>(null);
   /** Sheet area size: the bounds for dragging / resizing charts */
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
   const chartSeqRef = useRef(0);
@@ -239,6 +249,11 @@ export default function SpreadsheetTool() {
   const [namesOpen, setNamesOpen] = useState(false);
   /** 打开名称面板时的选区（`A1:B2`），供"用选区填入"使用 */
   const [selectionLabel, setSelectionLabel] = useState<string | null>(null);
+  /** Table objects (P2-S7.3): native `xl/tables` parts, kept outside Univer */
+  const [tables, setTables] = useState<SheetTable[]>([]);
+  const tablesRef = useRef<SheetTable[]>([]);
+  tablesRef.current = tables;
+  const [tableNotice, setTableNotice] = useState<string | null>(null);
   /** Sheet protection (P2-S7.2): carried by the snapshot, enforced by switching Univer to read-only */
   const [protection, setProtectionList] = useState<SheetProtectionState[]>([]);
   const protectionRef = useRef<SheetProtectionState[]>([]);
@@ -420,6 +435,8 @@ export default function SpreadsheetTool() {
     const names = sanitizeNamedRanges(namedRangesRef.current);
     if (names.length) next = { ...next, namedRanges: names };
     if (protectionRef.current.length) next = { ...next, syntoolsProtection: protectionRef.current };
+    const tables = sanitizeTables(tablesRef.current);
+    if (tables.length) next = { ...next, syntoolsTables: tables };
     // Comment threads ride along in their own field (xlsx has no counterpart yet)
     next = withSheetComments(next, commentsRef.current);
     return withWorkbookExtras(next, extrasRef.current);
@@ -633,7 +650,12 @@ export default function SpreadsheetTool() {
         // locale switch) `pending` is a raw Univer snapshot without these fields, so overwriting
         // would simply drop them.
         if (!extrasRef.current) extrasRef.current = readWorkbookExtras(pending);
-        if (!rawPartsRef.current) rawPartsRef.current = pending.syntoolsRawParts ?? null;
+        if (!rawPartsRef.current) {
+          rawPartsRef.current = pending.syntoolsRawParts ?? null;
+          setChartImport(
+            rawPartsRef.current ? summarizeChartParts(rawPartsRef.current.parts) : null,
+          );
+        }
         if (chartsRef.current.length === 0) {
           const configs = pending.syntoolsCharts ?? [];
           if (configs.length > 0) {
@@ -663,6 +685,9 @@ export default function SpreadsheetTool() {
           const protections = pending.syntoolsProtection ?? [];
           protectionRef.current = protections;
           setProtectionList(protections);
+          const pendingTables = pending.syntoolsTables ?? [];
+          tablesRef.current = pendingTables;
+          setTables(pendingTables);
         }
         if (pivotConfigsRef.current.length === 0) {
           const pivots = pending.syntoolsPivots ?? [];
@@ -825,6 +850,62 @@ export default function SpreadsheetTool() {
     handle.setEditable(protectionFor(protection, activeSheetId) === null);
   }, [protection, activeSheetId]);
 
+  /**
+   * 插入表格（P2-S7.3）：把当前选区（太窄时退回已用区域）变成一张原生表格。
+   * 表头取区域首行的文字，列名重复/为空自动兜底；表名与名称管理器共享命名空间。
+   */
+  const handleInsertTable = useCallback(() => {
+    const handle = handleRef.current;
+    const sheetId = handle?.getActiveSheetId();
+    if (!handle || !sheetId) return;
+    if (protectionFor(protectionRef.current, sheetId)) return;
+    const snapshot = handle.getSnapshot();
+    const active = handle.getActiveRange();
+    const sheetSnapshot = snapshot.sheets[sheetId];
+    const used = sheetSnapshot ? resolveUsedRange(sheetSnapshot) : null;
+    const range = active && active.endRow > active.startRow ? active : used;
+    if (!range) return;
+    const table = createTableFromSelection(
+      snapshot,
+      sheetId,
+      range,
+      takenNames({
+        ...snapshot,
+        syntoolsTables: tablesRef.current,
+        namedRanges: namedRangesRef.current,
+      }),
+    );
+    if (!table) {
+      setTableNotice(t('tools.sheet.tableInsertNeedsRows'));
+      return;
+    }
+    setTableNotice(null);
+    const next = [...tablesRef.current, table];
+    tablesRef.current = next;
+    setTables(next);
+    scheduleSaveRef.current();
+  }, [t]);
+
+  /** 删除与当前选区相交的表格（整块删除，不做"缩表"） */
+  const handleDeleteTable = useCallback(() => {
+    const handle = handleRef.current;
+    const sheetId = handle?.getActiveSheetId();
+    const range = handle?.getActiveRange();
+    if (!handle || !sheetId || !range) return;
+    if (protectionFor(protectionRef.current, sheetId)) return;
+    const hits = tablesInRange(tablesRef.current, sheetId, range);
+    if (hits.length === 0) {
+      setTableNotice(t('tools.sheet.tableDeleteNotFound'));
+      return;
+    }
+    setTableNotice(null);
+    const ids = new Set(hits.map((table) => table.id));
+    const next = tablesRef.current.filter((table) => !ids.has(table.id));
+    tablesRef.current = next;
+    setTables(next);
+    scheduleSaveRef.current();
+  }, [t]);
+
   /** Charts visible on the active sheet (each chart is bound to one sheet) */
   const visibleCharts = useMemo(
     () => charts.filter((item) => !item.sheetId || item.sheetId === activeSheetId),
@@ -886,6 +967,7 @@ export default function SpreadsheetTool() {
       // Tool-owned content carried by the snapshot: conditional formatting / data validation + charts + native chart parts
       extrasRef.current = readWorkbookExtras(snapshot);
       rawPartsRef.current = snapshot.syntoolsRawParts ?? null;
+      setChartImport(rawPartsRef.current ? summarizeChartParts(rawPartsRef.current.parts) : null);
       const configs = snapshot.syntoolsCharts ?? [];
       chartsRef.current = configs;
       setCharts(configs);
@@ -904,6 +986,9 @@ export default function SpreadsheetTool() {
       const protections = snapshot.syntoolsProtection ?? [];
       protectionRef.current = protections;
       setProtectionList(protections);
+      const nextTables = snapshot.syntoolsTables ?? [];
+      tablesRef.current = nextTables;
+      setTables(nextTables);
       metaLoadedRef.current = true;
       applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
       refreshSummary();
@@ -994,6 +1079,11 @@ export default function SpreadsheetTool() {
       const nextNames = namedRangesRef.current.filter((item) => item.sheetId !== id);
       namedRangesRef.current = nextNames;
       setNamedRanges(nextNames);
+    }
+    if (tablesRef.current.some((item) => item.sheetId === id)) {
+      const nextTables = tablesRef.current.filter((item) => item.sheetId !== id);
+      tablesRef.current = nextTables;
+      setTables(nextTables);
     }
     scheduleSaveRef.current();
   };
@@ -1340,6 +1430,11 @@ export default function SpreadsheetTool() {
   const activeSheet = sheets.find((sheet) => sheet.id === activeSheetId) ?? null;
   /** Protection of the active sheet drives both the menu copy and the read-only switch */
   const activeProtection = protectionFor(protection, activeSheetId);
+  /** Tables living on the active sheet (badge + delete target) */
+  const activeTables = useMemo(
+    () => tables.filter((table) => table.sheetId === activeSheetId),
+    [tables, activeSheetId],
+  );
   /**
    * A sheet holding only floating objects is still exportable: shapes and charts are written as
    * native `xdr:*` parts. Gating on cell count alone made such a workbook impossible to save.
@@ -1413,6 +1508,13 @@ export default function SpreadsheetTool() {
         }),
         editorMenuItem('insert-name', t('tools.sheet.namesTitle'), openNames, {
           disabled: busy !== null,
+        }),
+        { type: 'separator' },
+        editorMenuItem('insert-table', t('tools.sheet.tableInsert'), handleInsertTable, {
+          disabled: busy !== null || summary.cells === 0 || activeProtection !== null,
+        }),
+        editorMenuItem('insert-table-delete', t('tools.sheet.tableDelete'), handleDeleteTable, {
+          disabled: busy !== null || activeProtection !== null,
         }),
         { type: 'separator' },
         editorMenuItem('insert-sheet', t('tools.sheet.addSheet'), handleAddSheet, {
@@ -1491,6 +1593,17 @@ export default function SpreadsheetTool() {
                 className="inline-flex h-7 items-center justify-center rounded-md bg-amber-50 px-1.5 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
               >
                 <Icon name="lock" className="h-3.5 w-3.5" />
+              </span>
+            ) : null}
+            {activeTables.length > 0 ? (
+              <span
+                role="status"
+                data-testid="sheet-table-badge"
+                title={t('tools.sheet.tableBadge', { count: activeTables.length })}
+                aria-label={t('tools.sheet.tableBadge', { count: activeTables.length })}
+                className="inline-flex h-7 items-center rounded-md bg-sky-50 px-1.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950 dark:text-sky-300"
+              >
+                {activeTables.length}
               </span>
             ) : null}
             <span
@@ -1575,6 +1688,25 @@ export default function SpreadsheetTool() {
       {chartNotice ? (
         <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
           {t('tools.sheet.chartEmpty')}
+        </p>
+      ) : null}
+
+      {tableNotice ? (
+        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
+          {tableNotice}
+        </p>
+      ) : null}
+
+      {chartImport && chartImport.total > 0 ? (
+        <p role="status" className="text-[11px] text-gray-500 dark:text-gray-400">
+          {t('tools.sheet.chartImported', { count: chartImport.total })}
+          {chartTypeBreakdown(chartImport).length > 0
+            ? ` · ${chartTypeBreakdown(chartImport)
+                .map(
+                  (item) => `${t(`tools.sheet.${CHART_TYPE_LABEL_KEY[item.type]}`)} ${item.count}`,
+                )
+                .join(' / ')}`
+            : ''}
         </p>
       ) : null}
 

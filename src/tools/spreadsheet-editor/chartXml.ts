@@ -1,4 +1,10 @@
-import { resolveChart, type ChartConfig, type ChartSpec, type ChartType } from './charts';
+import {
+  comboSeriesType,
+  resolveChart,
+  type ChartConfig,
+  type ChartSpec,
+  type ChartType,
+} from './charts';
 import { columnIndexToName, type WorkbookSnapshotLite } from './core';
 import {
   dirOf,
@@ -133,7 +139,21 @@ function numCache(values: readonly (number | null)[]): string {
 
 /* ------------------------------ Chart XML generation ------------------------------ */
 
-function seriesXml(spec: ChartSpec, index: number, sheetName: string, type: ChartType): string {
+/** 散点图的 X 值：分类文字 → 序号，数字串 → 数值（与 `charts.ts` 的 ECharts 侧保持一致） */
+function scatterXValues(categories: readonly string[]): (number | null)[] {
+  return categories.map((label, index) => {
+    const parsed = Number(String(label).replace(/[,%\s]/g, ''));
+    return Number.isFinite(parsed) && String(label).trim() !== '' ? parsed : index + 1;
+  });
+}
+
+function seriesXml(
+  spec: ChartSpec,
+  index: number,
+  sheetName: string,
+  type: ChartType,
+  kind: ChartType = type,
+): string {
   const item = spec.series[index];
   const title = item.nameCell
     ? `<c:tx><c:strRef><c:f>${xmlEscape(
@@ -161,6 +181,28 @@ function seriesXml(spec: ChartSpec, index: number, sheetName: string, type: Char
       : `<c:spPr><a:solidFill><a:srgbClr val="${
           SERIES_COLORS[index % SERIES_COLORS.length]
         }"/></a:solidFill></c:spPr>`;
+
+  // 散点图：X 轴也是数值轴，序列里必须用 xVal/yVal（不能用 cat/val，Excel 会当成"无法识别的图表"）
+  if (kind === 'scatter') {
+    const xRef =
+      spec.categoryColumn === null
+        ? ''
+        : `<c:f>${xmlEscape(
+            absoluteRangeRef(
+              sheetName,
+              spec.categoryStartRow,
+              spec.categoryEndRow,
+              spec.categoryColumn,
+            ),
+          )}</c:f>`;
+    const xVal = `<c:xVal><c:numRef>${xRef}${numCache(scatterXValues(spec.categories))}</c:numRef></c:xVal>`;
+    const yVal = `<c:yVal><c:numRef><c:f>${xmlEscape(
+      absoluteRangeRef(sheetName, item.startRow, item.endRow, item.column),
+    )}</c:f>${numCache(item.data)}</c:numRef></c:yVal>`;
+    return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${shape}<c:marker><c:symbol val="circle"/><c:size val="6"/></c:marker>${xVal}${yVal}</c:ser>`;
+  }
+
+  // 雷达图的每个"分类"是一个指标轴，cat/val 的写法与柱状图相同
   return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${shape}${category}${values}</c:ser>`;
 }
 
@@ -174,16 +216,100 @@ function axesXml(): string {
 /** Build chartN.xml (chartSpace → chart → plotArea → chart group + axes) */
 export function buildChartXml(spec: ChartSpec, type: ChartType, sheetName: string): string {
   const sers = spec.series.map((_, index) => seriesXml(spec, index, sheetName, type)).join('');
+  const axIds = `<c:axId val="${CAT_AX_ID}"/><c:axId val="${VAL_AX_ID}"/>`;
   let group: string;
   if (type === 'pie') {
     group = `<c:pieChart><c:varyColors val="1"/>${sers}</c:pieChart>`;
   } else if (type === 'line') {
-    group = `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}<c:marker val="1"/><c:axId val="${CAT_AX_ID}"/><c:axId val="${VAL_AX_ID}"/></c:lineChart>`;
+    group = `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}<c:marker val="1"/>${axIds}</c:lineChart>`;
+  } else if (type === 'scatter') {
+    group = `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${sers}${axIds}</c:scatterChart>`;
+  } else if (type === 'radar') {
+    group = `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${sers}${axIds}</c:radarChart>`;
+  } else if (type === 'combo') {
+    /**
+     * 组合图 = 一个柱图组 + 一个折线图组，两组共用同一对 axId。
+     * 拆组而不是给单组混排，是因为 OOXML 里 series 的画法由所属 chart group 决定。
+     */
+    const total = spec.series.length;
+    const bars = spec.series
+      .map((_, index) => (comboSeriesType(index, total) === 'bar' ? index : -1))
+      .filter((index) => index >= 0)
+      .map((index) => seriesXml(spec, index, sheetName, type, 'bar'))
+      .join('');
+    const lines = spec.series
+      .map((_, index) => (comboSeriesType(index, total) === 'line' ? index : -1))
+      .filter((index) => index >= 0)
+      .map((index) => seriesXml(spec, index, sheetName, type, 'line'))
+      .join('');
+    group =
+      `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${bars}<c:gapWidth val="150"/>${axIds}</c:barChart>` +
+      `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${lines}<c:marker val="1"/>${axIds}</c:lineChart>`;
   } else {
-    group = `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${sers}<c:gapWidth val="150"/><c:axId val="${CAT_AX_ID}"/><c:axId val="${VAL_AX_ID}"/></c:barChart>`;
+    group = `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${sers}<c:gapWidth val="150"/>${axIds}</c:barChart>`;
   }
   const axes = type === 'pie' ? '' : axesXml();
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${A_NS}" xmlns:r="${R_NS}"><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/>${group}${axes}</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
+}
+
+/* ------------------------------ Chart XML read-back ------------------------------ */
+
+/** 从 chart part 读回来的结构（P2-S8 回读）：只取定位与类型需要的字段 */
+export interface ParsedChartXml {
+  type: ChartType;
+  /** 系列引用里的表名（去掉引号）；没有任何引用时为 null */
+  sheetName: string | null;
+  /** 分类轴 / X 值的引用（原样 `f` 文本） */
+  categoryRef: string | null;
+  /** 每个系列数值引用（原样 `f` 文本，顺序与系列一致） */
+  valueRefs: string[];
+}
+
+/** `'My Sheet'!$B$2:$B$4` → 表名 + 绝对引用（表名去掉引号并还原 `''`） */
+export function splitSheetRef(ref: string): { sheetName: string | null; body: string } {
+  const text = ref.trim();
+  const bang = text.lastIndexOf('!');
+  if (bang < 0) return { sheetName: null, body: text };
+  let name = text.slice(0, bang).trim();
+  if (name.startsWith("'")) name = name.slice(1, name.endsWith("'") ? -1 : undefined);
+  return { sheetName: name.replace(/''/g, "'"), body: text.slice(bang + 1) };
+}
+
+/**
+ * 读 chart part 的类型与系列引用。
+ *
+ * 只认结构、不解析样式：用途是"告诉用户文件里有什么图表"以及回读我们导出的类型，
+ * 派生的坐标轴 / 图例 / 主题色一律忽略 —— 猜错样式比不猜更糟。
+ */
+export function parseChartXml(xml: string): ParsedChartXml | null {
+  const hasBar = /<c:barChart\b/.test(xml) || /<c:bar3DChart\b/.test(xml);
+  const hasLine = /<c:lineChart\b/.test(xml) || /<c:line3DChart\b/.test(xml);
+  let type: ChartType | null = null;
+  if (hasBar && hasLine) type = 'combo';
+  else if (/<c:scatterChart\b/.test(xml)) type = 'scatter';
+  else if (/<c:radarChart\b/.test(xml)) type = 'radar';
+  else if (/<c:pieChart\b/.test(xml) || /<c:doughnutChart\b/.test(xml)) type = 'pie';
+  else if (hasLine) type = 'line';
+  else if (hasBar) type = 'bar';
+  if (!type) return null;
+
+  const seriesBlocks = xml.match(/<c:ser\b[\s\S]*?<\/c:ser>/g) ?? [];
+  const categoryRef = firstRef(seriesBlocks, /<c:(?:cat|xVal)\b[\s\S]*?<c:f>([^<]*)<\/c:f>/);
+  const valueRefs = seriesBlocks
+    .map((block) => /<c:(?:val|yVal)\b[\s\S]*?<c:f>([^<]*)<\/c:f>/.exec(block)?.[1]?.trim())
+    .filter((ref): ref is string => Boolean(ref));
+
+  const first = categoryRef ?? valueRefs[0] ?? null;
+  const sheetName = first ? splitSheetRef(first).sheetName : null;
+  return { type, sheetName, categoryRef, valueRefs };
+}
+
+function firstRef(blocks: readonly string[], pattern: RegExp): string | null {
+  for (const block of blocks) {
+    const hit = pattern.exec(block)?.[1]?.trim();
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /* -------------------------------- Anchor maths -------------------------------- */

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import {
+  CHART_TYPES,
+  CHART_TYPE_LABEL_KEY,
   buildChartOption,
   buildRangeLabel,
   parseRangeLabel,
@@ -18,12 +20,8 @@ interface ChartInstance {
   getDataURL: (options: { type: 'png'; pixelRatio?: number; backgroundColor?: string }) => string;
 }
 
-const TYPES: ChartType[] = ['bar', 'line', 'pie'];
-const TYPE_LABEL_KEY: Record<ChartType, string> = {
-  bar: 'chartBar',
-  line: 'chartLine',
-  pie: 'chartPie',
-};
+const TYPES: ChartType[] = CHART_TYPES;
+const TYPE_LABEL_KEY: Record<ChartType, string> = CHART_TYPE_LABEL_KEY;
 const MIN_WIDTH = 260;
 const MIN_HEIGHT = 200;
 

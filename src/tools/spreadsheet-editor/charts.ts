@@ -26,7 +26,29 @@ export interface ChartData {
   rangeLabel: string;
 }
 
-export type ChartType = 'bar' | 'line' | 'pie';
+export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'radar' | 'combo';
+
+/**
+ * P2-S8 扩展后的图表类型。`combo`（组合图）沿用同一个 `range`：
+ * 除最后一个系列外都画柱，最后一个系列画折线 —— "销量 + 增长率" 是最常见的用法，
+ * 单一坐标轴也让两侧尺度差异不至于把柱子压成一条线（次坐标轴留到后面再做）。
+ */
+export const CHART_TYPES: ChartType[] = ['bar', 'line', 'pie', 'scatter', 'radar', 'combo'];
+
+/** 类型 → 文案 key（面板按钮与导入统计共用一份，避免两处各写一遍） */
+export const CHART_TYPE_LABEL_KEY: Record<ChartType, string> = {
+  bar: 'chartBar',
+  line: 'chartLine',
+  pie: 'chartPie',
+  scatter: 'chartScatter',
+  radar: 'chartRadar',
+  combo: 'chartCombo',
+};
+
+/** 组合图里每个系列的画法：最后一个系列用折线，其余柱状 */
+export function comboSeriesType(index: number, total: number): 'bar' | 'line' {
+  return total > 1 && index === total - 1 ? 'line' : 'bar';
+}
 
 /**
  * Persisted config for an in-sheet chart.
@@ -246,17 +268,68 @@ export function buildChartOption(data: ChartData, type: ChartType): Record<strin
       ],
     };
   }
+  if (type === 'radar') {
+    // 雷达图把"分类"当指标轴：每个指标的最大值取所有系列里的最大绝对值，否则图形会溢出/缩成一点
+    const max = Math.max(
+      1,
+      ...data.series.flatMap((item) => item.data.map((value) => Math.abs(value ?? 0))),
+    );
+    return {
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0, type: 'scroll' },
+      radar: {
+        indicator: data.categories.map((name) => ({ name, max })),
+        radius: '62%',
+      },
+      series: [
+        {
+          type: 'radar',
+          data: data.series.map((item) => ({
+            name: item.name,
+            value: item.data.map((value) => value ?? 0),
+          })),
+        },
+      ],
+    };
+  }
+
+  if (type === 'scatter') {
+    // X 轴取分类列的数值；分类是文字时退化为序号 1..N（与 OOXML 的散点图口径一致）
+    const xs = data.categories.map((label, index) => {
+      const parsed = Number(String(label).replace(/[,%\s]/g, ''));
+      return Number.isFinite(parsed) && String(label).trim() !== '' ? parsed : index + 1;
+    });
+    return {
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: 12, right: 20, top: 24, bottom: 44, containLabel: true },
+      xAxis: { type: 'value' },
+      yAxis: { type: 'value' },
+      series: data.series.map((item) => ({
+        name: item.name,
+        type: 'scatter',
+        symbolSize: 8,
+        data: item.data
+          .map((value, index) => (value === null ? null : [xs[index], value]))
+          .filter((point): point is [number, number] => point !== null),
+      })),
+    };
+  }
+
   return {
     tooltip: { trigger: 'axis' },
     legend: { bottom: 0, type: 'scroll' },
     grid: { left: 12, right: 20, top: 24, bottom: 44, containLabel: true },
     xAxis: { type: 'category', data: data.categories },
     yAxis: { type: 'value' },
-    series: data.series.map((item) => ({
-      name: item.name,
-      type,
-      data: item.data,
-      ...(type === 'line' ? { smooth: true } : {}),
-    })),
+    series: data.series.map((item, index) => {
+      const kind = type === 'combo' ? comboSeriesType(index, data.series.length) : type;
+      return {
+        name: item.name,
+        type: kind,
+        data: item.data,
+        ...(kind === 'line' ? { smooth: true } : {}),
+      };
+    }),
   };
 }
