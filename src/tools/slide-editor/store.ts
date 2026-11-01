@@ -36,6 +36,8 @@ import {
   splitSectionAt,
 } from './model/sections';
 import { buildSummarySlide, pruneSlideLinks } from './model/summary';
+import { combineShapes, type CombineFailure } from './model/booleanCombine';
+import type { BooleanOp } from '../../core/drawing/boolean';
 import { replaceInDoc, type FindOptions, type TextHit } from './model/search';
 import { applyStyleSnapshot, extractStyleSnapshot, type StyleSnapshot } from './model/style';
 import { findTemplate, instantiateTemplate } from './model/templates';
@@ -59,6 +61,7 @@ import type {
   ConnectorEnd,
   Fill,
   PathCommand,
+  ShapeElement,
   Slide,
   SlideDoc,
   SlideElement,
@@ -237,6 +240,11 @@ interface SlideState {
   distributeSelected: (axis: DistributeAxis) => void;
   groupSelected: () => void;
   ungroupSelected: () => void;
+  /**
+   * Boolean combine (P2-S5): merge the selected shapes into one custom-geometry shape.
+   * Resolves with the outcome so the caller can tell "nothing selected" from "result was empty".
+   */
+  combineSelection: (op: BooleanOp) => Promise<'ok' | CombineFailure>;
   toggleLockSelected: () => void;
   toggleVisibleSelected: () => void;
 
@@ -1211,6 +1219,32 @@ export const useSlideStore = create<SlideState>((set, get) => ({
       doc: writeContainerElements(s, elements),
       selection: [group.id],
     }));
+  },
+
+  combineSelection: async (op) => {
+    const state = get();
+    const picked = containerElements(state).filter(
+      (element): element is ShapeElement =>
+        element.type === 'shape' && state.selection.includes(element.id),
+    );
+    if (picked.length < 2) return 'too-few-shapes';
+
+    // The clipper is async (it lazy-loads the backend), so build the result before touching history:
+    // an empty/failed combine must not leave an undo entry behind
+    const combined = await combineShapes(op, picked);
+    if (!combined.ok) return combined.reason;
+
+    get().commit();
+    set((s) => {
+      const elements = containerElements(s);
+      const ids = new Set(picked.map((element) => element.id));
+      const firstIndex = elements.findIndex((element) => ids.has(element.id));
+      const rest = elements.filter((element) => !ids.has(element.id));
+      // Keep the z-position of the bottom-most input, like the group action does
+      rest.splice(Math.min(Math.max(firstIndex, 0), rest.length), 0, combined.element);
+      return { doc: writeContainerElements(s, rest), selection: [combined.element.id] };
+    });
+    return 'ok';
   },
 
   ungroupSelected: () => {

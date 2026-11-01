@@ -112,6 +112,8 @@ export function SlideContextMenu({
   const sectionAtTarget = sectionStartingAt(doc.sections, doc.slides, targetIndex);
   const picked = elements.filter((element) => selection.includes(element.id));
   const hasSelection = picked.length > 0;
+  /** Boolean combine only accepts plain shapes (a group is not a polygon) */
+  const shapeCount = picked.filter((element) => element.type === 'shape').length;
   const hit = target.elementId
     ? elements.find((element) => element.id === target.elementId)
     : undefined;
@@ -206,6 +208,30 @@ export function SlideContextMenu({
             disabled={!canUngroup}
             onClick={run(() => store().ungroupSelected())}
           />
+
+          {/* Boolean combine (P2-S5): same four ops as the toolbar menu */}
+          <Separator />
+          {(
+            [
+              ['union', 'booleanUnion'],
+              ['subtract', 'booleanSubtract'],
+              ['intersect', 'booleanIntersect'],
+              ['exclude', 'booleanExclude'],
+            ] as const
+          ).map(([op, labelKey]) => (
+            <Row
+              key={op}
+              label={t(`tools.slide.${labelKey}`)}
+              disabled={shapeCount < 2}
+              onClick={run(() => {
+                void store()
+                  .combineSelection(op)
+                  .then((result) => {
+                    if (result !== 'ok') console.warn('[slide] boolean combine skipped:', result);
+                  });
+              })}
+            />
+          ))}
 
           <Separator />
           <Row

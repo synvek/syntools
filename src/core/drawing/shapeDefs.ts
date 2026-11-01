@@ -99,6 +99,40 @@ function arrowGeometry(
   return poly(prst, arrowPoints(direction, shaft, head), adj);
 }
 
+/**
+ * Sample a normalized elliptical arc. Angles are in **turns** (0.25 = 90°), y grows downwards
+ * (canvas convention), so 0.25 is the bottom and 0.75 the top.
+ */
+function arcPoints(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  startTurn: number,
+  endTurn: number,
+  steps: number,
+): number[][] {
+  const points: number[][] = [];
+  for (let index = 0; index <= steps; index += 1) {
+    const turn = startTurn + ((endTurn - startTurn) * index) / steps;
+    const angle = turn * Math.PI * 2;
+    points.push([cx + Math.cos(angle) * rx, cy + Math.sin(angle) * ry]);
+  }
+  return points;
+}
+
+/** Single-handle presets: the handle slides along the top edge, the value is the corner size */
+function cornerAdjust(at: (value: number) => { x: number; y: number }, max = 0.5): ShapeAdjustSpec {
+  return {
+    id: 'adj1',
+    value: 0.167,
+    min: 0.05,
+    max,
+    at,
+    from: (point) => clamp(point.x, 0.05, max),
+  };
+}
+
 /** Shared shaft/head handles for the four one-direction arrows */
 function arrowAdjusts(direction: 0 | 1 | 2 | 3): ShapeAdjustSpec[] {
   const shaftHandle = (value: number) => {
@@ -688,7 +722,331 @@ export const SHAPE_DEFS: ShapeDef[] = [
         [0, 0.15],
       ]),
   },
+
+  // ------------------------------------------------ catalogue expansion (P2-S5)
+  {
+    prst: 'snip1Rect',
+    group: 'basic',
+    labelKey: 'shapePresetSnip1Rect',
+    adjusts: [cornerAdjust((value) => ({ x: 1 - value, y: value }))],
+    outline: (adj) => {
+      const size = adjValue(adj, 'adj1', 0.167);
+      return poly(
+        'snip1Rect',
+        [
+          [0, 0],
+          [1 - size, 0],
+          [1, size],
+          [1, 1],
+          [0, 1],
+        ],
+        adj,
+      );
+    },
+  },
+  {
+    prst: 'snip2DiagRect',
+    group: 'basic',
+    labelKey: 'shapePresetSnip2DiagRect',
+    adjusts: [cornerAdjust((value) => ({ x: 1 - value, y: value }))],
+    outline: (adj) => {
+      const size = adjValue(adj, 'adj1', 0.167);
+      return poly(
+        'snip2DiagRect',
+        [
+          [size, 0],
+          [1, 0],
+          [1, 1 - size],
+          [1 - size, 1],
+          [0, 1],
+          [0, size],
+        ],
+        adj,
+      );
+    },
+  },
+  {
+    prst: 'bevel',
+    group: 'basic',
+    labelKey: 'shapePresetBevel',
+    adjusts: [cornerAdjust((value) => ({ x: value, y: 0 }))],
+    outline: (adj) => {
+      const size = adjValue(adj, 'adj1', 0.167);
+      return poly(
+        'bevel',
+        [
+          [size, 0],
+          [1 - size, 0],
+          [1, size],
+          [1, 1 - size],
+          [1 - size, 1],
+          [size, 1],
+          [0, 1 - size],
+          [0, size],
+        ],
+        adj,
+      );
+    },
+  },
+  {
+    prst: 'cube',
+    group: 'basic',
+    labelKey: 'shapePresetCube',
+    adjusts: [cornerAdjust((value) => ({ x: value, y: 0 }), 0.45)],
+    outline: (adj) => {
+      const depth = adjValue(adj, 'adj1', 0.25);
+      // Silhouette of a cube: the inner edges are preset-only detail we cannot express as one outline
+      return poly(
+        'cube',
+        [
+          [depth, 0],
+          [1, 0],
+          [1, 1 - depth],
+          [1 - depth, 1],
+          [0, 1],
+          [0, depth],
+        ],
+        adj,
+      );
+    },
+  },
+  {
+    prst: 'plus',
+    group: 'basic',
+    labelKey: 'shapePresetPlus',
+    adjusts: [
+      {
+        id: 'adj1',
+        value: 0.25,
+        min: 0.05,
+        max: 0.45,
+        at: (value) => ({ x: value, y: 0 }),
+        from: (point) => clamp(point.x, 0.05, 0.45),
+      },
+    ],
+    outline: (adj) => {
+      const arm = adjValue(adj, 'adj1', 0.25);
+      const far = 1 - arm;
+      return poly(
+        'plus',
+        [
+          [arm, 0],
+          [far, 0],
+          [far, arm],
+          [1, arm],
+          [1, far],
+          [far, far],
+          [far, 1],
+          [arm, 1],
+          [arm, far],
+          [0, far],
+          [0, arm],
+          [arm, arm],
+        ],
+        adj,
+      );
+    },
+  },
+  {
+    prst: 'nonIsoscelesTrapezoid',
+    group: 'basic',
+    labelKey: 'shapePresetNonIsoscelesTrapezoid',
+    outline: () =>
+      poly('nonIsoscelesTrapezoid', [
+        [0, 1],
+        [0.25, 0],
+        [0.75, 0],
+        [1, 1],
+      ]),
+  },
+  {
+    prst: 'lightningBolt',
+    group: 'basic',
+    labelKey: 'shapePresetLightningBolt',
+    outline: () =>
+      poly('lightningBolt', [
+        [0.42, 0],
+        [0.92, 0],
+        [0.58, 0.4],
+        [1, 0.4],
+        [0.28, 1],
+        [0.44, 0.56],
+        [0, 0.56],
+      ]),
+  },
+  {
+    prst: 'moon',
+    group: 'basic',
+    labelKey: 'shapePresetMoon',
+    // Crescent: the left half of the unit circle minus an offset circle through both poles
+    outline: () => {
+      const bias = 0.5;
+      const radius = Math.hypot(bias, 0.5);
+      const bottom = Math.atan2(0.5, -bias) / (Math.PI * 2);
+      const top = Math.atan2(-0.5, -bias) / (Math.PI * 2);
+      const outer = arcPoints(0.5, 0.5, 0.5, 0.5, 0.75, 0.25, 24);
+      const inner = arcPoints(0.5 + bias, 0.5, radius, radius, bottom, top + 1, 24);
+      return poly('moon', [...outer, ...inner]);
+    },
+  },
+  {
+    prst: 'notchedRightArrow',
+    group: 'arrow',
+    labelKey: 'shapePresetNotchedRightArrow',
+    outline: () => {
+      const shaft = 0.5;
+      const head = 0.4;
+      const notch = 0.25;
+      const y0 = (1 - shaft) / 2;
+      const y1 = (1 + shaft) / 2;
+      return poly('notchedRightArrow', [
+        [0, y0],
+        [1 - head, y0],
+        [1 - head, 0],
+        [1, 0.5],
+        [1 - head, 1],
+        [1 - head, y1],
+        [0, y1],
+        [notch, 0.5],
+      ]);
+    },
+  },
+  {
+    prst: 'bentArrow',
+    group: 'arrow',
+    labelKey: 'shapePresetBentArrow',
+    outline: () => poly('bentArrow', bentArrowPoints()),
+  },
+  {
+    prst: 'bentUpArrow',
+    group: 'arrow',
+    labelKey: 'shapePresetBentUpArrow',
+    // Same outline rotated a quarter turn: the head ends up pointing up
+    outline: () =>
+      poly(
+        'bentUpArrow',
+        bentArrowPoints().map(([x, y]) => [y, 1 - x]),
+      ),
+  },
+  {
+    prst: 'star7',
+    group: 'star',
+    labelKey: 'shapePresetStar7',
+    outline: () => star('star7', 0.55),
+  },
+  {
+    prst: 'star10',
+    group: 'star',
+    labelKey: 'shapePresetStar10',
+    outline: () => star('star10', 0.6),
+  },
+  {
+    prst: 'irregularSeal1',
+    group: 'star',
+    labelKey: 'shapePresetSeal1',
+    outline: () =>
+      poly('irregularSeal1', [
+        [0.5, 0],
+        [0.62, 0.32],
+        [0.95, 0.2],
+        [0.76, 0.46],
+        [1, 0.65],
+        [0.68, 0.68],
+        [0.72, 1],
+        [0.5, 0.78],
+        [0.28, 1],
+        [0.32, 0.68],
+        [0, 0.65],
+        [0.24, 0.46],
+        [0.05, 0.2],
+        [0.38, 0.32],
+      ]),
+  },
+  {
+    prst: 'irregularSeal2',
+    group: 'star',
+    labelKey: 'shapePresetSeal2',
+    outline: () =>
+      poly(
+        'irregularSeal2',
+        Array.from({ length: 24 }, (_, index) => {
+          const turn = index / 24;
+          const angle = turn * Math.PI * 2;
+          // Alternating radii with a slight wobble so it reads as a torn seal, not a gear
+          const radius = index % 2 === 0 ? 0.5 : 0.34 + (index % 4 === 1 ? 0.03 : 0);
+          return [0.5 + Math.cos(angle) * radius, 0.5 + Math.sin(angle) * radius];
+        }),
+      ),
+  },
+  {
+    prst: 'flowChartAlternateProcess',
+    group: 'flowchart',
+    labelKey: 'shapePresetFlowAlternateProcess',
+    outline: () => rect('flowChartAlternateProcess', 0.167),
+  },
+  {
+    prst: 'flowChartManualInput',
+    group: 'flowchart',
+    labelKey: 'shapePresetFlowManualInput',
+    outline: () =>
+      poly('flowChartManualInput', [
+        [0, 0.25],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ]),
+  },
+  {
+    prst: 'flowChartManualOperation',
+    group: 'flowchart',
+    labelKey: 'shapePresetFlowManualOperation',
+    outline: () =>
+      poly('flowChartManualOperation', [
+        [0, 0],
+        [1, 0],
+        [0.8, 1],
+        [0.2, 1],
+      ]),
+  },
+  {
+    prst: 'flowChartDelay',
+    group: 'flowchart',
+    labelKey: 'shapePresetFlowDelay',
+    outline: () =>
+      poly('flowChartDelay', [[0, 0], ...arcPoints(0.5, 0.5, 0.5, 0.5, 0.75, 1.25, 24), [0, 1]]),
+  },
+  {
+    prst: 'flowChartTrapezoid',
+    group: 'flowchart',
+    labelKey: 'shapePresetFlowTrapezoid',
+    outline: () =>
+      poly('flowChartTrapezoid', [
+        [0.2, 0],
+        [0.8, 0],
+        [0.92, 1],
+        [0.08, 1],
+      ]),
+  },
 ];
+
+/**
+ * Outline of `bentArrow`: a vertical leg on the left, a horizontal leg at the bottom and a head on
+ * the right. Fixed proportions — the three-handle version would need its own drag math for little gain.
+ */
+function bentArrowPoints(): number[][] {
+  const thickness = 0.3;
+  const head = 0.3;
+  return [
+    [0, 0],
+    [thickness, 0],
+    [thickness, 1 - thickness],
+    [1 - head, 1 - thickness],
+    [1 - head, 1 - 2 * thickness],
+    [1, 1 - thickness / 2],
+    [1 - head, 1],
+    [0, 1],
+  ];
+}
 
 const DEF_BY_PRST = new Map(SHAPE_DEFS.map((def) => [def.prst, def]));
 

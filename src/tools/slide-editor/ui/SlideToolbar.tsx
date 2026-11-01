@@ -105,6 +105,10 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
   const clearFormatPainter = useSlideStore((s) => s.clearFormatPainter);
 
   const hasSelection = selection.length > 0;
+  /** Boolean combine needs at least two plain shapes; groups / other element types are not eligible */
+  const selectedShapeCount = containerElements(useSlideStore.getState()).filter(
+    (element) => selection.includes(element.id) && element.type === 'shape',
+  ).length;
 
   const insertText = () => addElement(createTextElement(doc, t('tools.slide.insertText')));
   const insertShape = (geom: ShapeGeometry) => addElement(createShapeElement(doc, geom));
@@ -171,6 +175,29 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
     { key: 'flipH', label: t('tools.slide.flipH'), onClick: () => toggleFlip('flipX') },
     { key: 'flipV', label: t('tools.slide.flipV'), onClick: () => toggleFlip('flipY') },
   ];
+
+  /** Boolean combine (P2-S5): four ops on the selected shapes, result is one custom-geometry shape */
+  const booleanItems: MenuItem[] = (
+    [
+      ['union', 'booleanUnion'],
+      ['subtract', 'booleanSubtract'],
+      ['intersect', 'booleanIntersect'],
+      ['exclude', 'booleanExclude'],
+    ] as const
+  ).map(([op, labelKey]) => ({
+    key: op,
+    label: t(`tools.slide.${labelKey}`),
+    disabled: selectedShapeCount < 2,
+    onClick: () => {
+      void useSlideStore
+        .getState()
+        .combineSelection(op)
+        .then((result) => {
+          // Empty result / unsupported outline: nothing changed, so there is nothing to undo either
+          if (result !== 'ok') console.warn('[slide] boolean combine skipped:', result);
+        });
+    },
+  }));
 
   /** Flip is a "negate" operation, so it must read the current value: patchSelected works for multi-select too */
   function toggleFlip(axis: 'flipX' | 'flipY') {
@@ -408,6 +435,13 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
               disabled={!hasSelection}
               showLabel
             />
+            <MenuButton
+              label={t('tools.slide.booleanTitle')}
+              glyph={<BooleanIcon />}
+              items={booleanItems}
+              disabled={selectedShapeCount < 2}
+              showLabel
+            />
           </div>
 
           {SEP}
@@ -569,6 +603,16 @@ function IconButton({
 }
 
 /** Shape thumbnail (inline SVG to avoid extra dependencies) */
+/** Two overlapping rings: reads as "combine" at 16px, unlike a plain merge arrow */
+function BooleanIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none">
+      <circle cx="6" cy="8" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="10.5" cy="8" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
 function ShapeGlyph({ geom }: { geom: ShapeGeometry }) {
   const common = { width: 16, height: 16, viewBox: '0 0 16 16' } as const;
   if (geom.kind === 'ellipse') {

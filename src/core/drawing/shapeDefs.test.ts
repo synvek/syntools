@@ -2,10 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { SHAPE_DEFS, resolveShapeGeometry, shapeAdjustValues, shapeAdjustments } from './shapeDefs';
 
 describe('形状预设定义', () => {
-  it('至少 40 个预设且 prst / labelKey 唯一', () => {
-    expect(SHAPE_DEFS.length).toBeGreaterThanOrEqual(40);
+  it('至少 60 个预设且 prst / labelKey 唯一', () => {
+    expect(SHAPE_DEFS.length).toBeGreaterThanOrEqual(60);
     expect(new Set(SHAPE_DEFS.map((def) => def.prst)).size).toBe(SHAPE_DEFS.length);
     expect(new Set(SHAPE_DEFS.map((def) => def.labelKey)).size).toBe(SHAPE_DEFS.length);
+  });
+
+  it('每个预设都能解析出落在单位盒内的几何', () => {
+    for (const def of SHAPE_DEFS) {
+      const geom = resolveShapeGeometry(def.prst);
+      expect(geom, def.prst).toBeDefined();
+      const points = geom?.kind === 'polygon' ? (geom.points ?? []) : [];
+      expect(points.length % 2, def.prst).toBe(0);
+      for (const value of points) {
+        expect(Number.isFinite(value), def.prst).toBe(true);
+        // A vertex outside the box would be clipped by the element bounds on render
+        expect(value, def.prst).toBeGreaterThanOrEqual(-0.001);
+        expect(value, def.prst).toBeLessThanOrEqual(1.001);
+      }
+    }
   });
 
   it('可调形状带有手柄定义，静态形状没有', () => {
