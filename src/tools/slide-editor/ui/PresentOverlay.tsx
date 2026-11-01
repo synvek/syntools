@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { advancePlayback, entranceByElement, FLY_OFFSET } from '../model/animation';
+import { slideLinkIndex } from '../model/summary';
+import { findElementDeep } from '../model/tree';
 import { backgroundFillProps } from '../render/background';
 import { createElementNode } from '../render/nodes';
 import { useSlideStore } from '../store';
@@ -287,6 +289,34 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
 
   const prev = useCallback(() => setCursor((current) => Math.max(0, current - 1)), []);
 
+  /**
+   * Summary tiles (S6.3): a click on an element carrying `linkToSlideId` jumps to that slide instead of
+   * advancing. Hit testing goes through the Konva stage, because the element boxes overlap the DOM host.
+   */
+  const followLink = useCallback(
+    (point: { clientX: number; clientY: number }): boolean => {
+      const stage = stageRef.current;
+      if (!stage) return false;
+      const rect = stage.container().getBoundingClientRect();
+      const node = stage.getIntersection({
+        x: point.clientX - rect.left,
+        y: point.clientY - rect.top,
+      });
+      if (!node) return false;
+      // Only the element group carries the id: walk up from whatever shape was hit
+      let owner: Konva.Node | null = node;
+      while (owner && !owner.id()) owner = owner.getParent();
+      const elementId = owner?.id();
+      if (!elementId) return false;
+      const element = findElementDeep(doc.slides[cursor]?.elements ?? [], elementId);
+      const index = slideLinkIndex(doc.slides, element?.linkToSlideId);
+      if (index < 0) return false;
+      setCursor(index);
+      return true;
+    },
+    [cursor, doc.slides],
+  );
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -391,7 +421,11 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
           <div
             ref={hostRef}
             className="slide-present-enter min-h-0 flex-1"
-            onClick={next}
+            onClick={(event) => {
+              // A link target wins over "advance": the tile is the whole point of a summary page
+              if (followLink(event)) return;
+              next();
+            }}
             aria-label="present stage"
           />
         ) : (

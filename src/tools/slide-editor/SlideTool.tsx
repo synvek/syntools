@@ -27,6 +27,7 @@ import { FidelityDialog } from '@/core/components/FidelityDialog';
 import { downloadBytes, downloadDataUrl } from '@/core/pdf/download';
 import { buildExportFilename } from './core';
 import { clearDraft, readDraft, writeDraft } from './draft';
+import { linkedElements } from './model/summary';
 import { disposeRaster, renderSlideToDataUrl } from './io/raster';
 import { exportSlidesToVectorPdf } from './io/pdfVector';
 import { exportPrintPdf, printSlides, type PrintOptions } from './io/print';
@@ -218,6 +219,16 @@ export default function SlideTool() {
         severity: 'warning',
         count: degraded,
         messageKey: 'tools.slide.motionChannelLoss',
+      });
+    }
+    // 摘要页的跳转是内部链接：pptx 只能靠 hyperlink 表达外部地址，导出后需要在 PowerPoint 里重设
+    const jumpLinks = linkedElements(current.slides).length;
+    if (jumpLinks > 0) {
+      exportIssues.push({
+        code: 'slide.summaryLink',
+        severity: 'warning',
+        count: jumpLinks,
+        messageKey: 'tools.slide.summaryLinkLoss',
       });
     }
     setFidelity(

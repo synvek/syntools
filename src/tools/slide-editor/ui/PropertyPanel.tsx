@@ -15,6 +15,7 @@ import {
   Field,
   NumberInput,
   Section,
+  SelectInput,
   TextArea,
   TextInput,
   ToggleGroup,
@@ -462,6 +463,19 @@ export function PropertyPanel() {
             value={element.hyperlink ?? ''}
             placeholder={t('tools.slide.hyperlinkHint')}
             onChange={(hyperlink) => apply({ hyperlink: hyperlink || undefined })}
+          />
+        </Field>
+        {/* Internal jump used by summary tiles (S6.3): follows in presentation mode, reported on export */}
+        <Field label={t('tools.slide.slideLink')}>
+          <SelectInput
+            ariaLabel={t('tools.slide.slideLink')}
+            value={element.linkToSlideId ?? ''}
+            options={['', ...doc.slides.map((slide) => slide.id)]}
+            labels={[
+              t('tools.slide.slideLinkNone'),
+              ...doc.slides.map((_, index) => String(index + 1)),
+            ]}
+            onChange={(value) => apply({ linkToSlideId: value || undefined })}
           />
         </Field>
       </Section>

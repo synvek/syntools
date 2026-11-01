@@ -217,6 +217,12 @@ interface ElementBase {
   placeholder?: PlaceholderRef;
   /** Element-level hyperlink (DrawingML `a:hlinkClick`, applies to the whole element) */
   hyperlink?: string;
+  /**
+   * Internal jump target (S6.3): the id of another slide. Used by summary pages, where each tile
+   * jumps to its section. Presentation mode follows it on click; export cannot express it as a plain
+   * hyperlink, so the export report says so instead of silently shipping a dead tile.
+   */
+  linkToSlideId?: string;
   /** Shadow */
   shadow?: ShadowStyle;
   /** Outer glow (P2-S3) */

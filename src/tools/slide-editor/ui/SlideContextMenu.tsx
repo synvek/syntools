@@ -352,6 +352,13 @@ export function SlideContextMenu({
               />
             </>
           ) : null}
+
+          {/* Summary page (S6.3): one linked tile per section, inserted after the clicked slide */}
+          <Separator />
+          <Row
+            label={t('tools.slide.insertSummarySlide')}
+            onClick={run(() => store().insertSummarySlide(t('tools.slide.summarySlideTitle')))}
+          />
         </>
       ) : null}
     </div>

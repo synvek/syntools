@@ -35,6 +35,7 @@ import {
   renameSection as renameSectionIn,
   splitSectionAt,
 } from './model/sections';
+import { buildSummarySlide, pruneSlideLinks } from './model/summary';
 import { replaceInDoc, type FindOptions, type TextHit } from './model/search';
 import { applyStyleSnapshot, extractStyleSnapshot, type StyleSnapshot } from './model/style';
 import { findTemplate, instantiateTemplate } from './model/templates';
@@ -169,6 +170,8 @@ interface SlideState {
   renameSection: (id: string, name: string) => void;
   /** Delete a section: its slides join the previous one; the last pair collapses back to a flat deck */
   removeSection: (id: string) => void;
+  /** Summary page (S6.3): insert an agenda slide after the current one, one linked tile per section */
+  insertSummarySlide: (title: string) => void;
 
   select: (ids: string[], additive?: boolean) => void;
   addElement: (element: SlideElement) => void;
@@ -635,11 +638,12 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     get().commit();
     set((s) => {
       if (s.doc.slides.length <= 1) return s;
+      const removed = s.doc.slides[index];
       const slides = s.doc.slides.filter((_, i) => i !== index);
       return {
         doc: {
           ...s.doc,
-          slides,
+          slides: pruneSlideLinks(slides, new Set([removed.id])),
           // Deleting a section's first slide must not leave a boundary pointing at a missing slide
           sections: normalizeSections(s.doc.sections, slides),
           version: s.doc.version + 1,
@@ -706,6 +710,22 @@ export const useSlideStore = create<SlideState>((set, get) => ({
         version: s.doc.version + 1,
       },
     }));
+  },
+
+  insertSummarySlide: (title) => {
+    get().commit();
+    set((s) => {
+      const { slide } = buildSummarySlide(s.doc, title);
+      const slides = [...s.doc.slides];
+      // Right after the current slide: the summary reads as an agenda for what follows
+      const at = Math.min(slides.length, s.slideIndex + 1);
+      slides.splice(at, 0, slide);
+      return {
+        doc: { ...s.doc, slides, version: s.doc.version + 1 },
+        slideIndex: at,
+        selection: [],
+      };
+    });
   },
 
   select: (ids, additive = false) =>
