@@ -49,9 +49,9 @@ function makeSnapshot(overrides: Partial<WorkbookSnapshot> = {}): WorkbookSnapsh
       s1: {
         ...createEmptySheet('s1', SHEET_NAME),
         cellData: {
-          '0': { '0': { v: 'Month' }, '1': { v: 'Qty' } },
-          '1': { '0': { v: 'Jan' }, '1': { v: 10 } },
-          '2': { '0': { v: 'Feb' }, '1': { v: 20 } },
+          '0': { '0': { v: 'Month' }, '1': { v: 'Qty' }, '2': { v: 'Growth' } },
+          '1': { '0': { v: 'Jan' }, '1': { v: 10 }, '2': { v: 0.1 } },
+          '2': { '0': { v: 'Feb' }, '1': { v: 20 }, '2': { v: 0.2 } },
         },
       },
     },
@@ -226,9 +226,9 @@ describe('buildChartPlan', () => {
 });
 
 describe('导出 .xlsx：新图表类型（P2-S8）', () => {
-  const exportOne = async (type: ChartConfig['type']) => {
+  const exportOne = async (patch: Partial<ChartConfig>) => {
     const result = await exportSnapshotToBytes(
-      makeSnapshot({ syntoolsCharts: [{ ...CHART, type }] }),
+      makeSnapshot({ syntoolsCharts: [{ ...CHART, ...patch }] }),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return '';
@@ -237,21 +237,49 @@ describe('导出 .xlsx：新图表类型（P2-S8）', () => {
   };
 
   it('散点图导出为 scatterChart + xVal/yVal', async () => {
-    const chart = await exportOne('scatter');
+    const chart = await exportOne({ type: 'scatter' });
     expect(chart).toContain('<c:scatterChart>');
     expect(chart).toContain('<c:xVal>');
     expect(chart).toContain('<c:yVal>');
   });
 
   it('雷达图导出为 radarChart', async () => {
-    const chart = await exportOne('radar');
+    const chart = await exportOne({ type: 'radar' });
     expect(chart).toContain('<c:radarChart>');
   });
 
   it('组合图导出两个图表组（柱 + 折线）', async () => {
-    const chart = await exportOne('combo');
+    // 组合图至少两列数据：最后一列才是折线，单列时退化为纯柱图
+    const chart = await exportOne({
+      type: 'combo',
+      range: { startRow: 0, startColumn: 0, endRow: 2, endColumn: 2 },
+    });
     expect(chart).toContain('<c:barChart>');
     expect(chart).toContain('<c:lineChart>');
+  });
+
+  it('单列数据的组合图不会输出空的折线组', async () => {
+    const chart = await exportOne({ type: 'combo' });
+    expect(chart).toContain('<c:barChart>');
+    expect(chart).not.toContain('<c:lineChart>');
+  });
+
+  it('面积图导出为 areaChart（原生图表，不是图片）', async () => {
+    const chart = await exportOne({ type: 'area' });
+    expect(chart).toContain('<c:areaChart>');
+    expect(chart).toContain('<a:alpha val="60000"/>');
+  });
+
+  it('双轴导出两组柱 + 一条共用分类轴 + 两条数值轴', async () => {
+    const chart = await exportOne({
+      type: 'bar',
+      range: { startRow: 0, startColumn: 0, endRow: 2, endColumn: 2 },
+      secondary: true,
+    });
+    expect(chart.match(/<c:barChart>/g)).toHaveLength(2);
+    expect(chart.match(/<c:catAx>/g)).toHaveLength(1);
+    expect(chart.match(/<c:valAx>/g)).toHaveLength(2);
+    expect(chart).toContain('<c:axPos val="r"/>');
   });
 });
 

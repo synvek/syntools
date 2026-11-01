@@ -1,9 +1,11 @@
 import {
-  comboSeriesType,
   resolveChart,
+  seriesRenderKind,
+  usesSecondaryAxis,
   type ChartConfig,
   type ChartSpec,
   type ChartType,
+  type SeriesRenderKind,
 } from './charts';
 import { columnIndexToName, type WorkbookSnapshotLite } from './core';
 import {
@@ -48,6 +50,11 @@ const CT_CHART = 'application/vnd.openxmlformats-officedocument.drawingml.chart+
 /** Axis ids: any valid positive integers, as long as the chart group and axes cross-reference consistently */
 const CAT_AX_ID = '111111111';
 const VAL_AX_ID = '222222222';
+/**
+ * 次坐标轴的数值轴。Excel 的双轴图就是"两个图表组共用同一个分类轴、各自一条数值轴"，
+ * 次轴用 `axPos="r"` + `crosses="max"` 落到右侧，不需要第二条分类轴。
+ */
+const SECOND_VAL_AX_ID = '333333333';
 
 /** Series palette (close to the in-app ECharts look, and easy to tell series apart) */
 const SERIES_COLORS = [
@@ -174,13 +181,15 @@ function seriesXml(
   const values = `<c:val><c:numRef><c:f>${xmlEscape(
     absoluteRangeRef(sheetName, item.startRow, item.endRow, item.column),
   )}</c:f>${numCache(item.data)}</c:numRef></c:val>`;
-  // Pie slices are coloured via varyColors, so no series fill is written
+  // Pie slices are coloured via varyColors, so no series fill is written.
+  // 面积图叠在一起，半透明才能看清每一层（与 ECharts 的 areaStyle.opacity = 0.6 对齐）
+  const color = SERIES_COLORS[index % SERIES_COLORS.length];
   const shape =
     type === 'pie'
       ? ''
-      : `<c:spPr><a:solidFill><a:srgbClr val="${
-          SERIES_COLORS[index % SERIES_COLORS.length]
-        }"/></a:solidFill></c:spPr>`;
+      : kind === 'area'
+        ? `<c:spPr><a:solidFill><a:srgbClr val="${color}"><a:alpha val="60000"/></a:srgbClr></a:solidFill></c:spPr>`
+        : `<c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></c:spPr>`;
 
   // 散点图：X 轴也是数值轴，序列里必须用 xVal/yVal（不能用 cat/val，Excel 会当成"无法识别的图表"）
   if (kind === 'scatter') {
@@ -207,48 +216,94 @@ function seriesXml(
 }
 
 /** Category axis + value axis (element order per CT_CatAx / CT_ValAx) */
-function axesXml(): string {
+function axesXml(hasSecondary = false): string {
   const catAx = `<c:catAx><c:axId val="${CAT_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${VAL_AX_ID}"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx>`;
   const valAx = `<c:valAx><c:axId val="${VAL_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${CAT_AX_ID}"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`;
-  return catAx + valAx;
+  if (!hasSecondary) return catAx + valAx;
+  // 次轴：不画网格线（与主轴网格线会重叠成一片），crosses="max" 让它在分类轴最右端交叉 → 显示在右侧
+  const secondaryValAx = `<c:valAx><c:axId val="${SECOND_VAL_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${CAT_AX_ID}"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`;
+  return catAx + valAx + secondaryValAx;
+}
+
+/** 一组同画法、同坐标轴的系列：OOXML 里一个 chart group 只能一种画法、一对 axId */
+interface ChartGroup {
+  render: SeriesRenderKind;
+  secondary: boolean;
+  indexes: number[];
+}
+
+/** 输出顺序固定为 柱 → 线 → 面积（主组在前、次组在后），Excel 的图例顺序才与系列顺序一致 */
+const RENDER_ORDER: SeriesRenderKind[] = ['bar', 'line', 'area'];
+
+function groupSeries(spec: ChartSpec, type: ChartType, secondary: boolean): ChartGroup[] {
+  const total = spec.series.length;
+  const groups: ChartGroup[] = [];
+  for (const render of RENDER_ORDER) {
+    for (const onSecondary of [false, true]) {
+      const indexes = spec.series
+        .map((_, index) => index)
+        .filter(
+          (index) =>
+            seriesRenderKind(type, index, total) === render &&
+            usesSecondaryAxis(secondary, index, total) === onSecondary,
+        );
+      if (indexes.length > 0) {
+        groups.push({ render, secondary: onSecondary, indexes });
+      }
+    }
+  }
+  return groups;
+}
+
+function groupXml(group: ChartGroup, spec: ChartSpec, sheetName: string, type: ChartType): string {
+  const sers = group.indexes
+    .map((index) => seriesXml(spec, index, sheetName, type, group.render))
+    .join('');
+  const axIds = `<c:axId val="${CAT_AX_ID}"/><c:axId val="${
+    group.secondary ? SECOND_VAL_AX_ID : VAL_AX_ID
+  }"/>`;
+  if (group.render === 'line') {
+    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}<c:marker val="1"/>${axIds}</c:lineChart>`;
+  }
+  if (group.render === 'area') {
+    return `<c:areaChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}${axIds}</c:areaChart>`;
+  }
+  return `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${sers}<c:gapWidth val="150"/>${axIds}</c:barChart>`;
+}
+
+export interface ChartXmlOptions {
+  /** 最后一个系列走次坐标轴（与 `ChartConfig.secondary` 是同一个字段） */
+  secondary?: boolean;
 }
 
 /** Build chartN.xml (chartSpace → chart → plotArea → chart group + axes) */
-export function buildChartXml(spec: ChartSpec, type: ChartType, sheetName: string): string {
+export function buildChartXml(
+  spec: ChartSpec,
+  type: ChartType,
+  sheetName: string,
+  options: ChartXmlOptions = {},
+): string {
   const sers = spec.series.map((_, index) => seriesXml(spec, index, sheetName, type)).join('');
   const axIds = `<c:axId val="${CAT_AX_ID}"/><c:axId val="${VAL_AX_ID}"/>`;
   let group: string;
+  let hasSecondary = false;
   if (type === 'pie') {
     group = `<c:pieChart><c:varyColors val="1"/>${sers}</c:pieChart>`;
-  } else if (type === 'line') {
-    group = `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}<c:marker val="1"/>${axIds}</c:lineChart>`;
   } else if (type === 'scatter') {
     group = `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${sers}${axIds}</c:scatterChart>`;
   } else if (type === 'radar') {
     group = `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${sers}${axIds}</c:radarChart>`;
-  } else if (type === 'combo') {
-    /**
-     * 组合图 = 一个柱图组 + 一个折线图组，两组共用同一对 axId。
-     * 拆组而不是给单组混排，是因为 OOXML 里 series 的画法由所属 chart group 决定。
-     */
-    const total = spec.series.length;
-    const bars = spec.series
-      .map((_, index) => (comboSeriesType(index, total) === 'bar' ? index : -1))
-      .filter((index) => index >= 0)
-      .map((index) => seriesXml(spec, index, sheetName, type, 'bar'))
-      .join('');
-    const lines = spec.series
-      .map((_, index) => (comboSeriesType(index, total) === 'line' ? index : -1))
-      .filter((index) => index >= 0)
-      .map((index) => seriesXml(spec, index, sheetName, type, 'line'))
-      .join('');
-    group =
-      `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${bars}<c:gapWidth val="150"/>${axIds}</c:barChart>` +
-      `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${lines}<c:marker val="1"/>${axIds}</c:lineChart>`;
   } else {
-    group = `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${sers}<c:gapWidth val="150"/>${axIds}</c:barChart>`;
+    /**
+     * 柱 / 线 / 面积 / 组合 + 可选双轴：按"画法 × 坐标轴"分组，每组一个 chart group。
+     * 拆组而不是给单组混排，是因为 OOXML 里系列的画法和所属轴都由 chart group 决定；
+     * 双轴则是两组共用同一个分类轴、各带一条数值轴（与 Excel 自己生成的结构一致）。
+     */
+    const groups = groupSeries(spec, type, options.secondary === true);
+    hasSecondary = groups.some((item) => item.secondary);
+    group = groups.map((item) => groupXml(item, spec, sheetName, type)).join('');
   }
-  const axes = type === 'pie' ? '' : axesXml();
+  const axes = type === 'pie' ? '' : axesXml(hasSecondary);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${A_NS}" xmlns:r="${R_NS}"><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/>${group}${axes}</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
 }
 
@@ -284,11 +339,14 @@ export function splitSheetRef(ref: string): { sheetName: string | null; body: st
 export function parseChartXml(xml: string): ParsedChartXml | null {
   const hasBar = /<c:barChart\b/.test(xml) || /<c:bar3DChart\b/.test(xml);
   const hasLine = /<c:lineChart\b/.test(xml) || /<c:line3DChart\b/.test(xml);
+  const hasArea = /<c:areaChart\b/.test(xml) || /<c:area3DChart\b/.test(xml);
   let type: ChartType | null = null;
   if (hasBar && hasLine) type = 'combo';
   else if (/<c:scatterChart\b/.test(xml)) type = 'scatter';
   else if (/<c:radarChart\b/.test(xml)) type = 'radar';
   else if (/<c:pieChart\b/.test(xml) || /<c:doughnutChart\b/.test(xml)) type = 'pie';
+  // 面积图排在折线之前：Excel 的"带数据标记的面积图"可能同时带 lineChart
+  else if (hasArea) type = 'area';
   else if (hasLine) type = 'line';
   else if (hasBar) type = 'bar';
   if (!type) return null;
@@ -526,7 +584,9 @@ export function buildChartPlan(source: ChartPlanSource): XlsxChartPlan {
     const spec = resolveChart(source, sheetId ?? null, config.range);
     if (!spec.ok) continue;
     (chartsBySheet[sheetName] ??= []).push({
-      chartXml: buildChartXml(spec.value, config.type, sheetName),
+      chartXml: buildChartXml(spec.value, config.type, sheetName, {
+        secondary: config.secondary,
+      }),
       anchor: { x: config.x, y: config.y, width: config.width, height: config.height },
     });
   }

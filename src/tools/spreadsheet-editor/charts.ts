@@ -26,19 +26,20 @@ export interface ChartData {
   rangeLabel: string;
 }
 
-export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'radar' | 'combo';
+export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'scatter' | 'radar' | 'combo';
 
 /**
  * P2-S8 扩展后的图表类型。`combo`（组合图）沿用同一个 `range`：
- * 除最后一个系列外都画柱，最后一个系列画折线 —— "销量 + 增长率" 是最常见的用法，
- * 单一坐标轴也让两侧尺度差异不至于把柱子压成一条线（次坐标轴留到后面再做）。
+ * 除最后一个系列外都画柱，最后一个系列画折线 —— "销量 + 增长率" 是最常见的用法。
+ * 双轴不再藏在类型里，而是 `ChartConfig.secondary` 一个开关（见 `usesSecondaryAxis`）。
  */
-export const CHART_TYPES: ChartType[] = ['bar', 'line', 'pie', 'scatter', 'radar', 'combo'];
+export const CHART_TYPES: ChartType[] = ['bar', 'line', 'area', 'pie', 'scatter', 'radar', 'combo'];
 
 /** 类型 → 文案 key（面板按钮与导入统计共用一份，避免两处各写一遍） */
 export const CHART_TYPE_LABEL_KEY: Record<ChartType, string> = {
   bar: 'chartBar',
   line: 'chartLine',
+  area: 'chartArea',
   pie: 'chartPie',
   scatter: 'chartScatter',
   radar: 'chartRadar',
@@ -48,6 +49,38 @@ export const CHART_TYPE_LABEL_KEY: Record<ChartType, string> = {
 /** 组合图里每个系列的画法：最后一个系列用折线，其余柱状 */
 export function comboSeriesType(index: number, total: number): 'bar' | 'line' {
   return total > 1 && index === total - 1 ? 'line' : 'bar';
+}
+
+/** 分类轴图上单个系列的画法（饼/散点/雷达不参与） */
+export type SeriesRenderKind = 'bar' | 'line' | 'area';
+
+/**
+ * 类型 + 系列序号 → 画法。除组合图外整张图一种画法，所以这里只有组合图需要看序号。
+ * ECharts 与 OOXML 两侧都走这个函数，避免"应用里画的"和"Excel 里看到的"不一致。
+ */
+export function seriesRenderKind(type: ChartType, index: number, total: number): SeriesRenderKind {
+  if (type === 'combo') return comboSeriesType(index, total);
+  if (type === 'line') return 'line';
+  if (type === 'area') return 'area';
+  return 'bar';
+}
+
+/** 饼图 / 散点图 / 雷达图没有"第二条数值轴"的语义，不提供次坐标轴开关 */
+export function supportsSecondaryAxis(type: ChartType): boolean {
+  return type === 'bar' || type === 'line' || type === 'area' || type === 'combo';
+}
+
+/**
+ * 次坐标轴挂在"最后一个系列"上 —— 与组合图"最后一列画折线"是同一条规则
+ * （"销量 + 增长率" 里增长率走次轴），配置只留开/关，不再暴露一个系列索引。
+ * 只有一个系列时开关没有意义（全部挪到次轴等于没双轴），此时返回 false。
+ */
+export function usesSecondaryAxis(
+  secondary: boolean | undefined,
+  index: number,
+  total: number,
+): boolean {
+  return secondary === true && total > 1 && index === total - 1;
 }
 
 /**
@@ -62,6 +95,8 @@ export interface ChartConfig {
   range: ChartRange;
   /** Sheet the chart belongs to: it keeps reading that sheet and only shows on it after a sheet switch */
   sheetId?: string;
+  /** 最后一个系列走次坐标轴（右轴）；仅对柱/线/面积/组合图有效，见 `usesSecondaryAxis` */
+  secondary?: boolean;
   x: number;
   y: number;
   width: number;
@@ -248,8 +283,17 @@ export function buildChartData(
   };
 }
 
+export interface ChartOptionOptions {
+  /** 最后一个系列走次坐标轴（右轴），与 OOXML 侧的 `buildChartXml(..., { secondary })` 一一对应 */
+  secondary?: boolean;
+}
+
 /** Build an ECharts option (a pie slices the first series by category; the rest use a category axis with multiple series) */
-export function buildChartOption(data: ChartData, type: ChartType): Record<string, unknown> {
+export function buildChartOption(
+  data: ChartData,
+  type: ChartType,
+  options: ChartOptionOptions = {},
+): Record<string, unknown> {
   if (type === 'pie') {
     const first = data.series[0];
     return {
@@ -316,19 +360,28 @@ export function buildChartOption(data: ChartData, type: ChartType): Record<strin
     };
   }
 
+  const total = data.series.length;
+  // 双轴：主/次各一条数值轴，只有最后一个系列挂到右轴（与 OOXML 的组划分同一规则）
+  const dual = options.secondary === true && total > 1 && supportsSecondaryAxis(type);
   return {
     tooltip: { trigger: 'axis' },
     legend: { bottom: 0, type: 'scroll' },
-    grid: { left: 12, right: 20, top: 24, bottom: 44, containLabel: true },
+    grid: { left: 12, right: dual ? 48 : 20, top: 24, bottom: 44, containLabel: true },
     xAxis: { type: 'category', data: data.categories },
-    yAxis: { type: 'value' },
+    yAxis: dual
+      ? [{ type: 'value' }, { type: 'value', splitLine: { show: false } }]
+      : { type: 'value' },
     series: data.series.map((item, index) => {
-      const kind = type === 'combo' ? comboSeriesType(index, data.series.length) : type;
+      const kind = seriesRenderKind(type, index, total);
+      // 面积图在 ECharts 里是"折线 + 面积填充"，没有独立的 area 系列类型
+      const echartsType = kind === 'area' ? 'line' : kind;
       return {
         name: item.name,
-        type: kind,
+        type: echartsType,
         data: item.data,
         ...(kind === 'line' ? { smooth: true } : {}),
+        ...(kind === 'area' ? { areaStyle: { opacity: 0.6 } } : {}),
+        ...(dual && usesSecondaryAxis(options.secondary, index, total) ? { yAxisIndex: 1 } : {}),
       };
     }),
   };

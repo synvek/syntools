@@ -7,6 +7,7 @@ import {
   buildChartOption,
   buildRangeLabel,
   parseRangeLabel,
+  supportsSecondaryAxis,
   type ChartConfig,
   type ChartData,
   type ChartType,
@@ -94,9 +95,14 @@ export function ChartOverlay({
           charts.BarChart,
           charts.LineChart,
           charts.PieChart,
+          // 散点 / 雷达必须在 core.use 里注册，否则 setOption 会报"系列未导入"；
+          // 面积图没有独立系列类型，复用 LineChart + areaStyle
+          charts.ScatterChart,
+          charts.RadarChart,
           components.GridComponent,
           components.TooltipComponent,
           components.LegendComponent,
+          components.RadarComponent,
           renderers.CanvasRenderer,
         ]);
         const instance = core.init(host) as unknown as ChartInstance;
@@ -119,8 +125,11 @@ export function ChartOverlay({
 
   useEffect(() => {
     if (!ready || !data) return;
-    instanceRef.current?.setOption(buildChartOption(data, config.type), true);
-  }, [ready, data, config.type]);
+    instanceRef.current?.setOption(
+      buildChartOption(data, config.type, { secondary: config.secondary }),
+      true,
+    );
+  }, [ready, data, config.type, config.secondary]);
 
   /**
    * Attach pointermove / pointerup to window for the duration of a gesture.
@@ -262,6 +271,22 @@ export function ChartOverlay({
               {t(`tools.sheet.${TYPE_LABEL_KEY[item]}`)}
             </button>
           ))}
+          {/* 次坐标轴只对柱/线/面积/组合有意义，且至少两个系列才有"主 + 次"可言 */}
+          {supportsSecondaryAxis(config.type) && (data?.series.length ?? 0) > 1 ? (
+            <button
+              type="button"
+              aria-pressed={config.secondary === true}
+              title={t('tools.sheet.chartSecondaryHint')}
+              onClick={() => onChange({ secondary: config.secondary !== true })}
+              className={`h-6 rounded border px-1.5 text-[11px] transition-colors ${
+                config.secondary
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : 'border-gray-300 text-gray-600 hover:bg-gray-200 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
+            >
+              {t('tools.sheet.chartSecondary')}
+            </button>
+          ) : null}
           <button
             type="button"
             title={t('tools.sheet.chartExportPng')}
