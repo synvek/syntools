@@ -581,7 +581,7 @@ export function buildChartPlan(source: ChartPlanSource): XlsxChartPlan {
     const sheetId = config.sheetId && source.sheets?.[config.sheetId] ? config.sheetId : fallbackId;
     const sheetName = sheetId ? source.sheets?.[sheetId]?.name : undefined;
     if (!sheetName) continue;
-    const spec = resolveChart(source, sheetId ?? null, config.range);
+    const spec = resolveChart(source, sheetId ?? null, config.range, { type: config.type });
     if (!spec.ok) continue;
     (chartsBySheet[sheetName] ??= []).push({
       chartXml: buildChartXml(spec.value, config.type, sheetName, {

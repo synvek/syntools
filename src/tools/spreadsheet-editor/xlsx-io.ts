@@ -42,6 +42,7 @@ import { buildChartPlan, injectChartsIntoXlsx } from './chartXml';
 import { buildPivotXlsxPlan, injectPivotTablesIntoXlsx } from './pivotXlsx';
 import { collectEditorValidation } from './cfdv';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
+import { adoptChartParts, metricsOfSheet } from './chartAdopt';
 import { buildShapePlan, collectSheetShapes, injectShapesIntoXlsx } from './shapesXml';
 import type { SheetShapeConfig } from './shapes';
 import { injectNamedRanges, readNamedRangesFromXlsx, type NamedRange } from './namedRanges';
@@ -452,6 +453,22 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
     // Names live in workbook.xml (exceljs drops `localSheetId`, so they are read from the raw part)
     const namedRanges = await readNamedRangesFromXlsx(normalized, sheetOrder, sheets);
 
+    // Charts "import as editable": translate every native chart we can read into a ChartConfig and
+    // drop its part from the preserved set — keeping both would write the same chart twice on export.
+    // Anything we cannot express stays a verbatim part (see chartAdopt).
+    const charts = adoptChartParts(rawParts, {
+      sheetIdsByName: Object.fromEntries(
+        Object.entries(sheets)
+          .filter(([, sheet]) => Boolean(sheet.name))
+          .map(([id, sheet]) => [sheet.name as string, id]),
+      ),
+      metricsByName: Object.fromEntries(
+        Object.entries(sheets)
+          .filter(([, sheet]) => Boolean(sheet.name))
+          .map(([, sheet]) => [sheet.name as string, metricsOfSheet(sheet)]),
+      ),
+    });
+
     return {
       ok: true,
       value: {
@@ -465,7 +482,8 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
         ...(Object.keys(sheetExtras).length > 0
           ? { syntoolsExtras: { version: 1 as const, sheets: sheetExtras } }
           : {}),
-        ...(rawParts ? { syntoolsRawParts: rawParts } : {}),
+        ...(charts.charts.length > 0 ? { syntoolsCharts: charts.charts } : {}),
+        ...(charts.parts ? { syntoolsRawParts: charts.parts } : {}),
         ...(importedShapes.length > 0 ? { syntoolsShapes: importedShapes } : {}),
         ...(namedRanges.length > 0 ? { namedRanges } : {}),
         ...(protections.length > 0 ? { syntoolsProtection: protections } : {}),

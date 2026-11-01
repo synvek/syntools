@@ -1,5 +1,5 @@
 import { parseChartXml } from './chartXml';
-import type { ChartType } from './charts';
+import type { ChartConfig, ChartType } from './charts';
 
 /**
  * 图表回读（P2-S8）。
@@ -60,4 +60,28 @@ export function chartTypeBreakdown(
     .filter(([, count]) => count > 0)
     .sort((a, b) => b[1] - a[1])
     .map(([type, count]) => ({ type, count }));
+}
+
+/** 导入后的图表情况：转成了可编辑配置的，以及只能原样保留的 */
+export interface ChartImportReport {
+  editable: ChartFileSummary;
+  kept: ChartFileSummary;
+}
+
+/**
+ * 导入提示的唯一入口：`charts` 是 `adoptChartParts` 转出来的配置，`parts` 是摘除后剩下的原生 part。
+ * 两者都空说明文件里没有图表，返回 null（界面不显示提示）。
+ */
+export function summarizeImport(
+  charts: readonly ChartConfig[],
+  parts: Readonly<Record<string, string>> | null | undefined,
+): ChartImportReport | null {
+  const editable: ChartFileSummary = { total: 0, byType: {}, unknown: 0 };
+  for (const chart of charts) {
+    editable.total += 1;
+    editable.byType[chart.type] = (editable.byType[chart.type] ?? 0) + 1;
+  }
+  const kept = summarizeChartParts(parts ?? {});
+  if (editable.total === 0 && kept.total === 0) return null;
+  return { editable, kept };
 }

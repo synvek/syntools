@@ -36,7 +36,7 @@ import {
 import { csvToSnapshot, snapshotToCsv } from './csv';
 import { CHART_TYPE_LABEL_KEY, buildChartData, type ChartConfig, type ChartData } from './charts';
 import { registerChartStrings } from './chartStrings';
-import { chartTypeBreakdown, summarizeChartParts, type ChartFileSummary } from './chartImport';
+import { chartTypeBreakdown, summarizeImport, type ChartImportReport } from './chartImport';
 import { registerShapeStrings } from './shapeStrings';
 import {
   buildSheetLayout,
@@ -208,7 +208,7 @@ export default function SpreadsheetTool() {
   const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
   const [chartNotice, setChartNotice] = useState(false);
   /** 导入文件里保留下来的原生图表统计（P2-S8 回读：只报数量与类型，不做语义重建） */
-  const [chartImport, setChartImport] = useState<ChartFileSummary | null>(null);
+  const [chartImport, setChartImport] = useState<ChartImportReport | null>(null);
   /** Sheet area size: the bounds for dragging / resizing charts */
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
   const chartSeqRef = useRef(0);
@@ -309,7 +309,7 @@ export default function SpreadsheetTool() {
     }
     const next: Record<string, ChartData | null> = {};
     for (const config of configs) {
-      const result = buildChartData(snapshot, config.sheetId ?? sheetId, config.range);
+      const result = buildChartData(snapshot, config.sheetId ?? sheetId, config.range, config.type);
       next[config.id] = result.ok ? result.value : null;
     }
     setChartDataMap(next);
@@ -325,7 +325,7 @@ export default function SpreadsheetTool() {
       return;
     }
     const sheetId = handle.getActiveSheetId();
-    const result = buildChartData(handle.getSnapshot(), sheetId, range);
+    const result = buildChartData(handle.getSnapshot(), sheetId, range, 'bar');
     if (!result.ok) {
       setChartNotice(true);
       return;
@@ -652,9 +652,6 @@ export default function SpreadsheetTool() {
         if (!extrasRef.current) extrasRef.current = readWorkbookExtras(pending);
         if (!rawPartsRef.current) {
           rawPartsRef.current = pending.syntoolsRawParts ?? null;
-          setChartImport(
-            rawPartsRef.current ? summarizeChartParts(rawPartsRef.current.parts) : null,
-          );
         }
         if (chartsRef.current.length === 0) {
           const configs = pending.syntoolsCharts ?? [];
@@ -664,6 +661,8 @@ export default function SpreadsheetTool() {
             setSelectedChartId(configs[0]?.id ?? null);
           }
         }
+        // 图表导入提示：已转换成可编辑配置的 + 只能原样保留的（两者都为 0 时为 null，不显示）
+        setChartImport(summarizeImport(chartsRef.current, rawPartsRef.current?.parts));
         if (shapesRef.current.length === 0) {
           const shapeConfigs = pending.syntoolsShapes ?? [];
           if (shapeConfigs.length > 0) {
@@ -967,11 +966,11 @@ export default function SpreadsheetTool() {
       // Tool-owned content carried by the snapshot: conditional formatting / data validation + charts + native chart parts
       extrasRef.current = readWorkbookExtras(snapshot);
       rawPartsRef.current = snapshot.syntoolsRawParts ?? null;
-      setChartImport(rawPartsRef.current ? summarizeChartParts(rawPartsRef.current.parts) : null);
       const configs = snapshot.syntoolsCharts ?? [];
       chartsRef.current = configs;
       setCharts(configs);
       setSelectedChartId(configs[0]?.id ?? null);
+      setChartImport(summarizeImport(configs, rawPartsRef.current?.parts));
       const commentMap = readSheetComments(snapshot);
       commentsLoadedRef.current = true;
       commentsRef.current = commentMap;
@@ -1697,15 +1696,23 @@ export default function SpreadsheetTool() {
         </p>
       ) : null}
 
-      {chartImport && chartImport.total > 0 ? (
+      {chartImport ? (
         <p role="status" className="text-[11px] text-gray-500 dark:text-gray-400">
-          {t('tools.sheet.chartImported', { count: chartImport.total })}
-          {chartTypeBreakdown(chartImport).length > 0
-            ? ` · ${chartTypeBreakdown(chartImport)
-                .map(
-                  (item) => `${t(`tools.sheet.${CHART_TYPE_LABEL_KEY[item.type]}`)} ${item.count}`,
-                )
-                .join(' / ')}`
+          {chartImport.editable.total > 0
+            ? `${t('tools.sheet.chartImported', { count: chartImport.editable.total })}${
+                chartTypeBreakdown(chartImport.editable).length > 0
+                  ? ` · ${chartTypeBreakdown(chartImport.editable)
+                      .map(
+                        (item) =>
+                          `${t(`tools.sheet.${CHART_TYPE_LABEL_KEY[item.type]}`)} ${item.count}`,
+                      )
+                      .join(' / ')}`
+                  : ''
+              }`
+            : ''}
+          {chartImport.editable.total > 0 && chartImport.kept.total > 0 ? ' · ' : ''}
+          {chartImport.kept.total > 0
+            ? t('tools.sheet.chartKept', { count: chartImport.kept.total })
             : ''}
         </p>
       ) : null}

@@ -5,9 +5,20 @@ import { Icon } from '@/core/components/Icon';
 import { advancePlayback, entranceByElement, FLY_OFFSET } from '../model/animation';
 import { slideLinkIndex } from '../model/summary';
 import { findElementDeep } from '../model/tree';
+import { renderSlideToDataUrl } from '../io/raster';
 import { backgroundFillProps } from '../render/background';
 import { createElementNode } from '../render/nodes';
 import { useSlideStore } from '../store';
+import {
+  PRESENTER_WINDOW_NAME,
+  createPresenterChannel,
+  formatClock,
+  isPresenterAlive,
+  isPresenterMessage,
+  presenterHtml,
+  type PresenterFrame,
+  type PresenterLabels,
+} from './presenter';
 
 /**
  * Presentation mode.
@@ -29,6 +40,11 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
   const [laser, setLaser] = useState(false);
   const [showNotes, setShowNotes] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  /** 副屏是否已打开（>0 表示打开过；用计数而不是布尔，方便"重新打开时主动推一帧"） */
+  const [presenterReady, setPresenterReady] = useState(0);
+  const [presenterBlocked, setPresenterBlocked] = useState(false);
+  const presenterWindowRef = useRef<Window | null>(null);
+  const presenterChannelRef = useRef<BroadcastChannel | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -289,6 +305,135 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
 
   const prev = useCallback(() => setCursor((current) => Math.max(0, current - 1)), []);
 
+  /* ------------------------- Speaker view (second window, P2-S10) ------------------------- */
+
+  // 副屏的翻页命令要落到最新的 next/prev 上（它们依赖 cursor，每次换页都会重建）
+  const nextRef = useRef(next);
+  const prevRef = useRef(prev);
+  nextRef.current = next;
+  prevRef.current = prev;
+
+  // 副屏文案只在"打开窗口"那一刻用一次，放 ref 里避免 openPresenter 因 t 变化而重建
+  const labelsRef = useRef<PresenterLabels>({
+    title: '',
+    current: '',
+    next: '',
+    notes: '',
+    notesEmpty: '',
+    prev: '',
+    nextAction: '',
+    waiting: '',
+  });
+  labelsRef.current = {
+    title: t('tools.slide.presenter'),
+    current: t('tools.slide.presenterCurrent'),
+    next: t('tools.slide.nextSlide'),
+    notes: t('tools.slide.notes'),
+    notesEmpty: t('tools.slide.notesHint'),
+    prev: t('tools.slide.prevSlide'),
+    nextAction: t('tools.slide.nextSlide'),
+    waiting: t('tools.slide.presenterWaiting'),
+  };
+
+  const closePresenter = useCallback(() => {
+    const channel = presenterChannelRef.current;
+    presenterChannelRef.current = null;
+    channel?.postMessage({ type: 'closed' });
+    channel?.close();
+    const win = presenterWindowRef.current;
+    presenterWindowRef.current = null;
+    if (isPresenterAlive(win)) win?.close();
+    setPresenterReady(0);
+    setPresenterBlocked(false);
+  }, []);
+
+  /**
+   * 打开副屏。`window.open` 必须在用户手势里同步调用 —— 先 await 再 open 会被浏览器当成弹窗拦截。
+   * 被拦截时只提示，不阻断放映（单屏演讲者面板仍在）。
+   */
+  const openPresenter = useCallback(() => {
+    const alive = presenterWindowRef.current;
+    if (isPresenterAlive(alive)) {
+      alive?.focus();
+      return;
+    }
+    const win = window.open('', PRESENTER_WINDOW_NAME, 'popup=yes,width=1280,height=800');
+    if (!win) {
+      setPresenterBlocked(true);
+      return;
+    }
+    try {
+      win.document.open();
+      win.document.write(presenterHtml(labelsRef.current));
+      win.document.close();
+    } catch {
+      setPresenterBlocked(true);
+      win.close();
+      return;
+    }
+    presenterWindowRef.current = win;
+    setPresenterBlocked(false);
+    if (!presenterChannelRef.current) {
+      const channel = createPresenterChannel();
+      if (channel) {
+        channel.onmessage = (event: MessageEvent) => {
+          const message = event.data;
+          if (!isPresenterMessage(message) || message.type !== 'command') return;
+          if (message.action === 'next') nextRef.current();
+          else prevRef.current();
+        };
+        presenterChannelRef.current = channel;
+      }
+    }
+    setPresenterReady((value) => value + 1);
+  }, []);
+
+  const togglePresenter = useCallback(() => {
+    if (presenterReady > 0) closePresenter();
+    else openPresenter();
+  }, [closePresenter, openPresenter, presenterReady]);
+
+  // 键盘处理里用 ref 调用，免得每次换页都重绑 keydown
+  const togglePresenterRef = useRef(togglePresenter);
+  togglePresenterRef.current = togglePresenter;
+
+  // 换页 / 文档变化 → 推一帧（当前页与下一张都渲染成位图，副屏只负责显示）
+  useEffect(() => {
+    if (presenterReady === 0) return;
+    const channel = presenterChannelRef.current;
+    if (!channel) return;
+    const slide = doc.slides[cursor];
+    const upcoming = doc.slides[cursor + 1];
+    const frame: PresenterFrame = {
+      type: 'frame',
+      index: cursor,
+      total: doc.slides.length,
+      current: slide ? (renderSlideToDataUrl(doc, slide, 1280) ?? null) : null,
+      next: upcoming ? (renderSlideToDataUrl(doc, upcoming, 640) ?? null) : null,
+      notes: slide?.notes?.trim() ?? '',
+    };
+    channel.postMessage(frame);
+  }, [presenterReady, cursor, doc]);
+
+  // 计时单独一条消息：每秒只发一个数字，不重渲染两张位图
+  useEffect(() => {
+    if (presenterReady === 0) return;
+    presenterChannelRef.current?.postMessage({ type: 'tick', elapsed });
+  }, [presenterReady, elapsed]);
+
+  // 退出放映（组件卸载）时先让副屏自己关掉，再关通道
+  useEffect(() => {
+    return () => {
+      const channel = presenterChannelRef.current;
+      presenterChannelRef.current = null;
+      channel?.postMessage({ type: 'closed' });
+      channel?.close();
+      const win = presenterWindowRef.current;
+      presenterWindowRef.current = null;
+      if (isPresenterAlive(win)) win?.close();
+    };
+  }, []);
+
   /**
    * Summary tiles (S6.3): a click on an element carrying `linkToSlideId` jumps to that slide instead of
    * advancing. Hit testing goes through the Konva stage, because the element boxes overlap the DOM host.
@@ -338,13 +483,14 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
       if (key === 'w') setBlank((value) => (value === 'white' ? 'none' : 'white'));
       if (key === 'l') setLaser((value) => !value);
       if (key === 'n') setShowNotes((value) => !value);
+      if (key === 'p') togglePresenterRef.current();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [next, onClose, prev]);
 
   const notes = doc.slides[cursor]?.notes?.trim();
-  const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+  const clock = formatClock(elapsed);
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col bg-[#0b1220]">
@@ -407,6 +553,20 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="button"
+            aria-label={t('tools.slide.presenter')}
+            aria-pressed={presenterReady > 0}
+            data-testid="slide-presenter-window"
+            onClick={togglePresenter}
+            className={`rounded-md border px-2 py-1 text-[12px] transition-colors ${
+              presenterReady > 0
+                ? 'border-blue-500 text-blue-300'
+                : 'border-gray-600 hover:bg-gray-800'
+            }`}
+          >
+            {t('tools.slide.presenter')}
+          </button>
+          <button
+            type="button"
             onClick={onClose}
             className="inline-flex items-center gap-1.5 rounded-md border border-gray-600 px-2.5 py-1 text-[12px] transition-colors hover:bg-gray-800"
           >
@@ -415,6 +575,12 @@ export function PresentOverlay({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </header>
+
+      {presenterBlocked ? (
+        <p role="status" className="px-4 pb-1 text-[12px] text-amber-400">
+          {t('tools.slide.presenterBlocked')}
+        </p>
+      ) : null}
 
       <div className="relative flex flex-1 items-stretch gap-3 overflow-hidden px-4 pb-2">
         {blank === 'none' ? (

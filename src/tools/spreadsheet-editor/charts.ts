@@ -186,10 +186,19 @@ export interface ChartSpec {
  * - if the first row of the value columns is text, it becomes the series names and data starts on
  *   the second row.
  */
+export interface ResolveChartOptions {
+  /**
+   * 图表类型。散点图的 X 列是数值，靠"首列有没有文字"判断不出分类列，
+   * 所以由类型直接指定首列为分类/X 列（导入回读的散点图依赖这条，否则 X 会被当成第二个系列）。
+   */
+  type?: ChartType;
+}
+
 export function resolveChart(
   snapshot: WorkbookSnapshotLite,
   sheetId: string | null,
   range: ChartRange,
+  options: ResolveChartOptions = {},
 ): ToolResult<ChartSpec> {
   const order = snapshot.sheetOrder ?? [];
   const target = sheetId && snapshot.sheets?.[sheetId] ? sheetId : order[0];
@@ -214,10 +223,11 @@ export function resolveChart(
   if (rows.length < 2) return { ok: false, error: 'EMPTY' };
 
   const columnCount = rows[0].length;
-  // Whether the first column is the category axis (non-numeric text exists below the first row)
-  const firstColumnIsText = rows
-    .slice(1)
-    .some((line) => line[0].num === null && line[0].text !== '');
+  // Whether the first column is the category axis (non-numeric text exists below the first row);
+  // 散点图的 X 列本身就是数字，只能按类型直接认定（见 ResolveChartOptions.type）
+  const firstColumnIsText =
+    options.type === 'scatter' ||
+    rows.slice(1).some((line) => line[0].num === null && line[0].text !== '');
   const valueStart = firstColumnIsText ? 1 : 0;
   if (valueStart >= columnCount) return { ok: false, error: 'EMPTY' };
 
@@ -269,8 +279,9 @@ export function buildChartData(
   snapshot: WorkbookSnapshotLite,
   sheetId: string | null,
   range: ChartRange,
+  type?: ChartType,
 ): ToolResult<ChartData> {
-  const resolved = resolveChart(snapshot, sheetId, range);
+  const resolved = resolveChart(snapshot, sheetId, range, { type });
   if (!resolved.ok) return resolved;
   const spec = resolved.value;
   return {
