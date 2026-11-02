@@ -74,7 +74,6 @@ import { ImageResizeOverlay } from './ImageResizeOverlay';
 import { ShapeOverlay } from './ShapeOverlay';
 import { ShapePanel } from './ShapePanel';
 import { ShapeDrawLayer } from './ShapeDrawLayer';
-import { ShapeFormatBar } from './ShapeFormatBar';
 import { useSelectedShape } from './useSelectedShape';
 import { handleFloatingImagePointerDown } from './imageLayer';
 import { exportDocxBlob, importDocx } from './docx';
@@ -2027,9 +2026,7 @@ export default function RichTextEditorTool() {
             />
           ) : null}
 
-          {/* 选中形状时的上下文格式栏（对应 Word/Excel 的"形状格式"）：只放高频控件 */}
-          <ShapeFormatBar editor={editor} onOpenPanel={() => setShapesOpen(true)} />
-
+          {/* Shape formatting lives on the ribbon's contextual 形状格式 tab now */}
           {/* Editing workspace: fixed to the remaining first-screen height and scrolls internally (long documents don't stretch the page).
               The page view's gray workbench hangs off this container so it fills the whole scrollable area. */}
           <div

@@ -42,14 +42,14 @@ function measure(editor: Editor, viewport: HTMLElement): ImageBox | null {
   const rect = dom.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return null;
   const viewportRect = viewport.getBoundingClientRect();
-  // The overlay sits outside the zoom layer, so position and size must be mapped from screen px back to layout px
-  const zoom = readZoom(dom);
+  // The overlay sits OUTSIDE the zoom layer, so it works in screen pixels: dividing by the zoom
+  // factor would draw the frame larger than the image at any zoom below 100%.
   return {
     pos: found.pos,
-    left: (rect.left - viewportRect.left) / zoom + viewport.scrollLeft,
-    top: (rect.top - viewportRect.top) / zoom + viewport.scrollTop,
-    width: rect.width / zoom,
-    height: rect.height / zoom,
+    left: rect.left - viewportRect.left + viewport.scrollLeft,
+    top: rect.top - viewportRect.top + viewport.scrollTop,
+    width: rect.width,
+    height: rect.height,
   };
 }
 

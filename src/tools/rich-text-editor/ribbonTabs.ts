@@ -9,9 +9,12 @@ import type {
 } from '@/core/components/ribbon/types';
 import type { TextTransformValue } from './charFormat';
 import type { ViewMode } from './draft';
-import { normalizeImageLayer } from './imageLayer';
+import { normalizeHex } from '../../core/drawing/geometry';
+import { IMAGE_LAYERS, normalizeImageLayer, type ImageLayer } from './imageLayer';
 import { MM_TO_PX } from './pageSetup';
 import { ShapeMenu } from './ShapeMenu';
+import { findSelectedShape, shapeSpec, type DocShapeAttrs, type ShapeDash } from './shapeNode';
+import { applyShapeAttrs } from './useSelectedShape';
 
 /**
  * Commands of the word processor ribbon, described as data.
@@ -144,6 +147,9 @@ export interface RichTextRibbonInput {
   options: RichTextRibbonOptions;
   /** Opens the hidden file input of the toolbar (the input itself lives in the component) */
   onPickImage: () => void;
+  /** "更改形状" gallery of the contextual shape tab */
+  changeShapeOpen: boolean;
+  onToggleChangeShape: () => void;
 }
 
 interface ItemOptions {
@@ -648,6 +654,217 @@ function imageGroup(input: RichTextRibbonInput): RibbonGroup {
   };
 }
 
+/** Layer captions, shared by the picture and the shape tabs */
+const LAYER_LABELS: Record<ImageLayer, string> = {
+  inline: 'tools.richText.imageLayerInline',
+  'wrap-left': 'tools.richText.imageLayerWrapLeft',
+  'wrap-right': 'tools.richText.imageLayerWrapRight',
+  'top-bottom': 'tools.richText.imageLayerTopBottom',
+  front: 'tools.richText.imageLayerFront',
+  behind: 'tools.richText.imageLayerBehind',
+};
+
+const SHAPE_STROKE_WIDTHS = [0.5, 1, 1.5, 2, 3, 4, 6, 8] as const;
+const SHAPE_TEXT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72] as const;
+
+/**
+ * Contextual "形状格式" tab (Word shows it only while a shape is selected).
+ *
+ * Everything the old shape bar carried lives here now: swapping the preset, fill / outline / dash,
+ * the shape's text style and the text-wrap layer. Size, rotation and the adjustment handles stay in
+ * the side panel, reachable through the group's dialog launcher — the same split Word uses between
+ * the ribbon and "设置形状格式".
+ */
+function shapeFormatTab(input: RichTextRibbonInput, attrs: DocShapeAttrs, pos: number): RibbonTab {
+  const { editor, t, actions } = input;
+  const update = (patch: Partial<DocShapeAttrs>) => applyShapeAttrs(editor, patch);
+  // Colours are canonical `#rrggbb` across the app (docx export upper-cases them), so the swatch
+  // value is normalised before it lands in the node attributes
+  const hex = (color: string) => normalizeHex(color) ?? color;
+  const setLayer = (layer: ImageLayer) =>
+    editor.chain().focus().setNodeSelection(pos).setDocShapeLayer(layer).run();
+
+  const strokeWidthValue = SHAPE_STROKE_WIDTHS.find(
+    (width) => Math.abs(width - attrs.strokeWidth) < 0.01,
+  );
+  const textSizeValue = SHAPE_TEXT_SIZES.find((size) => size === Math.round(attrs.textSize));
+
+  return {
+    id: 'shape-format',
+    label: t('tools.richText.ribbon.tab.shapeFormat'),
+    groups: [
+      {
+        id: 'shape-change',
+        label: t('tools.richText.ribbon.grp.shapeChange'),
+        priority: 9,
+        items: [
+          item(
+            'change-shape',
+            t('tools.richText.ribbon.changeShape'),
+            'changeShape',
+            input.onToggleChangeShape,
+            { active: input.changeShapeOpen },
+          ),
+        ],
+        // Same gallery as 插入 → 形状: presets are visual, a text menu made users guess the codes
+        overlay: input.changeShapeOpen
+          ? createElement(ShapeMenu, {
+              open: true,
+              mode: 'change',
+              activePrst: attrs.prst,
+              onPick: (prst: string) => {
+                update({ prst, adj: null });
+                input.onToggleChangeShape();
+              },
+              onOpenPanel: actions.onOpenShapePanel,
+              onClose: input.onToggleChangeShape,
+            })
+          : null,
+      },
+      {
+        id: 'shape-style',
+        label: t('tools.richText.ribbon.grp.shapeStyle'),
+        priority: 8,
+        // Dialog launcher: size / rotation / adjustment handles live in the side panel
+        onLauncher: actions.onOpenShapePanel,
+        items: [
+          {
+            kind: 'color',
+            id: 'shape-fill',
+            label: t('tools.richText.shapeFill'),
+            icon: 'paintBucket',
+            value: attrs.fill,
+            onPick: (color) => update({ fill: hex(color) }),
+          },
+          {
+            kind: 'color',
+            id: 'shape-stroke',
+            label: t('tools.richText.shapeStroke'),
+            icon: 'borders',
+            value: attrs.stroke,
+            onPick: (color) => update({ stroke: hex(color) }),
+          },
+          select(
+            'shape-stroke-width',
+            t('tools.richText.shapeStrokeWidth'),
+            strokeWidthValue === undefined ? 'custom' : String(strokeWidthValue),
+            [
+              ...SHAPE_STROKE_WIDTHS.map((width) => ({
+                value: String(width),
+                label: String(width),
+              })),
+              // Imported shapes can carry any width: show it instead of silently rounding to a preset
+              ...(strokeWidthValue === undefined
+                ? [{ value: 'custom', label: String(Math.round(attrs.strokeWidth * 10) / 10) }]
+                : []),
+            ],
+            (value) => {
+              if (value === 'custom') return;
+              update({ strokeWidth: Number(value) });
+            },
+            'xs',
+          ),
+          select(
+            'shape-dash',
+            t('tools.richText.shapeDash'),
+            attrs.dash ?? 'solid',
+            [
+              { value: 'solid', label: t('tools.richText.shapeDashSolid') },
+              { value: 'dash', label: t('tools.richText.shapeDashDash') },
+              { value: 'dot', label: t('tools.richText.shapeDashDot') },
+            ],
+            (value) => update({ dash: value as ShapeDash }),
+            'xs',
+          ),
+        ],
+      },
+      {
+        id: 'shape-text',
+        label: t('tools.richText.ribbon.grp.shapeText'),
+        priority: 7,
+        items: [
+          select(
+            'shape-text-size',
+            t('tools.richText.fontSize'),
+            textSizeValue === undefined ? 'custom' : String(textSizeValue),
+            [
+              ...SHAPE_TEXT_SIZES.map((size) => ({ value: String(size), label: String(size) })),
+              ...(textSizeValue === undefined
+                ? [{ value: 'custom', label: String(Math.round(attrs.textSize)) }]
+                : []),
+            ],
+            (value) => {
+              if (value === 'custom') return;
+              update({ textSize: Number(value) });
+            },
+            'xs',
+          ),
+          {
+            kind: 'color',
+            id: 'shape-text-color',
+            label: t('tools.richText.color'),
+            icon: 'fontColor',
+            value: attrs.textColor,
+            onPick: (color) => update({ textColor: hex(color) }),
+          },
+          item(
+            'shape-bold',
+            t('tools.richText.bold'),
+            'bold',
+            () => update({ textBold: !attrs.textBold }),
+            { size: 'small', active: attrs.textBold },
+          ),
+          item(
+            'shape-italic',
+            t('tools.richText.italic'),
+            'italic',
+            () => update({ textItalic: !attrs.textItalic }),
+            { size: 'small', active: attrs.textItalic },
+          ),
+          item(
+            'shape-underline',
+            t('tools.richText.underline'),
+            'underline',
+            () => update({ textUnderline: !attrs.textUnderline }),
+            { size: 'small', active: attrs.textUnderline },
+          ),
+          {
+            kind: 'menu',
+            id: 'shape-align',
+            label: t('tools.richText.alignCenter'),
+            icon: 'alignArrange',
+            menu: (['left', 'center', 'right'] as const).map((align) => ({
+              id: `shape-align-${align}`,
+              label: t(`tools.richText.align${align[0]!.toUpperCase()}${align.slice(1)}`),
+              checked: attrs.textAlign === align,
+              onSelect: () => update({ textAlign: align }),
+            })),
+          },
+        ],
+      },
+      {
+        id: 'shape-arrange',
+        label: t('tools.richText.ribbon.grp.shapeArrange'),
+        priority: 6,
+        items: [
+          {
+            kind: 'menu',
+            id: 'shape-layer',
+            label: t('tools.richText.imageLayer'),
+            icon: 'imageLayer',
+            menu: IMAGE_LAYERS.map((layer) => ({
+              id: `shape-layer-${layer}`,
+              label: t(LAYER_LABELS[layer]),
+              checked: layer === attrs.layer,
+              onSelect: () => setLayer(layer),
+            })),
+          },
+        ],
+      },
+    ],
+  };
+}
+
 /**
  * Builds the six Office tabs. Contextual groups (table / picture) join the tab they belong to and
  * disappear again when the caret leaves them, exactly like Word's contextual tabs.
@@ -771,7 +988,7 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
   ];
   if (state.inImage) insert.push(imageGroup(input));
 
-  return [
+  const tabs: RibbonTab[] = [
     { id: 'home', label: t('tools.richText.ribbon.tab.home'), groups: home },
     { id: 'insert', label: t('tools.richText.ribbon.tab.insert'), groups: insert },
     {
@@ -986,6 +1203,13 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
       ],
     },
   ];
+
+  // Contextual tab: present only while a shape node is selected, like Word's 形状格式
+  const selectedShape = findSelectedShape(editor.state);
+  if (selectedShape) {
+    tabs.push(shapeFormatTab(input, shapeSpec(selectedShape.node.attrs), selectedShape.pos));
+  }
+  return tabs;
 }
 
 /** 100% = 1; kept in sync with the toolbar's previous ZOOM_LEVELS */

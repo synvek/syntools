@@ -647,6 +647,31 @@ const officeIcons: Record<string, ReactNode> = {
       <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
     </>
   ),
+  /* ------------------------------ shape format ----------------------------- */
+  /** Change shape: a square with an arrow pointing at a rounder one */
+  changeShape: (
+    <>
+      <rect x="3" y="4" width="9" height="9" rx="1" />
+      <circle cx="17" cy="17" r="4.5" />
+      <path d="M13 9.5h4.5V5" />
+      <path d="m13 9.5 4.5-4.5" strokeWidth="1.2" />
+    </>
+  ),
+  /** Line weight: three rules of growing thickness */
+  lineWeight: (
+    <>
+      <path d="M4 7h16" strokeWidth="1" />
+      <path d="M4 12h16" strokeWidth="2" />
+      <path d="M4 17.5h16" strokeWidth="3.5" />
+    </>
+  ),
+  /** Dash style: a dashed rule over a solid hint */
+  lineDash: (
+    <>
+      <path d="M3 8h4M10 8h4M17 8h4" strokeWidth="2" />
+      <path d="M3 14h18" strokeWidth="2" strokeLinecap="round" />
+    </>
+  ),
   /* --------------------------------- tables -------------------------------- */
   rowAbove: (
     <>

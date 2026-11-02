@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorState, type Editor } from '@tiptap/react';
@@ -204,6 +204,20 @@ export function EditorToolbar({
     },
   });
 
+  // Selecting a shape activates the contextual 形状格式 tab; leaving it returns to 开始, like Word
+  const [activeTabId, setActiveTabId] = useState<string | undefined>(undefined);
+  // "更改形状" gallery of that tab: presets apply to the selected shape instead of arming the draw tool
+  const [changeShapeOpen, setChangeShapeOpen] = useState(false);
+  const shapeSelected = Boolean(state?.shapeSelected);
+  useEffect(() => {
+    setActiveTabId((current) => {
+      if (shapeSelected) return 'shape-format';
+      return current === 'shape-format' ? 'home' : current;
+    });
+    // The gallery belongs to the shape tab: it cannot stay open once the shape is gone
+    if (!shapeSelected) setChangeShapeOpen(false);
+  }, [shapeSelected]);
+
   if (!editor || !state) return null;
 
   const pickImage = (e: ChangeEvent<HTMLInputElement>) => {
@@ -287,6 +301,8 @@ export function EditorToolbar({
     actions,
     options,
     onPickImage: () => fileRef.current?.click(),
+    changeShapeOpen,
+    onToggleChangeShape: () => setChangeShapeOpen((value) => !value),
   });
 
   const quickAccess = (
@@ -331,12 +347,14 @@ export function EditorToolbar({
   return (
     <div
       data-testid="rich-text-toolbar"
-      className="sticky top-0 z-20 -mx-1 rounded-lg border border-gray-200 bg-white/95 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95"
+      className="sticky top-0 z-30 -mx-1 rounded-lg border border-gray-200 bg-white/95 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95"
     >
       <Ribbon
         ariaLabel={t('tools.richText.ribbon.label')}
         accent="blue"
         tabs={tabs}
+        activeTabId={activeTabId}
+        onActiveTabChange={setActiveTabId}
         menus={menus}
         menuAriaLabel={menuAriaLabel}
         quickAccess={quickAccess}

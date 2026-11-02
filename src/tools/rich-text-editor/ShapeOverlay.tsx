@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/react';
 import { shapeAdjustValues, shapeAdjustments } from '../../core/drawing/shapeDefs';
 import { readZoom } from './imageLayer';
@@ -31,6 +31,8 @@ interface ShapeBox {
   layoutWidth: number;
   layoutHeight: number;
   rotation: number;
+  /** Current view zoom: the overlay lives outside the zoom layer, so screen sizes need it */
+  zoom: number;
   attrs: DocShapeAttrs;
 }
 
@@ -49,15 +51,18 @@ function measure(editor: Editor, viewport: HTMLElement): ShapeBox | null {
   const viewportRect = viewport.getBoundingClientRect();
   const zoom = readZoom(dom);
   const attrs = shapeSpec(found.node.attrs);
+  // The overlay sits OUTSIDE the zoom layer, so its coordinates and sizes stay in screen pixels:
+  // dividing by the zoom factor would draw the frame larger than the shape at any zoom below 100%.
   return {
     pos: found.pos,
-    left: (rect.left - viewportRect.left) / zoom + viewport.scrollLeft,
-    top: (rect.top - viewportRect.top) / zoom + viewport.scrollTop,
-    width: rect.width / zoom,
-    height: rect.height / zoom,
+    left: rect.left - viewportRect.left + viewport.scrollLeft,
+    top: rect.top - viewportRect.top + viewport.scrollTop,
+    width: rect.width,
+    height: rect.height,
     layoutWidth: attrs.width,
     layoutHeight: attrs.height,
     rotation: attrs.rotation,
+    zoom,
     attrs,
   };
 }
@@ -79,6 +84,9 @@ function nextSize(
 
 export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
   const [box, setBox] = useState<ShapeBox | null>(null);
+  /** Inline text editing: double-click the shape and type, like Word's shape text */
+  const [editing, setEditing] = useState(false);
+  const editableRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = useCallback(() => {
     const viewport = viewportRef.current;
@@ -107,8 +115,55 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
     };
   }, [editor, refresh, viewportRef]);
 
-  if (!editor || !box) return null;
-  const pos = box.pos;
+  const pos = box?.pos ?? null;
+
+  // Leaving the shape (or the editor) must not leave a dangling caret box
+  useEffect(() => {
+    if (!box) setEditing(false);
+  }, [box]);
+
+  // Double-click on the selected shape enters text editing, matching Word / PowerPoint
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const onDoubleClick = (event: MouseEvent) => {
+      const found = findSelectedShape(editor.state);
+      if (!found) return;
+      const node = editor.view.nodeDOM(found.pos) as HTMLElement | null;
+      if (!node || !node.contains(event.target as Node)) return;
+      event.preventDefault();
+      setEditing(true);
+    };
+    dom.addEventListener('dblclick', onDoubleClick);
+    return () => dom.removeEventListener('dblclick', onDoubleClick);
+  }, [editor]);
+
+  // Hide the node's own text while the overlay holds the caret (otherwise it shows through)
+  useEffect(() => {
+    if (!editing || !editor || pos === null) return;
+    const node = editor.view.nodeDOM(pos) as HTMLElement | null;
+    node?.classList.add('rte-shape-editing');
+    return () => node?.classList.remove('rte-shape-editing');
+  }, [editing, editor, pos]);
+
+  // Seed the editable with the current text and put the caret at its end
+  useEffect(() => {
+    if (!editing) return;
+    const div = editableRef.current;
+    if (!div) return;
+    div.textContent = box?.attrs.text ?? '';
+    div.focus();
+    const range = document.createRange();
+    range.selectNodeContents(div);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    // Only on entering edit mode: re-seeding on every render would fight the caret
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  if (!editor || !box || pos === null) return null;
 
   const apply = (attrs: Partial<DocShapeAttrs>, history: boolean): void => {
     const node = editor.state.doc.nodeAt(pos);
@@ -117,6 +172,17 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
     if (!history) tr.setMeta('addToHistory', false);
     keepShapeSelected(tr, pos);
     editor.view.dispatch(tr);
+  };
+
+  /**
+   * Ends inline editing. One undoable step per editing session: typing inside the overlay does not
+   * touch the document, only the commit does.
+   */
+  const finishEditing = (commit: boolean): void => {
+    const div = editableRef.current;
+    const next = commit && div ? (div.textContent ?? '') : box.attrs.text;
+    setEditing(false);
+    if (next !== box.attrs.text) apply({ text: next }, true);
   };
 
   const dragResize = (event: React.MouseEvent, direction: HandleDirection) => {
@@ -226,6 +292,55 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
 
   const values = shapeAdjustValues({ prst: box.attrs.prst, adj: box.attrs.adj ?? undefined });
   const adjusts = shapeAdjustments(box.attrs.prst);
+
+  // Text editing supersedes the handle frame: the caret box takes the shape's place
+  if (editing) {
+    return (
+      <div
+        data-testid="rich-text-shape-text-editor"
+        className="rte-shape-text-editor"
+        style={{
+          top: `${box.top}px`,
+          left: `${box.left}px`,
+          width: `${box.width}px`,
+          height: `${box.height}px`,
+          transform: box.rotation ? `rotate(${box.rotation}deg)` : undefined,
+        }}
+      >
+        <div
+          ref={editableRef}
+          className="rte-shape-text-editor__body"
+          role="textbox"
+          aria-multiline="true"
+          aria-label={box.attrs.text ? box.attrs.text : 'shape text'}
+          contentEditable
+          suppressContentEditableWarning
+          style={{
+            fontSize: `${Math.round(box.attrs.textSize * box.zoom)}px`,
+            color: box.attrs.textColor,
+            textAlign: box.attrs.textAlign,
+            fontWeight: box.attrs.textBold ? 700 : 400,
+            fontStyle: box.attrs.textItalic ? 'italic' : 'normal',
+            textDecoration: box.attrs.textUnderline ? 'underline' : 'none',
+          }}
+          onBlur={() => finishEditing(true)}
+          onKeyDown={(event) => {
+            // Esc discards nothing (the overlay is the only caret), it just leaves the mode
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              finishEditing(true);
+              return;
+            }
+            // Enter inserts a line break like Word; Cmd/Ctrl+Enter commits
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              finishEditing(true);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div

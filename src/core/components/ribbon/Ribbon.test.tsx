@@ -232,4 +232,43 @@ describe('ribbon', () => {
     fireEvent.click(screen.getByRole('button', { name: '剪贴板 ▾' }));
     expect(onPaste).toHaveBeenCalledTimes(1);
   });
+
+  // Contextual tabs (形状格式) are driven by the editor: it decides when the tab exists and which one
+  // is active, so the controlled API must follow it in both directions.
+  it('follows a controlled active tab and reports user switches', () => {
+    const onBold = vi.fn();
+    const onPaste = vi.fn();
+    const onTabChange = vi.fn();
+    const props = {
+      ariaLabel: '功能区',
+      accent: 'blue' as const,
+      collapseLabel: '折叠功能区',
+      expandLabel: '展开功能区',
+    };
+    const { rerender } = render(
+      <Ribbon
+        {...props}
+        tabs={makeTabs(onBold, onPaste)}
+        activeTabId="insert"
+        onActiveTabChange={onTabChange}
+      />,
+    );
+    expect(screen.getByRole('tab', { name: '插入' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByText('插图')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: '开始' }));
+    expect(onTabChange).toHaveBeenCalledWith('home');
+
+    // A conditional tab appears (shape selected): the parent's new id wins over the internal state
+    const tabs = [
+      ...makeTabs(onBold, onPaste),
+      { id: 'shape-format', label: '形状格式', groups: [] },
+    ];
+    rerender(
+      <Ribbon {...props} tabs={tabs} activeTabId="shape-format" onActiveTabChange={onTabChange} />,
+    );
+    expect(screen.getByRole('tab', { name: '形状格式' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+  });
 });

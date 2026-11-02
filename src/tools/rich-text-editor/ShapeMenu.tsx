@@ -12,6 +12,11 @@ interface ShapeMenuProps {
   /** 打开完整样式面板（尺寸/旋转/文字等长尾属性） */
   onOpenPanel: () => void;
   onClose: () => void;
+  /**
+   * `draw`（默认）：插入形状，选完预设进入拖拽绘制；`change`：更换选中形状的预设，选完立即生效。
+   * 两种模式共用同一套网格，只是提示语与收尾方式不同。
+   */
+  mode?: 'draw' | 'change';
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -28,19 +33,32 @@ const GROUP_LABELS: Record<string, string> = {
  * 尺寸、旋转、文字排版这些长尾属性仍然回到面板里改。一个下拉装不下全部控件，
  * 硬塞进去的结果是每次都要滚三层。
  */
-export function ShapeMenu({ open, activePrst, onPick, onOpenPanel, onClose }: ShapeMenuProps) {
+export function ShapeMenu({
+  open,
+  activePrst,
+  onPick,
+  onOpenPanel,
+  onClose,
+  mode = 'draw',
+}: ShapeMenuProps) {
   const { t } = useTranslation();
   if (!open) return null;
+  const drawing = mode === 'draw';
 
   return (
     <div
-      data-testid="rich-text-shape-menu"
+      data-testid={drawing ? 'rich-text-shape-menu' : 'rich-text-shape-change'}
       role="menu"
+      aria-label={
+        drawing ? t('tools.richText.shapeInsert') : t('tools.richText.ribbon.changeShape')
+      }
       className="absolute left-0 top-full z-40 mt-1 w-[268px] rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-900"
     >
-      <p className="mb-1 px-1 text-[11px] text-gray-500 dark:text-gray-400">
-        {t('tools.richText.shapeDrawHint')}
-      </p>
+      {drawing ? (
+        <p className="mb-1 px-1 text-[11px] text-gray-500 dark:text-gray-400">
+          {t('tools.richText.shapeDrawHint')}
+        </p>
+      ) : null}
       <div className="max-h-[280px] overflow-auto">
         {(['basic', 'arrow', 'star', 'flowchart'] as const).map((group) => (
           <div key={group} className="mb-1.5">
@@ -78,13 +96,15 @@ export function ShapeMenu({ open, activePrst, onPick, onOpenPanel, onClose }: Sh
         ))}
       </div>
       <div className="mt-1 flex items-center justify-end gap-1 border-t border-gray-200 pt-1 dark:border-gray-700">
-        <button
-          type="button"
-          onClick={onOpenPanel}
-          className="rounded-md border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          {t('tools.richText.shapeMoreStyles')}
-        </button>
+        {drawing ? (
+          <button
+            type="button"
+            onClick={onOpenPanel}
+            className="rounded-md border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            {t('tools.richText.shapeMoreStyles')}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onClose}

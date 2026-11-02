@@ -66,6 +66,64 @@ test.describe('word processor ribbon', () => {
     await ruler.click();
     await expect(page.getByTestId('rich-text-ruler')).toHaveCount(0);
   });
+
+  test('selecting a shape opens the contextual 形状格式 tab, not a second toolbar', async ({
+    page,
+  }) => {
+    await page.goto('/tools/rich-text-editor');
+    await expect(page.locator('.tiptap')).toBeVisible();
+
+    await page.getByRole('tab', { name: '插入', exact: true }).click();
+    await page.getByRole('button', { name: '插入形状' }).click();
+    await page
+      .getByTestId('rich-text-shape-menu')
+      .locator('[data-shape-preset="roundRect"]')
+      .click();
+
+    // Preset → drag on the page (the gallery only arms the draw layer)
+    const surface = await page.locator('.tiptap').boundingBox();
+    if (!surface) throw new Error('editor is not laid out');
+    await page.mouse.move(surface.x + 120, surface.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(surface.x + 320, surface.y + 240, { steps: 8 });
+    await page.mouse.up();
+
+    const shape = page.locator('.tiptap .rte-shape-node');
+    await expect(shape).toHaveCount(1);
+    // No leftover flat toolbar: shape formatting lives on the ribbon
+    await expect(page.getByTestId('rich-text-shape-format-bar')).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: '形状格式', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    // The context tab drives the node attributes (fill lives in the colour item's swatch)
+    await page.getByTestId('ribbon-shape-style-shape-fill').click();
+    await page.getByRole('button', { name: '#C00000' }).click();
+    await expect(shape).toHaveAttribute('data-shape-fill', '#c00000');
+
+    // 更改形状 opens the same visual gallery as 插入 → 形状 (no preset codes in a text menu)
+    await page.getByRole('button', { name: '更改形状', exact: true }).click();
+    const gallery = page.getByTestId('rich-text-shape-change');
+    await expect(gallery).toBeVisible();
+    await gallery.locator('[data-shape-preset="ellipse"]').click();
+    await expect(shape).toHaveAttribute('data-shape-prst', 'ellipse');
+    await expect(gallery).toHaveCount(0);
+
+    // Text is edited in place: double-click the shape, type, commit by clicking outside
+    const box = await shape.boundingBox();
+    if (!box) throw new Error('shape is not laid out');
+    await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+    const textEditor = page.getByTestId('rich-text-shape-text-editor');
+    await expect(textEditor).toBeVisible();
+    await page.keyboard.type('季度汇总');
+    await page.locator('.tiptap p').first().click();
+    await expect(textEditor).toHaveCount(0);
+    await expect(shape).toHaveAttribute('data-shape-text', '季度汇总');
+
+    // Leaving the shape drops the tab and returns to 开始
+    await expect(page.getByRole('tab', { name: '形状格式', exact: true })).toHaveCount(0);
+  });
 });
 
 test.describe('slide editor ribbon', () => {

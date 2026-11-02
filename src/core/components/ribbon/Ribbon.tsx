@@ -48,6 +48,12 @@ export interface RibbonProps {
   /** Document chrome (save state, title, new, present…) between the tabs and the collapse toggle */
   headerRight?: ReactNode;
   defaultTabId?: string;
+  /**
+   * Controlled active tab. Used by editors that switch tabs on their own — e.g. activating the
+   * contextual 形状格式 tab as soon as a shape gets selected.
+   */
+  activeTabId?: string;
+  onActiveTabChange?: (tabId: string) => void;
   /** Controlled collapse; omit to let the ribbon decide from its own width */
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
@@ -79,6 +85,8 @@ export function Ribbon({
   quickAccess,
   headerRight,
   defaultTabId,
+  activeTabId,
+  onActiveTabChange,
   collapsed: collapsedProp,
   onCollapsedChange,
   collapseLabel,
@@ -93,7 +101,8 @@ export function Ribbon({
     collapsed: collapsedProp,
     onCollapsedChange,
   });
-  const [activeId, setActiveId] = useState(() => defaultTabId ?? tabs[0]?.id ?? '');
+  const [ownTabId, setOwnTabId] = useState(() => defaultTabId ?? tabs[0]?.id ?? '');
+  const activeId = activeTabId ?? ownTabId;
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const rawId = useId();
@@ -125,7 +134,8 @@ export function Ribbon({
   }, [flyoutOpen]);
 
   const selectTab = (tabId: string) => {
-    setActiveId(tabId);
+    setOwnTabId(tabId);
+    onActiveTabChange?.(tabId);
     // In collapsed mode a tab click reveals its commands below the strip
     setFlyoutOpen(collapsed);
   };
