@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface FootnoteDialogProps {
-  /** null when closed; insert creates a footnote, edit modifies an existing one */
+  /** 脚注 / 尾注共用：决定文案，落到哪个 Word 部件由调用方的命令决定 */
+  kind?: 'footnote' | 'endnote';
+  /** null when closed; insert creates a note, edit modifies an existing one */
   mode: 'insert' | 'edit' | null;
   initialNote: string;
   onCancel: () => void;
@@ -12,10 +14,11 @@ interface FootnoteDialogProps {
 }
 
 /**
- * Footnote content dialog: same visual language as the PDF mode dialog.
+ * Footnote / endnote content dialog: same visual language as the PDF mode dialog.
  * Enter (without Shift) submits, Esc cancels.
  */
 export function FootnoteDialog({
+  kind = 'footnote',
   mode,
   initialNote,
   onCancel,
@@ -25,6 +28,22 @@ export function FootnoteDialog({
   const { t } = useTranslation();
   const [note, setNote] = useState(initialNote);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const keys =
+    kind === 'endnote'
+      ? {
+          insert: 'tools.richText.endnoteInsert',
+          edit: 'tools.richText.endnoteEdit',
+          desc: 'tools.richText.endnoteDialogDesc',
+          placeholder: 'tools.richText.endnotePlaceholder',
+          remove: 'tools.richText.endnoteRemove',
+        }
+      : {
+          insert: 'tools.richText.footnoteInsert',
+          edit: 'tools.richText.footnoteEdit',
+          desc: 'tools.richText.footnoteDialogDesc',
+          placeholder: 'tools.richText.footnotePlaceholder',
+          remove: 'tools.richText.footnoteRemove',
+        };
 
   useEffect(() => {
     if (!mode) return;
@@ -67,13 +86,9 @@ export function FootnoteDialog({
           id="rte-footnote-dialog-title"
           className="text-base font-semibold text-gray-900 dark:text-gray-100"
         >
-          {mode === 'insert'
-            ? t('tools.richText.footnoteInsert')
-            : t('tools.richText.footnoteEdit')}
+          {mode === 'insert' ? t(keys.insert) : t(keys.edit)}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {t('tools.richText.footnoteDialogDesc')}
-        </p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t(keys.desc)}</p>
 
         <textarea
           ref={textareaRef}
@@ -86,7 +101,7 @@ export function FootnoteDialog({
               submit();
             }
           }}
-          placeholder={t('tools.richText.footnotePlaceholder')}
+          placeholder={t(keys.placeholder)}
           className="mt-3 w-full resize-y rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
 
@@ -97,7 +112,7 @@ export function FootnoteDialog({
               onClick={onRemove}
               className="mr-auto rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
             >
-              {t('tools.richText.footnoteRemove')}
+              {t(keys.remove)}
             </button>
           ) : null}
           <button

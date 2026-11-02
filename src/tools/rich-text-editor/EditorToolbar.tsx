@@ -4,6 +4,7 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { Icon } from '@/core/components/Icon';
 import type { ViewMode } from './draft';
 import { findSelectedFootnote } from './footnotes';
+import { findSelectedEndnote } from './endnotes';
 import { normalizeImageLayer } from './imageLayer';
 import { TextColorPicker } from './TextColorPicker';
 import {
@@ -142,6 +143,45 @@ function FootnoteIcon({ className }: { className?: string }) {
   );
 }
 
+/** Endnote icon: a superscript marker above a double rule (notes collected at the document end) */
+function EndnoteIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M13 3h3v5" />
+      <path d="M12.5 8H17" />
+      <path d="M4 15h16" />
+      <path d="M4 19h16" />
+    </svg>
+  );
+}
+
+/** Bookmark icon: a ribbon with a notch, the universal "saved position" glyph */
+function BookmarkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M6 3.5h12v17l-6-4.2-6 4.2z" />
+    </svg>
+  );
+}
+
 /** Image alignment icon: box + three alignment lines (left/center/right differ, so the buttons don't look identical) */
 function ImageAlignIcon({ position }: { position: 'left' | 'center' | 'right' }) {
   const bars =
@@ -236,6 +276,14 @@ interface EditorToolbarProps {
   tocDisabled: boolean;
   /** Footnote: edit the selected footnote, otherwise insert a new one */
   onFootnote: () => void;
+  /** 尾注：与脚注同一套交互，落到独立部件 */
+  onEndnote: () => void;
+  /** Bookmark dialog (insert / rename / delete / jump) */
+  onOpenBookmarks: () => void;
+  bookmarksOpen: boolean;
+  /** Cross-reference dialog (reference a bookmark as text or page number) */
+  onOpenXrefs: () => void;
+  xrefsOpen: boolean;
   /** Formula: edit the selected formula, otherwise insert a new one */
   onMath: () => void;
   /** Style panel */
@@ -283,6 +331,11 @@ export function EditorToolbar({
   onRefreshToc,
   tocDisabled,
   onFootnote,
+  onEndnote,
+  onOpenBookmarks,
+  bookmarksOpen,
+  onOpenXrefs,
+  xrefsOpen,
   onMath,
   stylesOpen,
   onToggleStyles,
@@ -422,6 +475,7 @@ export function EditorToolbar({
           return `${before}-${after}`;
         })(),
         footnoteSelected: findSelectedFootnote(e.state) !== null,
+        endnoteSelected: findSelectedEndnote(e.state) !== null,
         mathSelected: e.isActive('mathInline') || e.isActive('mathBlock'),
         shapeSelected: e.isActive('docShape'),
       };
@@ -1127,6 +1181,27 @@ export function EditorToolbar({
           onClick={onFootnote}
         >
           <FootnoteIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton
+          label={
+            state.endnoteSelected
+              ? t('tools.richText.endnoteEdit')
+              : t('tools.richText.endnoteInsert')
+          }
+          active={state.endnoteSelected}
+          onClick={onEndnote}
+        >
+          <EndnoteIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton
+          label={t('tools.richText.bookmark')}
+          active={bookmarksOpen}
+          onClick={onOpenBookmarks}
+        >
+          <BookmarkIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label={t('tools.richText.xref')} active={xrefsOpen} onClick={onOpenXrefs}>
+          <Icon name="link" className="h-4 w-4" />
         </ToolButton>
         <ToolButton label={t('tools.richText.styles')} active={stylesOpen} onClick={onToggleStyles}>
           <Icon name="palette" className="h-4 w-4" />

@@ -46,6 +46,12 @@ export function docxLossIssues(losses: DocxExportLosses): FidelityIssue[] {
       count: losses.mathAsImages,
       messageKey: 'tools.richText.lossMathAsImages',
     },
+    {
+      code: 'rte.xrefStatic',
+      severity: 'warning',
+      count: losses.staticXrefs ?? 0,
+      messageKey: 'tools.richText.lossXrefStatic',
+    },
   ];
   return issues.filter((issue) => issue.count > 0);
 }

@@ -320,6 +320,8 @@ export interface DocxExportLosses {
   mathAsImages: number;
   /** Shapes written as native `wps:wsp` objects (old readers show an empty frame) */
   shapes?: number;
+  /** 「引用文字」交叉引用：导出为静态文本（Word 中不会随书签更新；「引用页码」是域，可更新） */
+  staticXrefs?: number;
 }
 
 const DOCX_IMAGE_MIME_RE = /^data:image\/([a-z+]+);base64,/i;
@@ -341,7 +343,12 @@ export function scanDocxExportLosses(
     unlinkedComments: 0,
     mathAsImages: 0,
     shapes: 0,
+    staticXrefs: 0,
   };
+  // 交叉引用：文字模式只能是静态文本（零宽书签在 Word 里没有文字可引用），需要明说
+  losses.staticXrefs = Array.from(doc.querySelectorAll('[data-xref]')).filter(
+    (el) => el.getAttribute('data-xref-mode') !== 'page',
+  ).length;
   // Formulas: syntax beyond Word's native equation support degrades to images (visually identical, no longer editable)
   const latexList = Array.from(doc.querySelectorAll('[data-latex]')).map(
     (el) => el.getAttribute('data-latex') ?? '',

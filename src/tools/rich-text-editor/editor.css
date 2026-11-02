@@ -1512,3 +1512,129 @@ button.rte-toc-text:hover {
     text-decoration: none;
   }
 }
+/* ================================================================== *
+ * Bookmark anchor (RTE-03): zero-width, layout-neutral
+ * A bookmark must not shift a single character of the line, otherwise exporting and
+ * printing would reflow text just because a jump target exists. Visibility therefore
+ * comes from the selected state only — Word hides bookmarks by default too.
+ * ================================================================== */
+
+.rte-surface .tiptap .rte-bookmark {
+  display: inline;
+  width: 0;
+  height: 0;
+}
+
+.rte-surface .tiptap .rte-bookmark.ProseMirror-selectednode {
+  outline: 2px solid #f59e0b;
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+@media print {
+  .rte-surface .tiptap .rte-bookmark.ProseMirror-selectednode {
+    outline: none;
+  }
+}
+
+/* ================================================================== *
+ * Cross-reference (RTE-03): live text in the editor, plain text everywhere else
+ * The NodeView only exists in the editing surface; print / snapshot PDF / Word get the
+ * injected text, so no editor chrome can leak into the output.
+ * ================================================================== */
+
+.rte-surface .tiptap .rte-xref-node {
+  color: #1d4ed8;
+  border-bottom: 1px dotted currentColor;
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+}
+
+.rte-surface .tiptap .rte-xref-node:hover {
+  background: rgba(29, 78, 216, 0.08);
+}
+
+.rte-surface .tiptap .rte-xref-missing {
+  color: #dc2626;
+  border-bottom: 1px dashed currentColor;
+  text-decoration: line-through;
+  cursor: default;
+}
+
+@media print {
+  .rte-surface .tiptap .rte-xref-node,
+  .rte-surface .tiptap .rte-xref-missing {
+    border-bottom: none;
+    color: inherit;
+    background: none;
+    text-decoration: none;
+  }
+}
+
+/* ================================================================== *
+ * Endnotes (RTE-03): same visual contract as footnotes
+ * Kept as a separate block rather than merged with the footnote rules: footnotes and endnotes are
+ * independent Word parts with independent numbering, and a shared selector here would make the two
+ * impossible to tune apart later.
+ * ================================================================== */
+
+.rte-endnote-ref {
+  margin: 0 0.1em;
+  color: #7c3aed;
+  font-size: 0.72em;
+  font-weight: 600;
+  vertical-align: super;
+  line-height: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rte-endnote-ref:hover {
+  text-decoration: underline;
+}
+
+.rte-surface .tiptap .rte-endnote-ref.ProseMirror-selectednode {
+  outline: 2px solid #c4b5fd;
+  border-radius: 2px;
+}
+
+.rte-endnote-list {
+  margin-top: 1.75em;
+  padding-top: 0.6em;
+  border-top: 1px solid #d1d5db;
+  color: #4b5563;
+  font-size: 0.875em;
+}
+
+.rte-endnote-list-title {
+  margin: 0 0 0.35em;
+  font-weight: 600;
+  color: inherit;
+}
+
+.rte-endnote-list-items {
+  margin: 0;
+  padding-left: 1.5em;
+}
+
+.rte-endnote-item {
+  padding-top: 0.15em;
+  padding-bottom: 0.15em;
+  overflow-wrap: anywhere;
+}
+
+.dark .rte-endnote-list {
+  border-top-color: #374151;
+  color: #9ca3af;
+}
+
+.dark .rte-endnote-ref {
+  color: #a78bfa;
+}
+
+@media print {
+  .rte-endnote-ref.ProseMirror-selectednode {
+    outline: none !important;
+  }
+}

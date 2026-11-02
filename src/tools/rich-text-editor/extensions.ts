@@ -13,6 +13,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { FindReplace } from './find-replace';
 import { charFormatExtensions } from './charFormat';
 import { ImageLayerCommands } from './imageLayer';
+import { DocBookmark } from './bookmarks';
 import { DocShape } from './shapeNode';
 import {
   BlockStyleCommands,
@@ -27,12 +28,14 @@ import { Comment, DocMarkCommands, TrackedDelete, TrackedFormat, TrackedInsert }
 import { createPageLayoutPlugin, type PageLayoutSnapshot } from './PageView';
 import { resolvePageMetrics, type PageMetrics } from './pageSetup';
 import { DEFAULT_TOC_LABELS, TableOfContents, type TocLabels } from './toc';
+import { DEFAULT_XREF_LABELS, DocXref, type XrefLabels } from './xrefs';
 import {
   DEFAULT_FOOTNOTE_LABELS,
   FootnoteList,
   FootnoteRef,
   type FootnoteLabels,
 } from './footnotes';
+import { DEFAULT_ENDNOTE_LABELS, EndnoteList, EndnoteRef, type EndnoteLabels } from './endnotes';
 import { MathBlock, MathCommands, MathInline } from './math';
 import { Spellcheck, SpellcheckCommands, type SpellDictionary } from './spellcheck';
 
@@ -246,8 +249,12 @@ export interface RichTextExtensionOptions {
   getPageMetrics?: () => PageMetrics;
   /** TOC labels */
   tocLabels?: TocLabels;
+  /** 交叉引用 labels（目标书签失效时的占位文字） */
+  xrefLabels?: XrefLabels;
   /** Footnote labels */
   footnoteLabels?: FootnoteLabels;
+  /** 尾注 labels（与脚注同一套结构，独立编号） */
+  endnoteLabels?: EndnoteLabels;
   /** Callback on formula click (the tool layer opens the edit dialog) */
   onMathSelect?: (pos: number, latex: string, display: boolean) => void;
   /** Spellcheck: dictionary and toggle arrive as getters, so no editor rebuild is needed after the word list loads */
@@ -262,7 +269,9 @@ export function createExtensions({
   onLayout: onPageLayout,
   getPageMetrics,
   tocLabels,
+  xrefLabels,
   footnoteLabels,
+  endnoteLabels,
   onMathSelect,
   spellcheck,
 }: RichTextExtensionOptions) {
@@ -301,6 +310,8 @@ export function createExtensions({
     SectionBreak,
     // DrawingML preset shape atom (P3-1.1): geometry comes from the shared kernel
     DocShape,
+    // Zero-width bookmark anchor (RTE-03): jump target now, cross-reference target later
+    DocBookmark,
     ParagraphStyle,
     BlockStyleCommands,
     Comment,
@@ -312,8 +323,13 @@ export function createExtensions({
     ...charFormatExtensions,
     // TOC / footnote labels follow the language: the nodes carry no attributes, so titles localize on language switch
     TableOfContents.configure({ labels: tocLabels ?? DEFAULT_TOC_LABELS }),
+    // 交叉引用 (RTE-03) 渲染在 NodeView 里，labels 决定"目标书签已删除"时显示什么
+    DocXref.configure({ labels: xrefLabels ?? DEFAULT_XREF_LABELS }),
     FootnoteRef.configure({ labels: footnoteLabels ?? DEFAULT_FOOTNOTE_LABELS }),
     FootnoteList.configure({ labels: footnoteLabels ?? DEFAULT_FOOTNOTE_LABELS }),
+    // 尾注：与脚注同构，独立编号；汇总 widget 注册在脚注之后（Word 里尾注也在文档最末）
+    EndnoteRef.configure({ labels: endnoteLabels ?? DEFAULT_ENDNOTE_LABELS }),
+    EndnoteList.configure({ labels: endnoteLabels ?? DEFAULT_ENDNOTE_LABELS }),
     MathInline.configure({ onSelect: onMathSelect }),
     MathBlock.configure({ onSelect: onMathSelect }),
     MathCommands,

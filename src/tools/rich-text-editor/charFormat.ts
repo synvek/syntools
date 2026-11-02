@@ -1,4 +1,5 @@
 import { Mark, mergeAttributes } from '@tiptap/core';
+import { isNoteReferenceElement } from './notes';
 
 /**
  * Character-level formatting that Word users expect but ProseMirror's default schema lacks:
@@ -49,9 +50,9 @@ export const Superscript = Mark.create({
     return [
       {
         tag: 'sup',
-        // Footnote references are their own node (sup[data-footnote]); parsing them as a
-        // superscript mark would swallow the node and lose the note body.
-        getAttrs: (el) => (el.hasAttribute('data-footnote') ? false : null),
+        // Footnote / endnote references are their own nodes (sup[data-footnote], sup[data-endnote]);
+        // parsing them as a superscript mark would swallow the node and lose the note body.
+        getAttrs: (el) => (isNoteReferenceElement(el) ? false : null),
       },
     ];
   },

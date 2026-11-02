@@ -155,11 +155,14 @@ export function htmlToMarkdown(html: string): string {
       out.push(`$$${el.getAttribute('data-latex') ?? ''}$$`);
       return;
     }
-    // Footnote summary: expanded into an ordered list (numbers written during injection, matching the body)
-    if (el.hasAttribute('data-footnote-list')) {
+    // Footnote / endnote summary: expanded into an ordered list (numbers written during injection,
+    // matching the body). Both parts share the shape and differ only in class names.
+    if (el.hasAttribute('data-footnote-list') || el.hasAttribute('data-endnote-list')) {
       const items = Array.from(el.querySelectorAll('li'));
       if (items.length === 0) return;
-      const caption = el.querySelector('.rte-footnote-list-title')?.textContent?.trim();
+      const caption = (
+        el.querySelector('.rte-footnote-list-title') ?? el.querySelector('.rte-endnote-list-title')
+      )?.textContent?.trim();
       if (caption) out.push(`**${caption}**`);
       items.forEach((item, index) => {
         out.push(`${index + 1}. ${inline(item).trim()}`);

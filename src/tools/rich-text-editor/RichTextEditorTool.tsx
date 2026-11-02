@@ -93,7 +93,10 @@ import {
 import { findChangeRange } from './marks';
 import { createCommentId } from '../../core/comments/model';
 import { pageIndexOfPosition } from './core';
+import { BookmarkDialog } from './BookmarkDialog';
 import { FootnoteDialog } from './FootnoteDialog';
+import { XrefDialog } from './XrefDialog';
+import { injectXrefHtml, resolveAllXrefs, type XrefLabels } from './xrefs';
 import {
   FOOTNOTE_EDIT_EVENT,
   findSelectedFootnote,
@@ -101,6 +104,13 @@ import {
   type FootnoteEditDetail,
   type FootnoteLabels,
 } from './footnotes';
+import {
+  ENDNOTE_EDIT_EVENT,
+  findSelectedEndnote,
+  injectEndnotes,
+  type EndnoteEditDetail,
+  type EndnoteLabels,
+} from './endnotes';
 import { injectMath } from './math';
 import { MathDialog } from './MathDialog';
 import {
@@ -138,6 +148,9 @@ registerRichTextStrings(i18n);
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 import { PdfModeDialog, type PdfMode } from './PdfModeDialog';
 type BusyKind = 'import' | 'docx' | 'pdf' | null;
+
+/** 两种说明共用一套对话框与面板，但落到 Word 里是两个独立部件 */
+type NoteKindName = 'footnote' | 'endnote';
 
 const SAVE_DEBOUNCE_MS = 600;
 /** Minimum usable editor height: on short windows let the page scroll rather than squash the editor */
@@ -264,8 +277,9 @@ export default function RichTextEditorTool() {
     initial?.pdfMode === 'snapshot' ? 'snapshot' : 'text',
   );
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
-  /** Footnote dialog: null = closed; pos null = create new */
-  const [footnoteDialog, setFootnoteDialog] = useState<{
+  /** 脚注 / 尾注共用一个对话框：kind 决定文案与落到哪个部件，pos null = 新建 */
+  const [noteDialog, setNoteDialog] = useState<{
+    kind: NoteKindName;
     mode: 'insert' | 'edit';
     pos: number | null;
     note: string;
@@ -277,6 +291,10 @@ export default function RichTextEditorTool() {
     latex: string;
     display: boolean;
   } | null>(null);
+  /** Bookmark dialog (RTE-03): insert / rename / delete / jump, all in one panel */
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  /** 交叉引用对话框：选书签 + 选模式，插入一条活引用 */
+  const [xrefsOpen, setXrefsOpen] = useState(false);
   const [printReady, setPrintReady] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
@@ -345,6 +363,12 @@ export default function RichTextEditorTool() {
     () => ({ name: t('tools.richText.footnote'), empty: t('tools.richText.footnoteEmpty') }),
     [t],
   );
+  const endnoteLabels = useMemo<EndnoteLabels>(
+    () => ({ name: t('tools.richText.endnote'), empty: t('tools.richText.endnoteEmpty') }),
+    [t],
+  );
+  /** 交叉引用的"目标书签已删除"占位文字（NodeView 与导出注入共用一份） */
+  const xrefLabels = useMemo<XrefLabels>(() => ({ missing: t('tools.richText.xrefMissing') }), [t]);
   /** Click a formula in the body (NodeView callback) -> open the edit dialog */
   const handleMathSelect = useCallback((pos: number, latex: string, display: boolean) => {
     setMathDialog({ mode: 'edit', pos, latex, display });
@@ -367,7 +391,9 @@ export default function RichTextEditorTool() {
         onLayout: handleLayout,
         getPageMetrics: getMetrics,
         tocLabels,
+        xrefLabels,
         footnoteLabels,
+        endnoteLabels,
         onMathSelect: handleMathSelect,
         spellcheck: { getDictionary: getSpellDictionary, isEnabled: isSpellcheckEnabled },
       }),
@@ -376,7 +402,9 @@ export default function RichTextEditorTool() {
       handleLayout,
       getMetrics,
       tocLabels,
+      xrefLabels,
       footnoteLabels,
+      endnoteLabels,
       handleMathSelect,
       getSpellDictionary,
       isSpellcheckEnabled,
@@ -578,13 +606,30 @@ export default function RichTextEditorTool() {
   }, [editor, snapshotHtml, layout, tocLabels]);
 
   /**
+   * 交叉引用解析值：atom 节点在 `getHTML()` 里只是空壳，导出前必须按"当前文档 + 当前分页"填一次。
+   * 与 TOC 一样依赖 layout：分页稳定后页码才会正确。
+   */
+  const xrefValues = useMemo(() => {
+    if (!editor || editor.isDestroyed || !snapshotHtml) return new Map<string, string>();
+    return resolveAllXrefs(editor.state.doc, (pos) => pageIndexOfPosition(layout.pageStarts, pos));
+  }, [editor, snapshotHtml, layout]);
+
+  /**
    * Unified preparation before export: fill in TOC content + footnote numbering and the end-of-document summary.
    * Both TOC and footnotes are "render-time derived" content (atom nodes serialize to an empty shell,
    * the footnote summary is a widget); without this step print / PDF / Word / Markdown lose content.
    */
   const prepareExportHtml = useCallback(
-    (html: string): string => injectFootnotes(injectTocHtml(html, tocHtml), footnoteLabels),
-    [tocHtml, footnoteLabels],
+    (html: string): string =>
+      injectXrefHtml(
+        injectEndnotes(
+          injectFootnotes(injectTocHtml(html, tocHtml), footnoteLabels),
+          endnoteLabels,
+        ),
+        xrefValues,
+        xrefLabels,
+      ),
+    [tocHtml, footnoteLabels, endnoteLabels, xrefValues, xrefLabels],
   );
 
   /** Shared by print / snapshot PDF / present / single-file HTML: the prepared HTML */
@@ -776,42 +821,58 @@ export default function RichTextEditorTool() {
     editor.chain().focus().refreshTableOfContents().run();
   };
 
-  // Click a footnote reference in the body (NodeView dispatches a bubbling event) -> open the edit dialog
+  // Click a footnote / endnote reference in the body (NodeView dispatches a bubbling event) -> open the edit dialog
   useEffect(() => {
     const onEditFootnote = (event: Event) => {
       const detail = (event as CustomEvent<FootnoteEditDetail>).detail;
       if (!detail) return;
-      setFootnoteDialog({ mode: 'edit', pos: detail.pos, note: detail.note });
+      setNoteDialog({ kind: 'footnote', mode: 'edit', pos: detail.pos, note: detail.note });
+    };
+    const onEditEndnote = (event: Event) => {
+      const detail = (event as CustomEvent<EndnoteEditDetail>).detail;
+      if (!detail) return;
+      setNoteDialog({ kind: 'endnote', mode: 'edit', pos: detail.pos, note: detail.note });
     };
     document.addEventListener(FOOTNOTE_EDIT_EVENT, onEditFootnote);
-    return () => document.removeEventListener(FOOTNOTE_EDIT_EVENT, onEditFootnote);
+    document.addEventListener(ENDNOTE_EDIT_EVENT, onEditEndnote);
+    return () => {
+      document.removeEventListener(FOOTNOTE_EDIT_EVENT, onEditFootnote);
+      document.removeEventListener(ENDNOTE_EDIT_EVENT, onEditEndnote);
+    };
   }, []);
 
-  /** Toolbar entry: edit the selected footnote if any, otherwise create a new one */
-  const handleFootnoteAction = () => {
+  /** Toolbar entry: edit the selected note of that kind if any, otherwise create a new one */
+  const handleNoteAction = (kind: NoteKindName) => {
     if (!editor) return;
-    const selected = findSelectedFootnote(editor.state);
-    if (selected) setFootnoteDialog({ mode: 'edit', pos: selected.pos, note: selected.note });
-    else setFootnoteDialog({ mode: 'insert', pos: null, note: '' });
+    const selected =
+      kind === 'footnote' ? findSelectedFootnote(editor.state) : findSelectedEndnote(editor.state);
+    if (selected) setNoteDialog({ kind, mode: 'edit', pos: selected.pos, note: selected.note });
+    else setNoteDialog({ kind, mode: 'insert', pos: null, note: '' });
   };
 
-  const handleFootnoteSubmit = (note: string) => {
-    if (!editor || !footnoteDialog) return;
-    if (footnoteDialog.mode === 'insert') {
-      editor.chain().focus().insertFootnote(note).run();
-    } else if (footnoteDialog.pos !== null) {
-      editor.chain().focus().updateFootnote(footnoteDialog.pos, note).run();
+  const handleNoteSubmit = (note: string) => {
+    if (!editor || !noteDialog) return;
+    const chain = editor.chain().focus();
+    if (noteDialog.kind === 'footnote') {
+      if (noteDialog.mode === 'insert') chain.insertFootnote(note).run();
+      else if (noteDialog.pos !== null) chain.updateFootnote(noteDialog.pos, note).run();
+    } else if (noteDialog.mode === 'insert') {
+      chain.insertEndnote(note).run();
+    } else if (noteDialog.pos !== null) {
+      chain.updateEndnote(noteDialog.pos, note).run();
     }
-    setFootnoteDialog(null);
+    setNoteDialog(null);
   };
 
-  const handleFootnoteRemove = () => {
-    if (!editor || !footnoteDialog || footnoteDialog.pos === null) return;
-    editor.chain().focus().removeFootnote(footnoteDialog.pos).run();
-    setFootnoteDialog(null);
+  const handleNoteRemove = () => {
+    if (!editor || !noteDialog || noteDialog.pos === null) return;
+    const chain = editor.chain().focus();
+    if (noteDialog.kind === 'footnote') chain.removeFootnote(noteDialog.pos).run();
+    else chain.removeEndnote(noteDialog.pos).run();
+    setNoteDialog(null);
   };
 
-  const handleFootnoteCancel = () => setFootnoteDialog(null);
+  const handleNoteCancel = () => setNoteDialog(null);
 
   /** Toolbar entry: edit the selected formula if any, otherwise create a new one */
   const handleMathAction = () => {
@@ -1552,7 +1613,15 @@ export default function RichTextEditorTool() {
         editorMenuItem(
           'insert-footnote',
           t('tools.richText.footnoteInsert'),
-          handleFootnoteAction,
+          () => handleNoteAction('footnote'),
+          {
+            disabled: !editor,
+          },
+        ),
+        editorMenuItem(
+          'insert-endnote',
+          t('tools.richText.endnoteInsert'),
+          () => handleNoteAction('endnote'),
           {
             disabled: !editor,
           },
@@ -1822,7 +1891,12 @@ export default function RichTextEditorTool() {
         onInsertToc={handleInsertToc}
         onRefreshToc={handleRefreshToc}
         tocDisabled={isEmpty}
-        onFootnote={handleFootnoteAction}
+        onFootnote={() => handleNoteAction('footnote')}
+        onEndnote={() => handleNoteAction('endnote')}
+        onOpenBookmarks={() => setBookmarksOpen(true)}
+        bookmarksOpen={bookmarksOpen}
+        onOpenXrefs={() => setXrefsOpen(true)}
+        xrefsOpen={xrefsOpen}
         onMath={handleMathAction}
         stylesOpen={stylesOpen}
         onToggleStyles={() => togglePanel('styles')}
@@ -2284,12 +2358,21 @@ export default function RichTextEditorTool() {
       />
 
       <FootnoteDialog
-        mode={footnoteDialog?.mode ?? null}
-        initialNote={footnoteDialog?.note ?? ''}
-        onCancel={handleFootnoteCancel}
-        onConfirm={handleFootnoteSubmit}
-        onRemove={handleFootnoteRemove}
+        kind={noteDialog?.kind ?? 'footnote'}
+        mode={noteDialog?.mode ?? null}
+        initialNote={noteDialog?.note ?? ''}
+        onCancel={handleNoteCancel}
+        onConfirm={handleNoteSubmit}
+        onRemove={handleNoteRemove}
       />
+
+      <BookmarkDialog
+        editor={editor}
+        open={bookmarksOpen}
+        onClose={() => setBookmarksOpen(false)}
+      />
+
+      <XrefDialog editor={editor} open={xrefsOpen} onClose={() => setXrefsOpen(false)} />
 
       <MathDialog
         mode={mathDialog?.mode ?? null}

@@ -18,6 +18,8 @@ import {
   resolvePageMetrics,
   type PageSetupConfig,
 } from './pageSetup';
+import { normalizeBookmarkName } from './bookmarks';
+import { XREF_ATTR, XREF_MODE_ATTR, normalizeXrefMode } from './xrefs';
 import { parseDocxSections, splitSectionNodes } from './sections';
 import { applyDocumentReview, parseDocumentReview, parseImportedComments } from './docxReview';
 import { renderWatermarkImage, type WatermarkImage } from './watermarkImage';
@@ -28,6 +30,7 @@ import {
   normalizeImageLayer,
   pxToEmu,
 } from './imageLayer';
+import { ENDNOTE_ATTR } from './endnotes';
 import { FOOTNOTE_ATTR } from './footnotes';
 import { latexToOmml } from './mathOmml';
 import { renderLatexImages, type MathImage, type MathImageRequest } from './mathImage';
@@ -330,6 +333,10 @@ type RunChild = InstanceType<
   | DocxNs['ExternalHyperlink']
   | DocxNs['InsertedTextRun']
   | DocxNs['DeletedTextRun']
+  | DocxNs['Bookmark']
+  | DocxNs['SimpleField']
+  | DocxNs['InternalHyperlink']
+  | DocxNs['EndnoteReferenceRun']
 >;
 type ParagraphChild = import('docx').ParagraphChild;
 
@@ -360,6 +367,8 @@ interface ExportContext {
   revisionId: { value: number };
   /** Footnote bodies collected in body order (number = index + 1) */
   footnoteNotes: string[];
+  /** Endnote bodies collected in body order (independent numbering, `endnotes.xml`) */
+  endnoteNotes: string[];
   /** Formulas OMML can't express -> pre-rendered images (indexed by mathKey) */
   mathImages: Map<string, MathImage>;
   /** Shapes met during the traversal, in document order (injected into document.xml afterwards) */
@@ -471,6 +480,34 @@ function collectInlineRuns(
       return;
     }
 
+    // Bookmark (RTE-03): a zero-width anchor becomes a native bookmarkStart/End pair.
+    // Handled before the hyperlink branch because both are `<a>` and only this one has no href.
+    const bookmarkName = normalizeBookmarkName(el.getAttribute('data-bookmark') ?? '');
+    if (bookmarkName) {
+      runs.push({ node: new D.Bookmark({ id: bookmarkName, children: [] }), commentIds });
+      return;
+    }
+
+    // Cross-reference (RTE-03): the page mode becomes a REF field Word recomputes on open;
+    // the text mode becomes an internal hyperlink carrying already-resolved words, because a
+    // zero-width bookmark has no text for `REF` to return in Word.
+    const xrefTarget = normalizeBookmarkName(el.getAttribute(XREF_ATTR) ?? '');
+    if (xrefTarget) {
+      const cached = (el.textContent ?? '').trim();
+      const mode = normalizeXrefMode(el.getAttribute(XREF_MODE_ATTR));
+      runs.push({
+        node:
+          mode === 'page'
+            ? new D.SimpleField(` REF ${xrefTarget} \\p \\h `, cached || '1')
+            : new D.InternalHyperlink({
+                anchor: xrefTarget,
+                children: [new D.TextRun({ text: cached || xrefTarget })],
+              }),
+        commentIds,
+      });
+      return;
+    }
+
     if (el.tagName === 'A') {
       const href = (el.getAttribute('href') ?? '').trim();
       const inner = collectInlineRuns(ctx, el, hyperlinkMark(mark), commentIds, tracked);
@@ -510,6 +547,16 @@ function collectInlineRuns(
       ctx.footnoteNotes.push((el.getAttribute('data-note') ?? '').trim());
       runs.push({
         node: new D.FootnoteReferenceRun(ctx.footnoteNotes.length),
+        commentIds,
+      });
+      return;
+    }
+
+    // Endnote reference -> Word endnote (its own counter, written to endnotes.xml)
+    if (el.tagName === 'SUP' && el.hasAttribute(ENDNOTE_ATTR)) {
+      ctx.endnoteNotes.push((el.getAttribute('data-note') ?? '').trim());
+      runs.push({
+        node: new D.EndnoteReferenceRun(ctx.endnoteNotes.length),
         commentIds,
       });
       return;
@@ -1309,6 +1356,7 @@ export async function exportDocxBlob(
       date: new Date().toISOString(),
       revisionId: { value: 1000 },
       footnoteNotes: [],
+      endnoteNotes: [],
       mathImages: new Map(),
       shapes: [],
     };
@@ -1369,6 +1417,22 @@ export async function exportDocxBlob(
             ]),
           )
         : undefined;
+    // Endnotes mirror footnotes but land in endnotes.xml; Word numbers them independently
+    const endnoteOptions =
+      ctx.endnoteNotes.length > 0
+        ? Object.fromEntries(
+            ctx.endnoteNotes.map((note, index) => [
+              String(index + 1),
+              {
+                children: [
+                  new D.Paragraph({
+                    children: [new D.TextRun({ text: note || ' ', size: 18 })],
+                  }),
+                ],
+              },
+            ]),
+          )
+        : undefined;
     const document = new D.Document({
       title: title || 'SynTools Document',
       creator: 'SynTools',
@@ -1411,6 +1475,7 @@ export async function exportDocxBlob(
       },
       ...(commentOptions ? { comments: commentOptions } : {}),
       ...(footnoteOptions ? { footnotes: footnoteOptions } : {}),
+      ...(endnoteOptions ? { endnotes: endnoteOptions } : {}),
       // Page background color (fills the sheet when opened in Word)
       ...(setup.background ? { background: { color: setup.background } } : {}),
       sections: sectionBodies.map(({ slice, children }, index) => {

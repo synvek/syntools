@@ -841,3 +841,113 @@ describe('docx export: character layout (RTE-05)', () => {
     expect(xml).not.toContain('w:hanging');
   });
 });
+
+describe('docx bookmarks (RTE-03)', () => {
+  const toFile = (blob: Blob, name: string): File => {
+    const file = new File([blob], name, {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    if (typeof file.arrayBuffer !== 'function') {
+      Object.defineProperty(file, 'arrayBuffer', { value: () => blobToArrayBuffer(blob) });
+    }
+    return file;
+  };
+
+  it('writes a native bookmarkStart / bookmarkEnd pair with the bookmark name', async () => {
+    const result = await exportDocxBlob('<p>a<a data-bookmark="Intro"></a>b</p>', 'bookmark');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('<w:bookmarkStart');
+    expect(xml).toContain('w:name="Intro"');
+    expect(xml).toContain('<w:bookmarkEnd');
+    // 书签必须是零宽：正文文字不能被吞掉
+    expect(xml).toContain('a');
+    expect(xml).toContain('b');
+  });
+
+  it('drops bookmarks whose name Word would reject', async () => {
+    const result = await exportDocxBlob('<p>a<a data-bookmark="  "></a>b</p>', 'bookmark-empty');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).not.toContain('w:bookmarkStart');
+  });
+
+  it('reads the bookmark back on import as an empty anchor', async () => {
+    const exported = await exportDocxBlob('<p>a<a data-bookmark="Intro"></a>b</p>', 'bookmark');
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    const imported = await importDocx(toFile(exported.value, 'bookmark.docx'));
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    // mammoth 把 bookmarkStart 读成空的 <a id>，编辑器解析规则据此还原书签节点
+    expect(imported.value).toMatch(/<a id="Intro"/);
+  });
+});
+
+describe('docx cross-references (RTE-03)', () => {
+  it('writes a REF field for page mode so Word recomputes the number', async () => {
+    const html = '<p>第 <span data-xref="Intro" data-xref-mode="page">3</span> 页</p>';
+    const result = await exportDocxBlob(html, 'xref-page');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('w:fldSimple');
+    expect(xml).toContain('REF Intro \\p');
+    // 缓存值随文档一起落地，Word 打开前也能看到页码
+    expect(xml).toContain('>3<');
+  });
+
+  it('writes an internal hyperlink for text mode (zero-width bookmark has no text for REF)', async () => {
+    const html = '<p>见 <span data-xref="Intro" data-xref-mode="text">图 1 架构</span></p>';
+    const result = await exportDocxBlob(html, 'xref-text');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const xml = await readDocumentXml(result.value);
+    expect(xml).toContain('w:anchor="Intro"');
+    expect(xml).toContain('图 1 架构');
+    expect(xml).not.toContain('w:fldSimple');
+  });
+
+  it('reports text-mode references as static text in the loss scan', () => {
+    const html =
+      '<p><span data-xref="A" data-xref-mode="text"></span><span data-xref="B" data-xref-mode="page"></span></p>';
+    const scan = scanDocxExportLosses(html);
+    expect(scan.ok).toBe(true);
+    if (scan.ok) expect(scan.value.staticXrefs).toBe(1);
+  });
+});
+
+describe('docx endnotes (RTE-03)', () => {
+  it('writes the reference in the body and the note text into endnotes.xml', async () => {
+    const html = '<p>正文<sup data-endnote="true" data-note="尾注正文"></sup></p>';
+    const result = await exportDocxBlob(html, 'endnote');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const body = await readDocumentXml(result.value);
+    expect(body).toContain('w:endnoteReference');
+    // 尾注正文必须落在独立部件里，而不是塞回正文
+    expect(body).not.toContain('尾注正文');
+    const endnotes = await readZipEntry(result.value, 'word/endnotes.xml');
+    expect(endnotes).toContain('尾注正文');
+  });
+
+  it('numbers endnotes independently from footnotes', async () => {
+    const html =
+      '<p>a<sup data-footnote="true" data-note="脚注一"></sup>' +
+      '<sup data-endnote="true" data-note="尾注一"></sup>' +
+      '<sup data-endnote="true" data-note="尾注二"></sup></p>';
+    const result = await exportDocxBlob(html, 'endnote-numbering');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const body = await readDocumentXml(result.value);
+    const footnoteIds = [...body.matchAll(/w:footnoteReference w:id="(\d+)"/g)].map((m) => m[1]);
+    const endnoteIds = [...body.matchAll(/w:endnoteReference w:id="(\d+)"/g)].map((m) => m[1]);
+    expect(footnoteIds).toEqual(['1']);
+    expect(endnoteIds).toEqual(['1', '2']);
+    const endnotes = await readZipEntry(result.value, 'word/endnotes.xml');
+    expect(endnotes).toContain('尾注一');
+    expect(endnotes).toContain('尾注二');
+  });
+});

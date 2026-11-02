@@ -1,0 +1,156 @@
+/**
+ * 书签（RTE-03）文案。
+ *
+ * 与 `charFormatStrings.ts` 同样的做法：单独一块，由 `strings.ts` 的 `EXTRA_STRINGS` 合并进
+ * `tools.richText.*`，避免再去动 9 个正文语言块。
+ */
+export const bookmarkStrings: Record<string, Record<string, string>> = {
+  zh: {
+    bookmark: '书签',
+    bookmarkName: '名称',
+    bookmarkPlaceholder: '输入书签名称',
+    bookmarkInsert: '插入书签',
+    bookmarkRename: '重命名',
+    bookmarkDelete: '删除',
+    bookmarkGoto: '定位',
+    bookmarkEmpty: '文档暂无书签',
+    bookmarkDuplicate: '该书签名已存在',
+    bookmarkInvalid: '书签名需以字母开头，只含字母、数字、下划线与连字符（最多 40 字符）',
+    bookmarkHint: '书签是零宽锚点：用于快速定位，也是后续交叉引用的目标',
+    bookmarkDefault: '书签',
+    bookmarkClose: '关闭',
+  },
+  en: {
+    bookmark: 'Bookmark',
+    bookmarkName: 'Name',
+    bookmarkPlaceholder: 'Enter a bookmark name',
+    bookmarkInsert: 'Insert bookmark',
+    bookmarkRename: 'Rename',
+    bookmarkDelete: 'Delete',
+    bookmarkGoto: 'Go to',
+    bookmarkEmpty: 'No bookmarks in this document',
+    bookmarkDuplicate: 'That bookmark name already exists',
+    bookmarkInvalid:
+      'Names must start with a letter and contain only letters, digits, underscores or hyphens (max 40 characters)',
+    bookmarkHint:
+      'A bookmark is a zero-width anchor for quick navigation and future cross-references',
+    bookmarkDefault: 'bookmark',
+    bookmarkClose: 'Close',
+  },
+  'zh-TW': {
+    bookmark: '書籤',
+    bookmarkName: '名稱',
+    bookmarkPlaceholder: '輸入書籤名稱',
+    bookmarkInsert: '插入書籤',
+    bookmarkRename: '重新命名',
+    bookmarkDelete: '刪除',
+    bookmarkGoto: '跳至',
+    bookmarkEmpty: '文件尚無書籤',
+    bookmarkDuplicate: '該書籤名稱已存在',
+    bookmarkInvalid: '書籤名稱需以字母開頭，僅含字母、數字、底線與連字號（最多 40 字元）',
+    bookmarkHint: '書籤是零寬錨點：用於快速定位，也是後續交互參照的目標',
+    bookmarkDefault: '書籤',
+    bookmarkClose: '關閉',
+  },
+  ja: {
+    bookmark: 'ブックマーク',
+    bookmarkName: '名前',
+    bookmarkPlaceholder: 'ブックマーク名を入力',
+    bookmarkInsert: 'ブックマークを挿入',
+    bookmarkRename: '名前を変更',
+    bookmarkDelete: '削除',
+    bookmarkGoto: '移動',
+    bookmarkEmpty: 'この文書にブックマークはありません',
+    bookmarkDuplicate: 'そのブックマーク名は既に存在します',
+    bookmarkInvalid:
+      '名前は英字で始まり、英数字・アンダースコア・ハイフンのみ使用できます（40 文字まで）',
+    bookmarkHint: 'ブックマークは幅ゼロのアンカーで、移動や将来の相互参照の対象になります',
+    bookmarkDefault: 'ブックマーク',
+    bookmarkClose: '閉じる',
+  },
+  fr: {
+    bookmark: 'Signet',
+    bookmarkName: 'Nom',
+    bookmarkPlaceholder: 'Saisir un nom de signet',
+    bookmarkInsert: 'Insérer un signet',
+    bookmarkRename: 'Renommer',
+    bookmarkDelete: 'Supprimer',
+    bookmarkGoto: 'Aller à',
+    bookmarkEmpty: 'Aucun signet dans ce document',
+    bookmarkDuplicate: 'Ce nom de signet existe déjà',
+    bookmarkInvalid:
+      'Le nom doit commencer par une lettre et ne contenir que lettres, chiffres, tirets bas ou traits d’union (40 caractères max.)',
+    bookmarkHint:
+      'Un signet est une ancre de largeur nulle, pour la navigation et les renvois à venir',
+    bookmarkDefault: 'signet',
+    bookmarkClose: 'Fermer',
+  },
+  de: {
+    bookmark: 'Textmarke',
+    bookmarkName: 'Name',
+    bookmarkPlaceholder: 'Namen der Textmarke eingeben',
+    bookmarkInsert: 'Textmarke einfügen',
+    bookmarkRename: 'Umbenennen',
+    bookmarkDelete: 'Löschen',
+    bookmarkGoto: 'Gehe zu',
+    bookmarkEmpty: 'Dieses Dokument enthält keine Textmarken',
+    bookmarkDuplicate: 'Dieser Name ist bereits vergeben',
+    bookmarkInvalid:
+      'Der Name muss mit einem Buchstaben beginnen und darf nur Buchstaben, Ziffern, Unterstriche oder Bindestriche enthalten (max. 40 Zeichen)',
+    bookmarkHint:
+      'Eine Textmarke ist ein Anker ohne Breite – zum Springen und für künftige Querverweise',
+    bookmarkDefault: 'Textmarke',
+    bookmarkClose: 'Schließen',
+  },
+  it: {
+    bookmark: 'Segnalibro',
+    bookmarkName: 'Nome',
+    bookmarkPlaceholder: 'Inserisci un nome per il segnalibro',
+    bookmarkInsert: 'Inserisci segnalibro',
+    bookmarkRename: 'Rinomina',
+    bookmarkDelete: 'Elimina',
+    bookmarkGoto: 'Vai a',
+    bookmarkEmpty: 'Nessun segnalibro nel documento',
+    bookmarkDuplicate: 'Questo nome esiste già',
+    bookmarkInvalid:
+      'Il nome deve iniziare con una lettera e contenere solo lettere, cifre, underscore o trattini (max 40 caratteri)',
+    bookmarkHint:
+      'Un segnalibro è un’ancora a larghezza zero, per la navigazione e i futuri riferimenti incrociati',
+    bookmarkDefault: 'segnalibro',
+    bookmarkClose: 'Chiudi',
+  },
+  es: {
+    bookmark: 'Marcador',
+    bookmarkName: 'Nombre',
+    bookmarkPlaceholder: 'Escribe un nombre de marcador',
+    bookmarkInsert: 'Insertar marcador',
+    bookmarkRename: 'Cambiar nombre',
+    bookmarkDelete: 'Eliminar',
+    bookmarkGoto: 'Ir a',
+    bookmarkEmpty: 'El documento no tiene marcadores',
+    bookmarkDuplicate: 'Ese nombre de marcador ya existe',
+    bookmarkInvalid:
+      'El nombre debe empezar por una letra y contener solo letras, dígitos, guiones bajos o guiones (máx. 40 caracteres)',
+    bookmarkHint:
+      'Un marcador es un ancla de ancho cero: sirve para navegar y para futuras referencias cruzadas',
+    bookmarkDefault: 'marcador',
+    bookmarkClose: 'Cerrar',
+  },
+  pt: {
+    bookmark: 'Marcador',
+    bookmarkName: 'Nome',
+    bookmarkPlaceholder: 'Digite um nome de marcador',
+    bookmarkInsert: 'Inserir marcador',
+    bookmarkRename: 'Renomear',
+    bookmarkDelete: 'Excluir',
+    bookmarkGoto: 'Ir para',
+    bookmarkEmpty: 'O documento não tem marcadores',
+    bookmarkDuplicate: 'Esse nome de marcador já existe',
+    bookmarkInvalid:
+      'O nome deve começar com uma letra e conter apenas letras, dígitos, sublinhados ou hífens (máx. 40 caracteres)',
+    bookmarkHint:
+      'Um marcador é uma âncora de largura zero, para navegação e futuras referências cruzadas',
+    bookmarkDefault: 'marcador',
+    bookmarkClose: 'Fechar',
+  },
+};

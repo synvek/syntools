@@ -11,7 +11,10 @@
  * because the home card, sidebar, and ⌘K search need it before the tool loads.
  */
 
+import { bookmarkStrings } from './bookmarkStrings';
 import { charFormatStrings } from './charFormatStrings';
+import { endnoteStrings } from './endnoteStrings';
+import { xrefStrings } from './xrefStrings';
 
 type StringTree = { [key: string]: string | StringTree };
 type ResourceTree = { tools: { richText: StringTree } };
@@ -3528,7 +3531,13 @@ const shapeStrings: Record<string, StringTree> = {
 };
 
 /** 增量文案块（语言 id → `tools.richText` 下的补充键）；新增小功能时往这里加一块即可 */
-const EXTRA_STRINGS: Record<string, StringTree>[] = [shapeStrings, charFormatStrings];
+const EXTRA_STRINGS: Record<string, StringTree>[] = [
+  shapeStrings,
+  charFormatStrings,
+  bookmarkStrings,
+  xrefStrings,
+  endnoteStrings,
+];
 
 /**
  * Merge every incremental block into one language tree (shallow: only `tools.richText` gains keys).
