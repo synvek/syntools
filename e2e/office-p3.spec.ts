@@ -36,8 +36,13 @@ test('rich text: inserted shape renders as SVG and exports as a native wps:wsp',
   await page.locator('.tiptap').click();
   await page.keyboard.type('形状测试');
 
-  // 1) Insert from the palette
+  // 1) Insert from the ribbon's 插入 tab: the button opens the shape gallery, "更多样式" the full panel
+  await page.getByRole('tab', { name: '插入', exact: true }).click();
   await page.getByRole('button', { name: '插入形状' }).click();
+  const gallery = page.getByTestId('rich-text-shape-menu');
+  await expect(gallery).toBeVisible();
+  await gallery.getByRole('button', { name: '更多样式' }).click();
+
   const panel = page.getByTestId('rich-text-shapes');
   await expect(panel).toBeVisible();
   await expect(panel.locator('[data-shape-preset]').first()).toBeVisible();

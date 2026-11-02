@@ -321,6 +321,8 @@ test('rich text: compare with a .docx file turns the differences into reviewable
     await (await chooser).setFiles(baseline);
   };
 
+  // 批注与修订 lives on the 审阅 tab of the ribbon
+  await page.getByRole('tab', { name: '审阅', exact: true }).click();
   await page.getByRole('button', { name: '批注与修订' }).click();
   await expect(page.getByTestId('rich-text-review')).toBeVisible();
   await compareWithBaseline();
@@ -366,6 +368,8 @@ test('rich text: tracked changes survive a .docx round trip through import', asy
   await pastePlainText(page, '甲乙丙');
 
   // 1) Mark the whole paragraph as an insertion
+  // 批注与修订 lives on the 审阅 tab of the ribbon
+  await page.getByRole('tab', { name: '审阅', exact: true }).click();
   await page.getByRole('button', { name: '批注与修订' }).click();
   await page.locator('.tiptap p').first().click();
   await page.keyboard.press('ControlOrMeta+A');
@@ -406,6 +410,8 @@ test('rich text: comments survive a .docx round trip through import', async ({ p
   await pastePlainText(page, '甲乙丙');
 
   // 1) Comment on a selection
+  // 批注与修订 lives on the 审阅 tab of the ribbon
+  await page.getByRole('tab', { name: '审阅', exact: true }).click();
   await page.getByRole('button', { name: '批注与修订' }).click();
   // Triple click selects the paragraph: a caret-only selection would silently create a document-level
   // comment (no mark), which is exactly what this test must not accept
@@ -558,7 +564,8 @@ test('slide: entrance animation plays before the slide advances', async ({ page 
   await page.goto('/tools/slide-editor');
   await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-  // 1) 插入一个文本框（自动选中），再给它加「飞入」
+  // 1) 插入一个文本框（自动选中），再给它加「飞入」；文本框在功能区的「插入」选项卡
+  await page.getByRole('tab', { name: '插入', exact: true }).click();
   await page.getByRole('button', { name: '文本框' }).click();
   await expect(page.getByText('已选中 1 个元素')).toBeVisible();
   await page.getByRole('button', { name: '动画', exact: true }).click();

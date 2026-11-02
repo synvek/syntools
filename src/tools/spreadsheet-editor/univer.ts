@@ -1,5 +1,8 @@
 import {
+  BorderStyleTypes,
+  BorderType,
   CommandType,
+  HorizontalAlign,
   LocaleType,
   RedoCommandId,
   UndoCommandId,
@@ -94,6 +97,19 @@ import '@univerjs/sheets-hyper-link-ui/lib/index.css';
 import '@univerjs/find-replace/lib/index.css';
 import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
 import type { SheetViewport } from './shapes';
+import { OpenConditionalFormattingOperator } from '@univerjs/sheets-conditional-formatting-ui';
+import '@univerjs/sheets-numfmt/facade';
+import {
+  buildAutoSum,
+  readSheetFormat,
+  shiftDecimals,
+  toggleThousandSeparator,
+  type BorderPresetId,
+  type SheetFormatPatch,
+  type SheetFormatState,
+  type UniverStyleLike,
+} from './sheetFormat';
+import type { FreezeMode, MergeMode, SheetPanelKind, SheetRibbonHost } from './commands';
 
 /**
  * Univer adapter layer: plugin registration, locales, theme and lifecycle funnel through one entry
@@ -111,7 +127,21 @@ export interface SheetInfo {
 /** 写进单元格的值：空串在 Univer 里应该写成 null，否则会留下"有内容的空单元格" */
 export type SheetCellValue = string | number | null;
 
-export interface UniverHandle {
+/**
+ * Univer chrome configuration in one place.
+ *
+ * The tool ships its own Office-style ribbon, so Univer's built-in toolbar and header menu are off;
+ * the header itself stays because it hosts the formula bar. Turning `toolbar: true` back on restores
+ * Univer's ribbon without touching anything else.
+ */
+export const UNIVER_UI_CHROME = {
+  header: true,
+  toolbar: false,
+  headerMenu: false,
+  footer: false,
+} as const;
+
+export interface UniverHandle extends SheetRibbonHost {
   loadSnapshot(snapshot: WorkbookSnapshot): void;
   getSnapshot(): WorkbookSnapshot;
   dispose(): void;
@@ -229,11 +259,16 @@ export function createUniverInstance(
 
   univer.registerPlugin(UniverRenderEnginePlugin);
   univer.registerPlugin(UniverFormulaEnginePlugin);
-  univer.registerPlugin(UniverUIPlugin, { container, header: true, toolbar: true, footer: false });
+  /**
+   * The built-in ribbon is turned off: this tool draws its own Office-style ribbon above the canvas
+   * (see `SpreadsheetRibbon`). Only the header stays — it hosts the formula bar, which the ribbon does
+   * not replace. Flipping `UNIVER_UI_CHROME` back to `toolbar: true` restores Univer's own toolbar.
+   */
+  univer.registerPlugin(UniverUIPlugin, { container, ...UNIVER_UI_CHROME });
   univer.registerPlugin(UniverDocsPlugin);
   univer.registerPlugin(UniverDocsUIPlugin);
   univer.registerPlugin(UniverSheetsPlugin);
-  univer.registerPlugin(UniverSheetsUIPlugin);
+  univer.registerPlugin(UniverSheetsUIPlugin, { formulaBar: true });
   univer.registerPlugin(UniverSheetsFormulaPlugin);
   univer.registerPlugin(UniverSheetsFormulaUIPlugin);
   univer.registerPlugin(UniverSheetsNumfmtPlugin);
@@ -274,6 +309,46 @@ export function createUniverInstance(
       mutationListener = null;
       mutationDisposable?.dispose();
       mutationDisposable = null;
+    };
+  };
+
+  /**
+   * Ribbon state subscription: selection moves and style mutations both change what the ribbon must
+   * highlight. Events are coalesced through `requestAnimationFrame`, otherwise dragging a selection
+   * repaints the ribbon on every mousemove.
+   */
+  let selectionListener: (() => void) | null = null;
+  let selectionDisposables: Array<{ dispose: () => void }> = [];
+
+  const subscribeRibbonEvents = (): void => {
+    if (!selectionListener) return;
+    for (const disposable of selectionDisposables) disposable.dispose();
+    let frame = 0;
+    const schedule = (): void => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        selectionListener?.();
+      });
+    };
+    selectionDisposables = [
+      univerAPI.addEvent(univerAPI.Event.SelectionChanged, schedule),
+      univerAPI.addEvent(univerAPI.Event.SheetZoomChanged, schedule),
+      // Style commands are mutations, not selection moves: without this the toggles never reflect a
+      // click until the user changes the selection
+      univerAPI.addEvent(univerAPI.Event.CommandExecuted, (event) => {
+        if (event.type === CommandType.MUTATION) schedule();
+      }),
+    ];
+  };
+
+  const onSelectionChange = (listener: () => void): (() => void) => {
+    selectionListener = listener;
+    subscribeRibbonEvents();
+    return () => {
+      selectionListener = null;
+      for (const disposable of selectionDisposables) disposable.dispose();
+      selectionDisposables = [];
     };
   };
 
@@ -398,10 +473,364 @@ export function createUniverInstance(
     if (sheet) workbook.duplicateSheet(sheet);
   };
 
+  /* ------------------------ ribbon host: format & ops ------------------------ */
+
+  /**
+   * Sampling cap for the selection style read. A whole-column selection can hold millions of cells and
+   * `getCellStyles()` materializes all of them; 200 evenly spread samples give the same "is it bold /
+   * mixed" answer at a fraction of the cost.
+   */
+  const MAX_SAMPLED_CELLS = 200;
+
+  const activeFWorksheet = () => univerAPI.getActiveWorkbook()?.getActiveSheet() ?? null;
+  const activeFRange = () => activeFWorksheet()?.getActiveRange() ?? null;
+
+  /**
+   * `getCellStyles()` yields `TextStyleValue` instances (a class wrapping the raw style in `_style`),
+   * not plain objects — reading them directly made every toggle look "off".
+   */
+  function unwrapStyle(cell: unknown): UniverStyleLike {
+    if (!cell || typeof cell !== 'object') return {};
+    const wrapper = cell as { getValue?: () => UniverStyleLike; _style?: UniverStyleLike };
+    if (typeof wrapper.getValue === 'function') return wrapper.getValue() ?? {};
+    return wrapper as UniverStyleLike;
+  }
+
+  function sampleStyles(matrix: Array<Array<UniverStyleLike | null>>): UniverStyleLike[] {
+    const total = matrix.reduce((sum, row) => sum + row.length, 0);
+    const at = (index: number): UniverStyleLike => {
+      let seen = 0;
+      for (const row of matrix) {
+        if (index < seen + row.length) return unwrapStyle(row[index - seen]);
+        seen += row.length;
+      }
+      return {};
+    };
+    if (total <= MAX_SAMPLED_CELLS) {
+      const all: UniverStyleLike[] = [];
+      for (const row of matrix) for (const cell of row) all.push(unwrapStyle(cell));
+      return all;
+    }
+    const stride = Math.max(1, Math.floor(total / MAX_SAMPLED_CELLS));
+    const sampled: UniverStyleLike[] = [];
+    for (let index = 0; index < total; index += stride) sampled.push(at(index));
+    return sampled;
+  }
+
+  const getFormatState = (): SheetFormatState | null => {
+    const range = activeFRange();
+    if (!range) return null;
+    let matrix: Array<Array<UniverStyleLike | null>> = [];
+    try {
+      matrix = range.getCellStyles() as unknown as Array<Array<UniverStyleLike | null>>;
+    } catch {
+      matrix = [];
+    }
+    let merged = false;
+    try {
+      merged = range.isMerged();
+    } catch {
+      merged = false;
+    }
+    return readSheetFormat(sampleStyles(matrix), merged);
+  };
+
+  /**
+   * Horizontal alignment via the command, not the facade: `FRange.setHorizontalAlignment` only accepts
+   * `'left' | 'center' | 'normal'` in Univer 0.25.1 — there is no way to set right alignment through it.
+   */
+  const setHorizontalAlign = (align: 'general' | 'left' | 'center' | 'right'): void => {
+    const workbook = univerAPI.getActiveWorkbook();
+    const sheet = workbook?.getActiveSheet();
+    const block = getActiveRange();
+    if (!workbook || !sheet || !block) return;
+    const value =
+      align === 'right'
+        ? HorizontalAlign.RIGHT
+        : align === 'center'
+          ? HorizontalAlign.CENTER
+          : align === 'left'
+            ? HorizontalAlign.LEFT
+            : HorizontalAlign.UNSPECIFIED;
+    void univerAPI.executeCommand('sheet.command.set-horizontal-text-align', {
+      unitId: workbook.getId(),
+      subUnitId: sheet.getSheetId(),
+      range: block,
+      value,
+    });
+  };
+
+  /**
+   * Style writes go through the facade so each click is a single undo step. Only the keys present in
+   * `patch` are touched — sending everything would wipe formatting the user did not ask about.
+   */
+  const applyFormat = (patch: SheetFormatPatch): void => {
+    const range = activeFRange();
+    if (!range) return;
+    if (patch.bold !== undefined) range.setFontWeight(patch.bold ? 'bold' : 'normal');
+    if (patch.italic !== undefined) range.setFontStyle(patch.italic ? 'italic' : 'normal');
+    if (patch.underline !== undefined) range.setFontLine(patch.underline ? 'underline' : 'none');
+    if (patch.strike !== undefined) range.setFontLine(patch.strike ? 'line-through' : 'none');
+    if (patch.fontFamily !== undefined) range.setFontFamily(patch.fontFamily);
+    if (patch.fontSize !== undefined) range.setFontSize(patch.fontSize);
+    if (patch.color !== undefined) range.setFontColor(patch.color ?? '#000000');
+    if (patch.fill !== undefined) range.setBackground(patch.fill ?? '#ffffff');
+    if (patch.hAlign !== undefined) setHorizontalAlign(patch.hAlign);
+    if (patch.vAlign !== undefined) range.setVerticalAlignment(patch.vAlign);
+    if (patch.wrap !== undefined) range.setWrap(patch.wrap);
+    if (patch.numberFormat !== undefined) {
+      range.setNumberFormat(patch.numberFormat || 'General');
+    }
+  };
+
+  const BORDER_PRESET_MAP: Record<BorderPresetId, { type: BorderType; style: BorderStyleTypes }> = {
+    none: { type: BorderType.NONE, style: BorderStyleTypes.NONE },
+    all: { type: BorderType.ALL, style: BorderStyleTypes.THIN },
+    outside: { type: BorderType.OUTSIDE, style: BorderStyleTypes.THIN },
+    inside: { type: BorderType.INSIDE, style: BorderStyleTypes.THIN },
+    bottom: { type: BorderType.BOTTOM, style: BorderStyleTypes.THIN },
+    top: { type: BorderType.TOP, style: BorderStyleTypes.THIN },
+    left: { type: BorderType.LEFT, style: BorderStyleTypes.THIN },
+    right: { type: BorderType.RIGHT, style: BorderStyleTypes.THIN },
+    thickOutside: { type: BorderType.OUTSIDE, style: BorderStyleTypes.THICK },
+  };
+
+  const applyBorder = (preset: BorderPresetId): void => {
+    const range = activeFRange();
+    if (!range) return;
+    const spec = BORDER_PRESET_MAP[preset];
+    range.setBorder(spec.type, spec.style, '#000000');
+  };
+
+  const applyNumberFormat = (pattern: string | null): void => {
+    activeFRange()?.setNumberFormat(pattern || 'General');
+  };
+
+  const applyDecimalShift = (delta: number): void => {
+    const range = activeFRange();
+    if (!range) return;
+    const current = getFormatState()?.numberFormat ?? '';
+    range.setNumberFormat(shiftDecimals(current, delta));
+  };
+
+  const applyThousandToggle = (): void => {
+    const range = activeFRange();
+    if (!range) return;
+    const current = getFormatState()?.numberFormat ?? '';
+    range.setNumberFormat(toggleThousandSeparator(current));
+  };
+
+  const mergeSelection = (mode: MergeMode): void => {
+    const range = activeFRange();
+    if (!range) return;
+    if (mode === 'unmerge') {
+      // `merge()` cannot unmerge; the command is the documented way back
+      void univerAPI.executeCommand('sheet.command.remove-worksheet-merge');
+      return;
+    }
+    if (mode === 'across') range.mergeAcross({ isForceMerge: true });
+    else range.merge({ isForceMerge: true });
+    if (mode === 'center') range.setHorizontalAlignment('center');
+  };
+
+  const selectionBlock = () => {
+    const range = getActiveRange();
+    if (!range) return null;
+    return {
+      rows: range.endRow - range.startRow + 1,
+      columns: range.endColumn - range.startColumn + 1,
+      startRow: range.startRow,
+      startColumn: range.startColumn,
+      endRow: range.endRow,
+      endColumn: range.endColumn,
+    };
+  };
+
+  const insertCells = (kind: 'row' | 'column', where: 'before' | 'after'): void => {
+    const sheet = activeFWorksheet();
+    const block = selectionBlock();
+    if (!sheet || !block) return;
+    if (kind === 'row') {
+      if (where === 'before') sheet.insertRowsBefore(block.startRow, block.rows);
+      else sheet.insertRowsAfter(block.endRow, block.rows);
+    } else if (where === 'before') {
+      sheet.insertColumnsBefore(block.startColumn, block.columns);
+    } else {
+      sheet.insertColumnsAfter(block.endColumn, block.columns);
+    }
+  };
+
+  const deleteCells = (kind: 'row' | 'column'): void => {
+    const sheet = activeFWorksheet();
+    const block = selectionBlock();
+    if (!sheet || !block) return;
+    if (kind === 'row') sheet.deleteRows(block.startRow, block.rows);
+    else sheet.deleteColumns(block.startColumn, block.columns);
+  };
+
+  const autoFit = (kind: 'row' | 'column'): void => {
+    const sheet = activeFWorksheet();
+    const block = selectionBlock();
+    if (!sheet || !block) return;
+    if (kind === 'row') sheet.autoResizeRows(block.startRow, block.rows);
+    else sheet.autoResizeColumns(block.startColumn, block.columns);
+  };
+
+  const setFreeze = (mode: FreezeMode): void => {
+    const sheet = activeFWorksheet();
+    if (!sheet) return;
+    if (mode === 'none') {
+      sheet.cancelFreeze();
+      return;
+    }
+    const block = selectionBlock();
+    const startRow = mode === 'row' ? 1 : mode === 'both' ? Math.max(1, block?.startRow ?? 1) : 0;
+    const startColumn =
+      mode === 'column' ? 1 : mode === 'both' ? Math.max(1, block?.startColumn ?? 1) : 0;
+    sheet.setFreeze({
+      xSplit: startColumn,
+      ySplit: startRow,
+      startRow,
+      startColumn,
+    });
+  };
+
+  const getFreezeState = (): FreezeMode => {
+    const freeze = activeFWorksheet()?.getFreeze();
+    if (!freeze) return 'none';
+    const row = (freeze.ySplit ?? 0) > 0;
+    const column = (freeze.xSplit ?? 0) > 0;
+    if (row && column) return 'both';
+    return row ? 'row' : column ? 'column' : 'none';
+  };
+
+  const setGridlinesHidden = (hidden: boolean): void => {
+    activeFWorksheet()?.setHiddenGridlines(hidden);
+  };
+
+  const areGridlinesHidden = (): boolean => activeFWorksheet()?.hasHiddenGridLines() ?? false;
+
+  const setZoomPercent = (percent: number): void => {
+    activeFWorksheet()?.zoom(Math.min(4, Math.max(0.25, percent / 100)));
+  };
+
+  const getZoomPercent = (): number => Math.round((activeFWorksheet()?.getZoom() ?? 1) * 100);
+
+  const sortSelection = (direction: 'asc' | 'desc'): void => {
+    activeFRange()?.sort({ column: 0, ascending: direction === 'asc' });
+  };
+
+  const toggleFilter = (): void => {
+    const sheet = activeFWorksheet();
+    const range = activeFRange();
+    if (!sheet || !range) return;
+    const existing = sheet.getFilter();
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    range.createFilter();
+  };
+
+  const hasFilter = (): boolean => Boolean(activeFWorksheet()?.getFilter());
+
+  /** AutoSum: insert `=SUM(range)` after the selected block (below it when vertical) */
+  const applyAutoSum = (): void => {
+    const block = selectionBlock();
+    const sheet = activeFWorksheet();
+    if (!block || !sheet) return;
+    const target = buildAutoSum(block);
+    sheet.getRange(target.row, target.column).setFormula(target.formula);
+    sheet.getRange(target.row, target.column).activate();
+  };
+
+  const clearFormatting = (): void => {
+    activeFRange()?.clearFormat();
+  };
+
+  const readSelectionText = (): string => {
+    const range = activeFRange();
+    if (!range) return '';
+    try {
+      return range
+        .getDisplayValues()
+        .map((row) => row.join('\t'))
+        .join('\n');
+    } catch {
+      return '';
+    }
+  };
+
+  const writeMatrix = (matrix: string[][]): void => {
+    const range = activeFRange();
+    if (!range || matrix.length === 0 || matrix[0]?.length === 0) return;
+    range.setValues(matrix.map((row) => row.map((value) => ({ v: value === '' ? null : value }))));
+  };
+
+  const clearSelection = (): void => {
+    activeFRange()?.clearContent();
+  };
+
+  const setHyperlink = (url: string): void => {
+    const range = activeFRange();
+    if (!range) return;
+    range.setHyperLink(url);
+  };
+
+  /** Operation ids of the plugin UIs that stay registered even though their toolbar is hidden */
+  const PANEL_OPERATIONS: Record<Exclude<SheetPanelKind, 'hyperlink'>, string> = {
+    // `CF_MENU_OPERATION.viewRule` — opens the "manage rules" sidebar
+    conditionalFormatting: OpenConditionalFormattingOperator.id,
+    dataValidation: 'data-validation.operation.open-validation-panel',
+    filter: 'sheet.operation.open-filter-panel',
+    findReplace: 'ui.operation.open-find-dialog',
+  };
+
+  const openPanel = (panel: SheetPanelKind): void => {
+    const workbook = univerAPI.getActiveWorkbook();
+    const sheetId = workbook?.getActiveSheet()?.getSheetId();
+    const block = selectionBlock();
+    try {
+      if (panel === 'hyperlink') {
+        // Same flow as Excel's "insert hyperlink": edit the link of the anchor cell
+        void univerAPI.executeCommand('sheet.operation.open-hyper-link-edit-panel', {
+          unitId: workbook?.getId(),
+          subUnitId: sheetId,
+          row: block?.startRow ?? 0,
+          column: block?.startColumn ?? 0,
+        });
+        return;
+      }
+      if (panel === 'conditionalFormatting') {
+        void univerAPI.executeCommand(PANEL_OPERATIONS.conditionalFormatting, { value: 2 });
+        return;
+      }
+      if (panel === 'dataValidation') {
+        void univerAPI.executeCommand(PANEL_OPERATIONS.dataValidation, { isAdd: true });
+        return;
+      }
+      if (panel === 'filter') {
+        if (!workbook || !sheetId || !block) return;
+        void univerAPI.executeCommand(PANEL_OPERATIONS.filter, {
+          unitId: workbook.getId(),
+          subUnitId: sheetId,
+          col: block.startColumn,
+        });
+        return;
+      }
+      void univerAPI.executeCommand(PANEL_OPERATIONS.findReplace);
+    } catch {
+      // A plugin version without the operation must not break the ribbon: the click degrades to a no-op
+    }
+  };
+
   const dispose = (): void => {
     mutationDisposable?.dispose();
     mutationDisposable = null;
     mutationListener = null;
+    for (const disposable of selectionDisposables) disposable.dispose();
+    selectionDisposables = [];
+    selectionListener = null;
     univer.dispose();
     container.replaceChildren();
   };
@@ -493,5 +922,33 @@ export function createUniverInstance(
     duplicateSheet,
     getViewport,
     onViewportChange,
+    // Ribbon host (see commands.ts): formatting, sheet operations and the state subscription
+    getFormatState,
+    applyFormat,
+    applyBorder,
+    applyNumberFormat,
+    shiftDecimals: applyDecimalShift,
+    toggleThousandSeparator: applyThousandToggle,
+    mergeSelection,
+    insertCells,
+    deleteCells,
+    autoFit,
+    setFreeze,
+    getFreezeState,
+    setGridlinesHidden,
+    areGridlinesHidden,
+    setZoomPercent,
+    getZoomPercent,
+    sortSelection,
+    toggleFilter,
+    hasFilter,
+    applyAutoSum,
+    clearFormatting,
+    readSelectionText,
+    writeMatrix,
+    clearSelection,
+    setHyperlink,
+    openPanel,
+    onSelectionChange,
   };
 }

@@ -14,6 +14,7 @@
 import { bookmarkStrings } from './bookmarkStrings';
 import { charFormatStrings } from './charFormatStrings';
 import { endnoteStrings } from './endnoteStrings';
+import { ribbonStrings } from './ribbonStrings';
 import { shapeUiStrings } from './shapeUiStrings';
 import { xrefStrings } from './xrefStrings';
 
@@ -3539,6 +3540,7 @@ const EXTRA_STRINGS: Record<string, StringTree>[] = [
   xrefStrings,
   endnoteStrings,
   shapeUiStrings,
+  ribbonStrings,
 ];
 
 /**

@@ -69,6 +69,7 @@ const fr = {
     copy: 'Copier',
     copied: 'Copié',
     clear: 'Effacer',
+    more: 'Plus',
     discardConfirm:
       "Le document actuel n'est pas enregistré. En créer un nouveau l'abandonnera. Êtes-vous sûr ?",
     swap: 'Échanger',

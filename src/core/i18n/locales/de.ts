@@ -69,6 +69,7 @@ const de = {
     copy: 'Kopieren',
     copied: 'Kopiert',
     clear: 'Leeren',
+    more: 'Mehr',
     discardConfirm:
       'Das aktuelle Dokument ist nicht gespeichert. Ein neues Dokument verwirft es. Sicher?',
     swap: 'Tauschen',

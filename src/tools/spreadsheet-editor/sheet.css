@@ -2,6 +2,10 @@
  * Spreadsheet tool styles:
  * 1. Give Univer an explicit height (otherwise the canvas height collapses to 0).
  * 2. Contain the style conflicts between Univer and Tailwind / the project's dark mode.
+ *
+ * The tool ships its own Office-style ribbon (`SpreadsheetRibbon`) and Univer's built-in toolbar is
+ * disabled in `univer.ts`, so the old `[data-u-comp='ribbon-toolbar']` alignment hacks are gone. What
+ * remains in the canvas is the header with the formula bar, which already sits flush left.
  */
 
 .sheet-canvas {
@@ -22,14 +26,9 @@
   color-scheme: dark;
 }
 
-/*
- * Univer's classic ribbon hard-codes justify-content: center for both the
- * "Home / Insert / Formula / Data" tab bar and the toolbar buttons below it. Left-align
- * them here so they line up with the left-aligned layout of the document header.
- */
-.sheet-canvas [data-u-comp='ribbon-header-menu'] [role='tablist'],
-.sheet-canvas [data-u-comp='ribbon-toolbar'] {
-  justify-content: flex-start;
+/* The formula bar keeps a tight, left-aligned frame now that it is the only header row left */
+.sheet-canvas [data-u-comp='formula-bar'] {
+  border-top: none;
 }
 
 /* Shorter but still usable height on mobile */

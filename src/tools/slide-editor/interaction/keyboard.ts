@@ -39,6 +39,9 @@ function isEditing(target: EventTarget | null): boolean {
 
 export function handleShortcut(event: KeyboardEvent, callbacks: KeyboardCallbacks): boolean {
   if (isEditing(event.target)) return false;
+  // A popup (context menu, ribbon menu) consumed the key in the capture phase. Without this the
+  // editor would ALSO act on it — closing a menu with Esc would clear the selection as well.
+  if (event.defaultPrevented) return false;
   const meta = event.metaKey || event.ctrlKey;
 
   if (meta && event.key.toLowerCase() === 'z') {

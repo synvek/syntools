@@ -82,13 +82,23 @@ test('hash: SHA-256 matches the standard vector', async ({ page }) => {
 test.describe('slide editor (zh-CN)', () => {
   test.use({ locale: 'zh-CN' });
 
+  /** The toolbar is an Office ribbon now: a command only exists while its tab is active */
+  async function ribbonTab(page: Page, name: '开始' | '插入' | '视图') {
+    await page.getByRole('tab', { name, exact: true }).click();
+  }
+
+  async function insertTextBox(page: Page) {
+    await ribbonTab(page, '插入');
+    await page.getByRole('button', { name: '文本框' }).click();
+  }
+
   test('canvas mounts → insert text box → export pptx → present', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
     // Konva injects 3 canvases (background / content / overlay)
     expect(await page.locator('canvas').count()).toBeGreaterThanOrEqual(3);
 
-    await page.getByRole('button', { name: '文本框' }).click();
+    await insertTextBox(page);
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
@@ -104,40 +114,59 @@ test.describe('slide editor (zh-CN)', () => {
     await expect(page.getByRole('button', { name: '放映', exact: true })).toBeVisible();
   });
 
-  /** Shapes moved into the toolbar "形状" dropdown, so expand the menu before inserting */
+  /**
+   * Shapes live in the ribbon's "形状" dropdown on the 插入 tab. Picking a preset only arms the draw
+   * tool (PowerPoint behaviour), so the shape is created by dragging a box on the canvas.
+   */
   async function insertShape(page: Page, name: string) {
+    await ribbonTab(page, '插入');
     await page.getByRole('button', { name: '形状', exact: true }).click();
     await page.getByRole('menuitem', { name, exact: true }).click();
+
+    const canvas = page.getByLabel('slide canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('slide canvas is not laid out');
+    const startX = box.x + box.width / 2 - 60;
+    const startY = box.y + box.height / 2 - 40;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 240, startY + 160, { steps: 8 });
+    await page.mouse.up();
+    await expect(page.getByText('已选中 1 个元素')).toBeVisible();
   }
 
   test('align left: both elements converge on the leftmost X', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    await page.getByRole('button', { name: '文本框' }).click();
+    await insertTextBox(page);
     await insertShape(page, '矩形');
     await page.keyboard.press('ControlOrMeta+a');
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
 
-    // The panel shows the last selected rectangle (240 wide, centered → x=520); the text box is further left at x=400
+    // The panel shows the last selected rectangle (wherever it was drawn); the text box sits at x=400
     const xInput = page.getByLabel('X 坐标').first();
-    await expect(xInput).toHaveValue('520');
+    await expect(xInput).not.toHaveValue('400');
+    const drawnX = await xInput.inputValue();
 
-    // Alignment acts on the selection and now lives in the toolbar "排列" row's dropdown
+    // Alignment acts on the selection and lives in the ribbon's 开始 tab (排列 group)
+    await ribbonTab(page, '开始');
     await page.getByRole('button', { name: '对齐', exact: true }).click();
     await page.getByRole('menuitem', { name: '左对齐', exact: true }).click();
     await expect(xInput).toHaveValue('400');
+    expect(drawnX).not.toBe('400');
   });
 
   test('group → ungroup: selection count 2 → 1 → 2', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    await page.getByRole('button', { name: '文本框' }).click();
+    await insertTextBox(page);
     await insertShape(page, '矩形');
     await page.keyboard.press('ControlOrMeta+a');
     await expect(page.getByText('已选中 2 个元素')).toBeVisible();
 
+    await ribbonTab(page, '开始');
     await page.getByRole('button', { name: '组合', exact: true }).click();
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
@@ -149,7 +178,7 @@ test.describe('slide editor (zh-CN)', () => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    await page.getByRole('button', { name: '文本框' }).click();
+    await insertTextBox(page);
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
     await page.keyboard.press('ControlOrMeta+c');
@@ -188,6 +217,7 @@ test.describe('slide editor (zh-CN)', () => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
+    await ribbonTab(page, '插入');
     await page.getByRole('button', { name: '表格', exact: true }).click();
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
 
@@ -203,7 +233,7 @@ test.describe('slide editor (zh-CN)', () => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    await page.getByRole('button', { name: '文本框' }).click();
+    await insertTextBox(page);
     await page.getByRole('button', { name: '图层', exact: true }).click();
 
     const row = page.getByRole('button', { name: '图层: 文本框' });
@@ -252,6 +282,8 @@ test.describe('slide editor (zh-CN)', () => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
+    // Both toggles live on the 视图 tab
+    await ribbonTab(page, '视图');
     const grid = page.getByRole('button', { name: '网格吸附' });
     await expect(grid).toHaveAttribute('aria-pressed', 'false');
     await grid.click();
@@ -267,7 +299,7 @@ test.describe('slide editor (zh-CN)', () => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    await page.getByRole('button', { name: '文本框' }).click();
+    await insertTextBox(page);
     await insertShape(page, '矩形');
 
     // Read both elements' screen positions (text box first, rectangle second; the rectangle covers the middle of the text box)
@@ -361,7 +393,7 @@ test.describe('slide editor (zh-CN)', () => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
 
-    await page.getByRole('button', { name: '文本框' }).click();
+    await insertTextBox(page);
     await insertShape(page, '矩形');
 
     // Left-click empty space to clear the selection first; the right-click menu should offer canvas-level actions.
@@ -2851,9 +2883,10 @@ test.describe('document editor present mode (zh-CN)', () => {
     await page.locator('.tiptap').click();
     await page.keyboard.type('示例链接文字');
 
-    // Create a link with the toolbar button first (that entry uses a native prompt)
+    // Create a link with the ribbon button first (that entry uses a native prompt; it lives on 插入)
     page.once('dialog', (dialog) => void dialog.accept('https://example.com/a'));
     await page.keyboard.press('ControlOrMeta+a');
+    await page.getByRole('tab', { name: '插入', exact: true }).click();
     await page.getByRole('button', { name: '链接', exact: true }).click();
     await expect(page.locator('.tiptap a[href="https://example.com/a"]')).toHaveCount(1);
 
@@ -2943,6 +2976,8 @@ test.describe('document editor present mode (zh-CN)', () => {
     expect(vMajor).toBeLessThan(38.5);
     expect(Math.abs(vOffset)).toBeLessThan(3);
 
+    // The ruler toggle now lives on the 视图 tab of the ribbon
+    await page.getByRole('tab', { name: '视图', exact: true }).click();
     const toggle = page.getByRole('button', { name: '标尺', exact: true });
     await toggle.click();
     await expect(ruler).toHaveCount(0);

@@ -68,6 +68,7 @@ const zhTW = {
     copy: '復制',
     copied: '已復制',
     clear: '清空',
+    more: '更多',
     discardConfirm: '目前文件尚未儲存，新建將捨棄目前內容，確定要新建嗎？',
     swap: '交換',
     newDoc: '新建文稿',

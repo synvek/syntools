@@ -69,6 +69,7 @@ const it = {
     copy: 'Copia',
     copied: 'Copiato',
     clear: 'Cancella',
+    more: 'Altro',
     discardConfirm:
       'Il documento corrente non è salvato. Crearne uno nuovo lo scarterà. Sei sicuro?',
     swap: 'Scambia',

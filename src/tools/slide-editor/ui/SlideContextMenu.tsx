@@ -79,7 +79,10 @@ export function SlideContextMenu({
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      // Intercept in the capture phase: once the menu is closed, the editor's global Esc (clear selection) doesn't fire
+      // Intercept in the capture phase: once the menu is closed, the editor's global Esc (clear selection) doesn't fire.
+      // `preventDefault` is what the editor's bubble-phase shortcut handler checks (same-target listeners
+      // cannot be stopped by stopPropagation).
+      event.preventDefault();
       event.stopPropagation();
       onClose();
     };

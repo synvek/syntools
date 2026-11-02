@@ -7,6 +7,8 @@
  * Tool metadata (name/description) still lives in `toolsMeta` under `core/i18n/locales/*`.
  */
 
+import { ribbonStrings } from './ribbonStrings';
+
 type StringTree = { [key: string]: string | StringTree };
 type ResourceTree = { tools: { slide: StringTree } };
 
@@ -3994,17 +3996,27 @@ const pt: ResourceTree = {
   },
 };
 
+/**
+ * Merge the Office ribbon block (tabs / group captions) into one language tree.
+ * Shallow on purpose: the ribbon only adds flat keys next to the existing copy.
+ */
+function withRibbon(tree: ResourceTree, lng: string): ResourceTree {
+  const extra = ribbonStrings[lng];
+  if (!extra) return tree;
+  return { tools: { slide: { ...tree.tools.slide, ...extra } } };
+}
+
 /** Language code → resource tree, keys aligned with `Lang` */
 export const slideStrings: Record<string, ResourceTree> = {
-  zh,
-  en,
-  'zh-TW': zhTW,
-  ja,
-  fr,
-  de,
-  it,
-  es,
-  pt,
+  zh: withRibbon(zh, 'zh'),
+  en: withRibbon(en, 'en'),
+  'zh-TW': withRibbon(zhTW, 'zh-TW'),
+  ja: withRibbon(ja, 'ja'),
+  fr: withRibbon(fr, 'fr'),
+  de: withRibbon(de, 'de'),
+  it: withRibbon(it, 'it'),
+  es: withRibbon(es, 'es'),
+  pt: withRibbon(pt, 'pt'),
 };
 
 /** Merge this tool's copy into i18next (called on lazy load, key path tools.slide.*) */

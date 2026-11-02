@@ -69,6 +69,7 @@ const es = {
     copy: 'Copiar',
     copied: 'Copiado',
     clear: 'Borrar',
+    more: 'Más',
     discardConfirm: 'El documento actual no está guardado. Crear uno nuevo lo descartará. ¿Seguro?',
     swap: 'Intercambiar',
     newDoc: 'Nuevo documento',

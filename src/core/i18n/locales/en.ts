@@ -69,6 +69,7 @@ const en = {
     copy: 'Copy',
     copied: 'Copied',
     clear: 'Clear',
+    more: 'More',
     discardConfirm:
       'The current document is not saved. Creating a new one will discard it. Are you sure?',
     swap: 'Swap',

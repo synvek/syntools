@@ -881,7 +881,15 @@ export default function SlideTool() {
         }
       />
 
-      <SlideToolbar onFailure={(error) => fail(error)} />
+      <SlideToolbar
+        onFailure={(error) => fail(error)}
+        onOpenRightPanel={(tab) => {
+          // The ribbon's 设计 / 动画 / 审阅 / 放映 tabs reveal the matching side panel
+          setViewMode('normal');
+          setRightTab(tab);
+        }}
+        onPresent={() => setPresenting(true)}
+      />
 
       {viewMode === 'master' ? (
         <MasterView onRuntimeFailure={() => setRuntimeError(true)} />

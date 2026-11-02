@@ -1,13 +1,13 @@
-import { useMemo, useRef, type ChangeEvent, type ReactNode } from 'react';
+import { useMemo, useRef } from 'react';
+import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { Icon } from '@/core/components/Icon';
-import type { ViewMode } from './draft';
+import { Ribbon } from '@/core/components/ribbon/Ribbon';
+import { RIBBON_ICON_BUTTON } from '@/core/components/ribbon/ribbonTheme';
+import { RibbonIcon } from '@/core/components/ribbon/ribbonIcons';
 import { findSelectedFootnote } from './footnotes';
 import { findSelectedEndnote } from './endnotes';
 import { normalizeImageLayer } from './imageLayer';
-import { TextColorPicker } from './TextColorPicker';
-import { ShapeMenu } from './ShapeMenu';
 import {
   DEFAULT_FONT_SIZE_PX,
   DEFAULT_LINE_HEIGHT,
@@ -25,345 +25,32 @@ import {
   LETTER_SPACING_PRESETS,
   TEXT_TRANSFORM_SAMPLES,
   TEXT_TRANSFORM_VALUES,
-  type TextTransformValue,
 } from './charFormat';
+import {
+  buildRichTextRibbonTabs,
+  type RichTextRibbonActions,
+  type RichTextRibbonOptions,
+  type RichTextToolbarState,
+} from './ribbonTabs';
 
-interface ToolButtonProps {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}
-
-/** Toolbar button: blue background when active, compact, with aria-pressed and a tooltip */
-function ToolButton({
-  label,
-  active = false,
-  disabled = false,
-  onClick,
-  children,
-}: ToolButtonProps) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex h-8 min-w-8 items-center justify-center rounded-md border px-1.5 text-xs transition-colors ${
-        active
-          ? 'border-blue-600 bg-blue-600 text-white'
-          : 'border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-      } disabled:cursor-not-allowed disabled:opacity-40`}
-    >
-      {children}
-    </button>
-  );
-}
-
-/**
- * Undo/redo icon: the standard "bent arrow + arc" shape (as in Excalidraw / tldraw and friends),
- * with stroke settings matching the built-in Icon set (24 viewBox, currentColor stroke).
- */
-function UndoIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M9 14 4 9l5-5" />
-      <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
-    </svg>
-  );
-}
-
-function RedoIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="m15 14 5-5-5-5" />
-      <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13" />
-    </svg>
-  );
-}
-
-/** Refresh icon: clockwise arrow + open ring (same stroke settings as the undo/redo icons) */
-function RefreshIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M20 11a8 8 0 1 0-2.5 6.3" />
-      <path d="M20 5v6h-6" />
-    </svg>
-  );
-}
-
-/** Footnote icon: baseline + superscript digit, carrying the same visual meaning as Word's "Insert Footnote" */
-function FootnoteIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      {/* Superscript digit 1 */}
-      <path d="M14 4.6 16 3.2v5.9" />
-      {/* Separator + body baseline, conveying "the footnote sits at the bottom of the page" */}
-      <path d="M5.5 12.5h6" />
-      <path d="M4 19.5h16" />
-    </svg>
-  );
-}
-
-/** Endnote icon: a superscript marker above a double rule (notes collected at the document end) */
-function EndnoteIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M13 3h3v5" />
-      <path d="M12.5 8H17" />
-      <path d="M4 15h16" />
-      <path d="M4 19h16" />
-    </svg>
-  );
-}
-
-/** Bookmark icon: a ribbon with a notch, the universal "saved position" glyph */
-function BookmarkIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M6 3.5h12v17l-6-4.2-6 4.2z" />
-    </svg>
-  );
-}
-
-/** Image alignment icon: box + three alignment lines (left/center/right differ, so the buttons don't look identical) */
-function ImageAlignIcon({ position }: { position: 'left' | 'center' | 'right' }) {
-  const bars =
-    position === 'left'
-      ? ['M2 9h8', 'M2 12h5', 'M2 15h8']
-      : position === 'center'
-        ? ['M1 9h10', 'M3.5 12h5', 'M1 15h10']
-        : ['M2 9h8', 'M5 12h5', 'M2 15h8'];
-  return (
-    <svg
-      viewBox="0 0 14 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      className="h-4 w-4"
-      aria-hidden="true"
-    >
-      <rect x="1.5" y="2" width="11" height="5" rx="1" />
-      {bars.map((d) => (
-        <path key={d} d={d} />
-      ))}
-    </svg>
-  );
-}
-
-/** Decorative bars inside the alignment buttons (left/center/right/justify) */
-function AlignBars({ widths }: { widths: string[] }) {
-  return (
-    <span className="flex w-4 flex-col items-center gap-[2px]" aria-hidden="true">
-      {widths.map((w, index) => (
-        <span key={index} className="h-[2px] bg-current" style={{ width: w }} />
-      ))}
-    </span>
-  );
-}
-
-interface ToolbarSelectProps {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  /** Wide variant: keeps long font names (e.g. Franklin Gothic Medium) from being truncated */
-  wide?: boolean;
-}
-
-/** Inline toolbar dropdown: same style as the pdfMode selector, compact height */
-function ToolbarSelect({ label, value, onChange, options, wide }: ToolbarSelectProps) {
-  return (
-    <select
-      aria-label={label}
-      title={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-8 rounded-md border border-gray-300 bg-white px-1.5 text-xs text-gray-700 outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 ${
-        wide ? 'max-w-44' : 'max-w-32'
-      }`}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-/** Zoom levels (100% = 1) */
-export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
-
-/** Table row height presets (mm): rows are stored in px, the toolbar talks mm like Word does */
+/** Table row height presets (mm): rows are stored in px, the ribbon talks mm like Word does */
 const ROW_HEIGHT_MM_PRESETS = [8, 12, 16, 20] as const;
 
-interface EditorToolbarProps {
+export interface EditorToolbarProps extends RichTextRibbonActions {
   editor: Editor | null;
-  onToggleFind: () => void;
-  findOpen: boolean;
-  onToggleOutline: () => void;
-  outlineOpen: boolean;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  /** Page setup */
-  pageSetupOpen: boolean;
-  onTogglePageSetup: () => void;
-  /** Horizontal ruler visibility */
-  rulerOpen: boolean;
-  onToggleRuler: () => void;
-  /** Insert table of contents */
-  onInsertToc: () => void;
-  /** Refresh TOC (recompute pagination and page numbers) */
-  onRefreshToc: () => void;
-  tocDisabled: boolean;
-  /** Footnote: edit the selected footnote, otherwise insert a new one */
-  onFootnote: () => void;
-  /** 尾注：与脚注同一套交互，落到独立部件 */
-  onEndnote: () => void;
-  /** Bookmark dialog (insert / rename / delete / jump) */
-  onOpenBookmarks: () => void;
-  bookmarksOpen: boolean;
-  /** Cross-reference dialog (reference a bookmark as text or page number) */
-  onOpenXrefs: () => void;
-  xrefsOpen: boolean;
-  /** Formula: edit the selected formula, otherwise insert a new one */
-  onMath: () => void;
-  /** Style panel */
-  stylesOpen: boolean;
-  onToggleStyles: () => void;
-  /** Shape panel (insert / edit a DrawingML preset shape) */
-  /** 侧边样式面板是否打开（由下拉里的"更多样式"打开） */
-  shapesOpen: boolean;
-  /** 形状库下拉：挑一个预设 → 进入画布拖拽绘制 */
-  shapeMenuOpen: boolean;
-  onToggleShapeMenu: () => void;
-  onPickShape: (prst: string) => void;
-  onOpenShapePanel: () => void;
-  /** 当前选中形状的预设，用于在形状库里高亮 */
-  activeShapePrst: string | null;
-  /** Template panel */
-  templatesOpen: boolean;
-  onToggleTemplates: () => void;
-  /** Spellcheck panel */
-  spellcheckOpen: boolean;
-  onToggleSpellcheck: () => void;
-  /** Comments and tracked changes */
-  reviewOpen: boolean;
-  onToggleReview: () => void;
-  /** Version history */
-  onOpenVersions: () => void;
-  versionsDisabled: boolean;
-  /** View zoom */
-  zoom: number;
-  onZoomChange: (zoom: number) => void;
 }
 
 /**
- * Rich text toolbar (two rows):
- * - Row 1 "content formatting": history / paragraph styles / character formatting / lists / insert / align / indent / conditional groups (image, table) / find
- * - Row 2 "document & view": outline / page setup / TOC / styles / comments & changes / version history ... with zoom and view mode on the right
- * useEditorState subscribes to active states precisely, keeping the whole tree from re-rendering on every keystroke.
+ * Word processor ribbon: six Office tabs (开始 / 插入 / 页面布局 / 引用 / 审阅 / 视图).
+ *
+ * The component owns only what a component can own — the editor state subscription, the installed
+ * font probe and the DOM measurements behind the image-width presets. Every command is described in
+ * `ribbonTabs.tsx`, so the tabs read like Word's and stay testable without an editor instance.
+ *
+ * `useEditorState` keeps the tree from re-rendering on every keystroke: it re-renders only when one of
+ * the selected attributes actually changes.
  */
-export function EditorToolbar({
-  editor,
-  onToggleFind,
-  findOpen,
-  onToggleOutline,
-  outlineOpen,
-  viewMode,
-  onViewModeChange,
-  pageSetupOpen,
-  onTogglePageSetup,
-  rulerOpen,
-  onToggleRuler,
-  onInsertToc,
-  onRefreshToc,
-  tocDisabled,
-  onFootnote,
-  onEndnote,
-  onOpenBookmarks,
-  bookmarksOpen,
-  onOpenXrefs,
-  xrefsOpen,
-  onMath,
-  stylesOpen,
-  onToggleStyles,
-  shapesOpen,
-  shapeMenuOpen,
-  onToggleShapeMenu,
-  onPickShape,
-  onOpenShapePanel,
-  activeShapePrst,
-  templatesOpen,
-  onToggleTemplates,
-  spellcheckOpen,
-  onToggleSpellcheck,
-  reviewOpen,
-  onToggleReview,
-  onOpenVersions,
-  versionsDisabled,
-  zoom,
-  onZoomChange,
-}: EditorToolbarProps) {
+export function EditorToolbar({ editor, ...actions }: EditorToolbarProps) {
   const { t } = useTranslation();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -421,9 +108,20 @@ export function EditorToolbar({
     ],
     [],
   );
-  const state = useEditorState({
+  const headingOptions = useMemo(
+    () => [
+      { value: 'paragraph', label: t('tools.richText.paragraph') },
+      ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
+        value: String(level),
+        label: t(`tools.richText.h${level}`),
+      })),
+    ],
+    [t],
+  );
+
+  const state = useEditorState<RichTextToolbarState | null>({
     editor,
-    selector: (ctx) => {
+    selector: (ctx): RichTextToolbarState | null => {
       const e = ctx.editor;
       if (!e) return null;
       const headingLevel = ([1, 2, 3, 4, 5, 6] as const).find((level) =>
@@ -509,21 +207,7 @@ export function EditorToolbar({
     reader.readAsDataURL(file);
   };
 
-  const toggleLink = () => {
-    if (state.link) {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
-    }
-    const href = window.prompt(t('tools.richText.linkPrompt'), 'https://');
-    if (!href) return;
-    editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
-  };
-
-  const chain = () => editor.chain().focus();
-  // Palette and native color picker only handle #rrggbb: non-standard values (e.g. named colors from imported docs) fall back to the default text color
-  const currentColor = /^#[0-9a-f]{6}$/i.test(state.color) ? state.color : '#111827';
-
-  // Image widths are stored in pixels; the toolbar exposes percentage presets (converted against the current content width)
+  // Image widths are stored in pixels; the ribbon exposes percentage presets (converted against the current content width)
   const contentWidth = Math.max(1, Math.round(editor.view.dom.clientWidth || CONTENT_WIDTH_PX));
   const presetWidths = [25, 50, 75, 100].map((pct) => ({
     pct,
@@ -568,716 +252,87 @@ export function EditorToolbar({
       : []),
   ];
 
-  // The root container must not use overflow-hidden: popovers (text color, etc.) are absolutely positioned and would be clipped by the toolbar's bottom edge
+  const options: RichTextRibbonOptions = {
+    fontFamilyValue: matchFontOption(state.fontFamily, fontOptions),
+    fontOptions,
+    fontSizeOptions,
+    lineHeightOptions,
+    letterSpacingOptions,
+    textTransformOptions,
+    headingOptions,
+    contentWidth,
+    imageWidthValue,
+    imageWidthOptions,
+    cellVAlignValue,
+    rowHeightValue,
+    rowHeightOptions,
+  };
+
+  const tabs = buildRichTextRibbonTabs({
+    editor,
+    state,
+    t,
+    actions,
+    options,
+    onPickImage: () => fileRef.current?.click(),
+  });
+
+  const quickAccess = (
+    <>
+      <button
+        type="button"
+        aria-label={t('tools.richText.undo')}
+        title={t('tools.richText.undo')}
+        data-testid="ribbon-qat-undo"
+        disabled={!state.canUndo}
+        onClick={() => editor.chain().focus().undo().run()}
+        className={`${RIBBON_ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
+      >
+        <RibbonIcon name="undo" className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        aria-label={t('tools.richText.redo')}
+        title={t('tools.richText.redo')}
+        data-testid="ribbon-qat-redo"
+        disabled={!state.canRedo}
+        onClick={() => editor.chain().focus().redo().run()}
+        className={`${RIBBON_ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
+      >
+        <RibbonIcon name="redo" className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        aria-label={t('tools.richText.findReplace')}
+        title={t('tools.richText.findReplace')}
+        aria-pressed={actions.findOpen}
+        data-testid="ribbon-qat-find"
+        onClick={actions.onToggleFind}
+        className={`${RIBBON_ICON_BUTTON} ${actions.findOpen ? 'bg-black/10 dark:bg-white/20' : ''}`}
+      >
+        <RibbonIcon name="search" className="h-3.5 w-3.5" />
+      </button>
+    </>
+  );
+
+  // The shell keeps `overflow` visible: ribbon menus and the shape gallery are absolutely positioned
   return (
     <div
       data-testid="rich-text-toolbar"
-      className="sticky top-0 z-10 -mx-1 rounded-lg border border-gray-200 bg-white/95 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95"
+      className="sticky top-0 z-20 -mx-1 rounded-lg border border-gray-200 bg-white/95 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95"
     >
-      {/* Row 1: content formatting */}
-      <div className="flex flex-wrap items-center gap-1 p-1">
-        <div className="flex items-center gap-1">
-          <ToolButton
-            label={t('tools.richText.undo')}
-            disabled={!state.canUndo}
-            onClick={() => chain().undo().run()}
-          >
-            <UndoIcon className="h-4 w-4" />
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.redo')}
-            disabled={!state.canRedo}
-            onClick={() => chain().redo().run()}
-          >
-            <RedoIcon className="h-4 w-4" />
-          </ToolButton>
-        </div>
-
-        <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-        <div className="flex items-center gap-1">
-          <ToolbarSelect
-            label={t('tools.richText.headingSelect')}
-            value={state.headingLevel ? String(state.headingLevel) : 'paragraph'}
-            onChange={(value) =>
-              value === 'paragraph'
-                ? chain().setParagraph().run()
-                : chain()
-                    .toggleHeading({ level: Number(value) as 1 | 2 | 3 | 4 | 5 | 6 })
-                    .run()
-            }
-            options={[
-              { value: 'paragraph', label: t('tools.richText.paragraph') },
-              ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
-                value: String(level),
-                label: t(`tools.richText.h${level}`),
-              })),
-            ]}
-          />
-          <ToolbarSelect
-            label={t('tools.richText.fontFamily')}
-            value={matchFontOption(state.fontFamily, fontOptions)}
-            onChange={(value) =>
-              value ? chain().setFontFamily(value).run() : chain().unsetFontFamily().run()
-            }
-            options={fontOptions}
-            wide
-          />
-          <ToolbarSelect
-            label={t('tools.richText.fontSize')}
-            value={state.fontSize}
-            onChange={(value) =>
-              value ? chain().setFontSize(value).run() : chain().unsetFontSize().run()
-            }
-            options={fontSizeOptions}
-          />
-          <ToolbarSelect
-            label={t('tools.richText.lineHeight')}
-            value={state.lineHeight}
-            onChange={(value) =>
-              value ? chain().setLineHeight(value).run() : chain().unsetLineHeight().run()
-            }
-            options={lineHeightOptions}
-          />
-          <ToolButton
-            label={t('tools.richText.findReplace')}
-            active={findOpen}
-            onClick={onToggleFind}
-          >
-            <Icon name="search" className="h-4 w-4" />
-          </ToolButton>
-        </div>
-
-        <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-        <div className="flex items-center gap-1">
-          <ToolButton
-            label={t('tools.richText.bold')}
-            active={state.bold}
-            onClick={() => chain().toggleBold().run()}
-          >
-            <span className="font-bold">B</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.italic')}
-            active={state.italic}
-            onClick={() => chain().toggleItalic().run()}
-          >
-            <span className="italic">I</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.underline')}
-            active={state.underline}
-            onClick={() => chain().toggleUnderline().run()}
-          >
-            <span className="underline">U</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.strike')}
-            active={state.strike}
-            onClick={() => chain().toggleStrike().run()}
-          >
-            <span className="line-through">S</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.superscript')}
-            active={state.superscript}
-            onClick={() => chain().toggleSuperscript().run()}
-          >
-            <span>
-              x<sup>2</sup>
-            </span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.subscript')}
-            active={state.subscript}
-            onClick={() => chain().toggleSubscript().run()}
-          >
-            <span>
-              x<sub>2</sub>
-            </span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.smallCaps')}
-            active={state.smallCaps}
-            onClick={() => chain().toggleSmallCaps().run()}
-          >
-            <span>
-              A<small>a</small>
-            </span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.code')}
-            active={state.code}
-            onClick={() => chain().toggleCode().run()}
-          >
-            <span className="font-mono">&lt;/&gt;</span>
-          </ToolButton>
-          {/* Character-level formatting: letter spacing (px) and text-transform */}
-          <ToolbarSelect
-            label={t('tools.richText.letterSpacing')}
-            value={state.letterSpacing}
-            onChange={(value) =>
-              chain()
-                .setLetterSpacing(value ? Number(value) : null)
-                .run()
-            }
-            options={letterSpacingOptions}
-          />
-          <ToolbarSelect
-            label={t('tools.richText.textTransform')}
-            value={state.textTransform}
-            onChange={(value) =>
-              chain()
-                .setTextTransform((value || null) as TextTransformValue | null)
-                .run()
-            }
-            options={textTransformOptions}
-          />
-          {/* Text color: preset palette popover that closes after picking (the native system picker doesn't close itself) */}
-          <TextColorPicker
-            value={currentColor}
-            onPick={(color) => chain().setColor(color).run()}
-            onReset={() => chain().unsetColor().run()}
-          />
-          {/* Highlighter: fixed yellow highlight; the blue button background reflects ON/OFF */}
-          <ToolButton
-            label={t('tools.richText.highlight')}
-            active={state.highlight}
-            onClick={() => chain().toggleHighlight({ color: '#FEF08A' }).run()}
-          >
-            <span className="rounded bg-yellow-200 px-1 text-gray-900 dark:bg-yellow-300">A</span>
-          </ToolButton>
-        </div>
-
-        <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-        <div className="flex items-center gap-1">
-          <ToolButton
-            label={t('tools.richText.bulletList')}
-            active={state.bulletList}
-            onClick={() => chain().toggleBulletList().run()}
-          >
-            <span className="text-base leading-none">&bull;</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.orderedList')}
-            active={state.orderedList}
-            onClick={() => chain().toggleOrderedList().run()}
-          >
-            <span className="text-xs">1.</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.taskList')}
-            active={state.taskList}
-            onClick={() => chain().toggleTaskList().run()}
-          >
-            <Icon name="check" className="h-4 w-4" />
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.quote')}
-            active={state.blockquote}
-            onClick={() => chain().toggleBlockquote().run()}
-          >
-            <span className="text-base leading-none">&rdquo;</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.codeBlock')}
-            active={state.codeBlock}
-            onClick={() => chain().toggleCodeBlock().run()}
-          >
-            <span className="font-mono">&#123;&#125;</span>
-          </ToolButton>
-        </div>
-
-        <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-        <div className="flex items-center gap-1">
-          <ToolButton label={t('tools.richText.link')} active={state.link} onClick={toggleLink}>
-            <Icon name="link" className="h-4 w-4" />
-          </ToolButton>
-          <ToolButton
-            label={
-              state.mathSelected ? t('tools.richText.mathEdit') : t('tools.richText.mathInsert')
-            }
-            active={state.mathSelected}
-            onClick={onMath}
-          >
-            <span className="font-serif text-sm italic leading-none">fx</span>
-          </ToolButton>
-          {/* 形状库：按钮 + 下拉（Word/Excel 的"插入 → 形状"网格） */}
-          <div className="relative">
-            <ToolButton
-              label={t('tools.richText.shapeInsert')}
-              active={shapeMenuOpen || shapesOpen || state.shapeSelected}
-              onClick={onToggleShapeMenu}
-            >
-              {/* Square + circle: the classic "insert shape" glyph */}
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinejoin="round"
-                className="h-4 w-4"
-                aria-hidden="true"
-              >
-                <rect x="3" y="3" width="11" height="11" rx="1.5" />
-                <circle cx="16" cy="16" r="5" />
-              </svg>
-            </ToolButton>
-            <ShapeMenu
-              open={shapeMenuOpen}
-              activePrst={activeShapePrst}
-              onPick={onPickShape}
-              onOpenPanel={onOpenShapePanel}
-              onClose={onToggleShapeMenu}
-            />
-          </div>
-          <ToolButton label={t('tools.richText.image')} onClick={() => fileRef.current?.click()}>
-            <Icon name="image" className="h-4 w-4" />
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.divider')}
-            onClick={() => chain().setHorizontalRule().run()}
-          >
-            <span className="text-base leading-none">&mdash;</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.pageBreak')}
-            onClick={() => chain().setPageBreak().run()}
-          >
-            {/* Monochrome line icon in the same style as the divider/align buttons (dashed page break) */}
-            <svg
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              className="h-4 w-4"
-              aria-hidden="true"
-            >
-              <path d="M2 5.5h12" strokeDasharray="3 2" />
-              <path d="M2 10.5h12" strokeDasharray="3 2" />
-            </svg>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.table')}
-            onClick={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-          >
-            <Icon name="table" className="h-4 w-4" />
-          </ToolButton>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={pickImage}
-          />
-        </div>
-
-        <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-        {state.inTable && (
-          <div className="flex items-center gap-1 rounded-md bg-blue-50 px-1 dark:bg-blue-950/40">
-            <ToolButton
-              label={t('tools.richText.rowAbove')}
-              onClick={() => chain().addRowBefore().run()}
-            >
-              <span className="text-xs leading-none">+&#8593;</span>
-            </ToolButton>
-            <ToolButton
-              label={t('tools.richText.rowBelow')}
-              onClick={() => chain().addRowAfter().run()}
-            >
-              <span className="text-xs leading-none">+&#8595;</span>
-            </ToolButton>
-            <ToolButton
-              label={t('tools.richText.columnLeft')}
-              onClick={() => chain().addColumnBefore().run()}
-            >
-              <span className="text-xs leading-none">+&#8592;</span>
-            </ToolButton>
-            <ToolButton
-              label={t('tools.richText.columnRight')}
-              onClick={() => chain().addColumnAfter().run()}
-            >
-              <span className="text-xs leading-none">+&#8594;</span>
-            </ToolButton>
-            <ToolButton
-              label={t('tools.richText.deleteRow')}
-              onClick={() => chain().deleteRow().run()}
-            >
-              <span className="text-xs leading-none">&minus;&#8595;</span>
-            </ToolButton>
-            <ToolButton
-              label={t('tools.richText.deleteColumn')}
-              onClick={() => chain().deleteColumn().run()}
-            >
-              <span className="text-xs leading-none">&minus;&#8594;</span>
-            </ToolButton>
-            <ToolButton
-              label={t('tools.richText.headerRow')}
-              active={state.headerRow}
-              onClick={() => chain().toggleHeaderRow().run()}
-            >
-              <span className="text-xs font-semibold leading-none">TH</span>
-            </ToolButton>
-            {state.canMergeCells && (
-              <ToolButton
-                label={t('tools.richText.mergeCells')}
-                onClick={() => chain().mergeCells().run()}
-              >
-                <span className="text-xs leading-none">&#8862;</span>
-              </ToolButton>
-            )}
-            {state.canSplitCell && (
-              <ToolButton
-                label={t('tools.richText.splitCell')}
-                onClick={() => chain().splitCell().run()}
-              >
-                <span className="text-xs leading-none">&#8863;</span>
-              </ToolButton>
-            )}
-            <ToolButton
-              label={t('tools.richText.deleteTable')}
-              onClick={() => chain().deleteTable().run()}
-            >
-              <Icon name="close" className="h-4 w-4" />
-            </ToolButton>
-          </div>
-        )}
-
-        <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-        <div className="flex items-center gap-1">
-          <ToolButton
-            label={t('tools.richText.alignLeft')}
-            active={state.alignLeft}
-            onClick={() => chain().setTextAlign('left').run()}
-          >
-            <AlignBars widths={['100%', '60%', '100%']} />
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.alignCenter')}
-            active={state.alignCenter}
-            onClick={() => chain().setTextAlign('center').run()}
-          >
-            <AlignBars widths={['60%', '100%', '60%']} />
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.alignRight')}
-            active={state.alignRight}
-            onClick={() => chain().setTextAlign('right').run()}
-          >
-            <AlignBars widths={['100%', '60%', '60%']} />
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.alignJustify')}
-            active={state.alignJustify}
-            onClick={() => chain().setTextAlign('justify').run()}
-          >
-            <AlignBars widths={['100%', '100%', '100%']} />
-          </ToolButton>
-        </div>
-
-        {/* Paragraph layout: first-line indent and space before/after */}
-        <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-
-        <div className="flex items-center gap-1">
-          <ToolButton
-            label={t('tools.richText.indentDecrease')}
-            onClick={() => chain().indentParagraph(-24).run()}
-          >
-            <span className="text-xs font-semibold leading-none">&#8676;</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.indentIncrease')}
-            onClick={() => chain().indentParagraph(24).run()}
-          >
-            <span className="text-xs font-semibold leading-none">&#8677;</span>
-          </ToolButton>
-          {/* 左缩进 / 悬挂缩进（Word 的 ind.left 与 ind.hanging），与首行缩进分开各占两个按钮 */}
-          <ToolButton
-            label={t('tools.richText.indentLeftDecrease')}
-            disabled={state.indentLeft <= 0}
-            onClick={() =>
-              chain()
-                .setParagraphIndent({ left: state.indentLeft - 24 })
-                .run()
-            }
-          >
-            <span className="text-[11px] font-semibold leading-none">⇤</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.indentLeftIncrease')}
-            onClick={() =>
-              chain()
-                .setParagraphIndent({ left: state.indentLeft + 24 })
-                .run()
-            }
-          >
-            <span className="text-[11px] font-semibold leading-none">⇥</span>
-          </ToolButton>
-          <ToolButton
-            label={t('tools.richText.hangingIndent')}
-            active={state.hangingIndent > 0}
-            onClick={() =>
-              chain()
-                .setParagraphIndent({
-                  hanging: state.hangingIndent > 0 ? null : 24,
-                  // 悬挂缩进必须有左缩进做参照，否则负的 text-indent 会把首行顶到页边距外
-                  left: state.hangingIndent > 0 ? state.indentLeft : Math.max(24, state.indentLeft),
-                })
-                .run()
-            }
-          >
-            <span className="text-[11px] font-semibold leading-none">↩︎</span>
-          </ToolButton>
-          <ToolbarSelect
-            label={t('tools.richText.paragraphSpacing')}
-            value={state.paragraphSpacing}
-            onChange={(value) => {
-              const [before, after] = value.split('-').map(Number);
-              chain()
-                .setParagraphSpacing(before || 0, after || 0)
-                .run();
-            }}
-            options={[
-              { value: '0-0', label: t('tools.richText.spacingPresetDefault') },
-              { value: '0-12', label: t('tools.richText.spacingPresetCompact') },
-              { value: '12-12', label: t('tools.richText.spacingPresetRelaxed') },
-              { value: '24-24', label: t('tools.richText.spacingPresetLoose') },
-            ]}
-          />
-        </div>
-
-        {/* Image: width / alignment / layer (inline, in front of text, behind text) */}
-        {state.inImage ? (
-          <>
-            <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-            <div className="flex items-center gap-1">
-              <ToolbarSelect
-                label={t('tools.richText.imageWidth')}
-                value={imageWidthValue}
-                onChange={(value) => {
-                  if (!value) {
-                    chain().setImageWidth(null).run();
-                    return;
-                  }
-                  if (value === 'custom') return;
-                  // Convert the percentage preset to pixels using the content width (image widths are stored in pixels)
-                  chain()
-                    .setImageWidth(Math.round((Number(value) / 100) * contentWidth))
-                    .run();
-                }}
-                options={imageWidthOptions}
-              />
-              {(['left', 'center', 'right'] as const).map((align) => (
-                <ToolButton
-                  key={align}
-                  label={t(`tools.richText.imageAlign_${align}`)}
-                  active={state.imageAlign === align}
-                  onClick={() =>
-                    chain()
-                      .setImageStyle(state.imageWidth, state.imageAlign === align ? null : align)
-                      .run()
-                  }
-                >
-                  <ImageAlignIcon position={align} />
-                </ToolButton>
-              ))}
-              <ToolbarSelect
-                label={t('tools.richText.imageLayer')}
-                value={state.imageLayer}
-                onChange={(value) => chain().setImageLayer(normalizeImageLayer(value)).run()}
-                options={[
-                  { value: 'inline', label: t('tools.richText.imageLayerInline') },
-                  { value: 'wrap-left', label: t('tools.richText.imageLayerWrapLeft') },
-                  { value: 'wrap-right', label: t('tools.richText.imageLayerWrapRight') },
-                  { value: 'top-bottom', label: t('tools.richText.imageLayerTopBottom') },
-                  { value: 'front', label: t('tools.richText.imageLayerFront') },
-                  { value: 'behind', label: t('tools.richText.imageLayerBehind') },
-                ]}
-              />
-            </div>
-          </>
-        ) : null}
-
-        {/* Table styles: borders / zebra stripes / cell vertical alignment / row height */}
-        {state.inTable ? (
-          <>
-            <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
-            <div className="flex items-center gap-1">
-              <ToolButton
-                label={t('tools.richText.tableBorders')}
-                active={state.tableBordered}
-                onClick={() => chain().toggleTableBorders().run()}
-              >
-                <span className="text-xs leading-none">&#9634;</span>
-              </ToolButton>
-              <ToolButton
-                label={t('tools.richText.tableZebra')}
-                active={state.tableZebra}
-                onClick={() => chain().toggleTableZebra().run()}
-              >
-                <span className="text-xs leading-none">&#9776;</span>
-              </ToolButton>
-              <ToolbarSelect
-                label={t('tools.richText.cellVAlign')}
-                value={cellVAlignValue}
-                onChange={(value) =>
-                  chain()
-                    .setCellVerticalAlign((value || null) as 'top' | 'middle' | 'bottom' | null)
-                    .run()
-                }
-                options={[
-                  { value: '', label: t('tools.richText.cellVAlignTop') },
-                  { value: 'middle', label: t('tools.richText.cellVAlignMiddle') },
-                  { value: 'bottom', label: t('tools.richText.cellVAlignBottom') },
-                ]}
-              />
-              <ToolbarSelect
-                label={t('tools.richText.rowHeight')}
-                value={rowHeightValue}
-                onChange={(value) => {
-                  if (!value) {
-                    chain().setRowHeight(null).run();
-                    return;
-                  }
-                  if (value === 'custom') return;
-                  chain()
-                    .setRowHeight(Math.round(Number(value) * MM_TO_PX))
-                    .run();
-                }}
-                options={rowHeightOptions}
-              />
-            </div>
-          </>
-        ) : null}
-      </div>
-
-      {/* Row 2: document & view (has its own background, so it needs its own radius or it covers the toolbar's bottom corners) */}
-      <div className="flex flex-wrap items-center gap-1 rounded-b-lg border-t border-gray-200 bg-gray-50/70 px-1 py-1 dark:border-gray-700 dark:bg-gray-800/40">
-        <span className="ml-1 mr-0.5 select-none text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-          {t('tools.richText.docSection')}
-        </span>
-        <ToolButton
-          label={t('tools.richText.outline')}
-          active={outlineOpen}
-          onClick={onToggleOutline}
-        >
-          <Icon name="menu" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={t('tools.richText.pageSetup')}
-          active={pageSetupOpen}
-          onClick={onTogglePageSetup}
-        >
-          <Icon name="ruler" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton label={t('tools.richText.ruler')} active={rulerOpen} onClick={onToggleRuler}>
-          <Icon name="rulerTicks" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={t('tools.richText.insertToc')}
-          disabled={tocDisabled}
-          onClick={onInsertToc}
-        >
-          <Icon name="listCheck" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={t('tools.richText.refreshToc')}
-          disabled={tocDisabled}
-          onClick={onRefreshToc}
-        >
-          <RefreshIcon className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={
-            state.footnoteSelected
-              ? t('tools.richText.footnoteEdit')
-              : t('tools.richText.footnoteInsert')
-          }
-          active={state.footnoteSelected}
-          onClick={onFootnote}
-        >
-          <FootnoteIcon className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={
-            state.endnoteSelected
-              ? t('tools.richText.endnoteEdit')
-              : t('tools.richText.endnoteInsert')
-          }
-          active={state.endnoteSelected}
-          onClick={onEndnote}
-        >
-          <EndnoteIcon className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={t('tools.richText.bookmark')}
-          active={bookmarksOpen}
-          onClick={onOpenBookmarks}
-        >
-          <BookmarkIcon className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton label={t('tools.richText.xref')} active={xrefsOpen} onClick={onOpenXrefs}>
-          <Icon name="link" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton label={t('tools.richText.styles')} active={stylesOpen} onClick={onToggleStyles}>
-          <Icon name="palette" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={t('tools.richText.templates')}
-          active={templatesOpen}
-          onClick={onToggleTemplates}
-        >
-          <Icon name="grid" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={t('tools.richText.spellcheck')}
-          active={spellcheckOpen}
-          onClick={onToggleSpellcheck}
-        >
-          <Icon name="book" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton label={t('tools.richText.review')} active={reviewOpen} onClick={onToggleReview}>
-          <Icon name="pen" className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          label={t('tools.richText.versionHistory')}
-          disabled={versionsDisabled}
-          onClick={onOpenVersions}
-        >
-          <Icon name="clock" className="h-4 w-4" />
-        </ToolButton>
-
-        {/* View controls right-aligned: zoom + view mode */}
-        <div className="ml-auto flex items-center gap-1">
-          <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-            {t('tools.richText.zoom')}
-            <ToolbarSelect
-              label={t('tools.richText.zoom')}
-              value={String(zoom)}
-              onChange={(value) => onZoomChange(Number(value))}
-              options={ZOOM_LEVELS.map((level) => ({
-                value: String(level),
-                label: `${Math.round(level * 100)}%`,
-              }))}
-            />
-          </label>
-          <ToolbarSelect
-            label={t('tools.richText.viewMode')}
-            value={viewMode}
-            onChange={(value) => onViewModeChange(value as ViewMode)}
-            options={[
-              { value: 'flow', label: t('tools.richText.viewFlow') },
-              { value: 'paged', label: t('tools.richText.viewPaged') },
-            ]}
-          />
-        </div>
-      </div>
+      <Ribbon
+        ariaLabel={t('tools.richText.ribbon.label')}
+        accent="blue"
+        tabs={tabs}
+        quickAccess={quickAccess}
+        collapseLabel={t('tools.richText.ribbon.collapse')}
+        expandLabel={t('tools.richText.ribbon.expand')}
+        moreLabel={t('common.more')}
+        testId="word-ribbon"
+        className="!border-0 !shadow-none"
+      />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
     </div>
   );
 }

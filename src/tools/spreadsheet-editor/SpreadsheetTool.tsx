@@ -8,10 +8,8 @@ import { EditorStatusBar } from '@/core/components/EditorStatusBar';
 import {
   EDITOR_ICON_BUTTON_CLASS,
   EDITOR_TITLE_INPUT_CLASS,
-  editorMenuItem,
   estimateJsonBytes,
   formatBytes,
-  type EditorMenu,
 } from '@/core/components/editorChrome';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { ProgressBar } from '@/core/components/ProgressBar';
@@ -76,6 +74,11 @@ import {
 } from './docStore';
 import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
 import { registerSpreadsheetStrings } from './strings';
+import { registerRibbonStrings } from './ribbonStrings';
+import { SpreadsheetRibbon, type RibbonBaseContext } from './SpreadsheetRibbon';
+import { buildSheetMenus, type SheetActions } from './commands';
+import { parseClipboardMatrix } from './sheetFormat';
+import { NumberFormatDialog } from './ui/NumberFormatDialog';
 import {
   createEmptySnapshot,
   exportSnapshotToBytes,
@@ -157,6 +160,7 @@ registerPivotStrings(i18n);
 registerShapeStrings(i18n);
 registerImageStrings(i18n);
 registerMetaStrings(i18n);
+registerRibbonStrings(i18n);
 
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 /** 首版一个工作簿只保留一个透视表：多表会让"导出到哪张工作表"的语义含混 */
@@ -220,8 +224,18 @@ const SAVE_DEBOUNCE_MS = 600;
 export default function SpreadsheetTool() {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  /** Collapsing the ribbon changes the chrome height above the canvas; the fill hook must re-measure */
+  const [ribbonCollapsed, setRibbonCollapsed] = useState(false);
+  /** Set once the Univer instance is live — the ribbon needs it reactively, `handleRef` is not enough */
+  const [ribbonHost, setRibbonHost] = useState<UniverHandle | null>(null);
+  const [numberFormatOpen, setNumberFormatOpen] = useState(false);
+  /** Pattern the custom-format dialog starts from (read when it opens, so it reflects the selection) */
+  const [numberFormatInitial, setNumberFormatInitial] = useState('');
   /** Sheet height = whatever remains in the first viewport (sheet tabs / status bar stay visible, "related tools" is pushed below the fold) */
-  const sheetHeight = useViewportFill(containerRef, { min: 460 });
+  const sheetHeight = useViewportFill(containerRef, {
+    min: 460,
+    signature: ribbonCollapsed ? 'ribbon-collapsed' : 'ribbon-expanded',
+  });
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const handleRef = useRef<UniverHandle | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -836,6 +850,7 @@ export default function SpreadsheetTool() {
         }
       }
       handleRef.current = handle;
+      setRibbonHost(handle);
       // Dirty tracking: only modifications that reach the snapshot trigger debounced persistence
       unsubscribeRef.current = handle.onMutation(() => {
         scheduleSave();
@@ -874,6 +889,7 @@ export default function SpreadsheetTool() {
         pendingRef.current = current.getSnapshot();
         current.dispose();
         handleRef.current = null;
+        setRibbonHost(null);
       }
     };
   }, [univerLocale, dark, scheduleSave, applyChartData]);
@@ -1588,136 +1604,87 @@ export default function SpreadsheetTool() {
    */
   const canExportXlsx = summary.cells > 0 || shapes.length > 0 || charts.length > 0;
 
-  const menus: EditorMenu[] = [
-    {
-      id: 'file',
-      label: t('common.menuFile'),
-      entries: [
-        editorMenuItem('file-new', t('common.newDoc'), handleNew, { shortcut: '⌘N' }),
-        editorMenuItem(
-          'file-import-xlsx',
-          t('tools.sheet.importXlsx'),
-          () => openImport('.xlsx,.xlsm'),
-          { disabled: busy !== null },
-        ),
-        editorMenuItem('file-import-csv', t('tools.sheet.importCsv'), () => openImport('.csv'), {
-          disabled: busy !== null,
-        }),
-        { type: 'separator' },
-        editorMenuItem('file-export-xlsx', t('tools.sheet.exportXlsx'), () => void handleExport(), {
-          disabled: !canExportXlsx,
-        }),
-        editorMenuItem('file-export-csv', t('tools.sheet.exportCsv'), handleExportCsv, {
-          disabled: summary.cells === 0,
-        }),
-        editorMenuItem('file-print', t('tools.sheet.print'), openPrint, {
-          disabled: summary.cells === 0,
-        }),
-        { type: 'separator' },
-        editorMenuItem('file-library', t('tools.sheet.library'), openLibrary),
-        editorMenuItem('file-versions', t('tools.sheet.versions'), openVersions, {
-          disabled: !docId,
-        }),
-        { type: 'separator' },
-        editorMenuItem('file-clear', t('common.clear'), handleClear, {
-          danger: true,
-          disabled: summary.cells === 0 && !title.trim(),
-        }),
-      ],
+  /**
+   * One command registry feeds both chromes: `commands.ts` is projected onto the kept menu bar
+   * (文件/编辑/插入/视图) **and** the ribbon, so the two can never disagree.
+   */
+  const sheetActions: SheetActions = {
+    newDoc: handleNew,
+    importXlsx: () => openImport('.xlsx,.xlsm'),
+    importCsv: () => openImport('.csv'),
+    exportXlsx: () => void handleExport(),
+    exportCsv: handleExportCsv,
+    print: openPrint,
+    library: openLibrary,
+    versions: openVersions,
+    clear: handleClear,
+    undo: () => handleRef.current?.undo(),
+    redo: () => handleRef.current?.redo(),
+    insertChart: openChart,
+    insertShape: () => setShapePaletteOpen(true),
+    insertImage: () => imageInputRef.current?.click(),
+    insertPivot: openPivot,
+    openNames,
+    insertTable: handleInsertTable,
+    deleteTable: handleDeleteTable,
+    addSheet: handleAddSheet,
+    duplicateSheet: () => {
+      if (activeSheetId) handleDuplicateSheet(activeSheetId);
     },
-    {
-      id: 'edit',
-      label: t('common.menuEdit'),
-      entries: [
-        editorMenuItem('edit-undo', t('tools.sheet.undo'), () => handleRef.current?.undo(), {
-          shortcut: '⌘Z',
-        }),
-        editorMenuItem('edit-redo', t('tools.sheet.redo'), () => handleRef.current?.redo(), {
-          shortcut: '⇧⌘Z',
-        }),
-      ],
+    renameSheet: () => {
+      if (!activeSheet) return;
+      const name = window.prompt(t('tools.sheet.rename'), activeSheet.name);
+      if (name === null) return;
+      const next = name.trim();
+      if (!next || next === activeSheet.name) return;
+      handleRenameSheet(activeSheet.id, next);
     },
-    {
-      id: 'insert',
-      label: t('common.menuInsert'),
-      entries: [
-        editorMenuItem('insert-chart', t('tools.sheet.insertChart'), openChart, {
-          disabled: busy !== null,
-        }),
-        editorMenuItem(
-          'insert-shape',
-          t('tools.sheet.insertShape'),
-          () => setShapePaletteOpen(true),
-          { disabled: busy !== null },
-        ),
-        editorMenuItem(
-          'insert-image',
-          t('tools.sheet.insertImage'),
-          () => imageInputRef.current?.click(),
-          { disabled: busy !== null || activeProtection !== null },
-        ),
-        editorMenuItem('insert-pivot', t('tools.sheet.insertPivot'), openPivot, {
-          disabled: busy !== null,
-        }),
-        editorMenuItem('insert-name', t('tools.sheet.namesTitle'), openNames, {
-          disabled: busy !== null,
-        }),
-        { type: 'separator' },
-        editorMenuItem('insert-table', t('tools.sheet.tableInsert'), handleInsertTable, {
-          disabled: busy !== null || summary.cells === 0 || activeProtection !== null,
-        }),
-        editorMenuItem('insert-table-delete', t('tools.sheet.tableDelete'), handleDeleteTable, {
-          disabled: busy !== null || activeProtection !== null,
-        }),
-        { type: 'separator' },
-        editorMenuItem('insert-sheet', t('tools.sheet.addSheet'), handleAddSheet, {
-          disabled: busy !== null,
-        }),
-        editorMenuItem(
-          'insert-sheet-duplicate',
-          t('tools.sheet.duplicate'),
-          () => activeSheetId && handleDuplicateSheet(activeSheetId),
-          { disabled: !activeSheetId || busy !== null },
-        ),
-        editorMenuItem(
-          'insert-sheet-rename',
-          t('tools.sheet.rename'),
-          () => {
-            if (!activeSheet) return;
-            const name = window.prompt(t('tools.sheet.rename'), activeSheet.name);
-            if (name === null) return;
-            const next = name.trim();
-            if (!next || next === activeSheet.name) return;
-            handleRenameSheet(activeSheet.id, next);
-          },
-          { disabled: !activeSheet || busy !== null },
-        ),
-        editorMenuItem(
-          'insert-sheet-delete',
-          t('tools.sheet.delete'),
-          () => activeSheetId && handleDeleteSheet(activeSheetId),
-          { danger: true, disabled: !activeSheetId || sheets.length <= 1 || busy !== null },
-        ),
-      ],
+    deleteSheet: () => {
+      if (activeSheetId) handleDeleteSheet(activeSheetId);
     },
-    {
-      id: 'view',
-      label: t('common.menuView'),
-      entries: [
-        editorMenuItem('view-comments', t('tools.sheet.comments'), openComments),
-        editorMenuItem(
-          'view-protect',
-          activeProtection ? t('tools.sheet.protectMenuOff') : t('tools.sheet.protectMenuOn'),
-          () => setProtectOpen(true),
-          { disabled: busy !== null || !activeSheetId },
-        ),
-        { type: 'separator' },
-        editorMenuItem('view-present', t('tools.sheet.present'), () => setPresenting(true), {
-          disabled: summary.cells === 0,
-        }),
-      ],
+    openComments,
+    openProtect: () => setProtectOpen(true),
+    present: () => setPresenting(true),
+    promptHyperlink: () => {
+      const url = window.prompt(t('tools.sheet.r.hyperlinkPrompt'), 'https://');
+      if (url === null) return;
+      handleRef.current?.setHyperlink(url.trim());
     },
-  ];
+    openNumberFormat: () => {
+      setNumberFormatInitial(handleRef.current?.getFormatState()?.numberFormat ?? '');
+      setNumberFormatOpen(true);
+    },
+    copyToClipboard: (text) => {
+      void navigator.clipboard?.writeText(text).catch(() => undefined);
+    },
+    pasteFromClipboard: () => {
+      const clipboard = navigator.clipboard;
+      if (!clipboard) return;
+      void clipboard
+        .readText()
+        .then((text) => {
+          if (!text.trim()) return;
+          handleRef.current?.writeMatrix(parseClipboardMatrix(text));
+        })
+        .catch(() => undefined);
+    },
+  };
+
+  const ribbonBase: RibbonBaseContext = {
+    t,
+    actions: sheetActions,
+    busy: busy !== null,
+    cellCount: summary.cells,
+    canExportXlsx,
+    sheetCount: sheets.length,
+    hasActiveSheet: Boolean(activeSheetId),
+    activeSheetName: activeSheet?.name ?? null,
+    protectedSheet: activeProtection !== null,
+    hasTable: activeTables.length > 0,
+    hasDocId: Boolean(docId),
+    hasTitle: Boolean(title.trim()),
+  };
+  const menus = buildSheetMenus({ ...ribbonBase, host: ribbonHost, format: null });
 
   const statusText = draftSaved ? t('common.saved') : t('common.saving');
   const memory = useMemo(() => {
@@ -1817,6 +1784,22 @@ export default function SpreadsheetTool() {
             </button>
           </>
         }
+      />
+
+      <SpreadsheetRibbon
+        ctx={ribbonBase}
+        host={ribbonHost}
+        saved={draftSaved}
+        onCollapsedChange={setRibbonCollapsed}
+      />
+      <NumberFormatDialog
+        open={numberFormatOpen}
+        initial={numberFormatInitial}
+        onClose={() => setNumberFormatOpen(false)}
+        onApply={(pattern) => {
+          handleRef.current?.applyNumberFormat(pattern);
+          setNumberFormatOpen(false);
+        }}
       />
 
       {libraryOpen ? (

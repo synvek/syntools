@@ -69,6 +69,7 @@ const pt = {
     copy: 'Copiar',
     copied: 'Copiado',
     clear: 'Limpar',
+    more: 'Mais',
     discardConfirm:
       'O documento atual não está guardado. Criar um novo irá descartá-lo. Tem certeza?',
     swap: 'Trocar',
