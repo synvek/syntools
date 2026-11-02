@@ -7,6 +7,7 @@ import { findSelectedFootnote } from './footnotes';
 import { findSelectedEndnote } from './endnotes';
 import { normalizeImageLayer } from './imageLayer';
 import { TextColorPicker } from './TextColorPicker';
+import { ShapeMenu } from './ShapeMenu';
 import {
   DEFAULT_FONT_SIZE_PX,
   DEFAULT_LINE_HEIGHT,
@@ -290,8 +291,15 @@ interface EditorToolbarProps {
   stylesOpen: boolean;
   onToggleStyles: () => void;
   /** Shape panel (insert / edit a DrawingML preset shape) */
+  /** 侧边样式面板是否打开（由下拉里的"更多样式"打开） */
   shapesOpen: boolean;
-  onToggleShapes: () => void;
+  /** 形状库下拉：挑一个预设 → 进入画布拖拽绘制 */
+  shapeMenuOpen: boolean;
+  onToggleShapeMenu: () => void;
+  onPickShape: (prst: string) => void;
+  onOpenShapePanel: () => void;
+  /** 当前选中形状的预设，用于在形状库里高亮 */
+  activeShapePrst: string | null;
   /** Template panel */
   templatesOpen: boolean;
   onToggleTemplates: () => void;
@@ -340,7 +348,11 @@ export function EditorToolbar({
   stylesOpen,
   onToggleStyles,
   shapesOpen,
-  onToggleShapes,
+  shapeMenuOpen,
+  onToggleShapeMenu,
+  onPickShape,
+  onOpenShapePanel,
+  activeShapePrst,
   templatesOpen,
   onToggleTemplates,
   spellcheckOpen,
@@ -793,25 +805,35 @@ export function EditorToolbar({
           >
             <span className="font-serif text-sm italic leading-none">fx</span>
           </ToolButton>
-          <ToolButton
-            label={t('tools.richText.shapeInsert')}
-            active={shapesOpen || state.shapeSelected}
-            onClick={onToggleShapes}
-          >
-            {/* Square + circle: the classic "insert shape" glyph */}
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinejoin="round"
-              className="h-4 w-4"
-              aria-hidden="true"
+          {/* 形状库：按钮 + 下拉（Word/Excel 的"插入 → 形状"网格） */}
+          <div className="relative">
+            <ToolButton
+              label={t('tools.richText.shapeInsert')}
+              active={shapeMenuOpen || shapesOpen || state.shapeSelected}
+              onClick={onToggleShapeMenu}
             >
-              <rect x="3" y="3" width="11" height="11" rx="1.5" />
-              <circle cx="16" cy="16" r="5" />
-            </svg>
-          </ToolButton>
+              {/* Square + circle: the classic "insert shape" glyph */}
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="11" height="11" rx="1.5" />
+                <circle cx="16" cy="16" r="5" />
+              </svg>
+            </ToolButton>
+            <ShapeMenu
+              open={shapeMenuOpen}
+              activePrst={activeShapePrst}
+              onPick={onPickShape}
+              onOpenPanel={onOpenShapePanel}
+              onClose={onToggleShapeMenu}
+            />
+          </div>
           <ToolButton label={t('tools.richText.image')} onClick={() => fileRef.current?.click()}>
             <Icon name="image" className="h-4 w-4" />
           </ToolButton>

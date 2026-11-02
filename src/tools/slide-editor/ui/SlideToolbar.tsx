@@ -5,7 +5,6 @@ import {
   SHAPE_PRESETS,
   createImageElement,
   createLineElement,
-  createShapeElement,
   createTableElement,
   createTextElement,
 } from '../model/factory';
@@ -68,6 +67,7 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
   const setScale = useSlideStore((s) => s.setScale);
   const setViewport = useSlideStore((s) => s.setViewport);
   const addElement = useSlideStore((s) => s.addElement);
+  const setDrawShapeGeom = useSlideStore((s) => s.setDrawShapeGeom);
   const undo = useSlideStore((s) => s.undo);
   const redo = useSlideStore((s) => s.redo);
   const moveSlide = useSlideStore((s) => s.moveSlide);
@@ -111,7 +111,11 @@ export function SlideToolbar({ onFailure }: { onFailure: (errorCode: string) => 
   ).length;
 
   const insertText = () => addElement(createTextElement(doc, t('tools.slide.insertText')));
-  const insertShape = (geom: ShapeGeometry) => addElement(createShapeElement(doc, geom));
+  /**
+   * 形状：选中预设后进入"拉框绘制"模式（PowerPoint 的顺序），在画布上拖出尺寸即可创建。
+   * 也支持不拖、直接单击画布，此时用默认 240×160 —— 和 Word/Excel 一致。
+   */
+  const insertShape = (geom: ShapeGeometry) => setDrawShapeGeom(geom);
   const insertLine = () => addElement(createLineElement(doc));
   const insertTable = () => addElement(createTableElement(doc));
 

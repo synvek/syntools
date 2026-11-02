@@ -74,6 +74,9 @@ import { VersionDiffPanel } from './VersionDiffPanel';
 import { ImageResizeOverlay } from './ImageResizeOverlay';
 import { ShapeOverlay } from './ShapeOverlay';
 import { ShapePanel } from './ShapePanel';
+import { ShapeDrawLayer } from './ShapeDrawLayer';
+import { ShapeFormatBar } from './ShapeFormatBar';
+import { useSelectedShape } from './useSelectedShape';
 import { handleFloatingImagePointerDown } from './imageLayer';
 import { exportDocxBlob, importDocx } from './docx';
 import { printSupported, snapshotToPdf, printToPdf } from './pdf';
@@ -246,6 +249,10 @@ export default function RichTextEditorTool() {
   const [zoom, setZoom] = useState(initial?.zoom ?? 1);
   const [stylesOpen, setStylesOpen] = useState(false);
   const [shapesOpen, setShapesOpen] = useState(false);
+  /** 形状库下拉（挑预设 → 进入画布绘制） */
+  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
+  /** 正在拖拽绘制的预设：null = 不在绘制模式 */
+  const [drawPrst, setDrawPrst] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [spellcheckOpen, setSpellcheckOpen] = useState(false);
   const [spellcheckEnabled, setSpellcheckEnabled] = useState(false);
@@ -412,6 +419,9 @@ export default function RichTextEditorTool() {
   );
 
   const editor = useEditor({ extensions, content: snapshotHtml });
+
+  /** 选中形状（工具栏上下文格式栏与形状库高亮都要用） */
+  const selectedShape = useSelectedShape(editor);
 
   // Force a relayout after page setup / zoom changes: page height and content width changes move the page breaks
   useEffect(() => {
@@ -1901,7 +1911,18 @@ export default function RichTextEditorTool() {
         stylesOpen={stylesOpen}
         onToggleStyles={() => togglePanel('styles')}
         shapesOpen={shapesOpen}
-        onToggleShapes={() => togglePanel('shapes')}
+        shapeMenuOpen={shapeMenuOpen}
+        onToggleShapeMenu={() => setShapeMenuOpen((open) => !open)}
+        onPickShape={(prst) => {
+          // Word / Excel 的顺序：先选形状，再在画布上画；面板留给长尾属性
+          setShapeMenuOpen(false);
+          setDrawPrst(prst);
+        }}
+        onOpenShapePanel={() => {
+          setShapeMenuOpen(false);
+          setShapesOpen(true);
+        }}
+        activeShapePrst={selectedShape?.attrs.prst ?? null}
         templatesOpen={templatesOpen}
         onToggleTemplates={() => togglePanel('templates')}
         spellcheckOpen={spellcheckOpen}
@@ -2016,6 +2037,9 @@ export default function RichTextEditorTool() {
             />
           ) : null}
 
+          {/* 选中形状时的上下文格式栏（对应 Word/Excel 的"形状格式"）：只放高频控件 */}
+          <ShapeFormatBar editor={editor} onOpenPanel={() => setShapesOpen(true)} />
+
           {/* Editing workspace: fixed to the remaining first-screen height and scrolls internally (long documents don't stretch the page).
               The page view's gray workbench hangs off this container so it fills the whole scrollable area. */}
           <div
@@ -2047,6 +2071,13 @@ export default function RichTextEditorTool() {
             <ImageResizeOverlay editor={editor} viewportRef={viewportRef} />
             {/* Shape handles: resize / rotate / preset adjustment dots for the selected shape */}
             <ShapeOverlay editor={editor} viewportRef={viewportRef} />
+            {/* Drag-to-draw: picked a preset in the gallery, now pull a rectangle on the page */}
+            <ShapeDrawLayer
+              editor={editor}
+              prst={drawPrst}
+              hint={t('tools.richText.shapeDrawHint')}
+              onDone={() => setDrawPrst(null)}
+            />
             {/* Zoom layer: CSS zoom participates in layout (scroll height stays correct); data-rte-zoom lets pagination undo it */}
             <div data-rte-zoom={zoom} style={{ zoom, ...(metrics.cssVars as React.CSSProperties) }}>
               <div

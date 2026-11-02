@@ -10,6 +10,7 @@ import {
   contentVisibleBox,
   createSheetShape,
   pxToAnchor,
+  screenPointToContent,
   rowTopPx,
   screenDeltaToContent,
   shapeLayerClip,
@@ -253,5 +254,36 @@ describe('预设清单与工厂', () => {
     });
     expect(shape.width).toBeGreaterThanOrEqual(8);
     expect(shape.height).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('拖拽绘制的坐标换算', () => {
+  const layout = buildSheetLayout(undefined);
+
+  it('轮廓坐标 → 内容坐标，与 shapeScreenRect 互为逆运算', () => {
+    const viewport = {
+      ...DEFAULT_SHEET_VIEWPORT,
+      originX: 58,
+      originY: 92,
+      scrollX: 120,
+      scrollY: 40,
+      zoom: 1.25,
+    };
+    const content = { x: 300, y: 210 };
+    const screen = {
+      x: viewport.originX + (content.x - viewport.scrollX) * viewport.zoom,
+      y: viewport.originY + (content.y - viewport.scrollY) * viewport.zoom,
+    };
+    const back = screenPointToContent(screen.x, screen.y, viewport);
+    expect(Math.round(back.x)).toBe(content.x);
+    expect(Math.round(back.y)).toBe(content.y);
+  });
+
+  it('换算结果可以直接取单元格锚点', () => {
+    const viewport = { ...DEFAULT_SHEET_VIEWPORT, originX: 50, originY: 60, zoom: 2 };
+    const point = screenPointToContent(50 + 200, 60 + 400, viewport);
+    const anchor = pxToAnchor(point.x, point.y, layout);
+    expect(anchor.col).toBeGreaterThan(0);
+    expect(anchor.row).toBeGreaterThan(0);
   });
 });

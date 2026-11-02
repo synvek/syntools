@@ -7,6 +7,7 @@ import { createStage, type StageHandle } from '../render/stage';
 import { openTextEditor, type TextEditorHandle } from '../render/textEditor';
 import { containerElements, useSlideStore } from '../store';
 import { elementsAtPath } from '../model/tree';
+import { createShapeElement } from '../model/factory';
 import { threadsForSlide } from '../../../core/comments/model';
 import type { SlideElement } from '../model/types';
 import { Rulers } from './Rulers';
@@ -53,6 +54,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
   const showRulers = useSlideStore((s) => s.showRulers);
   const guides = useSlideStore((s) => s.guides);
   const penMode = useSlideStore((s) => s.penMode);
+  const drawShapeGeom = useSlideStore((s) => s.drawShapeGeom);
   const penPoints = useSlideStore((s) => s.penPoints);
   const pathEditId = useSlideStore((s) => s.pathEditId);
   const activePathNode = useSlideStore((s) => s.activePathNode);
@@ -355,6 +357,22 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
       isPenMode: () => useSlideStore.getState().penMode,
       onPenPoint: (x, y) => useSlideStore.getState().addPenPoint({ x, y }),
       onPenFinish: () => useSlideStore.getState().finishPen(),
+      // 形状绘制：按下时 store 里存着待建几何，松手按拉出来的框建形状（单击则用默认尺寸）
+      isShapeDrawMode: () => useSlideStore.getState().drawShapeGeom !== null,
+      onShapeDrawn: (rect) => {
+        const state = useSlideStore.getState();
+        const geom = state.drawShapeGeom;
+        if (!geom) return;
+        const hasSize = rect.width >= 8 && rect.height >= 8;
+        state.addElement(
+          createShapeElement(
+            state.doc,
+            geom,
+            hasSize ? rect : { ...rect, width: 240, height: 160 },
+          ),
+        );
+        state.setDrawShapeGeom(null);
+      },
       onPathCommands: (id, commands) => {
         useSlideStore.getState().setPathCommands(id, commands);
         syncNow();
@@ -451,6 +469,18 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
     });
   }, [selection, pathEditId, activePathNode]);
 
+  // 绘制模式：Esc 退出（与画笔工具一致；点画布不取消，避免误触丢失已选形状）
+  useEffect(() => {
+    if (!drawShapeGeom) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      useSlideStore.getState().setDrawShapeGeom(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [drawShapeGeom]);
+
   // Close the menu after the document changes via keyboard edits / undo / menu actions, so it doesn't linger on a stale target.
   // slideIndex is deliberately not watched: right-clicking a thumbnail switches slides before the menu opens, which would close it at once.
   useEffect(() => {
@@ -463,7 +493,7 @@ export function SlideCanvas({ onRuntimeFailure }: { onRuntimeFailure: () => void
         ref={canvasRef}
         className="slide-stage"
         aria-label="slide canvas"
-        style={penMode ? { cursor: 'crosshair' } : undefined}
+        style={penMode || drawShapeGeom ? { cursor: 'crosshair' } : undefined}
       />
       <Rulers containerRef={canvasRef} />
       <SlideContextMenu target={menu} onClose={() => setMenu(null)} onEditText={startEditing} />

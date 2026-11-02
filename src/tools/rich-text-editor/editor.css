@@ -1638,3 +1638,15 @@ button.rte-toc-text:hover {
     outline: none !important;
   }
 }
+
+/* ================================================================== *
+ * Drag-to-draw mode (P3-1.7): crosshair everywhere on the surface
+ * The whole surface switches, not just the content box: users drag from the margin too, and a
+ * caret appearing mid-drag makes it look like text selection is about to happen.
+ * ================================================================== */
+
+.rte-surface.rte-shape-draw-mode,
+.rte-surface.rte-shape-draw-mode * {
+  cursor: crosshair !important;
+  user-select: none !important;
+}

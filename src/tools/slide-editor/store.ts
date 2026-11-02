@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { ShapeGeometry } from '../../core/drawing/geometry';
 import { resolvePresetGeometry } from '../../core/drawing/shapeDefs';
 import {
   clampBounds,
@@ -116,6 +117,8 @@ interface SlideState {
   guides: { id: string; axis: 'x' | 'y'; position: number }[];
   /** Pen tool active (canvas clicks add path points instead of selecting) */
   penMode: boolean;
+  /** 拖拽绘制的待建形状几何（null = 未进入绘制模式） */
+  drawShapeGeom: ShapeGeometry | null;
   /** Points placed so far by the pen tool, in page coordinates */
   penPoints: { x: number; y: number }[];
   /** Node editing (P1-1.4): id of the custom-geometry shape whose anchors are editable */
@@ -180,6 +183,7 @@ interface SlideState {
   addElement: (element: SlideElement) => void;
   /** Enter / leave the pen tool (leaving clears the in-progress path) */
   setPenMode: (on: boolean) => void;
+  setDrawShapeGeom: (geom: ShapeGeometry | null) => void;
   /** Pen: add one point (page coordinates) */
   addPenPoint: (point: { x: number; y: number }) => void;
   /** Pen: close the path and insert it as a custom-geometry shape (needs ≥ 2 points) */
@@ -420,6 +424,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   gridSnap: false,
   showRulers: true,
   penMode: false,
+  drawShapeGeom: null,
   penPoints: [],
   pathEditId: null,
   activePathNode: null,
@@ -761,6 +766,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
   },
 
   setPenMode: (on) => set({ penMode: on, penPoints: [] }),
+  setDrawShapeGeom: (geom) => set({ drawShapeGeom: geom, penMode: false, penPoints: [] }),
 
   addPenPoint: (point) => set((s) => (s.penMode ? { penPoints: [...s.penPoints, point] } : {})),
 

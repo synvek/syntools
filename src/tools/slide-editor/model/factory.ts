@@ -195,11 +195,29 @@ export function createTextElement(doc: SlideDoc, text = ''): SlideElement {
   };
 }
 
-export function createShapeElement(doc: SlideDoc, geom: ShapeGeometry): SlideElement {
+/**
+ * 新建形状。
+ * `rect` 由"拖拽绘制"传入（页面坐标），不传时沿用居中默认尺寸 —— 这样工具栏菜单里的
+ * 单击插入与在画布上拉框插入走的是同一个工厂，样式默认值只有一处。
+ */
+export function createShapeElement(
+  doc: SlideDoc,
+  geom: ShapeGeometry,
+  rect?: { x: number; y: number; width: number; height: number },
+): SlideElement {
+  const box =
+    rect && rect.width > 0 && rect.height > 0
+      ? {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        }
+      : centerRect(doc, 240, 160);
   return {
     id: createId('el'),
     type: 'shape',
-    ...centerRect(doc, 240, 160),
+    ...box,
     geom,
     fill: createSolidFill('#4472C4'),
     stroke: createStroke({ color: '#2F5597', width: 2 }),

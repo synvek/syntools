@@ -469,6 +469,43 @@ export const DocShape = Node.create({
           return true;
         },
 
+      /**
+       * 在指定文档位置插入形状（"在画布上拖拽绘制"用）。
+       * 形状是 inline 流的一部分，落点只能精确到"哪个块之后"；拖拽框出来的尺寸照实写入，
+       * 这样用户画多大就是多大，而不是插入后再拖手柄。
+       */
+      insertDocShapeAt:
+        (options: {
+          prst?: string;
+          width?: number;
+          height?: number;
+          pos?: number;
+          text?: string;
+        }) =>
+        ({ state, dispatch }) => {
+          const spec = shapeSpec({
+            shapeId: createShapeId(),
+            prst: options?.prst ?? 'roundRect',
+            width: options?.width ?? DEFAULT_SHAPE_SIZE.width,
+            height: options?.height ?? DEFAULT_SHAPE_SIZE.height,
+            text: options?.text ?? '',
+          });
+          const node = state.schema.nodes[this.name].create(spec);
+          const anchor = Math.max(
+            0,
+            Math.min(options?.pos ?? state.selection.from, state.doc.content.size),
+          );
+          const $pos = state.doc.resolve(anchor);
+          const pos = $pos.depth > 0 ? $pos.after(1) : $pos.pos;
+          const tr = state.tr.insert(pos, node);
+          if (pos + node.nodeSize >= tr.doc.content.size) {
+            tr.insert(pos + node.nodeSize, state.schema.nodes.paragraph.create());
+          }
+          tr.setSelection(NodeSelection.create(tr.doc, pos));
+          dispatch?.(tr.scrollIntoView());
+          return true;
+        },
+
       updateDocShape:
         (attrs: Partial<DocShapeAttrs>) =>
         ({ state, tr }) => {
@@ -562,6 +599,14 @@ declare module '@tiptap/core' {
         prst?: string;
         width?: number;
         height?: number;
+        text?: string;
+      }) => ReturnType;
+      /** Insert a preset shape at a specific document position (drag-to-draw) */
+      insertDocShapeAt: (options: {
+        prst?: string;
+        width?: number;
+        height?: number;
+        pos?: number;
         text?: string;
       }) => ReturnType;
       /** Update attributes of the selected shape */

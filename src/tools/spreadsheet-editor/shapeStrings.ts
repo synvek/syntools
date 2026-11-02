@@ -398,9 +398,62 @@ export const shapeStrings: Record<string, ResourceTree> = Object.fromEntries(
   Object.entries(ROWS).map(([lng, row]) => [lng, bundle(row)]),
 );
 
+/**
+ * 表格"拖拽绘制 + 形状格式栏"新增的两条文案。
+ * 没有并进上面的行式表：那张表是 34 键 × 9 语言的固定矩阵，加列会让 diff 变噪音；
+ * 这里按语言对象补两条，注册时一起合并进 `tools.sheet.*`。
+ */
+const EXTRA_COPY: Record<string, { shapeFormat: string; shapeDrawHint: string }> = {
+  zh: {
+    shapeFormat: '形状格式',
+    shapeDrawHint: '在表格中拖拽绘制形状；单击插入默认大小；Esc 取消',
+  },
+  en: {
+    shapeFormat: 'Shape format',
+    shapeDrawHint:
+      'Drag on the sheet to draw the shape; click to insert at default size; Esc to cancel',
+  },
+  'zh-TW': {
+    shapeFormat: '圖形格式',
+    shapeDrawHint: '在工作表中拖曳繪製圖形；按一下插入預設大小；Esc 取消',
+  },
+  ja: {
+    shapeFormat: '図形の書式',
+    shapeDrawHint: 'シート上でドラッグして図形を描画します。クリックで既定サイズ、Esc でキャンセル',
+  },
+  fr: {
+    shapeFormat: 'Format de la forme',
+    shapeDrawHint:
+      'Faites glisser sur la feuille pour dessiner la forme ; cliquez pour la taille par défaut ; Échap pour annuler',
+  },
+  de: {
+    shapeFormat: 'Formformat',
+    shapeDrawHint:
+      'Auf dem Blatt ziehen, um die Form zu zeichnen; Klicken für Standardgröße; Esc zum Abbrechen',
+  },
+  it: {
+    shapeFormat: 'Formato forma',
+    shapeDrawHint:
+      'Trascina sul foglio per disegnare la forma; clic per la dimensione predefinita; Esc per annullare',
+  },
+  es: {
+    shapeFormat: 'Formato de forma',
+    shapeDrawHint:
+      'Arrastra en la hoja para dibujar la forma; haz clic para el tamaño predeterminado; Esc para cancelar',
+  },
+  pt: {
+    shapeFormat: 'Formato da forma',
+    shapeDrawHint:
+      'Arraste na planilha para desenhar a forma; clique para o tamanho padrão; Esc para cancelar',
+  },
+};
+
 /** Merge the shape copy into i18next (keys under tools.sheet.*) */
 export function registerShapeStrings(instance: Registrar): void {
   for (const [lng, resources] of Object.entries(shapeStrings)) {
     instance.addResourceBundle(lng, 'translation', resources, true, true);
+  }
+  for (const [lng, copy] of Object.entries(EXTRA_COPY)) {
+    instance.addResourceBundle(lng, 'translation', { tools: { sheet: copy } }, true, true);
   }
 }

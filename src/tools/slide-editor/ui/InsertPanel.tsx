@@ -3,12 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import { resolvePresetGeometry } from '../../../core/drawing/shapeDefs';
 import { CHART_TYPES, themePalette } from '../model/chart';
-import {
-  createChartElement,
-  createFormulaElement,
-  createIconElement,
-  createShapeElement,
-} from '../model/factory';
+import { createChartElement, createFormulaElement, createIconElement } from '../model/factory';
 import { ICON_CATEGORIES, SLIDE_ICONS, iconSvg, type SlideIcon } from '../model/icons';
 import { SHAPE_GROUPS, SHAPE_PRESETS } from '../model/shapes';
 import { useSlideStore } from '../store';
@@ -38,6 +33,7 @@ export function InsertPanel({
   const { t } = useTranslation();
   const doc = useSlideStore((s) => s.doc);
   const addElement = useSlideStore((s) => s.addElement);
+  const setDrawShapeGeom = useSlideStore((s) => s.setDrawShapeGeom);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [shapeQuery, setShapeQuery] = useState('');
   const [chartType, setChartType] = useState<string>('bar');
@@ -70,10 +66,12 @@ export function InsertPanel({
     })).filter((group) => group.items.length > 0);
   }, [shapeQuery, t]);
 
+  /**
+   * 形状库同样是"选完再画"：进入绘制模式后由画布拉框决定位置与尺寸，
+   * 这样面板与工具栏下拉两条入口的行为一致（单击画布则用默认尺寸）。
+   */
   const insertShape = (prst: string) => {
-    addElement({
-      ...createShapeElement(doc, resolvePresetGeometry(prst)),
-    });
+    setDrawShapeGeom(resolvePresetGeometry(prst));
     onClose();
   };
 

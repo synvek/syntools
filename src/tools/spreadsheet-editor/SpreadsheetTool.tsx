@@ -57,6 +57,8 @@ import {
   type SheetImageConfig,
 } from './sheetImages';
 import { ShapeLayer, ShapePalette } from './ui/ShapeOverlay';
+import { ShapeDrawLayer } from './ui/ShapeDrawLayer';
+import { ShapeFormatBar } from './ui/ShapeFormatBar';
 import { ImageLayer } from './ui/ImageLayer';
 import { registerStoreStrings } from './storeStrings';
 import {
@@ -253,6 +255,8 @@ export default function SpreadsheetTool() {
   shapesRef.current = shapes;
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [shapePaletteOpen, setShapePaletteOpen] = useState(false);
+  /** 形状库选中后进入的绘制模式：在表格上拖拽即按该尺寸建形状 */
+  const [shapeDrawPrst, setShapeDrawPrst] = useState<string | null>(null);
   const [images, setImages] = useState<SheetImageConfig[]>([]);
   const imagesRef = useRef<SheetImageConfig[]>([]);
   imagesRef.current = images;
@@ -494,26 +498,27 @@ export default function SpreadsheetTool() {
     setShapes(next);
   }, []);
 
-  /** Insert a preset shape next to the current selection, so it always lands in view */
-  const insertShape = useCallback(
-    (prst: string) => {
+  /**
+   * 在指定锚点/尺寸处建形状（拖拽绘制与"插入到选区"共用一条路径）。
+   * 锚点由调用方给出：绘制时是鼠标落点，菜单插入时是当前选区左上角。
+   */
+  const insertShapeAt = useCallback(
+    (prst: string, from: SheetShapeConfig['from'], width?: number, height?: number) => {
       const handle = handleRef.current;
       if (!handle) return;
       const sheetId = handle.getActiveSheetId();
-      const layout = shapeLayoutRef.current;
-      const range = handle.getActiveRange();
-      const from = range
-        ? { col: range.startColumn, row: range.startRow, colOff: 8, rowOff: 8 }
-        : pxToAnchor(24, 24, layout);
       const shape = createSheetShape({
         prst,
         from,
         sheetId: sheetId ?? undefined,
+        width,
+        height,
         z: shapesRef.current.reduce((max, item) => Math.max(max, item.z), 0) + 1,
       });
       setShapeList([...shapesRef.current, shape]);
       setSelectedShapeId(shape.id);
       setShapePaletteOpen(false);
+      setShapeDrawPrst(null);
       scheduleSaveRef.current();
     },
     [setShapeList],
@@ -1871,6 +1876,23 @@ export default function SpreadsheetTool() {
         </p>
       ) : null}
 
+      {/* 选中形状时的上下文格式栏（对应 Excel 的「形状格式」选项卡） */}
+      <ShapeFormatBar
+        shape={visibleShapes.find((item) => item.id === selectedShapeId) ?? null}
+        onChange={(patch) => {
+          if (selectedShapeId) updateShape(selectedShapeId, patch);
+        }}
+        onRemove={() => {
+          if (selectedShapeId) removeShape(selectedShapeId);
+        }}
+        onBringFront={() => {
+          if (selectedShapeId) reorderShape(selectedShapeId, 'front');
+        }}
+        onSendBack={() => {
+          if (selectedShapeId) reorderShape(selectedShapeId, 'back');
+        }}
+      />
+
       {/* 工作表区域：图表以浮层形式贴在同一区域内，可拖动 / 缩放 / 改数据 */}
       <div
         ref={surfaceRef}
@@ -1921,8 +1943,26 @@ export default function SpreadsheetTool() {
           viewport={shapeViewport}
         />
         {shapePaletteOpen ? (
-          <ShapePalette onPick={insertShape} onClose={() => setShapePaletteOpen(false)} />
+          <ShapePalette
+            onPick={(prst) => {
+              // Excel 的顺序：选形状 → 在工作表上拖出来；单击则用默认大小
+              setShapePaletteOpen(false);
+              setShapeDrawPrst(prst);
+            }}
+            onClose={() => setShapePaletteOpen(false)}
+          />
         ) : null}
+        <ShapeDrawLayer
+          prst={shapeDrawPrst}
+          layout={shapeLayout}
+          viewport={shapeViewport}
+          surfaceRef={surfaceRef}
+          hint={t('tools.sheet.shapeDrawHint')}
+          onCancel={() => setShapeDrawPrst(null)}
+          onCreate={(from, width, height) =>
+            insertShapeAt(shapeDrawPrst ?? 'rect', from, width, height)
+          }
+        />
         {visibleCharts.map((config) => (
           <ChartOverlay
             key={config.id}

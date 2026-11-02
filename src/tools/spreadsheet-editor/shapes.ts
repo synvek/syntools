@@ -234,6 +234,22 @@ export function shapeScreenRect(
   };
 }
 
+/**
+ * 轮廓坐标 → 内容坐标（`shapeScreenRect` 的逆运算）。
+ * 拖拽绘制要用它把鼠标落点换算成单元格锚点，否则画出来的形状会随滚动/缩放漂移。
+ */
+export function screenPointToContent(
+  x: number,
+  y: number,
+  viewport: SheetViewport,
+): { x: number; y: number } {
+  const zoom = viewportZoom(viewport);
+  return {
+    x: (x - viewport.originX) / zoom + viewport.scrollX,
+    y: (y - viewport.originY) / zoom + viewport.scrollY,
+  };
+}
+
 /** Screen (pointer) delta → content delta: zoom scales everything the user drags */
 export function screenDeltaToContent(
   deltaX: number,

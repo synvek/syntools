@@ -1,17 +1,11 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Editor } from '@tiptap/react';
 import { resolvePresetGeometry } from '../../core/drawing/shapeDefs';
 import type { ImageLayer } from './imageLayer';
 import { IMAGE_LAYERS } from './imageLayer';
-import {
-  SHAPE_PRESETS,
-  findSelectedShape,
-  shapeSpec,
-  type DocShapeAttrs,
-  type ShapeDash,
-} from './shapeNode';
+import { SHAPE_PRESETS, findSelectedShape, type DocShapeAttrs, type ShapeDash } from './shapeNode';
 import { shapePathD } from './shapeSvg';
+import { applyShapeAttrs, useSelectedShape } from './useSelectedShape';
 
 /**
  * Shape panel (P3-1.2 / P3-1.4): preset palette plus the properties of the selected shape.
@@ -112,34 +106,11 @@ function NumberField({
 
 export function ShapePanel({ editor, onClose }: ShapePanelProps) {
   const { t } = useTranslation();
-  const [selected, setSelected] = useState<{ pos: number; attrs: DocShapeAttrs } | null>(null);
-
-  useEffect(() => {
-    if (!editor) return;
-    const refresh = () => {
-      const found = findSelectedShape(editor.state);
-      setSelected(found ? { pos: found.pos, attrs: shapeSpec(found.node.attrs) } : null);
-    };
-    refresh();
-    editor.on('transaction', refresh);
-    editor.on('selectionUpdate', refresh);
-    return () => {
-      editor.off('transaction', refresh);
-      editor.off('selectionUpdate', refresh);
-    };
-  }, [editor]);
+  const selected = useSelectedShape(editor);
 
   if (!editor) return null;
 
-  const update = (attrs: Partial<DocShapeAttrs>) => {
-    const found = findSelectedShape(editor.state);
-    if (!found) return;
-    const tr = editor.state.tr.setNodeMarkup(found.pos, undefined, {
-      ...found.node.attrs,
-      ...attrs,
-    });
-    editor.view.dispatch(tr);
-  };
+  const update = (attrs: Partial<DocShapeAttrs>) => applyShapeAttrs(editor, attrs);
 
   const attrs = selected?.attrs;
 

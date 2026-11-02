@@ -58,6 +58,11 @@ export interface StageCallbacks {
   /** Pen: double-click closed the path */
   onPenFinish?: () => void;
 
+  /** 形状绘制模式：按下即拉框，松手创建一个该尺寸的形状（Word / PowerPoint 的顺序） */
+  isShapeDrawMode?: () => boolean;
+  /** 形状绘制完成：rect 为页面坐标（未做最小尺寸限制，调用方决定单击的默认尺寸） */
+  onShapeDrawn?: (rect: { x: number; y: number; width: number; height: number }) => void;
+
   /** Node editing: final normalized commands after an anchor / control drag */
   onPathCommands: (id: string, commands: PathCommand[]) => void;
   /** Node editing: an anchor was clicked (null clears the focus) */
@@ -83,6 +88,9 @@ function ancestorElement(node: Konva.Node): Konva.Node | undefined {
 export function attachInteraction(handle: StageHandle): void {
   const { stage, contentLayer, marquee, callbacks } = handle;
   let marqueeStart: { x: number; y: number } | null = null;
+  /** 拉框绘制的起点：舞台坐标（画预览）与页面坐标（建形状）各记一份 */
+  let drawStartStage: { x: number; y: number } | null = null;
+  let drawStartPage: { x: number; y: number } | null = null;
   /** Middle-button drag panning: mutually exclusive with the marquee, and takes priority on press */
   let panStart: { x: number; y: number } | null = null;
   /** Whether this frame ended with a marquee; suppresses the stray background click that clears the selection */
@@ -104,6 +112,19 @@ export function attachInteraction(handle: StageHandle): void {
     }
     // The right button is handled by contextmenu (menu), not by the marquee
     if (event.evt instanceof MouseEvent && event.evt.button === 2) return;
+    // 形状绘制模式：按住拉框，松手建形状；不参与选择与框选
+    if (callbacks.isShapeDrawMode?.()) {
+      event.evt.preventDefault();
+      const viewPoint = pointerPosition();
+      const drawScale = contentLayer.scaleX() || 1;
+      drawStartStage = viewPoint;
+      drawStartPage = {
+        x: (viewPoint.x - contentLayer.x()) / drawScale,
+        y: (viewPoint.y - contentLayer.y()) / drawScale,
+      };
+      updateMarquee(marquee, { ...viewPoint, width: 0, height: 0 });
+      return;
+    }
     // Pen mode takes over the left button: every press appends a path point, never a selection
     if (callbacks.isPenMode?.()) {
       const view = pointerPosition();
@@ -130,6 +151,16 @@ export function attachInteraction(handle: StageHandle): void {
       panStart = current;
       return;
     }
+    if (drawStartStage) {
+      const point = pointerPosition();
+      updateMarquee(marquee, {
+        x: Math.min(drawStartStage.x, point.x),
+        y: Math.min(drawStartStage.y, point.y),
+        width: Math.abs(point.x - drawStartStage.x),
+        height: Math.abs(point.y - drawStartStage.y),
+      });
+      return;
+    }
     if (!marqueeStart) return;
     const current = pointerPosition();
     updateMarquee(marquee, {
@@ -143,6 +174,27 @@ export function attachInteraction(handle: StageHandle): void {
   stage.on('mouseup touchend', () => {
     if (panStart) {
       panStart = null;
+      return;
+    }
+    if (drawStartStage && drawStartPage) {
+      const point = pointerPosition();
+      const upScale = contentLayer.scaleX() || 1;
+      const pageEnd = {
+        x: (point.x - contentLayer.x()) / upScale,
+        y: (point.y - contentLayer.y()) / upScale,
+      };
+      const start = drawStartPage;
+      drawStartStage = null;
+      drawStartPage = null;
+      updateMarquee(marquee, null);
+      // 松手后浏览器还会补一个 click，必须吞掉它，否则新形状刚建好就被清空选择
+      marqueeJustEnded = true;
+      callbacks.onShapeDrawn?.({
+        x: Math.min(start.x, pageEnd.x),
+        y: Math.min(start.y, pageEnd.y),
+        width: Math.abs(pageEnd.x - start.x),
+        height: Math.abs(pageEnd.y - start.y),
+      });
       return;
     }
     if (!marqueeStart) return;
