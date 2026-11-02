@@ -16,7 +16,9 @@ export function RibbonTabStrip({
   activeId,
   accent,
   collapsed,
+  menus,
   quickAccess,
+  headerRight,
   collapseLabel,
   expandLabel,
   onSelect,
@@ -29,7 +31,11 @@ export function RibbonTabStrip({
   activeId: string;
   accent: RibbonAccent;
   collapsed: boolean;
+  /** File / edit / insert menus, left of everything else */
+  menus?: ReactNode;
   quickAccess?: ReactNode;
+  /** Document chrome (save state, title, new, present…) between the tabs and the collapse toggle */
+  headerRight?: ReactNode;
   collapseLabel: string;
   expandLabel: string;
   onSelect: (tabId: string) => void;
@@ -80,6 +86,13 @@ export function RibbonTabStrip({
 
   return (
     <div className={RIBBON_TABSTRIP}>
+      {menus ? (
+        <>
+          {menus}
+          <span className="mx-0.5 h-4 w-px bg-gray-300 dark:bg-[#4a4a4a]" />
+        </>
+      ) : null}
+
       {quickAccess ? (
         <>
           <div className="flex shrink-0 items-center gap-0.5">{quickAccess}</div>
@@ -124,6 +137,10 @@ export function RibbonTabStrip({
           );
         })}
       </div>
+
+      {headerRight ? (
+        <div className="flex shrink-0 items-center gap-1 pl-1.5">{headerRight}</div>
+      ) : null}
 
       <button
         type="button"

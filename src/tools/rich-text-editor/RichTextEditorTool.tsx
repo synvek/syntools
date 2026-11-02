@@ -5,11 +5,10 @@ import { DOMParser as PMDOMParser } from '@tiptap/pm/model';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
-import { EditorMenuBar } from '@/core/components/EditorMenuBar';
 import { EditorStatusBar } from '@/core/components/EditorStatusBar';
 import {
-  EDITOR_ICON_BUTTON_CLASS,
-  EDITOR_TITLE_INPUT_CLASS,
+  EDITOR_STRIP_TITLE_INPUT_CLASS,
+  STRIP_ICON_BUTTON_CLASS,
   editorMenuItem,
   estimateJsonBytes,
   formatBytes,
@@ -1823,20 +1822,21 @@ export default function RichTextEditorTool() {
 
   return (
     <div className="flex flex-col gap-4" data-tool-root>
-      <EditorMenuBar
+      <EditorToolbar
+        editor={editor}
         menus={menus}
-        ariaLabel={t('common.menuBar')}
-        actions={
+        menuAriaLabel={t('common.menuBar')}
+        headerRight={
           <>
             <span
               role="status"
               title={statusText}
               aria-label={statusText}
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${
                 saved ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'
               }`}
             >
-              <Icon name={saved ? 'check' : 'clock'} className="h-4 w-4" />
+              <Icon name={saved ? 'check' : 'clock'} className="h-3.5 w-3.5" />
             </span>
             <button
               type="button"
@@ -1844,32 +1844,26 @@ export default function RichTextEditorTool() {
               disabled={isEmpty && !title}
               aria-label={t('common.clear')}
               title={t('common.clear')}
-              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+              className={`${STRIP_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
             >
-              <Icon name="trash" className="h-4 w-4" />
+              <Icon name="trash" className="h-3.5 w-3.5" />
             </button>
-          </>
-        }
-        center={
-          <input
-            type="text"
-            value={title}
-            aria-label={t('tools.richText.docTitle')}
-            placeholder={t('tools.richText.titlePlaceholder')}
-            onChange={(event) => setTitle(event.target.value)}
-            className={EDITOR_TITLE_INPUT_CLASS}
-          />
-        }
-        right={
-          <>
+            <input
+              type="text"
+              value={title}
+              aria-label={t('tools.richText.docTitle')}
+              placeholder={t('tools.richText.titlePlaceholder')}
+              onChange={(event) => setTitle(event.target.value)}
+              className={EDITOR_STRIP_TITLE_INPUT_CLASS}
+            />
             <button
               type="button"
               onClick={handleNew}
               aria-label={t('common.newDoc')}
               title={t('common.newDoc')}
-              className={EDITOR_ICON_BUTTON_CLASS}
+              className={STRIP_ICON_BUTTON_CLASS}
             >
-              <Icon name="newDoc" className="h-4 w-4" />
+              <Icon name="newDoc" className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
@@ -1878,16 +1872,12 @@ export default function RichTextEditorTool() {
               disabled={isEmpty}
               aria-label={t('tools.richText.present')}
               title={t('tools.richText.present')}
-              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+              className={`${STRIP_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
             >
-              <Icon name="present" className="h-4 w-4" />
+              <Icon name="present" className="h-3.5 w-3.5" />
             </button>
           </>
         }
-      />
-
-      <EditorToolbar
-        editor={editor}
         findOpen={findOpen}
         onToggleFind={() => setFindOpen((open) => !open)}
         outlineOpen={outlineOpen}

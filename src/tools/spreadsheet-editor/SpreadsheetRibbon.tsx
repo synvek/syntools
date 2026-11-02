@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Ribbon } from '@/core/components/ribbon/Ribbon';
 import { RIBBON_ICON_BUTTON } from '@/core/components/ribbon/ribbonTheme';
 import { RibbonIcon } from '@/core/components/ribbon/ribbonIcons';
+import type { EditorMenu } from '@/core/components/editorChrome';
 import type { SheetFormatPatch, SheetFormatState } from './sheetFormat';
 import { buildSheetRibbonTabs, type SheetCommandContext, type SheetRibbonHost } from './commands';
 
@@ -11,7 +13,12 @@ export type RibbonBaseContext = Omit<SheetCommandContext, 'host' | 'format'>;
 export interface SpreadsheetRibbonProps {
   ctx: RibbonBaseContext;
   host: SheetRibbonHost | null;
-  saved: boolean;
+
+  /** 文件 / 编辑 / 插入 / 视图 menus, rendered as icon dropdowns on the strip */
+  menus?: EditorMenu[];
+  menuAriaLabel?: string;
+  /** Save state, protection badges, clear, title, new doc, present */
+  headerRight?: ReactNode;
   /** Feeds the viewport height calculation: the ribbon changes the space above the canvas */
   onCollapsedChange?: (collapsed: boolean) => void;
 }
@@ -23,7 +30,14 @@ export interface SpreadsheetRibbonProps {
  * glues them to React and owns the one piece of state that only a component can hold: the selection
  * format (subscribed, coalesced) plus the armed format painter.
  */
-export function SpreadsheetRibbon({ ctx, host, saved, onCollapsedChange }: SpreadsheetRibbonProps) {
+export function SpreadsheetRibbon({
+  ctx,
+  host,
+  menus,
+  menuAriaLabel,
+  headerRight,
+  onCollapsedChange,
+}: SpreadsheetRibbonProps) {
   const [format, setFormat] = useState<SheetFormatState | null>(null);
   const [painting, setPainting] = useState(false);
   const painterRef = useRef<SheetFormatPatch | null>(null);
@@ -79,19 +93,10 @@ export function SpreadsheetRibbon({ ctx, host, saved, onCollapsedChange }: Sprea
   };
 
   const { t } = ctx;
+  // Save state lives in the title cluster on the right (next to the document name), so the quick
+  // access bar only carries commands.
   const quickAccess = (
     <>
-      <span
-        role="status"
-        title={saved ? t('common.saved') : t('common.saving')}
-        aria-label={saved ? t('common.saved') : t('common.saving')}
-        data-testid="ribbon-qat-saved"
-        className={`inline-flex h-6 w-6 items-center justify-center ${
-          saved ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'
-        }`}
-      >
-        <RibbonIcon name={saved ? 'check' : 'clock'} className="h-3.5 w-3.5" />
-      </span>
       <button
         type="button"
         aria-label={t('tools.sheet.undo')}
@@ -154,7 +159,10 @@ export function SpreadsheetRibbon({ ctx, host, saved, onCollapsedChange }: Sprea
       ariaLabel={t('tools.sheet.r.ribbonLabel')}
       tabs={tabs}
       accent="green"
+      menus={menus}
+      menuAriaLabel={menuAriaLabel}
       quickAccess={quickAccess}
+      headerRight={headerRight}
       collapseLabel={t('tools.sheet.r.collapse')}
       expandLabel={t('tools.sheet.r.expand')}
       moreLabel={t('common.more')}

@@ -28,6 +28,16 @@ async function insertShape(page: Page, preset = 'roundRect'): Promise<void> {
   await page.getByRole('menu').getByRole('menuitem', { name: '插入形状' }).first().click();
   await expect(page.getByTestId('sheet-shape-palette')).toBeVisible();
   await page.locator(`[data-shape-preset="${preset}"]`).click();
+
+  // The preset only arms the draw tool (Excel behaviour): drag a box on the grid to create it
+  const grid = await page.locator('canvas[id^="univer-sheet-main-canvas"]').boundingBox();
+  if (!grid) throw new Error('sheet grid is not laid out');
+  const startX = grid.x + 160;
+  const startY = grid.y + 120;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 220, startY + 140, { steps: 8 });
+  await page.mouse.up();
   await expect(page.getByTestId('sheet-shape')).toHaveCount(1);
 }
 

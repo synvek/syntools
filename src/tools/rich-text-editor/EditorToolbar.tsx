@@ -1,8 +1,9 @@
 import { useMemo, useRef } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { Ribbon } from '@/core/components/ribbon/Ribbon';
+import type { EditorMenu } from '@/core/components/editorChrome';
 import { RIBBON_ICON_BUTTON } from '@/core/components/ribbon/ribbonTheme';
 import { RibbonIcon } from '@/core/components/ribbon/ribbonIcons';
 import { findSelectedFootnote } from './footnotes';
@@ -38,6 +39,11 @@ const ROW_HEIGHT_MM_PRESETS = [8, 12, 16, 20] as const;
 
 export interface EditorToolbarProps extends RichTextRibbonActions {
   editor: Editor | null;
+  /** 文件 / 编辑 / 插入 / 视图 menus rendered as icon dropdowns on the tab strip */
+  menus?: EditorMenu[];
+  menuAriaLabel?: string;
+  /** Save state, clear, title, new doc, present — right end of the tab strip */
+  headerRight?: ReactNode;
 }
 
 /**
@@ -50,7 +56,13 @@ export interface EditorToolbarProps extends RichTextRibbonActions {
  * `useEditorState` keeps the tree from re-rendering on every keystroke: it re-renders only when one of
  * the selected attributes actually changes.
  */
-export function EditorToolbar({ editor, ...actions }: EditorToolbarProps) {
+export function EditorToolbar({
+  editor,
+  menus,
+  menuAriaLabel,
+  headerRight,
+  ...actions
+}: EditorToolbarProps) {
   const { t } = useTranslation();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -325,7 +337,10 @@ export function EditorToolbar({ editor, ...actions }: EditorToolbarProps) {
         ariaLabel={t('tools.richText.ribbon.label')}
         accent="blue"
         tabs={tabs}
+        menus={menus}
+        menuAriaLabel={menuAriaLabel}
         quickAccess={quickAccess}
+        headerRight={headerRight}
         collapseLabel={t('tools.richText.ribbon.collapse')}
         expandLabel={t('tools.richText.ribbon.expand')}
         moreLabel={t('common.more')}

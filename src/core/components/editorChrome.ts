@@ -9,6 +9,14 @@
 export const EDITOR_TITLE_INPUT_CLASS =
   'w-full max-w-[240px] rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 outline-none transition-colors focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 
+/** Title input inside the ribbon tab strip (32px tall, so everything is one row) */
+export const EDITOR_STRIP_TITLE_INPUT_CLASS =
+  'h-6 w-[110px] min-w-0 shrink rounded border border-gray-300 bg-white px-1.5 text-[12px] text-gray-800 outline-none transition-colors focus:border-blue-500 xl:w-[150px] dark:border-[#4a4a4a] dark:bg-[#1f1f1f] dark:text-[#e8e8e8]';
+
+/** Icon button inside the ribbon tab strip (24px, matches the strip height) */
+export const STRIP_ICON_BUTTON_CLASS =
+  'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-500 transition-colors hover:bg-black/[0.06] hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#c8c8c8] dark:hover:bg-white/10 dark:hover:text-white';
+
 /** Toolbar icon button: aligned with the menu height */
 export const EDITOR_ICON_BUTTON_CLASS =
   'inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200';

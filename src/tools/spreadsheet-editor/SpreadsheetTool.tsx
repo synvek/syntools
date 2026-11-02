@@ -3,11 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { HintTip } from '@/core/components/DocumentHeader';
 import { clearDraft, readDraft, writeDraftSafe } from './draft';
 import { Icon } from '@/core/components/Icon';
-import { EditorMenuBar } from '@/core/components/EditorMenuBar';
 import { EditorStatusBar } from '@/core/components/EditorStatusBar';
 import {
-  EDITOR_ICON_BUTTON_CLASS,
-  EDITOR_TITLE_INPUT_CLASS,
+  EDITOR_STRIP_TITLE_INPUT_CLASS,
+  STRIP_ICON_BUTTON_CLASS,
   estimateJsonBytes,
   formatBytes,
 } from '@/core/components/editorChrome';
@@ -1699,10 +1698,13 @@ export default function SpreadsheetTool() {
 
   return (
     <div className="flex flex-col gap-4" data-tool-root>
-      <EditorMenuBar
+      <SpreadsheetRibbon
+        ctx={ribbonBase}
+        host={ribbonHost}
         menus={menus}
-        ariaLabel={t('common.menuBar')}
-        actions={
+        menuAriaLabel={t('common.menuBar')}
+        onCollapsedChange={setRibbonCollapsed}
+        headerRight={
           <>
             {activeProtection ? (
               <span
@@ -1710,7 +1712,7 @@ export default function SpreadsheetTool() {
                 data-testid="sheet-protected-badge"
                 title={t('tools.sheet.protectLockedNotice')}
                 aria-label={t('tools.sheet.protectLockedNotice')}
-                className="inline-flex h-7 items-center justify-center rounded-md bg-amber-50 px-1.5 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                className="inline-flex h-6 items-center justify-center rounded bg-amber-50 px-1.5 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
               >
                 <Icon name="lock" className="h-3.5 w-3.5" />
               </span>
@@ -1721,7 +1723,7 @@ export default function SpreadsheetTool() {
                 data-testid="sheet-table-badge"
                 title={t('tools.sheet.tableBadge', { count: activeTables.length })}
                 aria-label={t('tools.sheet.tableBadge', { count: activeTables.length })}
-                className="inline-flex h-7 items-center rounded-md bg-sky-50 px-1.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950 dark:text-sky-300"
+                className="inline-flex h-6 items-center rounded bg-sky-50 px-1.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950 dark:text-sky-300"
               >
                 {activeTables.length}
               </span>
@@ -1730,13 +1732,13 @@ export default function SpreadsheetTool() {
               role="status"
               title={statusText}
               aria-label={statusText}
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
+              className={`inline-flex h-6 w-6 items-center justify-center rounded ${
                 draftSaved
                   ? 'text-green-600 dark:text-green-400'
                   : 'text-gray-400 dark:text-gray-500'
               }`}
             >
-              <Icon name={draftSaved ? 'check' : 'clock'} className="h-4 w-4" />
+              <Icon name={draftSaved ? 'check' : 'clock'} className="h-3.5 w-3.5" />
             </span>
             <button
               type="button"
@@ -1744,33 +1746,27 @@ export default function SpreadsheetTool() {
               disabled={summary.cells === 0 && !title.trim()}
               aria-label={t('common.clear')}
               title={t('common.clear')}
-              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+              className={`${STRIP_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
             >
-              <Icon name="trash" className="h-4 w-4" />
+              <Icon name="trash" className="h-3.5 w-3.5" />
             </button>
             <HintTip text={t('tools.sheet.unsupportedTip')} />
-          </>
-        }
-        center={
-          <input
-            type="text"
-            value={title}
-            aria-label={t('tools.sheet.docTitle')}
-            placeholder={t('tools.sheet.titlePlaceholder')}
-            onChange={(event) => setTitle(event.target.value)}
-            className={EDITOR_TITLE_INPUT_CLASS}
-          />
-        }
-        right={
-          <>
+            <input
+              type="text"
+              value={title}
+              aria-label={t('tools.sheet.docTitle')}
+              placeholder={t('tools.sheet.titlePlaceholder')}
+              onChange={(event) => setTitle(event.target.value)}
+              className={EDITOR_STRIP_TITLE_INPUT_CLASS}
+            />
             <button
               type="button"
               onClick={handleNew}
               aria-label={t('common.newDoc')}
               title={t('common.newDoc')}
-              className={EDITOR_ICON_BUTTON_CLASS}
+              className={STRIP_ICON_BUTTON_CLASS}
             >
-              <Icon name="sheet" className="h-4 w-4" />
+              <Icon name="sheet" className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
@@ -1778,19 +1774,12 @@ export default function SpreadsheetTool() {
               onClick={openPresent}
               aria-label={t('tools.sheet.present')}
               title={t('tools.sheet.present')}
-              className={EDITOR_ICON_BUTTON_CLASS}
+              className={STRIP_ICON_BUTTON_CLASS}
             >
-              <Icon name="present" className="h-4 w-4" />
+              <Icon name="present" className="h-3.5 w-3.5" />
             </button>
           </>
         }
-      />
-
-      <SpreadsheetRibbon
-        ctx={ribbonBase}
-        host={ribbonHost}
-        saved={draftSaved}
-        onCollapsedChange={setRibbonCollapsed}
       />
       <NumberFormatDialog
         open={numberFormatOpen}

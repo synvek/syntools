@@ -1,8 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import type { EditorMenu } from '../editorChrome';
 import type { RibbonAccent, RibbonGroup, RibbonMenuItem, RibbonTab } from './types';
 import { RIBBON_FLYOUT, RIBBON_PANEL, RIBBON_SHELL } from './ribbonTheme';
 import { RibbonGroupView } from './RibbonGroup';
+import { RibbonMenuBar } from './RibbonMenuBar';
 import { RibbonMenuButton } from './RibbonSplitButton';
 import { RibbonTabStrip } from './RibbonTabStrip';
 import { useGroupOverflow, useRibbonCollapse } from './useRibbonCollapse';
@@ -37,8 +39,14 @@ export interface RibbonProps {
   ariaLabel: string;
   tabs: RibbonTab[];
   accent?: RibbonAccent;
-  /** Quick access toolbar contents (save state, undo/redo, print…) */
+  /** File / edit / insert / view menus, shown as icon dropdowns left of the first tab */
+  menus?: EditorMenu[];
+  /** Accessible name of the menu group (e.g. "菜单栏") */
+  menuAriaLabel?: string;
+  /** Quick access toolbar contents (undo/redo, print…) right of the menus */
   quickAccess?: ReactNode;
+  /** Document chrome (save state, title, new, present…) between the tabs and the collapse toggle */
+  headerRight?: ReactNode;
   defaultTabId?: string;
   /** Controlled collapse; omit to let the ribbon decide from its own width */
   collapsed?: boolean;
@@ -66,7 +74,10 @@ export function Ribbon({
   ariaLabel,
   tabs,
   accent = 'blue',
+  menus,
+  menuAriaLabel = 'Menu',
   quickAccess,
+  headerRight,
   defaultTabId,
   collapsed: collapsedProp,
   onCollapsedChange,
@@ -149,7 +160,13 @@ export function Ribbon({
         activeId={activeTab?.id ?? ''}
         accent={accent}
         collapsed={collapsed}
+        menus={
+          menus && menus.length > 0 ? (
+            <RibbonMenuBar menus={menus} ariaLabel={menuAriaLabel} />
+          ) : null
+        }
         quickAccess={quickAccess}
+        headerRight={headerRight}
         collapseLabel={collapseLabel}
         expandLabel={expandLabel}
         onSelect={selectTab}

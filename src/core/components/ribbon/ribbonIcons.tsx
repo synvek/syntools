@@ -632,6 +632,13 @@ const officeIcons: Record<string, ReactNode> = {
       <path d="M7 18.5h10M9 21h6" />
     </>
   ),
+  /** Insert menu: a plus in a rounded frame */
+  insert: (
+    <>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+      <path d="M12 8.5v7M8.5 12h7" />
+    </>
+  ),
   /** Overflow marker: commands of groups that no longer fit inside the panel */
   more: (
     <>

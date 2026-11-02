@@ -1,6 +1,8 @@
 import { useRef } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Ribbon } from '@/core/components/ribbon/Ribbon';
+import type { EditorMenu } from '@/core/components/editorChrome';
 import { RIBBON_ICON_BUTTON } from '@/core/components/ribbon/ribbonTheme';
 import { RibbonIcon } from '@/core/components/ribbon/ribbonIcons';
 import {
@@ -58,11 +60,19 @@ export function SlideToolbar({
   onFailure,
   onOpenRightPanel,
   onPresent,
+  menus,
+  menuAriaLabel,
+  headerRight,
 }: {
   onFailure: (errorCode: string) => void;
   /** Reveals one of the right-hand panels (theme / template / comments / animation / notes) */
   onOpenRightPanel: (tab: SlideRightTab) => void;
   onPresent: () => void;
+  /** 文件 / 编辑 / 插入 / 视图 menus as icon dropdowns on the tab strip */
+  menus?: EditorMenu[];
+  menuAriaLabel?: string;
+  /** Save state, clear, title, new doc, present — right end of the tab strip */
+  headerRight?: ReactNode;
 }) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -307,7 +317,10 @@ export function SlideToolbar({
         ariaLabel={t('tools.slide.ribbonLabel')}
         accent="orange"
         tabs={tabs}
+        menus={menus}
+        menuAriaLabel={menuAriaLabel}
         quickAccess={quickAccess}
+        headerRight={headerRight}
         collapseLabel={t('tools.slide.ribbonCollapse')}
         expandLabel={t('tools.slide.ribbonExpand')}
         moreLabel={t('common.more')}

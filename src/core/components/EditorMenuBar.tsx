@@ -111,7 +111,14 @@ export function EditorMenuBar({
   );
 }
 
-function EditorMenuEntryView({ entry, onClose }: { entry: EditorMenuEntry; onClose: () => void }) {
+/** One row of a menu panel — also used by the ribbon's icon menus, so both share one look */
+export function EditorMenuEntryView({
+  entry,
+  onClose,
+}: {
+  entry: EditorMenuEntry;
+  onClose: () => void;
+}) {
   if (entry.type === 'separator') {
     return <div role="separator" className="my-1 h-px bg-gray-200 dark:bg-gray-700" />;
   }

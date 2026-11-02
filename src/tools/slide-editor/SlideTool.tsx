@@ -3,11 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { HintTip } from '@/core/components/DocumentHeader';
 import { Icon } from '@/core/components/Icon';
-import { EditorMenuBar } from '@/core/components/EditorMenuBar';
 import { EditorStatusBar } from '@/core/components/EditorStatusBar';
 import {
-  EDITOR_ICON_BUTTON_CLASS,
-  EDITOR_TITLE_INPUT_CLASS,
+  EDITOR_STRIP_TITLE_INPUT_CLASS,
+  STRIP_ICON_BUTTON_CLASS,
   editorMenuItem,
   estimateJsonBytes,
   formatBytes,
@@ -816,22 +815,22 @@ export default function SlideTool() {
 
   return (
     <div className="flex flex-col gap-3" data-tool-root>
-      <EditorMenuBar
+      <SlideToolbar
         menus={menus}
-        ariaLabel={t('common.menuBar')}
-        actions={
+        menuAriaLabel={t('common.menuBar')}
+        headerRight={
           <>
             <span
               role="status"
               title={statusText}
               aria-label={statusText}
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${
                 draftSaved
                   ? 'text-green-600 dark:text-green-400'
                   : 'text-gray-400 dark:text-gray-500'
               }`}
             >
-              <Icon name={draftSaved ? 'check' : 'clock'} className="h-4 w-4" />
+              <Icon name={draftSaved ? 'check' : 'clock'} className="h-3.5 w-3.5" />
             </span>
             <button
               type="button"
@@ -839,33 +838,27 @@ export default function SlideTool() {
               disabled={doc.slides.length === 0 && !doc.name.trim()}
               aria-label={t('common.clear')}
               title={t('common.clear')}
-              className={`${EDITOR_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+              className={`${STRIP_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
             >
-              <Icon name="trash" className="h-4 w-4" />
+              <Icon name="trash" className="h-3.5 w-3.5" />
             </button>
             <HintTip text={t('tools.slide.unsupportedTip')} />
-          </>
-        }
-        center={
-          <input
-            type="text"
-            value={doc.name}
-            aria-label={t('tools.slide.docTitle')}
-            placeholder={t('tools.slide.titlePlaceholder')}
-            onChange={(event) => setDocName(event.target.value)}
-            className={EDITOR_TITLE_INPUT_CLASS}
-          />
-        }
-        right={
-          <>
+            <input
+              type="text"
+              value={doc.name}
+              aria-label={t('tools.slide.docTitle')}
+              placeholder={t('tools.slide.titlePlaceholder')}
+              onChange={(event) => setDocName(event.target.value)}
+              className={EDITOR_STRIP_TITLE_INPUT_CLASS}
+            />
             <button
               type="button"
               onClick={handleNew}
               aria-label={t('tools.slide.newDoc')}
               title={t('tools.slide.newDoc')}
-              className={EDITOR_ICON_BUTTON_CLASS}
+              className={STRIP_ICON_BUTTON_CLASS}
             >
-              <Icon name="slides" className="h-4 w-4" />
+              <Icon name="slides" className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
@@ -873,15 +866,12 @@ export default function SlideTool() {
               data-testid="slide-present"
               aria-label={t('tools.slide.present')}
               title={t('tools.slide.present')}
-              className={EDITOR_ICON_BUTTON_CLASS}
+              className={STRIP_ICON_BUTTON_CLASS}
             >
-              <Icon name="present" className="h-4 w-4" />
+              <Icon name="present" className="h-3.5 w-3.5" />
             </button>
           </>
         }
-      />
-
-      <SlideToolbar
         onFailure={(error) => fail(error)}
         onOpenRightPanel={(tab) => {
           // The ribbon's 设计 / 动画 / 审阅 / 放映 tabs reveal the matching side panel
