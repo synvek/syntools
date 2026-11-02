@@ -56,6 +56,13 @@ export interface DocShapeAttrs {
   name: string | null;
 }
 
+/**
+ * SVG 命名空间。必须显式传给 ProseMirror：DOMOutputSpec 的标签写成 `"<ns> <tag>"` 时，
+ * 解析器会走 `createElementNS`，否则 `document.createElement('svg')` 得到的是 HTML 命名空间里的
+ * 未知元素 —— 属性 `viewBox` 被小写成 `viewbox`、浏览器不会按 SVG 绘制，结果就是"能选中但看不见"。
+ */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 export const DEFAULT_SHAPE_SIZE = { width: 170, height: 100 } as const;
 export const DEFAULT_SHAPE_FILL = '#4472C4';
 export const DEFAULT_SHAPE_STROKE = '#2F5597';
@@ -386,7 +393,7 @@ export const DocShape = Node.create({
       'div',
       mergeAttributes(HTMLAttributes, shapeDomAttributes(spec)),
       [
-        'svg',
+        `${SVG_NS} svg`,
         {
           class: 'rte-shape-svg',
           width: String(spec.width),
