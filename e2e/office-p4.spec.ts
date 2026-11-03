@@ -24,8 +24,9 @@ async function openEditor(page: Page): Promise<void> {
 }
 
 async function insertShape(page: Page, preset = 'roundRect'): Promise<void> {
-  await page.getByTestId('menubar-insert').click();
-  await page.getByRole('menu').getByRole('menuitem', { name: '插入形状' }).first().click();
+  // 形状 has a ribbon button on the 插入 tab; the ⋯ menu no longer repeats it
+  await page.getByRole('tab', { name: '插入', exact: true }).click();
+  await page.getByTestId('ribbon-illustrations-insertShape').click();
   await expect(page.getByTestId('sheet-shape-palette')).toBeVisible();
   await page.locator(`[data-shape-preset="${preset}"]`).click();
 
@@ -112,7 +113,7 @@ test('spreadsheet: shapes export as native xdr:sp anchors', async ({ page }) => 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     (async () => {
-      await page.getByTestId('menubar-file').click();
+      await page.getByTestId('menubar-more').click();
       await page
         .getByRole('menu')
         .getByRole('menuitem', { name: '导出 Excel (.xlsx)' })

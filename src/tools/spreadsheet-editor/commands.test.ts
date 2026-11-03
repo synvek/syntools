@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   SHEET_COMMANDS,
-  buildSheetMenus,
+  buildSheetMenu,
   buildSheetRibbonTabs,
   nextFontSize,
   resolveCommand,
@@ -109,16 +109,28 @@ const allItems = (tabs: RibbonTab[]): RibbonItem[] =>
   tabs.flatMap((tab) => tab.groups.flatMap((group) => group.items));
 
 describe('sheet command registry', () => {
-  it('feeds the menu bar with stable ids', () => {
-    const menus = buildSheetMenus(makeCtx());
-    expect(menus.map((menu) => menu.id)).toEqual(['file', 'edit', 'insert', 'view']);
-    const fileIds = menus[0]?.entries
+  it('feeds the ⋯ menu with only the commands the ribbon does not have', () => {
+    const menu = buildSheetMenu(makeCtx());
+    expect(menu.id).toBe('more');
+    const ids = menu.entries
       .filter(
         (entry): entry is Extract<typeof entry, { type?: 'item' }> => entry.type !== 'separator',
       )
       .map((entry) => entry.id);
-    expect(fileIds).toContain('newDoc');
-    expect(fileIds).toContain('exportXlsx');
+    expect(ids).toContain('newDoc');
+    expect(ids).toContain('exportXlsx');
+    // 工具库已有入口 / 快速访问已有撤销重做：菜单里不该再出现第二条路径
+    for (const duplicate of [
+      'bold',
+      'insertChart',
+      'print',
+      'versions',
+      'present',
+      'undo',
+      'redo',
+    ]) {
+      expect(ids).not.toContain(duplicate);
+    }
   });
 
   it('greys out export when the workbook has no cells or objects', () => {

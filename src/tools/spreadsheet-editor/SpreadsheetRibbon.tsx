@@ -15,8 +15,8 @@ export interface SpreadsheetRibbonProps {
   host: SheetRibbonHost | null;
 
   /** 文件 / 编辑 / 插入 / 视图 menus, rendered as icon dropdowns on the strip */
-  menus?: EditorMenu[];
-  menuAriaLabel?: string;
+  /** 工具库里没有的命令（新建 / 导入 / 导出 / 库 / 清空）收在一个 ⋯ 菜单里 */
+  menu?: EditorMenu;
   /** Save state, protection badges, clear, title, new doc, present */
   headerRight?: ReactNode;
   /** Feeds the viewport height calculation: the ribbon changes the space above the canvas */
@@ -33,8 +33,7 @@ export interface SpreadsheetRibbonProps {
 export function SpreadsheetRibbon({
   ctx,
   host,
-  menus,
-  menuAriaLabel,
+  menu,
   headerRight,
   onCollapsedChange,
 }: SpreadsheetRibbonProps) {
@@ -159,8 +158,7 @@ export function SpreadsheetRibbon({
       ariaLabel={t('tools.sheet.r.ribbonLabel')}
       tabs={tabs}
       accent="green"
-      menus={menus}
-      menuAriaLabel={menuAriaLabel}
+      menu={menu}
       quickAccess={quickAccess}
       headerRight={headerRight}
       collapseLabel={t('tools.sheet.r.collapse')}

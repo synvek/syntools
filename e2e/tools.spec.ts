@@ -103,7 +103,7 @@ test.describe('slide editor (zh-CN)', () => {
 
     const downloadPromise = page.waitForEvent('download');
     // Export moved into the "文件" menu: open the menu first, then pick the format
-    await page.getByTestId('menubar-file').click();
+    await page.getByTestId('menubar-more').click();
     await page.getByRole('menuitem', { name: '导出 PPTX', exact: true }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.pptx$/);
@@ -251,7 +251,7 @@ test.describe('slide editor (zh-CN)', () => {
     // 1 page initially
     await expect(page.locator('.slide-thumb')).toHaveCount(1);
 
-    await page.getByTestId('menubar-file').click();
+    await page.getByTestId('menubar-more').click();
     await page.getByRole('menuitem', { name: '从大纲生成', exact: true }).click();
     const editor = page.getByRole('textbox', { name: '从大纲生成' });
     await editor.fill('# 第一页\n- 要点\n# 第二页');
@@ -271,7 +271,7 @@ test.describe('slide editor (zh-CN)', () => {
       ['另存为工程', /\.sld$/],
     ] as const) {
       const downloadPromise = page.waitForEvent('download');
-      await page.getByTestId('menubar-file').click();
+      await page.getByTestId('menubar-more').click();
       await page.getByRole('menuitem', { name: item, exact: true }).click();
       const download = await downloadPromise;
       expect(download.suggestedFilename()).toMatch(pattern);

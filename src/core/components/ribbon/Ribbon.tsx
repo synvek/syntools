@@ -4,7 +4,7 @@ import type { EditorMenu } from '../editorChrome';
 import type { RibbonAccent, RibbonGroup, RibbonMenuItem, RibbonTab } from './types';
 import { RIBBON_FLYOUT, RIBBON_PANEL, RIBBON_SHELL } from './ribbonTheme';
 import { RibbonGroupView } from './RibbonGroup';
-import { RibbonMenuBar } from './RibbonMenuBar';
+import { RibbonMoreMenu } from './RibbonMoreMenu';
 import { RibbonMenuButton } from './RibbonSplitButton';
 import { RibbonTabStrip } from './RibbonTabStrip';
 import { useGroupOverflow, useRibbonCollapse } from './useRibbonCollapse';
@@ -39,10 +39,11 @@ export interface RibbonProps {
   ariaLabel: string;
   tabs: RibbonTab[];
   accent?: RibbonAccent;
-  /** File / edit / insert / view menus, shown as icon dropdowns left of the first tab */
-  menus?: EditorMenu[];
-  /** Accessible name of the menu group (e.g. "菜单栏") */
-  menuAriaLabel?: string;
+  /**
+   * Commands with no ribbon counterpart (import / export / print …), reached through one ⋯ dropdown
+   * left of the first tab. Everything the ribbon already exposes belongs on a tab, not in here.
+   */
+  menu?: EditorMenu;
   /** Quick access toolbar contents (undo/redo, print…) right of the menus */
   quickAccess?: ReactNode;
   /** Document chrome (save state, title, new, present…) between the tabs and the collapse toggle */
@@ -80,8 +81,7 @@ export function Ribbon({
   ariaLabel,
   tabs,
   accent = 'blue',
-  menus,
-  menuAriaLabel = 'Menu',
+  menu,
   quickAccess,
   headerRight,
   defaultTabId,
@@ -170,11 +170,7 @@ export function Ribbon({
         activeId={activeTab?.id ?? ''}
         accent={accent}
         collapsed={collapsed}
-        menus={
-          menus && menus.length > 0 ? (
-            <RibbonMenuBar menus={menus} ariaLabel={menuAriaLabel} />
-          ) : null
-        }
+        menu={menu ? <RibbonMoreMenu menu={menu} /> : null}
         quickAccess={quickAccess}
         headerRight={headerRight}
         collapseLabel={collapseLabel}

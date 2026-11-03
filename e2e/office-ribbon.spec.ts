@@ -242,16 +242,25 @@ test.describe('spreadsheet ribbon', () => {
     await expect(page.getByRole('tabpanel')).toBeVisible();
   });
 
-  test('keeps the menu bar above the ribbon and shares its commands', async ({ page }) => {
+  test('keeps one ⋯ menu holding only the commands the ribbon does not have', async ({ page }) => {
     await openSheet(page);
-    await page.getByTestId('menubar-edit').click();
-    const menu = page.getByRole('menu');
-    await expect(menu.getByRole('menuitem', { name: '撤销' })).toBeVisible();
-    await expect(menu.getByRole('menuitem', { name: '重做' })).toBeVisible();
-    await page.keyboard.press('Escape');
 
-    // The insert menu entries come from the same command table as the ribbon
-    await page.getByTestId('menubar-insert').click();
-    await expect(page.getByRole('menu').getByRole('menuitem', { name: '插入图表' })).toBeVisible();
+    // One trigger, three dots, no per-menu buttons left over from the old menu bar
+    await expect(page.getByTestId('menubar-more')).toBeVisible();
+    await expect(page.getByTestId('menubar-file')).toHaveCount(0);
+    await expect(page.getByTestId('menubar-edit')).toHaveCount(0);
+    await expect(page.getByTestId('menubar-insert')).toHaveCount(0);
+
+    await page.getByTestId('menubar-more').click();
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem', { name: '新建' })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: '导出 Excel (.xlsx)' })).toBeVisible();
+
+    // …and the duplicates are gone: undo/redo, insert chart and print all live on the ribbon
+    await expect(menu.getByRole('menuitem', { name: '撤销' })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: '插入图表' })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: '打印' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
   });
 });

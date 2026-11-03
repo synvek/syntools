@@ -60,17 +60,15 @@ export function SlideToolbar({
   onFailure,
   onOpenRightPanel,
   onPresent,
-  menus,
-  menuAriaLabel,
+  menu,
   headerRight,
 }: {
   onFailure: (errorCode: string) => void;
   /** Reveals one of the right-hand panels (theme / template / comments / animation / notes) */
   onOpenRightPanel: (tab: SlideRightTab) => void;
   onPresent: () => void;
-  /** 文件 / 编辑 / 插入 / 视图 menus as icon dropdowns on the tab strip */
-  menus?: EditorMenu[];
-  menuAriaLabel?: string;
+  /** 工具库里没有的命令（新建 / 导入 / 导出 / 打印 / 清空…）收在一个 ⋯ 菜单里 */
+  menu?: EditorMenu;
   /** Save state, clear, title, new doc, present — right end of the tab strip */
   headerRight?: ReactNode;
 }) {
@@ -317,8 +315,7 @@ export function SlideToolbar({
         ariaLabel={t('tools.slide.ribbonLabel')}
         accent="orange"
         tabs={tabs}
-        menus={menus}
-        menuAriaLabel={menuAriaLabel}
+        menu={menu}
         quickAccess={quickAccess}
         headerRight={headerRight}
         collapseLabel={t('tools.slide.ribbonCollapse')}

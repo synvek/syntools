@@ -811,10 +811,12 @@ export function resolveCommand(ctx: SheetCommandContext, id: SheetCommandId) {
 /* ---------------------------------- menus --------------------------------- */
 
 /**
- * The menu bar kept from the previous design. Entries are resolved from the same command table, so
- * labels, disabled rules and behaviour match the ribbon exactly.
+ * The editor's single ⋯ menu: only commands with **no ribbon counterpart** (import / export / the
+ * document library / clear). Everything else lives on the seven tabs, and the quick access bar already
+ * owns undo / redo — listing those again here would give every command two paths and two places to keep
+ * in sync, which is exactly what merging the menu bar into the ribbon was meant to remove.
  */
-export function buildSheetMenus(ctx: SheetCommandContext): EditorMenu[] {
+export function buildSheetMenu(ctx: SheetCommandContext): EditorMenu {
   const entry = (id: SheetCommandId, options: { shortcut?: string; danger?: boolean } = {}) => {
     const command = resolveCommand(ctx, id);
     return editorMenuItem(command.id, command.label, command.run, {
@@ -822,88 +824,23 @@ export function buildSheetMenus(ctx: SheetCommandContext): EditorMenu[] {
       disabled: command.disabled,
     });
   };
-  const protectLabel = ctx.protectedSheet
-    ? ctx.t('tools.sheet.protectMenuOff')
-    : ctx.t('tools.sheet.protectMenuOn');
 
-  return [
-    {
-      id: 'file',
-      label: ctx.t('common.menuFile'),
-      entries: [
-        entry('newDoc', { shortcut: '⌘N' }),
-        entry('importXlsx'),
-        entry('importCsv'),
-        { type: 'separator' },
-        entry('exportXlsx'),
-        entry('exportCsv'),
-        entry('print'),
-        { type: 'separator' },
-        entry('library'),
-        entry('versions'),
-        { type: 'separator' },
-        entry('clearDoc', { danger: true }),
-      ],
-    },
-    {
-      id: 'edit',
-      label: ctx.t('common.menuEdit'),
-      entries: [
-        entry('undo', { shortcut: '⌘Z' }),
-        entry('redo', { shortcut: '⇧⌘Z' }),
-        { type: 'separator' },
-        entry('cut', { shortcut: '⌘X' }),
-        entry('copy', { shortcut: '⌘C' }),
-        entry('paste', { shortcut: '⌘V' }),
-        { type: 'separator' },
-        entry('clearContent'),
-        entry('clearFormat'),
-        entry('autoSum'),
-        entry('sortAsc'),
-        entry('sortDesc'),
-        { type: 'separator' },
-        entry('find', { shortcut: '⌘F' }),
-      ],
-    },
-    {
-      id: 'insert',
-      label: ctx.t('common.menuInsert'),
-      entries: [
-        entry('insertChart'),
-        entry('insertShape'),
-        entry('insertImage'),
-        entry('insertPivot'),
-        entry('openNames'),
-        entry('hyperlink'),
-        { type: 'separator' },
-        entry('insertTable'),
-        entry('deleteTable'),
-        { type: 'separator' },
-        entry('addSheet'),
-        entry('duplicateSheet'),
-        entry('renameSheet'),
-        entry('deleteSheet', { danger: true }),
-      ],
-    },
-    {
-      id: 'view',
-      label: ctx.t('common.menuView'),
-      entries: [
-        entry('comment'),
-        editorMenuItem('view-protect', protectLabel, ctx.actions.openProtect, {
-          disabled: ctx.busy || !ctx.hasActiveSheet,
-        }),
-        { type: 'separator' },
-        entry('conditionalFormatting'),
-        entry('dataValidation'),
-        { type: 'separator' },
-        entry('freezeTopRow'),
-        entry('toggleGridlines'),
-        { type: 'separator' },
-        entry('present'),
-      ],
-    },
-  ];
+  return {
+    id: 'more',
+    label: ctx.t('common.more'),
+    entries: [
+      entry('newDoc', { shortcut: '⌘N' }),
+      entry('importXlsx'),
+      entry('importCsv'),
+      { type: 'separator' },
+      entry('exportXlsx'),
+      entry('exportCsv'),
+      { type: 'separator' },
+      entry('library'),
+      { type: 'separator' },
+      entry('clearDoc', { danger: true }),
+    ],
+  };
 }
 
 /* --------------------------------- ribbon --------------------------------- */
@@ -1210,7 +1147,13 @@ export function buildSheetRibbonTabs(ctx: SheetCommandContext): RibbonTab[] {
         {
           id: 'tables',
           label: ctx.t('tools.sheet.grp.tables'),
-          items: [asItem('pivotTable', 'large'), asItem('insertTable', 'large')],
+          // 删除表格 used to be reachable only from the old insert menu; with the menu reduced to the
+          // file-level leftovers it belongs next to 插入表格.
+          items: [
+            asItem('pivotTable', 'large'),
+            asItem('insertTable', 'large'),
+            asItem('deleteTable', 'large'),
+          ],
         },
         {
           id: 'illustrations',

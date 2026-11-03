@@ -75,7 +75,7 @@ import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
 import { SpreadsheetRibbon, type RibbonBaseContext } from './SpreadsheetRibbon';
-import { buildSheetMenus, type SheetActions } from './commands';
+import { buildSheetMenu, type SheetActions } from './commands';
 import { parseClipboardMatrix } from './sheetFormat';
 import { NumberFormatDialog } from './ui/NumberFormatDialog';
 import {
@@ -1604,8 +1604,8 @@ export default function SpreadsheetTool() {
   const canExportXlsx = summary.cells > 0 || shapes.length > 0 || charts.length > 0;
 
   /**
-   * One command registry feeds both chromes: `commands.ts` is projected onto the kept menu bar
-   * (文件/编辑/插入/视图) **and** the ribbon, so the two can never disagree.
+   * One command registry feeds both surfaces: `commands.ts` is projected onto the ribbon **and** onto the
+   * ⋯ menu (which only carries the commands the ribbon has no button for), so the two cannot disagree.
    */
   const sheetActions: SheetActions = {
     newDoc: handleNew,
@@ -1683,7 +1683,7 @@ export default function SpreadsheetTool() {
     hasDocId: Boolean(docId),
     hasTitle: Boolean(title.trim()),
   };
-  const menus = buildSheetMenus({ ...ribbonBase, host: ribbonHost, format: null });
+  const menu = buildSheetMenu({ ...ribbonBase, host: ribbonHost, format: null });
 
   const statusText = draftSaved ? t('common.saved') : t('common.saving');
   const memory = useMemo(() => {
@@ -1701,8 +1701,7 @@ export default function SpreadsheetTool() {
       <SpreadsheetRibbon
         ctx={ribbonBase}
         host={ribbonHost}
-        menus={menus}
-        menuAriaLabel={t('common.menuBar')}
+        menu={menu}
         onCollapsedChange={setRibbonCollapsed}
         headerRight={
           <>

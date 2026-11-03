@@ -18,9 +18,10 @@ async function openEditor(page: Page): Promise<void> {
   await expect(page.locator('.tiptap')).toBeVisible();
 }
 
-async function pickMenu(page: Page, menuId: string, label: string): Promise<void> {
-  await page.getByTestId(`menubar-${menuId}`).click();
-  // Scope to the open dropdown: top-level menu buttons are `menuitem`s too
+/** The ⋯ dropdown holds only the commands the ribbon has no button for (import / export / …) */
+async function pickMoreMenu(page: Page, label: string): Promise<void> {
+  await page.getByTestId('menubar-more').click();
+  // Scope to the open dropdown: other surfaces on the page can hold an entry with the same label
   await page.getByRole('menu').getByRole('menuitem', { name: label }).first().click();
 }
 
@@ -70,7 +71,7 @@ test('rich text: inserted shape renders as SVG and exports as a native wps:wsp',
   // 5) Export: the placeholder paragraph must be gone, the drawing present
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    pickMenu(page, 'file', '导出 Word (.docx)'),
+    pickMoreMenu(page, '导出 Word (.docx)'),
   ]);
   const target = test.info().outputPath('shape.docx');
   await download.saveAs(target);

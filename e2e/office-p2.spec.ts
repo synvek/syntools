@@ -18,8 +18,10 @@ test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
 async function openRichText(page: Page): Promise<void> {
   await page.goto('/tools/rich-text-editor');
   await expect(page.locator('.tiptap')).toBeVisible();
-  // Pagination (and the per-page sheets) only exists in page view; the default is flow view
-  await pickMenu(page, 'view', '页面视图');
+  // Pagination (and the per-page sheets) only exists in page view; the default is flow view.
+  // The view mode is the 视图 tab's select — the menu bar no longer duplicates it.
+  await page.getByRole('tab', { name: '视图', exact: true }).click();
+  await page.getByLabel('视图模式').selectOption('paged');
   await expect(page.locator('.rte-page-sheet').first()).toBeVisible();
 }
 
@@ -67,15 +69,36 @@ async function pastePlainText(page: Page, text: string, atEnd = false): Promise<
 async function insertSectionBreakAtEnd(page: Page): Promise<void> {
   await page.locator('.tiptap p').last().click();
   await page.keyboard.press('ControlOrMeta+End');
-  await pickMenu(page, 'insert', '插入分节符');
+  await pickMoreMenu(page, '插入分节符');
   await waitForStableLayout(page);
 }
 
-async function pickMenu(page: Page, menuId: string, label: string): Promise<void> {
-  await page.getByTestId(`menubar-${menuId}`).click();
-  // Scope to the open dropdown: top-level menu buttons are `menuitem`s too, and other menus on the
-  // page can contain a disabled entry with the same label
+/**
+ * The ⋯ dropdown now carries only what the ribbon has no button for (import / export / insert section
+ * break). Formatting, page setup, page breaks and the view mode all live on a tab.
+ */
+async function pickMoreMenu(page: Page, label: string): Promise<void> {
+  await page.getByTestId('menubar-more').click();
+  // Scope to the open dropdown: other surfaces on the page can hold an entry with the same label
   await page.getByRole('menu').getByRole('menuitem', { name: label }).first().click();
+}
+
+/** 页面设置 is the layout tab's group launcher … */
+async function openPageSetup(page: Page): Promise<void> {
+  await page.getByRole('tab', { name: '页面布局', exact: true }).click();
+  await page.getByRole('button', { name: '页面设置', exact: true }).click();
+}
+
+/** … and 插入分页符 sits in the insert tab; both used to be menu entries only */
+async function insertPageBreak(page: Page): Promise<void> {
+  await page.getByRole('tab', { name: '插入', exact: true }).click();
+  await page.getByRole('button', { name: '插入分页符', exact: true }).click();
+}
+
+/** Sheet: 数据透视表 lives in the insert tab (was a menu entry) */
+async function insertPivotTable(page: Page): Promise<void> {
+  await page.getByRole('tab', { name: '插入', exact: true }).click();
+  await page.getByRole('button', { name: '数据透视表', exact: true }).click();
 }
 
 async function readDocumentXml(path: string): Promise<string> {
@@ -123,7 +146,7 @@ test('rich text: 50-page three-section document exports three w:sectPr', async (
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    pickMenu(page, 'file', '导出 Word'),
+    pickMoreMenu(page, '导出 Word'),
   ]);
   const target = test.info().outputPath('sections.docx');
   await download.saveAs(target);
@@ -157,7 +180,7 @@ test('rich text: page count matches between page view and snapshot PDF', async (
 
   // Caret into the second section, then give that section its own paper/orientation
   await page.locator('.tiptap p').nth(250).click();
-  await pickMenu(page, 'view', '页面设置');
+  await openPageSetup(page);
   const panel = page.getByTestId('rich-text-page-setup');
   await expect(panel).toBeVisible();
   // The panel edits the section under the caret — assert it, otherwise the whole case proves nothing
@@ -188,7 +211,7 @@ test('rich text: page count matches between page view and snapshot PDF', async (
   // The export entries are disabled while the document snapshot is still empty; the editor syncs it on a
   // 600ms debounce, so wait for that before opening the menu
   await page.waitForTimeout(1200);
-  await pickMenu(page, 'file', '导出 PDF');
+  await pickMoreMenu(page, '导出 PDF');
   const dialog = page.getByTestId('rich-text-pdf-dialog');
   await expect(dialog).toBeVisible();
   await dialog.getByRole('radio', { name: '截图版' }).click();
@@ -211,7 +234,7 @@ test('rich text: page break lands after the current block and keeps the caret af
 
   // Insert in the middle of a paragraph: the break must follow the whole block, not split it
   await page.locator('.tiptap p', { hasText: '乙' }).first().click();
-  await pickMenu(page, 'insert', '插入分页符');
+  await insertPageBreak(page);
   await waitForStableLayout(page);
 
   const afterInsert = await page.evaluate(() => {
@@ -236,7 +259,7 @@ test('rich text: page break lands after the current block and keeps the caret af
   // Insert at the very end: the document must not end on the atom, and typing continues after the break
   await page.locator('.tiptap p', { hasText: '丙' }).first().click();
   await page.keyboard.press('ControlOrMeta+End');
-  await pickMenu(page, 'insert', '插入分页符');
+  await insertPageBreak(page);
   await waitForStableLayout(page);
   await page.keyboard.type('丁');
   await expect(page.locator('.tiptap p', { hasText: '丁' }).first()).toBeVisible();
@@ -302,7 +325,7 @@ test('rich text: compare with a .docx file turns the differences into reviewable
   // 1) The exported .docx is the "other version": export first, edit afterwards
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    pickMenu(page, 'file', '导出 Word (.docx)'),
+    pickMoreMenu(page, '导出 Word (.docx)'),
   ]);
   // Save under a real .docx name: the import validates the extension, and the download's temp path has none
   const baseline = join(test.info().outputDir, 'baseline.docx');
@@ -380,13 +403,13 @@ test('rich text: tracked changes survive a .docx round trip through import', asy
   // 2) Export (w:ins + trackRevisions), then import the same file back
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    pickMenu(page, 'file', '导出 Word (.docx)'),
+    pickMoreMenu(page, '导出 Word (.docx)'),
   ]);
   const file = join(test.info().outputDir, 'tracked.docx');
   await download.saveAs(file);
 
   const chooser = page.waitForEvent('filechooser');
-  await pickMenu(page, 'file', '导入 Word (.docx)');
+  await pickMoreMenu(page, '导入 Word (.docx)');
   await (await chooser).setFiles(file);
 
   // 3) The revision comes back as an editable revision, not as plain text
@@ -426,13 +449,13 @@ test('rich text: comments survive a .docx round trip through import', async ({ p
   // 2) Export, then import the same file back
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    pickMenu(page, 'file', '导出 Word (.docx)'),
+    pickMoreMenu(page, '导出 Word (.docx)'),
   ]);
   const file = join(test.info().outputDir, 'commented.docx');
   await download.saveAs(file);
 
   const chooser = page.waitForEvent('filechooser');
-  await pickMenu(page, 'file', '导入 Word (.docx)');
+  await pickMoreMenu(page, '导入 Word (.docx)');
   await (await chooser).setFiles(file);
 
   // 3) The comment (record + anchor) comes back, with a namespaced id that cannot collide with editor ids
@@ -457,12 +480,12 @@ test('spreadsheet: pivot table aggregates a range and exports as static values',
   await mkdir(test.info().outputDir, { recursive: true });
   await writeFile(csv, '区域,季度,金额\n华东,Q1,100\n华东,Q2,50\n华南,Q1,30\n华南,Q2,20', 'utf8');
   const chooser = page.waitForEvent('filechooser');
-  await pickMenu(page, 'file', '导入 CSV (.csv)');
+  await pickMoreMenu(page, '导入 CSV (.csv)');
   await (await chooser).setFiles(csv);
   await expect(page.locator('.sheet-canvas')).toBeVisible();
 
   // 2) Single-cell selection falls back to the used range, so the panel opens with a real cross table
-  await pickMenu(page, 'insert', '插入透视表');
+  await insertPivotTable(page);
   const panel = page.getByTestId('sheet-pivot');
   await expect(panel).toBeVisible();
   const table = panel.getByRole('table');
@@ -537,11 +560,11 @@ test('spreadsheet: pivot printing paginates wide headers instead of clipping the
   await writeFile(csv, lines.join('\n'), 'utf8');
 
   const chooser = page.waitForEvent('filechooser');
-  await pickMenu(page, 'file', '导入 CSV (.csv)');
+  await pickMoreMenu(page, '导入 CSV (.csv)');
   await (await chooser).setFiles(csv);
   await expect(page.locator('.sheet-canvas')).toBeVisible();
 
-  await pickMenu(page, 'insert', '插入透视表');
+  await insertPivotTable(page);
   const panel = page.getByTestId('sheet-pivot');
   await expect(panel).toBeVisible();
 

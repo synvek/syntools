@@ -1295,7 +1295,7 @@ export default function RichTextEditorTool() {
     setDraftNotice(null);
   };
 
-  /** Menu image insert: same behaviour as the toolbar picker (read as data URL, then setImage) */
+  /** Image insert shared by the toolbar picker and the paste / drop path (data URL, then setImage) */
   const handleMenuImage = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -1304,16 +1304,6 @@ export default function RichTextEditorTool() {
       }
     };
     reader.readAsDataURL(file);
-  };
-
-  /** Menu link insert: prompt for the URL; an empty value removes the link (same rule as the toolbar) */
-  const handleMenuLink = () => {
-    if (!editor) return;
-    const href = window.prompt(t('tools.richText.linkPrompt'), 'https://');
-    if (href === null) return;
-    const chain = editor.chain().focus().extendMarkRange('link');
-    if (href.trim()) chain.setLink({ href: href.trim() }).run();
-    else chain.unsetLink().run();
   };
 
   const handleNew = () => {
@@ -1521,300 +1511,62 @@ export default function RichTextEditorTool() {
     );
   };
 
-  const menus: EditorMenu[] = [
-    {
-      id: 'file',
-      label: t('common.menuFile'),
-      entries: [
-        editorMenuItem('file-new', t('common.newDoc'), handleNew, { shortcut: '⌘N' }),
-        editorMenuItem('file-import', t('tools.richText.importDocx'), () =>
-          importInputRef.current?.click(),
-        ),
-        { type: 'separator' },
-        editorMenuItem(
-          'file-export-docx',
-          t('tools.richText.exportDocx'),
-          () => void handleExportDocx(),
-          { disabled: isEmpty },
-        ),
-        editorMenuItem(
-          'file-export-pdf',
-          t('tools.richText.exportPdf'),
-          () => setPdfDialogOpen(true),
-          { disabled: isEmpty },
-        ),
-        editorMenuItem(
-          'file-export-markdown',
-          t('tools.richText.exportMarkdown'),
-          () => void handleExportMarkdown(),
-          { disabled: isEmpty },
-        ),
-        editorMenuItem(
-          'file-export-html',
-          t('tools.richText.exportHtml'),
-          () => void handleExportHtml(),
-          { disabled: isEmpty },
-        ),
-        { type: 'separator' },
-        editorMenuItem('file-library', t('tools.richText.library'), openLibrary),
-        { type: 'separator' },
-        editorMenuItem('file-clear', t('common.clear'), handleClear, {
-          danger: true,
-          disabled: isEmpty && !title,
-        }),
-      ],
-    },
-    {
-      id: 'edit',
-      label: t('common.menuEdit'),
-      entries: [
-        editorMenuItem(
-          'edit-undo',
-          t('tools.richText.undo'),
-          () => editor?.chain().focus().undo().run(),
-          { shortcut: '⌘Z', disabled: !editor?.can().undo() },
-        ),
-        editorMenuItem(
-          'edit-redo',
-          t('tools.richText.redo'),
-          () => editor?.chain().focus().redo().run(),
-          { shortcut: '⇧⌘Z', disabled: !editor?.can().redo() },
-        ),
-        { type: 'separator' },
-        editorMenuItem(
-          'edit-select-all',
-          t('tools.richText.selectAll'),
-          () => editor?.chain().focus().selectAll().run(),
-          { shortcut: '⌘A', disabled: !editor },
-        ),
-        editorMenuItem('edit-find', t('tools.richText.findReplace'), () => setFindOpen(true), {
-          shortcut: '⌘F',
-        }),
-      ],
-    },
-    {
-      id: 'insert',
-      label: t('common.menuInsert'),
-      entries: [
-        editorMenuItem('insert-image', t('tools.richText.image'), () =>
-          imageInputRef.current?.click(),
-        ),
-        editorMenuItem('insert-table', t('tools.richText.table'), () =>
-          editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-        ),
-        editorMenuItem('insert-link', t('tools.richText.link'), handleMenuLink, {
-          disabled: !editor,
-        }),
-        editorMenuItem('insert-divider', t('tools.richText.divider'), () =>
-          editor?.chain().focus().setHorizontalRule().run(),
-        ),
-        editorMenuItem('insert-page-break', t('tools.richText.pageBreak'), () =>
-          editor?.chain().focus().setPageBreak().run(),
-        ),
-        editorMenuItem('insert-section-break', t('tools.richText.sectionBreak'), () =>
-          editor?.chain().focus().setSectionBreak({ startType: 'nextPage', pageSetup }).run(),
-        ),
-        { type: 'separator' },
-        editorMenuItem('insert-toc', t('tools.richText.insertToc'), handleInsertToc, {
-          disabled: isEmpty,
-        }),
-        editorMenuItem(
-          'insert-footnote',
-          t('tools.richText.footnoteInsert'),
-          () => handleNoteAction('footnote'),
-          {
-            disabled: !editor,
-          },
-        ),
-        editorMenuItem(
-          'insert-endnote',
-          t('tools.richText.endnoteInsert'),
-          () => handleNoteAction('endnote'),
-          {
-            disabled: !editor,
-          },
-        ),
-        editorMenuItem('insert-math', t('tools.richText.mathInsert'), handleMathAction, {
-          disabled: !editor,
-        }),
-      ],
-    },
-    {
-      id: 'format',
-      label: t('tools.richText.format'),
-      entries: [
-        editorMenuItem(
-          'format-bold',
-          `${t('tools.richText.bold')}${editor?.isActive('bold') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleBold().run(),
-          { shortcut: '⌘B', disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-italic',
-          `${t('tools.richText.italic')}${editor?.isActive('italic') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleItalic().run(),
-          { shortcut: '⌘I', disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-underline',
-          `${t('tools.richText.underline')}${editor?.isActive('underline') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleUnderline().run(),
-          { shortcut: '⌘U', disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-strike',
-          `${t('tools.richText.strike')}${editor?.isActive('strike') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleStrike().run(),
-          { disabled: !editor },
-        ),
-        { type: 'separator' },
-        editorMenuItem(
-          'format-paragraph',
-          `${t('tools.richText.paragraph')}${editor?.isActive('paragraph') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().setParagraph().run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-h1',
-          `${t('tools.richText.h1')}${editor?.isActive('heading', { level: 1 }) ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-h2',
-          `${t('tools.richText.h2')}${editor?.isActive('heading', { level: 2 }) ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-h3',
-          `${t('tools.richText.h3')}${editor?.isActive('heading', { level: 3 }) ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleHeading({ level: 3 }).run(),
-          { disabled: !editor },
-        ),
-        { type: 'separator' },
-        editorMenuItem(
-          'format-bullet-list',
-          `${t('tools.richText.bulletList')}${editor?.isActive('bulletList') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleBulletList().run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-ordered-list',
-          `${t('tools.richText.orderedList')}${editor?.isActive('orderedList') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleOrderedList().run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-quote',
-          `${t('tools.richText.quote')}${editor?.isActive('blockquote') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleBlockquote().run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-code-block',
-          `${t('tools.richText.codeBlock')}${editor?.isActive('codeBlock') ? ' ✓' : ''}`,
-          () => editor?.chain().focus().toggleCodeBlock().run(),
-          { disabled: !editor },
-        ),
-        { type: 'separator' },
-        editorMenuItem(
-          'format-align-left',
-          `${t('tools.richText.alignLeft')}${editor?.isActive({ textAlign: 'left' }) ? ' ✓' : ''}`,
-          () => editor?.chain().focus().setTextAlign('left').run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-align-center',
-          `${t('tools.richText.alignCenter')}${editor?.isActive({ textAlign: 'center' }) ? ' ✓' : ''}`,
-          () => editor?.chain().focus().setTextAlign('center').run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-align-right',
-          `${t('tools.richText.alignRight')}${editor?.isActive({ textAlign: 'right' }) ? ' ✓' : ''}`,
-          () => editor?.chain().focus().setTextAlign('right').run(),
-          { disabled: !editor },
-        ),
-        editorMenuItem(
-          'format-align-justify',
-          `${t('tools.richText.alignJustify')}${editor?.isActive({ textAlign: 'justify' }) ? ' ✓' : ''}`,
-          () => editor?.chain().focus().setTextAlign('justify').run(),
-          { disabled: !editor },
-        ),
-        { type: 'separator' },
-        editorMenuItem(
-          'format-clear',
-          t('tools.richText.clearFormat'),
-          () => editor?.chain().focus().unsetAllMarks().clearNodes().run(),
-          { disabled: !editor },
-        ),
-      ],
-    },
-    {
-      id: 'view',
-      label: t('common.menuView'),
-      entries: [
-        editorMenuItem(
-          'view-outline',
-          `${t('tools.richText.outline')}${outlineOpen ? ' ✓' : ''}`,
-          () => setOutlineOpen((open) => !open),
-        ),
-        editorMenuItem(
-          'view-styles',
-          `${t('tools.richText.styles')}${stylesOpen ? ' ✓' : ''}`,
-          () => togglePanel('styles'),
-        ),
-        editorMenuItem(
-          'view-templates',
-          `${t('tools.richText.templates')}${templatesOpen ? ' ✓' : ''}`,
-          () => togglePanel('templates'),
-        ),
-        editorMenuItem(
-          'view-review',
-          `${t('tools.richText.review')}${reviewOpen ? ' ✓' : ''}`,
-          () => togglePanel('review'),
-        ),
-        editorMenuItem(
-          'view-spellcheck',
-          `${t('tools.richText.spellcheck')}${spellcheckOpen ? ' ✓' : ''}`,
-          () => togglePanel('spellcheck'),
-        ),
-        { type: 'separator' },
-        editorMenuItem(
-          'view-page-setup',
-          `${t('tools.richText.pageSetup')}${pageSetupOpen ? ' ✓' : ''}`,
-          () => togglePanel('pageSetup'),
-        ),
-        editorMenuItem('view-ruler', `${t('tools.richText.ruler')}${rulerOpen ? ' ✓' : ''}`, () =>
-          setRulerOpen((open) => !open),
-        ),
-        { type: 'separator' },
-        editorMenuItem(
-          'view-flow',
-          `${t('tools.richText.viewFlow')}${viewMode === 'flow' ? ' ✓' : ''}`,
-          () => setViewMode('flow'),
-        ),
-        editorMenuItem(
-          'view-paged',
-          `${t('tools.richText.viewPaged')}${viewMode === 'paged' ? ' ✓' : ''}`,
-          () => setViewMode('paged'),
-        ),
-        { type: 'separator' },
-        editorMenuItem('view-present', t('tools.richText.present'), () => setPresenting(true), {
-          disabled: isEmpty,
-        }),
-        { type: 'separator' },
-        ...[0.5, 0.75, 1, 1.25, 1.5, 2].map((level) =>
-          editorMenuItem(
-            `view-zoom-${Math.round(level * 100)}`,
-            `${t('tools.richText.zoom')} ${Math.round(level * 100)}%${zoom === level ? ' ✓' : ''}`,
-            () => setZoom(level),
-          ),
-        ),
-      ],
-    },
-  ];
+  /**
+   * 只放"工具库里没有"的命令：新建 / 导入 / 导出 / 文档库 / 清空，外加 ribbon 没有入口的三项
+   * （插入分节符、全选）。格式、插入、页面布局、引用、审阅、视图都在六个标签页上，撤销重做在快速访问栏，
+   * 菜单里再列一遍只会出现两条路径、两处要同步。
+   */
+  const menu: EditorMenu = {
+    id: 'more',
+    label: t('common.more'),
+    entries: [
+      editorMenuItem('file-import', t('tools.richText.importDocx'), () =>
+        importInputRef.current?.click(),
+      ),
+      { type: 'separator' },
+      editorMenuItem(
+        'file-export-docx',
+        t('tools.richText.exportDocx'),
+        () => void handleExportDocx(),
+        { disabled: isEmpty },
+      ),
+      editorMenuItem(
+        'file-export-pdf',
+        t('tools.richText.exportPdf'),
+        () => setPdfDialogOpen(true),
+        { disabled: isEmpty },
+      ),
+      editorMenuItem(
+        'file-export-markdown',
+        t('tools.richText.exportMarkdown'),
+        () => void handleExportMarkdown(),
+        { disabled: isEmpty },
+      ),
+      editorMenuItem(
+        'file-export-html',
+        t('tools.richText.exportHtml'),
+        () => void handleExportHtml(),
+        { disabled: isEmpty },
+      ),
+      { type: 'separator' },
+      editorMenuItem('file-library', t('tools.richText.library'), openLibrary),
+      { type: 'separator' },
+      editorMenuItem('insert-section-break', t('tools.richText.sectionBreak'), () =>
+        editor?.chain().focus().setSectionBreak({ startType: 'nextPage', pageSetup }).run(),
+      ),
+      editorMenuItem(
+        'edit-select-all',
+        t('tools.richText.selectAll'),
+        () => editor?.chain().focus().selectAll().run(),
+        { shortcut: '⌘A', disabled: !editor },
+      ),
+      { type: 'separator' },
+      editorMenuItem('file-clear', t('common.clear'), handleClear, {
+        danger: true,
+        disabled: isEmpty && !title,
+      }),
+    ],
+  };
 
   const statusText = saved ? t('tools.richText.saved') : t('tools.richText.saving');
   const memory = useMemo(() => formatBytes(estimateJsonBytes(snapshotHtml)), [snapshotHtml]);
@@ -1823,8 +1575,7 @@ export default function RichTextEditorTool() {
     <div className="flex flex-col gap-4" data-tool-root>
       <EditorToolbar
         editor={editor}
-        menus={menus}
-        menuAriaLabel={t('common.menuBar')}
+        menu={menu}
         headerRight={
           <>
             <span

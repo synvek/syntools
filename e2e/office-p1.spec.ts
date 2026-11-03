@@ -15,18 +15,22 @@ test.use({ locale: 'zh-CN' });
 
 async function openSlideTool(page: Page): Promise<void> {
   await page.goto('/tools/slide-editor');
-  await expect(page.getByTestId('menubar-file')).toBeVisible();
+  await expect(page.getByTestId('menubar-more')).toBeVisible();
 }
 
-/** Menus render top-level entries as `menuitem` so they never collide with canvas buttons */
-async function pickFileMenu(page: Page, label: string): Promise<void> {
-  await page.getByTestId('menubar-file').click();
+/**
+ * The ribbon owns every formatting / insert command; the ⋯ dropdown keeps only the leftovers
+ * (import / export / print / outline). Entries render as `menuitem` so they never collide with
+ * canvas buttons.
+ */
+async function pickMoreMenu(page: Page, label: string): Promise<void> {
+  await page.getByTestId('menubar-more').click();
   await page.getByRole('menuitem', { name: label }).click();
 }
 
 /** Markdown outline → deck: the quickest way to real slides without importing a file */
 async function generateFromOutline(page: Page, outline: string): Promise<void> {
-  await pickFileMenu(page, '从大纲生成');
+  await pickMoreMenu(page, '从大纲生成');
   await page.getByRole('textbox', { name: '从大纲生成' }).fill(outline);
   await page.getByRole('button', { name: '生成幻灯片' }).click();
 }
@@ -35,7 +39,7 @@ async function generateFromOutline(page: Page, outline: string): Promise<void> {
 async function exportPdf(page: Page, name: string): Promise<string> {
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    pickFileMenu(page, '导出 PDF'),
+    pickMoreMenu(page, '导出 PDF'),
   ]);
   const target = test.info().outputPath(name);
   await download.saveAs(target);
@@ -112,6 +116,6 @@ test('slide: print dialog counts pages from the layout model', async ({ page }) 
   await openSlideTool(page);
   await generateFromOutline(page, ['# 第一页', '', '# 第二页'].join('\n'));
 
-  await pickFileMenu(page, '打印…');
+  await pickMoreMenu(page, '打印…');
   await expect(page.getByText('共 2 页')).toBeVisible();
 });

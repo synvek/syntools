@@ -227,6 +227,52 @@ describe('ribbon', () => {
     expect(screen.queryByTestId('ribbon-font-fill-panel')).toBeNull();
   });
 
+  // The editors merged their old 文件/编辑/插入/视图 menu bar into the ribbon: what is left is one ⋯
+  // dropdown holding only the commands the ribbon has no button for (import / export / print …).
+  it('exposes the leftovers of the old menu bar through a single ⋯ dropdown', () => {
+    const onExport = vi.fn();
+    const onImport = vi.fn();
+    render(
+      <Ribbon
+        ariaLabel="功能区"
+        tabs={makeTabs(vi.fn(), vi.fn())}
+        collapseLabel="折叠功能区"
+        expandLabel="展开功能区"
+        testId="test-ribbon"
+        menu={{
+          id: 'more',
+          label: '更多',
+          entries: [
+            { type: 'item', id: 'import', label: '导入', onSelect: onImport },
+            { type: 'separator' },
+            { type: 'item', id: 'export', label: '导出', shortcut: '⌘E', onSelect: onExport },
+          ],
+        }}
+      />,
+    );
+
+    // Exactly one trigger, and it is the three-dot button — no per-menu buttons any more
+    expect(screen.queryByTestId('menubar-file')).toBeNull();
+    expect(screen.queryByTestId('menubar-edit')).toBeNull();
+    const trigger = screen.getByTestId('menubar-more');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    const dropdown = screen.getByRole('menu', { name: '更多' });
+    expect(dropdown).toBeTruthy();
+    expect(screen.getAllByRole('menuitem')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '导出 ⌘E' }));
+    expect(onExport).toHaveBeenCalledTimes(1);
+    // Running an entry closes the dropdown again
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    fireEvent.click(trigger);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
   it('opens a group settings surface from the dialog launcher', () => {
     const { onPaste } = renderRibbon();
     fireEvent.click(screen.getByRole('button', { name: '剪贴板 ▾' }));
