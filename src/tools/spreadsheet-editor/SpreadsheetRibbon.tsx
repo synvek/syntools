@@ -5,7 +5,12 @@ import { RIBBON_ICON_BUTTON } from '@/core/components/ribbon/ribbonTheme';
 import { RibbonIcon } from '@/core/components/ribbon/ribbonIcons';
 import type { EditorMenu } from '@/core/components/editorChrome';
 import type { SheetFormatPatch, SheetFormatState } from './sheetFormat';
-import { buildSheetRibbonTabs, type SheetCommandContext, type SheetRibbonHost } from './commands';
+import {
+  buildSheetRibbonTabs,
+  type SheetCommandContext,
+  type SheetRibbonContext,
+  type SheetRibbonHost,
+} from './commands';
 
 /** Everything the ribbon needs except the two pieces of live state it owns (`host` / `format`) */
 export type RibbonBaseContext = Omit<SheetCommandContext, 'host' | 'format'>;
@@ -39,7 +44,10 @@ export function SpreadsheetRibbon({
 }: SpreadsheetRibbonProps) {
   const [format, setFormat] = useState<SheetFormatState | null>(null);
   const [painting, setPainting] = useState(false);
+  const [painterSticky, setPainterSticky] = useState(false);
   const painterRef = useRef<SheetFormatPatch | null>(null);
+  /** Mirrors `painterSticky` for the selection callback, which closes over its first render */
+  const painterStickyRef = useRef(false);
 
   const readFormat = useCallback(() => {
     setFormat(host ? host.getFormatState() : null);
@@ -55,28 +63,27 @@ export function SpreadsheetRibbon({
     return host.onSelectionChange(() => {
       const patch = painterRef.current;
       if (patch) {
-        // Format painter: the armed format lands on the next selection, then disarms (like Office)
-        painterRef.current = null;
-        setPainting(false);
+        // Format painter: the armed format lands on the next selection. The locked painter keeps
+        // its snapshot and paints again; the one-shot painter disarms (like Office)
         host.applyFormat(patch);
+        if (!painterStickyRef.current) {
+          painterRef.current = null;
+          setPainting(false);
+        }
       }
       setFormat(host.getFormatState());
     });
   }, [host, readFormat]);
 
-  const fullCtx = useMemo<SheetCommandContext>(
-    () => ({ ...ctx, host, format }),
-    [ctx, host, format],
-  );
-  const tabs = useMemo(() => buildSheetRibbonTabs(fullCtx), [fullCtx]);
+  const stopPainter = useCallback(() => {
+    painterRef.current = null;
+    painterStickyRef.current = false;
+    setPainterSticky(false);
+    setPainting(false);
+  }, []);
 
-  const togglePainter = () => {
-    if (painting) {
-      painterRef.current = null;
-      setPainting(false);
-      return;
-    }
-    if (!format) return;
+  const armPainter = useCallback(() => {
+    if (!format) return false;
     painterRef.current = {
       bold: format.bold === true,
       italic: format.italic === true,
@@ -89,7 +96,46 @@ export function SpreadsheetRibbon({
       wrap: format.wrap === true,
     };
     setPainting(true);
-  };
+    return true;
+  }, [format]);
+
+  /** Ribbon split button: one click paints once, a second click cancels */
+  const togglePainter = useCallback(() => {
+    if (painting) {
+      stopPainter();
+      return;
+    }
+    if (armPainter()) {
+      painterStickyRef.current = false;
+      setPainterSticky(false);
+    }
+  }, [armPainter, painting, stopPainter]);
+
+  /** Locked painter (Excel's double-click behaviour): stays armed after every painted selection */
+  const lockPainter = useCallback(() => {
+    if (painting && painterStickyRef.current) {
+      stopPainter();
+      return;
+    }
+    if (armPainter()) {
+      painterStickyRef.current = true;
+      setPainterSticky(true);
+    }
+  }, [armPainter, painting, stopPainter]);
+
+  const fullCtx = useMemo<SheetRibbonContext>(
+    () => ({
+      ...ctx,
+      host,
+      format,
+      painterActive: painting,
+      painterSticky,
+      togglePainter,
+      lockPainter,
+    }),
+    [ctx, host, format, painting, painterSticky, togglePainter, lockPainter],
+  );
+  const tabs = useMemo(() => buildSheetRibbonTabs(fullCtx), [fullCtx]);
 
   const { t } = ctx;
   // Save state lives in the title cluster on the right (next to the document name), so the quick
@@ -137,18 +183,6 @@ export function SpreadsheetRibbon({
         className={`${RIBBON_ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
       >
         <RibbonIcon name="download" className="h-3.5 w-3.5" />
-      </button>
-      <button
-        type="button"
-        aria-label={t('tools.sheet.r.formatPainter')}
-        title={t('tools.sheet.r.formatPainter')}
-        data-testid="ribbon-qat-painter"
-        aria-pressed={painting}
-        onClick={togglePainter}
-        disabled={ctx.busy || ctx.protectedSheet}
-        className={`${RIBBON_ICON_BUTTON} ${painting ? 'bg-black/10 dark:bg-white/20' : ''} disabled:cursor-not-allowed disabled:opacity-40`}
-      >
-        <RibbonIcon name="formatPainter" className="h-3.5 w-3.5" />
       </button>
     </>
   );

@@ -6,7 +6,7 @@ import {
   nextFontSize,
   resolveCommand,
   type SheetActions,
-  type SheetCommandContext,
+  type SheetRibbonContext,
   type SheetRibbonHost,
 } from './commands';
 import { EMPTY_SHEET_FORMAT, type SheetFormatState } from './sheetFormat';
@@ -85,7 +85,7 @@ function fakeActions(): SheetActions {
   };
 }
 
-function makeCtx(overrides: Partial<SheetCommandContext> = {}): SheetCommandContext {
+function makeCtx(overrides: Partial<SheetRibbonContext> = {}): SheetRibbonContext {
   return {
     t: (key: string) => key,
     host: fakeHost(),
@@ -101,12 +101,21 @@ function makeCtx(overrides: Partial<SheetCommandContext> = {}): SheetCommandCont
     hasTable: false,
     hasDocId: true,
     hasTitle: true,
+    // Format painter state lives in the component; the tests only need it to exist
+    painterActive: false,
+    painterSticky: false,
+    togglePainter: () => undefined,
+    lockPainter: () => undefined,
     ...overrides,
   };
 }
 
+/** Groups may be laid out by rows (Word-style matrix) or columns; both live in the ribbon */
+const groupItems = (group: RibbonGroup): RibbonItem[] =>
+  group.rows ? group.rows.flat() : group.items;
+
 const allItems = (tabs: RibbonTab[]): RibbonItem[] =>
-  tabs.flatMap((tab) => tab.groups.flatMap((group) => group.items));
+  tabs.flatMap((tab) => tab.groups.flatMap(groupItems));
 
 describe('sheet command registry', () => {
   it('feeds the ⋯ menu with only the commands the ribbon does not have', () => {
@@ -218,7 +227,7 @@ describe('spreadsheet ribbon tabs', () => {
     // uniqueness is the real requirement (Office repeats commands across tabs too).
     for (const tab of tabs) {
       const ids = tab.groups.flatMap((group) =>
-        group.items.map((item) => `${group.id}:${item.id}`),
+        groupItems(group).map((item) => `${group.id}:${item.id}`),
       );
       expect(new Set(ids).size).toBe(ids.length);
     }

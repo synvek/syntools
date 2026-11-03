@@ -124,6 +124,18 @@ export interface SheetCommandContext {
   hasTitle: boolean;
 }
 
+/**
+ * Ribbon-only additions: the format painter is armed by the component (it subscribes to the
+ * selection), so its state travels alongside the command context instead of living in the store.
+ */
+export interface SheetRibbonContext extends SheetCommandContext {
+  painterActive: boolean;
+  /** Locked painter (Excel's double-click): stays armed after every painted selection */
+  painterSticky: boolean;
+  togglePainter: () => void;
+  lockPainter: () => void;
+}
+
 /** One command, described once and reused by the menu bar and the ribbon */
 export interface SheetCommand {
   id: string;
@@ -876,7 +888,7 @@ function menuItems(ctx: SheetCommandContext, ids: SheetCommandId[]): RibbonMenuI
  * The seven Excel tabs. Group ids are stable so `data-testid="ribbon-<group>-<item>"` selectors and
  * the low-priority groups of the overflow logic stay predictable.
  */
-export function buildSheetRibbonTabs(ctx: SheetCommandContext): RibbonTab[] {
+export function buildSheetRibbonTabs(ctx: SheetRibbonContext): RibbonTab[] {
   const format = ctx.format;
   // Office shows the *result* of the format in the list, so the user picks by sight instead of by name
   const numfmtOptions = NUMBER_FORMAT_PRESETS.map((preset) => ({
@@ -950,131 +962,176 @@ export function buildSheetRibbonTabs(ctx: SheetCommandContext): RibbonTab[] {
             },
             asItem('copy'),
             asItem('cut'),
+            // Excel keeps the painter here: one click paints once, the arrow offers the locked mode
+            {
+              kind: 'split',
+              id: 'format-painter',
+              label: ctx.t('tools.sheet.r.formatPainter'),
+              icon: 'formatPainter',
+              active: ctx.painterActive,
+              disabled: editBlocked(ctx),
+              onSelect: ctx.togglePainter,
+              menu: [
+                {
+                  id: 'painter-once',
+                  label: ctx.t('tools.sheet.r.painterOnce'),
+                  checked: ctx.painterActive && !ctx.painterSticky,
+                  onSelect: ctx.togglePainter,
+                },
+                {
+                  id: 'painter-lock',
+                  label: ctx.t('tools.sheet.r.painterLock'),
+                  checked: ctx.painterSticky,
+                  onSelect: ctx.lockPainter,
+                },
+              ],
+            },
           ],
         },
         {
           id: 'font',
           label: ctx.t('tools.sheet.grp.font'),
           priority: 8,
-          items: [
-            {
-              kind: 'select',
-              id: 'font-family',
-              label: ctx.t('tools.sheet.r.fontFamily'),
-              value: format?.fontFamily ?? '',
-              // Wide enough for "Microsoft YaHei"; Office's font box never truncates a family name
-              width: 'md',
-              disabled: editBlocked(ctx),
-              listWidth: 'wide',
-              options: fontPreviewOptions([
-                { value: '', label: ctx.t('tools.sheet.r.fontDefault') },
-                ...FONT_FAMILY_PRESETS.map((font) => ({ value: font, label: font })),
-              ]),
-              onChange: (value) => ctx.host?.applyFormat({ fontFamily: value || null }),
-            },
-            {
-              kind: 'select',
-              id: 'font-size',
-              label: ctx.t('tools.sheet.r.fontSize'),
-              value: format?.fontSize ? String(format.fontSize) : '',
-              width: 'xs',
-              disabled: editBlocked(ctx),
-              options: [
-                ...(format?.fontSize && !FONT_SIZE_PRESETS.includes(format.fontSize)
-                  ? [{ value: String(format.fontSize), label: String(format.fontSize) }]
-                  : []),
-                ...FONT_SIZE_PRESETS.map((size) => ({ value: String(size), label: String(size) })),
-              ],
-              // Excel's size box accepts anything between 1 and 409, not only the presets; when the
-              // selection carries no explicit size the box shows the sheet default
-              editable: true,
-              display: String(SHEET_DEFAULT_FONT_SIZE),
-              onChange: (value) =>
-                ctx.host?.applyFormat({ fontSize: clampedFontSize(Number(value)) }),
-            },
-            asItem('growFont'),
-            asItem('shrinkFont'),
-            asItem('bold'),
-            asItem('italic'),
-            asItem('underline'),
-            asItem('strike'),
-            {
-              kind: 'split',
-              id: 'borders',
-              label: ctx.t('tools.sheet.r.borders'),
-              icon: 'borders',
-              disabled: noHostOrBusy(ctx),
-              onSelect: () => ctx.host?.applyBorder('bottom'),
-              menu: borderMenu,
-            },
-            {
-              kind: 'color',
-              id: 'fill-color',
-              label: ctx.t('tools.sheet.r.fillColor'),
-              icon: 'fillColor',
-              value: format?.fill ?? null,
-              disabled: editBlocked(ctx),
-              onPick: (color) => ctx.host?.applyFormat({ fill: color }),
-              onReset: () => ctx.host?.applyFormat({ fill: null }),
-              resetLabel: ctx.t('tools.sheet.r.noFill'),
-            },
-            {
-              kind: 'color',
-              id: 'font-color',
-              label: ctx.t('tools.sheet.r.fontColor'),
-              icon: 'fontColor',
-              value: format?.color ?? null,
-              disabled: editBlocked(ctx),
-              onPick: (color) => ctx.host?.applyFormat({ color }),
-              onReset: () => ctx.host?.applyFormat({ color: null }),
-              resetLabel: ctx.t('tools.sheet.r.autoColor'),
-            },
+          items: [],
+          // Excel's font block is two rows: family + size (+ the two size steppers) on top, the
+          // character buttons and the two colour pickers underneath. Row layout keeps the narrow
+          // size box from leaving a hole under the wide family box.
+          rows: [
+            [
+              {
+                kind: 'select',
+                id: 'font-family',
+                label: ctx.t('tools.sheet.r.fontFamily'),
+                value: format?.fontFamily ?? '',
+                // Wide enough for "Microsoft YaHei"; Office's font box never truncates a family name
+                width: 'md',
+                disabled: editBlocked(ctx),
+                listWidth: 'wide',
+                options: fontPreviewOptions([
+                  { value: '', label: ctx.t('tools.sheet.r.fontDefault') },
+                  ...FONT_FAMILY_PRESETS.map((font) => ({ value: font, label: font })),
+                ]),
+                onChange: (value) => ctx.host?.applyFormat({ fontFamily: value || null }),
+              },
+              {
+                kind: 'select',
+                id: 'font-size',
+                label: ctx.t('tools.sheet.r.fontSize'),
+                value: format?.fontSize ? String(format.fontSize) : '',
+                width: 'xs',
+                disabled: editBlocked(ctx),
+                options: [
+                  ...(format?.fontSize && !FONT_SIZE_PRESETS.includes(format.fontSize)
+                    ? [{ value: String(format.fontSize), label: String(format.fontSize) }]
+                    : []),
+                  ...FONT_SIZE_PRESETS.map((size) => ({
+                    value: String(size),
+                    label: String(size),
+                  })),
+                ],
+                // Excel's size box accepts anything between 1 and 409, not only the presets; when the
+                // selection carries no explicit size the box shows the sheet default
+                editable: true,
+                display: String(SHEET_DEFAULT_FONT_SIZE),
+                onChange: (value) =>
+                  ctx.host?.applyFormat({ fontSize: clampedFontSize(Number(value)) }),
+              },
+              asItem('growFont'),
+              asItem('shrinkFont'),
+            ],
+            [
+              asItem('bold'),
+              asItem('italic'),
+              asItem('underline'),
+              asItem('strike'),
+              {
+                kind: 'split',
+                id: 'borders',
+                label: ctx.t('tools.sheet.r.borders'),
+                icon: 'borders',
+                // Small so it shares the icon row instead of forcing a column of its own
+                size: 'small',
+                disabled: noHostOrBusy(ctx),
+                onSelect: () => ctx.host?.applyBorder('bottom'),
+                menu: borderMenu,
+              },
+              {
+                kind: 'color',
+                id: 'fill-color',
+                label: ctx.t('tools.sheet.r.fillColor'),
+                icon: 'fillColor',
+                size: 'small',
+                value: format?.fill ?? null,
+                disabled: editBlocked(ctx),
+                onPick: (color) => ctx.host?.applyFormat({ fill: color }),
+                onReset: () => ctx.host?.applyFormat({ fill: null }),
+                resetLabel: ctx.t('tools.sheet.r.noFill'),
+              },
+              {
+                kind: 'color',
+                id: 'font-color',
+                label: ctx.t('tools.sheet.r.fontColor'),
+                icon: 'fontColor',
+                size: 'small',
+                value: format?.color ?? null,
+                disabled: editBlocked(ctx),
+                onPick: (color) => ctx.host?.applyFormat({ color }),
+                onReset: () => ctx.host?.applyFormat({ color: null }),
+                resetLabel: ctx.t('tools.sheet.r.autoColor'),
+              },
+            ],
           ],
         },
         {
           id: 'align',
           label: ctx.t('tools.sheet.grp.align'),
           priority: 6,
-          items: [
-            asItem('alignTop'),
-            asItem('alignMiddle'),
-            asItem('alignBottom'),
-            asItem('alignLeft'),
-            asItem('alignCenter'),
-            asItem('alignRight'),
-            asItem('wrapText'),
-            {
-              kind: 'split',
-              id: 'merge',
-              label: ctx.t('tools.sheet.r.mergeCenter'),
-              icon: 'mergeCenter',
-              active: format?.merged ?? false,
-              disabled: noHostOrBusy(ctx),
-              onSelect: () => ctx.host?.mergeSelection('center'),
-              menu: menuItems(ctx, ['mergeCenter', 'mergeCells', 'mergeAcross', 'unmergeCells']),
-            },
+          items: [],
+          // Two rows of four: vertical alignment + wrap on top, horizontal + merge below
+          rows: [
+            [asItem('alignTop'), asItem('alignMiddle'), asItem('alignBottom'), asItem('wrapText')],
+            [
+              asItem('alignLeft'),
+              asItem('alignCenter'),
+              asItem('alignRight'),
+              {
+                kind: 'split',
+                id: 'merge',
+                label: ctx.t('tools.sheet.r.mergeCenter'),
+                icon: 'mergeCenter',
+                size: 'small',
+                active: format?.merged ?? false,
+                disabled: noHostOrBusy(ctx),
+                onSelect: () => ctx.host?.mergeSelection('center'),
+                menu: menuItems(ctx, ['mergeCenter', 'mergeCells', 'mergeAcross', 'unmergeCells']),
+              },
+            ],
           ],
         },
         {
           id: 'number',
           label: ctx.t('tools.sheet.grp.number'),
           priority: 5,
-          items: [
-            {
-              kind: 'select',
-              id: 'number-format',
-              label: ctx.t('tools.sheet.r.numberFormat'),
-              value: activeNumberFormat,
-              width: 'sm',
-              disabled: noHostOrBusy(ctx),
-              options: numfmtOptions,
-              onChange: (value) => ctx.host?.applyNumberFormat(value || null),
-            },
-            asItem('currency'),
-            asItem('percent'),
-            asItem('thousand'),
-            asItem('increaseDecimal'),
-            asItem('decreaseDecimal'),
+          items: [],
+          // One row: the format box followed by its five quick buttons, no half-empty column
+          rows: [
+            [
+              {
+                kind: 'select',
+                id: 'number-format',
+                label: ctx.t('tools.sheet.r.numberFormat'),
+                value: activeNumberFormat,
+                width: 'sm',
+                disabled: noHostOrBusy(ctx),
+                options: numfmtOptions,
+                onChange: (value) => ctx.host?.applyNumberFormat(value || null),
+              },
+              asItem('currency'),
+              asItem('percent'),
+              asItem('thousand'),
+              asItem('increaseDecimal'),
+              asItem('decreaseDecimal'),
+            ],
           ],
         },
         {
@@ -1157,7 +1214,8 @@ export function buildSheetRibbonTabs(ctx: SheetCommandContext): RibbonTab[] {
               onSelect: () => ctx.host?.clearSelection(),
               menu: menuItems(ctx, ['clearContent', 'clearFormat']),
             },
-            asItem('find', 'small'),
+            // Large: a small button here was the only item in the last column
+            asItem('find', 'large'),
           ],
         },
       ],
