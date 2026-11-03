@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NodeSelection } from '@tiptap/pm/state';
-import { DOMParser as PMDOMParser } from '@tiptap/pm/model';
+import { DOMParser as PMDOMParser, type Mark } from '@tiptap/pm/model';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
@@ -82,7 +82,7 @@ import { createExtensions } from './extensions';
 import { PageSetupPanel } from './PageSetupPanel';
 import { planComparison } from './revisions';
 import { ReviewPanel } from './ReviewPanel';
-import { StylePanel } from './StylePanel';
+import { applyFormat, captureFormat } from './formatPainter';
 import {
   addCommentReply,
   anchoredCommentIds,
@@ -1081,7 +1081,74 @@ export default function RichTextEditorTool() {
     );
   };
 
+  /**
+   * 格式刷: copy the run formatting of the current selection and paint it onto the next non-empty
+   * selection (`formatPainter.ts` owns the mark whitelist). `painterSticky` mirrors Word's
+   * double-click: the painter stays armed so several selections can be painted in a row.
+   */
+  const [painterActive, setPainterActive] = useState(false);
+  const [painterSticky, setPainterSticky] = useState(false);
+  const painterMarks = useRef<Mark[] | null>(null);
+  /** Guards the dispatch inside `applyFormat` from re-entering through `selectionUpdate` */
+  const painting = useRef(false);
+
+  const armPainter = () => {
+    if (!editor) return false;
+    const marks = captureFormat(editor);
+    // A plain paragraph has nothing to copy: arming an empty painter would look broken
+    if (!marks.length) return false;
+    painterMarks.current = marks;
+    setPainterActive(true);
+    return true;
+  };
+
+  const stopPainter = () => {
+    painterMarks.current = null;
+    setPainterActive(false);
+    setPainterSticky(false);
+  };
+
+  const handleTogglePainter = () => {
+    if (painterActive) {
+      stopPainter();
+      return;
+    }
+    armPainter();
+  };
+
+  /** Word's locked painter: arm once, then paint selection after selection until switched off */
+  const handleLockPainter = () => {
+    if (painterActive && painterSticky) {
+      stopPainter();
+      return;
+    }
+    if (armPainter()) setPainterSticky(true);
+  };
+
+  useEffect(() => {
+    if (!editor || !painterActive) return;
+    const handleSelectionUpdate = () => {
+      const marks = painterMarks.current;
+      if (!marks || painting.current) return;
+      if (editor.state.selection.empty) return;
+      painting.current = true;
+      const painted = applyFormat(editor, marks);
+      painting.current = false;
+      if (!painted) return;
+      // The one-shot painter drops its snapshot; the locked one keeps painting
+      if (!painterSticky) {
+        painterMarks.current = null;
+        setPainterActive(false);
+      }
+    };
+    editor.on('selectionUpdate', handleSelectionUpdate);
+    return () => {
+      editor.off('selectionUpdate', handleSelectionUpdate);
+    };
+  }, [editor, painterActive, painterSticky]);
+
   /** Tracked changes: mark the selection as insert/delete (local record + Mark) */
+
   const handleTrackChange = (kind: 'insert' | 'delete') => {
     if (!editor) return;
     const { from, to } = editor.state.selection;
@@ -1673,6 +1740,19 @@ export default function RichTextEditorTool() {
         versionsDisabled={!docId}
         zoom={zoom}
         onZoomChange={setZoom}
+        onMarkInsert={() => handleTrackChange('insert')}
+        onMarkDelete={() => handleTrackChange('delete')}
+        onAcceptAll={handleAcceptAll}
+        onRejectAll={handleRejectAll}
+        hasTrackedChanges={changes.length > 0}
+        onCompareFile={() => compareInputRef.current?.click()}
+        onInsertSectionBreak={(type) =>
+          editor?.chain().focus().setSectionBreak({ startType: type, pageSetup }).run()
+        }
+        painterActive={painterActive}
+        painterSticky={painterSticky}
+        onTogglePainter={handleTogglePainter}
+        onLockPainter={handleLockPainter}
       />
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
@@ -1683,10 +1763,15 @@ export default function RichTextEditorTool() {
           </aside>
         ) : null}
 
-        {/* Middle column: editor + editing panels still on top (find / styles / review) */}
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {/* Middle column: the editor owns the flow; find floats above it so the page never jumps
+            and the panel cannot slide under the sticky ribbon (z-30) while scrolling */}
+        <div className="relative flex min-w-0 flex-1 flex-col gap-4">
           {findOpen && editor ? (
-            <FindReplacePanel editor={editor} onClose={() => setFindOpen(false)} />
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-end px-2 pt-2">
+              <div className="pointer-events-auto max-w-full">
+                <FindReplacePanel editor={editor} onClose={() => setFindOpen(false)} />
+              </div>
+            </div>
           ) : null}
 
           {/* Print paper size/margins: @page doesn't support CSS variables, so inject per current setup */}
@@ -1704,7 +1789,7 @@ export default function RichTextEditorTool() {
             />
           ) : null}
 
-          {stylesOpen ? <StylePanel editor={editor} onClose={() => setStylesOpen(false)} /> : null}
+          {/* Styles live in the ribbon gallery now (Word's model): no panel under the page */}
           {shapesOpen ? <ShapePanel editor={editor} onClose={() => setShapesOpen(false)} /> : null}
           {spellcheckOpen ? (
             <SpellcheckPanel

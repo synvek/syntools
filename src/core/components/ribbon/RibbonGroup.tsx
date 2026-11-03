@@ -153,17 +153,37 @@ export function RibbonGroupView({
         divider ? 'border-l border-gray-300/70 dark:border-[#3a3a3a]' : ''
       } ${hidden ? 'hidden' : ''}`}
     >
-      <div className="flex h-14 flex-col flex-wrap content-start items-start gap-x-0.5 gap-y-0.5">
-        {group.items.map((item) => (
-          <ItemView
-            key={item.id}
-            item={item}
-            accent={accent}
-            onInvoked={onInvoked}
-            groupId={group.id}
-          />
-        ))}
-      </div>
+      {group.rows ? (
+        // Word-style matrix: each row keeps its own width, so a narrow combo box never sits under a
+        // wide one with a hole to its right
+        <div className="flex h-14 flex-col justify-center gap-1">
+          {group.rows.map((row, index) => (
+            <div key={index} className="flex items-center gap-0.5">
+              {row.map((item) => (
+                <ItemView
+                  key={item.id}
+                  item={item}
+                  accent={accent}
+                  onInvoked={onInvoked}
+                  groupId={group.id}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex h-14 flex-col flex-wrap content-start items-start gap-x-0.5 gap-y-0.5">
+          {group.items.map((item) => (
+            <ItemView
+              key={item.id}
+              item={item}
+              accent={accent}
+              onInvoked={onInvoked}
+              groupId={group.id}
+            />
+          ))}
+        </div>
+      )}
       <div className={RIBBON_GROUP_LABEL}>{group.label}</div>
       {group.overlay}
       {group.onLauncher ? (

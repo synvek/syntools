@@ -442,6 +442,14 @@ const officeIcons: Record<string, ReactNode> = {
     </>
   ),
   horizontalRule: <path d="M4 12h16" strokeWidth={2.4} />,
+  /** 剪贴板: a clipboard with a sheet peeking out of it */
+  paste: (
+    <>
+      <path d="M8.5 4.5h-3v16h13v-16h-3" />
+      <path d="M9 3.5h6v3H9z" />
+      <path d="M9 11h6M9 15h4" />
+    </>
+  ),
   pageBreak: (
     <>
       <path d="M3 6h6M15 6h6" />
@@ -742,6 +750,41 @@ const officeIcons: Record<string, ReactNode> = {
         opacity="0.25"
       />
       <path d="M3.5 9.5h17M3.5 14.5h17" />
+    </>
+  ),
+  /**
+   * Revision marks: Word paints insertions/deletions with a coloured rule in the margin. The badge
+   * carries the sign, the rule says "this happens in the margin".
+   */
+  trackInsert: (
+    <>
+      <path d="M6 3.5h12v17H6z" />
+      <path d="M12 8v8M8 12h8" strokeWidth={1.6} />
+    </>
+  ),
+  trackDelete: (
+    <>
+      <path d="M6 3.5h12v17H6z" />
+      <path d="M8 12h8" strokeWidth={1.6} />
+    </>
+  ),
+  accept: (
+    <>
+      <path d="M12 3.5 20.5 8v8L12 20.5 3.5 16V8z" />
+      <path d="M8.2 12.2l2.6 2.6 5-5.2" strokeWidth={1.7} />
+    </>
+  ),
+  reject: (
+    <>
+      <path d="M12 3.5 20.5 8v8L12 20.5 3.5 16V8z" />
+      <path d="M9 9l6 6M15 9l-6 6" strokeWidth={1.7} />
+    </>
+  ),
+  /** Layout → breaks: a page with a dashed cut and a section divider */
+  sectionBreak: (
+    <>
+      <path d="M6 3.5h9l3 3v14H6z" />
+      <path d="M3.5 13.5h17" strokeDasharray="2.5 2" />
     </>
   ),
 };

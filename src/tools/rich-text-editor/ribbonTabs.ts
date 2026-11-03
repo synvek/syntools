@@ -16,6 +16,7 @@ import { normalizeHex } from '../../core/drawing/geometry';
 import { IMAGE_LAYERS, normalizeImageLayer, type ImageLayer } from './imageLayer';
 import { MM_TO_PX } from './pageSetup';
 import { ShapeMenu } from './ShapeMenu';
+import { StyleGallery } from './StyleGallery';
 import { findSelectedShape, shapeSpec, type DocShapeAttrs, type ShapeDash } from './shapeNode';
 import { applyShapeAttrs } from './useSelectedShape';
 
@@ -38,6 +39,8 @@ export interface RichTextToolbarState {
   lineHeight: string;
   color: string;
   highlight: boolean;
+  /** Active highlight colour (Word's highlighter keeps the colour, not just on/off) */
+  highlightColor: string | null;
   bold: boolean;
   italic: boolean;
   underline: boolean;
@@ -122,6 +125,24 @@ export interface RichTextRibbonActions {
   versionsDisabled: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  /* --- revisions & comparison (Word's 审阅 tab) --- */
+  onMarkInsert: () => void;
+  onMarkDelete: () => void;
+  onAcceptAll: () => void;
+  onRejectAll: () => void;
+  /** False when the document has no tracked change: 接受/拒绝 have nothing to work on */
+  hasTrackedChanges: boolean;
+  onCompareFile: () => void;
+  /* --- section breaks (Word's 布局 → 分隔符) --- */
+  onInsertSectionBreak: (type: 'nextPage' | 'continuous') => void;
+  /* --- format painter --- */
+  /** Armed: the next selection receives the copied character formatting */
+  painterActive: boolean;
+  /** Locked (Word's double-click): stays armed after every painted selection */
+  painterSticky: boolean;
+  onTogglePainter: () => void;
+  /** Arms / disarms the locked painter */
+  onLockPainter: () => void;
 }
 
 /** Values the toolbar derives from the DOM (fonts, image width in px) and passes down as-is */
@@ -134,7 +155,6 @@ export interface RichTextRibbonOptions {
   lineHeightOptions: { value: string; label: string }[];
   letterSpacingOptions: { value: string; label: string }[];
   textTransformOptions: { value: string; label: string }[];
-  headingOptions: { value: string; label: string }[];
   /** Content width in px: image width presets are percentages of it */
   contentWidth: number;
   imageWidthValue: string;
@@ -192,7 +212,7 @@ function select(
   value: string,
   options: RibbonSelectOption[],
   onChange: (value: string) => void,
-  width: 'xs' | 'sm' | 'md' = 'sm',
+  width: 'xxs' | 'xs' | 'sm' | 'md' = 'sm',
   disabled = false,
   extra: Partial<RibbonSelectItem> = {},
 ): RibbonItem {
@@ -209,145 +229,231 @@ function fontGroup(input: RichTextRibbonInput): RibbonGroup {
     id: 'font',
     label: t('tools.richText.ribbon.grp.font'),
     priority: 9,
-    items: [
-      select(
-        'font-family',
-        t('tools.richText.fontFamily'),
-        options.fontFamilyValue,
-        options.fontOptions,
-        (value) => (value ? chain().setFontFamily(value).run() : chain().unsetFontFamily().run()),
-        'md',
-        false,
-        { listWidth: 'wide' },
-      ),
-      select(
-        'font-size',
-        t('tools.richText.fontSize'),
-        state.fontSize,
-        options.fontSizeOptions,
-        // Typed sizes are plain numbers; the text-style mark wants a CSS length
-        (value) =>
-          value
-            ? chain()
-                .setFontSize(/^[\d.]+$/.test(value) ? `${value}px` : value)
-                .run()
-            : chain().unsetFontSize().run(),
-        'xs',
-        false,
+    items: [],
+    // Word's font block is two rows: the size box sits right of the font box, the character
+    // buttons fill the row underneath. Row layout also keeps the narrow boxes from leaving a
+    // hole to their right, which column packing did.
+    rows: [
+      [
+        select(
+          'font-family',
+          t('tools.richText.fontFamily'),
+          options.fontFamilyValue,
+          options.fontOptions,
+          (value) => (value ? chain().setFontFamily(value).run() : chain().unsetFontFamily().run()),
+          'md',
+          false,
+          { listWidth: 'wide' },
+        ),
+        select(
+          'font-size',
+          t('tools.richText.fontSize'),
+          state.fontSize,
+          options.fontSizeOptions,
+          // Typed sizes are plain numbers; the text-style mark wants a CSS length
+          (value) =>
+            value
+              ? chain()
+                  .setFontSize(/^[\d.]+$/.test(value) ? `${value}px` : value)
+                  .run()
+              : chain().unsetFontSize().run(),
+          'xs',
+          false,
+          {
+            // Word's size box takes any value, not only the presets; the empty state shows the default size
+            editable: true,
+            display: options.fontSizeDefault,
+            toDraft: (value) => value.replace(/px$/, ''),
+            fromDraft: (draft) => draft,
+          },
+        ),
+        // A⁺ / A⁻: the Office habit of nudging the size without opening the box
+        item(
+          'grow-font',
+          t('tools.richText.increaseFontSize'),
+          'fontGrow',
+          () =>
+            chain()
+              .setFontSize(`${stepFontSize(currentFontSize, 1)}px`)
+              .run(),
+          { size: 'small' },
+        ),
+        item(
+          'shrink-font',
+          t('tools.richText.decreaseFontSize'),
+          'fontShrink',
+          () =>
+            chain()
+              .setFontSize(`${stepFontSize(currentFontSize, -1)}px`)
+              .run(),
+          { size: 'small' },
+        ),
+        // Character spacing and case are narrow boxes: they close the first row instead of
+        // opening two mostly-empty columns of their own
+        select(
+          'letter-spacing',
+          t('tools.richText.letterSpacing'),
+          state.letterSpacing,
+          options.letterSpacingOptions,
+          (value) =>
+            chain()
+              .setLetterSpacing(value ? Number(value) : null)
+              .run(),
+          'xxs',
+        ),
+        select(
+          'text-transform',
+          t('tools.richText.textTransform'),
+          state.textTransform,
+          options.textTransformOptions,
+          (value) =>
+            chain()
+              .setTextTransform((value || null) as TextTransformValue | null)
+              .run(),
+          'xxs',
+        ),
+      ],
+      [
+        item('bold', t('tools.richText.bold'), 'bold', () => chain().toggleBold().run(), {
+          size: 'small',
+          active: state.bold,
+        }),
+        item('italic', t('tools.richText.italic'), 'italic', () => chain().toggleItalic().run(), {
+          size: 'small',
+          active: state.italic,
+        }),
+        item(
+          'underline',
+          t('tools.richText.underline'),
+          'underline',
+          () => chain().toggleUnderline().run(),
+          { size: 'small', active: state.underline },
+        ),
+        item('strike', t('tools.richText.strike'), 'strike', () => chain().toggleStrike().run(), {
+          size: 'small',
+          active: state.strike,
+        }),
+        item(
+          'superscript',
+          t('tools.richText.superscript'),
+          'superscript',
+          () => chain().toggleSuperscript().run(),
+          { size: 'small', active: state.superscript },
+        ),
+        item(
+          'subscript',
+          t('tools.richText.subscript'),
+          'subscript',
+          () => chain().toggleSubscript().run(),
+          { size: 'small', active: state.subscript },
+        ),
+        item(
+          'small-caps',
+          t('tools.richText.smallCaps'),
+          'smallCaps',
+          () => chain().toggleSmallCaps().run(),
+          { size: 'small', active: state.smallCaps },
+        ),
+        item('code', t('tools.richText.code'), 'codeMark', () => chain().toggleCode().run(), {
+          size: 'small',
+          active: state.code,
+        }),
         {
-          // Word's size box takes any value, not only the presets; the empty state shows the default size
-          editable: true,
-          display: options.fontSizeDefault,
-          toDraft: (value) => value.replace(/px$/, ''),
-          fromDraft: (draft) => draft,
+          kind: 'color',
+          id: 'font-color',
+          label: t('tools.richText.color'),
+          icon: 'fontColor',
+          size: 'small',
+          value: /^#[0-9a-f]{6}$/i.test(state.color) ? state.color : '#111827',
+          onPick: (color) => chain().setColor(color).run(),
+          onReset: () => chain().unsetColor().run(),
+          resetLabel: t('tools.richText.colorDefault'),
         },
-      ),
-      // A⁺ / A⁻: the Office habit of nudging the size without opening the box
-      item(
-        'grow-font',
-        t('tools.richText.increaseFontSize'),
-        'fontGrow',
-        () =>
-          chain()
-            .setFontSize(`${stepFontSize(currentFontSize, 1)}px`)
-            .run(),
-        { size: 'small' },
-      ),
-      item(
-        'shrink-font',
-        t('tools.richText.decreaseFontSize'),
-        'fontShrink',
-        () =>
-          chain()
-            .setFontSize(`${stepFontSize(currentFontSize, -1)}px`)
-            .run(),
-        { size: 'small' },
-      ),
-      item('bold', t('tools.richText.bold'), 'bold', () => chain().toggleBold().run(), {
-        active: state.bold,
-      }),
-      item('italic', t('tools.richText.italic'), 'italic', () => chain().toggleItalic().run(), {
-        active: state.italic,
-      }),
-      item(
-        'underline',
-        t('tools.richText.underline'),
-        'underline',
-        () => chain().toggleUnderline().run(),
-        { active: state.underline },
-      ),
-      item('strike', t('tools.richText.strike'), 'strike', () => chain().toggleStrike().run(), {
-        active: state.strike,
-      }),
-      item(
-        'superscript',
-        t('tools.richText.superscript'),
-        'superscript',
-        () => chain().toggleSuperscript().run(),
-        { size: 'small', active: state.superscript },
-      ),
-      item(
-        'subscript',
-        t('tools.richText.subscript'),
-        'subscript',
-        () => chain().toggleSubscript().run(),
-        { size: 'small', active: state.subscript },
-      ),
-      item(
-        'small-caps',
-        t('tools.richText.smallCaps'),
-        'smallCaps',
-        () => chain().toggleSmallCaps().run(),
-        { size: 'small', active: state.smallCaps },
-      ),
-      item('code', t('tools.richText.code'), 'codeMark', () => chain().toggleCode().run(), {
-        size: 'small',
-        active: state.code,
-      }),
-      {
-        kind: 'color',
-        id: 'font-color',
-        label: t('tools.richText.color'),
-        icon: 'fontColor',
-        value: /^#[0-9a-f]{6}$/i.test(state.color) ? state.color : '#111827',
-        onPick: (color) => chain().setColor(color).run(),
-        onReset: () => chain().unsetColor().run(),
-        resetLabel: t('tools.richText.colorDefault'),
-      },
-      item(
-        'highlight',
-        t('tools.richText.highlight'),
-        'fillColor',
-        () => chain().toggleHighlight({ color: '#FEF08A' }).run(),
-        { active: state.highlight },
-      ),
-      select(
-        'letter-spacing',
-        t('tools.richText.letterSpacing'),
-        state.letterSpacing,
-        options.letterSpacingOptions,
-        (value) =>
-          chain()
-            .setLetterSpacing(value ? Number(value) : null)
-            .run(),
-        'xs',
-      ),
-      select(
-        'text-transform',
-        t('tools.richText.textTransform'),
-        state.textTransform,
-        options.textTransformOptions,
-        (value) =>
-          chain()
-            .setTextTransform((value || null) as TextTransformValue | null)
-            .run(),
-        'xs',
-      ),
+        // Word's highlighter remembers the colour; a fixed yellow made "highlight" a one-way toggle
+        {
+          kind: 'color',
+          id: 'highlight',
+          label: t('tools.richText.highlight'),
+          icon: 'fillColor',
+          size: 'small',
+          value: state.highlightColor ?? '#FEF08A',
+          onPick: (color) => chain().setHighlight({ color }).run(),
+          onReset: () => chain().unsetHighlight().run(),
+          resetLabel: t('tools.richText.highlightNone'),
+        },
+        // 清除格式: back to body text — Word's eraser drops both the marks and the paragraph style
+        item(
+          'clear-format',
+          t('tools.richText.clearFormat'),
+          'clear',
+          () => chain().setParagraph().unsetAllMarks().run(),
+          { size: 'small' },
+        ),
+      ],
     ],
   };
 }
 
-/** Lists, alignment and indents */
+/**
+ * Word's 剪贴板 group: paste, cut / copy and the format painter.
+ *
+ * The painter sits here (not in 字体) because that is where Word puts it, and because it is a
+ * clipboard-shaped command: copy the format, then paste it onto another selection.
+ */
+function clipboardGroup(input: RichTextRibbonInput): RibbonGroup {
+  const { t, actions } = input;
+  const chain = () => input.editor.chain().focus();
+  // Cut / copy use the browser command so the clipboard keeps the formatting. Focus has to go back
+  // to the document first: the click landed on the ribbon button, and the command acts on focus.
+  const runClipboard = (command: 'cut' | 'copy') => {
+    input.editor.view.focus();
+    document.execCommand(command);
+  };
+  return {
+    id: 'clipboard',
+    label: t('tools.richText.ribbon.grp.clipboard'),
+    priority: 10,
+    items: [
+      item('paste', t('tools.richText.paste'), 'paste', () => {
+        void navigator.clipboard
+          .readText()
+          .then((text) => {
+            if (text) chain().insertContent(text).run();
+          })
+          .catch(() => undefined);
+      }),
+      item('cut', t('tools.richText.cut'), 'scissors', () => runClipboard('cut'), {
+        size: 'small',
+      }),
+      item('copy', t('common.copy'), 'copy', () => runClipboard('copy'), { size: 'small' }),
+      // Split: one click paints once, the arrow offers Word's locked (repeat) painter
+      {
+        kind: 'split',
+        id: 'format-painter',
+        label: t('tools.richText.formatPainter'),
+        icon: 'formatPainter',
+        active: actions.painterActive,
+        onSelect: actions.onTogglePainter,
+        menu: [
+          {
+            id: 'painter-once',
+            label: t('tools.richText.formatPainterOnce'),
+            checked: actions.painterActive && !actions.painterSticky,
+            onSelect: actions.onTogglePainter,
+          },
+          {
+            id: 'painter-lock',
+            label: t('tools.richText.formatPainterLock'),
+            checked: actions.painterSticky,
+            onSelect: actions.onLockPainter,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/** Lists, alignment, spacing and indents */
 function paragraphGroup(input: RichTextRibbonInput): RibbonGroup {
   const { state, t, options } = input;
   const chain = () => input.editor.chain().focus();
@@ -355,156 +461,148 @@ function paragraphGroup(input: RichTextRibbonInput): RibbonGroup {
     id: 'paragraph',
     label: t('tools.richText.ribbon.grp.paragraph'),
     priority: 8,
-    items: [
-      select(
-        'heading',
-        t('tools.richText.headingSelect'),
-        state.headingLevel ? String(state.headingLevel) : 'paragraph',
-        options.headingOptions,
-        (value) =>
-          value === 'paragraph'
-            ? chain().setParagraph().run()
-            : chain()
-                .toggleHeading({ level: Number(value) as 1 | 2 | 3 | 4 | 5 | 6 })
-                .run(),
-        'md',
-        false,
-        { listWidth: 'wide' },
-      ),
-      select(
-        'line-height',
-        t('tools.richText.lineHeight'),
-        state.lineHeight,
-        options.lineHeightOptions,
-        (value) => (value ? chain().setLineHeight(value).run() : chain().unsetLineHeight().run()),
-        'xs',
-      ),
-      item(
-        'bullet-list',
-        t('tools.richText.bulletList'),
-        'bulletList',
-        () => chain().toggleBulletList().run(),
-        { size: 'small', active: state.bulletList },
-      ),
-      item(
-        'ordered-list',
-        t('tools.richText.orderedList'),
-        'orderedList',
-        () => chain().toggleOrderedList().run(),
-        { size: 'small', active: state.orderedList },
-      ),
-      item(
-        'task-list',
-        t('tools.richText.taskList'),
-        'taskList',
-        () => chain().toggleTaskList().run(),
-        { size: 'small', active: state.taskList },
-      ),
-      item('quote', t('tools.richText.quote'), 'quote', () => chain().toggleBlockquote().run(), {
-        size: 'small',
-        active: state.blockquote,
-      }),
-      item(
-        'code-block',
-        t('tools.richText.codeBlock'),
-        'codeBlock',
-        () => chain().toggleCodeBlock().run(),
-        { size: 'small', active: state.codeBlock },
-      ),
-      item(
-        'align-left',
-        t('tools.richText.alignLeft'),
-        'alignLeftCell',
-        () => chain().setTextAlign('left').run(),
-        { size: 'small', active: state.alignLeft },
-      ),
-      item(
-        'align-center',
-        t('tools.richText.alignCenter'),
-        'alignCenterCell',
-        () => chain().setTextAlign('center').run(),
-        { size: 'small', active: state.alignCenter },
-      ),
-      item(
-        'align-right',
-        t('tools.richText.alignRight'),
-        'alignRightCell',
-        () => chain().setTextAlign('right').run(),
-        { size: 'small', active: state.alignRight },
-      ),
-      item(
-        'align-justify',
-        t('tools.richText.alignJustify'),
-        'alignJustify',
-        () => chain().setTextAlign('justify').run(),
-        { size: 'small', active: state.alignJustify },
-      ),
-      item(
-        'indent-increase',
-        t('tools.richText.indentIncrease'),
-        'indentIncrease',
-        () => chain().indentParagraph(24).run(),
-        { size: 'small' },
-      ),
-      item(
-        'indent-decrease',
-        t('tools.richText.indentDecrease'),
-        'indentDecrease',
-        () => chain().indentParagraph(-24).run(),
-        { size: 'small' },
-      ),
-      item(
-        'indent-left-increase',
-        t('tools.richText.indentLeftIncrease'),
-        'hangingIndent',
-        () =>
-          chain()
-            .setParagraphIndent({ left: state.indentLeft + 24 })
-            .run(),
-        { size: 'small' },
-      ),
-      item(
-        'indent-left-decrease',
-        t('tools.richText.indentLeftDecrease'),
-        'indentDecrease',
-        () =>
-          chain()
-            .setParagraphIndent({ left: state.indentLeft - 24 })
-            .run(),
-        { size: 'small', disabled: state.indentLeft <= 0 },
-      ),
-      item(
-        'hanging-indent',
-        t('tools.richText.hangingIndent'),
-        'indentIncrease',
-        () =>
-          chain()
-            .setParagraphIndent({
-              hanging: state.hangingIndent > 0 ? null : 24,
-              // 悬挂缩进必须有左缩进做参照，否则负的 text-indent 会把首行顶到页边距外
-              left: state.hangingIndent > 0 ? state.indentLeft : Math.max(24, state.indentLeft),
-            })
-            .run(),
-        { size: 'small', active: state.hangingIndent > 0 },
-      ),
-      select(
-        'paragraph-spacing',
-        t('tools.richText.paragraphSpacing'),
-        state.paragraphSpacing,
-        [
-          { value: '0-0', label: t('tools.richText.spacingPresetDefault') },
-          { value: '0-12', label: t('tools.richText.spacingPresetCompact') },
-          { value: '12-12', label: t('tools.richText.spacingPresetRelaxed') },
-          { value: '24-24', label: t('tools.richText.spacingPresetLoose') },
-        ],
-        (value) => {
-          const [before, after] = value.split('-').map(Number);
-          chain()
-            .setParagraphSpacing(before || 0, after || 0)
-            .run();
-        },
-        'xs',
-      ),
+    items: [],
+    // Word's paragraph block: lists + alignment on top, spacing + indents underneath. Row layout
+    // keeps the two spacing boxes next to the indent buttons instead of in half-empty columns.
+    rows: [
+      [
+        item(
+          'bullet-list',
+          t('tools.richText.bulletList'),
+          'bulletList',
+          () => chain().toggleBulletList().run(),
+          { size: 'small', active: state.bulletList },
+        ),
+        item(
+          'ordered-list',
+          t('tools.richText.orderedList'),
+          'orderedList',
+          () => chain().toggleOrderedList().run(),
+          { size: 'small', active: state.orderedList },
+        ),
+        item(
+          'task-list',
+          t('tools.richText.taskList'),
+          'taskList',
+          () => chain().toggleTaskList().run(),
+          { size: 'small', active: state.taskList },
+        ),
+        item('quote', t('tools.richText.quote'), 'quote', () => chain().toggleBlockquote().run(), {
+          size: 'small',
+          active: state.blockquote,
+        }),
+        item(
+          'code-block',
+          t('tools.richText.codeBlock'),
+          'codeBlock',
+          () => chain().toggleCodeBlock().run(),
+          { size: 'small', active: state.codeBlock },
+        ),
+        item(
+          'align-left',
+          t('tools.richText.alignLeft'),
+          'alignLeftCell',
+          () => chain().setTextAlign('left').run(),
+          { size: 'small', active: state.alignLeft },
+        ),
+        item(
+          'align-center',
+          t('tools.richText.alignCenter'),
+          'alignCenterCell',
+          () => chain().setTextAlign('center').run(),
+          { size: 'small', active: state.alignCenter },
+        ),
+        item(
+          'align-right',
+          t('tools.richText.alignRight'),
+          'alignRightCell',
+          () => chain().setTextAlign('right').run(),
+          { size: 'small', active: state.alignRight },
+        ),
+        item(
+          'align-justify',
+          t('tools.richText.alignJustify'),
+          'alignJustify',
+          () => chain().setTextAlign('justify').run(),
+          { size: 'small', active: state.alignJustify },
+        ),
+      ],
+      [
+        select(
+          'line-height',
+          t('tools.richText.lineHeight'),
+          state.lineHeight,
+          options.lineHeightOptions,
+          (value) => (value ? chain().setLineHeight(value).run() : chain().unsetLineHeight().run()),
+          'xs',
+        ),
+        select(
+          'paragraph-spacing',
+          t('tools.richText.paragraphSpacing'),
+          state.paragraphSpacing,
+          [
+            { value: '0-0', label: t('tools.richText.spacingPresetDefault') },
+            { value: '0-12', label: t('tools.richText.spacingPresetCompact') },
+            { value: '12-12', label: t('tools.richText.spacingPresetRelaxed') },
+            { value: '24-24', label: t('tools.richText.spacingPresetLoose') },
+          ],
+          (value) => {
+            const [before, after] = value.split('-').map(Number);
+            chain()
+              .setParagraphSpacing(before || 0, after || 0)
+              .run();
+          },
+          'xs',
+        ),
+        item(
+          'indent-decrease',
+          t('tools.richText.indentDecrease'),
+          'indentDecrease',
+          () => chain().indentParagraph(-24).run(),
+          { size: 'small' },
+        ),
+        item(
+          'indent-increase',
+          t('tools.richText.indentIncrease'),
+          'indentIncrease',
+          () => chain().indentParagraph(24).run(),
+          { size: 'small' },
+        ),
+        item(
+          'indent-left-decrease',
+          t('tools.richText.indentLeftDecrease'),
+          'indentDecrease',
+          () =>
+            chain()
+              .setParagraphIndent({ left: state.indentLeft - 24 })
+              .run(),
+          { size: 'small', disabled: state.indentLeft <= 0 },
+        ),
+        item(
+          'indent-left-increase',
+          t('tools.richText.indentLeftIncrease'),
+          'hangingIndent',
+          () =>
+            chain()
+              .setParagraphIndent({ left: state.indentLeft + 24 })
+              .run(),
+          { size: 'small' },
+        ),
+        item(
+          'hanging-indent',
+          t('tools.richText.hangingIndent'),
+          'indentIncrease',
+          () =>
+            chain()
+              .setParagraphIndent({
+                hanging: state.hangingIndent > 0 ? null : 24,
+                // 悬挂缩进必须有左缩进做参照，否则负的 text-indent 会把首行顶到页边距外
+                left: state.hangingIndent > 0 ? state.indentLeft : Math.max(24, state.indentLeft),
+              })
+              .run(),
+          { size: 'small', active: state.hangingIndent > 0 },
+        ),
+      ],
     ],
   };
 }
@@ -710,6 +808,15 @@ const LAYER_LABELS: Record<ImageLayer, string> = {
   front: 'tools.richText.imageLayerFront',
   behind: 'tools.richText.imageLayerBehind',
 };
+
+/** Common table sizes behind 插入 → 表格's split button (the icon itself inserts 3×3) */
+const TABLE_SIZE_PRESETS = [
+  [2, 2],
+  [2, 3],
+  [3, 3],
+  [4, 4],
+  [5, 5],
+] as const;
 
 const SHAPE_STROKE_WIDTHS = [0.5, 1, 1.5, 2, 3, 4, 6, 8] as const;
 const SHAPE_TEXT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72] as const;
@@ -921,6 +1028,7 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
   const chain = () => editor.chain().focus();
 
   const home: RibbonGroup[] = [
+    clipboardGroup(input),
     fontGroup(input),
     paragraphGroup(input),
     {
@@ -931,11 +1039,20 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
         item('styles', t('tools.richText.styles'), 'palette', actions.onToggleStyles, {
           active: actions.stylesOpen,
         }),
+        // Both are primary commands: two large buttons fill the group, a small one left a hole
         item('templates', t('tools.richText.templates'), 'grid', actions.onToggleTemplates, {
-          size: 'small',
           active: actions.templatesOpen,
         }),
       ],
+      // Word's style gallery hangs under the button: picking one applies it right away, and the
+      // document never loses screen space to a separate panel
+      overlay: actions.stylesOpen
+        ? createElement(StyleGallery, {
+            open: true,
+            editor,
+            onClose: actions.onToggleStyles,
+          })
+        : null,
     },
     {
       id: 'editing',
@@ -956,9 +1073,20 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
       label: t('tools.richText.ribbon.grp.table'),
       priority: 9,
       items: [
-        item('insert-table', t('tools.richText.table'), 'table', () =>
-          chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-        ),
+        // Word opens a size grid; a split button keeps the one-click 3×3 and offers the common sizes
+        {
+          kind: 'split',
+          id: 'insert-table',
+          label: t('tools.richText.table'),
+          icon: 'table',
+          onSelect: () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+          menu: TABLE_SIZE_PRESETS.map(([rows, cols]) => ({
+            id: `insert-table-${rows}x${cols}`,
+            label: `${rows} × ${cols}`,
+            icon: 'table',
+            onSelect: () => chain().insertTable({ rows, cols, withHeaderRow: true }).run(),
+          })),
+        },
       ],
     },
     {
@@ -989,13 +1117,6 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
           {
             size: 'small',
           },
-        ),
-        item(
-          'page-break',
-          t('tools.richText.pageBreak'),
-          'pageBreak',
-          () => chain().setPageBreak().run(),
-          { size: 'small' },
         ),
       ],
       // Gallery instead of a menu: picking a preset arms the draw layer, so the grid is the point.
@@ -1055,10 +1176,38 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
               actions.onTogglePageSetup,
               { active: actions.pageSetupOpen },
             ),
-            item('templates', t('tools.richText.templates'), 'grid', actions.onToggleTemplates, {
-              size: 'small',
-              active: actions.templatesOpen,
-            }),
+          ],
+        },
+        {
+          // Word 的「布局 → 分隔符」：分页符 + 分节符（下一页 / 连续）
+          id: 'breaks',
+          label: t('tools.richText.ribbon.grp.breaks'),
+          priority: 7,
+          items: [
+            item('page-break', t('tools.richText.pageBreak'), 'pageBreak', () =>
+              chain().setPageBreak().run(),
+            ),
+            {
+              kind: 'split',
+              id: 'section-break',
+              label: t('tools.richText.sectionBreak'),
+              icon: 'sectionBreak',
+              onSelect: () => actions.onInsertSectionBreak('nextPage'),
+              menu: [
+                {
+                  id: 'section-break-next-page',
+                  label: t('tools.richText.sectionBreakNextPage'),
+                  icon: 'sectionBreak',
+                  onSelect: () => actions.onInsertSectionBreak('nextPage'),
+                },
+                {
+                  id: 'section-break-continuous',
+                  label: t('tools.richText.sectionBreakContinuous'),
+                  icon: 'horizontalRule',
+                  onSelect: () => actions.onInsertSectionBreak('continuous'),
+                },
+              ],
+            },
           ],
         },
         {
@@ -1111,14 +1260,18 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
           id: 'toc',
           label: t('tools.richText.ribbon.grp.toc'),
           priority: 9,
-          items: [
-            item('insert-toc', t('tools.richText.insertToc'), 'toc', actions.onInsertToc, {
-              disabled: actions.tocDisabled,
-            }),
-            item('refresh-toc', t('tools.richText.refreshToc'), 'refresh', actions.onRefreshToc, {
-              size: 'small',
-              disabled: actions.tocDisabled,
-            }),
+          items: [],
+          // One row: the small "update" button sits beside the large "table of contents" one
+          rows: [
+            [
+              item('insert-toc', t('tools.richText.insertToc'), 'toc', actions.onInsertToc, {
+                disabled: actions.tocDisabled,
+              }),
+              item('refresh-toc', t('tools.richText.refreshToc'), 'refresh', actions.onRefreshToc, {
+                size: 'small',
+                disabled: actions.tocDisabled,
+              }),
+            ],
           ],
         },
         {
@@ -1176,6 +1329,49 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
           ],
         },
         {
+          // Word 的审阅核心：标记修订、接受/拒绝、与文件比较
+          id: 'tracking',
+          label: t('tools.richText.ribbon.grp.tracking'),
+          priority: 7,
+          items: [],
+          // Two full rows instead of five buttons packed into 2½ columns
+          rows: [
+            [
+              item(
+                'track-insert',
+                t('tools.richText.markInsert'),
+                'trackInsert',
+                actions.onMarkInsert,
+                { size: 'small' },
+              ),
+              item(
+                'track-delete',
+                t('tools.richText.markDelete'),
+                'trackDelete',
+                actions.onMarkDelete,
+                { size: 'small' },
+              ),
+              item(
+                'compare-file',
+                t('tools.richText.compareWithFile'),
+                'diff',
+                actions.onCompareFile,
+                { size: 'small' },
+              ),
+            ],
+            [
+              item('accept-all', t('tools.richText.acceptAll'), 'accept', actions.onAcceptAll, {
+                size: 'small',
+                disabled: !actions.hasTrackedChanges,
+              }),
+              item('reject-all', t('tools.richText.rejectAll'), 'reject', actions.onRejectAll, {
+                size: 'small',
+                disabled: !actions.hasTrackedChanges,
+              }),
+            ],
+          ],
+        },
+        {
           id: 'comments',
           label: t('tools.richText.ribbon.grp.comments'),
           priority: 8,
@@ -1205,21 +1401,25 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
           id: 'document-views',
           label: t('tools.richText.ribbon.grp.documentViews'),
           priority: 9,
-          items: [
-            item('outline', t('tools.richText.outline'), 'outline', actions.onToggleOutline, {
-              active: actions.outlineOpen,
-            }),
-            select(
-              'view-mode',
-              t('tools.richText.viewMode'),
-              actions.viewMode,
-              [
-                { value: 'flow', label: t('tools.richText.viewFlow') },
-                { value: 'paged', label: t('tools.richText.viewPaged') },
-              ],
-              (value) => actions.onViewModeChange(value as ViewMode),
-              'md',
-            ),
+          items: [],
+          // View mode belongs beside the outline button, not in a column of its own
+          rows: [
+            [
+              item('outline', t('tools.richText.outline'), 'outline', actions.onToggleOutline, {
+                active: actions.outlineOpen,
+              }),
+              select(
+                'view-mode',
+                t('tools.richText.viewMode'),
+                actions.viewMode,
+                [
+                  { value: 'flow', label: t('tools.richText.viewFlow') },
+                  { value: 'paged', label: t('tools.richText.viewPaged') },
+                ],
+                (value) => actions.onViewModeChange(value as ViewMode),
+                'md',
+              ),
+            ],
           ],
         },
         {

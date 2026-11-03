@@ -38,6 +38,10 @@ import {
 /** Table row height presets (mm): rows are stored in px, the ribbon talks mm like Word does */
 const ROW_HEIGHT_MM_PRESETS = [8, 12, 16, 20] as const;
 
+/** Highlight colours can come back as `#fef08a` or `rgb(...)`; the swatch only takes hex or nothing */
+const normalizeColor = (value: unknown): string | null =>
+  typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : null;
+
 export interface EditorToolbarProps extends RichTextRibbonActions {
   editor: Editor | null;
   /** 工具库里没有的命令（新建 / 导入 / 导出 / 清空…）收在一个 ⋯ 菜单里 */
@@ -115,26 +119,6 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
     ],
     [],
   );
-  // Style list: each row is drawn in the style it applies (Office's 样式 gallery), scaled to fit one row
-  const headingOptions = useMemo(() => {
-    const headingPreview: Record<number, { fontSize: string; fontWeight: 'bold' | number }> = {
-      1: { fontSize: '17px', fontWeight: 'bold' },
-      2: { fontSize: '15px', fontWeight: 'bold' },
-      3: { fontSize: '14px', fontWeight: 600 },
-      4: { fontSize: '13px', fontWeight: 600 },
-      5: { fontSize: '12.5px', fontWeight: 600 },
-      6: { fontSize: '12px', fontWeight: 600 },
-    };
-    return [
-      { value: 'paragraph', label: t('tools.richText.paragraph'), preview: { fontSize: '12px' } },
-      ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
-        value: String(level),
-        label: t(`tools.richText.h${level}`),
-        preview: headingPreview[level],
-      })),
-    ];
-  }, [t]);
-
   const state = useEditorState<RichTextToolbarState | null>({
     editor,
     selector: (ctx): RichTextToolbarState | null => {
@@ -153,6 +137,7 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
         lineHeight: String(e.getAttributes('textStyle').lineHeight ?? ''),
         color: String(e.getAttributes('textStyle').color ?? ''),
         highlight: e.isActive('highlight'),
+        highlightColor: normalizeColor(e.getAttributes('highlight').color),
         bold: e.isActive('bold'),
         italic: e.isActive('italic'),
         underline: e.isActive('underline'),
@@ -290,7 +275,6 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
     lineHeightOptions,
     letterSpacingOptions,
     textTransformOptions,
-    headingOptions,
     contentWidth,
     imageWidthValue,
     imageWidthOptions,

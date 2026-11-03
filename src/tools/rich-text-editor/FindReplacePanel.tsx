@@ -74,7 +74,7 @@ export function FindReplacePanel({ editor, onClose }: FindReplacePanelProps) {
   return (
     <div
       data-testid="rich-text-find-panel"
-      className="flex flex-wrap items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50/70 p-1.5 dark:border-blue-800 dark:bg-blue-950/40"
+      className="flex max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 p-1.5 shadow-lg dark:border-blue-800 dark:bg-blue-950"
       onKeyDown={handleKeyDown}
     >
       <div className="relative flex items-center">

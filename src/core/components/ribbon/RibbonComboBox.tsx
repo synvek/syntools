@@ -17,6 +17,8 @@ import { RIBBON_ACCENT } from './ribbonTheme';
  */
 
 const WIDTHS = {
+  // Short single-value boxes (letter spacing, text case) that share a row with icons
+  xxs: 'w-[2.75rem]',
   xs: 'w-[3.25rem]',
   sm: 'w-[5.5rem]',
   md: 'w-[8.5rem]',

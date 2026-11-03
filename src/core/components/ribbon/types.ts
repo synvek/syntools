@@ -101,7 +101,7 @@ export interface RibbonSelectItem extends RibbonItemBase {
   value: string;
   options: RibbonSelectOption[];
   onChange: (value: string) => void;
-  width?: 'xs' | 'sm' | 'md';
+  width?: 'xxs' | 'xs' | 'sm' | 'md';
   /** Accept free text (Word's font size box); the preset list still opens from the arrow */
   editable?: boolean;
   /**
@@ -141,7 +141,19 @@ export type RibbonItem =
 export interface RibbonGroup {
   id: string;
   label: string;
+  /**
+   * Column-major packing (Office's default): large buttons own a column, small ones stack two high.
+   * Leave empty when `rows` describes the group instead.
+   */
   items: RibbonItem[];
+  /**
+   * Row-major layout, one inner array per visual row.
+   *
+   * Word uses this for 字体 / 段落: a wide combo box and a narrow one sit side by side on the first
+   * row, the icon buttons fill the second. Column packing cannot express that — a narrow control
+   * under a wide one leaves a visible hole to its right.
+   */
+  rows?: RibbonItem[][];
   /** Dialog launcher (bottom-right arrow) — opens the group's full settings surface */
   onLauncher?: () => void;
   /** Higher priority groups are dropped last when the panel gets too narrow (default 0) */

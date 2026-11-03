@@ -16,7 +16,9 @@ import { useGroupOverflow, useRibbonCollapse } from './useRibbonCollapse';
  * editor's panel, so they are skipped instead of being rendered with a wrong control.
  */
 function groupMenuItems(group: RibbonGroup): RibbonMenuItem[] {
-  return group.items.flatMap((item) => {
+  // Row-major groups keep their commands in `rows`; flatten so the overflow menu stays complete
+  const items = group.rows ? group.rows.flat() : group.items;
+  return items.flatMap((item) => {
     if (item.kind === 'select' || item.kind === 'color') return [];
     if (item.kind === 'menu' || item.kind === 'split') {
       return item.menu.map((entry) => ({ ...entry, id: `${group.id}-${item.id}-${entry.id}` }));
