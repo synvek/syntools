@@ -1,8 +1,11 @@
 import type { TFunction } from 'i18next';
+import { fontPreviewOptions } from '@/core/components/ribbon/ribbonPreviewOptions';
 import type {
   RibbonGroup,
   RibbonItem,
   RibbonMenuItem,
+  RibbonSelectItem,
+  RibbonSelectOption,
   RibbonTab,
 } from '@/core/components/ribbon/types';
 import { SHAPE_PRESETS } from '../model/factory';
@@ -161,12 +164,13 @@ function select(
   id: string,
   label: string,
   value: string,
-  options: { value: string; label: string }[],
+  options: RibbonSelectOption[],
   onChange: (value: string) => void,
   width: 'xs' | 'sm' | 'md' = 'sm',
   disabled = false,
+  extra: Partial<RibbonSelectItem> = {},
 ): RibbonItem {
-  return { kind: 'select', id, label, value, options, onChange, width, disabled };
+  return { kind: 'select', id, label, value, options, onChange, width, disabled, ...extra };
 }
 
 const numericOptions = (values: readonly number[]) =>
@@ -338,10 +342,12 @@ export function buildSlideRibbonTabs(ctx: SlideRibbonContext): RibbonTab[] {
               'font-family',
               t('tools.slide.fontFamily'),
               ctx.fontFamily,
-              SLIDE_FONT_FAMILIES.map((font) => ({ value: font, label: font })),
+              fontPreviewOptions(SLIDE_FONT_FAMILIES.map((font) => ({ value: font, label: font }))),
               (font) => ctx.applyRunStyle({ font }),
               'md',
               !ctx.canText,
+              // Long family names + the right-aligned specimen need the wider list
+              { listWidth: 'wide' },
             ),
             select(
               'font-size',
@@ -351,6 +357,8 @@ export function buildSlideRibbonTabs(ctx: SlideRibbonContext): RibbonTab[] {
               (size) => ctx.applyRunStyle({ size: Number(size) }),
               'xs',
               !ctx.canText,
+              // PowerPoint lets you type any size (10.5 / 137 …), not just the presets
+              { editable: true },
             ),
             item(
               'grow-font',

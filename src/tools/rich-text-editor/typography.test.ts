@@ -13,6 +13,7 @@ import {
   isFontInstalled,
   matchFontOption,
   pxToHalfPoints,
+  stepFontSize,
   type FontCandidate,
 } from './typography';
 
@@ -154,5 +155,25 @@ describe('default typography stays in sync with the stylesheet', () => {
         .find((body) => body.includes('font-size')) ?? '';
     expect(block).toContain(`font-size: ${DEFAULT_FONT_SIZE_PX}px`);
     expect(block).toContain(`line-height: ${DEFAULT_LINE_HEIGHT}`);
+  });
+});
+
+describe('stepFontSize (A⁺ / A⁻)', () => {
+  it('moves one rung on the ladder in the requested direction', () => {
+    expect(stepFontSize(14, 1)).toBe(16);
+    expect(stepFontSize(14, -1)).toBe(12);
+    expect(stepFontSize(11, 1)).toBe(12);
+    // Half-point steps exist because 10.5 is a real Word size
+    expect(stepFontSize(10, 1)).toBe(10.5);
+  });
+
+  it('clamps at both ends instead of returning undefined', () => {
+    expect(stepFontSize(96, 1)).toBe(96);
+    expect(stepFontSize(8, -1)).toBe(8);
+  });
+
+  it('snaps a value that is not on the ladder to its neighbour', () => {
+    expect(stepFontSize(13, 1)).toBe(14);
+    expect(stepFontSize(13, -1)).toBe(12);
   });
 });

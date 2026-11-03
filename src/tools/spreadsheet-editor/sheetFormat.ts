@@ -148,19 +148,21 @@ export interface NumberFormatPreset {
   labelKey: string;
   /** Univer/xlsx pattern; empty string means "General" */
   pattern: string;
+  /** What a typical value looks like once the pattern is applied — shown in the ribbon dropdown */
+  sample: string;
 }
 
 /** Excel's number-format dropdown, minus the locale-specific accounting variants */
 export const NUMBER_FORMAT_PRESETS: NumberFormatPreset[] = [
-  { id: 'general', labelKey: 'numberGeneral', pattern: '' },
-  { id: 'number', labelKey: 'numberNumber', pattern: '#,##0.00' },
-  { id: 'currency', labelKey: 'numberCurrency', pattern: '¥#,##0.00' },
-  { id: 'percent', labelKey: 'numberPercent', pattern: '0.00%' },
-  { id: 'thousand', labelKey: 'numberThousand', pattern: '#,##0' },
-  { id: 'date', labelKey: 'numberDate', pattern: 'yyyy-mm-dd' },
-  { id: 'time', labelKey: 'numberTime', pattern: 'hh:mm:ss' },
-  { id: 'text', labelKey: 'numberText', pattern: '@' },
-  { id: 'scientific', labelKey: 'numberScientific', pattern: '0.00E+00' },
+  { id: 'general', labelKey: 'numberGeneral', pattern: '', sample: '1234.5' },
+  { id: 'number', labelKey: 'numberNumber', pattern: '#,##0.00', sample: '1,234.50' },
+  { id: 'currency', labelKey: 'numberCurrency', pattern: '¥#,##0.00', sample: '¥1,234.50' },
+  { id: 'percent', labelKey: 'numberPercent', pattern: '0.00%', sample: '1234.50%' },
+  { id: 'thousand', labelKey: 'numberThousand', pattern: '#,##0', sample: '1,235' },
+  { id: 'date', labelKey: 'numberDate', pattern: 'yyyy-mm-dd', sample: '2026-11-03' },
+  { id: 'time', labelKey: 'numberTime', pattern: 'hh:mm:ss', sample: '14:30:00' },
+  { id: 'text', labelKey: 'numberText', pattern: '@', sample: '文本' },
+  { id: 'scientific', labelKey: 'numberScientific', pattern: '0.00E+00', sample: '1.23E+03' },
 ];
 
 /** Pattern used by the "add decimal place" command when the cell has no explicit format yet */

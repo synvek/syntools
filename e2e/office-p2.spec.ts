@@ -21,7 +21,8 @@ async function openRichText(page: Page): Promise<void> {
   // Pagination (and the per-page sheets) only exists in page view; the default is flow view.
   // The view mode is the 视图 tab's select — the menu bar no longer duplicates it.
   await page.getByRole('tab', { name: '视图', exact: true }).click();
-  await page.getByLabel('视图模式').selectOption('paged');
+  await page.getByRole('combobox', { name: '视图模式' }).click();
+  await page.getByRole('option', { name: '页面视图' }).click();
   await expect(page.locator('.rte-page-sheet').first()).toBeVisible();
 }
 

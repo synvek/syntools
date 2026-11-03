@@ -1,4 +1,5 @@
 import { editorMenuItem, type EditorMenu } from '@/core/components/editorChrome';
+import { fontPreviewOptions } from '@/core/components/ribbon/ribbonPreviewOptions';
 import type { RibbonMenuItem, RibbonTab } from '@/core/components/ribbon/types';
 import {
   BORDER_PRESETS,
@@ -17,6 +18,18 @@ import {
  * The module is free of `@univerjs/*` imports — actions only talk to `SheetRibbonHost`, so the whole
  * registry is unit-testable with a fake host (see commands.test.ts).
  */
+
+/**
+ * Excel's font size box clamps typed input to 1–409 and accepts halves (10.5); an empty or zero value
+ * clears the override so the sheet falls back to the theme font.
+ */
+/** Excel's default body text size; shown greyed in the empty size box */
+export const SHEET_DEFAULT_FONT_SIZE = 11;
+
+export function clampedFontSize(value: number): number | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.min(409, Math.max(1, Math.round(value * 10) / 10));
+}
 
 export type MergeMode = 'merge' | 'center' | 'across' | 'unmerge';
 export type FreezeMode = 'none' | 'row' | 'column' | 'both';
@@ -865,9 +878,11 @@ function menuItems(ctx: SheetCommandContext, ids: SheetCommandId[]): RibbonMenuI
  */
 export function buildSheetRibbonTabs(ctx: SheetCommandContext): RibbonTab[] {
   const format = ctx.format;
+  // Office shows the *result* of the format in the list, so the user picks by sight instead of by name
   const numfmtOptions = NUMBER_FORMAT_PRESETS.map((preset) => ({
     value: preset.pattern,
     label: ctx.t(`tools.sheet.r.${preset.labelKey}`),
+    preview: { hint: preset.sample },
   }));
   const activeNumberFormat = format?.numberFormat ?? '';
 
@@ -947,12 +962,14 @@ export function buildSheetRibbonTabs(ctx: SheetCommandContext): RibbonTab[] {
               id: 'font-family',
               label: ctx.t('tools.sheet.r.fontFamily'),
               value: format?.fontFamily ?? '',
-              width: 'sm',
+              // Wide enough for "Microsoft YaHei"; Office's font box never truncates a family name
+              width: 'md',
               disabled: editBlocked(ctx),
-              options: [
+              listWidth: 'wide',
+              options: fontPreviewOptions([
                 { value: '', label: ctx.t('tools.sheet.r.fontDefault') },
                 ...FONT_FAMILY_PRESETS.map((font) => ({ value: font, label: font })),
-              ],
+              ]),
               onChange: (value) => ctx.host?.applyFormat({ fontFamily: value || null }),
             },
             {
@@ -968,7 +985,12 @@ export function buildSheetRibbonTabs(ctx: SheetCommandContext): RibbonTab[] {
                   : []),
                 ...FONT_SIZE_PRESETS.map((size) => ({ value: String(size), label: String(size) })),
               ],
-              onChange: (value) => ctx.host?.applyFormat({ fontSize: Number(value) || null }),
+              // Excel's size box accepts anything between 1 and 409, not only the presets; when the
+              // selection carries no explicit size the box shows the sheet default
+              editable: true,
+              display: String(SHEET_DEFAULT_FONT_SIZE),
+              onChange: (value) =>
+                ctx.host?.applyFormat({ fontSize: clampedFontSize(Number(value)) }),
             },
             asItem('growFont'),
             asItem('shrinkFont'),
@@ -1043,7 +1065,7 @@ export function buildSheetRibbonTabs(ctx: SheetCommandContext): RibbonTab[] {
               id: 'number-format',
               label: ctx.t('tools.sheet.r.numberFormat'),
               value: activeNumberFormat,
-              width: 'xs',
+              width: 'sm',
               disabled: noHostOrBusy(ctx),
               options: numfmtOptions,
               onChange: (value) => ctx.host?.applyNumberFormat(value || null),

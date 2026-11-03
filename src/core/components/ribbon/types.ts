@@ -63,13 +63,61 @@ export interface RibbonSplitItem extends RibbonItemBase {
   menu: RibbonMenuItem[];
 }
 
-/** Compact native select (font family / size / number format) */
+/**
+ * Rendering hints for one option of a combo box.
+ *
+ * Office previews the *result*, not the label: the font list is set in each font, the style list is set
+ * in each style, the number format list shows a formatted sample. `hint` is the grey sample on the right
+ * (e.g. "AaBbCc" for fonts, "12 pt" for sizes).
+ */
+export interface RibbonSelectPreview {
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: 'normal' | 'bold' | number;
+  fontStyle?: 'normal' | 'italic';
+  textDecoration?: string;
+  letterSpacing?: string;
+  color?: string;
+  /** Right-aligned sample text, styled with the same preview */
+  hint?: string;
+}
+
+export interface RibbonSelectOption {
+  value: string;
+  label: string;
+  preview?: RibbonSelectPreview;
+  /** Renders as a non-selectable section title inside the list */
+  heading?: boolean;
+}
+
+/**
+ * Combo box (font family / font size / style / number format).
+ *
+ * Not a native `<select>`: the browser cannot paint options in their own font, which is exactly what
+ * makes Office's lists readable. See `RibbonComboBox`.
+ */
 export interface RibbonSelectItem extends RibbonItemBase {
   kind: 'select';
   value: string;
-  options: { value: string; label: string }[];
+  options: RibbonSelectOption[];
   onChange: (value: string) => void;
   width?: 'xs' | 'sm' | 'md';
+  /** Accept free text (Word's font size box); the preset list still opens from the arrow */
+  editable?: boolean;
+  /**
+   * What the trigger shows when the value is not in the list (falls back to the raw value).
+   * Editable boxes also use it as the placeholder when nothing is set yet (e.g. the default 11pt).
+   */
+  display?: string;
+  /** Editable only: stored value → the text in the input (`'15px'` → `'15'`) */
+  toDraft?: (value: string) => string;
+  /** Editable only: typed text → the stored value (`'18'` → `'18px'`) */
+  fromDraft?: (draft: string) => string;
+  /**
+   * `wide` gives the list room for long labels so the right-aligned samples line up (font lists, style
+   * galleries); `auto` hugs the content (numbers, zooms).
+   */
+  listWidth?: 'auto' | 'wide';
 }
 
 /** Color swatch button: preset palette popover plus a native picker fallback */

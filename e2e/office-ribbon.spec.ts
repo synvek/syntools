@@ -203,8 +203,12 @@ test.describe('spreadsheet ribbon', () => {
 
   test('applies number formats and border presets', async ({ page }) => {
     await openSheet(page);
-    await page.getByTestId('ribbon-number-number-format').selectOption('0.00%');
-    await expect(page.getByTestId('ribbon-number-number-format')).toHaveValue('0.00%');
+    // The number-format box is an Office-style combo: open it and pick by the formatted sample
+    const numberFormat = page.getByTestId('ribbon-number-number-format').getByRole('combobox');
+    await numberFormat.click();
+    await page.getByRole('option', { name: /百分比/ }).click();
+    await expect(numberFormat).toHaveText(/百分比/);
+    await expect(page.getByRole('listbox')).toHaveCount(0);
 
     await page.getByRole('button', { name: '边框 ▾' }).click();
     await page.getByRole('menu').getByRole('menuitem', { name: '所有框线' }).click();

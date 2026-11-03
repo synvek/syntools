@@ -13,6 +13,23 @@ export const DEFAULT_LINE_HEIGHT = 1.8;
 
 /** Available font sizes (px): excluding the default, which is shown separately as the first entry */
 export const FONT_SIZE_OPTIONS = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 48, 72] as const;
+
+/** Ladder used by 增大/减小字号 (A⁺ / A⁻): Word's own steps plus the small sizes 12pt-and-under text needs */
+export const FONT_SIZE_STEPS = [
+  8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 48, 72, 96,
+] as const;
+
+/** Next/previous step on the ladder; values between steps snap to the neighbour in that direction */
+export function stepFontSize(current: number, direction: 1 | -1): number {
+  if (!Number.isFinite(current) || current <= 0) return direction === 1 ? 12 : 12;
+  const exact = FONT_SIZE_STEPS.indexOf(current as (typeof FONT_SIZE_STEPS)[number]);
+  if (exact !== -1) {
+    return FONT_SIZE_STEPS[Math.min(FONT_SIZE_STEPS.length - 1, Math.max(0, exact + direction))]!;
+  }
+  const ordered = direction === 1 ? FONT_SIZE_STEPS : [...FONT_SIZE_STEPS].reverse();
+  const hit = ordered.find((size) => (direction === 1 ? size > current : size < current));
+  return hit ?? current;
+}
 /** Available line heights: excluding the default */
 export const LINE_HEIGHT_OPTIONS = [1, 1.15, 1.5, 1.75, 2, 2.5, 3] as const;
 

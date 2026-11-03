@@ -5,8 +5,11 @@ import type {
   RibbonGroup,
   RibbonItem,
   RibbonItemSize,
+  RibbonSelectItem,
+  RibbonSelectOption,
   RibbonTab,
 } from '@/core/components/ribbon/types';
+import { stepFontSize } from './typography';
 import type { TextTransformValue } from './charFormat';
 import type { ViewMode } from './draft';
 import { normalizeHex } from '../../core/drawing/geometry';
@@ -126,6 +129,8 @@ export interface RichTextRibbonOptions {
   fontFamilyValue: string;
   fontOptions: { value: string; label: string }[];
   fontSizeOptions: { value: string; label: string }[];
+  /** Shown in the size box (and as its placeholder) when the run has no explicit size */
+  fontSizeDefault: string;
   lineHeightOptions: { value: string; label: string }[];
   letterSpacingOptions: { value: string; label: string }[];
   textTransformOptions: { value: string; label: string }[];
@@ -185,18 +190,21 @@ function select(
   id: string,
   label: string,
   value: string,
-  options: { value: string; label: string }[],
+  options: RibbonSelectOption[],
   onChange: (value: string) => void,
   width: 'xs' | 'sm' | 'md' = 'sm',
   disabled = false,
+  extra: Partial<RibbonSelectItem> = {},
 ): RibbonItem {
-  return { kind: 'select', id, label, value, options, onChange, width, disabled };
+  return { kind: 'select', id, label, value, options, onChange, width, disabled, ...extra };
 }
 
 /** Lays the words on the page: font, character spacing, colour and highlight */
 function fontGroup(input: RichTextRibbonInput): RibbonGroup {
   const { state, t, options } = input;
   const chain = () => input.editor.chain().focus();
+  // Size of the current run in px (the mark stores "18px"; unset means the document default)
+  const currentFontSize = Number.parseFloat(state.fontSize) || Number(options.fontSizeDefault);
   return {
     id: 'font',
     label: t('tools.richText.ribbon.grp.font'),
@@ -209,14 +217,51 @@ function fontGroup(input: RichTextRibbonInput): RibbonGroup {
         options.fontOptions,
         (value) => (value ? chain().setFontFamily(value).run() : chain().unsetFontFamily().run()),
         'md',
+        false,
+        { listWidth: 'wide' },
       ),
       select(
         'font-size',
         t('tools.richText.fontSize'),
         state.fontSize,
         options.fontSizeOptions,
-        (value) => (value ? chain().setFontSize(value).run() : chain().unsetFontSize().run()),
+        // Typed sizes are plain numbers; the text-style mark wants a CSS length
+        (value) =>
+          value
+            ? chain()
+                .setFontSize(/^[\d.]+$/.test(value) ? `${value}px` : value)
+                .run()
+            : chain().unsetFontSize().run(),
         'xs',
+        false,
+        {
+          // Word's size box takes any value, not only the presets; the empty state shows the default size
+          editable: true,
+          display: options.fontSizeDefault,
+          toDraft: (value) => value.replace(/px$/, ''),
+          fromDraft: (draft) => draft,
+        },
+      ),
+      // A⁺ / A⁻: the Office habit of nudging the size without opening the box
+      item(
+        'grow-font',
+        t('tools.richText.increaseFontSize'),
+        'fontGrow',
+        () =>
+          chain()
+            .setFontSize(`${stepFontSize(currentFontSize, 1)}px`)
+            .run(),
+        { size: 'small' },
+      ),
+      item(
+        'shrink-font',
+        t('tools.richText.decreaseFontSize'),
+        'fontShrink',
+        () =>
+          chain()
+            .setFontSize(`${stepFontSize(currentFontSize, -1)}px`)
+            .run(),
+        { size: 'small' },
       ),
       item('bold', t('tools.richText.bold'), 'bold', () => chain().toggleBold().run(), {
         active: state.bold,
@@ -323,6 +368,8 @@ function paragraphGroup(input: RichTextRibbonInput): RibbonGroup {
                 .toggleHeading({ level: Number(value) as 1 | 2 | 3 | 4 | 5 | 6 })
                 .run(),
         'md',
+        false,
+        { listWidth: 'wide' },
       ),
       select(
         'line-height',

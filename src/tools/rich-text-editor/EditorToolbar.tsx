@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { Ribbon } from '@/core/components/ribbon/Ribbon';
 import type { EditorMenu } from '@/core/components/editorChrome';
+import { fontPreviewOptions } from '@/core/components/ribbon/ribbonPreviewOptions';
 import { RIBBON_ICON_BUTTON } from '@/core/components/ribbon/ribbonTheme';
 import { RibbonIcon } from '@/core/components/ribbon/ribbonIcons';
 import { findSelectedFootnote } from './footnotes';
@@ -71,12 +72,13 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
     );
     // The first entry shows the concrete font name (the one actually applied to body text); falls back to a generic label when undetected
     const label = installed ? defaultFontName : t('tools.richText.fontDefault');
-    return [
+    // Each row is rendered in its own face (Office's font list); the generic families are real CSS keywords
+    return fontPreviewOptions([
       ...buildFontOptions(installedFonts, label, defaultFontName),
       { value: 'sans-serif', label: t('tools.richText.fontSans') },
       { value: 'serif', label: t('tools.richText.fontSerif') },
       { value: 'monospace', label: t('tools.richText.fontMono') },
-    ];
+    ]);
   }, [installedFonts, defaultFontName, t]);
 
   // Font size / line spacing also show concrete values: the document default when unset
@@ -113,16 +115,25 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
     ],
     [],
   );
-  const headingOptions = useMemo(
-    () => [
-      { value: 'paragraph', label: t('tools.richText.paragraph') },
+  // Style list: each row is drawn in the style it applies (Office's 样式 gallery), scaled to fit one row
+  const headingOptions = useMemo(() => {
+    const headingPreview: Record<number, { fontSize: string; fontWeight: 'bold' | number }> = {
+      1: { fontSize: '17px', fontWeight: 'bold' },
+      2: { fontSize: '15px', fontWeight: 'bold' },
+      3: { fontSize: '14px', fontWeight: 600 },
+      4: { fontSize: '13px', fontWeight: 600 },
+      5: { fontSize: '12.5px', fontWeight: 600 },
+      6: { fontSize: '12px', fontWeight: 600 },
+    };
+    return [
+      { value: 'paragraph', label: t('tools.richText.paragraph'), preview: { fontSize: '12px' } },
       ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
         value: String(level),
         label: t(`tools.richText.h${level}`),
+        preview: headingPreview[level],
       })),
-    ],
-    [t],
-  );
+    ];
+  }, [t]);
 
   const state = useEditorState<RichTextToolbarState | null>({
     editor,
@@ -275,6 +286,7 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
     fontFamilyValue: matchFontOption(state.fontFamily, fontOptions),
     fontOptions,
     fontSizeOptions,
+    fontSizeDefault: String(DEFAULT_FONT_SIZE_PX),
     lineHeightOptions,
     letterSpacingOptions,
     textTransformOptions,

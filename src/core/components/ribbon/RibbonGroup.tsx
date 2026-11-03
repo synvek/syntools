@@ -3,7 +3,7 @@ import { RIBBON_ACCENT, RIBBON_GROUP_LABEL } from './ribbonTheme';
 import { RibbonButton } from './RibbonButton';
 import { RibbonColorPicker } from './RibbonColorPicker';
 import { RibbonMenuButton, RibbonSplitButton } from './RibbonSplitButton';
-import { RibbonSelect } from './RibbonSelect';
+import { RibbonComboBox } from './RibbonComboBox';
 
 /** Prefix for command test ids, so e2e can target one command without relying on the label */
 function itemTestId(groupId: string, itemId: string): string {
@@ -84,16 +84,15 @@ function ItemView({
       );
     case 'select':
       return (
-        <RibbonSelect
-          label={item.label}
-          value={item.value}
-          options={item.options}
-          width={item.width}
-          disabled={item.disabled}
-          onChange={(value) => {
-            item.onChange(value);
-            onInvoked?.();
+        <RibbonComboBox
+          item={{
+            ...item,
+            onChange: (value) => {
+              item.onChange(value);
+              onInvoked?.();
+            },
           }}
+          accent={accent}
           testId={itemTestId(groupId, item.id)}
         />
       );
