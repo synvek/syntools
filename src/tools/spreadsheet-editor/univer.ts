@@ -882,22 +882,44 @@ export function createUniverInstance(
 
   const onViewportChange = (listener: () => void): (() => void) => {
     let frame = 0;
+    const run = (): void => {
+      frame = 0;
+      listener();
+    };
     const schedule = (): void => {
       if (frame) return;
+      frame = window.requestAnimationFrame(run);
+    };
+    /**
+     * 滚轮要单独接一层。
+     *
+     * Univer 0.25 的 `Event.Scroll` 来自 `ScrollManagerService` 的 `scrollInfo$`，只有"命令驱动"的
+     * 滚动（`scrollToCell`、键盘翻页）会走到那里；**鼠标滚轮不会**。原来的实现只订阅门面事件，
+     * 于是滚轮把表格滚走了、形状层却停在原地（`office-p4` 的"滚动跟随"用例就是这么挂的）。
+     * wheel 之后隔一帧再读，是为了等 Univer 自己的滚动渲染把 offset 写回 scene。
+     */
+    const onWheel = (): void => {
+      if (frame) return;
       frame = window.requestAnimationFrame(() => {
-        frame = 0;
-        listener();
+        frame = window.requestAnimationFrame(run);
       });
     };
-    // Scroll fires per wheel tick; zoom and column/row resizing move the grid origin as well
+    // 滚轮之外的鼠标路径：拖动（canvas 内绘制的）滚动条，松手时补一次
+    const onPointerUp = (): void => schedule();
+    container.addEventListener('wheel', onWheel, { passive: true });
+    container.addEventListener('pointerup', onPointerUp);
+    // Keyboard paging / selection moves go through commands, not through the scroll event
     const disposables = [
       univerAPI.addEvent(univerAPI.Event.Scroll, schedule),
       univerAPI.addEvent(univerAPI.Event.SheetZoomChanged, schedule),
       univerAPI.addEvent(univerAPI.Event.SheetSkeletonChanged, schedule),
+      univerAPI.addEvent(univerAPI.Event.CommandExecuted, schedule),
     ];
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       frame = 0;
+      container.removeEventListener('wheel', onWheel);
+      container.removeEventListener('pointerup', onPointerUp);
       for (const disposable of disposables) disposable.dispose();
     };
   };

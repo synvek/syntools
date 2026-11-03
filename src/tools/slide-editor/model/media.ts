@@ -104,6 +104,16 @@ export async function createMediaFromBytes(
   return { ok: true, value: asset };
 }
 
+/**
+ * 单张图解码的硬超时（ms）。
+ *
+ * `onload` / `onerror` 并不保证成对出现：jsdom 对 `blob:` URL 两个事件都不触发，某些 WebView 遇到
+ * 不支持的编码（HEIC、损坏的 PNG）也会静默挂住。没有这个兜底时，一次导入会**永久 await**，
+ * 表现为"打开含图片的 pptx 卡死"——`baseline:roundtrip` 的 `slide/image-1px` 样例就是被这个卡死的
+ * （表现为整份基线测试 120s 超时，而不是报错）。
+ */
+const DECODE_TIMEOUT_MS = 5_000;
+
 /** Read an image's intrinsic size; returns null on failure (e.g. WMF/EMF the browser can't decode) */
 export async function measureImageSize(
   asset: MediaAsset,
@@ -112,9 +122,17 @@ export async function measureImageSize(
   const url = getMediaUrl(asset);
   if (!url) return null;
   return await new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => finish(null), DECODE_TIMEOUT_MS);
+    const finish = (size: { width: number; height: number } | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(size);
+    };
     const image = new Image();
-    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    image.onerror = () => resolve(null);
+    image.onload = () => finish({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onerror = () => finish(null);
     image.src = url;
   });
 }

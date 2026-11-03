@@ -226,6 +226,10 @@ export function attachInteraction(handle: StageHandle): void {
   });
 
   stage.on('click tap', (event) => {
+    // Konva fires `click` for every pointerup pair, including the right button. A right click belongs to
+    // the context menu (`contextmenu` below); letting it through here would clear the selection just
+    // before the menu opens, which is exactly the "right-click → 全选 → Esc" flow's regression.
+    if (event.evt instanceof MouseEvent && event.evt.button !== 0) return;
     // Konva still emits a background click after a marquee lands; swallow it to keep the selection
     if (marqueeJustEnded) {
       marqueeJustEnded = false;

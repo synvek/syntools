@@ -36,6 +36,25 @@ if (typeof Blob !== 'undefined' && typeof Blob.prototype.arrayBuffer !== 'functi
   };
 }
 
+/**
+ * jsdom cannot decode images, so `measureImageSize` never settles for `blob:` URLs and every picture
+ * sample degrades to a placeholder（`slide/image-1px` 曾因此在导入里永久 await，整份基线 120s 超时）。
+ * A 2×2 stand-in makes the media path behave like a browser, so the sample really round-trips.
+ */
+class FakeImage {
+  naturalWidth = 2;
+  naturalHeight = 2;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  set src(_value: string) {
+    queueMicrotask(() => this.onload?.());
+  }
+}
+
+if (typeof Image !== 'undefined') {
+  (globalThis as { Image?: unknown }).Image = FakeImage;
+}
+
 /** Minimal File stand-in: the importers only touch name / size / arrayBuffer() */
 function fakeFile(bytes: Uint8Array, name: string): File {
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
@@ -183,7 +202,10 @@ describe('OOXML round-trip baseline (generated samples)', () => {
     expect(docSamples).toHaveLength(SAMPLE_COUNTS.docx);
     const ids = sampleManifest.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(sampleManifest).toHaveLength(32);
+    // 总数由分组数量派生：样例随能力扩展（S9 加页眉页脚、SH7 加图片），写死 30 会立刻过期
+    expect(sampleManifest).toHaveLength(
+      SAMPLE_COUNTS.slide + SAMPLE_COUNTS.sheet + SAMPLE_COUNTS.docx,
+    );
   });
 
   it('exports and re-imports every sample without losing the document', async () => {
@@ -218,6 +240,7 @@ describe('OOXML round-trip baseline (generated samples)', () => {
     expect(report).toBeDefined();
     if (!report) return;
     for (const line of writeReport(report)) console.log(`[baseline] ${line}`);
-    expect(report.total).toBe(30);
+    // 样例数会随能力扩展（P2-S9 加页眉页脚、P4-SH7 加图片后为 15/9/8），断言 manifest 而不是写死数字
+    expect(report.total).toBe(sampleManifest.length);
   });
 });
