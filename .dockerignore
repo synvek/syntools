@@ -1,0 +1,38 @@
+# Rebuilt inside the image — host node_modules contains macOS binaries
+node_modules
+dist
+dist-ssr
+coverage
+
+# Git metadata / hooks are not needed for a build
+.git
+.gitignore
+.github
+.husky
+
+# Desktop build artifacts (the web build does not use them)
+src-tauri/target
+
+# Local-only test / editor / environment files
+playwright-report
+test-results
+*.log
+.DS_Store
+.vscode
+.idea
+.cursor
+.codebuddy
+.workbuddy
+plan
+infra
+.env
+.env.*
+!.env.example
+scripts/.en-locale.json
+scripts/locale-chunks
+
+# Docker tooling is not needed in the build context (but docker/nginx.conf is:
+# the runtime stage COPYs it into the image, so the directory stays included)
+Dockerfile
+docker-compose.yml
+.dockerignore

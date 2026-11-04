@@ -1,0 +1,17 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        # Canonical origin baked into sitemap.xml / canonical / hreflang at build time
+        SITE_URL: ${SITE_URL:-https://www.syntools.net}
+        # Set to e.g. /syntools/ when serving under a sub-path
+        BASE_PATH: ${BASE_PATH:-/}
+        # Leave empty (default) to keep analytics disabled
+        VITE_ANALYTICS_ENDPOINT: ${VITE_ANALYTICS_ENDPOINT:-}
+    image: syntools:local
+    container_name: syntools-web
+    restart: unless-stopped
+    ports:
+      # Container always listens on 80; only the host port is configurable
+      - '${PORT:-8080}:80'

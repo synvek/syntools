@@ -130,6 +130,8 @@ SynTools 从开发者工具箱起步，但早已不再只面向开发者：
 corepack enable
 ```
 
+Docker ≥ 24 仅在需要容器化部署时使用（见下文「部署」章节）。
+
 ---
 
 ## 快速开始
@@ -173,6 +175,10 @@ syntools/
 ├── index.html                 # 入口 + 内联主题初始化（防首帧闪烁）
 ├── vite.config.ts             # Vite + Vitest（@ → src）
 ├── vercel.json                # SPA 重写 + 安全响应头
+├── Dockerfile                 # 两阶段构建：pnpm build + nginx
+├── docker-compose.yml         # 自托管容器部署
+├── docker/nginx.conf          # SPA 回退、安全响应头、缓存策略
+├── .dockerignore              # 隔离宿主机构建产物
 ├── e2e/                       # Playwright 端到端用例
 ├── scripts/                   # 体积预算、预渲染 + sitemap、文案注入
 ├── src-tauri/                 # 可选的 Tauri 桌面外壳
@@ -277,6 +283,30 @@ pnpm build
 pnpm build:cf   # Cloudflare Pages：同一产物 + 埋点端点
 pnpm preview    # 可选：本地预览
 ```
+
+### Docker（自托管）
+
+`Dockerfile` 采用两阶段构建：`node:22-alpine` 通过 Corepack 锁定的 pnpm 安装依赖并执行 `pnpm build`，随后把静态产物 `dist/` 复制进 `nginx:alpine`。最终镜像不含 Node.js 与源码。`docker/nginx.conf` 直接托管 318 个预渲染页面，施加与 `vercel.json` 一致的 CSP 与安全响应头，并把未知路径回退到 `index.html` 交给前端路由。
+
+```bash
+docker compose up -d --build
+# 也可以直接构建运行
+docker build -t syntools:local .
+docker run -d --name syntools -p 8080:80 syntools:local
+```
+
+打开 [http://localhost:8080](http://localhost:8080)，容器提供 `/healthz` 健康检查端点。
+
+构建期参数（Compose 从 `.env` 或环境变量读取；直接用 `docker build` 时用 `--build-arg NAME=value`）：
+
+| 变量                      | 默认值                     | 说明                                                      |
+| ------------------------- | -------------------------- | --------------------------------------------------------- |
+| `SITE_URL`                | `https://www.syntools.net` | `sitemap.xml`、`canonical` 与 `hreflang` 使用的站点根地址 |
+| `BASE_PATH`               | `/`                        | 子路径部署，如 `/syntools/`                               |
+| `VITE_ANALYTICS_ENDPOINT` | 空                         | 可选埋点端点，留空即完全关闭埋点                          |
+| `PORT`                    | `8080`                     | Compose 映射到宿主机的端口（容器内固定监听 80）           |
+
+`SITE_URL` 与 `BASE_PATH` 会写入预渲染 HTML，修改后必须重新构建镜像。容器按 `/` 根路径提供服务；若把 `BASE_PATH` 设为子路径，需由前面的反向代理剥离该前缀（页面生成的资源 URL 仍带子路径）。HTTPS 也建议在同一代理上终结。
 
 ### 桌面应用（Tauri）
 

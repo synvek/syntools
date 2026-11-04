@@ -130,6 +130,8 @@ Enable Corepack if needed:
 corepack enable
 ```
 
+Docker ≥ 24 is only needed for the container deployment described below.
+
 ---
 
 ## Quick start
@@ -173,6 +175,10 @@ syntools/
 ├── index.html                 # Entry + inline theme bootstrap (no FOUC)
 ├── vite.config.ts             # Vite + Vitest (@ → src)
 ├── vercel.json                # SPA rewrites + security headers
+├── Dockerfile                 # Two-stage build: pnpm build + nginx
+├── docker-compose.yml         # Self-hosted container deployment
+├── docker/nginx.conf          # SPA fallback, security headers, caching
+├── .dockerignore              # Keeps host artifacts out of the build context
 ├── e2e/                       # Playwright end-to-end specs
 ├── scripts/                   # Bundle budget, prerender + sitemap, locale injection
 ├── src-tauri/                 # Optional Tauri desktop shell
@@ -277,6 +283,30 @@ pnpm build
 pnpm build:cf   # Cloudflare Pages: same build + analytics endpoint
 pnpm preview    # optional local check
 ```
+
+### Docker (self-hosted)
+
+`Dockerfile` is a two-stage build: `node:22-alpine` installs dependencies with the Corepack-pinned pnpm and runs `pnpm build`, then the static `dist/` is copied into `nginx:alpine`. The final image contains no Node.js or source files. `docker/nginx.conf` serves the 318 prerendered pages directly, applies the same CSP and security headers as `vercel.json`, and falls back to `index.html` for client-side routes.
+
+```bash
+docker compose up -d --build
+# or build and run directly
+docker build -t syntools:local .
+docker run -d --name syntools -p 8080:80 syntools:local
+```
+
+Open [http://localhost:8080](http://localhost:8080); the container exposes `/healthz` for health checks.
+
+Build-time settings (Compose reads them from `.env` or the shell; with plain `docker build` use `--build-arg NAME=value`):
+
+| Variable                  | Default                    | Purpose                                                         |
+| ------------------------- | -------------------------- | --------------------------------------------------------------- |
+| `SITE_URL`                | `https://www.syntools.net` | Canonical origin for `sitemap.xml`, `canonical` and `hreflang`  |
+| `BASE_PATH`               | `/`                        | Sub-path deployment, e.g. `/syntools/`                          |
+| `VITE_ANALYTICS_ENDPOINT` | empty                      | Optional analytics endpoint; empty keeps analytics off          |
+| `PORT`                    | `8080`                     | Host port published by Compose (container always listens on 80) |
+
+`SITE_URL` and `BASE_PATH` are baked into the prerendered HTML, so changing them requires a rebuild. The container serves the site at `/`; if `BASE_PATH` is set to a sub-path, the reverse proxy in front must strip that prefix from incoming requests. Terminate TLS at that same proxy.
 
 ### Desktop (Tauri)
 
