@@ -10,6 +10,17 @@ interface FindReplacePanelProps {
 }
 
 /**
+ * Shared control tokens with the other editor panels / ribbon popovers (ReviewPanel, ShapePanel,
+ * RibbonMenu): neutral surfaces, 28px controls, gray borders, accent only on the active toggle.
+ */
+const FIELD_CLASS =
+  'h-7 w-44 min-w-0 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500';
+const BUTTON_CLASS =
+  'inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800';
+const ICON_BUTTON_CLASS =
+  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800';
+
+/**
  * Find-and-replace panel: decoration highlights, match navigation, replace one / replace all.
  * The find-replace plugin owns match state; this component only handles input and display.
  */
@@ -68,102 +79,107 @@ export function FindReplacePanel({ editor, onClose }: FindReplacePanelProps) {
     }
   };
 
-  const controlClass =
-    'h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100';
-
   return (
     <div
       data-testid="rich-text-find-panel"
-      className="flex max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 p-1.5 shadow-lg dark:border-blue-800 dark:bg-blue-950"
+      className="flex max-w-full flex-col gap-2 rounded-lg border border-gray-200 bg-white p-2 text-sm shadow-xl dark:border-gray-700 dark:bg-gray-900"
       onKeyDown={handleKeyDown}
     >
-      <div className="relative flex items-center">
-        <input
-          ref={inputRef}
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          placeholder={t('tools.richText.find')}
-          aria-label={t('tools.richText.find')}
-          className={`${controlClass} w-44 pr-16`}
-        />
-        <span
-          className="pointer-events-none absolute right-2 text-xs text-gray-500 dark:text-gray-400"
-          aria-live="polite"
-        >
-          {total > 0 ? `${current + 1}/${total}` : term ? t('tools.richText.noMatch') : ''}
+      {/* Same header as the other editor panels: title on the left, close button on the right */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium text-gray-700 dark:text-gray-200">
+          {t('tools.richText.findReplace')}
         </span>
+        <button
+          type="button"
+          title={t('tools.richText.closeFind')}
+          aria-label={t('tools.richText.closeFind')}
+          onClick={onClose}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+        >
+          <Icon name="close" className="h-4 w-4" />
+        </button>
       </div>
 
-      <input
-        value={replacement}
-        onChange={(e) => setReplacement(e.target.value)}
-        placeholder={t('tools.richText.replace')}
-        aria-label={t('tools.richText.replace')}
-        className={`${controlClass} w-44`}
-      />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <div className="relative flex items-center">
+          <input
+            ref={inputRef}
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder={t('tools.richText.find')}
+            aria-label={t('tools.richText.find')}
+            className={`${FIELD_CLASS} pr-16`}
+          />
+          <span
+            className="pointer-events-none absolute right-2 text-xs text-gray-400 dark:text-gray-500"
+            aria-live="polite"
+          >
+            {total > 0 ? `${current + 1}/${total}` : term ? t('tools.richText.noMatch') : ''}
+          </span>
+        </div>
 
-      <button
-        type="button"
-        title={t('tools.richText.matchCase')}
-        aria-label={t('tools.richText.matchCase')}
-        aria-pressed={matchCase}
-        onClick={() => setMatchCase((v) => !v)}
-        className={`flex h-8 items-center rounded-md border px-2 text-xs font-semibold transition-colors ${
-          matchCase
-            ? 'border-blue-600 bg-blue-600 text-white'
-            : 'border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-        }`}
-      >
-        Aa
-      </button>
+        <input
+          value={replacement}
+          onChange={(e) => setReplacement(e.target.value)}
+          placeholder={t('tools.richText.replace')}
+          aria-label={t('tools.richText.replace')}
+          className={FIELD_CLASS}
+        />
 
-      <button
-        type="button"
-        title={t('tools.richText.prevMatch')}
-        aria-label={t('tools.richText.prevMatch')}
-        disabled={total === 0}
-        onClick={() => step(-1)}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-800"
-      >
-        <Icon name="chevronLeft" className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        title={t('tools.richText.nextMatch')}
-        aria-label={t('tools.richText.nextMatch')}
-        disabled={total === 0}
-        onClick={() => step(1)}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-800"
-      >
-        <Icon name="chevronRight" className="h-4 w-4" />
-      </button>
+        <button
+          type="button"
+          title={t('tools.richText.matchCase')}
+          aria-label={t('tools.richText.matchCase')}
+          aria-pressed={matchCase}
+          onClick={() => setMatchCase((v) => !v)}
+          className={`inline-flex h-7 shrink-0 items-center justify-center rounded-md border px-2 text-xs font-semibold transition-colors ${
+            matchCase
+              ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500'
+              : `${BUTTON_CLASS}`
+          }`}
+        >
+          Aa
+        </button>
 
-      <button
-        type="button"
-        disabled={total === 0}
-        onClick={() => editor.chain().focus().replaceMatch(replacement).run()}
-        className="h-8 rounded-md border border-gray-300 px-2 text-xs text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-      >
-        {t('tools.richText.replaceOne')}
-      </button>
-      <button
-        type="button"
-        disabled={total === 0}
-        onClick={() => editor.chain().focus().replaceAllMatches(replacement).run()}
-        className="h-8 rounded-md border border-gray-300 px-2 text-xs text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-      >
-        {t('tools.richText.replaceAll')}
-      </button>
+        <button
+          type="button"
+          title={t('tools.richText.prevMatch')}
+          aria-label={t('tools.richText.prevMatch')}
+          disabled={total === 0}
+          onClick={() => step(-1)}
+          className={ICON_BUTTON_CLASS}
+        >
+          <Icon name="chevronLeft" className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          title={t('tools.richText.nextMatch')}
+          aria-label={t('tools.richText.nextMatch')}
+          disabled={total === 0}
+          onClick={() => step(1)}
+          className={ICON_BUTTON_CLASS}
+        >
+          <Icon name="chevronRight" className="h-4 w-4" />
+        </button>
 
-      <button
-        type="button"
-        title={t('tools.richText.closeFind')}
-        aria-label={t('tools.richText.closeFind')}
-        onClick={onClose}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-      >
-        <Icon name="close" className="h-4 w-4" />
-      </button>
+        <button
+          type="button"
+          disabled={total === 0}
+          onClick={() => editor.chain().focus().replaceMatch(replacement).run()}
+          className={BUTTON_CLASS}
+        >
+          {t('tools.richText.replaceOne')}
+        </button>
+        <button
+          type="button"
+          disabled={total === 0}
+          onClick={() => editor.chain().focus().replaceAllMatches(replacement).run()}
+          className={BUTTON_CLASS}
+        >
+          {t('tools.richText.replaceAll')}
+        </button>
+      </div>
     </div>
   );
 }
