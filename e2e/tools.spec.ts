@@ -95,8 +95,9 @@ test.describe('slide editor (zh-CN)', () => {
   test('canvas mounts → insert text box → export pptx → present', async ({ page }) => {
     await page.goto('/tools/slide-editor');
     await expect(page.getByLabel('slide canvas')).toBeVisible();
-    // Konva injects 3 canvases (background / content / overlay)
-    expect(await page.locator('canvas').count()).toBeGreaterThanOrEqual(3);
+    // Konva injects 3 canvases (background / content / overlay) over a few React commits;
+    // an immediate count races the stage mount on a cold production bundle.
+    await expect.poll(() => page.locator('canvas').count()).toBeGreaterThanOrEqual(3);
 
     await insertTextBox(page);
     await expect(page.getByText('已选中 1 个元素')).toBeVisible();
@@ -3220,6 +3221,56 @@ test.describe('office tool workspace (zh-CN)', () => {
   }
 });
 
+type ShortcutProbeEvent = {
+  key: string;
+  ctrl: boolean;
+  meta: boolean;
+  prevented: boolean;
+};
+
+type ShortcutProbe = {
+  events: ShortcutProbeEvent[];
+  printCalls: number;
+};
+
+/**
+ * P0-3.2: the browser-native shortcuts must be cancelled on both keyboard maps. Stub `window.print`
+ * so a print dialog never blocks the run, and record `defaultPrevented` after every listener ran.
+ */
+async function installShortcutProbe(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const probe: ShortcutProbe = { events: [], printCalls: 0 };
+    (window as unknown as { __shortcutProbe: ShortcutProbe }).__shortcutProbe = probe;
+    window.print = () => {
+      probe.printCalls += 1;
+    };
+    window.addEventListener('keydown', (event) => {
+      // A macrotask runs after all synchronous listeners (including the app's own), so
+      // defaultPrevented here reflects the app's preventDefault() call.
+      window.setTimeout(() => {
+        probe.events.push({
+          key: event.key.toLowerCase(),
+          ctrl: event.ctrlKey,
+          meta: event.metaKey,
+          prevented: event.defaultPrevented,
+        });
+      }, 0);
+    });
+  });
+}
+
+function shortcutProbe(page: Page): Promise<ShortcutProbe> {
+  return page.evaluate(
+    () => (window as unknown as { __shortcutProbe: ShortcutProbe }).__shortcutProbe,
+  );
+}
+
+/** Only key presses carrying Ctrl or Meta are shortcuts; typed characters must be ignored. */
+async function modifierEvents(page: Page, key: string): Promise<ShortcutProbeEvent[]> {
+  const { events } = await shortcutProbe(page);
+  return events.filter((event) => event.key === key && (event.ctrl || event.meta));
+}
+
 test.describe('word processor: file commands (implementation plan P0-3)', () => {
   test('exports plain text and re-imports it without losing content', async ({ page }) => {
     const errors: string[] = [];
@@ -3267,6 +3318,82 @@ test.describe('word processor: file commands (implementation plan P0-3)', () => 
     await page.keyboard.press('ControlOrMeta+s');
     await expect(page.getByTestId('rich-text-save-notice')).toBeVisible();
   });
+
+  test('Ctrl/⌘+N creates a new document on both macOS and Windows keyboard maps', async ({
+    page,
+  }) => {
+    const dialogs: string[] = [];
+    page.on('dialog', async (dialog) => {
+      dialogs.push(dialog.type());
+      await dialog.accept();
+    });
+    await installShortcutProbe(page);
+    await page.goto('/tools/rich-text-editor');
+    // handleNew's discard confirm reads stats.chars, which comes from the debounced snapshotHtml;
+    // wait for the status bar to observe the typing before pressing the shortcut.
+    const statusText = () => page.locator('[data-editor-statusbar]').innerText();
+
+    for (const [index, modifier] of ['Control', 'Meta'].entries()) {
+      await expect.poll(statusText).toMatch(/字符: 0/);
+      const marker = `草稿${index === 0 ? '甲' : '乙'}`;
+      await page.locator('.tiptap').click();
+      await page.keyboard.type(marker);
+      await expect(page.locator('.tiptap')).toContainText(marker);
+      await expect.poll(statusText).toMatch(/字符: [1-9]/);
+      await page.keyboard.press(`${modifier}+n`);
+      await expect(page.locator('.tiptap')).not.toContainText(marker);
+    }
+
+    // Both presses must cancel the browser's "new window" default, not just perform the app action.
+    expect(dialogs).toEqual(['confirm', 'confirm']);
+    await expect.poll(async () => (await modifierEvents(page, 'n')).length).toBe(2);
+    const newEvents = await modifierEvents(page, 'n');
+    expect(newEvents.map(({ ctrl, meta, prevented }) => ({ ctrl, meta, prevented }))).toEqual([
+      { ctrl: true, meta: false, prevented: true },
+      { ctrl: false, meta: true, prevented: true },
+    ]);
+  });
+
+  test('Ctrl/⌘+P and +S dispatch file actions on both keyboard maps', async ({ page }) => {
+    await installShortcutProbe(page);
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('文本内容123');
+
+    for (const modifier of ['Control', 'Meta']) {
+      const before = (await shortcutProbe(page)).printCalls;
+      await page.keyboard.press(`${modifier}+p`);
+      await expect.poll(async () => (await shortcutProbe(page)).printCalls).toBe(before + 1);
+      await page.keyboard.press(`${modifier}+s`);
+    }
+
+    await expect(page.getByTestId('rich-text-save-notice')).toBeVisible();
+    expect((await shortcutProbe(page)).printCalls).toBe(2);
+    const fileEvents = [...(await modifierEvents(page, 'p')), ...(await modifierEvents(page, 's'))];
+    expect(fileEvents).toHaveLength(4);
+    expect(fileEvents.every((event) => event.prevented)).toBe(true);
+  });
+
+  for (const [platform, expected, otherPlatformGlyph] of [
+    ['MacIntel', '⌘N', 'Ctrl+'],
+    ['Win32', 'Ctrl+N', '⌘'],
+  ] as const) {
+    test(`shortcut help renders ${expected} on ${platform}`, async ({ page }) => {
+      await page.addInitScript((value) => {
+        Object.defineProperty(navigator, 'platform', { configurable: true, value });
+      }, platform);
+      await page.goto('/tools/rich-text-editor');
+      await page.getByTestId('menubar-more').click();
+      await page.getByRole('menuitem', { name: '键盘快捷键', exact: true }).click();
+      const dialog = page.getByTestId('rich-text-shortcut-help');
+      await expect(dialog).toBeVisible();
+      await expect(dialog.locator('li').filter({ hasText: '新建文档' }).locator('kbd')).toHaveText(
+        expected,
+      );
+      const combos = await dialog.locator('kbd').allTextContents();
+      expect(combos.every((combo) => !combo.includes(otherPlatformGlyph))).toBe(true);
+    });
+  }
 });
 
 test.describe('word processor: overlay stack and keyboard (implementation plan P0-4)', () => {

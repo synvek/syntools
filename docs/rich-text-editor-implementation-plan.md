@@ -202,13 +202,13 @@ graph TD
 
 ### 5.2 P0-2 导入侧结构化 IR（一期）
 
-- [ ] **P0-2 导入侧结构化 IR（一期）**（P0，8d）
+- [ ] **P0-2 导入侧结构化 IR（一期）**（P0，8d）—— P0-2.1 / P0-2.2 已落地，2.3–2.6 待办
 - **背景**：方案 §2.3/§3.3 认定根因是 `mammoth → HTML` 单向降级，多节、脚注尾注、TOC/REF 域、OMML、图片环绕、页眉页脚变体「写得出、读不回」，修订/批注/形状靠文本流严格相等补丁。
 - **涉及文件**：新增 [NEW] `src/tools/rich-text-editor/ooxmlIr.ts` + [NEW] `ooxmlIr.test.ts`；`src/tools/rich-text-editor/docx.ts`、`docxReview.ts`、`docxShapeImport.ts`、`notes.ts`、`mathOmml.ts`、`sections.ts`、`toc.ts`、`xrefs.ts`、`imageLayer.ts`；`src/tools/rich-text-editor/fidelity.ts`
 - **前置依赖**：P0-1（无真实样本无法判定「读回」）
 - **子任务**
-  - [ ] P0-2.1 定义 IR 类型与「OOXML part → IR → Tiptap 节点」纯函数边界，产出可单测模块（1d）
-  - [ ] P0-2.2 补 `footnotes.xml` / `endnotes.xml` 解析并回填编号与汇总（1d）
+  - [x] P0-2.1 定义 IR 类型与「OOXML part → IR → Tiptap 节点」纯函数边界，产出可单测模块（1d）—— [NEW] `ooxmlIr.ts` + `ooxmlIr.test.ts`（8 例）：`collectPartFacts` 复用基线 14 键口径、`parseOoxmlParts` 返回 `ToolResult<OoxmlIr>`、`irToTiptapDoc` 产出 Tiptap JSON；零 DOM / zip / File 依赖，暂不接入 mammoth 主链路（flag 留 P0-2.6）
+  - [x] P0-2.2 补 `footnotes.xml` / `endnotes.xml` 解析并回填编号与汇总（1d）—— IR 层完成：过滤 `separator` / `continuationSeparator`，按正文引用顺序分别编号（重复引用保留首号），`irNoteSummaries` 生成文末汇总，`irToTiptapDoc` 输出 `footnoteRef` / `endnoteRef`；未引用与缺失引用计入 `irLosses`（`ir.unreferencedNotes` / `ir.missingNotes`）
   - [ ] P0-2.3 补 TOC / REF 域还原与 OMML → LaTeX 映射（复用 `mathOmml.ts` 反向能力）（1.5d）
   - [ ] P0-2.4 补 `wp:anchor` 图片环绕/图层、`w:sectPr` 多节与每节页眉页脚（1.5d）
   - [ ] P0-2.5 修订/批注/形状改用段落或书签锚点定位，替代「可见文本流严格相等」；降级时走 `fidelity.ts` 明示（1.5d）
@@ -221,19 +221,19 @@ graph TD
 
 ### 5.3 P0-3 打印与文件命令补齐
 
-- [ ] **P0-3 打印与文件命令补齐**（P0，3d）
+- [x] **P0-3 打印与文件命令补齐**（P0，3d）—— 4/4 子任务落地，逐平台快捷键 e2e 7/7
 - **背景**：方案 §2.2/§4.2 指出无独立打印命令与打印预览，仅 PDF 文本模式触发 `window.print()`；缺 TXT 导出与 HTML/MD/TXT 导入。
 - **涉及文件**：`src/tools/rich-text-editor/ribbonTabs.ts`、`RichTextEditorTool.tsx`、`core.ts`、`pdf.ts`、`strings.ts`（9 语言）；`src/core/components/editorChrome.ts`；`e2e/tools.spec.ts`
 - **前置依赖**：无（可与 P0-1/P0-4 并行）
 - **子任务**
-  - [ ] P0-3.1 新增「打印 / 打印预览」文件菜单命令与 `Ctrl/⌘+P`，复用 `pdf.ts` 的 `printToPdf` / `printSupported`、`pageSetup.ts` 的 `buildPrintPageCss` 与组件内 `printHtml`（1d）
-  - [ ] P0-3.2 补 `Ctrl/⌘+S`（本地保存反馈）、`Ctrl/⌘+N`，与浏览器默认行为逐平台验证并 `preventDefault`（0.5d）
-  - [ ] P0-3.3 `ExportExt` 增加 `txt`，补 TXT 导出；新增 TXT / HTML / Markdown 导入（DOMPurify 消毒、10MB 上限）（1d）
-  - [ ] P0-3.4 9 语言文案、`e2e/tools.spec.ts` 打印与 TXT 往返用例（0.5d）
+  - [x] P0-3.1 新增「打印 / 打印预览」文件菜单命令与 `Ctrl/⌘+P`，复用 `pdf.ts` 的 `printToPdf` / `printSupported`、`pageSetup.ts` 的 `buildPrintPageCss` 与组件内 `printHtml`（1d）—— `file-print` / `file-print-preview` + 打印预览对话框，预览直接渲染导出 HTML
+  - [x] P0-3.2 补 `Ctrl/⌘+S`（本地保存反馈）、`Ctrl/⌘+N`，与浏览器默认行为逐平台验证并 `preventDefault`（0.5d）—— 单次全局 keydown + `fileActionsRef` 防闭包陈旧；`editorChrome.test.ts` 8 例 + `e2e/tools.spec.ts` 逐平台 3 例
+  - [x] P0-3.3 `ExportExt` 增加 `txt`，补 TXT 导出；新增 TXT / HTML / Markdown 导入（DOMPurify 消毒、10MB 上限）（1d）—— `core.ts` 的 `textToDocHtml` / `MAX_IMPORT_BYTES`
+  - [x] P0-3.4 9 语言文案、`e2e/tools.spec.ts` 打印与 TXT 往返用例（0.5d）
 - **✅ 验收项**
-  - ✅ 6 个快捷键在 macOS / Windows 键盘映射下均生效，打印预览与导出页面一致
-  - ✅ TXT 往返不丢字；导入不引入网络请求；`pnpm test` / `pnpm e2e` 的新增用例通过
-- **回退点**：新增命令以 `showPrintCommand` / `enableTextImport` 开关隔离；失败时保留原 PDF 文本模式打印链路。
+  - ✅ **「6 个快捷键」口径复核**：roadmap §5 的 P0-3「6 个快捷键可用」指新增的 3 个应用级快捷键 `Ctrl/⌘+P/S/N` 在 macOS（`⌘`）与 Windows/Linux（`Ctrl`）两种键盘映射下的 6 个组合；连同既有 `Ctrl/⌘+F` 共 4 个应用级快捷键。帮助面板另对 `A/B/I/U/F/S/P/N` 8 个组合统一给出平台感知标签（`modifierShortcut()`），其中 `A/B/I/U` 由 Tiptap StarterKit 处理。
+  - ✅ `e2e/tools.spec.ts` 分别以 `Control` 与 `Meta` 触发 P/S/N：断言 `defaultPrevented === true`、`window.print()` 调用 2 次、保存提示可见、新建清空内容且丢弃确认弹两次；`navigator.platform` 打桩 `MacIntel` / `Win32` 时帮助面板分别显示 `⌘N` / `Ctrl+N`，且所有 `<kbd>` 不出现另一平台修饰键。打印预览与导出页面一致、TXT 往返不丢字、导入不引入网络请求，新增 `pnpm test` / `pnpm e2e` 用例通过。
+- **回退点**：原计划的 `showPrintCommand` / `enableTextImport` 开关**未落地，记为计划偏差**（全仓无该常量）；当前新增命令与文本导入均为 `RichTextEditorTool.tsx` / `core.ts` 内独立函数与菜单项，可单独摘除并保留原 PDF 文本模式打印链路。P0-2.6 建立统一 feature flag 机制后一并补齐灰度开关。
 
 ### 5.4 P0-4 浮层、Esc 与键盘治理
 
@@ -510,7 +510,7 @@ graph TD
 | ----------------------------- | ----- | ---- | ------ | ------ | ------------------- | -------- |
 | P0-1 真实文档保真样本集与门禁 | `[x]` | M1   | P0     | 4d     | 无                  | §5.1     |
 | P0-2 导入侧结构化 IR（一期）  | `[ ]` | M1   | P0     | 8d     | P0-1                | §5.2     |
-| P0-3 打印与文件命令补齐       | `[~]` | M1   | P0     | 3d     | 无                  | §5.3     |
+| P0-3 打印与文件命令补齐       | `[x]` | M1   | P0     | 3d     | 无                  | §5.3     |
 | P0-4 浮层、Esc 与键盘治理     | `[x]` | M1   | P0     | 5d     | 无                  | §5.4     |
 | P0-5 关键路径回归测试         | `[ ]` | M1   | P0     | 4d     | P0-2、P0-4          | §5.5     |
 | P0-6 上下文选项卡一致性       | `[x]` | M1   | P0     | 2d     | 无（UI 层）         | §5.6     |
@@ -528,7 +528,7 @@ graph TD
 | P2-5 桌面壳文件集成           | `[ ]` | M3   | P2     | 不排期 | P2-4 + 桌面发布节奏 | §7.1     |
 | P2-6 无障碍检查器             | `[ ]` | M3   | P2     | 不排期 | P0-4 a11y 基线      | §7.1     |
 
-进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。
+进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已起步：§5.2 的 P0-2.1（纯函数 `ooxmlIr.ts` + 8 例单测）与 P0-2.2（按引用顺序编号、文末汇总、ref 节点映射，累计 12 例）转 `[x]`，主项仍 `[ ]`，2.3–2.6 待办；全量单测 3438 例、e2e 197 passed / 0 failed、首屏 191.89KB。
 
 阶段闸门勾选：
 
