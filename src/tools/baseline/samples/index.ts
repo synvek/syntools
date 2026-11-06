@@ -1,12 +1,18 @@
 import { docSamples } from './doc';
+import { externalDocSamples } from './external-doc';
 import { sheetSamples } from './sheet';
 import { slideSamples } from './slide';
 
 /**
- * 30 generated samples (decision D7, 2026-10-29): 15 slide / 8 sheet / 7 document.
- * Split so the ratio itself is a contract — plan §5.2 fixes it and the baseline test asserts it.
+ * Generated samples (decision D7): 15 slide / 9 sheet / 8 document, plus real third-party
+ * .docx binaries (P0-1). The counts are a contract asserted by the baseline test.
  */
-export const SAMPLE_COUNTS = { slide: 15, sheet: 9, docx: 8 } as const;
+export const SAMPLE_COUNTS = {
+  slide: 15,
+  sheet: 9,
+  docx: 8,
+  externalDocx: externalDocSamples.length,
+} as const;
 
 export const sampleManifest = [
   ...slideSamples.map((sample) => ({
@@ -30,6 +36,18 @@ export const sampleManifest = [
     source: 'generated' as const,
     ...(sample.notes ? { notes: sample.notes } : {}),
   })),
+  ...externalDocSamples.map((sample) => ({
+    id: sample.id,
+    tool: 'docx' as const,
+    title: sample.title,
+    source: 'external' as const,
+    producer: sample.producer,
+    producerFamily: sample.producerFamily,
+    ...(sample.producerVersion ? { producerVersion: sample.producerVersion } : {}),
+    path: sample.path,
+    expectedParts: sample.expectedParts,
+    notes: sample.notes,
+  })),
 ];
 
-export { docSamples, sheetSamples, slideSamples };
+export { docSamples, externalDocSamples, sheetSamples, slideSamples };

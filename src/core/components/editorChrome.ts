@@ -49,6 +49,17 @@ export function editorMenuItem(
   return { type: 'item', id, label, onSelect, ...options };
 }
 
+/**
+ * Platform-aware modifier label for menu shortcut hints (P0-4.5).
+ * Windows / Linux show `Ctrl+A`, macOS shows `⌘A`; `navigator.platform` is checked at call time
+ * so SSR / test environments without a navigator still get the Ctrl form.
+ */
+export function modifierShortcut(key: string): string {
+  const isMac =
+    typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+  return `${isMac ? '⌘' : 'Ctrl+'}${key}`;
+}
+
 /** Human-readable byte size (same format as the photo editor status bar) */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';

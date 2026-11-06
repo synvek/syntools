@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalBehavior } from '@/core/hooks/useOverlayStack';
 import katex from 'katex';
 import { isOmmlSupported } from './latex';
 
@@ -50,17 +51,8 @@ export function MathDialog({
     return () => clearTimeout(timer);
   }, [mode, initialLatex, initialDisplay]);
 
-  useEffect(() => {
-    if (!mode) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [mode, onCancel]);
+  // P0-4: `mode !== null` means open; use the shared dismiss stack + focus trap
+  useModalBehavior(Boolean(mode), onCancel);
 
   const preview = useMemo(() => {
     const source = latex.trim();
@@ -93,6 +85,7 @@ export function MathDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="rte-math-dialog-title"
+        aria-describedby="rte-math-dialog-desc"
         data-testid="rich-text-math-dialog"
         className="w-full max-w-xl rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
@@ -103,7 +96,7 @@ export function MathDialog({
         >
           {mode === 'insert' ? t('tools.richText.mathInsert') : t('tools.richText.mathEdit')}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p id="rte-math-dialog-desc" className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {t('tools.richText.mathDialogDesc')}
         </p>
 

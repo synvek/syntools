@@ -1,7 +1,9 @@
 {
-  "generatedAt": "2026-11-02T15:07:14.051Z",
+  "generatedAt": "2026-11-06T07:22:16.778Z",
   "generator": "src/tools/baseline/roundtrip.test.ts",
-  "total": 32,
+  "total": 42,
+  "externalSamples": 10,
+  "externalProducers": ["word", "wps", "libreoffice", "pages"],
   "samples": [
     {
       "id": "slide/text-basic",
@@ -298,7 +300,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6846,
+        "bytes": 6845,
         "parts": 24,
         "slideParts": 1,
         "mediaParts": 0,
@@ -502,7 +504,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6808,
+        "bytes": 6807,
         "parts": 24,
         "slideParts": 1,
         "mediaParts": 0,
@@ -1015,7 +1017,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 15778,
+        "bytes": 15777,
         "parts": 41,
         "slideParts": 1,
         "mediaParts": 1,
@@ -1580,7 +1582,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6481,
+        "bytes": 6480,
         "parts": 16,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1632,7 +1634,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6172,
+        "bytes": 6171,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1684,7 +1686,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6539,
+        "bytes": 6538,
         "parts": 16,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1736,7 +1738,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 7155,
+        "bytes": 7154,
         "parts": 17,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1789,7 +1791,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6243,
+        "bytes": 6242,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1842,7 +1844,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6191,
+        "bytes": 6190,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1900,7 +1902,7 @@
         }
       ],
       "artifacts": {
-        "bytes": 8931,
+        "bytes": 8930,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1958,7 +1960,7 @@
         }
       ],
       "artifacts": {
-        "bytes": 7868,
+        "bytes": 7867,
         "parts": 20,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2010,7 +2012,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 8158,
+        "bytes": 8157,
         "parts": 21,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2082,7 +2084,7 @@
         }
       ],
       "artifacts": {
-        "bytes": 10349,
+        "bytes": 10348,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2097,7 +2099,7 @@
       "id": "docx/basic",
       "tool": "docx",
       "title": "段落 + 行内样式",
-      "notes": "导出 XML 含 w:u / w:strike，导入侧 mammoth 只保留 strike、丢掉下划线",
+      "notes": "导出 XML 含 w:u / w:strike；MAMMOTH_STYLE_MAP 已补 u => u，下划线可回读（见 docxCompat.test.ts）",
       "ok": true,
       "before": {
         "headings": 0,
@@ -2281,7 +2283,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9770,
+        "bytes": 9771,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2347,7 +2349,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9940,
+        "bytes": 9932,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2413,7 +2415,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 10623,
+        "bytes": 10622,
         "parts": 26,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2480,7 +2482,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9918,
+        "bytes": 9921,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2556,6 +2558,1494 @@
         "worksheets": 0,
         "pivotParts": 0
       }
+    },
+    {
+      "id": "docx/external/feature-sample",
+      "tool": "docx",
+      "title": "DOCX 高级特性样本（脱敏，外部产出）",
+      "source": "external",
+      "producer": "Microsoft Office Word (declared) / MiniMax Code docx skill (creator)",
+      "producerFamily": "other",
+      "notes": "app.xml 声明 Microsoft Office Word，core.xml creator 为 MiniMax Code · docx skill；按方案 §4.2 作为「外部工具产出的二进制样本」接入，不等同于 Word 原生导出。此份是未经理工处理的源文档基线，不计入四类工具族覆盖。",
+      "ok": true,
+      "before": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 260,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 33,
+        "italic": 1,
+        "underline": 1,
+        "strike": 1,
+        "links": 43,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5689
+      },
+      "after": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 257,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 33,
+        "italic": 1,
+        "underline": 44,
+        "strike": 1,
+        "links": 43,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5689
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 31735,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 6,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "endnotes",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "revisions",
+          "before": 93,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 490,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 1,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 3,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 28,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 2,
+          "after": 2,
+          "status": "kept"
+        },
+        {
+          "name": "people",
+          "before": 1,
+          "after": 0,
+          "status": "lost"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/word",
+      "tool": "docx",
+      "title": "DOCX 高级特性样本（Word 另存，脱敏）",
+      "source": "external",
+      "producer": "Microsoft Office Word (app.xml) / MiniMax Code · docx skill (core.xml creator)",
+      "producerFamily": "word",
+      "notes": "同一脱敏源文档由不同办公软件打开/另存得到，属于「多工具变体」而非独立内容样本；core.xml creator 仍为 MiniMax Code · docx skill，app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。 app.xml 未声明 Word 版本号，故 producerVersion 留空。相对源文档修订标记与域计数发生变化（revisions 126、fields 482），可视为 Word 重写 OOXML 的结果。",
+      "ok": true,
+      "before": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 260,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 33,
+        "italic": 1,
+        "underline": 1,
+        "strike": 1,
+        "links": 43,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5689
+      },
+      "after": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 257,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 33,
+        "italic": 1,
+        "underline": 44,
+        "strike": 1,
+        "links": 43,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5689
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 31732,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 6,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "endnotes",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "revisions",
+          "before": 126,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 482,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 1,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 3,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 28,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 2,
+          "after": 2,
+          "status": "kept"
+        },
+        {
+          "name": "people",
+          "before": 1,
+          "after": 0,
+          "status": "lost"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/wps",
+      "tool": "docx",
+      "title": "DOCX 高级特性样本（WPS 另存，脱敏）",
+      "source": "external",
+      "producer": "WPS Office 12.1.0.19302 (app.xml) / MiniMax Code · docx skill (core.xml creator)",
+      "producerFamily": "wps",
+      "notes": "同一脱敏源文档由不同办公软件打开/另存得到，属于「多工具变体」而非独立内容样本；core.xml creator 仍为 MiniMax Code · docx skill，app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。 app.xml 声明 WPS Office_12.1.0.19302_F1E327BC-…；extra customXml / docProps/custom.xml 为 WPS 写入，people 部件从 1 增至 4，修订标记 581 为五份中最多。",
+      "ok": true,
+      "before": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 260,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 33,
+        "italic": 1,
+        "underline": 1,
+        "strike": 1,
+        "links": 43,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5768
+      },
+      "after": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 257,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 33,
+        "italic": 1,
+        "underline": 44,
+        "strike": 1,
+        "links": 43,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5768
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 36919,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 6,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "endnotes",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "revisions",
+          "before": 581,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 488,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 1,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 4,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 27,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 2,
+          "after": 2,
+          "status": "kept"
+        },
+        {
+          "name": "people",
+          "before": 4,
+          "after": 0,
+          "status": "lost"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/libreoffice",
+      "tool": "docx",
+      "title": "DOCX 高级特性样本（LibreOffice 另存，脱敏）",
+      "source": "external",
+      "producer": "LibreOffice 26.8.2.2 macOS aarch64 (app.xml) / MiniMax Code · docx skill (core.xml creator)",
+      "producerFamily": "libreoffice",
+      "notes": "同一脱敏源文档由不同办公软件打开/另存得到，属于「多工具变体」而非独立内容样本；core.xml creator 仍为 MiniMax Code · docx skill，app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。 app.xml 声明 LibreOffice/26.8.2.2$MacOSX_AARCH64；页眉页脚各 12 个、styles 39 为五份中最多，无 people 部件。文件名沿用用户提供的 libraoffice 拼写，未改动磁盘文件。",
+      "ok": true,
+      "before": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 260,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 33,
+        "italic": 1,
+        "underline": 1,
+        "strike": 1,
+        "links": 43,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5768
+      },
+      "after": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 257,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 33,
+        "italic": 1,
+        "underline": 44,
+        "strike": 1,
+        "links": 43,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5768
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 31765,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 12,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 12,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "endnotes",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "revisions",
+          "before": 189,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 204,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 2,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 3,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 39,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/pages",
+      "tool": "docx",
+      "title": "DOCX 高级特性样本（Pages 导出，脱敏）",
+      "source": "external",
+      "producer": "undeclared (docProps empty) / Apple Pages per supplied provenance",
+      "producerFamily": "pages",
+      "notes": "由用户提供的 .pages 源文件重新导出为 .docx；app.xml 与 core.xml 均为空元素，文件内没有任何工具/版本声明，producerFamily=pages 仅依据样本来源说明，不能从字节自证。导出后 endnotes / people 为 0，shapes 4 为五份中最多。 同一脱敏源文档由不同办公软件打开/另存得到，属于「多工具变体」而非独立内容样本；core.xml creator 仍为 MiniMax Code · docx skill，app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。",
+      "ok": true,
+      "before": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 260,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 18,
+        "italic": 0,
+        "underline": 1,
+        "strike": 1,
+        "links": 229,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5773
+      },
+      "after": {
+        "headings": 35,
+        "h1": 12,
+        "h2": 22,
+        "h3": 1,
+        "paragraphs": 257,
+        "listItems": 9,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 49,
+        "tableCells": 158,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 18,
+        "italic": 0,
+        "underline": 216,
+        "strike": 1,
+        "links": 213,
+        "images": 6,
+        "shapes": 0,
+        "chars": 5773
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 38487,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 9,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 9,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 6,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "revisions",
+          "before": 102,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 199,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 4,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 3,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 33,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/feature-sample-en",
+      "tool": "docx",
+      "title": "English feature sample (redacted source)",
+      "source": "external",
+      "producer": "undeclared (no docProps package parts)",
+      "producerFamily": "other",
+      "notes": "英文独立内容样本「Consensus Algorithms in Practice」，与中文样本集内容完全不同；core.xml creator 为 Priya Nair（脱敏源文档作者），app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。本组 5 份均含 word/comments.xml，补齐中文集缺失的批注覆盖。 此份连 docProps/app.xml 与 core.xml 部件都不存在，完全没有产出工具声明；是英文集的源文档基线，不计入四类工具族覆盖。无 word/media/ 部件，comments=5 为 10 份中最多。",
+      "ok": true,
+      "before": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 214,
+        "listItems": 17,
+        "orderedLists": 3,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 0,
+        "strike": 0,
+        "links": 40,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15353
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 211,
+        "listItems": 17,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 40,
+        "strike": 0,
+        "links": 40,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15353
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 39788,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 6,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "endnotes",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "comments",
+          "before": 5,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "revisions",
+          "before": 3,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 192,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 4,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 1,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "styles",
+          "before": 27,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "people",
+          "before": 3,
+          "after": 0,
+          "status": "lost"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/en-word",
+      "tool": "docx",
+      "title": "English feature sample (Word, redacted)",
+      "source": "external",
+      "producer": "Microsoft Office Word (app.xml) / Priya Nair (core.xml creator)",
+      "producerFamily": "word",
+      "notes": "英文独立内容样本「Consensus Algorithms in Practice」，与中文样本集内容完全不同；core.xml creator 为 Priya Nair（脱敏源文档作者），app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。本组 5 份均含 word/comments.xml，补齐中文集缺失的批注覆盖。 app.xml 声明 Microsoft Office Word 但未给版本号，Template=Normal.dotm；lastModifiedBy=me yangxb。revisions=141、fields=438 为英文集最多，显示 Word 重写 OOXML 的痕迹。",
+      "ok": true,
+      "before": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 214,
+        "listItems": 17,
+        "orderedLists": 3,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 0,
+        "strike": 0,
+        "links": 40,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15381
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 211,
+        "listItems": 17,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 40,
+        "strike": 0,
+        "links": 40,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15381
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 39777,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 6,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "endnotes",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "comments",
+          "before": 3,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "revisions",
+          "before": 141,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 438,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 4,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 1,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 3,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 31,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "people",
+          "before": 3,
+          "after": 0,
+          "status": "lost"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/en-wps",
+      "tool": "docx",
+      "title": "English feature sample (WPS, redacted)",
+      "source": "external",
+      "producer": "WPS Office 12.1.0.19302 (app.xml) / Priya Nair (core.xml creator)",
+      "producerFamily": "wps",
+      "notes": "英文独立内容样本「Consensus Algorithms in Practice」，与中文样本集内容完全不同；core.xml creator 为 Priya Nair（脱敏源文档作者），app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。本组 5 份均含 word/comments.xml，补齐中文集缺失的批注覆盖。 app.xml 声明 WPS Office_12.1.0.19302_F1E327BC-…；lastModifiedBy=yangxb。共 48 个包内部件，media=4 为英文集最多，revisions 仅 5。",
+      "ok": true,
+      "before": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 215,
+        "listItems": 17,
+        "orderedLists": 3,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 0,
+        "strike": 0,
+        "links": 40,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15401
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 212,
+        "listItems": 17,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 40,
+        "strike": 0,
+        "links": 40,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15401
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 39784,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 7,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 6,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "endnotes",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "comments",
+          "before": 3,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "revisions",
+          "before": 5,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 328,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 4,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 1,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 4,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 28,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "people",
+          "before": 3,
+          "after": 0,
+          "status": "lost"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/en-libreoffice",
+      "tool": "docx",
+      "title": "English feature sample (LibreOffice, redacted)",
+      "source": "external",
+      "producer": "LibreOffice 26.8.2.2 macOS aarch64 (app.xml) / Priya Nair (core.xml creator)",
+      "producerFamily": "libreoffice",
+      "notes": "英文独立内容样本「Consensus Algorithms in Practice」，与中文样本集内容完全不同；core.xml creator 为 Priya Nair（脱敏源文档作者），app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。本组 5 份均含 word/comments.xml，补齐中文集缺失的批注覆盖。 app.xml 声明 LibreOffice/26.8.2.2$MacOSX_AARCH64 LibreOffice_project/…；页眉页脚各 12 个、styles=38、numbering=5 为英文集最多，无 people 部件。文件名沿用用户提供的 libraoffice 拼写。",
+      "ok": true,
+      "before": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 215,
+        "listItems": 17,
+        "orderedLists": 3,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 0,
+        "strike": 0,
+        "links": 40,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15403
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 212,
+        "listItems": 17,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 40,
+        "strike": 0,
+        "links": 40,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15403
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 39801,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 12,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 12,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 4,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "endnotes",
+          "before": 3,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "comments",
+          "before": 3,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "revisions",
+          "before": 2,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 192,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 4,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 2,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 3,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 38,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 5,
+          "after": 2,
+          "status": "degraded"
+        }
+      ]
+    },
+    {
+      "id": "docx/external/en-pages",
+      "tool": "docx",
+      "title": "English feature sample (Pages export, redacted)",
+      "source": "external",
+      "producer": "undeclared (docProps empty) / Apple Pages per supplied provenance",
+      "producerFamily": "pages",
+      "notes": "英文独立内容样本「Consensus Algorithms in Practice」，与中文样本集内容完全不同；core.xml creator 为 Priya Nair（脱敏源文档作者），app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。本组 5 份均含 word/comments.xml，补齐中文集缺失的批注覆盖。 app.xml 与 core.xml 均为空元素，文件内没有任何工具/版本/作者声明，producerFamily=pages 仅依据样本来源说明。导出后 endnotes / people 为 0，shapes=4 为英文集最多。",
+      "ok": true,
+      "before": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 215,
+        "listItems": 17,
+        "orderedLists": 3,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 0,
+        "strike": 0,
+        "links": 10,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15406
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 212,
+        "listItems": 17,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 10,
+        "strike": 0,
+        "links": 10,
+        "images": 4,
+        "shapes": 0,
+        "chars": 15406
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 38234,
+        "parts": 28,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 1,
+        "worksheets": 0,
+        "pivotParts": 0
+      },
+      "parts": [
+        {
+          "name": "sections",
+          "before": 4,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "headers",
+          "before": 9,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "footers",
+          "before": 9,
+          "after": 1,
+          "status": "degraded"
+        },
+        {
+          "name": "footnotes",
+          "before": 6,
+          "after": 2,
+          "status": "degraded"
+        },
+        {
+          "name": "comments",
+          "before": 3,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "revisions",
+          "before": 2,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "fields",
+          "before": 156,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "math",
+          "before": 4,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "shapes",
+          "before": 4,
+          "after": 0,
+          "status": "lost"
+        },
+        {
+          "name": "images",
+          "before": 3,
+          "after": 4,
+          "status": "kept"
+        },
+        {
+          "name": "styles",
+          "before": 29,
+          "after": 18,
+          "status": "degraded"
+        },
+        {
+          "name": "numbering",
+          "before": 5,
+          "after": 2,
+          "status": "degraded"
+        }
+      ]
     }
   ]
 }

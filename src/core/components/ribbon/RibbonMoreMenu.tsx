@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EditorMenu } from '../editorChrome';
 import { EditorMenuEntryView } from '../EditorMenuBar';
-import { RIBBON_ICON_BUTTON } from './ribbonTheme';
+import { RIBBON_ICON_BUTTON, Z_PANEL } from './ribbonTheme';
 import { RibbonIcon } from './ribbonIcons';
 
 /**
@@ -54,7 +54,7 @@ export function RibbonMoreMenu({ menu }: { menu: EditorMenu }) {
         <div
           role="menu"
           aria-label={menu.label}
-          className="absolute left-0 top-full z-50 mt-0.5 flex max-h-[70vh] min-w-[200px] flex-col overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-xl dark:border-[#3a3a3a] dark:bg-[#252525]"
+          className={`absolute left-0 top-full ${Z_PANEL} mt-0.5 flex max-h-[70vh] min-w-[200px] flex-col overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-xl dark:border-[#3a3a3a] dark:bg-[#252525]`}
         >
           {menu.entries.map((entry, index) => (
             <EditorMenuEntryView

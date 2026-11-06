@@ -3,9 +3,9 @@
  *
  * Background: the project's zh / en bundles are first-paint synchronous resources (`SYNC_LANGS`),
  * and putting the dozens of UI strings of a single tool into `core/i18n/locales/*` would bloat the entry chunk
- * (project budget: first-paint gzip ≤ 180KB, already close to the limit in practice).
+ * (project budget: first-paint gzip ≤ 195KB, already close to the limit in practice).
  * So this tool's UI copy lives here and is merged into i18next by `registerRichTextStrings` on lazy load,
- * keeping the same key paths (`tools.richText.*`) and all 10 languages.
+ * keeping the same key paths (`tools.richText.*`) and all 9 languages.
  *
  * Note: tool metadata (name/description) still lives in `toolsMeta` under `core/i18n/locales/*`,
  * because the home card, sidebar, and ⌘K search need it before the tool loads.
@@ -14,8 +14,10 @@
 import { bookmarkStrings } from './bookmarkStrings';
 import { charFormatStrings } from './charFormatStrings';
 import { endnoteStrings } from './endnoteStrings';
+import { fileStrings } from './fileStrings';
 import { ribbonStrings } from './ribbonStrings';
 import { shapeUiStrings } from './shapeUiStrings';
+import { shortcutStrings } from './shortcutStrings';
 import { xrefStrings } from './xrefStrings';
 
 type StringTree = { [key: string]: string | StringTree };
@@ -3631,6 +3633,8 @@ const EXTRA_STRINGS: Record<string, StringTree>[] = [
   endnoteStrings,
   shapeUiStrings,
   ribbonStrings,
+  fileStrings,
+  shortcutStrings,
 ];
 
 /**

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
+import { Z_CONTEXT_MENU } from '@/core/components/ribbon/ribbonTheme';
 import { sectionStartingAt } from '../model/sections';
 import { containerElements, useSlideStore } from '../store';
 
@@ -139,7 +140,7 @@ export function SlideContextMenu({
       data-testid="slide-context-menu"
       aria-label={t('tools.slide.contextMenu')}
       style={{ left: pos.left, top: pos.top }}
-      className="fixed z-[60] max-h-[min(70vh,34rem)] w-52 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+      className={`fixed ${Z_CONTEXT_MENU} max-h-[min(70vh,34rem)] w-52 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900`}
     >
       {target.kind === 'element' ? (
         <>

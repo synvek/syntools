@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalBehavior } from '@/core/hooks/useOverlayStack';
 
 /** PDF export modes: text (searchable) / snapshot (high-fidelity image) */
 export type PdfMode = 'text' | 'snapshot';
@@ -35,17 +36,8 @@ export function PdfModeDialog({
     return () => clearTimeout(timer);
   }, [open, initialMode]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onCancel]);
+  // P0-4: topmost-only Escape, Tab trap and focus restore instead of a private window listener
+  useModalBehavior(open, onCancel);
 
   if (!open) return null;
 
@@ -68,6 +60,7 @@ export function PdfModeDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="rte-pdf-dialog-title"
+        aria-describedby="rte-pdf-dialog-desc"
         data-testid="rich-text-pdf-dialog"
         className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
@@ -78,7 +71,7 @@ export function PdfModeDialog({
         >
           {t('tools.richText.pdfDialogTitle')}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p id="rte-pdf-dialog-desc" className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {t('tools.richText.pdfDialogDesc')}
         </p>
 

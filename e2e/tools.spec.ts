@@ -3219,3 +3219,163 @@ test.describe('office tool workspace (zh-CN)', () => {
     });
   }
 });
+
+test.describe('word processor: file commands (implementation plan P0-3)', () => {
+  test('exports plain text and re-imports it without losing content', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('纯文本往返内容');
+
+    await page.getByTestId('menubar-more').click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('menuitem', { name: '导出纯文本 (.txt)', exact: true }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.txt$/);
+    expect(fs.readFileSync(await download.path(), 'utf8')).toContain('纯文本往返内容');
+
+    // The same bytes go back through the text picker; handleImport converts them to editor HTML
+    await page.getByTestId('rich-text-text-import-input').setInputFiles({
+      name: 'roundtrip.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('纯文本往返内容\n第二行'),
+    });
+    await expect(page.locator('.tiptap')).toContainText('纯文本往返内容');
+    await expect(page.locator('.tiptap')).toContainText('第二行');
+    expect(errors).toEqual([]);
+  });
+
+  test('print preview uses the exported document HTML and closes with Esc', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('打印预览内容');
+    await page.getByTestId('menubar-more').click();
+    await page.getByRole('menuitem', { name: '打印预览', exact: true }).click();
+    const preview = page.getByTestId('rich-text-print-preview');
+    await expect(preview).toBeVisible();
+    // snapshotHtml is debounced, so this also proves the preview follows the exported HTML
+    await expect(page.getByTestId('rich-text-print-preview-sheet')).toContainText('打印预览内容');
+    await page.keyboard.press('Escape');
+    await expect(preview).toHaveCount(0);
+  });
+
+  test('Ctrl/⌘+S saves locally with visible feedback', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('手动保存内容');
+    await page.keyboard.press('ControlOrMeta+s');
+    await expect(page.getByTestId('rich-text-save-notice')).toBeVisible();
+  });
+});
+
+test.describe('word processor: overlay stack and keyboard (implementation plan P0-4)', () => {
+  test('one Escape closes only the topmost layer without clearing find', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('浮层测试内容');
+
+    await page.keyboard.press('ControlOrMeta+f');
+    const find = page.getByTestId('rich-text-find-panel');
+    await expect(find).toBeVisible();
+
+    await page.getByTestId('menubar-more').click();
+    await page.getByRole('menuitem', { name: '打印预览', exact: true }).click();
+    const preview = page.getByTestId('rich-text-print-preview');
+    await expect(preview).toBeVisible();
+
+    // The dialog owns Escape; the find panel underneath must survive
+    await page.keyboard.press('Escape');
+    await expect(preview).toHaveCount(0);
+    await expect(find).toBeVisible();
+
+    // With no layer left, Escape falls back to closing find
+    await page.keyboard.press('Escape');
+    await expect(find).toHaveCount(0);
+  });
+
+  test('Tab does not escape an open dialog', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.getByTestId('menubar-more').click();
+    await page.getByRole('menuitem', { name: '打印预览', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '打印预览' });
+    await expect(dialog).toBeVisible();
+    for (let index = 0; index < 8; index += 1) {
+      await page.keyboard.press('Tab');
+      await expect(dialog.locator(':focus')).toHaveCount(1);
+    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('Shift+F10 opens the context menu and Escape closes it without clearing the selection', async ({
+    page,
+  }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('右键键盘测试');
+    await page.keyboard.press('Shift+Home');
+    const before = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+
+    await page.keyboard.press('Shift+F10');
+    const menu = page.getByTestId('rich-text-context-menu');
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+
+    const after = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    expect(after).toBe(before);
+  });
+
+  test('shortcut help dialog is described, traps Tab and closes with Esc', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.getByTestId('menubar-more').click();
+    await page.getByRole('menuitem', { name: '键盘快捷键', exact: true }).click();
+
+    const dialog = page.getByTestId('rich-text-shortcut-help');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute('aria-describedby', 'rte-shortcut-help-desc');
+    await expect(page.locator('#rte-shortcut-help-desc')).toBeVisible();
+    for (let index = 0; index < 6; index += 1) {
+      await page.keyboard.press('Tab');
+      // Poll: the focus trap settles on the next React commit, so an immediate `:focus` lookup
+      // can race the keydown handler.
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const node = document.querySelector('[data-testid="rich-text-shortcut-help"]');
+            return node?.contains(document.activeElement) ?? false;
+          }),
+        )
+        .toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('style gallery and shape menu support arrow keys, Esc and outside clicks', async ({
+    page,
+  }) => {
+    await page.goto('/tools/rich-text-editor');
+
+    await page.getByTestId('ribbon-styles-styles').click();
+    const gallery = page.getByTestId('rich-text-style-gallery');
+    await expect(gallery).toBeVisible();
+    const first = gallery.getByRole('menuitem').first();
+    const second = gallery.getByRole('menuitem').nth(1);
+    await expect(first).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(second).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(gallery).toHaveCount(0);
+
+    await page.getByRole('tab', { name: '插入', exact: true }).click();
+    await page.getByTestId('ribbon-illustrations-insert-shape').click();
+    const shapes = page.getByTestId('rich-text-shape-menu');
+    await expect(shapes).toBeVisible();
+    await page.keyboard.press('End');
+    await expect(shapes.getByRole('menuitem').last()).toBeFocused();
+    await page.mouse.click(5, 5);
+    await expect(shapes).toHaveCount(0);
+  });
+});

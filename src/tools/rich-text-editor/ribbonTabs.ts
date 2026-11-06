@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import type { Editor } from '@tiptap/react';
+import type { EditorState } from '@tiptap/pm/state';
 import type { TFunction } from 'i18next';
 import type {
   RibbonGroup,
@@ -13,7 +14,12 @@ import { stepFontSize } from './typography';
 import type { TextTransformValue } from './charFormat';
 import type { ViewMode } from './draft';
 import { normalizeHex } from '../../core/drawing/geometry';
-import { IMAGE_LAYERS, normalizeImageLayer, type ImageLayer } from './imageLayer';
+import {
+  IMAGE_LAYERS,
+  findSelectedImage,
+  normalizeImageLayer,
+  type ImageLayer,
+} from './imageLayer';
 import { MM_TO_PX } from './pageSetup';
 import { ShapeMenu } from './ShapeMenu';
 import { StyleGallery } from './StyleGallery';
@@ -27,6 +33,52 @@ import { applyShapeAttrs } from './useSelectedShape';
  * current content width); every command lives here so the Office tabs read like the Word ones and
  * the whole mapping stays testable without mounting the editor.
  */
+
+/**
+ * P0-6 rollback switch. When false, table/picture commands go back to the pre-P0-6 layout
+ * (groups appended to 开始 / 插入) and only 形状格式 remains a contextual tab.
+ */
+export const CONTEXT_TABS_ENABLED = true;
+
+export const CONTEXT_TAB_IDS = ['shape-format', 'table-tools', 'picture-format'] as const;
+
+export type ContextTabId = (typeof CONTEXT_TAB_IDS)[number];
+
+/**
+ * One source of truth for *which* contextual tab exists: both `buildRichTextRibbonTabs` (tab
+ * presence) and `EditorToolbar` (active tab) call this with the raw EditorState, so the ribbon
+ * can never show a tab that is inactive or activate one that is missing.
+ *
+ * Priority mirrors Word when several objects overlap: a selected shape wins over a picture,
+ * which wins over a table. The image predicate is intentionally the same lenient one used by
+ * the picture commands, so moving those groups out of 插入 does not hide commands that used
+ * to be reachable.
+ */
+export function resolveContextTab(state: EditorState | null): ContextTabId | null {
+  if (!state) return null;
+  if (findSelectedShape(state)) return 'shape-format';
+  if (!CONTEXT_TABS_ENABLED) return null;
+  if (findSelectedImage(state)) return 'picture-format';
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type.name === 'table') return 'table-tools';
+  }
+  return null;
+}
+
+/**
+ * Entering a contextual tab activates it; leaving returns to the last non-contextual tab the
+ * user was on (not a hard-coded 开始). Pure so the round trip is testable without a DOM.
+ */
+export function nextActiveTab(
+  current: string | undefined,
+  contextTabId: ContextTabId | null,
+  lastBaseTab: string,
+): string | undefined {
+  if (contextTabId) return contextTabId;
+  if (current && (CONTEXT_TAB_IDS as readonly string[]).includes(current)) return lastBaseTab;
+  return current;
+}
 
 /** Subset of `useEditorState` the ribbon consumes — mirrors the old flat toolbar exactly */
 export interface RichTextToolbarState {
@@ -80,6 +132,8 @@ export interface RichTextToolbarState {
   endnoteSelected: boolean;
   mathSelected: boolean;
   shapeSelected: boolean;
+  /** P0-6: reactive context tab id, computed by resolveContextTab in the useEditorState selector */
+  contextTab: ContextTabId | null;
 }
 
 /**
@@ -799,6 +853,24 @@ function imageGroup(input: RichTextRibbonInput): RibbonGroup {
   };
 }
 
+/** Word's 表格工具: the table commands now own a tab instead of trailing the 开始 groups (P0-6) */
+function tableToolsTab(input: RichTextRibbonInput): RibbonTab {
+  return {
+    id: 'table-tools',
+    label: input.t('tools.richText.ribbon.tab.tableTools'),
+    groups: [tableGroup(input)],
+  };
+}
+
+/** Word's 图片格式: picture size / alignment / wrapping, previously appended to 插入 (P0-6) */
+function pictureFormatTab(input: RichTextRibbonInput): RibbonTab {
+  return {
+    id: 'picture-format',
+    label: input.t('tools.richText.ribbon.tab.pictureFormat'),
+    groups: [imageGroup(input)],
+  };
+}
+
 /** Layer captions, shared by the picture and the shape tabs */
 const LAYER_LABELS: Record<ImageLayer, string> = {
   inline: 'tools.richText.imageLayerInline',
@@ -1065,7 +1137,8 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
       ],
     },
   ];
-  if (state.inTable) home.push(tableGroup(input));
+  // P0-6 rollback: with CONTEXT_TABS_ENABLED the group lives in its own 表格工具 tab
+  if (!CONTEXT_TABS_ENABLED && state.inTable) home.push(tableGroup(input));
 
   const insert: RibbonGroup[] = [
     {
@@ -1154,7 +1227,8 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
       ],
     },
   ];
-  if (state.inImage) insert.push(imageGroup(input));
+  // P0-6 rollback: with CONTEXT_TABS_ENABLED the group lives in its own 图片格式 tab
+  if (!CONTEXT_TABS_ENABLED && state.inImage) insert.push(imageGroup(input));
 
   const tabs: RibbonTab[] = [
     { id: 'home', label: t('tools.richText.ribbon.tab.home'), groups: home },
@@ -1451,10 +1525,18 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
     },
   ];
 
-  // Contextual tab: present only while a shape node is selected, like Word's 形状格式
-  const selectedShape = findSelectedShape(editor.state);
-  if (selectedShape) {
-    tabs.push(shapeFormatTab(input, shapeSpec(selectedShape.node.attrs), selectedShape.pos));
+  // Contextual tabs (Word-style). `resolveContextTab` is also used by EditorToolbar to activate
+  // the tab, so tab presence and tab activation can never disagree (P0-6).
+  const contextTabId = input.state.contextTab ?? resolveContextTab(editor.state);
+  if (contextTabId === 'shape-format') {
+    const selectedShape = findSelectedShape(editor.state);
+    if (selectedShape) {
+      tabs.push(shapeFormatTab(input, shapeSpec(selectedShape.node.attrs), selectedShape.pos));
+    }
+  } else if (contextTabId === 'table-tools') {
+    tabs.push(tableToolsTab(input));
+  } else if (contextTabId === 'picture-format') {
+    tabs.push(pictureFormatTab(input));
   }
   return tabs;
 }

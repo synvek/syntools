@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/react';
 import { readZoom } from './imageLayer';
 import { DEFAULT_SHAPE_SIZE } from './shapeNode';
 import { drawRect, isClickGesture, toCanvasPx } from './shapeDraw';
+import { hasOverlay } from '@/core/hooks/useOverlayStack';
 
 interface ShapeDrawLayerProps {
   editor: Editor | null;
@@ -57,6 +58,8 @@ export function ShapeDrawLayer({ editor, prst, onDone, hint }: ShapeDrawLayerPro
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      // P0-4: a dialog / menu above owns Escape; drawing must not be cancelled underneath it
+      if (hasOverlay()) return;
       event.preventDefault();
       cleanup();
       onDone();

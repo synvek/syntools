@@ -6,6 +6,8 @@
  * external files are a separate group and are never mixed into the same metric.
  */
 
+import type { ExternalProducerFamily } from './samples/external-doc';
+
 export type BaselineTool = 'slide' | 'docx' | 'sheet';
 
 /** Flat, numeric metrics only: JSON-diffable and stable across runs (never contains ids or times) */
@@ -16,12 +18,30 @@ export interface SampleIssue {
   count: number;
 }
 
+/** Fidelity of one OOXML part after a round trip of an external file */
+export type PartStatus = 'kept' | 'degraded' | 'lost';
+
+export interface SamplePart {
+  name: string;
+  /** Count in the original third-party file */
+  before: number;
+  /** Count in the file we exported back */
+  after: number;
+  status: PartStatus;
+}
+
 export interface SampleResult {
   id: string;
   tool: BaselineTool;
   title: string;
   /** Why a metric may legitimately differ (environment limits, known channel trade-offs) */
   notes?: string;
+  /** `external` = a real binary produced outside our own exporter (P0-1) */
+  source?: 'generated' | 'external';
+  /** Producing application, as declared in the file's docProps */
+  producer?: string;
+  /** Office suite that handled the external file; `other` = unprocessed source */
+  producerFamily?: ExternalProducerFamily;
   /** Export + import both succeeded */
   ok: boolean;
   error?: string;
@@ -33,6 +53,8 @@ export interface SampleResult {
   issues: SampleIssue[];
   /** Byte-level facts (zip part counts etc.); recorded but never compared to a golden */
   artifacts: Record<string, number>;
+  /** Per-part fidelity of external samples; generated samples have none */
+  parts?: SamplePart[];
 }
 
 export interface BaselineReport {
@@ -40,6 +62,10 @@ export interface BaselineReport {
   generatedAt: string;
   generator: string;
   total: number;
+  /** How many samples came from real third-party binaries rather than our own exporter */
+  externalSamples?: number;
+  /** Covered office suites (subset of EXTERNAL_PRODUCER_FAMILIES), for the coverage gate */
+  externalProducers?: string[];
   samples: SampleResult[];
 }
 
@@ -51,6 +77,14 @@ export interface MetricDiff {
   current: number;
 }
 
+/** A part whose fidelity class changed between golden and current run */
+export interface PartDiff {
+  sample: string;
+  part: string;
+  golden: PartStatus;
+  current: PartStatus;
+}
+
 export interface ReportDiff {
   addedSamples: string[];
   removedSamples: string[];
@@ -58,4 +92,6 @@ export interface ReportDiff {
   /** Issues that appeared / disappeared, keyed `sample:code` */
   addedIssues: string[];
   removedIssues: string[];
+  /** Per-part fidelity changes of external samples */
+  changedParts: PartDiff[];
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareReports, describeDiff } from './compare';
+import { blockingDrift, compareReports, describeDiff } from './compare';
 import type { BaselineReport, SampleResult } from './types';
 
 function sample(overrides: Partial<SampleResult> = {}): SampleResult {
@@ -65,5 +65,92 @@ describe('baseline report comparison', () => {
     const current = report([sample()]);
 
     expect(compareReports(golden, current).removedIssues).toEqual(['slide/demo:sheet.charts=2']);
+  });
+});
+
+describe('release gate (P0-1)', () => {
+  it('does not block an unchanged run', () => {
+    expect(blockingDrift(compareReports(report([sample()]), report([sample()])))).toEqual([]);
+  });
+
+  it('does not block an improvement, even though it is printed as drift', () => {
+    const golden = report([sample()]);
+    const current = report([sample({ after: { elements: 4, custGeomPoints: 5 } })]);
+    const diff = compareReports(golden, current);
+
+    expect(diff.changed).toHaveLength(1);
+    expect(describeDiff(diff)).toContain('after.elements: 3 → 4');
+    expect(blockingDrift(diff)).toEqual([]);
+  });
+
+  it('blocks fewer metrics back, a changed fixture and a new degradation', () => {
+    const golden = report([sample()]);
+    const current = report([
+      sample({
+        before: { elements: 2, custGeomPoints: 5 },
+        after: { elements: 2, custGeomPoints: 5 },
+        issues: [{ code: 'slide.placeholders', count: 1 }],
+      }),
+    ]);
+
+    const blockers = blockingDrift(compareReports(golden, current));
+    expect(blockers.some((line) => line.includes('before.elements'))).toBe(true);
+    expect(blockers.some((line) => line.includes('after.elements'))).toBe(true);
+    expect(blockers).toContain('new degradation: slide/demo:slide.placeholders=1');
+  });
+
+  it('blocks added / removed samples until the golden is updated', () => {
+    const golden = report([sample()]);
+    const current = report([sample(), sample({ id: 'docx/new', tool: 'docx' })]);
+    const blockers = blockingDrift(compareReports(golden, current));
+
+    expect(blockers.some((line) => line.includes('docx/new'))).toBe(true);
+    expect(
+      blockingDrift(compareReports(current, golden)).some((line) =>
+        line.includes('missing samples'),
+      ),
+    ).toBe(true);
+  });
+
+  it('blocks a part that used to survive and is now lost', () => {
+    const golden = report([
+      sample({
+        source: 'external',
+        parts: [{ name: 'footnotes', before: 3, after: 3, status: 'kept' }],
+      }),
+    ]);
+    const current = report([
+      sample({
+        source: 'external',
+        parts: [{ name: 'footnotes', before: 3, after: 0, status: 'lost' }],
+      }),
+    ]);
+    const diff = compareReports(golden, current);
+
+    expect(diff.changedParts).toEqual([
+      { sample: 'slide/demo', part: 'footnotes', golden: 'kept', current: 'lost' },
+    ]);
+    expect(describeDiff(diff)).toContain('part slide/demo:footnotes: kept → lost');
+    expect(blockingDrift(diff).some((line) => line.includes('footnotes'))).toBe(true);
+  });
+
+  it('does not block a part that was recovered', () => {
+    const golden = report([
+      sample({ parts: [{ name: 'endnotes', before: 2, after: 0, status: 'lost' }] }),
+    ]);
+    const current = report([
+      sample({ parts: [{ name: 'endnotes', before: 2, after: 2, status: 'kept' }] }),
+    ]);
+
+    expect(blockingDrift(compareReports(golden, current))).toEqual([]);
+  });
+
+  it('blocks a structural change such as a metric disappearing', () => {
+    const golden = report([sample()]);
+    const current = report([sample({ after: { elements: 3 } })]);
+    const diff = compareReports(golden, current);
+
+    expect(diff.changed[0].current).toBeNaN();
+    expect(blockingDrift(diff).length).toBeGreaterThan(0);
   });
 });

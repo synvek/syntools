@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Z_TOPMOST } from '@/core/components/ribbon/ribbonTheme';
 import { SHORTCUT_GROUPS } from '../model/shortcuts';
 
 /**
@@ -26,7 +27,7 @@ export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="absolute inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
+      className={`absolute inset-0 ${Z_TOPMOST} flex items-center justify-center bg-black/40 p-4`}
       onClick={onClose}
     >
       <div

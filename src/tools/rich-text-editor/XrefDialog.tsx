@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalBehavior } from '@/core/hooks/useOverlayStack';
 import type { Editor } from '@tiptap/react';
 import { collectBookmarks, type BookmarkEntry } from './bookmarks';
 import { collectXrefs, type XrefEntry, type XrefMode } from './xrefs';
@@ -49,17 +50,8 @@ export function XrefDialog({ editor, open, onClose }: XrefDialogProps) {
     };
   }, [open, editor, refresh]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  // P0-4: topmost-only Escape, Tab trap and focus restore instead of a private window listener
+  useModalBehavior(open, onClose);
 
   if (!open || !editor) return null;
 
@@ -87,6 +79,7 @@ export function XrefDialog({ editor, open, onClose }: XrefDialogProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="rte-xref-dialog-title"
+        aria-describedby="rte-xref-dialog-desc"
         data-testid="rich-text-xref-dialog"
         className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
@@ -97,7 +90,7 @@ export function XrefDialog({ editor, open, onClose }: XrefDialogProps) {
         >
           {t('tools.richText.xref')}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p id="rte-xref-dialog-desc" className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {t('tools.richText.xrefTextHint')}
         </p>
 

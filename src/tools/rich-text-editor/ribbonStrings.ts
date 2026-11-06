@@ -22,6 +22,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: '审阅',
         view: '视图',
         shapeFormat: '形状格式',
+        tableTools: '表格工具',
+        pictureFormat: '图片格式',
       },
       grp: {
         font: '字体',
@@ -67,6 +69,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: 'Review',
         view: 'View',
         shapeFormat: 'Shape Format',
+        tableTools: 'Table Tools',
+        pictureFormat: 'Picture Format',
       },
       grp: {
         font: 'Font',
@@ -112,6 +116,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: '校閱',
         view: '檢視',
         shapeFormat: '圖案格式',
+        tableTools: '表格工具',
+        pictureFormat: '圖片格式',
       },
       grp: {
         font: '字型',
@@ -157,6 +163,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: '校閲',
         view: '表示',
         shapeFormat: '図形の書式',
+        tableTools: 'テーブル ツール',
+        pictureFormat: '図の書式',
       },
       grp: {
         font: 'フォント',
@@ -202,6 +210,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: 'Révision',
         view: 'Affichage',
         shapeFormat: 'Format de la forme',
+        tableTools: 'Outils de tableau',
+        pictureFormat: "Format de l'image",
       },
       grp: {
         font: 'Police',
@@ -247,6 +257,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: 'Überprüfen',
         view: 'Ansicht',
         shapeFormat: 'Formformat',
+        tableTools: 'Tabellentools',
+        pictureFormat: 'Bildformat',
       },
       grp: {
         font: 'Schriftart',
@@ -292,6 +304,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: 'Revisione',
         view: 'Visualizza',
         shapeFormat: 'Formato forma',
+        tableTools: 'Strumenti tabella',
+        pictureFormat: 'Formato immagine',
       },
       grp: {
         font: 'Carattere',
@@ -337,6 +351,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: 'Revisar',
         view: 'Vista',
         shapeFormat: 'Formato de forma',
+        tableTools: 'Herramientas de tabla',
+        pictureFormat: 'Formato de imagen',
       },
       grp: {
         font: 'Fuente',
@@ -382,6 +398,8 @@ export const ribbonStrings: Record<string, StringTree> = {
         review: 'Revisão',
         view: 'Exibir',
         shapeFormat: 'Formatar Forma',
+        tableTools: 'Ferramentas de tabela',
+        pictureFormat: 'Formato da imagem',
       },
       grp: {
         font: 'Fonte',

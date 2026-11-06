@@ -8,6 +8,18 @@ import type { RibbonAccent } from './types';
  * they only paint *selected* states so no large colored areas appear.
  */
 
+/**
+ * Overlay stacking tokens (P0-4.2). Whole literal class names keep Tailwind's static scanner happy.
+ *
+ * Ladder: flyout < panel/dropdown < context menu < topmost dialog. Arbitrary `z-[60]` / `z-[70]`
+ * used to be repeated in five unrelated tools, so a menu and a dialog could silently out-stack
+ * each other; every overlay now reads its layer from here instead.
+ */
+export const Z_FLYOUT = 'z-40';
+export const Z_PANEL = 'z-50';
+export const Z_CONTEXT_MENU = 'z-[60]';
+export const Z_TOPMOST = 'z-[70]';
+
 export const RIBBON_SHELL =
   'rounded-lg border border-gray-200 bg-white shadow-sm dark:border-[#3a3a3a] dark:bg-[#1f1f1f]';
 
@@ -22,8 +34,7 @@ export const RIBBON_TABSTRIP =
  */
 export const RIBBON_PANEL = 'flex h-20 items-stretch gap-0 bg-white px-1 py-1 dark:bg-[#1f1f1f]';
 
-export const RIBBON_FLYOUT =
-  'absolute left-0 top-full z-40 mt-0.5 flex max-h-[70vh] max-w-[calc(100vw-2rem)] flex-wrap items-stretch rounded-lg border border-gray-200 bg-white p-1 shadow-xl dark:border-[#3a3a3a] dark:bg-[#1f1f1f]';
+export const RIBBON_FLYOUT = `absolute left-0 top-full ${Z_FLYOUT} mt-0.5 flex max-h-[70vh] max-w-[calc(100vw-2rem)] flex-wrap items-stretch rounded-lg border border-gray-200 bg-white p-1 shadow-xl dark:border-[#3a3a3a] dark:bg-[#1f1f1f]`;
 
 /** Vertical divider between groups (inset so it does not touch the panel edges) */
 export const RIBBON_GROUP_DIVIDER =

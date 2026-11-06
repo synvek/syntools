@@ -154,6 +154,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.62.1",
     "@tauri-apps/cli": "^2.11.4",
     "@testing-library/dom": "^10.4.0",

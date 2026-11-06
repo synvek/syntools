@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalBehavior } from '@/core/hooks/useOverlayStack';
 import type { Editor } from '@tiptap/react';
 import {
   collectBookmarks,
@@ -56,17 +57,8 @@ export function BookmarkDialog({ editor, open, onClose }: BookmarkDialogProps) {
     };
   }, [open, editor, refresh]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  // P0-4: topmost-only Escape, Tab trap and focus restore instead of a private window listener
+  useModalBehavior(open, onClose);
 
   if (!open || !editor) return null;
 
@@ -124,6 +116,7 @@ export function BookmarkDialog({ editor, open, onClose }: BookmarkDialogProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="rte-bookmark-dialog-title"
+        aria-describedby="rte-bookmark-dialog-desc"
         data-testid="rich-text-bookmark-dialog"
         className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
@@ -134,7 +127,7 @@ export function BookmarkDialog({ editor, open, onClose }: BookmarkDialogProps) {
         >
           {t('tools.richText.bookmark')}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p id="rte-bookmark-dialog-desc" className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {t('tools.richText.bookmarkHint')}
         </p>
 

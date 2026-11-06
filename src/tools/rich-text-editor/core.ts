@@ -50,26 +50,32 @@ export function normalizeCellVAlign(value: string | null | undefined): CellVerti
   return null;
 }
 
-export type ImportKind = 'docx' | 'legacy-doc' | 'unsupported';
+export type ImportKind = 'docx' | 'txt' | 'html' | 'md' | 'legacy-doc' | 'unsupported';
+
+/** Formats the editor can actually read into its HTML document model */
+export type ImportableKind = 'docx' | 'txt' | 'html' | 'md';
+
+/** Text formats converted on the client (no server, no extra dependency) */
+export type TextImportKind = Extract<ImportableKind, 'txt' | 'html' | 'md'>;
 
 /** Determine the importable kind from the extension; legacy binary .doc can't be parsed reliably in the browser */
 export function resolveImportKind(filename: string): ImportKind {
   const lower = filename.trim().toLowerCase();
   if (lower.endsWith('.docx')) return 'docx';
+  if (lower.endsWith('.txt')) return 'txt';
+  if (lower.endsWith('.md') || lower.endsWith('.markdown')) return 'md';
+  if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
   if (lower.endsWith('.doc') || lower.endsWith('.wps') || lower.endsWith('.rtf')) {
     return 'legacy-doc';
   }
   return 'unsupported';
 }
 
-/** Unified pre-import validation: format + size */
-export function checkImportFile(file: {
-  name: string;
-  size: number;
-}): ToolResult<Extract<ImportKind, 'docx'>> {
+/** Unified pre-import validation: format + size (same 10MB ceiling for docx and text formats) */
+export function checkImportFile(file: { name: string; size: number }): ToolResult<ImportableKind> {
   const kind = resolveImportKind(file.name);
   if (kind === 'legacy-doc') return { ok: false, error: 'UNSUPPORTED_LEGACY_DOC' };
-  if (kind !== 'docx') return { ok: false, error: 'NOT_DOCX' };
+  if (kind === 'unsupported') return { ok: false, error: 'NOT_DOCX' };
   if (file.size > MAX_IMPORT_BYTES) {
     return {
       ok: false,
@@ -77,7 +83,119 @@ export function checkImportFile(file: {
       params: { max: Math.round(MAX_IMPORT_BYTES / 1024 / 1024) },
     };
   }
-  return { ok: true, value: 'docx' };
+  return { ok: true, value: kind };
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Inline Markdown → HTML. The raw text is escaped first, so no markup can slip through unescaped. */
+function inlineMarkdown(value: string): string {
+  let text = escapeHtml(value);
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  text = text.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_all: string, label: string, href: string) =>
+      `<a href="${escapeHtml(/^(https?:|mailto:|\/|#)/i.test(href) ? href : '#')}">${label}</a>`,
+  );
+  return text;
+}
+
+/**
+ * Minimal Markdown → block HTML (headings, quotes, ordered/unordered lists, paragraphs).
+ * Deliberately small: it is a text import convenience, not a Markdown renderer. Anything it does
+ * not understand stays as literal text, and `sanitizeDocHtml` cleans up the result.
+ */
+function markdownToHtml(markdown: string): string {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  const blocks: string[] = [];
+  let paragraph: string[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push(`<p>${paragraph.map(inlineMarkdown).join('<br>')}</p>`);
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (!list) return;
+    const tag = list.ordered ? 'ol' : 'ul';
+    blocks.push(
+      `<${tag}>${list.items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join('')}</${tag}>`,
+    );
+    list = null;
+  };
+  const flushAll = () => {
+    flushParagraph();
+    flushList();
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushAll();
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.*)$/.exec(trimmed);
+    if (heading) {
+      flushAll();
+      const level = heading[1].length;
+      blocks.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
+    const quote = /^>\s?(.*)$/.exec(trimmed);
+    if (quote) {
+      flushAll();
+      blocks.push(`<blockquote><p>${inlineMarkdown(quote[1])}</p></blockquote>`);
+      continue;
+    }
+    const bullet = /^[-*+]\s+(.*)$/.exec(trimmed);
+    const numbered = /^\d+[.)]\s+(.*)$/.exec(trimmed);
+    if (bullet || numbered) {
+      flushParagraph();
+      const ordered = Boolean(numbered);
+      if (!list || list.ordered !== ordered) {
+        flushList();
+        list = { ordered, items: [] };
+      }
+      list.items.push(bullet?.[1] ?? numbered?.[1] ?? '');
+      continue;
+    }
+    flushList();
+    paragraph.push(trimmed);
+  }
+  flushAll();
+  return blocks.join('');
+}
+
+/**
+ * Convert a local text file into editor HTML. Every branch goes through `sanitizeDocHtml`, so even
+ * an .html import cannot inject scripts or event handlers. Expected failures use ToolResult, never throws.
+ */
+export function textToDocHtml(text: string, kind: TextImportKind): ToolResult<string> {
+  if (!text.trim()) return { ok: false, error: 'EMPTY' };
+  let raw: string;
+  if (kind === 'html') {
+    raw = text;
+  } else if (kind === 'md') {
+    raw = markdownToHtml(text);
+  } else {
+    raw = text
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((line) => `<p>${line.trim() ? escapeHtml(line) : '<br>'}</p>`)
+      .join('');
+  }
+  const clean = sanitizeDocHtml(raw);
+  if (!clean.ok) return clean;
+  return { ok: true, value: normalizeImportedDocHtml(clean.value) };
 }
 
 /** HTML size guard before export */
@@ -220,7 +338,7 @@ export function sanitizeFilename(name: string): string {
 }
 
 /** Build the export filename (keeping the user's original title) */
-export type ExportExt = 'docx' | 'pdf' | 'md' | 'html';
+export type ExportExt = 'docx' | 'pdf' | 'md' | 'html' | 'txt';
 
 export function buildExportFilename(title: string, ext: ExportExt): string {
   return `${sanitizeFilename(title)}.${ext}`;

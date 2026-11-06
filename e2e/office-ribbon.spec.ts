@@ -121,8 +121,69 @@ test.describe('word processor ribbon', () => {
     await expect(textEditor).toHaveCount(0);
     await expect(shape).toHaveAttribute('data-shape-text', '季度汇总');
 
-    // Leaving the shape drops the tab and returns to 开始
+    // Leaving the shape drops the tab and returns to the tab the user was on (插入), not a hard-coded 开始
     await expect(page.getByRole('tab', { name: '形状格式', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: '插入', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  test('a table opens the contextual 表格工具 tab and restores the previous tab (P0-6)', async ({
+    page,
+  }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('表格前的段落');
+    await page.keyboard.press('Enter');
+
+    await page.getByRole('tab', { name: '插入', exact: true }).click();
+    await page.getByTestId('ribbon-tables-insert-table').click();
+    await expect(page.locator('.tiptap table')).toHaveCount(1);
+    const tableTab = page.getByRole('tab', { name: '表格工具', exact: true });
+    await expect(tableTab).toHaveAttribute('aria-selected', 'true');
+
+    // The commands left 开始 but keep working from their own tab
+    await page.getByTestId('ribbon-table-row-below').click();
+    await expect(page.locator('.tiptap table tr')).toHaveCount(4);
+
+    // Caret back in the paragraph before the table → contextual tab disappears, 插入 restored
+    await page.locator('.tiptap p').first().click();
+    await expect(tableTab).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: '插入', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  test('a picture opens the contextual 图片格式 tab and restores the previous tab (P0-6)', async ({
+    page,
+  }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('图片前的段落');
+    await page.keyboard.press('Enter');
+
+    await page.setInputFiles('input[type="file"][accept="image/*"]', {
+      name: 'dot.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAKUlEQVR42u3NMQEAAAgDoC251a3gLwSgcyfTVFVVVVVVVVVVVVVVVVVV1S8DLQABAVXMpwAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+    await page.locator('.tiptap img').first().waitFor();
+    const pictureTab = page.getByRole('tab', { name: '图片格式', exact: true });
+    await expect(pictureTab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('ribbon-image-layout-image-align-center')).toBeVisible();
+
+    // Caret back in the paragraph without the image → contextual tab disappears, 开始 restored
+    await page.locator('.tiptap p').first().click();
+    await expect(pictureTab).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: '开始', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 });
 
@@ -266,5 +327,68 @@ test.describe('spreadsheet ribbon', () => {
     await expect(menu.getByRole('menuitem', { name: '打印' })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
+  });
+});
+
+test.describe('narrow ribbon (implementation plan P0-4.5)', () => {
+  test.describe('trimmed groups between full width and collapse', () => {
+    test.use({ locale: 'zh-CN', viewport: { width: 760, height: 900 } });
+
+    test('select / colour commands stay reachable from the overflow menu', async ({ page }) => {
+      await page.goto('/tools/rich-text-editor');
+      await expect(page.locator('.tiptap')).toBeVisible();
+
+      // Which group gets trimmed depends on measured widths, so walk down until the overflow menu
+      // actually offers a control entry; this also covers the window just above auto-collapse.
+      let found = false;
+      let widthUsed = 0;
+      for (const width of [1000, 900, 820, 760, 700, 680, 660, 650]) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.waitForTimeout(250);
+        const overflow = page.getByTestId('word-ribbon-overflow');
+        if ((await overflow.count()) === 0) continue;
+        await overflow.click();
+        const entry = page.locator('[role="menuitem"][data-ribbon-control="true"]').first();
+        if ((await entry.count()) > 0) {
+          found = true;
+          widthUsed = width;
+          await entry.click();
+          break;
+        }
+        await page.keyboard.press('Escape');
+      }
+      expect(found, `no width exposed a select / colour control (last: ${widthUsed})`).toBe(true);
+
+      const controls = page.getByTestId('word-ribbon-controls');
+      await expect(controls).toBeVisible();
+      await expect(
+        controls.getByRole('combobox').or(controls.getByRole('button')).first(),
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(controls).toHaveCount(0);
+    });
+  });
+
+  test.describe('below the 640px auto-collapse threshold', () => {
+    test.use({ locale: 'zh-CN', viewport: { width: 600, height: 900 } });
+
+    test('font / size / colour / zoom stay reachable in the collapsed flyout', async ({ page }) => {
+      await page.goto('/tools/rich-text-editor');
+      await expect(page.locator('.tiptap')).toBeVisible();
+
+      await page.getByRole('tab', { name: '开始', exact: true }).click();
+      await expect(page.getByRole('tabpanel')).toBeVisible();
+      for (const id of [
+        'ribbon-font-font-family',
+        'ribbon-font-font-size',
+        'ribbon-font-font-color',
+        'ribbon-font-highlight',
+      ]) {
+        await expect(page.getByTestId(id)).toBeVisible();
+      }
+
+      await page.getByRole('tab', { name: '视图', exact: true }).click();
+      await expect(page.getByTestId('ribbon-zoom-zoom')).toBeVisible();
+    });
   });
 });

@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { Z_FLYOUT } from '@/core/components/ribbon/ribbonTheme';
+import { useMenuNavigation } from '@/core/hooks/useMenuNavigation';
 import { resolvePresetGeometry } from '../../core/drawing/shapeDefs';
 import { SHAPE_PRESETS } from './shapeNode';
 import { shapePathD } from './shapeSvg';
@@ -42,17 +44,22 @@ export function ShapeMenu({
   mode = 'draw',
 }: ShapeMenuProps) {
   const { t } = useTranslation();
+  // Hooks must run before the conditional return: the parent mounts this overlay only while open,
+  // but `useMenuNavigation` still needs `open` to register/unregister the dismiss stack cleanly.
+  const { rootRef, onKeyDown } = useMenuNavigation(open, onClose);
   if (!open) return null;
   const drawing = mode === 'draw';
 
   return (
     <div
+      ref={rootRef}
+      onKeyDown={onKeyDown}
       data-testid={drawing ? 'rich-text-shape-menu' : 'rich-text-shape-change'}
       role="menu"
       aria-label={
         drawing ? t('tools.richText.shapeInsert') : t('tools.richText.ribbon.changeShape')
       }
-      className="absolute left-0 top-full z-40 mt-1 w-[268px] rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+      className={`absolute left-0 top-full ${Z_FLYOUT} mt-1 w-[268px] rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-900`}
     >
       {drawing ? (
         <p className="mb-1 px-1 text-[11px] text-gray-500 dark:text-gray-400">

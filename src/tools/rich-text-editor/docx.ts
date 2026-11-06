@@ -1183,6 +1183,8 @@ export async function importDocx(
 ): Promise<ToolResult<string>> {
   const check = checkImportFile(file);
   if (!check.ok) return check;
+  // checkImportFile also admits .txt/.md/.html for the text-import path; this entry point is docx-only
+  if (check.value !== 'docx') return { ok: false, error: 'NOT_DOCX' };
   try {
     const buffer = await file.arrayBuffer();
     const documentXml = await readDocumentXml(buffer);

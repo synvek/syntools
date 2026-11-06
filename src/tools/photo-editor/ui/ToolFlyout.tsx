@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/core/components/Icon';
+import { Z_CONTEXT_MENU } from '@/core/components/ribbon/ribbonTheme';
 
 export interface FlyoutItem<T extends string> {
   id: T;
@@ -141,7 +142,7 @@ export function ToolFlyout<T extends string>({
         visibility: position ? 'visible' : 'hidden',
         maxHeight: 'calc(100vh - 1rem)',
       }}
-      className="z-[60] min-w-40 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+      className={`${Z_CONTEXT_MENU} min-w-40 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900`}
     >
       {items.map((item) => {
         const active = item.id === activeId;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RibbonAccent, RibbonItemSize } from './types';
-import { RIBBON_ACCENT, RIBBON_BTN_IDLE, RIBBON_COLOR_SWATCHES } from './ribbonTheme';
+import { RIBBON_ACCENT, RIBBON_BTN_IDLE, RIBBON_COLOR_SWATCHES, Z_PANEL } from './ribbonTheme';
 import { RibbonIcon } from './ribbonIcons';
 
 const SWATCH =
@@ -95,7 +95,7 @@ export function RibbonColorPicker({
           role="dialog"
           aria-label={label}
           data-testid={testId ? `${testId}-panel` : undefined}
-          className="absolute left-0 top-full z-50 mt-0.5 w-[11.5rem] rounded-md border border-gray-200 bg-white p-1.5 shadow-xl dark:border-[#3a3a3a] dark:bg-[#252525]"
+          className={`absolute left-0 top-full ${Z_PANEL} mt-0.5 w-[11.5rem] rounded-md border border-gray-200 bg-white p-1.5 shadow-xl dark:border-[#3a3a3a] dark:bg-[#252525]`}
         >
           <div className="grid grid-cols-6 gap-1">
             {RIBBON_COLOR_SWATCHES.map((color) => (

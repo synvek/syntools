@@ -20,6 +20,8 @@ export interface RibbonMenuItem {
   /** Renders a leading check mark — used by the "current value" item of a split button */
   checked?: boolean;
   danger?: boolean;
+  /** Opens a control panel (select / colour) instead of running a command — P0-4.5 */
+  control?: boolean;
   onSelect: () => void;
 }
 

@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { Editor } from '@tiptap/react';
+import { Z_FLYOUT } from '@/core/components/ribbon/ribbonTheme';
+import { useMenuNavigation } from '@/core/hooks/useMenuNavigation';
 import { STYLE_PRESETS, applyStylePreset } from './stylePresets';
 
 interface StyleGalleryProps {
@@ -16,14 +18,17 @@ interface StyleGalleryProps {
  */
 export function StyleGallery({ open, editor, onClose }: StyleGalleryProps) {
   const { t } = useTranslation();
+  const { rootRef, onKeyDown } = useMenuNavigation(open, onClose);
   if (!open) return null;
 
   return (
     <div
+      ref={rootRef}
+      onKeyDown={onKeyDown}
       data-testid="rich-text-style-gallery"
       role="menu"
       aria-label={t('tools.richText.styles')}
-      className="absolute left-0 top-full z-40 mt-1 w-[360px] rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+      className={`absolute left-0 top-full ${Z_FLYOUT} mt-1 w-[360px] rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-900`}
     >
       {/* Three columns: the nine presets (body, 标题 1-6, quote, code) fill the grid exactly */}
       <div className="grid grid-cols-3 gap-1">

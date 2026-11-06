@@ -10,17 +10,21 @@ import {
   EDITOR_STRIP_TITLE_INPUT_CLASS,
   STRIP_ICON_BUTTON_CLASS,
   editorMenuItem,
+  modifierShortcut,
   estimateJsonBytes,
   formatBytes,
   type EditorMenu,
 } from '@/core/components/editorChrome';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { useViewportFill } from '@/core/hooks/useViewportFill';
+import { hasOverlay } from '@/core/hooks/useOverlayStack';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { downloadBytes } from '@/core/pdf/download';
 import type { ToolResult } from '@/core/types';
 import { PrintLayer } from './A4Page';
+import { PrintPreviewDialog } from './PrintPreviewDialog';
+import { ShortcutHelpDialog } from './ShortcutHelpDialog';
 import { EditorContextMenu, type EditorContextTarget } from './EditorContextMenu';
 import { EditorToolbar } from './EditorToolbar';
 import { RulerBar } from './RulerBar';
@@ -36,12 +40,14 @@ import { docxLossIssues, markdownLossIssues } from './fidelity';
 import { OutlinePanel } from './OutlinePanel';
 import {
   buildExportFilename,
+  checkImportFile,
   countDocStats,
   createEmptyDocHtml,
   htmlToPlain,
   sanitizeDocHtml,
   scanDocxExportLosses,
   scanMarkdownExportLosses,
+  textToDocHtml,
   type DocxExportLosses,
   type MarkdownExportLosses,
 } from './core';
@@ -301,6 +307,11 @@ export default function RichTextEditorTool() {
   /** 交叉引用对话框：选书签 + 选模式，插入一条活引用 */
   const [xrefsOpen, setXrefsOpen] = useState(false);
   const [printReady, setPrintReady] = useState(false);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  /** Keyboard shortcut help, opened from the ⋯ menu and closed through the shared overlay stack */
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  /** Short-lived "saved" confirmation for Ctrl/⌘+S (the status bar dot is the passive indicator) */
+  const [saveFlash, setSaveFlash] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
@@ -317,6 +328,8 @@ export default function RichTextEditorTool() {
   /** Editor height = remaining first-screen space (status bar stays in view, "related tools" is pushed below the fold) */
   const viewportMax = useViewportFill(viewportRef, { min: MIN_VIEWPORT_PX });
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  /** Separate picker for local text formats (.txt / .md / .html), handled by the same import function */
+  const textImportRef = useRef<HTMLInputElement | null>(null);
   /** "Compare with file" picker (same .docx path as import, but the result becomes revisions) */
   const compareInputRef = useRef<HTMLInputElement | null>(null);
   /** Image picker for the Insert menu (the toolbar owns its own hidden input) */
@@ -652,19 +665,53 @@ export default function RichTextEditorTool() {
     return result.ok ? result.value : '';
   }, [printHtml]);
 
-  // ⌘/Ctrl+F opens find & replace, Esc closes it (works while the editor is focused too)
+  /**
+   * File-command handlers live in a ref so the keydown listener can be registered once: an
+   * empty-dependency effect would otherwise capture handlers from the first render. (P0-3.2)
+   */
+  const fileActionsRef = useRef({
+    print: () => {},
+    save: () => {},
+    create: () => {},
+  });
+
+  // ⌘/Ctrl+F find, +P print, +S save locally, +N new document; Esc closes find
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
-        event.preventDefault();
-        setFindOpen(true);
-        return;
+      if (event.metaKey || event.ctrlKey) {
+        const key = event.key.toLowerCase();
+        if (key === 'f') {
+          event.preventDefault();
+          setFindOpen(true);
+          return;
+        }
+        if (!event.altKey && key === 'p') {
+          event.preventDefault();
+          fileActionsRef.current.print();
+          return;
+        }
+        if (!event.altKey && key === 's') {
+          event.preventDefault();
+          fileActionsRef.current.save();
+          return;
+        }
+        if (!event.altKey && key === 'n') {
+          event.preventDefault();
+          fileActionsRef.current.create();
+        }
       }
-      if (event.key === 'Escape') setFindOpen(false);
+      // P0-4: an open dialog / menu owns Escape; find must not be cleared underneath it
+      if (event.key === 'Escape' && !hasOverlay()) setFindOpen(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!saveFlash) return;
+    const timer = window.setTimeout(() => setSaveFlash(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [saveFlash]);
 
   const stats = useMemo(() => countDocStats(htmlToPlain(snapshotHtml)), [snapshotHtml]);
   const isEmpty = stats.chars === 0;
@@ -675,6 +722,38 @@ export default function RichTextEditorTool() {
     setImportRevisionsLost(false);
     setImportCommentsLost(0);
     setImportShapesLost(0);
+    const check = checkImportFile(file);
+    if (!check.ok) {
+      setBusy(null);
+      setFailure(check);
+      return;
+    }
+    if (check.value !== 'docx') {
+      // Local text formats: convert on the client, then commit through the same editor/persistence path
+      try {
+        const text = await file.text();
+        const converted = textToDocHtml(text, check.value);
+        setBusy(null);
+        if (!converted.ok) {
+          setFailure(converted);
+          return;
+        }
+        editor?.commands.setContent(converted.value);
+        setSnapshotHtml(converted.value);
+        applyReview({
+          comments: [],
+          changes: [],
+          userWords: userWordsRef.current,
+          templateId: templateIdRef.current,
+        });
+        persistNow({ title: titleRef.current, html: converted.value, view: viewRef.current });
+        if (!titleRef.current.trim()) setTitle(file.name.replace(/\.[^.]+$/, ''));
+      } catch {
+        setBusy(null);
+        setFailure({ ok: false, error: 'IMPORT_FAILED' });
+      }
+      return;
+    }
     let importedChanges: TrackedChange[] = [];
     let importedComments: DocComment[] = [];
     const result = await importDocx(file, {
@@ -1332,6 +1411,17 @@ export default function RichTextEditorTool() {
     downloadBytes(bytes, buildExportFilename(title || 'document', 'html'), 'text/html');
   };
 
+  /** Export plain text (P0-3.3): prepared HTML → plain text, so TOC / notes are included too */
+  const handleExportTxt = () => {
+    if (!editor) return;
+    const plain = htmlToPlain(prepareExportHtml(editor.getHTML()));
+    downloadBytes(
+      new TextEncoder().encode(plain),
+      buildExportFilename(title || 'document', 'txt'),
+      'text/plain;charset=utf-8',
+    );
+  };
+
   const resetEditorContent = (doc: {
     title: string;
     html: string;
@@ -1383,6 +1473,23 @@ export default function RichTextEditorTool() {
     setCurrentDocId(id);
     handleClear();
     void listDocuments().then(setDocs);
+  };
+
+  /** Point the single keydown listener at the latest handlers (see the ref declaration above). */
+  fileActionsRef.current = {
+    print: () => {
+      setPrintPreviewOpen(false);
+      void handleExportPdf('text');
+    },
+    save: () => {
+      persistNow({
+        title: titleRef.current,
+        html: readHtml() ?? snapshotHtml,
+        view: viewRef.current,
+      });
+      setSaveFlash(true);
+    },
+    create: handleNew,
   };
 
   /**
@@ -1522,6 +1629,26 @@ export default function RichTextEditorTool() {
     setContextMenu({ x: event.clientX, y: event.clientY, kind: from !== to ? 'text' : 'empty' });
   };
 
+  /** P0-4.4: Shift+F10 / the ContextMenu key is the keyboard equivalent of right-click */
+  const openContextMenuFromKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!editor) return;
+    if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+    event.preventDefault();
+    const { from, to } = editor.state.selection;
+    let x: number;
+    let y: number;
+    try {
+      const coords = editor.view.coordsAtPos(from);
+      x = coords.left;
+      y = coords.bottom;
+    } catch {
+      const rect = editor.view.dom.getBoundingClientRect();
+      x = rect.left + rect.width / 2;
+      y = rect.top + 24;
+    }
+    setContextMenu({ x, y, kind: from !== to ? 'text' : 'empty' });
+  };
+
   // Multi-section (P2-2): the page setup panel edits the section under the cursor. Section 0 is the
   // document-level setup; later sections carry their own snapshot on the section-break node.
   const sectionState = (() => {
@@ -1590,6 +1717,16 @@ export default function RichTextEditorTool() {
       editorMenuItem('file-import', t('tools.richText.importDocx'), () =>
         importInputRef.current?.click(),
       ),
+      editorMenuItem('file-import-text', t('tools.richText.importText'), () =>
+        textImportRef.current?.click(),
+      ),
+      { type: 'separator' },
+      editorMenuItem('file-print', t('tools.richText.print'), () => void handleExportPdf('text'), {
+        disabled: isEmpty,
+      }),
+      editorMenuItem('file-print-preview', t('tools.richText.printPreview'), () =>
+        setPrintPreviewOpen(true),
+      ),
       { type: 'separator' },
       editorMenuItem(
         'file-export-docx',
@@ -1615,6 +1752,9 @@ export default function RichTextEditorTool() {
         () => void handleExportHtml(),
         { disabled: isEmpty },
       ),
+      editorMenuItem('file-export-txt', t('tools.richText.exportTxt'), handleExportTxt, {
+        disabled: isEmpty,
+      }),
       { type: 'separator' },
       editorMenuItem('file-library', t('tools.richText.library'), openLibrary),
       { type: 'separator' },
@@ -1625,7 +1765,10 @@ export default function RichTextEditorTool() {
         'edit-select-all',
         t('tools.richText.selectAll'),
         () => editor?.chain().focus().selectAll().run(),
-        { shortcut: '⌘A', disabled: !editor },
+        { shortcut: modifierShortcut('A'), disabled: !editor },
+      ),
+      editorMenuItem('help-shortcuts', t('tools.richText.shortcutHelp'), () =>
+        setShortcutHelpOpen(true),
       ),
       { type: 'separator' },
       editorMenuItem('file-clear', t('common.clear'), handleClear, {
@@ -1645,6 +1788,14 @@ export default function RichTextEditorTool() {
         menu={menu}
         headerRight={
           <>
+            {saveFlash ? (
+              <span
+                data-testid="rich-text-save-notice"
+                className="mr-1 shrink-0 text-[11px] text-green-600 dark:text-green-400"
+              >
+                {t('tools.richText.savedNotice')}
+              </span>
+            ) : null}
             <span
               role="status"
               title={statusText}
@@ -1911,6 +2062,7 @@ export default function RichTextEditorTool() {
                 <div
                   ref={surfaceRef}
                   onContextMenu={openContextMenu}
+                  onKeyDown={openContextMenuFromKeyboard}
                   className={`rte-surface relative rounded-lg border border-gray-200 shadow-sm dark:border-gray-700 ${
                     viewMode === 'paged' ? 'rte-paged' : 'px-8 py-8'
                   } ${viewMode === 'flow' && metrics.columns > 1 ? 'rte-columns' : ''}`}
@@ -2075,6 +2227,21 @@ export default function RichTextEditorTool() {
         type="file"
         accept=".docx"
         className="hidden"
+        data-testid="rich-text-import-input"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void handleImport(file);
+        }}
+      />
+
+      {/* Local text formats share `handleImport`; conversion and DOMPurify sanitizing happen in core.ts */}
+      <input
+        ref={textImportRef}
+        type="file"
+        accept=".txt,.md,.markdown,.html,.htm,text/plain,text/markdown,text/html"
+        className="hidden"
+        data-testid="rich-text-text-import-input"
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = '';
@@ -2260,6 +2427,19 @@ export default function RichTextEditorTool() {
           cssVars={metrics.cssVars}
         />
       )}
+
+      <PrintPreviewDialog
+        open={printPreviewOpen}
+        html={presentHtml}
+        cssVars={metrics.cssVars}
+        onClose={() => setPrintPreviewOpen(false)}
+        onPrint={() => {
+          setPrintPreviewOpen(false);
+          void handleExportPdf('text');
+        }}
+      />
+
+      <ShortcutHelpDialog open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
     </div>
   );
 }

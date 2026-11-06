@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalBehavior } from '@/core/hooks/useOverlayStack';
 
 interface FootnoteDialogProps {
   /** 脚注 / 尾注共用：决定文案，落到哪个 Word 部件由调用方的命令决定 */
@@ -52,17 +53,8 @@ export function FootnoteDialog({
     return () => clearTimeout(timer);
   }, [mode, initialNote]);
 
-  useEffect(() => {
-    if (!mode) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [mode, onCancel]);
+  // P0-4: `mode !== null` means open; use the shared dismiss stack + focus trap
+  useModalBehavior(Boolean(mode), onCancel);
 
   if (!mode) return null;
 
@@ -78,6 +70,7 @@ export function FootnoteDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="rte-footnote-dialog-title"
+        aria-describedby="rte-footnote-dialog-desc"
         data-testid="rich-text-footnote-dialog"
         className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
@@ -88,7 +81,9 @@ export function FootnoteDialog({
         >
           {mode === 'insert' ? t(keys.insert) : t(keys.edit)}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t(keys.desc)}</p>
+        <p id="rte-footnote-dialog-desc" className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {t(keys.desc)}
+        </p>
 
         <textarea
           ref={textareaRef}

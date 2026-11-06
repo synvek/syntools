@@ -90,9 +90,9 @@ async function openPageSetup(page: Page): Promise<void> {
   await page.getByRole('button', { name: '页面设置', exact: true }).click();
 }
 
-/** … and 插入分页符 sits in the insert tab; both used to be menu entries only */
+/** 页面设置与插入分页符都在「页面布局」页签（breaks 组），曾只存在于菜单里 */
 async function insertPageBreak(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: '插入', exact: true }).click();
+  await page.getByRole('tab', { name: '页面布局', exact: true }).click();
   await page.getByRole('button', { name: '插入分页符', exact: true }).click();
 }
 
@@ -338,10 +338,12 @@ test('rich text: compare with a .docx file turns the differences into reviewable
   await page.keyboard.press('Delete');
   await pastePlainText(page, edited);
 
+  // The ribbon's 审阅 tab and the review toolbar expose same-named commands. The panel/toolbar
+  // buttons come later in the DOM, so `.last()` keeps these assertions on the real review UI.
   /** Run one comparison through the real UI (review panel button -> file picker) */
   const compareWithBaseline = async () => {
     const chooser = page.waitForEvent('filechooser');
-    await page.getByRole('button', { name: '与文件比较…' }).click();
+    await page.getByRole('button', { name: '与文件比较…' }).last().click();
     await (await chooser).setFiles(baseline);
   };
 
@@ -360,9 +362,9 @@ test('rich text: compare with a .docx file turns the differences into reviewable
   // Panel navigation: next/prev walk the revision list and move the editor selection with it
   const position = page.getByTestId('rich-text-change-position');
   await expect(position).toHaveText(/^1\/\d+$/);
-  await page.getByRole('button', { name: '下一处修订' }).click();
+  await page.getByRole('button', { name: '下一处修订' }).last().click();
   await expect(position).toHaveText(/^2\/\d+$/);
-  await page.getByRole('button', { name: '上一处修订' }).click();
+  await page.getByRole('button', { name: '上一处修订' }).last().click();
   await expect(position).toHaveText(/^1\/\d+$/);
 
   // 2) One comparison = one history step (plan §3.3.4)
@@ -378,7 +380,7 @@ test('rich text: compare with a .docx file turns the differences into reviewable
   await perChangeReject.first().click();
   await expect(perChangeReject).toHaveCount(beforeReject - 1);
 
-  await page.getByRole('button', { name: '全部接受', exact: true }).click();
+  await page.getByRole('button', { name: '全部接受', exact: true }).last().click();
   await expect(page.locator('.tiptap del[data-track]')).toHaveCount(0);
   await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
   // Accepting everything leaves the compared file's content plus nothing else (the rejected block stayed in its base form)
@@ -397,7 +399,7 @@ test('rich text: tracked changes survive a .docx round trip through import', asy
   await page.getByRole('button', { name: '批注与修订' }).click();
   await page.locator('.tiptap p').first().click();
   await page.keyboard.press('ControlOrMeta+A');
-  await page.getByRole('button', { name: '标记为插入' }).click();
+  await page.getByRole('button', { name: '标记为插入' }).last().click();
   await expect(page.getByTestId('rich-text-change-position')).toHaveText('1/1');
   await expect(page.locator('.tiptap ins[data-track]').first()).toBeVisible();
 
@@ -423,7 +425,7 @@ test('rich text: tracked changes survive a .docx round trip through import', asy
   await expect(page.getByRole('status').filter({ hasText: '修订标记未还原' })).toHaveCount(0);
 
   // Accepting clears the revision and keeps the text
-  await page.getByRole('button', { name: '全部接受', exact: true }).click();
+  await page.getByRole('button', { name: '全部接受', exact: true }).last().click();
   await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
   await expect(page.locator('.tiptap')).toContainText('甲乙丙');
 });

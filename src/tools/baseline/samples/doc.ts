@@ -29,7 +29,8 @@ export const docSamples: DocSample[] = [
   {
     id: 'docx/basic',
     title: '段落 + 行内样式',
-    notes: '导出 XML 含 w:u / w:strike，导入侧 mammoth 只保留 strike、丢掉下划线',
+    notes:
+      '导出 XML 含 w:u / w:strike；MAMMOTH_STYLE_MAP 已补 u => u，下划线可回读（见 docxCompat.test.ts）',
     html: () =>
       [
         '<p>Plain paragraph.</p>',

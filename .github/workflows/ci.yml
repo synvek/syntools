@@ -139,12 +139,15 @@ jobs:
       - name: Unit tests (with coverage)
         run: pnpm test -- --coverage
 
-      # Round-trip baseline (plan §5.2): generated OOXML samples → import → metrics → export.
-      # Non-blocking on purpose: the drift report is reviewed by a human, and a known degradation
-      # must not stop a release. Regenerate the golden locally with `pnpm baseline:roundtrip --update`.
-      - name: OOXML round-trip baseline (non-blocking)
-        continue-on-error: true
+      # Round-trip baseline is a release gate (P0-1): 32 generated + 10 real third-party .docx
+      # samples = two independent redacted documents × (source + Word / WPS / LibreOffice / Pages).
+      # A regression against report.golden.json fails this step; improvements are accepted with
+      # `pnpm baseline:roundtrip --update`. Coverage is now enforced: dropping a sample, losing a
+      # producer family or a part regression all fail the release.
+      - name: OOXML round-trip baseline (release gate)
         run: pnpm baseline:roundtrip
+        env:
+          BASELINE_REQUIRE_COVERAGE: 1
 
       - name: Upload baseline report
         if: always()

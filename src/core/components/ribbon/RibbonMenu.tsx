@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { RibbonMenuItem } from './types';
 import { RibbonIcon } from './ribbonIcons';
+import { Z_PANEL } from './ribbonTheme';
 
 /**
  * Dropdown panel of the ribbon.
@@ -43,7 +44,7 @@ export function RibbonMenu({
       ref={ref}
       role="menu"
       aria-label={ariaLabel}
-      className={`absolute top-full z-50 mt-0.5 flex max-h-[60vh] min-w-[180px] flex-col overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-xl dark:border-[#3a3a3a] dark:bg-[#252525] ${
+      className={`absolute top-full ${Z_PANEL} mt-0.5 flex max-h-[60vh] min-w-[180px] flex-col overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-xl dark:border-[#3a3a3a] dark:bg-[#252525] ${
         align === 'right' ? 'right-0' : 'left-0'
       }`}
     >
@@ -54,6 +55,8 @@ export function RibbonMenu({
           role="menuitem"
           disabled={item.disabled}
           aria-label={item.label}
+          aria-haspopup={item.control ? 'dialog' : undefined}
+          data-ribbon-control={item.control ? 'true' : undefined}
           onClick={() => {
             onClose();
             item.onSelect();

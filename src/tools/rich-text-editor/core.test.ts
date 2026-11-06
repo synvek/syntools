@@ -16,6 +16,7 @@ import {
   scanMarkdownExportLosses,
   sanitizeDocHtml,
   sanitizeFilename,
+  textToDocHtml,
 } from './core';
 
 describe('resolveImportKind', () => {
@@ -30,8 +31,17 @@ describe('resolveImportKind', () => {
     expect(resolveImportKind('note.rtf')).toBe('legacy-doc');
   });
 
+  it('recognizes the local text formats (P0-3)', () => {
+    expect(resolveImportKind('note.TXT')).toBe('txt');
+    expect(resolveImportKind('readme.md')).toBe('md');
+    expect(resolveImportKind('readme.markdown')).toBe('md');
+    expect(resolveImportKind('page.html')).toBe('html');
+    expect(resolveImportKind('page.htm')).toBe('html');
+  });
+
   it('rejects other extensions', () => {
-    expect(resolveImportKind('a.txt')).toBe('unsupported');
+    expect(resolveImportKind('a.pdf')).toBe('unsupported');
+    expect(resolveImportKind('a.xlsx')).toBe('unsupported');
   });
 });
 
@@ -58,6 +68,70 @@ describe('checkImportFile', () => {
     const result = checkImportFile({ name: 'a.docx', size: MAX_IMPORT_BYTES + 1 });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe('TOO_LARGE');
+  });
+
+  it('accepts text formats and applies the same size ceiling (P0-3)', () => {
+    for (const [name, kind] of [
+      ['note.txt', 'txt'],
+      ['readme.md', 'md'],
+      ['page.html', 'html'],
+    ] as const) {
+      expect(checkImportFile({ name, size: 1024 })).toEqual({ ok: true, value: kind });
+      const oversized = checkImportFile({ name, size: MAX_IMPORT_BYTES + 1 });
+      expect(oversized.ok).toBe(false);
+      if (!oversized.ok) expect(oversized.error).toBe('TOO_LARGE');
+    }
+  });
+});
+
+describe('textToDocHtml (P0-3)', () => {
+  it('turns plain text into paragraphs and keeps line breaks', () => {
+    const result = textToDocHtml('第一行\n第二行\n\n第四行', 'txt');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toContain('<p>第一行</p>');
+    expect(result.value).toContain('<p>第二行</p>');
+    expect(result.value).toContain('<p><br></p>');
+  });
+
+  it('escapes raw markup in a .txt file', () => {
+    const result = textToDocHtml('<script>alert(1)</script>&done', 'txt');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).not.toContain('<script');
+    expect(result.value).toContain('&lt;script&gt;');
+  });
+
+  it('converts Markdown headings, lists and inline styles', () => {
+    const result = textToDocHtml('# 标题\n\n- 甲\n- 乙\n\n正文 **粗体**', 'md');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toContain('<h1>标题</h1>');
+    expect(result.value).toContain('<ul><li>甲</li><li>乙</li></ul>');
+    expect(result.value).toContain('<strong>粗体</strong>');
+  });
+
+  it('sanitizes HTML imports and blocks javascript: links', () => {
+    const result = textToDocHtml(
+      '<p onclick="alert(1)">正文</p><script>alert(2)</script><a href="javascript:alert(3)">链接</a>',
+      'html',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toContain('正文');
+    expect(result.value).not.toContain('<script');
+    expect(result.value).not.toContain('onclick');
+    expect(result.value).not.toContain('javascript:');
+  });
+
+  it('rejects empty input', () => {
+    expect(textToDocHtml('   \n ', 'txt')).toEqual({ ok: false, error: 'EMPTY' });
+  });
+});
+
+describe('buildExportFilename', () => {
+  it('builds a .txt filename (P0-3)', () => {
+    expect(buildExportFilename('季度 汇总', 'txt')).toBe('季度 汇总.txt');
   });
 });
 

@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { useTranslation } from 'react-i18next';
 import type { Editor } from '@tiptap/react';
 import { Icon } from '@/core/components/Icon';
+import { Z_CONTEXT_MENU } from '@/core/components/ribbon/ribbonTheme';
+import { useOverlayStack } from '@/core/hooks/useOverlayStack';
 
 /**
  * Editor context menu.
@@ -144,25 +146,21 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
     inputRef.current?.select();
   }, [editing]);
 
+  // P0-4: the menu is now a dismiss-stack layer. The old capture-phase stopPropagation swallowed
+  // Escape from every other listener on the page, which also prevented "topmost only" semantics.
+  useOverlayStack(true, onClose);
+
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       if (!panelRef.current?.contains(event.target as Node)) onClose();
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      // Intercept in the capture phase: once the menu closes, Esc no longer reaches the editor
-      event.stopPropagation();
-      onClose();
-    };
     const onViewportChange = () => onClose();
     window.addEventListener('pointerdown', onPointerDown, true);
-    window.addEventListener('keydown', onKeyDown, true);
     // Scrolling / zooming invalidates the coordinates; closing beats leaving a misplaced menu
     window.addEventListener('wheel', onViewportChange, { passive: true });
     window.addEventListener('resize', onViewportChange);
     return () => {
       window.removeEventListener('pointerdown', onPointerDown, true);
-      window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('wheel', onViewportChange);
       window.removeEventListener('resize', onViewportChange);
     };
@@ -197,7 +195,7 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
       role="menu"
       aria-label={t('tools.richText.contextMenu')}
       style={{ left: pos.left, top: pos.top }}
-      className="fixed z-[60] max-h-[calc(100vh-1rem)] w-52 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+      className={`fixed ${Z_CONTEXT_MENU} max-h-[calc(100vh-1rem)] w-52 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-900`}
     >
       {linkEdit ? (
         <form

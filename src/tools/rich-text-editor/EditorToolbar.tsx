@@ -30,6 +30,9 @@ import {
 } from './charFormat';
 import {
   buildRichTextRibbonTabs,
+  CONTEXT_TAB_IDS,
+  nextActiveTab,
+  resolveContextTab,
   type RichTextRibbonActions,
   type RichTextRibbonOptions,
   type RichTextToolbarState,
@@ -189,23 +192,33 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
         endnoteSelected: findSelectedEndnote(e.state) !== null,
         mathSelected: e.isActive('mathInline') || e.isActive('mathBlock'),
         shapeSelected: e.isActive('docShape'),
+        // Selecting / leaving an object changes this value, so a selection-only transaction
+        // (no formatting flag change) still re-renders the ribbon and drops the contextual tab
+        contextTab: resolveContextTab(e.state),
       };
     },
   });
 
-  // Selecting a shape activates the contextual 形状格式 tab; leaving it returns to 开始, like Word
+  /**
+   * Contextual tabs (P0-6). `lastBaseTabRef` remembers the last non-context tab the user chose,
+   * so leaving a shape / table / picture returns there instead of always jumping to 开始.
+   * `resolveContextTab` reads the raw EditorState — the same source `buildRichTextRibbonTabs`
+   * uses to decide whether the tab exists, so presence and activation cannot disagree.
+   */
   const [activeTabId, setActiveTabId] = useState<string | undefined>(undefined);
-  // "更改形状" gallery of that tab: presets apply to the selected shape instead of arming the draw tool
+  // "更改形状" gallery of the shape tab: presets apply to the selected shape, not the draw tool
   const [changeShapeOpen, setChangeShapeOpen] = useState(false);
-  const shapeSelected = Boolean(state?.shapeSelected);
+  const lastBaseTabRef = useRef('home');
+  const contextTabId = state?.contextTab ?? null;
+  const handleActiveTabChange = (tabId: string): void => {
+    setActiveTabId(tabId);
+    if (!(CONTEXT_TAB_IDS as readonly string[]).includes(tabId)) lastBaseTabRef.current = tabId;
+  };
   useEffect(() => {
-    setActiveTabId((current) => {
-      if (shapeSelected) return 'shape-format';
-      return current === 'shape-format' ? 'home' : current;
-    });
+    setActiveTabId((current) => nextActiveTab(current, contextTabId, lastBaseTabRef.current));
     // The gallery belongs to the shape tab: it cannot stay open once the shape is gone
-    if (!shapeSelected) setChangeShapeOpen(false);
-  }, [shapeSelected]);
+    if (contextTabId !== 'shape-format') setChangeShapeOpen(false);
+  }, [contextTabId]);
 
   if (!editor || !state) return null;
 
@@ -343,7 +356,7 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
         accent="blue"
         tabs={tabs}
         activeTabId={activeTabId}
-        onActiveTabChange={setActiveTabId}
+        onActiveTabChange={handleActiveTabChange}
         menu={menu}
         quickAccess={quickAccess}
         headerRight={headerRight}

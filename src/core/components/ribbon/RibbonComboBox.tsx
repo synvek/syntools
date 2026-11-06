@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { RibbonAccent, RibbonSelectItem, RibbonSelectPreview } from './types';
-import { RIBBON_ACCENT } from './ribbonTheme';
+import { RIBBON_ACCENT, Z_PANEL } from './ribbonTheme';
 
 /**
  * Office-style combo box for the ribbon (font family / font size / style / number format).
@@ -199,7 +199,7 @@ export function RibbonComboBox({
       onPointerDown={() => {
         skipBlurRef.current = true;
       }}
-      className={`absolute top-full z-50 mt-0.5 max-h-[min(60vh,22rem)] ${align === 'right' ? 'right-0' : 'left-0'} w-max max-w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-[#3a3a3a] dark:bg-[#252525] ${
+      className={`absolute top-full ${Z_PANEL} mt-0.5 max-h-[min(60vh,22rem)] ${align === 'right' ? 'right-0' : 'left-0'} w-max max-w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-[#3a3a3a] dark:bg-[#252525] ${
         item.listWidth === 'wide' ? 'min-w-[15rem]' : 'min-w-[8rem]'
       }`}
     >

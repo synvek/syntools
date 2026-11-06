@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/core/components/Icon';
+import { Z_CONTEXT_MENU } from '@/core/components/ribbon/ribbonTheme';
 
 /**
  * Generic dropdown button (trigger + panel) in two variants:
@@ -234,7 +235,7 @@ export function MenuButton({
                 maxHeight: 'calc(100vh - 1rem)',
                 overflowY: 'auto',
               }}
-              className={`z-[60] rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900 ${
+              className={`${Z_CONTEXT_MENU} rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900 ${
                 panelClassName ?? (variant === 'header' ? 'min-w-44 p-1' : 'min-w-max p-1')
               }`}
             >

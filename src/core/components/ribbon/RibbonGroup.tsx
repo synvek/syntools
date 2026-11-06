@@ -10,7 +10,8 @@ function itemTestId(groupId: string, itemId: string): string {
   return `ribbon-${groupId}-${itemId}`;
 }
 
-function ItemView({
+/** Exported so the narrow-width control panel can render the very same controls as the ribbon. */
+export function ItemView({
   item,
   accent,
   onInvoked,
