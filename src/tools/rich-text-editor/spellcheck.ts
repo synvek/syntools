@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 import type { ToolResult } from '@/core/types';
 
 /**
@@ -326,11 +326,27 @@ interface SpellDecorationState {
   deco: DecorationSet;
 }
 
+/**
+ * Above this document size the decoration layer only checks the visible range (P1-5).
+ * Below it, viewport clipping would add scroll-driven rescans without saving anything measurable.
+ */
+export const VIEWPORT_SCAN_THRESHOLD = 120_000;
+
+/** Check this much extra around the visible range, so a short scroll does not trigger a rescan */
+const VIEWPORT_SCAN_MARGIN = 3_000;
+
 /** Build decorations: check each text node; offset + node position gives the document offset */
-export function buildSpellDecorations(doc: PMNode, dictionary: SpellDictionary): DecorationSet {
+export function buildSpellDecorations(
+  doc: PMNode,
+  dictionary: SpellDictionary,
+  range?: { from: number; to: number },
+): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return;
+    // Outside the scanned range: skip the tokenizer (the expensive half), keep walking.
+    // Half-open comparison: a node ending exactly at `from` does not overlap the range.
+    if (range && (pos + node.text.length <= range.from || pos > range.to)) return;
     for (const issue of checkText(node.text, dictionary)) {
       decorations.push(
         Decoration.inline(pos + issue.start, pos + issue.end, { class: 'rte-spell-error' }),
@@ -338,6 +354,21 @@ export function buildSpellDecorations(doc: PMNode, dictionary: SpellDictionary):
     }
   });
   return DecorationSet.create(doc, decorations);
+}
+
+/** Visible document range to scan, or null when the document is small enough to check whole */
+export function visibleScanRange(
+  doc: PMNode,
+  ranges: readonly { from: number; to: number }[],
+): { from: number; to: number } | null {
+  if (doc.content.size <= VIEWPORT_SCAN_THRESHOLD) return null;
+  const first = ranges[0];
+  const last = ranges[ranges.length - 1];
+  if (!first || !last) return null;
+  return {
+    from: Math.max(0, first.from - VIEWPORT_SCAN_MARGIN),
+    to: Math.min(doc.content.size, last.to + VIEWPORT_SCAN_MARGIN),
+  };
 }
 
 /**
@@ -364,12 +395,16 @@ export const Spellcheck = Extension.create<{
     const signatureOf = (dictionary: SpellDictionary, enabled: boolean) =>
       `${enabled ? '1' : '0'}|${dictionary.words.size}|${dictionary.userWords.join(',')}`;
 
+    // Set once the editor view exists: long documents only check the visible range (P1-5)
+    let currentView: EditorView | null = null;
+
     const build = (doc: PMNode): SpellDecorationState => {
       const dictionary = readDictionary();
       const enabled = readEnabled();
       const signature = signatureOf(dictionary, enabled);
       if (!enabled) return { signature, deco: DecorationSet.empty };
-      return { signature, deco: buildSpellDecorations(doc, dictionary) };
+      const range = currentView ? visibleScanRange(doc, currentView.visibleRanges) : null;
+      return { signature, deco: buildSpellDecorations(doc, dictionary, range) };
     };
 
     return [
@@ -380,19 +415,36 @@ export const Spellcheck = Extension.create<{
           apply: (tr, value) => {
             const force = tr.getMeta(spellcheckKey) === true;
             if (!tr.docChanged && !force) return value;
-            const next = build(tr.doc);
-            // Keep the same object when neither signature nor decorations changed, avoiding pointless PM redraws
-            if (!force && next.signature === value.signature) {
-              return {
-                signature: value.signature,
-                deco: buildSpellDecorations(tr.doc, readDictionary()),
-              };
-            }
-            return next;
+            // One scan per document change. The old "signature unchanged" branch rebuilt the very same
+            // decorations a second time (two full document walks per keystroke, P1-5) — `next` already
+            // carries the correct ones, and its signature equals `value.signature` in that case.
+            return build(tr.doc);
           },
         },
         props: {
           decorations: (state) => spellcheckKey.getState(state)?.deco ?? DecorationSet.empty,
+        },
+        view: (view) => {
+          currentView = view;
+          let timer = 0;
+          // Viewport-clipped documents lose the marks of the previous viewport after scrolling:
+          // rescan once scrolling settles (the force meta only rebuilds the visible range).
+          const rescan = () => {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => {
+              if (view.isDestroyed) return;
+              if (view.state.doc.content.size <= VIEWPORT_SCAN_THRESHOLD) return;
+              view.dispatch(view.state.tr.setMeta(spellcheckKey, true));
+            }, 150);
+          };
+          window.addEventListener('scroll', rescan, { passive: true, capture: true });
+          return {
+            destroy: () => {
+              window.clearTimeout(timer);
+              window.removeEventListener('scroll', rescan, { capture: true });
+              currentView = null;
+            },
+          };
         },
       }),
     ];

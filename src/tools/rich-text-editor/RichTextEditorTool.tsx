@@ -131,7 +131,7 @@ import {
   type WordIndex,
 } from './spellcheck';
 import { SpellcheckPanel } from './SpellcheckPanel';
-import type { PageLayoutSnapshot } from './PageView';
+import { forcePageRelayout, type PageLayoutSnapshot } from './PageView';
 import { buildTemplateApplication, type DocumentTemplate } from './templates';
 import { TemplatePanel } from './TemplatePanel';
 import { buildTocEntries, injectTocHtml, renderTocHtml, type TocLabels } from './toc';
@@ -345,6 +345,12 @@ export default function RichTextEditorTool() {
   const [rulerOpen, setRulerOpen] = useState(true);
   // Page geometry (mm) -> pixels: follows page setup changes; plugins read the latest values via getters
   const metrics = useMemo(() => resolvePageMetrics(pageSetup), [pageSetup]);
+  /**
+   * P1-5: intrinsic height for `content-visibility: auto` on the page sheets.
+   * Off-screen sheets then skip layout and paint entirely — without it a 200-page document lays out
+   * 300+ absolutely-positioned sheets on every keystroke.
+   */
+  const sheetHeightPx = useMemo(() => Math.round(pageMetricsToPx(metrics).heightPx), [metrics]);
   const metricsRef = useRef(metrics);
   metricsRef.current = metrics;
   const getMetrics = useCallback(() => metricsRef.current, []);
@@ -434,13 +440,11 @@ export default function RichTextEditorTool() {
   /** 选中形状（工具栏上下文格式栏与形状库高亮都要用） */
   const selectedShape = useSelectedShape(editor);
 
-  // Force a relayout after page setup / zoom changes: page height and content width changes move the page breaks
+  // Force a relayout after page setup / zoom changes: page height and content width changes move the
+  // page breaks, and neither lives in the document, so the plugin needs an explicit signal
   useEffect(() => {
     if (!editor || viewMode !== 'paged') return;
-    const id = window.setTimeout(() => {
-      // An empty transaction triggers the plugin's update -> re-measure and re-plan
-      editor.view.dispatch(editor.state.tr);
-    }, 0);
+    const id = window.setTimeout(() => forcePageRelayout(editor.view), 0);
     return () => clearTimeout(id);
   }, [editor, viewMode, metrics, zoom]);
 
@@ -770,6 +774,12 @@ export default function RichTextEditorTool() {
       },
       // Shapes are only restored when their block position provably matches the imported text
       onShapes: ({ skipped }) => setImportShapesLost(skipped),
+      // Structured-import side channel (P0-2.6): only fires with USE_OOXML_IR on, and never changes
+      // the imported HTML — it just explains the three grouped losses in the shared fidelity dialog
+      onIr: ({ issues }) => {
+        if (issues.length === 0) return;
+        setFidelity(isFidelityMuted() ? null : createFidelityReport('rte', 'import', issues));
+      },
     });
     setBusy(null);
     if (!result.ok) {
@@ -2091,6 +2101,10 @@ export default function RichTextEditorTool() {
                         className="rte-page-sheet"
                         style={{
                           top: `${top}px`,
+                          // P1-5 page virtualisation: the browser skips layout/paint for sheets
+                          // outside the viewport and reserves the intrinsic size instead
+                          contentVisibility: 'auto',
+                          containIntrinsicSize: `auto ${sheetHeightPx}px`,
                           ...(pageSetup.background ? { background: pageSetup.background } : {}),
                         }}
                         aria-hidden="true"

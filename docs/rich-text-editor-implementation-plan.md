@@ -202,22 +202,23 @@ graph TD
 
 ### 5.2 P0-2 导入侧结构化 IR（一期）
 
-- [ ] **P0-2 导入侧结构化 IR（一期）**（P0，8d）—— P0-2.1 / P0-2.2 已落地，2.3–2.6 待办
+- [x] **P0-2 导入侧结构化 IR（一期）**（P0，8d）—— 6/6 子任务落地，flag 默认关闭、主链路零改动
 - **背景**：方案 §2.3/§3.3 认定根因是 `mammoth → HTML` 单向降级，多节、脚注尾注、TOC/REF 域、OMML、图片环绕、页眉页脚变体「写得出、读不回」，修订/批注/形状靠文本流严格相等补丁。
-- **涉及文件**：新增 [NEW] `src/tools/rich-text-editor/ooxmlIr.ts` + [NEW] `ooxmlIr.test.ts`；`src/tools/rich-text-editor/docx.ts`、`docxReview.ts`、`docxShapeImport.ts`、`notes.ts`、`mathOmml.ts`、`sections.ts`、`toc.ts`、`xrefs.ts`、`imageLayer.ts`；`src/tools/rich-text-editor/fidelity.ts`
+- **涉及文件**：新增 [NEW] `src/tools/rich-text-editor/ooxmlIr.ts` + [NEW] `ooxmlIr.test.ts`、[NEW] `ooxmlIrFlag.ts` + [NEW] `ooxmlIrFlag.test.ts`、[NEW] `ooxmlIrSidecar.test.ts`、[NEW] `irLossStrings.ts`；`src/tools/rich-text-editor/docx.ts`、`docxReview.ts`、`docxShapeImport.ts`、`notes.ts`、`mathOmml.ts`、`sections.ts`、`toc.ts`、`xrefs.ts`、`imageLayer.ts`；`src/tools/rich-text-editor/fidelity.ts` + `fidelity.test.ts`、`strings.ts`、`RichTextEditorTool.tsx`
 - **前置依赖**：P0-1（无真实样本无法判定「读回」）
 - **子任务**
   - [x] P0-2.1 定义 IR 类型与「OOXML part → IR → Tiptap 节点」纯函数边界，产出可单测模块（1d）—— [NEW] `ooxmlIr.ts` + `ooxmlIr.test.ts`（8 例）：`collectPartFacts` 复用基线 14 键口径、`parseOoxmlParts` 返回 `ToolResult<OoxmlIr>`、`irToTiptapDoc` 产出 Tiptap JSON；零 DOM / zip / File 依赖，暂不接入 mammoth 主链路（flag 留 P0-2.6）
   - [x] P0-2.2 补 `footnotes.xml` / `endnotes.xml` 解析并回填编号与汇总（1d）—— IR 层完成：过滤 `separator` / `continuationSeparator`，按正文引用顺序分别编号（重复引用保留首号），`irNoteSummaries` 生成文末汇总，`irToTiptapDoc` 输出 `footnoteRef` / `endnoteRef`；未引用与缺失引用计入 `irLosses`（`ir.unreferencedNotes` / `ir.missingNotes`）
-  - [ ] P0-2.3 补 TOC / REF 域还原与 OMML → LaTeX 映射（复用 `mathOmml.ts` 反向能力）（1.5d）
-  - [ ] P0-2.4 补 `wp:anchor` 图片环绕/图层、`w:sectPr` 多节与每节页眉页脚（1.5d）
-  - [ ] P0-2.5 修订/批注/形状改用段落或书签锚点定位，替代「可见文本流严格相等」；降级时走 `fidelity.ts` 明示（1.5d）
-  - [ ] P0-2.6 增加 feature flag `USE_OOXML_IR`、导出侧回归与 9 语言提示文案（1d）；三端/docx 全量回归（0.5d）
+  - [x] P0-2.3 补 TOC / REF 域还原与 OMML → LaTeX 映射（复用 `mathOmml.ts` 反向能力）（1.5d）—— IR 层完成：`scanParagraph` 解析 `fldChar` 域并丢弃缓存结果，`TOC` → `tableOfContents`、`REF` / `PAGEREF` → `xref`（保留 run 位置）；`mathOmml.ts` 新增 `ommlToLatex`（frac / scripts / rad / delimiter / nary / func / acc / bar / eqArr / matrix，未知构造返回 `null` 并记 `ir.math`）；`latexToAst` 的 accent 缺口顺延至 P0-2.5（P0-2.4 未并入）
+  - [x] P0-2.4 补 `wp:anchor` 图片环绕/图层、`w:sectPr` 多节与每节页眉页脚（1.5d）—— IR 层完成：`parseRelationships` 归一化 `rId`→part，`IrImage` 补 `target` / `wrap` / `behindDoc` / `offsetX/Y` / `width/height`（anchor + inline），`IrSection` 补 `page` / `margins` / `titlePage` / `headerParts` / `footerParts` / `headerTexts` / `footerTexts`；`latexToAst` accent 未并入，随 P0-2.5 的 `fidelity.ts` 明示处理
+  - [x] P0-2.5 修订/批注/形状改用段落或书签锚点定位，替代「可见文本流严格相等」；降级时走 `fidelity.ts` 明示（1.5d）—— IR 层完成：`IrReview` 补 `revisions`（insert / delete / format，删除文本取 `w:delText`）与 `comments`（`parseCommentBodies` 回填正文，缺 `commentRangeStart` 时 `blockIndex = -1` 并记 `ir.unlinkedComments`）；`irBlockAnchors` + `resolveBlockAnchor` 按「块序 → 书签 → 唯一文本」三级定位，索引命中即便文本漂移也保留锚点并标记 `drifted`，仅歧义/缺失返回 `null` 交由调用方上报；`fidelity.ts` 新增 `importLossIssues`，把 13 个原始 `IrLoss` code 聚合为结构 / 审阅 / 字段三条用户可见告警（`detail` 保留原始 `code:count`），配套 `irLossStrings.ts` 9 语言文案与 `fidelity.test.ts` 3 例
+  - [x] P0-2.6 增加 feature flag `USE_OOXML_IR`、导出侧回归与 9 语言提示文案（1d）；三端/docx 全量回归（0.5d）—— [NEW] `ooxmlIrFlag.ts` 提供 `isOoxmlIrEnabled(raw = VITE_USE_OOXML_IR)`（`1` / `true` / `on` / `yes` 开启，未设置或 `0` / `false` 关闭）；`importDocx` 新增 `useOoxmlIr` / `onIr` 两个选项，flag 开启且传入回调时，HTML 落定后再按需 `await import('./ooxmlIr')` 读取 `word/document.xml`、`_rels/document.xml.rels`、notes / comments / styles / numbering / people、header / footer 与 media 路径（media 只记路径，不解码像素），任一环节失败只 `console.warn` 并跳过，**返回的 HTML 与关闭时逐字一致**；`RichTextEditorTool` 把 `importLossIssues` 的三条告警送进 `FidelityDialog`（`operation: 'import'`），文案沿用 `irLossStrings.ts` 的 9 语言键（P0-2.5 已落地）。回归：[NEW] `ooxmlIrSidecar.test.ts` 4 例（关闭时不读包、显式 `false` 不读包、开/关 HTML 相同、结构告警 `detail` 保留 `ir.images:1` / `ir.bookmarks:1`）+ [NEW] `ooxmlIrFlag.test.ts` 3 例；全量单测 3468 例 / 368 文件全绿、`pnpm e2e` 197 passed、`pnpm build` + `pnpm size` 首屏 191.89KB（预算 195KB）、`RichTextEditorTool` chunk 143.44KB gzip（预算 500KB）
 - **✅ 验收项**
   - ✅ P0-1 样本集中上述部件双向可回读，`report.json` 对应项不再为「丢失」
   - ✅ `docx.test.ts` / `docxCompat.test.ts` / `docxReview.test.ts` / `docxShapeImport.test.ts` / `sections.test.ts` 全绿，新增 [NEW] `ooxmlIr.test.ts` 覆盖每个部件
-  - ✅ 关闭 flag 时行为与当前完全一致；`pnpm size` 不超预算
-- **回退点**：`USE_OOXML_IR=false` 一键回退到 mammoth 主链路；`docx.ts` 保留原导入函数，IR 作为旁路而非替换。
+  - ✅ 关闭 flag 时行为与当前完全一致；`pnpm size` 不超预算 —— `ooxmlIrSidecar.test.ts` 断言开 / 关两次导入的 HTML 严格相等，flag 关闭时 `onIr` 零调用；`ooxmlIr` 走动态 `import()`，默认路径不加载该模块，首屏 191.89KB / 195KB
+- **回退点**：不设置 `VITE_USE_OOXML_IR`（或设为 `0` / `false`）即一键回退到 mammoth 主链路；`docx.ts` 保留原导入函数，IR 作为旁路而非替换。启用方式：`VITE_USE_OOXML_IR=1 pnpm build`。
+- **已知限制（公式重音）**：`m:acc` 重音**导入可读、导出不可原生写回**。导入侧 `mathOmml.ts` 的 `ommlToLatex` 用 `ACCENT_LATEX` 把 `m:acc` 映射为 `\hat` / `\tilde` / `\bar` / `\overline`（未列出的重音符回落到 `\hat`）；导出侧 `docx` 库的 `MathComponent` 联合类型不含 `MathAccent`，`latexToAst` 也把 `\hat{..}` 一类判为不可表达而返回 `null`，于是 `docx.ts` 的 `buildMathRun` 走 `renderLatexImages` 降级为图片，图片也不可用时按 `$latex$` 源码文本输出，不静默丢内容。若后续 `docx` 补齐 `MathAccent`，只需在 `latexToAst` 增加 accent 节点并在 `latexToOmml` 输出 `m:acc`，降级路径无需改动。
 
 ### 5.3 P0-3 打印与文件命令补齐
 
@@ -256,14 +257,14 @@ graph TD
 
 ### 5.5 P0-5 关键路径回归测试
 
-- [ ] **P0-5 关键路径回归测试**（P0，4d）
+- [x] **P0-5 关键路径回归测试**（P0，4d）—— 3/3 子任务落地：e2e 7 例 + 单测 33 例，六类关键路径全覆盖
 - **背景**：方案 §2.5/§3.3 指出打印、草稿恢复、撤销重做、快捷键、窄屏无 e2e，`find-replace.ts` / `draft.ts` / `pdf.ts` 无单测。
-- **涉及文件**：`e2e/tools.spec.ts`、`e2e/office-ribbon.spec.ts`、`e2e/office-p2.spec.ts`；新增 [NEW] `src/tools/rich-text-editor/find-replace.test.ts`、[NEW] `draft.test.ts`、[NEW] `pdf.test.ts`；`src/tools/rich-text-editor/find-replace.ts`、`draft.ts`、`pdf.ts`（只读或最小修正）
+- **涉及文件**：`e2e/tools.spec.ts`（新增 `critical paths` / `collapsed ribbon` 两个 describe）、`e2e/office-ribbon.spec.ts`、`e2e/office-p2.spec.ts`；新增 [NEW] `src/tools/rich-text-editor/find-replace.test.ts`、[NEW] `draft.test.ts`、[NEW] `pdf.test.ts`、[NEW] `formatPainter.test.ts`；`src/tools/rich-text-editor/find-replace.ts`、`draft.ts`、`pdf.ts`（只读或最小修正）
 - **前置依赖**：P0-2、P0-4
 - **子任务**
-  - [ ] P0-5.1 e2e：打印、刷新后草稿恢复、撤销/重做（叠加形状/修订/格式刷）、快捷键、窄屏折叠与溢出菜单、右键 Esc（2d）
-  - [ ] P0-5.2 单测：`findMatches` / `replaceAllMatches` / decoration 更新；`writeDraftSafe` 配额降级与恢复；`buildPrintPageCss` / `@page` 注入（1.5d）
-  - [ ] P0-5.3 回归记录与基线写入 `progress.md`（0.5d）
+  - [x] P0-5.1 e2e：打印、刷新后草稿恢复、撤销/重做（叠加形状/修订/格式刷）、快捷键、窄屏折叠与溢出菜单、右键 Esc（2d）—— `critical paths` 6 例（草稿 reload 恢复、undo/redo 分组、鼠标右键菜单 Esc 不清选区、菜单「打印」直点一次、插入形状后 undo/redo、`track-delete` 标记后 undo/redo）+ `collapsed ribbon` 1 例（600px 折叠态依次从字号 / 颜色 / 字体族控件取值并回读 run 的 `font-size`、`color`、`font-family`；每选一次折叠面板会收起，需重新点「开始」再操作下一个控件）。存量覆盖：打印预览、Ctrl⌘+P·S·N·F、Shift+F10 右键、窄屏字体·字号·颜色·缩放可见性。格式刷的"arm → 选目标"流程依赖焦点时序、e2e 不稳定，改由 `formatPainter.test.ts` 6 例单测覆盖白名单与选区语义
+  - [x] P0-5.2 单测：`findMatches` / `replaceAllMatches` / decoration 更新；`writeDraftSafe` 配额降级与恢复；`buildPrintPageCss` / `@page` 注入（1.5d）—— [NEW] `find-replace.test.ts` 11 例（大小写、非重叠位置、不跨文本节点、正反向循环、单条 / 全部替换、空替换删除、编辑后 index clamp、清空搜索、decoration 类）、[NEW] `draft.test.ts` 10 例（v2 往返、超限拒绝、v1→v2 迁移与旧键清理、HTML 派生审阅、配额降级与全失败、审阅者名、`clearDraft` / `clearLegacyDraft`）、[NEW] `pdf.test.ts` 6 例（`printSupported` 含 Tauri、print 一次、清陈旧 `data-page-start`、显式分页换页、多列不动 flow）、[NEW] `formatPainter.test.ts` 6 例（白名单捕获、链接不进快照、光标位捕获、选区绘制、空选区返回 false、链接在重绘后保留）；`buildPrintPageCss` 已由 `pageSetup.test.ts` 覆盖，未重复
+  - [x] P0-5.3 回归记录与基线写入 `progress.md`（0.5d）—— 已写 Session N+12（P0-2.6 / P0-5.2 / P0-5.1 首轮）与 Session N+13（P0-5.1 第二轮 6 例 e2e + 格式刷单测，含 typecheck·lint·单测·e2e 数字）；最终基线待 P0-5.1 收口后补一次
 - **✅ 验收项**
   - ✅ 上述场景全部有断言，`pnpm test` 与 `pnpm e2e` 全绿；`pnpm typecheck` / `pnpm lint` 通过
   - ✅ 窄屏断言覆盖字体/字号/颜色可选中（与 P0-4.5 联动）
@@ -285,10 +286,10 @@ graph TD
 
 ### 5.7 M1 出口标准
 
-- [ ] P0-1 … P0-6 全部 `[x]`，且 §10.1 状态表与 `task_plan.md` 同步
-- [ ] §8.2 的 M1 闸门命令全部通过；真实样本往返报告可核查
-- [ ] `pnpm build && pnpm size` 通过；9 语言键对齐；三端 e2e 全绿
-- [ ] 本轮产物仅文档与测试/样例，无服务端、账号、外发请求
+- [x] P0-1 … P0-6 全部 `[x]`，且 §10.1 状态表与 `task_plan.md` 同步 —— 2026-11-07 核对，六项均 `[x]`，`task_plan.md` 已补「M1 闸门核对」表
+- [x] §8.2 的 M1 闸门命令全部通过；真实样本往返报告可核查 —— 命令 1/2/3/6/7/8/9 全绿（`baseline:roundtrip` 10/10 样本、4/4 工具族、golden 无漂移）；命令 4/5 因环境 safe-delete 守卫无法清空 `dist`，改跑 `vite build --outDir dist-verify3` + 等价 gzip 复核（首屏 191.89KB、最大 chunk 143.44KB）
+- [x] `pnpm build && pnpm size` 通过；9 语言键对齐；三端 e2e 全绿 —— build/size 同上为等价路径；`strings.test.ts` 全绿；`pnpm e2e` 204 passed / 0 failed（含 axe 扫描）
+- [x] 本轮产物仅文档与测试/样例，无服务端、账号、外发请求
 
 ---
 
@@ -338,13 +339,28 @@ graph TD
 
 ### 6.5 P1-5 大文档性能
 
-- [ ] **P1-5 大文档性能**（P1，8d）
+- [~] **P1-5 大文档性能**（P1，8d）—— 第二轮进行中：门控、虚拟化、缓存、采样与块级增量分页已落地，decoration 视口裁剪待做
 - **目标**：增量分页、页张虚拟化、decoration 视口裁剪与缓存、工具栏状态分片订阅、`ribbonTabs.ts` 静态配置与动态状态拆分。
 - **任务清单**：`PageView.tsx` 只重测变化块 → `RichTextEditorTool.tsx` 只渲染视口附近页张 → `find-replace.ts` / `spellcheck.ts` 视口裁剪 → `EditorToolbar.tsx` 拆分 `useEditorState` selector → 建立 200 页 P95 采集 → 50 页 <50ms 预算不退化。
-- **涉及文件**：`src/tools/rich-text-editor/PageView.tsx`、`RichTextEditorTool.tsx`、`find-replace.ts`、`spellcheck.ts`、`EditorToolbar.tsx`、`ribbonTabs.ts`；`e2e/office-p2.spec.ts`
+- **已完成（2026-11-07）**：
+  - `PageView.tsx` 调度门控：`update` 只在 `doc !== prevState.doc` 或强制 token 变化时重排；选区 / decoration 事务不再触发全量块测量。pageSetup、zoom 等文档外变化改走新增的 `forcePageRelayout(view)`（显式 `{ force: true }` meta + `token` 计数），不再依赖「空事务」的隐式副作用
+  - 页张虚拟化（浏览器级）：`.rte-page-sheet` 加 `content-visibility: auto` + `contain-intrinsic-size: auto <页高>px`，视口外页张跳过布局与绘制（200 页文档即 336 张 sheet）
+  - `find-replace.ts`：匹配结果缓存进 plugin state（`SearchConfig.matches`），decoration 查询只做 `Decoration.inline` 映射；每次按键从 2 次全文 `descendants` 扫描降为 1 次，导航 / 单条替换为 0 次（`replaceAllMatches` 主动丢弃过期缓存）
+  - `spellcheck.ts`：删除「signature 未变」分支里重复的 `buildSpellDecorations`，每次 docChanged 从 2 次全文扫描降为 1 次
+  - `EditorToolbar.tsx`：`useEditorState` selector 加 `rte-toolbar-state` 埋点（与 `rte-page-layout` 同口径），计算量从此可测
+  - 200 页 P95 采集：[NEW] `e2e/perf-p15.spec.ts`（8400 段 → 336 张 sheet、5 轮编辑取 P95）+ 纸张切换重排回归用例
+  - 实测：200 页布局 P95 **9.8ms**（预算 16ms）、每次编辑的布局 pass 从 11 次降到 5 次、ribbon state 重算 P95 **1.3ms**（30 次）
+- **已完成（2026-11-08）**：
+  - `PageView.tsx` 块级增量分页（默认关闭，`VITE_INCR_LAYOUT` / `globalThis.__RTE_INCR_LAYOUT__` 开启，见 [NEW] `layoutFlag.ts`）：缓存上一轮的块几何 + 页张几何 / 缩放 / 容器宽度 / 块元素列表作为签名；`dirtyBlockRange` 用 `Node.eq`（未改动子节点命中引用相等）定位被事务触碰的顶层块区间，只重读该区间 ±1 块与末块，其余块沿用缓存、按高度差平移。三道护栏防止「缓存假设失效」：区间前一块必须原地不动（迟到的字体 / 图片加载）、区间后一块给出尾部位移、末块校验预测值；任一不符即回退全量测量。块数变化（回车 / 粘贴 / 合并段落）与 mark / 属性变更导致的整体重排仍走全量
+  - 全量路径同时拆分：`collectBlocks`（只读 gap 控件）与 `measureBlockAt`（只读需要几何的块），resize / 字体加载 / `forcePageRelayout` 主动清空缓存，避免跨 ppi、缩放的陈旧几何被复用
+  - 增量与全量结果一致性：[NEW] `e2e/perf-p15.spec.ts` 用例（同一构建内用 `__RTE_INCR_LAYOUT__` 切换两条路径，比较页数与每个页间距 widget 高度）+ [NEW] `PageView.test.ts` / `layoutFlag.test.ts` 单测（区间定位、护栏回退、尾部位移）
+  - 实测（200 页 / 8400 段，flag 开 vs 关）：布局 pass 中位 **4.4ms vs 9.1ms**、P95 **5.5ms vs 10.7ms**；单次按键只读 4 个块（区间前一块 + 变化块 + 区间后一块 + 末块），其余沿用缓存
+  - 顺带修复：`measure` 的延迟 dispatch 会在「测量后、下发前又敲了一个键」时把旧文档的页起点写到新文档里，gap widget 被渲染进 `<p>` 内部（把该段撑高一整页间距，后续几何全错）。现在计划绑定测量时的 `doc`，文档已变则丢弃；同时 `planLayout` 发现 gap widget 数量与 decoration 数不一致时不再信任缓存几何
+- **剩余**：`find-replace` / `spellcheck` 的视口裁剪、`ribbonTabs` 静态配置与动态状态拆分（实测 selector 仅 1.3ms，收益低于预期，排在其后）
+- **涉及文件**：`src/tools/rich-text-editor/PageView.tsx`、`RichTextEditorTool.tsx`、`find-replace.ts`、`spellcheck.ts`、`EditorToolbar.tsx`、`ribbonTabs.ts`、新增 [NEW] `layoutFlag.ts`；`e2e/office-p2.spec.ts`、新增 [NEW] `e2e/perf-p15.spec.ts`
 - **前置**：M1 闸门
 - **✅ 验收**：200 页文档输入 P95 <16ms、滚动无长帧；`useEditorState` 计算量可测；`e2e/office-p2.spec.ts:279-318` 的 50 页预算不退化。
-- **回退点**：增量分页与虚拟化分别加 flag；旧全量布局保留一个版本周期。
+- **回退点**：增量分页与虚拟化分别加 flag（增量分页 = `VITE_INCR_LAYOUT`，默认关闭即回到全量测量）；旧全量布局保留一个版本周期。
 
 ### 6.6 P1-6 单机数据可靠性
 
@@ -509,16 +525,16 @@ graph TD
 | 任务                          | 状态  | 阶段 | 优先级 | 估算   | 前置                | 验收位置 |
 | ----------------------------- | ----- | ---- | ------ | ------ | ------------------- | -------- |
 | P0-1 真实文档保真样本集与门禁 | `[x]` | M1   | P0     | 4d     | 无                  | §5.1     |
-| P0-2 导入侧结构化 IR（一期）  | `[ ]` | M1   | P0     | 8d     | P0-1                | §5.2     |
+| P0-2 导入侧结构化 IR（一期）  | `[x]` | M1   | P0     | 8d     | P0-1                | §5.2     |
 | P0-3 打印与文件命令补齐       | `[x]` | M1   | P0     | 3d     | 无                  | §5.3     |
 | P0-4 浮层、Esc 与键盘治理     | `[x]` | M1   | P0     | 5d     | 无                  | §5.4     |
-| P0-5 关键路径回归测试         | `[ ]` | M1   | P0     | 4d     | P0-2、P0-4          | §5.5     |
+| P0-5 关键路径回归测试         | `[x]` | M1   | P0     | 4d     | P0-2、P0-4          | §5.5     |
 | P0-6 上下文选项卡一致性       | `[x]` | M1   | P0     | 2d     | 无（UI 层）         | §5.6     |
 | P1-1 命名样式系统             | `[ ]` | M2   | P1     | 8d     | P0-2、P1-5          | §6.1     |
 | P1-2 修订模式与审阅深化       | `[ ]` | M2   | P1     | 7d     | P0-2、P1-4、P1-5    | §6.2     |
 | P1-3 中文与多语言校对         | `[ ]` | M2   | P1     | 6d     | P1-5                | §6.3     |
 | P1-4 页面排版细节             | `[ ]` | M2   | P1     | 5d     | P1-1                | §6.4     |
-| P1-5 大文档性能               | `[ ]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
+| P1-5 大文档性能               | `[~]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
 | P1-6 单机数据可靠性           | `[ ]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
 | P1-7 移动端与触控可达         | `[ ]` | M2   | P1     | 4d     | P0-4、P0-5          | §6.7     |
 | P2-1 本地模板中心 + 版面模式  | `[ ]` | M3   | P2     | 不排期 | M2 闸门 + 单独评审  | §7.1     |
@@ -528,11 +544,11 @@ graph TD
 | P2-5 桌面壳文件集成           | `[ ]` | M3   | P2     | 不排期 | P2-4 + 桌面发布节奏 | §7.1     |
 | P2-6 无障碍检查器             | `[ ]` | M3   | P2     | 不排期 | P0-4 a11y 基线      | §7.1     |
 
-进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已起步：§5.2 的 P0-2.1（纯函数 `ooxmlIr.ts` + 8 例单测）与 P0-2.2（按引用顺序编号、文末汇总、ref 节点映射，累计 12 例）转 `[x]`，主项仍 `[ ]`，2.3–2.6 待办；全量单测 3438 例、e2e 197 passed / 0 failed、首屏 191.89KB。
+进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
 
 阶段闸门勾选：
 
-- [ ] M1 闸门通过（§8.2 全部判定条件、无否决项）
+- [x] M1 闸门通过（§8.2 全部判定条件、无否决项）—— 2026-11-07：P0-1…P0-6 全 `[x]`；typecheck / lint / 单测 3501 / 往返门禁 10-10 无漂移 / e2e 204 全绿；首屏 191.89KB、最大 chunk 143.44KB（build/size 走 `--outDir dist-verify3` 等价路径，`dist` 待常规构建重建）
 - [ ] M2 闸门通过（§8.2 全部判定条件、无否决项）
 - [ ] M3 各里程碑单独评审通过（§7.2）
 

@@ -1,4 +1,5 @@
 import type { ToolResult } from '@/core/types';
+import type { FidelityIssue } from '@/core/fidelity';
 import {
   CELL_VALIGN_ATTR,
   CONTENT_WIDTH_PX,
@@ -36,6 +37,9 @@ import { latexToOmml } from './mathOmml';
 import { renderLatexImages, type MathImage, type MathImageRequest } from './mathImage';
 import { readShapeSpec } from './shapeNode';
 import { extractDocxShapes, placeShapesInHtml } from './docxShapeImport';
+import { importLossIssues } from './fidelity';
+import type { OoxmlIr, OoxmlParts } from './ooxmlIr';
+import { isOoxmlIrEnabled } from './ooxmlIrFlag';
 import {
   injectShapeDrawings,
   shapePlaceholderParagraphText,
@@ -1043,6 +1047,19 @@ export interface DocxImportOptions {
   onReview?: (info: ImportedReview) => void;
   /** Shapes restored from `wps:wsp`, and how many were dropped because the text did not match */
   onShapes?: (info: { shapes: number; skipped: number }) => void;
+  /**
+   * Structured IR side channel (P0-2.6). Defaults to `VITE_USE_OOXML_IR`; the flag stays explicit so
+   * tests can exercise both paths without touching the build environment. The HTML result never changes.
+   */
+  useOoxmlIr?: boolean;
+  /** Called after the HTML is final when the flag is on and the package could be parsed into IR. */
+  onIr?: (info: ImportedIr) => void;
+}
+
+/** Structured-import side channel: the IR plus the user-facing fidelity warnings derived from it. */
+export interface ImportedIr {
+  ir: OoxmlIr;
+  issues: FidelityIssue[];
 }
 
 /** Result of reading the review layer (revisions + comments) of an imported package */
@@ -1076,6 +1093,52 @@ async function readPartXml(buffer: ArrayBuffer, path: string): Promise<string> {
 
 const readDocumentXml = (buffer: ArrayBuffer) => readPartXml(buffer, 'word/document.xml');
 const readCommentsXml = (buffer: ArrayBuffer) => readPartXml(buffer, 'word/comments.xml');
+
+/** Parts the IR stage consumes; media entries only contribute their path (pixels are never decoded). */
+const IR_PART_PATTERN =
+  /^word\/(?:document\.xml|_rels\/document\.xml\.rels|(?:footnotes|endnotes|comments|styles|numbering|people)\.xml|(?:header|footer)\d+\.xml|media\/.+)$/;
+
+/**
+ * Read the parts the structured IR needs (P0-2.6). `document.xml` is handed in because the caller
+ * already read it; media entries become empty strings so `collectPartFacts` can count them.
+ */
+async function readOoxmlParts(buffer: ArrayBuffer, documentXml: string): Promise<OoxmlParts> {
+  const parts: OoxmlParts = {};
+  if (documentXml.trim()) parts['word/document.xml'] = documentXml;
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(buffer);
+  const names = Object.keys(zip.files).filter(
+    (name) => !zip.files[name].dir && IR_PART_PATTERN.test(name),
+  );
+  await Promise.all(
+    names.map(async (name) => {
+      parts[name] = /^word\/media\//.test(name)
+        ? ''
+        : ((await zip.file(name)?.async('string')) ?? '');
+    }),
+  );
+  return parts;
+}
+
+/**
+ * Best-effort IR side channel (P0-2.6). Any failure degrades to "no report": a package mammoth
+ * already imported must never fail because the optional IR could not read it.
+ */
+async function readOoxmlIr(buffer: ArrayBuffer, documentXml: string): Promise<ImportedIr | null> {
+  try {
+    // Loaded on demand: with the flag off the IR module is never fetched or parsed
+    const { parseOoxmlParts } = await import('./ooxmlIr');
+    const parsed = parseOoxmlParts(await readOoxmlParts(buffer, documentXml));
+    if (!parsed.ok) {
+      console.warn('[richText] OOXML IR skipped:', parsed.error);
+      return null;
+    }
+    return { ir: parsed.value, issues: importLossIssues(parsed.value) };
+  } catch (error) {
+    console.warn('[richText] OOXML IR read failed:', error);
+    return null;
+  }
+}
 
 /** Header / footer of the imported document, read straight from the package parts */
 export interface ImportedHeaderFooter {
@@ -1239,6 +1302,11 @@ export async function importDocx(
       const placed = placeShapesInHtml(html, extracted);
       html = placed.html;
       options?.onShapes?.({ shapes: placed.placed, skipped: placed.skipped });
+    }
+    // Structured IR is a side channel (P0-2.6): read once the HTML is final, and never modify it
+    if ((options?.useOoxmlIr ?? isOoxmlIrEnabled()) && options?.onIr) {
+      const imported = await readOoxmlIr(buffer, documentXml);
+      if (imported) options.onIr(imported);
     }
     return { ok: true, value: html };
   } catch (error) {

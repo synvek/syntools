@@ -14,6 +14,7 @@ import {
   removeUserWord,
   suggest,
   tokenize,
+  visibleScanRange,
 } from './spellcheck';
 
 /**
@@ -191,5 +192,36 @@ describe('document-level decorations and issue list', () => {
     const editor = createEditor('<p>hello world</p>');
     expect(buildSpellDecorations(editor.state.doc, dictionary).find()).toHaveLength(0);
     expect(collectDocIssues(editor.state.doc, dictionary)).toEqual([]);
+  });
+
+  it('skips text nodes outside the scanned range (P1-5 viewport clipping)', () => {
+    const editor = createEditor('<p>wrold hello</p><p>anther hello</p>');
+    const doc = editor.state.doc;
+    // Paragraph 1 covers 0..11 (text starts at 1), paragraph 2 starts at 12
+    const first = buildSpellDecorations(doc, dictionary, { from: 0, to: 11 });
+    expect(first.find()).toHaveLength(1);
+    const second = buildSpellDecorations(doc, dictionary, { from: 12, to: doc.content.size });
+    expect(second.find()).toHaveLength(1);
+    expect(second.find()[0].from).toBeGreaterThan(12);
+  });
+});
+
+describe('visibleScanRange (P1-5)', () => {
+  it('checks the whole short document', () => {
+    const editor = createEditor('<p>hello world</p>');
+    expect(visibleScanRange(editor.state.doc, [{ from: 1, to: 5 }])).toBeNull();
+  });
+
+  it('clips long documents to the visible range plus a margin', () => {
+    const editor = createEditor(`<p>${'hello world '.repeat(12_000)}</p>`);
+    const range = visibleScanRange(editor.state.doc, [{ from: 50_000, to: 51_000 }]);
+    expect(range).not.toBeNull();
+    expect(range?.from).toBe(47_000);
+    expect(range?.to).toBe(54_000);
+  });
+
+  it('returns null when the view reports no visible range', () => {
+    const editor = createEditor(`<p>${'hello world '.repeat(12_000)}</p>`);
+    expect(visibleScanRange(editor.state.doc, [])).toBeNull();
   });
 });

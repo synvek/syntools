@@ -5,6 +5,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { countPages, pageIndexOfPosition } from './core';
 import { isFloatingImageElement } from './imageLayer';
+import { isIncrementalLayoutEnabled } from './layoutFlag';
 import { MM_TO_PX, SHEET_GAP_MM, pageMetricsToPx, type PageMetrics } from './pageSetup';
 import { planSectionedPageBlocks, sectionBoxFromElement, type SectionBox } from './sections';
 
@@ -17,6 +18,7 @@ import { planSectionedPageBlocks, sectionBoxFromElement, type SectionBox } from 
  *
  * Layout algorithm:
  * 1. Measure block geometry (skip gap widgets and subtract their heights to recover "natural" positions);
+ *    the incremental path (P1-5) re-reads only the blocks the transaction touched and reuses the rest;
  * 2. planPageBlocks picks the page-start blocks (same algorithm as PDF/Word export);
  * 3. Insert a 52mm block-level gap widget before each page start (40mm margin compensation + 12mm inter-sheet gap);
  * 4. Align each page to a real A4 sheet (210mm x 297mm).
@@ -67,6 +69,19 @@ interface PageLayoutState {
   /** Heights of the corresponding gap widgets (px) */
   heights: number[];
   deco: DecorationSet;
+  /** Bumped by `forcePageRelayout`: lets the plugin re-run for a non-document change (page setup, zoom) */
+  token: number;
+}
+
+/**
+ * Ask for a pagination pass although the document did not change.
+ *
+ * Page setup / zoom live outside ProseMirror, so no transaction carries them; a plain dispatch used to
+ * be enough when every transaction re-paginated. With the `docChanged` gate this explicit signal is
+ * what keeps "change paper size → pages re-flow" working.
+ */
+export function forcePageRelayout(view: EditorView): void {
+  view.dispatch(view.state.tr.setMeta(pageLayoutKey, { force: true }));
 }
 
 /** Fixed spacing between adjacent sheets = 12mm sheet gap (px) */
@@ -149,6 +164,234 @@ function buildDecorations(
   return DecorationSet.create(doc, widgets);
 }
 
+/** A block's geometry in natural coordinates: CSS px, zoom-corrected, gap widgets subtracted */
+interface BlockGeometry {
+  top: number;
+  height: number;
+}
+
+/**
+ * Block geometry from the previous pass, so an incremental pass can skip the blocks the edit cannot
+ * have moved. Validity is a cheap signature — page geometry, zoom, container width and the block
+ * elements themselves; width / zoom / page-setup changes rewrap every line, so those paths clear the
+ * cache and the signature check is only the backstop.
+ */
+interface BlockLayoutCache {
+  doc: PMNode;
+  /** Page geometry (usable height, sheet advance, fallback gap) the geometry was measured against */
+  metricsKey: string;
+  scale: number;
+  /** Container width in CSS px: a width change rewraps every line */
+  width: number;
+  elements: HTMLElement[];
+  items: BlockGeometry[];
+}
+
+/** Owns the cache across passes (one plugin instance is the lifetime of one paginated view) */
+interface BlockLayoutCacheStore {
+  current: BlockLayoutCache | null;
+}
+
+/** Inclusive top-level block range touched by a document change; `all` when the block count changed */
+export type DirtyBlocks = { first: number; last: number } | 'all';
+
+/** Tolerance for "unchanged position" — sub-pixel layout noise stays below one CSS px */
+const GEOMETRY_EPS = 1;
+
+/**
+ * Locate the top-level blocks a document change touched, by walking both documents' children.
+ *
+ * `Node.eq` hits reference equality first for untouched children (ProseMirror keeps the node when a
+ * transaction maps a fragment), so the walk costs one pointer comparison per block. A position-based
+ * diff (`findDiffStart`) is deliberately not used: it compares text only, so "bold applied to a
+ * selection" — no text change, but every line of the range rewraps — would look unchanged.
+ */
+export function dirtyBlockRange(prev: PMNode, next: PMNode): DirtyBlocks {
+  if (prev.childCount !== next.childCount) return 'all';
+  let first = -1;
+  let last = -1;
+  for (let index = 0; index < next.childCount; index += 1) {
+    if (prev.child(index).eq(next.child(index))) continue;
+    if (first < 0) first = index;
+    last = index;
+  }
+  // Same blocks but a different document (doc-level attributes only): nothing reusable piecewise
+  return first < 0 ? 'all' : { first, last };
+}
+
+/**
+ * Blocks an incremental pass has to read: the changed range widened by one block on each side — the
+ * block before it proves nothing above moved, the block after it carries the shift of everything
+ * below — plus the last block, which probes "no block outside the range resized".
+ */
+function incrementalProbes(count: number, range: { first: number; last: number }): number[] {
+  const probes: number[] = [];
+  const to = Math.min(count - 1, range.last + 1);
+  for (let index = Math.max(0, range.first - 1); index <= to; index += 1) probes.push(index);
+  if (to < count - 1) probes.push(count - 1);
+  return probes;
+}
+
+/**
+ * Rebuild block geometry from the cached pass plus a sparse re-measure of `measured`.
+ *
+ * Only the changed range is re-read. Blocks before it cannot have moved; blocks after it move by the
+ * height delta the change introduced (reflow pushes a block down, it does not resize the blocks below
+ * it), which the first block after the range carries exactly. Two guards keep the assumptions honest:
+ * the block *before* the range must still sit where it did (otherwise something above changed — a late
+ * font or image load), and the last block must land where the shift predicts (otherwise a block
+ * outside the range resized). Either mismatch returns null, which forces a full measure.
+ */
+export function incrementalItems(
+  cached: readonly BlockGeometry[],
+  measured: ReadonlyMap<number, BlockGeometry>,
+  range: { first: number; last: number },
+): BlockGeometry[] | null {
+  const count = cached.length;
+  if (count === 0) return null;
+  const items = cached.slice();
+  const first = Math.max(0, range.first);
+  if (first > 0) {
+    const guard = measured.get(first - 1);
+    const base = cached[first - 1];
+    if (
+      !guard ||
+      Math.abs(guard.top - base.top) > GEOMETRY_EPS ||
+      Math.abs(guard.height - base.height) > GEOMETRY_EPS
+    ) {
+      return null;
+    }
+  }
+  const last = Math.min(range.last, count - 1);
+  for (let index = first; index <= last; index += 1) {
+    const next = measured.get(index);
+    if (!next) return null;
+    items[index] = next;
+  }
+  if (last === count - 1) return items;
+  // The first block after the change carries the shift of everything below it
+  const anchor = measured.get(last + 1);
+  if (!anchor) return null;
+  items[last + 1] = anchor;
+  const shift = anchor.top - cached[last + 1].top;
+  for (let index = last + 2; index < count; index += 1) {
+    items[index] = { top: cached[index].top + shift, height: cached[index].height };
+  }
+  const tail = count - 1;
+  if (tail > last + 1) {
+    const probe = measured.get(tail);
+    if (!probe || Math.abs(probe.top - (cached[tail].top + shift)) > GEOMETRY_EPS) return null;
+  }
+  return items;
+}
+
+/**
+ * Read one block's geometry: zoom-corrected (rects scale with the CSS zoom) and with the gap widgets
+ * above it subtracted, so page planning never sees our own gaps.
+ */
+function measureBlockAt(
+  el: HTMLElement,
+  gapAbove: number,
+  scale: number,
+  domTop: number,
+): BlockGeometry {
+  const rect = el.getBoundingClientRect();
+  // Floating images (in front of / behind text) are out of the text flow: count them as zero height,
+  // otherwise their absolute position is mistaken for a block spilling across pages and extra gaps appear.
+  if (isFloatingImageElement(el)) return { top: 0, height: 0 };
+  const top = (rect.top - domTop) / scale - gapAbove;
+  // A section break is a marker, not content: the forced page start must land on the next visible block
+  if (isSectionBreakElement(el)) return { top, height: 0 };
+  return { top, height: rect.height / scale };
+}
+
+/**
+ * Collect the block children of the editing surface plus how many gap pixels sit above each of them.
+ * Only the gap widgets are read here; block geometry is read separately (see `blockGeometry`) so an
+ * incremental pass can read a handful of blocks instead of all of them.
+ */
+function collectBlocks(
+  view: EditorView,
+  scale: number,
+): { elements: HTMLElement[]; gapBefore: number[]; gaps: number } {
+  const elements: HTMLElement[] = [];
+  const gapBefore: number[] = [];
+  let gapPx = 0;
+  let gaps = 0;
+  Array.from(view.dom.children).forEach((node) => {
+    const el = node as HTMLElement;
+    if (isGapElement(el)) {
+      gaps += 1;
+      gapPx += el.getBoundingClientRect().height / scale;
+      return;
+    }
+    elements.push(el);
+    gapBefore.push(gapPx);
+  });
+  return { elements, gapBefore, gaps };
+}
+
+/** The cached pass, when it is still valid for this page geometry, zoom, width and block list */
+function reusableCache(
+  cache: BlockLayoutCacheStore,
+  elements: readonly HTMLElement[],
+  box: { metricsKey: string; scale: number; width: number },
+): BlockLayoutCache | null {
+  const cached = cache.current;
+  if (!cached) return null;
+  if (cached.metricsKey !== box.metricsKey) return null;
+  if (cached.scale !== box.scale) return null;
+  if (Math.abs(cached.width - box.width) >= 0.5) return null;
+  if (cached.elements.length !== elements.length) return null;
+  if (cached.elements.some((el, index) => el !== elements[index])) return null;
+  return cached;
+}
+
+/**
+ * Block geometry for this pass: the full measure (every block read) or, with the incremental flag on,
+ * the cached geometry refreshed only for the blocks the last transaction touched.
+ */
+function blockGeometry(
+  view: EditorView,
+  elements: HTMLElement[],
+  gapBefore: number[],
+  box: { metricsKey: string; scale: number; width: number; domTop: number },
+  cache: BlockLayoutCacheStore,
+  gapsTrusted: boolean,
+): BlockGeometry[] {
+  const measureAll = (): BlockGeometry[] =>
+    elements.map((el, index) => measureBlockAt(el, gapBefore[index], box.scale, box.domTop));
+
+  const cached = reusableCache(cache, elements, box);
+  // Same document, same signature and consistent gaps: the cached geometry is still exact
+  if (cached && gapsTrusted && cached.doc === view.state.doc) return cached.items;
+
+  let items: BlockGeometry[] | null = null;
+  if (cached && gapsTrusted && isIncrementalLayoutEnabled()) {
+    const range = dirtyBlockRange(cached.doc, view.state.doc);
+    if (range !== 'all') {
+      const measured = new Map<number, BlockGeometry>();
+      incrementalProbes(elements.length, range).forEach((index) => {
+        measured.set(
+          index,
+          measureBlockAt(elements[index], gapBefore[index], box.scale, box.domTop),
+        );
+      });
+      items = incrementalItems(cached.items, measured, range);
+    }
+  }
+  if (!items) items = measureAll();
+  cache.current = {
+    doc: view.state.doc,
+    metricsKey: box.metricsKey,
+    scale: box.scale,
+    width: box.width,
+    elements,
+    items,
+  };
+  return items;
+}
+
 /**
  * Measure and plan pagination. Returns null when already converged (no dispatch needed).
  * Widget heights are computed as needed so each page's first block lands exactly at the natural
@@ -158,46 +401,45 @@ function buildDecorations(
 function planLayout(
   view: EditorView,
   metrics: PageMetrics,
+  cache: BlockLayoutCacheStore,
 ): { positions: number[]; heights: number[] } | null {
   const state = pageLayoutKey.getState(view.state) ?? {
     positions: [],
     heights: [],
     deco: DecorationSet.empty,
+    token: 0,
   };
   const paged = view.dom.closest('.rte-paged') !== null;
   if (!paged) {
+    cache.current = null;
     return state.positions.length > 0 ? { positions: [], heights: [] } : null;
   }
   const px = pageMetricsToPx(metrics);
   const scale = readZoomScale(view);
-  // Read block geometry (use rects for sub-pixel values, avoiding per-block rounding drift from offsetTop):
-  // 1) divide by the zoom factor to recover CSS px; 2) subtract gap heights to recover natural positions
-  const domTop = view.dom.getBoundingClientRect().top;
-  let gapPx = 0;
-  const elements: HTMLElement[] = [];
-  const items: { top: number; height: number }[] = [];
-  Array.from(view.dom.children).forEach((node) => {
-    const el = node as HTMLElement;
-    const rect = el.getBoundingClientRect();
-    const height = rect.height / scale;
-    if (isGapElement(el)) {
-      gapPx += height;
-      return;
-    }
-    elements.push(el);
-    // Floating images (in front of / behind text) are out of the text flow: count them as zero height,
-    // otherwise their absolute position is mistaken for a block spilling across pages and extra gaps appear.
-    if (isFloatingImageElement(el)) {
-      items.push({ top: 0, height: 0 });
-      return;
-    }
-    // A section break is a marker, not content: the forced page start must land on the next visible block
-    if (isSectionBreakElement(el)) {
-      items.push({ top: (rect.top - domTop) / scale - gapPx, height: 0 });
-      return;
-    }
-    items.push({ top: (rect.top - domTop) / scale - gapPx, height });
-  });
+  // Use rects (not offsetTop) for sub-pixel values: the natural position of a block is its box top
+  // divided by the zoom factor, minus the gap widgets above it.
+  const domRect = view.dom.getBoundingClientRect();
+  // The convergence check must verify the decorations still exist (a whole-document setContent maps
+  // decorations to an empty set; comparing positions alone would falsely report convergence and deadlock)
+  const decoCount = state.deco.find().length;
+  const { elements, gapBefore, gaps } = collectBlocks(view, scale);
+  // Gap widgets are placed on block boundaries, so the surface holds exactly one per decoration.
+  // A mismatch means one was rendered *inside* a block (a stale page start), which inflates that
+  // block's box and shifts every natural position below it: cached geometry is useless then.
+  const gapsTrusted = gaps === decoCount;
+  const items = blockGeometry(
+    view,
+    elements,
+    gapBefore,
+    {
+      metricsKey: `${px.contentHeightPx}|${px.advancePx}|${px.gapPx}`,
+      scale,
+      width: domRect.width / scale,
+      domTop: domRect.top,
+    },
+    cache,
+    gapsTrusted,
+  );
   const starts = planPageStarts(elements, items, px.contentHeightPx);
 
   // Block index -> document position + height of each gap widget
@@ -213,9 +455,6 @@ function planLayout(
     }
     index += 1;
   });
-  // The convergence check must verify the decorations still exist (a whole-document setContent maps
-  // decorations to an empty set; comparing positions alone would falsely report convergence and deadlock)
-  const decoCount = state.deco.find().length;
   if (
     positions.length === state.positions.length &&
     positions.every((pos, i) => pos === state.positions[i]) &&
@@ -263,11 +502,13 @@ export function createPageLayoutPlugin(
 ): Plugin<PageLayoutState> {
   let raf = 0;
   let fontTimer = 0;
+  // Block geometry carried between passes for the incremental path (P1-5)
+  const cache: BlockLayoutCacheStore = { current: null };
 
   const measure = (view: EditorView) => {
     const metrics = getMetrics();
     const startedAt = performance.now();
-    const plan = planLayout(view, metrics);
+    const plan = planLayout(view, metrics, cache);
     try {
       performance.measure(PAGE_LAYOUT_MEASURE, { start: startedAt, end: performance.now() });
     } catch {
@@ -275,11 +516,23 @@ export function createPageLayoutPlugin(
     }
     if (plan) {
       const { positions, heights } = plan;
+      // The plan belongs to the document it was measured on. A keystroke landing in the macrotask gap
+      // below shifts every later page start by one position; dispatching them then puts the gap widget
+      // *inside* the preceding paragraph (`<p><span data-page-gap>`, which inflates that block by a page
+      // gap and corrupts every natural position below it). Drop the plan instead: the next pass, which
+      // the keystroke already scheduled, measures the new document.
+      const plannedDoc = view.state.doc;
       // Dispatch on a later macrotask, avoiding a synchronous dispatch inside PM's update cycle
       setTimeout(() => {
+        if (view.state.doc !== plannedDoc) return;
         const current =
           pageLayoutKey.getState(view.state) ??
-          ({ positions: [], heights: [], deco: DecorationSet.empty } satisfies PageLayoutState);
+          ({
+            positions: [],
+            heights: [],
+            deco: DecorationSet.empty,
+            token: 0,
+          } satisfies PageLayoutState);
         // Decorations can be lost through document transactions (setContent, etc.); then they must be
         // rebuilt even if the page breaks didn't change, otherwise the page view degrades into
         // continuous layout without inter-page gaps
@@ -307,14 +560,16 @@ export function createPageLayoutPlugin(
   return new Plugin<PageLayoutState>({
     key: pageLayoutKey,
     state: {
-      init: () => ({ positions: [], heights: [], deco: DecorationSet.empty }),
+      init: () => ({ positions: [], heights: [], deco: DecorationSet.empty, token: 0 }),
       apply: (tr: Transaction, value) => {
         const meta = tr.getMeta(pageLayoutKey) as
-          { positions: number[]; heights: number[] } | undefined;
+          { positions: number[]; heights: number[] } | { force: true } | undefined;
+        if (meta && 'force' in meta) return { ...value, token: value.token + 1 };
         if (meta) {
           return {
             positions: meta.positions,
             heights: meta.heights,
+            token: value.token,
             deco: buildDecorations(
               tr.doc,
               meta.positions,
@@ -331,13 +586,32 @@ export function createPageLayoutPlugin(
       decorations: (state) => pageLayoutKey.getState(state)?.deco ?? DecorationSet.empty,
     },
     view: (view) => {
-      const onResize = () => schedule(view);
+      // Everything that can rewrap the whole document without a document change (resize, zoom, page
+      // setup, a late font/image load) must drop the cached block geometry as well.
+      const invalidate = (target: EditorView) => {
+        cache.current = null;
+        schedule(target);
+      };
+      const onResize = () => invalidate(view);
       schedule(view);
       // Re-calibrate after fonts/images finish loading asynchronously
       fontTimer = window.setTimeout(onResize, 400);
       window.addEventListener('resize', onResize);
       return {
-        update: (nextView) => schedule(nextView),
+        // Re-paginate only when the document instance changed. A caret move, a selection drag or a
+        // decoration-only transaction cannot move blocks, yet scheduling on them re-measured every
+        // block of the document (2100+ getBoundingClientRect calls per keystroke in a 200-page file).
+        // Metric / resize / font-load changes have their own paths (resize listener + plugin re-init).
+        update: (nextView, prevState) => {
+          if (nextView.state.doc !== prevState.doc) {
+            schedule(nextView);
+            return;
+          }
+          // Page setup / zoom changes carry no document transaction: they bump the token instead
+          const nextToken = pageLayoutKey.getState(nextView.state)?.token ?? 0;
+          const prevToken = pageLayoutKey.getState(prevState)?.token ?? 0;
+          if (nextToken !== prevToken) invalidate(nextView);
+        },
         destroy: () => {
           cancelAnimationFrame(raf);
           clearTimeout(fontTimer);

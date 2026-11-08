@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-06T07:22:37.432Z",
+  "generatedAt": "2026-11-06T16:31:24.667Z",
   "generator": "src/tools/baseline/roundtrip.test.ts",
   "total": 42,
   "externalSamples": 10,
@@ -300,7 +300,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6846,
+        "bytes": 6845,
         "parts": 24,
         "slideParts": 1,
         "mediaParts": 0,
@@ -402,7 +402,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6765,
+        "bytes": 6764,
         "parts": 24,
         "slideParts": 1,
         "mediaParts": 0,
@@ -1017,7 +1017,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 15778,
+        "bytes": 15777,
         "parts": 41,
         "slideParts": 1,
         "mediaParts": 1,
@@ -1582,7 +1582,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6481,
+        "bytes": 6480,
         "parts": 16,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1634,7 +1634,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6172,
+        "bytes": 6171,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1686,7 +1686,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6539,
+        "bytes": 6538,
         "parts": 16,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1738,7 +1738,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 7155,
+        "bytes": 7154,
         "parts": 17,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1791,7 +1791,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6243,
+        "bytes": 6242,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1844,7 +1844,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6191,
+        "bytes": 6190,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1902,7 +1902,7 @@
         }
       ],
       "artifacts": {
-        "bytes": 8931,
+        "bytes": 8930,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1960,7 +1960,7 @@
         }
       ],
       "artifacts": {
-        "bytes": 7868,
+        "bytes": 7867,
         "parts": 20,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2012,7 +2012,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 8158,
+        "bytes": 8157,
         "parts": 21,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2084,7 +2084,7 @@
         }
       ],
       "artifacts": {
-        "bytes": 10347,
+        "bytes": 10349,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2283,7 +2283,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9770,
+        "bytes": 9769,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2349,7 +2349,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9933,
+        "bytes": 9932,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2415,7 +2415,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 10623,
+        "bytes": 10621,
         "parts": 26,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2482,7 +2482,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9918,
+        "bytes": 9923,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2618,7 +2618,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 31731,
+        "bytes": 31733,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2768,7 +2768,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 31729,
+        "bytes": 31712,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2918,7 +2918,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 36931,
+        "bytes": 36929,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3068,7 +3068,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 31764,
+        "bytes": 31781,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3212,7 +3212,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 38481,
+        "bytes": 38500,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3350,7 +3350,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 39760,
+        "bytes": 39759,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3500,7 +3500,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 39782,
+        "bytes": 39785,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3656,7 +3656,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 39803,
+        "bytes": 39786,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3812,7 +3812,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 39795,
+        "bytes": 39799,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3962,7 +3962,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 38227,
+        "bytes": 38235,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,

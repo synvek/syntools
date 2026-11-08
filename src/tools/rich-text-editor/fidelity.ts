@@ -1,5 +1,6 @@
 import type { FidelityIssue } from '@/core/fidelity';
 import type { DocxExportLosses, MarkdownExportLosses } from './core';
+import type { OoxmlIr } from './ooxmlIr';
 
 /**
  * Adapters from the editor's own loss scanners to the shared fidelity report.
@@ -54,6 +55,62 @@ export function docxLossIssues(losses: DocxExportLosses): FidelityIssue[] {
     },
   ];
   return issues.filter((issue) => issue.count > 0);
+}
+
+/**
+ * Import-side adapter (P0-2.5): structured-IR losses → the shared fidelity report.
+ * Codes are grouped by user-facing meaning so nine-language copy stays at three entries;
+ * `detail` keeps the raw `code:count` pairs for diagnosis.
+ */
+const IR_LOSS_GROUPS: ReadonlyArray<{
+  code: string;
+  messageKey: string;
+  codes: readonly string[];
+  severity: FidelityIssue['severity'];
+}> = [
+  {
+    code: 'rte.irStructure',
+    severity: 'warning',
+    messageKey: 'tools.richText.lossIrStructure',
+    codes: ['ir.images', 'ir.shapes', 'ir.sections', 'ir.bookmarks'],
+  },
+  {
+    code: 'rte.irReview',
+    severity: 'warning',
+    messageKey: 'tools.richText.lossIrReview',
+    codes: [
+      'ir.reviewIns',
+      'ir.reviewDel',
+      'ir.comments',
+      'ir.unlinkedComments',
+      'ir.unreferencedNotes',
+      'ir.missingNotes',
+    ],
+  },
+  {
+    code: 'rte.irFields',
+    severity: 'warning',
+    messageKey: 'tools.richText.lossIrFields',
+    codes: ['ir.fields', 'ir.math', 'ir.anchorMiss'],
+  },
+];
+
+/** Only `losses` is needed, so callers (and tests) can build a minimal IR stub. */
+export function importLossIssues(ir: Pick<OoxmlIr, 'losses'>): FidelityIssue[] {
+  return IR_LOSS_GROUPS.flatMap((group) => {
+    const matches = ir.losses.filter((loss) => group.codes.includes(loss.code));
+    const count = matches.reduce((sum, loss) => sum + loss.count, 0);
+    if (count === 0) return [];
+    return [
+      {
+        code: group.code,
+        severity: group.severity,
+        count,
+        messageKey: group.messageKey,
+        detail: matches.map((loss) => `${loss.code}:${loss.count}`).join(', '),
+      },
+    ];
+  });
 }
 
 /** Markdown export: review metadata and page layout are not representable */

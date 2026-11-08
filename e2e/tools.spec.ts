@@ -3506,3 +3506,173 @@ test.describe('word processor: overlay stack and keyboard (implementation plan P
     await expect(shapes).toHaveCount(0);
   });
 });
+
+test.describe('word processor: critical paths (implementation plan P0-5)', () => {
+  test('draft auto-save survives a reload', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('草稿恢复内容');
+    // SAVE_DEBOUNCE_MS is 600: wait past it so the draft really reaches localStorage
+    await page.waitForTimeout(1200);
+    await page.reload();
+    await expect(page.locator('.tiptap')).toContainText('草稿恢复内容');
+  });
+
+  test('undo and redo walk the history one group at a time', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    const editor = page.locator('.tiptap');
+    await editor.click();
+    await page.keyboard.type('第一段');
+    // Break the history group so one undo removes exactly the second typed group
+    await page.waitForTimeout(600);
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('第二段');
+    await page.waitForTimeout(600);
+    await expect(editor).toContainText('第二段');
+
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(editor).not.toContainText('第二段');
+    await expect(editor).toContainText('第一段');
+
+    await page.keyboard.press('ControlOrMeta+Shift+z');
+    await expect(editor).toContainText('第二段');
+  });
+
+  test('right-click context menu closes with Escape without clearing the selection', async ({
+    page,
+  }) => {
+    await page.goto('/tools/rich-text-editor');
+    const editor = page.locator('.tiptap');
+    await editor.click();
+    await page.keyboard.type('鼠标右键测试');
+    await page.keyboard.press('Shift+Home');
+    const before = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    expect(before.length).toBeGreaterThan(0);
+
+    await editor.click({ button: 'right' });
+    const menu = page.getByTestId('rich-text-context-menu');
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+
+    const after = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    expect(after).toBe(before);
+  });
+
+  test('the file menu print command prints once', async ({ page }) => {
+    await installShortcutProbe(page);
+    await page.goto('/tools/rich-text-editor');
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('菜单打印内容');
+
+    const before = (await shortcutProbe(page)).printCalls;
+    await page.getByTestId('menubar-more').click();
+    await page.getByRole('menuitem', { name: '打印', exact: true }).click();
+    await expect.poll(async () => (await shortcutProbe(page)).printCalls).toBe(before + 1);
+  });
+
+  test('inserting a shape then undo / redo keeps the document consistent', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    const editor = page.locator('.tiptap');
+    await expect(editor).toBeVisible();
+
+    await page.getByRole('tab', { name: '插入', exact: true }).click();
+    await page.getByTestId('ribbon-illustrations-insert-shape').click();
+    await page
+      .getByTestId('rich-text-shape-menu')
+      .locator('[data-shape-preset="roundRect"]')
+      .click();
+
+    const surface = await editor.boundingBox();
+    if (!surface) throw new Error('editor is not laid out');
+    await page.mouse.move(surface.x + 120, surface.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(surface.x + 320, surface.y + 240, { steps: 8 });
+    await page.mouse.up();
+
+    const shape = editor.locator('.rte-shape-node');
+    await expect(shape).toHaveCount(1);
+
+    // Hand focus back to the editor: right after the drag, the shortcut would target the overlay
+    await editor.click({ position: { x: 4, y: 4 } });
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(shape).toHaveCount(0);
+
+    await page.keyboard.press('ControlOrMeta+Shift+z');
+    await expect(shape).toHaveCount(1);
+  });
+
+  test('a tracked change mark can be undone and redone', async ({ page }) => {
+    await page.goto('/tools/rich-text-editor');
+    const editor = page.locator('.tiptap');
+    await editor.click();
+    await page.keyboard.type('修订文本');
+    for (let i = 0; i < 4; i += 1) await editor.press('Shift+ArrowLeft');
+
+    await page.getByRole('tab', { name: '审阅', exact: true }).click();
+    await page.getByTestId('ribbon-tracking-track-delete').click();
+    const tracked = editor.locator('del[data-track="delete"]');
+    await expect(tracked).toHaveCount(1);
+    await expect(tracked).toHaveText('修订文本');
+
+    // Undo drops the mark but keeps the text, redo puts the revision back
+    await editor.click();
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(tracked).toHaveCount(0);
+    await expect(editor).toContainText('修订文本');
+
+    await page.keyboard.press('ControlOrMeta+Shift+z');
+    await expect(tracked).toHaveCount(1);
+  });
+});
+
+test.describe('word processor: collapsed ribbon applies what it shows (P0-5.1)', () => {
+  test.use({ locale: 'zh-CN', viewport: { width: 600, height: 900 } });
+
+  test('size / colour / family picked in the collapsed ribbon reach the selected run', async ({
+    page,
+  }) => {
+    await page.goto('/tools/rich-text-editor');
+    const editor = page.locator('.tiptap');
+    await expect(editor).toBeVisible();
+    // Below 640px the ribbon starts collapsed: open 开始 so the font controls are in the DOM
+    await page.getByRole('tab', { name: '开始', exact: true }).click();
+    await editor.click();
+    await page.keyboard.type('窄屏样式');
+    // Select backwards from the caret: Home is not reliable inside the contenteditable
+    for (let i = 0; i < 4; i += 1) await editor.press('Shift+ArrowLeft');
+    const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    expect(selected).toBe('窄屏样式');
+
+    // Font size: the chevron opens the preset list without stealing focus from the editor
+    const sizeTrigger = page
+      .getByTestId('ribbon-font-font-size')
+      .getByRole('button', { name: '字号' });
+    await sizeTrigger.click();
+    const sizeList = page.getByRole('listbox', { name: '字号' });
+    await expect(sizeList).toBeVisible();
+    // The first entry can be the "no explicit size" option, which would be a no-op
+    await sizeList.getByRole('option').nth(1).click();
+    const run = editor.locator('span[style*="font-size"]');
+    await expect(run).toHaveCount(1);
+
+    const applied = await run.evaluate((el) => (el as HTMLElement).style.fontSize);
+    expect(applied).toMatch(/^[\d.]+px$/);
+
+    // Picking a value closes the collapsed flyout: reopen 开始 before the next control
+    await page.getByRole('tab', { name: '开始', exact: true }).click();
+    await page.getByTestId('ribbon-font-font-color').click();
+    await page.getByRole('button', { name: '#C00000' }).click();
+    await expect(run).toHaveCSS('color', 'rgb(192, 0, 0)');
+
+    await page.getByRole('tab', { name: '开始', exact: true }).click();
+    await page.getByTestId('ribbon-font-font-family').getByRole('combobox').click();
+    const families = page.getByRole('listbox', { name: '字体' });
+    await expect(families).toBeVisible();
+    await families.getByRole('option').nth(1).click();
+
+    const family = await run.evaluate((el) => (el as HTMLElement).style.fontFamily);
+    expect(family.length).toBeGreaterThan(0);
+    await expect(editor).toContainText('窄屏样式');
+  });
+});

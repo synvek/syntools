@@ -15,6 +15,7 @@ import { bookmarkStrings } from './bookmarkStrings';
 import { charFormatStrings } from './charFormatStrings';
 import { endnoteStrings } from './endnoteStrings';
 import { fileStrings } from './fileStrings';
+import { irLossStrings } from './irLossStrings';
 import { ribbonStrings } from './ribbonStrings';
 import { shapeUiStrings } from './shapeUiStrings';
 import { shortcutStrings } from './shortcutStrings';
@@ -3635,6 +3636,7 @@ const EXTRA_STRINGS: Record<string, StringTree>[] = [
   ribbonStrings,
   fileStrings,
   shortcutStrings,
+  irLossStrings,
 ];
 
 /**

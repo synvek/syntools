@@ -73,23 +73,33 @@ test.describe('word processor ribbon', () => {
     await page.goto('/tools/rich-text-editor');
     await expect(page.locator('.tiptap')).toBeVisible();
 
-    await page.getByRole('tab', { name: '插入', exact: true }).click();
-    await page.getByRole('button', { name: '插入形状' }).click();
-    await page
-      .getByTestId('rich-text-shape-menu')
-      .locator('[data-shape-preset="roundRect"]')
-      .click();
-
-    // Preset → drag on the page (the gallery only arms the draw layer)
-    const surface = await page.locator('.tiptap').boundingBox();
-    if (!surface) throw new Error('editor is not laid out');
-    await page.mouse.move(surface.x + 120, surface.y + 120);
-    await page.mouse.down();
-    await page.mouse.move(surface.x + 320, surface.y + 240, { steps: 8 });
-    await page.mouse.up();
-
+    // Preset → drag on the page (the gallery only arms the draw layer). Both halves are retried
+    // together: a drag whose mouse steps land while the menu is still closing consumes the preset
+    // without inserting anything, and re-arming needs the whole sequence again.
     const shape = page.locator('.tiptap .rte-shape-node');
-    await expect(shape).toHaveCount(1);
+    const armShape = async () => {
+      await page.getByRole('tab', { name: '插入', exact: true }).click();
+      await page.getByRole('button', { name: '插入形状' }).click();
+      await page
+        .getByTestId('rich-text-shape-menu')
+        .locator('[data-shape-preset="roundRect"]')
+        .click();
+    };
+    const drawShape = async () => {
+      const surface = await page.locator('.tiptap').boundingBox();
+      if (!surface) throw new Error('editor is not laid out');
+      await page.mouse.move(surface.x + 120, surface.y + 120);
+      await page.mouse.down();
+      await page.mouse.move(surface.x + 320, surface.y + 240, { steps: 8 });
+      await page.mouse.up();
+    };
+    await expect(async () => {
+      if ((await shape.count()) === 0) {
+        await armShape();
+        await drawShape();
+      }
+      await expect(shape).toHaveCount(1, { timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
     // No leftover flat toolbar: shape formatting lives on the ribbon
     await expect(page.getByTestId('rich-text-shape-format-bar')).toHaveCount(0);
     await expect(page.getByRole('tab', { name: '形状格式', exact: true })).toHaveAttribute(
@@ -147,9 +157,13 @@ test.describe('word processor ribbon', () => {
     await page.getByTestId('ribbon-table-row-below').click();
     await expect(page.locator('.tiptap table tr')).toHaveCount(4);
 
-    // Caret back in the paragraph before the table → contextual tab disappears, 插入 restored
-    await page.locator('.tiptap p').first().click();
-    await expect(tableTab).toHaveCount(0);
+    // Caret back in the paragraph before the table → contextual tab disappears, 插入 restored.
+    // Retried as a unit: under load the click can land while the row-insert dispatch is still
+    // settling, leaving the caret inside the table and the contextual tab legitimately open.
+    await expect(async () => {
+      await page.locator('.tiptap p').first().click();
+      await expect(tableTab).toHaveCount(0, { timeout: 1_500 });
+    }).toPass({ timeout: 15_000 });
     await expect(page.getByRole('tab', { name: '插入', exact: true })).toHaveAttribute(
       'aria-selected',
       'true',

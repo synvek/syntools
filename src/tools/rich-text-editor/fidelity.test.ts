@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { docxLossIssues, markdownLossIssues } from './fidelity';
+import { docxLossIssues, importLossIssues, markdownLossIssues } from './fidelity';
 import type { DocxExportLosses, MarkdownExportLosses } from './core';
+import type { IrLoss } from './ooxmlIr';
 
 /** Adapter tests: the editor's loss counters must map onto the shared fidelity vocabulary */
 
@@ -47,6 +48,46 @@ describe('docxLossIssues', () => {
 
   it('returns nothing when the document exports cleanly', () => {
     expect(docxLossIssues(docx())).toEqual([]);
+  });
+});
+
+describe('importLossIssues', () => {
+  const ir = (losses: IrLoss[]) => ({ losses });
+
+  it('groups raw IR codes into the three user-facing warnings', () => {
+    const issues = importLossIssues(
+      ir([
+        { code: 'ir.images', count: 2 },
+        { code: 'ir.shapes', count: 1 },
+        { code: 'ir.reviewIns', count: 3 },
+        { code: 'ir.comments', count: 2 },
+        { code: 'ir.math', count: 4 },
+      ]),
+    );
+    expect(issues.map((issue) => issue.code)).toEqual([
+      'rte.irStructure',
+      'rte.irReview',
+      'rte.irFields',
+    ]);
+    expect(issues.map((issue) => issue.count)).toEqual([3, 5, 4]);
+    expect(issues.every((issue) => issue.severity === 'warning')).toBe(true);
+    expect(issues[0].messageKey).toBe('tools.richText.lossIrStructure');
+  });
+
+  it('keeps raw code counts in the detail trail', () => {
+    const issues = importLossIssues(
+      ir([
+        { code: 'ir.images', count: 2 },
+        { code: 'ir.bookmarks', count: 1 },
+      ]),
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0].detail).toBe('ir.images:2, ir.bookmarks:1');
+  });
+
+  it('skips groups without matching losses and ignores unknown codes', () => {
+    expect(importLossIssues(ir([]))).toEqual([]);
+    expect(importLossIssues(ir([{ code: 'ir.unknown', count: 9 }]))).toEqual([]);
   });
 });
 

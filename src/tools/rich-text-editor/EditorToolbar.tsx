@@ -45,6 +45,17 @@ const ROW_HEIGHT_MM_PRESETS = [8, 12, 16, 20] as const;
 const normalizeColor = (value: unknown): string | null =>
   typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : null;
 
+/** `performance.measure` name of one ribbon-state recomputation (P1-5: toolbar cost must be measurable) */
+export const TOOLBAR_STATE_MEASURE = 'rte-toolbar-state';
+
+function recordToolbarStateMeasure(startedAt: number): void {
+  try {
+    performance.measure(TOOLBAR_STATE_MEASURE, { start: startedAt, end: performance.now() });
+  } catch {
+    // Older engines / jsdom lack the options form: diagnostic only, never load-bearing
+  }
+}
+
 export interface EditorToolbarProps extends RichTextRibbonActions {
   editor: Editor | null;
   /** 工具库里没有的命令（新建 / 导入 / 导出 / 清空…）收在一个 ⋯ 菜单里 */
@@ -127,10 +138,13 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
     selector: (ctx): RichTextToolbarState | null => {
       const e = ctx.editor;
       if (!e) return null;
+      // P1-5: the selector recomputes ~50 flags on every transaction; publishing the cost as a real
+      // measure entry is what lets the perf e2e assert "toolbar state cost" instead of guessing.
+      const startedAt = performance.now();
       const headingLevel = ([1, 2, 3, 4, 5, 6] as const).find((level) =>
         e.isActive('heading', { level }),
       );
-      return {
+      const result: RichTextToolbarState = {
         canUndo: e.can().undo(),
         canRedo: e.can().redo(),
         headingLevel,
@@ -196,6 +210,8 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
         // (no formatting flag change) still re-renders the ribbon and drops the contextual tab
         contextTab: resolveContextTab(e.state),
       };
+      recordToolbarStateMeasure(startedAt);
+      return result;
     },
   });
 

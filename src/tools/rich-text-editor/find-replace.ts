@@ -12,6 +12,14 @@ export interface SearchConfig {
   matchCase: boolean;
   /** Index of the current match (wraps around) */
   index: number;
+  /**
+   * Cached match list, maintained by the plugin.
+   *
+   * P1-5: the decoration query runs on every state update, and a 200-page document has ~8k text
+   * nodes — scanning them per keystroke (twice: once in `apply`, once in `decorations`) dominated the
+   * cost of having the find bar open. The list is recomputed once per document change instead.
+   */
+  matches?: TextMatch[];
 }
 
 export interface TextMatch {
@@ -54,21 +62,26 @@ export const FindReplace = Extension.create({
           init: () => null,
           apply: (tr, value) => {
             const meta = tr.getMeta(findReplaceKey) as SearchConfig | null | undefined;
-            if (meta !== undefined) return meta;
+            if (meta !== undefined) {
+              if (!meta) return null;
+              // Navigation reuses the cached list; a new term recomputes exactly once
+              const matches = meta.matches ?? findMatches(tr.doc, meta.term, meta.matchCase);
+              return { ...meta, matches };
+            }
             if (!value) return null;
             if (!tr.docChanged) return value;
             // Recompute matches after doc changes and clamp the index to avoid stale references
             const matches = findMatches(tr.doc, value.term, value.matchCase);
-            if (matches.length === 0) return { ...value, index: 0 };
-            return { ...value, index: Math.min(value.index, matches.length - 1) };
+            if (matches.length === 0) return { ...value, matches, index: 0 };
+            return { ...value, matches, index: Math.min(value.index, matches.length - 1) };
           },
         },
         props: {
           decorations(state) {
             const config = findReplaceKey.getState(state);
-            if (!config || !config.term) return DecorationSet.empty;
-            const matches = findMatches(state.doc, config.term, config.matchCase);
-            if (matches.length === 0) return DecorationSet.empty;
+            // Only the decoration objects are built here: scanning the document happens in `apply`
+            const matches = config?.matches;
+            if (!config || !matches || matches.length === 0) return DecorationSet.empty;
             const decorations = matches.map((match, i) =>
               Decoration.inline(match.from, match.to, {
                 class: i === config.index ? 'rte-find-current' : 'rte-find-match',
@@ -96,7 +109,8 @@ export const FindReplace = Extension.create({
         ({ state, tr, dispatch }) => {
           const config = findReplaceKey.getState(state);
           if (!config || !config.term || dispatch === undefined) return false;
-          const total = findMatches(state.doc, config.term, config.matchCase).length;
+          const total = (config.matches ?? findMatches(state.doc, config.term, config.matchCase))
+            .length;
           if (total === 0) return false;
           const next = (config.index + delta + total) % total;
           tr.setMeta(findReplaceKey, { ...config, index: next });
@@ -108,7 +122,7 @@ export const FindReplace = Extension.create({
         ({ state, tr, dispatch }) => {
           const config = findReplaceKey.getState(state);
           if (!config || !config.term || dispatch === undefined) return false;
-          const matches = findMatches(state.doc, config.term, config.matchCase);
+          const matches = config.matches ?? findMatches(state.doc, config.term, config.matchCase);
           const match = matches[Math.min(config.index, matches.length - 1)];
           if (!match) return false;
           if (replacement) tr.insertText(replacement, match.from, match.to);
@@ -121,7 +135,7 @@ export const FindReplace = Extension.create({
         ({ state, tr, dispatch }) => {
           const config = findReplaceKey.getState(state);
           if (!config || !config.term || dispatch === undefined) return false;
-          const matches = findMatches(state.doc, config.term, config.matchCase);
+          const matches = config.matches ?? findMatches(state.doc, config.term, config.matchCase);
           if (matches.length === 0) return false;
           // Replace back to front so earlier positions stay valid
           for (let i = matches.length - 1; i >= 0; i -= 1) {
@@ -129,7 +143,8 @@ export const FindReplace = Extension.create({
             if (replacement) tr.insertText(replacement, match.from, match.to);
             else tr.delete(match.from, match.to);
           }
-          tr.setMeta(findReplaceKey, { ...config, index: 0 });
+          // Deliberately drops the cached matches: they describe the pre-replace document
+          tr.setMeta(findReplaceKey, { term: config.term, matchCase: config.matchCase, index: 0 });
           return true;
         },
     };
