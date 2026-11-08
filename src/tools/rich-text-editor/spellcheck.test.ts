@@ -5,6 +5,7 @@ import {
   addUserWord,
   buildSpellDecorations,
   checkText,
+  checkTextReport,
   collectDocIssues,
   createWordIndex,
   editDistance,
@@ -14,7 +15,6 @@ import {
   removeUserWord,
   suggest,
   tokenize,
-  visibleScanRange,
 } from './spellcheck';
 
 /**
@@ -121,6 +121,24 @@ describe('checkText', () => {
   it('returns no results for empty text', () => {
     expect(checkText('', dictionary)).toEqual([]);
   });
+
+  it('runs the Chinese rules on the same text (P1-3) and tags every issue with its kind', () => {
+    const issues = checkText('我们,明天见 wrold', dictionary);
+    expect(issues.map((issue) => [issue.word, issue.kind])).toEqual([
+      [',', 'punctuation'],
+      ['wrold', 'spelling'],
+    ]);
+    // Document order, and the rule knows the correction
+    expect(issues[0].suggestion).toBe('，');
+  });
+
+  it('reports that an over-long text was cut at the scan limit', () => {
+    const long = `${'known '.repeat(40_000)}wrold`;
+    const report = checkTextReport(long, { words: new Set(['known']), userWords: [] });
+    expect(report.truncated).toBe(true);
+    // The tail (where the misspelling sits) is beyond the cap, so it is not reported — but not silently
+    expect(report.issues).toEqual([]);
+  });
 });
 
 describe('custom dictionary', () => {
@@ -182,16 +200,29 @@ describe('document-level decorations and issue list', () => {
 
   it('collectDocIssues returns issues with document positions and respects the cap', () => {
     const editor = createEditor('<p>hello wrold and anther</p>');
-    const issues = collectDocIssues(editor.state.doc, dictionary);
+    const issues = collectDocIssues(editor.state.doc, dictionary).issues;
     expect(issues.map((issue) => issue.word)).toEqual(['wrold', 'anther']);
     expect(issues[0].from).toBeLessThan(issues[1].from);
-    expect(collectDocIssues(editor.state.doc, dictionary, 1)).toHaveLength(1);
+    expect(collectDocIssues(editor.state.doc, dictionary, 1)).toEqual({
+      issues: [issues[0]],
+      capped: true,
+      truncated: false,
+    });
+  });
+
+  it('reports the cap instead of dropping issues silently (P1-3)', () => {
+    const editor = createEditor('<p>wrold anther</p>');
+    const report = collectDocIssues(editor.state.doc, dictionary, 1);
+    expect(report.issues).toHaveLength(1);
+    expect(report.capped).toBe(true);
+    // Everything fits: no cap was hit, so the panel must not warn
+    expect(collectDocIssues(editor.state.doc, dictionary, 100).capped).toBe(false);
   });
 
   it('produces no decorations or issues when every word is known', () => {
     const editor = createEditor('<p>hello world</p>');
     expect(buildSpellDecorations(editor.state.doc, dictionary).find()).toHaveLength(0);
-    expect(collectDocIssues(editor.state.doc, dictionary)).toEqual([]);
+    expect(collectDocIssues(editor.state.doc, dictionary).issues).toEqual([]);
   });
 
   it('skips text nodes outside the scanned range (P1-5 viewport clipping)', () => {
@@ -203,25 +234,5 @@ describe('document-level decorations and issue list', () => {
     const second = buildSpellDecorations(doc, dictionary, { from: 12, to: doc.content.size });
     expect(second.find()).toHaveLength(1);
     expect(second.find()[0].from).toBeGreaterThan(12);
-  });
-});
-
-describe('visibleScanRange (P1-5)', () => {
-  it('checks the whole short document', () => {
-    const editor = createEditor('<p>hello world</p>');
-    expect(visibleScanRange(editor.state.doc, [{ from: 1, to: 5 }])).toBeNull();
-  });
-
-  it('clips long documents to the visible range plus a margin', () => {
-    const editor = createEditor(`<p>${'hello world '.repeat(12_000)}</p>`);
-    const range = visibleScanRange(editor.state.doc, [{ from: 50_000, to: 51_000 }]);
-    expect(range).not.toBeNull();
-    expect(range?.from).toBe(47_000);
-    expect(range?.to).toBe(54_000);
-  });
-
-  it('returns null when the view reports no visible range', () => {
-    const editor = createEditor(`<p>${'hello world '.repeat(12_000)}</p>`);
-    expect(visibleScanRange(editor.state.doc, [])).toBeNull();
   });
 });

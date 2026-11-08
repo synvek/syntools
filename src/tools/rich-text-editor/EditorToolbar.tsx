@@ -47,10 +47,12 @@ const normalizeColor = (value: unknown): string | null =>
 
 /** `performance.measure` name of one ribbon-state recomputation (P1-5: toolbar cost must be measurable) */
 export const TOOLBAR_STATE_MEASURE = 'rte-toolbar-state';
+/** `performance.measure` name of one tab-config build — decides whether the static/dynamic split is worth it */
+export const RIBBON_TABS_MEASURE = 'rte-ribbon-tabs';
 
-function recordToolbarStateMeasure(startedAt: number): void {
+function recordMeasure(name: string, startedAt: number): void {
   try {
-    performance.measure(TOOLBAR_STATE_MEASURE, { start: startedAt, end: performance.now() });
+    performance.measure(name, { start: startedAt, end: performance.now() });
   } catch {
     // Older engines / jsdom lack the options form: diagnostic only, never load-bearing
   }
@@ -210,7 +212,7 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
         // (no formatting flag change) still re-renders the ribbon and drops the contextual tab
         contextTab: resolveContextTab(e.state),
       };
-      recordToolbarStateMeasure(startedAt);
+      recordMeasure(TOOLBAR_STATE_MEASURE, startedAt);
       return result;
     },
   });
@@ -312,6 +314,7 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
     rowHeightOptions,
   };
 
+  const tabsStartedAt = performance.now();
   const tabs = buildRichTextRibbonTabs({
     editor,
     state,
@@ -322,6 +325,7 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
     changeShapeOpen,
     onToggleChangeShape: () => setChangeShapeOpen((value) => !value),
   });
+  recordMeasure(RIBBON_TABS_MEASURE, tabsStartedAt);
 
   const quickAccess = (
     <>

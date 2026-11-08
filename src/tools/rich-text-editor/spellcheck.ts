@@ -3,6 +3,8 @@ import type { Node as PMNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 import type { ToolResult } from '@/core/types';
+import { decorationRange, onViewportSettled, type DocRange } from './viewportRange';
+import { checkChinese } from './zhRules';
 
 /**
  * Fully local spellcheck (English):
@@ -236,10 +238,23 @@ export function suggest(
  * Checking
  * ------------------------------------------------------------------ */
 
+/** What a rule flagged: a dictionary miss (`spelling`) or one of the Chinese rules (P1-3) */
+export type SpellIssueKind = 'spelling' | 'punctuation' | 'duplicate' | 'typo';
+
 export interface SpellIssue {
   word: string;
   start: number;
   end: number;
+  kind: SpellIssueKind;
+  /** Correct form when the rule knows it (Chinese typos, punctuation width) */
+  suggestion?: string;
+}
+
+/** One check pass: the issues plus whether the text had to be cut short */
+export interface SpellCheckReport {
+  issues: SpellIssue[];
+  /** The text exceeded `MAX_CHECK_CHARS`; only the leading part was scanned */
+  truncated: boolean;
 }
 
 export interface SpellDictionary {
@@ -253,24 +268,47 @@ export interface SpellDictionary {
 export const MAX_CHECK_CHARS = 200_000;
 
 /**
- * Check a piece of text and return likely misspellings with positions.
- * Lookup only, no suggestions — suggestions are expensive and computed on demand for visible entries.
+ * Check a piece of text and return likely issues with positions: dictionary lookups for Latin words,
+ * rules for Chinese (P1-3). `truncated` tells the caller the text was cut at `MAX_CHECK_CHARS` — the
+ * panel shows it, so the cap is never a silent gap.
  */
-export function checkText(text: string, dictionary: SpellDictionary, minLength = 3): SpellIssue[] {
-  if (!text) return [];
+export function checkTextReport(
+  text: string,
+  dictionary: SpellDictionary,
+  minLength = 3,
+): SpellCheckReport {
+  if (!text) return { issues: [], truncated: false };
+  const truncated = text.length > MAX_CHECK_CHARS;
+  const source = truncated ? text.slice(0, MAX_CHECK_CHARS) : text;
   const known = dictionary.words;
   const userKnown = new Set(dictionary.userWords.map((word) => normalizeWord(word)));
   const issues: SpellIssue[] = [];
-  for (const token of tokenize(text.slice(0, MAX_CHECK_CHARS), minLength)) {
+  for (const token of tokenize(source, minLength)) {
     if (!isCheckableWord(token.word, minLength)) continue;
     const normalized = normalizeWord(token.word);
     if (normalized.length < minLength) continue;
     if (known.has(normalized) || userKnown.has(normalized)) continue;
     // All-caps acronyms (API, HTTP, ...) aren't treated as misspellings
     if (token.word.length > 1 && token.word === token.word.toUpperCase()) continue;
-    issues.push({ word: token.word, start: token.start, end: token.end });
+    issues.push({ word: token.word, start: token.start, end: token.end, kind: 'spelling' });
   }
-  return issues;
+  for (const issue of checkChinese(source, dictionary.userWords)) {
+    issues.push({
+      word: issue.word,
+      start: issue.start,
+      end: issue.end,
+      kind: issue.kind,
+      suggestion: issue.suggestion,
+    });
+  }
+  // Document order, so decorations and the panel list read like the page
+  issues.sort((a, b) => a.start - b.start || a.end - b.end);
+  return { issues, truncated };
+}
+
+/** Convenience wrapper around `checkTextReport` for callers that only need the issues */
+export function checkText(text: string, dictionary: SpellDictionary, minLength = 3): SpellIssue[] {
+  return checkTextReport(text, dictionary, minLength).issues;
 }
 
 /** Add a custom dictionary entry (deduped, trimmed, lowercased), returning a new array */
@@ -291,26 +329,57 @@ export interface DocSpellIssue {
   word: string;
   from: number;
   to: number;
+  kind: SpellIssueKind;
+  /** Correct form when the rule knows it */
+  suggestion?: string;
+}
+
+/** Whole-document result plus the two caps the panel has to disclose (no silent truncation) */
+export interface DocSpellReport {
+  issues: DocSpellIssue[];
+  /** `limit` was reached: the document has more issues than are reported */
+  capped: boolean;
+  /** Some text was longer than `MAX_CHECK_CHARS` and only partly scanned */
+  truncated: boolean;
 }
 
 /**
- * Collect spelling issues for the whole document (with document positions).
- * `limit` caps panel rendering: 100 by default, enough to alert the user without flooding long documents.
+ * Collect issues for the whole document (with document positions).
+ * `limit` caps panel rendering: 100 by default, enough to alert the user without flooding long documents —
+ * the report says so instead of dropping the rest silently.
  */
 export function collectDocIssues(
   doc: PMNode,
   dictionary: SpellDictionary,
   limit = 100,
-): DocSpellIssue[] {
+): DocSpellReport {
   const issues: DocSpellIssue[] = [];
+  let capped = false;
+  let truncated = false;
   doc.descendants((node, pos) => {
-    if (issues.length >= limit || !node.isText || !node.text) return;
-    for (const issue of checkText(node.text, dictionary)) {
-      issues.push({ word: issue.word, from: pos + issue.start, to: pos + issue.end });
-      if (issues.length >= limit) return;
+    if (!node.isText || !node.text) return;
+    if (issues.length >= limit) {
+      capped = true;
+      return false;
     }
+    const report = checkTextReport(node.text, dictionary);
+    if (report.truncated) truncated = true;
+    for (const issue of report.issues) {
+      if (issues.length >= limit) {
+        capped = true;
+        return false;
+      }
+      issues.push({
+        word: issue.word,
+        from: pos + issue.start,
+        to: pos + issue.end,
+        kind: issue.kind,
+        suggestion: issue.suggestion,
+      });
+    }
+    return undefined;
   });
-  return issues;
+  return { issues, capped, truncated };
 }
 
 /* ------------------------------------------------------------------ *
@@ -327,19 +396,13 @@ interface SpellDecorationState {
 }
 
 /**
- * Above this document size the decoration layer only checks the visible range (P1-5).
- * Below it, viewport clipping would add scroll-driven rescans without saving anything measurable.
+ * Build decorations: check each text node; offset + node position gives the document offset.
+ * `range` clips the walk to the scrolled viewport on large documents (P1-5, see `viewportRange.ts`).
  */
-export const VIEWPORT_SCAN_THRESHOLD = 120_000;
-
-/** Check this much extra around the visible range, so a short scroll does not trigger a rescan */
-const VIEWPORT_SCAN_MARGIN = 3_000;
-
-/** Build decorations: check each text node; offset + node position gives the document offset */
 export function buildSpellDecorations(
   doc: PMNode,
   dictionary: SpellDictionary,
-  range?: { from: number; to: number },
+  range?: DocRange | null,
 ): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
@@ -354,21 +417,6 @@ export function buildSpellDecorations(
     }
   });
   return DecorationSet.create(doc, decorations);
-}
-
-/** Visible document range to scan, or null when the document is small enough to check whole */
-export function visibleScanRange(
-  doc: PMNode,
-  ranges: readonly { from: number; to: number }[],
-): { from: number; to: number } | null {
-  if (doc.content.size <= VIEWPORT_SCAN_THRESHOLD) return null;
-  const first = ranges[0];
-  const last = ranges[ranges.length - 1];
-  if (!first || !last) return null;
-  return {
-    from: Math.max(0, first.from - VIEWPORT_SCAN_MARGIN),
-    to: Math.min(doc.content.size, last.to + VIEWPORT_SCAN_MARGIN),
-  };
 }
 
 /**
@@ -403,7 +451,7 @@ export const Spellcheck = Extension.create<{
       const enabled = readEnabled();
       const signature = signatureOf(dictionary, enabled);
       if (!enabled) return { signature, deco: DecorationSet.empty };
-      const range = currentView ? visibleScanRange(doc, currentView.visibleRanges) : null;
+      const range = decorationRange(currentView, doc.content.size);
       return { signature, deco: buildSpellDecorations(doc, dictionary, range) };
     };
 
@@ -426,22 +474,12 @@ export const Spellcheck = Extension.create<{
         },
         view: (view) => {
           currentView = view;
-          let timer = 0;
           // Viewport-clipped documents lose the marks of the previous viewport after scrolling:
           // rescan once scrolling settles (the force meta only rebuilds the visible range).
-          const rescan = () => {
-            window.clearTimeout(timer);
-            timer = window.setTimeout(() => {
-              if (view.isDestroyed) return;
-              if (view.state.doc.content.size <= VIEWPORT_SCAN_THRESHOLD) return;
-              view.dispatch(view.state.tr.setMeta(spellcheckKey, true));
-            }, 150);
-          };
-          window.addEventListener('scroll', rescan, { passive: true, capture: true });
+          const settled = onViewportSettled(view, spellcheckKey, readEnabled);
           return {
             destroy: () => {
-              window.clearTimeout(timer);
-              window.removeEventListener('scroll', rescan, { capture: true });
+              settled.destroy();
               currentView = null;
             },
           };

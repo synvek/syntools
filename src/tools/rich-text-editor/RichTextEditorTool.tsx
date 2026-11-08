@@ -1092,16 +1092,25 @@ export default function RichTextEditorTool() {
     [dictionary],
   );
 
-  /** Spelling issues in the current document (excluding words ignored this session, capped to protect rendering) */
-  const spellIssues = useMemo(() => {
+  /**
+   * Issues in the current document (excluding words ignored this session, capped to protect rendering).
+   * `capped` / `truncated` are reported to the panel: a cap must never look like "that is all there is".
+   */
+  const spellReport = useMemo(() => {
     // snapshotHtml signals both "document has content" and "body changed"
-    if (!editor || editor.isDestroyed || !spellcheckEnabled || !snapshotHtml) return [];
-    const issues = collectDocIssues(
+    if (!editor || editor.isDestroyed || !spellcheckEnabled || !snapshotHtml) {
+      return { issues: [], capped: false, truncated: false };
+    }
+    const report = collectDocIssues(
       editor.state.doc,
       { words: dictionary, userWords },
       SPELL_ISSUE_LIMIT,
     );
-    return issues.filter((issue) => !ignoredWords.includes(issue.word));
+    return {
+      issues: report.issues.filter((issue) => !ignoredWords.includes(issue.word)),
+      capped: report.capped,
+      truncated: report.truncated,
+    };
     // snapshotHtml is the body-change signal; dictionary / userWords / ignoredWords feed the check directly
   }, [editor, snapshotHtml, spellcheckEnabled, dictionary, userWords, ignoredWords]);
 
@@ -1960,7 +1969,10 @@ export default function RichTextEditorTool() {
               loading={dictionaryLoading}
               loadFailed={dictionaryFailed}
               onLoadDictionary={() => void handleLoadDictionary()}
-              issues={spellIssues}
+              issues={spellReport.issues}
+              capped={spellReport.capped}
+              truncated={spellReport.truncated}
+              issueLimit={SPELL_ISSUE_LIMIT}
               suggestionsFor={suggestionsFor}
               onReplace={handleReplaceIssue}
               onAddToDictionary={handleAddToDictionary}

@@ -1,6 +1,7 @@
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
+import { decorationRange, onViewportSettled } from './viewportRange';
 
 /**
  * Find and replace: ProseMirror decoration highlights, match navigation, and replacement.
@@ -29,6 +30,12 @@ export interface TextMatch {
 
 export const findReplaceKey = new PluginKey<SearchConfig | null>('findReplace');
 
+/**
+ * Meta value meaning "the viewport moved, rebuild the highlights": no state change, only the
+ * decoration prop re-runs (see `viewportRange.ts`).
+ */
+const REBUILD_META = true;
+
 /** Find all matches in the document (no cross-text-node matches, matching mainstream editors) */
 export function findMatches(
   doc: import('@tiptap/pm/model').Node,
@@ -55,13 +62,17 @@ export const FindReplace = Extension.create({
   name: 'findReplace',
 
   addProseMirrorPlugins() {
+    // Set once the editor view exists: long documents only decorate the visible matches (P1-5)
+    let currentView: EditorView | null = null;
     return [
       new Plugin<SearchConfig | null>({
         key: findReplaceKey,
         state: {
           init: () => null,
           apply: (tr, value) => {
-            const meta = tr.getMeta(findReplaceKey) as SearchConfig | null | undefined;
+            const meta = tr.getMeta(findReplaceKey) as SearchConfig | true | null | undefined;
+            // Viewport moved: the cached match list is still valid, only the highlights are rebuilt
+            if (meta === REBUILD_META) return value;
             if (meta !== undefined) {
               if (!meta) return null;
               // Navigation reuses the cached list; a new term recomputes exactly once
@@ -82,13 +93,34 @@ export const FindReplace = Extension.create({
             // Only the decoration objects are built here: scanning the document happens in `apply`
             const matches = config?.matches;
             if (!config || !matches || matches.length === 0) return DecorationSet.empty;
-            const decorations = matches.map((match, i) =>
-              Decoration.inline(match.from, match.to, {
-                class: i === config.index ? 'rte-find-current' : 'rte-find-match',
-              }),
-            );
+            // Highlighting every match of a common word in a 200-page document would build tens of
+            // thousands of inline decorations, nearly all of them off screen (P1-5)
+            const range = decorationRange(currentView, state.doc.content.size);
+            const decorations: Decoration[] = [];
+            matches.forEach((match, index) => {
+              if (range && (match.to <= range.from || match.from >= range.to)) return;
+              decorations.push(
+                Decoration.inline(match.from, match.to, {
+                  class: index === config.index ? 'rte-find-current' : 'rte-find-match',
+                }),
+              );
+            });
             return DecorationSet.create(state.doc, decorations);
           },
+        },
+        view: (view) => {
+          currentView = view;
+          const settled = onViewportSettled(
+            view,
+            findReplaceKey,
+            () => findReplaceKey.getState(view.state) !== null,
+          );
+          return {
+            destroy: () => {
+              settled.destroy();
+              currentView = null;
+            },
+          };
         },
       }),
     ];
@@ -109,11 +141,20 @@ export const FindReplace = Extension.create({
         ({ state, tr, dispatch }) => {
           const config = findReplaceKey.getState(state);
           if (!config || !config.term || dispatch === undefined) return false;
-          const total = (config.matches ?? findMatches(state.doc, config.term, config.matchCase))
-            .length;
+          const matches = config.matches ?? findMatches(state.doc, config.term, config.matchCase);
+          const total = matches.length;
           if (total === 0) return false;
           const next = (config.index + delta + total) % total;
+          const match = matches[next];
           tr.setMeta(findReplaceKey, { ...config, index: next });
+          // Selecting the match is what scrolls it into view (`scrollIntoView` follows the
+          // selection), and with viewport-clipped highlights (P1-5) an off-screen match would
+          // otherwise stay unhighlighted and invisible
+          if (match) {
+            tr.setSelection(
+              TextSelection.between(tr.doc.resolve(match.from), tr.doc.resolve(match.to)),
+            );
+          }
           tr.scrollIntoView();
           return true;
         },

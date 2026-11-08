@@ -319,11 +319,18 @@ graph TD
 
 ### 6.3 P1-3 中文与多语言校对
 
-- [ ] **P1-3 中文与多语言校对**（P1，6d）
+- [~] **P1-3 中文与多语言校对**（P1，6d）—— 第一轮完成：规则集、分类展示、取消静默截断；中文分词与多语言词表待做
 - **目标**：本地中文分词 + 规则/词典（标点、重复字、常见错别字），不联网；扩展 `TOKEN_RE` 与建议逻辑。
-- **任务清单**：中文分词与规则集 → 多语言词表按需懒加载 → `SpellcheckPanel.tsx` 分类展示 → 取消 200k/100 条的静默截断（改为可见提示）→ 词表体积与 9 语言提示验证。
+- **任务清单**：~~规则集~~（已完成）→ 中文分词（待做）→ 多语言词表按需懒加载（待做）→ ~~`SpellcheckPanel.tsx` 分类展示~~（已完成）→ ~~取消 200k/100 条的静默截断~~（已完成）→ 词表体积与 9 语言提示验证（文案已补齐，体积验证待词表落地）
+- **已完成（2026-11-08）**：
+  - [NEW] `zhRules.ts`：纯函数规则集，不做分词 —— ① 夹在汉字之间的半角标点（`我们,明天` → 建议全角，需两侧都是汉字，`1.2` / `github.com` / `A,B` 不误报）② 重复标点（`，，` `。。`，`……` `——` `！！` 不算）③ 重复虚词（`我们们` `是的的`；虚词表白名单，`人人` `天天` `高高兴兴` 不误报，`的的确确` / `是是非非` 单独豁免）④ 40 条人工核对过的同音错字（`按装`→`安装`、`必竟`→`毕竟`、`装模做样`→`装模作样`，最长匹配优先）。刻意不做 `的/地/得`：上下文相关，误报代价高于漏报
+  - `spellcheck.ts`：`SpellIssue` 增加 `kind`（`spelling` / `punctuation` / `duplicate` / `typo`）与 `suggestion`；`checkTextReport` 把英文词表查词与中文规则合并、按文档顺序排序，并回报 `truncated`；`collectDocIssues` 改回报文 `{ issues, capped, truncated }`，两个上限都不再是静默截断
+  - `SpellcheckPanel.tsx`：按 `typo → punctuation → duplicate → spelling` 分组，组头带条数；规则命中的建议直接来自规则（不经英文建议索引），点一下即原地替换；底部按需显示「仅列出前 N 条」/「仅检查了前 N 个字符」两条黄色提示
+  - `strings.ts`：分类名 + 两条上限提示，9 语言键对齐（`strings.test.ts` 通过）
+  - 测试：[NEW] `zhRules.test.ts`（15 例，正负例各半）+ `spellcheck.test.ts` 增补（kind/建议、200k 截断回报、上限回报）+ [NEW] `e2e/office-proofing.spec.ts`（中文三类问题分组展示、点建议原地替换、`的的确确` 不误报）
+- **剩余**：中文分词（词典式，需要中文词表）与多语言词表按需懒加载；词表体积与 9 语言提示验证随词表一起做
 - **涉及文件**：`src/tools/rich-text-editor/spellcheck.ts`、`SpellcheckPanel.tsx`、`strings.ts`；`public/dict/`、`scripts/build-wordlist.mjs`
-- **前置**：P1-5（decoration 视口裁剪）
+- **前置**：P1-5（decoration 视口裁剪 —— 2026-11-08 已满足，`viewportRange.ts` 落地）
 - **✅ 验收**：中文错别字/标点有提示；无任何外发请求；新词表不进首屏；`pnpm size` 通过。
 - **回退点**：中文词表按语言开关隔离，出问题仅保留英文本地词库。
 
@@ -339,7 +346,7 @@ graph TD
 
 ### 6.5 P1-5 大文档性能
 
-- [~] **P1-5 大文档性能**（P1，8d）—— 第二轮进行中：门控、虚拟化、缓存、采样与块级增量分页已落地，decoration 视口裁剪待做
+- [x] **P1-5 大文档性能**（P1，8d）—— 第二轮完成：门控、页张虚拟化、匹配缓存、200 页采样、块级增量分页与 decoration 视口裁剪全部落地（`ribbonTabs` 拆分经实测取消，见「剩余」）
 - **目标**：增量分页、页张虚拟化、decoration 视口裁剪与缓存、工具栏状态分片订阅、`ribbonTabs.ts` 静态配置与动态状态拆分。
 - **任务清单**：`PageView.tsx` 只重测变化块 → `RichTextEditorTool.tsx` 只渲染视口附近页张 → `find-replace.ts` / `spellcheck.ts` 视口裁剪 → `EditorToolbar.tsx` 拆分 `useEditorState` selector → 建立 200 页 P95 采集 → 50 页 <50ms 预算不退化。
 - **已完成（2026-11-07）**：
@@ -356,8 +363,15 @@ graph TD
   - 增量与全量结果一致性：[NEW] `e2e/perf-p15.spec.ts` 用例（同一构建内用 `__RTE_INCR_LAYOUT__` 切换两条路径，比较页数与每个页间距 widget 高度）+ [NEW] `PageView.test.ts` / `layoutFlag.test.ts` 单测（区间定位、护栏回退、尾部位移）
   - 实测（200 页 / 8400 段，flag 开 vs 关）：布局 pass 中位 **4.4ms vs 9.1ms**、P95 **5.5ms vs 10.7ms**；单次按键只读 4 个块（区间前一块 + 变化块 + 区间后一块 + 末块），其余沿用缓存
   - 顺带修复：`measure` 的延迟 dispatch 会在「测量后、下发前又敲了一个键」时把旧文档的页起点写到新文档里，gap widget 被渲染进 `<p>` 内部（把该段撑高一整页间距，后续几何全错）。现在计划绑定测量时的 `doc`，文档已变则丢弃；同时 `planLayout` 发现 gap widget 数量与 decoration 数不一致时不再信任缓存几何
-- **剩余**：`find-replace` / `spellcheck` 的视口裁剪、`ribbonTabs` 静态配置与动态状态拆分（实测 selector 仅 1.3ms，收益低于预期，排在其后）
-- **涉及文件**：`src/tools/rich-text-editor/PageView.tsx`、`RichTextEditorTool.tsx`、`find-replace.ts`、`spellcheck.ts`、`EditorToolbar.tsx`、`ribbonTabs.ts`、新增 [NEW] `layoutFlag.ts`；`e2e/office-p2.spec.ts`、新增 [NEW] `e2e/perf-p15.spec.ts`
+- **已完成（2026-11-08 · decoration 视口裁剪）**：
+  - [NEW] `viewportRange.ts`：`decorationRange(view, docSize)`（>12 万字符才裁剪，短文档直通、不做任何几何读取）+ `expandRange`（视口两侧各留 3000 字符，钳到文档范围）+ `onViewportSettled`（capture 阶段监听 scroll，150ms 防抖后用空 meta 事务重建 decoration，挂载时立即触发一次，让大文档首屏的整篇 decoration 立刻被裁掉）。坐标 → 文档位置只能用公开的 `view.posAtCoords`（`EditorView.visibleRanges` 是内部字段，不在 `prosemirror-view` 类型里）
+  - `spellcheck.ts`：`buildSpellDecorations` 的第三个参数改为 `DocRange | null`，插件 view 改用 `onViewportSettled`，删掉自带的 `VIEWPORT_SCAN_THRESHOLD` / `visibleScanRange`（此前写的 `visibleRanges` 版本无法通过类型检查）
+  - `find-replace.ts`：`decorations` 只为可见匹配建 `Decoration.inline`（常用词在 200 页文档里是上万条 inline decoration，几乎全在屏幕外）；`true` meta 表示「只重建 decoration、不动匹配缓存」；`gotoMatch` 顺带把选区移到匹配处 —— `scrollIntoView` 跟随选区，否则视口外的当前匹配既不高亮也滚不到，裁剪后会表现为「按了下一个却什么都没发生」
+  - `EditorToolbar.tsx`：新增 `rte-ribbon-tabs` 埋点（与 `rte-toolbar-state` 同口径），用数据判断静态配置拆分是否值得
+  - 测试：[NEW] `viewportRange.test.ts`（stub view 覆盖短文档直通、视口裁剪、反向区间、离屏回退；`buildSpellDecorations` 的区间跳过用例保留）+ `e2e/perf-p15.spec.ts` 新增「find highlights cover only the visible slice of a 200-page document」（8400 个匹配 vs 实际 decoration <1000，并验证跳跃后当前匹配被高亮）
+  - 实测（200 页，多次采样取区间）：布局 P95 **9.0–9.3ms**（全量路径，预算 16ms）、`rte-toolbar-state` P95 **1.1–1.2ms**、`rte-ribbon-tabs` P95 **0.5–0.6ms**；50 页预算 P95 **2.4ms**（预算 50ms）不退化
+- **剩余**：`[-]` `ribbonTabs` 静态配置与动态状态拆分 —— 实测 `rte-ribbon-tabs` P95 **0.5–0.6ms**（1552 行纯数据构建器），收益不足以覆盖重构风险，取消并登记为技术债（若后续 tab 数量翻倍再评估）
+- **涉及文件**：`src/tools/rich-text-editor/PageView.tsx`、`RichTextEditorTool.tsx`、`find-replace.ts`、`spellcheck.ts`、`EditorToolbar.tsx`、`ribbonTabs.ts`、新增 [NEW] `layoutFlag.ts` / [NEW] `viewportRange.ts`；`e2e/office-p2.spec.ts`、新增 [NEW] `e2e/perf-p15.spec.ts`
 - **前置**：M1 闸门
 - **✅ 验收**：200 页文档输入 P95 <16ms、滚动无长帧；`useEditorState` 计算量可测；`e2e/office-p2.spec.ts:279-318` 的 50 页预算不退化。
 - **回退点**：增量分页与虚拟化分别加 flag（增量分页 = `VITE_INCR_LAYOUT`，默认关闭即回到全量测量）；旧全量布局保留一个版本周期。
@@ -532,9 +546,9 @@ graph TD
 | P0-6 上下文选项卡一致性       | `[x]` | M1   | P0     | 2d     | 无（UI 层）         | §5.6     |
 | P1-1 命名样式系统             | `[ ]` | M2   | P1     | 8d     | P0-2、P1-5          | §6.1     |
 | P1-2 修订模式与审阅深化       | `[ ]` | M2   | P1     | 7d     | P0-2、P1-4、P1-5    | §6.2     |
-| P1-3 中文与多语言校对         | `[ ]` | M2   | P1     | 6d     | P1-5                | §6.3     |
+| P1-3 中文与多语言校对         | `[~]` | M2   | P1     | 6d     | P1-5（已满足）      | §6.3     |
 | P1-4 页面排版细节             | `[ ]` | M2   | P1     | 5d     | P1-1                | §6.4     |
-| P1-5 大文档性能               | `[~]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
+| P1-5 大文档性能               | `[x]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
 | P1-6 单机数据可靠性           | `[ ]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
 | P1-7 移动端与触控可达         | `[ ]` | M2   | P1     | 4d     | P0-4、P0-5          | §6.7     |
 | P2-1 本地模板中心 + 版面模式  | `[ ]` | M3   | P2     | 不排期 | M2 闸门 + 单独评审  | §7.1     |
@@ -545,6 +559,10 @@ graph TD
 | P2-6 无障碍检查器             | `[ ]` | M3   | P2     | 不排期 | P0-4 a11y 基线      | §7.1     |
 
 进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
+
+进度备注（2026-11-08）：P0-1…P0-6 保持 `[x]`；**P1-5 转 `[x]`** —— §6.5 的块级增量分页（`layoutFlag.ts`，默认关闭，实测 200 页布局中位 4.4ms / P95 5.5ms，全量 9.1ms / 10.7ms）与 decoration 视口裁剪（[NEW] `viewportRange.ts`：>12 万字符的文档只装饰视口 ±3000 字符，滚动停止 150ms 后重建；`spellcheck.ts` / `find-replace.ts` 共用；`gotoMatch` 补选区移动，否则裁剪后视口外的当前匹配既不高亮也滚不到）均已落地，200 页布局 P95 9.0ms（预算 16ms）、50 页 P95 2.4ms（预算 50ms）、`rte-toolbar-state` P95 1.1ms、`rte-ribbon-tabs` P95 0.5ms；`ribbonTabs` 静态配置拆分按实测取消（登记为技术债）。顺带修复 `spellcheck.ts` 的 `EditorView.visibleRanges` 类型错误（该字段是内部 API，不在 typings 里）——`pnpm build` 重新可用。P1-3 的前置（decoration 视口裁剪）已满足，可开工。
+
+进度备注（2026-11-08 · P1-3）：P1-3 转 `[~]` —— 第一轮落地中文规则集（[NEW] `zhRules.ts`：半角标点 / 重复标点 / 重复虚词 / 40 条人工核对同音错字，纯函数、零词表、零请求）、`SpellcheckPanel` 按 `typo → punctuation → duplicate → spelling` 分类展示（组头条数、规则自带建议一键替换）、`collectDocIssues` 改回报 `{ issues, capped, truncated }` 取消 200k / 100 条的静默截断，分类名与两条上限提示已补 9 语言（`strings.test.ts` 通过）。新增 `zhRules.test.ts` 15 例与 `e2e/office-proofing.spec.ts`（分组 + 原地替换 + `的的确确` 不误报）。剩余：中文分词（词典式，需中文词表）与多语言词表按需懒加载。
 
 阶段闸门勾选：
 

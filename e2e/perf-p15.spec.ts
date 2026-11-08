@@ -95,6 +95,7 @@ test('rich text: 200-page pagination stays within the P1-5 budget', async ({ pag
     return {
       layout: summarize('rte-page-layout'),
       toolbar: summarize('rte-toolbar-state'),
+      tabs: summarize('rte-ribbon-tabs'),
       sheets: document.querySelectorAll('.rte-page-sheet').length,
     };
   });
@@ -103,10 +104,45 @@ test('rich text: 200-page pagination stays within the P1-5 budget', async ({ pag
   // P1-5 acceptance: 200-page input P95 stays under one 60fps frame
   console.info('200-page layout pass cost (ms)', stats.layout);
   console.info('ribbon state recompute cost (ms)', stats.toolbar);
+  console.info('ribbon tab config build cost (ms)', stats.tabs);
   expect(stats.layout?.p95).toBeLessThan(16);
   expect(stats.layout?.passes).toBeGreaterThanOrEqual(5);
   // The selector recomputes ~50 flags per transaction; it must stay a small fraction of the frame
   expect(stats.toolbar?.p95 ?? 0).toBeLessThan(16);
+  // Building the six tab configs (static skeleton + dynamic flags) must not become the new bottleneck
+  expect(stats.tabs?.p95 ?? 0).toBeLessThan(16);
+});
+
+test('find highlights cover only the visible slice of a 200-page document', async ({ page }) => {
+  test.setTimeout(600_000);
+  await openRichText(page);
+  // Every paragraph contains 段: a common term means thousands of matches
+  const paragraphs = Array.from(
+    { length: PARAGRAPHS },
+    (_, index) => `第 ${index + 1} 段：大文档的查找高亮只覆盖视口附近的范围。`,
+  ).join('\n');
+  await pastePlainText(page, paragraphs);
+
+  await page.keyboard.press('ControlOrMeta+f');
+  const find = page.getByLabel('查找', { exact: true });
+  await expect(find).toBeFocused();
+  await find.fill('段');
+
+  const counter = find.locator('xpath=..').locator('span[aria-live="polite"]');
+  await expect(counter).toHaveText(/^1\/\d+$/);
+  const total = Number((await counter.textContent())?.split('/')[1] ?? 0);
+  expect(total).toBeGreaterThanOrEqual(PARAGRAPHS);
+
+  // P1-5: decorating every match would build thousands of inline spans on every keystroke
+  const highlighted = async () => page.locator('.rte-find-match, .rte-find-current').count();
+  expect(await highlighted()).toBeGreaterThan(0);
+  expect(await highlighted()).toBeLessThan(1000);
+
+  // Jumping to the next match scrolls it into view and the clip follows the new viewport
+  await page.keyboard.press('Enter');
+  await expect(counter).toHaveText(/^2\/\d+$/);
+  await expect(page.locator('.rte-find-current')).toHaveCount(1);
+  expect(await highlighted()).toBeLessThan(1000);
 });
 
 /** Sheet count plus every gap widget height (rounded to 1px): a fingerprint of the page breaks */
@@ -167,6 +203,29 @@ test('incremental pagination paginates exactly like the full measure', async ({ 
   await expect(page.locator('.tiptap p')).toHaveCount(121);
   await waitForStableLayout(page);
   await expectMatchesFullMeasure();
+});
+
+test('spellcheck marks cover only the visible slice of a 200-page document', async ({ page }) => {
+  test.setTimeout(600_000);
+  await openRichText(page);
+  // Every paragraph carries one misspelling: without clipping this is 8400 inline decorations
+  const paragraphs = Array.from(
+    { length: PARAGRAPHS },
+    (_, index) => `Paragraph ${index + 1} contains one wrold to underline.`,
+  ).join('\n');
+  await pastePlainText(page, paragraphs);
+
+  await page.getByRole('tab', { name: '审阅', exact: true }).click();
+  await page.getByRole('button', { name: '拼写检查', exact: true }).click();
+  const panel = page.getByTestId('rich-text-spellcheck');
+  await panel.getByRole('button', { name: '加载英文词表' }).click();
+  await panel.getByRole('button', { name: '已关闭' }).click();
+
+  // Marks appear for the viewport only (P1-5); the whole document would be thousands of spans
+  await expect(page.locator('.rte-spell-error').first()).toBeVisible({ timeout: 30_000 });
+  const marked = await page.locator('.rte-spell-error').count();
+  expect(marked).toBeGreaterThan(0);
+  expect(marked).toBeLessThan(1000);
 });
 
 test('changing the paper size re-paginates without a document edit', async ({ page }) => {
