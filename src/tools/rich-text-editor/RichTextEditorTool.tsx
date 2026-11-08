@@ -536,6 +536,10 @@ export default function RichTextEditorTool() {
         setTitle(init.doc.title);
         editor.commands.setContent(init.doc.html);
         setSnapshotHtml(init.doc.html);
+        setViewMode(init.doc.view ?? 'flow');
+        setPageSetup(normalizePageSetup(init.doc.pageSetup ?? null));
+        setZoom(init.doc.zoom ?? 1);
+        setPdfMode(init.doc.pdfMode === 'snapshot' ? 'snapshot' : 'text');
         applyReview(init.doc);
         setSaved(true);
       }
@@ -1377,6 +1381,8 @@ export default function RichTextEditorTool() {
       comments: commentsRef.current,
       changes: changesRef.current,
       userWords: userWordsRef.current,
+      // Must be passed explicitly: omitting it would blank the stored template on this path
+      templateId: templateIdRef.current || undefined,
     })
       .then(() => saveManualVersion(id, note || undefined))
       .then(() => listVersions(id))
@@ -1444,13 +1450,30 @@ export default function RichTextEditorTool() {
   const resetEditorContent = (doc: {
     title: string;
     html: string;
+    view?: ViewMode;
+    pageSetup?: Partial<PageSetupConfig>;
+    zoom?: number;
+    pdfMode?: PdfMode;
     comments?: DocComment[];
     changes?: TrackedChange[];
+    userWords?: string[];
+    templateId?: string;
   }) => {
     setTitle(doc.title);
     editor?.commands.setContent(doc.html);
     setSnapshotHtml(doc.html);
-    applyReview({ comments: doc.comments ?? [], changes: doc.changes ?? [] });
+    // View mode / page setup / zoom / pdf mode and the template id belong to the document: switching
+    // document or restoring a version must carry them over, otherwise the previous layout leaks in
+    if (doc.view) setViewMode(doc.view);
+    if (doc.pageSetup) setPageSetup(normalizePageSetup(doc.pageSetup));
+    if (typeof doc.zoom === 'number') setZoom(doc.zoom);
+    if (doc.pdfMode) setPdfMode(doc.pdfMode);
+    applyReview({
+      comments: doc.comments ?? [],
+      changes: doc.changes ?? [],
+      userWords: doc.userWords,
+      templateId: doc.templateId,
+    });
     setPendingQuote(null);
     setFailure(null);
     setLosses(null);
@@ -1604,13 +1627,11 @@ export default function RichTextEditorTool() {
 
   const handleRestoreVersion = (version: StoredVersion) => {
     if (!window.confirm(t('tools.richText.restoreConfirm'))) return;
+    // resetEditorContent also syncs the review refs (comments/changes/userWords/templateId),
+    // so the following persist writes the snapshot's metadata instead of stale values
     resetEditorContent(version);
-    // Sync review metadata before persisting, so restore doesn't overwrite snapshot comments with stale refs
-    commentsRef.current = version.comments;
-    changesRef.current = version.changes;
-    userWordsRef.current = version.userWords ?? [];
-    templateIdRef.current = version.templateId ?? '';
-    persistNow({ title: version.title, html: version.html, view: viewRef.current });
+    // Keep the snapshot's own view mode: state is set inside resetEditorContent, so the ref is still stale here
+    persistNow({ title: version.title, html: version.html, view: version.view ?? viewRef.current });
     setVersionsOpen(false);
     setDiffVersion(null);
   };

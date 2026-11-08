@@ -85,13 +85,28 @@ function requestAs<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
+/**
+ * Resolve only after the transaction commits: the write is durable before callers report success,
+ * and commit failures (quota / abort) surface here instead of being swallowed by the request promise.
+ */
+function txDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error('IndexedDB transaction failed'));
+    tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction aborted'));
+  });
+}
+
 async function withStore<T>(
   storeName: string,
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
   const db = await openDb();
-  return requestAs(run(db.transaction(storeName, mode).objectStore(storeName)));
+  const tx = db.transaction(storeName, mode);
+  const result = await requestAs(run(tx.objectStore(storeName)));
+  if (mode !== 'readonly') await txDone(tx);
+  return result;
 }
 
 function newId(): string {
@@ -272,9 +287,11 @@ export async function deleteDocument(id: string): Promise<void> {
   try {
     await withStore(DOC_STORE, 'readwrite', (store) => store.delete(id));
     const versions = await listVersions(id);
+    if (versions.length === 0) return;
     const db = await openDb();
     const tx = db.transaction(VER_STORE, 'readwrite');
     versions.forEach((version) => tx.objectStore(VER_STORE).delete(version.id));
+    await txDone(tx);
   } catch {
     // Ignore
   }
