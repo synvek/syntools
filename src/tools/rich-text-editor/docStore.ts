@@ -235,10 +235,7 @@ async function putVersionBounded(version: StoredVersion): Promise<void> {
   const store = tx.objectStore(VER_STORE);
   store.put(version);
   versions.slice(MAX_VERSIONS - 1).forEach((stale) => store.delete(stale.id));
-  await new Promise<void>((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error('version tx failed'));
-  });
+  await txDone(tx);
 }
 
 async function pushVersion(doc: StoredDocument, now: number): Promise<void> {
@@ -297,12 +294,22 @@ export async function deleteDocument(id: string): Promise<void> {
   }
 }
 
-/** Duplicate a document (keeping page setup, comments and tracked changes); returns the new id (null on failure) */
-export async function duplicateDocument(id: string): Promise<string | null> {
+/**
+ * Duplicate a document (keeping page setup, comments and tracked changes); returns the new id (null on failure).
+ * The store layer has no i18n: the caller passes the already-localized untitled label and suffix,
+ * so a duplicate in an English UI does not end up with a Chinese title.
+ */
+export async function duplicateDocument(
+  id: string,
+  labels: { untitled: string; suffix: string },
+): Promise<string | null> {
   const source = await loadDocument(id);
   if (!source) return null;
   const cloneId = newId();
-  await saveDocument(cloneId, { ...source, title: `${source.title || '未命名文档'} 副本` });
+  await saveDocument(cloneId, {
+    ...source,
+    title: `${source.title || labels.untitled}${labels.suffix}`,
+  });
   return cloneId;
 }
 

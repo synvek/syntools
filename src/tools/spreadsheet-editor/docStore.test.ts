@@ -36,7 +36,9 @@ describe('docStore（jsdom 无 IndexedDB：静默降级）', () => {
   it('saveDocument / deleteDocument / duplicateDocument 不抛异常', async () => {
     await expect(saveDocument('a', 't', snapshot())).resolves.toBeUndefined();
     await expect(deleteDocument('a')).resolves.toBeUndefined();
-    await expect(duplicateDocument('a')).resolves.toBeNull();
+    await expect(
+      duplicateDocument('a', { untitled: '未命名工作簿', suffix: ' 副本' }),
+    ).resolves.toBeNull();
   });
 
   it('没有可恢复内容时 initDocStore 返回 null', async () => {

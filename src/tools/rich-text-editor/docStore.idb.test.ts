@@ -202,7 +202,7 @@ describe('deleteDocument / duplicateDocument', () => {
       templateId: 'report',
     });
 
-    const cloneId = await duplicateDocument(docId);
+    const cloneId = await duplicateDocument(docId, { untitled: '未命名文档', suffix: ' 副本' });
     expect(cloneId).not.toBeNull();
     expect(cloneId).not.toBe(docId);
 
@@ -217,8 +217,21 @@ describe('deleteDocument / duplicateDocument', () => {
     expect(clone?.templateId).toBe('report');
   });
 
+  it('names the duplicate with the labels the caller passes (no hardcoded language in the store)', async () => {
+    await saveDocument(docId, { title: '', html: '<p>x</p>' });
+    const cloneId = await duplicateDocument(docId, {
+      untitled: 'Untitled document',
+      suffix: ' copy',
+    });
+
+    const clone = await loadDocument(cloneId as string);
+    expect(clone?.title).toBe('Untitled document copy');
+  });
+
   it('returns null when duplicating a document that does not exist', async () => {
-    await expect(duplicateDocument('missing-doc')).resolves.toBeNull();
+    await expect(
+      duplicateDocument('missing-doc', { untitled: '未命名文档', suffix: ' 副本' }),
+    ).resolves.toBeNull();
   });
 });
 

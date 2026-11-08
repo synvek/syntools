@@ -1590,7 +1590,10 @@ export default function RichTextEditorTool() {
   };
 
   const handleDuplicateDoc = (id: string) => {
-    void duplicateDocument(id).then(() => {
+    void duplicateDocument(id, {
+      untitled: t('tools.richText.untitledDoc'),
+      suffix: t('tools.richText.copySuffix'),
+    }).then(() => {
       void listDocuments().then(setDocs);
     });
   };

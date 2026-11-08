@@ -28,7 +28,9 @@ describe('docStore (no IndexedDB in jsdom: silent degradation)', () => {
   it('saveDocument / deleteDocument / duplicateDocument never throw', async () => {
     await expect(saveDocument('a', { title: 't', html: '<p>x</p>' })).resolves.toBeUndefined();
     await expect(deleteDocument('a')).resolves.toBeUndefined();
-    await expect(duplicateDocument('a')).resolves.toBeNull();
+    await expect(
+      duplicateDocument('a', { untitled: '未命名文档', suffix: ' 副本' }),
+    ).resolves.toBeNull();
   });
 
   it('saveManualVersion returns null when the document is missing', async () => {

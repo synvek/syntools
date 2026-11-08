@@ -1552,7 +1552,10 @@ export default function SpreadsheetTool() {
   };
 
   const handleDuplicateDoc = (id: string) => {
-    void duplicateDocument(id).then(() => {
+    void duplicateDocument(id, {
+      untitled: t('tools.sheet.untitledDoc'),
+      suffix: t('tools.sheet.copySuffix'),
+    }).then(() => {
       void listDocuments().then(setDocs);
     });
   };
