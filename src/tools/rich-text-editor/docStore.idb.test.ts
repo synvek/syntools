@@ -13,6 +13,8 @@ import {
   saveDocument,
   saveManualVersion,
   setCurrentDocId,
+  subscribeDocEvents,
+  type DocStoreEvent,
 } from './docStore';
 
 /**
@@ -60,6 +62,44 @@ function putRaw(store: string, value: unknown): Promise<void> {
       }),
   );
 }
+
+/**
+ * Minimal BroadcastChannel stand-in (jsdom has none): peers deliver to every other instance,
+ * so a test can act as "the other tab" by posting from a channel it created itself.
+ */
+class FakeBroadcastChannel {
+  static peers = new Set<FakeBroadcastChannel>();
+  private listeners = new Set<(event: MessageEvent) => void>();
+
+  constructor(public readonly name: string) {
+    FakeBroadcastChannel.peers.add(this);
+  }
+
+  postMessage(data: unknown): void {
+    const event = { data } as MessageEvent;
+    for (const peer of FakeBroadcastChannel.peers) {
+      if (peer === this) continue;
+      peer.listeners.forEach((listener) => listener(event));
+    }
+  }
+
+  addEventListener(type: string, listener: (event: MessageEvent) => void): void {
+    if (type === 'message') this.listeners.add(listener);
+  }
+
+  removeEventListener(_type: string, listener: (event: MessageEvent) => void): void {
+    this.listeners.delete(listener);
+  }
+
+  close(): void {
+    FakeBroadcastChannel.peers.delete(this);
+  }
+}
+
+globalThis.BroadcastChannel = FakeBroadcastChannel as unknown as typeof BroadcastChannel;
+
+/** A channel instance owned by the test, standing in for another tab */
+const otherTab = () => new FakeBroadcastChannel('syntools-rich-text.docs');
 
 let docId = '';
 
@@ -281,5 +321,48 @@ describe('initDocStore', () => {
       schemaVersion?: number;
     };
     expect(upgraded.schemaVersion).toBe(2);
+  });
+});
+describe('cross-tab events', () => {
+  it('reports a save performed by another tab', () => {
+    const events: DocStoreEvent[] = [];
+    const unsubscribe = subscribeDocEvents((event) => events.push(event));
+
+    otherTab().postMessage({ type: 'saved', id: 'doc-x', at: 111, tabId: 'other-tab' });
+
+    expect(events).toEqual([{ type: 'saved', id: 'doc-x', at: 111, tabId: 'other-tab' }]);
+    unsubscribe();
+  });
+
+  it('ignores the events this tab published itself', async () => {
+    const events: DocStoreEvent[] = [];
+    const unsubscribe = subscribeDocEvents((event) => events.push(event));
+
+    await saveDocument(docId, { title: '本页保存', html: '<p>x</p>' });
+
+    expect(events).toHaveLength(0);
+    unsubscribe();
+  });
+
+  it('stops delivering after unsubscribe', () => {
+    const events: DocStoreEvent[] = [];
+    const unsubscribe = subscribeDocEvents((event) => events.push(event));
+    unsubscribe();
+
+    otherTab().postMessage({ type: 'deleted', id: 'doc-y', at: 222, tabId: 'other-tab' });
+
+    expect(events).toEqual([]);
+  });
+
+  it('tolerates malformed payloads', () => {
+    const events: DocStoreEvent[] = [];
+    const unsubscribe = subscribeDocEvents((event) => events.push(event));
+
+    otherTab().postMessage(null);
+    otherTab().postMessage({ id: 42 });
+    otherTab().postMessage({ type: 'saved', tabId: 'other-tab' });
+
+    expect(events).toEqual([]);
+    unsubscribe();
   });
 });

@@ -42,6 +42,13 @@ function stubEditor(selection = { from: 0, to: 0 }) {
   };
   const editor = {
     chain: () => chain,
+    // Escape dismissal re-applies the editor selection through commands.focus (see the menu component)
+    commands: {
+      focus: (...args: unknown[]) => {
+        calls.push(`commands.focus(${args.map((arg) => JSON.stringify(arg)).join(',')})`);
+        return true;
+      },
+    },
     isActive: () => false,
     state: {
       selection,
@@ -136,5 +143,57 @@ describe('editor context menu', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'tools.richText.deleteImage' }));
     expect(calls).toContain('setNodeSelection(5)');
     expect(calls).toContain('deleteSelection()');
+  });
+
+  it('re-applies the editor selection when dismissed with Escape (nothing else took focus)', async () => {
+    document.body.focus();
+    const { calls } = setup({ x: 10, y: 10, kind: 'text' }, { from: 2, to: 6 });
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    // The refocus is deferred one frame so the overlay unmount happens first
+    await vi.waitFor(() => expect(calls.some((c) => c.startsWith('commands.focus('))).toBe(true));
+  });
+
+  it('re-applies the selection when the editor DOM itself holds focus', async () => {
+    const dom = document.createElement('div');
+    dom.setAttribute('tabindex', '0');
+    document.body.appendChild(dom);
+    dom.focus();
+
+    const focus = vi.fn();
+    const editor = {
+      chain: () => ({ run: () => true }),
+      commands: { focus },
+      isActive: () => false,
+      isDestroyed: false,
+      view: { dom },
+      state: { selection: { from: 2, to: 6 }, doc: { nodeAt: () => null } },
+    } as unknown as Editor;
+    render(
+      <EditorContextMenu
+        editor={editor}
+        target={{ x: 10, y: 10, kind: 'text' }}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    await vi.waitFor(() => expect(focus).toHaveBeenCalled());
+    dom.remove();
+  });
+
+  it('keeps focus where the user put it when Escape fires from another element', async () => {
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    outside.focus();
+    const { calls } = setup({ x: 10, y: 10, kind: 'text' }, { from: 2, to: 6 });
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(calls.some((c) => c.startsWith('commands.focus('))).toBe(false);
+    outside.remove();
   });
 });

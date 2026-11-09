@@ -150,6 +150,35 @@ export function EditorContextMenu({ editor, target, onClose }: EditorContextMenu
   // Escape from every other listener on the page, which also prevented "topmost only" semantics.
   useOverlayStack(true, onClose);
 
+  /*
+   * Escape is a pure dismissal (nothing else asked for focus), but unmounting the overlay re-renders the
+   * editor wrapper and the browser can drop the DOM selection on the way, leaving the user's selection
+   * visually gone. Re-apply the editor's own (unchanged) ProseMirror selection in that case only:
+   * other close paths never touch focus, so clicking outside still leaves the click target focused.
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (editor.isDestroyed) return;
+      const active = document.activeElement;
+      // Recorded now: the panel is gone by the time the deferred callback runs
+      const fromMenu = !!active && !!panelRef.current?.contains(active);
+      const editorDom = editor.view?.dom ?? null;
+      const fromEditor =
+        !!active && !!editorDom && (active === editorDom || editorDom.contains(active));
+      // Focus belongs to some other control (a dialog input, a toolbar field): leave it alone
+      const elsewhere = !!active && active !== document.body && !fromMenu && !fromEditor;
+
+      // Deferred one frame so the overlay unmount happens first, then re-apply the editor selection
+      window.setTimeout(() => {
+        if (editor.isDestroyed || elsewhere) return;
+        editor.commands.focus(undefined, { scrollIntoView: false });
+      }, 0);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editor]);
+
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       if (!panelRef.current?.contains(event.target as Node)) onClose();

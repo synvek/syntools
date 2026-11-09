@@ -272,13 +272,14 @@ graph TD
 
 ### 5.6 P0-6 上下文选项卡一致性
 
-- [ ] **P0-6 上下文选项卡一致性**（P0，2d）
+- [x] **P0-6 上下文选项卡一致性**（P0，2d）
 - **背景**：方案 §2.4/§4.2 指出表格/图片上下文只是「开始/插入」里追加分组，与 Word「表格工具 / 图片格式」不一致；形状格式已实现可直接复用。
 - **涉及文件**：`src/tools/rich-text-editor/ribbonTabs.ts`（`tableGroup` / `imageGroup` / `shapeFormatTab`）、`EditorToolbar.tsx`（受控 `activeTabId`）、`e2e/office-ribbon.spec.ts`
 - **前置依赖**：无（本项只改 Ribbon UI 层，复用已实现的 `shapeFormatTab`；IR / 浮层栈无代码耦合）
 - **子任务**
-  - [ ] P0-6.1 「表格工具」「图片格式」独立上下文选项卡，选中自动激活、离开回到原 tab（1d）
-  - [ ] P0-6.2 分组重排与 9 语言文案；`office-ribbon.spec.ts` 增加断言（0.5d）；三端回归（0.5d）
+  - [x] P0-6.1 「表格工具」「图片格式」独立上下文选项卡，选中自动激活、离开回到原 tab（1d）
+  - [x] P0-6.2 分组重排与 9 语言文案；`office-ribbon.spec.ts` 增加断言（0.5d）；三端回归（0.5d）
+- **落地证据**：`ribbonTabs.ts` 已有 `tableTools` / `pictureFormat` 两项上下文选项卡配置（`tab.tableTools` / `tab.pictureFormat` 文案键 9 语言齐备），与 `shapeFormatTab` 走同一 `activeTabId` 受控机制；`office-ribbon.spec.ts` 断言在 2026-11-08 的门禁中全绿。本文档 §5.6 的任务标记此前遗漏未勾，2026-11-09 与 §10.1 对齐。
 - **✅ 验收项**
   - ✅ 选中表格/图片/形状出现对应上下文选项卡，行为与已实现的 `shape-format` 一致
   - ✅ `e2e/office-ribbon.spec.ts` 全绿，三端无回归
@@ -378,13 +379,20 @@ graph TD
 
 ### 6.6 P1-6 单机数据可靠性
 
-- [ ] **P1-6 单机数据可靠性**（P1，6d）
+- [~] **P1-6 单机数据可靠性**（P1，6d）
 - **目标**：按字节计量与配额预警、内嵌图片外置 IndexedDB、版本快照增量或总量上限、`saveDocument` 版本校验 + `BroadcastChannel` 多标签页冲突提示、草稿列表与手动恢复 UI。
 - **任务清单**：`draft.ts` 按字节计量 → 图片外置与引用化 → `docStore.ts` 乐观锁 + storage 事件 → 草稿/版本管理面板 → 刷新恢复与冲突 e2e。
 - **涉及文件**：`src/tools/rich-text-editor/draft.ts`、`docStore.ts`、`migrate.ts`、`RichTextEditorTool.tsx`；`src/core/components/EditorStatusBar.tsx`；`e2e/tools.spec.ts`
 - **前置**：M1 闸门（可与 P1-5 并行）
 - **✅ 验收**：图片不再被静默剥离；两个标签页同开同一文档有明确冲突提示；刷新恢复 100% 可继续编辑；`pnpm test` 新增 [NEW] `draft.test.ts` / `docStore.test.ts` 用例通过。
 - **回退点**：草稿 schema 走 `migrate.ts` 新增 v3，保留 v2 读回；图片外置失败时回落 base64。
+- **已达成的部分（2026-11-09）**
+  - [x] 版本快照总量上限：`MAX_VERSIONS = 20` + 事务内裁剪（`putVersionBounded`），超限删最旧
+  - [x] 文档库写事务提交语义：`txDone()` 让 `saveDocument` / `deleteDocument` 提交成功后才 resolve，配额与 abort 错误不再被 request promise 掩盖
+  - [x] 刷新恢复：`initDocStore` 指针恢复 + v1 草稿迁移，完整恢复标题 / 正文 / 视图 / 页面设置 / 缩放 / PDF 模式 / 批注 / 修订 / 自定义词 / 模板
+  - [x] `BroadcastChannel` 多标签页冲突提示：`docStore` 新增 `subscribeDocEvents`（按 tab 过滤自发布事件），编辑器在另一个标签页保存/删除当前文档时给出提示条，保存场景可一键载入对方版本
+  - [x] 新增 [NEW] `docStore.idb.test.ts`（17 例，`fake-indexeddb` + 假 `BroadcastChannel`）与 [NEW] `DocLibraryPanel.test.tsx`（10 例），覆盖持久化、版本裁剪、删除清理、惰性 v1 迁移、复制标题本地化、跨标签页事件
+- **仍未完成**：`draft.ts` 按字节计量与配额预警、内嵌图片外置 IndexedDB、`saveDocument` 乐观锁版本校验（当前只做冲突提示，不做写入拒绝）、草稿/版本管理面板的批量恢复 UI
 
 ### 6.7 P1-7 移动端与触控可达
 
@@ -549,7 +557,7 @@ graph TD
 | P1-3 中文与多语言校对         | `[~]` | M2   | P1     | 6d     | P1-5（已满足）      | §6.3     |
 | P1-4 页面排版细节             | `[ ]` | M2   | P1     | 5d     | P1-1                | §6.4     |
 | P1-5 大文档性能               | `[x]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
-| P1-6 单机数据可靠性           | `[ ]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
+| P1-6 单机数据可靠性           | `[~]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
 | P1-7 移动端与触控可达         | `[ ]` | M2   | P1     | 4d     | P0-4、P0-5          | §6.7     |
 | P2-1 本地模板中心 + 版面模式  | `[ ]` | M3   | P2     | 不排期 | M2 闸门 + 单独评审  | §7.1     |
 | P2-2 默认不外发的本地 AI 辅助 | `[ ]` | M3   | P2     | 不排期 | P2-1 + 隐私评审     | §7.1     |
@@ -561,6 +569,8 @@ graph TD
 进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
 
 进度备注（2026-11-08）：P0-1…P0-6 保持 `[x]`；**P1-5 转 `[x]`** —— §6.5 的块级增量分页（`layoutFlag.ts`，默认关闭，实测 200 页布局中位 4.4ms / P95 5.5ms，全量 9.1ms / 10.7ms）与 decoration 视口裁剪（[NEW] `viewportRange.ts`：>12 万字符的文档只装饰视口 ±3000 字符，滚动停止 150ms 后重建；`spellcheck.ts` / `find-replace.ts` 共用；`gotoMatch` 补选区移动，否则裁剪后视口外的当前匹配既不高亮也滚不到）均已落地，200 页布局 P95 9.0ms（预算 16ms）、50 页 P95 2.4ms（预算 50ms）、`rte-toolbar-state` P95 1.1ms、`rte-ribbon-tabs` P95 0.5ms；`ribbonTabs` 静态配置拆分按实测取消（登记为技术债）。顺带修复 `spellcheck.ts` 的 `EditorView.visibleRanges` 类型错误（该字段是内部 API，不在 typings 里）——`pnpm build` 重新可用。P1-3 的前置（decoration 视口裁剪）已满足，可开工。
+
+进度备注（2026-11-09 · P1-6 第一片）：P1-6 转 `[~]` —— 已落地「版本快照上限」（`MAX_VERSIONS` 20 + 事务内裁剪）、「文档库写事务提交语义」（`txDone()` 让 `saveDocument` / `deleteDocument` 提交后才 resolve，配额与 abort 错误可观测）、「刷新恢复」（`initDocStore` 指针恢复 + v1 草稿迁移，标题 / 正文 / 视图 / 页面设置 / 缩放 / PDF 模式 / 批注 / 修订 / 自定义词 / 模板全部还原）、「`BroadcastChannel` 多标签页冲突提示」（[NEW] `subscribeDocEvents` 按 tab 过滤自发布事件；另一个标签页保存当前文档时编辑器出现提示条，可一键载入对方版本；删除则只提示不载入）。新增 [NEW] `docStore.idb.test.ts`（17 例，`fake-indexeddb` + 假 `BroadcastChannel`）、[NEW] `DocLibraryPanel.test.tsx`（10 例）、[NEW] `e2e/rich-text-docs.spec.ts`（4 例，含跨标签页提示与载入）。文案 4 键 × 9 语言（`fileStrings.ts`），`strings.test.ts` 通过。验证：typecheck / lint 通过，单测 379 文件 / 3584 例全绿，`rich-text-docs.spec.ts` 4 passed；`tools + office-p1/p2/p3/ribbon/proofing/a11y` 全量跑 150 passed / 2 failed —— 失败的仍是 P0-4/P0-5 那两条「Esc 不清选区」用例（并发负载下 `window.getSelection()` 为空，单文件 6 worker × 8 次重复全绿，浏览器探测显示无负载时选区始终保留），已定位为负载敏感而非本轮改动引入，处理方式待定（候选：改断言 ProseMirror 选区状态 / 这两条串行执行）。**未完成**：`draft.ts` 按字节计量与配额预警、内嵌图片外置 IndexedDB、`saveDocument` 乐观锁写入校验、草稿/版本批量恢复 UI。
 
 进度备注（2026-11-08 · P1-3）：P1-3 转 `[~]` —— 第一轮落地中文规则集（[NEW] `zhRules.ts`：半角标点 / 重复标点 / 重复虚词 / 40 条人工核对同音错字，纯函数、零词表、零请求）、`SpellcheckPanel` 按 `typo → punctuation → duplicate → spelling` 分类展示（组头条数、规则自带建议一键替换）、`collectDocIssues` 改回报 `{ issues, capped, truncated }` 取消 200k / 100 条的静默截断，分类名与两条上限提示已补 9 语言（`strings.test.ts` 通过）。新增 `zhRules.test.ts` 15 例与 `e2e/office-proofing.spec.ts`（分组 + 原地替换 + `的的确确` 不误报）。剩余：中文分词（词典式，需中文词表）与多语言词表按需懒加载。
 

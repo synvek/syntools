@@ -71,7 +71,9 @@ import {
   saveDocument,
   saveManualVersion,
   setCurrentDocId,
+  subscribeDocEvents,
   type DocMeta,
+  type DocStoreEvent,
   type StoredVersion,
 } from './docStore';
 import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
@@ -322,6 +324,8 @@ export default function RichTextEditorTool() {
   const [versions, setVersions] = useState<StoredVersion[]>([]);
   const [docId, setDocId] = useState<string | null>(null);
   const [draftNotice, setDraftNotice] = useState<'degraded' | 'failed' | null>(null);
+  /** 另一个标签页保存/删除了当前文档：提示用户，避免两边静默互相覆盖 */
+  const [remoteChange, setRemoteChange] = useState<DocStoreEvent | null>(null);
   const [saved, setSaved] = useState(Boolean(initial));
   const flowRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -546,6 +550,16 @@ export default function RichTextEditorTool() {
     });
     // Run only once, after the editor is ready
   }, [editor, applyReview]);
+
+  // Another tab saved / deleted the document currently open here: flag it instead of silently diverging
+  useEffect(
+    () =>
+      subscribeDocEvents((event) => {
+        if (event.id !== docIdRef.current) return;
+        setRemoteChange(event);
+      }),
+    [],
+  );
 
   // Deferred/async callbacks may land on an already destroyed editor (React StrictMode double mount), so check first
   const readHtml = useCallback((): string | null => {
@@ -1589,6 +1603,18 @@ export default function RichTextEditorTool() {
     });
   };
 
+  /** 载入另一个标签页刚保存的版本（本地未保存的改动会被覆盖，所以只在用户点按钮时执行） */
+  const handleReloadRemote = () => {
+    const id = docIdRef.current;
+    setRemoteChange(null);
+    if (!id) return;
+    void loadDocument(id).then((doc) => {
+      if (!doc) return;
+      resetEditorContent(doc);
+      setSaved(true);
+    });
+  };
+
   const handleDuplicateDoc = (id: string) => {
     void duplicateDocument(id, {
       untitled: t('tools.richText.untitledDoc'),
@@ -2343,6 +2369,36 @@ export default function RichTextEditorTool() {
             ? t('tools.richText.draftDegraded')
             : t('tools.richText.draftSaveFailed')}
         </p>
+      )}
+
+      {remoteChange && !failure && (
+        <div
+          role="status"
+          data-testid="rich-text-remote-change"
+          className="flex flex-wrap items-center gap-2 text-sm text-amber-600 dark:text-amber-400"
+        >
+          <span>
+            {remoteChange.type === 'deleted'
+              ? t('tools.richText.remoteDeleted')
+              : t('tools.richText.remoteSaved')}
+          </span>
+          {remoteChange.type === 'saved' && (
+            <button
+              type="button"
+              onClick={handleReloadRemote}
+              className="rounded-md border border-amber-400 px-2 py-0.5 text-xs transition-colors hover:bg-amber-50 dark:hover:bg-amber-950/40"
+            >
+              {t('tools.richText.remoteReload')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setRemoteChange(null)}
+            className="rounded-md px-2 py-0.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            {t('tools.richText.remoteDismiss')}
+          </button>
+        </div>
       )}
 
       {importRevisionsLost && !failure && (

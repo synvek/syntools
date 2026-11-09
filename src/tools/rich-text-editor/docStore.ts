@@ -116,6 +116,67 @@ function newId(): string {
 }
 
 /* ------------------------------------------------------------------ *
+ * Cross-tab notifications (same-origin BroadcastChannel, no server)
+ * ------------------------------------------------------------------ */
+
+/** Channel name: one per database, so every tab editing the library hears the same events */
+const CHANNEL_NAME = 'syntools-rich-text.docs';
+/** Identity of this tab: the receiver ignores events it published itself */
+const TAB_ID = newId();
+
+export interface DocStoreEvent {
+  type: 'saved' | 'deleted';
+  id: string;
+  at: number;
+  /** Tab that caused the change; receivers skip their own tab */
+  tabId: string;
+}
+
+let channel: BroadcastChannel | null = null;
+
+function broadcastChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === 'undefined') return null;
+  if (!channel) {
+    try {
+      channel = new BroadcastChannel(CHANNEL_NAME);
+    } catch {
+      channel = null;
+    }
+  }
+  return channel;
+}
+
+function publish(event: Omit<DocStoreEvent, 'tabId'>): void {
+  try {
+    broadcastChannel()?.postMessage({ ...event, tabId: TAB_ID });
+  } catch {
+    // Ignore: other tabs simply miss the hint, persistence is unaffected
+  }
+}
+
+/**
+ * Listen for saves / deletes performed by **other** tabs, so a tab can warn about concurrent edits
+ * instead of silently overwriting them. Returns an unsubscribe function.
+ */
+export function subscribeDocEvents(handler: (event: DocStoreEvent) => void): () => void {
+  const ch = broadcastChannel();
+  if (!ch) return () => {};
+  const onMessage = (event: MessageEvent) => {
+    const data = event.data as Partial<DocStoreEvent> | null;
+    if (!data || typeof data !== 'object' || typeof data.id !== 'string') return;
+    if (data.tabId === TAB_ID) return;
+    handler({
+      type: data.type === 'deleted' ? 'deleted' : 'saved',
+      id: data.id,
+      at: typeof data.at === 'number' ? data.at : Date.now(),
+      tabId: typeof data.tabId === 'string' ? data.tabId : '',
+    });
+  };
+  ch.addEventListener('message', onMessage);
+  return () => ch.removeEventListener('message', onMessage);
+}
+
+/* ------------------------------------------------------------------ *
  * Read normalization (v1 records lazily backfilled to v2)
  * ------------------------------------------------------------------ */
 
@@ -202,6 +263,8 @@ export async function saveDocument(id: string, draft: RichTextDraftInput): Promi
     };
     await withStore(DOC_STORE, 'readwrite', (store) => store.put(doc));
     await pushVersion(doc, now);
+    // Only after the write is committed: other tabs must not reload a document that isn't stored yet
+    publish({ type: 'saved', id, at: now });
   } catch {
     // IndexedDB unavailable: ignore (the localStorage draft still covers it)
   }
@@ -289,6 +352,7 @@ export async function deleteDocument(id: string): Promise<void> {
     const tx = db.transaction(VER_STORE, 'readwrite');
     versions.forEach((version) => tx.objectStore(VER_STORE).delete(version.id));
     await txDone(tx);
+    publish({ type: 'deleted', id, at: Date.now() });
   } catch {
     // Ignore
   }

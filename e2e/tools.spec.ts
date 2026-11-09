@@ -16,6 +16,16 @@ async function pickFromGroup(page: Page, row: Locator, name: string) {
   await expect(flyout).toHaveCount(0);
 }
 
+/**
+ * Type into the rich-text editor and wait for the whole string to land.
+ * Under parallel load the default zero-delay `keyboard.type` can drop keystrokes; every case that later
+ * selects by a fixed character count would then fail for reasons unrelated to the product.
+ */
+async function typeInEditor(page: Page, text: string): Promise<void> {
+  await page.keyboard.type(text, { delay: 15 });
+  await expect(page.locator('.tiptap')).toContainText(text);
+}
+
 // UI copy follows the browser language (Playwright defaults to en-US), so these cases assert Simplified Chinese
 test.use({ locale: 'zh-CN' });
 
@@ -3442,6 +3452,10 @@ test.describe('word processor: overlay stack and keyboard (implementation plan P
     await page.locator('.tiptap').click();
     await page.keyboard.type('右键键盘测试');
     await page.keyboard.press('Shift+Home');
+    // Same async selection as the right-click variant below: wait for it before taking the baseline
+    await expect
+      .poll(async () => page.evaluate(() => window.getSelection()?.toString() ?? ''))
+      .not.toBe('');
     const before = await page.evaluate(() => window.getSelection()?.toString() ?? '');
 
     await page.keyboard.press('Shift+F10');
@@ -3450,8 +3464,11 @@ test.describe('word processor: overlay stack and keyboard (implementation plan P
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
 
-    const after = await page.evaluate(() => window.getSelection()?.toString() ?? '');
-    expect(after).toBe(before);
+    // Focus restoration after dismissing the menu is async: under load a single sample can still read
+    // the detached menu node and return an empty selection, so poll for the restored one
+    await expect
+      .poll(async () => page.evaluate(() => window.getSelection()?.toString() ?? ''))
+      .toBe(before);
   });
 
   test('shortcut help dialog is described, traps Tab and closes with Esc', async ({ page }) => {
@@ -3546,6 +3563,10 @@ test.describe('word processor: critical paths (implementation plan P0-5)', () =>
     await editor.click();
     await page.keyboard.type('鼠标右键测试');
     await page.keyboard.press('Shift+Home');
+    // The selection is established asynchronously: sampling immediately can read an empty range
+    await expect
+      .poll(async () => page.evaluate(() => window.getSelection()?.toString() ?? ''))
+      .not.toBe('');
     const before = await page.evaluate(() => window.getSelection()?.toString() ?? '');
     expect(before.length).toBeGreaterThan(0);
 
@@ -3555,8 +3576,10 @@ test.describe('word processor: critical paths (implementation plan P0-5)', () =>
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
 
-    const after = await page.evaluate(() => window.getSelection()?.toString() ?? '');
-    expect(after).toBe(before);
+    // Same async focus restoration as the keyboard variant above: poll instead of sampling once
+    await expect
+      .poll(async () => page.evaluate(() => window.getSelection()?.toString() ?? ''))
+      .toBe(before);
   });
 
   test('the file menu print command prints once', async ({ page }) => {
@@ -3606,7 +3629,7 @@ test.describe('word processor: critical paths (implementation plan P0-5)', () =>
     await page.goto('/tools/rich-text-editor');
     const editor = page.locator('.tiptap');
     await editor.click();
-    await page.keyboard.type('修订文本');
+    await typeInEditor(page, '修订文本');
     for (let i = 0; i < 4; i += 1) await editor.press('Shift+ArrowLeft');
 
     await page.getByRole('tab', { name: '审阅', exact: true }).click();
@@ -3638,7 +3661,7 @@ test.describe('word processor: collapsed ribbon applies what it shows (P0-5.1)',
     // Below 640px the ribbon starts collapsed: open 开始 so the font controls are in the DOM
     await page.getByRole('tab', { name: '开始', exact: true }).click();
     await editor.click();
-    await page.keyboard.type('窄屏样式');
+    await typeInEditor(page, '窄屏样式');
     // Select backwards from the caret: Home is not reliable inside the contenteditable
     for (let i = 0; i < 4; i += 1) await editor.press('Shift+ArrowLeft');
     const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');

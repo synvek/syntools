@@ -74,6 +74,25 @@ test('duplicating from the library adds a localized copy', async ({ page }) => {
   await expect(panel.getByText('未命名文档', { exact: true })).toBeVisible();
 });
 
+test('flags a save made in another tab and can load that version', async ({ context, page }) => {
+  await openEditor(page);
+  const otherTab = await context.newPage();
+  await otherTab.goto('/tools/rich-text-editor');
+  await expect(otherTab.locator('.tiptap')).toBeVisible();
+
+  await page.locator('.tiptap').click();
+  await page.keyboard.type('第一个标签页的内容');
+  await saveNow(page);
+
+  const banner = otherTab.getByTestId('rich-text-remote-change');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('另一个标签页更新了此文档');
+
+  await otherTab.getByRole('button', { name: '载入最新版本' }).click();
+  await expect(otherTab.locator('.tiptap')).toContainText('第一个标签页的内容');
+  await expect(otherTab.getByTestId('rich-text-remote-change')).toHaveCount(0);
+});
+
 test('manual snapshot lands in the version panel and restores the archived content', async ({
   page,
 }) => {
