@@ -1,3 +1,4 @@
+import { externalizeImages, hydrateImages } from './assets';
 import { clearLegacyDraft, readDraft } from './draft';
 import {
   CURRENT_SCHEMA_VERSION,
@@ -236,8 +237,8 @@ export async function listDocuments(): Promise<DocMeta[]> {
   }
 }
 
-/** Load a single document (normalized to v2); returns null on failure */
-export async function loadDocument(id: string): Promise<StoredDocument | null> {
+/** Read a document exactly as stored (image references still unresolved) */
+async function readRawDocument(id: string): Promise<StoredDocument | null> {
   try {
     const raw = await withStore<unknown>(
       DOC_STORE,
@@ -250,14 +251,25 @@ export async function loadDocument(id: string): Promise<StoredDocument | null> {
   }
 }
 
+/** Load a single document (normalized to v2, images resolved back to data URLs); null on failure */
+export async function loadDocument(id: string): Promise<StoredDocument | null> {
+  const doc = await readRawDocument(id);
+  if (!doc) return null;
+  // Editors, print and PDF all expect a plain src, so hydration happens at the read boundary
+  return { ...doc, html: await hydrateImages(doc.html) };
+}
+
 /** Save a document (upsert) and create a version snapshot per the interval */
 export async function saveDocument(id: string, draft: RichTextDraftInput): Promise<void> {
   try {
     const now = Date.now();
-    const existing = await loadDocument(id);
+    const existing = await readRawDocument(id);
+    const normalized = toDraftV2(draft);
     const doc: StoredDocument = {
       id,
-      ...toDraftV2(draft),
+      ...normalized,
+      // Images leave the document payload here; on failure the base64 simply stays inline
+      html: await externalizeImages(normalized.html),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -292,7 +304,7 @@ function buildVersion(doc: StoredDocument, savedAt: number, note?: string): Stor
 
 /** Write a snapshot and trim old ones beyond the cap */
 async function putVersionBounded(version: StoredVersion): Promise<void> {
-  const versions = await listVersions(version.docId);
+  const versions = await readRawVersions(version.docId);
   const db = await openDb();
   const tx = db.transaction(VER_STORE, 'readwrite');
   const store = tx.objectStore(VER_STORE);
@@ -302,7 +314,7 @@ async function putVersionBounded(version: StoredVersion): Promise<void> {
 }
 
 async function pushVersion(doc: StoredDocument, now: number): Promise<void> {
-  const versions = await listVersions(doc.id);
+  const versions = await readRawVersions(doc.id);
   const latest = versions[0];
   if (latest && now - latest.savedAt < VERSION_MIN_INTERVAL_MS) return;
   await putVersionBounded(buildVersion(doc, now));
@@ -317,7 +329,8 @@ export async function saveManualVersion(
   note?: string,
 ): Promise<StoredVersion | null> {
   try {
-    const doc = await loadDocument(docId);
+    // Raw read: the snapshot keeps asset references instead of re-inlining the images
+    const doc = await readRawDocument(docId);
     if (!doc) return null;
     const version = buildVersion(doc, Date.now(), note);
     await putVersionBounded(version);
@@ -327,8 +340,8 @@ export async function saveManualVersion(
   }
 }
 
-/** List a document's version snapshots (newest first, including current content); normalized to v2 */
-export async function listVersions(docId: string): Promise<StoredVersion[]> {
+/** Read the snapshots exactly as stored (image references still unresolved) */
+async function readRawVersions(docId: string): Promise<StoredVersion[]> {
   try {
     const db = await openDb();
     const store = db.transaction(VER_STORE, 'readonly').objectStore(VER_STORE);
@@ -341,6 +354,15 @@ export async function listVersions(docId: string): Promise<StoredVersion[]> {
   } catch {
     return [];
   }
+}
+
+/** List a document's version snapshots (newest first, images resolved); normalized to v2 */
+export async function listVersions(docId: string): Promise<StoredVersion[]> {
+  const raw = await readRawVersions(docId);
+  // Restoring a snapshot puts the HTML back into the editor, so the images must be readable again
+  return Promise.all(
+    raw.map(async (version) => ({ ...version, html: await hydrateImages(version.html) })),
+  );
 }
 
 export async function deleteDocument(id: string): Promise<void> {

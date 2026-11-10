@@ -74,6 +74,53 @@ test('duplicating from the library adds a localized copy', async ({ page }) => {
   await expect(panel.getByText('未命名文档', { exact: true })).toBeVisible();
 });
 
+test('keeps an inline image out of the document payload and restores it after reload', async ({
+  page,
+}) => {
+  await openEditor(page);
+  await page.locator('.tiptap').click();
+  await page.keyboard.type('图片文档');
+  await page.setInputFiles('input[type="file"][accept="image/*"]', {
+    name: 'dot.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAKUlEQVR42u3NMQEAAAgDoC251a3gLwSgcyfTVFVVVVVVVVVVVVVVVVVV1S8DLQABAVXMpwAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  });
+  await page.locator('.tiptap img').first().waitFor();
+  await saveNow(page);
+
+  // Stored copy keeps only a reference: the base64 lives in the asset store, not in every snapshot
+  const readStoredHtml = () =>
+    page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('syntools-rich-text', 2);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const documents = await new Promise<Array<{ html: string }>>((resolve, reject) => {
+        const request = db.transaction('documents', 'readonly').objectStore('documents').getAll();
+        request.onsuccess = () => resolve(request.result as Array<{ html: string }>);
+        request.onerror = () => reject(request.error);
+      });
+      db.close();
+      return documents.map((doc) => doc.html).join('');
+    });
+
+  // Saving is async (asset write + document write), so poll instead of sampling once
+  await expect.poll(readStoredHtml).toContain('syntools-asset:');
+  expect(await readStoredHtml()).not.toContain('data:image');
+
+  // Readers get a usable src back, so the image survives a reload
+  // (ProseMirror adds its own caret separator <img>, hence the exclusion)
+  const realImage = page.locator('.tiptap img:not(.ProseMirror-separator)');
+  await page.reload();
+  await expect(realImage).toHaveCount(1);
+  const src = await realImage.first().getAttribute('src');
+  expect(src?.startsWith('data:image/png;base64,')).toBe(true);
+});
+
 test('flags a save made in another tab and can load that version', async ({ context, page }) => {
   await openEditor(page);
   const otherTab = await context.newPage();

@@ -101,6 +101,42 @@ globalThis.BroadcastChannel = FakeBroadcastChannel as unknown as typeof Broadcas
 /** A channel instance owned by the test, standing in for another tab */
 const otherTab = () => new FakeBroadcastChannel('syntools-rich-text.docs');
 
+/** Read one record straight from a store, bypassing the normalization / hydration layer */
+function getRaw(store: string, key: string): Promise<unknown> {
+  return openRawDb().then(
+    (db) =>
+      new Promise((resolve, reject) => {
+        const request = db.transaction(store, 'readonly').objectStore(store).get(key);
+        request.onsuccess = () => {
+          db.close();
+          resolve(request.result);
+        };
+        request.onerror = () => {
+          db.close();
+          reject(request.error);
+        };
+      }),
+  );
+}
+
+/** Read a whole store straight from IndexedDB */
+function getAllRaw(store: string): Promise<Array<Record<string, unknown>>> {
+  return openRawDb().then(
+    (db) =>
+      new Promise((resolve, reject) => {
+        const request = db.transaction(store, 'readonly').objectStore(store).getAll();
+        request.onsuccess = () => {
+          db.close();
+          resolve(request.result as Array<Record<string, unknown>>);
+        };
+        request.onerror = () => {
+          db.close();
+          reject(request.error);
+        };
+      }),
+  );
+}
+
 let docId = '';
 
 beforeEach(() => {
@@ -145,6 +181,31 @@ describe('saveDocument / loadDocument', () => {
     expect(second?.html).toBe('<p>2</p>');
     // Still a single record, not a duplicate
     expect((await listDocuments()).filter((item) => item.id === docId)).toHaveLength(1);
+  });
+
+  it('stores embedded images as references and hands data URLs back on read', async () => {
+    const png =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
+    await saveDocument(docId, { title: '图', html: `<p><img src="${png}"></p>` });
+
+    const raw = (await getRaw('documents', docId)) as { html: string };
+    expect(raw.html).toContain('syntools-asset:');
+    expect(raw.html).not.toContain('data:image');
+
+    // Same for the snapshot taken by the save, so version history stays small too
+    const rawVersions = await getAllRaw('versions');
+    const mine = rawVersions.filter((version) => version.docId === docId);
+    expect(mine.length).toBeGreaterThan(0);
+    mine.forEach((version) => {
+      expect(String(version.html)).toContain('syntools-asset:');
+      expect(String(version.html)).not.toContain('data:image');
+    });
+
+    // Readers (editor, print, PDF) still get a usable src
+    const doc = await loadDocument(docId);
+    expect(doc?.html).toContain(png);
+    const versions = await listVersions(docId);
+    expect(versions[0].html).toContain(png);
   });
 
   it('normalizes a legacy v1 record lazily on read instead of rewriting it in the upgrade', async () => {
