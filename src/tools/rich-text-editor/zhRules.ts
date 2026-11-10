@@ -10,6 +10,13 @@
  * Deliberately conservative: every rule needs *both* sides of the evidence (punctuation between two
  * Chinese characters, a doubled word that can never be legitimate, a typo from a hand-checked list),
  * because a false red underline in a word processor is worse than a missed typo.
+ *
+ * Second slice adds word-level repetition ("文档文档", copied one time too many). It deliberately does
+ * *not* ship a segmentation lexicon: the only Chinese dictionary available offline (the one inside
+ * `pinyin-pro`, 4082 entries built for polyphone disambiguation) indexes 1 of 30 common office words,
+ * so segmenting against it would have been a decoder ring for the wrong corpus. Repetition is decided
+ * by word class instead — nouns cannot be ABAB-reduplicated, verbs can — which is both precise and
+ * free of any asset.
  */
 
 export type ZhIssueKind = 'punctuation' | 'duplicate' | 'typo';
@@ -53,6 +60,143 @@ const NEVER_DOUBLED = new Set('的了们是在和有不也就都把被这那着�
 
 /** Legitimate doubled function words ("他的的确确说过" / "是是非非"), skipped by the duplicate rule */
 const LEGIT_DOUBLED = ['的的确确', '是是非非'];
+
+/**
+ * Two-character nouns that cannot be ABAB-reduplicated, so seeing one twice in a row is a copy-paste
+ * slip ("文档文档") and never a stylistic choice. Content verbs are absent on purpose: 研究研究 /
+ * 讨论讨论 / 商量商量 are all correct. The list is a watch list, not a dictionary — a unit that is not
+ * here is simply not reported.
+ */
+const REPEAT_NOUNS = new Set([
+  '文档',
+  '系统',
+  '项目',
+  '图片',
+  '表格',
+  '版本',
+  '目录',
+  '页面',
+  '段落',
+  '用户',
+  '数据',
+  '报告',
+  '计划',
+  '文件',
+  '记录',
+  '内容',
+  '标题',
+  '样式',
+  '字体',
+  '格式',
+  '模板',
+  '章节',
+  '附件',
+  '会议',
+  '时间',
+  '公司',
+  '部门',
+  '同事',
+  '客户',
+  '产品',
+  '需求',
+  '功能',
+  '接口',
+  '服务',
+  '配置',
+  '参数',
+  '日志',
+  '订单',
+  '合同',
+  '预算',
+  '费用',
+  '发票',
+  '账号',
+  '密码',
+  '邮箱',
+  '地址',
+  '电话',
+  '编号',
+  '名称',
+  '说明',
+  '规则',
+  '流程',
+  '任务',
+  '进度',
+  '质量',
+  '风险',
+  '成本',
+  '资源',
+  '环境',
+  '代码',
+  '测试',
+  '部署',
+  '发布',
+  '备份',
+  '归档',
+  '权限',
+  '角色',
+  '字段',
+  '报表',
+  '图表',
+  '公式',
+  '函数',
+  '数组',
+  '对象',
+  '组件',
+  '模块',
+  '插件',
+  '脚本',
+  '缓存',
+  '队列',
+  '线程',
+  '事务',
+  '索引',
+  '消息',
+  '通知',
+  '评论',
+  '批注',
+  '修订',
+  '快照',
+  '草稿',
+  '摘要',
+  '结论',
+  '建议',
+  '方案',
+  '步骤',
+  '重点',
+  '目标',
+  '结果',
+  '原因',
+  '问题',
+  '错误',
+  '警告',
+  '提示',
+  '状态',
+  '类型',
+  '属性',
+  '方法',
+  '结构',
+  '算法',
+  '协议',
+  '标准',
+  '规范',
+  '清单',
+  '封面',
+  '页眉',
+  '页脚',
+  '脚注',
+  '尾注',
+]);
+
+/**
+ * Longer units repeated verbatim are reported without a word-class check (a three- or four-character
+ * unit is not a reduplicable word), but colloquial emphasis does repeat them.
+ */
+const REPEAT_EXEMPT = new Set(['怎么样', '没关系', '对了', '不好意思']);
+
+/** Unit length range for word-level repetition */
+const REPEAT_MIN = 2;
+const REPEAT_MAX = 4;
 
 /**
  * Common homophone typos (wrong → right). Hand-checked, all of them unambiguously wrong in any context;
@@ -113,6 +257,53 @@ const TYPO_RE = new RegExp(
   'g',
 );
 const TYPO_TABLE = new Map(TYPOS);
+
+/** A unit qualifies for the repetition rule: pure Chinese characters, no punctuation inside */
+function isCjkUnit(unit: string): boolean {
+  for (const char of unit) if (!CJK.test(char)) return false;
+  return true;
+}
+
+/**
+ * Word-level repetition: the same unit twice in a row ("文档文档", "说明书说明书").
+ *
+ * A 2-character unit is reported only when it is a known noun (see `REPEAT_NOUNS`) because ABAB is a
+ * legitimate verb pattern; a 3–4 character unit is reported unless it is colloquial emphasis. Runs
+ * longer than two copies collapse into one issue ("文档文档文档" → one hit covering all three).
+ */
+export function findWordRepetitions(text: string): ZhIssue[] {
+  const issues: ZhIssue[] = [];
+  let index = 0;
+  while (index < text.length) {
+    let unit = 0;
+    for (let size = REPEAT_MAX; size >= REPEAT_MIN; size -= 1) {
+      const middle = index + size;
+      if (middle + size > text.length) continue;
+      const word = text.slice(index, middle);
+      if (text.slice(middle, middle + size) !== word) continue;
+      if (!isCjkUnit(word) || REPEAT_EXEMPT.has(word)) continue;
+      if (size === REPEAT_MIN && !REPEAT_NOUNS.has(word)) continue;
+      unit = size;
+      break;
+    }
+    if (!unit) {
+      index += 1;
+      continue;
+    }
+    const word = text.slice(index, index + unit);
+    let end = index + unit * 2;
+    while (text.slice(end, end + unit) === word) end += unit;
+    issues.push({
+      word: text.slice(index, end),
+      start: index,
+      end,
+      kind: 'duplicate',
+      suggestion: word,
+    });
+    index = end;
+  }
+  return issues;
+}
 
 /**
  * Check Chinese text. `ignore` holds words the user already accepted (the custom dictionary), so
@@ -181,6 +372,9 @@ export function checkChinese(text: string, ignore: readonly string[] = []): ZhIs
     }
     match = TYPO_RE.exec(text);
   }
+
+  // 5. Word-level repetition: "文档文档" / "说明书说明书"
+  issues.push(...findWordRepetitions(text));
 
   const seen = new Set<string>();
   return issues

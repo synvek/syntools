@@ -320,20 +320,28 @@ graph TD
 
 ### 6.3 P1-3 中文与多语言校对
 
-- [~] **P1-3 中文与多语言校对**（P1，6d）—— 第一轮完成：规则集、分类展示、取消静默截断；中文分词与多语言词表待做
+- [x] **P1-3 中文与多语言校对**（P1，6d）—— 两轮完成：规则集、分类展示、取消静默截断、词级重复检测；中文分词与多语言词表按实测取消（见「计划偏差」）
 - **目标**：本地中文分词 + 规则/词典（标点、重复字、常见错别字），不联网；扩展 `TOKEN_RE` 与建议逻辑。
-- **任务清单**：~~规则集~~（已完成）→ 中文分词（待做）→ 多语言词表按需懒加载（待做）→ ~~`SpellcheckPanel.tsx` 分类展示~~（已完成）→ ~~取消 200k/100 条的静默截断~~（已完成）→ 词表体积与 9 语言提示验证（文案已补齐，体积验证待词表落地）
+- **任务清单**：~~规则集~~（已完成）→ ~~词级重复检测~~（已完成）→ ~~`SpellcheckPanel.tsx` 分类展示~~（已完成）→ ~~取消 200k/100 条的静默截断~~（已完成）→ ~~中文分词~~（`[-]` 按实测取消，见「计划偏差」）→ ~~多语言词表按需懒加载~~（`[-]` 无合规离线词表来源，interface 已通用，见「计划偏差」）→ 词表体积与 9 语言提示验证（仅 en 词表 724KB gzip 静态资源、不进首屏；9 语言文案已对齐）
 - **已完成（2026-11-08）**：
   - [NEW] `zhRules.ts`：纯函数规则集，不做分词 —— ① 夹在汉字之间的半角标点（`我们,明天` → 建议全角，需两侧都是汉字，`1.2` / `github.com` / `A,B` 不误报）② 重复标点（`，，` `。。`，`……` `——` `！！` 不算）③ 重复虚词（`我们们` `是的的`；虚词表白名单，`人人` `天天` `高高兴兴` 不误报，`的的确确` / `是是非非` 单独豁免）④ 40 条人工核对过的同音错字（`按装`→`安装`、`必竟`→`毕竟`、`装模做样`→`装模作样`，最长匹配优先）。刻意不做 `的/地/得`：上下文相关，误报代价高于漏报
   - `spellcheck.ts`：`SpellIssue` 增加 `kind`（`spelling` / `punctuation` / `duplicate` / `typo`）与 `suggestion`；`checkTextReport` 把英文词表查词与中文规则合并、按文档顺序排序，并回报 `truncated`；`collectDocIssues` 改回报文 `{ issues, capped, truncated }`，两个上限都不再是静默截断
   - `SpellcheckPanel.tsx`：按 `typo → punctuation → duplicate → spelling` 分组，组头带条数；规则命中的建议直接来自规则（不经英文建议索引），点一下即原地替换；底部按需显示「仅列出前 N 条」/「仅检查了前 N 个字符」两条黄色提示
   - `strings.ts`：分类名 + 两条上限提示，9 语言键对齐（`strings.test.ts` 通过）
   - 测试：[NEW] `zhRules.test.ts`（15 例，正负例各半）+ `spellcheck.test.ts` 增补（kind/建议、200k 截断回报、上限回报）+ [NEW] `e2e/office-proofing.spec.ts`（中文三类问题分组展示、点建议原地替换、`的的确确` 不误报）
-- **剩余**：中文分词（词典式，需要中文词表）与多语言词表按需懒加载；词表体积与 9 语言提示验证随词表一起做
-- **涉及文件**：`src/tools/rich-text-editor/spellcheck.ts`、`SpellcheckPanel.tsx`、`strings.ts`；`public/dict/`、`scripts/build-wordlist.mjs`
+- **已完成（2026-11-10 · 词级重复）**：
+  - `zhRules.ts` 新增 `findWordRepetitions()`（规则 ⑤，「复制粘贴多贴了一次」）：同一汉字单元连续出现两次即报，`kind` 复用 `duplicate`、`suggestion` 为单元本身，面板点一下删掉多余拷贝。2 字单元只在 `REPEAT_NOUNS`（约 110 个不可 ABAB 重叠的办公名词：文档 / 系统 / 项目 / 时间 / 数据 …）命中时报，因为 ABAB 本身是合法动词重叠；3–4 字单元不查词类直接报（`说明书说明书`）；`REPEAT_EXEMPT` 放过口语强调（`怎么样怎么样` / `没关系没关系` / `对了对了` / `不好意思不好意思`）；三次以上合并成一条（`文档文档文档` 一条覆盖全段）
+  - **为什么不做分词**：仓库内唯一可离线拿到的中文词典是 `pinyin-pro` 为多音字消歧准备的 `DICT2–5`（合计 4,082 条），用 30 个常用办公词探测只命中 1 个（命中「质量」，缺「我们 / 文档 / 系统 / 进行 / 讨论 / 时间 / 项目 / 数据 / 内容 / 表格 …」），拿它切词等于用错语料的对码本；而词级重复本身不需要分词 —— 用「名词不能 ABAB 重叠」的词类判据即可，且零资产、零请求
+  - 测试：`zhRules.test.ts` 15 → 20 例（名词重复、3 字单元、三次以上合并、动词 ABAB / 量词重叠 / 口语强调 / `的的确确` 不误报、自定义词典静音整段）+ `e2e/office-proofing.spec.ts` 新增 1 例（`文档文档` 进「重复字」组、点建议原地改回 `文档请查收`、列表清空后 decoration 归零）
+  - 误报复核：对 `docs/` + `src/` 全部 1,484 个 `md`/`ts`/`tsx` 文件跑该规则，命中 15 处且全部是本轮新增文档与测试里的示例字符串（`文档文档` ×8 / `说明书说明书` ×4 / `文档文档文档` ×3），真实正文零命中
+- **计划偏差（2026-11-10 收尾时登记）**
+  - 中文分词（词典式）取消：见上「为什么不做分词」。引入 jieba / CC-CEDICT 等词库需要 MB 级资产与联网构建，与本任务「不联网、不进首屏」的口径冲突；词级重复改由词类判据实现，规则层仍是纯函数
+  - 多语言词表按需懒加载取消（仅保留接口）：`loadDictionary(file)` / `dictionaryUrl(file)` 已按文件名通用（en 词表即走这条路径），但仓库没有 de / fr / es 等词表的合规离线来源，构建期联网取词表违反「无可外发请求、可离线构建」，故本轮只发布 `en-words.txt.gz`；后续有合规词表时按同一接口追加即可，无需改代码
+- **闸门证据（2026-11-10）**：typecheck / lint / prettier 通过；全量单测 380 文件 / **3602 例**全绿（较 P1-6 收尾的 3597 例 +5）；全量 e2e **217 passed / 0 failed**（15 个 spec，较 216 增加新的词级重复用例）；体积复核（`vite build --outDir /tmp/syntools-e2e-build` + `check-bundle-size.mjs` 以软链接指向该目录）首屏 **191.93KB**（预算 195KB）、最大普通 chunk 427.33KB（预算 500KB）、`SpreadsheetTool` 1776.81KB 走 12MB 重 chunk 例外、`RichTextEditorTool` chunk 148.04KB；未新增资产 / 依赖 / 网络请求（规则是纯函数）；9 语言键未新增，`strings.test.ts` 通过。中间有一次「构建与 e2e 同机并发」的全量跑出现 1 例失败（`tools.spec.ts` 的 P0-4「右键 Esc 不清选区」，即 §6.6 记录的负载敏感用例），隔离 `--repeat-each=3` 全绿、空载全量复跑 **217 passed / 0 failed**（EXIT=0），与本轮改动无关（未触及选区与上下文菜单）
+- **涉及文件**：`src/tools/rich-text-editor/zhRules.ts`、`spellcheck.ts`、`SpellcheckPanel.tsx`、`strings.ts`；`public/dict/en-words.txt.gz`、`scripts/build-wordlist.mjs`；`e2e/office-proofing.spec.ts`
 - **前置**：P1-5（decoration 视口裁剪 —— 2026-11-08 已满足，`viewportRange.ts` 落地）
 - **✅ 验收**：中文错别字/标点有提示；无任何外发请求；新词表不进首屏；`pnpm size` 通过。
-- **回退点**：中文词表按语言开关隔离，出问题仅保留英文本地词库。
+- **回退点**：中文规则整组是纯函数，删掉 `checkChinese` / `findWordRepetitions` 的调用即回到纯英文校验；词表按语言开关隔离，出问题仅保留英文本地词库。
 
 ### 6.4 P1-4 页面排版细节
 
@@ -379,7 +387,7 @@ graph TD
 
 ### 6.6 P1-6 单机数据可靠性
 
-- [~] **P1-6 单机数据可靠性**（P1，6d）
+- [x] **P1-6 单机数据可靠性**（P1，6d）
 - **目标**：按字节计量与配额预警、内嵌图片外置 IndexedDB、版本快照增量或总量上限、`saveDocument` 版本校验 + `BroadcastChannel` 多标签页冲突提示、草稿列表与手动恢复 UI。
 - **任务清单**：`draft.ts` 按字节计量 → 图片外置与引用化 → `docStore.ts` 乐观锁 + storage 事件 → 草稿/版本管理面板 → 刷新恢复与冲突 e2e。
 - **涉及文件**：`src/tools/rich-text-editor/draft.ts`、`docStore.ts`、`migrate.ts`、`RichTextEditorTool.tsx`；`src/core/components/EditorStatusBar.tsx`；`e2e/tools.spec.ts`
@@ -395,7 +403,10 @@ graph TD
   - [x] 刷新恢复：`initDocStore` 指针恢复 + v1 草稿迁移，完整恢复标题 / 正文 / 视图 / 页面设置 / 缩放 / PDF 模式 / 批注 / 修订 / 自定义词 / 模板
   - [x] `BroadcastChannel` 多标签页冲突提示：`docStore` 新增 `subscribeDocEvents`（按 tab 过滤自发布事件），编辑器在另一个标签页保存/删除当前文档时给出提示条，保存场景可一键载入对方版本
   - [x] 新增 [NEW] `docStore.idb.test.ts`（17 例，`fake-indexeddb` + 假 `BroadcastChannel`）与 [NEW] `DocLibraryPanel.test.tsx`（10 例），覆盖持久化、版本裁剪、删除清理、惰性 v1 迁移、复制标题本地化、跨标签页事件
-- **仍未完成**：草稿/版本管理面板的批量恢复 UI、localStorage 草稿仍内联 base64（超限时仍走「剥离图片」降级；文档库与版本快照已外置，故刷新后图片可从库中恢复）
+- **计划偏差（2026-11-10 收尾时登记）**
+  - 「草稿列表与手动恢复 UI」由既有 `DocLibraryPanel`（文档列表 + 打开 / 复制 / 删除）与 `VersionHistoryPanel`（快照列表 + 恢复 / 对比 / 手动快照）承担：每次保存同时写 localStorage 草稿与文档库，草稿退化为崩溃回退通道，独立「草稿列表」会与文档库重复，故不再单独做一层面板
+  - localStorage 草稿仍内联 base64（读取路径同步，改异步会影响初始化时序）；超限时继续走「剥离图片」降级，图片可从文档库 / 版本快照恢复，不属于「静默剥离」路径
+- **闸门证据（2026-11-10）**：typecheck / lint 通过；单测 380 文件 / **3597 例**全绿；全量 e2e **216 passed / 0 failed**（15 个 spec）；体积等价复核（`vite build --outDir /tmp/syntools-size-check` + 等价 gzip 计算，`dist` 因沙箱批量删除守卫无法原地清空）首屏 **192.31KB**（预算 195KB）、最大普通 chunk 427.33KB（预算 500KB）、`SpreadsheetTool` 1776.81KB 走 12MB 重 chunk 例外；9 语言键对齐（`strings.test.ts`）；未新增网络请求 / 服务端依赖（IndexedDB + BroadcastChannel 均为本地能力）；回退点保留（图片外置失败回落 base64、draft schema 仍可按 v3 演进并保留 v2 读回）
 
 ### 6.7 P1-7 移动端与触控可达
 
@@ -557,10 +568,10 @@ graph TD
 | P0-6 上下文选项卡一致性       | `[x]` | M1   | P0     | 2d     | 无（UI 层）         | §5.6     |
 | P1-1 命名样式系统             | `[ ]` | M2   | P1     | 8d     | P0-2、P1-5          | §6.1     |
 | P1-2 修订模式与审阅深化       | `[ ]` | M2   | P1     | 7d     | P0-2、P1-4、P1-5    | §6.2     |
-| P1-3 中文与多语言校对         | `[~]` | M2   | P1     | 6d     | P1-5（已满足）      | §6.3     |
+| P1-3 中文与多语言校对         | `[x]` | M2   | P1     | 6d     | P1-5（已满足）      | §6.3     |
 | P1-4 页面排版细节             | `[ ]` | M2   | P1     | 5d     | P1-1                | §6.4     |
 | P1-5 大文档性能               | `[x]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
-| P1-6 单机数据可靠性           | `[~]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
+| P1-6 单机数据可靠性           | `[x]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
 | P1-7 移动端与触控可达         | `[ ]` | M2   | P1     | 4d     | P0-4、P0-5          | §6.7     |
 | P2-1 本地模板中心 + 版面模式  | `[ ]` | M3   | P2     | 不排期 | M2 闸门 + 单独评审  | §7.1     |
 | P2-2 默认不外发的本地 AI 辅助 | `[ ]` | M3   | P2     | 不排期 | P2-1 + 隐私评审     | §7.1     |
@@ -572,6 +583,10 @@ graph TD
 进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
 
 进度备注（2026-11-08）：P0-1…P0-6 保持 `[x]`；**P1-5 转 `[x]`** —— §6.5 的块级增量分页（`layoutFlag.ts`，默认关闭，实测 200 页布局中位 4.4ms / P95 5.5ms，全量 9.1ms / 10.7ms）与 decoration 视口裁剪（[NEW] `viewportRange.ts`：>12 万字符的文档只装饰视口 ±3000 字符，滚动停止 150ms 后重建；`spellcheck.ts` / `find-replace.ts` 共用；`gotoMatch` 补选区移动，否则裁剪后视口外的当前匹配既不高亮也滚不到）均已落地，200 页布局 P95 9.0ms（预算 16ms）、50 页 P95 2.4ms（预算 50ms）、`rte-toolbar-state` P95 1.1ms、`rte-ribbon-tabs` P95 0.5ms；`ribbonTabs` 静态配置拆分按实测取消（登记为技术债）。顺带修复 `spellcheck.ts` 的 `EditorView.visibleRanges` 类型错误（该字段是内部 API，不在 typings 里）——`pnpm build` 重新可用。P1-3 的前置（decoration 视口裁剪）已满足，可开工。
+
+进度备注（2026-11-10 · P1-3 收尾）：**P1-3 转 `[x]`** —— 第二片落地「词级重复检测」：`zhRules.ts` 新增 `findWordRepetitions()`（规则 ⑤），同一汉字单元连续出现两次即报（`文档文档`），2 字单元只在约 110 个不可 ABAB 重叠的办公名词命中时报（动词重叠 / 量词重叠 / 口语强调 / `的的确确` 均不误报），3–4 字单元直接报，三次以上合并成一条，`kind` 复用 `duplicate`、建议即单元本身，面板点一下删掉多余拷贝（零新文案，9 语言键不变）。**中文分词按实测取消并登记偏差**：仓库内唯一可离线取用的中文词典是 `pinyin-pro` 的 `DICT2–5`（4,082 条，为多音字消歧而建），30 个常用办公词只命中 1 个，不足以支撑切词；引入 jieba / CC-CEDICT 需 MB 级资产与联网构建，与「不联网、不进首屏」冲突，且词级重复用词类判据即可、无需分词。**多语言词表懒加载同样登记偏差**：`loadDictionary(file)` / `dictionaryUrl(file)` 已是通用接口，缺的是 de / fr / es 的合规离线词表，本轮只发布 en。误报复核：对 `docs/` + `src/` 的 1,484 个 `md`/`ts`/`tsx` 跑规则，15 处命中全部是本轮新增的示例字符串，正文零命中。闸门：typecheck / lint / prettier 通过，单测 380 文件 / **3602 例**全绿（+5），e2e **217 passed / 0 failed**（+1；中间一次「构建与 e2e 同机并发」跑出现 P0-4「右键 Esc 不清选区」负载敏感失败 1 例，隔离 3/3 与空载全量复跑均全绿），首屏 **191.93KB**、最大普通 chunk 427.33KB。M2 闸门仍为 `[ ]`，剩余 P1-1 / P1-2 / P1-4 / P1-7。
+
+进度备注（2026-11-10 · P1-6 收尾）：**P1-6 转 `[x]`** —— 六项任务清单全部落地或登记偏差：按字节计量与配额预警、图片外置 IndexedDB、版本快照总量上限、`saveDocument` 乐观锁 + `BroadcastChannel` 冲突提示、刷新恢复（已在更早批次完成）、草稿/版本面板（由 `DocLibraryPanel` + `VersionHistoryPanel` 承担，见 §6.6 计划偏差）。验收四条逐项核对：图片不再被静默剥离（文档库与快照外置，草稿超限仍降级但可从库恢复）、两标签页同开有明确冲突提示且过期写入被拒绝、刷新恢复覆盖全部文档状态（标题/正文/视图/页面设置/缩放/PDF 模式/批注/修订/自定义词/模板）、新增 `draft.test.ts`（14 例）/ `docStore.idb.test.ts`（22 例）/ `assets.test.ts`（4 例）/ `DocLibraryPanel.test.tsx`（10 例）全绿。闸门复核：全量单测 **380 文件 / 3597 例**、全量 e2e **216 passed / 0 failed**、首屏 **192.31KB**（较上次记录的 191.89KB 增加 0.42KB，预算 195KB 内）、最大普通 chunk 427.33KB（预算 500KB）。M2 闸门仍为 `[ ]`：P1-1 / P1-2 / P1-3（剩余中文分词与多语言词表）/ P1-4 / P1-7 未完成。
 
 进度备注（2026-11-10 · P1-6 第四片）：完成「`saveDocument` 乐观锁写入校验」。`StoredDocument` 增加 `rev`，`saveDocument(id, draft, { baseRev })` 冲突时返回 `{ ok:false, rev, conflict:true }` 且不写库（返回类型由 `void` 改为 `SaveDocumentResult`）；编辑器用 `docRevRef` 记录载入时的修订号，`loadDocument` / `initDocStore` / 切文档 / 载入对方版本 / 新建分别同步或重置。实现中发现并修掉一个**由锁本身引入的回归**：每次打开标签页的首次保存都会无意义地推高 `rev`，把其它已打开的标签页顶成过期写入方（e2e 直接暴露：B 打开后 A 的保存被判冲突）。修法两条：① `saveDocument` 在 `samePayload()`（title/html/view/zoom/pdfMode/pageSetup/comments/changes/userWords/templateId 全等）时直接返回当前 `rev`，不写库也不发事件；② 收到远端更新提示后本标签页暂停写文档（草稿照常写），UI 显示冲突/远端提示并提供「载入最新版本」。文案 `saveConflict` × 9 语言。测试：`docStore.idb.test.ts` 21 → 22 例（过期 `baseRev` 被拒且新内容未被覆盖、无 `baseRev` 时仍自增、首次保存 `baseRev: 0`、无变化不推高 `rev` 且不产生快照），e2e 新增「旧修订标签页不得覆盖新内容」（直接读 IndexedDB 断言 A 的内容仍在、B 的内容未写入）。验证：typecheck / lint 通过，单测 380 文件 / **3597 例**全绿，e2e `rich-text-docs` **6 passed**、`tools + office-p1/p2/ribbon` **146 passed**。
 

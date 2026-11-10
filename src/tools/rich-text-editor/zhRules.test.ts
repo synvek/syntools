@@ -103,6 +103,47 @@ describe('curated homophone typos', () => {
   });
 });
 
+describe('word-level repetition', () => {
+  it('flags a noun repeated twice in a row and suggests the single copy', () => {
+    const [issue] = checkChinese('请把文档文档发给客户');
+    expect(issue).toMatchObject({
+      word: '文档文档',
+      start: 2,
+      end: 6,
+      kind: 'duplicate',
+      suggestion: '文档',
+    });
+  });
+
+  it('flags longer units without a word-class check', () => {
+    expect(words('说明书说明书丢了')).toEqual(['说明书说明书']);
+  });
+
+  it('collapses a run longer than two copies into one issue', () => {
+    const issues = checkChinese('文档文档文档');
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ word: '文档文档文档', start: 0, end: 6, suggestion: '文档' });
+  });
+
+  it('leaves legitimate ABAB reduplication and quantifier repetition alone', () => {
+    // Verb reduplication is correct Chinese, and content verbs are not in the noun watch list
+    expect(words('我们研究研究再定')).toEqual([]);
+    expect(words('大家商量商量')).toEqual([]);
+    // Quantifier / numeral units repeat legitimately
+    expect(words('一个一个来，一件一件办')).toEqual([]);
+    // Colloquial emphasis
+    expect(words('怎么样怎么样，服不服')).toEqual([]);
+    expect(words('欢迎欢迎')).toEqual([]);
+    // Idioms that look like a repeated unit
+    expect(words('的的确确如此')).toEqual([]);
+    expect(words('是是非非说不清')).toEqual([]);
+  });
+
+  it('respects the custom dictionary for the whole repeated run', () => {
+    expect(words('文档文档', ['文档文档'])).toEqual([]);
+  });
+});
+
 describe('result shape', () => {
   it('returns every issue sorted by position, with no duplicates', () => {
     const issues = checkChinese('我们,明天,,按装好');

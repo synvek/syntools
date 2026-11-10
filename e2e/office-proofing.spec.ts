@@ -62,3 +62,23 @@ test('rich text: Chinese proofing flags punctuation, doubled characters and typo
 
   expect(errors).toEqual([]);
 });
+
+test('rich text: a doubled paste of a whole word is flagged and fixable in place', async ({
+  page,
+}) => {
+  await openRichText(page);
+  await page.locator('.tiptap').click();
+  await page.keyboard.type('文档文档请查收');
+
+  await enableSpellcheck(page);
+  const issues = page.getByTestId('rich-text-spellcheck-issues');
+  await expect(issues).toBeVisible({ timeout: 30_000 });
+
+  // Word-level repetition (P1-3 second slice) lands in the same "repeated" group as doubled particles
+  await expect(issues).toContainText('重复字 (1)');
+  await issues.getByRole('button', { name: '文档', exact: true }).click();
+  await expect(page.locator('.tiptap p').first()).toHaveText('文档请查收');
+  // With no issues left the list itself unmounts, so assert on the panel that stays mounted
+  await expect(page.getByTestId('rich-text-spellcheck')).not.toContainText('文档文档');
+  expect(await page.locator('.rte-spell-error').count()).toBe(0);
+});
