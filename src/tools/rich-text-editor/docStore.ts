@@ -23,6 +23,19 @@ export interface StoredDocument extends RichTextDraftV2 {
   id: string;
   createdAt: number;
   updatedAt: number;
+  /**
+   * Optimistic-concurrency token: bumped on every successful write. A save can pass the revision it
+   * started from, so a tab that edited a stale copy is rejected instead of overwriting newer content.
+   */
+  rev: number;
+}
+
+export interface SaveDocumentResult {
+  ok: boolean;
+  /** Revision after the write (unchanged value when the save was rejected) */
+  rev: number;
+  /** True when the caller's base revision was older than the stored one: nothing was written */
+  conflict: boolean;
 }
 
 export interface StoredVersion extends RichTextDraftV2 {
@@ -190,7 +203,9 @@ function toStoredDocument(raw: unknown): StoredDocument | null {
   if (!migrated.ok) return null;
   const createdAt = readPositiveNumber(raw.createdAt);
   const updatedAt = readPositiveNumber(raw.updatedAt) || createdAt || Date.now();
-  return { id, ...migrated.value, createdAt, updatedAt };
+  // Records written before the lock existed start at revision 1
+  const rev = readPositiveNumber(raw.rev) || 1;
+  return { id, ...migrated.value, createdAt, updatedAt, rev };
 }
 
 function toStoredVersion(raw: unknown): StoredVersion | null {
@@ -259,11 +274,44 @@ export async function loadDocument(id: string): Promise<StoredDocument | null> {
   return { ...doc, html: await hydrateImages(doc.html) };
 }
 
-/** Save a document (upsert) and create a version snapshot per the interval */
-export async function saveDocument(id: string, draft: RichTextDraftInput): Promise<void> {
+/** Fields that decide whether a save would change anything (bookkeeping fields excluded) */
+const PAYLOAD_FIELDS = [
+  'title',
+  'html',
+  'view',
+  'zoom',
+  'pdfMode',
+  'pageSetup',
+  'comments',
+  'changes',
+  'userWords',
+  'templateId',
+] as const;
+
+function samePayload(a: RichTextDraftV2, b: RichTextDraftV2): boolean {
+  return PAYLOAD_FIELDS.every(
+    (field) => JSON.stringify(a[field] ?? null) === JSON.stringify(b[field] ?? null),
+  );
+}
+
+/**
+ * Save a document (upsert) and create a version snapshot per the interval.
+ * `options.baseRev` enables the optimistic lock: when the stored revision moved on (another tab
+ * saved in the meantime) the write is refused and `conflict` comes back, so newer content is never
+ * silently overwritten. Without `baseRev` the write is unconditional (migration / duplication).
+ */
+export async function saveDocument(
+  id: string,
+  draft: RichTextDraftInput,
+  options: { baseRev?: number } = {},
+): Promise<SaveDocumentResult> {
   try {
     const now = Date.now();
     const existing = await readRawDocument(id);
+    if (typeof options.baseRev === 'number' && existing && options.baseRev !== existing.rev) {
+      return { ok: false, rev: existing.rev, conflict: true };
+    }
+
     const normalized = toDraftV2(draft);
     const doc: StoredDocument = {
       id,
@@ -272,13 +320,23 @@ export async function saveDocument(id: string, draft: RichTextDraftInput): Promi
       html: await externalizeImages(normalized.html),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
+      rev: (existing?.rev ?? 0) + 1,
     };
+
+    // Nothing actually changed (e.g. a tab that just opened and re-applied the loaded content):
+    // writing anyway would bump the revision and turn every other open tab into a stale writer
+    if (existing && samePayload(existing, doc)) {
+      return { ok: true, rev: existing.rev, conflict: false };
+    }
+
     await withStore(DOC_STORE, 'readwrite', (store) => store.put(doc));
     await pushVersion(doc, now);
     // Only after the write is committed: other tabs must not reload a document that isn't stored yet
     publish({ type: 'saved', id, at: now });
+    return { ok: true, rev: doc.rev, conflict: false };
   } catch {
     // IndexedDB unavailable: ignore (the localStorage draft still covers it)
+    return { ok: false, rev: options.baseRev ?? 0, conflict: false };
   }
 }
 

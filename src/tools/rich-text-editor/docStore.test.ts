@@ -26,7 +26,11 @@ describe('docStore (no IndexedDB in jsdom: silent degradation)', () => {
   });
 
   it('saveDocument / deleteDocument / duplicateDocument never throw', async () => {
-    await expect(saveDocument('a', { title: 't', html: '<p>x</p>' })).resolves.toBeUndefined();
+    // Saving now reports the outcome instead of returning void (ok:false = IndexedDB unavailable)
+    await expect(saveDocument('a', { title: 't', html: '<p>x</p>' })).resolves.toMatchObject({
+      ok: false,
+      conflict: false,
+    });
     await expect(deleteDocument('a')).resolves.toBeUndefined();
     await expect(
       duplicateDocument('a', { untitled: '未命名文档', suffix: ' 副本' }),

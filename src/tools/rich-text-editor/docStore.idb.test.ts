@@ -225,6 +225,60 @@ describe('saveDocument / loadDocument', () => {
   });
 });
 
+describe('optimistic lock (rev)', () => {
+  it('refuses a save whose base revision is stale and keeps the newer content', async () => {
+    const first = await saveDocument(docId, { title: 'v1', html: '<p>旧</p>' });
+    expect(first).toEqual({ ok: true, rev: 1, conflict: false });
+
+    const second = await saveDocument(
+      docId,
+      { title: 'v2', html: '<p>新</p>' },
+      { baseRev: first.rev },
+    );
+    expect(second).toMatchObject({ ok: true, rev: 2, conflict: false });
+
+    // This tab loaded revision 1 before the other save, so its write must not win
+    const stale = await saveDocument(
+      docId,
+      { title: 'v1', html: '<p>旧标签页</p>' },
+      { baseRev: 1 },
+    );
+    expect(stale).toEqual({ ok: false, rev: 2, conflict: true });
+
+    const doc = await loadDocument(docId);
+    expect(doc?.html).toBe('<p>新</p>');
+    expect(doc?.rev).toBe(2);
+  });
+
+  it('writes without a base revision and still bumps the revision', async () => {
+    // Migration / duplication paths have no revision to compare against
+    expect(await saveDocument(docId, { title: 'a', html: '<p>a</p>' })).toMatchObject({ rev: 1 });
+    expect(await saveDocument(docId, { title: 'b', html: '<p>b</p>' })).toMatchObject({ rev: 2 });
+
+    const doc = await loadDocument(docId);
+    expect(doc?.title).toBe('b');
+    expect(doc?.rev).toBe(2);
+  });
+
+  it('does not bump the revision when the save would not change anything', async () => {
+    const first = await saveDocument(docId, { title: 't', html: '<p>same</p>' });
+    const second = await saveDocument(
+      docId,
+      { title: 't', html: '<p>same</p>' },
+      { baseRev: first.rev },
+    );
+
+    // A tab that merely re-saves the content it just loaded must not invalidate other tabs
+    expect(second).toEqual({ ok: true, rev: first.rev, conflict: false });
+    expect(await listVersions(docId)).toHaveLength(1);
+  });
+
+  it('reports a first save with base revision 0 as ok', async () => {
+    const saved = await saveDocument(docId, { title: 'new', html: '<p>x</p>' }, { baseRev: 0 });
+    expect(saved).toEqual({ ok: true, rev: 1, conflict: false });
+  });
+});
+
 describe('version snapshots', () => {
   it('skips the automatic snapshot inside the 2 minute window, manual snapshots always land', async () => {
     const start = 1_700_000_000_000;

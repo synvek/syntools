@@ -140,6 +140,51 @@ test('flags a save made in another tab and can load that version', async ({ cont
   await expect(otherTab.getByTestId('rich-text-remote-change')).toHaveCount(0);
 });
 
+test('does not let a tab holding an older revision overwrite the newer content', async ({
+  context,
+  page,
+}) => {
+  await openEditor(page);
+  // This tab opens the same document first, so it keeps the older revision
+  const stale = await context.newPage();
+  await stale.goto('/tools/rich-text-editor');
+  await expect(stale.locator('.tiptap')).toBeVisible();
+
+  await page.locator('.tiptap').click();
+  await page.keyboard.type('标签页A的内容');
+  await saveNow(page);
+
+  // The stale tab edits and saves: it must be told about the newer revision and stop writing
+  const staleEditor = stale.locator('.tiptap');
+  await staleEditor.click();
+  await staleEditor.press('ControlOrMeta+a');
+  await stale.keyboard.type('标签页B的内容');
+  await staleEditor.press('ControlOrMeta+s');
+  await expect(stale.getByTestId('rich-text-remote-change')).toBeVisible();
+
+  const storedHtml = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('syntools-rich-text', 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const documents = await new Promise<Array<{ html: string }>>((resolve, reject) => {
+      const request = db.transaction('documents', 'readonly').objectStore('documents').getAll();
+      request.onsuccess = () => resolve(request.result as Array<{ html: string }>);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return documents.map((doc) => doc.html).join('');
+  });
+  expect(storedHtml).toContain('标签页A的内容');
+  expect(storedHtml).not.toContain('标签页B的内容');
+
+  // Loading the newer version lets editing continue on top of it
+  await stale.getByRole('button', { name: '载入最新版本' }).click();
+  await expect(staleEditor).toContainText('标签页A的内容');
+  await expect(stale.getByTestId('rich-text-remote-change')).toHaveCount(0);
+});
+
 test('manual snapshot lands in the version panel and restores the archived content', async ({
   page,
 }) => {

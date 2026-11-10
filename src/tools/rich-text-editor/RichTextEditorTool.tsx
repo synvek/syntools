@@ -327,6 +327,14 @@ export default function RichTextEditorTool() {
   const [draftNotice, setDraftNotice] = useState<'degraded' | 'nearLimit' | 'failed' | null>(null);
   /** 另一个标签页保存/删除了当前文档：提示用户，避免两边静默互相覆盖 */
   const [remoteChange, setRemoteChange] = useState<DocStoreEvent | null>(null);
+  /** 乐观锁拒绝了本次保存（本地内容仍留在草稿里，等用户决定是否载入对方版本） */
+  const [saveConflict, setSaveConflict] = useState(false);
+  /**
+   * 另一个标签页持有更新版本时，本标签页不再写文档（草稿照常写）：既避免连续的无谓冲突，
+   * 也避免用户还没看到提示就被覆盖。
+   */
+  const remoteBlocksSaveRef = useRef(false);
+  remoteBlocksSaveRef.current = Boolean(remoteChange) || saveConflict;
   const [saved, setSaved] = useState(Boolean(initial));
   const flowRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -468,6 +476,8 @@ export default function RichTextEditorTool() {
 
   const docIdRef = useRef<string | null>(null);
   docIdRef.current = docId;
+  /** 当前文档已载入的修订号：保存时作为乐观锁基准，另一个标签页写过就会被拒绝 */
+  const docRevRef = useRef(0);
   // Read review metadata through refs so persistNow keeps a stable identity;
   // otherwise every comment change would re-register the editor update listener
   const commentsRef = useRef<DocComment[]>(comments);
@@ -511,7 +521,21 @@ export default function RichTextEditorTool() {
               : null,
       );
       const id = ensureDocId();
-      void saveDocument(id, withPrefs).then(() => {
+      // The other tab already owns a newer revision: keep the draft (written above) but leave the
+      // document untouched until the user picks "reload" in the notice
+      if (remoteBlocksSaveRef.current) return;
+      // Optimistic lock: the revision this tab started from must still be current, otherwise the write
+      // is refused and the notice below asks the user to load the newer version
+      void saveDocument(id, withPrefs, { baseRev: docRevRef.current }).then((saved) => {
+        if (saved.conflict) {
+          setSaveConflict(true);
+          // Keep the stale revision on purpose: further autosaves must not overwrite the other tab either
+          return;
+        }
+        if (saved.ok) {
+          docRevRef.current = saved.rev;
+          setSaveConflict(false);
+        }
         void listDocuments().then(setDocs);
       });
       // ensureDocId/setSaved/setDraftNotice have stable identities, no need to list them as deps
@@ -547,6 +571,7 @@ export default function RichTextEditorTool() {
       docIdRef.current = init.docId;
       setDocId(init.docId);
       if (init.doc && editor && !editor.isDestroyed) {
+        docRevRef.current = init.doc.rev ?? 0;
         setTitle(init.doc.title);
         editor.commands.setContent(init.doc.html);
         setSnapshotHtml(init.doc.html);
@@ -1395,22 +1420,37 @@ export default function RichTextEditorTool() {
     const id = docIdRef.current;
     if (!id) return;
     const html = readHtml() ?? snapshotHtml;
-    void saveDocument(id, {
-      title: titleRef.current,
-      html,
-      view: viewRef.current,
-      pageSetup,
-      zoom,
-      pdfMode,
-      comments: commentsRef.current,
-      changes: changesRef.current,
-      userWords: userWordsRef.current,
-      // Must be passed explicitly: omitting it would blank the stored template on this path
-      templateId: templateIdRef.current || undefined,
-    })
-      .then(() => saveManualVersion(id, note || undefined))
-      .then(() => listVersions(id))
+    void saveDocument(
+      id,
+      {
+        title: titleRef.current,
+        html,
+        view: viewRef.current,
+        pageSetup,
+        zoom,
+        pdfMode,
+        comments: commentsRef.current,
+        changes: changesRef.current,
+        userWords: userWordsRef.current,
+        // Must be passed explicitly: omitting it would blank the stored template on this path
+        templateId: templateIdRef.current || undefined,
+      },
+      { baseRev: docRevRef.current },
+    )
+      .then((saved) => {
+        if (saved.conflict) {
+          setSaveConflict(true);
+          return null;
+        }
+        if (saved.ok) {
+          docRevRef.current = saved.rev;
+          setSaveConflict(false);
+        }
+        return saveManualVersion(id, note || undefined);
+      })
+      .then((version) => (version === null ? null : listVersions(id)))
       .then((list) => {
+        if (!list) return;
         setVersions(list);
         setSaved(true);
       });
@@ -1535,8 +1575,12 @@ export default function RichTextEditorTool() {
     // Creating a document assigns a new id; the old document stays in the library
     const id = createDocId();
     docIdRef.current = id;
+    // A brand-new document has no stored revision yet: save it unconditionally the first time
+    docRevRef.current = 0;
     setDocId(id);
     setCurrentDocId(id);
+    setRemoteChange(null);
+    setSaveConflict(false);
     handleClear();
     void listDocuments().then(setDocs);
   };
@@ -1604,8 +1648,11 @@ export default function RichTextEditorTool() {
     void loadDocument(id).then((doc) => {
       if (!doc) return;
       docIdRef.current = id;
+      docRevRef.current = doc.rev;
       setDocId(id);
       setCurrentDocId(id);
+      setRemoteChange(null);
+      setSaveConflict(false);
       // StoredDocument is already normalized to v2, so comments and tracked-change metadata come along directly
       resetEditorContent(doc);
       setLibraryOpen(false);
@@ -1617,9 +1664,12 @@ export default function RichTextEditorTool() {
   const handleReloadRemote = () => {
     const id = docIdRef.current;
     setRemoteChange(null);
+    setSaveConflict(false);
     if (!id) return;
     void loadDocument(id).then((doc) => {
       if (!doc) return;
+      // Adopt the freshest revision, otherwise the next save would be refused as a conflict too
+      docRevRef.current = doc.rev;
       resetEditorContent(doc);
       setSaved(true);
     });
@@ -2383,18 +2433,20 @@ export default function RichTextEditorTool() {
         </p>
       )}
 
-      {remoteChange && !failure && (
+      {(remoteChange || saveConflict) && !failure && (
         <div
           role="status"
           data-testid="rich-text-remote-change"
           className="flex flex-wrap items-center gap-2 text-sm text-amber-600 dark:text-amber-400"
         >
           <span>
-            {remoteChange.type === 'deleted'
-              ? t('tools.richText.remoteDeleted')
-              : t('tools.richText.remoteSaved')}
+            {saveConflict
+              ? t('tools.richText.saveConflict')
+              : remoteChange?.type === 'deleted'
+                ? t('tools.richText.remoteDeleted')
+                : t('tools.richText.remoteSaved')}
           </span>
-          {remoteChange.type === 'saved' && (
+          {(saveConflict || remoteChange?.type === 'saved') && (
             <button
               type="button"
               onClick={handleReloadRemote}
@@ -2405,7 +2457,10 @@ export default function RichTextEditorTool() {
           )}
           <button
             type="button"
-            onClick={() => setRemoteChange(null)}
+            onClick={() => {
+              setRemoteChange(null);
+              setSaveConflict(false);
+            }}
             className="rounded-md px-2 py-0.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             {t('tools.richText.remoteDismiss')}
