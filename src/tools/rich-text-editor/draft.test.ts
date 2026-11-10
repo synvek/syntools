@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  DRAFT_WARN_RATIO,
   LEGACY_DRAFT_KEY,
   clearDraft,
   clearLegacyDraft,
+  draftWarningLevel,
   readDraft,
   readReviewerName,
+  utf8Bytes,
   writeDraft,
   writeDraftSafe,
   writeReviewerName,
@@ -101,11 +104,13 @@ describe('v1 → v2 migration', () => {
 });
 
 describe('writeDraftSafe quota fallback', () => {
-  it('writes as-is when there is room', () => {
-    expect(writeDraftSafe({ title: 'a', html: '<p>a</p>' })).toEqual({
-      ok: true,
-      degraded: false,
-    });
+  it('writes as-is when there is room and reports the byte usage', () => {
+    const result = writeDraftSafe({ title: 'a', html: '<p>a</p>' });
+
+    expect(result).toMatchObject({ ok: true, degraded: false, tooLarge: false });
+    expect(result.bytes).toBeGreaterThan(0);
+    expect(result.ratio).toBeLessThan(DRAFT_WARN_RATIO);
+    expect(draftWarningLevel(result)).toBe('ok');
   });
 
   it('retries without images when the first write is rejected', () => {
@@ -119,7 +124,7 @@ describe('writeDraftSafe quota fallback', () => {
       html: '<p>文字</p><img src="data:image/png;base64,AAA">',
     });
 
-    expect(result).toEqual({ ok: true, degraded: true });
+    expect(result).toMatchObject({ ok: true, degraded: true });
     // The retry dropped the image but kept the text
     expect(localStorage.getItem(V2_KEY)).toContain('文字');
     expect(localStorage.getItem(V2_KEY)).not.toContain('<img');
@@ -130,10 +135,50 @@ describe('writeDraftSafe quota fallback', () => {
       throw new DOMException('quota', 'QuotaExceededError');
     });
 
-    expect(writeDraftSafe({ title: 'x', html: '<p>x</p><img src="a">' })).toEqual({
-      ok: false,
-      degraded: false,
+    const result = writeDraftSafe({ title: 'x', html: '<p>x</p><img src="a">' });
+    expect(result).toMatchObject({ ok: false, degraded: false });
+    // The write failed on the storage side, not because of the size budget
+    expect(result.tooLarge).toBe(false);
+    expect(draftWarningLevel(result)).toBe('failed');
+  });
+});
+
+describe('byte-based measurement and quota warning', () => {
+  it('counts UTF-8 bytes, not UTF-16 code units', () => {
+    expect(utf8Bytes('abc')).toBe(3);
+    // Two Chinese characters are 2 JS code units but 6 bytes: the reason html.length under-reported usage
+    expect(utf8Bytes('中文')).toBe(6);
+    expect(utf8Bytes('a中')).toBe(4);
+  });
+
+  it('rejects a draft that fits by character count but not by bytes', () => {
+    // 3 bytes per character, so this exceeds 10MB while `html.length` stays well under the limit
+    const html = '中'.repeat(Math.floor(MAX_IMPORT_BYTES / 3) + 1);
+
+    expect(html.length).toBeLessThan(MAX_IMPORT_BYTES);
+    expect(writeDraft({ title: '中文', html })).toBe(false);
+    expect(localStorage.getItem(V2_KEY)).toBeNull();
+  });
+
+  it('maps byte usage onto the three notice levels', () => {
+    const base = { degraded: false, bytes: 100, tooLarge: false };
+    expect(draftWarningLevel({ ...base, ok: true, ratio: 0 })).toBe('ok');
+    // Exactly at the threshold already counts as "near the limit"
+    expect(draftWarningLevel({ ...base, ok: true, ratio: DRAFT_WARN_RATIO })).toBe('nearLimit');
+    expect(draftWarningLevel({ ...base, ok: false, ratio: 1.2, tooLarge: true })).toBe('failed');
+  });
+
+  it('reports the oversized payload instead of silently dropping it', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
     });
+
+    const result = writeDraftSafe({ title: 'x', html: '中'.repeat(4_000_000) });
+
+    expect(result.ok).toBe(false);
+    expect(result.bytes).toBeGreaterThan(MAX_IMPORT_BYTES);
+    expect(result.ratio).toBeGreaterThan(1);
+    expect(result.tooLarge).toBe(true);
   });
 });
 

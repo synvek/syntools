@@ -16,6 +16,23 @@ export const LEGACY_DRAFT_KEY = 'syntools:rich-text-editor.draft.v1';
 const REVIEWER_KEY = 'syntools:rich-text-editor.reviewer';
 /** Per-draft size limit (10MB), keeping localStorage from overflowing */
 const MAX_DRAFT_BYTES = MAX_IMPORT_BYTES;
+/** Warn the user once a draft uses this share of the budget (localStorage is a shared, small quota) */
+export const DRAFT_WARN_RATIO = 0.8;
+
+/**
+ * UTF-8 byte length. localStorage quotas are counted in bytes while JS strings are UTF-16, so a
+ * Chinese document takes 3 bytes per character — measuring `html.length` under-reported it by ~3x.
+ */
+export function utf8Bytes(text: string): number {
+  if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(text).length;
+  let bytes = text.length;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (code > 0x7ff) bytes += 2;
+    else if (code > 0x7f) bytes += 1;
+  }
+  return bytes;
+}
 
 /** Editing view mode: flow (continuous scrolling) / paged (A4 page guides) */
 export type ViewMode = 'flow' | 'paged';
@@ -49,13 +66,27 @@ export function readDraft(): RichTextDraftV2 | null {
   return migrated.value;
 }
 
+/** Serialize + measure once: what lands in storage is the whole payload (comments / changes / words too) */
+function measure(draft: RichTextDraftInput): { text: string; bytes: number } {
+  const text = JSON.stringify(toDraftV2(draft));
+  return { text, bytes: utf8Bytes(text) };
+}
+
+function putIfItFits(text: string, bytes: number): boolean {
+  if (bytes > MAX_DRAFT_BYTES) return false;
+  try {
+    localStorage.setItem(DRAFT_KEY_V2, text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Write the draft, returning success (oversized drafts are rejected rather than silently dropped) */
 export function writeDraft(draft: RichTextDraftInput): boolean {
   try {
-    const normalized = toDraftV2(draft);
-    if (normalized.html.length > MAX_DRAFT_BYTES) return false;
-    localStorage.setItem(DRAFT_KEY_V2, JSON.stringify(normalized));
-    return true;
+    const { text, bytes } = measure(draft);
+    return putIfItFits(text, bytes);
   } catch {
     return false;
   }
@@ -103,6 +134,21 @@ export interface DraftWriteResult {
   ok: boolean;
   /** Whether it was degraded (only fit after stripping images) */
   degraded: boolean;
+  /** UTF-8 bytes of the payload that was attempted (may exceed the limit when rejected) */
+  bytes: number;
+  /** `bytes / MAX_DRAFT_BYTES`, so the UI can warn before the write starts failing */
+  ratio: number;
+  /** True when the draft was rejected purely because of its size */
+  tooLarge: boolean;
+}
+
+/** How the UI should report a write: nothing, a "almost full" warning, or a hard failure */
+export type DraftWarningLevel = 'ok' | 'nearLimit' | 'failed';
+
+/** Single source of truth for the warning threshold, so the notice and its tests cannot drift */
+export function draftWarningLevel(result: DraftWriteResult): DraftWarningLevel {
+  if (!result.ok) return 'failed';
+  return result.ratio >= DRAFT_WARN_RATIO ? 'nearLimit' : 'ok';
 }
 
 /** Strip embedded images (first degradation step) */
@@ -110,15 +156,61 @@ function stripImages(html: string): string {
   return html.replace(/<img\b[^>]*>/gi, '');
 }
 
+const EMPTY_RESULT: DraftWriteResult = {
+  ok: false,
+  degraded: false,
+  bytes: 0,
+  ratio: 0,
+  tooLarge: false,
+};
+
 /**
  * Degraded write when over the limit: write as-is first; on failure retry without images;
  * if that also fails, return ok:false (the UI suggests exporting a file to keep the content).
  */
 export function writeDraftSafe(draft: RichTextDraftInput): DraftWriteResult {
-  if (writeDraft(draft)) return { ok: true, degraded: false };
-  const stripped = stripImages(draft.html);
-  if (stripped !== draft.html && writeDraft({ ...draft, html: stripped })) {
-    return { ok: true, degraded: true };
+  let original: { text: string; bytes: number };
+  try {
+    original = measure(draft);
+  } catch {
+    return EMPTY_RESULT;
   }
-  return { ok: false, degraded: false };
+
+  const ratio = original.bytes / MAX_DRAFT_BYTES;
+  if (putIfItFits(original.text, original.bytes)) {
+    return { ok: true, degraded: false, bytes: original.bytes, ratio, tooLarge: false };
+  }
+
+  const stripped = stripImages(draft.html);
+  if (stripped !== draft.html) {
+    try {
+      const fallback = measure({ ...draft, html: stripped });
+      if (putIfItFits(fallback.text, fallback.bytes)) {
+        return {
+          ok: true,
+          degraded: true,
+          bytes: fallback.bytes,
+          ratio: fallback.bytes / MAX_DRAFT_BYTES,
+          tooLarge: false,
+        };
+      }
+      return {
+        ok: false,
+        degraded: false,
+        bytes: fallback.bytes,
+        ratio: fallback.bytes / MAX_DRAFT_BYTES,
+        tooLarge: fallback.bytes > MAX_DRAFT_BYTES,
+      };
+    } catch {
+      return { ...EMPTY_RESULT, bytes: original.bytes, ratio };
+    }
+  }
+
+  return {
+    ok: false,
+    degraded: false,
+    bytes: original.bytes,
+    ratio,
+    tooLarge: original.bytes > MAX_DRAFT_BYTES,
+  };
 }

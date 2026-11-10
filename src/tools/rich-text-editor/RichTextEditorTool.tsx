@@ -53,6 +53,7 @@ import {
 } from './core';
 import {
   clearDraft,
+  draftWarningLevel,
   readDraft,
   readReviewerName,
   writeDraftSafe,
@@ -323,7 +324,7 @@ export default function RichTextEditorTool() {
   const [docs, setDocs] = useState<DocMeta[]>([]);
   const [versions, setVersions] = useState<StoredVersion[]>([]);
   const [docId, setDocId] = useState<string | null>(null);
-  const [draftNotice, setDraftNotice] = useState<'degraded' | 'failed' | null>(null);
+  const [draftNotice, setDraftNotice] = useState<'degraded' | 'nearLimit' | 'failed' | null>(null);
   /** 另一个标签页保存/删除了当前文档：提示用户，避免两边静默互相覆盖 */
   const [remoteChange, setRemoteChange] = useState<DocStoreEvent | null>(null);
   const [saved, setSaved] = useState(Boolean(initial));
@@ -498,8 +499,17 @@ export default function RichTextEditorTool() {
         templateId: templateIdRef.current || undefined,
       };
       const result = writeDraftSafe(withPrefs);
+      const level = draftWarningLevel(result);
       setSaved(result.ok);
-      setDraftNotice(result.ok ? (result.degraded ? 'degraded' : null) : 'failed');
+      setDraftNotice(
+        level === 'failed'
+          ? 'failed'
+          : level === 'nearLimit'
+            ? 'nearLimit'
+            : result.degraded
+              ? 'degraded'
+              : null,
+      );
       const id = ensureDocId();
       void saveDocument(id, withPrefs).then(() => {
         void listDocuments().then(setDocs);
@@ -2367,7 +2377,9 @@ export default function RichTextEditorTool() {
         <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
           {draftNotice === 'degraded'
             ? t('tools.richText.draftDegraded')
-            : t('tools.richText.draftSaveFailed')}
+            : draftNotice === 'nearLimit'
+              ? t('tools.richText.draftNearLimit')
+              : t('tools.richText.draftSaveFailed')}
         </p>
       )}
 

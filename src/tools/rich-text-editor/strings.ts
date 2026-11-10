@@ -149,6 +149,7 @@ const zh: ResourceTree = {
       restoreConfirm: '用该版本覆盖当前内容？',
       versionChars: '{{count}} 字符',
       draftDegraded: '草稿过大，已剥离图片后保存到本地。',
+      draftNearLimit: '本地草稿已接近容量上限，建议导出文件备份。',
       draftSaveFailed: '本地草稿保存失败，请导出文件以保留内容。',
       printFallback: '当前环境不支持打印对话框，已改用快照模式导出 PDF。',
       pageSetup: '页面设置',
@@ -517,6 +518,7 @@ const en: ResourceTree = {
       restoreConfirm: 'Overwrite the current content with this version?',
       versionChars: '{{count}} chars',
       draftDegraded: 'Draft too large: images were stripped to keep the local draft.',
+      draftNearLimit: 'The local draft is close to the storage limit. Export a file to back it up.',
       draftSaveFailed: 'Failed to save the local draft. Export a file to keep your content.',
       printFallback: 'Print dialog is unavailable here; exported as snapshot PDF instead.',
       pageSetup: 'Page setup',
@@ -889,6 +891,7 @@ const zhTW: ResourceTree = {
       restoreConfirm: '以該版本覆蓋目前內容？',
       versionChars: '{{count}} 字元',
       draftDegraded: '草稿過大，已剝離圖片後儲存到本機。',
+      draftNearLimit: '本機草稿已接近容量上限，建議匯出檔案備份。',
       draftSaveFailed: '本機草稿儲存失敗，請匯出檔案以保留內容。',
       printFallback: '目前環境不支援列印對話框，已改用快照模式匯出 PDF。',
       pageSetup: '版面設定',
@@ -1257,6 +1260,8 @@ const ja: ResourceTree = {
       restoreConfirm: '現在の内容をこのバージョンで上書きしますか？',
       versionChars: '{{count}} 文字',
       draftDegraded: '下書きが大きすぎるため、画像を取り除いて保存しました。',
+      draftNearLimit:
+        'ローカル下書きが容量の上限に近づいています。書き出してバックアップしてください。',
       draftSaveFailed: 'ローカル下書きの保存に失敗しました。内容を残すには書き出してください。',
       printFallback:
         'この環境では印刷ダイアログを使用できないため、スナップショットで書き出しました。',
@@ -1639,6 +1644,8 @@ const fr: ResourceTree = {
       restoreConfirm: 'Remplacer le contenu actuel par cette version\u00a0?',
       versionChars: '{{count}} caractères',
       draftDegraded: "Brouillon trop volumineux : images retirées pour l'enregistrement local.",
+      draftNearLimit:
+        'Le brouillon local approche de la limite de stockage. Exportez un fichier pour le sauvegarder.',
       draftSaveFailed:
         "Échec de l'enregistrement local. Exportez un fichier pour conserver le contenu.",
       printFallback:
@@ -2026,6 +2033,8 @@ const de: ResourceTree = {
       restoreConfirm: 'Aktuellen Inhalt mit dieser Version überschreiben?',
       versionChars: '{{count}} Zeichen',
       draftDegraded: 'Entwurf zu groß: Bilder wurden für die lokale Speicherung entfernt.',
+      draftNearLimit:
+        'Der lokale Entwurf nähert sich dem Speicherlimit. Exportieren Sie eine Datei zur Sicherung.',
       draftSaveFailed:
         'Lokaler Entwurf konnte nicht gespeichert werden. Exportieren Sie eine Datei.',
       printFallback: 'Druckdialog hier nicht verfügbar; PDF wurde als Snapshot exportiert.',
@@ -2413,6 +2422,8 @@ const it: ResourceTree = {
       restoreConfirm: 'Sovrascrivere il contenuto attuale con questa versione?',
       versionChars: '{{count}} caratteri',
       draftDegraded: 'Bozza troppo grande: immagini rimosse per il salvataggio locale.',
+      draftNearLimit:
+        'La bozza locale è vicina al limite di archiviazione. Esporta un file per conservarla.',
       draftSaveFailed:
         'Salvataggio locale non riuscito. Esporta un file per conservare il contenuto.',
       printFallback: 'Finestra di stampa non disponibile; esportato come PDF snapshot.',
@@ -2800,6 +2811,8 @@ const es: ResourceTree = {
       restoreConfirm: '¿Sobrescribir el contenido actual con esta versión?',
       versionChars: '{{count}} caracteres',
       draftDegraded: 'Borrador demasiado grande: se quitaron las imágenes para guardarlo.',
+      draftNearLimit:
+        'El borrador local está cerca del límite de almacenamiento. Exporta un archivo para conservarlo.',
       draftSaveFailed:
         'No se pudo guardar el borrador local. Exporta un archivo para conservar el contenido.',
       printFallback:
@@ -3186,6 +3199,8 @@ const pt: ResourceTree = {
       restoreConfirm: 'Substituir o conteúdo atual por esta versão?',
       versionChars: '{{count}} caracteres',
       draftDegraded: 'Rascunho grande demais: as imagens foram removidas para guardar localmente.',
+      draftNearLimit:
+        'O rascunho local está próximo do limite de armazenamento. Exporte um arquivo para preservá-lo.',
       draftSaveFailed:
         'Falha ao guardar o rascunho local. Exporte um ficheiro para manter o conteúdo.',
       printFallback: 'Diálogo de impressão indisponível; exportado como PDF de instantâneo.',

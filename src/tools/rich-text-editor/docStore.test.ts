@@ -90,7 +90,7 @@ describe('writeDraftSafe (degradation over the limit)', () => {
 
   it('writes normal content directly', () => {
     const result = writeDraftSafe({ title: 't', html: '<p>hello</p>' });
-    expect(result).toEqual({ ok: true, degraded: false });
+    expect(result).toMatchObject({ ok: true, degraded: false });
     expect(localStorage.getItem(DRAFT_KEY_V2)).toContain('hello');
   });
 
