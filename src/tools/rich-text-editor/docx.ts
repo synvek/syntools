@@ -46,6 +46,7 @@ import {
   toDocxStyleId,
 } from './namedStyleDocx';
 import { applyParagraphControls, parseDocxParagraphControls } from './docxParagraphControls';
+import { parseTabStops, TAB_ATTR, TAB_STOPS_ATTR, tabsToTabNodes } from './tabStops';
 import type { OoxmlIr, OoxmlParts } from './ooxmlIr';
 import { isOoxmlIrEnabled } from './ooxmlIrFlag';
 import {
@@ -426,6 +427,36 @@ function applyTextTransform(text: string, transform: Mark['textTransform']): str
   return text;
 }
 
+/**
+ * Tab stops of a paragraph: `data-tab-stops` (`96:left,192:right`) -> Word's `w:tabs`.
+ * Positions are CSS px from the text edge; Word counts twips from the same edge, so the conversion is
+ * the usual ×15 — no separate indent arithmetic, which keeps the two sides symmetric with the import.
+ */
+function paragraphTabStops(
+  raw: string | null | undefined,
+): import('docx').TabStopDefinition[] | undefined {
+  const stops = parseTabStops(raw);
+  if (stops.length === 0) return undefined;
+  // `TabStopType` values are the same words we store ('left' / 'center' / 'right' / 'decimal')
+  return stops.map((stop) => ({ type: stop.align, position: Math.round(stop.pos * PX_TO_TWIP) }));
+}
+
+/**
+ * Run children for text containing tabs. Word only advances to a tab stop on `<w:tab/>`; a raw `\t`
+ * inside `w:t` is not a tab at all (the docx writer copies it verbatim, and Word shows nothing).
+ */
+function runChildren(text: string, D: DocxNs): IRunOptionsChildren | null {
+  if (!text.includes('\t')) return null;
+  const children: (string | import('docx').Tab)[] = [];
+  text.split('\t').forEach((part, index) => {
+    if (index > 0) children.push(new D.Tab());
+    if (part) children.push(part);
+  });
+  return children as IRunOptionsChildren;
+}
+
+type IRunOptionsChildren = NonNullable<import('docx').IRunOptions['children']>;
+
 /** Create one text run (automatically wrapped as a revision when tracking) */
 function createTextRun(
   ctx: ExportContext,
@@ -434,8 +465,10 @@ function createTextRun(
   text: string,
 ): RunChild {
   const { D } = ctx;
+  const content = applyTextTransform(text, mark.textTransform);
+  const children = runChildren(content, D);
   const options = {
-    text: applyTextTransform(text, mark.textTransform),
+    ...(children ? { children } : { text: content }),
     bold: mark.bold,
     italics: mark.italics,
     strike: mark.strike,
@@ -483,6 +516,12 @@ function collectInlineRuns(
     }
     if (node.nodeType !== 1) return;
     const el = node as Element;
+
+    // P1-4 制表位: the tab atom becomes `<w:tab/>`, which is the only thing Word advances on
+    if (el.hasAttribute(TAB_ATTR)) {
+      runs.push({ node: new D.TextRun({ children: [new D.Tab()] }), commentIds });
+      return;
+    }
 
     // Tracked revisions: inner text produces native Word revision runs
     if (el.tagName === 'INS' && el.getAttribute('data-track') === 'insert') {
@@ -1021,6 +1060,8 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       keepNext: el.hasAttribute('data-keep-next') || undefined,
       keepLines: el.hasAttribute('data-keep-lines') || undefined,
       widowControl: el.getAttribute('data-widow-control') === 'off' ? false : undefined,
+      // P1-4 制表位: `w:tabs`; the tab characters themselves become `<w:tab/>` runs (see runChildren)
+      tabStops: paragraphTabStops(el.getAttribute(TAB_STOPS_ATTR)),
       // A format revision marks the whole block: the mark's own span tells us the previous kind
       revision: (() => {
         const target = el.querySelector('[data-track-format]')?.getAttribute('data-track-format');
@@ -1364,7 +1405,10 @@ export async function importDocx(
       const imported = await readOoxmlIr(buffer, documentXml);
       if (imported) options.onIr(imported);
     }
-    return { ok: true, value: html };
+    // P1-4 制表位 last: mammoth hands `<w:tab/>` over as `\t` text, which ProseMirror's parser would
+    // collapse into a space on the next `setContent`. Only after every text-matching pass (review,
+    // shapes) has run, because the tab atom no longer contributes to `textContent`.
+    return { ok: true, value: tabsToTabNodes(html) };
   } catch (error) {
     console.error('[richText] docx import failed:', error);
     return { ok: false, error: 'IMPORT_FAILED' };

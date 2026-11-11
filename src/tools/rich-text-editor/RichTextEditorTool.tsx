@@ -205,6 +205,15 @@ const TOC_EXPORT_CSS =
   '.rte-toc-text{flex:1;min-width:0;overflow-wrap:anywhere}' +
   '.rte-toc-page{flex-shrink:0;color:#6b7280}';
 
+/**
+ * Tab stops (P1-4) for single-file HTML export: the file carries no editor stylesheet, and a bare
+ * `<span data-rte-tab>` would collapse to nothing (words run together). Inlining the default grid
+ * keeps the export readable; custom stops print on the same 0.5in grid, as registered in the plan.
+ */
+const TAB_EXPORT_CSS =
+  '[data-rte-tab]{white-space:pre;tab-size:48px;-moz-tab-size:48px}' +
+  '[data-rte-tab]::before{content:"\\9"}';
+
 /** Wait for the next frame to finish rendering (layout must settle before printing/screenshotting) */
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
@@ -1631,7 +1640,7 @@ export default function RichTextEditorTool() {
     if (!editor) return;
     // Single-file HTML uses KaTeX MathML so formulas render correctly without shipping the stylesheet
     const body = injectMath(prepareExportHtml(editor.getHTML()));
-    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem;vertical-align:top}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}${TABLE_EXPORT_CSS}${IMAGE_EXPORT_CSS}${TOC_EXPORT_CSS}</style></head><body>${body}</body></html>`;
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title || 'document'}</title><style>body{font-family:'PingFang SC','Microsoft YaHei',Arial,sans-serif;max-width:170mm;margin:20mm auto;line-height:1.8;font-size:15px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:.4rem .6rem;vertical-align:top}pre{background:#f3f4f6;padding:.75rem .9rem;border-radius:.5rem}${TABLE_EXPORT_CSS}${IMAGE_EXPORT_CSS}${TOC_EXPORT_CSS}${TAB_EXPORT_CSS}</style></head><body>${body}</body></html>`;
     const bytes = new TextEncoder().encode(html);
     downloadBytes(bytes, buildExportFilename(title || 'document', 'html'), 'text/html');
   };

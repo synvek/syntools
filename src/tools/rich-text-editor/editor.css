@@ -1828,3 +1828,93 @@ button.rte-toc-text:hover {
 .rte-ruler-handle--left::after {
   border-top-color: #475569;
 }
+
+/* P1-4 制表位: the tab is an inline atom (`<span data-rte-tab>`), not a `\t` character — ProseMirror's
+   HTML parser collapses whitespace, so a text tab would turn into a space on the next draft reload.
+   Without custom stops the atom carries a real tab (via ::before) and steps on Word's default 0.5in
+   grid, so editor, page view and print agree. Custom stops get an explicit advance from the TabStops
+   decoration (`.rte-tab--measured`), which only exists in the editor / page view. */
+.rte-surface .tiptap .rte-tab,
+.rte-print-flow .rte-tab {
+  white-space: pre;
+  tab-size: 48px;
+  -moz-tab-size: 48px;
+}
+
+.rte-surface .tiptap .rte-tab::before,
+.rte-print-flow .rte-tab::before {
+  content: '\0009';
+}
+
+/* A measured tab is a fixed-width box and paints nothing, so the character inside is dropped */
+.rte-surface .tiptap .rte-tab--measured {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: baseline;
+}
+
+.rte-surface .tiptap .rte-tab--measured::before {
+  content: none;
+}
+
+/* Click target for adding a stop: the tick strip of the horizontal ruler (not the vertical one) */
+.rte-ruler-content:not(.rte-ruler-content--v) {
+  cursor: default;
+  pointer-events: auto;
+  /* Keep the caret in the editor when the ruler is clicked (Word behaves the same way) */
+  user-select: none;
+}
+
+/* Tab stop marker on the ruler: an "L" (left-aligned stop), teal so it reads apart from the
+   blue indent markers */
+.rte-ruler-tabstop {
+  position: absolute;
+  bottom: 0;
+  width: 9px;
+  height: 9px;
+  margin-left: -4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.rte-ruler-tabstop::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid #0d9488;
+}
+
+.rte-ruler-tabstop::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 0;
+  bottom: 0;
+  border-top: 1px solid #0d9488;
+}
+
+/* Center / right / decimal stops are drawn with a distinguishing notch instead of a plain foot */
+.rte-ruler-tabstop[data-align='center']::after {
+  left: 0;
+  right: auto;
+  width: 9px;
+  border-top-style: dashed;
+}
+
+.rte-ruler-tabstop[data-align='right']::after {
+  left: 0;
+  right: 4px;
+  border-top-style: solid;
+}
+
+.rte-ruler-tabstop[data-align='decimal']::after {
+  left: 0;
+  right: 0;
+  border-top-style: dotted;
+}

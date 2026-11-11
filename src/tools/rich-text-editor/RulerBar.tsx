@@ -3,12 +3,14 @@ import {
   useEffect,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { ViewMode } from './draft';
 import { MM_TO_PX, type PageMargins, type PageMetrics } from './pageSetup';
+import { normalizeTabStops, removeTabStop, setTabStop, type TabStop } from './tabStops';
 
 /**
  * Ruler (modeled on Word): a horizontal ruler at the top and a vertical one on the left, showing
@@ -40,6 +42,8 @@ interface RulerIndent {
   /** Hanging indent (> 0 means the first line marker drives `hanging` instead of `textIndent`) */
   hanging: number;
   firstLine: number;
+  /** P1-4 制表位 of the caret paragraph (px from the text edge, like Word's `w:tabs`) */
+  tabStops: TabStop[];
 }
 
 interface RulerGeometry {
@@ -157,6 +161,7 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
         right: Number(attrs.indentRight ?? 0),
         hanging: Number(attrs.hangingIndent ?? 0),
         firstLine: Number(attrs.textIndent ?? 0),
+        tabStops: normalizeTabStops(attrs.tabStops),
       });
     } else {
       setIndent(null);
@@ -288,6 +293,29 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
     caret.x <= contentWidth &&
     caret.y >= 0 &&
     caret.y <= contentHeight;
+  /** Document CSS px -> ruler screen px (the ruler sits outside the `zoom` layer) */
+  const zoomPx = (value: number) => value * (zoom || 1);
+
+  /**
+   * Click on the tick strip sets a left tab stop exactly where the user clicked (snapped to the
+   * 4px grid the indent drag uses). Clicking an existing marker removes it — Word hides that behind
+   * a dialog, but the ruler is the direct manipulation surface here (`TabStops` honours the stops
+   * in the editor; `.docx` export writes them as `w:tabs`).
+   */
+  const addTabStop = (event: ReactMouseEvent<HTMLSpanElement>) => {
+    if (!editor || !indent) return;
+    const target = event.target as HTMLElement;
+    // Markers and indent handles have their own handlers
+    if (target.closest('.rte-ruler-handle, .rte-ruler-tabstop')) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / (zoom || 1);
+    if (x < 4 || x > contentWidth / (zoom || 1) - 4) return;
+    const pos = Math.round(x / 4) * 4;
+    editor
+      .chain()
+      .setParagraphTabStops(setTabStop(indent.tabStops, { pos, align: 'left' }))
+      .run();
+  };
 
   return (
     <>
@@ -302,7 +330,13 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
           {geo.padLeft > 0 ? (
             <span className="rte-ruler-pad" style={{ width: `${geo.padLeft}px` }} />
           ) : null}
-          <span className="rte-ruler-content" style={{ width: `${contentWidth}px` }}>
+          <span
+            className="rte-ruler-content"
+            style={{ width: `${contentWidth}px` }}
+            // Keep the caret in the editor: clicking the ruler must not blur it (Word behaves the same)
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={addTabStop}
+          >
             <span
               className="rte-ruler-ticks rte-ruler-ticks--minor"
               style={{ backgroundSize: `${mmPx}px 100%` }}
@@ -335,7 +369,7 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
                   data-value={indent.hanging > 0 ? indent.hanging : indent.firstLine}
                   className="rte-ruler-handle rte-ruler-handle--first"
                   style={{
-                    left: `${indent.hanging > 0 ? Math.max(0, indent.left - indent.hanging) : indent.firstLine}px`,
+                    left: `${zoomPx(indent.hanging > 0 ? Math.max(0, indent.left - indent.hanging) : indent.firstLine)}px`,
                   }}
                   onPointerDown={beginDrag('first')}
                   onPointerMove={moveDrag}
@@ -349,7 +383,7 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
                   data-testid="rte-ruler-handle-left"
                   data-value={indent.left}
                   className="rte-ruler-handle rte-ruler-handle--left"
-                  style={{ left: `${indent.left}px` }}
+                  style={{ left: `${zoomPx(indent.left)}px` }}
                   onPointerDown={beginDrag('left')}
                   onPointerMove={moveDrag}
                   onPointerUp={endDrag}
@@ -364,12 +398,36 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
                   className="rte-ruler-handle rte-ruler-handle--right"
                   // Keep the whole handle inside the track: it is clipped at the content edge, and a
                   // half-clipped handle cannot be grabbed
-                  style={{ left: `${Math.max(6, contentWidth - indent.right - 6)}px` }}
+                  style={{ left: `${Math.max(6, contentWidth - zoomPx(indent.right) - 6)}px` }}
                   onPointerDown={beginDrag('right')}
                   onPointerMove={moveDrag}
                   onPointerUp={endDrag}
                   onPointerCancel={endDrag}
                 />
+                {/* P1-4 制表位: markers of the caret paragraph. Click adds one on the tick strip,
+                    clicking a marker removes it again. */}
+                {indent.tabStops.map((stop) => (
+                  <button
+                    key={`${stop.align}-${stop.pos}`}
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    data-testid="rte-ruler-tabstop"
+                    data-pos={stop.pos}
+                    data-align={stop.align}
+                    className="rte-ruler-tabstop"
+                    style={{ left: `${zoomPx(stop.pos)}px` }}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (!editor) return;
+                      editor
+                        .chain()
+                        .setParagraphTabStops(removeTabStop(indent.tabStops, stop.pos))
+                        .run();
+                    }}
+                  />
+                ))}
               </>
             ) : null}
           </span>

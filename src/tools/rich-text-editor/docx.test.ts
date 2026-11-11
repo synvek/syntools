@@ -1066,3 +1066,41 @@ describe('paragraph pagination control in .docx (P1-4)', () => {
     expect(body).toContain('w:line="300"');
   });
 });
+
+describe('docx export: tab stops (P1-4)', () => {
+  it('writes w:tabs and turns the tab atom into a w:tab run', async () => {
+    const html = '<p data-tab-stops="96:left,240:right">甲<span data-rte-tab="true"></span>乙</p>';
+    const result = await exportDocxBlob(html, '制表位', DEFAULT_PAGE_SETUP, null, []);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const body = await readDocumentXml(result.value);
+    expect(body).toContain('<w:tabs>');
+    // CSS px -> twips (×15): the same conversion the indent writer uses
+    expect(body).toContain('w:pos="1440"');
+    expect(body).toContain('w:pos="3600"');
+    expect(body).toContain('w:val="right"');
+    // Word only advances on <w:tab/>, not on a literal tab inside w:t
+    expect(body).toContain('<w:tab/>');
+  });
+
+  it('returns both the stops and the tab after an import', async () => {
+    const html = '<p data-tab-stops="96:left">甲<span data-rte-tab="true"></span>乙</p>';
+    const exported = await exportDocxBlob(html, '制表位', DEFAULT_PAGE_SETUP, null, []);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    const file = new File([exported.value], 'tabs.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    if (typeof file.arrayBuffer !== 'function') {
+      Object.defineProperty(file, 'arrayBuffer', {
+        value: () => blobToArrayBuffer(exported.value),
+      });
+    }
+    const imported = await importDocx(file);
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.value).toContain('data-tab-stops="96:left"');
+    // mammoth hands `<w:tab/>` over as `\t`; the atom is what survives ProseMirror's parser
+    expect(imported.value).toContain('data-rte-tab="true"');
+  });
+});

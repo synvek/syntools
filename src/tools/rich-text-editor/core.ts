@@ -279,6 +279,11 @@ export function htmlToPlain(html: string): string {
       }
       if (node.nodeType !== 1) return;
       const el = node as Element;
+      // 制表位 atom (P1-4): plain text has no tab stops, but the words either side must not merge
+      if (el.hasAttribute('data-rte-tab')) {
+        chunks.push(' ');
+        return;
+      }
       if (BLOCK_TAGS.has(el.tagName)) {
         chunks.push('\n');
         walk(el);

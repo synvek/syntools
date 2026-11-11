@@ -4,13 +4,16 @@
  * `keepNext` / `keepLines` / `widowControl` live in `w:pPr`, and mammoth — the converter behind the
  * import — throws `w:pPr` away (it only keeps the style name). So the export writes the flags and the
  * import re-reads them here, straight from `word/document.xml`, and stamps them back as the same
- * `data-*` attributes the editor already renders.
+ * `data-*` attributes the editor already renders. Tab stops (`w:tabs`, P1-4 last slice) ride along on
+ * the same pass: mammoth keeps `<w:tab/>` as a `\t` character but drops the stop list.
  *
  * Ordering is the whole risk: `w:p` elements can be matched reliably (they never nest), but the HTML
  * mammoth produces is not one-to-one when lists come into play (`<li>` replaces the paragraph wrapper).
  * The mapping therefore only runs when the two block counts agree exactly, and silently leaves the
  * document alone otherwise — a wrong flag on the wrong paragraph is worse than a lost flag.
  */
+
+import { formatTabStops, normalizeTabStops, TAB_STOPS_ATTR, type TabStop } from './tabStops';
 
 export interface DocxParagraphControl {
   keepNext: boolean;
@@ -23,6 +26,8 @@ export interface DocxParagraphControl {
    * those are absolute lengths in twips and cannot be expressed as a multiple.
    */
   lineHeight: number | null;
+  /** P1-4 制表位 (`w:tabs`), converted from twips to CSS px */
+  tabStops: TabStop[];
 }
 
 /** Every `w:p` in document order, including the ones inside table cells */
@@ -30,6 +35,8 @@ const PARAGRAPH_RE = /<w:p(?:\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/w:p>)/g;
 /** Only the property block matters; `w:val="0"` is an explicit off switch for any toggle */
 const PROPERTIES_RE = /<w:pPr\b[^>]*>([\s\S]*?)<\/w:pPr>/;
 const SPACING_RE = /<w:spacing\b([^>]*)\/?>/;
+const TABS_BLOCK_RE = /<w:tabs\b[^>]*>([\s\S]*?)<\/w:tabs>/;
+const TAB_STOP_RE = /<w:tab\b([^>]*?)\/?>/g;
 
 function toggleOn(properties: string, name: string): boolean {
   const match = new RegExp(`<w:${name}\\b([^>]*)/?>`).exec(properties);
@@ -56,6 +63,23 @@ function lineHeightOf(properties: string): number | null {
   return Math.round((line / 240) * 100) / 100;
 }
 
+/** `w:tabs` -> stops in CSS px (Word counts twips from the same text edge, 1px = 15twip) */
+function tabStopsOf(properties: string): TabStop[] {
+  const block = TABS_BLOCK_RE.exec(properties)?.[1];
+  if (!block) return [];
+  const stops: TabStop[] = [];
+  for (const match of block.matchAll(TAB_STOP_RE)) {
+    const attrs = match[1] ?? '';
+    const pos = Number.parseInt(/w:pos="(-?\d+)"/.exec(attrs)?.[1] ?? '', 10);
+    if (!Number.isFinite(pos) || pos < 0) continue;
+    const value = /w:val="([^"]*)"/.exec(attrs)?.[1] ?? 'left';
+    // `clear` removes an inherited stop and `bar` draws a vertical rule: neither is a stop we render
+    if (value === 'clear' || value === 'bar') continue;
+    stops.push({ pos: Math.round(pos / 15), align: value as TabStop['align'] });
+  }
+  return normalizeTabStops(stops);
+}
+
 export function parseDocxParagraphControls(xml: string): DocxParagraphControl[] {
   if (!xml.includes('<w:p')) return [];
   const controls: DocxParagraphControl[] = [];
@@ -67,6 +91,7 @@ export function parseDocxParagraphControls(xml: string): DocxParagraphControl[] 
       keepLines: toggleOn(properties, 'keepLines'),
       widowControl: toggleOff(properties, 'widowControl') ? false : null,
       lineHeight: lineHeightOf(properties),
+      tabStops: tabStopsOf(properties),
     });
   }
   return controls;
@@ -94,6 +119,9 @@ export function applyParagraphControls(
     if (control.keepNext) block.setAttribute('data-keep-next', 'true');
     if (control.keepLines) block.setAttribute('data-keep-lines', 'true');
     if (control.widowControl === false) block.setAttribute('data-widow-control', 'off');
+    if (control.tabStops.length > 0) {
+      block.setAttribute(TAB_STOPS_ATTR, formatTabStops(control.tabStops));
+    }
     if (control.lineHeight) {
       // Inline style, because line spacing *is* the CSS: the paragraph attribute parses it back
       const existing = block.getAttribute('style');

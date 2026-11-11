@@ -138,3 +138,46 @@ test('rich text: dragging a ruler marker sets the paragraph indent', async ({ pa
   await page.mouse.up();
   await expect(paragraph).toHaveAttribute('style', /margin-right: (?:3[2-9]|[4-6]\d)px/);
 });
+
+test('rich text: clicking the ruler sets a tab stop and Tab lands on it', async ({ page }) => {
+  await openRichText(page);
+  await page.keyboard.type('甲');
+
+  // Click the tick strip: the stop lands where the pointer is (snapped to the 4px grid)
+  const content = page.locator('.rte-ruler-content:not(.rte-ruler-content--v)');
+  await expect(content).toBeVisible();
+  await content.click({ position: { x: 200, y: 8 } });
+
+  const marker = page.getByTestId('rte-ruler-tabstop');
+  await expect(marker).toHaveCount(1);
+  const pos = Number(await marker.getAttribute('data-pos'));
+  expect(pos).toBeGreaterThan(190);
+  expect(pos).toBeLessThan(210);
+  await expect(page.locator('.tiptap p').first()).toHaveAttribute(
+    'data-tab-stops',
+    new RegExp(`^${pos}:left$`),
+  );
+
+  // Tab inserts the atom (not a `\t` text node) and the following text starts at the stop
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('乙');
+  const tab = page.locator('.tiptap .rte-tab').first();
+  await expect(tab).toHaveCount(1);
+
+  const paragraphBox = await page.locator('.tiptap p').first().boundingBox();
+  const tabBox = await tab.boundingBox();
+  expect(paragraphBox && tabBox).toBeTruthy();
+  if (!paragraphBox || !tabBox) return;
+  // Measured advance: the tab starts where the text ends and pushes the next text onto the stop
+  expect(tabBox.width).toBeGreaterThan(100);
+  expect(Math.abs(tabBox.x + tabBox.width - paragraphBox.x - pos)).toBeLessThan(2);
+
+  // Shift-Tab steps back one stop: it walks left over the text and removes the tab it runs into
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('.tiptap .rte-tab')).toHaveCount(0);
+
+  // Clicking the marker again removes the stop
+  await marker.click();
+  await expect(page.getByTestId('rte-ruler-tabstop')).toHaveCount(0);
+  await expect(page.locator('.tiptap p').first()).not.toHaveAttribute('data-tab-stops');
+});

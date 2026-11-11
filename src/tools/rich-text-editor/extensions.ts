@@ -27,6 +27,7 @@ import {
 import { Comment, DocMarkCommands, TrackedDelete, TrackedFormat, TrackedInsert } from './marks';
 import { RevisionTracking, type TrackingEntry } from './tracking';
 import { NamedStyleAttribute } from './namedStyles';
+import { DocTab, TabStops } from './tabStops';
 import { createPageLayoutPlugin, type PageLayoutSnapshot } from './PageView';
 import { resolvePageMetrics, type PageMetrics } from './pageSetup';
 import { DEFAULT_TOC_LABELS, TableOfContents, type TocLabels } from './toc';
@@ -325,6 +326,10 @@ export function createExtensions({
     DocBookmark,
     ParagraphStyle,
     BlockStyleCommands,
+    // 制表位（P1-4）：Tab 插入制表符节点（不是 `\t` 文本 —— HTML 解析会把制表符揉成空格），
+    // 自定义制表位按实测推进量渲染，标尺上可点设
+    DocTab,
+    TabStops,
     NamedStyleAttribute,
     Comment,
     TrackedInsert,

@@ -12,6 +12,13 @@ import {
   keepImageSelected,
   normalizeImageLayer,
 } from './imageLayer';
+import {
+  formatTabStops,
+  normalizeTabStops,
+  parseTabStops,
+  TAB_STOPS_ATTR,
+  type TabStop,
+} from './tabStops';
 
 /**
  * Typography details extension (modeled on Word):
@@ -65,6 +72,8 @@ interface StyleAttrs {
   widowControl?: boolean | null;
   /** P1-4: line spacing as a multiple of the font size (Word's `w:line` + `w:lineRule="auto"`) */
   lineHeight?: number | null;
+  /** P1-4 制表位：Word's `w:tabs` (px from the paragraph's text edge) */
+  tabStops?: TabStop[] | null;
   width?: number | null;
   align?: string | null;
   /** Image layer: inline / front (in front of text) / behind (behind text) */
@@ -163,6 +172,16 @@ const ParagraphStyle = Extension.create({
             parseHTML: (el: HTMLElement) => readLineHeight(el),
             renderHTML: (attrs: StyleAttrs) =>
               attrs.lineHeight ? { style: `line-height: ${attrs.lineHeight}` } : {},
+          },
+          // P1-4 制表位. The tab character stays in the text (drafts / getHTML / the docx writer all
+          // need it); this attribute only carries the stop list, exactly like `w:tabs` does
+          tabStops: {
+            default: null,
+            parseHTML: (el: HTMLElement) => parseTabStops(el.getAttribute(TAB_STOPS_ATTR)),
+            renderHTML: (attrs: StyleAttrs) => {
+              const stops = normalizeTabStops(attrs.tabStops);
+              return stops.length > 0 ? { [TAB_STOPS_ATTR]: formatTabStops(stops) } : {};
+            },
           },
         },
       },
@@ -329,6 +348,10 @@ declare module '@tiptap/core' {
        * 行距是段落属性，mark 会在每个 span 边界断开，导出到 `.docx` 也只能落到 `w:spacing`。
        */
       setParagraphLineHeight: (value: number | null) => ReturnType;
+      /**
+       * P1-4 制表位：整段替换（null / 空数组清除）。与 `w:tabs` 一一对应，制表符本身留在正文里。
+       */
+      setParagraphTabStops: (stops: readonly TabStop[] | null) => ReturnType;
     };
     imageStyle: {
       /** Set image width (px; null = natural size) and alignment */
@@ -426,6 +449,19 @@ export const BlockStyleCommands = Extension.create({
               ? null
               : Math.round(Math.max(0.8, Math.min(4, value)) * 100) / 100;
           tr.setNodeMarkup($from.before(), undefined, { ...node.attrs, lineHeight: next });
+          return true;
+        },
+      setParagraphTabStops:
+        (stops) =>
+        ({ state, tr }) => {
+          const { $from } = state.selection;
+          const node = $from.parent;
+          if (node.type.name !== 'paragraph') return false;
+          const normalized = normalizeTabStops(stops ? [...stops] : []);
+          tr.setNodeMarkup($from.before(), undefined, {
+            ...node.attrs,
+            tabStops: normalized.length > 0 ? normalized : null,
+          });
           return true;
         },
       setImageStyle:

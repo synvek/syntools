@@ -131,6 +131,11 @@ export function htmlToMarkdown(html: string): string {
             text += `$${el.getAttribute('data-latex') ?? ''}$`;
             break;
           }
+          // 制表位 atom (P1-4): Markdown has no tab stops (a tab would read as indentation), keep a space
+          if (el.hasAttribute('data-rte-tab')) {
+            text += ' ';
+            break;
+          }
           // Comment marks (data-comment-id) have no Markdown equivalent: keep the text and report the marks in the loss list
           const style = inlineStyleAttr(el);
           text += style ? `<span style="${style}">${inner}</span>` : inner;

@@ -390,9 +390,9 @@ graph TD
 
 ### 6.4 P1-4 页面排版细节
 
-- [~] **P1-4 页面排版细节**（P1，5d）—— 五片完成：分页控制三件套 + `.docx` 往返、标尺缩进标记与拖拽、行距段落化、奇偶页不同、页眉页脚双击就地编辑；只剩制表位
+- [x] **P1-4 页面排版细节**（P1，5d）—— 六片完成：分页控制三件套 + `.docx` 往返、标尺缩进标记与拖拽、行距段落化、奇偶页不同、页眉页脚双击就地编辑、标尺制表位（自定义停位在编辑区按实测推进量对齐）
 - **目标**：补 `keepNext` / `keepLines` / `widowControl`、制表位与标尺拖拽缩进、页眉页脚可视化编辑、奇偶/首页不同。
-- **任务清单**：~~`blockStyles.ts` / `ParagraphStyle` 扩属性~~（第一片）→ ~~`docx.ts` 映射 `w:keepNext` 等~~（第一片）→ ~~`.docx` 回读 `w:pPr` 分页位~~（第一片）→ ~~`RulerBar.tsx` 缩进标记与拖拽~~（第二片）→ ~~行距段落化（`w:spacing` 往返）~~（第三片）→ ~~奇偶页不同（`w:evenAndOddHeaders` + `even` 部件往返）~~（第四片）→ ~~页眉页脚双击就地编辑浮层~~（第五片）→ 制表位（待做）→ 打印/快照 PDF 一致性验证（五片均复核，无回归）
+- **任务清单**：~~`blockStyles.ts` / `ParagraphStyle` 扩属性~~（第一片）→ ~~`docx.ts` 映射 `w:keepNext` 等~~（第一片）→ ~~`.docx` 回读 `w:pPr` 分页位~~（第一片）→ ~~`RulerBar.tsx` 缩进标记与拖拽~~（第二片）→ ~~行距段落化（`w:spacing` 往返）~~（第三片）→ ~~奇偶页不同（`w:evenAndOddHeaders` + `even` 部件往返）~~（第四片）→ ~~页眉页脚双击就地编辑浮层~~（第五片）→ ~~制表位（标尺点击设置 + `w:tabs` 往返）~~（第六片）→ 打印/快照 PDF 一致性验证（五片均复核，无回归）
 - **已完成（2026-11-11 · 第一片 · 分页控制）**：
   - `blockStyles.ts`：`ParagraphStyle` 新增 `keepNext` / `keepLines` / `widowControl` 三个段落属性。前两者写 `data-keep-next` / `data-keep-lines`，孤行控制只存「关闭」态（`data-widow-control="off"`）—— 开着是文档默认，存 true 只会让 HTML 变脏。用 `data-*` 而不是 inline style：分页控制是元数据，不是外观，CSS 与 `.docx` 各自决定怎么兑现
   - `BlockStyleCommands.setParagraphPagination(patch)`：只写传入的字段，所以「开段中不分页」不会把「段内不拆页」清掉（与 `setParagraphIndent` 同一套部分更新语义）
@@ -431,12 +431,29 @@ graph TD
   - 「首页不同」时第 1 页不提供命中区：模型里没有首页自己的文本，Word 的首个空页就是这个特性本身，给一个改不动的输入框只会骗人
   - 可访问性：命中区是真 `<button>`，`Enter` / `Space` 同样能打开，标签为「双击编辑页眉 / 页脚」（× 9 语言）；打印时整层 `display: none`
   - 测试：`pageSetup.test.ts` +2 例（按页选字段 / 开关关闭恒为默认部件），`e2e/office-p2.spec.ts` +1 例（双击命中区 → 输入 → 回显到 sheet 与面板 → `Esc` 不落盘）
-- **剩余（第五片之后）**：标尺上的制表位（tab stop）与点击设置
+- **已完成（2026-11-11 · 第六片 · 标尺制表位）**：
+  - 模型：`ParagraphStyle` 新增 `tabStops`（`TabStop[]`，px 自文本边起算），HTML 上是 `data-tab-stops="96:left,240:right"`，与 Word 的 `w:tabs` 一一对应；`BlockStyleCommands.setParagraphTabStops(stops | null)` 整段替换。制表位是元数据不是外观，所以不写内联 style
+  - 制表符做成**节点**而不是 `\t` 文本：[NEW] `DocTab`（inline atom，渲染 `<span data-rte-tab>`）。这是实测逼出来的：ProseMirror 的 HTML parser 会归一化空白，`getHTML()` 里的 `\t` 在下次 `setContent`（草稿重载、`.docx` 导入）时变成空格，制表位会静默失效。元素在任何解析路径下都活得下来；代码块里的 `\t` 仍按字面文本处理
+  - 渲染分两层：没有自定义制表位的段落，原子用 `::before` 放一个真制表符、按 `tab-size: 48px`（Word 默认 0.5 英寸）步进 —— 编辑区、页面视图、打印/快照 PDF 读同一份 CSS，天然一致；有自定义制表位的段落由插件按**实测**给每个制表符一个精确推进量（`Decoration.node` + `width`），因为 CSS 表达不了「任意位置制表位」
+  - 实测推进量：`measureTabWidths()` 读当前布局（`coordsAtPos` 取制表符左缘，减去段落内容左缘与左缩进），算出到下一个停位的距离；同一行的多个制表符按文档顺序累加「已修正量」，一趟算对，而不是每个制表符一次 dispatch。`center` / `right` / `decimal` 需要被对齐文本的宽度，同样从布局里量；换行到下一行的文本无法用停位对齐，退化成左对齐而不是猜
+  - 刷新节奏照抄分页插件：`requestAnimationFrame` 里量 → 只有位移超过 0.5px 才 dispatch → 最多再确认两轮（改宽度会重排刚量过的那一行）；dispatch 前比对 `doc` 引用，中途有按键就丢弃这批宽度
+  - Tab / Shift-Tab：Tab 在段落里插入原子，列表 / 表格 / 代码块不抢（那里的 Tab 已有含义）；Shift-Tab 向左跨过同一行的文本、删掉遇到的制表符（Word 的「退回一个制表位」就是把后面的文本挪回上一个停位），碰到图片等其它原子就停手
+  - 标尺：光标所在段落的制表位画成青色「L」标记（中 / 右 / 小数点对齐用不同脚形区分），点标尺空白处按 4px 网格加左停位、点标记删除。标尺根节点是 `pointer-events: none`，内容层显式开 `auto`；`mousedown` 阻止默认行为，点标尺不会把光标从编辑区抢走
+  - 顺带修掉标尺在缩放下的定位：`left` 相对的是未被 `zoom` 包裹的标尺，缩进标记与制表位标记统一乘 `zoom`，点击换算统一除 `zoom`
+  - `.docx` 往返：导出把 `data-tab-stops` 写成 `<w:tabs>`（px × 15 = twips），原子写成 `<w:tab/>`（Word 只认这个，`w:t` 里的裸 `\t` 不生效）；导入在 `docxParagraphControls.ts` 读 `w:tabs`（跳过 `clear` / `bar`），mammoth 吐出的 `\t` 文本在**最后一步**转成原子 —— 放最后是因为比稿 / 形状对齐都按可见文本匹配，原子不参与 `textContent`
+  - 单文件 HTML 导出不带样式表，所以额外内联一条 `TAB_EXPORT_CSS`（`[data-rte-tab]` + `::before` + `tab-size`）—— 否则导出的文件里制表符什么都不画，前后文字会连在一起（与 `TOC_EXPORT_CSS` 同一种处理）
+  - 测试：[NEW] `tabStops.test.ts` 18 例（模型排序 / 去重 / 上限 / 往返、默认网格与自定义停位、Tab 插入原子且 HTML 往返不丢、列表不抢 Tab、Shift-Tab 两种光标位置、`data-tab-stops` 往返、CSS 契约）+ `docxParagraphControls.test.ts` +3 例（四种对齐与 twips→px、忽略 `clear` / `bar`、属性块不被当成 run）+ `docx.test.ts` +2 例（导出 `w:tabs` + `<w:tab/>`、导入后停位与原子都回来）+ `e2e/office-pagination.spec.ts` +1 例（点标尺 → 标记与 `data-tab-stops` → Tab 落到停位（右缘差 < 2px）→ Shift-Tab 退回 → 点标记删除）
+- **计划偏差（2026-11-11 登记，制表位）**：
+  - 自定义制表位的**实测推进量只活到页面视图**：`width` 挂在 decoration 上，而打印 / 快照 PDF 走 `getHTML()`。带自定义停位的段落打印时按 0.5 英寸默认网格排，编辑区按停位排。要补这一半得给打印流再写一遍测量（打印 DOM 里没有 decoration）；`w:tabs` 已把精确位置写进 `.docx`，Word 打开是对的。登记为技术债
+  - 标尺只能加**左对齐**停位（点击即加、再点即删）；中 / 右 / 小数点对齐从 `.docx` 导入后按规则渲染，但界面没有切换对齐方式的入口（Word 用对话框）。要补就在标尺角落加一个对齐方式循环按钮，本轮未做
+  - `tabStops` 只挂在 `paragraph` 上（与 `indentLeft` 等段落属性同一组），标题里按 Tab 走默认网格、没有自定义停位
+  - 制表位标记与缩进标记一样是 `aria-hidden` 的指针手柄，键盘用户没有等价入口（ribbon 里没有「制表位」命令）
+- **闸门证据（2026-11-11 · 第六片 · 制表位）**：typecheck / lint / prettier 通过；`src/tools/rich-text-editor` 单测 **57 文件 / 783 例**全绿（+19 例）；e2e 分组复跑 `office-pagination` + `office-p1/p2/p3/p4` + `office-ribbon` + `office-styles` + `a11y-p04` + `rich-text-docs` + `tools.spec.ts` 共 **171 passed / 0 failed**（沙箱无法原地清空 `dist`，改用 `vite build --outDir /tmp/…` + `vite preview` 等价复核）；全量 227 例与体量门禁待干净环境复跑；无新增依赖
 - **闸门证据（2026-11-11 · 第五片 · 就地编辑）**：typecheck / lint / prettier 通过；全量单测 385 文件 / **3687 例**全绿（+2）；全量 e2e **226 passed / 0 failed**（+1；首轮 `tools.spec.ts` 的右键菜单焦点恢复用例超时，隔离复跑与整轮复跑均通过 —— 与计划里记过的负载敏感同类，非本次改动引起）；首屏 **192.01KB**（预算 195KB）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 157.19KB（+0.61KB）、其 CSS 4.71KB（+0.12KB）；无新增依赖
 - **闸门证据（2026-11-11 · 第四片 · 奇偶页不同）**：typecheck / lint / prettier 通过；全量单测 385 文件 / **3685 例**全绿（较第三片 3678 例 +7）；全量 e2e **225 passed / 0 failed**（+1 例奇偶页页眉）；首屏 **192.04KB**（预算 195KB，与上一片持平）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 156.58KB（+0.68KB：按页取值、面板字段与读回）；无新增依赖 / 网络请求
 - **闸门证据（2026-11-11 · 第三片 · 行距段落化）**：typecheck / lint / prettier 通过；全量单测 385 文件 / **3678 例**全绿（较第二片 3672 例 +6）；全量 e2e **224 passed / 0 failed**（+1 例行距往返）；首屏 **192.02KB**（预算 195KB）、`RichTextEditorTool` chunk 155.90KB（+0.36KB）；打印 / 快照 PDF 复跑无回归（读的是同一份内联样式，未改 `editor.css`）；无新增依赖
 - **闸门证据（2026-11-11 · 第二片）**：typecheck / lint / prettier 通过；全量单测 383 文件 / **3655 例**全绿（空载一次通过；并发跑 e2e 时有 2 例超时/字节比对失败，隔离复跑均通过，属负载敏感）；全量 e2e **222 passed / 0 failed**（EXIT=0，+1 例标尺拖拽）；体积复核首屏 **191.92KB**（预算 195KB）、`RichTextEditorTool` chunk 154.06KB（+0.46KB）；**第一片闸门证据（2026-11-11 · 分页控制）**：单测 383 文件 / **3655 例**（较 P1-1 收尾 3645 例 +10）、全量 e2e **221 passed / 0 failed**（+1 例分页往返）、打印一致性无回归：`office-p2.spec.ts` 的「page count matches between page view and snapshot PDF」与 `tools.spec.ts` 的打印用例全绿；体积复核首屏 **191.91KB**（预算 195KB）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 153.60KB（+1.06KB）；无新增依赖
-- **涉及文件**：`src/tools/rich-text-editor/blockStyles.ts`、`docxParagraphControls.ts`（[NEW]）、`docx.ts`、`ribbonTabs.ts`、`EditorToolbar.tsx`、`editor.css`、`strings.ts`、`RulerBar.tsx`、`src/core/components/ribbon/ribbonIcons.tsx`；`e2e/office-pagination.spec.ts`、`e2e/office-p2.spec.ts`；`pageSetup.ts`、`PageSetupPanel.tsx`、`sections.ts`、`pdf.ts`、`RichTextEditorTool.tsx`
+- **涉及文件**：`src/tools/rich-text-editor/blockStyles.ts`、`docxParagraphControls.ts`（[NEW]）、`docx.ts`、`ribbonTabs.ts`、`EditorToolbar.tsx`、`editor.css`、`strings.ts`、`RulerBar.tsx`、`src/core/components/ribbon/ribbonIcons.tsx`；`e2e/office-pagination.spec.ts`、`e2e/office-p2.spec.ts`；`pageSetup.ts`、`PageSetupPanel.tsx`、`sections.ts`、`pdf.ts`、`RichTextEditorTool.tsx`；制表位：`tabStops.ts`（[NEW]）、`tabStops.test.ts`（[NEW]）、`extensions.ts`、`core.ts`、`docs.ts`
 - **前置**：P1-1（样式语义）
 - **✅ 验收**：docx 往返保留分页控制、行距与奇偶页页眉；页面视图双击页边空白即可改当前页页眉 / 页脚；打印与快照 PDF 结果一致；`pnpm e2e` 打印用例不退化。
 - **回退点**：新增属性为可选字段，旧草稿 `migrate.ts` 归一化时给默认值；行距回退到 mark 上只需把 ribbon 的下拉改回 `setLineHeight`（`LineHeight` 扩展仍在）。
@@ -517,9 +534,9 @@ graph TD
 
 ### 6.8 M2 出口标准
 
-- [ ] P1-1 … P1-7 全部 `[x]`（2026-11-11：只剩 P1-4 的制表位）；§8.2 的 M2 闸门命令全部通过
-- [ ] 200 页性能预算达标、docx 往返样式/修订保真、窄屏命令可达、配额与冲突可检测
-- [ ] `pnpm build && pnpm size` 通过；9 语言键对齐；三端 e2e 全绿
+- [x] P1-1 … P1-7 全部 `[x]`（2026-11-11：P1-4 第六片收尾，制表位落地）
+- [ ] 200 页性能预算达标、docx 往返样式/修订保真、窄屏命令可达、配额与冲突可检测（P1-5 / P1-1 / P1-2 已各自取证，闸门整体待复跑）
+- [ ] `pnpm build && pnpm size` 通过；9 语言键对齐；三端 e2e 全绿（本轮沙箱无法清空 `dist`，全量 227 例与体量门禁待干净环境一次跑完）
 
 ---
 
@@ -666,7 +683,7 @@ graph TD
 | P1-1 命名样式系统             | `[x]` | M2   | P1     | 8d     | P0-2、P1-5          | §6.1     |
 | P1-2 修订模式与审阅深化       | `[x]` | M2   | P1     | 7d     | P0-2、P1-4、P1-5    | §6.2     |
 | P1-3 中文与多语言校对         | `[x]` | M2   | P1     | 6d     | P1-5（已满足）      | §6.3     |
-| P1-4 页面排版细节             | `[~]` | M2   | P1     | 5d     | P1-1                | §6.4     |
+| P1-4 页面排版细节             | `[x]` | M2   | P1     | 5d     | P1-1                | §6.4     |
 | P1-5 大文档性能               | `[x]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
 | P1-6 单机数据可靠性           | `[x]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
 | P1-7 移动端与触控可达         | `[x]` | M2   | P1     | 4d     | P0-4、P0-5          | §6.7     |
@@ -680,6 +697,8 @@ graph TD
 进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
 
 进度备注（2026-11-08）：P0-1…P0-6 保持 `[x]`；**P1-5 转 `[x]`** —— §6.5 的块级增量分页（`layoutFlag.ts`，默认关闭，实测 200 页布局中位 4.4ms / P95 5.5ms，全量 9.1ms / 10.7ms）与 decoration 视口裁剪（[NEW] `viewportRange.ts`：>12 万字符的文档只装饰视口 ±3000 字符，滚动停止 150ms 后重建；`spellcheck.ts` / `find-replace.ts` 共用；`gotoMatch` 补选区移动，否则裁剪后视口外的当前匹配既不高亮也滚不到）均已落地，200 页布局 P95 9.0ms（预算 16ms）、50 页 P95 2.4ms（预算 50ms）、`rte-toolbar-state` P95 1.1ms、`rte-ribbon-tabs` P95 0.5ms；`ribbonTabs` 静态配置拆分按实测取消（登记为技术债）。顺带修复 `spellcheck.ts` 的 `EditorView.visibleRanges` 类型错误（该字段是内部 API，不在 typings 里）——`pnpm build` 重新可用。P1-3 的前置（decoration 视口裁剪）已满足，可开工。
+
+进度备注（2026-11-11 · P1-4 第六片）：**P1-4 转 `[x]`，M2 的 P1 清单全绿** —— 补上最后一块「标尺制表位」。关键判断：制表符不能存成 `\t` 文本。ProseMirror 的 HTML parser 会归一化空白，实测 `setContent('甲\t乙')` 之后 `textContent` 就是「甲 乙」，也就是说草稿重载 / `.docx` 导入之后所有制表位都会静默失效；改成 inline atom（`<span data-rte-tab>`）之后任何解析路径都保得住，`.docx` 侧正好对应 `<w:tab/>`（`w:t` 里的裸 `\t` Word 根本不认）。渲染分两层：没有自定义停位的段落用 `::before` + `tab-size: 48px`（Word 默认 0.5 英寸）交给浏览器，编辑区 / 页面视图 / 打印读同一份 CSS；有自定义停位的段落按实测推进量给 `Decoration.node` 写 `width` —— CSS 没有「任意位置制表位」，只能量。测量沿用分页插件的节奏（rAF 里量、变化 > 0.5px 才 dispatch、最多再确认两轮、dispatch 前比对 doc 引用），同一行多个停位按文档顺序累加修正量，一趟算对。标尺点空白加停位、点标记删除；顺手把缩进标记在缩放下的定位也修了（标尺在 `zoom` 外层，位置要乘 `zoom`）。偏差已登记：实测宽度是 decoration，打印 / 快照 PDF 读 `getHTML()`，带自定义停位的段落打印走默认网格；标尺只提供左对齐停位。闸门：typecheck / lint / prettier 通过，`src/tools/rich-text-editor` 单测 57 文件 / **783 例**全绿（+19），e2e 分组复跑 **171 passed / 0 failed**（沙箱清不掉 `dist`，用 `/tmp` 构建 + `vite preview` 等价复核），全量 227 例与体量门禁待干净环境复跑。M2 闸门：P1 清单 `[x]`，其余两条待一次完整 `pnpm build && pnpm size && pnpm e2e`。
 
 进度备注（2026-11-11 · P1-7）：**P1-7 转 `[x]`** —— 补的是「已有形状/图片的二次编辑」这一半：绘制层早就用 pointer 事件，但缩放手柄、旋转手柄、黄点调整手柄、图片 8 个手柄全挂在 `onMouseDown` + window `mousemove` 上，触摸和笔压根不发这些事件，平板上手柄是死的。抽了 `pointerDrag.ts` 的 `startPointerDrag`：pointerdown 起手、window 跟 pointermove、pointerup / pointercancel 收尾，按 pointerId 过滤（第二根手指不劫持），并对起手元素 `setPointerCapture` —— 手指滑出 9px 圆点后手势仍继续（合成事件没有真实指针可捕获，try/catch 降级为 window 监听）。`pointercancel` 也走同一条提交路径，来电 / 系统手势打断不会留下拖到一半的文档。样式上补 `touch-action: none`（否则浏览器把拖拽当滚动），`@media (pointer: coarse)` 下视觉圆点不变、伪元素把命中区扩到 ~44px；旋转手柄的 `::after` 已用于连接线，改用 `::before`。测试：`pointerDrag.test.ts` 3 例 + e2e 合成 `pointerType: 'touch'` 手势双向拖拽（Playwright 的 mouse API 造不出 touch 类型，而这正是旧实现忽略的那类）。溢出面板的 select/color 与 760/600px 窄屏 e2e 是 P0-4.5 的成果，本项只复核，已在「计划偏差」登记。「笔势」按 pointer 统一处理，未做压感。闸门：typecheck / lint / prettier 通过，单测 386 文件 / **3690 例**全绿（+3），e2e **227 passed**（+1），首屏 192.02KB、`RichTextEditorTool` 157.21KB。M2 闸门仍为 `[ ]` —— 只剩 P1-4 的制表位。
 

@@ -23,7 +23,14 @@ const documentXml = `<?xml version="1.0" encoding="UTF-8"?>
 
 describe('parseDocxParagraphControls', () => {
   it('reads the three toggles per paragraph, in document order', () => {
-    expect(parseDocxParagraphControls(documentXml)).toEqual([
+    expect(
+      parseDocxParagraphControls(documentXml).map((control) => ({
+        keepNext: control.keepNext,
+        keepLines: control.keepLines,
+        widowControl: control.widowControl,
+        lineHeight: control.lineHeight,
+      })),
+    ).toEqual([
       { keepNext: true, keepLines: false, widowControl: null, lineHeight: null },
       { keepNext: false, keepLines: true, widowControl: null, lineHeight: null },
       // w:val="0" is the explicit off switch
@@ -32,6 +39,31 @@ describe('parseDocxParagraphControls', () => {
       // A self-closing w:p is still a paragraph (it becomes an empty <p>)
       { keepNext: false, keepLines: false, widowControl: null, lineHeight: null },
     ]);
+  });
+
+  it('reads w:tabs as px and keeps every alignment Word writes', () => {
+    const xml = paragraph(
+      '<w:tabs><w:tab w:val="left" w:pos="1440"/><w:tab w:val="center" w:pos="2880"/><w:tab w:val="right" w:pos="4320"/><w:tab w:val="decimal" w:pos="5040"/></w:tabs>',
+    );
+    expect(parseDocxParagraphControls(xml)[0]?.tabStops).toEqual([
+      { pos: 96, align: 'left' },
+      { pos: 192, align: 'center' },
+      { pos: 288, align: 'right' },
+      { pos: 336, align: 'decimal' },
+    ]);
+  });
+
+  it('drops w:tab entries that are not stops (clear / bar) and sorts by position', () => {
+    const xml = paragraph(
+      '<w:tabs><w:tab w:val="clear" w:pos="720"/><w:tab w:val="bar" w:pos="1440"/><w:tab w:val="left" w:pos="2160"/></w:tabs>',
+    );
+    expect(parseDocxParagraphControls(xml)[0]?.tabStops).toEqual([{ pos: 144, align: 'left' }]);
+  });
+
+  it('does not mistake the w:tabs property block for a run tab', () => {
+    const xml = `<w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="1440"/></w:tabs></w:pPr><w:r><w:tab/><w:t>乙</w:t></w:r></w:p>`;
+    // `<w:tab/>` inside a run is the tab itself; the reader only cares about the stop list
+    expect(parseDocxParagraphControls(xml)[0]?.tabStops).toEqual([{ pos: 96, align: 'left' }]);
   });
 
   it('only looks inside w:pPr, not at run properties', () => {
@@ -83,5 +115,13 @@ describe('applyParagraphControls', () => {
     const result = applyParagraphControls('<p style="margin-left: 24px">一</p>', spacing);
     expect(result).toContain('line-height: 1.5');
     expect(result).toContain('margin-left: 24px');
+  });
+
+  it('stamps tab stops on the matching block', () => {
+    const tabs = parseDocxParagraphControls(
+      `<w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="1440"/></w:tabs></w:pPr>` +
+        `<w:r><w:tab/><w:t>一</w:t></w:r></w:p>`,
+    );
+    expect(applyParagraphControls('<p>一</p>', tabs)).toContain('data-tab-stops="96:left"');
   });
 });
