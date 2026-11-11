@@ -50,6 +50,12 @@ export interface PageSetupConfig {
   background: string | null;
   /** Whether the first page uses a different header/footer (Word's "different first page") */
   differentFirstPage: boolean;
+  /** Whether even pages use their own header/footer (Word's `w:evenAndOddHeaders`) */
+  differentOddEven: boolean;
+  /** Header text of even pages (read only when `differentOddEven`) */
+  evenHeader: string;
+  /** Footer text of even pages */
+  evenFooter: string;
 }
 
 export interface PageMetrics {
@@ -91,6 +97,9 @@ export const DEFAULT_PAGE_SETUP: PageSetupConfig = {
   watermark: null,
   background: null,
   differentFirstPage: false,
+  differentOddEven: false,
+  evenHeader: '',
+  evenFooter: '',
 };
 
 /** Default watermark style (used when the panel first enables it) */
@@ -205,7 +214,33 @@ export function normalizePageSetup(input: Partial<PageSetupConfig> | null): Page
     watermark: normalizeWatermark(raw.watermark),
     background: normalizeHexColor(raw.background),
     differentFirstPage: raw.differentFirstPage === true,
+    differentOddEven: raw.differentOddEven === true,
+    evenHeader: typeof raw.evenHeader === 'string' ? raw.evenHeader : '',
+    evenFooter: typeof raw.evenFooter === 'string' ? raw.evenFooter : '',
   };
+}
+
+/**
+ * Header text of one page (1-based), applying Word's two switches:
+ * 首页不同 → the first page has no header; 奇偶页不同 → even pages use `evenHeader`.
+ * The on-screen page view, the snapshot PDF and the `.docx` export all ask here, so they cannot drift.
+ */
+export function headerForPage(setup: PageSetupConfig, page: number): string {
+  if (setup.differentFirstPage && page === 1) return '';
+  if (setup.differentOddEven && page % 2 === 0) return setup.evenHeader;
+  return setup.header;
+}
+
+/** Footer text of one page (1-based); same switch rules as {@link headerForPage} */
+export function footerForPage(setup: PageSetupConfig, page: number): string {
+  if (setup.differentFirstPage && page === 1) return '';
+  if (setup.differentOddEven && page % 2 === 0) return setup.evenFooter;
+  return setup.footer;
+}
+
+/** Whether one page carries any header at all (used to size the header band) */
+export function pageHasHeader(setup: PageSetupConfig, page: number): boolean {
+  return headerForPage(setup, page).trim() !== '';
 }
 
 /**
@@ -229,6 +264,9 @@ export interface PageSetupPatch {
   watermark?: Partial<WatermarkConfig> | null;
   background?: string | null;
   differentFirstPage?: boolean;
+  differentOddEven?: boolean;
+  evenHeader?: string;
+  evenFooter?: string;
 }
 
 /**
@@ -248,6 +286,9 @@ export function mergePageSetup(base: PageSetupConfig, patch: PageSetupPatch): Pa
   if (patch.columns !== undefined) merged.columns = patch.columns;
   if (patch.background !== undefined) merged.background = patch.background;
   if (patch.differentFirstPage !== undefined) merged.differentFirstPage = patch.differentFirstPage;
+  if (patch.differentOddEven !== undefined) merged.differentOddEven = patch.differentOddEven;
+  if (patch.evenHeader !== undefined) merged.evenHeader = patch.evenHeader;
+  if (patch.evenFooter !== undefined) merged.evenFooter = patch.evenFooter;
   if ('watermark' in patch) {
     merged.watermark =
       patch.watermark === null || patch.watermark === undefined

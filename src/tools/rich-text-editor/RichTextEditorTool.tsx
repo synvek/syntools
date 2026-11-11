@@ -150,6 +150,8 @@ import { buildTocEntries, injectTocHtml, renderTocHtml, type TocLabels } from '.
 import {
   DEFAULT_PAGE_SETUP,
   buildPrintPageCss,
+  footerForPage,
+  headerForPage,
   mergePageSetup,
   normalizePageSetup,
   pageMetricsToPx,
@@ -2367,13 +2369,15 @@ export default function RichTextEditorTool() {
                             <span>{pageSetup.watermark.text}</span>
                           </span>
                         ) : null}
-                        {/* Header / footer / page number: shared with Word export and snapshot PDF */}
-                        {pageSetup.header.trim() ? (
-                          <span className="rte-page-header">{pageSetup.header}</span>
+                        {/* Header / footer / page number: 首页不同 and 奇偶页不同 decide the text per page */}
+                        {headerForPage(pageSetup, index + 1).trim() ? (
+                          <span className="rte-page-header">
+                            {headerForPage(pageSetup, index + 1)}
+                          </span>
                         ) : null}
-                        {pageSetup.footer.trim() || pageSetup.showPageNumber ? (
+                        {footerForPage(pageSetup, index + 1).trim() || pageSetup.showPageNumber ? (
                           <span className="rte-page-footer">
-                            {pageSetup.footer.trim()}
+                            {footerForPage(pageSetup, index + 1)}
                             {pageSetup.showPageNumber ? (
                               <span className="rte-page-footer-number">
                                 {t('tools.richText.pageBadge', { page: index + 1 })}
@@ -2382,7 +2386,8 @@ export default function RichTextEditorTool() {
                           </span>
                         ) : null}
                         {/* Page badge appears only when the footer shows no page number, to avoid duplication */}
-                        {!pageSetup.showPageNumber && !pageSetup.footer.trim() ? (
+                        {!pageSetup.showPageNumber &&
+                        !footerForPage(pageSetup, index + 1).trim() ? (
                           <span className="rte-page-badge">
                             {t('tools.richText.pageBadge', { page: index + 1 })}
                           </span>

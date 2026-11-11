@@ -1176,6 +1176,12 @@ async function readOoxmlIr(buffer: ArrayBuffer, documentXml: string): Promise<Im
 export interface ImportedHeaderFooter {
   header?: string;
   footer?: string;
+  /** Even-page header (only meaningful together with `differentOddEven`) */
+  evenHeader?: string;
+  /** Even-page footer */
+  evenFooter?: string;
+  /** `w:evenAndOddHeaders` was set in settings.xml (Word's 奇偶页不同) */
+  differentOddEven?: boolean;
   /** Whether the footer carries a PAGE field (Word's page number) */
   showPageNumber: boolean;
 }
@@ -1195,13 +1201,12 @@ function relationshipTargets(relsXml: string): Map<string, string> {
 }
 
 /**
- * `r:id` of a section's default header / footer reference. `first` and `even` are the title-page
- * and even-page variants: they belong to `w:titlePg` / even-and-odd, which the model covers with
- * `differentFirstPage` alone, so only the default part becomes the header / footer text.
+ * `r:id` of a section's header / footer reference of one type: `default` (odd pages), `first`
+ * (`w:titlePg`) or `even` (`w:evenAndOddHeaders`).
  */
-function defaultReferenceId(sectPr: Element, tag: string): string | null {
+function referenceId(sectPr: Element, tag: string, type = 'default'): string | null {
   const refs = Array.from(sectPr.getElementsByTagName(tag));
-  const chosen = refs.find((ref) => (ref.getAttribute('w:type') ?? 'default') === 'default');
+  const chosen = refs.find((ref) => (ref.getAttribute('w:type') ?? 'default') === type);
   return chosen?.getAttribute('r:id') ?? null;
 }
 
@@ -1244,8 +1249,10 @@ async function readHeaderFooter(
   if (doc.getElementsByTagName('parsererror').length > 0) return null;
   const sectPr = doc.getElementsByTagName('w:sectPr')[0];
   if (!sectPr) return null;
-  const headerId = defaultReferenceId(sectPr, 'w:headerReference');
-  const footerId = defaultReferenceId(sectPr, 'w:footerReference');
+  const headerId = referenceId(sectPr, 'w:headerReference');
+  const footerId = referenceId(sectPr, 'w:footerReference');
+  const evenHeaderId = referenceId(sectPr, 'w:headerReference', 'even');
+  const evenFooterId = referenceId(sectPr, 'w:footerReference', 'even');
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(buffer);
@@ -1264,6 +1271,11 @@ async function readHeaderFooter(
     const info: ImportedHeaderFooter = { showPageNumber: hasPageField(footerXml) };
     if (headerId) info.header = partText(headerXml);
     if (footerId) info.footer = partText(footerXml);
+    if (evenHeaderId) info.evenHeader = partText(await readPart(evenHeaderId));
+    if (evenFooterId) info.evenFooter = partText(await readPart(evenFooterId));
+    // The switch itself lives in settings.xml; without it Word ignores the even parts entirely
+    const settingsXml = (await zip.file('word/settings.xml')?.async('string')) ?? '';
+    if (/<w:evenAndOddHeaders\b/.test(settingsXml)) info.differentOddEven = true;
     return info;
   } catch (error) {
     console.warn('[richText] docx header/footer read failed:', error);
@@ -1620,6 +1632,9 @@ export async function exportDocxBlob(
         trackRevisions: (review?.changes?.length ?? 0) > 0,
         updateFields: true,
       },
+      // 奇偶页不同: writes `<w:evenAndOddHeaders/>` into settings.xml, without which Word ignores the
+      // `even` header / footer parts entirely
+      evenAndOddHeaderAndFooters: slices.some((slice) => slice.pageSetup.differentOddEven),
       ...(commentOptions ? { comments: commentOptions } : {}),
       ...(footnoteOptions ? { footnotes: footnoteOptions } : {}),
       ...(endnoteOptions ? { endnotes: endnoteOptions } : {}),
@@ -1712,27 +1727,48 @@ function buildHeaderFooter(
   setup: PageSetupConfig,
   kind: 'header' | 'footer',
   extra: InstanceType<DocxNs['ImageRun']> | undefined = undefined,
-): { default: InstanceType<DocxNs['Header'] | DocxNs['Footer']> } | undefined {
+):
+  | {
+      default?: InstanceType<DocxNs['Header'] | DocxNs['Footer']>;
+      even?: InstanceType<DocxNs['Header'] | DocxNs['Footer']>;
+    }
+  | undefined {
   const text = (kind === 'header' ? setup.header : setup.footer).trim();
+  const evenText = (kind === 'header' ? setup.evenHeader : setup.evenFooter).trim();
   const pageNumber = kind === 'footer' && setup.showPageNumber;
-  if (!text && !pageNumber && !extra) return undefined;
-  const children: InstanceType<DocxNs['Paragraph']>[] = [
-    new D.Paragraph({
-      alignment: pageNumber && !text ? D.AlignmentType.CENTER : D.AlignmentType.LEFT,
-      children: [
-        ...(text ? [new D.TextRun({ text })] : []),
-        ...(pageNumber
-          ? [
-              new D.TextRun({
-                children: [text ? '  ' : '', D.PageNumber.CURRENT],
-              }),
-            ]
-          : []),
-        ...(extra ? [extra] : []),
-      ],
-    }),
-  ];
-  return {
-    default: kind === 'header' ? new D.Header({ children }) : new D.Footer({ children }),
-  } as { default: InstanceType<DocxNs['Header'] | DocxNs['Footer']> };
+
+  const build = (value: string) => {
+    if (!value && !pageNumber && !extra) return null;
+    const children: InstanceType<DocxNs['Paragraph']>[] = [
+      new D.Paragraph({
+        alignment: pageNumber && !value ? D.AlignmentType.CENTER : D.AlignmentType.LEFT,
+        children: [
+          ...(value ? [new D.TextRun({ text: value })] : []),
+          ...(pageNumber
+            ? [
+                new D.TextRun({
+                  children: [value ? '  ' : '', D.PageNumber.CURRENT],
+                }),
+              ]
+            : []),
+          ...(extra ? [extra] : []),
+        ],
+      }),
+    ];
+    return kind === 'header' ? new D.Header({ children }) : new D.Footer({ children });
+  };
+
+  const parts: {
+    default?: InstanceType<DocxNs['Header'] | DocxNs['Footer']>;
+    even?: InstanceType<DocxNs['Header'] | DocxNs['Footer']>;
+  } = {};
+  const main = build(text);
+  if (main) parts.default = main;
+  if (setup.differentOddEven) {
+    // 奇偶页不同: even pages read their own part. Omitting it would leave them without a header at all,
+    // and the footer carries the page number, so it has to be repeated there too (watermark included).
+    const even = build(evenText);
+    if (even) parts.even = even;
+  }
+  return Object.keys(parts).length ? parts : undefined;
 }

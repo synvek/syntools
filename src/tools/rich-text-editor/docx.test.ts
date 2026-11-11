@@ -279,6 +279,49 @@ describe('importDocx layout read-back (P2-2.4)', () => {
     expect(captured.layout?.pageSetup.showPageNumber).toBe(true);
   });
 
+  it('writes even-page parts and the settings switch for 奇偶页不同 (P1-4)', async () => {
+    const setup = normalizePageSetup({
+      header: '奇数页页眉',
+      footer: '奇数页页脚',
+      evenHeader: '偶数页页眉',
+      evenFooter: '偶数页页脚',
+      differentOddEven: true,
+    });
+    const exported = await exportDocxBlob('<p>a</p>', 'oddeven', setup);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const documentXml = await readDocumentXml(exported.value);
+    expect(documentXml).toContain('w:type="even"');
+    const settings = await readZipEntry(exported.value, 'word/settings.xml');
+    // Word ignores the even parts without this switch, and the docx builder has no option for it
+    expect(settings).toContain('<w:evenAndOddHeaders/>');
+  });
+
+  it('round-trips the even-page header / footer and the switch', async () => {
+    const setup = normalizePageSetup({
+      header: '奇数页页眉',
+      evenHeader: '偶数页页眉',
+      evenFooter: '偶数页页脚',
+      differentOddEven: true,
+    });
+    const exported = await exportDocxBlob('<p>a</p>', 'oddeven', setup);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+
+    const captured: { layout?: { pageSetup: Partial<PageSetupConfig>; sectionCount: number } } = {};
+    await importDocx(toFile(exported.value, 'oddeven.docx'), {
+      onLayout: (info) => {
+        captured.layout = info;
+      },
+    });
+    expect(captured.layout?.pageSetup.differentOddEven).toBe(true);
+    expect(captured.layout?.pageSetup.evenHeader).toBe('偶数页页眉');
+    expect(captured.layout?.pageSetup.evenFooter).toBe('偶数页页脚');
+    // The odd-page header stays the default part
+    expect(captured.layout?.pageSetup.header).toBe('奇数页页眉');
+  });
+
   it('imports a document without a footer as having no page numbers', async () => {
     const exported = await exportDocxBlob('<p>a</p>', 'nofooter', {
       ...DEFAULT_PAGE_SETUP,

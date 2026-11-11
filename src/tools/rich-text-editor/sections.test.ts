@@ -84,6 +84,24 @@ describe('节级页面设置解析', () => {
     expect(resolveSectionPageSetup(sections, 1).header).toBe('B');
   });
 
+  it('偶数页页眉页脚跟随同一个「链接到前一节」开关', () => {
+    const sections = [
+      createSection(
+        'a',
+        normalizePageSetup({
+          header: 'A 页眉',
+          evenHeader: 'A 偶数页眉',
+          evenFooter: 'A 偶数页脚',
+          differentOddEven: true,
+        }),
+      ),
+      { ...createSection('b'), headerLinked: true, footerLinked: true },
+    ];
+    const second = resolveSectionPageSetup(sections, 1);
+    expect(second.evenHeader).toBe('A 偶数页眉');
+    expect(second.evenFooter).toBe('A 偶数页脚');
+  });
+
   it('横向节的可用高度小于纵向节', () => {
     const sections = [
       createSection('portrait'),

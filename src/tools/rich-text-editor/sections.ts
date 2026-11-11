@@ -82,15 +82,19 @@ function clampSectionIndex(sections: readonly DocSection[], index: number): numb
   return Math.min(Math.max(0, Math.trunc(index)), sections.length - 1);
 }
 
-/** Walk back to the nearest section that owns its own header / footer */
+/**
+ * Walk back to the nearest section that owns its own header / footer. The even-page parts follow the
+ * same "link to previous" flag as their odd counterpart: Word has one checkbox per part, not two.
+ */
 function inheritedValue(
   sections: readonly DocSection[],
   index: number,
-  part: 'header' | 'footer',
+  part: 'header' | 'footer' | 'evenHeader' | 'evenFooter',
 ): string {
+  const isHeader = part === 'header' || part === 'evenHeader';
   for (let i = index - 1; i >= 0; i -= 1) {
     const section = sections[i];
-    const linked = part === 'header' ? section.headerLinked : section.footerLinked;
+    const linked = isHeader ? section.headerLinked : section.footerLinked;
     if (!linked) return section.pageSetup[part];
   }
   return DEFAULT_PAGE_SETUP[part];
@@ -115,6 +119,12 @@ export function resolveSectionPageSetup(
     footer: section.footerLinked
       ? inheritedValue(sections, at, 'footer')
       : section.pageSetup.footer,
+    evenHeader: section.headerLinked
+      ? inheritedValue(sections, at, 'evenHeader')
+      : section.pageSetup.evenHeader,
+    evenFooter: section.footerLinked
+      ? inheritedValue(sections, at, 'evenFooter')
+      : section.pageSetup.evenFooter,
   };
 }
 

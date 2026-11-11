@@ -3,6 +3,8 @@ import { applyPagedBreaks, planPageStarts } from './PageView';
 import { isFloatingImageElement } from './imageLayer';
 import {
   DEFAULT_PAGE_SETUP,
+  footerForPage,
+  headerForPage,
   normalizePageSetup,
   pageMetricsToPx,
   resolvePageMetrics,
@@ -305,12 +307,15 @@ function drawHeaderFooter(
   doc.setFontSize(9);
   doc.setTextColor(110, 118, 129);
   const left = setup.margin.left;
-  if (setup.header.trim()) {
-    doc.text(setup.header.trim(), left, Math.max(4, setup.margin.top / 2));
+  // Same per-page rule as the on-screen page view and the .docx export (首页不同 / 奇偶页不同)
+  const header = headerForPage(setup, page).trim();
+  const footer = footerForPage(setup, page).trim();
+  if (header) {
+    doc.text(header, left, Math.max(4, setup.margin.top / 2));
   }
   const footerY = metrics.heightMm - Math.max(4, setup.margin.bottom / 2);
-  if (setup.footer.trim()) {
-    doc.text(setup.footer.trim(), left, footerY);
+  if (footer) {
+    doc.text(footer, left, footerY);
   }
   if (setup.showPageNumber) {
     const label = String(page);

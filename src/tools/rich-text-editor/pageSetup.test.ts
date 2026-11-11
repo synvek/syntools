@@ -6,6 +6,8 @@ import {
   MARGIN_PRESETS,
   buildPrintPageCss,
   computePageMetrics,
+  footerForPage,
+  headerForPage,
   mergePageSetup,
   mmToTwip,
   normalizePageSetup,
@@ -229,5 +231,54 @@ describe('mergePageSetup', () => {
     expect(mergePageSetup(themed, { background: null }).background).toBeNull();
     expect(mergePageSetup(themed, {}).background).toBe('#fff8e1');
     expect(mergePageSetup(themed, {}).size).toBe(DEFAULT_PAGE_SETUP.size);
+  });
+});
+
+describe('首页不同 / 奇偶页不同（P1-4）', () => {
+  const setup = normalizePageSetup({
+    header: '正文字段页眉',
+    footer: '正文字段页脚',
+    evenHeader: '偶数页页眉',
+    evenFooter: '偶数页页脚',
+  });
+
+  it('defaults to one header for every page', () => {
+    expect(headerForPage(setup, 1)).toBe('正文字段页眉');
+    expect(headerForPage(setup, 2)).toBe('正文字段页眉');
+    expect(footerForPage(setup, 4)).toBe('正文字段页脚');
+  });
+
+  it('switches even pages to the even parts, leaving odd pages alone', () => {
+    const oddEven = normalizePageSetup({ ...setup, differentOddEven: true });
+    expect(headerForPage(oddEven, 1)).toBe('正文字段页眉');
+    expect(headerForPage(oddEven, 2)).toBe('偶数页页眉');
+    expect(headerForPage(oddEven, 3)).toBe('正文字段页眉');
+    expect(footerForPage(oddEven, 2)).toBe('偶数页页脚');
+    expect(footerForPage(oddEven, 3)).toBe('正文字段页脚');
+  });
+
+  it('drops the header on the first page when 首页不同 is on, whichever parity wins', () => {
+    const first = normalizePageSetup({
+      ...setup,
+      differentFirstPage: true,
+      differentOddEven: true,
+    });
+    expect(headerForPage(first, 1)).toBe('');
+    expect(footerForPage(first, 1)).toBe('');
+    expect(headerForPage(first, 2)).toBe('偶数页页眉');
+  });
+
+  it('only honours the switch when it is explicitly true, and patches keep the parts', () => {
+    expect(
+      normalizePageSetup({ differentOddEven: 'yes' } as unknown as object).differentOddEven,
+    ).toBe(false);
+    const patched = mergePageSetup(setup, {
+      differentOddEven: true,
+      evenHeader: '偶页',
+      evenFooter: '',
+    });
+    expect(patched.evenHeader).toBe('偶页');
+    expect(patched.evenFooter).toBe('');
+    expect(patched.differentOddEven).toBe(true);
   });
 });

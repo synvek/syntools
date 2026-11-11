@@ -197,7 +197,41 @@ export function PageSetupPanel({
           />
           <span>{t('tools.richText.differentFirstPage')}</span>
         </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={setup.differentOddEven}
+            onChange={(e) => patch({ differentOddEven: e.target.checked })}
+          />
+          <span>{t('tools.richText.differentOddEven')}</span>
+        </label>
       </div>
+
+      {/* 奇偶页不同: the even-page texts only matter while the switch is on, so they stay hidden until then */}
+      {setup.differentOddEven ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="flex min-w-40 flex-1 flex-col gap-1">
+            <span className={labelClass}>{t('tools.richText.evenHeaderText')}</span>
+            <input
+              type="text"
+              value={setup.evenHeader}
+              onChange={(e) => patch({ evenHeader: e.target.value })}
+              placeholder={t('tools.richText.headerPlaceholder')}
+              className={fieldClass}
+            />
+          </label>
+          <label className="flex min-w-40 flex-1 flex-col gap-1">
+            <span className={labelClass}>{t('tools.richText.evenFooterText')}</span>
+            <input
+              type="text"
+              value={setup.evenFooter}
+              onChange={(e) => patch({ evenFooter: e.target.value })}
+              placeholder={t('tools.richText.footerPlaceholder')}
+              className={fieldClass}
+            />
+          </label>
+        </div>
+      ) : null}
 
       {/* Columns / watermark / background: all three are about visual layout, so they share one group */}
       <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">

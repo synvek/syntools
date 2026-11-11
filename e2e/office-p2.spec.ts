@@ -156,6 +156,43 @@ test('rich text: 50-page three-section document exports three w:sectPr', async (
   expect((xml.match(/<w:sectPr/g) ?? []).length).toBe(3);
 });
 
+test('rich text: 奇偶页不同 puts the even header on even pages only', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openRichText(page);
+
+  const paragraphs = Array.from(
+    { length: 100 },
+    (_, index) => `第 ${index + 1} 段：奇偶页页眉的端到端验收内容。`,
+  ).join('\n');
+  await pastePlainText(page, paragraphs);
+  await expect
+    .poll(async () => page.locator('.rte-page-sheet').count(), { timeout: 20_000 })
+    .toBeGreaterThan(2);
+
+  await openPageSetup(page);
+  const panel = page.getByTestId('rich-text-page-setup');
+  await expect(panel).toBeVisible();
+
+  const field = (label: string) =>
+    panel
+      .locator('label')
+      .filter({ has: page.getByText(label, { exact: true }) })
+      .locator('input');
+  await field('页眉').fill('奇数页页眉');
+  // The even-page inputs only exist while the switch is on
+  await expect(field('偶数页页眉')).toHaveCount(0);
+  await panel.getByText('奇偶页不同', { exact: true }).click();
+  await field('偶数页页眉').fill('偶数页页眉');
+  await panel.getByRole('button', { name: '关闭页面设置' }).click();
+  await expect(panel).toBeHidden();
+
+  const sheets = page.locator('.rte-page-sheet');
+  await expect(sheets.nth(0).locator('.rte-page-header')).toHaveText('奇数页页眉');
+  await expect(sheets.nth(1).locator('.rte-page-header')).toHaveText('偶数页页眉');
+  // Odd pages come back to the default header — this is a per-page rule, not a one-off switch
+  await expect(sheets.nth(2).locator('.rte-page-header')).toHaveText('奇数页页眉');
+});
+
 test('rich text: page count matches between page view and snapshot PDF', async ({ page }) => {
   test.setTimeout(180_000);
   await openRichText(page);
