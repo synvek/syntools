@@ -35,14 +35,26 @@ export const DEFAULT_TOC_LABELS: TocLabels = { title: '目录', empty: '文档�
 /** Extra indent per heading level (px) */
 const TOC_INDENT_PX = 16;
 
-/** Collect the document's headings; empty headings are skipped so they map one-to-one with TOC entries */
-export function collectHeadings(doc: PMNode): TocHeading[] {
+/**
+ * Collect the document's headings; empty ones are skipped so they map one-to-one with TOC entries.
+ *
+ * `styleLevel` (P1-1) lets a paragraph join the TOC by the level of its named style — a block styled
+ * 标题 2 belongs in the outline even when it is a paragraph node, which is what "目录基于样式层级生成"
+ * means. Heading nodes keep their own `level`; the style only decides for everything else.
+ */
+export function collectHeadings(
+  doc: PMNode,
+  styleLevel?: (node: PMNode) => number | null,
+): TocHeading[] {
   const headings: TocHeading[] = [];
   doc.descendants((node, pos) => {
-    if (node.type.name !== 'heading') return;
+    const styled = styleLevel?.(node) ?? null;
+    const isHeading = node.type.name === 'heading';
+    if (!isHeading && styled === null) return;
     const text = node.textContent.trim();
     if (!text) return;
-    headings.push({ level: Number(node.attrs.level ?? 1), text, pos });
+    const level = isHeading ? Number(node.attrs.level ?? 1) : (styled as number);
+    headings.push({ level, text, pos });
   });
   return headings;
 }
@@ -55,8 +67,9 @@ export function collectHeadings(doc: PMNode): TocHeading[] {
 export function buildTocEntries(
   doc: PMNode,
   pageOfPosition: (pos: number) => number,
+  styleLevel?: (node: PMNode) => number | null,
 ): { entries: TocEntry[]; headings: TocHeading[] } {
-  const headings = collectHeadings(doc);
+  const headings = collectHeadings(doc, styleLevel);
   const result = buildTableOfContents(headings, (index) => pageOfPosition(headings[index].pos));
   return { entries: result.ok ? result.value.entries : [], headings };
 }
@@ -158,11 +171,19 @@ class TocNodeView implements NodeView {
   private node: PMNode;
   private readonly view: EditorView;
   private readonly labels: TocLabels;
+  /** Style-derived heading level (P1-1): read live, so a style edit re-levels the outline */
+  private readonly styleLevel?: (node: PMNode) => number | null;
 
-  constructor(node: PMNode, view: EditorView, labels: TocLabels) {
+  constructor(
+    node: PMNode,
+    view: EditorView,
+    labels: TocLabels,
+    styleLevel?: (node: PMNode) => number | null,
+  ) {
     this.node = node;
     this.view = view;
     this.labels = labels;
+    this.styleLevel = styleLevel;
     this.dom = document.createElement('div');
     this.dom.className = 'rte-toc-node';
     this.dom.setAttribute('data-toc-node', 'true');
@@ -189,7 +210,11 @@ class TocNodeView implements NodeView {
   private render(): void {
     const state = this.view.state;
     const query = createPageLayoutQuery(state);
-    const { entries, headings } = buildTocEntries(state.doc, (pos) => query.pageIndexOfPos(pos));
+    const { entries, headings } = buildTocEntries(
+      state.doc,
+      (pos) => query.pageIndexOfPos(pos),
+      this.styleLevel,
+    );
     const element = renderTocElement(entries, headings, this.labels, (pos) => this.jump(pos));
     this.dom.replaceChildren(element);
   }
@@ -215,14 +240,18 @@ declare module '@tiptap/core' {
   }
 }
 
-export const TableOfContents = Node.create<{ labels: TocLabels }>({
+export const TableOfContents = Node.create<{
+  labels: TocLabels;
+  /** Style-derived heading level for blocks that are not `heading` nodes (P1-1) */
+  styleLevel?: (node: PMNode) => number | null;
+}>({
   name: 'tableOfContents',
   group: 'block',
   atom: true,
   selectable: true,
 
   addOptions() {
-    return { labels: DEFAULT_TOC_LABELS };
+    return { labels: DEFAULT_TOC_LABELS, styleLevel: undefined };
   },
 
   parseHTML() {
@@ -254,6 +283,7 @@ export const TableOfContents = Node.create<{ labels: TocLabels }>({
   addNodeView() {
     // configure({ labels: undefined }) overrides the defaults, so fall back explicitly here
     const labels = this.options.labels ?? DEFAULT_TOC_LABELS;
-    return ({ node, view }) => new TocNodeView(node, view, labels);
+    const { styleLevel } = this.options;
+    return ({ node, view }) => new TocNodeView(node, view, labels, styleLevel);
   },
 });

@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LEGACY_DRAFT_KEY } from './draft';
+import { CURRENT_SCHEMA_VERSION } from './migrate';
 import {
   createDocId,
   deleteDocument,
@@ -158,7 +159,7 @@ describe('saveDocument / loadDocument', () => {
     const doc = await loadDocument(docId);
     expect(doc?.title).toBe('会议纪要');
     expect(doc?.html).toBe('<p>甲</p>');
-    expect(doc?.schemaVersion).toBe(2);
+    expect(doc?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     // Extension fields are backfilled on read, so callers never deal with undefined arrays
     expect(doc?.comments).toEqual([]);
     expect(doc?.changes).toEqual([]);
@@ -218,7 +219,7 @@ describe('saveDocument / loadDocument', () => {
     });
 
     const doc = await loadDocument(docId);
-    expect(doc?.schemaVersion).toBe(2);
+    expect(doc?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(doc?.title).toBe('旧记录');
     // Comment metadata is recovered from the mark for v1 records
     expect(doc?.comments.map((comment) => comment.id)).toEqual(['c-1']);
@@ -435,7 +436,7 @@ describe('initDocStore', () => {
     const upgraded = JSON.parse(localStorage.getItem(DRAFT_KEY_V2) ?? '{}') as {
       schemaVersion?: number;
     };
-    expect(upgraded.schemaVersion).toBe(2);
+    expect(upgraded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 });
 describe('cross-tab events', () => {

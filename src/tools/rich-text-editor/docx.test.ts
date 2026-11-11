@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { CONTENT_WIDTH_PX, planPageBlocks, scanDocxExportLosses } from './core';
 import { exportDocxBlob, importDocx } from './docx';
+import type { NamedStyle } from './namedStyles';
 import { DEFAULT_PAGE_SETUP, normalizePageSetup, type PageSetupConfig } from './pageSetup';
 import { renderTocHtml } from './toc';
 
@@ -949,5 +950,48 @@ describe('docx endnotes (RTE-03)', () => {
     const endnotes = await readZipEntry(result.value, 'word/endnotes.xml');
     expect(endnotes).toContain('尾注一');
     expect(endnotes).toContain('尾注二');
+  });
+});
+
+describe('named styles in .docx (P1-1)', () => {
+  const styles: NamedStyle[] = [
+    { id: 'body', font: { size: 11 } },
+    {
+      id: 'title',
+      name: '我的标题',
+      headingLevel: 1,
+      font: { size: 30, bold: true, color: '#b45309' },
+    },
+  ];
+
+  it('writes the set as w:styles and points styled paragraphs at it', async () => {
+    const html =
+      '<h1 data-rte-style="title">第一章</h1><p data-rte-style="body">正文</p><p>无样式</p>';
+    const result = await exportDocxBlob(html, '样式', DEFAULT_PAGE_SETUP, null, styles);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const body = await readDocumentXml(result.value);
+    // `rte-` prefixed: Word's own Title / Heading built-ins slug down to the same names
+    expect(body).toContain('<w:pStyle w:val="rte-title"/>');
+    expect(body).toContain('<w:pStyle w:val="rte-body"/>');
+    // A styled heading must not also claim Heading 1: two style ids would fight on the way back
+    expect(body).not.toContain('w:val="Heading1"');
+
+    const stylesXml = await readZipEntry(result.value, 'word/styles.xml');
+    expect(stylesXml).toContain('w:styleId="rte-title"');
+    expect(stylesXml).toContain('我的标题');
+    // 30pt → half-points, plus the outline level Word uses for navigation and TOC
+    expect(stylesXml).toContain('<w:sz w:val="60"/>');
+    expect(stylesXml).toContain('<w:outlineLvl w:val="0"/>');
+    expect(stylesXml).toContain('w:styleId="rte-body"');
+  });
+
+  it('keeps unstyled documents as before (headings keep the built-in style)', async () => {
+    const result = await exportDocxBlob('<h2>小节</h2>', '无样式', DEFAULT_PAGE_SETUP, null, []);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const body = await readDocumentXml(result.value);
+    expect(body).toContain('Heading2');
   });
 });

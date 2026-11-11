@@ -23,6 +23,7 @@ import {
 import { MM_TO_PX } from './pageSetup';
 import { ShapeMenu } from './ShapeMenu';
 import { StyleGallery } from './StyleGallery';
+import type { NamedStyle } from './namedStyles';
 import { findSelectedShape, shapeSpec, type DocShapeAttrs, type ShapeDash } from './shapeNode';
 import { applyShapeAttrs } from './useSelectedShape';
 
@@ -163,6 +164,9 @@ export interface RichTextRibbonActions {
   onMath: () => void;
   stylesOpen: boolean;
   onToggleStyles: () => void;
+  /** Named style set of the document (P1-1): the gallery applies and edits it */
+  namedStyles: NamedStyle[];
+  onNamedStylesChange: (styles: NamedStyle[]) => void;
   shapesOpen: boolean;
   shapeMenuOpen: boolean;
   onToggleShapeMenu: () => void;
@@ -1122,6 +1126,8 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
         ? createElement(StyleGallery, {
             open: true,
             editor,
+            styles: actions.namedStyles,
+            onChangeStyles: actions.onNamedStylesChange,
             onClose: actions.onToggleStyles,
           })
         : null,

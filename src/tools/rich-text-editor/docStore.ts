@@ -286,11 +286,30 @@ const PAYLOAD_FIELDS = [
   'changes',
   'userWords',
   'templateId',
+  // Named styles (v3): a style edit changes the document without touching the body, so the payload
+  // comparison has to see it — otherwise the library copy would keep the old definitions
+  'styles',
 ] as const;
+
+/**
+ * Key-order independent serialization: the stored copy comes back through `sanitizeStyles`, which
+ * rebuilds every object with its own property order. Comparing raw `JSON.stringify` output would then
+ * report a difference for identical data and bump the revision on every re-save.
+ */
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    return Object.fromEntries(
+      Object.entries(item as Record<string, unknown>).sort(([left], [right]) =>
+        left < right ? -1 : left > right ? 1 : 0,
+      ),
+    );
+  });
+}
 
 function samePayload(a: RichTextDraftV2, b: RichTextDraftV2): boolean {
   return PAYLOAD_FIELDS.every(
-    (field) => JSON.stringify(a[field] ?? null) === JSON.stringify(b[field] ?? null),
+    (field) => stableJson(a[field] ?? null) === stableJson(b[field] ?? null),
   );
 }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NodeSelection } from '@tiptap/pm/state';
-import { DOMParser as PMDOMParser, type Mark } from '@tiptap/pm/model';
+import { DOMParser as PMDOMParser, type Mark, type Node as PMNode } from '@tiptap/pm/model';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { Icon } from '@/core/components/Icon';
@@ -134,6 +134,14 @@ import {
   type WordIndex,
 } from './spellcheck';
 import { SpellcheckPanel } from './SpellcheckPanel';
+import {
+  buildStyleCss,
+  inlineNamedStyles,
+  mergeStyles,
+  styleHeadingLevel,
+  sanitizeStyles,
+  type NamedStyle,
+} from './namedStyles';
 import { forcePageRelayout, type PageLayoutSnapshot } from './PageView';
 import { buildTemplateApplication, type DocumentTemplate } from './templates';
 import { TemplatePanel } from './TemplatePanel';
@@ -272,6 +280,13 @@ export default function RichTextEditorTool() {
   const [ignoredWords, setIgnoredWords] = useState<string[]>([]);
   /** Id of the last applied template (persisted with the draft; the panel marks the current template from it) */
   const [templateId, setTemplateId] = useState(initial?.templateId ?? '');
+  /** Named style set (draft v3): blocks only carry `data-rte-style`, the look lives here (P1-1) */
+  const [namedStyles, setNamedStyles] = useState<NamedStyle[]>(() =>
+    sanitizeStyles(initial?.styles),
+  );
+  /** Same set for callbacks that must not be rebuilt on every style edit (autosave, TOC level lookup) */
+  const namedStylesRef = useRef<NamedStyle[]>(namedStyles);
+  namedStylesRef.current = namedStyles;
   const [reviewOpen, setReviewOpen] = useState(false);
   // Comment / tracked-change metadata is persisted with the draft: restore the previous session on init
   const [comments, setComments] = useState<DocComment[]>(() => initial?.comments ?? []);
@@ -421,6 +436,14 @@ export default function RichTextEditorTool() {
     [],
   );
   const isSpellcheckEnabled = useCallback(() => spellcheckEnabledRef.current, []);
+  /**
+   * TOC levels from named styles (P1-1): a block styled 标题 2 belongs in the outline even when it is a
+   * paragraph node. Reads the ref, so a style edit re-levels the TOC without rebuilding the extensions.
+   */
+  const tocStyleLevel = useCallback(
+    (node: PMNode) => styleHeadingLevel(namedStylesRef.current, node),
+    [],
+  );
   const extensions = useMemo(
     () =>
       createExtensions({
@@ -428,6 +451,7 @@ export default function RichTextEditorTool() {
         onLayout: handleLayout,
         getPageMetrics: getMetrics,
         tocLabels,
+        tocStyleLevel,
         xrefLabels,
         footnoteLabels,
         endnoteLabels,
@@ -439,6 +463,7 @@ export default function RichTextEditorTool() {
       handleLayout,
       getMetrics,
       tocLabels,
+      tocStyleLevel,
       xrefLabels,
       footnoteLabels,
       endnoteLabels,
@@ -484,6 +509,28 @@ export default function RichTextEditorTool() {
   const changesRef = useRef<TrackedChange[]>(changes);
   const templateIdRef = useRef<string>(initial?.templateId ?? '');
 
+  /**
+   * Named styles are applied through one stylesheet, so editing a style repaints every block that
+   * points at it without rewriting the document (P1-1 acceptance).
+   */
+  const styleSheetRef = useRef<HTMLStyleElement | null>(null);
+  useEffect(() => {
+    if (!styleSheetRef.current) {
+      const sheet = document.createElement('style');
+      sheet.id = 'rte-named-styles';
+      document.head.appendChild(sheet);
+      styleSheetRef.current = sheet;
+    }
+    styleSheetRef.current.textContent = buildStyleCss(namedStyles);
+  }, [namedStyles]);
+  useEffect(
+    () => () => {
+      styleSheetRef.current?.remove();
+      styleSheetRef.current = null;
+    },
+    [],
+  );
+
   /** Lazily allocate a document id: only persisted on first save */
   const ensureDocId = (): string => {
     if (!docIdRef.current) {
@@ -507,6 +554,7 @@ export default function RichTextEditorTool() {
         changes: changesRef.current,
         userWords: userWordsRef.current,
         templateId: templateIdRef.current || undefined,
+        styles: namedStylesRef.current,
       };
       const result = writeDraftSafe(withPrefs);
       const level = draftWarningLevel(result);
@@ -677,11 +725,14 @@ export default function RichTextEditorTool() {
   const tocHtml = useMemo(() => {
     // snapshotHtml is the signal that body content changed; an empty document needs no TOC
     if (!editor || editor.isDestroyed || !snapshotHtml) return '';
-    const { entries, headings } = buildTocEntries(editor.state.doc, (pos) =>
-      pageIndexOfPosition(layout.pageStarts, pos),
+    const { entries, headings } = buildTocEntries(
+      editor.state.doc,
+      (pos) => pageIndexOfPosition(layout.pageStarts, pos),
+      // Reads the state (not the ref) so editing a style's level re-derives the exported TOC
+      (node) => styleHeadingLevel(namedStyles, node),
     );
     return renderTocHtml(entries, headings, tocLabels);
-  }, [editor, snapshotHtml, layout, tocLabels]);
+  }, [editor, snapshotHtml, layout, tocLabels, namedStyles]);
 
   /**
    * 交叉引用解析值：atom 节点在 `getHTML()` 里只是空壳，导出前必须按"当前文档 + 当前分页"填一次。
@@ -712,8 +763,9 @@ export default function RichTextEditorTool() {
 
   /** Shared by print / snapshot PDF / present / single-file HTML: the prepared HTML */
   const printHtml = useMemo(
-    () => injectMath(prepareExportHtml(snapshotHtml)),
-    [prepareExportHtml, snapshotHtml],
+    // Exports leave without our stylesheet, so the named styles are expanded to inline CSS (P1-1)
+    () => injectMath(inlineNamedStyles(prepareExportHtml(snapshotHtml), namedStyles)),
+    [prepareExportHtml, snapshotHtml, namedStyles],
   );
 
   // Read-only HTML for presentation: reuse the same sanitizing path as PDF export to avoid injection risk
@@ -833,6 +885,13 @@ export default function RichTextEditorTool() {
         if (issues.length === 0) return;
         setFidelity(isFidelityMuted() ? null : createFidelityReport('rte', 'import', issues));
       },
+      // Named styles the body actually uses (P1-1): adopting them is what makes the round trip keep
+      // the look — the imported definitions win for the ids they define, the rest stays untouched
+      onStyles: (imported) => {
+        const next = mergeStyles(namedStylesRef.current, imported);
+        namedStylesRef.current = next;
+        setNamedStyles(next);
+      },
     });
     setBusy(null);
     if (!result.ok) {
@@ -864,11 +923,18 @@ export default function RichTextEditorTool() {
     // TOC field cache entries come from the rendered TOC, so fill it in before exporting
     const html = prepareExportHtml(editor.getHTML());
     // Include comment and tracked-change metadata so Word can review them natively
-    const result = await exportDocxBlob(html, title, pageSetup, {
-      comments: commentsRef.current,
-      changes: changesRef.current,
-      author: resolveAuthor(),
-    });
+    const result = await exportDocxBlob(
+      html,
+      title,
+      pageSetup,
+      {
+        comments: commentsRef.current,
+        changes: changesRef.current,
+        author: resolveAuthor(),
+      },
+      // Named styles travel with the file: `w:styles` + `w:pStyle` keep the names for a round trip
+      namedStylesRef.current,
+    );
     setBusy(null);
     if (!result.ok) {
       setFailure(result);
@@ -1104,6 +1170,20 @@ export default function RichTextEditorTool() {
   const handleReplaceIssue = (issue: DocSpellIssue, replacement: string) => {
     if (!editor) return;
     editor.chain().focus().insertContentAt({ from: issue.from, to: issue.to }, replacement).run();
+  };
+
+  /**
+   * A style edit is document state even though it does not touch a node: persist right away, otherwise
+   * autosave (which only runs on body changes) would drop it on refresh.
+   */
+  const handleNamedStylesChange = (next: NamedStyle[]) => {
+    namedStylesRef.current = next;
+    setNamedStyles(next);
+    persistNow({
+      title: titleRef.current,
+      html: readHtml() ?? snapshotHtml,
+      view: viewRef.current,
+    });
   };
 
   const handleAddToDictionary = (word: string) => {
@@ -1997,6 +2077,8 @@ export default function RichTextEditorTool() {
         onMath={handleMathAction}
         stylesOpen={stylesOpen}
         onToggleStyles={() => togglePanel('styles')}
+        namedStyles={namedStyles}
+        onNamedStylesChange={handleNamedStylesChange}
         shapesOpen={shapesOpen}
         shapeMenuOpen={shapeMenuOpen}
         onToggleShapeMenu={() => setShapeMenuOpen((open) => !open)}

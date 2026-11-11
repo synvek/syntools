@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LEGACY_DRAFT_KEY, readDraft, writeDraftSafe } from './draft';
+import { CURRENT_SCHEMA_VERSION } from './migrate';
 import {
   deleteDocument,
   duplicateDocument,
@@ -64,7 +65,7 @@ describe('docStore (no IndexedDB in jsdom: silent degradation)', () => {
         schemaVersion?: number;
         title?: string;
       };
-      expect(upgraded.schemaVersion).toBe(2);
+      expect(upgraded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       expect(upgraded.title).toBe('旧文档');
     });
 
@@ -106,7 +107,7 @@ describe('writeDraftSafe (degradation over the limit)', () => {
       changes?: unknown[];
       userWords?: unknown[];
     };
-    expect(stored.schemaVersion).toBe(2);
+    expect(stored.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(stored.comments).toEqual([]);
     expect(stored.changes).toEqual([]);
     expect(stored.userWords).toEqual([]);

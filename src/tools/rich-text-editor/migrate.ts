@@ -3,18 +3,20 @@ import type { CommentEntry } from '../../core/comments/model';
 import type { ViewMode } from './draft';
 import type { DocComment, TrackedChange } from './docs';
 import type { PageSetupConfig } from './pageSetup';
+import { sanitizeStyles, type NamedStyle } from './namedStyles';
 
 /**
  * Draft / document library schema migration (pure logic, no DOM or IndexedDB, easy to unit test):
  * - v1: no version number, only title / html / view / pageSetup / zoom / pdfMode
  * - v2: adds schemaVersion, comments, tracked changes, custom dictionary and template id
+ * - v3: adds the named style set (P1-1); v2 drafts read back with the shipped nine styles
  *
  * Migration contract: **read-compatible + lazily backfilled**; a failed migration never discards user data.
  * On failure the original values are kept and defaults used; an error is returned only when the input
  * can't serve as a draft at all.
  */
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 /** Implicit version number for legacy v1 data */
 export const LEGACY_SCHEMA_VERSION = 1;
 
@@ -23,7 +25,7 @@ const MAX_DERIVED_ENTRIES = 200;
 
 export type PdfExportMode = 'text' | 'snapshot';
 
-/** Draft schema v2: the data contract every persistence entry point relies on */
+/** Draft schema (v2 shape extended by v3 fields): the data contract every persistence entry point relies on */
 export interface RichTextDraftV2 {
   schemaVersion: number;
   title: string;
@@ -40,6 +42,8 @@ export interface RichTextDraftV2 {
   userWords?: string[];
   /** Id of the most recently applied document template */
   templateId?: string;
+  /** Named style set (v3): blocks reference these by `data-rte-style` */
+  styles?: NamedStyle[];
 }
 
 /**
@@ -48,9 +52,9 @@ export interface RichTextDraftV2 {
  */
 export type RichTextDraftInput = Omit<
   RichTextDraftV2,
-  'schemaVersion' | 'comments' | 'changes' | 'userWords' | 'templateId'
+  'schemaVersion' | 'comments' | 'changes' | 'userWords' | 'templateId' | 'styles'
 > &
-  Partial<Pick<RichTextDraftV2, 'comments' | 'changes' | 'userWords' | 'templateId'>>;
+  Partial<Pick<RichTextDraftV2, 'comments' | 'changes' | 'userWords' | 'templateId' | 'styles'>>;
 
 /** Document-level extension fields (missing in v1 records, backfilled lazily on read) */
 export interface DocExtras {
@@ -58,6 +62,7 @@ export interface DocExtras {
   changes: TrackedChange[];
   userWords: string[];
   templateId?: string;
+  styles: NamedStyle[];
 }
 
 /** Loose object guard, used to filter arbitrary JSON values on read */
@@ -249,7 +254,10 @@ export function normalizeDocExtras(raw: unknown, deriveReview: boolean): DocExtr
 
   const templateId = readString(source.templateId) || undefined;
 
-  return { comments, changes, userWords, templateId };
+  // v2 drafts (and everything older) have no style set: the shipped nine styles are used
+  const styles = sanitizeStyles(source.styles);
+
+  return { comments, changes, userWords, templateId, styles };
 }
 
 /* ------------------------------------------------------------------ *
@@ -264,8 +272,10 @@ export function migrateDraft(raw: unknown): ToolResult<RichTextDraftV2> {
   if (!isPlainObject(raw)) return { ok: false, error: 'MIGRATION_FAILED' };
   if (typeof raw.html !== 'string') return { ok: false, error: 'MIGRATION_FAILED' };
 
-  const isV2 = raw.schemaVersion === CURRENT_SCHEMA_VERSION;
-  const extras = normalizeDocExtras(raw, !isV2);
+  // Review metadata starts at v2: only version-less v1 data is derived from the HTML. Reading a v2
+  // draft as "legacy" would resurrect comments the user deliberately deleted.
+  const version = typeof raw.schemaVersion === 'number' ? raw.schemaVersion : LEGACY_SCHEMA_VERSION;
+  const extras = normalizeDocExtras(raw, version < 2);
 
   const zoom =
     typeof raw.zoom === 'number' && Number.isFinite(raw.zoom) && raw.zoom > 0

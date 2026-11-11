@@ -209,3 +209,68 @@ describe('normalizeDocExtras / toDraftV2', () => {
     ]);
   });
 });
+
+describe('named styles（v2 → v3）', () => {
+  it('reads a v2 draft back with the shipped nine styles', () => {
+    const result = migrateDraft({ schemaVersion: 2, title: '旧稿', html: '<p>x</p>' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(result.value.styles).toHaveLength(9);
+    expect(result.value.styles?.[0]?.id).toBe('body');
+  });
+
+  it('keeps a v3 style set and sanitizes it', () => {
+    const result = migrateDraft({
+      schemaVersion: 3,
+      title: '新稿',
+      html: '<p data-rte-style="custom-1">x</p>',
+      styles: [
+        { id: 'body', font: { size: 11 } },
+        { id: 'custom-1', name: '提示', basedOn: 'body', font: { color: '#B45309', size: 12 } },
+        { id: '!!!' },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const custom = result.value.styles?.find((style) => style.id === 'custom-1');
+    expect(custom?.name).toBe('提示');
+    expect(custom?.font).toEqual({ size: 12, color: '#b45309' });
+    expect(result.value.styles?.map((style) => style.id)).not.toContain('!!!');
+  });
+
+  it('always backfills a body style so paragraphs never lose their look', () => {
+    const extraStyleOnly = normalizeDocExtras(
+      { html: '<p>x</p>', styles: [{ id: 'custom-1' }] },
+      false,
+    );
+    expect(extraStyleOnly.styles[0]?.id).toBe('body');
+  });
+
+  it('round-trips through the write side', () => {
+    const draft = toDraftV2({
+      title: '稿',
+      html: '<p>x</p>',
+      styles: [
+        { id: 'body', font: { size: 12 } },
+        { id: 'custom-1', name: '提示' },
+      ],
+    });
+    expect(draft.styles).toHaveLength(2);
+    expect(draft.styles?.[1]?.name).toBe('提示');
+    expect(draft.schemaVersion).toBe(3);
+  });
+
+  it('derives review metadata for v1 only, never for v2/v3', () => {
+    // A v2 draft with an explicitly empty comment list must stay empty after migration
+    const v2 = migrateDraft({
+      schemaVersion: 2,
+      title: 't',
+      html: '<p><span data-comment-id="c-1">x</span></p>',
+      comments: [],
+    });
+    expect(v2.ok && v2.value.comments).toEqual([]);
+    const v1 = migrateDraft({ title: 't', html: '<p><span data-comment-id="c-1">x</span></p>' });
+    expect(v1.ok && v1.value.comments.length).toBe(1);
+  });
+});

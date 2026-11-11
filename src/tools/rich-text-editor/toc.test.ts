@@ -43,6 +43,20 @@ describe('collectHeadings', () => {
     expect(headings[0].pos).toBeLessThan(headings[1].pos);
   });
 
+  it('adds blocks that borrow a heading level from their named style (P1-1)', () => {
+    const editor = createEditor(
+      '<h1>标题节点</h1><p data-rte-style="heading2">样式标题</p><p>正文</p>',
+    );
+    const levelOf = (node: { attrs: Record<string, unknown> }) =>
+      node.attrs.styleId === 'heading2' ? 2 : null;
+    expect(collectHeadings(editor.state.doc, levelOf).map((h) => [h.level, h.text])).toEqual([
+      [1, '标题节点'],
+      [2, '样式标题'],
+    ]);
+    // Without the resolver a paragraph never enters the outline
+    expect(collectHeadings(editor.state.doc)).toHaveLength(1);
+  });
+
   it('skips empty headings so entries stay one-to-one', () => {
     const editor = createEditor('<h1></h1><h1>有内容</h1>');
     expect(collectHeadings(editor.state.doc).map((heading) => heading.text)).toEqual(['有内容']);

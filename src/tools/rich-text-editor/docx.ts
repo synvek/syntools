@@ -38,6 +38,13 @@ import { renderLatexImages, type MathImage, type MathImageRequest } from './math
 import { readShapeSpec } from './shapeNode';
 import { extractDocxShapes, placeShapesInHtml } from './docxShapeImport';
 import { importLossIssues } from './fidelity';
+import { defaultStyleName, resolveStyle, type NamedStyle } from './namedStyles';
+import {
+  applyStyleClasses,
+  docxStyleMapEntries,
+  parseDocxStylesXml,
+  toDocxStyleId,
+} from './namedStyleDocx';
 import type { OoxmlIr, OoxmlParts } from './ooxmlIr';
 import { isOoxmlIrEnabled } from './ooxmlIrFlag';
 import {
@@ -377,6 +384,8 @@ interface ExportContext {
   mathImages: Map<string, MathImage>;
   /** Shapes met during the traversal, in document order (injected into document.xml afterwards) */
   shapes: ShapeExportEntry[];
+  /** Named styles of the document: blocks with `data-rte-style` become `w:pStyle`, the set becomes `w:styles` */
+  namedStyles: readonly NamedStyle[];
 }
 
 /** Default hyperlink styling: docx has no built-in Hyperlink character style, so add blue underline explicitly */
@@ -882,7 +891,12 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
   const D = ctx.D;
   const out: BlockChild[] = [];
   Array.from(root.children).forEach((el) => {
-    const heading = HEADING_LEVEL[el.tagName];
+    // A block carrying a named style keeps that style: also writing `Heading n` would give the same
+    // paragraph two competing style ids, and the round trip would come back with the wrong one
+    const styleId = el.getAttribute('data-rte-style');
+    const styledId =
+      styleId && ctx.namedStyles.some((style) => style.id === styleId) ? styleId : null;
+    const heading = styledId ? undefined : HEADING_LEVEL[el.tagName];
     if (el.hasAttribute('data-toc')) {
       out.push(buildTocField(D, el));
       return;
@@ -986,6 +1000,9 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       children: blockChildren(ctx, el),
       alignment: alignmentType(D, blockAlignment(el)),
       heading: heading ? headingLevel(D, heading) : undefined,
+      // P1-1: the paragraph points at a named style, so Word (and our own import) can find it again.
+      // The `rte-` prefix keeps the id clear of Word's own Title / Heading1 built-ins
+      style: styledId ? toDocxStyleId(styledId) : undefined,
       // 左右缩进与悬挂缩进都是 Word 的 `w:ind`；只写实际用到的子属性，
       // 否则 docx 库会给每段都生成一堆 0 值属性
       indent: paragraphIndent(textIndent, indentLeft, indentRight, hangingIndent),
@@ -1054,6 +1071,11 @@ export interface DocxImportOptions {
   useOoxmlIr?: boolean;
   /** Called after the HTML is final when the flag is on and the package could be parsed into IR. */
   onIr?: (info: ImportedIr) => void;
+  /**
+   * Named styles read from `word/styles.xml` that the imported body actually uses (P1-1). Called only
+   * when at least one block points at a style, so a plain document never touches the caller's set.
+   */
+  onStyles?: (styles: NamedStyle[]) => void;
 }
 
 /** Structured-import side channel: the IR plus the user-facing fidelity warnings derived from it. */
@@ -1268,15 +1290,23 @@ export async function importDocx(
     // (a retry would produce unhandled rejections)
     const nodeBuffer =
       typeof Buffer === 'undefined' ? undefined : Buffer.from(new Uint8Array(buffer));
+    // Named styles (P1-1): read the definitions before converting, so mammoth can map each style name
+    // to a marker class and the paragraphs come back pointing at the same style id
+    const importedStyles = parseDocxStylesXml(await readPartXml(buffer, 'word/styles.xml'));
     const parsed = await mammoth.convertToHtml(
       (nodeBuffer ? { arrayBuffer: buffer, buffer: nodeBuffer } : { arrayBuffer: buffer }) as {
         arrayBuffer: ArrayBuffer;
       },
-      { styleMap: MAMMOTH_STYLE_MAP },
+      { styleMap: [...MAMMOTH_STYLE_MAP, ...docxStyleMapEntries(importedStyles)] },
     );
     const clean = sanitizeDocHtml(parsed.value);
     if (!clean.ok) return clean;
     let html = normalizeImportedDocHtml(clean.value);
+    // Marker classes become attributes *after* sanitizing: the values are our own ids, and doing it
+    // afterwards means the sanitizer never has to whitelist them
+    const styled = applyStyleClasses(html, importedStyles);
+    html = styled.html;
+    if (styled.used.length > 0) options?.onStyles?.(styled.used);
     // Review layer last: mammoth keeps inserted text as plain text, drops deleted text and comment ranges
     // outright, so revisions / format changes / comment marks are re-applied onto the final HTML
     // (see docxReview.ts for the alignment contract)
@@ -1410,6 +1440,8 @@ export async function exportDocxBlob(
   title: string,
   setupInput?: PageSetupConfig | null,
   review?: DocxReviewOptions | null,
+  /** The document's named styles (P1-1): written as `w:styles` and referenced by `w:pStyle` */
+  namedStyles: readonly NamedStyle[] = [],
 ): Promise<ToolResult<Blob>> {
   const check = checkExportSize(html);
   if (!check.ok) return check;
@@ -1429,6 +1461,7 @@ export async function exportDocxBlob(
       endnoteNotes: [],
       mathImages: new Map(),
       shapes: [],
+      namedStyles,
     };
     const doc = new DOMParser().parseFromString(html, 'text/html');
 
@@ -1503,14 +1536,44 @@ export async function exportDocxBlob(
             ]),
           )
         : undefined;
+    // P1-1: the document's named styles become real Word paragraph styles, so the .docx keeps the
+    // style names and a round trip can rebuild the set (see `namedStyleDocx.ts` for the reader).
+    // Only properties the style actually sets are written; an empty `w:rPr` would override the
+    // document defaults with nothing.
+    const namedParagraphStyles = ctx.namedStyles.map((style) => {
+      const resolved = resolveStyle(ctx.namedStyles, style.id) ?? style;
+      const font = resolved.font ?? {};
+      const level = resolved.headingLevel;
+      const align = resolved.paragraph?.align;
+      return {
+        id: toDocxStyleId(style.id),
+        name: defaultStyleName(style),
+        basedOn: style.basedOn ?? 'Normal',
+        next: 'Normal',
+        quickFormat: true,
+        run: {
+          ...(font.family ? { font: firstFontFamily(font.family) ?? font.family } : {}),
+          ...(font.size ? { size: Math.round(font.size * 2) } : {}),
+          ...(font.bold ? { bold: true } : {}),
+          ...(font.italic ? { italics: true } : {}),
+          ...(font.color ? { color: font.color.replace('#', '').toUpperCase() } : {}),
+        },
+        paragraph: {
+          // 0-based outline level: Word's navigation pane and TOC both use it
+          ...(level ? { outlineLevel: level - 1 } : {}),
+          ...(align ? { alignment: alignmentType(D, align) } : {}),
+        },
+      };
+    });
+
     const document = new D.Document({
       title: title || 'SynTools Document',
       creator: 'SynTools',
-      // Quote / Code are the only two semantic block styles we write. They exist mainly so the
-      // paragraph carries a style **name** into the document: mammoth can only rebuild
-      // <blockquote>/<pre> from a named style (see MAMMOTH_STYLE_MAP), not from indentation.
+      // Quote / Code stay for compatibility: mammoth can only rebuild <blockquote>/<pre> from a named
+      // style (see MAMMOTH_STYLE_MAP), not from indentation.
       styles: {
         paragraphStyles: [
+          ...namedParagraphStyles,
           {
             id: 'Quote',
             name: 'Quote',

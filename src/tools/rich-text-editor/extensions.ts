@@ -25,6 +25,7 @@ import {
   TableStyle,
 } from './blockStyles';
 import { Comment, DocMarkCommands, TrackedDelete, TrackedFormat, TrackedInsert } from './marks';
+import { NamedStyleAttribute } from './namedStyles';
 import { createPageLayoutPlugin, type PageLayoutSnapshot } from './PageView';
 import { resolvePageMetrics, type PageMetrics } from './pageSetup';
 import { DEFAULT_TOC_LABELS, TableOfContents, type TocLabels } from './toc';
@@ -249,6 +250,8 @@ export interface RichTextExtensionOptions {
   getPageMetrics?: () => PageMetrics;
   /** TOC labels */
   tocLabels?: TocLabels;
+  /** Named-style heading level for the TOC (P1-1): non-heading blocks styled as a heading join the outline */
+  tocStyleLevel?: (node: PmNode) => number | null;
   /** 交叉引用 labels（目标书签失效时的占位文字） */
   xrefLabels?: XrefLabels;
   /** Footnote labels */
@@ -274,6 +277,7 @@ export function createExtensions({
   endnoteLabels,
   onMathSelect,
   spellcheck,
+  tocStyleLevel,
 }: RichTextExtensionOptions) {
   return [
     StarterKit.configure({
@@ -314,6 +318,7 @@ export function createExtensions({
     DocBookmark,
     ParagraphStyle,
     BlockStyleCommands,
+    NamedStyleAttribute,
     Comment,
     TrackedInsert,
     TrackedDelete,
@@ -322,7 +327,10 @@ export function createExtensions({
     // Character-level formatting (superscript / subscript / letter spacing / text transform)
     ...charFormatExtensions,
     // TOC / footnote labels follow the language: the nodes carry no attributes, so titles localize on language switch
-    TableOfContents.configure({ labels: tocLabels ?? DEFAULT_TOC_LABELS }),
+    TableOfContents.configure({
+      labels: tocLabels ?? DEFAULT_TOC_LABELS,
+      styleLevel: tocStyleLevel,
+    }),
     // 交叉引用 (RTE-03) 渲染在 NodeView 里，labels 决定"目标书签已删除"时显示什么
     DocXref.configure({ labels: xrefLabels ?? DEFAULT_XREF_LABELS }),
     FootnoteRef.configure({ labels: footnoteLabels ?? DEFAULT_FOOTNOTE_LABELS }),
