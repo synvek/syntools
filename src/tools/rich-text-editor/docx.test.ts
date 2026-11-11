@@ -1011,4 +1011,15 @@ describe('paragraph pagination control in .docx (P1-4)', () => {
     expect(body.match(/<w:keepNext\/>/g)).toHaveLength(1);
     expect(body.match(/<w:widowControl /g)).toHaveLength(1);
   });
+
+  it('writes paragraph line spacing as a w:line multiple (240 = single)', async () => {
+    const html = '<p style="line-height: 1.5">一倍半</p><p>默认</p>';
+    const result = await exportDocxBlob(html, '行距', DEFAULT_PAGE_SETUP, null, []);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const body = await readDocumentXml(result.value);
+    expect(body).toContain('w:line="360"');
+    // A paragraph without its own spacing keeps the editor default (300 = 1.25 lines)
+    expect(body).toContain('w:line="300"');
+  });
 });

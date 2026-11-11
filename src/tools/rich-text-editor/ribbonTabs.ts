@@ -599,7 +599,11 @@ function paragraphGroup(input: RichTextRibbonInput): RibbonGroup {
           t('tools.richText.lineHeight'),
           state.lineHeight,
           options.lineHeightOptions,
-          (value) => (value ? chain().setLineHeight(value).run() : chain().unsetLineHeight().run()),
+          // P1-4: line spacing is applied to the paragraph (w:spacing), not to the run
+          (value) =>
+            chain()
+              .setParagraphLineHeight(value ? Number(value) : null)
+              .run(),
           'xs',
         ),
         select(
@@ -1345,8 +1349,11 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
               t('tools.richText.lineHeight'),
               state.lineHeight,
               options.lineHeightOptions,
+              // P1-4: line spacing is applied to the paragraph (w:spacing), not to the run
               (value) =>
-                value ? chain().setLineHeight(value).run() : chain().unsetLineHeight().run(),
+                chain()
+                  .setParagraphLineHeight(value ? Number(value) : null)
+                  .run(),
               'xs',
             ),
             select(

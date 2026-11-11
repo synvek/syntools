@@ -153,7 +153,10 @@ export function EditorToolbar({ editor, menu, headerRight, ...actions }: EditorT
         paragraph: e.isActive('paragraph'),
         fontSize: String(e.getAttributes('textStyle').fontSize ?? ''),
         fontFamily: String(e.getAttributes('textStyle').fontFamily ?? ''),
-        lineHeight: String(e.getAttributes('textStyle').lineHeight ?? ''),
+        // P1-4: line spacing is a paragraph property; the textStyle fallback keeps old drafts readable
+        lineHeight: String(
+          e.getAttributes('paragraph').lineHeight ?? e.getAttributes('textStyle').lineHeight ?? '',
+        ),
         color: String(e.getAttributes('textStyle').color ?? ''),
         highlight: e.isActive('highlight'),
         highlightColor: normalizeColor(e.getAttributes('highlight').color),

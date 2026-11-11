@@ -996,6 +996,9 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
     const spaceAfter = style?.marginBottom
       ? Math.round(Number.parseFloat(style.marginBottom) * PX_TO_TWIP)
       : 120;
+    // P1-4: paragraph line spacing → `w:spacing/@w:line` (240 twips = one line, `lineRule="auto"`)
+    const lineHeightRaw = style?.lineHeight ? Number.parseFloat(style.lineHeight) : Number.NaN;
+    const lineHeight = Number.isFinite(lineHeightRaw) && lineHeightRaw > 0 ? lineHeightRaw : null;
 
     const paragraphOptions: ParagraphOptions = {
       children: blockChildren(ctx, el),
@@ -1010,7 +1013,8 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
       spacing: {
         before: Math.max(0, spaceBefore),
         after: Math.max(0, spaceAfter),
-        line: 300,
+        // 300 = the editor's default 1.25 line spacing; a paragraph that carries its own multiple wins
+        line: lineHeight ? Math.round(lineHeight * 240) : 300,
       },
       // P1-4: pagination control is a `w:pPr` toggle; only the states the user actually chose are
       // written, so Word keeps its own defaults for everything else

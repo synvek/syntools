@@ -61,6 +61,49 @@ test('rich text: pagination flags reach .docx and come back on import', async ({
   expect(errors).toEqual([]);
 });
 
+/**
+ * Line spacing is a paragraph property (P1-4): it must survive the `.docx` trip as `w:line`, which
+ * used to be a fixed 300 for every paragraph regardless of what the ribbon showed.
+ */
+test('rich text: paragraph line spacing reaches .docx and comes back on import', async ({
+  page,
+}) => {
+  await openRichText(page);
+  await page.keyboard.type('一倍半');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('默认行距');
+
+  await page.locator('.tiptap p').first().click();
+  await page.getByRole('combobox', { name: '行距' }).first().click();
+  const options = page.getByRole('listbox', { name: '行距' });
+  await expect(options).toBeVisible();
+  await options.getByRole('option', { name: '1.5', exact: true }).click();
+
+  const first = page.locator('.tiptap p').first();
+  await expect(first).toHaveAttribute('style', /line-height: 1.5/);
+  // The second paragraph keeps the document default: this is not a document-wide switch
+  await expect(page.locator('.tiptap p').last()).not.toHaveAttribute('style', /line-height/);
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    (async () => {
+      await page.getByTestId('menubar-more').click();
+      await page.getByRole('menuitem', { name: '导出 Word (.docx)' }).click();
+    })(),
+  ]);
+  const file = test.info().outputPath('line-height.docx');
+  await download.saveAs(file);
+
+  // Clear locally, then import: the 1.5 can only come back out of the file
+  await page.getByRole('combobox', { name: '行距' }).first().click();
+  await page.getByRole('listbox', { name: '行距' }).getByRole('option').first().click();
+  await expect(first).not.toHaveAttribute('style', /line-height: 1.5/);
+
+  await page.getByTestId('rich-text-import-input').setInputFiles(file);
+  await expect(page.locator('.tiptap p').first()).toHaveAttribute('style', /line-height: 1.5/);
+  await expect(page.locator('.tiptap p').last()).not.toHaveAttribute('style', /line-height: 1.5/);
+});
+
 test('rich text: dragging a ruler marker sets the paragraph indent', async ({ page }) => {
   await openRichText(page);
   await page.keyboard.type('缩进段落');

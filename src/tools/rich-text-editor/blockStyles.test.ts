@@ -351,3 +351,40 @@ describe('paragraph pagination (P1-4)', () => {
     expect(editor.getHTML()).not.toContain('data-keep-lines');
   });
 });
+
+describe('paragraph line height (P1-4)', () => {
+  it('writes line spacing on the paragraph instead of the text run', () => {
+    const editor = createEditor('<p>第一段</p><p>第二段</p>');
+    editor.commands.setTextSelection(2);
+    expect(editor.commands.setParagraphLineHeight(1.5)).toBe(true);
+
+    const html = editor.getHTML();
+    expect(html).toContain('line-height: 1.5');
+    // Only the paragraph with the caret changes: line spacing is not a document-wide switch
+    expect(html).toContain('<p>第二段</p>');
+    expect(html).not.toContain('data-line-height');
+    expect(editor.getAttributes('paragraph').lineHeight).toBe(1.5);
+  });
+
+  it('reads an existing inline line-height back, and only as a multiple', () => {
+    const editor = createEditor(
+      '<p style="line-height: 2">双倍</p><p style="line-height: 24px">绝对</p>',
+    );
+    const heights: unknown[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'paragraph') heights.push(node.attrs.lineHeight);
+    });
+    // px is an absolute length, which cannot be carried as a Word multiple: treated as unset
+    expect(heights).toEqual([2, null]);
+  });
+
+  it('clears the spacing and clamps out-of-range values', () => {
+    const editor = createEditor('<p style="line-height: 1.5">段落</p>');
+    editor.commands.setTextSelection(2);
+    expect(editor.commands.setParagraphLineHeight(9)).toBe(true);
+    expect(editor.getAttributes('paragraph').lineHeight).toBe(4);
+
+    expect(editor.commands.setParagraphLineHeight(null)).toBe(true);
+    expect(editor.getHTML()).not.toContain('line-height');
+  });
+});

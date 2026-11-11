@@ -24,19 +24,29 @@ const documentXml = `<?xml version="1.0" encoding="UTF-8"?>
 describe('parseDocxParagraphControls', () => {
   it('reads the three toggles per paragraph, in document order', () => {
     expect(parseDocxParagraphControls(documentXml)).toEqual([
-      { keepNext: true, keepLines: false, widowControl: null },
-      { keepNext: false, keepLines: true, widowControl: null },
+      { keepNext: true, keepLines: false, widowControl: null, lineHeight: null },
+      { keepNext: false, keepLines: true, widowControl: null, lineHeight: null },
       // w:val="0" is the explicit off switch
-      { keepNext: false, keepLines: false, widowControl: false },
-      { keepNext: false, keepLines: false, widowControl: null },
+      { keepNext: false, keepLines: false, widowControl: false, lineHeight: null },
+      { keepNext: false, keepLines: false, widowControl: null, lineHeight: null },
       // A self-closing w:p is still a paragraph (it becomes an empty <p>)
-      { keepNext: false, keepLines: false, widowControl: null },
+      { keepNext: false, keepLines: false, widowControl: null, lineHeight: null },
     ]);
   });
 
   it('only looks inside w:pPr, not at run properties', () => {
     const xml = `<w:p><w:r><w:rPr><w:keepNext/></w:rPr><w:t>x</w:t></w:r></w:p>`;
     expect(parseDocxParagraphControls(xml)[0]?.keepNext).toBe(false);
+  });
+
+  it('reads line spacing as a multiple when the rule is auto (240 = single)', () => {
+    const xml =
+      paragraph('<w:spacing w:line="360" w:lineRule="auto"/>') +
+      paragraph('<w:spacing w:line="240"/>') +
+      // exact / atLeast are absolute twips, not multiples: refusing beats guessing wrong
+      paragraph('<w:spacing w:line="360" w:lineRule="exact"/>');
+    const controls = parseDocxParagraphControls(xml);
+    expect(controls.map((control) => control.lineHeight)).toEqual([1.5, 1, null]);
   });
 
   it('returns nothing for markup without paragraphs', () => {
@@ -64,5 +74,14 @@ describe('applyParagraphControls', () => {
 
   it('leaves the document alone when nothing was parsed', () => {
     expect(applyParagraphControls(html, [])).toBe(html);
+  });
+
+  it('stamps line spacing as an inline style, keeping other styles intact', () => {
+    const spacing = parseDocxParagraphControls(
+      paragraph('<w:spacing w:line="360" w:lineRule="auto"/>'),
+    );
+    const result = applyParagraphControls('<p style="margin-left: 24px">一</p>', spacing);
+    expect(result).toContain('line-height: 1.5');
+    expect(result).toContain('margin-left: 24px');
   });
 });

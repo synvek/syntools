@@ -28,6 +28,18 @@ function readPx(value: string | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Line spacing of a paragraph: unitless multiples only (1.5, 2 …). `px` / `%` values are absolute and
+ * cannot be carried as a Word multiple (`w:line` with `lineRule="auto"`), so they are treated as unset.
+ */
+function readLineHeight(el: HTMLElement): number | null {
+  const raw = el.style.lineHeight?.trim();
+  if (!raw || !/^\d*\.?\d+$/.test(raw)) return null;
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed < 0.8 || parsed > 4) return null;
+  return Math.round(parsed * 100) / 100;
+}
+
 function styleObject(styles: Record<string, string | undefined>): string {
   return Object.entries(styles)
     .filter(([, value]) => Boolean(value))
@@ -51,6 +63,8 @@ interface StyleAttrs {
   keepLines?: boolean | null;
   /** P1-4: `false` switches widow/orphan control off; `null` = the default (on) */
   widowControl?: boolean | null;
+  /** P1-4: line spacing as a multiple of the font size (Word's `w:line` + `w:lineRule="auto"`) */
+  lineHeight?: number | null;
   width?: number | null;
   align?: string | null;
   /** Image layer: inline / front (in front of text) / behind (behind text) */
@@ -139,6 +153,16 @@ const ParagraphStyle = Extension.create({
               el.getAttribute('data-widow-control') === 'off' ? false : null,
             renderHTML: (attrs: StyleAttrs) =>
               attrs.widowControl === false ? { 'data-widow-control': 'off' } : {},
+          },
+          // Line spacing belongs to the paragraph, not to the run: Word's `w:spacing/@w:line` is a
+          // paragraph property, and a run-level mark made "1.5 lines" split at every span boundary.
+          // Written as an inline `line-height` (a CSS-expressible value, unlike the pagination flags)
+          // so page view, print and the snapshot PDF all read it from the same markup.
+          lineHeight: {
+            default: null,
+            parseHTML: (el: HTMLElement) => readLineHeight(el),
+            renderHTML: (attrs: StyleAttrs) =>
+              attrs.lineHeight ? { style: `line-height: ${attrs.lineHeight}` } : {},
           },
         },
       },
@@ -300,6 +324,11 @@ declare module '@tiptap/core' {
         keepLines?: boolean | null;
         widowControl?: boolean | null;
       }) => ReturnType;
+      /**
+       * P1-4 行距段落化：整段行距（倍数，null 恢复默认）。挂在段落上而不是 `textStyle` mark 上 ——
+       * 行距是段落属性，mark 会在每个 span 边界断开，导出到 `.docx` 也只能落到 `w:spacing`。
+       */
+      setParagraphLineHeight: (value: number | null) => ReturnType;
     };
     imageStyle: {
       /** Set image width (px; null = natural size) and alignment */
@@ -383,6 +412,20 @@ export const BlockStyleCommands = Extension.create({
             ...('keepLines' in patch ? { keepLines: patch.keepLines ?? null } : {}),
             ...('widowControl' in patch ? { widowControl: patch.widowControl ?? null } : {}),
           });
+          return true;
+        },
+      setParagraphLineHeight:
+        (value: number | null) =>
+        ({ state, tr }) => {
+          const { $from } = state.selection;
+          const node = $from.parent;
+          if (node.type.name !== 'paragraph') return false;
+          // Word's own range is 0.8–4 lines; anything outside is a typo, not a layout decision
+          const next =
+            value === null || !Number.isFinite(value)
+              ? null
+              : Math.round(Math.max(0.8, Math.min(4, value)) * 100) / 100;
+          tr.setNodeMarkup($from.before(), undefined, { ...node.attrs, lineHeight: next });
           return true;
         },
       setImageStyle:

@@ -17,12 +17,19 @@ export interface DocxParagraphControl {
   keepLines: boolean;
   /** `false` = widow control explicitly switched off; `null` = default (on) */
   widowControl: boolean | null;
+  /**
+   * Line spacing as a multiple of the font size (`w:spacing/@w:line` with `lineRule="auto"`, where
+   * 240 = single). `null` when the paragraph has none, or when the rule is `exact` / `atLeast` —
+   * those are absolute lengths in twips and cannot be expressed as a multiple.
+   */
+  lineHeight: number | null;
 }
 
 /** Every `w:p` in document order, including the ones inside table cells */
 const PARAGRAPH_RE = /<w:p(?:\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/w:p>)/g;
 /** Only the property block matters; `w:val="0"` is an explicit off switch for any toggle */
 const PROPERTIES_RE = /<w:pPr\b[^>]*>([\s\S]*?)<\/w:pPr>/;
+const SPACING_RE = /<w:spacing\b([^>]*)\/?>/;
 
 function toggleOn(properties: string, name: string): boolean {
   const match = new RegExp(`<w:${name}\\b([^>]*)/?>`).exec(properties);
@@ -37,6 +44,18 @@ function toggleOff(properties: string, name: string): boolean {
   return /w:val="(0|false)"/.test(match[1] ?? '');
 }
 
+/** Line spacing multiple of a paragraph, or null when absent / not a multiple (`exact`, `atLeast`) */
+function lineHeightOf(properties: string): number | null {
+  const attrs = SPACING_RE.exec(properties)?.[1];
+  if (!attrs) return null;
+  const rule = /w:lineRule="([^"]*)"/.exec(attrs)?.[1];
+  // `auto` is also the default when the attribute is missing, so only other values disqualify
+  if (rule && rule !== 'auto') return null;
+  const line = Number.parseInt(/w:line="(\d+)"/.exec(attrs)?.[1] ?? '', 10);
+  if (!Number.isFinite(line) || line <= 0) return null;
+  return Math.round((line / 240) * 100) / 100;
+}
+
 export function parseDocxParagraphControls(xml: string): DocxParagraphControl[] {
   if (!xml.includes('<w:p')) return [];
   const controls: DocxParagraphControl[] = [];
@@ -47,6 +66,7 @@ export function parseDocxParagraphControls(xml: string): DocxParagraphControl[] 
       keepNext: toggleOn(properties, 'keepNext'),
       keepLines: toggleOn(properties, 'keepLines'),
       widowControl: toggleOff(properties, 'widowControl') ? false : null,
+      lineHeight: lineHeightOf(properties),
     });
   }
   return controls;
@@ -74,6 +94,14 @@ export function applyParagraphControls(
     if (control.keepNext) block.setAttribute('data-keep-next', 'true');
     if (control.keepLines) block.setAttribute('data-keep-lines', 'true');
     if (control.widowControl === false) block.setAttribute('data-widow-control', 'off');
+    if (control.lineHeight) {
+      // Inline style, because line spacing *is* the CSS: the paragraph attribute parses it back
+      const existing = block.getAttribute('style');
+      block.setAttribute(
+        'style',
+        `${existing ? `${existing.replace(/;\s*$/, '')}; ` : ''}line-height: ${control.lineHeight}`,
+      );
+    }
   });
   return doc.body.innerHTML;
 }
