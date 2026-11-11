@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/react';
 import { findSelectedImage, keepImageSelected, readZoom } from './imageLayer';
+import { startPointerDrag } from './pointerDrag';
 
 /**
  * Image resize handles: selecting an image shows 8 handles (4 corners + 4 edge midpoints) for proportional dragging.
@@ -113,10 +114,8 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
     };
   }, [editor, refresh, viewportRef]);
 
-  const startResize = (event: React.MouseEvent, direction: HandleDirection) => {
+  const startResize = (event: React.PointerEvent<HTMLElement>, direction: HandleDirection) => {
     if (!editor || !box) return;
-    event.preventDefault();
-    event.stopPropagation();
     const startX = event.clientX;
     const startY = event.clientY;
     const startWidth = box.width;
@@ -140,7 +139,7 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
       editor.view.dispatch(tr);
     };
 
-    const onMove = (moveEvent: MouseEvent): void => {
+    const onMove = (moveEvent: PointerEvent): void => {
       const raw = nextWidth(
         direction,
         (moveEvent.clientX - startX) / zoom,
@@ -153,16 +152,13 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
     };
 
     const onUp = (): void => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
       if (Math.round(current) === Math.round(startWidth)) return;
       // Dragging does not enter history; on release it becomes a single undoable step
       apply(startWidth, false);
       apply(current, true);
     };
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    startPointerDrag(event, { move: onMove, end: onUp });
   };
 
   if (!box) return null;
@@ -183,7 +179,7 @@ export function ImageResizeOverlay({ editor, viewportRef }: ImageResizeOverlayPr
           key={direction}
           data-handle={direction}
           className={`rte-image-handle rte-image-handle--${direction}`}
-          onMouseDown={(event) => startResize(event, direction)}
+          onPointerDown={(event) => startResize(event, direction)}
         />
       ))}
     </div>

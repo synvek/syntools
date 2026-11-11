@@ -632,6 +632,27 @@
   }
 }
 
+/* Touch / pen (P1-7): a handle must swallow the gesture, not scroll or zoom the page under it */
+.rte-image-handle,
+.rte-shape-rotate,
+.rte-shape-adjust {
+  touch-action: none;
+}
+
+/*
+ * Coarse pointers: the dot stays small, the hit area grows to ~44px (WCAG 2.5.5 / Apple HIG).
+ * `::before` is free on the rotate handle because its `::after` draws the connector line.
+ */
+@media (pointer: coarse) {
+  .rte-image-handle::after,
+  .rte-shape-adjust::after,
+  .rte-shape-rotate::before {
+    content: '';
+    position: absolute;
+    inset: -18px;
+  }
+}
+
 .rte-surface .tiptap .column-resize-handle {
   position: absolute;
   top: 0;

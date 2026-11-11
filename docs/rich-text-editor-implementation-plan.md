@@ -498,17 +498,26 @@ graph TD
 
 ### 6.7 P1-7 移动端与触控可达
 
-- [ ] **P1-7 移动端与触控可达**（P1，4d）
+- [x] **P1-7 移动端与触控可达**（P1，4d）—— 形状/图片手柄全部改为指针事件（鼠标、手指、笔同一套），溢出面板与窄屏 e2e 由 P0-4.5 提前落地、本项复核
 - **目标**：形状绘制/手柄支持 touch 与笔势，溢出菜单提供可弹出的 select/color 面板，窄屏命令可达性清单化。
-- **任务清单**：`ShapeDrawLayer.tsx` / `ShapeOverlay.tsx` 指针事件扩展 → `Ribbon.tsx` 溢出面板支持 select/color → 窄屏 e2e 覆盖全部关键命令。
-- **涉及文件**：`src/tools/rich-text-editor/ShapeDrawLayer.tsx`、`ShapeOverlay.tsx`、`ImageResizeOverlay.tsx`；`src/core/components/ribbon/Ribbon.tsx`、`useRibbonCollapse.ts`；`e2e/office-ribbon.spec.ts`
+- **任务清单**：~~`ShapeDrawLayer.tsx` 指针事件~~（P0-4 时期已用 pointer，本项复核）→ ~~`ShapeOverlay.tsx` / `ImageResizeOverlay.tsx` 指针事件扩展~~（2026-11-11）→ ~~`Ribbon.tsx` 溢出面板支持 select/color~~（P0-4.5 已完成：`word-ribbon-controls` 面板）→ ~~窄屏 e2e 覆盖全部关键命令~~（P0-4.5 已完成：760px 溢出面板 + 600px 折叠浮层）
+- **已完成（2026-11-11 · 手柄触控化）**：
+  - 根因：形状的缩放手柄、旋转手柄、黄点调整手柄与图片的 8 个缩放手柄都挂在 `onMouseDown` + window `mousemove/mouseup` 上 —— 触摸和笔根本不发这些事件，平板上手柄是「死」的。形状**绘制**层（`ShapeDrawLayer.tsx`）早就是 pointer 事件，所以只有「已有形状/图片的二次编辑」这一半不可用
+  - 抽出 `pointerDrag.ts` 的 `startPointerDrag(event, { move, end })`：`pointerdown` 起手、window 上跟 `pointermove`、`pointerup` / `pointercancel` 收尾，按 `pointerId` 过滤（第二根手指不会劫持当前手势），并对起手元素 `setPointerCapture` —— 手指滑出 9px 的小圆点后手势仍继续（合成事件没有真实指针可捕获，已 try/catch 降级为 window 监听）
+  - `pointercancel` 也走 `end()` 提交：来电、系统手势打断时不会留下「拖到一半」的文档状态（提交与 pointerup 完全一致：先回滚到起点、再以最终值记一步）
+  - 两个覆盖层共用同一个助手：`ShapeOverlay.tsx` 的 resize / rotate / adjust 三个分支、`ImageResizeOverlay.tsx` 的宽度拖拽，逻辑各自不变，只换了事件源与收尾方式
+  - 触控可用性：`.rte-image-handle` / `.rte-shape-rotate` / `.rte-shape-adjust` 加 `touch-action: none`（否则浏览器把拖拽当成滚动/缩放页面）；`@media (pointer: coarse)` 下保持 9–11px 的视觉圆点，用伪元素把命中区扩到约 44px（WCAG 2.5.5 / Apple HIG）—— 旋转手柄的 `::after` 已经在画连接线，所以它用 `::before`
+  - 测试：[NEW] `pointerDrag.test.ts` 3 例（window 跟随并在 pointerup 提交一次、其他 pointerId 不劫持、pointercancel 也提交）；`e2e/office-p3.spec.ts` +1 例（合成 `pointerType: 'touch'` 手势拖右下角放大形状，再反向拖回缩小 —— Playwright 的 mouse API 造不出 touch 类型，而这正是旧实现忽略的那一类）
+- **计划偏差（2026-11-11 登记）**：`Ribbon.tsx` 溢出面板与 760/600px 窄屏 e2e 属 P0-4.5 的成果，本项只做复核未重写；「笔势」按 pointer 事件统一处理（`pointerType` 不分支），未做压感/涂抹识别
+- **涉及文件**：`src/tools/rich-text-editor/pointerDrag.ts`（[NEW]）、`ShapeOverlay.tsx`、`ImageResizeOverlay.tsx`、`editor.css`；`e2e/office-p3.spec.ts`；复核：`ShapeDrawLayer.tsx`、`src/core/components/ribbon/Ribbon.tsx`、`useRibbonCollapse.ts`、`e2e/office-ribbon.spec.ts`
 - **前置**：P0-4、P0-5
+- **闸门证据（2026-11-11）**：typecheck / lint / prettier 通过；全量单测 386 文件 / **3690 例**全绿（+1 文件 3 例）；全量 e2e **227 passed / 0 failed**（+1 手柄触控，首轮一个右键菜单焦点恢复用例超时、隔离复跑通过 —— 同类负载敏感）；首屏 **192.02KB**（预算 195KB）、`RichTextEditorTool` 157.21KB（+0.02KB）、其 CSS 4.76KB（+0.05KB）；无新增依赖
 - **✅ 验收**：触屏可完成插入形状与缩放；<640px 下字体/字号/颜色/缩放可达；窄屏 e2e 全绿。
-- **回退点**：触控分支独立，桌面指针行为不变。
+- **回退点**：触控分支独立，桌面指针行为不变（鼠标同样走 pointer 事件，`pointerId` 过滤后行为与旧的 mousemove 一致）。
 
 ### 6.8 M2 出口标准
 
-- [ ] P1-1 … P1-7 全部 `[x]`；§8.2 的 M2 闸门命令全部通过
+- [ ] P1-1 … P1-7 全部 `[x]`（2026-11-11：只剩 P1-4 的制表位）；§8.2 的 M2 闸门命令全部通过
 - [ ] 200 页性能预算达标、docx 往返样式/修订保真、窄屏命令可达、配额与冲突可检测
 - [ ] `pnpm build && pnpm size` 通过；9 语言键对齐；三端 e2e 全绿
 
@@ -660,7 +669,7 @@ graph TD
 | P1-4 页面排版细节             | `[~]` | M2   | P1     | 5d     | P1-1                | §6.4     |
 | P1-5 大文档性能               | `[x]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
 | P1-6 单机数据可靠性           | `[x]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
-| P1-7 移动端与触控可达         | `[ ]` | M2   | P1     | 4d     | P0-4、P0-5          | §6.7     |
+| P1-7 移动端与触控可达         | `[x]` | M2   | P1     | 4d     | P0-4、P0-5          | §6.7     |
 | P2-1 本地模板中心 + 版面模式  | `[ ]` | M3   | P2     | 不排期 | M2 闸门 + 单独评审  | §7.1     |
 | P2-2 默认不外发的本地 AI 辅助 | `[ ]` | M3   | P2     | 不排期 | P2-1 + 隐私评审     | §7.1     |
 | P2-3 Word 深度对象选择性补齐  | `[ ]` | M3   | P2     | 不排期 | M2 闸门 + 反馈排序  | §7.1     |
@@ -671,6 +680,8 @@ graph TD
 进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
 
 进度备注（2026-11-08）：P0-1…P0-6 保持 `[x]`；**P1-5 转 `[x]`** —— §6.5 的块级增量分页（`layoutFlag.ts`，默认关闭，实测 200 页布局中位 4.4ms / P95 5.5ms，全量 9.1ms / 10.7ms）与 decoration 视口裁剪（[NEW] `viewportRange.ts`：>12 万字符的文档只装饰视口 ±3000 字符，滚动停止 150ms 后重建；`spellcheck.ts` / `find-replace.ts` 共用；`gotoMatch` 补选区移动，否则裁剪后视口外的当前匹配既不高亮也滚不到）均已落地，200 页布局 P95 9.0ms（预算 16ms）、50 页 P95 2.4ms（预算 50ms）、`rte-toolbar-state` P95 1.1ms、`rte-ribbon-tabs` P95 0.5ms；`ribbonTabs` 静态配置拆分按实测取消（登记为技术债）。顺带修复 `spellcheck.ts` 的 `EditorView.visibleRanges` 类型错误（该字段是内部 API，不在 typings 里）——`pnpm build` 重新可用。P1-3 的前置（decoration 视口裁剪）已满足，可开工。
+
+进度备注（2026-11-11 · P1-7）：**P1-7 转 `[x]`** —— 补的是「已有形状/图片的二次编辑」这一半：绘制层早就用 pointer 事件，但缩放手柄、旋转手柄、黄点调整手柄、图片 8 个手柄全挂在 `onMouseDown` + window `mousemove` 上，触摸和笔压根不发这些事件，平板上手柄是死的。抽了 `pointerDrag.ts` 的 `startPointerDrag`：pointerdown 起手、window 跟 pointermove、pointerup / pointercancel 收尾，按 pointerId 过滤（第二根手指不劫持），并对起手元素 `setPointerCapture` —— 手指滑出 9px 圆点后手势仍继续（合成事件没有真实指针可捕获，try/catch 降级为 window 监听）。`pointercancel` 也走同一条提交路径，来电 / 系统手势打断不会留下拖到一半的文档。样式上补 `touch-action: none`（否则浏览器把拖拽当滚动），`@media (pointer: coarse)` 下视觉圆点不变、伪元素把命中区扩到 ~44px；旋转手柄的 `::after` 已用于连接线，改用 `::before`。测试：`pointerDrag.test.ts` 3 例 + e2e 合成 `pointerType: 'touch'` 手势双向拖拽（Playwright 的 mouse API 造不出 touch 类型，而这正是旧实现忽略的那类）。溢出面板的 select/color 与 760/600px 窄屏 e2e 是 P0-4.5 的成果，本项只复核，已在「计划偏差」登记。「笔势」按 pointer 统一处理，未做压感。闸门：typecheck / lint / prettier 通过，单测 386 文件 / **3690 例**全绿（+3），e2e **227 passed**（+1），首屏 192.02KB、`RichTextEditorTool` 157.21KB。M2 闸门仍为 `[ ]` —— 只剩 P1-4 的制表位。
 
 进度备注（2026-11-11 · P1-4 第五片）：**P1-4 只剩制表位** —— 补上「页眉页脚双击就地编辑」。动手前先确认了一件事：页面视图的 sheet 是 `pointer-events: none` 的装饰层，所以「双击页眉」这个手势原本没有落点，得先补一层只铺在页边距带里的命中区（`height = 页边距 / 2`，永不压正文）。双击后输入框沿用命中区几何、改成纸面配色，文字不跳；`Enter` / 失焦提交，`Esc` 取消 —— 这里踩了个 React 的坑：取消会触发 blur，而 blur 的提交闭包还持有旧状态，用 `bandCancelledRef` 挡掉才真的取消得掉。写哪一份由页码决定（`bandFieldFor`）：奇偶页不同时第 2 页写的是 `evenHeader`，否则文本会落进奇页字段、页面继续显示旧内容。提交走 `applySectionPageSetup`，与面板同一条写入路径，所以「就地改完 → 打开面板」能看到同一个值（e2e 正是这么断言）。「首页不同」时第 1 页不给命中区：模型里没有首页自己的文本，Word 的首个空页就是这个特性，摆一个改不动的输入框只会骗人。命中区是 `<button>`，`Enter` / `Space` 也能开，顺手给 P1-7 的可达性垫了一步。闸门：typecheck / lint / prettier 通过，单测 385 文件 / **3687 例**全绿（+2），e2e **226 passed / 0 failed**（+1；首轮一个右键菜单焦点恢复用例超时，隔离与整轮复跑均通过，属已知负载敏感），首屏 192.01KB、`RichTextEditorTool` 157.19KB（+0.61KB）。P1-4 剩余：标尺制表位。M2 闸门仍为 `[ ]`。
 

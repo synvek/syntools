@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/react';
+import { startPointerDrag } from './pointerDrag';
 import { shapeAdjustValues, shapeAdjustments } from '../../core/drawing/shapeDefs';
 import { readZoom } from './imageLayer';
 import { findSelectedShape, keepShapeSelected, shapeSpec, type DocShapeAttrs } from './shapeNode';
@@ -185,9 +186,7 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
     if (next !== box.attrs.text) apply({ text: next }, true);
   };
 
-  const dragResize = (event: React.MouseEvent, direction: HandleDirection) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const dragResize = (event: React.PointerEvent<HTMLElement>, direction: HandleDirection) => {
     const startX = event.clientX;
     const startY = event.clientY;
     const zoom = readZoom(editor.view.dom);
@@ -208,19 +207,14 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
       apply(current, false);
     };
     const onUp = (): void => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
       if (current.width === start.width && current.height === start.height) return;
       apply(start, false);
       apply(current, true);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    startPointerDrag(event, { move: onMove, end: onUp });
   };
 
-  const dragRotate = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const dragRotate = (event: React.PointerEvent<HTMLElement>) => {
     const dom = editor.view.nodeDOM(pos) as HTMLElement | null;
     if (!dom) return;
     const rect = dom.getBoundingClientRect();
@@ -235,7 +229,7 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
       return (radians * 180) / Math.PI + 90;
     };
 
-    const onMove = (moveEvent: MouseEvent): void => {
+    const onMove = (moveEvent: PointerEvent): void => {
       const raw = angleOf(moveEvent.clientX, moveEvent.clientY);
       // Snap to whole degrees, and to 15° steps while Shift is held
       const step = moveEvent.shiftKey ? 15 : 1;
@@ -243,32 +237,27 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
       apply({ rotation: current }, false);
     };
     const onUp = (): void => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
       if (current === startAngle) return;
       apply({ rotation: startAngle }, false);
       apply({ rotation: current }, true);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    startPointerDrag(event, { move: onMove, end: onUp });
   };
 
   const dragAdjust = (
-    event: React.MouseEvent,
+    event: React.PointerEvent<HTMLElement>,
     id: string,
     from: (p: { x: number; y: number }) => number,
     min: number,
     max: number,
   ) => {
-    event.preventDefault();
-    event.stopPropagation();
     const dom = editor.view.nodeDOM(pos) as HTMLElement | null;
     if (!dom) return;
     const rect = dom.getBoundingClientRect();
     const base = box.attrs.adj ?? {};
     let current = base;
 
-    const onMove = (moveEvent: MouseEvent): void => {
+    const onMove = (moveEvent: PointerEvent): void => {
       if (rect.width <= 0 || rect.height <= 0) return;
       const point = {
         x: (moveEvent.clientX - rect.left) / rect.width,
@@ -280,14 +269,11 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
       apply({ adj: current }, false);
     };
     const onUp = (): void => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
       if (JSON.stringify(current) === JSON.stringify(base)) return;
       apply({ adj: base }, false);
       apply({ adj: current }, true);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    startPointerDrag(event, { move: onMove, end: onUp });
   };
 
   const values = shapeAdjustValues({ prst: box.attrs.prst, adj: box.attrs.adj ?? undefined });
@@ -363,17 +349,17 @@ export function ShapeOverlay({ editor, viewportRef }: ShapeOverlayProps) {
             className="rte-shape-adjust"
             title={String(index + 1)}
             style={{ left: `${point.x * box.width}px`, top: `${point.y * box.height}px` }}
-            onMouseDown={(event) => dragAdjust(event, spec.id, spec.from, spec.min, spec.max)}
+            onPointerDown={(event) => dragAdjust(event, spec.id, spec.from, spec.min, spec.max)}
           />
         );
       })}
-      <span data-shape-handle="rotate" className="rte-shape-rotate" onMouseDown={dragRotate} />
+      <span data-shape-handle="rotate" className="rte-shape-rotate" onPointerDown={dragRotate} />
       {HANDLES.map((direction) => (
         <span
           key={direction}
           data-handle={direction}
           className={`rte-image-handle rte-image-handle--${direction}`}
-          onMouseDown={(event) => dragResize(event, direction)}
+          onPointerDown={(event) => dragResize(event, direction)}
         />
       ))}
     </div>

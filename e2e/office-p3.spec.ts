@@ -30,6 +30,72 @@ async function readDocumentXml(path: string): Promise<string> {
   return (await zip.file('word/document.xml')?.async('string')) ?? '';
 }
 
+/**
+ * A synthetic touch gesture on one handle. Playwright's mouse API cannot produce `pointerType: 'touch'`,
+ * and that type is exactly what the handles used to ignore.
+ */
+async function touchDrag(page: Page, selector: string, dx: number, dy: number): Promise<void> {
+  await page
+    .locator(selector)
+    .first()
+    .evaluate(
+      (element, delta) => {
+        const rect = element.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const init = {
+          pointerId: 11,
+          pointerType: 'touch',
+          isPrimary: true,
+          bubbles: true,
+          cancelable: true,
+        } as const;
+        const fire = (type: string, cx: number, cy: number) =>
+          window.dispatchEvent(new PointerEvent(type, { ...init, clientX: cx, clientY: cy }));
+        element.dispatchEvent(new PointerEvent('pointerdown', { ...init, clientX: x, clientY: y }));
+        fire('pointermove', x + delta.dx, y + delta.dy);
+        fire('pointerup', x + delta.dx, y + delta.dy);
+      },
+      { dx, dy },
+    );
+}
+
+/** Insert a roundRect through the ribbon (the gallery's 更多样式 opens the full panel) */
+async function insertRoundRect(page: Page): Promise<void> {
+  await page.getByRole('tab', { name: '插入', exact: true }).click();
+  await page.getByRole('button', { name: '插入形状' }).click();
+  const gallery = page.getByTestId('rich-text-shape-menu');
+  await expect(gallery).toBeVisible();
+  await gallery.getByRole('button', { name: '更多样式' }).click();
+  const panel = page.getByTestId('rich-text-shapes');
+  await expect(panel).toBeVisible();
+  await panel.locator('[data-shape-preset="roundRect"]').click();
+}
+
+test('rich text: a touch drag on a shape handle resizes it (P1-7)', async ({ page }) => {
+  await openEditor(page);
+  await page.locator('.tiptap').click();
+  await insertRoundRect(page);
+
+  const shape = page.locator('.tiptap .rte-shape-node');
+  await expect(shape).toHaveCount(1);
+  await shape.click();
+  await expect(page.getByTestId('rich-text-shape-frame')).toBeVisible();
+
+  const widthOf = async () => Number(await shape.getAttribute('data-shape-w'));
+  const before = await widthOf();
+  expect(before).toBeGreaterThan(0);
+
+  // The old mousedown/mousemove path ignored this entirely (the shape stayed put)
+  await touchDrag(page, '[data-handle="se"]', 60, 40);
+  await expect.poll(widthOf).toBeGreaterThan(before);
+  const grown = await widthOf();
+
+  // A second gesture in the other direction shrinks it again: the handles stay attached to the new box
+  await touchDrag(page, '[data-handle="se"]', -40, -20);
+  await expect.poll(widthOf).toBeLessThan(grown);
+});
+
 test('rich text: inserted shape renders as SVG and exports as a native wps:wsp', async ({
   page,
 }) => {
