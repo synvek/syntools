@@ -238,6 +238,24 @@ export function footerForPage(setup: PageSetupConfig, page: number): string {
   return setup.footer;
 }
 
+export type HeaderFooterPart = 'header' | 'footer';
+
+/**
+ * Which page-setup field the band of one page edits.
+ *
+ * With 奇偶页不同 on, page 2 shows `evenHeader` / `evenFooter`; typing there must write that field,
+ * otherwise the text would land in the odd-page part and the page would keep showing the old header.
+ */
+export function bandFieldFor(
+  setup: PageSetupConfig,
+  part: HeaderFooterPart,
+  page: number,
+): 'header' | 'evenHeader' | 'footer' | 'evenFooter' {
+  const even = setup.differentOddEven && page % 2 === 0;
+  if (part === 'header') return even ? 'evenHeader' : 'header';
+  return even ? 'evenFooter' : 'footer';
+}
+
 /** Whether one page carries any header at all (used to size the header band) */
 export function pageHasHeader(setup: PageSetupConfig, page: number): boolean {
   return headerForPage(setup, page).trim() !== '';

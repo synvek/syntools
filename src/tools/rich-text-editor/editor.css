@@ -965,9 +965,62 @@
   color: #9ca3af;
 }
 
+/* --- Header / footer bands (P1-4): the double-click target and the inline editor --- */
+.rte-page-band-layer {
+  position: absolute;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* Transparent hit area inside the page margins: it must never cover the text area above it */
+.rte-page-band {
+  position: absolute;
+  right: var(--rte-page-margin-right, 20mm);
+  left: var(--rte-page-margin-left, 20mm);
+  border: 1px dashed transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: auto;
+}
+
+.rte-page-band:hover,
+.rte-page-band:focus-visible {
+  border-color: #93c5fd;
+  background: rgb(147 197 253 / 8%);
+  outline: none;
+}
+
+.rte-page-band-header {
+  top: 0;
+  height: calc(var(--rte-page-margin-top, 20mm) / 2);
+}
+
+.rte-page-band-footer {
+  bottom: 0;
+  height: calc(var(--rte-page-margin-bottom, 20mm) / 2);
+}
+
+/* Editing: keep the band geometry but paint paper, so the text does not jump while typing */
+.rte-page-band-input {
+  border: 1px solid #3b82f6;
+  background: #fff;
+  padding: 0 4px;
+  color: #111827;
+}
+
+.dark .rte-page-band-input {
+  background: #111827;
+  color: #e5e7eb;
+}
+
 @media print {
   .rte-page-sheet,
-  .rte-page-badge {
+  .rte-page-badge,
+  .rte-page-band-layer {
     display: none;
   }
 }

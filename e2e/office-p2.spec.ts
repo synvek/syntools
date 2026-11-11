@@ -193,6 +193,38 @@ test('rich text: 奇偶页不同 puts the even header on even pages only', async
   await expect(sheets.nth(2).locator('.rte-page-header')).toHaveText('奇数页页眉');
 });
 
+test('rich text: double-clicking the page margin edits the header in place', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openRichText(page);
+  await page.keyboard.type('正文');
+
+  // The sheet itself is a decoration; the hit area is the band button inside the top margin
+  await page.locator('.rte-page-band-header').first().dblclick();
+  const input = page.locator('.rte-page-band-input');
+  await expect(input).toBeVisible();
+  await expect(input).toHaveAttribute('value', '');
+  await input.fill('就地页眉');
+  await input.press('Enter');
+
+  await expect(page.locator('.rte-page-header').first()).toHaveText('就地页眉');
+  // Committed through the same model the panel edits, so the panel shows it too
+  await openPageSetup(page);
+  const panel = page.getByTestId('rich-text-page-setup');
+  const headerField = panel
+    .locator('label')
+    .filter({ has: page.getByText('页眉', { exact: true }) })
+    .locator('input');
+  await expect(headerField).toHaveValue('就地页眉');
+  await panel.getByRole('button', { name: '关闭页面设置' }).click();
+
+  // Escape cancels: the header keeps the committed text
+  await page.locator('.rte-page-band-header').first().dblclick();
+  await page.locator('.rte-page-band-input').fill('不该保存');
+  await page.locator('.rte-page-band-input').press('Escape');
+  await expect(page.locator('.rte-page-band-input')).toHaveCount(0);
+  await expect(page.locator('.rte-page-header').first()).toHaveText('就地页眉');
+});
+
 test('rich text: page count matches between page view and snapshot PDF', async ({ page }) => {
   test.setTimeout(180_000);
   await openRichText(page);

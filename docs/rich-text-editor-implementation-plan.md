@@ -390,9 +390,9 @@ graph TD
 
 ### 6.4 P1-4 页面排版细节
 
-- [~] **P1-4 页面排版细节**（P1，5d）—— 四片完成：分页控制三件套 + `.docx` 往返、标尺缩进标记与拖拽、行距段落化、奇偶页不同；制表位、页眉页脚可视化编辑待做
+- [~] **P1-4 页面排版细节**（P1，5d）—— 五片完成：分页控制三件套 + `.docx` 往返、标尺缩进标记与拖拽、行距段落化、奇偶页不同、页眉页脚双击就地编辑；只剩制表位
 - **目标**：补 `keepNext` / `keepLines` / `widowControl`、制表位与标尺拖拽缩进、页眉页脚可视化编辑、奇偶/首页不同。
-- **任务清单**：~~`blockStyles.ts` / `ParagraphStyle` 扩属性~~（第一片）→ ~~`docx.ts` 映射 `w:keepNext` 等~~（第一片）→ ~~`.docx` 回读 `w:pPr` 分页位~~（第一片）→ ~~`RulerBar.tsx` 缩进标记与拖拽~~（第二片）→ ~~行距段落化（`w:spacing` 往返）~~（第三片）→ ~~奇偶页不同（`w:evenAndOddHeaders` + `even` 部件往返）~~（第四片）→ 制表位（待做）→ 页眉页脚双击编辑浮层（待做）→ 打印/快照 PDF 一致性验证（四片均复核，无回归）
+- **任务清单**：~~`blockStyles.ts` / `ParagraphStyle` 扩属性~~（第一片）→ ~~`docx.ts` 映射 `w:keepNext` 等~~（第一片）→ ~~`.docx` 回读 `w:pPr` 分页位~~（第一片）→ ~~`RulerBar.tsx` 缩进标记与拖拽~~（第二片）→ ~~行距段落化（`w:spacing` 往返）~~（第三片）→ ~~奇偶页不同（`w:evenAndOddHeaders` + `even` 部件往返）~~（第四片）→ ~~页眉页脚双击就地编辑浮层~~（第五片）→ 制表位（待做）→ 打印/快照 PDF 一致性验证（五片均复核，无回归）
 - **已完成（2026-11-11 · 第一片 · 分页控制）**：
   - `blockStyles.ts`：`ParagraphStyle` 新增 `keepNext` / `keepLines` / `widowControl` 三个段落属性。前两者写 `data-keep-next` / `data-keep-lines`，孤行控制只存「关闭」态（`data-widow-control="off"`）—— 开着是文档默认，存 true 只会让 HTML 变脏。用 `data-*` 而不是 inline style：分页控制是元数据，不是外观，CSS 与 `.docx` 各自决定怎么兑现
   - `BlockStyleCommands.setParagraphPagination(patch)`：只写传入的字段，所以「开段中不分页」不会把「段内不拆页」清掉（与 `setParagraphIndent` 同一套部分更新语义）
@@ -424,13 +424,21 @@ graph TD
   - 分节：偶数页页眉页脚跟随各自的「链接到前一节」开关（Word 一个部件一个勾，不额外加第二个开关）
   - 面板：「奇偶页不同」勾选后**才**展开偶数页页眉 / 页脚两个输入框，避免给只用一个页眉的文档塞无意义字段；文案 `differentOddEven` / `evenHeaderText` / `evenFooterText` × 9 语言
   - 测试：`pageSetup.test.ts` +4 例（单页默认 / 偶页切换 / 首页不同优先级 / 只认显式 true 且 patch 保留）、`sections.test.ts` +1 例（偶页部件随链接继承）、`docx.test.ts` +2 例（`even` 部件 + `w:type="even"` + settings 开关、导出→回读偶页页眉页脚与开关）、`e2e/office-p2.spec.ts` +1 例（三页文档：第 1/3 页奇页页眉、第 2 页偶页页眉）
-- **剩余（第四片之后）**：标尺上的制表位（tab stop）与点击设置、页眉页脚双击就地编辑浮层（当前只能在页面设置面板里改文字）
+- **已完成（2026-11-11 · 第五片 · 页眉页脚就地编辑）**：
+  - 页面视图的 sheet 是 `pointer-events: none` 的**装饰层**，所以 Word 那个「双击页眉」的手势原本无处可落。补的一层是独立的透明命中区：`.rte-page-band-layer` + 每页两个 `.rte-page-band`（页眉 / 页脚），只铺在页边距带里（`height = 页边距 / 2`），永不覆盖正文
+  - 双击进入就地输入：输入框沿用命中区的几何位置、改成纸面配色，所以打字时文字不会跳；`Enter` 或失焦提交，`Esc` 取消（`bandCancelledRef` 挡掉卸载时的 blur，否则取消会被随后的一次提交覆盖）
+  - 写哪一份由**页码**决定：`bandFieldFor(setup, part, page)` —— 奇偶页不同时第 2 页写 `evenHeader` / `evenFooter`，否则改到奇页字段上、页面还显示旧文本。提交走 `applySectionPageSetup`，与页面设置面板同一条写入路径，所以两边互相可见
+  - 「首页不同」时第 1 页不提供命中区：模型里没有首页自己的文本，Word 的首个空页就是这个特性本身，给一个改不动的输入框只会骗人
+  - 可访问性：命中区是真 `<button>`，`Enter` / `Space` 同样能打开，标签为「双击编辑页眉 / 页脚」（× 9 语言）；打印时整层 `display: none`
+  - 测试：`pageSetup.test.ts` +2 例（按页选字段 / 开关关闭恒为默认部件），`e2e/office-p2.spec.ts` +1 例（双击命中区 → 输入 → 回显到 sheet 与面板 → `Esc` 不落盘）
+- **剩余（第五片之后）**：标尺上的制表位（tab stop）与点击设置
+- **闸门证据（2026-11-11 · 第五片 · 就地编辑）**：typecheck / lint / prettier 通过；全量单测 385 文件 / **3687 例**全绿（+2）；全量 e2e **226 passed / 0 failed**（+1；首轮 `tools.spec.ts` 的右键菜单焦点恢复用例超时，隔离复跑与整轮复跑均通过 —— 与计划里记过的负载敏感同类，非本次改动引起）；首屏 **192.01KB**（预算 195KB）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 157.19KB（+0.61KB）、其 CSS 4.71KB（+0.12KB）；无新增依赖
 - **闸门证据（2026-11-11 · 第四片 · 奇偶页不同）**：typecheck / lint / prettier 通过；全量单测 385 文件 / **3685 例**全绿（较第三片 3678 例 +7）；全量 e2e **225 passed / 0 failed**（+1 例奇偶页页眉）；首屏 **192.04KB**（预算 195KB，与上一片持平）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 156.58KB（+0.68KB：按页取值、面板字段与读回）；无新增依赖 / 网络请求
 - **闸门证据（2026-11-11 · 第三片 · 行距段落化）**：typecheck / lint / prettier 通过；全量单测 385 文件 / **3678 例**全绿（较第二片 3672 例 +6）；全量 e2e **224 passed / 0 failed**（+1 例行距往返）；首屏 **192.02KB**（预算 195KB）、`RichTextEditorTool` chunk 155.90KB（+0.36KB）；打印 / 快照 PDF 复跑无回归（读的是同一份内联样式，未改 `editor.css`）；无新增依赖
 - **闸门证据（2026-11-11 · 第二片）**：typecheck / lint / prettier 通过；全量单测 383 文件 / **3655 例**全绿（空载一次通过；并发跑 e2e 时有 2 例超时/字节比对失败，隔离复跑均通过，属负载敏感）；全量 e2e **222 passed / 0 failed**（EXIT=0，+1 例标尺拖拽）；体积复核首屏 **191.92KB**（预算 195KB）、`RichTextEditorTool` chunk 154.06KB（+0.46KB）；**第一片闸门证据（2026-11-11 · 分页控制）**：单测 383 文件 / **3655 例**（较 P1-1 收尾 3645 例 +10）、全量 e2e **221 passed / 0 failed**（+1 例分页往返）、打印一致性无回归：`office-p2.spec.ts` 的「page count matches between page view and snapshot PDF」与 `tools.spec.ts` 的打印用例全绿；体积复核首屏 **191.91KB**（预算 195KB）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 153.60KB（+1.06KB）；无新增依赖
 - **涉及文件**：`src/tools/rich-text-editor/blockStyles.ts`、`docxParagraphControls.ts`（[NEW]）、`docx.ts`、`ribbonTabs.ts`、`EditorToolbar.tsx`、`editor.css`、`strings.ts`、`RulerBar.tsx`、`src/core/components/ribbon/ribbonIcons.tsx`；`e2e/office-pagination.spec.ts`、`e2e/office-p2.spec.ts`；`pageSetup.ts`、`PageSetupPanel.tsx`、`sections.ts`、`pdf.ts`、`RichTextEditorTool.tsx`
 - **前置**：P1-1（样式语义）
-- **✅ 验收**：docx 往返保留分页控制、行距与奇偶页页眉；打印与快照 PDF 结果一致；`pnpm e2e` 打印用例不退化。
+- **✅ 验收**：docx 往返保留分页控制、行距与奇偶页页眉；页面视图双击页边空白即可改当前页页眉 / 页脚；打印与快照 PDF 结果一致；`pnpm e2e` 打印用例不退化。
 - **回退点**：新增属性为可选字段，旧草稿 `migrate.ts` 归一化时给默认值；行距回退到 mark 上只需把 ribbon 的下拉改回 `setLineHeight`（`LineHeight` 扩展仍在）。
 
 ### 6.5 P1-5 大文档性能
@@ -663,6 +671,8 @@ graph TD
 进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
 
 进度备注（2026-11-08）：P0-1…P0-6 保持 `[x]`；**P1-5 转 `[x]`** —— §6.5 的块级增量分页（`layoutFlag.ts`，默认关闭，实测 200 页布局中位 4.4ms / P95 5.5ms，全量 9.1ms / 10.7ms）与 decoration 视口裁剪（[NEW] `viewportRange.ts`：>12 万字符的文档只装饰视口 ±3000 字符，滚动停止 150ms 后重建；`spellcheck.ts` / `find-replace.ts` 共用；`gotoMatch` 补选区移动，否则裁剪后视口外的当前匹配既不高亮也滚不到）均已落地，200 页布局 P95 9.0ms（预算 16ms）、50 页 P95 2.4ms（预算 50ms）、`rte-toolbar-state` P95 1.1ms、`rte-ribbon-tabs` P95 0.5ms；`ribbonTabs` 静态配置拆分按实测取消（登记为技术债）。顺带修复 `spellcheck.ts` 的 `EditorView.visibleRanges` 类型错误（该字段是内部 API，不在 typings 里）——`pnpm build` 重新可用。P1-3 的前置（decoration 视口裁剪）已满足，可开工。
+
+进度备注（2026-11-11 · P1-4 第五片）：**P1-4 只剩制表位** —— 补上「页眉页脚双击就地编辑」。动手前先确认了一件事：页面视图的 sheet 是 `pointer-events: none` 的装饰层，所以「双击页眉」这个手势原本没有落点，得先补一层只铺在页边距带里的命中区（`height = 页边距 / 2`，永不压正文）。双击后输入框沿用命中区几何、改成纸面配色，文字不跳；`Enter` / 失焦提交，`Esc` 取消 —— 这里踩了个 React 的坑：取消会触发 blur，而 blur 的提交闭包还持有旧状态，用 `bandCancelledRef` 挡掉才真的取消得掉。写哪一份由页码决定（`bandFieldFor`）：奇偶页不同时第 2 页写的是 `evenHeader`，否则文本会落进奇页字段、页面继续显示旧内容。提交走 `applySectionPageSetup`，与面板同一条写入路径，所以「就地改完 → 打开面板」能看到同一个值（e2e 正是这么断言）。「首页不同」时第 1 页不给命中区：模型里没有首页自己的文本，Word 的首个空页就是这个特性，摆一个改不动的输入框只会骗人。命中区是 `<button>`，`Enter` / `Space` 也能开，顺手给 P1-7 的可达性垫了一步。闸门：typecheck / lint / prettier 通过，单测 385 文件 / **3687 例**全绿（+2），e2e **226 passed / 0 failed**（+1；首轮一个右键菜单焦点恢复用例超时，隔离与整轮复跑均通过，属已知负载敏感），首屏 192.01KB、`RichTextEditorTool` 157.19KB（+0.61KB）。P1-4 剩余：标尺制表位。M2 闸门仍为 `[ ]`。
 
 进度备注（2026-11-11 · P1-4 第四片）：**P1-4 仍为 `[~]`** —— 补上「奇偶页不同」。做法上最要紧的不是开关本身，而是把「这一页用哪份页眉」收敛成一个函数：`pageSetup.ts` 的 `headerForPage` / `footerForPage`，页面视图、快照 PDF、`.docx` 导出都问它。此前「首页不同」只写进 `.docx`（`w:titlePg`），屏幕和快照 PDF 仍在第 1 页画页眉 —— 现在三处按 Word 语义一致留空。导出侧 `headers` / `footers` 变成按需带 `even` 部件：偶页页脚要重复页码域（否则偶页丢页码）、水印也复制过去（否则偶页没水印）；开关走 docx 原生 `evenAndOddHeaderAndFooters` 写 `w:evenAndOddHeaders`（先写了个 zip 注入版本，发现库里有原生选项后删掉，少一次打包后重写）。回读只在 settings.xml 有该元素时才置真，否则 `evenHeaderReference` 在 Word 里本就不生效，只读部件会导入一份用不上的文本。分节侧偶页部件跟随同一个「链接到前一节」开关，不额外加第二个勾。面板里勾上「奇偶页不同」才展开两个偶数页输入框。闸门：typecheck / lint / prettier 通过，单测 385 文件 / **3685 例**全绿（+7），e2e **225 passed / 0 failed**（+1 例三页文档的奇偶页页眉），首屏 192.04KB、`RichTextEditorTool` 156.58KB（+0.68KB）。P1-4 剩余：标尺制表位、页眉页脚双击就地编辑。M2 闸门仍为 `[ ]`。
 

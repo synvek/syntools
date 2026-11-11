@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PageSetupConfig } from './pageSetup';
 import {
   DEFAULT_PAGE_SETUP,
+  bandFieldFor,
   DEFAULT_WATERMARK,
   MARGIN_PRESETS,
   buildPrintPageCss,
@@ -280,5 +281,20 @@ describe('首页不同 / 奇偶页不同（P1-4）', () => {
     expect(patched.evenHeader).toBe('偶页');
     expect(patched.evenFooter).toBe('');
     expect(patched.differentOddEven).toBe(true);
+  });
+});
+
+describe('就地编辑页眉页脚时写哪一份（P1-4）', () => {
+  it('writes the even part on even pages when 奇偶页不同 is on', () => {
+    const oddEven = normalizePageSetup({ differentOddEven: true });
+    expect(bandFieldFor(oddEven, 'header', 1)).toBe('header');
+    expect(bandFieldFor(oddEven, 'header', 2)).toBe('evenHeader');
+    expect(bandFieldFor(oddEven, 'footer', 2)).toBe('evenFooter');
+    expect(bandFieldFor(oddEven, 'footer', 3)).toBe('footer');
+  });
+
+  it('always writes the default part when the switch is off', () => {
+    expect(bandFieldFor(DEFAULT_PAGE_SETUP, 'header', 2)).toBe('header');
+    expect(bandFieldFor(DEFAULT_PAGE_SETUP, 'footer', 4)).toBe('footer');
   });
 });

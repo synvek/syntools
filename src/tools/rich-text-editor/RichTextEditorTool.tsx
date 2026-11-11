@@ -149,6 +149,7 @@ import { TemplatePanel } from './TemplatePanel';
 import { buildTocEntries, injectTocHtml, renderTocHtml, type TocLabels } from './toc';
 import {
   DEFAULT_PAGE_SETUP,
+  bandFieldFor,
   buildPrintPageCss,
   footerForPage,
   headerForPage,
@@ -339,6 +340,16 @@ export default function RichTextEditorTool() {
   const [findOpen, setFindOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(initial?.view ?? 'flow');
+  /**
+   * Inline header / footer editing (page view). `page` is 1-based, because the field to write depends
+   * on the page's parity when 奇偶页不同 is on.
+   */
+  const [bandEdit, setBandEdit] = useState<{ part: 'header' | 'footer'; page: number } | null>(
+    null,
+  );
+  /** Escape must not be followed by the blur-commit that React fires while unmounting the input */
+  const bandCancelledRef = useRef(false);
+  const [bandDraft, setBandDraft] = useState('');
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [docs, setDocs] = useState<DocMeta[]>([]);
@@ -1960,6 +1971,41 @@ export default function RichTextEditorTool() {
   };
 
   /**
+   * 页眉 / 页脚就地编辑（P1-4）：页面视图里双击页边空白带，改当前页实际显示的那一份文本。
+   * 关闭态的 sheet 是 `pointer-events: none` 的装饰层，所以可点的命中区是一层独立的透明 button。
+   */
+  const openBandEdit = (part: 'header' | 'footer', page: number) => {
+    setBandDraft(
+      part === 'header' ? headerForPage(pageSetup, page) : footerForPage(pageSetup, page),
+    );
+    bandCancelledRef.current = false;
+    setBandEdit({ part, page });
+  };
+
+  /** Escape: close without writing (the following blur must not commit) */
+  const closeBandEdit = () => {
+    bandCancelledRef.current = true;
+    setBandEdit(null);
+  };
+
+  /** Enter / blur commits; the field is chosen by the page, so 奇偶页不同 edits the part that page shows */
+  const commitBandEdit = () => {
+    if (bandCancelledRef.current) {
+      bandCancelledRef.current = false;
+      return;
+    }
+    const target = bandEdit;
+    if (!target) return;
+    setBandEdit(null);
+    const field = bandFieldFor(pageSetup, target.part, target.page);
+    if (pageSetup[field] === bandDraft) return;
+    if (field === 'header') applySectionPageSetup({ header: bandDraft });
+    else if (field === 'evenHeader') applySectionPageSetup({ evenHeader: bandDraft });
+    else if (field === 'footer') applySectionPageSetup({ footer: bandDraft });
+    else applySectionPageSetup({ evenFooter: bandDraft });
+  };
+
+  /**
    * 只放"工具库里没有"的命令：新建 / 导入 / 导出 / 文档库 / 清空，外加 ribbon 没有入口的三项
    * （插入分节符、全选）。格式、插入、页面布局、引用、审阅、视图都在六个标签页上，撤销重做在快速访问栏，
    * 菜单里再列一遍只会出现两条路径、两处要同步。
@@ -2395,6 +2441,68 @@ export default function RichTextEditorTool() {
                       </div>
                     ))}
                   <EditorContent editor={editor} />
+                  {/*
+                    Header / footer bands (P1-4): the sheet below is a `pointer-events: none` decoration,
+                    so Word's "double-click the header" gesture needs real hit areas. They live in the page
+                    margins only — never over text — and are hidden in print.
+                  */}
+                  {viewMode === 'paged' &&
+                    layout.sheetTops.map((top, index) => {
+                      const page = index + 1;
+                      // 首页不同 has no first-page text in the model (the blank first page *is* the feature)
+                      if (pageSetup.differentFirstPage && page === 1) return null;
+                      return (
+                        <div
+                          key={`band-${index}`}
+                          className="rte-page-band-layer"
+                          style={{ top: `${top}px`, height: `${sheetHeightPx}px` }}
+                        >
+                          {(['header', 'footer'] as const).map((part) => {
+                            const label = t(
+                              part === 'header'
+                                ? 'tools.richText.editHeader'
+                                : 'tools.richText.editFooter',
+                            );
+                            const active = bandEdit?.part === part && bandEdit.page === page;
+                            return active ? (
+                              <input
+                                key={part}
+                                autoFocus
+                                className={`rte-page-band rte-page-band-${part} rte-page-band-input`}
+                                aria-label={label}
+                                value={bandDraft}
+                                onChange={(event) => setBandDraft(event.target.value)}
+                                onBlur={commitBandEdit}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    commitBandEdit();
+                                  } else if (event.key === 'Escape') {
+                                    event.preventDefault();
+                                    closeBandEdit();
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <button
+                                key={part}
+                                type="button"
+                                className={`rte-page-band rte-page-band-${part}`}
+                                aria-label={label}
+                                title={label}
+                                onDoubleClick={() => openBandEdit(part, page)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    openBandEdit(part, page);
+                                  }
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             </div>
