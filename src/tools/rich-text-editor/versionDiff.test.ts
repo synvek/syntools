@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildSideBySide, buildVersionDiff } from './versionDiff';
 
-/** Pure-logic version diff tests: stats, line numbers, side-by-side pairing, and empty state. */
+/**
+ * Pure-logic version diff tests: stats, block numbers, side-by-side pairing, empty state, and the
+ * structure-aware cases (block-kind changes, lists as one block, word-level segments).
+ */
 
 describe('buildVersionDiff', () => {
   it('marks identical content and a similarity of 1', () => {
@@ -73,6 +76,78 @@ describe('buildVersionDiff', () => {
   it('returns EMPTY when neither side has comparable text', () => {
     expect(buildVersionDiff('', '')).toEqual({ ok: false, error: 'EMPTY' });
     expect(buildVersionDiff('<p></p>', '<p> </p>')).toEqual({ ok: false, error: 'EMPTY' });
+  });
+});
+
+describe('structure awareness', () => {
+  it('reports a block-kind change with identical text as a format row', () => {
+    const result = buildVersionDiff('<h2>标题</h2>', '<p>标题</p>');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.identical).toBe(false);
+    expect(result.value.addedLines).toBe(0);
+    expect(result.value.removedLines).toBe(0);
+    expect(result.value.rows).toHaveLength(1);
+    expect(result.value.rows[0]).toMatchObject({
+      kind: 'format',
+      text: '标题',
+      beforeType: 'h2',
+      afterType: 'p',
+      beforeLine: 1,
+      afterLine: 1,
+    });
+  });
+
+  it('keeps a list as one block instead of one row per item', () => {
+    const result = buildVersionDiff(
+      '<ul><li>a</li><li>b</li></ul>',
+      '<ul><li>a</li><li>b</li></ul><p>c</p>',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.beforeLines).toBe(1);
+    expect(result.value.afterLines).toBe(2);
+    expect(result.value.rows.map((row) => row.kind)).toEqual(['equal', 'insert']);
+    expect(result.value.rows[0].text).toBe('a\nb');
+  });
+
+  it('carries the token diff of a rewritten block so only the changed word is marked', () => {
+    const result = buildVersionDiff('<p>hello world</p>', '<p>hello there</p>');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [deleted, inserted] = result.value.rows;
+    expect(deleted.kind).toBe('delete');
+    expect(inserted.kind).toBe('insert');
+    expect(deleted.segments).toEqual(inserted.segments);
+    expect(deleted.segments).toEqual([
+      { kind: 'equal', text: 'hello ' },
+      { kind: 'delete', text: 'world' },
+      { kind: 'insert', text: 'there' },
+    ]);
+  });
+
+  it('detects a moved block instead of calling the document unchanged', () => {
+    const result = buildVersionDiff('<p>a</p><p>b</p>', '<p>b</p><p>a</p>');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.identical).toBe(false);
+    expect(result.value.rows.map((row) => [row.kind, row.text])).toEqual([
+      ['delete', 'a'],
+      ['equal', 'b'],
+      ['insert', 'a'],
+    ]);
+  });
+
+  it('pairs a format row on both sides and reports the block kinds there', () => {
+    const diff = buildVersionDiff('<h2>标题</h2>', '<p>标题</p>');
+    expect(diff.ok).toBe(true);
+    if (!diff.ok) return;
+    const sides = buildSideBySide(diff.value.rows);
+    expect(sides).toHaveLength(1);
+    expect(sides[0].kind).toBe('format');
+    expect(sides[0].left).toBe(sides[0].right);
+    expect(sides[0].left?.beforeType).toBe('h2');
+    expect(sides[0].right?.afterType).toBe('p');
   });
 });
 

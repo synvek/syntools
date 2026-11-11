@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import type { StoredVersion } from './docStore';
-import { buildSideBySide, buildVersionDiff, type DiffSideRow } from './versionDiff';
+import { buildSideBySide, buildVersionDiff, type DiffRow, type DiffSideRow } from './versionDiff';
 
 interface VersionDiffPanelProps {
   versions: StoredVersion[];
@@ -23,13 +23,16 @@ const MAX_RENDERED_ROWS = 1500;
 
 const NAME_CLASS: Record<DiffSideRow['kind'], string> = {
   equal: 'border-transparent text-gray-500 dark:text-gray-400',
+  format:
+    'border-violet-400 bg-violet-50/60 text-gray-800 dark:bg-violet-950/30 dark:text-gray-100',
   change: 'border-amber-400 bg-amber-50/60 text-gray-800 dark:bg-amber-950/30 dark:text-gray-100',
   insert: 'border-green-500 bg-green-50/60 text-gray-800 dark:bg-green-950/30 dark:text-gray-100',
   delete: 'border-red-500 bg-red-50/60 text-gray-800 dark:bg-red-950/30 dark:text-gray-100',
 };
 
-const CELL_CLASS: Record<'equal' | 'insert' | 'delete' | 'empty', string> = {
+const CELL_CLASS: Record<'equal' | 'format' | 'insert' | 'delete' | 'empty', string> = {
   equal: 'border-transparent text-gray-600 dark:text-gray-300',
+  format: 'border-violet-400 bg-violet-50/60 dark:bg-violet-950/30',
   insert: 'border-green-500 bg-green-50/60 dark:bg-green-950/30',
   delete: 'border-red-500 bg-red-50/60 dark:bg-red-950/30',
   empty: 'border-transparent bg-gray-50/60 dark:bg-gray-800/30',
@@ -37,6 +40,36 @@ const CELL_CLASS: Record<'equal' | 'insert' | 'delete' | 'empty', string> = {
 
 function lineNo(value: number | null): string {
   return value === null ? '' : String(value);
+}
+
+/**
+ * Cell text with the tokens that actually changed highlighted. Both rows of a `replace` carry the same
+ * segment list: the left cell keeps `equal` + `delete`, the right one `equal` + `insert`.
+ */
+function SegmentText({ row, side }: { row: DiffRow; side: 'left' | 'right' }) {
+  if (!row.segments?.length) return <>{row.text}</>;
+  const changed = side === 'left' ? 'delete' : 'insert';
+  return (
+    <>
+      {row.segments.map((segment, index) => {
+        if (segment.kind !== 'equal' && segment.kind !== changed) return null;
+        if (segment.kind === 'equal') return <span key={index}>{segment.text}</span>;
+        return (
+          <span
+            key={index}
+            data-seg={segment.kind}
+            className={
+              side === 'left'
+                ? 'rounded-sm bg-red-200/80 dark:bg-red-900/60'
+                : 'rounded-sm bg-green-200/80 dark:bg-green-900/60'
+            }
+          >
+            {segment.text}
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 /**
@@ -115,10 +148,10 @@ export function VersionDiffPanel({
             ) : (
               <>
                 <span className="text-green-600 dark:text-green-400">
-                  +{diff.value.addedLines} {t('tools.richText.diffLinesUnit')}
+                  +{diff.value.addedLines} {t('tools.richText.diffBlocksUnit')}
                 </span>
                 <span className="text-red-600 dark:text-red-400">
-                  −{diff.value.removedLines} {t('tools.richText.diffLinesUnit')}
+                  −{diff.value.removedLines} {t('tools.richText.diffBlocksUnit')}
                 </span>
                 <span>
                   {t('tools.richText.diffSimilarity', {
@@ -196,6 +229,7 @@ export function VersionDiffPanel({
               visibleRows.map((row, index) => (
                 <div
                   key={`${index}-${row.kind}`}
+                  data-diff-kind={row.kind}
                   className={`grid grid-cols-2 border-l-2 ${NAME_CLASS[row.kind]}`}
                 >
                   <span
@@ -206,8 +240,13 @@ export function VersionDiffPanel({
                     <span className="w-8 shrink-0 select-none text-right text-gray-300 dark:text-gray-600">
                       {lineNo(row.left?.beforeLine ?? null)}
                     </span>
+                    {row.left && row.right && row.left.beforeType !== row.right.afterType ? (
+                      <span className="shrink-0 rounded-sm bg-violet-100 px-1 text-[10px] leading-4 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                        {row.left.beforeType} → {row.right.afterType}
+                      </span>
+                    ) : null}
                     <span className="min-w-0 whitespace-pre-wrap break-all">
-                      {row.left?.text ?? ''}
+                      {row.left ? <SegmentText row={row.left} side="left" /> : ''}
                     </span>
                   </span>
                   <span
@@ -219,7 +258,7 @@ export function VersionDiffPanel({
                       {lineNo(row.right?.afterLine ?? null)}
                     </span>
                     <span className="min-w-0 whitespace-pre-wrap break-all">
-                      {row.right?.text ?? ''}
+                      {row.right ? <SegmentText row={row.right} side="right" /> : ''}
                     </span>
                   </span>
                 </div>

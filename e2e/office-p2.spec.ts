@@ -386,6 +386,33 @@ test('rich text: compare with a .docx file turns the differences into reviewable
   // Accepting everything leaves the compared file's content plus nothing else (the rejected block stayed in its base form)
   await expect(page.locator('.tiptap')).toContainText('第一段原文');
   await expect(page.locator('.tiptap')).toContainText('第三段原文');
+
+  // 4) "Merge" is a real document, not just a screen state: export it, clear the editor, import it back
+  const mergedText = (await page.locator('.tiptap').innerText()).replace(/\s+/g, '');
+  expect(mergedText).toContain('第一段原文');
+  expect(mergedText).toMatch(/第二段原文|第二段改过的文字/);
+
+  const [mergedDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    pickMoreMenu(page, '导出 Word (.docx)'),
+  ]);
+  const mergedFile = join(test.info().outputDir, 'merged.docx');
+  await mergedDownload.saveAs(mergedFile);
+
+  await page.locator('.tiptap').click();
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.press('Delete');
+  const mergedChooser = page.waitForEvent('filechooser');
+  await pickMoreMenu(page, '导入 Word (.docx)');
+  await (await mergedChooser).setFiles(mergedFile);
+
+  // The exported merge round-trips to the same text, with no revision mark left inside
+  await expect
+    .poll(async () => (await page.locator('.tiptap').innerText()).replace(/\s+/g, ''))
+    .toContain('第一段原文');
+  expect((await page.locator('.tiptap').innerText()).replace(/\s+/g, '')).toBe(mergedText);
+  await expect(page.locator('.tiptap del[data-track]')).toHaveCount(0);
+  await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
 });
 
 test('rich text: revision mode records typing as a revision that can be rejected or accepted', async ({

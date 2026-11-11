@@ -332,9 +332,9 @@ graph TD
 
 ### 6.2 P1-2 修订模式与审阅深化
 
-- [~] **P1-2 修订模式与审阅深化**（P1，7d）—— 前几批已落地标记/命令、`w:pPrChange` 往返、面板线程与作者筛选；本片补上「修订模式」开关与事务改写；版本 diff 的结构感知仍待做
+- [x] **P1-2 修订模式与审阅深化**（P1，7d）—— 三片完成：标记/命令与 `w:pPrChange` 往返、面板线程与作者筛选（早前批次）；修订模式开关与事务改写；版本 diff 结构感知 + 合并稿往返
 - **目标**：新增「修订模式」开关自动记录输入/删除/格式变更；补 `w:pPrChange`、作者/时间元数据、按作者筛选、批注线程；版本 diff 从纯文本行级升级为结构感知。
-- **任务清单**：~~`marks.ts` 标记与接受/拒绝命令~~（早前批次）→ ~~`docxReview.ts` 导出补 `pPrChange`~~（早前批次）→ ~~`ReviewPanel.tsx` 线程 UI + 按作者筛选 + 上/下一处导航~~（早前批次）→ ~~tracking 状态与事务拦截~~（本片）→ 版本 diff 结构感知（待做）→ ~~与 `.docx` 比较的 e2e~~（早前批次；本片补修订模式用例）
+- **任务清单**：~~`marks.ts` 标记与接受/拒绝命令~~（早前批次）→ ~~`docxReview.ts` 导出补 `pPrChange`~~（早前批次）→ ~~`ReviewPanel.tsx` 线程 UI + 按作者筛选 + 上/下一处导航~~（早前批次）→ ~~tracking 状态与事务拦截~~（2026-11-11 第一片）→ ~~版本 diff 结构感知~~（2026-11-11 第二片）→ ~~与 `.docx` 比较的 e2e~~（早前批次；第一片补修订模式用例、第二片补「合并稿导出 → 回导」）
 - **已完成（2026-11-11 · 修订模式）**：
   - [NEW] `tracking.ts`：`trackTransaction(state, tr)` 把**即将派发的那一个事务**改写成修订，而不是追加第二个事务 —— 一次按键仍是一步撤销（与「一次比较 = 一步撤销」同口径，撤销不会出现「先撤标记、再撤删除」的两次操作）。规则：插入文本打 `trackedInsert`；删除**保留原文**并打 `trackedDelete`；选中后直接改写时两半共用同一个 `changeId`，所以逐条接受/拒绝它是一次动作；删除「本身仍是待定插入」的文本按抵消处理，不留痕迹（输入后立刻退格不该留下一条修订）；纯文本之外的变更（Enter 拆段、块级粘贴、结构命令）一律不跟踪 —— 宁可不标，也不标错
   - 拦截点用 tiptap 3 的 `dispatchTransaction` 扩展钩子（`{ transaction, next }`，文档化的组合点），不 monkey-patch `view.dispatch`：可与其它扩展组合，view 重建也不会失效（一开始写的 `onCreate` 里替换 `view.dispatch` 既装不上 —— tiptap 的 `create` 事件在 `setTimeout(0)` 里发 —— 也不该由业务扩展去改视图）
@@ -345,13 +345,23 @@ graph TD
   - 面板与草稿零改动：修订模式的条目与手动标记同形状（`id` / `kind` / `text` / `author` / `createdAt`），作者筛选、逐条接受/拒绝、上/下一处导航、草稿持久化直接可用。撤销会把标记一起撤掉，此时逐条接受/拒绝因找不到 id 而失败 —— 顺手清掉这条陈旧条目，不留「按了没反应」的按钮
   - 文案：`trackRevisions` × 9 语言（`strings.test.ts` 通过）
   - 测试：[NEW] `tracking.test.ts` 8 例（关闭时不记录、插入可拒绝、删除保留原文可接受、选中改写两半同 id、输入后删除抵消、接受/拒绝不被二次跟踪、撤销不产生删除修订、拆段不半跟踪）+ `e2e/office-p2.spec.ts` +1 例（开启修订模式 → 输入出现在面板 → 全部拒绝回到原文 → 再输入 → 全部接受保留文本）
-- **剩余**：① `versionDiff.ts` 的结构感知 diff —— 现在仍是 `diffLines` 纯文本行级，块类型 / 样式 / 修订的变化只能表现为文本差异；② 「比较后合并」的专门 e2e（当前覆盖的是比较 → 逐条接受/拒绝，没有「只接受一部分再导出合并稿」的独立用例）
+- **已完成（2026-11-11 · 结构感知版本 diff）**：
+  - `versionDiff.ts` 放弃 `diffLines`（HTML 先拍平成纯文本，块类型、标题层级、列表/表格结构全被抹掉），改为复用 `compare.ts` 的 `blocksFromHtml` + `compareBlocks` —— 与「与文件比较」同一个算法，所以版本对比和修订比较不会给出互相矛盾的结论
+  - 行模型升级为**块模型**：`DiffRow` 增加 `beforeType` / `afterType`（`p` / `h2` / `li` / `table` …）与 `segments`（块内词级 diff），新增 `kind: 'format'`。于是「标题变成正文」「列表变成段落」这类**文字没变、结构变了**的编辑第一次可见；多行块（列表、表格行）保持一行，不再按行号拆散
+  - 块内改写仍是词级高亮：`compareBlocks` 把一次改写配成 `replace` 并带 token diff，左右单元格各取自己那一半（左 `equal` + `delete`，右 `equal` + `insert`），所以「hello world → hello there」只标 `world` / `there`，不是整行变色
+  - 统计口径与文案同步：`addedLines` / `removedLines` 现在是**块数**，面板单位从「行」改为新增键 `diffBlocksUnit`（段 / blocks / blocs / Absätze / blocchi / bloques / blocos，9 语言）
+  - 空块（`<p></p>`）在进入 diff 前丢弃：既不产生空白行，也保持「两侧都没有可比文本 → `EMPTY`」的既有语义
+  - 面板：格式变化用紫色行 + `h2 → p` 小标签；改动词用深浅两级底色；行容器带 `data-diff-kind` / 高亮片段带 `data-seg`，让断言不必依赖颜色
+  - 合并稿闭环：`office-p2` 的比较用例补上「拒绝一条 + 接受其余 → 导出 .docx → 清空 → 回导」，断言正文与导出前逐字符一致且不残留修订标记 —— 之前只验证了屏幕状态，没验证「合并结果是一份真文档」
+  - 测试：`versionDiff.test.ts` 11 → 16 例（块类型变化成 `format` 行、列表算一块、词级 segments、块移动不被当成无变化、format 行在双栏里占两侧）+ [NEW] `VersionDiffPanel.test.tsx` 4 例（format 行与 `h2 → p` 标签、只标改动词、按块计数、两侧一致时的提示）+ `office-p2` 比较用例扩到 4 段
+- **剩余**：无（P1-2 的子任务全部落地；后续审阅深化需求按新的评审单独立项）
 - **计划偏差（2026-11-11 登记）**：修订模式不跟踪段落拆分/合并与块级粘贴 —— 结构性变更无法用 mark 表达，硬拆会破坏文档模型；开关状态不进草稿（每次会话默认关闭），符合本任务「开关默认关闭」的回退点
-- **闸门证据（2026-11-11 · 修订模式）**：typecheck / lint / prettier 通过；全量单测 384 文件 / **3663 例**全绿（较上一片 383 / 3655 增加 1 文件 8 例）；全量 e2e **223 passed / 0 failed**（+1）；首屏 **191.92KB**（预算 195KB，与上一片持平）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 155.02KB（+0.96KB：修订模式改写与开关）；无新增依赖 / 资产 / 网络请求
-- **涉及文件**：`src/tools/rich-text-editor/tracking.ts`（[NEW]）、`RichTextEditorTool.tsx`、`extensions.ts`、`ribbonTabs.ts`、`marks.ts`、`revisions.ts`、`strings.ts`、`src/core/components/ribbon/ribbonIcons.tsx`；`e2e/office-p2.spec.ts`；早前批次：`docx.ts`、`docxReview.ts`、`ReviewPanel.tsx`、`compare.ts`
+- **闸门证据（2026-11-11 · 结构感知版本 diff 收尾）**：typecheck / lint / prettier 通过；全量单测 385 文件 / **3672 例**全绿（较第一片 384 / 3663 增加 1 文件 9 例）；全量 e2e **223 passed / 0 failed**（合并稿用例扩写在同一 test 内，总数不变）；首屏 **192.04KB**（预算 195KB）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 155.54KB（+0.52KB）；无新增依赖 / 资产 / 网络请求
+- **闸门证据（2026-11-11 · 修订模式）**：typecheck / lint / prettier 通过；全量单测 384 文件 / **3663 例**全绿（+1 文件 8 例）；全量 e2e **223 passed / 0 failed**（+1）；首屏 191.92KB、`RichTextEditorTool` chunk 155.02KB（+0.96KB）
+- **涉及文件**：`src/tools/rich-text-editor/versionDiff.ts`、`VersionDiffPanel.tsx`、`strings.ts`；[NEW] `VersionDiffPanel.test.tsx`；`e2e/office-p2.spec.ts`；第一片：`tracking.ts`（[NEW]）、`RichTextEditorTool.tsx`、`extensions.ts`、`ribbonTabs.ts`、`marks.ts`、`revisions.ts`、`src/core/components/ribbon/ribbonIcons.tsx`；早前批次：`docx.ts`、`docxReview.ts`、`ReviewPanel.tsx`、`compare.ts`
 - **前置**：P0-2（IR）、P1-4（段落属性）、P1-5（状态分片）
 - **✅ 验收**：开关打开后连续输入生成可逐条接受/拒绝的修订；比较两文件结果可导出且往返保留；`e2e/office-p2.spec.ts` 修订用例不退化。
-- **回退点**：开关默认关闭，关闭时 `trackTransaction` 根本不被调用（等价于旧的手动标记路径）；旧手动标记按钮与原命令全部保留。
+- **回退点**：开关默认关闭，关闭时 `trackTransaction` 根本不被调用（等价于旧的手动标记路径）；旧手动标记按钮与原命令全部保留。版本对比退回到纯文本行级只是改 `versionDiff.ts` 一个文件（面板按 `kind` / `segments` 渲染，两者都是可选字段）。
 
 ### 6.3 P1-3 中文与多语言校对
 
@@ -619,7 +629,7 @@ graph TD
 | P0-5 关键路径回归测试         | `[x]` | M1   | P0     | 4d     | P0-2、P0-4          | §5.5     |
 | P0-6 上下文选项卡一致性       | `[x]` | M1   | P0     | 2d     | 无（UI 层）         | §5.6     |
 | P1-1 命名样式系统             | `[x]` | M2   | P1     | 8d     | P0-2、P1-5          | §6.1     |
-| P1-2 修订模式与审阅深化       | `[~]` | M2   | P1     | 7d     | P0-2、P1-4、P1-5    | §6.2     |
+| P1-2 修订模式与审阅深化       | `[x]` | M2   | P1     | 7d     | P0-2、P1-4、P1-5    | §6.2     |
 | P1-3 中文与多语言校对         | `[x]` | M2   | P1     | 6d     | P1-5（已满足）      | §6.3     |
 | P1-4 页面排版细节             | `[~]` | M2   | P1     | 5d     | P1-1                | §6.4     |
 | P1-5 大文档性能               | `[x]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
@@ -635,6 +645,8 @@ graph TD
 进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
 
 进度备注（2026-11-08）：P0-1…P0-6 保持 `[x]`；**P1-5 转 `[x]`** —— §6.5 的块级增量分页（`layoutFlag.ts`，默认关闭，实测 200 页布局中位 4.4ms / P95 5.5ms，全量 9.1ms / 10.7ms）与 decoration 视口裁剪（[NEW] `viewportRange.ts`：>12 万字符的文档只装饰视口 ±3000 字符，滚动停止 150ms 后重建；`spellcheck.ts` / `find-replace.ts` 共用；`gotoMatch` 补选区移动，否则裁剪后视口外的当前匹配既不高亮也滚不到）均已落地，200 页布局 P95 9.0ms（预算 16ms）、50 页 P95 2.4ms（预算 50ms）、`rte-toolbar-state` P95 1.1ms、`rte-ribbon-tabs` P95 0.5ms；`ribbonTabs` 静态配置拆分按实测取消（登记为技术债）。顺带修复 `spellcheck.ts` 的 `EditorView.visibleRanges` 类型错误（该字段是内部 API，不在 typings 里）——`pnpm build` 重新可用。P1-3 的前置（decoration 视口裁剪）已满足，可开工。
+
+进度备注（2026-11-11 · P1-2 第二片）：**P1-2 转 `[x]`** —— 版本对比从「HTML 拍平成纯文本 + `diffLines`」换成块级 diff，直接复用「与文件比较」的 `blocksFromHtml` + `compareBlocks`，两条路径从此不会给出互相矛盾的结论。收益都是行级做不到的：标题降级为正文、列表改段落这类**文字没变结构变了**的编辑第一次可见（新行类型 `format` + `beforeType → afterType` 小标签）；多行块（列表 / 表格行）保持一块，不再按行号拆散；块内改写仍只标改动词（`replace` 自带 token diff，左右单元格各取一半）。统计口径随之从「行」改为「块」，新增 `diffBlocksUnit` × 9 语言。空块在进 diff 前丢弃，保住「两侧都没有可比文本 → `EMPTY`」的既有语义。顺手补上合并闭环：`office-p2` 的比较用例扩到「拒绝一条 + 接受其余 → 导出 .docx → 清空 → 回导」，断言正文与导出前逐字符一致且不残留修订标记 —— 以前只验证屏幕状态，没验证合并稿是一份真文档。闸门：typecheck / lint / prettier 通过，单测 385 文件 / **3672 例**全绿（+1 文件 +9 例），e2e **223 passed / 0 failed**，首屏 192.04KB、`RichTextEditorTool` 155.54KB（+0.52KB）。M2 闸门仍为 `[ ]`，剩余 P1-4 余项（制表位、页眉页脚双击编辑、奇偶页不同、行距段落化）与 P1-7。
 
 进度备注（2026-11-11 · P1-2 第一片）：**P1-2 转 `[~]`** —— 补上这块唯一缺的「开关」能力：修订模式（审阅 → 修订组首位）打开后，输入自动成为 `trackedInsert`、删除**保留原文**并标 `trackedDelete`，选中改写时两半共用同一个 `changeId`（所以逐条接受/拒绝仍是一次动作）。改写发生在**即将派发的那一个事务**上（tiptap 的 `dispatchTransaction` 钩子），不是追加第二个事务 —— 一次按键 = 一步撤销，避免「先撤标记、再撤删除」的两次撤销。删除「本身还是待定插入」的文本按抵消处理，输入后立刻退格不留痕。位置换算与结构守卫是两块硬骨头：保留删除内容会让同批后续 step 右移（用只含补回长度的 `Mapping` + `Step.map` 平移，映射非法就整体放弃），Enter 拆段 / 块级粘贴 / 结构命令一律不跟踪（mark 表达不了，硬拆会毁模型）。撤销与接受/拒绝命令、比较事务分别用 `isHistoryTransaction` / `NO_TRACK_META` 挡住，不会被二次包装；撤销把标记撤掉后，逐条按钮因找不到 id 失败时顺手清掉陈旧条目。面板、作者筛选、草稿持久化零改动（条目形状与手动标记一致）。闸门：typecheck / lint / prettier 通过，单测 384 文件 / **3663 例**全绿（+1 文件 +8 例），e2e **223 passed / 0 failed**（+1 用例），首屏 191.92KB、`RichTextEditorTool` 155.02KB（+0.96KB）。P1-2 剩余：`versionDiff` 的结构感知 diff、比较后「只接受一部分再导出合并稿」的专门 e2e。M2 闸门仍为 `[ ]`，剩余 P1-2 余项 / P1-4 余项 / P1-7。
 
