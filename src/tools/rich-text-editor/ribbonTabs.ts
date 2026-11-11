@@ -129,6 +129,11 @@ export interface RichTextToolbarState {
   imageAlign: string | null;
   imageLayer: string;
   paragraphSpacing: string;
+  /** P1-4 pagination state of the caret paragraph */
+  keepNext: boolean;
+  keepLines: boolean;
+  /** Widow control is on unless the paragraph explicitly turns it off */
+  widowControl: boolean;
   footnoteSelected: boolean;
   endnoteSelected: boolean;
   mathSelected: boolean;
@@ -184,6 +189,9 @@ export interface RichTextRibbonActions {
   zoom: number;
   onZoomChange: (zoom: number) => void;
   /* --- revisions & comparison (Word's 审阅 tab) --- */
+  /** 修订模式：on = 之后的输入 / 删除自动记录为修订 */
+  trackingMode: boolean;
+  onToggleTracking: () => void;
   onMarkInsert: () => void;
   onMarkDelete: () => void;
   onAcceptAll: () => void;
@@ -659,6 +667,37 @@ function paragraphGroup(input: RichTextRibbonInput): RibbonGroup {
               })
               .run(),
           { size: 'small', active: state.hangingIndent > 0 },
+        ),
+        // P1-4: pagination control lives here rather than in a dialog — Word keeps it on the ribbon too
+        item(
+          'keep-next',
+          t('tools.richText.keepNext'),
+          'keepNext',
+          () =>
+            chain()
+              .setParagraphPagination({ keepNext: state.keepNext ? null : true })
+              .run(),
+          { size: 'small', active: state.keepNext },
+        ),
+        item(
+          'keep-lines',
+          t('tools.richText.keepLines'),
+          'keepLines',
+          () =>
+            chain()
+              .setParagraphPagination({ keepLines: state.keepLines ? null : true })
+              .run(),
+          { size: 'small', active: state.keepLines },
+        ),
+        item(
+          'widow-control',
+          t('tools.richText.widowControl'),
+          'widowControl',
+          () =>
+            chain()
+              .setParagraphPagination({ widowControl: state.widowControl ? false : null })
+              .run(),
+          { size: 'small', active: state.widowControl },
         ),
       ],
     ],
@@ -1414,9 +1453,17 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
           label: t('tools.richText.ribbon.grp.tracking'),
           priority: 7,
           items: [],
-          // Two full rows instead of five buttons packed into 2½ columns
+          // Two full rows instead of six buttons packed into 2½ columns
           rows: [
             [
+              // Revision mode first: it is the switch that decides whether the next edit is recorded
+              item(
+                'track-revisions',
+                t('tools.richText.trackRevisions'),
+                'trackRevisions',
+                actions.onToggleTracking,
+                { size: 'small', active: actions.trackingMode },
+              ),
               item(
                 'track-insert',
                 t('tools.richText.markInsert'),
@@ -1431,6 +1478,8 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
                 actions.onMarkDelete,
                 { size: 'small' },
               ),
+            ],
+            [
               item(
                 'compare-file',
                 t('tools.richText.compareWithFile'),
@@ -1438,8 +1487,6 @@ export function buildRichTextRibbonTabs(input: RichTextRibbonInput): RibbonTab[]
                 actions.onCompareFile,
                 { size: 'small' },
               ),
-            ],
-            [
               item('accept-all', t('tools.richText.acceptAll'), 'accept', actions.onAcceptAll, {
                 size: 'small',
                 disabled: !actions.hasTrackedChanges,

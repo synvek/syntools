@@ -457,6 +457,29 @@ const officeIcons: Record<string, ReactNode> = {
       <path d="M12 8v2m0 4v2" />
     </>
   ),
+  /** 段中不分页: two lines held together, the break arrow blocked */
+  keepNext: (
+    <>
+      <path d="M4 5h16M4 9h16" />
+      <path d="M12 12v6m0 0-2.5-2.5M12 18l2.5-2.5" />
+      <path d="M4 21h16" />
+    </>
+  ),
+  /** 段内不拆页: one paragraph braced around by a page edge */
+  keepLines: (
+    <>
+      <path d="M6 3h12v18H6z" />
+      <path d="M9 8h6M9 12h6M9 16h4" />
+    </>
+  ),
+  /** 孤行控制: two lines split off at the page edge */
+  widowControl: (
+    <>
+      <path d="M3 4h18M3 8h18M3 14h8" />
+      <path d="M15 12v8l2.5-2.5" />
+      <path d="M15 20l-2.5-2.5" />
+    </>
+  ),
   shapeInsert: (
     <>
       <rect x="3" y="3" width="11" height="11" rx="1.5" />
@@ -785,6 +808,19 @@ const officeIcons: Record<string, ReactNode> = {
     <>
       <path d="M6 3.5h9l3 3v14H6z" />
       <path d="M3.5 13.5h17" strokeDasharray="2.5 2" />
+    </>
+  ),
+  /**
+   * Revision mode toggle: lines being rewritten by a pencil. Distinct from trackInsert / trackDelete
+   * on purpose — those mark a selection once, this one switches the recording behaviour on.
+   */
+  trackRevisions: (
+    <>
+      <path d="M4.5 5.5h15" />
+      <path d="M4.5 9.5h8" />
+      <path d="M4.5 13.5h5" />
+      <path d="M4.5 17.5h6" />
+      <path d="M15.8 11.6l3.4 3.4-5 1.6 1.6-5z" />
     </>
   ),
 };

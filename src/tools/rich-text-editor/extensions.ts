@@ -25,6 +25,7 @@ import {
   TableStyle,
 } from './blockStyles';
 import { Comment, DocMarkCommands, TrackedDelete, TrackedFormat, TrackedInsert } from './marks';
+import { RevisionTracking, type TrackingEntry } from './tracking';
 import { NamedStyleAttribute } from './namedStyles';
 import { createPageLayoutPlugin, type PageLayoutSnapshot } from './PageView';
 import { resolvePageMetrics, type PageMetrics } from './pageSetup';
@@ -265,6 +266,11 @@ export interface RichTextExtensionOptions {
     getDictionary: () => SpellDictionary;
     isEnabled: () => boolean;
   };
+  /** Revision mode (P1-2): getter for the toggle + sink for the revisions one dispatch produced */
+  tracking?: {
+    isEnabled: () => boolean;
+    onChange: (entries: TrackingEntry[]) => void;
+  };
 }
 
 export function createExtensions({
@@ -277,6 +283,7 @@ export function createExtensions({
   endnoteLabels,
   onMathSelect,
   spellcheck,
+  tracking,
   tocStyleLevel,
 }: RichTextExtensionOptions) {
   return [
@@ -323,6 +330,11 @@ export function createExtensions({
     TrackedInsert,
     TrackedDelete,
     TrackedFormat,
+    // Revision mode (P1-2): rewrites the transaction being dispatched, so tracking stays one undo step
+    RevisionTracking.configure({
+      isEnabled: tracking?.isEnabled ?? (() => false),
+      onChange: tracking?.onChange ?? (() => {}),
+    }),
     DocMarkCommands,
     // Character-level formatting (superscript / subscript / letter spacing / text transform)
     ...charFormatExtensions,

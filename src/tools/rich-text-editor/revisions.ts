@@ -2,6 +2,7 @@ import type { EditorState, Transaction } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { compareBlocks, type DocBlock } from './compare';
 import { blockTargetKey } from './marks';
+import { NO_TRACK_META } from './tracking';
 
 /**
  * Comparison → tracked revisions (P2-3 第二批).
@@ -233,6 +234,8 @@ export function planComparison(state: EditorState, target: PMNode): RevisionPlan
   if (!ops.length) return null;
 
   const tr = state.tr;
+  // The comparison *is* the revision output: with revision mode on it must not be re-wrapped
+  tr.setMeta(NO_TRACK_META, true);
   // Back to front: every operation only touches its own range, so positions stay valid
   [...ops]
     .sort((a, b) => b.at - a.at)

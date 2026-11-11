@@ -318,3 +318,36 @@ describe('table row height', () => {
     expect(editor.commands.setRowHeight(40)).toBe(false);
   });
 });
+
+describe('paragraph pagination (P1-4)', () => {
+  it('round-trips the three flags as data attributes', () => {
+    const editor = createEditor(
+      '<p data-keep-next="true" data-keep-lines="true" data-widow-control="off">段落</p>',
+    );
+    const attrs = editor.getAttributes('paragraph');
+    expect(attrs.keepNext).toBe(true);
+    expect(attrs.keepLines).toBe(true);
+    // Only the "off" state is stored: on is the document default
+    expect(attrs.widowControl).toBe(false);
+    const html = editor.getHTML();
+    expect(html).toContain('data-keep-next="true"');
+    expect(html).toContain('data-keep-lines="true"');
+    expect(html).toContain('data-widow-control="off"');
+  });
+
+  it('toggles one flag without clearing the others', () => {
+    const editor = createEditor('<p data-keep-next="true">段落</p>');
+    editor.commands.setTextSelection(2);
+    editor.commands.setParagraphPagination({ keepLines: true });
+    expect(editor.getAttributes('paragraph')).toMatchObject({ keepNext: true, keepLines: true });
+    editor.commands.setParagraphPagination({ keepNext: null });
+    expect(editor.getAttributes('paragraph')).toMatchObject({ keepNext: null, keepLines: true });
+  });
+
+  it('drops the attribute once the flag is cleared', () => {
+    const editor = createEditor('<p data-keep-lines="true">段落</p>');
+    editor.commands.setTextSelection(2);
+    editor.commands.setParagraphPagination({ keepLines: null });
+    expect(editor.getHTML()).not.toContain('data-keep-lines');
+  });
+});

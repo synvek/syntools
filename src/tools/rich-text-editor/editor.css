@@ -1679,3 +1679,78 @@ button.rte-toc-text:hover {
   cursor: crosshair !important;
   user-select: none !important;
 }
+
+/* P1-4 pagination control: stored as data-* on the paragraph, honoured here (page view + print) */
+.tiptap [data-keep-next],
+.rte-print-flow [data-keep-next] {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.tiptap [data-keep-lines],
+.rte-print-flow [data-keep-lines] {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.tiptap [data-widow-control='off'],
+.rte-print-flow [data-widow-control='off'] {
+  orphans: 1;
+  widows: 1;
+}
+
+/* P1-4: Word-style indent markers on the horizontal ruler (first line / left / right) */
+.rte-ruler-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 11px;
+  margin-left: -5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+  /* The ruler itself is pointer-transparent so it never steals editor clicks */
+  pointer-events: auto;
+}
+
+.rte-ruler-handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #2563eb;
+}
+
+.rte-ruler-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: rgb(37 99 235 / 0.45);
+}
+
+/* The right marker sits on the content edge, so its triangle points up from the bottom */
+.rte-ruler-handle--right::before {
+  top: auto;
+  bottom: 0;
+  border-top: 0;
+  border-bottom: 6px solid #2563eb;
+}
+
+.rte-ruler-handle--right::after {
+  top: 0;
+  bottom: 6px;
+}
+
+.rte-ruler-handle--left::before,
+.rte-ruler-handle--left::after {
+  border-top-color: #475569;
+}

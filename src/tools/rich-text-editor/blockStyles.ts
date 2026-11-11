@@ -45,6 +45,12 @@ interface StyleAttrs {
   indentRight?: number | null;
   /** 悬挂缩进（px）：显示为负 text-indent，配合左缩进即 Word 的 hanging */
   hangingIndent?: number | null;
+  /** P1-4: keep this paragraph on the same page as the next one (Word's 段中不分页) */
+  keepNext?: boolean | null;
+  /** P1-4: never split this paragraph across pages (Word's 段内不拆页) */
+  keepLines?: boolean | null;
+  /** P1-4: `false` switches widow/orphan control off; `null` = the default (on) */
+  widowControl?: boolean | null;
   width?: number | null;
   align?: string | null;
   /** Image layer: inline / front (in front of text) / behind (behind text) */
@@ -112,6 +118,27 @@ const ParagraphStyle = Extension.create({
             parseHTML: (el: HTMLElement) => readPx(el.style.marginBottom),
             renderHTML: (attrs: StyleAttrs) =>
               attrs.spacingAfter ? { style: `margin-bottom: ${attrs.spacingAfter}px` } : {},
+          },
+          // Pagination control is metadata, not appearance: it stays on data-* so the CSS (print and
+          // page view) can decide how to honour it, and the .docx writer can read it back verbatim
+          keepNext: {
+            default: null,
+            parseHTML: (el: HTMLElement) => (el.hasAttribute('data-keep-next') ? true : null),
+            renderHTML: (attrs: StyleAttrs) => (attrs.keepNext ? { 'data-keep-next': 'true' } : {}),
+          },
+          keepLines: {
+            default: null,
+            parseHTML: (el: HTMLElement) => (el.hasAttribute('data-keep-lines') ? true : null),
+            renderHTML: (attrs: StyleAttrs) =>
+              attrs.keepLines ? { 'data-keep-lines': 'true' } : {},
+          },
+          widowControl: {
+            default: null,
+            // Only the *off* state is stored: words documents have widow control on by default
+            parseHTML: (el: HTMLElement) =>
+              el.getAttribute('data-widow-control') === 'off' ? false : null,
+            renderHTML: (attrs: StyleAttrs) =>
+              attrs.widowControl === false ? { 'data-widow-control': 'off' } : {},
           },
         },
       },
@@ -264,6 +291,15 @@ declare module '@tiptap/core' {
         right?: number | null;
         hanging?: number | null;
       }) => ReturnType;
+      /**
+       * P1-4 pagination control. Only the fields present in `patch` are written, so toggling
+       * 段中不分页 does not clear 段内不拆页.
+       */
+      setParagraphPagination: (patch: {
+        keepNext?: boolean | null;
+        keepLines?: boolean | null;
+        widowControl?: boolean | null;
+      }) => ReturnType;
     };
     imageStyle: {
       /** Set image width (px; null = natural size) and alignment */
@@ -332,6 +368,20 @@ export const BlockStyleCommands = Extension.create({
             ...('left' in patch ? { indentLeft: normalize(patch.left) } : {}),
             ...('right' in patch ? { indentRight: normalize(patch.right) } : {}),
             ...('hanging' in patch ? { hangingIndent: normalize(patch.hanging) } : {}),
+          });
+          return true;
+        },
+      setParagraphPagination:
+        (patch) =>
+        ({ state, tr }) => {
+          const { $from } = state.selection;
+          const node = $from.parent;
+          if (node.type.name !== 'paragraph') return false;
+          tr.setNodeMarkup($from.before(), undefined, {
+            ...node.attrs,
+            ...('keepNext' in patch ? { keepNext: patch.keepNext ?? null } : {}),
+            ...('keepLines' in patch ? { keepLines: patch.keepLines ?? null } : {}),
+            ...('widowControl' in patch ? { widowControl: patch.widowControl ?? null } : {}),
           });
           return true;
         },

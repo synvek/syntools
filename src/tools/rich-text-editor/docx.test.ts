@@ -995,3 +995,20 @@ describe('named styles in .docx (P1-1)', () => {
     expect(body).toContain('Heading2');
   });
 });
+
+describe('paragraph pagination control in .docx (P1-4)', () => {
+  it('writes keepNext / keepLines / widowControl into w:pPr', async () => {
+    const html =
+      '<p data-keep-next="true">一</p><p data-keep-lines="true">二</p><p data-widow-control="off">三</p><p>四</p>';
+    const result = await exportDocxBlob(html, '分页', DEFAULT_PAGE_SETUP, null, []);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const body = await readDocumentXml(result.value);
+    expect(body).toContain('<w:keepNext/>');
+    expect(body).toContain('<w:keepLines/>');
+    expect(body).toContain('<w:widowControl w:val="false"/>');
+    // Only the paragraph that asked for it carries the flag
+    expect(body.match(/<w:keepNext\/>/g)).toHaveLength(1);
+    expect(body.match(/<w:widowControl /g)).toHaveLength(1);
+  });
+});

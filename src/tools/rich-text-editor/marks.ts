@@ -1,6 +1,7 @@
 import { Mark, mergeAttributes } from '@tiptap/core';
 import type { Node as PMNode, Schema } from '@tiptap/pm/model';
 import type { Transaction } from '@tiptap/pm/state';
+import { NO_TRACK_META } from './tracking';
 
 /**
  * Mark implementations for document-level annotations (local, no collaboration service):
@@ -343,11 +344,14 @@ export const DocMarkCommands = Mark.create({
         (changeId: string, target: string) =>
         ({ commands }) =>
           commands.setMark('trackedFormat', { changeId, target }),
+      // Accept / reject resolve revisions that already exist: with revision mode on they must never be
+      // rewritten into new revisions (the `NO_TRACK_META` flag says "this edit is a review action").
       acceptAllTracked:
         () =>
         ({ state, tr }) => {
           if (!hasTrackedMarks(state.doc)) return false;
           applyTrackedOps(tr, state.schema, collectTrackedOps(state.doc, 'accept'));
+          tr.setMeta(NO_TRACK_META, true);
           return true;
         },
       rejectAllTracked:
@@ -355,6 +359,7 @@ export const DocMarkCommands = Mark.create({
         ({ state, tr }) => {
           if (!hasTrackedMarks(state.doc)) return false;
           applyTrackedOps(tr, state.schema, collectTrackedOps(state.doc, 'reject'));
+          tr.setMeta(NO_TRACK_META, true);
           return true;
         },
       acceptTrackedChange:
@@ -363,6 +368,7 @@ export const DocMarkCommands = Mark.create({
           const ops = collectTrackedOps(state.doc, 'accept', changeId);
           if (!ops.length) return false;
           applyTrackedOps(tr, state.schema, ops);
+          tr.setMeta(NO_TRACK_META, true);
           return true;
         },
       rejectTrackedChange:
@@ -371,6 +377,7 @@ export const DocMarkCommands = Mark.create({
           const ops = collectTrackedOps(state.doc, 'reject', changeId);
           if (!ops.length) return false;
           applyTrackedOps(tr, state.schema, ops);
+          tr.setMeta(NO_TRACK_META, true);
           return true;
         },
     };

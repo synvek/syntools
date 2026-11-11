@@ -101,6 +101,7 @@ import {
   type TrackedChange,
 } from './docs';
 import { findChangeRange } from './marks';
+import type { TrackingEntry } from './tracking';
 import { createCommentId } from '../../core/comments/model';
 import { pageIndexOfPosition } from './core';
 import { BookmarkDialog } from './BookmarkDialog';
@@ -288,6 +289,8 @@ export default function RichTextEditorTool() {
   const namedStylesRef = useRef<NamedStyle[]>(namedStyles);
   namedStylesRef.current = namedStyles;
   const [reviewOpen, setReviewOpen] = useState(false);
+  /** 修订模式（P1-2）：开启后输入 / 删除自动变成可逐条接受-拒绝的修订；关闭时行为与旧版一致 */
+  const [trackingMode, setTrackingMode] = useState(false);
   // Comment / tracked-change metadata is persisted with the draft: restore the previous session on init
   const [comments, setComments] = useState<DocComment[]>(() => initial?.comments ?? []);
   const [changes, setChanges] = useState<TrackedChange[]>(() => initial?.changes ?? []);
@@ -436,6 +439,15 @@ export default function RichTextEditorTool() {
     [],
   );
   const isSpellcheckEnabled = useCallback(() => spellcheckEnabledRef.current, []);
+  /** Revision mode reads the toggle through a ref as well: flipping it must not rebuild the editor */
+  const trackingModeRef = useRef(false);
+  const isTrackingEnabled = useCallback(() => trackingModeRef.current, []);
+  /**
+   * Sink for the revisions one dispatch produced. The callbacks live in a ref because the author
+   * (`resolveAuthor`) is defined further down and depends on the current language / reviewer name;
+   * `createExtensions` only needs a stable trampoline.
+   */
+  const trackedChangeSink = useRef<(entries: TrackingEntry[]) => void>(() => {});
   /**
    * TOC levels from named styles (P1-1): a block styled 标题 2 belongs in the outline even when it is a
    * paragraph node. Reads the ref, so a style edit re-levels the TOC without rebuilding the extensions.
@@ -457,6 +469,10 @@ export default function RichTextEditorTool() {
         endnoteLabels,
         onMathSelect: handleMathSelect,
         spellcheck: { getDictionary: getSpellDictionary, isEnabled: isSpellcheckEnabled },
+        tracking: {
+          isEnabled: isTrackingEnabled,
+          onChange: (entries) => trackedChangeSink.current(entries),
+        },
       }),
     [
       placeholder,
@@ -470,6 +486,7 @@ export default function RichTextEditorTool() {
       handleMathSelect,
       getSpellDictionary,
       isSpellcheckEnabled,
+      isTrackingEnabled,
     ],
   );
 
@@ -1137,6 +1154,7 @@ export default function RichTextEditorTool() {
   // Mirror the dictionary and toggle into refs for the PM plugin's getters
   dictionaryRef.current = dictionary;
   spellcheckEnabledRef.current = spellcheckEnabled;
+  trackingModeRef.current = trackingMode;
 
   const refreshSpellcheck = useCallback(() => {
     if (!editor || editor.isDestroyed) return;
@@ -1165,6 +1183,17 @@ export default function RichTextEditorTool() {
     spellcheckEnabledRef.current = next;
     if (next) void handleLoadDictionary();
     refreshSpellcheck();
+  };
+
+  /**
+   * Revision mode: the toggle writes no mark itself, it only changes how the *next* edit gets recorded.
+   * Turning it off leaves existing revisions in place — they stay accept/reject-able (Word behaves the
+   * same way), which is also the rollback point: no flag, no interception.
+   */
+  const handleToggleTracking = () => {
+    const next = !trackingMode;
+    setTrackingMode(next);
+    trackingModeRef.current = next;
   };
 
   const handleReplaceIssue = (issue: DocSpellIssue, replacement: string) => {
@@ -1249,6 +1278,19 @@ export default function RichTextEditorTool() {
 
   /** New comment author: falls back to the default label when empty */
   const resolveAuthor = () => author.trim() || t('tools.richText.commentAuthor');
+
+  /**
+   * Revision mode keeps the same record shape as the manual marks (id / kind / text / author / time),
+   * so the review panel, per-author filter and draft persistence need no special case for it.
+   */
+  trackedChangeSink.current = (entries: TrackingEntry[]) => {
+    const createdAt = Date.now();
+    const by = resolveAuthor();
+    setChanges((prev) => [
+      ...prev,
+      ...entries.map((entry) => ({ ...entry, author: by, createdAt })),
+    ]);
+  };
 
   /**
    * New comment: record the selection quote, then edit inline in the panel (no native browser prompt any more).
@@ -1413,17 +1455,18 @@ export default function RichTextEditorTool() {
   /** Accept one change: the mark carries the id, so only that range is touched */
   const handleAcceptChange = (id: string) => {
     if (!editor) return;
-    if (!editor.chain().focus().acceptTrackedChange(id).run()) return;
+    // The command fails when no mark carries this id any more — the edit was undone (revision mode
+    // keeps undo as a plain undo) or already resolved elsewhere. Dropping the stale entry is the only
+    // honest outcome; keeping it would leave a button that can never work.
+    if (editor.chain().focus().acceptTrackedChange(id).run()) refreshCommentAnchors();
     setChanges((prev) => prev.filter((change) => change.id !== id));
-    refreshCommentAnchors();
   };
 
   /** Reject one change (insertions disappear, deletions come back, format revisions revert the block kind) */
   const handleRejectChange = (id: string) => {
     if (!editor) return;
-    if (!editor.chain().focus().rejectTrackedChange(id).run()) return;
+    if (editor.chain().focus().rejectTrackedChange(id).run()) refreshCommentAnchors();
     setChanges((prev) => prev.filter((change) => change.id !== id));
-    refreshCommentAnchors();
   };
 
   const handleAcceptAll = () => {
@@ -2102,6 +2145,8 @@ export default function RichTextEditorTool() {
         versionsDisabled={!docId}
         zoom={zoom}
         onZoomChange={setZoom}
+        trackingMode={trackingMode}
+        onToggleTracking={handleToggleTracking}
         onMarkInsert={() => handleTrackChange('insert')}
         onMarkDelete={() => handleTrackChange('delete')}
         onAcceptAll={handleAcceptAll}

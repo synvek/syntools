@@ -332,13 +332,26 @@ graph TD
 
 ### 6.2 P1-2 修订模式与审阅深化
 
-- [ ] **P1-2 修订模式与审阅深化**（P1，7d）
+- [~] **P1-2 修订模式与审阅深化**（P1，7d）—— 前几批已落地标记/命令、`w:pPrChange` 往返、面板线程与作者筛选；本片补上「修订模式」开关与事务改写；版本 diff 的结构感知仍待做
 - **目标**：新增「修订模式」开关自动记录输入/删除/格式变更；补 `w:pPrChange`、作者/时间元数据、按作者筛选、批注线程；版本 diff 从纯文本行级升级为结构感知。
-- **任务清单**：tracking 状态与事务拦截 → `marks.ts` 扩展 → `docxReview.ts` 导出补 `pPrChange` → `ReviewPanel.tsx` 线程 UI → `versionDiff.ts` 结构感知 diff → 与 `.docx` 比较/合并的 e2e。
-- **涉及文件**：`src/tools/rich-text-editor/marks.ts`、`docx.ts`、`docxReview.ts`、`ReviewPanel.tsx`、`versionDiff.ts`、`compare.ts`、`revisions.ts`
+- **任务清单**：~~`marks.ts` 标记与接受/拒绝命令~~（早前批次）→ ~~`docxReview.ts` 导出补 `pPrChange`~~（早前批次）→ ~~`ReviewPanel.tsx` 线程 UI + 按作者筛选 + 上/下一处导航~~（早前批次）→ ~~tracking 状态与事务拦截~~（本片）→ 版本 diff 结构感知（待做）→ ~~与 `.docx` 比较的 e2e~~（早前批次；本片补修订模式用例）
+- **已完成（2026-11-11 · 修订模式）**：
+  - [NEW] `tracking.ts`：`trackTransaction(state, tr)` 把**即将派发的那一个事务**改写成修订，而不是追加第二个事务 —— 一次按键仍是一步撤销（与「一次比较 = 一步撤销」同口径，撤销不会出现「先撤标记、再撤删除」的两次操作）。规则：插入文本打 `trackedInsert`；删除**保留原文**并打 `trackedDelete`；选中后直接改写时两半共用同一个 `changeId`，所以逐条接受/拒绝它是一次动作；删除「本身仍是待定插入」的文本按抵消处理，不留痕迹（输入后立刻退格不该留下一条修订）；纯文本之外的变更（Enter 拆段、块级粘贴、结构命令）一律不跟踪 —— 宁可不标，也不标错
+  - 拦截点用 tiptap 3 的 `dispatchTransaction` 扩展钩子（`{ transaction, next }`，文档化的组合点），不 monkey-patch `view.dispatch`：可与其它扩展组合，view 重建也不会失效（一开始写的 `onCreate` 里替换 `view.dispatch` 既装不上 —— tiptap 的 `create` 事件在 `setTimeout(0)` 里发 —— 也不该由业务扩展去改视图）
+  - 位置换算：保留被删内容会让同一批里后续 step 的位置整体右移，因此维护一个只记录「补回的删除长度」的 `Mapping`，用 `Step.map(shifts)` 平移；`Step.map` 返回 `null`（映射非法）时整体放弃改写、直接走原始事务，不留半成品
+  - 光标：改写后显式把光标放到新文本之后 —— 否则 ProseMirror 的默认映射会把光标留在被划掉的旧文本之前
+  - 守卫：撤销/重做（`isHistoryTransaction`）、接受/拒绝命令与比较事务（`NO_TRACK_META`）、`addToHistory: false` 的装饰性事务都不进入改写；开关通过 getter 读取，切换它不重建编辑器
+  - Ribbon：审阅 → 修订组重排为两行三列，第一行首位是**修订模式**开关（新图标 `trackRevisions`，`active` 反映开关态），第二行「与文件比较… / 全部接受 / 全部拒绝」；`trackingMode` / `onToggleTracking` 进 `RichTextRibbonActions`
+  - 面板与草稿零改动：修订模式的条目与手动标记同形状（`id` / `kind` / `text` / `author` / `createdAt`），作者筛选、逐条接受/拒绝、上/下一处导航、草稿持久化直接可用。撤销会把标记一起撤掉，此时逐条接受/拒绝因找不到 id 而失败 —— 顺手清掉这条陈旧条目，不留「按了没反应」的按钮
+  - 文案：`trackRevisions` × 9 语言（`strings.test.ts` 通过）
+  - 测试：[NEW] `tracking.test.ts` 8 例（关闭时不记录、插入可拒绝、删除保留原文可接受、选中改写两半同 id、输入后删除抵消、接受/拒绝不被二次跟踪、撤销不产生删除修订、拆段不半跟踪）+ `e2e/office-p2.spec.ts` +1 例（开启修订模式 → 输入出现在面板 → 全部拒绝回到原文 → 再输入 → 全部接受保留文本）
+- **剩余**：① `versionDiff.ts` 的结构感知 diff —— 现在仍是 `diffLines` 纯文本行级，块类型 / 样式 / 修订的变化只能表现为文本差异；② 「比较后合并」的专门 e2e（当前覆盖的是比较 → 逐条接受/拒绝，没有「只接受一部分再导出合并稿」的独立用例）
+- **计划偏差（2026-11-11 登记）**：修订模式不跟踪段落拆分/合并与块级粘贴 —— 结构性变更无法用 mark 表达，硬拆会破坏文档模型；开关状态不进草稿（每次会话默认关闭），符合本任务「开关默认关闭」的回退点
+- **闸门证据（2026-11-11 · 修订模式）**：typecheck / lint / prettier 通过；全量单测 384 文件 / **3663 例**全绿（较上一片 383 / 3655 增加 1 文件 8 例）；全量 e2e **223 passed / 0 failed**（+1）；首屏 **191.92KB**（预算 195KB，与上一片持平）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 155.02KB（+0.96KB：修订模式改写与开关）；无新增依赖 / 资产 / 网络请求
+- **涉及文件**：`src/tools/rich-text-editor/tracking.ts`（[NEW]）、`RichTextEditorTool.tsx`、`extensions.ts`、`ribbonTabs.ts`、`marks.ts`、`revisions.ts`、`strings.ts`、`src/core/components/ribbon/ribbonIcons.tsx`；`e2e/office-p2.spec.ts`；早前批次：`docx.ts`、`docxReview.ts`、`ReviewPanel.tsx`、`compare.ts`
 - **前置**：P0-2（IR）、P1-4（段落属性）、P1-5（状态分片）
 - **✅ 验收**：开关打开后连续输入生成可逐条接受/拒绝的修订；比较两文件结果可导出且往返保留；`e2e/office-p2.spec.ts` 修订用例不退化。
-- **回退点**：开关默认关闭；旧手动标记路径保留。
+- **回退点**：开关默认关闭，关闭时 `trackTransaction` 根本不被调用（等价于旧的手动标记路径）；旧手动标记按钮与原命令全部保留。
 
 ### 6.3 P1-3 中文与多语言校对
 
@@ -367,10 +380,27 @@ graph TD
 
 ### 6.4 P1-4 页面排版细节
 
-- [ ] **P1-4 页面排版细节**（P1，5d）
+- [~] **P1-4 页面排版细节**（P1，5d）—— 两片完成：分页控制三件套 + `.docx` 往返、标尺缩进标记与拖拽；制表位、页眉页脚可视化编辑、奇偶页不同、行距段落化待做
 - **目标**：补 `keepNext` / `keepLines` / `widowControl`、制表位与标尺拖拽缩进、页眉页脚可视化编辑、奇偶/首页不同。
-- **任务清单**：`blockStyles.ts` / `ParagraphStyle` 扩属性 → `docx.ts` 映射 `w:keepNext` 等 → `RulerBar.tsx` 制表位与拖拽 → 页眉页脚双击编辑浮层 → 打印/快照 PDF 一致性验证。
-- **涉及文件**：`src/tools/rich-text-editor/blockStyles.ts`、`docx.ts`、`RulerBar.tsx`、`PageSetupPanel.tsx`、`pageSetup.ts`、`sections.ts`、`pdf.ts`
+- **任务清单**：~~`blockStyles.ts` / `ParagraphStyle` 扩属性~~（第一片）→ ~~`docx.ts` 映射 `w:keepNext` 等~~（第一片）→ ~~`.docx` 回读 `w:pPr` 分页位~~（第一片）→ ~~`RulerBar.tsx` 缩进标记与拖拽~~（第二片）→ 制表位（待做）→ 页眉页脚双击编辑浮层（待做）→ 奇偶页不同（待做）→ 打印/快照 PDF 一致性验证（两片均复核，无回归）
+- **已完成（2026-11-11 · 第一片 · 分页控制）**：
+  - `blockStyles.ts`：`ParagraphStyle` 新增 `keepNext` / `keepLines` / `widowControl` 三个段落属性。前两者写 `data-keep-next` / `data-keep-lines`，孤行控制只存「关闭」态（`data-widow-control="off"`）—— 开着是文档默认，存 true 只会让 HTML 变脏。用 `data-*` 而不是 inline style：分页控制是元数据，不是外观，CSS 与 `.docx` 各自决定怎么兑现
+  - `BlockStyleCommands.setParagraphPagination(patch)`：只写传入的字段，所以「开段中不分页」不会把「段内不拆页」清掉（与 `setParagraphIndent` 同一套部分更新语义）
+  - UI：开始 → 段落组新增三个开关（`keepNext` / `keepLines` / `widowControl` 三个新图标 + 9 语言 tooltip），状态从 `paragraph` 节点属性读、`active` 高亮，与 Word 把这三个放在 ribbon 的习惯一致，不再另开对话框
+  - `docx.ts` 导出：`w:pPr` 写 `<w:keepNext/>` / `<w:keepLines/>` / `<w:widowControl w:val="false"/>`，只写用户真正开/关的那一段
+  - `.docx` 回读：[NEW] `docxParagraphControls.ts`。mammoth 会把 `w:pPr` 整块丢掉（它只保留样式名），所以导入时直接读 `word/document.xml`：按出现顺序取出每个 `w:p` 的 `w:pPr`，把三个开关还原成同样的 `data-*`。**顺序守卫**：只有「HTML 块数 == Word 段落数」时才落属性，否则原样返回 —— 列表会让 mammoth 用 `<li>` 顶掉段落外壳，位置一旦错位就会把标记盖到相邻段落上，宁可不标
+  - 打印与分页一致：`editor.css` 增加 `break-after: avoid` / `break-inside: avoid` / `orphans: 1; widows: 1`（`.tiptap` 与 `.rte-print-flow` 双作用域），页面视图与打印/快照 PDF 读同一份 HTML
+  - 测试：[NEW] `docxParagraphControls.test.ts`（6 例：三开关按段落顺序、`w:val="0"` 关闭、只看 `w:pPr` 不看 `w:rPr`、顺序错位不落属性）+ `blockStyles.test.ts` +3 例（`data-*` 往返、只改一个字段、清除后属性消失）+ `docx.test.ts` +1 例（导出只给需要的段落写标记）+ [NEW] `e2e/office-pagination.spec.ts`（ribbon 开关 → 导出 → 本地清除 → 导入后标记回来，且第二段不受影响）
+- **已完成（2026-11-11 · 第二片 · 标尺缩进拖拽）**：
+  - `RulerBar.tsx` 在水平标尺上新增 Word 那三个缩进标记：首行（上三角）、左缩进（下三角）、右缩进（下三角，锚在内容右缘）。位置来自光标所在段落的 `indentLeft` / `textIndent` / `hangingIndent` / `indentRight`，随光标移动（复用既有的 transaction / selectionUpdate 订阅，不额外建立选择状态）
+  - 拖拽：`pointerdown` 时 `setPointerCapture`（指针移出小标记也不断线），移动按 4px 对齐、clamp 0–480，屏幕 px 除以 `zoom` 换算成 CSS px 后直接调 `setParagraphIndent` / `indentParagraph` —— 编辑器始终是唯一事实来源，段落、标记、页面视图一起动，不需要本地预览态
+  - 有悬挂缩进时首行标记驱动 `hanging`（并保持左缩进不动），没有悬挂时驱动 `textIndent`，与 Word 的语义一致
+  - 无障碍取舍：标尺容器原本是 `aria-hidden` 的纯指示层，标记做成 `tabIndex={-1}` + `aria-hidden` 的指针手柄，键盘用户走 ribbon 上既有的增加/减少缩进命令（同一批命令、同一份状态），不为标尺另造一套键盘模型
+  - 两个 CSS 坑（都是实测出来的）：① `.rte-ruler` 是 `pointer-events: none`（避免抢编辑区点击），手柄必须显式 `pointer-events: auto`，否则拖拽完全收不到事件；② `.rte-ruler-track` 有 `overflow: hidden`，右缩进标记若正好落在内容右缘会被裁掉一半、抓不住，因此向内偏移 6px
+  - 测试：`e2e/office-pagination.spec.ts` +1 例（拖左标记 → `margin-left: 48px` 且 `data-value` 同步；右标记初始 0，向左拖 → `margin-right` 落在 36–60px）
+- **剩余（第二片之后）**：标尺上的制表位（tab stop）与点击设置、页眉页脚双击就地编辑浮层（当前只能在页面设置面板里改文字）、奇偶页不同（只有首页不同）、段落行距的段落化（目前行距挂在 `textStyle` mark 上，导出固定 `w:line=300`）
+- **闸门证据（2026-11-11 · 第二片）**：typecheck / lint / prettier 通过；全量单测 383 文件 / **3655 例**全绿（空载一次通过；并发跑 e2e 时有 2 例超时/字节比对失败，隔离复跑均通过，属负载敏感）；全量 e2e **222 passed / 0 failed**（EXIT=0，+1 例标尺拖拽）；体积复核首屏 **191.92KB**（预算 195KB）、`RichTextEditorTool` chunk 154.06KB（+0.46KB）；**第一片闸门证据（2026-11-11 · 分页控制）**：单测 383 文件 / **3655 例**（较 P1-1 收尾 3645 例 +10）、全量 e2e **221 passed / 0 failed**（+1 例分页往返）、打印一致性无回归：`office-p2.spec.ts` 的「page count matches between page view and snapshot PDF」与 `tools.spec.ts` 的打印用例全绿；体积复核首屏 **191.91KB**（预算 195KB）、最大普通 chunk 427.33KB（预算 500KB）、`RichTextEditorTool` chunk 153.60KB（+1.06KB）；无新增依赖
+- **涉及文件**：`src/tools/rich-text-editor/blockStyles.ts`、`docxParagraphControls.ts`（[NEW]）、`docx.ts`、`ribbonTabs.ts`、`EditorToolbar.tsx`、`editor.css`、`strings.ts`、`RulerBar.tsx`、`src/core/components/ribbon/ribbonIcons.tsx`；`PageSetupPanel.tsx`、`sections.ts`（待做）、`pdf.ts`（已复核）
 - **前置**：P1-1（样式语义）
 - **✅ 验收**：docx 往返保留分页控制；打印与快照 PDF 结果一致；`pnpm e2e` 打印用例不退化。
 - **回退点**：新增属性为可选字段，旧草稿 `migrate.ts` 归一化时给默认值。
@@ -589,9 +619,9 @@ graph TD
 | P0-5 关键路径回归测试         | `[x]` | M1   | P0     | 4d     | P0-2、P0-4          | §5.5     |
 | P0-6 上下文选项卡一致性       | `[x]` | M1   | P0     | 2d     | 无（UI 层）         | §5.6     |
 | P1-1 命名样式系统             | `[x]` | M2   | P1     | 8d     | P0-2、P1-5          | §6.1     |
-| P1-2 修订模式与审阅深化       | `[ ]` | M2   | P1     | 7d     | P0-2、P1-4、P1-5    | §6.2     |
+| P1-2 修订模式与审阅深化       | `[~]` | M2   | P1     | 7d     | P0-2、P1-4、P1-5    | §6.2     |
 | P1-3 中文与多语言校对         | `[x]` | M2   | P1     | 6d     | P1-5（已满足）      | §6.3     |
-| P1-4 页面排版细节             | `[ ]` | M2   | P1     | 5d     | P1-1                | §6.4     |
+| P1-4 页面排版细节             | `[~]` | M2   | P1     | 5d     | P1-1                | §6.4     |
 | P1-5 大文档性能               | `[x]` | M2   | P1     | 8d     | M1 闸门             | §6.5     |
 | P1-6 单机数据可靠性           | `[x]` | M2   | P1     | 6d     | M1 闸门             | §6.6     |
 | P1-7 移动端与触控可达         | `[ ]` | M2   | P1     | 4d     | P0-4、P0-5          | §6.7     |
@@ -605,6 +635,12 @@ graph TD
 进度备注（2026-11-06 下午）：P0-1 已转 `[x]` —— 中文 + 英文两套独立内容共 10 份真实样本、工具族 4 / 4，英文集补齐 `comments` 部件；CI 已启用 `BASELINE_REQUIRE_COVERAGE=1`。P0-2 的前置依赖随之解锁，但仍是 6 个子任务的 8d 实现工作，未开始即不算完成。P0-4 已转 `[x]` —— 六个子任务全部落地，`office-p2.spec.ts` 的 3 例既有 P2 用例定位漂移同步修正，`pnpm e2e` 全量 193 passed / 0 failed。P0-3 已转 `[x]` —— 4 个子任务与验收项完成，「6 个快捷键」口径按 3 个新增快捷键 × 2 种键盘映射复核并写入 §5.3；`editorChrome.test.ts` 8 例、逐平台 e2e 7/7；`showPrintCommand` / `enableTextImport` 开关未落地，已在 §5.3 记为计划偏差。P0-2 已全部转 `[x]`：§5.2 的 P0-2.1（纯函数 IR 边界）、P0-2.2（编号/汇总/ref）、P0-2.3（TOC/REF 域与 OMML 反向）、P0-2.4（rels 归一化、图片环绕、多节页面设置）、P0-2.5（修订/批注结构回填、块序→书签→唯一文本三级锚点定位、`importLossIssues` 聚合为结构/审阅/字段三条告警）、P0-2.6（`VITE_USE_OOXML_IR` flag、`importDocx` 的 `useOoxmlIr` / `onIr` 旁路、按需 `import('./ooxmlIr')`、`FidelityDialog` 导入告警）6/6 落地；`ooxmlIr.test.ts` 32 例、`fidelity.test.ts` 8 例、`ooxmlIrSidecar.test.ts` 4 例、`ooxmlIrFlag.test.ts` 3 例。公式重音 `m:acc` 的导出边界（`docx` 无 `MathAccent`，降级为图片）已记入 §5.2「已知限制」。随后继续 P0-5：P0-5.2 三个单测文件（`find-replace` 11 例 / `draft` 10 例 / `pdf` 6 例）与 P0-5.3 记录落地，P0-5.1 补 3 例关键路径 e2e（草稿 reload、undo/redo 分组、鼠标右键 Esc 不清选区）；P0-5.1 已完成：`critical paths` 6 例（草稿 reload、undo/redo 分组、鼠标右键 Esc、菜单「打印」直点、形状 undo/redo、`track-delete` 修订 undo/redo）+ `collapsed ribbon` 1 例（600px 依次回读字号 / 颜色 / 字体族，每次取值后飞出的折叠面板会收起，需重新点「开始」）。**P0-5 全部转 `[x]`**：主项 3/3 子任务，回归合计 e2e 7 例 + 单测 33 例。全量单测 3501 例 / 372 文件、e2e 204 passed / 0 failed、首屏 191.89KB、`RichTextEditorTool` chunk 143.44KB gzip。
 
 进度备注（2026-11-08）：P0-1…P0-6 保持 `[x]`；**P1-5 转 `[x]`** —— §6.5 的块级增量分页（`layoutFlag.ts`，默认关闭，实测 200 页布局中位 4.4ms / P95 5.5ms，全量 9.1ms / 10.7ms）与 decoration 视口裁剪（[NEW] `viewportRange.ts`：>12 万字符的文档只装饰视口 ±3000 字符，滚动停止 150ms 后重建；`spellcheck.ts` / `find-replace.ts` 共用；`gotoMatch` 补选区移动，否则裁剪后视口外的当前匹配既不高亮也滚不到）均已落地，200 页布局 P95 9.0ms（预算 16ms）、50 页 P95 2.4ms（预算 50ms）、`rte-toolbar-state` P95 1.1ms、`rte-ribbon-tabs` P95 0.5ms；`ribbonTabs` 静态配置拆分按实测取消（登记为技术债）。顺带修复 `spellcheck.ts` 的 `EditorView.visibleRanges` 类型错误（该字段是内部 API，不在 typings 里）——`pnpm build` 重新可用。P1-3 的前置（decoration 视口裁剪）已满足，可开工。
+
+进度备注（2026-11-11 · P1-2 第一片）：**P1-2 转 `[~]`** —— 补上这块唯一缺的「开关」能力：修订模式（审阅 → 修订组首位）打开后，输入自动成为 `trackedInsert`、删除**保留原文**并标 `trackedDelete`，选中改写时两半共用同一个 `changeId`（所以逐条接受/拒绝仍是一次动作）。改写发生在**即将派发的那一个事务**上（tiptap 的 `dispatchTransaction` 钩子），不是追加第二个事务 —— 一次按键 = 一步撤销，避免「先撤标记、再撤删除」的两次撤销。删除「本身还是待定插入」的文本按抵消处理，输入后立刻退格不留痕。位置换算与结构守卫是两块硬骨头：保留删除内容会让同批后续 step 右移（用只含补回长度的 `Mapping` + `Step.map` 平移，映射非法就整体放弃），Enter 拆段 / 块级粘贴 / 结构命令一律不跟踪（mark 表达不了，硬拆会毁模型）。撤销与接受/拒绝命令、比较事务分别用 `isHistoryTransaction` / `NO_TRACK_META` 挡住，不会被二次包装；撤销把标记撤掉后，逐条按钮因找不到 id 失败时顺手清掉陈旧条目。面板、作者筛选、草稿持久化零改动（条目形状与手动标记一致）。闸门：typecheck / lint / prettier 通过，单测 384 文件 / **3663 例**全绿（+1 文件 +8 例），e2e **223 passed / 0 failed**（+1 用例），首屏 191.92KB、`RichTextEditorTool` 155.02KB（+0.96KB）。P1-2 剩余：`versionDiff` 的结构感知 diff、比较后「只接受一部分再导出合并稿」的专门 e2e。M2 闸门仍为 `[ ]`，剩余 P1-2 余项 / P1-4 余项 / P1-7。
+
+进度备注（2026-11-11 · P1-4 第二片）：**P1-4 仍为 `[~]`** —— 标尺从"纯刻度指示层"变成可操作的排版工具：水平标尺上多了 Word 的三个缩进标记（首行 / 左 / 右），位置跟着光标所在段落走，拖拽按 4px 对齐、按 `zoom` 换算，直接调既有命令，所以段落、标记、页面视图同步。有悬挂缩进时首行标记驱动 `hanging`，否则驱动 `textIndent`。键盘用户仍走 ribbon 的缩进按钮（标尺容器本来 `aria-hidden`，不为它另造键盘模型）。两个坑：`.rte-ruler` 的 `pointer-events: none` 会让手柄收不到事件（手柄需 `auto`）；`.rte-ruler-track` 的 `overflow: hidden` 会把落在内容右缘的右缩进标记裁掉一半（向内偏移 6px）。闸门：typecheck / lint / prettier 通过，单测 383 文件 / **3655 例**（空载一次通过），e2e **222 passed / 0 failed**（+1 拖拽用例；并发跑时出现过 2 例负载敏感失败，隔离复跑通过），首屏 191.92KB、`RichTextEditorTool` 154.06KB。P1-4 剩余：制表位、页眉页脚双击编辑、奇偶页不同、行距段落化。M2 闸门仍为 `[ ]`，剩余 P1-2 / P1-4 余项 / P1-7。
+
+进度备注（2026-11-11 · P1-4 第一片）：**P1-4 转 `[~]`** —— 分页控制打通 ribbon → 属性 → `.docx` → 回读：段落新增 `keepNext` / `keepLines` / `widowControl`（`data-keep-next` / `data-keep-lines` / `data-widow-control="off"`，孤行控制只存关闭态），命令按字段部分更新，开始 → 段落组三个开关带 9 语言 tooltip 与新图标。导出写 `w:keepNext` / `w:keepLines` / `w:widowControl`；导入新增 `docxParagraphControls.ts` 直读 `word/document.xml` 的 `w:pPr`（mammoth 会把这块丢掉），带「块数相等才落属性」的顺序守卫，避免列表导致的错位。`editor.css` 让页面视图/打印/快照 PDF 都遵守同一份 `break-*` / `orphans` 规则。剩余：标尺制表位与拖拽缩进、页眉页脚双击编辑、奇偶页不同、行距段落化。闸门：typecheck / lint / prettier 通过，单测 383 文件 / **3655 例**全绿（+10），e2e **221 passed / 0 failed**（+1），首屏 191.91KB、`RichTextEditorTool` 153.60KB。M2 闸门仍为 `[ ]`，剩余 P1-2 / P1-4 余项 / P1-7。
 
 进度备注（2026-11-11 · P1-1 第二片收尾）：**P1-1 转 `[x]`** —— 关键路径的第一环闭合。导出侧把样式集写成真正的 `w:styles`（名称 / 基于 / 字号 / 加粗 / 斜体 / 颜色 / 字体族 / `outlineLvl`），带样式的段落写 `w:pStyle` 且不再写 `Heading n`；导入侧 [NEW] `namedStyleDocx.ts` 读 `word/styles.xml` 还原样式对象，用 mammoth styleMap 把名称映射回 `data-rte-style`，声明了层级的样式再换回 `<hN>`，只收养文档真正用到的定义。目录也接上了样式层级：段落套用带 `headingLevel` 的样式即进大纲，改层级目录随之变化。三个坑都是回读实测出来的：Word 内建 `Title` 会挤掉我们同名的 `title`（改用 `rte-` 前缀 + 前缀优先读取）；动态 styleMap 顶掉 mammoth 的 `List Paragraph` 导致往返丢列表（`docxCompat.test.ts` 抓到，改为只映射自有样式）；回读的样式标题退化成段落（按层级换 `hN`）。**计划偏差**：样式的段落（对齐 / 行高）与编号只在模型和读盘层支持，UI 与导出留给 P1-4 / P1-2，避免与那两片的 `w:pPr` / `w:numPr` 各写一套。闸门：typecheck / lint / prettier 通过，单测 382 文件 / **3645 例**全绿（+13），e2e **220 passed / 0 failed**，首屏 191.91KB、最大普通 chunk 427.33KB、`RichTextEditorTool` 152.54KB。M2 闸门仍为 `[ ]`，剩余 P1-2 / P1-4 / P1-7。
 

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react';
 import type { Editor } from '@tiptap/react';
 import type { ViewMode } from './draft';
 import { MM_TO_PX, type PageMargins, type PageMetrics } from './pageSetup';
@@ -24,6 +31,15 @@ interface RulerBarProps {
   zoom: number;
   metrics: PageMetrics;
   margin: PageMargins;
+}
+
+/** Indents of the caret paragraph, in CSS px (the unit `setParagraphIndent` stores) */
+interface RulerIndent {
+  left: number;
+  right: number;
+  /** Hanging indent (> 0 means the first line marker drives `hanging` instead of `textIndent`) */
+  hanging: number;
+  firstLine: number;
 }
 
 interface RulerGeometry {
@@ -57,6 +73,7 @@ const MIN_RULER_HEIGHT_PX = 120;
 export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin }: RulerBarProps) {
   const [geo, setGeo] = useState<RulerGeometry | null>(null);
   const [caret, setCaret] = useState<{ x: number; y: number } | null>(null);
+  const [indent, setIndent] = useState<RulerIndent | null>(null);
   const geoRef = useRef<RulerGeometry | null>(null);
   const frameRef = useRef<number | null>(null);
   geoRef.current = geo;
@@ -121,12 +138,28 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
     rulerObserverRef.current = observer;
   }, []);
 
-  /** Caret position -> offsets on both rulers (relative to the content area's left / top edge) */
+  /**
+   * Caret position -> offsets on both rulers, plus the indents of the paragraph the caret sits in
+   * (P1-4: the markers follow the text, not a separate selection model).
+   */
   const syncCaret = useCallback(() => {
     const geometry = geoRef.current;
     if (!editor || !geometry) {
       setCaret(null);
+      setIndent(null);
       return;
+    }
+    const block = editor.state.selection.$from.parent;
+    if (block.type.name === 'paragraph') {
+      const attrs = editor.getAttributes('paragraph');
+      setIndent({
+        left: Number(attrs.indentLeft ?? 0),
+        right: Number(attrs.indentRight ?? 0),
+        hanging: Number(attrs.hangingIndent ?? 0),
+        firstLine: Number(attrs.textIndent ?? 0),
+      });
+    } else {
+      setIndent(null);
     }
     const { from } = editor.state.selection;
     const coords = editor.view.coordsAtPos(from);
@@ -185,6 +218,59 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
     };
   }, [editor, syncCaret]);
 
+  /**
+   * Pointer drag on a ruler marker. The editor is the single source of truth: every 4px step dispatches
+   * one transaction, so the paragraph, the markers and the page view all move together.
+   * Keyboard users get the same commands from the ribbon (增加/减少缩进), which is why the handles
+   * themselves stay out of the tab order and inside the ruler's `aria-hidden` subtree.
+   */
+  const dragRef = useRef<{
+    kind: 'left' | 'right' | 'first';
+    startX: number;
+    start: number;
+    last: number;
+  } | null>(null);
+
+  const beginDrag =
+    (kind: 'left' | 'right' | 'first') => (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!editor || !indent) return;
+      event.preventDefault();
+      // Pointer capture keeps the drag alive once the pointer leaves the small handle
+      event.currentTarget.setPointerCapture(event.pointerId);
+      const start =
+        kind === 'left'
+          ? indent.left
+          : kind === 'right'
+            ? indent.right
+            : indent.hanging > 0
+              ? indent.hanging
+              : indent.firstLine;
+      dragRef.current = { kind, startX: event.clientX, start, last: start };
+    };
+
+  const moveDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag || !editor || !indent) return;
+    // Screen -> CSS px: the sheet is scaled by `zoom`
+    const delta = (event.clientX - drag.startX) / (zoom || 1);
+    const raw = drag.kind === 'right' ? drag.start - delta : drag.start + delta;
+    const next = Math.max(0, Math.min(480, Math.round(raw / 4) * 4));
+    if (next === drag.last) return;
+    drag.last = next;
+    if (drag.kind === 'left') editor.chain().setParagraphIndent({ left: next }).run();
+    else if (drag.kind === 'right') editor.chain().setParagraphIndent({ right: next }).run();
+    else if (indent.hanging > 0) editor.chain().setParagraphIndent({ hanging: next }).run();
+    else
+      editor
+        .chain()
+        .indentParagraph(next - indent.firstLine)
+        .run();
+  };
+
+  const endDrag = () => {
+    dragRef.current = null;
+  };
+
   if (!geo) return null;
 
   const mmPx = MM_TO_PX * zoom;
@@ -236,6 +322,55 @@ export function RulerBar({ editor, viewportRef, viewMode, zoom, metrics, margin 
             ))}
             {caretVisible ? (
               <span className="rte-ruler-caret" style={{ left: `${caret.x}px` }} />
+            ) : null}
+            {/* Word's three indent markers: first line (top), left (bottom), right (bottom, from
+                the content edge). They follow the caret paragraph and drag live. */}
+            {indent ? (
+              <>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  data-testid="rte-ruler-handle-first"
+                  data-value={indent.hanging > 0 ? indent.hanging : indent.firstLine}
+                  className="rte-ruler-handle rte-ruler-handle--first"
+                  style={{
+                    left: `${indent.hanging > 0 ? Math.max(0, indent.left - indent.hanging) : indent.firstLine}px`,
+                  }}
+                  onPointerDown={beginDrag('first')}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  data-testid="rte-ruler-handle-left"
+                  data-value={indent.left}
+                  className="rte-ruler-handle rte-ruler-handle--left"
+                  style={{ left: `${indent.left}px` }}
+                  onPointerDown={beginDrag('left')}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  data-testid="rte-ruler-handle-right"
+                  data-value={indent.right}
+                  className="rte-ruler-handle rte-ruler-handle--right"
+                  // Keep the whole handle inside the track: it is clipped at the content edge, and a
+                  // half-clipped handle cannot be grabbed
+                  style={{ left: `${Math.max(6, contentWidth - indent.right - 6)}px` }}
+                  onPointerDown={beginDrag('right')}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                />
+              </>
             ) : null}
           </span>
           {geo.padRight > 0 ? (

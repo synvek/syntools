@@ -45,6 +45,7 @@ import {
   parseDocxStylesXml,
   toDocxStyleId,
 } from './namedStyleDocx';
+import { applyParagraphControls, parseDocxParagraphControls } from './docxParagraphControls';
 import type { OoxmlIr, OoxmlParts } from './ooxmlIr';
 import { isOoxmlIrEnabled } from './ooxmlIrFlag';
 import {
@@ -1011,6 +1012,11 @@ function htmlToDocxChildren(ctx: ExportContext, root: Element): BlockChild[] {
         after: Math.max(0, spaceAfter),
         line: 300,
       },
+      // P1-4: pagination control is a `w:pPr` toggle; only the states the user actually chose are
+      // written, so Word keeps its own defaults for everything else
+      keepNext: el.hasAttribute('data-keep-next') || undefined,
+      keepLines: el.hasAttribute('data-keep-lines') || undefined,
+      widowControl: el.getAttribute('data-widow-control') === 'off' ? false : undefined,
       // A format revision marks the whole block: the mark's own span tells us the previous kind
       revision: (() => {
         const target = el.querySelector('[data-track-format]')?.getAttribute('data-track-format');
@@ -1307,6 +1313,10 @@ export async function importDocx(
     const styled = applyStyleClasses(html, importedStyles);
     html = styled.html;
     if (styled.used.length > 0) options?.onStyles?.(styled.used);
+    // P1-4: mammoth drops w:pPr, so pagination flags are re-read from document.xml and mapped by
+    // position (guarded: applied only when the block counts agree)
+    const controls = parseDocxParagraphControls(await readPartXml(buffer, 'word/document.xml'));
+    html = applyParagraphControls(html, controls);
     // Review layer last: mammoth keeps inserted text as plain text, drops deleted text and comment ranges
     // outright, so revisions / format changes / comment marks are re-applied onto the final HTML
     // (see docxReview.ts for the alignment contract)

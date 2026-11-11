@@ -388,6 +388,47 @@ test('rich text: compare with a .docx file turns the differences into reviewable
   await expect(page.locator('.tiptap')).toContainText('第三段原文');
 });
 
+test('rich text: revision mode records typing as a revision that can be rejected or accepted', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await openRichText(page);
+  await pastePlainText(page, '甲乙丙');
+
+  // 批注与修订 lives on the 审阅 tab of the ribbon
+  await page.getByRole('tab', { name: '审阅', exact: true }).click();
+  await page.getByRole('button', { name: '修订模式' }).click();
+  await page.getByRole('button', { name: '批注与修订' }).click();
+
+  /** Type one character at the end of the document */
+  const typeAtEnd = async (value: string) => {
+    await page.locator('.tiptap p').first().click();
+    await page.keyboard.press('ControlOrMeta+End');
+    await page.keyboard.type(value);
+  };
+
+  // 1) Typing becomes a pending insertion instead of a plain edit
+  await typeAtEnd('丁');
+  await expect(page.locator('.tiptap ins[data-track]').first()).toBeVisible();
+  await expect(page.getByTestId('rich-text-review')).toContainText('丁');
+  expect(await page.getByRole('button', { name: /^拒绝此条修订/ }).count()).toBeGreaterThanOrEqual(
+    1,
+  );
+
+  // 2) Rejecting brings the document back to what it was
+  await page.getByRole('button', { name: '全部拒绝', exact: true }).last().click();
+  await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
+  await expect(page.locator('.tiptap')).toContainText('甲乙丙');
+  await expect(page.locator('.tiptap')).not.toContainText('丁');
+
+  // 3) Accepting keeps the typed text and drops the mark
+  await typeAtEnd('丁');
+  await expect(page.locator('.tiptap ins[data-track]').first()).toBeVisible();
+  await page.getByRole('button', { name: '全部接受', exact: true }).last().click();
+  await expect(page.locator('.tiptap ins[data-track]')).toHaveCount(0);
+  await expect(page.locator('.tiptap')).toContainText('甲乙丙丁');
+});
+
 test('rich text: tracked changes survive a .docx round trip through import', async ({ page }) => {
   test.setTimeout(120_000);
   await openRichText(page);
