@@ -81,6 +81,8 @@ interface StyleAttrs {
   /** Offset of a floating image from the content area's top-left corner (px) */
   offsetX?: number | null;
   offsetY?: number | null;
+  /** `paragraph` = the offsets are measured from the anchor paragraph instead of the content area */
+  anchor?: string | null;
   bordered?: boolean;
   zebra?: boolean;
   /** Table cell vertical alignment (null = default, top) */
@@ -236,21 +238,33 @@ const ImageStyle = Image.extend({
         renderHTML: (attrs: StyleAttrs) =>
           hasImageLayerAttr(attrs.layer) ? { 'data-layer': attrs.layer } : {},
       },
+      // A missing offset is meaningful: the absolutely positioned picture then keeps its *static*
+      // position, i.e. the block it is anchored to. That is what a `.docx` anchor whose `relativeFrom`
+      // depends on Word's layout (`paragraph` / `line`) degrades to, so `null` must not become `0`.
       offsetX: {
         default: null,
         parseHTML: (el: HTMLElement) => readPx(el.style.left),
         renderHTML: (attrs: StyleAttrs) =>
-          isFloatingImageLayer(attrs.layer)
-            ? { style: `left: ${Math.round(attrs.offsetX ?? 0)}px` }
+          isFloatingImageLayer(attrs.layer) && Number.isFinite(attrs.offsetX)
+            ? { style: `left: ${Math.round(attrs.offsetX as number)}px` }
             : {},
       },
       offsetY: {
         default: null,
         parseHTML: (el: HTMLElement) => readPx(el.style.top),
         renderHTML: (attrs: StyleAttrs) =>
-          isFloatingImageLayer(attrs.layer)
-            ? { style: `top: ${Math.round(attrs.offsetY ?? 0)}px` }
+          isFloatingImageLayer(attrs.layer) && Number.isFinite(attrs.offsetY)
+            ? { style: `top: ${Math.round(attrs.offsetY as number)}px` }
             : {},
+      },
+      // A paragraph-relative anchor (`relativeFrom="paragraph"`): the offsets are measured from the
+      // anchor paragraph, so the CSS turns the paragraph into the containing block
+      anchor: {
+        default: null,
+        parseHTML: (el: HTMLElement) =>
+          el.getAttribute('data-anchor') === 'paragraph' ? 'paragraph' : null,
+        renderHTML: (attrs: StyleAttrs) =>
+          attrs.anchor === 'paragraph' ? { 'data-anchor': 'paragraph' } : {},
       },
     };
   },

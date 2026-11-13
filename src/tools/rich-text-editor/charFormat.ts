@@ -209,6 +209,32 @@ export const SmallCaps = Mark.create({
   },
 });
 
+/**
+ * 着重号 (`w:em`): the dots Chinese typesetting puts *under* emphasised characters. Word has no CSS
+ * equivalent in a mark, but `text-emphasis` does exactly this, so the mark only carries the style name
+ * and the visual comes from one rule in `editor.css`.
+ */
+export const EmphasisMark = Mark.create({
+  name: 'emphasisMark',
+  addAttributes() {
+    return {
+      emphasize: {
+        default: 'dot',
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-emphasis') ?? 'dot',
+        renderHTML: (attributes: Record<string, unknown>) => ({
+          'data-emphasis': attributes.emphasize ?? 'dot',
+        }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[data-emphasis]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['span', mergeAttributes({ class: 'rte-emphasis' }, HTMLAttributes), 0];
+  },
+});
+
 /** Marks registered by the rich-text extension set (order matters only for serialization clarity) */
 export const charFormatExtensions = [
   Superscript,
@@ -216,4 +242,5 @@ export const charFormatExtensions = [
   LetterSpacing,
   TextTransform,
   SmallCaps,
+  EmphasisMark,
 ];

@@ -92,6 +92,24 @@ describe('applyRevisionMarks', () => {
     expect(result.value.changes[0].createdAt).toBe(Date.parse('2026-10-29T10:00:00Z'));
   });
 
+  it('keeps a deletion at a paragraph boundary inside its own paragraph', () => {
+    // Word stores the old date as `w:del` at the end of a paragraph; resolving the offset against the
+    // whole document put it in front of the next paragraph's first word
+    const xml = `<w:document xmlns:w="w"><w:body>
+      <w:p><w:r><w:t>生成日期:新</w:t></w:r><w:del w:id="3" w:author="甲"><w:r><w:delText>旧</w:delText></w:r></w:del></w:p>
+      <w:p><w:r><w:t>目录</w:t></w:r></w:p>
+    </w:body></w:document>`;
+    const result = applyRevisionMarks(
+      '<p>生成日期:新</p><p>目录</p>',
+      parseRevisionRuns(xml),
+      1000,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.html).toContain('<p>生成日期:新<del');
+    expect(result.value.html).toContain('</del></p><p>目录</p>');
+  });
+
   it('gives up (instead of guessing) when the HTML text does not line up with the runs', () => {
     const result = applyRevisionMarks('<p>完全不同的内容</p>', parseRevisionRuns(XML), 1000);
     expect(result.ok).toBe(false);
@@ -246,13 +264,14 @@ describe('comment round trip (comments.xml)', () => {
     expect(html).toContain('待审');
   });
 
-  it('imports a comment that crosses paragraphs as text and counts it', () => {
+  it('anchors a comment that crosses paragraphs to the part inside its first paragraph', () => {
     const xml = `<w:document xmlns:w="w"><w:body>
       <w:p><w:commentRangeStart w:id="7"/><w:r><w:t>甲</w:t></w:r></w:p>
       <w:p><w:r><w:t>乙</w:t></w:r><w:commentRangeEnd w:id="7"/></w:p>
     </w:body></w:document>`;
     const parsed = parseDocumentReview(xml);
-    expect(parsed.anchors).toEqual([{ docxId: '7', start: 0, end: 2 }]);
+    // The anchor now also records the paragraph it starts in: ranges are re-anchored block by block
+    expect(parsed.anchors).toEqual([{ docxId: '7', start: 0, end: 2, block: 0 }]);
 
     const applied = applyDocumentReview(
       '<p>甲</p><p>乙</p>',
@@ -262,9 +281,10 @@ describe('comment round trip (comments.xml)', () => {
     );
     expect(applied.ok).toBe(true);
     if (!applied.ok) return;
-    // A mark cannot span two paragraphs in the editor: keep the text, report the loss
-    expect(applied.value.comments).toEqual([]);
-    expect(applied.value.skippedComments).toBe(1);
-    expect(applied.value.html).not.toContain('data-comment-id');
+    // A mark cannot span two paragraphs: the anchor is clamped to the paragraph it starts in, so the
+    // comment survives (with a shortened range) instead of disappearing
+    expect(applied.value.comments).toHaveLength(1);
+    expect(applied.value.comments[0]).toMatchObject({ quote: '甲', text: '跨段落批注' });
+    expect(applied.value.html).toContain('data-comment-id="docx-cmt-7"');
   });
 });

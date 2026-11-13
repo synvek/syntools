@@ -275,8 +275,35 @@ describe('importDocx layout read-back (P2-2.4)', () => {
       },
     });
     expect(captured.layout?.pageSetup.header).toBe('公司机密');
-    expect(captured.layout?.pageSetup.footer).toBe('内部资料 第');
+    // The writer turned the number into a PAGE field, so the reader hands back a *template*: the field
+    // is a placeholder instead of Word's frozen cached value
+    expect(captured.layout?.pageSetup.footer).toBe('内部资料 第 {{page}}');
     expect(captured.layout?.pageSetup.showPageNumber).toBe(true);
+    expect(captured.layout?.pageSetup.footerAlign).toBe('left');
+  });
+
+  it('round-trips a centred footer (w:jc on the band paragraph)', async () => {
+    const setup = normalizePageSetup({
+      footer: '第 {{page}} 页 / 共 {{pages}} 页',
+      footerAlign: 'center',
+    });
+    const exported = await exportDocxBlob('<p>a</p>', 'center', setup);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    const footerXml = await readZipEntry(exported.value, 'word/footer1.xml');
+    expect(footerXml).toContain('w:jc w:val="center"');
+    // Both placeholders became real fields again
+    expect(footerXml).toContain('PAGE');
+    expect(footerXml).toContain('NUMPAGES');
+
+    const captured: { layout?: { pageSetup: Partial<PageSetupConfig>; sectionCount: number } } = {};
+    await importDocx(toFile(exported.value, 'center.docx'), {
+      onLayout: (info) => {
+        captured.layout = info;
+      },
+    });
+    expect(captured.layout?.pageSetup.footerAlign).toBe('center');
+    expect(captured.layout?.pageSetup.footer).toBe('第 {{page}} 页 / 共 {{pages}} 页');
   });
 
   it('writes even-page parts and the settings switch for 奇偶页不同 (P1-4)', async () => {
@@ -317,7 +344,7 @@ describe('importDocx layout read-back (P2-2.4)', () => {
     });
     expect(captured.layout?.pageSetup.differentOddEven).toBe(true);
     expect(captured.layout?.pageSetup.evenHeader).toBe('偶数页页眉');
-    expect(captured.layout?.pageSetup.evenFooter).toBe('偶数页页脚');
+    expect(captured.layout?.pageSetup.evenFooter).toBe('偶数页页脚 {{page}}');
     // The odd-page header stays the default part
     expect(captured.layout?.pageSetup.header).toBe('奇数页页眉');
   });

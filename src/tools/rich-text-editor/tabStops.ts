@@ -35,13 +35,23 @@ const MAX_TAB_STOP_PX = 4096;
 
 export type TabStopAlign = 'left' | 'center' | 'right' | 'decimal';
 
+/** `w:leader` — what fills the gap up to the stop (tables of contents use dots) */
+export type TabLeader = 'none' | 'dot' | 'hyphen' | 'underscore' | 'heavy' | 'middleDot';
+
 export interface TabStop {
   /** Distance from the paragraph's text edge in CSS px (Word's `w:tab/@w:pos` in twips ÷ 15) */
   pos: number;
   align: TabStopAlign;
+  /** Fill character; omitted means `none` */
+  leader?: TabLeader;
 }
 
 const ALIGNS: readonly TabStopAlign[] = ['left', 'center', 'right', 'decimal'];
+const LEADERS: readonly TabLeader[] = ['none', 'dot', 'hyphen', 'underscore', 'heavy', 'middleDot'];
+
+function normalizeLeader(value: unknown): TabLeader {
+  return LEADERS.includes(value as TabLeader) ? (value as TabLeader) : 'none';
+}
 
 function normalizeAlign(value: unknown): TabStopAlign {
   return ALIGNS.includes(value as TabStopAlign) ? (value as TabStopAlign) : 'left';
@@ -59,7 +69,13 @@ export function normalizeTabStops(input: unknown): TabStop[] {
     const rounded = Math.round(pos);
     if (rounded > MAX_TAB_STOP_PX || seen.has(rounded)) continue;
     seen.add(rounded);
-    stops.push({ pos: rounded, align: normalizeAlign((raw as TabStop).align) });
+    const leader = normalizeLeader((raw as TabStop).leader);
+    stops.push({
+      pos: rounded,
+      align: normalizeAlign((raw as TabStop).align),
+      // `none` is the default, so it is left out: the stop objects stay comparable by value
+      ...(leader === 'none' ? {} : { leader }),
+    });
     if (stops.length >= MAX_TAB_STOPS) break;
   }
   return stops.sort((a, b) => a.pos - b.pos);
@@ -68,7 +84,11 @@ export function normalizeTabStops(input: unknown): TabStop[] {
 /** Wire format used by `data-tab-stops` (drafts, HTML import/export and the docx reader) */
 export function formatTabStops(stops: readonly TabStop[]): string {
   return normalizeTabStops(stops)
-    .map((stop) => `${stop.pos}:${stop.align}`)
+    .map((stop) =>
+      stop.leader && stop.leader !== 'none'
+        ? `${stop.pos}:${stop.align}:${stop.leader}`
+        : `${stop.pos}:${stop.align}`,
+    )
     .join(',');
 }
 
@@ -76,8 +96,8 @@ export function parseTabStops(raw: string | null | undefined): TabStop[] {
   if (!raw) return [];
   return normalizeTabStops(
     raw.split(',').map((part) => {
-      const [pos, align] = part.split(':');
-      return { pos: Number(pos), align: align as TabStopAlign };
+      const [pos, align, leader] = part.split(':');
+      return { pos: Number(pos), align: align as TabStopAlign, leader: leader as TabLeader };
     }),
   );
 }
@@ -249,9 +269,13 @@ function buildDecorations(doc: PmNode, widths: Map<number, number>): DecorationS
     if (stops.length === 0) return;
     const width = widths.get(pos);
     if (width === undefined) return;
+    // The leader belongs to the stop the tab runs into; the ruler cannot pick per-tab stops yet, so the
+    // first leader in the paragraph is used (tables of contents have exactly one tab per line)
+    const leader = stops.find((stop) => stop.leader && stop.leader !== 'none')?.leader;
     decorations.push(
       Decoration.node(pos, pos + node.nodeSize, {
         class: 'rte-tab--measured',
+        ...(leader ? { 'data-tab-leader': leader } : {}),
         style: `width: ${Math.round(width * 100) / 100}px`,
       }),
     );
@@ -298,38 +322,97 @@ function runAfter(doc: PmNode, from: number, blockEnd: number): { run: string; r
 }
 
 /**
- * Advance of a tab at `x` (CSS px from the text edge).
+ * Room kept between the text the tab aligns and the right text edge (CSS px).
  *
- * Left stops are pure arithmetic; center / right / decimal also need the width of the text the tab
- * aligns, read from the laid-out line (`coordsAtPos`). A run already wrapped to the next line cannot
- * be aligned by a stop, so it degrades to a left stop instead of guessing.
+ * Word puts a table of contents' right stop *exactly* on the text margin: A4 is 11906 twip and one
+ * inch of margin on each side leaves 9026 twip, which is also what `TOC1`–`TOC9` carry as `w:pos`.
+ * 9026 twip ÷ 15 rounds to **602px** while the text area is 601.73px, so the aligned run ends a third
+ * of a pixel past the margin — enough for the browser to wrap the page number onto the next line.
  */
+export const TAB_EDGE_SAFETY_PX = 0.5;
+
+/** What the run after a tab measures, and how much room the text edge still offers */
+export interface TabRunMetrics {
+  /** Rendered width of the text after the tab (CSS px); 0 when the line ends at the tab */
+  runWidth: number;
+  /** Width of everything before the first `.` (decimal stops); `null` when the run has no dot */
+  dotWidth?: number | null;
+  /** Distance from the paragraph's text edge to the right edge of its text area (CSS px) */
+  available: number;
+}
+
+/**
+ * Advance of one tab at `x` (CSS px from the text edge), clamped so the text it aligns can never be
+ * pushed past the right text edge.
+ *
+ * Left stops are pure arithmetic; center / right / decimal also need the width of the run they align.
+ * The clamp is what keeps a stop that sits *on* the margin (see {@link TAB_EDGE_SAFETY_PX}) from
+ * wrapping its page number onto the following line.
+ */
+export function resolveTabAdvance(stop: TabStop, x: number, metrics: TabRunMetrics): number {
+  const { runWidth, available } = metrics;
+  const advance = Math.max(0, stop.pos - x);
+  const edge = Math.max(0, available - x - TAB_EDGE_SAFETY_PX);
+  if (stop.align === 'left' || runWidth <= 0) return Math.min(advance, edge);
+  let aligned = advance - runWidth;
+  if (stop.align === 'center') aligned = advance - runWidth / 2;
+  else if (stop.align === 'decimal') {
+    const dotWidth = metrics.dotWidth;
+    // Decimal: align the '.'; a run without one reads as right-aligned (Word does the same)
+    aligned = advance - Math.max(0, dotWidth ?? runWidth);
+  }
+  // The aligned run has to fit as well, not just the tab box itself
+  return Math.min(Math.max(0, aligned), Math.max(0, edge - runWidth));
+}
+
+/**
+ * Width of the inline run `[from, to)` as laid out, read from a DOM range.
+ *
+ * Differencing two caret boxes (the previous approach) only worked while the run sat next to the tab:
+ * once the run had wrapped, its width read as "unknown" and a right stop degraded into a left one,
+ * which pushed the run further out and kept it wrapped forever. A range still knows the width.
+ */
+function runWidthPx(view: EditorView, from: number, to: number, scale: number): number | null {
+  if (to <= from) return 0;
+  try {
+    const start = view.domAtPos(from);
+    const end = view.domAtPos(to);
+    const range = document.createRange();
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+    const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0);
+    if (rects.length === 0) return null;
+    // The first line is what the stop aligns (a run that wrapped has no single alignment anyway)
+    const top = rects[0]?.top ?? 0;
+    const sameLine = rects.filter((rect) => Math.abs(rect.top - top) < 2);
+    const left = Math.min(...sameLine.map((rect) => rect.left));
+    const right = Math.max(...sameLine.map((rect) => rect.right));
+    return Math.max(0, (right - left) / scale);
+  } catch {
+    // Partially updated DOM or a detached node: fall back to the plain stop
+    return null;
+  }
+}
+
+/** Advance of a tab, reading the width of the run it aligns from the laid-out DOM */
 function tabAdvance(
   view: EditorView,
   stops: readonly TabStop[],
   x: number,
-  tabPos: number,
+  runFrom: number,
   run: string,
   runEnd: number,
-  tabTop: number,
   scale: number,
+  available: number,
 ): number {
   const stop = nextTabStop(stops, x);
-  const advance = stop.pos - x;
-  if (stop.align === 'left' || run.length === 0) return Math.max(0, advance);
-  const start = view.coordsAtPos(tabPos);
-  const end = view.coordsAtPos(runEnd);
-  if (Math.abs(end.top - tabTop) > 2 || Math.abs(start.top - tabTop) > 2) {
-    return Math.max(0, advance);
+  if (stop.align === 'left' || run.length === 0) {
+    return resolveTabAdvance(stop, x, { runWidth: 0, available });
   }
-  const runWidth = Math.max(0, (end.left - start.left) / scale);
-  if (stop.align === 'center') return Math.max(0, advance - runWidth / 2);
-  if (stop.align === 'right') return Math.max(0, advance - runWidth);
-  // Decimal: align the '.'; a run without one reads as right-aligned (Word does the same)
+  const runWidth = runWidthPx(view, runFrom, runEnd, scale) ?? 0;
   const dot = run.indexOf('.');
-  if (dot <= 0) return Math.max(0, advance - runWidth);
-  const dotEnd = view.coordsAtPos(runEnd - run.length + dot);
-  return Math.max(0, advance - Math.max(0, (dotEnd.left - start.left) / scale));
+  const dotWidth = dot > 0 ? runWidthPx(view, runFrom, runFrom + dot, scale) : null;
+  return resolveTabAdvance(stop, x, { runWidth, dotWidth, available });
 }
 
 /** Zoom factor of the editor surface (`data-rte-zoom`): measured screen px ÷ CSS px */
@@ -365,18 +448,24 @@ export function measureTabWidths(
     const dom = view.nodeDOM(blockPos);
     if (!(dom instanceof HTMLElement)) return;
     const rect = dom.getBoundingClientRect();
-    const padding = Number.parseFloat(getComputedStyle(dom).paddingLeft) || 0;
+    const style = getComputedStyle(dom);
+    const padLeft = Number.parseFloat(style.paddingLeft) || 0;
+    const padRight = Number.parseFloat(style.paddingRight) || 0;
     const indent = Number(block.attrs.indentLeft ?? 0) || 0;
-    // Text edge = content box left minus the left indent (stops are relative to the text margin)
-    const textLeft = rect.left + padding - indent * scale;
+    // Text edge = content box left minus the left indent (stops are relative to the text margin), so the
+    // usable width grows by that indent: the block was narrowed by exactly the same amount
+    const textLeft = rect.left + padLeft - indent * scale;
+    const available = (rect.width - padLeft - padRight) / scale + indent;
     const coords = view.coordsAtPos(pos);
     const line = Math.round(coords.top / 2);
     const shift = lineShifts.get(line) ?? 0;
     const x = (coords.left - textLeft) / scale + shift;
-    const { run, runEnd } = runAfter(doc, pos + node.nodeSize, $pos.end($pos.depth));
-    const advance = tabAdvance(view, stops, x, pos, run, runEnd, coords.top, scale);
+    const runFrom = pos + node.nodeSize;
+    const { run, runEnd } = runAfter(doc, runFrom, $pos.end($pos.depth));
+    const advance = tabAdvance(view, stops, x, runFrom, run, runEnd, scale, available);
     lineShifts.set(line, shift + advance - (previous.get(pos) ?? 0));
-    widths.set(pos, Math.round(advance * 100) / 100);
+    // Floor, not round: a hundredth of a pixel above the text edge is enough to wrap the aligned run
+    widths.set(pos, Math.floor(advance * 100) / 100);
   });
   return widths;
 }

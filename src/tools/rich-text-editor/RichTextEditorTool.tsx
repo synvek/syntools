@@ -152,10 +152,12 @@ import {
   bandFieldFor,
   buildPrintPageCss,
   footerForPage,
+  hasPageToken,
   headerForPage,
   mergePageSetup,
   normalizePageSetup,
   pageMetricsToPx,
+  renderPageTokens,
   watermarkCssVars,
   resolvePageMetrics,
   type PageSetupConfig,
@@ -415,6 +417,8 @@ export default function RichTextEditorTool() {
     if (tops.length === 0) return 0;
     return Math.round(tops[tops.length - 1] + pageMetricsToPx(metrics).heightPx + 12);
   }, [layout, metrics]);
+  /** Sheet count: fills the `{{pages}}` placeholder of a header / footer band */
+  const pageCount = Math.max(1, layout.sheetTops.length);
 
   const placeholder = useMemo(() => t('tools.richText.placeholder'), [t]);
   /** Pagination snapshot callback: update only when sheet positions or page breaks change, avoiding pointless re-renders */
@@ -2401,54 +2405,73 @@ export default function RichTextEditorTool() {
                   ) : null}
                   {/* Page view: one real sheet per page, content flows continuously */}
                   {viewMode === 'paged' &&
-                    layout.sheetTops.map((top, index) => (
-                      <div
-                        key={index}
-                        className="rte-page-sheet"
-                        style={{
-                          top: `${top}px`,
-                          // P1-5 page virtualisation: the browser skips layout/paint for sheets
-                          // outside the viewport and reserves the intrinsic size instead
-                          contentVisibility: 'auto',
-                          containIntrinsicSize: `auto ${sheetHeightPx}px`,
-                          ...(pageSetup.background ? { background: pageSetup.background } : {}),
-                        }}
-                        aria-hidden="true"
-                      >
-                        {/* Render the watermark once per sheet (matching repeated per-page printing) */}
-                        {pageSetup.watermark?.text.trim() ? (
-                          <span
-                            className="rte-watermark"
-                            style={watermarkCssVars(pageSetup.watermark) as React.CSSProperties}
-                          >
-                            <span>{pageSetup.watermark.text}</span>
-                          </span>
-                        ) : null}
-                        {/* Header / footer / page number: 首页不同 and 奇偶页不同 decide the text per page */}
-                        {headerForPage(pageSetup, index + 1).trim() ? (
-                          <span className="rte-page-header">
-                            {headerForPage(pageSetup, index + 1)}
-                          </span>
-                        ) : null}
-                        {footerForPage(pageSetup, index + 1).trim() || pageSetup.showPageNumber ? (
-                          <span className="rte-page-footer">
-                            {footerForPage(pageSetup, index + 1)}
-                            {pageSetup.showPageNumber ? (
-                              <span className="rte-page-footer-number">
-                                {t('tools.richText.pageBadge', { page: index + 1 })}
-                              </span>
-                            ) : null}
-                          </span>
-                        ) : null}
-                        {/* Page badge appears only when the footer shows no page number, to avoid duplication */}
-                        {!pageSetup.showPageNumber &&
-                        !footerForPage(pageSetup, index + 1).trim() ? (
-                          <span className="rte-page-badge">
-                            {t('tools.richText.pageBadge', { page: index + 1 })}
-                          </span>
-                        ) : null}
-                      </div>
-                    ))}
+                    layout.sheetTops.map((top, index) => {
+                      // The band text is a template (`{{page}}` / `{{pages}}`): a footer imported from
+                      // Word carries its own page number, so it must not get the extra right-hand one
+                      const page = index + 1;
+                      const headerText = renderPageTokens(
+                        headerForPage(pageSetup, page),
+                        page,
+                        pageCount,
+                      );
+                      const footerRaw = footerForPage(pageSetup, page);
+                      const footerText = renderPageTokens(footerRaw, page, pageCount);
+                      const footerOwnNumber = hasPageToken(footerRaw);
+                      const extraNumber = pageSetup.showPageNumber && !footerOwnNumber;
+                      return (
+                        <div
+                          key={index}
+                          className="rte-page-sheet"
+                          style={{
+                            top: `${top}px`,
+                            // P1-5 page virtualisation: the browser skips layout/paint for sheets
+                            // outside the viewport and reserves the intrinsic size instead
+                            contentVisibility: 'auto',
+                            containIntrinsicSize: `auto ${sheetHeightPx}px`,
+                            ...(pageSetup.background ? { background: pageSetup.background } : {}),
+                          }}
+                          aria-hidden="true"
+                        >
+                          {/* Render the watermark once per sheet (matching repeated per-page printing) */}
+                          {pageSetup.watermark?.text.trim() ? (
+                            <span
+                              className="rte-watermark"
+                              style={watermarkCssVars(pageSetup.watermark) as React.CSSProperties}
+                            >
+                              <span>{pageSetup.watermark.text}</span>
+                            </span>
+                          ) : null}
+                          {/* Header / footer / page number: 首页不同 and 奇偶页不同 decide the text per page */}
+                          {headerText.trim() ? (
+                            <span
+                              className="rte-page-header"
+                              style={{ textAlign: pageSetup.headerAlign }}
+                            >
+                              {headerText}
+                            </span>
+                          ) : null}
+                          {footerText.trim() || extraNumber ? (
+                            <span
+                              className="rte-page-footer"
+                              style={{ textAlign: pageSetup.footerAlign }}
+                            >
+                              {footerText}
+                              {extraNumber ? (
+                                <span className="rte-page-footer-number">
+                                  {t('tools.richText.pageBadge', { page })}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
+                          {/* Page badge appears only when the footer shows no page number, to avoid duplication */}
+                          {!pageSetup.showPageNumber && !footerText.trim() ? (
+                            <span className="rte-page-badge">
+                              {t('tools.richText.pageBadge', { page })}
+                            </span>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   <EditorContent editor={editor} />
                   {/*
                     Header / footer bands (P1-4): the sheet below is a `pointer-events: none` decoration,

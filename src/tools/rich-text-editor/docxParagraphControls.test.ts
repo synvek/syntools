@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { applyParagraphControls, parseDocxParagraphControls } from './docxParagraphControls';
+import {
+  applyParagraphControls,
+  parseDocxParagraphControls,
+  parseDocxStyleAlignments,
+} from './docxParagraphControls';
 
 /**
  * Pagination control across a .docx round trip (P1-4 first slice).
@@ -13,10 +17,10 @@ const paragraph = (properties: string, text = '文字'): string =>
 const documentXml = `<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    ${paragraph('<w:keepNext/>')}
-    ${paragraph('<w:keepLines/>')}
-    ${paragraph('<w:widowControl w:val="0"/>')}
-    ${paragraph('')}
+    ${paragraph('<w:keepNext/>', '一')}
+    ${paragraph('<w:keepLines/>', '二')}
+    ${paragraph('<w:widowControl w:val="0"/>', '三')}
+    ${paragraph('', '四')}
     <w:p/>
   </w:body>
 </w:document>`;
@@ -60,6 +64,22 @@ describe('parseDocxParagraphControls', () => {
     expect(parseDocxParagraphControls(xml)[0]?.tabStops).toEqual([{ pos: 144, align: 'left' }]);
   });
 
+  it('keeps the leader of a tab stop (tables of contents use dots)', () => {
+    const xml = paragraph('<w:tabs><w:tab w:val="right" w:leader="dot" w:pos="9026"/></w:tabs>');
+    expect(parseDocxParagraphControls(xml)[0]?.tabStops).toEqual([
+      { pos: 602, align: 'right', leader: 'dot' },
+    ]);
+  });
+
+  it('reads a paragraph border into attributes and CSS', () => {
+    const xml = paragraph(
+      '<w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" w:color="2E75B6"/></w:pBdr>',
+    );
+    const borders = parseDocxParagraphControls(xml)[0]?.borders;
+    // sz counts eighths of a point: 12/8pt ≈ 2px
+    expect(borders).toEqual([{ side: 'bottom', style: 'single', width: 2, color: '#2e75b6' }]);
+  });
+
   it('does not mistake the w:tabs property block for a run tab', () => {
     const xml = `<w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="1440"/></w:tabs></w:pPr><w:r><w:tab/><w:t>乙</w:t></w:r></w:p>`;
     // `<w:tab/>` inside a run is the tab itself; the reader only cares about the stop list
@@ -88,20 +108,29 @@ describe('parseDocxParagraphControls', () => {
 
 describe('applyParagraphControls', () => {
   const controls = parseDocxParagraphControls(documentXml);
-  const html = '<p>一</p><h1>标题</h1><p>三</p><p>四</p><p></p>';
+  const html = '<p>一</p><h1>二</h1><p>三</p><p>四</p><p></p>';
 
   it('stamps the flags onto the matching blocks', () => {
     const result = applyParagraphControls(html, controls);
     expect(result).toContain('<p data-keep-next="true">一</p>');
-    expect(result).toContain('<h1 data-keep-lines="true">标题</h1>');
+    expect(result).toContain('<h1 data-keep-lines="true">二</h1>');
     expect(result).toContain('<p data-widow-control="off">三</p>');
     expect(result).toContain('<p>四</p>');
   });
 
-  it('refuses to guess when the block count does not match', () => {
-    // Lists make mammoth emit <li> instead of a paragraph wrapper, so positions stop lining up
-    const mismatched = '<ul><li>一</li></ul><p>二</p>';
-    expect(applyParagraphControls(mismatched, controls)).toBe(mismatched);
+  it('pairs by text, so an extra list wrapper no longer costs the whole document', () => {
+    // Lists make mammoth emit <li> instead of a paragraph wrapper: the counts stop matching but the
+    // texts still line up in order
+    const reshaped = '<ul><li>一</li></ul><p>二</p><p>三</p><p>四</p><p></p>';
+    const result = applyParagraphControls(reshaped, controls);
+    expect(result).toContain('<li data-keep-next="true">一</li>');
+    expect(result).toContain('<p data-keep-lines="true">二</p>');
+    expect(result).toContain('<p data-widow-control="off">三</p>');
+  });
+
+  it('skips the blocks it cannot line up instead of guessing', () => {
+    const unrelated = '<p>无关</p><p>也无关</p>';
+    expect(applyParagraphControls(unrelated, controls)).toBe(unrelated);
   });
 
   it('leaves the document alone when nothing was parsed', () => {
@@ -110,7 +139,7 @@ describe('applyParagraphControls', () => {
 
   it('stamps line spacing as an inline style, keeping other styles intact', () => {
     const spacing = parseDocxParagraphControls(
-      paragraph('<w:spacing w:line="360" w:lineRule="auto"/>'),
+      paragraph('<w:spacing w:line="360" w:lineRule="auto"/>', '一'),
     );
     const result = applyParagraphControls('<p style="margin-left: 24px">一</p>', spacing);
     expect(result).toContain('line-height: 1.5');
@@ -123,5 +152,70 @@ describe('applyParagraphControls', () => {
         `<w:r><w:tab/><w:t>一</w:t></w:r></w:p>`,
     );
     expect(applyParagraphControls('<p>一</p>', tabs)).toContain('data-tab-stops="96:left"');
+  });
+});
+
+describe('alignment and indentation', () => {
+  it('reads w:jc into the CSS alignment Word means', () => {
+    const xml =
+      paragraph('<w:jc w:val="center"/>') +
+      paragraph('<w:jc w:val="both"/>') +
+      paragraph('<w:jc w:val="right"/>') +
+      paragraph('<w:jc w:val="start"/>') +
+      paragraph('');
+    expect(parseDocxParagraphControls(xml).map((control) => control.align)).toEqual([
+      'center',
+      'justify',
+      'right',
+      'left',
+      null,
+    ]);
+  });
+
+  it('reads w:ind in twips as px, with hanging indents turning negative', () => {
+    const xml =
+      paragraph('<w:ind w:left="1440" w:right="720" w:firstLine="480"/>') +
+      paragraph('<w:ind w:left="1440" w:hanging="480"/>') +
+      // start / end are the writing-mode independent spellings of the same attributes
+      paragraph('<w:ind w:start="720" w:end="240"/>');
+    const [first, hanging, aliases] = parseDocxParagraphControls(xml);
+    expect(first).toMatchObject({ indentLeft: 96, indentRight: 48, firstLine: 32 });
+    expect(hanging).toMatchObject({ indentLeft: 96, firstLine: -32 });
+    expect(aliases).toMatchObject({ indentLeft: 48, indentRight: 16 });
+  });
+
+  it('inherits the alignment of the paragraph style (Title / Subtitle are centred there)', () => {
+    const stylesXml =
+      '<w:styles><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/>' +
+      '<w:pPr><w:jc w:val="center"/></w:pPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/>' +
+      '<w:pPr><w:jc w:val="center"/></w:pPr></w:style>' +
+      // A style that only says "based on Title" inherits it
+      '<w:style w:type="paragraph" w:styleId="CoverTitle"><w:basedOn w:val="Title"/></w:style></w:styles>';
+    const alignments = parseDocxStyleAlignments(stylesXml);
+    const xml =
+      paragraph('<w:pStyle w:val="Title"/>') + paragraph('<w:pStyle w:val="CoverTitle"/>');
+    expect(parseDocxParagraphControls(xml, alignments).map((control) => control.align)).toEqual([
+      'center',
+      'center',
+    ]);
+    // A direct w:jc wins over the style
+    const overridden = parseDocxParagraphControls(
+      paragraph('<w:pStyle w:val="Title"/><w:jc w:val="left"/>'),
+      alignments,
+    );
+    expect(overridden[0]?.align).toBe('left');
+  });
+
+  it('writes alignment and indent as inline CSS, and an empty paragraph still gets its centring', () => {
+    const controls = parseDocxParagraphControls(
+      paragraph('<w:jc w:val="center"/>', '') +
+        paragraph('<w:ind w:left="1440" w:firstLine="480"/>', '正文'),
+    );
+    // A picture-only paragraph has no text: it must still be recognised by position
+    const result = applyParagraphControls('<p><img src="x.png"></p><p>正文</p>', controls);
+    expect(result).toContain('text-align: center');
+    expect(result).toContain('margin-left: 96px');
+    expect(result).toContain('text-indent: 32px');
   });
 });

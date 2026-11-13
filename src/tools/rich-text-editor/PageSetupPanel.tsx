@@ -177,7 +177,9 @@ export function PageSetupPanel({
             type="text"
             value={setup.footer}
             onChange={(e) => patch({ footer: e.target.value })}
-            placeholder={t('tools.richText.footerPlaceholder')}
+            // The tokens are appended in code: a translation string may not carry `{{page}}`, i18next
+            // would read it as an interpolation variable and blank it out
+            placeholder={`${t('tools.richText.footerPlaceholder')} · {{page}} / {{pages}}`}
             className={fieldClass}
           />
         </label>

@@ -4,9 +4,11 @@ import { isFloatingImageElement } from './imageLayer';
 import {
   DEFAULT_PAGE_SETUP,
   footerForPage,
+  hasPageToken,
   headerForPage,
   normalizePageSetup,
   pageMetricsToPx,
+  renderPageTokens,
   resolvePageMetrics,
   type PageSetupConfig,
 } from './pageSetup';
@@ -187,7 +189,7 @@ export async function snapshotToPdf(
       // Watermark: drawn as text over the snapshot so opacity and rotation stay controllable
       drawWatermark(doc, pageSetup, pageMetrics);
       // Header / footer / page number (drawn as text over the snapshot)
-      drawHeaderFooter(doc, pageSetup, pageMetrics, i + 1);
+      drawHeaderFooter(doc, pageSetup, pageMetrics, i + 1, pages.length);
       onProgress?.((i + 1) / pages.length);
     }
 
@@ -303,21 +305,28 @@ function drawHeaderFooter(
   setup: PageSetupConfig,
   metrics: { widthMm: number; heightMm: number },
   page: number,
+  totalPages: number,
 ): void {
   doc.setFontSize(9);
   doc.setTextColor(110, 118, 129);
   const left = setup.margin.left;
+  const width = metrics.widthMm - setup.margin.left - setup.margin.right;
+  // Same alignment rule as the page view and the .docx export (`w:jc` of the band paragraph)
+  const drawBand = (text: string, align: 'left' | 'center' | 'right', y: number): void => {
+    if (!text) return;
+    if (align === 'center') doc.text(text, left + width / 2, y, { align: 'center' });
+    else if (align === 'right') doc.text(text, left + width, y, { align: 'right' });
+    else doc.text(text, left, y);
+  };
   // Same per-page rule as the on-screen page view and the .docx export (首页不同 / 奇偶页不同)
-  const header = headerForPage(setup, page).trim();
-  const footer = footerForPage(setup, page).trim();
-  if (header) {
-    doc.text(header, left, Math.max(4, setup.margin.top / 2));
-  }
+  const header = renderPageTokens(headerForPage(setup, page), page, totalPages).trim();
+  const footerRaw = footerForPage(setup, page);
+  const footer = renderPageTokens(footerRaw, page, totalPages).trim();
+  drawBand(header, setup.headerAlign, Math.max(4, setup.margin.top / 2));
   const footerY = metrics.heightMm - Math.max(4, setup.margin.bottom / 2);
-  if (footer) {
-    doc.text(footer, left, footerY);
-  }
-  if (setup.showPageNumber) {
+  drawBand(footer, setup.footerAlign, footerY);
+  // A band that carries `{{page}}` already printed the number
+  if (setup.showPageNumber && !hasPageToken(footerRaw)) {
     const label = String(page);
     doc.text(label, metrics.widthMm - setup.margin.right - doc.getTextWidth(label), footerY);
   }

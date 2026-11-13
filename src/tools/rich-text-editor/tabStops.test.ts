@@ -12,8 +12,10 @@ import {
   parseTabStops,
   removeTabBefore,
   removeTabStop,
+  resolveTabAdvance,
   setTabStop,
   TAB_ATTR,
+  TAB_EDGE_SAFETY_PX,
   TAB_STOPS_ATTR,
   tabsToTabNodes,
 } from './tabStops';
@@ -173,6 +175,47 @@ describe('editor wiring', () => {
     expect(spans).toHaveLength(1);
     // jsdom has no layout, so no measured width is applied — the default grid handles the step
     expect(spans[0]?.classList.contains('rte-tab--measured')).toBe(false);
+  });
+});
+
+describe('measured advance (right-edge clamp)', () => {
+  // A4 is 11906twip, one inch of margin on each side leaves 9026twip — exactly what TOC styles carry
+  const CONTENT_PX = (11906 - 1440 * 2) / 15;
+
+  it('subtracts the aligned run for right / center / decimal stops', () => {
+    const right = { pos: 400, align: 'right' as const };
+    expect(resolveTabAdvance(right, 100, { runWidth: 10, available: CONTENT_PX })).toBe(290);
+    const center = { pos: 400, align: 'center' as const };
+    expect(resolveTabAdvance(center, 100, { runWidth: 10, available: CONTENT_PX })).toBe(295);
+    // Decimal aligns the '.', so only the part before it is subtracted
+    const decimal = { pos: 400, align: 'decimal' as const };
+    expect(
+      resolveTabAdvance(decimal, 100, { runWidth: 24, dotWidth: 16, available: CONTENT_PX }),
+    ).toBe(284);
+  });
+
+  it('keeps a right stop that sits exactly on the text margin from wrapping its page number', () => {
+    // 9026twip rounds to 602px while the text area is 601.73px: the unclamped advance put the run 0.3px
+    // past the margin and the browser wrapped the page number onto the next line
+    const stop = { pos: 602, align: 'right' as const };
+    const advance = resolveTabAdvance(stop, 0, { runWidth: 7, available: CONTENT_PX });
+    expect(advance + 7).toBeLessThanOrEqual(CONTENT_PX);
+    expect(advance).toBeCloseTo(CONTENT_PX - TAB_EDGE_SAFETY_PX - 7, 2);
+  });
+
+  it('clamps the tab box itself for a left stop past the text edge, and never goes negative', () => {
+    const left = { pos: 900, align: 'left' as const };
+    expect(resolveTabAdvance(left, 0, { runWidth: 0, available: CONTENT_PX })).toBeCloseTo(
+      CONTENT_PX - TAB_EDGE_SAFETY_PX,
+      2,
+    );
+    // No room left at all (tab past the edge, run wider than the line): the tab collapses instead of pushing
+    expect(resolveTabAdvance(left, CONTENT_PX, { runWidth: 40, available: CONTENT_PX })).toBe(0);
+  });
+
+  it('does not clamp a stop that has room, so normal tabs keep their Word position', () => {
+    const stop = { pos: 300, align: 'right' as const };
+    expect(resolveTabAdvance(stop, 40, { runWidth: 12, available: CONTENT_PX })).toBe(248);
   });
 });
 

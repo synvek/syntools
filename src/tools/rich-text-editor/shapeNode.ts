@@ -53,6 +53,8 @@ export interface DocShapeAttrs {
   textItalic: boolean;
   textUnderline: boolean;
   textAlign: 'left' | 'center' | 'right';
+  /** Horizontal placement of the shape on its own line (inline shapes would otherwise always be left) */
+  align: 'left' | 'center' | 'right';
   name: string | null;
 }
 
@@ -178,6 +180,7 @@ export function shapeSpec(attrs: Partial<DocShapeAttrs>): DocShapeAttrs {
     textUnderline: attrs.textUnderline === true,
     textAlign:
       attrs.textAlign === 'left' || attrs.textAlign === 'right' ? attrs.textAlign : 'center',
+    align: attrs.align === 'center' || attrs.align === 'right' ? attrs.align : 'left',
     name: typeof attrs.name === 'string' ? attrs.name : null,
   };
 }
@@ -235,6 +238,7 @@ export function readShapeSpec(el: Element): DocShapeAttrs | null {
     textUnderline: el.getAttribute('data-shape-text-underline') === '1',
     textAlign:
       (el.getAttribute('data-shape-text-align') as DocShapeAttrs['textAlign']) ?? undefined,
+    align: (el.getAttribute('data-align') as DocShapeAttrs['align']) ?? undefined,
     name: el.getAttribute('data-shape-name'),
   });
 }
@@ -267,6 +271,7 @@ export function shapeDomAttributes(spec: DocShapeAttrs): Record<string, string> 
   if (spec.textBold) attributes['data-shape-text-bold'] = '1';
   if (spec.textItalic) attributes['data-shape-text-italic'] = '1';
   if (spec.textUnderline) attributes['data-shape-text-underline'] = '1';
+  if (spec.align !== 'left') attributes['data-align'] = spec.align;
   if (spec.name) attributes['data-shape-name'] = spec.name;
   if (spec.layer !== 'inline') attributes['data-layer'] = spec.layer;
   if (spec.offsetX !== null) attributes['data-shape-x'] = String(spec.offsetX);
@@ -368,6 +373,7 @@ export const DocShape = Node.create({
       textItalic: hidden(false),
       textUnderline: hidden(false),
       textAlign: hidden('center'),
+      align: hidden('left'),
       name: hidden(null),
     };
   },

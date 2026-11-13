@@ -417,6 +417,14 @@
   z-index: -1;
 }
 
+/* A `.docx` anchor with `relativeFrom="paragraph"` measures its offset from the anchor paragraph, so the
+   paragraph becomes the containing block. Without this the offset was dropped and the picture collapsed to
+   the end of the paragraph's line box — under the large in-flow picture above it. */
+.rte-surface .tiptap p:has(img[data-anchor='paragraph']),
+.rte-print-flow p:has(img[data-anchor='paragraph']) {
+  position: relative;
+}
+
 /* Wrap mode: square — the image floats to one side and text wraps on the other side and below (Word's "square" wrapping) */
 .rte-surface .tiptap img[data-layer='wrap-left'] {
   float: left;
@@ -490,6 +498,22 @@
   vertical-align: middle;
   margin: 6px 0;
   user-select: none;
+}
+
+/* Alignment of an inline shape: Word centres it with `w:jc` on the paragraph, which does not travel to
+   a body-level shape block */
+.rte-surface .tiptap .rte-shape-node[data-align='center'],
+.rte-print-flow .rte-shape-node[data-align='center'] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.rte-surface .tiptap .rte-shape-node[data-align='right'],
+.rte-print-flow .rte-shape-node[data-align='right'] {
+  display: block;
+  margin-left: auto;
+  margin-right: 0;
 }
 
 .rte-surface .tiptap .rte-shape-node .rte-shape-svg {
@@ -973,12 +997,14 @@
 
 .rte-page-footer {
   bottom: calc(var(--rte-page-margin-bottom, 20mm) / 2 - 7px);
-  display: flex;
-  justify-content: space-between;
+  /* A block, not a flex row: Word's footer alignment (`w:jc`) is a text-align, and a flex item would
+     shrink-wrap the text instead of centring it across the text column */
+  display: block;
 }
 
 .rte-page-footer-number {
-  margin-left: auto;
+  /* The extra page number (no `{{page}}` in the band text) stays on the right of the first line */
+  float: right;
 }
 
 .dark .rte-page-header,
@@ -1846,15 +1872,65 @@ button.rte-toc-text:hover {
   content: '\0009';
 }
 
-/* A measured tab is a fixed-width box and paints nothing, so the character inside is dropped */
+/* A measured tab is a fixed-width box and paints nothing, so the character inside is dropped.
+   It needs a real height: an empty inline-block is zero tall, and a zero-tall box has no area to
+   paint the leader (`w:leader="dot"`) in, which is why a table of contents came back with blank space
+   between the entry and its page number. One em bottom-aligned on the baseline keeps the dots where
+   Word draws them and stays inside the line box. */
 .rte-surface .tiptap .rte-tab--measured {
   display: inline-block;
   overflow: hidden;
+  height: 1em;
   vertical-align: baseline;
+  line-height: 1;
 }
 
 .rte-surface .tiptap .rte-tab--measured::before {
   content: none;
+}
+
+/* `w:leader` — the fill between an entry and its page number. Tables of contents use dots, drawn as a
+   repeating radial gradient so the row keeps its line height (a border would add a pixel of height). */
+.rte-surface .tiptap .rte-tab[data-tab-leader='dot'],
+.rte-print-flow .rte-tab[data-tab-leader='dot'] {
+  /* A 0.6px dot came out as *nothing at all* — Chrome drops a stop that small when rasterising a 4px
+     tile — so the leader rendered as blank space. 0.8px / 1px is the smallest pair that survives. */
+  background-image: radial-gradient(circle, currentColor 0.8px, transparent 1px);
+  background-size: 4px 4px;
+  /* Just above the baseline, where Word puts the leader dots */
+  background-position: 0 calc(100% - 2px);
+  background-repeat: repeat-x;
+}
+
+/* 着重号 (`w:em`): dots under emphasised characters, which is what Chinese typesetting calls for */
+.rte-surface .tiptap [data-emphasis],
+.rte-print-flow [data-emphasis] {
+  text-emphasis: filled dot;
+  text-emphasis-position: under;
+  -webkit-text-emphasis: filled dot;
+  -webkit-text-emphasis-position: under;
+}
+
+/* Inline code: a monospace character style (`w:rStyle` → `<code>`) renders like Word's Code style */
+.rte-surface .tiptap code,
+.rte-print-flow code {
+  font-family: Consolas, 'SFMono-Regular', Menlo, monospace;
+  font-size: 0.92em;
+  background: #f4f4f4;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* `w:pBdr` — the .docx reader writes the width/colour inline, this is the fallback when a rule comes
+   from a draft that only kept the attribute */
+.rte-surface .tiptap [data-border-bottom],
+.rte-print-flow [data-border-bottom] {
+  border-bottom: 1px solid currentColor;
+}
+
+.rte-surface .tiptap [data-border-top],
+.rte-print-flow [data-border-top] {
+  border-top: 1px solid currentColor;
 }
 
 /* Click target for adding a stop: the tick strip of the horizontal ruler (not the vertical one) */

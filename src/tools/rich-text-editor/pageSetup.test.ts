@@ -8,8 +8,10 @@ import {
   buildPrintPageCss,
   computePageMetrics,
   footerForPage,
+  hasPageToken,
   headerForPage,
   mergePageSetup,
+  renderPageTokens,
   mmToTwip,
   normalizePageSetup,
   resolvePageMetrics,
@@ -281,6 +283,39 @@ describe('首页不同 / 奇偶页不同（P1-4）', () => {
     expect(patched.evenHeader).toBe('偶页');
     expect(patched.evenFooter).toBe('');
     expect(patched.differentOddEven).toBe(true);
+  });
+});
+
+describe('页眉页脚模板（{{page}} / {{pages}}）', () => {
+  it('fills the page placeholders per page and leaves the literal text alone', () => {
+    const template = '第 {{page}} 页 / 共 {{pages}} 页';
+    expect(renderPageTokens(template, 4, 13)).toBe('第 4 页 / 共 13 页');
+    expect(renderPageTokens(template, 13, 13)).toBe('第 13 页 / 共 13 页');
+    // No placeholder, no change (and no accidental replacement of the shorter token inside the longer)
+    expect(renderPageTokens('内部资料', 4, 13)).toBe('内部资料');
+    expect(renderPageTokens('{{pages}}', 4, 13)).toBe('13');
+  });
+
+  it('knows when the band carries its own page number', () => {
+    expect(hasPageToken('第 {{page}} 页')).toBe(true);
+    expect(hasPageToken('{{pages}} 页')).toBe(false);
+    expect(hasPageToken('页脚')).toBe(false);
+  });
+
+  it('defaults the band alignment to left and keeps a patched one', () => {
+    const setup = normalizePageSetup({});
+    expect(setup.headerAlign).toBe('left');
+    expect(setup.footerAlign).toBe('left');
+    const centered = normalizePageSetup({ footerAlign: 'center', headerAlign: 'right' });
+    expect(centered.footerAlign).toBe('center');
+    expect(centered.headerAlign).toBe('right');
+    // Garbage from an old draft degrades to left instead of leaking into the CSS
+    expect(normalizePageSetup({ footerAlign: 'middle' } as unknown as object).footerAlign).toBe(
+      'left',
+    );
+    const patched = mergePageSetup(setup, { footerAlign: 'right' });
+    expect(patched.footerAlign).toBe('right');
+    expect(patched.headerAlign).toBe('left');
   });
 });
 

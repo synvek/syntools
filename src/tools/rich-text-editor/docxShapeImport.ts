@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { emuToPx } from '../../core/drawing/geometry';
+import { alignBlocks } from './docxBlockAlign';
 import { parseShapeGeometry } from '../../core/drawing/drawingml';
 import {
   attr,
@@ -37,7 +38,10 @@ const parser = new XMLParser({
   removeNSPrefix: false,
   preserveOrder: true,
   attributeNamePrefix: '@_',
-  trimValues: true,
+  // Word splits a sentence at every formatting change, so `w:t` frequently ends with the space that
+  // joins two runs ("DOCX " + "高级特性…"). Trimming each value glues the words together and every
+  // text-based pairing (shapes, paragraph properties) then misses the paragraph.
+  trimValues: false,
   parseTagValue: false,
   ignoreDeclaration: true,
   ignorePiTags: true,
@@ -95,6 +99,16 @@ function paragraphText(node: XmlNode): string {
   return text;
 }
 
+/** `w:jc` of the paragraph the shape sits in: an inline shape is centred through it */
+function paragraphAlign(paragraph: XmlNode): DocShapeAttrs['align'] {
+  const properties = childOf(paragraph, 'pPr');
+  // Namespace prefixes are preserved by the parser, so `w:val` (not `val`) is the key
+  const value = attr(childOf(properties, 'jc'), 'w:val');
+  if (value === 'center') return 'center';
+  if (value === 'right' || value === 'end') return 'right';
+  return 'left';
+}
+
 function hexColor(node: XmlNode | undefined): string | null {
   const srgb = collect(node, 'srgbClr')[0];
   const value = attr(srgb, 'val');
@@ -139,7 +153,11 @@ function textRunSize(textBox: XmlNode | undefined): number {
 }
 
 /** One `wps:wsp` inside a drawing → shape attributes (null when the geometry is unusable) */
-function shapeFromDrawing(drawing: XmlNode, blockIndex: number): ImportedShape | null {
+function shapeFromDrawing(
+  drawing: XmlNode,
+  blockIndex: number,
+  align: DocShapeAttrs['align'],
+): ImportedShape | null {
   const wsp = collect(drawing, 'wsp')[0];
   if (!wsp) return null;
   const spPr = childOf(wsp, 'spPr');
@@ -178,9 +196,142 @@ function shapeFromDrawing(drawing: XmlNode, blockIndex: number): ImportedShape |
     textItalic: collect(textBox, 'i').length > 0,
     textUnderline: collect(textBox, 'u').length > 0,
     textAlign: (attr(collect(textBox, 'jc')[0], 'val') as DocShapeAttrs['textAlign']) ?? 'center',
+    align,
     name: name ?? null,
   });
   return { attrs: spec, blockIndex };
+}
+
+/**
+ * Legacy VML shapes (`w:pict` / `v:roundrect` …) are not convertible yet, but they must be counted:
+ * silently dropping a visible shape is exactly the failure the caller reports. Entries that only wrap
+ * a `v:imagedata` are pictures — mammoth imports those.
+ */
+function vmlShapeCount(node: XmlNode): number {
+  let count = 0;
+  for (const pict of pictsOutsideFallback(node)) {
+    for (const shape of collect(pict, 'shape')) {
+      if (collect(shape, 'imagedata').length === 0) count += 1;
+    }
+    if (collect(pict, 'imagedata').length === 0) {
+      for (const tag of ['roundrect', 'rect', 'oval', 'line', 'polyline', 'arc']) {
+        count += collect(pict, tag).length;
+      }
+    }
+  }
+  return count;
+}
+
+/** CSS length to px: VML sizes the frame in `style="width:187.2pt;height:64.8pt"` */
+function cssLengthPx(value: string | undefined): number | null {
+  if (!value) return null;
+  const match = /^\s*(-?[\d.]+)\s*(pt|px|in|cm|mm|emu)?\s*$/i.exec(value);
+  if (!match) return null;
+  const amount = Number.parseFloat(match[1] ?? '');
+  if (!Number.isFinite(amount)) return null;
+  switch ((match[2] ?? 'px').toLowerCase()) {
+    case 'pt':
+      return Math.round((amount * 96) / 72);
+    case 'in':
+      return Math.round(amount * 96);
+    case 'cm':
+      return Math.round((amount * 96) / 2.54);
+    case 'mm':
+      return Math.round((amount * 96) / 25.4);
+    case 'emu':
+      return Math.round(amount / 9525);
+    default:
+      return Math.round(amount);
+  }
+}
+
+/**
+ * Legacy VML shape (`w:pict` → `v:roundrect` / `v:rect` / `v:oval`) as an editor shape.
+ *
+ * Word still writes these for shapes created by older tools; mammoth has no handling at all, so the
+ * text inside the shape imported while the shape itself vanished. The visible content is the text box,
+ * so that is what is carried over: fill / outline where VML names them, and Word's own text colour and
+ * size when the text box declares them.
+ */
+function vmlShapeFrom(
+  node: XmlNode,
+  kind: string,
+  blockIndex: number,
+  align: DocShapeAttrs['align'],
+): ImportedShape | null {
+  const style = attr(node, 'style') ?? '';
+  const width = cssLengthPx(/\bwidth:([^;]+)/.exec(style)?.[1]);
+  const height = cssLengthPx(/\bheight:([^;]+)/.exec(style)?.[1]);
+  if (!width || !height) return null;
+  const textBox = collect(node, 'txbxContent')[0];
+  const text = textBox
+    ? collect(textBox, 't')
+        .map((item) => textOf(item))
+        .join('')
+        .trim()
+    : '';
+  const textColorHex = textBox
+    ? /^[0-9a-f]{6}$/i.test(attr(collect(textBox, 'color')[0], 'w:val') ?? '')
+      ? (attr(collect(textBox, 'color')[0], 'w:val') as string)
+      : null
+    : null;
+  const halfPoints = Number.parseInt(attr(collect(textBox ?? node, 'sz')[0], 'w:val') ?? '', 10);
+  const fill = attr(node, 'fillcolor') ?? '#FFFFFF';
+  const stroke = attr(node, 'strokecolor') ?? (textColorHex ? `#${textColorHex}` : '#000000');
+  const strokeWidth = Number.parseFloat(attr(node, 'strokeweight') ?? '') || 1;
+  const prst = kind === 'roundrect' ? 'roundRect' : kind === 'oval' ? 'ellipse' : 'rect';
+  return {
+    blockIndex,
+    attrs: shapeSpec({
+      prst,
+      width,
+      height,
+      fill,
+      stroke,
+      strokeWidth,
+      text,
+      align,
+      ...(Number.isFinite(halfPoints) && halfPoints > 0 ? { textSize: halfPoints / 2 } : {}),
+      ...(textColorHex ? { textColor: `#${textColorHex}` } : {}),
+    }),
+  };
+}
+
+/**
+ * `w:pict` elements that are not inside `mc:Fallback`: a DrawingML shape writes its VML twin there for
+ * old readers, and importing both would draw the same shape twice.
+ */
+function pictsOutsideFallback(node: XmlNode): XmlNode[] {
+  const out: XmlNode[] = [];
+  const walk = (current: XmlNode): void => {
+    for (const child of childrenOf(current)) {
+      const name = localNameOf(child);
+      if (name === 'Fallback') continue;
+      if (name === 'pict') out.push(child);
+      walk(child);
+    }
+  };
+  walk(node);
+  return out;
+}
+
+/** Every VML shape in a paragraph (a `w:pict` may hold several, and one may wrap an image) */
+function vmlShapesOf(
+  node: XmlNode,
+  blockIndex: number,
+  align: DocShapeAttrs['align'],
+): ImportedShape[] {
+  const shapes: ImportedShape[] = [];
+  for (const pict of pictsOutsideFallback(node)) {
+    for (const kind of ['roundrect', 'rect', 'oval']) {
+      for (const shapeNode of collect(pict, kind)) {
+        if (collect(shapeNode, 'imagedata').length > 0) continue;
+        const shape = vmlShapeFrom(shapeNode, kind, blockIndex, align);
+        if (shape) shapes.push(shape);
+      }
+    }
+  }
+  return shapes;
 }
 
 /**
@@ -202,19 +353,27 @@ export function extractDocxShapes(documentXml: string): ExtractedShapes {
     const name = localNameOf(node);
     if (name !== 'p') {
       // Tables and other containers: their drawings cannot be anchored block-wise here
-      unsupported += collect(node, 'wsp').length;
+      unsupported += collect(node, 'wsp').length + vmlShapeCount(node);
       continue;
     }
     const text = normalizeText(paragraphText(node));
     const drawings = collect(node, 'drawing');
+    const align = paragraphAlign(node);
     // Boundary = how many non-empty paragraphs came before: the HTML insert point
     const blockIndex = blocks.length;
     if (text) blocks.push(text);
     for (const drawing of drawings) {
-      const shape = shapeFromDrawing(drawing, blockIndex);
+      // A drawing without `wps:wsp` is a picture (or a chart): mammoth imports the picture itself, so
+      // counting it here would report "7 shapes skipped" for a document that only had 1 shape
+      if (collect(drawing, 'wsp').length === 0) continue;
+      const shape = shapeFromDrawing(drawing, blockIndex, align);
       if (shape) shapes.push(shape);
       else unsupported += 1;
     }
+    const vmlShapes = vmlShapesOf(node, blockIndex, align);
+    shapes.push(...vmlShapes);
+    // Whatever VML could not be turned into a shape is still reported instead of vanishing silently
+    unsupported += Math.max(0, vmlShapeCount(node) - vmlShapes.length);
   }
   return { shapes, blocks, unsupported };
 }
@@ -244,16 +403,27 @@ export function placeShapesInHtml(html: string, extracted: ExtractedShapes): Pla
   }));
   const htmlBlocks = elements.filter((item) => item.text.length > 0);
 
-  const sameLength = htmlBlocks.length === extracted.blocks.length;
-  const sameText = sameLength && htmlBlocks.every((item, i) => item.text === extracted.blocks[i]);
-  if (!sameText) return { html, placed: 0, skipped: total };
+  // Align the two sides by text. Requiring both sequences to be identical meant a single reshaped
+  // block (a list wrapper, one table cell expanded into a paragraph) skipped every shape; a block
+  // without a counterpart keeps its shapes out instead of guessing.
+  const anchors = new Map<number, Element>();
+  for (const [index, blockIndex] of alignBlocks(
+    extracted.blocks,
+    htmlBlocks.map((item) => item.text),
+  )) {
+    const element = htmlBlocks[blockIndex]?.element;
+    if (element) anchors.set(index, element);
+  }
+  if (anchors.size === 0) return { html, placed: 0, skipped: total };
 
   // Insert from the end so earlier insertions never shift later boundaries
   const ordered = [...extracted.shapes].sort((a, b) => b.blockIndex - a.blockIndex);
   let placed = 0;
   for (const shape of ordered) {
-    const reference =
-      shape.blockIndex < htmlBlocks.length ? htmlBlocks[shape.blockIndex].element : null;
+    const anchor = anchors.get(shape.blockIndex);
+    // No anchor for this block and it is not the tail: leave the shape out rather than misplace it
+    if (!anchor && shape.blockIndex < extracted.blocks.length) continue;
+    const reference = anchor ?? null;
     const element = doc.createElement('div');
     for (const [name, value] of Object.entries(shapeDomAttributes(shape.attrs))) {
       element.setAttribute(name, value);
@@ -262,6 +432,14 @@ export function placeShapesInHtml(html: string, extracted: ExtractedShapes): Pla
     element.innerHTML =
       `<svg class="rte-shape-svg" width="${shape.attrs.width}" height="${shape.attrs.height}" viewBox="0 0 ${shape.attrs.width} ${shape.attrs.height}" aria-hidden="true">` +
       `<path d="${shapePathOf(shape.attrs)}" fill="${shape.attrs.fill || 'none'}" stroke="${shape.attrs.stroke || 'none'}" stroke-width="${shape.attrs.strokeWidth}"/></svg>`;
+    // An inline shape sits in its paragraph, so Word centres it through `w:jc` on that paragraph; the
+    // element is a body-level block here and would otherwise always hug the left edge
+    const align = reference
+      ? (reference as HTMLElement).style.textAlign ||
+        (reference as HTMLElement).getAttribute('data-align') ||
+        ''
+      : '';
+    if (align === 'center' || align === 'right') element.setAttribute('data-align', align);
     if (reference) body.insertBefore(element, reference);
     else body.appendChild(element);
     placed += 1;

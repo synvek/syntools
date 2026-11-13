@@ -14,10 +14,13 @@ import {
   COLUMN_GAP_MM,
   DEFAULT_PAGE_SETUP,
   MM_TO_PX,
+  PAGE_TOKEN,
+  TOTAL_PAGES_TOKEN,
   mmToTwip,
   normalizePageSetup,
   resolvePageMetrics,
   type PageSetupConfig,
+  type PartAlign,
 } from './pageSetup';
 import { normalizeBookmarkName } from './bookmarks';
 import { XREF_ATTR, XREF_MODE_ATTR, normalizeXrefMode } from './xrefs';
@@ -45,7 +48,17 @@ import {
   parseDocxStylesXml,
   toDocxStyleId,
 } from './namedStyleDocx';
-import { applyParagraphControls, parseDocxParagraphControls } from './docxParagraphControls';
+import {
+  applyParagraphControls,
+  parseDocxParagraphControls,
+  parseDocxStyleAlignments,
+  parseDocxStyleTabStops,
+} from './docxParagraphControls';
+import { applyImageBoxes, parseDocxImageBoxes } from './docxImageImport';
+import { convertDocxNotes } from './docxNotesImport';
+import { applyDocxMath, parseDocxMath } from './docxMathImport';
+import { applyDocxPageBreaks, parseDocxSectionBreaks } from './docxSectionBreaks';
+import { applyDocxRunFormats, parseDocxRunFormats } from './docxRunFormats';
 import { parseTabStops, TAB_ATTR, TAB_STOPS_ATTR, tabsToTabNodes } from './tabStops';
 import type { OoxmlIr, OoxmlParts } from './ooxmlIr';
 import { isOoxmlIrEnabled } from './ooxmlIrFlag';
@@ -1215,12 +1228,17 @@ async function readOoxmlIr(buffer: ArrayBuffer, documentXml: string): Promise<Im
 
 /** Header / footer of the imported document, read straight from the package parts */
 export interface ImportedHeaderFooter {
+  /** Band text as a *template*: `{{page}}` / `{{pages}}` stand in for Word's fields */
   header?: string;
   footer?: string;
   /** Even-page header (only meaningful together with `differentOddEven`) */
   evenHeader?: string;
   /** Even-page footer */
   evenFooter?: string;
+  /** Alignment of the header paragraph (`w:jc`) */
+  headerAlign?: PartAlign;
+  /** Alignment of the footer paragraph, so a centred footer stays centred */
+  footerAlign?: PartAlign;
   /** `w:evenAndOddHeaders` was set in settings.xml (Word's 奇偶页不同) */
   differentOddEven?: boolean;
   /** Whether the footer carries a PAGE field (Word's page number) */
@@ -1251,29 +1269,183 @@ function referenceId(sectPr: Element, tag: string, type = 'default'): string | n
   return chosen?.getAttribute('r:id') ?? null;
 }
 
-/**
- * Visible text of a header / footer part. The page setup model keeps a single line per part,
- * so multi-paragraph headers are joined with a space instead of silently dropping lines.
- */
-function partText(xml: string): string {
-  if (!xml.trim()) return '';
-  const doc = new DOMParser().parseFromString(xml, 'application/xml');
-  if (doc.getElementsByTagName('parsererror').length > 0) return '';
-  return Array.from(doc.getElementsByTagName('w:p'))
-    .map((paragraph) =>
-      Array.from(paragraph.getElementsByTagName('w:t'))
-        .map((run) => run.textContent ?? '')
-        .join(''),
-    )
-    .map((text) => text.trim())
-    .filter(Boolean)
-    .join(' ');
+/** One header / footer band: the text template plus the alignment Word gave the paragraph */
+interface BandTemplate {
+  text: string;
+  align: PartAlign;
 }
 
-/** A PAGE field instruction (simple field or fldChar sequence); NUMPAGES must not count */
-function hasPageField(xml: string): boolean {
-  if (!xml.trim()) return false;
-  return /<w:instrText[^>]*>\s*PAGE\b/i.test(xml) || /\bw:instr\s*=\s*"\s*PAGE\b/i.test(xml);
+/** Field instruction → placeholder (`PAGE` → `{{page}}`); anything else has no placeholder */
+function tokenOfField(instruction: string): string {
+  const name = (instruction.trim().split(/[\s\\]+/)[0] ?? '').toUpperCase();
+  if (name === 'PAGE') return PAGE_TOKEN;
+  if (name === 'NUMPAGES') return TOTAL_PAGES_TOKEN;
+  return '';
+}
+
+/**
+ * Text of one band paragraph as a template.
+ *
+ * A `fldChar` sequence is `begin` → `instrText` → `separate` → **cached result** → `end`. The cached
+ * result is what Word last saved — copying it in froze the footer at the saved page number ("第 4 页 /
+ * 共 13 页" on every page) — so it is dropped and the instruction becomes a placeholder instead.
+ */
+function paragraphTemplate(paragraph: Element): string {
+  let out = '';
+  let field: 'none' | 'instruction' | 'result' = 'none';
+  let instruction = '';
+  const walk = (node: Element): void => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType !== 1) return;
+      const el = child as Element;
+      switch (el.localName) {
+        case 'fldChar': {
+          const type = el.getAttribute('w:fldCharType');
+          if (type === 'begin') {
+            field = 'instruction';
+            instruction = '';
+          } else if (type === 'separate') {
+            out += tokenOfField(instruction);
+            field = 'result';
+          } else if (type === 'end') {
+            field = 'none';
+            instruction = '';
+          }
+          return;
+        }
+        case 'instrText':
+          if (field === 'instruction') instruction += el.textContent ?? '';
+          return;
+        case 'fldSimple': {
+          // A one-element field: the instruction is an attribute and the runs are its cached value
+          const token = tokenOfField(el.getAttribute('w:instr') ?? '');
+          if (token) {
+            out += token;
+            return;
+          }
+          Array.from(el.getElementsByTagName('w:t')).forEach((run) => {
+            out += run.textContent ?? '';
+          });
+          return;
+        }
+        case 't':
+          // Inside a field result the text is Word's cached value, which the placeholder replaces
+          if (field !== 'result') out += el.textContent ?? '';
+          return;
+        case 'tab':
+        case 'br':
+        case 'cr':
+          out += ' ';
+          return;
+        case 'pPr':
+        case 'rPr':
+        case 'sectPr':
+          return;
+        default:
+          walk(el);
+      }
+    });
+  };
+  walk(paragraph);
+  return out;
+}
+
+/**
+ * Sections ordered by how much of the document each one holds (most content first).
+ *
+ * Sections are merged on import, so one band has to stand in for the whole document — and that has to be
+ * the band the body pages use. A cover section comes first in the file, so document order alone put the
+ * cover's footer ("- 7 -") on all 13 pages instead of the body's "第 7 页 / 共 13 页".
+ */
+function sectionsByContent(doc: Document): Element[] {
+  const sections = Array.from(doc.getElementsByTagName('w:sectPr'));
+  if (sections.length <= 1) return sections;
+  const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
+  const counts: number[] = [];
+  let previous = 0;
+  for (const section of sections) {
+    let before = 0;
+    for (const paragraph of paragraphs) {
+      if (paragraph.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING)
+        before += 1;
+    }
+    counts.push(Math.max(0, before - previous));
+    previous = before;
+  }
+  return sections
+    .map((section, index) => ({ section, weight: counts[index] ?? 0, index }))
+    .sort((a, b) => b.weight - a.weight || b.index - a.index)
+    .map((item) => item.section);
+}
+
+/** Resolver for a paragraph style's alignment (see {@link bandStyleAlign}) */
+type StyleAlignLookup = (styleId: string) => PartAlign | null;
+
+/** `w:jc` value → alignment; `both` / `distribute` read as left */
+function alignOfJc(value: string | null | undefined): PartAlign {
+  if (value === 'center') return 'center';
+  if (value === 'right' || value === 'end') return 'right';
+  return 'left';
+}
+
+/**
+ * Alignment of a band paragraph: its own `w:jc`, else the one it inherits from its style.
+ *
+ * Word centres plenty of footers through the `Footer` style instead of the paragraph, and reading only
+ * the paragraph left those footers hard against the left margin.
+ */
+function bandAlignOf(paragraph: Element | undefined, styles?: StyleAlignLookup): PartAlign {
+  const direct = paragraph?.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
+  if (direct) return alignOfJc(direct);
+  const styleId = paragraph?.getElementsByTagName('w:pStyle')[0]?.getAttribute('w:val');
+  return (styleId ? styles?.(styleId) : null) ?? 'left';
+}
+
+/**
+ * Alignment carried by a style, following `w:basedOn` (a `Footer` style that only inherits the centring
+ * from another style still counts). Built once per import from `word/styles.xml`.
+ */
+function bandStyleLookup(stylesXml: string): StyleAlignLookup {
+  if (!stylesXml.trim()) return () => null;
+  const doc = new DOMParser().parseFromString(stylesXml, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length > 0) return () => null;
+  const byId = new Map<string, { align: PartAlign | null; basedOn: string | null }>();
+  for (const style of Array.from(doc.getElementsByTagName('w:style'))) {
+    const id = style.getAttribute('w:styleId');
+    if (!id) continue;
+    const jc = style.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
+    byId.set(id, {
+      align: jc ? alignOfJc(jc) : null,
+      basedOn: style.getElementsByTagName('w:basedOn')[0]?.getAttribute('w:val') ?? null,
+    });
+  }
+  const resolve = (styleId: string, depth = 0): PartAlign | null => {
+    if (depth > 5) return null;
+    const style = byId.get(styleId);
+    if (!style) return null;
+    if (style.align) return style.align;
+    return style.basedOn ? resolve(style.basedOn, depth + 1) : null;
+  };
+  return resolve;
+}
+
+/**
+ * Visible text of a header / footer part, as a template. The page setup model keeps a single line per
+ * part, so multi-paragraph bands are joined with a space instead of silently dropping lines.
+ */
+function partTemplate(xml: string, styles?: StyleAlignLookup): BandTemplate {
+  const empty: BandTemplate = { text: '', align: 'left' };
+  if (!xml.trim()) return empty;
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length > 0) return empty;
+  const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
+  const text = paragraphs
+    // Runs are split wherever the formatting changes, so a gap can arrive as several spaces; the band
+    // model is a single line, and collapsing them keeps an export → import round trip stable
+    .map((paragraph) => paragraphTemplate(paragraph).replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join(' ');
+  return { text, align: bandAlignOf(paragraphs[0], styles) };
 }
 
 /**
@@ -1288,12 +1460,9 @@ async function readHeaderFooter(
   if (!documentXml.trim()) return null;
   const doc = new DOMParser().parseFromString(documentXml, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length > 0) return null;
-  const sectPr = doc.getElementsByTagName('w:sectPr')[0];
-  if (!sectPr) return null;
-  const headerId = referenceId(sectPr, 'w:headerReference');
-  const footerId = referenceId(sectPr, 'w:footerReference');
-  const evenHeaderId = referenceId(sectPr, 'w:headerReference', 'even');
-  const evenFooterId = referenceId(sectPr, 'w:footerReference', 'even');
+  const sections = Array.from(doc.getElementsByTagName('w:sectPr'));
+  if (sections.length === 0) return null;
+  const bodyFirst = sectionsByContent(doc);
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(buffer);
@@ -1307,16 +1476,64 @@ async function readHeaderFooter(
       const path = target.startsWith('/') ? target.slice(1) : `word/${target}`;
       return (await zip.file(path)?.async('string')) ?? '';
     };
-    const headerXml = await readPart(headerId);
-    const footerXml = await readPart(footerId);
-    const info: ImportedHeaderFooter = { showPageNumber: hasPageField(footerXml) };
-    if (headerId) info.header = partText(headerXml);
-    if (footerId) info.footer = partText(footerXml);
-    if (evenHeaderId) info.evenHeader = partText(await readPart(evenHeaderId));
-    if (evenFooterId) info.evenFooter = partText(await readPart(evenFooterId));
+    // Word centres footers through the `Footer` style as often as through `w:jc` on the paragraph
+    const styles = bandStyleLookup((await zip.file('word/styles.xml')?.async('string')) ?? '');
+    const readBand = async (id: string | null): Promise<BandTemplate | null> => {
+      const xml = await readPart(id);
+      return xml.trim() ? partTemplate(xml, styles) : null;
+    };
+    /** One band slot, looked up in every section: Word inherits a band that a section does not set */
+    const findBand = async (
+      ref: 'w:headerReference' | 'w:footerReference',
+      type: 'default' | 'first' | 'even',
+    ): Promise<BandTemplate | null> => {
+      // Body first: the section holding most of the document owns the band that stands for all of it
+      for (const section of bodyFirst) {
+        const band = await readBand(referenceId(section, ref, type));
+        if (band?.text) return band;
+      }
+      return null;
+    };
+    const info: ImportedHeaderFooter = { showPageNumber: false };
+    // The body band (`default`) is resolved across *all* sections before any first-page band is
+    // considered. A cover declares `w:titlePg` with a `first` footer ("- 7 -" style), and letting that
+    // win put the cover's footer on all 13 pages instead of the body's "第 7 页 / 共 13 页".
+    const header =
+      (await findBand('w:headerReference', 'default')) ??
+      (await findBand('w:headerReference', 'first'));
+    const footer =
+      (await findBand('w:footerReference', 'default')) ??
+      (await findBand('w:footerReference', 'first'));
+    if (header) {
+      info.header = header.text;
+      info.headerAlign = header.align;
+    }
+    if (footer) {
+      info.footer = footer.text;
+      info.footerAlign = footer.align;
+      info.showPageNumber = footer.text.includes(PAGE_TOKEN);
+    }
+    // Even pages are their own slot: only `even` references feed it, in every section
+    const evenHeader = await findBand('w:headerReference', 'even');
+    const evenFooter = await findBand('w:footerReference', 'even');
+    if (evenHeader) {
+      info.evenHeader = evenHeader.text;
+      info.headerAlign = info.headerAlign ?? evenHeader.align;
+    }
+    if (evenFooter) {
+      info.evenFooter = evenFooter.text;
+      info.footerAlign = info.footerAlign ?? evenFooter.align;
+      info.showPageNumber = info.showPageNumber || evenFooter.text.includes(PAGE_TOKEN);
+    }
     // The switch itself lives in settings.xml; without it Word ignores the even parts entirely
     const settingsXml = (await zip.file('word/settings.xml')?.async('string')) ?? '';
     if (/<w:evenAndOddHeaders\b/.test(settingsXml)) info.differentOddEven = true;
+    if (info.differentOddEven) {
+      // Even/odd is on but the document only fills the odd band: Word's own documents inherit here, and
+      // without this an even page (4 of 13) rendered a blank footer with just the page number next to it
+      info.evenHeader = info.evenHeader || info.header;
+      info.evenFooter = info.evenFooter || info.footer;
+    }
     return info;
   } catch (error) {
     console.warn('[richText] docx header/footer read failed:', error);
@@ -1355,7 +1572,8 @@ export async function importDocx(
       typeof Buffer === 'undefined' ? undefined : Buffer.from(new Uint8Array(buffer));
     // Named styles (P1-1): read the definitions before converting, so mammoth can map each style name
     // to a marker class and the paragraphs come back pointing at the same style id
-    const importedStyles = parseDocxStylesXml(await readPartXml(buffer, 'word/styles.xml'));
+    const stylesXml = await readPartXml(buffer, 'word/styles.xml');
+    const importedStyles = parseDocxStylesXml(stylesXml);
     const parsed = await mammoth.convertToHtml(
       (nodeBuffer ? { arrayBuffer: buffer, buffer: nodeBuffer } : { arrayBuffer: buffer }) as {
         arrayBuffer: ArrayBuffer;
@@ -1370,9 +1588,27 @@ export async function importDocx(
     const styled = applyStyleClasses(html, importedStyles);
     html = styled.html;
     if (styled.used.length > 0) options?.onStyles?.(styled.used);
-    // P1-4: mammoth drops w:pPr, so pagination flags are re-read from document.xml and mapped by
-    // position (guarded: applied only when the block counts agree)
-    const controls = parseDocxParagraphControls(await readPartXml(buffer, 'word/document.xml'));
+    // Picture sizes / wrap modes: mammoth keeps the bytes but drops `wp:extent`, so every image lands
+    // at its natural pixel size (a 1600px screenshot Word paints at 442px) and in the text flow
+    html = applyImageBoxes(html, parseDocxImageBoxes(documentXml));
+    // Footnote / endnote references: mammoth emits a static “[1]” plus a trailing list, the editor
+    // wants a self-contained atom (and the note text would otherwise read as body content)
+    html = convertDocxNotes(html);
+    // Run formats mammoth drops (highlight, 着重号, monospace character styles). Placed after the note
+    // references became atoms, so the paragraph text equals Word's visible text again
+    html = applyDocxRunFormats(html, parseDocxRunFormats(documentXml, stylesXml)).html;
+    // Section breaks merged away still mean "new page" in Word, so keep the page start (P1-4 slice 7)
+    html = applyDocxPageBreaks(html, parseDocxSectionBreaks(documentXml)).html;
+    // Equations: mammoth drops OMML outright, so each one is converted back to LaTeX and spliced in at
+    // the character offset it occupies inside its paragraph
+    html = applyDocxMath(html, parseDocxMath(documentXml)).html;
+    // P1-4: mammoth drops w:pPr, so paragraph properties are re-read from document.xml and paired by
+    // text; alignment also falls back to the paragraph style (Title / Subtitle are centred there)
+    const controls = parseDocxParagraphControls(
+      documentXml,
+      parseDocxStyleAlignments(stylesXml),
+      parseDocxStyleTabStops(stylesXml),
+    );
     html = applyParagraphControls(html, controls);
     // Review layer last: mammoth keeps inserted text as plain text, drops deleted text and comment ranges
     // outright, so revisions / format changes / comment marks are re-applied onto the final HTML
@@ -1765,6 +2001,30 @@ function buildWatermarkRun(
   });
 }
 
+/**
+ * Band text → runs, turning `{{page}}` / `{{pages}}` back into Word fields.
+ * This is the other half of {@link partTemplate}: the round trip keeps the footer a live field instead
+ * of the frozen number that used to be written out.
+ */
+function bandRuns(D: DocxNs, text: string): InstanceType<DocxNs['TextRun']>[] {
+  if (!text) return [];
+  const runs: InstanceType<DocxNs['TextRun']>[] = [];
+  const pattern = /\{\{page\}\}|\{\{pages\}\}/g;
+  let last = 0;
+  for (const match of text.matchAll(pattern)) {
+    const at = match.index ?? 0;
+    if (at > last) runs.push(new D.TextRun({ text: text.slice(last, at) }));
+    runs.push(
+      new D.TextRun({
+        children: [match[0] === PAGE_TOKEN ? D.PageNumber.CURRENT : D.PageNumber.TOTAL_PAGES],
+      }),
+    );
+    last = at + match[0].length;
+  }
+  if (last < text.length) runs.push(new D.TextRun({ text: text.slice(last) }));
+  return runs;
+}
+
 /** Build the docx header/footer (returns undefined when empty, avoiding blank headers) */
 function buildHeaderFooter(
   D: DocxNs,
@@ -1779,16 +2039,27 @@ function buildHeaderFooter(
   | undefined {
   const text = (kind === 'header' ? setup.header : setup.footer).trim();
   const evenText = (kind === 'header' ? setup.evenHeader : setup.evenFooter).trim();
+  const align = kind === 'header' ? setup.headerAlign : setup.footerAlign;
   const pageNumber = kind === 'footer' && setup.showPageNumber;
 
   const build = (value: string) => {
-    if (!value && !pageNumber && !extra) return null;
+    // A band that carries its own placeholder already *is* the page number run: adding a second one
+    // would print "第 4 页 / 共 13 页  4"
+    const ownNumber = value.includes(PAGE_TOKEN);
+    const withExtraNumber = pageNumber && !ownNumber;
+    if (!value && !withExtraNumber && !extra) return null;
     const children: InstanceType<DocxNs['Paragraph']>[] = [
       new D.Paragraph({
-        alignment: pageNumber && !value ? D.AlignmentType.CENTER : D.AlignmentType.LEFT,
+        // A footer that only holds the page number stays centred, which is what Word's default does
+        alignment:
+          align === 'center' || (align === 'left' && withExtraNumber && !value)
+            ? D.AlignmentType.CENTER
+            : align === 'right'
+              ? D.AlignmentType.RIGHT
+              : D.AlignmentType.LEFT,
         children: [
-          ...(value ? [new D.TextRun({ text: value })] : []),
-          ...(pageNumber
+          ...bandRuns(D, value),
+          ...(withExtraNumber
             ? [
                 new D.TextRun({
                   children: [value ? '  ' : '', D.PageNumber.CURRENT],

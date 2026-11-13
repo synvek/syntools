@@ -1,4 +1,5 @@
 import type { ToolResult } from '@/core/types';
+import { alignBlocks } from './docxBlockAlign';
 import type { DocComment, TrackedChange } from './docs';
 
 /**
@@ -11,9 +12,11 @@ import type { DocComment, TrackedChange } from './docs';
  * - `w:commentRangeStart/End` 也在 `ignoreElements` 里，批注锚点直接消失。
  * 所以导入不是"解析 HTML"，而是"把 XML 的 run 流回填到 mammoth 的 HTML 上"。
  *
- * 回填的正确性靠一条硬约束：mammoth 产出的可见文本必须与"非删除 run"拼出的文本**完全一致**。
- * 一致才回填；不一致（第三方文档里的域、脚注、图片替代文本、分栏重排…）一律**放弃回填并明确降级**，
- * 绝不错位——错误但沉默的还原比诚实的部分还原更糟（同 `sections.ts` 对 `sectPr` 的结论）。
+ * 回填按**段落**逐块对齐（`docxBlockAlign` 的最长公共子序列，键为去空白后的文本），而不是要求全文
+ * 完全一致：第三方文档里的域、目录制表符、脚注、图片替代文本必然让「mammoth 的文本」与「非删除 run
+ * 的文本」在个别段落上不同，早先的全文相等判据会让**整篇**修订一起降级（哪怕只有一段目录被改写）。
+ * 段落内部再做字符级校验：文本逐字相同直接用偏移；只有空白不同时按可见字符建立映射（`looseOffsetMap`）；
+ * 可见字符都不同则该段放弃——错误但沉默的还原比诚实的部分还原更糟（同 `sections.ts` 对 `sectPr` 的结论）。
  *
  * 三层的偏移基准是同一份"可见文本流"（删除的文字不占位），因此修订、格式修订、批注可以在**一次**
  * DOM 操作里从后往前应用；分两次会因为前一次的 DOM 变更让后一次的偏移整体错位。
@@ -48,6 +51,8 @@ export interface CommentAnchor {
   docxId: string;
   start: number;
   end: number;
+  /** Paragraph the anchor starts in: comments are re-anchored block by block */
+  block: number;
 }
 
 /** One `w:comment` from `word/comments.xml` */
@@ -126,7 +131,8 @@ interface CollectContext {
   anchors: CommentAnchor[];
   /** Offset into the *visible* text stream (deleted runs do not advance it) */
   offset: number;
-  openComments: Map<string, number>;
+  /** Open comment ranges: where they started, and in which paragraph */
+  openComments: Map<string, { offset: number; block: number }>;
 }
 
 function collectRuns(
@@ -157,14 +163,14 @@ function collectRuns(
     }
 
     if (tag === 'w:commentRangeStart') {
-      ctx.openComments.set(attribute(element, 'w:id'), ctx.offset);
+      ctx.openComments.set(attribute(element, 'w:id'), { offset: ctx.offset, block });
       continue;
     }
     if (tag === 'w:commentRangeEnd') {
       const id = attribute(element, 'w:id');
       const start = ctx.openComments.get(id);
       if (start !== undefined) {
-        ctx.anchors.push({ docxId: id, start, end: ctx.offset });
+        ctx.anchors.push({ docxId: id, start: start.offset, end: ctx.offset, block: start.block });
         ctx.openComments.delete(id);
       }
       continue;
@@ -320,33 +326,52 @@ export interface AppliedReview {
   skippedComments: number;
 }
 
-const BLOCK_TAGS = new Set([
-  'P',
-  'DIV',
-  'LI',
-  'UL',
-  'OL',
-  'BLOCKQUOTE',
-  'PRE',
-  'TABLE',
-  'TBODY',
-  'THEAD',
-  'TR',
-  'TD',
-  'TH',
-  'H1',
-  'H2',
-  'H3',
-  'H4',
-  'H5',
-  'H6',
-]);
+/** Whitespace-insensitive text: the alignment key, and what mammoth preserves best */
+const normalizeText = (text: string): string =>
+  text
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-function containsBlock(fragment: DocumentFragment): boolean {
-  for (const element of Array.from(fragment.querySelectorAll('*'))) {
-    if (BLOCK_TAGS.has(element.tagName)) return true;
+/** Blocks mammoth emits, one per Word paragraph (`<li>` replaces the paragraph wrapper in lists) */
+const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li';
+
+/** Innermost blocks only: `<li><p>…</p></li>` is one paragraph, not two */
+function leafBlocks(root: Element): Element[] {
+  return Array.from(root.querySelectorAll(BLOCK_SELECTOR)).filter(
+    (block) => !block.querySelector(BLOCK_SELECTOR),
+  );
+}
+
+/**
+ * Offset translator for a block whose text differs from Word's only in whitespace.
+ *
+ * mammoth rewrites some whitespace (`w:tab` in a table of contents, `w:noBreakHyphen`, runs that end
+ * with a space), so the two texts stop being byte-identical while the visible characters still match.
+ * Comparing the non-whitespace characters proves the block is the right one; the returned function
+ * maps a Word offset onto the HTML text, snapping to the next visible character.
+ */
+function looseOffsetMap(expected: string, actual: string): ((offset: number) => number) | null {
+  const expectedChars: { char: string; index: number }[] = [];
+  const actualChars: { char: string; index: number }[] = [];
+  Array.from(expected).forEach((char, index) => {
+    if (!/\s/.test(char)) expectedChars.push({ char, index });
+  });
+  Array.from(actual).forEach((char, index) => {
+    if (!/\s/.test(char)) actualChars.push({ char, index });
+  });
+  if (expectedChars.length !== actualChars.length) return null;
+  for (let index = 0; index < expectedChars.length; index += 1) {
+    if (expectedChars[index]?.char !== actualChars[index]?.char) return null;
   }
-  return false;
+  return (offset: number): number => {
+    for (let index = 0; index < expectedChars.length; index += 1) {
+      const expectedChar = expectedChars[index];
+      const actualChar = actualChars[index];
+      if (expectedChar && actualChar && expectedChar.index >= offset) return actualChar.index;
+    }
+    return actual.length;
+  };
 }
 
 interface TextSlot {
@@ -355,14 +380,55 @@ interface TextSlot {
   length: number;
 }
 
-/** Map a global text offset onto a (text node, offset) pair of the parsed HTML */
-function locate(slots: TextSlot[], offset: number): { node: Text; offset: number } | null {
+/**
+ * Map a global text offset onto a (text node, offset) pair of the parsed HTML.
+ *
+ * `start` is exclusive at the end of a slot and `end` is inclusive: at a block boundary both blocks
+ * touch the same offset, and picking the wrong one makes the range span two paragraphs — which the
+ * schema rejects, so a single mis-picked boundary used to cost every revision in the document.
+ */
+function locateStart(slots: TextSlot[], offset: number): { node: Text; offset: number } | null {
   for (const slot of slots) {
-    if (offset >= slot.start && offset <= slot.start + slot.length) {
-      const local = Math.min(offset - slot.start, slot.node.data.length);
-      return { node: slot.node, offset: local };
+    if (offset >= slot.start && offset < slot.start + slot.length) {
+      return { node: slot.node, offset: offset - slot.start };
     }
   }
+  // End of a block: stay inside it instead of jumping to the first node of the next one
+  for (let index = slots.length - 1; index >= 0; index -= 1) {
+    const slot = slots[index];
+    if (slot && slot.start + slot.length === offset) {
+      return { node: slot.node, offset: slot.length };
+    }
+  }
+  return null;
+}
+
+/** Text nodes of one block, with block-local offsets; re-read after every mutation */
+function textSlotsOf(element: Element): TextSlot[] {
+  const slots: TextSlot[] = [];
+  let offset = 0;
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    slots.push({ node, start: offset, length: node.data.length });
+    offset += node.data.length;
+  }
+  return slots;
+}
+
+function locateEnd(slots: TextSlot[], offset: number): { node: Text; offset: number } | null {
+  for (const slot of slots) {
+    if (offset > slot.start && offset <= slot.start + slot.length) {
+      return { node: slot.node, offset: offset - slot.start };
+    }
+  }
+  // Empty range at the very start of a block
+  for (const slot of slots) {
+    if (slot.start === offset) return { node: slot.node, offset: 0 };
+  }
+  // Past the end (a range that Word lets cross into the next paragraph): clamp to this block
+  const last = slots[slots.length - 1];
+  if (last) return { node: last.node, offset: last.length };
   return null;
 }
 
@@ -383,6 +449,8 @@ function blockSpans(runs: RevisionRun[]): Map<number, { start: number; end: numb
 
 interface MarkOp {
   at: number;
+  /** Source paragraph; offsets are resolved inside it */
+  block: number;
   /** Length of the covered text (`0` for a deletion, which only inserts the struck-through text) */
   length: number;
   changeId: string;
@@ -413,24 +481,94 @@ export function applyDocumentReview(
     return { ok: true, value: { html, changes: [], comments: [], skippedComments: 0 } };
   }
 
-  const expected = runs
-    .filter((run) => run.kind !== 'delete')
-    .map((run) => run.text)
-    .join('');
+  // Expected stream, grouped by paragraph: the alignment unit is one block, not the whole document.
+  // Blocks with no visible text (only a picture, or only deleted text) still get an entry, otherwise a
+  // deletion anchored in them would have nowhere to go.
+  const expectedBlocks: { block: number; start: number; text: string }[] = [];
+  let expectedCursor = 0;
+  for (const run of runs) {
+    const last = expectedBlocks[expectedBlocks.length - 1];
+    if (!last || last.block !== run.block) {
+      expectedBlocks.push({ block: run.block, start: expectedCursor, text: '' });
+    }
+    if (run.kind === 'delete') continue;
+    const current = expectedBlocks[expectedBlocks.length - 1];
+    if (current) current.text += run.text;
+    expectedCursor += run.text.length;
+  }
 
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const slots: TextSlot[] = [];
   let visible = '';
+  const blocks = leafBlocks(doc.body);
+  const blockSlots = new Map<Element, TextSlot[]>();
+  for (const block of blocks) blockSlots.set(block, []);
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
     const node = walker.currentNode as Text;
     const parent = node.parentElement?.tagName;
     if (parent === 'STYLE' || parent === 'SCRIPT') continue;
-    slots.push({ node, start: visible.length, length: node.data.length });
+    const slot: TextSlot = { node, start: visible.length, length: node.data.length };
+    slots.push(slot);
+    const owner = node.parentElement?.closest(BLOCK_SELECTOR);
+    if (owner && blockSlots.has(owner)) blockSlots.get(owner)?.push(slot);
     visible += node.data;
   }
 
-  if (visible !== expected) return { ok: false, error: 'REVISION_MISMATCH' };
+  const blockText = (block: Element): string =>
+    (blockSlots.get(block) ?? []).map((slot) => slot.node.data).join('');
+
+  /**
+   * Pair paragraphs with blocks by text, walking both in document order. A paragraph with no
+   * counterpart (mammoth dropped it, or a reshaped list swallowed it) only costs its own revisions:
+   * one table-of-contents tab that mammoth rewrote used to cost every revision in the document.
+   * `exact` records whether the two texts are byte-identical — only then are the offsets trustworthy.
+   */
+  interface BlockMatch {
+    element: Element;
+    globalStart: number;
+    expectedStart: number;
+    /** Paragraph-local Word offset -> paragraph-local HTML offset */
+    map: (offset: number) => number;
+  }
+  const matches = new Map<number, BlockMatch>();
+  /** End of the last matched block in the visible stream: where an empty block lands */
+  let lastBlockEnd = 0;
+
+  for (const [expectedIndex, blockIndex] of alignBlocks(
+    expectedBlocks.map((block) => normalizeText(block.text)),
+    blocks.map((block) => normalizeText(blockText(block))),
+  )) {
+    const expectedBlock = expectedBlocks[expectedIndex];
+    const element = blocks[blockIndex];
+    if (!expectedBlock || !element) continue;
+    const text = blockText(element);
+    // Byte-identical is the normal case; otherwise the whitespace mangling is translated character by
+    // character, and a block whose visible characters differ is rejected instead of mis-anchored
+    const map =
+      text === expectedBlock.text
+        ? (offset: number) => offset
+        : looseOffsetMap(expectedBlock.text, text);
+    if (!map) continue;
+    const first = blockSlots.get(element)?.[0];
+    const globalStart = first?.start ?? lastBlockEnd;
+    matches.set(expectedBlock.block, {
+      element,
+      globalStart,
+      expectedStart: expectedBlock.start,
+      map,
+    });
+    lastBlockEnd = globalStart + text.length;
+  }
+
+  if (matches.size === 0) return { ok: false, error: 'REVISION_MISMATCH' };
+
+  /** Paragraph-local offset -> offset in the visible text stream (`null` when the block was not proven) */
+  const globalOffset = (block: number, offset: number): number | null => {
+    const match = matches.get(block);
+    if (!match) return null;
+    return match.globalStart + match.map(offset - match.expectedStart);
+  };
 
   const parseDate = (value: string | null, fallback: number): number => {
     if (!value) return fallback;
@@ -450,41 +588,54 @@ export function applyDocumentReview(
       cursor += run.text.length;
       continue;
     }
+    const at = globalOffset(run.block, cursor);
     const createdAt = parseDate(run.date, importedAt);
     if (run.kind === 'insert') {
-      insertedCount += 1;
-      const id = `docx-ins-${insertedCount}`;
+      // The covered length must be the *mapped* one: a tab that mammoth dropped makes Word's run
+      // longer than the HTML text, and the raw length would reach into the next block
+      const end = globalOffset(run.block, cursor + run.text.length);
+      if (at !== null && end !== null) {
+        insertedCount += 1;
+        const id = `docx-ins-${insertedCount}`;
+        ops.push({
+          at,
+          block: run.block,
+          length: Math.max(0, end - at),
+          changeId: id,
+          kind: 'insert',
+          text: run.text,
+          author: run.author,
+          createdAt,
+        });
+        changes.push({ id, kind: 'insert', text: run.text, author: run.author, createdAt });
+      }
+      cursor += run.text.length;
+      continue;
+    }
+    if (at !== null) {
+      deletedCount += 1;
+      const id = `docx-del-${deletedCount}`;
       ops.push({
-        at: cursor,
-        length: run.text.length,
+        at,
+        block: run.block,
+        length: 0,
         changeId: id,
-        kind: 'insert',
+        kind: 'delete',
         text: run.text,
         author: run.author,
         createdAt,
       });
-      changes.push({ id, kind: 'insert', text: run.text, author: run.author, createdAt });
-      cursor += run.text.length;
-      continue;
+      changes.push({ id, kind: 'delete', text: run.text, author: run.author, createdAt });
     }
-    deletedCount += 1;
-    const id = `docx-del-${deletedCount}`;
-    ops.push({
-      at: cursor,
-      length: 0,
-      changeId: id,
-      kind: 'delete',
-      text: run.text,
-      author: run.author,
-      createdAt,
-    });
-    changes.push({ id, kind: 'delete', text: run.text, author: run.author, createdAt });
   }
 
   const spans = blockSpans(runs);
   formats.forEach((format, index) => {
     const span = spans.get(format.block);
     if (!span || span.end <= span.start) return;
+    const start = globalOffset(format.block, span.start);
+    const end = globalOffset(format.block, span.end);
+    if (start === null || end === null || end <= start) return;
     const id = `docx-fmt-${index + 1}`;
     const text = runs
       .filter((run) => run.block === format.block && run.kind !== 'delete')
@@ -492,8 +643,9 @@ export function applyDocumentReview(
       .join('');
     const createdAt = parseDate(format.date, importedAt);
     ops.push({
-      at: span.start,
-      length: span.end - span.start,
+      at: start,
+      block: format.block,
+      length: end - start,
       changeId: id,
       kind: 'format',
       text,
@@ -508,14 +660,17 @@ export function applyDocumentReview(
   let skippedComments = 0;
   anchors.forEach((anchor) => {
     const meta = metaById.get(anchor.docxId);
-    if (!meta || anchor.end <= anchor.start || anchor.end > visible.length) {
+    const start = globalOffset(anchor.block, anchor.start);
+    const end = globalOffset(anchor.block, anchor.end);
+    if (!meta || start === null || end === null || end <= start) {
       skippedComments += 1;
       return;
     }
     const commentId = `docx-cmt-${anchor.docxId}`;
     ops.push({
-      at: anchor.start,
-      length: anchor.end - anchor.start,
+      at: start,
+      block: anchor.block,
+      length: end - start,
       changeId: commentId,
       kind: 'comment',
       text: '',
@@ -523,9 +678,18 @@ export function applyDocumentReview(
       createdAt: parseDate(meta.date, importedAt),
       commentId,
     });
+    // The quote is taken from the paragraph the anchor starts in: a range across paragraphs is clamped
+    // there, and slicing the whole visible stream would quote the next paragraph's text too
+    const anchorMatch = matches.get(anchor.block);
+    const localQuote = anchorMatch
+      ? blockText(anchorMatch.element).slice(
+          start - anchorMatch.globalStart,
+          end - anchorMatch.globalStart,
+        )
+      : visible.slice(start, end);
     restored.push({
       id: commentId,
-      quote: meta.quote || visible.slice(anchor.start, anchor.end),
+      quote: meta.quote || localQuote,
       text: meta.text,
       author: meta.author,
       createdAt: parseDate(meta.date, importedAt),
@@ -536,8 +700,28 @@ export function applyDocumentReview(
   // Back to front: every operation keeps the offsets of the earlier ones valid. A block-wide format wrap
   // starts before anything inside it, so it is applied last and nests around the inner marks.
   for (const op of [...ops].sort((a, b) => b.at - a.at)) {
-    const start = locate(slots, op.at);
-    if (!start) return { ok: false, error: 'REVISION_MISMATCH' };
+    const match = matches.get(op.block);
+    if (!match) continue;
+    // Offsets are resolved *inside the operation's own paragraph*. Resolving them against the whole
+    // document put a deletion at a paragraph boundary in front of the next paragraph's first word — the
+    // date line's deleted text ended up glued to the "目录" heading — and wrapping could reach across a
+    // `</p>`, which the schema rejects.
+    const element = match.element;
+    const localSlots = textSlotsOf(element);
+    const localStart = op.at - match.globalStart;
+    const localEnd = localStart + op.length;
+    const start = locateStart(localSlots, localStart);
+    if (!start) {
+      // Deleted text can be the whole content of a paragraph mammoth left empty
+      if (op.kind === 'delete' && localSlots.length === 0) {
+        const element = doc.createElement('del');
+        element.setAttribute('data-track', 'delete');
+        element.setAttribute('data-track-id', op.changeId);
+        element.textContent = op.text;
+        match.element.appendChild(element);
+      }
+      continue;
+    }
 
     if (op.kind === 'delete') {
       const element = doc.createElement('del');
@@ -551,21 +735,11 @@ export function applyDocumentReview(
       continue;
     }
 
-    const end = locate(slots, op.at + op.length);
-    if (!end) return { ok: false, error: 'REVISION_MISMATCH' };
+    const end = locateEnd(localSlots, localEnd);
+    if (!end) continue;
     const range = doc.createRange();
     range.setStart(start.node, start.offset);
     range.setEnd(end.node, end.offset);
-    // Neither an insertion nor a comment spans blocks in OOXML (a comment may cross paragraphs, but the
-    // editor cannot anchor that); wrapping a <p> would produce a node the schema rejects
-    if (containsBlock(range.cloneContents())) {
-      if (op.kind === 'comment') {
-        skippedComments += 1;
-        restored.pop();
-        continue;
-      }
-      return { ok: false, error: 'REVISION_MISMATCH' };
-    }
 
     let wrapper: HTMLElement;
     if (op.kind === 'comment') {
@@ -583,6 +757,10 @@ export function applyDocumentReview(
     }
     wrapper.appendChild(range.extractContents());
     range.insertNode(wrapper);
+  }
+
+  if (changes.length === 0 && restored.length === 0 && skippedComments === 0) {
+    return { ok: false, error: 'REVISION_MISMATCH' };
   }
 
   return {

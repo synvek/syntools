@@ -31,15 +31,49 @@ export interface WatermarkConfig {
   color: string;
 }
 
+/** Horizontal alignment of a header / footer paragraph (Word's `w:jc` on the band) */
+export type PartAlign = 'left' | 'center' | 'right';
+
+/**
+ * Page-number placeholder inside header / footer text.
+ *
+ * Word stores a band as paragraphs that mix literal runs with fields (`PAGE` / `NUMPAGES`), so the text
+ * is a *template*: `第 {{page}} 页 / 共 {{pages}} 页`. Keeping the placeholder instead of Word's cached
+ * field value is what makes the same footer read 4 on page 4 and 5 on page 5 — the cached value is
+ * frozen at whatever page number the document was saved with.
+ */
+export const PAGE_TOKEN = '{{page}}';
+/** Total-page placeholder (`NUMPAGES`) */
+export const TOTAL_PAGES_TOKEN = '{{pages}}';
+
+/** Whether the text carries its own page number (the band then needs no extra right-aligned one) */
+export function hasPageToken(text: string): boolean {
+  return text.includes(PAGE_TOKEN);
+}
+
+/** Fill the placeholders for one page (page view, print flow and snapshot PDF all call this) */
+export function renderPageTokens(text: string, page: number, totalPages: number): string {
+  if (!text) return text;
+  return text
+    .split(PAGE_TOKEN)
+    .join(String(page))
+    .split(TOTAL_PAGES_TOKEN)
+    .join(String(totalPages));
+}
+
 export interface PageSetupConfig {
   size: PageSize;
   orientation: Orientation;
   /** Page margins (mm) */
   margin: PageMargins;
-  /** Header text (empty string means hidden) */
+  /** Header text (empty string means hidden); `{{page}}` / `{{pages}}` are filled per page */
   header: string;
   /** Footer text */
   footer: string;
+  /** Alignment of the header band (Word centres plenty of headers; left is the default) */
+  headerAlign: PartAlign;
+  /** Alignment of the footer band */
+  footerAlign: PartAlign;
   /** Whether to show page numbers in the footer */
   showPageNumber: boolean;
   /** Column count */
@@ -92,6 +126,8 @@ export const DEFAULT_PAGE_SETUP: PageSetupConfig = {
   margin: { ...MARGIN_PRESETS.normal },
   header: '',
   footer: '',
+  headerAlign: 'left',
+  footerAlign: 'left',
   showPageNumber: true,
   columns: 1,
   watermark: null,
@@ -159,6 +195,11 @@ function normalizeColumns(value: unknown, contentWidthMm: number): ColumnCount {
   return 1;
 }
 
+/** Band alignment: anything that is not one of the three values reads as left (Word's default) */
+function partAlignOf(value: unknown): PartAlign {
+  return value === 'center' || value === 'right' ? value : 'left';
+}
+
 function normalizeWatermark(value: unknown): WatermarkConfig | null {
   if (typeof value !== 'object' || value === null) return null;
   const raw = value as Partial<WatermarkConfig>;
@@ -209,6 +250,8 @@ export function normalizePageSetup(input: Partial<PageSetupConfig> | null): Page
     margin: normalizedMargin,
     header: typeof raw.header === 'string' ? raw.header : '',
     footer: typeof raw.footer === 'string' ? raw.footer : '',
+    headerAlign: partAlignOf(raw.headerAlign),
+    footerAlign: partAlignOf(raw.footerAlign),
     showPageNumber: raw.showPageNumber !== false,
     columns: normalizeColumns(raw.columns, contentWidthMm),
     watermark: normalizeWatermark(raw.watermark),
@@ -276,6 +319,8 @@ export interface PageSetupPatch {
   margin?: Partial<PageMargins>;
   header?: string;
   footer?: string;
+  headerAlign?: PartAlign;
+  footerAlign?: PartAlign;
   showPageNumber?: boolean;
   columns?: ColumnCount;
   /** Merged field-wise; `null` removes the watermark */
@@ -300,6 +345,8 @@ export function mergePageSetup(base: PageSetupConfig, patch: PageSetupPatch): Pa
   if (patch.orientation !== undefined) merged.orientation = patch.orientation;
   if (patch.header !== undefined) merged.header = patch.header;
   if (patch.footer !== undefined) merged.footer = patch.footer;
+  if (patch.headerAlign !== undefined) merged.headerAlign = patch.headerAlign;
+  if (patch.footerAlign !== undefined) merged.footerAlign = patch.footerAlign;
   if (patch.showPageNumber !== undefined) merged.showPageNumber = patch.showPageNumber;
   if (patch.columns !== undefined) merged.columns = patch.columns;
   if (patch.background !== undefined) merged.background = patch.background;
