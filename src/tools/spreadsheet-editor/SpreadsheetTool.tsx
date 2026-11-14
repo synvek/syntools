@@ -115,10 +115,8 @@ import { PrintDialog } from './ui/PrintDialog';
 import { CommentDialog } from './ui/CommentDialog';
 import {
   countSheetComments,
-  readSheetComments,
   setSheetThreads,
   threadsForSheet,
-  withSheetComments,
   type SheetCommentMap,
 } from './comments';
 import {
@@ -136,7 +134,8 @@ import {
 } from '@/core/fidelity';
 import { FidelityDialog } from '@/core/components/FidelityDialog';
 import { collectExportIssues } from './fidelity';
-import { readWorkbookExtras, withWorkbookExtras, type WorkbookExtras } from './xlsx-extras';
+import type { WorkbookExtras } from './xlsx-extras';
+import { applySheetObjects, readSheetObjects, type SheetObjectSource } from './sheetObjects';
 import {
   DEFAULT_SHEET_PRINT_OPTIONS,
   printSheet,
@@ -151,7 +150,6 @@ import { registerMetaStrings } from './metaStrings';
 import { sanitizeNamedRanges, type NamedRange } from './namedRanges';
 import {
   createTableFromSelection,
-  sanitizeTables,
   takenNames,
   tablesInRange,
   type SheetTable,
@@ -549,26 +547,32 @@ export default function SpreadsheetTool() {
   const [a11yStatus, setA11yStatus] = useState('');
 
   /**
-   * Merge content this tool owns but Univer knows nothing about into the snapshot: conditional
-   * formatting / data validation (round-trip preserved) plus the in-sheet chart configs.
+   * Everything this tool owns but Univer knows nothing about, as one value: charts / shapes /
+   * pictures / pivots / names / protection / tables / comments plus the round-trip extras.
+   * Which snapshot field each one lands in, and whether an empty value means "drop the field",
+   * is declared in `sheetObjects.ts` (P2-5) — this object is only the wiring.
    */
-  const withDocOwnedContent = useCallback((base: WorkbookSnapshot): WorkbookSnapshot => {
-    let next: WorkbookSnapshot = base;
-    if (chartsRef.current.length) next = { ...next, syntoolsCharts: chartsRef.current };
-    if (rawPartsRef.current) next = { ...next, syntoolsRawParts: rawPartsRef.current };
-    if (pivotConfigsRef.current.length) next = { ...next, syntoolsPivots: pivotConfigsRef.current };
-    if (shapesRef.current.length) next = { ...next, syntoolsShapes: shapesRef.current };
-    if (imagesRef.current.length) next = { ...next, syntoolsImages: imagesRef.current };
-    // Names and protection are workbook/sheet metadata written into workbook.xml and sheetProtection
-    const names = sanitizeNamedRanges(namedRangesRef.current);
-    if (names.length) next = { ...next, namedRanges: names };
-    if (protectionRef.current.length) next = { ...next, syntoolsProtection: protectionRef.current };
-    const tables = sanitizeTables(tablesRef.current);
-    if (tables.length) next = { ...next, syntoolsTables: tables };
-    // Comment threads ride along in their own field (xlsx has no counterpart yet)
-    next = withSheetComments(next, commentsRef.current);
-    return withWorkbookExtras(next, extrasRef.current);
-  }, []);
+  const sheetObjectSource = useCallback(
+    (): SheetObjectSource => ({
+      charts: chartsRef.current,
+      rawParts: rawPartsRef.current,
+      pivots: pivotConfigsRef.current,
+      shapes: shapesRef.current,
+      images: imagesRef.current,
+      namedRanges: namedRangesRef.current,
+      protection: protectionRef.current,
+      tables: tablesRef.current,
+      comments: commentsRef.current,
+      extras: extrasRef.current,
+    }),
+    [],
+  );
+
+  /** Merge the object set into a snapshot (save + export share this one path) */
+  const withDocOwnedContent = useCallback(
+    (base: WorkbookSnapshot): WorkbookSnapshot => applySheetObjects(base, sheetObjectSource()),
+    [sheetObjectSource],
+  );
 
   /**
    * Shapes (SHEET-02) are app-side content exactly like charts: they are not Univer mutations, so
@@ -959,16 +963,17 @@ export default function SpreadsheetTool() {
       const pending = pendingRef.current ?? readDraft();
       if (pending) {
         handle.loadSnapshot(pending);
-        // Tool-owned content (conditional formatting / data validation + charts): read only on the
-        // first restore from the draft. On an instance rebuild (StrictMode's second mount, theme /
-        // locale switch) `pending` is a raw Univer snapshot without these fields, so overwriting
-        // would simply drop them.
-        if (!extrasRef.current) extrasRef.current = readWorkbookExtras(pending);
+        // Tool-owned content: read back through the registry (P2-5), then keep the per-family
+        // "first restore wins" rules below. On an instance rebuild (StrictMode's second mount,
+        // theme / locale switch) `pending` is a raw Univer snapshot without these fields, so
+        // overwriting would simply drop them.
+        const adopted = readSheetObjects(pending);
+        if (!extrasRef.current) extrasRef.current = adopted.extras;
         if (!rawPartsRef.current) {
-          rawPartsRef.current = pending.syntoolsRawParts ?? null;
+          rawPartsRef.current = adopted.rawParts;
         }
         if (chartsRef.current.length === 0) {
-          const configs = pending.syntoolsCharts ?? [];
+          const configs = adopted.charts;
           if (configs.length > 0) {
             chartsRef.current = configs;
             setCharts(configs);
@@ -978,39 +983,35 @@ export default function SpreadsheetTool() {
         // 图表导入提示：已转换成可编辑配置的 + 只能原样保留的（两者都为 0 时为 null，不显示）
         setChartImport(summarizeImport(chartsRef.current, rawPartsRef.current?.parts));
         if (imagesRef.current.length === 0) {
-          const imageConfigs = pending.syntoolsImages ?? [];
+          const imageConfigs = adopted.images;
           if (imageConfigs.length > 0) {
             imagesRef.current = imageConfigs;
             setImages(imageConfigs);
           }
         }
         if (shapesRef.current.length === 0) {
-          const shapeConfigs = pending.syntoolsShapes ?? [];
+          const shapeConfigs = adopted.shapes;
           if (shapeConfigs.length > 0) {
             shapesRef.current = shapeConfigs;
             setShapes(shapeConfigs);
           }
         }
         if (!commentsLoadedRef.current) {
-          const map = readSheetComments(pending);
           commentsLoadedRef.current = true;
-          commentsRef.current = map;
-          setSheetComments(map);
+          commentsRef.current = adopted.comments;
+          setSheetComments(adopted.comments);
         }
         if (!metaLoadedRef.current) {
           metaLoadedRef.current = true;
-          const names = pending.namedRanges ?? [];
-          namedRangesRef.current = names;
-          setNamedRanges(names);
-          const protections = pending.syntoolsProtection ?? [];
-          protectionRef.current = protections;
-          setProtectionList(protections);
-          const pendingTables = pending.syntoolsTables ?? [];
-          tablesRef.current = pendingTables;
-          setTables(pendingTables);
+          namedRangesRef.current = adopted.namedRanges;
+          setNamedRanges(adopted.namedRanges);
+          protectionRef.current = adopted.protection;
+          setProtectionList(adopted.protection);
+          tablesRef.current = adopted.tables;
+          setTables(adopted.tables);
         }
         if (pivotConfigsRef.current.length === 0) {
-          const pivots = pending.syntoolsPivots ?? [];
+          const pivots = adopted.pivots;
           if (pivots.length > 0) {
             pivotConfigsRef.current = pivots;
             setPivotConfigs(pivots);
@@ -1295,31 +1296,35 @@ export default function SpreadsheetTool() {
       setTitle(nextTitle);
       setFailure(null);
       setChartNotice(false);
-      // Tool-owned content carried by the snapshot: conditional formatting / data validation + charts + native chart parts
-      extrasRef.current = readWorkbookExtras(snapshot);
-      rawPartsRef.current = snapshot.syntoolsRawParts ?? null;
-      const configs = snapshot.syntoolsCharts ?? [];
-      chartsRef.current = configs;
-      setCharts(configs);
-      setSelectedChartId(configs[0]?.id ?? null);
-      setChartImport(summarizeImport(configs, rawPartsRef.current?.parts));
-      const commentMap = readSheetComments(snapshot);
+      // Every object family comes back through the registry (P2-5) instead of ten hand-written
+      // `snapshot.syntoolsXxx ?? []` lines. The two families this block used to forget are the
+      // reason it is a registry: opening another document kept the previous one's pictures and
+      // shapes on the canvas, and the next save wrote *those* into the new document.
+      const objects = readSheetObjects(snapshot);
+      extrasRef.current = objects.extras;
+      rawPartsRef.current = objects.rawParts;
+      chartsRef.current = objects.charts;
+      setCharts(objects.charts);
+      setSelectedChartId(objects.charts[0]?.id ?? null);
+      setChartImport(summarizeImport(objects.charts, objects.rawParts?.parts));
       commentsLoadedRef.current = true;
-      commentsRef.current = commentMap;
-      setSheetComments(commentMap);
-      const pivots = snapshot.syntoolsPivots ?? [];
-      pivotConfigsRef.current = pivots;
-      setPivotConfigs(pivots);
+      commentsRef.current = objects.comments;
+      setSheetComments(objects.comments);
+      pivotConfigsRef.current = objects.pivots;
+      setPivotConfigs(objects.pivots);
       // Names / protection travel in the same snapshot; adopting them here keeps "打开文件" honest
-      const names = snapshot.namedRanges ?? [];
-      namedRangesRef.current = names;
-      setNamedRanges(names);
-      const protections = snapshot.syntoolsProtection ?? [];
-      protectionRef.current = protections;
-      setProtectionList(protections);
-      const nextTables = snapshot.syntoolsTables ?? [];
-      tablesRef.current = nextTables;
-      setTables(nextTables);
+      namedRangesRef.current = objects.namedRanges;
+      setNamedRanges(objects.namedRanges);
+      protectionRef.current = objects.protection;
+      setProtectionList(objects.protection);
+      tablesRef.current = objects.tables;
+      setTables(objects.tables);
+      imagesRef.current = objects.images;
+      setImages(objects.images);
+      setSelectedImageId(null);
+      shapesRef.current = objects.shapes;
+      setShapes(objects.shapes);
+      setSelectedShapeId(null);
       metaLoadedRef.current = true;
       applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
       refreshSummary();

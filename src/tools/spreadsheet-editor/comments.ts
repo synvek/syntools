@@ -4,9 +4,9 @@ import type { CommentThread } from '../../core/comments/model';
  * Workbook comment storage (P1-2).
  *
  * Threads are app-side data anchored to cells (`{ kind: 'cell', sheetId, row, col }`) and travel
- * with the snapshot under `syntoolsComments` — the same pattern as `syntoolsCharts`. They are not
- * written into xlsx (the sheet's native comment format differs), so export reports them as a
- * fidelity warning instead of silently dropping them.
+ * with the snapshot under `syntoolsComments` — the same pattern as `syntoolsCharts`. On export they
+ * are flattened into legacy cell notes (`commentsXlsx.ts`, P1-9), because xlsx's thread format has
+ * no room for our author/reply shape; the fidelity report says so instead of implying a loss.
  */
 export type SheetCommentMap = Record<string, CommentThread[]>;
 
@@ -50,15 +50,23 @@ export function setSheetThreads(
   return next;
 }
 
-/** Attach the comment map to a snapshot (no-op shape when there is nothing to store) */
+/**
+ * Attach the comment map to a snapshot (no-op shape when there is nothing to store).
+ * Returns the very same object when nothing changes, so the save path can skip work.
+ */
 export function withSheetComments<T extends object>(
   snapshot: T,
   map: SheetCommentMap,
 ): T & CommentsCarrier {
-  const next: T & CommentsCarrier = { ...snapshot };
-  if (countSheetComments(map) > 0) next.syntoolsComments = map;
-  else delete next.syntoolsComments;
-  return next;
+  const next = snapshot as T & CommentsCarrier;
+  if (countSheetComments(map) > 0) {
+    if (next.syntoolsComments === map) return next;
+    return { ...next, syntoolsComments: map };
+  }
+  if (!('syntoolsComments' in next)) return next;
+  const clone: T & CommentsCarrier = { ...next };
+  delete clone.syntoolsComments;
+  return clone;
 }
 
 /** 0-based row/column → A1 reference (matches what Excel users see) */

@@ -58,7 +58,8 @@ const zh: ResourceTree = {
       commentDelete: '删除',
       commentOrphaned: '锚点已失效',
       commentClose: '关闭',
-      commentSidecarNote: '批注保存在本工具文档中，导出 xlsx 时不会写入文件。',
+      commentSidecarNote:
+        '批注保存在本工具文档中；导出 xlsx 时会写成单元格备注（多人回复合并为一条）。',
       lossComments: '{{count}} 条批注未写入 xlsx，仅保存在本工具文档中',
       printSettings: '打印设置',
       printArea: '打印区域',
@@ -85,6 +86,7 @@ const zh: ResourceTree = {
       exporting: '处理中…',
       ready: '编辑内容会自动保留在当前页面',
       unsupportedTip: '支持图表 / 形状 / 图片 / 透视表；无法写入 xlsx 的内容会在导出报告中列出',
+      commentsAsNotes: '{{count}} 条批注已写入为单元格备注（多人回复会合并到同一条备注）',
       cfUnsupported: '{{count}} 条条件格式无法写入 xlsx',
       dvUnsupported: '{{count}} 条数据验证无法写入 xlsx',
       // 导入侧保真（P0-4）：说的是"已经发生了什么"，不是"可能发生什么"
@@ -191,7 +193,7 @@ const en: ResourceTree = {
       commentOrphaned: 'Anchor lost',
       commentClose: 'Close',
       commentSidecarNote:
-        'Comments are stored in this tool’s document; they are not written into the exported xlsx.',
+        'Comments are saved with this document; on export they become cell notes (replies are merged into one note).',
       lossComments:
         '{{count}} comments were not written to the xlsx and stay in this document only',
       printSettings: 'Print settings',
@@ -220,6 +222,8 @@ const en: ResourceTree = {
       ready: 'Edits stay on this page',
       unsupportedTip:
         'Charts, shapes, pictures and pivot tables are supported; anything that cannot be written to xlsx is listed in the export report',
+      commentsAsNotes:
+        '{{count}} comments were written as cell notes (replies are merged into one note)',
       cfUnsupported: '{{count}} conditional formatting rules cannot be written to the xlsx',
       dvUnsupported: '{{count}} data validation rules cannot be written to the xlsx',
       // Import-side fidelity (P0-4): what did happen, not what might happen
@@ -332,7 +336,8 @@ const zhTW: ResourceTree = {
       commentDelete: '刪除',
       commentOrphaned: '錨點已失效',
       commentClose: '關閉',
-      commentSidecarNote: '註解保存在本工具文件中，匯出 xlsx 時不會寫入檔案。',
+      commentSidecarNote:
+        '註解保存在本工具文件中；匯出 xlsx 時會寫成儲存格備註（多人回覆合併為一條）。',
       lossComments: '{{count}} 則註解未寫入 xlsx，僅保存在本工具文件中',
       printSettings: '列印設定',
       printArea: '列印範圍',
@@ -421,7 +426,7 @@ const ja: ResourceTree = {
       commentOrphaned: 'アンカーが失われました',
       commentClose: '閉じる',
       commentSidecarNote:
-        'コメントはこのツールのドキュメントに保存され、xlsx には書き出されません。',
+        'コメントはこのツールのドキュメントに保存され、xlsx へ書き出す際はセル ノートになります（複数の返信は 1 件にまとめられます）。',
       lossComments:
         '{{count}} 件のコメントは xlsx に書き出されず、このドキュメントにのみ保存されます',
       printSettings: '印刷設定',
@@ -514,7 +519,7 @@ const fr: ResourceTree = {
       commentOrphaned: 'Ancre perdue',
       commentClose: 'Fermer',
       commentSidecarNote:
-        'Les commentaires sont stockés dans le document de cet outil et ne sont pas écrits dans le xlsx exporté.',
+        "Les commentaires sont enregistrés dans ce document ; à l'export ils deviennent des notes de cellule (les réponses sont fusionnées).",
       lossComments:
         '{{count}} commentaires ne sont pas écrits dans le xlsx et restent dans ce document',
       printSettings: 'Réglages impression',
@@ -609,7 +614,7 @@ const de: ResourceTree = {
       commentOrphaned: 'Anker verloren',
       commentClose: 'Schließen',
       commentSidecarNote:
-        'Kommentare werden im Dokument dieses Tools gespeichert und nicht in die exportierte xlsx geschrieben.',
+        'Kommentare werden in diesem Dokument gespeichert und beim Export als Zellnotizen geschrieben (Antworten werden zu einer Notiz zusammengefasst).',
       lossComments:
         '{{count}} Kommentare wurden nicht in die xlsx geschrieben und bleiben nur in diesem Dokument',
       printSettings: 'Druckeinstellungen',
@@ -704,7 +709,7 @@ const it: ResourceTree = {
       commentOrphaned: 'Ancora persa',
       commentClose: 'Chiudi',
       commentSidecarNote:
-        'I commenti sono salvati nel documento di questo strumento e non vengono scritti nel file xlsx esportato.',
+        'I commenti sono salvati in questo documento e, durante l’esportazione, diventano note di cella (le risposte sono unite).',
       lossComments:
         '{{count}} commenti non sono stati scritti nel file xlsx e restano solo in questo documento',
       printSettings: 'Impostazioni di stampa',
@@ -797,7 +802,7 @@ const es: ResourceTree = {
       commentOrphaned: 'Ancla perdida',
       commentClose: 'Cerrar',
       commentSidecarNote:
-        'Los comentarios se guardan en el documento de esta herramienta y no se escriben en el xlsx exportado.',
+        'Los comentarios se guardan en este documento y al exportar se escriben como notas de celda (las respuestas se unen).',
       lossComments:
         '{{count}} comentarios no se escribieron en el xlsx y solo permanecen en este documento',
       printSettings: 'Configuración de impresión',
@@ -889,7 +894,7 @@ const pt: ResourceTree = {
       commentOrphaned: 'Âncora perdida',
       commentClose: 'Fechar',
       commentSidecarNote:
-        'Os comentários ficam no documento desta ferramenta e não são gravados no xlsx exportado.',
+        'Os comentários ficam neste documento e, ao exportar, são gravados como notas de célula (as respostas são unidas).',
       lossComments:
         '{{count}} comentários não foram gravados no xlsx e ficam apenas neste documento',
       printSettings: 'Definições de impressão',

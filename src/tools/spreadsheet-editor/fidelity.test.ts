@@ -70,7 +70,7 @@ describe('collectExportIssues', () => {
     };
     expect(
       collectExportIssues(snapshot).find((issue) => issue.code === 'sheet.comments'),
-    ).toMatchObject({ severity: 'warning', count: 1, messageKey: 'tools.sheet.lossComments' });
+    ).toMatchObject({ severity: 'info', count: 1, messageKey: 'tools.sheet.commentsAsNotes' });
   });
 });
 

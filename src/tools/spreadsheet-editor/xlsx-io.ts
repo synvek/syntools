@@ -38,24 +38,24 @@ import {
 import type { ChartConfig } from './charts';
 import type { PivotConfig } from './pivot';
 import type { SheetCommentMap } from './comments';
-import { buildChartPlan, injectChartsIntoXlsx } from './chartXml';
-import { buildPivotXlsxPlan, injectPivotTablesIntoXlsx } from './pivotXlsx';
+import { buildThreadNotes, threadNotesForSheet } from './commentsXlsx';
 import { collectEditorValidation } from './cfdv';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
 import { adoptChartParts, metricsOfSheet } from './chartAdopt';
-import { buildShapePlan, collectSheetShapes, injectShapesIntoXlsx } from './shapesXml';
-import { buildImagePlan, collectSheetImages, injectImagesIntoXlsx } from './imagesXml';
+import { collectSheetShapes } from './shapesXml';
+import { collectSheetImages } from './imagesXml';
 import { createConvertedAnchors, pruneConvertedAnchors } from './drawingAnchors';
 import type { SheetImageConfig } from './sheetImages';
 import type { SheetShapeConfig } from './shapes';
-import { injectNamedRanges, readNamedRangesFromXlsx, type NamedRange } from './namedRanges';
+import { readNamedRangesFromXlsx, type NamedRange } from './namedRanges';
+import { runXlsxPostProcess } from './xlsxPostProcess';
 import {
   applySheetProtection,
   readSheetProtection,
   type SheetProtectionState,
   type WorksheetProtectionLike,
 } from './sheetProtection';
-import { injectTablesIntoXlsx, readSheetTables, type SheetTable } from './sheetTables';
+import { readSheetTables, type SheetTable } from './sheetTables';
 import { diagnoseXlsxArchive } from './xlsx-diagnose';
 import { collectImportIssues } from './importFidelity';
 import { reportSheetIssue } from './issues';
@@ -569,6 +569,8 @@ export async function exportSnapshotToBytes(
     workbook.created = new Date();
     // Conditional formatting / data validation: saved with the snapshot on import, written back here
     const extras = readWorkbookExtras(snapshot);
+    // Comment threads become legacy notes (P1-9); computed once, applied per sheet below
+    const threadNotes = buildThreadNotes(snapshot);
 
     let firstWorksheet: ReturnType<typeof workbook.addWorksheet> | null = null;
     let worksheetCount = 0;
@@ -650,6 +652,14 @@ export async function exportSnapshotToBytes(
         }
       }
 
+      // Comment threads → legacy notes (P1-9). Written after the cells so a thread wins over an
+      // imported note on the same cell; exceljs emits `xl/commentsN.xml` plus the VML drawing, which
+      // is what makes Excel show the note box at all.
+      for (const note of threadNotesForSheet(threadNotes, sheetId)) {
+        const target = worksheet.getCell(note.row + 1, note.col + 1);
+        (target as unknown as { note: string }).note = note.text;
+      }
+
       for (const merge of sheet.mergeData ?? []) {
         worksheet.mergeCells(
           merge.startRow + 1,
@@ -696,45 +706,9 @@ export async function exportSnapshotToBytes(
     }
 
     const buffer = (await workbook.xlsx.writeBuffer()) as ArrayBuffer;
-    // Charts: in-app charts become native Excel charts (DrawingML); native charts kept from import are written back verbatim
-    const plan = buildChartPlan(snapshot);
-    const needsInjection = Object.keys(plan.chartsBySheet).length > 0 || plan.passthrough !== null;
-    const withCharts = needsInjection ? await injectChartsIntoXlsx(buffer, plan) : buffer;
-
-    // Pictures: same drawing part as charts; written before shapes so shapes stay on top
-    // (the in-app overlay paints pictures under shapes for the same reason)
-    const imagePlan = buildImagePlan(snapshot);
-    const withImages =
-      Object.keys(imagePlan.imagesBySheet).length > 0
-        ? await injectImagesIntoXlsx(withCharts, imagePlan)
-        : withCharts;
-
-    // Shapes: appended to the same drawing part the charts created (Excel allows one per sheet)
-    const shapePlan = buildShapePlan(snapshot);
-    const withShapes =
-      Object.keys(shapePlan.shapesBySheet).length > 0
-        ? await injectShapesIntoXlsx(withImages, shapePlan)
-        : withImages;
-
-    // Pivots: value sheets plus native pivotTable/pivotCache parts, so Excel can still refresh them
-    const pivotPlan = buildPivotXlsxPlan(snapshot);
-    const withPivots =
-      pivotPlan.items.length > 0
-        ? await injectPivotTablesIntoXlsx(withShapes, pivotPlan)
-        : withShapes;
-
-    // Names (P2-S7.1): exceljs cannot express sheet-scoped names, so workbook.xml is patched here
-    const namedRanges = snapshot.namedRanges ?? [];
-    const withNames =
-      namedRanges.length > 0
-        ? await injectNamedRanges(withPivots, namedRanges, snapshot.sheetOrder, snapshot.sheets)
-        : withPivots;
-
-    // Tables (P2-S7.3): parts + sheet rels + content types; cells are left untouched
-    const bytes =
-      (snapshot.syntoolsTables ?? []).length > 0
-        ? await injectTablesIntoXlsx(withNames, snapshot)
-        : withNames;
+    // Native parts exceljs cannot write (charts / pictures / shapes / pivot tables / names / tables)
+    // are injected by the registry in `xlsxPostProcess.ts`; the array order there is the layer order
+    const bytes = await runXlsxPostProcess(buffer, snapshot);
     return { ok: true, value: new Uint8Array(bytes) };
   } catch {
     return { ok: false, error: 'EXPORT_FAILED' };

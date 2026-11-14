@@ -112,14 +112,14 @@ export function collectExportIssues(snapshot: WorkbookSnapshot): FidelityIssue[]
     });
   }
 
-  // Comment threads live in our own snapshot field only; xlsx has no counterpart here yet
+  // Comment threads are written as legacy notes (P1-9): the text survives, the thread does not
   const comments = countSheetComments(readSheetComments(snapshot));
   if (comments > 0) {
     issues.push({
       code: 'sheet.comments',
-      severity: 'warning',
+      severity: 'info',
       count: comments,
-      messageKey: 'tools.sheet.lossComments',
+      messageKey: 'tools.sheet.commentsAsNotes',
     });
   }
 

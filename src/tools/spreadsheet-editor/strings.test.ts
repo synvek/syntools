@@ -66,6 +66,7 @@ describe('sheet copy', () => {
       'shortcutGroupFormat',
       'shortcutGroupDocs',
       'shortcutEngineNote',
+      'commentsAsNotes',
       // P1-10 公式审计
       'formulaAudit',
       'formulaAuditNone',
