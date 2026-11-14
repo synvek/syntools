@@ -15,7 +15,8 @@ import {
 import type { WorkbookSnapshot } from '../xlsx-io';
 
 /**
- * Print setup for a spreadsheet: area, paper, orientation, scaling, repeated header and gridlines.
+ * Print setup for a spreadsheet: area, paper, orientation, scaling, repeated header, gridlines and
+ * floating objects (pictures / charts / shapes).
  * The page count is computed with the same pure pagination used by printing / PDF export, so the
  * number shown always matches what comes out.
  */
@@ -152,6 +153,14 @@ export function PrintDialog({
               onChange={(event) => patch({ gridlines: event.target.checked })}
             />
             {t('tools.sheet.gridlines')}
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={options.printObjects}
+              onChange={(event) => patch({ printObjects: event.target.checked })}
+            />
+            {t('tools.sheet.printObjects')}
           </label>
         </div>
 

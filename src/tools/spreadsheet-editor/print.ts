@@ -1,5 +1,6 @@
 import type { ToolResult } from '@/core/types';
 import { excelSerialToDate, type UniverStyleLite } from './core';
+import { anchorToPx, buildSheetLayout, columnLeftPx, rowTopPx } from './shapes';
 import type { SheetSnapshot, WorkbookSnapshot } from './xlsx-io';
 
 /**
@@ -34,6 +35,11 @@ export interface SheetPrintOptions {
   /** Repeat the first printed row at the top of every following page */
   repeatHeaderRow: boolean;
   gridlines: boolean;
+  /**
+   * 打印图片 / 图表 / 形状（P1-6）。默认 true，与 Excel 的"打印对象"一致；
+   * 关掉后模型里干脆没有对象，PDF 也就不会带上半透明的图压住文字。
+   */
+  printObjects: boolean;
 }
 
 export const PAPER_SIZES: Record<PaperSize, { width: number; height: number }> = {
@@ -49,6 +55,7 @@ export const DEFAULT_SHEET_PRINT_OPTIONS: SheetPrintOptions = {
   scale: 'fit',
   repeatHeaderRow: true,
   gridlines: true,
+  printObjects: true,
 };
 
 /** Snapshot px → pt */
@@ -175,12 +182,39 @@ export interface SheetPrintCell {
   covered?: boolean;
 }
 
+/**
+ * 叠在表格上的浮动对象（P1-6）。坐标是**本打印模型**的 pt，原点 = 打印范围左上角，
+ * 因此"打印选区而不是整张表"时对象会自动跟着范围平移。
+ */
+export interface SheetPrintObject {
+  /** 图表 / 图片 / 形状自己的 id（测试与排错用） */
+  id: string;
+  kind: 'image' | 'chart' | 'shape';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 图片与图表的位图（dataURL）。图表没有位图 = 渲染失败/数据为空，此时整块跳过 */
+  src?: string;
+  /** 形状外观（形状不转位图，直接画 div：清晰且不受缩放影响） */
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  text?: string;
+  rotation?: number;
+}
+
+/** 图表位图来源：chartId → PNG dataURL。由调用方离屏渲染（纯模型层不碰 DOM / echarts） */
+export type ChartImageMap = Record<string, string>;
+
 export interface SheetPrintModel {
   sheetName: string;
   range: CellRange;
   columns: { index: number; width: number }[];
   rows: { index: number; height: number }[];
   cells: SheetPrintCell[];
+  /** 浮动对象（P1-6）：图片 / 图表 / 形状，按模型坐标排好 */
+  objects: SheetPrintObject[];
   /** Total size in points at 100% */
   width: number;
   height: number;
@@ -198,11 +232,116 @@ function alignOf(style: UniverStyleLite | undefined): SheetPrintCell['align'] {
   return undefined;
 }
 
-/** Build the printable model (columns / rows / cells / merges) for a range */
+/** 图表的 x/y 以工作表左上角（**含**行列头）为原点，与 `chartXml.computeAnchor` 的口径一致 */
+const DEFAULT_ROW_HEADER_WIDTH = 46;
+const DEFAULT_COLUMN_HEADER_HEIGHT = 20;
+
+/**
+ * 打印选项 + 调用方给的模型选项合成一份最终模型选项。
+ *
+ * 规则：默认打印对象（Excel 默认），面板上的开关关掉时**以面板为准**；
+ * 但调用方显式传了 `includeObjects`（比如内部截图、测试）时不覆盖它。
+ */
+export function resolvePrintModelOptions(
+  options: SheetPrintOptions,
+  modelOptions: PrintModelOptions = {},
+): PrintModelOptions {
+  return {
+    ...modelOptions,
+    includeObjects: modelOptions.includeObjects ?? options.printObjects !== false,
+  };
+}
+
+export interface PrintModelOptions {
+  /** chartId → 已渲染的 PNG dataURL；缺失的图表整块跳过（没有位图就画不出东西） */
+  chartImages?: ChartImageMap;
+  /** 是否把浮动对象放进模型；默认 true（Excel 默认也打印对象） */
+  includeObjects?: boolean;
+}
+
+/**
+ * 浮动对象 → 打印坐标。
+ *
+ * 三种对象的锚点口径不同，必须分别换算：
+ * - 图片 / 形状：单元格锚点（`from`）+ 真实列宽行高，走 `anchorToPx`；
+ * - 图表：像素坐标且**含行列头**（导出侧 `computeAnchor` 就是减掉行列头再算单元格的）。
+ *
+ * 全部再减去打印范围原点，这样"打印选区"时对象不会留在原地。
+ */
+function collectPrintObjects(
+  snapshot: WorkbookSnapshot,
+  sheetId: string,
+  sheet: SheetSnapshot,
+  area: CellRange,
+  chartImages: ChartImageMap,
+): SheetPrintObject[] {
+  const layout = buildSheetLayout(sheet);
+  const originX = columnLeftPx(layout, area.startColumn);
+  const originY = rowTopPx(layout, area.startRow);
+  const pt = (px: number): number => px * PX_TO_PT;
+  // 归属：只有"从没写过 sheetId"的老草稿才回落到第一张表；
+  // 写了但指向已删掉的表 → 这类对象没有归属，宁可不打印，也不要让它出现在每一张表的打印件上
+  const fallbackId = snapshot.sheetOrder?.[0];
+  const isOnSheet = (id: string | undefined): boolean =>
+    id === undefined ? fallbackId === sheetId : id === sheetId;
+
+  const objects: SheetPrintObject[] = [];
+  for (const image of snapshot.syntoolsImages ?? []) {
+    if (!isOnSheet(image.sheetId)) continue;
+    const at = anchorToPx(image.from, layout);
+    objects.push({
+      id: image.id,
+      kind: 'image',
+      x: pt(at.x - originX),
+      y: pt(at.y - originY),
+      width: pt(image.width),
+      height: pt(image.height),
+      src: image.src,
+    });
+  }
+  for (const shape of snapshot.syntoolsShapes ?? []) {
+    if (!isOnSheet(shape.sheetId)) continue;
+    const at = anchorToPx(shape.from, layout);
+    objects.push({
+      id: shape.id,
+      kind: 'shape',
+      x: pt(at.x - originX),
+      y: pt(at.y - originY),
+      width: pt(shape.width),
+      height: pt(shape.height),
+      fill: shape.fill,
+      stroke: shape.stroke,
+      strokeWidth: shape.strokeWidth,
+      ...(shape.text ? { text: shape.text } : {}),
+      ...(shape.rotation ? { rotation: shape.rotation } : {}),
+    });
+  }
+  const headerX = sheet.rowHeader?.width ?? DEFAULT_ROW_HEADER_WIDTH;
+  const headerY = sheet.columnHeader?.height ?? DEFAULT_COLUMN_HEADER_HEIGHT;
+  for (const chart of snapshot.syntoolsCharts ?? []) {
+    if (!isOnSheet(chart.sheetId)) continue;
+    const src = chartImages[chart.id];
+    // 位图渲染不出来（数据空了 / 离屏渲染失败）时不画占位框：一张"什么都没有"的框比不画更让人困惑
+    if (!src) continue;
+    objects.push({
+      id: chart.id,
+      kind: 'chart',
+      x: pt(Math.max(0, chart.x - headerX) - originX),
+      y: pt(Math.max(0, chart.y - headerY) - originY),
+      width: pt(chart.width),
+      height: pt(chart.height),
+      src,
+    });
+  }
+  return objects;
+}
+
+/** Build the printable model (columns / rows / cells / merges / floating objects) for a range */
 export function buildSheetPrintModel(
   snapshot: WorkbookSnapshot,
   sheetId: string | null,
   range: CellRange | null,
+  modelOptions: PrintModelOptions = {},
 ): SheetPrintModel | null {
   const ids = snapshot.sheetOrder?.length
     ? snapshot.sheetOrder
@@ -287,6 +426,10 @@ export function buildSheetPrintModel(
     columns,
     rows,
     cells: cells.sort((a, b) => a.row - b.row || a.col - b.col),
+    objects:
+      modelOptions.includeObjects === false
+        ? []
+        : collectPrintObjects(snapshot, target, sheet, area, modelOptions.chartImages ?? {}),
     width: columns.reduce((sum, column) => sum + column.width, 0),
     height: rows.reduce((sum, row) => sum + row.height, 0),
   };
@@ -399,6 +542,90 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** 一页在模型坐标系里覆盖的区域（pt，未缩放） */
+export interface PrintPageRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * 页面对应的模型矩形。
+ *
+ * 重复标题行会让一页"跳过一段行"：第 2 页 = 复制的表头行 + 第 6..10 行。对象按单元格锚点定位，
+ * 复制过来的表头行没有真实位置，所以对象层以**正文第一行**为原点——这也符合 Excel 的行为：
+ * 打印标题只复制行，不复制浮动对象。
+ */
+export function resolvePageRect(
+  model: SheetPrintModel,
+  page: SheetPrintPage,
+): PrintPageRect | null {
+  const firstCol = page.columns[0];
+  const lastCol = page.columns[page.columns.length - 1];
+  if (firstCol === undefined || lastCol === undefined) return null;
+  const colIndex = new Map(model.columns.map((column, index) => [column.index, index] as const));
+  const startCol = colIndex.get(firstCol);
+  const endCol = colIndex.get(lastCol);
+  if (startCol === undefined || endCol === undefined) return null;
+  let x = 0;
+  for (let index = 0; index < startCol; index += 1) x += model.columns[index].width;
+  let width = 0;
+  for (let index = startCol; index <= endCol; index += 1) width += model.columns[index].width;
+
+  // 正文行：重复表头时跳过第一行（那是从别的页复制来的）
+  const bodyRows = page.repeatedHeader ? page.rows.slice(1) : page.rows;
+  const firstRow = bodyRows[0];
+  const lastRow = bodyRows[bodyRows.length - 1];
+  if (firstRow === undefined || lastRow === undefined) return null;
+  const rowIndex = new Map(model.rows.map((row, index) => [row.index, index] as const));
+  const startRow = rowIndex.get(firstRow);
+  const endRow = rowIndex.get(lastRow);
+  if (startRow === undefined || endRow === undefined) return null;
+  let y = 0;
+  for (let index = 0; index < startRow; index += 1) y += model.rows[index].height;
+  let height = 0;
+  for (let index = startRow; index <= endRow; index += 1) height += model.rows[index].height;
+  return { x, y, width, height };
+}
+
+/** 对象与页面矩形是否相交（不相交就整块不画，避免在页外生成一堆被裁掉的节点） */
+function intersectsPage(object: SheetPrintObject, rect: PrintPageRect): boolean {
+  return (
+    object.x + object.width > rect.x &&
+    object.x < rect.x + rect.width &&
+    object.y + object.height > rect.y &&
+    object.y < rect.y + rect.height
+  );
+}
+
+/** 单个对象的 HTML：图片/图表用位图，形状直接画 div（缩放后仍然清晰） */
+function renderObject(object: SheetPrintObject, rect: PrintPageRect, scale: number): string {
+  const left = ((object.x - rect.x) * scale).toFixed(2);
+  const top = ((object.y - rect.y) * scale).toFixed(2);
+  const width = (object.width * scale).toFixed(2);
+  const height = (object.height * scale).toFixed(2);
+  const box = `position:absolute;left:${left}pt;top:${top}pt;width:${width}pt;height:${height}pt`;
+  if (object.kind === 'shape') {
+    const styles = [box, `background:${object.fill ?? 'transparent'}`];
+    if (object.stroke) {
+      const strokeWidth = (object.strokeWidth ?? 1) * PX_TO_PT;
+      styles.push(`border:${strokeWidth.toFixed(2)}pt solid ${object.stroke}`);
+    }
+    if (object.rotation) styles.push(`transform:rotate(${object.rotation}deg)`);
+    styles.push(
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'overflow:hidden',
+      'font-size:9pt',
+      'line-height:1.2',
+    );
+    return `<div class="print-shape" style="${styles.join(';')}">${escapeHtml(object.text ?? '')}</div>`;
+  }
+  return `<img class="print-${object.kind}" alt="" src="${escapeHtml(object.src ?? '')}" style="${box};object-fit:fill">`;
+}
+
 /** One `<td>` per cell; merged anchors are clipped to the current page */
 function renderCell(
   cell: SheetPrintCell,
@@ -492,9 +719,26 @@ export function buildSheetPrintHtml(
           return `<tr style="height:${height.toFixed(2)}pt">${tds}</tr>`;
         })
         .join('');
+      // 浮动对象层：与表格同一个内容框原点，按页矩形裁切（跨页的对象在每页各画被裁的那一块）
+      const rect = resolvePageRect(model, page);
+      const headerHeight = page.repeatedHeader
+        ? (model.rows.find((row) => row.index === page.rows[0])?.height ?? 0) * scale
+        : 0;
+      const placed = rect ? model.objects.filter((object) => intersectsPage(object, rect)) : [];
+      const objectLayer =
+        rect && placed.length > 0
+          ? `<div class="print-objects" style="left:${options.margin}pt;top:${(
+              options.margin + headerHeight
+            ).toFixed(2)}pt;width:${Math.min(rect.width * scale, contentWidth).toFixed(
+              2,
+            )}pt;height:${(rect.height * scale).toFixed(2)}pt">${placed
+              .map((object) => renderObject(object, rect, scale))
+              .join('')}</div>`
+          : '';
+      // 对象层放在表格之后：绝对定位的层要盖在单元格上面，才与编辑态"浮在格子上"一致
       return `<section class="print-page"><table class="sheet-table" style="width:${tableWidth.toFixed(
         2,
-      )}pt;${gridline}">${colgroup}${rowsHtml}</table></section>`;
+      )}pt;${gridline}">${colgroup}${rowsHtml}</table>${objectLayer}</section>`;
     })
     .join('');
 
@@ -508,6 +752,8 @@ html, body { margin: 0; padding: 0; background: #fff }
 .sheet-table { border-collapse: collapse; table-layout: fixed; font: 9pt/1.35 system-ui, -apple-system, sans-serif }
 .sheet-table td { ${gridline} padding: 2pt 3pt; vertical-align: middle;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.print-objects { position: absolute; overflow: hidden }
+.print-image, .print-chart, .print-shape { display: block }
 @media print { .sheet-table td { overflow: hidden } }
 </style></head><body>${body}</body></html>`;
 }
@@ -521,9 +767,15 @@ export async function printSheet(
   sheetId: string | null,
   options: SheetPrintOptions,
   range: CellRange | null = null,
+  modelOptions: PrintModelOptions = {},
 ): Promise<ToolResult<{ pages: number }>> {
   if (typeof window === 'undefined') return { ok: false, error: 'PRINT_UNSUPPORTED' };
-  const model = buildSheetPrintModel(snapshot, sheetId, range);
+  const model = buildSheetPrintModel(
+    snapshot,
+    sheetId,
+    range,
+    resolvePrintModelOptions(options, modelOptions),
+  );
   if (!model) return { ok: false, error: 'EMPTY' };
   const pages = paginateSheet(model, options);
   if (pages.length === 0) return { ok: false, error: 'EMPTY' };
@@ -553,8 +805,14 @@ export async function exportSheetPdf(
   sheetId: string | null,
   options: SheetPrintOptions,
   range: CellRange | null = null,
+  modelOptions: PrintModelOptions = {},
 ): Promise<ToolResult<Uint8Array>> {
-  const model = buildSheetPrintModel(snapshot, sheetId, range);
+  const model = buildSheetPrintModel(
+    snapshot,
+    sheetId,
+    range,
+    resolvePrintModelOptions(options, modelOptions),
+  );
   if (!model) return { ok: false, error: 'EMPTY' };
   const pages = paginateSheet(model, options);
   if (pages.length === 0) return { ok: false, error: 'EMPTY' };

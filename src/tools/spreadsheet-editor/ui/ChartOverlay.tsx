@@ -17,14 +17,7 @@ import {
   type ChartLegendPosition,
   type ChartType,
 } from '../charts';
-
-/** Minimal ECharts instance interface (avoids a static echarts type import) */
-interface ChartInstance {
-  setOption: (option: unknown, notMerge?: boolean) => void;
-  resize: () => void;
-  dispose: () => void;
-  getDataURL: (options: { type: 'png'; pixelRatio?: number; backgroundColor?: string }) => string;
-}
+import { createChartRenderer, type ChartRenderer } from '../chartRender';
 
 const TYPES: ChartType[] = CHART_TYPES;
 const TYPE_LABEL_KEY: Record<ChartType, string> = CHART_TYPE_LABEL_KEY;
@@ -68,7 +61,7 @@ export function ChartOverlay({
 }: ChartOverlayProps) {
   const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const instanceRef = useRef<ChartInstance | null>(null);
+  const instanceRef = useRef<ChartRenderer | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [rangeText, setRangeText] = useState(() => buildRangeLabel(config.range));
@@ -91,28 +84,12 @@ export function ChartOverlay({
     let observer: ResizeObserver | null = null;
     void (async () => {
       try {
-        const [core, charts, components, renderers] = await Promise.all([
-          import('echarts/core'),
-          import('echarts/charts'),
-          import('echarts/components'),
-          import('echarts/renderers'),
-        ]);
-        if (cancelled) return;
-        core.use([
-          charts.BarChart,
-          charts.LineChart,
-          charts.PieChart,
-          // 散点 / 雷达必须在 core.use 里注册，否则 setOption 会报"系列未导入"；
-          // 面积图没有独立系列类型，复用 LineChart + areaStyle
-          charts.ScatterChart,
-          charts.RadarChart,
-          components.GridComponent,
-          components.TooltipComponent,
-          components.LegendComponent,
-          components.RadarComponent,
-          renderers.CanvasRenderer,
-        ]);
-        const instance = core.init(host) as unknown as ChartInstance;
+        // 模块注册表与打印出图共用 `chartRender.ts`：两边各抄一份迟早漂移
+        const instance = await createChartRenderer(host);
+        if (cancelled) {
+          instance.dispose();
+          return;
+        }
         instanceRef.current = instance;
         // Let ECharts recompute the canvas after a size change (drag-resize / window resize)
         observer = new ResizeObserver(() => instance.resize());

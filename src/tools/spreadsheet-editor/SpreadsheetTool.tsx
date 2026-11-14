@@ -125,7 +125,8 @@ import {
   setThreadResolved,
   type CommentThread,
 } from '../../core/comments/model';
-import { exportSheetPdf, type CellRange } from './print';
+import { exportSheetPdf, type CellRange, type PrintModelOptions } from './print';
+import { renderChartImages } from './chartRender';
 import {
   createFidelityReport,
   isFidelityMuted,
@@ -1632,7 +1633,9 @@ export default function SpreadsheetTool() {
     const range = handle.getActiveRange();
     const sheetId = handle.getActiveSheetId();
     setPrintTarget({
-      snapshot: handle.getSnapshot(),
+      // 图片 / 图表 / 形状只存在于本工具自己的字段里，`getSnapshot()` 拿不到——
+      // 不合并进来的话，打印与 PDF 永远是"只有格子"（P1-6）
+      snapshot: withDocOwnedContent(handle.getSnapshot()),
       sheetId,
       selection: range
         ? {
@@ -1646,18 +1649,48 @@ export default function SpreadsheetTool() {
   };
 
   /** Print; browsers that block the popup fall back to PDF export */
+  /**
+   * 打印用的图表位图：图表在应用内是 ECharts 画布，打印模型只吃位图，
+   * 所以先离屏渲染一遍（同一份 `ChartConfig` + 同一份图表数据，和应用里看到的一致）。
+   */
+  const printModelOptions = async (target: typeof printTarget): Promise<PrintModelOptions> => {
+    if (!target) return {};
+    const owner = (chart: ChartConfig): string =>
+      chart.sheetId && target.snapshot.sheets?.[chart.sheetId]
+        ? chart.sheetId
+        : (target.snapshot.sheetOrder?.[0] ?? '');
+    const charts = (target.snapshot.syntoolsCharts ?? []).filter(
+      (chart) => owner(chart) === target.sheetId,
+    );
+    const chartImages = await renderChartImages(charts, (chart) => chartDataMap[chart.id] ?? null);
+    return { chartImages };
+  };
+
   const handlePrint = async (options: SheetPrintOptions, range: CellRange | null) => {
     if (!printTarget) return;
     setFailure(null);
     setBusy('export');
-    const result = await printSheet(printTarget.snapshot, printTarget.sheetId, options, range);
+    const modelOptions = await printModelOptions(printTarget);
+    const result = await printSheet(
+      printTarget.snapshot,
+      printTarget.sheetId,
+      options,
+      range,
+      modelOptions,
+    );
     if (result.ok) {
       setBusy(null);
       setPrintTarget(null);
       return;
     }
     if (result.error === 'PRINT_BLOCKED' || result.error === 'PRINT_UNSUPPORTED') {
-      const pdf = await exportSheetPdf(printTarget.snapshot, printTarget.sheetId, options, range);
+      const pdf = await exportSheetPdf(
+        printTarget.snapshot,
+        printTarget.sheetId,
+        options,
+        range,
+        modelOptions,
+      );
       setBusy(null);
       if (!pdf.ok) {
         setFailure(pdf);
@@ -1676,7 +1709,14 @@ export default function SpreadsheetTool() {
     if (!printTarget) return;
     setFailure(null);
     setBusy('export');
-    const result = await exportSheetPdf(printTarget.snapshot, printTarget.sheetId, options, range);
+    const modelOptions = await printModelOptions(printTarget);
+    const result = await exportSheetPdf(
+      printTarget.snapshot,
+      printTarget.sheetId,
+      options,
+      range,
+      modelOptions,
+    );
     setBusy(null);
     if (!result.ok) {
       setFailure(result);

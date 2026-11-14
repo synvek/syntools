@@ -5,6 +5,8 @@ import {
   DEFAULT_SHEET_PRINT_OPTIONS,
   formatSheetValue,
   paginateSheet,
+  resolvePageRect,
+  resolvePrintModelOptions,
   resolvePrintRange,
   resolvePrintScale,
   resolveUsedRange,
@@ -251,5 +253,246 @@ describe('buildSheetPrintHtml', () => {
     const html = buildSheetPrintHtml(model, paginateSheet(model, options()), options());
     expect(html).toContain('&lt;script&gt;');
     expect(html).not.toContain('<script>');
+  });
+});
+
+/**
+ * P1-6 打印含对象：图片 / 图表 / 形状要跟着纸面走。
+ *
+ * 这里的坐标全部按"pt、原点 = 打印范围左上角"断言，因为对象一旦错位，
+ * 用户看到的是"图跑到别的页上去了"，而不是一条可以忽略的告警。
+ */
+describe('浮动对象（P1-6）', () => {
+  // 默认列宽 93px、行高 27px、行头 46px、列头 20px，px → pt 系数 0.75
+  const COL_PX = 93;
+  const ROW_PX = 27;
+  const PX_TO_PT = 0.75;
+  const ROW_HEADER = 46;
+  const COL_HEADER = 20;
+
+  function makeBook(
+    patch: (book: WorkbookSnapshot) => void,
+    cellRows = [0],
+  ): { snapshot: WorkbookSnapshot; id: string } {
+    const snapshot = createEmptySnapshot('book');
+    const id = snapshot.sheetOrder[0];
+    snapshot.sheets[id].cellData = {};
+    for (const row of cellRows) snapshot.sheets[id].cellData[String(row)] = { 0: { v: 'x' } };
+    patch(snapshot);
+    return { snapshot, id };
+  }
+
+  const image = (sheetId: string) => ({
+    id: 'img-1',
+    sheetId,
+    from: { col: 1, row: 1, colOff: 0, rowOff: 0 },
+    width: 100,
+    height: 80,
+    src: 'data:image/png;base64,AAA',
+    name: 'logo.png',
+    z: 1,
+  });
+
+  const chart = (sheetId: string) => ({
+    id: 'chart-1',
+    type: 'bar' as const,
+    sheetId,
+    range: { startRow: 0, startColumn: 0, endRow: 2, endColumn: 1 },
+    // 图表坐标以工作表左上角（含行头 / 列头）为原点，与导出侧 computeAnchor 一致
+    x: ROW_HEADER + COL_PX,
+    y: COL_HEADER + ROW_PX,
+    width: 320,
+    height: 200,
+  });
+
+  it('图片按列宽行高换算成 pt', () => {
+    const { snapshot, id } = makeBook((book) => {
+      book.syntoolsImages = [image(book.sheetOrder[0])];
+    });
+    const model = buildSheetPrintModel(snapshot, id, null)!;
+    expect(model.objects).toHaveLength(1);
+    expect(model.objects[0]).toMatchObject({
+      kind: 'image',
+      x: COL_PX * PX_TO_PT,
+      y: ROW_PX * PX_TO_PT,
+      width: 100 * PX_TO_PT,
+      height: 80 * PX_TO_PT,
+      src: 'data:image/png;base64,AAA',
+    });
+  });
+
+  it('形状保留外观（形状不转位图，缩放后仍然清晰）', () => {
+    const { snapshot, id } = makeBook((book) => {
+      book.syntoolsShapes = [
+        {
+          id: 'shape-1',
+          prst: 'rect',
+          sheetId: book.sheetOrder[0],
+          from: { col: 2, row: 2, colOff: 0, rowOff: 0 },
+          width: 120,
+          height: 60,
+          fill: '#FFD966',
+          stroke: '#BF9000',
+          strokeWidth: 2,
+          text: '标题',
+          z: 1,
+        },
+      ];
+    });
+    const model = buildSheetPrintModel(snapshot, id, null)!;
+    expect(model.objects[0]).toMatchObject({
+      kind: 'shape',
+      x: COL_PX * 2 * PX_TO_PT,
+      y: ROW_PX * 2 * PX_TO_PT,
+      fill: '#FFD966',
+      stroke: '#BF9000',
+      strokeWidth: 2,
+      text: '标题',
+    });
+  });
+
+  it('图表坐标要减掉行列头（导出侧口径一致）', () => {
+    const { snapshot, id } = makeBook((book) => {
+      book.syntoolsCharts = [chart(book.sheetOrder[0])];
+    });
+    const model = buildSheetPrintModel(snapshot, id, null, {
+      chartImages: { 'chart-1': 'data:image/png;base64,CHART' },
+    })!;
+    expect(model.objects[0]).toMatchObject({
+      kind: 'chart',
+      x: COL_PX * PX_TO_PT,
+      y: ROW_PX * PX_TO_PT,
+      width: 320 * PX_TO_PT,
+      height: 200 * PX_TO_PT,
+      src: 'data:image/png;base64,CHART',
+    });
+  });
+
+  it('没有位图的图表整块跳过（不画一个空框）', () => {
+    const { snapshot, id } = makeBook((book) => {
+      book.syntoolsCharts = [chart(book.sheetOrder[0])];
+    });
+    expect(buildSheetPrintModel(snapshot, id, null)!.objects).toEqual([]);
+  });
+
+  it('别的表上的对象不会出现在这张表的打印件里', () => {
+    const { snapshot, id } = makeBook((book) => {
+      book.syntoolsImages = [image('other-sheet')];
+    });
+    expect(buildSheetPrintModel(snapshot, id, null)!.objects).toEqual([]);
+  });
+
+  it('打印选区时对象跟着范围平移', () => {
+    const { snapshot, id } = makeBook(
+      (book) => {
+        book.syntoolsImages = [image(book.sheetOrder[0])];
+      },
+      [0, 1, 2],
+    );
+    const model = buildSheetPrintModel(snapshot, id, {
+      startRow: 1,
+      startColumn: 1,
+      endRow: 2,
+      endColumn: 3,
+    })!;
+    // 图片锚在 B2，正好是选区左上角 → 打印件里应当从 0,0 开始
+    expect(model.objects[0]).toMatchObject({ x: 0, y: 0 });
+  });
+
+  it('includeObjects: false 时模型里没有对象（留给"不打印对象"的开关）', () => {
+    const { snapshot, id } = makeBook((book) => {
+      book.syntoolsImages = [image(book.sheetOrder[0])];
+    });
+    expect(buildSheetPrintModel(snapshot, id, null, { includeObjects: false })!.objects).toEqual(
+      [],
+    );
+  });
+
+  it('页面矩形：重复表头的那一页从正文第一行开始', () => {
+    const rows = Array.from({ length: 40 }, (_, index) => index);
+    const { snapshot, id } = makeBook((book) => {
+      const sheet = book.sheets[book.sheetOrder[0]];
+      sheet.rowData = {};
+      for (const row of rows) sheet.rowData[String(row)] = { h: 30 };
+    }, rows);
+    const model = buildSheetPrintModel(snapshot, id, null)!;
+    const pages = paginateSheet(model, options({ scale: 'actual', repeatHeaderRow: true }));
+    expect(pages.length).toBe(2);
+    const first = resolvePageRect(model, pages[0])!;
+    expect(first).toMatchObject({ x: 0, y: 0 });
+    const second = resolvePageRect(model, pages[1])!;
+    // 30px 行 × 0.75 = 22.5pt；A4 版心 769.89pt 放得下 34 行 → 第二页从第 35 行（索引 34）开始
+    expect(pages[1].repeatedHeader).toBe(true);
+    expect(second.y).toBe(34 * 22.5);
+    expect(second.height).toBe(6 * 22.5);
+  });
+
+  it('HTML：对象层按页裁切，只出现在相交的那一页', () => {
+    const rows = Array.from({ length: 40 }, (_, index) => index);
+    const { snapshot, id } = makeBook((book) => {
+      const sheet = book.sheets[book.sheetOrder[0]];
+      sheet.rowData = {};
+      for (const row of rows) sheet.rowData[String(row)] = { h: 30 };
+      // 锚在第 36 行：第一页只到第 34 行，所以第一页不该出现
+      book.syntoolsImages = [
+        { ...image(book.sheetOrder[0]), from: { col: 0, row: 35, colOff: 0, rowOff: 0 } },
+      ];
+    }, rows);
+    const model = buildSheetPrintModel(snapshot, id, null)!;
+    const opts = options({ scale: 'actual', repeatHeaderRow: true });
+    const pages = paginateSheet(model, opts);
+    const html = buildSheetPrintHtml(model, pages, opts);
+    const sections = html.split('<section class="print-page">');
+    expect(sections).toHaveLength(3);
+    expect(sections[1]).not.toContain('print-objects');
+    expect(sections[2]).toContain('print-objects');
+    expect(sections[2]).toContain('class="print-image"');
+    // 对象层与表格同原点：left/top 都用页边距
+    expect(sections[2]).toContain(`left:${opts.margin}pt`);
+    expect(html).toContain('.print-objects { position: absolute; overflow: hidden }');
+  });
+
+  it('HTML：形状画成带边框的 div，文本转义', () => {
+    const { snapshot, id } = makeBook((book) => {
+      book.syntoolsShapes = [
+        {
+          id: 'shape-9',
+          prst: 'rect',
+          sheetId: book.sheetOrder[0],
+          from: { col: 0, row: 0, colOff: 0, rowOff: 0 },
+          width: 100,
+          height: 50,
+          fill: '#FFF2CC',
+          stroke: '#000000',
+          strokeWidth: 1,
+          text: '<b>注</b>',
+          z: 1,
+        },
+      ];
+    });
+    const model = buildSheetPrintModel(snapshot, id, null)!;
+    const opts = options();
+    const html = buildSheetPrintHtml(model, paginateSheet(model, opts), opts);
+    expect(html).toContain('class="print-shape"');
+    expect(html).toContain('background:#FFF2CC');
+    expect(html).toContain('border:0.75pt solid #000000');
+    expect(html).toContain('&lt;b&gt;注&lt;/b&gt;');
+  });
+});
+
+describe('打印对象的开关（P1-6）', () => {
+  it('面板上的"打印对象"决定模型里有没有对象，调用方显式指定时以调用方为准', () => {
+    expect(resolvePrintModelOptions(DEFAULT_SHEET_PRINT_OPTIONS).includeObjects).toBe(true);
+    const off = resolvePrintModelOptions({
+      ...DEFAULT_SHEET_PRINT_OPTIONS,
+      printObjects: false,
+    });
+    expect(off.includeObjects).toBe(false);
+    expect(
+      resolvePrintModelOptions(
+        { ...DEFAULT_SHEET_PRINT_OPTIONS, printObjects: false },
+        { includeObjects: true },
+      ).includeObjects,
+    ).toBe(true);
   });
 });
