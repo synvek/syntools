@@ -73,59 +73,73 @@ export function SheetTabs({
 
   return (
     <div className="relative flex items-center gap-1 overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-800/50">
-      {sheets.map((sheet) => {
-        const active = sheet.id === activeId;
-        return (
-          <div key={sheet.id} className="flex shrink-0 items-center">
-            {editingId === sheet.id ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                onBlur={commitRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitRename();
-                  if (e.key === 'Escape') setEditingId(null);
-                }}
-                className="w-28 rounded border border-blue-500 bg-white px-2 py-1 text-sm focus:outline-none dark:bg-gray-900"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => onSelect(sheet.id)}
-                onDoubleClick={() => startRename(sheet.id, sheet.name)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setMenu({ id: sheet.id, x: e.clientX, y: e.clientY });
-                }}
-                title={
-                  sheet.hidden ? `${sheet.name} (${t('tools.sheet.hiddenSheet')})` : sheet.name
-                }
-                className={[
-                  'flex items-center gap-1.5 rounded px-3 py-1 text-sm transition-colors',
-                  active
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-700',
-                ].join(' ')}
-                style={
-                  active || !sheet.tabColor
-                    ? undefined
-                    : { boxShadow: `inset 3px 0 0 ${sheet.tabColor}` }
-                }
-              >
-                {sheet.tabColor && (
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: sheet.tabColor }}
-                  />
-                )}
-                <span className="max-w-[120px] truncate">{sheet.name}</span>
-              </button>
-            )}
-          </div>
-        );
-      })}
+      {/*
+       * The tab strip is a real tablist (P0-6): without it a screen reader reads five unrelated
+       * buttons and never says which sheet is active. The "+" button deliberately stays *outside*
+       * the tablist so the list only contains tabs.
+       */}
+      <div
+        role="tablist"
+        aria-label={t('tools.sheet.sheets')}
+        data-testid="sheet-tabs"
+        className="flex items-center gap-1"
+      >
+        {sheets.map((sheet) => {
+          const active = sheet.id === activeId;
+          return (
+            <div key={sheet.id} className="flex shrink-0 items-center">
+              {editingId === sheet.id ? (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitRename();
+                    if (e.key === 'Escape') setEditingId(null);
+                  }}
+                  className="w-28 rounded border border-blue-500 bg-white px-2 py-1 text-sm focus:outline-none dark:bg-gray-900"
+                />
+              ) : (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onSelect(sheet.id)}
+                  onDoubleClick={() => startRename(sheet.id, sheet.name)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMenu({ id: sheet.id, x: e.clientX, y: e.clientY });
+                  }}
+                  title={
+                    sheet.hidden ? `${sheet.name} (${t('tools.sheet.hiddenSheet')})` : sheet.name
+                  }
+                  className={[
+                    'flex items-center gap-1.5 rounded px-3 py-1 text-sm transition-colors',
+                    active
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-700',
+                  ].join(' ')}
+                  style={
+                    active || !sheet.tabColor
+                      ? undefined
+                      : { boxShadow: `inset 3px 0 0 ${sheet.tabColor}` }
+                  }
+                >
+                  {sheet.tabColor && (
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: sheet.tabColor }}
+                    />
+                  )}
+                  <span className="max-w-[120px] truncate">{sheet.name}</span>
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       <button
         type="button"

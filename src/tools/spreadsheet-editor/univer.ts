@@ -110,6 +110,7 @@ import {
   type UniverStyleLike,
 } from './sheetFormat';
 import type { FreezeMode, MergeMode, SheetPanelKind, SheetRibbonHost } from './commands';
+import { reportSheetIssue } from './issues';
 
 /**
  * Univer adapter layer: plugin registration, locales, theme and lifecycle funnel through one entry
@@ -523,13 +524,16 @@ export function createUniverInstance(
     let matrix: Array<Array<UniverStyleLike | null>> = [];
     try {
       matrix = range.getCellStyles() as unknown as Array<Array<UniverStyleLike | null>>;
-    } catch {
+    } catch (error) {
+      // Without the read the ribbon shows every toggle as "off"; say so instead of pretending
+      reportSheetIssue({ code: 'styleRead', level: 'notice', detail: String(error) });
       matrix = [];
     }
     let merged = false;
     try {
       merged = range.isMerged();
-    } catch {
+    } catch (error) {
+      reportSheetIssue({ code: 'styleRead', level: 'notice', detail: String(error) });
       merged = false;
     }
     return readSheetFormat(sampleStyles(matrix), merged);
@@ -756,7 +760,8 @@ export function createUniverInstance(
         .getDisplayValues()
         .map((row) => row.join('\t'))
         .join('\n');
-    } catch {
+    } catch (error) {
+      reportSheetIssue({ code: 'styleRead', level: 'notice', detail: String(error) });
       return '';
     }
   };
@@ -819,8 +824,14 @@ export function createUniverInstance(
         return;
       }
       void univerAPI.executeCommand(PANEL_OPERATIONS.findReplace);
-    } catch {
-      // A plugin version without the operation must not break the ribbon: the click degrades to a no-op
+    } catch (error) {
+      // A plugin version without the operation must not break the ribbon, but a click that does
+      // nothing is a bug report waiting to happen — publish it (P0-3)
+      reportSheetIssue({
+        code: 'panelUnavailable',
+        level: 'notice',
+        detail: `${panel}: ${String(error)}`,
+      });
     }
   };
 

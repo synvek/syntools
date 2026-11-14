@@ -84,10 +84,26 @@ const zh: ResourceTree = {
       exportCsv: '导出 CSV',
       exporting: '处理中…',
       ready: '编辑内容会自动保留在当前页面',
-      unsupportedTip:
-        '暂不支持图片与透视表；导入的原生图表会保留，无法写入的条件格式/数据验证会在导出报告中列出',
+      unsupportedTip: '支持图表 / 形状 / 图片 / 透视表；无法写入 xlsx 的内容会在导出报告中列出',
       cfUnsupported: '{{count}} 条条件格式无法写入 xlsx',
       dvUnsupported: '{{count}} 条数据验证无法写入 xlsx',
+      // 导入侧保真（P0-4）：说的是"已经发生了什么"，不是"可能发生什么"
+      importChartsReadonly: '{{count}} 个原生图表已原样保留，但无法在本工具中编辑',
+      importChartsheet: '{{count}} 个图表工作表（Chart Sheet）无法导入',
+      importThreadedComments: '{{count}} 组线程批注无法导入，仅旧式备注可用',
+      importMacros: '文件包含宏（VBA），导入后宏不会保留',
+      importPicturesReadonly: '{{count}} 张图片格式不受支持，已原样保留但不会显示',
+      // 失败可见化（P0-3）：短句 + 下一步动作
+      issue: {
+        clipboardRead: '无法读取剪贴板，请用 ⌘/Ctrl + V 粘贴',
+        clipboardWrite: '无法写入剪贴板，请用 ⌘/Ctrl + C 复制',
+        panelUnavailable: '该功能面板在当前版本不可用',
+        styleRead: '单元格格式读取失败，格式按钮可能显示不准确',
+        chartPartsUnreadable: '文件中的原生图表未能读取，图表可能缺失',
+      },
+      a11yGridLabel: '表格编辑区',
+      a11yCell: '已选中 {{cell}}',
+      a11yRange: '已选中 {{cell}} 起的 {{rows}} 行 {{columns}} 列',
       err: err({
         EMPTY: '工作簿为空',
         NOT_XLSX: '仅支持 .xlsx 文件',
@@ -97,6 +113,12 @@ const zh: ResourceTree = {
         EXPORT_FAILED: 'Excel 导出失败',
         SNAPSHOT_FAILED: '表格数据读取失败',
         RUNTIME_FAILED: '表格引擎启动失败',
+        FILE_ENCRYPTED:
+          '文件已加密，或是旧版 .xls 二进制格式；请用 Excel / WPS 另存为无密码的 .xlsx',
+        NOT_ZIP: '文件已损坏或不是 .xlsx（压缩包无法读取），请重新下载或另存后再试',
+        MISSING_WORKBOOK_PART: '文件缺少工作簿内容（xl/workbook.xml），可能并不是有效的 Excel 文件',
+        PART_UNREADABLE:
+          '工作簿内部结构无法解析（可能由不常见工具生成），请用 Excel / WPS 另存为 .xlsx',
       }),
     },
   },
@@ -176,9 +198,29 @@ const en: ResourceTree = {
       exporting: 'Working…',
       ready: 'Edits stay on this page',
       unsupportedTip:
-        'Images and pivot tables are not supported; charts imported from a file are preserved, and conditional formatting / data validation that cannot be written are listed in the export report',
+        'Charts, shapes, pictures and pivot tables are supported; anything that cannot be written to xlsx is listed in the export report',
       cfUnsupported: '{{count}} conditional formatting rules cannot be written to the xlsx',
       dvUnsupported: '{{count}} data validation rules cannot be written to the xlsx',
+      // Import-side fidelity (P0-4): what did happen, not what might happen
+      importChartsReadonly:
+        '{{count}} native charts were preserved as-is but cannot be edited in this tool',
+      importChartsheet: '{{count}} chart sheets could not be imported',
+      importThreadedComments:
+        '{{count}} threaded comment sets could not be imported; only legacy notes are readable',
+      importMacros: 'The file contains VBA macros; they are not kept after import',
+      importPicturesReadonly:
+        '{{count}} pictures use an unsupported format; they are preserved but not displayed',
+      // Visible failure (P0-3): a short sentence plus the next action
+      issue: {
+        clipboardRead: 'Cannot read the clipboard — use ⌘/Ctrl + V to paste',
+        clipboardWrite: 'Cannot write to the clipboard — use ⌘/Ctrl + C to copy',
+        panelUnavailable: 'This panel is unavailable in the current engine version',
+        styleRead: 'Could not read the cell formatting; format buttons may look wrong',
+        chartPartsUnreadable: 'Native charts in the file could not be read and may be missing',
+      },
+      a11yGridLabel: 'Sheet editing area',
+      a11yCell: 'Selected {{cell}}',
+      a11yRange: 'Selected {{rows}} rows by {{columns}} columns starting at {{cell}}',
       err: err({
         EMPTY: 'The workbook is empty',
         NOT_XLSX: 'Only .xlsx files are supported',
@@ -188,6 +230,14 @@ const en: ResourceTree = {
         EXPORT_FAILED: 'Excel export failed',
         SNAPSHOT_FAILED: 'Failed to read sheet data',
         RUNTIME_FAILED: 'Failed to start the sheet engine',
+        FILE_ENCRYPTED:
+          'The file is encrypted or is a legacy .xls binary; save it as an unprotected .xlsx in Excel / WPS',
+        NOT_ZIP:
+          'The file is damaged or not an .xlsx (the archive cannot be read); download it again',
+        MISSING_WORKBOOK_PART:
+          'The file has no workbook content (xl/workbook.xml); it may not be a valid Excel file',
+        PART_UNREADABLE:
+          'The workbook structure cannot be parsed (produced by an uncommon tool?); save it as .xlsx in Excel / WPS',
       }),
     },
   },
@@ -264,8 +314,7 @@ const zhTW: ResourceTree = {
       exportCsv: '匯出 CSV',
       exporting: '處理中…',
       ready: '編輯內容會保留在目前頁面',
-      unsupportedTip:
-        '不支援圖片與樞紐分析表；匯入的原生圖表會保留，無法寫入的條件式格式/資料驗證會列在匯出報告中',
+      unsupportedTip: '支援圖表 / 圖案 / 圖片 / 樞紐分析表；無法寫入 xlsx 的內容會列在匯出報告中',
       cfUnsupported: '{{count}} 條條件式格式無法寫入 xlsx',
       dvUnsupported: '{{count}} 條資料驗證無法寫入 xlsx',
       err: err({
@@ -356,7 +405,7 @@ const ja: ResourceTree = {
       exporting: '処理中…',
       ready: '編集内容はこのページに保持されます',
       unsupportedTip:
-        '画像とピボットテーブルには対応していません。読み込んだネイティブグラフは保持され、書き出せない条件付き書式・データ検証はエクスポートレポートに表示されます',
+        'グラフ・図形・画像・ピボットテーブルに対応しています。xlsx に書き出せない内容はエクスポートレポートに表示されます',
       cfUnsupported: '{{count}} 件の条件付き書式は xlsx に書き出せません',
       dvUnsupported: '{{count}} 件のデータ検証は xlsx に書き出せません',
       err: err({
@@ -449,7 +498,7 @@ const fr: ResourceTree = {
       exporting: 'Traitement…',
       ready: 'Les modifications restent sur cette page',
       unsupportedTip:
-        "Images et tableaux croisés dynamiques non pris en charge ; les graphiques importés sont conservés et la mise en forme conditionnelle / validation des données non exportables sont listées dans le rapport d'export",
+        "Graphiques, formes, images et tableaux croisés dynamiques pris en charge ; les éléments non exportables sont listés dans le rapport d'exportation",
       cfUnsupported:
         '{{count}} règles de mise en forme conditionnelle ne peuvent pas être écrites dans le xlsx',
       dvUnsupported:
@@ -545,7 +594,7 @@ const de: ResourceTree = {
       exporting: 'Wird verarbeitet…',
       ready: 'Änderungen bleiben auf dieser Seite',
       unsupportedTip:
-        'Bilder und Pivot-Tabellen werden nicht unterstützt; importierte Diagramme bleiben erhalten und nicht exportierbare bedingte Formatierungen / Datenvalidierungen werden im Exportbericht aufgeführt',
+        'Diagramme, Formen, Bilder und Pivot-Tabellen werden unterstützt; nicht exportierbare Inhalte stehen im Exportbericht',
       cfUnsupported:
         '{{count}} Regeln für bedingte Formatierung können nicht in die xlsx geschrieben werden',
       dvUnsupported:
@@ -639,7 +688,7 @@ const it: ResourceTree = {
       exporting: 'Elaborazione…',
       ready: 'Le modifiche restano in questa pagina',
       unsupportedTip:
-        'Immagini e tabelle pivot non sono supportati; i grafici importati vengono conservati e formattazione condizionale / convalida dati non esportabili sono elencate nel report di esportazione',
+        'Grafici, forme, immagini e tabelle pivot sono supportati; ciò che non può essere esportato è elencato nel report di esportazione',
       cfUnsupported:
         '{{count}} regole di formattazione condizionale non possono essere scritte nel file xlsx',
       dvUnsupported: '{{count}} regole di convalida dati non possono essere scritte nel file xlsx',
@@ -732,7 +781,7 @@ const es: ResourceTree = {
       exporting: 'Procesando…',
       ready: 'Los cambios se mantienen en esta página',
       unsupportedTip:
-        'No se admiten imágenes ni tablas dinámicas; los gráficos importados se conservan y el formato condicional / la validación de datos no exportables se listan en el informe de exportación',
+        'Se admiten gráficos, formas, imágenes y tablas dinámicas; lo que no se puede exportar aparece en el informe de exportación',
       cfUnsupported: '{{count}} reglas de formato condicional no se pueden escribir en el xlsx',
       dvUnsupported: '{{count}} reglas de validación de datos no se pueden escribir en el xlsx',
       err: err({
@@ -824,7 +873,7 @@ const pt: ResourceTree = {
       exporting: 'A processar…',
       ready: 'As alterações permanecem nesta página',
       unsupportedTip:
-        'Imagens e tabelas dinâmicas não são suportados; os gráficos importados são preservados e formatação condicional / validação de dados não exportáveis são listadas no relatório de exportação',
+        'Gráficos, formas, imagens e tabelas dinâmicas são suportados; o que não puder ser exportado é listado no relatório de exportação',
       cfUnsupported: '{{count}} regras de formatação condicional não podem ser gravadas no xlsx',
       dvUnsupported: '{{count}} regras de validação de dados não podem ser gravadas no xlsx',
       err: err({

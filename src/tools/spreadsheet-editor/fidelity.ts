@@ -12,7 +12,9 @@ import type { WorkbookSnapshot } from './xlsx-io';
  *
  * Editor-created conditional formatting / data validation is converted to OOXML by `cfdv.ts`;
  * only the rules without an exceljs/OOXML equivalent are reported as warnings here.
- * Floating shapes are written as native `xdr:sp` (SHEET-02); pictures are still dropped on import.
+ * Floating shapes are written as native `xdr:sp` (SHEET-02) and pictures as `xl/media` + `xdr:pic`,
+ * so neither is a loss any more. The mirror image of this file — what an *import* could not keep —
+ * lives in `importFidelity.ts` (P0-4).
  */
 export function collectExportIssues(snapshot: WorkbookSnapshot): FidelityIssue[] {
   const issues: FidelityIssue[] = [];

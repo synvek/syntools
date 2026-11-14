@@ -82,8 +82,10 @@ import {
   createEmptySnapshot,
   exportSnapshotToBytes,
   importXlsxToSnapshot,
+  type ImportOutcome,
   type WorkbookSnapshot,
 } from './xlsx-io';
+import { reportSheetIssue, subscribeSheetIssues, type SheetIssue } from './issues';
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
 import {
   collectFieldKeys,
@@ -214,6 +216,31 @@ function usedBlock(
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 /** Debounce after edits: avoids a full save() on every keystroke */
 const SAVE_DEBOUNCE_MS = 600;
+/**
+ * Document-library writes are a second, much slower tier than the draft (P0-5): a full snapshot is
+ * structured-cloned into IndexedDB, which is the expensive half of persistence. 10 s keeps the
+ * library close enough to the draft while taking that cost off the typing path.
+ */
+const DOC_SAVE_DEBOUNCE_MS = 10_000;
+/** How long an inline failure notice stays on screen before it goes away by itself */
+const ISSUE_NOTICE_MS = 6_000;
+
+/**
+ * Run a heavy-but-deferrable task (full `getSnapshot()` + `JSON.stringify`) when the browser is
+ * idle, with a hard deadline so a permanently busy page still saves.
+ */
+function runWhenIdle(task: () => void): void {
+  const idle = (
+    window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+    }
+  ).requestIdleCallback;
+  if (typeof idle === 'function') {
+    idle(task, { timeout: 1500 });
+    return;
+  }
+  window.setTimeout(task, 0);
+}
 
 /**
  * Spreadsheet editor: Univer provides the editing surface; import and export happen entirely in the
@@ -479,6 +506,24 @@ export default function SpreadsheetTool() {
   const titleRef = useRef(title);
   titleRef.current = title;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const docSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Latest snapshot waiting for the slow IndexedDB tier (P0-5) */
+  const pendingDocRef = useRef<{
+    id: string;
+    title: string;
+    snapshot: WorkbookSnapshot;
+  } | null>(null);
+  /** Assigned once `flushDocSave` exists; the debounce timer and unmount cleanup go through it */
+  const flushDocSaveRef = useRef<() => void>(() => {});
+  /**
+   * Snapshot size shown in the status bar. Measured once per save instead of on every render: the
+   * old `useMemo` called `getSnapshot()` during render, so typing billed the whole workbook twice.
+   */
+  const [memoryBytes, setMemoryBytes] = useState(0);
+  /** Inline failure notice (P0-3); replaces the silent `catch {}` this module used to have */
+  const [issueNotice, setIssueNotice] = useState<SheetIssue | null>(null);
+  /** Screen-reader announcement of the current selection (P0-6) */
+  const [a11yStatus, setA11yStatus] = useState('');
 
   /**
    * Merge content this tool owns but Univer knows nothing about into the snapshot: conditional
@@ -720,6 +765,38 @@ export default function SpreadsheetTool() {
   };
 
   /**
+   * IndexedDB tier (P0-5): keep only the newest snapshot and write it on a slow debounce. The draft
+   * (localStorage) is the fast path; this is the durable one, so it must never queue up N writes for
+   * N keystrokes — the last one wins.
+   */
+  const queueDocSave = useCallback(
+    (id: string, title: string, snapshot: WorkbookSnapshot): void => {
+      pendingDocRef.current = { id, title, snapshot };
+      if (docSaveTimerRef.current) clearTimeout(docSaveTimerRef.current);
+      docSaveTimerRef.current = setTimeout(() => {
+        docSaveTimerRef.current = null;
+        flushDocSaveRef.current();
+      }, DOC_SAVE_DEBOUNCE_MS);
+    },
+    [],
+  );
+
+  const flushDocSave = useCallback((): void => {
+    if (docSaveTimerRef.current) {
+      clearTimeout(docSaveTimerRef.current);
+      docSaveTimerRef.current = null;
+    }
+    const pending = pendingDocRef.current;
+    pendingDocRef.current = null;
+    if (!pending) return;
+    void saveDocument(pending.id, pending.title, pending.snapshot).then(() => {
+      void listDocuments().then(setDocs);
+    });
+  }, []);
+  // The debounce timer and the unmount cleanup call through the ref, so they always see this closure
+  flushDocSaveRef.current = flushDocSave;
+
+  /**
    * Unified persistence: localStorage draft (a synchronous safety net) plus the IndexedDB document
    * library (multiple documents / version history). Called only after real edits or explicit
    * actions, replacing the old "full save() + stringify every 2 seconds" poll.
@@ -735,7 +812,9 @@ export default function SpreadsheetTool() {
       const result = writeDraftSafe(snapshot);
       setDraftSaved(result.ok);
       setDraftNotice(result.ok ? null : result.degraded ? 'degraded' : 'failed');
-      setSummary(summarizeWorkbook(base));
+      const nextSummary = summarizeWorkbook(base);
+      setSummary(nextSummary);
+      setMemoryBytes(estimateJsonBytes({ summary: nextSummary, snapshot }));
       // Allocate the document id lazily: it only enters the library on the first save
       let id = docIdRef.current;
       if (!id) {
@@ -744,25 +823,92 @@ export default function SpreadsheetTool() {
         setDocId(id);
         setCurrentDocId(id);
       }
-      void saveDocument(id, nextTitle ?? titleRef.current, snapshot).then(() => {
-        void listDocuments().then(setDocs);
-      });
+      queueDocSave(id, nextTitle ?? titleRef.current, snapshot);
     },
-    [applyChartData, withDocOwnedContent],
+    [applyChartData, queueDocSave, withDocOwnedContent],
   );
 
-  /** Edit events → debounced persistence */
+  /**
+   * Edit events → debounced persistence. The snapshot + stringify work happens in an idle callback:
+   * doing it inside the timer made every pause in typing a main-thread stall on large sheets.
+   */
   const scheduleSave = useCallback((): void => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
-      persistNow();
+      runWhenIdle(persistNow);
     }, SAVE_DEBOUNCE_MS);
   }, [persistNow]);
   // Chart edits (non-Univer changes) trigger persistence through this ref, so callbacks need not be declared in order
   useEffect(() => {
     scheduleSaveRef.current = scheduleSave;
   }, [scheduleSave]);
+
+  /** Inline failure notices (P0-3): one at a time, auto-dismissed, never blocking */
+  useEffect(() => subscribeSheetIssues((issue) => setIssueNotice(issue)), []);
+
+  useEffect(() => {
+    if (!issueNotice) return;
+    const timer = window.setTimeout(() => setIssueNotice(null), ISSUE_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [issueNotice]);
+
+  /**
+   * Close-the-tab safety net (P0-5): the draft is written on a debounce and the library on a slow
+   * one, so the last edits must be flushed when the page goes away.
+   */
+  useEffect(() => {
+    const flush = () => flushDocSaveRef.current();
+    const onHidden = () => {
+      if (document.visibilityState !== 'hidden') return;
+      persistNow();
+      flushDocSaveRef.current();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, [persistNow]);
+
+  /** A queued library write must not be stranded when the tool unmounts (route change) */
+  useEffect(() => () => flushDocSaveRef.current(), []);
+
+  /**
+   * Screen-reader announcement of the selection (P0-6). The grid is a canvas, so a live region is
+   * the only thing assistive tech can follow; it settles for 300 ms so dragging a selection
+   * announces the result instead of every intermediate cell.
+   */
+  useEffect(() => {
+    const host = ribbonHost;
+    if (!host) return;
+    let timer: number | null = null;
+    let last = '';
+    const announce = () => {
+      timer = null;
+      const range = host.getActiveRange();
+      if (!range) return;
+      const cell = `${columnIndexToName(range.startColumn)}${range.startRow + 1}`;
+      const rows = range.endRow - range.startRow + 1;
+      const columns = range.endColumn - range.startColumn + 1;
+      const next =
+        rows === 1 && columns === 1
+          ? t('tools.sheet.a11yCell', { cell })
+          : t('tools.sheet.a11yRange', { cell, rows, columns });
+      if (next === last) return;
+      last = next;
+      setA11yStatus(next);
+    };
+    const unsubscribe = host.onSelectionChange(() => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(announce, 300);
+    });
+    return () => {
+      unsubscribe();
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [ribbonHost, t]);
 
   const lang = useSettingsStore((s) => s.lang);
   const theme = useSettingsStore((s) => s.theme);
@@ -1198,10 +1344,12 @@ export default function SpreadsheetTool() {
       setFailure(check);
       return;
     }
+    // Import-side fidelity (P0-4): the sink is filled by the xlsx path; CSV has nothing to report
+    const outcome: ImportOutcome = { issues: [] };
     const result =
       check.value === 'csv'
         ? csvToSnapshot(await file.text(), file.name.replace(/\.csv$/i, ''), univerLocale)
-        : await importXlsxToSnapshot(file);
+        : await importXlsxToSnapshot(file, outcome);
     setBusy(null);
     if (!result.ok) {
       setFailure(result);
@@ -1210,6 +1358,13 @@ export default function SpreadsheetTool() {
     const nextTitle = title.trim() ? title : result.value.name;
     applySnapshot(result.value, nextTitle);
     persistNow(nextTitle);
+    // An import is an explicit action: the library entry must exist now, not after the debounce
+    flushDocSaveRef.current();
+    // Same dialog as the export side, opposite direction: tell the user what the file had that this
+    // editor could not keep, instead of letting them find out after re-exporting.
+    if (outcome.issues.length > 0 && !isFidelityMuted()) {
+      setFidelity(createFidelityReport('sheet', 'import', outcome.issues));
+    }
   };
 
   const handleAddSheet = () => {
@@ -1579,6 +1734,9 @@ export default function SpreadsheetTool() {
     applySnapshot(version.snapshot, version.title);
     setVersionsOpen(false);
     persistNow(version.title);
+    // Explicit actions bypass the 10 s library debounce: the document list must match what the user
+    // just asked for, not what it will look like in ten seconds (P0-5)
+    flushDocSaveRef.current();
   };
 
   const stats = useMemo(
@@ -1657,18 +1815,31 @@ export default function SpreadsheetTool() {
       setNumberFormatOpen(true);
     },
     copyToClipboard: (text) => {
-      void navigator.clipboard?.writeText(text).catch(() => undefined);
+      const clipboard = navigator.clipboard;
+      if (!clipboard) {
+        reportSheetIssue({ code: 'clipboardWrite', level: 'notice' });
+        return;
+      }
+      // A rejected clipboard write used to be indistinguishable from a successful one (P0-3)
+      void clipboard.writeText(text).catch((error: unknown) => {
+        reportSheetIssue({ code: 'clipboardWrite', level: 'notice', detail: String(error) });
+      });
     },
     pasteFromClipboard: () => {
       const clipboard = navigator.clipboard;
-      if (!clipboard) return;
+      if (!clipboard) {
+        reportSheetIssue({ code: 'clipboardRead', level: 'notice' });
+        return;
+      }
       void clipboard
         .readText()
         .then((text) => {
           if (!text.trim()) return;
           handleRef.current?.writeMatrix(parseClipboardMatrix(text));
         })
-        .catch(() => undefined);
+        .catch((error: unknown) => {
+          reportSheetIssue({ code: 'clipboardRead', level: 'notice', detail: String(error) });
+        });
     },
   };
 
@@ -1689,15 +1860,12 @@ export default function SpreadsheetTool() {
   const menu = buildSheetMenu({ ...ribbonBase, host: ribbonHost, format: null });
 
   const statusText = draftSaved ? t('common.saved') : t('common.saving');
-  const memory = useMemo(() => {
-    let snapshot: unknown = null;
-    try {
-      snapshot = handleRef.current?.getSnapshot() ?? null;
-    } catch {
-      snapshot = null;
-    }
-    return formatBytes(estimateJsonBytes({ summary, snapshot }));
-  }, [summary]);
+  /**
+   * Snapshot size comes from the last save, not from a render-time `getSnapshot()` (P0-5). Before
+   * this, every keystroke that changed the summary serialised the whole workbook just to print a
+   * number in the status bar.
+   */
+  const memory = formatBytes(memoryBytes);
 
   return (
     <div className="flex flex-col gap-4" data-tool-root>
@@ -1875,6 +2043,10 @@ export default function SpreadsheetTool() {
         <div
           ref={containerRef}
           className="sheet-canvas"
+          // The grid itself is a canvas: this label at least tells assistive tech what the region is,
+          // while the live region below carries the cell coordinates (P0-6)
+          role="application"
+          aria-label={t('tools.sheet.a11yGridLabel')}
           style={sheetHeight ? { height: `${sheetHeight}px` } : undefined}
         />
         {/* Pictures sit under the shapes (the export writes pic before sp for the same reason) */}
@@ -1952,6 +2124,11 @@ export default function SpreadsheetTool() {
         ))}
       </div>
 
+      {/* Selection announcement for screen readers (P0-6): visual users get the highlight, readers get this */}
+      <p role="status" aria-live="polite" className="sr-only" data-testid="sheet-a11y-status">
+        {a11yStatus}
+      </p>
+
       <SheetTabs
         sheets={sheets}
         activeId={activeSheetId}
@@ -2005,6 +2182,21 @@ export default function SpreadsheetTool() {
           {draftNotice === 'degraded'
             ? t('tools.sheet.draftDegraded')
             : t('tools.sheet.draftSaveFailed')}
+        </p>
+      )}
+
+      {/* P0-3: a click that did nothing now says why, once, then gets out of the way */}
+      {issueNotice && (
+        <p
+          role="status"
+          data-testid="sheet-issue-notice"
+          className={
+            issueNotice.level === 'error'
+              ? 'text-sm text-red-600 dark:text-red-400'
+              : 'text-sm text-amber-600 dark:text-amber-400'
+          }
+        >
+          {t(`tools.sheet.issue.${issueNotice.code}`)}
         </p>
       )}
 

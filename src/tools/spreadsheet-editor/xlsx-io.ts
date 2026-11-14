@@ -56,6 +56,10 @@ import {
   type WorksheetProtectionLike,
 } from './sheetProtection';
 import { injectTablesIntoXlsx, readSheetTables, type SheetTable } from './sheetTables';
+import { diagnoseXlsxArchive } from './xlsx-diagnose';
+import { collectImportIssues } from './importFidelity';
+import { reportSheetIssue } from './issues';
+import type { FidelityIssue } from '@/core/fidelity';
 
 /**
  * xlsx adapter layer: exceljs is always dynamically imported so it stays out of the initial bundle
@@ -367,17 +371,36 @@ async function collectRawChartPartsFrom(buffer: ArrayBuffer): Promise<RawChartPa
   try {
     const JSZip = (await import('jszip')).default;
     return await collectRawChartParts(await JSZip.loadAsync(buffer));
-  } catch {
+  } catch (error) {
+    // Charts would otherwise vanish without a trace: the import still succeeds, the user is told
+    reportSheetIssue({ code: 'chartPartsUnreadable', level: 'notice', detail: String(error) });
     return null;
   }
 }
 
+/**
+ * Import-side fidelity sink (P0-4). Passing one in makes the import report what it could not keep;
+ * callers without a sink (older tests, CSV paths) are unaffected.
+ */
+export interface ImportOutcome {
+  /** Filled once the import succeeds: degradations detected from the archive */
+  issues: FidelityIssue[];
+}
+
 /** Import .xlsx: exceljs parse → Univer workbook snapshot */
-export async function importXlsxToSnapshot(file: File): Promise<ToolResult<WorkbookSnapshot>> {
+export async function importXlsxToSnapshot(
+  file: File,
+  outcome?: ImportOutcome,
+): Promise<ToolResult<WorkbookSnapshot>> {
   const check = checkImportFile(file);
   if (!check.ok) return check;
   try {
     const buffer = await file.arrayBuffer();
+    // Classify the container before exceljs sees it: "encrypted" and "corrupted" need different
+    // user actions, and a ZIP without a workbook part is not a workbook at all (P0-2).
+    const diagnosis = await diagnoseXlsxArchive(buffer);
+    if (!diagnosis.ok) return diagnosis;
+    const archiveParts = diagnosis.parts;
     // Collect native chart parts first (not parsed, just kept verbatim for the export to write back)
     const rawGathered = await collectRawChartPartsFrom(buffer);
     // Floating shapes / pictures are read from the drawing parts (exceljs drops them like every other drawing).
@@ -391,7 +414,13 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
     const normalized = await normalizeXlsxArchive(buffer);
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(normalized);
+    try {
+      await workbook.xlsx.load(normalized);
+    } catch {
+      // The container was a valid ZIP with a workbook part, so this is a producer-specific part we
+      // cannot read — not a corrupt download (that is NOT_ZIP one level up).
+      return { ok: false, error: 'PART_UNREADABLE' };
+    }
 
     const sheets: Record<string, SheetSnapshot> = {};
     const sheetOrder: string[] = [];
@@ -492,6 +521,15 @@ export async function importXlsxToSnapshot(file: File): Promise<ToolResult<Workb
           .map(([, sheet]) => [sheet.name as string, metricsOfSheet(sheet)]),
       ),
     });
+
+    // Import-side report (P0-4): the facts are the archive parts we just read plus the charts that
+    // stayed verbatim, so nothing is claimed that the code cannot point at.
+    if (outcome) {
+      const rawChartCount = Object.keys(charts.parts?.parts ?? {}).filter((part) =>
+        /^xl\/charts\/[^/]+\.xml$/i.test(part),
+      ).length;
+      outcome.issues.push(...collectImportIssues({ parts: archiveParts, rawChartCount }));
+    }
 
     return {
       ok: true,

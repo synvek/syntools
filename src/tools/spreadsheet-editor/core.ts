@@ -15,7 +15,16 @@ export type SheetErrorCode =
   | 'IMPORT_FAILED'
   | 'EXPORT_FAILED'
   | 'SNAPSHOT_FAILED'
-  | 'RUNTIME_FAILED';
+  | 'RUNTIME_FAILED'
+  /*
+   * Import diagnosis (P0-2): "the file could not be read" is not one situation. Each code below
+   * leads to a different user action (remove the password / re-download / use another producer),
+   * so they are separate codes rather than one message with a detail string.
+   */
+  | 'FILE_ENCRYPTED'
+  | 'NOT_ZIP'
+  | 'MISSING_WORKBOOK_PART'
+  | 'PART_UNREADABLE';
 
 /** Import file size cap (10MB), matching FileDropZone */
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
