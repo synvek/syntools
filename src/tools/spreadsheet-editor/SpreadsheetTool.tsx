@@ -85,6 +85,9 @@ import { parseClipboardMatrix, type SheetFormatState } from './sheetFormat';
 import { NumberFormatDialog } from './ui/NumberFormatDialog';
 import { FormatCellsDialog } from './ui/FormatCellsDialog';
 import { ShortcutHelp } from './ui/ShortcutHelp';
+import { SortDialog } from './ui/SortDialog';
+import type { SortColumn } from './sorting';
+import { auditFormulas, SUPPORTED_FUNCTION_COUNT, type FunctionAudit } from './sheetFunctions';
 import { findShortcut, isMacPlatform } from './shortcuts';
 import { commitFromDraft } from './formatCells';
 import {
@@ -269,6 +272,12 @@ export default function SpreadsheetTool() {
   const [formatCellsFormat, setFormatCellsFormat] = useState<SheetFormatState | null>(null);
   /** Keyboard cheat sheet (P1-1) */
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  /** "排序" dialog (P1-5): columns and header guess are captured when it opens */
+  const [sortOpen, setSortOpen] = useState(false);
+  const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
+  const [sortHasHeader, setSortHasHeader] = useState(false);
+  /** Result of "检查公式" (P1-10) */
+  const [formulaReport, setFormulaReport] = useState<FunctionAudit | null>(null);
   /** Pattern the custom-format dialog starts from (read when it opens, so it reflects the selection) */
   const [numberFormatInitial, setNumberFormatInitial] = useState('');
   /** Sheet height = whatever remains in the first viewport (sheet tabs / status bar stay visible, "related tools" is pushed below the fold) */
@@ -1834,6 +1843,17 @@ export default function SpreadsheetTool() {
       setFormatCellsOpen(true);
     },
     openShortcuts: () => setShortcutsOpen(true),
+    checkFormulas: () => {
+      setFormulaReport(auditFormulas(ribbonHost?.readSelectionFormulas() ?? []));
+    },
+    openSort: () => {
+      // Whatever the dialog says about columns must describe the selection it will reorder
+      const info = ribbonHost?.describeSortRange();
+      if (!info) return;
+      setSortColumns(info.columns);
+      setSortHasHeader(info.hasHeader);
+      setSortOpen(true);
+    },
     copyToClipboard: (text) => {
       const clipboard = navigator.clipboard;
       if (!clipboard) {
@@ -2012,6 +2032,48 @@ export default function SpreadsheetTool() {
        * through the same host instance the rest of the tool edits; the *format snapshot* is taken
        * when the dialog opens, so a stale ribbon state can never seed it.
        */}
+      {/*
+       * Formula audit result (P1-10). A short inline card instead of a dialog: the answer is one
+       * sentence and the user should stay in the grid.
+       */}
+      {formulaReport ? (
+        <div
+          role="status"
+          data-testid="sheet-formula-audit"
+          className="flex items-start justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200"
+        >
+          <span>
+            {formulaReport.formulas === 0
+              ? t('tools.sheet.formulaAuditNone')
+              : formulaReport.unsupported.length === 0
+                ? t('tools.sheet.formulaAuditOk', {
+                    count: formulaReport.formulas,
+                    total: SUPPORTED_FUNCTION_COUNT,
+                  })
+                : t('tools.sheet.formulaAuditMissing', {
+                    names: formulaReport.unsupported.join(', '),
+                  })}
+          </span>
+          <button
+            type="button"
+            onClick={() => setFormulaReport(null)}
+            aria-label={t('tools.sheet.printCancel')}
+            className="text-green-700 hover:text-green-900 dark:text-green-300"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+      <SortDialog
+        open={sortOpen}
+        columns={sortColumns}
+        hasHeader={sortHasHeader}
+        onClose={() => setSortOpen(false)}
+        onApply={(keys, hasHeader) => {
+          ribbonHost?.sortRange(keys, hasHeader);
+          setSortOpen(false);
+        }}
+      />
       <ShortcutHelp
         open={shortcutsOpen}
         ctx={{ ...ribbonBase, host: ribbonHost, format: null }}

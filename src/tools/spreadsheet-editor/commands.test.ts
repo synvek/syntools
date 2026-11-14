@@ -36,6 +36,9 @@ function fakeHost(overrides: Partial<SheetRibbonHost> = {}): SheetRibbonHost {
     setZoomPercent: vi.fn(),
     getZoomPercent: () => 100,
     sortSelection: vi.fn(),
+    sortRange: vi.fn(),
+    describeSortRange: () => null,
+    readSelectionFormulas: () => [],
     toggleFilter: vi.fn(),
     hasFilter: () => false,
     applyAutoSum: vi.fn(),
@@ -82,6 +85,8 @@ function fakeActions(): SheetActions {
     openNumberFormat: noop,
     openFormatCells: noop,
     openShortcuts: noop,
+    openSort: noop,
+    checkFormulas: noop,
     copyToClipboard: noop,
     pasteFromClipboard: noop,
   };
@@ -332,6 +337,36 @@ describe('spreadsheet ribbon tabs', () => {
       .find((tab) => tab.id === 'home')
       ?.groups.find((g) => g.id === 'number');
     expect(blockedNumber?.onLauncher).toBeUndefined();
+  });
+
+  it('排序菜单里有"排序…"并打开对话框（P1-5），快捷升降序仍在', () => {
+    const actions = fakeActions();
+    const sort = allItems(buildSheetRibbonTabs(makeCtx({ actions }))).find(
+      (item) => item.id === 'sort-filter',
+    );
+    expect(sort?.kind).toBe('menu');
+    if (sort?.kind !== 'menu') throw new Error('sort-filter must be a menu');
+    expect(sort.menu.map((entry) => entry.id)).toEqual([
+      'sortAsc',
+      'sortDesc',
+      'customSort',
+      'toggleFilter',
+    ]);
+    sort.menu.find((entry) => entry.id === 'customSort')?.onSelect();
+    expect(actions.openSort).toHaveBeenCalledTimes(1);
+  });
+
+  it('公式页签有"检查公式"（P1-10）', () => {
+    const actions = fakeActions();
+    const item = allItems(buildSheetRibbonTabs(makeCtx({ actions }))).find(
+      (entry) => entry.id === 'formulaAudit',
+    );
+    expect(item).toBeDefined();
+    if (!item || !('onSelect' in item) || typeof item.onSelect !== 'function') {
+      throw new Error('formulaAudit must be clickable');
+    }
+    item.onSelect();
+    expect(actions.checkFormulas).toHaveBeenCalledTimes(1);
   });
 
   it('greys out the whole formatting surface when no instance is ready', () => {

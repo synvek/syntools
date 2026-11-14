@@ -114,6 +114,14 @@ import {
 } from './sheetFormat';
 import type { FreezeMode, MergeMode, SheetPanelKind, SheetRibbonHost } from './commands';
 import { reportSheetIssue } from './issues';
+import {
+  looksLikeHeader,
+  normalizeSortKeys,
+  sortBody,
+  sortColumns,
+  type SortColumn,
+  type SortKey,
+} from './sorting';
 
 /**
  * Univer adapter layer: plugin registration, locales, theme and lifecycle funnel through one entry
@@ -244,6 +252,12 @@ const EN_LOCALE = mergeLocales(
   HyperLinkUIEnUS,
   FindReplaceEnUS,
 );
+
+/**
+ * Sorting more rows than this is refused (P1-5): a whole-column selection reports ~1M rows, and the
+ * engine would happily try, taking the tab down with it.
+ */
+const MAX_SORT_ROWS = 50_000;
 
 /**
  * Create a Univer instance and mount it into `container`.
@@ -748,6 +762,84 @@ export function createUniverInstance(
     activeFRange()?.sort({ column: 0, ascending: direction === 'asc' });
   };
 
+  /**
+   * Multi-key sort (P1-5). The engine reorders rows; this only decides the body (header or not) and
+   * validates the keys, so formula semantics stay the engine's business.
+   *
+   * Selecting a whole column yields a ~1M-row range — sorting that would freeze the tab, so it is
+   * refused with a visible notice instead of being attempted.
+   */
+  const sortRange = (keys: SortKey[], hasHeader: boolean): void => {
+    const range = activeFRange();
+    const sheet = activeFWorksheet();
+    if (!range || !sheet) return;
+    const selection = {
+      startRow: range.getRow(),
+      startColumn: range.getColumn(),
+      rows: range.getLastRow() - range.getRow() + 1,
+      columns: range.getLastColumn() - range.getColumn() + 1,
+    };
+    const body = sortBody(selection, hasHeader);
+    if (!body) return;
+    const target =
+      body.rows === selection.rows && body.startRow === selection.startRow
+        ? range
+        : sheet.getRange(body.startRow, selection.startColumn, body.rows, body.columns);
+    target.sort(
+      normalizeSortKeys(keys, body.columns).map((key) => ({
+        column: key.column,
+        ascending: key.ascending,
+      })),
+    );
+  };
+
+  /** Formulas of the selection, flattened (empty strings for cells without one) — P1-10 audit input */
+  const readSelectionFormulas = (): string[] => {
+    const range = activeFRange();
+    if (!range) return [];
+    try {
+      return (range.getFormulas() as string[][]).flat();
+    } catch (error) {
+      reportSheetIssue({ code: 'formulaRead', level: 'notice', detail: String(error) });
+      return [];
+    }
+  };
+
+  /** Column labels + header guess for the sort dialog; `null` when the selection is unusable */
+  const describeSortRange = (): { columns: SortColumn[]; hasHeader: boolean } | null => {
+    const range = activeFRange();
+    const sheet = activeFWorksheet();
+    if (!range || !sheet) return null;
+    const startRow = range.getRow();
+    const startColumn = range.getColumn();
+    const rows = range.getLastRow() - startRow + 1;
+    const columns = range.getLastColumn() - startColumn + 1;
+    if (rows > MAX_SORT_ROWS) {
+      reportSheetIssue({
+        code: 'sortTooLarge',
+        level: 'notice',
+        detail: `${rows} rows`,
+      });
+      return null;
+    }
+    const readRow = (offset: number): unknown[] | null => {
+      try {
+        const values = sheet.getRange(startRow + offset, startColumn, 1, columns).getValues();
+        return (values?.[0] as unknown[] | undefined) ?? null;
+      } catch (error) {
+        reportSheetIssue({ code: 'styleRead', level: 'notice', detail: String(error) });
+        return null;
+      }
+    };
+    const first = readRow(0);
+    const second = rows > 1 ? readRow(1) : null;
+    const hasHeader = looksLikeHeader(first ?? [], second);
+    return {
+      columns: sortColumns(hasHeader ? first : null, columns, startColumn),
+      hasHeader,
+    };
+  };
+
   const toggleFilter = (): void => {
     const sheet = activeFWorksheet();
     const range = activeFRange();
@@ -997,6 +1089,9 @@ export function createUniverInstance(
     setZoomPercent,
     getZoomPercent,
     sortSelection,
+    sortRange,
+    describeSortRange,
+    readSelectionFormulas,
     toggleFilter,
     hasFilter,
     applyAutoSum,

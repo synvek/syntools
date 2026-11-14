@@ -100,7 +100,22 @@ const zh: ResourceTree = {
         panelUnavailable: '该功能面板在当前版本不可用',
         styleRead: '单元格格式读取失败，格式按钮可能显示不准确',
         chartPartsUnreadable: '文件中的原生图表未能读取，图表可能缺失',
+        sortTooLarge: '选区超过 50,000 行，请缩小范围后再排序',
+        formulaRead: '无法读取选区内的公式',
       },
+      // P1-10 公式审计
+      formulaAudit: '检查公式',
+      formulaAuditNone: '选区内没有公式',
+      formulaAuditOk: '已检查 {{count}} 个公式，所用函数均已支持（共 {{total}} 个可用函数）',
+      formulaAuditMissing: '以下函数在本工具中不可用：{{names}}。导出到 Excel 后可正常计算。',
+      // P1-5 排序对话框
+      sortTitle: '排序',
+      sortHasHeader: '数据包含标题',
+      sortThen: '排序依据',
+      sortAddLevel: '添加条件',
+      sortRemoveLevel: '删除条件',
+      sortNote:
+        '包含公式的单元格会随整行移动；含合并单元格的区域无法排序。当前按值排序，不区分大小写，也不支持自定义序列。',
       shortcutTitle: '键盘快捷键',
       shortcutGroupFile: '文件',
       shortcutGroupFormat: '格式',
@@ -223,7 +238,24 @@ const en: ResourceTree = {
         panelUnavailable: 'This panel is unavailable in the current engine version',
         styleRead: 'Could not read the cell formatting; format buttons may look wrong',
         chartPartsUnreadable: 'Native charts in the file could not be read and may be missing',
+        sortTooLarge: 'The selection exceeds 50,000 rows — narrow it down before sorting',
+        formulaRead: 'Could not read the formulas in the selection',
       },
+      // P1-10 formula audit
+      formulaAudit: 'Check formulas',
+      formulaAuditNone: 'The selection contains no formulas',
+      formulaAuditOk:
+        'Checked {{count}} formulas — every function is supported ({{total}} available)',
+      formulaAuditMissing:
+        'Not available in this editor: {{names}}. They will calculate normally after exporting to Excel.',
+      // P1-5 sort dialog
+      sortTitle: 'Sort',
+      sortHasHeader: 'My data has headers',
+      sortThen: 'Sort by',
+      sortAddLevel: 'Add level',
+      sortRemoveLevel: 'Remove level',
+      sortNote:
+        'Cells with formulas move with their row; ranges containing merged cells cannot be sorted. Sorting is by value: case-insensitive, no custom lists.',
       shortcutTitle: 'Keyboard shortcuts',
       shortcutGroupFile: 'File',
       shortcutGroupFormat: 'Formatting',

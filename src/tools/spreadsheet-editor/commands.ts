@@ -14,6 +14,7 @@ import {
   type SheetFormatState,
 } from './sheetFormat';
 import { isMacPlatform, shortcutLabel } from './shortcuts';
+import type { SortColumn, SortKey } from './sorting';
 
 /**
  * Command layer of the spreadsheet: every user-facing action is described once here and projected onto
@@ -60,6 +61,12 @@ export interface SheetRibbonHost {
   setZoomPercent(percent: number): void;
   getZoomPercent(): number;
   sortSelection(direction: 'asc' | 'desc'): void;
+  /** Multi-key sort, executed by the engine (P1-5) */
+  sortRange(keys: SortKey[], hasHeader: boolean): void;
+  /** Column labels + header guess for the sort dialog; `null` when the selection cannot be sorted */
+  describeSortRange(): { columns: SortColumn[]; hasHeader: boolean } | null;
+  /** Formula strings of the current selection (empty strings for non-formula cells) */
+  readSelectionFormulas(): string[];
   toggleFilter(): void;
   hasFilter(): boolean;
   applyAutoSum(): void;
@@ -109,6 +116,10 @@ export interface SheetActions {
   openFormatCells: () => void;
   /** Keyboard cheat sheet (P1-1) */
   openShortcuts: () => void;
+  /** "排序" dialog (P1-5) */
+  openSort: () => void;
+  /** Audit the selected formulas against the engine's function set (P1-10) */
+  checkFormulas: () => void;
   copyToClipboard: (text: string) => void;
   pasteFromClipboard: () => void;
 }
@@ -609,6 +620,14 @@ const SHEET_COMMAND_DEFS = {
   },
 
   /* --------------------------------- editing -------------------------------- */
+  /** P1-10: which of the selected formulas this editor cannot compute */
+  formulaAudit: {
+    id: 'formulaAudit',
+    labelKey: 'tools.sheet.formulaAudit',
+    icon: 'functionWizard',
+    run: (ctx: SheetCommandContext) => ctx.actions.checkFormulas(),
+    disabled: noHostOrBusy,
+  },
   autoSum: {
     id: 'autoSum',
     labelKey: 'tools.sheet.r.autoSum',
@@ -628,6 +647,14 @@ const SHEET_COMMAND_DEFS = {
     labelKey: 'tools.sheet.r.sortAsc',
     icon: 'sortAsc',
     run: (ctx: SheetCommandContext) => ctx.host?.sortSelection('asc'),
+    disabled: editBlocked,
+  },
+  /** P1-5: the dialog behind the sort menu; the quick asc/desc buttons stay unchanged */
+  customSort: {
+    id: 'customSort',
+    labelKey: 'tools.sheet.sortTitle',
+    icon: 'sortAsc',
+    run: (ctx: SheetCommandContext) => ctx.actions.openSort(),
     disabled: editBlocked,
   },
   sortDesc: {
@@ -1260,7 +1287,8 @@ export function buildSheetRibbonTabs(ctx: SheetRibbonContext): RibbonTab[] {
               icon: 'sortAsc',
               size: 'large',
               disabled: editBlocked(ctx),
-              menu: menuItems(ctx, ['sortAsc', 'sortDesc', 'toggleFilter']),
+              // P1-5: the quick buttons stay one click away, the dialog holds multi-key sorting
+              menu: menuItems(ctx, ['sortAsc', 'sortDesc', 'customSort', 'toggleFilter']),
             },
             {
               kind: 'split',
@@ -1337,7 +1365,11 @@ export function buildSheetRibbonTabs(ctx: SheetRibbonContext): RibbonTab[] {
         {
           id: 'function-library',
           label: ctx.t('tools.sheet.grp.functions'),
-          items: [asItem('autoSum', 'large'), asItem('numberFormatCustom', 'large')],
+          items: [
+            asItem('autoSum', 'large'),
+            asItem('numberFormatCustom', 'large'),
+            asItem('formulaAudit', 'large'),
+          ],
         },
         {
           id: 'defined-names',

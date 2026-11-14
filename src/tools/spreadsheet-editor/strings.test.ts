@@ -66,6 +66,18 @@ describe('sheet copy', () => {
       'shortcutGroupFormat',
       'shortcutGroupDocs',
       'shortcutEngineNote',
+      // P1-10 公式审计
+      'formulaAudit',
+      'formulaAuditNone',
+      'formulaAuditOk',
+      'formulaAuditMissing',
+      // P1-5 排序对话框
+      'sortTitle',
+      'sortHasHeader',
+      'sortThen',
+      'sortAddLevel',
+      'sortRemoveLevel',
+      'sortNote',
     ];
     for (const lng of ['zh', 'en']) {
       for (const key of keys) {
@@ -81,6 +93,8 @@ describe('sheet copy', () => {
       'panelUnavailable',
       'styleRead',
       'chartPartsUnreadable',
+      'sortTooLarge',
+      'formulaRead',
     ];
     for (const lng of ['zh', 'en']) {
       const issue = sheet(lng).issue as Record<string, string>;

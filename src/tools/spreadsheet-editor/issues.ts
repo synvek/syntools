@@ -15,7 +15,15 @@
  */
 
 export type SheetIssueCode =
-  'clipboardRead' | 'clipboardWrite' | 'panelUnavailable' | 'styleRead' | 'chartPartsUnreadable';
+  | 'clipboardRead'
+  | 'clipboardWrite'
+  | 'panelUnavailable'
+  | 'styleRead'
+  | 'chartPartsUnreadable'
+  /** A whole-column selection reaching the sort: refuse instead of freezing the tab (P1-5) */
+  | 'sortTooLarge'
+  /** Reading formulas off the selection failed (P1-10) */
+  | 'formulaRead';
 
 /** `notice` = degraded but the document is intact; `error` = the requested action did not happen */
 export type SheetIssueLevel = 'notice' | 'error';
