@@ -14,15 +14,41 @@ import { columnIndexToName, excelSerialToDate } from './core';
  *    `count` 是唯一计文本的聚合（Excel 的"计数"计非空）。
  */
 
-export type PivotAggregation = 'sum' | 'count' | 'avg' | 'min' | 'max';
+export type PivotAggregation = 'sum' | 'count' | 'countDistinct' | 'avg' | 'min' | 'max';
 
 export const PIVOT_AGGREGATIONS: readonly PivotAggregation[] = [
   'sum',
   'count',
+  'countDistinct',
   'avg',
   'min',
   'max',
 ];
+
+/**
+ * 显示方式（P1-7）。
+ *
+ * 只作用于**正文单元格**：`percentTotal/percentRow/percentColumn` 会把对应的合计改写为 100%，
+ * 因为"行占比"的行合计按定义就是 100%；`rank` 不改合计（合计没有名次，留原始聚合值更诚实）。
+ */
+export type PivotShowAs = 'normal' | 'percentTotal' | 'percentRow' | 'percentColumn' | 'rank';
+
+export const PIVOT_SHOW_AS: readonly PivotShowAs[] = [
+  'normal',
+  'percentTotal',
+  'percentRow',
+  'percentColumn',
+  'rank',
+];
+
+/** 显示方式 → i18n key（面板与导出/打印共用，避免两处各写一遍） */
+export const PIVOT_SHOW_AS_LABEL_KEY: Record<PivotShowAs, string> = {
+  normal: 'tools.sheet.pivotShowAsNormal',
+  percentTotal: 'tools.sheet.pivotShowAsPercentTotal',
+  percentRow: 'tools.sheet.pivotShowAsPercentRow',
+  percentColumn: 'tools.sheet.pivotShowAsPercentColumn',
+  rank: 'tools.sheet.pivotShowAsRank',
+};
 
 /** 源区域单元格预算：超过就只聚合前 N 行并置 `truncated`，绝不静默截断 */
 export const PIVOT_SOURCE_LIMIT = 50_000;
@@ -39,6 +65,8 @@ export interface PivotValueField {
   /** 源区域内的列偏移（0 = 第一列） */
   column: number;
   aggregation: PivotAggregation;
+  /** 显示方式；缺省 = 正常值（老快照不带这个字段） */
+  showAs?: PivotShowAs;
 }
 
 export interface PivotConfig {
@@ -62,6 +90,40 @@ export interface PivotConfig {
    * 导出也复用这张表（不重复追加工作表，原生 `pivotTable` part 直接挂在它上面）。
    */
   outputSheetId?: string;
+}
+
+/* ---------------------------- 多实例（P1-7 ①） ---------------------------- */
+
+/** 新实例 id：`pivot-1..n`，跳过已被占用的（删掉中间某个再新建时不会撞号） */
+export function nextPivotId(configs: readonly PivotConfig[]): string {
+  const taken = new Set(configs.map((config) => config.id));
+  for (let index = 1; index <= configs.length + 1; index += 1) {
+    const id = `pivot-${index}`;
+    if (!taken.has(id)) return id;
+  }
+  return `pivot-${configs.length + 1}`;
+}
+
+/**
+ * 按 id 就地替换，没有就追加。
+ *
+ * 不用"每次重排成一项"：切换实例时配置的先后顺序是用户在面板里看到的顺序，
+ * 就地替换才不会让列表在编辑时乱跳。
+ */
+export function upsertPivotConfig(
+  configs: readonly PivotConfig[],
+  next: PivotConfig,
+): PivotConfig[] {
+  const index = configs.findIndex((config) => config.id === next.id);
+  if (index < 0) return [...configs, next];
+  const copy = [...configs];
+  copy[index] = next;
+  return copy;
+}
+
+/** 删掉一个实例；已经插入到文档的结果表不动（那是文档里的真实工作表） */
+export function removePivotConfig(configs: readonly PivotConfig[], id: string): PivotConfig[] {
+  return configs.filter((config) => config.id !== id);
 }
 
 export interface PivotKey {
@@ -101,6 +163,8 @@ export interface PivotBlock {
   valueField: PivotValueField;
   /** 该值字段在源区域里的列标签（表头第二行显示） */
   label: string;
+  /** 该块的显示方式：矩阵/面板据此给标签加"占比 / 排名"后缀 */
+  showAs: PivotShowAs;
   /** cells[row][col]，null = 该组合没有可聚合的值 */
   cells: (number | null)[][];
   rowTotals: (number | null)[];
@@ -260,6 +324,20 @@ interface Accumulator {
   count: number;
   min: number;
   max: number;
+  /**
+   * 去重计数的键集合（只有 countDistinct 字段才会建）。
+   *
+   * 用 `normalizeKey` 的规范化结果做键：`1` 与 `'1'`、`2026-01-01 08:00` 与 `2026-01-01`
+   * 不能算成两个不同的值，否则"去重"只是在数原始字符串。
+   */
+  distinct?: Set<string>;
+}
+
+/** 去重计数：非空才算一个值（文本也计，和 Excel 的"非重复计数"一致） */
+function addDistinct(acc: Accumulator, value: unknown): void {
+  if (!isPresent(value)) return;
+  const key = normalizeKey(value, undefined).key;
+  (acc.distinct ??= new Set<string>()).add(key);
 }
 
 function addTo(acc: Accumulator, value: unknown): boolean {
@@ -286,9 +364,15 @@ function mergeAcc(target: Accumulator, source: Accumulator): void {
   target.count += source.count;
   target.min = Math.min(target.min, source.min);
   target.max = Math.max(target.max, source.max);
+  if (source.distinct) {
+    const set = (target.distinct ??= new Set<string>());
+    for (const key of source.distinct) set.add(key);
+  }
 }
 
 function aggregateOf(acc: Accumulator, aggregation: PivotAggregation): number | null {
+  // 去重计数只有文本时 count 仍是 0，必须在 count 判定之前处理
+  if (aggregation === 'countDistinct') return acc.distinct?.size ? acc.distinct.size : null;
   if (acc.count === 0) return null;
   switch (aggregation) {
     case 'count':
@@ -334,6 +418,63 @@ function compositeKey(
  *
  * 单字段行/列时按值排序；多字段时按字段顺序逐级排序（Excel 的默认行为）。
  */
+/** 百分比保留两位小数（1/3 → 33.33），避免矩阵里出现 33.33333333333333 */
+function percent(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** 占比：分母为 0 / 缺失时给 null（Excel 里是空单元格，不是 #DIV/0!） */
+function ratio(value: number | null, total: number | null): number | null {
+  if (value === null || total === null || total === 0) return null;
+  return percent((value / total) * 100);
+}
+
+/**
+ * 显示方式（P1-7）：只改**数值**，不改结构。
+ *
+ * - 占比三种：分母分别是总计 / 行合计 / 列合计，对应的合计行改写为 100%；
+ * - 排名：每列内按降序排名（1 = 最大），并列取同名次；合计列没有名次，保留原始聚合值。
+ */
+function applyShowAs(block: PivotBlock): PivotBlock {
+  const showAs = block.showAs;
+  if (showAs === 'normal') return block;
+  if (showAs === 'rank') {
+    const cells = block.cells.map((row) => [...row]);
+    for (let col = 0; col < (block.colTotals.length ?? 0); col += 1) {
+      const values = block.cells.map((row) => row[col]).filter((value) => value !== null);
+      for (let row = 0; row < cells.length; row += 1) {
+        const value = cells[row][col];
+        if (value === null) continue;
+        // 并列取同名次：名次 = 比自己大的值的个数 + 1
+        cells[row][col] = values.filter((other) => other > value).length + 1;
+      }
+    }
+    return { ...block, cells };
+  }
+
+  const cells = block.cells.map((row, rowIndex) =>
+    row.map((value, colIndex) => {
+      if (showAs === 'percentTotal') return ratio(value, block.grandTotal);
+      if (showAs === 'percentRow') return ratio(value, block.rowTotals[rowIndex]);
+      return ratio(value, block.colTotals[colIndex]);
+    }),
+  );
+  return {
+    ...block,
+    cells,
+    rowTotals:
+      showAs === 'percentRow'
+        ? block.rowTotals.map((value) => (value === null ? null : 100))
+        : block.rowTotals,
+    colTotals:
+      showAs === 'percentColumn'
+        ? block.colTotals.map((value) => (value === null ? null : 100))
+        : block.colTotals,
+    grandTotal:
+      showAs === 'percentTotal' ? (block.grandTotal === null ? null : 100) : block.grandTotal,
+  };
+}
+
 export function computePivot(config: PivotConfig, source: PivotSource): PivotResult {
   const rowFields = config.rows.filter((field) => field >= 0 && field < source.fields.length);
   const colFields = config.cols.filter((field) => field >= 0 && field < source.fields.length);
@@ -394,6 +535,8 @@ export function computePivot(config: PivotConfig, source: PivotSource): PivotRes
       const target = cells[r][c][index];
       if (valueField.aggregation === 'count') {
         if (isPresent(value)) target.count += 1;
+      } else if (valueField.aggregation === 'countDistinct') {
+        addDistinct(target, value);
       } else if (!addTo(target, value)) {
         skippedValues += 1;
       }
@@ -443,25 +586,29 @@ export function computePivot(config: PivotConfig, source: PivotSource): PivotRes
   });
 
   const empty = emptyAcc();
-  // 每个值字段一块：同一份分组结果，按各自的聚合方式折算
-  const blocks: PivotBlock[] = effectiveValues.map((valueField, index) => ({
-    valueField,
-    label:
-      source.fields[valueField.column]?.label ??
-      columnIndexToName(config.range.startColumn + valueField.column),
-    cells: orderRows.map((row) =>
-      orderCols.map((col) =>
-        aggregateOf(cells[row.index][col.index]?.[index] ?? empty, valueField.aggregation),
+  // 每个值字段一块：同一份分组结果，按各自的聚合方式折算，再按显示方式改写
+  const blocks: PivotBlock[] = effectiveValues.map((valueField, index) => {
+    const block: PivotBlock = {
+      valueField,
+      label:
+        source.fields[valueField.column]?.label ??
+        columnIndexToName(config.range.startColumn + valueField.column),
+      showAs: valueField.showAs ?? 'normal',
+      cells: orderRows.map((row) =>
+        orderCols.map((col) =>
+          aggregateOf(cells[row.index][col.index]?.[index] ?? empty, valueField.aggregation),
+        ),
       ),
-    ),
-    rowTotals: orderRows.map((row) =>
-      aggregateOf(rowTotals[row.index][index], valueField.aggregation),
-    ),
-    colTotals: orderCols.map((col) =>
-      aggregateOf(colTotals[col.index][index], valueField.aggregation),
-    ),
-    grandTotal: aggregateOf(grand[index], valueField.aggregation),
-  }));
+      rowTotals: orderRows.map((row) =>
+        aggregateOf(rowTotals[row.index][index], valueField.aggregation),
+      ),
+      colTotals: orderCols.map((col) =>
+        aggregateOf(colTotals[col.index][index], valueField.aggregation),
+      ),
+      grandTotal: aggregateOf(grand[index], valueField.aggregation),
+    };
+    return applyShowAs(block);
+  });
   const first = blocks[0];
 
   return {
@@ -496,22 +643,48 @@ export function collectFieldKeys(source: PivotSource, column: number): PivotKey[
 }
 
 /**
+ * 表头里值字段的显示文本。
+ *
+ * 显示方式必须体现在标签上——只写 "33.33" 的那一列，没人分得清是金额还是百分比。
+ * 后缀文案由调用方从 i18n 传入（`pivot.ts` 是纯计算层，不认语言）。
+ */
+export function pivotValueLabel(block: PivotBlock, suffix = ''): string {
+  return suffix ? `${block.label} (${suffix})` : block.label;
+}
+
+/**
  * 交叉表 -> 值矩阵（导出 xlsx / 打印共用）。
  *
- * 首行是列键、首列是行键，合计行列跟随在其后；数值按 `aggregation` 的小数位处理
+ * 表头：单值 1 行（列键 / 值字段名），多值 2 行（列键行 + 值字段名行），首列是行键，
+ * 合计行列跟随在其后；数值按 `aggregation` 的小数位处理
  * （avg 保留两位，其余保持原值，避免把整数聚合结果写成 3.0000000001 这种）。
+ *
+ * 多值为什么必须是两行：Excel 原生透视表在"多个值字段"时表头固定占两行
+ * （上面是列键或"值"标题，下面是各值字段名），`pivotXlsx.ts` 的 `firstDataRow` 也按两行写。
+ * 静态矩阵少写这一行，刷新后整表会多占一行、和 `location` 对不上。
  */
 export function pivotToMatrix(
   result: PivotResult,
   config: PivotConfig,
   blankLabel: string,
+  /**
+   * 值字段标签的渲染（表头里那一行文字）。
+   *
+   * 显示方式（占比 / 排名）必须体现在标签上，否则"33.33"这一列没人知道是钱还是百分比；
+   * 但 `pivot.ts` 是纯计算层、不认语言，所以后缀文案由调用方注入。
+   */
+  valueLabel?: (block: PivotBlock) => string,
+  /** 多值且没有列字段时，表头第一行的标题（Excel 里是"值"/"Values"），由调用方按语言注入 */
+  valuesCaption = '',
 ): (string | number)[][] {
+  const labelFor = valueLabel ?? ((block: PivotBlock) => block.label);
   const blocks = result.blocks.length
     ? result.blocks
     : [
         {
           valueField: config.values[0] ?? { column: 0, aggregation: 'count' as const },
           label: '',
+          showAs: 'normal' as const,
           cells: result.cells,
           rowTotals: result.rowTotals,
           colTotals: result.colTotals,
@@ -533,21 +706,35 @@ export function pivotToMatrix(
 
   // 没有列字段时 `colKeys` 仍有一个"复合空键"，不能拿它判断有没有列维度
   const hasCols = result.colFields.length > 0;
-  const header: (string | number)[] = [''];
+  /**
+   * 表头第 1 行：列键（多值时每个列键横跨它的所有值字段列）；没有列字段时放"值"标题。
+   * 表头第 2 行（仅多值）：值字段名。静态矩阵不合并单元格，组内每列都重复一遍标题，
+   * 这样列数与数据行、与原生 part 的 `location` 三者才对得上。
+   */
+  const labelRow: (string | number)[] = [''];
+  const measureRow: (string | number)[] = [''];
   if (hasCols) {
     for (const keys of result.colKeys) {
-      for (const block of blocks) {
-        // 多值字段：列键 × 值字段名，表头一眼能看出这列是谁的
-        header.push(multi ? `${labelOf(keys)} / ${block.label}` : labelOf(keys));
-      }
+      const label = labelOf(keys);
+      for (let index = 0; index < blocks.length; index += 1) labelRow.push(label);
     }
-    for (const block of blocks) header.push(multi ? block.label : '');
+    // 合计块：单值版表头留空，多值版第一行同样留空（Excel 是合并的"总计"标题）
+    for (let index = 0; index < blocks.length; index += 1) labelRow.push('');
+    for (let index = 0; index < result.colKeys.length; index += 1) {
+      for (const block of blocks) measureRow.push(labelFor(block));
+    }
+    for (const block of blocks) measureRow.push(labelFor(block));
+  } else if (multi) {
+    for (let index = 0; index < blocks.length; index += 1) labelRow.push(valuesCaption);
+    for (const block of blocks) measureRow.push(labelFor(block));
   } else {
     // 单列结果：表头写值字段名，导出/打印时才知道这列是什么
-    header.push(result.fields[config.values[0]?.column ?? 0]?.label ?? '');
+    labelRow.push(
+      labelFor(blocks[0]) || (result.fields[config.values[0]?.column ?? 0]?.label ?? ''),
+    );
   }
 
-  const matrix: (string | number)[][] = [header];
+  const matrix: (string | number)[][] = multi ? [labelRow, measureRow] : [labelRow];
   result.rowKeys.forEach((keys, rowIndex) => {
     const line: (string | number)[] = [labelOf(keys)];
     for (let col = 0; col < (hasCols ? result.colKeys.length : 1); col += 1) {

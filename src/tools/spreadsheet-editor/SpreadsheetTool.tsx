@@ -100,10 +100,16 @@ import {
 import { reportSheetIssue, subscribeSheetIssues, type SheetIssue } from './issues';
 import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
 import {
+  PIVOT_SHOW_AS_LABEL_KEY,
   collectFieldKeys,
   computePivot,
+  nextPivotId,
   pivotToMatrix,
+  pivotValueLabel,
   readPivotSource,
+  removePivotConfig,
+  upsertPivotConfig,
+  type PivotBlock,
   type PivotConfig,
 } from './pivot';
 import { registerPivotStrings } from './pivotStrings';
@@ -1475,25 +1481,78 @@ export default function SpreadsheetTool() {
     // 没有活动工作表就没有源数据：与图表一致，直接不进面板
     const sheetId = handle.getActiveSheetId() ?? snapshot.sheetOrder[0];
     if (!sheetId) return;
-    // 已有配置就沿用（用户上次摆好的行列不因为重开面板丢失）
-    const saved = pivotConfigsRef.current.find((item) => item.sheetId === sheetId);
-    const config = saved ?? buildPivotConfig(snapshot, sheetId);
+    // 已有配置就沿用（用户上次摆好的行列不因为重开面板丢失）；
+    // 一张表多个透视时优先回到"这张表上的那个"，没有才新建一个实例
+    const list = pivotConfigsRef.current;
+    const saved =
+      list.find((item) => item.sheetId === sheetId && item.id === pivotConfig?.id) ??
+      list.find((item) => item.sheetId === sheetId);
+    const config = saved ?? { ...buildPivotConfig(snapshot, sheetId), id: nextPivotId(list) };
     setPivotConfig(config);
-    // 第一次打开就把配置写进文档：否则"打开面板直接导出"会因为 ref 里没有配置而漏掉透视表工作表
-    pivotConfigsRef.current = [config];
-    setPivotConfigs([config]);
+    // 打开面板就把配置写进文档：否则"打开面板直接导出"会因为 ref 里没有配置而漏掉透视表工作表
+    pivotConfigsRef.current = upsertPivotConfig(list, config);
+    setPivotConfigs(pivotConfigsRef.current);
     scheduleSaveRef.current();
     setPivotSnapshot(snapshot);
     setPivotOpen(true);
   };
 
-  /** 配置是工具自有内容：写进 ref + 状态，并显式请求保存（与图表同一范式） */
+  /**
+   * 配置是工具自有内容：写进 ref + 状态，并显式请求保存（与图表同一范式）。
+   * 多实例下按 id 就地替换，不重置整个列表 —— 否则改第二个透视表会把第一个删掉。
+   */
   const applyPivotConfig = (next: PivotConfig) => {
     setPivotConfig(next);
-    const list = [next];
+    const list = upsertPivotConfig(pivotConfigsRef.current, next);
     pivotConfigsRef.current = list;
     setPivotConfigs(list);
     scheduleSaveRef.current();
+  };
+
+  /** 新建一个透视实例（同一张工作表可以有多张，各自独立的行列/筛选/值布局） */
+  const handlePivotCreate = () => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    const snapshot = handle.getSnapshot();
+    const sheetId = handle.getActiveSheetId() ?? snapshot.sheetOrder[0];
+    if (!sheetId) return;
+    const list = pivotConfigsRef.current;
+    const base = buildPivotConfig(snapshot, sheetId);
+    const config: PivotConfig = {
+      ...base,
+      id: nextPivotId(list),
+      // 名字带序号，插入后生成的工作表名也就能一眼分清是哪一张
+      name: list.length === 0 ? base.name : `${base.name} ${list.length + 1}`,
+    };
+    setPivotConfig(config);
+    pivotConfigsRef.current = upsertPivotConfig(list, config);
+    setPivotConfigs(pivotConfigsRef.current);
+    scheduleSaveRef.current();
+    setPivotSnapshot(snapshot);
+  };
+
+  /** 切换正在编辑的实例：源区域从当前文档重读（别的表上的数据可能刚改过） */
+  const handlePivotSelect = (id: string) => {
+    const target = pivotConfigsRef.current.find((config) => config.id === id);
+    if (!target) return;
+    setPivotConfig(target);
+    const handle = handleRef.current;
+    if (handle) setPivotSnapshot(handle.getSnapshot());
+  };
+
+  /**
+   * 删除实例。**不动**已经插入到文档里的结果表：那是文档里的一张真实工作表，
+   * 删配置就等于同时删数据，用户不会预期这个行为。
+   */
+  const handlePivotDelete = (id: string) => {
+    const list = removePivotConfig(pivotConfigsRef.current, id);
+    pivotConfigsRef.current = list;
+    setPivotConfigs(list);
+    scheduleSaveRef.current();
+    if (pivotConfig?.id !== id) return;
+    const next = list[0] ?? null;
+    setPivotConfig(next);
+    if (!next) setPivotOpen(false);
   };
 
   const handlePivotUseSelection = () => {
@@ -1517,6 +1576,19 @@ export default function SpreadsheetTool() {
    * （先按旧范围清空再写）。导出会复用这张表，不再追加副本——
    * 否则用户点了插入再导出，文档里会出现两张透视表。
    */
+  /**
+   * 值字段标签：占比 / 排名要带后缀（`金额 (占总计百分比)`）。
+   * 插入到文档、导出、打印三处都走同一个回调，避免同一份透视在三个地方三种表头。
+   */
+  const pivotValueLabelOf = useCallback(
+    (block: PivotBlock) =>
+      pivotValueLabel(
+        block,
+        block.showAs === 'normal' ? '' : t(PIVOT_SHOW_AS_LABEL_KEY[block.showAs]),
+      ),
+    [t],
+  );
+
   const handlePivotInsert = () => {
     const handle = handleRef.current;
     if (!handle || !pivotConfig) return;
@@ -1526,7 +1598,13 @@ export default function SpreadsheetTool() {
     const source = readPivotSource(snapshot, pivotConfig);
     if (source.records.length === 0 || source.fields.length === 0) return;
     const result = computePivot(pivotConfig, source);
-    const matrix = pivotToMatrix(result, pivotConfig, t('tools.sheet.pivotBlank'));
+    const matrix = pivotToMatrix(
+      result,
+      pivotConfig,
+      t('tools.sheet.pivotBlank'),
+      pivotValueLabelOf,
+      t('tools.sheet.pivotValues'),
+    );
     if (matrix.length === 0 || result.rowKeys.length === 0) return;
 
     const sheets = handle.getSheets();
@@ -1578,6 +1656,8 @@ export default function SpreadsheetTool() {
       pivotConfig,
       pivotView.result,
       t('tools.sheet.pivotBlank'),
+      pivotValueLabelOf,
+      t('tools.sheet.pivotValues'),
     );
     if (!sheet) return;
     const base = createEmptySnapshot(t('tools.sheet.pivotTitle'), univerLocale);
@@ -1597,7 +1677,13 @@ export default function SpreadsheetTool() {
     const base = withDocOwnedContent(handle.getSnapshot());
     // 透视表写进额外工作表：导出层会再注入原生 pivotTable part，
     // 支持不了的形态（多级列头/筛选/截断）保留静态值并由保真报告告警
-    const snapshot = appendPivotSheets(base, pivotConfigsRef.current, t('tools.sheet.pivotBlank'));
+    const snapshot = appendPivotSheets(
+      base,
+      pivotConfigsRef.current,
+      t('tools.sheet.pivotBlank'),
+      pivotValueLabelOf,
+      t('tools.sheet.pivotValues'),
+    );
     const result = await exportSnapshotToBytes(snapshot);
     setBusy(null);
     if (!result.ok) {
@@ -2391,6 +2477,10 @@ export default function SpreadsheetTool() {
       {pivotOpen && pivotConfig && pivotView ? (
         <PivotPanel
           config={pivotConfig}
+          configs={pivotConfigs}
+          onSelect={handlePivotSelect}
+          onCreate={handlePivotCreate}
+          onDelete={handlePivotDelete}
           fields={pivotView.source.fields}
           result={pivotView.result}
           empty={pivotView.source.records.length === 0}

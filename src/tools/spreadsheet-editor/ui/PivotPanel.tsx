@@ -1,7 +1,20 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PivotAggregation, PivotConfig, PivotField, PivotKey, PivotResult } from '../pivot';
-import { PIVOT_AGGREGATIONS } from '../pivot';
+import type {
+  PivotAggregation,
+  PivotBlock,
+  PivotConfig,
+  PivotField,
+  PivotKey,
+  PivotResult,
+  PivotShowAs,
+} from '../pivot';
+import {
+  PIVOT_AGGREGATIONS,
+  PIVOT_SHOW_AS,
+  PIVOT_SHOW_AS_LABEL_KEY,
+  pivotValueLabel,
+} from '../pivot';
 
 /**
  * 透视表面板（P2-4.4）：字段区（行/列/值/筛选）+ 交叉表结果 + 合计行列。
@@ -30,6 +43,16 @@ interface PivotPanelProps {
   onClose: () => void;
   /** 把结果落成文档里的一张真实工作表（第一次插入，之后是更新） */
   onInsert: () => void;
+  /**
+   * 工作簿里的全部透视实例（P1-7 ①）。
+   *
+   * 三个回调都可选：面板本身也能被"只有一张透视"的场景直接复用，
+   * 不传就不显示实例栏，不假装支持多实例。
+   */
+  configs?: PivotConfig[];
+  onSelect?: (id: string) => void;
+  onCreate?: () => void;
+  onDelete?: (id: string) => void;
   /** 文档里已经有这张透视结果表：按钮变成「更新」 */
   inserted: boolean;
   onExport: () => void;
@@ -39,6 +62,7 @@ interface PivotPanelProps {
 const AGGREGATION_KEYS: Record<PivotAggregation, string> = {
   sum: 'tools.sheet.pivotSum',
   count: 'tools.sheet.pivotCount',
+  countDistinct: 'tools.sheet.pivotCountDistinct',
   avg: 'tools.sheet.pivotAvg',
   min: 'tools.sheet.pivotMin',
   max: 'tools.sheet.pivotMax',
@@ -67,6 +91,10 @@ export function PivotPanel({
   inserted,
   onExport,
   onPrint,
+  configs,
+  onSelect,
+  onCreate,
+  onDelete,
 }: PivotPanelProps) {
   const { t } = useTranslation();
   const [openFilter, setOpenFilter] = useState<number | null>(null);
@@ -75,8 +103,10 @@ export function PivotPanel({
     fields.find((field) => field.column === column)?.label ?? String(column);
 
   /**
-   * 一个字段同时只属于一个区域（Excel 也允许行+筛选并存，但首版不做：
-   * 隐藏的维度会让"为什么这一行不在了"变得难以解释）。
+   * 字段可以同时是**行/列字段与筛选**（P1-7 ④），只有值字段不能再做筛选
+   * （Excel 同样不允许：值字段没有可分组的键）。
+   *
+   * 之前这里无条件 `delete filters[column]`，结果是"想按区域筛选、又想看区域明细"做不到。
    */
   const assign = (zone: Zone, column: number) => {
     const next: PivotConfig = {
@@ -86,7 +116,7 @@ export function PivotPanel({
       values: config.values.filter((item) => item.column !== column),
       filters: { ...config.filters },
     };
-    delete next.filters[column];
+    if (zone === 'values') delete next.filters[column];
     if (zone === 'rows') next.rows = [...next.rows, column];
     if (zone === 'cols') next.cols = [...next.cols, column];
     // 值区支持多个字段（Excel 的"列 × 值"二维表头）；同一列不会重复加入
@@ -97,16 +127,21 @@ export function PivotPanel({
     onConfigChange(next);
   };
 
+  /** 从行/列/值区摘掉字段：**不动筛选**，否则"行 + 筛选"的字段一点 ✕ 就两边都没了 */
   const unassign = (column: number) => {
-    const next: PivotConfig = {
+    onConfigChange({
       ...config,
       rows: config.rows.filter((item) => item !== column),
       cols: config.cols.filter((item) => item !== column),
-      values: config.values.filter((item) => item.column !== column),
-      filters: { ...config.filters },
-    };
-    delete next.filters[column];
-    onConfigChange(next);
+      values: config.values.filter((field) => field.column !== column),
+    });
+  };
+
+  /** 只去掉筛选（字段可能同时还是行/列字段，那种情况要保留） */
+  const removeFilter = (column: number) => {
+    const filters = { ...config.filters };
+    delete filters[column];
+    onConfigChange({ ...config, filters });
   };
 
   const setAggregation = (column: number, aggregation: PivotAggregation) => {
@@ -114,6 +149,18 @@ export function PivotPanel({
       ...config,
       values: config.values.map((field) =>
         field.column === column ? { ...field, aggregation } : field,
+      ),
+    });
+  };
+
+  const setShowAs = (column: number, showAs: PivotShowAs) => {
+    onConfigChange({
+      ...config,
+      values: config.values.map((field) =>
+        // normal 是默认值：不写进配置，快照里不留噪声
+        field.column === column
+          ? { ...field, showAs: showAs === 'normal' ? undefined : showAs }
+          : field,
       ),
     });
   };
@@ -133,6 +180,10 @@ export function PivotPanel({
   };
 
   const aggregationLabel = (aggregation: PivotAggregation) => t(AGGREGATION_KEYS[aggregation]);
+  const showAsLabel = (showAs: PivotShowAs) => t(PIVOT_SHOW_AS_LABEL_KEY[showAs]);
+  /** 表头里的值标签：占比 / 排名要带后缀，否则数字没有单位 */
+  const blockLabel = (block: PivotBlock) =>
+    pivotValueLabel(block, block.showAs === 'normal' ? '' : showAsLabel(block.showAs));
 
   const blocks = result?.blocks ?? [];
   const multi = blocks.length > 1;
@@ -163,6 +214,38 @@ export function PivotPanel({
             ✕
           </button>
         </div>
+
+        {configs && onSelect && onCreate && onDelete ? (
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-2 text-xs dark:border-gray-700">
+            <span className="text-gray-500 dark:text-gray-400">{t('tools.sheet.pivotSelect')}</span>
+            <select
+              aria-label={t('tools.sheet.pivotSelect')}
+              value={config.id}
+              onChange={(event) => onSelect(event.target.value)}
+              className="rounded border border-gray-300 bg-white px-1 py-0.5 dark:border-gray-600 dark:bg-gray-900"
+            >
+              {configs.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onCreate}
+              className="rounded border border-gray-300 px-2 py-0.5 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              {t('tools.sheet.pivotNew')}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(config.id)}
+              className="rounded border border-gray-300 px-2 py-0.5 text-red-600 hover:bg-red-50 dark:border-gray-600 dark:text-red-400 dark:hover:bg-red-950/40"
+            >
+              {t('tools.sheet.pivotDelete')}
+            </button>
+          </div>
+        ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
@@ -261,6 +344,23 @@ export function PivotPanel({
                           ))}
                         </select>
                       ) : null}
+                      {zone === 'values' ? (
+                        <select
+                          value={
+                            config.values.find((field) => field.column === column)?.showAs ??
+                            'normal'
+                          }
+                          aria-label={`${labelOf(column)} ${t('tools.sheet.pivotShowAs')}`}
+                          onChange={(event) => setShowAs(column, event.target.value as PivotShowAs)}
+                          className="rounded bg-transparent text-[11px] outline-none"
+                        >
+                          {PIVOT_SHOW_AS.map((showAs) => (
+                            <option key={showAs} value={showAs}>
+                              {showAsLabel(showAs)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
                       <button
                         type="button"
                         // 筛选区有两个按钮：一个是"选值"、一个是"移除"。名字必须不同，
@@ -281,7 +381,7 @@ export function PivotPanel({
                         <button
                           type="button"
                           aria-label={`${labelOf(column)} ✕`}
-                          onClick={() => unassign(column)}
+                          onClick={() => removeFilter(column)}
                           className="text-gray-400 hover:text-gray-600"
                         >
                           ✕
@@ -366,20 +466,20 @@ export function PivotPanel({
                       {Array.from({ length: colCount }).flatMap((_, colIndex) =>
                         blocks.map((block) => (
                           <th
-                            key={`v-${colIndex}-${block.label}`}
+                            key={`v-${colIndex}-${blockLabel(block)}`}
                             className="px-2 py-0.5 text-right font-normal"
                           >
-                            {block.label}
+                            {blockLabel(block)}
                           </th>
                         )),
                       )}
                       {hasCols
                         ? blocks.map((block) => (
                             <th
-                              key={`vt-${block.label}`}
+                              key={`vt-${blockLabel(block)}`}
                               className="px-2 py-0.5 text-right font-normal"
                             >
-                              {block.label}
+                              {blockLabel(block)}
                             </th>
                           ))
                         : null}
@@ -400,7 +500,7 @@ export function PivotPanel({
                           const value = block.cells[rowIndex][colIndex];
                           return (
                             <td
-                              key={`c-${colIndex}-${block.label}`}
+                              key={`c-${colIndex}-${blockLabel(block)}`}
                               className="px-2 py-1 text-right tabular-nums"
                             >
                               {value === null ? '' : formatCell(value)}
@@ -413,7 +513,7 @@ export function PivotPanel({
                             const value = block.rowTotals[rowIndex];
                             return (
                               <td
-                                key={`t-${block.label}`}
+                                key={`t-${blockLabel(block)}`}
                                 className="px-2 py-1 text-right font-medium tabular-nums"
                               >
                                 {value === null ? '' : formatCell(value)}
@@ -433,7 +533,7 @@ export function PivotPanel({
                           const value = block.colTotals[colIndex];
                           return (
                             <td
-                              key={`ct-${colIndex}-${block.label}`}
+                              key={`ct-${colIndex}-${blockLabel(block)}`}
                               className="px-2 py-1 text-right tabular-nums"
                             >
                               {value === null ? '' : formatCell(value)}
@@ -442,7 +542,10 @@ export function PivotPanel({
                         }),
                       )}
                       {blocks.map((block) => (
-                        <td key={`gt-${block.label}`} className="px-2 py-1 text-right tabular-nums">
+                        <td
+                          key={`gt-${blockLabel(block)}`}
+                          className="px-2 py-1 text-right tabular-nums"
+                        >
                           {block.grandTotal === null ? '' : formatCell(block.grandTotal)}
                         </td>
                       ))}

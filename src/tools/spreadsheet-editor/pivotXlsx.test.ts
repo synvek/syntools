@@ -85,6 +85,35 @@ describe('canInjectNativePivot', () => {
     // 没有值字段：默认 count 没有源列可指
     expect(canInjectNativePivot({ ...config, values: [] }, source)).toBe(false);
   });
+
+  it('P1-7 的新能力退回静态值（经典透视表写不出来）', () => {
+    const { snapshot, config } = bookWithPivot();
+    const source = readPivotSource(snapshot, config);
+    // 去重计数：需要数据模型，subtotal 枚举里没有 distinctCount
+    expect(
+      canInjectNativePivot(
+        { ...config, values: [{ column: 2, aggregation: 'countDistinct' }] },
+        source,
+      ),
+    ).toBe(false);
+    // 占比 / 排名：静态矩阵里已经是百分比/名次，再挂 showDataAs 会二次换算
+    for (const showAs of ['percentTotal', 'percentRow', 'percentColumn', 'rank'] as const) {
+      expect(
+        canInjectNativePivot(
+          { ...config, values: [{ column: 2, aggregation: 'sum', showAs }] },
+          source,
+        ),
+        showAs,
+      ).toBe(false);
+    }
+    // normal 仍然放行（老配置不受影响）
+    expect(
+      canInjectNativePivot(
+        { ...config, values: [{ column: 2, aggregation: 'sum', showAs: 'normal' }] },
+        source,
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('pivot part XML', () => {
@@ -173,9 +202,33 @@ describe('pivot part XML', () => {
     expect(doc.querySelectorAll('colItems i')).toHaveLength(6);
     // 多值字段：表头两行，数据从第 3 行开始
     expect(doc.querySelector('location')?.getAttribute('firstDataRow')).toBe('2');
+    // 与静态矩阵同尺寸：2 行表头 + 2 行数据 + 1 行合计 × 行标签 + 4 个数据列 + 2 个合计列
+    expect(doc.querySelector('location')?.getAttribute('ref')).toBe('A1:G5');
     expect(item.config.values).toHaveLength(2);
     expect(buildPivotXlsxPlan(snapshot).items).toHaveLength(1);
     expect(config.values).toHaveLength(2);
+  });
+
+  it('writes x children on the values axis when there is no column field', () => {
+    const { snapshot } = bookWithPivot({
+      cols: [],
+      values: [
+        { column: 2, aggregation: 'sum' },
+        { column: 2, aggregation: 'count' },
+      ],
+    });
+    const item = buildPivotXlsxPlan(snapshot).items[0];
+    const doc = parseXml(buildPivotTableDefinitionXml(item, 1, 'PivotTable1'));
+    // 没有列字段的多值表：Excel 用 x="-2" 表示"值"轴
+    expect(doc.querySelector('colFields field')?.getAttribute('x')).toBe('-2');
+    const entries = [...doc.querySelectorAll('colItems i')];
+    expect(entries).toHaveLength(2);
+    // 每一项都带 <x/>（Excel 自己的输出就是这样），第二项再用 i="1" 指向第二个数据字段
+    expect(entries.every((entry) => entry.querySelector('x'))).toBe(true);
+    expect(entries[1].getAttribute('i')).toBe('1');
+    // 表头两行 → 数据从第 3 行开始，与静态矩阵（2 行表头 + 2 行数据）落在同一块区域
+    expect(doc.querySelector('location')?.getAttribute('firstDataRow')).toBe('2');
+    expect(doc.querySelector('location')?.getAttribute('ref')).toBe('A1:C4');
   });
 });
 
@@ -275,5 +328,11 @@ describe('injectPivotTablesIntoXlsx', () => {
     const workbook = await zip.file('xl/workbook.xml')!.async('string');
     expect(workbook).toMatch(/<pivotCaches count="2">/);
     expect(workbook).toContain('cacheId="2"');
+    // 二次注入走的是"已有 <pivotCaches>"分支：重拼时的切片偏移错一个字符就会吃掉
+    // 紧跟的 `</workbook>` 的 `<`，工作簿直接变成非法 XML
+    const doc = parseXml(workbook);
+    expect(doc.documentElement.nodeName).toBe('workbook');
+    expect(doc.querySelector('pivotCaches')?.getAttribute('count')).toBe('2');
+    expect(doc.querySelectorAll('pivotCache')).toHaveLength(2);
   });
 });

@@ -61,6 +61,34 @@ describe('buildPivotSheet', () => {
     expect(sheet!.name).toBe('透视表 1');
   });
 
+  it('keeps the two-row header for multi-value pivots', () => {
+    const rows: unknown[][] = [
+      ['区域', '季度', '金额', '数量'],
+      ['华东', 'Q1', 100, 2],
+      ['华东', 'Q1', 50, 3],
+      ['华南', 'Q1', 30, 1],
+    ];
+    const config = configOf({
+      range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 3 },
+      values: [
+        { column: 2, aggregation: 'sum' },
+        { column: 2, aggregation: 'count' },
+      ],
+    });
+    const sheet = buildPivotSheet(
+      'pivot1',
+      config,
+      buildPivot(snapshotOf(rows), config),
+      '(空白)',
+      undefined,
+      '值',
+    )!;
+    // 表头两行：第 1 行列键、第 2 行值字段名，数据从第 3 行开始（与 Excel 原生表头一致）
+    expect(sheet.cellData['0']['1']).toEqual({ v: 'Q1' });
+    expect(sheet.cellData['1']['1']).toEqual({ v: '金额' });
+    expect(sheet.cellData['2']['0']).toEqual({ v: '华东' });
+  });
+
   it('returns null when the pivot has no rows', () => {
     const config = configOf({ range: { startRow: 0, startColumn: 0, endRow: 0, endColumn: 2 } });
     expect(

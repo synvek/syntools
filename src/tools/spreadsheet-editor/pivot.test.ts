@@ -3,10 +3,14 @@ import {
   buildPivot,
   collectFieldKeys,
   computePivot,
+  nextPivotId,
   normalizeKey,
   pivotNumber,
   pivotToMatrix,
+  pivotValueLabel,
   readPivotSource,
+  removePivotConfig,
+  upsertPivotConfig,
   type PivotConfig,
 } from './pivot';
 
@@ -390,17 +394,312 @@ describe('multiple value fields', () => {
 
   it('lays blocks side by side in the export matrix, with per-block totals', () => {
     const result = buildPivot(sheetOf(DATA), multiConfig());
+    // 多值：表头两行（列键行 + 值字段名行），与 Excel 原生透视表的表头形状一致
     expect(pivotToMatrix(result, multiConfig(), '(空白)')).toEqual([
-      ['', 'Q1 / 金额', 'Q1 / 数量', '金额', '数量'],
+      ['', 'Q1', 'Q1', '', ''],
+      ['', '金额', '数量', '金额', '数量'],
       ['华东', 150, 2.5, 150, 2.5],
       ['华南', 30, 1, 30, 1],
       ['', 180, 2, 180, 2],
     ]);
   });
 
+  it('writes the values caption on the first header row when there is no column field', () => {
+    const config = multiConfig();
+    const result = buildPivot(sheetOf(DATA), { ...config, cols: [] });
+    // 没有列维度的多值表：第一行是"值"标题（Excel 里合并成一个格子），第二行才是值字段名
+    expect(pivotToMatrix(result, { ...config, cols: [] }, '(空白)', undefined, '值')).toEqual([
+      ['', '值', '值'],
+      ['', '金额', '数量'],
+      ['华东', 150, 2.5],
+      ['华南', 30, 1],
+    ]);
+    // 缺省（导出层不需要表头文案）时第一行留空，但行数仍然是两行
+    expect(pivotToMatrix(result, { ...config, cols: [] }, '(空白)')[0]).toEqual(['', '', '']);
+  });
+
   it('keeps the single-value matrix layout unchanged', () => {
     const result = buildPivot(sheetOf(SALES), configOf());
     // 单值时不加值字段名，导出结果与上一版一致（老断言不会因为新特性变化）
     expect(pivotToMatrix(result, configOf(), '(空白)')[0]).toEqual(['', 'Q1', 'Q2', '']);
+  });
+});
+
+/**
+ * P1-7 能力增强：去重计数与显示方式（占比 / 排名）。
+ *
+ * 期望值按 Excel 透视表的口径手算：占比以"总计 / 行合计 / 列合计"为分母，
+ * 排名是列内降序（1 = 最大），并列取同名次；分母为 0 时给空值而不是 #DIV/0!。
+ */
+describe('P1-7 去重计数与显示方式', () => {
+  /** 区域 / 季度 / 金额 / 客户（客户有重复、有文本、有空） */
+  const ROWS: unknown[][] = [
+    ['区域', '季度', '金额', '客户'],
+    ['华东', 'Q1', 100, '甲'],
+    ['华东', 'Q1', 100, '乙'],
+    ['华东', 'Q2', 50, '甲'],
+    ['华南', 'Q1', 0, '丙'],
+  ];
+
+  it('去重计数：重复值只算一次', () => {
+    const result = buildPivot(sheetOf(ROWS), {
+      ...configOf({ range: { startRow: 0, startColumn: 0, endRow: 4, endColumn: 3 } }),
+      rows: [0],
+      cols: [],
+      values: [{ column: 3, aggregation: 'countDistinct' }],
+    });
+    const block = result.blocks[0];
+    expect(block.cells.map((row) => row[0])).toEqual([2, 1]); // 华东: 甲乙 2；华南: 丙 1
+    expect(block.grandTotal).toBe(3);
+  });
+
+  it('去重计数：文本也计（与"计数"的差别在重复项）', () => {
+    const source = sheetOf(ROWS);
+    const config = configOf({
+      range: { startRow: 0, startColumn: 0, endRow: 4, endColumn: 3 },
+      rows: [0],
+      cols: [],
+      values: [{ column: 3, aggregation: 'countDistinct' }],
+    });
+    const distinct = computePivot(config, readPivotSource(source, config));
+    const count = computePivot(
+      { ...config, values: [{ column: 3, aggregation: 'count' }] },
+      readPivotSource(source, config),
+    );
+    expect(distinct.grandTotal).toBe(3);
+    expect(count.grandTotal).toBe(4); // 计数把重复的"甲"也算进去
+  });
+
+  it('去重计数：空值不计，全空时给 null 而不是 0', () => {
+    const rows: unknown[][] = [
+      ['区域', '客户'],
+      ['华东', '甲'],
+      ['华东', undefined],
+      ['华东', ''],
+    ];
+    const config = configOf({
+      range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 1 },
+      rows: [0],
+      cols: [],
+      values: [{ column: 1, aggregation: 'countDistinct' }],
+    });
+    const result = buildPivot(sheetOf(rows), config);
+    expect(result.blocks[0].grandTotal).toBe(1);
+
+    const empty = buildPivot(
+      sheetOf([
+        ['区域', '客户'],
+        ['华东', undefined],
+      ]),
+      { ...config, range: { startRow: 0, startColumn: 0, endRow: 1, endColumn: 1 } },
+    );
+    expect(empty.blocks[0].cells[0][0]).toBeNull();
+  });
+
+  it('去重计数的行列合计是合并后的去重数（不是各格相加）', () => {
+    const result = buildPivot(
+      sheetOf(ROWS),
+      configOf({
+        range: { startRow: 0, startColumn: 0, endRow: 4, endColumn: 3 },
+        rows: [0],
+        cols: [1],
+        values: [{ column: 3, aggregation: 'countDistinct' }],
+      }),
+    );
+    const block = result.blocks[0];
+    // 华东 × Q1 = {甲,乙} = 2，华东 × Q2 = {甲} = 1 → 行合计合并后仍是 {甲,乙} = 2，不是 3
+    expect(block.rowTotals[0]).toBe(2);
+    expect(block.grandTotal).toBe(3);
+  });
+
+  it('占比（占总计）：两位小数，总计改写为 100', () => {
+    const result = buildPivot(
+      sheetOf([
+        ['区域', '金额'],
+        ['华东', 1],
+        ['华南', 2],
+      ]),
+      configOf({
+        range: { startRow: 0, startColumn: 0, endRow: 2, endColumn: 1 },
+        rows: [0],
+        cols: [],
+        values: [{ column: 1, aggregation: 'sum', showAs: 'percentTotal' }],
+      }),
+    );
+    const block = result.blocks[0];
+    expect(block.cells.map((row) => row[0])).toEqual([33.33, 66.67]);
+    expect(block.grandTotal).toBe(100);
+    expect(block.showAs).toBe('percentTotal');
+  });
+
+  it('占比（占行合计）：每行加总 100，行合计改写为 100', () => {
+    const result = buildPivot(
+      sheetOf([
+        ['区域', '季度', '金额'],
+        ['华东', 'Q1', 30],
+        ['华东', 'Q2', 10],
+        ['华南', 'Q1', 5],
+      ]),
+      configOf({
+        range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 2 },
+        rows: [0],
+        cols: [1],
+        values: [{ column: 2, aggregation: 'sum', showAs: 'percentRow' }],
+      }),
+    );
+    const block = result.blocks[0];
+    expect(block.cells[0][0]).toBe(75); // 华东 Q1: 30/40
+    expect(block.cells[0][1]).toBe(25); // 华东 Q2: 10/40
+    expect(block.rowTotals[0]).toBe(100);
+  });
+
+  it('占比（占列合计）：每列加总 100，列合计改写为 100', () => {
+    const result = buildPivot(
+      sheetOf([
+        ['区域', '季度', '金额'],
+        ['华东', 'Q1', 30],
+        ['华南', 'Q1', 10],
+      ]),
+      configOf({
+        range: { startRow: 0, startColumn: 0, endRow: 2, endColumn: 2 },
+        rows: [0],
+        cols: [1],
+        values: [{ column: 2, aggregation: 'sum', showAs: 'percentColumn' }],
+      }),
+    );
+    const block = result.blocks[0];
+    expect(block.cells[0][0]).toBe(75);
+    expect(block.cells[1][0]).toBe(25);
+    expect(block.colTotals[0]).toBe(100);
+  });
+
+  it('占比：分母为 0 时给 null（不出现 Infinity / NaN）', () => {
+    const result = buildPivot(
+      sheetOf([
+        ['区域', '金额'],
+        ['华东', 0],
+      ]),
+      configOf({
+        range: { startRow: 0, startColumn: 0, endRow: 1, endColumn: 1 },
+        rows: [0],
+        cols: [],
+        values: [{ column: 1, aggregation: 'sum', showAs: 'percentTotal' }],
+      }),
+    );
+    const value = result.blocks[0].cells[0][0];
+    expect(value).toBeNull();
+  });
+
+  it('排名：列内降序，并列取同名次', () => {
+    const result = buildPivot(
+      sheetOf([
+        ['区域', '金额'],
+        ['华东', 100],
+        ['华南', 100],
+        ['华北', 30],
+      ]),
+      configOf({
+        range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 1 },
+        rows: [0],
+        cols: [],
+        values: [{ column: 1, aggregation: 'sum', showAs: 'rank' }],
+      }),
+    );
+    // 100 / 100 并列第 1，30 第 3（行按字段值排序，这里只比名次集合）
+    expect(result.blocks[0].cells.map((row) => row[0] as number).sort((a, b) => a - b)).toEqual([
+      1, 1, 3,
+    ]);
+  });
+
+  it('显示方式只改数值，不改行/列结构', () => {
+    const base = configOf({ range: { startRow: 0, startColumn: 0, endRow: 4, endColumn: 2 } });
+    const plain = buildPivot(sheetOf(SALES), base);
+    const percent = buildPivot(sheetOf(SALES), {
+      ...base,
+      values: [{ column: 2, aggregation: 'sum', showAs: 'percentTotal' }],
+    });
+    expect(percent.rowKeys).toEqual(plain.rowKeys);
+    expect(percent.colKeys).toEqual(plain.colKeys);
+  });
+
+  it('矩阵表头带上显示方式后缀（由调用方注入文案）', () => {
+    const config = configOf({
+      range: { startRow: 0, startColumn: 0, endRow: 4, endColumn: 2 },
+      rows: [0],
+      cols: [],
+      values: [{ column: 2, aggregation: 'sum', showAs: 'percentTotal' }],
+    });
+    const result = buildPivot(sheetOf(SALES), config);
+    const plain = pivotToMatrix(result, config, '(空白)');
+    expect(plain[0][1]).toBe('金额');
+
+    const labelled = pivotToMatrix(result, config, '(空白)', (block) =>
+      pivotValueLabel(block, block.showAs === 'percentTotal' ? '占总计%' : ''),
+    );
+    expect(labelled[0][1]).toBe('金额 (占总计%)');
+  });
+});
+
+/**
+ * P1-7 ①：多实例。
+ *
+ * 守两件事：**同一张工作表可以有多个透视**（各自独立的行列/值布局），
+ * 以及"改一个不会动到另一个"——原来 `applyPivotConfig` 把列表重置成 `[next]`，
+ * 改第二个透视就会把第一个悄悄删掉。
+ */
+describe('多实例（P1-7 ①）', () => {
+  const configWith = (id: string, sheetId = 's1'): PivotConfig => ({
+    ...configOf(),
+    id,
+    sheetId,
+  });
+
+  it('nextPivotId 从 pivot-1 起，跳过已占用的编号', () => {
+    expect(nextPivotId([])).toBe('pivot-1');
+    expect(nextPivotId([configWith('pivot-1')])).toBe('pivot-2');
+    expect(nextPivotId([configWith('pivot-1'), configWith('pivot-2')])).toBe('pivot-3');
+    // 中间删掉一个：编号可以复用，不留空洞
+    expect(nextPivotId([configWith('pivot-1'), configWith('pivot-3')])).toBe('pivot-2');
+  });
+
+  it('upsert 按 id 就地替换，顺序不变', () => {
+    const list = [configWith('pivot-1'), configWith('pivot-2')];
+    const next = upsertPivotConfig(list, { ...configWith('pivot-2'), name: '改过的名字' });
+    expect(next.map((config) => config.id)).toEqual(['pivot-1', 'pivot-2']);
+    expect(next[1].name).toBe('改过的名字');
+    // 原数组不被改动（React 状态必须拿新引用才会重渲染）
+    expect(list[1].name).toBe('透视 1');
+    expect(next).not.toBe(list);
+  });
+
+  it('upsert 新 id 时追加到末尾', () => {
+    const list = [configWith('pivot-1')];
+    const next = upsertPivotConfig(list, configWith('pivot-2'));
+    expect(next.map((config) => config.id)).toEqual(['pivot-1', 'pivot-2']);
+  });
+
+  it('remove 只删指定实例', () => {
+    const list = [configWith('pivot-1'), configWith('pivot-2')];
+    expect(removePivotConfig(list, 'pivot-1').map((config) => config.id)).toEqual(['pivot-2']);
+    // 删不存在的 id 不抛错、也不改列表
+    expect(removePivotConfig(list, 'nope')).toHaveLength(2);
+  });
+
+  it('两个实例各自独立计算（同一份源数据、不同布局）', () => {
+    const source = sheetOf(SALES);
+    const byQuarter = configWith('pivot-1');
+    const byRegion = {
+      ...configWith('pivot-2'),
+      rows: [],
+      cols: [0],
+      values: [{ column: 2, aggregation: 'sum' as const }],
+    };
+    const first = computePivot(byQuarter, readPivotSource(source, byQuarter));
+    const second = computePivot(byRegion, readPivotSource(source, byRegion));
+    expect(first.blocks[0].grandTotal).toBe(second.blocks[0].grandTotal);
+    expect(first.rowFields).toEqual([0]);
+    expect(second.colFields).toEqual([0]);
+    expect(first.colKeys).toHaveLength(2); // Q1/Q2
+    expect(second.colKeys).toHaveLength(2); // 华东/华南
   });
 });

@@ -1,4 +1,10 @@
-import { buildPivot, pivotToMatrix, type PivotConfig, type PivotResult } from './pivot';
+import {
+  buildPivot,
+  pivotToMatrix,
+  type PivotBlock,
+  type PivotConfig,
+  type PivotResult,
+} from './pivot';
 import { createEmptySheet, type SheetSnapshot, type WorkbookSnapshot } from './xlsx-io';
 
 /**
@@ -16,9 +22,13 @@ export function buildPivotSheet(
   config: PivotConfig,
   result: PivotResult,
   blankLabel: string,
+  /** 值字段标签（含"占比 / 排名"后缀）；缺省用字段名 */
+  valueLabel?: (block: PivotBlock) => string,
+  /** 多值且无列字段时表头第一行的标题（"值"/"Values"）；缺省留空 */
+  valuesCaption?: string,
 ): SheetSnapshot | null {
   if (result.rowKeys.length === 0) return null;
-  const matrix = pivotToMatrix(result, config, blankLabel);
+  const matrix = pivotToMatrix(result, config, blankLabel, valueLabel, valuesCaption);
   // 工作表重名在 Excel 里会被当成损坏：名字后面补序号保证唯一（id 里的数字正好可用）
   const suffix = id.replace(/[^0-9]/g, '');
   const sheet = createEmptySheet(id, `${config.name || 'Pivot'}${suffix ? ` ${suffix}` : ''}`);
@@ -80,6 +90,8 @@ export function appendPivotSheets(
   snapshot: WorkbookSnapshot,
   configs: PivotConfig[],
   blankLabel: string,
+  valueLabel?: (block: PivotBlock) => string,
+  valuesCaption?: string,
 ): WorkbookSnapshot {
   if (configs.length === 0) return snapshot;
   const next: WorkbookSnapshot = {
@@ -107,7 +119,14 @@ export function appendPivotSheets(
       idSeq += 1;
       id = `pivot${idSeq}`;
     } while (next.sheets[id] || next.sheetOrder.includes(id));
-    const sheet = buildPivotSheet(id, config, buildPivot(snapshot, config), blankLabel);
+    const sheet = buildPivotSheet(
+      id,
+      config,
+      buildPivot(snapshot, config),
+      blankLabel,
+      valueLabel,
+      valuesCaption,
+    );
     if (!sheet) return;
     sheet.name = takeSheetName(takenNames, sheet.name, config.name || 'Pivot');
     next.sheets[id] = sheet;

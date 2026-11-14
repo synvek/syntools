@@ -106,6 +106,21 @@ export function canInjectNativePivot(config: PivotConfig, source: PivotSource): 
   if (config.cols.length > 1) return false;
   if (Object.keys(config.filters).length > 0) return false;
   if (config.values.length === 0) return false;
+  /**
+   * P1-7 新增的两种能力在**经典**透视表里写不出来：
+   * - 去重计数需要数据模型（Excel 2013+ 的"添加到数据模型"才有 distinctCount），
+   *   `subtotal` 枚举里没有这个值，硬写会被 Excel 判成无效字段；
+   * - 占比 / 排名在 OOXML 里是 `dataField@showDataAs`，但静态矩阵里写的已经是百分比数字，
+   *   两者叠在一起会变成"百分比再除一次总计"。
+   * 两种都退回静态值，并由 `sheet.pivotSnapshot` 提示。
+   */
+  if (
+    config.values.some(
+      (field) => field.aggregation === 'countDistinct' || (field.showAs ?? 'normal') !== 'normal',
+    )
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -286,6 +301,7 @@ export function buildPivotCacheRecordsXml(item: PivotXlsxItem): string {
 const AGGREGATION_NAMES: Record<string, string> = {
   sum: 'Sum',
   count: 'Count',
+  countDistinct: 'Distinct Count',
   avg: 'Average',
   min: 'Min',
   max: 'Max',
@@ -334,10 +350,12 @@ function colItemsXml(item: PivotXlsxItem): string {
   const valueCount = result.blocks.length || 1;
 
   if (!hasCols) {
-    // 没有列字段：单值就是"值"伪列一项；多值每个数据字段一项
+    // 没有列字段：单值就是"值"伪列一项；多值每个数据字段一项。
+    // 每项都要带 `<x/>`（空 = 值轴上的"无项"），Excel 自己的输出也是这样；
+    // 只写 `<i/>` 虽然过 schema，但和带列字段的分支长得不一样，刷新时容易被判成坏项。
     if (valueCount === 1) return '<colItems count="1"><i/></colItems>';
     const entries = Array.from({ length: valueCount }, (_, index) =>
-      index === 0 ? '<i/>' : `<i i="${index}"/>`,
+      index === 0 ? '<i><x/></i>' : `<i i="${index}"><x/></i>`,
     ).join('');
     return `<colItems count="${valueCount}">${entries}</colItems>`;
   }
@@ -453,7 +471,13 @@ export function insertPivotCachesIntoWorkbook(
       const existing = block.match(/<pivotCache\b[^>]*\/>/g) ?? [];
       const count = existing.length + entries.length;
       const rebuilt = `<pivotCaches count="${count}">${existing.join('')}${tags}</pivotCaches>`;
-      return withNamespace.slice(0, openIndex) + rebuilt + withNamespace.slice(closeIndex + 15);
+      // 用长度而不是魔数：写成 15 会多吃掉闭合标签后紧跟的一个字符（通常是 `</workbook>` 的 `<`）
+      const closeTag = '</pivotCaches>';
+      return (
+        withNamespace.slice(0, openIndex) +
+        rebuilt +
+        withNamespace.slice(closeIndex + closeTag.length)
+      );
     }
   }
 

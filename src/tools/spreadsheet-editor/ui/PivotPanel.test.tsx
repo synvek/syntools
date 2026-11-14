@@ -155,3 +155,109 @@ describe('PivotPanel', () => {
     expect(next.filters[0]).toEqual(['t:华东']);
   });
 });
+
+/** P1-7 ①：多实例栏（列出 / 切换 / 新建 / 删除），以及"不传就不显示"的嵌入场景 */
+describe('PivotPanel 多实例', () => {
+  function renderInstances(overrides: Partial<PivotConfig> = {}) {
+    const config = configOf(overrides);
+    const snapshot = snapshotOf(SALES);
+    const source = readPivotSource(snapshot, config);
+    const result = computePivot(config, source);
+    const callbacks = {
+      onConfigChange: vi.fn(),
+      onUseSelection: vi.fn(),
+      onRefresh: vi.fn(),
+      onRemove: vi.fn(),
+      onClose: vi.fn(),
+      onInsert: vi.fn(),
+      onExport: vi.fn(),
+      onPrint: vi.fn(),
+      onSelect: vi.fn(),
+      onCreate: vi.fn(),
+      onDelete: vi.fn(),
+    };
+    render(
+      <PivotPanel
+        config={config}
+        configs={[
+          { ...config, id: 'pivot-1', name: '透视 A' },
+          { ...config, id: 'pivot-2', name: '透视 B' },
+        ]}
+        fields={source.fields}
+        result={result}
+        empty={false}
+        recordCount={source.records.length}
+        keysByColumn={{}}
+        inserted={false}
+        {...callbacks}
+      />,
+    );
+    return callbacks;
+  }
+
+  it('实例栏列出全部透视，切换时回传 id', () => {
+    const callbacks = renderInstances();
+    const select = screen.getByLabelText('tools.sheet.pivotSelect') as HTMLSelectElement;
+    expect(within(select).getAllByRole('option')).toHaveLength(2);
+    expect(within(select).getByText('透视 A')).toBeTruthy();
+    fireEvent.change(select, { target: { value: 'pivot-2' } });
+    expect(callbacks.onSelect).toHaveBeenCalledWith('pivot-2');
+  });
+
+  it('新建与删除按钮分别回传"新建"和"当前实例 id"', () => {
+    const callbacks = renderInstances();
+    fireEvent.click(screen.getByText('tools.sheet.pivotNew'));
+    expect(callbacks.onCreate).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText('tools.sheet.pivotDelete'));
+    expect(callbacks.onDelete).toHaveBeenCalledWith('pivot-1');
+  });
+
+  it('不传 configs 时不渲染实例栏（嵌入场景不该出现空下拉）', () => {
+    renderPanel();
+    expect(screen.queryByLabelText('tools.sheet.pivotSelect')).toBeNull();
+  });
+});
+
+/** P1-7 ④：同一字段可以既做行/列字段又做筛选；值字段不能再筛选（与 Excel 一致） */
+describe('PivotPanel 字段跨区复用', () => {
+  function lastConfig(callbacks: { onConfigChange: ReturnType<typeof vi.fn> }): PivotConfig {
+    return callbacks.onConfigChange.mock.calls.at(-1)?.[0] as PivotConfig;
+  }
+
+  it('已经是筛选的字段再加进行区时，筛选不丢', () => {
+    const callbacks = renderPanel({ rows: [], filters: { 0: [] } });
+    fireEvent.click(screen.getByLabelText('区域 → tools.sheet.pivotRows'));
+    const next = lastConfig(callbacks);
+    expect(next.rows).toEqual([0]);
+    expect(next.filters).toEqual({ 0: [] });
+  });
+
+  it('值字段不能再做筛选（值字段没有可分组的键）', () => {
+    const callbacks = renderPanel({
+      rows: [],
+      values: [{ column: 2, aggregation: 'sum' }],
+      filters: { 2: [] },
+    });
+    fireEvent.click(screen.getByLabelText('金额 → tools.sheet.pivotValues'));
+    expect(lastConfig(callbacks).filters[2]).toBeUndefined();
+  });
+
+  it('从行区摘掉字段时，筛选保留', () => {
+    const callbacks = renderPanel({ rows: [0], filters: { 0: [] } });
+    // 行区与筛选区各有一个"区域 ✕"，行区那个在前
+    fireEvent.click(screen.getAllByLabelText('区域 ✕')[0]);
+    const next = lastConfig(callbacks);
+    expect(next.rows).toEqual([]);
+    expect(next.filters).toEqual({ 0: [] });
+  });
+
+  it('筛选区的 ✕ 只去掉筛选，行字段还在', () => {
+    const callbacks = renderPanel({ rows: [0], filters: { 0: [] } });
+    // 行区与筛选区各有一个"区域 ✕"，筛选区那个在最后
+    const buttons = screen.getAllByLabelText('区域 ✕');
+    fireEvent.click(buttons[buttons.length - 1]);
+    const next = lastConfig(callbacks);
+    expect(next.rows).toEqual([0]);
+    expect(next.filters[0]).toBeUndefined();
+  });
+});
