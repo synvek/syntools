@@ -289,6 +289,18 @@ describe('pivotToMatrix', () => {
     ]);
   });
 
+  it('gives each column field its own header row', () => {
+    const config = configOf({ rows: [0], cols: [1, 0] });
+    // 两个列字段 → 两行表头（季度 / 区域），行列数与原生透视表一致
+    expect(pivotToMatrix(buildPivot(sheetOf(SALES), config), config, '(空白)')).toEqual([
+      ['', 'Q1', 'Q1', 'Q2', 'Q2', ''],
+      ['', '华东', '华南', '华东', '华南', ''],
+      ['华东', 100, '', 50, '', 150],
+      ['华南', '', 30, '', 20, 50],
+      ['', 100, 30, 50, 20, 200],
+    ]);
+  });
+
   it('omits the totals row/column when there is no column field', () => {
     const result = buildPivot(
       sheetOf(SALES),
@@ -422,6 +434,96 @@ describe('multiple value fields', () => {
     const result = buildPivot(sheetOf(SALES), configOf());
     // 单值时不加值字段名，导出结果与上一版一致（老断言不会因为新特性变化）
     expect(pivotToMatrix(result, configOf(), '(空白)')[0]).toEqual(['', 'Q1', 'Q2', '']);
+  });
+});
+
+/**
+ * P1-7 ③ 计算字段：表达式只做四则运算，字段引用写 `[列名]`。
+ *
+ * 期望值同样按 Excel 手算：利润 = 金额 - 成本，再按区域求和；
+ * 除零给空值，缺字段给整列空 + 错误码（不静默丢字段）。
+ */
+describe('P1-7 计算字段', () => {
+  /** 区域 / 金额 / 成本 */
+  const PROFIT: unknown[][] = [
+    ['区域', '金额', '成本'],
+    ['华东', 100, 60],
+    ['华东', 50, 20],
+    ['华南', 30, 10],
+  ];
+
+  const profitConfig = (expression = '[金额] - [成本]'): PivotConfig =>
+    configOf({
+      range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 2 },
+      cols: [],
+      calcFields: [{ id: 'calc-1', name: '利润', expression }],
+      values: [{ column: -1, aggregation: 'sum', calcId: 'calc-1' }],
+    });
+
+  it('aggregates the expression per record, then by row field', () => {
+    const result = buildPivot(sheetOf(PROFIT), profitConfig());
+    expect(result.blocks[0].label).toBe('利润');
+    expect(result.cells.map((row) => row[0])).toEqual([70, 20]);
+    expect(result.grandTotal).toBe(90);
+    expect(result.calcErrors).toBeUndefined();
+  });
+
+  it('treats division by zero as an empty cell, not as Infinity or 0', () => {
+    const rows: unknown[][] = [
+      ['区域', '金额', '成本'],
+      ['华东', 100, 0],
+      ['华东', 50, 25],
+      ['华南', 30, 0],
+    ];
+    const result = buildPivot(sheetOf(rows), profitConfig('[金额] / [成本]'));
+    // 华东：一条除零（跳过）+ 一条 2 = 2；华南：只有除零 → 整格空
+    expect(result.cells.map((row) => row[0])).toEqual([2, null]);
+    // 计算字段的 null 不是"源单元格是文本"，不该计入 skippedValues
+    expect(result.skippedValues).toBe(0);
+  });
+
+  it('keeps the column (all empty) and reports the error for unknown fields', () => {
+    const result = buildPivot(sheetOf(PROFIT), profitConfig('[金额] - [不存在的列]'));
+    expect(result.blocks).toHaveLength(1);
+    expect(result.cells.map((row) => row[0])).toEqual([null, null]);
+    expect(result.calcErrors).toEqual({ 'calc-1': 'unknownField' });
+  });
+
+  it('lets one calculated field reference another', () => {
+    const config = configOf({
+      range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 2 },
+      cols: [],
+      calcFields: [
+        { id: 'calc-1', name: '利润', expression: '[金额] - [成本]' },
+        { id: 'calc-2', name: '利润两倍', expression: '[利润] * 2' },
+      ],
+      values: [{ column: -1, aggregation: 'sum', calcId: 'calc-2' }],
+    });
+    const result = buildPivot(sheetOf(PROFIT), config);
+    expect(result.cells.map((row) => row[0])).toEqual([140, 40]);
+  });
+
+  it('ignores value entries whose calculated field was deleted', () => {
+    const config = configOf({
+      range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 2 },
+      cols: [],
+      calcFields: [],
+      values: [{ column: -1, aggregation: 'sum', calcId: 'calc-9' }],
+    });
+    const result = buildPivot(sheetOf(PROFIT), config);
+    // 没有可用的值字段 → 回落到默认 count（第一列非空计数），不会崩
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].valueField).toEqual({ column: 0, aggregation: 'count' });
+  });
+
+  it('shows the calculated field label in the export matrix', () => {
+    const config = profitConfig();
+    const matrix = pivotToMatrix(buildPivot(sheetOf(PROFIT), config), config, '(空白)');
+    expect(matrix).toEqual([
+      ['', '利润'],
+      ['华东', 70],
+      ['华南', 20],
+    ]);
   });
 });
 

@@ -8,6 +8,7 @@ import type {
   PivotKey,
   PivotResult,
   PivotShowAs,
+  PivotValueField,
 } from '../pivot';
 import {
   PIVOT_AGGREGATIONS,
@@ -15,6 +16,7 @@ import {
   PIVOT_SHOW_AS_LABEL_KEY,
   pivotValueLabel,
 } from '../pivot';
+import { CALC_ERROR_LABEL_KEY, compileCalcFields, nextCalcId } from '../pivotCalc';
 
 /**
  * 透视表面板（P2-4.4）：字段区（行/列/值/筛选）+ 交叉表结果 + 合计行列。
@@ -98,6 +100,12 @@ export function PivotPanel({
 }: PivotPanelProps) {
   const { t } = useTranslation();
   const [openFilter, setOpenFilter] = useState<number | null>(null);
+  /** 新建计算字段的草稿（P1-7 ③）：打开时才算校验，不打开不占渲染成本 */
+  const [calcDraft, setCalcDraft] = useState<{
+    id: string;
+    name: string;
+    expression: string;
+  } | null>(null);
 
   const labelOf = (column: number) =>
     fields.find((field) => field.column === column)?.label ?? String(column);
@@ -144,26 +152,11 @@ export function PivotPanel({
     onConfigChange({ ...config, filters });
   };
 
-  const setAggregation = (column: number, aggregation: PivotAggregation) => {
-    onConfigChange({
-      ...config,
-      values: config.values.map((field) =>
-        field.column === column ? { ...field, aggregation } : field,
-      ),
-    });
-  };
-
-  const setShowAs = (column: number, showAs: PivotShowAs) => {
-    onConfigChange({
-      ...config,
-      values: config.values.map((field) =>
-        // normal 是默认值：不写进配置，快照里不留噪声
-        field.column === column
-          ? { ...field, showAs: showAs === 'normal' ? undefined : showAs }
-          : field,
-      ),
-    });
-  };
+  /**
+   * 显示方式设成 normal 时把字段删掉（默认值不写进快照，避免老版本读到噪声）。
+   * 聚合方式没有"默认"语义，原样写。
+   */
+  const normalizeShowAs = (showAs: PivotShowAs) => (showAs === 'normal' ? undefined : showAs);
 
   const toggleFilterValue = (column: number, key: string) => {
     const current = config.filters[column] ?? [];
@@ -172,11 +165,59 @@ export function PivotPanel({
     onConfigChange({ ...config, filters: { ...config.filters, [column]: next } });
   };
 
+  /** 行/列/筛选区仍然按"列号"渲染；值区改由 `valueChips` 单独渲染（要支持计算字段） */
   const zoneChips = (zone: Zone): number[] => {
     if (zone === 'rows') return config.rows;
     if (zone === 'cols') return config.cols;
-    if (zone === 'values') return config.values.map((field) => field.column);
+    if (zone === 'values') return [];
     return Object.keys(config.filters).map(Number);
+  };
+
+  const valueLabel = (field: PivotValueField) =>
+    field.calcId
+      ? (config.calcFields?.find((item) => item.id === field.calcId)?.name ?? field.calcId)
+      : labelOf(field.column);
+
+  const updateValueField = (target: PivotValueField, patch: Partial<PivotValueField>) => {
+    onConfigChange({
+      ...config,
+      values: config.values.map((field) => (field === target ? { ...field, ...patch } : field)),
+    });
+  };
+
+  /**
+   * 从值区摘掉一个值字段。
+   * 计算字段定义只在"没有任何值字段再引用它"时才一起删，避免快照里留下孤儿定义。
+   */
+  const removeValueField = (target: PivotValueField) => {
+    const values = config.values.filter((field) => field !== target);
+    const calcId = target.calcId;
+    const calcFields =
+      calcId && !values.some((field) => field.calcId === calcId)
+        ? (config.calcFields ?? []).filter((field) => field.id !== calcId)
+        : config.calcFields;
+    onConfigChange({ ...config, values, calcFields });
+  };
+
+  const openCalcDraft = () =>
+    setCalcDraft({ id: nextCalcId(config.calcFields ?? []), name: '', expression: '' });
+
+  /** 草稿校验：与真正保存走同一套编译（语法 / 未知字段 / 重名 / 环） */
+  const draftError = calcDraft
+    ? (compileCalcFields(
+        [...(config.calcFields ?? []), calcDraft],
+        fields.map((field) => field.label),
+      ).errors.get(calcDraft.id) ?? null)
+    : null;
+
+  const saveCalcDraft = () => {
+    if (!calcDraft || draftError) return;
+    onConfigChange({
+      ...config,
+      calcFields: [...(config.calcFields ?? []), { ...calcDraft, name: calcDraft.name.trim() }],
+      values: [...config.values, { column: -1, aggregation: 'sum', calcId: calcDraft.id }],
+    });
+    setCalcDraft(null);
   };
 
   const aggregationLabel = (aggregation: PivotAggregation) => t(AGGREGATION_KEYS[aggregation]);
@@ -189,6 +230,9 @@ export function PivotPanel({
   const multi = blocks.length > 1;
   const hasCols = (result?.colFields.length ?? 0) > 0;
   const colCount = hasCols ? (result?.colKeys.length ?? 0) : 1;
+  // 预览表头与导出口径一致：每个列字段一行，多值再加一行值字段名
+  const colLevels = hasCols ? (result?.colFields.length ?? 1) : 1;
+  const headerRows = colLevels + (multi ? 1 : 0);
   const labelOfKeys = (keys: PivotKey[]) =>
     keys.map((key) => (key.blank ? t('tools.sheet.pivotBlank') : key.label)).join(' / ');
 
@@ -319,77 +363,169 @@ export function PivotPanel({
                   {t(ZONE_LABEL[zone])}
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  {zoneChips(zone).map((column) => (
-                    <span
-                      key={column}
-                      className="flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
-                    >
-                      {labelOf(column)}
-                      {zone === 'values' ? (
-                        <select
-                          value={
-                            config.values.find((field) => field.column === column)?.aggregation ??
-                            'sum'
-                          }
-                          aria-label={`${labelOf(column)} ${t('tools.sheet.pivotValues')}`}
+                  {zone === 'values'
+                    ? config.values.map((field) => {
+                        const key = field.calcId ?? `column-${field.column}`;
+                        const label = valueLabel(field);
+                        const error = field.calcId ? result?.calcErrors?.[field.calcId] : undefined;
+                        return (
+                          <span
+                            key={key}
+                            // 出错的字段用红色 + tooltip 说明原因：整列为空但不解释，用户只会以为透视"坏了"
+                            title={error ? t(CALC_ERROR_LABEL_KEY[error]) : undefined}
+                            className={
+                              error
+                                ? 'flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300'
+                                : 'flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                            }
+                          >
+                            {label}
+                            <select
+                              value={field.aggregation}
+                              aria-label={`${label} ${t('tools.sheet.pivotValues')}`}
+                              onChange={(event) =>
+                                updateValueField(field, {
+                                  aggregation: event.target.value as PivotAggregation,
+                                })
+                              }
+                              className="rounded bg-transparent text-[11px] outline-none"
+                            >
+                              {PIVOT_AGGREGATIONS.map((aggregation) => (
+                                <option key={aggregation} value={aggregation}>
+                                  {aggregationLabel(aggregation)}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={field.showAs ?? 'normal'}
+                              aria-label={`${label} ${t('tools.sheet.pivotShowAs')}`}
+                              onChange={(event) =>
+                                updateValueField(field, {
+                                  showAs: normalizeShowAs(event.target.value as PivotShowAs),
+                                })
+                              }
+                              className="rounded bg-transparent text-[11px] outline-none"
+                            >
+                              {PIVOT_SHOW_AS.map((showAs) => (
+                                <option key={showAs} value={showAs}>
+                                  {showAsLabel(showAs)}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              aria-label={`${label} ✕`}
+                              onClick={() => removeValueField(field)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        );
+                      })
+                    : zoneChips(zone).map((column) => (
+                        <span
+                          key={column}
+                          className="flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                        >
+                          {labelOf(column)}
+                          <button
+                            type="button"
+                            // 筛选区有两个按钮：一个是"选值"、一个是"移除"。名字必须不同，
+                            // 否则读屏和测试都只能看到两个一模一样的 "区域 ✕"
+                            aria-label={
+                              zone === 'filters'
+                                ? `${labelOf(column)} ${t('tools.sheet.pivotFilters')}`
+                                : `${labelOf(column)} ✕`
+                            }
+                            onClick={() =>
+                              zone === 'filters' ? setOpenFilter(column) : unassign(column)
+                            }
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            {zone === 'filters' ? '⚙' : '✕'}
+                          </button>
+                          {zone === 'filters' ? (
+                            <button
+                              type="button"
+                              aria-label={`${labelOf(column)} ✕`}
+                              onClick={() => removeFilter(column)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              ✕
+                            </button>
+                          ) : null}
+                        </span>
+                      ))}
+                </div>
+                {zone === 'values' ? (
+                  <div className="mt-1 space-y-1">
+                    {(config.calcFields ?? []).map((field) => {
+                      const error = result?.calcErrors?.[field.id];
+                      if (!error) return null;
+                      return (
+                        <p key={field.id} className="text-[11px] text-red-600 dark:text-red-400">
+                          {field.name}: {t(CALC_ERROR_LABEL_KEY[error])}
+                        </p>
+                      );
+                    })}
+                    {calcDraft ? (
+                      <div className="space-y-1 rounded border border-gray-300 p-1 text-[11px] dark:border-gray-600">
+                        <input
+                          value={calcDraft.name}
+                          aria-label={t('tools.sheet.pivotCalcName')}
+                          placeholder={t('tools.sheet.pivotCalcName')}
                           onChange={(event) =>
-                            setAggregation(column, event.target.value as PivotAggregation)
+                            setCalcDraft({ ...calcDraft, name: event.target.value })
                           }
-                          className="rounded bg-transparent text-[11px] outline-none"
-                        >
-                          {PIVOT_AGGREGATIONS.map((aggregation) => (
-                            <option key={aggregation} value={aggregation}>
-                              {aggregationLabel(aggregation)}
-                            </option>
-                          ))}
-                        </select>
-                      ) : null}
-                      {zone === 'values' ? (
-                        <select
-                          value={
-                            config.values.find((field) => field.column === column)?.showAs ??
-                            'normal'
+                          className="w-full rounded border border-gray-300 px-1 py-0.5 dark:border-gray-600 dark:bg-gray-900"
+                        />
+                        <input
+                          value={calcDraft.expression}
+                          aria-label={t('tools.sheet.pivotCalcExpression')}
+                          placeholder="[金额] - [成本]"
+                          onChange={(event) =>
+                            setCalcDraft({ ...calcDraft, expression: event.target.value })
                           }
-                          aria-label={`${labelOf(column)} ${t('tools.sheet.pivotShowAs')}`}
-                          onChange={(event) => setShowAs(column, event.target.value as PivotShowAs)}
-                          className="rounded bg-transparent text-[11px] outline-none"
-                        >
-                          {PIVOT_SHOW_AS.map((showAs) => (
-                            <option key={showAs} value={showAs}>
-                              {showAsLabel(showAs)}
-                            </option>
-                          ))}
-                        </select>
-                      ) : null}
+                          className="w-full rounded border border-gray-300 px-1 py-0.5 font-mono dark:border-gray-600 dark:bg-gray-900"
+                        />
+                        <p className="text-gray-500 dark:text-gray-400">
+                          {t('tools.sheet.pivotCalcHint')}
+                        </p>
+                        {draftError ? (
+                          <p className="text-red-600 dark:text-red-400">
+                            {t(CALC_ERROR_LABEL_KEY[draftError])}
+                          </p>
+                        ) : null}
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            disabled={Boolean(draftError)}
+                            onClick={saveCalcDraft}
+                            className="rounded border border-gray-300 px-1.5 py-0.5 disabled:opacity-50 dark:border-gray-600"
+                          >
+                            {t('tools.sheet.pivotCalcSave')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCalcDraft(null)}
+                            className="rounded border border-gray-300 px-1.5 py-0.5 dark:border-gray-600"
+                          >
+                            {t('tools.sheet.pivotCalcCancel')}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        // 筛选区有两个按钮：一个是"选值"、一个是"移除"。名字必须不同，
-                        // 否则读屏和测试都只能看到两个一模一样的 "区域 ✕"
-                        aria-label={
-                          zone === 'filters'
-                            ? `${labelOf(column)} ${t('tools.sheet.pivotFilters')}`
-                            : `${labelOf(column)} ✕`
-                        }
-                        onClick={() =>
-                          zone === 'filters' ? setOpenFilter(column) : unassign(column)
-                        }
-                        className="text-gray-400 hover:text-gray-600"
+                        onClick={openCalcDraft}
+                        className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
                       >
-                        {zone === 'filters' ? '⚙' : '✕'}
+                        {t('tools.sheet.pivotCalcAdd')}
                       </button>
-                      {zone === 'filters' ? (
-                        <button
-                          type="button"
-                          aria-label={`${labelOf(column)} ✕`}
-                          onClick={() => removeFilter(column)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          ✕
-                        </button>
-                      ) : null}
-                    </span>
-                  ))}
-                </div>
+                    )}
+                  </div>
+                ) : null}
                 {zone === 'filters' && openFilter !== null ? (
                   <div className="mt-1 max-h-24 overflow-auto rounded border border-gray-200 p-1 text-[11px] dark:border-gray-700">
                     {(keysByColumn[openFilter] ?? []).map((key) => {
@@ -436,31 +572,37 @@ export function PivotPanel({
             <div className="min-h-0 overflow-auto rounded border border-gray-200 dark:border-gray-700">
               <table className="w-full border-collapse text-xs">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-800">
-                    <th
-                      rowSpan={multi ? 2 : 1}
-                      className="sticky left-0 z-10 bg-gray-50 px-2 py-1 text-left font-medium dark:bg-gray-800"
-                    />
-                    {Array.from({ length: colCount }).map((_, colIndex) => (
-                      <th
-                        key={`col-${colIndex}`}
-                        colSpan={multi ? blocks.length : 1}
-                        className="px-2 py-1 text-right font-medium"
-                      >
-                        {hasCols && result.colKeys[colIndex]
-                          ? labelOfKeys(result.colKeys[colIndex])
-                          : ''}
-                      </th>
-                    ))}
-                    {hasCols ? (
-                      <th
-                        colSpan={multi ? blocks.length : 1}
-                        className="px-2 py-1 text-right font-medium"
-                      >
-                        {t('tools.sheet.pivotGrandTotal')}
-                      </th>
-                    ) : null}
-                  </tr>
+                  {Array.from({ length: colLevels }).map((_, level) => (
+                    <tr key={`level-${level}`} className="bg-gray-50 dark:bg-gray-800">
+                      {level === 0 ? (
+                        <th
+                          rowSpan={headerRows}
+                          className="sticky left-0 z-10 bg-gray-50 px-2 py-1 text-left font-medium dark:bg-gray-800"
+                        />
+                      ) : null}
+                      {Array.from({ length: colCount }).map((_, colIndex) => {
+                        const key = result?.colKeys[colIndex]?.[level];
+                        return (
+                          <th
+                            key={`col-${level}-${colIndex}`}
+                            colSpan={multi ? blocks.length : 1}
+                            className="px-2 py-1 text-right font-medium"
+                          >
+                            {key ? labelOfKeys([key]) : ''}
+                          </th>
+                        );
+                      })}
+                      {hasCols && level === 0 ? (
+                        <th
+                          rowSpan={headerRows}
+                          colSpan={multi ? blocks.length : 1}
+                          className="px-2 py-1 text-right font-medium"
+                        >
+                          {t('tools.sheet.pivotGrandTotal')}
+                        </th>
+                      ) : null}
+                    </tr>
+                  ))}
                   {multi ? (
                     <tr className="bg-gray-50 text-[11px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                       {Array.from({ length: colCount }).flatMap((_, colIndex) =>

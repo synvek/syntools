@@ -72,12 +72,17 @@ describe('canInjectNativePivot', () => {
     expect(canInjectNativePivot(config, source)).toBe(true);
   });
 
+  it('accepts multi-level column fields now that the matrix expands per field', () => {
+    const { snapshot, config } = bookWithPivot();
+    const source = readPivotSource(snapshot, config);
+    // 静态矩阵与 colFields / colItems 都按"每个列字段一行"展开，刷新前后行列数一致
+    expect(canInjectNativePivot({ ...config, cols: [1, 0] }, source)).toBe(true);
+  });
+
   it('refuses shapes the static preview cannot match', () => {
     const { snapshot, config } = bookWithPivot();
     const source = readPivotSource(snapshot, config);
 
-    // 多级列头：Excel 每个列字段占一行表头，静态矩阵只有一行
-    expect(canInjectNativePivot({ ...config, cols: [0, 1] }, source)).toBe(false);
     // 筛选：原生 part 的筛选是页字段，会把表整体推下去
     expect(canInjectNativePivot({ ...config, filters: { 0: ['t:华东'] } }, source)).toBe(false);
     // 截断：缓存里只有部分行，刷新后数字会变
@@ -113,6 +118,22 @@ describe('canInjectNativePivot', () => {
         source,
       ),
     ).toBe(true);
+  });
+
+  it('falls back to static values for calculated fields', () => {
+    const { snapshot, config } = bookWithPivot();
+    const source = readPivotSource(snapshot, config);
+    // 原生 part 要把计算字段写成 cacheField@formula，语法差异会让 Excel 报"需要修复"
+    expect(
+      canInjectNativePivot(
+        {
+          ...config,
+          calcFields: [{ id: 'calc-1', name: '毛利', expression: '[金额] - 100' }],
+          values: [{ column: -1, aggregation: 'sum', calcId: 'calc-1' }],
+        },
+        source,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -229,6 +250,34 @@ describe('pivot part XML', () => {
     // 表头两行 → 数据从第 3 行开始，与静态矩阵（2 行表头 + 2 行数据）落在同一块区域
     expect(doc.querySelector('location')?.getAttribute('firstDataRow')).toBe('2');
     expect(doc.querySelector('location')?.getAttribute('ref')).toBe('A1:C4');
+  });
+
+  it('expands multiple column fields into per-level x children', () => {
+    const { snapshot } = bookWithPivot({ cols: [1, 0] });
+    const item = buildPivotXlsxPlan(snapshot).items[0];
+    const doc = parseXml(buildPivotTableDefinitionXml(item, 1, 'PivotTable1'));
+    // 两个列字段：colFields 按顺序各一项
+    const colFields = [...doc.querySelectorAll('colFields field')];
+    expect(colFields.map((node) => node.getAttribute('x'))).toEqual(['1', '0']);
+    // 4 个列键 + 1 个合计列；一列一项 = 每个列字段一个 <x>
+    const entries = [...doc.querySelectorAll('colItems i')];
+    expect(entries).toHaveLength(5);
+    expect([...entries[0].querySelectorAll('x')].map((node) => node.getAttribute('v'))).toEqual([
+      '0',
+      '0',
+    ]);
+    expect([...entries[4].querySelectorAll('x')]).toHaveLength(2);
+    expect(entries[4].getAttribute('t')).toBe('grand');
+    // 表头两行（每个列字段一行）+ 2 行数据 + 1 行合计 → A1:F5
+    expect(doc.querySelector('location')?.getAttribute('firstDataRow')).toBe('2');
+    expect(doc.querySelector('location')?.getAttribute('ref')).toBe('A1:F5');
+    // 关掉自动分类汇总，否则 Excel 会自己插入 Q1 小计列，与静态矩阵对不上
+    const axisFields = [...doc.querySelectorAll('pivotField[axis]')];
+    expect(axisFields).toHaveLength(2);
+    for (const field of axisFields) {
+      expect(field.getAttribute('defaultSubtotal')).toBe('0');
+      expect(field.querySelectorAll('item[t="default"]')).toHaveLength(0);
+    }
   });
 });
 

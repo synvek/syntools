@@ -218,6 +218,61 @@ describe('PivotPanel 多实例', () => {
   });
 });
 
+/** P1-7 ③：计算字段（四则运算 + [列名] 引用），错误必须当场说清楚 */
+describe('PivotPanel 计算字段', () => {
+  function lastConfig(callbacks: { onConfigChange: ReturnType<typeof vi.fn> }): PivotConfig {
+    return callbacks.onConfigChange.mock.calls.at(-1)?.[0] as PivotConfig;
+  }
+
+  it('新建计算字段后同时写入定义与值字段', () => {
+    const callbacks = renderPanel({ values: [] });
+    fireEvent.click(screen.getByText('tools.sheet.pivotCalcAdd'));
+    fireEvent.change(screen.getByLabelText('tools.sheet.pivotCalcName'), {
+      target: { value: '双倍金额' },
+    });
+    fireEvent.change(screen.getByLabelText('tools.sheet.pivotCalcExpression'), {
+      target: { value: '[金额] * 2' },
+    });
+    fireEvent.click(screen.getByText('tools.sheet.pivotCalcSave'));
+    const next = lastConfig(callbacks);
+    expect(next.calcFields).toEqual([{ id: 'calc-1', name: '双倍金额', expression: '[金额] * 2' }]);
+    expect(next.values).toEqual([{ column: -1, aggregation: 'sum', calcId: 'calc-1' }]);
+  });
+
+  it('表达式引用不存在的字段时不能保存，并显示原因', () => {
+    const callbacks = renderPanel({ values: [] });
+    fireEvent.click(screen.getByText('tools.sheet.pivotCalcAdd'));
+    fireEvent.change(screen.getByLabelText('tools.sheet.pivotCalcName'), {
+      target: { value: '毛利' },
+    });
+    fireEvent.change(screen.getByLabelText('tools.sheet.pivotCalcExpression'), {
+      target: { value: '[金额] - [不存在]' },
+    });
+    expect(screen.getByText('tools.sheet.pivotCalcUnknownField')).toBeTruthy();
+    expect(screen.getByText('tools.sheet.pivotCalcSave')).toBeDisabled();
+    expect(callbacks.onConfigChange).not.toHaveBeenCalled();
+  });
+
+  it('删除计算字段的值条目时，定义一起清掉', () => {
+    const callbacks = renderPanel({
+      values: [{ column: -1, aggregation: 'sum', calcId: 'calc-1' }],
+      calcFields: [{ id: 'calc-1', name: '毛利', expression: '[金额] * 2' }],
+    });
+    fireEvent.click(screen.getByLabelText('毛利 ✕'));
+    const next = lastConfig(callbacks);
+    expect(next.values).toEqual([]);
+    expect(next.calcFields).toEqual([]);
+  });
+
+  it('出错的字段在值区标出原因，而不是静默留空', () => {
+    renderPanel({
+      values: [{ column: -1, aggregation: 'sum', calcId: 'calc-1' }],
+      calcFields: [{ id: 'calc-1', name: '毛利', expression: '[不存在] * 2' }],
+    });
+    expect(screen.getByText(/毛利: tools\.sheet\.pivotCalcUnknownField/)).toBeTruthy();
+  });
+});
+
 /** P1-7 ④：同一字段可以既做行/列字段又做筛选；值字段不能再筛选（与 Excel 一致） */
 describe('PivotPanel 字段跨区复用', () => {
   function lastConfig(callbacks: { onConfigChange: ReturnType<typeof vi.fn> }): PivotConfig {

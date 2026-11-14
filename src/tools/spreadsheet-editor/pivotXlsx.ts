@@ -94,8 +94,8 @@ export interface PivotXlsxPlan {
  * 哪些配置能以原生透视表导出。
  *
  * 只放行"静态预览和 Excel 布局能对上"的形态：
- * - 多级**列**字段：Excel 每个列字段占一行表头，静态矩阵只有一行（把标签用 " / " 拼起来），
- *   两者对不上，刷新后表会整体下移、盖住合计行；
+ * - 多级**列**字段已放行：静态矩阵按"每个列字段一行表头"展开（与原生同口径），
+ *   `colFields` / `colItems` 也逐级写 `<x>`，刷新前后的行列数不变；
  * - 有筛选：原生 part 的筛选是页字段（pivotField axis="axisPage"），会把表整体推下去；
  *   而把筛选写进缓存又等于"刷新后换了口径"，两种都不诚实 —— 退回静态值并告警；
  * - 截断（超 5 万单元格）：缓存里只有部分行，刷新后数字会变。
@@ -103,7 +103,6 @@ export interface PivotXlsxPlan {
 export function canInjectNativePivot(config: PivotConfig, source: PivotSource): boolean {
   if (source.truncated) return false;
   if (source.fields.length === 0 || source.records.length === 0) return false;
-  if (config.cols.length > 1) return false;
   if (Object.keys(config.filters).length > 0) return false;
   if (config.values.length === 0) return false;
   /**
@@ -121,6 +120,13 @@ export function canInjectNativePivot(config: PivotConfig, source: PivotSource): 
   ) {
     return false;
   }
+  /**
+   * 计算字段（P1-7 ③）同理退回静态值：原生 part 要把它写成 `cacheField@formula`
+   * （`<cacheField formula="..."/>` + `dataField fld` 指向虚拟列），
+   * 一旦公式语法与 Excel 的口径有差异，打开就是"需要修复"的提示，而且刷新后数字还会变。
+   * 静态矩阵里的值已经是算好的，宁可不可刷新，也不要给一个可能算错的表。
+   */
+  if (config.values.some((field) => field.calcId)) return false;
   return true;
 }
 
@@ -320,13 +326,20 @@ function pivotFieldXml(
 ): string {
   if (axis === 'data') return `<pivotField dataField="1" showAll="0"/>`;
   if (!axis) return `<pivotField showAll="0"/>`;
+  /**
+   * `defaultSubtotal="0"`：关掉自动分类汇总。
+   *
+   * 静态矩阵只有"合计行/合计列"各一个，没有 `Q1 Total` 这种按外层键入的小计；
+   * 留着默认值的话，多级行/列字段刷新后 Excel 会自己插入小计行列，表就比 `location`
+   * 多出一圈。同时 `<items>` 里也不再写 `<item t="default"/>`——那个条目就是小计项。
+   */
   const items =
     field.items.length === 0
       ? ''
-      : `<items count="${field.items.length + 1}">${field.items
+      : `<items count="${field.items.length}">${field.items
           .map((_, index) => `<item x="${index}"/>`)
-          .join('')}<item t="default"/></items>`;
-  return `<pivotField axis="${axis}" showAll="0">${items}</pivotField>`;
+          .join('')}</items>`;
+  return `<pivotField axis="${axis}" showAll="0" defaultSubtotal="0">${items}</pivotField>`;
 }
 
 function rowItemsXml(item: PivotXlsxItem): string {
@@ -360,25 +373,31 @@ function colItemsXml(item: PivotXlsxItem): string {
     return `<colItems count="${valueCount}">${entries}</colItems>`;
   }
 
-  const column = result.colFields[0];
-  const field = fields[column];
   const items: string[] = [];
   result.colKeys.forEach((keys) => {
-    const x = itemIndex(field, keys[0]);
+    // 多级列字段：一个 <i> 里按级写多个 <x>（第 n 个对应第 n 个列字段）
+    const children = result.colFields
+      .map((column, level) => `<x v="${itemIndex(fields[column], keys[level])}"/>`)
+      .join('');
     if (valueCount === 1) {
-      items.push(`<i><x v="${x}"/></i>`);
+      items.push(`<i>${children}</i>`);
       return;
     }
     for (let index = 0; index < valueCount; index += 1) {
-      items.push(index === 0 ? `<i><x v="${x}"/></i>` : `<i i="${index}"><x v="${x}"/></i>`);
+      items.push(index === 0 ? `<i>${children}</i>` : `<i i="${index}">${children}</i>`);
     }
   });
-  // 合计列：单值一项；多值按数据字段各一项
+  // 合计列：单值一项；多值按数据字段各一项。多级列字段时每级补一个空 <x/>
+  const grandChildren = '<x/>'.repeat(result.colFields.length);
   if (valueCount === 1) {
-    items.push('<i t="grand"><x/></i>');
+    items.push(`<i t="grand">${grandChildren}</i>`);
   } else {
     for (let index = 0; index < valueCount; index += 1) {
-      items.push(index === 0 ? '<i t="grand"><x/></i>' : `<i i="${index}" t="grand"><x/></i>`);
+      items.push(
+        index === 0
+          ? `<i t="grand">${grandChildren}</i>`
+          : `<i i="${index}" t="grand">${grandChildren}</i>`,
+      );
     }
   }
   return `<colItems count="${items.length}">${items.join('')}</colItems>`;
@@ -393,7 +412,8 @@ export function buildPivotTableDefinitionXml(
   const { result } = item;
   const hasCols = result.colFields.length > 0;
   const valueCount = result.blocks.length || 1;
-  const headerRows = valueCount > 1 ? 2 : 1;
+  // 表头行数：每个列字段一行（无列字段时 1 行），多值再加一行值字段名 —— 与 `pivotToMatrix` 同口径
+  const headerRows = (hasCols ? result.colFields.length : 1) + (valueCount > 1 ? 1 : 0);
   const firstDataCol = result.rowFields.length > 0 ? 1 : 0;
   const valueColumns = result.blocks.map((block) => block.valueField.column);
 
