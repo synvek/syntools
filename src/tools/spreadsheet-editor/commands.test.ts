@@ -80,6 +80,8 @@ function fakeActions(): SheetActions {
     present: noop,
     promptHyperlink: noop,
     openNumberFormat: noop,
+    openFormatCells: noop,
+    openShortcuts: noop,
     copyToClipboard: noop,
     pasteFromClipboard: noop,
   };
@@ -106,6 +108,11 @@ function makeCtx(overrides: Partial<SheetRibbonContext> = {}): SheetRibbonContex
     painterSticky: false,
     togglePainter: () => undefined,
     lockPainter: () => undefined,
+    // Pending border weight / colour (P1-3), owned by the ribbon component in production
+    borderStyle: 'thin',
+    borderColor: '#000000',
+    setBorderStyle: () => undefined,
+    setBorderColor: () => undefined,
     ...overrides,
   };
 }
@@ -265,9 +272,40 @@ describe('spreadsheet ribbon tabs', () => {
       'outside',
       'inside',
       'thickOutside',
+      // P1-3: the weights follow the presets and only arm the pending style
+      'border-style-thin',
+      'border-style-medium',
+      'border-style-thick',
+      'border-style-dashed',
+      'border-style-dotted',
+      'border-style-double',
     ]);
     borders.menu.find((entry) => entry.id === 'none')?.onSelect();
-    expect(host.applyBorder).toHaveBeenCalledWith('none');
+    expect(host.applyBorder).toHaveBeenCalledWith('none', { style: 'thin', color: '#000000' });
+  });
+
+  it('passes the armed border weight and colour to the preset click (P1-3)', () => {
+    const host = fakeHost();
+    const ctx = makeCtx({ host, borderStyle: 'thick', borderColor: '#123456' });
+    const borders = allItems(buildSheetRibbonTabs(ctx)).find((item) => item.id === 'borders');
+    if (borders?.kind !== 'split') throw new Error('borders must be a split button');
+    borders.menu.find((entry) => entry.id === 'outside')?.onSelect();
+    expect(host.applyBorder).toHaveBeenCalledWith('outside', {
+      style: 'thick',
+      color: '#123456',
+    });
+  });
+
+  it('picking a weight only arms it — nothing is drawn until a preset is clicked', () => {
+    const host = fakeHost();
+    const setBorderStyle = vi.fn();
+    const borders = allItems(buildSheetRibbonTabs(makeCtx({ host, setBorderStyle }))).find(
+      (item) => item.id === 'borders',
+    );
+    if (borders?.kind !== 'split') throw new Error('borders must be a split button');
+    borders.menu.find((entry) => entry.id === 'border-style-dashed')?.onSelect();
+    expect(setBorderStyle).toHaveBeenCalledWith('dashed');
+    expect(host.applyBorder).not.toHaveBeenCalled();
   });
 
   it('offers the number format presets and applies the chosen pattern', () => {
@@ -279,6 +317,21 @@ describe('spreadsheet ribbon tabs', () => {
     expect(select.options.map((option) => option.value)).toContain('0.00%');
     select.onChange('0.00%');
     expect(host.applyNumberFormat).toHaveBeenCalledWith('0.00%');
+  });
+
+  it('数字组带"设置单元格格式"启动器（P1-2），且无实例时不可用', () => {
+    const actions = fakeActions();
+    const tabs = buildSheetRibbonTabs(makeCtx({ actions }));
+    const number = tabs.find((tab) => tab.id === 'home')?.groups.find((g) => g.id === 'number');
+    expect(number?.onLauncher).toBeTypeOf('function');
+    number?.onLauncher?.();
+    expect(actions.openFormatCells).toHaveBeenCalledTimes(1);
+
+    const blocked = buildSheetRibbonTabs(makeCtx({ host: null }));
+    const blockedNumber = blocked
+      .find((tab) => tab.id === 'home')
+      ?.groups.find((g) => g.id === 'number');
+    expect(blockedNumber?.onLauncher).toBeUndefined();
   });
 
   it('greys out the whole formatting surface when no instance is ready', () => {

@@ -60,6 +60,12 @@ describe('sheet copy', () => {
       'a11yGridLabel',
       'a11yCell',
       'a11yRange',
+      // P1-1 快捷键帮助
+      'shortcutTitle',
+      'shortcutGroupFile',
+      'shortcutGroupFormat',
+      'shortcutGroupDocs',
+      'shortcutEngineNote',
     ];
     for (const lng of ['zh', 'en']) {
       for (const key of keys) {

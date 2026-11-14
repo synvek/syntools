@@ -75,9 +75,18 @@ import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
 import { SpreadsheetRibbon, type RibbonBaseContext } from './SpreadsheetRibbon';
-import { buildSheetMenu, type SheetActions } from './commands';
-import { parseClipboardMatrix } from './sheetFormat';
+import {
+  buildSheetMenu,
+  resolveCommand,
+  type SheetActions,
+  type SheetCommandContext,
+} from './commands';
+import { parseClipboardMatrix, type SheetFormatState } from './sheetFormat';
 import { NumberFormatDialog } from './ui/NumberFormatDialog';
+import { FormatCellsDialog } from './ui/FormatCellsDialog';
+import { ShortcutHelp } from './ui/ShortcutHelp';
+import { findShortcut, isMacPlatform } from './shortcuts';
+import { commitFromDraft } from './formatCells';
 import {
   createEmptySnapshot,
   exportSnapshotToBytes,
@@ -255,6 +264,11 @@ export default function SpreadsheetTool() {
   /** Set once the Univer instance is live — the ribbon needs it reactively, `handleRef` is not enough */
   const [ribbonHost, setRibbonHost] = useState<UniverHandle | null>(null);
   const [numberFormatOpen, setNumberFormatOpen] = useState(false);
+  /** "设置单元格格式" (P1-2) plus the selection snapshot it edits */
+  const [formatCellsOpen, setFormatCellsOpen] = useState(false);
+  const [formatCellsFormat, setFormatCellsFormat] = useState<SheetFormatState | null>(null);
+  /** Keyboard cheat sheet (P1-1) */
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /** Pattern the custom-format dialog starts from (read when it opens, so it reflects the selection) */
   const [numberFormatInitial, setNumberFormatInitial] = useState('');
   /** Sheet height = whatever remains in the first viewport (sheet tabs / status bar stay visible, "related tools" is pushed below the fold) */
@@ -1814,6 +1828,12 @@ export default function SpreadsheetTool() {
       setNumberFormatInitial(handleRef.current?.getFormatState()?.numberFormat ?? '');
       setNumberFormatOpen(true);
     },
+    openFormatCells: () => {
+      // Snapshot the selection now: the dialog must describe what it is about to change
+      setFormatCellsFormat(handleRef.current?.getFormatState() ?? null);
+      setFormatCellsOpen(true);
+    },
+    openShortcuts: () => setShortcutsOpen(true),
     copyToClipboard: (text) => {
       const clipboard = navigator.clipboard;
       if (!clipboard) {
@@ -1858,6 +1878,33 @@ export default function SpreadsheetTool() {
     hasTitle: Boolean(title.trim()),
   };
   const menu = buildSheetMenu({ ...ribbonBase, host: ribbonHost, format: null });
+
+  /**
+   * Keyboard layer (P1-1).
+   *
+   * A ref keeps the listener stable across renders while still seeing the current context (busy
+   * flags, protection, the live host). `defaultPrevented` is the contract with the sheet engine: if
+   * its keymap already ran, we must not run the command a second time.
+   */
+  const commandCtxRef = useRef<SheetCommandContext | null>(null);
+  commandCtxRef.current = { ...ribbonBase, host: ribbonHost, format: null };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return;
+      const id = findShortcut(event, isMacPlatform());
+      if (!id) return;
+      const ctx = commandCtxRef.current;
+      if (!ctx) return;
+      const command = resolveCommand(ctx, id);
+      if (command.disabled) return;
+      // The browser would otherwise print / save / open its own dialog
+      event.preventDefault();
+      command.run();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const statusText = draftSaved ? t('common.saved') : t('common.saving');
   /**
@@ -1958,6 +2005,27 @@ export default function SpreadsheetTool() {
         onApply={(pattern) => {
           handleRef.current?.applyNumberFormat(pattern);
           setNumberFormatOpen(false);
+        }}
+      />
+      {/*
+       * Format Cells (P1-2). It lives here rather than inside the ribbon because it must apply
+       * through the same host instance the rest of the tool edits; the *format snapshot* is taken
+       * when the dialog opens, so a stale ribbon state can never seed it.
+       */}
+      <ShortcutHelp
+        open={shortcutsOpen}
+        ctx={{ ...ribbonBase, host: ribbonHost, format: null }}
+        onClose={() => setShortcutsOpen(false)}
+      />
+      <FormatCellsDialog
+        open={formatCellsOpen}
+        format={formatCellsFormat}
+        onClose={() => setFormatCellsOpen(false)}
+        onApply={(draft) => {
+          const commit = commitFromDraft(draft);
+          ribbonHost?.applyFormat(commit.patch);
+          if (commit.border) ribbonHost?.applyBorder(commit.border.preset, commit.border.spec);
+          setFormatCellsOpen(false);
         }}
       />
 

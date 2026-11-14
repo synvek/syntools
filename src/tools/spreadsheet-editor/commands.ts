@@ -3,13 +3,17 @@ import { fontPreviewOptions } from '@/core/components/ribbon/ribbonPreviewOption
 import type { RibbonMenuItem, RibbonTab } from '@/core/components/ribbon/types';
 import {
   BORDER_PRESETS,
+  BORDER_STYLES,
   FONT_FAMILY_PRESETS,
   FONT_SIZE_PRESETS,
   NUMBER_FORMAT_PRESETS,
   type BorderPresetId,
+  type BorderSpec,
+  type BorderStyleId,
   type SheetFormatPatch,
   type SheetFormatState,
 } from './sheetFormat';
+import { isMacPlatform, shortcutLabel } from './shortcuts';
 
 /**
  * Command layer of the spreadsheet: every user-facing action is described once here and projected onto
@@ -40,7 +44,8 @@ export type SheetPanelKind =
 export interface SheetRibbonHost {
   getFormatState(): SheetFormatState | null;
   applyFormat(patch: SheetFormatPatch): void;
-  applyBorder(preset: BorderPresetId): void;
+  /** `spec` carries the line weight / colour the user picked in the border menu (P1-3) */
+  applyBorder(preset: BorderPresetId, spec?: BorderSpec): void;
   applyNumberFormat(pattern: string | null): void;
   shiftDecimals(delta: number): void;
   toggleThousandSeparator(): void;
@@ -100,6 +105,10 @@ export interface SheetActions {
   present: () => void;
   promptHyperlink: () => void;
   openNumberFormat: () => void;
+  /** "设置单元格格式" dialog (P1-2) */
+  openFormatCells: () => void;
+  /** Keyboard cheat sheet (P1-1) */
+  openShortcuts: () => void;
   copyToClipboard: (text: string) => void;
   pasteFromClipboard: () => void;
 }
@@ -134,6 +143,14 @@ export interface SheetRibbonContext extends SheetCommandContext {
   painterSticky: boolean;
   togglePainter: () => void;
   lockPainter: () => void;
+  /**
+   * Pending border weight / colour (P1-3). Excel lets the user choose these *before* drawing, so
+   * they live in the ribbon and are handed to `applyBorder` with every preset click.
+   */
+  borderStyle: BorderStyleId;
+  borderColor: string;
+  setBorderStyle: (style: BorderStyleId) => void;
+  setBorderColor: (color: string) => void;
 }
 
 /** One command, described once and reused by the menu bar and the ribbon */
@@ -517,6 +534,21 @@ const SHEET_COMMAND_DEFS = {
     run: (ctx: SheetCommandContext) => ctx.actions.openNumberFormat(),
     disabled: noHostOrBusy,
   },
+  /** Keyboard cheat sheet (P1-1) — also the target of its own binding */
+  shortcutHelp: {
+    id: 'shortcutHelp',
+    labelKey: 'tools.sheet.shortcutTitle',
+    icon: 'info',
+    run: (ctx: SheetCommandContext) => ctx.actions.openShortcuts(),
+  },
+  /** Excel's Ctrl+1 surface: number / font / alignment / border in one dialog (P1-2) */
+  formatCells: {
+    id: 'formatCells',
+    labelKey: 'tools.sheet.r.formatCellsDialog',
+    icon: 'numberFormat',
+    run: (ctx: SheetCommandContext) => ctx.actions.openFormatCells(),
+    disabled: noHostOrBusy,
+  },
 
   /* ---------------------------------- cells --------------------------------- */
   insertRowsAbove: {
@@ -842,10 +874,16 @@ export function resolveCommand(ctx: SheetCommandContext, id: SheetCommandId) {
  * in sync, which is exactly what merging the menu bar into the ribbon was meant to remove.
  */
 export function buildSheetMenu(ctx: SheetCommandContext): EditorMenu {
-  const entry = (id: SheetCommandId, options: { shortcut?: string; danger?: boolean } = {}) => {
+  /**
+   * The shortcut shown in the menu comes from the binding table (P1-1), never from a hand-written
+   * string: a menu that advertises ⌘N while nothing listens for it is worse than no hint at all.
+   */
+  const entry = (id: SheetCommandId, options: { danger?: boolean } = {}) => {
     const command = resolveCommand(ctx, id);
+    const shortcut = shortcutLabel(id, isMacPlatform());
     return editorMenuItem(command.id, command.label, command.run, {
-      ...options,
+      ...(options.danger ? { danger: true } : {}),
+      ...(shortcut ? { shortcut } : {}),
       disabled: command.disabled,
     });
   };
@@ -854,7 +892,7 @@ export function buildSheetMenu(ctx: SheetCommandContext): EditorMenu {
     id: 'more',
     label: ctx.t('common.more'),
     entries: [
-      entry('newDoc', { shortcut: '⌘N' }),
+      entry('newDoc'),
       entry('importXlsx'),
       entry('importCsv'),
       { type: 'separator' },
@@ -862,6 +900,7 @@ export function buildSheetMenu(ctx: SheetCommandContext): EditorMenu {
       entry('exportCsv'),
       { type: 'separator' },
       entry('library'),
+      entry('shortcutHelp'),
       { type: 'separator' },
       entry('clearDoc', { danger: true }),
     ],
@@ -923,13 +962,29 @@ export function buildSheetRibbonTabs(ctx: SheetRibbonContext): RibbonTab[] {
         };
   };
 
-  const borderMenu: RibbonMenuItem[] = BORDER_PRESETS.map((preset) => ({
-    id: preset.id,
-    label: ctx.t(`tools.sheet.r.${preset.labelKey}`),
-    icon: preset.icon,
-    disabled: noHostOrBusy(ctx),
-    onSelect: () => ctx.host?.applyBorder(preset.id),
-  }));
+  /**
+   * Border menu = "where" then "how thick". Picking a weight only arms it (Excel behaves the same);
+   * the next preset click draws with it. Colour comes from the Format Cells dialog, because a colour
+   * swatch inside a list would need a control the ribbon menu does not have.
+   */
+  const pendingBorder: BorderSpec = { style: ctx.borderStyle, color: ctx.borderColor };
+  const borderMenu: RibbonMenuItem[] = [
+    ...BORDER_PRESETS.map((preset) => ({
+      id: preset.id,
+      label: ctx.t(`tools.sheet.r.${preset.labelKey}`),
+      icon: preset.icon,
+      disabled: noHostOrBusy(ctx),
+      onSelect: () => ctx.host?.applyBorder(preset.id, pendingBorder),
+    })),
+    ...BORDER_STYLES.map((style) => ({
+      id: `border-style-${style.id}`,
+      label: ctx.t(`tools.sheet.r.${style.labelKey}`),
+      icon: 'borders',
+      checked: ctx.borderStyle === style.id,
+      disabled: noHostOrBusy(ctx),
+      onSelect: () => ctx.setBorderStyle(style.id),
+    })),
+  ];
 
   const conditionalMenu: RibbonMenuItem[] = [
     {
@@ -1052,7 +1107,7 @@ export function buildSheetRibbonTabs(ctx: SheetRibbonContext): RibbonTab[] {
                 // Small so it shares the icon row instead of forcing a column of its own
                 size: 'small',
                 disabled: noHostOrBusy(ctx),
-                onSelect: () => ctx.host?.applyBorder('bottom'),
+                onSelect: () => ctx.host?.applyBorder('bottom', pendingBorder),
                 menu: borderMenu,
               },
               {
@@ -1113,6 +1168,8 @@ export function buildSheetRibbonTabs(ctx: SheetRibbonContext): RibbonTab[] {
           label: ctx.t('tools.sheet.grp.number'),
           priority: 5,
           items: [],
+          // Excel puts the Format Cells launcher on the 数字 group; keep that muscle memory
+          ...(noHostOrBusy(ctx) ? {} : { onLauncher: ctx.actions.openFormatCells }),
           // One row: the format box followed by its five quick buttons, no half-empty column
           rows: [
             [

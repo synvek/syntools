@@ -4,7 +4,12 @@ import { Ribbon } from '@/core/components/ribbon/Ribbon';
 import { RIBBON_ICON_BUTTON } from '@/core/components/ribbon/ribbonTheme';
 import { RibbonIcon } from '@/core/components/ribbon/ribbonIcons';
 import type { EditorMenu } from '@/core/components/editorChrome';
-import type { SheetFormatPatch, SheetFormatState } from './sheetFormat';
+import {
+  DEFAULT_BORDER,
+  type BorderStyleId,
+  type SheetFormatPatch,
+  type SheetFormatState,
+} from './sheetFormat';
 import {
   buildSheetRibbonTabs,
   type SheetCommandContext,
@@ -45,6 +50,9 @@ export function SpreadsheetRibbon({
   const [format, setFormat] = useState<SheetFormatState | null>(null);
   const [painting, setPainting] = useState(false);
   const [painterSticky, setPainterSticky] = useState(false);
+  /** Pending border weight / colour: chosen first, applied by the next border-preset click (P1-3) */
+  const [borderStyle, setBorderStyle] = useState<BorderStyleId>(DEFAULT_BORDER.style);
+  const [borderColor, setBorderColor] = useState(DEFAULT_BORDER.color);
   const painterRef = useRef<SheetFormatPatch | null>(null);
   /** Mirrors `painterSticky` for the selection callback, which closes over its first render */
   const painterStickyRef = useRef(false);
@@ -82,9 +90,15 @@ export function SpreadsheetRibbon({
     setPainting(false);
   }, []);
 
+  /**
+   * Snapshot of everything the painter reproduces (P1-4). Number format, alignment and border used
+   * to be dropped, which is why "copy the formatting" produced a different cell than the source.
+   * A mixed selection has no single alignment to copy, so those keys are left out instead of being
+   * guessed.
+   */
   const armPainter = useCallback(() => {
     if (!format) return false;
-    painterRef.current = {
+    const patch: SheetFormatPatch = {
       bold: format.bold === true,
       italic: format.italic === true,
       underline: format.underline === true,
@@ -94,7 +108,12 @@ export function SpreadsheetRibbon({
       color: format.color,
       fill: format.fill,
       wrap: format.wrap === true,
+      numberFormat: format.numberFormat,
+      border: format.border,
     };
+    if (format.hAlign !== 'mixed') patch.hAlign = format.hAlign;
+    if (format.vAlign !== 'mixed') patch.vAlign = format.vAlign;
+    painterRef.current = patch;
     setPainting(true);
     return true;
   }, [format]);
@@ -132,8 +151,22 @@ export function SpreadsheetRibbon({
       painterSticky,
       togglePainter,
       lockPainter,
+      borderStyle,
+      borderColor,
+      setBorderStyle,
+      setBorderColor,
     }),
-    [ctx, host, format, painting, painterSticky, togglePainter, lockPainter],
+    [
+      ctx,
+      host,
+      format,
+      painting,
+      painterSticky,
+      togglePainter,
+      lockPainter,
+      borderStyle,
+      borderColor,
+    ],
   );
   const tabs = useMemo(() => buildSheetRibbonTabs(fullCtx), [fullCtx]);
 

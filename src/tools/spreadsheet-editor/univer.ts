@@ -101,10 +101,13 @@ import { OpenConditionalFormattingOperator } from '@univerjs/sheets-conditional-
 import '@univerjs/sheets-numfmt/facade';
 import {
   buildAutoSum,
+  DEFAULT_BORDER,
   readSheetFormat,
   shiftDecimals,
   toggleThousandSeparator,
   type BorderPresetId,
+  type BorderSpec,
+  type BorderStyleId,
   type SheetFormatPatch,
   type SheetFormatState,
   type UniverStyleLike,
@@ -585,25 +588,46 @@ export function createUniverInstance(
     if (patch.numberFormat !== undefined) {
       range.setNumberFormat(patch.numberFormat || 'General');
     }
+    // Painters copy borders too: `null` clears, a spec draws all four sides (P1-4)
+    if (patch.border !== undefined)
+      applyBorder(patch.border ? 'all' : 'none', patch.border ?? undefined);
   };
 
-  const BORDER_PRESET_MAP: Record<BorderPresetId, { type: BorderType; style: BorderStyleTypes }> = {
-    none: { type: BorderType.NONE, style: BorderStyleTypes.NONE },
-    all: { type: BorderType.ALL, style: BorderStyleTypes.THIN },
-    outside: { type: BorderType.OUTSIDE, style: BorderStyleTypes.THIN },
-    inside: { type: BorderType.INSIDE, style: BorderStyleTypes.THIN },
-    bottom: { type: BorderType.BOTTOM, style: BorderStyleTypes.THIN },
-    top: { type: BorderType.TOP, style: BorderStyleTypes.THIN },
-    left: { type: BorderType.LEFT, style: BorderStyleTypes.THIN },
-    right: { type: BorderType.RIGHT, style: BorderStyleTypes.THIN },
-    thickOutside: { type: BorderType.OUTSIDE, style: BorderStyleTypes.THICK },
+  const BORDER_PRESET_MAP: Record<BorderPresetId, BorderType> = {
+    none: BorderType.NONE,
+    all: BorderType.ALL,
+    outside: BorderType.OUTSIDE,
+    inside: BorderType.INSIDE,
+    bottom: BorderType.BOTTOM,
+    top: BorderType.TOP,
+    left: BorderType.LEFT,
+    right: BorderType.RIGHT,
+    thickOutside: BorderType.OUTSIDE,
   };
 
-  const applyBorder = (preset: BorderPresetId): void => {
+  /** Line weight chosen in the ribbon; the ids are the tool's own, the numbers are Univer's */
+  const BORDER_STYLE_MAP: Record<BorderStyleId, BorderStyleTypes> = {
+    thin: BorderStyleTypes.THIN,
+    medium: BorderStyleTypes.MEDIUM,
+    thick: BorderStyleTypes.THICK,
+    dashed: BorderStyleTypes.DASHED,
+    dotted: BorderStyleTypes.DOTTED,
+    double: BorderStyleTypes.DOUBLE,
+  };
+
+  const applyBorder = (preset: BorderPresetId, spec?: BorderSpec): void => {
     const range = activeFRange();
     if (!range) return;
-    const spec = BORDER_PRESET_MAP[preset];
-    range.setBorder(spec.type, spec.style, '#000000');
+    if (preset === 'none') {
+      range.setBorder(BorderType.NONE, BorderStyleTypes.NONE, spec?.color ?? DEFAULT_BORDER.color);
+      return;
+    }
+    // "粗外框" is a preset, not a weight: it overrides whatever the menu had selected
+    const style =
+      preset === 'thickOutside'
+        ? BorderStyleTypes.THICK
+        : BORDER_STYLE_MAP[spec?.style ?? DEFAULT_BORDER.style];
+    range.setBorder(BORDER_PRESET_MAP[preset], style, spec?.color ?? DEFAULT_BORDER.color);
   };
 
   const applyNumberFormat = (pattern: string | null): void => {

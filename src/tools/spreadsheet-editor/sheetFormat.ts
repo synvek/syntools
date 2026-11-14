@@ -14,6 +14,17 @@ export type TriState = boolean | 'mixed';
 export type HAlign = 'general' | 'left' | 'center' | 'right' | 'mixed';
 export type VAlign = 'top' | 'middle' | 'bottom' | 'mixed';
 
+/** Line weights offered by the border tools; the Univer enum lives in `univer.ts` */
+export type BorderStyleId = 'thin' | 'medium' | 'thick' | 'dashed' | 'dotted' | 'double';
+
+/** A border the user picked (line style + colour) — applied to the next border-preset click */
+export interface BorderSpec {
+  style: BorderStyleId;
+  color: string;
+}
+
+export const DEFAULT_BORDER: BorderSpec = { style: 'thin', color: '#000000' };
+
 export interface SheetFormatState {
   bold: TriState;
   italic: TriState;
@@ -27,6 +38,15 @@ export interface SheetFormatState {
   vAlign: VAlign;
   wrap: TriState;
   numberFormat: string | null;
+  /**
+   * Presence + colour of the cell border, or `null` when the sampled cells have none.
+   *
+   * The exact line weight is deliberately not decoded: Univer stores it as a numeric
+   * `BorderStyleTypes`, and mapping that table without verifying 0.25.1 would put a guess into the
+   * painter. Painting therefore reproduces "has a border, in this colour", which is what users
+   * check; the precise weight stays whatever the target already had.
+   */
+  border: BorderSpec | null;
   merged: boolean;
 }
 
@@ -44,6 +64,8 @@ export interface SheetFormatPatch {
   vAlign?: 'top' | 'middle' | 'bottom';
   wrap?: boolean;
   numberFormat?: string | null;
+  /** `undefined` leaves borders alone, `null` clears them, a spec draws an all-around border */
+  border?: BorderSpec | null;
 }
 
 export const EMPTY_SHEET_FORMAT: SheetFormatState = {
@@ -59,6 +81,7 @@ export const EMPTY_SHEET_FORMAT: SheetFormatState = {
   vAlign: 'bottom',
   wrap: false,
   numberFormat: null,
+  border: null,
   merged: false,
 };
 
@@ -71,6 +94,20 @@ interface DecorationLike {
 const H_ALIGN: Record<number, HAlign> = { 1: 'left', 2: 'center', 3: 'right' };
 const V_ALIGN: Record<number, VAlign> = { 1: 'top', 2: 'middle', 3: 'bottom' };
 const WRAP = 3;
+
+/** One side of an `IBorderData` entry */
+interface BorderSideLike {
+  s?: number;
+  cl?: { rgb?: string | null } | null;
+}
+
+/** Structural mirror of Univer's `IBorderData` */
+interface BorderDataLike {
+  t?: BorderSideLike | null;
+  b?: BorderSideLike | null;
+  l?: BorderSideLike | null;
+  r?: BorderSideLike | null;
+}
 
 /** Structural mirror of the subset of Univer's `IStyleData` this tool reads */
 export interface UniverStyleLike {
@@ -86,6 +123,7 @@ export interface UniverStyleLike {
   vt?: number | null;
   tb?: number | null;
   n?: { pattern?: string } | null;
+  bd?: BorderDataLike | null;
 }
 
 const decorationOn = (decoration?: DecorationLike | null): boolean => Boolean(decoration?.s);
@@ -107,6 +145,28 @@ const sameNumber = (values: (number | null)[]): number | null => {
   const first = values[0] ?? null;
   return values.every((value) => (value ?? null) === first) ? first : null;
 };
+
+/** First drawn side of a cell, or `null` when the cell has no border at all */
+function readBorder(style: UniverStyleLike): BorderSpec | null {
+  const side = [style.bd?.t, style.bd?.b, style.bd?.l, style.bd?.r].find(
+    (entry) => entry && (entry.s ?? 0) > 0,
+  );
+  if (!side) return null;
+  return { style: 'thin', color: side.cl?.rgb ?? DEFAULT_BORDER.color };
+}
+
+/** Same border across the sampled cells; a mix (or none) collapses to `null` */
+function sameBorder(styles: UniverStyleLike[]): BorderSpec | null {
+  if (styles.length === 0) return null;
+  const first = readBorder(styles[0] ?? {});
+  if (!first) return null;
+  const signature = `${first.style}:${first.color}`;
+  const agree = styles.every((style) => {
+    const spec = readBorder(style);
+    return spec !== null && `${spec.style}:${spec.color}` === signature;
+  });
+  return agree ? first : null;
+}
 
 /**
  * Fold the styles of the sampled cells into one ribbon state.
@@ -137,6 +197,7 @@ export function readSheetFormat(styles: UniverStyleLike[], merged = false): Shee
     vAlign,
     wrap: toggle(styles.map((style) => (style.tb ?? 0) === WRAP)),
     numberFormat: sameString(styles.map((style) => style.n?.pattern ?? null)),
+    border: sameBorder(styles),
     merged,
   };
 }
@@ -221,6 +282,19 @@ export const BORDER_PRESETS: BorderPreset[] = [
   { id: 'outside', labelKey: 'borderOutside', icon: 'borderOutside' },
   { id: 'inside', labelKey: 'borderInside', icon: 'borders' },
   { id: 'thickOutside', labelKey: 'borderThickOutside', icon: 'borderOutside' },
+];
+
+/**
+ * Line weights of the border menu. Excel lets the user pick a weight *before* drawing the border;
+ * the ribbon keeps that pending choice in component state and passes it with every preset click.
+ */
+export const BORDER_STYLES: Array<{ id: BorderStyleId; labelKey: string }> = [
+  { id: 'thin', labelKey: 'borderThin' },
+  { id: 'medium', labelKey: 'borderMedium' },
+  { id: 'thick', labelKey: 'borderThick' },
+  { id: 'dashed', labelKey: 'borderDashed' },
+  { id: 'dotted', labelKey: 'borderDotted' },
+  { id: 'double', labelKey: 'borderDouble' },
 ];
 
 /* -------------------------------- auto sum -------------------------------- */

@@ -71,6 +71,29 @@ describe('read sheet format', () => {
   });
 });
 
+describe('border read-back (P1-4 format painter)', () => {
+  it('no border data means no border to paint', () => {
+    expect(readSheetFormat([{}]).border).toBeNull();
+  });
+
+  it('reads presence and colour, with a side-less style fallback', () => {
+    const state = readSheetFormat([{ bd: { b: { s: 1, cl: { rgb: '#ff0000' } } } }]);
+    expect(state.border).toEqual({ style: 'thin', color: '#ff0000' });
+  });
+
+  it('a side with no weight counts as "no border"', () => {
+    expect(readSheetFormat([{ bd: { t: { s: 0 } } }]).border).toBeNull();
+  });
+
+  it('mixed colours across the selection collapse to no border (do not guess)', () => {
+    const state = readSheetFormat([
+      { bd: { t: { s: 1, cl: { rgb: '#ff0000' } } } },
+      { bd: { t: { s: 1, cl: { rgb: '#00ff00' } } } },
+    ]);
+    expect(state.border).toBeNull();
+  });
+});
+
 describe('number format helpers', () => {
   it('adds and removes decimal places on the first placeholder', () => {
     expect(shiftDecimals('#,##0.00', 1)).toBe('#,##0.000');
