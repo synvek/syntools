@@ -2,14 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/core/components/Icon';
 import {
+  CHART_LEGEND_LABEL_KEY,
+  CHART_LEGEND_POSITIONS,
   CHART_TYPES,
   CHART_TYPE_LABEL_KEY,
   buildChartOption,
   buildRangeLabel,
+  chartText,
   parseRangeLabel,
+  supportsAxisTitles,
   supportsSecondaryAxis,
   type ChartConfig,
   type ChartData,
+  type ChartLegendPosition,
   type ChartType,
 } from '../charts';
 
@@ -67,6 +72,8 @@ export function ChartOverlay({
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [rangeText, setRangeText] = useState(() => buildRangeLabel(config.range));
+  /** P1-8 的格式化面板：与工具栏分开，避免把 7 个类型按钮挤到看不见 */
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Read the latest values inside gesture callbacks (avoids stale closures)
   const latest = useRef({ config, bounds, onChange });
@@ -126,10 +133,27 @@ export function ChartOverlay({
   useEffect(() => {
     if (!ready || !data) return;
     instanceRef.current?.setOption(
-      buildChartOption(data, config.type, { secondary: config.secondary }),
+      buildChartOption(data, config.type, {
+        secondary: config.secondary,
+        title: config.title,
+        legend: config.legend,
+        axisTitles: config.axisTitles,
+        dataLabels: config.dataLabels,
+        showGridlines: config.showGridlines,
+      }),
       true,
     );
-  }, [ready, data, config.type, config.secondary]);
+  }, [
+    ready,
+    data,
+    config.type,
+    config.secondary,
+    config.title,
+    config.legend,
+    config.axisTitles,
+    config.dataLabels,
+    config.showGridlines,
+  ]);
 
   /**
    * Attach pointermove / pointerup to window for the duration of a gesture.
@@ -194,6 +218,19 @@ export function ChartOverlay({
       return;
     }
     onChange({ range: parsed });
+  };
+
+  /**
+   * 轴标题的写入：两个输入框共用一个 `axisTitles`，清空后要把整个字段去掉，
+   * 否则快照里会留下 `{ x: undefined }` 这种空壳（导出侧会当成"没有"，但比较起来很吵）。
+   */
+  const patchAxisTitles = (patch: { x?: string; y?: string }) => {
+    const next = { ...config.axisTitles, ...patch };
+    const cleaned =
+      next.x || next.y
+        ? { ...(next.x ? { x: next.x } : {}), ...(next.y ? { y: next.y } : {}) }
+        : undefined;
+    onChange({ axisTitles: cleaned });
   };
 
   const exportPng = () => {
@@ -289,6 +326,22 @@ export function ChartOverlay({
           ) : null}
           <button
             type="button"
+            aria-pressed={settingsOpen}
+            title={t('tools.sheet.chartSettings')}
+            aria-label={t('tools.sheet.chartSettings')}
+            onClick={() => setSettingsOpen((open) => !open)}
+            className={`flex h-6 w-6 items-center justify-center rounded ${
+              settingsOpen
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            <span aria-hidden="true" className="text-xs leading-none">
+              ⚙
+            </span>
+          </button>
+          <button
+            type="button"
             title={t('tools.sheet.chartExportPng')}
             aria-label={t('tools.sheet.chartExportPng')}
             onClick={exportPng}
@@ -307,6 +360,92 @@ export function ChartOverlay({
           </button>
         </div>
       </div>
+
+      {/* 图表设置（P1-8）：标题 / 图例位置 / 轴标题 / 数据标签 / 网格线 */}
+      {settingsOpen ? (
+        <div
+          data-testid="sheet-chart-settings"
+          className="absolute right-1.5 top-9 z-10 w-56 space-y-1.5 rounded-md border border-gray-300 bg-white p-2 text-[11px] text-gray-700 shadow-xl dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+        >
+          <label className="block">
+            <span className="block text-gray-500 dark:text-gray-400">
+              {t('tools.sheet.chartTitleLabel')}
+            </span>
+            <input
+              type="text"
+              aria-label={t('tools.sheet.chartTitleLabel')}
+              value={config.title ?? ''}
+              placeholder={t('tools.sheet.chartTitlePlaceholder')}
+              onChange={(event) => onChange({ title: chartText(event.target.value) })}
+              className="mt-0.5 w-full rounded border border-gray-300 bg-white px-1 py-0.5 dark:border-gray-600 dark:bg-gray-900"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-1">
+            <span className="text-gray-500 dark:text-gray-400">
+              {t('tools.sheet.chartLegendLabel')}
+            </span>
+            <select
+              aria-label={t('tools.sheet.chartLegendLabel')}
+              value={config.legend ?? 'bottom'}
+              onChange={(event) => onChange({ legend: event.target.value as ChartLegendPosition })}
+              className="rounded border border-gray-300 bg-white px-1 py-0.5 dark:border-gray-600 dark:bg-gray-900"
+            >
+              {CHART_LEGEND_POSITIONS.map((position) => (
+                <option key={position} value={position}>
+                  {t(`tools.sheet.${CHART_LEGEND_LABEL_KEY[position]}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {/* 饼图没有轴，雷达图的"轴"是各指标名：两者都不给轴标题输入（导出侧同样不写） */}
+          {supportsAxisTitles(config.type) ? (
+            <>
+              <label className="block">
+                <span className="block text-gray-500 dark:text-gray-400">
+                  {t('tools.sheet.chartAxisX')}
+                </span>
+                <input
+                  type="text"
+                  aria-label={t('tools.sheet.chartAxisX')}
+                  value={config.axisTitles?.x ?? ''}
+                  onChange={(event) => patchAxisTitles({ x: chartText(event.target.value) })}
+                  className="mt-0.5 w-full rounded border border-gray-300 bg-white px-1 py-0.5 dark:border-gray-600 dark:bg-gray-900"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-gray-500 dark:text-gray-400">
+                  {t('tools.sheet.chartAxisY')}
+                </span>
+                <input
+                  type="text"
+                  aria-label={t('tools.sheet.chartAxisY')}
+                  value={config.axisTitles?.y ?? ''}
+                  onChange={(event) => patchAxisTitles({ y: chartText(event.target.value) })}
+                  className="mt-0.5 w-full rounded border border-gray-300 bg-white px-1 py-0.5 dark:border-gray-600 dark:bg-gray-900"
+                />
+              </label>
+            </>
+          ) : null}
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={config.dataLabels === true}
+              onChange={(event) => onChange({ dataLabels: event.target.checked })}
+            />
+            <span>{t('tools.sheet.chartDataLabels')}</span>
+          </label>
+          {config.type !== 'pie' ? (
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={config.showGridlines !== false}
+                onChange={(event) => onChange({ showGridlines: event.target.checked })}
+              />
+              <span>{t('tools.sheet.chartGridlines')}</span>
+            </label>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="relative min-h-0 flex-1">
         <div ref={hostRef} data-testid="sheet-chart-canvas" className="h-full w-full" />

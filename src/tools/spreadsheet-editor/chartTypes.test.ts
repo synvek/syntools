@@ -112,6 +112,56 @@ describe('ECharts option', () => {
     const option = buildChartOption(single, 'bar', { secondary: true }) as { yAxis: unknown[] };
     expect(Array.isArray(option.yAxis)).toBe(false);
   });
+
+  /* ------------------------- P1-8：格式化属性进 ECharts ------------------------- */
+
+  it('标题 / 图例 / 轴标题 / 数据标签 / 网格线都进 option', () => {
+    const option = buildChartOption(DATA, 'bar', {
+      title: '  月度销量  ',
+      legend: 'right',
+      axisTitles: { x: '月份', y: '销量' },
+      dataLabels: true,
+      showGridlines: false,
+    }) as {
+      title: { text: string };
+      legend: { right?: number; bottom?: number };
+      grid: { top: number };
+      xAxis: { name?: string };
+      yAxis: { name?: string; splitLine?: { show: boolean } };
+      series: { label?: { show: boolean } }[];
+    };
+    // 标题去空格；给标题留出的上边距大于默认的 24
+    expect(option.title.text).toBe('月度销量');
+    expect(option.grid.top).toBeGreaterThan(24);
+    expect(option.legend.right).toBe(0);
+    expect(option.xAxis.name).toBe('月份');
+    expect(option.yAxis.name).toBe('销量');
+    expect(option.yAxis.splitLine?.show).toBe(false);
+    expect(option.series.every((item) => item.label?.show === true)).toBe(true);
+  });
+
+  it('图例 none 是"隐藏"而不是抛给引擎的默认值', () => {
+    const none = buildChartOption(DATA, 'bar', { legend: 'none' }) as {
+      legend: { show?: boolean; bottom?: number };
+    };
+    expect(none.legend.show).toBe(false);
+    const plain = buildChartOption(DATA, 'bar') as { legend: { bottom?: number } };
+    expect(plain.legend.bottom).toBe(0);
+  });
+
+  it('饼图默认显示切片标签，关掉数据标签后隐藏；饼图没有轴标题', () => {
+    const pie = buildChartOption(DATA, 'pie', {
+      dataLabels: false,
+      axisTitles: { x: '月份' },
+    }) as { series: { label: { show: boolean } }[]; xAxis?: unknown };
+    expect(pie.series[0].label.show).toBe(false);
+    expect(pie.xAxis).toBeUndefined();
+
+    const labelled = buildChartOption(DATA, 'pie', { dataLabels: true }) as {
+      series: { label: { show: boolean } }[];
+    };
+    expect(labelled.series[0].label.show).toBe(true);
+  });
 });
 
 describe('OOXML 导出', () => {

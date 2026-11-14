@@ -1,8 +1,11 @@
 import {
+  chartText,
   resolveChart,
   seriesRenderKind,
+  supportsAxisTitles,
   usesSecondaryAxis,
   type ChartConfig,
+  type ChartLegendPosition,
   type ChartSpec,
   type ChartType,
   type SeriesRenderKind,
@@ -215,12 +218,22 @@ function seriesXml(
   return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${shape}${category}${values}</c:ser>`;
 }
 
-/** Category axis + value axis (element order per CT_CatAx / CT_ValAx) */
-function axesXml(hasSecondary = false): string {
-  const catAx = `<c:catAx><c:axId val="${CAT_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${VAL_AX_ID}"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx>`;
-  const valAx = `<c:valAx><c:axId val="${VAL_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${CAT_AX_ID}"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`;
+/**
+ * Category axis + value axis (element order per CT_CatAx / CT_ValAx).
+ * 轴标题的位置有讲究：`title` 必须排在 `majorTickMark` / `numFmt` 之前，否则 Excel 打不开。
+ */
+function axesXml(hasSecondary: boolean, options: ChartXmlOptions = {}): string {
+  const xTitle = chartText(options.axisTitles?.x);
+  const yTitle = chartText(options.axisTitles?.y);
+  // 网格线默认开（Excel 默认），显式关掉时只是不写 <c:majorGridlines/>
+  const gridlines = options.showGridlines === false ? '' : '<c:majorGridlines/>';
+  const xAxisTitle = xTitle ? titleXml(xTitle) : '';
+  const yAxisTitle = yTitle ? titleXml(yTitle, true) : '';
+  const catAx = `<c:catAx><c:axId val="${CAT_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/>${xAxisTitle}<c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${VAL_AX_ID}"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx>`;
+  const valAx = `<c:valAx><c:axId val="${VAL_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/>${gridlines}${yAxisTitle}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${CAT_AX_ID}"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`;
   if (!hasSecondary) return catAx + valAx;
   // 次轴：不画网格线（与主轴网格线会重叠成一片），crosses="max" 让它在分类轴最右端交叉 → 显示在右侧
+  // 次轴暂不支持单独设标题：配置里只有一组 axisTitles，硬塞给两条数值轴会写出两个一样的标题
   const secondaryValAx = `<c:valAx><c:axId val="${SECOND_VAL_AX_ID}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${CAT_AX_ID}"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`;
   return catAx + valAx + secondaryValAx;
 }
@@ -255,25 +268,68 @@ function groupSeries(spec: ChartSpec, type: ChartType, secondary: boolean): Char
   return groups;
 }
 
-function groupXml(group: ChartGroup, spec: ChartSpec, sheetName: string, type: ChartType): string {
+function groupXml(
+  group: ChartGroup,
+  spec: ChartSpec,
+  sheetName: string,
+  type: ChartType,
+  dataLabels: string,
+): string {
   const sers = group.indexes
     .map((index) => seriesXml(spec, index, sheetName, type, group.render))
     .join('');
   const axIds = `<c:axId val="${CAT_AX_ID}"/><c:axId val="${
     group.secondary ? SECOND_VAL_AX_ID : VAL_AX_ID
   }"/>`;
+  // `dLbls` 必须紧跟 ser、排在 gapWidth / axId 之前（CT_BarChart / CT_LineChart 的元素顺序）
   if (group.render === 'line') {
-    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}<c:marker val="1"/>${axIds}</c:lineChart>`;
+    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}${dataLabels}<c:marker val="1"/>${axIds}</c:lineChart>`;
   }
   if (group.render === 'area') {
-    return `<c:areaChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}${axIds}</c:areaChart>`;
+    return `<c:areaChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}${dataLabels}${axIds}</c:areaChart>`;
   }
-  return `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${sers}<c:gapWidth val="150"/>${axIds}</c:barChart>`;
+  return `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${sers}${dataLabels}<c:gapWidth val="150"/>${axIds}</c:barChart>`;
 }
 
 export interface ChartXmlOptions {
   /** 最后一个系列走次坐标轴（与 `ChartConfig.secondary` 是同一个字段） */
   secondary?: boolean;
+  /** 以下 5 项与 `ChartConfig` 同名字段一一对应（P1-8）；缺省即 Excel 的默认外观 */
+  title?: string;
+  legend?: ChartLegendPosition;
+  axisTitles?: { x?: string; y?: string };
+  dataLabels?: boolean;
+  showGridlines?: boolean;
+}
+
+/** 图例位置 → OOXML 的 `legendPos` 值（b/t/r/l） */
+const LEGEND_POS_CODE: Record<Exclude<ChartLegendPosition, 'none'>, string> = {
+  top: 't',
+  right: 'r',
+  bottom: 'b',
+  left: 'l',
+};
+
+/**
+ * 标题元素（chart title 与 axis title 共用）。
+ * `vertical` 时按 Excel 的做法把文本旋转 -90°，纵轴标题才不是横着压在轴上。
+ */
+function titleXml(text: string, vertical = false): string {
+  const bodyPr = vertical ? '<a:bodyPr rot="-5400000" vert="horz"/>' : '<a:bodyPr/>';
+  return `<c:title><c:tx><c:rich>${bodyPr}<a:lstStyle/><a:p><a:pPr><a:defRPr/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>${xmlEscape(text)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>`;
+}
+
+/**
+ * 数据标签：只打开"显示值"，其余开关显式写 0 —— Excel 会沿用上一次的缓存，
+ * 不写就可能在别的机器上冒出系列名 / 图例键。
+ */
+const DATA_LABELS_XML =
+  '<c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>';
+
+/** 图例元素：`none` 时整段不写（Excel 里就是"没有图例"，不是"隐藏的图例"） */
+function legendXml(position: ChartLegendPosition): string {
+  if (position === 'none') return '';
+  return `<c:legend><c:legendPos val="${LEGEND_POS_CODE[position]}"/><c:overlay val="0"/></c:legend>`;
 }
 
 /** Build chartN.xml (chartSpace → chart → plotArea → chart group + axes) */
@@ -285,14 +341,15 @@ export function buildChartXml(
 ): string {
   const sers = spec.series.map((_, index) => seriesXml(spec, index, sheetName, type)).join('');
   const axIds = `<c:axId val="${CAT_AX_ID}"/><c:axId val="${VAL_AX_ID}"/>`;
+  const dataLabels = options.dataLabels === true ? DATA_LABELS_XML : '';
   let group: string;
   let hasSecondary = false;
   if (type === 'pie') {
-    group = `<c:pieChart><c:varyColors val="1"/>${sers}</c:pieChart>`;
+    group = `<c:pieChart><c:varyColors val="1"/>${sers}${dataLabels}</c:pieChart>`;
   } else if (type === 'scatter') {
-    group = `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${sers}${axIds}</c:scatterChart>`;
+    group = `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${sers}${dataLabels}${axIds}</c:scatterChart>`;
   } else if (type === 'radar') {
-    group = `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${sers}${axIds}</c:radarChart>`;
+    group = `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${sers}${dataLabels}${axIds}</c:radarChart>`;
   } else {
     /**
      * 柱 / 线 / 面积 / 组合 + 可选双轴：按"画法 × 坐标轴"分组，每组一个 chart group。
@@ -301,10 +358,17 @@ export function buildChartXml(
      */
     const groups = groupSeries(spec, type, options.secondary === true);
     hasSecondary = groups.some((item) => item.secondary);
-    group = groups.map((item) => groupXml(item, spec, sheetName, type)).join('');
+    group = groups.map((item) => groupXml(item, spec, sheetName, type, dataLabels)).join('');
   }
-  const axes = type === 'pie' ? '' : axesXml(hasSecondary);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${A_NS}" xmlns:r="${R_NS}"><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/>${group}${axes}</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
+  // 饼图没有轴；雷达图的"轴"是各指标名，放不下轴标题（与 ECharts 侧同一判断）
+  const axisOptions = supportsAxisTitles(type) ? options : { ...options, axisTitles: undefined };
+  const axes = type === 'pie' ? '' : axesXml(hasSecondary, axisOptions);
+  // CT_Chart 的元素顺序固定：title → autoTitleDeleted → plotArea → legend → plotVisOnly
+  const title = chartText(options.title);
+  const head = title
+    ? `${titleXml(title)}<c:autoTitleDeleted val="0"/>`
+    : '<c:autoTitleDeleted val="1"/>';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${A_NS}" xmlns:r="${R_NS}"><c:chart>${head}<c:plotArea><c:layout/>${group}${axes}</c:plotArea>${legendXml(options.legend ?? 'bottom')}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
 }
 
 /* ------------------------------ Chart XML read-back ------------------------------ */
@@ -586,6 +650,12 @@ export function buildChartPlan(source: ChartPlanSource): XlsxChartPlan {
     (chartsBySheet[sheetName] ??= []).push({
       chartXml: buildChartXml(spec.value, config.type, sheetName, {
         secondary: config.secondary,
+        // P1-8：格式化字段原样带进 XML，导出与应用内渲染共用同一份配置
+        title: config.title,
+        legend: config.legend,
+        axisTitles: config.axisTitles,
+        dataLabels: config.dataLabels,
+        showGridlines: config.showGridlines,
       }),
       anchor: { x: config.x, y: config.y, width: config.width, height: config.height },
     });

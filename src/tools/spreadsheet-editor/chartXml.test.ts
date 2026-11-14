@@ -19,7 +19,7 @@ import {
   DEFAULT_SHEET_METRICS,
 } from './chartXml';
 import { collectRawChartParts } from './rawChartParts';
-import { resolveChart, type ChartConfig } from './charts';
+import { CHART_TYPES, resolveChart, type ChartConfig } from './charts';
 import { createEmptySheet, exportSnapshotToBytes, type WorkbookSnapshot } from './xlsx-io';
 
 const SHEET_NAME = 'Sales Data';
@@ -107,6 +107,122 @@ describe('buildChartXml', () => {
     expect(pie).toContain('<c:pieChart><c:varyColors val="1"/>');
     expect(pie).not.toContain('<c:catAx>');
     expect(pie).not.toContain('<a:srgbClr'); // 饼图交给 varyColors 着色
+  });
+});
+
+/**
+ * P1-8 图表格式化：7 类图表 × 5 个属性。
+ *
+ * 这里逐项断言 XML 结构，而不是只看"包含了某段文字"：OOXML 对元素的**顺序**有硬约束
+ * （`dLbls` 必须在 `ser` 之后、`axId` 之前；`title` 必须在 `majorTickMark` 之前），
+ * 顺序错了 Excel 会直接提示"需要修复"，而普通用户完全无法自救。
+ */
+describe('buildChartXml：格式化（P1-8）', () => {
+  const spec = (() => {
+    const resolved = resolveChart(makeSnapshot(), 's1', CHART.range);
+    if (!resolved.ok) throw new Error('spec failed');
+    return resolved.value;
+  })();
+
+  it('标题：7 类图表都写 <c:title>，并关闭自动标题', () => {
+    for (const type of CHART_TYPES) {
+      const xml = buildChartXml(spec, type, SHEET_NAME, { title: '月度销量' });
+      expect(xml, type).toContain('<a:t>月度销量</a:t>');
+      expect(xml, type).toContain('<c:autoTitleDeleted val="0"/>');
+      // title 必须在 plotArea 之前（CT_Chart 的元素顺序）
+      expect(xml.indexOf('<c:title>'), type).toBeLessThan(xml.indexOf('<c:plotArea>'));
+    }
+  });
+
+  it('标题：留空 / 只有空格时只关自动标题，不写空标题框', () => {
+    for (const title of ['', '   ']) {
+      const xml = buildChartXml(spec, 'bar', SHEET_NAME, { title });
+      expect(xml).not.toContain('<c:title>');
+      expect(xml).toContain('<c:autoTitleDeleted val="1"/>');
+    }
+  });
+
+  it('图例：位置映射到 b/t/r/l，none 时整段不写', () => {
+    const cases = [
+      ['top', 't'],
+      ['right', 'r'],
+      ['bottom', 'b'],
+      ['left', 'l'],
+    ] as const;
+    for (const type of CHART_TYPES) {
+      for (const [position, code] of cases) {
+        const xml = buildChartXml(spec, type, SHEET_NAME, { legend: position });
+        expect(xml, `${type}/${position}`).toContain(`<c:legendPos val="${code}"/>`);
+      }
+      const none = buildChartXml(spec, type, SHEET_NAME, { legend: 'none' });
+      expect(none, type).not.toContain('<c:legend>');
+    }
+    // 缺省仍是底部图例（老快照的行为不变）
+    expect(buildChartXml(spec, 'bar', SHEET_NAME)).toContain('<c:legendPos val="b"/>');
+  });
+
+  it('数据标签：每个图组里都有一段 dLbls，且位置在 ser 之后、axId 之前', () => {
+    for (const type of CHART_TYPES) {
+      const xml = buildChartXml(spec, type, SHEET_NAME, { dataLabels: true });
+      expect(xml, type).toContain('<c:showVal val="1"/>');
+      const dLbls = xml.indexOf('<c:dLbls>');
+      expect(dLbls, type).toBeGreaterThan(xml.indexOf('<c:ser>'));
+      if (type !== 'pie') {
+        expect(dLbls, type).toBeLessThan(xml.indexOf('<c:axId'));
+      }
+    }
+    expect(buildChartXml(spec, 'bar', SHEET_NAME)).not.toContain('<c:dLbls>');
+  });
+
+  it('轴标题：横轴排进 catAx、纵轴排进 valAx 且旋转 -90°', () => {
+    const xml = buildChartXml(spec, 'bar', SHEET_NAME, {
+      axisTitles: { x: '月份', y: '销量' },
+    });
+    const catAx = xml.slice(xml.indexOf('<c:catAx>'), xml.indexOf('</c:catAx>'));
+    const valAx = xml.slice(xml.indexOf('<c:valAx>'), xml.indexOf('</c:valAx>'));
+    expect(catAx).toContain('<a:t>月份</a:t>');
+    expect(valAx).toContain('<a:t>销量</a:t>');
+    expect(valAx).toContain('rot="-5400000"');
+    // 轴标题必须在 majorTickMark / numFmt 之前
+    expect(catAx.indexOf('<c:title>')).toBeLessThan(catAx.indexOf('<c:majorTickMark'));
+    expect(valAx.indexOf('<c:title>')).toBeLessThan(valAx.indexOf('<c:numFmt'));
+  });
+
+  it('轴标题：饼图与雷达图不写（它们没有可命名的轴）', () => {
+    for (const type of ['pie', 'radar'] as const) {
+      const xml = buildChartXml(spec, type, SHEET_NAME, { axisTitles: { x: '月份', y: '销量' } });
+      expect(xml, type).not.toContain('<a:t>月份</a:t>');
+      expect(xml, type).not.toContain('<a:t>销量</a:t>');
+    }
+  });
+
+  it('网格线：关掉后 valAx 里不再有 majorGridlines，缺省仍然写', () => {
+    const off = buildChartXml(spec, 'bar', SHEET_NAME, { showGridlines: false });
+    expect(off).not.toContain('<c:majorGridlines/>');
+    const on = buildChartXml(spec, 'bar', SHEET_NAME);
+    expect(on).toContain('<c:majorGridlines/>');
+  });
+
+  it('5 个属性同时打开时仍是结构完整的 chartSpace', () => {
+    const xml = buildChartXml(spec, 'combo', SHEET_NAME, {
+      secondary: true,
+      title: '月度销量',
+      legend: 'top',
+      axisTitles: { x: '月份', y: '销量' },
+      dataLabels: true,
+      showGridlines: false,
+    });
+    expect(xml.startsWith('<?xml')).toBe(true);
+    expect(xml.match(/<c:chartSpace\b/g)).toHaveLength(1);
+    expect(xml.match(/<c:plotArea>/g)).toHaveLength(1);
+    expect(xml).toContain('<c:legendPos val="t"/>');
+    expect(xml).toContain('<c:showVal val="1"/>');
+    // 次轴仍然不画网格线，主轴被关掉了 → 整份没有 majorGridlines
+    expect(xml).not.toContain('<c:majorGridlines/>');
+    // 真 XML 解析一遍：拼字符串最容易出的是少一个闭合标签，Excel 会因此要求"修复"
+    const parsed = new DOMParser().parseFromString(xml, 'application/xml');
+    expect(parsed.getElementsByTagName('parsererror')).toHaveLength(0);
+    expect(parsed.documentElement.nodeName).toBe('c:chartSpace');
   });
 });
 

@@ -211,6 +211,59 @@ describe('导入即编辑（导出 → 导入往返）', () => {
   });
 });
 
+/**
+ * P1-8 回读：文件里的标题 / 图例 / 数据标签 / 网格线要能变成可编辑配置，
+ * 否则"导入 → 改一个数字 → 导出"会把用户原本的图表标题悄悄抹掉。
+ */
+describe('格式化回读（P1-8）', () => {
+  it('导出的格式化属性经真实导出 → 采纳后仍是同一份配置', async () => {
+    const { adopted } = await exportAndAdopt([
+      {
+        ...CHART,
+        title: '月度销量',
+        legend: 'left',
+        dataLabels: true,
+        showGridlines: false,
+      },
+    ]);
+    expect(adopted.charts[0]).toMatchObject({
+      title: '月度销量',
+      legend: 'left',
+      dataLabels: true,
+      showGridlines: false,
+    });
+  });
+
+  it('默认外观不写进配置（快照里不留噪声）', async () => {
+    const { adopted } = await exportAndAdopt([{ ...CHART }]);
+    expect(adopted.charts[0].title).toBeUndefined();
+    // 导出侧默认图例在底部 = 我们的默认值，回读时不该显式写出来
+    expect(adopted.charts[0].legend).toBeUndefined();
+    expect(adopted.charts[0].dataLabels).toBeUndefined();
+    expect(adopted.charts[0].showGridlines).toBeUndefined();
+  });
+
+  it('没有 legend 元素 = 无图例；autoTitleDeleted 时不认标题', () => {
+    const spec = (() => {
+      const resolved = resolveChart(makeSnapshot([CHART]), SHEET_ID, CHART.range, { type: 'bar' });
+      if (!resolved.ok) throw new Error('spec failed');
+      return resolved.value;
+    })();
+    const noLegend = parseChartPart(
+      buildChartXml(spec, 'bar', SHEET_NAME, { legend: 'none', title: '销量' }),
+    );
+    expect(noLegend?.format.legend).toBe('none');
+    expect(noLegend?.format.title).toBe('销量');
+
+    // 只有 title 元素但 autoTitleDeleted=1：Excel 认为"没有标题"，我们也不认
+    const deleted = buildChartXml(spec, 'bar', SHEET_NAME).replace(
+      '<c:autoTitleDeleted val="1"/>',
+      '<c:title><c:tx><c:rich><a:t>残留标题</a:t></c:rich></c:tx></c:title><c:autoTitleDeleted val="1"/>',
+    );
+    expect(parseChartPart(deleted)?.format.title).toBeUndefined();
+  });
+});
+
 describe('摘除与降级', () => {
   const DRAWING = `<xdr:wsDr xmlns:xdr="http://x" xmlns:c="http://c" xmlns:r="http://r"><xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="1" cy="1"/><xdr:graphicFrame><a:graphic><a:graphicData uri="http://c"><c:chart r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame></xdr:oneCellAnchor></xdr:wsDr>`;
   const RELS =

@@ -1,7 +1,13 @@
 import { parseCellRef } from './core';
-import type { ChartConfig, ChartRange, ChartType } from './charts';
+import type { ChartConfig, ChartLegendPosition, ChartRange, ChartType } from './charts';
 import { DEFAULT_SHEET_METRICS, EMU_PER_PX, splitSheetRef, type SheetMetrics } from './chartXml';
-import { dirOf, parseRelationships, relsPathFor, type RawChartParts } from './rawChartParts';
+import {
+  decodeXmlEntities,
+  dirOf,
+  parseRelationships,
+  relsPathFor,
+  type RawChartParts,
+} from './rawChartParts';
 import { resolvePartPath } from './xlsx-normalize';
 
 /**
@@ -37,11 +43,25 @@ interface SeriesInfo {
   secondary: boolean;
 }
 
+/**
+ * 图表级格式化（P1-8 回读）。只读"我们自己也建模"的 4 项：
+ * 轴标题不读 —— 一个 chart 里有两个 `title` 元素，靠位置区分很容易把纵轴标题当成图表标题，
+ * 猜错的代价是给用户的图改名字，比不读更糟（会在保真报告里说明）。
+ */
+interface ChartFormatInfo {
+  title?: string;
+  legend?: ChartLegendPosition;
+  dataLabels?: boolean;
+  showGridlines?: boolean;
+}
+
 interface PartInfo {
   type: ChartType;
   series: SeriesInfo[];
   range: ChartRange;
   secondary: boolean;
+  /** 标题 / 图例 / 数据标签 / 网格线 */
+  format: ChartFormatInfo;
   /** 只能近似还原的地方（类型降级 / 次轴系列不在末位），交给上层提示用户 */
   warnings: string[];
 }
@@ -196,7 +216,39 @@ function resolveType(series: readonly SeriesInfo[], warnings: string[]): ChartTy
   return best;
 }
 
-/** chart part XML → 结构信息（类型 / 区域 / 双轴 / 系列引用） */
+const LEGEND_BY_CODE: Record<string, ChartLegendPosition> = {
+  t: 'top',
+  r: 'right',
+  b: 'bottom',
+  l: 'left',
+};
+
+/** 标题 / 图例 / 数据标签 / 网格线：只认能确定的结构，读不出来就留空（由默认值兜底） */
+function parseChartFormat(xml: string): ChartFormatInfo {
+  const info: ChartFormatInfo = {};
+  // 图表标题必须在 plotArea 之前：坐标轴标题在 plotArea 里面，靠这个切分才不会认错
+  const head = xml.slice(0, Math.max(0, xml.indexOf('<c:plotArea')));
+  if (!/<c:autoTitleDeleted val="1"\/>/.test(head)) {
+    const block = /<c:title>([\s\S]*?)<\/c:title>/.exec(head)?.[1];
+    const raw = block ? /<a:t>([\s\S]*?)<\/a:t>/.exec(block)?.[1] : undefined;
+    const text = raw === undefined ? undefined : decodeXmlEntities(raw).trim();
+    if (text) info.title = text;
+  }
+  if (!/<c:legend>/.test(xml)) {
+    info.legend = 'none';
+  } else {
+    // 有 legend 但没有 legendPos 时按 OOXML 的默认值（右侧）算
+    const code = /<c:legendPos val="(\w)"\/>/.exec(xml)?.[1];
+    info.legend = (code ? LEGEND_BY_CODE[code] : undefined) ?? 'right';
+  }
+  const dLbls = /<c:dLbls>([\s\S]*?)<\/c:dLbls>/.exec(xml)?.[1];
+  if (dLbls) info.dataLabels = /<c:showVal val="1"\/>/.test(dLbls);
+  const valAx = /<c:valAx>([\s\S]*?)<\/c:valAx>/.exec(xml)?.[1];
+  if (valAx) info.showGridlines = /<c:majorGridlines\/>/.test(valAx);
+  return info;
+}
+
+/** chart part XML → 结构信息（类型 / 区域 / 双轴 / 系列引用 / 格式化） */
 export function parseChartPart(xml: string): PartInfo | null {
   const groups = parseGroups(xml);
   if (groups.length === 0) return null;
@@ -242,7 +294,7 @@ export function parseChartPart(xml: string): PartInfo | null {
     }
   }
 
-  return { type, series, range, secondary, warnings };
+  return { type, series, range, secondary, format: parseChartFormat(xml), warnings };
 }
 
 /* ---------------------------------- 几何还原 ---------------------------------- */
@@ -422,6 +474,13 @@ export function adoptChartParts(
         range: info.range,
         sheetId,
         ...(info.secondary ? { secondary: true } : {}),
+        // 只写"与默认不同"的项：缺省值由 ChartConfig / 导出侧兜底，快照里不留噪声
+        ...(info.format.title ? { title: info.format.title } : {}),
+        ...(info.format.legend && info.format.legend !== 'bottom'
+          ? { legend: info.format.legend }
+          : {}),
+        ...(info.format.dataLabels ? { dataLabels: true } : {}),
+        ...(info.format.showGridlines === false ? { showGridlines: false } : {}),
         ...geometry,
       });
       if (info.warnings.length > 0) warnings[chartPath] = info.warnings;

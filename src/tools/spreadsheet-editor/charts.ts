@@ -71,6 +71,14 @@ export function supportsSecondaryAxis(type: ChartType): boolean {
 }
 
 /**
+ * 轴标题只对"分类轴 + 数值轴"的图有意义：饼图没有轴，雷达图的"轴"是各指标名（本身已是标题），
+ * 两者都不提供轴标题输入，导出侧也不写。
+ */
+export function supportsAxisTitles(type: ChartType): boolean {
+  return type !== 'pie' && type !== 'radar';
+}
+
+/**
  * 次坐标轴挂在"最后一个系列"上 —— 与组合图"最后一列画折线"是同一条规则
  * （"销量 + 增长率" 里增长率走次轴），配置只留开/关，不再暴露一个系列索引。
  * 只有一个系列时开关没有意义（全部挪到次轴等于没双轴），此时返回 false。
@@ -83,10 +91,46 @@ export function usesSecondaryAxis(
   return secondary === true && total > 1 && index === total - 1;
 }
 
+/** 图例位置；`none` = 不显示图例（Excel 里就是"没有 legend 元素"） */
+export type ChartLegendPosition = 'none' | 'top' | 'right' | 'bottom' | 'left';
+
+/** 顺序即面板里的顺序 */
+export const CHART_LEGEND_POSITIONS: ChartLegendPosition[] = [
+  'none',
+  'top',
+  'right',
+  'bottom',
+  'left',
+];
+
+/** 位置 → 文案 key（面板与测试共用，避免两处各写一遍） */
+export const CHART_LEGEND_LABEL_KEY: Record<ChartLegendPosition, string> = {
+  none: 'chartLegendNone',
+  top: 'chartLegendTop',
+  right: 'chartLegendRight',
+  bottom: 'chartLegendBottom',
+  left: 'chartLegendLeft',
+};
+
+/**
+ * 标题类文本的归一化：`undefined` / 空串 / 纯空格都表示"没有"。
+ *
+ * 为什么要区分"没有"与"空标题"：Excel 里 `<c:title>` 存在但文字为空 → 图表上方一个空框，
+ * 用户看不出怎么去掉。所以留空一律不写 title，而不是写一个空 title。
+ */
+export function chartText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const text = value.trim();
+  return text ? text : undefined;
+}
+
 /**
  * Persisted config for an in-sheet chart.
  * Geometry is in pixels relative to the sheet area and is saved with the snapshot (see syntoolsCharts
  * in xlsx-io).
+ *
+ * P1-8 的格式化字段全部是可选的，缺省即 Excel 的默认外观（无标题 / 图例在底部 / 无数据标签 /
+ * 有网格线）。这样老快照读进来不需要迁移，导出结果也不会因为多了几个字段而变化。
  */
 export interface ChartConfig {
   id: string;
@@ -97,6 +141,16 @@ export interface ChartConfig {
   sheetId?: string;
   /** 最后一个系列走次坐标轴（右轴）；仅对柱/线/面积/组合图有效，见 `usesSecondaryAxis` */
   secondary?: boolean;
+  /** 图表标题；缺省 = 无标题（空串同样视为无标题，见 `chartText`） */
+  title?: string;
+  /** 图例位置；缺省 = 底部（Excel 默认） */
+  legend?: ChartLegendPosition;
+  /** 轴标题；饼图 / 雷达图没有分类轴，写了也不画 */
+  axisTitles?: { x?: string; y?: string };
+  /** 数值标签；缺省 = 不显示（饼图例外：默认显示分类名，见 `buildChartOption`） */
+  dataLabels?: boolean;
+  /** 数值轴网格线；缺省 = 显示（Excel 默认） */
+  showGridlines?: boolean;
   x: number;
   y: number;
   width: number;
@@ -297,19 +351,63 @@ export function buildChartData(
 export interface ChartOptionOptions {
   /** 最后一个系列走次坐标轴（右轴），与 OOXML 侧的 `buildChartXml(..., { secondary })` 一一对应 */
   secondary?: boolean;
+  /** 以下 5 项与 `ChartXmlOptions` 同名同义：应用内画的和导出的必须一致（P1-8） */
+  title?: string;
+  legend?: ChartLegendPosition;
+  axisTitles?: { x?: string; y?: string };
+  dataLabels?: boolean;
+  showGridlines?: boolean;
 }
 
-/** Build an ECharts option (a pie slices the first series by category; the rest use a category axis with multiple series) */
+/** 图例位置 → ECharts 的 legend 配置；`none` 是显式隐藏而不是"留空" */
+function legendOption(position: ChartLegendPosition | undefined): Record<string, unknown> {
+  switch (position) {
+    case 'none':
+      return { show: false };
+    case 'top':
+      return { top: 0, type: 'scroll' };
+    case 'left':
+      return { left: 0, top: 'middle', orient: 'vertical', type: 'scroll' };
+    case 'right':
+      return { right: 0, top: 'middle', orient: 'vertical', type: 'scroll' };
+    case 'bottom':
+    default:
+      return { bottom: 0, type: 'scroll' };
+  }
+}
+
+/** 轴标题（ECharts 用 `name` + 居中的 nameLocation 表达） */
+function axisName(text: string | undefined, gap: number): Record<string, unknown> {
+  return text ? { name: text, nameLocation: 'middle', nameGap: gap } : {};
+}
+
+/**
+ * Build an ECharts option (a pie slices the first series by category; the rest use a category axis with multiple series)
+ *
+ * P1-8：标题 / 图例 / 轴标题 / 数据标签 / 网格线全部从这里进 ECharts，
+ * 与 `chartXml.ts` 的导出侧共用同一份配置，避免"应用里看着有标题、导出后没有"。
+ */
 export function buildChartOption(
   data: ChartData,
   type: ChartType,
   options: ChartOptionOptions = {},
 ): Record<string, unknown> {
+  const title = chartText(options.title);
+  const legend = legendOption(options.legend);
+  // 标题与图例都占位置：不留出来就会压在图上
+  const top = 24 + (title ? 18 : 0) + (options.legend === 'top' ? 18 : 0);
+  const bottom = options.legend === 'none' ? 28 : 44;
+  const gridlines = options.showGridlines !== false;
+  const titleOption = title
+    ? { show: true, text: title, left: 'center', top: 4, textStyle: { fontSize: 13 } }
+    : {};
+
   if (type === 'pie') {
     const first = data.series[0];
     return {
+      ...(title ? { title: titleOption } : {}),
       tooltip: { trigger: 'item' },
-      legend: { bottom: 0, type: 'scroll' },
+      legend,
       series: [
         {
           type: 'pie',
@@ -318,7 +416,8 @@ export function buildChartOption(
             name,
             value: first?.data[index] ?? null,
           })),
-          label: { formatter: '{b}: {c}' },
+          // 饼图默认显示"分类: 数值"，关掉数据标签时整块隐藏（与 OOXML 的 dLbls 一致）
+          label: { show: options.dataLabels !== false, formatter: '{b}: {c}' },
         },
       ],
     };
@@ -330,8 +429,10 @@ export function buildChartOption(
       ...data.series.flatMap((item) => item.data.map((value) => Math.abs(value ?? 0))),
     );
     return {
+      ...(title ? { title: titleOption } : {}),
       tooltip: { trigger: 'item' },
-      legend: { bottom: 0, type: 'scroll' },
+      legend,
+      // 雷达图没有分类轴 / 数值轴，轴标题无处可放（导出侧同理，不写 axis title）
       radar: {
         indicator: data.categories.map((name) => ({ name, max })),
         radius: '62%',
@@ -343,6 +444,7 @@ export function buildChartOption(
             name: item.name,
             value: item.data.map((value) => value ?? 0),
           })),
+          ...(options.dataLabels ? { label: { show: true } } : {}),
         },
       ],
     };
@@ -355,15 +457,25 @@ export function buildChartOption(
       return Number.isFinite(parsed) && String(label).trim() !== '' ? parsed : index + 1;
     });
     return {
+      ...(title ? { title: titleOption } : {}),
       tooltip: { trigger: 'item' },
-      legend: { bottom: 0, type: 'scroll' },
-      grid: { left: 12, right: 20, top: 24, bottom: 44, containLabel: true },
-      xAxis: { type: 'value' },
-      yAxis: { type: 'value' },
+      legend,
+      grid: { left: 12, right: 20, top, bottom, containLabel: true },
+      xAxis: {
+        type: 'value',
+        splitLine: { show: gridlines },
+        ...axisName(chartText(options.axisTitles?.x), 28),
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { show: gridlines },
+        ...axisName(chartText(options.axisTitles?.y), 40),
+      },
       series: data.series.map((item) => ({
         name: item.name,
         type: 'scatter',
         symbolSize: 8,
+        ...(options.dataLabels ? { label: { show: true } } : {}),
         data: item.data
           .map((value, index) => (value === null ? null : [xs[index], value]))
           .filter((point): point is [number, number] => point !== null),
@@ -374,14 +486,28 @@ export function buildChartOption(
   const total = data.series.length;
   // 双轴：主/次各一条数值轴，只有最后一个系列挂到右轴（与 OOXML 的组划分同一规则）
   const dual = options.secondary === true && total > 1 && supportsSecondaryAxis(type);
+  const valueAxis = {
+    type: 'value',
+    splitLine: { show: gridlines },
+    ...axisName(chartText(options.axisTitles?.y), dual ? 48 : 40),
+  };
   return {
+    ...(title ? { title: titleOption } : {}),
     tooltip: { trigger: 'axis' },
-    legend: { bottom: 0, type: 'scroll' },
-    grid: { left: 12, right: dual ? 48 : 20, top: 24, bottom: 44, containLabel: true },
-    xAxis: { type: 'category', data: data.categories },
-    yAxis: dual
-      ? [{ type: 'value' }, { type: 'value', splitLine: { show: false } }]
-      : { type: 'value' },
+    legend,
+    grid: {
+      left: 12,
+      right: dual ? 48 : 20,
+      top,
+      bottom,
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: data.categories,
+      ...axisName(chartText(options.axisTitles?.x), 28),
+    },
+    yAxis: dual ? [valueAxis, { type: 'value', splitLine: { show: false } }] : valueAxis,
     series: data.series.map((item, index) => {
       const kind = seriesRenderKind(type, index, total);
       // 面积图在 ECharts 里是"折线 + 面积填充"，没有独立的 area 系列类型
@@ -392,6 +518,7 @@ export function buildChartOption(
         data: item.data,
         ...(kind === 'line' ? { smooth: true } : {}),
         ...(kind === 'area' ? { areaStyle: { opacity: 0.6 } } : {}),
+        ...(options.dataLabels ? { label: { show: true } } : {}),
         ...(dual && usesSecondaryAxis(options.secondary, index, total) ? { yAxisIndex: 1 } : {}),
       };
     }),
