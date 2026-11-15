@@ -66,6 +66,15 @@ export interface BaselineReport {
   externalSamples?: number;
   /** Covered office suites (subset of EXTERNAL_PRODUCER_FAMILIES), for the coverage gate */
   externalProducers?: string[];
+  /**
+   * Per-tool breakdown of `externalSamples` (P0-4 C).
+   *
+   * The gate is per tool: 10 real .docx must not hide the fact that no real .xlsx was ever
+   * verified, which is exactly the hole P0-4 was opened for.
+   */
+  externalByTool?: Record<string, number>;
+  /** Office suites covered by the external .xlsx samples (P0-4 C) */
+  sheetProducers?: string[];
   samples: SampleResult[];
 }
 

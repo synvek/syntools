@@ -139,6 +139,12 @@ export interface ChartConfig {
   range: ChartRange;
   /** Sheet the chart belongs to: it keeps reading that sheet and only shows on it after a sheet switch */
   sheetId?: string;
+  /**
+   * 数据源工作表。Excel 允许"图放在 A 表、数据引用 B 表"（`ChartData!$A$2:$B$5`），
+   * 站内的 `range` 只有一套行列号，所以必须显式记住数据到底在哪张表。
+   * 缺省 = 与 `sheetId` 相同（拖出来的图都是这种）；只有导入的跨表图表才会不同。
+   */
+  dataSheetId?: string;
   /** 最后一个系列走次坐标轴（右轴）；仅对柱/线/面积/组合图有效，见 `usesSecondaryAxis` */
   secondary?: boolean;
   /** 图表标题；缺省 = 无标题（空串同样视为无标题，见 `chartText`） */
@@ -155,6 +161,17 @@ export interface ChartConfig {
   y: number;
   width: number;
   height: number;
+}
+
+/**
+ * 图表读数据的工作表：跨表图表用 `dataSheetId`，否则跟随 `sheetId`（再退到当前表）。
+ * 应用内渲染（含打印出图）与导出原生图表都必须按它取数，别各写一遍 `?? sheetId`。
+ */
+export function chartDataSheetId(
+  config: Pick<ChartConfig, 'sheetId' | 'dataSheetId'>,
+  fallback?: string | null,
+): string | null {
+  return config.dataSheetId ?? config.sheetId ?? fallback ?? null;
 }
 
 /** Range → A1 notation ("A1:C10") */

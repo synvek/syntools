@@ -1,10 +1,5 @@
 [
-  {
-    "id": "slide/text-basic",
-    "tool": "slide",
-    "title": "三页纯文本",
-    "source": "generated"
-  },
+  { "id": "slide/text-basic", "tool": "slide", "title": "三页纯文本", "source": "generated" },
   {
     "id": "slide/text-rich",
     "tool": "slide",
@@ -89,24 +84,14 @@
     "source": "generated",
     "notes": "pptxgen 把母版对象写进版式：回读后 masterElements 1→0、layoutElements 0→1，属结构位移"
   },
-  {
-    "id": "slide/4x3",
-    "tool": "slide",
-    "title": "4:3 页面尺寸下的几何",
-    "source": "generated"
-  },
+  { "id": "slide/4x3", "tool": "slide", "title": "4:3 页面尺寸下的几何", "source": "generated" },
   {
     "id": "sheet/cells-basic",
     "tool": "sheet",
     "title": "文本 / 数字 / 布尔",
     "source": "generated"
   },
-  {
-    "id": "sheet/formulas",
-    "tool": "sheet",
-    "title": "公式 + 缓存值",
-    "source": "generated"
-  },
+  { "id": "sheet/formulas", "tool": "sheet", "title": "公式 + 缓存值", "source": "generated" },
   {
     "id": "sheet/formats",
     "tool": "sheet",
@@ -167,18 +152,8 @@
     "source": "generated",
     "notes": "导出 XML 含 w:u / w:strike；MAMMOTH_STYLE_MAP 已补 u => u，下划线可回读（见 docxCompat.test.ts）"
   },
-  {
-    "id": "docx/headings",
-    "tool": "docx",
-    "title": "三级标题结构",
-    "source": "generated"
-  },
-  {
-    "id": "docx/lists",
-    "tool": "docx",
-    "title": "无序/有序嵌套列表",
-    "source": "generated"
-  },
+  { "id": "docx/headings", "tool": "docx", "title": "三级标题结构", "source": "generated" },
+  { "id": "docx/lists", "tool": "docx", "title": "无序/有序嵌套列表", "source": "generated" },
   {
     "id": "docx/table",
     "tool": "docx",
@@ -456,5 +431,138 @@
       "numbering"
     ],
     "notes": "英文独立内容样本「Consensus Algorithms in Practice」，与中文样本集内容完全不同；core.xml creator 为 Priya Nair（脱敏源文档作者），app.xml 的 Application 只声明处理/另存工具，不等同于该工具原生生成的字节。本组 5 份均含 word/comments.xml，补齐中文集缺失的批注覆盖。 app.xml 与 core.xml 均为空元素，文件内没有任何工具/版本/作者声明，producerFamily=pages 仅依据样本来源说明。导出后 endnotes / people 为 0，shapes=4 为英文集最多。"
+  },
+  {
+    "id": "xlsx/external/excel-cn",
+    "tool": "sheet",
+    "title": "XLSX 综合特性样本（Excel for Mac 保存，中文，脱敏）",
+    "source": "external",
+    "producer": "Microsoft Excel for Mac (app.xml: Microsoft Macintosh Excel)",
+    "producerFamily": "word",
+    "path": "samples/xlsx-feature-sample-excel-cn.xlsx",
+    "expectedParts": ["worksheets", "calcChain"],
+    "notes": "app.xml 声明 Microsoft Macintosh Excel 但未写版本号，故 producerVersion 留空；31 个页签含一张完全隐藏表、主题色标签色与工作表保护。中文内容样本，30–31 个页签；cn 版不含图表与图片（对应页签为空占位），用于对比\"同内容不同套件\"的样式重写差异。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。"
+  },
+  {
+    "id": "xlsx/external/excel-en",
+    "tool": "sheet",
+    "title": "XLSX feature sample (Excel for Mac, English, redacted)",
+    "source": "external",
+    "producer": "Microsoft Excel for Mac (app.xml: Microsoft Macintosh Excel)",
+    "producerFamily": "word",
+    "path": "samples/xlsx-feature-sample-excel-en.xlsx",
+    "expectedParts": [
+      "worksheets",
+      "charts",
+      "drawings",
+      "media",
+      "chartsheets",
+      "tables",
+      "comments",
+      "definedNames",
+      "sheetProtection",
+      "conditionalFormattings",
+      "dataValidations",
+      "calcChain"
+    ],
+    "notes": "app.xml 声明 Microsoft Macintosh Excel、未写版本号。6 张图表 + 1 张图表工作表是四套件里唯一的原生图表工作表样本；含 3 个媒体文件（png / jpg / emf）。英文独立内容样本，31–32 个页签，额外带 6 张图表、1 张图表工作表、3 个媒体文件、表格对象与定义名称。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。"
+  },
+  {
+    "id": "xlsx/external/wps-cn",
+    "tool": "sheet",
+    "title": "XLSX 综合特性样本（WPS 另存，中文，脱敏）",
+    "source": "external",
+    "producer": "Microsoft Macintosh Excel (app.xml) / WPS Office per supplied provenance",
+    "producerFamily": "wps",
+    "path": "samples/xlsx-feature-sample-wps-cn.xlsx",
+    "expectedParts": ["worksheets"],
+    "notes": "app.xml 声明的是 Microsoft Macintosh Excel——WPS 沿用了 Excel 的 Application 字符串，文件内没有可自证的 WPS 版本号，producerFamily 仅依据样本来源说明。31 个页签、47 个包内部件（同内容 Excel 版为 41），无 calcChain。中文内容样本，30–31 个页签；cn 版不含图表与图片（对应页签为空占位），用于对比\"同内容不同套件\"的样式重写差异。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。"
+  },
+  {
+    "id": "xlsx/external/wps-en",
+    "tool": "sheet",
+    "title": "XLSX feature sample (WPS, English, redacted)",
+    "source": "external",
+    "producer": "Microsoft Macintosh Excel (app.xml) / WPS Office per supplied provenance",
+    "producerFamily": "wps",
+    "path": "samples/xlsx-feature-sample-wps-en.xlsx",
+    "expectedParts": [
+      "worksheets",
+      "charts",
+      "drawings",
+      "media",
+      "tables",
+      "comments",
+      "definedNames",
+      "sheetProtection",
+      "conditionalFormattings",
+      "dataValidations"
+    ],
+    "notes": "同 wps-cn：app.xml 只声明 Excel，WPS 版本无从自证。32 个页签、85 个包内部件；媒体目录里有一个目录条目（xl/media/）与 3 个真实文件，统计时按文件计。英文独立内容样本，31–32 个页签，额外带 6 张图表、1 张图表工作表、3 个媒体文件、表格对象与定义名称。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。"
+  },
+  {
+    "id": "xlsx/external/libreoffice-cn",
+    "tool": "sheet",
+    "title": "XLSX 综合特性样本（LibreOffice Calc 另存，中文，脱敏）",
+    "source": "external",
+    "producer": "LibreOffice 26.8.2.2 macOS aarch64 (app.xml) LibreOffice_project/9dea406a…",
+    "producerFamily": "libreoffice",
+    "producerVersion": "26.8.2.2",
+    "path": "samples/xlsx-feature-sample-libraoffice-cn.xlsx",
+    "expectedParts": ["worksheets"],
+    "notes": "app.xml 声明 LibreOffice/26.8.2.2$MacOSX_AARCH64、AppVersion 15.0000；文件名沿用用户提供的 libraoffice 拼写，未改动磁盘文件。31 个页签、41 个包内部件。中文内容样本，30–31 个页签；cn 版不含图表与图片（对应页签为空占位），用于对比\"同内容不同套件\"的样式重写差异。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。"
+  },
+  {
+    "id": "xlsx/external/libreoffice-en",
+    "tool": "sheet",
+    "title": "XLSX feature sample (LibreOffice Calc, English, redacted)",
+    "source": "external",
+    "producer": "LibreOffice 26.8.2.2 macOS aarch64 (app.xml) LibreOffice_project/9dea406a…",
+    "producerFamily": "libreoffice",
+    "producerVersion": "26.8.2.2",
+    "path": "samples/xlsx-feature-sample-libraoffice-en.xlsx",
+    "expectedParts": [
+      "worksheets",
+      "charts",
+      "drawings",
+      "media",
+      "tables",
+      "comments",
+      "definedNames",
+      "sheetProtection",
+      "conditionalFormattings",
+      "dataValidations"
+    ],
+    "notes": "32 个页签、86 个包内部件，为四类套件中最多；媒体文件扩展名被重写为 .jpeg。英文独立内容样本，31–32 个页签，额外带 6 张图表、1 张图表工作表、3 个媒体文件、表格对象与定义名称。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。"
+  },
+  {
+    "id": "xlsx/external/numbers-cn",
+    "tool": "sheet",
+    "title": "XLSX 综合特性样本（Numbers 导出，中文，脱敏）",
+    "source": "external",
+    "producer": "undeclared (docProps/app.xml and core.xml are empty elements) / Apple Numbers per supplied provenance",
+    "producerFamily": "pages",
+    "path": "samples/xlsx-feature-sample-numbers-cn.xlsx",
+    "expectedParts": ["worksheets", "conditionalFormattings"],
+    "notes": "docProps 的 app.xml 与 core.xml 都是空元素，文件内没有任何工具/版本/作者声明，producerFamily=pages 仅依据样本来源说明。30 个页签（少一张\"完全隐藏表\"）、有值单元格 2,934 为中文集最多。中文内容样本，30–31 个页签；cn 版不含图表与图片（对应页签为空占位），用于对比\"同内容不同套件\"的样式重写差异。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。"
+  },
+  {
+    "id": "xlsx/external/numbers-en",
+    "tool": "sheet",
+    "title": "XLSX feature sample (Numbers export, English, redacted)",
+    "source": "external",
+    "producer": "undeclared (docProps/app.xml and core.xml are empty elements) / Apple Numbers per supplied provenance",
+    "producerFamily": "pages",
+    "path": "samples/xlsx-feature-sample-numbers-en.xlsx",
+    "expectedParts": [
+      "worksheets",
+      "charts",
+      "drawings",
+      "media",
+      "comments",
+      "conditionalFormattings",
+      "dataValidations"
+    ],
+    "notes": "docProps 全为空元素，无工具声明。31 个页签、有值单元格 3,566（8 份中最多）；无表格对象与定义名称，图表 5 张（比 Excel / WPS 少一张图表工作表）。英文独立内容样本，31–32 个页签，额外带 6 张图表、1 张图表工作表、3 个媒体文件、表格对象与定义名称。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。"
   }
 ]

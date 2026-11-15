@@ -645,10 +645,18 @@ export function buildChartPlan(source: ChartPlanSource): XlsxChartPlan {
     const sheetId = config.sheetId && source.sheets?.[config.sheetId] ? config.sheetId : fallbackId;
     const sheetName = sheetId ? source.sheets?.[sheetId]?.name : undefined;
     if (!sheetName) continue;
-    const spec = resolveChart(source, sheetId ?? null, config.range, { type: config.type });
+    /**
+     * 跨表图表：锚点仍挂在图表所在的表上，但 `<c:f>` 引用必须写成**数据表**的表名，
+     * 否则 Excel 会去图表所在表里找同一块区域 —— 数据看着像"被换掉了"。
+     */
+    const dataSheetId =
+      config.dataSheetId && source.sheets?.[config.dataSheetId] ? config.dataSheetId : sheetId;
+    const dataSheetName = dataSheetId ? source.sheets?.[dataSheetId]?.name : undefined;
+    if (!dataSheetName) continue;
+    const spec = resolveChart(source, dataSheetId ?? null, config.range, { type: config.type });
     if (!spec.ok) continue;
     (chartsBySheet[sheetName] ??= []).push({
-      chartXml: buildChartXml(spec.value, config.type, sheetName, {
+      chartXml: buildChartXml(spec.value, config.type, dataSheetName, {
         secondary: config.secondary,
         // P1-8：格式化字段原样带进 XML，导出与应用内渲染共用同一份配置
         title: config.title,

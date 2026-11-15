@@ -41,6 +41,10 @@ interface SeriesInfo {
   render: RenderKind;
   /** 该系列是否挂在次坐标轴上（由所属 chart group 的 axId 决定） */
   secondary: boolean;
+  /** 该系列引用里显式写出的工作表名（去重）：`ChartData!$B$2` → `ChartData` */
+  refSheets: string[];
+  /** 该系列存在"没写表名"的引用 —— OOXML 里它指的是图表所在工作表 */
+  usesHostSheet: boolean;
 }
 
 /**
@@ -58,12 +62,17 @@ interface ChartFormatInfo {
 interface PartInfo {
   type: ChartType;
   series: SeriesInfo[];
+  /** 数据区域（**引用所在工作表**的坐标系，不一定是图表所在的表） */
   range: ChartRange;
   secondary: boolean;
   /** 标题 / 图例 / 数据标签 / 网格线 */
   format: ChartFormatInfo;
   /** 只能近似还原的地方（类型降级 / 次轴系列不在末位），交给上层提示用户 */
   warnings: string[];
+  /** 所有系列引用里显式写出的工作表名（去重）；空 = 引用全都没写表名 */
+  refSheets: string[];
+  /** 存在没写表名的引用：它指的是图表所在工作表（不一定是数据表） */
+  usesHostSheet: boolean;
 }
 
 interface ChartGroupInfo {
@@ -145,7 +154,12 @@ function secondaryAxisIds(xml: string): Set<string> {
   return new Set(rightSide.length > 0 ? rightSide : ids.slice(1).map((item) => item.id));
 }
 
-/** 单个系列的引用：名字单元格、分类/X 区间、数值区间 */
+/**
+ * 单个系列的引用：名字单元格、分类/X 区间、数值区间。
+ *
+ * 三条引用各自都可能带表名前缀（`ChartData!$B$2:$B$5`，Excel 默认就是这么写的），
+ * 所以这里同时记下"引用了哪张表"，由上层决定站内能不能表达（见 `adoptChartParts`）。
+ */
 function parseSeries(
   xml: string,
   position: number,
@@ -156,11 +170,21 @@ function parseSeries(
   const val = /<c:(?:val|yVal)\b[\s\S]*?<c:f>([^<]*)<\/c:f>/.exec(xml)?.[1];
   const valueRange = val ? parseRefRange(val) : null;
   if (!valueRange) return null;
+  const refs = [tx, cat, val].filter((ref): ref is string => Boolean(ref));
+  const txParts = splitSheetRef(tx ?? '');
   return {
     index: Number.isFinite(index) ? index : position,
-    nameCell: cellOf(splitSheetRef(tx ?? '').body),
+    nameCell: cellOf(txParts.body),
     cat: cat ? parseRefRange(cat) : null,
     val: valueRange,
+    refSheets: [
+      ...new Set(
+        refs
+          .map((ref) => splitSheetRef(ref).sheetName)
+          .filter((name): name is string => Boolean(name)),
+      ),
+    ],
+    usesHostSheet: refs.some((ref) => splitSheetRef(ref).sheetName === null),
   };
 }
 
@@ -187,6 +211,30 @@ function mergeRange(series: readonly SeriesInfo[]): ChartRange | null {
   }
   if (endRow < 0 || endColumn < 0) return null;
   return { startRow, startColumn, endRow, endColumn };
+}
+
+/**
+ * 引用结构能不能压成站内的一块矩形 `range`。
+ *
+ * 站内模型只有"一块区域 + 首列是分类列"，而 Excel 的每条引用都是独立的：
+ * - 分类列同时又是某条系列的值列（散点图里 `xVal` / `yVal` 指同一列，画一条 45° 线）→ 压不成矩形；
+ * - 每条系列各用一列不同的分类 → 一块区域里只有一个分类列。
+ * 这两种都只能原样保留，否则导出时要么丢分类、要么整张图被当成空数据丢掉。
+ */
+function expressibleAsRange(series: readonly SeriesInfo[]): boolean {
+  const valueColumns = new Set(
+    series
+      .map((item) => item.val?.startColumn)
+      .filter((column): column is number => column !== undefined),
+  );
+  const categoryColumns = new Set(
+    series
+      .map((item) => item.cat?.startColumn)
+      .filter((column): column is number => column !== undefined),
+  );
+  if (categoryColumns.size > 1) return false;
+  for (const column of categoryColumns) if (valueColumns.has(column)) return false;
+  return true;
 }
 
 /** 画法集合 → 本站图表类型；表达不了就降级并记一条警告 */
@@ -294,7 +342,19 @@ export function parseChartPart(xml: string): PartInfo | null {
     }
   }
 
-  return { type, series, range, secondary, format: parseChartFormat(xml), warnings };
+  const refSheets = [...new Set(series.flatMap((item) => item.refSheets))];
+  const usesHostSheet = series.some((item) => item.usesHostSheet);
+
+  return {
+    type,
+    series,
+    range,
+    secondary,
+    format: parseChartFormat(xml),
+    warnings,
+    refSheets,
+    usesHostSheet,
+  };
 }
 
 /* ---------------------------------- 几何还原 ---------------------------------- */
@@ -417,6 +477,16 @@ export function metricsOfSheet(sheet: {
   };
 }
 
+/** 表名 → sheetId；Excel 的表名大小写不敏感，先精确匹配再退化到忽略大小写 */
+function sheetIdFor(names: Record<string, string>, name: string): string | undefined {
+  if (names[name]) return names[name];
+  const lower = name.toLowerCase();
+  for (const [key, id] of Object.entries(names)) {
+    if (key.toLowerCase() === lower) return id;
+  }
+  return undefined;
+}
+
 /**
  * 把原生 chart part 转成可编辑的 `ChartConfig`，并从 `RawChartParts` 中摘除。
  * 无法转换的图表保持原样（仍在 `parts` 里），所以"转换一部分"也是安全的。
@@ -465,6 +535,31 @@ export function adoptChartParts(
         kept += 1;
         continue;
       }
+      // 引用压不成一块矩形（分类列与值列重叠 / 每系列各一列分类）→ 原样保留，别在导出时丢掉
+      if (!expressibleAsRange(info.series)) {
+        kept += 1;
+        warnings[chartPath] = ['ref-overlap'];
+        continue;
+      }
+
+      /**
+       * 数据表可以不是图表所在的表（`ChartData!$A$2:$A$5`）：`info.range` 用的是**数据表**的行列号，
+       * 直接配 `sheetId` 会把图挪去读另一张表的数据 —— 那是最坏的一种静默损坏。
+       * 一张图跨多张表（分类在一张、数值在另一张）站内表达不了，原样保留。
+       */
+      const dataSheets = new Set(info.refSheets);
+      if (info.usesHostSheet) dataSheets.add(sheetName);
+      if (dataSheets.size > 1) {
+        kept += 1;
+        warnings[chartPath] = ['cross-sheet'];
+        continue;
+      }
+      const dataSheetName = [...dataSheets][0] ?? sheetName;
+      const dataSheetId = sheetIdFor(options.sheetIdsByName, dataSheetName);
+      if (!dataSheetId) {
+        kept += 1;
+        continue;
+      }
 
       const geometry = adoptGeometry(drawingXml, rel.id, metrics, offset);
       offset += 24;
@@ -473,6 +568,8 @@ export function adoptChartParts(
         type: info.type,
         range: info.range,
         sheetId,
+        // 只有跨表时才写：同表图表沿用 `sheetId`，快照里不留噪声
+        ...(dataSheetId !== sheetId ? { dataSheetId } : {}),
         ...(info.secondary ? { secondary: true } : {}),
         // 只写"与默认不同"的项：缺省值由 ChartConfig / 导出侧兜底，快照里不留噪声
         ...(info.format.title ? { title: info.format.title } : {}),

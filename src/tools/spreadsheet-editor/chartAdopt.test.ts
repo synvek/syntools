@@ -127,6 +127,12 @@ describe('chart part 解析', () => {
   it('曲面图这类认不出的结构返回 null', () => {
     expect(parseChartPart('<c:chartSpace><c:surfaceChart/></c:chartSpace>')).toBeNull();
   });
+
+  it('记下引用里显式写出的表名（跨表判断用）', () => {
+    const info = parseChartPart(buildChartXml(spec, 'bar', 'ChartData'));
+    expect(info?.refSheets).toEqual(['ChartData']);
+    expect(info?.usesHostSheet).toBe(false);
+  });
 });
 
 describe('导入即编辑（导出 → 导入往返）', () => {
@@ -322,4 +328,147 @@ describe('摘除与降级', () => {
     expect(adopted.charts).toHaveLength(1);
     expect(adopted.parts).toBeNull();
   });
+
+  it('散点图的 X 与 Y 引用同一列：压不成矩形，原样保留', () => {
+    // Excel 允许 xVal / yVal 指同一列（画出一条 45° 线），站内一块矩形表达不了，
+    // 硬转会在导出时被当成空数据整张丢掉
+    const chartXml = `<c:chartSpace xmlns:c="http://c"><c:chart><c:plotArea><c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/><c:ser><c:idx val="0"/><c:order val="0"/><c:xVal><c:numRef><c:f>'Sales Data'!$B$2:$B$5</c:f></c:numRef></c:xVal><c:yVal><c:numRef><c:f>'Sales Data'!$B$2:$B$5</c:f></c:numRef></c:yVal></c:ser><c:axId val="1"/><c:axId val="2"/></c:scatterChart></c:plotArea></c:chart></c:chartSpace>`;
+    const raw: RawChartParts = {
+      version: 1,
+      parts: {
+        'xl/drawings/drawing1.xml': encode(DRAWING),
+        'xl/drawings/_rels/drawing1.xml.rels': encode(RELS),
+        'xl/charts/chart1.xml': encode(chartXml),
+      },
+      sheetDrawings: { [SHEET_NAME]: 'xl/drawings/drawing1.xml' },
+    };
+    const adopted = adoptChartParts(raw, { sheetIdsByName: { [SHEET_NAME]: SHEET_ID } });
+    expect(adopted.charts).toHaveLength(0);
+    expect(adopted.kept).toBe(1);
+    expect(adopted.warnings['xl/charts/chart1.xml']).toEqual(['ref-overlap']);
+  });
 });
+
+/**
+ * 跨表图表：Excel 的默认写法就是 `ChartData!$A$2:$A$5`（图放一张表、数据在另一张）。
+ * 这里守住两条线：导出的引用要写数据表的表名，回读时不能把图表挪去读别的表。
+ */
+describe('跨工作表数据引用', () => {
+  const HOST_ID = 's1';
+  const DATA_ID = 's2';
+  const HOST_NAME = 'Summary';
+  const DATA_NAME = 'ChartData';
+
+  const CROSS: ChartConfig = {
+    id: 'c1',
+    type: 'bar',
+    // ChartData 的 A2:B5（表头 + 3 行数据）
+    range: { startRow: 1, startColumn: 0, endRow: 4, endColumn: 1 },
+    sheetId: HOST_ID,
+    dataSheetId: DATA_ID,
+    x: 200,
+    y: 120,
+    width: 400,
+    height: 300,
+  };
+
+  function crossSnapshot(charts: ChartConfig[]): WorkbookSnapshot {
+    return {
+      id: 'wb',
+      name: 'book',
+      appVersion: '1.0.0',
+      locale: 'zhCN',
+      sheetOrder: [HOST_ID, DATA_ID],
+      sheets: {
+        [HOST_ID]: createEmptySheet(HOST_ID, HOST_NAME),
+        [DATA_ID]: {
+          ...createEmptySheet(DATA_ID, DATA_NAME),
+          cellData: {
+            '1': { '0': { v: 'Month' }, '1': { v: 'Qty' } },
+            '2': { '0': { v: 'Jan' }, '1': { v: 10 } },
+            '3': { '0': { v: 'Feb' }, '1': { v: 20 } },
+            '4': { '0': { v: 'Mar' }, '1': { v: 30 } },
+          },
+        },
+      },
+      styles: {},
+      syntoolsCharts: charts,
+    };
+  }
+
+  async function exportCross() {
+    const exported = await exportSnapshotToBytes(crossSnapshot([CROSS]));
+    if (!exported.ok) throw new Error('export failed');
+    const zip = await JSZip.loadAsync(toArrayBuffer(exported.value));
+    return zip;
+  }
+
+  it('引用写成数据表的表名，锚点仍挂在图表所在的表', async () => {
+    const zip = await exportCross();
+    const chartXml = (await zip.file('xl/charts/chart1.xml')?.async('string')) ?? '';
+    // 系列名 = A2 单元格、数值 = B3:B5（表头行不计入数据）
+    expect(chartXml).toContain("'ChartData'!$B$2");
+    expect(chartXml).toContain("'ChartData'!$B$3:$B$5");
+    expect(chartXml).not.toContain("'Summary'!");
+
+    // sheet1 = Summary（带 drawing），sheet2 = ChartData（没有图表）
+    const hostSheet = (await zip.file('xl/worksheets/sheet1.xml')?.async('string')) ?? '';
+    const dataSheet = (await zip.file('xl/worksheets/sheet2.xml')?.async('string')) ?? '';
+    expect(hostSheet).toContain('<drawing');
+    expect(dataSheet).not.toContain('<drawing');
+  });
+
+  it('导入回读：图表留在 Summary，数据来自 ChartData', async () => {
+    const parts = await collectRawChartParts(await exportCross());
+    if (!parts) throw new Error('no chart parts collected');
+    const adopted = adoptChartParts(parts, {
+      sheetIdsByName: { [HOST_NAME]: HOST_ID, [DATA_NAME]: DATA_ID },
+    });
+    expect(adopted.kept).toBe(0);
+    expect(adopted.parts).toBeNull();
+    expect(adopted.charts[0]).toMatchObject({
+      sheetId: HOST_ID,
+      dataSheetId: DATA_ID,
+      range: CROSS.range,
+    });
+  });
+
+  it('分类与数值分散在两张表：站内表达不了，原样保留', () => {
+    const chartXml = `<c:chartSpace xmlns:c="http://c"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/><c:ser><c:idx val="0"/><c:order val="0"/><c:cat><c:strRef><c:f>Data1!$A$2:$A$3</c:f></c:strRef></c:cat><c:val><c:numRef><c:f>Data2!$B$2:$B$3</c:f></c:numRef></c:val></c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart></c:plotArea></c:chart></c:chartSpace>`;
+    const raw: RawChartParts = {
+      version: 1,
+      parts: {
+        'xl/drawings/drawing1.xml': encode(DRAWING_MIN),
+        'xl/drawings/_rels/drawing1.xml.rels': encode(RELS_MIN),
+        'xl/charts/chart1.xml': encode(chartXml),
+      },
+      sheetDrawings: { [HOST_NAME]: 'xl/drawings/drawing1.xml' },
+    };
+    const adopted = adoptChartParts(raw, {
+      sheetIdsByName: { [HOST_NAME]: HOST_ID, Data1: 's2', Data2: 's3' },
+    });
+    expect(adopted.charts).toHaveLength(0);
+    expect(adopted.kept).toBe(1);
+    expect(adopted.warnings['xl/charts/chart1.xml']).toEqual(['cross-sheet']);
+  });
+
+  it('引用的表不在文件里（外部工作簿）：原样保留', () => {
+    const chartXml = `<c:chartSpace xmlns:c="http://c"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numRef><c:f>[Book1]Sheet1!$B$2:$B$3</c:f></c:numRef></c:val></c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart></c:plotArea></c:chart></c:chartSpace>`;
+    const raw: RawChartParts = {
+      version: 1,
+      parts: {
+        'xl/drawings/drawing1.xml': encode(DRAWING_MIN),
+        'xl/drawings/_rels/drawing1.xml.rels': encode(RELS_MIN),
+        'xl/charts/chart1.xml': encode(chartXml),
+      },
+      sheetDrawings: { [HOST_NAME]: 'xl/drawings/drawing1.xml' },
+    };
+    const adopted = adoptChartParts(raw, { sheetIdsByName: { [HOST_NAME]: HOST_ID } });
+    expect(adopted.charts).toHaveLength(0);
+    expect(adopted.kept).toBe(1);
+  });
+});
+
+const DRAWING_MIN = `<xdr:wsDr xmlns:xdr="http://x" xmlns:c="http://c" xmlns:r="http://r"><xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="1" cy="1"/><xdr:graphicFrame><a:graphic><a:graphicData uri="http://c"><c:chart r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame></xdr:oneCellAnchor></xdr:wsDr>`;
+const RELS_MIN =
+  '<?xml version="1.0"?><Relationships xmlns="http://p"><Relationship Id="rId1" Type="http://x/relationships/chart" Target="../charts/chart1.xml"/></Relationships>';

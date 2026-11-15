@@ -1,9 +1,11 @@
 {
-  "generatedAt": "2026-11-06T07:22:16.778Z",
+  "generatedAt": "2026-11-15T15:30:06.384Z",
   "generator": "src/tools/baseline/roundtrip.test.ts",
-  "total": 42,
-  "externalSamples": 10,
+  "total": 50,
+  "externalSamples": 18,
   "externalProducers": ["word", "wps", "libreoffice", "pages"],
+  "externalByTool": { "docx": 10, "sheet": 8 },
+  "sheetProducers": ["word", "wps", "libreoffice", "pages"],
   "samples": [
     {
       "id": "slide/text-basic",
@@ -300,7 +302,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6845,
+        "bytes": 6847,
         "parts": 24,
         "slideParts": 1,
         "mediaParts": 0,
@@ -402,7 +404,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6765,
+        "bytes": 6766,
         "parts": 24,
         "slideParts": 1,
         "mediaParts": 0,
@@ -504,7 +506,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6807,
+        "bytes": 6809,
         "parts": 24,
         "slideParts": 1,
         "mediaParts": 0,
@@ -915,7 +917,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 15839,
+        "bytes": 15840,
         "parts": 41,
         "slideParts": 1,
         "mediaParts": 1,
@@ -1017,7 +1019,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 15777,
+        "bytes": 15778,
         "parts": 41,
         "slideParts": 1,
         "mediaParts": 1,
@@ -1582,7 +1584,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6480,
+        "bytes": 6481,
         "parts": 16,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1634,7 +1636,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6171,
+        "bytes": 6172,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1686,7 +1688,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6538,
+        "bytes": 6539,
         "parts": 16,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1738,7 +1740,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 7154,
+        "bytes": 7155,
         "parts": 17,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1791,7 +1793,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6242,
+        "bytes": 6243,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1844,7 +1846,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 6190,
+        "bytes": 6191,
         "parts": 15,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1895,14 +1897,9 @@
         "dvRules": 0,
         "commentThreads": 0
       },
-      "issues": [
-        {
-          "code": "sheet.chartsKept",
-          "count": 1
-        }
-      ],
+      "issues": [{ "code": "sheet.chartsKept", "count": 1 }],
       "artifacts": {
-        "bytes": 8930,
+        "bytes": 8931,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -1953,14 +1950,9 @@
         "dvRules": 0,
         "commentThreads": 0
       },
-      "issues": [
-        {
-          "code": "sheet.shapesKept",
-          "count": 2
-        }
-      ],
+      "issues": [{ "code": "sheet.shapesKept", "count": 2 }],
       "artifacts": {
-        "bytes": 7867,
+        "bytes": 7868,
         "parts": 20,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2012,7 +2004,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 8157,
+        "bytes": 8158,
         "parts": 21,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2077,14 +2069,9 @@
         "shapes": 3,
         "chars": 34
       },
-      "issues": [
-        {
-          "code": "rte.shapes",
-          "count": 3
-        }
-      ],
+      "issues": [{ "code": "rte.shapes", "count": 3 }],
       "artifacts": {
-        "bytes": 10348,
+        "bytes": 10349,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2151,7 +2138,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9794,
+        "bytes": 9795,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2283,7 +2270,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9771,
+        "bytes": 9769,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2349,7 +2336,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9932,
+        "bytes": 9933,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2482,7 +2469,7 @@
       },
       "issues": [],
       "artifacts": {
-        "bytes": 9921,
+        "bytes": 9922,
         "parts": 24,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2573,9 +2560,9 @@
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 260,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 257,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -2586,20 +2573,20 @@
         "bold": 33,
         "italic": 1,
         "underline": 1,
-        "strike": 1,
-        "links": 43,
+        "strike": 8,
+        "links": 37,
         "images": 6,
-        "shapes": 0,
-        "chars": 5689
+        "shapes": 2,
+        "chars": 5470
       },
       "after": {
         "headings": 35,
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 257,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 260,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -2609,16 +2596,16 @@
         "codeBlocks": 0,
         "bold": 33,
         "italic": 1,
-        "underline": 44,
-        "strike": 1,
-        "links": 43,
+        "underline": 108,
+        "strike": 8,
+        "links": 37,
         "images": 6,
-        "shapes": 0,
-        "chars": 5689
+        "shapes": 2,
+        "chars": 5514
       },
       "issues": [],
       "artifacts": {
-        "bytes": 31735,
+        "bytes": 34266,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2629,84 +2616,19 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 6,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "endnotes",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "revisions",
-          "before": 93,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 490,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 1,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 3,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 28,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 2,
-          "after": 2,
-          "status": "kept"
-        },
-        {
-          "name": "people",
-          "before": 1,
-          "after": 0,
-          "status": "lost"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 7, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 6, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 4, "after": 4, "status": "kept" },
+        { "name": "endnotes", "before": 3, "after": 3, "status": "kept" },
+        { "name": "revisions", "before": 93, "after": 84, "status": "degraded" },
+        { "name": "fields", "before": 490, "after": 0, "status": "lost" },
+        { "name": "math", "before": 7, "after": 6, "status": "degraded" },
+        { "name": "shapes", "before": 1, "after": 2, "status": "kept" },
+        { "name": "images", "before": 3, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 28, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 2, "after": 2, "status": "kept" },
+        { "name": "people", "before": 1, "after": 0, "status": "lost" }
       ]
     },
     {
@@ -2723,9 +2645,9 @@
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 260,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 257,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -2736,20 +2658,20 @@
         "bold": 33,
         "italic": 1,
         "underline": 1,
-        "strike": 1,
-        "links": 43,
+        "strike": 8,
+        "links": 37,
         "images": 6,
-        "shapes": 0,
-        "chars": 5689
+        "shapes": 2,
+        "chars": 5470
       },
       "after": {
         "headings": 35,
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 257,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 260,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -2759,16 +2681,16 @@
         "codeBlocks": 0,
         "bold": 33,
         "italic": 1,
-        "underline": 44,
-        "strike": 1,
-        "links": 43,
+        "underline": 108,
+        "strike": 8,
+        "links": 37,
         "images": 6,
-        "shapes": 0,
-        "chars": 5689
+        "shapes": 2,
+        "chars": 5514
       },
       "issues": [],
       "artifacts": {
-        "bytes": 31732,
+        "bytes": 34270,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2779,84 +2701,19 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 6,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "endnotes",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "revisions",
-          "before": 126,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 482,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 1,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 3,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 28,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 2,
-          "after": 2,
-          "status": "kept"
-        },
-        {
-          "name": "people",
-          "before": 1,
-          "after": 0,
-          "status": "lost"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 7, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 6, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 4, "after": 4, "status": "kept" },
+        { "name": "endnotes", "before": 3, "after": 3, "status": "kept" },
+        { "name": "revisions", "before": 126, "after": 84, "status": "degraded" },
+        { "name": "fields", "before": 482, "after": 0, "status": "lost" },
+        { "name": "math", "before": 7, "after": 6, "status": "degraded" },
+        { "name": "shapes", "before": 1, "after": 2, "status": "kept" },
+        { "name": "images", "before": 3, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 28, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 2, "after": 2, "status": "kept" },
+        { "name": "people", "before": 1, "after": 0, "status": "lost" }
       ]
     },
     {
@@ -2873,9 +2730,9 @@
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 260,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 257,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -2886,20 +2743,20 @@
         "bold": 33,
         "italic": 1,
         "underline": 1,
-        "strike": 1,
-        "links": 43,
+        "strike": 10,
+        "links": 37,
         "images": 6,
-        "shapes": 0,
-        "chars": 5768
+        "shapes": 1,
+        "chars": 5574
       },
       "after": {
         "headings": 35,
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 257,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 260,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -2909,16 +2766,16 @@
         "codeBlocks": 0,
         "bold": 33,
         "italic": 1,
-        "underline": 44,
-        "strike": 1,
-        "links": 43,
+        "underline": 108,
+        "strike": 10,
+        "links": 37,
         "images": 6,
-        "shapes": 0,
-        "chars": 5768
+        "shapes": 1,
+        "chars": 5618
       },
       "issues": [],
       "artifacts": {
-        "bytes": 36919,
+        "bytes": 39455,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -2929,84 +2786,19 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 6,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "endnotes",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "revisions",
-          "before": 581,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 488,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 1,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 4,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 27,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 2,
-          "after": 2,
-          "status": "kept"
-        },
-        {
-          "name": "people",
-          "before": 4,
-          "after": 0,
-          "status": "lost"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 7, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 6, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 4, "after": 4, "status": "kept" },
+        { "name": "endnotes", "before": 3, "after": 3, "status": "kept" },
+        { "name": "revisions", "before": 581, "after": 88, "status": "degraded" },
+        { "name": "fields", "before": 488, "after": 0, "status": "lost" },
+        { "name": "math", "before": 7, "after": 6, "status": "degraded" },
+        { "name": "shapes", "before": 1, "after": 1, "status": "kept" },
+        { "name": "images", "before": 4, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 27, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 2, "after": 2, "status": "kept" },
+        { "name": "people", "before": 4, "after": 0, "status": "lost" }
       ]
     },
     {
@@ -3023,9 +2815,9 @@
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 260,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 257,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -3036,20 +2828,20 @@
         "bold": 33,
         "italic": 1,
         "underline": 1,
-        "strike": 1,
-        "links": 43,
+        "strike": 2,
+        "links": 37,
         "images": 6,
-        "shapes": 0,
-        "chars": 5768
+        "shapes": 2,
+        "chars": 5517
       },
       "after": {
         "headings": 35,
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 257,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 260,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -3059,16 +2851,16 @@
         "codeBlocks": 0,
         "bold": 33,
         "italic": 1,
-        "underline": 44,
-        "strike": 1,
-        "links": 43,
+        "underline": 108,
+        "strike": 2,
+        "links": 37,
         "images": 6,
-        "shapes": 0,
-        "chars": 5768
+        "shapes": 2,
+        "chars": 5561
       },
       "issues": [],
       "artifacts": {
-        "bytes": 31765,
+        "bytes": 34112,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3079,78 +2871,18 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 12,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 12,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "endnotes",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "revisions",
-          "before": 189,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 204,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 2,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 3,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 39,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 12, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 12, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 4, "after": 4, "status": "kept" },
+        { "name": "endnotes", "before": 3, "after": 3, "status": "kept" },
+        { "name": "revisions", "before": 189, "after": 72, "status": "degraded" },
+        { "name": "fields", "before": 204, "after": 0, "status": "lost" },
+        { "name": "math", "before": 7, "after": 6, "status": "degraded" },
+        { "name": "shapes", "before": 2, "after": 2, "status": "kept" },
+        { "name": "images", "before": 3, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 39, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 3, "after": 2, "status": "degraded" }
       ]
     },
     {
@@ -3167,9 +2899,9 @@
         "h1": 12,
         "h2": 22,
         "h3": 1,
-        "paragraphs": 260,
-        "listItems": 9,
-        "orderedLists": 2,
+        "paragraphs": 257,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -3180,11 +2912,11 @@
         "bold": 18,
         "italic": 0,
         "underline": 1,
-        "strike": 1,
-        "links": 229,
+        "strike": 8,
+        "links": 225,
         "images": 6,
-        "shapes": 0,
-        "chars": 5773
+        "shapes": 2,
+        "chars": 5561
       },
       "after": {
         "headings": 35,
@@ -3192,8 +2924,8 @@
         "h2": 22,
         "h3": 1,
         "paragraphs": 257,
-        "listItems": 9,
-        "orderedLists": 2,
+        "listItems": 6,
+        "orderedLists": 1,
         "unorderedLists": 1,
         "tables": 5,
         "tableRows": 49,
@@ -3203,16 +2935,16 @@
         "codeBlocks": 0,
         "bold": 18,
         "italic": 0,
-        "underline": 216,
-        "strike": 1,
-        "links": 213,
+        "underline": 212,
+        "strike": 8,
+        "links": 207,
         "images": 6,
-        "shapes": 0,
-        "chars": 5773
+        "shapes": 2,
+        "chars": 5561
       },
       "issues": [],
       "artifacts": {
-        "bytes": 38487,
+        "bytes": 39576,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3223,72 +2955,17 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 9,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 9,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 6,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "revisions",
-          "before": 102,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 199,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 4,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 3,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 33,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 9, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 9, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 6, "after": 5, "status": "degraded" },
+        { "name": "revisions", "before": 102, "after": 19, "status": "degraded" },
+        { "name": "fields", "before": 199, "after": 0, "status": "lost" },
+        { "name": "math", "before": 7, "after": 0, "status": "lost" },
+        { "name": "shapes", "before": 4, "after": 2, "status": "degraded" },
+        { "name": "images", "before": 3, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 33, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 4, "after": 2, "status": "degraded" }
       ]
     },
     {
@@ -3305,32 +2982,8 @@
         "h1": 13,
         "h2": 20,
         "h3": 0,
-        "paragraphs": 214,
-        "listItems": 17,
-        "orderedLists": 3,
-        "unorderedLists": 1,
-        "tables": 5,
-        "tableRows": 35,
-        "tableCells": 126,
-        "colspanCells": 0,
-        "blockquotes": 0,
-        "codeBlocks": 0,
-        "bold": 36,
-        "italic": 0,
-        "underline": 0,
-        "strike": 0,
-        "links": 40,
-        "images": 4,
-        "shapes": 0,
-        "chars": 15353
-      },
-      "after": {
-        "headings": 33,
-        "h1": 13,
-        "h2": 20,
-        "h3": 0,
         "paragraphs": 211,
-        "listItems": 17,
+        "listItems": 14,
         "orderedLists": 2,
         "unorderedLists": 1,
         "tables": 5,
@@ -3341,16 +2994,40 @@
         "codeBlocks": 0,
         "bold": 36,
         "italic": 0,
-        "underline": 40,
-        "strike": 0,
-        "links": 40,
+        "underline": 0,
+        "strike": 1,
+        "links": 34,
         "images": 4,
-        "shapes": 0,
-        "chars": 15353
+        "shapes": 2,
+        "chars": 14878
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 213,
+        "listItems": 14,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 68,
+        "strike": 1,
+        "links": 34,
+        "images": 4,
+        "shapes": 2,
+        "chars": 14943
       },
       "issues": [],
       "artifacts": {
-        "bytes": 39788,
+        "bytes": 40930,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3361,84 +3038,19 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 6,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "endnotes",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "comments",
-          "before": 5,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "revisions",
-          "before": 3,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 192,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 4,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 1,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "styles",
-          "before": 27,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "people",
-          "before": 3,
-          "after": 0,
-          "status": "lost"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 7, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 6, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 4, "after": 4, "status": "kept" },
+        { "name": "endnotes", "before": 3, "after": 3, "status": "kept" },
+        { "name": "comments", "before": 5, "after": 0, "status": "lost" },
+        { "name": "revisions", "before": 3, "after": 2, "status": "degraded" },
+        { "name": "fields", "before": 192, "after": 0, "status": "lost" },
+        { "name": "math", "before": 4, "after": 3, "status": "degraded" },
+        { "name": "shapes", "before": 1, "after": 2, "status": "kept" },
+        { "name": "styles", "before": 27, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 3, "after": 2, "status": "degraded" },
+        { "name": "people", "before": 3, "after": 0, "status": "lost" }
       ]
     },
     {
@@ -3455,32 +3067,8 @@
         "h1": 13,
         "h2": 20,
         "h3": 0,
-        "paragraphs": 214,
-        "listItems": 17,
-        "orderedLists": 3,
-        "unorderedLists": 1,
-        "tables": 5,
-        "tableRows": 35,
-        "tableCells": 126,
-        "colspanCells": 0,
-        "blockquotes": 0,
-        "codeBlocks": 0,
-        "bold": 36,
-        "italic": 0,
-        "underline": 0,
-        "strike": 0,
-        "links": 40,
-        "images": 4,
-        "shapes": 0,
-        "chars": 15381
-      },
-      "after": {
-        "headings": 33,
-        "h1": 13,
-        "h2": 20,
-        "h3": 0,
         "paragraphs": 211,
-        "listItems": 17,
+        "listItems": 14,
         "orderedLists": 2,
         "unorderedLists": 1,
         "tables": 5,
@@ -3491,16 +3079,40 @@
         "codeBlocks": 0,
         "bold": 36,
         "italic": 0,
-        "underline": 40,
-        "strike": 0,
-        "links": 40,
+        "underline": 0,
+        "strike": 2,
+        "links": 34,
         "images": 4,
-        "shapes": 0,
-        "chars": 15381
+        "shapes": 2,
+        "chars": 14906
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 213,
+        "listItems": 14,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 102,
+        "strike": 2,
+        "links": 34,
+        "images": 4,
+        "shapes": 2,
+        "chars": 14971
       },
       "issues": [],
       "artifacts": {
-        "bytes": 39777,
+        "bytes": 41252,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3511,90 +3123,20 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 6,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "endnotes",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "comments",
-          "before": 3,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "revisions",
-          "before": 141,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 438,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 4,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 1,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 3,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 31,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "people",
-          "before": 3,
-          "after": 0,
-          "status": "lost"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 7, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 6, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 4, "after": 4, "status": "kept" },
+        { "name": "endnotes", "before": 3, "after": 3, "status": "kept" },
+        { "name": "comments", "before": 3, "after": 0, "status": "lost" },
+        { "name": "revisions", "before": 141, "after": 72, "status": "degraded" },
+        { "name": "fields", "before": 438, "after": 0, "status": "lost" },
+        { "name": "math", "before": 4, "after": 3, "status": "degraded" },
+        { "name": "shapes", "before": 1, "after": 2, "status": "kept" },
+        { "name": "images", "before": 3, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 31, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 3, "after": 2, "status": "degraded" },
+        { "name": "people", "before": 3, "after": 0, "status": "lost" }
       ]
     },
     {
@@ -3611,32 +3153,8 @@
         "h1": 13,
         "h2": 20,
         "h3": 0,
-        "paragraphs": 215,
-        "listItems": 17,
-        "orderedLists": 3,
-        "unorderedLists": 1,
-        "tables": 5,
-        "tableRows": 35,
-        "tableCells": 126,
-        "colspanCells": 0,
-        "blockquotes": 0,
-        "codeBlocks": 0,
-        "bold": 36,
-        "italic": 0,
-        "underline": 0,
-        "strike": 0,
-        "links": 40,
-        "images": 4,
-        "shapes": 0,
-        "chars": 15401
-      },
-      "after": {
-        "headings": 33,
-        "h1": 13,
-        "h2": 20,
-        "h3": 0,
         "paragraphs": 212,
-        "listItems": 17,
+        "listItems": 14,
         "orderedLists": 2,
         "unorderedLists": 1,
         "tables": 5,
@@ -3647,16 +3165,40 @@
         "codeBlocks": 0,
         "bold": 36,
         "italic": 0,
-        "underline": 40,
-        "strike": 0,
-        "links": 40,
+        "underline": 0,
+        "strike": 2,
+        "links": 34,
         "images": 4,
-        "shapes": 0,
-        "chars": 15401
+        "shapes": 1,
+        "chars": 14941
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 214,
+        "listItems": 14,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 68,
+        "strike": 2,
+        "links": 34,
+        "images": 4,
+        "shapes": 1,
+        "chars": 15006
       },
       "issues": [],
       "artifacts": {
-        "bytes": 39784,
+        "bytes": 40934,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3667,90 +3209,20 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 7,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 6,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "endnotes",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "comments",
-          "before": 3,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "revisions",
-          "before": 5,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 328,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 4,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 1,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 4,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 28,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "people",
-          "before": 3,
-          "after": 0,
-          "status": "lost"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 7, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 6, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 4, "after": 4, "status": "kept" },
+        { "name": "endnotes", "before": 3, "after": 3, "status": "kept" },
+        { "name": "comments", "before": 3, "after": 0, "status": "lost" },
+        { "name": "revisions", "before": 5, "after": 4, "status": "degraded" },
+        { "name": "fields", "before": 328, "after": 0, "status": "lost" },
+        { "name": "math", "before": 4, "after": 3, "status": "degraded" },
+        { "name": "shapes", "before": 1, "after": 1, "status": "kept" },
+        { "name": "images", "before": 4, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 28, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 3, "after": 2, "status": "degraded" },
+        { "name": "people", "before": 3, "after": 0, "status": "lost" }
       ]
     },
     {
@@ -3767,32 +3239,8 @@
         "h1": 13,
         "h2": 20,
         "h3": 0,
-        "paragraphs": 215,
-        "listItems": 17,
-        "orderedLists": 3,
-        "unorderedLists": 1,
-        "tables": 5,
-        "tableRows": 35,
-        "tableCells": 126,
-        "colspanCells": 0,
-        "blockquotes": 0,
-        "codeBlocks": 0,
-        "bold": 36,
-        "italic": 0,
-        "underline": 0,
-        "strike": 0,
-        "links": 40,
-        "images": 4,
-        "shapes": 0,
-        "chars": 15403
-      },
-      "after": {
-        "headings": 33,
-        "h1": 13,
-        "h2": 20,
-        "h3": 0,
         "paragraphs": 212,
-        "listItems": 17,
+        "listItems": 14,
         "orderedLists": 2,
         "unorderedLists": 1,
         "tables": 5,
@@ -3803,16 +3251,40 @@
         "codeBlocks": 0,
         "bold": 36,
         "italic": 0,
-        "underline": 40,
-        "strike": 0,
-        "links": 40,
+        "underline": 0,
+        "strike": 1,
+        "links": 34,
         "images": 4,
-        "shapes": 0,
-        "chars": 15403
+        "shapes": 2,
+        "chars": 14927
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 214,
+        "listItems": 14,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 68,
+        "strike": 1,
+        "links": 34,
+        "images": 4,
+        "shapes": 2,
+        "chars": 14992
       },
       "issues": [],
       "artifacts": {
-        "bytes": 39801,
+        "bytes": 40970,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3823,84 +3295,19 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 12,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 12,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 4,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "endnotes",
-          "before": 3,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "comments",
-          "before": 3,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "revisions",
-          "before": 2,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 192,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 4,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 2,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 3,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 38,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 5,
-          "after": 2,
-          "status": "degraded"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 12, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 12, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 4, "after": 4, "status": "kept" },
+        { "name": "endnotes", "before": 3, "after": 3, "status": "kept" },
+        { "name": "comments", "before": 3, "after": 0, "status": "lost" },
+        { "name": "revisions", "before": 2, "after": 2, "status": "kept" },
+        { "name": "fields", "before": 192, "after": 0, "status": "lost" },
+        { "name": "math", "before": 4, "after": 3, "status": "degraded" },
+        { "name": "shapes", "before": 2, "after": 2, "status": "kept" },
+        { "name": "images", "before": 3, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 38, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 5, "after": 2, "status": "degraded" }
       ]
     },
     {
@@ -3917,32 +3324,8 @@
         "h1": 13,
         "h2": 20,
         "h3": 0,
-        "paragraphs": 215,
-        "listItems": 17,
-        "orderedLists": 3,
-        "unorderedLists": 1,
-        "tables": 5,
-        "tableRows": 35,
-        "tableCells": 126,
-        "colspanCells": 0,
-        "blockquotes": 0,
-        "codeBlocks": 0,
-        "bold": 36,
-        "italic": 0,
-        "underline": 0,
-        "strike": 0,
-        "links": 10,
-        "images": 4,
-        "shapes": 0,
-        "chars": 15406
-      },
-      "after": {
-        "headings": 33,
-        "h1": 13,
-        "h2": 20,
-        "h3": 0,
         "paragraphs": 212,
-        "listItems": 17,
+        "listItems": 14,
         "orderedLists": 2,
         "unorderedLists": 1,
         "tables": 5,
@@ -3953,16 +3336,40 @@
         "codeBlocks": 0,
         "bold": 36,
         "italic": 0,
-        "underline": 10,
-        "strike": 0,
-        "links": 10,
+        "underline": 0,
+        "strike": 1,
+        "links": 4,
         "images": 4,
-        "shapes": 0,
-        "chars": 15406
+        "shapes": 2,
+        "chars": 14931
+      },
+      "after": {
+        "headings": 33,
+        "h1": 13,
+        "h2": 20,
+        "h3": 0,
+        "paragraphs": 212,
+        "listItems": 14,
+        "orderedLists": 2,
+        "unorderedLists": 1,
+        "tables": 5,
+        "tableRows": 35,
+        "tableCells": 126,
+        "colspanCells": 0,
+        "blockquotes": 0,
+        "codeBlocks": 0,
+        "bold": 36,
+        "italic": 0,
+        "underline": 4,
+        "strike": 1,
+        "links": 4,
+        "images": 4,
+        "shapes": 2,
+        "chars": 14931
       },
       "issues": [],
       "artifacts": {
-        "bytes": 38234,
+        "bytes": 39176,
         "parts": 28,
         "slideParts": 0,
         "mediaParts": 0,
@@ -3973,78 +3380,550 @@
         "pivotParts": 0
       },
       "parts": [
-        {
-          "name": "sections",
-          "before": 4,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "headers",
-          "before": 9,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "footers",
-          "before": 9,
-          "after": 1,
-          "status": "degraded"
-        },
-        {
-          "name": "footnotes",
-          "before": 6,
-          "after": 2,
-          "status": "degraded"
-        },
-        {
-          "name": "comments",
-          "before": 3,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "revisions",
-          "before": 2,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "fields",
-          "before": 156,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "math",
-          "before": 4,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "shapes",
-          "before": 4,
-          "after": 0,
-          "status": "lost"
-        },
-        {
-          "name": "images",
-          "before": 3,
-          "after": 4,
-          "status": "kept"
-        },
-        {
-          "name": "styles",
-          "before": 29,
-          "after": 18,
-          "status": "degraded"
-        },
-        {
-          "name": "numbering",
-          "before": 5,
-          "after": 2,
-          "status": "degraded"
-        }
+        { "name": "sections", "before": 4, "after": 1, "status": "degraded" },
+        { "name": "headers", "before": 9, "after": 0, "status": "lost" },
+        { "name": "footers", "before": 9, "after": 1, "status": "degraded" },
+        { "name": "footnotes", "before": 6, "after": 5, "status": "degraded" },
+        { "name": "comments", "before": 3, "after": 0, "status": "lost" },
+        { "name": "revisions", "before": 2, "after": 2, "status": "kept" },
+        { "name": "fields", "before": 156, "after": 0, "status": "lost" },
+        { "name": "math", "before": 4, "after": 0, "status": "lost" },
+        { "name": "shapes", "before": 4, "after": 2, "status": "degraded" },
+        { "name": "images", "before": 3, "after": 4, "status": "kept" },
+        { "name": "styles", "before": 29, "after": 18, "status": "degraded" },
+        { "name": "numbering", "before": 5, "after": 2, "status": "degraded" }
+      ]
+    },
+    {
+      "id": "xlsx/external/excel-cn",
+      "tool": "sheet",
+      "title": "XLSX 综合特性样本（Excel for Mac 保存，中文，脱敏）",
+      "source": "external",
+      "producer": "Microsoft Excel for Mac (app.xml: Microsoft Macintosh Excel)",
+      "producerFamily": "word",
+      "notes": "app.xml 声明 Microsoft Macintosh Excel 但未写版本号，故 producerVersion 留空；31 个页签含一张完全隐藏表、主题色标签色与工作表保护。中文内容样本，30–31 个页签；cn 版不含图表与图片（对应页签为空占位），用于对比\"同内容不同套件\"的样式重写差异。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。",
+      "ok": true,
+      "before": {
+        "sheets": 31,
+        "hiddenSheets": 2,
+        "cells": 835,
+        "formulas": 7,
+        "richTextCells": 0,
+        "hyperlinks": 0,
+        "notes": 0,
+        "merges": 0,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 0,
+        "cfRules": 0,
+        "dvRules": 0,
+        "commentThreads": 0
+      },
+      "after": {
+        "sheets": 31,
+        "hiddenSheets": 2,
+        "cells": 835,
+        "formulas": 7,
+        "richTextCells": 0,
+        "hyperlinks": 0,
+        "notes": 0,
+        "merges": 0,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 0,
+        "cfRules": 0,
+        "dvRules": 0,
+        "commentThreads": 0
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 37808,
+        "parts": 46,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 0,
+        "worksheets": 31,
+        "pivotParts": 0
+      },
+      "parts": [
+        { "name": "worksheets", "before": 31, "after": 31, "status": "kept" },
+        { "name": "calcChain", "before": 1, "after": 0, "status": "lost" }
+      ]
+    },
+    {
+      "id": "xlsx/external/excel-en",
+      "tool": "sheet",
+      "title": "XLSX feature sample (Excel for Mac, English, redacted)",
+      "source": "external",
+      "producer": "Microsoft Excel for Mac (app.xml: Microsoft Macintosh Excel)",
+      "producerFamily": "word",
+      "notes": "app.xml 声明 Microsoft Macintosh Excel、未写版本号。6 张图表 + 1 张图表工作表是四套件里唯一的原生图表工作表样本；含 3 个媒体文件（png / jpg / emf）。英文独立内容样本，31–32 个页签，额外带 6 张图表、1 张图表工作表、3 个媒体文件、表格对象与定义名称。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。",
+      "ok": true,
+      "before": {
+        "sheets": 31,
+        "hiddenSheets": 2,
+        "cells": 844,
+        "formulas": 7,
+        "richTextCells": 1,
+        "hyperlinks": 2,
+        "notes": 4,
+        "merges": 5,
+        "freezeSheets": 3,
+        "charts": 5,
+        "shapes": 0,
+        "rawChartParts": 6,
+        "cfRules": 1,
+        "dvRules": 5,
+        "commentThreads": 0
+      },
+      "after": {
+        "sheets": 31,
+        "hiddenSheets": 2,
+        "cells": 844,
+        "formulas": 7,
+        "richTextCells": 1,
+        "hyperlinks": 2,
+        "notes": 4,
+        "merges": 5,
+        "freezeSheets": 3,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 3,
+        "cfRules": 1,
+        "dvRules": 5,
+        "commentThreads": 0
+      },
+      "issues": [
+        { "code": "sheet.importChartsReadonly", "count": 6 },
+        { "code": "sheet.importChartsheet", "count": 1 },
+        { "code": "sheet.importPicturesReadonly", "count": 1 },
+        { "code": "sheet.charts", "count": 5 },
+        { "code": "sheet.cfKept", "count": 1 },
+        { "code": "sheet.dvKept", "count": 5 }
+      ],
+      "artifacts": {
+        "bytes": 49137,
+        "parts": 65,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 0,
+        "worksheets": 31,
+        "pivotParts": 0
+      },
+      "parts": [
+        { "name": "worksheets", "before": 31, "after": 31, "status": "kept" },
+        { "name": "charts", "before": 6, "after": 1, "status": "degraded" },
+        { "name": "chartsheets", "before": 1, "after": 0, "status": "lost" },
+        { "name": "drawings", "before": 4, "after": 3, "status": "degraded" },
+        { "name": "media", "before": 3, "after": 0, "status": "lost" },
+        { "name": "tables", "before": 1, "after": 1, "status": "kept" },
+        { "name": "comments", "before": 1, "after": 1, "status": "kept" },
+        { "name": "definedNames", "before": 7, "after": 6, "status": "degraded" },
+        { "name": "sheetProtection", "before": 1, "after": 1, "status": "kept" },
+        { "name": "conditionalFormattings", "before": 1, "after": 1, "status": "kept" },
+        { "name": "dataValidations", "before": 5, "after": 5, "status": "kept" },
+        { "name": "calcChain", "before": 1, "after": 0, "status": "lost" }
+      ]
+    },
+    {
+      "id": "xlsx/external/wps-cn",
+      "tool": "sheet",
+      "title": "XLSX 综合特性样本（WPS 另存，中文，脱敏）",
+      "source": "external",
+      "producer": "Microsoft Macintosh Excel (app.xml) / WPS Office per supplied provenance",
+      "producerFamily": "wps",
+      "notes": "app.xml 声明的是 Microsoft Macintosh Excel——WPS 沿用了 Excel 的 Application 字符串，文件内没有可自证的 WPS 版本号，producerFamily 仅依据样本来源说明。31 个页签、47 个包内部件（同内容 Excel 版为 41），无 calcChain。中文内容样本，30–31 个页签；cn 版不含图表与图片（对应页签为空占位），用于对比\"同内容不同套件\"的样式重写差异。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。",
+      "ok": true,
+      "before": {
+        "sheets": 31,
+        "hiddenSheets": 2,
+        "cells": 835,
+        "formulas": 7,
+        "richTextCells": 0,
+        "hyperlinks": 0,
+        "notes": 0,
+        "merges": 0,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 0,
+        "cfRules": 0,
+        "dvRules": 0,
+        "commentThreads": 0
+      },
+      "after": {
+        "sheets": 31,
+        "hiddenSheets": 2,
+        "cells": 835,
+        "formulas": 7,
+        "richTextCells": 0,
+        "hyperlinks": 0,
+        "notes": 0,
+        "merges": 0,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 0,
+        "cfRules": 0,
+        "dvRules": 0,
+        "commentThreads": 0
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 37834,
+        "parts": 46,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 0,
+        "worksheets": 31,
+        "pivotParts": 0
+      },
+      "parts": [{ "name": "worksheets", "before": 31, "after": 31, "status": "kept" }]
+    },
+    {
+      "id": "xlsx/external/wps-en",
+      "tool": "sheet",
+      "title": "XLSX feature sample (WPS, English, redacted)",
+      "source": "external",
+      "producer": "Microsoft Macintosh Excel (app.xml) / WPS Office per supplied provenance",
+      "producerFamily": "wps",
+      "notes": "同 wps-cn：app.xml 只声明 Excel，WPS 版本无从自证。32 个页签、85 个包内部件；媒体目录里有一个目录条目（xl/media/）与 3 个真实文件，统计时按文件计。英文独立内容样本，31–32 个页签，额外带 6 张图表、1 张图表工作表、3 个媒体文件、表格对象与定义名称。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。",
+      "ok": true,
+      "before": {
+        "sheets": 32,
+        "hiddenSheets": 2,
+        "cells": 844,
+        "formulas": 7,
+        "richTextCells": 1,
+        "hyperlinks": 2,
+        "notes": 4,
+        "merges": 5,
+        "freezeSheets": 3,
+        "charts": 6,
+        "shapes": 6,
+        "rawChartParts": 3,
+        "cfRules": 1,
+        "dvRules": 5,
+        "commentThreads": 0
+      },
+      "after": {
+        "sheets": 32,
+        "hiddenSheets": 2,
+        "cells": 844,
+        "formulas": 7,
+        "richTextCells": 1,
+        "hyperlinks": 2,
+        "notes": 4,
+        "merges": 5,
+        "freezeSheets": 3,
+        "charts": 0,
+        "shapes": 6,
+        "rawChartParts": 3,
+        "cfRules": 1,
+        "dvRules": 5,
+        "commentThreads": 0
+      },
+      "issues": [
+        { "code": "sheet.importChartsReadonly", "count": 3 },
+        { "code": "sheet.importPicturesReadonly", "count": 1 },
+        { "code": "sheet.charts", "count": 6 },
+        { "code": "sheet.shapesKept", "count": 6 },
+        { "code": "sheet.cfKept", "count": 1 },
+        { "code": "sheet.dvKept", "count": 5 }
+      ],
+      "artifacts": {
+        "bytes": 47971,
+        "parts": 65,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 0,
+        "worksheets": 32,
+        "pivotParts": 0
+      },
+      "parts": [
+        { "name": "worksheets", "before": 32, "after": 32, "status": "kept" },
+        { "name": "charts", "before": 6, "after": 0, "status": "lost" },
+        { "name": "drawings", "before": 4, "after": 2, "status": "degraded" },
+        { "name": "media", "before": 3, "after": 2, "status": "degraded" },
+        { "name": "tables", "before": 1, "after": 1, "status": "kept" },
+        { "name": "comments", "before": 1, "after": 1, "status": "kept" },
+        { "name": "definedNames", "before": 7, "after": 6, "status": "degraded" },
+        { "name": "sheetProtection", "before": 1, "after": 1, "status": "kept" },
+        { "name": "conditionalFormattings", "before": 1, "after": 1, "status": "kept" },
+        { "name": "dataValidations", "before": 5, "after": 5, "status": "kept" }
+      ]
+    },
+    {
+      "id": "xlsx/external/libreoffice-cn",
+      "tool": "sheet",
+      "title": "XLSX 综合特性样本（LibreOffice Calc 另存，中文，脱敏）",
+      "source": "external",
+      "producer": "LibreOffice 26.8.2.2 macOS aarch64 (app.xml) LibreOffice_project/9dea406a…",
+      "producerFamily": "libreoffice",
+      "notes": "app.xml 声明 LibreOffice/26.8.2.2$MacOSX_AARCH64、AppVersion 15.0000；文件名沿用用户提供的 libraoffice 拼写，未改动磁盘文件。31 个页签、41 个包内部件。中文内容样本，30–31 个页签；cn 版不含图表与图片（对应页签为空占位），用于对比\"同内容不同套件\"的样式重写差异。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。",
+      "ok": true,
+      "before": {
+        "sheets": 31,
+        "hiddenSheets": 2,
+        "cells": 833,
+        "formulas": 10,
+        "richTextCells": 231,
+        "hyperlinks": 0,
+        "notes": 0,
+        "merges": 0,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 0,
+        "cfRules": 0,
+        "dvRules": 0,
+        "commentThreads": 0
+      },
+      "after": {
+        "sheets": 31,
+        "hiddenSheets": 2,
+        "cells": 833,
+        "formulas": 10,
+        "richTextCells": 231,
+        "hyperlinks": 0,
+        "notes": 0,
+        "merges": 0,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 0,
+        "cfRules": 0,
+        "dvRules": 0,
+        "commentThreads": 0
+      },
+      "issues": [],
+      "artifacts": {
+        "bytes": 41039,
+        "parts": 46,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 0,
+        "worksheets": 31,
+        "pivotParts": 0
+      },
+      "parts": [{ "name": "worksheets", "before": 31, "after": 31, "status": "kept" }]
+    },
+    {
+      "id": "xlsx/external/libreoffice-en",
+      "tool": "sheet",
+      "title": "XLSX feature sample (LibreOffice Calc, English, redacted)",
+      "source": "external",
+      "producer": "LibreOffice 26.8.2.2 macOS aarch64 (app.xml) LibreOffice_project/9dea406a…",
+      "producerFamily": "libreoffice",
+      "notes": "32 个页签、86 个包内部件，为四类套件中最多；媒体文件扩展名被重写为 .jpeg。英文独立内容样本，31–32 个页签，额外带 6 张图表、1 张图表工作表、3 个媒体文件、表格对象与定义名称。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。",
+      "ok": true,
+      "before": {
+        "sheets": 32,
+        "hiddenSheets": 2,
+        "cells": 843,
+        "formulas": 10,
+        "richTextCells": 4,
+        "hyperlinks": 2,
+        "notes": 4,
+        "merges": 5,
+        "freezeSheets": 3,
+        "charts": 6,
+        "shapes": 6,
+        "rawChartParts": 3,
+        "cfRules": 1,
+        "dvRules": 5,
+        "commentThreads": 0
+      },
+      "after": {
+        "sheets": 32,
+        "hiddenSheets": 2,
+        "cells": 843,
+        "formulas": 10,
+        "richTextCells": 4,
+        "hyperlinks": 2,
+        "notes": 4,
+        "merges": 5,
+        "freezeSheets": 3,
+        "charts": 0,
+        "shapes": 6,
+        "rawChartParts": 3,
+        "cfRules": 1,
+        "dvRules": 5,
+        "commentThreads": 0
+      },
+      "issues": [
+        { "code": "sheet.importChartsReadonly", "count": 3 },
+        { "code": "sheet.importPicturesReadonly", "count": 1 },
+        { "code": "sheet.charts", "count": 6 },
+        { "code": "sheet.shapesKept", "count": 6 },
+        { "code": "sheet.cfKept", "count": 1 },
+        { "code": "sheet.dvKept", "count": 5 }
+      ],
+      "artifacts": {
+        "bytes": 48990,
+        "parts": 65,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 0,
+        "worksheets": 32,
+        "pivotParts": 0
+      },
+      "parts": [
+        { "name": "worksheets", "before": 32, "after": 32, "status": "kept" },
+        { "name": "charts", "before": 6, "after": 0, "status": "lost" },
+        { "name": "drawings", "before": 4, "after": 2, "status": "degraded" },
+        { "name": "media", "before": 3, "after": 2, "status": "degraded" },
+        { "name": "tables", "before": 1, "after": 1, "status": "kept" },
+        { "name": "comments", "before": 1, "after": 1, "status": "kept" },
+        { "name": "definedNames", "before": 7, "after": 6, "status": "degraded" },
+        { "name": "sheetProtection", "before": 1, "after": 0, "status": "lost" },
+        { "name": "conditionalFormattings", "before": 1, "after": 1, "status": "kept" },
+        { "name": "dataValidations", "before": 5, "after": 5, "status": "kept" }
+      ]
+    },
+    {
+      "id": "xlsx/external/numbers-cn",
+      "tool": "sheet",
+      "title": "XLSX 综合特性样本（Numbers 导出，中文，脱敏）",
+      "source": "external",
+      "producer": "undeclared (docProps/app.xml and core.xml are empty elements) / Apple Numbers per supplied provenance",
+      "producerFamily": "pages",
+      "notes": "docProps 的 app.xml 与 core.xml 都是空元素，文件内没有任何工具/版本/作者声明，producerFamily=pages 仅依据样本来源说明。30 个页签（少一张\"完全隐藏表\"）、有值单元格 2,934 为中文集最多。中文内容样本，30–31 个页签；cn 版不含图表与图片（对应页签为空占位），用于对比\"同内容不同套件\"的样式重写差异。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。",
+      "ok": true,
+      "before": {
+        "sheets": 30,
+        "hiddenSheets": 0,
+        "cells": 830,
+        "formulas": 7,
+        "richTextCells": 0,
+        "hyperlinks": 0,
+        "notes": 0,
+        "merges": 0,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 0,
+        "cfRules": 1,
+        "dvRules": 0,
+        "commentThreads": 0
+      },
+      "after": {
+        "sheets": 30,
+        "hiddenSheets": 0,
+        "cells": 830,
+        "formulas": 7,
+        "richTextCells": 0,
+        "hyperlinks": 0,
+        "notes": 0,
+        "merges": 0,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 0,
+        "rawChartParts": 0,
+        "cfRules": 1,
+        "dvRules": 0,
+        "commentThreads": 0
+      },
+      "issues": [{ "code": "sheet.cfKept", "count": 1 }],
+      "artifacts": {
+        "bytes": 40688,
+        "parts": 45,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 0,
+        "worksheets": 30,
+        "pivotParts": 0
+      },
+      "parts": [
+        { "name": "worksheets", "before": 30, "after": 30, "status": "kept" },
+        { "name": "conditionalFormattings", "before": 1, "after": 1, "status": "kept" }
+      ]
+    },
+    {
+      "id": "xlsx/external/numbers-en",
+      "tool": "sheet",
+      "title": "XLSX feature sample (Numbers export, English, redacted)",
+      "source": "external",
+      "producer": "undeclared (docProps/app.xml and core.xml are empty elements) / Apple Numbers per supplied provenance",
+      "producerFamily": "pages",
+      "notes": "docProps 全为空元素，无工具声明。31 个页签、有值单元格 3,566（8 份中最多）；无表格对象与定义名称，图表 5 张（比 Excel / WPS 少一张图表工作表）。英文独立内容样本，31–32 个页签，额外带 6 张图表、1 张图表工作表、3 个媒体文件、表格对象与定义名称。透视表页签是结果版式：文件内没有 xl/pivotTables 与 pivotCache 部件，原生透视对象尚未覆盖。",
+      "ok": true,
+      "before": {
+        "sheets": 31,
+        "hiddenSheets": 0,
+        "cells": 840,
+        "formulas": 7,
+        "richTextCells": 2,
+        "hyperlinks": 2,
+        "notes": 4,
+        "merges": 5,
+        "freezeSheets": 0,
+        "charts": 5,
+        "shapes": 2,
+        "rawChartParts": 2,
+        "cfRules": 1,
+        "dvRules": 1,
+        "commentThreads": 0
+      },
+      "after": {
+        "sheets": 31,
+        "hiddenSheets": 0,
+        "cells": 840,
+        "formulas": 7,
+        "richTextCells": 2,
+        "hyperlinks": 2,
+        "notes": 4,
+        "merges": 5,
+        "freezeSheets": 0,
+        "charts": 0,
+        "shapes": 2,
+        "rawChartParts": 2,
+        "cfRules": 1,
+        "dvRules": 1,
+        "commentThreads": 0
+      },
+      "issues": [
+        { "code": "sheet.importChartsReadonly", "count": 2 },
+        { "code": "sheet.charts", "count": 5 },
+        { "code": "sheet.shapesKept", "count": 2 },
+        { "code": "sheet.cfKept", "count": 1 },
+        { "code": "sheet.dvKept", "count": 1 }
+      ],
+      "artifacts": {
+        "bytes": 49554,
+        "parts": 63,
+        "slideParts": 0,
+        "mediaParts": 0,
+        "chartParts": 0,
+        "headerParts": 0,
+        "footerParts": 0,
+        "worksheets": 31,
+        "pivotParts": 0
+      },
+      "parts": [
+        { "name": "worksheets", "before": 31, "after": 31, "status": "kept" },
+        { "name": "charts", "before": 5, "after": 0, "status": "lost" },
+        { "name": "drawings", "before": 4, "after": 2, "status": "degraded" },
+        { "name": "media", "before": 3, "after": 3, "status": "kept" },
+        { "name": "comments", "before": 1, "after": 1, "status": "kept" },
+        { "name": "conditionalFormattings", "before": 1, "after": 1, "status": "kept" },
+        { "name": "dataValidations", "before": 1, "after": 1, "status": "kept" }
       ]
     }
   ]

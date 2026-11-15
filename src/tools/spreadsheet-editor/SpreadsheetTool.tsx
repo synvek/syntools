@@ -31,7 +31,13 @@ import {
   type WorkbookSummary,
 } from './core';
 import { csvToSnapshot, snapshotToCsv } from './csv';
-import { CHART_TYPE_LABEL_KEY, buildChartData, type ChartConfig, type ChartData } from './charts';
+import {
+  CHART_TYPE_LABEL_KEY,
+  buildChartData,
+  chartDataSheetId,
+  type ChartConfig,
+  type ChartData,
+} from './charts';
 import { registerChartStrings } from './chartStrings';
 import { chartTypeBreakdown, summarizeImport, type ChartImportReport } from './chartImport';
 import { registerShapeStrings } from './shapeStrings';
@@ -423,7 +429,13 @@ export default function SpreadsheetTool() {
     }
     const next: Record<string, ChartData | null> = {};
     for (const config of configs) {
-      const result = buildChartData(snapshot, config.sheetId ?? sheetId, config.range, config.type);
+      // 跨表图表（导入的 `ChartData!` 引用）读的是 `dataSheetId`，不是图表所在的表
+      const result = buildChartData(
+        snapshot,
+        chartDataSheetId(config, sheetId),
+        config.range,
+        config.type,
+      );
       next[config.id] = result.ok ? result.value : null;
     }
     setChartDataMap(next);

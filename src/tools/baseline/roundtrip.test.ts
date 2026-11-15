@@ -8,6 +8,7 @@ import { docxLossIssues } from '../rich-text-editor/fidelity';
 import { exportPptx } from '../slide-editor/pptx/export';
 import { importPptxFile } from '../slide-editor/pptx/import';
 import { collectExportIssues } from '../spreadsheet-editor/fidelity';
+import { collectImportIssues } from '../spreadsheet-editor/importFidelity';
 import { exportSnapshotToBytes, importXlsxToSnapshot } from '../spreadsheet-editor/xlsx-io';
 import { blockingDrift, compareReports, describeDiff } from './compare';
 import { docMetrics, sheetMetrics, slideMetrics } from './metrics';
@@ -16,6 +17,7 @@ import {
   externalDocSamples,
   SAMPLE_COUNTS,
   sampleManifest,
+  sheetExternalSamples,
   sheetSamples,
   slideSamples,
 } from './samples';
@@ -25,6 +27,11 @@ import {
   REQUIRED_EXTERNAL_SAMPLES,
   type ExternalDocSample,
 } from './samples/external-doc';
+import {
+  REQUIRED_EXTERNAL_SHEETS,
+  REQUIRED_SHEET_PRODUCERS,
+  type SheetExternalSample,
+} from './samples/sheet-external';
 import type {
   BaselineReport,
   Metrics,
@@ -237,6 +244,51 @@ async function docxPartFacts(bytes: Uint8Array): Promise<Record<string, number>>
   };
 }
 
+/**
+ * Count the OOXML parts a real .xlsx actually contains (P0-4 C: per-part fidelity).
+ *
+ * 与 `docxPartFacts` 同一口径，但表格的"部件"有两类：包内文件（图表/媒体/透视）和在
+ * sheet/workbook XML 里按规则出现次数的条目（条件格式、数据验证、定义名称、保护）。
+ * 目录条目必须跳过——wps-en 的包里有一个 `xl/media/` 目录项，不跳会让媒体计数多 1。
+ */
+async function xlsxPartFacts(bytes: Uint8Array): Promise<Record<string, number>> {
+  const zip = await JSZip.loadAsync(bytes);
+  const names = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
+  const read = async (name: string): Promise<string> => {
+    const entry = zip.file(name);
+    return entry ? await entry.async('string') : '';
+  };
+  const count = (xml: string, pattern: RegExp): number => (xml.match(pattern) ?? []).length;
+  const worksheets = names.filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(name)).sort();
+  const [workbook, ...sheetXml] = await Promise.all([
+    read('xl/workbook.xml'),
+    ...worksheets.map((name) => read(name)),
+  ]);
+  const sum = (pattern: RegExp): number =>
+    sheetXml.reduce((total, xml) => total + count(xml, pattern), 0);
+  return {
+    worksheets: worksheets.length,
+    charts: names.filter((name) => /^xl\/charts\/chart\d+\.xml$/i.test(name)).length,
+    chartsheets: names.filter((name) => /^xl\/chartsheets\/sheet\d+\.xml$/i.test(name)).length,
+    drawings: names.filter((name) => /^xl\/drawings\/drawing\d+\.xml$/i.test(name)).length,
+    media: names.filter((name) => /^xl\/media\/[^/]+$/i.test(name)).length,
+    tables: names.filter((name) => /^xl\/tables\/table\d+\.xml$/i.test(name)).length,
+    pivotTables: names.filter((name) => /^xl\/pivotTables\/[^/]+\.xml$/i.test(name)).length,
+    pivotCacheDefinitions: names.filter((name) =>
+      /^xl\/pivotCache\/pivotCacheDefinition\d+\.xml$/i.test(name),
+    ).length,
+    comments: names.filter((name) => /^xl\/comments\d+\.xml$/i.test(name)).length,
+    threadedComments: names.filter((name) => /^xl\/threadedComments\/[^/]+\.xml$/i.test(name))
+      .length,
+    definedNames: count(workbook, /<definedName[\s>]/g),
+    sheetProtection: sheetXml.filter((xml) => xml.includes('<sheetProtection')).length,
+    conditionalFormattings: sum(/<conditionalFormatting[\s>]/g),
+    dataValidations: sum(/<dataValidation[\s>]/g),
+    vbaProject: names.filter((name) => /^xl\/vbaProject\.bin$/i.test(name)).length,
+    calcChain: names.filter((name) => /^xl\/calcChain\.xml$/i.test(name)).length,
+  };
+}
+
 function partStatuses(before: Record<string, number>, after: Record<string, number>): SamplePart[] {
   return Object.entries(before)
     .filter(([, count]) => count > 0)
@@ -293,15 +345,91 @@ async function runExternalDoc(sample: ExternalDocSample): Promise<SampleResult> 
   };
 }
 
-function writeReport(report: BaselineReport): { lines: string[]; diff: ReportDiff | null } {
+/**
+ * A real third-party .xlsx goes the other way round: import → export → import again (P0-4).
+ *
+ * 与 docx 的区别在报告口径：表格的"丢东西"分两侧——导入侧是我们根本没有对应模型
+ * （图表工作表 / 线程批注 / 宏 / 不可渲染的图片格式），导出侧是快照里有但写不出来。
+ * 两侧的 issue 合并计数，用同一个 `code` 暴露给报告，避免同一个问题出现两行。
+ */
+async function runExternalSheet(sample: SheetExternalSample): Promise<SampleResult> {
+  const fail = (error: string): SampleResult => ({
+    ...failed(sample.id, 'sheet', sample.title, error),
+    source: 'external',
+    producer: sample.producer,
+    producerFamily: sample.producerFamily,
+    parts: [],
+  });
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(readFileSync(join(process.cwd(), sample.path)));
+  } catch (error) {
+    return fail(`read:${String(error)}`);
+  }
+  const beforeParts = await xlsxPartFacts(bytes);
+  const imported = await importXlsxToSnapshot(
+    fakeFile(bytes, `${sample.id.replace(/\W+/g, '-')}.xlsx`),
+  );
+  if (!imported.ok) return fail(`import:${imported.error}`);
+  const exported = await exportSnapshotToBytes(imported.value);
+  if (!exported.ok) return fail(`export:${exported.error}`);
+  const afterParts = await xlsxPartFacts(exported.value);
+  const reImported = await importXlsxToSnapshot(fakeFile(exported.value, 'roundtrip.xlsx'));
+  if (!reImported.ok) return fail(`reimport:${reImported.error}`);
+
+  const zip = await JSZip.loadAsync(bytes);
+  const rawChartCount = Object.keys(imported.value.syntoolsRawParts?.parts ?? {}).length;
+  const merged = new Map<string, number>();
+  for (const issue of [
+    ...issuesOf(collectImportIssues({ parts: Object.keys(zip.files), rawChartCount })),
+    ...issuesOf(collectExportIssues(imported.value)),
+  ]) {
+    merged.set(issue.code, (merged.get(issue.code) ?? 0) + issue.count);
+  }
+
+  return {
+    id: sample.id,
+    tool: 'sheet',
+    title: sample.title,
+    source: 'external',
+    producer: sample.producer,
+    producerFamily: sample.producerFamily,
+    notes: sample.notes,
+    ok: true,
+    before: sheetMetrics(imported.value),
+    after: sheetMetrics(reImported.value),
+    issues: [...merged].map(([code, count]) => ({ code, count })),
+    artifacts: await zipFacts(exported.value),
+    parts: partStatuses(beforeParts, afterParts),
+  };
+}
+
+/**
+ * 生成的报告必须过 `prettier --check .`（`fixtures/` 不在 `.prettierignore` 里）。
+ *
+ * `JSON.stringify` 会把 `["worksheets"]` 这种短数组摊成四行，prettier 又把它收回一行，
+ * 于是每次 `--update` 之后 `format:check` 都会变红。这里直接让生成物走一遍 prettier，
+ * 让"生成"与"格式检查"用同一个事实来源。
+ */
+async function formatJson(value: unknown): Promise<string> {
+  const { format, resolveConfig } = await import('prettier');
+  // 程序化调用**不会**自动读 `.prettierrc`：不显式解析就会用默认 printWidth 80 写出
+  // 与 `prettier --check .`（printWidth 100）不一致的排版
+  const config = (await resolveConfig(join(process.cwd(), 'package.json'))) ?? {};
+  return format(JSON.stringify(value), { ...config, parser: 'json' });
+}
+
+async function writeReport(
+  report: BaselineReport,
+): Promise<{ lines: string[]; diff: ReportDiff | null }> {
   mkdirSync(FIXTURE_DIR, { recursive: true });
-  writeFileSync(join(FIXTURE_DIR, 'manifest.json'), `${JSON.stringify(sampleManifest, null, 2)}\n`);
-  writeFileSync(join(FIXTURE_DIR, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  writeFileSync(join(FIXTURE_DIR, 'manifest.json'), await formatJson(sampleManifest));
+  writeFileSync(join(FIXTURE_DIR, 'report.json'), await formatJson(report));
 
   const goldenPath = join(FIXTURE_DIR, 'report.golden.json');
   const hadGolden = existsSync(goldenPath);
   if (!hadGolden || process.env.BASELINE_UPDATE) {
-    writeFileSync(goldenPath, `${JSON.stringify(report, null, 2)}\n`);
+    writeFileSync(goldenPath, await formatJson(report));
     return {
       lines: [hadGolden ? 'golden baseline updated' : 'golden baseline created'],
       diff: null,
@@ -318,11 +446,16 @@ describe('OOXML round-trip baseline (generated + external samples)', () => {
     expect(sheetSamples).toHaveLength(SAMPLE_COUNTS.sheet);
     expect(docSamples).toHaveLength(SAMPLE_COUNTS.docx);
     expect(externalDocSamples).toHaveLength(SAMPLE_COUNTS.externalDocx);
+    expect(sheetExternalSamples).toHaveLength(SAMPLE_COUNTS.externalXlsx);
     const ids = sampleManifest.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
     // 总数由分组数量派生：样例随能力扩展（S9 加页眉页脚、SH7 加图片），写死数字会立刻过期
     expect(sampleManifest).toHaveLength(
-      SAMPLE_COUNTS.slide + SAMPLE_COUNTS.sheet + SAMPLE_COUNTS.docx + SAMPLE_COUNTS.externalDocx,
+      SAMPLE_COUNTS.slide +
+        SAMPLE_COUNTS.sheet +
+        SAMPLE_COUNTS.docx +
+        SAMPLE_COUNTS.externalDocx +
+        SAMPLE_COUNTS.externalXlsx,
     );
   });
 
@@ -331,8 +464,8 @@ describe('OOXML round-trip baseline (generated + external samples)', () => {
    * manifest is only trustworthy if `expectedParts` still describes the bytes on disk. This also
    * asserts the four office-suite families required by plan §4.2 are actually represented.
    */
-  it('keeps external sample registrations in sync with the checked-in OOXML bytes (P0-1)', async () => {
-    const families = new Set<string>();
+  it('keeps external sample registrations in sync with the checked-in OOXML bytes (P0-1 / P0-4)', async () => {
+    const docxFamilies = new Set<string>();
     for (const sample of externalDocSamples) {
       const path = join(process.cwd(), sample.path);
       expect(existsSync(path), `${sample.id}: missing ${sample.path}`).toBe(true);
@@ -345,10 +478,29 @@ describe('OOXML round-trip baseline (generated + external samples)', () => {
       expect(present, `${sample.id}: expectedParts no longer matches the file`).toEqual(
         [...sample.expectedParts].sort(),
       );
-      if (sample.producerFamily !== 'other') families.add(sample.producerFamily);
+      if (sample.producerFamily !== 'other') docxFamilies.add(sample.producerFamily);
     }
-    expect([...families].sort()).toEqual([...EXTERNAL_PRODUCER_FAMILIES].sort());
-  });
+    expect([...docxFamilies].sort()).toEqual([...EXTERNAL_PRODUCER_FAMILIES].sort());
+
+    // 同一条规则套到 .xlsx 上：登记的 expectedParts 必须仍描述磁盘上的字节
+    const sheetFamilies = new Set<string>();
+    for (const sample of sheetExternalSamples) {
+      const path = join(process.cwd(), sample.path);
+      expect(existsSync(path), `${sample.id}: missing ${sample.path}`).toBe(true);
+      const bytes = new Uint8Array(readFileSync(path));
+      const parts = await xlsxPartFacts(bytes);
+      const present = Object.entries(parts)
+        .filter(([, count]) => count > 0)
+        .map(([name]) => name)
+        .sort();
+      expect(present, `${sample.id}: expectedParts no longer matches the file`).toEqual(
+        [...sample.expectedParts].sort(),
+      );
+      if (sample.producerFamily !== 'other') sheetFamilies.add(sample.producerFamily);
+    }
+    // 表格侧也必须四族齐全：只有 Excel 一份样本，等于没验证 WPS/Numbers 的重写差异
+    expect([...sheetFamilies].sort()).toEqual([...EXTERNAL_PRODUCER_FAMILIES].sort());
+  }, 60_000);
 
   it('exports and re-imports every sample without losing the document', async () => {
     const results: SampleResult[] = [];
@@ -356,6 +508,7 @@ describe('OOXML round-trip baseline (generated + external samples)', () => {
     for (const sample of sheetSamples) results.push(await runSheet(sample));
     for (const sample of docSamples) results.push(await runDoc(sample));
     for (const sample of externalDocSamples) results.push(await runExternalDoc(sample));
+    for (const sample of sheetExternalSamples) results.push(await runExternalSheet(sample));
 
     const failures = results.filter((result) => !result.ok);
     expect(failures.map((result) => `${result.id}: ${result.error}`)).toEqual([]);
@@ -372,39 +525,58 @@ describe('OOXML round-trip baseline (generated + external samples)', () => {
       generatedAt: new Date().toISOString(),
       generator: 'src/tools/baseline/roundtrip.test.ts',
       total: results.length,
-      externalSamples: externalDocSamples.length,
+      externalSamples: externalDocSamples.length + sheetExternalSamples.length,
       externalProducers: EXTERNAL_PRODUCER_FAMILIES.filter((family) =>
         externalDocSamples.some((sample) => sample.producerFamily === family),
+      ),
+      externalByTool: { docx: externalDocSamples.length, sheet: sheetExternalSamples.length },
+      sheetProducers: EXTERNAL_PRODUCER_FAMILIES.filter((family) =>
+        sheetExternalSamples.some((sample) => sample.producerFamily === family),
       ),
       samples: results,
     };
     (globalThis as { __baselineReport?: BaselineReport }).__baselineReport = report;
-  }, 180_000);
+  }, 300_000);
 
-  it('gates the golden baseline when BASELINE_REPORT is set (P0-1)', () => {
+  it('gates the golden baseline when BASELINE_REPORT is set (P0-1)', async () => {
     if (!process.env.BASELINE_REPORT) return;
     const report = (globalThis as { __baselineReport?: BaselineReport }).__baselineReport;
     expect(report).toBeDefined();
     if (!report) return;
-    const { lines, diff } = writeReport(report);
+    const { lines, diff } = await writeReport(report);
     for (const line of lines) console.log(`[baseline] ${line}`);
-    const external = report.externalSamples ?? 0;
-    const producers = report.externalProducers ?? [];
-    console.log(`[baseline] external samples: ${external} / ${REQUIRED_EXTERNAL_SAMPLES}`);
+    const externalDocx = report.externalByTool?.docx ?? 0;
+    const externalSheet = report.externalByTool?.sheet ?? 0;
+    const docxProducers = report.externalProducers ?? [];
+    const sheetProducers = report.sheetProducers ?? [];
+    console.log(`[baseline] external docx: ${externalDocx} / ${REQUIRED_EXTERNAL_SAMPLES}`);
     console.log(
-      `[baseline] producer families: ${producers.length} / ${REQUIRED_EXTERNAL_PRODUCERS} (${producers.join(', ')})`,
+      `[baseline] docx producer families: ${docxProducers.length} / ${REQUIRED_EXTERNAL_PRODUCERS} (${docxProducers.join(', ')})`,
+    );
+    console.log(`[baseline] external xlsx: ${externalSheet} / ${REQUIRED_EXTERNAL_SHEETS}`);
+    console.log(
+      `[baseline] sheet producer families: ${sheetProducers.length} / ${REQUIRED_SHEET_PRODUCERS} (${sheetProducers.join(', ')})`,
     );
     // 样例数会随能力扩展（S9 加页眉页脚、SH7 加图片、P0-1 加真实样本），断言 manifest 而不是写死数字
     expect(report.total).toBe(sampleManifest.length);
     if (!diff) return; // golden created / explicitly updated
     const blockers = [...blockingDrift(diff)];
     if (process.env.BASELINE_REQUIRE_COVERAGE === '1') {
-      if (external < REQUIRED_EXTERNAL_SAMPLES) {
-        blockers.push(`external sample coverage: ${external} / ${REQUIRED_EXTERNAL_SAMPLES}`);
+      // 门禁按工具分组：10 份真实 docx 不能替 0 份真实 xlsx 背书（P0-4 C）
+      if (externalDocx < REQUIRED_EXTERNAL_SAMPLES) {
+        blockers.push(`docx external coverage: ${externalDocx} / ${REQUIRED_EXTERNAL_SAMPLES}`);
       }
-      if (producers.length < REQUIRED_EXTERNAL_PRODUCERS) {
+      if (docxProducers.length < REQUIRED_EXTERNAL_PRODUCERS) {
         blockers.push(
-          `external producer coverage: ${producers.length} / ${REQUIRED_EXTERNAL_PRODUCERS} (${producers.join(', ')})`,
+          `docx producer coverage: ${docxProducers.length} / ${REQUIRED_EXTERNAL_PRODUCERS} (${docxProducers.join(', ')})`,
+        );
+      }
+      if (externalSheet < REQUIRED_EXTERNAL_SHEETS) {
+        blockers.push(`sheet external coverage: ${externalSheet} / ${REQUIRED_EXTERNAL_SHEETS}`);
+      }
+      if (sheetProducers.length < REQUIRED_SHEET_PRODUCERS) {
+        blockers.push(
+          `sheet producer coverage: ${sheetProducers.length} / ${REQUIRED_SHEET_PRODUCERS} (${sheetProducers.join(', ')})`,
         );
       }
     }
