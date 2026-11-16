@@ -86,6 +86,7 @@ import {
   type StoredVersion,
 } from './docStore';
 import { DocLibraryPanel, StorageNotice, VersionHistoryPanel } from './DocLibraryPanel';
+import { useSheetTabs } from './hooks/useSheetTabs';
 import { SHEET_TEMPLATES, templateById, type SheetTemplate, type TemplateId } from './templates';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
@@ -113,7 +114,7 @@ import {
   type WorkbookSnapshot,
 } from './xlsx-io';
 import { reportSheetIssue, subscribeSheetIssues, type SheetIssue } from './issues';
-import { createUniverInstance, type SheetInfo, type UniverHandle } from './univer';
+import { createUniverInstance, type UniverHandle } from './univer';
 import {
   PIVOT_SHOW_AS_LABEL_KEY,
   collectFieldKeys,
@@ -536,8 +537,6 @@ export default function SpreadsheetTool() {
     cells: 0,
     formulas: 0,
   });
-  const [sheets, setSheets] = useState<SheetInfo[]>([]);
-  const [activeSheetId, setActiveSheetId] = useState<string | null>(null);
   const [busy, setBusy] = useState<BusyKind>(null);
   const [draftSaved, setDraftSaved] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -981,6 +980,47 @@ export default function SpreadsheetTool() {
     theme === 'dark' || (theme === 'system' && document.documentElement.classList.contains('dark'));
   const univerLocale: 'zhCN' | 'enUS' = lang === 'zh' || lang === 'zh-TW' ? 'zhCN' : 'enUS';
 
+  /**
+   * 删表后把挂在那张表上的对象一起清掉（P2-4 从 handler 里搬过来的规则）：
+   * 保护 / 局部名称 / 表格对象都带 sheetId，留着会让导出指向一张不存在的表。
+   */
+  const pruneSheetObjects = useCallback((sheetId: string) => {
+    if (protectionRef.current.some((item) => item.sheetId === sheetId)) {
+      const next = protectionRef.current.filter((item) => item.sheetId !== sheetId);
+      protectionRef.current = next;
+      setProtectionList(next);
+    }
+    if (namedRangesRef.current.some((item) => item.sheetId === sheetId)) {
+      const next = namedRangesRef.current.filter((item) => item.sheetId !== sheetId);
+      namedRangesRef.current = next;
+      setNamedRanges(next);
+    }
+    if (tablesRef.current.some((item) => item.sheetId === sheetId)) {
+      const next = tablesRef.current.filter((item) => item.sheetId !== sheetId);
+      tablesRef.current = next;
+      setTables(next);
+    }
+  }, []);
+
+  // 标签栏的状态与动作（P2-4）：引擎调用 + 刷新 + 落盘 + 删表清理，规则都在 hook 里
+  const {
+    sheets,
+    activeSheetId,
+    refresh: refreshSheets,
+    add: addSheet,
+    select: selectSheet,
+    rename: renameSheetInEngine,
+    remove: removeSheet,
+    duplicate: duplicateSheetInEngine,
+    setHidden: setSheetHiddenInEngine,
+  } = useSheetTabs({
+    handleRef,
+    onRemoved: pruneSheetObjects,
+    onCommit: () => scheduleSaveRef.current(),
+    onError: (message) => setFailure({ ok: false, error: message }),
+    lastVisibleMessage: t('tools.sheet.lastVisibleSheet'),
+  });
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -1066,8 +1106,7 @@ export default function SpreadsheetTool() {
         // Column widths / row heights may have changed: shapes are anchored through them
         setShapeLayoutVersion((version) => version + 1);
       });
-      setSheets(handle.getSheets());
-      setActiveSheetId(handle.getActiveSheetId());
+      refreshSheets();
       // Re-apply the read-only switch after every rebuild (locale / theme rebuilds the instance)
       handle.setEditable(protectionFor(protectionRef.current, handle.getActiveSheetId()) === null);
       const initial = handle.getSnapshot();
@@ -1099,7 +1138,7 @@ export default function SpreadsheetTool() {
         setRibbonHost(null);
       }
     };
-  }, [univerLocale, dark, scheduleSave, applyChartData]);
+  }, [univerLocale, dark, scheduleSave, applyChartData, refreshSheets]);
 
   // Sheet area size: chart dragging / resizing needs bounds
   useEffect(() => {
@@ -1123,13 +1162,6 @@ export default function SpreadsheetTool() {
     const handle = handleRef.current;
     if (!handle) return;
     setSummary(summarizeWorkbook(handle.getSnapshot()));
-  }, []);
-
-  const refreshSheets = useCallback(() => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    setSheets(handle.getSheets());
-    setActiveSheetId(handle.getActiveSheetId());
   }, []);
 
   /**
@@ -1444,65 +1476,23 @@ export default function SpreadsheetTool() {
     }
   };
 
+  // 标签栏的六个动作只是 hook 的薄包装：动作本身（刷新 / 清理 / 落盘 / 报错）都在 useSheetTabs 里
   const handleAddSheet = () => {
-    handleRef.current?.addSheet();
-    refreshSheets();
+    addSheet();
     setFailure(null);
   };
 
-  const handleSelectSheet = (id: string) => {
-    handleRef.current?.setActiveSheet(id);
-    refreshSheets();
-  };
+  const handleSelectSheet = (id: string) => selectSheet(id);
 
-  const handleRenameSheet = (id: string, name: string) => {
-    handleRef.current?.renameSheet(id, name);
-    refreshSheets();
-  };
+  const handleRenameSheet = (id: string, name: string) => renameSheetInEngine(id, name);
 
-  const handleDeleteSheet = (id: string) => {
-    handleRef.current?.deleteSheet(id);
-    refreshSheets();
-    // 该表的保护与局部名称随表一起消失：留着会让导出的 localSheetId 指向不存在的表
-    if (protectionRef.current.some((item) => item.sheetId === id)) {
-      const nextProtection = protectionRef.current.filter((item) => item.sheetId !== id);
-      protectionRef.current = nextProtection;
-      setProtectionList(nextProtection);
-    }
-    if (namedRangesRef.current.some((item) => item.sheetId === id)) {
-      const nextNames = namedRangesRef.current.filter((item) => item.sheetId !== id);
-      namedRangesRef.current = nextNames;
-      setNamedRanges(nextNames);
-    }
-    if (tablesRef.current.some((item) => item.sheetId === id)) {
-      const nextTables = tablesRef.current.filter((item) => item.sheetId !== id);
-      tablesRef.current = nextTables;
-      setTables(nextTables);
-    }
-    scheduleSaveRef.current();
-  };
+  const handleDeleteSheet = (id: string) => removeSheet(id);
 
-  const handleDuplicateSheet = (id: string) => {
-    handleRef.current?.duplicateSheet(id);
-    refreshSheets();
-  };
+  const handleDuplicateSheet = (id: string) => duplicateSheetInEngine(id);
 
-  /**
-   * 隐藏 / 取消隐藏（P2-7）。可见性是两个地方的事：
-   * Univer 负责界面，快照里的 `hidden` 才是导出时写 `worksheet.state` 的依据，
-   * 所以改完必须显式请求持久化（它不是普通 cell mutation，脏标记看不到）。
-   */
+  /** 隐藏 / 取消隐藏（P2-7）：拒绝时 hook 已经报过错，这里只负责清掉旧的失败提示 */
   const handleToggleSheetHidden = (id: string, hidden: boolean) => {
-    const changed = handleRef.current?.setSheetHidden(id, hidden) ?? false;
-    if (!changed) {
-      // 最后一张可见表不能隐藏：给个明确说法，别让菜单点了没反应。
-      // 这里放的是已翻译好的整句（不是错误码）：横幅走 translateToolError，查不到码就原样显示。
-      setFailure({ ok: false, error: t('tools.sheet.lastVisibleSheet') });
-      return;
-    }
-    setFailure(null);
-    refreshSheets();
-    scheduleSaveRef.current();
+    if (setSheetHiddenInEngine(id, hidden)) setFailure(null);
   };
 
   /**
