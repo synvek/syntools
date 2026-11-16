@@ -41,10 +41,29 @@ describe('保护模型换算', () => {
     expect(state!.flags.selectUnlockedCells).toBe(true);
   });
 
-  it('未保护 / 无 sheet 标记返回 null', () => {
+  it('没有 sheetProtection 元素才算未保护', () => {
     expect(fromExcelProtection(null)).toBeNull();
-    expect(fromExcelProtection({})).toBeNull();
-    expect(fromExcelProtection({ sheet: false })).toBeNull();
+    // 元素存在就是受保护：exceljs 会把 LibreOffice 的 `sheet="true"` 吃掉，只剩哈希
+    expect(fromExcelProtection({})).toMatchObject({ enabled: true });
+    expect(fromExcelProtection({ sheet: false })).toMatchObject({ enabled: true });
+  });
+
+  it('只剩哈希（sheet/objects 被 exceljs 漏读）也认作受保护，密码哈希保留', () => {
+    const back = fromExcelProtection({
+      algorithmName: 'SHA-512',
+      hashValue: 'AAECAwQ=',
+      saltValue: 'c2FsdA==',
+      spinCount: 100000,
+    });
+    expect(back).toMatchObject({
+      enabled: true,
+      password: {
+        algorithmName: 'SHA-512',
+        hashValue: 'AAECAwQ=',
+        saltValue: 'c2FsdA==',
+        spinCount: 100000,
+      },
+    });
   });
 
   it('允许口径 ↔ exceljs 模型对齐（往返不漂）', () => {
@@ -107,6 +126,26 @@ describe('导出写 sheetProtection', () => {
     expect(back?.flags.formatCells).toBe(true);
     expect(back?.flags.selectLockedCells).toBe(false);
     expect(back?.password).toBeUndefined();
+  });
+
+  it('导入的哈希保护原样写回（LibreOffice 这类外部文件不丢保护）', async () => {
+    const state: SheetProtectionState = {
+      sheetId: '1',
+      enabled: true,
+      flags: {},
+      password: {
+        algorithmName: 'SHA-512',
+        hashValue: 'AAECAwQ=',
+        saltValue: 'c2FsdA==',
+        spinCount: 100000,
+      },
+    };
+    const bytes = await exportWith(state);
+    const xml = await sheetXml(bytes);
+    expect(xml).toContain('<sheetProtection');
+    expect(xml).toContain('algorithmName="SHA-512"');
+    expect(xml).toContain('hashValue="AAECAwQ="');
+    expect(xml).toContain('saltValue="c2FsdA=="');
   });
 
   it('密码只算一次哈希，导出多次得到同一份 salt', async () => {

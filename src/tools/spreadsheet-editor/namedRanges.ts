@@ -32,6 +32,12 @@ const CELL_LIKE = /^[A-Za-z]{1,3}\d{1,7}$/;
 const RC_LIKE = /^[Rr]\d*([Cc]\d*)?$/;
 
 const CELL_PATTERN = /^([A-Za-z]{1,3})(\d{1,7})$/;
+/**
+ * 整行 / 整列范围。内置名几乎都是这种写法 —— `_xlnm.Print_Titles` 就是 `Sheet!$1:$2`。
+ * 不收这类引用，导入时读得到、导出时被静默丢掉（外部样本里 `definedNames` 7→6 就是这么来的）。
+ */
+const ROW_RANGE = /^(\d{1,7}):(\d{1,7})$/;
+const COLUMN_RANGE = /^([A-Za-z]{1,3}):([A-Za-z]{1,3})$/;
 /** 表名在引用里出现时可能需要单引号（含空格、连字符等） */
 const PLAIN_SHEET_NAME = /^[A-Za-z_][A-Za-z0-9_.]*$/;
 
@@ -108,6 +114,22 @@ function parseRef(input: string): ParsedRef | null {
   }
 
   text = text.replace(/\$/g, '');
+
+  // 整行 / 整列：只做大小写与顺序归一，不试图换算成单元格
+  const rows = ROW_RANGE.exec(text);
+  if (rows) {
+    const [start, end] = [Number(rows[1]), Number(rows[2])];
+    return { sheetName, range: `${Math.min(start, end)}:${Math.max(start, end)}` };
+  }
+  const columns = COLUMN_RANGE.exec(text);
+  if (columns) {
+    const [start, end] = [colToIndex(columns[1]), colToIndex(columns[2])];
+    return {
+      sheetName,
+      range: `${indexToCol(Math.min(start, end))}:${indexToCol(Math.max(start, end))}`,
+    };
+  }
+
   const parts = text.split(':');
   if (parts.length > 2) return null;
   const cells: string[] = [];
@@ -165,6 +187,11 @@ export function normalizeRef(input: string): string | null {
 
 /** `A1:B2` → `$A$1:$B$2`（导出用，Excel 自己的 definedName 也是绝对引用） */
 function toAbsolute(range: string): string {
+  // 整行 `1:2` → `$1:$2`，整列 `A:C` → `$A:$C`（与 Excel 自己写内置名的方式一致）
+  const rows = /^(\d+):(\d+)$/.exec(range);
+  if (rows) return `$${rows[1]}:$${rows[2]}`;
+  const columns = /^([A-Z]+):([A-Z]+)$/.exec(range);
+  if (columns) return `$${columns[1]}:$${columns[2]}`;
   return range
     .split(':')
     .map((cell) => {

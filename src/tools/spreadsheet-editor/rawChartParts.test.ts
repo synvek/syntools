@@ -118,6 +118,60 @@ describe('collectRawChartParts', () => {
     await expect(collectRawChartParts(zip)).resolves.toBeNull();
   });
 
+  /**
+   * 纯图片 drawing 里一定有 `<xdr:spPr>`，用 `includes('<xdr:sp')` 判断"有形状"会全部命中：
+   * 图片于是既被原样保留、又被重新注入一遍（图翻倍），保留的那份还引用着没导出的 `xl/media`。
+   */
+  it('图片的 spPr 不算形状：纯图片 drawing 仍不保留', async () => {
+    const zip = new JSZip();
+    zip.file(
+      'xl/workbook.xml',
+      '<?xml version="1.0"?><workbook xmlns:r="http://r"><sheets><sheet name="S1" r:id="rId1"/></sheets></workbook>',
+    );
+    zip.file(
+      'xl/_rels/workbook.xml.rels',
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+    );
+    zip.file('xl/worksheets/sheet1.xml', '<?xml version="1.0"?><worksheet/>');
+    zip.file(
+      'xl/worksheets/_rels/sheet1.xml.rels',
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>',
+    );
+    zip.file(
+      'xl/drawings/drawing1.xml',
+      '<?xml version="1.0"?><xdr:wsDr xmlns:xdr="http://x"><xdr:twoCellAnchor><xdr:pic><xdr:spPr><a:xfrm/></xdr:spPr></xdr:pic></xdr:twoCellAnchor></xdr:wsDr>',
+    );
+    zip.file(
+      'xl/drawings/_rels/drawing1.xml.rels',
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/image" Target="../media/image1.png"/></Relationships>',
+    );
+    zip.file('xl/media/image1.png', new Uint8Array([1, 2, 3]));
+    await expect(collectRawChartParts(zip)).resolves.toBeNull();
+  });
+
+  it('真有形状锚点时保留（`<xdr:sp>`）', async () => {
+    const zip = new JSZip();
+    zip.file(
+      'xl/workbook.xml',
+      '<?xml version="1.0"?><workbook xmlns:r="http://r"><sheets><sheet name="S1" r:id="rId1"/></sheets></workbook>',
+    );
+    zip.file(
+      'xl/_rels/workbook.xml.rels',
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+    );
+    zip.file('xl/worksheets/sheet1.xml', '<?xml version="1.0"?><worksheet/>');
+    zip.file(
+      'xl/worksheets/_rels/sheet1.xml.rels',
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>',
+    );
+    zip.file(
+      'xl/drawings/drawing1.xml',
+      '<?xml version="1.0"?><xdr:wsDr xmlns:xdr="http://x"><xdr:twoCellAnchor><xdr:sp><xdr:spPr/></xdr:sp></xdr:twoCellAnchor></xdr:wsDr>',
+    );
+    const parts = await collectRawChartParts(zip);
+    expect(parts?.sheetDrawings).toEqual({ S1: 'xl/drawings/drawing1.xml' });
+  });
+
   it('含图表时保留 drawing / chart / 其 rels 与内容类型', async () => {
     const zip = new JSZip();
     zip.file(

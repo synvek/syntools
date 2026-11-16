@@ -55,11 +55,20 @@ describe('引用规范化', () => {
     expect(normalizeRef("'My Sheet'!A1:B2")).toBe("'My Sheet'!A1:B2");
   });
 
-  it('整列/整行/垃圾输入一律返回 null，不做猜测', () => {
-    expect(normalizeRef('A:A')).toBeNull();
-    expect(normalizeRef('1:1')).toBeNull();
+  it('整行 / 整列范围保留（内置名与打印标题都是这种写法）', () => {
+    expect(normalizeRef('A:A')).toBe('A:A');
+    expect(normalizeRef('$A:$C')).toBe('A:C');
+    expect(normalizeRef('c:a')).toBe('A:C');
+    expect(normalizeRef('1:1')).toBe('1:1');
+    expect(normalizeRef('$2:$1')).toBe('1:2');
+    expect(normalizeRef('DefinedNames!$1:$2')).toBe('DefinedNames!1:2');
+    expect(normalizeRef("'My Sheet'!$1:$2")).toBe("'My Sheet'!1:2");
+  });
+
+  it('垃圾输入一律返回 null，不做猜测', () => {
     expect(normalizeRef('hello')).toBeNull();
     expect(normalizeRef('')).toBeNull();
+    expect(normalizeRef('A1:')).toBeNull();
   });
 });
 
@@ -100,6 +109,18 @@ describe('definedNames XML', () => {
       'sheet-2': { name: 'Report' },
     });
     expect(again).toBe(next);
+  });
+
+  it('整行范围按 Excel 的写法导出（打印标题 $1:$2）', () => {
+    const names: NamedRange[] = [
+      { id: 'name-1', name: '_xlnm.Print_Titles', ref: 'DefinedNames!1:2', hidden: true },
+    ];
+    const next = setDefinedNamesInWorkbookXml(WORKBOOK_XML, names, ['sheet-1'], {
+      'sheet-1': { name: 'DefinedNames' },
+    });
+    expect(next).toContain(
+      '<definedName name="_xlnm.Print_Titles" hidden="1">DefinedNames!$1:$2</definedName>',
+    );
   });
 
   it('清空名称时整块移除', () => {

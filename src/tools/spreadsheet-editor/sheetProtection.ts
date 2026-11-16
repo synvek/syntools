@@ -96,7 +96,12 @@ const ALLOW_KEYS = [
 export function fromExcelProtection(
   model: ExcelSheetProtectionModel | null | undefined,
 ): SheetProtectionState | null {
-  if (!model || model.sheet !== true) return null;
+  /**
+   * 只要求"元素存在"，不要求 `sheet === true`：exceljs 只回读它自己认识的属性，
+   * LibreOffice 写的 `<sheetProtection sheet="true" ...>` 读回来只剩哈希三件套，
+   * 按 `sheet === true` 判定会把这类保护整段丢掉 —— 等于在导出时悄悄取消保护。
+   */
+  if (!model) return null;
   const flags: SheetProtectionFlags = {};
   for (const key of ALLOW_KEYS) {
     if (model[key] === true) flags[key] = true;

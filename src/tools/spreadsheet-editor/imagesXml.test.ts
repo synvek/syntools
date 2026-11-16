@@ -167,6 +167,33 @@ describe('导入：还原 dataURL 与锚点', () => {
     });
   });
 
+  /**
+   * Excel 的图片锚点就是 `twoCellAnchor` + `<a:ext cx="0" cy="0"/>`（外部样本里 3 张图全丢都栽在这里）。
+   * 尺寸必须回落到 from/to + 真实列宽行高，否则整批图片被静默丢掉。
+   */
+  it('twoCellAnchor + ext=0：按 from/to 与真实列宽行高算出尺寸', async () => {
+    const pic = `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="PNG image"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>`;
+    const anchor = `<xdr:twoCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>7</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>${pic}<xdr:clientData/></xdr:twoCellAnchor>`;
+
+    const zip = await exportZip([IMAGE]);
+    // 复用导出件里的 drawing rels（rId1 → ../media/image1.png），只把锚点换回 Excel 的写法
+    zip.file(
+      'xl/drawings/drawing1.xml',
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">${anchor}</xdr:wsDr>`,
+    );
+    const byName = await collectSheetImages(
+      (await zip.generateAsync({ type: 'arraybuffer' })) as ArrayBuffer,
+      undefined,
+      { [SHEET_NAME]: { columnWidth: () => 90, rowHeight: () => 15 } },
+    );
+    const [restored] = byName[SHEET_NAME] ?? [];
+    expect(restored?.src).toBe(PNG_DATA_URL);
+    expect(restored?.from).toEqual({ col: 1, row: 2, colOff: 0, rowOff: 0 });
+    // (5-1) × 90 = 360，(7-2) × 15 = 75
+    expect(restored?.width).toBe(360);
+    expect(restored?.height).toBe(75);
+  });
+
   it('往返再导出仍只有一张图、一个 media', async () => {
     const second = await exportZip([{ ...IMAGE, id: 'image-import-1' }]);
     const drawing = (await second.file('xl/drawings/drawing1.xml')?.async('string')) ?? '';

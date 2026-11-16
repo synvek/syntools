@@ -4,6 +4,7 @@ import {
   absoluteCellRef,
   absoluteRangeRef,
   addContentTypeEntries,
+  anchorSpanSize,
   appendAnchorsToDrawing,
   buildAnchorXml,
   buildChartPlan,
@@ -15,6 +16,8 @@ import {
   ensureRelationshipNamespace,
   insertDrawingIntoSheet,
   sheetRefPrefix,
+  spanMetricsOfSheet,
+  spanSize,
   upsertRelationship,
   DEFAULT_SHEET_METRICS,
 } from './chartXml';
@@ -317,6 +320,55 @@ describe('关系与内容类型拼接', () => {
     const next = appendAnchorsToDrawing(base, '<xdr:oneCellAnchor/>');
     expect(next.match(/<xdr:oneCellAnchor\/>/g)).toHaveLength(2);
     expect(next.endsWith('</xdr:wsDr>')).toBe(true);
+  });
+});
+
+describe('单元格跨度 → 像素尺寸', () => {
+  const point = (col: number, row: number, colOff = 0, rowOff = 0) => ({
+    col,
+    row,
+    colOff,
+    rowOff,
+  });
+
+  it('整列整行的跨度按每列/每行的真实尺寸累加', () => {
+    const metrics = {
+      columnWidth: (column: number) => (column === 2 ? 150 : 100),
+      rowHeight: () => 20,
+    };
+    // 第 1、2、3 列：100 + 150 + 100 = 350；第 2、3、4 行：20 × 3 = 60
+    expect(spanSize(point(1, 2), point(4, 5), metrics)).toEqual({ width: 350, height: 60 });
+  });
+
+  it('两端偏移参与计算，反向锚点按小的那头算', () => {
+    expect(spanSize(point(1, 0, 0, 0), point(2, 0, 9525, 0))).toEqual({ width: 94, height: 0 });
+    expect(spanSize(point(3, 0), point(1, 0)).width).toBe(spanSize(point(1, 0), point(3, 0)).width);
+  });
+
+  it('spanMetricsOfSheet 用行/列覆盖值，缺省回落默认', () => {
+    const metrics = spanMetricsOfSheet({
+      defaultColumnWidth: 50,
+      defaultRowHeight: 10,
+      columnData: { '0': { w: 120 } },
+      rowData: { '3': { h: 40 } },
+    });
+    expect(metrics.columnWidth(0)).toBe(120);
+    expect(metrics.columnWidth(1)).toBe(50);
+    expect(metrics.rowHeight(3)).toBe(40);
+    expect(metrics.rowHeight(0)).toBe(10);
+  });
+
+  it('anchorSpanSize 只认 twoCellAnchor（有 to 才有跨度）', () => {
+    const twoCell = {
+      'xdr:twoCellAnchor': [
+        {
+          'xdr:from': [{ 'xdr:col': [{ '#text': '1' }] }, { 'xdr:row': [{ '#text': '2' }] }],
+        },
+        { 'xdr:to': [{ 'xdr:col': [{ '#text': '3' }] }, { 'xdr:row': [{ '#text': '6' }] }] },
+      ],
+    };
+    expect(anchorSpanSize(twoCell)).toEqual({ width: 186, height: 108 });
+    expect(anchorSpanSize({ 'xdr:oneCellAnchor': [] })).toBeNull();
   });
 });
 

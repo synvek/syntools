@@ -42,6 +42,7 @@ import { buildThreadNotes, threadNotesForSheet } from './commentsXlsx';
 import { collectEditorValidation } from './cfdv';
 import { collectRawChartParts, type RawChartParts } from './rawChartParts';
 import { adoptChartParts, metricsOfSheet } from './chartAdopt';
+import { spanMetricsOfSheet } from './chartXml';
 import { collectSheetShapes } from './shapesXml';
 import { collectSheetImages } from './imagesXml';
 import { createConvertedAnchors, pruneConvertedAnchors } from './drawingAnchors';
@@ -403,13 +404,6 @@ export async function importXlsxToSnapshot(
     const archiveParts = diagnosis.parts;
     // Collect native chart parts first (not parsed, just kept verbatim for the export to write back)
     const rawGathered = await collectRawChartPartsFrom(buffer);
-    // Floating shapes / pictures are read from the drawing parts (exceljs drops them like every other drawing).
-    // `converted` records which anchors became app-side configs, so the preserved drawing can drop exactly
-    // those — keeping them would export the same shape/picture twice (verbatim part + regenerated anchor).
-    const converted = createConvertedAnchors();
-    const shapesByName = await collectSheetShapes(buffer, converted.add);
-    const imagesByName = await collectSheetImages(buffer, converted.add);
-    const rawParts = pruneConvertedAnchors(rawGathered, converted);
     // Then normalise comment relationships: the way openpyxl and friends write them makes exceljs throw, blocking the whole import
     const normalized = await normalizeXlsxArchive(buffer);
     const ExcelJS = (await import('exceljs')).default;
@@ -473,6 +467,22 @@ export async function importXlsxToSnapshot(
     });
 
     if (sheetOrder.length === 0) return { ok: false, error: 'EMPTY' };
+
+    // Floating shapes / pictures are read from the drawing parts (exceljs drops them like every other
+    // drawing). They are parsed **after** the sheets so the cell-span → pixel maths can use the real
+    // column widths / row heights: Excel writes `twoCellAnchor` with `cx=0 cy=0` and puts the size in
+    // `from`/`to`, so a default-width guess would resize every imported picture.
+    // `converted` records which anchors became app-side configs, so the preserved drawing can drop
+    // exactly those — keeping them would export the same shape/picture twice (verbatim + regenerated).
+    const converted = createConvertedAnchors();
+    const spanMetricsByName = Object.fromEntries(
+      Object.entries(sheets)
+        .filter(([, sheet]) => Boolean(sheet.name))
+        .map(([, sheet]) => [sheet.name as string, spanMetricsOfSheet(sheet)]),
+    );
+    const shapesByName = await collectSheetShapes(buffer, converted.add, spanMetricsByName);
+    const imagesByName = await collectSheetImages(buffer, converted.add, spanMetricsByName);
+    const rawParts = pruneConvertedAnchors(rawGathered, converted);
 
     // Sheet names are the only stable link between a drawing and our snapshot ids
     const importedShapes: SheetShapeConfig[] = [];

@@ -10,6 +10,7 @@ import {
   type ChartType,
   type SeriesRenderKind,
 } from './charts';
+import { childOf, textOf, type XmlNode } from '../../core/drawing/xmlNode';
 import { columnIndexToName, type WorkbookSnapshotLite } from './core';
 import {
   dirOf,
@@ -432,6 +433,111 @@ function firstRef(blocks: readonly string[], pattern: RegExp): string | null {
     if (hit) return hit;
   }
   return null;
+}
+
+/* ------------------------------ Cell-span geometry ------------------------------ */
+
+/**
+ * 单元格尺寸来源：两轴各给一个"第 N 列 / 行多宽"的函数。
+ * 真实工作表的列宽不是统一的（`<cols>` 会按列覆盖），所以这里不写成单个默认值。
+ */
+export interface AnchorSpanMetrics {
+  columnWidth: (column: number) => number;
+  rowHeight: (row: number) => number;
+}
+
+/** 没有工作表信息时的兜底（Univer 默认列宽 / 行高） */
+export const DEFAULT_SPAN_METRICS: AnchorSpanMetrics = {
+  columnWidth: () => DEFAULT_SHEET_METRICS.defaultColumnWidth,
+  rowHeight: () => DEFAULT_SHEET_METRICS.defaultRowHeight,
+};
+
+/** 快照里能提供列宽 / 行高的那一小撮字段（SheetSnapshot 满足，测试也可以只给这几项） */
+export interface SpanSheetSource {
+  defaultColumnWidth?: number;
+  defaultRowHeight?: number;
+  columnData?: Record<string, { w?: number } | undefined>;
+  rowData?: Record<string, { h?: number } | undefined>;
+}
+
+/**
+ * 快照工作表 → 跨度换算。
+ *
+ * 用**真实列宽/行高**而不是默认值：图片与形状的尺寸在 Excel 里就是"跨几列几行"，
+ * 用默认列宽算出来的图会胖一圈、压住邻居。
+ */
+export function spanMetricsOfSheet(sheet: SpanSheetSource): AnchorSpanMetrics {
+  const columnDefault = Math.max(
+    1,
+    sheet.defaultColumnWidth || DEFAULT_SHEET_METRICS.defaultColumnWidth,
+  );
+  const rowDefault = Math.max(1, sheet.defaultRowHeight || DEFAULT_SHEET_METRICS.defaultRowHeight);
+  return {
+    columnWidth: (column) => Math.max(1, sheet.columnData?.[String(column)]?.w ?? columnDefault),
+    rowHeight: (row) => Math.max(1, sheet.rowData?.[String(row)]?.h ?? rowDefault),
+  };
+}
+
+export interface CellAnchorPoint {
+  col: number;
+  row: number;
+  colOff: number;
+  rowOff: number;
+}
+
+/** 一个轴上的跨度：整列宽度之和 + 两端偏移之差（EXCEL 的 from/to 可以反向，按小的那头算） */
+function axisSpan(
+  startIndex: number,
+  startOffset: number,
+  endIndex: number,
+  endOffset: number,
+  sizeOf: (index: number) => number,
+): number {
+  const forward = endIndex > startIndex || (endIndex === startIndex && endOffset >= startOffset);
+  const [fromIndex, fromOffset, toIndex, toOffset] = forward
+    ? [startIndex, startOffset, endIndex, endOffset]
+    : [endIndex, endOffset, startIndex, startOffset];
+  let size = (toOffset - fromOffset) / EMU_PER_PX;
+  for (let index = fromIndex; index < toIndex; index += 1) size += Math.max(1, sizeOf(index));
+  return Math.max(0, size);
+}
+
+/**
+ * `from` / `to` 两组单元格锚点 → 像素尺寸。
+ *
+ * Excel 的 `twoCellAnchor` 把尺寸写成"跨几列几行 + 两个偏移"，`<a:ext>` 里通常是 **cx=0 cy=0**
+ * （外部样本就是这样）。只读 ext 会把这批图片/形状整批静默丢掉 —— 所以 ext 为 0 时必须回落到这里。
+ */
+export function spanSize(
+  from: CellAnchorPoint,
+  to: CellAnchorPoint,
+  metrics: AnchorSpanMetrics = DEFAULT_SPAN_METRICS,
+): { width: number; height: number } {
+  return {
+    width: axisSpan(from.col, from.colOff, to.col, to.colOff, metrics.columnWidth),
+    height: axisSpan(from.row, from.rowOff, to.row, to.rowOff, metrics.rowHeight),
+  };
+}
+
+/** `from` / `to` 各自是一组"列 + 行 + 两个偏移"，值都是元素文本 */
+function cellAnchorPoint(node: XmlNode): CellAnchorPoint {
+  const read = (tag: string): number => Number(textOf(childOf(node, tag)).trim()) || 0;
+  return { col: read('col'), row: read('row'), colOff: read('colOff'), rowOff: read('rowOff') };
+}
+
+/**
+ * 一个 anchor 节点的 `from` / `to` → 像素尺寸；没有 `to`（oneCellAnchor / absoluteAnchor）时返回 null。
+ * 形状与图片的导入都走这里，两条路径不会再一个修了、另一个还丢。
+ */
+export function anchorSpanSize(
+  node: XmlNode,
+  metrics: AnchorSpanMetrics = DEFAULT_SPAN_METRICS,
+): { width: number; height: number } | null {
+  const from = childOf(node, 'from');
+  const to = childOf(node, 'to');
+  if (!from || !to) return null;
+  const size = spanSize(cellAnchorPoint(from), cellAnchorPoint(to), metrics);
+  return size.width > 0 && size.height > 0 ? size : null;
 }
 
 /* -------------------------------- Anchor maths -------------------------------- */

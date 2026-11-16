@@ -1458,6 +1458,24 @@ export default function SpreadsheetTool() {
   };
 
   /**
+   * 隐藏 / 取消隐藏（P2-7）。可见性是两个地方的事：
+   * Univer 负责界面，快照里的 `hidden` 才是导出时写 `worksheet.state` 的依据，
+   * 所以改完必须显式请求持久化（它不是普通 cell mutation，脏标记看不到）。
+   */
+  const handleToggleSheetHidden = (id: string, hidden: boolean) => {
+    const changed = handleRef.current?.setSheetHidden(id, hidden) ?? false;
+    if (!changed) {
+      // 最后一张可见表不能隐藏：给个明确说法，别让菜单点了没反应。
+      // 这里放的是已翻译好的整句（不是错误码）：横幅走 translateToolError，查不到码就原样显示。
+      setFailure({ ok: false, error: t('tools.sheet.lastVisibleSheet') });
+      return;
+    }
+    setFailure(null);
+    refreshSheets();
+    scheduleSaveRef.current();
+  };
+
+  /**
    * 从当前选区（单格时退回已用区域）生成初始配置。
    * 布局给一个能立刻看到结果的最小默认：第一个字段做行、最后一个字段做值。
    */
@@ -2410,6 +2428,7 @@ export default function SpreadsheetTool() {
         onRename={handleRenameSheet}
         onDelete={handleDeleteSheet}
         onDuplicate={handleDuplicateSheet}
+        onToggleHidden={handleToggleSheetHidden}
       />
 
       <EditorStatusBar

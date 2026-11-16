@@ -16,6 +16,8 @@ interface SheetTabsProps {
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  /** 隐藏 / 取消隐藏（P2-7）：隐藏表在标签栏留下但置灰，用户能找回来 */
+  onToggleHidden: (id: string, hidden: boolean) => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export function SheetTabs({
   onRename,
   onDelete,
   onDuplicate,
+  onToggleHidden,
 }: SheetTabsProps) {
   const { t } = useTranslation();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -70,6 +73,9 @@ export function SheetTabs({
   };
 
   const canDelete = sheets.length > 1;
+  /** Excel 的规矩：至少留一张可见工作表（Univer 同样会拒绝） */
+  const canHide = sheets.filter((sheet) => !sheet.hidden).length > 1;
+  const menuSheet = menu ? sheets.find((sheet) => sheet.id === menu.id) : undefined;
 
   return (
     <div className="relative flex items-center gap-1 overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-800/50">
@@ -120,6 +126,8 @@ export function SheetTabs({
                     active
                       ? 'bg-blue-600 text-white'
                       : 'text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-700',
+                    // 隐藏表不再"看不见"：留在标签栏里置灰，右键就能取消隐藏
+                    !active && sheet.hidden ? 'italic opacity-60' : '',
                   ].join(' ')}
                   style={
                     active || !sheet.tabColor
@@ -175,6 +183,18 @@ export function SheetTabs({
             }}
           >
             {t('tools.sheet.duplicate')}
+          </button>
+          <button
+            type="button"
+            disabled={!menuSheet?.hidden && !canHide}
+            title={!menuSheet?.hidden && !canHide ? t('tools.sheet.lastVisibleSheet') : undefined}
+            className="block w-full px-3 py-1.5 text-left text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-gray-700"
+            onClick={() => {
+              if (menuSheet) onToggleHidden(menuSheet.id, !menuSheet.hidden);
+              setMenu(null);
+            }}
+          >
+            {menuSheet?.hidden ? t('tools.sheet.showSheet') : t('tools.sheet.hideSheet')}
           </button>
           <button
             type="button"

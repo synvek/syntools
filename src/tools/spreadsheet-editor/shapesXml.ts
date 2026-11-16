@@ -13,13 +13,16 @@ import {
 } from '../../core/drawing/xmlNode';
 import type { SheetShapeConfig } from './shapes';
 import {
+  DEFAULT_SPAN_METRICS,
   EMU_PER_PX,
   addContentTypeEntries,
+  anchorSpanSize,
   buildDrawingXml,
   appendAnchorsToDrawing,
   contentTypeOverride,
   insertDrawingIntoSheet,
   upsertRelationship,
+  type AnchorSpanMetrics,
 } from './chartXml';
 import { dirOf, parseRelationships, relsPathFor, resolveSheetParts } from './rawChartParts';
 import { resolvePartPath } from './xlsx-normalize';
@@ -266,7 +269,11 @@ function strokeColor(spPr: XmlNode | undefined): string | null {
 }
 
 /** One `xdr:oneCellAnchor` (or `twoCellAnchor`) → a shape config */
-function parseAnchor(node: XmlNode, index: number): SheetShapeConfig | null {
+function parseAnchor(
+  node: XmlNode,
+  index: number,
+  metrics: AnchorSpanMetrics = DEFAULT_SPAN_METRICS,
+): SheetShapeConfig | null {
   const from = childOf(node, 'from');
   const shape = childOf(node, 'sp');
   if (!from || !shape) return null;
@@ -276,9 +283,13 @@ function parseAnchor(node: XmlNode, index: number): SheetShapeConfig | null {
   const geometry = parseShapeGeometry(spPr);
   const ext = childOf(node, 'ext');
   const xfrmExt = childOf(childOf(spPr, 'xfrm'), 'ext');
-  const cx = numAttr(ext, 'cx') ?? numAttr(xfrmExt, 'cx') ?? 0;
-  const cy = numAttr(ext, 'cy') ?? numAttr(xfrmExt, 'cy') ?? 0;
-  if (!cx || !cy) return null;
+  const cx = numAttr(ext, 'cx') || numAttr(xfrmExt, 'cx') || 0;
+  const cy = numAttr(ext, 'cy') || numAttr(xfrmExt, 'cy') || 0;
+  // Excel 的 twoCellAnchor 把尺寸放在 from/to 里，`<a:ext>` 写的是 0；只读 ext 会把这类形状整批丢掉
+  const span = cx && cy ? null : anchorSpanSize(node, metrics);
+  const width = cx ? emuToPx(cx) : (span?.width ?? 0);
+  const height = cy ? emuToPx(cy) : (span?.height ?? 0);
+  if (!width || !height) return null;
 
   const textBody = childOf(shape, 'txBody');
   const text = textBody
@@ -297,8 +308,8 @@ function parseAnchor(node: XmlNode, index: number): SheetShapeConfig | null {
       colOff: Math.round(emuToPx(Number(nodeText(from, 'colOff')) || 0)),
       rowOff: Math.round(emuToPx(Number(nodeText(from, 'rowOff')) || 0)),
     },
-    width: emuToPx(cx),
-    height: emuToPx(cy),
+    width: Math.round(width),
+    height: Math.round(height),
     rotation: Math.round((numAttr(childOf(spPr, 'xfrm'), 'rot') ?? 0) / 60000),
     fill: fillColor(spPr) ?? '#4472c4',
     stroke: strokeColor(spPr) ?? '#2f5597',
@@ -320,10 +331,12 @@ function nodeText(node: XmlNode | undefined, tag: string): string {
 export async function parseSheetShapes(
   zip: JSZipType,
   onConverted?: (sheetName: string, anchorId: string) => void,
+  metricsByName?: Record<string, AnchorSpanMetrics>,
 ): Promise<Record<string, SheetShapeConfig[]>> {
   const out: Record<string, SheetShapeConfig[]> = {};
   const sheetParts = await resolveSheetParts(zip);
   for (const [sheetName, sheetPath] of Object.entries(sheetParts)) {
+    const metrics = metricsByName?.[sheetName] ?? DEFAULT_SPAN_METRICS;
     const sheetRels = parseRelationships(await readText(zip, relsPathFor(sheetPath)));
     const drawingRel = sheetRels.find((item) => DRAWING_REL.test(item.type));
     if (!drawingRel) continue;
@@ -340,7 +353,7 @@ export async function parseSheetShapes(
       ...collect(parsed, 'twoCellAnchor'),
       ...collect(parsed, 'absoluteAnchor'),
     ]) {
-      const shape = parseAnchor(anchor, shapes.length);
+      const shape = parseAnchor(anchor, shapes.length, metrics);
       if (!shape) continue;
       shapes.push(shape);
       // 上报"已转成 config 的 anchor"，调用方据此从保留的 drawing 里摘掉它，避免导出写两份
@@ -356,11 +369,12 @@ export async function parseSheetShapes(
 export async function collectSheetShapes(
   buffer: ArrayBuffer,
   onConverted?: (sheetName: string, anchorId: string) => void,
+  metricsByName?: Record<string, AnchorSpanMetrics>,
 ): Promise<Record<string, SheetShapeConfig[]>> {
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(buffer);
-    return await parseSheetShapes(zip, onConverted);
+    return await parseSheetShapes(zip, onConverted, metricsByName);
   } catch {
     return {};
   }

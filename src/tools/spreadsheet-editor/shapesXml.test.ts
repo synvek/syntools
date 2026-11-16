@@ -243,6 +243,37 @@ describe('导入回读', () => {
     expect(byName[SHEET_NAME][0].prst).toBe('roundRect');
   });
 
+  /**
+   * Excel 把 `twoCellAnchor` 的尺寸写成"跨几列几行"，`<a:ext>` 里是 0（外部样本就是这样）。
+   * 只读 ext 会把这类形状整批静默丢掉 —— 这里固定"回落到 from/to + 真实列宽"的行为。
+   */
+  it('twoCellAnchor + ext=0：按 from/to 与真实列宽行高算出尺寸', async () => {
+    const sp = `<xdr:sp><xdr:nvSpPr><xdr:cNvPr id="2" name="Shape-Rect"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr><xdr:txBody><a:p><a:r><a:t>Rectangle</a:t></a:r></a:p></xdr:txBody></xdr:sp>`;
+    const anchor = `<xdr:twoCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>7</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>${sp}<xdr:clientData/></xdr:twoCellAnchor>`;
+
+    const exported = await exportSnapshotToBytes(makeSnapshot({ syntoolsShapes: [shape()] }));
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    const zip = await JSZip.loadAsync(toArrayBuffer(exported.value));
+    // 复用导出件里的 sheet → drawing 关系，只把它换回 Excel 的写法
+    zip.file(
+      'xl/drawings/drawing1.xml',
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">${anchor}</xdr:wsDr>`,
+    );
+    const byName = await collectSheetShapes(
+      (await zip.generateAsync({ type: 'arraybuffer' })) as ArrayBuffer,
+      undefined,
+      { [SHEET_NAME]: { columnWidth: () => 100, rowHeight: () => 20 } },
+    );
+    const [restored] = byName[SHEET_NAME] ?? [];
+    expect(restored?.prst).toBe('rect');
+    expect(restored?.from).toEqual({ col: 1, row: 2, colOff: 0, rowOff: 0 });
+    // (4-1) × 100 = 300，(7-2) × 20 = 100
+    expect(restored?.width).toBe(300);
+    expect(restored?.height).toBe(100);
+    expect(restored?.text).toBe('Rectangle');
+  });
+
   it('没有形状的文件不会产生空数组字段', async () => {
     const exported = await exportSnapshotToBytes(makeSnapshot());
     expect(exported.ok).toBe(true);

@@ -33,6 +33,8 @@ const RELATIONSHIP_TAG = /<Relationship\b[^>]*?\/?>/g;
 const DRAWING_REL = /relationships\/drawing$/;
 const CHART_REL = /relationships\/chart$/;
 const IMAGE_REL = /relationships\/image$/;
+/** 真·形状元素 `<xdr:sp>` / `<xdr:sp ...>`（别用 `includes('<xdr:sp')`，`xdr:spPr` 也会命中） */
+const SHAPE_ELEMENT = /<xdr:sp[\s/>]/;
 
 /** Directory of a part (with trailing slash): xl/worksheets/sheet1.xml → xl/worksheets/ */
 export function dirOf(partPath: string): string {
@@ -121,7 +123,12 @@ export async function collectRawChartParts(zip: JSZipType): Promise<RawChartPart
     // A drawing is worth keeping when it holds a chart **or** a shape (`xdr:sp`). Shapes used to be
     // dropped here, which silently deleted every shape of an imported file on the next export.
     const drawingXml = await readText(zip, drawingPath);
-    const hasShapes = Boolean(drawingXml && drawingXml.includes('<xdr:sp'));
+    /**
+     * 必须是"形状锚点"，不能是 `includes('<xdr:sp')`：`xdr:pic` 内部就有 `xdr:spPr`，
+     * 子串匹配会把**每个纯图片 drawing** 都判成"有形状"，于是图片被原样保留、又被重新写一遍
+     * （图翻倍），并且保留的那份还引用着我们没保留的 `xl/media`（导出后是断链）。
+     */
+    const hasShapes = Boolean(drawingXml && SHAPE_ELEMENT.test(drawingXml));
     // Picture-only drawings stay out of scope
     if (chartRels.length === 0 && !hasShapes) continue;
 

@@ -208,6 +208,11 @@ export interface UniverHandle extends SheetRibbonHost {
   /** Duplicate a sheet (the copy is inserted after the source) */
   duplicateSheet(id: string): void;
   /**
+   * 隐藏 / 取消隐藏工作表（P2-7）。
+   * 返回是否真的改成功：Univer 不允许隐藏最后一张可见表，这种情况下面板要能告诉用户原因。
+   */
+  setSheetHidden(id: string, hidden: boolean): boolean;
+  /**
    * Grid → container projection, for the floating overlay layers (shapes).
    * Null when the render unit is not ready yet (first frames, or a disposed instance).
    */
@@ -489,6 +494,21 @@ export function createUniverInstance(
     if (!workbook) return;
     const sheet = workbook.getSheetBySheetId(id);
     if (sheet) workbook.duplicateSheet(sheet);
+  };
+
+  const setSheetHidden = (id: string, hidden: boolean): boolean => {
+    const sheet = univerAPI.getActiveWorkbook()?.getSheetBySheetId(id);
+    if (!sheet) return false;
+    // 已经是要的状态就别再发一次 mutation（会多占一格撤销栈）
+    if (sheet.isSheetHidden() === hidden) return true;
+    // 隐藏最后一张可见表时 Univer 抛异常：这里兜住，界面上还要置灰，两头都别让用户踩空
+    try {
+      if (hidden) sheet.hideSheet();
+      else sheet.showSheet();
+    } catch {
+      return false;
+    }
+    return sheet.isSheetHidden() === hidden;
   };
 
   /* ------------------------ ribbon host: format & ops ------------------------ */
@@ -1069,6 +1089,7 @@ export function createUniverInstance(
     deleteSheet,
     renameSheet,
     duplicateSheet,
+    setSheetHidden,
     getViewport,
     onViewportChange,
     // Ribbon host (see commands.ts): formatting, sheet operations and the state subscription

@@ -132,6 +132,11 @@ export function sheetMetrics(snapshot: WorkbookSnapshot): Metrics {
     charts: (snapshot.syntoolsCharts ?? []).length,
     /** Floating shapes written as native `xdr:sp` (SHEET-02) */
     shapes: (snapshot.syntoolsShapes ?? []).length,
+    /**
+     * Floating pictures written as `xdr:pic` + `xl/media`（SHEET-02 剩余）。
+     * 单列一项，否则"图片全丢"只能从 `media` 部件数间接看，门禁里看不出是哪一侧丢的。
+     */
+    images: (snapshot.syntoolsImages ?? []).length,
     /** Charts that survive only as verbatim parts (edited file → import → export) */
     rawChartParts: Object.keys(snapshot.syntoolsRawParts?.parts ?? {}).length,
     /** CF/DV are measured across both channels: editor resources and preserved extras */

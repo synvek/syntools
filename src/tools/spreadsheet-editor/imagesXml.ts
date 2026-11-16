@@ -14,13 +14,16 @@ import {
 import type { SheetImageConfig } from './sheetImages';
 import { imageDataUrl, mimeForExtension, parseImageDataUrl } from './sheetImages';
 import {
+  DEFAULT_SPAN_METRICS,
   EMU_PER_PX,
   addContentTypeEntries,
+  anchorSpanSize,
   appendAnchorsToDrawing,
   buildDrawingXml,
   contentTypeOverride,
   insertDrawingIntoSheet,
   upsertRelationship,
+  type AnchorSpanMetrics,
 } from './chartXml';
 import { dirOf, parseRelationships, relsPathFor, resolveSheetParts } from './rawChartParts';
 import { resolvePartPath } from './xlsx-normalize';
@@ -290,6 +293,7 @@ async function parsePictureAnchor(
   index: number,
   zip: JSZipType,
   drawingRelsPath: string,
+  metrics: AnchorSpanMetrics = DEFAULT_SPAN_METRICS,
 ): Promise<SheetImageConfig | null> {
   const from = childOf(node, 'from');
   const pic = childOf(node, 'pic');
@@ -304,9 +308,13 @@ async function parsePictureAnchor(
   const spPr = childOf(pic, 'spPr');
   const ext = childOf(node, 'ext');
   const xfrmExt = childOf(childOf(spPr, 'xfrm'), 'ext');
-  const cx = numAttr(ext, 'cx') ?? numAttr(xfrmExt, 'cx') ?? 0;
-  const cy = numAttr(ext, 'cy') ?? numAttr(xfrmExt, 'cy') ?? 0;
-  if (!cx || !cy) return null;
+  const cx = numAttr(ext, 'cx') || numAttr(xfrmExt, 'cx') || 0;
+  const cy = numAttr(ext, 'cy') || numAttr(xfrmExt, 'cy') || 0;
+  // Excel 的 twoCellAnchor 尺寸写在 from/to 里，`<a:ext>` 是 0：必须回落，否则整批图片被丢掉
+  const span = cx && cy ? null : anchorSpanSize(node, metrics);
+  const width = cx ? emuToPx(cx) : (span?.width ?? 0);
+  const height = cy ? emuToPx(cy) : (span?.height ?? 0);
+  if (!width || !height) return null;
 
   const cNvPr = childOf(childOf(pic, 'nvPicPr'), 'cNvPr');
   const name = attr(cNvPr, 'descr') || attr(cNvPr, 'name') || `image ${index + 1}`;
@@ -319,8 +327,8 @@ async function parsePictureAnchor(
       colOff: Math.round(emuToPx(Number(nodeText(from, 'colOff')) || 0)),
       rowOff: Math.round(emuToPx(Number(nodeText(from, 'rowOff')) || 0)),
     },
-    width: emuToPx(cx),
-    height: emuToPx(cy),
+    width: Math.round(width),
+    height: Math.round(height),
     src,
     name,
     z: index,
@@ -334,10 +342,12 @@ async function parsePictureAnchor(
 export async function parseSheetImages(
   zip: JSZipType,
   onConverted?: ConvertedAnchorSink,
+  metricsByName?: Record<string, AnchorSpanMetrics>,
 ): Promise<Record<string, SheetImageConfig[]>> {
   const out: Record<string, SheetImageConfig[]> = {};
   const sheetParts = await resolveSheetParts(zip);
   for (const [sheetName, sheetPath] of Object.entries(sheetParts)) {
+    const metrics = metricsByName?.[sheetName] ?? DEFAULT_SPAN_METRICS;
     const sheetRels = parseRelationships(await readText(zip, relsPathFor(sheetPath)));
     const drawingRel = sheetRels.find((item) => DRAWING_REL.test(item.type));
     if (!drawingRel) continue;
@@ -354,7 +364,7 @@ export async function parseSheetImages(
       ...collect(parsed, 'twoCellAnchor'),
       ...collect(parsed, 'absoluteAnchor'),
     ]) {
-      const image = await parsePictureAnchor(anchor, images.length, zip, drawingRelsPath);
+      const image = await parsePictureAnchor(anchor, images.length, zip, drawingRelsPath, metrics);
       if (!image) continue;
       images.push(image);
       const cNvPr = childOf(childOf(childOf(anchor, 'pic'), 'nvPicPr'), 'cNvPr');
@@ -370,11 +380,12 @@ export async function parseSheetImages(
 export async function collectSheetImages(
   buffer: ArrayBuffer,
   onConverted?: ConvertedAnchorSink,
+  metricsByName?: Record<string, AnchorSpanMetrics>,
 ): Promise<Record<string, SheetImageConfig[]>> {
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(buffer);
-    return await parseSheetImages(zip, onConverted);
+    return await parseSheetImages(zip, onConverted, metricsByName);
   } catch {
     return {};
   }
