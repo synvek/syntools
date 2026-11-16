@@ -65,19 +65,27 @@ import { ShapeFormatBar } from './ui/ShapeFormatBar';
 import { ImageLayer } from './ui/ImageLayer';
 import { registerStoreStrings } from './storeStrings';
 import {
+  clearVersions,
   createDocId,
   deleteDocument,
+  deleteVersion,
   duplicateDocument,
+  estimateStorage,
+  getDocStoreStatus,
   initDocStore,
   listDocuments,
   listVersions,
   loadDocument,
+  retryDocStore,
   saveDocument,
   setCurrentDocId,
+  subscribeDocStoreStatus,
   type DocMeta,
+  type DocStorageEstimate,
+  type DocStoreStatus,
   type StoredVersion,
 } from './docStore';
-import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
+import { DocLibraryPanel, StorageNotice, VersionHistoryPanel } from './DocLibraryPanel';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
 import { SpreadsheetRibbon, type RibbonBaseContext } from './SpreadsheetRibbon';
@@ -539,6 +547,9 @@ export default function SpreadsheetTool() {
   const [docId, setDocId] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
+  /** P2-3: 文档库状态（不可用 / 空间不足）与占用，横幅据此显示 */
+  const [storeStatus, setStoreStatus] = useState<DocStoreStatus>(getDocStoreStatus);
+  const [storageUsage, setStorageUsage] = useState<DocStorageEstimate | null>(null);
   /** Persistence failure notice: over the size cap (failed) / local storage unavailable (degraded) */
   const [draftNotice, setDraftNotice] = useState<'degraded' | 'failed' | null>(null);
   const docIdRef = useRef<string | null>(null);
@@ -892,6 +903,9 @@ export default function SpreadsheetTool() {
 
   /** Inline failure notices (P0-3): one at a time, auto-dismissed, never blocking */
   useEffect(() => subscribeSheetIssues((issue) => setIssueNotice(issue)), []);
+
+  /** P2-3: 文档库降级要说话——状态一变就更新横幅，而不是让列表空着装作没存过 */
+  useEffect(() => subscribeDocStoreStatus(setStoreStatus), []);
 
   useEffect(() => {
     if (!issueNotice) return;
@@ -1869,6 +1883,8 @@ export default function SpreadsheetTool() {
     setVersionsOpen(false);
     setLibraryOpen(true);
     void listDocuments().then(setDocs);
+    // 占用取不到（浏览器不支持）就保持 null，面板里那一行自然不出现
+    void estimateStorage().then(setStorageUsage);
   };
 
   const openVersions = () => {
@@ -1877,6 +1893,29 @@ export default function SpreadsheetTool() {
     const id = docIdRef.current;
     if (id) void listVersions(id).then(setVersions);
     else setVersions([]);
+  };
+
+  /** P2-3：横幅上的"重试"——重开一次库；成功才刷新列表 */
+  const handleRetryStore = () => {
+    void retryDocStore().then((next) => {
+      setStoreStatus(next);
+      if (next.ok) void listDocuments().then(setDocs);
+    });
+  };
+
+  /** P2-3：空间不足时的"腾地方"——删单个版本 / 清空本文档版本 */
+  const handleDeleteVersion = (version: StoredVersion) => {
+    void deleteVersion(version.id).then(() => {
+      const id = docIdRef.current;
+      if (id) void listVersions(id).then(setVersions);
+    });
+  };
+
+  const handleClearVersions = () => {
+    const id = docIdRef.current;
+    if (!id) return;
+    if (!window.confirm(t('tools.sheet.clearVersionsConfirm'))) return;
+    void clearVersions(id).then(() => void listVersions(id).then(setVersions));
   };
 
   const handleOpenDoc = (id: string) => {
@@ -2261,6 +2300,7 @@ export default function SpreadsheetTool() {
           onDelete={handleDeleteDoc}
           onNew={handleNew}
           onClose={() => setLibraryOpen(false)}
+          usage={storageUsage}
         />
       ) : null}
       {versionsOpen ? (
@@ -2268,6 +2308,8 @@ export default function SpreadsheetTool() {
           versions={versions}
           onRestore={handleRestoreVersion}
           onClose={() => setVersionsOpen(false)}
+          onDeleteVersion={handleDeleteVersion}
+          onClearVersions={handleClearVersions}
         />
       ) : null}
 
@@ -2468,6 +2510,9 @@ export default function SpreadsheetTool() {
           {translateToolError('tools.sheet', { ok: false, error: 'RUNTIME_FAILED' })}
         </p>
       )}
+
+      {/* P2-3: 文档库不可用 / 空间不足——说清原因，并能就地重试；空间不足还能去删旧版本 */}
+      <StorageNotice status={storeStatus} onRetry={handleRetryStore} onFreeSpace={openVersions} />
 
       {draftNotice && (
         <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
