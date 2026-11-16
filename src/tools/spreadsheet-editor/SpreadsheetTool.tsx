@@ -64,29 +64,10 @@ import { ShapeDrawLayer } from './ui/ShapeDrawLayer';
 import { ShapeFormatBar } from './ui/ShapeFormatBar';
 import { ImageLayer } from './ui/ImageLayer';
 import { registerStoreStrings } from './storeStrings';
-import {
-  clearVersions,
-  createDocId,
-  deleteDocument,
-  deleteVersion,
-  duplicateDocument,
-  estimateStorage,
-  getDocStoreStatus,
-  initDocStore,
-  listDocuments,
-  listVersions,
-  loadDocument,
-  retryDocStore,
-  saveDocument,
-  setCurrentDocId,
-  subscribeDocStoreStatus,
-  type DocMeta,
-  type DocStorageEstimate,
-  type DocStoreStatus,
-  type StoredVersion,
-} from './docStore';
+import { createDocId, saveDocument, setCurrentDocId } from './docStore';
 import { DocLibraryPanel, StorageNotice, VersionHistoryPanel } from './DocLibraryPanel';
 import { useSheetTabs } from './hooks/useSheetTabs';
+import { useSheetDocLibrary } from './hooks/useSheetDocLibrary';
 import { SHEET_TEMPLATES, templateById, type SheetTemplate, type TemplateId } from './templates';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
@@ -541,15 +522,10 @@ export default function SpreadsheetTool() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [runtimeError, setRuntimeError] = useState(false);
-  // Local document library (IndexedDB): multiple workbooks + version history; degrades silently when unavailable
-  const [docs, setDocs] = useState<DocMeta[]>([]);
-  const [versions, setVersions] = useState<StoredVersion[]>([]);
+  // Local document library (IndexedDB): state and I/O live in `useSheetDocLibrary` (P2-4)
   const [docId, setDocId] = useState<string | null>(null);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [versionsOpen, setVersionsOpen] = useState(false);
-  /** P2-3: 文档库状态（不可用 / 空间不足）与占用，横幅据此显示 */
-  const [storeStatus, setStoreStatus] = useState<DocStoreStatus>(getDocStoreStatus);
-  const [storageUsage, setStorageUsage] = useState<DocStorageEstimate | null>(null);
+  /** 文档库的刷新函数在 hook 里，而库写入（`queueDocSave`）比它先声明：走 ref 取最新闭包 */
+  const refreshDocsRef = useRef<() => void>(() => {});
   /** Persistence failure notice: over the size cap (failed) / local storage unavailable (degraded) */
   const [draftNotice, setDraftNotice] = useState<'degraded' | 'failed' | null>(null);
   const docIdRef = useRef<string | null>(null);
@@ -851,7 +827,7 @@ export default function SpreadsheetTool() {
     pendingDocRef.current = null;
     if (!pending) return;
     void saveDocument(pending.id, pending.title, pending.snapshot).then(() => {
-      void listDocuments().then(setDocs);
+      refreshDocsRef.current();
     });
   }, []);
   // The debounce timer and the unmount cleanup call through the ref, so they always see this closure
@@ -907,9 +883,6 @@ export default function SpreadsheetTool() {
 
   /** Inline failure notices (P0-3): one at a time, auto-dismissed, never blocking */
   useEffect(() => subscribeSheetIssues((issue) => setIssueNotice(issue)), []);
-
-  /** P2-3: 文档库降级要说话——状态一变就更新横幅，而不是让列表空着装作没存过 */
-  useEffect(() => subscribeDocStoreStatus(setStoreStatus), []);
 
   useEffect(() => {
     if (!issueNotice) return;
@@ -1403,6 +1376,57 @@ export default function SpreadsheetTool() {
     [applyChartData, refreshSummary, refreshSheets],
   );
 
+  /** 清空重来（新建 / 删除当前文档后）：编辑器与草稿都回到"空工作簿" */
+  const loadEmptyWorkbook = () => {
+    applySnapshot(createEmptySnapshot('', univerLocale), '');
+    clearDraft();
+    setDraftSaved(false);
+    setDraftNotice(null);
+  };
+
+  /**
+   * 文档库编排（P2-4 第 2 片）：列表 / 版本 / 面板 / 降级状态与全部库里动作都在 hook 里，
+   * 组件只提供"怎么把快照灌进编辑器"和"删掉当前文档后怎么清空"。
+   */
+  const {
+    docs,
+    versions,
+    libraryOpen,
+    versionsOpen,
+    storeStatus,
+    storageUsage,
+    init: initLibrary,
+    refreshDocs,
+    adoptNewDoc,
+    openLibrary,
+    closeLibrary,
+    openVersions,
+    closeVersions,
+    retryStore,
+    deleteVersionById,
+    clearAllVersions,
+    openDoc,
+    duplicateDoc,
+    removeDoc,
+    restoreVersion,
+  } = useSheetDocLibrary({
+    docIdRef,
+    onAdoptDocId: setDocId,
+    onOpenSnapshot: applySnapshot,
+    onResetWorkbook: loadEmptyWorkbook,
+    onPersist: (nextTitle) => persistNow(nextTitle),
+    onFlush: () => flushDocSaveRef.current(),
+    messages: {
+      untitled: t('tools.sheet.untitledDoc'),
+      copySuffix: t('tools.sheet.copySuffix'),
+      deleteConfirm: (title) => t('tools.sheet.deleteDocConfirm', { title }),
+      restoreConfirm: t('tools.sheet.restoreConfirm'),
+      clearVersionsConfirm: t('tools.sheet.clearVersionsConfirm'),
+    },
+  });
+  // `queueDocSave` 比 hook 先声明：库写入成功后通过 ref 刷新列表
+  refreshDocsRef.current = refreshDocs;
+
   // Startup: adopt the document-library pointer (content already came from the localStorage draft, avoiding a race with instance creation)
   useEffect(() => {
     // P2-6：`?template=budget` 直达模板。这是用户点链接进来的明确意图，
@@ -1416,13 +1440,8 @@ export default function SpreadsheetTool() {
       loadTemplateRef.current(wanted.id, { confirm: false });
       window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     }
-    void initDocStore().then((init) => {
-      void listDocuments().then(setDocs);
-      if (!init) return;
-      docIdRef.current = init.docId;
-      setDocId(init.docId);
-    });
-  }, []);
+    void initLibrary();
+  }, [initLibrary]);
 
   // Title changes are persisted too (skipped on first render so merely opening the page does not create an empty document)
   const didMountRef = useRef(false);
@@ -1862,13 +1881,6 @@ export default function SpreadsheetTool() {
     setPrintTarget(null);
   };
 
-  const loadEmptyWorkbook = () => {
-    applySnapshot(createEmptySnapshot('', univerLocale), '');
-    clearDraft();
-    setDraftSaved(false);
-    setDraftNotice(null);
-  };
-
   const handleClear = () => {
     loadEmptyWorkbook();
   };
@@ -1877,12 +1889,8 @@ export default function SpreadsheetTool() {
     const hasContent = summary.cells > 0 || title.trim().length > 0;
     if (hasContent && !window.confirm(t('common.discardConfirm'))) return;
     // A new document gets a fresh id; the previous workbook stays in the library
-    const id = createDocId();
-    docIdRef.current = id;
-    setDocId(id);
-    setCurrentDocId(id);
+    adoptNewDoc();
     loadEmptyWorkbook();
-    void listDocuments().then(setDocs);
   };
 
   /**
@@ -1898,16 +1906,12 @@ export default function SpreadsheetTool() {
       if (hasContent && !window.confirm(t('common.discardConfirm'))) return;
     }
     const nextTitle = t(template.titleKey);
-    const id = createDocId();
-    docIdRef.current = id;
-    setDocId(id);
-    setCurrentDocId(id);
+    adoptNewDoc();
     applySnapshot(template.build(nextTitle, univerLocale), nextTitle);
-    setLibraryOpen(false);
+    closeLibrary();
     persistNow(nextTitle);
     // 显式动作：库里的条目现在就要在，不等 10 秒的防抖
     flushDocSaveRef.current();
-    void listDocuments().then(setDocs);
   };
 
   const handleUseTemplate = (id: TemplateId, options?: { confirm?: boolean }) => {
@@ -1916,89 +1920,6 @@ export default function SpreadsheetTool() {
   };
   // 启动副作用要调用它，而那时 handleUseTemplate 还在后面的语句里：走 ref，避免把整块提前
   loadTemplateRef.current = handleUseTemplate;
-
-  const openLibrary = () => {
-    setVersionsOpen(false);
-    setLibraryOpen(true);
-    void listDocuments().then(setDocs);
-    // 占用取不到（浏览器不支持）就保持 null，面板里那一行自然不出现
-    void estimateStorage().then(setStorageUsage);
-  };
-
-  const openVersions = () => {
-    setLibraryOpen(false);
-    setVersionsOpen(true);
-    const id = docIdRef.current;
-    if (id) void listVersions(id).then(setVersions);
-    else setVersions([]);
-  };
-
-  /** P2-3：横幅上的"重试"——重开一次库；成功才刷新列表 */
-  const handleRetryStore = () => {
-    void retryDocStore().then((next) => {
-      setStoreStatus(next);
-      if (next.ok) void listDocuments().then(setDocs);
-    });
-  };
-
-  /** P2-3：空间不足时的"腾地方"——删单个版本 / 清空本文档版本 */
-  const handleDeleteVersion = (version: StoredVersion) => {
-    void deleteVersion(version.id).then(() => {
-      const id = docIdRef.current;
-      if (id) void listVersions(id).then(setVersions);
-    });
-  };
-
-  const handleClearVersions = () => {
-    const id = docIdRef.current;
-    if (!id) return;
-    if (!window.confirm(t('tools.sheet.clearVersionsConfirm'))) return;
-    void clearVersions(id).then(() => void listVersions(id).then(setVersions));
-  };
-
-  const handleOpenDoc = (id: string) => {
-    void loadDocument(id).then((doc) => {
-      if (!doc) return;
-      docIdRef.current = id;
-      setDocId(id);
-      setCurrentDocId(id);
-      applySnapshot(doc.snapshot, doc.title);
-      setLibraryOpen(false);
-    });
-  };
-
-  const handleDuplicateDoc = (id: string) => {
-    void duplicateDocument(id, {
-      untitled: t('tools.sheet.untitledDoc'),
-      suffix: t('tools.sheet.copySuffix'),
-    }).then(() => {
-      void listDocuments().then(setDocs);
-    });
-  };
-
-  const handleDeleteDoc = (id: string) => {
-    const target = docs.find((doc) => doc.id === id);
-    const label = target?.title || t('tools.sheet.untitledDoc');
-    if (!window.confirm(t('tools.sheet.deleteDocConfirm', { title: label }))) return;
-    void deleteDocument(id).then(() => {
-      void listDocuments().then(setDocs);
-      if (id === docIdRef.current) {
-        docIdRef.current = null;
-        setDocId(null);
-        loadEmptyWorkbook();
-      }
-    });
-  };
-
-  const handleRestoreVersion = (version: StoredVersion) => {
-    if (!window.confirm(t('tools.sheet.restoreConfirm'))) return;
-    applySnapshot(version.snapshot, version.title);
-    setVersionsOpen(false);
-    persistNow(version.title);
-    // Explicit actions bypass the 10 s library debounce: the document list must match what the user
-    // just asked for, not what it will look like in ten seconds (P0-5)
-    flushDocSaveRef.current();
-  };
 
   const stats = useMemo(
     () => [
@@ -2333,11 +2254,11 @@ export default function SpreadsheetTool() {
         <DocLibraryPanel
           currentDocId={docId}
           docs={docs}
-          onOpen={handleOpenDoc}
-          onDuplicate={handleDuplicateDoc}
-          onDelete={handleDeleteDoc}
+          onOpen={openDoc}
+          onDuplicate={duplicateDoc}
+          onDelete={removeDoc}
           onNew={handleNew}
-          onClose={() => setLibraryOpen(false)}
+          onClose={closeLibrary}
           usage={storageUsage}
           templates={SHEET_TEMPLATES}
           onTemplate={handleUseTemplate}
@@ -2346,10 +2267,10 @@ export default function SpreadsheetTool() {
       {versionsOpen ? (
         <VersionHistoryPanel
           versions={versions}
-          onRestore={handleRestoreVersion}
-          onClose={() => setVersionsOpen(false)}
-          onDeleteVersion={handleDeleteVersion}
-          onClearVersions={handleClearVersions}
+          onRestore={restoreVersion}
+          onClose={closeVersions}
+          onDeleteVersion={deleteVersionById}
+          onClearVersions={clearAllVersions}
         />
       ) : null}
 
@@ -2552,7 +2473,7 @@ export default function SpreadsheetTool() {
       )}
 
       {/* P2-3: 文档库不可用 / 空间不足——说清原因，并能就地重试；空间不足还能去删旧版本 */}
-      <StorageNotice status={storeStatus} onRetry={handleRetryStore} onFreeSpace={openVersions} />
+      <StorageNotice status={storeStatus} onRetry={retryStore} onFreeSpace={openVersions} />
 
       {draftNotice && (
         <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
