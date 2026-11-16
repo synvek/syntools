@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { StoredVersion } from './docStore';
+import { SHEET_TEMPLATES } from './templates';
 import { DocLibraryPanel, StorageNotice, VersionHistoryPanel } from './DocLibraryPanel';
 
 afterEach(() => vi.restoreAllMocks());
@@ -82,6 +83,32 @@ describe('DocLibraryPanel', () => {
   it('拿不到占用就不显示这一行（而不是显示 0）', () => {
     render(<DocLibraryPanel {...props} usage={null} />);
     expect(screen.queryByTestId('sheet-storage-usage')).toBeNull();
+  });
+});
+
+describe('DocLibraryPanel 模板入口（P2-6）', () => {
+  const props = {
+    currentDocId: 'a',
+    docs: [],
+    onOpen: noop,
+    onDuplicate: noop,
+    onDelete: noop,
+    onNew: noop,
+    onClose: noop,
+  };
+
+  it('列出三份模板，点击回传模板 id', () => {
+    const onTemplate = vi.fn();
+    render(<DocLibraryPanel {...props} templates={SHEET_TEMPLATES} onTemplate={onTemplate} />);
+    const section = screen.getByTestId('sheet-templates');
+    expect(section.textContent).toContain('tools.sheet.templates');
+    fireEvent.click(screen.getByText('tools.sheet.templateSales'));
+    expect(onTemplate).toHaveBeenCalledWith('sales');
+  });
+
+  it('没提供模板时不渲染这一块', () => {
+    render(<DocLibraryPanel {...props} />);
+    expect(screen.queryByTestId('sheet-templates')).toBeNull();
   });
 });
 

@@ -86,6 +86,7 @@ import {
   type StoredVersion,
 } from './docStore';
 import { DocLibraryPanel, StorageNotice, VersionHistoryPanel } from './DocLibraryPanel';
+import { SHEET_TEMPLATES, templateById, type SheetTemplate, type TemplateId } from './templates';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
 import { SpreadsheetRibbon, type RibbonBaseContext } from './SpreadsheetRibbon';
@@ -553,6 +554,10 @@ export default function SpreadsheetTool() {
   /** Persistence failure notice: over the size cap (failed) / local storage unavailable (degraded) */
   const [draftNotice, setDraftNotice] = useState<'degraded' | 'failed' | null>(null);
   const docIdRef = useRef<string | null>(null);
+  /** P2-6：启动时按 URL 参数打开模板，而 handler 定义在下面，所以通过 ref 调用 */
+  const loadTemplateRef = useRef<(id: TemplateId, options?: { confirm?: boolean }) => void>(
+    () => {},
+  );
   docIdRef.current = docId;
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -1368,6 +1373,17 @@ export default function SpreadsheetTool() {
 
   // Startup: adopt the document-library pointer (content already came from the localStorage draft, avoiding a race with instance creation)
   useEffect(() => {
+    // P2-6：`?template=budget` 直达模板。这是用户点链接进来的明确意图，
+    // 所以覆盖草稿内容、不弹确认；顺手把参数从地址栏抹掉，刷新时不会又生成一份新文档。
+    const wanted = templateById(
+      typeof window === 'undefined'
+        ? null
+        : new URLSearchParams(window.location.search).get('template'),
+    );
+    if (wanted) {
+      loadTemplateRef.current(wanted.id, { confirm: false });
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+    }
     void initDocStore().then((init) => {
       void listDocuments().then(setDocs);
       if (!init) return;
@@ -1879,6 +1895,38 @@ export default function SpreadsheetTool() {
     void listDocuments().then(setDocs);
   };
 
+  /**
+   * 打开一份内置模板（P2-6）。和"新建"同一套路：先占一个新的文档 id，再灌内容，
+   * 于是模板天然是"新文档"，不会覆盖库里的东西，也能立刻被保存 / 起名 / 导出。
+   *
+   * `confirm: false` 给 URL 直达用：`?template=budget` 是用户的明确意图，
+   * 不该再弹一次"放弃当前内容？"（那份草稿此时还没被看到过）。
+   */
+  const loadTemplate = (template: SheetTemplate, options: { confirm?: boolean } = {}): void => {
+    if (options.confirm !== false) {
+      const hasContent = summary.cells > 0 || title.trim().length > 0;
+      if (hasContent && !window.confirm(t('common.discardConfirm'))) return;
+    }
+    const nextTitle = t(template.titleKey);
+    const id = createDocId();
+    docIdRef.current = id;
+    setDocId(id);
+    setCurrentDocId(id);
+    applySnapshot(template.build(nextTitle, univerLocale), nextTitle);
+    setLibraryOpen(false);
+    persistNow(nextTitle);
+    // 显式动作：库里的条目现在就要在，不等 10 秒的防抖
+    flushDocSaveRef.current();
+    void listDocuments().then(setDocs);
+  };
+
+  const handleUseTemplate = (id: TemplateId, options?: { confirm?: boolean }) => {
+    const template = templateById(id);
+    if (template) loadTemplate(template, options);
+  };
+  // 启动副作用要调用它，而那时 handleUseTemplate 还在后面的语句里：走 ref，避免把整块提前
+  loadTemplateRef.current = handleUseTemplate;
+
   const openLibrary = () => {
     setVersionsOpen(false);
     setLibraryOpen(true);
@@ -2301,6 +2349,8 @@ export default function SpreadsheetTool() {
           onNew={handleNew}
           onClose={() => setLibraryOpen(false)}
           usage={storageUsage}
+          templates={SHEET_TEMPLATES}
+          onTemplate={handleUseTemplate}
         />
       ) : null}
       {versionsOpen ? (

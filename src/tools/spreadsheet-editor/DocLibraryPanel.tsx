@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { formatBytes } from '@/core/components/editorChrome';
 import { Icon } from '@/core/components/Icon';
 import type { DocMeta, DocStorageEstimate, DocStoreStatus, StoredVersion } from './docStore';
+import type { SheetTemplate, TemplateId } from './templates';
 
 interface DocLibraryPanelProps {
   currentDocId: string | null;
@@ -13,6 +14,9 @@ interface DocLibraryPanelProps {
   onClose: () => void;
   /** 浏览器给的占用（拿不到就不显示这一行，不显示 0） */
   usage?: DocStorageEstimate | null;
+  /** 内置模板（P2-6）：列表由 `templates.ts` 提供，面板只负责渲染与回调 */
+  templates?: readonly SheetTemplate[];
+  onTemplate?: (id: TemplateId) => void;
 }
 
 const smallButton =
@@ -68,6 +72,8 @@ export function DocLibraryPanel({
   onNew,
   onClose,
   usage = null,
+  templates = [],
+  onTemplate,
 }: DocLibraryPanelProps) {
   const { t } = useTranslation();
   return (
@@ -92,6 +98,27 @@ export function DocLibraryPanel({
           <Icon name="close" className="h-4 w-4" />
         </button>
       </div>
+
+      {/* P2-6：模板放在"新建"旁边——新用户第一件想做的事是"看个例子"，不是"从空格子开始" */}
+      {templates.length > 0 && onTemplate && (
+        <div data-testid="sheet-templates" className="mb-2">
+          <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+            {t('tools.sheet.templates')}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {templates.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => onTemplate(template.id)}
+                className={smallButton}
+              >
+                {t(template.titleKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {usage && (
         <p
