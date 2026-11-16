@@ -15,22 +15,16 @@ import { ProgressBar } from '@/core/components/ProgressBar';
 import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
-import { downloadBytes } from '@/core/pdf/download';
 import { useSettingsStore } from '@/stores/settings';
 import type { ToolResult } from '@/core/types';
 import {
-  CSV_BOM,
-  buildExportFilename,
   buildPresentGrid,
-  checkImportFile,
   columnIndexToName,
-  sanitizeFilename,
   summarizeWorkbook,
   type PresentGrid,
   type WorkbookSnapshotLite,
   type WorkbookSummary,
 } from './core';
-import { csvToSnapshot, snapshotToCsv } from './csv';
 import {
   CHART_TYPE_LABEL_KEY,
   buildChartData,
@@ -68,6 +62,8 @@ import { createDocId, saveDocument, setCurrentDocId } from './docStore';
 import { DocLibraryPanel, StorageNotice, VersionHistoryPanel } from './DocLibraryPanel';
 import { useSheetTabs } from './hooks/useSheetTabs';
 import { useSheetDocLibrary } from './hooks/useSheetDocLibrary';
+import { useSheetFileIo } from './hooks/useSheetFileIo';
+import { useSheetComments } from './hooks/useSheetComments';
 import { SHEET_TEMPLATES, templateById, type SheetTemplate, type TemplateId } from './templates';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
@@ -87,13 +83,7 @@ import type { SortColumn } from './sorting';
 import { auditFormulas, SUPPORTED_FUNCTION_COUNT, type FunctionAudit } from './sheetFunctions';
 import { findShortcut, isMacPlatform } from './shortcuts';
 import { commitFromDraft } from './formatCells';
-import {
-  createEmptySnapshot,
-  exportSnapshotToBytes,
-  importXlsxToSnapshot,
-  type ImportOutcome,
-  type WorkbookSnapshot,
-} from './xlsx-io';
+import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
 import { reportSheetIssue, subscribeSheetIssues, type SheetIssue } from './issues';
 import { createUniverInstance, type UniverHandle } from './univer';
 import {
@@ -110,34 +100,15 @@ import {
   type PivotConfig,
 } from './pivot';
 import { registerPivotStrings } from './pivotStrings';
-import { appendPivotSheets, buildPivotSheet, uniqueSheetName } from './pivotSheet';
+import { buildPivotSheet, uniqueSheetName } from './pivotSheet';
 import { PivotPanel } from './ui/PivotPanel';
 import { PresentSheet } from './ui/PresentSheet';
 import { ChartOverlay } from './ui/ChartOverlay';
 import { PrintDialog } from './ui/PrintDialog';
 import { CommentDialog } from './ui/CommentDialog';
-import {
-  countSheetComments,
-  setSheetThreads,
-  threadsForSheet,
-  type SheetCommentMap,
-} from './comments';
-import {
-  addReply,
-  createThread,
-  setThreadResolved,
-  type CommentThread,
-} from '../../core/comments/model';
-import { exportSheetPdf, type CellRange, type PrintModelOptions } from './print';
-import { renderChartImages } from './chartRender';
-import {
-  createFidelityReport,
-  isFidelityMuted,
-  muteFidelity,
-  type FidelityReport,
-} from '@/core/fidelity';
+import { countSheetComments, threadsForSheet } from './comments';
+import { isFidelityMuted, muteFidelity } from '@/core/fidelity';
 import { FidelityDialog } from '@/core/components/FidelityDialog';
-import { collectExportIssues } from './fidelity';
 import type { WorkbookExtras } from './xlsx-extras';
 import { applySheetObjects, readSheetObjects, type SheetObjectSource } from './sheetObjects';
 import {
@@ -227,7 +198,6 @@ function usedBlock(
   return rows > 0 && columns > 0 ? { rows, columns } : undefined;
 }
 
-const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 /** Debounce after edits: avoids a full save() on every keystroke */
 const SAVE_DEBOUNCE_MS = 600;
 /**
@@ -294,12 +264,6 @@ export default function SpreadsheetTool() {
   const pendingRef = useRef<WorkbookSnapshot | null>(null);
   const [title, setTitle] = useState('');
   const [presenting, setPresenting] = useState(false);
-  const [printTarget, setPrintTarget] = useState<{
-    snapshot: WorkbookSnapshot;
-    sheetId: string | null;
-    selection: CellRange | null;
-  } | null>(null);
-  const [fidelity, setFidelity] = useState<FidelityReport | null>(null);
   const [presentGrid, setPresentGrid] = useState<PresentGrid | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
   /** Floating charts on the sheet: configs (persisted with the snapshot) + derived data + a selection hint */
@@ -344,15 +308,8 @@ export default function SpreadsheetTool() {
   const [pivotConfig, setPivotConfig] = useState<PivotConfig | null>(null);
   /** Snapshot the panel aggregates from: refreshed on every mutation so edits recompute immediately */
   const [pivotSnapshot, setPivotSnapshot] = useState<WorkbookSnapshot | null>(null);
-  /** Cell comment threads (P1-2): keyed by sheet id, carried by the snapshot like syntoolsCharts */
-  const [sheetComments, setSheetComments] = useState<SheetCommentMap>({});
-  const commentsRef = useRef<SheetCommentMap>({});
-  commentsRef.current = sheetComments;
-  /** Only adopt comments from the first restored snapshot; later rebuilds carry a raw Univer snapshot */
-  const commentsLoadedRef = useRef(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [commentCell, setCommentCell] = useState<{ row: number; col: number } | null>(null);
-  const [commentAuthor, setCommentAuthor] = useState('');
+  // Cell comment threads (P1-2) 与面板状态在 `useSheetComments` 里（P2-4）；ref 与 state 同源保证
+  // 快照合成读到的一定是最新的一份。
   /** Named ranges (P2-S7.1): workbook/sheet metadata that neither Univer nor its formula engine knows */
   const [namedRanges, setNamedRanges] = useState<NamedRange[]>([]);
   const namedRangesRef = useRef<NamedRange[]>([]);
@@ -557,6 +514,33 @@ export default function SpreadsheetTool() {
   const [a11yStatus, setA11yStatus] = useState('');
 
   /**
+   * 单元格批注（P2-4 第 4 片）：线程数据 + 面板状态 + 四个动作 + "只采纳第一次"的规则都在 hook 里。
+   * 回落取 `activeSheetId` 而不是直接传值——标签栏的 state 比这里声明得晚。
+   */
+  const {
+    comments: sheetComments,
+    commentsRef,
+    panelOpen: commentsOpen,
+    cell: commentCell,
+    author: commentAuthor,
+    setAuthor: setCommentAuthor,
+    openPanel: openComments,
+    closePanel: closeComments,
+    useCurrentCell: useCurrentCommentCell,
+    adoptOnce: adoptComments,
+    reset: resetComments,
+    add: addSheetComment,
+    reply: replySheetComment,
+    toggleResolved: resolveSheetComment,
+    remove: deleteSheetComment,
+  } = useSheetComments({
+    handleRef,
+    fallbackSheetId: () => activeSheetId,
+    onCommit: () => scheduleSaveRef.current(),
+    anonymousAuthor: t('tools.sheet.commentAnonymous'),
+  });
+
+  /**
    * Everything this tool owns but Univer knows nothing about, as one value: charts / shapes /
    * pictures / pivots / names / protection / tables / comments plus the round-trip extras.
    * Which snapshot field each one lands in, and whether an empty value means "drop the field",
@@ -575,7 +559,7 @@ export default function SpreadsheetTool() {
       comments: commentsRef.current,
       extras: extrasRef.current,
     }),
-    [],
+    [commentsRef],
   );
 
   /** Merge the object set into a snapshot (save + export share this one path) */
@@ -734,72 +718,6 @@ export default function SpreadsheetTool() {
     },
     [setImageList],
   );
-
-  /** Comments are app-side data: write through the ref and request a save explicitly (like charts) */
-  const setCommentMap = useCallback((next: SheetCommentMap) => {
-    commentsRef.current = next;
-    setSheetComments(next);
-    scheduleSaveRef.current();
-  }, []);
-
-  const commentAnchor = (): { row: number; col: number } | null => {
-    const range = handleRef.current?.getActiveRange();
-    return range ? { row: range.startRow, col: range.startColumn } : null;
-  };
-
-  const openComments = () => {
-    setCommentCell(commentAnchor());
-    setCommentsOpen(true);
-  };
-
-  const resolveCommentAuthor = () => commentAuthor.trim() || t('tools.sheet.commentAnonymous');
-
-  const activeCommentSheetId = () => handleRef.current?.getActiveSheetId() ?? activeSheetId;
-
-  const updateCommentThread = (
-    threadId: string,
-    updater: (thread: CommentThread) => CommentThread,
-  ) => {
-    const sheetId = activeCommentSheetId();
-    if (!sheetId) return;
-    const threads = threadsForSheet(commentsRef.current, sheetId);
-    let changed = false;
-    const next = threads.map((thread) => {
-      if (thread.id !== threadId) return thread;
-      const updated = updater(thread);
-      if (updated !== thread) changed = true;
-      return updated;
-    });
-    if (changed) setCommentMap(setSheetThreads(commentsRef.current, sheetId, next));
-  };
-
-  const addSheetComment = (body: string) => {
-    const sheetId = activeCommentSheetId();
-    if (!sheetId || !commentCell) return;
-    const thread = createThread(
-      { kind: 'cell', sheetId, row: commentCell.row, col: commentCell.col },
-      { author: resolveCommentAuthor(), body },
-    );
-    const threads = [...threadsForSheet(commentsRef.current, sheetId), thread];
-    setCommentMap(setSheetThreads(commentsRef.current, sheetId, threads));
-  };
-
-  const replySheetComment = (threadId: string, body: string) =>
-    updateCommentThread(threadId, (thread) =>
-      addReply(thread, { author: resolveCommentAuthor(), body }),
-    );
-
-  const resolveSheetComment = (threadId: string, resolved: boolean) =>
-    updateCommentThread(threadId, (thread) => setThreadResolved(thread, resolved));
-
-  const deleteSheetComment = (threadId: string) => {
-    const sheetId = activeCommentSheetId();
-    if (!sheetId) return;
-    const threads = threadsForSheet(commentsRef.current, sheetId);
-    const next = threads.filter((thread) => thread.id !== threadId);
-    if (next.length === threads.length) return;
-    setCommentMap(setSheetThreads(commentsRef.current, sheetId, next));
-  };
 
   /**
    * IndexedDB tier (P0-5): keep only the newest snapshot and write it on a slow debounce. The draft
@@ -1047,11 +965,8 @@ export default function SpreadsheetTool() {
             setShapes(shapeConfigs);
           }
         }
-        if (!commentsLoadedRef.current) {
-          commentsLoadedRef.current = true;
-          commentsRef.current = adopted.comments;
-          setSheetComments(adopted.comments);
-        }
+        // 实例重建（StrictMode / 换主题）拿到的是原始快照：只采纳第一次，别抹掉用户刚写的批注
+        adoptComments(adopted.comments);
         if (!metaLoadedRef.current) {
           metaLoadedRef.current = true;
           namedRangesRef.current = adopted.namedRanges;
@@ -1111,7 +1026,7 @@ export default function SpreadsheetTool() {
         setRibbonHost(null);
       }
     };
-  }, [univerLocale, dark, scheduleSave, applyChartData, refreshSheets]);
+  }, [univerLocale, dark, scheduleSave, applyChartData, refreshSheets, adoptComments]);
 
   // Sheet area size: chart dragging / resizing needs bounds
   useEffect(() => {
@@ -1350,9 +1265,8 @@ export default function SpreadsheetTool() {
       setCharts(objects.charts);
       setSelectedChartId(objects.charts[0]?.id ?? null);
       setChartImport(summarizeImport(objects.charts, objects.rawParts?.parts));
-      commentsLoadedRef.current = true;
-      commentsRef.current = objects.comments;
-      setSheetComments(objects.comments);
+      // 换文档：必须无条件替换，上一份的批注不能挂在新文档上
+      resetComments(objects.comments);
       pivotConfigsRef.current = objects.pivots;
       setPivotConfigs(objects.pivots);
       // Names / protection travel in the same snapshot; adopting them here keeps "打开文件" honest
@@ -1373,7 +1287,7 @@ export default function SpreadsheetTool() {
       refreshSummary();
       refreshSheets();
     },
-    [applyChartData, refreshSummary, refreshSheets],
+    [applyChartData, refreshSummary, refreshSheets, resetComments],
   );
 
   /** 清空重来（新建 / 删除当前文档后）：编辑器与草稿都回到"空工作簿" */
@@ -1453,47 +1367,6 @@ export default function SpreadsheetTool() {
     const timer = setTimeout(() => persistNow(), SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [title, persistNow]);
-
-  /** Limit the file dialog's default filter to the format picked in the dropdown (users can still switch to "all files"; the type check lives in handleImport) */
-  const openImport = (accept: string) => {
-    const input = importInputRef.current;
-    if (!input) return;
-    input.accept = accept;
-    input.click();
-  };
-
-  const handleImport = async (file: File) => {
-    setBusy('import');
-    setFailure(null);
-    // Route by extension first: .csv goes through the pure-logic parser, .xlsx/.xlsm to exceljs
-    const check = checkImportFile(file);
-    if (!check.ok) {
-      setBusy(null);
-      setFailure(check);
-      return;
-    }
-    // Import-side fidelity (P0-4): the sink is filled by the xlsx path; CSV has nothing to report
-    const outcome: ImportOutcome = { issues: [] };
-    const result =
-      check.value === 'csv'
-        ? csvToSnapshot(await file.text(), file.name.replace(/\.csv$/i, ''), univerLocale)
-        : await importXlsxToSnapshot(file, outcome);
-    setBusy(null);
-    if (!result.ok) {
-      setFailure(result);
-      return;
-    }
-    const nextTitle = title.trim() ? title : result.value.name;
-    applySnapshot(result.value, nextTitle);
-    persistNow(nextTitle);
-    // An import is an explicit action: the library entry must exist now, not after the debounce
-    flushDocSaveRef.current();
-    // Same dialog as the export side, opposite direction: tell the user what the file had that this
-    // editor could not keep, instead of letting them find out after re-exporting.
-    if (outcome.issues.length > 0 && !isFidelityMuted()) {
-      setFidelity(createFidelityReport('sheet', 'import', outcome.issues));
-    }
-  };
 
   // 标签栏的六个动作只是 hook 的薄包装：动作本身（刷新 / 清理 / 落盘 / 报错）都在 useSheetTabs 里
   const handleAddSheet = () => {
@@ -1658,6 +1531,40 @@ export default function SpreadsheetTool() {
     [t],
   );
 
+  /**
+   * 文件进出（P2-4 第 3 片）：导入 / 导出 xlsx·csv / 打印·PDF 与它们的"忙 / 失败 / 保真报告"，
+   * 全部在 hook 里；组件只提供快照合成方式与几个落盘回调。
+   */
+  const {
+    printTarget,
+    fidelity,
+    closeFidelity,
+    closePrint,
+    openImport,
+    importFile,
+    exportXlsx,
+    exportCsv,
+    openPrint,
+    print: printWithOptions,
+    exportPdf,
+  } = useSheetFileIo({
+    handleRef,
+    title,
+    locale: univerLocale,
+    importInputRef,
+    setBusy,
+    setFailure,
+    withDocOwnedContent,
+    applySnapshot,
+    persistNow: (nextTitle) => persistNow(nextTitle),
+    flushDocSave: () => flushDocSaveRef.current(),
+    pivotConfigsRef,
+    pivotValueLabelOf,
+    chartDataMap,
+    pivotBlankLabel: t('tools.sheet.pivotBlank'),
+    pivotValuesCaption: t('tools.sheet.pivotValues'),
+  });
+
   const handlePivotInsert = () => {
     const handle = handleRef.current;
     if (!handle || !pivotConfig) return;
@@ -1738,149 +1645,6 @@ export default function SpreadsheetTool() {
     void printSheet(snapshot, sheet.id, DEFAULT_SHEET_PRINT_OPTIONS as SheetPrintOptions, null);
   };
 
-  const handleExport = async () => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    setBusy('export');
-    setFailure(null);
-    const base = withDocOwnedContent(handle.getSnapshot());
-    // 透视表写进额外工作表：导出层会再注入原生 pivotTable part，
-    // 支持不了的形态（多级列头/筛选/截断）保留静态值并由保真报告告警
-    const snapshot = appendPivotSheets(
-      base,
-      pivotConfigsRef.current,
-      t('tools.sheet.pivotBlank'),
-      pivotValueLabelOf,
-      t('tools.sheet.pivotValues'),
-    );
-    const result = await exportSnapshotToBytes(snapshot);
-    setBusy(null);
-    if (!result.ok) {
-      setFailure(result);
-      return;
-    }
-    downloadBytes(result.value, buildExportFilename(title || 'workbook', 'xlsx'), XLSX_MIME);
-    setFidelity(
-      isFidelityMuted()
-        ? null
-        : createFidelityReport('sheet', 'export', collectExportIssues(snapshot)),
-    );
-  };
-
-  /** Export CSV from the active sheet; a leading BOM lets Excel handle Chinese text correctly */
-  const handleExportCsv = () => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    setFailure(null);
-    const result = snapshotToCsv(handle.getSnapshot(), handle.getActiveSheetId());
-    if (!result.ok) {
-      setFailure(result);
-      return;
-    }
-    const bytes = new TextEncoder().encode(CSV_BOM + result.value);
-    downloadBytes(bytes, buildExportFilename(title || 'workbook', 'csv'), 'text/csv;charset=utf-8');
-  };
-
-  /** Open the print dialog with a fresh snapshot + selection (printing never mutates the doc) */
-  const openPrint = () => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    const range = handle.getActiveRange();
-    const sheetId = handle.getActiveSheetId();
-    setPrintTarget({
-      // 图片 / 图表 / 形状只存在于本工具自己的字段里，`getSnapshot()` 拿不到——
-      // 不合并进来的话，打印与 PDF 永远是"只有格子"（P1-6）
-      snapshot: withDocOwnedContent(handle.getSnapshot()),
-      sheetId,
-      selection: range
-        ? {
-            startRow: range.startRow,
-            startColumn: range.startColumn,
-            endRow: range.endRow,
-            endColumn: range.endColumn,
-          }
-        : null,
-    });
-  };
-
-  /** Print; browsers that block the popup fall back to PDF export */
-  /**
-   * 打印用的图表位图：图表在应用内是 ECharts 画布，打印模型只吃位图，
-   * 所以先离屏渲染一遍（同一份 `ChartConfig` + 同一份图表数据，和应用里看到的一致）。
-   */
-  const printModelOptions = async (target: typeof printTarget): Promise<PrintModelOptions> => {
-    if (!target) return {};
-    const owner = (chart: ChartConfig): string =>
-      chart.sheetId && target.snapshot.sheets?.[chart.sheetId]
-        ? chart.sheetId
-        : (target.snapshot.sheetOrder?.[0] ?? '');
-    const charts = (target.snapshot.syntoolsCharts ?? []).filter(
-      (chart) => owner(chart) === target.sheetId,
-    );
-    const chartImages = await renderChartImages(charts, (chart) => chartDataMap[chart.id] ?? null);
-    return { chartImages };
-  };
-
-  const handlePrint = async (options: SheetPrintOptions, range: CellRange | null) => {
-    if (!printTarget) return;
-    setFailure(null);
-    setBusy('export');
-    const modelOptions = await printModelOptions(printTarget);
-    const result = await printSheet(
-      printTarget.snapshot,
-      printTarget.sheetId,
-      options,
-      range,
-      modelOptions,
-    );
-    if (result.ok) {
-      setBusy(null);
-      setPrintTarget(null);
-      return;
-    }
-    if (result.error === 'PRINT_BLOCKED' || result.error === 'PRINT_UNSUPPORTED') {
-      const pdf = await exportSheetPdf(
-        printTarget.snapshot,
-        printTarget.sheetId,
-        options,
-        range,
-        modelOptions,
-      );
-      setBusy(null);
-      if (!pdf.ok) {
-        setFailure(pdf);
-        return;
-      }
-      downloadBytes(pdf.value, `${sanitizeFilename(title || 'workbook')}.pdf`, 'application/pdf');
-      setPrintTarget(null);
-      return;
-    }
-    setBusy(null);
-    setFailure(result);
-  };
-
-  /** Export the print layout as PDF (paper / orientation / area) */
-  const handlePrintPdf = async (options: SheetPrintOptions, range: CellRange | null) => {
-    if (!printTarget) return;
-    setFailure(null);
-    setBusy('export');
-    const modelOptions = await printModelOptions(printTarget);
-    const result = await exportSheetPdf(
-      printTarget.snapshot,
-      printTarget.sheetId,
-      options,
-      range,
-      modelOptions,
-    );
-    setBusy(null);
-    if (!result.ok) {
-      setFailure(result);
-      return;
-    }
-    downloadBytes(result.value, `${sanitizeFilename(title || 'workbook')}.pdf`, 'application/pdf');
-    setPrintTarget(null);
-  };
-
   const handleClear = () => {
     loadEmptyWorkbook();
   };
@@ -1954,8 +1718,8 @@ export default function SpreadsheetTool() {
     newDoc: handleNew,
     importXlsx: () => openImport('.xlsx,.xlsm'),
     importCsv: () => openImport('.csv'),
-    exportXlsx: () => void handleExport(),
-    exportCsv: handleExportCsv,
+    exportXlsx: () => void exportXlsx(),
+    exportCsv: exportCsv,
     print: openPrint,
     library: openLibrary,
     versions: openVersions,
@@ -2462,7 +2226,7 @@ export default function SpreadsheetTool() {
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = '';
-          if (file) void handleImport(file);
+          if (file) void importFile(file);
         }}
       />
 
@@ -2507,7 +2271,7 @@ export default function SpreadsheetTool() {
       <FidelityDialog
         report={fidelity}
         muted={isFidelityMuted()}
-        onClose={() => setFidelity(null)}
+        onClose={closeFidelity}
         onMute={muteFidelity}
       />
 
@@ -2533,7 +2297,7 @@ export default function SpreadsheetTool() {
             Boolean(pivotConfig.outputSheetId) &&
             sheets.some((sheet) => sheet.id === pivotConfig.outputSheetId)
           }
-          onExport={() => void handleExport()}
+          onExport={() => void exportXlsx()}
           onPrint={handlePivotPrint}
         />
       ) : null}
@@ -2544,9 +2308,9 @@ export default function SpreadsheetTool() {
           sheetId={printTarget.sheetId}
           selection={printTarget.selection}
           busy={busy !== null}
-          onCancel={() => setPrintTarget(null)}
-          onPrint={(options, range) => void handlePrint(options, range)}
-          onExportPdf={(options, range) => void handlePrintPdf(options, range)}
+          onCancel={closePrint}
+          onPrint={(options, range) => void printWithOptions(options, range)}
+          onExportPdf={(options, range) => void exportPdf(options, range)}
         />
       ) : null}
 
@@ -2560,8 +2324,8 @@ export default function SpreadsheetTool() {
           onReply={replySheetComment}
           onToggleResolved={resolveSheetComment}
           onDeleteThread={deleteSheetComment}
-          onUseCurrentCell={() => setCommentCell(commentAnchor())}
-          onClose={() => setCommentsOpen(false)}
+          onUseCurrentCell={useCurrentCommentCell}
+          onClose={closeComments}
         />
       ) : null}
 
