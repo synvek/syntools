@@ -690,6 +690,21 @@ function alignOf(style: UniverStyleLite | undefined): PresentCell['align'] {
 }
 
 /**
+ * 单元格的显示文本：有值用值，只有公式时显示公式（快照里的公式已带 `=`）。
+ * 演示视图与无障碍网格共用这一份规则，避免同一格在两种视图里读出不同的字。
+ */
+export function cellDisplayText(cell: { v?: unknown; f?: unknown } | undefined): string {
+  if (!cell) return '';
+  const value = cell.v ?? cell.f;
+  if (value === undefined || value === null || value === '') return '';
+  const formula = typeof cell.f === 'string' ? cell.f : '';
+  if (formula && (cell.v === undefined || cell.v === null)) {
+    return formula.startsWith('=') ? formula : `=${formula}`;
+  }
+  return String(value);
+}
+
+/**
  * Snapshot → read-only grid data (a pure function, easy to unit test).
  * Used by present mode: renders straight to an HTML table without a Univer instance.
  */
@@ -741,16 +756,8 @@ export function buildPresentGrid(
     for (const [colKey, cell] of Object.entries(rowCells ?? {})) {
       const col = Number(colKey);
       if (!Number.isFinite(col) || col >= cols) continue;
-      const value = cell?.v ?? cell?.f;
-      if (value === undefined || value === null || value === '') continue;
-      const formula = typeof cell?.f === 'string' ? cell.f : '';
-      // Per Univer, formulas in the snapshot already carry a leading "=", so do not add another
-      const text =
-        formula && (cell.v === undefined || cell.v === null)
-          ? formula.startsWith('=')
-            ? formula
-            : `=${formula}`
-          : String(value);
+      const text = cellDisplayText(cell);
+      if (!text) continue;
       const style = (cell as { s?: UniverStyleLite }).s;
       cells.push({
         row,

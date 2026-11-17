@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HintTip } from '@/core/components/DocumentHeader';
-import { clearDraft, readDraft, writeDraftSafe } from './draft';
+import { clearDraft } from './draft';
 import { Icon } from '@/core/components/Icon';
 import { EditorStatusBar } from '@/core/components/EditorStatusBar';
 import {
   EDITOR_STRIP_TITLE_INPUT_CLASS,
   STRIP_ICON_BUTTON_CLASS,
-  estimateJsonBytes,
   formatBytes,
 } from '@/core/components/editorChrome';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
@@ -17,13 +16,7 @@ import { i18n } from '@/core/i18n';
 import { translateToolError } from '@/core/i18n/helpers';
 import { useSettingsStore } from '@/stores/settings';
 import type { ToolResult } from '@/core/types';
-import {
-  buildPresentGrid,
-  columnIndexToName,
-  summarizeWorkbook,
-  type PresentGrid,
-  type WorkbookSummary,
-} from './core';
+import { columnIndexToName, summarizeWorkbook, type WorkbookSummary } from './core';
 import { CHART_TYPE_LABEL_KEY } from './charts';
 import { registerChartStrings } from './chartStrings';
 import { chartTypeBreakdown } from './chartImport';
@@ -40,16 +33,26 @@ import { ShapeDrawLayer } from './ui/ShapeDrawLayer';
 import { ShapeFormatBar } from './ui/ShapeFormatBar';
 import { ImageLayer } from './ui/ImageLayer';
 import { registerStoreStrings } from './storeStrings';
-import { createDocId, saveDocument, setCurrentDocId } from './docStore';
+import { useSheetDocLibrary } from './hooks/useSheetDocLibrary';
 import { DocLibraryPanel, StorageNotice, VersionHistoryPanel } from './DocLibraryPanel';
 import { useSheetTabs } from './hooks/useSheetTabs';
-import { useSheetDocLibrary } from './hooks/useSheetDocLibrary';
 import { useSheetFileIo } from './hooks/useSheetFileIo';
 import { useSheetComments } from './hooks/useSheetComments';
 import { useSheetCharts } from './hooks/useSheetCharts';
 import { useSheetObjects } from './hooks/useSheetObjects';
 import { useSheetMeta } from './hooks/useSheetMeta';
 import { useSheetPivot } from './hooks/useSheetPivot';
+import { useSheetPersistence } from './hooks/useSheetPersistence';
+import { useSheetInstance } from './hooks/useSheetInstance';
+import { useSheetPresent } from './hooks/useSheetPresent';
+import {
+  ARIA_GRID_DOM_ID,
+  buildAriaGrid,
+  emptyAriaGrid,
+  planAriaRange,
+  type AriaRange,
+} from './a11yGrid';
+import { AriaGrid } from './AriaGrid';
 import { SHEET_TEMPLATES, templateById, type SheetTemplate, type TemplateId } from './templates';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
@@ -118,33 +121,8 @@ type Failure = Extract<ToolResult<unknown>, { ok: false }>;
 const PIVOT_SHEET_ID = 'pivot-print';
 type BusyKind = 'import' | 'export' | null;
 
-/** Debounce after edits: avoids a full save() on every keystroke */
-const SAVE_DEBOUNCE_MS = 600;
-/**
- * Document-library writes are a second, much slower tier than the draft (P0-5): a full snapshot is
- * structured-cloned into IndexedDB, which is the expensive half of persistence. 10 s keeps the
- * library close enough to the draft while taking that cost off the typing path.
- */
-const DOC_SAVE_DEBOUNCE_MS = 10_000;
 /** How long an inline failure notice stays on screen before it goes away by itself */
 const ISSUE_NOTICE_MS = 6_000;
-
-/**
- * Run a heavy-but-deferrable task (full `getSnapshot()` + `JSON.stringify`) when the browser is
- * idle, with a hard deadline so a permanently busy page still saves.
- */
-function runWhenIdle(task: () => void): void {
-  const idle = (
-    window as Window & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-    }
-  ).requestIdleCallback;
-  if (typeof idle === 'function') {
-    idle(task, { timeout: 1500 });
-    return;
-  }
-  window.setTimeout(task, 0);
-}
 
 /**
  * Spreadsheet editor: Univer provides the editing surface; import and export happen entirely in the
@@ -183,9 +161,7 @@ export default function SpreadsheetTool() {
   /** Carries the current data across instance rebuilds (theme / locale switch) */
   const pendingRef = useRef<WorkbookSnapshot | null>(null);
   const [title, setTitle] = useState('');
-  const [presenting, setPresenting] = useState(false);
-  const [presentGrid, setPresentGrid] = useState<PresentGrid | null>(null);
-  const [presentFailed, setPresentFailed] = useState(false);
+
   /** Sheet area size: the bounds for dragging / resizing charts（图表层与形状/图片层共用） */
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
   // 形状 / 图片（SHEET-02）的状态与动作在 `useSheetObjects` 里（P2-4）
@@ -292,29 +268,6 @@ export default function SpreadsheetTool() {
   const surfaceRef = useRef<HTMLDivElement | null>(null);
 
   /**
-   * Present: read the current workbook snapshot → turn it into a read-only grid.
-   * It renders without the Univer instance, so the workbook being edited is left untouched.
-   */
-  const openPresent = () => {
-    setPresentGrid(null);
-    setPresentFailed(false);
-    setPresenting(true);
-    try {
-      const handle = handleRef.current;
-      // 对象层（P2-10）：图片 / 形状 / 图表只存在于工具自有字段里，`getSnapshot()` 拿不到，
-      // 必须先合成再投影，否则演示视图永远是"只有格子"。
-      const snapshot = handle ? withDocOwnedContent(handle.getSnapshot()) : null;
-      const grid = snapshot
-        ? buildPresentGrid(snapshot, handleRef.current?.getActiveSheetId() ?? null)
-        : null;
-      if (grid) setPresentGrid(grid);
-      else setPresentFailed(true);
-    } catch {
-      setPresentFailed(true);
-    }
-  };
-
-  /**
    * 浮动图表（P2-4 第 5 片）：配置 + 派生数据 + 选中态 + 四个动作都在 hook 里。
    * `chartBounds` 仍留在组件，因为形状 / 图片层用的是同一个尺寸。
    */
@@ -347,42 +300,20 @@ export default function SpreadsheetTool() {
     formulas: 0,
   });
   const [busy, setBusy] = useState<BusyKind>(null);
-  const [draftSaved, setDraftSaved] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [runtimeError, setRuntimeError] = useState(false);
-  // Local document library (IndexedDB): state and I/O live in `useSheetDocLibrary` (P2-4)
-  const [docId, setDocId] = useState<string | null>(null);
-  /** 文档库的刷新函数在 hook 里，而库写入（`queueDocSave`）比它先声明：走 ref 取最新闭包 */
+  /** 文档库的刷新函数在 hook 里，而库写入比它先声明：走 ref 取最新闭包 */
   const refreshDocsRef = useRef<() => void>(() => {});
-  /** Persistence failure notice: over the size cap (failed) / local storage unavailable (degraded) */
-  const [draftNotice, setDraftNotice] = useState<'degraded' | 'failed' | null>(null);
-  const docIdRef = useRef<string | null>(null);
   /** P2-6：启动时按 URL 参数打开模板，而 handler 定义在下面，所以通过 ref 调用 */
   const loadTemplateRef = useRef<(id: TemplateId, options?: { confirm?: boolean }) => void>(
     () => {},
   );
-  docIdRef.current = docId;
-  const titleRef = useRef(title);
-  titleRef.current = title;
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const docSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Latest snapshot waiting for the slow IndexedDB tier (P0-5) */
-  const pendingDocRef = useRef<{
-    id: string;
-    title: string;
-    snapshot: WorkbookSnapshot;
-  } | null>(null);
-  /** Assigned once `flushDocSave` exists; the debounce timer and unmount cleanup go through it */
-  const flushDocSaveRef = useRef<() => void>(() => {});
-  /**
-   * Snapshot size shown in the status bar. Measured once per save instead of on every render: the
-   * old `useMemo` called `getSnapshot()` during render, so typing billed the whole workbook twice.
-   */
-  const [memoryBytes, setMemoryBytes] = useState(0);
   /** Inline failure notice (P0-3); replaces the silent `catch {}` this module used to have */
   const [issueNotice, setIssueNotice] = useState<SheetIssue | null>(null);
   /** Screen-reader announcement of the current selection (P0-6) */
   const [a11yStatus, setA11yStatus] = useState('');
+  /** 选区（P2-9）：无障碍网格只投影这一块，同样是"稳定后才更新"，避免方向键刷 DOM */
+  const [selection, setSelection] = useState<AriaRange | null>(null);
 
   /**
    * 单元格批注（P2-4 第 4 片）：线程数据 + 面板状态 + 四个动作 + "只采纳第一次"的规则都在 hook 里。
@@ -489,85 +420,37 @@ export default function SpreadsheetTool() {
     [sheetObjectSource],
   );
 
-  /**
-   * IndexedDB tier (P0-5): keep only the newest snapshot and write it on a slow debounce. The draft
-   * (localStorage) is the fast path; this is the durable one, so it must never queue up N writes for
-   * N keystrokes — the last one wins.
-   */
-  const queueDocSave = useCallback(
-    (id: string, title: string, snapshot: WorkbookSnapshot): void => {
-      pendingDocRef.current = { id, title, snapshot };
-      if (docSaveTimerRef.current) clearTimeout(docSaveTimerRef.current);
-      docSaveTimerRef.current = setTimeout(() => {
-        docSaveTimerRef.current = null;
-        flushDocSaveRef.current();
-      }, DOC_SAVE_DEBOUNCE_MS);
-    },
-    [],
-  );
+  // 两级落盘（P2-4 第九片）：草稿去抖 + 文档库单槽；关页 / 切后台 / 卸载都兜住
+  const {
+    docId,
+    docIdRef,
+    adoptDocId,
+    draftSaved,
+    draftNotice,
+    memoryBytes,
+    persistNow,
+    scheduleSave,
+    flushDocSave,
+    resetDraftState,
+  } = useSheetPersistence({
+    handleRef,
+    withDocOwnedContent,
+    syncChartData: applyChartData,
+    getTitle: () => title,
+    onSummary: setSummary,
+    onDocSaved: () => refreshDocsRef.current(),
+  });
+  // 图表 / 名称 / 保护等 hook 声明得更早，通过 ref 拿到同一个 scheduleSave
+  scheduleSaveRef.current = scheduleSave;
 
-  const flushDocSave = useCallback((): void => {
-    if (docSaveTimerRef.current) {
-      clearTimeout(docSaveTimerRef.current);
-      docSaveTimerRef.current = null;
-    }
-    const pending = pendingDocRef.current;
-    pendingDocRef.current = null;
-    if (!pending) return;
-    void saveDocument(pending.id, pending.title, pending.snapshot).then(() => {
-      refreshDocsRef.current();
-    });
-  }, []);
-  // The debounce timer and the unmount cleanup call through the ref, so they always see this closure
-  flushDocSaveRef.current = flushDocSave;
-
-  /**
-   * Unified persistence: localStorage draft (a synchronous safety net) plus the IndexedDB document
-   * library (multiple documents / version history). Called only after real edits or explicit
-   * actions, replacing the old "full save() + stringify every 2 seconds" poll.
-   */
-  const persistNow = useCallback(
-    (nextTitle?: string): void => {
-      const handle = handleRef.current;
-      if (!handle) return;
-      const base = handle.getSnapshot();
-      // Chart data follows the cell contents
-      applyChartData(base, handle.getActiveSheetId());
-      const snapshot = withDocOwnedContent(base);
-      const result = writeDraftSafe(snapshot);
-      setDraftSaved(result.ok);
-      setDraftNotice(result.ok ? null : result.degraded ? 'degraded' : 'failed');
-      const nextSummary = summarizeWorkbook(base);
-      setSummary(nextSummary);
-      setMemoryBytes(estimateJsonBytes({ summary: nextSummary, snapshot }));
-      // Allocate the document id lazily: it only enters the library on the first save
-      let id = docIdRef.current;
-      if (!id) {
-        id = createDocId();
-        docIdRef.current = id;
-        setDocId(id);
-        setCurrentDocId(id);
-      }
-      queueDocSave(id, nextTitle ?? titleRef.current, snapshot);
-    },
-    [applyChartData, queueDocSave, withDocOwnedContent],
-  );
-
-  /**
-   * Edit events → debounced persistence. The snapshot + stringify work happens in an idle callback:
-   * doing it inside the timer made every pause in typing a main-thread stall on large sheets.
-   */
-  const scheduleSave = useCallback((): void => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      saveTimerRef.current = null;
-      runWhenIdle(persistNow);
-    }, SAVE_DEBOUNCE_MS);
-  }, [persistNow]);
-  // Chart edits (non-Univer changes) trigger persistence through this ref, so callbacks need not be declared in order
-  useEffect(() => {
-    scheduleSaveRef.current = scheduleSave;
-  }, [scheduleSave]);
+  // 演示视图（P2-4 第十一片）：只读网格的投影与开合，渲染不经过 Univer 实例
+  const {
+    presenting,
+    grid: presentGrid,
+    failed: presentFailed,
+    open: openPresent,
+    close: closePresent,
+  } = useSheetPresent({ handleRef, withDocOwnedContent });
 
   /** Inline failure notices (P0-3): one at a time, auto-dismissed, never blocking */
   useEffect(() => subscribeSheetIssues((issue) => setIssueNotice(issue)), []);
@@ -577,28 +460,6 @@ export default function SpreadsheetTool() {
     const timer = window.setTimeout(() => setIssueNotice(null), ISSUE_NOTICE_MS);
     return () => window.clearTimeout(timer);
   }, [issueNotice]);
-
-  /**
-   * Close-the-tab safety net (P0-5): the draft is written on a debounce and the library on a slow
-   * one, so the last edits must be flushed when the page goes away.
-   */
-  useEffect(() => {
-    const flush = () => flushDocSaveRef.current();
-    const onHidden = () => {
-      if (document.visibilityState !== 'hidden') return;
-      persistNow();
-      flushDocSaveRef.current();
-    };
-    window.addEventListener('pagehide', flush);
-    document.addEventListener('visibilitychange', onHidden);
-    return () => {
-      window.removeEventListener('pagehide', flush);
-      document.removeEventListener('visibilitychange', onHidden);
-    };
-  }, [persistNow]);
-
-  /** A queued library write must not be stranded when the tool unmounts (route change) */
-  useEffect(() => () => flushDocSaveRef.current(), []);
 
   /**
    * Screen-reader announcement of the selection (P0-6). The grid is a canvas, so a live region is
@@ -614,6 +475,8 @@ export default function SpreadsheetTool() {
       timer = null;
       const range = host.getActiveRange();
       if (!range) return;
+      // 无障碍网格跟着同一次"稳定"更新：方向键连按时不该每按一次就重建一遍 DOM
+      setSelection(range);
       const cell = `${columnIndexToName(range.startColumn)}${range.startRow + 1}`;
       const rows = range.endRow - range.startRow + 1;
       const columns = range.endColumn - range.startColumn + 1;
@@ -629,6 +492,8 @@ export default function SpreadsheetTool() {
       if (timer !== null) window.clearTimeout(timer);
       timer = window.setTimeout(announce, 300);
     });
+    // 先播一次：无障碍网格挂载时就该有内容，否则要等用户第一次移动选区
+    announce();
     return () => {
       unsubscribe();
       if (timer !== null) window.clearTimeout(timer);
@@ -662,106 +527,66 @@ export default function SpreadsheetTool() {
   // 「插入到文档」会新建工作表：让标签栏重新取一遍（hook 声明得早，只能通过 ref 回调）
   refreshSheetsRef.current = refreshSheets;
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    let cancelled = false;
-    let stopViewport: (() => void) | null = null;
-    // Create one tick later: under StrictMode the effect mounts → unmounts → mounts synchronously,
-    // and instantiating inside the effect would unmount Univer's React root during React's own
-    // render, leaving the second instance blank (an empty sheet in development).
-    const timer = window.setTimeout(() => {
-      if (cancelled) return;
-      let handle: UniverHandle;
-      try {
-        handle = createUniverInstance(container, { locale: univerLocale, dark });
-      } catch {
-        setRuntimeError(true);
-        return;
+  /**
+   * Univer 实例的创建 / 重建 / 销毁（P2-4 第十片）。
+   * 生命周期（一个 tick 后创建、重建前抓快照、订阅与退订）在 hook 里；
+   * 下面的具名回调只回答"重建后各域该做什么"。
+   */
+  // 语言 / 主题变化必须重建实例：这两个值打成一个稳定对象给 hook 当依赖
+  const engineOptions = useMemo(() => ({ locale: univerLocale, dark }), [univerLocale, dark]);
+  useSheetInstance({
+    containerRef,
+    handleRef,
+    pendingRef,
+    subscriptionRef: unsubscribeRef,
+    engineOptions,
+    create: createUniverInstance,
+    adopt: (snapshot) => {
+      // Tool-owned content: read back through the registry (P2-5), then keep the per-family
+      // "first restore wins" rules below. On an instance rebuild (StrictMode's second mount,
+      // theme / locale switch) `snapshot` is a raw Univer snapshot without these fields, so
+      // overwriting would simply drop them.
+      const adopted = readSheetObjects(snapshot);
+      if (!extrasRef.current) extrasRef.current = adopted.extras;
+      if (!rawPartsRef.current) {
+        rawPartsRef.current = adopted.rawParts;
       }
-      const pending = pendingRef.current ?? readDraft();
-      if (pending) {
-        handle.loadSnapshot(pending);
-        // Tool-owned content: read back through the registry (P2-5), then keep the per-family
-        // "first restore wins" rules below. On an instance rebuild (StrictMode's second mount,
-        // theme / locale switch) `pending` is a raw Univer snapshot without these fields, so
-        // overwriting would simply drop them.
-        const adopted = readSheetObjects(pending);
-        if (!extrasRef.current) extrasRef.current = adopted.extras;
-        if (!rawPartsRef.current) {
-          rawPartsRef.current = adopted.rawParts;
-        }
-        // 重建拿到的是原始 Univer 快照：已经有图表（来自草稿）时不覆盖
-        adoptChartsIfEmpty(adopted.charts, rawPartsRef.current);
-        // 形状与图片同样"空才采纳"，两族互不影响
-        adoptObjectsIfEmpty({ shapes: adopted.shapes, images: adopted.images });
-        // 实例重建（StrictMode / 换主题）拿到的是原始快照：只采纳第一次，别抹掉用户刚写的批注
-        adoptComments(adopted.comments);
-        adoptMeta({
-          namedRanges: adopted.namedRanges,
-          protection: adopted.protection,
-          tables: adopted.tables,
-        });
-        // 透视配置同样"空才采纳"：重建快照里本来就没有透视，有内容就说明来自草稿
-        adoptPivotsIfEmpty(adopted.pivots);
-      }
-      handleRef.current = handle;
-      setRibbonHost(handle);
-      // Dirty tracking: only modifications that reach the snapshot trigger debounced persistence
-      unsubscribeRef.current = handle.onMutation(() => {
-        scheduleSave();
-        // 透视表是"源数据的视图"：源表一改就重算，而不是等用户手动刷新
-        if (pivotOpenRef.current) refreshPivot();
-        // Column widths / row heights may have changed: shapes are anchored through them
-        setShapeLayoutVersion((version) => version + 1);
+      // 重建拿到的是原始 Univer 快照：已经有图表（来自草稿）时不覆盖
+      adoptChartsIfEmpty(adopted.charts, rawPartsRef.current);
+      // 形状与图片同样"空才采纳"，两族互不影响
+      adoptObjectsIfEmpty({ shapes: adopted.shapes, images: adopted.images });
+      // 实例重建（StrictMode / 换主题）拿到的是原始快照：只采纳第一次，别抹掉用户刚写的批注
+      adoptComments(adopted.comments);
+      adoptMeta({
+        namedRanges: adopted.namedRanges,
+        protection: adopted.protection,
+        tables: adopted.tables,
       });
+      // 透视配置同样"空才采纳"：重建快照里本来就没有透视，有内容就说明来自草稿
+      adoptPivotsIfEmpty(adopted.pivots);
+    },
+    onHostChange: setRibbonHost,
+    onReady: (handle) => {
       refreshSheets();
       // Re-apply the read-only switch after every rebuild (locale / theme rebuilds the instance)
       handle.setEditable(protectionFor(protectionRef.current, handle.getActiveSheetId()) === null);
       const initial = handle.getSnapshot();
       setSummary(summarizeWorkbook(initial));
       applyChartData(initial, handle.getActiveSheetId());
-      // Shapes are projected through the grid's origin / scroll / zoom; the render unit is only
-      // measured once Univer has painted, hence the extra frame before the first read.
-      const syncViewport = (): void => {
-        if (cancelled) return;
-        setShapeViewport(handle.getViewport() ?? DEFAULT_SHEET_VIEWPORT);
-      };
-      stopViewport = handle.onViewportChange(syncViewport);
-      syncViewport();
-      window.requestAnimationFrame(syncViewport);
-    }, 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-      stopViewport?.();
-      stopViewport = null;
-      unsubscribeRef.current?.();
-      unsubscribeRef.current = null;
-      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-      const current = handleRef.current;
-      if (current) {
-        pendingRef.current = current.getSnapshot();
-        current.dispose();
-        handleRef.current = null;
-        setRibbonHost(null);
-      }
-    };
-  }, [
-    univerLocale,
-    dark,
-    scheduleSave,
-    applyChartData,
-    refreshSheets,
-    adoptComments,
-    adoptChartsIfEmpty,
-    adoptMeta,
-    adoptObjectsIfEmpty,
-    adoptPivotsIfEmpty,
-    pivotOpenRef,
-    protectionRef,
-    refreshPivot,
-  ]);
+    },
+    onMutation: () => {
+      // Dirty tracking: only modifications that reach the snapshot trigger debounced persistence
+      scheduleSave();
+      // 透视表是"源数据的视图"：源表一改就重算，而不是等用户手动刷新
+      if (pivotOpenRef.current) refreshPivot();
+      // Column widths / row heights may have changed: shapes are anchored through them
+      setShapeLayoutVersion((version) => version + 1);
+      // 无障碍投影读的是选区那一块，代价很小：内容一变就跟上，不必等下一次移动选区
+      setSelection(handleRef.current?.getActiveRange() ?? null);
+    },
+    onViewport: (handle) => setShapeViewport(handle.getViewport() ?? DEFAULT_SHEET_VIEWPORT),
+    onFailure: () => setRuntimeError(true),
+  });
 
   // Sheet area size: chart dragging / resizing needs bounds
   useEffect(() => {
@@ -817,6 +642,23 @@ export default function SpreadsheetTool() {
         .sort((a, b) => a.z - b.z),
     [images, activeSheetId],
   );
+
+  /**
+   * 无障碍投影（P2-9）：只读选区那一块（含行列号与显示值）。
+   * 读值走引擎的按区域接口，不再克隆整份快照——所以刷新频率可以跟着选区与 mutation 走。
+   */
+  const ariaGrid = useMemo(() => {
+    const handle = handleRef.current;
+    const plan = planAriaRange(selection);
+    if (!handle || !plan) return emptyAriaGrid();
+    const values = handle.readRangeText({
+      startRow: plan.startRow,
+      startColumn: plan.startColumn,
+      endRow: plan.startRow + plan.rowCount - 1,
+      endColumn: plan.startColumn + plan.columnCount - 1,
+    });
+    return buildAriaGrid({ ...plan, sheetId: activeSheetId ?? '', values });
+  }, [activeSheetId, selection]);
 
   /**
    * Row/column layout of the active sheet. Shapes are stored as cell anchors; both the overlay and
@@ -901,8 +743,7 @@ export default function SpreadsheetTool() {
   const loadEmptyWorkbook = () => {
     applySnapshot(createEmptySnapshot('', univerLocale), '');
     clearDraft();
-    setDraftSaved(false);
-    setDraftNotice(null);
+    resetDraftState();
   };
 
   /**
@@ -932,11 +773,11 @@ export default function SpreadsheetTool() {
     restoreVersion,
   } = useSheetDocLibrary({
     docIdRef,
-    onAdoptDocId: setDocId,
+    onAdoptDocId: adoptDocId,
     onOpenSnapshot: applySnapshot,
     onResetWorkbook: loadEmptyWorkbook,
     onPersist: (nextTitle) => persistNow(nextTitle),
-    onFlush: () => flushDocSaveRef.current(),
+    onFlush: flushDocSave,
     messages: {
       untitled: t('tools.sheet.untitledDoc'),
       copySuffix: t('tools.sheet.copySuffix'),
@@ -945,7 +786,7 @@ export default function SpreadsheetTool() {
       clearVersionsConfirm: t('tools.sheet.clearVersionsConfirm'),
     },
   });
-  // `queueDocSave` 比 hook 先声明：库写入成功后通过 ref 刷新列表
+  // 库写入（持久化 hook）比文档库 hook 先声明：写成功后通过 ref 刷新列表
   refreshDocsRef.current = refreshDocs;
 
   // Startup: adopt the document-library pointer (content already came from the localStorage draft, avoiding a race with instance creation)
@@ -971,9 +812,8 @@ export default function SpreadsheetTool() {
       didMountRef.current = true;
       return;
     }
-    const timer = setTimeout(() => persistNow(), SAVE_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [title, persistNow]);
+    scheduleSave();
+  }, [title, scheduleSave]);
 
   // 标签栏的六个动作只是 hook 的薄包装：动作本身（刷新 / 清理 / 落盘 / 报错）都在 useSheetTabs 里
   const handleAddSheet = () => {
@@ -1020,7 +860,7 @@ export default function SpreadsheetTool() {
     withDocOwnedContent,
     applySnapshot,
     persistNow: (nextTitle) => persistNow(nextTitle),
-    flushDocSave: () => flushDocSaveRef.current(),
+    flushDocSave,
     pivotConfigsRef,
     pivotValueLabelOf,
     chartDataMap,
@@ -1083,7 +923,7 @@ export default function SpreadsheetTool() {
     closeLibrary();
     persistNow(nextTitle);
     // 显式动作：库里的条目现在就要在，不等 10 秒的防抖
-    flushDocSaveRef.current();
+    flushDocSave();
   };
 
   const handleUseTemplate = (id: TemplateId, options?: { confirm?: boolean }) => {
@@ -1159,7 +999,8 @@ export default function SpreadsheetTool() {
     },
     openComments,
     openProtect,
-    present: () => setPresenting(true),
+    // 命令表也走同一套投影：只置位不建网格会让第二次演示停留在上一份内容
+    present: openPresent,
     promptHyperlink: () => {
       const url = window.prompt(t('tools.sheet.r.hyperlinkPrompt'), 'https://');
       if (url === null) return;
@@ -1514,8 +1355,13 @@ export default function SpreadsheetTool() {
           // while the live region below carries the cell coordinates (P0-6)
           role="application"
           aria-label={t('tools.sheet.a11yGridLabel')}
+          // 投影网格是兄弟节点：用 aria-owns 挂成子节点，`aria-activedescendant` 才指向合法后代
+          aria-owns={ARIA_GRID_DOM_ID}
+          aria-activedescendant={ariaGrid.activeId ?? undefined}
           style={sheetHeight ? { height: `${sheetHeight}px` } : undefined}
         />
+        {/* 画布对读屏是不可见的：叠一层视觉隐藏的 grid 把"在哪 / 是什么"投影出去（P2-9） */}
+        <AriaGrid model={ariaGrid} />
         {/* Pictures sit under the shapes (the export writes pic before sp for the same reason) */}
         <ImageLayer
           images={visibleImages}
@@ -1761,7 +1607,7 @@ export default function SpreadsheetTool() {
       {presenting ? (
         <PresentOverlay
           title={title.trim() || t('tools.sheet.titlePlaceholder')}
-          onClose={() => setPresenting(false)}
+          onClose={closePresent}
           exitLabel={t('tools.sheet.exitPresent')}
           failedLabel={t('tools.sheet.presentFailed')}
           failed={presentFailed}

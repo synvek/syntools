@@ -173,6 +173,17 @@ export interface UniverHandle extends SheetRibbonHost {
     endRow: number;
     endColumn: number;
   } | null;
+  /**
+   * 读某块区域的**显示值**（P2-9 无障碍投影）。
+   * 只取这一块，不克隆整份快照——选区变化很频繁，`getSnapshot()` 在这里太贵。
+   * 矩阵按行返回；读取失败给空数组，由调用方降级。
+   */
+  readRangeText(range: {
+    startRow: number;
+    startColumn: number;
+    endRow: number;
+    endColumn: number;
+  }): string[][];
   /** Append a new sheet at the end; leave the name out to let Univer generate one */
   addSheet(name?: string): void;
   /**
@@ -899,6 +910,31 @@ export function createUniverInstance(
     }
   };
 
+  /**
+   * 按区域读显示值（无障碍网格用）：与 `readSelectionText` 同一个通道，
+   * 只是允许指定任意范围，且只取被投影的那一块。
+   */
+  const readRangeText = (range: {
+    startRow: number;
+    startColumn: number;
+    endRow: number;
+    endColumn: number;
+  }): string[][] => {
+    const sheet = activeFWorksheet();
+    if (!sheet) return [];
+    const rows = range.endRow - range.startRow + 1;
+    const columns = range.endColumn - range.startColumn + 1;
+    if (rows <= 0 || columns <= 0) return [];
+    try {
+      return sheet
+        .getRange(range.startRow, range.startColumn, rows, columns)
+        .getDisplayValues() as string[][];
+    } catch (error) {
+      reportSheetIssue({ code: 'styleRead', level: 'notice', detail: String(error) });
+      return [];
+    }
+  };
+
   const writeMatrix = (matrix: string[][]): void => {
     const range = activeFRange();
     if (!range || matrix.length === 0 || matrix[0]?.length === 0) return;
@@ -1099,6 +1135,7 @@ export function createUniverInstance(
     applyAutoSum,
     clearFormatting,
     readSelectionText,
+    readRangeText,
     writeMatrix,
     clearSelection,
     setHyperlink,

@@ -60,6 +60,7 @@ import { readSheetTables, type SheetTable } from './sheetTables';
 import { diagnoseXlsxArchive } from './xlsx-diagnose';
 import { collectImportIssues } from './importFidelity';
 import { reportSheetIssue } from './issues';
+import { exportSnapshotInWorker, importXlsxInWorker } from './sheetWorkerClient';
 import type { FidelityIssue } from '@/core/fidelity';
 
 /**
@@ -388,9 +389,25 @@ export interface ImportOutcome {
   issues: FidelityIssue[];
 }
 
-/** Import .xlsx: exceljs parse → Univer workbook snapshot */
-export async function importXlsxToSnapshot(
-  file: File,
+/**
+ * 导入实现只需要这三个成员。刻意不用 `File`：worker 里没有理由为了拿字节再造一个 File，
+ * 而 jsdom 的 `File` 没有 `arrayBuffer()`（单测所以一直用结构等价的假文件）。
+ */
+export interface ImportFileLike {
+  name: string;
+  size: number;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+
+/**
+ * 导入 .xlsx 的**同步实现**（P2-1）：exceljs 解析 → Univer 快照。
+ *
+ * UI 层不要直接调它——那是"把最贵的一段留在主线程"。它现在的身份有两个：
+ * ① `importXlsxToSnapshot` 在 worker 不可用时的退路；② sheet worker 内部的真正实现
+ * （同一条代码路径两条线程复用，行为差异只可能来自运行环境）。
+ */
+export async function importXlsxInThread(
+  file: ImportFileLike,
   outcome?: ImportOutcome,
 ): Promise<ToolResult<WorkbookSnapshot>> {
   const check = checkImportFile(file);
@@ -568,8 +585,35 @@ export async function importXlsxToSnapshot(
   }
 }
 
-/** Export .xlsx: Univer workbook snapshot → xlsx bytes */
-export async function exportSnapshotToBytes(
+/**
+ * 导入 .xlsx（P2-1）：优先交给 sheet worker 解析，拿不到线程就回落到同步实现。
+ *
+ * 三条分支的语义（与 `sheetWorkerClient` 的返回值一一对应，没有第四种）：
+ * - `ok`：worker 解析完成，保真问题与 worker 内的降级提示一并带回；
+ * - `failed`：文件本身读不了（加密 / 非 zip / 部件坏了），**不重试**——换线程是同一个结果，
+ *   重试只会让用户多等一遍；
+ * - `unavailable`：线程起不来 / 崩溃 / 超时，退回 `importXlsxInThread`，功能不受影响，只是慢。
+ */
+export async function importXlsxToSnapshot(
+  file: File,
+  outcome?: ImportOutcome,
+): Promise<ToolResult<WorkbookSnapshot>> {
+  const check = checkImportFile(file);
+  if (!check.ok) return check;
+  const offloaded = await importXlsxInWorker(file);
+  if (offloaded.status === 'ok') {
+    if (outcome) outcome.issues.push(...offloaded.issues);
+    // worker 里的 `reportSheetIssue` 播报到的是 worker 自己的模块状态，必须在这里重播一次，
+    // 否则"原生图表部件读不出来"这类提示会随线程一起消失
+    for (const notice of offloaded.notices) reportSheetIssue(notice);
+    return { ok: true, value: offloaded.snapshot };
+  }
+  if (offloaded.status === 'failed') return { ok: false, error: offloaded.error };
+  return importXlsxInThread(file, outcome);
+}
+
+/** Export .xlsx 的**同步实现**（P2-1）：快照 → xlsx 字节。worker 与主线程共用，同 `importXlsxInThread` */
+export async function exportSnapshotInThread(
   snapshot: WorkbookSnapshot,
 ): Promise<ToolResult<Uint8Array>> {
   try {
@@ -723,4 +767,21 @@ export async function exportSnapshotToBytes(
   } catch {
     return { ok: false, error: 'EXPORT_FAILED' };
   }
+}
+
+/**
+ * 导出 .xlsx（P2-1）：优先在 sheet worker 里写文件，拿不到线程就回落。
+ *
+ * 这里的取舍要说清楚：快照必须先**结构化克隆**进 worker（无法 transfer，纯对象），
+ * 所以省下的是 exceljs 的建表 + 序列化 + zip 后处理，不是克隆本身。2 万单元格的克隆
+ * 是毫秒级、写文件是百毫秒级，这笔账仍然划算；但"零成本"是假的——
+ * 千级以下的小表走 worker 反而略慢，故阈值留给实测（见方案 §5 P2-1 偏差说明）。
+ */
+export async function exportSnapshotToBytes(
+  snapshot: WorkbookSnapshot,
+): Promise<ToolResult<Uint8Array>> {
+  const offloaded = await exportSnapshotInWorker(snapshot);
+  if (offloaded.status === 'ok') return { ok: true, value: offloaded.bytes };
+  if (offloaded.status === 'failed') return { ok: false, error: offloaded.error };
+  return exportSnapshotInThread(snapshot);
 }

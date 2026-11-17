@@ -131,6 +131,8 @@ const zh: ResourceTree = {
       shortcutEngineNote:
         '单元格内的编辑快捷键（加粗、撤销、查找、方向键等）由表格引擎提供，不在此列表中。',
       a11yGridLabel: '表格编辑区',
+      a11yGridCell: '第 {{row}} 行 第 {{column}} 列，{{value}}',
+      a11yGridBlank: '空白',
       a11yCell: '已选中 {{cell}}',
       a11yRange: '已选中 {{cell}} 起的 {{rows}} 行 {{columns}} 列',
       err: err({
@@ -281,6 +283,8 @@ const en: ResourceTree = {
       shortcutEngineNote:
         'In-cell shortcuts (bold, undo, find, arrow keys…) come from the sheet engine and are not listed here.',
       a11yGridLabel: 'Sheet editing area',
+      a11yGridCell: 'Row {{row}}, column {{column}}, {{value}}',
+      a11yGridBlank: 'blank',
       a11yCell: 'Selected {{cell}}',
       a11yRange: 'Selected {{rows}} rows by {{columns}} columns starting at {{cell}}',
       err: err({

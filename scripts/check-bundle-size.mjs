@@ -31,6 +31,8 @@ const CHUNK_BUDGET = 500 * 1024;
 // higher limit (still reported), while other chunks stay bound by 500KB.
 // Note: Univer cannot be split by hand (@univerjs/* are circularly dependent, see vite.config.ts); in
 // production builds it merges into the dynamic entry `SpreadsheetTool-*.js` (~6MB raw / ~1.7MB gzip), hence that prefix.
+// `sheet.worker-*` (plan P2-1) needs no exemption: the worker chunk is ~1KB and its dynamically
+// imported exceljs lands in its own `exceljs.min-*` chunk (~268KB gzip), inside the normal budget.
 const HEAVY_CHUNK_BUDGET = 12 * 1024 * 1024;
 const HEAVY_CHUNK_PATTERNS = [/^vendor-univer/, /^vendor-exceljs-/, /^SpreadsheetTool-/];
 const budgetFor = (file) =>

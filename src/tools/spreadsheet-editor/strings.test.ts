@@ -58,6 +58,8 @@ describe('sheet copy', () => {
       'importMacros',
       'importPicturesReadonly',
       'a11yGridLabel',
+      'a11yGridCell',
+      'a11yGridBlank',
       'a11yCell',
       'a11yRange',
       // P1-1 快捷键帮助

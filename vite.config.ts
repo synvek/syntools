@@ -58,6 +58,13 @@ export default defineConfig({
     exclude: ['prettier-plugin-java'],
   },
   envPrefix: ['VITE_', 'TAURI_'],
+  worker: {
+    // The spreadsheet tool's IO worker (plan P2-1) dynamically imports exceljs, and the default
+    // "iife" worker format cannot code-split ("UMD and IIFE output formats are not supported for
+    // code-splitting builds"). Module workers are supported everywhere this app runs; browsers
+    // without support fire `onerror` and the tool falls back to the in-thread path.
+    format: 'es',
+  },
   build: {
     rollupOptions: {
       // Limit transform parallelism to lower peak memory with large deps (univer/mermaid)
