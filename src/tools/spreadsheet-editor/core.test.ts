@@ -9,6 +9,10 @@ import {
   booleanNumberToViewFlag,
   buildExportFilename,
   buildPresentGrid,
+  PRESENT_CELL_WIDTH,
+  PRESENT_COL_HEADER_HEIGHT,
+  PRESENT_ROW_HEADER_WIDTH,
+  PRESENT_ROW_HEIGHT,
   cellDocumentToRichText,
   checkImportFile,
   columnIndexToName,
@@ -106,6 +110,13 @@ describe('导入校验', () => {
     expect(resolveImportKind('data.csv')).toBe('csv');
     expect(resolveImportKind('old.xls')).toBe('legacy-xls');
     expect(resolveImportKind('wps.et')).toBe('legacy-xls');
+  });
+
+  it('.ods 走 OpenDocument 解析器；.fods（扁平 XML）仍不支持', () => {
+    expect(resolveImportKind('报表.ODS')).toBe('ods');
+    // flat ODS 不是 zip，混进来只会报"解析失败"，不如明确不支持
+    expect(resolveImportKind('flat.fods')).toBe('unsupported');
+    expect(checkImportFile({ name: 'a.ods', size: 1024 })).toEqual({ ok: true, value: 'ods' });
   });
 
   it('其它扩展名不支持', () => {
@@ -316,6 +327,115 @@ describe('放映（只读表格）', () => {
   it('展示上限为常量且大于常规表宽', () => {
     expect(PRESENT_MAX_ROWS).toBeGreaterThan(50);
     expect(PRESENT_MAX_COLS).toBeGreaterThan(20);
+  });
+
+  describe('对象层（P2-10）', () => {
+    const objectsSnapshot = {
+      sheetOrder: ['s1', 's2'],
+      sheets: {
+        s1: { name: '一', cellData: {} },
+        s2: { name: '二', cellData: {} },
+      },
+      syntoolsImages: [
+        {
+          id: 'img-1',
+          sheetId: 's1',
+          src: 'data:image/png;base64,AAA',
+          name: 'cat.png',
+          from: { col: 1, row: 2, colOff: 8, rowOff: 4 },
+          width: 120,
+          height: 80,
+          z: 2,
+        },
+        {
+          id: 'img-other',
+          sheetId: 's2',
+          src: 'data:image/png;base64,BBB',
+          from: { col: 0, row: 0, colOff: 0, rowOff: 0 },
+          width: 10,
+          height: 10,
+          z: 0,
+        },
+      ],
+      syntoolsShapes: [
+        {
+          id: 'shape-1',
+          sheetId: 's1',
+          prst: 'roundRect',
+          from: { col: 0, row: 0, colOff: 0, rowOff: 0 },
+          width: 100,
+          height: 40,
+          fill: '#eee',
+          stroke: '#333',
+          strokeWidth: 2,
+          text: '标题',
+          z: 1,
+        },
+      ],
+      syntoolsCharts: [
+        {
+          id: 'chart-1',
+          sheetId: 's1',
+          type: 'bar',
+          title: '销售',
+          x: 24,
+          y: 16,
+          width: 320,
+          height: 220,
+          z: 3,
+        },
+      ],
+    };
+
+    it('单元格锚点换算成相对整张表的像素（含行头 / 列头）', () => {
+      const grid = buildPresentGrid(objectsSnapshot, 's1')!;
+      const image = grid.objects.find((object) => object.id === 'img-1')!;
+      expect(image).toMatchObject({
+        kind: 'image',
+        left: PRESENT_ROW_HEADER_WIDTH + PRESENT_CELL_WIDTH + 8,
+        top: PRESENT_COL_HEADER_HEIGHT + 2 * PRESENT_ROW_HEIGHT + 4,
+        width: 120,
+        height: 80,
+        src: 'data:image/png;base64,AAA',
+        name: 'cat.png',
+      });
+    });
+
+    it('只投影本表的对象，并按 z 从小到大叠放', () => {
+      const grid = buildPresentGrid(objectsSnapshot, 's1')!;
+      expect(grid.objects.map((object) => object.id)).toEqual(['shape-1', 'img-1', 'chart-1']);
+      expect(grid.objects.some((object) => object.id === 'img-other')).toBe(false);
+    });
+
+    it('图表用 x/y 定位，标题缺省时退回类型名', () => {
+      const grid = buildPresentGrid(objectsSnapshot, 's1')!;
+      const chart = grid.objects.find((object) => object.id === 'chart-1')!;
+      expect(chart).toMatchObject({
+        kind: 'chart',
+        left: PRESENT_ROW_HEADER_WIDTH + 24,
+        top: PRESENT_COL_HEADER_HEIGHT + 16,
+        label: '销售',
+      });
+
+      const unnamed = buildPresentGrid(
+        {
+          ...objectsSnapshot,
+          syntoolsCharts: [{ ...objectsSnapshot.syntoolsCharts[0], title: '' }],
+        },
+        's1',
+      )!;
+      expect(unnamed.objects.find((object) => object.id === 'chart-1')?.label).toBe('bar');
+    });
+
+    it('切到另一张表时只看到那张表的对象', () => {
+      const grid = buildPresentGrid(objectsSnapshot, 's2')!;
+      expect(grid.objects.map((object) => object.id)).toEqual(['img-other']);
+    });
+
+    it('没有对象时不产生空层（老文档的快照没有这些字段）', () => {
+      const grid = buildPresentGrid(snapshot, 's1')!;
+      expect(grid.objects).toEqual([]);
+    });
   });
 });
 

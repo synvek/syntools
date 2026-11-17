@@ -23,7 +23,9 @@ export type SheetIssueCode =
   /** A whole-column selection reaching the sort: refuse instead of freezing the tab (P1-5) */
   | 'sortTooLarge'
   /** Reading formulas off the selection failed (P1-10) */
-  | 'formulaRead';
+  | 'formulaRead'
+  /** Univer 内部注入器不可用：浮层停止跟随滚动，编辑器其余部分照常（P2-11） */
+  | 'internalsUnavailable';
 
 /** `notice` = degraded but the document is intact; `error` = the requested action did not happen */
 export type SheetIssueLevel = 'notice' | 'error';

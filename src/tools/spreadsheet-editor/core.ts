@@ -200,19 +200,27 @@ export function hexToArgb(hex: string | undefined): string | undefined {
   return undefined;
 }
 
-export type ImportKind = 'xlsx' | 'csv' | 'legacy-xls' | 'unsupported';
+export type ImportKind = 'xlsx' | 'csv' | 'ods' | 'legacy-xls' | 'unsupported';
 
-/** Decide the importable type from the extension; legacy .xls (BIFF binary) is not parsed in the browser */
+/**
+ * Decide the importable type from the extension; legacy .xls (BIFF binary) is not parsed in the browser.
+ * `.fods`（flat ODS，单个 XML 而不是 zip）**不认**：它走的是另一条解析路径，混进来只会报
+ * "解析失败"，不如明确留在 unsupported 里。
+ */
 export function resolveImportKind(filename: string): ImportKind {
   const lower = filename.trim().toLowerCase();
   if (lower.endsWith('.xlsx') || lower.endsWith('.xlsm')) return 'xlsx';
+  if (lower.endsWith('.ods')) return 'ods';
   if (lower.endsWith('.csv')) return 'csv';
   if (lower.endsWith('.xls') || lower.endsWith('.et')) return 'legacy-xls';
   return 'unsupported';
 }
 
 /** Single pre-import check: format and size */
-export function checkImportFile(file: { name: string; size: number }): ToolResult<'xlsx' | 'csv'> {
+export function checkImportFile(file: {
+  name: string;
+  size: number;
+}): ToolResult<'xlsx' | 'csv' | 'ods'> {
   const kind = resolveImportKind(file.name);
   if (kind === 'legacy-xls') return { ok: false, error: 'UNSUPPORTED_LEGACY_XLS' };
   if (kind === 'unsupported') return { ok: false, error: 'NOT_XLSX' };
@@ -521,6 +529,10 @@ export interface WorkbookSnapshotLite {
     string,
     { name?: string; cellData?: Record<string, Record<string, { v?: unknown; f?: unknown }>> }
   >;
+  /** 工具自有对象（演示模式要摊在网格上；见 `PresentObjectSource`） */
+  syntoolsImages?: PresentImageSource[];
+  syntoolsShapes?: PresentShapeSource[];
+  syntoolsCharts?: PresentChartSource[];
 }
 
 export interface WorkbookSummary {
@@ -568,6 +580,76 @@ export const PRESENT_MAX_COLS = 30;
 export const PRESENT_BLANK_ROWS = 16;
 export const PRESENT_BLANK_COLS = 8;
 
+/**
+ * 演示网格的几何：**投影与渲染必须用同一组常量**（P2-10）。
+ * 以前列宽写在组件里（108），如果投影另算一套，对象层就会与单元格错位——这正是"位置对不上"
+ * 类 bug 的典型来源。行头 / 列头也在这里，因为对象坐标是相对整张表的左上角。
+ */
+export const PRESENT_CELL_WIDTH = 108;
+export const PRESENT_ROW_HEIGHT = 26;
+export const PRESENT_ROW_HEADER_WIDTH = 40;
+export const PRESENT_COL_HEADER_HEIGHT = 26;
+
+/**
+ * 演示模式下要摊在网格上的对象（P2-10）。
+ * 只声明"能定位 + 能画"的字段，不引 `shapes.ts` / `sheetImages.ts` / `charts.ts` 的类型——那几个
+ * 模块都依赖 core，反向 import 会成环。形状 / 图片 / 图形的配置结构天然满足这些字段。
+ */
+export interface PresentObjectSource {
+  id: string;
+  sheetId?: string;
+  z?: number;
+  /** 单元格锚点（形状 / 图片用） */
+  from?: { col: number; row: number; colOff: number; rowOff: number };
+  /** 绝对像素位置（图表用：相对表格区域左上角） */
+  x?: number;
+  y?: number;
+  width: number;
+  height: number;
+}
+
+export interface PresentImageSource extends PresentObjectSource {
+  src: string;
+  name?: string;
+}
+
+export interface PresentShapeSource extends PresentObjectSource {
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  rotation?: number;
+  text?: string;
+}
+
+export interface PresentChartSource extends PresentObjectSource {
+  /** ChartType 的字面量（bar / line / pie …），演示时作为占位框的说明 */
+  type?: string;
+  title?: string;
+}
+
+/** 演示对象层的一项：坐标已经换算成"相对整张表的 CSS px" */
+export interface PresentObject {
+  id: string;
+  kind: 'image' | 'shape' | 'chart';
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  z: number;
+  /** image：dataURL */
+  src?: string;
+  /** shape：填充 / 描边 / 文字 / 旋转 */
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  rotation?: number;
+  text?: string;
+  /** chart：标题（没有标题时退回类型名） */
+  label?: string;
+  /** 无障碍与调试用：图片名 / 形状名 */
+  name?: string;
+}
+
 export interface PresentCell {
   row: number;
   col: number;
@@ -596,6 +678,8 @@ export interface PresentGrid {
   merges: PresentMerge[];
   /** Content exceeds the display cap (rows/columns truncated) */
   truncated: boolean;
+  /** 叠在网格上的图片 / 形状 / 图表占位框（P2-10），已按 z 从下往上排好 */
+  objects: PresentObject[];
 }
 
 function alignOf(style: UniverStyleLite | undefined): PresentCell['align'] {
@@ -700,7 +784,83 @@ export function buildPresentGrid(
     cells: cells.sort((a, b) => a.row - b.row || a.col - b.col),
     merges,
     truncated: used.rows > rows || used.cols > cols,
+    objects: buildPresentObjects(snapshot, target, order[0] ?? target),
   };
+}
+
+/**
+ * 把对象摊到演示网格上（P2-10）：复用 P1-6 的投影思路——**锚点 → 单元格 → 像素**，
+ * 只是这里的像素是演示表格自己的列宽 / 行高，不是编辑器的真实列宽。
+ *
+ * 三件必须说清的事：
+ * 1. 图的 `x/y` 是相对表格区域左上角的像素，所以要加上行头 / 列头；
+ * 2. 没有 `sheetId` 的对象挂第一张表（与编辑模式里"图表归属"的兜底规则一致）；
+ * 3. 先按 z 升序，同 z 保持原顺序（`sort` 在 V8 上是稳定的）——叠放顺序与编辑模式一致。
+ */
+function buildPresentObjects(
+  snapshot: WorkbookSnapshotLite,
+  sheetId: string,
+  firstSheetId: string,
+): PresentObject[] {
+  const ownerOf = (source: PresentObjectSource): string =>
+    source.sheetId && snapshot.sheets?.[source.sheetId] ? source.sheetId : firstSheetId;
+  const anchorLeft = (source: PresentObjectSource): number =>
+    PRESENT_ROW_HEADER_WIDTH +
+    (source.from ? source.from.col * PRESENT_CELL_WIDTH + source.from.colOff : 0);
+  const anchorTop = (source: PresentObjectSource): number =>
+    PRESENT_COL_HEADER_HEIGHT +
+    (source.from ? source.from.row * PRESENT_ROW_HEIGHT + source.from.rowOff : 0);
+
+  const objects: PresentObject[] = [];
+
+  for (const image of snapshot.syntoolsImages ?? []) {
+    if (ownerOf(image) !== sheetId) continue;
+    objects.push({
+      id: image.id,
+      kind: 'image',
+      left: anchorLeft(image),
+      top: anchorTop(image),
+      width: image.width,
+      height: image.height,
+      z: image.z ?? 0,
+      src: image.src,
+      ...(image.name ? { name: image.name } : {}),
+    });
+  }
+
+  for (const shape of snapshot.syntoolsShapes ?? []) {
+    if (ownerOf(shape) !== sheetId) continue;
+    objects.push({
+      id: shape.id,
+      kind: 'shape',
+      left: anchorLeft(shape),
+      top: anchorTop(shape),
+      width: shape.width,
+      height: shape.height,
+      z: shape.z ?? 0,
+      ...(shape.fill ? { fill: shape.fill } : {}),
+      ...(shape.stroke ? { stroke: shape.stroke } : {}),
+      ...(shape.strokeWidth === undefined ? {} : { strokeWidth: shape.strokeWidth }),
+      ...(shape.rotation === undefined ? {} : { rotation: shape.rotation }),
+      ...(shape.text ? { text: shape.text } : {}),
+    });
+  }
+
+  for (const chart of snapshot.syntoolsCharts ?? []) {
+    if (ownerOf(chart) !== sheetId) continue;
+    objects.push({
+      id: chart.id,
+      kind: 'chart',
+      left: PRESENT_ROW_HEADER_WIDTH + (chart.x ?? 0),
+      top: PRESENT_COL_HEADER_HEIGHT + (chart.y ?? 0),
+      width: chart.width,
+      height: chart.height,
+      z: chart.z ?? 0,
+      label: chart.title || chart.type || '',
+    });
+  }
+
+  return objects.sort((a, b) => a.z - b.z);
 }
 
 /** Strip illegal filename characters and cap the length */

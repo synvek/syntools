@@ -6,6 +6,7 @@ import { exportSheetPdf, printSheet, type CellRange, type PrintModelOptions } fr
 import { renderChartImages } from '../chartRender';
 import { CSV_BOM, buildExportFilename, checkImportFile, sanitizeFilename } from '../core';
 import { csvToSnapshot, snapshotToCsv } from '../csv';
+import { odsToSnapshot } from '../ods';
 import { exportSnapshotToBytes, importXlsxToSnapshot, type ImportOutcome } from '../xlsx-io';
 import type { WorkbookSnapshot } from '../xlsx-io';
 import { collectExportIssues } from '../fidelity';
@@ -100,19 +101,21 @@ export function useSheetFileIo(options: UseFileIoOptions): FileIoApi {
     const { setBusy, setFailure } = latest.current;
     setBusy('import');
     setFailure(null);
-    // 先按扩展名分流：.csv 走纯逻辑解析器，.xlsx/.xlsm 走 exceljs
+    // 先按扩展名分流：.csv 走纯逻辑解析器，.ods 走 OpenDocument 解析器，.xlsx/.xlsm 走 exceljs
     const check = checkImportFile(file);
     if (!check.ok) {
       setBusy(null);
       setFailure(check);
       return;
     }
-    // 导入侧保真（P0-4）：这份"回收站"由 xlsx 路径填，CSV 没有可报告的内容
+    // 导入侧保真（P0-4）：这份"回收站"由 xlsx / ods 两条路径填，CSV 没有可报告的内容
     const outcome: ImportOutcome = { issues: [] };
     const result =
       check.value === 'csv'
         ? csvToSnapshot(await file.text(), file.name.replace(/\.csv$/i, ''), latest.current.locale)
-        : await importXlsxToSnapshot(file, outcome);
+        : check.value === 'ods'
+          ? await odsToSnapshot(file, outcome)
+          : await importXlsxToSnapshot(file, outcome);
     setBusy(null);
     if (!result.ok) {
       setFailure(result);

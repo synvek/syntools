@@ -98,6 +98,7 @@ const zh: ResourceTree = {
       importChartsheet: '{{count}} 个图表工作表（Chart Sheet）无法导入',
       importThreadedComments: '{{count}} 组线程批注无法导入，仅旧式备注可用',
       importMacros: '文件包含宏（VBA），导入后宏不会保留',
+      importOdsStyleLoss: '{{count}} 个单元格只保留了部分样式（边框 / 数字格式等未导入）',
       importPicturesReadonly: '{{count}} 张图片格式不受支持，已原样保留但不会显示',
       // 失败可见化（P0-3）：短句 + 下一步动作
       issue: {
@@ -108,6 +109,7 @@ const zh: ResourceTree = {
         chartPartsUnreadable: '文件中的原生图表未能读取，图表可能缺失',
         sortTooLarge: '选区超过 50,000 行，请缩小范围后再排序',
         formulaRead: '无法读取选区内的公式',
+        internalsUnavailable: '当前引擎版本不支持浮层跟随滚动，图层位置可能不会随表格移动',
       },
       // P1-10 公式审计
       formulaAudit: '检查公式',
@@ -133,7 +135,7 @@ const zh: ResourceTree = {
       a11yRange: '已选中 {{cell}} 起的 {{rows}} 行 {{columns}} 列',
       err: err({
         EMPTY: '工作簿为空',
-        NOT_XLSX: '仅支持 .xlsx 文件',
+        NOT_XLSX: '仅支持 .xlsx / .ods / .csv 文件',
         UNSUPPORTED_LEGACY_XLS: '暂不支持旧版 .xls / .et，请另存为 .xlsx 后重试',
         TOO_LARGE: '文件超出 {{max}}MB 限制',
         IMPORT_FAILED: '文件解析失败',
@@ -241,6 +243,8 @@ const en: ResourceTree = {
       importThreadedComments:
         '{{count}} threaded comment sets could not be imported; only legacy notes are readable',
       importMacros: 'The file contains VBA macros; they are not kept after import',
+      importOdsStyleLoss:
+        '{{count}} cells kept only part of their styling (borders, number formats, …)',
       importPicturesReadonly:
         '{{count}} pictures use an unsupported format; they are preserved but not displayed',
       // Visible failure (P0-3): a short sentence plus the next action
@@ -252,6 +256,8 @@ const en: ResourceTree = {
         chartPartsUnreadable: 'Native charts in the file could not be read and may be missing',
         sortTooLarge: 'The selection exceeds 50,000 rows — narrow it down before sorting',
         formulaRead: 'Could not read the formulas in the selection',
+        internalsUnavailable:
+          'This engine version cannot track scrolling for floating objects; they may not follow the sheet',
       },
       // P1-10 formula audit
       formulaAudit: 'Check formulas',
@@ -279,7 +285,7 @@ const en: ResourceTree = {
       a11yRange: 'Selected {{rows}} rows by {{columns}} columns starting at {{cell}}',
       err: err({
         EMPTY: 'The workbook is empty',
-        NOT_XLSX: 'Only .xlsx files are supported',
+        NOT_XLSX: 'Only .xlsx / .ods / .csv files are supported',
         UNSUPPORTED_LEGACY_XLS: 'Legacy .xls / .et is not supported, please save as .xlsx',
         TOO_LARGE: 'File exceeds the {{max}}MB limit',
         IMPORT_FAILED: 'Failed to parse the file',
@@ -380,7 +386,7 @@ const zhTW: ResourceTree = {
       dvUnsupported: '{{count}} 條資料驗證無法寫入 xlsx',
       err: err({
         EMPTY: '活頁簿為空',
-        NOT_XLSX: '僅支援 .xlsx 檔案',
+        NOT_XLSX: '僅支援 .xlsx / .ods / .csv 檔案',
         UNSUPPORTED_LEGACY_XLS: '不支援舊版 .xls / .et，請另存為 .xlsx 後再試',
         TOO_LARGE: '檔案超過 {{max}}MB 限制',
         IMPORT_FAILED: '檔案解析失敗',
@@ -475,7 +481,7 @@ const ja: ResourceTree = {
       dvUnsupported: '{{count}} 件のデータ検証は xlsx に書き出せません',
       err: err({
         EMPTY: 'ブックが空です',
-        NOT_XLSX: '.xlsx ファイルのみ対応しています',
+        NOT_XLSX: '.xlsx / .ods / .csv ファイルに対応しています',
         UNSUPPORTED_LEGACY_XLS:
           '旧形式の .xls / .et には対応していません。.xlsx で保存し直してください',
         TOO_LARGE: 'ファイルが {{max}}MB の上限を超えています',
@@ -574,7 +580,7 @@ const fr: ResourceTree = {
         '{{count}} règles de validation des données ne peuvent pas être écrites dans le xlsx',
       err: err({
         EMPTY: 'Le classeur est vide',
-        NOT_XLSX: 'Seuls les fichiers .xlsx sont pris en charge',
+        NOT_XLSX: 'Seuls les fichiers .xlsx / .ods / .csv sont pris en charge',
         UNSUPPORTED_LEGACY_XLS:
           'Les anciens formats .xls / .et ne sont pas pris en charge, enregistrez en .xlsx',
         TOO_LARGE: 'Le fichier dépasse la limite de {{max}} Mo',
@@ -674,7 +680,7 @@ const de: ResourceTree = {
         '{{count}} Datenvalidierungsregeln können nicht in die xlsx geschrieben werden',
       err: err({
         EMPTY: 'Die Arbeitsmappe ist leer',
-        NOT_XLSX: 'Nur .xlsx-Dateien werden unterstützt',
+        NOT_XLSX: 'Nur .xlsx / .ods / .csv-Dateien werden unterstützt',
         UNSUPPORTED_LEGACY_XLS:
           'Alte .xls- / .et-Dateien werden nicht unterstützt, bitte als .xlsx speichern',
         TOO_LARGE: 'Die Datei überschreitet das Limit von {{max}} MB',
@@ -771,7 +777,7 @@ const it: ResourceTree = {
       dvUnsupported: '{{count}} regole di convalida dati non possono essere scritte nel file xlsx',
       err: err({
         EMPTY: 'La cartella di lavoro è vuota',
-        NOT_XLSX: 'Sono supportati solo i file .xlsx',
+        NOT_XLSX: 'Sono supportati solo i file .xlsx / .ods / .csv',
         UNSUPPORTED_LEGACY_XLS:
           'I formati .xls / .et precedenti non sono supportati, salva come .xlsx',
         TOO_LARGE: 'Il file supera il limite di {{max}} MB',
@@ -867,7 +873,7 @@ const es: ResourceTree = {
       dvUnsupported: '{{count}} reglas de validación de datos no se pueden escribir en el xlsx',
       err: err({
         EMPTY: 'El libro está vacío',
-        NOT_XLSX: 'Solo se admiten archivos .xlsx',
+        NOT_XLSX: 'Solo se admiten archivos .xlsx / .ods / .csv',
         UNSUPPORTED_LEGACY_XLS:
           'Los formatos .xls / .et antiguos no son compatibles, guarda como .xlsx',
         TOO_LARGE: 'El archivo supera el límite de {{max}} MB',
@@ -963,7 +969,7 @@ const pt: ResourceTree = {
       dvUnsupported: '{{count}} regras de validação de dados não podem ser gravadas no xlsx',
       err: err({
         EMPTY: 'O livro está vazio',
-        NOT_XLSX: 'Apenas são suportados ficheiros .xlsx',
+        NOT_XLSX: 'Apenas são suportados ficheiros .xlsx / .ods / .csv',
         UNSUPPORTED_LEGACY_XLS:
           'Os formatos antigos .xls / .et não são suportados, guarde como .xlsx',
         TOO_LARGE: 'O ficheiro excede o limite de {{max}} MB',

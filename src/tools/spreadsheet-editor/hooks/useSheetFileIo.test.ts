@@ -4,6 +4,7 @@ import type { WorkbookSnapshot } from '../xlsx-io';
 import { useSheetFileIo, type UseFileIoOptions } from './useSheetFileIo';
 
 const deps = vi.hoisted(() => ({
+  odsToSnapshot: vi.fn(),
   checkImportFile: vi.fn(),
   buildExportFilename: vi.fn((name: string, ext: string) => `${name}.${ext}`),
   sanitizeFilename: vi.fn((name: string) => name.replace(/\s+/g, '-')),
@@ -35,6 +36,7 @@ vi.mock('../csv', () => ({
   csvToSnapshot: deps.csvToSnapshot,
   snapshotToCsv: deps.snapshotToCsv,
 }));
+vi.mock('../ods', () => ({ odsToSnapshot: deps.odsToSnapshot }));
 vi.mock('../xlsx-io', () => ({
   importXlsxToSnapshot: deps.importXlsxToSnapshot,
   exportSnapshotToBytes: deps.exportSnapshotToBytes,
@@ -112,6 +114,7 @@ function fileOf(name: string, text = 'a,b\n1,2'): File {
 beforeEach(() => {
   vi.clearAllMocks();
   deps.checkImportFile.mockReturnValue({ ok: true, value: 'xlsx' });
+  deps.odsToSnapshot.mockResolvedValue({ ok: true, value: { ...SNAPSHOT, name: '导入' } });
   deps.importXlsxToSnapshot.mockResolvedValue({ ok: true, value: { ...SNAPSHOT, name: '导入' } });
   deps.exportSnapshotToBytes.mockResolvedValue({ ok: true, value: new Uint8Array([1]) });
   deps.snapshotToCsv.mockReturnValue({ ok: true, value: 'a,b\n1,2' });
@@ -186,6 +189,20 @@ describe('useSheetFileIo', () => {
     await act(() => view.result.current.importFile(fileOf('a.xlsx')));
     expect(deps.createFidelityReport).not.toHaveBeenCalled();
     expect(view.result.current.fidelity).toBeNull();
+  });
+
+  it('按扩展名分流：ODS 走 OpenDocument 解析器，保真报告同样能收到样式损失', async () => {
+    deps.checkImportFile.mockReturnValue({ ok: true, value: 'ods' });
+    deps.odsToSnapshot.mockImplementation(async (_file, outcome: { issues: unknown[] }) => {
+      outcome.issues.push({ code: 'sheet.importOdsStyleLoss', severity: 'info', count: 3 });
+      return { ok: true, value: SNAPSHOT };
+    });
+    const { view, persistNow } = setup({ title: '' });
+    await act(() => view.result.current.importFile(fileOf('a.ods')));
+    expect(deps.odsToSnapshot).toHaveBeenCalled();
+    expect(deps.importXlsxToSnapshot).not.toHaveBeenCalled();
+    expect(persistNow).toHaveBeenCalled();
+    expect(view.result.current.fidelity).not.toBeNull();
   });
 
   it('按扩展名分流：CSV 走纯逻辑解析器，不碰 exceljs', async () => {

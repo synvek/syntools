@@ -96,6 +96,7 @@ describe('sheet copy', () => {
       'chartPartsUnreadable',
       'sortTooLarge',
       'formulaRead',
+      'internalsUnavailable',
     ];
     for (const lng of ['zh', 'en']) {
       const issue = sheet(lng).issue as Record<string, string>;

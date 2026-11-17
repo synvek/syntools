@@ -22,37 +22,19 @@ import {
   columnIndexToName,
   summarizeWorkbook,
   type PresentGrid,
-  type WorkbookSnapshotLite,
   type WorkbookSummary,
 } from './core';
-import {
-  CHART_TYPE_LABEL_KEY,
-  buildChartData,
-  chartDataSheetId,
-  type ChartConfig,
-  type ChartData,
-} from './charts';
+import { CHART_TYPE_LABEL_KEY } from './charts';
 import { registerChartStrings } from './chartStrings';
-import { chartTypeBreakdown, summarizeImport, type ChartImportReport } from './chartImport';
+import { chartTypeBreakdown } from './chartImport';
 import { registerShapeStrings } from './shapeStrings';
 import { registerImageStrings } from './imageStrings';
 import {
   buildSheetLayout,
-  createSheetShape,
-  pxToAnchor,
   DEFAULT_SHEET_VIEWPORT,
   type SheetLayout,
-  type SheetShapeConfig,
   type SheetViewport,
 } from './shapes';
-import {
-  IMAGE_ACCEPT,
-  MAX_IMAGE_BYTES,
-  createSheetImage,
-  fitImageSize,
-  parseImageDataUrl,
-  type SheetImageConfig,
-} from './sheetImages';
 import { ShapeLayer, ShapePalette } from './ui/ShapeOverlay';
 import { ShapeDrawLayer } from './ui/ShapeDrawLayer';
 import { ShapeFormatBar } from './ui/ShapeFormatBar';
@@ -64,6 +46,10 @@ import { useSheetTabs } from './hooks/useSheetTabs';
 import { useSheetDocLibrary } from './hooks/useSheetDocLibrary';
 import { useSheetFileIo } from './hooks/useSheetFileIo';
 import { useSheetComments } from './hooks/useSheetComments';
+import { useSheetCharts } from './hooks/useSheetCharts';
+import { useSheetObjects } from './hooks/useSheetObjects';
+import { useSheetMeta } from './hooks/useSheetMeta';
+import { useSheetPivot } from './hooks/useSheetPivot';
 import { SHEET_TEMPLATES, templateById, type SheetTemplate, type TemplateId } from './templates';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
@@ -90,17 +76,12 @@ import {
   PIVOT_SHOW_AS_LABEL_KEY,
   collectFieldKeys,
   computePivot,
-  nextPivotId,
-  pivotToMatrix,
   pivotValueLabel,
   readPivotSource,
-  removePivotConfig,
-  upsertPivotConfig,
   type PivotBlock,
-  type PivotConfig,
 } from './pivot';
 import { registerPivotStrings } from './pivotStrings';
-import { buildPivotSheet, uniqueSheetName } from './pivotSheet';
+import { buildPivotSheet } from './pivotSheet';
 import { PivotPanel } from './ui/PivotPanel';
 import { PresentSheet } from './ui/PresentSheet';
 import { ChartOverlay } from './ui/ChartOverlay';
@@ -111,31 +92,13 @@ import { isFidelityMuted, muteFidelity } from '@/core/fidelity';
 import { FidelityDialog } from '@/core/components/FidelityDialog';
 import type { WorkbookExtras } from './xlsx-extras';
 import { applySheetObjects, readSheetObjects, type SheetObjectSource } from './sheetObjects';
-import {
-  DEFAULT_SHEET_PRINT_OPTIONS,
-  printSheet,
-  resolveUsedRange,
-  type SheetPrintOptions,
-} from './print';
+import { DEFAULT_SHEET_PRINT_OPTIONS, printSheet, type SheetPrintOptions } from './print';
 import type { RawChartParts } from './rawChartParts';
 import { SheetTabs } from './SheetTabs';
 import { NameManagerPanel } from './ui/NameManagerPanel';
 import { ProtectDialog } from './ui/ProtectDialog';
 import { registerMetaStrings } from './metaStrings';
-import { sanitizeNamedRanges, type NamedRange } from './namedRanges';
-import {
-  createTableFromSelection,
-  takenNames,
-  tablesInRange,
-  type SheetTable,
-} from './sheetTables';
-import {
-  createPasswordHash,
-  protectionFor,
-  setProtection,
-  type SheetProtectionFlags,
-  type SheetProtectionState,
-} from './sheetProtection';
+import { protectionFor } from './sheetProtection';
 import './sheet.css';
 
 // Tool copy is registered lazily with this chunk so it does not weigh down the initial bundle
@@ -149,54 +112,11 @@ registerMetaStrings(i18n);
 registerRibbonStrings(i18n);
 
 type Failure = Extract<ToolResult<unknown>, { ok: false }>;
-/** 首版一个工作簿只保留一个透视表：多表会让"导出到哪张工作表"的语义含混 */
-const PIVOT_ID = 'pivot-1';
-/** File → dataURL：图片要存进快照，必须自包含（不能引用原文件路径） */
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
-    reader.readAsDataURL(file);
-  });
-}
-
-/** dataURL → 原始像素尺寸；量不出来（损坏 / 环境不支持）时返回 0，交给 fitImageSize 兜底 */
-function measureImage(src: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    if (typeof Image === 'undefined') {
-      resolve({ width: 0, height: 0 });
-      return;
-    }
-    const probe = new Image();
-    probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
-    probe.onerror = () => resolve({ width: 0, height: 0 });
-    probe.src = src;
-  });
-}
+// 图片的读取与测量在 `imageSource.ts`（随 `useSheetObjects` 一起搬走）
 
 /** 打印用的合成快照里只有一个工作表，id 固定即可 */
 const PIVOT_SHEET_ID = 'pivot-print';
 type BusyKind = 'import' | 'export' | null;
-
-/**
- * 一张表已经被写入的范围（行数/列数），用于「更新透视表」前清掉旧值：
- * 换布局后行列可能变少，不清就会留下上一版的尾巴。
- */
-function usedBlock(
-  sheet: WorkbookSnapshot['sheets'][string] | undefined,
-): { rows: number; columns: number } | undefined {
-  if (!sheet) return undefined;
-  let rows = 0;
-  let columns = 0;
-  for (const [row, cells] of Object.entries(sheet.cellData ?? {})) {
-    for (const column of Object.keys(cells ?? {})) {
-      rows = Math.max(rows, Number(row) + 1);
-      columns = Math.max(columns, Number(column) + 1);
-    }
-  }
-  return rows > 0 && columns > 0 ? { rows, columns } : undefined;
-}
 
 /** Debounce after edits: avoids a full save() on every keystroke */
 const SAVE_DEBOUNCE_MS = 600;
@@ -266,76 +186,105 @@ export default function SpreadsheetTool() {
   const [presenting, setPresenting] = useState(false);
   const [presentGrid, setPresentGrid] = useState<PresentGrid | null>(null);
   const [presentFailed, setPresentFailed] = useState(false);
-  /** Floating charts on the sheet: configs (persisted with the snapshot) + derived data + a selection hint */
-  const [charts, setCharts] = useState<ChartConfig[]>([]);
-  const chartsRef = useRef<ChartConfig[]>([]);
-  chartsRef.current = charts;
-  const [chartDataMap, setChartDataMap] = useState<Record<string, ChartData | null>>({});
-  const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
-  const [chartNotice, setChartNotice] = useState(false);
-  /** 导入文件里保留下来的原生图表统计（P2-S8 回读：只报数量与类型，不做语义重建） */
-  const [chartImport, setChartImport] = useState<ChartImportReport | null>(null);
-  /** Sheet area size: the bounds for dragging / resizing charts */
+  /** Sheet area size: the bounds for dragging / resizing charts（图表层与形状/图片层共用） */
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
-  const chartSeqRef = useRef(0);
-  /** Floating shapes (SHEET-02): cell-anchored configs, persisted in their own snapshot field */
-  const [shapes, setShapes] = useState<SheetShapeConfig[]>([]);
-  const shapesRef = useRef<SheetShapeConfig[]>([]);
-  shapesRef.current = shapes;
-  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
-  const [shapePaletteOpen, setShapePaletteOpen] = useState(false);
-  /** 形状库选中后进入的绘制模式：在表格上拖拽即按该尺寸建形状 */
-  const [shapeDrawPrst, setShapeDrawPrst] = useState<string | null>(null);
-  const [images, setImages] = useState<SheetImageConfig[]>([]);
-  const imagesRef = useRef<SheetImageConfig[]>([]);
-  imagesRef.current = images;
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-  /** 插入图片时的提示（超限 / 读取失败），贴在工具栏下方，不打断操作 */
-  const [imageNotice, setImageNotice] = useState<string | null>(null);
+  // 形状 / 图片（SHEET-02）的状态与动作在 `useSheetObjects` 里（P2-4）
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   /** Bumped on every mutation so the row/column layout is re-measured after a resize */
   const [shapeLayoutVersion, setShapeLayoutVersion] = useState(0);
   const shapeLayoutRef = useRef<SheetLayout>(buildSheetLayout(undefined));
   /** Grid → container projection for the shape layer: scrolls / zooms with the sheet (P4-SH6) */
   const [shapeViewport, setShapeViewport] = useState<SheetViewport>(DEFAULT_SHEET_VIEWPORT);
-  /** Pivot table (P2-4): analysis view over a source range, persisted in its own snapshot field */
-  const [pivotConfigs, setPivotConfigs] = useState<PivotConfig[]>([]);
-  const pivotConfigsRef = useRef<PivotConfig[]>([]);
-  pivotConfigsRef.current = pivotConfigs;
-  const [pivotOpen, setPivotOpen] = useState(false);
-  const pivotOpenRef = useRef(false);
-  pivotOpenRef.current = pivotOpen;
-  const [pivotConfig, setPivotConfig] = useState<PivotConfig | null>(null);
-  /** Snapshot the panel aggregates from: refreshed on every mutation so edits recompute immediately */
-  const [pivotSnapshot, setPivotSnapshot] = useState<WorkbookSnapshot | null>(null);
   // Cell comment threads (P1-2) 与面板状态在 `useSheetComments` 里（P2-4）；ref 与 state 同源保证
   // 快照合成读到的一定是最新的一份。
-  /** Named ranges (P2-S7.1): workbook/sheet metadata that neither Univer nor its formula engine knows */
-  const [namedRanges, setNamedRanges] = useState<NamedRange[]>([]);
-  const namedRangesRef = useRef<NamedRange[]>([]);
-  namedRangesRef.current = namedRanges;
-  const [namesOpen, setNamesOpen] = useState(false);
-  /** 打开名称面板时的选区（`A1:B2`），供"用选区填入"使用 */
-  const [selectionLabel, setSelectionLabel] = useState<string | null>(null);
-  /** Table objects (P2-S7.3): native `xl/tables` parts, kept outside Univer */
-  const [tables, setTables] = useState<SheetTable[]>([]);
-  const tablesRef = useRef<SheetTable[]>([]);
-  tablesRef.current = tables;
-  const [tableNotice, setTableNotice] = useState<string | null>(null);
-  /** Sheet protection (P2-S7.2): carried by the snapshot, enforced by switching Univer to read-only */
-  const [protection, setProtectionList] = useState<SheetProtectionState[]>([]);
-  const protectionRef = useRef<SheetProtectionState[]>([]);
-  protectionRef.current = protection;
-  const [protectOpen, setProtectOpen] = useState(false);
-  const [protectBusy, setProtectBusy] = useState(false);
-  /** Only adopt names/protection from the first restored snapshot (same rule as comments) */
-  const metaLoadedRef = useRef(false);
   /**
    * Persistence trigger: adding / moving / resizing / deleting a chart is not a Univer MUTATION, so
    * dirty tracking never sees it — persistence has to be requested explicitly. (Assigned once
    * scheduleSave exists.)
    */
   const scheduleSaveRef = useRef<() => void>(() => {});
+
+  // 名称 / 保护 / 表格（P2-4 第七片）：三者都在快照里、都不是 Univer 的 mutation，规则全在 hook 里
+  const {
+    namedRanges,
+    namedRangesRef,
+    updateNames,
+    namesOpen,
+    selectionLabel,
+    openNames,
+    closeNames,
+    tables,
+    tablesRef,
+    tableNotice,
+    insertTable,
+    deleteTable,
+    protection,
+    protectionRef,
+    protectOpen,
+    protectBusy,
+    openProtect,
+    closeProtect,
+    applyProtection,
+    pruneSheet: pruneMeta,
+    adoptOnce: adoptMeta,
+    reset: resetMeta,
+  } = useSheetMeta({
+    handleRef,
+    onCommit: () => scheduleSaveRef.current(),
+    messages: {
+      tableNeedsRows: t('tools.sheet.tableInsertNeedsRows'),
+      tableNotFound: t('tools.sheet.tableDeleteNotFound'),
+    },
+  });
+  /** 标签栏刷新挂在 ref 上：透视 hook 比 `useSheetTabs` 声明得早，插入新表时要通知它 */
+  const refreshSheetsRef = useRef<() => void>(() => {});
+
+  /**
+   * 值字段标签：占比 / 排名要带后缀（`金额 (占总计百分比)`）。
+   * 插入到文档、导出、打印三处都走同一个回调，避免同一份透视在三个地方三种表头。
+   */
+  const pivotValueLabelOf = useCallback(
+    (block: PivotBlock) =>
+      pivotValueLabel(
+        block,
+        block.showAs === 'normal' ? '' : t(PIVOT_SHOW_AS_LABEL_KEY[block.showAs]),
+      ),
+    [t],
+  );
+
+  // 透视表（P2-4 第八片）：配置的生命周期、面板快照与「插入到文档」，视图派生与打印留在组件
+  const {
+    configs: pivotConfigs,
+    configsRef: pivotConfigsRef,
+    config: pivotConfig,
+    snapshot: pivotSnapshot,
+    open: pivotOpen,
+    openRef: pivotOpenRef,
+    openPanel: openPivot,
+    closePanel: closePivot,
+    applyConfig: applyPivotConfig,
+    create: handlePivotCreate,
+    select: handlePivotSelect,
+    remove: handlePivotDelete,
+    removeAll: handlePivotRemove,
+    useSelection: handlePivotUseSelection,
+    refresh: refreshPivot,
+    insert: handlePivotInsert,
+    adoptIfEmpty: adoptPivotsIfEmpty,
+    reset: resetPivots,
+  } = useSheetPivot({
+    handleRef,
+    onCommit: () => scheduleSaveRef.current(),
+    onSheetsChanged: () => refreshSheetsRef.current(),
+    isSheetProtected: (sheetId) => protectionFor(protectionRef.current, sheetId) !== null,
+    valueLabel: pivotValueLabelOf,
+    messages: {
+      title: t('tools.sheet.pivotTitle'),
+      blank: t('tools.sheet.pivotBlank'),
+      values: t('tools.sheet.pivotValues'),
+    },
+  });
+
   /** Content such as conditional formatting / data validation that survives the snapshot round-trip without semantic mapping */
   const extrasRef = useRef<WorkbookExtras | null>(null);
   /** Excel native chart parts that came with the imported file (written back verbatim, never parsed) */
@@ -352,7 +301,9 @@ export default function SpreadsheetTool() {
     setPresenting(true);
     try {
       const handle = handleRef.current;
-      const snapshot = handle?.getSnapshot();
+      // 对象层（P2-10）：图片 / 形状 / 图表只存在于工具自有字段里，`getSnapshot()` 拿不到，
+      // 必须先合成再投影，否则演示视图永远是"只有格子"。
+      const snapshot = handle ? withDocOwnedContent(handle.getSnapshot()) : null;
       const grid = snapshot
         ? buildPresentGrid(snapshot, handleRef.current?.getActiveSheetId() ?? null)
         : null;
@@ -363,110 +314,30 @@ export default function SpreadsheetTool() {
     }
   };
 
-  const setChartList = useCallback((next: ChartConfig[]) => {
-    chartsRef.current = next;
-    setCharts(next);
-  }, []);
-
-  /** Recompute the derived data of every chart from the current workbook (called after cell edits) */
-  const applyChartData = useCallback((snapshot: WorkbookSnapshotLite, sheetId: string | null) => {
-    const configs = chartsRef.current;
-    if (configs.length === 0) {
-      setChartDataMap({});
-      return;
-    }
-    const next: Record<string, ChartData | null> = {};
-    for (const config of configs) {
-      // 跨表图表（导入的 `ChartData!` 引用）读的是 `dataSheetId`，不是图表所在的表
-      const result = buildChartData(
-        snapshot,
-        chartDataSheetId(config, sheetId),
-        config.range,
-        config.type,
-      );
-      next[config.id] = result.ok ? result.value : null;
-    }
-    setChartDataMap(next);
-  }, []);
-
-  /** Insert a floating chart into the sheet area: data comes from the current selection, position/size get defaults */
-  const openChart = useCallback(() => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    const range = handle.getActiveRange();
-    if (!range) {
-      setChartNotice(true);
-      return;
-    }
-    const sheetId = handle.getActiveSheetId();
-    const result = buildChartData(handle.getSnapshot(), sheetId, range, 'bar');
-    if (!result.ok) {
-      setChartNotice(true);
-      return;
-    }
-    setChartNotice(false);
-    chartSeqRef.current += 1;
-    const offset = (chartsRef.current.length % 5) * 24;
-    const config: ChartConfig = {
-      id: `chart-${Date.now().toString(36)}-${chartSeqRef.current}`,
-      type: 'bar',
-      range,
-      sheetId: sheetId ?? undefined,
-      x: 24 + offset,
-      y: 24 + offset,
-      width: Math.max(260, Math.min(420, (chartBounds.width || 460) - 48)),
-      height: Math.max(200, Math.min(280, (chartBounds.height || 320) - 48)),
-    };
-    setChartList([...chartsRef.current, config]);
-    setSelectedChartId(config.id);
-    setChartDataMap((prev) => ({ ...prev, [config.id]: result.value }));
-    scheduleSaveRef.current();
-  }, [chartBounds.height, chartBounds.width, setChartList]);
-
-  /** Update a chart config; recompute its data immediately when the data range changes */
-  const updateChart = useCallback(
-    (id: string, patch: Partial<ChartConfig>) => {
-      setChartList(
-        chartsRef.current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-      );
-      if (patch.range) {
-        const handle = handleRef.current;
-        if (handle) applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
-      }
-      scheduleSaveRef.current();
-    },
-    [applyChartData, setChartList],
-  );
-
-  const removeChart = useCallback(
-    (id: string) => {
-      setChartList(chartsRef.current.filter((item) => item.id !== id));
-      setSelectedChartId((prev) => (prev === id ? null : prev));
-      setChartDataMap((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      scheduleSaveRef.current();
-    },
-    [setChartList],
-  );
-
-  /** Point a chart at the current sheet selection */
-  const pickRangeForChart = useCallback(
-    (id: string) => {
-      const handle = handleRef.current;
-      if (!handle) return;
-      const range = handle.getActiveRange();
-      if (!range) {
-        setChartNotice(true);
-        return;
-      }
-      setChartNotice(false);
-      updateChart(id, { range, sheetId: handle.getActiveSheetId() ?? undefined });
-    },
-    [updateChart],
-  );
+  /**
+   * 浮动图表（P2-4 第 5 片）：配置 + 派生数据 + 选中态 + 四个动作都在 hook 里。
+   * `chartBounds` 仍留在组件，因为形状 / 图片层用的是同一个尺寸。
+   */
+  const {
+    charts,
+    chartsRef,
+    dataMap: chartDataMap,
+    selectedId: selectedChartId,
+    notice: chartNotice,
+    importReport: chartImport,
+    select: selectChart,
+    insert: insertChart,
+    update: updateChart,
+    remove: removeChart,
+    pickRange: pickRangeForChart,
+    applyData: applyChartData,
+    adoptIfEmpty: adoptChartsIfEmpty,
+    reset: resetCharts,
+  } = useSheetCharts({
+    handleRef,
+    bounds: chartBounds,
+    onCommit: () => scheduleSaveRef.current(),
+  });
 
   const [summary, setSummary] = useState<WorkbookSummary>({
     sheets: 0,
@@ -541,6 +412,47 @@ export default function SpreadsheetTool() {
   });
 
   /**
+   * 漂浮形状与图片（P2-4 第 6 片）：两族对象的状态、插入 / 更新 / 删除 / 层级调整都在 hook 里。
+   * 布局（`shapeLayoutRef`）仍留在组件——它由表格选区与滚动驱动，是画布的事。
+   */
+  const {
+    shapes,
+    shapesRef,
+    selectedShapeId,
+    selectShape,
+    insertShape,
+    updateShape,
+    removeShape,
+    reorderShape,
+    paletteOpen: shapePaletteOpen,
+    openPalette: openShapePalette,
+    closePalette: closeShapePalette,
+    drawPrst: shapeDrawPrst,
+    choosePreset: chooseShapePreset,
+    cancelDraw: cancelShapeDraw,
+    images,
+    imagesRef,
+    selectedImageId,
+    selectImage,
+    imageAccept,
+    addImageFile,
+    updateImage,
+    removeImage,
+    reorderImage,
+    imageNotice,
+    adoptIfEmpty: adoptObjectsIfEmpty,
+    reset: resetObjects,
+  } = useSheetObjects({
+    handleRef,
+    layoutRef: shapeLayoutRef,
+    onCommit: () => scheduleSaveRef.current(),
+    messages: {
+      imageTooLarge: t('tools.sheet.imageTooLarge'),
+      imageReadFailed: t('tools.sheet.imageReadFailed'),
+    },
+  });
+
+  /**
    * Everything this tool owns but Univer knows nothing about, as one value: charts / shapes /
    * pictures / pivots / names / protection / tables / comments plus the round-trip extras.
    * Which snapshot field each one lands in, and whether an empty value means "drop the field",
@@ -559,164 +471,22 @@ export default function SpreadsheetTool() {
       comments: commentsRef.current,
       extras: extrasRef.current,
     }),
-    [commentsRef],
+    [
+      chartsRef,
+      commentsRef,
+      imagesRef,
+      namedRangesRef,
+      pivotConfigsRef,
+      protectionRef,
+      shapesRef,
+      tablesRef,
+    ],
   );
 
   /** Merge the object set into a snapshot (save + export share this one path) */
   const withDocOwnedContent = useCallback(
     (base: WorkbookSnapshot): WorkbookSnapshot => applySheetObjects(base, sheetObjectSource()),
     [sheetObjectSource],
-  );
-
-  /**
-   * Shapes (SHEET-02) are app-side content exactly like charts: they are not Univer mutations, so
-   * every edit writes through the ref and asks for a save explicitly.
-   */
-  const setShapeList = useCallback((next: SheetShapeConfig[]) => {
-    shapesRef.current = next;
-    setShapes(next);
-  }, []);
-
-  /**
-   * 在指定锚点/尺寸处建形状（拖拽绘制与"插入到选区"共用一条路径）。
-   * 锚点由调用方给出：绘制时是鼠标落点，菜单插入时是当前选区左上角。
-   */
-  const insertShapeAt = useCallback(
-    (prst: string, from: SheetShapeConfig['from'], width?: number, height?: number) => {
-      const handle = handleRef.current;
-      if (!handle) return;
-      const sheetId = handle.getActiveSheetId();
-      const shape = createSheetShape({
-        prst,
-        from,
-        sheetId: sheetId ?? undefined,
-        width,
-        height,
-        z: shapesRef.current.reduce((max, item) => Math.max(max, item.z), 0) + 1,
-      });
-      setShapeList([...shapesRef.current, shape]);
-      setSelectedShapeId(shape.id);
-      setShapePaletteOpen(false);
-      setShapeDrawPrst(null);
-      scheduleSaveRef.current();
-    },
-    [setShapeList],
-  );
-
-  const updateShape = useCallback(
-    (id: string, patch: Partial<SheetShapeConfig>) => {
-      setShapeList(
-        shapesRef.current.map((shape) => (shape.id === id ? { ...shape, ...patch } : shape)),
-      );
-      scheduleSaveRef.current();
-    },
-    [setShapeList],
-  );
-
-  const removeShape = useCallback(
-    (id: string) => {
-      setShapeList(shapesRef.current.filter((shape) => shape.id !== id));
-      setSelectedShapeId((current) => (current === id ? null : current));
-      scheduleSaveRef.current();
-    },
-    [setShapeList],
-  );
-
-  /** z-order: one step above everything / below everything */
-  const reorderShape = useCallback(
-    (id: string, direction: 'front' | 'back') => {
-      const zs = shapesRef.current.map((shape) => shape.z);
-      const next = direction === 'front' ? Math.max(0, ...zs) + 1 : Math.min(0, ...zs) - 1;
-      setShapeList(
-        shapesRef.current.map((shape) => (shape.id === id ? { ...shape, z: next } : shape)),
-      );
-      scheduleSaveRef.current();
-    },
-    [setShapeList],
-  );
-
-  /* ---------------------------- Pictures (SHEET-02 剩余) ---------------------------- */
-
-  const setImageList = useCallback((next: SheetImageConfig[]) => {
-    imagesRef.current = next;
-    setImages(next);
-  }, []);
-
-  /**
-   * 插入一张图。图片以 dataURL 存进快照 —— 快照必须自包含（草稿/历史版本/导出都不能依赖原文件路径），
-   * 导出时再拆回 `xl/media/imageN.<ext>`。超过上限直接拒绝，免得把 localStorage 撑爆。
-   */
-  const insertImageFile = useCallback(
-    async (file: File) => {
-      if (file.size > MAX_IMAGE_BYTES) {
-        setImageNotice(t('tools.sheet.imageTooLarge'));
-        return;
-      }
-      let src = '';
-      try {
-        src = await readFileAsDataUrl(file);
-      } catch {
-        setImageNotice(t('tools.sheet.imageReadFailed'));
-        return;
-      }
-      if (!parseImageDataUrl(src)) {
-        setImageNotice(t('tools.sheet.imageReadFailed'));
-        return;
-      }
-      const natural = await measureImage(src);
-      const handle = handleRef.current;
-      const layout = shapeLayoutRef.current;
-      const range = handle?.getActiveRange();
-      const from = range
-        ? { col: range.startColumn, row: range.startRow, colOff: 8, rowOff: 8 }
-        : pxToAnchor(24, 24, layout);
-      const fit = fitImageSize(natural.width, natural.height);
-      const image = createSheetImage({
-        src,
-        name: file.name,
-        from,
-        sheetId: handle?.getActiveSheetId() ?? undefined,
-        width: fit.width,
-        height: fit.height,
-        z: imagesRef.current.reduce((max, item) => Math.max(max, item.z), 0) + 1,
-      });
-      setImageNotice(null);
-      setImageList([...imagesRef.current, image]);
-      setSelectedImageId(image.id);
-      scheduleSaveRef.current();
-    },
-    [setImageList, t],
-  );
-
-  const updateImage = useCallback(
-    (id: string, patch: Partial<SheetImageConfig>) => {
-      setImageList(
-        imagesRef.current.map((image) => (image.id === id ? { ...image, ...patch } : image)),
-      );
-      scheduleSaveRef.current();
-    },
-    [setImageList],
-  );
-
-  const removeImage = useCallback(
-    (id: string) => {
-      setImageList(imagesRef.current.filter((image) => image.id !== id));
-      setSelectedImageId((current) => (current === id ? null : current));
-      scheduleSaveRef.current();
-    },
-    [setImageList],
-  );
-
-  const reorderImage = useCallback(
-    (id: string, direction: 'front' | 'back') => {
-      const zs = imagesRef.current.map((image) => image.z);
-      const next = direction === 'front' ? Math.max(0, ...zs) + 1 : Math.min(0, ...zs) - 1;
-      setImageList(
-        imagesRef.current.map((image) => (image.id === id ? { ...image, z: next } : image)),
-      );
-      scheduleSaveRef.current();
-    },
-    [setImageList],
   );
 
   /**
@@ -871,28 +641,6 @@ export default function SpreadsheetTool() {
     theme === 'dark' || (theme === 'system' && document.documentElement.classList.contains('dark'));
   const univerLocale: 'zhCN' | 'enUS' = lang === 'zh' || lang === 'zh-TW' ? 'zhCN' : 'enUS';
 
-  /**
-   * 删表后把挂在那张表上的对象一起清掉（P2-4 从 handler 里搬过来的规则）：
-   * 保护 / 局部名称 / 表格对象都带 sheetId，留着会让导出指向一张不存在的表。
-   */
-  const pruneSheetObjects = useCallback((sheetId: string) => {
-    if (protectionRef.current.some((item) => item.sheetId === sheetId)) {
-      const next = protectionRef.current.filter((item) => item.sheetId !== sheetId);
-      protectionRef.current = next;
-      setProtectionList(next);
-    }
-    if (namedRangesRef.current.some((item) => item.sheetId === sheetId)) {
-      const next = namedRangesRef.current.filter((item) => item.sheetId !== sheetId);
-      namedRangesRef.current = next;
-      setNamedRanges(next);
-    }
-    if (tablesRef.current.some((item) => item.sheetId === sheetId)) {
-      const next = tablesRef.current.filter((item) => item.sheetId !== sheetId);
-      tablesRef.current = next;
-      setTables(next);
-    }
-  }, []);
-
   // 标签栏的状态与动作（P2-4）：引擎调用 + 刷新 + 落盘 + 删表清理，规则都在 hook 里
   const {
     sheets,
@@ -906,11 +654,13 @@ export default function SpreadsheetTool() {
     setHidden: setSheetHiddenInEngine,
   } = useSheetTabs({
     handleRef,
-    onRemoved: pruneSheetObjects,
+    onRemoved: pruneMeta,
     onCommit: () => scheduleSaveRef.current(),
     onError: (message) => setFailure({ ok: false, error: message }),
     lastVisibleMessage: t('tools.sheet.lastVisibleSheet'),
   });
+  // 「插入到文档」会新建工作表：让标签栏重新取一遍（hook 声明得早，只能通过 ref 回调）
+  refreshSheetsRef.current = refreshSheets;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -941,48 +691,19 @@ export default function SpreadsheetTool() {
         if (!rawPartsRef.current) {
           rawPartsRef.current = adopted.rawParts;
         }
-        if (chartsRef.current.length === 0) {
-          const configs = adopted.charts;
-          if (configs.length > 0) {
-            chartsRef.current = configs;
-            setCharts(configs);
-            setSelectedChartId(configs[0]?.id ?? null);
-          }
-        }
-        // 图表导入提示：已转换成可编辑配置的 + 只能原样保留的（两者都为 0 时为 null，不显示）
-        setChartImport(summarizeImport(chartsRef.current, rawPartsRef.current?.parts));
-        if (imagesRef.current.length === 0) {
-          const imageConfigs = adopted.images;
-          if (imageConfigs.length > 0) {
-            imagesRef.current = imageConfigs;
-            setImages(imageConfigs);
-          }
-        }
-        if (shapesRef.current.length === 0) {
-          const shapeConfigs = adopted.shapes;
-          if (shapeConfigs.length > 0) {
-            shapesRef.current = shapeConfigs;
-            setShapes(shapeConfigs);
-          }
-        }
+        // 重建拿到的是原始 Univer 快照：已经有图表（来自草稿）时不覆盖
+        adoptChartsIfEmpty(adopted.charts, rawPartsRef.current);
+        // 形状与图片同样"空才采纳"，两族互不影响
+        adoptObjectsIfEmpty({ shapes: adopted.shapes, images: adopted.images });
         // 实例重建（StrictMode / 换主题）拿到的是原始快照：只采纳第一次，别抹掉用户刚写的批注
         adoptComments(adopted.comments);
-        if (!metaLoadedRef.current) {
-          metaLoadedRef.current = true;
-          namedRangesRef.current = adopted.namedRanges;
-          setNamedRanges(adopted.namedRanges);
-          protectionRef.current = adopted.protection;
-          setProtectionList(adopted.protection);
-          tablesRef.current = adopted.tables;
-          setTables(adopted.tables);
-        }
-        if (pivotConfigsRef.current.length === 0) {
-          const pivots = adopted.pivots;
-          if (pivots.length > 0) {
-            pivotConfigsRef.current = pivots;
-            setPivotConfigs(pivots);
-          }
-        }
+        adoptMeta({
+          namedRanges: adopted.namedRanges,
+          protection: adopted.protection,
+          tables: adopted.tables,
+        });
+        // 透视配置同样"空才采纳"：重建快照里本来就没有透视，有内容就说明来自草稿
+        adoptPivotsIfEmpty(adopted.pivots);
       }
       handleRef.current = handle;
       setRibbonHost(handle);
@@ -990,7 +711,7 @@ export default function SpreadsheetTool() {
       unsubscribeRef.current = handle.onMutation(() => {
         scheduleSave();
         // 透视表是"源数据的视图"：源表一改就重算，而不是等用户手动刷新
-        if (pivotOpenRef.current) setPivotSnapshot(handle.getSnapshot());
+        if (pivotOpenRef.current) refreshPivot();
         // Column widths / row heights may have changed: shapes are anchored through them
         setShapeLayoutVersion((version) => version + 1);
       });
@@ -1026,7 +747,21 @@ export default function SpreadsheetTool() {
         setRibbonHost(null);
       }
     };
-  }, [univerLocale, dark, scheduleSave, applyChartData, refreshSheets, adoptComments]);
+  }, [
+    univerLocale,
+    dark,
+    scheduleSave,
+    applyChartData,
+    refreshSheets,
+    adoptComments,
+    adoptChartsIfEmpty,
+    adoptMeta,
+    adoptObjectsIfEmpty,
+    adoptPivotsIfEmpty,
+    pivotOpenRef,
+    protectionRef,
+    refreshPivot,
+  ]);
 
   // Sheet area size: chart dragging / resizing needs bounds
   useEffect(() => {
@@ -1052,140 +787,12 @@ export default function SpreadsheetTool() {
     setSummary(summarizeWorkbook(handle.getSnapshot()));
   }, []);
 
-  /**
-   * 名称改动立刻进快照：名称不是 Univer 的 mutation，脏标记看不到它，
-   * 所以必须显式请求持久化（与图表/形状同一条路径）。
-   */
-  const updateNames = useCallback((next: NamedRange[]) => {
-    namedRangesRef.current = next;
-    setNamedRanges(next);
-    scheduleSaveRef.current();
-  }, []);
-
-  /** 关面板时把"半成品"名称清掉：空名或引用识别不了的行导出后就是坏文件 */
-  const closeNames = useCallback(() => {
-    const cleaned = sanitizeNamedRanges(namedRangesRef.current);
-    if (cleaned.length !== namedRangesRef.current.length) updateNames(cleaned);
-    setNamesOpen(false);
-  }, [updateNames]);
-
-  /**
-   * 打开名称管理器：顺手把当前选区记成 `A1:B2`，供"用选区填入"按钮使用。
-   * 只在打开那一刻取一次 —— 面板是模态的，背后的选区不会变。
-   */
-  const openNames = useCallback(() => {
-    const range = handleRef.current?.getActiveRange();
-    if (!range) {
-      setSelectionLabel(null);
-    } else {
-      const from = `${columnIndexToName(range.startColumn)}${range.startRow + 1}`;
-      const to = `${columnIndexToName(range.endColumn)}${range.endRow + 1}`;
-      setSelectionLabel(from === to ? from : `${from}:${to}`);
-    }
-    setNamesOpen(true);
-  }, []);
-
-  /**
-   * 保护开关：开启时把该表切为只读（Univer 的 editable 权限），关闭时恢复。
-   * 密码只在开启那一刻算一次哈希，之后从快照原样导出（导出结果才是可复现的）。
-   */
-  const applyProtection = useCallback(
-    async (input: { enabled: boolean; flags: SheetProtectionFlags; password: string }) => {
-      const handle = handleRef.current;
-      const sheetId = handle?.getActiveSheetId();
-      if (!sheetId) return;
-      setProtectBusy(true);
-      try {
-        if (!input.enabled) {
-          const next = setProtection(protectionRef.current, sheetId, null);
-          protectionRef.current = next;
-          setProtectionList(next);
-          scheduleSaveRef.current();
-          setProtectOpen(false);
-          return;
-        }
-        const hash = await createPasswordHash(input.password);
-        const previous = protectionFor(protectionRef.current, sheetId);
-        const next = setProtection(protectionRef.current, sheetId, {
-          sheetId,
-          enabled: true,
-          flags: input.flags,
-          // 保留已有密码：只是改"允许的操作"时不该把密码丢掉
-          ...(hash ?? (previous?.password ? { password: previous.password } : {})),
-        });
-        protectionRef.current = next;
-        setProtectionList(next);
-        scheduleSaveRef.current();
-        setProtectOpen(false);
-      } finally {
-        setProtectBusy(false);
-      }
-    },
-    [],
-  );
-
   /** 活动表受保护 → 整个工作簿切只读（Univer 只有工作簿级 editable 权限） */
   useEffect(() => {
     const handle = handleRef.current;
     if (!handle) return;
     handle.setEditable(protectionFor(protection, activeSheetId) === null);
   }, [protection, activeSheetId]);
-
-  /**
-   * 插入表格（P2-S7.3）：把当前选区（太窄时退回已用区域）变成一张原生表格。
-   * 表头取区域首行的文字，列名重复/为空自动兜底；表名与名称管理器共享命名空间。
-   */
-  const handleInsertTable = useCallback(() => {
-    const handle = handleRef.current;
-    const sheetId = handle?.getActiveSheetId();
-    if (!handle || !sheetId) return;
-    if (protectionFor(protectionRef.current, sheetId)) return;
-    const snapshot = handle.getSnapshot();
-    const active = handle.getActiveRange();
-    const sheetSnapshot = snapshot.sheets[sheetId];
-    const used = sheetSnapshot ? resolveUsedRange(sheetSnapshot) : null;
-    const range = active && active.endRow > active.startRow ? active : used;
-    if (!range) return;
-    const table = createTableFromSelection(
-      snapshot,
-      sheetId,
-      range,
-      takenNames({
-        ...snapshot,
-        syntoolsTables: tablesRef.current,
-        namedRanges: namedRangesRef.current,
-      }),
-    );
-    if (!table) {
-      setTableNotice(t('tools.sheet.tableInsertNeedsRows'));
-      return;
-    }
-    setTableNotice(null);
-    const next = [...tablesRef.current, table];
-    tablesRef.current = next;
-    setTables(next);
-    scheduleSaveRef.current();
-  }, [t]);
-
-  /** 删除与当前选区相交的表格（整块删除，不做"缩表"） */
-  const handleDeleteTable = useCallback(() => {
-    const handle = handleRef.current;
-    const sheetId = handle?.getActiveSheetId();
-    const range = handle?.getActiveRange();
-    if (!handle || !sheetId || !range) return;
-    if (protectionFor(protectionRef.current, sheetId)) return;
-    const hits = tablesInRange(tablesRef.current, sheetId, range);
-    if (hits.length === 0) {
-      setTableNotice(t('tools.sheet.tableDeleteNotFound'));
-      return;
-    }
-    setTableNotice(null);
-    const ids = new Set(hits.map((table) => table.id));
-    const next = tablesRef.current.filter((table) => !ids.has(table.id));
-    tablesRef.current = next;
-    setTables(next);
-    scheduleSaveRef.current();
-  }, [t]);
 
   /** Charts visible on the active sheet (each chart is bound to one sheet) */
   const visibleCharts = useMemo(
@@ -1253,7 +860,6 @@ export default function SpreadsheetTool() {
       handle.loadSnapshot(snapshot);
       setTitle(nextTitle);
       setFailure(null);
-      setChartNotice(false);
       // Every object family comes back through the registry (P2-5) instead of ten hand-written
       // `snapshot.syntoolsXxx ?? []` lines. The two families this block used to forget are the
       // reason it is a registry: opening another document kept the previous one's pictures and
@@ -1261,33 +867,34 @@ export default function SpreadsheetTool() {
       const objects = readSheetObjects(snapshot);
       extrasRef.current = objects.extras;
       rawPartsRef.current = objects.rawParts;
-      chartsRef.current = objects.charts;
-      setCharts(objects.charts);
-      setSelectedChartId(objects.charts[0]?.id ?? null);
-      setChartImport(summarizeImport(objects.charts, objects.rawParts?.parts));
+      // 换文档：图表必须无条件替换（同时清掉上一份的提示与选中态）
+      resetCharts(objects.charts, objects.rawParts);
       // 换文档：必须无条件替换，上一份的批注不能挂在新文档上
       resetComments(objects.comments);
-      pivotConfigsRef.current = objects.pivots;
-      setPivotConfigs(objects.pivots);
-      // Names / protection travel in the same snapshot; adopting them here keeps "打开文件" honest
-      namedRangesRef.current = objects.namedRanges;
-      setNamedRanges(objects.namedRanges);
-      protectionRef.current = objects.protection;
-      setProtectionList(objects.protection);
-      tablesRef.current = objects.tables;
-      setTables(objects.tables);
-      imagesRef.current = objects.images;
-      setImages(objects.images);
-      setSelectedImageId(null);
-      shapesRef.current = objects.shapes;
-      setShapes(objects.shapes);
-      setSelectedShapeId(null);
-      metaLoadedRef.current = true;
+      // 换文档：配置无条件替换，并清掉活动实例 / 关掉面板（上一份的源区域不能挂在新文档上）
+      resetPivots(objects.pivots);
+      // 名称 / 保护 / 表格随同一份快照走：换文档必须无条件替换（上一份不能挂在新文档上）
+      resetMeta({
+        namedRanges: objects.namedRanges,
+        protection: objects.protection,
+        tables: objects.tables,
+      });
+      // 换文档：形状与图片无条件替换，选中态 / 绘制模式一起清掉
+      resetObjects({ shapes: objects.shapes, images: objects.images });
       applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
       refreshSummary();
       refreshSheets();
     },
-    [applyChartData, refreshSummary, refreshSheets, resetComments],
+    [
+      applyChartData,
+      refreshSummary,
+      refreshSheets,
+      resetComments,
+      resetCharts,
+      resetMeta,
+      resetObjects,
+      resetPivots,
+    ],
   );
 
   /** 清空重来（新建 / 删除当前文档后）：编辑器与草稿都回到"空工作簿" */
@@ -1388,150 +995,6 @@ export default function SpreadsheetTool() {
   };
 
   /**
-   * 从当前选区（单格时退回已用区域）生成初始配置。
-   * 布局给一个能立刻看到结果的最小默认：第一个字段做行、最后一个字段做值。
-   */
-  const buildPivotConfig = (snapshot: WorkbookSnapshot, sheetId: string): PivotConfig => {
-    const active = handleRef.current?.getActiveRange() ?? null;
-    const sheet = snapshot.sheets[sheetId];
-    const used = sheet ? resolveUsedRange(sheet) : null;
-    const single =
-      !!active && active.startRow === active.endRow && active.startColumn === active.endColumn;
-    const range =
-      active && !single
-        ? active
-        : (used ?? active ?? { startRow: 0, startColumn: 0, endRow: 0, endColumn: 0 });
-    const width = range.endColumn - range.startColumn + 1;
-    return {
-      id: PIVOT_ID,
-      name: t('tools.sheet.pivotTitle'),
-      sheetId,
-      range: { ...range },
-      // 默认给一个立刻能看懂的交叉表：第一列做行、第二列做列（够宽时）、最后一列求和
-      rows: width > 1 ? [0] : [],
-      cols: width > 2 ? [1] : [],
-      values: width > 1 ? [{ column: width - 1, aggregation: 'sum' }] : [],
-      filters: {},
-      hasHeader: true,
-    };
-  };
-
-  const openPivot = () => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    const snapshot = handle.getSnapshot();
-    // 没有活动工作表就没有源数据：与图表一致，直接不进面板
-    const sheetId = handle.getActiveSheetId() ?? snapshot.sheetOrder[0];
-    if (!sheetId) return;
-    // 已有配置就沿用（用户上次摆好的行列不因为重开面板丢失）；
-    // 一张表多个透视时优先回到"这张表上的那个"，没有才新建一个实例
-    const list = pivotConfigsRef.current;
-    const saved =
-      list.find((item) => item.sheetId === sheetId && item.id === pivotConfig?.id) ??
-      list.find((item) => item.sheetId === sheetId);
-    const config = saved ?? { ...buildPivotConfig(snapshot, sheetId), id: nextPivotId(list) };
-    setPivotConfig(config);
-    // 打开面板就把配置写进文档：否则"打开面板直接导出"会因为 ref 里没有配置而漏掉透视表工作表
-    pivotConfigsRef.current = upsertPivotConfig(list, config);
-    setPivotConfigs(pivotConfigsRef.current);
-    scheduleSaveRef.current();
-    setPivotSnapshot(snapshot);
-    setPivotOpen(true);
-  };
-
-  /**
-   * 配置是工具自有内容：写进 ref + 状态，并显式请求保存（与图表同一范式）。
-   * 多实例下按 id 就地替换，不重置整个列表 —— 否则改第二个透视表会把第一个删掉。
-   */
-  const applyPivotConfig = (next: PivotConfig) => {
-    setPivotConfig(next);
-    const list = upsertPivotConfig(pivotConfigsRef.current, next);
-    pivotConfigsRef.current = list;
-    setPivotConfigs(list);
-    scheduleSaveRef.current();
-  };
-
-  /** 新建一个透视实例（同一张工作表可以有多张，各自独立的行列/筛选/值布局） */
-  const handlePivotCreate = () => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    const snapshot = handle.getSnapshot();
-    const sheetId = handle.getActiveSheetId() ?? snapshot.sheetOrder[0];
-    if (!sheetId) return;
-    const list = pivotConfigsRef.current;
-    const base = buildPivotConfig(snapshot, sheetId);
-    const config: PivotConfig = {
-      ...base,
-      id: nextPivotId(list),
-      // 名字带序号，插入后生成的工作表名也就能一眼分清是哪一张
-      name: list.length === 0 ? base.name : `${base.name} ${list.length + 1}`,
-    };
-    setPivotConfig(config);
-    pivotConfigsRef.current = upsertPivotConfig(list, config);
-    setPivotConfigs(pivotConfigsRef.current);
-    scheduleSaveRef.current();
-    setPivotSnapshot(snapshot);
-  };
-
-  /** 切换正在编辑的实例：源区域从当前文档重读（别的表上的数据可能刚改过） */
-  const handlePivotSelect = (id: string) => {
-    const target = pivotConfigsRef.current.find((config) => config.id === id);
-    if (!target) return;
-    setPivotConfig(target);
-    const handle = handleRef.current;
-    if (handle) setPivotSnapshot(handle.getSnapshot());
-  };
-
-  /**
-   * 删除实例。**不动**已经插入到文档里的结果表：那是文档里的一张真实工作表，
-   * 删配置就等于同时删数据，用户不会预期这个行为。
-   */
-  const handlePivotDelete = (id: string) => {
-    const list = removePivotConfig(pivotConfigsRef.current, id);
-    pivotConfigsRef.current = list;
-    setPivotConfigs(list);
-    scheduleSaveRef.current();
-    if (pivotConfig?.id !== id) return;
-    const next = list[0] ?? null;
-    setPivotConfig(next);
-    if (!next) setPivotOpen(false);
-  };
-
-  const handlePivotUseSelection = () => {
-    const handle = handleRef.current;
-    if (!handle) return;
-    const snapshot = handle.getSnapshot();
-    const sheetId = handle.getActiveSheetId() ?? snapshot.sheetOrder[0];
-    if (!sheetId) return;
-    // 换源区域后旧的字段偏移不再有效：布局复位，避免把"第 3 列"当成"第 1 列"继续算
-    applyPivotConfig({
-      ...buildPivotConfig(snapshot, sheetId),
-      id: pivotConfig?.id ?? PIVOT_ID,
-    });
-    setPivotSnapshot(snapshot);
-  };
-
-  /**
-   * 「插入到文档」：把透视结果落成一张真实工作表。
-   *
-   * 第一次插在末尾并记下 `outputSheetId`；之后再点就是**更新**同一张表
-   * （先按旧范围清空再写）。导出会复用这张表，不再追加副本——
-   * 否则用户点了插入再导出，文档里会出现两张透视表。
-   */
-  /**
-   * 值字段标签：占比 / 排名要带后缀（`金额 (占总计百分比)`）。
-   * 插入到文档、导出、打印三处都走同一个回调，避免同一份透视在三个地方三种表头。
-   */
-  const pivotValueLabelOf = useCallback(
-    (block: PivotBlock) =>
-      pivotValueLabel(
-        block,
-        block.showAs === 'normal' ? '' : t(PIVOT_SHOW_AS_LABEL_KEY[block.showAs]),
-      ),
-    [t],
-  );
-
-  /**
    * 文件进出（P2-4 第 3 片）：导入 / 导出 xlsx·csv / 打印·PDF 与它们的"忙 / 失败 / 保真报告"，
    * 全部在 hook 里；组件只提供快照合成方式与几个落盘回调。
    */
@@ -1564,61 +1027,6 @@ export default function SpreadsheetTool() {
     pivotBlankLabel: t('tools.sheet.pivotBlank'),
     pivotValuesCaption: t('tools.sheet.pivotValues'),
   });
-
-  const handlePivotInsert = () => {
-    const handle = handleRef.current;
-    if (!handle || !pivotConfig) return;
-    // 从**当前**文档重算：面板可能停在旧快照上（源数据改过但没点刷新），
-    // 插进去的数字必须是用户此刻看到的这份数据。
-    const snapshot = handle.getSnapshot();
-    const source = readPivotSource(snapshot, pivotConfig);
-    if (source.records.length === 0 || source.fields.length === 0) return;
-    const result = computePivot(pivotConfig, source);
-    const matrix = pivotToMatrix(
-      result,
-      pivotConfig,
-      t('tools.sheet.pivotBlank'),
-      pivotValueLabelOf,
-      t('tools.sheet.pivotValues'),
-    );
-    if (matrix.length === 0 || result.rowKeys.length === 0) return;
-
-    const sheets = handle.getSheets();
-    const target = pivotConfig.outputSheetId
-      ? sheets.find((sheet) => sheet.id === pivotConfig.outputSheetId)
-      : undefined;
-
-    if (target) {
-      // 保护的意义就是拦住写入：目标表受保护时不要悄悄覆盖它
-      if (protectionFor(protectionRef.current, target.id)) return;
-      const used = usedBlock(snapshot.sheets[target.id]);
-      handle.writeSheetValues(target.id, matrix, used);
-      handle.setActiveSheet(target.id);
-      setPivotSnapshot(handle.getSnapshot());
-    } else {
-      const name = uniqueSheetName(
-        sheets.map((sheet) => sheet.name),
-        pivotConfig.name,
-        t('tools.sheet.pivotTitle'),
-      );
-      const id = handle.insertSheetWithValues(name, matrix);
-      if (!id) return;
-      // 记住这张表：下次点按钮是更新而不是再插一张
-      applyPivotConfig({ ...pivotConfig, outputSheetId: id });
-      handle.setActiveSheet(id);
-      setPivotSnapshot(handle.getSnapshot());
-    }
-    refreshSheets();
-    scheduleSaveRef.current();
-  };
-
-  const handlePivotRemove = () => {
-    pivotConfigsRef.current = [];
-    setPivotConfigs([]);
-    setPivotConfig(null);
-    setPivotOpen(false);
-    scheduleSaveRef.current();
-  };
 
   /**
    * 打印/PDF：透视表不是 Univer 的工作表，直接 `window.print()` 打印不到它。
@@ -1716,7 +1124,8 @@ export default function SpreadsheetTool() {
    */
   const sheetActions: SheetActions = {
     newDoc: handleNew,
-    importXlsx: () => openImport('.xlsx,.xlsm'),
+    // 同一个入口也收 .ods：分流在 `checkImportFile`，用户不必先记住自己手里是哪种容器
+    importXlsx: () => openImport('.xlsx,.xlsm,.ods'),
     importCsv: () => openImport('.csv'),
     exportXlsx: () => void exportXlsx(),
     exportCsv: exportCsv,
@@ -1726,13 +1135,13 @@ export default function SpreadsheetTool() {
     clear: handleClear,
     undo: () => handleRef.current?.undo(),
     redo: () => handleRef.current?.redo(),
-    insertChart: openChart,
-    insertShape: () => setShapePaletteOpen(true),
+    insertChart,
+    insertShape: openShapePalette,
     insertImage: () => imageInputRef.current?.click(),
     insertPivot: openPivot,
     openNames,
-    insertTable: handleInsertTable,
-    deleteTable: handleDeleteTable,
+    insertTable,
+    deleteTable,
     addSheet: handleAddSheet,
     duplicateSheet: () => {
       if (activeSheetId) handleDuplicateSheet(activeSheetId);
@@ -1749,7 +1158,7 @@ export default function SpreadsheetTool() {
       if (activeSheetId) handleDeleteSheet(activeSheetId);
     },
     openComments,
-    openProtect: () => setProtectOpen(true),
+    openProtect,
     present: () => setPresenting(true),
     promptHyperlink: () => {
       const url = window.prompt(t('tools.sheet.r.hyperlinkPrompt'), 'https://');
@@ -2112,7 +1521,7 @@ export default function SpreadsheetTool() {
           images={visibleImages}
           layout={shapeLayout}
           selectedId={selectedImageId}
-          onSelect={setSelectedImageId}
+          onSelect={selectImage}
           onChange={updateImage}
           onRemove={removeImage}
           onBringFront={(id) => reorderImage(id, 'front')}
@@ -2123,14 +1532,14 @@ export default function SpreadsheetTool() {
         <input
           ref={imageInputRef}
           type="file"
-          accept={IMAGE_ACCEPT}
+          accept={imageAccept}
           className="hidden"
           data-testid="sheet-image-input"
           onChange={(event) => {
             const file = event.target.files?.[0];
             // Reset first: picking the same file twice must still fire a change event
             event.target.value = '';
-            if (file) void insertImageFile(file);
+            if (file) void addImageFile(file);
           }}
         />
         {/* Shapes sit under the charts: charts are interactive panels, shapes are annotations */}
@@ -2138,7 +1547,7 @@ export default function SpreadsheetTool() {
           shapes={visibleShapes}
           layout={shapeLayout}
           selectedId={selectedShapeId}
-          onSelect={setSelectedShapeId}
+          onSelect={selectShape}
           onChange={updateShape}
           onRemove={removeShape}
           onBringFront={(id) => reorderShape(id, 'front')}
@@ -2150,10 +1559,9 @@ export default function SpreadsheetTool() {
           <ShapePalette
             onPick={(prst) => {
               // Excel 的顺序：选形状 → 在工作表上拖出来；单击则用默认大小
-              setShapePaletteOpen(false);
-              setShapeDrawPrst(prst);
+              chooseShapePreset(prst);
             }}
-            onClose={() => setShapePaletteOpen(false)}
+            onClose={closeShapePalette}
           />
         ) : null}
         <ShapeDrawLayer
@@ -2162,9 +1570,9 @@ export default function SpreadsheetTool() {
           viewport={shapeViewport}
           surfaceRef={surfaceRef}
           hint={t('tools.sheet.shapeDrawHint')}
-          onCancel={() => setShapeDrawPrst(null)}
+          onCancel={cancelShapeDraw}
           onCreate={(from, width, height) =>
-            insertShapeAt(shapeDrawPrst ?? 'rect', from, width, height)
+            insertShape(shapeDrawPrst ?? 'rect', from, width, height)
           }
         />
         {visibleCharts.map((config) => (
@@ -2174,7 +1582,7 @@ export default function SpreadsheetTool() {
             data={chartDataMap[config.id] ?? null}
             selected={config.id === selectedChartId}
             bounds={chartBounds}
-            onSelect={() => setSelectedChartId(config.id)}
+            onSelect={() => selectChart(config.id)}
             onChange={(patch) => updateChart(config.id, patch)}
             onPickRange={() => pickRangeForChart(config.id)}
             onClose={() => removeChart(config.id)}
@@ -2221,7 +1629,7 @@ export default function SpreadsheetTool() {
       <input
         ref={importInputRef}
         type="file"
-        accept=".xlsx,.xlsm,.csv"
+        accept=".xlsx,.xlsm,.ods,.csv"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -2289,9 +1697,9 @@ export default function SpreadsheetTool() {
           keysByColumn={pivotFieldKeys}
           onConfigChange={applyPivotConfig}
           onUseSelection={handlePivotUseSelection}
-          onRefresh={() => setPivotSnapshot(handleRef.current?.getSnapshot() ?? null)}
+          onRefresh={refreshPivot}
           onRemove={handlePivotRemove}
-          onClose={() => setPivotOpen(false)}
+          onClose={closePivot}
           onInsert={handlePivotInsert}
           inserted={
             Boolean(pivotConfig.outputSheetId) &&
@@ -2346,7 +1754,7 @@ export default function SpreadsheetTool() {
           state={activeProtection}
           busy={protectBusy}
           onApply={(input) => void applyProtection(input)}
-          onClose={() => setProtectOpen(false)}
+          onClose={closeProtect}
         />
       ) : null}
 

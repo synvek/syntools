@@ -20,11 +20,7 @@ import DocsUIEnUS from '@univerjs/docs-ui/locale/en-US';
 import DocsUIZhCN from '@univerjs/docs-ui/locale/zh-CN';
 import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
 import '@univerjs/engine-formula/facade';
-import {
-  IRenderManagerService,
-  SHEET_VIEWPORT_KEY,
-  UniverRenderEnginePlugin,
-} from '@univerjs/engine-render';
+import { UniverRenderEnginePlugin } from '@univerjs/engine-render';
 import { UniverSheetsPlugin } from '@univerjs/sheets';
 import SheetsEnUS from '@univerjs/sheets/locale/en-US';
 import SheetsZhCN from '@univerjs/sheets/locale/zh-CN';
@@ -97,6 +93,7 @@ import '@univerjs/sheets-hyper-link-ui/lib/index.css';
 import '@univerjs/find-replace/lib/index.css';
 import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
 import type { SheetViewport } from './shapes';
+import { readSheetViewport } from './univer-internals';
 import { OpenConditionalFormattingOperator } from '@univerjs/sheets-conditional-formatting-ui';
 import '@univerjs/sheets-numfmt/facade';
 import {
@@ -982,49 +979,33 @@ export function createUniverInstance(
     container.replaceChildren();
   };
 
+  /** 内部 API 只报一次：版本换了以后每帧都报会把通知栏刷屏 */
+  let internalsReported = false;
+
   /**
    * Grid → container projection for the floating overlays (P4-SH6).
    *
-   * Three offsets have to be combined, and none of them is exposed as a single public "cell → screen"
-   * call:
+   * 内部注入器的调用与几何换算都在 `univer-internals.ts`（P2-11）：那边把
+   * `__getInjector()` → render → scene/engine 这一串双下划线 API 收在一个文件里，
+   * 并给出"哪一层断了"的具体码。
    *
-   * 1. the canvas element's position inside the tool container (ribbon + formula bar sit above it);
-   * 2. `viewMain`'s own left/top, which Univer sets to the row-header width / column-header height;
-   * 3. the viewport scroll, in content px, plus the scene scale (the sheet zoom).
-   *
-   * Everything is returned in CSS px of the *container*, which is exactly the overlay's coordinate
-   * space (both are children of the same `relative` box).
+   * 这里只做两件事：拿不到就**降级**（浮层停在上一帧的位置），并把第一次失败报出去——
+   * 静默降级的后果是"滚动时形状不动"，那是个没人能排查的 bug report。
    */
   const getViewport = (): SheetViewport | null => {
-    const workbook = univerAPI.getActiveWorkbook();
-    const unitId = workbook?.getId();
+    const unitId = univerAPI.getActiveWorkbook()?.getId();
     if (!unitId) return null;
-    let render;
-    try {
-      render = univer.__getInjector().get(IRenderManagerService)?.getRenderById(unitId);
-    } catch {
-      // The injector is internal API: a version bump that renames it must degrade, not crash the tool
-      return null;
+    const read = readSheetViewport(univer, unitId, container);
+    if (read.ok) return read.value;
+    if (!internalsReported) {
+      internalsReported = true;
+      reportSheetIssue({
+        code: 'internalsUnavailable',
+        level: 'notice',
+        detail: `${read.code}${read.detail ? `: ${read.detail}` : ''}`,
+      });
     }
-    if (!render) return null;
-    const viewMain = render.scene.getViewport(SHEET_VIEWPORT_KEY.VIEW_MAIN);
-    if (!viewMain) return null;
-    const zoom = Math.abs(render.scene.scaleX) || 1;
-    const scroll = render.scene.getViewportScrollXY(viewMain);
-    const containerBox = container.getBoundingClientRect();
-    const canvasBox = render.engine.getCanvasElement().getBoundingClientRect();
-    const headerX = (viewMain.left ?? 0) * zoom;
-    const headerY = (viewMain.top ?? 0) * zoom;
-    return {
-      originX: canvasBox.left - containerBox.left + headerX,
-      originY: canvasBox.top - containerBox.top + headerY,
-      scrollX: scroll.x,
-      scrollY: scroll.y,
-      zoom,
-      // The canvas also covers the row / column headers; only the remainder shows cells
-      width: Math.max(0, canvasBox.width - headerX),
-      height: Math.max(0, canvasBox.height - headerY),
-    };
+    return null;
   };
 
   const onViewportChange = (listener: () => void): (() => void) => {
