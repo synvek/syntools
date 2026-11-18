@@ -9,4 +9,5 @@ export const pdfHeaderFooterTool: ToolMeta = {
   icon: 'pdfHeaderFooter',
   component: () => import('./PdfHeaderFooterTool'),
   weight: 11,
+  relatedIds: ['pdf-editor'],
 };

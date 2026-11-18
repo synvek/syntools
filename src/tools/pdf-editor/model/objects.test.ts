@@ -14,9 +14,13 @@ import {
   DEFAULT_TEXT_STYLE,
   moveObjectToPage,
   nextZ,
+  reorderZ,
+  setObjectLocked,
+  setObjectOpacity,
   sortByZ,
   unionRect,
 } from './objects';
+import type { PdfObject } from './types';
 
 const rect = { x: 0.1, y: 0.2, w: 0.3, h: 0.1 };
 const page = 'page-main-0';
@@ -266,5 +270,62 @@ describe('clampObject / unionRect / cloneObject', () => {
     expect(copy.page).toBe('page-main-1');
     expect(copy.z).toBe(9);
     expect(source.page).toBe(page);
+  });
+});
+
+describe('reorderZ / 锁定 / 透明度', () => {
+  const stack = (): PdfObject[] => [
+    createShapeObject({ page, rect, type: 'rect', z: 1, id: 'a' }),
+    createShapeObject({ page, rect, type: 'rect', z: 2, id: 'b' }),
+    createShapeObject({ page, rect, type: 'rect', z: 3, id: 'c' }),
+    createShapeObject({ page: 'page-main-1', rect, type: 'rect', z: 1, id: 'other' }),
+  ];
+
+  const order = (objects: PdfObject[]) =>
+    objects
+      .filter((object) => object.page === page)
+      .sort((left, right) => left.z - right.z)
+      .map((object) => object.id);
+
+  it('置顶/置底只重排同页 z，其他页不受影响', () => {
+    const objects = stack();
+
+    expect(order(reorderZ(objects, 'a', 'front'))).toEqual(['b', 'c', 'a']);
+    expect(order(reorderZ(objects, 'c', 'back'))).toEqual(['c', 'a', 'b']);
+    expect(reorderZ(objects, 'a', 'front').find((object) => object.id === 'other')?.z).toBe(1);
+  });
+
+  it('上移/下移一次只换一位，到边界返回原数组', () => {
+    const objects = stack();
+
+    expect(order(reorderZ(objects, 'a', 'forward'))).toEqual(['b', 'a', 'c']);
+    expect(order(reorderZ(objects, 'c', 'backward'))).toEqual(['a', 'c', 'b']);
+    expect(reorderZ(objects, 'c', 'front')).toBe(objects);
+    expect(reorderZ(objects, 'a', 'back')).toBe(objects);
+    expect(reorderZ(objects, 'missing', 'front')).toBe(objects);
+  });
+
+  it('锁定与解锁幂等，无变化时返回同一数组', () => {
+    const objects = stack();
+    const locked = setObjectLocked(objects, 'b', true);
+    expect(locked.find((object) => object.id === 'b')?.locked).toBe(true);
+    expect(setObjectLocked(locked, 'b', true)).toBe(locked);
+    expect(setObjectLocked(objects, 'missing', true)).toBe(objects);
+
+    const unlocked = setObjectLocked(locked, 'b', false);
+    expect(unlocked.find((object) => object.id === 'b')?.locked).toBeUndefined();
+  });
+
+  it('透明度夹到 0–1，重复设置不产生新数组', () => {
+    const objects = stack();
+
+    expect(setObjectOpacity(objects, 'a', 1.5).find((object) => object.id === 'a')?.opacity).toBe(
+      1,
+    );
+    expect(setObjectOpacity(objects, 'a', -1).find((object) => object.id === 'a')?.opacity).toBe(0);
+
+    const half = setObjectOpacity(objects, 'a', 0.5);
+    expect(half.find((object) => object.id === 'a')?.opacity).toBe(0.5);
+    expect(setObjectOpacity(half, 'a', 0.5)).toBe(half);
   });
 });

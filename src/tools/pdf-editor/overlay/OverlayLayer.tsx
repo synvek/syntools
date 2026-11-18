@@ -6,6 +6,15 @@ import type {
   ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  INITIAL_ANNOTATION_STYLE,
+  isAnnotateTool,
+  isDrawingTool,
+  isMarkupTool,
+  isShapeTool,
+  type AnnotationStyle,
+  type PdfTool,
+} from '../model/annotate';
 import { clampNormRect } from '../model/coords';
 import type { NormRect, PdfObject, PdfPageState } from '../model/types';
 import {
@@ -17,9 +26,17 @@ import {
   snapAngle,
   type ResizeHandle,
 } from './handles';
-import { objectsInRect, type NormPoint } from './hitTest';
+import { hitTest, objectsInRect, type NormPoint } from './hitTest';
 import { ObjectView, type PagePixelSize } from './objectViews';
 import { textCss } from './textStyle';
+import { dragRect, inkTrack, isUsableDrag, trackRect } from './tools/track';
+
+/** What a finished drawing gesture asks the controller to create */
+export type AnnotationRequest =
+  | { kind: 'markup'; type: 'highlight' | 'underline' | 'strikeout'; rect: NormRect }
+  | { kind: 'shape'; type: 'rect' | 'ellipse' | 'arrow' | 'line'; rect: NormRect }
+  | { kind: 'ink'; rect: NormRect; points: NormPoint[] }
+  | { kind: 'note'; point: NormPoint };
 
 interface OverlayLayerProps {
   /** Objects anchored to this page (all z orders; painted ascending) */
@@ -30,6 +47,10 @@ interface OverlayLayerProps {
   scale: number;
   selectedIds: string[];
   editingId: string | null;
+  /** Active tool; annotation tools take the pointer, `select` does selection and transforms */
+  tool?: PdfTool;
+  /** Style of newly created annotations (also used for the in-progress preview) */
+  style?: AnnotationStyle;
   onSelect(ids: string[]): void;
   onStartEdit(id: string): void;
   onEndEdit(): void;
@@ -40,6 +61,10 @@ interface OverlayLayerProps {
   onMove(updates: Array<{ id: string; rect: NormRect }>): void;
   onResize(id: string, rect: NormRect): void;
   onRotate(id: string, rotation: number): void;
+  /** A drawing tool finished a gesture */
+  onAnnotate?(request: AnnotationRequest): void;
+  /** The eraser hit an unlocked object */
+  onErase?(id: string): void;
 }
 
 /** Default box: two text lines wide enough to type into without resizing first */
@@ -81,7 +106,22 @@ type Gesture =
       startRotation: number;
       aspect: number;
     }
-  | { mode: 'marquee'; start: NormPoint };
+  | { mode: 'marquee'; start: NormPoint }
+  | {
+      mode: 'draw';
+      tool: PdfTool;
+      start: NormPoint;
+      current: NormPoint;
+      /** Ink samples; empty for markup and shapes */
+      points: NormPoint[];
+    };
+
+/** Live preview while an annotation tool is dragging */
+interface Draft {
+  tool: PdfTool;
+  rect: NormRect;
+  points: NormPoint[];
+}
 
 /**
  * Interactive layer above the rendered page.
@@ -91,9 +131,9 @@ type Gesture =
  * `editingId` matches.
  *
  * Gestures start on the root (event delegation via `data-object-id` / `data-handle`), so a pointer
- * capture on the root keeps resize/rotate/marquee tracking even when the pointer leaves the page.
- * Empty-area pointerdown still bubbles to the scroll container for panning unless Shift starts a
- * marquee.
+ * capture on the root keeps resize/rotate/marquee/drawing tracking even when the pointer leaves the
+ * page. Empty-area pointerdown still bubbles to the scroll container for panning unless Shift starts
+ * a marquee.
  */
 export function OverlayLayer({
   objects,
@@ -101,6 +141,8 @@ export function OverlayLayer({
   scale,
   selectedIds,
   editingId,
+  tool = 'select',
+  style = INITIAL_ANNOTATION_STYLE,
   onSelect,
   onStartEdit,
   onEndEdit,
@@ -109,12 +151,15 @@ export function OverlayLayer({
   onMove,
   onResize,
   onRotate,
+  onAnnotate,
+  onErase,
 }: OverlayLayerProps) {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [pageSize, setPageSize] = useState<PagePixelSize>({ width: 0, height: 0 });
   const gestureRef = useRef<Gesture | null>(null);
   const [marquee, setMarquee] = useState<NormRect | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   // SVG geometry needs the page box in CSS px; measured so stroke widths stay 1:1 with save output
   useLayoutEffect(() => {
@@ -150,6 +195,28 @@ export function OverlayLayer({
     };
   };
 
+  /** Height of the default new text box: two lines of 11 pt text at the current zoom */
+  const newTextBoxHeight = (): number => {
+    const element = rootRef.current;
+    if (!element) return 0.05;
+    const box = element.getBoundingClientRect();
+    if (box.height <= 0) return 0.05;
+    return Math.min(0.25, Math.max(0.02, (11 * 1.35 * 2) / (box.height / scale)));
+  };
+
+  const createTextAt = (point: NormPoint) => {
+    const height = newTextBoxHeight();
+    const id = onCreate(
+      clampNormRect({
+        x: point.x - NEW_BOX_WIDTH / 2,
+        y: point.y,
+        w: NEW_BOX_WIDTH,
+        h: height,
+      }),
+    );
+    if (id) onStartEdit(id);
+  };
+
   const onDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     const element = rootRef.current;
     if (!element) return;
@@ -172,6 +239,42 @@ export function OverlayLayer({
     rootRef.current?.setPointerCapture?.(event.pointerId);
   };
 
+  /**
+   * Annotation tools own the press: erase, place a note, or start a drawing gesture.
+   *
+   * Returns true when the event was consumed, so selection never runs for the same press.
+   */
+  const beginAnnotate = (point: NormPoint, event: ReactPointerEvent<HTMLDivElement>): boolean => {
+    if (tool === 'eraser') {
+      const target = hitTest(point, visible, pageAspect);
+      if (target && !target.locked) onErase?.(target.id);
+      event.stopPropagation();
+      return true;
+    }
+
+    if (tool === 'note') {
+      onAnnotate?.({ kind: 'note', point });
+      event.stopPropagation();
+      return true;
+    }
+
+    if (tool === 'text') {
+      createTextAt(point);
+      event.stopPropagation();
+      return true;
+    }
+
+    if (!isDrawingTool(tool)) return false;
+
+    event.stopPropagation();
+    capture(event);
+    // Ink starts at the press point, so the stroke begins where the user put the pen down
+    const points = tool === 'ink' ? [point] : [];
+    gestureRef.current = { mode: 'draw', tool, start: point, current: point, points };
+    setDraft({ tool, rect: dragRect(point, point), points });
+    return true;
+  };
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     const point = pointFromEvent(event.clientX, event.clientY);
@@ -183,6 +286,8 @@ export function OverlayLayer({
       if (owner?.dataset.objectId) onSelect([owner.dataset.objectId]);
       return;
     }
+
+    if (isAnnotateTool(tool) && beginAnnotate(point, event)) return;
 
     const handleElement = target.closest<HTMLElement>('[data-handle]');
     if (handleElement && selected.length === 1 && !editingId) {
@@ -279,6 +384,17 @@ export function OverlayLayer({
       return;
     }
 
+    if (gesture.mode === 'draw') {
+      gesture.current = point;
+      if (gesture.tool === 'ink') gesture.points.push(point);
+      setDraft({
+        tool: gesture.tool,
+        rect: dragRect(gesture.start, point),
+        points: gesture.tool === 'ink' ? [...gesture.points] : [],
+      });
+      return;
+    }
+
     if (gesture.mode === 'move') {
       const dx = point.x - gesture.start.x;
       const dy = point.y - gesture.start.y;
@@ -306,7 +422,30 @@ export function OverlayLayer({
 
     const angle = angleFromCenter(gesture.center, point, gesture.aspect);
     const rotation = (((gesture.startRotation + (angle - gesture.startAngle)) % 360) + 360) % 360;
-    onRotate(gesture.object.id, event.shiftKey ? snapAngle(rotation) : rotation);
+    // 15° steps by default (Acrobat-like); Shift hands the angle over to the pointer
+    onRotate(gesture.object.id, event.shiftKey ? rotation : snapAngle(rotation));
+  };
+
+  /** Turn a finished drawing gesture into a creation request */
+  const commitDraw = (gesture: Extract<Gesture, { mode: 'draw' }>) => {
+    if (isMarkupTool(gesture.tool)) {
+      const rect = dragRect(gesture.start, gesture.current);
+      if (isUsableDrag(rect)) onAnnotate?.({ kind: 'markup', type: gesture.tool, rect });
+      return;
+    }
+
+    if (isShapeTool(gesture.tool)) {
+      const rect = dragRect(gesture.start, gesture.current);
+      if (isUsableDrag(rect)) onAnnotate?.({ kind: 'shape', type: gesture.tool, rect });
+      return;
+    }
+
+    if (gesture.tool === 'ink') {
+      const points = inkTrack(gesture.points);
+      if (points.length >= 2) {
+        onAnnotate?.({ kind: 'ink', rect: trackRect(points), points });
+      }
+    }
   };
 
   const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -319,18 +458,30 @@ export function OverlayLayer({
       setMarquee(null);
     }
 
+    if (gesture?.mode === 'draw') {
+      if (gesture.tool === 'ink') {
+        // The release point is part of the stroke even when no move event reached it
+        const point = pointFromEvent(event.clientX, event.clientY);
+        if (point) gesture.points.push(point);
+      }
+      commitDraw(gesture);
+      setDraft(null);
+    }
+
     rootRef.current?.releasePointerCapture?.(event.pointerId);
   };
 
   const single = selected.length === 1 ? selected[0] : null;
-  const showFrame = single !== null && !editingId && single.locked !== true;
+  const showFrame =
+    single !== null && !editingId && single.locked !== true && !isAnnotateTool(tool);
 
   return (
     <div
       ref={rootRef}
       data-testid="pdf-overlay"
       data-page-id={page}
-      className="absolute inset-0"
+      data-tool={tool}
+      className={`absolute inset-0 ${isAnnotateTool(tool) ? 'cursor-crosshair' : ''}`}
       onDoubleClick={onDoubleClick}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -340,7 +491,7 @@ export function OverlayLayer({
       {visible.map((object) => {
         const isSelected = selectedIds.includes(object.id);
         const editing = object.kind === 'text' && object.id === editingId;
-        const style: CSSProperties = {
+        const objectStyle: CSSProperties = {
           left: `${object.rect.x * 100}%`,
           top: `${object.rect.y * 100}%`,
           width: `${object.rect.w * 100}%`,
@@ -358,9 +509,9 @@ export function OverlayLayer({
             data-locked={object.locked ? 'true' : 'false'}
             data-selected={isSelected ? 'true' : 'false'}
             data-editing={editing ? 'true' : 'false'}
-            style={style}
+            style={objectStyle}
             className={`absolute ${isSelected ? 'ring-1 ring-[#b3261e]' : ''} ${
-              editing || object.locked ? '' : 'cursor-move'
+              editing || object.locked || isAnnotateTool(tool) ? '' : 'cursor-move'
             }`}
           >
             {editing && object.kind === 'text' ? (
@@ -390,6 +541,8 @@ export function OverlayLayer({
         );
       })}
 
+      {draft ? <AnnotationPreview draft={draft} style={style} /> : null}
+
       {showFrame && single ? <SelectionFrame object={single} /> : null}
 
       {marquee ? (
@@ -406,6 +559,102 @@ export function OverlayLayer({
       ) : null}
     </div>
   );
+}
+
+/** In-progress annotation: same geometry as the finished object, so nothing jumps on release */
+function AnnotationPreview({ draft, style }: { draft: Draft; style: AnnotationStyle }) {
+  const { rect, tool } = draft;
+  const box: CSSProperties = {
+    left: `${rect.x * 100}%`,
+    top: `${rect.y * 100}%`,
+    width: `${rect.w * 100}%`,
+    height: `${rect.h * 100}%`,
+  };
+
+  if (tool === 'ink') {
+    if (draft.points.length < 2) return null;
+    const points = draft.points.map((point) => `${point.x * 100},${point.y * 100}`).join(' ');
+    return (
+      <svg
+        data-testid="pdf-annotation-preview"
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <polyline
+          points={points}
+          fill="none"
+          stroke={style.inkColor}
+          strokeWidth={Math.max(0.4, style.inkWidth / 4)}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    );
+  }
+
+  if (isMarkupTool(tool)) {
+    const band = tool === 'highlight' ? 1 : 0.18;
+    const top = tool === 'underline' ? 1 - band : tool === 'strikeout' ? (1 - band) / 2 : 0;
+    return (
+      <div
+        data-testid="pdf-annotation-preview"
+        className="pointer-events-none absolute"
+        style={{
+          ...box,
+          top: `${(rect.y + rect.h * top) * 100}%`,
+          height: `${rect.h * band * 100}%`,
+        }}
+      >
+        <div
+          className="h-full w-full"
+          style={{
+            backgroundColor: style.markupColor,
+            opacity: tool === 'highlight' ? 0.35 : 0.9,
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (isShapeTool(tool)) {
+    if (tool === 'line' || tool === 'arrow') {
+      return (
+        <svg
+          data-testid="pdf-annotation-preview"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <line
+            x1={rect.x * 100}
+            y1={rect.y * 100}
+            x2={(rect.x + rect.w) * 100}
+            y2={(rect.y + rect.h) * 100}
+            stroke={style.shapeStroke}
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      );
+    }
+
+    return (
+      <div
+        data-testid="pdf-annotation-preview"
+        className={`pointer-events-none absolute border border-dashed ${
+          tool === 'ellipse' ? 'rounded-full' : ''
+        }`}
+        style={{ ...box, borderColor: style.shapeStroke }}
+      />
+    );
+  }
+
+  return null;
 }
 
 /** Eight resize handles plus one rotate handle, positioned in page-normalized percentages */

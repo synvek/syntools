@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PdfTool } from '../model/annotate';
 import type { PdfPageState, ViewMode, ZoomMode } from '../model/types';
 import { PageCanvas } from './PageCanvas';
 import { renderDpr, usePageMetrics } from './usePageMetrics';
@@ -12,7 +13,8 @@ export interface PageScrollViewProps {
   /** Visible pages in output order */
   pages: PdfPageState[];
   view: { mode: ViewMode; zoom: number; zoomMode: ZoomMode; page: number };
-  tool: 'select' | 'hand';
+  /** Only `hand` changes the viewport behaviour (drag to pan); annotation tools are handled above */
+  tool: PdfTool;
   darkCanvas: boolean;
   /** Fit modes only: report the resolved scale so the ribbon can show the real percentage */
   onResolvedScale(scale: number): void;

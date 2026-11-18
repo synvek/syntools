@@ -9,5 +9,5 @@ export const pdfExtractTextTool: ToolMeta = {
   icon: 'text',
   component: () => import('./PdfExtractTextTool'),
   weight: 22,
-  relatedIds: ['pdf-viewer', 'pdf-decrypt'],
+  relatedIds: ['pdf-editor', 'pdf-viewer', 'pdf-decrypt'],
 };

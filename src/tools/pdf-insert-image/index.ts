@@ -9,4 +9,5 @@ export const pdfInsertImageTool: ToolMeta = {
   icon: 'pdfInsertImage',
   component: () => import('./PdfInsertImageTool'),
   weight: 12,
+  relatedIds: ['pdf-editor'],
 };

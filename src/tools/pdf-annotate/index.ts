@@ -9,4 +9,5 @@ export const pdfAnnotateTool: ToolMeta = {
   icon: 'pdfAnnotate',
   component: () => import('./PdfAnnotateTool'),
   weight: 19,
+  relatedIds: ['pdf-editor'],
 };

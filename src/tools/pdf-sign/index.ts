@@ -9,4 +9,5 @@ export const pdfSignTool: ToolMeta = {
   icon: 'pdfSign',
   component: () => import('./PdfSignTool'),
   weight: 14,
+  relatedIds: ['pdf-editor'],
 };

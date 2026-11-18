@@ -28,6 +28,9 @@ interface PdfEditorViewProps {
   headerRight?: ReactNode;
   /** Status bar override; defaults to the page counter without size details */
   statusBar?: ReactNode;
+  /** Controlled ribbon tab: contextual tabs switch themselves when an object is selected */
+  activeTabId?: string;
+  onTabChange?(tabId: string): void;
 }
 
 /**
@@ -50,6 +53,8 @@ export function PdfEditorView({
   banner,
   headerRight,
   statusBar,
+  activeTabId,
+  onTabChange,
 }: PdfEditorViewProps) {
   const { t } = useTranslation();
 
@@ -61,6 +66,8 @@ export function PdfEditorView({
           tabs={tabs}
           accent="red"
           defaultTabId="home"
+          activeTabId={activeTabId}
+          onActiveTabChange={onTabChange}
           headerRight={headerRight}
           collapseLabel={t('tools.pdfEditor.ribbonCollapse')}
           expandLabel={t('tools.pdfEditor.ribbonExpand')}

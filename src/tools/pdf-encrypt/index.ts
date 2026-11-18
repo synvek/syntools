@@ -9,4 +9,5 @@ export const pdfEncryptTool: ToolMeta = {
   icon: 'pdfEncrypt',
   component: () => import('./PdfEncryptTool'),
   weight: 16,
+  relatedIds: ['pdf-editor'],
 };

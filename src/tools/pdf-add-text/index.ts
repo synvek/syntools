@@ -9,4 +9,5 @@ export const pdfAddTextTool: ToolMeta = {
   icon: 'pdfAddText',
   component: () => import('./PdfAddTextTool'),
   weight: 13,
+  relatedIds: ['pdf-editor'],
 };

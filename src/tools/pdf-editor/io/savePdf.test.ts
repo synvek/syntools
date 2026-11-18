@@ -11,7 +11,14 @@ import {
   rotateAllPages,
   setPageRotation,
 } from '../model/doc';
-import { createTextObject } from '../model/objects';
+import {
+  createImageObject,
+  createInkObject,
+  createMarkupObject,
+  createNoteObject,
+  createShapeObject,
+  createTextObject,
+} from '../model/objects';
 import type { PdfEditorDoc } from '../model/types';
 import { editedFilename, flattenPdf, outputRotation, textRenderMode } from './savePdf';
 
@@ -61,6 +68,87 @@ describe('outputRotation', () => {
     expect(outputRotation({ id: 'p0', sourceKey: 'main', sourceIndex: 0, rotation: 0 }, 270)).toBe(
       270,
     );
+  });
+});
+
+describe('flattenPdf — 全对象类型', () => {
+  it('六种对象混合保存：每页都画出来且不抛错', async () => {
+    const bytes = await samplePdf(1);
+    const page = pageIdFor('main', 0);
+    const rect = { x: 0.1, y: 0.2, w: 0.3, h: 0.1 };
+
+    let doc = await docFrom(bytes, 1);
+    doc = addObject(
+      doc,
+      createMarkupObject({ page, type: 'highlight', rect, quads: [rect], color: '#fde047', z: 1 }),
+    );
+    doc = addObject(
+      doc,
+      createInkObject({
+        page,
+        points: [
+          { x: 0.2, y: 0.4 },
+          { x: 0.3, y: 0.45 },
+          { x: 0.4, y: 0.4 },
+        ],
+        z: 2,
+      }),
+    );
+    doc = addObject(
+      doc,
+      createShapeObject({ page, rect: { ...rect, y: 0.4 }, type: 'arrow', z: 3 }),
+    );
+    doc = addObject(
+      doc,
+      createNoteObject({ page, rect: { x: 0.6, y: 0.2, w: 0.04, h: 0.04 }, body: 'Check', z: 4 }),
+    );
+    doc = addObject(
+      doc,
+      createImageObject({
+        page,
+        rect: { x: 0.1, y: 0.6, w: 0.2, h: 0.2 },
+        // 故意给一个坏 payload：坏图必须被跳过，而不是让整次保存失败
+        dataUrl: 'data:image/png;base64,broken',
+        naturalW: 100,
+        naturalH: 100,
+        z: 5,
+      }),
+    );
+    doc = addObject(doc, createTextObject({ page, rect: { ...rect, y: 0.8 }, text: 'Hi', z: 6 }));
+
+    const result = await flattenPdf(doc);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.rasterized).toBe(false);
+    const out = await PDFDocument.load(result.value.bytes);
+    expect(out.getPageCount()).toBe(1);
+
+    // The overlay must have added paint operators on top of the copied page
+    const empty = await flattenPdf(await docFrom(bytes, 1));
+    expect(empty.ok).toBe(true);
+    if (!empty.ok) return;
+    expect(result.value.bytes.length).toBeGreaterThan(empty.value.bytes.length);
+  });
+
+  it('旋转对象的 CTM 与纯 ASCII 文本不产生栅格', async () => {
+    const bytes = await samplePdf(1);
+    let doc = await docFrom(bytes, 1);
+    doc = addObject(
+      doc,
+      createShapeObject({
+        page: pageIdFor('main', 0),
+        rect: { x: 0.2, y: 0.2, w: 0.4, h: 0.1 },
+        type: 'rect',
+        rotation: 90,
+        z: 1,
+      }),
+    );
+
+    const result = await flattenPdf(doc);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.rasterized).toBe(false);
   });
 });
 

@@ -9,5 +9,5 @@ export const pdfToImageTool: ToolMeta = {
   icon: 'pdfToImage',
   component: () => import('./PdfToImageTool'),
   weight: 7,
-  relatedIds: ['images-to-pdf', 'pdf-grayscale', 'image-compress', 'pdf-viewer'],
+  relatedIds: ['pdf-editor', 'images-to-pdf', 'pdf-grayscale', 'image-compress', 'pdf-viewer'],
 };

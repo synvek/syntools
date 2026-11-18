@@ -9,5 +9,5 @@ export const pdfReorderTool: ToolMeta = {
   icon: 'pdfReorder',
   component: () => import('./PdfReorderTool'),
   weight: 5,
-  relatedIds: ['pdf-rotate', 'pdf-delete-pages', 'pdf-extract-pages', 'pdf-merge'],
+  relatedIds: ['pdf-editor', 'pdf-rotate', 'pdf-delete-pages', 'pdf-extract-pages', 'pdf-merge'],
 };

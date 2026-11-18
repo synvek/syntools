@@ -9,4 +9,5 @@ export const pdfMetadataTool: ToolMeta = {
   icon: 'pdfMetadata',
   component: () => import('./PdfMetadataTool'),
   weight: 15,
+  relatedIds: ['pdf-editor'],
 };

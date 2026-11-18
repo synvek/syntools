@@ -9,5 +9,5 @@ export const pdfMergeTool: ToolMeta = {
   icon: 'pdfMerge',
   component: () => import('./PdfMergeTool'),
   weight: 1,
-  relatedIds: ['pdf-split', 'pdf-reorder', 'pdf-encrypt', 'pdf-to-image'],
+  relatedIds: ['pdf-editor', 'pdf-split', 'pdf-reorder', 'pdf-encrypt', 'pdf-to-image'],
 };

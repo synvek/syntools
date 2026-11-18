@@ -9,4 +9,5 @@ export const pdfRotateTool: ToolMeta = {
   icon: 'pdfRotate',
   component: () => import('./PdfRotateTool'),
   weight: 6,
+  relatedIds: ['pdf-editor'],
 };

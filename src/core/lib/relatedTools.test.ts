@@ -71,3 +71,20 @@ describe('注册表 relatedIds 完整性', () => {
     }
   });
 });
+
+describe('PDF 单点工具与编辑器的互链（M2-10）', () => {
+  it('每个 pdf-* 工具都能跳到 PDF 编辑器', () => {
+    const missing = tools
+      .filter((tool) => tool.id.startsWith('pdf-') && tool.id !== 'pdf-editor')
+      .filter((tool) => !(tool.relatedIds ?? []).includes('pdf-editor'))
+      .map((tool) => tool.id);
+    expect(missing).toEqual([]);
+  });
+
+  it('编辑器页把单点工具列进相关工具', () => {
+    const editor = toolMap.get('pdf-editor')!;
+    const ids = resolveRelatedTools(editor, 6).map((tool) => tool.id);
+    expect(ids).toContain('pdf-add-text');
+    expect(ids).toContain('pdf-sign');
+  });
+});

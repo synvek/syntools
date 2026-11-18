@@ -10,7 +10,9 @@
  * milestone only edits the block it actually touches.
  */
 
+import { annotateStrings } from './annotateStrings';
 import { fileStrings } from './fileStrings';
+import { pageStrings } from './pageStrings';
 import { panelStrings } from './panelStrings';
 import { ribbonStrings } from './ribbonStrings';
 import { viewStrings } from './viewStrings';
@@ -217,6 +219,8 @@ function withExtras(lng: string): ResourceTree {
     tools: {
       pdfEditor: {
         ...base[lng],
+        ...annotateStrings[lng],
+        ...pageStrings[lng],
         ...fileStrings[lng],
         ...panelStrings[lng],
         ...ribbonStrings[lng],

@@ -6,12 +6,27 @@ import { PDF_THUMB_SCALE } from '@/core/pdf/types';
 import { MAIN_SOURCE_KEY } from '../model/doc';
 import type { PdfPageState } from '../model/types';
 
+/** Page operations offered right on the rail (M2-7); acts on the current page */
+export interface ThumbnailPageOps {
+  insertBlank(): void;
+  remove(): void;
+  duplicate(): void;
+  rotateLeft(): void;
+  rotateRight(): void;
+  extract(): void;
+  /** Shown when the last page cannot be removed */
+  blocked?: string | null;
+}
+
 interface ThumbnailRailProps {
   pdfDoc: PDFDocumentProxy;
   /** Visible pages in output order; page number = index + 1 */
   pages: PdfPageState[];
   currentPage: number;
   onSelect(page: number): void;
+  /** Drag or Alt+↑/↓ reorder; both report 1-based page numbers */
+  onMove(from: number, to: number): void;
+  pageOps?: ThumbnailPageOps;
 }
 
 /**
@@ -44,12 +59,16 @@ function Thumbnail({
   page,
   selected,
   onSelect,
+  onMove,
+  onRemove,
 }: {
   pdfDoc: PDFDocumentProxy;
   state: PdfPageState;
   page: number;
   selected: boolean;
   onSelect(page: number): void;
+  onMove(from: number, to: number): void;
+  onRemove?(): void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLButtonElement | null>(null);
@@ -101,7 +120,34 @@ function Thumbnail({
       aria-label={t('tools.pdfEditor.pageAria', { page })}
       data-testid="pdf-thumbnail"
       data-page={page}
+      draggable
       onClick={() => onSelect(page)}
+      onDragStart={(event) => {
+        event.dataTransfer.setData('text/plain', String(page));
+        event.dataTransfer.effectAllowed = 'move';
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        const from = Number(event.dataTransfer.getData('text/plain'));
+        if (Number.isFinite(from) && from > 0 && from !== page) onMove(from, page);
+      }}
+      onKeyDown={(event) => {
+        // Keyboard path for the drag: Alt+↑/↓ moves this page one slot, like Office
+        if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+          event.preventDefault();
+          const to = event.key === 'ArrowUp' ? page - 1 : page + 1;
+          if (to >= 1) onMove(page, to);
+          return;
+        }
+        if (event.key === 'Delete' && onRemove) {
+          event.preventDefault();
+          onRemove();
+        }
+      }}
       className={`flex w-full flex-col items-center gap-1 rounded-md p-1 transition-colors motion-reduce:transition-none ${
         selected
           ? 'bg-blue-50 ring-1 ring-blue-500 dark:bg-blue-950/40'
@@ -120,27 +166,120 @@ function Thumbnail({
   );
 }
 
-/** Left rail: page thumbnails, click to jump */
-export function ThumbnailRail({ pdfDoc, pages, currentPage, onSelect }: ThumbnailRailProps) {
+/** Left rail: page thumbnails, drag or Alt+↑/↓ to reorder, click to jump */
+export function ThumbnailRail({
+  pdfDoc,
+  pages,
+  currentPage,
+  onSelect,
+  onMove,
+  pageOps,
+}: ThumbnailRailProps) {
   const { t } = useTranslation();
+  const [announcement, setAnnouncement] = useState('');
+
+  const move = (from: number, to: number) => {
+    if (from === to || to < 1 || to > pages.length) return;
+    onMove(from, to);
+    setAnnouncement(t('tools.pdfEditor.pageMoved', { from, to }));
+  };
+
+  const toolButton =
+    'rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-700 transition-colors hover:bg-gray-100 motion-reduce:transition-none dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800';
 
   return (
-    <div
-      role="listbox"
-      aria-label={t('tools.pdfEditor.thumbTitle')}
-      data-testid="pdf-thumbnails"
-      className="flex max-h-full w-[7.5rem] shrink-0 flex-col gap-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
-    >
-      {pages.map((page, index) => (
-        <Thumbnail
-          key={page.id}
-          pdfDoc={pdfDoc}
-          state={page}
-          page={index + 1}
-          selected={index + 1 === currentPage}
-          onSelect={onSelect}
-        />
-      ))}
+    <div className="flex max-h-full w-[7.5rem] shrink-0 flex-col gap-1">
+      {pageOps ? (
+        <div
+          data-testid="pdf-page-toolbar"
+          className="flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
+        >
+          <button
+            type="button"
+            data-testid="pdf-page-insert-blank"
+            onClick={pageOps.insertBlank}
+            className={toolButton}
+          >
+            {t('tools.pdfEditor.pageOpsInsertBlank')}
+          </button>
+          <button
+            type="button"
+            data-testid="pdf-page-duplicate"
+            onClick={pageOps.duplicate}
+            className={toolButton}
+          >
+            {t('tools.pdfEditor.pageOpsDuplicate')}
+          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              data-testid="pdf-page-rotate-left"
+              onClick={pageOps.rotateLeft}
+              className={`${toolButton} flex-1`}
+            >
+              {t('tools.pdfEditor.pageOpsRotateLeft')}
+            </button>
+            <button
+              type="button"
+              data-testid="pdf-page-rotate-right"
+              onClick={pageOps.rotateRight}
+              className={`${toolButton} flex-1`}
+            >
+              {t('tools.pdfEditor.pageOpsRotateRight')}
+            </button>
+          </div>
+          <button
+            type="button"
+            data-testid="pdf-page-extract"
+            onClick={pageOps.extract}
+            className={toolButton}
+          >
+            {t('tools.pdfEditor.pageOpsExtract')}
+          </button>
+          <button
+            type="button"
+            data-testid="pdf-page-delete"
+            onClick={pageOps.remove}
+            disabled={pages.length <= 1}
+            title={pages.length <= 1 ? t('tools.pdfEditor.lastPageBlocked') : undefined}
+            className={`${toolButton} border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40`}
+          >
+            {t('tools.pdfEditor.pageOpsDelete')}
+          </button>
+          {pageOps.blocked ? (
+            <p
+              role="alert"
+              className="text-[11px] leading-tight text-amber-600 dark:text-amber-400"
+            >
+              {pageOps.blocked}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div
+        role="listbox"
+        aria-label={t('tools.pdfEditor.thumbTitle')}
+        data-testid="pdf-thumbnails"
+        className="flex max-h-full min-h-0 flex-1 flex-col gap-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
+      >
+        {pages.map((page, index) => (
+          <Thumbnail
+            key={page.id}
+            pdfDoc={pdfDoc}
+            state={page}
+            page={index + 1}
+            selected={index + 1 === currentPage}
+            onSelect={onSelect}
+            onMove={move}
+            onRemove={pageOps?.remove}
+          />
+        ))}
+      </div>
+
+      <p aria-live="polite" className="sr-only" data-testid="pdf-page-announcement">
+        {announcement}
+      </p>
     </div>
   );
 }

@@ -9,5 +9,5 @@ export const pdfDecryptTool: ToolMeta = {
   icon: 'unlock',
   component: () => import('./PdfDecryptTool'),
   weight: 21,
-  relatedIds: ['pdf-encrypt', 'pdf-extract-text'],
+  relatedIds: ['pdf-editor', 'pdf-encrypt', 'pdf-extract-text'],
 };

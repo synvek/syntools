@@ -9,5 +9,5 @@ export const pdfSplitTool: ToolMeta = {
   icon: 'pdfSplit',
   component: () => import('./PdfSplitTool'),
   weight: 2,
-  relatedIds: ['pdf-merge', 'pdf-extract-pages', 'pdf-delete-pages', 'images-to-pdf'],
+  relatedIds: ['pdf-editor', 'pdf-merge', 'pdf-extract-pages', 'pdf-delete-pages', 'images-to-pdf'],
 };

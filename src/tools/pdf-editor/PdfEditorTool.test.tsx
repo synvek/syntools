@@ -96,6 +96,8 @@ const nativeGetContext = HTMLCanvasElement.prototype.getContext;
 
 beforeEach(() => {
   openMock.mockReset();
+  // Panel toggles persist to localStorage; a leaked flag would open rails in the next test
+  localStorage.clear();
   // jsdom ships no canvas backend; PageCanvas only needs a truthy 2D context because the fake
   // document never paints anything.
   HTMLCanvasElement.prototype.getContext = (() => ({})) as unknown as typeof nativeGetContext;
@@ -187,6 +189,88 @@ describe('PdfEditorTool 打开流程', () => {
     await waitFor(() => expect(screen.getByTestId('pdf-ribbon')).toBeInTheDocument());
     expect(screen.queryByLabelText('PDF 密码')).toBeNull();
     expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('第 1 / 3 页');
+  });
+
+  it('注释页选高亮后拖动，创建可选中对象，Esc 回到选择工具', async () => {
+    openMock.mockResolvedValue({ ok: true, value: fakePdfDoc(1) } as ToolResult<PDFDocumentProxy>);
+    // jsdom 没有布局：给页面一个 600×800 的盒子，指针才能换算成归一化坐标
+    const box = {
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 600,
+      bottom: 800,
+      width: 600,
+      height: 800,
+      toJSON: () => ({}),
+    } as DOMRect;
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(box);
+
+    try {
+      const { container } = render(<PdfEditorTool />);
+      choose(container, pdfFile('one-page.pdf'));
+      await waitFor(() => expect(screen.getByTestId('pdf-ribbon')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByTestId('ribbon-tab-annotate'));
+      fireEvent.click(screen.getByTestId('ribbon-markup-highlight'));
+
+      const overlay = screen.getByTestId('pdf-overlay');
+      expect(overlay).toHaveAttribute('data-tool', 'highlight');
+
+      fireEvent(
+        overlay,
+        new MouseEvent('pointerdown', { bubbles: true, clientX: 120, clientY: 400 }),
+      );
+      fireEvent(
+        overlay,
+        new MouseEvent('pointermove', { bubbles: true, clientX: 300, clientY: 460 }),
+      );
+      fireEvent(
+        overlay,
+        new MouseEvent('pointerup', { bubbles: true, clientX: 300, clientY: 460 }),
+      );
+
+      await waitFor(() => expect(screen.getAllByTestId('pdf-object')).toHaveLength(1));
+      const created = screen.getByTestId('pdf-object');
+      expect(created).toHaveAttribute('data-kind', 'markup');
+      expect(created).toHaveAttribute('data-selected', 'true');
+
+      // 选中标记对象时自动出现「注释格式」上下文标签
+      expect(screen.getByTestId('ribbon-tab-annotate-format')).toBeInTheDocument();
+
+      // Esc：清空选择并退出注释工具（否则下一次点击又会画一个高亮）
+      fireEvent.keyDown(window, { key: 'Escape' });
+      await waitFor(() => expect(overlay).toHaveAttribute('data-tool', 'select'));
+      expect(screen.getByTestId('pdf-object')).toHaveAttribute('data-selected', 'false');
+      // 取消选择后上下文标签消失，回到来源标签
+      expect(screen.queryByTestId('ribbon-tab-annotate-format')).toBeNull();
+    } finally {
+      rectSpy.mockRestore();
+    }
+  });
+
+  it('缩略图工具栏：插入空白页、删除页，最后一页不可删', async () => {
+    openMock.mockResolvedValue({ ok: true, value: fakePdfDoc(2) } as ToolResult<PDFDocumentProxy>);
+    const { container } = render(<PdfEditorTool />);
+    choose(container, pdfFile('two-pages.pdf'));
+    await waitFor(() => expect(screen.getByTestId('pdf-ribbon')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('ribbon-tab-view'));
+    fireEvent.click(screen.getByTestId('ribbon-panels-thumbnails'));
+    await waitFor(() => expect(screen.getByTestId('pdf-page-toolbar')).toBeInTheDocument());
+    // 面板开关写进 localStorage，刷新后保持
+    expect(localStorage.getItem('syntools.pdf-editor.panels')).toContain('"thumbnails":true');
+
+    fireEvent.click(screen.getByTestId('pdf-page-insert-blank'));
+    await waitFor(() => expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('/ 3 页'));
+
+    fireEvent.click(screen.getByTestId('pdf-page-delete'));
+    await waitFor(() => expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('/ 2 页'));
+
+    fireEvent.click(screen.getByTestId('pdf-page-delete'));
+    await waitFor(() => expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('/ 1 页'));
+    expect(screen.getByTestId('pdf-page-delete')).toBeDisabled();
   });
 });
 

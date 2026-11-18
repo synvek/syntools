@@ -9,4 +9,5 @@ export const pdfViewerTool: ToolMeta = {
   icon: 'pdfViewer',
   component: () => import('./PdfViewerTool'),
   weight: 9,
+  relatedIds: ['pdf-editor'],
 };

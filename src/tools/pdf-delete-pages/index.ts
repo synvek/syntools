@@ -9,4 +9,5 @@ export const pdfDeletePagesTool: ToolMeta = {
   icon: 'pdfDelete',
   component: () => import('./PdfDeletePagesTool'),
   weight: 3,
+  relatedIds: ['pdf-editor'],
 };

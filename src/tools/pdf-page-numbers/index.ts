@@ -9,4 +9,5 @@ export const pdfPageNumbersTool: ToolMeta = {
   icon: 'pdfPageNumbers',
   component: () => import('./PdfPageNumbersTool'),
   weight: 10,
+  relatedIds: ['pdf-editor'],
 };

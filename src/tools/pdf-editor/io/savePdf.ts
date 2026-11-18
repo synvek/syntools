@@ -6,25 +6,19 @@
  * rotation is added on top of the file's own /Rotate, and overlay objects are *painted* (not turned
  * into `/Annots`), which is what "flatten" means here.
  *
- * Layer rule: no React, no pdfjs. Only the model types, the pdf-lib pipeline and the shared drawing
- * helpers, so the round-trip test runs in plain jsdom.
+ * Layer rule: no React, no pdfjs. Only the model types, the pdf-lib pipeline, the shared drawing
+ * helpers and `drawObject` (one branch per object kind), so the round-trip test runs in plain jsdom.
  */
 
-import { PDFDocument, StandardFonts, degrees, type PDFFont, type PDFPage } from '@cantoo/pdf-lib';
+import { PDFDocument, StandardFonts, degrees, type PDFPage } from '@cantoo/pdf-lib';
 import type { ToolResult } from '@/core/types';
-import {
-  beginVisualDraw,
-  endVisualDraw,
-  getVisualPageSize,
-  normalizePageRotation,
-  parseColor,
-} from '@/core/pdf/draw';
+import { normalizePageRotation } from '@/core/pdf/draw';
 import { loadPdfFromBytes } from '@/core/pdf/load';
-import { embedRasterizedText, needsUnicodeFont } from '@/core/pdf/text';
-import { normRectToVisual } from '../model/coords';
+import { needsUnicodeFont } from '@/core/pdf/text';
 import { visiblePages } from '../model/doc';
 import { sortByZ } from '../model/objects';
-import type { PdfEditorDoc, PdfPageState, PdfTextAlign, PdfTextObject } from '../model/types';
+import type { PdfEditorDoc, PdfPageState } from '../model/types';
+import { drawPageObjects, embedImageDataUrl, type FontSet } from './drawObject';
 
 export interface FlattenOptions {
   /**
@@ -59,19 +53,6 @@ export function editedFilename(name: string): string {
   return `${base}-edited.pdf`;
 }
 
-function alignX(rect: { x: number; width: number }, width: number, align: PdfTextAlign): number {
-  if (align === 'center') return rect.x + (rect.width - width) / 2;
-  if (align === 'right') return rect.x + rect.width - width;
-  return rect.x;
-}
-
-interface FontSet {
-  regular: PDFFont;
-  bold: PDFFont;
-  italic: PDFFont;
-  boldItalic: PDFFont;
-}
-
 async function embedFonts(out: PDFDocument): Promise<FontSet> {
   const [regular, bold, italic, boldItalic] = await Promise.all([
     out.embedFont(StandardFonts.Helvetica),
@@ -80,97 +61,6 @@ async function embedFonts(out: PDFDocument): Promise<FontSet> {
     out.embedFont(StandardFonts.HelveticaBoldOblique),
   ]);
   return { regular, bold, italic, boldItalic };
-}
-
-function pickFont(fonts: FontSet, object: PdfTextObject): PDFFont {
-  if (object.bold && object.italic) return fonts.boldItalic;
-  if (object.bold) return fonts.bold;
-  if (object.italic) return fonts.italic;
-  return fonts.regular;
-}
-
-/**
- * Paint one text object in visual coordinates.
- *
- * The CTM is remapped first so /Rotate 90 pages need no per-page branching here; `patch` cover is
- * painted before the glyphs (decision D1) so the original content is hidden, not edited.
- */
-async function drawTextObject(
-  out: PDFDocument,
-  page: PDFPage,
-  object: PdfTextObject,
-  fonts: FontSet,
-): Promise<boolean> {
-  const visual = getVisualPageSize(page);
-  const rect = normRectToVisual(object.rect, visual);
-  let rasterized = false;
-
-  beginVisualDraw(page);
-  try {
-    const cover = object.patch?.cover ?? object.bg;
-    if (cover) {
-      page.drawRectangle({
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        color: parseColor(cover),
-        opacity: 1,
-      });
-    }
-    if (object.border) {
-      page.drawRectangle({
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        borderColor: parseColor(object.border),
-        borderWidth: 1,
-      });
-    }
-
-    const lines = object.text.split(/\r?\n/);
-    const step = object.fontSize * object.lineHeight;
-    // Approximate ascent: the first baseline sits one font size below the box top
-    const firstBaseline = rect.y + rect.height - object.fontSize;
-
-    for (const [index, line] of lines.entries()) {
-      if (!line) continue;
-      const baseline = firstBaseline - index * step;
-
-      if (textRenderMode(line) === 'raster') {
-        rasterized = true;
-        const raster = await embedRasterizedText(
-          out,
-          line,
-          object.fontSize,
-          parseColor(object.color),
-        );
-        page.drawImage(raster.image, {
-          x: alignX(rect, raster.width, object.align),
-          y: baseline - object.fontSize * 0.2,
-          width: raster.width,
-          height: raster.height,
-          opacity: object.opacity,
-        });
-        continue;
-      }
-
-      const font = pickFont(fonts, object);
-      page.drawText(line, {
-        x: alignX(rect, font.widthOfTextAtSize(line, object.fontSize), object.align),
-        y: baseline,
-        size: object.fontSize,
-        font,
-        color: parseColor(object.color),
-        opacity: object.opacity,
-      });
-    }
-  } finally {
-    endVisualDraw(page);
-  }
-
-  return rasterized;
 }
 
 /** Output rotation = the file's own /Rotate plus the editor's rotation */
@@ -218,26 +108,27 @@ export async function flattenPdf(
     }
 
     for (const state of pages) {
-      let page: PDFPage;
-      if (state.blank) {
-        page = out.addPage([state.blank.widthPt, state.blank.heightPt]);
-      } else {
-        const owner = loaded.get(state.sourceKey);
-        if (!owner) return { ok: false, error: 'INVALID_RANGE' };
-        const [copied] = await out.copyPages(owner, [state.sourceIndex]);
-        if (!copied) return { ok: false, error: 'INVALID_RANGE' };
-        page = copied;
-        out.addPage(page);
-      }
+      const page =
+        state.blank !== undefined
+          ? out.addPage([state.blank.widthPt, state.blank.heightPt])
+          : await copySourcePage(out, loaded, state);
+      if (!page) return { ok: false, error: 'INVALID_RANGE' };
 
       const baseRotation = normalizePageRotation(page.getRotation().angle);
       const rotation = outputRotation(state, baseRotation);
       if (rotation !== baseRotation) page.setRotation(degrees(rotation));
 
-      for (const object of objects) {
-        if (object.page !== state.id || object.kind !== 'text') continue;
-        if (await drawTextObject(out, page, object, fonts)) rasterized = true;
-      }
+      const pageObjects = objects.filter((object) => object.page === state.id);
+      const painted = await drawPageObjects(
+        {
+          out,
+          page,
+          fonts,
+          embedImage: (dataUrl) => embedImageDataUrl(out, dataUrl),
+        },
+        pageObjects,
+      );
+      if (painted.rasterized) rasterized = true;
     }
 
     const title = doc.meta.title?.trim();
@@ -256,4 +147,18 @@ export async function flattenPdf(
     // Never hand back a half-written file
     return { ok: false, error: 'PROCESS_FAILED' };
   }
+}
+
+/** Copy one source page into the output document; `null` when the source or index is missing */
+async function copySourcePage(
+  out: PDFDocument,
+  loaded: Map<string, PDFDocument>,
+  state: PdfPageState,
+): Promise<PDFPage | null> {
+  const owner = loaded.get(state.sourceKey);
+  if (!owner) return null;
+  const [copied] = await out.copyPages(owner, [state.sourceIndex]);
+  if (!copied) return null;
+  out.addPage(copied);
+  return copied;
 }

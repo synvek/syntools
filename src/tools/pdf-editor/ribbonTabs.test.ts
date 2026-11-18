@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RibbonItem, RibbonTab } from '@/core/components/ribbon/types';
-import { buildPdfRibbonTabs, parseZoomPercent } from './ribbonTabs';
+import {
+  buildPdfRibbonTabs,
+  nextActiveTab,
+  parseZoomPercent,
+  resolveContextTab,
+} from './ribbonTabs';
 import type { PdfRibbonActions, PdfRibbonContext } from './ribbonTabs';
 
 /** Labels come back as key names without the `tools.pdfEditor.` prefix, which is easy to assert */
@@ -19,6 +24,20 @@ function makeActions(overrides: Partial<PdfRibbonActions> = {}): PdfRibbonAction
     setViewMode: vi.fn(),
     togglePanel: vi.fn(),
     toggleDarkCanvas: vi.fn(),
+    setAnnotateColor: vi.fn(),
+    setAnnotateWidth: vi.fn(),
+    deleteSelection: vi.fn(),
+    clearAnnotations: vi.fn(),
+    setObjectColor: vi.fn(),
+    setObjectWidth: vi.fn(),
+    setObjectFit: vi.fn(),
+    setObjectOpacity: vi.fn(),
+    setObjectFontSize: vi.fn(),
+    toggleObjectBold: vi.fn(),
+    toggleObjectItalic: vi.fn(),
+    setObjectAlign: vi.fn(),
+    setObjectZ: vi.fn(),
+    toggleObjectLock: vi.fn(),
     ...overrides,
   };
 }
@@ -66,9 +85,9 @@ function fire(tabs: RibbonTab[], groupId: string, itemId: string): void {
 describe('buildPdfRibbonTabs — 结构', () => {
   const tabs = buildPdfRibbonTabs(makeCtx());
 
-  it('M0 只暴露 开始 / 视图 两个标签', () => {
-    expect(tabs.map((tab) => tab.id)).toEqual(['home', 'view']);
-    expect(tabs.map((tab) => tab.label)).toEqual(['tabHome', 'tabView']);
+  it('暴露 开始 / 注释 / 视图 三个标签', () => {
+    expect(tabs.map((tab) => tab.id)).toEqual(['home', 'annotate', 'view']);
+    expect(tabs.map((tab) => tab.label)).toEqual(['tabHome', 'tabAnnotate', 'tabView']);
   });
 
   it('标签、分组、命令的 id 都唯一', () => {
@@ -100,12 +119,12 @@ describe('buildPdfRibbonTabs — 结构', () => {
       'zoom',
       'navigate',
     ]);
-    expect(tabs[1].groups.map((group) => group.id)).toEqual(['view-mode', 'panels', 'display']);
+    expect(tabs[2].groups.map((group) => group.id)).toEqual(['view-mode', 'panels', 'display']);
   });
 
   it('面板尚未实现时不注册面板分组（避免空按钮）', () => {
     const tabs = buildPdfRibbonTabs(makeCtx({ panelsAvailable: false }));
-    expect(tabs[1].groups.map((group) => group.id)).toEqual(['view-mode', 'display']);
+    expect(tabs[2].groups.map((group) => group.id)).toEqual(['view-mode', 'display']);
     expect(allItems(tabs).some((item) => item.id === 'thumbnails')).toBe(false);
   });
 });
@@ -115,8 +134,12 @@ describe('buildPdfRibbonTabs — 禁用与提示', () => {
     const tabs = buildPdfRibbonTabs(makeCtx({ hasDoc: false }));
     for (const item of allItems(tabs)) {
       expect(item.disabled).toBe(true);
-      expect(item.hint).toBe('openFirstHint');
+      expect(item.hint).toBeTruthy();
     }
+
+    // 开始页的命令统一提示"先打开文件"；注释页的颜色/线宽还要先选工具
+    const home = tabs[0].groups.flatMap((group) => group.items);
+    for (const item of home) expect(item.hint).toBe('openFirstHint');
   });
 
   it('有文档时按撤销栈状态禁用撤销/重做', () => {
@@ -282,5 +305,206 @@ describe('buildPdfRibbonTabs — 命令接线', () => {
     if (mode.kind !== 'select') throw new Error('mode must be a select');
     mode.onChange('single');
     expect(actions.setViewMode).toHaveBeenCalledWith('single');
+  });
+});
+
+describe('buildPdfRibbonTabs — 注释页', () => {
+  const style = {
+    markupColor: '#fde047',
+    inkColor: '#e11d48',
+    inkWidth: 2,
+    shapeStroke: '#0ea5e9',
+    shapeWidth: 2,
+    opacity: 1,
+  };
+
+  const withAnnotate = (overrides: Partial<PdfRibbonContext> = {}) =>
+    buildPdfRibbonTabs(
+      makeCtx({ annotate: { style, selectionCount: 0, objectCount: 0 }, ...overrides }),
+    );
+
+  const isActive = (tabs: RibbonTab[], groupId: string, itemId: string): boolean => {
+    const item = findItem(tabs, groupId, itemId);
+    if (item.kind !== 'toggle') throw new Error(`${itemId} must be a toggle`);
+    return item.active === true;
+  };
+
+  it('工具 toggle 跟随当前工具，点击切换工具', () => {
+    const actions = makeActions();
+    const tabs = withAnnotate({ tool: 'highlight', actions });
+
+    expect(isActive(tabs, 'markup', 'highlight')).toBe(true);
+    expect(isActive(tabs, 'markup', 'underline')).toBe(false);
+    expect(isActive(tabs, 'ink', 'ink')).toBe(false);
+
+    fire(tabs, 'shapes', 'rect');
+    fire(tabs, 'ink', 'eraser');
+    expect(actions.setTool).toHaveBeenCalledWith('rect');
+    expect(actions.setTool).toHaveBeenCalledWith('eraser');
+  });
+
+  it('颜色与线宽只对拥有该属性的工具可用', () => {
+    const actions = makeActions();
+    const tabs = withAnnotate({ tool: 'ink', actions });
+
+    const color = findItem(tabs, 'format', 'annotate-color');
+    if (color.kind !== 'color') throw new Error('color item expected');
+    expect(color.disabled).toBe(false);
+    expect(color.value).toBe('#e11d48');
+    color.onPick('#000000');
+    expect(actions.setAnnotateColor).toHaveBeenCalledWith('#000000');
+
+    const width = findItem(tabs, 'format', 'annotate-width');
+    if (width.kind !== 'select') throw new Error('width item expected');
+    expect(width.disabled).toBe(false);
+    width.onChange('4');
+    expect(actions.setAnnotateWidth).toHaveBeenCalledWith(4);
+
+    // 选择工具没有颜色可改：禁用并提示先选工具
+    const idle = withAnnotate({ tool: 'select' });
+    const idleColor = findItem(idle, 'format', 'annotate-color');
+    expect(idleColor.disabled).toBe(true);
+    expect(idleColor.hint).toBe('hintPickTool');
+    expect(findItem(idle, 'format', 'annotate-width').disabled).toBe(true);
+  });
+
+  it('形状工具读的是描边颜色', () => {
+    const tabs = withAnnotate({ tool: 'arrow' });
+    const color = findItem(tabs, 'format', 'annotate-color');
+    if (color.kind !== 'color') throw new Error('color item expected');
+    expect(color.value).toBe('#0ea5e9');
+  });
+
+  it('管理分组按选中数与对象数禁用', () => {
+    const actions = makeActions();
+    const empty = withAnnotate({ actions });
+    expect(findItem(empty, 'manage', 'delete-selection').disabled).toBe(true);
+    expect(findItem(empty, 'manage', 'clear-annotations').disabled).toBe(true);
+
+    const filled = withAnnotate({
+      actions,
+      annotate: { style, selectionCount: 2, objectCount: 5 },
+    });
+    fire(filled, 'manage', 'delete-selection');
+    fire(filled, 'manage', 'clear-annotations');
+    expect(actions.deleteSelection).toHaveBeenCalledTimes(1);
+    expect(actions.clearAnnotations).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('buildPdfRibbonTabs — 上下文标签', () => {
+  const textSelection = {
+    kind: 'text' as const,
+    opacity: 0.8,
+    locked: false,
+    color: '#111111',
+    fontSize: 12,
+    bold: false,
+    italic: true,
+    align: 'left' as const,
+  };
+
+  it('按对象类型解析上下文标签', () => {
+    expect(resolveContextTab(null)).toBeNull();
+    expect(resolveContextTab(textSelection)).toBe('text-format');
+    expect(resolveContextTab({ kind: 'image', opacity: 1, locked: false })).toBe('image-format');
+    expect(resolveContextTab({ kind: 'stamp', opacity: 1, locked: false })).toBe('image-format');
+    expect(resolveContextTab({ kind: 'markup', opacity: 1, locked: false })).toBe(
+      'annotate-format',
+    );
+    expect(resolveContextTab({ kind: 'note', opacity: 1, locked: false })).toBe('annotate-format');
+    expect(resolveContextTab({ kind: 'ink', opacity: 1, locked: false })).toBe('annotate-format');
+  });
+
+  it('选中出现上下文标签，取消选择回到来源标签', () => {
+    const withText = buildPdfRibbonTabs(makeCtx({ selection: textSelection }));
+    expect(withText.map((tab) => tab.id)).toEqual(['home', 'annotate', 'view', 'text-format']);
+
+    const cleared = buildPdfRibbonTabs(makeCtx({ selection: null }));
+    expect(cleared.map((tab) => tab.id)).toEqual(['home', 'annotate', 'view']);
+
+    expect(nextActiveTab('home', 'text-format', 'home')).toBe('text-format');
+    expect(nextActiveTab('text-format', null, 'annotate')).toBe('annotate');
+    expect(nextActiveTab('home', null, 'home')).toBe('home');
+  });
+
+  it('文本上下文标签接线字号/粗体/对齐/颜色/透明度', () => {
+    const actions = makeActions();
+    const tabs = buildPdfRibbonTabs(makeCtx({ actions, selection: textSelection }));
+
+    const size = findItem(tabs, 'text-style', 'font-size');
+    if (size.kind !== 'select') throw new Error('font size must be a select');
+    expect(size.value).toBe('12');
+    size.onChange('18');
+    expect(actions.setObjectFontSize).toHaveBeenCalledWith(18);
+
+    fire(tabs, 'text-style', 'bold');
+    fire(tabs, 'text-style', 'italic');
+    fire(tabs, 'text-align', 'align-center');
+    expect(actions.toggleObjectBold).toHaveBeenCalledTimes(1);
+    expect(actions.toggleObjectItalic).toHaveBeenCalledTimes(1);
+    expect(actions.setObjectAlign).toHaveBeenCalledWith('center');
+
+    const color = findItem(tabs, 'text-color', 'text-color');
+    if (color.kind !== 'color') throw new Error('color item expected');
+    expect(color.value).toBe('#111111');
+    color.onPick('#ff0000');
+    expect(actions.setObjectColor).toHaveBeenCalledWith('#ff0000');
+
+    const opacity = findItem(tabs, 'text-color', 'opacity');
+    if (opacity.kind !== 'select') throw new Error('opacity must be a select');
+    opacity.onChange('50');
+    expect(actions.setObjectOpacity).toHaveBeenCalledWith(0.5);
+  });
+
+  it('锁定对象禁用编辑，但保留解锁与删除', () => {
+    const actions = makeActions();
+    const tabs = buildPdfRibbonTabs(
+      makeCtx({
+        actions,
+        selection: { kind: 'image', opacity: 1, locked: true, fit: 'contain' },
+      }),
+    );
+
+    const fit = findItem(tabs, 'image-fit', 'fit');
+    if (fit.kind !== 'select') throw new Error('fit must be a select');
+    expect(fit.disabled).toBe(true);
+
+    const lock = findItem(tabs, 'arrange', 'lock');
+    expect(lock.disabled).toBe(false);
+    expect(lock.kind === 'toggle' && lock.active).toBe(true);
+    fire(tabs, 'arrange', 'lock');
+    expect(actions.toggleObjectLock).toHaveBeenCalledTimes(1);
+
+    fire(tabs, 'arrange', 'delete');
+    expect(actions.deleteSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it('排列菜单提供四向层级命令', () => {
+    const actions = makeActions();
+    const tabs = buildPdfRibbonTabs(
+      makeCtx({
+        actions,
+        selection: { kind: 'markup', opacity: 1, locked: false, color: '#fde047' },
+      }),
+    );
+
+    const menu = findItem(tabs, 'arrange', 'z-order');
+    if (menu.kind !== 'menu') throw new Error('z-order must be a menu');
+    expect(menu.menu.map((entry) => entry.id)).toEqual(['front', 'forward', 'backward', 'back']);
+    menu.menu[0].onSelect();
+    menu.menu[3].onSelect();
+    expect(actions.setObjectZ).toHaveBeenCalledWith('front');
+    expect(actions.setObjectZ).toHaveBeenCalledWith('back');
+  });
+
+  it('标记对象可以改色但没有线宽', () => {
+    const tabs = buildPdfRibbonTabs(
+      makeCtx({ selection: { kind: 'markup', opacity: 1, locked: false, color: '#fde047' } }),
+    );
+    const color = findItem(tabs, 'ann-format', 'ann-color');
+    expect(color.disabled).toBe(false);
+    const width = findItem(tabs, 'ann-format', 'ann-width');
+    expect(width.disabled).toBe(true);
   });
 });

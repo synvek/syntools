@@ -10,5 +10,5 @@ export const pdfCompressTool: ToolMeta = {
   component: () => import('./PdfCompressTool'),
   // Explicit weight: an undefined weight sorted as 0 and pushed this tool above the "editor" entry
   weight: 20,
-  relatedIds: ['pdf-to-image', 'image-compress'],
+  relatedIds: ['pdf-editor', 'pdf-to-image', 'image-compress'],
 };

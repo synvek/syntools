@@ -9,4 +9,5 @@ export const pdfCropTool: ToolMeta = {
   icon: 'pdfCrop',
   component: () => import('./PdfCropTool'),
   weight: 17,
+  relatedIds: ['pdf-editor'],
 };

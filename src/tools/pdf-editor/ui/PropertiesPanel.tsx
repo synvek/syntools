@@ -7,6 +7,14 @@ interface PropertiesPanelProps {
   /** Current selection (only the single-selection case is editable here) */
   object: PdfObject | null;
   onChangeText(patch: Partial<PdfTextObject>): void;
+  /** Note body; annotations (markup / ink / shape) have no text of their own */
+  onChangeNoteBody?(body: string): void;
+  /** Markup colour, ink colour or shape stroke */
+  onChangeColor?(color: string): void;
+  /** Ink / shape stroke width in points */
+  onChangeWidth?(width: number): void;
+  /** Image scaling mode */
+  onChangeFit?(fit: 'contain' | 'cover' | 'fill'): void;
   onOpacityChange(value: number): void;
   onToggleLock(): void;
   onZOrder(action: ZOrderAction): void;
@@ -26,6 +34,10 @@ const smallButton =
 export function PropertiesPanel({
   object,
   onChangeText,
+  onChangeNoteBody,
+  onChangeColor,
+  onChangeWidth,
+  onChangeFit,
   onOpacityChange,
   onToggleLock,
   onZOrder,
@@ -33,6 +45,12 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const { t } = useTranslation();
   const text = object?.kind === 'text' ? object : null;
+  const note = object?.kind === 'note' ? object : null;
+  const annotate =
+    object && (object.kind === 'markup' || object.kind === 'ink' || object.kind === 'shape')
+      ? object
+      : null;
+  const image = object?.kind === 'image' ? object : null;
 
   return (
     <div
@@ -127,6 +145,71 @@ export function PropertiesPanel({
                 </p>
               ) : null}
             </>
+          ) : null}
+
+          {annotate ? (
+            <>
+              <label className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
+                {t('tools.pdfEditor.propColor')}
+                <input
+                  type="color"
+                  value={annotate.kind === 'shape' ? annotate.stroke : annotate.color}
+                  data-testid="pdf-property-annotation-color"
+                  onChange={(event) => onChangeColor?.(event.target.value)}
+                  className="h-6 w-10 cursor-pointer rounded border border-gray-300 bg-transparent p-0 dark:border-gray-700"
+                />
+              </label>
+
+              {annotate.kind !== 'markup' ? (
+                <label className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
+                  {t('tools.pdfEditor.propStrokeWidth')}
+                  <input
+                    type="number"
+                    min={0.5}
+                    max={12}
+                    step={0.5}
+                    value={annotate.width}
+                    data-testid="pdf-property-stroke-width"
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      if (Number.isFinite(value)) onChangeWidth?.(value);
+                    }}
+                    className="w-16 rounded border border-gray-300 bg-white px-1.5 py-1 text-right tabular-nums text-gray-800 outline-none focus:border-[#b3261e] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                  />
+                </label>
+              ) : null}
+            </>
+          ) : null}
+
+          {image && onChangeFit ? (
+            <label className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
+              {t('tools.pdfEditor.propImageFit')}
+              <select
+                value={image.fit}
+                data-testid="pdf-property-fit"
+                onChange={(event) =>
+                  onChangeFit(event.target.value as 'contain' | 'cover' | 'fill')
+                }
+                className="rounded border border-gray-300 bg-white px-1 py-1 text-[11px] text-gray-800 outline-none focus:border-[#b3261e] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              >
+                <option value="contain">{t('tools.pdfEditor.fitContain')}</option>
+                <option value="cover">{t('tools.pdfEditor.fitCover')}</option>
+                <option value="fill">{t('tools.pdfEditor.fitFill')}</option>
+              </select>
+            </label>
+          ) : null}
+
+          {note && onChangeNoteBody ? (
+            <label className="flex flex-col gap-1 text-gray-600 dark:text-gray-300">
+              {t('tools.pdfEditor.propNoteBody')}
+              <textarea
+                value={note.body}
+                rows={3}
+                data-testid="pdf-property-note-body"
+                onChange={(event) => onChangeNoteBody(event.target.value)}
+                className="w-full resize-none rounded border border-gray-300 bg-white px-1.5 py-1 text-[11px] text-gray-800 outline-none focus:border-[#b3261e] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              />
+            </label>
           ) : null}
 
           <button

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTextObject } from '../model/objects';
+import { createShapeObject, createTextObject } from '../model/objects';
 import type { NormRect, PdfObject } from '../model/types';
 import { OverlayLayer } from './OverlayLayer';
 
@@ -156,5 +156,394 @@ describe('OverlayLayer', () => {
     render(<Harness initial={[onOtherPage]} />);
 
     expect(screen.queryByTestId('pdf-text-object')).toBeNull();
+  });
+});
+
+/**
+ * Gesture tests assert the callback contract directly: the layer reports normalized rects, and the
+ * controller decides how to merge them into history.
+ */
+describe('OverlayLayer 手势与多选', () => {
+  /**
+   * jsdom has no `PointerEvent`, so `fireEvent.pointerDown` degrades to a bare `Event` and drops
+   * `clientX` / `button`. React only reads the DOM fields, so a bubbling MouseEvent under the same
+   * type name exercises the real handlers.
+   */
+  function pointer(
+    type: 'pointerdown' | 'pointermove' | 'pointerup',
+    init: MouseEventInit = {},
+  ): MouseEvent {
+    return new MouseEvent(type, { bubbles: true, cancelable: true, ...init });
+  }
+
+  const baseProps = {
+    page: PAGE_ID,
+    scale: 1,
+    selectedIds: [] as string[],
+    editingId: null,
+    onSelect: () => {},
+    onStartEdit: () => {},
+    onEndEdit: () => {},
+    onCreate: () => null,
+    onTextChange: () => {},
+    onMove: () => {},
+    onResize: () => {},
+    onRotate: () => {},
+  };
+
+  it('拖动多选对象：一次 pointermove 上报全部被选对象的位移', () => {
+    const first = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.2, y: 0.2, w: 0.1, h: 0.1 },
+      type: 'rect',
+      id: 'a',
+      z: 1,
+    });
+    const second = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.5, y: 0.5, w: 0.1, h: 0.1 },
+      type: 'ellipse',
+      id: 'b',
+      z: 2,
+    });
+    const onMove = vi.fn();
+
+    render(
+      <OverlayLayer
+        {...baseProps}
+        objects={[first, second]}
+        selectedIds={['a', 'b']}
+        onMove={onMove}
+      />,
+    );
+
+    const [node] = screen.getAllByTestId('pdf-object');
+    fireEvent(node, pointer('pointerdown', { clientX: 150, clientY: 200, button: 0 }));
+    fireEvent(node, pointer('pointermove', { clientX: 210, clientY: 280 }));
+
+    expect(onMove).toHaveBeenCalledTimes(1);
+    const updates = onMove.mock.calls[0][0] as Array<{ id: string; rect: NormRect }>;
+    expect(updates.map((update) => update.id)).toEqual(['a', 'b']);
+    expect(updates[0].rect.x).toBeCloseTo(0.3, 6);
+    expect(updates[0].rect.y).toBeCloseTo(0.3, 6);
+    expect(updates[0].rect.w).toBeCloseTo(0.1, 6);
+    expect(updates[1].rect.x).toBeCloseTo(0.6, 6);
+    expect(updates[1].rect.y).toBeCloseTo(0.6, 6);
+  });
+
+  it('Shift 点击追加选择，再次 Shift 点击从选择中移除', () => {
+    const first = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.2, y: 0.2, w: 0.1, h: 0.1 },
+      type: 'rect',
+      id: 'a',
+    });
+    const second = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.5, y: 0.5, w: 0.1, h: 0.1 },
+      type: 'rect',
+      id: 'b',
+    });
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <OverlayLayer
+        {...baseProps}
+        objects={[first, second]}
+        selectedIds={['a']}
+        onSelect={onSelect}
+      />,
+    );
+
+    const [, secondNode] = screen.getAllByTestId('pdf-object');
+    fireEvent(secondNode, pointer('pointerdown', { clientX: 330, clientY: 440, shiftKey: true }));
+    expect(onSelect).toHaveBeenCalledWith(['a', 'b']);
+
+    onSelect.mockClear();
+    rerender(
+      <OverlayLayer
+        {...baseProps}
+        objects={[first, second]}
+        selectedIds={['a', 'b']}
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent(secondNode, pointer('pointerdown', { clientX: 330, clientY: 440, shiftKey: true }));
+    expect(onSelect).toHaveBeenCalledWith(['a']);
+  });
+
+  it('拖动缩放手柄上报新的 rect', () => {
+    const object = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.2, y: 0.2, w: 0.2, h: 0.2 },
+      type: 'rect',
+      id: 'a',
+    });
+    const onResize = vi.fn();
+    const { container } = render(
+      <OverlayLayer {...baseProps} objects={[object]} selectedIds={['a']} onResize={onResize} />,
+    );
+
+    const handle = container.querySelector('[data-handle="e"]');
+    expect(handle).not.toBeNull();
+    fireEvent(handle as Element, pointer('pointerdown', { clientX: 240, clientY: 240, button: 0 }));
+    fireEvent(
+      screen.getByTestId('pdf-overlay'),
+      pointer('pointermove', { clientX: 300, clientY: 240 }),
+    );
+
+    expect(onResize).toHaveBeenCalledWith('a', { x: 0.2, y: 0.2, w: 0.3, h: 0.2 });
+  });
+
+  it('旋转默认吸附 15°，按住 Shift 自由旋转', () => {
+    const object = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.2, y: 0.2, w: 0.2, h: 0.2 },
+      type: 'rect',
+      id: 'a',
+    });
+    // Center is (180, 240) px; the pointer starts straight above it (0°) and ends at ~50°.
+    // jsdom reports a 0×0 page box, so the layer falls back to pageAspect = 1.
+    const start = { clientX: 180, clientY: 200, button: 0 };
+    const end = { clientX: 270, clientY: 139 };
+
+    const snapped = vi.fn();
+    const first = render(
+      <OverlayLayer {...baseProps} objects={[object]} selectedIds={['a']} onRotate={snapped} />,
+    );
+    fireEvent(
+      first.container.querySelector('[data-handle="rotate"]') as Element,
+      pointer('pointerdown', start),
+    );
+    fireEvent(screen.getByTestId('pdf-overlay'), pointer('pointermove', end));
+    expect(snapped).toHaveBeenCalledWith('a', 45);
+    first.unmount();
+
+    const free = vi.fn();
+    const second = render(
+      <OverlayLayer {...baseProps} objects={[object]} selectedIds={['a']} onRotate={free} />,
+    );
+    fireEvent(
+      second.container.querySelector('[data-handle="rotate"]') as Element,
+      pointer('pointerdown', start),
+    );
+    fireEvent(
+      screen.getByTestId('pdf-overlay'),
+      pointer('pointermove', { ...end, shiftKey: true }),
+    );
+    expect(free.mock.calls[0][1]).toBeCloseTo(50, 0);
+  });
+
+  it('Shift 框选按 z 降序回传命中对象', () => {
+    const near = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+      type: 'rect',
+      id: 'near',
+      z: 1,
+    });
+    const middle = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.5, y: 0.5, w: 0.2, h: 0.2 },
+      type: 'rect',
+      id: 'middle',
+      z: 2,
+    });
+    const outside = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.8, y: 0.1, w: 0.1, h: 0.1 },
+      type: 'rect',
+      id: 'outside',
+      z: 3,
+    });
+    const onSelect = vi.fn();
+
+    render(
+      <OverlayLayer
+        {...baseProps}
+        objects={[near, middle, outside]}
+        selectedIds={[]}
+        onSelect={onSelect}
+      />,
+    );
+
+    const root = screen.getByTestId('pdf-overlay');
+    fireEvent(root, pointer('pointerdown', { clientX: 0, clientY: 0, shiftKey: true }));
+    fireEvent(root, pointer('pointermove', { clientX: 450, clientY: 600 }));
+    expect(screen.getByTestId('pdf-marquee')).toBeInTheDocument();
+    fireEvent(root, pointer('pointerup', { clientX: 450, clientY: 600 }));
+
+    expect(onSelect).toHaveBeenCalledWith(['middle', 'near']);
+  });
+
+  it('点击空白处清空选择', () => {
+    const onSelect = vi.fn();
+    render(<OverlayLayer {...baseProps} objects={[]} selectedIds={['a']} onSelect={onSelect} />);
+
+    fireEvent(
+      screen.getByTestId('pdf-overlay'),
+      pointer('pointerdown', { clientX: 5, clientY: 5 }),
+    );
+
+    expect(onSelect).toHaveBeenCalledWith([]);
+  });
+});
+
+describe('OverlayLayer 注释工具', () => {
+  function pointer(
+    type: 'pointerdown' | 'pointermove' | 'pointerup',
+    init: MouseEventInit = {},
+  ): MouseEvent {
+    return new MouseEvent(type, { bubbles: true, cancelable: true, ...init });
+  }
+
+  const baseProps = {
+    page: PAGE_ID,
+    scale: 1,
+    selectedIds: [] as string[],
+    editingId: null,
+    onSelect: () => {},
+    onStartEdit: () => {},
+    onEndEdit: () => {},
+    onCreate: () => null,
+    onTextChange: () => {},
+    onMove: () => {},
+    onResize: () => {},
+    onRotate: () => {},
+  };
+
+  const overlay = () => screen.getByTestId('pdf-overlay');
+
+  const existing = () =>
+    createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.2, y: 0.2, w: 0.2, h: 0.2 },
+      type: 'rect',
+      id: 'existing',
+    });
+
+  it('高亮拖动结束后请求创建 markup', () => {
+    const onAnnotate = vi.fn();
+    render(<OverlayLayer {...baseProps} objects={[]} tool="highlight" onAnnotate={onAnnotate} />);
+
+    fireEvent(overlay(), pointer('pointerdown', { clientX: 120, clientY: 400 }));
+    expect(screen.getByTestId('pdf-annotation-preview')).toBeInTheDocument();
+    fireEvent(overlay(), pointer('pointermove', { clientX: 300, clientY: 460 }));
+    fireEvent(overlay(), pointer('pointerup', { clientX: 300, clientY: 460 }));
+
+    expect(onAnnotate).toHaveBeenCalledTimes(1);
+    const request = onAnnotate.mock.calls[0][0] as { kind: string; type: string; rect: NormRect };
+    expect(request.kind).toBe('markup');
+    expect(request.type).toBe('highlight');
+    expect(request.rect.x).toBeCloseTo(0.2, 6);
+    expect(request.rect.y).toBeCloseTo(0.5, 6);
+    expect(request.rect.w).toBeCloseTo(0.3, 6);
+    expect(request.rect.h).toBeCloseTo(0.075, 6);
+    expect(screen.queryByTestId('pdf-annotation-preview')).toBeNull();
+  });
+
+  it('形状工具把拖动矩形交给控制器', () => {
+    const onAnnotate = vi.fn();
+    render(<OverlayLayer {...baseProps} objects={[]} tool="ellipse" onAnnotate={onAnnotate} />);
+
+    fireEvent(overlay(), pointer('pointerdown', { clientX: 120, clientY: 160 }));
+    fireEvent(overlay(), pointer('pointermove', { clientX: 240, clientY: 320 }));
+    fireEvent(overlay(), pointer('pointerup', { clientX: 240, clientY: 320 }));
+
+    const request = onAnnotate.mock.calls[0][0] as { kind: string; type: string; rect: NormRect };
+    expect(request.kind).toBe('shape');
+    expect(request.type).toBe('ellipse');
+    expect(request.rect.x).toBeCloseTo(0.2, 6);
+    expect(request.rect.w).toBeCloseTo(0.2, 6);
+  });
+
+  it('画笔按采样点简化后上报折线', () => {
+    const onAnnotate = vi.fn();
+    render(<OverlayLayer {...baseProps} objects={[]} tool="ink" onAnnotate={onAnnotate} />);
+
+    fireEvent(overlay(), pointer('pointerdown', { clientX: 60, clientY: 80 }));
+    fireEvent(overlay(), pointer('pointermove', { clientX: 120, clientY: 160 }));
+    fireEvent(overlay(), pointer('pointermove', { clientX: 180, clientY: 240 }));
+    fireEvent(overlay(), pointer('pointerup', { clientX: 240, clientY: 320 }));
+
+    const request = onAnnotate.mock.calls[0][0] as {
+      kind: string;
+      points: Array<{ x: number; y: number }>;
+      rect: NormRect;
+    };
+    expect(request.kind).toBe('ink');
+    // 共线采样被 Douglas-Peucker 压成首尾两点
+    expect(request.points).toHaveLength(2);
+    expect(request.points[0].x).toBeCloseTo(0.1, 6);
+    expect(request.points[1].y).toBeCloseTo(0.4, 6);
+    // 外接框覆盖按下点到抬起点
+    expect(request.rect.w).toBeCloseTo(0.3, 6);
+  });
+
+  it('点一下放置便签，不进入拖动', () => {
+    const onAnnotate = vi.fn();
+    render(<OverlayLayer {...baseProps} objects={[]} tool="note" onAnnotate={onAnnotate} />);
+
+    fireEvent(overlay(), pointer('pointerdown', { clientX: 300, clientY: 400 }));
+
+    expect(onAnnotate).toHaveBeenCalledWith({ kind: 'note', point: { x: 0.5, y: 0.5 } });
+  });
+
+  it('橡皮点掉命中的对象，锁定对象不受影响', () => {
+    const onErase = vi.fn();
+    const { unmount } = render(
+      <OverlayLayer {...baseProps} objects={[existing()]} tool="eraser" onErase={onErase} />,
+    );
+
+    fireEvent(overlay(), pointer('pointerdown', { clientX: 180, clientY: 240 }));
+    expect(onErase).toHaveBeenCalledWith('existing');
+
+    unmount();
+    onErase.mockClear();
+    render(
+      <OverlayLayer
+        {...baseProps}
+        objects={[{ ...existing(), locked: true }]}
+        tool="eraser"
+        onErase={onErase}
+      />,
+    );
+    fireEvent(overlay(), pointer('pointerdown', { clientX: 180, clientY: 240 }));
+    expect(onErase).not.toHaveBeenCalled();
+  });
+
+  it('注释工具下按在对象上不会选中，也不会拖动', () => {
+    const onSelect = vi.fn();
+    const onMove = vi.fn();
+    const onAnnotate = vi.fn();
+    render(
+      <OverlayLayer
+        {...baseProps}
+        objects={[existing()]}
+        selectedIds={['existing']}
+        tool="underline"
+        onSelect={onSelect}
+        onMove={onMove}
+        onAnnotate={onAnnotate}
+      />,
+    );
+
+    const node = screen.getByTestId('pdf-object');
+    fireEvent(node, pointer('pointerdown', { clientX: 180, clientY: 240 }));
+    fireEvent(node, pointer('pointermove', { clientX: 300, clientY: 300 }));
+    fireEvent(node, pointer('pointerup', { clientX: 300, clientY: 300 }));
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
+    expect(onAnnotate).toHaveBeenCalledTimes(1);
+  });
+
+  it('过小的拖动不创建对象', () => {
+    const onAnnotate = vi.fn();
+    render(<OverlayLayer {...baseProps} objects={[]} tool="rect" onAnnotate={onAnnotate} />);
+
+    fireEvent(overlay(), pointer('pointerdown', { clientX: 100, clientY: 100 }));
+    fireEvent(overlay(), pointer('pointerup', { clientX: 101, clientY: 101 }));
+
+    expect(onAnnotate).not.toHaveBeenCalled();
   });
 });

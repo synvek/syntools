@@ -23,16 +23,22 @@ import {
   addObjects,
   clampPage,
   createDoc,
+  deletePage,
+  duplicatePage,
+  insertBlankPage,
   isDirty,
   markSaved,
+  movePage,
   removeObjects,
   setCurrentPage,
+  setPageRotation,
   setViewMode,
   setZoom,
   setZoomMode,
   updateObject,
   updateObjects,
   visiblePageCount,
+  visiblePageIndexById,
   visiblePages,
 } from './model/doc';
 import {
@@ -47,19 +53,37 @@ import {
   type History,
 } from './model/history';
 import {
+  INITIAL_ANNOTATION_STYLE,
+  withStyleColor,
+  withStyleWidth,
+  type AnnotationStyle,
+} from './model/annotate';
+import {
+  createInkObject,
+  createMarkupObject,
+  createNoteObject,
+  createShapeObject,
   createTextObject,
   nextZ,
+  NOTE_SIZE,
   reorderZ,
   setObjectLocked,
   setObjectOpacity,
   type ZOrderAction,
 } from './model/objects';
-import type { NormRect, PdfEditorDoc, PdfPageState, PdfTextObject } from './model/types';
-import { OverlayLayer } from './overlay/OverlayLayer';
+import type { NormRect, PdfEditorDoc, PdfObject, PdfPageState, PdfTextObject } from './model/types';
+import { OverlayLayer, type AnnotationRequest } from './overlay/OverlayLayer';
 import { PageScrollView } from './render/PageScrollView';
 import { usePdfDocument } from './render/usePdfDocument';
-import { buildPdfRibbonTabs } from './ribbonTabs';
+import {
+  buildPdfRibbonTabs,
+  CONTEXT_TAB_IDS,
+  nextActiveTab,
+  resolveContextTab,
+  ribbonSelectionOf,
+} from './ribbonTabs';
 import type { PdfPanel, PdfRibbonActions, PdfTool } from './ribbonTabs';
+import { AnnotationsPanel } from './ui/AnnotationsPanel';
 import { registerPdfEditorStrings } from './strings';
 import { DraftPrompt } from './ui/DraftPrompt';
 import { LeaveGuard } from './ui/LeaveGuard';
@@ -76,7 +100,30 @@ registerPdfEditorStrings(i18n);
 
 type Panels = Record<PdfPanel, boolean>;
 
-const CLOSED_PANELS: Panels = { thumbnails: false, outline: false, properties: false };
+const CLOSED_PANELS: Panels = {
+  thumbnails: false,
+  outline: false,
+  properties: false,
+  annotations: false,
+};
+
+/** A4 in PDF points: what "insert blank page" creates */
+const BLANK_PAGE = { widthPt: 595.28, heightPt: 841.89 };
+
+const PANELS_KEY = 'syntools.pdf-editor.panels';
+
+/** Panel toggles survive a reload (M2-8); never let storage errors break the editor */
+function readStoredPanels(): Panels {
+  try {
+    if (typeof localStorage === 'undefined') return CLOSED_PANELS;
+    const raw = localStorage.getItem(PANELS_KEY);
+    if (!raw) return CLOSED_PANELS;
+    const parsed = JSON.parse(raw) as Partial<Panels>;
+    return { ...CLOSED_PANELS, ...parsed };
+  } catch {
+    return CLOSED_PANELS;
+  }
+}
 
 /**
  * Controller: open pipeline, undo/redo, overlay objects, save and keyboard.
@@ -93,14 +140,20 @@ export default function PdfEditorTool() {
 
   const [history, setHistory] = useState<History | null>(null);
   const [tool, setTool] = useState<PdfTool>('select');
+  const [annotateStyle, setAnnotateStyle] = useState<AnnotationStyle>(INITIAL_ANNOTATION_STYLE);
   const [darkCanvas, setDarkCanvas] = useState(false);
-  const [panels, setPanels] = useState<Panels>(CLOSED_PANELS);
+  const [panels, setPanels] = useState<Panels>(readStoredPanels);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const savingRef = useRef(false);
+  /** Ribbon tab: contextual tabs are driven by the selection (M2-8) */
+  const [activeTabId, setActiveTabId] = useState<string>('home');
+  const baseTabRef = useRef('home');
+  /** Shown under the thumbnail toolbar when the last page cannot be removed */
+  const [pageBlocked, setPageBlocked] = useState<string | null>(null);
 
   // Drafts (M1-8): last unsaved edits, offered on the empty state instead of restored silently
   const [draft, setDraft] = useState<DraftRecord | null>(null);
@@ -136,6 +189,14 @@ export default function PdfEditorTool() {
     draftRevRef.current = undefined;
     draftConflictRef.current = false;
   }, [docFingerprint]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PANELS_KEY, JSON.stringify(panels));
+    } catch {
+      // Private mode / quota: panel state is a nicety, never worth an error banner
+    }
+  }, [panels]);
 
   // Open pipeline → document model. Re-opening the same file keeps the existing model instance.
   useEffect(() => {
@@ -313,13 +374,19 @@ export default function PdfEditorTool() {
     }
   }, [doc, editingId, mutate]);
 
+  /** Locked objects survive Delete on purpose: the user has to unlock before removing them */
   const deleteSelected = useCallback(() => {
-    if (selectedIds.length === 0) return;
-    const ids = new Set(selectedIds);
+    if (!doc || selectedIds.length === 0) return;
+    const ids = new Set(
+      doc.objects
+        .filter((object) => selectedIds.includes(object.id) && !object.locked)
+        .map((object) => object.id),
+    );
+    if (ids.size === 0) return;
     setEditingId(null);
-    setSelectedIds([]);
+    setSelectedIds((current) => current.filter((id) => !ids.has(id)));
     mutate((current) => removeObjects(current, ids), { label: 'delete-object' });
-  }, [mutate, selectedIds]);
+  }, [doc, mutate, selectedIds]);
 
   const handleMoveObjects = useCallback(
     (updates: Array<{ id: string; rect: NormRect }>) => {
@@ -357,6 +424,61 @@ export default function PdfEditorTool() {
     [mutate],
   );
 
+  /** Build one object from a finished drawing gesture, then select it */
+  const handleAnnotate = useCallback(
+    (pageId: string, request: AnnotationRequest) => {
+      const base = { page: pageId, z: nextZ(doc?.objects ?? []), opacity: annotateStyle.opacity };
+      let object: PdfObject;
+
+      switch (request.kind) {
+        case 'markup':
+          object = createMarkupObject({
+            ...base,
+            type: request.type,
+            rect: request.rect,
+            quads: [request.rect],
+            color: annotateStyle.markupColor,
+          });
+          break;
+        case 'shape':
+          object = createShapeObject({
+            ...base,
+            rect: request.rect,
+            type: request.type,
+            stroke: annotateStyle.shapeStroke,
+            width: annotateStyle.shapeWidth,
+          });
+          break;
+        case 'ink':
+          object = createInkObject({
+            ...base,
+            points: request.points,
+            color: annotateStyle.inkColor,
+            width: annotateStyle.inkWidth,
+          });
+          break;
+        default:
+          object = createNoteObject({
+            ...base,
+            rect: { x: request.point.x, y: request.point.y, w: NOTE_SIZE, h: NOTE_SIZE },
+          });
+      }
+
+      mutate((current) => addObject(current, object), { label: `annotate-${request.kind}` });
+      setEditingId(null);
+      setSelectedIds([object.id]);
+    },
+    [annotateStyle, doc?.objects, mutate],
+  );
+
+  const eraseObject = useCallback(
+    (id: string) => {
+      mutate((current) => removeObjects(current, new Set([id])), { label: 'erase-object' });
+      setSelectedIds((current) => current.filter((candidate) => candidate !== id));
+    },
+    [mutate],
+  );
+
   const updateSelected = useCallback(
     (patch: Partial<PdfTextObject>) => {
       if (!selectedId) return;
@@ -366,6 +488,20 @@ export default function PdfEditorTool() {
             object.kind === 'text' ? { ...object, ...patch } : object,
           ),
         { label: 'style-object' },
+      );
+    },
+    [mutate, selectedId],
+  );
+
+  const updateSelectedNote = useCallback(
+    (body: string) => {
+      if (!selectedId) return;
+      mutate(
+        (current) =>
+          updateObject(current, selectedId, (object) =>
+            object.kind === 'note' ? { ...object, body } : object,
+          ),
+        { label: 'edit-note', mergeKey: `note:${selectedId}` },
       );
     },
     [mutate, selectedId],
@@ -449,6 +585,156 @@ export default function PdfEditorTool() {
     setEditingId(null);
   }, [currentPageId, doc]);
 
+  /** Remove every annotation of the current page (the manage group's "clear all") */
+  const clearAnnotations = useCallback(() => {
+    if (!doc) return;
+    const pageId = currentPageId();
+    const ids = new Set(
+      doc.objects.filter((object) => !pageId || object.page === pageId).map((object) => object.id),
+    );
+    if (ids.size === 0) return;
+    setSelectedIds([]);
+    setEditingId(null);
+    mutate((current) => removeObjects(current, ids), { label: 'clear-annotations' });
+  }, [currentPageId, doc, mutate]);
+
+  /** Patch the single selected object; repeated edits merge into one undo step */
+  const patchSelectedObject = useCallback(
+    (update: (object: PdfObject) => PdfObject) => {
+      if (!selectedId) return;
+      mutate((current) => updateObject(current, selectedId, update), {
+        label: 'edit-object',
+        mergeKey: `edit:${selectedId}`,
+      });
+    },
+    [mutate, selectedId],
+  );
+
+  const setObjectColor = useCallback(
+    (color: string) => {
+      patchSelectedObject((object) => {
+        if (object.kind === 'text' || object.kind === 'markup' || object.kind === 'ink') {
+          return { ...object, color };
+        }
+        if (object.kind === 'shape') return { ...object, stroke: color };
+        return object;
+      });
+    },
+    [patchSelectedObject],
+  );
+
+  const setObjectWidth = useCallback(
+    (width: number) => {
+      patchSelectedObject((object) =>
+        object.kind === 'shape' || object.kind === 'ink' ? { ...object, width } : object,
+      );
+    },
+    [patchSelectedObject],
+  );
+
+  const setObjectFit = useCallback(
+    (fit: 'contain' | 'cover' | 'fill') => {
+      patchSelectedObject((object) => (object.kind === 'image' ? { ...object, fit } : object));
+    },
+    [patchSelectedObject],
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* Page operations (M2-7)                                                  */
+  /* ---------------------------------------------------------------------- */
+
+  const currentPageState = doc ? (visiblePages(doc)[doc.view.page - 1] ?? null) : null;
+
+  const insertBlankPageAfterCurrent = useCallback(() => {
+    setPageBlocked(null);
+    mutate((current) => insertBlankPage(current, current.view.page + 1, BLANK_PAGE), {
+      label: 'insert-blank-page',
+    });
+  }, [mutate]);
+
+  const removeCurrentPage = useCallback(() => {
+    if (!doc) return;
+    // The editor always needs one page to render; deleting the last one is a no-op with a reason
+    if (visiblePageCount(doc) <= 1) {
+      setPageBlocked(t('tools.pdfEditor.lastPageBlocked'));
+      return;
+    }
+    setPageBlocked(null);
+    setSelectedIds([]);
+    setEditingId(null);
+    mutate((current) => deletePage(current, current.view.page), { label: 'delete-page' });
+  }, [doc, mutate, t]);
+
+  const duplicateCurrentPage = useCallback(() => {
+    const pageId = currentPageState?.id;
+    if (!pageId) return;
+    setPageBlocked(null);
+    mutate((current) => duplicatePage(current, pageId), { label: 'duplicate-page' });
+  }, [currentPageState?.id, mutate]);
+
+  const rotateCurrentPage = useCallback(
+    (delta: number) => {
+      const pageId = currentPageState?.id;
+      if (!pageId) return;
+      mutate((current) => setPageRotation(current, pageId, delta), { label: 'rotate-page' });
+    },
+    [currentPageState?.id, mutate],
+  );
+
+  const movePageTo = useCallback(
+    (from: number, to: number) => {
+      mutate((current) => movePage(current, from, to), { label: 'move-page' });
+    },
+    [mutate],
+  );
+
+  /** Download just the page the user is on, with its annotations baked in */
+  /** Annotations panel entry: select the object and scroll to the page it lives on */
+  const selectAnnotation = useCallback(
+    (object: PdfObject) => {
+      setSelectedIds([object.id]);
+      setEditingId(null);
+      mutate((current) => setCurrentPage(current, visiblePageIndexById(current, object.page)), {
+        label: 'select-annotation',
+        view: true,
+      });
+    },
+    [mutate],
+  );
+
+  const extractCurrentPage = useCallback(async () => {
+    if (!doc || !currentPageState) return;
+    const pageId = currentPageState.id;
+    const single: PdfEditorDoc = {
+      ...doc,
+      pages: doc.pages.map((page) => ({ ...page, deleted: page.id !== pageId })),
+      objects: doc.objects.filter((object) => object.page === pageId),
+    };
+    const result = await flattenPdf(single);
+    if (!result.ok) return;
+    downloadBytes(result.value.bytes, result.value.filename, 'application/pdf');
+  }, [currentPageState, doc]);
+
+  const pageOps = useMemo(
+    () => ({
+      insertBlank: insertBlankPageAfterCurrent,
+      remove: removeCurrentPage,
+      duplicate: duplicateCurrentPage,
+      rotateLeft: () => rotateCurrentPage(-90),
+      rotateRight: () => rotateCurrentPage(90),
+      extract: () => void extractCurrentPage(),
+      blocked: pageBlocked,
+    }),
+    [
+      duplicateCurrentPage,
+      extractCurrentPage,
+      insertBlankPageAfterCurrent,
+      pageBlocked,
+      removeCurrentPage,
+      rotateCurrentPage,
+    ],
+  );
+
   /** Arrow keys: 0.1% or 1% (Shift) of the page, one history entry per press */
   const nudgeSelection = useCallback(
     (dx: number, dy: number) => {
@@ -507,6 +793,12 @@ export default function PdfEditorTool() {
   /* Ribbon commands                                                         */
   /* ---------------------------------------------------------------------- */
 
+  /** Flat projection of the single selection, consumed by the contextual tabs and the properties */
+  const selectedObject =
+    selectedId !== null ? (doc?.objects.find((object) => object.id === selectedId) ?? null) : null;
+  const ribbonSelection = selectedObject ? ribbonSelectionOf(selectedObject) : null;
+  const contextTab = resolveContextTab(ribbonSelection);
+
   const actions: PdfRibbonActions = useMemo(
     () => ({
       undo,
@@ -540,9 +832,59 @@ export default function PdfEditorTool() {
         }),
       togglePanel: (panel) => setPanels((current) => ({ ...current, [panel]: !current[panel] })),
       toggleDarkCanvas: () => setDarkCanvas((value) => !value),
+      setAnnotateColor: (color) =>
+        setAnnotateStyle((current) => withStyleColor(current, tool, color)),
+      setAnnotateWidth: (width) =>
+        setAnnotateStyle((current) => withStyleWidth(current, tool, width)),
+      deleteSelection: deleteSelected,
+      clearAnnotations,
+      setObjectColor,
+      setObjectWidth,
+      setObjectFit,
+      setObjectOpacity: setSelectedOpacity,
+      setObjectFontSize: (size: number) => updateSelected({ fontSize: size }),
+      toggleObjectBold: () =>
+        updateSelected({ bold: !(selectedObject?.kind === 'text' && selectedObject.bold) }),
+      toggleObjectItalic: () =>
+        updateSelected({ italic: !(selectedObject?.kind === 'text' && selectedObject.italic) }),
+      setObjectAlign: (align) => updateSelected({ align }),
+      setObjectZ: changeSelectedZ,
+      toggleObjectLock: toggleSelectedLock,
     }),
-    [mutate, redo, undo],
+    [
+      changeSelectedZ,
+      clearAnnotations,
+      deleteSelected,
+      mutate,
+      redo,
+      selectedObject,
+      setObjectColor,
+      setObjectFit,
+      setObjectWidth,
+      setSelectedOpacity,
+      toggleSelectedLock,
+      tool,
+      undo,
+      updateSelected,
+    ],
   );
+
+  /** Objects of the page the user is looking at: what "clear all" would remove */
+  const annotationCount = useMemo(() => {
+    if (!doc) return 0;
+    const pageId = visiblePages(doc)[doc.view.page - 1]?.id;
+    return pageId ? doc.objects.filter((object) => object.page === pageId).length : 0;
+  }, [doc]);
+
+  // Word semantics: selecting an object opens its contextual tab; clearing goes back to the base tab
+  useEffect(() => {
+    setActiveTabId((current) => nextActiveTab(current, contextTab, baseTabRef.current) ?? current);
+  }, [contextTab]);
+
+  const handleTabChange = useCallback((tabId: string) => {
+    if (!(CONTEXT_TAB_IDS as readonly string[]).includes(tabId)) baseTabRef.current = tabId;
+    setActiveTabId(tabId);
+  }, []);
 
   const tabs = useMemo(
     () =>
@@ -564,9 +906,29 @@ export default function PdfEditorTool() {
         panelsAvailable: true,
         darkCanvas,
         tool,
+        annotate: {
+          style: annotateStyle,
+          selectionCount: selectedIds.length,
+          objectCount: annotationCount,
+        },
+        selection: ribbonSelection,
+        contextTab,
         actions,
       }),
-    [t, doc, history, panels, darkCanvas, tool, actions],
+    [
+      t,
+      doc,
+      history,
+      panels,
+      darkCanvas,
+      tool,
+      annotateStyle,
+      annotationCount,
+      selectedIds.length,
+      ribbonSelection,
+      contextTab,
+      actions,
+    ],
   );
 
   const pages = useMemo(() => (doc ? visiblePages(doc) : []), [doc]);
@@ -724,6 +1086,14 @@ export default function PdfEditorTool() {
         changeSelectedZ(key === ']' ? 'front' : 'back');
         return;
       }
+      if (event.key === 'Escape') {
+        // The editing textarea consumes its own Escape before it reaches this listener
+        setEditingId(null);
+        setSelectedIds((current) => (current.length === 0 ? current : []));
+        // Esc also leaves the annotation tool, so the next click selects instead of drawing
+        setTool((current) => (current === 'select' ? current : 'select'));
+        return;
+      }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (selectedIds.length === 0) return;
         event.preventDefault();
@@ -787,9 +1157,6 @@ export default function PdfEditorTool() {
   /* Rendering                                                               */
   /* ---------------------------------------------------------------------- */
 
-  const selectedObject =
-    selectedId !== null ? (doc?.objects.find((object) => object.id === selectedId) ?? null) : null;
-
   const passwordBlock = pdf.needsPassword ? (
     <div className="mx-auto flex w-full max-w-md flex-col gap-2 pb-6">
       <PdfPasswordField
@@ -813,6 +1180,10 @@ export default function PdfEditorTool() {
       scale={scale}
       selectedIds={selectedIds}
       editingId={editingId}
+      tool={tool}
+      style={annotateStyle}
+      onAnnotate={(request) => handleAnnotate(page.id, request)}
+      onErase={eraseObject}
       onSelect={(ids) => {
         setSelectedIds(ids);
         if (editingId && !ids.includes(editingId)) setEditingId(null);
@@ -857,6 +1228,8 @@ export default function PdfEditorTool() {
             pages={pages}
             currentPage={doc?.view.page ?? 1}
             onSelect={selectPage}
+            onMove={movePageTo}
+            pageOps={pageOps}
           />
         ) : null}
         {showOutline && pdf.pdfDoc ? (
@@ -866,15 +1239,32 @@ export default function PdfEditorTool() {
     ) : undefined;
 
   const rightPanel =
-    doc && panels.properties ? (
-      <PropertiesPanel
-        object={selectedObject}
-        onChangeText={updateSelected}
-        onOpacityChange={setSelectedOpacity}
-        onToggleLock={toggleSelectedLock}
-        onZOrder={changeSelectedZ}
-        onDelete={deleteSelected}
-      />
+    doc && (panels.properties || panels.annotations) ? (
+      <div className="flex min-h-0 flex-col gap-3">
+        {panels.properties ? (
+          <PropertiesPanel
+            object={selectedObject}
+            onChangeText={updateSelected}
+            onChangeNoteBody={updateSelectedNote}
+            onChangeColor={setObjectColor}
+            onChangeWidth={setObjectWidth}
+            onChangeFit={setObjectFit}
+            onOpacityChange={setSelectedOpacity}
+            onToggleLock={toggleSelectedLock}
+            onZOrder={changeSelectedZ}
+            onDelete={deleteSelected}
+          />
+        ) : null}
+        {panels.annotations ? (
+          <AnnotationsPanel
+            objects={doc.objects}
+            pages={pages}
+            selectedIds={selectedIds}
+            onSelect={selectAnnotation}
+            onDelete={eraseObject}
+          />
+        ) : null}
+      </div>
     ) : undefined;
 
   const saveState: SaveState = !doc
@@ -914,6 +1304,8 @@ export default function PdfEditorTool() {
         pageArea={pageArea}
         leftPanel={leftPanel}
         rightPanel={rightPanel}
+        activeTabId={activeTabId}
+        onTabChange={handleTabChange}
         error={pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null}
         banner={doc ? (errorMessage ?? banner) : null}
         note={pdf.busy ? t('common.loading') : null}

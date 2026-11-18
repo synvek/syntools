@@ -9,5 +9,5 @@ export const pdfWatermarkTool: ToolMeta = {
   icon: 'watermark',
   component: () => import('./PdfWatermarkTool'),
   weight: 23,
-  relatedIds: ['image-watermark', 'pdf-merge'],
+  relatedIds: ['pdf-editor', 'image-watermark', 'pdf-merge'],
 };

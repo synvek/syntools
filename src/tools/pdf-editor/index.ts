@@ -16,5 +16,12 @@ export const pdfEditorTool: ToolMeta = {
   component: () => import('./PdfEditorTool'),
   // First in the PDF category: it is the "open and edit" entry, the single-purpose tools follow.
   weight: 0,
-  relatedIds: ['pdf-viewer', 'pdf-annotate', 'pdf-merge', 'rich-text-editor'],
+  relatedIds: [
+    'pdf-viewer',
+    'pdf-annotate',
+    'pdf-add-text',
+    'pdf-merge',
+    'pdf-sign',
+    'rich-text-editor',
+  ],
 };

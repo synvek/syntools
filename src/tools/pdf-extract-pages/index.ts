@@ -9,4 +9,5 @@ export const pdfExtractPagesTool: ToolMeta = {
   icon: 'pdfExtract',
   component: () => import('./PdfExtractPagesTool'),
   weight: 4,
+  relatedIds: ['pdf-editor'],
 };

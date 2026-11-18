@@ -9,4 +9,5 @@ export const pdfGrayscaleTool: ToolMeta = {
   icon: 'pdfGrayscale',
   component: () => import('./PdfGrayscaleTool'),
   weight: 18,
+  relatedIds: ['pdf-editor'],
 };
