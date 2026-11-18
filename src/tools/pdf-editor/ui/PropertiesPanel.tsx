@@ -1,25 +1,38 @@
 import { useTranslation } from 'react-i18next';
 import { needsUnicodeFont } from '@/core/pdf/text';
-import type { PdfTextObject } from '../model/types';
+import type { ZOrderAction } from '../model/objects';
+import type { PdfObject, PdfTextObject } from '../model/types';
 
 interface PropertiesPanelProps {
-  /** Selected object; only text exists in M1 */
-  object: PdfTextObject | null;
-  onChange(patch: Partial<PdfTextObject>): void;
+  /** Current selection (only the single-selection case is editable here) */
+  object: PdfObject | null;
+  onChangeText(patch: Partial<PdfTextObject>): void;
+  onOpacityChange(value: number): void;
+  onToggleLock(): void;
+  onZOrder(action: ZOrderAction): void;
   onDelete(): void;
 }
 
 const MIN_SIZE = 6;
 const MAX_SIZE = 96;
 
+const smallButton =
+  'rounded border border-gray-300 px-2 py-1 text-[11px] text-gray-700 transition-colors hover:bg-gray-100 motion-reduce:transition-none dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800';
+
 /**
- * Right rail: the three things M1 lets the user change on a text box (size, colour, delete).
- *
- * Everything else (bold, box, rotation) is already in the model and arrives with the annotation tab
- * in M2 — shipping disabled controls here would just be noise.
+ * Right rail: shared object controls (opacity, lock, layer order, delete) plus the text-only style
+ * fields. Fields for other kinds arrive with their tools in M2-5 / M3.
  */
-export function PropertiesPanel({ object, onChange, onDelete }: PropertiesPanelProps) {
+export function PropertiesPanel({
+  object,
+  onChangeText,
+  onOpacityChange,
+  onToggleLock,
+  onZOrder,
+  onDelete,
+}: PropertiesPanelProps) {
   const { t } = useTranslation();
+  const text = object?.kind === 'text' ? object : null;
 
   return (
     <div
@@ -33,41 +46,87 @@ export function PropertiesPanel({ object, onChange, onDelete }: PropertiesPanelP
       {object ? (
         <>
           <label className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
-            {t('tools.pdfEditor.propFontSize')}
+            {t('tools.pdfEditor.propOpacity')}
             <input
-              type="number"
-              min={MIN_SIZE}
-              max={MAX_SIZE}
-              step={1}
-              value={Math.round(object.fontSize)}
-              data-testid="pdf-property-font-size"
-              onChange={(event) => {
-                const value = Number(event.target.value);
-                if (!Number.isFinite(value)) return;
-                onChange({ fontSize: Math.min(MAX_SIZE, Math.max(MIN_SIZE, value)) });
-              }}
-              className="w-16 rounded border border-gray-300 bg-white px-1.5 py-1 text-right tabular-nums text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(object.opacity * 100)}
+              data-testid="pdf-property-opacity"
+              onChange={(event) => onOpacityChange(Number(event.target.value) / 100)}
+              className="w-24 accent-[#b3261e]"
             />
           </label>
 
-          <label className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
-            {t('tools.pdfEditor.propColor')}
-            <input
-              type="color"
-              value={object.color}
-              data-testid="pdf-property-color"
-              onChange={(event) => onChange({ color: event.target.value })}
-              className="h-6 w-10 cursor-pointer rounded border border-gray-300 bg-transparent p-0 dark:border-gray-700"
-            />
-          </label>
-
-          {needsUnicodeFont(object.text) ? (
-            <p
-              role="note"
-              className="text-[11px] leading-relaxed text-amber-600 dark:text-amber-400"
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              data-testid="pdf-property-lock"
+              aria-pressed={object.locked ? 'true' : 'false'}
+              onClick={onToggleLock}
+              className={smallButton}
             >
-              {t('tools.pdfEditor.textRasterNote')}
-            </p>
+              {object.locked ? t('tools.pdfEditor.propUnlock') : t('tools.pdfEditor.propLock')}
+            </button>
+            <button
+              type="button"
+              data-testid="pdf-property-front"
+              onClick={() => onZOrder('front')}
+              className={smallButton}
+            >
+              {t('tools.pdfEditor.propFront')}
+            </button>
+            <button
+              type="button"
+              data-testid="pdf-property-back"
+              onClick={() => onZOrder('back')}
+              className={smallButton}
+            >
+              {t('tools.pdfEditor.propBack')}
+            </button>
+          </div>
+
+          {text ? (
+            <>
+              <label className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
+                {t('tools.pdfEditor.propFontSize')}
+                <input
+                  type="number"
+                  min={MIN_SIZE}
+                  max={MAX_SIZE}
+                  step={1}
+                  value={Math.round(text.fontSize)}
+                  data-testid="pdf-property-font-size"
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (!Number.isFinite(value)) return;
+                    onChangeText({ fontSize: Math.min(MAX_SIZE, Math.max(MIN_SIZE, value)) });
+                  }}
+                  className="w-16 rounded border border-gray-300 bg-white px-1.5 py-1 text-right tabular-nums text-gray-800 outline-none focus:border-[#b3261e] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
+                {t('tools.pdfEditor.propColor')}
+                <input
+                  type="color"
+                  value={text.color}
+                  data-testid="pdf-property-color"
+                  onChange={(event) => onChangeText({ color: event.target.value })}
+                  className="h-6 w-10 cursor-pointer rounded border border-gray-300 bg-transparent p-0 dark:border-gray-700"
+                />
+              </label>
+
+              {needsUnicodeFont(text.text) ? (
+                <p
+                  role="note"
+                  className="text-[11px] leading-relaxed text-amber-600 dark:text-amber-400"
+                >
+                  {t('tools.pdfEditor.textRasterNote')}
+                </p>
+              ) : null}
+            </>
           ) : null}
 
           <button

@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clampObject,
   clampOpacity,
+  cloneObject,
+  createImageObject,
+  createInkObject,
+  createMarkupObject,
+  createNoteObject,
   createObjectId,
+  createShapeObject,
+  createStampObject,
   createTextObject,
   DEFAULT_TEXT_STYLE,
   moveObjectToPage,
   nextZ,
   sortByZ,
+  unionRect,
 } from './objects';
 
 const rect = { x: 0.1, y: 0.2, w: 0.3, h: 0.1 };
@@ -38,12 +47,12 @@ describe('createTextObject', () => {
       text: '18pt',
       z: 7,
       id: 'fixed-id',
+      opacity: 1.5,
       style: {
         fontSize: 18,
         bold: true,
         color: '#ff0000',
         align: 'center',
-        opacity: 1.5,
         patch: { cover: '#ffffff', sourceText: '旧文本' },
       },
     });
@@ -115,5 +124,147 @@ describe('对象其他辅助', () => {
     expect(moved.rect).toEqual(object.rect);
     expect(moved.z).toBe(5);
     expect(object.page).toBe(page);
+  });
+});
+
+describe('对象工厂（M2-1）', () => {
+  const png = 'data:image/png;base64,AAAA';
+
+  it('图片：默认 fit=contain，尺寸为负时收敛到 1', () => {
+    const object = createImageObject({
+      page,
+      rect: { x: 0.2, y: 0.2, w: 0.3, h: 0.2 },
+      dataUrl: png,
+      naturalW: 0,
+      naturalH: -5,
+    });
+
+    expect(object.kind).toBe('image');
+    expect(object.fit).toBe('contain');
+    expect(object.naturalW).toBe(1);
+    expect(object.naturalH).toBe(1);
+  });
+
+  it('图章与签名共用形状，kind 可区分', () => {
+    const stamp = createStampObject({
+      page,
+      rect,
+      dataUrl: png,
+      naturalW: 120,
+      naturalH: 60,
+    });
+    const signature = createStampObject({
+      page,
+      rect,
+      dataUrl: png,
+      naturalW: 120,
+      naturalH: 60,
+      kind: 'signature',
+    });
+
+    expect(stamp.kind).toBe('stamp');
+    expect(signature.kind).toBe('signature');
+    expect(signature.naturalW).toBe(120);
+  });
+
+  it('画笔：矩形由轨迹包围盒推导，点坐标相对矩形', () => {
+    const object = createInkObject({
+      page,
+      points: [
+        { x: 0.2, y: 0.2 },
+        { x: 0.3, y: 0.4 },
+        { x: 0.45, y: 0.25 },
+      ],
+      width: 3,
+    });
+
+    expect(object.points).toHaveLength(3);
+    expect(object.rect.x).toBeCloseTo(0.19, 6);
+    expect(object.rect.y).toBeCloseTo(0.19, 6);
+    expect(object.rect.w).toBeCloseTo(0.27, 6);
+    expect(object.rect.h).toBeCloseTo(0.22, 6);
+    // first point maps to the padded corner
+    expect(object.points[0].x).toBeCloseTo(0.01 / 0.27, 5);
+    expect(object.points[0].y).toBeCloseTo(0.01 / 0.22, 5);
+  });
+
+  it('画笔：单点轨迹不产生对象点，线宽被夹取', () => {
+    const object = createInkObject({ page, points: [{ x: 0.5, y: 0.5 }], width: 999 });
+    expect(object.points).toEqual([]);
+    expect(object.width).toBe(40);
+  });
+
+  it('高亮：多行四边形取并集，并丢弃空四边形', () => {
+    const object = createMarkupObject({
+      page,
+      type: 'highlight',
+      quads: [
+        { x: 0.1, y: 0.1, w: 0.4, h: 0.02 },
+        { x: 0.1, y: 0.13, w: 0.2, h: 0.02 },
+        { x: 0.1, y: 0.2, w: 0, h: 0.02 },
+      ],
+    });
+
+    expect(object.quads).toHaveLength(2);
+    expect(object.rect.x).toBeCloseTo(0.1, 10);
+    expect(object.rect.y).toBeCloseTo(0.1, 10);
+    expect(object.rect.w).toBeCloseTo(0.4, 10);
+    expect(object.rect.h).toBeCloseTo(0.05, 10);
+    expect(object.color).toBe('#fde047');
+  });
+
+  it('形状：默认描边宽度、非法 dash 被过滤', () => {
+    const object = createShapeObject({
+      page,
+      rect,
+      type: 'arrow',
+      dash: [4, 0, -1, 2],
+    });
+
+    expect(object.width).toBe(2);
+    expect(object.dash).toEqual([4, 2]);
+    expect(object.fill).toBeUndefined();
+  });
+
+  it('便签：默认图标与最小尺寸', () => {
+    const object = createNoteObject({ page, rect: { x: 0.5, y: 0.5, w: 0, h: 0 } });
+    expect(object.icon).toBe('note');
+    expect(object.rect.w).toBeCloseTo(0.028, 6);
+    expect(object.rect.h).toBeCloseTo(0.028, 6);
+  });
+});
+
+describe('clampObject / unionRect / cloneObject', () => {
+  it('统一夹取角度、透明度与越界矩形', () => {
+    const object = clampObject(
+      createTextObject({
+        page,
+        rect: { x: -0.2, y: 0.9, w: 0.5, h: 0.4 },
+        text: 'x',
+        rotation: -450,
+        opacity: 3,
+      }),
+    );
+
+    expect(object.rotation).toBe(270);
+    expect(object.opacity).toBe(1);
+    expect(object.rect.x).toBeCloseTo(0, 10);
+    expect(object.rect.y).toBeCloseTo(0.9, 10);
+    expect(object.rect.w).toBeCloseTo(0.3, 10);
+    expect(object.rect.h).toBeCloseTo(0.1, 10);
+  });
+
+  it('unionRect 对空集合返回零尺寸，不抛错', () => {
+    expect(unionRect([])).toEqual({ x: 1, y: 1, w: 0, h: 0 });
+  });
+
+  it('cloneObject 生成新 id，可覆盖页码与层级', () => {
+    const source = createTextObject({ page, rect, text: 'a', id: 'fixed' });
+    const copy = cloneObject(source, { page: 'page-main-1', z: 9 });
+
+    expect(copy.id).not.toBe('fixed');
+    expect(copy.page).toBe('page-main-1');
+    expect(copy.z).toBe(9);
+    expect(source.page).toBe(page);
   });
 });

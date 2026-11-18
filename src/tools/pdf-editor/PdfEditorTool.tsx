@@ -16,19 +16,22 @@ import {
   type DraftModel,
   type DraftRecord,
 } from './io/draftStore';
+import { copyObjects, pasteObjects } from './commands/clipboard';
 import { flattenPdf } from './io/savePdf';
 import {
   addObject,
+  addObjects,
   clampPage,
   createDoc,
   isDirty,
   markSaved,
-  removeObject,
+  removeObjects,
   setCurrentPage,
   setViewMode,
   setZoom,
   setZoomMode,
   updateObject,
+  updateObjects,
   visiblePageCount,
   visiblePages,
 } from './model/doc';
@@ -43,7 +46,14 @@ import {
   undo as historyUndo,
   type History,
 } from './model/history';
-import { createTextObject, nextZ } from './model/objects';
+import {
+  createTextObject,
+  nextZ,
+  reorderZ,
+  setObjectLocked,
+  setObjectOpacity,
+  type ZOrderAction,
+} from './model/objects';
 import type { NormRect, PdfEditorDoc, PdfPageState, PdfTextObject } from './model/types';
 import { OverlayLayer } from './overlay/OverlayLayer';
 import { PageScrollView } from './render/PageScrollView';
@@ -85,7 +95,7 @@ export default function PdfEditorTool() {
   const [tool, setTool] = useState<PdfTool>('select');
   const [darkCanvas, setDarkCanvas] = useState(false);
   const [panels, setPanels] = useState<Panels>(CLOSED_PANELS);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -102,6 +112,7 @@ export default function PdfEditorTool() {
   const draftFingerprintRef = useRef<string | null>(null);
 
   const doc = history ? currentDoc(history) : null;
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   // Latest document for async callbacks (autosave debounce, in-flight draft writes)
   const docRef = useRef<PdfEditorDoc | null>(null);
   docRef.current = doc;
@@ -130,7 +141,7 @@ export default function PdfEditorTool() {
   useEffect(() => {
     if (pdf.status === 'idle') {
       setHistory(null);
-      setSelectedId(null);
+      setSelectedIds([]);
       setEditingId(null);
       setSaveError(null);
       setBanner(null);
@@ -270,7 +281,7 @@ export default function PdfEditorTool() {
         z: nextZ(doc?.objects ?? []),
       });
       mutate((current) => addObject(current, object), { label: 'add-text' });
-      setSelectedId(object.id);
+      setSelectedIds([object.id]);
       return object.id;
     },
     [doc?.objects, mutate],
@@ -289,19 +300,6 @@ export default function PdfEditorTool() {
     [mutate],
   );
 
-  const handleMoveObject = useCallback(
-    (id: string, rect: NormRect) => {
-      mutate(
-        (current) =>
-          updateObject(current, id, (object) =>
-            object.kind === 'text' ? { ...object, rect } : object,
-          ),
-        { label: 'move-object', mergeKey: `move:${id}` },
-      );
-    },
-    [mutate],
-  );
-
   /** Empty boxes are discarded, and an edit session always ends without a stray caret */
   const handleEndEdit = useCallback(() => {
     const id = editingId;
@@ -310,18 +308,54 @@ export default function PdfEditorTool() {
 
     const object = doc.objects.find((candidate) => candidate.id === id);
     if (object?.kind === 'text' && !object.text.trim()) {
-      mutate((current) => removeObject(current, id), { label: 'discard-empty-text' });
-      setSelectedId(null);
+      mutate((current) => removeObjects(current, new Set([id])), { label: 'discard-empty-text' });
+      setSelectedIds([]);
     }
   }, [doc, editingId, mutate]);
 
   const deleteSelected = useCallback(() => {
-    if (!selectedId) return;
-    const id = selectedId;
+    if (selectedIds.length === 0) return;
+    const ids = new Set(selectedIds);
     setEditingId(null);
-    setSelectedId(null);
-    mutate((current) => removeObject(current, id), { label: 'delete-object' });
-  }, [mutate, selectedId]);
+    setSelectedIds([]);
+    mutate((current) => removeObjects(current, ids), { label: 'delete-object' });
+  }, [mutate, selectedIds]);
+
+  const handleMoveObjects = useCallback(
+    (updates: Array<{ id: string; rect: NormRect }>) => {
+      if (updates.length === 0) return;
+      const rects = new Map(updates.map((update) => [update.id, update.rect]));
+      mutate(
+        (current) =>
+          updateObjects(current, new Set(rects.keys()), (object) => {
+            const rect = rects.get(object.id);
+            return rect ? { ...object, rect } : object;
+          }),
+        { label: 'move-object', mergeKey: 'move-objects' },
+      );
+    },
+    [mutate],
+  );
+
+  const handleResizeObject = useCallback(
+    (id: string, rect: NormRect) => {
+      mutate((current) => updateObject(current, id, (object) => ({ ...object, rect })), {
+        label: 'resize-object',
+        mergeKey: `resize:${id}`,
+      });
+    },
+    [mutate],
+  );
+
+  const handleRotateObject = useCallback(
+    (id: string, rotation: number) => {
+      mutate((current) => updateObject(current, id, (object) => ({ ...object, rotation })), {
+        label: 'rotate-object',
+        mergeKey: `rotate:${id}`,
+      });
+    },
+    [mutate],
+  );
 
   const updateSelected = useCallback(
     (patch: Partial<PdfTextObject>) => {
@@ -335,6 +369,104 @@ export default function PdfEditorTool() {
       );
     },
     [mutate, selectedId],
+  );
+
+  const setSelectedOpacity = useCallback(
+    (value: number) => {
+      if (!selectedId) return;
+      mutate(
+        (current) => ({
+          ...current,
+          objects: setObjectOpacity(current.objects, selectedId, value),
+        }),
+        { label: 'opacity-object' },
+      );
+    },
+    [mutate, selectedId],
+  );
+
+  const toggleSelectedLock = useCallback(() => {
+    if (!selectedId || !doc) return;
+    const object = doc.objects.find((candidate) => candidate.id === selectedId);
+    if (!object) return;
+    mutate(
+      (current) => ({
+        ...current,
+        objects: setObjectLocked(current.objects, selectedId, !object.locked),
+      }),
+      { label: 'lock-object' },
+    );
+  }, [doc, mutate, selectedId]);
+
+  const changeSelectedZ = useCallback(
+    (action: ZOrderAction) => {
+      if (!selectedId) return;
+      mutate(
+        (current) => {
+          const objects = reorderZ(current.objects, selectedId, action);
+          return objects === current.objects ? current : { ...current, objects };
+        },
+        { label: 'z-order' },
+      );
+    },
+    [mutate, selectedId],
+  );
+
+  const currentPageId = useCallback((): string | null => {
+    if (!doc) return null;
+    return visiblePages(doc)[doc.view.page - 1]?.id ?? null;
+  }, [doc]);
+
+  const copySelection = useCallback(() => {
+    if (!doc || selectedIds.length === 0) return;
+    copyObjects(doc.objects.filter((object) => selectedIds.includes(object.id)));
+  }, [doc, selectedIds]);
+
+  const pasteSelection = useCallback(() => {
+    if (!doc) return;
+    const anchorPage =
+      doc.objects.find((object) => selectedIds.includes(object.id))?.page ?? currentPageId();
+    if (!anchorPage) return;
+    const pasted = pasteObjects({ objects: doc.objects, pageId: anchorPage });
+    if (pasted.length === 0) return;
+    mutate((current) => addObjects(current, pasted), { label: 'paste' });
+    setSelectedIds(pasted.map((object) => object.id));
+  }, [currentPageId, doc, mutate, selectedIds]);
+
+  const cutSelection = useCallback(() => {
+    if (selectedIds.length === 0) return;
+    copySelection();
+    deleteSelected();
+  }, [copySelection, deleteSelected, selectedIds]);
+
+  const selectAllObjects = useCallback(() => {
+    if (!doc) return;
+    const pageId = currentPageId();
+    const ids = doc.objects
+      .filter((object) => !pageId || object.page === pageId)
+      .map((object) => object.id);
+    setSelectedIds(ids);
+    setEditingId(null);
+  }, [currentPageId, doc]);
+
+  /** Arrow keys: 0.1% or 1% (Shift) of the page, one history entry per press */
+  const nudgeSelection = useCallback(
+    (dx: number, dy: number) => {
+      if (selectedIds.length === 0) return;
+      const ids = new Set(selectedIds);
+      mutate(
+        (current) =>
+          updateObjects(current, ids, (object) => {
+            if (object.locked) return object;
+            return {
+              ...object,
+              rect: { ...object.rect, x: object.rect.x + dx, y: object.rect.y + dy },
+            };
+          }),
+        { label: 'nudge', mergeKey: 'nudge' },
+      );
+    },
+    [mutate, selectedIds],
   );
 
   /* ---------------------------------------------------------------------- */
@@ -568,10 +700,42 @@ export default function PdfEditorTool() {
         redo();
         return;
       }
+      if (mod && key === 'a') {
+        event.preventDefault();
+        selectAllObjects();
+        return;
+      }
+      if (mod && key === 'c') {
+        copySelection();
+        return;
+      }
+      if (mod && key === 'x') {
+        event.preventDefault();
+        cutSelection();
+        return;
+      }
+      if (mod && key === 'v') {
+        event.preventDefault();
+        pasteSelection();
+        return;
+      }
+      if (mod && (key === ']' || key === '[')) {
+        event.preventDefault();
+        changeSelectedZ(key === ']' ? 'front' : 'back');
+        return;
+      }
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        if (!selectedId) return;
+        if (selectedIds.length === 0) return;
         event.preventDefault();
         deleteSelected();
+        return;
+      }
+      if (event.key.startsWith('Arrow') && selectedIds.length > 0) {
+        event.preventDefault();
+        const step = event.shiftKey ? 0.01 : 0.001;
+        const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+        const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+        nudgeSelection(dx, dy);
         return;
       }
       if (event.key === 'PageDown') {
@@ -597,7 +761,22 @@ export default function PdfEditorTool() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deleteSelected, doc, jumpToEdge, redo, save, selectedId, stepPage, undo]);
+  }, [
+    changeSelectedZ,
+    copySelection,
+    cutSelection,
+    deleteSelected,
+    doc,
+    jumpToEdge,
+    nudgeSelection,
+    pasteSelection,
+    redo,
+    save,
+    selectAllObjects,
+    selectedIds.length,
+    stepPage,
+    undo,
+  ]);
 
   const dirty = doc ? isDirty(doc) : false;
   useUnsavedChanges(dirty, t('tools.pdfEditor.unsavedMessage'));
@@ -608,8 +787,8 @@ export default function PdfEditorTool() {
   /* Rendering                                                               */
   /* ---------------------------------------------------------------------- */
 
-  const selectedObject = doc?.objects.find((object) => object.id === selectedId);
-  const selectedText = selectedObject?.kind === 'text' ? selectedObject : null;
+  const selectedObject =
+    selectedId !== null ? (doc?.objects.find((object) => object.id === selectedId) ?? null) : null;
 
   const passwordBlock = pdf.needsPassword ? (
     <div className="mx-auto flex w-full max-w-md flex-col gap-2 pb-6">
@@ -632,20 +811,22 @@ export default function PdfEditorTool() {
       objects={doc?.objects ?? []}
       page={page.id}
       scale={scale}
-      selectedId={selectedId}
+      selectedIds={selectedIds}
       editingId={editingId}
-      onSelect={(id) => {
-        setSelectedId(id);
-        if (editingId && id !== editingId) setEditingId(null);
+      onSelect={(ids) => {
+        setSelectedIds(ids);
+        if (editingId && !ids.includes(editingId)) setEditingId(null);
       }}
       onStartEdit={(id) => {
-        setSelectedId(id);
+        setSelectedIds([id]);
         setEditingId(id);
       }}
       onEndEdit={handleEndEdit}
       onCreate={(rect) => handleCreateObject(page.id, rect)}
       onTextChange={handleTextChange}
-      onMove={handleMoveObject}
+      onMove={handleMoveObjects}
+      onResize={handleResizeObject}
+      onRotate={handleRotateObject}
     />
   );
 
@@ -686,7 +867,14 @@ export default function PdfEditorTool() {
 
   const rightPanel =
     doc && panels.properties ? (
-      <PropertiesPanel object={selectedText} onChange={updateSelected} onDelete={deleteSelected} />
+      <PropertiesPanel
+        object={selectedObject}
+        onChangeText={updateSelected}
+        onOpacityChange={setSelectedOpacity}
+        onToggleLock={toggleSelectedLock}
+        onZOrder={changeSelectedZ}
+        onDelete={deleteSelected}
+      />
     ) : undefined;
 
   const saveState: SaveState = !doc

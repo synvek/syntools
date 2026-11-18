@@ -26,7 +26,7 @@ const PAGE_BOX = {
  */
 function Harness({ initial }: { initial?: PdfObject[] }) {
   const [objects, setObjects] = useState<PdfObject[]>(initial ?? []);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
 
   return (
@@ -35,11 +35,11 @@ function Harness({ initial }: { initial?: PdfObject[] }) {
         objects={objects}
         page={PAGE_ID}
         scale={1}
-        selectedId={selected}
+        selectedIds={selected}
         editingId={editing}
         onSelect={setSelected}
         onStartEdit={(id) => {
-          setSelected(id);
+          setSelected([id]);
           setEditing(id);
         }}
         onEndEdit={() => {
@@ -51,7 +51,7 @@ function Harness({ initial }: { initial?: PdfObject[] }) {
         onCreate={(rect: NormRect) => {
           const object = createTextObject({ page: PAGE_ID, rect, text: '', z: 1 });
           setObjects((previous) => [...previous, object]);
-          setSelected(object.id);
+          setSelected([object.id]);
           return object.id;
         }}
         onTextChange={(id, text) =>
@@ -61,9 +61,22 @@ function Harness({ initial }: { initial?: PdfObject[] }) {
             ),
           )
         }
-        onMove={(id, rect) =>
+        onMove={(updates) =>
+          setObjects((previous) =>
+            previous.map((object) => {
+              const update = updates.find((candidate) => candidate.id === object.id);
+              return update ? { ...object, rect: update.rect } : object;
+            }),
+          )
+        }
+        onResize={(id, rect) =>
           setObjects((previous) =>
             previous.map((object) => (object.id === id ? { ...object, rect } : object)),
+          )
+        }
+        onRotate={(id, rotation) =>
+          setObjects((previous) =>
+            previous.map((object) => (object.id === id ? { ...object, rotation } : object)),
           )
         }
       />

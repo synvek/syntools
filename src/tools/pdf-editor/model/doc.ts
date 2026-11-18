@@ -406,3 +406,33 @@ export function removeObject(doc: PdfEditorDoc, id: string): PdfEditorDoc {
   const objects = doc.objects.filter((object) => object.id !== id);
   return objects.length === doc.objects.length ? doc : touch({ ...doc, objects });
 }
+
+/** Append many objects in one history step (paste) */
+export function addObjects(doc: PdfEditorDoc, objects: readonly PdfObject[]): PdfEditorDoc {
+  if (objects.length === 0) return doc;
+  return touch({ ...doc, objects: [...doc.objects, ...objects] });
+}
+
+/** Update many objects in one history step (drag a multi-selection, paste, style a group) */
+export function updateObjects(
+  doc: PdfEditorDoc,
+  ids: ReadonlySet<string>,
+  update: (object: PdfObject) => PdfObject,
+): PdfEditorDoc {
+  if (ids.size === 0) return doc;
+  let changed = false;
+  const objects = doc.objects.map((object) => {
+    if (!ids.has(object.id)) return object;
+    const next = update(object);
+    if (next !== object) changed = true;
+    return next;
+  });
+  return changed ? touch({ ...doc, objects }) : doc;
+}
+
+/** Remove many objects in one history step */
+export function removeObjects(doc: PdfEditorDoc, ids: ReadonlySet<string>): PdfEditorDoc {
+  if (ids.size === 0) return doc;
+  const objects = doc.objects.filter((object) => !ids.has(object.id));
+  return objects.length === doc.objects.length ? doc : touch({ ...doc, objects });
+}
