@@ -10,13 +10,14 @@ import {
 } from './objects';
 
 const rect = { x: 0.1, y: 0.2, w: 0.3, h: 0.1 };
+const page = 'page-main-0';
 
 describe('createTextObject', () => {
   it('默认样式：Helvetica 11pt、左对齐、不透明', () => {
-    const object = createTextObject({ page: 2, rect, text: 'Hello' });
+    const object = createTextObject({ page: 'page-main-2', rect, text: 'Hello' });
 
     expect(object.kind).toBe('text');
-    expect(object.page).toBe(2);
+    expect(object.page).toBe('page-main-2');
     expect(object.text).toBe('Hello');
     expect(object.fontFamily).toBe(DEFAULT_TEXT_STYLE.fontFamily);
     expect(object.fontSize).toBe(11);
@@ -32,7 +33,7 @@ describe('createTextObject', () => {
 
   it('样式可覆盖，透明度被夹到 0–1', () => {
     const object = createTextObject({
-      page: 0,
+      page,
       rect,
       text: '18pt',
       z: 7,
@@ -60,7 +61,7 @@ describe('createTextObject', () => {
 
   it('矩形被夹进页面（反向拖拽也能收敛）', () => {
     const object = createTextObject({
-      page: 0,
+      page,
       rect: { x: 0.9, y: 0.9, w: -0.4, h: -0.5 },
       text: '',
     });
@@ -81,15 +82,15 @@ describe('nextZ / sortByZ', () => {
   it('空列表从 1 开始，否则取最大值 +1', () => {
     expect(nextZ([])).toBe(1);
     const objects = [
-      createTextObject({ page: 0, rect, text: 'a', z: 3 }),
-      createTextObject({ page: 0, rect, text: 'b', z: 1 }),
+      createTextObject({ page, rect, text: 'a', z: 3 }),
+      createTextObject({ page, rect, text: 'b', z: 1 }),
     ];
     expect(nextZ(objects)).toBe(4);
   });
 
   it('sortByZ 返回新数组且不改原数组', () => {
-    const low = createTextObject({ page: 0, rect, text: 'low', z: 1 });
-    const high = createTextObject({ page: 0, rect, text: 'high', z: 9 });
+    const low = createTextObject({ page, rect, text: 'low', z: 1 });
+    const high = createTextObject({ page, rect, text: 'high', z: 9 });
     const source = [high, low];
 
     const sorted = sortByZ(source);
@@ -107,12 +108,12 @@ describe('对象其他辅助', () => {
   });
 
   it('moveObjectToPage 只改页，其余字段保持', () => {
-    const object = createTextObject({ page: 0, rect, text: 'move me', z: 5 });
-    const moved = moveObjectToPage(object, 3);
-    expect(moved.page).toBe(3);
+    const object = createTextObject({ page, rect, text: 'move me', z: 5 });
+    const moved = moveObjectToPage(object, 'page-main-3');
+    expect(moved.page).toBe('page-main-3');
     expect(moved.id).toBe(object.id);
     expect(moved.rect).toEqual(object.rect);
     expect(moved.z).toBe(5);
-    expect(object.page).toBe(0);
+    expect(object.page).toBe(page);
   });
 });

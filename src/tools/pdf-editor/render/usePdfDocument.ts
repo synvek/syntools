@@ -3,6 +3,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { fileToBytes } from '@/core/pdf/load';
 import { openPdfjsDoc } from '@/core/pdf/render';
 import { PDF_MAX_BYTES, isPdfFile, type PdfError } from '@/core/pdf/types';
+import { MAIN_SOURCE_KEY } from '../model/doc';
 import type { PdfSource } from '../model/types';
 
 export type PdfOpenStatus = 'idle' | 'opening' | 'need-password' | 'ready' | 'error';
@@ -30,10 +31,16 @@ interface PendingFile {
   bytes: Uint8Array;
 }
 
-/** `destroy()` is the only call that releases a pdfjs worker; ignore failures on teardown */
+/**
+ * `destroy()` is the only call that releases a pdfjs worker; ignore failures on teardown.
+ *
+ * pdfjs-dist v5 dropped it from the `PDFDocumentProxy` typings (it lives on the loading task), but
+ * the proxy still forwards the call at runtime.
+ */
 function destroyDoc(doc: PDFDocumentProxy | null | undefined): void {
-  if (!doc) return;
-  void doc.destroy().catch(() => undefined);
+  const destroyable = doc as (PDFDocumentProxy & { destroy?: () => Promise<void> }) | null;
+  if (!destroyable?.destroy) return;
+  void destroyable.destroy().catch(() => undefined);
 }
 
 function fingerprintOf(doc: PDFDocumentProxy, file: File): string {
@@ -94,6 +101,7 @@ export function usePdfDocument(): PdfDocumentController {
 
       setPdfDoc(doc);
       setSource({
+        key: MAIN_SOURCE_KEY,
         bytes: meta.bytes,
         pageCount: doc.numPages,
         encrypted: meta.encrypted,

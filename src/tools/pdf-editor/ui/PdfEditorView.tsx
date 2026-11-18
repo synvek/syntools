@@ -59,7 +59,7 @@ export function PdfEditorView({
         <Ribbon
           ariaLabel={t('tools.pdfEditor.ribbonLabel')}
           tabs={tabs}
-          accent="blue"
+          accent="red"
           defaultTabId="home"
           headerRight={headerRight}
           collapseLabel={t('tools.pdfEditor.ribbonCollapse')}

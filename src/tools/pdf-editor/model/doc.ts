@@ -3,8 +3,10 @@
  *
  * Rules that the rest of the editor relies on:
  *
- * 1. **`pages.length` always equals `source.pageCount`.** Deleting marks `deleted` instead of
- *    splicing, so `sourceIndex` never shifts and saves can rebuild from the original bytes.
+ * 1. **Pages are identified by `id`, never by position.** Deleting marks `deleted` instead of
+ *    splicing, reordering moves entries, and objects anchor to `page.id`, so an object can never
+ *    drift onto a neighbouring page. `pages.length` no longer mirrors `source.pageCount`: inserted
+ *    blank pages and pages imported from attachments add entries on top of `source`.
  * 2. **View changes do not bump `revision`.** Zooming, scrolling and switching view modes must not
  *    mark the document dirty; only content mutations do.
  * 3. **Reducers return the same object when nothing changes**, so React state updates and the
@@ -14,6 +16,7 @@
 
 import { normalizeRotation } from './coords';
 import type {
+  PdfBlankPage,
   PdfEditorDoc,
   PdfObject,
   PdfPageState,
@@ -25,6 +28,9 @@ import type {
 
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 4;
+
+/** Source key of the file the user opened; imported pages live under `attach-N` */
+export const MAIN_SOURCE_KEY = 'main';
 
 /** Preset zoom levels used by the ribbon combo box (custom values are still allowed) */
 export const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
@@ -45,11 +51,15 @@ export interface CreateDocInput {
 /** Build a document from an opened file: one page state per source page, nothing dirty */
 export function createDoc(input: CreateDocInput): PdfEditorDoc {
   const now = input.now ?? Date.now();
+  const source = { ...input.source, key: input.source.key || MAIN_SOURCE_KEY };
   return {
     id: input.id ?? createDocId(),
     name: input.name,
-    source: input.source,
-    pages: Array.from({ length: input.source.pageCount }, (_, sourceIndex) => ({
+    source,
+    attachments: [],
+    pages: Array.from({ length: source.pageCount }, (_, sourceIndex) => ({
+      id: pageIdFor(source.key, sourceIndex),
+      sourceKey: source.key,
       sourceIndex,
       rotation: 0 as PdfRotation,
     })),
@@ -63,11 +73,22 @@ export function createDoc(input: CreateDocInput): PdfEditorDoc {
   };
 }
 
+/** Deterministic page id: stable across reloads, unique per (source, index) */
+export function pageIdFor(sourceKey: string, sourceIndex: number): string {
+  return `page-${sourceKey}-${sourceIndex}`;
+}
+
 /** Document before a file is opened (empty state); `pageCount` is 0 and saves must refuse it */
 export function createEmptyDoc(now = Date.now()): PdfEditorDoc {
   return createDoc({
     name: '',
-    source: { bytes: new Uint8Array(0), pageCount: 0, encrypted: false, fingerprint: '' },
+    source: {
+      key: MAIN_SOURCE_KEY,
+      bytes: new Uint8Array(0),
+      pageCount: 0,
+      encrypted: false,
+      fingerprint: '',
+    },
     now,
   });
 }
@@ -149,15 +170,22 @@ export function touch(doc: PdfEditorDoc, now = Date.now()): PdfEditorDoc {
 /* Page reducers                                                               */
 /* -------------------------------------------------------------------------- */
 
+export function pageById(doc: PdfEditorDoc, pageId: string): PdfPageState | null {
+  return doc.pages.find((page) => page.id === pageId) ?? null;
+}
+
+/** 1-based position in visible order, or 0 when the page is missing/deleted */
+export function visiblePageIndexById(doc: PdfEditorDoc, pageId: string): number {
+  const visible = visiblePages(doc);
+  const index = visible.findIndex((page) => page.id === pageId);
+  return index < 0 ? 0 : index + 1;
+}
+
 /** Add a rotation on top of the page's own /Rotate (90 + 270 wraps back to 0) */
-export function setPageRotation(
-  doc: PdfEditorDoc,
-  sourceIndex: number,
-  delta: number,
-): PdfEditorDoc {
+export function setPageRotation(doc: PdfEditorDoc, pageId: string, delta: number): PdfEditorDoc {
   let changed = false;
   const pages = doc.pages.map((page) => {
-    if (page.sourceIndex !== sourceIndex) return page;
+    if (page.id !== pageId) return page;
     const rotation = normalizeRotation(page.rotation + delta);
     if (rotation === page.rotation) return page;
     changed = true;
@@ -209,21 +237,145 @@ export function deletePage(doc: PdfEditorDoc, page: number): PdfEditorDoc {
   if (!Number.isFinite(index) || index < 1 || index > visible.length) return doc;
   const target = visible[index - 1];
   const pages = doc.pages.map((state) =>
-    state.sourceIndex === target.sourceIndex ? { ...state, deleted: true } : state,
+    state.id === target.id ? { ...state, deleted: true } : state,
   );
   const next = touch({ ...doc, pages });
   return { ...next, view: { ...next.view, page: clampPage(next, next.view.page) } };
 }
 
 /** Bring a previously deleted page back (undo-friendly, M2) */
-export function restorePage(doc: PdfEditorDoc, sourceIndex: number): PdfEditorDoc {
+export function restorePage(doc: PdfEditorDoc, pageId: string): PdfEditorDoc {
   let changed = false;
   const pages = doc.pages.map((page) => {
-    if (page.sourceIndex !== sourceIndex || !page.deleted) return page;
+    if (page.id !== pageId || !page.deleted) return page;
     changed = true;
     return { ...page, deleted: false };
   });
   return changed ? touch({ ...doc, pages }) : doc;
+}
+
+/** Array position where a page inserted at `atVisibleIndex` (1-based) belongs */
+function insertionPoint(doc: PdfEditorDoc, atVisibleIndex: number): number {
+  const visible = visiblePages(doc);
+  const rounded = Math.round(atVisibleIndex);
+  const clamped = Math.min(
+    Math.max(1, Number.isFinite(rounded) ? rounded : visible.length + 1),
+    visible.length + 1,
+  );
+  if (clamped <= visible.length) {
+    const targetId = visible[clamped - 1].id;
+    return doc.pages.findIndex((page) => page.id === targetId);
+  }
+  const lastId = visible[visible.length - 1]?.id;
+  const lastIndex = lastId ? doc.pages.findIndex((page) => page.id === lastId) : -1;
+  return lastIndex + 1;
+}
+
+function uniquePageId(doc: PdfEditorDoc, base: string): string {
+  const used = new Set(doc.pages.map((page) => page.id));
+  if (!used.has(base)) return base;
+  let suffix = 2;
+  while (used.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+/**
+ * Insert an empty page at a 1-based visible position.
+ *
+ * The name is what the user sees; the page carries its size in `blank` because there are no source
+ * bytes to copy. Rendering of blank pages lands with the page-operations UI (M2-7).
+ */
+export function insertBlankPage(
+  doc: PdfEditorDoc,
+  atVisibleIndex: number,
+  size: PdfBlankPage,
+): PdfEditorDoc {
+  const position = insertionPoint(doc, atVisibleIndex);
+  const page: PdfPageState = {
+    id: uniquePageId(doc, `page-blank-${doc.pages.length}`),
+    sourceKey: '',
+    sourceIndex: -1,
+    rotation: 0,
+    blank: { ...size },
+  };
+  const pages = [...doc.pages.slice(0, position), page, ...doc.pages.slice(position)];
+  const next = touch({ ...doc, pages });
+  return { ...next, view: { ...next.view, page: visiblePageIndexById(next, page.id) } };
+}
+
+/**
+ * Insert pages copied from another PDF.
+ *
+ * Encrypted attachments are rejected: the editor would have to keep a second password alive just
+ * for saving, and the UI has no prompt for it. The caller is expected to unlock/decrypt first.
+ */
+export function insertPagesFrom(
+  doc: PdfEditorDoc,
+  atVisibleIndex: number,
+  source: PdfSource,
+  indices: number[],
+): PdfEditorDoc {
+  if (source.encrypted) return doc;
+  const valid = indices.filter(
+    (index) => Number.isInteger(index) && index >= 0 && index < source.pageCount,
+  );
+  if (valid.length === 0) return doc;
+
+  const key = source.key || `attach-${doc.attachments.length + 1}`;
+  const attachments = doc.attachments.some((item) => item.key === key)
+    ? doc.attachments
+    : [...doc.attachments, { ...source, key }];
+
+  const used = new Set(doc.pages.map((page) => page.id));
+  const created = valid.map((sourceIndex) => {
+    const base = pageIdFor(key, sourceIndex);
+    let id = base;
+    let suffix = 2;
+    while (used.has(id)) {
+      id = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    used.add(id);
+    const page: PdfPageState = { id, sourceKey: key, sourceIndex, rotation: 0 };
+    return page;
+  });
+
+  const position = insertionPoint(doc, atVisibleIndex);
+  const pages = [...doc.pages.slice(0, position), ...created, ...doc.pages.slice(position)];
+  const next = touch({ ...doc, pages, attachments });
+  return { ...next, view: { ...next.view, page: visiblePageIndexById(next, created[0].id) } };
+}
+
+/** Duplicate one page right after itself (objects stay with the original page) */
+export function duplicatePage(doc: PdfEditorDoc, pageId: string): PdfEditorDoc {
+  const position = doc.pages.findIndex((page) => page.id === pageId);
+  if (position < 0) return doc;
+  const page = doc.pages[position];
+  const copy: PdfPageState = { ...page, id: uniquePageId(doc, `${page.id}-copy`) };
+  const pages = [...doc.pages];
+  pages.splice(position + 1, 0, copy);
+  const next = touch({ ...doc, pages });
+  return { ...next, view: { ...next.view, page: visiblePageIndexById(next, copy.id) } };
+}
+
+/** Move a page by id to a 1-based visible position (keyboard path for the thumbnail rail) */
+export function movePageById(
+  doc: PdfEditorDoc,
+  pageId: string,
+  toVisibleIndex: number,
+): PdfEditorDoc {
+  const visible = visiblePages(doc);
+  if (visible.length < 2) return doc;
+  const fromIndex = visible.findIndex((page) => page.id === pageId);
+  if (fromIndex < 0) return doc;
+  const target = Math.min(visible.length, Math.max(1, Math.round(toVisibleIndex))) - 1;
+  if (target === fromIndex) return doc;
+
+  const reordered = [...visible];
+  const [moved] = reordered.splice(fromIndex, 1);
+  reordered.splice(target, 0, moved);
+  const next = touch({ ...doc, pages: [...reordered, ...doc.pages.filter((p) => p.deleted)] });
+  return { ...next, view: { ...next.view, page: visiblePageIndexById(next, pageId) } };
 }
 
 /* -------------------------------------------------------------------------- */

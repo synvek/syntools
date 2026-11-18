@@ -92,6 +92,14 @@ export const RIBBON_ACCENT: Record<RibbonAccent, AccentClasses> = {
     launcher: 'text-gray-400 hover:text-[#c43e1c] dark:text-[#8a8a8a] dark:hover:text-[#f0906f]',
     ring: 'focus-visible:ring-[#c43e1c] dark:focus-visible:ring-[#f0906f]',
   },
+  // PDF brand red (D4 = A): distinct from the slide deck's orange and readable on both themes
+  red: {
+    tab: 'text-[#b3261e] border-[#b3261e] dark:text-[#f2b8b5] dark:border-[#f2b8b5]',
+    toggle:
+      'border-[#b3261e] bg-[#b3261e] text-white hover:bg-[#8c1d18] dark:border-[#f2b8b5] dark:bg-[#f2b8b5] dark:text-[#121212] dark:hover:bg-[#f9dedc]',
+    launcher: 'text-gray-400 hover:text-[#b3261e] dark:text-[#8a8a8a] dark:hover:text-[#f2b8b5]',
+    ring: 'focus-visible:ring-[#b3261e] dark:focus-visible:ring-[#f2b8b5]',
+  },
 };
 
 /** Swatches shared by every ribbon color picker (kept in sync with the word processor palette) */

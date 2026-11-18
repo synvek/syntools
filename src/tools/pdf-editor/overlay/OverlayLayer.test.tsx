@@ -6,6 +6,8 @@ import type { NormRect, PdfObject } from '../model/types';
 import { OverlayLayer } from './OverlayLayer';
 
 /** Page box used for the hit-testing math (jsdom has no layout) */
+const PAGE_ID = 'page-main-0';
+
 const PAGE_BOX = {
   x: 0,
   y: 0,
@@ -31,7 +33,7 @@ function Harness({ initial }: { initial?: PdfObject[] }) {
     <div>
       <OverlayLayer
         objects={objects}
-        page={0}
+        page={PAGE_ID}
         scale={1}
         selectedId={selected}
         editingId={editing}
@@ -47,7 +49,7 @@ function Harness({ initial }: { initial?: PdfObject[] }) {
           );
         }}
         onCreate={(rect: NormRect) => {
-          const object = createTextObject({ page: 0, rect, text: '', z: 1 });
+          const object = createTextObject({ page: PAGE_ID, rect, text: '', z: 1 });
           setObjects((previous) => [...previous, object]);
           setSelected(object.id);
           return object.id;
@@ -112,7 +114,7 @@ describe('OverlayLayer', () => {
 
   it('点击已有文本框只选中，不进入编辑', () => {
     const object = createTextObject({
-      page: 0,
+      page: PAGE_ID,
       rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.05 },
       text: 'Existing',
       z: 1,
@@ -132,7 +134,7 @@ describe('OverlayLayer', () => {
 
   it('只渲染属于当前页的对象', () => {
     const onOtherPage = createTextObject({
-      page: 1,
+      page: 'page-main-1',
       rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.05 },
       text: 'page 2',
       z: 1,

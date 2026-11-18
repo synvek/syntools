@@ -207,17 +207,35 @@ export async function flattenPdf(
     const objects = sortByZ(doc.objects);
     let rasterized = false;
 
+    // Every save rebuilds from bytes, so each source (main + attachments) is loaded once
+    const loaded = new Map<string, PDFDocument>([[doc.source.key, source.value]]);
+    for (const attachment of doc.attachments) {
+      const result = await loadPdfFromBytes(attachment.bytes, {
+        password: attachment.password,
+      });
+      if (!result.ok) return result;
+      loaded.set(attachment.key, result.value);
+    }
+
     for (const state of pages) {
-      const [page] = await out.copyPages(source.value, [state.sourceIndex]);
-      if (!page) return { ok: false, error: 'INVALID_RANGE' };
+      let page: PDFPage;
+      if (state.blank) {
+        page = out.addPage([state.blank.widthPt, state.blank.heightPt]);
+      } else {
+        const owner = loaded.get(state.sourceKey);
+        if (!owner) return { ok: false, error: 'INVALID_RANGE' };
+        const [copied] = await out.copyPages(owner, [state.sourceIndex]);
+        if (!copied) return { ok: false, error: 'INVALID_RANGE' };
+        page = copied;
+        out.addPage(page);
+      }
 
       const baseRotation = normalizePageRotation(page.getRotation().angle);
       const rotation = outputRotation(state, baseRotation);
       if (rotation !== baseRotation) page.setRotation(degrees(rotation));
-      out.addPage(page);
 
       for (const object of objects) {
-        if (object.page !== state.sourceIndex || object.kind !== 'text') continue;
+        if (object.page !== state.id || object.kind !== 'text') continue;
         if (await drawTextObject(out, page, object, fonts)) rasterized = true;
       }
     }

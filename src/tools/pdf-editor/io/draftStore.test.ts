@@ -1,6 +1,14 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { addObject, createDoc, markSaved, setCurrentPage, setZoom } from '../model/doc';
+import {
+  addObject,
+  createDoc,
+  insertPagesFrom,
+  markSaved,
+  pageIdFor,
+  setCurrentPage,
+  setZoom,
+} from '../model/doc';
 import { createTextObject } from '../model/objects';
 import type { PdfEditorDoc } from '../model/types';
 import {
@@ -9,6 +17,7 @@ import {
   getDraft,
   latestDraft,
   putDraft,
+  readDraftAttachments,
   readDraftBytes,
   resetDraftStore,
   serializeDoc,
@@ -18,6 +27,7 @@ function makeDoc(fingerprint: string, pageCount = 2): PdfEditorDoc {
   return createDoc({
     name: `${fingerprint}.pdf`,
     source: {
+      key: 'main',
       bytes: new Uint8Array([1, 2, 3]),
       pageCount,
       encrypted: false,
@@ -61,6 +71,7 @@ describe('putDraft', () => {
     const encrypted = createDoc({
       name: 'secret.pdf',
       source: {
+        key: 'main',
         bytes: new Uint8Array([1]),
         pageCount: 1,
         encrypted: true,
@@ -100,7 +111,7 @@ describe('checksum / bytes round trip', () => {
     const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
     const doc = createDoc({
       name: 'bytes.pdf',
-      source: { bytes, pageCount: 1, encrypted: false, fingerprint: 'fp-bytes' },
+      source: { key: 'main', bytes, pageCount: 1, encrypted: false, fingerprint: 'fp-bytes' },
       now: 0,
     });
 
@@ -126,6 +137,7 @@ describe('serializeDoc / applyDraftModel', () => {
     const doc = createDoc({
       name: 'secret.pdf',
       source: {
+        key: 'main',
         bytes: new Uint8Array([1]),
         pageCount: 1,
         encrypted: false,
@@ -145,7 +157,7 @@ describe('serializeDoc / applyDraftModel', () => {
     doc = addObject(
       doc,
       createTextObject({
-        page: 0,
+        page: pageIdFor('main', 0),
         rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.1 },
         text: 'Hello',
         z: 1,
@@ -155,6 +167,7 @@ describe('serializeDoc / applyDraftModel', () => {
     doc = markSaved(doc);
 
     const source = {
+      key: 'main',
       bytes: new Uint8Array([9]),
       pageCount: 2,
       encrypted: false,
@@ -177,6 +190,67 @@ describe('deleteDraft', () => {
     await deleteDraft('fp-del');
 
     expect(await getDraft('fp-del')).toBeNull();
+    expect(await latestDraft()).toBeNull();
+  });
+});
+
+describe('模型版本与附件', () => {
+  it('附件字节随草稿保存并可恢复', async () => {
+    const attachmentBytes = new Uint8Array([7, 7, 7]);
+    let doc = makeDoc('fp-attach');
+    doc = insertPagesFrom(
+      doc,
+      2,
+      {
+        key: 'attach-1',
+        bytes: attachmentBytes,
+        pageCount: 1,
+        encrypted: false,
+        fingerprint: 'fp-attach-src',
+      },
+      [0],
+    );
+
+    await putDraft(doc, { bytes: doc.source.bytes });
+    const record = await getDraft('fp-attach');
+
+    expect(record?.attachments).toHaveLength(1);
+    const sources = readDraftAttachments(record!);
+    expect(sources[0].key).toBe('attach-1');
+    expect(Array.from(sources[0].bytes)).toEqual([7, 7, 7]);
+    expect(record?.model.pages.some((page) => page.blank)).toBe(false);
+  });
+
+  it('旧版本（v1）记录被视为无草稿', async () => {
+    // Written directly: the store under test refuses to deserialize foreign shapes
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('syntools-pdf-editor', 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains('drafts')) {
+          request.result.createObjectStore('drafts', { keyPath: 'fingerprint' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('drafts', 'readwrite');
+      tx.objectStore('drafts').put({
+        fingerprint: 'fp-old',
+        name: 'old.pdf',
+        rev: 1,
+        updatedAt: 1,
+        pageCount: 1,
+        model: { version: 1 },
+        sourceBytes: null,
+        attachments: [],
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+
+    expect(await getDraft('fp-old')).toBeNull();
     expect(await latestDraft()).toBeNull();
   });
 });

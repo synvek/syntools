@@ -205,24 +205,34 @@ export function PageScrollView({
             const displayPage = view.mode === 'single' ? view.page : index + 1;
             return (
               <div
-                key={page.sourceIndex}
+                key={page.id}
                 data-testid="pdf-page"
                 data-page={displayPage}
+                data-page-id={page.id}
                 ref={(element) => {
                   pageRefs.current[displayPage - 1] = element;
                 }}
                 style={{ width: boxWidth, height: boxHeight }}
                 className="relative shrink-0 bg-white shadow-sm ring-1 ring-black/10"
               >
-                <PageCanvas
-                  pdfDoc={pdfDoc}
-                  pageNumber={page.sourceIndex + 1}
-                  scale={scale}
-                  dpr={dpr}
-                  width={boxWidth}
-                  height={boxHeight}
-                  label={t('tools.pdfEditor.pageAria', { page: displayPage })}
-                />
+                {page.blank ? (
+                  // Inserted blank pages have no pdfjs page to render
+                  <div
+                    data-testid="pdf-blank-page"
+                    aria-label={t('tools.pdfEditor.pageAria', { page: displayPage })}
+                    className="h-full w-full"
+                  />
+                ) : (
+                  <PageCanvas
+                    pdfDoc={pdfDoc}
+                    pageNumber={page.sourceIndex + 1}
+                    scale={scale}
+                    dpr={dpr}
+                    width={boxWidth}
+                    height={boxHeight}
+                    label={t('tools.pdfEditor.pageAria', { page: displayPage })}
+                  />
+                )}
                 {overlay?.(page, scale)}
               </div>
             );

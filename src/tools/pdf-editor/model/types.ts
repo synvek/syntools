@@ -20,8 +20,10 @@ export type PdfRotation = 0 | 90 | 180 | 270;
 export type ViewMode = 'single' | 'continuous';
 export type ZoomMode = 'custom' | 'fit-width' | 'fit-page';
 
-/** Original file: the single source of truth every save rebuilds from */
+/** One set of bytes the document is built from: the opened file, or a PDF inserted into it */
 export interface PdfSource {
+  /** `'main'` for the opened file; `'attach-N'` for imported pages. Stable within a document */
+  key: string;
   bytes: Uint8Array;
   pageCount: number;
   encrypted: boolean;
@@ -34,12 +36,29 @@ export interface PdfSource {
   fingerprint: string;
 }
 
+/** An inserted blank page: it has no source bytes, so the size lives in the model */
+export interface PdfBlankPage {
+  widthPt: number;
+  heightPt: number;
+}
+
 /** Per-page output state; `rotation` is added on top of the file's own /Rotate */
 export interface PdfPageState {
+  /**
+   * Stable page id (`page-<sourceIndex>` at creation, unique after insert/duplicate).
+   *
+   * Objects anchor to this id and React keys use it, so reordering pages never moves an object to a
+   * different page. `sourceIndex` alone cannot work once pages come from more than one PDF.
+   */
+  id: string;
+  /** Points into `PdfEditorDoc.sources` (main file or an attachment) */
+  sourceKey: string;
   sourceIndex: number;
   rotation: PdfRotation;
-  /** Deleted pages stay in the array so `sourceIndex` never shifts */
+  /** Deleted pages stay in the array so page ids never shift */
   deleted?: boolean;
+  /** Present for pages created in the editor (no bytes to copy) */
+  blank?: PdfBlankPage;
 }
 
 export type PdfTextAlign = 'left' | 'center' | 'right';
@@ -58,8 +77,8 @@ export interface PdfTextPatch {
 
 export interface PdfObjectBase {
   id: string;
-  /** `PdfPageState.sourceIndex` of the page this object is anchored to */
-  page: number;
+  /** `PdfPageState.id` of the page this object is anchored to (stable across reorders) */
+  page: string;
   rect: NormRect;
   /** Object rotation in degrees (free rotation, not page rotation) */
   rotation: number;
@@ -149,8 +168,11 @@ export type PdfObject =
 export interface PdfEditorDoc {
   id: string;
   name: string;
+  /** The opened file; `source.fingerprint` is the draft key */
   source: PdfSource;
-  /** Output order. Length always equals `source.pageCount`. */
+  /** PDFs whose pages were inserted into this document (never encrypted, see `insertPagesFrom`) */
+  attachments: PdfSource[];
+  /** Output order; includes deleted pages (filtered by `visiblePages`) */
   pages: PdfPageState[];
   /** Overlay objects, paint order = ascending `z` */
   objects: PdfObject[];

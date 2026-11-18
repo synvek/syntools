@@ -28,6 +28,11 @@ export const fileStrings: Record<string, StringTree> = {
     draftConflict: '其他标签页已保存这份草稿，本次修改未写入',
     draftNoSource: '草稿缺少原文件，请重新选择该 PDF，编辑内容会自动恢复',
     draftModelOnly: '本地空间不足，草稿只保存了编辑内容',
+    leaveTitle: '离开编辑器？',
+    leaveBody:
+      '当前修改还没有保存为 PDF。离开后，下次打开可以从本地草稿继续；清除站点数据会删除草稿。',
+    leaveStay: '继续编辑',
+    leaveLeave: '离开',
   },
   'zh-TW': {
     fileMenuLabel: '檔案',
@@ -49,6 +54,11 @@ export const fileStrings: Record<string, StringTree> = {
     draftConflict: '其他分頁已儲存這份草稿，本次修改未寫入',
     draftNoSource: '草稿缺少原始檔案，請重新選擇該 PDF，編輯內容會自動還原',
     draftModelOnly: '本機空間不足，草稿只儲存了編輯內容',
+    leaveTitle: '離開編輯器？',
+    leaveBody:
+      '目前修改尚未儲存為 PDF。離開後，下次開啟可以從本機草稿繼續；清除網站資料會刪除草稿。',
+    leaveStay: '繼續編輯',
+    leaveLeave: '離開',
   },
   en: {
     fileMenuLabel: 'File',
@@ -71,6 +81,11 @@ export const fileStrings: Record<string, StringTree> = {
     draftNoSource:
       'This draft has no original file — re-open the same PDF and the edits will return',
     draftModelOnly: 'Low local space: only the edits were saved',
+    leaveTitle: 'Leave the editor?',
+    leaveBody:
+      'Your changes are not saved as a PDF yet. Reopening the tool offers the local draft; clearing site data deletes it.',
+    leaveStay: 'Keep editing',
+    leaveLeave: 'Leave',
   },
   ja: {
     fileMenuLabel: 'ファイル',
@@ -92,6 +107,11 @@ export const fileStrings: Record<string, StringTree> = {
     draftConflict: '別のタブがこの下書きを保存したため、今回の変更は書き込まれませんでした',
     draftNoSource: '下書きに元ファイルがありません。同じ PDF を開き直すと編集内容が復元されます',
     draftModelOnly: '空き容量が少ないため、編集内容のみ保存しました',
+    leaveTitle: 'エディタを離れますか？',
+    leaveBody:
+      '変更はまだ PDF として保存されていません。次回開くときにローカル下書きから再開できます（サイトデータを消すと失われます）。',
+    leaveStay: '編集を続ける',
+    leaveLeave: '離れる',
   },
   fr: {
     fileMenuLabel: 'Fichier',
@@ -115,6 +135,11 @@ export const fileStrings: Record<string, StringTree> = {
     draftNoSource:
       'Ce brouillon n’a pas le fichier d’origine — rouvrez le même PDF pour restaurer les modifications',
     draftModelOnly: 'Espace local insuffisant : seules les modifications ont été enregistrées',
+    leaveTitle: 'Quitter l’éditeur ?',
+    leaveBody:
+      'Les modifications ne sont pas encore enregistrées en PDF. Le brouillon local sera proposé à la prochaine ouverture ; effacer les données du site le supprime.',
+    leaveStay: 'Continuer l’édition',
+    leaveLeave: 'Quitter',
   },
   de: {
     fileMenuLabel: 'Datei',
@@ -138,6 +163,11 @@ export const fileStrings: Record<string, StringTree> = {
     draftNoSource:
       'Dem Entwurf fehlt die Originaldatei – dieselbe PDF erneut öffnen, um die Änderungen wiederherzustellen',
     draftModelOnly: 'Wenig lokaler Speicher: nur die Änderungen wurden gesichert',
+    leaveTitle: 'Editor verlassen?',
+    leaveBody:
+      'Die Änderungen sind noch nicht als PDF gespeichert. Beim nächsten Öffnen wird der lokale Entwurf angeboten; das Löschen der Websitedaten entfernt ihn.',
+    leaveStay: 'Weiter bearbeiten',
+    leaveLeave: 'Verlassen',
   },
   it: {
     fileMenuLabel: 'File',
@@ -160,6 +190,11 @@ export const fileStrings: Record<string, StringTree> = {
     draftNoSource:
       'La bozza non ha il file originale: riapri lo stesso PDF per ripristinare le modifiche',
     draftModelOnly: 'Spazio locale insufficiente: sono state salvate solo le modifiche',
+    leaveTitle: 'Uscire dall’editor?',
+    leaveBody:
+      'Le modifiche non sono ancora salvate come PDF. Alla prossima apertura verrà proposto il documento locale; cancellando i dati del sito viene eliminato.',
+    leaveStay: 'Continua a modificare',
+    leaveLeave: 'Esci',
   },
   es: {
     fileMenuLabel: 'Archivo',
@@ -182,6 +217,11 @@ export const fileStrings: Record<string, StringTree> = {
     draftNoSource:
       'El borrador no tiene el archivo original: vuelve a abrir el mismo PDF para restaurar los cambios',
     draftModelOnly: 'Poco espacio local: solo se guardaron los cambios',
+    leaveTitle: '¿Salir del editor?',
+    leaveBody:
+      'Los cambios aún no se han guardado como PDF. Al volver a abrir se ofrecerá el borrador local; si borras los datos del sitio, se eliminará.',
+    leaveStay: 'Seguir editando',
+    leaveLeave: 'Salir',
   },
   pt: {
     fileMenuLabel: 'Arquivo',
@@ -204,5 +244,10 @@ export const fileStrings: Record<string, StringTree> = {
     draftNoSource:
       'O rascunho não tem o arquivo original — reabra o mesmo PDF para restaurar as edições',
     draftModelOnly: 'Pouco espaço local: apenas as edições foram salvas',
+    leaveTitle: 'Sair do editor?',
+    leaveBody:
+      'As alterações ainda não foram salvas como PDF. Ao reabrir, o rascunho local será oferecido; limpar os dados do site o apaga.',
+    leaveStay: 'Continuar editando',
+    leaveLeave: 'Sair',
   },
 };

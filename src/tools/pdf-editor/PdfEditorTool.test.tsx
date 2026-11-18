@@ -80,7 +80,13 @@ function choose(container: HTMLElement, file: File): void {
 function fakeDocModel() {
   return createDoc({
     name: 'contract.pdf',
-    source: { bytes: new Uint8Array([1]), pageCount: 3, encrypted: false, fingerprint: 'fp' },
+    source: {
+      key: 'main',
+      bytes: new Uint8Array([1]),
+      pageCount: 3,
+      encrypted: false,
+      fingerprint: 'fp',
+    },
     id: 'doc-test',
     now: 0,
   });
@@ -92,7 +98,7 @@ beforeEach(() => {
   openMock.mockReset();
   // jsdom ships no canvas backend; PageCanvas only needs a truthy 2D context because the fake
   // document never paints anything.
-  HTMLCanvasElement.prototype.getContext = (() => ({})) as typeof nativeGetContext;
+  HTMLCanvasElement.prototype.getContext = (() => ({})) as unknown as typeof nativeGetContext;
 });
 
 afterEach(() => {

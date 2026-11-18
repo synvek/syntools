@@ -17,29 +17,43 @@ export function StatusBar({ doc, pdfDoc }: StatusBarProps) {
   const total = doc ? visiblePageCount(doc) : 0;
   const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
 
-  const currentSourceIndex = doc
-    ? (visiblePages(doc)[doc.view.page - 1]?.sourceIndex ?? null)
-    : null;
+  const currentPage = doc ? (visiblePages(doc)[doc.view.page - 1] ?? null) : null;
+  // Blank pages have no pdfjs page; inserted attachments are only visible once their proxy is
+  // wired in (M2-7), so only the main source can report a size for now
+  const mainSourceIndex =
+    currentPage && !currentPage.blank && currentPage.sourceKey === doc?.source.key
+      ? currentPage.sourceIndex
+      : null;
 
   useEffect(() => {
     setPageSize(null);
-    if (!doc || !pdfDoc || currentSourceIndex == null) return;
+    if (!currentPage?.blank) {
+      if (!doc || !pdfDoc || mainSourceIndex == null) return;
 
-    let cancelled = false;
-    void (async () => {
-      try {
-        const page = await pdfDoc.getPage(currentSourceIndex + 1);
-        const viewport = page.getViewport({ scale: 1 });
-        if (!cancelled) setPageSize({ width: viewport.width, height: viewport.height });
-      } catch {
-        if (!cancelled) setPageSize(null);
-      }
-    })();
+      let cancelled = false;
+      void (async () => {
+        try {
+          const page = await pdfDoc.getPage(mainSourceIndex + 1);
+          const viewport = page.getViewport({ scale: 1 });
+          if (!cancelled) setPageSize({ width: viewport.width, height: viewport.height });
+        } catch {
+          if (!cancelled) setPageSize(null);
+        }
+      })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [doc, pdfDoc, currentSourceIndex]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPageSize({ width: currentPage.blank.widthPt, height: currentPage.blank.heightPt });
+    return undefined;
+  }, [doc, pdfDoc, mainSourceIndex, currentPage]);
+
+  const totalBytes = doc
+    ? doc.source.bytes.byteLength +
+      doc.attachments.reduce((sum, attachment) => sum + attachment.bytes.byteLength, 0)
+    : 0;
 
   return (
     <div
@@ -63,7 +77,7 @@ export function StatusBar({ doc, pdfDoc }: StatusBarProps) {
       ) : null}
       {doc ? (
         <span data-testid="pdf-status-filesize">
-          {t('tools.pdfEditor.statusFileSize')} {formatFileSize(doc.source.bytes.byteLength)}
+          {t('tools.pdfEditor.statusFileSize')} {formatFileSize(totalBytes)}
         </span>
       ) : null}
       <span className="ml-auto">{t('tools.pdfEditor.privacy')}</span>

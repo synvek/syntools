@@ -7,13 +7,13 @@ import type {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { clampNormRect } from '../model/coords';
-import type { NormRect, PdfObject, PdfTextObject } from '../model/types';
+import type { NormRect, PdfObject, PdfPageState, PdfTextObject } from '../model/types';
 
 interface OverlayLayerProps {
   /** Objects anchored to this page (all z orders; painted ascending) */
   objects: PdfObject[];
-  /** `PdfPageState.sourceIndex` of the page this layer covers */
-  page: number;
+  /** `PdfPageState.id` of the page this layer covers */
+  page: string;
   /** CSS px per PDF point, so a 11 pt text box looks 11 pt at any zoom */
   scale: number;
   selectedId: string | null;
@@ -136,7 +136,7 @@ export function OverlayLayer({
     <div
       ref={rootRef}
       data-testid="pdf-overlay"
-      data-page={page}
+      data-page-id={page}
       className="absolute inset-0"
       onDoubleClick={onDoubleClick}
       onPointerDown={() => onSelect(null)}
@@ -206,4 +206,4 @@ export function OverlayLayer({
 }
 
 /** Small helper so the page view can pass the layer through a render prop without importing types */
-export type OverlayRenderer = (page: number, scale: number) => ReactNode;
+export type OverlayRenderer = (page: PdfPageState, scale: number) => ReactNode;

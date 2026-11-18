@@ -150,6 +150,29 @@ test.describe('PDF 编辑器（M1）', () => {
     await expect(page.getByTestId('pdf-draft-prompt')).toHaveCount(0);
   });
 
+  test('有未保存修改时，站内跳转会先确认', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+    await page
+      .getByTestId('pdf-page')
+      .first()
+      .dblclick({ position: { x: 160, y: 220 } });
+    await page.keyboard.type('Unsaved');
+    await page.getByTestId('pdf-status-page').click();
+
+    const homeLink = page.locator('header a[href="/"]').first();
+
+    await homeLink.click();
+    await expect(page.getByTestId('pdf-leave-guard')).toBeVisible();
+    await page.getByTestId('pdf-leave-stay').click();
+    await expect(page.getByTestId('pdf-leave-guard')).toHaveCount(0);
+    await expect(page.getByTestId('pdf-ribbon')).toBeVisible();
+
+    await homeLink.click();
+    await expect(page.getByTestId('pdf-leave-guard')).toBeVisible();
+    await page.getByTestId('pdf-leave-confirm').click();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
   test('加密 PDF：错误密码可重试，正确密码后打开', async ({ page }) => {
     await page.goto('/tools/pdf-editor');
     await page.locator('input[type="file"]').setInputFiles(fixture('encrypted.pdf'));

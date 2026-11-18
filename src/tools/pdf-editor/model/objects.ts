@@ -47,8 +47,8 @@ export function createObjectId(): string {
 }
 
 export interface CreateTextObjectInput {
-  /** `PdfPageState.sourceIndex` */
-  page: number;
+  /** `PdfPageState.id` (stable across reorders) */
+  page: string;
   /** Normalized rect; clamped into the page */
   rect: NormRect;
   text: string;
@@ -100,6 +100,6 @@ export function createTextObject(input: CreateTextObjectInput): PdfTextObject {
 }
 
 /** Re-anchor an object to another page (drag from one thumbnail to another in M2) */
-export function moveObjectToPage<T extends PdfObject>(object: T, page: number): T {
+export function moveObjectToPage<T extends PdfObject>(object: T, page: string): T {
   return { ...object, page };
 }

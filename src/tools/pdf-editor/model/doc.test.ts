@@ -6,11 +6,17 @@ import {
   createDoc,
   createEmptyDoc,
   deletePage,
+  duplicatePage,
+  insertBlankPage,
+  insertPagesFrom,
   isDirty,
   markSaved,
   MAX_ZOOM,
   MIN_ZOOM,
   movePage,
+  movePageById,
+  pageById,
+  pageIdFor,
   removeObject,
   restorePage,
   rotateAllPages,
@@ -27,7 +33,10 @@ import {
 import { createTextObject } from './objects';
 import type { PdfSource } from './types';
 
+const pageId = (sourceIndex: number) => pageIdFor('main', sourceIndex);
+
 const source = (pageCount: number): PdfSource => ({
+  key: 'main',
   bytes: new Uint8Array([1, 2, 3]),
   pageCount,
   encrypted: false,
@@ -105,21 +114,21 @@ describe('缩放与页码（视图变化不算脏）', () => {
 describe('页面旋转', () => {
   it('单页旋转叠加而不是替换', () => {
     const doc = makeDoc(2);
-    const rotated = setPageRotation(doc, 0, 90);
+    const rotated = setPageRotation(doc, pageId(0), 90);
     expect(rotated.pages[0].rotation).toBe(90);
     expect(rotated.pages[1].rotation).toBe(0);
     expect(rotated.revision).toBe(1);
     expect(isDirty(rotated)).toBe(true);
 
-    const wrapped = setPageRotation(rotated, 0, 270);
+    const wrapped = setPageRotation(rotated, pageId(0), 270);
     expect(wrapped.pages[0].rotation).toBe(0);
   });
 
   it('没有实际变化时返回同一对象', () => {
     const doc = makeDoc(2);
-    expect(setPageRotation(doc, 0, 0)).toBe(doc);
-    expect(setPageRotation(doc, 0, 360)).toBe(doc);
-    expect(setPageRotation(doc, 99, 90)).toBe(doc);
+    expect(setPageRotation(doc, pageId(0), 0)).toBe(doc);
+    expect(setPageRotation(doc, pageId(0), 360)).toBe(doc);
+    expect(setPageRotation(doc, 'page-missing', 90)).toBe(doc);
   });
 
   it('rotateAllPages 跳过已删除页', () => {
@@ -166,9 +175,9 @@ describe('页面顺序与删除', () => {
 
   it('restorePage 恢复被删页', () => {
     const doc = deletePage(makeDoc(2), 1);
-    const restored = restorePage(doc, 0);
+    const restored = restorePage(doc, pageId(0));
     expect(visiblePageCount(restored)).toBe(2);
-    expect(restorePage(restored, 0)).toBe(restored);
+    expect(restorePage(restored, pageId(0))).toBe(restored);
   });
 
   it('movePage 按可见顺序移动，被删页停在末尾', () => {
@@ -194,7 +203,7 @@ describe('页面顺序与删除', () => {
 
 describe('保存状态', () => {
   it('markSaved 清零脏标记且不改 revision', () => {
-    const doc = setPageRotation(makeDoc(2), 0, 90);
+    const doc = setPageRotation(makeDoc(2), pageId(0), 90);
     expect(isDirty(doc)).toBe(true);
     const saved = markSaved(doc, 5000);
     expect(saved.revision).toBe(doc.revision);
@@ -212,7 +221,12 @@ describe('保存状态', () => {
 
 describe('对象增删改', () => {
   const text = () =>
-    createTextObject({ page: 0, rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.1 }, text: 'Hello', z: 1 });
+    createTextObject({
+      page: pageId(0),
+      rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.1 },
+      text: 'Hello',
+      z: 1,
+    });
 
   it('addObject 追加并标脏', () => {
     const doc = makeDoc(1);
@@ -243,5 +257,78 @@ describe('对象增删改', () => {
     const next = removeObject(doc, doc.objects[0].id);
     expect(next.objects).toEqual([]);
     expect(next.revision).toBe(doc.revision + 1);
+  });
+});
+
+describe('页面 id 与多来源（模型 v2）', () => {
+  const attachment = (key = 'attach-1'): PdfSource => ({
+    key,
+    bytes: new Uint8Array([9, 9, 9]),
+    pageCount: 2,
+    encrypted: false,
+    fingerprint: `fp-${key}`,
+  });
+
+  it('创建时按来源生成稳定 id，删除不影响其它页 id', () => {
+    const doc = makeDoc(3);
+    expect(doc.pages.map((page) => page.id)).toEqual(['page-main-0', 'page-main-1', 'page-main-2']);
+    const deleted = deletePage(doc, 3);
+    expect(pageById(deleted, 'page-main-0')?.id).toBe('page-main-0');
+    expect(pageById(deleted, 'page-main-1')?.deleted).toBeUndefined();
+    expect(pageById(deleted, 'page-main-2')?.deleted).toBe(true);
+  });
+
+  it('insertBlankPage 插到可见位置并带上尺寸', () => {
+    const doc = insertBlankPage(makeDoc(2), 2, { widthPt: 300, heightPt: 400 });
+    const visible = visiblePages(doc);
+
+    expect(visible).toHaveLength(3);
+    expect(visible[1].blank).toEqual({ widthPt: 300, heightPt: 400 });
+    expect(visible[1].sourceIndex).toBe(-1);
+    expect(doc.view.page).toBe(2);
+    expect(doc.attachments).toHaveLength(0);
+  });
+
+  it('insertPagesFrom 复制页、登记附件，同 key 不重复登记', () => {
+    let doc = insertPagesFrom(makeDoc(1), 2, attachment(), [1, 0]);
+    expect(visiblePages(doc)).toHaveLength(3);
+    expect(visiblePages(doc).map((page) => page.sourceIndex)).toEqual([0, 1, 0]);
+    expect(doc.attachments).toHaveLength(1);
+
+    doc = insertPagesFrom(doc, 1, attachment(), [1]);
+    expect(doc.attachments).toHaveLength(1);
+    expect(visiblePages(doc)).toHaveLength(4);
+    // Second insert of the same source page needs a unique id
+    const ids = doc.pages.map((page) => page.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('insertPagesFrom 拒绝加密来源与越界索引', () => {
+    const doc = makeDoc(1);
+    expect(insertPagesFrom(doc, 2, { ...attachment('attach-x'), encrypted: true }, [0])).toBe(doc);
+    expect(insertPagesFrom(doc, 2, attachment(), [5])).toBe(doc);
+  });
+
+  it('duplicatePage 紧跟原页，id 唯一、对象仍锚在原页', () => {
+    const doc = makeDoc(2);
+    const duplicated = duplicatePage(doc, 'page-main-0');
+
+    expect(visiblePages(duplicated).map((page) => page.id)).toEqual([
+      'page-main-0',
+      'page-main-0-copy',
+      'page-main-1',
+    ]);
+    expect(duplicated.view.page).toBe(2);
+  });
+
+  it('movePageById 跨位置移动并跟随当前页', () => {
+    const moved = movePageById(makeDoc(3), 'page-main-0', 3);
+    expect(visiblePages(moved).map((page) => page.id)).toEqual([
+      'page-main-1',
+      'page-main-2',
+      'page-main-0',
+    ]);
+    expect(moved.view.page).toBe(3);
+    expect(movePageById(moved, 'missing', 1)).toBe(moved);
   });
 });

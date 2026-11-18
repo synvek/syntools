@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useInRouterContext } from 'react-router-dom';
 import { i18n } from '@/core/i18n';
 import { useUnsavedChanges } from '@/core/hooks/useUnsavedChanges';
 import { downloadBytes } from '@/core/pdf/download';
@@ -10,6 +11,7 @@ import {
   deleteDraft,
   latestDraft,
   putDraft,
+  readDraftAttachments,
   readDraftBytes,
   type DraftModel,
   type DraftRecord,
@@ -50,6 +52,7 @@ import { buildPdfRibbonTabs } from './ribbonTabs';
 import type { PdfPanel, PdfRibbonActions, PdfTool } from './ribbonTabs';
 import { registerPdfEditorStrings } from './strings';
 import { DraftPrompt } from './ui/DraftPrompt';
+import { LeaveGuard } from './ui/LeaveGuard';
 import { OutlinePanel } from './ui/OutlinePanel';
 import { PdfEditorView } from './ui/PdfEditorView';
 import { PropertiesPanel } from './ui/PropertiesPanel';
@@ -162,7 +165,13 @@ export default function PdfEditorTool() {
         return syncPresent(previous as History, { ...current, source });
       }
       return createHistory(
-        restoredModel ? applyDraftModel(restoredModel, source) : createDoc({ name, source }),
+        restoredModel
+          ? applyDraftModel(
+              restoredModel,
+              source,
+              draft && draft.fingerprint === source.fingerprint ? readDraftAttachments(draft) : [],
+            )
+          : createDoc({ name, source }),
       );
     });
     setSaveError(null);
@@ -251,11 +260,11 @@ export default function PdfEditorTool() {
   /* ---------------------------------------------------------------------- */
 
   const handleCreateObject = useCallback(
-    (sourceIndex: number, rect: NormRect): string => {
+    (pageId: string, rect: NormRect): string => {
       // Built outside the updater: React may run the updater later, but the overlay needs the id
       // synchronously to enter edit mode.
       const object = createTextObject({
-        page: sourceIndex,
+        page: pageId,
         rect,
         text: '',
         z: nextZ(doc?.objects ?? []),
@@ -592,6 +601,8 @@ export default function PdfEditorTool() {
 
   const dirty = doc ? isDirty(doc) : false;
   useUnsavedChanges(dirty, t('tools.pdfEditor.unsavedMessage'));
+  // `useBlocker` throws outside a data router; the guard is only mounted where that exists
+  const inRouter = useInRouterContext();
 
   /* ---------------------------------------------------------------------- */
   /* Rendering                                                               */
@@ -619,7 +630,7 @@ export default function PdfEditorTool() {
   const renderOverlay = (page: PdfPageState, scale: number) => (
     <OverlayLayer
       objects={doc?.objects ?? []}
-      page={page.sourceIndex}
+      page={page.id}
       scale={scale}
       selectedId={selectedId}
       editingId={editingId}
@@ -632,7 +643,7 @@ export default function PdfEditorTool() {
         setEditingId(id);
       }}
       onEndEdit={handleEndEdit}
-      onCreate={(rect) => handleCreateObject(page.sourceIndex, rect)}
+      onCreate={(rect) => handleCreateObject(page.id, rect)}
       onTextChange={handleTextChange}
       onMove={handleMoveObject}
     />
@@ -694,30 +705,33 @@ export default function PdfEditorTool() {
     saveError ?? (pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null);
 
   return (
-    <PdfEditorView
-      doc={doc}
-      tabs={tabs}
-      onFile={handleFile}
-      emptyExtra={passwordBlock}
-      draftPrompt={
-        !doc && pdf.status === 'idle' && draft ? (
-          <DraftPrompt
-            draft={draft}
-            resumable={draft.sourceBytes !== null}
-            busy={draftBusy}
-            onResume={() => void resumeDraft()}
-            onDiscard={discardDraft}
-          />
-        ) : undefined
-      }
-      pageArea={pageArea}
-      leftPanel={leftPanel}
-      rightPanel={rightPanel}
-      error={pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null}
-      banner={doc ? (errorMessage ?? banner) : null}
-      note={pdf.busy ? t('common.loading') : null}
-      headerRight={headerRight}
-      statusBar={<StatusBar doc={doc} pdfDoc={pdf.pdfDoc} />}
-    />
+    <>
+      {inRouter ? <LeaveGuard dirty={dirty} /> : null}
+      <PdfEditorView
+        doc={doc}
+        tabs={tabs}
+        onFile={handleFile}
+        emptyExtra={passwordBlock}
+        draftPrompt={
+          !doc && pdf.status === 'idle' && draft ? (
+            <DraftPrompt
+              draft={draft}
+              resumable={draft.sourceBytes !== null}
+              busy={draftBusy}
+              onResume={() => void resumeDraft()}
+              onDiscard={discardDraft}
+            />
+          ) : undefined
+        }
+        pageArea={pageArea}
+        leftPanel={leftPanel}
+        rightPanel={rightPanel}
+        error={pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null}
+        banner={doc ? (errorMessage ?? banner) : null}
+        note={pdf.busy ? t('common.loading') : null}
+        headerRight={headerRight}
+        statusBar={<StatusBar doc={doc} pdfDoc={pdf.pdfDoc} />}
+      />
+    </>
   );
 }

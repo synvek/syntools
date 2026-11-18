@@ -17,6 +17,7 @@ import {
 import type { PdfEditorDoc, PdfSource } from './types';
 
 const source: PdfSource = {
+  key: 'main',
   bytes: new Uint8Array([1, 2, 3]),
   pageCount: 2,
   encrypted: false,

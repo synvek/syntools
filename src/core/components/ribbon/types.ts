@@ -175,5 +175,5 @@ export interface RibbonTab {
   groups: RibbonGroup[];
 }
 
-/** Accent theme: keeps three editors visually distinct while sharing one component */
-export type RibbonAccent = 'blue' | 'green' | 'orange';
+/** Accent theme: keeps each editor visually distinct while sharing one component */
+export type RibbonAccent = 'blue' | 'green' | 'orange' | 'red';

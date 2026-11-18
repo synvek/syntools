@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { renderPageDataUrl } from '@/core/pdf/render';
 import { PDF_THUMB_SCALE } from '@/core/pdf/types';
+import { MAIN_SOURCE_KEY } from '../model/doc';
 import type { PdfPageState } from '../model/types';
 
 interface ThumbnailRailProps {
@@ -39,13 +40,13 @@ function enqueueThumbnail<T>(task: () => Promise<T>): Promise<T> {
  */
 function Thumbnail({
   pdfDoc,
-  sourceIndex,
+  state,
   page,
   selected,
   onSelect,
 }: {
   pdfDoc: PDFDocumentProxy;
-  sourceIndex: number;
+  state: PdfPageState;
   page: number;
   selected: boolean;
   onSelect(page: number): void;
@@ -74,19 +75,22 @@ function Thumbnail({
     return () => observer.disconnect();
   }, []);
 
+  // Blank pages and pages from an inserted PDF (proxy not wired in yet) show the placeholder
+  const renderable = !state.blank && state.sourceKey === MAIN_SOURCE_KEY;
+
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !renderable) return;
     let cancelled = false;
     void (async () => {
       const result = await enqueueThumbnail(() =>
-        renderPageDataUrl(pdfDoc, sourceIndex + 1, PDF_THUMB_SCALE),
+        renderPageDataUrl(pdfDoc, state.sourceIndex + 1, PDF_THUMB_SCALE),
       );
       if (!cancelled && result.ok) setUrl(result.value);
     })();
     return () => {
       cancelled = true;
     };
-  }, [visible, pdfDoc, sourceIndex]);
+  }, [visible, renderable, pdfDoc, state.sourceIndex]);
 
   return (
     <button
@@ -129,9 +133,9 @@ export function ThumbnailRail({ pdfDoc, pages, currentPage, onSelect }: Thumbnai
     >
       {pages.map((page, index) => (
         <Thumbnail
-          key={page.sourceIndex}
+          key={page.id}
           pdfDoc={pdfDoc}
-          sourceIndex={page.sourceIndex}
+          state={page}
           page={index + 1}
           selected={index + 1 === currentPage}
           onSelect={onSelect}

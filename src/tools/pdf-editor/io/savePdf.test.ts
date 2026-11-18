@@ -4,7 +4,10 @@ import {
   addObject,
   createDoc,
   deletePage,
+  insertBlankPage,
+  insertPagesFrom,
   markSaved,
+  pageIdFor,
   rotateAllPages,
   setPageRotation,
 } from '../model/doc';
@@ -24,7 +27,7 @@ async function samplePdf(pages = 3, firstRotation = 0): Promise<Uint8Array> {
 async function docFrom(bytes: Uint8Array, pageCount = 3): Promise<PdfEditorDoc> {
   return createDoc({
     name: 'three-pages.pdf',
-    source: { bytes, pageCount, encrypted: false, fingerprint: 'fp-test' },
+    source: { key: 'main', bytes, pageCount, encrypted: false, fingerprint: 'fp-test' },
     id: 'doc-test',
     now: 0,
   });
@@ -46,10 +49,18 @@ describe('textRenderMode / editedFilename', () => {
 
 describe('outputRotation', () => {
   it('用户旋转叠加在文件自身的 /Rotate 上', () => {
-    expect(outputRotation({ sourceIndex: 0, rotation: 90 }, 0)).toBe(90);
-    expect(outputRotation({ sourceIndex: 0, rotation: 90 }, 90)).toBe(180);
-    expect(outputRotation({ sourceIndex: 0, rotation: 270 }, 90)).toBe(0);
-    expect(outputRotation({ sourceIndex: 0, rotation: 0 }, 270)).toBe(270);
+    expect(outputRotation({ id: 'p0', sourceKey: 'main', sourceIndex: 0, rotation: 90 }, 0)).toBe(
+      90,
+    );
+    expect(outputRotation({ id: 'p0', sourceKey: 'main', sourceIndex: 0, rotation: 90 }, 90)).toBe(
+      180,
+    );
+    expect(outputRotation({ id: 'p0', sourceKey: 'main', sourceIndex: 0, rotation: 270 }, 90)).toBe(
+      0,
+    );
+    expect(outputRotation({ id: 'p0', sourceKey: 'main', sourceIndex: 0, rotation: 0 }, 270)).toBe(
+      270,
+    );
   });
 });
 
@@ -61,7 +72,7 @@ describe('flattenPdf', () => {
     doc = addObject(
       doc,
       createTextObject({
-        page: 0,
+        page: pageIdFor('main', 0),
         rect: { x: 0.1, y: 0.1, w: 0.4, h: 0.08 },
         text: 'Hello PDF',
         z: 1,
@@ -89,7 +100,7 @@ describe('flattenPdf', () => {
   it('文件自带 /Rotate 90 时叠加而不是替换', async () => {
     const bytes = await samplePdf(2, 90);
     let doc = await docFrom(bytes, 2);
-    doc = setPageRotation(doc, 0, 90);
+    doc = setPageRotation(doc, pageIdFor('main', 0), 90);
 
     const result = await flattenPdf(doc);
     expect(result.ok).toBe(true);
@@ -117,7 +128,13 @@ describe('flattenPdf', () => {
   it('可见页为 0 时返回 NO_PAGES，不产生字节', async () => {
     const empty = createDoc({
       name: 'empty.pdf',
-      source: { bytes: new Uint8Array(0), pageCount: 0, encrypted: false, fingerprint: '' },
+      source: {
+        key: 'main',
+        bytes: new Uint8Array(0),
+        pageCount: 0,
+        encrypted: false,
+        fingerprint: '',
+      },
       id: 'empty',
       now: 0,
     });
@@ -136,7 +153,12 @@ describe('flattenPdf', () => {
     let doc = await docFrom(bytes, 2);
     doc = addObject(
       doc,
-      createTextObject({ page: 1, rect: { x: 0.2, y: 0.2, w: 0.3, h: 0.1 }, text: 'A', z: 1 }),
+      createTextObject({
+        page: pageIdFor('main', 1),
+        rect: { x: 0.2, y: 0.2, w: 0.3, h: 0.1 },
+        text: 'A',
+        z: 1,
+      }),
     );
 
     const first = await flattenPdf(doc);
@@ -149,5 +171,55 @@ describe('flattenPdf', () => {
     // Rebuilt from the source bytes, so the overlay is painted exactly once
     expect(a.getPageCount()).toBe(b.getPageCount());
     expect(a.getPage(1).node.Contents()?.toString()).not.toBe('undefined');
+  });
+});
+
+describe('flattenPdf 多来源页', () => {
+  it('插入外部 PDF 页与空白页：顺序、尺寸与页数正确', async () => {
+    const mainBytes = await samplePdf(1);
+    const extraBytes = await samplePdf(2, 90);
+    let doc = await docFrom(mainBytes, 1);
+
+    doc = insertBlankPage(doc, 2, { widthPt: 300, heightPt: 400 });
+    doc = insertPagesFrom(
+      doc,
+      3,
+      {
+        key: 'attach-1',
+        bytes: extraBytes,
+        pageCount: 2,
+        encrypted: false,
+        fingerprint: 'fp-extra',
+      },
+      [1, 0],
+    );
+
+    const result = await flattenPdf(doc);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const out = await PDFDocument.load(result.value.bytes);
+    expect(out.getPageCount()).toBe(4);
+    // page 2 is the inserted blank page
+    expect(out.getPage(1).getWidth()).toBeCloseTo(300);
+    expect(out.getPage(1).getHeight()).toBeCloseTo(400);
+    // pages 3/4 come from the attachment in the requested order: source page 2 then page 1,
+    // and the attachment's own /Rotate 90 only applies to its first page
+    expect(out.getPage(2).getRotation().angle).toBe(0);
+    expect(out.getPage(3).getRotation().angle).toBe(90);
+  });
+
+  it('附件来源缺失时返回 INVALID_RANGE，不产出半成品', async () => {
+    const mainBytes = await samplePdf(1);
+    const doc = await docFrom(mainBytes, 1);
+    const broken: PdfEditorDoc = {
+      ...doc,
+      pages: [
+        ...doc.pages,
+        { id: 'page-ghost-0', sourceKey: 'ghost', sourceIndex: 0, rotation: 0 },
+      ],
+    };
+
+    expect(await flattenPdf(broken)).toEqual({ ok: false, error: 'INVALID_RANGE' });
   });
 });
