@@ -84,6 +84,7 @@ const zh: ResourceTree = {
       printEmpty: '没有可打印的内容',
       lossCharts: '{{count}} 个图表未能写入（数据不足或工作表缺失）',
       keptCharts: '{{count}} 个图表已写入',
+      rawPartsDangling: '{{count}} 处保留内容引用了未随文档保存的图片（导出后可能显示为空白）',
       keptConditionalFormats: '{{count}} 条条件格式已原样保留',
       keptDataValidations: '{{count}} 个单元格的数据验证已原样保留',
       exportCsv: '导出 CSV',
@@ -110,6 +111,7 @@ const zh: ResourceTree = {
         sortTooLarge: '选区超过 50,000 行，请缩小范围后再排序',
         formulaRead: '无法读取选区内的公式',
         internalsUnavailable: '当前引擎版本不支持浮层跟随滚动，图层位置可能不会随表格移动',
+        cellEdit: '单元格编辑失败，内容可能没有变化',
       },
       // P1-10 公式审计
       formulaAudit: '检查公式',
@@ -131,6 +133,11 @@ const zh: ResourceTree = {
       shortcutEngineNote:
         '单元格内的编辑快捷键（加粗、撤销、查找、方向键等）由表格引擎提供，不在此列表中。',
       a11yGridLabel: '表格编辑区',
+      mobileBarLabel: '常用操作',
+      cellEditOpen: '编辑',
+      cellEditTitle: '编辑 {{cell}}',
+      cellEditHint: '以 = 开头按公式写入；清空内容会删除该格的值',
+      cellEditApply: '写入',
       a11yGridCell: '第 {{row}} 行 第 {{column}} 列，{{value}}',
       a11yGridBlank: '空白',
       a11yCell: '已选中 {{cell}}',
@@ -227,6 +234,8 @@ const en: ResourceTree = {
       printEmpty: 'Nothing to print',
       lossCharts: '{{count}} charts could not be written (insufficient data or missing sheet)',
       keptCharts: '{{count}} charts written',
+      rawPartsDangling:
+        '{{count}} kept item(s) reference images that were not saved with the document (may show as blank)',
       keptConditionalFormats: '{{count}} conditional formatting rules kept as-is',
       keptDataValidations: '{{count}} cells of data validation kept as-is',
       exportCsv: 'Export CSV',
@@ -260,6 +269,7 @@ const en: ResourceTree = {
         formulaRead: 'Could not read the formulas in the selection',
         internalsUnavailable:
           'This engine version cannot track scrolling for floating objects; they may not follow the sheet',
+        cellEdit: 'Cell editing failed; the value may be unchanged',
       },
       // P1-10 formula audit
       formulaAudit: 'Check formulas',
@@ -283,6 +293,11 @@ const en: ResourceTree = {
       shortcutEngineNote:
         'In-cell shortcuts (bold, undo, find, arrow keys…) come from the sheet engine and are not listed here.',
       a11yGridLabel: 'Sheet editing area',
+      mobileBarLabel: 'Quick actions',
+      cellEditOpen: 'Edit',
+      cellEditTitle: 'Edit {{cell}}',
+      cellEditHint: 'Start with = to write a formula; clearing the field removes the value',
+      cellEditApply: 'Apply',
       a11yGridCell: 'Row {{row}}, column {{column}}, {{value}}',
       a11yGridBlank: 'blank',
       a11yCell: 'Selected {{cell}}',

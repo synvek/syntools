@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  exportCsvInWorker,
   exportSnapshotInWorker,
   importXlsxInWorker,
   isSheetWorkerUnavailable,
@@ -83,6 +84,35 @@ describe('sheet worker 任务分发', () => {
     expect(workbook.worksheets[0].getCell('B1').value).toBe(42);
   });
 
+  /**
+   * CSV 也走线程（P2-1 收尾）：十万行的表在主线程上拼字符串是一次可见的卡顿。
+   * 这里验的是"同一份 `snapshotToCsv` 在 worker 里跑"——输出逐字符相同，失败的归因也一样。
+   */
+  it('exportCsv：快照 → CSV 文本（与主线程同一实现）', async () => {
+    const response = await handleSheetWorkerRequest({
+      id: 4,
+      kind: 'exportCsv',
+      snapshot: sampleSnapshot(),
+      sheetId: 's1',
+    });
+
+    expect(response.status).toBe('ok');
+    if (response.status !== 'ok' || response.task.kind !== 'exportCsv') return;
+    expect(response.task.text).toBe('销售额,42');
+  });
+
+  it('exportCsv：没有可导出的格子 → failed（业务失败，不报废线程）', async () => {
+    const empty = createEmptySnapshot('empty');
+    const response = await handleSheetWorkerRequest({
+      id: 5,
+      kind: 'exportCsv',
+      snapshot: empty,
+      sheetId: empty.sheetOrder[0] ?? null,
+    });
+
+    expect(response).toEqual({ id: 5, status: 'failed', error: 'EMPTY' });
+  });
+
   it('transferableBuffer：视图不覆盖整个 buffer 时复制，避免搬走别的数据', () => {
     const backing = new Uint8Array([1, 2, 3, 4, 5, 6]);
     const view = backing.subarray(1, 4);
@@ -113,6 +143,7 @@ describe('sheet worker 客户端：不可用时静默回落', () => {
       status: 'unavailable',
     });
     expect(await exportSnapshotInWorker(sampleSnapshot())).toEqual({ status: 'unavailable' });
+    expect(await exportCsvInWorker(sampleSnapshot(), 's1')).toEqual({ status: 'unavailable' });
     expect(isSheetWorkerUnavailable()).toBe(true);
   });
 
@@ -171,6 +202,20 @@ describe('sheet worker 客户端：不可用时静默回落', () => {
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
     expect(Array.from(result.bytes)).toEqual([1, 2, 3]);
+  });
+
+  it('线程回包：CSV 文本原样带回', async () => {
+    installFakeWorker((message, worker) => {
+      queueMicrotask(() => {
+        worker.onmessage?.({
+          data: { id: message.id, status: 'ok', task: { kind: 'exportCsv', text: 'a,b\n1,2' } },
+        });
+      });
+    });
+
+    const result = await exportCsvInWorker(sampleSnapshot(), 's1');
+
+    expect(result).toEqual({ status: 'ok', text: 'a,b\n1,2' });
   });
 
   it('线程 onerror → 报废一次，之后不再起线程', async () => {

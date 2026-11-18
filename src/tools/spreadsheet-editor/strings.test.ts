@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SHEET_ISSUE_CODES } from './issues';
 import { spreadsheetStrings } from './strings';
 
 /**
@@ -90,16 +91,8 @@ describe('sheet copy', () => {
   });
 
   it('失败提示覆盖 issues.ts 的全部 code', () => {
-    const codes = [
-      'clipboardRead',
-      'clipboardWrite',
-      'panelUnavailable',
-      'styleRead',
-      'chartPartsUnreadable',
-      'sortTooLarge',
-      'formulaRead',
-      'internalsUnavailable',
-    ];
+    // 清单直接取自 issues.ts：另抄一份的写法曾让新增 code 静默漏报（P2-8）
+    const codes = SHEET_ISSUE_CODES;
     for (const lng of ['zh', 'en']) {
       const issue = sheet(lng).issue as Record<string, string>;
       expect(Object.keys(issue).sort(), lng).toEqual([...codes].sort());

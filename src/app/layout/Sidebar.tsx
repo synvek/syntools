@@ -157,7 +157,9 @@ export function Sidebar({ mobile = false, onClose, onCollapse }: SidebarProps) {
       </div>
       <div className="flex-1 overflow-y-auto p-3">
         {grouped.length === 0 ? (
-          <p className="px-2 text-xs text-gray-400">{t('sidebar.filterEmpty')}</p>
+          <p className="px-2 text-xs text-gray-500 dark:text-gray-400">
+            {t('sidebar.filterEmpty')}
+          </p>
         ) : (
           grouped.map(({ category, items }) => {
             const isCollapsed = !filtering && collapsed.has(category.id);
@@ -171,14 +173,17 @@ export function Sidebar({ mobile = false, onClose, onCollapse }: SidebarProps) {
                     onClick={() => toggleCategory(category.id)}
                     aria-expanded={!isCollapsed}
                     aria-controls={`sidebar-cat-${category.id}`}
-                    className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                    className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                   >
                     <Icon
                       name="chevron"
                       className={`h-3 w-3 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
                     />
                     <span className="min-w-0 flex-1 truncate">{label}</span>
-                    <span className="tabular-nums text-[10px] opacity-70">{items.length}</span>
+                    {/* 原来的 `opacity-70` 把 #9ca3af 压到 #babfc7（对比度 1.84），小字直接不可读 */}
+                    <span className="tabular-nums text-[10px] text-gray-500 dark:text-gray-400">
+                      {items.length}
+                    </span>
                   </button>
                   <div className="relative shrink-0" data-sidebar-category-menu>
                     <button

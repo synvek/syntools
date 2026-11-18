@@ -8,6 +8,7 @@ import { CSV_BOM, buildExportFilename, checkImportFile, sanitizeFilename } from 
 import { csvToSnapshot, snapshotToCsv } from '../csv';
 import { odsToSnapshot } from '../ods';
 import { exportSnapshotToBytes, importXlsxToSnapshot, type ImportOutcome } from '../xlsx-io';
+import { exportCsvInWorker } from '../sheetWorkerClient';
 import type { WorkbookSnapshot } from '../xlsx-io';
 import { collectExportIssues } from '../fidelity';
 import { appendPivotSheets } from '../pivotSheet';
@@ -72,7 +73,8 @@ export interface FileIoApi {
   openImport: (accept: string) => void;
   importFile: (file: File) => Promise<void>;
   exportXlsx: () => Promise<void>;
-  exportCsv: () => void;
+  /** 异步：拼接可能交给 worker（P2-1），`unavailable` 时退回同步实现 */
+  exportCsv: () => Promise<void>;
   openPrint: () => void;
   print: (options: SheetPrintOptions, range: CellRange | null) => Promise<void>;
   exportPdf: (options: SheetPrintOptions, range: CellRange | null) => Promise<void>;
@@ -167,13 +169,28 @@ export function useSheetFileIo(options: UseFileIoOptions): FileIoApi {
     );
   }, []);
 
-  /** 活动工作表 → CSV；开头的 BOM 让 Excel 正确识别中文 */
-  const exportCsv = useCallback(() => {
+  /**
+   * 活动工作表 → CSV；开头的 BOM 让 Excel 正确识别中文。
+   *
+   * 拼接交给 worker（P2-1 收尾）：十万行的表在主线程上拼字符串是几百毫秒的硬卡顿。
+   * `unavailable` 时退回同一份同步实现——两条路径只有"在哪条线程上跑"的区别。
+   */
+  const exportCsv = useCallback(async () => {
     const handle = latest.current.handleRef.current;
     if (!handle) return;
     const { setFailure } = latest.current;
     setFailure(null);
-    const result = snapshotToCsv(handle.getSnapshot(), handle.getActiveSheetId());
+    const sheetId = handle.getActiveSheetId();
+    const snapshot = handle.getSnapshot();
+    const offload = await exportCsvInWorker(snapshot, sheetId);
+    if (offload.status === 'failed') {
+      setFailure({ ok: false, error: offload.error });
+      return;
+    }
+    const result =
+      offload.status === 'ok'
+        ? { ok: true as const, value: offload.text }
+        : snapshotToCsv(snapshot, sheetId);
     if (!result.ok) {
       setFailure(result);
       return;

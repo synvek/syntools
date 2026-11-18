@@ -39,12 +39,10 @@ export interface SheetFormatState {
   wrap: TriState;
   numberFormat: string | null;
   /**
-   * Presence + colour of the cell border, or `null` when the sampled cells have none.
-   *
-   * The exact line weight is deliberately not decoded: Univer stores it as a numeric
-   * `BorderStyleTypes`, and mapping that table without verifying 0.25.1 would put a guess into the
-   * painter. Painting therefore reproduces "has a border, in this colour", which is what users
-   * check; the precise weight stays whatever the target already had.
+   * Weight + colour of the cell border, or `null` when the sampled cells have no border (or
+   * disagree). The numeric `BorderStyleTypes` code is decoded through `borderStyleFromCode`, whose
+   * table is pinned against `@univerjs/core` by a contract test — a renumbered enum fails the test
+   * instead of silently painting every border as thin.
    */
   border: BorderSpec | null;
   merged: boolean;
@@ -146,13 +144,67 @@ const sameNumber = (values: (number | null)[]): number | null => {
   return values.every((value) => (value ?? null) === first) ? first : null;
 };
 
-/** First drawn side of a cell, or `null` when the cell has no border at all */
+/**
+ * Univer `BorderStyleTypes` → the six weights the border menu offers.
+ *
+ * The numbers come from `@univerjs/core` 0.25.1 (`NONE` 0, `THIN` 1, `HAIR` 2, `DOTTED` 3,
+ * `DASHED` 4, `DASH_DOT` 5, `DASH_DOT_DOT` 6, `DOUBLE` 7, `MEDIUM` 8, then the MEDIUM_* variants
+ * 9–11, `SLANT_DASH_DOT` 12, `THICK` 13). A unit test pins every id against the real enum, because
+ * getting this table wrong is how "copy formatting" turns a thin border into a thick one — the
+ * failure is visual only, so no compiler would catch it.
+ *
+ * Variants we cannot draw collapse to the closest thing we have: HAIR is the thinnest line we
+ * render, the dash-dot family keeps its dashes, and the MEDIUM_* family keeps its weight (at normal
+ * zoom the weight difference is what the eye reads first).
+ */
+const BORDER_STYLE_BY_CODE: Record<number, BorderStyleId> = {
+  1: 'thin', // THIN
+  2: 'thin', // HAIR
+  3: 'dotted', // DOTTED
+  4: 'dashed', // DASHED
+  5: 'dashed', // DASH_DOT
+  6: 'dashed', // DASH_DOT_DOT
+  7: 'double', // DOUBLE
+  8: 'medium', // MEDIUM
+  9: 'medium', // MEDIUM_DASHED
+  10: 'medium', // MEDIUM_DASH_DOT
+  11: 'medium', // MEDIUM_DASH_DOT_DOT
+  12: 'dashed', // SLANT_DASH_DOT
+  13: 'thick', // THICK
+};
+
+/** The code each offered weight is written as (the write side lives in `univer.ts`) */
+export const BORDER_STYLE_CODE: Record<BorderStyleId, number> = {
+  thin: 1,
+  medium: 8,
+  thick: 13,
+  dashed: 4,
+  dotted: 3,
+  double: 7,
+};
+
+/**
+ * Decode a stored border weight. Unknown codes degrade to `thin` — the value this function used to
+ * return unconditionally — so a future enum addition paints *something* rather than dropping the
+ * border entirely.
+ */
+export function borderStyleFromCode(code: number | null | undefined): BorderStyleId {
+  return BORDER_STYLE_BY_CODE[code ?? 0] ?? 'thin';
+}
+
+/**
+ * First drawn side of a cell, or `null` when the cell has no border at all.
+ *
+ * Sides can disagree (thin top, thick bottom). One `BorderSpec` cannot express that, so the first
+ * drawn side wins — the same rule the painter has always used; the alternative (reporting "mixed")
+ * would make the painter *clear* the target's borders, which is worse than copying one side.
+ */
 function readBorder(style: UniverStyleLike): BorderSpec | null {
   const side = [style.bd?.t, style.bd?.b, style.bd?.l, style.bd?.r].find(
     (entry) => entry && (entry.s ?? 0) > 0,
   );
   if (!side) return null;
-  return { style: 'thin', color: side.cl?.rgb ?? DEFAULT_BORDER.color };
+  return { style: borderStyleFromCode(side.s), color: side.cl?.rgb ?? DEFAULT_BORDER.color };
 }
 
 /** Same border across the sampled cells; a mix (or none) collapses to `null` */

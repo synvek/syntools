@@ -29,7 +29,12 @@ export const SHEET_WORKER_TIMEOUT_MS = 60_000;
 
 export type SheetWorkerRequest =
   | { id: number; kind: 'importXlsx'; name: string; buffer: ArrayBuffer }
-  | { id: number; kind: 'exportXlsx'; snapshot: WorkbookSnapshot };
+  | { id: number; kind: 'exportXlsx'; snapshot: WorkbookSnapshot }
+  /**
+   * CSV 也走线程（P2-1 收尾）：`snapshotToCsv` 要把整个工作表拼成一个字符串，
+   * 十万行的表在主线程上就是一次可见的卡顿。`sheetId` 为 null 时由实现挑第一张非空表。
+   */
+  | { id: number; kind: 'exportCsv'; snapshot: WorkbookSnapshot; sheetId: string | null };
 
 /**
  * 成功载荷。`issues` 是导入侧保真报告（P0-4）的原始素材，`notices` 是 worker 内
@@ -43,7 +48,9 @@ export type SheetWorkerSuccess =
       issues: FidelityIssue[];
       notices: SheetIssue[];
     }
-  | { kind: 'exportXlsx'; bytes: ArrayBuffer };
+  | { kind: 'exportXlsx'; bytes: ArrayBuffer }
+  /** CSV 是纯文本：结构化克隆一份字符串，比任何 transfer 都简单 */
+  | { kind: 'exportCsv'; text: string };
 
 export type SheetWorkerResponse =
   /** 业务层面完成（`snapshot` / `bytes` 二选一，看 `kind`） */

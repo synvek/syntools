@@ -2,11 +2,15 @@ import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import {
   collectRawChartParts,
+  danglingPartReferences,
   decodeXmlEntities,
   dirOf,
+  isExternalTarget,
   parseRelationships,
+  partOfRels,
   relevantContentTypeEntries,
   relsPathFor,
+  resolveRelTarget,
 } from './rawChartParts';
 
 describe('部件路径工具', () => {
@@ -15,6 +19,25 @@ describe('部件路径工具', () => {
     expect(dirOf('workbook.xml')).toBe('');
     expect(relsPathFor('xl/worksheets/sheet1.xml')).toBe('xl/worksheets/_rels/sheet1.xml.rels');
     expect(relsPathFor('xl/drawings/drawing1.xml')).toBe('xl/drawings/_rels/drawing1.xml.rels');
+  });
+
+  it('从 .rels 反推拥有者部件；包级 rels 没有拥有者', () => {
+    expect(partOfRels('xl/drawings/_rels/drawing1.xml.rels')).toBe('xl/drawings/drawing1.xml');
+    expect(partOfRels('xl/_rels/workbook.xml.rels')).toBe('xl/workbook.xml');
+    expect(partOfRels('_rels/.rels')).toBe('');
+  });
+
+  it('解析相对 / 绝对 Target，外部链接不算部件', () => {
+    expect(resolveRelTarget('xl/drawings/drawing1.xml', '../media/image1.png')).toBe(
+      'xl/media/image1.png',
+    );
+    expect(resolveRelTarget('xl/drawings/drawing1.xml', '/xl/charts/chart1.xml')).toBe(
+      'xl/charts/chart1.xml',
+    );
+    expect(resolveRelTarget('xl/worksheets/sheet1.xml', 'https://example.com/a')).toBeNull();
+    expect(resolveRelTarget('xl/worksheets/sheet1.xml', 'mailto:a@b.c')).toBeNull();
+    expect(isExternalTarget('https://example.com')).toBe(true);
+    expect(isExternalTarget('../media/image1.png')).toBe(false);
   });
 });
 
@@ -211,5 +234,109 @@ describe('collectRawChartParts', () => {
       'xl/drawings/drawing1.xml',
     ]);
     expect(parts.contentTypes).toContain('<Types/>');
+  });
+});
+
+/**
+ * 引用闭包（技术债"混合 drawing 的引用闭包"）：
+ * 保留 XML 而不保留它引用的 `xl/media`，导出后就是一条 `r:embed` 指向不存在的部件——
+ * Excel 会报"发现不可读取的内容"。下面的夹具都是真实存在的形态：
+ * 形状与图片同处一个 drawing、图表用图片做数据点填充、超链接关系混在里面。
+ */
+describe('collectRawChartParts：引用闭包', () => {
+  const WORKBOOK =
+    '<?xml version="1.0"?><workbook xmlns:r="http://r"><sheets><sheet name="S1" r:id="rId1"/></sheets></workbook>';
+  const WORKBOOK_RELS =
+    '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>';
+  const SHEET = '<?xml version="1.0"?><worksheet><drawing r:id="rId1"/></worksheet>';
+  const SHEET_RELS =
+    '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>';
+
+  function mixedDrawingZip(drawingRels: string): JSZip {
+    const zip = new JSZip();
+    zip.file('xl/workbook.xml', WORKBOOK);
+    zip.file('xl/_rels/workbook.xml.rels', WORKBOOK_RELS);
+    zip.file('xl/worksheets/sheet1.xml', SHEET);
+    zip.file('xl/worksheets/_rels/sheet1.xml.rels', SHEET_RELS);
+    zip.file(
+      'xl/drawings/drawing1.xml',
+      '<?xml version="1.0"?><xdr:wsDr xmlns:xdr="http://x"><xdr:twoCellAnchor><xdr:sp><xdr:spPr/></xdr:sp></xdr:twoCellAnchor>' +
+        '<xdr:twoCellAnchor><xdr:pic><xdr:blipFill><a:blip r:embed="rId2"/></xdr:blipFill></xdr:pic></xdr:twoCellAnchor></xdr:wsDr>',
+    );
+    zip.file('xl/drawings/_rels/drawing1.xml.rels', drawingRels);
+    return zip;
+  }
+
+  it('形状与图片同处一个 drawing：图片的 xl/media 一起保留，闭包成立', async () => {
+    const zip = mixedDrawingZip(
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId2" Type="http://x/relationships/image" Target="../media/image5.png"/></Relationships>',
+    );
+    zip.file('xl/media/image5.png', new Uint8Array([1, 2, 3]));
+
+    const parts = await collectRawChartParts(zip);
+    expect(parts).not.toBeNull();
+    if (!parts) return;
+    expect(Object.keys(parts.parts).sort()).toEqual([
+      'xl/drawings/_rels/drawing1.xml.rels',
+      'xl/drawings/drawing1.xml',
+      'xl/media/image5.png',
+    ]);
+    expect(danglingPartReferences(parts.parts)).toEqual([]);
+  });
+
+  it('图表用图片做数据点填充：chart 的 .rels 与媒体都由闭包带出', async () => {
+    const zip = new JSZip();
+    zip.file('xl/workbook.xml', WORKBOOK);
+    zip.file('xl/_rels/workbook.xml.rels', WORKBOOK_RELS);
+    zip.file('xl/worksheets/sheet1.xml', SHEET);
+    zip.file('xl/worksheets/_rels/sheet1.xml.rels', SHEET_RELS);
+    zip.file(
+      'xl/drawings/drawing1.xml',
+      '<?xml version="1.0"?><xdr:wsDr xmlns:xdr="http://x"><xdr:oneCellAnchor/></xdr:wsDr>',
+    );
+    zip.file(
+      'xl/drawings/_rels/drawing1.xml.rels',
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/chart" Target="../charts/chart1.xml"/></Relationships>',
+    );
+    zip.file('xl/charts/chart1.xml', '<?xml version="1.0"?><c:chartSpace/>');
+    zip.file(
+      'xl/charts/_rels/chart1.xml.rels',
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://x/relationships/image" Target="../media/image7.png"/></Relationships>',
+    );
+    zip.file('xl/media/image7.png', new Uint8Array([9]));
+
+    const parts = await collectRawChartParts(zip);
+    expect(parts).not.toBeNull();
+    if (!parts) return;
+    expect(Object.keys(parts.parts)).toContain('xl/media/image7.png');
+    expect(danglingPartReferences(parts.parts)).toEqual([]);
+  });
+
+  it('超链接（TargetMode=External）不算部件，也不会被判成断链', async () => {
+    const zip = mixedDrawingZip(
+      '<?xml version="1.0"?><Relationships>' +
+        '<Relationship Id="rId2" Type="http://x/relationships/image" Target="../media/image5.png"/>' +
+        '<Relationship Id="rId3" Type="http://x/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/>' +
+        '</Relationships>',
+    );
+    zip.file('xl/media/image5.png', new Uint8Array([1]));
+
+    const parts = await collectRawChartParts(zip);
+    expect(parts).not.toBeNull();
+    if (!parts) return;
+    expect(Object.keys(parts.parts)).not.toContain('https://example.com/');
+    expect(danglingPartReferences(parts.parts)).toEqual([]);
+  });
+
+  it('旧草稿里缺媒体的保留集合会被报成断链（导出侧据此提示，而不是静默产出）', () => {
+    const rels = btoa(
+      '<?xml version="1.0"?><Relationships><Relationship Id="rId2" Type="http://x/relationships/image" Target="../media/image5.png"/></Relationships>',
+    );
+    expect(
+      danglingPartReferences({
+        'xl/drawings/drawing1.xml': btoa('<xdr:wsDr/>'),
+        'xl/drawings/_rels/drawing1.xml.rels': rels,
+      }),
+    ).toEqual([{ rels: 'xl/drawings/_rels/drawing1.xml.rels', target: 'xl/media/image5.png' }]);
   });
 });

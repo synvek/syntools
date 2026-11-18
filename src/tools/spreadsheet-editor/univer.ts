@@ -97,6 +97,7 @@ import { readSheetViewport } from './univer-internals';
 import { OpenConditionalFormattingOperator } from '@univerjs/sheets-conditional-formatting-ui';
 import '@univerjs/sheets-numfmt/facade';
 import {
+  BORDER_STYLE_CODE,
   buildAutoSum,
   DEFAULT_BORDER,
   readSheetFormat,
@@ -111,6 +112,7 @@ import {
 } from './sheetFormat';
 import type { FreezeMode, MergeMode, SheetPanelKind, SheetRibbonHost } from './commands';
 import { reportSheetIssue } from './issues';
+import { parseCellInput } from './cellEdit';
 import {
   looksLikeHeader,
   normalizeSortKeys,
@@ -184,6 +186,16 @@ export interface UniverHandle extends SheetRibbonHost {
     endRow: number;
     endColumn: number;
   }): string[][];
+  /**
+   * 读当前选区左上角的原值（P2-8 手机端"改值"浮层）。
+   * 公式返回 `=…` 原文，不是缓存值；没有选区时返回 null。
+   */
+  readActiveCell(): { row: number; column: number; value: string } | null;
+  /**
+   * 写回当前选区左上角（P2-8）：空串清空、`=…` 写公式、纯十进制数写数值、其余写文本。
+   * 返回是否真的落盘——写失败要能让界面说出来，而不是关掉浮层假装成功。
+   */
+  writeActiveCell(text: string): boolean;
   /** Append a new sheet at the end; leave the name out to let Univer generate one */
   addSheet(name?: string): void;
   /**
@@ -647,15 +659,18 @@ export function createUniverInstance(
     thickOutside: BorderType.OUTSIDE,
   };
 
-  /** Line weight chosen in the ribbon; the ids are the tool's own, the numbers are Univer's */
-  const BORDER_STYLE_MAP: Record<BorderStyleId, BorderStyleTypes> = {
-    thin: BorderStyleTypes.THIN,
-    medium: BorderStyleTypes.MEDIUM,
-    thick: BorderStyleTypes.THICK,
-    dashed: BorderStyleTypes.DASHED,
-    dotted: BorderStyleTypes.DOTTED,
-    double: BorderStyleTypes.DOUBLE,
-  };
+  /**
+   * Line weight chosen in the ribbon; the ids are the tool's own, the numbers are Univer's.
+   *
+   * 从 `sheetFormat.ts` 的 `BORDER_STYLE_CODE` 派生而不是再抄一份：读回（格式刷 / 格式对话框
+   * 回填）与写出（这里）必须指向同一个数字，而那张表由 `sheetFormat.test.ts` 对着真实枚举钉住。
+   */
+  const BORDER_STYLE_MAP = Object.fromEntries(
+    (Object.keys(BORDER_STYLE_CODE) as BorderStyleId[]).map((id) => [
+      id,
+      BORDER_STYLE_CODE[id] as BorderStyleTypes,
+    ]),
+  ) as Record<BorderStyleId, BorderStyleTypes>;
 
   const applyBorder = (preset: BorderPresetId, spec?: BorderSpec): void => {
     const range = activeFRange();
@@ -935,6 +950,48 @@ export function createUniverInstance(
     }
   };
 
+  /**
+   * 读当前选区左上角的**原值**（P2-8 手机端浮层编辑）。
+   * 有公式时返回 `=…` 原文而不是缓存值——把缓存值写回去等于把公式换成常量。
+   */
+  const readActiveCell = (): { row: number; column: number; value: string } | null => {
+    const range = getActiveRange();
+    const sheet = activeFWorksheet();
+    if (!range || !sheet) return null;
+    try {
+      const cell = sheet.getRange(range.startRow, range.startColumn, 1, 1);
+      const formula = cell.getFormula();
+      if (formula) return { row: range.startRow, column: range.startColumn, value: formula };
+      const value = cell.getValue();
+      return {
+        row: range.startRow,
+        column: range.startColumn,
+        value: value === null || value === undefined ? '' : String(value),
+      };
+    } catch (error) {
+      reportSheetIssue({ code: 'cellEdit', level: 'notice', detail: String(error) });
+      return null;
+    }
+  };
+
+  /** 写回当前选区左上角（P2-8）；字符串怎么变单元格值由 `parseCellInput` 唯一决定，这里只负责落盘 */
+  const writeActiveCell = (text: string): boolean => {
+    const range = getActiveRange();
+    const sheet = activeFWorksheet();
+    if (!range || !sheet) return false;
+    const input = parseCellInput(text);
+    try {
+      const cell = sheet.getRange(range.startRow, range.startColumn, 1, 1);
+      if (input.kind === 'clear') cell.clearContent();
+      else if (input.kind === 'formula') cell.setFormula(input.formula);
+      else cell.setValue(input.value);
+      return true;
+    } catch (error) {
+      reportSheetIssue({ code: 'cellEdit', level: 'error', detail: String(error) });
+      return false;
+    }
+  };
+
   const writeMatrix = (matrix: string[][]): void => {
     const range = activeFRange();
     if (!range || matrix.length === 0 || matrix[0]?.length === 0) return;
@@ -1136,6 +1193,8 @@ export function createUniverInstance(
     clearFormatting,
     readSelectionText,
     readRangeText,
+    readActiveCell,
+    writeActiveCell,
     writeMatrix,
     clearSelection,
     setHyperlink,

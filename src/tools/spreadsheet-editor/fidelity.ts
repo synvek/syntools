@@ -3,6 +3,7 @@ import { buildChartPlan } from './chartXml';
 import { buildShapePlan } from './shapesXml';
 import { buildPivotXlsxPlan } from './pivotXlsx';
 import { countUnsupportedValidation } from './cfdv';
+import { danglingPartReferences } from './rawChartParts';
 import { countSheetComments, readSheetComments } from './comments';
 import { countExtras, readWorkbookExtras } from './xlsx-extras';
 import type { WorkbookSnapshot } from './xlsx-io';
@@ -109,6 +110,21 @@ export function collectExportIssues(snapshot: WorkbookSnapshot): FidelityIssue[]
       severity: 'warning',
       count: unsupported.dataValidations,
       messageKey: 'tools.sheet.dvUnsupported',
+    });
+  }
+
+  // 保留部件的引用闭包：形状 / 图表所在的 drawing 里可能挂着我们没建模的图片。
+  // 导入侧已经把它们连同 xl/media 一起搬走，这里兜的是**旧草稿**——`syntoolsRawParts` 随快照落盘，
+  // 修复前存下的那份可能本来就不闭包，写出去会让 Excel 报"发现不可读取的内容"。
+  const dangling = snapshot.syntoolsRawParts
+    ? danglingPartReferences(snapshot.syntoolsRawParts.parts)
+    : [];
+  if (dangling.length > 0) {
+    issues.push({
+      code: 'sheet.rawPartsDangling',
+      severity: 'warning',
+      count: dangling.length,
+      messageKey: 'tools.sheet.rawPartsDangling',
     });
   }
 

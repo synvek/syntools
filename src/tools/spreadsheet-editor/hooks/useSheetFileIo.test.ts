@@ -10,6 +10,7 @@ const deps = vi.hoisted(() => ({
   sanitizeFilename: vi.fn((name: string) => name.replace(/\s+/g, '-')),
   csvToSnapshot: vi.fn(),
   snapshotToCsv: vi.fn(),
+  exportCsvInWorker: vi.fn(),
   importXlsxToSnapshot: vi.fn(),
   exportSnapshotToBytes: vi.fn(),
   collectExportIssues: vi.fn(() => []),
@@ -37,6 +38,7 @@ vi.mock('../csv', () => ({
   snapshotToCsv: deps.snapshotToCsv,
 }));
 vi.mock('../ods', () => ({ odsToSnapshot: deps.odsToSnapshot }));
+vi.mock('../sheetWorkerClient', () => ({ exportCsvInWorker: deps.exportCsvInWorker }));
 vi.mock('../xlsx-io', () => ({
   importXlsxToSnapshot: deps.importXlsxToSnapshot,
   exportSnapshotToBytes: deps.exportSnapshotToBytes,
@@ -118,6 +120,8 @@ beforeEach(() => {
   deps.importXlsxToSnapshot.mockResolvedValue({ ok: true, value: { ...SNAPSHOT, name: '导入' } });
   deps.exportSnapshotToBytes.mockResolvedValue({ ok: true, value: new Uint8Array([1]) });
   deps.snapshotToCsv.mockReturnValue({ ok: true, value: 'a,b\n1,2' });
+  // jsdom 没有 Worker：默认走同步回落，各用例按需改成 ok / failed
+  deps.exportCsvInWorker.mockResolvedValue({ status: 'unavailable' });
   deps.csvToSnapshot.mockReturnValue({ ok: true, value: { ...SNAPSHOT, name: '表' } });
   deps.printSheet.mockResolvedValue({ ok: true, value: undefined });
   deps.exportSheetPdf.mockResolvedValue({ ok: true, value: new Uint8Array([2]) });
@@ -243,9 +247,9 @@ describe('useSheetFileIo', () => {
     expect(deps.downloadBytes).not.toHaveBeenCalled();
   });
 
-  it('CSV 导出带 BOM（Excel 打开中文不乱码）', () => {
+  it('CSV 导出带 BOM（Excel 打开中文不乱码）', async () => {
     const { view } = setup();
-    act(() => view.result.current.exportCsv());
+    await act(() => view.result.current.exportCsv());
     const bytes = deps.downloadBytes.mock.calls[0][0] as Uint8Array;
     // TextDecoder 默认会吃掉 BOM，所以直接看字节：EF BB BF
     expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
@@ -253,11 +257,36 @@ describe('useSheetFileIo', () => {
     expect(deps.downloadBytes.mock.calls[0][2]).toBe('text/csv;charset=utf-8');
   });
 
-  it('CSV 导出失败：报错不下载', () => {
+  it('CSV 导出失败：报错不下载', async () => {
     deps.snapshotToCsv.mockReturnValue({ ok: false, error: 'EXPORT_FAILED' });
     const { view, setFailure } = setup();
-    act(() => view.result.current.exportCsv());
+    await act(() => view.result.current.exportCsv());
     expect(setFailure).toHaveBeenCalledWith({ ok: false, error: 'EXPORT_FAILED' });
+    expect(deps.downloadBytes).not.toHaveBeenCalled();
+  });
+
+  /** P2-1 收尾：拼接交给 worker，主线程只拿最终文本 + 加 BOM */
+  it('CSV 走 worker 时用它的文本，不再调同步实现', async () => {
+    deps.exportCsvInWorker.mockResolvedValue({ status: 'ok', text: 'x,y\n3,4' });
+    const { view } = setup();
+
+    await act(() => view.result.current.exportCsv());
+
+    expect(deps.exportCsvInWorker).toHaveBeenCalledWith(SNAPSHOT, 's1');
+    expect(deps.snapshotToCsv).not.toHaveBeenCalled();
+    const bytes = deps.downloadBytes.mock.calls[0][0] as Uint8Array;
+    expect(new TextDecoder().decode(bytes.slice(3))).toBe('x,y\n3,4');
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
+  it('worker 报业务失败：直接报错，不再用主线程重算一遍', async () => {
+    deps.exportCsvInWorker.mockResolvedValue({ status: 'failed', error: 'EMPTY_SHEET' });
+    const { view, setFailure } = setup();
+
+    await act(() => view.result.current.exportCsv());
+
+    expect(setFailure).toHaveBeenCalledWith({ ok: false, error: 'EMPTY_SHEET' });
+    expect(deps.snapshotToCsv).not.toHaveBeenCalled();
     expect(deps.downloadBytes).not.toHaveBeenCalled();
   });
 

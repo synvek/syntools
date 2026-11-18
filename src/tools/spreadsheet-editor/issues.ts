@@ -14,18 +14,27 @@
  * Pure pub/sub, no React: `univer.ts` and the tool component both publish into it.
  */
 
-export type SheetIssueCode =
-  | 'clipboardRead'
-  | 'clipboardWrite'
-  | 'panelUnavailable'
-  | 'styleRead'
-  | 'chartPartsUnreadable'
+/**
+ * 全部 code 的唯一清单。类型从它派生、`strings.test.ts` 也从它派生——
+ * 之前测试里另抄了一份数组，新增 code 忘了同步时测试会**静默漏报**（P2-8 就踩了一次）。
+ */
+export const SHEET_ISSUE_CODES = [
+  'clipboardRead',
+  'clipboardWrite',
+  'panelUnavailable',
+  'styleRead',
+  'chartPartsUnreadable',
   /** A whole-column selection reaching the sort: refuse instead of freezing the tab (P1-5) */
-  | 'sortTooLarge'
+  'sortTooLarge',
   /** Reading formulas off the selection failed (P1-10) */
-  | 'formulaRead'
+  'formulaRead',
   /** Univer 内部注入器不可用：浮层停止跟随滚动，编辑器其余部分照常（P2-11） */
-  | 'internalsUnavailable';
+  'internalsUnavailable',
+  /** 手机端"改值"浮层读写失败（P2-8）：用户以为改了，其实没落地 */
+  'cellEdit',
+] as const;
+
+export type SheetIssueCode = (typeof SHEET_ISSUE_CODES)[number];
 
 /** `notice` = degraded but the document is intact; `error` = the requested action did not happen */
 export type SheetIssueLevel = 'notice' | 'error';

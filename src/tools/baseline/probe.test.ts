@@ -20,7 +20,8 @@ describe('probe', () => {
         console.log(name, 'IMPORT FAIL', imported.error);
         continue;
       }
-      const snapshot = imported.value as Record<string, unknown>;
+      // 探针只是把快照当字典随手取几个字段：两次断言分开写，别让 `tsc` 认定这是一次误转
+      const snapshot = imported.value as unknown as Record<string, unknown>;
       const images = Object.keys((snapshot.syntoolsImages as object) ?? {});
       const charts = ((snapshot.syntoolsCharts as unknown[]) ?? []).length;
       const names = ((snapshot.namedRanges as unknown[]) ?? []) as { name: string }[];

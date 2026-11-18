@@ -72,6 +72,51 @@ describe('collectExportIssues', () => {
       collectExportIssues(snapshot).find((issue) => issue.code === 'sheet.comments'),
     ).toMatchObject({ severity: 'info', count: 1, messageKey: 'tools.sheet.commentsAsNotes' });
   });
+
+  /**
+   * 旧的保留部件（修复前存下的草稿）可能引用我们没搬走的 `xl/media`。
+   * 写出去 Excel 会报"发现不可读取的内容"，所以必须在导出报告里说出来。
+   */
+  it('warns when kept parts reference content that was not kept', () => {
+    const snapshot = createEmptySnapshot('book');
+    snapshot.syntoolsRawParts = {
+      version: 1,
+      parts: {
+        'xl/drawings/drawing1.xml': btoa('<xdr:wsDr/>'),
+        'xl/drawings/_rels/drawing1.xml.rels': btoa(
+          '<?xml version="1.0"?><Relationships><Relationship Id="rId2" Type="http://x/relationships/image" Target="../media/image5.png"/></Relationships>',
+        ),
+      },
+      sheetDrawings: { Sheet1: 'xl/drawings/drawing1.xml' },
+    };
+
+    expect(
+      collectExportIssues(snapshot).find((issue) => issue.code === 'sheet.rawPartsDangling'),
+    ).toMatchObject({
+      severity: 'warning',
+      count: 1,
+      messageKey: 'tools.sheet.rawPartsDangling',
+    });
+  });
+
+  it('stays quiet when the kept parts are closed (normal import)', () => {
+    const snapshot = createEmptySnapshot('book');
+    snapshot.syntoolsRawParts = {
+      version: 1,
+      parts: {
+        'xl/drawings/drawing1.xml': btoa('<xdr:wsDr/>'),
+        'xl/drawings/_rels/drawing1.xml.rels': btoa(
+          '<?xml version="1.0"?><Relationships><Relationship Id="rId2" Type="http://x/relationships/image" Target="../media/image5.png"/></Relationships>',
+        ),
+        'xl/media/image5.png': btoa('png'),
+      },
+      sheetDrawings: { Sheet1: 'xl/drawings/drawing1.xml' },
+    };
+
+    expect(
+      collectExportIssues(snapshot).find((issue) => issue.code === 'sheet.rawPartsDangling'),
+    ).toBeUndefined();
+  });
 });
 
 describe('collectExportIssues: pivot', () => {

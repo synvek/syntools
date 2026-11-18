@@ -1,6 +1,9 @@
+import { BorderStyleTypes } from '@univerjs/core';
 import { describe, expect, it } from 'vitest';
 import {
+  BORDER_STYLE_CODE,
   EMPTY_SHEET_FORMAT,
+  borderStyleFromCode,
   buildAutoSum,
   parseClipboardMatrix,
   rangeLabel,
@@ -91,6 +94,58 @@ describe('border read-back (P1-4 format painter)', () => {
       { bd: { t: { s: 1, cl: { rgb: '#00ff00' } } } },
     ]);
     expect(state.border).toBeNull();
+  });
+
+  it('reads the line weight, not just "there is a border" (P1-4 收尾)', () => {
+    expect(readSheetFormat([{ bd: { b: { s: 13 } } }]).border).toEqual({
+      style: 'thick',
+      color: '#000000',
+    });
+    expect(readSheetFormat([{ bd: { b: { s: 8 } } }]).border?.style).toBe('medium');
+    expect(readSheetFormat([{ bd: { b: { s: 7 } } }]).border?.style).toBe('double');
+  });
+
+  it('mixed weights across the selection also collapse (no "first cell wins")', () => {
+    const state = readSheetFormat([{ bd: { t: { s: 1 } } }, { bd: { t: { s: 13 } } }]);
+    expect(state.border).toBeNull();
+  });
+});
+
+/**
+ * 契约测试：这张映射表是"格式刷会不会把细线刷成粗线"的唯一决定因素，而它全凭手抄。
+ * 直接拿真实枚举逐个对一遍——Univer 重排 `BorderStyleTypes` 时这里先红，而不是等用户发现。
+ */
+describe('border weight codes vs @univerjs/core', () => {
+  it('each offered weight keeps its documented enum value', () => {
+    expect(BORDER_STYLE_CODE.thin).toBe(BorderStyleTypes.THIN);
+    expect(BORDER_STYLE_CODE.medium).toBe(BorderStyleTypes.MEDIUM);
+    expect(BORDER_STYLE_CODE.thick).toBe(BorderStyleTypes.THICK);
+    expect(BORDER_STYLE_CODE.dashed).toBe(BorderStyleTypes.DASHED);
+    expect(BORDER_STYLE_CODE.dotted).toBe(BorderStyleTypes.DOTTED);
+    expect(BORDER_STYLE_CODE.double).toBe(BorderStyleTypes.DOUBLE);
+  });
+
+  it('decodes every enum member to one of our six weights', () => {
+    const offered = new Set(['thin', 'medium', 'thick', 'dashed', 'dotted', 'double']);
+    const codes = Object.values(BorderStyleTypes).filter(
+      (value): value is number => typeof value === 'number' && value > 0,
+    );
+
+    expect(codes.length).toBeGreaterThanOrEqual(13);
+    for (const code of codes) expect(offered.has(borderStyleFromCode(code))).toBe(true);
+  });
+
+  it('decodes the variants we cannot draw onto the closest weight', () => {
+    expect(borderStyleFromCode(BorderStyleTypes.HAIR)).toBe('thin');
+    expect(borderStyleFromCode(BorderStyleTypes.DASH_DOT)).toBe('dashed');
+    expect(borderStyleFromCode(BorderStyleTypes.MEDIUM_DASHED)).toBe('medium');
+    expect(borderStyleFromCode(BorderStyleTypes.SLANT_DASH_DOT)).toBe('dashed');
+  });
+
+  it('an unknown / missing code falls back to thin instead of dropping the border', () => {
+    expect(borderStyleFromCode(999)).toBe('thin');
+    expect(borderStyleFromCode(undefined)).toBe('thin');
+    expect(borderStyleFromCode(BorderStyleTypes.NONE)).toBe('thin');
   });
 });
 

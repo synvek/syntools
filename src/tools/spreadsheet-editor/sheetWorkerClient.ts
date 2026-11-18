@@ -31,6 +31,9 @@ export type SheetExportOffload =
   | { status: 'failed'; error: string }
   | { status: 'unavailable' };
 
+export type SheetCsvOffload =
+  { status: 'ok'; text: string } | { status: 'failed'; error: string } | { status: 'unavailable' };
+
 interface PendingTask {
   resolve: (response: SheetWorkerResponse) => void;
   reject: (error: Error) => void;
@@ -168,6 +171,36 @@ export async function exportSnapshotInWorker(
       return { status: 'unavailable' };
     }
     return { status: 'ok', bytes: new Uint8Array(response.task.bytes) };
+  } catch {
+    markBroken();
+    return { status: 'unavailable' };
+  }
+}
+
+/**
+ * 导出 CSV：整表拼字符串进 worker，回传纯文本。
+ *
+ * 之所以连这件"只是拼字符串"的活也搬走：十万行的表在主线程上拼完要几百毫秒，
+ * 期间页面完全不动（滚动、光标都停住）。快照本身要结构化克隆一份，但那是指针搬运，
+ * 与"逐格转义 + 拼大串"不是同一个量级。
+ */
+export async function exportCsvInWorker(
+  snapshot: WorkbookSnapshot,
+  sheetId: string | null,
+): Promise<SheetCsvOffload> {
+  if (!ensureWorker()) return { status: 'unavailable' };
+  try {
+    const response = await post({ id: (sequence += 1), kind: 'exportCsv', snapshot, sheetId }, []);
+    if (response.status === 'crashed') {
+      markBroken();
+      return { status: 'unavailable' };
+    }
+    if (response.status === 'failed') return { status: 'failed', error: response.error };
+    if (response.task.kind !== 'exportCsv') {
+      markBroken();
+      return { status: 'unavailable' };
+    }
+    return { status: 'ok', text: response.task.text };
   } catch {
     markBroken();
     return { status: 'unavailable' };

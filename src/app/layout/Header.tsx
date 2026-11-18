@@ -86,7 +86,7 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
       <button
         type="button"
         onClick={onSearch}
-        className="ml-4 hidden max-w-md flex-1 items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-400 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600 sm:flex"
+        className="ml-4 hidden max-w-md flex-1 items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 sm:flex"
       >
         <Icon name="search" className="h-4 w-4" />
         {t('header.searchPlaceholder')}

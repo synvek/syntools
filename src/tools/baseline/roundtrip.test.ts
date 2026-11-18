@@ -9,6 +9,11 @@ import { exportPptx } from '../slide-editor/pptx/export';
 import { importPptxFile } from '../slide-editor/pptx/import';
 import { collectExportIssues } from '../spreadsheet-editor/fidelity';
 import { collectImportIssues } from '../spreadsheet-editor/importFidelity';
+import {
+  parseRelationships,
+  partOfRels,
+  resolveRelTarget,
+} from '../spreadsheet-editor/rawChartParts';
 import { exportSnapshotToBytes, importXlsxToSnapshot } from '../spreadsheet-editor/xlsx-io';
 import { blockingDrift, compareReports, describeDiff } from './compare';
 import { docMetrics, sheetMetrics, slideMetrics } from './metrics';
@@ -289,6 +294,40 @@ async function xlsxPartFacts(bytes: Uint8Array): Promise<Record<string, number>>
   };
 }
 
+/**
+ * 引用闭包门禁（技术债"混合 drawing 的引用闭包"）：把导出的包当成 Excel 来读一遍，
+ * 每条内部关系都必须指向包里真实存在的部件。
+ *
+ * 为什么用"整个包"而不是只看保留部件：真正的失败形态是**别人**看到的结果——
+ * 一条 `r:embed` 指向不存在的 `xl/media/…` 会让 Excel 报"发现不可读取的内容"或显示空图。
+ * 这个检查不依赖我们的保留策略，因此能抓住将来任何一处"写了引用却没写目标"的改动。
+ */
+async function danglingZipReferences(bytes: Uint8Array): Promise<string[]> {
+  const zip = await JSZip.loadAsync(bytes);
+  const names = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
+  const canonical = (path: string): string => {
+    try {
+      return decodeURIComponent(path);
+    } catch {
+      return path;
+    }
+  };
+  const kept = new Set(names.map(canonical));
+  const out: string[] = [];
+  for (const name of names) {
+    if (!name.toLowerCase().endsWith('.rels')) continue;
+    const entry = zip.file(name);
+    if (!entry) continue;
+    const owner = partOfRels(name);
+    for (const rel of parseRelationships(await entry.async('string'))) {
+      const target = resolveRelTarget(owner, rel.target);
+      if (!target) continue; // 外部链接：不指向包内部件
+      if (!kept.has(canonical(target))) out.push(`${name} → ${target}`);
+    }
+  }
+  return out;
+}
+
 function partStatuses(before: Record<string, number>, after: Record<string, number>): SamplePart[] {
   return Object.entries(before)
     .filter(([, count]) => count > 0)
@@ -501,6 +540,34 @@ describe('OOXML round-trip baseline (generated + external samples)', () => {
     // 表格侧也必须四族齐全：只有 Excel 一份样本，等于没验证 WPS/Numbers 的重写差异
     expect([...sheetFamilies].sort()).toEqual([...EXTERNAL_PRODUCER_FAMILIES].sort());
   }, 60_000);
+
+  /**
+   * 每一个外部 .xlsx 走一遍导入 → 导出，导出的包里不允许出现指向不存在部件的关系。
+   * 8 份样本覆盖 Excel / WPS / LibreOffice / Numbers：这四家的 drawing 写法差异最大
+   * （谁把图片放在形状里、谁用 EMF、谁的 `.rels` 用百分号编码），也正是断链最容易钻出来的地方。
+   */
+  it('re-exports third-party .xlsx files with no dangling package relationships', async () => {
+    const failures: string[] = [];
+    for (const sample of sheetExternalSamples) {
+      const bytes = new Uint8Array(readFileSync(join(process.cwd(), sample.path)));
+      const imported = await importXlsxToSnapshot(
+        fakeFile(bytes, `${sample.id.replace(/\W+/g, '-')}.xlsx`),
+      );
+      if (!imported.ok) {
+        failures.push(`${sample.id}: import failed (${imported.error})`);
+        continue;
+      }
+      const exported = await exportSnapshotToBytes(imported.value);
+      if (!exported.ok) {
+        failures.push(`${sample.id}: export failed (${exported.error})`);
+        continue;
+      }
+      for (const dangling of await danglingZipReferences(exported.value)) {
+        failures.push(`${sample.id}: ${dangling}`);
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 120_000);
 
   it('exports and re-imports every sample without losing the document', async () => {
     const results: SampleResult[] = [];

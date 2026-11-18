@@ -54,6 +54,18 @@ export async function handleSheetWorkerRequest(
       };
     }
 
+    if (request.kind === 'exportCsv') {
+      // `csv.ts` 是纯函数且不依赖 exceljs：单独 import 才不会为了导 CSV 把解析器也拉进来
+      const { snapshotToCsv } = await import('./csv');
+      const result = snapshotToCsv(request.snapshot, request.sheetId);
+      if (!result.ok) return { id: request.id, status: 'failed', error: result.error };
+      return {
+        id: request.id,
+        status: 'ok',
+        task: { kind: 'exportCsv', text: result.value },
+      };
+    }
+
     const { exportSnapshotInThread } = await import('./xlsx-io');
     const result = await exportSnapshotInThread(request.snapshot);
     if (!result.ok) return { id: request.id, status: 'failed', error: result.error };

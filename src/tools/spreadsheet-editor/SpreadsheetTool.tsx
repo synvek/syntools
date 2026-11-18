@@ -1,25 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HintTip } from '@/core/components/DocumentHeader';
 import { clearDraft } from './draft';
-import { Icon } from '@/core/components/Icon';
-import { EditorStatusBar } from '@/core/components/EditorStatusBar';
-import {
-  EDITOR_STRIP_TITLE_INPUT_CLASS,
-  STRIP_ICON_BUTTON_CLASS,
-  formatBytes,
-} from '@/core/components/editorChrome';
+import { formatBytes } from '@/core/components/editorChrome';
 import { PresentOverlay } from '@/core/components/PresentOverlay';
 import { ProgressBar } from '@/core/components/ProgressBar';
 import { useViewportFill } from '@/core/hooks/useViewportFill';
 import { i18n } from '@/core/i18n';
-import { translateToolError } from '@/core/i18n/helpers';
 import { useSettingsStore } from '@/stores/settings';
 import type { ToolResult } from '@/core/types';
 import { columnIndexToName, summarizeWorkbook, type WorkbookSummary } from './core';
-import { CHART_TYPE_LABEL_KEY } from './charts';
+import { cellAddress } from './cellEdit';
 import { registerChartStrings } from './chartStrings';
-import { chartTypeBreakdown } from './chartImport';
 import { registerShapeStrings } from './shapeStrings';
 import { registerImageStrings } from './imageStrings';
 import {
@@ -34,7 +25,7 @@ import { ShapeFormatBar } from './ui/ShapeFormatBar';
 import { ImageLayer } from './ui/ImageLayer';
 import { registerStoreStrings } from './storeStrings';
 import { useSheetDocLibrary } from './hooks/useSheetDocLibrary';
-import { DocLibraryPanel, StorageNotice, VersionHistoryPanel } from './DocLibraryPanel';
+import { DocLibraryPanel, VersionHistoryPanel } from './DocLibraryPanel';
 import { useSheetTabs } from './hooks/useSheetTabs';
 import { useSheetFileIo } from './hooks/useSheetFileIo';
 import { useSheetComments } from './hooks/useSheetComments';
@@ -43,8 +34,12 @@ import { useSheetObjects } from './hooks/useSheetObjects';
 import { useSheetMeta } from './hooks/useSheetMeta';
 import { useSheetPivot } from './hooks/useSheetPivot';
 import { useSheetPersistence } from './hooks/useSheetPersistence';
+import { useSheetLayout } from './hooks/useSheetLayout';
+import { useSheetCommandSurface } from './hooks/useSheetCommandSurface';
+import { useSheetFormatSurfaces } from './hooks/useSheetFormatSurfaces';
 import { useSheetInstance } from './hooks/useSheetInstance';
 import { useSheetPresent } from './hooks/useSheetPresent';
+import { useNarrowViewport } from './hooks/useNarrowViewport';
 import {
   ARIA_GRID_DOM_ID,
   buildAriaGrid,
@@ -56,24 +51,15 @@ import { AriaGrid } from './AriaGrid';
 import { SHEET_TEMPLATES, templateById, type SheetTemplate, type TemplateId } from './templates';
 import { registerSpreadsheetStrings } from './strings';
 import { registerRibbonStrings } from './ribbonStrings';
-import { SpreadsheetRibbon, type RibbonBaseContext } from './SpreadsheetRibbon';
-import {
-  buildSheetMenu,
-  resolveCommand,
-  type SheetActions,
-  type SheetCommandContext,
-} from './commands';
-import { parseClipboardMatrix, type SheetFormatState } from './sheetFormat';
-import { NumberFormatDialog } from './ui/NumberFormatDialog';
-import { FormatCellsDialog } from './ui/FormatCellsDialog';
+import { SpreadsheetRibbon } from './SpreadsheetRibbon';
+import { resolveCommand, type SheetCommandContext } from './commands';
 import { ShortcutHelp } from './ui/ShortcutHelp';
-import { SortDialog } from './ui/SortDialog';
-import type { SortColumn } from './sorting';
-import { auditFormulas, SUPPORTED_FUNCTION_COUNT, type FunctionAudit } from './sheetFunctions';
+import { SheetNotices } from './ui/SheetNotices';
+import { SheetHeaderStrip } from './ui/SheetHeaderStrip';
+import { SheetFooter } from './ui/SheetFooter';
 import { findShortcut, isMacPlatform } from './shortcuts';
-import { commitFromDraft } from './formatCells';
 import { createEmptySnapshot, type WorkbookSnapshot } from './xlsx-io';
-import { reportSheetIssue, subscribeSheetIssues, type SheetIssue } from './issues';
+import { subscribeSheetIssues, type SheetIssue } from './issues';
 import { createUniverInstance, type UniverHandle } from './univer';
 import {
   PIVOT_SHOW_AS_LABEL_KEY,
@@ -97,7 +83,6 @@ import type { WorkbookExtras } from './xlsx-extras';
 import { applySheetObjects, readSheetObjects, type SheetObjectSource } from './sheetObjects';
 import { DEFAULT_SHEET_PRINT_OPTIONS, printSheet, type SheetPrintOptions } from './print';
 import type { RawChartParts } from './rawChartParts';
-import { SheetTabs } from './SheetTabs';
 import { NameManagerPanel } from './ui/NameManagerPanel';
 import { ProtectDialog } from './ui/ProtectDialog';
 import { registerMetaStrings } from './metaStrings';
@@ -136,24 +121,21 @@ export default function SpreadsheetTool() {
   const [ribbonCollapsed, setRibbonCollapsed] = useState(false);
   /** Set once the Univer instance is live — the ribbon needs it reactively, `handleRef` is not enough */
   const [ribbonHost, setRibbonHost] = useState<UniverHandle | null>(null);
-  const [numberFormatOpen, setNumberFormatOpen] = useState(false);
-  /** "设置单元格格式" (P1-2) plus the selection snapshot it edits */
-  const [formatCellsOpen, setFormatCellsOpen] = useState(false);
-  const [formatCellsFormat, setFormatCellsFormat] = useState<SheetFormatState | null>(null);
-  /** Keyboard cheat sheet (P1-1) */
+  /** 快捷键速查（P1-1）：只有这一处状态留在编排层，因为它要用完整命令上下文渲染 */
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  /** "排序" dialog (P1-5): columns and header guess are captured when it opens */
-  const [sortOpen, setSortOpen] = useState(false);
-  const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
-  const [sortHasHeader, setSortHasHeader] = useState(false);
-  /** Result of "检查公式" (P1-10) */
-  const [formulaReport, setFormulaReport] = useState<FunctionAudit | null>(null);
-  /** Pattern the custom-format dialog starts from (read when it opens, so it reflects the selection) */
-  const [numberFormatInitial, setNumberFormatInitial] = useState('');
+  /** 手机端"改值"浮层：拿到的是打开那一刻的原值，取消即丢弃（P2-8） */
+  const [cellEdit, setCellEdit] = useState<{ address: string; value: string } | null>(null);
   /** Sheet height = whatever remains in the first viewport (sheet tabs / status bar stay visible, "related tools" is pushed below the fold) */
+  /**
+   * 窄屏判定（P2-8）：收起对象浮层、把画布下限从 460 降到 320、底部多一条 6 个动作的工具条。
+   * 必须放在 `useViewportFill` 之前——它决定画布还剩多少高度。
+   */
+  const narrow = useNarrowViewport();
   const sheetHeight = useViewportFill(containerRef, {
-    min: 460,
-    signature: ribbonCollapsed ? 'ribbon-collapsed' : 'ribbon-expanded',
+    // 手机上 460 的下限会把底部工具条挤出首屏；320 仍能看清表头与两三行数据
+    min: narrow ? 320 : 460,
+    // 断点变化也要重算，所以把 narrow 打进 signature（旋转屏幕不一定是 resize）
+    signature: `${ribbonCollapsed ? 'ribbon-collapsed' : 'ribbon-expanded'}:${narrow ? 'narrow' : 'wide'}`,
   });
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const handleRef = useRef<UniverHandle | null>(null);
@@ -166,8 +148,7 @@ export default function SpreadsheetTool() {
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
   // 形状 / 图片（SHEET-02）的状态与动作在 `useSheetObjects` 里（P2-4）
   const imageInputRef = useRef<HTMLInputElement | null>(null);
-  /** Bumped on every mutation so the row/column layout is re-measured after a resize */
-  const [shapeLayoutVersion, setShapeLayoutVersion] = useState(0);
+  /** 形状 / 图片锚点换算表由 `useSheetLayout` 持有（技术债 #7），这里只留一份给动作层的引用 */
   const shapeLayoutRef = useRef<SheetLayout>(buildSheetLayout(undefined));
   /** Grid → container projection for the shape layer: scrolls / zooms with the sheet (P4-SH6) */
   const [shapeViewport, setShapeViewport] = useState<SheetViewport>(DEFAULT_SHEET_VIEWPORT);
@@ -308,6 +289,15 @@ export default function SpreadsheetTool() {
   const loadTemplateRef = useRef<(id: TemplateId, options?: { confirm?: boolean }) => void>(
     () => {},
   );
+  /**
+   * 启动时从 `?template=` 读到的模板先寄存在这里（P2-8 顺手修掉的真缺陷）：
+   * 首帧的启动 effect 跑在实例创建之前，`applySnapshot` 那一刻 `handleRef.current` 还是 null，
+   * 于是模板被静默丢弃——`?template=sales` 一直打开的是一张空白 "Sheet1"。
+   * 现在由"库就绪 + 实例就绪"的 effect 消费它，且**只消费一次**（主题 / 语言重建实例不会重放）。
+   */
+  const pendingTemplateRef = useRef<TemplateId | null>(null);
+  /** 文档库初始化是否完成：模板要排在它后面，否则指针里那份旧 docId 会盖掉模板新建的 id */
+  const [libraryReady, setLibraryReady] = useState(false);
   /** Inline failure notice (P0-3); replaces the silent `catch {}` this module used to have */
   const [issueNotice, setIssueNotice] = useState<SheetIssue | null>(null);
   /** Screen-reader announcement of the current selection (P0-6) */
@@ -528,6 +518,25 @@ export default function SpreadsheetTool() {
   refreshSheetsRef.current = refreshSheets;
 
   /**
+   * 形状 / 图片的锚点换算表（技术债 #7 收口）。
+   *
+   * 以前是 `useMemo` 里读引擎快照 + `void shapeLayoutVersion` 当失效令牌：写的人知道自己在干什么，
+   * 读的人只看到一行像笔误的 `void`。现在读快照这件事只发生在 `refreshShapeLayout()` 里，
+   * 调用点就是四个**真的可能改列宽 / 行高**的时机：实例就绪、单元格变更、换工作表（hook 内）、
+   * 换文档（`applySnapshot`）。形状动作层（声明得比这里早）通过 `shapeLayoutRef` 拿最新一份。
+   */
+  const readShapeLayout = useCallback((): SheetLayout => {
+    const handle = handleRef.current;
+    const sheetId = handle?.getActiveSheetId();
+    return buildSheetLayout(sheetId ? handle?.getSnapshot().sheets?.[sheetId] : undefined);
+  }, []);
+  const { layout: shapeLayout, refresh: refreshShapeLayout } = useSheetLayout(
+    readShapeLayout,
+    activeSheetId,
+  );
+  shapeLayoutRef.current = shapeLayout;
+
+  /**
    * Univer 实例的创建 / 重建 / 销毁（P2-4 第十片）。
    * 生命周期（一个 tick 后创建、重建前抓快照、订阅与退订）在 hook 里；
    * 下面的具名回调只回答"重建后各域该做什么"。
@@ -573,6 +582,8 @@ export default function SpreadsheetTool() {
       const initial = handle.getSnapshot();
       setSummary(summarizeWorkbook(initial));
       applyChartData(initial, handle.getActiveSheetId());
+      // 新实例的列宽行高要重新量：形状按锚点换算像素，量晚了就会错位
+      refreshShapeLayout();
     },
     onMutation: () => {
       // Dirty tracking: only modifications that reach the snapshot trigger debounced persistence
@@ -580,7 +591,7 @@ export default function SpreadsheetTool() {
       // 透视表是"源数据的视图"：源表一改就重算，而不是等用户手动刷新
       if (pivotOpenRef.current) refreshPivot();
       // Column widths / row heights may have changed: shapes are anchored through them
-      setShapeLayoutVersion((version) => version + 1);
+      refreshShapeLayout();
       // 无障碍投影读的是选区那一块，代价很小：内容一变就跟上，不必等下一次移动选区
       setSelection(handleRef.current?.getActiveRange() ?? null);
     },
@@ -611,6 +622,26 @@ export default function SpreadsheetTool() {
     if (!handle) return;
     setSummary(summarizeWorkbook(handle.getSnapshot()));
   }, []);
+
+  /**
+   * 手机端"改值"（P2-8）：读当前格**原值**回填浮层（公式是 `=…` 原文，不是缓存值）。
+   * 没有句柄 / 没有选区时什么都不做——工具条上那颗按钮此时本来就是禁用的。
+   */
+  const openCellEdit = useCallback(() => {
+    const cell = handleRef.current?.readActiveCell();
+    if (!cell) return;
+    setCellEdit({ address: cellAddress(cell.row, cell.column), value: cell.value });
+  }, []);
+
+  /** 写回并关掉浮层；写失败由 `writeActiveCell` 内部播报，界面不会"看起来成功了" */
+  const applyCellEdit = useCallback(
+    (next: string) => {
+      const written = handleRef.current?.writeActiveCell(next) ?? false;
+      setCellEdit(null);
+      if (written) refreshSummary();
+    },
+    [refreshSummary],
+  );
 
   /** 活动表受保护 → 整个工作簿切只读（Univer 只有工作簿级 editable 权限） */
   useEffect(() => {
@@ -659,20 +690,6 @@ export default function SpreadsheetTool() {
     });
     return buildAriaGrid({ ...plan, sheetId: activeSheetId ?? '', values });
   }, [activeSheetId, selection]);
-
-  /**
-   * Row/column layout of the active sheet. Shapes are stored as cell anchors; both the overlay and
-   * the export go through this one conversion table so they cannot drift apart.
-   */
-  const shapeLayout = useMemo<SheetLayout>(() => {
-    // The snapshot is read through a ref, so the memo cannot depend on it: `shapeLayoutVersion` is
-    // the explicit invalidation token, bumped by the mutation subscription (column resize etc.)
-    void shapeLayoutVersion;
-    const snapshot = handleRef.current?.getSnapshot();
-    const sheet = activeSheetId ? snapshot?.sheets?.[activeSheetId] : undefined;
-    return buildSheetLayout(sheet);
-  }, [activeSheetId, shapeLayoutVersion]);
-  shapeLayoutRef.current = shapeLayout;
 
   /** 面板看到的一切都由这里算出来：源快照变了（编辑 / 刷新 / 换区域）就整体重算 */
   const pivotView = useMemo(() => {
@@ -724,11 +741,14 @@ export default function SpreadsheetTool() {
       // 换文档：形状与图片无条件替换，选中态 / 绘制模式一起清掉
       resetObjects({ shapes: objects.shapes, images: objects.images });
       applyChartData(handle.getSnapshot(), handle.getActiveSheetId());
+      // 新文档的列宽行高与上一份无关：形状锚点必须按新表重新量（技术债 #7）
+      refreshShapeLayout();
       refreshSummary();
       refreshSheets();
     },
     [
       applyChartData,
+      refreshShapeLayout,
       refreshSummary,
       refreshSheets,
       resetComments,
@@ -799,11 +819,24 @@ export default function SpreadsheetTool() {
         : new URLSearchParams(window.location.search).get('template'),
     );
     if (wanted) {
-      loadTemplateRef.current(wanted.id, { confirm: false });
+      // 只记下来 + 抹掉地址栏参数，真正的加载等"库就绪 + 实例就绪"（见下面的 effect）
+      pendingTemplateRef.current = wanted.id;
       window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     }
-    void initLibrary();
+    void initLibrary().then(() => setLibraryReady(true));
   }, [initLibrary]);
+
+  /**
+   * `?template=` 的真正加载点：库初始化完成（docId 指针已落定）且实例已就绪（`applySnapshot` 有句柄可用）。
+   * 两个条件是"与"关系，谁后到都由这个 effect 负责收口；消费后立刻清空，重建实例不会重放。
+   */
+  useEffect(() => {
+    if (!libraryReady || !ribbonHost) return;
+    const wanted = pendingTemplateRef.current;
+    if (!wanted) return;
+    pendingTemplateRef.current = null;
+    loadTemplateRef.current(wanted, { confirm: false });
+  }, [libraryReady, ribbonHost]);
 
   // Title changes are persisted too (skipped on first render so merely opening the page does not create an empty document)
   const didMountRef = useRef(false);
@@ -956,121 +989,63 @@ export default function SpreadsheetTool() {
    * A sheet holding only floating objects is still exportable: shapes and charts are written as
    * native `xdr:*` parts. Gating on cell count alone made such a workbook impossible to save.
    */
-  const canExportXlsx = summary.cells > 0 || shapes.length > 0 || charts.length > 0;
+  /**
+   * 格式类浮层（P2-4 第十三片）：数字格式 / 排序 / 设置单元格格式 / 公式审计。
+   * 8 个 state 与 ~70 行 JSX 只服务它们自己，全部搬进 hook，这里只拿回"一行渲染 + 四个开框回调"。
+   */
+  const {
+    surfaces: formatSurfaces,
+    showNumberFormat,
+    showFormatCells,
+    showSort,
+    showFormulaReport,
+  } = useSheetFormatSurfaces({ t, host: ribbonHost });
 
   /**
-   * One command registry feeds both surfaces: `commands.ts` is projected onto the ribbon **and** onto the
-   * ⋯ menu (which only carries the commands the ribbon has no button for), so the two cannot disagree.
+   * 命令表面（P2-4 第十二片）：命令表 → 真实动作 / 真实事实的接线全部在 hook 里。
+   * 组件只交出"能力"（谁打开哪个框、哪个句柄、哪些事实），不再自己维护 90 行 if/then。
    */
-  const sheetActions: SheetActions = {
+  const { ribbonBase, menu, commandCtx } = useSheetCommandSurface({
+    t,
+    handleRef,
+    host: ribbonHost,
+    imageInputRef,
     newDoc: handleNew,
-    // 同一个入口也收 .ods：分流在 `checkImportFile`，用户不必先记住自己手里是哪种容器
-    importXlsx: () => openImport('.xlsx,.xlsm,.ods'),
-    importCsv: () => openImport('.csv'),
-    exportXlsx: () => void exportXlsx(),
-    exportCsv: exportCsv,
-    print: openPrint,
-    library: openLibrary,
-    versions: openVersions,
     clear: handleClear,
-    undo: () => handleRef.current?.undo(),
-    redo: () => handleRef.current?.redo(),
+    openImport,
+    exportXlsx,
+    exportCsv,
+    openPrint,
+    openLibrary,
+    openVersions,
+    openPresent,
     insertChart,
     insertShape: openShapePalette,
-    insertImage: () => imageInputRef.current?.click(),
     insertPivot: openPivot,
     openNames,
     insertTable,
     deleteTable,
-    addSheet: handleAddSheet,
-    duplicateSheet: () => {
-      if (activeSheetId) handleDuplicateSheet(activeSheetId);
-    },
-    renameSheet: () => {
-      if (!activeSheet) return;
-      const name = window.prompt(t('tools.sheet.rename'), activeSheet.name);
-      if (name === null) return;
-      const next = name.trim();
-      if (!next || next === activeSheet.name) return;
-      handleRenameSheet(activeSheet.id, next);
-    },
-    deleteSheet: () => {
-      if (activeSheetId) handleDeleteSheet(activeSheetId);
-    },
     openComments,
     openProtect,
-    // 命令表也走同一套投影：只置位不建网格会让第二次演示停留在上一份内容
-    present: openPresent,
-    promptHyperlink: () => {
-      const url = window.prompt(t('tools.sheet.r.hyperlinkPrompt'), 'https://');
-      if (url === null) return;
-      handleRef.current?.setHyperlink(url.trim());
-    },
-    openNumberFormat: () => {
-      setNumberFormatInitial(handleRef.current?.getFormatState()?.numberFormat ?? '');
-      setNumberFormatOpen(true);
-    },
-    openFormatCells: () => {
-      // Snapshot the selection now: the dialog must describe what it is about to change
-      setFormatCellsFormat(handleRef.current?.getFormatState() ?? null);
-      setFormatCellsOpen(true);
-    },
-    openShortcuts: () => setShortcutsOpen(true),
-    checkFormulas: () => {
-      setFormulaReport(auditFormulas(ribbonHost?.readSelectionFormulas() ?? []));
-    },
-    openSort: () => {
-      // Whatever the dialog says about columns must describe the selection it will reorder
-      const info = ribbonHost?.describeSortRange();
-      if (!info) return;
-      setSortColumns(info.columns);
-      setSortHasHeader(info.hasHeader);
-      setSortOpen(true);
-    },
-    copyToClipboard: (text) => {
-      const clipboard = navigator.clipboard;
-      if (!clipboard) {
-        reportSheetIssue({ code: 'clipboardWrite', level: 'notice' });
-        return;
-      }
-      // A rejected clipboard write used to be indistinguishable from a successful one (P0-3)
-      void clipboard.writeText(text).catch((error: unknown) => {
-        reportSheetIssue({ code: 'clipboardWrite', level: 'notice', detail: String(error) });
-      });
-    },
-    pasteFromClipboard: () => {
-      const clipboard = navigator.clipboard;
-      if (!clipboard) {
-        reportSheetIssue({ code: 'clipboardRead', level: 'notice' });
-        return;
-      }
-      void clipboard
-        .readText()
-        .then((text) => {
-          if (!text.trim()) return;
-          handleRef.current?.writeMatrix(parseClipboardMatrix(text));
-        })
-        .catch((error: unknown) => {
-          reportSheetIssue({ code: 'clipboardRead', level: 'notice', detail: String(error) });
-        });
-    },
-  };
-
-  const ribbonBase: RibbonBaseContext = {
-    t,
-    actions: sheetActions,
+    addSheet: handleAddSheet,
+    duplicateSheet: handleDuplicateSheet,
+    renameSheet: handleRenameSheet,
+    deleteSheet: handleDeleteSheet,
+    activeSheet,
+    showNumberFormat,
+    showFormatCells,
+    showShortcuts: () => setShortcutsOpen(true),
+    showFormulaReport,
+    showSort,
     busy: busy !== null,
-    cellCount: summary.cells,
-    canExportXlsx,
+    summary,
     sheetCount: sheets.length,
-    hasActiveSheet: Boolean(activeSheetId),
-    activeSheetName: activeSheet?.name ?? null,
     protectedSheet: activeProtection !== null,
     hasTable: activeTables.length > 0,
-    hasDocId: Boolean(docId),
-    hasTitle: Boolean(title.trim()),
-  };
-  const menu = buildSheetMenu({ ...ribbonBase, host: ribbonHost, format: null });
+    docId,
+    title,
+    hasFloatingObjects: shapes.length > 0 || charts.length > 0,
+  });
 
   /**
    * Keyboard layer (P1-1).
@@ -1080,7 +1055,7 @@ export default function SpreadsheetTool() {
    * its keymap already ran, we must not run the command a second time.
    */
   const commandCtxRef = useRef<SheetCommandContext | null>(null);
-  commandCtxRef.current = { ...ribbonBase, host: ribbonHost, format: null };
+  commandCtxRef.current = commandCtx;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1108,160 +1083,32 @@ export default function SpreadsheetTool() {
   const memory = formatBytes(memoryBytes);
 
   return (
-    <div className="flex flex-col gap-4" data-tool-root>
+    <div className={`flex flex-col ${narrow ? 'gap-2' : 'gap-4'}`} data-tool-root>
       <SpreadsheetRibbon
         ctx={ribbonBase}
         host={ribbonHost}
         menu={menu}
         onCollapsedChange={setRibbonCollapsed}
         headerRight={
-          <>
-            {activeProtection ? (
-              <span
-                role="status"
-                data-testid="sheet-protected-badge"
-                title={t('tools.sheet.protectLockedNotice')}
-                aria-label={t('tools.sheet.protectLockedNotice')}
-                className="inline-flex h-6 items-center justify-center rounded bg-amber-50 px-1.5 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-              >
-                <Icon name="lock" className="h-3.5 w-3.5" />
-              </span>
-            ) : null}
-            {activeTables.length > 0 ? (
-              <span
-                role="status"
-                data-testid="sheet-table-badge"
-                title={t('tools.sheet.tableBadge', { count: activeTables.length })}
-                aria-label={t('tools.sheet.tableBadge', { count: activeTables.length })}
-                className="inline-flex h-6 items-center rounded bg-sky-50 px-1.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950 dark:text-sky-300"
-              >
-                {activeTables.length}
-              </span>
-            ) : null}
-            <span
-              role="status"
-              title={statusText}
-              aria-label={statusText}
-              className={`inline-flex h-6 w-6 items-center justify-center rounded ${
-                draftSaved
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-gray-400 dark:text-gray-500'
-              }`}
-            >
-              <Icon name={draftSaved ? 'check' : 'clock'} className="h-3.5 w-3.5" />
-            </span>
-            <button
-              type="button"
-              onClick={handleClear}
-              disabled={summary.cells === 0 && !title.trim()}
-              aria-label={t('common.clear')}
-              title={t('common.clear')}
-              className={`${STRIP_ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
-            >
-              <Icon name="trash" className="h-3.5 w-3.5" />
-            </button>
-            <HintTip text={t('tools.sheet.unsupportedTip')} />
-            <input
-              type="text"
-              value={title}
-              aria-label={t('tools.sheet.docTitle')}
-              placeholder={t('tools.sheet.titlePlaceholder')}
-              onChange={(event) => setTitle(event.target.value)}
-              className={EDITOR_STRIP_TITLE_INPUT_CLASS}
-            />
-            <button
-              type="button"
-              onClick={handleNew}
-              aria-label={t('common.newDoc')}
-              title={t('common.newDoc')}
-              className={STRIP_ICON_BUTTON_CLASS}
-            >
-              <Icon name="sheet" className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              data-testid="sheet-present"
-              onClick={openPresent}
-              aria-label={t('tools.sheet.present')}
-              title={t('tools.sheet.present')}
-              className={STRIP_ICON_BUTTON_CLASS}
-            >
-              <Icon name="present" className="h-3.5 w-3.5" />
-            </button>
-          </>
+          <SheetHeaderStrip
+            protectedSheet={activeProtection !== null}
+            tableCount={activeTables.length}
+            draftSaved={draftSaved}
+            statusText={statusText}
+            title={title}
+            onTitleChange={setTitle}
+            clearDisabled={summary.cells === 0 && !title.trim()}
+            onClear={handleClear}
+            onNewDoc={handleNew}
+            onPresent={openPresent}
+          />
         }
       />
-      <NumberFormatDialog
-        open={numberFormatOpen}
-        initial={numberFormatInitial}
-        onClose={() => setNumberFormatOpen(false)}
-        onApply={(pattern) => {
-          handleRef.current?.applyNumberFormat(pattern);
-          setNumberFormatOpen(false);
-        }}
-      />
-      {/*
-       * Format Cells (P1-2). It lives here rather than inside the ribbon because it must apply
-       * through the same host instance the rest of the tool edits; the *format snapshot* is taken
-       * when the dialog opens, so a stale ribbon state can never seed it.
-       */}
-      {/*
-       * Formula audit result (P1-10). A short inline card instead of a dialog: the answer is one
-       * sentence and the user should stay in the grid.
-       */}
-      {formulaReport ? (
-        <div
-          role="status"
-          data-testid="sheet-formula-audit"
-          className="flex items-start justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200"
-        >
-          <span>
-            {formulaReport.formulas === 0
-              ? t('tools.sheet.formulaAuditNone')
-              : formulaReport.unsupported.length === 0
-                ? t('tools.sheet.formulaAuditOk', {
-                    count: formulaReport.formulas,
-                    total: SUPPORTED_FUNCTION_COUNT,
-                  })
-                : t('tools.sheet.formulaAuditMissing', {
-                    names: formulaReport.unsupported.join(', '),
-                  })}
-          </span>
-          <button
-            type="button"
-            onClick={() => setFormulaReport(null)}
-            aria-label={t('tools.sheet.printCancel')}
-            className="text-green-700 hover:text-green-900 dark:text-green-300"
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
-      <SortDialog
-        open={sortOpen}
-        columns={sortColumns}
-        hasHeader={sortHasHeader}
-        onClose={() => setSortOpen(false)}
-        onApply={(keys, hasHeader) => {
-          ribbonHost?.sortRange(keys, hasHeader);
-          setSortOpen(false);
-        }}
-      />
+      {formatSurfaces}
       <ShortcutHelp
         open={shortcutsOpen}
         ctx={{ ...ribbonBase, host: ribbonHost, format: null }}
         onClose={() => setShortcutsOpen(false)}
-      />
-      <FormatCellsDialog
-        open={formatCellsOpen}
-        format={formatCellsFormat}
-        onClose={() => setFormatCellsOpen(false)}
-        onApply={(draft) => {
-          const commit = commitFromDraft(draft);
-          ribbonHost?.applyFormat(commit.patch);
-          if (commit.border) ribbonHost?.applyBorder(commit.border.preset, commit.border.spec);
-          setFormatCellsOpen(false);
-        }}
       />
 
       {libraryOpen ? (
@@ -1288,60 +1135,40 @@ export default function SpreadsheetTool() {
         />
       ) : null}
 
-      {chartNotice ? (
-        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
-          {t('tools.sheet.chartEmpty')}
-        </p>
-      ) : null}
-
-      {tableNotice ? (
-        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
-          {tableNotice}
-        </p>
-      ) : null}
-
-      {imageNotice ? (
-        <p role="status" className="px-4 pb-1 text-[12px] text-amber-600 dark:text-amber-400">
-          {imageNotice}
-        </p>
-      ) : null}
-      {chartImport ? (
-        <p role="status" className="text-[11px] text-gray-500 dark:text-gray-400">
-          {chartImport.editable.total > 0
-            ? `${t('tools.sheet.chartImported', { count: chartImport.editable.total })}${
-                chartTypeBreakdown(chartImport.editable).length > 0
-                  ? ` · ${chartTypeBreakdown(chartImport.editable)
-                      .map(
-                        (item) =>
-                          `${t(`tools.sheet.${CHART_TYPE_LABEL_KEY[item.type]}`)} ${item.count}`,
-                      )
-                      .join(' / ')}`
-                  : ''
-              }`
-            : ''}
-          {chartImport.editable.total > 0 && chartImport.kept.total > 0 ? ' · ' : ''}
-          {chartImport.kept.total > 0
-            ? t('tools.sheet.chartKept', { count: chartImport.kept.total })
-            : ''}
-        </p>
-      ) : null}
-
-      {/* 选中形状时的上下文格式栏（对应 Excel 的「形状格式」选项卡） */}
-      <ShapeFormatBar
-        shape={visibleShapes.find((item) => item.id === selectedShapeId) ?? null}
-        onChange={(patch) => {
-          if (selectedShapeId) updateShape(selectedShapeId, patch);
-        }}
-        onRemove={() => {
-          if (selectedShapeId) removeShape(selectedShapeId);
-        }}
-        onBringFront={() => {
-          if (selectedShapeId) reorderShape(selectedShapeId, 'front');
-        }}
-        onSendBack={() => {
-          if (selectedShapeId) reorderShape(selectedShapeId, 'back');
-        }}
+      {/* 行内提示区（P2-4 第十四片）：等级决定颜色、去重与文案映射都在组件里 */}
+      <SheetNotices
+        chartEmpty={chartNotice}
+        tableNotice={tableNotice}
+        imageNotice={imageNotice}
+        chartImport={chartImport}
+        runtimeError={runtimeError}
+        storeStatus={storeStatus}
+        onRetryStore={retryStore}
+        onFreeSpace={openVersions}
+        draftNotice={draftNotice}
+        issueNotice={issueNotice}
+        failure={failure}
       />
+
+      {/* 选中形状时的上下文格式栏（对应 Excel 的「形状格式」选项卡）。窄屏不显示对象浮层，
+          这条栏也就没有可编辑的对象，留着只会白占一行（P2-8） */}
+      {narrow ? null : (
+        <ShapeFormatBar
+          shape={visibleShapes.find((item) => item.id === selectedShapeId) ?? null}
+          onChange={(patch) => {
+            if (selectedShapeId) updateShape(selectedShapeId, patch);
+          }}
+          onRemove={() => {
+            if (selectedShapeId) removeShape(selectedShapeId);
+          }}
+          onBringFront={() => {
+            if (selectedShapeId) reorderShape(selectedShapeId, 'front');
+          }}
+          onSendBack={() => {
+            if (selectedShapeId) reorderShape(selectedShapeId, 'back');
+          }}
+        />
+      )}
 
       {/* 工作表区域：图表以浮层形式贴在同一区域内，可拖动 / 缩放 / 改数据 */}
       <div
@@ -1362,19 +1189,74 @@ export default function SpreadsheetTool() {
         />
         {/* 画布对读屏是不可见的：叠一层视觉隐藏的 grid 把"在哪 / 是什么"投影出去（P2-9） */}
         <AriaGrid model={ariaGrid} />
-        {/* Pictures sit under the shapes (the export writes pic before sp for the same reason) */}
-        <ImageLayer
-          images={visibleImages}
-          layout={shapeLayout}
-          selectedId={selectedImageId}
-          onSelect={selectImage}
-          onChange={updateImage}
-          onRemove={removeImage}
-          onBringFront={(id) => reorderImage(id, 'front')}
-          onSendBack={(id) => reorderImage(id, 'back')}
-          bounds={chartBounds}
-          viewport={shapeViewport}
-        />
+        {/*
+          窄屏不渲染对象浮层（P2-8）：这几层都是 `absolute` + `z-30..50`，在手机上会盖住网格、
+          抢走手指。数据仍在快照里，导出 / 打印 / 桌面端不受影响——只是移动端看不到浮动对象。
+        */}
+        {narrow ? null : (
+          <>
+            {/* Pictures sit under the shapes (the export writes pic before sp for the same reason) */}
+            <ImageLayer
+              images={visibleImages}
+              layout={shapeLayout}
+              selectedId={selectedImageId}
+              onSelect={selectImage}
+              onChange={updateImage}
+              onRemove={removeImage}
+              onBringFront={(id) => reorderImage(id, 'front')}
+              onSendBack={(id) => reorderImage(id, 'back')}
+              bounds={chartBounds}
+              viewport={shapeViewport}
+            />
+            {/* Shapes sit under the charts: charts are interactive panels, shapes are annotations */}
+            <ShapeLayer
+              shapes={visibleShapes}
+              layout={shapeLayout}
+              selectedId={selectedShapeId}
+              onSelect={selectShape}
+              onChange={updateShape}
+              onRemove={removeShape}
+              onBringFront={(id) => reorderShape(id, 'front')}
+              onSendBack={(id) => reorderShape(id, 'back')}
+              bounds={chartBounds}
+              viewport={shapeViewport}
+            />
+            {shapePaletteOpen ? (
+              <ShapePalette
+                onPick={(prst) => {
+                  // Excel 的顺序：选形状 → 在工作表上拖出来；单击则用默认大小
+                  chooseShapePreset(prst);
+                }}
+                onClose={closeShapePalette}
+              />
+            ) : null}
+            <ShapeDrawLayer
+              prst={shapeDrawPrst}
+              layout={shapeLayout}
+              viewport={shapeViewport}
+              surfaceRef={surfaceRef}
+              hint={t('tools.sheet.shapeDrawHint')}
+              onCancel={cancelShapeDraw}
+              onCreate={(from, width, height) =>
+                insertShape(shapeDrawPrst ?? 'rect', from, width, height)
+              }
+            />
+            {visibleCharts.map((config) => (
+              <ChartOverlay
+                key={config.id}
+                config={config}
+                data={chartDataMap[config.id] ?? null}
+                selected={config.id === selectedChartId}
+                bounds={chartBounds}
+                onSelect={() => selectChart(config.id)}
+                onChange={(patch) => updateChart(config.id, patch)}
+                onPickRange={() => pickRangeForChart(config.id)}
+                onClose={() => removeChart(config.id)}
+              />
+            ))}
+          </>
+        )}
+        {/* 隐藏的 file input 留在门控之外：窄屏仍可从 Ribbon 用「插入图片」（P2-8） */}
         <input
           ref={imageInputRef}
           type="file"
@@ -1388,86 +1270,30 @@ export default function SpreadsheetTool() {
             if (file) void addImageFile(file);
           }}
         />
-        {/* Shapes sit under the charts: charts are interactive panels, shapes are annotations */}
-        <ShapeLayer
-          shapes={visibleShapes}
-          layout={shapeLayout}
-          selectedId={selectedShapeId}
-          onSelect={selectShape}
-          onChange={updateShape}
-          onRemove={removeShape}
-          onBringFront={(id) => reorderShape(id, 'front')}
-          onSendBack={(id) => reorderShape(id, 'back')}
-          bounds={chartBounds}
-          viewport={shapeViewport}
-        />
-        {shapePaletteOpen ? (
-          <ShapePalette
-            onPick={(prst) => {
-              // Excel 的顺序：选形状 → 在工作表上拖出来；单击则用默认大小
-              chooseShapePreset(prst);
-            }}
-            onClose={closeShapePalette}
-          />
-        ) : null}
-        <ShapeDrawLayer
-          prst={shapeDrawPrst}
-          layout={shapeLayout}
-          viewport={shapeViewport}
-          surfaceRef={surfaceRef}
-          hint={t('tools.sheet.shapeDrawHint')}
-          onCancel={cancelShapeDraw}
-          onCreate={(from, width, height) =>
-            insertShape(shapeDrawPrst ?? 'rect', from, width, height)
-          }
-        />
-        {visibleCharts.map((config) => (
-          <ChartOverlay
-            key={config.id}
-            config={config}
-            data={chartDataMap[config.id] ?? null}
-            selected={config.id === selectedChartId}
-            bounds={chartBounds}
-            onSelect={() => selectChart(config.id)}
-            onChange={(patch) => updateChart(config.id, patch)}
-            onPickRange={() => pickRangeForChart(config.id)}
-            onClose={() => removeChart(config.id)}
-          />
-        ))}
       </div>
 
-      {/* Selection announcement for screen readers (P0-6): visual users get the highlight, readers get this */}
-      <p role="status" aria-live="polite" className="sr-only" data-testid="sheet-a11y-status">
-        {a11yStatus}
-      </p>
-
-      <SheetTabs
-        sheets={sheets}
-        activeId={activeSheetId}
-        onSelect={handleSelectSheet}
-        onAdd={handleAddSheet}
-        onRename={handleRenameSheet}
-        onDelete={handleDeleteSheet}
-        onDuplicate={handleDuplicateSheet}
-        onToggleHidden={handleToggleSheetHidden}
-      />
-
-      <EditorStatusBar
-        left={
-          <>
-            {stats.map((item) => (
-              <span key={item.label}>
-                {item.label}: {item.value}
-              </span>
-            ))}
-            {countSheetComments(sheetComments) > 0 ? (
-              <span className="text-amber-600 dark:text-amber-400">
-                {t('tools.sheet.commentCount', { count: countSheetComments(sheetComments) })}
-              </span>
-            ) : null}
-          </>
-        }
-        right={<span>{t('common.memoryUsage', { size: memory })}</span>}
+      <SheetFooter
+        a11yStatus={a11yStatus}
+        tabs={{
+          sheets,
+          activeId: activeSheetId,
+          onSelect: handleSelectSheet,
+          onAdd: handleAddSheet,
+          onRename: handleRenameSheet,
+          onDelete: handleDeleteSheet,
+          onDuplicate: handleDuplicateSheet,
+          onToggleHidden: handleToggleSheetHidden,
+        }}
+        stats={stats}
+        commentCount={countSheetComments(sheetComments)}
+        memory={memory}
+        narrow={narrow}
+        mobileCtx={ribbonBase}
+        mobileHost={ribbonHost}
+        onEditCell={openCellEdit}
+        cellEdit={cellEdit}
+        onCancelCellEdit={() => setCellEdit(null)}
+        onSubmitCellEdit={applyCellEdit}
       />
 
       {busy !== null && <ProgressBar indeterminate label={t('tools.sheet.exporting')} />}
@@ -1483,44 +1309,6 @@ export default function SpreadsheetTool() {
           if (file) void importFile(file);
         }}
       />
-
-      {runtimeError && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-          {translateToolError('tools.sheet', { ok: false, error: 'RUNTIME_FAILED' })}
-        </p>
-      )}
-
-      {/* P2-3: 文档库不可用 / 空间不足——说清原因，并能就地重试；空间不足还能去删旧版本 */}
-      <StorageNotice status={storeStatus} onRetry={retryStore} onFreeSpace={openVersions} />
-
-      {draftNotice && (
-        <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
-          {draftNotice === 'degraded'
-            ? t('tools.sheet.draftDegraded')
-            : t('tools.sheet.draftSaveFailed')}
-        </p>
-      )}
-
-      {/* P0-3: a click that did nothing now says why, once, then gets out of the way */}
-      {issueNotice && (
-        <p
-          role="status"
-          data-testid="sheet-issue-notice"
-          className={
-            issueNotice.level === 'error'
-              ? 'text-sm text-red-600 dark:text-red-400'
-              : 'text-sm text-amber-600 dark:text-amber-400'
-          }
-        >
-          {t(`tools.sheet.issue.${issueNotice.code}`)}
-        </p>
-      )}
-
-      {failure && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-          {translateToolError('tools.sheet', failure)}
-        </p>
-      )}
 
       <FidelityDialog
         report={fidelity}
