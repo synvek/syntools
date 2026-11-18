@@ -791,6 +791,10 @@ const de = {
       name: 'PDF annotieren',
       description: 'Hervorhebungen, Freihand, Formen und Text auf PDF-Seiten zeichnen',
     },
+    'pdf-editor': {
+      name: 'PDF-Editor',
+      description: 'PDF lokal öffnen, bearbeiten und speichern – ohne Upload',
+    },
   },
 } satisfies ShellResources;
 

@@ -8,5 +8,6 @@ export const pdfWatermarkTool: ToolMeta = {
   keywords: ['pdf', 'watermark', '水印', '文字', '印章', '标记'],
   icon: 'watermark',
   component: () => import('./PdfWatermarkTool'),
+  weight: 23,
   relatedIds: ['image-watermark', 'pdf-merge'],
 };

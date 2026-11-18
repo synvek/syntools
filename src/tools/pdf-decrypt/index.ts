@@ -8,5 +8,6 @@ export const pdfDecryptTool: ToolMeta = {
   keywords: ['pdf', 'decrypt', 'unlock', 'password', '解密', '移除密码'],
   icon: 'unlock',
   component: () => import('./PdfDecryptTool'),
+  weight: 21,
   relatedIds: ['pdf-encrypt', 'pdf-extract-text'],
 };

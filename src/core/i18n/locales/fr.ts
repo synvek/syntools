@@ -800,6 +800,10 @@ const fr = {
       name: 'Annoter un PDF',
       description: 'Dessiner surlignages, traits libres, formes et texte sur les pages PDF',
     },
+    'pdf-editor': {
+      name: 'Éditeur PDF',
+      description: 'Ouvrir, modifier et enregistrer un PDF en local, sans envoi',
+    },
   },
 } satisfies ShellResources;
 

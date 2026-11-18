@@ -17,9 +17,17 @@ export type PageNumberPosition = 'bottom-center' | 'bottom-right' | 'bottom-left
 
 export type HAlign = 'left' | 'center' | 'right';
 
-function parseColor(hex: string): RGB {
+export function parseColor(hex: string): RGB {
   const h = hex.replace('#', '');
-  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  const n = parseInt(
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h,
+    16,
+  );
   if (Number.isNaN(n)) return rgb(0.2, 0.2, 0.2);
   return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
 }
@@ -46,7 +54,7 @@ export function getVisualPageSize(page: PDFPage): { width: number; height: numbe
  *
  * @see https://github.com/Hopding/pdf-lib/issues/147
  */
-function beginVisualDraw(page: PDFPage): void {
+export function beginVisualDraw(page: PDFPage): void {
   const rot = normalizePageRotation(page.getRotation().angle);
   if (rot === 0) return;
   const { width, height } = getVisualPageSize(page);
@@ -60,7 +68,14 @@ function beginVisualDraw(page: PDFPage): void {
   }
 }
 
-function endVisualDraw(page: PDFPage): void {
+/**
+ * Export of the rotation-cancelling CTM wrapper.
+ *
+ * The PDF editor draws overlay objects at save time with the same convention as the single-purpose
+ * tools (visual coordinates), so a second copy of this math would be a rotation bug waiting to
+ * happen. Implementation is unchanged — only the visibility moved.
+ */
+export function endVisualDraw(page: PDFPage): void {
   const rot = normalizePageRotation(page.getRotation().angle);
   if (rot === 0) return;
   page.pushOperators(popGraphicsState());
@@ -237,9 +252,7 @@ export async function addTextToPages(
     const color = parseColor(opts.color ?? '#111111');
     const pages = doc.getPages();
     const indices =
-      opts.pageIndices && opts.pageIndices.length > 0
-        ? opts.pageIndices
-        : pages.map((_, i) => i);
+      opts.pageIndices && opts.pageIndices.length > 0 ? opts.pageIndices : pages.map((_, i) => i);
     for (const i of indices) {
       if (i < 0 || i >= pages.length) continue;
       const page = pages[i];
@@ -293,9 +306,7 @@ export async function embedImageOnPages(
     const image = isPng ? await doc.embedPng(imageBytes) : await doc.embedJpg(imageBytes);
     const pages = doc.getPages();
     const indices =
-      opts.pageIndices && opts.pageIndices.length > 0
-        ? opts.pageIndices
-        : pages.map((_, i) => i);
+      opts.pageIndices && opts.pageIndices.length > 0 ? opts.pageIndices : pages.map((_, i) => i);
     const w = opts.width ?? Math.min(160, image.width);
     const h = opts.height ?? (w * image.height) / image.width;
     for (const i of indices) {
@@ -353,8 +364,7 @@ export async function cropPages(
 ): Promise<ToolResult<Uint8Array>> {
   try {
     const pages = doc.getPages();
-    const indices =
-      pageIndices && pageIndices.length > 0 ? pageIndices : pages.map((_, i) => i);
+    const indices = pageIndices && pageIndices.length > 0 ? pageIndices : pages.map((_, i) => i);
     for (const i of indices) {
       if (i < 0 || i >= pages.length) continue;
       const page = pages[i];
@@ -375,14 +385,7 @@ export async function cropPages(
   }
 }
 
-export type AnnotateKind =
-  | 'highlight'
-  | 'line'
-  | 'rect'
-  | 'ellipse'
-  | 'circle'
-  | 'pen'
-  | 'text';
+export type AnnotateKind = 'highlight' | 'line' | 'rect' | 'ellipse' | 'circle' | 'pen' | 'text';
 
 export type PdfAnnotation =
   | {

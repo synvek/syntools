@@ -8,5 +8,6 @@ export const pdfExtractTextTool: ToolMeta = {
   keywords: ['pdf', 'text', 'extract', '提取', '文本', 'ocr', '内容'],
   icon: 'text',
   component: () => import('./PdfExtractTextTool'),
+  weight: 22,
   relatedIds: ['pdf-viewer', 'pdf-decrypt'],
 };

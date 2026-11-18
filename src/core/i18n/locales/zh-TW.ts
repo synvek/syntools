@@ -758,6 +758,10 @@ const zhTW = {
       name: 'PDF 標注',
       description: '在頁面上可視化繪制高亮、畫筆、形狀與文本',
     },
+    'pdf-editor': {
+      name: 'PDF 編輯器',
+      description: '本機開啟、編輯並儲存 PDF，不上傳檔案',
+    },
   },
 } satisfies ShellResources;
 

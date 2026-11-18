@@ -743,6 +743,10 @@ const en = {
       name: 'Annotate PDF',
       description: 'Draw highlights, freehand, shapes, and text on PDF pages',
     },
+    'pdf-editor': {
+      name: 'PDF Editor',
+      description: 'Open, edit and save PDFs locally without uploading',
+    },
   },
 } satisfies ShellResources;
 

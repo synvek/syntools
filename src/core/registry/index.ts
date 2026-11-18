@@ -104,6 +104,7 @@ import { pdfEncryptTool } from '@/tools/pdf-encrypt';
 import { pdfCropTool } from '@/tools/pdf-crop';
 import { pdfGrayscaleTool } from '@/tools/pdf-grayscale';
 import { pdfAnnotateTool } from '@/tools/pdf-annotate';
+import { pdfEditorTool } from '@/tools/pdf-editor';
 import { richTextEditorTool } from '@/tools/rich-text-editor';
 import { slideEditorTool } from '@/tools/slide-editor';
 import { spreadsheetEditorTool } from '@/tools/spreadsheet-editor';
@@ -301,6 +302,7 @@ export const tools: ToolMeta[] = [
   pdfCropTool,
   pdfGrayscaleTool,
   pdfAnnotateTool,
+  pdfEditorTool,
   bmiCalculatorTool,
   mbtiTestTool,
   uaParserTool,

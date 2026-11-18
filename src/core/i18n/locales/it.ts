@@ -789,6 +789,10 @@ const it = {
       name: 'Annota PDF',
       description: 'Disegna evidenziazioni, a mano libera, forme e testo sulle pagine PDF',
     },
+    'pdf-editor': {
+      name: 'Editor PDF',
+      description: 'Apri, modifica e salva PDF in locale, senza caricamenti',
+    },
   },
 } satisfies ShellResources;
 

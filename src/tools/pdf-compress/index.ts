@@ -8,5 +8,7 @@ export const pdfCompressTool: ToolMeta = {
   keywords: ['pdf', 'compress', 'shrink', '压缩', '减小体积', '优化'],
   icon: 'archive',
   component: () => import('./PdfCompressTool'),
+  // Explicit weight: an undefined weight sorted as 0 and pushed this tool above the "editor" entry
+  weight: 20,
   relatedIds: ['pdf-to-image', 'image-compress'],
 };

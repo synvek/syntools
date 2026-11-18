@@ -776,6 +776,10 @@ const ja = {
       name: 'PDF 注釈',
       description: 'ハイライト、フリーハンド、図形、テキストを PDF ページに描画',
     },
+    'pdf-editor': {
+      name: 'PDF エディター',
+      description: 'PDF をローカルで開いて編集・保存（アップロードなし）',
+    },
   },
 } satisfies ShellResources;
 

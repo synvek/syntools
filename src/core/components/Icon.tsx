@@ -751,6 +751,13 @@ const icons: Record<string, ReactNode> = {
       <path d="M14 3v5h5M8 15h5M9 12h7" />
     </>
   ),
+  pdfEdit: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5" />
+      <path d="M14 3v5h5" />
+      <path d="m20 11 2 2-5.5 5.5H14V16z" />
+    </>
+  ),
   richText: (
     <>
       <path d="M4 6h16M4 11h10M4 16h16" />

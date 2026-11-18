@@ -795,6 +795,10 @@ const pt = {
       name: 'Anotar PDF',
       description: 'Desenhe realces, à mão livre, formas e texto em páginas PDF',
     },
+    'pdf-editor': {
+      name: 'Editor de PDF',
+      description: 'Abra, edite e salve PDF localmente, sem enviar',
+    },
   },
 } satisfies ShellResources;
 

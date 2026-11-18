@@ -791,6 +791,10 @@ const es = {
       name: 'Anotar PDF',
       description: 'Dibuja resaltados, a mano alzada, formas y texto en páginas PDF',
     },
+    'pdf-editor': {
+      name: 'Editor de PDF',
+      description: 'Abre, edita y guarda PDF en local, sin subirlo',
+    },
   },
 } satisfies ShellResources;
 
