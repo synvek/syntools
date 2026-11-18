@@ -103,7 +103,11 @@ export function SheetNotices(props: SheetNoticesProps) {
       />
 
       {draftNotice && (
-        <p role="status" className="text-sm text-amber-700 dark:text-amber-400">
+        <p
+          role="status"
+          data-testid="sheet-draft-notice"
+          className="text-sm text-amber-700 dark:text-amber-400"
+        >
           {draftNotice === 'degraded'
             ? t('tools.sheet.draftDegraded')
             : t('tools.sheet.draftSaveFailed')}

@@ -1303,6 +1303,8 @@ export default function SpreadsheetTool() {
         type="file"
         accept=".xlsx,.xlsm,.ods,.csv"
         className="hidden"
+        // e2e 的导入入口（与富文本的 `rich-text-import-input` 同一约定）：`openImport` 只改 accept 再点一下
+        data-testid="sheet-import-input"
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = '';
