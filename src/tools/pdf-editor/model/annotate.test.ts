@@ -19,6 +19,8 @@ describe('工具分类', () => {
     expect(isShapeTool('ink')).toBe(false);
     expect(isDrawingTool('ink')).toBe(true);
     expect(isDrawingTool('strikeout')).toBe(true);
+    // 文本框与形状一样靠拖拽放置
+    expect(isDrawingTool('text')).toBe(true);
     expect(isDrawingTool('note')).toBe(false);
   });
 

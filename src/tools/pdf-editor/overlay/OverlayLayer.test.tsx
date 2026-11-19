@@ -95,21 +95,37 @@ afterEach(() => {
 });
 
 describe('OverlayLayer', () => {
-  it('双击空白处创建文本框并进入编辑', () => {
-    render(<Harness />);
+  /** jsdom 没有 PointerEvent：用同名 MouseEvent 才能带上 clientX / clientY */
+  const drag = (type: 'pointerdown' | 'pointermove' | 'pointerup', x: number, y: number) =>
+    new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
 
-    fireEvent.doubleClick(screen.getByTestId('pdf-overlay'), { clientX: 300, clientY: 400 });
+  /** 文本框像形状一样拖出来，松开后自动进入编辑 */
+  const dragOutTextBox = () => {
+    const overlay = screen.getByTestId('pdf-overlay');
+    fireEvent(overlay, drag('pointerdown', 120, 160));
+    fireEvent(overlay, drag('pointermove', 320, 260));
+    fireEvent(overlay, drag('pointerup', 320, 260));
+  };
 
-    const input = screen.getByTestId('pdf-text-input');
-    expect(input).toHaveFocus();
+  it('文本框工具拖出矩形后自动进入编辑', () => {
+    render(<Harness tool="text" />);
+
+    const overlay = screen.getByTestId('pdf-overlay');
+    fireEvent(overlay, drag('pointerdown', 120, 160));
+    // 拖动过程中有虚线预览，而不是点一下凭空出现
+    expect(screen.getByTestId('pdf-annotation-preview')).toBeInTheDocument();
+    fireEvent(overlay, drag('pointermove', 320, 260));
+    fireEvent(overlay, drag('pointerup', 320, 260));
+
+    expect(screen.getByTestId('pdf-text-input')).toHaveFocus();
     const box = screen.getByTestId('pdf-text-object');
     expect(box).toHaveAttribute('data-editing', 'true');
     expect(box).toHaveAttribute('data-selected', 'true');
   });
 
   it('输入后失焦提交为文本对象', () => {
-    render(<Harness />);
-    fireEvent.doubleClick(screen.getByTestId('pdf-overlay'), { clientX: 300, clientY: 400 });
+    render(<Harness tool="text" />);
+    dragOutTextBox();
 
     fireEvent.change(screen.getByTestId('pdf-text-input'), { target: { value: 'Hello' } });
     fireEvent.blur(screen.getByTestId('pdf-text-input'));
@@ -120,9 +136,73 @@ describe('OverlayLayer', () => {
   });
 
   it('空白内容失焦后丢弃对象', () => {
-    render(<Harness />);
-    fireEvent.doubleClick(screen.getByTestId('pdf-overlay'), { clientX: 100, clientY: 100 });
+    render(<Harness tool="text" />);
+    dragOutTextBox();
     fireEvent.blur(screen.getByTestId('pdf-text-input'));
+
+    expect(screen.queryByTestId('pdf-text-object')).toBeNull();
+  });
+
+  it('双击已有文本框重新进入编辑', () => {
+    const object = createTextObject({
+      page: PAGE_ID,
+      rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.1 },
+      text: 'Existing',
+      z: 1,
+      id: 'obj-edit',
+    });
+    render(<Harness initial={[object]} />);
+
+    fireEvent.doubleClick(screen.getByTestId('pdf-text-object'), { clientX: 90, clientY: 140 });
+
+    expect(screen.getByTestId('pdf-text-input')).toHaveFocus();
+    expect(screen.getByTestId('pdf-text-object')).toHaveAttribute('data-editing', 'true');
+  });
+
+  it('文本框工具下连按两次也能进入编辑（不依赖浏览器 dblclick）', () => {
+    const object = createTextObject({
+      page: PAGE_ID,
+      rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.1 },
+      text: 'One',
+      z: 1,
+      id: 'obj-press',
+    });
+    render(<Harness initial={[object]} tool="text" />);
+
+    const box = screen.getByTestId('pdf-text-object');
+    fireEvent(box, drag('pointerdown', 90, 140));
+    fireEvent(box, drag('pointerdown', 92, 142));
+
+    expect(screen.getByTestId('pdf-text-input')).toHaveFocus();
+    expect(box).toHaveAttribute('data-editing', 'true');
+  });
+
+  it('两次按下间隔过久时只选中，不进入编辑', () => {
+    const object = createTextObject({
+      page: PAGE_ID,
+      rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.1 },
+      text: 'One',
+      z: 1,
+      id: 'obj-slow',
+    });
+    render(<Harness initial={[object]} />);
+
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000);
+    const box = screen.getByTestId('pdf-text-object');
+    fireEvent(box, drag('pointerdown', 90, 140));
+
+    now.mockReturnValue(2_000);
+    fireEvent(box, drag('pointerdown', 92, 142));
+
+    expect(screen.queryByTestId('pdf-text-input')).toBeNull();
+    expect(box).toHaveAttribute('data-selected', 'true');
+  });
+
+  it('双击空白不再创建文本框', () => {
+    render(<Harness />);
+
+    fireEvent.doubleClick(screen.getByTestId('pdf-overlay'), { clientX: 300, clientY: 400 });
 
     expect(screen.queryByTestId('pdf-text-object')).toBeNull();
   });

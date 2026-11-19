@@ -70,6 +70,10 @@ interface OverlayLayerProps {
 /** Default box: two text lines wide enough to type into without resizing first */
 const NEW_BOX_WIDTH = 0.36;
 
+/** Double-press detection for "open the text editor": time window and normalized movement slop */
+const DOUBLE_PRESS_MS = 350;
+const DOUBLE_PRESS_SLOP = 0.01;
+
 /** Distance from the frame to the rotate handle, in CSS px */
 const ROTATE_HANDLE_OFFSET = 24;
 
@@ -161,6 +165,8 @@ export function OverlayLayer({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [pageSize, setPageSize] = useState<PagePixelSize>({ width: 0, height: 0 });
   const gestureRef = useRef<Gesture | null>(null);
+  /** Previous press on an object, used to detect a double press without waiting for `dblclick` */
+  const lastPressRef = useRef<{ id: string; at: number; x: number; y: number } | null>(null);
   const [marquee, setMarquee] = useState<NormRect | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
 
@@ -207,37 +213,23 @@ export function OverlayLayer({
     return Math.min(0.25, Math.max(0.02, (11 * 1.35 * 2) / (box.height / scale)));
   };
 
-  const createTextAt = (point: NormPoint) => {
-    const height = newTextBoxHeight();
-    const id = onCreate(
-      clampNormRect({
-        x: point.x - NEW_BOX_WIDTH / 2,
-        y: point.y,
-        w: NEW_BOX_WIDTH,
-        h: height,
-      }),
-    );
-    if (id) onStartEdit(id);
-  };
-
+  /**
+   * Double-click re-enters a text box for editing.
+   *
+   * It used to create a new box on empty paper instead, which made creation a hidden gesture and left
+   * existing boxes uneditable — once a text object was deselected there was no way back into it.
+   * Creation now comes from dragging with the text tool, like every other object.
+   */
   const onDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
-    // Creating a box is an edit: the hand tool must not do it
+    // Fallback for the browser's own dblclick; the pointerdown pair above is the reliable path
     if (tool === 'hand') return;
-    const element = rootRef.current;
-    if (!element) return;
-    // Only a double-click on the page itself creates a box, not on an existing one
-    if (event.target !== element) return;
-
-    const box = element.getBoundingClientRect();
-    if (box.width <= 0 || box.height <= 0) return;
-
-    const x = (event.clientX - box.left) / box.width;
-    const y = (event.clientY - box.top) / box.height;
-    const heightPt = box.height / scale;
-    const h = Math.min(0.25, Math.max(0.02, (11 * 1.35 * 2) / heightPt));
-
-    const id = onCreate(clampNormRect({ x: x - NEW_BOX_WIDTH / 2, y, w: NEW_BOX_WIDTH, h }));
-    if (id) onStartEdit(id);
+    const owner = (event.target as HTMLElement).closest<HTMLElement>('[data-object-id]');
+    const id = owner?.dataset.objectId;
+    if (!id) return;
+    const object = visible.find((candidate) => candidate.id === id);
+    if (object?.kind !== 'text' || object.locked || editingId === id) return;
+    event.stopPropagation();
+    onStartEdit(id);
   };
 
   const capture = (event: ReactPointerEvent<HTMLElement>) => {
@@ -274,12 +266,6 @@ export function OverlayLayer({
       return true;
     }
 
-    if (tool === 'text') {
-      createTextAt(point);
-      event.stopPropagation();
-      return true;
-    }
-
     if (tool === 'patch') {
       // The text layer above this one normally takes these clicks; consuming here only happens when
       // that page has no lines, and it must never fall through to a selection drag.
@@ -298,6 +284,50 @@ export function OverlayLayer({
     return true;
   };
 
+  /**
+   * Second press on the same text box opens the editor, decided on `pointerdown` instead of waiting
+   * for `dblclick`. That event proved unreliable over canvas text: the browser selects the word under
+   * the pointer, the first press's pointer capture swallows the pair, so users needed three or four
+   * double-clicks — and a box holding a single word could never be opened at all.
+   *
+   * Returns true when the press was consumed by entering edit mode.
+   */
+  const openTextEditor = (
+    target: HTMLElement,
+    point: NormPoint,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ): boolean => {
+    const id = target.closest<HTMLElement>('[data-object-id]')?.dataset.objectId;
+    if (!id) {
+      lastPressRef.current = null;
+      return false;
+    }
+
+    const now = Date.now();
+    const lastPress = lastPressRef.current;
+    lastPressRef.current = { id, at: now, x: point.x, y: point.y };
+
+    const object = visible.find((candidate) => candidate.id === id);
+    const repeat =
+      lastPress !== null &&
+      lastPress.id === id &&
+      now - lastPress.at <= DOUBLE_PRESS_MS &&
+      Math.abs(point.x - lastPress.x) <= DOUBLE_PRESS_SLOP &&
+      Math.abs(point.y - lastPress.y) <= DOUBLE_PRESS_SLOP;
+
+    if (!repeat || object?.kind !== 'text' || object.locked || editingId === id) return false;
+
+    lastPressRef.current = null;
+    // The first press may have armed a move gesture; this press must not drag the box around
+    gestureRef.current = null;
+    // Also stops the browser's word selection under the pointer
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect([id]);
+    onStartEdit(id);
+    return true;
+  };
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     // Hand tool: every press belongs to the canvas pan. Without this the overlay still selected,
     // moved or marquee'd whatever was under the pointer, so 平移 behaved exactly like 选择 as soon
@@ -313,6 +343,9 @@ export function OverlayLayer({
       if (owner?.dataset.objectId) onSelect([owner.dataset.objectId]);
       return;
     }
+
+    // Before any tool takes the press: a double press on a text box always means "edit this text"
+    if (openTextEditor(target, point, event)) return;
 
     if (isAnnotateTool(tool) && beginAnnotate(point, event)) return;
 
@@ -481,6 +514,23 @@ export function OverlayLayer({
       if (points.length >= 2) {
         onAnnotate?.({ kind: 'ink', rect: trackRect(points), points });
       }
+      return;
+    }
+
+    if (gesture.tool === 'text') {
+      // Drag out the box like a shape; a plain click still drops the default two-line box
+      const rect = dragRect(gesture.start, gesture.current);
+      const id = onCreate(
+        isUsableDrag(rect)
+          ? rect
+          : clampNormRect({
+              x: gesture.start.x - NEW_BOX_WIDTH / 2,
+              y: gesture.start.y,
+              w: NEW_BOX_WIDTH,
+              h: newTextBoxHeight(),
+            }),
+      );
+      if (id) onStartEdit(id);
     }
   };
 
@@ -688,6 +738,16 @@ function AnnotationPreview({ draft, style }: { draft: Draft; style: AnnotationSt
           tool === 'ellipse' ? 'rounded-full' : ''
         }`}
         style={{ ...box, borderColor: style.shapeStroke }}
+      />
+    );
+  }
+
+  if (tool === 'text') {
+    return (
+      <div
+        data-testid="pdf-annotation-preview"
+        className="pointer-events-none absolute border border-dashed border-[#2563eb] bg-[#2563eb]/5"
+        style={box}
       />
     );
   }

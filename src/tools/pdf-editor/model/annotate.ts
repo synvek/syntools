@@ -33,9 +33,14 @@ export function isShapeTool(tool: PdfTool): tool is ShapeTool {
   return (SHAPE_TOOLS as readonly string[]).includes(tool);
 }
 
-/** Tools that paint by dragging on the page (the eraser and note are click tools) */
+/**
+ * Tools that draw by dragging on the page (the eraser and note are click tools).
+ *
+ * The text box belongs here too: like a shape it is placed by dragging out its rectangle, instead of
+ * being conjured by a double-click on empty paper.
+ */
 export function isDrawingTool(tool: PdfTool): boolean {
-  return isMarkupTool(tool) || isShapeTool(tool) || tool === 'ink';
+  return isMarkupTool(tool) || isShapeTool(tool) || tool === 'ink' || tool === 'text';
 }
 
 /** True when the tool owns the pointer, so selection must not start a drag */

@@ -47,7 +47,9 @@ function TextObjectView({ object, scale }: { object: PdfTextObject; scale: numbe
   return (
     <div
       style={textCss(object, scale)}
-      className="h-full w-full overflow-hidden whitespace-pre-wrap break-words"
+      // `select-none`: without it a double-click selects the word under the pointer, so the box could
+      // not be opened for editing reliably (and dragging sometimes started a text selection instead)
+      className="h-full w-full select-none overflow-hidden whitespace-pre-wrap break-words"
     >
       {object.text}
     </div>
