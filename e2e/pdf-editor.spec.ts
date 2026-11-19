@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { PDFDocument } from '@cantoo/pdf-lib';
 
 // Tool copy follows the UI locale; assertions rely on Simplified Chinese
 test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
@@ -270,5 +272,140 @@ test.describe('PDF 编辑器（M3/M4）', () => {
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('pdf-image-confirm').click();
     expect((await downloadPromise).suggestedFilename()).toBe('three-pages.png');
+  });
+});
+
+test.describe('PDF 编辑器（M2-9 / M3-6）', () => {
+  test('矩形与画笔都能保存', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+    await page.getByRole('tab', { name: '注释' }).click();
+
+    const overlay = page.getByTestId('pdf-overlay').first();
+    const box = await overlay.boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+
+    // Rectangle: drag once and expect a shape object
+    await page.getByTestId('ribbon-shapes-rect').click();
+    await page.mouse.move(box.x + 60, box.y + 60);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 200, box.y + 150, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.getByTestId('pdf-object').first()).toHaveAttribute('data-kind', 'shape');
+
+    // Selecting the shape switched the ribbon to its contextual tab; go back to 注释 for the pen
+    await page.getByTestId('ribbon-tab-annotate').click();
+    await page.getByTestId('ribbon-ink-ink').click();
+    await page.mouse.move(box.x + 260, box.y + 60);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 310, box.y + 100, { steps: 3 });
+    await page.mouse.move(box.x + 360, box.y + 60, { steps: 3 });
+    await page.mouse.up();
+    await expect(page.locator('[data-testid="pdf-object"][data-kind="ink"]')).toHaveCount(1);
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.keyboard.press('Control+s');
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages-edited.pdf');
+  });
+
+  test('点选原文本行可修补并保存', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+    await page.getByRole('tab', { name: '注释' }).click();
+    await page.getByTestId('ribbon-insert-patch').click();
+
+    const hint = page.getByTestId('pdf-patch-hint');
+    if (await hint.isVisible().catch(() => false)) {
+      await page.getByTestId('pdf-patch-hint-dismiss').click();
+    }
+
+    const line = page.getByTestId('pdf-text-line').first();
+    await expect(line).toBeVisible();
+    const lineBox = await line.boundingBox();
+    expect(lineBox).not.toBeNull();
+    if (!lineBox) return;
+
+    // Text lines are pointer-events-none; the click must land on the layer at the same spot
+    await page.mouse.click(lineBox.x + lineBox.width / 2, lineBox.y + lineBox.height / 2);
+
+    const input = page.getByTestId('pdf-text-input');
+    await expect(input).toBeVisible();
+    await input.fill('E2E 修补');
+    await input.press('Escape');
+
+    await expect(page.getByTestId('pdf-text-object')).toHaveCount(1);
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.keyboard.press('Control+s');
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages-edited.pdf');
+  });
+
+  test('手写签名落到页面上', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+    await page.getByRole('tab', { name: '注释' }).click();
+    await page.getByTestId('ribbon-insert-signature').click();
+
+    const canvas = page.getByTestId('pdf-signature-canvas');
+    await expect(canvas).toBeVisible();
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+
+    await page.mouse.move(box.x + 40, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 90, box.y + box.height / 2 - 30, { steps: 4 });
+    await page.mouse.move(box.x + 140, box.y + box.height / 2 + 10, { steps: 4 });
+    await page.mouse.up();
+    await page.getByTestId('pdf-signature-apply').click();
+
+    await expect(page.getByTestId('pdf-object').first()).toHaveAttribute('data-kind', 'signature');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.keyboard.press('Control+s');
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages-edited.pdf');
+  });
+
+  test('旋转 90° + 非零 CropBox 的页面文本可命中', async ({ page }) => {
+    await openPdf(page, 'rotated-cropbox.pdf');
+    await page.getByTestId('ribbon-tab-annotate').click();
+    await page.getByTestId('ribbon-insert-patch').click();
+
+    const hint = page.getByTestId('pdf-patch-hint');
+    if (await hint.isVisible().catch(() => false)) {
+      await page.getByTestId('pdf-patch-hint-dismiss').click();
+    }
+
+    const line = page.getByTestId('pdf-text-line').first();
+    await expect(line).toBeVisible();
+    const lineBox = await line.boundingBox();
+    expect(lineBox).not.toBeNull();
+    if (!lineBox) return;
+
+    await page.mouse.click(lineBox.x + lineBox.width / 2, lineBox.y + lineBox.height / 2);
+    const input = page.getByTestId('pdf-text-input');
+    await expect(input).toBeVisible();
+    await input.fill('Rotated patch');
+    await input.press('Escape');
+    await expect(page.getByTestId('pdf-text-object')).toHaveCount(1);
+  });
+
+  test('删除一页后保存，下载文件只剩两页', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+    await page.getByRole('tab', { name: '视图' }).click();
+    await page.getByTestId('ribbon-panels-thumbnails').click();
+    await expect(page.getByTestId('pdf-page-toolbar')).toBeVisible();
+
+    await page.getByTestId('pdf-page-delete').click();
+    await expect(page.getByTestId('pdf-status-page')).toHaveText(/\/ 2 页/);
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.keyboard.press('Control+s');
+    const download = await downloadPromise;
+    const path = await download.path();
+    expect(path).not.toBeNull();
+    if (!path) return;
+
+    const bytes = await readFile(path);
+    const saved = await PDFDocument.load(bytes);
+    expect(saved.getPageCount()).toBe(2);
   });
 });

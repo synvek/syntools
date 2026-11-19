@@ -29,6 +29,7 @@ import { exportPdfToDocx } from './io/exportDocx';
 import { exportPdfImages } from './io/exportImages';
 import { collectPdfText, encodeText, textFileName } from './io/exportText';
 import { readImageBlob, readImageFile, placeImageRect, type ImportedImage } from './io/imageImport';
+import { memoryPressure, readMemoryInfo } from './io/memoryHint';
 import { downloadPageZip } from './io/pageExport';
 import { flattenPdf } from './io/savePdf';
 import { createStampImage, STAMP_LABEL_KEYS, type StampKey } from './io/stampImage';
@@ -220,6 +221,8 @@ export default function PdfEditorTool() {
   const [fidelityReport, setFidelityReport] = useState<FidelityReport | null>(null);
   /** Set by the large-file prompt: the user explicitly asked for thumbnails anyway */
   const [thumbsForced, setThumbsForced] = useState(false);
+  /** Fingerprint already warned about; a new document may warn again (M4-5) */
+  const memoryWarnedRef = useRef<string | null>(null);
   /** M3-3 crop dialog; the target is always the single selected image */
   const [cropOpen, setCropOpen] = useState(false);
   /** M4-5: page progress while the flattened file is being rebuilt */
@@ -562,7 +565,10 @@ export default function PdfEditorTool() {
       });
       mutate((current) => addObject(current, object), { label: 'patch-text' });
       setSelectedIds([object.id]);
-      setEditingId(object.id);
+      // Start editing after the click sequence completes. Mounting the textarea during `pointerdown`
+      // makes the browser dispatch `click` to a common ancestor (mousedown on the text layer, mouseup
+      // on the textarea), which blurs the fresh textarea and closes edit mode immediately.
+      setTimeout(() => setEditingId(object.id), 0);
     },
     [doc?.objects, mutate],
   );
@@ -1397,6 +1403,15 @@ export default function PdfEditorTool() {
     },
     [],
   );
+
+  // One banner per document when the heap is nearly full (Chromium only)
+  const openFingerprint = doc?.source.fingerprint ?? null;
+  useEffect(() => {
+    if (pdf.status !== 'ready' || !openFingerprint) return;
+    if (memoryWarnedRef.current === openFingerprint) return;
+    memoryWarnedRef.current = openFingerprint;
+    if (memoryPressure(readMemoryInfo())) setBanner(t('tools.pdfEditor.memoryHint'));
+  }, [pdf.status, openFingerprint, t]);
 
   // Closing the document also drops its bitmaps, without waiting for the tool to unmount
   const hasDocument = doc !== null;

@@ -53,6 +53,7 @@ export const editStrings: Record<string, StringTree> = {
     stampClose: '关闭',
     thumbsLargeHint: '文件较大（超过 20 MB），默认不生成缩略图以保持流畅。',
     thumbsGenerate: '仍要生成缩略图',
+    memoryHint: '浏览器内存占用较高（>85%），保存大文件可能失败，建议关闭其他标签页。',
     cmdCropImage: '裁剪图片',
     cropTitle: '裁剪图片',
     cropHint: '拖动四角调整保留区域，拖动中间移动裁剪框',
@@ -105,6 +106,7 @@ export const editStrings: Record<string, StringTree> = {
     stampClose: '關閉',
     thumbsLargeHint: '檔案較大（超過 20 MB），預設不產生縮圖以保持流暢。',
     thumbsGenerate: '仍要產生縮圖',
+    memoryHint: '瀏覽器記憶體佔用較高（>85%），儲存大檔案可能失敗，建議關閉其他分頁。',
     cmdCropImage: '裁切圖片',
     cropTitle: '裁切圖片',
     cropHint: '拖曳四角調整保留區域，拖曳中間移動裁切框',
@@ -158,6 +160,8 @@ export const editStrings: Record<string, StringTree> = {
     thumbsLargeHint:
       'Large file (over 20 MB): thumbnails are off by default to keep scrolling smooth.',
     thumbsGenerate: 'Generate thumbnails anyway',
+    memoryHint:
+      'Browser memory is over 85% full; saving a large file may fail. Close other tabs first.',
     cmdCropImage: 'Crop image',
     cropTitle: 'Crop image',
     cropHint: 'Drag a corner to resize, drag the middle to move',
@@ -211,6 +215,8 @@ export const editStrings: Record<string, StringTree> = {
     thumbsLargeHint:
       '大きなファイル（20 MB 超）のため、滑らかさを優先してサムネイルを生成していません。',
     thumbsGenerate: 'それでもサムネイルを生成',
+    memoryHint:
+      'ブラウザのメモリ使用率が 85% を超えています。大きいファイルの保存に失敗する可能性があります。',
     cmdCropImage: '画像を切り抜き',
     cropTitle: '画像を切り抜き',
     cropHint: '四隅をドラッグして範囲を調整、中央をドラッグして移動',
@@ -264,6 +270,8 @@ export const editStrings: Record<string, StringTree> = {
     thumbsLargeHint:
       'Fichier volumineux (> 20 Mo) : les vignettes sont désactivées pour rester fluide.',
     thumbsGenerate: 'Générer les vignettes quand même',
+    memoryHint:
+      'Mémoire du navigateur à plus de 85 % : l’enregistrement d’un gros fichier peut échouer.',
     cmdCropImage: "Rogner l'image",
     cropTitle: "Rogner l'image",
     cropHint: 'Faites glisser un coin pour redimensionner, le centre pour déplacer',
@@ -317,6 +325,8 @@ export const editStrings: Record<string, StringTree> = {
     thumbsLargeHint:
       'Große Datei (> 20 MB): Miniaturansichten bleiben aus, damit es flüssig bleibt.',
     thumbsGenerate: 'Miniaturansichten trotzdem erzeugen',
+    memoryHint:
+      'Browser-Speicher über 85 % belegt: Das Speichern großer Dateien kann fehlschlagen.',
     cmdCropImage: 'Bild zuschneiden',
     cropTitle: 'Bild zuschneiden',
     cropHint: 'Ecke ziehen zum Ändern, Mitte ziehen zum Verschieben',
@@ -369,6 +379,7 @@ export const editStrings: Record<string, StringTree> = {
     stampClose: 'Chiudi',
     thumbsLargeHint: 'File grande (> 20 MB): miniature disattivate per mantenere la fluidità.',
     thumbsGenerate: 'Genera comunque le miniature',
+    memoryHint: 'Memoria del browser oltre l’85%: il salvataggio di file grandi può fallire.',
     cmdCropImage: 'Ritaglia immagine',
     cropTitle: 'Ritaglia immagine',
     cropHint: 'Trascina un angolo per ridimensionare, il centro per spostare',
@@ -422,6 +433,7 @@ export const editStrings: Record<string, StringTree> = {
     thumbsLargeHint:
       'Archivo grande (> 20 MB): las miniaturas están desactivadas para mantener la fluidez.',
     thumbsGenerate: 'Generar miniaturas igualmente',
+    memoryHint: 'Memoria del navegador por encima del 85 %: guardar archivos grandes puede fallar.',
     cmdCropImage: 'Recortar imagen',
     cropTitle: 'Recortar imagen',
     cropHint: 'Arrastra una esquina para ajustar, el centro para mover',
@@ -474,6 +486,7 @@ export const editStrings: Record<string, StringTree> = {
     stampClose: 'Fechar',
     thumbsLargeHint: 'Ficheiro grande (> 20 MB): miniaturas desativadas para manter a fluidez.',
     thumbsGenerate: 'Gerar miniaturas mesmo assim',
+    memoryHint: 'Memória do navegador acima de 85%: guardar ficheiros grandes pode falhar.',
     cmdCropImage: 'Recortar imagem',
     cropTitle: 'Recortar imagem',
     cropHint: 'Arraste um canto para ajustar, o centro para mover',
