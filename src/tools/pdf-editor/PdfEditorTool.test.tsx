@@ -156,6 +156,9 @@ describe('PdfEditorTool 打开流程', () => {
 
     await waitFor(() => expect(screen.getByTestId('pdf-ribbon')).toBeInTheDocument());
 
+    // 翻页命令在「视图」标签里（浏览类命令，不是编辑类）
+    fireEvent.click(screen.getByRole('tab', { name: '视图' }));
+
     fireEvent.click(screen.getByTestId('ribbon-navigate-next'));
     await waitFor(() =>
       expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('第 2 / 3 页'),
@@ -356,6 +359,7 @@ describe('PdfEditorView 表现层', () => {
     expect(screen.queryByText('打开一份 PDF 开始编辑')).toBeNull();
     expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('第 1 / 3 页');
 
+    fireEvent.click(screen.getByRole('tab', { name: '视图' }));
     fireEvent.click(screen.getByTestId('ribbon-navigate-next'));
     expect(actions.nextPage).toHaveBeenCalledTimes(1);
   });

@@ -31,13 +31,12 @@ export type PdfPanel = 'thumbnails' | 'outline' | 'properties' | 'annotations';
 /**
  * Contextual tabs, Word style: present only while a matching object is selected.
  *
- * Annotations have no tab of their own any more. The annotation, page-editing and annotation-format
- * tabs held three or four groups each, so every command was one click deeper than necessary; their
- * commands now live in `开始`, and the object format controls there follow the selection the same way
- * the contextual tabs do. Text and image boxes still get a tab because their formatting is wide enough
- * to earn one.
+ * Only images keep a tab. Annotation, page-editing, annotation-format and text-box-format tabs held
+ * two or three groups each, and a tab that appears only after a selection is invisible until the user
+ * happens to click an object — the commands read as missing rather than contextual. Those commands now
+ * live in `开始` and simply disable themselves while nothing suitable is selected.
  */
-export const CONTEXT_TAB_IDS = ['text-format', 'image-format'] as const;
+export const CONTEXT_TAB_IDS = ['image-format'] as const;
 export type ContextTabId = (typeof CONTEXT_TAB_IDS)[number];
 
 /**
@@ -66,9 +65,9 @@ const IMAGE_KINDS: readonly string[] = ['image', 'stamp', 'signature'];
 /** Which contextual tab the current selection owns */
 export function resolveContextTab(selection: PdfRibbonSelection | null): ContextTabId | null {
   if (!selection) return null;
-  if (selection.kind === 'text') return 'text-format';
   if (IMAGE_KINDS.includes(selection.kind)) return 'image-format';
-  // Annotations (markup / ink / shape / note) stay on the current tab: their controls are in `开始`
+  // Everything else (text boxes, markup / ink / shape / note) stays on the current tab: its controls
+  // are always present in `开始`, disabled until a matching object is selected
   return null;
 }
 
@@ -680,97 +679,97 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
     arrangeGroup,
   ];
 
-  if (contextTab === 'text-format' && selection) {
-    contextTabs.push({
-      id: 'text-format',
-      label: t(key('tabTextFormat')),
-      groups: [
+  /**
+   * Text box formatting, pinned to `开始` (disabled until a text box is selected).
+   *
+   * This was the `文本框格式` contextual tab. A tab that only materialises after a selection is
+   * invisible until the user happens to click a text box, which read as "these buttons are missing"
+   * rather than "these buttons are contextual".
+   */
+  const textEditable = canEdit && selection?.kind === 'text';
+  const textGroups: RibbonGroup[] = [
+    {
+      id: 'text-style',
+      label: t(key('grpTextStyle')),
+      priority: 4,
+      items: [
         {
-          id: 'text-style',
-          label: t(key('grpTextStyle')),
-          priority: 6,
-          items: [
-            {
-              kind: 'select',
-              id: 'font-size',
-              label: t(key('cmdFontSize')),
-              value: String(Math.round(selection.fontSize ?? 11)),
-              options: [8, 9, 10, 11, 12, 14, 16, 18, 24, 32, 48, 72].map((size) => ({
-                value: String(size),
-                label: String(size),
-              })),
-              width: 'xxs',
-              disabled: !canEdit,
-              hint,
-              onChange: (value: string) => actions.setObjectFontSize?.(Number(value)),
-            },
-            {
-              kind: 'toggle',
-              id: 'bold',
-              label: t(key('cmdBold')),
-              icon: 'richText',
-              size: 'small',
-              active: selection.bold === true,
-              disabled: !canEdit,
-              hint,
-              onSelect: () => actions.toggleObjectBold?.(),
-            },
-            {
-              kind: 'toggle',
-              id: 'italic',
-              label: t(key('cmdItalic')),
-              icon: 'text',
-              size: 'small',
-              active: selection.italic === true,
-              disabled: !canEdit,
-              hint,
-              onSelect: () => actions.toggleObjectItalic?.(),
-            },
-          ],
-        },
-        {
-          id: 'text-align',
-          label: t(key('grpAlign')),
-          priority: 4,
-          items: (
-            [
-              ['left', 'cmdAlignLeft', 'panelLeftOpen'],
-              ['center', 'cmdAlignCenter', 'actualSize'],
-              ['right', 'cmdAlignRight', 'panelLeftClose'],
-            ] as const
-          ).map(([align, labelKey, icon]) => ({
-            kind: 'toggle' as const,
-            id: `align-${align}`,
-            label: t(key(labelKey)),
-            icon,
-            size: 'small' as const,
-            active: selection.align === align,
-            disabled: !canEdit,
-            hint,
-            onSelect: () => actions.setObjectAlign?.(align),
+          kind: 'select',
+          id: 'font-size',
+          label: t(key('cmdFontSize')),
+          value: String(Math.round(selection?.fontSize ?? 11)),
+          options: [8, 9, 10, 11, 12, 14, 16, 18, 24, 32, 48, 72].map((size) => ({
+            value: String(size),
+            label: String(size),
           })),
+          width: 'xxs',
+          disabled: !textEditable,
+          hint,
+          onChange: (value: string) => actions.setObjectFontSize?.(Number(value)),
         },
         {
-          id: 'text-color',
-          label: t(key('grpFormat')),
-          priority: 5,
-          items: [
-            {
-              kind: 'color',
-              id: 'text-color',
-              label: t(key('cmdColor')),
-              value: selection.color ?? null,
-              disabled: !canEdit,
-              hint,
-              onPick: (color) => actions.setObjectColor?.(color),
-            },
-            // Opacity and arrangement live in `开始` (shared by every object kind), so this tab
-            // keeps only what is specific to a text box.
-          ],
+          kind: 'toggle',
+          id: 'bold',
+          label: t(key('cmdBold')),
+          icon: 'richText',
+          size: 'small',
+          active: selection?.bold === true,
+          disabled: !textEditable,
+          hint,
+          onSelect: () => actions.toggleObjectBold?.(),
+        },
+        {
+          kind: 'toggle',
+          id: 'italic',
+          label: t(key('cmdItalic')),
+          icon: 'text',
+          size: 'small',
+          active: selection?.italic === true,
+          disabled: !textEditable,
+          hint,
+          onSelect: () => actions.toggleObjectItalic?.(),
         },
       ],
-    });
-  }
+    },
+    {
+      id: 'text-align',
+      label: t(key('grpAlign')),
+      priority: 4,
+      items: (
+        [
+          ['left', 'cmdAlignLeft', 'panelLeftOpen'],
+          ['center', 'cmdAlignCenter', 'actualSize'],
+          ['right', 'cmdAlignRight', 'panelLeftClose'],
+        ] as const
+      ).map(([align, labelKey, icon]) => ({
+        kind: 'toggle' as const,
+        id: `align-${align}`,
+        label: t(key(labelKey)),
+        icon,
+        size: 'small' as const,
+        active: selection?.align === align,
+        disabled: !textEditable,
+        hint,
+        onSelect: () => actions.setObjectAlign?.(align),
+      })),
+    },
+    {
+      id: 'text-color',
+      label: t(key('grpFormat')),
+      priority: 4,
+      items: [
+        {
+          kind: 'color',
+          id: 'text-color',
+          label: t(key('cmdColor')),
+          value: selection?.color ?? null,
+          disabled: !textEditable,
+          hint,
+          onPick: (color) => actions.setObjectColor?.(color),
+        },
+      ],
+    },
+  ];
 
   if (contextTab === 'image-format' && selection) {
     contextTabs.push({
@@ -906,50 +905,14 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
             },
           ],
         },
-        {
-          id: 'navigate',
-          label: t(key('grpNavigate')),
-          priority: 9,
-          items: [
-            {
-              kind: 'button',
-              id: 'prev',
-              label: t(key('cmdPrevPage')),
-              icon: 'chevronLeft',
-              size: 'small',
-              disabled: lock || view.page <= 1,
-              hint,
-              onSelect: actions.prevPage,
-            },
-            {
-              kind: 'button',
-              id: 'next',
-              label: t(key('cmdNextPage')),
-              icon: 'chevronRight',
-              size: 'small',
-              disabled: lock || view.page >= view.pageCount,
-              hint,
-              onSelect: actions.nextPage,
-            },
-            {
-              kind: 'select',
-              id: 'page',
-              label: t(key('cmdPageJump')),
-              value: String(view.page),
-              options: pageOptions,
-              editable: true,
-              width: 'xxs',
-              disabled: lock,
-              hint,
-              onChange: (value: string) => actions.goToPage(Number(value)),
-            },
-          ],
-        },
-        // The 注释, 编辑 and 注释格式 tabs each held two or three groups, so every second command
-        // cost a tab switch. They now sit together in `开始`, right after the selection / zoom /
-        // navigation commands users already knew the place of.
+        // Page navigation moved to `视图`: flipping pages is browsing, not editing. It sits next to
+        // the view mode there instead of splitting the editing commands below.
+        //
+        // The 注释, 编辑, 注释格式 and 文本框格式 tabs each held two or three groups, so every second
+        // command cost a tab switch. They now sit together in `开始`, right after selection / zoom.
         ...annotateGroups,
         ...annotationGroups,
+        ...textGroups,
         ...editGroups,
         {
           id: 'export',
@@ -1012,6 +975,46 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
               disabled: lock,
               hint,
               onChange: (value: string) => actions.setViewMode(value as ViewMode),
+            },
+          ],
+        },
+        // Page navigation: browsing commands sit with the view mode, not with the editing tools
+        {
+          id: 'navigate',
+          label: t(key('grpNavigate')),
+          priority: 9,
+          items: [
+            {
+              kind: 'button',
+              id: 'prev',
+              label: t(key('cmdPrevPage')),
+              icon: 'chevronLeft',
+              size: 'small',
+              disabled: lock || view.page <= 1,
+              hint,
+              onSelect: actions.prevPage,
+            },
+            {
+              kind: 'button',
+              id: 'next',
+              label: t(key('cmdNextPage')),
+              icon: 'chevronRight',
+              size: 'small',
+              disabled: lock || view.page >= view.pageCount,
+              hint,
+              onSelect: actions.nextPage,
+            },
+            {
+              kind: 'select',
+              id: 'page',
+              label: t(key('cmdPageJump')),
+              value: String(view.page),
+              options: pageOptions,
+              editable: true,
+              width: 'xxs',
+              disabled: lock,
+              hint,
+              onChange: (value: string) => actions.goToPage(Number(value)),
             },
           ],
         },

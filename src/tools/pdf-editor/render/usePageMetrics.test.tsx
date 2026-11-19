@@ -7,7 +7,7 @@ import { usePageMetrics } from './usePageMetrics';
 function fakeDoc(sizes: Record<number, { width: number; height: number }> = {}) {
   return {
     getPage: vi.fn(async (pageNumber: number) => ({
-      getViewport: () => ({ width: 600, height: 800, ...sizes[pageNumber] }),
+      getViewport: () => sizes[pageNumber] ?? { width: 600, height: 800 },
     })),
   } as unknown as PDFDocumentProxy;
 }

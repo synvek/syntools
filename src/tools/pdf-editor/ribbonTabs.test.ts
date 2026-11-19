@@ -121,11 +121,10 @@ describe('buildPdfRibbonTabs — 结构', () => {
     }
   });
 
-  it('注释 / 编辑 / 注释格式的分组都并入了开始，视图保持原样', () => {
+  it('注释 / 编辑 / 注释格式 / 文本框格式并入开始，翻页移入视图', () => {
     expect(tabs[0].groups.map((group) => group.id)).toEqual([
       'select',
       'zoom',
-      'navigate',
       'markup',
       'shapes',
       'ink',
@@ -134,18 +133,26 @@ describe('buildPdfRibbonTabs — 结构', () => {
       'manage',
       'ann-format',
       'arrange',
+      'text-style',
+      'text-align',
+      'text-color',
       'clipboard',
       'object-align',
       'object-distribute',
       'format-painter',
       'export',
     ]);
-    expect(tabs[1].groups.map((group) => group.id)).toEqual(['view-mode', 'panels', 'display']);
+    expect(tabs[1].groups.map((group) => group.id)).toEqual([
+      'view-mode',
+      'navigate',
+      'panels',
+      'display',
+    ]);
   });
 
   it('面板尚未实现时不注册面板分组（避免空按钮）', () => {
     const tabs = buildPdfRibbonTabs(makeCtx({ panelsAvailable: false }));
-    expect(tabs[1].groups.map((group) => group.id)).toEqual(['view-mode', 'display']);
+    expect(tabs[1].groups.map((group) => group.id)).toEqual(['view-mode', 'navigate', 'display']);
     expect(allItems(tabs).some((item) => item.id === 'thumbnails')).toBe(false);
   });
 });
@@ -159,7 +166,8 @@ describe('buildPdfRibbonTabs — 禁用与提示', () => {
     }
 
     // 基础命令统一提示"先打开文件"；注释颜色/线宽并入开始后，仍要先选注释工具
-    const base = tabs[0].groups
+    const base = tabs
+      .flatMap((tab) => tab.groups)
       .filter((group) => ['select', 'zoom', 'navigate', 'export'].includes(group.id))
       .flatMap((group) => group.items);
     for (const item of base) expect(item.hint).toBe('openFirstHint');
@@ -419,36 +427,49 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
 
   it('按对象类型解析上下文标签', () => {
     expect(resolveContextTab(null)).toBeNull();
-    expect(resolveContextTab(textSelection)).toBe('text-format');
     expect(resolveContextTab({ kind: 'image', opacity: 1, locked: false })).toBe('image-format');
     expect(resolveContextTab({ kind: 'stamp', opacity: 1, locked: false })).toBe('image-format');
-    // 注释对象不再拥有独立标签：它们的格式控件在开始标签里
+    // 文本框与注释对象的格式控件都常驻开始，不再弹标签
+    expect(resolveContextTab(textSelection)).toBeNull();
     expect(resolveContextTab({ kind: 'markup', opacity: 1, locked: false })).toBeNull();
     expect(resolveContextTab({ kind: 'note', opacity: 1, locked: false })).toBeNull();
     expect(resolveContextTab({ kind: 'ink', opacity: 1, locked: false })).toBeNull();
   });
 
-  it('选中出现上下文标签，取消选择回到来源标签', () => {
+  it('只有图片对象打开上下文标签，取消选择回到来源标签', () => {
+    const withImage = buildPdfRibbonTabs(
+      makeCtx({ selection: { kind: 'image', opacity: 1, locked: false } }),
+    );
+    expect(withImage.map((tab) => tab.id)).toEqual(['home', 'view', 'image-format']);
+
+    // 选中文本框不再切标签：格式控件就在开始里
     const withText = buildPdfRibbonTabs(makeCtx({ selection: textSelection }));
-    expect(withText.map((tab) => tab.id)).toEqual(['home', 'view', 'text-format']);
+    expect(withText.map((tab) => tab.id)).toEqual(['home', 'view']);
 
     const cleared = buildPdfRibbonTabs(makeCtx({ selection: null }));
     expect(cleared.map((tab) => tab.id)).toEqual(['home', 'view']);
 
-    expect(nextActiveTab('home', 'text-format', 'home')).toBe('text-format');
-    expect(nextActiveTab('text-format', null, 'home')).toBe('home');
+    expect(nextActiveTab('home', 'image-format', 'home')).toBe('image-format');
+    expect(nextActiveTab('image-format', null, 'home')).toBe('home');
     expect(nextActiveTab('home', null, 'home')).toBe('home');
   });
 
-  it('文本上下文标签接线字号/粗体/对齐/颜色/透明度', () => {
+  it('文本框格式并入开始后接线字号/粗体/对齐/颜色', () => {
     const actions = makeActions();
     const tabs = buildPdfRibbonTabs(makeCtx({ actions, selection: textSelection }));
 
     const size = findItem(tabs, 'text-style', 'font-size');
     if (size.kind !== 'select') throw new Error('font size must be a select');
     expect(size.value).toBe('12');
+    expect(size.disabled).toBe(false);
     size.onChange('18');
     expect(actions.setObjectFontSize).toHaveBeenCalledWith(18);
+
+    // 没选中文本框时这些命令常驻但禁用（原来的问题是"整个标签都不出现"）
+    const idle = buildPdfRibbonTabs(makeCtx({ selection: null }));
+    expect(findItem(idle, 'text-style', 'font-size').disabled).toBe(true);
+    expect(findItem(idle, 'text-align', 'align-center').disabled).toBe(true);
+    expect(findItem(idle, 'text-color', 'text-color').disabled).toBe(true);
 
     fire(tabs, 'text-style', 'bold');
     fire(tabs, 'text-style', 'italic');
