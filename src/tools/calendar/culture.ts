@@ -59,6 +59,17 @@ function uniqueStrings(items: string[]): string[] {
   return out;
 }
 
+/**
+ * lunar-javascript only translates part of its festival tables: even in `en` mode,
+ * solar/lunar "other festivals" still come back as Chinese labels. Keep those
+ * out of non-Chinese calendars instead of leaking them into the UI.
+ */
+const CJK_IDEOGRAPH = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+
+function isChineseLabel(text: string): boolean {
+  return CJK_IDEOGRAPH.test(text);
+}
+
 function truncateLabel(text: string, max = 4): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max)}…`;
@@ -117,7 +128,10 @@ function buildEnDay(
   region: WesternHolidayRegion,
 ): DayCultureInfo {
   const solar = Solar.fromYmd(year, month, day);
-  const libFestivals = uniqueStrings([...solar.getFestivals(), ...solar.getOtherFestivals()]);
+  const libFestivals = uniqueStrings([
+    ...solar.getFestivals(),
+    ...solar.getOtherFestivals(),
+  ]).filter((name) => !isChineseLabel(name));
   const western = getWesternHoliday(year, month, day, region);
   const festivals = uniqueStrings([...libFestivals, ...(western ? [western.name] : [])]);
 

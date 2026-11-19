@@ -11,6 +11,7 @@ import {
   getDaysCultureInfo,
   isSameDay,
   resolveCultureProfile,
+  resolveWesternRegion,
   shiftMonth,
   todayParts,
   weekdayOrder,
@@ -38,15 +39,16 @@ function cellTone(info: DayCultureInfo | undefined, inMonth: boolean): string {
 export default function CalendarTool() {
   const { t, i18n } = useTranslation();
   const today = useMemo(() => todayParts(), []);
+  const defaultWeekStart: WeekStart = resolveWesternRegion(i18n.language) === 'us' ? 0 : 1;
   const init = useMemo(
     () =>
       readSharedState({
         y: today.year,
         m: today.month,
         d: today.day,
-        w: 1,
+        w: defaultWeekStart,
       }),
-    [today.day, today.month, today.year],
+    [defaultWeekStart, today.day, today.month, today.year],
   );
 
   const [year, setYear] = useState(Number(init.y) || today.year);

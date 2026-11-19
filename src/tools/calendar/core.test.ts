@@ -4,6 +4,7 @@ import {
   easterSunday,
   formatDateParts,
   getDayCultureInfo,
+  getDaysCultureInfo,
   getWesternHoliday,
   resolveCultureProfile,
   resolveWesternRegion,
@@ -70,6 +71,24 @@ describe('calendar', () => {
   it('英文：英国区域', () => {
     expect(resolveWesternRegion('en-GB')).toBe('gb');
     expect(getWesternHoliday(2025, 12, 26, 'gb')?.name).toMatch(/Boxing/);
+  });
+
+  it('英文：农历库未翻译的中文节日不会泄漏到日历', () => {
+    const cjk = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+
+    const cancerDay = getDayCultureInfo(2026, 2, 4, 'en');
+    expect(cancerDay.festivals).not.toContain('世界抗癌日');
+    expect(cjk.test(cancerDay.subline)).toBe(false);
+
+    const days = Array.from({ length: 365 }, (_, i) => {
+      const d = new Date(2026, 0, 1 + i);
+      return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+    });
+    const all = getDaysCultureInfo(days, 'en');
+    for (const info of all.values()) {
+      const text = [info.subline, ...info.festivals, info.holidayName ?? ''].join('|');
+      expect(cjk.test(text)).toBe(false);
+    }
   });
 
   it('复活节推算', () => {
