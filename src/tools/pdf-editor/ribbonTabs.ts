@@ -889,44 +889,51 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
           id: 'zoom',
           label: t(key('grpZoom')),
           priority: 9,
-          items: [
-            {
-              kind: 'select',
-              id: 'zoom',
-              label: t(key('cmdZoom')),
-              value: `${zoomPercent}%`,
-              options: zoomOptions,
-              // Typing a zoom is expected in Office; presets stay in the dropdown
-              editable: true,
-              width: 'xs',
-              disabled: lock,
-              hint,
-              onChange: (value: string) => {
-                const zoom = parseZoomPercent(value);
-                if (zoom !== null) actions.setZoom(zoom);
+          items: [],
+          // Row layout so the two fit buttons sit side by side under the zoom box: in the default
+          // column packing they stacked vertically and left the group looking lopsided
+          rows: [
+            [
+              {
+                kind: 'select',
+                id: 'zoom',
+                label: t(key('cmdZoom')),
+                value: `${zoomPercent}%`,
+                options: zoomOptions,
+                // Typing a zoom is expected in Office; presets stay in the dropdown
+                editable: true,
+                width: 'xs',
+                disabled: lock,
+                hint,
+                onChange: (value: string) => {
+                  const zoom = parseZoomPercent(value);
+                  if (zoom !== null) actions.setZoom(zoom);
+                },
               },
-            },
+            ],
             // fitScreen ≈ fit page, actualSize stands in for fit width in the shared glyph set
-            {
-              kind: 'button',
-              id: 'fit-width',
-              label: t(key('cmdFitWidth')),
-              icon: 'actualSize',
-              size: 'small',
-              disabled: lock,
-              hint,
-              onSelect: () => actions.fit('fit-width'),
-            },
-            {
-              kind: 'button',
-              id: 'fit-page',
-              label: t(key('cmdFitPage')),
-              icon: 'fitScreen',
-              size: 'small',
-              disabled: lock,
-              hint,
-              onSelect: () => actions.fit('fit-page'),
-            },
+            [
+              {
+                kind: 'button',
+                id: 'fit-width',
+                label: t(key('cmdFitWidth')),
+                icon: 'actualSize',
+                size: 'small',
+                disabled: lock,
+                hint,
+                onSelect: () => actions.fit('fit-width'),
+              },
+              {
+                kind: 'button',
+                id: 'fit-page',
+                label: t(key('cmdFitPage')),
+                icon: 'fitScreen',
+                size: 'small',
+                disabled: lock,
+                hint,
+                onSelect: () => actions.fit('fit-page'),
+              },
+            ],
           ],
         },
         // Page navigation moved to `视图`: flipping pages is browsing, not editing. It sits next to

@@ -149,6 +149,16 @@ describe('buildPdfRibbonTabs — 结构', () => {
     ]);
   });
 
+  it('缩放的适应宽度 / 适应整页并排成一行', () => {
+    const group = tabs[0].groups.find((candidate) => candidate.id === 'zoom');
+    if (!group?.rows) throw new Error('zoom group must use rows');
+
+    expect(group.rows.map((row) => row.map((item) => item.id))).toEqual([
+      ['zoom'],
+      ['fit-width', 'fit-page'],
+    ]);
+  });
+
   it('面板尚未实现时不注册面板分组（避免空按钮）', () => {
     const tabs = buildPdfRibbonTabs(makeCtx({ panelsAvailable: false }));
     expect(tabs[1].groups.map((group) => group.id)).toEqual(['view-mode', 'navigate', 'display']);
