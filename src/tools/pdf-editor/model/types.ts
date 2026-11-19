@@ -105,12 +105,27 @@ export interface PdfTextObject extends PdfObjectBase {
   patch?: PdfTextPatch;
 }
 
+/**
+ * Visible part of the source bitmap, normalized to its natural size (0–1).
+ *
+ * `dataUrl` always keeps the *full* bitmap, so re-cropping never compounds resampling: the save
+ * pipeline crops from the original every time (M3-3).
+ */
+export interface PdfImageCrop {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface PdfImageObject extends PdfObjectBase {
   kind: 'image';
   dataUrl: string;
   naturalW: number;
   naturalH: number;
   fit: 'contain' | 'cover' | 'fill';
+  /** Absent means "use the whole bitmap" */
+  crop?: PdfImageCrop;
 }
 
 export interface PdfInkObject extends PdfObjectBase {

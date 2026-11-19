@@ -33,6 +33,7 @@ import type {
   PdfTextAlign,
   PdfTextObject,
 } from '../model/types';
+import { cropImageDataUrl, croppedSize } from './imageCrop';
 import { fittedBox, imageFormat } from './imageScale';
 
 export interface FontSet {
@@ -256,15 +257,24 @@ async function drawImageObject(
   object: Extract<PdfObject, { kind: 'image' | 'stamp' | 'signature' }>,
   frame: Rect,
 ): Promise<void> {
-  const image = await ctx.embedImage(object.dataUrl);
+  // Crop is applied to the bitmap at save time (9-arg drawImage); the model keeps the full source so
+  // cropping again starts from the original pixels instead of stacking resamples (M3-3)
+  const crop = object.kind === 'image' ? object.crop : undefined;
+  const payload = crop
+    ? await cropImageDataUrl(object.dataUrl, crop, {
+        width: object.naturalW,
+        height: object.naturalH,
+      })
+    : object.dataUrl;
+
+  const image = await ctx.embedImage(payload);
   if (!image) return;
 
   const fit = object.kind === 'image' ? object.fit : 'contain';
-  const box = fittedBox(
-    { width: frame.width, height: frame.height },
-    { width: object.naturalW, height: object.naturalH },
-    fit,
-  );
+  const natural = crop
+    ? croppedSize({ width: object.naturalW, height: object.naturalH }, crop)
+    : { width: object.naturalW, height: object.naturalH };
+  const box = fittedBox({ width: frame.width, height: frame.height }, natural, fit);
   ctx.page.drawImage(image, {
     x: frame.x + box.offsetX,
     y: frame.y + box.offsetY,

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { cacheCanvas, canvasCacheKey, takeCachedCanvas } from './canvasCache';
 
 interface PageCanvasProps {
   pdfDoc: PDFDocumentProxy;
@@ -13,6 +14,8 @@ interface PageCanvasProps {
   height: number;
   /** Accessible page caption */
   label: string;
+  /** IntersectionObserver margin; large files pass `0px` to stop pre-rendering neighbours (M4-5) */
+  rootMargin?: string;
 }
 
 /**
@@ -36,10 +39,12 @@ export function PageCanvas({
   width,
   height,
   label,
+  rootMargin = '600px 0px',
 }: PageCanvasProps) {
   const holderRef = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
   const [rendered, setRendered] = useState(false);
+  const cacheKey = canvasCacheKey(pdfDoc, pageNumber, scale, dpr);
 
   useEffect(() => {
     const holder = holderRef.current;
@@ -50,16 +55,16 @@ export function PageCanvas({
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setVisible(true);
-          observer.disconnect();
-        }
+        // Toggle both ways: pages that leave the margin release their canvas into the LRU, so a
+        // continuous scroll never keeps hundreds of bitmaps alive (M4-5)
+        const intersecting = entries.some((entry) => entry.isIntersecting);
+        setVisible(intersecting);
       },
-      { rootMargin: '600px 0px' },
+      { rootMargin },
     );
     observer.observe(holder);
     return () => observer.disconnect();
-  }, []);
+  }, [rootMargin]);
 
   useEffect(() => {
     if (!visible) return;
@@ -69,6 +74,32 @@ export function PageCanvas({
     let cancelled = false;
     let cancelRender: (() => void) | null = null;
     let canvas: HTMLCanvasElement | null = null;
+    let complete = false;
+
+    const releaseCanvas = () => {
+      if (!canvas) return;
+      holder.replaceChildren();
+      // Only a finished bitmap is safe to reuse; a cancelled render would flash a blank page
+      if (complete) {
+        cacheCanvas(cacheKey, canvas);
+      } else {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+      canvas = null;
+    };
+
+    const cached = takeCachedCanvas(cacheKey);
+    if (cached) {
+      canvas = cached;
+      holder.replaceChildren(cached);
+      setRendered(true);
+      return () => {
+        cancelled = true;
+        complete = true;
+        releaseCanvas();
+      };
+    }
 
     setRendered(false);
 
@@ -102,6 +133,7 @@ export function PageCanvas({
         cancelRender = () => task.cancel();
 
         await task.promise;
+        complete = true;
         if (!cancelled) setRendered(true);
       } catch {
         // RenderingCancelledException on zoom/teardown, or the document was destroyed mid-flight
@@ -111,9 +143,9 @@ export function PageCanvas({
     return () => {
       cancelled = true;
       cancelRender?.();
-      canvas?.remove();
+      releaseCanvas();
     };
-  }, [visible, pdfDoc, pageNumber, scale, dpr, label]);
+  }, [visible, pdfDoc, pageNumber, scale, dpr, label, cacheKey]);
 
   return (
     <div

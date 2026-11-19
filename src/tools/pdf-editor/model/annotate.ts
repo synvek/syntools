@@ -11,7 +11,16 @@ export type MarkupTool = PdfMarkupObject['type'];
 export type ShapeTool = PdfShapeObject['type'];
 
 export type PdfTool =
-  'select' | 'hand' | MarkupTool | ShapeTool | 'ink' | 'eraser' | 'note' | 'text';
+  | 'select'
+  | 'hand'
+  | MarkupTool
+  | ShapeTool
+  | 'ink'
+  | 'eraser'
+  | 'note'
+  | 'text'
+  /** Rewrite an existing line of text (M3-2); the line layer owns the pointer */
+  | 'patch';
 
 export const MARKUP_TOOLS: readonly MarkupTool[] = ['highlight', 'underline', 'strikeout'];
 export const SHAPE_TOOLS: readonly ShapeTool[] = ['rect', 'ellipse', 'arrow', 'line'];

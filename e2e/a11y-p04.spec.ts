@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
@@ -13,6 +14,8 @@ import { expect, test } from '@playwright/test';
  * here. The M1 gate therefore scans the ribbon / dialog surfaces that P0-4 actually changed.
  */
 test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
+
+const PDF_FIXTURE = fileURLToPath(new URL('../fixtures/pdf/three-pages.pdf', import.meta.url));
 
 const ROUTES = [
   ['word processor', '/tools/rich-text-editor'],
@@ -57,5 +60,32 @@ test.describe('P0-4 axe baseline', () => {
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
     expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  });
+});
+
+/**
+ * M4-5: the PDF editor ribbon is built from the shared component and must meet the same bar once a
+ * document is open (the empty state renders no ribbon).
+ */
+test.describe('M4-5 axe: PDF editor', () => {
+  test('pdf editor ribbon: no critical / serious violations', async ({ page }) => {
+    await page.goto('/tools/pdf-editor');
+    await page.locator('input[type="file"]').first().setInputFiles(PDF_FIXTURE);
+    await expect(page.getByTestId('pdf-ribbon')).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .include('[data-testid="pdf-ribbon"]')
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze();
+    const blocking = results.violations.filter(
+      (violation) => violation.impact === 'critical' || violation.impact === 'serious',
+    );
+    expect(
+      blocking.map((violation) => ({
+        id: violation.id,
+        impact: violation.impact,
+        nodes: violation.nodes.slice(0, 3).map((node) => node.target),
+      })),
+    ).toEqual([]);
   });
 });

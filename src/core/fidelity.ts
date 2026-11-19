@@ -8,7 +8,7 @@
  * Pure logic only: no React, no tool imports, so every tool can depend on it cheaply.
  */
 
-export type FidelityTool = 'slide' | 'rte' | 'sheet';
+export type FidelityTool = 'slide' | 'rte' | 'sheet' | 'pdf';
 export type FidelityOperation = 'import' | 'export';
 
 /** info = worth knowing, warning = degraded but usable, loss = content did not survive */

@@ -38,6 +38,15 @@ function makeActions(overrides: Partial<PdfRibbonActions> = {}): PdfRibbonAction
     setObjectAlign: vi.fn(),
     setObjectZ: vi.fn(),
     toggleObjectLock: vi.fn(),
+    insertImage: vi.fn(),
+    openSignature: vi.fn(),
+    openStamp: vi.fn(),
+    copySelection: vi.fn(),
+    cutSelection: vi.fn(),
+    pasteSelection: vi.fn(),
+    alignObjects: vi.fn(),
+    distributeObjects: vi.fn(),
+    toggleFormatPainter: vi.fn(),
     ...overrides,
   };
 }
@@ -85,9 +94,9 @@ function fire(tabs: RibbonTab[], groupId: string, itemId: string): void {
 describe('buildPdfRibbonTabs — 结构', () => {
   const tabs = buildPdfRibbonTabs(makeCtx());
 
-  it('暴露 开始 / 注释 / 视图 三个标签', () => {
-    expect(tabs.map((tab) => tab.id)).toEqual(['home', 'annotate', 'view']);
-    expect(tabs.map((tab) => tab.label)).toEqual(['tabHome', 'tabAnnotate', 'tabView']);
+  it('暴露 开始 / 注释 / 编辑 / 视图 四个标签', () => {
+    expect(tabs.map((tab) => tab.id)).toEqual(['home', 'annotate', 'edit', 'view']);
+    expect(tabs.map((tab) => tab.label)).toEqual(['tabHome', 'tabAnnotate', 'tabEdit', 'tabView']);
   });
 
   it('标签、分组、命令的 id 都唯一', () => {
@@ -112,19 +121,20 @@ describe('buildPdfRibbonTabs — 结构', () => {
     }
   });
 
-  it('分组顺序符合 Office 习惯（历史/选择/缩放/导航）', () => {
+  it('分组顺序符合 Office 习惯（历史/选择/缩放/导航/导出）', () => {
     expect(tabs[0].groups.map((group) => group.id)).toEqual([
       'history',
       'select',
       'zoom',
       'navigate',
+      'export',
     ]);
-    expect(tabs[2].groups.map((group) => group.id)).toEqual(['view-mode', 'panels', 'display']);
+    expect(tabs[3].groups.map((group) => group.id)).toEqual(['view-mode', 'panels', 'display']);
   });
 
   it('面板尚未实现时不注册面板分组（避免空按钮）', () => {
     const tabs = buildPdfRibbonTabs(makeCtx({ panelsAvailable: false }));
-    expect(tabs[2].groups.map((group) => group.id)).toEqual(['view-mode', 'display']);
+    expect(tabs[3].groups.map((group) => group.id)).toEqual(['view-mode', 'display']);
     expect(allItems(tabs).some((item) => item.id === 'thumbnails')).toBe(false);
   });
 });
@@ -418,10 +428,16 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
 
   it('选中出现上下文标签，取消选择回到来源标签', () => {
     const withText = buildPdfRibbonTabs(makeCtx({ selection: textSelection }));
-    expect(withText.map((tab) => tab.id)).toEqual(['home', 'annotate', 'view', 'text-format']);
+    expect(withText.map((tab) => tab.id)).toEqual([
+      'home',
+      'annotate',
+      'edit',
+      'view',
+      'text-format',
+    ]);
 
     const cleared = buildPdfRibbonTabs(makeCtx({ selection: null }));
-    expect(cleared.map((tab) => tab.id)).toEqual(['home', 'annotate', 'view']);
+    expect(cleared.map((tab) => tab.id)).toEqual(['home', 'annotate', 'edit', 'view']);
 
     expect(nextActiveTab('home', 'text-format', 'home')).toBe('text-format');
     expect(nextActiveTab('text-format', null, 'annotate')).toBe('annotate');
@@ -506,5 +522,57 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
     expect(color.disabled).toBe(false);
     const width = findItem(tabs, 'ann-format', 'ann-width');
     expect(width.disabled).toBe(true);
+  });
+});
+
+describe('M3 插入与编辑标签', () => {
+  it('注释插入组提供修补、图片、签名、图章四个入口', () => {
+    const tabs = buildPdfRibbonTabs(makeCtx());
+    const insert = tabs.flatMap((tab) => tab.groups).find((group) => group.id === 'insert');
+    expect(insert?.items.map((item) => item.id)).toEqual(
+      expect.arrayContaining(['image', 'signature', 'stamp', 'patch']),
+    );
+    expect(findItem(tabs, 'insert', 'patch')).toMatchObject({ kind: 'toggle', active: false });
+  });
+
+  it('编辑标签的剪贴板按选区数量启用', () => {
+    const empty = buildPdfRibbonTabs(makeCtx());
+    expect(findItem(empty, 'clipboard', 'copy').disabled).toBe(true);
+    expect(findItem(empty, 'clipboard', 'paste').disabled).toBe(true);
+
+    const withSelection = buildPdfRibbonTabs(
+      makeCtx({ edit: { selectionCount: 2, clipboard: 1, painter: false } }),
+    );
+    expect(findItem(withSelection, 'clipboard', 'copy').disabled).toBe(false);
+    expect(findItem(withSelection, 'clipboard', 'paste').disabled).toBe(false);
+  });
+
+  it('对齐需要两个对象、分布需要三个，命令参数正确', () => {
+    const actions = makeActions();
+    const two = buildPdfRibbonTabs(
+      makeCtx({ actions, edit: { selectionCount: 2, clipboard: 0, painter: false } }),
+    );
+    expect(findItem(two, 'object-align', 'align-object-middle').disabled).toBe(false);
+    expect(findItem(two, 'object-distribute', 'distribute-h').disabled).toBe(true);
+    fire(two, 'object-align', 'align-object-left');
+    expect(actions.alignObjects).toHaveBeenCalledWith('left');
+
+    const three = buildPdfRibbonTabs(
+      makeCtx({ actions, edit: { selectionCount: 3, clipboard: 0, painter: false } }),
+    );
+    expect(findItem(three, 'object-distribute', 'distribute-v').disabled).toBe(false);
+    fire(three, 'object-distribute', 'distribute-v');
+    expect(actions.distributeObjects).toHaveBeenCalledWith('vertical');
+  });
+
+  it('格式刷显示已取格式状态', () => {
+    const actions = makeActions();
+    const tabs = buildPdfRibbonTabs(
+      makeCtx({ actions, edit: { selectionCount: 1, clipboard: 0, painter: true } }),
+    );
+    const painter = findItem(tabs, 'format-painter', 'format-painter');
+    expect(painter).toMatchObject({ kind: 'toggle', active: true, label: 'painterArmed' });
+    fire(tabs, 'format-painter', 'format-painter');
+    expect(actions.toggleFormatPainter).toHaveBeenCalled();
   });
 });

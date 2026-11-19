@@ -3,7 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useInRouterContext } from 'react-router-dom';
 import { i18n } from '@/core/i18n';
 import { useUnsavedChanges } from '@/core/hooks/useUnsavedChanges';
+import { FidelityDialog } from '@/core/components/FidelityDialog';
+import {
+  createFidelityReport,
+  isFidelityMuted,
+  muteFidelity,
+  type FidelityReport,
+} from '@/core/fidelity';
 import { downloadBytes } from '@/core/pdf/download';
+import type { TextLine } from '@/core/pdf/textLines';
 import { PdfPasswordField } from '@/core/pdf/PdfPasswordField';
 import { PdfRunButton } from '@/core/pdf/ui';
 import {
@@ -16,8 +24,14 @@ import {
   type DraftModel,
   type DraftRecord,
 } from './io/draftStore';
-import { copyObjects, pasteObjects } from './commands/clipboard';
+import { clipboardSize, copyObjects, pasteObjects } from './commands/clipboard';
+import { exportPdfToDocx } from './io/exportDocx';
+import { exportPdfImages } from './io/exportImages';
+import { collectPdfText, encodeText, textFileName } from './io/exportText';
+import { readImageBlob, readImageFile, placeImageRect, type ImportedImage } from './io/imageImport';
+import { downloadPageZip } from './io/pageExport';
 import { flattenPdf } from './io/savePdf';
+import { createStampImage, STAMP_LABEL_KEYS, type StampKey } from './io/stampImage';
 import {
   addObject,
   addObjects,
@@ -26,6 +40,7 @@ import {
   deletePage,
   duplicatePage,
   insertBlankPage,
+  insertPagesFrom,
   isDirty,
   markSaved,
   movePage,
@@ -35,6 +50,7 @@ import {
   setViewMode,
   setZoom,
   setZoomMode,
+  touch,
   updateObject,
   updateObjects,
   visiblePageCount,
@@ -59,21 +75,41 @@ import {
   type AnnotationStyle,
 } from './model/annotate';
 import {
+  alignObjects,
+  applyObjectFormat,
+  createImageObject,
   createInkObject,
   createMarkupObject,
   createNoteObject,
   createShapeObject,
+  createStampObject,
   createTextObject,
+  createTextPatch,
+  distributeObjects,
   nextZ,
   NOTE_SIZE,
+  readObjectFormat,
   reorderZ,
   setObjectLocked,
   setObjectOpacity,
+  type AlignMode,
+  type DistributeAxis,
+  type ObjectFormat,
   type ZOrderAction,
 } from './model/objects';
-import type { NormRect, PdfEditorDoc, PdfObject, PdfPageState, PdfTextObject } from './model/types';
+import type {
+  NormRect,
+  PdfEditorDoc,
+  PdfImageCrop,
+  PdfObject,
+  PdfPageState,
+  PdfSource,
+  PdfTextObject,
+} from './model/types';
 import { OverlayLayer, type AnnotationRequest } from './overlay/OverlayLayer';
+import { clearCanvasCache } from './render/canvasCache';
 import { PageScrollView } from './render/PageScrollView';
+import { TextPatchLayer } from './render/TextPatchLayer';
 import { usePdfDocument } from './render/usePdfDocument';
 import {
   buildPdfRibbonTabs,
@@ -87,11 +123,18 @@ import { AnnotationsPanel } from './ui/AnnotationsPanel';
 import { registerPdfEditorStrings } from './strings';
 import { DraftPrompt } from './ui/DraftPrompt';
 import { LeaveGuard } from './ui/LeaveGuard';
+import { ExportDocxDialog, type ExportDocxDialogResult } from './ui/ExportDocxDialog';
+import { ExportImagesDialog, type ExportImagesDialogResult } from './ui/ExportImagesDialog';
+import { ImageCropDialog } from './ui/ImageCropDialog';
+import { InsertPagesDialog } from './ui/InsertPagesDialog';
 import { OutlinePanel } from './ui/OutlinePanel';
+import { PatchHint } from './ui/PatchHint';
 import { PdfEditorView } from './ui/PdfEditorView';
 import { PropertiesPanel } from './ui/PropertiesPanel';
 import { SaveStatus } from './ui/SaveStatus';
 import type { SaveState } from './ui/SaveStatus';
+import { SignaturePad, type SignatureImage } from './ui/SignaturePad';
+import { StampGallery } from './ui/StampGallery';
 import { StatusBar } from './ui/StatusBar';
 import { ThumbnailRail } from './ui/ThumbnailRail';
 
@@ -109,6 +152,9 @@ const CLOSED_PANELS: Panels = {
 
 /** A4 in PDF points: what "insert blank page" creates */
 const BLANK_PAGE = { widthPt: 595.28, heightPt: 841.89 };
+
+/** Above this size thumbnails are opt-in (see `thumbnailsBlocked`) */
+const LARGE_DOC_BYTES = 20 * 1024 * 1024;
 
 const PANELS_KEY = 'syntools.pdf-editor.panels';
 
@@ -154,6 +200,30 @@ export default function PdfEditorTool() {
   const baseTabRef = useRef('home');
   /** Shown under the thumbnail toolbar when the last page cannot be removed */
   const [pageBlocked, setPageBlocked] = useState<string | null>(null);
+  /** "Insert pages from file" dialog (M2-7) */
+  const [insertOpen, setInsertOpen] = useState(false);
+  /** M3 insertion dialogs + hidden image picker */
+  const [signatureOpen, setSignatureOpen] = useState(false);
+  const [stampOpen, setStampOpen] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  /** The next pick from `imageInputRef` swaps the selected bitmap instead of inserting a new one */
+  const replaceTargetRef = useRef(false);
+  /** Clipboard size is module state; the ribbon needs a render trigger when it changes */
+  const [clipboardCount, setClipboardCount] = useState(clipboardSize);
+  /** Format painter: the snapshot is a ref (no re-render), `painterArmed` drives the ribbon */
+  const painterRef = useRef<ObjectFormat | null>(null);
+  const [painterArmed, setPainterArmed] = useState(false);
+  /** M4 export dialogs, busy flag and the shared fidelity report */
+  const [exportDocxOpen, setExportDocxOpen] = useState(false);
+  const [exportImagesOpen, setExportImagesOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [fidelityReport, setFidelityReport] = useState<FidelityReport | null>(null);
+  /** Set by the large-file prompt: the user explicitly asked for thumbnails anyway */
+  const [thumbsForced, setThumbsForced] = useState(false);
+  /** M3-3 crop dialog; the target is always the single selected image */
+  const [cropOpen, setCropOpen] = useState(false);
+  /** M4-5: page progress while the flattened file is being rebuilt */
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Drafts (M1-8): last unsaved edits, offered on the empty state instead of restored silently
   const [draft, setDraft] = useState<DraftRecord | null>(null);
@@ -471,6 +541,318 @@ export default function PdfEditorTool() {
     [annotateStyle, doc?.objects, mutate],
   );
 
+  /* ---------------------------------------------------------------------- */
+  /* M3: text patching, bitmaps, signature and stamps                        */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Turn the clicked text line into a patch object and enter edit mode.
+   *
+   * The object covers the original glyphs on save (`patch.cover`) and starts with the current text so
+   * the user can correct a character instead of retyping the whole line.
+   */
+  const handlePatchLine = useCallback(
+    (pageId: string, line: TextLine) => {
+      const object = createTextPatch({
+        page: pageId,
+        rect: line.rect,
+        text: line.text,
+        fontSize: line.fontSize,
+        z: nextZ(doc?.objects ?? []),
+      });
+      mutate((current) => addObject(current, object), { label: 'patch-text' });
+      setSelectedIds([object.id]);
+      setEditingId(object.id);
+    },
+    [doc?.objects, mutate],
+  );
+
+  /** Visual page size in points; attachments have no proxy here, so they fall back to A4 */
+  const pagePointSize = useCallback(
+    async (page: PdfPageState): Promise<{ width: number; height: number }> => {
+      if (page.blank) return { width: page.blank.widthPt, height: page.blank.heightPt };
+      const proxy = pdf.pdfDoc;
+      if (!proxy || page.sourceKey !== 'main') return { width: 595.28, height: 841.89 };
+      try {
+        const viewport = (await proxy.getPage(page.sourceIndex + 1)).getViewport({ scale: 1 });
+        return { width: viewport.width, height: viewport.height };
+      } catch {
+        return { width: 595.28, height: 841.89 };
+      }
+    },
+    [pdf.pdfDoc],
+  );
+
+  /** Place a decoded bitmap on the current page (image, signature or stamp) */
+  const insertBitmap = useCallback(
+    async (image: ImportedImage, kind: 'image' | 'signature' | 'stamp') => {
+      if (!doc) return;
+      const page = visiblePages(doc)[doc.view.page - 1];
+      if (!page) return;
+
+      const pageSize = await pagePointSize(page);
+      const rect = placeImageRect(
+        { width: image.width, height: image.height },
+        pageSize,
+        kind === 'image' ? {} : { maxWidth: 0.3, maxHeight: 0.15 },
+      );
+      const base = { page: page.id, rect, z: nextZ(doc.objects) };
+      const object =
+        kind === 'image'
+          ? createImageObject({
+              ...base,
+              dataUrl: image.dataUrl,
+              naturalW: image.width,
+              naturalH: image.height,
+            })
+          : createStampObject({
+              ...base,
+              kind,
+              dataUrl: image.dataUrl,
+              naturalW: image.width,
+              naturalH: image.height,
+            });
+
+      mutate((current) => addObject(current, object), { label: `insert-${kind}` });
+      setSelectedIds([object.id]);
+      setEditingId(null);
+      setTool('select');
+    },
+    [doc, mutate, pagePointSize],
+  );
+
+  const insertImageFile = useCallback(
+    async (file: File) => {
+      // Read the flag before the await: a second pick while this one decodes must not replace twice
+      const replaceId = replaceTargetRef.current ? selectedId : null;
+      replaceTargetRef.current = false;
+
+      const result = await readImageFile(file);
+      if (!result.ok) {
+        setBanner(t(`tools.pdfEditor.err.${result.error}`));
+        return;
+      }
+
+      if (replaceId) {
+        const image = result.value;
+        mutate(
+          (current) =>
+            updateObject(current, replaceId, (object) =>
+              object.kind === 'image'
+                ? {
+                    ...object,
+                    dataUrl: image.dataUrl,
+                    naturalW: image.width,
+                    naturalH: image.height,
+                    // A crop window is relative to the old bitmap; keeping it would show the wrong area
+                    crop: undefined,
+                  }
+                : object.kind === 'stamp' || object.kind === 'signature'
+                  ? {
+                      ...object,
+                      dataUrl: image.dataUrl,
+                      naturalW: image.width,
+                      naturalH: image.height,
+                    }
+                  : object,
+            ),
+          { label: 'replace-image' },
+        );
+        return;
+      }
+
+      await insertBitmap(result.value, 'image');
+    },
+    [insertBitmap, mutate, selectedId, t],
+  );
+
+  /** Ribbon "replace": only meaningful for a bitmap-backed object */
+  const replaceSelectedImage = useCallback(() => {
+    const target = doc?.objects.find((object) => object.id === selectedId);
+    if (
+      !target ||
+      (target.kind !== 'image' && target.kind !== 'stamp' && target.kind !== 'signature')
+    ) {
+      return;
+    }
+    replaceTargetRef.current = true;
+    imageInputRef.current?.click();
+  }, [doc?.objects, selectedId]);
+
+  /** Apply (or clear) the crop window on the selected image (M3-3) */
+  const applyImageCrop = useCallback(
+    (crop: PdfImageCrop | undefined) => {
+      if (!selectedId) return;
+      mutate(
+        (current) =>
+          updateObject(current, selectedId, (object) =>
+            object.kind === 'image' ? { ...object, crop } : object,
+          ),
+        { label: 'crop-image' },
+      );
+      setCropOpen(false);
+    },
+    [mutate, selectedId],
+  );
+
+  /** ⌘V with a bitmap on the system clipboard inserts it on the page in view (M3-3) */
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (!doc) return;
+      const items = Array.from(event.clipboardData?.items ?? []);
+      const entry = items.find((item) => item.type.startsWith('image/'));
+      const file = entry?.getAsFile?.() ?? null;
+      if (!file) return; // text paste keeps working inside the text tool
+      event.preventDefault();
+      void (async () => {
+        const result = await readImageBlob(file);
+        if (!result.ok) {
+          setBanner(t(`tools.pdfEditor.err.${result.error}`));
+          return;
+        }
+        await insertBitmap(result.value, 'image');
+      })();
+    };
+
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [doc, insertBitmap, t]);
+
+  const applySignature = useCallback(
+    (image: SignatureImage) => {
+      void insertBitmap(image, 'signature');
+    },
+    [insertBitmap],
+  );
+
+  const applyStamp = useCallback(
+    async (key: StampKey) => {
+      const image = await createStampImage(key, t(`tools.pdfEditor.${STAMP_LABEL_KEYS[key]}`));
+      if (!image) {
+        setBanner(t('tools.pdfEditor.err.PROCESS_FAILED'));
+        return;
+      }
+      await insertBitmap(image, 'stamp');
+    },
+    [insertBitmap, t],
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* M4: Word / image / text export                                          */
+  /* ---------------------------------------------------------------------- */
+
+  /** Source page numbers (1-based) of the pages actually in the document, in order, duplicates dropped */
+  const exportSourcePages = useCallback((target: PdfEditorDoc): number[] => {
+    const seen = new Set<number>();
+    const pages: number[] = [];
+    for (const page of visiblePages(target)) {
+      if (page.blank || page.sourceKey !== 'main') continue;
+      const sourcePage = page.sourceIndex + 1;
+      if (seen.has(sourcePage)) continue;
+      seen.add(sourcePage);
+      pages.push(sourcePage);
+    }
+    return pages;
+  }, []);
+
+  const handleExportDocx = useCallback(
+    async (options: ExportDocxDialogResult) => {
+      if (!doc || !pdf.pdfDoc) return;
+      setExportBusy(true);
+      try {
+        const result = await exportPdfToDocx(pdf.pdfDoc, doc, {
+          mode: options.mode,
+          pageNumbers: options.pages,
+          headerFooter: options.headerFooter,
+        });
+        if (!result.ok) {
+          setBanner(t(`tools.pdfEditor.err.${result.error}`));
+          return;
+        }
+        downloadBytes(
+          result.value.bytes,
+          result.value.filename,
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        );
+        setFidelityReport(result.value.report);
+        setExportDocxOpen(false);
+      } catch {
+        setBanner(t('tools.pdfEditor.err.PROCESS_FAILED'));
+      } finally {
+        setExportBusy(false);
+      }
+    },
+    [doc, pdf.pdfDoc, t],
+  );
+
+  const handleExportImages = useCallback(
+    async (options: ExportImagesDialogResult) => {
+      if (!doc) return;
+      setExportBusy(true);
+      try {
+        const result = await exportPdfImages(doc, options.pages, {
+          format: options.format,
+          dpi: options.dpi,
+        });
+        if (!result.ok) {
+          setBanner(t(`tools.pdfEditor.err.${result.error}`));
+          return;
+        }
+        setFidelityReport(result.value.report);
+        setExportImagesOpen(false);
+      } catch {
+        setBanner(t('tools.pdfEditor.err.PROCESS_FAILED'));
+      } finally {
+        setExportBusy(false);
+      }
+    },
+    [doc, t],
+  );
+
+  const handleExportText = useCallback(async () => {
+    if (!doc || !pdf.pdfDoc) return;
+    const pages = exportSourcePages(doc);
+    if (pages.length === 0) {
+      setBanner(t('tools.pdfEditor.exportEmpty'));
+      return;
+    }
+
+    setExportBusy(true);
+    try {
+      const result = await collectPdfText(pdf.pdfDoc, pages);
+      if (!result.ok) {
+        setBanner(t(`tools.pdfEditor.err.${result.error}`));
+        return;
+      }
+      if (!result.value.text.trim()) {
+        setBanner(t('tools.pdfEditor.exportEmpty'));
+        return;
+      }
+      downloadBytes(
+        encodeText(result.value.text),
+        textFileName(doc.name),
+        'text/plain;charset=utf-8',
+      );
+      if (result.value.emptyPages.length > 0) {
+        setFidelityReport(
+          createFidelityReport('pdf', 'export', [
+            {
+              code: 'pdf.noTextLayer',
+              severity: 'loss',
+              count: result.value.emptyPages.length,
+              messageKey: 'tools.pdfEditor.fidelityNoTextLayer',
+              detail: result.value.emptyPages.map((page) => `p${page}`).join(', '),
+            },
+          ]),
+        );
+      }
+    } catch {
+      setBanner(t('tools.pdfEditor.err.PROCESS_FAILED'));
+    } finally {
+      setExportBusy(false);
+    }
+  }, [doc, exportSourcePages, pdf.pdfDoc, t]);
+
   const eraseObject = useCallback(
     (id: string) => {
       mutate((current) => removeObjects(current, new Set([id])), { label: 'erase-object' });
@@ -555,7 +937,8 @@ export default function PdfEditorTool() {
 
   const copySelection = useCallback(() => {
     if (!doc || selectedIds.length === 0) return;
-    copyObjects(doc.objects.filter((object) => selectedIds.includes(object.id)));
+    const count = copyObjects(doc.objects.filter((object) => selectedIds.includes(object.id)));
+    setClipboardCount(count);
   }, [doc, selectedIds]);
 
   const pasteSelection = useCallback(() => {
@@ -574,6 +957,73 @@ export default function PdfEditorTool() {
     copySelection();
     deleteSelected();
   }, [copySelection, deleteSelected, selectedIds]);
+
+  /* ---------------------------------------------------------------------- */
+  /* M3-5: align / distribute / format painter                              */
+  /* ---------------------------------------------------------------------- */
+
+  const alignSelection = useCallback(
+    (mode: AlignMode) => {
+      const ids = new Set(selectedIds);
+      if (ids.size < 2) return;
+      mutate(
+        (current) => {
+          const objects = alignObjects(current.objects, ids, mode);
+          return objects === current.objects ? current : touch({ ...current, objects });
+        },
+        { label: 'align-objects' },
+      );
+    },
+    [mutate, selectedIds],
+  );
+
+  const distributeSelection = useCallback(
+    (axis: DistributeAxis) => {
+      const ids = new Set(selectedIds);
+      if (ids.size < 3) return;
+      mutate(
+        (current) => {
+          const objects = distributeObjects(current.objects, ids, axis);
+          return objects === current.objects ? current : touch({ ...current, objects });
+        },
+        { label: 'distribute-objects' },
+      );
+    },
+    [mutate, selectedIds],
+  );
+
+  const toggleFormatPainter = useCallback(() => {
+    if (painterArmed) {
+      painterRef.current = null;
+      setPainterArmed(false);
+      return;
+    }
+    const source = doc?.objects.find((object) => object.id === selectedId);
+    if (!source) return;
+    painterRef.current = readObjectFormat(source);
+    setPainterArmed(true);
+  }, [doc?.objects, painterArmed, selectedId]);
+
+  /** A click while the painter is armed paints the clicked object instead of changing selection */
+  const applyPainter = useCallback(
+    (ids: string[]): boolean => {
+      const format = painterRef.current;
+      if (!format || ids.length !== 1) return false;
+      const id = ids[0];
+      mutate(
+        (current) => updateObject(current, id, (object) => applyObjectFormat(object, format)),
+        {
+          label: 'paint-format',
+        },
+      );
+      painterRef.current = null;
+      setPainterArmed(false);
+      setSelectedIds([id]);
+      setEditingId(null);
+      return true;
+    },
+    [mutate],
+  );
 
   const selectAllObjects = useCallback(() => {
     if (!doc) return;
@@ -689,6 +1139,25 @@ export default function PdfEditorTool() {
   );
 
   /** Download just the page the user is on, with its annotations baked in */
+  /** Imported pages land right after the page the user is looking at */
+  const handleInsertPages = useCallback(
+    (source: PdfSource, indices: number[]) => {
+      setPageBlocked(null);
+      mutate((current) => insertPagesFrom(current, current.view.page + 1, source, indices), {
+        label: 'insert-pages',
+      });
+    },
+    [mutate],
+  );
+
+  /** One PDF per page, zipped — the page order in the ZIP is the order in the rail */
+  const exportPagesZip = useCallback(async () => {
+    if (!doc) return;
+    const numbers = visiblePages(doc).map((_, index) => index + 1);
+    const done = await downloadPageZip(doc, numbers);
+    if (!done) setBanner(t('tools.pdfEditor.err.PROCESS_FAILED'));
+  }, [doc, t]);
+
   /** Annotations panel entry: select the object and scroll to the page it lives on */
   const selectAnnotation = useCallback(
     (object: PdfObject) => {
@@ -718,6 +1187,8 @@ export default function PdfEditorTool() {
   const pageOps = useMemo(
     () => ({
       insertBlank: insertBlankPageAfterCurrent,
+      insertFromFile: () => setInsertOpen(true),
+      exportZip: () => void exportPagesZip(),
       remove: removeCurrentPage,
       duplicate: duplicateCurrentPage,
       rotateLeft: () => rotateCurrentPage(-90),
@@ -727,6 +1198,7 @@ export default function PdfEditorTool() {
     }),
     [
       duplicateCurrentPage,
+      exportPagesZip,
       extractCurrentPage,
       insertBlankPageAfterCurrent,
       pageBlocked,
@@ -765,9 +1237,12 @@ export default function PdfEditorTool() {
     setSaving(true);
     setSaveError(null);
     setBanner(null);
+    setSaveProgress({ done: 0, total: visiblePages(doc).length });
 
     try {
-      const result = await flattenPdf(doc);
+      const result = await flattenPdf(doc, {
+        onProgress: (done, total) => setSaveProgress({ done, total }),
+      });
       if (!result.ok) {
         setSaveError(t(`tools.pdfEditor.err.${result.error}`));
         return;
@@ -786,6 +1261,7 @@ export default function PdfEditorTool() {
     } finally {
       savingRef.current = false;
       setSaving(false);
+      setSaveProgress(null);
     }
   }, [doc, t]);
 
@@ -796,6 +1272,7 @@ export default function PdfEditorTool() {
   /** Flat projection of the single selection, consumed by the contextual tabs and the properties */
   const selectedObject =
     selectedId !== null ? (doc?.objects.find((object) => object.id === selectedId) ?? null) : null;
+  const selectedImage = selectedObject?.kind === 'image' ? selectedObject : null;
   const ribbonSelection = selectedObject ? ribbonSelectionOf(selectedObject) : null;
   const contextTab = resolveContextTab(ribbonSelection);
 
@@ -850,18 +1327,43 @@ export default function PdfEditorTool() {
       setObjectAlign: (align) => updateSelected({ align }),
       setObjectZ: changeSelectedZ,
       toggleObjectLock: toggleSelectedLock,
+      insertImage: () => {
+        replaceTargetRef.current = false;
+        imageInputRef.current?.click();
+      },
+      replaceImage: replaceSelectedImage,
+      cropImage: () => setCropOpen(true),
+      openSignature: () => setSignatureOpen(true),
+      openStamp: () => setStampOpen(true),
+      copySelection,
+      cutSelection,
+      pasteSelection,
+      alignObjects: alignSelection,
+      distributeObjects: distributeSelection,
+      toggleFormatPainter,
+      exportDocx: () => setExportDocxOpen(true),
+      exportImages: () => setExportImagesOpen(true),
+      exportText: () => void handleExportText(),
     }),
     [
+      alignSelection,
+      handleExportText,
       changeSelectedZ,
       clearAnnotations,
+      copySelection,
+      cutSelection,
       deleteSelected,
+      distributeSelection,
       mutate,
+      pasteSelection,
       redo,
+      replaceSelectedImage,
       selectedObject,
       setObjectColor,
       setObjectFit,
       setObjectWidth,
       setSelectedOpacity,
+      toggleFormatPainter,
       toggleSelectedLock,
       tool,
       undo,
@@ -880,6 +1382,27 @@ export default function PdfEditorTool() {
   useEffect(() => {
     setActiveTabId((current) => nextActiveTab(current, contextTab, baseTabRef.current) ?? current);
   }, [contextTab]);
+
+  // Opening another file must not inherit "generate thumbnails anyway" from the previous one
+  useEffect(() => {
+    setThumbsForced(false);
+  }, [doc?.source.fingerprint]);
+
+  // Cached bitmaps belong to the document; leaving the tool must not retain them (M4-5).
+  // Children clean up after the parent, so clear again once their "cache on unmount" ran.
+  useEffect(
+    () => () => {
+      clearCanvasCache();
+      setTimeout(clearCanvasCache, 0);
+    },
+    [],
+  );
+
+  // Closing the document also drops its bitmaps, without waiting for the tool to unmount
+  const hasDocument = doc !== null;
+  useEffect(() => {
+    if (!hasDocument) clearCanvasCache();
+  }, [hasDocument]);
 
   const handleTabChange = useCallback((tabId: string) => {
     if (!(CONTEXT_TAB_IDS as readonly string[]).includes(tabId)) baseTabRef.current = tabId;
@@ -911,6 +1434,11 @@ export default function PdfEditorTool() {
           selectionCount: selectedIds.length,
           objectCount: annotationCount,
         },
+        edit: {
+          selectionCount: selectedIds.length,
+          clipboard: clipboardCount,
+          painter: painterArmed,
+        },
         selection: ribbonSelection,
         contextTab,
         actions,
@@ -925,6 +1453,8 @@ export default function PdfEditorTool() {
       annotateStyle,
       annotationCount,
       selectedIds.length,
+      clipboardCount,
+      painterArmed,
       ribbonSelection,
       contextTab,
       actions,
@@ -932,6 +1462,8 @@ export default function PdfEditorTool() {
   );
 
   const pages = useMemo(() => (doc ? visiblePages(doc) : []), [doc]);
+  // >20 MB documents decode slowly; thumbnails become opt-in and neighbours stop pre-rendering
+  const largeDoc = (doc?.source.bytes.byteLength ?? 0) > LARGE_DOC_BYTES;
 
   /* ---------------------------------------------------------------------- */
   /* Viewport callbacks                                                      */
@@ -1092,6 +1624,8 @@ export default function PdfEditorTool() {
         setSelectedIds((current) => (current.length === 0 ? current : []));
         // Esc also leaves the annotation tool, so the next click selects instead of drawing
         setTool((current) => (current === 'select' ? current : 'select'));
+        painterRef.current = null;
+        setPainterArmed(false);
         return;
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -1185,6 +1719,7 @@ export default function PdfEditorTool() {
       onAnnotate={(request) => handleAnnotate(page.id, request)}
       onErase={eraseObject}
       onSelect={(ids) => {
+        if (applyPainter(ids)) return;
         setSelectedIds(ids);
         if (editingId && !ids.includes(editingId)) setEditingId(null);
       }}
@@ -1201,28 +1736,67 @@ export default function PdfEditorTool() {
     />
   );
 
+  /**
+   * The patch layer only covers the page in view and disappears while a patch is being edited, so the
+   * textarea inside the overlay stays clickable.
+   */
+  const renderPatchLayer = (page: PdfPageState) => {
+    if (tool !== 'patch' || editingId || !pdf.pdfDoc || page.blank) return null;
+    const current = doc ? pages[doc.view.page - 1] : undefined;
+    if (!current || current.id !== page.id) return null;
+    return (
+      <TextPatchLayer
+        pdfDoc={pdf.pdfDoc}
+        pageNumber={page.sourceIndex + 1}
+        pageId={page.id}
+        onPatch={handlePatchLine}
+      />
+    );
+  };
+
   const pageArea =
     doc && pdf.pdfDoc ? (
-      <PageScrollView
-        pdfDoc={pdf.pdfDoc}
-        pages={pages}
-        view={doc.view}
-        tool={tool}
-        darkCanvas={darkCanvas}
-        onResolvedScale={handleResolvedScale}
-        onPageChange={handlePageChange}
-        overlay={renderOverlay}
-        onZoomBy={handleZoomBy}
-      />
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        {tool === 'patch' ? <PatchHint /> : null}
+        <PageScrollView
+          pdfDoc={pdf.pdfDoc}
+          pages={pages}
+          view={doc.view}
+          tool={tool}
+          darkCanvas={darkCanvas}
+          onResolvedScale={handleResolvedScale}
+          onPageChange={handlePageChange}
+          overlay={renderOverlay}
+          patchLayer={renderPatchLayer}
+          onZoomBy={handleZoomBy}
+          onDropImage={(file) => void insertImageFile(file)}
+          preloadMargin={largeDoc ? '0px' : '600px 0px'}
+        />
+      </div>
     ) : null;
 
   const showThumbnails = doc !== null && panels.thumbnails && pdf.pdfDoc !== null;
   const showOutline = doc !== null && panels.outline && pdf.pdfDoc !== null;
 
+  const thumbnailsBlocked = showThumbnails && largeDoc && !thumbsForced;
+
   const leftPanel =
     showThumbnails || showOutline ? (
       <div className="flex min-h-0 gap-3">
-        {showThumbnails && pdf.pdfDoc ? (
+        {thumbnailsBlocked ? (
+          <div className="flex w-40 shrink-0 flex-col gap-2 rounded-md border border-gray-200 p-2 text-[11px] text-gray-600 dark:border-gray-700 dark:text-gray-300">
+            <p>{t('tools.pdfEditor.thumbsLargeHint')}</p>
+            <button
+              type="button"
+              data-testid="pdf-thumbs-force"
+              onClick={() => setThumbsForced(true)}
+              className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              {t('tools.pdfEditor.thumbsGenerate')}
+            </button>
+          </div>
+        ) : null}
+        {showThumbnails && pdf.pdfDoc && !thumbnailsBlocked ? (
           <ThumbnailRail
             pdfDoc={pdf.pdfDoc}
             pages={pages}
@@ -1307,10 +1881,70 @@ export default function PdfEditorTool() {
         activeTabId={activeTabId}
         onTabChange={handleTabChange}
         error={pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null}
-        banner={doc ? (errorMessage ?? banner) : null}
-        note={pdf.busy ? t('common.loading') : null}
+        banner={
+          doc
+            ? (errorMessage ?? (painterArmed ? t('tools.pdfEditor.painterArmed') : null) ?? banner)
+            : null
+        }
+        note={exportBusy ? t('tools.pdfEditor.exportBusy') : pdf.busy ? t('common.loading') : null}
         headerRight={headerRight}
-        statusBar={<StatusBar doc={doc} pdfDoc={pdf.pdfDoc} />}
+        statusBar={<StatusBar doc={doc} pdfDoc={pdf.pdfDoc} progress={saveProgress} />}
+      />
+
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        data-testid="pdf-image-input"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          // Reset first: picking the same file twice must fire `change` twice
+          event.target.value = '';
+          if (file) void insertImageFile(file);
+        }}
+      />
+
+      <InsertPagesDialog
+        open={insertOpen}
+        onClose={() => setInsertOpen(false)}
+        onInsert={handleInsertPages}
+      />
+      <SignaturePad
+        open={signatureOpen}
+        onClose={() => setSignatureOpen(false)}
+        onApply={applySignature}
+      />
+      <StampGallery
+        open={stampOpen}
+        onClose={() => setStampOpen(false)}
+        onPick={(key) => void applyStamp(key)}
+      />
+      <ExportDocxDialog
+        open={exportDocxOpen}
+        pageCount={doc ? visiblePages(doc).length : 0}
+        busy={exportBusy}
+        onClose={() => setExportDocxOpen(false)}
+        onExport={(options) => void handleExportDocx(options)}
+      />
+      <ExportImagesDialog
+        open={exportImagesOpen}
+        pageCount={doc ? visiblePages(doc).length : 0}
+        busy={exportBusy}
+        onClose={() => setExportImagesOpen(false)}
+        onExport={(options) => void handleExportImages(options)}
+      />
+      <ImageCropDialog
+        open={cropOpen}
+        object={selectedImage}
+        onClose={() => setCropOpen(false)}
+        onApply={applyImageCrop}
+      />
+      <FidelityDialog
+        report={fidelityReport}
+        onClose={() => setFidelityReport(null)}
+        onMute={muteFidelity}
+        muted={isFidelityMuted()}
       />
     </>
   );

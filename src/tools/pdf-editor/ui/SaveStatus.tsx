@@ -43,7 +43,9 @@ export function SaveStatus({ state, name }: SaveStatusProps) {
           {name}
         </span>
       ) : null}
-      <span aria-live="polite">{t(`tools.pdfEditor.${LABEL_KEY[state]}`)}</span>
+      <span className="text-gray-600 dark:text-gray-300" aria-live="polite">
+        {t(`tools.pdfEditor.${LABEL_KEY[state]}`)}
+      </span>
     </div>
   );
 }

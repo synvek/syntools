@@ -9,10 +9,12 @@ interface StatusBarProps {
   doc: PdfEditorDoc | null;
   /** Used to read the current page size; omitted in tests without a document proxy */
   pdfDoc?: PDFDocumentProxy | null;
+  /** Page progress while `flattenPdf` runs (M4-5); `null` when idle */
+  progress?: { done: number; total: number } | null;
 }
 
 /** Bottom strip: page position, zoom, page size, file size and the local-only promise */
-export function StatusBar({ doc, pdfDoc }: StatusBarProps) {
+export function StatusBar({ doc, pdfDoc, progress }: StatusBarProps) {
   const { t } = useTranslation();
   const total = doc ? visiblePageCount(doc) : 0;
   const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
@@ -78,6 +80,11 @@ export function StatusBar({ doc, pdfDoc }: StatusBarProps) {
       {doc ? (
         <span data-testid="pdf-status-filesize">
           {t('tools.pdfEditor.statusFileSize')} {formatFileSize(totalBytes)}
+        </span>
+      ) : null}
+      {progress ? (
+        <span data-testid="pdf-status-progress" aria-live="polite">
+          {t('tools.pdfEditor.saveProgress', { done: progress.done, total: progress.total })}
         </span>
       ) : null}
       <span className="ml-auto">{t('tools.pdfEditor.privacy')}</span>

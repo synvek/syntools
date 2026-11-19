@@ -9,7 +9,7 @@ const fixture = (name: string) =>
 
 async function openPdf(page: Page, name: string): Promise<void> {
   await page.goto('/tools/pdf-editor');
-  await page.locator('input[type="file"]').setInputFiles(fixture(name));
+  await page.locator('input[type="file"]').first().setInputFiles(fixture(name));
   await expect(page.getByTestId('pdf-ribbon')).toBeVisible();
 }
 
@@ -36,11 +36,14 @@ test.describe('PDF 编辑器（M1）', () => {
   test('非 PDF 文件在校验后报错', async ({ page }) => {
     await page.goto('/tools/pdf-editor');
 
-    await page.locator('input[type="file"]').setInputFiles({
-      name: 'notes.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('hello'),
-    });
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'notes.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('hello'),
+      });
 
     await expect(page.getByRole('alert')).toContainText('请选择 PDF 文件');
     await expect(page.getByTestId('pdf-ribbon')).toHaveCount(0);
@@ -175,7 +178,7 @@ test.describe('PDF 编辑器（M1）', () => {
 
   test('加密 PDF：错误密码可重试，正确密码后打开', async ({ page }) => {
     await page.goto('/tools/pdf-editor');
-    await page.locator('input[type="file"]').setInputFiles(fixture('encrypted.pdf'));
+    await page.locator('input[type="file"]').first().setInputFiles(fixture('encrypted.pdf'));
 
     const password = page.getByLabel('PDF 密码');
     await expect(password).toBeVisible();
@@ -190,5 +193,82 @@ test.describe('PDF 编辑器（M1）', () => {
     await page.getByRole('button', { name: '解锁' }).click();
     await expect(page.getByTestId('pdf-ribbon')).toBeVisible();
     await expect(page.getByTestId('pdf-status-page')).toHaveText('第 1 / 1 页');
+  });
+});
+
+/**
+ * M3/M4 smoke: annotation baking, Word and image export.
+ *
+ * These exercise the same paths the component tests cover, but through pdf-lib/pdfjs in a real
+ * browser — the only place canvas-based rasterisation and `docx` packaging can actually be observed.
+ */
+test.describe('PDF 编辑器（M3/M4）', () => {
+  test('高亮注释可保存下载', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+
+    await page.getByRole('tab', { name: '注释' }).click();
+    await page.getByTestId('ribbon-markup-highlight').click();
+
+    const overlay = page.getByTestId('pdf-overlay').first();
+    const box = await overlay.boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+
+    await page.mouse.move(box.x + 40, box.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 160, box.y + 120, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(page.getByTestId('pdf-object').first()).toHaveAttribute('data-kind', 'markup');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.keyboard.press('Control+s');
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages-edited.pdf');
+  });
+
+  test('插入图片后可保存', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+    await page.getByRole('tab', { name: '注释' }).click();
+
+    const chooserPromise = page.waitForEvent('filechooser');
+    await page.getByTestId('ribbon-insert-image').click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles({
+      name: 'dot.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+
+    await expect(page.getByTestId('pdf-object').first()).toHaveAttribute('data-kind', 'image');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.keyboard.press('Control+s');
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages-edited.pdf');
+  });
+
+  test('导出 Word（混合模式）下载 .docx', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+
+    await page.getByTestId('ribbon-export-docx').click();
+    await expect(page.getByTestId('pdf-export-docx-dialog')).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTestId('pdf-export-confirm').click();
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages.docx');
+  });
+
+  test('导出单页 PNG', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+
+    await page.getByTestId('ribbon-export-images').click();
+    await page.getByTestId('pdf-image-pages').fill('1');
+    await page.getByTestId('pdf-image-dpi').selectOption('96');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTestId('pdf-image-confirm').click();
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages.png');
   });
 });

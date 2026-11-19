@@ -26,6 +26,11 @@ export interface FlattenOptions {
    * future mode (annotations / encrypted) cannot ship half-implemented.
    */
   mode?: 'flatten';
+  /**
+   * Page progress for the status bar (M4-5). Called after each page is copied and painted, so the
+   * count is always "pages finished", never "pages started".
+   */
+  onProgress?: (done: number, total: number) => void;
 }
 
 export interface FlattenResult {
@@ -107,7 +112,7 @@ export async function flattenPdf(
       loaded.set(attachment.key, result.value);
     }
 
-    for (const state of pages) {
+    for (const [index, state] of pages.entries()) {
       const page =
         state.blank !== undefined
           ? out.addPage([state.blank.widthPt, state.blank.heightPt])
@@ -129,6 +134,12 @@ export async function flattenPdf(
         pageObjects,
       );
       if (painted.rasterized) rasterized = true;
+
+      opts?.onProgress?.(index + 1, pages.length);
+      // Yield every 10 pages so a 300-page file still repaints the progress text (M4-5)
+      if ((index + 1) % 10 === 0 && index + 1 < pages.length) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
     }
 
     const title = doc.meta.title?.trim();

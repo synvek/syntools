@@ -11,6 +11,8 @@
  */
 
 import { annotateStrings } from './annotateStrings';
+import { editStrings } from './editStrings';
+import { exportStrings } from './exportStrings';
 import { fileStrings } from './fileStrings';
 import { pageStrings } from './pageStrings';
 import { panelStrings } from './panelStrings';
@@ -32,6 +34,7 @@ const base: Record<string, StringTree> = {
     statusPage: '第 {{page}} / {{total}} 页',
     statusPageSize: '页面尺寸',
     statusFileSize: '文件大小',
+    saveProgress: '保存中 {{done}}/{{total}} 页',
     err: {
       NOT_PDF: '请选择 PDF 文件',
       TOO_LARGE: '文件过大（建议小于 50MB）',
@@ -53,6 +56,7 @@ const base: Record<string, StringTree> = {
     statusPage: '第 {{page}} / {{total}} 頁',
     statusPageSize: '頁面尺寸',
     statusFileSize: '檔案大小',
+    saveProgress: '儲存中 {{done}}/{{total}} 頁',
     err: {
       NOT_PDF: '請選擇 PDF 檔案',
       TOO_LARGE: '檔案過大（建議小於 50MB）',
@@ -74,6 +78,7 @@ const base: Record<string, StringTree> = {
     statusPage: 'Page {{page}} of {{total}}',
     statusPageSize: 'Page size',
     statusFileSize: 'File size',
+    saveProgress: 'Saving page {{done}}/{{total}}',
     err: {
       NOT_PDF: 'Please choose a PDF file',
       TOO_LARGE: 'File is too large (recommended under 50 MB)',
@@ -95,6 +100,7 @@ const base: Record<string, StringTree> = {
     statusPage: '{{page}} / {{total}} ページ',
     statusPageSize: 'ページサイズ',
     statusFileSize: 'ファイルサイズ',
+    saveProgress: '保存中 {{done}}/{{total}} ページ',
     err: {
       NOT_PDF: 'PDF ファイルを選択してください',
       TOO_LARGE: 'ファイルが大きすぎます（50MB 未満を推奨）',
@@ -116,6 +122,7 @@ const base: Record<string, StringTree> = {
     statusPage: 'Page {{page}} sur {{total}}',
     statusPageSize: 'Taille de page',
     statusFileSize: 'Taille du fichier',
+    saveProgress: 'Enregistrement {{done}}/{{total}}',
     err: {
       NOT_PDF: 'Veuillez choisir un fichier PDF',
       TOO_LARGE: 'Fichier trop volumineux (50 Mo recommandé au maximum)',
@@ -137,6 +144,7 @@ const base: Record<string, StringTree> = {
     statusPage: 'Seite {{page}} von {{total}}',
     statusPageSize: 'Seitengröße',
     statusFileSize: 'Dateigröße',
+    saveProgress: 'Speichern {{done}}/{{total}}',
     err: {
       NOT_PDF: 'Bitte eine PDF-Datei auswählen',
       TOO_LARGE: 'Datei zu groß (empfohlen: unter 50 MB)',
@@ -158,6 +166,7 @@ const base: Record<string, StringTree> = {
     statusPage: 'Pagina {{page}} di {{total}}',
     statusPageSize: 'Dimensioni pagina',
     statusFileSize: 'Dimensione file',
+    saveProgress: 'Salvataggio {{done}}/{{total}}',
     err: {
       NOT_PDF: 'Scegli un file PDF',
       TOO_LARGE: 'File troppo grande (consigliato sotto 50 MB)',
@@ -179,6 +188,7 @@ const base: Record<string, StringTree> = {
     statusPage: 'Página {{page}} de {{total}}',
     statusPageSize: 'Tamaño de página',
     statusFileSize: 'Tamaño del archivo',
+    saveProgress: 'Guardando {{done}}/{{total}}',
     err: {
       NOT_PDF: 'Elige un archivo PDF',
       TOO_LARGE: 'Archivo demasiado grande (se recomienda menos de 50 MB)',
@@ -200,6 +210,7 @@ const base: Record<string, StringTree> = {
     statusPage: 'Página {{page}} de {{total}}',
     statusPageSize: 'Tamanho da página',
     statusFileSize: 'Tamanho do arquivo',
+    saveProgress: 'A guardar {{done}}/{{total}}',
     err: {
       NOT_PDF: 'Escolha um arquivo PDF',
       TOO_LARGE: 'Arquivo grande demais (recomendado abaixo de 50 MB)',
@@ -220,6 +231,8 @@ function withExtras(lng: string): ResourceTree {
       pdfEditor: {
         ...base[lng],
         ...annotateStrings[lng],
+        ...editStrings[lng],
+        ...exportStrings[lng],
         ...pageStrings[lng],
         ...fileStrings[lng],
         ...panelStrings[lng],

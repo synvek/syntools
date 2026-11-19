@@ -67,7 +67,7 @@ export function DraftPrompt({ draft, resumable, busy, onResume, onDiscard }: Dra
           type="button"
           onClick={onDiscard}
           data-testid="pdf-draft-discard"
-          className="rounded border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          className="rounded border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors motion-reduce:transition-none hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           {t('tools.pdfEditor.draftDiscard')}
         </button>

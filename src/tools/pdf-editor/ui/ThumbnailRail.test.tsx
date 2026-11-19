@@ -27,6 +27,8 @@ function pages(count = 3): PdfPageState[] {
 function pageOps() {
   return {
     insertBlank: vi.fn(),
+    insertFromFile: vi.fn(),
+    exportZip: vi.fn(),
     remove: vi.fn(),
     duplicate: vi.fn(),
     rotateLeft: vi.fn(),
@@ -94,16 +96,20 @@ describe('ThumbnailRail 重排与页面操作', () => {
     const { ops } = setup();
 
     fireEvent.click(screen.getByTestId('pdf-page-insert-blank'));
+    fireEvent.click(screen.getByTestId('pdf-page-insert-from-file'));
     fireEvent.click(screen.getByTestId('pdf-page-duplicate'));
     fireEvent.click(screen.getByTestId('pdf-page-rotate-left'));
     fireEvent.click(screen.getByTestId('pdf-page-rotate-right'));
     fireEvent.click(screen.getByTestId('pdf-page-extract'));
+    fireEvent.click(screen.getByTestId('pdf-page-export-zip'));
 
     expect(ops.insertBlank).toHaveBeenCalledTimes(1);
+    expect(ops.insertFromFile).toHaveBeenCalledTimes(1);
     expect(ops.duplicate).toHaveBeenCalledTimes(1);
     expect(ops.rotateLeft).toHaveBeenCalledTimes(1);
     expect(ops.rotateRight).toHaveBeenCalledTimes(1);
     expect(ops.extract).toHaveBeenCalledTimes(1);
+    expect(ops.exportZip).toHaveBeenCalledTimes(1);
   });
 
   it('只剩一页时删除按钮禁用', () => {

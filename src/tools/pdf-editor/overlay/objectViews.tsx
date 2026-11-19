@@ -20,6 +20,8 @@ import type {
   PdfTextObject,
 } from '../model/types';
 
+import { clampCrop, croppedSize } from '../io/imageCrop';
+import { fittedBox } from '../io/imageScale';
 import { textCss } from './textStyle';
 
 export interface PagePixelSize {
@@ -52,15 +54,49 @@ function TextObjectView({ object, scale }: { object: PdfTextObject; scale: numbe
   );
 }
 
-function ImageObjectView({ object }: { object: PdfImageObject }) {
+function ImageObjectView({
+  object,
+  pageSize,
+}: {
+  object: PdfImageObject;
+  pageSize: PagePixelSize;
+}) {
+  if (!object.crop) {
+    return (
+      <img
+        src={object.dataUrl}
+        alt=""
+        draggable={false}
+        style={{ objectFit: object.fit }}
+        className="h-full w-full select-none"
+      />
+    );
+  }
+
+  // Mirror `drawImageObject`: fit the *cropped* bitmap, then blow the image up by 1/crop so the
+  // hidden part sits outside the clipping box. Same maths as savePdf, so WYSIWYG holds.
+  const crop = clampCrop(object.crop);
+  const frame = frameSize(object, pageSize);
+  const natural = croppedSize({ width: object.naturalW, height: object.naturalH }, crop);
+  const box = fittedBox(frame, natural, object.fit);
+  const imageW = box.width / crop.w;
+  const imageH = box.height / crop.h;
+
   return (
-    <img
-      src={object.dataUrl}
-      alt=""
-      draggable={false}
-      style={{ objectFit: object.fit }}
-      className="h-full w-full select-none"
-    />
+    <div className="relative h-full w-full overflow-hidden">
+      <img
+        src={object.dataUrl}
+        alt=""
+        draggable={false}
+        className="absolute max-w-none select-none"
+        style={{
+          width: imageW,
+          height: imageH,
+          left: box.offsetX - crop.x * imageW,
+          top: box.offsetY - crop.y * imageH,
+        }}
+      />
+    </div>
   );
 }
 
@@ -239,7 +275,7 @@ export function ObjectView({ object, scale, pageSize }: ViewProps) {
     case 'text':
       return <TextObjectView object={object} scale={scale} />;
     case 'image':
-      return <ImageObjectView object={object} />;
+      return <ImageObjectView object={object} pageSize={pageSize} />;
     case 'stamp':
     case 'signature':
       return <StampObjectView object={object} />;

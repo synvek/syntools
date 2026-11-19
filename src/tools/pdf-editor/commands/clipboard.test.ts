@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createShapeObject, createTextObject } from '../model/objects';
-import { clearClipboard, clipboardSize, copyObjects, pasteObjects } from './clipboard';
+import {
+  clearClipboard,
+  clipboardSize,
+  copyObjects,
+  deserializeClipboard,
+  pasteObjects,
+  serializeClipboard,
+} from './clipboard';
 
 const PAGE = 'page-main-0';
 const RECT = { x: 0.2, y: 0.2, w: 0.2, h: 0.1 };
@@ -74,5 +81,25 @@ describe('对象剪贴板', () => {
 
     expect(clipboardSize()).toBe(0);
     expect(pasteObjects({ objects: [], pageId: PAGE })).toEqual([]);
+  });
+
+  it('序列化后可还原，跨文档粘贴仍重新生成 id', () => {
+    copyObjects([shape('shape-9', { z: 2 })]);
+    const json = serializeClipboard();
+    clearClipboard();
+    expect(clipboardSize()).toBe(0);
+
+    expect(deserializeClipboard(json)).toBe(1);
+    const [pasted] = pasteObjects({ objects: [], pageId: 'page-main-4' });
+    expect(pasted.id).not.toBe('shape-9');
+    expect(pasted.page).toBe('page-main-4');
+  });
+
+  it('拒绝版本不符或损坏的载荷，且不清空现有剪贴板', () => {
+    copyObjects([shape()]);
+    expect(deserializeClipboard('{"version":99,"objects":[]}')).toBe(0);
+    expect(deserializeClipboard('not json')).toBe(0);
+    expect(deserializeClipboard('{"version":1,"objects":[{"id":1}]}')).toBe(0);
+    expect(clipboardSize()).toBe(1);
   });
 });

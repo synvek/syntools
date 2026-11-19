@@ -1,10 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PDFDocument } from '@cantoo/pdf-lib';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { ToolResult } from '@/core/types';
 
 // Mock the pdfjs boundary only: the open pipeline, state machine and shell all stay real.
-vi.mock('@/core/pdf/render', () => ({ openPdfjsDoc: vi.fn() }));
+// `renderPageDataUrl` is used by the thumbnail rail and must exist as a mock, otherwise opening the
+// panel rejects with "No export is defined on the mock".
+vi.mock('@/core/pdf/render', () => ({
+  openPdfjsDoc: vi.fn(),
+  renderPageDataUrl: vi.fn(async () => ({ ok: false, error: 'PROCESS_FAILED' })),
+}));
 
 import { i18n } from '@/core/i18n';
 import { openPdfjsDoc } from '@/core/pdf/render';
@@ -193,15 +199,16 @@ describe('PdfEditorTool 打开流程', () => {
 
   it('注释页选高亮后拖动，创建可选中对象，Esc 回到选择工具', async () => {
     openMock.mockResolvedValue({ ok: true, value: fakePdfDoc(1) } as ToolResult<PDFDocumentProxy>);
-    // jsdom 没有布局：给页面一个 600×800 的盒子，指针才能换算成归一化坐标
+    // jsdom 没有布局：给页面一个 1200×800 的盒子，指针才能换算成归一化坐标。
+    // 宽度同时作用于 ribbon 容器，必须 > 640，否则 ribbon 自动折叠成弹出面板。
     const box = {
       x: 0,
       y: 0,
       left: 0,
       top: 0,
-      right: 600,
+      right: 1200,
       bottom: 800,
-      width: 600,
+      width: 1200,
       height: 800,
       toJSON: () => ({}),
     } as DOMRect;
@@ -271,6 +278,43 @@ describe('PdfEditorTool 打开流程', () => {
     fireEvent.click(screen.getByTestId('pdf-page-delete'));
     await waitFor(() => expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('/ 1 页'));
     expect(screen.getByTestId('pdf-page-delete')).toBeDisabled();
+  });
+
+  it('从文件插入页：解析范围后页数与页序都更新', async () => {
+    const other = await PDFDocument.create();
+    other.addPage([595.28, 841.89]);
+    other.addPage([595.28, 841.89]);
+    const otherBytes = await other.save();
+
+    openMock.mockResolvedValue({ ok: true, value: fakePdfDoc(2) } as ToolResult<PDFDocumentProxy>);
+    const { container } = render(<PdfEditorTool />);
+    choose(container, pdfFile('two-pages.pdf'));
+    await waitFor(() => expect(screen.getByTestId('pdf-ribbon')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('ribbon-tab-view'));
+    fireEvent.click(screen.getByTestId('ribbon-panels-thumbnails'));
+    await waitFor(() => expect(screen.getByTestId('pdf-page-toolbar')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('pdf-page-insert-from-file'));
+    fireEvent.change(screen.getByTestId('pdf-insert-pages-file'), {
+      target: {
+        files: [
+          {
+            name: 'other.pdf',
+            type: 'application/pdf',
+            size: otherBytes.byteLength,
+            lastModified: 0,
+            arrayBuffer: async () => otherBytes.buffer,
+          } as unknown as File,
+        ],
+      },
+    });
+
+    await waitFor(() => expect(screen.getByTestId('pdf-insert-pages-range')).toHaveValue('1-2'));
+    fireEvent.click(screen.getByTestId('pdf-insert-pages-confirm'));
+
+    await waitFor(() => expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('/ 4 页'));
+    expect(screen.queryByTestId('pdf-insert-pages-dialog')).toBeNull();
   });
 });
 

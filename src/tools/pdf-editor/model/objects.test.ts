@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  alignObjects,
+  applyObjectFormat,
   clampObject,
   clampOpacity,
   cloneObject,
@@ -11,9 +13,12 @@ import {
   createShapeObject,
   createStampObject,
   createTextObject,
+  createTextPatch,
   DEFAULT_TEXT_STYLE,
+  distributeObjects,
   moveObjectToPage,
   nextZ,
+  readObjectFormat,
   reorderZ,
   setObjectLocked,
   setObjectOpacity,
@@ -88,6 +93,55 @@ describe('createTextObject', () => {
     const a = createObjectId();
     const b = createObjectId();
     expect(a).not.toBe(b);
+  });
+});
+
+describe('createTextPatch（M3-2）', () => {
+  it('继承行框/字号并默认白底遮挡', () => {
+    const lineRect = { x: 0.12, y: 0.34, w: 0.4, h: 0.03 };
+    const object = createTextPatch({
+      page,
+      rect: lineRect,
+      text: '合计 ¥1,200',
+      fontSize: 10.5,
+      z: 4,
+    });
+
+    expect(object.kind).toBe('text');
+    expect(object.rect.x).toBeCloseTo(lineRect.x, 10);
+    expect(object.rect.y).toBeCloseTo(lineRect.y, 10);
+    expect(object.rect.w).toBeCloseTo(lineRect.w, 10);
+    expect(object.rect.h).toBeCloseTo(lineRect.h, 10);
+    expect(object.text).toBe('合计 ¥1,200');
+    expect(object.fontSize).toBe(10.5);
+    expect(object.align).toBe('left');
+    expect(object.z).toBe(4);
+    expect(object.patch).toEqual({ cover: '#ffffff', sourceText: '合计 ¥1,200' });
+  });
+
+  it('覆盖色与文字色可覆盖', () => {
+    const object = createTextPatch({
+      page,
+      rect,
+      text: 'x',
+      fontSize: 9,
+      cover: '#f7f1e3',
+      color: '#333333',
+    });
+    expect(object.patch?.cover).toBe('#f7f1e3');
+    expect(object.color).toBe('#333333');
+  });
+
+  it('字号与矩形同样被夹紧', () => {
+    const object = createTextPatch({
+      page,
+      rect: { x: 0.9, y: 0.9, w: 0.3, h: 0.3 },
+      text: 'x',
+      fontSize: 0.5,
+    });
+    expect(object.fontSize).toBe(4);
+    expect(object.rect.x + object.rect.w).toBeLessThanOrEqual(1);
+    expect(object.rect.y + object.rect.h).toBeLessThanOrEqual(1);
   });
 });
 
@@ -327,5 +381,79 @@ describe('reorderZ / 锁定 / 透明度', () => {
     const half = setObjectOpacity(objects, 'a', 0.5);
     expect(half.find((object) => object.id === 'a')?.opacity).toBe(0.5);
     expect(setObjectOpacity(half, 'a', 0.5)).toBe(half);
+  });
+});
+
+describe('alignObjects / distributeObjects / 格式刷（M3-5）', () => {
+  const boxes = (): PdfObject[] => [
+    createShapeObject({ page, rect: { x: 0.1, y: 0.1, w: 0.1, h: 0.1 }, type: 'rect', id: 'a' }),
+    createShapeObject({ page, rect: { x: 0.5, y: 0.3, w: 0.2, h: 0.2 }, type: 'rect', id: 'b' }),
+    createShapeObject({ page, rect: { x: 0.8, y: 0.6, w: 0.1, h: 0.1 }, type: 'rect', id: 'c' }),
+  ];
+  const ids = new Set(['a', 'b', 'c']);
+  const rectOf = (objects: PdfObject[], id: string) =>
+    objects.find((object) => object.id === id)?.rect;
+
+  it('六种对齐都以选区外框为基准，尺寸不变', () => {
+    const objects = boxes();
+    expect(rectOf(alignObjects(objects, ids, 'left'), 'b')?.x).toBeCloseTo(0.1, 10);
+    // The selection box spans 0.1–0.9 on x and 0.1–0.7 on y
+    expect(rectOf(alignObjects(objects, ids, 'right'), 'b')?.x).toBeCloseTo(0.7, 10);
+    expect(rectOf(alignObjects(objects, ids, 'center'), 'b')?.x).toBeCloseTo(0.4, 5);
+    expect(rectOf(alignObjects(objects, ids, 'top'), 'b')?.y).toBeCloseTo(0.1, 10);
+    expect(rectOf(alignObjects(objects, ids, 'bottom'), 'b')?.y).toBeCloseTo(0.5, 10);
+    expect(rectOf(alignObjects(objects, ids, 'middle'), 'b')?.y).toBeCloseTo(0.3, 5);
+    expect(rectOf(alignObjects(objects, ids, 'left'), 'b')?.w).toBeCloseTo(0.2, 10);
+  });
+
+  it('少于两个对象时不做任何事', () => {
+    const objects = boxes();
+    expect(alignObjects(objects, new Set(['a']), 'left')).toBe(objects);
+    expect(distributeObjects(objects, new Set(['a', 'b']), 'horizontal')).toBe(objects);
+  });
+
+  it('水平分布让中间对象等距，首尾不动', () => {
+    const objects = boxes();
+    const distributed = distributeObjects(objects, ids, 'horizontal');
+    expect(rectOf(distributed, 'a')?.x).toBeCloseTo(0.1, 10);
+    expect(rectOf(distributed, 'c')?.x).toBeCloseTo(0.8, 10);
+    const gapAB = (rectOf(distributed, 'b')?.x ?? 0) - ((rectOf(distributed, 'a')?.x ?? 0) + 0.1);
+    const gapBC = 0.8 - ((rectOf(distributed, 'b')?.x ?? 0) + 0.2);
+    expect(gapAB).toBeCloseTo(gapBC, 6);
+  });
+
+  it('垂直分布同样保持首尾位置', () => {
+    const objects = boxes();
+    const distributed = distributeObjects(objects, ids, 'vertical');
+    expect(rectOf(distributed, 'a')?.y).toBeCloseTo(0.1, 10);
+    expect(rectOf(distributed, 'c')?.y).toBeCloseTo(0.6, 10);
+    expect(rectOf(distributed, 'b')?.y).toBeGreaterThan(0.1);
+    expect(rectOf(distributed, 'b')?.y).toBeLessThan(0.6);
+  });
+
+  it('格式刷只复制目标类型拥有的属性', () => {
+    const source = createTextObject({
+      page,
+      rect,
+      text: 'source',
+      style: { fontSize: 22, color: '#123456', bold: true, align: 'right', lineHeight: 1.8 },
+    });
+    const target = createTextObject({ page, rect, text: 'target' });
+    const painted = applyObjectFormat(target, readObjectFormat(source));
+
+    expect(painted.kind).toBe('text');
+    if (painted.kind !== 'text') return;
+    expect(painted.fontSize).toBe(22);
+    expect(painted.color).toBe('#123456');
+    expect(painted.bold).toBe(true);
+    expect(painted.align).toBe('right');
+    expect(painted.text).toBe('target');
+
+    const shape = createShapeObject({ page, rect, type: 'rect', stroke: '#000000' });
+    expect(readObjectFormat(source).width).toBeUndefined();
+    expect(applyObjectFormat(shape, readObjectFormat(source))).toMatchObject({
+      kind: 'shape',
+      stroke: '#123456',
+    });
   });
 });

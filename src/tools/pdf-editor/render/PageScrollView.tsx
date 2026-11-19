@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type {
+  DragEvent as ReactDragEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { PdfTool } from '../model/annotate';
@@ -22,8 +26,14 @@ export interface PageScrollViewProps {
   onPageChange(page: number): void;
   /** Object layer per page (absolute, above the canvas) */
   overlay?(page: PdfPageState, scale: number): ReactNode;
+  /** Text-patch layer per page; rendered above the overlay so its clicks cannot start a drag */
+  patchLayer?(page: PdfPageState, scale: number): ReactNode;
   /** ⌘/Ctrl + wheel zoom; the factor is relative (1.1 = one step in) */
   onZoomBy?(factor: number): void;
+  /** A bitmap dropped anywhere on the viewport (M3-3); inserted on the current page */
+  onDropImage?(file: File): void;
+  /** IntersectionObserver margin for page rendering; large files pass `0px` (M4-5) */
+  preloadMargin?: string;
 }
 
 /**
@@ -42,7 +52,10 @@ export function PageScrollView({
   onResolvedScale,
   onPageChange,
   overlay,
+  patchLayer,
   onZoomBy,
+  onDropImage,
+  preloadMargin = '600px 0px',
 }: PageScrollViewProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -184,12 +197,28 @@ export function PageScrollView({
     scrollRef.current?.releasePointerCapture?.(event.pointerId);
   };
 
+  const onDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!onDropImage) return;
+    // `preventDefault` is what makes the drop zone accept the file instead of navigating to it
+    event.preventDefault();
+  };
+
+  const onDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!onDropImage) return;
+    const file = event.dataTransfer?.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    event.preventDefault();
+    onDropImage(file);
+  };
+
   return (
     <div
       ref={scrollRef}
       data-testid="pdf-scroll-view"
       data-dark={darkCanvas ? 'true' : 'false'}
       onScroll={handleScroll}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -233,9 +262,11 @@ export function PageScrollView({
                     width={boxWidth}
                     height={boxHeight}
                     label={t('tools.pdfEditor.pageAria', { page: displayPage })}
+                    rootMargin={preloadMargin}
                   />
                 )}
                 {overlay?.(page, scale)}
+                {patchLayer?.(page, scale)}
               </div>
             );
           })}

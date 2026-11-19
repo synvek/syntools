@@ -311,3 +311,34 @@ describe('flattenPdf 多来源页', () => {
     expect(await flattenPdf(broken)).toEqual({ ok: false, error: 'INVALID_RANGE' });
   });
 });
+
+describe('flattenPdf 保存进度（M4-5）', () => {
+  it('逐页回调，最后一页等于总页数', async () => {
+    const bytes = await samplePdf(12);
+    const doc = await docFrom(bytes, 12);
+    const calls: Array<[number, number]> = [];
+
+    const result = await flattenPdf(doc, {
+      onProgress: (done, total) => calls.push([done, total]),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toHaveLength(12);
+    expect(calls[0]).toEqual([1, 12]);
+    expect(calls.at(-1)).toEqual([12, 12]);
+  });
+
+  it('失败时不回调（无页文档直接返回 NO_PAGES）', async () => {
+    const bytes = await samplePdf(1);
+    const doc = await docFrom(bytes, 1);
+    const calls: number[] = [];
+
+    const result = await flattenPdf(
+      { ...doc, source: { ...doc.source, bytes: new Uint8Array() } },
+      { onProgress: (done) => calls.push(done) },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'NO_PAGES' });
+    expect(calls).toEqual([]);
+  });
+});

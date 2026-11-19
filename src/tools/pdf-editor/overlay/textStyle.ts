@@ -16,7 +16,8 @@ export function textCss(object: PdfTextObject, scale: number): CSSProperties {
     fontWeight: object.bold ? 600 : 400,
     fontStyle: object.italic ? 'italic' : 'normal',
     fontFamily: object.fontFamily,
-    background: object.bg,
+    // A patch paints its cover behind the new text, both in the editor and on save
+    background: object.patch?.cover ?? object.bg,
     border: object.border ? `1px solid ${object.border}` : undefined,
   };
 }

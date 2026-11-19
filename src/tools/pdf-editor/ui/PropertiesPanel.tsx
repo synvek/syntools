@@ -136,6 +136,22 @@ export function PropertiesPanel({
                 />
               </label>
 
+              {text.patch ? (
+                <label className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
+                  {t('tools.pdfEditor.propPatchCover')}
+                  <input
+                    type="color"
+                    value={text.patch.cover}
+                    data-testid="pdf-property-patch-cover"
+                    onChange={(event) =>
+                      onChangeText({ patch: { ...text.patch, cover: event.target.value } })
+                    }
+                    title={text.patch.sourceText}
+                    className="h-6 w-10 cursor-pointer rounded border border-gray-300 bg-transparent p-0 dark:border-gray-700"
+                  />
+                </label>
+              ) : null}
+
               {needsUnicodeFont(text.text) ? (
                 <p
                   role="note"

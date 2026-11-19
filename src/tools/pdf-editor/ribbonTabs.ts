@@ -151,6 +151,25 @@ export interface PdfRibbonActions {
   setObjectAlign?(align: 'left' | 'center' | 'right'): void;
   setObjectZ?(action: 'front' | 'back' | 'forward' | 'backward'): void;
   toggleObjectLock?(): void;
+  /** M3: bitmap / signature / stamp insertion opens the matching picker */
+  insertImage?(): void;
+  /** M3-3: swap the bitmap behind the selected image/stamp/signature */
+  replaceImage?(): void;
+  openSignature?(): void;
+  openStamp?(): void;
+  /** M3-5: clipboard, alignment and the format painter */
+  copySelection?(): void;
+  cutSelection?(): void;
+  pasteSelection?(): void;
+  alignObjects?(mode: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void;
+  distributeObjects?(axis: 'horizontal' | 'vertical'): void;
+  toggleFormatPainter?(): void;
+  /** M4: export dialogs / direct text download */
+  exportDocx?(): void;
+  exportImages?(): void;
+  exportText?(): void;
+  /** M3-3: open the crop dialog for the selected image */
+  cropImage?(): void;
 }
 
 /** What the annotate tab needs to know beyond the tool itself */
@@ -158,6 +177,15 @@ export interface PdfRibbonAnnotate {
   style: AnnotationStyle;
   selectionCount: number;
   objectCount: number;
+}
+
+/** What the `edit` tab needs beyond the document itself (M3-5) */
+export interface PdfRibbonEdit {
+  selectionCount: number;
+  /** Objects currently in the in-memory clipboard */
+  clipboard: number;
+  /** Format painter armed: the next click applies the copied style */
+  painter: boolean;
 }
 
 export interface PdfRibbonContext {
@@ -169,6 +197,8 @@ export interface PdfRibbonContext {
   panels: PdfRibbonPanels;
   /** Annotation state; omitted in older tests, which then see an empty annotate tab */
   annotate?: PdfRibbonAnnotate;
+  /** Edit tab state; omitted in older tests, which then see an empty edit tab */
+  edit?: PdfRibbonEdit;
   /**
    * Panel toggles only appear once the panels themselves exist (M1-4). Shipping a toggle that
    * changes nothing would be a fake control, so the view tab grows by one group instead.
@@ -314,7 +344,41 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
         id: 'insert',
         label: t(key('grpInsert')),
         priority: 4,
-        items: [toolToggle('note', 'comment', 'cmdNote'), toolToggle('text', 'text', 'cmdText')],
+        items: [
+          toolToggle('note', 'comment', 'cmdNote'),
+          toolToggle('text', 'text', 'cmdText'),
+          toolToggle('patch', 'pdfAddText', 'cmdPatch'),
+          {
+            kind: 'button',
+            id: 'image',
+            label: t(key('cmdImage')),
+            icon: 'pdfInsertImage',
+            size: 'small',
+            disabled: lock,
+            hint,
+            onSelect: () => actions.insertImage?.(),
+          },
+          {
+            kind: 'button',
+            id: 'signature',
+            label: t(key('cmdSignature')),
+            icon: 'pdfSign',
+            size: 'small',
+            disabled: lock,
+            hint,
+            onSelect: () => actions.openSignature?.(),
+          },
+          {
+            kind: 'button',
+            id: 'stamp',
+            label: t(key('cmdStamp')),
+            icon: 'tag',
+            size: 'small',
+            disabled: lock,
+            hint,
+            onSelect: () => actions.openStamp?.(),
+          },
+        ],
       },
       {
         id: 'format',
@@ -373,6 +437,122 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
             disabled: lock || annotate.objectCount === 0,
             hint,
             onSelect: () => actions.clearAnnotations?.(),
+          },
+        ],
+      },
+    ],
+  };
+
+  const edit = ctx.edit ?? { selectionCount: 0, clipboard: 0, painter: false };
+  const multi = edit.selectionCount;
+
+  const editTab: RibbonTab = {
+    id: 'edit',
+    label: t(key('tabEdit')),
+    groups: [
+      {
+        id: 'clipboard',
+        label: t(key('grpClipboard')),
+        priority: 9,
+        items: [
+          {
+            kind: 'button',
+            id: 'copy',
+            label: t(key('cmdCopy')),
+            icon: 'copy',
+            size: 'small',
+            disabled: lock || multi === 0,
+            hint,
+            onSelect: () => actions.copySelection?.(),
+          },
+          {
+            kind: 'button',
+            id: 'cut',
+            label: t(key('cmdCut')),
+            icon: 'scissors',
+            size: 'small',
+            disabled: lock || multi === 0,
+            hint,
+            onSelect: () => actions.cutSelection?.(),
+          },
+          {
+            kind: 'button',
+            id: 'paste',
+            label: t(key('cmdPaste')),
+            icon: 'paste',
+            size: 'small',
+            disabled: lock || edit.clipboard === 0,
+            hint,
+            onSelect: () => actions.pasteSelection?.(),
+          },
+        ],
+      },
+      {
+        id: 'object-align',
+        label: t(key('grpAlign')),
+        priority: 7,
+        items: (
+          [
+            ['left', 'cmdAlignLeft', 'alignLeftCell'],
+            ['center', 'cmdAlignCenter', 'alignCenterCell'],
+            ['right', 'cmdAlignRight', 'alignRightCell'],
+            ['top', 'cmdAlignTop', 'alignTopCell'],
+            ['middle', 'cmdAlignMiddle', 'alignMiddleCell'],
+            ['bottom', 'cmdAlignBottom', 'alignBottomCell'],
+          ] as const
+        ).map(([mode, labelKey, icon]) => ({
+          kind: 'button' as const,
+          id: `align-object-${mode}`,
+          label: t(key(labelKey)),
+          icon,
+          size: 'small' as const,
+          disabled: lock || multi < 2,
+          hint,
+          onSelect: () => actions.alignObjects?.(mode),
+        })),
+      },
+      {
+        id: 'object-distribute',
+        label: t(key('grpDistribute')),
+        priority: 6,
+        items: [
+          {
+            kind: 'button',
+            id: 'distribute-h',
+            label: t(key('cmdDistributeH')),
+            icon: 'distribute',
+            size: 'small',
+            disabled: lock || multi < 3,
+            hint,
+            onSelect: () => actions.distributeObjects?.('horizontal'),
+          },
+          {
+            kind: 'button',
+            id: 'distribute-v',
+            label: t(key('cmdDistributeV')),
+            icon: 'distribute',
+            size: 'small',
+            disabled: lock || multi < 3,
+            hint,
+            onSelect: () => actions.distributeObjects?.('vertical'),
+          },
+        ],
+      },
+      {
+        id: 'format-painter',
+        label: t(key('grpFormatPainter')),
+        priority: 5,
+        items: [
+          {
+            kind: 'toggle',
+            id: 'format-painter',
+            label: edit.painter ? t(key('painterArmed')) : t(key('cmdFormatPainter')),
+            icon: 'formatPainter',
+            size: 'small',
+            active: edit.painter,
+            disabled: lock || multi === 0,
+            hint,
+            onSelect: () => actions.toggleFormatPainter?.(),
           },
         ],
       },
@@ -618,6 +798,27 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
                 actions.setObjectFit?.(value as 'contain' | 'cover' | 'fill'),
             },
             opacityItem,
+            {
+              kind: 'button',
+              id: 'replace-image',
+              label: t(key('cmdReplaceImage')),
+              icon: 'swap',
+              size: 'small',
+              disabled: !canEdit,
+              hint,
+              onSelect: () => actions.replaceImage?.(),
+            },
+            {
+              kind: 'button',
+              id: 'crop-image',
+              label: t(key('cmdCropImage')),
+              icon: 'image',
+              size: 'small',
+              // Stamps and signatures are fixed bitmaps; only `image` objects own a crop window
+              disabled: !canEdit || selection.kind !== 'image',
+              hint,
+              onSelect: () => actions.cropImage?.(),
+            },
           ],
         },
         arrangeGroup,
@@ -769,9 +970,47 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
             },
           ],
         },
+        {
+          id: 'export',
+          label: t(key('grpExport')),
+          priority: 2,
+          items: [
+            {
+              kind: 'button',
+              id: 'docx',
+              label: t(key('cmdExportDocx')),
+              icon: 'download',
+              size: 'small',
+              disabled: lock,
+              hint,
+              onSelect: () => actions.exportDocx?.(),
+            },
+            {
+              kind: 'button',
+              id: 'images',
+              label: t(key('cmdExportImages')),
+              icon: 'image',
+              size: 'small',
+              disabled: lock,
+              hint,
+              onSelect: () => actions.exportImages?.(),
+            },
+            {
+              kind: 'button',
+              id: 'plaintext',
+              label: t(key('cmdExportText')),
+              icon: 'text',
+              size: 'small',
+              disabled: lock,
+              hint,
+              onSelect: () => actions.exportText?.(),
+            },
+          ],
+        },
       ],
     },
     annotateTab,
+    editTab,
     {
       id: 'view',
       label: t(key('tabView')),

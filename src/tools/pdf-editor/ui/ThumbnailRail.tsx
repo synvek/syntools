@@ -9,6 +9,10 @@ import type { PdfPageState } from '../model/types';
 /** Page operations offered right on the rail (M2-7); acts on the current page */
 export interface ThumbnailPageOps {
   insertBlank(): void;
+  /** Open the "insert pages from file" dialog */
+  insertFromFile(): void;
+  /** Download one PDF per page as a ZIP */
+  exportZip(): void;
   remove(): void;
   duplicate(): void;
   rotateLeft(): void;
@@ -204,6 +208,14 @@ export function ThumbnailRail({
           </button>
           <button
             type="button"
+            data-testid="pdf-page-insert-from-file"
+            onClick={pageOps.insertFromFile}
+            className={toolButton}
+          >
+            {t('tools.pdfEditor.pageOpsInsertFromFile')}
+          </button>
+          <button
+            type="button"
             data-testid="pdf-page-duplicate"
             onClick={pageOps.duplicate}
             className={toolButton}
@@ -235,6 +247,14 @@ export function ThumbnailRail({
             className={toolButton}
           >
             {t('tools.pdfEditor.pageOpsExtract')}
+          </button>
+          <button
+            type="button"
+            data-testid="pdf-page-export-zip"
+            onClick={pageOps.exportZip}
+            className={toolButton}
+          >
+            {t('tools.pdfEditor.pageOpsExportZip')}
           </button>
           <button
             type="button"

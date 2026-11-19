@@ -217,6 +217,42 @@ export function createTextObject(input: CreateTextObjectInput): PdfTextObject {
   };
 }
 
+/**
+ * Text patch: rewrite one existing line (decision D1 = B).
+ *
+ * The rect and font size come from the pdfjs text layer (`groupTextItems`), so the box lands exactly
+ * on the glyphs it covers; the caller still owns the colour (pdfjs does not report it per item).
+ */
+export interface CreateTextPatchInput {
+  page: string;
+  rect: NormRect;
+  /** Text currently on the page, kept in `patch.sourceText` for traceability */
+  text: string;
+  /** PDF points, inherited from the line */
+  fontSize: number;
+  z?: number;
+  color?: string;
+  /** Cover colour; defaults to white, which matches most printed pages */
+  cover?: string;
+}
+
+export function createTextPatch(input: CreateTextPatchInput): PdfTextObject {
+  return createTextObject({
+    page: input.page,
+    rect: input.rect,
+    text: input.text,
+    z: input.z,
+    style: {
+      fontSize: input.fontSize,
+      color: input.color ?? '#111111',
+      align: 'left',
+      // One line: line height is irrelevant for a single row, but keep it tight for the caret
+      lineHeight: 1.2,
+      patch: { cover: input.cover ?? '#ffffff', sourceText: input.text },
+    },
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /* Image / stamp / signature                                                  */
 /* -------------------------------------------------------------------------- */
@@ -424,6 +460,169 @@ export function cloneObject<T extends PdfObject>(object: T, overrides: Partial<P
     ...overrides,
     id: createObjectId(),
   } as T;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Align / distribute / format painter (M3-5)                                 */
+/* -------------------------------------------------------------------------- */
+
+export type AlignMode = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+export type DistributeAxis = 'horizontal' | 'vertical';
+
+const EPSILON = 1e-6;
+
+/**
+ * Align every selected object inside the selection's bounding box.
+ *
+ * Only the position changes, size and rotation stay untouched — aligning a rotated object by its
+ * unrotated frame is what every Office editor does, so "visually centred" here means "frame
+ * centred". Returns the same array when fewer than two objects are selected or nothing moves.
+ */
+export function alignObjects(
+  objects: PdfObject[],
+  ids: ReadonlySet<string>,
+  mode: AlignMode,
+): PdfObject[] {
+  const targets = objects.filter((object) => ids.has(object.id));
+  if (targets.length < 2) return objects;
+
+  const bounds = unionRect(targets.map((object) => object.rect));
+  let changed = false;
+  const next = objects.map((object) => {
+    if (!ids.has(object.id)) return object;
+    const rect = object.rect;
+    let x = rect.x;
+    let y = rect.y;
+
+    if (mode === 'left') x = bounds.x;
+    else if (mode === 'center') x = bounds.x + (bounds.w - rect.w) / 2;
+    else if (mode === 'right') x = bounds.x + bounds.w - rect.w;
+    else if (mode === 'top') y = bounds.y;
+    else if (mode === 'middle') y = bounds.y + (bounds.h - rect.h) / 2;
+    else y = bounds.y + bounds.h - rect.h;
+
+    if (Math.abs(x - rect.x) < EPSILON && Math.abs(y - rect.y) < EPSILON) return object;
+    changed = true;
+    return { ...object, rect: clampNormRect({ ...rect, x, y }) };
+  });
+  return changed ? next : objects;
+}
+
+/**
+ * Equalise the gaps between selected objects along one axis.
+ *
+ * The first and the last object keep their place; everything in between is spread so every gap is
+ * identical. Standard Office behaviour, and it keeps a hand-placed layout anchored at both ends.
+ */
+export function distributeObjects(
+  objects: PdfObject[],
+  ids: ReadonlySet<string>,
+  axis: DistributeAxis,
+): PdfObject[] {
+  const targets = objects.filter((object) => ids.has(object.id));
+  if (targets.length < 3) return objects;
+
+  const key = axis === 'horizontal' ? 'x' : 'y';
+  const sizeKey = axis === 'horizontal' ? 'w' : 'h';
+  const sorted = [...targets].sort((a, b) => a.rect[key] - b.rect[key]);
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const span = last.rect[key] + last.rect[sizeKey] - first.rect[key];
+  const totalSize = sorted.reduce((sum, object) => sum + object.rect[sizeKey], 0);
+  const gap = (span - totalSize) / (sorted.length - 1);
+  if (!Number.isFinite(gap)) return objects;
+
+  const positions = new Map<string, number>();
+  let cursor = first.rect[key];
+  for (const object of sorted) {
+    positions.set(object.id, cursor);
+    cursor += object.rect[sizeKey] + gap;
+  }
+
+  let changed = false;
+  const next = objects.map((object) => {
+    const position = positions.get(object.id);
+    if (position === undefined) return object;
+    if (Math.abs(position - object.rect[key]) < EPSILON) return object;
+    changed = true;
+    return { ...object, rect: clampNormRect({ ...object.rect, [key]: position }) };
+  });
+  return changed ? next : objects;
+}
+
+/** Flat style snapshot the format painter carries between objects */
+export interface ObjectFormat {
+  color?: string;
+  stroke?: string;
+  width?: number;
+  fontSize?: number;
+  fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
+  align?: PdfTextObject['align'];
+  lineHeight?: number;
+  fit?: PdfImageObject['fit'];
+  opacity: number;
+}
+
+/** Read the paintable style of one object (geometry is never copied) */
+export function readObjectFormat(object: PdfObject): ObjectFormat {
+  return {
+    color: 'color' in object ? object.color : undefined,
+    stroke: object.kind === 'shape' ? object.stroke : undefined,
+    width: object.kind === 'shape' || object.kind === 'ink' ? object.width : undefined,
+    fontSize: object.kind === 'text' ? object.fontSize : undefined,
+    fontFamily: object.kind === 'text' ? object.fontFamily : undefined,
+    bold: object.kind === 'text' ? object.bold : undefined,
+    italic: object.kind === 'text' ? object.italic : undefined,
+    align: object.kind === 'text' ? object.align : undefined,
+    lineHeight: object.kind === 'text' ? object.lineHeight : undefined,
+    fit: object.kind === 'image' ? object.fit : undefined,
+    opacity: object.opacity,
+  };
+}
+
+/**
+ * Apply a format painter snapshot, but only to properties the target kind actually owns.
+ *
+ * A paint bucket from a highlight must not turn a text box yellow-on-yellow: the kind decides which
+ * fields are writable, which is also why unknown kinds simply return the input object.
+ */
+export function applyObjectFormat(object: PdfObject, format: ObjectFormat): PdfObject {
+  const opacity = clampOpacity(format.opacity);
+
+  switch (object.kind) {
+    case 'text':
+      return {
+        ...object,
+        color: format.color ?? object.color,
+        fontSize: format.fontSize ?? object.fontSize,
+        fontFamily: format.fontFamily ?? object.fontFamily,
+        bold: format.bold ?? object.bold,
+        italic: format.italic ?? object.italic,
+        align: format.align ?? object.align,
+        lineHeight: format.lineHeight ?? object.lineHeight,
+        opacity,
+      };
+    case 'markup':
+    case 'ink':
+      return { ...object, color: format.color ?? object.color, opacity };
+    case 'shape':
+      return {
+        ...object,
+        stroke: format.stroke ?? format.color ?? object.stroke,
+        width: format.width ?? object.width,
+        opacity,
+      };
+    case 'image':
+      return { ...object, fit: format.fit ?? object.fit, opacity };
+    case 'note':
+    case 'stamp':
+    case 'signature':
+      return { ...object, opacity };
+    default:
+      return object;
+  }
 }
 
 /* -------------------------------------------------------------------------- */

@@ -10,12 +10,55 @@ import { clampNormRect } from '../model/coords';
 import { clampObject, cloneObject, nextZ } from '../model/objects';
 import type { PdfObject } from '../model/types';
 
+/** Bumped when the serialized shape changes; a mismatched payload is ignored, never guessed at */
+export const CLIPBOARD_VERSION = 1;
+
 let clipboard: PdfObject[] = [];
 
 /** Snapshot the selection; returns how many objects were copied */
 export function copyObjects(objects: readonly PdfObject[]): number {
   clipboard = objects.map((object) => ({ ...object }));
   return clipboard.length;
+}
+
+interface ClipboardPayload {
+  version: number;
+  objects: PdfObject[];
+}
+
+/**
+ * Serialize the clipboard (M3-5).
+ *
+ * The payload is plain JSON so a future "paste across tabs / project files" path can persist it. It
+ * stays in module memory today: PDF objects mean nothing to other applications, so writing them to
+ * the system clipboard would only produce garbage in Word.
+ */
+export function serializeClipboard(): string {
+  const payload: ClipboardPayload = { version: CLIPBOARD_VERSION, objects: clipboard };
+  return JSON.stringify(payload);
+}
+
+/** Restore a payload produced by `serializeClipboard`; returns how many objects were loaded */
+export function deserializeClipboard(json: string): number {
+  try {
+    const parsed = JSON.parse(json) as Partial<ClipboardPayload>;
+    if (parsed.version !== CLIPBOARD_VERSION || !Array.isArray(parsed.objects)) return 0;
+    const objects = parsed.objects.filter(
+      (object): object is PdfObject =>
+        !!object &&
+        typeof object === 'object' &&
+        typeof (object as PdfObject).id === 'string' &&
+        typeof (object as PdfObject).kind === 'string' &&
+        typeof (object as PdfObject).page === 'string' &&
+        !!(object as PdfObject).rect,
+    );
+    // A payload with no usable object must not wipe what the user already copied
+    if (objects.length === 0) return 0;
+    clipboard = objects;
+    return clipboard.length;
+  } catch {
+    return 0;
+  }
 }
 
 export function clipboardSize(): number {

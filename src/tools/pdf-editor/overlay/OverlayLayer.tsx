@@ -264,6 +264,13 @@ export function OverlayLayer({
       return true;
     }
 
+    if (tool === 'patch') {
+      // The text layer above this one normally takes these clicks; consuming here only happens when
+      // that page has no lines, and it must never fall through to a selection drag.
+      event.stopPropagation();
+      return true;
+    }
+
     if (!isDrawingTool(tool)) return false;
 
     event.stopPropagation();
