@@ -1,10 +1,15 @@
+import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Ribbon } from '@/core/components/ribbon/Ribbon';
 import type { RibbonTab } from '@/core/components/ribbon/types';
+import { useViewportFill } from '@/core/hooks/useViewportFill';
 import type { PdfEditorDoc } from '../model/types';
 import { EmptyState } from './EmptyState';
 import { StatusBar } from './StatusBar';
+
+/** Smallest workspace worth showing; a shorter first screen lets the page scroll instead of squashing it */
+const MIN_WORK_HEIGHT = 360;
 
 interface PdfEditorViewProps {
   /** `null` until a file is open — the ribbon stays hidden, like the other PDF tools */
@@ -61,6 +66,21 @@ export function PdfEditorView({
 }: PdfEditorViewProps) {
   const { t } = useTranslation();
 
+  /**
+   * Workspace height (rails + page viewport) = the first screen's leftover space below the ribbon.
+   *
+   * The row used to rely on `min-h-[55vh]` only, so N page canvases stretched it and the real scroll
+   * container was the window: scrolling a long document also scrolled the tool title away and left the
+   * sticky ribbon offset wrong. With a measured height `PageScrollView` is the only scroller again —
+   * the same approach as the other editors. The row mounts only once a document is open, which is why
+   * the doc presence is the recompute signature.
+   */
+  const workRowRef = useRef<HTMLDivElement | null>(null);
+  const workHeight = useViewportFill(workRowRef, {
+    min: MIN_WORK_HEIGHT,
+    signature: doc ? 'doc' : 'empty',
+  });
+
   return (
     <div className="flex flex-col gap-3" data-tool-root>
       {doc ? (
@@ -96,11 +116,16 @@ export function PdfEditorView({
         </p>
       ) : null}
 
-      <div className="flex min-h-[55vh] flex-col">
+      <div className="flex flex-col">
         {doc ? (
-          <div className="flex min-h-[55vh] flex-1 gap-3">
+          <div
+            ref={workRowRef}
+            data-testid="pdf-work-area"
+            className="flex gap-3"
+            style={{ height: workHeight ?? undefined, minHeight: MIN_WORK_HEIGHT }}
+          >
             {leftPanel}
-            <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {pageArea ?? (
                 <div
                   className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-gray-300 p-10 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"

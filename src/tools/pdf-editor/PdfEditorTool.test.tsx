@@ -347,6 +347,9 @@ describe('PdfEditorView 表现层', () => {
     expect(screen.getByTestId('pdf-ribbon-sticky')).toHaveClass('sticky', 'top-14');
     expect(screen.getByRole('tab', { name: '开始' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '视图' })).toBeInTheDocument();
+    // Only the page viewport scrolls: the workspace row is pinned to the first screen's leftover height,
+    // otherwise the canvases stretch it and the window scrolls the tool title away with the pages.
+    expect(screen.getByTestId('pdf-work-area').style.height).toMatch(/^\d+px$/);
     expect(screen.getByTestId('page-area-slot')).toBeInTheDocument();
     expect(screen.queryByText('打开一份 PDF 开始编辑')).toBeNull();
     expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('第 1 / 3 页');

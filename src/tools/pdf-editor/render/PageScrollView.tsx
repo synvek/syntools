@@ -224,7 +224,9 @@ export function PageScrollView({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       /* p-6 is 24px, matching PAGE_PADDING in usePageMetrics.ts */
-      className={`relative min-h-0 flex-1 overflow-auto rounded-lg border p-6 ${
+      /* `overscroll-contain`: once a page hits the end, the wheel must not chain to the window and scroll
+         the tool title / ribbon out of view — the page viewport is the only scroller in this tool */
+      className={`relative min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border p-6 ${
         darkCanvas
           ? 'border-gray-700 bg-gray-900'
           : 'border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950'

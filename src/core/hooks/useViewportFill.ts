@@ -67,13 +67,14 @@ export function useViewportFill(
     };
 
     compute();
-    const observer = new ResizeObserver(compute);
-    if (el.parentElement) observer.observe(el.parentElement);
+    // jsdom has no ResizeObserver; the window resize listener still covers real browsers' fallback
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(compute);
+    if (observer && el.parentElement) observer.observe(el.parentElement);
     // Banners / panels above shift the page offset without resizing the parent, so observe the root too
-    if (root && root !== el.parentElement) observer.observe(root);
+    if (observer && root && root !== el.parentElement) observer.observe(root);
     window.addEventListener('resize', compute);
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       window.removeEventListener('resize', compute);
     };
   }, [ref, min, signature]);
