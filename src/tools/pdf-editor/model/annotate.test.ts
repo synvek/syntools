@@ -35,10 +35,13 @@ describe('注释样式读写', () => {
     expect(styleColorFor(INITIAL_ANNOTATION_STYLE, 'highlight')).toBe('#fde047');
     expect(styleColorFor(INITIAL_ANNOTATION_STYLE, 'rect')).toBe('#e11d48');
     expect(styleColorFor(INITIAL_ANNOTATION_STYLE, 'ink')).toBe('#e11d48');
-    expect(styleColorFor(INITIAL_ANNOTATION_STYLE, 'select')).toBeNull();
+    // 没选注释工具时回退到标记色：格式组不该一打开就是灰的
+    expect(styleColorFor(INITIAL_ANNOTATION_STYLE, 'select')).toBe('#fde047');
+    expect(styleColorFor(INITIAL_ANNOTATION_STYLE, 'note')).toBeNull();
 
     expect(styleWidthFor(INITIAL_ANNOTATION_STYLE, 'arrow')).toBe(2);
     expect(styleWidthFor(INITIAL_ANNOTATION_STYLE, 'ink')).toBe(2);
+    expect(styleWidthFor(INITIAL_ANNOTATION_STYLE, 'select')).toBe(2);
     expect(styleWidthFor(INITIAL_ANNOTATION_STYLE, 'note')).toBeNull();
   });
 
@@ -62,10 +65,14 @@ describe('注释样式读写', () => {
     expect(shape.inkWidth).toBe(INITIAL_ANNOTATION_STYLE.inkWidth);
   });
 
-  it('选择工具写入时原样返回同一个对象', () => {
-    expect(withStyleColor(INITIAL_ANNOTATION_STYLE, 'select', '#000000')).toBe(
+  it('没有注释工具时写入标记色 / 形状线宽，而不是丢弃修改', () => {
+    expect(withStyleColor(INITIAL_ANNOTATION_STYLE, 'select', '#000000').markupColor).toBe(
+      '#000000',
+    );
+    expect(withStyleWidth(INITIAL_ANNOTATION_STYLE, 'hand', 4).shapeWidth).toBe(4);
+    // note / text / patch 没有可绘制的样式，保持原样
+    expect(withStyleColor(INITIAL_ANNOTATION_STYLE, 'note', '#000000')).toBe(
       INITIAL_ANNOTATION_STYLE,
     );
-    expect(withStyleWidth(INITIAL_ANNOTATION_STYLE, 'hand', 4)).toBe(INITIAL_ANNOTATION_STYLE);
   });
 });

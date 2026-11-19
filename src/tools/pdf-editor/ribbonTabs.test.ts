@@ -29,6 +29,8 @@ function makeActions(overrides: Partial<PdfRibbonActions> = {}): PdfRibbonAction
     deleteSelection: vi.fn(),
     clearAnnotations: vi.fn(),
     setObjectColor: vi.fn(),
+    setObjectFill: vi.fn(),
+    setShapeColor: vi.fn(),
     setObjectWidth: vi.fn(),
     setObjectFit: vi.fn(),
     setObjectOpacity: vi.fn(),
@@ -129,13 +131,10 @@ describe('buildPdfRibbonTabs — 结构', () => {
       'shapes',
       'ink',
       'insert',
-      'format',
       'manage',
-      'ann-format',
+      // 原来的 format / ann-format / text-style / text-align / text-color 合成一个
+      'format',
       'arrange',
-      'text-style',
-      'text-align',
-      'text-color',
       'clipboard',
       'object-align',
       'object-distribute',
@@ -171,7 +170,12 @@ describe('buildPdfRibbonTabs — 禁用与提示', () => {
       .filter((group) => ['select', 'zoom', 'navigate', 'export'].includes(group.id))
       .flatMap((group) => group.items);
     for (const item of base) expect(item.hint).toBe('openFirstHint');
-    expect(findItem(tabs, 'format', 'annotate-color').hint).toBe('hintPickTool');
+    // 格式组也一样：没有文档时所有控件都提示先打开文件
+    for (const group of tabs[0].groups.filter((candidate) => candidate.id === 'format')) {
+      for (const item of group.rows ? group.rows.flat() : group.items) {
+        expect(item.hint).toBe('openFirstHint');
+      }
+    }
   });
 
   it('首页禁用上一页，末页禁用下一页', () => {
@@ -364,36 +368,94 @@ describe('buildPdfRibbonTabs — 注释命令（已并入开始）', () => {
     expect(actions.setTool).toHaveBeenCalledWith('eraser');
   });
 
-  it('颜色与线宽只对拥有该属性的工具可用', () => {
+  it('格式组的颜色与线宽跟随当前注释工具', () => {
     const actions = makeActions();
     const tabs = withAnnotate({ tool: 'ink', actions });
 
-    const color = findItem(tabs, 'format', 'annotate-color');
+    const color = findItem(tabs, 'format', 'color');
     if (color.kind !== 'color') throw new Error('color item expected');
     expect(color.disabled).toBe(false);
     expect(color.value).toBe('#e11d48');
     color.onPick('#000000');
     expect(actions.setAnnotateColor).toHaveBeenCalledWith('#000000');
 
-    const width = findItem(tabs, 'format', 'annotate-width');
+    const width = findItem(tabs, 'format', 'width');
     if (width.kind !== 'select') throw new Error('width item expected');
     expect(width.disabled).toBe(false);
     width.onChange('4');
     expect(actions.setAnnotateWidth).toHaveBeenCalledWith(4);
 
-    // 选择工具没有颜色可改：禁用并提示先选工具
+    // 没有选中对象、也没选注释工具时不再禁用：改的是默认标记色
     const idle = withAnnotate({ tool: 'select' });
-    const idleColor = findItem(idle, 'format', 'annotate-color');
-    expect(idleColor.disabled).toBe(true);
-    expect(idleColor.hint).toBe('hintPickTool');
-    expect(findItem(idle, 'format', 'annotate-width').disabled).toBe(true);
+    const idleColor = findItem(idle, 'format', 'color');
+    if (idleColor.kind !== 'color') throw new Error('color item expected');
+    expect(idleColor.disabled).toBe(false);
+    expect(idleColor.value).toBe('#fde047');
+    expect(findItem(idle, 'format', 'width').disabled).toBe(false);
   });
 
   it('形状工具读的是描边颜色', () => {
     const tabs = withAnnotate({ tool: 'arrow' });
-    const color = findItem(tabs, 'format', 'annotate-color');
+    const color = findItem(tabs, 'format', 'color');
     if (color.kind !== 'color') throw new Error('color item expected');
     expect(color.value).toBe('#0ea5e9');
+  });
+
+  it('形状有独立的描边与填充按钮，填充可以清空', () => {
+    const actions = makeActions();
+    const tabs = withAnnotate({
+      actions,
+      selection: {
+        kind: 'shape',
+        opacity: 1,
+        locked: false,
+        color: '#e11d48',
+        stroke: '#e11d48',
+        fill: '#fde047',
+        width: 3,
+      },
+    });
+
+    const stroke = findItem(tabs, 'format', 'stroke');
+    if (stroke.kind !== 'color') throw new Error('stroke item expected');
+    expect(stroke.value).toBe('#e11d48');
+    expect(stroke.disabled).toBe(false);
+    stroke.onPick('#000000');
+    expect(actions.setObjectColor).toHaveBeenCalledWith('#000000');
+
+    const fill = findItem(tabs, 'format', 'fill');
+    if (fill.kind !== 'color') throw new Error('fill item expected');
+    expect(fill.value).toBe('#fde047');
+    expect(fill.disabled).toBe(false);
+    fill.onPick('#e11d48');
+    expect(actions.setObjectFill).toHaveBeenCalledWith('#e11d48');
+
+    // "无填充" = 透明背景，走 reset 分支
+    fill.onReset?.();
+    expect(actions.setObjectFill).toHaveBeenLastCalledWith(null);
+  });
+
+  it('没有选中形状时，形状色写入下一张形状的默认描边，填充保持禁用', () => {
+    const actions = makeActions();
+    const tabs = withAnnotate({ actions, selection: null });
+
+    const stroke = findItem(tabs, 'format', 'stroke');
+    if (stroke.kind !== 'color') throw new Error('stroke item expected');
+    expect(stroke.disabled).toBe(false);
+    expect(stroke.value).toBe('#0ea5e9');
+    stroke.onPick('#123456');
+    expect(actions.setShapeColor).toHaveBeenCalledWith('#123456');
+
+    // 填充只对已存在的形状有意义，没有"默认填充"可改
+    expect(findItem(tabs, 'format', 'fill').disabled).toBe(true);
+  });
+
+  it('颜色与层级按钮改成图标按钮（不显示文字）', () => {
+    const tabs = withAnnotate();
+    for (const id of ['color', 'stroke', 'fill']) {
+      expect(findItem(tabs, 'format', id).size).toBe('small');
+    }
+    expect(findItem(tabs, 'arrange', 'z-order').size).toBe('small');
   });
 
   it('管理分组按选中数与对象数禁用', () => {
@@ -458,34 +520,35 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
     const actions = makeActions();
     const tabs = buildPdfRibbonTabs(makeCtx({ actions, selection: textSelection }));
 
-    const size = findItem(tabs, 'text-style', 'font-size');
+    const size = findItem(tabs, 'format', 'font-size');
     if (size.kind !== 'select') throw new Error('font size must be a select');
     expect(size.value).toBe('12');
     expect(size.disabled).toBe(false);
     size.onChange('18');
     expect(actions.setObjectFontSize).toHaveBeenCalledWith(18);
 
-    // 没选中文本框时这些命令常驻但禁用（原来的问题是"整个标签都不出现"）
+    // 没选中文本框时文字类命令常驻但禁用（原来的问题是"整个标签都不出现"）；
+    // 颜色仍可用，因为此时它编辑的是下一个注释的颜色
     const idle = buildPdfRibbonTabs(makeCtx({ selection: null }));
-    expect(findItem(idle, 'text-style', 'font-size').disabled).toBe(true);
-    expect(findItem(idle, 'text-align', 'align-center').disabled).toBe(true);
-    expect(findItem(idle, 'text-color', 'text-color').disabled).toBe(true);
+    expect(findItem(idle, 'format', 'font-size').disabled).toBe(true);
+    expect(findItem(idle, 'format', 'align-center').disabled).toBe(true);
+    expect(findItem(idle, 'format', 'color').disabled).toBe(false);
 
-    fire(tabs, 'text-style', 'bold');
-    fire(tabs, 'text-style', 'italic');
-    fire(tabs, 'text-align', 'align-center');
+    fire(tabs, 'format', 'bold');
+    fire(tabs, 'format', 'italic');
+    fire(tabs, 'format', 'align-center');
     expect(actions.toggleObjectBold).toHaveBeenCalledTimes(1);
     expect(actions.toggleObjectItalic).toHaveBeenCalledTimes(1);
     expect(actions.setObjectAlign).toHaveBeenCalledWith('center');
 
-    const color = findItem(tabs, 'text-color', 'text-color');
+    const color = findItem(tabs, 'format', 'color');
     if (color.kind !== 'color') throw new Error('color item expected');
     expect(color.value).toBe('#111111');
     color.onPick('#ff0000');
     expect(actions.setObjectColor).toHaveBeenCalledWith('#ff0000');
 
-    // 透明度是所有对象共用的命令，现在常驻开始标签
-    const opacity = findItem(tabs, 'ann-format', 'opacity');
+    // 透明度是所有对象共用的命令，现在和颜色/线宽同组
+    const opacity = findItem(tabs, 'format', 'opacity');
     if (opacity.kind !== 'select') throw new Error('opacity must be a select');
     opacity.onChange('50');
     expect(actions.setObjectOpacity).toHaveBeenCalledWith(0.5);
@@ -536,9 +599,9 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
     const tabs = buildPdfRibbonTabs(
       makeCtx({ selection: { kind: 'markup', opacity: 1, locked: false, color: '#fde047' } }),
     );
-    const color = findItem(tabs, 'ann-format', 'ann-color');
+    const color = findItem(tabs, 'format', 'color');
     expect(color.disabled).toBe(false);
-    const width = findItem(tabs, 'ann-format', 'ann-width');
+    const width = findItem(tabs, 'format', 'width');
     expect(width.disabled).toBe(true);
   });
 });

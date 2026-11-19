@@ -10,7 +10,9 @@ type Size = NonNullable<RibbonItemSize>;
 
 const TRIGGER: Record<Size, string> = {
   large: 'h-14 w-[3.25rem] flex-col gap-1 px-0.5 text-[11px] leading-[1.1]',
-  small: 'h-6 min-w-6 px-1',
+  // Small stays a fixed-width icon button: the colour bar goes *under* the glyph, not beside it, or the
+  // trigger doubles in width and pushes the rest of the group out of line
+  small: 'h-6 w-6 flex-col gap-0.5 px-0',
 };
 
 /**
@@ -86,7 +88,9 @@ export function RibbonColorPicker({
         {/* Color bar: the "current color" preview every Office color button carries */}
         <span
           aria-hidden="true"
-          className="block h-[3px] w-6 rounded-sm border border-black/10 dark:border-white/20"
+          className={`block h-[3px] rounded-sm border border-black/10 dark:border-white/20 ${
+            large ? 'w-6' : 'w-4'
+          }`}
           style={{ backgroundColor: value ?? 'transparent' }}
         />
       </button>

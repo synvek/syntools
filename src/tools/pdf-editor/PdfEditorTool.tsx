@@ -1083,6 +1083,24 @@ export default function PdfEditorTool() {
     [patchSelectedObject],
   );
 
+  /** Shape background; `null` removes the fill so the shape stays transparent (PDF default) */
+  const setObjectFill = useCallback(
+    (fill: string | null) => {
+      patchSelectedObject((object) =>
+        object.kind === 'shape' ? { ...object, fill: fill ?? undefined } : object,
+      );
+    },
+    [patchSelectedObject],
+  );
+
+  /** Default stroke for the next shape: the ribbon's shape-colour button with nothing selected */
+  const setShapeColor = useCallback(
+    (color: string) => {
+      setAnnotateStyle((current) => ({ ...current, shapeStroke: color }));
+    },
+    [setAnnotateStyle],
+  );
+
   const setObjectWidth = useCallback(
     (width: number) => {
       patchSelectedObject((object) =>
@@ -1326,6 +1344,8 @@ export default function PdfEditorTool() {
       deleteSelection: deleteSelected,
       clearAnnotations,
       setObjectColor,
+      setObjectFill,
+      setShapeColor,
       setObjectWidth,
       setObjectFit,
       setObjectOpacity: setSelectedOpacity,
@@ -1370,6 +1390,8 @@ export default function PdfEditorTool() {
       replaceSelectedImage,
       selectedObject,
       setObjectColor,
+      setObjectFill,
+      setShapeColor,
       setObjectFit,
       setObjectWidth,
       setSelectedOpacity,

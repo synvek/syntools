@@ -10,6 +10,7 @@
  */
 
 import type {
+  RibbonColorItem,
   RibbonGroup,
   RibbonSelectItem,
   RibbonTab,
@@ -51,6 +52,10 @@ export interface PdfRibbonSelection {
   locked: boolean;
   /** Text colour, annotation colour or shape stroke */
   color?: string;
+  /** Shape stroke, kept apart from `color` so the ribbon can offer text and stroke colours separately */
+  stroke?: string;
+  /** Shape fill; absent means no fill (the shape is transparent) */
+  fill?: string;
   /** Ink / shape stroke width in points */
   width?: number;
   fit?: 'contain' | 'cover' | 'fill';
@@ -92,6 +97,7 @@ export function ribbonSelectionOf(object: {
   locked?: boolean;
   color?: string;
   stroke?: string;
+  fill?: string;
   width?: number;
   fit?: 'contain' | 'cover' | 'fill';
   fontSize?: number;
@@ -104,6 +110,8 @@ export function ribbonSelectionOf(object: {
     opacity: object.opacity,
     locked: object.locked === true,
     color: object.color ?? object.stroke,
+    stroke: object.stroke,
+    fill: object.fill,
     width: object.width,
     fit: object.fit,
     fontSize: object.fontSize,
@@ -148,6 +156,10 @@ export interface PdfRibbonActions {
   clearAnnotations?(): void;
   /** Object-level edits used by the contextual tabs (M2-8) */
   setObjectColor?(color: string): void;
+  /** Shape fill; `null` clears it (the shape renders without a background) */
+  setObjectFill?(color: string | null): void;
+  /** Default stroke colour for the next shape, when nothing is selected */
+  setShapeColor?(color: string): void;
   setObjectWidth?(width: number): void;
   setObjectFit?(fit: 'contain' | 'cover' | 'fill'): void;
   setObjectOpacity?(value: number): void;
@@ -385,39 +397,6 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
       ],
     },
     {
-      id: 'format',
-      label: t(key('grpFormat')),
-      priority: 7,
-      items: [
-        {
-          kind: 'color',
-          id: 'annotate-color',
-          label: t(key('cmdColor')),
-          value: annotateColor,
-          disabled: lock || annotateColor === null,
-          hint: annotateColor === null ? t(key('hintPickTool')) : hint,
-          onPick: (color) => actions.setAnnotateColor?.(color),
-        },
-        {
-          kind: 'select',
-          id: 'annotate-width',
-          label: t(key('cmdWidth')),
-          value: String(annotateWidth ?? 2),
-          options: [1, 2, 3, 4, 6].map((width) => ({
-            value: String(width),
-            label: `${width} pt`,
-          })),
-          width: 'xs',
-          disabled: lock || annotateWidth === null,
-          hint: annotateWidth === null ? t(key('hintPickTool')) : hint,
-          onChange: (value: string) => {
-            const width = Number(value);
-            if (Number.isFinite(width)) actions.setAnnotateWidth?.(width);
-          },
-        },
-      ],
-    },
-    {
       id: 'manage',
       label: t(key('grpManage')),
       priority: 3,
@@ -588,6 +567,8 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
         id: 'z-order',
         label: t(key('cmdArrange')),
         icon: 'layers',
+        // Icon-only: the caption only repeated the group name and ate a full column
+        size: 'small',
         disabled: !canEdit,
         hint,
         menu: [
@@ -637,139 +618,182 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
     ],
   };
 
-  const widthSelect = (id: string, value: number | undefined): RibbonSelectItem => ({
-    kind: 'select',
-    id,
-    label: t(key('cmdWidth')),
-    value: String(value ?? 2),
-    options: [1, 2, 3, 4, 6].map((width) => ({ value: String(width), label: `${width} pt` })),
-    width: 'xs',
-    disabled: !canEdit || value === undefined,
-    hint,
-    onChange: (next: string) => actions.setObjectWidth?.(Number(next)),
-  });
-
   const contextTabs: RibbonTab[] = [];
 
   /**
-   * Object format + arrangement, pinned to `开始` (disabled until something is selected).
+   * One `格式` group instead of three.
    *
-   * This was the `注释格式` contextual tab. Keeping it a tab meant the same commands disappeared and
-   * reappeared while a user was arranging objects, and text / image boxes never saw them at all.
+   * `开始` used to show three sibling groups all labelled 格式: the armed tool's palette (colour +
+   * width), the selected object's colour / width / opacity, and a text box's font, alignment and
+   * colour. Only the middle one followed the selection, so the first looked permanently disabled —
+   * "how do I enable this?" — and the third looked like it belonged to another tab. Every control now
+   * resolves its target the same way: the selected object first, the armed annotation tool second.
    */
-  const annotationGroups: RibbonGroup[] = [
-    {
-      id: 'ann-format',
-      label: t(key('grpFormat')),
-      priority: 5,
-      items: [
-        {
-          kind: 'color',
-          id: 'ann-color',
-          label: t(key('cmdColor')),
-          value: selection?.color ?? null,
-          disabled: !canEdit || selection?.color === undefined,
-          hint,
-          onPick: (color) => actions.setObjectColor?.(color),
-        },
-        widthSelect('ann-width', selection?.width),
-        opacityItem,
-      ],
-    },
-    arrangeGroup,
-  ];
+  const selectedKind = selection?.kind ?? null;
+  const textSelected = canEdit && selectedKind === 'text';
+  /** Only ink and shapes own a stroke; images / stamps / signatures have opacity alone */
+  const strokeSelected = canEdit && (selectedKind === 'ink' || selectedKind === 'shape');
+  /** Text boxes and markup both carry a text-like colour behind the `A` button */
+  const textColorSelected = canEdit && (selectedKind === 'text' || selectedKind === 'markup');
+  /** Only shapes have a background fill */
+  const fillSelected = canEdit && selectedKind === 'shape';
 
   /**
-   * Text box formatting, pinned to `开始` (disabled until a text box is selected).
-   *
-   * This was the `文本框格式` contextual tab. A tab that only materialises after a selection is
-   * invisible until the user happens to click a text box, which read as "these buttons are missing"
-   * rather than "these buttons are contextual".
+   * With an object selected the group only edits that object — an image has no stroke, so the width
+   * box must go quiet rather than silently editing the tool palette behind the user's back. With no
+   * selection the same controls edit the palette of the armed tool (markup colour by default).
    */
-  const textEditable = canEdit && selection?.kind === 'text';
-  const textGroups: RibbonGroup[] = [
-    {
-      id: 'text-style',
-      label: t(key('grpTextStyle')),
-      priority: 4,
-      items: [
-        {
-          kind: 'select',
-          id: 'font-size',
-          label: t(key('cmdFontSize')),
-          value: String(Math.round(selection?.fontSize ?? 11)),
-          options: [8, 9, 10, 11, 12, 14, 16, 18, 24, 32, 48, 72].map((size) => ({
-            value: String(size),
-            label: String(size),
-          })),
-          width: 'xxs',
-          disabled: !textEditable,
-          hint,
-          onChange: (value: string) => actions.setObjectFontSize?.(Number(value)),
-        },
-        {
-          kind: 'toggle',
-          id: 'bold',
-          label: t(key('cmdBold')),
-          icon: 'richText',
-          size: 'small',
-          active: selection?.bold === true,
-          disabled: !textEditable,
-          hint,
-          onSelect: () => actions.toggleObjectBold?.(),
-        },
-        {
-          kind: 'toggle',
-          id: 'italic',
-          label: t(key('cmdItalic')),
-          icon: 'text',
-          size: 'small',
-          active: selection?.italic === true,
-          disabled: !textEditable,
-          hint,
-          onSelect: () => actions.toggleObjectItalic?.(),
-        },
-      ],
+  const objectTargeted = selection !== null;
+  /** Default stroke colour for the next shape; the `A` button cannot reach it when no shape is active */
+  const annotateStroke = annotate ? annotate.style.shapeStroke : null;
+
+  /**
+   * Three colour buttons instead of one, because Office users read `A` as "font colour" and expect a
+   * second, shape-coloured button for strokes — and a paint bucket for fills, which shapes have always
+   * supported in the model (`fill` + pdf-lib `color`) but had no UI for.
+   */
+  const formatColor: RibbonColorItem = {
+    kind: 'color',
+    id: 'color',
+    label: t(key('cmdColor')),
+    icon: 'fontColor',
+    size: 'small',
+    value: objectTargeted ? (textColorSelected ? (selection?.color ?? null) : null) : annotateColor,
+    disabled: objectTargeted
+      ? !textColorSelected || selection?.color === undefined
+      : lock || annotateColor === null,
+    hint,
+    onPick: (color) =>
+      objectTargeted ? actions.setObjectColor?.(color) : actions.setAnnotateColor?.(color),
+  };
+
+  const formatStroke: RibbonColorItem = {
+    kind: 'color',
+    id: 'stroke',
+    label: t(key('cmdStrokeColor')),
+    icon: 'shapeRect',
+    size: 'small',
+    // Ink keeps its colour in `color`, shapes in `stroke`
+    value: objectTargeted
+      ? strokeSelected
+        ? selectedKind === 'ink'
+          ? (selection?.color ?? null)
+          : (selection?.stroke ?? null)
+        : null
+      : annotateStroke,
+    disabled: objectTargeted ? !strokeSelected : lock || annotateStroke === null,
+    hint,
+    onPick: (color) =>
+      objectTargeted ? actions.setObjectColor?.(color) : actions.setShapeColor?.(color),
+  };
+
+  const formatFill: RibbonColorItem = {
+    kind: 'color',
+    id: 'fill',
+    label: t(key('cmdFillColor')),
+    icon: 'paintBucket',
+    size: 'small',
+    value: fillSelected ? (selection?.fill ?? null) : null,
+    disabled: !fillSelected,
+    hint,
+    onPick: (color) => actions.setObjectFill?.(color),
+    // Transparent fill: the shape renders with no background, which is the PDF default
+    onReset: () => actions.setObjectFill?.(null),
+    resetLabel: t(key('cmdNoFill')),
+  };
+
+  const formatWidth: RibbonSelectItem = {
+    kind: 'select',
+    id: 'width',
+    label: t(key('cmdWidth')),
+    value: String(
+      objectTargeted ? (strokeSelected ? (selection?.width ?? 2) : 2) : (annotateWidth ?? 2),
+    ),
+    options: [1, 2, 3, 4, 6].map((width) => ({ value: String(width), label: `${width} pt` })),
+    width: 'xs',
+    disabled: objectTargeted
+      ? !strokeSelected || selection?.width === undefined
+      : lock || annotateWidth === null,
+    hint,
+    onChange: (next: string) => {
+      const width = Number(next);
+      if (!Number.isFinite(width)) return;
+      if (objectTargeted) actions.setObjectWidth?.(width);
+      else actions.setAnnotateWidth?.(width);
     },
-    {
-      id: 'text-align',
-      label: t(key('grpAlign')),
-      priority: 4,
-      items: (
-        [
-          ['left', 'cmdAlignLeft', 'panelLeftOpen'],
-          ['center', 'cmdAlignCenter', 'actualSize'],
-          ['right', 'cmdAlignRight', 'panelLeftClose'],
-        ] as const
-      ).map(([align, labelKey, icon]) => ({
-        kind: 'toggle' as const,
-        id: `align-${align}`,
-        label: t(key(labelKey)),
-        icon,
-        size: 'small' as const,
-        active: selection?.align === align,
-        disabled: !textEditable,
-        hint,
-        onSelect: () => actions.setObjectAlign?.(align),
-      })),
-    },
-    {
-      id: 'text-color',
-      label: t(key('grpFormat')),
-      priority: 4,
-      items: [
-        {
-          kind: 'color',
-          id: 'text-color',
-          label: t(key('cmdColor')),
-          value: selection?.color ?? null,
-          disabled: !textEditable,
-          hint,
-          onPick: (color) => actions.setObjectColor?.(color),
-        },
-      ],
-    },
-  ];
+  };
+
+  const fontSizeItem: RibbonSelectItem = {
+    kind: 'select',
+    id: 'font-size',
+    label: t(key('cmdFontSize')),
+    value: String(Math.round(selection?.fontSize ?? 11)),
+    options: [8, 9, 10, 11, 12, 14, 16, 18, 24, 32, 48, 72].map((size) => ({
+      value: String(size),
+      label: String(size),
+    })),
+    width: 'xxs',
+    disabled: !textSelected,
+    hint,
+    onChange: (value: string) => actions.setObjectFontSize?.(Number(value)),
+  };
+
+  const boldItem: RibbonToggleItem = {
+    kind: 'toggle',
+    id: 'bold',
+    label: t(key('cmdBold')),
+    icon: 'richText',
+    size: 'small',
+    active: selection?.bold === true,
+    disabled: !textSelected,
+    hint,
+    onSelect: () => actions.toggleObjectBold?.(),
+  };
+
+  const italicItem: RibbonToggleItem = {
+    kind: 'toggle',
+    id: 'italic',
+    label: t(key('cmdItalic')),
+    icon: 'text',
+    size: 'small',
+    active: selection?.italic === true,
+    disabled: !textSelected,
+    hint,
+    onSelect: () => actions.toggleObjectItalic?.(),
+  };
+
+  const alignItems: RibbonToggleItem[] = (
+    [
+      ['left', 'cmdAlignLeft', 'panelLeftOpen'],
+      ['center', 'cmdAlignCenter', 'actualSize'],
+      ['right', 'cmdAlignRight', 'panelLeftClose'],
+    ] as const
+  ).map(([align, labelKey, icon]) => ({
+    kind: 'toggle' as const,
+    id: `align-${align}`,
+    label: t(key(labelKey)),
+    icon,
+    size: 'small' as const,
+    active: selection?.align === align,
+    disabled: !textSelected,
+    hint,
+    onSelect: () => actions.setObjectAlign?.(align),
+  }));
+
+  /**
+   * Word-style two rows: the colour buttons and wide combos share the first row (a narrow box under a
+   * wide one would leave a hole), the icon buttons fill the second.
+   */
+  const formatGroup: RibbonGroup = {
+    id: 'format',
+    label: t(key('grpFormat')),
+    priority: 7,
+    items: [],
+    rows: [
+      [formatColor, formatStroke, formatFill, formatWidth, opacityItem],
+      [fontSizeItem, boldItem, italicItem, ...alignItems],
+    ],
+  };
 
   if (contextTab === 'image-format' && selection) {
     contextTabs.push({
@@ -911,8 +935,8 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
         // The 注释, 编辑, 注释格式 and 文本框格式 tabs each held two or three groups, so every second
         // command cost a tab switch. They now sit together in `开始`, right after selection / zoom.
         ...annotateGroups,
-        ...annotationGroups,
-        ...textGroups,
+        formatGroup,
+        arrangeGroup,
         ...editGroups,
         {
           id: 'export',

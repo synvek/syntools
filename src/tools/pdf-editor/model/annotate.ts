@@ -63,18 +63,26 @@ export const INITIAL_ANNOTATION_STYLE: AnnotationStyle = {
   opacity: 1,
 };
 
-/** Colour the format group shows for the active tool */
+/**
+ * Colour the format group shows for the active tool.
+ *
+ * With no annotation tool armed (`select` / `hand`) it falls back to the markup palette instead of
+ * returning `null`: the format group used to look permanently disabled on a freshly opened document,
+ * which read as "this control cannot be enabled" rather than "pick a tool first".
+ */
 export function styleColorFor(style: AnnotationStyle, tool: PdfTool): string | null {
   if (isMarkupTool(tool)) return style.markupColor;
   if (isShapeTool(tool)) return style.shapeStroke;
   if (tool === 'ink') return style.inkColor;
+  if (tool === 'select' || tool === 'hand') return style.markupColor;
   return null;
 }
 
-/** Stroke width the format group shows for the active tool */
+/** Stroke width the format group shows for the active tool (same fallback as the colour) */
 export function styleWidthFor(style: AnnotationStyle, tool: PdfTool): number | null {
   if (isShapeTool(tool)) return style.shapeWidth;
   if (tool === 'ink') return style.inkWidth;
+  if (tool === 'select' || tool === 'hand') return style.shapeWidth;
   return null;
 }
 
@@ -87,6 +95,7 @@ export function withStyleColor(
   if (isMarkupTool(tool)) return { ...style, markupColor: color };
   if (isShapeTool(tool)) return { ...style, shapeStroke: color };
   if (tool === 'ink') return { ...style, inkColor: color };
+  if (tool === 'select' || tool === 'hand') return { ...style, markupColor: color };
   return style;
 }
 
@@ -98,5 +107,6 @@ export function withStyleWidth(
 ): AnnotationStyle {
   if (isShapeTool(tool)) return { ...style, shapeWidth: width };
   if (tool === 'ink') return { ...style, inkWidth: width };
+  if (tool === 'select' || tool === 'hand') return { ...style, shapeWidth: width };
   return style;
 }

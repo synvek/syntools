@@ -249,14 +249,17 @@ describe('PdfEditorTool 打开流程', () => {
       // 注释格式已并入开始标签：选中标记对象时对象颜色控件转为可用，不再弹出独立上下文标签
       expect(screen.queryByTestId('ribbon-tab-annotate-format')).toBeNull();
       expect(screen.getByTestId('ribbon-tab-home')).toHaveAttribute('aria-selected', 'true');
-      expect(screen.getByTestId('ribbon-ann-format-ann-color')).not.toBeDisabled();
+      // 颜色 / 层级改成纯图标按钮：说明只留悬浮提示，不再占一行文字
+      expect(screen.getByTestId('ribbon-format-color')).not.toBeDisabled();
+      expect(screen.getByTestId('ribbon-format-color')).toHaveTextContent('');
 
       // Esc：清空选择并退出注释工具（否则下一次点击又会画一个高亮）
       fireEvent.keyDown(window, { key: 'Escape' });
       await waitFor(() => expect(overlay).toHaveAttribute('data-tool', 'select'));
       expect(screen.getByTestId('pdf-object')).toHaveAttribute('data-selected', 'false');
-      // 取消选择后对象格式控件回到禁用状态
-      expect(screen.getByTestId('ribbon-ann-format-ann-color')).toBeDisabled();
+      // 取消选择后文本类按钮回到禁用；颜色回到"下一个注释的颜色"，仍然可用
+      expect(screen.getByTestId('ribbon-format-bold')).toBeDisabled();
+      expect(screen.getByTestId('ribbon-format-color')).not.toBeDisabled();
     } finally {
       rectSpy.mockRestore();
     }
