@@ -491,6 +491,39 @@ describe('OverlayLayer 注释工具', () => {
     expect(request.rect.w).toBeCloseTo(0.2, 6);
   });
 
+  it('橡皮按下后拖动可以连续擦除，同一次按压不重复擦同一个对象', () => {
+    const onErase = vi.fn();
+    const first = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+      type: 'rect',
+      id: 'first',
+    });
+    const second = createShapeObject({
+      page: PAGE_ID,
+      rect: { x: 0.6, y: 0.6, w: 0.2, h: 0.2 },
+      type: 'rect',
+      id: 'second',
+    });
+    render(
+      <OverlayLayer {...baseProps} objects={[first, second]} tool="eraser" onErase={onErase} />,
+    );
+
+    // 按下点先擦掉指针下的对象
+    fireEvent(overlay(), pointer('pointerdown', { clientX: 120, clientY: 120 }));
+    expect(onErase).toHaveBeenLastCalledWith('first');
+
+    // 继续拖动擦掉经过的第二个对象
+    fireEvent(overlay(), pointer('pointermove', { clientX: 400, clientY: 500 }));
+    expect(onErase).toHaveBeenLastCalledWith('second');
+
+    // 拖回第一个对象不重复上报
+    fireEvent(overlay(), pointer('pointermove', { clientX: 120, clientY: 120 }));
+    fireEvent(overlay(), pointer('pointerup', { clientX: 120, clientY: 120 }));
+
+    expect(onErase).toHaveBeenCalledTimes(2);
+  });
+
   it('画笔按采样点简化后上报折线', () => {
     const onAnnotate = vi.fn();
     render(<OverlayLayer {...baseProps} objects={[]} tool="ink" onAnnotate={onAnnotate} />);

@@ -107,6 +107,8 @@ type Gesture =
       aspect: number;
     }
   | { mode: 'marquee'; start: NormPoint }
+  /** Eraser sweep: ids already removed, so one pass over an object only erases it once */
+  | { mode: 'erase'; erased: Set<string> }
   | {
       mode: 'draw';
       tool: PdfTool;
@@ -249,9 +251,20 @@ export function OverlayLayer({
    */
   const beginAnnotate = (point: NormPoint, event: ReactPointerEvent<HTMLDivElement>): boolean => {
     if (tool === 'eraser') {
-      const target = hitTest(point, visible, pageAspect);
-      if (target && !target.locked) onErase?.(target.id);
+      /*
+       * Erase on press *and* keep erasing while the pointer is down. Deleting only whatever sat under
+       * the initial press made the eraser read like a one-shot "delete" button — one click removed an
+       * object, with no way to sweep across a row of markup.
+       */
       event.stopPropagation();
+      capture(event);
+      const erased = new Set<string>();
+      const target = hitTest(point, visible, pageAspect);
+      if (target && !target.locked) {
+        erased.add(target.id);
+        onErase?.(target.id);
+      }
+      gestureRef.current = { mode: 'erase', erased };
       return true;
     }
 
@@ -386,6 +399,15 @@ export function OverlayLayer({
     const point = pointFromEvent(event.clientX, event.clientY);
     if (!point) return;
 
+    if (gesture.mode === 'erase') {
+      const target = hitTest(point, visible, pageAspect);
+      if (target && !target.locked && !gesture.erased.has(target.id)) {
+        gesture.erased.add(target.id);
+        onErase?.(target.id);
+      }
+      return;
+    }
+
     if (gesture.mode === 'marquee') {
       setMarquee(
         clampNormRect({
@@ -495,7 +517,9 @@ export function OverlayLayer({
       data-testid="pdf-overlay"
       data-page-id={page}
       data-tool={tool}
-      className={`absolute inset-0 ${isAnnotateTool(tool) ? 'cursor-crosshair' : ''}`}
+      className={`absolute inset-0 ${
+        tool === 'eraser' ? 'cursor-cell' : isAnnotateTool(tool) ? 'cursor-crosshair' : ''
+      }`}
       onDoubleClick={onDoubleClick}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

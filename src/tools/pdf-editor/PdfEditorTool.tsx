@@ -865,7 +865,11 @@ export default function PdfEditorTool() {
 
   const eraseObject = useCallback(
     (id: string) => {
-      mutate((current) => removeObjects(current, new Set([id])), { label: 'erase-object' });
+      // A sweep with the eraser is one undo step: the merge window collapses the objects it crosses
+      mutate((current) => removeObjects(current, new Set([id])), {
+        label: 'erase-object',
+        mergeKey: 'erase-object',
+      });
       setSelectedIds((current) => current.filter((candidate) => candidate !== id));
     },
     [mutate],
