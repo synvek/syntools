@@ -564,6 +564,16 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
     expect(actions.setObjectOpacity).toHaveBeenCalledWith(0.5);
   });
 
+  it('字体格式按钮使用对应的 B / I / 对齐图标', () => {
+    const tabs = buildPdfRibbonTabs(makeCtx({ selection: textSelection }));
+
+    expect(findItem(tabs, 'format', 'bold').icon).toBe('bold');
+    expect(findItem(tabs, 'format', 'italic').icon).toBe('italic');
+    expect(findItem(tabs, 'format', 'align-left').icon).toBe('alignLeft');
+    expect(findItem(tabs, 'format', 'align-center').icon).toBe('alignCenter');
+    expect(findItem(tabs, 'format', 'align-right').icon).toBe('alignRight');
+  });
+
   it('锁定对象禁用编辑，但保留解锁与删除', () => {
     const actions = makeActions();
     const tabs = buildPdfRibbonTabs(

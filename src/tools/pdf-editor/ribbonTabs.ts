@@ -742,7 +742,7 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
     kind: 'toggle',
     id: 'bold',
     label: t(key('cmdBold')),
-    icon: 'richText',
+    icon: 'bold',
     size: 'small',
     active: selection?.bold === true,
     disabled: !textSelected,
@@ -754,7 +754,7 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
     kind: 'toggle',
     id: 'italic',
     label: t(key('cmdItalic')),
-    icon: 'text',
+    icon: 'italic',
     size: 'small',
     active: selection?.italic === true,
     disabled: !textSelected,
@@ -764,9 +764,9 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
 
   const alignItems: RibbonToggleItem[] = (
     [
-      ['left', 'cmdAlignLeft', 'panelLeftOpen'],
-      ['center', 'cmdAlignCenter', 'actualSize'],
-      ['right', 'cmdAlignRight', 'panelLeftClose'],
+      ['left', 'cmdAlignLeft', 'alignLeft'],
+      ['center', 'cmdAlignCenter', 'alignCenter'],
+      ['right', 'cmdAlignRight', 'alignRight'],
     ] as const
   ).map(([align, labelKey, icon]) => ({
     kind: 'toggle' as const,

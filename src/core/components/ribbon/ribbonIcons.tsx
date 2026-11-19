@@ -84,6 +84,12 @@ const officeIcons: Record<string, ReactNode> = {
       <path d="M18 14c1.6 2 2.5 3.2 2.5 4.3A2.5 2.5 0 0 1 16 19c0-1.1.9-2.3 2-4z" />
     </>
   ),
+  /* ----------------------------- paragraph align ----------------------------- */
+  // Four ragged lines, the way Word draws paragraph alignment; the `*Cell` glyphs next to them are
+  // for table-cell content and sat too close in meaning to reuse here
+  alignLeft: <path d="M4 6h16M4 10h10M4 14h16M4 18h10" />,
+  alignCenter: <path d="M4 6h16M7 10h10M4 14h16M7 18h10" />,
+  alignRight: <path d="M4 6h16M10 10h10M4 14h16M10 18h10" />,
   /* -------------------------------- borders -------------------------------- */
   borders: (
     <>
