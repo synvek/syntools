@@ -574,7 +574,7 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
     expect(findItem(tabs, 'format', 'align-right').icon).toBe('alignRight');
   });
 
-  it('锁定对象禁用编辑，但保留解锁与删除', () => {
+  it('锁定对象禁用编辑，删除命令只保留在管理组', () => {
     const actions = makeActions();
     const tabs = buildPdfRibbonTabs(
       makeCtx({
@@ -593,8 +593,8 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
     fire(tabs, 'arrange', 'lock');
     expect(actions.toggleObjectLock).toHaveBeenCalledTimes(1);
 
-    fire(tabs, 'arrange', 'delete');
-    expect(actions.deleteSelection).toHaveBeenCalledTimes(1);
+    expect(() => findItem(tabs, 'arrange', 'delete')).toThrow('missing item arrange/delete');
+    expect(findItem(tabs, 'manage', 'delete-selection').kind).toBe('button');
   });
 
   it('排列菜单提供四向层级命令', () => {

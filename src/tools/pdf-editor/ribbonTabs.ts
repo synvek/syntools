@@ -605,16 +605,6 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
         hint,
         onSelect: () => actions.toggleObjectLock?.(),
       },
-      {
-        kind: 'button',
-        id: 'delete',
-        label: t(key('cmdDeleteSelection')),
-        icon: 'trash',
-        size: 'small',
-        disabled: lock || selection === null,
-        hint,
-        onSelect: () => actions.deleteSelection?.(),
-      },
     ],
   };
 
