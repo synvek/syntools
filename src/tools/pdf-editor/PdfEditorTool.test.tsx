@@ -219,7 +219,7 @@ describe('PdfEditorTool 打开流程', () => {
       choose(container, pdfFile('one-page.pdf'));
       await waitFor(() => expect(screen.getByTestId('pdf-ribbon')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByTestId('ribbon-tab-annotate'));
+      // 注释命令已并入开始标签，不需要先切标签
       fireEvent.click(screen.getByTestId('ribbon-markup-highlight'));
 
       const overlay = screen.getByTestId('pdf-overlay');
@@ -243,15 +243,17 @@ describe('PdfEditorTool 打开流程', () => {
       expect(created).toHaveAttribute('data-kind', 'markup');
       expect(created).toHaveAttribute('data-selected', 'true');
 
-      // 选中标记对象时自动出现「注释格式」上下文标签
-      expect(screen.getByTestId('ribbon-tab-annotate-format')).toBeInTheDocument();
+      // 注释格式已并入开始标签：选中标记对象时对象颜色控件转为可用，不再弹出独立上下文标签
+      expect(screen.queryByTestId('ribbon-tab-annotate-format')).toBeNull();
+      expect(screen.getByTestId('ribbon-tab-home')).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByTestId('ribbon-ann-format-ann-color')).not.toBeDisabled();
 
       // Esc：清空选择并退出注释工具（否则下一次点击又会画一个高亮）
       fireEvent.keyDown(window, { key: 'Escape' });
       await waitFor(() => expect(overlay).toHaveAttribute('data-tool', 'select'));
       expect(screen.getByTestId('pdf-object')).toHaveAttribute('data-selected', 'false');
-      // 取消选择后上下文标签消失，回到来源标签
-      expect(screen.queryByTestId('ribbon-tab-annotate-format')).toBeNull();
+      // 取消选择后对象格式控件回到禁用状态
+      expect(screen.getByTestId('ribbon-ann-format-ann-color')).toBeDisabled();
     } finally {
       rectSpy.mockRestore();
     }

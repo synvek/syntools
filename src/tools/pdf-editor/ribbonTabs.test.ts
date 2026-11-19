@@ -94,9 +94,9 @@ function fire(tabs: RibbonTab[], groupId: string, itemId: string): void {
 describe('buildPdfRibbonTabs — 结构', () => {
   const tabs = buildPdfRibbonTabs(makeCtx());
 
-  it('暴露 开始 / 注释 / 编辑 / 视图 四个标签', () => {
-    expect(tabs.map((tab) => tab.id)).toEqual(['home', 'annotate', 'edit', 'view']);
-    expect(tabs.map((tab) => tab.label)).toEqual(['tabHome', 'tabAnnotate', 'tabEdit', 'tabView']);
+  it('只暴露 开始 / 视图 两个标签', () => {
+    expect(tabs.map((tab) => tab.id)).toEqual(['home', 'view']);
+    expect(tabs.map((tab) => tab.label)).toEqual(['tabHome', 'tabView']);
   });
 
   it('标签、分组、命令的 id 都唯一', () => {
@@ -121,19 +121,31 @@ describe('buildPdfRibbonTabs — 结构', () => {
     }
   });
 
-  it('分组顺序符合 Office 习惯（选择/缩放/导航/导出）', () => {
+  it('注释 / 编辑 / 注释格式的分组都并入了开始，视图保持原样', () => {
     expect(tabs[0].groups.map((group) => group.id)).toEqual([
       'select',
       'zoom',
       'navigate',
+      'markup',
+      'shapes',
+      'ink',
+      'insert',
+      'format',
+      'manage',
+      'ann-format',
+      'arrange',
+      'clipboard',
+      'object-align',
+      'object-distribute',
+      'format-painter',
       'export',
     ]);
-    expect(tabs[3].groups.map((group) => group.id)).toEqual(['view-mode', 'panels', 'display']);
+    expect(tabs[1].groups.map((group) => group.id)).toEqual(['view-mode', 'panels', 'display']);
   });
 
   it('面板尚未实现时不注册面板分组（避免空按钮）', () => {
     const tabs = buildPdfRibbonTabs(makeCtx({ panelsAvailable: false }));
-    expect(tabs[3].groups.map((group) => group.id)).toEqual(['view-mode', 'display']);
+    expect(tabs[1].groups.map((group) => group.id)).toEqual(['view-mode', 'display']);
     expect(allItems(tabs).some((item) => item.id === 'thumbnails')).toBe(false);
   });
 });
@@ -146,9 +158,12 @@ describe('buildPdfRibbonTabs — 禁用与提示', () => {
       expect(item.hint).toBeTruthy();
     }
 
-    // 开始页的命令统一提示"先打开文件"；注释页的颜色/线宽还要先选工具
-    const home = tabs[0].groups.flatMap((group) => group.items);
-    for (const item of home) expect(item.hint).toBe('openFirstHint');
+    // 基础命令统一提示"先打开文件"；注释颜色/线宽并入开始后，仍要先选注释工具
+    const base = tabs[0].groups
+      .filter((group) => ['select', 'zoom', 'navigate', 'export'].includes(group.id))
+      .flatMap((group) => group.items);
+    for (const item of base) expect(item.hint).toBe('openFirstHint');
+    expect(findItem(tabs, 'format', 'annotate-color').hint).toBe('hintPickTool');
   });
 
   it('首页禁用上一页，末页禁用下一页', () => {
@@ -306,7 +321,7 @@ describe('buildPdfRibbonTabs — 命令接线', () => {
   });
 });
 
-describe('buildPdfRibbonTabs — 注释页', () => {
+describe('buildPdfRibbonTabs — 注释命令（已并入开始）', () => {
   const style = {
     markupColor: '#fde047',
     inkColor: '#e11d48',
@@ -407,28 +422,21 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
     expect(resolveContextTab(textSelection)).toBe('text-format');
     expect(resolveContextTab({ kind: 'image', opacity: 1, locked: false })).toBe('image-format');
     expect(resolveContextTab({ kind: 'stamp', opacity: 1, locked: false })).toBe('image-format');
-    expect(resolveContextTab({ kind: 'markup', opacity: 1, locked: false })).toBe(
-      'annotate-format',
-    );
-    expect(resolveContextTab({ kind: 'note', opacity: 1, locked: false })).toBe('annotate-format');
-    expect(resolveContextTab({ kind: 'ink', opacity: 1, locked: false })).toBe('annotate-format');
+    // 注释对象不再拥有独立标签：它们的格式控件在开始标签里
+    expect(resolveContextTab({ kind: 'markup', opacity: 1, locked: false })).toBeNull();
+    expect(resolveContextTab({ kind: 'note', opacity: 1, locked: false })).toBeNull();
+    expect(resolveContextTab({ kind: 'ink', opacity: 1, locked: false })).toBeNull();
   });
 
   it('选中出现上下文标签，取消选择回到来源标签', () => {
     const withText = buildPdfRibbonTabs(makeCtx({ selection: textSelection }));
-    expect(withText.map((tab) => tab.id)).toEqual([
-      'home',
-      'annotate',
-      'edit',
-      'view',
-      'text-format',
-    ]);
+    expect(withText.map((tab) => tab.id)).toEqual(['home', 'view', 'text-format']);
 
     const cleared = buildPdfRibbonTabs(makeCtx({ selection: null }));
-    expect(cleared.map((tab) => tab.id)).toEqual(['home', 'annotate', 'edit', 'view']);
+    expect(cleared.map((tab) => tab.id)).toEqual(['home', 'view']);
 
     expect(nextActiveTab('home', 'text-format', 'home')).toBe('text-format');
-    expect(nextActiveTab('text-format', null, 'annotate')).toBe('annotate');
+    expect(nextActiveTab('text-format', null, 'home')).toBe('home');
     expect(nextActiveTab('home', null, 'home')).toBe('home');
   });
 
@@ -455,7 +463,8 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
     color.onPick('#ff0000');
     expect(actions.setObjectColor).toHaveBeenCalledWith('#ff0000');
 
-    const opacity = findItem(tabs, 'text-color', 'opacity');
+    // 透明度是所有对象共用的命令，现在常驻开始标签
+    const opacity = findItem(tabs, 'ann-format', 'opacity');
     if (opacity.kind !== 'select') throw new Error('opacity must be a select');
     opacity.onChange('50');
     expect(actions.setObjectOpacity).toHaveBeenCalledWith(0.5);
@@ -513,7 +522,7 @@ describe('buildPdfRibbonTabs — 上下文标签', () => {
   });
 });
 
-describe('M3 插入与编辑标签', () => {
+describe('M3 插入与编辑命令（已并入开始）', () => {
   it('注释插入组提供修补、图片、签名、图章四个入口', () => {
     const tabs = buildPdfRibbonTabs(makeCtx());
     const insert = tabs.flatMap((tab) => tab.groups).find((group) => group.id === 'insert');
@@ -523,7 +532,7 @@ describe('M3 插入与编辑标签', () => {
     expect(findItem(tabs, 'insert', 'patch')).toMatchObject({ kind: 'toggle', active: false });
   });
 
-  it('编辑标签的剪贴板按选区数量启用', () => {
+  it('剪贴板按选区数量启用', () => {
     const empty = buildPdfRibbonTabs(makeCtx());
     expect(findItem(empty, 'clipboard', 'copy').disabled).toBe(true);
     expect(findItem(empty, 'clipboard', 'paste').disabled).toBe(true);

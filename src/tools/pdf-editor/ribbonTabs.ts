@@ -28,8 +28,16 @@ import type { ViewMode, ZoomMode } from './model/types';
 export type { PdfTool };
 export type PdfPanel = 'thumbnails' | 'outline' | 'properties' | 'annotations';
 
-/** Contextual tabs, Word style: present only while a matching object is selected */
-export const CONTEXT_TAB_IDS = ['annotate-format', 'text-format', 'image-format'] as const;
+/**
+ * Contextual tabs, Word style: present only while a matching object is selected.
+ *
+ * Annotations have no tab of their own any more. The annotation, page-editing and annotation-format
+ * tabs held three or four groups each, so every command was one click deeper than necessary; their
+ * commands now live in `开始`, and the object format controls there follow the selection the same way
+ * the contextual tabs do. Text and image boxes still get a tab because their formatting is wide enough
+ * to earn one.
+ */
+export const CONTEXT_TAB_IDS = ['text-format', 'image-format'] as const;
 export type ContextTabId = (typeof CONTEXT_TAB_IDS)[number];
 
 /**
@@ -54,14 +62,13 @@ export interface PdfRibbonSelection {
 }
 
 const IMAGE_KINDS: readonly string[] = ['image', 'stamp', 'signature'];
-const ANNOTATE_KINDS: readonly string[] = ['markup', 'ink', 'shape', 'note'];
 
 /** Which contextual tab the current selection owns */
 export function resolveContextTab(selection: PdfRibbonSelection | null): ContextTabId | null {
   if (!selection) return null;
   if (selection.kind === 'text') return 'text-format';
   if (IMAGE_KINDS.includes(selection.kind)) return 'image-format';
-  if (ANNOTATE_KINDS.includes(selection.kind)) return 'annotate-format';
+  // Annotations (markup / ink / shape / note) stay on the current tab: their controls are in `开始`
   return null;
 }
 
@@ -309,255 +316,249 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
   const annotateColor = styleColorFor(annotate.style, ctx.tool);
   const annotateWidth = styleWidthFor(annotate.style, ctx.tool);
 
-  const annotateTab: RibbonTab = {
-    id: 'annotate',
-    label: t(key('tabAnnotate')),
-    groups: [
-      {
-        id: 'markup',
-        label: t(key('grpMarkup')),
-        priority: 7,
-        items: [
-          toolToggle('highlight', 'brush', 'cmdHighlight'),
-          toolToggle('underline', 'underline', 'cmdUnderline'),
-          toolToggle('strikeout', 'strike', 'cmdStrikeout'),
-        ],
-      },
-      {
-        id: 'shapes',
-        label: t(key('grpShapes')),
-        priority: 6,
-        items: [
-          toolToggle('rect', 'shapeRect', 'cmdRect'),
-          toolToggle('ellipse', 'shapeEllipse', 'cmdEllipse'),
-          toolToggle('arrow', 'shapeArrow', 'cmdArrow'),
-          toolToggle('line', 'shapeLine', 'cmdLine'),
-        ],
-      },
-      {
-        id: 'ink',
-        label: t(key('grpInk')),
-        priority: 5,
-        items: [toolToggle('ink', 'pen', 'cmdInk'), toolToggle('eraser', 'eraser', 'cmdEraser')],
-      },
-      {
-        id: 'insert',
-        label: t(key('grpInsert')),
-        priority: 4,
-        items: [
-          toolToggle('note', 'comment', 'cmdNote'),
-          toolToggle('text', 'text', 'cmdText'),
-          toolToggle('patch', 'pdfAddText', 'cmdPatch'),
-          {
-            kind: 'button',
-            id: 'image',
-            label: t(key('cmdImage')),
-            icon: 'pdfInsertImage',
-            size: 'small',
-            disabled: lock,
-            hint,
-            onSelect: () => actions.insertImage?.(),
+  /** Annotation commands; merged into `开始` so the two or three commands per tab are one click away */
+  const annotateGroups: RibbonGroup[] = [
+    {
+      id: 'markup',
+      label: t(key('grpMarkup')),
+      priority: 6,
+      items: [
+        toolToggle('highlight', 'brush', 'cmdHighlight'),
+        toolToggle('underline', 'underline', 'cmdUnderline'),
+        toolToggle('strikeout', 'strike', 'cmdStrikeout'),
+      ],
+    },
+    {
+      id: 'shapes',
+      label: t(key('grpShapes')),
+      priority: 4,
+      items: [
+        toolToggle('rect', 'shapeRect', 'cmdRect'),
+        toolToggle('ellipse', 'shapeEllipse', 'cmdEllipse'),
+        toolToggle('arrow', 'shapeArrow', 'cmdArrow'),
+        toolToggle('line', 'shapeLine', 'cmdLine'),
+      ],
+    },
+    {
+      id: 'ink',
+      label: t(key('grpInk')),
+      priority: 4,
+      items: [toolToggle('ink', 'pen', 'cmdInk'), toolToggle('eraser', 'eraser', 'cmdEraser')],
+    },
+    {
+      id: 'insert',
+      label: t(key('grpInsert')),
+      priority: 7,
+      items: [
+        toolToggle('note', 'comment', 'cmdNote'),
+        toolToggle('text', 'text', 'cmdText'),
+        toolToggle('patch', 'pdfAddText', 'cmdPatch'),
+        {
+          kind: 'button',
+          id: 'image',
+          label: t(key('cmdImage')),
+          icon: 'pdfInsertImage',
+          size: 'small',
+          disabled: lock,
+          hint,
+          onSelect: () => actions.insertImage?.(),
+        },
+        {
+          kind: 'button',
+          id: 'signature',
+          label: t(key('cmdSignature')),
+          icon: 'pdfSign',
+          size: 'small',
+          disabled: lock,
+          hint,
+          onSelect: () => actions.openSignature?.(),
+        },
+        {
+          kind: 'button',
+          id: 'stamp',
+          label: t(key('cmdStamp')),
+          icon: 'tag',
+          size: 'small',
+          disabled: lock,
+          hint,
+          onSelect: () => actions.openStamp?.(),
+        },
+      ],
+    },
+    {
+      id: 'format',
+      label: t(key('grpFormat')),
+      priority: 7,
+      items: [
+        {
+          kind: 'color',
+          id: 'annotate-color',
+          label: t(key('cmdColor')),
+          value: annotateColor,
+          disabled: lock || annotateColor === null,
+          hint: annotateColor === null ? t(key('hintPickTool')) : hint,
+          onPick: (color) => actions.setAnnotateColor?.(color),
+        },
+        {
+          kind: 'select',
+          id: 'annotate-width',
+          label: t(key('cmdWidth')),
+          value: String(annotateWidth ?? 2),
+          options: [1, 2, 3, 4, 6].map((width) => ({
+            value: String(width),
+            label: `${width} pt`,
+          })),
+          width: 'xs',
+          disabled: lock || annotateWidth === null,
+          hint: annotateWidth === null ? t(key('hintPickTool')) : hint,
+          onChange: (value: string) => {
+            const width = Number(value);
+            if (Number.isFinite(width)) actions.setAnnotateWidth?.(width);
           },
-          {
-            kind: 'button',
-            id: 'signature',
-            label: t(key('cmdSignature')),
-            icon: 'pdfSign',
-            size: 'small',
-            disabled: lock,
-            hint,
-            onSelect: () => actions.openSignature?.(),
-          },
-          {
-            kind: 'button',
-            id: 'stamp',
-            label: t(key('cmdStamp')),
-            icon: 'tag',
-            size: 'small',
-            disabled: lock,
-            hint,
-            onSelect: () => actions.openStamp?.(),
-          },
-        ],
-      },
-      {
-        id: 'format',
-        label: t(key('grpFormat')),
-        priority: 8,
-        items: [
-          {
-            kind: 'color',
-            id: 'annotate-color',
-            label: t(key('cmdColor')),
-            value: annotateColor,
-            disabled: lock || annotateColor === null,
-            hint: annotateColor === null ? t(key('hintPickTool')) : hint,
-            onPick: (color) => actions.setAnnotateColor?.(color),
-          },
-          {
-            kind: 'select',
-            id: 'annotate-width',
-            label: t(key('cmdWidth')),
-            value: String(annotateWidth ?? 2),
-            options: [1, 2, 3, 4, 6].map((width) => ({
-              value: String(width),
-              label: `${width} pt`,
-            })),
-            width: 'xs',
-            disabled: lock || annotateWidth === null,
-            hint: annotateWidth === null ? t(key('hintPickTool')) : hint,
-            onChange: (value: string) => {
-              const width = Number(value);
-              if (Number.isFinite(width)) actions.setAnnotateWidth?.(width);
-            },
-          },
-        ],
-      },
-      {
-        id: 'manage',
-        label: t(key('grpManage')),
-        priority: 2,
-        items: [
-          {
-            kind: 'button',
-            id: 'delete-selection',
-            label: t(key('cmdDeleteSelection')),
-            icon: 'trash',
-            size: 'small',
-            disabled: lock || annotate.selectionCount === 0,
-            hint,
-            onSelect: () => actions.deleteSelection?.(),
-          },
-          {
-            kind: 'button',
-            id: 'clear-annotations',
-            label: t(key('cmdClearAnnotations')),
-            icon: 'pdfDelete',
-            size: 'small',
-            disabled: lock || annotate.objectCount === 0,
-            hint,
-            onSelect: () => actions.clearAnnotations?.(),
-          },
-        ],
-      },
-    ],
-  };
+        },
+      ],
+    },
+    {
+      id: 'manage',
+      label: t(key('grpManage')),
+      priority: 3,
+      items: [
+        {
+          kind: 'button',
+          id: 'delete-selection',
+          label: t(key('cmdDeleteSelection')),
+          icon: 'trash',
+          size: 'small',
+          disabled: lock || annotate.selectionCount === 0,
+          hint,
+          onSelect: () => actions.deleteSelection?.(),
+        },
+        {
+          kind: 'button',
+          id: 'clear-annotations',
+          label: t(key('cmdClearAnnotations')),
+          icon: 'pdfDelete',
+          size: 'small',
+          disabled: lock || annotate.objectCount === 0,
+          hint,
+          onSelect: () => actions.clearAnnotations?.(),
+        },
+      ],
+    },
+  ];
 
   const edit = ctx.edit ?? { selectionCount: 0, clipboard: 0, painter: false };
   const multi = edit.selectionCount;
 
-  const editTab: RibbonTab = {
-    id: 'edit',
-    label: t(key('tabEdit')),
-    groups: [
-      {
-        id: 'clipboard',
-        label: t(key('grpClipboard')),
-        priority: 9,
-        items: [
-          {
-            kind: 'button',
-            id: 'copy',
-            label: t(key('cmdCopy')),
-            icon: 'copy',
-            size: 'small',
-            disabled: lock || multi === 0,
-            hint,
-            onSelect: () => actions.copySelection?.(),
-          },
-          {
-            kind: 'button',
-            id: 'cut',
-            label: t(key('cmdCut')),
-            icon: 'scissors',
-            size: 'small',
-            disabled: lock || multi === 0,
-            hint,
-            onSelect: () => actions.cutSelection?.(),
-          },
-          {
-            kind: 'button',
-            id: 'paste',
-            label: t(key('cmdPaste')),
-            icon: 'paste',
-            size: 'small',
-            disabled: lock || edit.clipboard === 0,
-            hint,
-            onSelect: () => actions.pasteSelection?.(),
-          },
-        ],
-      },
-      {
-        id: 'object-align',
-        label: t(key('grpAlign')),
-        priority: 7,
-        items: (
-          [
-            ['left', 'cmdAlignLeft', 'alignLeftCell'],
-            ['center', 'cmdAlignCenter', 'alignCenterCell'],
-            ['right', 'cmdAlignRight', 'alignRightCell'],
-            ['top', 'cmdAlignTop', 'alignTopCell'],
-            ['middle', 'cmdAlignMiddle', 'alignMiddleCell'],
-            ['bottom', 'cmdAlignBottom', 'alignBottomCell'],
-          ] as const
-        ).map(([mode, labelKey, icon]) => ({
-          kind: 'button' as const,
-          id: `align-object-${mode}`,
-          label: t(key(labelKey)),
-          icon,
-          size: 'small' as const,
-          disabled: lock || multi < 2,
+  /** Clipboard / alignment / format painter; merged into `开始` for the same reason */
+  const editGroups: RibbonGroup[] = [
+    {
+      id: 'clipboard',
+      label: t(key('grpClipboard')),
+      priority: 5,
+      items: [
+        {
+          kind: 'button',
+          id: 'copy',
+          label: t(key('cmdCopy')),
+          icon: 'copy',
+          size: 'small',
+          disabled: lock || multi === 0,
           hint,
-          onSelect: () => actions.alignObjects?.(mode),
-        })),
-      },
-      {
-        id: 'object-distribute',
-        label: t(key('grpDistribute')),
-        priority: 6,
-        items: [
-          {
-            kind: 'button',
-            id: 'distribute-h',
-            label: t(key('cmdDistributeH')),
-            icon: 'distribute',
-            size: 'small',
-            disabled: lock || multi < 3,
-            hint,
-            onSelect: () => actions.distributeObjects?.('horizontal'),
-          },
-          {
-            kind: 'button',
-            id: 'distribute-v',
-            label: t(key('cmdDistributeV')),
-            icon: 'distribute',
-            size: 'small',
-            disabled: lock || multi < 3,
-            hint,
-            onSelect: () => actions.distributeObjects?.('vertical'),
-          },
-        ],
-      },
-      {
-        id: 'format-painter',
-        label: t(key('grpFormatPainter')),
-        priority: 5,
-        items: [
-          {
-            kind: 'toggle',
-            id: 'format-painter',
-            label: edit.painter ? t(key('painterArmed')) : t(key('cmdFormatPainter')),
-            icon: 'formatPainter',
-            size: 'small',
-            active: edit.painter,
-            disabled: lock || multi === 0,
-            hint,
-            onSelect: () => actions.toggleFormatPainter?.(),
-          },
-        ],
-      },
-    ],
-  };
+          onSelect: () => actions.copySelection?.(),
+        },
+        {
+          kind: 'button',
+          id: 'cut',
+          label: t(key('cmdCut')),
+          icon: 'scissors',
+          size: 'small',
+          disabled: lock || multi === 0,
+          hint,
+          onSelect: () => actions.cutSelection?.(),
+        },
+        {
+          kind: 'button',
+          id: 'paste',
+          label: t(key('cmdPaste')),
+          icon: 'paste',
+          size: 'small',
+          disabled: lock || edit.clipboard === 0,
+          hint,
+          onSelect: () => actions.pasteSelection?.(),
+        },
+      ],
+    },
+    {
+      id: 'object-align',
+      label: t(key('grpAlign')),
+      priority: 2,
+      items: (
+        [
+          ['left', 'cmdAlignLeft', 'alignLeftCell'],
+          ['center', 'cmdAlignCenter', 'alignCenterCell'],
+          ['right', 'cmdAlignRight', 'alignRightCell'],
+          ['top', 'cmdAlignTop', 'alignTopCell'],
+          ['middle', 'cmdAlignMiddle', 'alignMiddleCell'],
+          ['bottom', 'cmdAlignBottom', 'alignBottomCell'],
+        ] as const
+      ).map(([mode, labelKey, icon]) => ({
+        kind: 'button' as const,
+        id: `align-object-${mode}`,
+        label: t(key(labelKey)),
+        icon,
+        size: 'small' as const,
+        disabled: lock || multi < 2,
+        hint,
+        onSelect: () => actions.alignObjects?.(mode),
+      })),
+    },
+    {
+      id: 'object-distribute',
+      label: t(key('grpDistribute')),
+      priority: 1,
+      items: [
+        {
+          kind: 'button',
+          id: 'distribute-h',
+          label: t(key('cmdDistributeH')),
+          icon: 'distribute',
+          size: 'small',
+          disabled: lock || multi < 3,
+          hint,
+          onSelect: () => actions.distributeObjects?.('horizontal'),
+        },
+        {
+          kind: 'button',
+          id: 'distribute-v',
+          label: t(key('cmdDistributeV')),
+          icon: 'distribute',
+          size: 'small',
+          disabled: lock || multi < 3,
+          hint,
+          onSelect: () => actions.distributeObjects?.('vertical'),
+        },
+      ],
+    },
+    {
+      id: 'format-painter',
+      label: t(key('grpFormatPainter')),
+      priority: 2,
+      items: [
+        {
+          kind: 'toggle',
+          id: 'format-painter',
+          label: edit.painter ? t(key('painterArmed')) : t(key('cmdFormatPainter')),
+          icon: 'formatPainter',
+          size: 'small',
+          active: edit.painter,
+          disabled: lock || multi === 0,
+          hint,
+          onSelect: () => actions.toggleFormatPainter?.(),
+        },
+      ],
+    },
+  ];
 
   const selection = ctx.selection ?? null;
   const contextTab = ctx.contextTab === undefined ? resolveContextTab(selection) : ctx.contextTab;
@@ -581,7 +582,7 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
   const arrangeGroup: RibbonGroup = {
     id: 'arrange',
     label: t(key('grpArrange')),
-    priority: 5,
+    priority: 3,
     items: [
       {
         kind: 'menu',
@@ -651,33 +652,33 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
 
   const contextTabs: RibbonTab[] = [];
 
-  if (contextTab === 'annotate-format' && selection) {
-    contextTabs.push({
-      id: 'annotate-format',
-      label: t(key('tabAnnotateFormat')),
-      groups: [
+  /**
+   * Object format + arrangement, pinned to `开始` (disabled until something is selected).
+   *
+   * This was the `注释格式` contextual tab. Keeping it a tab meant the same commands disappeared and
+   * reappeared while a user was arranging objects, and text / image boxes never saw them at all.
+   */
+  const annotationGroups: RibbonGroup[] = [
+    {
+      id: 'ann-format',
+      label: t(key('grpFormat')),
+      priority: 5,
+      items: [
         {
-          id: 'ann-format',
-          label: t(key('grpFormat')),
-          priority: 6,
-          items: [
-            {
-              kind: 'color',
-              id: 'ann-color',
-              label: t(key('cmdColor')),
-              value: selection.color ?? null,
-              disabled: !canEdit || selection.color === undefined,
-              hint,
-              onPick: (color) => actions.setObjectColor?.(color),
-            },
-            widthSelect('ann-width', selection.width),
-            opacityItem,
-          ],
+          kind: 'color',
+          id: 'ann-color',
+          label: t(key('cmdColor')),
+          value: selection?.color ?? null,
+          disabled: !canEdit || selection?.color === undefined,
+          hint,
+          onPick: (color) => actions.setObjectColor?.(color),
         },
-        arrangeGroup,
+        widthSelect('ann-width', selection?.width),
+        opacityItem,
       ],
-    });
-  }
+    },
+    arrangeGroup,
+  ];
 
   if (contextTab === 'text-format' && selection) {
     contextTabs.push({
@@ -763,10 +764,10 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
               hint,
               onPick: (color) => actions.setObjectColor?.(color),
             },
-            opacityItem,
+            // Opacity and arrangement live in `开始` (shared by every object kind), so this tab
+            // keeps only what is specific to a text box.
           ],
         },
-        arrangeGroup,
       ],
     });
   }
@@ -797,7 +798,7 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
               onChange: (value: string) =>
                 actions.setObjectFit?.(value as 'contain' | 'cover' | 'fill'),
             },
-            opacityItem,
+            // Opacity / arrange are shared object commands and live in `开始`
             {
               kind: 'button',
               id: 'replace-image',
@@ -821,7 +822,6 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
             },
           ],
         },
-        arrangeGroup,
       ],
     });
   }
@@ -834,7 +834,9 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
         {
           id: 'select',
           label: t(key('grpSelect')),
-          priority: 3,
+          // The merged tab holds 16 groups: select / zoom / navigation must survive the longest,
+          // otherwise a narrow window hides the tool picker behind the overflow menu
+          priority: 10,
           items: [
             {
               kind: 'toggle',
@@ -863,7 +865,7 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
         {
           id: 'zoom',
           label: t(key('grpZoom')),
-          priority: 7,
+          priority: 9,
           items: [
             {
               kind: 'select',
@@ -907,7 +909,7 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
         {
           id: 'navigate',
           label: t(key('grpNavigate')),
-          priority: 8,
+          priority: 9,
           items: [
             {
               kind: 'button',
@@ -943,10 +945,16 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
             },
           ],
         },
+        // The 注释, 编辑 and 注释格式 tabs each held two or three groups, so every second command
+        // cost a tab switch. They now sit together in `开始`, right after the selection / zoom /
+        // navigation commands users already knew the place of.
+        ...annotateGroups,
+        ...annotationGroups,
+        ...editGroups,
         {
           id: 'export',
           label: t(key('grpExport')),
-          priority: 2,
+          priority: 8,
           items: [
             {
               kind: 'button',
@@ -982,8 +990,6 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
         },
       ],
     },
-    annotateTab,
-    editTab,
     {
       id: 'view',
       label: t(key('tabView')),

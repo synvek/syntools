@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PdfTool } from '../model/annotate';
 import { createShapeObject, createTextObject } from '../model/objects';
 import type { NormRect, PdfObject } from '../model/types';
 import { OverlayLayer } from './OverlayLayer';
@@ -24,7 +25,7 @@ const PAGE_BOX = {
  * Minimal controller mirroring what `PdfEditorTool` does, so the layer's contract (controlled
  * selection/editing, empty boxes discarded) is exercised rather than assumed.
  */
-function Harness({ initial }: { initial?: PdfObject[] }) {
+function Harness({ initial, tool }: { initial?: PdfObject[]; tool?: PdfTool }) {
   const [objects, setObjects] = useState<PdfObject[]>(initial ?? []);
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
@@ -37,6 +38,7 @@ function Harness({ initial }: { initial?: PdfObject[] }) {
         scale={1}
         selectedIds={selected}
         editingId={editing}
+        tool={tool}
         onSelect={setSelected}
         onStartEdit={(id) => {
           setSelected([id]);
@@ -155,6 +157,39 @@ describe('OverlayLayer', () => {
     });
     render(<Harness initial={[onOtherPage]} />);
 
+    expect(screen.queryByTestId('pdf-text-object')).toBeNull();
+  });
+
+  /**
+   * 抓手工具与选择工具的区别：抓手不在页面上做任何编辑动作，按下事件必须冒泡到滚动容器，
+   * 否则指针落在对象上时"平移"会和"选择"表现一致（拖动对象而不是平移画布）。
+   */
+  it('抓手模式：按下对象既不选中也不移动', () => {
+    const object = createTextObject({
+      page: PAGE_ID,
+      rect: { x: 0.1, y: 0.1, w: 0.3, h: 0.05 },
+      text: 'Existing',
+      z: 1,
+      id: 'obj-hand',
+    });
+    render(<Harness initial={[object]} tool="hand" />);
+
+    fireEvent.pointerDown(screen.getByTestId('pdf-text-object'), {
+      clientX: 60,
+      clientY: 100,
+      button: 0,
+    });
+
+    expect(screen.getByTestId('pdf-text-object')).toHaveAttribute('data-selected', 'false');
+    expect(screen.queryByTestId('pdf-selection-frame')).toBeNull();
+  });
+
+  it('抓手模式：双击空白不创建文本框', () => {
+    render(<Harness tool="hand" />);
+
+    fireEvent.doubleClick(screen.getByTestId('pdf-overlay'), { clientX: 300, clientY: 400 });
+
+    expect(screen.queryByTestId('pdf-text-input')).toBeNull();
     expect(screen.queryByTestId('pdf-text-object')).toBeNull();
   });
 });

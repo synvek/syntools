@@ -133,7 +133,8 @@ interface Draft {
  * Gestures start on the root (event delegation via `data-object-id` / `data-handle`), so a pointer
  * capture on the root keeps resize/rotate/marquee/drawing tracking even when the pointer leaves the
  * page. Empty-area pointerdown still bubbles to the scroll container for panning unless Shift starts
- * a marquee.
+ * a marquee. The `hand` tool short-circuits here entirely: every press bubbles to the scroll
+ * container, so dragging pans the page even when the pointer lands on an object or its handles.
  */
 export function OverlayLayer({
   objects,
@@ -218,6 +219,8 @@ export function OverlayLayer({
   };
 
   const onDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    // Creating a box is an edit: the hand tool must not do it
+    if (tool === 'hand') return;
     const element = rootRef.current;
     if (!element) return;
     // Only a double-click on the page itself creates a box, not on an existing one
@@ -283,6 +286,10 @@ export function OverlayLayer({
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // Hand tool: every press belongs to the canvas pan. Without this the overlay still selected,
+    // moved or marquee'd whatever was under the pointer, so 平移 behaved exactly like 选择 as soon
+    // as the pointer landed on an object — the bug users report as "the two tools look the same".
+    if (tool === 'hand') return;
     const target = event.target as HTMLElement;
     const point = pointFromEvent(event.clientX, event.clientY);
     if (!point) return;

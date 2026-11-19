@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { fitPageScale, fitWidthScale } from '../model/coords';
 import { clampZoom } from '../model/doc';
@@ -67,9 +67,20 @@ export function usePageMetrics({
   padding?: number;
 }): { pageSize: PageSize | null; scale: number } {
   const [pageSize, setPageSize] = useState<PageSize | null>(null);
+  /** Which document the cached size belongs to: only a new document may clear it */
+  const docRef = useRef<PDFDocumentProxy | null>(null);
 
   useEffect(() => {
-    setPageSize(null);
+    /*
+     * Do not blank the size on every page change. `pageSize === null` collapses every placeholder box
+     * to 0 px, the scroll container loses its content, and the browser clamps `scrollTop` back to 0 —
+     * which showed up as "scroll to page 2 and the viewport jumps back to page 1". The previous size
+     * stays until the new page resolves; sizes differ only slightly for mixed-size PDFs.
+     */
+    if (docRef.current !== pdfDoc) {
+      docRef.current = pdfDoc;
+      setPageSize(null);
+    }
     if (!pdfDoc) return;
 
     let cancelled = false;
