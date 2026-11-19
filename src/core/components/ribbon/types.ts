@@ -22,6 +22,8 @@ export interface RibbonMenuItem {
   danger?: boolean;
   /** Opens a control panel (select / colour) instead of running a command — P0-4.5 */
   control?: boolean;
+  /** Draw a divider above this item (file menus group open / save / export) */
+  separatorBefore?: boolean;
   onSelect: () => void;
 }
 

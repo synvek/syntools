@@ -343,12 +343,13 @@ describe('PdfEditorView 表现层', () => {
     );
 
     expect(screen.getByTestId('pdf-ribbon')).toBeInTheDocument();
+    // M4-6 follow-up: the ribbon must stay under the app header while pages scroll
+    expect(screen.getByTestId('pdf-ribbon-sticky')).toHaveClass('sticky', 'top-14');
     expect(screen.getByRole('tab', { name: '开始' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '视图' })).toBeInTheDocument();
     expect(screen.getByTestId('page-area-slot')).toBeInTheDocument();
     expect(screen.queryByText('打开一份 PDF 开始编辑')).toBeNull();
     expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('第 1 / 3 页');
-    expect(screen.getByTestId('ribbon-history-undo')).toBeDisabled();
 
     fireEvent.click(screen.getByTestId('ribbon-navigate-next'));
     expect(actions.nextPage).toHaveBeenCalledTimes(1);

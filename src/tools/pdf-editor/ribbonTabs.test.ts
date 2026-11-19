@@ -121,9 +121,8 @@ describe('buildPdfRibbonTabs — 结构', () => {
     }
   });
 
-  it('分组顺序符合 Office 习惯（历史/选择/缩放/导航/导出）', () => {
+  it('分组顺序符合 Office 习惯（选择/缩放/导航/导出）', () => {
     expect(tabs[0].groups.map((group) => group.id)).toEqual([
-      'history',
       'select',
       'zoom',
       'navigate',
@@ -150,13 +149,6 @@ describe('buildPdfRibbonTabs — 禁用与提示', () => {
     // 开始页的命令统一提示"先打开文件"；注释页的颜色/线宽还要先选工具
     const home = tabs[0].groups.flatMap((group) => group.items);
     for (const item of home) expect(item.hint).toBe('openFirstHint');
-  });
-
-  it('有文档时按撤销栈状态禁用撤销/重做', () => {
-    const tabs = buildPdfRibbonTabs(makeCtx({ history: { canUndo: false, canRedo: true } }));
-    expect(findItem(tabs, 'history', 'undo').disabled).toBe(true);
-    expect(findItem(tabs, 'history', 'redo').disabled).toBe(false);
-    expect(findItem(tabs, 'history', 'undo').hint).toBeUndefined();
   });
 
   it('首页禁用上一页，末页禁用下一页', () => {
@@ -268,8 +260,6 @@ describe('buildPdfRibbonTabs — 命令接线', () => {
     const actions = makeActions();
     const tabs = buildPdfRibbonTabs(makeCtx({ actions }));
 
-    fire(tabs, 'history', 'undo');
-    fire(tabs, 'history', 'redo');
     fire(tabs, 'select', 'select');
     fire(tabs, 'select', 'hand');
     fire(tabs, 'navigate', 'prev');
@@ -281,8 +271,6 @@ describe('buildPdfRibbonTabs — 命令接线', () => {
     fire(tabs, 'panels', 'properties');
     fire(tabs, 'display', 'dark-canvas');
 
-    expect(actions.undo).toHaveBeenCalledTimes(1);
-    expect(actions.redo).toHaveBeenCalledTimes(1);
     expect(actions.setTool).toHaveBeenCalledWith('select');
     expect(actions.setTool).toHaveBeenCalledWith('hand');
     expect(actions.prevPage).toHaveBeenCalledTimes(1);

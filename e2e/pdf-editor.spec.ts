@@ -409,3 +409,52 @@ test.describe('PDF 编辑器（M2-9 / M3-6）', () => {
     expect(saved.getPageCount()).toBe(2);
   });
 });
+
+test.describe('PDF 编辑器（保存入口与吸顶）', () => {
+  test('头部保存按钮直接下载 PDF', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+    const button = page.getByTestId('pdf-save-button');
+    await expect(button).toBeVisible();
+    await expect(button).toHaveText('保存 PDF');
+
+    const downloadPromise = page.waitForEvent('download');
+    await button.click();
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages-edited.pdf');
+  });
+
+  test('左侧 ⋯ 菜单提供打开/插入/保存/导出', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+
+    await expect(page.getByTestId('pdf-qat-undo')).toBeVisible();
+    await expect(page.getByTestId('pdf-qat-redo')).toBeVisible();
+    await page.getByTestId('pdf-file-menu').click();
+
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem')).toHaveCount(6);
+    await expect(menu.getByRole('menuitem', { name: '保存' })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: '导出 Word' })).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await menu.getByRole('menuitem', { name: '保存' }).click();
+    expect((await downloadPromise).suggestedFilename()).toBe('three-pages-edited.pdf');
+  });
+
+  test('滚动到第 3 页时功能区仍固定在顶部', async ({ page }) => {
+    await openPdf(page, 'three-pages.pdf');
+
+    const topBefore = await page
+      .getByTestId('pdf-ribbon')
+      .evaluate((element) => element.getBoundingClientRect().top);
+    await page.evaluate(() => window.scrollTo(0, 1200));
+    const topAfter = await page
+      .getByTestId('pdf-ribbon')
+      .evaluate((element) => element.getBoundingClientRect().top);
+
+    // The app header is h-14 (56px); the ribbon sticks right below it instead of scrolling away
+    expect(Math.abs(topAfter - 56)).toBeLessThanOrEqual(1);
+    expect(topAfter).toBeLessThanOrEqual(topBefore);
+    await expect(page.getByTestId('pdf-save-button')).toBeVisible();
+    await expect(page.getByTestId('pdf-qat-undo')).toBeVisible();
+  });
+});

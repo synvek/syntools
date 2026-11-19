@@ -24,6 +24,8 @@ interface PdfEditorViewProps {
   note?: string | null;
   /** Inline message above the page area while a document is open (save failure, raster notice) */
   banner?: string | null;
+  /** Quick-access cluster (undo/redo + ⋯ file menu) left of the tabs */
+  quickAccess?: ReactNode;
   /** Doc chrome (save state / file name) inside the ribbon header */
   headerRight?: ReactNode;
   /** Status bar override; defaults to the page counter without size details */
@@ -51,6 +53,7 @@ export function PdfEditorView({
   error,
   note,
   banner,
+  quickAccess,
   headerRight,
   statusBar,
   activeTabId,
@@ -61,18 +64,26 @@ export function PdfEditorView({
   return (
     <div className="flex flex-col gap-3" data-tool-root>
       {doc ? (
-        <Ribbon
-          ariaLabel={t('tools.pdfEditor.ribbonLabel')}
-          tabs={tabs}
-          accent="red"
-          defaultTabId="home"
-          activeTabId={activeTabId}
-          onActiveTabChange={onTabChange}
-          headerRight={headerRight}
-          collapseLabel={t('tools.pdfEditor.ribbonCollapse')}
-          expandLabel={t('tools.pdfEditor.ribbonExpand')}
-          testId="pdf-ribbon"
-        />
+        // Sticky below the app header (h-14): a scroll through a 300-page document must never hide
+        // save / export / undo. z-20 stays under the header's z-30.
+        <div
+          className="sticky top-14 z-20 -mx-1 bg-gray-50/95 px-1 pb-1 backdrop-blur-sm dark:bg-gray-950/95"
+          data-testid="pdf-ribbon-sticky"
+        >
+          <Ribbon
+            ariaLabel={t('tools.pdfEditor.ribbonLabel')}
+            tabs={tabs}
+            accent="red"
+            defaultTabId="home"
+            activeTabId={activeTabId}
+            onActiveTabChange={onTabChange}
+            quickAccess={quickAccess}
+            headerRight={headerRight}
+            collapseLabel={t('tools.pdfEditor.ribbonCollapse')}
+            expandLabel={t('tools.pdfEditor.ribbonExpand')}
+            testId="pdf-ribbon"
+          />
+        </div>
       ) : null}
 
       {doc && banner ? (

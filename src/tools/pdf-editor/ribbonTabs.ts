@@ -832,33 +832,6 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
       label: t(key('tabHome')),
       groups: [
         {
-          id: 'history',
-          label: t(key('grpHistory')),
-          priority: 9,
-          items: [
-            {
-              kind: 'button',
-              id: 'undo',
-              label: t(key('cmdUndo')),
-              icon: 'undo',
-              size: 'small',
-              disabled: lock || !ctx.history.canUndo,
-              hint,
-              onSelect: actions.undo,
-            },
-            {
-              kind: 'button',
-              id: 'redo',
-              label: t(key('cmdRedo')),
-              icon: 'redo',
-              size: 'small',
-              disabled: lock || !ctx.history.canRedo,
-              hint,
-              onSelect: actions.redo,
-            },
-          ],
-        },
-        {
           id: 'select',
           label: t(key('grpSelect')),
           priority: 3,

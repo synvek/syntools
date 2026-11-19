@@ -120,6 +120,7 @@ import {
   ribbonSelectionOf,
 } from './ribbonTabs';
 import type { PdfPanel, PdfRibbonActions, PdfTool } from './ribbonTabs';
+import type { RibbonMenuItem } from '@/core/components/ribbon/types';
 import { AnnotationsPanel } from './ui/AnnotationsPanel';
 import { registerPdfEditorStrings } from './strings';
 import { DraftPrompt } from './ui/DraftPrompt';
@@ -131,6 +132,7 @@ import { InsertPagesDialog } from './ui/InsertPagesDialog';
 import { OutlinePanel } from './ui/OutlinePanel';
 import { PatchHint } from './ui/PatchHint';
 import { PdfEditorView } from './ui/PdfEditorView';
+import { PdfFileMenu } from './ui/PdfFileMenu';
 import { PropertiesPanel } from './ui/PropertiesPanel';
 import { SaveStatus } from './ui/SaveStatus';
 import type { SaveState } from './ui/SaveStatus';
@@ -225,6 +227,8 @@ export default function PdfEditorTool() {
   const memoryWarnedRef = useRef<string | null>(null);
   /** M3-3 crop dialog; the target is always the single selected image */
   const [cropOpen, setCropOpen] = useState(false);
+  /** "Open…" from the file menu, when the empty-state drop zone is no longer mounted */
+  const openInputRef = useRef<HTMLInputElement | null>(null);
   /** M4-5: page progress while the flattened file is being rebuilt */
   const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
 
@@ -1866,7 +1870,65 @@ export default function PdfEditorTool() {
           ? 'dirty'
           : 'saved';
 
-  const headerRight = doc ? <SaveStatus state={saveState} name={doc.name} /> : null;
+  const fileMenuItems = useMemo<RibbonMenuItem[]>(() => {
+    if (!doc) return [];
+    return [
+      {
+        id: 'open',
+        label: t('tools.pdfEditor.fileOpen'),
+        icon: 'file',
+        onSelect: () => openInputRef.current?.click(),
+      },
+      {
+        id: 'insert-pages',
+        label: t('tools.pdfEditor.insertPagesTitle'),
+        icon: 'insert',
+        onSelect: () => setInsertOpen(true),
+      },
+      {
+        id: 'save',
+        label: t('tools.pdfEditor.fileSave'),
+        icon: 'download',
+        separatorBefore: true,
+        disabled: saving,
+        onSelect: () => void save(),
+      },
+      {
+        id: 'export-docx',
+        label: t('tools.pdfEditor.cmdExportDocx'),
+        icon: 'text',
+        onSelect: () => setExportDocxOpen(true),
+      },
+      {
+        id: 'export-images',
+        label: t('tools.pdfEditor.cmdExportImages'),
+        icon: 'image',
+        onSelect: () => setExportImagesOpen(true),
+      },
+      {
+        id: 'export-text',
+        label: t('tools.pdfEditor.cmdExportText'),
+        icon: 'text',
+        onSelect: () => void handleExportText(),
+      },
+    ];
+  }, [doc, handleExportText, save, saving, t]);
+
+  const headerRight = doc ? (
+    <div className="flex items-center gap-2">
+      <SaveStatus state={saveState} name={doc.name} />
+      <button
+        type="button"
+        data-testid="pdf-save-button"
+        onClick={() => void save()}
+        disabled={saving}
+        title={`${t('tools.pdfEditor.savePdfButton')} (⌘S)`}
+        className="rounded bg-[#b3261e] px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-[#8d1d17] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+      >
+        {saving ? t('tools.pdfEditor.saveSaving') : t('tools.pdfEditor.savePdfButton')}
+      </button>
+    </div>
+  ) : null;
 
   const errorMessage =
     saveError ?? (pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null);
@@ -1903,7 +1965,31 @@ export default function PdfEditorTool() {
         }
         note={exportBusy ? t('tools.pdfEditor.exportBusy') : pdf.busy ? t('common.loading') : null}
         headerRight={headerRight}
+        quickAccess={
+          doc ? (
+            <PdfFileMenu
+              canUndo={history ? historyCanUndo(history) : false}
+              canRedo={history ? historyCanRedo(history) : false}
+              onUndo={undo}
+              onRedo={redo}
+              items={fileMenuItems}
+            />
+          ) : undefined
+        }
         statusBar={<StatusBar doc={doc} pdfDoc={pdf.pdfDoc} progress={saveProgress} />}
+      />
+
+      <input
+        ref={openInputRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        data-testid="pdf-open-input"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) handleFile(file);
+        }}
       />
 
       <input

@@ -59,8 +59,8 @@ src/core/docx/             窄 Word 构建器（HTML → docx，动态加载 `do
 
 ## 测试与门禁
 
-- 单测：`vitest run src/tools/pdf-editor src/core/docx src/core/pdf`（45 文件 / 431 例）
-- 端到端：`playwright test e2e/pdf-editor.spec.ts`（18 例：打开/翻页/草稿/密码/高亮/图片/矩形+画笔/文本修补/签名/删页保存/旋转+CropBox/Word/PNG）
+- 单测：`vitest run src/tools/pdf-editor src/core/docx src/core/pdf`（46 文件 / 433 例）
+- 端到端：`playwright test e2e/pdf-editor.spec.ts`（21 例：打开/翻页/草稿/密码/高亮/图片/矩形+画笔/文本修补/签名/删页保存/旋转+CropBox/Word/PNG/保存按钮/文件菜单/吸顶）
 - 无障碍：`e2e/a11y-p04.spec.ts` 的 PDF 场景（功能区 axe，critical/serious 为 0）
 - 体积：`pnpm build && pnpm size`（entry 实测 193.32 KB，预算 195 KB）
 - 许可：`pnpm license:check`；`@cantoo/pdf-lib` 已列入 `THIRD-PARTY-NOTICES.md`

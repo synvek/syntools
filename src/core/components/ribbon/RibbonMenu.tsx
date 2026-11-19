@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import type { RibbonMenuItem } from './types';
 import { RibbonIcon } from './ribbonIcons';
 import { Z_PANEL } from './ribbonTheme';
@@ -49,30 +49,34 @@ export function RibbonMenu({
       }`}
     >
       {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          role="menuitem"
-          disabled={item.disabled}
-          aria-label={item.label}
-          aria-haspopup={item.control ? 'dialog' : undefined}
-          data-ribbon-control={item.control ? 'true' : undefined}
-          onClick={() => {
-            onClose();
-            item.onSelect();
-          }}
-          className={`flex h-7 items-center gap-2 rounded px-2 text-left text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-            item.danger
-              ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50'
-              : 'text-gray-700 hover:bg-black/[0.05] dark:text-[#e8e8e8] dark:hover:bg-white/10'
-          }`}
-        >
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-            {item.checked ? <RibbonIcon name="check" className="h-3.5 w-3.5" /> : null}
-          </span>
-          {item.icon ? <RibbonIcon name={item.icon} className="h-4 w-4 shrink-0" /> : null}
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-        </button>
+        <Fragment key={item.id}>
+          {item.separatorBefore ? (
+            <div role="separator" className="my-1 h-px shrink-0 bg-gray-200 dark:bg-[#3a3a3a]" />
+          ) : null}
+          <button
+            type="button"
+            role="menuitem"
+            disabled={item.disabled}
+            aria-label={item.label}
+            aria-haspopup={item.control ? 'dialog' : undefined}
+            data-ribbon-control={item.control ? 'true' : undefined}
+            onClick={() => {
+              onClose();
+              item.onSelect();
+            }}
+            className={`flex h-7 items-center gap-2 rounded px-2 text-left text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              item.danger
+                ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50'
+                : 'text-gray-700 hover:bg-black/[0.05] dark:text-[#e8e8e8] dark:hover:bg-white/10'
+            }`}
+          >
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+              {item.checked ? <RibbonIcon name="check" className="h-3.5 w-3.5" /> : null}
+            </span>
+            {item.icon ? <RibbonIcon name={item.icon} className="h-4 w-4 shrink-0" /> : null}
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          </button>
+        </Fragment>
       ))}
     </div>
   );
