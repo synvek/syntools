@@ -37,6 +37,15 @@ export function utf8Bytes(text: string): number {
 /** Editing view mode: flow (continuous scrolling) / paged (A4 page guides) */
 export type ViewMode = 'flow' | 'paged';
 
+/**
+ * View of a document that has never stored one (fresh visit, new document, imported file).
+ *
+ * Page view, like Word: the writing surface is a real A4 sheet (210mm × 297mm). Flow view opens as a
+ * short continuous box (one `min-height` of text, ~10cm while empty), which does not read as a page —
+ * so it stays an explicit choice the user makes in the 视图 tab.
+ */
+export const DEFAULT_VIEW_MODE: ViewMode = 'paged';
+
 export type { RichTextDraftV2, RichTextDraftInput } from './migrate';
 /** Write-side type alias: extension fields are optional and backfilled by writeDraft */
 export type RichTextDraft = RichTextDraftInput;

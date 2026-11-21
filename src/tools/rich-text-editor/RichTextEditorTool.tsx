@@ -52,6 +52,7 @@ import {
   type MarkdownExportLosses,
 } from './core';
 import {
+  DEFAULT_VIEW_MODE,
   clearDraft,
   draftWarningLevel,
   readDraft,
@@ -350,7 +351,7 @@ export default function RichTextEditorTool() {
   const [presenting, setPresenting] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>(initial?.view ?? 'flow');
+  const [viewMode, setViewMode] = useState<ViewMode>(initial?.view ?? DEFAULT_VIEW_MODE);
   /**
    * Inline header / footer editing (page view). `page` is 1-based, because the field to write depends
    * on the page's parity when 奇偶页不同 is on.
@@ -666,7 +667,7 @@ export default function RichTextEditorTool() {
         setTitle(init.doc.title);
         editor.commands.setContent(init.doc.html);
         setSnapshotHtml(init.doc.html);
-        setViewMode(init.doc.view ?? 'flow');
+        setViewMode(init.doc.view ?? DEFAULT_VIEW_MODE);
         setPageSetup(normalizePageSetup(init.doc.pageSetup ?? null));
         setZoom(init.doc.zoom ?? 1);
         setPdfMode(init.doc.pdfMode === 'snapshot' ? 'snapshot' : 'text');

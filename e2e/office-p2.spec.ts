@@ -18,7 +18,8 @@ test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
 async function openRichText(page: Page): Promise<void> {
   await page.goto('/tools/rich-text-editor');
   await expect(page.locator('.tiptap')).toBeVisible();
-  // Pagination (and the per-page sheets) only exists in page view; the default is flow view.
+  // Pagination (and the per-page sheets) only exists in page view. It is the default for a new
+  // document, but the test selects it explicitly so it never depends on that default.
   // The view mode is the 视图 tab's select — the menu bar no longer duplicates it.
   await page.getByRole('tab', { name: '视图', exact: true }).click();
   await page.getByRole('combobox', { name: '视图模式' }).click();
