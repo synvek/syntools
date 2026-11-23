@@ -78,7 +78,9 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
     <header
       data-tauri-drag-region={frameless ? 'deep' : undefined}
       className={`sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 ${
-        // macOS traffic lights sit in the first ~68px of the title bar area (see trafficLightPosition)
+        // macOS traffic lights own the first ~70px: trafficLightPosition {x:16, y:30} puts the trio at
+        // x 16-70 and centers it on the 56px header (tao sets title bar height = 14 + y and the buttons
+        // keep their 9px inset, so their center sits at y - 2 = 28 = h-14 / 2)
         insetForTrafficLights ? 'pl-20 pr-4' : 'px-4'
       }`}
     >
