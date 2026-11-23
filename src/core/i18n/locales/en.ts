@@ -14,6 +14,10 @@ const en = {
     downloadAria: 'Download desktop app',
     downloadLabel: 'Download',
     sourceAria: 'Source code',
+    minimizeAria: 'Minimize',
+    maximizeAria: 'Maximize',
+    restoreAria: 'Restore',
+    closeAria: 'Close',
   },
   sidebar: {
     nav: 'Tool navigation',

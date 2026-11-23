@@ -14,6 +14,10 @@ const es = {
     downloadAria: 'Descargar app de escritorio',
     downloadLabel: 'Descargar',
     sourceAria: 'Código fuente',
+    minimizeAria: 'Minimizar',
+    maximizeAria: 'Maximizar',
+    restoreAria: 'Restaurar',
+    closeAria: 'Cerrar',
   },
   sidebar: {
     nav: 'Navegación de herramientas',

@@ -12,6 +12,10 @@ export default {
     downloadAria: '下载桌面版',
     downloadLabel: '下载',
     sourceAria: '源码',
+    minimizeAria: '最小化',
+    maximizeAria: '最大化',
+    restoreAria: '还原',
+    closeAria: '关闭',
   },
   sidebar: {
     nav: '工具导航',

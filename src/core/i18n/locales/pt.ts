@@ -14,6 +14,10 @@ const pt = {
     downloadAria: 'Baixar app para desktop',
     downloadLabel: 'Baixar',
     sourceAria: 'Código-fonte',
+    minimizeAria: 'Minimizar',
+    maximizeAria: 'Maximizar',
+    restoreAria: 'Restaurar',
+    closeAria: 'Fechar',
   },
   sidebar: {
     nav: 'Navegação de ferramentas',

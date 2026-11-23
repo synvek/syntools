@@ -14,6 +14,10 @@ const zhTW = {
     downloadAria: '下載桌面版',
     downloadLabel: '下載',
     sourceAria: '源碼',
+    minimizeAria: '最小化',
+    maximizeAria: '最大化',
+    restoreAria: '還原',
+    closeAria: '關閉',
   },
   sidebar: {
     nav: '工具導航',

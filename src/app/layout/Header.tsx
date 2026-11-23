@@ -13,6 +13,8 @@ import {
   type RoutedLang,
 } from '@/core/i18n';
 import { useSettingsStore } from '@/stores/settings';
+import { WindowControls } from '@/app/layout/WindowControls';
+import { desktopPlatform } from '@/core/desktop/window';
 
 interface HeaderProps {
   onSearch: () => void;
@@ -35,6 +37,17 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
   const isDark =
     theme === 'dark' ||
     (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  /**
+   * Windows and macOS run frameless (see tauri.windows.conf.json / tauri.macos.conf.json), so this header
+   * doubles as the window title bar: Windows gets caption buttons on the right, macOS keeps its native
+   * traffic lights overlaid on the left — which is why the home logo has to start past them. Linux keeps its
+   * native frame (an undecorated GTK window cannot be resized by its edges), so it needs none of this.
+   */
+  const platform = desktopPlatform();
+  const frameless = platform === 'windows' || platform === 'macos';
+  const insetForTrafficLights = platform === 'macos';
+  const showCaptionButtons = platform === 'windows';
 
   /**
    * No "redirect by browser language".
@@ -62,7 +75,13 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-950">
+    <header
+      data-tauri-drag-region={frameless ? 'deep' : undefined}
+      className={`sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 ${
+        // macOS traffic lights sit in the first ~68px of the title bar area (see trafficLightPosition)
+        insetForTrafficLights ? 'pl-20 pr-4' : 'px-4'
+      }`}
+    >
       <button
         type="button"
         onClick={onMenu}
@@ -150,6 +169,7 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
         >
           <Icon name="github" />
         </a>
+        {showCaptionButtons && <WindowControls />}
       </div>
     </header>
   );

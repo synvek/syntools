@@ -14,6 +14,10 @@ const fr = {
     downloadAria: "Télécharger l'application de bureau",
     downloadLabel: 'Télécharger',
     sourceAria: 'Code source',
+    minimizeAria: 'Réduire',
+    maximizeAria: 'Agrandir',
+    restoreAria: 'Restaurer',
+    closeAria: 'Fermer',
   },
   sidebar: {
     nav: 'Navigation des outils',

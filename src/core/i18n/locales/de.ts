@@ -14,6 +14,10 @@ const de = {
     downloadAria: 'Desktop-App herunterladen',
     downloadLabel: 'Herunterladen',
     sourceAria: 'Quellcode',
+    minimizeAria: 'Minimieren',
+    maximizeAria: 'Maximieren',
+    restoreAria: 'Wiederherstellen',
+    closeAria: 'Schließen',
   },
   sidebar: {
     nav: 'Tool-Navigation',

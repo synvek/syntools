@@ -14,6 +14,10 @@ const ja = {
     downloadAria: 'デスクトップ版をダウンロード',
     downloadLabel: 'ダウンロード',
     sourceAria: 'ソースコード',
+    minimizeAria: '最小化',
+    maximizeAria: '最大化',
+    restoreAria: '元に戻す',
+    closeAria: '閉じる',
   },
   sidebar: {
     nav: 'ツールナビゲーション',

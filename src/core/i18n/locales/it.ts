@@ -14,6 +14,10 @@ const it = {
     downloadAria: "Scarica l'app desktop",
     downloadLabel: 'Scarica',
     sourceAria: 'Codice sorgente',
+    minimizeAria: 'Riduci a icona',
+    maximizeAria: 'Ingrandisci',
+    restoreAria: 'Ripristina',
+    closeAria: 'Chiudi',
   },
   sidebar: {
     nav: 'Navigazione tra gli strumenti',
