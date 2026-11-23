@@ -85,10 +85,11 @@ export interface RibbonProps {
   accent?: RibbonAccent;
   /**
    * Commands with no ribbon counterpart (import / export / print …), reached through one ⋯ dropdown
-   * left of the first tab. Everything the ribbon already exposes belongs on a tab, not in here.
+   * that closes the quick access cluster of the tab strip, immediately left of the tabs — the same
+   * place the PDF editor puts its file menu. Everything the ribbon already exposes belongs on a tab.
    */
   menu?: EditorMenu;
-  /** Quick access toolbar contents (undo/redo, print…) right of the menus */
+  /** Quick access toolbar contents (undo/redo, print…) left of the ⋯ menu */
   quickAccess?: ReactNode;
   /** Document chrome (save state, title, new, present…) between the tabs and the collapse toggle */
   headerRight?: ReactNode;
@@ -114,9 +115,9 @@ export interface RibbonProps {
 /**
  * Office-style ribbon.
  *
- * Structure: tab strip (quick access → tabs → collapse toggle) on top of a command panel whose groups
- * carry a caption and a dialog launcher. Fully data driven — the editors only build the `tabs` array,
- * so the spreadsheet, the word processor and the slide editor share one visual language.
+ * Structure: tab strip (quick access + ⋯ menu → tabs → collapse toggle) on top of a command panel whose
+ * groups carry a caption and a dialog launcher. Fully data driven — the editors only build the `tabs`
+ * array, so the spreadsheet, the word processor and the slide editor share one visual language.
  *
  * Collapsed mode mirrors Office: only the strip remains, clicking a tab opens a flyout panel and any
  * executed command closes it. Between full width and that mode, trimmed groups keep their commands

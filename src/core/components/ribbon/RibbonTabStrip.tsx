@@ -5,7 +5,11 @@ import { RIBBON_ACCENT, RIBBON_ICON_BUTTON, RIBBON_TAB_IDLE, RIBBON_TABSTRIP } f
 import { RibbonIcon } from './ribbonIcons';
 
 /**
- * Tab strip: quick access toolbar (left) → tabs (middle) → collapse toggle (right).
+ * Tab strip: quick access toolbar + ⋯ menu (left) → tabs (middle) → collapse toggle (right).
+ *
+ * The ⋯ menu closes the quick access cluster instead of opening the strip, the way the PDF editor
+ * lays it out: the two most-used commands first, then file-level import / export, then one divider
+ * before the tabs.
  *
  * Keyboard follows the WAI-ARIA tabs pattern with automatic activation: ←/→ move and select,
  * Home/End jump to the ends, Enter/Space re-select (used by tests and by collapsed mode). Double-click
@@ -31,7 +35,7 @@ export function RibbonTabStrip({
   activeId: string;
   accent: RibbonAccent;
   collapsed: boolean;
-  /** The editor's single ⋯ menu, left of everything else */
+  /** The editor's single ⋯ menu, right of the quick access commands */
   menu?: ReactNode;
   quickAccess?: ReactNode;
   /** Document chrome (save state, title, new, present…) between the tabs and the collapse toggle */
@@ -86,16 +90,13 @@ export function RibbonTabStrip({
 
   return (
     <div className={RIBBON_TABSTRIP}>
-      {menu ? (
+      {quickAccess || menu ? (
         <>
-          {menu}
-          <span className="mx-0.5 h-4 w-px bg-gray-300 dark:bg-[#4a4a4a]" />
-        </>
-      ) : null}
-
-      {quickAccess ? (
-        <>
-          <div className="flex shrink-0 items-center gap-0.5">{quickAccess}</div>
+          {/* One cluster before the divider: undo/redo (…) then the ⋯ file menu, as in the PDF editor */}
+          <div className="flex shrink-0 items-center gap-0.5">
+            {quickAccess}
+            {menu}
+          </div>
           <span className="mx-0.5 h-4 w-px bg-gray-300 dark:bg-[#4a4a4a]" />
         </>
       ) : null}
