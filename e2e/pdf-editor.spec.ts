@@ -545,12 +545,18 @@ test.describe('PDF 编辑器（保存入口与吸顶）', () => {
     const topBefore = await page
       .getByTestId('pdf-ribbon')
       .evaluate((element) => element.getBoundingClientRect().top);
-    await page.evaluate(() => window.scrollTo(0, 1200));
+    // The page scrolls inside the app shell, not the window (see AppLayout / .app-shell)
+    await page.evaluate(() => {
+      const scroller = document.querySelector<HTMLElement>('[data-app-scroll]');
+      if (!scroller) throw new Error('app scroller is missing');
+      scroller.scrollTop = 1200;
+    });
     const topAfter = await page
       .getByTestId('pdf-ribbon')
       .evaluate((element) => element.getBoundingClientRect().top);
 
-    // The app header is h-14 (56px); the ribbon sticks right below it instead of scrolling away
+    // The app header is h-14 (56px) and the scroller starts right below it, so the ribbon sticks at 56px
+    // instead of scrolling away
     expect(Math.abs(topAfter - 56)).toBeLessThanOrEqual(1);
     expect(topAfter).toBeLessThanOrEqual(topBefore);
     await expect(page.getByTestId('pdf-save-button')).toBeVisible();

@@ -34,15 +34,26 @@ export function useViewportFill(
     const el = ref.current;
     if (!el) return;
     const root = el.closest<HTMLElement>('[data-tool-root]');
+    /**
+     * The page scroller of the app shell (see AppLayout). It ends at the window's bottom edge, but its usable
+     * height is not `window.innerHeight`: the header above it and a horizontal scrollbar below both eat into it.
+     */
+    const scroller = el.closest<HTMLElement>('[data-app-scroll]');
 
-    const compute = () => {
-      // Measure offsets via the offsetTop chain: independent of scroll, so the height does not jitter
+    /** Document-relative offset; layout-only, so scrolling never shifts the result (no jitter) */
+    const documentTop = (start: HTMLElement): number => {
       let top = 0;
-      let node: HTMLElement | null = el;
+      let node: HTMLElement | null = start;
       while (node) {
         top += node.offsetTop;
         node = node.offsetParent as HTMLElement | null;
       }
+      return top;
+    };
+
+    const compute = () => {
+      // Measure offsets via the offsetTop chain: independent of scroll, so the height does not jitter
+      const top = documentTop(el);
 
       // In-flow siblings after the workspace stay on the first screen; overlays (fixed / absolute) do not count
       const rect = el.getBoundingClientRect();
@@ -61,8 +72,12 @@ export function useViewportFill(
       }
 
       const reserved = Math.max(0, below - rect.bottom);
+      // Bottom of the visible workspace area, in the same document coordinates as `top`
+      const viewportBottom = scroller
+        ? documentTop(scroller) + scroller.clientHeight
+        : window.innerHeight;
       // Round down: give up a pixel rather than let the status bar slip below the fold
-      const available = window.innerHeight - top - reserved;
+      const available = viewportBottom - top - reserved;
       setHeight(Math.max(min, Math.floor(available)));
     };
 
@@ -72,6 +87,9 @@ export function useViewportFill(
     if (observer && el.parentElement) observer.observe(el.parentElement);
     // Banners / panels above shift the page offset without resizing the parent, so observe the root too
     if (observer && root && root !== el.parentElement) observer.observe(root);
+    // A horizontal scrollbar inside the scroller changes its client height without a window resize
+    if (observer && scroller && scroller !== root && scroller !== el.parentElement)
+      observer.observe(scroller);
     window.addEventListener('resize', compute);
     return () => {
       observer?.disconnect();

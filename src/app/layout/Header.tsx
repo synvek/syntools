@@ -43,6 +43,9 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
    * doubles as the window title bar: Windows gets caption buttons on the right, macOS keeps its native
    * traffic lights overlaid on the left — which is why the home logo has to start past them. Linux keeps its
    * native frame (an undecorated GTK window cannot be resized by its edges), so it needs none of this.
+   *
+   * The header is a flex child of the app shell, not part of the page scroller (see AppLayout): the vertical
+   * scrollbar therefore starts below it instead of running down past the caption buttons.
    */
   const platform = desktopPlatform();
   const frameless = platform === 'windows' || platform === 'macos';
@@ -77,7 +80,7 @@ export function Header({ onSearch, onMenu }: HeaderProps) {
   return (
     <header
       data-tauri-drag-region={frameless ? 'deep' : undefined}
-      className={`sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 ${
+      className={`relative z-30 flex h-14 shrink-0 items-center gap-3 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 ${
         // macOS traffic lights own the first ~70px: trafficLightPosition {x:16, y:30} puts the trio at
         // x 16-70 and centers it on the 56px header (tao sets title bar height = 14 + y and the buttons
         // keep their 9px inset, so their center sits at y - 2 = 28 = h-14 / 2)

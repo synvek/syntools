@@ -92,10 +92,10 @@ export function PdfEditorView({
   return (
     <div className="flex flex-col gap-3" data-tool-root>
       {doc ? (
-        // Sticky below the app header (h-14): a scroll through a 300-page document must never hide
-        // save / export / undo. z-20 stays under the header's z-30.
+        // Sticky at the top of the app's content scroller (which already sits below the header, h-14), so a
+        // scroll through a 300-page document never hides save / export / undo. z-20 stays under the header's z-30.
         <div
-          className="sticky top-14 z-20 -mx-1 bg-gray-50/95 px-1 pb-1 backdrop-blur-sm dark:bg-gray-950/95"
+          className="sticky top-0 z-20 -mx-1 bg-gray-50/95 px-1 pb-1 backdrop-blur-sm dark:bg-gray-950/95"
           data-testid="pdf-ribbon-sticky"
         >
           <Ribbon

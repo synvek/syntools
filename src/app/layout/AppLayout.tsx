@@ -58,27 +58,36 @@ export function AppLayout() {
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+    <div className="app-shell flex flex-col overflow-hidden bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
       <Header onSearch={() => setSearchOpen(true)} onMenu={() => setSidebarOpen(true)} />
-      <div className="flex flex-1">
-        {!sidebarCollapsed && <Sidebar onCollapse={toggleSidebarCollapsed} />}
-        {sidebarCollapsed && (
-          <button
-            type="button"
-            onClick={toggleSidebarCollapsed}
-            aria-label={t('sidebar.expand')}
-            title={t('sidebar.expand')}
-            className="fixed left-0 top-14 z-20 m-2 rounded-md border border-gray-200 bg-white p-1.5 text-gray-400 shadow-sm hover:bg-gray-100 hover:text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-          >
-            <Icon name="panelLeftOpen" className="h-4 w-4" />
-          </button>
-        )}
-        {sidebarOpen && <Sidebar mobile onClose={() => setSidebarOpen(false)} />}
-        <main className="min-w-0 flex-1">
-          <Outlet />
-        </main>
+      {/*
+        The only page scroller, deliberately starting below the header: a window-level scrollbar would begin at
+        the very top of the frameless desktop window, i.e. alongside the Windows caption buttons. `min-h-full`
+        keeps short pages from pulling the footer up over the leftover space.
+      */}
+      <div className="flex-1 overflow-y-auto" data-app-scroll>
+        <div className="flex min-h-full flex-col">
+          <div className="flex flex-1">
+            {!sidebarCollapsed && <Sidebar onCollapse={toggleSidebarCollapsed} />}
+            {sidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleSidebarCollapsed}
+                aria-label={t('sidebar.expand')}
+                title={t('sidebar.expand')}
+                className="fixed left-0 top-14 z-20 m-2 rounded-md border border-gray-200 bg-white p-1.5 text-gray-400 shadow-sm hover:bg-gray-100 hover:text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              >
+                <Icon name="panelLeftOpen" className="h-4 w-4" />
+              </button>
+            )}
+            {sidebarOpen && <Sidebar mobile onClose={() => setSidebarOpen(false)} />}
+            <main className="min-w-0 flex-1">
+              <Outlet />
+            </main>
+          </div>
+          {showFooter && <Footer />}
+        </div>
       </div>
-      {showFooter && <Footer />}
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );

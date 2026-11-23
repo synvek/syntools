@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * App shell: exactly one viewport tall, scrolling inside instead of as a whole page.
+ *
+ * The desktop build runs frameless (see tauri.windows.conf.json), with the custom title bar sitting at the
+ * top of the page. A window-level scrollbar would start at y = 0 — right beside the Windows close button and
+ * 17px left of the window edge, which also leaves the header border cut short. Keeping the scroller inside
+ * the content area puts the scrollbar where it belongs: below the caption buttons.
+ *
+ * `dvh` stops mobile browsers' collapsing toolbars from clipping the last row; `vh` is the fallback for
+ * engines without dynamic viewport units.
+ */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* Markdown preview typography (T41): external CSS to satisfy the strict CSP (no inline style tags) */
 .markdown-body {
   @apply text-sm leading-6 text-gray-800 dark:text-gray-100;

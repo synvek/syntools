@@ -282,7 +282,8 @@ export function Sidebar({ mobile = false, onClose, onCollapse }: SidebarProps) {
 
   return (
     <aside className="hidden lg:block">
-      <div className="sticky top-14 h-[calc(100vh-3.5rem)]">{content}</div>
+      {/* `top-0`, not `top-14`: the app shell scrolls inside its content area, which starts below the header */}
+      <div className="sticky top-0 h-[calc(100vh-3.5rem)]">{content}</div>
     </aside>
   );
 }

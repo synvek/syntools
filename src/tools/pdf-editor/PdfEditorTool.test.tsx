@@ -363,8 +363,9 @@ describe('PdfEditorView 表现层', () => {
     );
 
     expect(screen.getByTestId('pdf-ribbon')).toBeInTheDocument();
-    // M4-6 follow-up: the ribbon must stay under the app header while pages scroll
-    expect(screen.getByTestId('pdf-ribbon-sticky')).toHaveClass('sticky', 'top-14');
+    // M4-6 follow-up: the ribbon must stay pinned while pages scroll; the app's content scroller already
+    // starts below the header, so the sticky offset is 0 rather than the header height
+    expect(screen.getByTestId('pdf-ribbon-sticky')).toHaveClass('sticky', 'top-0');
     expect(screen.getByRole('tab', { name: '开始' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '视图' })).toBeInTheDocument();
     // Only the page viewport scrolls: the workspace row is pinned to the first screen's leftover height,
