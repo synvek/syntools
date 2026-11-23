@@ -12,6 +12,13 @@ import {
   setPageRotation,
 } from '../model/doc';
 import {
+  DEFAULT_FOOTER,
+  DEFAULT_HEADER,
+  DEFAULT_PAGE_NUMBERS,
+  DEFAULT_WATERMARK,
+  setDecoration,
+} from '../model/decorations';
+import {
   createImageObject,
   createInkObject,
   createMarkupObject,
@@ -183,6 +190,32 @@ describe('flattenPdf', () => {
     expect(out.getTitle()).toBe('three-pages');
     // pdf-lib overwrites /Producer on save, so the brand lives in /Creator
     expect(out.getCreator()).toBe('SynTools');
+  });
+
+  it('页面装饰写进每一页，且排在用户对象之前', async () => {
+    const bytes = await samplePdf(2);
+    const plain = await docFrom(bytes, 2);
+    const decorated = setDecoration(plain, {
+      numbers: { ...DEFAULT_PAGE_NUMBERS, enabled: true },
+      header: { ...DEFAULT_HEADER, text: 'Confidential' },
+      footer: { ...DEFAULT_FOOTER, text: 'internal use only' },
+      watermark: { ...DEFAULT_WATERMARK, text: 'DRAFT' },
+    });
+
+    const without = await flattenPdf(plain);
+    const withDecoration = await flattenPdf(decorated);
+    expect(without.ok).toBe(true);
+    expect(withDecoration.ok).toBe(true);
+    if (!without.ok || !withDecoration.ok) return;
+
+    expect(withDecoration.value.rasterized).toBe(false);
+    expect(withDecoration.value.bytes.length).toBeGreaterThan(without.value.bytes.length);
+
+    const out = await PDFDocument.load(withDecoration.value.bytes);
+    expect(out.getPageCount()).toBe(2);
+    for (const page of out.getPages()) {
+      expect(page.node.Contents()).toBeTruthy();
+    }
   });
 
   it('文件自带 /Rotate 90 时叠加而不是替换', async () => {

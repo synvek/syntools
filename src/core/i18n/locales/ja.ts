@@ -778,7 +778,8 @@ const ja = {
     },
     'pdf-editor': {
       name: 'PDF エディター',
-      description: 'PDF をローカルで開いて編集・保存（アップロードなし）',
+      description:
+        'ブラウザーで PDF を編集：本文の修正、注釈・図形・署名の追加、ページ整理、編集可能なプロジェクト保存や PDF / Word 書き出しまで、アップロード不要',
     },
   },
 } satisfies ShellResources;

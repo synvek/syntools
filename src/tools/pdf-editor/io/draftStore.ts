@@ -14,7 +14,7 @@
 
 import type { ToolResult } from '@/core/types';
 import { visiblePageCount } from '../model/doc';
-import type { PdfEditorDoc, PdfSource } from '../model/types';
+import type { PdfDocModel, PdfEditorDoc, PdfSource } from '../model/types';
 
 const DB_NAME = 'syntools-pdf-editor';
 const STORE = 'drafts';
@@ -29,7 +29,7 @@ const MAX_DRAFTS = 5;
 const HEADROOM_FACTOR = 3;
 
 /** The document without its bytes: source/attachment payloads must not enter the JSON model */
-export type DraftModel = Omit<PdfEditorDoc, 'source' | 'attachments'> & { version: number };
+export type DraftModel = PdfDocModel & { version: number };
 
 /** Bytes of one inserted PDF; `key` matches `PdfPageState.sourceKey` */
 export interface DraftAttachment {
@@ -136,9 +136,14 @@ export function serializeDoc(doc: PdfEditorDoc): DraftModel {
   return model as DraftModel;
 }
 
-/** Rebuild the document from a stored model plus the bytes the editor just opened */
+/**
+ * Rebuild the document from a stored model plus the bytes the editor just opened.
+ *
+ * Takes the model *without* its `version` marker: the same function rebuilds a draft and a
+ * `.pdfproj`, and the version belongs to the container, not to the document.
+ */
 export function applyDraftModel(
-  model: DraftModel,
+  model: PdfDocModel,
   source: PdfSource,
   attachments: PdfSource[] = [],
 ): PdfEditorDoc {

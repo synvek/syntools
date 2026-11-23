@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { renderPageDataUrl } from '@/core/pdf/render';
 import { PDF_THUMB_SCALE } from '@/core/pdf/types';
-import { MAIN_SOURCE_KEY } from '../model/doc';
 import type { PdfPageState } from '../model/types';
+import { docForPage, type SourceDocs } from '../render/sourceDocs';
 
 /** Page operations offered right on the rail (M2-7); acts on the current page */
 export interface ThumbnailPageOps {
@@ -24,6 +24,8 @@ export interface ThumbnailPageOps {
 
 interface ThumbnailRailProps {
   pdfDoc: PDFDocumentProxy;
+  /** Proxies per byte source; omitted in tests that only mount the main file */
+  docs?: SourceDocs;
   /** Visible pages in output order; page number = index + 1 */
   pages: PdfPageState[];
   currentPage: number;
@@ -58,7 +60,7 @@ function enqueueThumbnail<T>(task: () => Promise<T>): Promise<T> {
  * independent of the main viewport canvas.
  */
 function Thumbnail({
-  pdfDoc,
+  sourceDoc,
   state,
   page,
   selected,
@@ -66,7 +68,8 @@ function Thumbnail({
   onMove,
   onRemove,
 }: {
-  pdfDoc: PDFDocumentProxy;
+  /** Proxy of the page's own source; `undefined` while an attachment is still opening */
+  sourceDoc?: PDFDocumentProxy;
   state: PdfPageState;
   page: number;
   selected: boolean;
@@ -98,22 +101,22 @@ function Thumbnail({
     return () => observer.disconnect();
   }, []);
 
-  // Blank pages and pages from an inserted PDF (proxy not wired in yet) show the placeholder
-  const renderable = !state.blank && state.sourceKey === MAIN_SOURCE_KEY;
+  // Blank pages and pages whose source proxy is still opening show the placeholder
+  const renderable = !state.blank && sourceDoc !== undefined;
 
   useEffect(() => {
-    if (!visible || !renderable) return;
+    if (!visible || !renderable || !sourceDoc) return;
     let cancelled = false;
     void (async () => {
       const result = await enqueueThumbnail(() =>
-        renderPageDataUrl(pdfDoc, state.sourceIndex + 1, PDF_THUMB_SCALE),
+        renderPageDataUrl(sourceDoc, state.sourceIndex + 1, PDF_THUMB_SCALE),
       );
       if (!cancelled && result.ok) setUrl(result.value);
     })();
     return () => {
       cancelled = true;
     };
-  }, [visible, renderable, pdfDoc, state.sourceIndex]);
+  }, [visible, renderable, sourceDoc, state.sourceIndex]);
 
   return (
     <button
@@ -173,6 +176,7 @@ function Thumbnail({
 /** Left rail: page thumbnails, drag or Alt+↑/↓ to reorder, click to jump */
 export function ThumbnailRail({
   pdfDoc,
+  docs,
   pages,
   currentPage,
   onSelect,
@@ -286,7 +290,7 @@ export function ThumbnailRail({
         {pages.map((page, index) => (
           <Thumbnail
             key={page.id}
-            pdfDoc={pdfDoc}
+            sourceDoc={docForPage(docs, page, pdfDoc)}
             state={page}
             page={index + 1}
             selected={index + 1 === currentPage}

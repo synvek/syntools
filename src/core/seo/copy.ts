@@ -38,8 +38,8 @@ export const SITE_TITLE: Record<SeoLang, string> = {
 
 /** Site-level one-line description (home page and fallback) */
 export const SITE_DESCRIPTION: Record<SeoLang, string> = {
-  en: 'SynTools is a free online toolkit: JSON formatting, Base64/URL encoding, regex testing, text diff, timestamps, UUID and password generation, hashing, QR codes, colour and base conversion, Markdown preview, image compression, PDF merge/split/encrypt, and in-browser Word/Excel/PPT editing — all processed on the client, so files never leave the browser.',
-  zh: 'SynTools 是免费的在线工具集：JSON 格式化、Base64/URL 编解码、正则测试、文本对比、时间戳转换、UUID/密码生成、哈希计算、二维码、颜色与进制转换、Markdown 预览、图片压缩、PDF 合并拆分加密、Word/Excel/PPT 在线编辑等，纯前端处理，数据不离开浏览器。',
+  en: 'SynTools is a free online toolkit: JSON formatting, Base64/URL encoding, regex testing, text diff, timestamps, UUID and password generation, hashing, QR codes, colour and base conversion, Markdown preview, image compression, in-browser PDF editing (text, annotations, page operations, Word export), PDF merge/split/encrypt, and Word/Excel/PPT editing — all processed on the client, so files never leave the browser.',
+  zh: 'SynTools 是免费的在线工具集：JSON 格式化、Base64/URL 编解码、正则测试、文本对比、时间戳转换、UUID/密码生成、哈希计算、二维码、颜色与进制转换、Markdown 预览、图片压缩、PDF 在线编辑（改文字、批注、页面整理、导出 Word）、PDF 合并拆分加密、Word/Excel/PPT 在线编辑等，纯前端处理，数据不离开浏览器。',
 };
 
 /** Suffix for tool page descriptions (turns a tool blurb into a full page description) */
@@ -81,7 +81,7 @@ export const STATIC_PAGE_SEO: Record<SeoLang, Record<string, PageSeo>> = {
     '/about/': {
       title: 'About SynTools',
       description:
-        'SynTools is a purely front-end online toolkit: encoding and formatting, image and photo editing, PDF processing, in-browser Word/Excel/PPT editing — all running locally, with no file uploads. Source is published under AGPL-3.0, with a commercial licence available.',
+        'SynTools is a purely front-end online toolkit: encoding and formatting, image and photo editing, PDF editing and processing, in-browser Word/Excel/PPT editing — all running locally, with no file uploads. Source is published under AGPL-3.0, with a commercial licence available.',
     },
   },
   zh: {
@@ -108,7 +108,7 @@ export const STATIC_PAGE_SEO: Record<SeoLang, Record<string, PageSeo>> = {
     '/about/': {
       title: '关于 SynTools',
       description:
-        'SynTools 是一个纯前端的在线工具集：编码格式化、图片与照片编辑、PDF 处理、Word/Excel/PPT 浏览器编辑等，全部在本机运行，文件不上传。源码以 AGPL-3.0 公开，另提供商业许可。',
+        'SynTools 是一个纯前端的在线工具集：编码格式化、图片与照片编辑、PDF 编辑与处理、Word/Excel/PPT 浏览器编辑等，全部在本机运行，文件不上传。源码以 AGPL-3.0 公开，另提供商业许可。',
     },
   },
 };

@@ -31,7 +31,7 @@ export function EmptyState({ onFile, error, note, draftPrompt }: EmptyStateProps
       {draftPrompt}
 
       <FileDropZone
-        accept=".pdf,application/pdf"
+        accept=".pdf,.pdfproj,application/pdf"
         maxBytes={PDF_MAX_BYTES}
         onFile={onFile}
         hint={t('tools.pdfEditor.emptyHint')}

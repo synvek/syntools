@@ -186,6 +186,8 @@ export interface PdfRibbonActions {
   exportDocx?(): void;
   exportImages?(): void;
   exportText?(): void;
+  /** P1-A: page numbers / header / footer / watermark dialog */
+  openDecoration?(): void;
   /** M3-3: open the crop dialog for the selected image */
   cropImage?(): void;
 }
@@ -969,6 +971,26 @@ export function buildPdfRibbonTabs(ctx: PdfRibbonContext): RibbonTab[] {
               disabled: lock,
               hint,
               onSelect: () => actions.exportText?.(),
+            },
+          ],
+        },
+        // P1-A: page numbers / header / footer / watermark all write to every page on save, so one
+        // entry opens one dialog instead of four single-purpose commands
+        {
+          id: 'decorate',
+          label: t(key('grpDecorate')),
+          priority: 7,
+          items: [
+            {
+              kind: 'button',
+              // Not `page`: the navigate combo already owns that id, and item ids are global
+              id: 'decoration',
+              label: t(key('cmdPageDecoration')),
+              icon: 'pageSetup',
+              size: 'small',
+              disabled: lock,
+              hint,
+              onSelect: () => actions.openDecoration?.(),
             },
           ],
         },

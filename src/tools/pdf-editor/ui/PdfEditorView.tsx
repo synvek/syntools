@@ -29,6 +29,13 @@ interface PdfEditorViewProps {
   note?: string | null;
   /** Inline message above the page area while a document is open (save failure, raster notice) */
   banner?: string | null;
+  /**
+   * Clear the banner.
+   *
+   * Restore notices ("draft restored" / "project opened") stay until dismissed: they explain why the
+   * page already has content, so they must not be a transient toast, but they must be closable.
+   */
+  onDismissBanner?(): void;
   /** Quick-access cluster (undo/redo + ⋯ file menu) left of the tabs */
   quickAccess?: ReactNode;
   /** Doc chrome (save state / file name) inside the ribbon header */
@@ -58,6 +65,7 @@ export function PdfEditorView({
   error,
   note,
   banner,
+  onDismissBanner,
   quickAccess,
   headerRight,
   statusBar,
@@ -107,13 +115,35 @@ export function PdfEditorView({
       ) : null}
 
       {doc && banner ? (
-        <p
+        <div
           role="alert"
           data-testid="pdf-banner"
-          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+          className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
         >
-          {banner}
-        </p>
+          <span className="min-w-0 flex-1">{banner}</span>
+          {onDismissBanner ? (
+            <button
+              type="button"
+              data-testid="pdf-banner-dismiss"
+              onClick={onDismissBanner}
+              aria-label={t('tools.pdfEditor.bannerDismiss')}
+              title={t('tools.pdfEditor.bannerDismiss')}
+              className="-my-0.5 -mr-1 rounded p-1 text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-600 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none dark:text-amber-300 dark:hover:bg-amber-900/50 dark:hover:text-amber-100"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="flex flex-col">

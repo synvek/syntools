@@ -745,7 +745,8 @@ const en = {
     },
     'pdf-editor': {
       name: 'PDF Editor',
-      description: 'Open, edit and save PDFs locally without uploading',
+      description:
+        'Edit PDFs in the browser: fix text, add annotations, shapes and signatures, manage pages, then save an editable project or export a flat PDF or Word file — no upload',
     },
   },
 } satisfies ShellResources;

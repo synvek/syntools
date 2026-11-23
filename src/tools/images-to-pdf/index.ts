@@ -9,4 +9,6 @@ export const imagesToPdfTool: ToolMeta = {
   icon: 'imagesToPdf',
   component: () => import('./ImagesToPdfTool'),
   weight: 8,
+  // The generated PDF usually needs a caption or a page order fix right after — point at the editor
+  relatedIds: ['pdf-editor', 'pdf-to-image', 'pdf-merge'],
 };

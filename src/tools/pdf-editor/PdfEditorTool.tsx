@@ -11,6 +11,7 @@ import {
   type FidelityReport,
 } from '@/core/fidelity';
 import { downloadBytes } from '@/core/pdf/download';
+import { fileToBytes } from '@/core/pdf/load';
 import type { TextLine } from '@/core/pdf/textLines';
 import { PdfPasswordField } from '@/core/pdf/PdfPasswordField';
 import { PdfRunButton } from '@/core/pdf/ui';
@@ -21,7 +22,6 @@ import {
   putDraft,
   readDraftAttachments,
   readDraftBytes,
-  type DraftModel,
   type DraftRecord,
 } from './io/draftStore';
 import { clipboardSize, copyObjects, pasteObjects } from './commands/clipboard';
@@ -29,6 +29,8 @@ import { exportPdfToDocx } from './io/exportDocx';
 import { exportPdfImages } from './io/exportImages';
 import { collectPdfText, encodeText, textFileName } from './io/exportText';
 import { readImageBlob, readImageFile, placeImageRect, type ImportedImage } from './io/imageImport';
+import { isLargeDocument, thumbnailsNeedConsent } from './io/largeDoc';
+import { isProjectFile, openProject, saveProject } from './io/projectFile';
 import { memoryPressure, readMemoryInfo } from './io/memoryHint';
 import { downloadPageZip } from './io/pageExport';
 import { flattenPdf } from './io/savePdf';
@@ -38,6 +40,7 @@ import {
   addObjects,
   clampPage,
   createDoc,
+  MAIN_SOURCE_KEY,
   deletePage,
   duplicatePage,
   insertBlankPage,
@@ -75,6 +78,7 @@ import {
   withStyleWidth,
   type AnnotationStyle,
 } from './model/annotate';
+import { setDecoration } from './model/decorations';
 import {
   alignObjects,
   applyObjectFormat,
@@ -100,6 +104,8 @@ import {
 } from './model/objects';
 import type {
   NormRect,
+  PdfDecoration,
+  PdfDocModel,
   PdfEditorDoc,
   PdfImageCrop,
   PdfObject,
@@ -110,6 +116,7 @@ import type {
 import { OverlayLayer, type AnnotationRequest } from './overlay/OverlayLayer';
 import { clearCanvasCache } from './render/canvasCache';
 import { PageScrollView } from './render/PageScrollView';
+import { docForPage, useAttachmentDocs, type SourceDocs } from './render/sourceDocs';
 import { TextPatchLayer } from './render/TextPatchLayer';
 import { usePdfDocument } from './render/usePdfDocument';
 import {
@@ -130,6 +137,7 @@ import { ExportImagesDialog, type ExportImagesDialogResult } from './ui/ExportIm
 import { ImageCropDialog } from './ui/ImageCropDialog';
 import { InsertPagesDialog } from './ui/InsertPagesDialog';
 import { OutlinePanel } from './ui/OutlinePanel';
+import { PageDecorationDialog } from './ui/PageDecorationDialog';
 import { PatchHint } from './ui/PatchHint';
 import { PdfEditorView } from './ui/PdfEditorView';
 import { PdfFileMenu } from './ui/PdfFileMenu';
@@ -156,10 +164,10 @@ const CLOSED_PANELS: Panels = {
 /** A4 in PDF points: what "insert blank page" creates */
 const BLANK_PAGE = { widthPt: 595.28, heightPt: 841.89 };
 
-/** Above this size thumbnails are opt-in (see `thumbnailsBlocked`) */
-const LARGE_DOC_BYTES = 20 * 1024 * 1024;
-
 const PANELS_KEY = 'syntools.pdf-editor.panels';
+
+/** Stable empty list so the attachment-proxy hook does not see a new array on every render */
+const NO_ATTACHMENTS: PdfSource[] = [];
 
 /** Panel toggles survive a reload (M2-8); never let storage errors break the editor */
 function readStoredPanels(): Panels {
@@ -198,6 +206,9 @@ export default function PdfEditorTool() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const savingRef = useRef(false);
+  /** `.pdfproj` parse failure / busy state, kept apart from the PDF open pipeline */
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [projectBusy, setProjectBusy] = useState(false);
   /** Ribbon tab: contextual tabs are driven by the selection (M2-8) */
   const [activeTabId, setActiveTabId] = useState<string>('home');
   const baseTabRef = useRef('home');
@@ -227,6 +238,8 @@ export default function PdfEditorTool() {
   const memoryWarnedRef = useRef<string | null>(null);
   /** M3-3 crop dialog; the target is always the single selected image */
   const [cropOpen, setCropOpen] = useState(false);
+  /** P1-A page decoration dialog (numbers / header / footer / watermark) */
+  const [decorateOpen, setDecorateOpen] = useState(false);
   /** "Open…" from the file menu, when the empty-state drop zone is no longer mounted */
   const openInputRef = useRef<HTMLInputElement | null>(null);
   /** M4-5: page progress while the flattened file is being rebuilt */
@@ -237,8 +250,16 @@ export default function PdfEditorTool() {
   const [draftBusy, setDraftBusy] = useState(false);
   const draftRevRef = useRef<number | undefined>(undefined);
   const draftConflictRef = useRef(false);
-  /** Model waiting for its bytes: set when resuming, or when the user re-picks a model-only draft */
-  const pendingModelRef = useRef<{ fingerprint: string; model: DraftModel } | null>(null);
+  /**
+   * Model waiting for its bytes: a resumed draft, a re-picked model-only draft, or an opened
+   * `.pdfproj` (which also brings its attachments and skips the draft-delete path).
+   */
+  const pendingModelRef = useRef<{
+    fingerprint: string;
+    model: PdfDocModel;
+    attachments?: PdfSource[];
+    project?: boolean;
+  } | null>(null);
   const draftFingerprintRef = useRef<string | null>(null);
 
   const doc = history ? currentDoc(history) : null;
@@ -246,6 +267,18 @@ export default function PdfEditorTool() {
   // Latest document for async callbacks (autosave debounce, in-flight draft writes)
   const docRef = useRef<PdfEditorDoc | null>(null);
   docRef.current = doc;
+
+  /**
+   * One pdfjs proxy per byte source.
+   *
+   * Inserted pages are copied from their own file at save time, so they must also *render* from their
+   * own file: without this map an inserted page showed the main document's page at the same index.
+   */
+  const attachmentDocs = useAttachmentDocs(doc ? doc.attachments : NO_ATTACHMENTS);
+  const pageDocs = useMemo<SourceDocs>(
+    () => (pdf.pdfDoc ? { ...attachmentDocs, [MAIN_SOURCE_KEY]: pdf.pdfDoc } : attachmentDocs),
+    [attachmentDocs, pdf.pdfDoc],
+  );
 
   // Offer the newest draft once, without blocking the first paint
   useEffect(() => {
@@ -289,9 +322,10 @@ export default function PdfEditorTool() {
     if (pdf.status !== 'ready' || !source) return;
     const name = pdf.name ?? 'document.pdf';
 
-    // A draft is applied exactly once: either resuming from the prompt, or re-picking a file whose
-    // draft only kept the model (quota guard). `draft` is cleared so the next open starts clean.
+    // A model is applied exactly once: resuming a draft, re-picking a model-only draft (quota
+    // guard), or opening a `.pdfproj`. `draft` is cleared so the next open starts clean.
     const pending = pendingModelRef.current;
+    const isProject = pending?.project === true;
     const modelOnly =
       draft && !draft.sourceBytes && draft.fingerprint === source.fingerprint ? draft : null;
     const restoredModel =
@@ -303,23 +337,24 @@ export default function PdfEditorTool() {
     if (restoredModel) {
       pendingModelRef.current = null;
       setDraft(null);
-      setBanner(t('tools.pdfEditor.draftRestored'));
+      setBanner(t(isProject ? 'tools.pdfEditor.projectOpened' : 'tools.pdfEditor.draftRestored'));
       void deleteDraft(source.fingerprint);
     }
+    setOpenError(null);
 
     setHistory((previous) => {
       const current = previous ? currentDoc(previous) : null;
-      if (current && current.source.fingerprint === source.fingerprint) {
+      // A project is authoritative even when the same PDF is already open: its model is the point
+      if (!isProject && current && current.source.fingerprint === source.fingerprint) {
         // Same document (re-open / unlock): refresh bytes and password, keep edits
         return syncPresent(previous as History, { ...current, source });
       }
+      const attachments =
+        pending?.attachments ??
+        (draft && draft.fingerprint === source.fingerprint ? readDraftAttachments(draft) : []);
       return createHistory(
         restoredModel
-          ? applyDraftModel(
-              restoredModel,
-              source,
-              draft && draft.fingerprint === source.fingerprint ? readDraftAttachments(draft) : [],
-            )
+          ? applyDraftModel(restoredModel, source, attachments)
           : createDoc({ name, source }),
       );
     });
@@ -1263,7 +1298,55 @@ export default function PdfEditorTool() {
   /* Saving                                                                  */
   /* ---------------------------------------------------------------------- */
 
-  const save = useCallback(async () => {
+  /** After a project/download write: the edits are on disk, so the draft has served its purpose */
+  const markDocumentSaved = useCallback(() => {
+    setHistory((previous) =>
+      previous ? syncPresent(previous, markSaved(currentDoc(previous))) : previous,
+    );
+    const fingerprint = docRef.current?.source.fingerprint;
+    if (!fingerprint) return;
+    void deleteDraft(fingerprint);
+    draftRevRef.current = undefined;
+    setDraft(null);
+  }, []);
+
+  /**
+   * Save the editable project (`.pdfproj`) — the default ⌘S.
+   *
+   * Objects stay objects: reopening the file restores text boxes, shapes and annotations with their
+   * geometry, so "save" no longer means "flatten and lose editability".
+   */
+  const saveProjectFile = useCallback(async () => {
+    if (!doc || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError(null);
+    setBanner(null);
+
+    try {
+      // `markSaved` first: the file on disk is clean, so reopening it must not start dirty
+      const result = await saveProject(markSaved(doc));
+      if (!result.ok) {
+        setSaveError(t(`tools.pdfEditor.projectErr.${result.error}`));
+        return;
+      }
+      downloadBytes(result.value.bytes, result.value.filename, 'application/zip');
+      markDocumentSaved();
+    } catch {
+      setSaveError(t('tools.pdfEditor.projectErr.PROJECT_FAILED'));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }, [doc, markDocumentSaved, t]);
+
+  /**
+   * Export the flattened PDF (⌘⇧S) — delivery only.
+   *
+   * Deliberately does *not* clear the dirty flag: the objects are baked into this file, so the
+   * project is still the only place the edits survive.
+   */
+  const exportPdf = useCallback(async () => {
     if (!doc || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
@@ -1280,14 +1363,13 @@ export default function PdfEditorTool() {
         return;
       }
       downloadBytes(result.value.bytes, result.value.filename, 'application/pdf');
-      setHistory((previous) =>
-        previous ? syncPresent(previous, markSaved(currentDoc(previous))) : previous,
+      setBanner(
+        t(
+          result.value.rasterized
+            ? 'tools.pdfEditor.textRasterNote'
+            : 'tools.pdfEditor.flatExportNote',
+        ),
       );
-      // The edits now live in the downloaded file, so the draft has served its purpose
-      void deleteDraft(doc.source.fingerprint);
-      draftRevRef.current = undefined;
-      setDraft(null);
-      if (result.value.rasterized) setBanner(t('tools.pdfEditor.textRasterNote'));
     } catch {
       setSaveError(t('tools.pdfEditor.err.PROCESS_FAILED'));
     } finally {
@@ -1300,6 +1382,15 @@ export default function PdfEditorTool() {
   /* ---------------------------------------------------------------------- */
   /* Ribbon commands                                                         */
   /* ---------------------------------------------------------------------- */
+
+  /** P1-A: one history step for the whole decoration set; `undefined` clears it */
+  const applyDecoration = useCallback(
+    (decoration: PdfDecoration | undefined) => {
+      mutate((current) => setDecoration(current, decoration), { label: 'decoration' });
+      setDecorateOpen(false);
+    },
+    [mutate],
+  );
 
   /** Flat projection of the single selection, consumed by the contextual tabs and the properties */
   const selectedObject =
@@ -1378,6 +1469,7 @@ export default function PdfEditorTool() {
       exportDocx: () => setExportDocxOpen(true),
       exportImages: () => setExportImagesOpen(true),
       exportText: () => void handleExportText(),
+      openDecoration: () => setDecorateOpen(true),
     }),
     [
       alignSelection,
@@ -1508,18 +1600,61 @@ export default function PdfEditorTool() {
 
   const pages = useMemo(() => (doc ? visiblePages(doc) : []), [doc]);
   // >20 MB documents decode slowly; thumbnails become opt-in and neighbours stop pre-rendering
-  const largeDoc = (doc?.source.bytes.byteLength ?? 0) > LARGE_DOC_BYTES;
+  const largeDoc = isLargeDocument(doc?.source.bytes.byteLength ?? 0);
 
   /* ---------------------------------------------------------------------- */
   /* Viewport callbacks                                                      */
   /* ---------------------------------------------------------------------- */
 
   const { openFile, openBytes } = pdf;
+
+  /**
+   * Open a `.pdfproj`: the model travels with the bytes, so it is adopted through the same
+   * "pending model" path a resumed draft uses, with its attachments attached.
+   */
+  const openProjectFile = useCallback(
+    async (file: File) => {
+      setOpenError(null);
+      setProjectBusy(true);
+      try {
+        const parsed = await openProject(await fileToBytes(file), file.name);
+        if (!parsed.ok) {
+          setOpenError(t(`tools.pdfEditor.projectErr.${parsed.error}`));
+          return;
+        }
+        pendingModelRef.current = {
+          fingerprint: parsed.value.fingerprint,
+          model: parsed.value.model,
+          attachments: parsed.value.attachments,
+          project: true,
+        };
+        const opened = await openBytes(
+          parsed.value.name,
+          parsed.value.bytes,
+          parsed.value.fingerprint,
+        );
+        if (!opened) pendingModelRef.current = null;
+      } catch {
+        setOpenError(t('tools.pdfEditor.projectErr.PROJECT_FAILED'));
+      } finally {
+        setProjectBusy(false);
+      }
+    },
+    [openBytes, t],
+  );
+
+  /** Single entry point for both entry points (drop zone, menu, hidden input): route by extension */
   const handleFile = useCallback(
     (file: File) => {
+      // A notice about the *previous* document must not outlive it
+      setBanner(null);
+      if (isProjectFile(file.name)) {
+        void openProjectFile(file);
+        return;
+      }
       void openFile(file);
     },
-    [openFile],
+    [openFile, openProjectFile],
   );
 
   /* ---------------------------------------------------------------------- */
@@ -1618,15 +1753,22 @@ export default function PdfEditorTool() {
       const mod = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
 
-      // ⌘/Ctrl+S is intercepted even inside fields: the browser save dialog must never win
+      // ⌘/Ctrl+S is intercepted even inside fields: the browser save dialog must never win.
+      // Save = project (editable); ⇧⌘S = flattened PDF for delivery.
       if (mod && key === 's') {
         event.preventDefault();
-        void save();
+        void (event.shiftKey ? exportPdf() : saveProjectFile());
         return;
       }
 
       if (inField) return;
       if (!doc) return;
+
+      // Home / End belong to a focused ribbon tablist (WAI-ARIA): moving between tabs must not also
+      // jump the document to the first/last page
+      if ((event.key === 'Home' || event.key === 'End') && target?.closest('[role="tablist"]')) {
+        return;
+      }
 
       if (mod && key === 'z') {
         event.preventDefault();
@@ -1716,11 +1858,12 @@ export default function PdfEditorTool() {
     cutSelection,
     deleteSelected,
     doc,
+    exportPdf,
     jumpToEdge,
     nudgeSelection,
     pasteSelection,
     redo,
-    save,
+    saveProjectFile,
     selectAllObjects,
     selectedIds.length,
     stepPage,
@@ -1786,12 +1929,13 @@ export default function PdfEditorTool() {
    * textarea inside the overlay stays clickable.
    */
   const renderPatchLayer = (page: PdfPageState) => {
-    if (tool !== 'patch' || editingId || !pdf.pdfDoc || page.blank) return null;
+    const sourceDoc = docForPage(pageDocs, page);
+    if (tool !== 'patch' || editingId || !sourceDoc) return null;
     const current = doc ? pages[doc.view.page - 1] : undefined;
     if (!current || current.id !== page.id) return null;
     return (
       <TextPatchLayer
-        pdfDoc={pdf.pdfDoc}
+        pdfDoc={sourceDoc}
         pageNumber={page.sourceIndex + 1}
         pageId={page.id}
         onPatch={handlePatchLine}
@@ -1805,6 +1949,7 @@ export default function PdfEditorTool() {
         {tool === 'patch' ? <PatchHint /> : null}
         <PageScrollView
           pdfDoc={pdf.pdfDoc}
+          docs={pageDocs}
           pages={pages}
           view={doc.view}
           tool={tool}
@@ -1816,6 +1961,7 @@ export default function PdfEditorTool() {
           onZoomBy={handleZoomBy}
           onDropImage={(file) => void insertImageFile(file)}
           preloadMargin={largeDoc ? '0px' : '600px 0px'}
+          decoration={doc.decoration ?? null}
         />
       </div>
     ) : null;
@@ -1823,7 +1969,7 @@ export default function PdfEditorTool() {
   const showThumbnails = doc !== null && panels.thumbnails && pdf.pdfDoc !== null;
   const showOutline = doc !== null && panels.outline && pdf.pdfDoc !== null;
 
-  const thumbnailsBlocked = showThumbnails && largeDoc && !thumbsForced;
+  const thumbnailsBlocked = showThumbnails && thumbnailsNeedConsent(largeDoc, thumbsForced);
 
   const leftPanel =
     showThumbnails || showOutline ? (
@@ -1844,6 +1990,7 @@ export default function PdfEditorTool() {
         {showThumbnails && pdf.pdfDoc && !thumbnailsBlocked ? (
           <ThumbnailRail
             pdfDoc={pdf.pdfDoc}
+            docs={pageDocs}
             pages={pages}
             currentPage={doc?.view.page ?? 1}
             onSelect={selectPage}
@@ -1912,12 +2059,19 @@ export default function PdfEditorTool() {
         onSelect: () => setInsertOpen(true),
       },
       {
-        id: 'save',
-        label: t('tools.pdfEditor.fileSave'),
+        id: 'save-project',
+        label: t('tools.pdfEditor.fileSaveProject'),
         icon: 'download',
         separatorBefore: true,
         disabled: saving,
-        onSelect: () => void save(),
+        onSelect: () => void saveProjectFile(),
+      },
+      {
+        id: 'export-flat',
+        label: t('tools.pdfEditor.fileExportFlat'),
+        icon: 'file',
+        disabled: saving,
+        onSelect: () => void exportPdf(),
       },
       {
         id: 'export-docx',
@@ -1938,7 +2092,7 @@ export default function PdfEditorTool() {
         onSelect: () => void handleExportText(),
       },
     ];
-  }, [doc, handleExportText, save, saving, t]);
+  }, [doc, exportPdf, handleExportText, saveProjectFile, saving, t]);
 
   const headerRight = doc ? (
     <div className="flex items-center gap-2">
@@ -1946,18 +2100,34 @@ export default function PdfEditorTool() {
       <button
         type="button"
         data-testid="pdf-save-button"
-        onClick={() => void save()}
+        onClick={() => void saveProjectFile()}
         disabled={saving}
-        title={`${t('tools.pdfEditor.savePdfButton')} (⌘S)`}
+        title={`${t('tools.pdfEditor.saveProjectButton')} (⌘S)`}
         className="rounded bg-[#b3261e] px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-[#8d1d17] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
       >
-        {saving ? t('tools.pdfEditor.saveSaving') : t('tools.pdfEditor.savePdfButton')}
+        {saving ? t('tools.pdfEditor.saveSaving') : t('tools.pdfEditor.saveProjectButton')}
       </button>
     </div>
   ) : null;
 
   const errorMessage =
-    saveError ?? (pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null);
+    saveError ??
+    openError ??
+    (pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null);
+
+  /** Inline message above the page area, in priority order */
+  const bannerText = doc
+    ? (errorMessage ?? (painterArmed ? t('tools.pdfEditor.painterArmed') : null) ?? banner)
+    : null;
+  // The ‖ painter hint is state-driven and clears itself; everything else can be closed by hand
+  const dismissBanner =
+    errorMessage || banner
+      ? () => {
+          setBanner(null);
+          setSaveError(null);
+          setOpenError(null);
+        }
+      : undefined;
 
   return (
     <>
@@ -1983,13 +2153,19 @@ export default function PdfEditorTool() {
         rightPanel={rightPanel}
         activeTabId={activeTabId}
         onTabChange={handleTabChange}
-        error={pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null}
-        banner={
-          doc
-            ? (errorMessage ?? (painterArmed ? t('tools.pdfEditor.painterArmed') : null) ?? banner)
-            : null
+        error={
+          openError ??
+          (pdf.error && !pdf.needsPassword ? t(`tools.pdfEditor.err.${pdf.error}`) : null)
         }
-        note={exportBusy ? t('tools.pdfEditor.exportBusy') : pdf.busy ? t('common.loading') : null}
+        banner={bannerText}
+        onDismissBanner={dismissBanner}
+        note={
+          exportBusy
+            ? t('tools.pdfEditor.exportBusy')
+            : projectBusy || pdf.busy
+              ? t('common.loading')
+              : null
+        }
         headerRight={headerRight}
         quickAccess={
           doc ? (
@@ -2002,13 +2178,15 @@ export default function PdfEditorTool() {
             />
           ) : undefined
         }
-        statusBar={<StatusBar doc={doc} pdfDoc={pdf.pdfDoc} progress={saveProgress} />}
+        statusBar={
+          <StatusBar doc={doc} pdfDoc={pdf.pdfDoc} docs={pageDocs} progress={saveProgress} />
+        }
       />
 
       <input
         ref={openInputRef}
         type="file"
-        accept=".pdf,application/pdf"
+        accept=".pdf,.pdfproj,application/pdf"
         data-testid="pdf-open-input"
         className="hidden"
         onChange={(event) => {
@@ -2066,6 +2244,12 @@ export default function PdfEditorTool() {
         object={selectedImage}
         onClose={() => setCropOpen(false)}
         onApply={applyImageCrop}
+      />
+      <PageDecorationDialog
+        open={decorateOpen}
+        initial={doc?.decoration ?? null}
+        onClose={() => setDecorateOpen(false)}
+        onApply={applyDecoration}
       />
       <FidelityDialog
         report={fidelityReport}

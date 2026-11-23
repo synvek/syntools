@@ -3,39 +3,39 @@ import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { visiblePages, visiblePageCount } from '../model/doc';
 import type { PdfEditorDoc } from '../model/types';
+import { docForPage, type SourceDocs } from '../render/sourceDocs';
 import { formatFileSize, formatPageSize } from './statusFormat';
 
 interface StatusBarProps {
   doc: PdfEditorDoc | null;
   /** Used to read the current page size; omitted in tests without a document proxy */
   pdfDoc?: PDFDocumentProxy | null;
+  /** Proxies for inserted PDFs; without it only main-file pages can report a size */
+  docs?: SourceDocs;
   /** Page progress while `flattenPdf` runs (M4-5); `null` when idle */
   progress?: { done: number; total: number } | null;
 }
 
 /** Bottom strip: page position, zoom, page size, file size and the local-only promise */
-export function StatusBar({ doc, pdfDoc, progress }: StatusBarProps) {
+export function StatusBar({ doc, pdfDoc, docs, progress }: StatusBarProps) {
   const { t } = useTranslation();
   const total = doc ? visiblePageCount(doc) : 0;
   const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
 
   const currentPage = doc ? (visiblePages(doc)[doc.view.page - 1] ?? null) : null;
-  // Blank pages have no pdfjs page; inserted attachments are only visible once their proxy is
-  // wired in (M2-7), so only the main source can report a size for now
-  const mainSourceIndex =
-    currentPage && !currentPage.blank && currentPage.sourceKey === doc?.source.key
-      ? currentPage.sourceIndex
-      : null;
+  // Blank pages carry their size in the model; everything else reads it from its own source proxy
+  const sourceDoc = currentPage ? docForPage(docs, currentPage, pdfDoc) : undefined;
+  const sourceIndex = currentPage && !currentPage.blank ? currentPage.sourceIndex : null;
 
   useEffect(() => {
     setPageSize(null);
     if (!currentPage?.blank) {
-      if (!doc || !pdfDoc || mainSourceIndex == null) return;
+      if (!sourceDoc || sourceIndex == null) return;
 
       let cancelled = false;
       void (async () => {
         try {
-          const page = await pdfDoc.getPage(mainSourceIndex + 1);
+          const page = await sourceDoc.getPage(sourceIndex + 1);
           const viewport = page.getViewport({ scale: 1 });
           if (!cancelled) setPageSize({ width: viewport.width, height: viewport.height });
         } catch {
@@ -50,7 +50,7 @@ export function StatusBar({ doc, pdfDoc, progress }: StatusBarProps) {
 
     setPageSize({ width: currentPage.blank.widthPt, height: currentPage.blank.heightPt });
     return undefined;
-  }, [doc, pdfDoc, mainSourceIndex, currentPage]);
+  }, [sourceDoc, sourceIndex, currentPage]);
 
   const totalBytes = doc
     ? doc.source.bytes.byteLength +

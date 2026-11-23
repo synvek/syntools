@@ -760,7 +760,8 @@ const zhTW = {
     },
     'pdf-editor': {
       name: 'PDF 編輯器',
-      description: '本機開啟、編輯並儲存 PDF，不上傳檔案',
+      description:
+        '在瀏覽器裡編輯 PDF：改原文、加註解形狀與簽名、整理頁面，可儲存為繼續編輯的專案檔，或匯出扁平 PDF、Word，不上傳檔案',
     },
   },
 } satisfies ShellResources;

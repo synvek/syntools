@@ -793,7 +793,8 @@ const es = {
     },
     'pdf-editor': {
       name: 'Editor de PDF',
-      description: 'Abre, edita y guarda PDF en local, sin subirlo',
+      description:
+        'Edita PDF en el navegador: texto, anotaciones, formas y firmas, gestión de páginas, y guarda un proyecto editable o exporta un PDF plano o un archivo Word, sin subirlo',
     },
   },
 } satisfies ShellResources;

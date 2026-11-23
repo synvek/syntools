@@ -140,6 +140,8 @@ describe('buildPdfRibbonTabs — 结构', () => {
       'object-distribute',
       'format-painter',
       'export',
+      // P1-A：页码 / 页眉页脚 / 水印共用一个对话框
+      'decorate',
     ]);
     expect(tabs[1].groups.map((group) => group.id)).toEqual([
       'view-mode',
@@ -307,6 +309,7 @@ describe('buildPdfRibbonTabs — 命令接线', () => {
     fire(tabs, 'panels', 'outline');
     fire(tabs, 'panels', 'properties');
     fire(tabs, 'display', 'dark-canvas');
+    fire(tabs, 'decorate', 'decoration');
 
     expect(actions.setTool).toHaveBeenCalledWith('select');
     expect(actions.setTool).toHaveBeenCalledWith('hand');
@@ -318,6 +321,16 @@ describe('buildPdfRibbonTabs — 命令接线', () => {
     expect(actions.togglePanel).toHaveBeenCalledWith('outline');
     expect(actions.togglePanel).toHaveBeenCalledWith('properties');
     expect(actions.toggleDarkCanvas).toHaveBeenCalledTimes(1);
+  });
+
+  it('页面装饰入口打开对话框（没有动作时也不抛错）', () => {
+    const openDecoration = vi.fn();
+    const withAction = buildPdfRibbonTabs(makeCtx({ actions: makeActions({ openDecoration }) }));
+    fire(withAction, 'decorate', 'decoration');
+    expect(openDecoration).toHaveBeenCalledTimes(1);
+
+    const withoutAction = buildPdfRibbonTabs(makeCtx());
+    expect(() => fire(withoutAction, 'decorate', 'decoration')).not.toThrow();
   });
 
   it('下拉框把输入解析成模型值', () => {

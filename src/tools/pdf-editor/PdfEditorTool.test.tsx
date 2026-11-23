@@ -118,11 +118,12 @@ describe('PdfEditorTool 空态与校验', () => {
     const { container } = render(<PdfEditorTool />);
 
     expect(screen.getByText('打开一份 PDF 开始编辑')).toBeInTheDocument();
-    expect(screen.getByText('拖入或点击选择 PDF 文件')).toBeInTheDocument();
+    expect(screen.getByText('拖入或点击选择 PDF 或工程文件（.pdfproj）')).toBeInTheDocument();
     expect(screen.getAllByText('文件仅在本机处理，不会上传。').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('pdf-ribbon')).toBeNull();
     expect(screen.getByTestId('pdf-status-page')).toHaveTextContent('未打开文件');
-    expect(fileInput(container)).toHaveAttribute('accept', '.pdf,application/pdf');
+    // Project files open through the same picker: `.pdfproj` is the editable format
+    expect(fileInput(container)).toHaveAttribute('accept', '.pdf,.pdfproj,application/pdf');
   });
 
   it('非 PDF 直接报错，不进入解析', async () => {
@@ -131,6 +132,17 @@ describe('PdfEditorTool 空态与校验', () => {
     choose(container, fakeFile('notes.txt', 'text/plain'));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('请选择 PDF 文件'));
+    expect(openMock).not.toHaveBeenCalled();
+  });
+
+  it('损坏的工程文件报工程错误，而不是当成 PDF 解析', async () => {
+    const { container } = render(<PdfEditorTool />);
+
+    choose(container, fakeFile('broken.pdfproj', 'application/zip'));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('工程文件读取失败，文件可能已损坏'),
+    );
     expect(openMock).not.toHaveBeenCalled();
   });
 });

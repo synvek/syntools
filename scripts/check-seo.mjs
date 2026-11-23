@@ -8,8 +8,10 @@
  * It covers the things that break silently after a deploy without raising errors:
  * whether robots.txt was rewritten by the host, whether the sitemap host matches,
  * whether deep links still return prerendered content, whether canonical is unique,
- * whether og:image really resolves, and whether the apex 301s to the main domain
- * **keeping the path**.
+ * whether og:image really resolves, whether the apex 301s to the main domain
+ * **keeping the path**, and whether `llms.txt` — the catalogue answer engines read — is
+ * present and up to date (a missing file silently downgrades GEO: models then describe the
+ * site from stale scrapes, which is how the PDF editor went unmentioned for a while).
  *
  * Exit code: 0 when everything passes, 1 on failures (usable directly in CI).
  */
@@ -235,6 +237,39 @@ async function main() {
       'sitemap has language alternates',
       ok,
       `xhtml namespace ${hasNs ? 'yes' : 'no'} | alternates ${altCount} | /zh/ entries ${hasZh ? 'yes' : 'no'}`,
+    );
+  });
+
+  // 15. llms.txt — the entry point for answer engines (GEO). A missing or stale file means models
+  // describe the site from whatever they scraped last, usually without the PDF editor.
+  await check('llms.txt is reachable and lists the catalogue', async () => {
+    const { status, body } = await get(`${SITE}/llms.txt${stamp}`);
+    const hasTitle = /^# \S+/m.test(body);
+    const hasSummary = /^> \S+/m.test(body);
+    const toolLinks = (body.match(/^- \[[^\]]+\]\([^)]*\/tools\//gm) || []).length;
+    const hasPdfEditor = /^- \[[^\]]+\]\([^)]*\/tools\/pdf-editor\//m.test(body);
+    const ok = status === 200 && hasTitle && hasSummary && toolLinks > 100 && hasPdfEditor;
+    record(
+      'llms.txt is reachable and lists the catalogue',
+      ok,
+      `HTTP ${status} | title ${hasTitle ? 'yes' : 'no'} | summary ${hasSummary ? 'yes' : 'no'} | tool links ${toolLinks} | pdf-editor ${hasPdfEditor ? 'yes' : 'no'}`,
+    );
+  });
+
+  // 16. The PDF editor is the flagship document tool: it must expose structured data, a canonical
+  // URL and a description that actually says what it does (edit + save), not just "PDF".
+  await check('pdf-editor page declares structured data', async () => {
+    const { status, body } = await get(`${SITE}/tools/pdf-editor/${stamp}`);
+    const canonical = body.match(/rel="canonical"\s+href="([^"]+)"/i)?.[1];
+    const description = body.match(/name="description"\s+content="([^"]*)"/i)?.[1] || '';
+    const jsonLd = /application\/ld\+json/.test(body);
+    const mentionsEdit = /edit|编辑/i.test(description);
+    const ok =
+      status === 200 && jsonLd && mentionsEdit && canonical === `${SITE}/tools/pdf-editor/`;
+    record(
+      'pdf-editor page declares structured data',
+      ok,
+      `HTTP ${status} | json-ld ${jsonLd ? 'yes' : 'no'} | description mentions edit ${mentionsEdit ? 'yes' : 'no'} | canonical ${canonical === `${SITE}/tools/pdf-editor/` ? 'ok' : `bad (${canonical})`}`,
     );
   });
 

@@ -171,6 +171,62 @@ export interface PdfStampObject extends PdfObjectBase {
   naturalH: number;
 }
 
+/** Where the page number / header / footer sits on the page */
+export type PdfDecorationPosition = 'top-center' | 'bottom-center' | 'bottom-left' | 'bottom-right';
+
+export type PdfDecorationAlign = 'left' | 'center' | 'right';
+
+/** Page numbering rule (P1-A); `format` supports `{n}` and `{total}` */
+export interface PdfPageNumberRule {
+  enabled: boolean;
+  format: string;
+  position: PdfDecorationPosition;
+  fontSize: number;
+  color: string;
+  /** Distance from the page edge in PDF points */
+  margin: number;
+  /** Number printed on the first page */
+  startFrom: number;
+}
+
+/** One header/footer line; an empty `text` means "off" */
+export interface PdfLineDecoration {
+  text: string;
+  align: PdfDecorationAlign;
+  fontSize: number;
+  color: string;
+  margin: number;
+}
+
+/** Diagonal text watermark; tiled mode repeats it across the page */
+export interface PdfWatermarkDecoration {
+  text: string;
+  fontSize: number;
+  color: string;
+  /** 0–1; the page content stays readable underneath */
+  opacity: number;
+  /** Degrees, counter-clockwise in the PDF's bottom-left coordinate system */
+  rotation: number;
+  tiled: boolean;
+  /** Tile spacing in points (tiled mode only) */
+  spacing: number;
+}
+
+/**
+ * Document-level page decoration (P1-A).
+ *
+ * Decorations are *not* objects: they are applied to every page at save time (see
+ * `io/drawDecorations.ts`) and previewed by `render/DecorationLayer.tsx`. Keeping them out of
+ * `objects` means a 300-page document does not grow 300 copies of the same header, and changing the
+ * header never needs one undo entry per page.
+ */
+export interface PdfDecoration {
+  numbers?: PdfPageNumberRule;
+  header?: PdfLineDecoration;
+  footer?: PdfLineDecoration;
+  watermark?: PdfWatermarkDecoration;
+}
+
 export type PdfObject =
   | PdfTextObject
   | PdfImageObject
@@ -193,6 +249,8 @@ export interface PdfEditorDoc {
   objects: PdfObject[];
   /** AcroForm values, keyed by field name (M3) */
   forms: Record<string, string | boolean>;
+  /** Page numbers / header / footer / watermark applied to every page on save (P1-A) */
+  decoration?: PdfDecoration;
   meta: {
     title?: string;
     author?: string;
@@ -216,3 +274,12 @@ export interface PdfEditorDoc {
   /** `revision` at the last successful save (or at open) */
   savedRevision: number;
 }
+
+/**
+ * The document without its payloads.
+ *
+ * Shared by the two places that persist a document outside memory — the IndexedDB draft
+ * (`+ version`) and the `.pdfproj` file — because both store the model as JSON and keep the bytes
+ * (and the password, which lives inside `source`) in their own containers.
+ */
+export type PdfDocModel = Omit<PdfEditorDoc, 'source' | 'attachments'>;

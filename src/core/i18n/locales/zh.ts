@@ -698,6 +698,10 @@ export default {
     'pdf-crop': { name: 'PDF 裁剪', description: '裁剪 PDF 页面边距（cropBox）' },
     'pdf-grayscale': { name: 'PDF 转灰度', description: '将 PDF 转为视觉灰度版（渲图重打）' },
     'pdf-annotate': { name: 'PDF 标注', description: '在页面上可视化绘制高亮、画笔、形状与文本' },
-    'pdf-editor': { name: 'PDF 编辑器', description: '本地打开、编辑并保存 PDF，不上传文件' },
+    'pdf-editor': {
+      name: 'PDF 编辑器',
+      description:
+        '在浏览器里编辑 PDF：改原文、加批注形状与签名、整理页面，可保存为继续编辑的工程文件，或导出扁平 PDF、Word，不上传文件',
+    },
   },
 };

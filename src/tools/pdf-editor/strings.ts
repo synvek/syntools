@@ -11,6 +11,7 @@
  */
 
 import { annotateStrings } from './annotateStrings';
+import { decorationStrings } from './decorationStrings';
 import { editStrings } from './editStrings';
 import { exportStrings } from './exportStrings';
 import { fileStrings } from './fileStrings';
@@ -27,8 +28,8 @@ const base: Record<string, StringTree> = {
   zh: {
     privacy: '文件仅在本机处理，不会上传。',
     emptyTitle: '打开一份 PDF 开始编辑',
-    emptyHint: '拖入或点击选择 PDF 文件',
-    emptyFormats: '支持 .pdf，单文件不超过 50MB',
+    emptyHint: '拖入或点击选择 PDF 或工程文件（.pdfproj）',
+    emptyFormats: '支持 .pdf 与 .pdfproj，单文件不超过 50MB',
     stubTitle: '编辑器骨架已就绪',
     stubBody: '打开、浏览与保存能力将在后续里程碑接入。',
     statusPage: '第 {{page}} / {{total}} 页',
@@ -49,8 +50,8 @@ const base: Record<string, StringTree> = {
   'zh-TW': {
     privacy: '檔案僅在本機處理，不會上傳。',
     emptyTitle: '開啟一份 PDF 開始編輯',
-    emptyHint: '拖入或點擊選擇 PDF 檔案',
-    emptyFormats: '支援 .pdf，單檔不超過 50MB',
+    emptyHint: '拖入或點擊選擇 PDF 或專案檔（.pdfproj）',
+    emptyFormats: '支援 .pdf 與 .pdfproj，單檔不超過 50MB',
     stubTitle: '編輯器骨架已就緒',
     stubBody: '開啟、瀏覽與儲存功能將於後續里程碑接入。',
     statusPage: '第 {{page}} / {{total}} 頁',
@@ -71,8 +72,8 @@ const base: Record<string, StringTree> = {
   en: {
     privacy: 'Files are processed on this device and never uploaded.',
     emptyTitle: 'Open a PDF to start editing',
-    emptyHint: 'Drop a PDF here or click to choose one',
-    emptyFormats: 'PDF only, up to 50 MB per file',
+    emptyHint: 'Drop a PDF or a project file here, or click to choose one',
+    emptyFormats: 'PDF or .pdfproj, up to 50 MB per file',
     stubTitle: 'Editor skeleton is in place',
     stubBody: 'Opening, browsing and saving arrive in the upcoming milestones.',
     statusPage: 'Page {{page}} of {{total}}',
@@ -93,8 +94,8 @@ const base: Record<string, StringTree> = {
   ja: {
     privacy: 'ファイルはこの端末内で処理され、アップロードされません。',
     emptyTitle: 'PDF を開いて編集を開始',
-    emptyHint: 'PDF をドロップするか、クリックして選択',
-    emptyFormats: 'PDF のみ、1 ファイル 50MB まで',
+    emptyHint: 'PDF またはプロジェクトファイル（.pdfproj）をドロップするか、クリックして選択',
+    emptyFormats: 'PDF と .pdfproj、1 ファイル 50MB まで',
     stubTitle: 'エディターの土台ができました',
     stubBody: '開く・閲覧・保存は今後のマイルストーンで追加されます。',
     statusPage: '{{page}} / {{total}} ページ',
@@ -115,8 +116,8 @@ const base: Record<string, StringTree> = {
   fr: {
     privacy: 'Les fichiers sont traités sur cet appareil et ne sont jamais envoyés.',
     emptyTitle: 'Ouvrez un PDF pour commencer',
-    emptyHint: 'Déposez un PDF ici ou cliquez pour le choisir',
-    emptyFormats: 'PDF uniquement, 50 Mo maximum par fichier',
+    emptyHint: 'Déposez un PDF ou un fichier de projet ici, ou cliquez pour le choisir',
+    emptyFormats: 'PDF ou .pdfproj, 50 Mo maximum par fichier',
     stubTitle: 'La base de l’éditeur est en place',
     stubBody: 'L’ouverture, la navigation et l’enregistrement arrivent dans les prochaines étapes.',
     statusPage: 'Page {{page}} sur {{total}}',
@@ -137,8 +138,8 @@ const base: Record<string, StringTree> = {
   de: {
     privacy: 'Dateien werden auf diesem Gerät verarbeitet und nie hochgeladen.',
     emptyTitle: 'PDF öffnen und mit dem Bearbeiten beginnen',
-    emptyHint: 'PDF hierher ziehen oder zum Auswählen klicken',
-    emptyFormats: 'Nur PDF, maximal 50 MB pro Datei',
+    emptyHint: 'PDF oder Projektdatei hierher ziehen oder zum Auswählen klicken',
+    emptyFormats: 'PDF oder .pdfproj, maximal 50 MB pro Datei',
     stubTitle: 'Das Editor-Gerüst steht',
     stubBody: 'Öffnen, Anzeigen und Speichern folgen in den nächsten Meilensteinen.',
     statusPage: 'Seite {{page}} von {{total}}',
@@ -159,8 +160,8 @@ const base: Record<string, StringTree> = {
   it: {
     privacy: 'I file vengono elaborati su questo dispositivo e non vengono mai caricati.',
     emptyTitle: 'Apri un PDF per iniziare a modificarlo',
-    emptyHint: 'Trascina qui un PDF o fai clic per sceglierlo',
-    emptyFormats: 'Solo PDF, massimo 50 MB per file',
+    emptyHint: 'Trascina qui un PDF o un file di progetto, oppure fai clic per sceglierlo',
+    emptyFormats: 'PDF o .pdfproj, massimo 50 MB per file',
     stubTitle: 'La base dell’editor è pronta',
     stubBody: 'Apertura, navigazione e salvataggio arrivano nelle prossime tappe.',
     statusPage: 'Pagina {{page}} di {{total}}',
@@ -181,8 +182,8 @@ const base: Record<string, StringTree> = {
   es: {
     privacy: 'Los archivos se procesan en este dispositivo y nunca se suben.',
     emptyTitle: 'Abre un PDF para empezar a editarlo',
-    emptyHint: 'Arrastra un PDF aquí o haz clic para elegirlo',
-    emptyFormats: 'Solo PDF, máximo 50 MB por archivo',
+    emptyHint: 'Arrastra un PDF o un archivo de proyecto aquí, o haz clic para elegirlo',
+    emptyFormats: 'PDF o .pdfproj, máximo 50 MB por archivo',
     stubTitle: 'La base del editor está lista',
     stubBody: 'Abrir, navegar y guardar llegan en las próximas etapas.',
     statusPage: 'Página {{page}} de {{total}}',
@@ -203,8 +204,8 @@ const base: Record<string, StringTree> = {
   pt: {
     privacy: 'Os arquivos são processados neste dispositivo e nunca são enviados.',
     emptyTitle: 'Abra um PDF para começar a editar',
-    emptyHint: 'Arraste um PDF para aqui ou clique para escolher',
-    emptyFormats: 'Somente PDF, até 50 MB por arquivo',
+    emptyHint: 'Arraste um PDF ou um arquivo de projeto para aqui, ou clique para escolher',
+    emptyFormats: 'PDF ou .pdfproj, até 50 MB por arquivo',
     stubTitle: 'A base do editor está pronta',
     stubBody: 'Abrir, navegar e salvar chegam nas próximas etapas.',
     statusPage: 'Página {{page}} de {{total}}',
@@ -231,6 +232,7 @@ function withExtras(lng: string): ResourceTree {
       pdfEditor: {
         ...base[lng],
         ...annotateStrings[lng],
+        ...decorationStrings[lng],
         ...editStrings[lng],
         ...exportStrings[lng],
         ...pageStrings[lng],

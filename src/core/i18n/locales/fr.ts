@@ -802,7 +802,8 @@ const fr = {
     },
     'pdf-editor': {
       name: 'Éditeur PDF',
-      description: 'Ouvrir, modifier et enregistrer un PDF en local, sans envoi',
+      description:
+        'Modifier un PDF dans le navigateur : texte, annotations, formes et signatures, gestion des pages, puis enregistrer un projet modifiable ou exporter un PDF aplati ou un fichier Word — sans envoi',
     },
   },
 } satisfies ShellResources;

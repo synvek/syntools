@@ -7,13 +7,21 @@ import type {
 import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { PdfTool } from '../model/annotate';
-import type { PdfPageState, ViewMode, ZoomMode } from '../model/types';
+import type { PdfDecoration, PdfPageState, ViewMode, ZoomMode } from '../model/types';
+import { DecorationLayer } from './DecorationLayer';
 import { PageCanvas } from './PageCanvas';
+import { isAtBottom, pickCurrentPage } from './pageSync';
+import { docForPage, type SourceDocs } from './sourceDocs';
 import { renderDpr, usePageMetrics } from './usePageMetrics';
 import type { ContainerSize } from './usePageMetrics';
 
 export interface PageScrollViewProps {
   pdfDoc: PDFDocumentProxy;
+  /**
+   * Proxies for every byte source (`main` plus attachments). Optional so tests can mount the view
+   * with the main document alone; the controller always passes the full map.
+   */
+  docs?: SourceDocs;
   /** Visible pages in output order */
   pages: PdfPageState[];
   view: { mode: ViewMode; zoom: number; zoomMode: ZoomMode; page: number };
@@ -34,6 +42,8 @@ export interface PageScrollViewProps {
   onDropImage?(file: File): void;
   /** IntersectionObserver margin for page rendering; large files pass `0px` (M4-5) */
   preloadMargin?: string;
+  /** Page-level decoration preview (P1-A); painted under the object layer by design */
+  decoration?: PdfDecoration | null;
 }
 
 /**
@@ -45,6 +55,7 @@ export interface PageScrollViewProps {
  */
 export function PageScrollView({
   pdfDoc,
+  docs,
   pages,
   view,
   tool,
@@ -56,6 +67,7 @@ export function PageScrollView({
   onZoomBy,
   onDropImage,
   preloadMargin = '600px 0px',
+  decoration,
 }: PageScrollViewProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -134,10 +146,10 @@ export function PageScrollView({
     if (!element || view.mode !== 'continuous') return;
 
     const anchor = element.getBoundingClientRect().top + 8;
-    let current = 1;
-    pageRefs.current.forEach((pageElement, index) => {
-      if (pageElement && pageElement.getBoundingClientRect().top <= anchor) current = index + 1;
-    });
+    const tops = pageRefs.current.map((pageElement) =>
+      pageElement ? pageElement.getBoundingClientRect().top : Number.POSITIVE_INFINITY,
+    );
+    const current = pickCurrentPage(tops, anchor, isAtBottom(element));
 
     if (current !== lastPageRef.current) {
       lastPageRef.current = current;
@@ -168,7 +180,13 @@ export function PageScrollView({
 
     const pageElement = pageRefs.current[view.page - 1];
     const element = scrollRef.current;
-    if (pageElement && element) element.scrollTop = Math.max(0, pageElement.offsetTop - 8);
+    if (pageElement && element) {
+      // Measured delta, not `offsetTop`: the scroller has padding and its own border, so offsetTop is
+      // a few pixels off — enough for `syncCurrentPage` to report the previous page right after a jump
+      // (that turned "next page" into a page that refused to move, and a flaky scroll assertion).
+      const delta = pageElement.getBoundingClientRect().top - element.getBoundingClientRect().top;
+      element.scrollTop = Math.max(0, element.scrollTop + delta - 6);
+    }
   }, [view.page, view.mode]);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -236,6 +254,9 @@ export function PageScrollView({
         <div className="flex flex-col items-center gap-4">
           {orderedPages.map((page, index) => {
             const displayPage = view.mode === 'single' ? view.page : index + 1;
+            // Each page renders from its own source: an inserted page must not fall back to the
+            // main file's page at the same index (that showed the wrong content)
+            const sourceDoc = docForPage(docs, page, pdfDoc);
             return (
               <div
                 key={page.id}
@@ -255,9 +276,9 @@ export function PageScrollView({
                     aria-label={t('tools.pdfEditor.pageAria', { page: displayPage })}
                     className="h-full w-full"
                   />
-                ) : (
+                ) : sourceDoc ? (
                   <PageCanvas
-                    pdfDoc={pdfDoc}
+                    pdfDoc={sourceDoc}
                     pageNumber={page.sourceIndex + 1}
                     scale={scale}
                     dpr={dpr}
@@ -266,7 +287,24 @@ export function PageScrollView({
                     label={t('tools.pdfEditor.pageAria', { page: displayPage })}
                     rootMargin={preloadMargin}
                   />
+                ) : (
+                  // Attachment proxy still opening (or failed): keep the page box, drop the bitmap
+                  <div
+                    data-testid="pdf-page-pending"
+                    aria-label={t('tools.pdfEditor.pageAria', { page: displayPage })}
+                    className="h-full w-full bg-gray-50 dark:bg-gray-800"
+                  />
                 )}
+                {decoration ? (
+                  <DecorationLayer
+                    decoration={decoration}
+                    scale={scale}
+                    pageWidth={pageSize.width}
+                    pageHeight={pageSize.height}
+                    pageNumber={displayPage}
+                    totalPages={pages.length}
+                  />
+                ) : null}
                 {overlay?.(page, scale)}
                 {patchLayer?.(page, scale)}
               </div>

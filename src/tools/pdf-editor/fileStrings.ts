@@ -1,8 +1,10 @@
 /**
- * PDF editor file-level copy: the `文件` menu and the save-state badge.
+ * PDF editor file-level copy: the `文件` menu, the save-state badge and project-file errors.
  *
  * Same incremental-block convention as `ribbonStrings.ts`; merged into `tools.pdfEditor.*`.
- * Only strings the shell already renders live here — draft restore copy lands with M1-8.
+ *
+ * Saving is two commands, and the copy has to keep them apart: `保存工程` writes a `.pdfproj`
+ * (editable, the default), while `另存为 PDF（扁平）` bakes every object into the page for delivery.
  */
 
 type StringTree = { [key: string]: string | StringTree };
@@ -11,7 +13,9 @@ export const fileStrings: Record<string, StringTree> = {
   zh: {
     fileMenuLabel: '文件',
     fileOpen: '打开…',
-    fileSave: '保存',
+    fileSaveProject: '保存工程',
+    fileExportFlat: '另存为 PDF（扁平）',
+    saveProjectButton: '保存工程',
     savePdfButton: '保存 PDF',
     fileSaveAs: '另存为…',
     fileClose: '关闭',
@@ -21,24 +25,36 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: '有未保存的更改',
     saveSaving: '保存中…',
     saveFailed: '保存失败',
+    flatExportNote: '已导出扁平 PDF（对象已合并，不可再编辑）；工程文件仍可继续调整',
+    projectOpened: '已打开工程文件，对象可继续编辑',
     draftTitle: '继续上次编辑',
     draftMeta: '{{name}} · {{pages}} 页 · {{when}}',
     draftContinue: '继续编辑',
     draftDiscard: '丢弃',
     draftRestored: '已恢复上次编辑的内容',
+    bannerDismiss: '关闭提示',
     draftConflict: '其他标签页已保存这份草稿，本次修改未写入',
     draftNoSource: '草稿缺少原文件，请重新选择该 PDF，编辑内容会自动恢复',
     draftModelOnly: '本地空间不足，草稿只保存了编辑内容',
     leaveTitle: '离开编辑器？',
     leaveBody:
-      '当前修改还没有保存为 PDF。离开后，下次打开可以从本地草稿继续；清除站点数据会删除草稿。',
+      '当前修改还没有保存为工程文件。离开后，下次打开可以从本地草稿继续；清除站点数据会删除草稿。',
     leaveStay: '继续编辑',
     leaveLeave: '离开',
+    projectErr: {
+      NOT_PROJECT: '这不是 PDF 编辑器工程文件（.pdfproj）',
+      PROJECT_VERSION: '工程文件由更新版本的编辑器保存，请升级后再打开',
+      PROJECT_EMPTY: '工程文件里没有可用的页面',
+      PROJECT_ENCRYPTED: '加密 PDF 不能保存为工程文件：密码不会写入文件',
+      PROJECT_FAILED: '工程文件读取失败，文件可能已损坏',
+    },
   },
   'zh-TW': {
     fileMenuLabel: '檔案',
     fileOpen: '開啟…',
-    fileSave: '儲存',
+    fileSaveProject: '儲存專案',
+    fileExportFlat: '另存為 PDF（平面化）',
+    saveProjectButton: '儲存專案',
     savePdfButton: '儲存 PDF',
     fileSaveAs: '另存新檔…',
     fileClose: '關閉',
@@ -48,24 +64,36 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: '有未儲存的變更',
     saveSaving: '儲存中…',
     saveFailed: '儲存失敗',
+    flatExportNote: '已匯出平面化 PDF（物件已合併，無法再編輯）；專案檔仍可繼續調整',
+    projectOpened: '已開啟專案檔，物件可繼續編輯',
     draftTitle: '繼續上次編輯',
     draftMeta: '{{name}} · {{pages}} 頁 · {{when}}',
     draftContinue: '繼續編輯',
     draftDiscard: '捨棄',
     draftRestored: '已還原上次編輯的內容',
+    bannerDismiss: '關閉提示',
     draftConflict: '其他分頁已儲存這份草稿，本次修改未寫入',
     draftNoSource: '草稿缺少原始檔案，請重新選擇該 PDF，編輯內容會自動還原',
     draftModelOnly: '本機空間不足，草稿只儲存了編輯內容',
     leaveTitle: '離開編輯器？',
     leaveBody:
-      '目前修改尚未儲存為 PDF。離開後，下次開啟可以從本機草稿繼續；清除網站資料會刪除草稿。',
+      '目前修改尚未儲存為專案檔。離開後，下次開啟可以從本機草稿繼續；清除網站資料會刪除草稿。',
     leaveStay: '繼續編輯',
     leaveLeave: '離開',
+    projectErr: {
+      NOT_PROJECT: '這不是 PDF 編輯器專案檔（.pdfproj）',
+      PROJECT_VERSION: '專案檔由較新版本的編輯器儲存，請升級後再開啟',
+      PROJECT_EMPTY: '專案檔中沒有可用的頁面',
+      PROJECT_ENCRYPTED: '加密 PDF 不能儲存為專案檔：密碼不會寫入檔案',
+      PROJECT_FAILED: '專案檔讀取失敗，檔案可能已損毀',
+    },
   },
   en: {
     fileMenuLabel: 'File',
     fileOpen: 'Open…',
-    fileSave: 'Save',
+    fileSaveProject: 'Save project',
+    fileExportFlat: 'Save as flat PDF',
+    saveProjectButton: 'Save project',
     savePdfButton: 'Save PDF',
     fileSaveAs: 'Save as…',
     fileClose: 'Close',
@@ -75,25 +103,39 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: 'Unsaved changes',
     saveSaving: 'Saving…',
     saveFailed: 'Save failed',
+    flatExportNote:
+      'Flat PDF exported (objects baked in, no longer editable); the project file stays editable',
+    projectOpened: 'Project opened — objects can be edited again',
     draftTitle: 'Continue where you left off',
     draftMeta: '{{name}} · {{pages}} pages · {{when}}',
     draftContinue: 'Continue editing',
     draftDiscard: 'Discard',
     draftRestored: 'Restored your last edit',
+    bannerDismiss: 'Dismiss message',
     draftConflict: 'Another tab saved this draft; your change was not written',
     draftNoSource:
       'This draft has no original file — re-open the same PDF and the edits will return',
     draftModelOnly: 'Low local space: only the edits were saved',
     leaveTitle: 'Leave the editor?',
     leaveBody:
-      'Your changes are not saved as a PDF yet. Reopening the tool offers the local draft; clearing site data deletes it.',
+      'Your changes are not saved as a project file yet. Reopening the tool offers the local draft; clearing site data deletes it.',
     leaveStay: 'Keep editing',
     leaveLeave: 'Leave',
+    projectErr: {
+      NOT_PROJECT: 'This is not a PDF editor project file (.pdfproj)',
+      PROJECT_VERSION: 'This project was saved by a newer editor — update before opening it',
+      PROJECT_EMPTY: 'The project file has no usable pages',
+      PROJECT_ENCRYPTED:
+        'An encrypted PDF cannot be saved as a project: the password is never written',
+      PROJECT_FAILED: 'Could not read the project file; it may be damaged',
+    },
   },
   ja: {
     fileMenuLabel: 'ファイル',
     fileOpen: '開く…',
-    fileSave: '保存',
+    fileSaveProject: 'プロジェクトを保存',
+    fileExportFlat: 'フラット PDF として保存',
+    saveProjectButton: 'プロジェクトを保存',
     savePdfButton: 'PDF を保存',
     fileSaveAs: '名前を付けて保存…',
     fileClose: '閉じる',
@@ -103,24 +145,39 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: '未保存の変更があります',
     saveSaving: '保存中…',
     saveFailed: '保存に失敗しました',
+    flatExportNote:
+      'フラット PDF を書き出しました（オブジェクトは統合され再編集できません）。プロジェクトファイルなら編集を続けられます',
+    projectOpened: 'プロジェクトを開きました。オブジェクトは引き続き編集できます',
     draftTitle: '前回の編集を続ける',
     draftMeta: '{{name}} · {{pages}} ページ · {{when}}',
     draftContinue: '編集を続ける',
     draftDiscard: '破棄',
     draftRestored: '前回の編集内容を復元しました',
+    bannerDismiss: 'メッセージを閉じる',
     draftConflict: '別のタブがこの下書きを保存したため、今回の変更は書き込まれませんでした',
     draftNoSource: '下書きに元ファイルがありません。同じ PDF を開き直すと編集内容が復元されます',
     draftModelOnly: '空き容量が少ないため、編集内容のみ保存しました',
     leaveTitle: 'エディタを離れますか？',
     leaveBody:
-      '変更はまだ PDF として保存されていません。次回開くときにローカル下書きから再開できます（サイトデータを消すと失われます）。',
+      '変更はまだプロジェクトファイルとして保存されていません。次回開くときにローカル下書きから再開できます（サイトデータを消すと失われます）。',
     leaveStay: '編集を続ける',
     leaveLeave: '離れる',
+    projectErr: {
+      NOT_PROJECT: 'PDF エディタのプロジェクトファイル（.pdfproj）ではありません',
+      PROJECT_VERSION:
+        '新しいバージョンのエディタで保存されたプロジェクトです。更新してから開いてください',
+      PROJECT_EMPTY: 'プロジェクトに使用できるページがありません',
+      PROJECT_ENCRYPTED:
+        '暗号化された PDF はプロジェクトとして保存できません（パスワードは書き込みません）',
+      PROJECT_FAILED: 'プロジェクトファイルを読み込めませんでした。破損している可能性があります',
+    },
   },
   fr: {
     fileMenuLabel: 'Fichier',
     fileOpen: 'Ouvrir…',
-    fileSave: 'Enregistrer',
+    fileSaveProject: 'Enregistrer le projet',
+    fileExportFlat: 'Enregistrer en PDF aplati',
+    saveProjectButton: 'Enregistrer le projet',
     savePdfButton: 'Enregistrer le PDF',
     fileSaveAs: 'Enregistrer sous…',
     fileClose: 'Fermer',
@@ -130,11 +187,15 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: 'Modifications non enregistrées',
     saveSaving: 'Enregistrement…',
     saveFailed: 'Échec de l’enregistrement',
+    flatExportNote:
+      'PDF aplati exporté (objets fusionnés, non modifiables) ; le fichier de projet reste modifiable',
+    projectOpened: 'Projet ouvert — les objets sont de nouveau modifiables',
     draftTitle: 'Reprendre la dernière édition',
     draftMeta: '{{name}} · {{pages}} pages · {{when}}',
     draftContinue: 'Reprendre',
     draftDiscard: 'Abandonner',
     draftRestored: 'Dernière édition restaurée',
+    bannerDismiss: 'Fermer le message',
     draftConflict:
       'Un autre onglet a enregistré ce brouillon ; votre modification n’a pas été écrite',
     draftNoSource:
@@ -142,14 +203,25 @@ export const fileStrings: Record<string, StringTree> = {
     draftModelOnly: 'Espace local insuffisant : seules les modifications ont été enregistrées',
     leaveTitle: 'Quitter l’éditeur ?',
     leaveBody:
-      'Les modifications ne sont pas encore enregistrées en PDF. Le brouillon local sera proposé à la prochaine ouverture ; effacer les données du site le supprime.',
+      'Les modifications ne sont pas encore enregistrées dans un fichier de projet. Le brouillon local sera proposé à la prochaine ouverture ; effacer les données du site le supprime.',
     leaveStay: 'Continuer l’édition',
     leaveLeave: 'Quitter',
+    projectErr: {
+      NOT_PROJECT: 'Ce n’est pas un fichier de projet de l’éditeur PDF (.pdfproj)',
+      PROJECT_VERSION:
+        'Ce projet a été enregistré par un éditeur plus récent — mettez à jour avant de l’ouvrir',
+      PROJECT_EMPTY: 'Le fichier de projet ne contient aucune page utilisable',
+      PROJECT_ENCRYPTED:
+        'Un PDF chiffré ne peut pas être enregistré en projet : le mot de passe n’est jamais écrit',
+      PROJECT_FAILED: 'Impossible de lire le fichier de projet ; il est peut-être endommagé',
+    },
   },
   de: {
     fileMenuLabel: 'Datei',
     fileOpen: 'Öffnen…',
-    fileSave: 'Speichern',
+    fileSaveProject: 'Projekt speichern',
+    fileExportFlat: 'Als flaches PDF speichern',
+    saveProjectButton: 'Projekt speichern',
     savePdfButton: 'PDF speichern',
     fileSaveAs: 'Speichern unter…',
     fileClose: 'Schließen',
@@ -159,11 +231,15 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: 'Nicht gespeicherte Änderungen',
     saveSaving: 'Wird gespeichert…',
     saveFailed: 'Speichern fehlgeschlagen',
+    flatExportNote:
+      'Flaches PDF exportiert (Objekte eingebrannt, nicht mehr bearbeitbar); die Projektdatei bleibt bearbeitbar',
+    projectOpened: 'Projekt geöffnet – Objekte sind wieder bearbeitbar',
     draftTitle: 'Letzte Bearbeitung fortsetzen',
     draftMeta: '{{name}} · {{pages}} Seiten · {{when}}',
     draftContinue: 'Fortsetzen',
     draftDiscard: 'Verwerfen',
     draftRestored: 'Letzte Bearbeitung wiederhergestellt',
+    bannerDismiss: 'Hinweis schließen',
     draftConflict:
       'Ein anderer Tab hat diesen Entwurf gespeichert; die Änderung wurde nicht geschrieben',
     draftNoSource:
@@ -171,14 +247,25 @@ export const fileStrings: Record<string, StringTree> = {
     draftModelOnly: 'Wenig lokaler Speicher: nur die Änderungen wurden gesichert',
     leaveTitle: 'Editor verlassen?',
     leaveBody:
-      'Die Änderungen sind noch nicht als PDF gespeichert. Beim nächsten Öffnen wird der lokale Entwurf angeboten; das Löschen der Websitedaten entfernt ihn.',
+      'Die Änderungen sind noch nicht als Projektdatei gespeichert. Beim nächsten Öffnen wird der lokale Entwurf angeboten; das Löschen der Websitedaten entfernt ihn.',
     leaveStay: 'Weiter bearbeiten',
     leaveLeave: 'Verlassen',
+    projectErr: {
+      NOT_PROJECT: 'Das ist keine Projektdatei des PDF-Editors (.pdfproj)',
+      PROJECT_VERSION:
+        'Dieses Projekt wurde mit einer neueren Version gespeichert – bitte zuerst aktualisieren',
+      PROJECT_EMPTY: 'Die Projektdatei enthält keine nutzbaren Seiten',
+      PROJECT_ENCRYPTED:
+        'Eine verschlüsselte PDF kann nicht als Projekt gespeichert werden: Das Passwort wird nie geschrieben',
+      PROJECT_FAILED: 'Projektdatei konnte nicht gelesen werden; sie ist möglicherweise beschädigt',
+    },
   },
   it: {
     fileMenuLabel: 'File',
     fileOpen: 'Apri…',
-    fileSave: 'Salva',
+    fileSaveProject: 'Salva progetto',
+    fileExportFlat: 'Salva come PDF appiattito',
+    saveProjectButton: 'Salva progetto',
     savePdfButton: 'Salva PDF',
     fileSaveAs: 'Salva con nome…',
     fileClose: 'Chiudi',
@@ -188,25 +275,39 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: 'Modifiche non salvate',
     saveSaving: 'Salvataggio…',
     saveFailed: 'Salvataggio non riuscito',
+    flatExportNote:
+      'PDF appiattito esportato (oggetti uniti, non più modificabili); il file di progetto resta modificabile',
+    projectOpened: 'Progetto aperto: gli oggetti sono di nuovo modificabili',
     draftTitle: 'Riprendi l’ultima modifica',
     draftMeta: '{{name}} · {{pages}} pagine · {{when}}',
     draftContinue: 'Riprendi',
     draftDiscard: 'Scarta',
     draftRestored: 'Ultima modifica ripristinata',
+    bannerDismiss: 'Chiudi messaggio',
     draftConflict: 'Un’altra scheda ha salvato questa bozza; la modifica non è stata scritta',
     draftNoSource:
       'La bozza non ha il file originale: riapri lo stesso PDF per ripristinare le modifiche',
     draftModelOnly: 'Spazio locale insufficiente: sono state salvate solo le modifiche',
     leaveTitle: 'Uscire dall’editor?',
     leaveBody:
-      'Le modifiche non sono ancora salvate come PDF. Alla prossima apertura verrà proposto il documento locale; cancellando i dati del sito viene eliminato.',
+      'Le modifiche non sono ancora salvate come file di progetto. Alla prossima apertura verrà proposto il documento locale; cancellando i dati del sito viene eliminato.',
     leaveStay: 'Continua a modificare',
     leaveLeave: 'Esci',
+    projectErr: {
+      NOT_PROJECT: 'Non è un file di progetto dell’editor PDF (.pdfproj)',
+      PROJECT_VERSION: 'Progetto salvato da una versione più recente: aggiorna prima di aprirlo',
+      PROJECT_EMPTY: 'Il file di progetto non contiene pagine utilizzabili',
+      PROJECT_ENCRYPTED:
+        'Un PDF cifrato non può essere salvato come progetto: la password non viene mai scritta',
+      PROJECT_FAILED: 'Impossibile leggere il file di progetto; potrebbe essere danneggiato',
+    },
   },
   es: {
     fileMenuLabel: 'Archivo',
     fileOpen: 'Abrir…',
-    fileSave: 'Guardar',
+    fileSaveProject: 'Guardar proyecto',
+    fileExportFlat: 'Guardar como PDF plano',
+    saveProjectButton: 'Guardar proyecto',
     savePdfButton: 'Guardar PDF',
     fileSaveAs: 'Guardar como…',
     fileClose: 'Cerrar',
@@ -216,25 +317,39 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: 'Cambios sin guardar',
     saveSaving: 'Guardando…',
     saveFailed: 'Error al guardar',
+    flatExportNote:
+      'PDF plano exportado (objetos fusionados, ya no editable); el archivo de proyecto sigue siendo editable',
+    projectOpened: 'Proyecto abierto: los objetos vuelven a ser editables',
     draftTitle: 'Continuar la última edición',
     draftMeta: '{{name}} · {{pages}} páginas · {{when}}',
     draftContinue: 'Continuar',
     draftDiscard: 'Descartar',
     draftRestored: 'Se restauró tu última edición',
+    bannerDismiss: 'Cerrar mensaje',
     draftConflict: 'Otra pestaña guardó este borrador; tu cambio no se escribió',
     draftNoSource:
       'El borrador no tiene el archivo original: vuelve a abrir el mismo PDF para restaurar los cambios',
     draftModelOnly: 'Poco espacio local: solo se guardaron los cambios',
     leaveTitle: '¿Salir del editor?',
     leaveBody:
-      'Los cambios aún no se han guardado como PDF. Al volver a abrir se ofrecerá el borrador local; si borras los datos del sitio, se eliminará.',
+      'Los cambios aún no se han guardado como archivo de proyecto. Al volver a abrir se ofrecerá el borrador local; si borras los datos del sitio, se eliminará.',
     leaveStay: 'Seguir editando',
     leaveLeave: 'Salir',
+    projectErr: {
+      NOT_PROJECT: 'No es un archivo de proyecto del editor de PDF (.pdfproj)',
+      PROJECT_VERSION: 'Proyecto guardado por una versión más reciente: actualiza antes de abrirlo',
+      PROJECT_EMPTY: 'El archivo de proyecto no tiene páginas utilizables',
+      PROJECT_ENCRYPTED:
+        'Un PDF cifrado no se puede guardar como proyecto: la contraseña nunca se escribe',
+      PROJECT_FAILED: 'No se pudo leer el archivo de proyecto; puede estar dañado',
+    },
   },
   pt: {
     fileMenuLabel: 'Arquivo',
     fileOpen: 'Abrir…',
-    fileSave: 'Salvar',
+    fileSaveProject: 'Salvar projeto',
+    fileExportFlat: 'Salvar como PDF achatado',
+    saveProjectButton: 'Salvar projeto',
     savePdfButton: 'Guardar PDF',
     fileSaveAs: 'Salvar como…',
     fileClose: 'Fechar',
@@ -244,19 +359,31 @@ export const fileStrings: Record<string, StringTree> = {
     saveDirty: 'Alterações não salvas',
     saveSaving: 'Salvando…',
     saveFailed: 'Falha ao salvar',
+    flatExportNote:
+      'PDF achatado exportado (objetos unidos, não editável); o arquivo de projeto continua editável',
+    projectOpened: 'Projeto aberto — os objetos voltam a ser editáveis',
     draftTitle: 'Continuar a última edição',
     draftMeta: '{{name}} · {{pages}} páginas · {{when}}',
     draftContinue: 'Continuar',
     draftDiscard: 'Descartar',
     draftRestored: 'Última edição restaurada',
+    bannerDismiss: 'Fechar mensagem',
     draftConflict: 'Outra aba salvou este rascunho; sua alteração não foi gravada',
     draftNoSource:
       'O rascunho não tem o arquivo original — reabra o mesmo PDF para restaurar as edições',
     draftModelOnly: 'Pouco espaço local: apenas as edições foram salvas',
     leaveTitle: 'Sair do editor?',
     leaveBody:
-      'As alterações ainda não foram salvas como PDF. Ao reabrir, o rascunho local será oferecido; limpar os dados do site o apaga.',
+      'As alterações ainda não foram salvas como arquivo de projeto. Ao reabrir, o rascunho local será oferecido; limpar os dados do site o apaga.',
     leaveStay: 'Continuar editando',
     leaveLeave: 'Sair',
+    projectErr: {
+      NOT_PROJECT: 'Este não é um arquivo de projeto do editor de PDF (.pdfproj)',
+      PROJECT_VERSION: 'Projeto salvo por uma versão mais recente — atualize antes de abrir',
+      PROJECT_EMPTY: 'O arquivo de projeto não tem páginas utilizáveis',
+      PROJECT_ENCRYPTED:
+        'Um PDF criptografado não pode ser salvo como projeto: a senha nunca é gravada',
+      PROJECT_FAILED: 'Não foi possível ler o arquivo de projeto; ele pode estar danificado',
+    },
   },
 };

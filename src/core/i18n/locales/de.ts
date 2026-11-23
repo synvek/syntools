@@ -793,7 +793,8 @@ const de = {
     },
     'pdf-editor': {
       name: 'PDF-Editor',
-      description: 'PDF lokal öffnen, bearbeiten und speichern – ohne Upload',
+      description:
+        'PDF im Browser bearbeiten: Text ändern, Anmerkungen, Formen und Signaturen hinzufügen, Seiten verwalten, dann als weiterbearbeitbares Projekt oder flaches PDF bzw. Word-Datei speichern – ohne Upload',
     },
   },
 } satisfies ShellResources;

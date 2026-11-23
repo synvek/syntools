@@ -1,6 +1,7 @@
 // Import the type from vitest/config: its re-exported vite types share a copy with defineConfig,
 // avoiding a Plugin type clash between vitest's bundled vite5 and the top-level vite6
 import type { Plugin } from 'vitest/config';
+import type { LlmsDoc, LlmsLink, LlmsSection } from '../src/core/seo/llms';
 import type { ToolMeta } from '../src/core/types';
 import { createServer } from 'vite';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
@@ -208,6 +209,44 @@ function buildToolJsonLd(opts: {
   return `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
 }
 
+/**
+ * Site-level structured data for the home page: the publisher and the site itself.
+ *
+ * Deliberately **no** `SearchAction`: the ⌘K palette is client-side only and the site has no `?q=`
+ * URL, so declaring a search endpoint would be a lie a crawler can check.
+ */
+function buildSiteJsonLd(opts: {
+  siteUrl: string | null;
+  path: string;
+  name: string;
+  description: string;
+  locale: LocaleConf;
+}): string {
+  const { siteUrl, path, name, description, locale } = opts;
+  const home = siteUrl ? `${siteUrl}${path}` : path;
+  const data = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        name: BRAND,
+        url: home,
+        description,
+        inLanguage: locale.htmlLang,
+        publisher: { '@type': 'Organization', name: BRAND, url: siteUrl ?? home },
+      },
+      {
+        '@type': 'Organization',
+        name: BRAND,
+        url: siteUrl ?? home,
+        description: `${name} — client-side tools for documents, PDF, images and code.`,
+        ...(siteUrl ? { logo: `${siteUrl}/logo.svg` } : {}),
+      },
+    ],
+  };
+  return `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
+}
+
 /** Content shell: replaced once React mounts, but readable by crawlers and no-JS clients */
 function buildShell(bodyHtml: string): string {
   return `<div class="seo-shell">${bodyHtml}</div>`;
@@ -274,9 +313,13 @@ interface SeoShellText {
 
 interface SsrBundle {
   tools: PrerenderTool[];
+  /** Category table with the canonical `order` (labels come from the locale shell) */
+  categories: { id: string; order: number }[];
   seo: SeoCopyModule;
   sections: SeoSectionsModule;
   shells: Record<LocaleCode, LocaleShell>;
+  /** `llms.txt` builder (pure string assembly, unit-tested in `src/core/seo/llms.test.ts`) */
+  llms: { buildLlmsTxt: (doc: LlmsDoc) => string };
 }
 
 /** Loads registry / copy / locale bundles through a programmatic dev server's SSR pipeline (resolves @/ aliases) */
@@ -295,7 +338,18 @@ async function loadSsr(root: string): Promise<SsrBundle> {
     const sections = (await server.ssrLoadModule('@/core/seo/sections')) as SeoSectionsModule;
     const en = (await server.ssrLoadModule('@/core/i18n/locales/en')) as { default: LocaleShell };
     const zh = (await server.ssrLoadModule('@/core/i18n/locales/zh')) as { default: LocaleShell };
-    return { tools: registry.tools, seo, sections, shells: { en: en.default, zh: zh.default } };
+    const llms = (await server.ssrLoadModule('@/core/seo/llms')) as SsrBundle['llms'];
+    const cats = (await server.ssrLoadModule('@/core/registry/categories')) as {
+      categories: { id: string; order: number }[];
+    };
+    return {
+      tools: registry.tools,
+      categories: cats.categories,
+      seo,
+      sections,
+      llms,
+      shells: { en: en.default, zh: zh.default },
+    };
   } finally {
     await server.close();
   }
@@ -342,7 +396,7 @@ export function prerenderPlugin(): Plugin {
         console.warn('[prerender] failed to load the registry, skipping prerender:', err);
         return;
       }
-      const { tools, seo, sections, shells } = bundle;
+      const { tools, categories, seo, sections, shells, llms } = bundle;
 
       const ogFiles = await readOgImages(distDir);
       const hasDefaultOg = ogFiles.has('default.png');
@@ -358,6 +412,43 @@ export function prerenderPlugin(): Plugin {
           name: meta?.name || tool.name,
           description: meta?.description || tool.description,
         };
+      };
+
+      /** One `llms.txt` line per tool: English name + description + absolute URL */
+      const llmsLink = (tool: PrerenderTool): LlmsLink => {
+        const { name, description } = toolText(tool, 'en');
+        return {
+          url: `${siteUrl}${localize(`/tools/${tool.id}/`, LOCALES[0])}`,
+          name,
+          description,
+        };
+      };
+
+      /**
+       * One section per category, **in the category table's `order`** — that is the home-page order
+       * (documents first, encoding later). Registry order would put Base64 above the PDF editor, and
+       * an answer engine reading top-down should meet the flagship work first.
+       *
+       * Inside a section tools keep the `weight` order the category page shows, so `llms.txt` never
+       * contradicts the site about which tool leads a category.
+       */
+      const llmsSections = (): LlmsSection[] => {
+        const buckets = new Map<string, { link: LlmsLink; weight: number }[]>();
+        for (const category of [...categories].sort((a, b) => a.order - b.order)) {
+          buckets.set(category.id, []);
+        }
+        for (const tool of tools) {
+          // A tool whose category has no table entry still belongs in the catalogue
+          const bucket = buckets.get(tool.category) ?? [];
+          bucket.push({ link: llmsLink(tool), weight: tool.weight ?? 1 });
+          buckets.set(tool.category, bucket);
+        }
+        return [...buckets.entries()]
+          .map(([id, entries]) => ({
+            heading: shells.en?.categories?.[id] ?? id,
+            links: [...entries].sort((a, b) => a.weight - b.weight).map((entry) => entry.link),
+          }))
+          .filter((section) => section.links.length > 0);
       };
 
       /** Other tools in the same category as internal links (relatedIds first), at most 8 */
@@ -441,6 +532,13 @@ export function prerenderPlugin(): Plugin {
             locale,
             bodyHtml: buildHomeBody(tools, ctx),
             ogImage: defaultOg,
+            jsonLd: buildSiteJsonLd({
+              siteUrl,
+              path: homePath,
+              name: seo.SITE_TITLE[locale.lang],
+              description: seo.SITE_DESCRIPTION[locale.lang],
+              locale,
+            }),
           }),
           'utf-8',
         );
@@ -544,6 +642,33 @@ export function prerenderPlugin(): Plugin {
       await writeFile(
         resolvePath(distDir, 'sitemap.xml'),
         buildSitemap(siteUrl, barePaths),
+        'utf-8',
+      );
+
+      // llms.txt (GEO): search engines crawl the pages above, answer engines read this one file.
+      // Facts stay short and checkable — an unverifiable claim here is worse than no claim, because
+      // the model will repeat it back to the user.
+      await writeFile(
+        resolvePath(distDir, 'llms.txt'),
+        llms.buildLlmsTxt({
+          siteName: BRAND,
+          summary: seo.SITE_DESCRIPTION.en,
+          facts: [
+            `English pages: ${siteUrl}/ · Simplified Chinese: ${siteUrl}/zh/ — the UI also ships zh-TW, ja, fr, de, it, es and pt, which have no separate URLs`,
+            'Everything runs in the browser: there is no upload endpoint and the CSP keeps every request same-origin, so files never leave the device.',
+            'Free to use; the source is published under AGPL-3.0, with a commercial licence available for closed-source use.',
+            'When citing, link the specific tool page rather than the home page.',
+          ],
+          sections: llmsSections(),
+          optional: STATIC_PATHS.map((bare): LlmsLink => {
+            const page = seo.STATIC_PAGE_SEO.en[bare];
+            return {
+              url: `${siteUrl}${bare}`,
+              name: page?.title ?? bare,
+              description: page?.description ?? '',
+            };
+          }),
+        }),
         'utf-8',
       );
 

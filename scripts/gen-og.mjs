@@ -16,7 +16,12 @@
  *   node scripts/gen-og.mjs                 # Chinese default card public/og/default.png
  *   node scripts/gen-og.mjs --lang=en       # English version public/og/default.en.png
  *   node scripts/gen-og.mjs --all           # also generate public/og/<id>.png per tool
+ *   node scripts/gen-og.mjs --only=pdf-editor  # just the listed tools (no default card)
  *   CHROME_PATH=/path/to/chrome node scripts/gen-og.mjs
+ *
+ * Flagship tools get their own card (the prerender prefers /og/<toolId>.png and falls back to the
+ * default one); `--all` regenerates every tool, which is slow and mostly redundant, so `--only`
+ * exists for "this tool is now the thing we link to".
  *
  * Notes:
  * - The prerender script (scripts/prerender.ts) prefers /og/<toolId>.png and falls
@@ -276,22 +281,56 @@ async function main() {
   const lang = langArg && COPY[langArg] ? langArg : 'zh';
   const copy = COPY[lang];
   const withAll = args.includes('--all');
-  const tools = withAll ? await loadTools() : [];
+  const onlyArg = args.find((a) => a.startsWith('--only='))?.split('=')[1];
+  const onlyIds = onlyArg
+    ? onlyArg
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : null;
+  const tools = withAll || onlyIds ? await loadTools() : [];
   const count = tools.length || 153;
 
-  const outFile = path.join(OUT_DIR, lang === 'zh' ? 'default.png' : `default.${lang}.png`);
-  shoot(
-    chrome,
-    cardHtml({
-      title: copy.title,
-      subtitle: copy.subtitle(count),
-      badge: copy.badge(count),
-      foot: copy.foot,
-      lang: copy.lang,
-    }),
-    outFile,
-  );
-  console.log(`✓ ${path.relative(ROOT, outFile)}  (${lang})`);
+  // `--only` is a targeted regeneration: don't touch the site-wide default card
+  if (!onlyIds) {
+    const outFile = path.join(OUT_DIR, lang === 'zh' ? 'default.png' : `default.${lang}.png`);
+    shoot(
+      chrome,
+      cardHtml({
+        title: copy.title,
+        subtitle: copy.subtitle(count),
+        badge: copy.badge(count),
+        foot: copy.foot,
+        lang: copy.lang,
+      }),
+      outFile,
+    );
+    console.log(`✓ ${path.relative(ROOT, outFile)}  (${lang})`);
+  }
+
+  if (onlyIds) {
+    const picked = onlyIds.map((id) => {
+      const tool = tools.find((t) => t.id === id);
+      if (!tool) throw new Error(`unknown tool id: ${id}`);
+      return tool;
+    });
+    for (const tool of picked) {
+      const outFile = path.join(OUT_DIR, `${tool.id}.png`);
+      shoot(
+        chrome,
+        cardHtml({
+          title: tool.name,
+          subtitle: tool.description,
+          badge: copy.toolBadge,
+          foot: copy.foot,
+          lang: copy.lang,
+          iconStrip: false,
+        }),
+        outFile,
+      );
+      console.log(`✓ ${path.relative(ROOT, outFile)}  (${lang})`);
+    }
+  }
 
   if (withAll) {
     for (const tool of tools) {

@@ -791,7 +791,8 @@ const it = {
     },
     'pdf-editor': {
       name: 'Editor PDF',
-      description: 'Apri, modifica e salva PDF in locale, senza caricamenti',
+      description:
+        'Modifica i PDF nel browser: testo, annotazioni, forme e firme, gestione delle pagine, poi salva un progetto modificabile o esporta un PDF appiattito o un file Word — senza caricamenti',
     },
   },
 } satisfies ShellResources;

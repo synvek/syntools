@@ -15,9 +15,11 @@ import type { ToolResult } from '@/core/types';
 import { normalizePageRotation } from '@/core/pdf/draw';
 import { loadPdfFromBytes } from '@/core/pdf/load';
 import { needsUnicodeFont } from '@/core/pdf/text';
+import { hasDecoration } from '../model/decorations';
 import { visiblePages } from '../model/doc';
 import { sortByZ } from '../model/objects';
 import type { PdfEditorDoc, PdfPageState } from '../model/types';
+import { drawPageDecorations } from './drawDecorations';
 import { drawPageObjects, embedImageDataUrl, type FontSet } from './drawObject';
 
 export interface FlattenOptions {
@@ -122,6 +124,15 @@ export async function flattenPdf(
       const baseRotation = normalizePageRotation(page.getRotation().angle);
       const rotation = outputRotation(state, baseRotation);
       if (rotation !== baseRotation) page.setRotation(degrees(rotation));
+
+      // Decorations sit above the page content but below the user's objects (P1-A)
+      if (hasDecoration(doc.decoration)) {
+        const decorated = await drawPageDecorations(
+          { out, page, fonts },
+          { decoration: doc.decoration, index, total: pages.length },
+        );
+        if (decorated.rasterized) rasterized = true;
+      }
 
       const pageObjects = objects.filter((object) => object.page === state.id);
       const painted = await drawPageObjects(

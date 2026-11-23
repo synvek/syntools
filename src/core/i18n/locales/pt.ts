@@ -797,7 +797,8 @@ const pt = {
     },
     'pdf-editor': {
       name: 'Editor de PDF',
-      description: 'Abra, edite e salve PDF localmente, sem enviar',
+      description:
+        'Edite PDF no navegador: texto, anotações, formas e assinaturas, gestão de páginas, e salve um projeto editável ou exporte um PDF achatado ou um arquivo Word, sem enviar',
     },
   },
 } satisfies ShellResources;
