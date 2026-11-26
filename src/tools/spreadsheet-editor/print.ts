@@ -1,5 +1,11 @@
 import type { ToolResult } from '@/core/types';
-import { excelSerialToDate, type UniverStyleLite } from './core';
+import {
+  BASELINE_SUBSCRIPT,
+  BASELINE_SUPERSCRIPT,
+  TEXT_DECORATION_DOUBLE,
+  excelSerialToDate,
+  type UniverStyleLite,
+} from './core';
 import { anchorToPx, buildSheetLayout, columnLeftPx, rowTopPx } from './shapes';
 import type { SheetSnapshot, WorkbookSnapshot } from './xlsx-io';
 
@@ -168,7 +174,10 @@ export interface SheetPrintCell {
   text: string;
   bold?: boolean;
   italic?: boolean;
-  underline?: boolean;
+  /** true = single line, 'double' = Excel's 双下划线 */
+  underline?: boolean | 'double';
+  /** BaselineOffset: superscript / subscript text */
+  baseline?: 'super' | 'sub';
   fontSize?: number;
   color?: string;
   background?: string;
@@ -406,7 +415,14 @@ export function buildSheetPrintModel(
         text,
         ...(style?.bl === 1 ? { bold: true } : {}),
         ...(style?.it === 1 ? { italic: true } : {}),
-        ...(style?.ul?.s === 1 ? { underline: true } : {}),
+        ...(style?.ul?.s === 1
+          ? { underline: style.ul.t === TEXT_DECORATION_DOUBLE ? ('double' as const) : true }
+          : {}),
+        ...(style?.va === BASELINE_SUPERSCRIPT
+          ? { baseline: 'super' as const }
+          : style?.va === BASELINE_SUBSCRIPT
+            ? { baseline: 'sub' as const }
+            : {}),
         ...(style?.fs !== undefined
           ? { fontSize: Math.min(Math.round(style.fs), MAX_FONT_SIZE) }
           : {}),
@@ -659,7 +675,10 @@ function renderCell(
   const styles: string[] = [];
   if (cell.bold) styles.push('font-weight:600');
   if (cell.italic) styles.push('font-style:italic');
-  if (cell.underline) styles.push('text-decoration:underline');
+  if (cell.underline) {
+    styles.push(`text-decoration:underline${cell.underline === 'double' ? ' double' : ''}`);
+  }
+  if (cell.baseline) styles.push(`vertical-align:${cell.baseline}`);
   if (cell.fontSize) styles.push(`font-size:${(cell.fontSize * PX_TO_PT).toFixed(2)}pt`);
   if (cell.color) styles.push(`color:${cell.color}`);
   if (cell.background) styles.push(`background:${cell.background}`);

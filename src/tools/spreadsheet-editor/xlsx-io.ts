@@ -2,7 +2,7 @@ import type { ToolResult } from '@/core/types';
 import {
   MIN_COLUMN_COUNT,
   MIN_ROW_COUNT,
-  argbToHex,
+  excelColorToHex,
   cellDocumentToRichText,
   checkImportFile,
   columnWidthToPx,
@@ -26,6 +26,8 @@ import {
   type UniverStyleLite,
 } from './core';
 import { normalizeXlsxArchive } from './xlsx-normalize';
+import { readXlsxThemePalette, type ThemePalette } from './xlsx-theme';
+import { createTextMeasure, shrinkFontSize, type TextMeasure } from './textMeasure';
 import {
   applySheetExtras,
   collectSheetExtras,
@@ -249,7 +251,12 @@ function readNoteText(note: unknown): string | undefined {
  * Preserves dates (Excel serial + number format), error values, hyperlinks, notes and cell rich text
  * so an import never silently drops content; returns null for a cell with nothing in it.
  */
-function convertCell(cell: ExcelCellLike, row: number, col: number): CellSnapshot | null {
+function convertCell(
+  cell: ExcelCellLike,
+  row: number,
+  col: number,
+  palette?: ThemePalette,
+): CellSnapshot | null {
   const target: CellSnapshot = {};
   const custom: CellCustomPayload = {};
   const numFmt = typeof cell.numFmt === 'string' ? cell.numFmt : undefined;
@@ -285,7 +292,7 @@ function convertCell(cell: ExcelCellLike, row: number, col: number): CellSnapsho
     } else if (Array.isArray(record.richText)) {
       const pieces = record.richText as RichTextPiece[];
       target.v = pieces.map((piece) => piece?.text ?? '').join('');
-      const doc = richTextToCellDocument(pieces, `cell-${row}-${col}`);
+      const doc = richTextToCellDocument(pieces, `cell-${row}-${col}`, palette);
       if (doc) target.p = doc;
     } else if (typeof record.error === 'string') {
       target.v = record.error;
@@ -309,9 +316,19 @@ function convertCell(cell: ExcelCellLike, row: number, col: number): CellSnapsho
   }
   const note = readNoteText(cell.note);
   if (note) custom.note = note;
+
+  const excelStyle = cell.style as ExcelStyleLite;
+  const shrink = excelStyle?.alignment?.shrinkToFit;
+  if (shrink) {
+    // Scaled to the real column width right after the sheet's columns are read (applyShrinkToFit)
+    custom.shrinkToFit = {
+      fs: typeof excelStyle?.font?.size === 'number' ? excelStyle.font.size : 0,
+    };
+  }
+
   if (Object.keys(custom).length > 0) target.custom = custom;
 
-  const style = excelStyleToUniver(cell.style as ExcelStyleLite);
+  const style = excelStyleToUniver(excelStyle, palette);
   if (Object.keys(style).length > 0) target.s = { ...target.s, ...style };
 
   if (target.v === undefined && target.f === undefined && !target.p && !target.custom) return null;
@@ -324,12 +341,13 @@ function collectStructure(
   sheet: SheetSnapshot,
   maxRow: number,
   maxColumn: number,
+  palette?: ThemePalette,
 ): void {
   // Hidden sheets: both hidden and veryHidden normalise to hidden, so a "vanished" sheet is not treated as visible
   sheet.hidden = worksheetStateToHidden(worksheet.state);
 
-  // Tab colour (theme colours need the theme table to resolve; fall back to the default without argb)
-  const tabColor = argbToHex(worksheet.properties?.tabColor?.argb);
+  // Tab colour (a theme tab colour is resolved through the workbook palette, like any other colour)
+  const tabColor = excelColorToHex(worksheet.properties?.tabColor, palette);
   if (tabColor) sheet.tabColor = tabColor;
 
   // View-level options: keep the snapshot defaults (gridlines on / LTR) when the fields are absent
@@ -361,6 +379,49 @@ function collectStructure(
     const xSplit = frozen.xSplit ?? 0;
     const ySplit = frozen.ySplit ?? 0;
     sheet.freeze = { xSplit, ySplit, startRow: ySplit, startColumn: xSplit };
+  }
+}
+
+/** Excel's default cell font size, used when the shrink-to-fit cell inherits its font */
+const DEFAULT_FONT_PT = 11;
+/** Univer keeps a little padding inside the cell; measuring against the full width would over-shrink */
+const CELL_PADDING_PX = 6;
+
+/** The text a cell actually renders (rich text keeps its runs in `p`, plain values in `v`) */
+function displayTextOf(cell: CellSnapshot): string {
+  const stream = cell.p?.body?.dataStream;
+  if (stream) return stream.replace(/\r\n$/, '');
+  if (typeof cell.v === 'string') return cell.v;
+  if (typeof cell.v === 'number' || typeof cell.v === 'boolean') return String(cell.v);
+  return '';
+}
+
+/**
+ * Shrink-to-fit ("缩小字体填充"): Univer has no notion of it — it draws the nominal size and clips — so the
+ * size Excel would have picked is measured here against the real column width and stored as the cell's
+ * font size. The authored size stays in `custom.shrinkToFit` so export can write back
+ * `<alignment shrinkToFit="1"/>` with the original font size.
+ *
+ * Runs after the columns are read, because the computation needs their width.
+ */
+function applyShrinkToFit(sheet: SheetSnapshot, measure: TextMeasure): void {
+  for (const [rowKey, row] of Object.entries(sheet.cellData)) {
+    for (const [colKey, cell] of Object.entries(row)) {
+      const shrink = cell.custom?.shrinkToFit;
+      if (!shrink) continue;
+      const fontPt = shrink.fs > 0 ? shrink.fs : DEFAULT_FONT_PT;
+      const width = sheet.columnData[colKey]?.w ?? sheet.defaultColumnWidth;
+      const next = shrinkFontSize(
+        displayTextOf(cell),
+        fontPt,
+        cell.s?.ff,
+        width - CELL_PADDING_PX,
+        measure,
+      );
+      shrink.fs = fontPt;
+      if (next !== null) cell.s = { ...cell.s, fs: next };
+      sheet.cellData[rowKey] = row;
+    }
   }
 }
 
@@ -423,6 +484,10 @@ export async function importXlsxInThread(
     const rawGathered = await collectRawChartPartsFrom(buffer);
     // Then normalise comment relationships: the way openpyxl and friends write them makes exceljs throw, blocking the whole import
     const normalized = await normalizeXlsxArchive(buffer);
+    // The workbook's own theme: `<color theme="4"/>` only means something against this palette
+    const themePalette = await readXlsxThemePalette(normalized);
+    // Shrink-to-fit needs real glyph widths, measured once per import
+    const measureText = createTextMeasure();
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
     try {
@@ -458,6 +523,7 @@ export async function importXlsxInThread(
             cell as unknown as ExcelCellLike,
             Number(rowKey),
             Number(colKey),
+            themePalette,
           );
           if (!target) return;
           sheet.cellData[rowKey] = sheet.cellData[rowKey] ?? {};
@@ -467,7 +533,15 @@ export async function importXlsxInThread(
 
       sheet.rowCount = Math.max(MIN_ROW_COUNT, maxRow + 20);
       sheet.columnCount = Math.max(MIN_COLUMN_COUNT, maxColumn + 4);
-      collectStructure(worksheet as unknown as WorksheetLike, sheet, maxRow, maxColumn);
+      collectStructure(
+        worksheet as unknown as WorksheetLike,
+        sheet,
+        maxRow,
+        maxColumn,
+        themePalette,
+      );
+      // After the columns: the shrunk size depends on the real column width
+      applyShrinkToFit(sheet, measureText);
 
       // Conditional formatting / data validation: not mapped semantically yet, kept with the snapshot and written back on export
       const extras = collectSheetExtras(worksheet as unknown as WorksheetExtrasLike);
@@ -698,8 +772,15 @@ export async function exportSnapshotInThread(
             // Skip truly blank cells, but still write cells that only carry a note or a style
             continue;
           }
-          if (cell.s) {
-            target.style = univerStyleToExcel(cell.s) as never;
+          if (cell.s || cell.custom?.shrinkToFit) {
+            const style = univerStyleToExcel(cell.s ?? {});
+            const shrink = cell.custom?.shrinkToFit;
+            if (shrink) {
+              // Excel shrinks it itself: write the authored size back, plus the alignment flag
+              style.font = { ...style.font, size: shrink.fs };
+              style.alignment = { ...style.alignment, shrinkToFit: true };
+            }
+            target.style = style as never;
           }
           // Note: write it back as the cell comment
           if (note) target.note = note;

@@ -1,4 +1,5 @@
 import type { ToolResult } from '@/core/types';
+import { resolveThemeColor, type ThemePalette } from './xlsx-theme';
 
 /**
  * Spreadsheet editor pure-logic layer (technical design §8.2):
@@ -41,10 +42,15 @@ export interface UniverStyleLite {
   fs?: number;
   it?: BooleanNumber;
   bl?: BooleanNumber;
-  ul?: { s: BooleanNumber };
+  /** ITextDecoration: `t` selects the line type (see TEXT_DECORATION_SINGLE / _DOUBLE) */
+  ul?: { s: BooleanNumber; t?: number };
   st?: { s: BooleanNumber };
   cl?: { rgb?: string };
   bg?: { rgb?: string };
+  /** BaselineOffset: 2 subscript / 3 superscript (drawn smaller and shifted by engine-render) */
+  va?: 2 | 3;
+  /** Text rotation: `a` in degrees (negative = counter-clockwise, i.e. Excel's 1-90), `v: 1` = vertical text */
+  tr?: { a: number; v?: BooleanNumber };
   /** HorizontalAlign: 1 left / 2 center / 3 right / 4 justify */
   ht?: 1 | 2 | 3 | 4;
   /** VerticalAlign: 1 top / 2 middle / 3 bottom */
@@ -60,40 +66,51 @@ export interface UniverStyleLite {
   };
 }
 
+/** ExcelJS colour reference: either a concrete ARGB or a slot in the workbook theme */
+export interface ExcelColorLike {
+  argb?: string;
+  theme?: number;
+  tint?: number;
+}
+
+/** ExcelJS font subset (only the fields this tool cares about) */
+export interface ExcelFontLite {
+  name?: string;
+  size?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean | string;
+  strike?: boolean;
+  /** superscript / subscript — Excel keeps them as a font attribute, not as separate characters */
+  vertAlign?: string;
+  color?: ExcelColorLike;
+}
+
 /** ExcelJS cell style (only the fields this tool cares about) */
 export interface ExcelStyleLite {
-  font?: {
-    name?: string;
-    size?: number;
-    bold?: boolean;
-    italic?: boolean;
-    underline?: boolean | string;
-    strike?: boolean;
-    color?: { argb?: string };
+  font?: ExcelFontLite;
+  fill?: { type?: string; fgColor?: ExcelColorLike };
+  alignment?: {
+    horizontal?: string;
+    vertical?: string;
+    wrapText?: boolean;
+    /** Degrees counter-clockwise (1-90) / clockwise (91-180), or the literal 'vertical' for 255 */
+    textRotation?: number | string;
+    shrinkToFit?: boolean;
   };
-  fill?: { type?: string; fgColor?: { argb?: string } };
-  alignment?: { horizontal?: string; vertical?: string; wrapText?: boolean };
   numFmt?: string;
   border?: {
-    top?: { style?: string; color?: { argb?: string } };
-    bottom?: { style?: string; color?: { argb?: string } };
-    left?: { style?: string; color?: { argb?: string } };
-    right?: { style?: string; color?: { argb?: string } };
+    top?: { style?: string; color?: ExcelColorLike };
+    bottom?: { style?: string; color?: ExcelColorLike };
+    left?: { style?: string; color?: ExcelColorLike };
+    right?: { style?: string; color?: ExcelColorLike };
   };
 }
 
 /** Rich text piece (font subset aligned with ExcelJS RichText) */
 export interface RichTextPiece {
   text: string;
-  font?: {
-    name?: string;
-    size?: number;
-    bold?: boolean;
-    italic?: boolean;
-    underline?: boolean | string;
-    strike?: boolean;
-    color?: { argb?: string };
-  };
+  font?: ExcelFontLite;
 }
 
 /**
@@ -123,6 +140,12 @@ export interface CellCustomPayload {
   note?: string;
   /** Error value text (e.g. #VALUE!): restored as an Excel error cell on export */
   error?: string;
+  /**
+   * Shrink-to-fit ("缩小字体填充"): the engine cannot shrink glyphs, so import stores the size Excel
+   * computed here and lowers the cell font to it. `fs` keeps the authored size for export, which writes
+   * the original size plus `<alignment shrinkToFit="1"/>` so Excel still shrinks it itself.
+   */
+  shrinkToFit?: { fs: number };
 }
 
 export interface MergeRange {
@@ -198,6 +221,90 @@ export function hexToArgb(hex: string | undefined): string | undefined {
   if (/^[0-9A-F]{6}$/.test(value)) return `FF${value}`;
   if (/^[0-9A-F]{8}$/.test(value)) return value;
   return undefined;
+}
+
+/**
+ * ExcelJS colour → #RRGGBB, resolving `theme` references against the workbook palette.
+ * A theme colour that cannot be resolved is dropped rather than guessed: painting the wrong colour is
+ * worse than leaving the default, and importFidelity reports nothing for it either way.
+ */
+export function excelColorToHex(
+  color: ExcelColorLike | undefined,
+  palette?: ThemePalette,
+): string | undefined {
+  if (!color) return undefined;
+  const direct = argbToHex(color.argb);
+  if (direct) return direct;
+  return resolveThemeColor(palette, color.theme, color.tint);
+}
+
+/** Univer text-decoration line types (shared by underline and strike) */
+export const TEXT_DECORATION_SINGLE = 12;
+export const TEXT_DECORATION_DOUBLE = 10;
+
+/** Univer BaselineOffset: superscript / subscript */
+export const BASELINE_SUBSCRIPT = 2;
+export const BASELINE_SUPERSCRIPT = 3;
+
+/**
+ * Excel underline → Univer text decoration.
+ * Excel has four variants; Univer only knows single and double, so the two "accounting" forms keep
+ * their line type and lose the accounting gap (still better than dropping the underline entirely).
+ */
+export function underlineToUniver(
+  underline: boolean | string | undefined,
+): { s: BooleanNumber; t?: number } | undefined {
+  if (!underline) return undefined;
+  const value = underline === true ? 'single' : String(underline).toLowerCase();
+  return value.startsWith('double') ? { s: 1, t: TEXT_DECORATION_DOUBLE } : { s: 1 };
+}
+
+/** Univer underline → Excel's `underline` attribute */
+export function univerUnderlineToExcel(ul: UniverStyleLite['ul']): boolean | 'double' | undefined {
+  if (!ul?.s) return undefined;
+  return ul.t === TEXT_DECORATION_DOUBLE ? 'double' : true;
+}
+
+/** Excel `vertAlign` → Univer BaselineOffset (only the two baseline-shifted modes matter) */
+export function vertAlignToUniver(vertAlign: string | undefined): 2 | 3 | undefined {
+  const value = vertAlign?.toLowerCase();
+  if (value === 'superscript') return BASELINE_SUPERSCRIPT;
+  if (value === 'subscript') return BASELINE_SUBSCRIPT;
+  return undefined;
+}
+
+/** Univer BaselineOffset → Excel `vertAlign` */
+export function univerVertAlignToExcel(
+  va: UniverStyleLite['va'],
+): 'superscript' | 'subscript' | undefined {
+  if (va === BASELINE_SUPERSCRIPT) return 'superscript';
+  if (va === BASELINE_SUBSCRIPT) return 'subscript';
+  return undefined;
+}
+
+/**
+ * Excel text rotation → Univer text rotation.
+ * Excel counts counter-clockwise in 1-90 and clockwise in 91-180 (as `n - 90`), and 255 means the text is
+ * laid out vertically top-to-bottom. Univer uses the opposite sign for counter-clockwise and a flag for
+ * the vertical case (see its own rotate menu: -45 = angle up, 45 = angle down).
+ */
+export function textRotationToUniver(
+  value: number | string | undefined,
+): { a: number; v?: BooleanNumber } | undefined {
+  if (value === 'vertical' || value === 255) return { a: 0, v: 1 };
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  if (value < 1 || value > 180) return undefined;
+  return value <= 90 ? { a: -value } : { a: value - 90 };
+}
+
+/** Univer text rotation → Excel `textRotation` */
+export function univerTextRotationToExcel(
+  tr: UniverStyleLite['tr'],
+): number | 'vertical' | undefined {
+  if (!tr) return undefined;
+  if (tr.v === 1) return 'vertical';
+  if (typeof tr.a !== 'number' || !Number.isFinite(tr.a) || tr.a === 0) return undefined;
+  return tr.a < 0 ? Math.min(90, Math.round(-tr.a)) : Math.min(180, Math.round(90 + tr.a));
 }
 
 export type ImportKind = 'xlsx' | 'csv' | 'ods' | 'legacy-xls' | 'unsupported';
@@ -310,10 +417,13 @@ const BORDER_TO_EXCEL: Record<number, string> = {
   13: 'thick',
 };
 
-function toUniverBorder(side: { style?: string; color?: { argb?: string } } | undefined) {
+function toUniverBorder(
+  side: { style?: string; color?: ExcelColorLike } | undefined,
+  palette?: ThemePalette,
+) {
   if (!side?.style) return undefined;
   const s = BORDER_TO_UNIVER[side.style] ?? 1;
-  const rgb = argbToHex(side.color?.argb);
+  const rgb = excelColorToHex(side.color, palette);
   return { s, cl: rgb ? { rgb } : {} };
 }
 
@@ -325,23 +435,31 @@ function toExcelBorder(side: { s: number; cl: { rgb?: string } } | undefined) {
   };
 }
 
-/** ExcelJS style → Univer style (only font / size / bold-italic / underline / strike / colour /
- * background / alignment / wrap / number format / borders) */
-export function excelStyleToUniver(style: ExcelStyleLite): UniverStyleLite {
+/**
+ * ExcelJS style → Univer style: font (name / size / bold / italic / underline variants / strike /
+ * colour / super-subscript) / background / alignment (including rotation and shrink-to-fit) / wrap /
+ * number format / borders.
+ *
+ * `palette` is the workbook theme, needed to turn `theme="4"` colour references into RGB.
+ */
+export function excelStyleToUniver(style: ExcelStyleLite, palette?: ThemePalette): UniverStyleLite {
   const out: UniverStyleLite = {};
   const font = style.font;
   if (font?.name) out.ff = font.name;
   if (typeof font?.size === 'number') out.fs = font.size;
   if (font?.bold) out.bl = 1;
   if (font?.italic) out.it = 1;
-  if (font?.underline) out.ul = { s: 1 };
+  const underline = underlineToUniver(font?.underline);
+  if (underline) out.ul = underline;
   if (font?.strike) out.st = { s: 1 };
-  const fontColor = argbToHex(font?.color?.argb);
+  const fontColor = excelColorToHex(font?.color, palette);
   if (fontColor) out.cl = { rgb: fontColor };
+  const baseline = vertAlignToUniver(font?.vertAlign);
+  if (baseline) out.va = baseline;
 
   const fill = style.fill;
   if (fill?.type === 'pattern' || fill?.type === 'gradient') {
-    const bg = argbToHex(fill.fgColor?.argb);
+    const bg = excelColorToHex(fill.fgColor, palette);
     if (bg) out.bg = { rgb: bg };
   }
 
@@ -354,16 +472,21 @@ export function excelStyleToUniver(style: ExcelStyleLite): UniverStyleLite {
     const vt = VERTICAL_TO_UNIVER[align.vertical];
     if (vt) out.vt = vt;
   }
-  if (align?.wrapText) out.tb = 3;
+  const rotation = textRotationToUniver(align?.textRotation);
+  if (rotation) out.tr = rotation;
+  // Excel turns wrapping off when shrinking (the glyphs get smaller instead of the line wrapping), so
+  // shrink wins when a file carries both flags: clipping is closer to Excel than an unbounded wrap
+  if (align?.shrinkToFit) out.tb = 2;
+  else if (align?.wrapText) out.tb = 3;
 
   if (style.numFmt && style.numFmt !== 'General') out.n = { pattern: style.numFmt };
 
   const border = style.border;
   const bd = {
-    t: toUniverBorder(border?.top),
-    r: toUniverBorder(border?.right),
-    b: toUniverBorder(border?.bottom),
-    l: toUniverBorder(border?.left),
+    t: toUniverBorder(border?.top, palette),
+    r: toUniverBorder(border?.right, palette),
+    b: toUniverBorder(border?.bottom, palette),
+    l: toUniverBorder(border?.left, palette),
   };
   if (bd.t || bd.r || bd.b || bd.l) out.bd = bd;
 
@@ -378,10 +501,13 @@ export function univerStyleToExcel(style: UniverStyleLite): ExcelStyleLite {
   if (typeof style.fs === 'number') font.size = style.fs;
   if (style.bl) font.bold = true;
   if (style.it) font.italic = true;
-  if (style.ul?.s) font.underline = true;
+  const underline = univerUnderlineToExcel(style.ul);
+  if (underline) font.underline = underline;
   if (style.st?.s) font.strike = true;
   const fontColor = hexToArgb(style.cl?.rgb);
   if (fontColor) font.color = { argb: fontColor };
+  const baseline = univerVertAlignToExcel(style.va);
+  if (baseline) font.vertAlign = baseline;
   if (Object.keys(font).length > 0) out.font = font;
 
   const bg = hexToArgb(style.bg?.rgb);
@@ -397,6 +523,8 @@ export function univerStyleToExcel(style: UniverStyleLite): ExcelStyleLite {
     if (vertical) alignment.vertical = vertical;
   }
   if (style.tb === 3) alignment.wrapText = true;
+  const rotation = univerTextRotationToExcel(style.tr);
+  if (rotation !== undefined) alignment.textRotation = rotation;
   if (Object.keys(alignment).length > 0) out.alignment = alignment;
 
   if (style.n?.pattern) out.numFmt = style.n.pattern;
@@ -421,17 +549,23 @@ export function univerStyleToExcel(style: UniverStyleLite): ExcelStyleLite {
 /* ------------------------------ Cell rich text / dates / custom payload ------------------------------ */
 
 /** Rich-text font subset → Univer text style (same fields as cell styles, so rendering can be reused) */
-export function richTextFontToStyle(font: RichTextPiece['font'] | undefined): UniverStyleLite {
+export function richTextFontToStyle(
+  font: RichTextPiece['font'] | undefined,
+  palette?: ThemePalette,
+): UniverStyleLite {
   const out: UniverStyleLite = {};
   if (!font) return out;
   if (font.name) out.ff = font.name;
   if (typeof font.size === 'number') out.fs = font.size;
   if (font.bold) out.bl = 1;
   if (font.italic) out.it = 1;
-  if (font.underline) out.ul = { s: 1 };
+  const underline = underlineToUniver(font.underline);
+  if (underline) out.ul = underline;
   if (font.strike) out.st = { s: 1 };
-  const color = argbToHex(font.color?.argb);
+  const color = excelColorToHex(font.color, palette);
   if (color) out.cl = { rgb: color };
+  const baseline = vertAlignToUniver(font.vertAlign);
+  if (baseline) out.va = baseline;
   return out;
 }
 
@@ -443,10 +577,13 @@ export function styleToRichTextFont(style: UniverStyleLite | undefined): RichTex
   if (typeof style.fs === 'number') font.size = style.fs;
   if (style.bl) font.bold = true;
   if (style.it) font.italic = true;
-  if (style.ul?.s) font.underline = true;
+  const underline = univerUnderlineToExcel(style.ul);
+  if (underline) font.underline = underline;
   if (style.st?.s) font.strike = true;
   const color = hexToArgb(style.cl?.rgb);
   if (color) font.color = { argb: color };
+  const baseline = univerVertAlignToExcel(style.va);
+  if (baseline) font.vertAlign = baseline;
   return Object.keys(font).length > 0 ? font : undefined;
 }
 
@@ -457,6 +594,7 @@ export function styleToRichTextFont(style: UniverStyleLite | undefined): RichTex
 export function richTextToCellDocument(
   pieces: readonly RichTextPiece[],
   id: string,
+  palette?: ThemePalette,
 ): CellDocumentData | null {
   const text = pieces.map((piece) => piece.text ?? '').join('');
   if (!text) return null;
@@ -464,7 +602,7 @@ export function richTextToCellDocument(
   let cursor = 0;
   for (const piece of pieces) {
     const length = (piece.text ?? '').length;
-    const ts = richTextFontToStyle(piece.font);
+    const ts = richTextFontToStyle(piece.font, palette);
     if (length > 0 && Object.keys(ts).length > 0) {
       textRuns.push({ st: cursor, ed: cursor + length, ts });
     }
@@ -656,7 +794,10 @@ export interface PresentCell {
   text: string;
   bold?: boolean;
   italic?: boolean;
-  underline?: boolean;
+  /** true = single line, 'double' = Excel's 双下划线 */
+  underline?: boolean | 'double';
+  /** BaselineOffset: superscript / subscript text */
+  baseline?: 'super' | 'sub';
   fontSize?: number;
   color?: string;
   background?: string;
@@ -765,7 +906,14 @@ export function buildPresentGrid(
         text,
         ...(style?.bl === 1 ? { bold: true } : {}),
         ...(style?.it === 1 ? { italic: true } : {}),
-        ...(style?.ul?.s === 1 ? { underline: true } : {}),
+        ...(style?.ul?.s === 1
+          ? { underline: style.ul.t === TEXT_DECORATION_DOUBLE ? ('double' as const) : true }
+          : {}),
+        ...(style?.va === BASELINE_SUPERSCRIPT
+          ? { baseline: 'super' as const }
+          : style?.va === BASELINE_SUBSCRIPT
+            ? { baseline: 'sub' as const }
+            : {}),
         ...(style?.fs !== undefined ? { fontSize: Math.round(style.fs) } : {}),
         ...(style?.cl?.rgb ? { color: style.cl.rgb } : {}),
         ...(style?.bg?.rgb ? { background: style.bg.rgb } : {}),

@@ -204,6 +204,59 @@ describe('样式双向映射', () => {
     expect(back.border?.left?.style).toBe('medium');
     expect(back.border?.right?.style).toBe('thick');
   });
+
+  it('主题色按工作簿调色板解析（0=dk1 … 4=accent1）', () => {
+    const palette = ['#000000', '#FFFFFF', '#44546A', '#E7E6E6', '#156082'];
+    const style = excelStyleToUniver({ font: { color: { theme: 4 } } }, palette);
+    expect(style.cl).toEqual({ rgb: '#156082' });
+    // 越界或没有调色板时宁可不画，也不猜一个颜色
+    expect(excelStyleToUniver({ font: { color: { theme: 9 } } }, palette).cl).toBeUndefined();
+    expect(excelStyleToUniver({ font: { color: { theme: 4 } } }).cl).toBeUndefined();
+    // 具体 RGB 优先于主题引用
+    const both = excelStyleToUniver({ font: { color: { argb: 'FFC00000', theme: 4 } } }, palette);
+    expect(both.cl).toEqual({ rgb: '#C00000' });
+  });
+
+  it('下划线变体：双下划线保留线型，会计用下划线降级为单线', () => {
+    expect(excelStyleToUniver({ font: { underline: 'double' } }).ul).toEqual({ s: 1, t: 10 });
+    expect(excelStyleToUniver({ font: { underline: true } }).ul).toEqual({ s: 1 });
+    expect(excelStyleToUniver({ font: { underline: 'singleAccounting' } }).ul).toEqual({ s: 1 });
+    expect(univerStyleToExcel({ ul: { s: 1, t: 10 } }).font?.underline).toBe('double');
+    expect(univerStyleToExcel({ ul: { s: 1 } }).font?.underline).toBe(true);
+  });
+
+  it('上标 / 下标映射为 BaselineOffset，并可还原', () => {
+    expect(excelStyleToUniver({ font: { vertAlign: 'superscript' } }).va).toBe(3);
+    expect(excelStyleToUniver({ font: { vertAlign: 'subscript' } }).va).toBe(2);
+    expect(excelStyleToUniver({ font: { vertAlign: 'baseline' } }).va).toBeUndefined();
+    expect(univerStyleToExcel({ va: 3 }).font?.vertAlign).toBe('superscript');
+    expect(univerStyleToExcel({ va: 2 }).font?.vertAlign).toBe('subscript');
+  });
+
+  it('文字旋转：Excel 逆时针 1-90 / 顺时针 91-180 / 255 竖排', () => {
+    expect(excelStyleToUniver({ alignment: { textRotation: 45 } }).tr).toEqual({ a: -45 });
+    expect(excelStyleToUniver({ alignment: { textRotation: 90 } }).tr).toEqual({ a: -90 });
+    expect(excelStyleToUniver({ alignment: { textRotation: 135 } }).tr).toEqual({ a: 45 });
+    expect(excelStyleToUniver({ alignment: { textRotation: 'vertical' } }).tr).toEqual({
+      a: 0,
+      v: 1,
+    });
+    expect(excelStyleToUniver({ alignment: { textRotation: 0 } }).tr).toBeUndefined();
+
+    expect(univerStyleToExcel({ tr: { a: -45 } }).alignment?.textRotation).toBe(45);
+    expect(univerStyleToExcel({ tr: { a: -90 } }).alignment?.textRotation).toBe(90);
+    expect(univerStyleToExcel({ tr: { a: 45 } }).alignment?.textRotation).toBe(135);
+    expect(univerStyleToExcel({ tr: { a: 0, v: 1 } }).alignment?.textRotation).toBe('vertical');
+  });
+
+  it('缩小字体填充：Excel 关闭换行改为裁剪，字号由导入时按列宽计算', () => {
+    const style = excelStyleToUniver({
+      alignment: { shrinkToFit: true, wrapText: true },
+    });
+    expect(style.tb).toBe(2);
+    // 缩放不写进样式（Univer 没有这个字段），导出时由 custom.shrinkToFit 复位
+    expect(style.fs).toBeUndefined();
+  });
 });
 
 describe('工作簿统计', () => {

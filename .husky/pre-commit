@@ -1,1 +1,40 @@
+#!/usr/bin/env sh
+# Git hooks run with the PATH of whatever launched git. Commits from an IDE / GUI get the bare
+# /usr/bin:/bin:/usr/sbin:/sbin, so a node + pnpm installed through nvm, fnm or volta is invisible and
+# every commit dies with "pnpm: command not found". Resolve the toolchain here so the hook works the
+# same from a terminal, the IDE and any CI image, without asking each contributor to configure husky.
+
+if ! command -v node >/dev/null 2>&1; then
+  # nvm keeps one bin dir per version: try the newest first ("engines.node" is >=20)
+  nvm_bins=$(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null \
+    | awk -F'/node/v' '{ split($2, v, "."); printf "%d %d %d %s\n", v[1], v[2], v[3], $0 }' \
+    | sort -k1,1nr -k2,2nr -k3,3nr \
+    | awk '{ print $NF }')
+  for dir in $nvm_bins "$HOME/.volta/bin" /opt/homebrew/bin /usr/local/bin; do
+    if [ -x "$dir/node" ]; then
+      PATH="$dir:$PATH"
+      export PATH
+      break
+    fi
+  done
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  for dir in "$HOME/Library/pnpm" "$HOME/.local/share/pnpm" /opt/homebrew/bin /usr/local/bin; do
+    if [ -x "$dir/pnpm" ]; then
+      PATH="$dir:$PATH"
+      export PATH
+      break
+    fi
+  done
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pre-commit: pnpm is not on PATH — git hooks do not load your shell profile." >&2
+  echo "  Either install pnpm, or point husky at your version manager:" >&2
+  echo "  echo '. ~/.nvm/nvm.sh' >> ~/.config/husky/init.sh" >&2
+  echo "  (skip the checks for one commit with 'git commit --no-verify')" >&2
+  exit 1
+fi
+
 pnpm exec lint-staged

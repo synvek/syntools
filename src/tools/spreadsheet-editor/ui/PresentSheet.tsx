@@ -123,7 +123,10 @@ export function PresentSheet({ grid }: { grid: PresentGrid }) {
             height: ROW_HEIGHT,
             fontWeight: cell?.bold ? 600 : undefined,
             fontStyle: cell?.italic ? 'italic' : undefined,
-            textDecoration: cell?.underline ? 'underline' : undefined,
+            textDecoration: cell?.underline
+              ? `underline${cell.underline === 'double' ? ' double' : ''}`
+              : undefined,
+            verticalAlign: cell?.baseline,
             fontSize: cell?.fontSize ? Math.max(10, Math.min(20, cell.fontSize)) : undefined,
             color: cell?.color,
             background: cell?.background,
