@@ -4,6 +4,43 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 
 const enTools = {
   tools: {
+    'ip-location': {
+      refresh: 'Refresh',
+      copyAll: 'Copy all',
+      loading: 'Looking up your IP location…',
+      note: "The location comes from Cloudflare's edge data through a same-origin endpoint: no third-party IP database is queried and your IP is not logged.",
+      hintNotFound:
+        'This deployment was built without PLUS mode, so /api/ip-info does not exist. Deploy with pnpm build:cf.',
+      fields: {
+        ip: 'IP address',
+        country: 'Country/region',
+        province: 'Province',
+        city: 'City',
+        carrier: 'Carrier',
+        isp: 'Network',
+        asn: 'ASN',
+        timezone: 'Timezone',
+        postalCode: 'Postal code',
+        continent: 'Continent',
+        colo: 'Edge node',
+      },
+      carriers: {
+        unicom: 'China Unicom',
+        telecom: 'China Telecom',
+        mobile: 'China Mobile',
+        broadnet: 'China Broadnet',
+        cernet: 'CERNET',
+        other: 'Other',
+        unknown: 'Unknown',
+      },
+      err: {
+        UNAVAILABLE:
+          'The edge node returned no location data (local development, or no data for this region)',
+        NETWORK: 'Network request failed, please try again',
+        NOT_FOUND: 'Endpoint missing: this build has no PLUS mode',
+        HTTP: 'Endpoint returned {{status}}',
+      },
+    },
     'video-convert': {
       unsupportedOption: '(unsupported here)',
       formats: 'Supported: MP4 / MOV / WebM / MKV / AVI / MPEG-TS',

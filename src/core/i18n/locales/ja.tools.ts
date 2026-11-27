@@ -4,6 +4,43 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 
 const jaTools = {
   tools: {
+    'ip-location': {
+      refresh: '更新',
+      copyAll: 'すべてコピー',
+      loading: 'IP の位置情報を取得しています…',
+      note: '位置情報は同一オリジンのエンドポイント経由で Cloudflare のエッジデータから取得します。サードパーティの IP データベースは使用せず、IP は記録しません。',
+      hintNotFound:
+        'このデプロイは PLUS モード無効のため /api/ip-info が存在しません。pnpm build:cf でデプロイしてください。',
+      fields: {
+        ip: 'IP アドレス',
+        country: '国・地域',
+        province: '省',
+        city: '市',
+        carrier: '通信事業者',
+        isp: 'ネットワーク名',
+        asn: 'ASN',
+        timezone: 'タイムゾーン',
+        postalCode: '郵便番号',
+        continent: '大陸',
+        colo: 'エッジノード',
+      },
+      carriers: {
+        unicom: 'China Unicom',
+        telecom: 'China Telecom',
+        mobile: 'China Mobile',
+        broadnet: 'China Broadnet',
+        cernet: 'CERNET',
+        other: 'その他',
+        unknown: '不明',
+      },
+      err: {
+        UNAVAILABLE:
+          'エッジノードから位置情報が返されませんでした（ローカル開発、またはこの地域のデータなし）',
+        NETWORK: '通信に失敗しました。後でもう一度お試しください',
+        NOT_FOUND: 'エンドポイントがありません：このビルドは PLUS モードではありません',
+        HTTP: 'エンドポイントが {{status}} を返しました',
+      },
+    },
     'video-convert': {
       unsupportedOption: '（このブラウザでは非対応）',
       formats: '対応形式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS',

@@ -4,6 +4,41 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 
 const zhTWTools = {
   tools: {
+    'ip-location': {
+      refresh: '重新整理',
+      copyAll: '複製全部',
+      loading: '正在取得 IP 歸屬地…',
+      note: '資料由本站同源介面讀取 Cloudflare 邊緣節點資訊，不查詢第三方 IP 資料庫，也不記錄你的 IP。',
+      hintNotFound: '目前部署未啟用 PLUS 模式，介面 /api/ip-info 不存在；請以 pnpm build:cf 部署。',
+      fields: {
+        ip: 'IP 位址',
+        country: '國家/地區',
+        province: '省份',
+        city: '城市',
+        carrier: '電信業者',
+        isp: '網路名稱',
+        asn: 'ASN',
+        timezone: '時區',
+        postalCode: '郵遞區號',
+        continent: '洲別',
+        colo: '接入節點',
+      },
+      carriers: {
+        unicom: '中國聯通',
+        telecom: '中國電信',
+        mobile: '中國移動',
+        broadnet: '中國廣電',
+        cernet: '教育網',
+        other: '其他',
+        unknown: '未知',
+      },
+      err: {
+        UNAVAILABLE: '邊緣節點未回傳歸屬地資料（本機開發，或該地區沒有資料）',
+        NETWORK: '網路請求失敗，請稍後再試',
+        NOT_FOUND: '介面不存在：此建置未啟用 PLUS 模式',
+        HTTP: '介面回傳 {{status}}',
+      },
+    },
     'video-convert': {
       unsupportedOption: '（瀏覽器不支援）',
       formats: '支援格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS',

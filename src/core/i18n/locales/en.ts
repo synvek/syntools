@@ -149,6 +149,11 @@ const en = {
     back: 'Back to home',
   },
   toolsMeta: {
+    'ip-location': {
+      name: 'IP Location',
+      description:
+        "Show the visitor's IP address, country, province, city and carrier (Unicom / Telecom / Mobile)",
+    },
     'code-editor': {
       name: 'Code Editor',
       description:

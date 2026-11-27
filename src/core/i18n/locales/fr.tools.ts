@@ -4,6 +4,43 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 
 const frTools = {
   tools: {
+    'ip-location': {
+      refresh: 'Actualiser',
+      copyAll: 'Tout copier',
+      loading: 'Recherche de la localisation de votre IP…',
+      note: "La localisation provient des données de périphérie de Cloudflare via un point d'accès de même origine : aucune base IP tierce n'est interrogée et votre IP n'est pas enregistrée.",
+      hintNotFound:
+        "Ce déploiement a été compilé sans le mode PLUS : /api/ip-info n'existe pas. Déployez avec pnpm build:cf.",
+      fields: {
+        ip: 'Adresse IP',
+        country: 'Pays/région',
+        province: 'Province',
+        city: 'Ville',
+        carrier: 'Opérateur',
+        isp: 'Réseau',
+        asn: 'ASN',
+        timezone: 'Fuseau horaire',
+        postalCode: 'Code postal',
+        continent: 'Continent',
+        colo: 'Nœud de périphérie',
+      },
+      carriers: {
+        unicom: 'China Unicom',
+        telecom: 'China Telecom',
+        mobile: 'China Mobile',
+        broadnet: 'China Broadnet',
+        cernet: 'CERNET',
+        other: 'Autre',
+        unknown: 'Inconnu',
+      },
+      err: {
+        UNAVAILABLE:
+          "Le nœud de périphérie n'a renvoyé aucune donnée de localisation (développement local ou aucune donnée pour cette région)",
+        NETWORK: 'Échec de la requête réseau, veuillez réessayer',
+        NOT_FOUND: "Point d'accès absent : cette compilation n'a pas le mode PLUS",
+        HTTP: "Le point d'accès a renvoyé {{status}}",
+      },
+    },
     'video-convert': {
       unsupportedOption: '(non pris en charge)',
       formats: 'Formats pris en charge : MP4 / MOV / WebM / MKV / AVI / MPEG-TS',

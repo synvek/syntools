@@ -150,6 +150,11 @@ const fr = {
     },
   },
   toolsMeta: {
+    'ip-location': {
+      name: 'Localisation IP',
+      description:
+        "Afficher l'adresse IP du visiteur, le pays, la région, la ville et l'opérateur (Unicom / Telecom / Mobile)",
+    },
     'code-editor': {
       name: 'Éditeur de code',
       description:

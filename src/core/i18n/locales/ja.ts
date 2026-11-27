@@ -149,6 +149,10 @@ const ja = {
     },
   },
   toolsMeta: {
+    'ip-location': {
+      name: 'IP ロケーション',
+      description: '訪問者の IP、国・地域・省市、通信事業者（Unicom / Telecom / Mobile）を表示',
+    },
     'code-editor': {
       name: 'コードエディタ',
       description:

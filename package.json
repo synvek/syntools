@@ -1,7 +1,7 @@
 {
   "name": "syntools",
   "private": true,
-  "version": "0.13.3",
+  "version": "0.14.0",
   "type": "module",
   "homepage": "https://github.com/synvek/syntools",
   "repository": {
@@ -21,7 +21,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:pages": "BASE_PATH=/syntools/ SITE_URL=https://synvek.github.io/syntools pnpm build",
-    "build:cf": "VITE_ANALYTICS_ENDPOINT=/api/event pnpm build",
+    "build:cf": "PLUS_MODE=true VITE_ANALYTICS_ENDPOINT=/api/event pnpm build",
     "preview": "vite preview",
     "version": "tsx scripts/sync-version.ts && git add src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json",
     "version:sync": "tsx scripts/sync-version.ts",

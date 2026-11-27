@@ -149,6 +149,11 @@ const de = {
     },
   },
   toolsMeta: {
+    'ip-location': {
+      name: 'IP-Standort',
+      description:
+        'IP-Adresse, Land, Region, Stadt und Netzbetreiber (Unicom / Telecom / Mobile) des Besuchers anzeigen',
+    },
     'code-editor': {
       name: 'Code-Editor',
       description:

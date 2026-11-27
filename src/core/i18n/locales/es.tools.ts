@@ -4,6 +4,43 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 
 const esTools = {
   tools: {
+    'ip-location': {
+      refresh: 'Actualizar',
+      copyAll: 'Copiar todo',
+      loading: 'Buscando la ubicación de la IP…',
+      note: 'La ubicación proviene de los datos de borde de Cloudflare mediante un endpoint del mismo origen: no se consulta ninguna base de IP de terceros y tu IP no se registra.',
+      hintNotFound:
+        'Esta implementación se compiló sin el modo PLUS, por lo que /api/ip-info no existe. Despliega con pnpm build:cf.',
+      fields: {
+        ip: 'Dirección IP',
+        country: 'País/región',
+        province: 'Provincia',
+        city: 'Ciudad',
+        carrier: 'Operador',
+        isp: 'Red',
+        asn: 'ASN',
+        timezone: 'Zona horaria',
+        postalCode: 'Código postal',
+        continent: 'Continente',
+        colo: 'Nodo de borde',
+      },
+      carriers: {
+        unicom: 'China Unicom',
+        telecom: 'China Telecom',
+        mobile: 'China Mobile',
+        broadnet: 'China Broadnet',
+        cernet: 'CERNET',
+        other: 'Otro',
+        unknown: 'Desconocido',
+      },
+      err: {
+        UNAVAILABLE:
+          'El nodo de borde no devolvió datos de ubicación (desarrollo local o sin datos para esta región)',
+        NETWORK: 'La solicitud de red falló, inténtalo de nuevo',
+        NOT_FOUND: 'Falta el endpoint: esta compilación no tiene modo PLUS',
+        HTTP: 'El endpoint devolvió {{status}}',
+      },
+    },
     'video-convert': {
       unsupportedOption: '(no disponible)',
       formats: 'Formatos admitidos: MP4 / MOV / WebM / MKV / AVI / MPEG-TS',

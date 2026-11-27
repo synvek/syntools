@@ -277,13 +277,13 @@ syntools/
 
 **Vercel** — `vercel.json` 已配置 `buildCommand`、`outputDirectory`、SPA 重写与安全响应头（`BASE_PATH` 默认为 `/`）。
 
-**Cloudflare Pages** — 用 `pnpm build:cf` 构建，与普通构建的唯一差别是构建期注入埋点端点。移除 ffmpeg 核心后，产物里已没有任何文件接近 Pages 单文件 25 MiB 的上限。
+**Cloudflare Pages** — 用 `pnpm build:cf` 构建：除了构建期注入埋点端点，还会设置 `PLUS_MODE=true`，注册依赖服务端的工具（目前是「IP 归属地」，由 `functions/api/ip-info.ts` 提供），并把 `functions/` 一起部署。普通构建、GitHub Pages 与桌面版保持纯前端，不带这个工具也不带接口。移除 ffmpeg 核心后，产物里已没有任何文件接近 Pages 单文件 25 MiB 的上限。
 
 **其他托管** — 托管 `dist/`，将未知路径重写到 `index.html`，并对带 hash 的 `/assets/*` 做长缓存。若部署到 GitHub 项目站子路径，可用 `pnpm build:pages`（设置 `BASE_PATH=/syntools/`）。
 
 ```bash
 pnpm build
-pnpm build:cf   # Cloudflare Pages：同一产物 + 埋点端点
+pnpm build:cf   # Cloudflare Pages：埋点端点 + PLUS_MODE（服务端工具）
 pnpm preview    # 可选：本地预览
 ```
 

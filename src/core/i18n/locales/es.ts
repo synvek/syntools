@@ -149,6 +149,11 @@ const es = {
     back: 'Volver al inicio',
   },
   toolsMeta: {
+    'ip-location': {
+      name: 'Ubicación IP',
+      description:
+        'Muestra la IP, el país, la provincia, la ciudad y el operador (Unicom / Telecom / Mobile) del visitante',
+    },
     'code-editor': {
       name: 'Editor de código',
       description:

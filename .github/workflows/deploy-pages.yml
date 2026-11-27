@@ -36,9 +36,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # build:cf = FFMPEG_PAGES=1 VITE_ANALYTICS_ENDPOINT=/api/event pnpm build
+      # build:cf = PLUS_MODE=true VITE_ANALYTICS_ENDPOINT=/api/event pnpm build
       # Must use this script, not plain pnpm build: otherwise the front end gets no analytics
-      # endpoint and the whole telemetry chain fails silently.
+      # endpoint (telemetry fails silently) and PLUS_MODE stays off, so the server-backed tools
+      # and the functions/ directory are not shipped.
       - name: Build
         run: pnpm build:cf
         env:

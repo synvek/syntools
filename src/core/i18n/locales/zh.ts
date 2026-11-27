@@ -145,6 +145,10 @@ export default {
     back: '返回首页',
   },
   toolsMeta: {
+    'ip-location': {
+      name: 'IP 归属地',
+      description: '查看当前访客的 IP、国家/省份/城市与运营商（联通 / 电信 / 移动）',
+    },
     'code-editor': {
       name: '代码编辑器',
       description: '语法高亮可编辑代码，支持多语言格式化、10 套风格与源码 / HTML / 图片导出',

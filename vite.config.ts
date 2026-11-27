@@ -26,6 +26,25 @@ function resolveBase(): string {
   return `/${raw.replace(/^\/+|\/+$/g, '')}/`;
 }
 
+/**
+ * 服务端增强能力开关（PLUS_MODE，默认关闭）。
+ *
+ * 打开后会注册依赖同源接口的工具（目前是 `/api/ip-info` → 「IP 归属地」），
+ * 并把 `functions/` 一起部署到 Cloudflare Pages。单机（Tauri）与 GitHub Pages
+ * 没有这个后端，所以默认 false，只有 `pnpm build:cf` 显式打开。
+ *
+ * `PLUS_MODE` 会被归一化成 `VITE_PLUS_MODE`：客户端通过 `import.meta.env`
+ * 读取（`src/core/config/plusMode.ts`），预渲染插件用同样的环境变量，
+ * 因此 dist 里的工具页/ sitemap 与运行时注册表不会不一致。
+ */
+function resolvePlusMode(): boolean {
+  const raw = process.env.PLUS_MODE ?? process.env.VITE_PLUS_MODE ?? '';
+  return /^(1|true|yes|on)$/i.test(raw.trim());
+}
+
+const PLUS_MODE = resolvePlusMode();
+if (PLUS_MODE) process.env.VITE_PLUS_MODE = 'true';
+
 // https://vitejs.dev/config/
 export default defineConfig({
   base: resolveBase(),

@@ -159,10 +159,14 @@ function main() {
   for (const file of files) {
     const data = JSON.parse(readFileSync(file, 'utf8'));
     for (const lang of LANGS) {
+      // 外壳（toolsMeta / categories）在 `<lang>.ts`，工具 UI 文案在 `<lang>.tools.ts`
+      // （拆分原因见 src/core/i18n/locales/index.ts）
       const localePath = path.join(LOCALE_DIR, `${lang}.ts`);
-      const content = readFileSync(localePath, 'utf8');
-      const lines = content.split('\n');
+      const toolsPath = path.join(LOCALE_DIR, `${lang}.tools.ts`);
+      const lines = readFileSync(localePath, 'utf8').split('\n');
+      const toolLines = readFileSync(toolsPath, 'utf8').split('\n');
       let changed = false;
+      let toolsChanged = false;
 
       if (data.categories) {
         const anchor = findAnchor(lines, 'categories: {');
@@ -200,13 +204,13 @@ function main() {
 
           // 2) ui: merge missing keys when present, otherwise insert the whole block
           if (entry.ui?.[lang]) {
-            const toolsAnchor = findAnchor(lines, 'tools: {');
-            const range = findObjectRange(lines, id, toolsAnchor);
+            const toolsAnchor = findAnchor(toolLines, 'tools: {');
+            const range = findObjectRange(toolLines, id, toolsAnchor);
             if (range) {
-              if (mergeObject(lines, range, nest(entry.ui[lang]))) changed = true;
+              if (mergeObject(toolLines, range, nest(entry.ui[lang]))) toolsChanged = true;
             } else {
-              lines.splice(toolsAnchor + 1, 0, ...serialize({ [id]: nest(entry.ui[lang]) }, 4));
-              changed = true;
+              toolLines.splice(toolsAnchor + 1, 0, ...serialize({ [id]: nest(entry.ui[lang]) }, 4));
+              toolsChanged = true;
             }
           }
         }
@@ -215,6 +219,10 @@ function main() {
       if (changed) {
         writeFileSync(localePath, lines.join('\n'));
         console.log(`Injected into ${lang}.ts`);
+      }
+      if (toolsChanged) {
+        writeFileSync(toolsPath, toolLines.join('\n'));
+        console.log(`Injected into ${lang}.tools.ts`);
       }
     }
   }

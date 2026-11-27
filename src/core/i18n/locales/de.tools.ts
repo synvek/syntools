@@ -4,6 +4,43 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 
 const deTools = {
   tools: {
+    'ip-location': {
+      refresh: 'Aktualisieren',
+      copyAll: 'Alles kopieren',
+      loading: 'Standort der IP wird ermittelt…',
+      note: 'Der Standort stammt aus den Edge-Daten von Cloudflare über einen Endpunkt derselben Herkunft: Es wird keine fremde IP-Datenbank abgefragt und die IP nicht protokolliert.',
+      hintNotFound:
+        'Dieses Deployment wurde ohne PLUS-Modus gebaut, daher fehlt /api/ip-info. Bitte mit pnpm build:cf deployen.',
+      fields: {
+        ip: 'IP-Adresse',
+        country: 'Land/Region',
+        province: 'Provinz',
+        city: 'Stadt',
+        carrier: 'Netzbetreiber',
+        isp: 'Netzwerk',
+        asn: 'ASN',
+        timezone: 'Zeitzone',
+        postalCode: 'Postleitzahl',
+        continent: 'Kontinent',
+        colo: 'Edge-Knoten',
+      },
+      carriers: {
+        unicom: 'China Unicom',
+        telecom: 'China Telecom',
+        mobile: 'China Mobile',
+        broadnet: 'China Broadnet',
+        cernet: 'CERNET',
+        other: 'Sonstige',
+        unknown: 'Unbekannt',
+      },
+      err: {
+        UNAVAILABLE:
+          'Der Edge-Knoten liefert keine Standortdaten (lokale Entwicklung oder keine Daten für diese Region)',
+        NETWORK: 'Netzwerkanfrage fehlgeschlagen, bitte erneut versuchen',
+        NOT_FOUND: 'Endpunkt fehlt: Dieser Build hat keinen PLUS-Modus',
+        HTTP: 'Endpunkt antwortete mit {{status}}',
+      },
+    },
     'video-convert': {
       unsupportedOption: '(hier nicht unterstützt)',
       formats: 'Unterstützt: MP4 / MOV / WebM / MKV / AVI / MPEG-TS',

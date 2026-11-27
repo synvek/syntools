@@ -150,6 +150,11 @@ const pt = {
     back: 'Voltar ao início',
   },
   toolsMeta: {
+    'ip-location': {
+      name: 'Localização de IP',
+      description:
+        'Mostra o IP, país, região, cidade e operadora (Unicom / Telecom / Mobile) do visitante',
+    },
     'code-editor': {
       name: 'Editor de código',
       description:

@@ -277,13 +277,13 @@ The build output is a static SPA in `dist/`. `pnpm build` also prerenders the ho
 
 **Vercel** — `vercel.json` already defines `buildCommand`, `outputDirectory`, SPA rewrites, and security headers (`BASE_PATH` defaults to `/`).
 
-**Cloudflare Pages** — build with `pnpm build:cf`; the only difference from a plain build is that the analytics endpoint is injected at build time. No asset comes near Pages' 25 MiB per-file limit any more, because the ffmpeg core is gone.
+**Cloudflare Pages** — build with `pnpm build:cf`: it injects the analytics endpoint and sets `PLUS_MODE=true`, which registers the server-backed tools (today `IP Location`, served by `functions/api/ip-info.ts`) and deploys `functions/` alongside `dist/`. Plain builds, GitHub Pages and the desktop app stay client-only and ship neither the tool nor the endpoint. No asset comes near Pages' 25 MiB per-file limit any more, because the ffmpeg core is gone.
 
 **Other hosts** — serve `dist/`, rewrite unknown paths to `index.html`, and cache hashed `/assets/*` aggressively. For GitHub project pages under a subpath, build with `pnpm build:pages` (sets `BASE_PATH=/syntools/`).
 
 ```bash
 pnpm build
-pnpm build:cf   # Cloudflare Pages: same build + analytics endpoint
+pnpm build:cf   # Cloudflare Pages: analytics endpoint + PLUS_MODE (server-backed tools)
 pnpm preview    # optional local check
 ```
 

@@ -153,6 +153,8 @@ import { audioConvertTool } from '@/tools/audio-convert';
 import { videoToGifTool } from '@/tools/video-to-gif';
 import { videoConvertTool } from '@/tools/video-convert';
 import { subtitleTool } from '@/tools/subtitle-tool';
+import { ipLocationTool } from '@/tools/ip-location';
+import { PLUS_MODE } from '@/core/config/plusMode';
 
 /**
  * The project's single registration entry point: adding a tool means adding one line here.
@@ -313,6 +315,9 @@ export const tools: ToolMeta[] = [
   flowchartEditorTool,
   mindmapEditorTool,
   photoEditorTool,
+  // 服务端增强能力：只有 PLUS_MODE 构建（`pnpm build:cf`）才上线，
+  // 因为工具依赖同源 `/api/ip-info`，单机版与纯静态部署没有这个接口。
+  ...(PLUS_MODE ? [ipLocationTool] : []),
 ];
 
 export const toolMap = new Map(tools.map((t) => [t.id, t]));

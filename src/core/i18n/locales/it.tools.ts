@@ -4,6 +4,43 @@ import type { ToolStringsResources } from '@/core/i18n/types';
 
 const itTools = {
   tools: {
+    'ip-location': {
+      refresh: 'Aggiorna',
+      copyAll: 'Copia tutto',
+      loading: "Ricerca della posizione dell'IP…",
+      note: 'La posizione proviene dai dati edge di Cloudflare tramite un endpoint della stessa origine: nessun database IP di terze parti viene interrogato e il tuo IP non viene registrato.',
+      hintNotFound:
+        'Questa distribuzione è stata compilata senza la modalità PLUS, quindi /api/ip-info non esiste. Distribuisci con pnpm build:cf.',
+      fields: {
+        ip: 'Indirizzo IP',
+        country: 'Paese/regione',
+        province: 'Provincia',
+        city: 'Città',
+        carrier: 'Operatore',
+        isp: 'Rete',
+        asn: 'ASN',
+        timezone: 'Fuso orario',
+        postalCode: 'CAP',
+        continent: 'Continente',
+        colo: 'Nodo edge',
+      },
+      carriers: {
+        unicom: 'China Unicom',
+        telecom: 'China Telecom',
+        mobile: 'China Mobile',
+        broadnet: 'China Broadnet',
+        cernet: 'CERNET',
+        other: 'Altro',
+        unknown: 'Sconosciuto',
+      },
+      err: {
+        UNAVAILABLE:
+          'Il nodo edge non ha restituito dati di posizione (sviluppo locale o nessun dato per questa regione)',
+        NETWORK: 'Richiesta di rete non riuscita, riprova più tardi',
+        NOT_FOUND: 'Endpoint mancante: questa build non ha la modalità PLUS',
+        HTTP: "L'endpoint ha restituito {{status}}",
+      },
+    },
     'video-convert': {
       unsupportedOption: '(non supportato)',
       formats: 'Formati supportati: MP4 / MOV / WebM / MKV / AVI / MPEG-TS',

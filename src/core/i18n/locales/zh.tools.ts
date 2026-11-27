@@ -2,6 +2,41 @@
 
 const zhTools = {
   tools: {
+    'ip-location': {
+      refresh: '刷新',
+      copyAll: '复制全部',
+      loading: '正在获取 IP 归属地…',
+      note: '数据由本站同源接口读取 Cloudflare 边缘节点信息，不查询第三方 IP 库，也不记录你的 IP。',
+      hintNotFound: '当前部署未启用 PLUS 模式，接口 /api/ip-info 不存在；请用 pnpm build:cf 部署。',
+      fields: {
+        ip: 'IP 地址',
+        country: '国家/地区',
+        province: '省份',
+        city: '城市',
+        carrier: '运营商',
+        isp: '网络名称',
+        asn: 'ASN',
+        timezone: '时区',
+        postalCode: '邮编',
+        continent: '大洲',
+        colo: '接入节点',
+      },
+      carriers: {
+        unicom: '中国联通',
+        telecom: '中国电信',
+        mobile: '中国移动',
+        broadnet: '中国广电',
+        cernet: '教育网',
+        other: '其他',
+        unknown: '未知',
+      },
+      err: {
+        UNAVAILABLE: '边缘节点没有返回归属地数据（本地开发，或该地区没有数据）',
+        NETWORK: '网络请求失败，请稍后重试',
+        NOT_FOUND: '接口不存在：该构建未启用 PLUS 模式',
+        HTTP: '接口返回 {{status}}',
+      },
+    },
     'video-convert': {
       unsupportedOption: '（浏览器不支持）',
       formats: '支持格式：MP4 / MOV / WebM / MKV / AVI / MPEG-TS',

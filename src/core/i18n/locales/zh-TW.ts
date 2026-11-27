@@ -147,6 +147,10 @@ const zhTW = {
     back: '返回首頁',
   },
   toolsMeta: {
+    'ip-location': {
+      name: 'IP 歸屬地',
+      description: '查看目前訪客的 IP、國家/省份/城市與電信業者（聯通 / 電信 / 移動）',
+    },
     'code-editor': {
       name: '程式碼編輯器',
       description: '語法高亮可編輯程式碼，支援多語言格式化、10 種風格與原始碼 / HTML / 圖片匯出',
