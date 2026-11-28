@@ -4,6 +4,7 @@
  *
  *   pnpm check:seo
  *   SITE_URL=https://staging.example.com pnpm check:seo
+ *   PLUS_MODE=1 pnpm check:seo        # also verify the server-backed (PLUS) tool page
  *
  * It covers the things that break silently after a deploy without raising errors:
  * whether robots.txt was rewritten by the host, whether the sitemap host matches,
@@ -21,6 +22,13 @@ const SITE = (process.env.SITE_URL || 'https://www.syntools.net').replace(/\/$/,
 const APEX = (process.env.APEX_URL || 'https://syntools.net').replace(/\/$/, '');
 const SAMPLE_TOOL = 'tools/json-format/';
 const TIMEOUT = 20000;
+
+/**
+ * PLUS deployments (Cloudflare Pages) ship additional server-backed tools. They are opt-in here:
+ * a plain static deploy must not be failed for a page it never builds.
+ */
+const PLUS = /^(1|true|yes|on)$/i.test((process.env.PLUS_MODE ?? '').trim());
+const PLUS_TOOL = 'tools/ip-location/';
 
 const results = [];
 
@@ -272,6 +280,38 @@ async function main() {
       `HTTP ${status} | json-ld ${jsonLd ? 'yes' : 'no'} | description mentions edit ${mentionsEdit ? 'yes' : 'no'} | canonical ${canonical === `${SITE}/tools/pdf-editor/` ? 'ok' : `bad (${canonical})`}`,
     );
   });
+
+  // 17. PLUS builds only: the server-backed tool page must exist, and its meta description must not
+  // keep the client-only promise — that sentence is checkable and would be repeated by answer engines.
+  if (PLUS) {
+    await check('plus tool page describes its endpoint honestly', async () => {
+      const { status, body } = await get(`${SITE}/${PLUS_TOOL}${stamp}`);
+      const hasH1 = /<h1[\s>]/i.test(body);
+      const canonical = body.match(/rel="canonical"\s+href="([^"]+)"/i)?.[1];
+      const description = body.match(/name="description"\s+content="([^"]*)"/i)?.[1] || '';
+      const claimsClientOnly = /never leaves your browser|纯前端处理/i.test(description);
+      const mentionsEndpoint = /same-origin|同源/i.test(description);
+      const canonicalOk = canonical === `${SITE}/${PLUS_TOOL}`;
+      record(
+        'plus tool page describes its endpoint honestly',
+        status === 200 && hasH1 && canonicalOk && mentionsEndpoint && !claimsClientOnly,
+        `HTTP ${status} | h1 ${hasH1 ? 'yes' : 'no'} | canonical ${canonicalOk ? 'ok' : `bad (${canonical})`} | same-origin ${mentionsEndpoint ? 'yes' : 'no'} | client-only claim ${claimsClientOnly ? 'present' : 'none'}`,
+      );
+    });
+
+    // 18. GEO: `llms.txt` is the catalogue answer engines read; it must list the tool and state the
+    // one server call instead of claiming everything runs in the browser.
+    await check('llms.txt lists the plus tool and its endpoint', async () => {
+      const { status, body } = await get(`${SITE}/llms.txt${stamp}`);
+      const listed = /^- \[[^\]]+\]\([^)]*\/tools\/ip-location\//m.test(body);
+      const honest = /same-origin endpoint|同源/.test(body);
+      record(
+        'llms.txt lists the plus tool and its endpoint',
+        status === 200 && listed && honest,
+        `HTTP ${status} | listed ${listed ? 'yes' : 'no'} | processing fact ${honest ? 'mentions the endpoint' : 'still claims client-only'}`,
+      );
+    });
+  }
 
   // ---- Output ----
   const pad = Math.max(...results.map((r) => r.name.length)) + 2;

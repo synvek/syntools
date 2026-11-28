@@ -51,6 +51,7 @@ SynTools started as a developer toolbox, but it is no longer developer-only:
 - **Lazy-loaded tools** — the app shell stays small; each tool loads on demand
 - **Static deploy** — works on GitHub Pages, Vercel, Cloudflare Pages, or any static host
 - **Desktop app** — optional Tauri packaging for macOS / Windows / Linux
+- **Optional server-backed tool** — IP location (own IP, country, province, city, carrier) exists only in the Cloudflare Pages PLUS build; static and desktop builds keep it out of the registry, the router and the sitemap
 
 ---
 
@@ -215,7 +216,9 @@ syntools/
 6. Add `core.test.ts` (aim for ≥ 80% coverage on core logic).
 7. Run `pnpm test && pnpm lint`.
 
-After registration, `/tools/<id>`, the sidebar group, home cards, and ⌘K search update automatically.
+After registration, `/tools/<id>`, the sidebar group, home cards, ⌘K search, the prerendered page, `sitemap.xml` and `llms.txt` all update automatically.
+
+If the tool needs a backend, set `mode: 'server'`, register it behind `PLUS_MODE`, and follow `src/tools/ip-location/` — see [Server-backed tools](#server-backed-tools-plus-mode). Its meta description then uses `SERVER_TOOL_DESCRIPTION_SUFFIX` instead of the client-only sentence.
 
 ---
 
@@ -224,7 +227,7 @@ After registration, `/tools/<id>`, the sidebar group, home cards, and ⌘K searc
 - Client tools process input in the browser only — text, office documents, PDFs, and images alike — they must not send user content to remote endpoints.
 - Favorites, recent tools, and theme preference live in `localStorage` (`syntools:*` keys); editor drafts stay on-device too.
 - Production headers (CSP, COOP, Referrer-Policy, etc.) are configured in `vercel.json`.
-- Future server-backed tools (`ToolMeta.mode = 'server'`) will be labeled clearly before any data leaves the browser.
+- Server-backed tools are labeled before any data leaves the browser: `ToolMeta.mode = 'server'` gives the page a "Needs server" badge, swaps the SEO description for one that names the same-origin endpoint, and requires the tool to be gated behind `PLUS_MODE` (see [Server-backed tools](#server-backed-tools-plus-mode)). Today the only one is IP Location, which sends no file content — just a request for the visitor's own geolocation.
 
 ---
 
@@ -267,6 +270,7 @@ The UI ships 9 languages, but **only en and zh have their own URLs**:
 - SEO copy lives in `core/seo/copy.ts` (runtime) and `core/seo/sections.ts` (prerender-only body sections); the latter never enters the first-screen bundle
 - Language is decided by the path: `/zh/…` is always Chinese; unprefixed paths resolve as "explicit user choice → OS/browser detection → English". There is deliberately **no** redirect on `navigator.language` — that is close to hiding content from crawlers, the cloaking pattern Google warns about
 - **For answer engines (GEO)** the build also emits `dist/llms.txt` (`core/seo/llms.ts`): the H1/blockquote/`## Section` map from the llms.txt proposal, one line per tool with the same one-sentence description the page meta uses. It is generated from the registry, so a new tool cannot be missing from it — the same reason `sitemap.xml` is generated rather than hand-maintained
+- Server-backed tools never inherit the client-only description suffix: `toolDescriptionSuffix(tool.mode, lang)` in `core/seo/copy.ts` swaps in a sentence about the same-origin endpoint, and **both** `scripts/prerender.ts` and the runtime head sync use it, so the prerendered HTML and the SPA cannot disagree. `llms.txt` states that one server call as well, derived from the registry rather than from a flag
 - The home page carries a `WebSite` + `Organization` JSON-LD graph; each tool page carries `WebApplication` + `BreadcrumbList`. There is deliberately **no** `SearchAction`, because the ⌘K palette is client-side and has no `?q=` URL to point at
 
 ---
@@ -286,6 +290,23 @@ pnpm build
 pnpm build:cf   # Cloudflare Pages: analytics endpoint + PLUS_MODE (server-backed tools)
 pnpm preview    # optional local check
 ```
+
+### Server-backed tools (PLUS mode)
+
+`PLUS_MODE=true` — set by `pnpm build:cf` — registers tools that need a backend and deploys `functions/` alongside `dist/`. Today that is one tool:
+
+| Piece     | Where                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------- |
+| Tool page | `src/tools/ip-location/` — own IP, country, province, city, carrier                      |
+| Endpoint  | `functions/api/ip-info.ts` — GET only, returns the caller's own `request.cf` geolocation |
+| Switch    | `src/core/config/plusMode.ts`, reading `import.meta.env.VITE_PLUS_MODE`                  |
+| Gate      | `...(PLUS_MODE ? [ipLocationTool] : [])` in `src/core/registry/index.ts`                 |
+
+The endpoint accepts no `?ip=` parameter, so it can never be used as a public IP lookup; it logs nothing, sets no cookie, answers `cache-control: no-store`, and queries no third-party IP database — the visitor's address never leaves Cloudflare. `pnpm dev` has no Functions runtime; use `wrangler pages dev` (or a preview deployment) to exercise it.
+
+With the switch off — and in every other build (`pnpm build`, `build:pages`, `tauri:build`) — the tool is absent from the registry, the router, the sitemap and `llms.txt`, so nothing is downloaded and no request is made.
+
+SEO and GEO are generated like any other page: `/tools/ip-location/` and `/zh/tools/ip-location/` are prerendered with their own title, description and JSON-LD; the description suffix comes from `SERVER_TOOL_DESCRIPTION_SUFFIX`, and `llms.txt` gains a fact naming the single same-origin call. Verify a live deployment with `PLUS_MODE=1 pnpm check:seo` — it adds two checks (the page must not repeat the client-only promise, and `llms.txt` must list the tool). A dedicated share card is optional: `PLUS_MODE=true pnpm og --only=ip-location` writes `public/og/ip-location.png` (server tools get a different footer line).
 
 ### Docker (self-hosted)
 

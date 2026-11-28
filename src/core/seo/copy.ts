@@ -48,6 +48,31 @@ export const TOOL_DESCRIPTION_SUFFIX: Record<SeoLang, string> = {
   zh: '纯前端处理，数据不离开浏览器。',
 };
 
+/**
+ * Suffix for tools that talk to our own backend (`ToolMeta.mode === 'server'`, i.e. PLUS builds).
+ *
+ * It cannot reuse the client-only sentence above: for these tools one same-origin request is the
+ * whole feature, and a meta description that says "data never leaves your browser" next to a page
+ * that calls `/api/ip-info` is a checkable lie — search snippets and answer engines would repeat it.
+ */
+export const SERVER_TOOL_DESCRIPTION_SUFFIX: Record<SeoLang, string> = {
+  en: 'Looked up through our own same-origin edge endpoint; no third-party IP database, nothing stored.',
+  zh: '由本站同源边缘接口查询，不调用第三方 IP 库，也不保存记录。',
+};
+
+/**
+ * Pick the description suffix for a tool.
+ *
+ * Shared by the prerender plugin and the runtime head sync (`core/seo/meta.ts`), so the static
+ * HTML and the SPA never disagree about whether a tool is client-only.
+ */
+export function toolDescriptionSuffix(
+  mode: 'client' | 'server' | undefined,
+  lang: SeoLang,
+): string {
+  return (mode === 'server' ? SERVER_TOOL_DESCRIPTION_SUFFIX : TOOL_DESCRIPTION_SUFFIX)[lang];
+}
+
 export interface PageSeo {
   /** Page-level title without the site name */
   title: string;

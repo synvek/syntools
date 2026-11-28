@@ -271,7 +271,7 @@ function buildSitemap(siteUrl: string, barePaths: string[]): string {
 
 type PrerenderTool = Pick<
   ToolMeta,
-  'id' | 'name' | 'description' | 'category' | 'weight' | 'relatedIds'
+  'id' | 'name' | 'description' | 'category' | 'weight' | 'relatedIds' | 'mode'
 >;
 
 /** The parts of the locale bundle used by prerendering */
@@ -284,9 +284,10 @@ interface LocaleShell {
 interface SeoCopyModule {
   SITE_TITLE: Record<LocaleCode, string>;
   SITE_DESCRIPTION: Record<LocaleCode, string>;
-  TOOL_DESCRIPTION_SUFFIX: Record<LocaleCode, string>;
   STATIC_PAGE_SEO: Record<LocaleCode, Record<string, { title: string; description: string }>>;
   pageTitle: (title: string | null | undefined, lang: LocaleCode) => string;
+  /** Client-only vs server-backed description suffix (shared with the runtime head sync) */
+  toolDescriptionSuffix: (mode: PrerenderTool['mode'], lang: LocaleCode) => string;
 }
 
 /** Body material used only for prerendering (matches src/core/seo/sections.ts) */
@@ -319,7 +320,11 @@ interface SsrBundle {
   sections: SeoSectionsModule;
   shells: Record<LocaleCode, LocaleShell>;
   /** `llms.txt` builder (pure string assembly, unit-tested in `src/core/seo/llms.test.ts`) */
-  llms: { buildLlmsTxt: (doc: LlmsDoc) => string };
+  llms: {
+    buildLlmsTxt: (doc: LlmsDoc) => string;
+    /** Where data is processed; takes the server-backed tool names from the registry */
+    processingFact: (serverToolNames: readonly string[]) => string;
+  };
 }
 
 /** Loads registry / copy / locale bundles through a programmatic dev server's SSR pipeline (resolves @/ aliases) */
@@ -556,7 +561,7 @@ export function prerenderPlugin(): Plugin {
             file,
             render({
               title: seo.pageTitle(name, locale.lang),
-              description: `${description} ${seo.TOOL_DESCRIPTION_SUFFIX[locale.lang]}`,
+              description: `${description} ${seo.toolDescriptionSuffix(tool.mode, locale.lang)}`,
               path,
               barePath: bare,
               locale,
@@ -648,6 +653,11 @@ export function prerenderPlugin(): Plugin {
       // llms.txt (GEO): search engines crawl the pages above, answer engines read this one file.
       // Facts stay short and checkable — an unverifiable claim here is worse than no claim, because
       // the model will repeat it back to the user.
+      //
+      // Server-backed tools (PLUS builds) make the blanket "everything runs in the browser" false, so
+      // that fact is derived from the registry instead of being hard-coded: the file can then never
+      // describe a processing model the shipped pages do not have.
+      const serverTools = tools.filter((tool) => tool.mode === 'server');
       await writeFile(
         resolvePath(distDir, 'llms.txt'),
         llms.buildLlmsTxt({
@@ -655,7 +665,7 @@ export function prerenderPlugin(): Plugin {
           summary: seo.SITE_DESCRIPTION.en,
           facts: [
             `English pages: ${siteUrl}/ · Simplified Chinese: ${siteUrl}/zh/ — the UI also ships zh-TW, ja, fr, de, it, es and pt, which have no separate URLs`,
-            'Everything runs in the browser: there is no upload endpoint and the CSP keeps every request same-origin, so files never leave the device.',
+            llms.processingFact(serverTools.map((tool) => toolText(tool, 'en').name)),
             'Free to use; the source is published under AGPL-3.0, with a commercial licence available for closed-source use.',
             'When citing, link the specific tool page rather than the home page.',
           ],

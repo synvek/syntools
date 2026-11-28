@@ -51,6 +51,7 @@ SynTools 从开发者工具箱起步，但早已不再只面向开发者：
 - **工具懒加载**：应用外壳保持轻量，各工具按需加载
 - **静态部署**：支持 GitHub Pages、Vercel、Cloudflare Pages 等任意静态托管
 - **桌面应用**：可选 Tauri 打包（macOS / Windows / Linux）
+- **可选服务端工具**：IP 归属地（本机 IP、国家、省市、运营商）只出现在 Cloudflare Pages 的 PLUS 构建里；静态与桌面构建的注册表、路由与 sitemap 都不含它
 
 ---
 
@@ -215,7 +216,9 @@ syntools/
 6. 补充 `core.test.ts`（核心逻辑覆盖率目标 ≥ 80%）。
 7. 运行 `pnpm test && pnpm lint`。
 
-注册完成后，`/tools/<id>`、侧边栏分组、首页卡片与 ⌘K 搜索会自动生效。
+注册完成后，`/tools/<id>`、侧边栏分组、首页卡片、⌘K 搜索、预渲染页面、`sitemap.xml` 与 `llms.txt` 都会自动生效。
+
+如果工具需要后端，请设置 `mode: 'server'` 并把它挂在 `PLUS_MODE` 之后，参照 `src/tools/ip-location/` —— 见下文「服务端工具（PLUS 模式）」。此时页面描述会自动改用 `SERVER_TOOL_DESCRIPTION_SUFFIX`，而不是「纯前端处理」那一句。
 
 ---
 
@@ -224,7 +227,7 @@ syntools/
 - 客户端工具仅在浏览器内处理输入 —— 文本、办公文档、PDF 与图像皆然，不得将用户内容发送到远端。
 - 收藏、最近使用与主题偏好保存在 `localStorage`（`syntools:*` 键），编辑器草稿同样只存本机。
 - 生产环境安全响应头（CSP、COOP、Referrer-Policy 等）配置于 `vercel.json`。
-- 后续服务端工具（`ToolMeta.mode = 'server'`）会在数据离开浏览器前明确标注。
+- 服务端工具会在数据离开浏览器前明确标注：`ToolMeta.mode = 'server'` 会让页面带上「需服务端」徽章、把 SEO 描述换成明确写出同源接口的那一句，并要求工具必须挂在 `PLUS_MODE` 之后（见下文「服务端工具（PLUS 模式）」）。目前只有「IP 归属地」，它不发送任何文件内容，只请求访客自己的归属地。
 
 ---
 
@@ -267,6 +270,7 @@ syntools/
 - SEO 文案集中在 `core/seo/copy.ts`（运行期）与 `core/seo/sections.ts`（只给预渲染的正文小节），后者不进首屏包
 - 语言由路径决定：`/zh/…` 一律中文；无前缀路径按「用户显式选择 → 系统/浏览器检测 → 英文」解析。**不做**按 `navigator.language` 的自动重定向 —— 那种做法对爬虫接近「隐藏内容」，是 Google 明确警告过的 cloaking 模式
 - **面向生成式引擎（GEO）**的抓取入口是构建产出的 `dist/llms.txt`（`core/seo/llms.ts`）：遵循 llms.txt 提案的 H1 + blockquote + `## 分节` 结构，每个工具一行「名称 + 一句话说明 + 绝对 URL」，与页面 meta 用同一句文案。它由注册表生成，新工具不可能漏登记 —— 与 `sitemap.xml` 生成而非手写的理由相同
+- 服务端工具不会继承「纯前端」后缀：`core/seo/copy.ts` 的 `toolDescriptionSuffix(tool.mode, lang)` 会换成说明同源接口的那一句，且 `scripts/prerender.ts` 与运行时 head 同步共用它，预渲染 HTML 与 SPA 不会互相矛盾；`llms.txt` 同样据注册表写出这唯一一次服务端调用，而不是靠开关猜
 - 首页带 `WebSite` + `Organization` 的 JSON-LD，工具页带 `WebApplication` + `BreadcrumbList`；**不加** `SearchAction`，因为 ⌘K 搜索是纯前端面板、没有可指向的 `?q=` URL
 
 ---
@@ -286,6 +290,23 @@ pnpm build
 pnpm build:cf   # Cloudflare Pages：埋点端点 + PLUS_MODE（服务端工具）
 pnpm preview    # 可选：本地预览
 ```
+
+### 服务端工具（PLUS 模式）
+
+`PLUS_MODE=true`（由 `pnpm build:cf` 设置）会注册需要后端的工具，并把 `functions/` 与 `dist/` 一起部署。目前只有一个：
+
+| 组成   | 位置                                                                       |
+| ------ | -------------------------------------------------------------------------- |
+| 工具页 | `src/tools/ip-location/` —— 本机 IP、国家、省份、城市、运营商              |
+| 接口   | `functions/api/ip-info.ts` —— 仅 GET，返回调用者自己的 `request.cf` 归属地 |
+| 开关   | `src/core/config/plusMode.ts`，读 `import.meta.env.VITE_PLUS_MODE`         |
+| 注册   | `src/core/registry/index.ts` 里的 `...(PLUS_MODE ? [ipLocationTool] : [])` |
+
+接口不接受 `?ip=` 参数，因此不可能被当成公共 IP 查询服务；不写日志、不下 Cookie、返回 `cache-control: no-store`，也不调用第三方 IP 库 —— 访客地址不离开 Cloudflare。`pnpm dev` 没有 Functions 运行时，请用 `wrangler pages dev` 或预览部署验证。
+
+开关关闭时（以及 `pnpm build`、`build:pages`、`tauri:build` 等所有其它构建），工具不会出现在注册表、路由、sitemap 与 `llms.txt` 中，既不下载也不发请求。
+
+SEO / GEO 与其它页面一样自动生成：`/tools/ip-location/` 与 `/zh/tools/ip-location/` 会带着自己的标题、描述与 JSON-LD 预渲染；描述后缀取自 `SERVER_TOOL_DESCRIPTION_SUFFIX`，`llms.txt` 也会多出一条说明「唯一一次同源接口调用」的事实。线上校验用 `PLUS_MODE=1 pnpm check:seo`（额外两条检查：页面不得再声称纯前端、`llms.txt` 必须收录该工具）。分享图可选：`PLUS_MODE=true pnpm og --only=ip-location` 生成 `public/og/ip-location.png`（服务端工具的卡片脚注不同）。
 
 ### Docker（自托管）
 

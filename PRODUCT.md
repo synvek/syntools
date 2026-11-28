@@ -37,6 +37,7 @@ Both are equally central; neither may be sacrificed for the other.
 - 150+ tools, registry-driven; the sidebar, home page, search and routing are all derived from one registry.
 - Global search, recents, favorites; light/dark theme (follows the system by default); i18n for 9 locales.
 - Lazy-loaded tools; static deployment; optional Tauri desktop.
+- Optional PLUS build (`pnpm build:cf`, Cloudflare Pages only): registers server-backed tools and ships `functions/`. Today one tool — IP location (own IP, country, province, city, carrier) — served by a same-origin `/api/ip-info` endpoint that stores nothing. Plain, Pages and desktop builds contain neither the tool nor the endpoint.
 - License: AGPL-3.0-only; author/entity mark Synvek.
 
 **Technical and product constraints:**

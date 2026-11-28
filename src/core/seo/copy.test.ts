@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEO_LANGS,
+  SERVER_TOOL_DESCRIPTION_SUFFIX,
   SITE_DESCRIPTION,
   SITE_TITLE,
   STATIC_PAGE_SEO,
@@ -8,6 +9,7 @@ import {
   pageTitle,
   seoLangOf,
   staticPageSeo,
+  toolDescriptionSuffix,
 } from '@/core/seo/copy';
 import { SHELL_TEXT, STATIC_PAGE_SECTIONS } from '@/core/seo/sections';
 
@@ -63,6 +65,24 @@ describe('SEO 文案完整性', () => {
       expect(STATIC_PAGE_SEO.en[path].description).not.toBe(STATIC_PAGE_SEO.zh[path].description);
     }
     expect(SITE_DESCRIPTION.en).not.toBe(SITE_DESCRIPTION.zh);
+  });
+});
+
+describe('toolDescriptionSuffix', () => {
+  it('纯前端工具使用「不上传」后缀', () => {
+    for (const lang of SEO_LANGS) {
+      expect(toolDescriptionSuffix('client', lang)).toBe(TOOL_DESCRIPTION_SUFFIX[lang]);
+      expect(toolDescriptionSuffix(undefined, lang)).toBe(TOOL_DESCRIPTION_SUFFIX[lang]);
+    }
+  });
+
+  it('服务端工具换成同源接口后缀，绝不沿用「纯前端 / 数据不出浏览器」', () => {
+    for (const lang of SEO_LANGS) {
+      expect(toolDescriptionSuffix('server', lang)).toBe(SERVER_TOOL_DESCRIPTION_SUFFIX[lang]);
+      expect(SERVER_TOOL_DESCRIPTION_SUFFIX[lang]).not.toBe(TOOL_DESCRIPTION_SUFFIX[lang]);
+    }
+    expect(SERVER_TOOL_DESCRIPTION_SUFFIX.en).not.toMatch(/never leaves your browser/i);
+    expect(SERVER_TOOL_DESCRIPTION_SUFFIX.zh).not.toContain('纯前端');
   });
 });
 

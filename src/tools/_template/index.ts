@@ -8,6 +8,10 @@ import type { ToolMeta } from '@/core/types';
  * 4. Register this metadata in the `tools` array of `src/core/registry/index.ts` (one line);
  * 5. Fill in the `core.ts` pure functions and `core.test.ts` cases (coverage >= 80%);
  * 6. Run `pnpm test && pnpm lint` to confirm it passes.
+ *
+ * Tools that need a backend must set `mode: 'server'` (the page gets a "needs server" badge and a
+ * different SEO description suffix) and be registered behind PLUS_MODE, following
+ * `src/tools/ip-location/` — see README "Server-backed tools (PLUS mode)".
  */
 export const templateTool: ToolMeta = {
   id: 'template',

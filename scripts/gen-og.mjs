@@ -17,6 +17,8 @@
  *   node scripts/gen-og.mjs --lang=en       # English version public/og/default.en.png
  *   node scripts/gen-og.mjs --all           # also generate public/og/<id>.png per tool
  *   node scripts/gen-og.mjs --only=pdf-editor  # just the listed tools (no default card)
+ *   PLUS_MODE=true node scripts/gen-og.mjs --only=ip-location   # PLUS tools live in the registry
+ *                                                              # only when PLUS_MODE is on
  *   CHROME_PATH=/path/to/chrome node scripts/gen-og.mjs
  *
  * Flagship tools get their own card (the prerender prefers /og/<toolId>.png and falls back to the
@@ -78,6 +80,8 @@ const COPY = {
     subtitle: () => '打开即用，文件不出浏览器',
     badge: (n) => `${n} 个工具`,
     foot: '纯前端本地计算',
+    // Server-backed tools (PLUS) must not carry the client-only claim on their card
+    serverFoot: '同源接口查询 · 不记录 IP',
     toolBadge: '免费 · 无需上传',
     lang: 'zh-CN',
   },
@@ -87,6 +91,7 @@ const COPY = {
     subtitle: () => `Documents, PDF, images, encoding — all running in your browser.`,
     badge: (n) => `${n} tools`,
     foot: '100% client-side · your files never leave the device',
+    serverFoot: 'Same-origin lookup · no IP stored',
     toolBadge: 'Free · No upload',
     lang: 'en',
   },
@@ -322,7 +327,7 @@ async function main() {
           title: tool.name,
           subtitle: tool.description,
           badge: copy.toolBadge,
-          foot: copy.foot,
+          foot: tool.mode === 'server' ? copy.serverFoot : copy.foot,
           lang: copy.lang,
           iconStrip: false,
         }),
@@ -340,7 +345,7 @@ async function main() {
           title: tool.name,
           subtitle: tool.description,
           badge: copy.toolBadge,
-          foot: copy.foot,
+          foot: tool.mode === 'server' ? copy.serverFoot : copy.foot,
           lang: copy.lang,
           iconStrip: false,
         }),

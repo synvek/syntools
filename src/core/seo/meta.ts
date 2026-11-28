@@ -12,7 +12,8 @@ import {
   withLangPrefix,
   type Lang,
 } from '@/core/i18n';
-import { TOOL_DESCRIPTION_SUFFIX, pageTitle, seoLangOf, staticPageSeo } from '@/core/seo/copy';
+import { pageTitle, seoLangOf, staticPageSeo, toolDescriptionSuffix } from '@/core/seo/copy';
+import { toolMap } from '@/core/registry';
 
 /**
  * Keep `<html lang>`, `<meta name="description">`, `og:*` and `canonical` in sync with the active language.
@@ -87,7 +88,9 @@ export function resolvePageSeo(
     if (!name || !desc) return null;
     // The suffix exists in en / zh only. Other languages (including Traditional) skip it, otherwise you get
     // half-language mashups like "日本語の説明 + Processed entirely on the client".
-    const suffix = lang === 'en' || lang === 'zh' ? ` ${TOOL_DESCRIPTION_SUFFIX[lang]}` : '';
+    // Server-backed tools (PLUS builds) get their own sentence — see toolDescriptionSuffix.
+    const mode = toolMap.get(toolId)?.mode;
+    const suffix = lang === 'en' || lang === 'zh' ? ` ${toolDescriptionSuffix(mode, lang)}` : '';
     return {
       title: pageTitle(name, seoLang),
       description: `${desc}${suffix}`,

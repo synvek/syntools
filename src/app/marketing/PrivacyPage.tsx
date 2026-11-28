@@ -56,6 +56,7 @@ const zh: PrivacyCopy = {
       title: '第三方',
       body: [
         '页面不加载任何第三方脚本、字体、图标库或统计服务。第三方分析在技术上无法运行 —— 站点的 CSP 把网络请求限制为同源。',
+        '「IP 归属地」工具会请求同源接口 /api/ip-info，由本站的 Cloudflare 边缘节点返回你自己的国家、省市与运营商；接口不落库、不调用第三方 IP 库。其余工具仍然全程在本机处理，文件不经过任何服务端。',
         '统计事件的存储使用 Cloudflare 的 Analytics Engine，作为基础设施服务商只保存上述聚合事件，不接触你的文件，也不做跨站画像。',
         '桌面版唯一的联网行为是检查更新（向 GitHub Releases 查询最新版本），可以在设置中关闭；关闭后没有任何出站请求。',
       ],
@@ -109,6 +110,7 @@ const en: PrivacyCopy = {
       title: 'Third parties',
       body: [
         'No third-party scripts, fonts, icon packs or analytics services are loaded. Third-party analytics cannot technically run: the Content-Security-Policy restricts network requests to the same origin.',
+        'The IP Location tool calls a same-origin endpoint (/api/ip-info) served by our own Cloudflare edge node, which returns your own country, province, city and carrier; nothing is stored and no third-party IP database is queried. Every other tool still runs entirely on your machine — no file ever reaches a server.',
         'Event storage uses Cloudflare’s Analytics Engine as an infrastructure processor: it holds the aggregate events above, never touches your files, and builds no cross-site profile.',
         'The only outbound behaviour in the desktop build is an update check against GitHub Releases, which can be disabled; after that there are no outbound requests at all.',
       ],

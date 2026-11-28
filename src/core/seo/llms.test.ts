@@ -1,11 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { buildLlmsTxt } from './llms';
+import { buildLlmsTxt, processingFact } from './llms';
 
 const base = {
   siteName: 'SynTools',
   summary: 'A free online toolkit that runs entirely in the browser.',
   facts: ['Two URL trees: en and 简体中文', 'AGPL-3.0 source'],
 };
+
+describe('processingFact', () => {
+  it('纯前端构建仍然声称「全部在浏览器内运行」', () => {
+    const fact = processingFact([]);
+    expect(fact).toContain('Everything runs in the browser');
+    expect(fact).not.toContain('server');
+  });
+
+  it('有服务端工具时改成「文件不出本机 + 唯一一次同源调用」，并点名工具', () => {
+    const fact = processingFact(['IP Location']);
+    expect(fact).toContain('One tool (IP Location)');
+    expect(fact).toContain("visitor's own IP geolocation");
+    expect(fact).not.toContain('Everything runs in the browser');
+    expect(processingFact(['A', 'B'])).toContain('2 tools (A, B)');
+  });
+});
 
 describe('buildLlmsTxt', () => {
   it('以 H1 + blockquote 摘要 + 事实列表开头', () => {

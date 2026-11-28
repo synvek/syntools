@@ -37,6 +37,21 @@ export interface LlmsDoc {
   optional: LlmsLink[];
 }
 
+/**
+ * The "where is data processed" fact.
+ *
+ * Derived from the tools that actually made it into the build, not from a flag: a PLUS build ships
+ * server-backed tools, and the blanket "everything runs in the browser" would then be a claim an
+ * answer engine can check and refute. Client-only builds keep the short sentence.
+ */
+export function processingFact(serverToolNames: readonly string[]): string {
+  if (serverToolNames.length === 0) {
+    return 'Everything runs in the browser: there is no upload endpoint and the CSP keeps every request same-origin, so files never leave the device.';
+  }
+  const which = serverToolNames.length === 1 ? 'One tool' : `${serverToolNames.length} tools`;
+  return `Files never leave the device: there is no upload endpoint and the CSP keeps every request same-origin. ${which} (${serverToolNames.join(', ')}) ask a same-origin endpoint for the visitor's own IP geolocation; nothing is stored and no third-party IP database is queried.`;
+}
+
 /** Renders one `- [name](url): description` line, collapsing whitespace so a newline cannot break the list */
 function linkLine(link: LlmsLink): string {
   const note = link.description.replace(/\s+/g, ' ').trim();
